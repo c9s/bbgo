@@ -30,6 +30,7 @@ func (p *MultiCurrencyPosition) String() (o string) {
 		if base.IsZero() {
 			continue
 		}
+
 		o += fmt.Sprintf("base %s: %f", currency, base.Float64())
 	}
 

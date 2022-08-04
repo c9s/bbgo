@@ -335,10 +335,11 @@ func toDirection(d int) string {
 type State struct{}
 
 type Strategy struct {
-	Symbols        []string         `json:"symbols"`
-	Paths          [][]string       `json:"paths"`
-	MinSpreadRatio fixedpoint.Value `json:"minSpreadRatio"`
-	SeparateStream bool             `json:"separateStream"`
+	Symbols        []string                    `json:"symbols"`
+	Paths          [][]string                  `json:"paths"`
+	MinSpreadRatio fixedpoint.Value            `json:"minSpreadRatio"`
+	SeparateStream bool                        `json:"separateStream"`
+	Limits         map[string]fixedpoint.Value `json:"limits"`
 
 	markets map[string]*ArbMarket
 	paths   []*Path
@@ -500,6 +501,21 @@ func (s *Strategy) checkMinimalOrderQuantity(orders []types.SubmitOrder) error {
 	return nil
 }
 
+func (s *Strategy) applyBalanceMaxQuantity(balances types.BalanceMap) types.BalanceMap {
+	if s.Limits == nil {
+		return balances
+	}
+
+	for c, b := range balances {
+		if limit, ok := s.Limits[c]; ok {
+			b.Available = fixedpoint.Min(b.Available, limit)
+			balances[c] = b
+		}
+	}
+
+	return balances
+}
+
 func (s *Strategy) addBalanceBuffer(balances types.BalanceMap) (out types.BalanceMap) {
 	var ratio = fixedpoint.NewFromFloat(0.005)
 	out = types.BalanceMap{}
@@ -536,7 +552,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	balances := session.Account.Balances()
 
 	balances = s.addBalanceBuffer(balances)
-
+	balances = s.applyBalanceMaxQuantity(balances)
 
 	var orders []types.SubmitOrder
 	if dir {
