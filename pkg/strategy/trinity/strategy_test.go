@@ -124,10 +124,9 @@ func Test_fitQuantityByQuote(t *testing.T) {
 		quoteBalance float64
 	}
 	tests := []struct {
-		name  string
-		args  args
-		want  float64
-		want1 float64
+		name string
+		args args
+		want float64
 	}{
 		{
 			name: "simple",
@@ -136,18 +135,14 @@ func Test_fitQuantityByQuote(t *testing.T) {
 				quantity:     2.0,
 				quoteBalance: 1000,
 			},
-			want:  0.6134969325153374,
-			want1: 0.3067484662576687,
+			want: 0.6134969325153374,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := fitQuantityByQuote(tt.args.price, tt.args.quantity, tt.args.quoteBalance)
+			got := fitQuantityByQuote(tt.args.price, tt.args.quantity, tt.args.quoteBalance)
 			if !assert.Equal(t, got, tt.want) {
 				t.Errorf("fitQuantityByQuote() got = %v, want %v", got, tt.want)
-			}
-			if !assert.Equal(t, got1, tt.want1) {
-				t.Errorf("fitQuantityByQuote() got = %v, want %v", got, tt.want1)
 			}
 		})
 	}

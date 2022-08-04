@@ -99,7 +99,7 @@ func (m *ArbMarket) updateRate() {
 
 func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitOrder, float64, string) {
 	if dir == 1 { // sell ETH -> BTC, sell USDT -> TWD
-		q, _ := fitQuantityByBase(transitingQuantity, m.bestBid.Volume.Float64())
+		q := fitQuantityByBase(transitingQuantity, m.bestBid.Volume.Float64())
 		return types.SubmitOrder{
 			Symbol:   m.Symbol,
 			Side:     types.SideTypeSell,
@@ -110,7 +110,7 @@ func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitO
 		}, q * m.bestBid.Price.Float64(), m.QuoteCurrency
 	} else if dir == -1 { // use 1 BTC to buy X ETH
 		market := m
-		q, _ := fitQuantityByQuote(market.bestAsk.Price.Float64(), market.bestAsk.Volume.Float64(), transitingQuantity)
+		q := fitQuantityByQuote(market.bestAsk.Price.Float64(), market.bestAsk.Volume.Float64(), transitingQuantity)
 		return types.SubmitOrder{
 			Symbol:   market.Symbol,
 			Side:     types.SideTypeBuy,
@@ -288,7 +288,7 @@ func (p *Path) newForwardOrders(balances types.BalanceMap) []types.SubmitOrder {
 		market := p.marketA
 		transitingQuantity = b.Available.Float64()
 
-		q, _ := fitQuantityByQuote(market.bestAsk.Price.Float64(), market.bestAsk.Volume.Float64(), transitingQuantity)
+		q := fitQuantityByQuote(market.bestAsk.Price.Float64(), market.bestAsk.Volume.Float64(), transitingQuantity)
 		quantity = q
 		orders = append(orders, types.SubmitOrder{
 			Symbol:   market.Symbol,
@@ -614,7 +614,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		select {
 		case <-ctx.Done():
 			wait = false
-			log.Warnf("context done: %w", ctx.Err())
+			log.WithError(ctx.Err()).Warnf("context done")
 			break
 		case <-timeout:
 			wait = false
@@ -700,20 +700,16 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 	return ranks
 }
 
-func fitQuantityByBase(quantity, balance float64) (float64, float64) {
-	rate := 1.0
-
+func fitQuantityByBase(quantity, balance float64) float64 {
 	if quantity > balance {
 		quantity = math.Min(quantity, balance)
-		rate = balance / quantity
 	}
 
-	return quantity, rate
+	return quantity
 }
 
 // 1620 x 2 , quote balance = 1000 => rate = 1000/(1620*2) = 0.3086419753, quantity = 0.61728395
-func fitQuantityByQuote(price, quantity, quoteBalance float64) (float64, float64) {
-	rate := 1.0
+func fitQuantityByQuote(price, quantity, quoteBalance float64) float64 {
 	quote := quantity * price
 	if quote > quoteBalance {
 		// rate = quoteBalance / quote
@@ -721,8 +717,7 @@ func fitQuantityByQuote(price, quantity, quoteBalance float64) (float64, float64
 		// or we can calculate it by:
 		//   quantity = quoteBalance / price
 		quantity = quoteBalance / price
-		rate = quoteBalance / quote
 	}
 
-	return quantity, rate
+	return quantity
 }
