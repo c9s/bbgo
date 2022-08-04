@@ -3,16 +3,36 @@ package trinity
 import (
 	"fmt"
 
-	"github.com/slack-go/slack"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 type MultiCurrencyPosition struct {
 	Currencies map[string]fixedpoint.Value
 	Markets    map[string]types.Market
+	Profits    map[string]fixedpoint.Value
+	Fees       map[string]fixedpoint.Value
+}
+
+func NewMultiCurrencyPosition(markets map[string]types.Market) *MultiCurrencyPosition {
+	p := &MultiCurrencyPosition{
+		Currencies: make(map[string]fixedpoint.Value),
+		Markets:    make(map[string]types.Market),
+		Profits:    make(map[string]fixedpoint.Value),
+		Fees:       make(map[string]fixedpoint.Value),
+	}
+
+	for _, market := range markets {
+		p.Markets[market.Symbol] = market
+		p.Currencies[market.BaseCurrency] = fixedpoint.Zero
+		p.Currencies[market.QuoteCurrency] = fixedpoint.Zero
+		p.Profits[market.QuoteCurrency] = fixedpoint.Zero
+		p.Profits[market.BaseCurrency] = fixedpoint.Zero
+		p.Fees[market.QuoteCurrency] = fixedpoint.Zero
+		p.Fees[market.BaseCurrency] = fixedpoint.Zero
+	}
+
+	return p
 }
 
 func (p *MultiCurrencyPosition) handleTrade(trade types.Trade) {
@@ -26,40 +46,13 @@ func (p *MultiCurrencyPosition) handleTrade(trade types.Trade) {
 		p.Currencies[market.BaseCurrency] = p.Currencies[market.BaseCurrency].Sub(trade.Quantity)
 		p.Currencies[market.QuoteCurrency] = p.Currencies[market.QuoteCurrency].Add(trade.QuoteQuantity)
 	}
-}
 
-type Profit struct {
-	Asset  string           `json:"asset"`
-	Profit fixedpoint.Value `json:"profit"`
-}
-
-func (p *Profit) PlainText() string {
-	var title = fmt.Sprintf("Triangular PnL ")
-	title += util.PnLEmojiSimple(p.Profit) + " "
-	title += util.PnLSignString(p.Profit) + " " + p.Asset
-	return title
-}
-
-func (p *Profit) SlackAttachment() slack.Attachment {
-	var color = util.PnLColor(p.Profit)
-	var title = fmt.Sprintf("Triangular PnL ")
-	title += util.PnLEmojiSimple(p.Profit) + " "
-	title += util.PnLSignString(p.Profit) + " " + p.Asset
-
-	var fields []slack.AttachmentField
-	if !p.Profit.IsZero() {
-		fields = append(fields, slack.AttachmentField{
-			Title: "Profit",
-			Value: util.PnLSignString(p.Profit) + " " + p.Asset,
-			Short: true,
-		})
-	}
-
-	return slack.Attachment{
-		Color:  color,
-		Title:  title,
-		Fields: fields,
-		// Footer:        "",
+	if !trade.Fee.IsZero() {
+		if f, ok := p.Fees[trade.FeeCurrency]; ok {
+			p.Fees[trade.FeeCurrency] = f.Add(trade.Fee)
+		} else {
+			p.Fees[trade.FeeCurrency] = trade.Fee
+		}
 	}
 }
 
@@ -74,8 +67,15 @@ func (p *MultiCurrencyPosition) CollectProfits() []Profit {
 			Asset:  currency,
 			Profit: base,
 		})
+
+		if total, ok := p.Profits[currency]; ok {
+			p.Profits[currency] = total.Add(base)
+		} else {
+			p.Profits[currency] = base
+		}
 	}
 
+	p.Reset()
 	return profits
 }
 
@@ -86,12 +86,34 @@ func (p *MultiCurrencyPosition) Reset() {
 }
 
 func (p *MultiCurrencyPosition) String() (o string) {
+	o += "profits: \n"
+
 	for currency, base := range p.Currencies {
 		if base.IsZero() {
 			continue
 		}
 
-		o += fmt.Sprintf("base %s: %f\n", currency, base.Float64())
+		o += fmt.Sprintf("- %s: %f\n", currency, base.Float64())
+	}
+
+	o += "totalProfits: \n"
+
+	for currency, total := range p.Profits {
+		if total.IsZero() {
+			continue
+		}
+
+		o += fmt.Sprintf("- %s: %f\n", currency, total.Float64())
+	}
+
+	o += "fees: \n"
+
+	for currency, fee := range p.Fees {
+		if fee.IsZero() {
+			continue
+		}
+
+		o += fmt.Sprintf("- %s: %f\n", currency, fee.Float64())
 	}
 
 	return o

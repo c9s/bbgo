@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -95,7 +96,7 @@ func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitO
 	return types.SubmitOrder{}, 0.0, ""
 }
 
-func buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateStream bool) (map[string]*ArbMarket, error) {
+func buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateStream bool, sigC sigchan.Chan) (map[string]*ArbMarket, error) {
 	markets := make(map[string]*ArbMarket)
 	// build market object
 	for _, symbol := range symbols {
@@ -123,6 +124,7 @@ func buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateSt
 			priceUpdater := func(_ types.SliceOrderBook) {
 				m.bestAsk, m.bestBid, _ = book.BestBidAndAsk()
 				m.updateRate()
+				sigC.Emit()
 			}
 			book.OnUpdate(priceUpdater)
 			book.OnSnapshot(priceUpdater)
@@ -341,8 +343,9 @@ type Strategy struct {
 	SeparateStream bool                        `json:"separateStream"`
 	Limits         map[string]fixedpoint.Value `json:"limits"`
 
-	markets map[string]*ArbMarket
-	paths   []*Path
+	markets    map[string]types.Market
+	arbMarkets map[string]*ArbMarket
+	paths      []*Path
 
 	session *bbgo.ExchangeSession
 
@@ -350,6 +353,7 @@ type Strategy struct {
 	orderStore     *bbgo.OrderStore
 	tradeCollector *bbgo.TradeCollector
 	position       *MultiCurrencyPosition
+	sigC           sigchan.Chan
 }
 
 func (s *Strategy) ID() string {
@@ -371,6 +375,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.MinSpreadRatio = fixedpoint.NewFromFloat(1.002)
 	}
 
+	s.markets = make(map[string]types.Market)
+	s.sigC = sigchan.New(10)
+
 	s.session = session
 	s.orderStore = bbgo.NewOrderStore("")
 	s.orderStore.BindStream(session.UserDataStream)
@@ -379,18 +386,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.activeOrders.BindStream(session.UserDataStream)
 	s.tradeCollector = bbgo.NewTradeCollector("", nil, s.orderStore)
 
-	arbMarkets, err := buildArbMarkets(session, s.Symbols, s.SeparateStream)
+	for _, symbol := range s.Symbols {
+		market, ok := session.Market(symbol)
+		if !ok {
+			return fmt.Errorf("market not found: %s", symbol)
+		}
+		s.markets[symbol] = market
+	}
+
+	arbMarkets, err := buildArbMarkets(session, s.Symbols, s.SeparateStream, s.sigC)
 	if err != nil {
 		return err
 	}
 
-	s.markets = arbMarkets
+	s.arbMarkets = arbMarkets
 
 	if s.position == nil {
-		s.position = &MultiCurrencyPosition{
-			Currencies: make(map[string]fixedpoint.Value),
-			Markets:    make(map[string]types.Market),
-		}
+		s.position = NewMultiCurrencyPosition(s.markets)
 	}
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
@@ -399,13 +411,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.tradeCollector.BindStream(session.UserDataStream)
 
-	for _, market := range s.markets {
+	for _, market := range s.arbMarkets {
 		m := market
-
-		s.position.Markets[market.market.Symbol] = market.market
-		s.position.Currencies[market.market.BaseCurrency] = fixedpoint.Zero
-		s.position.Currencies[market.market.QuoteCurrency] = fixedpoint.Zero
-
 		if s.SeparateStream {
 			log.Infof("connecting %s market stream...", m.Symbol)
 			if err := m.stream.Connect(ctx); err != nil {
@@ -422,9 +429,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		p := &Path{
-			marketA: s.markets[symbols[0]],
-			marketB: s.markets[symbols[1]],
-			marketC: s.markets[symbols[2]],
+			marketA: s.arbMarkets[symbols[0]],
+			marketB: s.arbMarkets[symbols[1]],
+			marketC: s.arbMarkets[symbols[2]],
 		}
 
 		if p.marketA == nil {
@@ -447,9 +454,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	go func() {
-		ticker := time.NewTicker(20 * time.Millisecond)
-		defer ticker.Stop()
-
 		// fs := []ratioFunction{calculateForwardRatio, calculateBackwardRate}
 		fs := []ratioFunction{calculateForwardRatio}
 		log.Infof("waiting for market prices ready...")
@@ -470,7 +474,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			select {
 			case <-ctx.Done():
 				return
-			case <-ticker.C:
+			case <-s.sigC:
 				minRatio := s.MinSpreadRatio.Float64()
 				for side, f := range fs {
 					ranks := s.calculateRanks(minRatio, f)
@@ -490,7 +494,7 @@ type ratioFunction func(p *Path) float64
 
 func (s *Strategy) checkMinimalOrderQuantity(orders []types.SubmitOrder) error {
 	for _, order := range orders {
-		market := s.markets[order.Symbol]
+		market := s.arbMarkets[order.Symbol]
 		if order.Quantity.Compare(market.market.MinQuantity) < 0 {
 			return fmt.Errorf("order quantity is too small: %f < %f", order.Quantity.Float64(), market.market.MinQuantity.Float64())
 		}
@@ -616,7 +620,6 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	for _, profit := range profits {
 		bbgo.Notify(profit)
 	}
-	s.position.Reset()
 
 	coolingDownTime := 200 * time.Millisecond
 	log.Infof("cooling down for %s", 200*time.Millisecond)
