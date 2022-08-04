@@ -8,26 +8,26 @@ import (
 )
 
 type MultiCurrencyPosition struct {
-	Currencies map[string]fixedpoint.Value `json:"currencies"`
-	Markets    map[string]types.Market     `json:"markets"`
-	Profits    map[string]fixedpoint.Value `json:"profits"`
-	Fees       map[string]fixedpoint.Value `json:"fees"`
+	Currencies   map[string]fixedpoint.Value `json:"currencies"`
+	Markets      map[string]types.Market     `json:"markets"`
+	TotalProfits map[string]fixedpoint.Value `json:"totalProfits"`
+	Fees         map[string]fixedpoint.Value `json:"fees"`
 }
 
 func NewMultiCurrencyPosition(markets map[string]types.Market) *MultiCurrencyPosition {
 	p := &MultiCurrencyPosition{
-		Currencies: make(map[string]fixedpoint.Value),
-		Markets:    make(map[string]types.Market),
-		Profits:    make(map[string]fixedpoint.Value),
-		Fees:       make(map[string]fixedpoint.Value),
+		Currencies:   make(map[string]fixedpoint.Value),
+		Markets:      make(map[string]types.Market),
+		TotalProfits: make(map[string]fixedpoint.Value),
+		Fees:         make(map[string]fixedpoint.Value),
 	}
 
 	for _, market := range markets {
 		p.Markets[market.Symbol] = market
 		p.Currencies[market.BaseCurrency] = fixedpoint.Zero
 		p.Currencies[market.QuoteCurrency] = fixedpoint.Zero
-		p.Profits[market.QuoteCurrency] = fixedpoint.Zero
-		p.Profits[market.BaseCurrency] = fixedpoint.Zero
+		p.TotalProfits[market.QuoteCurrency] = fixedpoint.Zero
+		p.TotalProfits[market.BaseCurrency] = fixedpoint.Zero
 		p.Fees[market.QuoteCurrency] = fixedpoint.Zero
 		p.Fees[market.BaseCurrency] = fixedpoint.Zero
 	}
@@ -68,10 +68,10 @@ func (p *MultiCurrencyPosition) CollectProfits() []Profit {
 			Profit: base,
 		})
 
-		if total, ok := p.Profits[currency]; ok {
-			p.Profits[currency] = total.Add(base)
+		if total, ok := p.TotalProfits[currency]; ok {
+			p.TotalProfits[currency] = total.Add(base)
 		} else {
-			p.Profits[currency] = base
+			p.TotalProfits[currency] = base
 		}
 	}
 
@@ -98,7 +98,7 @@ func (p *MultiCurrencyPosition) String() (o string) {
 
 	o += "totalProfits: \n"
 
-	for currency, total := range p.Profits {
+	for currency, total := range p.TotalProfits {
 		if total.IsZero() {
 			continue
 		}

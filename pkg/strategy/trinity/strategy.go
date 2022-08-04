@@ -20,9 +20,11 @@ import (
 
 const ID = "trinity"
 
-var one = fixedpoint.One
-
 var log = logrus.WithField("strategy", ID)
+
+var one = fixedpoint.One
+var marketOrderProtectiveRatio = fixedpoint.NewFromFloat(0.008)
+var balanceBufferRatio = fixedpoint.NewFromFloat(0.005)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -328,8 +330,6 @@ func toDirection(d int) string {
 	}
 }
 
-type State struct{}
-
 type Strategy struct {
 	Symbols         []string                    `json:"symbols"`
 	Paths           [][]string                  `json:"paths"`
@@ -338,6 +338,7 @@ type Strategy struct {
 	Limits          map[string]fixedpoint.Value `json:"limits"`
 	CoolingDownTime types.Duration              `json:"duration"`
 	NotifyTrade     bool                        `json:"notifyTrade"`
+	ResetPosition bool `json:"resetPosition"`
 
 	markets    map[string]types.Market
 	arbMarkets map[string]*ArbMarket
@@ -402,6 +403,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.arbMarkets = arbMarkets
 
 	if s.Position == nil {
+		s.Position = NewMultiCurrencyPosition(s.markets)
+	}
+
+	if s.ResetPosition {
 		s.Position = NewMultiCurrencyPosition(s.markets)
 	}
 
@@ -529,11 +534,10 @@ func (s *Strategy) applyBalanceMaxQuantity(balances types.BalanceMap) types.Bala
 }
 
 func (s *Strategy) addBalanceBuffer(balances types.BalanceMap) (out types.BalanceMap) {
-	var ratio = fixedpoint.NewFromFloat(0.005)
 	out = types.BalanceMap{}
 	for c, b := range balances {
 		ab := b
-		ab.Available = ab.Available.Mul(one.Sub(ratio))
+		ab.Available = ab.Available.Mul(one.Sub(balanceBufferRatio))
 		out[c] = ab
 	}
 
@@ -543,14 +547,13 @@ func (s *Strategy) addBalanceBuffer(balances types.BalanceMap) (out types.Balanc
 func (s *Strategy) toProtectiveMarketOrders(orders []types.SubmitOrder) []types.SubmitOrder {
 	var out []types.SubmitOrder
 
-	var ratio = fixedpoint.NewFromFloat(0.002)
 	for _, order := range orders {
 		switch order.Side {
 		case types.SideTypeSell:
-			order.Price = order.Price.Mul(one.Sub(ratio))
+			order.Price = order.Price.Mul(one.Sub(marketOrderProtectiveRatio))
 
 		case types.SideTypeBuy:
-			order.Price = order.Price.Mul(one.Add(ratio))
+			order.Price = order.Price.Mul(one.Add(marketOrderProtectiveRatio))
 		}
 
 		out = append(out, order)
@@ -599,7 +602,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	s.orderStore.Add(createdOrders...)
 	s.activeOrders.Add(createdOrders...)
 
-	timeoutDuration := 200 * time.Millisecond
+	timeoutDuration := 500 * time.Millisecond
 	timeout := time.After(timeoutDuration)
 	wait := true
 	for wait && s.activeOrders.NumOfOrders() > 0 {
@@ -614,13 +617,14 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 			break
 
 		default:
-			time.Sleep(20 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 		}
 	}
 
 	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
+		log.Infof("query order service to ensure orders are filled")
 		allFilled := false
-		for maxTries := 5; !allFilled && maxTries > 0; maxTries-- {
+		for maxTries := 20; !allFilled && maxTries > 0; maxTries-- {
 			allFilled = true
 			for _, o := range createdOrders {
 				remoteOrder, err2 := service.QueryOrder(ctx, types.OrderQuery{
@@ -634,16 +638,21 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 				}
 
 				if remoteOrder.Status != types.OrderStatusFilled {
+					log.Infof(remoteOrder.String())
 					allFilled = false
 				}
 
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(200 * time.Millisecond)
 			}
 		}
+		if allFilled {
+			log.Infof("all orders are filled!")
+		}
+	} else {
+		// wait for trades
+		time.Sleep(500 * time.Millisecond)
 	}
 
-	// wait for trades
-	time.Sleep(500 * time.Millisecond)
 	s.tradeCollector.Process()
 
 	log.Infof("final position: %s", s.Position.String())
