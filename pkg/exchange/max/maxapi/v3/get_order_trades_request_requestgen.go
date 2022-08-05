@@ -37,12 +37,12 @@ func (g *GetOrderTradesRequest) GetQueryParameters() (url.Values, error) {
 // GetParameters builds and checks the parameters and return the result in a map object
 func (g *GetOrderTradesRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
-	// check id field -> json key id
+	// check id field -> json key order_id
 	if g.id != nil {
 		id := *g.id
 
 		// assign parameter of id
-		params["id"] = id
+		params["order_id"] = id
 	} else {
 	}
 	// check clientOrderID field -> json key client_oid
