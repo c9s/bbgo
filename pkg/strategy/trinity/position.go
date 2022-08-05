@@ -12,6 +12,7 @@ type MultiCurrencyPosition struct {
 	Markets      map[string]types.Market     `json:"markets"`
 	TotalProfits map[string]fixedpoint.Value `json:"totalProfits"`
 	Fees         map[string]fixedpoint.Value `json:"fees"`
+	TradePrices  map[string]fixedpoint.Value `json:"prices"`
 }
 
 func NewMultiCurrencyPosition(markets map[string]types.Market) *MultiCurrencyPosition {
@@ -19,6 +20,7 @@ func NewMultiCurrencyPosition(markets map[string]types.Market) *MultiCurrencyPos
 		Currencies:   make(map[string]fixedpoint.Value),
 		Markets:      make(map[string]types.Market),
 		TotalProfits: make(map[string]fixedpoint.Value),
+		TradePrices:  make(map[string]fixedpoint.Value),
 		Fees:         make(map[string]fixedpoint.Value),
 	}
 
@@ -30,6 +32,8 @@ func NewMultiCurrencyPosition(markets map[string]types.Market) *MultiCurrencyPos
 		p.TotalProfits[market.BaseCurrency] = fixedpoint.Zero
 		p.Fees[market.QuoteCurrency] = fixedpoint.Zero
 		p.Fees[market.BaseCurrency] = fixedpoint.Zero
+		p.TradePrices[market.QuoteCurrency] = fixedpoint.Zero
+		p.TradePrices[market.BaseCurrency] = fixedpoint.Zero
 	}
 
 	return p
@@ -45,6 +49,10 @@ func (p *MultiCurrencyPosition) handleTrade(trade types.Trade) {
 	case types.SideTypeSell:
 		p.Currencies[market.BaseCurrency] = p.Currencies[market.BaseCurrency].Sub(trade.Quantity)
 		p.Currencies[market.QuoteCurrency] = p.Currencies[market.QuoteCurrency].Add(trade.QuoteQuantity)
+	}
+
+	if types.IsUSDFiatCurrency(market.QuoteCurrency) {
+		p.TradePrices[market.BaseCurrency] = trade.Price
 	}
 
 	if !trade.Fee.IsZero() {
@@ -63,10 +71,17 @@ func (p *MultiCurrencyPosition) CollectProfits() []Profit {
 			continue
 		}
 
-		profits = append(profits, Profit{
-			Asset:  currency,
-			Profit: base,
-		})
+		profit := Profit{
+			Asset:       currency,
+			Profit:      base,
+			ProfitInUSD: fixedpoint.Zero,
+		}
+
+		if price, ok := p.TradePrices[currency]; ok && !price.IsZero() {
+			profit.ProfitInUSD = base.Mul(price)
+		}
+
+		profits = append(profits, profit)
 
 		if total, ok := p.TotalProfits[currency]; ok {
 			p.TotalProfits[currency] = total.Add(base)

@@ -10,14 +10,16 @@ import (
 )
 
 type Profit struct {
-	Asset  string           `json:"asset"`
-	Profit fixedpoint.Value `json:"profit"`
+	Asset       string           `json:"asset"`
+	Profit      fixedpoint.Value `json:"profit"`
+	ProfitInUSD fixedpoint.Value `json:"profitInUSD"`
 }
 
 func (p *Profit) PlainText() string {
 	var title = fmt.Sprintf("Triangular PnL ")
 	title += util.PnLEmojiSimple(p.Profit) + " "
-	title += util.PnLSignString(p.Profit) + " " + p.Asset
+	title += util.PnLSignString(p.Profit) + " " + p.Asset + " "
+	title += " ~= " + util.PnLSignString(p.ProfitInUSD) + " USD"
 	return title
 }
 
@@ -32,6 +34,14 @@ func (p *Profit) SlackAttachment() slack.Attachment {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Profit",
 			Value: util.PnLSignString(p.Profit) + " " + p.Asset,
+			Short: true,
+		})
+	}
+
+	if !p.ProfitInUSD.IsZero() {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Profit (~= USD)",
+			Value: util.PnLSignString(p.ProfitInUSD) + " USD",
 			Short: true,
 		})
 	}
