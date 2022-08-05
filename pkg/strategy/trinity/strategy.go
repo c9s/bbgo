@@ -266,7 +266,7 @@ func (p *Path) newForwardOrders(balances types.BalanceMap) []types.SubmitOrder {
 
 		market := p.marketA
 		transitingQuantity = b.Available.Float64()
-		quantity = math.Min(transitingQuantity, market.bestBid.Volume.Float64())
+		quantity = math.Min(market.bestBid.Volume.Float64(), transitingQuantity)
 		orders = append(orders, types.SubmitOrder{
 			Symbol:   market.Symbol,
 			Side:     types.SideTypeSell,
@@ -589,16 +589,11 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	// show orders
-	for i, order := range orders {
-		log.Infof("order #%d: %+v", i, order.String())
-	}
-
+	logSubmitOrders(orders)
 	orders = s.toProtectiveMarketOrders(orders)
 
 	log.Infof("adjusted to protective market orders:")
-	for i, order := range orders {
-		log.Infof("order #%d: %+v", i, order.String())
-	}
+	logSubmitOrders(orders)
 
 	createdOrders, err := session.Exchange.SubmitOrders(ctx, orders...)
 	if err != nil {
@@ -716,4 +711,12 @@ func fitQuantityByQuote(price, quantity, quoteBalance float64) float64 {
 	}
 
 	return quantity
+}
+
+func logSubmitOrders(orders []types.SubmitOrder) {
+	for i, order := range orders {
+		in, inCurrency := order.In()
+		out, outCurrency := order.Out()
+		log.Infof("SUBMIT ORDER #%d: %+v \tIN: %f %s => OUT: %f %s", i, order.String(), in.Float64(), inCurrency, out.Float64(), outCurrency)
+	}
 }
