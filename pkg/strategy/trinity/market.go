@@ -9,6 +9,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+
 type ArbMarket struct {
 	Symbol                      string
 	BaseCurrency, QuoteCurrency string

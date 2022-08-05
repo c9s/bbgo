@@ -17,6 +17,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+//go:generate bash symbols.sh
+
 const ID = "trinity"
 
 var log = logrus.WithField("strategy", ID)
@@ -145,7 +147,18 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
+func compileSymbols(symbols []string) []string {
+	var ss = make([]string, len(symbols))
+	for i, s := range symbols {
+		ss[i] = toSymbol(s)
+	}
+
+	return ss
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	s.Symbols = compileSymbols(s.Symbols)
+
 	if s.MarketOrderProtectiveRatio.IsZero() {
 		s.MarketOrderProtectiveRatio = marketOrderProtectiveRatio
 	}
