@@ -282,35 +282,23 @@ func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoin
 		}
 
 		return balance.Available.Mul(fixedpoint.Min(s.Leverage, fixedpoint.One)).Div(currentPrice)
-	} else if !usingLeverage { // Spot
-		if side == types.SideTypeBuy {
-			balance, ok := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
-			if !ok {
-				log.Errorf("can not update %s quote balance from exchange", s.Symbol)
-				return fixedpoint.Zero
-			}
-
-			return balance.Available.Mul(fixedpoint.Min(s.Leverage, fixedpoint.One)).Div(currentPrice)
-		} else if side == types.SideTypeSell {
-			balance, ok := s.session.GetAccount().Balance(s.Market.BaseCurrency)
-			if !ok {
-				log.Errorf("can not update %s base balance from exchange", s.Symbol)
-				return fixedpoint.Zero
-			}
-
-			return balance.Available
-		}
-	} else { // Using leverage
-		netValue, err := s.AccountValueCalculator.NetValue(ctx)
-		if err != nil {
-			log.WithError(err).Errorf("%s can not get net account value from exchange", s.Symbol)
+	} else if !usingLeverage && side == types.SideTypeSell { // Spot sell
+		balance, ok := s.session.GetAccount().Balance(s.Market.BaseCurrency)
+		if !ok {
+			log.Errorf("can not update %s base balance from exchange", s.Symbol)
 			return fixedpoint.Zero
 		}
 
-		return netValue.Mul(s.Leverage).Div(currentPrice)
-	}
+		return balance.Available.Mul(fixedpoint.Min(s.Leverage, fixedpoint.One))
+	} else { // Using leverage or spot buy
+		quoteQty, err := risk.CalculateQuoteQuantity(s.session, ctx, s.Market.QuoteCurrency, s.Leverage)
+		if err != nil {
+			log.WithError(err).Errorf("can not update %s quote balance from exchange", s.Symbol)
+			return fixedpoint.Zero
+		}
 
-	return fixedpoint.Zero
+		return quoteQty.Div(currentPrice)
+	}
 }
 
 // PrintResult prints accumulated profit status

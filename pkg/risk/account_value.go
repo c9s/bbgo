@@ -283,7 +283,7 @@ func CalculateQuoteQuantity(session *bbgo.ExchangeSession, ctx context.Context, 
 	usingLeverage := session.Margin || session.IsolatedMargin || session.Futures || session.IsolatedFutures
 	if !usingLeverage {
 		// For spot, we simply return the quote balance
-		return quoteBalance.Available, nil
+		return quoteBalance.Available.Mul(fixedpoint.Min(leverage, fixedpoint.One)), nil
 	}
 
 	// using leverage -- starts from here
@@ -294,5 +294,5 @@ func CalculateQuoteQuantity(session *bbgo.ExchangeSession, ctx context.Context, 
 	}
 	logrus.Infof("calculating available leveraged quote quantity: account available quote = %+v", availableQuote)
 
-	return availableQuote, nil
+	return availableQuote.Mul(leverage), nil
 }
