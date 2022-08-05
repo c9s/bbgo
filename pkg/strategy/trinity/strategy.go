@@ -120,21 +120,25 @@ func (m *ArbMarket) updateRate() {
 func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitOrder, float64) {
 	if dir == 1 { // sell ETH -> BTC, sell USDT -> TWD
 		q, r := fitQuantityByBase(m.bestBid.Volume.Float64(), transitingQuantity)
+		fq := fixedpoint.NewFromFloat(q)
+		fq = m.market.TruncateQuantity(fq)
 		return types.SubmitOrder{
 			Symbol:   m.Symbol,
 			Side:     types.SideTypeSell,
 			Type:     types.OrderTypeLimit,
-			Quantity: fixedpoint.NewFromFloat(q),
+			Quantity: fq,
 			Price:    m.bestBid.Price,
 			Market:   m.market,
 		}, r
 	} else if dir == -1 { // use 1 BTC to buy X ETH
 		q, r := fitQuantityByQuote(m.bestAsk.Price.Float64(), m.bestAsk.Volume.Float64(), transitingQuantity)
+		fq := fixedpoint.NewFromFloat(q)
+		fq = m.market.TruncateQuantity(fq)
 		return types.SubmitOrder{
 			Symbol:   m.Symbol,
 			Side:     types.SideTypeBuy,
 			Type:     types.OrderTypeLimit,
-			Quantity: fixedpoint.NewFromFloat(q),
+			Quantity: fq,
 			Price:    m.bestAsk.Price,
 			Market:   m.market,
 		}, r
@@ -402,6 +406,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		s.markets[symbol] = market
 	}
+	s.optimizeMarketQuantityPrecision()
 
 	arbMarkets, err := buildArbMarkets(session, s.Symbols, s.SeparateStream, s.sigC)
 	if err != nil {
@@ -524,6 +529,27 @@ func (s *Strategy) checkMinimalOrderQuantity(orders []types.SubmitOrder) error {
 	}
 
 	return nil
+}
+
+func (s *Strategy) optimizeMarketQuantityPrecision() {
+	var baseMarkets = make(map[string][]types.Market)
+	for _, m := range s.markets {
+		baseMarkets[m.BaseCurrency] = append(baseMarkets[m.BaseCurrency], m)
+	}
+
+	for _, markets := range baseMarkets {
+		var prec = 8
+		for _, m := range markets {
+			if m.VolumePrecision < prec {
+				prec = m.VolumePrecision
+			}
+		}
+
+		for _, m := range markets {
+			m.VolumePrecision = prec
+			s.markets[m.Symbol] = m
+		}
+	}
 }
 
 func (s *Strategy) applyBalanceMaxQuantity(balances types.BalanceMap) types.BalanceMap {
