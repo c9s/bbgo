@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -144,6 +145,26 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 				Depth: types.DepthLevelFull,
 			})
 		}
+	}
+}
+
+func (s *Strategy) executeOrder(ctx context.Context, order types.SubmitOrder, wg *sync.WaitGroup, orderC chan types.Order) {
+	waitTime := 100 * time.Millisecond
+	for {
+		createdOrders, err := s.session.Exchange.SubmitOrders(ctx, order)
+		if err != nil {
+			log.WithError(err).Errorf("can not submit orders")
+			time.Sleep(waitTime)
+			waitTime *= 2
+			continue
+		}
+
+		createdOrder := createdOrders[0]
+		s.orderStore.Add(createdOrder)
+		s.activeOrders.Add(createdOrder)
+		orderC <- createdOrder
+		wg.Done()
+		break
 	}
 }
 
@@ -399,12 +420,19 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	log.Infof("adjusted to protective market orders:")
 	logSubmitOrders(orders)
 
-	createdOrders, err := session.Exchange.SubmitOrders(ctx, orders...)
-	if err != nil {
-		log.WithError(err).Errorf("can not submit orders")
-	}
-	s.orderStore.Add(createdOrders...)
-	s.activeOrders.Add(createdOrders...)
+	var orderC = make(chan types.Order, 3)
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go s.executeOrder(ctx, orders[0], &wg, orderC)
+	go s.executeOrder(ctx, orders[1], &wg, orderC)
+	go s.executeOrder(ctx, orders[2], &wg, orderC)
+	wg.Wait()
+
+	var createdOrders = make(types.OrderSlice, 3)
+	createdOrders[0] = <-orderC
+	createdOrders[1] = <-orderC
+	createdOrders[2] = <-orderC
+	close(orderC)
 
 	timeoutDuration := 500 * time.Millisecond
 	timeout := time.After(timeoutDuration)

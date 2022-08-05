@@ -57,11 +57,11 @@ func (p *Path) String() string {
 func (p *Path) newForwardOrders(balances types.BalanceMap) []types.SubmitOrder {
 	var transitingQuantity float64
 	var transitingCurrency string
-	var orders []types.SubmitOrder
+	var orders = make([]types.SubmitOrder, 3)
 
 	initialBalance, transitingCurrency := p.marketA.getInitialBalance(balances, p.dirA)
 	orderA, _ := p.marketA.newOrder(p.dirB, initialBalance.Float64())
-	orders = append(orders, orderA)
+	orders[0] = orderA
 
 	q, c := orderA.Out()
 	transitingQuantity, transitingCurrency = q.Float64(), c
@@ -74,18 +74,13 @@ func (p *Path) newForwardOrders(balances types.BalanceMap) []types.SubmitOrder {
 	q, c = orderB.Out()
 	transitingQuantity, transitingCurrency = q.Float64(), c
 	log.Infof("transiting quantity %f %s", transitingQuantity, transitingCurrency)
-
-	orders = append(orders, orderB)
+	orders[1] = orderB
 
 	orderC, rateC := p.marketC.newOrder(p.dirC, transitingQuantity)
 	orders = adjustOrderQuantityByRate(orders, rateC)
 
 	q, c = orderC.Out()
-	log.Infof("FINAL QUANTITY %f %s", q.Float64(), c)
+	orders[2] = orderC
 
-	orders = append(orders, orderC)
-
-	log.Infof("FINAL ORDERS:")
-	logSubmitOrders(orders)
 	return orders
 }
