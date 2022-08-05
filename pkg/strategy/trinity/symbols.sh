@@ -20,4 +20,14 @@ func toSymbol(s string) string {
   }
   return s
 }
+
+func compileSymbols(symbols []string) []string {
+	var ss = make([]string, len(symbols))
+	for i, s := range symbols {
+		ss[i] = toSymbol(s)
+	}
+
+	return ss
+}
+
 DOC
