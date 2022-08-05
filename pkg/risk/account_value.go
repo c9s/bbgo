@@ -140,7 +140,7 @@ func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value
 	return accountValue, nil
 }
 
-func (c *AccountValueCalculator) AvailableValue(ctx context.Context) (fixedpoint.Value, error) {
+func (c *AccountValueCalculator) AvailableQuote(ctx context.Context) (fixedpoint.Value, error) {
 	accountValue := fixedpoint.Zero
 
 	if len(c.prices) == 0 {
