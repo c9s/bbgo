@@ -116,13 +116,13 @@ type SubmitOrder struct {
 	Side   SideType  `json:"side" db:"side"`
 	Type   OrderType `json:"orderType" db:"order_type"`
 
-	Quantity     fixedpoint.Value `json:"quantity" db:"quantity"`
-	Price        fixedpoint.Value `json:"price" db:"price"`
+	Quantity fixedpoint.Value `json:"quantity" db:"quantity"`
+	Price    fixedpoint.Value `json:"price" db:"price"`
 
 	// AveragePrice is only used in back-test currently
 	AveragePrice fixedpoint.Value `json:"averagePrice"`
 
-	StopPrice    fixedpoint.Value `json:"stopPrice,omitempty" db:"stop_price"`
+	StopPrice fixedpoint.Value `json:"stopPrice,omitempty" db:"stop_price"`
 
 	Market Market `json:"-" db:"-"`
 
@@ -138,6 +138,32 @@ type SubmitOrder struct {
 	ClosePosition bool `json:"closePosition" db:"close_position"`
 
 	Tag string `json:"tag" db:"-"`
+}
+
+func (o *SubmitOrder) In() (fixedpoint.Value, string) {
+	switch o.Side {
+	case SideTypeBuy:
+		return o.Quantity.Mul(o.Price), o.Market.QuoteCurrency
+
+	case SideTypeSell:
+		return o.Quantity, o.Market.BaseCurrency
+
+	}
+
+	return fixedpoint.Zero, ""
+}
+
+func (o *SubmitOrder) Out() (fixedpoint.Value, string) {
+	switch o.Side {
+	case SideTypeBuy:
+		return o.Quantity, o.Market.BaseCurrency
+
+	case SideTypeSell:
+		return o.Quantity.Mul(o.Price), o.Market.QuoteCurrency
+
+	}
+
+	return fixedpoint.Zero, ""
 }
 
 func (o *SubmitOrder) String() string {
