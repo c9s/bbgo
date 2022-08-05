@@ -31,6 +31,13 @@ if [[ -n $SETUP_SYSTEMD ]] ; then
 fi
 
 
+use_dnum=no
+if [[ -n $USE_DNUM ]] ; then
+    use_dnum=yes
+fi
+
+
+
 # use the git describe as the binary version, you may override this with something else.
 tag=$(git describe --tags)
 
@@ -116,15 +123,23 @@ END
   remote_run "sudo systemctl daemon-reload && systemctl enable $target"
 fi
 
-info "building binary: $bin_type-$host_os-$host_arch..."
-make $bin_type-$host_os-$host_arch
+
+bin_target=$bin_type-$host_os-$host_arch
+
+if [[ "$use_dnum" == "yes" ]]; then
+  bin_target=$bin_type-dnum-$host_os-$host_arch
+fi
+
+
+info "building binary: $bin_target..."
+make $bin_target
 
 # copy the binary to the server
 info "deploying..."
 info "copying binary to host $host..."
 
 if [[ $(remote_test "-e $host_bin_dir/bbgo-$tag") != "yes" ]] ; then
-  scp build/bbgo/$bin_type-$host_os-$host_arch $host:$host_bin_dir/bbgo-$tag
+  scp build/bbgo/$bin_target $host:$host_bin_dir/bbgo-$tag
 else
   info "binary $host_bin_dir/bbgo-$tag already exists, we will use the existing one"
 fi
