@@ -626,8 +626,6 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
-		log.Infof("query order service to ensure orders are filled")
-
 		updatedOrders, allFilled := waitForAllOrdersFilled(ctx, service, createdOrders, 20)
 		if allFilled {
 			log.Infof("all orders are filled!")
@@ -644,7 +642,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		}
 	} else {
 		// wait for trades
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 	}
 
 	s.tradeCollector.Process()
