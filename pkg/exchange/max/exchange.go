@@ -168,6 +168,33 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
+func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
+	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	maxTrades, err := e.v3order.NewGetOrderTradesRequest().Id(uint64(orderID)).Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var trades []types.Trade
+	for _, t := range maxTrades {
+		localTrade, err := toGlobalTrade(t)
+		if err != nil {
+			log.WithError(err).Errorf("can not convert trade: %+v", t)
+			continue
+		}
+
+		trades = append(trades, *localTrade)
+	}
+
+	// ensure everything is sorted ascending
+	trades = types.SortTradesAscending(trades)
+	return trades, nil
+}
+
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
 	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
 	if err != nil {
