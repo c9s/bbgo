@@ -623,12 +623,14 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 
 	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
 		log.Infof("query order service to ensure orders are filled")
-		allFilled := waitForAllOrdersFilled(ctx, service, createdOrders, 20)
+
+		updatedOrders, allFilled := waitForAllOrdersFilled(ctx, service, createdOrders, 20)
 		if allFilled {
 			log.Infof("all orders are filled!")
 		}
+		createdOrders = updatedOrders
 
-		trades, err := collectOrdersTrades(ctx, service, createdOrders)
+		trades, err := collectOrdersTrades(ctx, service, updatedOrders)
 		if err != nil {
 			log.WithError(err).Errorf("failed to query order trades")
 		} else {
@@ -703,12 +705,12 @@ func collectOrdersTrades(ctx context.Context, ex types.ExchangeOrderQueryService
 	return ordersTrades, err2
 }
 
-func waitForAllOrdersFilled(ctx context.Context, ex types.ExchangeOrderQueryService, createdOrders types.OrderSlice, maxTries int) bool {
+func waitForAllOrdersFilled(ctx context.Context, ex types.ExchangeOrderQueryService, orders types.OrderSlice, maxTries int) (types.OrderSlice, bool) {
 	log.Infof("query order service to ensure orders are filled")
 	allFilled := false
 	for ; !allFilled && maxTries > 0; maxTries-- {
 		allFilled = true
-		for _, o := range createdOrders {
+		for i, o := range orders {
 			remoteOrder, err2 := ex.QueryOrder(ctx, types.OrderQuery{
 				Symbol:  o.Symbol,
 				OrderID: strconv.FormatUint(o.OrderID, 10),
@@ -719,6 +721,8 @@ func waitForAllOrdersFilled(ctx context.Context, ex types.ExchangeOrderQueryServ
 				continue
 			}
 
+			orders[i] = *remoteOrder
+
 			if remoteOrder.Status != types.OrderStatusFilled {
 				log.Infof(remoteOrder.String())
 				allFilled = false
@@ -727,7 +731,7 @@ func waitForAllOrdersFilled(ctx context.Context, ex types.ExchangeOrderQueryServ
 			time.Sleep(200 * time.Millisecond)
 		}
 	}
-	return allFilled
+	return orders, allFilled
 }
 
 func fitQuantityByBase(quantity, balance float64) float64 {
