@@ -422,13 +422,13 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
-		updatedOrders, allFilled := waitForAllOrdersFilled(ctx, service, createdOrders, 20)
+		updatedOrders, allFilled := waitForAllOrdersFilled(context.Background(), service, createdOrders, 20)
 		if allFilled {
 			log.Infof("all orders are filled!")
 		}
 		createdOrders = updatedOrders
 
-		trades, err := collectOrdersTrades(ctx, service, updatedOrders)
+		trades, err := collectOrdersTrades(context.Background(), service, updatedOrders)
 		if err != nil {
 			log.WithError(err).Errorf("failed to query order trades")
 		} else {
@@ -448,6 +448,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	profits := s.Position.CollectProfits()
 	for _, profit := range profits {
 		bbgo.Notify(&profit)
+		log.Info(profit.PlainText())
 	}
 
 	if s.CoolingDownTime > 0 {
@@ -528,4 +529,3 @@ func waitForAllOrdersFilled(ctx context.Context, ex types.ExchangeOrderQueryServ
 	}
 	return orders, allFilled
 }
-

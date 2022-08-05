@@ -18,8 +18,11 @@ type Profit struct {
 func (p *Profit) PlainText() string {
 	var title = fmt.Sprintf("Triangular PnL ")
 	title += util.PnLEmojiSimple(p.Profit) + " "
-	title += util.PnLSignString(p.Profit) + " " + p.Asset + " "
-	title += " ~= " + util.PnLSignString(p.ProfitInUSD) + " USD"
+	title += util.PnLSignString(p.Profit) + " " + p.Asset
+
+	if !p.ProfitInUSD.IsZero() {
+		title += " ~= " + util.PnLSignString(p.ProfitInUSD) + " USD"
+	}
 	return title
 }
 
@@ -28,6 +31,10 @@ func (p *Profit) SlackAttachment() slack.Attachment {
 	var title = fmt.Sprintf("Triangular PnL ")
 	title += util.PnLEmojiSimple(p.Profit) + " "
 	title += util.PnLSignString(p.Profit) + " " + p.Asset
+
+	if !p.ProfitInUSD.IsZero() {
+		title += " ~= " + util.PnLSignString(p.ProfitInUSD) + " USD"
+	}
 
 	var fields []slack.AttachmentField
 	if !p.Profit.IsZero() {
