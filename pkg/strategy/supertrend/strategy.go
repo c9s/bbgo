@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/fatih/color"
 	"os"
 	"sync"
@@ -58,8 +59,11 @@ type Strategy struct {
 	// LinearRegression Use linear regression as trend confirmation
 	LinearRegression *LinGre `json:"linearRegression,omitempty"`
 
-	// Leverage
-	Leverage float64 `json:"leverage"`
+	// Leverage uses the account net value to calculate the order qty
+	Leverage fixedpoint.Value `json:"leverage"`
+	// Quantity sets the fixed order qty, takes precedence over Leverage
+	Quantity               fixedpoint.Value `json:"quantity"`
+	AccountValueCalculator *risk.AccountValueCalculator
 
 	// TakeProfitAtrMultiplier TP according to ATR multiple, 0 to disable this
 	TakeProfitAtrMultiplier float64 `json:"takeProfitAtrMultiplier"`
@@ -266,17 +270,31 @@ func (s *Strategy) generateOrderForm(side types.SideType, quantity fixedpoint.Va
 }
 
 // calculateQuantity returns leveraged quantity
-func (s *Strategy) calculateQuantity(currentPrice fixedpoint.Value) fixedpoint.Value {
-	balance, ok := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
-	if !ok {
-		log.Errorf("can not update %s balance from exchange", s.Symbol)
-		return fixedpoint.Zero
+func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoint.Value) fixedpoint.Value {
+	// Quantity takes precedence
+	if !s.Quantity.IsZero() {
+		return s.Quantity
 	}
 
-	amountAvailable := balance.Available.Mul(fixedpoint.NewFromFloat(s.Leverage))
-	quantity := amountAvailable.Div(currentPrice)
+	usingLeverage := s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures
 
-	return quantity
+	if bbgo.IsBackTesting || !usingLeverage { // Backtesting or Spot
+		balance, ok := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
+		if !ok {
+			log.Errorf("can not update %s quote balance from exchange", s.Symbol)
+			return fixedpoint.Zero
+		}
+
+		return balance.Available.Mul(s.Leverage).Div(currentPrice)
+	} else { // Using leverage
+		netValue, err := s.AccountValueCalculator.NetValue(ctx)
+		if err != nil {
+			log.WithError(err).Errorf("%s can not get net account value from exchange", s.Symbol)
+			return fixedpoint.Zero
+		}
+
+		return netValue.Mul(s.Leverage).Div(currentPrice)
+	}
 }
 
 // PrintResult prints accumulated profit status
@@ -336,6 +354,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.BindTradeStats(s.TradeStats)
 	s.orderExecutor.Bind()
+
+	// AccountValueCalculator
+	s.AccountValueCalculator = risk.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
 
 	// Accumulated profit report
 	if s.AccumulatedProfitMAWindow <= 0 {
@@ -449,7 +470,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 			}
 
-			orderForm := s.generateOrderForm(side, s.calculateQuantity(closePrice), types.SideEffectTypeMarginBuy)
+			orderForm := s.generateOrderForm(side, s.calculateQuantity(ctx, closePrice), types.SideEffectTypeMarginBuy)
 			log.Infof("submit open position order %v", orderForm)
 			_, err := s.orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {
