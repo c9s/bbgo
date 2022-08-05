@@ -12,8 +12,8 @@ import (
 	"regexp"
 )
 
-func (g *GetOrderTradesRequest) Id(id uint64) *GetOrderTradesRequest {
-	g.id = &id
+func (g *GetOrderTradesRequest) OrderID(orderID uint64) *GetOrderTradesRequest {
+	g.orderID = &orderID
 	return g
 }
 
@@ -37,12 +37,12 @@ func (g *GetOrderTradesRequest) GetQueryParameters() (url.Values, error) {
 // GetParameters builds and checks the parameters and return the result in a map object
 func (g *GetOrderTradesRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
-	// check id field -> json key order_id
-	if g.id != nil {
-		id := *g.id
+	// check orderID field -> json key order_id
+	if g.orderID != nil {
+		orderID := *g.orderID
 
-		// assign parameter of id
-		params["order_id"] = id
+		// assign parameter of orderID
+		params["order_id"] = orderID
 	} else {
 	}
 	// check clientOrderID field -> json key client_oid

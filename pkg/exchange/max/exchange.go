@@ -178,7 +178,7 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 		return nil, err
 	}
 
-	maxTrades, err := e.v3order.NewGetOrderTradesRequest().Id(uint64(orderID)).Do(ctx)
+	maxTrades, err := e.v3order.NewGetOrderTradesRequest().OrderID(uint64(orderID)).Do(ctx)
 	if err != nil {
 		return nil, err
 	}

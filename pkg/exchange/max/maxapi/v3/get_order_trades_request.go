@@ -14,6 +14,6 @@ func (s *OrderService) NewGetOrderTradesRequest() *GetOrderTradesRequest {
 type GetOrderTradesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	id            *uint64 `param:"order_id,omitempty"`
+	orderID       *uint64 `param:"order_id,omitempty"`
 	clientOrderID *string `param:"client_oid,omitempty"`
 }
