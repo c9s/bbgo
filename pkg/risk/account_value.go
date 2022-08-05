@@ -140,6 +140,34 @@ func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value
 	return accountValue, nil
 }
 
+func (c *AccountValueCalculator) AvailableValue(ctx context.Context) (fixedpoint.Value, error) {
+	accountValue := fixedpoint.Zero
+
+	if len(c.prices) == 0 {
+		if err := c.UpdatePrices(ctx); err != nil {
+			return accountValue, err
+		}
+	}
+
+	balances := c.session.Account.Balances()
+	for _, b := range balances {
+		if b.Currency == c.quoteCurrency {
+			accountValue = accountValue.Add(b.Available)
+			continue
+		}
+
+		symbol := b.Currency + c.quoteCurrency
+		price, ok := c.prices[symbol]
+		if !ok {
+			continue
+		}
+
+		accountValue = accountValue.Add(b.Available.Mul(price))
+	}
+
+	return accountValue, nil
+}
+
 // MarginLevel calculates the margin level from the asset market value and the debt value
 // See https://www.binance.com/en/support/faq/360030493931
 func (c *AccountValueCalculator) MarginLevel(ctx context.Context) (fixedpoint.Value, error) {
@@ -163,7 +191,6 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 	if leverage.IsZero() {
 		leverage = fixedpoint.NewFromInt(3)
 	}
-
 
 	baseBalance, _ := session.Account.Balance(market.BaseCurrency)
 	quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)

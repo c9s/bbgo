@@ -270,7 +270,7 @@ func (s *Strategy) generateOrderForm(side types.SideType, quantity fixedpoint.Va
 }
 
 // calculateQuantity returns leveraged quantity
-func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoint.Value) fixedpoint.Value {
+func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoint.Value, side types.SideType) fixedpoint.Value {
 	// Quantity takes precedence
 	if !s.Quantity.IsZero() {
 		return s.Quantity
@@ -278,14 +278,32 @@ func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoin
 
 	usingLeverage := s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures
 
-	if bbgo.IsBackTesting || !usingLeverage { // Backtesting or Spot
+	if bbgo.IsBackTesting { // Backtesting
 		balance, ok := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
 		if !ok {
 			log.Errorf("can not update %s quote balance from exchange", s.Symbol)
 			return fixedpoint.Zero
 		}
 
-		return balance.Available.Mul(s.Leverage).Div(currentPrice)
+		return balance.Available.Mul(fixedpoint.Min(s.Leverage, fixedpoint.One)).Div(currentPrice)
+	} else if !usingLeverage { // Spot
+		if side == types.SideTypeBuy {
+			balance, ok := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
+			if !ok {
+				log.Errorf("can not update %s quote balance from exchange", s.Symbol)
+				return fixedpoint.Zero
+			}
+
+			return balance.Available.Mul(fixedpoint.Min(s.Leverage, fixedpoint.One)).Div(currentPrice)
+		} else if side == types.SideTypeSell {
+			balance, ok := s.session.GetAccount().Balance(s.Market.BaseCurrency)
+			if !ok {
+				log.Errorf("can not update %s base balance from exchange", s.Symbol)
+				return fixedpoint.Zero
+			}
+
+			return balance.Available
+		}
 	} else { // Using leverage
 		netValue, err := s.AccountValueCalculator.NetValue(ctx)
 		if err != nil {
@@ -295,6 +313,8 @@ func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoin
 
 		return netValue.Mul(s.Leverage).Div(currentPrice)
 	}
+
+	return fixedpoint.Zero
 }
 
 // PrintResult prints accumulated profit status
@@ -470,7 +490,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 			}
 
-			orderForm := s.generateOrderForm(side, s.calculateQuantity(ctx, closePrice), types.SideEffectTypeMarginBuy)
+			orderForm := s.generateOrderForm(side, s.calculateQuantity(ctx, closePrice, side), types.SideEffectTypeMarginBuy)
 			log.Infof("submit open position order %v", orderForm)
 			_, err := s.orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {
