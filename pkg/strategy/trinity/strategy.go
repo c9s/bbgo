@@ -538,11 +538,15 @@ func (s *Strategy) optimizeMarketQuantityPrecision() {
 	}
 
 	for _, markets := range baseMarkets {
-		var prec = 8
+		var prec = 9
 		for _, m := range markets {
 			if m.VolumePrecision < prec {
 				prec = m.VolumePrecision
 			}
+		}
+
+		if prec == 9 {
+			continue
 		}
 
 		for _, m := range markets {
