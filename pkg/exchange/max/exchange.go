@@ -169,6 +169,10 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
+	if q.OrderID == "" {
+		return nil, errors.New("max.QueryOrder: OrderID is required parameter")
+	}
+
 	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
 	if err != nil {
 		return nil, err
@@ -196,6 +200,10 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 }
 
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	if q.OrderID == "" {
+		return nil, errors.New("max.QueryOrder: OrderID is required parameter")
+	}
+
 	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
 	if err != nil {
 		return nil, err
