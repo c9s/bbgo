@@ -99,7 +99,7 @@ func (m *ArbMarket) updateRate() {
 
 func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitOrder, float64, string) {
 	if dir == 1 { // sell ETH -> BTC, sell USDT -> TWD
-		q := fitQuantityByBase(transitingQuantity, m.bestBid.Volume.Float64())
+		q := fitQuantityByBase(m.bestBid.Volume.Float64(), transitingQuantity)
 		return types.SubmitOrder{
 			Symbol:   m.Symbol,
 			Side:     types.SideTypeSell,
@@ -109,16 +109,15 @@ func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitO
 			Market:   m.market,
 		}, q * m.bestBid.Price.Float64(), m.QuoteCurrency
 	} else if dir == -1 { // use 1 BTC to buy X ETH
-		market := m
-		q := fitQuantityByQuote(market.bestAsk.Price.Float64(), market.bestAsk.Volume.Float64(), transitingQuantity)
+		q := fitQuantityByQuote(m.bestAsk.Price.Float64(), m.bestAsk.Volume.Float64(), transitingQuantity)
 		return types.SubmitOrder{
-			Symbol:   market.Symbol,
+			Symbol:   m.Symbol,
 			Side:     types.SideTypeBuy,
 			Type:     types.OrderTypeLimit,
 			Quantity: fixedpoint.NewFromFloat(q),
-			Price:    market.bestAsk.Price,
-			Market:   market.market,
-		}, q, market.BaseCurrency
+			Price:    m.bestAsk.Price,
+			Market:   m.market,
+		}, q, m.BaseCurrency
 	}
 
 	return types.SubmitOrder{}, 0.0, ""
@@ -577,6 +576,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	if dir {
 		orders = p.newForwardOrders(balances)
 	} else {
+		return
 	}
 
 	if len(orders) == 0 {
@@ -701,11 +701,7 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 }
 
 func fitQuantityByBase(quantity, balance float64) float64 {
-	if quantity > balance {
-		quantity = math.Min(quantity, balance)
-	}
-
-	return quantity
+	return math.Min(quantity, balance)
 }
 
 // 1620 x 2 , quote balance = 1000 => rate = 1000/(1620*2) = 0.3086419753, quantity = 0.61728395
