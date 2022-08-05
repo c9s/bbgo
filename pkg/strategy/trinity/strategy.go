@@ -623,30 +623,18 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 
 	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
 		log.Infof("query order service to ensure orders are filled")
-		allFilled := false
-		for maxTries := 20; !allFilled && maxTries > 0; maxTries-- {
-			allFilled = true
-			for _, o := range createdOrders {
-				remoteOrder, err2 := service.QueryOrder(ctx, types.OrderQuery{
-					Symbol:  o.Symbol,
-					OrderID: strconv.FormatUint(o.OrderID, 10),
-				})
-
-				if err2 != nil {
-					log.WithError(err2).Errorf("order query error")
-					continue
-				}
-
-				if remoteOrder.Status != types.OrderStatusFilled {
-					log.Infof(remoteOrder.String())
-					allFilled = false
-				}
-
-				time.Sleep(200 * time.Millisecond)
-			}
-		}
+		allFilled := waitForAllOrdersFilled(ctx, service, createdOrders, 20)
 		if allFilled {
 			log.Infof("all orders are filled!")
+		}
+
+		trades, err := collectOrdersTrades(ctx, service, createdOrders)
+		if err != nil {
+			log.WithError(err).Errorf("failed to query order trades")
+		} else {
+			for _, t := range trades {
+				s.tradeCollector.ProcessTrade(t)
+			}
 		}
 	} else {
 		// wait for trades
@@ -654,7 +642,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	// Need to wait for MAX!!!!
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	s.tradeCollector.Process()
 
@@ -693,6 +681,53 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 	})
 
 	return ranks
+}
+
+func collectOrdersTrades(ctx context.Context, ex types.ExchangeOrderQueryService, createdOrders types.OrderSlice) ([]types.Trade, error) {
+	var ordersTrades []types.Trade
+	var err2 error
+	for _, o := range createdOrders {
+		trades, err := ex.QueryOrderTrades(ctx, types.OrderQuery{
+			Symbol:  o.Symbol,
+			OrderID: strconv.FormatUint(o.OrderID, 10),
+		})
+
+		if err != nil {
+			err2 = err
+			continue
+		}
+
+		ordersTrades = append(ordersTrades, trades...)
+	}
+
+	return ordersTrades, err2
+}
+
+func waitForAllOrdersFilled(ctx context.Context, ex types.ExchangeOrderQueryService, createdOrders types.OrderSlice, maxTries int) bool {
+	log.Infof("query order service to ensure orders are filled")
+	allFilled := false
+	for ; !allFilled && maxTries > 0; maxTries-- {
+		allFilled = true
+		for _, o := range createdOrders {
+			remoteOrder, err2 := ex.QueryOrder(ctx, types.OrderQuery{
+				Symbol:  o.Symbol,
+				OrderID: strconv.FormatUint(o.OrderID, 10),
+			})
+
+			if err2 != nil {
+				log.WithError(err2).Errorf("order query error")
+				continue
+			}
+
+			if remoteOrder.Status != types.OrderStatusFilled {
+				log.Infof(remoteOrder.String())
+				allFilled = false
+			}
+
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+	return allFilled
 }
 
 func fitQuantityByBase(quantity, balance float64) float64 {
