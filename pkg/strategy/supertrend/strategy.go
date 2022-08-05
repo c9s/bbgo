@@ -119,10 +119,6 @@ func (s *Strategy) Validate() error {
 		return errors.New("interval is required")
 	}
 
-	if s.Leverage <= 0.0 {
-		return errors.New("leverage is required")
-	}
-
 	return nil
 }
 

@@ -12,6 +12,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var log = logrus.WithField("risk", "AccountValueCalculator")
+
 var one = fixedpoint.One
 
 var maxLeverage = fixedpoint.NewFromInt(10)
@@ -267,4 +269,30 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 	}
 
 	return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your settings")
+}
+
+func CalculateQuoteQuantity(session *bbgo.ExchangeSession, ctx context.Context, quoteCurrency string, leverage fixedpoint.Value) (fixedpoint.Value, error) {
+	// default leverage guard
+	if leverage.IsZero() {
+		leverage = fixedpoint.NewFromInt(3)
+	}
+
+	quoteBalance, _ := session.Account.Balance(quoteCurrency)
+	accountValue := NewAccountValueCalculator(session, quoteCurrency)
+
+	usingLeverage := session.Margin || session.IsolatedMargin || session.Futures || session.IsolatedFutures
+	if !usingLeverage {
+		// For spot, we simply return the quote balance
+		return quoteBalance.Available, nil
+	}
+
+	// using leverage -- starts from here
+	availableQuote, err := accountValue.AvailableQuote(ctx)
+	if err != nil {
+		log.WithError(err).Errorf("can not update available quote")
+		return fixedpoint.Zero, err
+	}
+	logrus.Infof("calculating available leveraged quote quantity: account available quote = %+v", availableQuote)
+
+	return availableQuote, nil
 }
