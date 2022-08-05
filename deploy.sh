@@ -1,4 +1,28 @@
 #!/bin/bash
+#
+# Setup:
+#
+# 1) Make sure that you have the SSH host called "bbgo" and your linux system has systemd installed.
+#
+# 2) Use ssh to connect the bbgo host
+#
+#      $ ssh bbgo
+#
+# 3) On the REMOTE server, create directory, setup the dotenv file and the bbgo.yaml config file
+#      $ mkdir bbgo
+#      $ vim bbgo/.env.local
+#      $ vim bbgo/bbgo.yaml
+#
+# 4) Make sure your REMOTE user can use SUDO WITHOUT PASSWORD.
+#
+# 5) Run the following command to setup systemd from LOCAL:
+#
+#      $ SETUP_SYSTEMD=yes sh deploy.sh bbgo
+#
+# 6) To update your existing deployment, simply run deploy.sh again:
+#
+#      $ sh deploy.sh bbgo
+#
 set -e
 
 target=$1
