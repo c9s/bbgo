@@ -33,14 +33,14 @@ func (m *ArbMarket) getInitialBalance(balances types.BalanceMap, dir int) (fixed
 			return fixedpoint.Zero, m.BaseCurrency
 		}
 
-		return b.Available, m.BaseCurrency
+		return m.market.TruncateQuantity(b.Available), m.BaseCurrency
 	} else if dir == -1 {
 		b, ok := balances[m.QuoteCurrency]
 		if !ok {
 			return fixedpoint.Zero, m.QuoteCurrency
 		}
 
-		return b.Available, m.QuoteCurrency
+		return m.market.TruncateQuantity(b.Available), m.QuoteCurrency
 	}
 
 	return fixedpoint.Zero, ""
