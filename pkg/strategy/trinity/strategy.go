@@ -298,7 +298,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					}
 
 					bestRank := ranks[0]
-					log.Infof("found best path %s profit %.5f%%", bestRank.Path, bestRank.Ratio-1.0)
+					log.Infof("found best path %s profit %.5f%%", bestRank.Path, (bestRank.Ratio-1.0)*100.0)
 					s.executePath(ctx, session, bestRank.Path, side == 0)
 				}
 			}
