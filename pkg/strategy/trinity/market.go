@@ -1,9 +1,6 @@
 package trinity
 
 import (
-	"fmt"
-
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
@@ -103,4 +100,3 @@ func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitO
 
 	return types.SubmitOrder{}, 0.0
 }
-
