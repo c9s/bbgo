@@ -391,6 +391,7 @@ func (s *Strategy) toProtectiveMarketOrders(orders [3]types.SubmitOrder) [3]type
 			order.Price = order.Price.Mul(one.Add(s.MarketOrderProtectiveRatio))
 		}
 
+		// order.Type = types.OrderTypeMarket
 		orders[i] = order
 	}
 
@@ -429,13 +430,8 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 			orders = adjustOrderQuantityByRate(orders, rate)
 		}
 	*/
-
-	// show orders
-	logSubmitOrders(orders)
 	orders = s.toProtectiveMarketOrders(orders)
-
-	log.Infof("adjusted to protective market orders:")
-	logSubmitOrders(orders)
+	// logSubmitOrders(orders)
 
 	var orderC = make(chan types.Order, 3)
 	var wg sync.WaitGroup
