@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime/pprof"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -244,11 +243,6 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cpuProfile, err := cmd.Flags().GetString("cpu-profile")
-	if err != nil {
-		return err
-	}
-
 	if !setup {
 		// if it's not setup, then the config file option is required.
 		if len(configFile) == 0 {
@@ -278,20 +272,6 @@ func run(cmd *cobra.Command, args []string) error {
 		userConfig, err = bbgo.Load(configFile, true)
 		if err != nil {
 			return err
-		}
-
-		if cpuProfile != "" {
-			f, err := os.Create(cpuProfile)
-			if err != nil {
-				log.Fatal("could not create CPU profile: ", err)
-			}
-			defer f.Close() // error handling omitted for example
-
-			if err := pprof.StartCPUProfile(f); err != nil {
-				log.Fatal("could not start CPU profile: ", err)
-			}
-
-			defer pprof.StopCPUProfile()
 		}
 
 		return runConfig(ctx, cmd, userConfig)
