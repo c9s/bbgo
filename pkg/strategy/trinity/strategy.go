@@ -391,6 +391,7 @@ func (s *Strategy) toProtectiveMarketOrders(orders [3]types.SubmitOrder) [3]type
 			order.Price = order.Price.Mul(one.Add(s.MarketOrderProtectiveRatio))
 		}
 
+		// order.Quantity = order.Market.TruncateQuantity(order.Quantity)
 		// order.Type = types.OrderTypeMarket
 		orders[i] = order
 	}
