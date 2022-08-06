@@ -23,7 +23,7 @@ type ArbMarket struct {
 }
 
 func (m *ArbMarket) String() string {
-	return fmt.Sprintf("%s (%f / %f)", m.Symbol, m.buyRate, m.sellRate)
+	return m.Symbol
 }
 
 func (m *ArbMarket) getInitialBalance(balances types.BalanceMap, dir int) (fixedpoint.Value, string) {

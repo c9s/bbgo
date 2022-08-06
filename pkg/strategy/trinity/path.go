@@ -2,7 +2,6 @@ package trinity
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -49,9 +48,7 @@ func (p *Path) Ready() bool {
 }
 
 func (p *Path) String() string {
-	return p.marketA.String() + " " + toDirection(p.dirA) + " " + p.marketB.String() + " " + toDirection(p.dirB) + " " + p.marketC.String() + " " + toDirection(p.dirC) +
-		" -> " + strconv.FormatFloat(calculateForwardRatio(p), 'f', -1, 64) +
-		" <- " + strconv.FormatFloat(calculateBackwardRate(p), 'f', -1, 64)
+	return p.marketA.String() + " " + p.marketB.String() + " " + p.marketC.String()
 }
 
 func (p *Path) newForwardOrders(balances types.BalanceMap) []types.SubmitOrder {

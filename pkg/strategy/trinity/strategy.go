@@ -296,7 +296,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					if len(ranks) == 0 {
 						break
 					}
-					s.executePath(ctx, session, ranks[0].Path, side == 0)
+
+					bestRank := ranks[0]
+					log.Infof("found best path %s profit %.5f%%", bestRank.Path, bestRank.Ratio-1.0)
+					s.executePath(ctx, session, bestRank.Path, side == 0)
 				}
 			}
 		}
@@ -411,6 +414,18 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	if err := s.checkMinimalOrderQuantity(orders); err != nil {
 		log.WithError(err).Warnf("minimalOrderQuantity error")
 		return
+	}
+
+	qB := p.marketA.market.TruncateQuantity(orders[1].Quantity)
+	if qB.Compare(orders[1].Quantity) < 0 {
+		rate := qB.Div(orders[1].Quantity).Float64()
+		orders = adjustOrderQuantityByRate(orders, rate)
+	}
+
+	qC := p.marketA.market.TruncateQuantity(orders[2].Quantity)
+	if qC.Compare(orders[1].Quantity) < 0 {
+		rate := qC.Div(orders[1].Quantity).Float64()
+		orders = adjustOrderQuantityByRate(orders, rate)
 	}
 
 	// show orders
