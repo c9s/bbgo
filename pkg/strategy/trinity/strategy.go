@@ -412,6 +412,8 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		orders = p.newOrders(balances, -1)
 	}
 
+	logSubmitOrders(orders)
+
 	if err := s.checkMinimalOrderQuantity(orders); err != nil {
 		log.WithError(err).Warnf("minimalOrderQuantity error")
 		return
@@ -586,7 +588,6 @@ func (s *Strategy) buildArbMarkets(session *bbgo.ExchangeSession, symbols []stri
 
 	return markets, nil
 }
-
 
 func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64) []PathRank {
 	prof := util.StartTimeProfile("calculatingRanks")
