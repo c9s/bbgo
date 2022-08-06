@@ -200,7 +200,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 	s.optimizeMarketQuantityPrecision()
 
-	arbMarkets, err := buildArbMarkets(session, s.Symbols, s.SeparateStream, s.sigC)
+	arbMarkets, err := s.buildArbMarkets(session, s.Symbols, s.SeparateStream, s.sigC)
 	if err != nil {
 		return err
 	}
@@ -483,12 +483,28 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 				s.tradeCollector.ProcessTrade(t)
 			}
 		}
+
+		log.Infof("final executed orders:")
+		for i, o := range updatedOrders {
+			averagePrice := tradeAveragePrice(trades, o.OrderID)
+			updatedOrders[i].AveragePrice = averagePrice
+
+			if market, ok := s.markets[o.Symbol]; ok {
+				updatedOrders[i].Market = market
+			}
+
+			in, inCurrency := updatedOrders[i].In()
+			out, outCurrency := updatedOrders[i].Out()
+			log.Info(o.String())
+			log.Infof("<- IN %f %s", in.Float64(), inCurrency)
+			log.Infof("-> OUT %f %s", out.Float64(), outCurrency)
+		}
+
 	} else {
 		// wait for trades
 		time.Sleep(200 * time.Millisecond)
+		s.tradeCollector.Process()
 	}
-
-	s.tradeCollector.Process()
 
 	log.Infof("final position: %s", s.Position.String())
 
@@ -503,6 +519,74 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		time.Sleep(s.CoolingDownTime.Duration())
 	}
 }
+
+func (s *Strategy) buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateStream bool, sigC sigchan.Chan) (map[string]*ArbMarket, error) {
+	markets := make(map[string]*ArbMarket)
+	// build market object
+	for _, symbol := range symbols {
+		market, ok := s.markets[symbol]
+		if !ok {
+			return nil, fmt.Errorf("market not found: %s", symbol)
+		}
+
+		m := &ArbMarket{
+			Symbol:        symbol,
+			market:        market,
+			BaseCurrency:  market.BaseCurrency,
+			QuoteCurrency: market.QuoteCurrency,
+			sigC:          sigC,
+		}
+
+		if separateStream {
+			stream := session.Exchange.NewStream()
+			stream.SetPublicOnly()
+			stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{
+				Depth: types.DepthLevelFull,
+				Speed: types.SpeedHigh,
+			})
+
+			book := types.NewStreamBook(symbol)
+			priceUpdater := func(_ types.SliceOrderBook) {
+				bestAsk, bestBid, _ := book.BestBidAndAsk()
+				if bestAsk.Equals(m.bestAsk) && bestBid.Equals(m.bestBid) {
+					return
+				}
+
+				m.bestBid = bestBid
+				m.bestAsk = bestAsk
+				m.updateRate()
+			}
+			book.OnUpdate(priceUpdater)
+			book.OnSnapshot(priceUpdater)
+			book.BindStream(stream)
+
+			m.book = book
+			m.stream = stream
+		} else {
+			book, _ := session.OrderBook(symbol)
+			priceUpdater := func(_ types.SliceOrderBook) {
+				bestAsk, bestBid, _ := book.BestBidAndAsk()
+				if bestAsk.Equals(m.bestAsk) && bestBid.Equals(m.bestBid) {
+					return
+				}
+
+				m.bestBid = bestBid
+				m.bestAsk = bestAsk
+				m.updateRate()
+			}
+			book.OnUpdate(priceUpdater)
+			book.OnSnapshot(priceUpdater)
+
+			m.book = book
+			m.stream = session.MarketDataStream
+		}
+
+		markets[symbol] = m
+	}
+
+	return markets, nil
+}
+
 
 func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64) []PathRank {
 	prof := util.StartTimeProfile("calculatingRanks")
@@ -577,4 +661,19 @@ func waitForAllOrdersFilled(ctx context.Context, ex types.ExchangeOrderQueryServ
 		}
 	}
 	return orders, allFilled
+}
+
+func tradeAveragePrice(trades []types.Trade, orderID uint64) fixedpoint.Value {
+	totalAmount := fixedpoint.Zero
+	totalQuantity := fixedpoint.Zero
+	for _, trade := range trades {
+		if trade.OrderID != orderID {
+			continue
+		}
+
+		totalAmount = totalAmount.Add(trade.Price.Mul(trade.Quantity))
+		totalQuantity = totalQuantity.Add(trade.Quantity)
+	}
+
+	return totalAmount.Div(totalQuantity)
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-
 type ArbMarket struct {
 	Symbol                      string
 	BaseCurrency, QuoteCurrency string
@@ -105,69 +104,3 @@ func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitO
 	return types.SubmitOrder{}, 0.0
 }
 
-func buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateStream bool, sigC sigchan.Chan) (map[string]*ArbMarket, error) {
-	markets := make(map[string]*ArbMarket)
-	// build market object
-	for _, symbol := range symbols {
-		market, ok := session.Market(symbol)
-		if !ok {
-			return nil, fmt.Errorf("market not found: %s", symbol)
-		}
-
-		m := &ArbMarket{
-			Symbol:        symbol,
-			market:        market,
-			BaseCurrency:  market.BaseCurrency,
-			QuoteCurrency: market.QuoteCurrency,
-			sigC:          sigC,
-		}
-
-		if separateStream {
-			stream := session.Exchange.NewStream()
-			stream.SetPublicOnly()
-			stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{
-				Depth: types.DepthLevelFull,
-				Speed: types.SpeedHigh,
-			})
-
-			book := types.NewStreamBook(symbol)
-			priceUpdater := func(_ types.SliceOrderBook) {
-				bestAsk, bestBid, _ := book.BestBidAndAsk()
-				if bestAsk.Equals(m.bestAsk) && bestBid.Equals(m.bestBid) {
-					return
-				}
-
-				m.bestBid = bestBid
-				m.bestAsk = bestAsk
-				m.updateRate()
-			}
-			book.OnUpdate(priceUpdater)
-			book.OnSnapshot(priceUpdater)
-			book.BindStream(stream)
-
-			m.book = book
-			m.stream = stream
-		} else {
-			book, _ := session.OrderBook(symbol)
-			priceUpdater := func(_ types.SliceOrderBook) {
-				bestAsk, bestBid, _ := book.BestBidAndAsk()
-				if bestAsk.Equals(m.bestAsk) && bestBid.Equals(m.bestBid) {
-					return
-				}
-
-				m.bestBid = bestBid
-				m.bestAsk = bestAsk
-				m.updateRate()
-			}
-			book.OnUpdate(priceUpdater)
-			book.OnSnapshot(priceUpdater)
-
-			m.book = book
-			m.stream = session.MarketDataStream
-		}
-
-		markets[symbol] = m
-	}
-
-	return markets, nil
-}
