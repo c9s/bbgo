@@ -16,6 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 //go:generate bash symbols.sh
@@ -395,6 +396,8 @@ func (s *Strategy) toProtectiveMarketOrders(orders []types.SubmitOrder) []types.
 }
 
 func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSession, p *Path, dir bool) {
+	prof := util.StartTimeProfile("executePath")
+
 	log.Infof("executing path: %+v", p)
 	balances := session.Account.Balances()
 	balances = s.addBalanceBuffer(balances)
@@ -450,6 +453,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	createdOrders[1] = <-orderC
 	createdOrders[2] = <-orderC
 	close(orderC)
+	prof.StopAndLog(log.Infof)
 
 	timeoutDuration := 500 * time.Millisecond
 	timeout := time.After(timeoutDuration)
@@ -507,6 +511,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 }
 
 func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64) []PathRank {
+	prof := util.StartTimeProfile("calculatingRanks")
 	ranks := make([]PathRank, 0, len(s.paths))
 
 	// ranking paths here
@@ -527,6 +532,7 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 		return ranks[i].Ratio > ranks[j].Ratio
 	})
 
+	prof.StopAndLog(log.Infof)
 	return ranks
 }
 
