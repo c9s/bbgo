@@ -416,6 +416,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		return
 	}
 
+	/*
 	qB := p.marketA.market.TruncateQuantity(orders[1].Quantity)
 	if qB.Compare(orders[1].Quantity) < 0 {
 		rate := qB.Div(orders[1].Quantity).Float64()
@@ -427,6 +428,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		rate := qC.Div(orders[1].Quantity).Float64()
 		orders = adjustOrderQuantityByRate(orders, rate)
 	}
+	*/
 
 	// show orders
 	logSubmitOrders(orders)
