@@ -12,6 +12,18 @@ type PriceVolume struct {
 	Price, Volume fixedpoint.Value
 }
 
+func (p *PriceVolume) Equals(pv2 PriceVolume) bool {
+	if p.Price.Compare(pv2.Price) != 0 {
+		return false
+	}
+
+	if p.Volume.Compare(pv2.Volume) != 0 {
+		return false
+	}
+
+	return true
+}
+
 func (p PriceVolume) String() string {
 	return fmt.Sprintf("PriceVolume{ price: %s, volume: %s }", p.Price.String(), p.Volume.String())
 }

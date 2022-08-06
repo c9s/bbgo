@@ -132,7 +132,13 @@ func buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateSt
 
 			book := types.NewStreamBook(symbol)
 			priceUpdater := func(_ types.SliceOrderBook) {
-				m.bestAsk, m.bestBid, _ = book.BestBidAndAsk()
+				bestAsk, bestBid, _ := book.BestBidAndAsk()
+				if bestAsk.Equals(m.bestAsk) && bestBid.Equals(m.bestBid) {
+					return
+				}
+
+				m.bestBid = bestBid
+				m.bestAsk = bestAsk
 				m.updateRate()
 			}
 			book.OnUpdate(priceUpdater)
@@ -144,7 +150,13 @@ func buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateSt
 		} else {
 			book, _ := session.OrderBook(symbol)
 			priceUpdater := func(_ types.SliceOrderBook) {
-				m.bestAsk, m.bestBid, _ = book.BestBidAndAsk()
+				bestAsk, bestBid, _ := book.BestBidAndAsk()
+				if bestAsk.Equals(m.bestAsk) && bestBid.Equals(m.bestBid) {
+					return
+				}
+
+				m.bestBid = bestBid
+				m.bestAsk = bestAsk
 				m.updateRate()
 			}
 			book.OnUpdate(priceUpdater)

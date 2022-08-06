@@ -51,32 +51,29 @@ func (p *Path) String() string {
 	return p.marketA.String() + " " + p.marketB.String() + " " + p.marketC.String()
 }
 
-func (p *Path) newForwardOrders(balances types.BalanceMap) []types.SubmitOrder {
+func (p *Path) newOrders(balances types.BalanceMap, sign int) [3]types.SubmitOrder {
+	var orders [3]types.SubmitOrder
 	var transitingQuantity float64
-	var transitingCurrency string
-	var orders = make([]types.SubmitOrder, 3)
 
-	initialBalance, transitingCurrency := p.marketA.getInitialBalance(balances, p.dirA)
+	initialBalance, _ := p.marketA.getInitialBalance(balances, p.dirA * sign)
 	orderA, _ := p.marketA.newOrder(p.dirB, initialBalance.Float64())
 	orders[0] = orderA
 
-	q, c := orderA.Out()
-	transitingQuantity, transitingCurrency = q.Float64(), c
-	log.Infof("transiting quantity %f %s", transitingQuantity, transitingCurrency)
+	q, _ := orderA.Out()
+	transitingQuantity = q.Float64()
 
 	// orderB
-	orderB, rateB := p.marketB.newOrder(p.dirB, transitingQuantity)
+	orderB, rateB := p.marketB.newOrder(p.dirB * sign, transitingQuantity)
 	orders = adjustOrderQuantityByRate(orders, rateB)
 
-	q, c = orderB.Out()
-	transitingQuantity, transitingCurrency = q.Float64(), c
-	log.Infof("transiting quantity %f %s", transitingQuantity, transitingCurrency)
+	q, _ = orderB.Out()
+	transitingQuantity = q.Float64()
 	orders[1] = orderB
 
-	orderC, rateC := p.marketC.newOrder(p.dirC, transitingQuantity)
+	orderC, rateC := p.marketC.newOrder(p.dirC * sign, transitingQuantity)
 	orders = adjustOrderQuantityByRate(orders, rateC)
 
-	q, c = orderC.Out()
+	q, _ = orderC.Out()
 	orders[2] = orderC
 
 	return orders

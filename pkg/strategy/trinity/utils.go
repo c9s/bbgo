@@ -21,7 +21,7 @@ func fitQuantityByQuote(price, quantity, quoteBalance float64) (float64, float64
 	return q, r
 }
 
-func logSubmitOrders(orders []types.SubmitOrder) {
+func logSubmitOrders(orders [3]types.SubmitOrder) {
 	for i, order := range orders {
 		in, inCurrency := order.In()
 		out, outCurrency := order.Out()

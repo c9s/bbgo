@@ -81,7 +81,7 @@ func calculateForwardRatio(p *Path) float64 {
 	return ratio
 }
 
-func adjustOrderQuantityByRate(orders []types.SubmitOrder, rate float64) []types.SubmitOrder {
+func adjustOrderQuantityByRate(orders [3]types.SubmitOrder, rate float64) [3]types.SubmitOrder {
 	if rate == 1.0 {
 		return orders
 	}
@@ -270,8 +270,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	go func() {
-		// fs := []ratioFunction{calculateForwardRatio, calculateBackwardRate}
-		fs := []ratioFunction{calculateForwardRatio}
+		fs := []ratioFunction{calculateForwardRatio, calculateBackwardRate}
 		log.Infof("waiting for market prices ready...")
 		wait := true
 		for wait {
@@ -298,9 +297,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 						break
 					}
 
+					forward := side == 0
 					bestRank := ranks[0]
-					log.Infof("found best path %s profit %.5f%%", bestRank.Path, (bestRank.Ratio-1.0)*100.0)
-					s.executePath(ctx, session, bestRank.Path, side == 0)
+					if forward {
+						log.Infof("found best forward path %s profit %.5f%%", bestRank.Path, (bestRank.Ratio-1.0)*100.0)
+					} else {
+						log.Infof("found best backward path %s profit %.5f%%", bestRank.Path, (bestRank.Ratio-1.0)*100.0)
+					}
+					s.executePath(ctx, session, bestRank.Path, forward)
 				}
 			}
 		}
@@ -311,7 +315,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 type ratioFunction func(p *Path) float64
 
-func (s *Strategy) checkMinimalOrderQuantity(orders []types.SubmitOrder) error {
+func (s *Strategy) checkMinimalOrderQuantity(orders [3]types.SubmitOrder) error {
 	for _, order := range orders {
 		market := s.arbMarkets[order.Symbol]
 		if order.Quantity.Compare(market.market.MinQuantity) < 0 {
@@ -377,10 +381,8 @@ func (s *Strategy) addBalanceBuffer(balances types.BalanceMap) (out types.Balanc
 	return out
 }
 
-func (s *Strategy) toProtectiveMarketOrders(orders []types.SubmitOrder) []types.SubmitOrder {
-	var out []types.SubmitOrder
-
-	for _, order := range orders {
+func (s *Strategy) toProtectiveMarketOrders(orders [3]types.SubmitOrder) [3]types.SubmitOrder {
+	for i, order := range orders {
 		switch order.Side {
 		case types.SideTypeSell:
 			order.Price = order.Price.Mul(one.Sub(s.MarketOrderProtectiveRatio))
@@ -389,29 +391,24 @@ func (s *Strategy) toProtectiveMarketOrders(orders []types.SubmitOrder) []types.
 			order.Price = order.Price.Mul(one.Add(s.MarketOrderProtectiveRatio))
 		}
 
-		out = append(out, order)
+		orders[i] = order
 	}
 
-	return out
+	return orders
 }
 
 func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSession, p *Path, dir bool) {
 	prof := util.StartTimeProfile("executePath")
 
-	log.Infof("executing path: %+v", p)
 	balances := session.Account.Balances()
 	balances = s.addBalanceBuffer(balances)
 	balances = s.applyBalanceMaxQuantity(balances)
 
-	var orders []types.SubmitOrder
+	var orders [3]types.SubmitOrder
 	if dir {
-		orders = p.newForwardOrders(balances)
+		orders = p.newOrders(balances, 1)
 	} else {
-		return
-	}
-
-	if len(orders) == 0 {
-		return
+		orders = p.newOrders(balances, -1)
 	}
 
 	if err := s.checkMinimalOrderQuantity(orders); err != nil {
@@ -420,17 +417,17 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	/*
-	qB := p.marketA.market.TruncateQuantity(orders[1].Quantity)
-	if qB.Compare(orders[1].Quantity) < 0 {
-		rate := qB.Div(orders[1].Quantity).Float64()
-		orders = adjustOrderQuantityByRate(orders, rate)
-	}
+		qB := p.marketA.market.TruncateQuantity(orders[1].Quantity)
+		if qB.Compare(orders[1].Quantity) < 0 {
+			rate := qB.Div(orders[1].Quantity).Float64()
+			orders = adjustOrderQuantityByRate(orders, rate)
+		}
 
-	qC := p.marketA.market.TruncateQuantity(orders[2].Quantity)
-	if qC.Compare(orders[1].Quantity) < 0 {
-		rate := qC.Div(orders[1].Quantity).Float64()
-		orders = adjustOrderQuantityByRate(orders, rate)
-	}
+		qC := p.marketA.market.TruncateQuantity(orders[2].Quantity)
+		if qC.Compare(orders[1].Quantity) < 0 {
+			rate := qC.Div(orders[1].Quantity).Float64()
+			orders = adjustOrderQuantityByRate(orders, rate)
+		}
 	*/
 
 	// show orders
@@ -455,6 +452,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	close(orderC)
 	prof.StopAndLog(log.Infof)
 
+	// wait for trades
 	timeoutDuration := 500 * time.Millisecond
 	timeout := time.After(timeoutDuration)
 	wait := true
@@ -477,7 +475,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
 		updatedOrders, allFilled := waitForAllOrdersFilled(context.Background(), service, createdOrders, 20)
 		if allFilled {
-			log.Infof("all orders are filled!")
+			log.Infof("all orders are filled")
 		}
 		createdOrders = updatedOrders
 
