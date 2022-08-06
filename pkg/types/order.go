@@ -143,7 +143,11 @@ type SubmitOrder struct {
 func (o *SubmitOrder) In() (fixedpoint.Value, string) {
 	switch o.Side {
 	case SideTypeBuy:
-		return o.Quantity.Mul(o.Price), o.Market.QuoteCurrency
+		if o.AveragePrice.IsZero() {
+			return o.Quantity.Mul(o.Price), o.Market.QuoteCurrency
+		} else {
+			return o.Quantity.Mul(o.AveragePrice), o.Market.QuoteCurrency
+		}
 
 	case SideTypeSell:
 		return o.Quantity, o.Market.BaseCurrency
@@ -159,8 +163,11 @@ func (o *SubmitOrder) Out() (fixedpoint.Value, string) {
 		return o.Quantity, o.Market.BaseCurrency
 
 	case SideTypeSell:
-		return o.Quantity.Mul(o.Price), o.Market.QuoteCurrency
-
+		if o.AveragePrice.IsZero() {
+			return o.Quantity.Mul(o.Price), o.Market.QuoteCurrency
+		} else {
+			return o.Quantity.Mul(o.AveragePrice), o.Market.QuoteCurrency
+		}
 	}
 
 	return fixedpoint.Zero, ""
