@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -82,7 +83,7 @@ func calculateForwardRatio(p *Path) float64 {
 }
 
 func adjustOrderQuantityByRate(orders [3]types.SubmitOrder, rate float64) [3]types.SubmitOrder {
-	if rate == 1.0 {
+	if rate == 1.0 || math.IsNaN(rate) {
 		return orders
 	}
 
@@ -603,7 +604,6 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 		}
 
 		p := path
-		log.Infof("adding path #%d: ratio: %f path: %+v", i, ratio, p)
 		ranks = append(ranks, PathRank{Path: p, Ratio: ratio})
 	}
 
