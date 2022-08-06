@@ -79,7 +79,7 @@ func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitO
 	if dir == 1 { // sell ETH -> BTC, sell USDT -> TWD
 		q, r := fitQuantityByBase(m.market.TruncateQuantity(m.bestBid.Volume).Float64(), transitingQuantity)
 		fq := fixedpoint.NewFromFloat(q)
-		fq = m.market.TruncateQuantity(fq)
+		// fq = m.market.TruncateQuantity(fq)
 		return types.SubmitOrder{
 			Symbol:   m.Symbol,
 			Side:     types.SideTypeSell,
@@ -91,7 +91,7 @@ func (m *ArbMarket) newOrder(dir int, transitingQuantity float64) (types.SubmitO
 	} else if dir == -1 { // use 1 BTC to buy X ETH
 		q, r := fitQuantityByQuote(m.bestAsk.Price.Float64(), m.market.TruncateQuantity(m.bestAsk.Volume).Float64(), transitingQuantity)
 		fq := fixedpoint.NewFromFloat(q)
-		fq = m.market.TruncateQuantity(fq)
+		// fq = m.market.TruncateQuantity(fq)
 		return types.SubmitOrder{
 			Symbol:   m.Symbol,
 			Side:     types.SideTypeBuy,
