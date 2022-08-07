@@ -389,8 +389,7 @@ func (s *Strategy) toProtectiveMarketOrders(orders [3]types.SubmitOrder, ratio f
 }
 
 func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSession, p *Path, dir bool) {
-	prof := util.StartTimeProfile("executePath")
-
+	prof := util.StartTimeProfile("generateOrders")
 	balances := session.Account.Balances()
 	balances = s.addBalanceBuffer(balances)
 	balances = s.applyBalanceMaxQuantity(balances)
@@ -424,14 +423,33 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	*/
 	orders = s.toProtectiveMarketOrders(orders, s.MarketOrderProtectiveRatio)
 	// logSubmitOrders(orders)
+	prof.StopAndLog(log.Infof)
+
+	if err := s.executeAllOrders(ctx, session, orders); err != nil {
+		log.WithError(err).Errorf("order execute error")
+		return
+	}
+
+	log.Infof("final position: %s", s.Position.String())
+
+	profits := s.Position.CollectProfits()
+	for _, profit := range profits {
+		bbgo.Notify(&profit)
+		log.Info(profit.PlainText())
+	}
+
+	if s.CoolingDownTime > 0 {
+		log.Infof("cooling down for %s", s.CoolingDownTime.Duration().String())
+		time.Sleep(s.CoolingDownTime.Duration())
+	}
+}
+
+func (s *Strategy) executeAllOrders(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder) error {
 
 	var orderC = make(chan types.Order, 3)
 	var wg sync.WaitGroup
 	wg.Add(3)
 	go s.executeOrder(ctx, orders[0], &wg, orderC)
-
-	time.Sleep(50*time.Millisecond)
-
 	go s.executeOrder(ctx, orders[1], &wg, orderC)
 	go s.executeOrder(ctx, orders[2], &wg, orderC)
 	wg.Wait()
@@ -441,7 +459,6 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	createdOrders[1] = <-orderC
 	createdOrders[2] = <-orderC
 	close(orderC)
-	prof.StopAndLog(log.Infof)
 
 	// wait for trades
 	timeoutDuration := 500 * time.Millisecond
@@ -479,7 +496,6 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 			}
 		}
 
-		log.Infof("final executed orders:")
 		for i, o := range updatedOrders {
 			averagePrice := tradeAveragePrice(trades, o.OrderID)
 			updatedOrders[i].AveragePrice = averagePrice
@@ -496,18 +512,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		s.tradeCollector.Process()
 	}
 
-	log.Infof("final position: %s", s.Position.String())
-
-	profits := s.Position.CollectProfits()
-	for _, profit := range profits {
-		bbgo.Notify(&profit)
-		log.Info(profit.PlainText())
-	}
-
-	if s.CoolingDownTime > 0 {
-		log.Infof("cooling down for %s", s.CoolingDownTime.Duration().String())
-		time.Sleep(s.CoolingDownTime.Duration())
-	}
+	return nil
 }
 
 func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
