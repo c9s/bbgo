@@ -138,7 +138,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 func (s *Strategy) executeOrder(ctx context.Context, order types.SubmitOrder, wg *sync.WaitGroup, orderC chan types.Order) {
 	waitTime := 100 * time.Millisecond
-	for {
+	for maxTries := 100; maxTries >= 0; maxTries-- {
 		createdOrders, err := s.session.Exchange.SubmitOrders(ctx, order)
 		if err != nil {
 			log.WithError(err).Errorf("can not submit orders")
