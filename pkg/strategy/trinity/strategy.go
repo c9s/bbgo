@@ -430,7 +430,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	wg.Add(3)
 	go s.executeOrder(ctx, orders[0], &wg, orderC)
 
-	time.Sleep(10*time.Millisecond)
+	time.Sleep(50*time.Millisecond)
 
 	go s.executeOrder(ctx, orders[1], &wg, orderC)
 	go s.executeOrder(ctx, orders[2], &wg, orderC)
