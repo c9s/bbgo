@@ -513,13 +513,14 @@ func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
 		return orders[i].CreationTime.Before(orders[i].CreationTime.Time())
 	})
 
-	log.Infof("ANALYZING ORDERS (Earlier First): ")
-	for _, o := range orders {
+	log.Infof("ANALYZING ORDERS (Earlier First)")
+	for i, o := range orders {
 		in, inCurrency := o.In()
 		out, outCurrency := o.Out()
-		log.Info(o.String())
-		log.Infof("<- IN %f %s", in.Float64(), inCurrency)
-		log.Infof("-> OUT %f %s", out.Float64(), outCurrency)
+		log.Infof("#%d %s IN %f %s -> OUT %f %s", i, o.String(), in.Float64(), inCurrency, out.Float64(), outCurrency)
+	}
+
+	for _, o := range orders {
 
 		switch o.Side {
 		case types.SideTypeSell:
@@ -528,9 +529,9 @@ func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
 				price = price.Mul(one.Add(s.MarketOrderProtectiveRatio))
 			}
 
-			priceDiff := price.Sub(o.AveragePrice)
+			priceDiff := o.AveragePrice.Sub(price)
 			slippage := priceDiff.Div(price)
-			log.Infof("%s %s %s AVG PRICE %f PRICE %f SLIPPAGE %f Q %f", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), slippage.Float64(), o.Quantity.Float64())
+			log.Infof("%s %s %s AVG PRICE %f PRICE %f SLIPPAGE %s Q %f", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), slippage.Percentage(), o.Quantity.Float64())
 
 		case types.SideTypeBuy:
 			price := o.Price
@@ -538,9 +539,9 @@ func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
 				price = price.Mul(one.Sub(s.MarketOrderProtectiveRatio))
 			}
 
-			priceDiff := o.AveragePrice.Sub(price)
+			priceDiff := price.Sub(o.AveragePrice)
 			slippage := priceDiff.Div(price)
-			log.Infof("%s %s %s AVG PRICE %f PRICE %f SLIPPAGE %f Q %f", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), slippage.Float64(), o.Quantity.Float64())
+			log.Infof("%s %s %s AVG PRICE %f PRICE %f SLIPPAGE %s Q %f", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), slippage.Percentage(), o.Quantity.Float64())
 		}
 	}
 }
