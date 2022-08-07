@@ -471,8 +471,10 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	orders[0].Type = types.OrderTypeLimit
 	orders[0].TimeInForce = types.TimeInForceIOC
 
-	orders[1].Type = types.OrderTypeMarket
-	orders[2].Type = types.OrderTypeMarket
+	orders = s.toProtectiveMarketOrders(orders, s.MarketOrderProtectiveRatio)
+
+	// orders[1].Type = types.OrderTypeMarket
+	// orders[2].Type = types.OrderTypeMarket
 
 	iocOrder := s.executeOrder(ctx, orders[0])
 	if iocOrder == nil {
