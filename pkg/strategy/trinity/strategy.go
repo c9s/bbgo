@@ -94,20 +94,6 @@ func adjustOrderQuantityByRate(orders [3]types.SubmitOrder, rate float64) [3]typ
 	return orders
 }
 
-func toDirection(d int) string {
-	switch d {
-	case -1:
-		return "<="
-	case 1:
-		return "=>"
-	case 0:
-		return "(undefined)"
-
-	default:
-		return "(undefined)"
-	}
-}
-
 type Strategy struct {
 	Symbols                    []string                    `json:"symbols"`
 	Paths                      [][]string                  `json:"paths"`
