@@ -94,6 +94,12 @@ func adjustOrderQuantityByRate(orders [3]types.SubmitOrder, rate float64) [3]typ
 	return orders
 }
 
+type State struct {
+	IOCWinTimes     int     `json:"iocWinningTimes"`
+	IOCLossTimes    int     `json:"iocLossTimes"`
+	IOCWinningRatio float64 `json:"iocWinningRatio"`
+}
+
 type Strategy struct {
 	Symbols                    []string                    `json:"symbols"`
 	Paths                      [][]string                  `json:"paths"`
@@ -115,6 +121,7 @@ type Strategy struct {
 	orderStore     *bbgo.OrderStore
 	tradeCollector *bbgo.TradeCollector
 	Position       *MultiCurrencyPosition `persistence:"position"`
+	State          *State                 `persistence:"state"`
 	sigC           sigchan.Chan
 }
 
@@ -165,6 +172,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.MinSpreadRatio.IsZero() {
 		s.MinSpreadRatio = fixedpoint.NewFromFloat(1.002)
+	}
+
+	if s.State == nil {
+		s.State = &State{}
 	}
 
 	s.markets = make(map[string]types.Market)
@@ -476,6 +487,8 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 
 	filledQuantity := iocOrder.ExecutedQuantity
 	if filledQuantity.IsZero() {
+		s.State.IOCLossTimes++
+
 		// we didn't get filled
 		bbgo.Notify("%s %s IOC order did not get filled, skip", iocOrder.Symbol, iocOrder.Side)
 		log.Infof("%s %s IOC order did not get filled, skip: %+v", iocOrder.Symbol, iocOrder.Side, iocOrder)
@@ -514,6 +527,16 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	close(orderC)
 
 	s.waitOrdersAndCollectTrades(ctx, session, createdOrders)
+
+	s.State.IOCWinTimes++
+	if s.State.IOCLossTimes == 0 {
+		s.State.IOCWinningRatio = 999.0
+	} else {
+		s.State.IOCWinningRatio = float64(s.State.IOCWinTimes) / float64(s.State.IOCLossTimes)
+	}
+
+	log.Infof("ioc winning ratio update: %f", s.State.IOCWinningRatio)
+
 	return nil
 }
 
