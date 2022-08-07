@@ -37,8 +37,8 @@ bin_type=bbgo-slim
 host_bin_dir=bin
 
 host=bbgo
-host_user=root
-host_home=/root
+# host_user=ubuntu
+# host_home=/root
 
 host_systemd_service_dir=/etc/systemd/system
 host_os=linux
@@ -123,6 +123,11 @@ if [[ $(remote_test "-e $host_systemd_service_dir/$target.service") != "yes" ]];
     host_home=$(remote_eval "\$HOME")
   fi
 
+  if [[ -z $host_user ]]; then
+    host_user=$(remote_eval "\$USER")
+  fi
+
+
   cat <<END >".systemd.$target.service"
 [Unit]
 After=network-online.target
@@ -141,10 +146,12 @@ RestartSec=30
 END
 
   info "uploading systemd service file..."
-  scp ".systemd.$target.service" "$host:$host_systemd_service_dir/$target.service"
+  scp ".systemd.$target.service" "$host:$target.service"
+  remote_run "sudo mv -v $target.service $host_systemd_service_dir/$target.service"
+  # scp ".systemd.$target.service" "$host:$host_systemd_service_dir/$target.service"
 
   info "reloading systemd daemon..."
-  remote_run "sudo systemctl daemon-reload && systemctl enable $target"
+  remote_run "sudo systemctl daemon-reload && sudo systemctl enable $target"
 fi
 
 
