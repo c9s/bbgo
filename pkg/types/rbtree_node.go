@@ -20,3 +20,14 @@ type RBNode struct {
 	key, value          fixedpoint.Value
 	color               Color
 }
+
+func NewNil() *RBNode {
+	return &RBNode{color: Black}
+}
+
+func (node *RBNode) isNil() bool {
+	if node == nil {
+		return true
+	}
+	return node.color == Black && node.left == nil && node.right == nil
+}
