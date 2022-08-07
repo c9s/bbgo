@@ -55,7 +55,7 @@ func (p *Path) newOrders(balances types.BalanceMap, sign int) [3]types.SubmitOrd
 	var orders [3]types.SubmitOrder
 	var transitingQuantity float64
 
-	initialBalance, _ := p.marketA.getInitialBalance(balances, p.dirA * sign)
+	initialBalance, _ := p.marketA.getInitialBalance(balances, p.dirA*sign)
 	orderA, _ := p.marketA.newOrder(p.dirB, initialBalance.Float64())
 	orders[0] = orderA
 
@@ -63,18 +63,21 @@ func (p *Path) newOrders(balances types.BalanceMap, sign int) [3]types.SubmitOrd
 	transitingQuantity = q.Float64()
 
 	// orderB
-	orderB, rateB := p.marketB.newOrder(p.dirB * sign, transitingQuantity)
+	orderB, rateB := p.marketB.newOrder(p.dirB*sign, transitingQuantity)
 	orders = adjustOrderQuantityByRate(orders, rateB)
 
 	q, _ = orderB.Out()
 	transitingQuantity = q.Float64()
 	orders[1] = orderB
 
-	orderC, rateC := p.marketC.newOrder(p.dirC * sign, transitingQuantity)
+	orderC, rateC := p.marketC.newOrder(p.dirC*sign, transitingQuantity)
 	orders = adjustOrderQuantityByRate(orders, rateC)
 
 	q, _ = orderC.Out()
 	orders[2] = orderC
 
+	orders[0].Quantity = p.marketA.market.TruncateQuantity(orders[0].Quantity)
+	orders[1].Quantity = p.marketB.market.TruncateQuantity(orders[1].Quantity)
+	orders[2].Quantity = p.marketC.market.TruncateQuantity(orders[2].Quantity)
 	return orders
 }

@@ -596,8 +596,7 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 	ranks := make([]PathRank, 0, len(s.paths))
 
 	// ranking paths here
-	for i, path := range s.paths {
-		_ = i
+	for _, path := range s.paths {
 		ratio := method(path)
 		if ratio < minRatio {
 			continue
