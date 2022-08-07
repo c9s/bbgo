@@ -368,14 +368,16 @@ func (s *Strategy) addBalanceBuffer(balances types.BalanceMap) (out types.Balanc
 	return out
 }
 
-func (s *Strategy) toProtectiveMarketOrders(orders [3]types.SubmitOrder) [3]types.SubmitOrder {
+func (s *Strategy) toProtectiveMarketOrders(orders [3]types.SubmitOrder, ratio fixedpoint.Value) [3]types.SubmitOrder {
+	sellRatio := one.Sub(ratio)
+	buyRatio := one.Add(ratio)
 	for i, order := range orders {
 		switch order.Side {
 		case types.SideTypeSell:
-			order.Price = order.Price.Mul(one.Sub(s.MarketOrderProtectiveRatio))
+			order.Price = order.Price.Mul(sellRatio)
 
 		case types.SideTypeBuy:
-			order.Price = order.Price.Mul(one.Add(s.MarketOrderProtectiveRatio))
+			order.Price = order.Price.Mul(buyRatio)
 		}
 
 		// order.Quantity = order.Market.TruncateQuantity(order.Quantity)
@@ -420,7 +422,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 			orders = adjustOrderQuantityByRate(orders, rate)
 		}
 	*/
-	orders = s.toProtectiveMarketOrders(orders)
+	orders = s.toProtectiveMarketOrders(orders, s.MarketOrderProtectiveRatio)
 	// logSubmitOrders(orders)
 
 	var orderC = make(chan types.Order, 3)
