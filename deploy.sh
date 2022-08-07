@@ -168,8 +168,13 @@ else
   info "binary $host_bin_dir/bbgo-$tag already exists, we will use the existing one"
 fi
 
-# link binary and restart the systemd service
-info "linking binary and restarting..."
-ssh $host "(cd $target && ln -sf \$HOME/$host_bin_dir/bbgo-$tag bbgo && sudo systemctl restart $target.service)"
+if [[ -n "$UPLOAD_ONLY" ]] ; then
+  # link binary and restart the systemd service
+  info "linking binary"
+  ssh $host "(cd $target && ln -sf \$HOME/$host_bin_dir/bbgo-$tag bbgo)"
+else
+  info "linking binary and restarting..."
+  ssh $host "(cd $target && ln -sf \$HOME/$host_bin_dir/bbgo-$tag bbgo && sudo systemctl restart $target.service)"
+fi
 
 info "deployed successfully!"
