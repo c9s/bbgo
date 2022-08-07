@@ -226,27 +226,27 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// build paths
 	// rate update and check paths
-	for _, symbols := range s.Paths {
-		if len(symbols) != 3 {
+	for _, pathSymbols := range s.Paths {
+		if len(pathSymbols) != 3 {
 			return errors.New("a path must contains 3 symbols")
 		}
 
 		p := &Path{
-			marketA: s.arbMarkets[symbols[0]],
-			marketB: s.arbMarkets[symbols[1]],
-			marketC: s.arbMarkets[symbols[2]],
+			marketA: s.arbMarkets[pathSymbols[0]],
+			marketB: s.arbMarkets[pathSymbols[1]],
+			marketC: s.arbMarkets[pathSymbols[2]],
 		}
 
 		if p.marketA == nil {
-			return fmt.Errorf("market object of %s is missing", symbols[0])
+			return fmt.Errorf("market object of %s is missing", pathSymbols[0])
 		}
 
 		if p.marketB == nil {
-			return fmt.Errorf("market object of %s is missing", symbols[1])
+			return fmt.Errorf("market object of %s is missing", pathSymbols[1])
 		}
 
 		if p.marketC == nil {
-			return fmt.Errorf("market object of %s is missing", symbols[2])
+			return fmt.Errorf("market object of %s is missing", pathSymbols[2])
 		}
 
 		if err := p.solveDirection(); err != nil {
@@ -287,9 +287,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					forward := side == 0
 					bestRank := ranks[0]
 					if forward {
-						log.Infof("found best forward path %s profit %.5f%%", bestRank.Path, (bestRank.Ratio-1.0)*100.0)
+						log.Infof("%d paths elected, found best forward path %s profit %.5f%%", len(ranks), bestRank.Path, (bestRank.Ratio-1.0)*100.0)
 					} else {
-						log.Infof("found best backward path %s profit %.5f%%", bestRank.Path, (bestRank.Ratio-1.0)*100.0)
+						log.Infof("%d paths elected, found best backward path %s profit %.5f%%", len(ranks), bestRank.Path, (bestRank.Ratio-1.0)*100.0)
 					}
 					s.executePath(ctx, session, bestRank.Path, forward)
 				}
