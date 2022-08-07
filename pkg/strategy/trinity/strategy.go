@@ -490,7 +490,6 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 		s.State.IOCLossTimes++
 
 		// we didn't get filled
-		bbgo.Notify("%s %s IOC order did not get filled, skip", iocOrder.Symbol, iocOrder.Side)
 		log.Infof("%s %s IOC order did not get filled, skip: %+v", iocOrder.Symbol, iocOrder.Side, iocOrder)
 		return nil
 	}
