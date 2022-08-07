@@ -136,7 +136,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
-func (s *Strategy) executeOrder(ctx context.Context, order types.SubmitOrder, wg *sync.WaitGroup, orderC chan types.Order) {
+func (s *Strategy) executeOrder(ctx context.Context, order types.SubmitOrder) *types.Order {
 	waitTime := 100 * time.Millisecond
 	for maxTries := 100; maxTries >= 0; maxTries-- {
 		createdOrders, err := s.session.Exchange.SubmitOrders(ctx, order)
@@ -150,10 +150,10 @@ func (s *Strategy) executeOrder(ctx context.Context, order types.SubmitOrder, wg
 		createdOrder := createdOrders[0]
 		s.orderStore.Add(createdOrder)
 		s.activeOrders.Add(createdOrder)
-		orderC <- createdOrder
-		wg.Done()
-		break
+		return &createdOrder
 	}
+
+	return nil
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -421,14 +421,20 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 			orders = adjustOrderQuantityByRate(orders, rate)
 		}
 	*/
-	orders = s.toProtectiveMarketOrders(orders, s.MarketOrderProtectiveRatio)
 	// logSubmitOrders(orders)
 	prof.StopAndLog(log.Infof)
 
-	if err := s.executeAllOrders(ctx, session, orders); err != nil {
+	if err := s.iocOrderExecution(ctx, session, orders); err != nil {
 		log.WithError(err).Errorf("order execute error")
 		return
 	}
+
+	/*
+		if err := s.marketOrderExecution(ctx, session, orders); err != nil {
+			log.WithError(err).Errorf("order execute error")
+			return
+		}
+	*/
 
 	log.Infof("final position: %s", s.Position.String())
 
@@ -444,14 +450,98 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 }
 
-func (s *Strategy) executeAllOrders(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder) error {
+func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder) error {
+	service, ok := session.Exchange.(types.ExchangeOrderQueryService)
+	if !ok {
+		return errors.New("exchange does not support ExchangeOrderQueryService")
+	}
+
+	// Change the first order to IOC
+	orders[0].Type = types.OrderTypeLimit
+	orders[0].TimeInForce = types.TimeInForceIOC
+
+	orders[1].Type = types.OrderTypeMarket
+	orders[2].Type = types.OrderTypeMarket
+
+	iocOrder := s.executeOrder(ctx, orders[0])
+	if iocOrder == nil {
+		return errors.New("ioc order submit error")
+	}
+
+	var err error
+	iocOrder, err = waitForOrderFilled(ctx, service, *iocOrder)
+	if err != nil {
+		return err
+	}
+
+	filledQuantity := iocOrder.ExecutedQuantity
+	if filledQuantity.IsZero() {
+		// we didn't get filled
+		bbgo.Notify("%s %s IOC order did not get filled, skip", iocOrder.Symbol, iocOrder.Side)
+		log.Infof("%s %s IOC order did not get filled, skip: %+v", iocOrder.Symbol, iocOrder.Side, iocOrder)
+		return nil
+	}
+
+	filledRatio := iocOrder.ExecutedQuantity.Div(iocOrder.Quantity)
+	bbgo.Notify("%s %s IOC order got filled %f/%f (%s)", iocOrder.Symbol, iocOrder.Side, filledQuantity.Float64(), iocOrder.Quantity.Float64(), filledRatio.Percentage())
+	log.Infof("%s %s IOC order got filled %f/%f", iocOrder.Symbol, iocOrder.Side, filledQuantity.Float64(), iocOrder.Quantity.Float64())
+
+	orders[1].Quantity = orders[1].Quantity.Mul(filledRatio)
+	orders[2].Quantity = orders[2].Quantity.Mul(filledRatio)
+
+	var orderC = make(chan types.Order, 2)
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		o := s.executeOrder(ctx, orders[1])
+		orderC <- *o
+		wg.Done()
+	}()
+
+	go func() {
+		o := s.executeOrder(ctx, orders[2])
+		orderC <- *o
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	var createdOrders = make(types.OrderSlice, 3)
+	createdOrders[0] = *iocOrder
+	createdOrders[1] = <-orderC
+	createdOrders[2] = <-orderC
+	close(orderC)
+
+	s.waitOrdersAndCollectTrades(ctx, session, createdOrders)
+	return nil
+}
+
+func (s *Strategy) marketOrderExecution(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder) error {
+	orders = s.toProtectiveMarketOrders(orders, s.MarketOrderProtectiveRatio)
 
 	var orderC = make(chan types.Order, 3)
 	var wg sync.WaitGroup
 	wg.Add(3)
-	go s.executeOrder(ctx, orders[0], &wg, orderC)
-	go s.executeOrder(ctx, orders[1], &wg, orderC)
-	go s.executeOrder(ctx, orders[2], &wg, orderC)
+
+	go func() {
+		o := s.executeOrder(ctx, orders[0])
+		orderC <- *o
+		wg.Done()
+	}()
+
+	go func() {
+		o := s.executeOrder(ctx, orders[1])
+		orderC <- *o
+		wg.Done()
+	}()
+
+	go func() {
+		o := s.executeOrder(ctx, orders[2])
+		orderC <- *o
+		wg.Done()
+	}()
+
 	wg.Wait()
 
 	var createdOrders = make(types.OrderSlice, 3)
@@ -459,6 +549,12 @@ func (s *Strategy) executeAllOrders(ctx context.Context, session *bbgo.ExchangeS
 	createdOrders[1] = <-orderC
 	createdOrders[2] = <-orderC
 	close(orderC)
+
+	s.waitOrdersAndCollectTrades(ctx, session, createdOrders)
+	return nil
+}
+
+func (s *Strategy) waitOrdersAndCollectTrades(ctx context.Context, session *bbgo.ExchangeSession, createdOrders types.OrderSlice) {
 
 	// wait for trades
 	timeoutDuration := 500 * time.Millisecond
@@ -511,8 +607,6 @@ func (s *Strategy) executeAllOrders(ctx context.Context, session *bbgo.ExchangeS
 		time.Sleep(200 * time.Millisecond)
 		s.tradeCollector.Process()
 	}
-
-	return nil
 }
 
 func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
@@ -662,6 +756,38 @@ func collectOrdersTrades(ctx context.Context, ex types.ExchangeOrderQueryService
 	}
 
 	return ordersTrades, err2
+}
+
+func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService, order types.Order) (*types.Order, error) {
+	timeout := 1 * time.Minute
+	timeoutC := time.After(timeout)
+
+	for {
+		select {
+		case <-timeoutC:
+			return nil, fmt.Errorf("order wait timeout %s", timeout)
+
+		default:
+			remoteOrder, err2 := ex.QueryOrder(ctx, types.OrderQuery{
+				Symbol:  order.Symbol,
+				OrderID: strconv.FormatUint(order.OrderID, 10),
+			})
+
+			if err2 != nil {
+				log.WithError(err2).Errorf("order query error")
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+
+			switch remoteOrder.Status {
+			case types.OrderStatusFilled, types.OrderStatusCanceled:
+				return remoteOrder, nil
+			default:
+				log.Infof("WAITING: %s", remoteOrder.String())
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+	}
 }
 
 func waitForAllOrdersFilled(ctx context.Context, ex types.ExchangeOrderQueryService, orders types.OrderSlice, maxTries int) (types.OrderSlice, bool) {
