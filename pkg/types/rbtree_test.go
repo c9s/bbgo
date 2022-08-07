@@ -2,6 +2,7 @@ package types
 
 import (
 	"math/rand"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,33 @@ import (
 )
 
 var itov func(int64) fixedpoint.Value = fixedpoint.NewFromInt
+
+func TestRBTree_ConcurrentIndependence(t *testing.T) {
+	// each RBTree instances must not affect each other in concurrent environment
+	var wg sync.WaitGroup
+	for w := 0; w < 10; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			tree := NewRBTree()
+			for stepCnt := 0; stepCnt < 10000; stepCnt++ {
+				switch opCode := rand.Intn(2); opCode {
+				case 0:
+					priceI := rand.Int63n(16)
+					price := fixedpoint.NewFromInt(priceI)
+					tree.Delete(price)
+				case 1:
+					priceI := rand.Int63n(16)
+					volumeI := rand.Int63n(8)
+					tree.Upsert(fixedpoint.NewFromInt(priceI), fixedpoint.NewFromInt(volumeI))
+				default:
+					panic("impossible")
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}
 
 func TestRBTree_InsertAndDelete(t *testing.T) {
 	tree := NewRBTree()
@@ -154,12 +182,12 @@ func TestRBTree_bulkInsert(t *testing.T) {
 		pvs[price] = volume
 	}
 	tree.Inorder(func(n *RBNode) bool {
-		if n.left != neel {
+		if !n.left.isNil() {
 			if !assert.True(t, n.key.Compare(n.left.key) > 0) {
 				return false
 			}
 		}
-		if n.right != neel {
+		if !n.right.isNil() {
 			if !assert.True(t, n.key.Compare(n.right.key) < 0) {
 				return false
 			}
@@ -206,12 +234,12 @@ func TestRBTree_bulkInsertAndDelete(t *testing.T) {
 
 	// validate tree structure
 	tree.Inorder(func(n *RBNode) bool {
-		if n.left != neel {
+		if !n.left.isNil() {
 			if !assert.True(t, n.key.Compare(n.left.key) > 0) {
 				return false
 			}
 		}
-		if n.right != neel {
+		if !n.right.isNil() {
 			if !assert.True(t, n.key.Compare(n.right.key) < 0) {
 				return false
 			}
