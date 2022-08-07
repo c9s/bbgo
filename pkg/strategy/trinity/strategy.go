@@ -429,6 +429,9 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	var wg sync.WaitGroup
 	wg.Add(3)
 	go s.executeOrder(ctx, orders[0], &wg, orderC)
+
+	time.Sleep(10*time.Millisecond)
+
 	go s.executeOrder(ctx, orders[1], &wg, orderC)
 	go s.executeOrder(ctx, orders[2], &wg, orderC)
 	wg.Wait()
@@ -521,7 +524,6 @@ func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
 	}
 
 	for _, o := range orders {
-
 		switch o.Side {
 		case types.SideTypeSell:
 			price := o.Price
