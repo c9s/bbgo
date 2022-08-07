@@ -484,13 +484,8 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 			if market, ok := s.markets[o.Symbol]; ok {
 				updatedOrders[i].Market = market
 			}
-
-			in, inCurrency := updatedOrders[i].In()
-			out, outCurrency := updatedOrders[i].Out()
-			log.Info(o.String())
-			log.Infof("<- IN %f %s", in.Float64(), inCurrency)
-			log.Infof("-> OUT %f %s", out.Float64(), outCurrency)
 		}
+		s.analyzeOrders(updatedOrders)
 
 	} else {
 		// wait for trades
@@ -509,6 +504,44 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	if s.CoolingDownTime > 0 {
 		log.Infof("cooling down for %s", s.CoolingDownTime.Duration().String())
 		time.Sleep(s.CoolingDownTime.Duration())
+	}
+}
+
+func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
+	sort.Slice(orders, func(i, j int) bool {
+		// o1 < o2 -- earlier first
+		return orders[i].CreationTime.Before(orders[i].CreationTime.Time())
+	})
+
+	log.Infof("ANALYZING ORDERS (Earlier First): ")
+	for _, o := range orders {
+		in, inCurrency := o.In()
+		out, outCurrency := o.Out()
+		log.Info(o.String())
+		log.Infof("<- IN %f %s", in.Float64(), inCurrency)
+		log.Infof("-> OUT %f %s", out.Float64(), outCurrency)
+
+		switch o.Side {
+		case types.SideTypeSell:
+			price := o.Price
+			if !s.MarketOrderProtectiveRatio.IsZero() {
+				price = price.Mul(one.Add(s.MarketOrderProtectiveRatio))
+			}
+
+			priceDiff := price.Sub(o.AveragePrice)
+			slippage := priceDiff.Div(price)
+			log.Infof("%s %s %s AVG PRICE %f PRICE %f SLIPPAGE %f Q %f", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), slippage.Float64(), o.Quantity.Float64())
+
+		case types.SideTypeBuy:
+			price := o.Price
+			if !s.MarketOrderProtectiveRatio.IsZero() {
+				price = price.Mul(one.Sub(s.MarketOrderProtectiveRatio))
+			}
+
+			priceDiff := o.AveragePrice.Sub(price)
+			slippage := priceDiff.Div(price)
+			log.Infof("%s %s %s AVG PRICE %f PRICE %f SLIPPAGE %f Q %f", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), slippage.Float64(), o.Quantity.Float64())
+		}
 	}
 }
 
