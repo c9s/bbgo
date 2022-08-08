@@ -168,15 +168,6 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	return err
 }
 
-// preloadSupertrend preloads supertrend indicator
-func preloadSupertrend(supertrend *indicator.Supertrend, kLineStore *bbgo.MarketDataStore) {
-	if klines, ok := kLineStore.KLinesOfInterval(supertrend.Interval); ok {
-		for i := 0; i < len(*klines); i++ {
-			supertrend.Update((*klines)[i].GetHigh().Float64(), (*klines)[i].GetLow().Float64(), (*klines)[i].GetClose().Float64())
-		}
-	}
-}
-
 // setupIndicators initializes indicators
 func (s *Strategy) setupIndicators() {
 	// K-line store for indicators
@@ -194,8 +185,10 @@ func (s *Strategy) setupIndicators() {
 	}
 	s.Supertrend = &indicator.Supertrend{IntervalWindow: types.IntervalWindow{Window: s.Window, Interval: s.Interval}, ATRMultiplier: s.SupertrendMultiplier}
 	s.Supertrend.AverageTrueRange = &indicator.ATR{IntervalWindow: types.IntervalWindow{Window: s.Window, Interval: s.Interval}}
-	s.Supertrend.Bind(kLineStore)
-	preloadSupertrend(s.Supertrend, kLineStore)
+	s.Supertrend.BindK(s.session.MarketDataStream, s.Symbol, s.Supertrend.Interval)
+	if klines, ok := kLineStore.KLinesOfInterval(s.Supertrend.Interval); ok {
+		s.Supertrend.LoadK((*klines)[0:])
+	}
 
 	// Linear Regression
 	if s.LinearRegression != nil {
