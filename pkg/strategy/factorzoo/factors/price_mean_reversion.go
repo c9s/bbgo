@@ -1,86 +1,74 @@
 package factorzoo
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-
-	log "github.com/sirupsen/logrus"
+	"gonum.org/v1/gonum/stat"
 )
+
+// price mean reversion
+// assume that the quotient of SMA over close price will dynamically revert into one.
+// so this fraction value is our alpha, PMR
 
 //go:generate callbackgen -type PMR
 type PMR struct {
-	types.SeriesBase
 	types.IntervalWindow
+	types.SeriesBase
 
-	// Values
-	Values    types.Float64Slice
-	LastValue float64
-
+	Values  types.Float64Slice
+	SMA     *indicator.SMA
 	EndTime time.Time
 
-	UpdateCallbacks []func(val float64)
+	updateCallbacks []func(value float64)
 }
 
-func (inc *PMR) Index(i int) float64 {
-	if inc.Values == nil {
-		return 0
+var _ types.SeriesExtend = &PMR{}
+
+func (inc *PMR) Update(price float64) {
+	if inc.SeriesBase.Series == nil {
+		inc.SeriesBase.Series = inc
+		inc.SMA = &indicator.SMA{IntervalWindow: inc.IntervalWindow}
 	}
-	return inc.Values.Index(i)
+	inc.SMA.Update(price)
+	if inc.SMA.Length() >= inc.Window {
+		reversion := inc.SMA.Last() / price
+		inc.Values.Push(reversion)
+	}
 }
 
 func (inc *PMR) Last() float64 {
-	if inc.Values.Length() == 0 {
+	if len(inc.Values) == 0 {
 		return 0
 	}
-	return inc.Values.Last()
+
+	return inc.Values[len(inc.Values)-1]
+}
+
+func (inc *PMR) Index(i int) float64 {
+	if i >= len(inc.Values) {
+		return 0
+	}
+
+	return inc.Values[len(inc.Values)-1-i]
 }
 
 func (inc *PMR) Length() int {
-	if inc.Values == nil {
-		return 0
-	}
-	return inc.Values.Length()
+	return len(inc.Values)
 }
 
-//var _ types.SeriesExtend = &PMR{}
-
-func (inc *PMR) Update(klines []types.KLine) {
-	if inc.Values == nil {
-		inc.SeriesBase.Series = inc
+func (inc *PMR) CalculateAndUpdate(allKLines []types.KLine) {
+	if len(inc.Values) == 0 {
+		for _, k := range allKLines {
+			inc.PushK(k)
+		}
+		inc.EmitUpdate(inc.Last())
+	} else {
+		k := allKLines[len(allKLines)-1]
+		inc.PushK(k)
+		inc.EmitUpdate(inc.Last())
 	}
-
-	if len(klines) < inc.Window {
-		return
-	}
-
-	var end = len(klines) - 1
-	var lastKLine = klines[end]
-
-	if inc.EndTime != zeroTime && lastKLine.GetEndTime().Before(inc.EndTime) {
-		return
-	}
-
-	var recentT = klines[end-(inc.Window-1) : end+1]
-
-	val, err := calculateReversion(recentT, inc.Window, indicator.KLineClosePriceMapper)
-	if err != nil {
-		log.WithError(err).Error("can not calculate")
-		return
-	}
-	inc.Values.Push(val)
-	inc.LastValue = val
-
-	if len(inc.Values) > indicator.MaxNumOfVOL {
-		inc.Values = inc.Values[indicator.MaxNumOfVOLTruncateSize-1:]
-	}
-
-	inc.EndTime = klines[end].GetEndTime().Time()
-
-	inc.EmitUpdate(val)
-
 }
 
 func (inc *PMR) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
@@ -88,25 +76,33 @@ func (inc *PMR) handleKLineWindowUpdate(interval types.Interval, window types.KL
 		return
 	}
 
-	inc.Update(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *PMR) Bind(updater indicator.KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculateReversion(klines []types.KLine, window int, val KLineValueMapper) (float64, error) {
-	length := len(klines)
-	if length == 0 || length < window {
-		return 0.0, fmt.Errorf("insufficient elements for calculating VOL with window = %d", window)
+func (inc *PMR) PushK(k types.KLine) {
+	if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
+		return
 	}
 
-	ma := 0.
-	for _, p := range klines[length-window : length-1] {
-		ma += val(p)
-	}
-	ma /= float64(window)
-	reversion := ma / val(klines[length-1])
+	inc.Update(indicator.KLineClosePriceMapper(k))
+	inc.EndTime = k.EndTime.Time()
+	inc.EmitUpdate(inc.Last())
+}
 
-	return reversion, nil
+func CalculateKLinesPMR(allKLines []types.KLine, window int) float64 {
+	return pmr(indicator.MapKLinePrice(allKLines, indicator.KLineClosePriceMapper), window)
+}
+
+func pmr(prices []float64, window int) float64 {
+	var end = len(prices) - 1
+	if end == 0 {
+		return prices[0]
+	}
+
+	reversion := -stat.Mean(prices[end-window:end], nil) / prices[end]
+	return reversion
 }

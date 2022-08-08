@@ -1,64 +1,70 @@
 package factorzoo
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-
-	log "github.com/sirupsen/logrus"
 )
+
+// simply internal return rate over certain timeframe(interval)
 
 //go:generate callbackgen -type RR
 type RR struct {
 	types.IntervalWindow
+	types.SeriesBase
 
-	// Values
-	Values types.Float64Slice
-
+	prices  *types.Queue
+	Values  types.Float64Slice
 	EndTime time.Time
 
-	UpdateCallbacks []func(val float64)
+	updateCallbacks []func(value float64)
+}
+
+var _ types.SeriesExtend = &RR{}
+
+func (inc *RR) Update(price float64) {
+	if inc.SeriesBase.Series == nil {
+		inc.SeriesBase.Series = inc
+		inc.prices = types.NewQueue(inc.Window)
+	}
+	inc.prices.Update(price)
+	irr := inc.prices.Last()/inc.prices.Index(1) - 1
+	inc.Values.Push(irr)
+
 }
 
 func (inc *RR) Last() float64 {
 	if len(inc.Values) == 0 {
-		return 0.0
+		return 0
 	}
+
 	return inc.Values[len(inc.Values)-1]
 }
 
-func (inc *RR) CalculateAndUpdate(klines []types.KLine) {
-
-	if len(klines) < inc.Window {
-		return
+func (inc *RR) Index(i int) float64 {
+	if i >= len(inc.Values) {
+		return 0
 	}
 
-	var end = len(klines) - 1
-	var lastKLine = klines[end]
+	return inc.Values[len(inc.Values)-1-i]
+}
 
-	if inc.EndTime != zeroTime && lastKLine.GetEndTime().Before(inc.EndTime) {
-		return
+func (inc *RR) Length() int {
+	return len(inc.Values)
+}
+
+func (inc *RR) CalculateAndUpdate(allKLines []types.KLine) {
+	if len(inc.Values) == 0 {
+		for _, k := range allKLines {
+			inc.PushK(k)
+		}
+		inc.EmitUpdate(inc.Last())
+	} else {
+		k := allKLines[len(allKLines)-1]
+		inc.PushK(k)
+		inc.EmitUpdate(inc.Last())
 	}
-
-	var recentT = klines[end-(inc.Window-1) : end+1]
-
-	val, err := calculateReturn(recentT, inc.Window, indicator.KLineClosePriceMapper)
-	if err != nil {
-		log.WithError(err).Error("can not calculate")
-		return
-	}
-	inc.Values.Push(val)
-
-	if len(inc.Values) > indicator.MaxNumOfVOL {
-		inc.Values = inc.Values[indicator.MaxNumOfVOLTruncateSize-1:]
-	}
-
-	inc.EndTime = klines[end].GetEndTime().Time()
-
-	inc.EmitUpdate(val)
-
 }
 
 func (inc *RR) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
@@ -73,13 +79,34 @@ func (inc *RR) Bind(updater indicator.KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculateReturn(klines []types.KLine, window int, val KLineValueMapper) (float64, error) {
-	length := len(klines)
-	if length == 0 || length < window {
-		return 0.0, fmt.Errorf("insufficient elements for calculating VOL with window = %d", window)
+func (inc *RR) BindK(target indicator.KLineClosedEmitter, symbol string, interval types.Interval) {
+	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
+}
+
+func (inc *RR) PushK(k types.KLine) {
+	if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
+		return
 	}
 
-	rate := val(klines[length-1])/val(klines[length-2]) - 1
-
-	return rate, nil
+	inc.Update(indicator.KLineClosePriceMapper(k))
+	inc.EndTime = k.EndTime.Time()
+	inc.EmitUpdate(inc.Last())
 }
+
+func (inc *RR) LoadK(allKLines []types.KLine) {
+	for _, k := range allKLines {
+		inc.PushK(k)
+	}
+	inc.EmitUpdate(inc.Last())
+}
+
+//func calculateReturn(klines []types.KLine, window int, val KLineValueMapper) (float64, error) {
+//	length := len(klines)
+//	if length == 0 || length < window {
+//		return 0.0, fmt.Errorf("insufficient elements for calculating VOL with window = %d", window)
+//	}
+//
+//	rate := val(klines[length-1])/val(klines[length-2]) - 1
+//
+//	return rate, nil
+//}

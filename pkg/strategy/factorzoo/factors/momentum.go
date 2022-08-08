@@ -6,9 +6,11 @@ import (
 
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-
-	log "github.com/sirupsen/logrus"
 )
+
+// gap jump momentum
+// if the gap between current open price and previous close price gets larger
+// meaning an opening price jump was happened, the larger momentum we get is our alpha, MOM
 
 //go:generate callbackgen -type MOM
 type MOM struct {
@@ -18,6 +20,9 @@ type MOM struct {
 	// Values
 	Values    types.Float64Slice
 	LastValue float64
+
+	opens  *types.Queue
+	closes *types.Queue
 
 	EndTime time.Time
 
@@ -47,40 +52,31 @@ func (inc *MOM) Length() int {
 
 //var _ types.SeriesExtend = &MOM{}
 
-func (inc *MOM) Update(klines []types.KLine) {
-	if inc.Values == nil {
+func (inc *MOM) Update(open, close float64) {
+	if inc.SeriesBase.Series == nil {
 		inc.SeriesBase.Series = inc
+		inc.opens = types.NewQueue(inc.Window)
+		inc.closes = types.NewQueue(inc.Window + 1)
 	}
-
-	if len(klines) < inc.Window {
-		return
+	inc.opens.Update(open)
+	inc.closes.Update(close)
+	if inc.opens.Length() >= inc.Window && inc.closes.Length() >= inc.Window {
+		gap := inc.opens.Last()/inc.closes.Index(1) - 1
+		inc.Values.Push(gap)
 	}
+}
 
-	var end = len(klines) - 1
-	var lastKLine = klines[end]
-
-	if inc.EndTime != zeroTime && lastKLine.GetEndTime().Before(inc.EndTime) {
-		return
+func (inc *MOM) CalculateAndUpdate(allKLines []types.KLine) {
+	if len(inc.Values) == 0 {
+		for _, k := range allKLines {
+			inc.PushK(k)
+		}
+		inc.EmitUpdate(inc.Last())
+	} else {
+		k := allKLines[len(allKLines)-1]
+		inc.PushK(k)
+		inc.EmitUpdate(inc.Last())
 	}
-
-	var recentT = klines[end-(inc.Window-1) : end+1]
-
-	val, err := calculateMomentum(recentT, inc.Window, indicator.KLineOpenPriceMapper, indicator.KLineClosePriceMapper)
-	if err != nil {
-		log.WithError(err).Error("can not calculate")
-		return
-	}
-	inc.Values.Push(val)
-	inc.LastValue = val
-
-	if len(inc.Values) > indicator.MaxNumOfVOL {
-		inc.Values = inc.Values[indicator.MaxNumOfVOLTruncateSize-1:]
-	}
-
-	inc.EndTime = klines[end].GetEndTime().Time()
-
-	inc.EmitUpdate(val)
-
 }
 
 func (inc *MOM) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
@@ -88,11 +84,21 @@ func (inc *MOM) handleKLineWindowUpdate(interval types.Interval, window types.KL
 		return
 	}
 
-	inc.Update(window)
+	inc.CalculateAndUpdate(window)
 }
 
 func (inc *MOM) Bind(updater indicator.KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
+}
+
+func (inc *MOM) PushK(k types.KLine) {
+	if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
+		return
+	}
+
+	inc.Update(k.Open.Float64(), k.Close.Float64())
+	inc.EndTime = k.EndTime.Time()
+	inc.EmitUpdate(inc.Last())
 }
 
 func calculateMomentum(klines []types.KLine, window int, valA KLineValueMapper, valB KLineValueMapper) (float64, error) {
