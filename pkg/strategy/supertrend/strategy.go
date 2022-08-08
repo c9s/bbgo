@@ -57,7 +57,7 @@ type Strategy struct {
 	SupertrendMultiplier float64 `json:"supertrendMultiplier"`
 
 	// LinearRegression Use linear regression as trend confirmation
-	LinearRegression *LinGre `json:"linearRegression,omitempty"`
+	LinearRegression *LinReg `json:"linearRegression,omitempty"`
 
 	// Leverage uses the account net value to calculate the order qty
 	Leverage fixedpoint.Value `json:"leverage"`
@@ -204,8 +204,10 @@ func (s *Strategy) setupIndicators() {
 		} else if s.LinearRegression.Interval == "" {
 			s.LinearRegression = nil
 		} else {
-			s.LinearRegression.Bind(kLineStore)
-			s.LinearRegression.preload(kLineStore)
+			s.LinearRegression.BindK(s.session.MarketDataStream, s.Symbol, s.LinearRegression.Interval)
+			if klines, ok := kLineStore.KLinesOfInterval(s.LinearRegression.Interval); ok {
+				s.LinearRegression.LoadK((*klines)[0:])
+			}
 		}
 	}
 }
