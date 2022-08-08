@@ -1198,20 +1198,24 @@ func expand(a []float64, length int, defaultVal float64) []float64 {
 		return a
 	}
 	for i := 0; i < length-l; i++ {
-		a = append(a, defaultVal)
+		a = append([]float64{defaultVal}, a...)
 	}
 	return a
 }
 
-func (canvas *Canvas) Plot(tag string, a Series, endTime Time, length int) {
+func (canvas *Canvas) Plot(tag string, a Series, endTime Time, length int, intervals ...Interval) {
 	var timeline []time.Time
 	e := endTime.Time()
 	if a.Length() == 0 {
 		return
 	}
 	oldest := a.Index(a.Length() - 1)
+	interval := canvas.Interval
+	if len(intervals) > 0 {
+		interval = intervals[0]
+	}
 	for i := length - 1; i >= 0; i-- {
-		shiftedT := e.Add(-time.Duration(i*canvas.Interval.Minutes()) * time.Minute)
+		shiftedT := e.Add(-time.Duration(i*interval.Minutes()) * time.Minute)
 		timeline = append(timeline, shiftedT)
 	}
 	canvas.Series = append(canvas.Series, chart.TimeSeries{
