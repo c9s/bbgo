@@ -405,7 +405,7 @@ func (s *Strategy) initIndicators(kline *types.KLine, priceLines *types.Queue) e
 	s.takeProfitFactor = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.ProfitFactorWindow}}
 	s.trendLine = &indicator.EWMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.TrendWindow}}
 
-	for i := 0; i < s.ProfitFactorWindow; i++ {
+	for i := 0; i <= s.ProfitFactorWindow; i++ {
 		s.takeProfitFactor.Update(s.TakeProfitFactor)
 	}
 	store, _ := s.Session.MarketDataStore(s.Symbol)
