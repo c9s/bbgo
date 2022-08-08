@@ -130,7 +130,24 @@ func (inc *Supertrend) GetSignal() types.Direction {
 var _ types.SeriesExtend = &Supertrend{}
 
 func (inc *Supertrend) PushK(k types.KLine) {
+	if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
+		return
+	}
+
 	inc.Update(k.GetHigh().Float64(), k.GetLow().Float64(), k.GetClose().Float64())
+	inc.EndTime = k.EndTime.Time()
+	inc.EmitUpdate(inc.Last())
+
+}
+
+func (inc *Supertrend) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
+	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
+}
+
+func (inc *Supertrend) LoadK(allKLines []types.KLine) {
+	for _, k := range allKLines {
+		inc.PushK(k)
+	}
 }
 
 func (inc *Supertrend) CalculateAndUpdate(kLines []types.KLine) {

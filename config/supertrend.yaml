@@ -43,8 +43,10 @@ exchangeStrategies:
     # ATR Multiplier for calculating super trend prices, the higher, the stronger the trends are
     supertrendMultiplier: 4.1
 
-    # leverage is the leverage of the orders
+    # leverage uses the account net value to calculate the order qty
     leverage: 1.0
+    # quantity sets the fixed order qty, takes precedence over Leverage
+    #quantity: 0.5
 
     # fastDEMAWindow and slowDEMAWindow are for filtering super trend noise
     fastDEMAWindow: 144
