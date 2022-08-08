@@ -119,8 +119,10 @@ func (s *ProtectiveStopLoss) Bind(session *ExchangeSession, orderExecutor *Gener
 		}
 
 		isPositionOpened := !position.IsClosed() && !position.IsDust(kline.Close)
-		if isPositionOpened && position.IsShort() {
+		if isPositionOpened {
 			s.handleChange(context.Background(), position, kline.Close, s.orderExecutor)
+		} else {
+			s.stopLossPrice = fixedpoint.Zero
 		}
 	})
 
