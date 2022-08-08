@@ -4,12 +4,12 @@ package factorzoo
 
 import ()
 
-func (inc *RR) OnUpdate(cb func(val float64)) {
-	inc.UpdateCallbacks = append(inc.UpdateCallbacks, cb)
+func (inc *RR) OnUpdate(cb func(value float64)) {
+	inc.updateCallbacks = append(inc.updateCallbacks, cb)
 }
 
-func (inc *RR) EmitUpdate(val float64) {
-	for _, cb := range inc.UpdateCallbacks {
-		cb(val)
+func (inc *RR) EmitUpdate(value float64) {
+	for _, cb := range inc.updateCallbacks {
+		cb(value)
 	}
 }
