@@ -412,7 +412,6 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		orders = p.newOrders(balances, -1)
 	}
 
-	logSubmitOrders(orders)
 
 	if err := s.checkMinimalOrderQuantity(orders); err != nil {
 		log.WithError(err).Warnf("minimalOrderQuantity error")
@@ -475,6 +474,8 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	orders[0].Type = types.OrderTypeLimit
 	orders[0].TimeInForce = types.TimeInForceIOC
 
+	// logSubmitOrders(orders)
+
 	orders = s.toProtectiveMarketOrders(orders, s.MarketOrderProtectiveRatio)
 
 	// orders[1].Type = types.OrderTypeMarket
@@ -484,6 +485,7 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	if iocOrder == nil {
 		return nil, errors.New("ioc order submit error")
 	}
+
 
 	var err error
 	iocOrder, err = waitForOrderFilled(ctx, service, *iocOrder)
