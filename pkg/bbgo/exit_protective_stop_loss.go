@@ -79,12 +79,18 @@ func (s *ProtectiveStopLoss) placeStopOrder(ctx context.Context, position *types
 	return err
 }
 
-func (s *ProtectiveStopLoss) shouldStop(closePrice fixedpoint.Value) bool {
+func (s *ProtectiveStopLoss) shouldStop(closePrice fixedpoint.Value, position *types.Position) bool {
 	if s.stopLossPrice.IsZero() {
 		return false
 	}
 
-	return closePrice.Compare(s.stopLossPrice) >= 0
+	if position.IsShort() {
+		return closePrice.Compare(s.stopLossPrice) >= 0
+	} else if position.IsLong() {
+		return closePrice.Compare(s.stopLossPrice) <= 0
+	}
+
+	return false
 }
 
 func (s *ProtectiveStopLoss) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
@@ -187,7 +193,7 @@ func (s *ProtectiveStopLoss) checkStopPrice(closePrice fixedpoint.Value, positio
 		return
 	}
 
-	if s.shouldStop(closePrice) {
+	if s.shouldStop(closePrice, position) {
 		log.Infof("[ProtectiveStopLoss] protection stop order is triggered at price %f, position = %+v", closePrice.Float64(), position)
 		if err := s.orderExecutor.ClosePosition(context.Background(), one, "protectiveStopLoss"); err != nil {
 			log.WithError(err).Errorf("failed to close position")
