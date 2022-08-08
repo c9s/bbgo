@@ -2,55 +2,43 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
-#    futures: true
-
 
 exchangeStrategies:
 - on: binance
   factorzoo:
-    symbol: BTCUSDT
+    symbol: BTCBUSD
     linear:
       enabled: true
       interval: 1d
-      quantity: 1
-#      amount: 50_000
+      quantity: 1.0
       window: 5
 
     exits:
       - trailingStop:
-          callbackRate: 5%
+          callbackRate: 1%
           activationRatio: 1%
           closePosition: 100%
-          minProfit: 10%
+          minProfit: 15%
           interval: 1m
           side: buy
       - trailingStop:
-          callbackRate: 5%
+          callbackRate: 1%
           activationRatio: 1%
           closePosition: 100%
-          minProfit: 10%
+          minProfit: 15%
           interval: 1m
           side: sell
-
-## (0) roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
-#      - roiStopLoss:
-#          percentage: 1.0%
-#
-## (1) roiTakeProfit is used to force taking profit by percentage of the position ROI (currently the price change)
-## force to take the profit ROI exceeded the percentage.
-#      - roiTakeProfit:
-#          percentage: 35%
 
 
 backtest:
   sessions:
     - binance
   startTime: "2021-01-01"
-  endTime: "2022-07-31"
+  endTime: "2022-08-31"
   symbols:
-    - BTCUSDT
+    - BTCBUSD
   accounts:
     binance:
       balances:
         BTC: 1.0
-        USDT: 60_000.0
+        BUSD: 40_000.0
