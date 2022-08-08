@@ -1,8 +1,11 @@
 package supertrend
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/risk"
+	"github.com/fatih/color"
 	"os"
 	"sync"
 
@@ -54,10 +57,13 @@ type Strategy struct {
 	SupertrendMultiplier float64 `json:"supertrendMultiplier"`
 
 	// LinearRegression Use linear regression as trend confirmation
-	LinearRegression *LinGre `json:"linearRegression,omitempty"`
+	LinearRegression *LinReg `json:"linearRegression,omitempty"`
 
-	// Leverage
-	Leverage float64 `json:"leverage"`
+	// Leverage uses the account net value to calculate the order qty
+	Leverage fixedpoint.Value `json:"leverage"`
+	// Quantity sets the fixed order qty, takes precedence over Leverage
+	Quantity               fixedpoint.Value `json:"quantity"`
+	AccountValueCalculator *risk.AccountValueCalculator
 
 	// TakeProfitAtrMultiplier TP according to ATR multiple, 0 to disable this
 	TakeProfitAtrMultiplier float64 `json:"takeProfitAtrMultiplier"`
@@ -84,6 +90,16 @@ type Strategy struct {
 
 	// StrategyController
 	bbgo.StrategyController
+
+	// Accumulated profit report
+	accumulatedProfit   fixedpoint.Value
+	accumulatedProfitMA *indicator.SMA
+	// AccumulatedProfitMAWindow Accumulated profit SMA window
+	AccumulatedProfitMAWindow int `json:"accumulatedProfitMAWindow"`
+	dailyAccumulatedProfits   types.Float64Slice
+	lastDayAccumulatedProfit  fixedpoint.Value
+	// AccumulatedProfitLastPeriodWindow Last period window of accumulated profit
+	AccumulatedProfitLastPeriodWindow int `json:"accumulatedProfitLastPeriodWindow"`
 }
 
 func (s *Strategy) ID() string {
@@ -103,10 +119,6 @@ func (s *Strategy) Validate() error {
 		return errors.New("interval is required")
 	}
 
-	if s.Leverage <= 0.0 {
-		return errors.New("leverage is required")
-	}
-
 	return nil
 }
 
@@ -115,6 +127,9 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LinearRegression.Interval})
 
 	s.ExitMethods.SetAndSubscribe(session, s)
+
+	// Accumulated profit report
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1d})
 }
 
 // Position control
@@ -153,15 +168,6 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	return err
 }
 
-// preloadSupertrend preloads supertrend indicator
-func preloadSupertrend(supertrend *indicator.Supertrend, kLineStore *bbgo.MarketDataStore) {
-	if klines, ok := kLineStore.KLinesOfInterval(supertrend.Interval); ok {
-		for i := 0; i < len(*klines); i++ {
-			supertrend.Update((*klines)[i].GetHigh().Float64(), (*klines)[i].GetLow().Float64(), (*klines)[i].GetClose().Float64())
-		}
-	}
-}
-
 // setupIndicators initializes indicators
 func (s *Strategy) setupIndicators() {
 	// K-line store for indicators
@@ -179,8 +185,10 @@ func (s *Strategy) setupIndicators() {
 	}
 	s.Supertrend = &indicator.Supertrend{IntervalWindow: types.IntervalWindow{Window: s.Window, Interval: s.Interval}, ATRMultiplier: s.SupertrendMultiplier}
 	s.Supertrend.AverageTrueRange = &indicator.ATR{IntervalWindow: types.IntervalWindow{Window: s.Window, Interval: s.Interval}}
-	s.Supertrend.Bind(kLineStore)
-	preloadSupertrend(s.Supertrend, kLineStore)
+	s.Supertrend.BindK(s.session.MarketDataStream, s.Symbol, s.Supertrend.Interval)
+	if klines, ok := kLineStore.KLinesOfInterval(s.Supertrend.Interval); ok {
+		s.Supertrend.LoadK((*klines)[0:])
+	}
 
 	// Linear Regression
 	if s.LinearRegression != nil {
@@ -189,8 +197,10 @@ func (s *Strategy) setupIndicators() {
 		} else if s.LinearRegression.Interval == "" {
 			s.LinearRegression = nil
 		} else {
-			s.LinearRegression.Bind(kLineStore)
-			s.LinearRegression.preload(kLineStore)
+			s.LinearRegression.BindK(s.session.MarketDataStream, s.Symbol, s.LinearRegression.Interval)
+			if klines, ok := kLineStore.KLinesOfInterval(s.LinearRegression.Interval); ok {
+				s.LinearRegression.LoadK((*klines)[0:])
+			}
 		}
 	}
 }
@@ -251,17 +261,52 @@ func (s *Strategy) generateOrderForm(side types.SideType, quantity fixedpoint.Va
 }
 
 // calculateQuantity returns leveraged quantity
-func (s *Strategy) calculateQuantity(currentPrice fixedpoint.Value) fixedpoint.Value {
-	balance, ok := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
-	if !ok {
-		log.Errorf("can not update %s balance from exchange", s.Symbol)
-		return fixedpoint.Zero
+func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoint.Value, side types.SideType) fixedpoint.Value {
+	// Quantity takes precedence
+	if !s.Quantity.IsZero() {
+		return s.Quantity
 	}
 
-	amountAvailable := balance.Available.Mul(fixedpoint.NewFromFloat(s.Leverage))
-	quantity := amountAvailable.Div(currentPrice)
+	usingLeverage := s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures
 
-	return quantity
+	if bbgo.IsBackTesting { // Backtesting
+		balance, ok := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
+		if !ok {
+			log.Errorf("can not update %s quote balance from exchange", s.Symbol)
+			return fixedpoint.Zero
+		}
+
+		return balance.Available.Mul(fixedpoint.Min(s.Leverage, fixedpoint.One)).Div(currentPrice)
+	} else if !usingLeverage && side == types.SideTypeSell { // Spot sell
+		balance, ok := s.session.GetAccount().Balance(s.Market.BaseCurrency)
+		if !ok {
+			log.Errorf("can not update %s base balance from exchange", s.Symbol)
+			return fixedpoint.Zero
+		}
+
+		return balance.Available.Mul(fixedpoint.Min(s.Leverage, fixedpoint.One))
+	} else { // Using leverage or spot buy
+		quoteQty, err := risk.CalculateQuoteQuantity(s.session, ctx, s.Market.QuoteCurrency, s.Leverage)
+		if err != nil {
+			log.WithError(err).Errorf("can not update %s quote balance from exchange", s.Symbol)
+			return fixedpoint.Zero
+		}
+
+		return quoteQty.Div(currentPrice)
+	}
+}
+
+// PrintResult prints accumulated profit status
+func (s *Strategy) PrintResult(o *os.File) {
+	f := bufio.NewWriter(o)
+	defer f.Flush()
+	hiyellow := color.New(color.FgHiYellow).FprintfFunc()
+	hiyellow(f, "------ %s Accumulated Profit Results ------\n", s.InstanceID())
+	hiyellow(f, "Symbol: %v\n", s.Symbol)
+	hiyellow(f, "Accumulated Profit: %v\n", s.accumulatedProfit)
+	hiyellow(f, "Accumulated Profit %dMA: %f\n", s.AccumulatedProfitMAWindow, s.accumulatedProfitMA.Last())
+	hiyellow(f, "Last %d day(s) Accumulated Profit: %f\n", s.AccumulatedProfitLastPeriodWindow, s.dailyAccumulatedProfits.Sum())
+	hiyellow(f, "\n")
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -289,6 +334,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.TradeStats == nil {
 		s.TradeStats = types.NewTradeStats(s.Symbol)
 	}
+	startTime := s.Environment.StartTime()
+	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1d, startTime))
+	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1w, startTime))
+	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1mo, startTime))
 
 	// Set fee rate
 	if s.session.MakerFeeRate.Sign() > 0 || s.session.TakerFeeRate.Sign() > 0 {
@@ -304,6 +353,31 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.BindTradeStats(s.TradeStats)
 	s.orderExecutor.Bind()
+
+	// AccountValueCalculator
+	s.AccountValueCalculator = risk.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
+
+	// Accumulated profit report
+	if s.AccumulatedProfitMAWindow <= 0 {
+		s.AccumulatedProfitMAWindow = 60
+	}
+	s.accumulatedProfitMA = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.AccumulatedProfitMAWindow}}
+	s.orderExecutor.TradeCollector().OnProfit(func(trade types.Trade, profit *types.Profit) {
+		if profit == nil {
+			return
+		}
+
+		s.accumulatedProfit = s.accumulatedProfit.Add(profit.Profit)
+		s.accumulatedProfitMA.Update(s.accumulatedProfit.Float64())
+	})
+	if s.AccumulatedProfitLastPeriodWindow <= 0 {
+		s.AccumulatedProfitLastPeriodWindow = 7
+	}
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1d, func(kline types.KLine) {
+		s.dailyAccumulatedProfits.Update(s.accumulatedProfit.Sub(s.lastDayAccumulatedProfit).Float64())
+		s.dailyAccumulatedProfits = s.dailyAccumulatedProfits.Tail(s.AccumulatedProfitLastPeriodWindow)
+		s.lastDayAccumulatedProfit = s.accumulatedProfit
+	}))
 
 	// Sync position to redis on trade
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
@@ -395,7 +469,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				}
 			}
 
-			orderForm := s.generateOrderForm(side, s.calculateQuantity(closePrice), types.SideEffectTypeMarginBuy)
+			orderForm := s.generateOrderForm(side, s.calculateQuantity(ctx, closePrice, side), types.SideEffectTypeMarginBuy)
 			log.Infof("submit open position order %v", orderForm)
 			_, err := s.orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {
@@ -408,6 +482,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// Graceful shutdown
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
+
+		// Print accumulated profit report
+		defer s.PrintResult(os.Stdout)
 
 		_ = s.orderExecutor.GracefulCancel(ctx)
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
