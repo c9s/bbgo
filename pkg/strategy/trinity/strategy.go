@@ -435,11 +435,15 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	// logSubmitOrders(orders)
 	prof.StopAndLog(log.Infof)
 
-	if err := s.iocOrderExecution(ctx, session, orders); err != nil {
+	createdOrders, err := s.iocOrderExecution(ctx, session, orders)
+	if err != nil {
 		log.WithError(err).Errorf("order execute error")
 		return
 	}
 
+	if len(createdOrders) == 0 {
+		return
+	}
 	/*
 		if err := s.marketOrderExecution(ctx, session, orders); err != nil {
 			log.WithError(err).Errorf("order execute error")
@@ -461,10 +465,10 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 }
 
-func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder) error {
+func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder) (types.OrderSlice, error) {
 	service, ok := session.Exchange.(types.ExchangeOrderQueryService)
 	if !ok {
-		return errors.New("exchange does not support ExchangeOrderQueryService")
+		return nil, errors.New("exchange does not support ExchangeOrderQueryService")
 	}
 
 	// Change the first order to IOC
@@ -478,13 +482,13 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 
 	iocOrder := s.executeOrder(ctx, orders[0])
 	if iocOrder == nil {
-		return errors.New("ioc order submit error")
+		return nil, errors.New("ioc order submit error")
 	}
 
 	var err error
 	iocOrder, err = waitForOrderFilled(ctx, service, *iocOrder)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	filledQuantity := iocOrder.ExecutedQuantity
@@ -493,7 +497,7 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 
 		// we didn't get filled
 		log.Infof("%s %s IOC order did not get filled, skip: %+v", iocOrder.Symbol, iocOrder.Side, iocOrder)
-		return nil
+		return nil, nil
 	}
 
 	filledRatio := iocOrder.ExecutedQuantity.Div(iocOrder.Quantity)
@@ -538,7 +542,7 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 
 	log.Infof("ioc winning ratio update: %f", s.State.IOCWinningRatio)
 
-	return nil
+	return createdOrders, nil
 }
 
 func (s *Strategy) marketOrderExecution(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder) error {
