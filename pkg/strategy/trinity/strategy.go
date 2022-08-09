@@ -814,7 +814,7 @@ func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService,
 				return remoteOrder, nil
 			default:
 				log.Infof("WAITING: %s", remoteOrder.String())
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(50 * time.Millisecond)
 			}
 		}
 	}
