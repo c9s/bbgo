@@ -110,6 +110,7 @@ type Strategy struct {
 	NotifyTrade                bool                        `json:"notifyTrade"`
 	ResetPosition              bool                        `json:"resetPosition"`
 	MarketOrderProtectiveRatio fixedpoint.Value            `json:"marketOrderProtectiveRatio"`
+	DryRun                     bool                        `json:"dryRun"`
 
 	markets    map[string]types.Market
 	arbMarkets map[string]*ArbMarket
@@ -412,7 +413,6 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		orders = p.newOrders(balances, -1)
 	}
 
-
 	if err := s.checkMinimalOrderQuantity(orders); err != nil {
 		log.WithError(err).Warnf("minimalOrderQuantity error")
 		return
@@ -431,8 +431,12 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 			orders = adjustOrderQuantityByRate(orders, rate)
 		}
 	*/
-	// logSubmitOrders(orders)
 	prof.StopAndLog(log.Infof)
+
+	if s.DryRun {
+		logSubmitOrders(orders)
+		return
+	}
 
 	createdOrders, err := s.iocOrderExecution(ctx, session, orders)
 	if err != nil {
@@ -485,7 +489,6 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	if iocOrder == nil {
 		return nil, errors.New("ioc order submit error")
 	}
-
 
 	var err error
 	iocOrder, err = waitForOrderFilled(ctx, service, *iocOrder)
