@@ -14,7 +14,7 @@ type CreateWalletOrderRequest struct {
 	market     string     `param:"market,required"`
 	side       string     `param:"side,required"`
 	volume     string     `param:"volume,required"`
-	orderType  string     `param:"ord_type"`
+	orderType  OrderType     `param:"ord_type"`
 
 	price         *string `param:"price"`
 	stopPrice     *string `param:"stop_price"`
