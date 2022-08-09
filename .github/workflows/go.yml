@@ -14,6 +14,9 @@ jobs:
       matrix:
         redis-version:
         - 6.2
+        go-version:
+        - 1.17
+        - 1.18
     env:
       MYSQL_DATABASE: bbgo
       MYSQL_USER: "root"
@@ -46,7 +49,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        go-version: ${{ matrix.go-version }}
 
     - name: Install Migration Tool
       run: go install github.com/c9s/rockhopper/cmd/rockhopper@v1.2.1
