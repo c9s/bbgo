@@ -226,8 +226,6 @@ func (s *TradeStats) BriefString() string {
 		GrossLoss:                s.GrossLoss,
 		LargestProfitTrade:       s.LargestProfitTrade,
 		LargestLossTrade:         s.LargestLossTrade,
-		AverageProfitTrade:       s.AverageProfitTrade,
-		AverageLossTrade:         s.AverageLossTrade,
 		ProfitFactor:             s.ProfitFactor,
 		TotalNetProfit:           s.TotalNetProfit,
 		IntervalProfits:          s.IntervalProfits,
