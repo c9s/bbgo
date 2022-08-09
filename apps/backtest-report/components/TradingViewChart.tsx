@@ -71,7 +71,7 @@ const parseOrder = () => {
           case "update_time":
           case "creation_time":
           case "time":
-            d[key] = moment(d[key], 'dddd, DD MMM YYYY h:mm:ss').toDate();
+            d[key] = new Date(d[key]);
             break;
         }
       }
