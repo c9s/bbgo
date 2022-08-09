@@ -27,7 +27,7 @@ func (c *CreateWalletOrderRequest) Volume(volume string) *CreateWalletOrderReque
 	return c
 }
 
-func (c *CreateWalletOrderRequest) OrderType(orderType string) *CreateWalletOrderRequest {
+func (c *CreateWalletOrderRequest) OrderType(orderType max.OrderType) *CreateWalletOrderRequest {
 	c.orderType = orderType
 	return c
 }
