@@ -556,16 +556,21 @@ make embed && go run -tags web ./cmd/bbgo-lorca
 
 ## FAQ
 
-What's Position?
+### What's Position?
 
 - Base Currency & Quote Currency <https://www.ig.com/au/glossary-trading-terms/base-currency-definition>
 - How to calculate average cost? <https://www.janushenderson.com/en-us/investor/planning/calculate-average-cost/>
 
-## Looking For A New Strategy?
+### Looking For A New Strategy?
 
 You can write an article about BBGO in any topic, in 750-1500 words for exchange, and I can implement the strategy for
 you (depends on the complexity and efforts). If you're interested in, DM me in telegram <https://t.me/c123456789s> or
 twitter <https://twitter.com/c9s>, we can discuss.
+
+### Adding New Crypto Exchange support?
+
+If you want BBGO to support a new crypto exchange that is not included in the current BBGO, we can implement it for you.
+The cost is 10 ETH. If you're interested in it, DM me in telegram <https://t.me/c123456789s>.
 
 ## Contributing
 
