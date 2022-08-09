@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -21,6 +22,8 @@ type TradeCollector struct {
 	position   *types.Position
 	orderStore *OrderStore
 	doneTrades map[types.TradeKey]struct{}
+
+	mu sync.Mutex
 
 	recoverCallbacks []func(trade types.Trade)
 
@@ -100,11 +103,18 @@ func (c *TradeCollector) Recover(ctx context.Context, ex types.ExchangeTradeHist
 	return nil
 }
 
+func (c *TradeCollector) setDone(key types.TradeKey) {
+	c.mu.Lock()
+	c.doneTrades[key] = struct{}{}
+	c.mu.Unlock()
+}
+
 // Process filters the received trades and see if there are orders matching the trades
 // if we have the order in the order store, then the trade will be considered for the position.
 // profit will also be calculated.
 func (c *TradeCollector) Process() bool {
 	positionChanged := false
+
 	c.tradeStore.Filter(func(trade types.Trade) bool {
 		key := trade.Key()
 
@@ -114,7 +124,8 @@ func (c *TradeCollector) Process() bool {
 		}
 
 		if c.orderStore.Exists(trade.OrderID) {
-			c.doneTrades[key] = struct{}{}
+			c.setDone(key)
+
 			if c.position != nil {
 				profit, netProfit, madeProfit := c.position.AddTrade(trade)
 				if madeProfit {
@@ -169,7 +180,7 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 			c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
 		}
 
-		c.doneTrades[key] = struct{}{}
+		c.setDone(key)
 		return true
 	}
 	return false
