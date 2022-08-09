@@ -105,18 +105,28 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange)
 
 		// verify the current open orders via the RESTful API
 		log.Warnf("[ActiveOrderBook] using REStful API to verify active orders...")
-		openOrders, err := ex.QueryOpenOrders(ctx, b.Symbol)
-		if err != nil {
-			log.WithError(err).Errorf("can not query %s open orders", b.Symbol)
-			continue
+
+		orders = b.Orders()
+		var symbols = map[string]struct{}{}
+		for _, order := range orders {
+			symbols[order.Symbol] = struct{}{}
+
 		}
 
-		openOrderStore := NewOrderStore(b.Symbol)
-		openOrderStore.Add(openOrders...)
-		for _, o := range orders {
-			// if it's not on the order book (open orders), we should remove it from our local side
-			if !openOrderStore.Exists(o.OrderID) {
-				b.Remove(o)
+		for symbol := range symbols {
+			openOrders, err := ex.QueryOpenOrders(ctx, symbol)
+			if err != nil {
+				log.WithError(err).Errorf("can not query %s open orders", symbol)
+				continue
+			}
+
+			openOrderStore := NewOrderStore(symbol)
+			openOrderStore.Add(openOrders...)
+			for _, o := range orders {
+				// if it's not on the order book (open orders), we should remove it from our local side
+				if !openOrderStore.Exists(o.OrderID) {
+					b.Remove(o)
+				}
 			}
 		}
 	}

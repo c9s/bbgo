@@ -1,10 +1,12 @@
 package types
 
-import "math/big"
+import (
+	"math/big"
 
-import "github.com/leekchan/accounting"
+	"github.com/leekchan/accounting"
 
-import "github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+)
 
 type Acc = accounting.Accounting
 
@@ -23,6 +25,17 @@ var BTC = wrapper{accounting.Accounting{Symbol: "BTC ", Precision: 8}}
 var BNB = wrapper{accounting.Accounting{Symbol: "BNB ", Precision: 4}}
 
 var FiatCurrencies = []string{"USDC", "USDT", "USD", "TWD", "EUR", "GBP", "BUSD"}
+
+var USDFiatCurrencies = []string{"USDT", "USDC", "USD", "BUSD"}
+
+func IsUSDFiatCurrency(currency string) bool {
+	for _, c := range USDFiatCurrencies {
+		if c == currency {
+			return true
+		}
+	}
+	return false
+}
 
 func IsFiatCurrency(currency string) bool {
 	for _, c := range FiatCurrencies {

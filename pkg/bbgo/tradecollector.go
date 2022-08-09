@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -21,6 +22,8 @@ type TradeCollector struct {
 	position   *types.Position
 	orderStore *OrderStore
 	doneTrades map[types.TradeKey]struct{}
+
+	mu sync.Mutex
 
 	recoverCallbacks []func(trade types.Trade)
 
@@ -100,11 +103,18 @@ func (c *TradeCollector) Recover(ctx context.Context, ex types.ExchangeTradeHist
 	return nil
 }
 
+func (c *TradeCollector) setDone(key types.TradeKey) {
+	c.mu.Lock()
+	c.doneTrades[key] = struct{}{}
+	c.mu.Unlock()
+}
+
 // Process filters the received trades and see if there are orders matching the trades
 // if we have the order in the order store, then the trade will be considered for the position.
 // profit will also be calculated.
 func (c *TradeCollector) Process() bool {
 	positionChanged := false
+
 	c.tradeStore.Filter(func(trade types.Trade) bool {
 		key := trade.Key()
 
@@ -114,22 +124,28 @@ func (c *TradeCollector) Process() bool {
 		}
 
 		if c.orderStore.Exists(trade.OrderID) {
-			c.doneTrades[key] = struct{}{}
-			profit, netProfit, madeProfit := c.position.AddTrade(trade)
-			if madeProfit {
-				p := c.position.NewProfit(trade, profit, netProfit)
-				c.EmitTrade(trade, profit, netProfit)
-				c.EmitProfit(trade, &p)
+			c.setDone(key)
+
+			if c.position != nil {
+				profit, netProfit, madeProfit := c.position.AddTrade(trade)
+				if madeProfit {
+					p := c.position.NewProfit(trade, profit, netProfit)
+					c.EmitTrade(trade, profit, netProfit)
+					c.EmitProfit(trade, &p)
+				} else {
+					c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
+					c.EmitProfit(trade, nil)
+				}
+				positionChanged = true
 			} else {
 				c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
-				c.EmitProfit(trade, nil)
 			}
-			positionChanged = true
 			return true
 		}
 		return false
 	})
-	if positionChanged {
+
+	if positionChanged && c.position != nil {
 		c.EmitPositionUpdate(c.position)
 	}
 
@@ -149,17 +165,22 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 			return false
 		}
 
-		profit, netProfit, madeProfit := c.position.AddTrade(trade)
-		if madeProfit {
-			p := c.position.NewProfit(trade, profit, netProfit)
-			c.EmitTrade(trade, profit, netProfit)
-			c.EmitProfit(trade, &p)
+		if c.position != nil {
+			profit, netProfit, madeProfit := c.position.AddTrade(trade)
+			if madeProfit {
+				p := c.position.NewProfit(trade, profit, netProfit)
+				c.EmitTrade(trade, profit, netProfit)
+				c.EmitProfit(trade, &p)
+			} else {
+				c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
+				c.EmitProfit(trade, nil)
+			}
+			c.EmitPositionUpdate(c.position)
 		} else {
 			c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
-			c.EmitProfit(trade, nil)
 		}
-		c.EmitPositionUpdate(c.position)
-		c.doneTrades[key] = struct{}{}
+
+		c.setDone(key)
 		return true
 	}
 	return false

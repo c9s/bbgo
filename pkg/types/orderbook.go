@@ -114,12 +114,16 @@ func (b *MutexOrderBook) Update(update SliceOrderBook) {
 	b.Unlock()
 }
 
+//go:generate callbackgen -type StreamOrderBook
 // StreamOrderBook receives streaming data from websocket connection and
 // update the order book with mutex lock, so you can safely access it.
 type StreamOrderBook struct {
 	*MutexOrderBook
 
 	C sigchan.Chan
+
+	updateCallbacks   []func(update SliceOrderBook)
+	snapshotCallbacks []func(snapshot SliceOrderBook)
 }
 
 func NewStreamBook(symbol string) *StreamOrderBook {
@@ -136,6 +140,7 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 		}
 
 		sb.Load(book)
+		sb.EmitSnapshot(book)
 		sb.C.Emit()
 	})
 
@@ -145,6 +150,7 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 		}
 
 		sb.Update(book)
+		sb.EmitUpdate(book)
 		sb.C.Emit()
 	})
 }

@@ -1,4 +1,4 @@
-package types
+package util
 
 const GreenColor = "#228B22"
 const RedColor = "#800000"

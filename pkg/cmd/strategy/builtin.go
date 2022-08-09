@@ -1,4 +1,4 @@
-package cmd
+package strategy
 
 // import built-in strategies
 import (
