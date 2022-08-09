@@ -214,11 +214,11 @@ func (k KLine) GetChange() fixedpoint.Value {
 
 func (k KLine) Color() string {
 	if k.Direction() > 0 {
-		return GreenColor
+		return util.GreenColor
 	} else if k.Direction() < 0 {
-		return RedColor
+		return util.RedColor
 	}
-	return GrayColor
+	return util.GrayColor
 }
 
 func (k KLine) String() string {
@@ -368,11 +368,11 @@ func (k KLineWindow) GetTrend() int {
 
 func (k KLineWindow) Color() string {
 	if k.GetTrend() > 0 {
-		return GreenColor
+		return util.GreenColor
 	} else if k.GetTrend() < 0 {
-		return RedColor
+		return util.RedColor
 	}
-	return GrayColor
+	return util.GrayColor
 }
 
 // Mid price

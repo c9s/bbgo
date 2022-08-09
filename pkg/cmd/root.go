@@ -62,15 +62,15 @@ var RootCmd = &cobra.Command{
 		}
 
 		if cpuProfile != "" {
-			log.Infof("starting cpu profiler...")
+			log.Infof("starting cpu profiler, recording at %s", cpuProfile)
 
 			cpuProfileFile, err = os.Create(cpuProfile)
 			if err != nil {
-				log.Fatal("could not create CPU profile: ", err)
+				return errors.Wrap(err, "can not create file for CPU profile")
 			}
 
 			if err := pprof.StartCPUProfile(cpuProfileFile); err != nil {
-				log.Fatal("could not start CPU profile: ", err)
+				return errors.Wrap(err, "can not start CPU profile")
 			}
 		}
 

@@ -314,6 +314,9 @@ func (tree *RBTree) RotateRight(y *RBNode) {
 	y.left = x.right
 
 	if !x.right.isNil() {
+		if x.right == nil {
+			panic(fmt.Errorf("x.right is nil: node = %+v, left = %+v, right = %+v, parent = %+v", x, x.left, x.right, x.parent))
+		}
 		x.right.parent = y
 	}
 

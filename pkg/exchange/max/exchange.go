@@ -168,7 +168,42 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
+func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
+	if q.OrderID == "" {
+		return nil, errors.New("max.QueryOrder: OrderID is required parameter")
+	}
+
+	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	maxTrades, err := e.v3order.NewGetOrderTradesRequest().OrderID(uint64(orderID)).Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var trades []types.Trade
+	for _, t := range maxTrades {
+		localTrade, err := toGlobalTrade(t)
+		if err != nil {
+			log.WithError(err).Errorf("can not convert trade: %+v", t)
+			continue
+		}
+
+		trades = append(trades, *localTrade)
+	}
+
+	// ensure everything is sorted ascending
+	trades = types.SortTradesAscending(trades)
+	return trades, nil
+}
+
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	if q.OrderID == "" {
+		return nil, errors.New("max.QueryOrder: OrderID is required parameter")
+	}
+
 	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
 	if err != nil {
 		return nil, err
