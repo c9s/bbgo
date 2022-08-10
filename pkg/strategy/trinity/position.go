@@ -53,6 +53,8 @@ func (p *MultiCurrencyPosition) handleTrade(trade types.Trade) {
 
 	if types.IsUSDFiatCurrency(market.QuoteCurrency) {
 		p.TradePrices[market.BaseCurrency] = trade.Price
+	} else if types.IsUSDFiatCurrency(market.BaseCurrency) { // For USDT/TWD pair, convert USDT/TWD price to TWD/USDT
+		p.TradePrices[market.QuoteCurrency] = one.Div(trade.Price)
 	}
 
 	if !trade.Fee.IsZero() {
@@ -101,7 +103,7 @@ func (p *MultiCurrencyPosition) Reset() {
 }
 
 func (p *MultiCurrencyPosition) String() (o string) {
-	o += "profits: \n"
+	o += "position: \n"
 
 	for currency, base := range p.Currencies {
 		if base.IsZero() {

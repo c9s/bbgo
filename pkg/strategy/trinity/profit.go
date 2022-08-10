@@ -16,7 +16,7 @@ type Profit struct {
 }
 
 func (p *Profit) PlainText() string {
-	var title = fmt.Sprintf("Triangular PnL ")
+	var title = fmt.Sprintf("Arbitrage Profit ")
 	title += util.PnLEmojiSimple(p.Profit) + " "
 	title += util.PnLSignString(p.Profit) + " " + p.Asset
 

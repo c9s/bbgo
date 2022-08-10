@@ -455,18 +455,29 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		}
 	*/
 
-	log.Infof("final position: %s", s.Position.String())
+	log.Info(s.Position.String())
 
 	profits := s.Position.CollectProfits()
+	profitInUSD := fixedpoint.Zero
 	for _, profit := range profits {
 		bbgo.Notify(&profit)
 		log.Info(profit.PlainText())
+		profitInUSD = profitInUSD.Add(profit.ProfitInUSD)
 	}
+
+	notifyUsdPnL(profitInUSD)
 
 	if s.CoolingDownTime > 0 {
 		log.Infof("cooling down for %s", s.CoolingDownTime.Duration().String())
 		time.Sleep(s.CoolingDownTime.Duration())
 	}
+}
+
+func notifyUsdPnL(profit fixedpoint.Value) {
+	var title = fmt.Sprintf("Triangular Sum PnL ~= ")
+	title += util.PnLEmojiSimple(profit) + " "
+	title += util.PnLSignString(profit) + " USD"
+	bbgo.Notify(title)
 }
 
 func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder) (types.OrderSlice, error) {
