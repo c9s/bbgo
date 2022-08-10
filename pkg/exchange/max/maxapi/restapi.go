@@ -11,6 +11,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"regexp"
 	"strings"
@@ -40,6 +41,7 @@ const (
 var httpTransportMaxIdleConnsPerHost = http.DefaultMaxIdleConnsPerHost
 var httpTransportMaxIdleConns = 100
 var httpTransportIdleConnTimeout = 90 * time.Second
+var disableUserAgentHeader = false
 
 func init() {
 
@@ -50,8 +52,13 @@ func init() {
 	if val, ok := util.GetEnvVarInt("HTTP_TRANSPORT_MAX_IDLE_CONNS"); ok {
 		httpTransportMaxIdleConns = val
 	}
+
 	if val, ok := util.GetEnvVarDuration("HTTP_TRANSPORT_IDLE_CONN_TIMEOUT"); ok {
 		httpTransportIdleConnTimeout = val
+	}
+
+	if val, ok := util.GetEnvVarBool("DISABLE_MAX_USER_AGENT_HEADER"); ok {
+		disableUserAgentHeader = val
 	}
 }
 
@@ -77,7 +84,10 @@ var httpTransport = &http.Transport{
 		Timeout:   10 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}).DialContext,
-	ForceAttemptHTTP2:     true,
+
+	// ForceAttemptHTTP2:     true,
+	// DisableCompression:    false,
+
 	MaxIdleConns:          httpTransportMaxIdleConns,
 	MaxIdleConnsPerHost:   httpTransportMaxIdleConnsPerHost,
 	IdleConnTimeout:       httpTransportIdleConnTimeout,
@@ -218,16 +228,18 @@ func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refU
 	req.Header.Add("X-MAX-PAYLOAD", encoded)
 	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, c.APISecret))
 
-	return req, nil
-}
-
-func (c *RestClient) sendAuthenticatedRequest(m string, refURL string, data map[string]interface{}) (*requestgen.Response, error) {
-	req, err := c.newAuthenticatedRequest(nil, m, refURL, nil, data, nil)
-	if err != nil {
-		return nil, err
+	if disableUserAgentHeader {
+		req.Header.Set("USER-AGENT", "")
+	} else {
+		req.Header.Set("USER-AGENT", UserAgent)
 	}
 
-	return c.SendRequest(req)
+	if false {
+		out, _ := httputil.DumpRequestOut(req, true)
+		fmt.Println(string(out))
+	}
+
+	return req, nil
 }
 
 // ErrorResponse is the custom error type that is returned if the API returns an
