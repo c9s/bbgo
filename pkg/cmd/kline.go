@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -52,6 +53,19 @@ var klineCmd = &cobra.Command{
 		interval, err := cmd.Flags().GetString("interval")
 		if err != nil {
 			return err
+		}
+
+		now := time.Now()
+		kLines, err := session.Exchange.QueryKLines(ctx, symbol, types.Interval(interval), types.KLineQueryOptions{
+			Limit:   50,
+			EndTime: &now,
+		})
+		if err != nil {
+			return err
+		}
+		log.Infof("kLines from RESTful API")
+		for _, k := range kLines {
+			log.Info(k.String())
 		}
 
 		s := session.Exchange.NewStream()
