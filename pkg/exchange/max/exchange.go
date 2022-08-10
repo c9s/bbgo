@@ -515,7 +515,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 		req.Market(toLocalSymbol(o.Symbol)).
 			Side(toLocalSideType(o.Side)).
 			Volume(quantityString).
-			OrderType(string(orderType)).
+			OrderType(orderType).
 			ClientOrderID(clientOrderID)
 
 		switch o.Type {
