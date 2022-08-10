@@ -26,22 +26,18 @@ func (s *RoiTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 	s.orderExecutor = orderExecutor
 
 	position := orderExecutor.Position()
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if kline.Symbol != position.Symbol || kline.Interval != types.Interval1m {
-			return
-		}
-
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
 		closePrice := kline.Close
 		if position.IsClosed() || position.IsDust(closePrice) {
 			return
 		}
 
 		roi := position.ROI(closePrice)
-		if roi.Compare(s.Percentage) > 0 {
+		if roi.Compare(s.Percentage) >= 0 {
 			// stop loss
 			Notify("[RoiTakeProfit] %s take profit is triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Percentage(), kline.Close.Float64())
 			_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "roiTakeProfit")
 			return
 		}
-	})
+	}))
 }
