@@ -123,7 +123,7 @@ func (reward Reward) Reward() (*types.Reward, error) {
 }
 
 type RewardService struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 }
 
 func (s *RewardService) NewGetRewardsRequest() *GetRewardsRequest {
