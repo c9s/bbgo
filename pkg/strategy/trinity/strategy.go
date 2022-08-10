@@ -184,6 +184,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.session = session
 	s.orderStore = bbgo.NewOrderStore("")
+	s.orderStore.AddOrderUpdate = true
 	s.orderStore.BindStream(session.UserDataStream)
 
 	s.activeOrders = bbgo.NewActiveOrderBook("")
@@ -336,14 +337,14 @@ func (s *Strategy) optimizeMarketQuantityPrecision() {
 	}
 
 	for _, markets := range baseMarkets {
-		var prec = 9
+		var prec = -1
 		for _, m := range markets {
-			if m.VolumePrecision < prec {
+			if prec == -1 || m.VolumePrecision < prec {
 				prec = m.VolumePrecision
 			}
 		}
 
-		if prec == 9 {
+		if prec == -1 {
 			continue
 		}
 
@@ -414,7 +415,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	if err := s.checkMinimalOrderQuantity(orders); err != nil {
-		log.WithError(err).Warnf("minimalOrderQuantity error")
+		log.WithError(err).Debugf("minimalOrderQuantity")
 		return
 	}
 
@@ -474,6 +475,9 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 		return nil, errors.New("exchange does not support ExchangeOrderQueryService")
 	}
 
+	var err error
+	var filledQuantity = fixedpoint.Zero
+
 	// Change the first order to IOC
 	orders[0].Type = types.OrderTypeLimit
 	orders[0].TimeInForce = types.TimeInForceIOC
@@ -490,13 +494,20 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 		return nil, errors.New("ioc order submit error")
 	}
 
-	var err error
-	iocOrder, err = waitForOrderFilled(ctx, service, *iocOrder)
-	if err != nil {
-		return nil, err
+	o, err := s.waitWebSocketOrderDone(ctx, iocOrder.OrderID, 2*time.Millisecond, 100*time.Millisecond)
+	if o != nil && err == nil {
+		log.Infof("IOC order is directly filled: %s", o.String())
+		filledQuantity = o.ExecutedQuantity
+	} else if err != nil {
+		log.WithError(err).Warnf("fallback to RESTful API query")
+		iocOrder, err = waitForOrderFilled(ctx, service, *iocOrder)
+		if err != nil {
+			return nil, err
+		}
+
+		filledQuantity = iocOrder.ExecutedQuantity
 	}
 
-	filledQuantity := iocOrder.ExecutedQuantity
 	if filledQuantity.IsZero() {
 		s.State.IOCLossTimes++
 
@@ -505,12 +516,22 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 		return nil, nil
 	}
 
-	filledRatio := iocOrder.ExecutedQuantity.Div(iocOrder.Quantity)
+	filledRatio := filledQuantity.Div(iocOrder.Quantity)
 	bbgo.Notify("%s %s IOC order got filled %f/%f (%s)", iocOrder.Symbol, iocOrder.Side, filledQuantity.Float64(), iocOrder.Quantity.Float64(), filledRatio.Percentage())
 	log.Infof("%s %s IOC order got filled %f/%f", iocOrder.Symbol, iocOrder.Side, filledQuantity.Float64(), iocOrder.Quantity.Float64())
 
 	orders[1].Quantity = orders[1].Quantity.Mul(filledRatio)
 	orders[2].Quantity = orders[2].Quantity.Mul(filledRatio)
+
+	if orders[1].Quantity.Compare(orders[1].Market.MinQuantity) <= 0 {
+		log.Warnf("order #2 quantity %f is less than min quantity %f, skip", orders[1].Quantity.Float64(), orders[1].Market.MinQuantity.Float64())
+		return nil, nil
+	}
+
+	if orders[2].Quantity.Compare(orders[2].Market.MinQuantity) <= 0 {
+		log.Warnf("order #3 quantity %f is less than min quantity %f, skip", orders[2].Quantity.Float64(), orders[2].Market.MinQuantity.Float64())
+		return nil, nil
+	}
 
 	var orderC = make(chan types.Order, 2)
 	var wg sync.WaitGroup
@@ -585,6 +606,36 @@ func (s *Strategy) marketOrderExecution(ctx context.Context, session *bbgo.Excha
 
 	s.waitOrdersAndCollectTrades(ctx, session, createdOrders)
 	return nil
+}
+
+func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, interval, timeoutDuration time.Duration) (*types.Order, error) {
+	prof := util.StartTimeProfile("waitWebSocketOrderDone")
+	defer prof.StopAndLog(log.Infof)
+
+	timeout := time.After(timeoutDuration)
+	for {
+		select {
+
+		case <-ctx.Done():
+			return nil, ctx.Err()
+
+		case <-timeout:
+			return nil, fmt.Errorf("order wait time timeout %s", timeoutDuration)
+
+		case order := <-s.orderStore.C:
+			if order.Status == types.OrderStatusFilled || order.Status == types.OrderStatusCanceled {
+				return &order, nil
+			}
+
+		default:
+			order, ok := s.orderStore.Get(orderID)
+			if ok && (order.Status == types.OrderStatusFilled || order.Status == types.OrderStatusCanceled) {
+				return &order, nil
+			}
+
+			time.Sleep(interval)
+		}
+	}
 }
 
 func (s *Strategy) waitOrdersAndCollectTrades(ctx context.Context, session *bbgo.ExchangeSession, createdOrders types.OrderSlice) {
@@ -665,7 +716,7 @@ func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
 
 			priceDiff := o.AveragePrice.Sub(price)
 			slippage := priceDiff.Div(price)
-			log.Infof("%s %s %s AVG PRICE %f PRICE %f SLIPPAGE %s Q %f", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), slippage.Percentage(), o.Quantity.Float64())
+			log.Infof("%-8s %-4s %-10s AVG PRICE %f PRICE %f Q %f SLIPPAGE %.3f%%", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), o.Quantity.Float64(), slippage.Float64()*100.0)
 
 		case types.SideTypeBuy:
 			price := o.Price
@@ -675,7 +726,7 @@ func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
 
 			priceDiff := price.Sub(o.AveragePrice)
 			slippage := priceDiff.Div(price)
-			log.Infof("%s %s %s AVG PRICE %f PRICE %f SLIPPAGE %s Q %f", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), slippage.Percentage(), o.Quantity.Float64())
+			log.Infof("%-8s %-4s %-10s AVG PRICE %f PRICE %f Q %f SLIPPAGE %.3f%%", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), o.Quantity.Float64(), slippage.Float64()*100.0)
 		}
 	}
 }
@@ -792,6 +843,9 @@ func collectOrdersTrades(ctx context.Context, ex types.ExchangeOrderQueryService
 }
 
 func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService, order types.Order) (*types.Order, error) {
+	prof := util.StartTimeProfile("queryOrder")
+	defer prof.StopAndLog(log.Infof)
+
 	timeout := 1 * time.Minute
 	timeoutC := time.After(timeout)
 
