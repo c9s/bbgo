@@ -61,7 +61,7 @@ type GetWithdrawalAddressesRequest struct {
 }
 
 type WithdrawalService struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 }
 
 func (s *WithdrawalService) NewGetWithdrawalAddressesRequest() *GetWithdrawalAddressesRequest {
