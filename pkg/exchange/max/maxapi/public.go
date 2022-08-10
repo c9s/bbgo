@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
 	"github.com/valyala/fastjson"
 
@@ -16,7 +16,7 @@ import (
 )
 
 type PublicService struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 }
 
 type Market struct {
@@ -234,35 +234,39 @@ func (k KLine) KLine() types.KLine {
 }
 
 func (s *PublicService) KLines(symbol string, resolution string, start time.Time, limit int) ([]KLine, error) {
-	queries := url.Values{}
-	queries.Set("market", symbol)
-
 	interval, err := ParseInterval(resolution)
 	if err != nil {
 		return nil, err
 	}
-	queries.Set("period", strconv.Itoa(int(interval)))
 
-	nilTime := time.Time{}
-	if start != nilTime {
-		queries.Set("timestamp", strconv.FormatInt(start.Unix(), 10))
-	}
-
-	if limit > 0 {
-		queries.Set("limit", strconv.Itoa(limit)) // default to 30, max limit = 10,000
-	}
-
-	req, err := s.client.NewRequest(context.Background(), "GET", fmt.Sprintf("%s/k", s.client.BaseURL), queries, nil)
+	req := s.NewGetKLinesRequest()
+	req.Market(symbol).Period(int(interval)).Timestamp(start).Limit(limit)
+	data, err := req.Do(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("request build error: %s", err.Error())
+		return nil, err
 	}
 
-	resp, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %s", err.Error())
+	var kLines []KLine
+	for _, slice := range data {
+		ts := int64(slice[0])
+		startTime := time.Unix(ts, 0)
+		endTime := startTime.Add(time.Duration(interval)*time.Minute - time.Millisecond)
+		isClosed := time.Now().Before(endTime)
+		kLines = append(kLines, KLine{
+			Symbol:    symbol,
+			Interval:  resolution,
+			StartTime: startTime,
+			EndTime:   endTime,
+			Open:      fixedpoint.NewFromFloat(slice[1]),
+			High:      fixedpoint.NewFromFloat(slice[2]),
+			Low:       fixedpoint.NewFromFloat(slice[3]),
+			Close:     fixedpoint.NewFromFloat(slice[4]),
+			Volume:    fixedpoint.NewFromFloat(slice[5]),
+			Closed:    isClosed,
+		})
 	}
-
-	return parseKLines(resp.Body, symbol, resolution, interval)
+	return kLines, nil
+	// return parseKLines(resp.Body, symbol, resolution, interval)
 }
 
 func parseKLines(payload []byte, symbol, resolution string, interval Interval) (klines []KLine, err error) {
