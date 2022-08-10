@@ -381,6 +381,21 @@ func (s *Strategy) addBalanceBuffer(balances types.BalanceMap) (out types.Balanc
 	return out
 }
 
+func (s *Strategy) toProtectiveMarketOrder(order types.SubmitOrder, ratio fixedpoint.Value) types.SubmitOrder {
+	sellRatio := one.Sub(ratio)
+	buyRatio := one.Add(ratio)
+
+	switch order.Side {
+	case types.SideTypeSell:
+		order.Price = order.Price.Mul(sellRatio)
+
+	case types.SideTypeBuy:
+		order.Price = order.Price.Mul(buyRatio)
+	}
+
+	return order
+}
+
 func (s *Strategy) toProtectiveMarketOrders(orders [3]types.SubmitOrder, ratio fixedpoint.Value) [3]types.SubmitOrder {
 	sellRatio := one.Sub(ratio)
 	buyRatio := one.Add(ratio)
@@ -494,8 +509,7 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	orders[0].TimeInForce = types.TimeInForceIOC
 
 	// logSubmitOrders(orders)
-
-	orders = s.toProtectiveMarketOrders(orders, s.MarketOrderProtectiveRatio)
+	// orders = s.toProtectiveMarketOrders(orders, s.MarketOrderProtectiveRatio)
 
 	// orders[1].Type = types.OrderTypeMarket
 	// orders[2].Type = types.OrderTypeMarket
@@ -543,6 +557,9 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 		log.Warnf("order #3 quantity %f is less than min quantity %f, skip", orders[2].Quantity.Float64(), orders[2].Market.MinQuantity.Float64())
 		return nil, nil
 	}
+
+	orders[1] = s.toProtectiveMarketOrder(orders[1], s.MarketOrderProtectiveRatio)
+	orders[2] = s.toProtectiveMarketOrder(orders[2], s.MarketOrderProtectiveRatio)
 
 	var orderC = make(chan types.Order, 2)
 	var wg sync.WaitGroup
