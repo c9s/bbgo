@@ -67,7 +67,7 @@ type QueryTradeOptions struct {
 }
 
 type TradeService struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 }
 
 func (options *QueryTradeOptions) Map() map[string]interface{} {
