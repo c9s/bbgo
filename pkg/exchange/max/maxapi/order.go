@@ -4,6 +4,8 @@ package max
 //go:generate -command PostRequest requestgen -method POST
 
 import (
+	"github.com/c9s/requestgen"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -57,7 +59,7 @@ type QueryOrderOptions struct {
 
 // OrderService manages the Order endpoint.
 type OrderService struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 }
 
 type SubmitOrder struct {

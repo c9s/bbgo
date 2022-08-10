@@ -11,7 +11,7 @@ import (
 )
 
 type AccountService struct {
-	client *RestClient
+	client requestgen.AuthenticatedAPIClient
 }
 
 // Account is for max rest api v2, Balance and Type will be conflict with types.PrivateBalanceUpdate
