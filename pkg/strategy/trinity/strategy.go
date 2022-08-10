@@ -430,7 +430,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	if err := s.checkMinimalOrderQuantity(orders); err != nil {
-		log.WithError(err).Debugf("minimalOrderQuantity")
+		log.WithError(err).Warnf("order quantity too small, skip")
 		return
 	}
 
