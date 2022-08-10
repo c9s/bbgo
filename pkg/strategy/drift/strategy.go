@@ -5,15 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"os"
-	"reflect"
-	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 	"github.com/wcharczuk/go-chart/v2"
 
@@ -23,8 +20,6 @@ import (
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
 )
 
 const ID = "drift"
@@ -39,7 +34,7 @@ var Four fixedpoint.Value = fixedpoint.NewFromInt(4)
 var Three fixedpoint.Value = fixedpoint.NewFromInt(3)
 var Two fixedpoint.Value = fixedpoint.NewFromInt(2)
 var Delta fixedpoint.Value = fixedpoint.NewFromFloat(0.01)
-var Fee = fixedpoint.NewFromFloat(0.0008) // taker fee % * 2, for upper bound
+var Fee = 0.0008 // taker fee % * 2, for upper bound
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -69,9 +64,12 @@ type Strategy struct {
 	drift1m             *DriftMA
 	atr                 *indicator.ATR
 	midPrice            fixedpoint.Value
-	lock                sync.RWMutex
+	lock                sync.RWMutex `ignore:"true"`
+	positionLock        sync.RWMutex `ignore:"true"`
 	minutesCounter      int
 	orderPendingCounter map[uint64]int
+	frameKLine          *types.KLine
+	kline1m             *types.KLine
 
 	beta float64
 
@@ -117,124 +115,6 @@ type Strategy struct {
 
 	getLastPrice func() fixedpoint.Value
 	getSource    SourceFunc
-}
-
-type jsonStruct struct {
-	key   string
-	json  string
-	tp    string
-	value interface{}
-}
-type jsonArr []jsonStruct
-
-func (a jsonArr) Len() int           { return len(a) }
-func (a jsonArr) Less(i, j int) bool { return a[i].key < a[j].key }
-func (a jsonArr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-
-func (s *Strategy) Print(f io.Writer, pretty bool, withColor ...bool) {
-	//b, _ := json.MarshalIndent(s.ExitMethods, "  ", "  ")
-
-	t := table.NewWriter()
-	style := table.Style{
-		Name:    "StyleRounded",
-		Box:     table.StyleBoxRounded,
-		Color:   table.ColorOptionsDefault,
-		Format:  table.FormatOptionsDefault,
-		HTML:    table.DefaultHTMLOptions,
-		Options: table.OptionsDefault,
-		Title:   table.TitleOptionsDefault,
-	}
-	var hiyellow func(io.Writer, string, ...interface{})
-	if len(withColor) > 0 && withColor[0] {
-		if pretty {
-			style.Color = table.ColorOptionsYellowWhiteOnBlack
-			style.Color.Row = text.Colors{text.FgHiYellow, text.BgHiBlack}
-			style.Color.RowAlternate = text.Colors{text.FgYellow, text.BgBlack}
-		}
-		hiyellow = color.New(color.FgHiYellow).FprintfFunc()
-	} else {
-		hiyellow = func(a io.Writer, format string, args ...interface{}) {
-			fmt.Fprintf(a, format, args...)
-		}
-	}
-	if pretty {
-		t.SetOutputMirror(f)
-		t.SetStyle(style)
-		t.AppendHeader(table.Row{"json", "struct field name", "type", "value"})
-	}
-	hiyellow(f, "------ %s Settings ------\n", s.InstanceID())
-
-	embeddedWhiteSet := map[string]struct{}{"Window": {}, "Interval": {}, "Symbol": {}}
-	redundantSet := map[string]struct{}{}
-	var rows []table.Row
-	val := reflect.ValueOf(*s)
-	var values jsonArr
-	for i := 0; i < val.Type().NumField(); i++ {
-		t := val.Type().Field(i)
-		if !t.IsExported() {
-			continue
-		}
-		fieldName := t.Name
-		switch jsonTag := t.Tag.Get("json"); jsonTag {
-		case "-":
-		case "":
-			if t.Anonymous {
-				var target reflect.Type
-				if t.Type.Kind() == reflect.Pointer {
-					target = t.Type.Elem()
-				} else {
-					target = t.Type
-				}
-				for j := 0; j < target.NumField(); j++ {
-					tt := target.Field(j)
-					if !tt.IsExported() {
-						continue
-					}
-					fieldName := tt.Name
-					if _, ok := embeddedWhiteSet[fieldName]; !ok {
-						continue
-					}
-
-					if jtag := tt.Tag.Get("json"); jtag != "" && jtag != "-" {
-						name := strings.Split(jtag, ",")[0]
-						if _, ok := redundantSet[name]; ok {
-							continue
-						}
-						redundantSet[name] = struct{}{}
-						var value interface{}
-						if t.Type.Kind() == reflect.Pointer {
-							value = val.Field(i).Elem().Field(j).Interface()
-						} else {
-							value = val.Field(i).Field(j).Interface()
-						}
-						values = append(values, jsonStruct{key: fieldName, json: name, tp: tt.Type.String(), value: value})
-					}
-				}
-			}
-		default:
-			name := strings.Split(jsonTag, ",")[0]
-			if _, ok := redundantSet[name]; ok {
-				continue
-			}
-			redundantSet[name] = struct{}{}
-			values = append(values, jsonStruct{key: fieldName, json: name, tp: t.Type.String(), value: val.Field(i).Interface()})
-		}
-	}
-	sort.Sort(values)
-	for _, value := range values {
-		if pretty {
-			rows = append(rows, table.Row{value.json, value.key, value.tp, value.value})
-		} else {
-			hiyellow(f, "%s: %v\n", value.json, value.value)
-		}
-	}
-	if pretty {
-		rows = append(rows, table.Row{"takeProfitFactor(last)", "takeProfitFactor", "float64", s.takeProfitFactor.Last()})
-		t.AppendRows(rows)
-		t.Render()
-	} else {
-		hiyellow(f, "takeProfitFactor(last): %f\n", s.takeProfitFactor.Last())
-	}
 }
 
 func (s *Strategy) ID() string {
@@ -326,52 +206,7 @@ func (s *Strategy) SourceFuncGenerator() SourceFunc {
 	}
 }
 
-type DriftMA struct {
-	types.SeriesBase
-	ma1   types.UpdatableSeriesExtend
-	drift *indicator.Drift
-	ma2   types.UpdatableSeriesExtend
-}
-
-func (s *DriftMA) Update(value float64) {
-	s.ma1.Update(value)
-	s.drift.Update(s.ma1.Last())
-	s.ma2.Update(s.drift.Last())
-}
-
-func (s *DriftMA) Last() float64 {
-	return s.ma2.Last()
-}
-
-func (s *DriftMA) Index(i int) float64 {
-	return s.ma2.Index(i)
-}
-
-func (s *DriftMA) Length() int {
-	return s.ma2.Length()
-}
-
-func (s *DriftMA) ZeroPoint() float64 {
-	return s.drift.ZeroPoint()
-}
-
-func (s *DriftMA) Clone() *DriftMA {
-	out := DriftMA{
-		ma1:   types.Clone(s.ma1),
-		drift: s.drift.Clone(),
-		ma2:   types.Clone(s.ma2),
-	}
-	out.SeriesBase.Series = &out
-	return &out
-}
-
-func (s *DriftMA) TestUpdate(v float64) *DriftMA {
-	out := s.Clone()
-	out.Update(v)
-	return out
-}
-
-func (s *Strategy) initIndicators(kline *types.KLine, priceLines *types.Queue) error {
+func (s *Strategy) initIndicators(priceLines *types.Queue) error {
 	s.ma = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
 	s.stdevHigh = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
 	s.stdevLow = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
@@ -426,8 +261,8 @@ func (s *Strategy) initIndicators(kline *types.KLine, priceLines *types.Queue) e
 		s.atr.PushK(kline)
 		priceLines.Update(source)
 	}
-	if kline != nil && klines != nil {
-		kline.Set(&(*klines)[len(*klines)-1])
+	if s.frameKLine != nil && klines != nil {
+		s.frameKLine.Set(&(*klines)[len(*klines)-1])
 	}
 	klines, ok = store.KLinesOfInterval(types.Interval1m)
 	if !ok {
@@ -436,6 +271,9 @@ func (s *Strategy) initIndicators(kline *types.KLine, priceLines *types.Queue) e
 	for _, kline := range *klines {
 		source := s.getSource(&kline).Float64()
 		s.drift1m.Update(source)
+	}
+	if s.kline1m != nil && klines != nil {
+		s.kline1m.Set(&(*klines)[len(*klines)-1])
 	}
 	return nil
 }
@@ -450,10 +288,11 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr, takeProfitFacto
 
 		drift := s.drift1m.Array(2)
 		for _, order := range nonTraded {
+			log.Warnf("%v", order)
 			if s.minutesCounter-s.orderPendingCounter[order.OrderID] > s.PendingMinutes {
-				if order.Side == types.SideTypeBuy && drift[1] > drift[0] {
+				if order.Side == types.SideTypeBuy && drift[1] < drift[0] {
 					continue
-				} else if order.Side == types.SideTypeSell && drift[1] < drift[0] {
+				} else if order.Side == types.SideTypeSell && drift[1] > drift[0] {
 					continue
 				}
 				toCancel = true
@@ -479,6 +318,7 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr, takeProfitFacto
 					delete(s.orderPendingCounter, order.OrderID)
 				}
 			}
+			log.Warnf("cancel all %v", err)
 			return 0, err
 		}
 	}
@@ -486,7 +326,6 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr, takeProfitFacto
 }
 
 func (s *Strategy) trailingCheck(price float64, direction string) bool {
-	avg := s.buyPrice + s.sellPrice
 	if s.highestPrice > 0 && s.highestPrice < price {
 		s.highestPrice = price
 	}
@@ -498,11 +337,11 @@ func (s *Strategy) trailingCheck(price float64, direction string) bool {
 		trailingCallbackRate := s.TrailingCallbackRate[i]
 		trailingActivationRatio := s.TrailingActivationRatio[i]
 		if isShort {
-			if (avg-s.lowestPrice)/s.lowestPrice > trailingActivationRatio {
+			if (s.sellPrice-s.lowestPrice)/s.lowestPrice > trailingActivationRatio {
 				return (price-s.lowestPrice)/s.lowestPrice > trailingCallbackRate
 			}
 		} else {
-			if (s.highestPrice-avg)/avg > trailingActivationRatio {
+			if (s.highestPrice-s.buyPrice)/s.buyPrice > trailingActivationRatio {
 				return (s.highestPrice-price)/price > trailingCallbackRate
 			}
 		}
@@ -524,8 +363,7 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 			bestBid := ticker.Buy
 			bestAsk := ticker.Sell
 
-			var pricef, atr, avg float64
-			var price fixedpoint.Value
+			var pricef, atr float64
 			if util.TryLock(&s.lock) {
 				if !bestAsk.IsZero() && !bestBid.IsZero() {
 					s.midPrice = bestAsk.Add(bestBid).Div(Two)
@@ -534,18 +372,18 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 				} else {
 					s.midPrice = bestBid
 				}
-				price = s.midPrice
 				pricef = s.midPrice.Float64()
 			} else {
 				return
 			}
 
-			defer s.lock.Unlock()
+			s.lock.Unlock()
 			// for trailing stoploss during the realtime
 			if s.NoTrailingStopLoss || s.TrailingStopLossType == "kline" {
 				return
 			}
 
+			stoploss := s.StopLoss.Float64()
 			atr = s.atr.Last()
 			takeProfitFactor := s.takeProfitFactor.Predict(2)
 			numPending := 0
@@ -558,44 +396,46 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 				return
 			}
 
+			s.positionLock.Lock()
+
 			if s.highestPrice > 0 && s.highestPrice < pricef {
 				s.highestPrice = pricef
 			}
 			if s.lowestPrice > 0 && s.lowestPrice > pricef {
 				s.lowestPrice = pricef
 			}
-			avg = s.buyPrice + s.sellPrice
 
-			exitShortCondition := ( /*avg*(1.+stoploss) <= pricef || (ddrift > 0 && drift > DDriftFilterPos) ||*/ avg-atr*takeProfitFactor >= pricef ||
-				s.trailingCheck(pricef, "short")) &&
-				(s.p.IsShort() && !s.p.IsDust(price))
-			exitLongCondition := ( /*avg*(1.-stoploss) >= pricef || (ddrift < 0 && drift < DDriftFilterNeg) ||*/ avg+atr*takeProfitFactor <= pricef ||
-				s.trailingCheck(pricef, "long")) &&
-				(!s.p.IsLong() && !s.p.IsDust(price))
+			exitShortCondition := s.sellPrice > 0 && (s.sellPrice*(1.+stoploss) <= pricef || s.sellPrice-atr*takeProfitFactor >= pricef ||
+				s.trailingCheck(pricef, "short"))
+			exitLongCondition := s.buyPrice > 0 && (s.buyPrice*(1.-stoploss) >= pricef || s.buyPrice+atr*takeProfitFactor <= pricef ||
+				s.trailingCheck(pricef, "long"))
 			if exitShortCondition || exitLongCondition {
-				if exitLongCondition && s.highestPrice > avg {
-					s.takeProfitFactor.Update((s.highestPrice - avg) / atr * 1.5)
-				} else if exitShortCondition && avg > s.lowestPrice {
-					s.takeProfitFactor.Update((avg - s.lowestPrice) / atr * 1.5)
+				if exitLongCondition && s.highestPrice > s.buyPrice {
+					s.takeProfitFactor.Update((s.highestPrice - s.buyPrice) / atr * 1.5)
+				}
+				if exitShortCondition && s.sellPrice > s.lowestPrice {
+					s.takeProfitFactor.Update((s.sellPrice - s.lowestPrice) / atr * 1.5)
 				}
 				log.Infof("Close position by orderbook changes")
+				s.positionLock.Unlock()
 				_ = s.ClosePosition(ctx, fixedpoint.One)
+			} else {
+				s.positionLock.Unlock()
 			}
 		})
 		s.getLastPrice = func() (lastPrice fixedpoint.Value) {
 			var ok bool
 			s.lock.RLock()
+			defer s.lock.RUnlock()
 			if s.midPrice.IsZero() {
 				lastPrice, ok = s.Session.LastPrice(s.Symbol)
 				if !ok {
 					log.Error("cannot get lastprice")
-					s.lock.RUnlock()
 					return lastPrice
 				}
 			} else {
 				lastPrice = s.midPrice
 			}
-			s.lock.RUnlock()
 			return lastPrice
 		}
 	}
@@ -648,11 +488,7 @@ func (s *Strategy) DrawPNL(profit types.Series) *types.Canvas {
 
 func (s *Strategy) DrawCumPNL(cumProfit types.Series) *types.Canvas {
 	canvas := types.NewCanvas(s.InstanceID())
-	if s.GraphPNLDeductFee {
-		canvas.PlotRaw("cummulative pnl % (with Fee Deducted)", cumProfit, cumProfit.Length())
-	} else {
-		canvas.PlotRaw("cummulative pnl %", cumProfit, cumProfit.Length())
-	}
+	canvas.PlotRaw("cummulative pnl", cumProfit, cumProfit.Length())
 	canvas.YAxis = chart.YAxis{
 		ValueFormatter: func(v interface{}) string {
 			if vf, isFloat := v.(float64); isFloat {
@@ -701,7 +537,7 @@ func (s *Strategy) Draw(time types.Time, priceLine types.SeriesExtend, profit ty
 
 // Sending new rebalance orders cost too much.
 // Modify the position instead to expect the strategy itself rebalance on Close
-func (s *Strategy) Rebalance(ctx context.Context, orderTagHistory map[uint64]string) {
+func (s *Strategy) Rebalance(ctx context.Context) {
 	price := s.getLastPrice()
 	_, beta := types.LinearRegression(s.trendLine, 3)
 	if math.Abs(beta) > s.RebalanceFilter && math.Abs(s.beta) > s.RebalanceFilter || math.Abs(s.beta) < s.RebalanceFilter && math.Abs(beta) < s.RebalanceFilter {
@@ -722,29 +558,6 @@ func (s *Strategy) Rebalance(ctx context.Context, orderTagHistory map[uint64]str
 			s.p.Quote = q.Mul(price)
 			s.p.AverageCost = price
 		}
-		/*if total.Mul(percentage).Compare(baseBalance) > 0 {
-			q := total.Mul(percentage).Sub(baseBalance)
-			if s.Market.IsDustQuantity(q, price) {
-				return
-			}
-			err := s.GeneralOrderExecutor.GracefulCancel(ctx)
-			if err != nil {
-				panic(fmt.Sprintf("%s", err))
-			}
-			orders, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol: s.Symbol,
-				Side: types.SideTypeBuy,
-				Type: types.OrderTypeMarket,
-				Price: price,
-				Quantity: q,
-				Tag: "rebalance",
-			})
-			if err == nil {
-				orderTagHistory[orders[0].OrderID] = "rebalance"
-			} else {
-				log.WithError(err).Errorf("rebalance %v %v %v %v", total, q, balances[s.Market.QuoteCurrency].Available, quoteBalance)
-			}
-		}*/
 	} else if beta <= -s.RebalanceFilter {
 		if total.Mul(percentage).Compare(quoteBalance.Div(price)) > 0 {
 			q := total.Mul(percentage).Sub(quoteBalance.Div(price))
@@ -754,29 +567,6 @@ func (s *Strategy) Rebalance(ctx context.Context, orderTagHistory map[uint64]str
 			s.p.Quote = q.Mul(price).Neg()
 			s.p.AverageCost = price
 		}
-		/*if total.Mul(percentage).Compare(quoteBalance.Div(price)) > 0 {
-			q := total.Mul(percentage).Sub(quoteBalance.Div(price))
-			if s.Market.IsDustQuantity(q, price) {
-				return
-			}
-			err := s.GeneralOrderExecutor.GracefulCancel(ctx)
-			if err != nil {
-				panic(fmt.Sprintf("%s", err))
-			}
-			orders, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:   s.Symbol,
-				Side:     types.SideTypeSell,
-				Type:     types.OrderTypeMarket,
-				Price:    price,
-				Quantity: q,
-				Tag:      "rebalance",
-			})
-			if err == nil {
-				orderTagHistory[orders[0].OrderID] = "rebalance"
-			} else {
-				log.WithError(err).Errorf("rebalance %v %v %v %v", total, q, balances[s.Market.BaseCurrency].Available, baseBalance)
-			}
-		}*/
 	} else {
 		if total.Div(Two).Compare(quoteBalance.Div(price)) > 0 {
 			q := total.Div(Two).Sub(quoteBalance.Div(price))
@@ -854,194 +644,90 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	for _, method := range s.ExitMethods {
 		method.Bind(session, s.GeneralOrderExecutor)
 	}
-	buyPrice := fixedpoint.Zero
-	sellPrice := fixedpoint.Zero
-	Volume := fixedpoint.Zero
 	profit := types.Float64Slice{}
-	cumProfit := types.Float64Slice{1.}
-	orderTagHistory := make(map[uint64]string)
-	s.Session.UserDataStream.OnOrderUpdate(func(order types.Order) {
-		orderTagHistory[order.OrderID] = order.Tag
-	})
-	modify := func(p fixedpoint.Value) fixedpoint.Value {
+	cumProfit := types.Float64Slice{}
+	modify := func(p float64) float64 {
 		return p
 	}
 	if s.GraphPNLDeductFee {
-		modify = func(p fixedpoint.Value) fixedpoint.Value {
-			return p.Mul(fixedpoint.One.Sub(Fee))
+		modify = func(p float64) float64 {
+			return p * (1. - Fee)
 		}
 	}
-	s.Session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+	s.GeneralOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _profit, _netProfit fixedpoint.Value) {
 		s.p.AddTrade(trade)
-		tag, ok := orderTagHistory[trade.OrderID]
+		order, ok := s.GeneralOrderExecutor.TradeCollector().OrderStore().Get(trade.OrderID)
 		if !ok {
 			panic(fmt.Sprintf("cannot find order: %v", trade))
 		}
-		bp := buyPrice
-		vol := Volume
-		sp := sellPrice
-		resetPrice := false
+		tag := order.Tag
+
+		price := trade.Price.Float64()
+		balances := s.Session.GetAccount().Balances()
+
+		if s.buyPrice > 0 {
+			profit.Update(modify(price / s.buyPrice))
+			asset := balances[s.Market.BaseCurrency].Total().Mul(trade.Price).Add(balances[s.Market.QuoteCurrency].Total())
+			cumProfit.Update(asset.Float64())
+		} else if s.sellPrice > 0 {
+			profit.Update(modify(s.sellPrice / price))
+			asset := balances[s.Market.BaseCurrency].Total().Mul(trade.Price).Add(balances[s.Market.QuoteCurrency].Total())
+			cumProfit.Update(asset.Float64())
+		}
+		s.positionLock.Lock()
+		defer s.positionLock.Unlock()
 		if tag == "close" {
-			if !buyPrice.IsZero() {
-				if trade.Side == types.SideTypeSell {
-					if trade.Quantity.Compare(Volume) > 0 {
-						profit.Update(modify(trade.Price.Div(buyPrice)).Float64())
-					} else {
-						profit.Update(modify(trade.Price.Div(buyPrice)).
-							Sub(fixedpoint.One).
-							Mul(trade.Quantity).
-							Div(Volume).
-							Add(fixedpoint.One).
-							Float64())
-					}
-					cumProfit.Update(cumProfit.Last() * profit.Last())
-					Volume = Volume.Sub(trade.Quantity)
-					if Volume.Sign() < 0 {
-						sellPrice = trade.Price
-						buyPrice = fixedpoint.Zero
-						resetPrice = true
-					} else if Volume.Sign() == 0 {
-						buyPrice = fixedpoint.Zero
-						resetPrice = true
-					}
-				} else {
-					buyPrice = buyPrice.Mul(Volume).Add(trade.Price.Mul(trade.Quantity)).Div(Volume.Add(trade.Quantity))
-					Volume = Volume.Add(trade.Quantity)
-				}
-			} else if !sellPrice.IsZero() {
-				if trade.Side == types.SideTypeBuy {
-					if trade.Quantity.Compare(Volume.Neg()) > 0 {
-						profit.Update(modify(sellPrice.Div(trade.Price)).Float64())
-					} else {
-						profit.Update(modify(sellPrice.Div(trade.Price)).
-							Sub(fixedpoint.One).
-							Mul(trade.Quantity).
-							Div(Volume).
-							Neg().
-							Add(fixedpoint.One).
-							Float64())
-					}
-					cumProfit.Update(cumProfit.Last() * profit.Last())
-					Volume = Volume.Add(trade.Quantity)
-					if Volume.Sign() > 0 {
-						buyPrice = trade.Price
-						sellPrice = fixedpoint.Zero
-						resetPrice = true
-					} else if Volume.Sign() == 0 {
-						sellPrice = fixedpoint.Zero
-						resetPrice = true
-					}
-				} else {
-					sellPrice = sellPrice.Mul(Volume).Sub(trade.Price.Mul(trade.Quantity)).Div(Volume.Sub(trade.Quantity))
-					Volume = Volume.Sub(trade.Quantity)
-				}
+			if s.p.IsDust(trade.Price) {
+				s.buyPrice = 0
+				s.sellPrice = 0
+				s.highestPrice = 0
+				s.lowestPrice = 0
+			} else if s.p.IsLong() {
+
+				s.buyPrice = trade.Price.Float64()
+				s.sellPrice = 0
+				s.highestPrice = s.buyPrice
+				s.lowestPrice = 0
 			} else {
-				// position changed by strategy
-				oldSign := Volume.Sign()
-				if trade.Side == types.SideTypeBuy {
-					Volume = Volume.Add(trade.Quantity)
-					if Volume.Sign() > 0 {
-						buyPrice = trade.Price
-						sellPrice = fixedpoint.Zero
-						if oldSign <= 0 {
-							resetPrice = true
-						}
-					} else if Volume.Sign() < 0 {
-						sellPrice = trade.Price
-						buyPrice = fixedpoint.Zero
-						if oldSign >= 0 {
-							resetPrice = true
-						}
-					} else {
-						buyPrice = fixedpoint.Zero
-						sellPrice = fixedpoint.Zero
-						if oldSign != 0 {
-							resetPrice = true
-						}
-					}
-				} else if trade.Side == types.SideTypeSell {
-					sellPrice = trade.Price
-					Volume = Volume.Sub(trade.Quantity)
-					if Volume.Sign() > 0 {
-						buyPrice = trade.Price
-						sellPrice = fixedpoint.Zero
-						if oldSign <= 0 {
-							resetPrice = true
-						}
-					} else if Volume.Sign() < 0 {
-						sellPrice = trade.Price
-						buyPrice = fixedpoint.Zero
-						if oldSign >= 0 {
-							resetPrice = true
-						}
-					} else {
-						buyPrice = fixedpoint.Zero
-						sellPrice = fixedpoint.Zero
-						if oldSign != 0 {
-							resetPrice = true
-						}
-					}
-				}
+				s.sellPrice = trade.Price.Float64()
+				s.buyPrice = 0
+				s.highestPrice = 0
+				s.lowestPrice = s.sellPrice
+			}
+		} else if tag == "long" {
+			if s.p.IsDust(trade.Price) {
+				s.buyPrice = 0
+				s.sellPrice = 0
+				s.highestPrice = 0
+				s.lowestPrice = 0
+			} else if s.p.IsLong() {
+				s.buyPrice = trade.Price.Float64()
+				s.sellPrice = 0
+				s.highestPrice = s.buyPrice
+				s.lowestPrice = 0
 			}
 		} else if tag == "short" {
-			if buyPrice.IsZero() {
-				if !sellPrice.IsZero() {
-					sellPrice = sellPrice.Mul(Volume).Sub(trade.Price.Mul(trade.Quantity)).Div(Volume.Sub(trade.Quantity))
-				} else {
-					sellPrice = trade.Price
-				}
-			} else {
-				profit.Update(modify(trade.Price.Div(buyPrice)).Float64())
-				cumProfit.Update(cumProfit.Last() * profit.Last())
-				buyPrice = fixedpoint.Zero
-				Volume = fixedpoint.Zero
-				sellPrice = trade.Price
+			if s.p.IsDust(trade.Price) {
+				s.sellPrice = 0
+				s.buyPrice = 0
+				s.highestPrice = 0
+				s.lowestPrice = 0
+			} else if s.p.IsShort() {
+				s.sellPrice = trade.Price.Float64()
+				s.buyPrice = 0
+				s.highestPrice = 0
+				s.lowestPrice = s.sellPrice
 			}
-			Volume = Volume.Sub(trade.Quantity)
-			resetPrice = true
-		} else if tag == "long" {
-			if sellPrice.IsZero() {
-				if !buyPrice.IsZero() {
-					buyPrice = buyPrice.Mul(Volume).Add(trade.Price.Mul(trade.Quantity)).Div(Volume.Add(trade.Quantity))
-				} else {
-					buyPrice = trade.Price
-				}
-			} else {
-				profit.Update(modify(sellPrice.Div(trade.Price)).Float64())
-				cumProfit.Update(cumProfit.Last() * profit.Last())
-				sellPrice = fixedpoint.Zero
-				buyPrice = trade.Price
-				Volume = fixedpoint.Zero
-			}
-			Volume = Volume.Add(trade.Quantity)
-			resetPrice = true
-		} else if tag == "rebalance" {
-			if sellPrice.IsZero() {
-				profit.Update(modify(sellPrice.Div(trade.Price)).Float64())
-			} else {
-				profit.Update(modify(trade.Price.Div(buyPrice)).Float64())
-			}
-			resetPrice = true
-			cumProfit.Update(cumProfit.Last() * profit.Last())
-			sellPrice = fixedpoint.Zero
-			buyPrice = fixedpoint.Zero
-			Volume = fixedpoint.Zero
-			s.p.Lock()
-			defer s.p.Unlock()
-			s.p.Reset()
+		} else {
+			panic("tag unknown")
 		}
-		s.buyPrice = buyPrice.Float64()
-		s.sellPrice = sellPrice.Float64()
-		if resetPrice {
-			s.highestPrice = s.buyPrice
-			s.lowestPrice = s.sellPrice
-		}
-		bbgo.Notify("tag %s %v %s volafter: %v, quantity: %v, bp: %v, sp: %v, volbefore: %v, bpafter: %v, spafter: %v", tag, trade.Price, trade.Side, Volume, trade.Quantity, bp, sp, vol, s.buyPrice, s.sellPrice)
+		bbgo.Notify("tag: %s, sp: %.4f bp: %.4f hp: %.4f lp: %.4f, trade: %s, pos: %s", tag, s.sellPrice, s.buyPrice, s.highestPrice, s.lowestPrice, trade.String(), s.p.String())
 	})
 
-	dynamicKLine := &types.KLine{}
+	s.frameKLine = &types.KLine{}
+	s.kline1m = &types.KLine{}
 	priceLine := types.NewQueue(300)
-	if err := s.initIndicators(dynamicKLine, priceLine); err != nil {
+	if err := s.initIndicators(priceLine); err != nil {
 		log.WithError(err).Errorf("initIndicator failed")
 		return nil
 	}
@@ -1055,7 +741,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	bbgo.RegisterCommand("/draw", "Draw Indicators", func(reply interact.Reply) {
-		canvas := s.DrawIndicators(dynamicKLine.StartTime, priceLine, zeroPoints)
+		canvas := s.DrawIndicators(s.frameKLine.StartTime, priceLine, zeroPoints)
 		var buffer bytes.Buffer
 		if err := canvas.Render(chart.PNG, &buffer); err != nil {
 			log.WithError(err).Errorf("cannot render indicators in drift")
@@ -1093,10 +779,24 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		reply.Message(buffer.String())
 	})
 
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		if s.Status != types.StrategyStatusRunning {
-			return
+	bbgo.RegisterCommand("/pos", "Show internal position", func(reply interact.Reply) {
+		reply.Message(s.p.String())
+	})
+
+	bbgo.RegisterCommand("/dump", "Dump internal params", func(reply interact.Reply) {
+		reply.Message("Please enter series output length:")
+	}).Next(func(length string, reply interact.Reply) {
+		var buffer bytes.Buffer
+		l, err := strconv.Atoi(length)
+		if err != nil {
+			s.ParamDump(&buffer)
+		} else {
+			s.ParamDump(&buffer, l)
 		}
+		reply.Message(buffer.String())
+	})
+
+	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		if kline.Symbol != s.Symbol {
 			return
 		}
@@ -1107,8 +807,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 		if kline.Interval == types.Interval1m {
+			s.kline1m.Set(&kline)
 			s.drift1m.Update(s.getSource(&kline).Float64())
 			s.minutesCounter += 1
+			if s.Status != types.StrategyStatusRunning {
+				return
+			}
 			if s.NoTrailingStopLoss || s.TrailingStopLossType == "realtime" {
 				return
 			}
@@ -1125,40 +829,43 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 			if numPending > 0 {
+				log.Infof("pending orders: %d, exit", numPending)
 				return
 			}
 
 			lowf := math.Min(kline.Low.Float64(), pricef)
 			highf := math.Max(kline.High.Float64(), pricef)
+			s.positionLock.Lock()
 			if s.lowestPrice > 0 && lowf < s.lowestPrice {
 				s.lowestPrice = lowf
 			}
 			if s.highestPrice > 0 && highf > s.highestPrice {
 				s.highestPrice = highf
 			}
-			avg := s.buyPrice + s.sellPrice
-			exitShortCondition := ( /*avg*(1.+stoploss) <= pricef || (drift > 0 || ddrift > DDriftFilterPos) ||*/ avg-atr*takeProfitFactor >= pricef ||
-				s.trailingCheck(highf, "short")) &&
-				(s.p.IsShort() && !s.p.IsDust(price))
-			exitLongCondition := ( /*avg*(1.-stoploss) >= pricef || (drift < 0 || ddrift < DDriftFilterNeg) ||*/ avg+atr*takeProfitFactor <= pricef ||
-				s.trailingCheck(lowf, "long")) &&
-				(s.p.IsLong() && !s.p.IsDust(price))
+			exitShortCondition := s.sellPrice > 0 && (s.sellPrice*(1.+stoploss) <= highf || s.sellPrice-atr*takeProfitFactor >= lowf ||
+				s.trailingCheck(highf, "short"))
+			exitLongCondition := s.buyPrice > 0 && (s.buyPrice*(1.-stoploss) >= lowf || s.buyPrice+atr*takeProfitFactor <= highf ||
+				s.trailingCheck(lowf, "long"))
 			if exitShortCondition || exitLongCondition {
-				if exitLongCondition && s.highestPrice > avg {
-					s.takeProfitFactor.Update((s.highestPrice - avg) / atr * 1.5)
-				} else if exitShortCondition && avg > s.lowestPrice {
-					s.takeProfitFactor.Update((avg - s.lowestPrice) / atr * 1.5)
+				if exitLongCondition && s.highestPrice > s.buyPrice {
+					s.takeProfitFactor.Update((s.highestPrice - s.buyPrice) / atr * 1.5)
 				}
+				if exitShortCondition && s.sellPrice > s.lowestPrice {
+					s.takeProfitFactor.Update((s.sellPrice - s.lowestPrice) / atr * 1.5)
+				}
+				s.positionLock.Unlock()
 				_ = s.ClosePosition(ctx, fixedpoint.One)
+			} else {
+				s.positionLock.Unlock()
 			}
 			return
 		}
 		if kline.Interval != s.Interval {
 			return
 		}
-		dynamicKLine.Set(&kline)
+		s.frameKLine.Set(&kline)
 
-		source := s.getSource(dynamicKLine)
+		source := s.getSource(s.frameKLine)
 		sourcef := source.Float64()
 		priceLine.Update(sourcef)
 		s.ma.Update(sourcef)
@@ -1182,6 +889,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		highdiff := highf - s.ma.Last()
 		s.stdevHigh.Update(highdiff)
 
+		if s.Status != types.StrategyStatusRunning {
+			return
+		}
+
+		s.positionLock.Lock()
 		log.Errorf("highdiff: %3.2f ma: %.2f, close: %8v, high: %8v, low: %8v, time: %v", s.stdevHigh.Last(), s.ma.Last(), kline.Close, kline.High, kline.Low, kline.StartTime)
 		if s.lowestPrice > 0 && lowf < s.lowestPrice {
 			s.lowestPrice = lowf
@@ -1189,34 +901,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if s.highestPrice > 0 && highf > s.highestPrice {
 			s.highestPrice = highf
 		}
-		avg := s.buyPrice + s.sellPrice
 		takeProfitFactor := s.takeProfitFactor.Predict(2)
 
 		if !s.NoRebalance {
-			s.Rebalance(ctx, orderTagHistory)
+			s.Rebalance(ctx)
 		}
 
-		//if !s.IsBackTesting() {
 		balances := s.GeneralOrderExecutor.Session().GetAccount().Balances()
-		bbgo.Notify("source: %.4f, price: %.4f, driftPred: %.4f, ddriftPred: %.4f, drift[1]: %.4f, ddrift[1]: %.4f, atr: %.4f, avg: %.4f, takeProfitFact: %.4f, lowf %.4f, highf: %.4f",
-			sourcef, pricef, driftPred, ddriftPred, drift[1], ddrift[1], atr, avg, takeProfitFactor, lowf, highf)
+		bbgo.Notify("source: %.4f, price: %.4f, driftPred: %.4f, ddriftPred: %.4f, drift[1]: %.4f, ddrift[1]: %.4f, atr: %.4f, takeProfitFact: %.4f, lowf %.4f, highf: %.4f lowest: %.4f highest: %.4f sp %.4f bp %.4f",
+			sourcef, pricef, driftPred, ddriftPred, drift[1], ddrift[1], atr, takeProfitFactor, lowf, highf, s.lowestPrice, s.highestPrice, s.sellPrice, s.buyPrice)
 		// Notify will parse args to strings and process separately
 		bbgo.Notify("balances: [Base] %s(%vU) [Quote] %s",
 			balances[s.Market.BaseCurrency].String(),
 			balances[s.Market.BaseCurrency].Total().Mul(price),
 			balances[s.Market.QuoteCurrency].String())
-		//}
 
 		shortCondition := (drift[1] >= DriftFilterNeg || ddrift[1] >= 0) && (driftPred <= DDriftFilterNeg || ddriftPred <= 0) || drift[1] < 0 && drift[0] < 0
 		longCondition := (drift[1] <= DriftFilterPos || ddrift[1] <= 0) && (driftPred >= DDriftFilterPos || ddriftPred >= 0) || drift[1] > 0 && drift[0] > 0
-		exitShortCondition := ((drift[0] >= DDriftFilterPos && ddrift[0] >= 0) ||
-			avg*(1.+stoploss) <= pricef ||
-			avg-atr*takeProfitFactor >= pricef) &&
-			s.p.IsShort()
-		exitLongCondition := ((drift[0] <= DDriftFilterNeg && ddrift[0] <= 0) ||
-			avg*(1.-stoploss) >= pricef ||
-			avg+atr*takeProfitFactor <= pricef) &&
-			s.p.IsLong()
 		if shortCondition && longCondition {
 			if drift[1] > drift[0] {
 				longCondition = false
@@ -1224,26 +925,38 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				shortCondition = false
 			}
 		}
+		exitShortCondition := s.sellPrice > 0 && ( //!shortCondition && !longCondition ||
+		s.sellPrice*(1.+stoploss) <= highf ||
+			s.trailingCheck(pricef, "short") ||
+			s.sellPrice-atr*takeProfitFactor >= s.lowestPrice)
+		exitLongCondition := s.buyPrice > 0 && ( //!longCondition && !shortCondition ||
+		s.buyPrice*(1.-stoploss) >= lowf ||
+			s.trailingCheck(pricef, "long") ||
+			s.buyPrice+atr*takeProfitFactor <= s.highestPrice)
 
-		if (exitShortCondition || exitLongCondition) && s.p.IsOpened(price) && !shortCondition && !longCondition {
+		if exitShortCondition || exitLongCondition {
 			if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
 				log.WithError(err).Errorf("cannot cancel orders")
+				s.positionLock.Unlock()
 				return
 			}
-			if exitShortCondition && avg > s.lowestPrice {
-				s.takeProfitFactor.Update((avg - s.lowestPrice) / atr * 1.5)
-			} else if exitLongCondition && avg < s.highestPrice {
-				s.takeProfitFactor.Update((s.highestPrice - avg) / atr * 1.5)
+			if exitShortCondition && s.sellPrice > s.lowestPrice {
+				s.takeProfitFactor.Update((s.sellPrice - s.lowestPrice) / atr * 1.5)
+			}
+			if exitLongCondition && s.buyPrice < s.highestPrice {
+				s.takeProfitFactor.Update((s.highestPrice - s.buyPrice) / atr * 1.5)
 			}
 			if s.takeProfitFactor.Last() == 0 {
-				log.Errorf("exit %f %f %f %v", s.highestPrice, s.lowestPrice, avg, s.takeProfitFactor.Array(10))
+				log.Errorf("exit %f %f %v", s.highestPrice, s.lowestPrice, s.takeProfitFactor.Array(10))
 			}
+			s.positionLock.Unlock()
 			_ = s.ClosePosition(ctx, fixedpoint.One)
 			return
 		}
 		if longCondition {
 			if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
 				log.WithError(err).Errorf("cannot cancel orders")
+				s.positionLock.Unlock()
 				return
 			}
 			source = source.Sub(fixedpoint.NewFromFloat(s.stdevLow.Last() * s.HighLowVarianceMultiplier))
@@ -1255,15 +968,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
 			if !ok {
 				log.Errorf("unable to get quoteCurrency")
+				s.positionLock.Unlock()
 				return
 			}
 			if s.Market.IsDustQuantity(
 				quoteBalance.Available.Div(source), source) {
+				s.positionLock.Unlock()
 				return
 			}
-			if avg > s.lowestPrice && s.Position.IsShort() {
-				s.takeProfitFactor.Update((avg - s.lowestPrice) / atr * 1.5)
+			if s.sellPrice > s.lowestPrice && s.lowestPrice > 0 {
+				s.takeProfitFactor.Update((s.sellPrice - s.lowestPrice) / atr * 1.5)
 			}
+			s.positionLock.Unlock()
 			quantity := quoteBalance.Available.Div(source)
 			createdOrders, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:   s.Symbol,
@@ -1277,18 +993,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.WithError(err).Errorf("cannot place buy order")
 				return
 			}
-			orderTagHistory[createdOrders[0].OrderID] = "long"
 			s.orderPendingCounter[createdOrders[0].OrderID] = s.minutesCounter
 			return
 		}
 		if shortCondition {
 			if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
 				log.WithError(err).Errorf("cannot cancel orders")
+				s.positionLock.Unlock()
 				return
 			}
 			baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
 			if !ok {
 				log.Errorf("unable to get baseBalance")
+				s.positionLock.Unlock()
 				return
 			}
 			source = source.Add(fixedpoint.NewFromFloat(s.stdevHigh.Last() * s.HighLowVarianceMultiplier))
@@ -1298,11 +1015,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			sourcef = source.Float64()
 
 			if s.Market.IsDustQuantity(baseBalance.Available, source) {
+				s.positionLock.Unlock()
 				return
 			}
-			if avg < s.highestPrice && avg > 0 && s.Position.IsLong() {
-				s.takeProfitFactor.Update((s.highestPrice - avg) / atr * 1.5)
+			if s.buyPrice < s.highestPrice && s.buyPrice > 0 {
+				s.takeProfitFactor.Update((s.highestPrice - s.buyPrice) / atr * 1.5)
 			}
+			s.positionLock.Unlock()
 			// Cleanup pending StopOrders
 			quantity := baseBalance.Available
 			createdOrders, err := s.GeneralOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
@@ -1317,7 +1036,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				log.WithError(err).Errorf("cannot place sell order")
 				return
 			}
-			orderTagHistory[createdOrders[0].OrderID] = "short"
 			s.orderPendingCounter[createdOrders[0].OrderID] = s.minutesCounter
 			return
 		}
@@ -1333,7 +1051,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		os.Stdout.Write(buffer.Bytes())
 
 		if s.GenerateGraph {
-			s.Draw(dynamicKLine.StartTime, priceLine, &profit, &cumProfit, zeroPoints)
+			s.Draw(s.frameKLine.StartTime, priceLine, &profit, &cumProfit, zeroPoints)
 		}
 
 		wg.Done()
