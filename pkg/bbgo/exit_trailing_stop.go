@@ -76,10 +76,16 @@ func (s *TrailingStop2) getRatio(price fixedpoint.Value, position *types.Positio
 	switch s.Side {
 	case types.SideTypeBuy:
 		// for short position, it's:
-		//  (avg_cost - price) / price
-		return position.AverageCost.Sub(price).Div(price), nil
+		//  (avg_cost - price) / avg_cost
+		return position.AverageCost.Sub(price).Div(position.AverageCost), nil
 	case types.SideTypeSell:
 		return price.Sub(position.AverageCost).Div(position.AverageCost), nil
+	case types.SideTypeBoth:
+		if position.IsLong() {
+			return price.Sub(position.AverageCost).Div(position.AverageCost), nil
+		} else if position.IsShort() {
+			return position.AverageCost.Sub(price).Div(position.AverageCost), nil
+		}
 	}
 
 	return fixedpoint.Zero, fmt.Errorf("unexpected side type: %v", s.Side)
@@ -90,23 +96,21 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 		return nil
 	}
 
-	if (position.IsLong() && s.Side == types.SideTypeSell) || (position.IsShort() && s.Side == types.SideTypeBuy) {
-		if !s.MinProfit.IsZero() {
-			// check if we have the minimal profit
-			roi := position.ROI(price)
-			if roi.Compare(s.MinProfit) >= 0 {
-				Notify("[trailingStop] activated: ROI %f > minimal profit ratio %f", roi.Float64(), s.MinProfit.Float64())
-				s.activated = true
-			}
-		} else if !s.ActivationRatio.IsZero() {
-			ratio, err := s.getRatio(price, position)
-			if err != nil {
-				return err
-			}
+	if !s.MinProfit.IsZero() {
+		// check if we have the minimal profit
+		roi := position.ROI(price)
+		if roi.Compare(s.MinProfit) >= 0 {
+			Notify("[trailingStop] activated: ROI %f > minimal profit ratio %f", roi.Float64(), s.MinProfit.Float64())
+			s.activated = true
+		}
+	} else if !s.ActivationRatio.IsZero() {
+		ratio, err := s.getRatio(price, position)
+		if err != nil {
+			return err
+		}
 
-			if ratio.Compare(s.ActivationRatio) >= 0 {
-				s.activated = true
-			}
+		if ratio.Compare(s.ActivationRatio) >= 0 {
+			s.activated = true
 		}
 	}
 
@@ -119,6 +123,12 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 			s.latestHigh = fixedpoint.Min(price, s.latestHigh)
 		case types.SideTypeSell:
 			s.latestHigh = fixedpoint.Max(price, s.latestHigh)
+		case types.SideTypeBoth:
+			if position.IsLong() {
+				s.latestHigh = fixedpoint.Max(price, s.latestHigh)
+			} else if position.IsShort() {
+				s.latestHigh = fixedpoint.Min(price, s.latestHigh)
+			}
 		}
 	}
 
@@ -128,16 +138,26 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 
 	switch s.Side {
 	case types.SideTypeBuy:
-		if position.IsShort() {
-			change := price.Sub(s.latestHigh).Div(s.latestHigh)
+		change := price.Sub(s.latestHigh).Div(s.latestHigh)
+		if change.Compare(s.CallbackRate) >= 0 {
+			// submit order
+			return s.triggerStop(price)
+		}
+	case types.SideTypeSell:
+		change := s.latestHigh.Sub(price).Div(s.latestHigh)
+		if change.Compare(s.CallbackRate) >= 0 {
+			// submit order
+			return s.triggerStop(price)
+		}
+	case types.SideTypeBoth:
+		if position.IsLong() {
+			change := s.latestHigh.Sub(price).Div(s.latestHigh)
 			if change.Compare(s.CallbackRate) >= 0 {
 				// submit order
 				return s.triggerStop(price)
 			}
-		}
-	case types.SideTypeSell:
-		if position.IsLong() {
-			change := s.latestHigh.Sub(price).Div(price)
+		} else if position.IsShort() {
+			change := price.Sub(s.latestHigh).Div(s.latestHigh)
 			if change.Compare(s.CallbackRate) >= 0 {
 				// submit order
 				return s.triggerStop(price)
