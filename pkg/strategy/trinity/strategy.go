@@ -520,7 +520,7 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	}()
 
 	go func() {
-		o, err := waitForOrderFilled(ctx, service, *iocOrder, 500*time.Millisecond)
+		o, err := waitForOrderFilled(ctx, service, *iocOrder, 5*time.Second)
 		if err != nil {
 			log.WithError(err).Errorf("ioc order restful wait error")
 			return
