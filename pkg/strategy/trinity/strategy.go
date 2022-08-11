@@ -505,7 +505,7 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 
 	ratioFP := fixedpoint.NewFromFloat(ratio)
 	if ratioFP.Compare(s.MinSpreadRatio) > 0 {
-		orders[0] = s.toProtectiveMarketOrder(orders[0], ratioFP.Sub(s.MinSpreadRatio))
+		// orders[0] = s.toProtectiveMarketOrder(orders[0], ratioFP.Sub(s.MinSpreadRatio))
 	}
 
 	iocOrder := s.executeOrder(ctx, orders[0])
