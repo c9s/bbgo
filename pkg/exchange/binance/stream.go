@@ -268,6 +268,17 @@ func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
 
 		s.EmitTradeUpdate(*trade)
 
+		order, err := e.OrderFutures()
+		if err != nil {
+			log.WithError(err).Error("futures order convert error")
+			return
+		}
+
+		// Update Order with FILLED event
+		if order.Status == types.OrderStatusFilled {
+			s.EmitOrderUpdate(*order)
+		}
+
 	case "CALCULATED - Liquidation Execution":
 		log.Infof("CALCULATED - Liquidation Execution not support yet.")
 	}
