@@ -81,6 +81,8 @@ func (p *MultiCurrencyPosition) CollectProfits() []Profit {
 
 		if price, ok := p.TradePrices[currency]; ok && !price.IsZero() {
 			profit.ProfitInUSD = base.Mul(price)
+		} else if types.IsUSDFiatCurrency(currency) {
+			profit.ProfitInUSD = base
 		}
 
 		profits = append(profits, profit)
