@@ -39,7 +39,7 @@ func NewTradeCollector(symbol string, position *types.Position, orderStore *Orde
 		orderSig: sigchan.New(1),
 
 		tradeC:     make(chan types.Trade, 100),
-		tradeStore: NewTradeStore(symbol),
+		tradeStore: NewTradeStore(),
 		doneTrades: make(map[types.TradeKey]struct{}),
 		position:   position,
 		orderStore: orderStore,
