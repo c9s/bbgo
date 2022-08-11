@@ -96,7 +96,11 @@ func (e *GeneralOrderExecutor) Bind() {
 
 // CancelOrders cancels the given order objects directly
 func (e *GeneralOrderExecutor) CancelOrders(ctx context.Context, orders ...types.Order) error {
-	return e.session.Exchange.CancelOrders(ctx, orders...)
+	err := e.session.Exchange.CancelOrders(ctx, orders...)
+	if err != nil { // Retry once
+		err = e.session.Exchange.CancelOrders(ctx, orders...)
+	}
+	return err
 }
 
 func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
@@ -107,7 +111,11 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 
 	createdOrders, err := e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
 	if err != nil {
-		err = fmt.Errorf("can not place orders: %w", err)
+		// Retry once
+		createdOrders, err = e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
+		if err != nil {
+			err = fmt.Errorf("can not place orders: %w", err)
+		}
 	}
 
 	e.orderStore.Add(createdOrders...)
@@ -122,7 +130,10 @@ func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context
 		return nil
 	}
 	if err := activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
-		return fmt.Errorf("graceful cancel order error: %w", err)
+		// Retry once
+		if err = activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
+			return fmt.Errorf("graceful cancel order error: %w", err)
+		}
 	}
 
 	e.tradeCollector.Process()
