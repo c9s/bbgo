@@ -495,15 +495,12 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	orders[0].Type = types.OrderTypeLimit
 	orders[0].TimeInForce = types.TimeInForceIOC
 
+	logSubmitOrders(orders)
+
 	ratioFP := fixedpoint.NewFromFloat(ratio)
 	if ratioFP.Compare(s.MinSpreadRatio) > 0 {
 		orders[0] = s.toProtectiveMarketOrder(orders[0], ratioFP.Sub(s.MinSpreadRatio))
 	}
-
-	// logSubmitOrders(orders)
-
-	// orders[1].Type = types.OrderTypeMarket
-	// orders[2].Type = types.OrderTypeMarket
 
 	iocOrder := s.executeOrder(ctx, orders[0])
 	if iocOrder == nil {
@@ -658,7 +655,6 @@ func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, i
 }
 
 func (s *Strategy) waitOrdersAndCollectTrades(ctx context.Context, session *bbgo.ExchangeSession, createdOrders types.OrderSlice) {
-
 	// wait for trades
 	timeoutDuration := 500 * time.Millisecond
 	timeout := time.After(timeoutDuration)
@@ -818,7 +814,6 @@ func (s *Strategy) buildArbMarkets(session *bbgo.ExchangeSession, symbols []stri
 }
 
 func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64) []PathRank {
-	prof := util.StartTimeProfile("calculatingRanks")
 	ranks := make([]PathRank, 0, len(s.paths))
 
 	// ranking paths here
@@ -837,7 +832,6 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 		return ranks[i].Ratio > ranks[j].Ratio
 	})
 
-	prof.StopAndLog(log.Infof)
 	return ranks
 }
 
