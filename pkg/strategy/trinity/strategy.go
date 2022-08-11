@@ -507,9 +507,9 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	defer close(iocOrderC)
 
 	go func() {
-		o, err := s.waitWebSocketOrderDone(ctx, iocOrder.OrderID, 2*time.Millisecond, 100*time.Millisecond)
+		o, err := s.waitWebSocketOrderDone(ctx, iocOrder.OrderID, 500*time.Millisecond)
 		if err != nil {
-			log.WithError(err).Errorf("ioc order wait error")
+			// log.WithError(err).Errorf("ioc order wait error")
 			return
 		} else if o != nil {
 			select {
@@ -520,7 +520,7 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	}()
 
 	go func() {
-		o, err := waitForOrderFilled(ctx, service, *iocOrder)
+		o, err := waitForOrderFilled(ctx, service, *iocOrder, 500*time.Millisecond)
 		if err != nil {
 			log.WithError(err).Errorf("ioc order restful wait error")
 			return
@@ -639,32 +639,24 @@ func (s *Strategy) marketOrderExecution(ctx context.Context, session *bbgo.Excha
 	return nil
 }
 
-func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, interval, timeoutDuration time.Duration) (*types.Order, error) {
+func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, timeoutDuration time.Duration) (*types.Order, error) {
 	prof := util.StartTimeProfile("waitWebSocketOrderDone")
 	defer prof.StopAndLog(log.Infof)
 
-	timeout := time.After(timeoutDuration)
+	timeoutC := time.After(timeoutDuration)
 	for {
 		select {
 
 		case <-ctx.Done():
 			return nil, ctx.Err()
 
-		case <-timeout:
+		case <-timeoutC:
 			return nil, fmt.Errorf("order wait time timeout %s", timeoutDuration)
 
 		case order := <-s.orderStore.C:
 			if orderID == order.OrderID && (order.Status == types.OrderStatusFilled || order.Status == types.OrderStatusCanceled) {
 				return &order, nil
 			}
-
-		default:
-			order, ok := s.orderStore.Get(orderID)
-			if ok && (order.Status == types.OrderStatusFilled || order.Status == types.OrderStatusCanceled) {
-				return &order, nil
-			}
-
-			time.Sleep(interval)
 		}
 	}
 }
@@ -850,11 +842,10 @@ func collectOrdersTrades(ctx context.Context, ex types.ExchangeOrderQueryService
 	return ordersTrades, err2
 }
 
-func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService, order types.Order) (*types.Order, error) {
+func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService, order types.Order, timeout time.Duration) (*types.Order, error) {
 	prof := util.StartTimeProfile("waitForOrderFilled")
 	defer prof.StopAndLog(log.Infof)
 
-	timeout := 1 * time.Minute
 	timeoutC := time.After(timeout)
 
 	for {
