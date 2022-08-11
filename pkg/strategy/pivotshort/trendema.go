@@ -22,8 +22,10 @@ func (s *TrendEMA) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	symbol := orderExecutor.Position().Symbol
 	s.trendEWMA = session.StandardIndicatorSet(symbol).EWMA(s.IntervalWindow)
 	session.MarketDataStream.OnStart(func() {
-		s.trendEWMALast = s.trendEWMA.Values[s.trendEWMA.Length()-2]
-		s.trendEWMACurrent = s.trendEWMA.Last()
+		if s.trendEWMA.Length() > 1 {
+			s.trendEWMALast = s.trendEWMA.Values[s.trendEWMA.Length()-2]
+			s.trendEWMACurrent = s.trendEWMA.Last()
+		}
 	})
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, s.Interval, func(kline types.KLine) {
 		s.trendEWMALast = s.trendEWMACurrent
