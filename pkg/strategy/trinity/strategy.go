@@ -417,7 +417,6 @@ func (s *Strategy) toProtectiveMarketOrders(orders [3]types.SubmitOrder, ratio f
 }
 
 func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSession, p *Path, ratio float64, dir bool) {
-	prof := util.StartTimeProfile("generateOrders")
 	balances := session.Account.Balances()
 	balances = s.addBalanceBuffer(balances)
 	balances = s.applyBalanceMaxQuantity(balances)
@@ -433,8 +432,6 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		log.WithError(err).Warnf("order quantity too small, skip")
 		return
 	}
-
-	prof.StopAndLog(log.Infof)
 
 	if s.DryRun {
 		logSubmitOrders(orders)
