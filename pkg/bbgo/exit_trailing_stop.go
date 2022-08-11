@@ -76,10 +76,16 @@ func (s *TrailingStop2) getRatio(price fixedpoint.Value, position *types.Positio
 	switch s.Side {
 	case types.SideTypeBuy:
 		// for short position, it's:
-		//  (avg_cost - price) / price
-		return position.AverageCost.Sub(price).Div(price), nil
+		//  (avg_cost - price) / avg_cost
+		return position.AverageCost.Sub(price).Div(position.AverageCost), nil
 	case types.SideTypeSell:
 		return price.Sub(position.AverageCost).Div(position.AverageCost), nil
+	default:
+		if position.IsLong() {
+			return price.Sub(position.AverageCost).Div(position.AverageCost), nil
+		} else if position.IsShort() {
+			return position.AverageCost.Sub(price).Div(position.AverageCost), nil
+		}
 	}
 
 	return fixedpoint.Zero, fmt.Errorf("unexpected side type: %v", s.Side)
@@ -117,6 +123,12 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 			s.latestHigh = fixedpoint.Min(price, s.latestHigh)
 		case types.SideTypeSell:
 			s.latestHigh = fixedpoint.Max(price, s.latestHigh)
+		default:
+			if position.IsLong() {
+				s.latestHigh = fixedpoint.Max(price, s.latestHigh)
+			} else if position.IsShort() {
+				s.latestHigh = fixedpoint.Min(price, s.latestHigh)
+			}
 		}
 	}
 
@@ -126,21 +138,30 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 
 	switch s.Side {
 	case types.SideTypeBuy:
-		s.latestHigh = fixedpoint.Min(price, s.latestHigh)
-
 		change := price.Sub(s.latestHigh).Div(s.latestHigh)
 		if change.Compare(s.CallbackRate) >= 0 {
 			// submit order
 			return s.triggerStop(price)
 		}
-
 	case types.SideTypeSell:
-		s.latestHigh = fixedpoint.Max(price, s.latestHigh)
-
-		change := s.latestHigh.Sub(price).Div(price)
+		change := s.latestHigh.Sub(price).Div(s.latestHigh)
 		if change.Compare(s.CallbackRate) >= 0 {
 			// submit order
 			return s.triggerStop(price)
+		}
+	default:
+		if position.IsLong() {
+			change := s.latestHigh.Sub(price).Div(s.latestHigh)
+			if change.Compare(s.CallbackRate) >= 0 {
+				// submit order
+				return s.triggerStop(price)
+			}
+		} else if position.IsShort() {
+			change := price.Sub(s.latestHigh).Div(s.latestHigh)
+			if change.Compare(s.CallbackRate) >= 0 {
+				// submit order
+				return s.triggerStop(price)
+			}
 		}
 	}
 
