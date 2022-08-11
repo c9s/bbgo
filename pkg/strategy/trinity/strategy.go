@@ -304,7 +304,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					} else {
 						log.Infof("%d paths elected, found best backward path %s profit %.5f%%", len(ranks), bestRank.Path, (bestRank.Ratio-1.0)*100.0)
 					}
-					s.executePath(ctx, session, bestRank.Path, forward)
+					s.executePath(ctx, session, bestRank.Path, bestRank.Ratio, forward)
 				}
 			}
 		}
@@ -416,7 +416,7 @@ func (s *Strategy) toProtectiveMarketOrders(orders [3]types.SubmitOrder, ratio f
 	return orders
 }
 
-func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSession, p *Path, dir bool) {
+func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSession, p *Path, ratio float64, dir bool) {
 	prof := util.StartTimeProfile("generateOrders")
 	balances := session.Account.Balances()
 	balances = s.addBalanceBuffer(balances)
@@ -434,19 +434,6 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		return
 	}
 
-	/*
-		qB := p.marketA.market.TruncateQuantity(orders[1].Quantity)
-		if qB.Compare(orders[1].Quantity) < 0 {
-			rate := qB.Div(orders[1].Quantity).Float64()
-			orders = adjustOrderQuantityByRate(orders, rate)
-		}
-
-		qC := p.marketA.market.TruncateQuantity(orders[2].Quantity)
-		if qC.Compare(orders[1].Quantity) < 0 {
-			rate := qC.Div(orders[1].Quantity).Float64()
-			orders = adjustOrderQuantityByRate(orders, rate)
-		}
-	*/
 	prof.StopAndLog(log.Infof)
 
 	if s.DryRun {
@@ -454,7 +441,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 		return
 	}
 
-	createdOrders, err := s.iocOrderExecution(ctx, session, orders)
+	createdOrders, err := s.iocOrderExecution(ctx, session, orders, ratio)
 	if err != nil {
 		log.WithError(err).Errorf("order execute error")
 		return
@@ -495,7 +482,7 @@ func notifyUsdPnL(profit fixedpoint.Value) {
 	bbgo.Notify(title)
 }
 
-func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder) (types.OrderSlice, error) {
+func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder, ratio float64) (types.OrderSlice, error) {
 	service, ok := session.Exchange.(types.ExchangeOrderQueryService)
 	if !ok {
 		return nil, errors.New("exchange does not support ExchangeOrderQueryService")
@@ -508,8 +495,12 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	orders[0].Type = types.OrderTypeLimit
 	orders[0].TimeInForce = types.TimeInForceIOC
 
+	ratioFP := fixedpoint.NewFromFloat(ratio)
+	if ratioFP.Compare(s.MinSpreadRatio) > 0 {
+		orders[0] = s.toProtectiveMarketOrder(orders[0], ratioFP.Sub(s.MinSpreadRatio))
+	}
+
 	// logSubmitOrders(orders)
-	// orders = s.toProtectiveMarketOrders(orders, s.MarketOrderProtectiveRatio)
 
 	// orders[1].Type = types.OrderTypeMarket
 	// orders[2].Type = types.OrderTypeMarket
