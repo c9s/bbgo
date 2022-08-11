@@ -56,7 +56,7 @@ func (p *Path) newOrders(balances types.BalanceMap, sign int) [3]types.SubmitOrd
 	var transitingQuantity float64
 
 	initialBalance, _ := p.marketA.getInitialBalance(balances, p.dirA*sign)
-	orderA, _ := p.marketA.newOrder(p.dirB, initialBalance.Float64())
+	orderA, _ := p.marketA.newOrder(p.dirA*sign, initialBalance.Float64())
 	orders[0] = orderA
 
 	q, _ := orderA.Out()
