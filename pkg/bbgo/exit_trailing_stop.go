@@ -90,21 +90,23 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 		return nil
 	}
 
-	if !s.MinProfit.IsZero() {
-		// check if we have the minimal profit
-		roi := position.ROI(price)
-		if roi.Compare(s.MinProfit) >= 0 {
-			Notify("[trailingStop] activated: ROI %f > minimal profit ratio %f", roi.Float64(), s.MinProfit.Float64())
-			s.activated = true
-		}
-	} else if !s.ActivationRatio.IsZero() {
-		ratio, err := s.getRatio(price, position)
-		if err != nil {
-			return err
-		}
+	if (position.IsLong() && s.Side == types.SideTypeSell) || (position.IsShort() && s.Side == types.SideTypeBuy) {
+		if !s.MinProfit.IsZero() {
+			// check if we have the minimal profit
+			roi := position.ROI(price)
+			if roi.Compare(s.MinProfit) >= 0 {
+				Notify("[trailingStop] activated: ROI %f > minimal profit ratio %f", roi.Float64(), s.MinProfit.Float64())
+				s.activated = true
+			}
+		} else if !s.ActivationRatio.IsZero() {
+			ratio, err := s.getRatio(price, position)
+			if err != nil {
+				return err
+			}
 
-		if ratio.Compare(s.ActivationRatio) >= 0 {
-			s.activated = true
+			if ratio.Compare(s.ActivationRatio) >= 0 {
+				s.activated = true
+			}
 		}
 	}
 
@@ -126,21 +128,20 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 
 	switch s.Side {
 	case types.SideTypeBuy:
-		s.latestHigh = fixedpoint.Min(price, s.latestHigh)
-
-		change := price.Sub(s.latestHigh).Div(s.latestHigh)
-		if change.Compare(s.CallbackRate) >= 0 {
-			// submit order
-			return s.triggerStop(price)
+		if position.IsShort() {
+			change := price.Sub(s.latestHigh).Div(s.latestHigh)
+			if change.Compare(s.CallbackRate) >= 0 {
+				// submit order
+				return s.triggerStop(price)
+			}
 		}
-
 	case types.SideTypeSell:
-		s.latestHigh = fixedpoint.Max(price, s.latestHigh)
-
-		change := s.latestHigh.Sub(price).Div(price)
-		if change.Compare(s.CallbackRate) >= 0 {
-			// submit order
-			return s.triggerStop(price)
+		if position.IsLong() {
+			change := s.latestHigh.Sub(price).Div(price)
+			if change.Compare(s.CallbackRate) >= 0 {
+				// submit order
+				return s.triggerStop(price)
+			}
 		}
 	}
 
