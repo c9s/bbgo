@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -447,12 +448,6 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	if len(createdOrders) == 0 {
 		return
 	}
-	/*
-		if err := s.marketOrderExecution(ctx, session, orders); err != nil {
-			log.WithError(err).Errorf("order execute error")
-			return
-		}
-	*/
 
 	log.Info(s.Position.String())
 
@@ -491,6 +486,10 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	orders[0].Type = types.OrderTypeLimit
 	orders[0].TimeInForce = types.TimeInForceIOC
 
+	var originalOrders [3]types.SubmitOrder
+	originalOrders[0] = orders[0]
+	originalOrders[1] = orders[1]
+	originalOrders[2] = orders[2]
 	logSubmitOrders(orders)
 
 	ratioFP := fixedpoint.NewFromFloat(ratio)
@@ -588,8 +587,26 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	createdOrders[2] = <-orderC
 	close(orderC)
 
-	s.waitOrdersAndCollectTrades(ctx, session, createdOrders)
+	orderTrades, updatedOrders, err := s.waitOrdersAndCollectTrades(ctx, service, createdOrders)
+	if err != nil {
+		log.WithError(err).Errorf("trade collecting error")
+	} else {
+		for i, order := range updatedOrders {
+			trades, hasTrades := orderTrades[order.OrderID]
+			if !hasTrades {
+				continue
+			}
+			averagePrice := tradeAveragePrice(trades, order.OrderID)
+			updatedOrders[i].AveragePrice = averagePrice
+			if market, hasMarket := s.markets[order.Symbol]; hasMarket {
+				updatedOrders[i].Market = market
+			}
+			updatedOrders[i].Price = originalOrders[i].Price
+		}
+		s.analyzeOrders(updatedOrders)
+	}
 
+	// update ioc winning ratio
 	s.State.IOCWinTimes++
 	if s.State.IOCLossTimes == 0 {
 		s.State.IOCWinningRatio = 999.0
@@ -600,43 +617,6 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	log.Infof("ioc winning ratio update: %f", s.State.IOCWinningRatio)
 
 	return createdOrders, nil
-}
-
-func (s *Strategy) marketOrderExecution(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder) error {
-	orders = s.toProtectiveMarketOrders(orders, s.MarketOrderProtectiveRatio)
-
-	var orderC = make(chan types.Order, 3)
-	var wg sync.WaitGroup
-	wg.Add(3)
-
-	go func() {
-		o := s.executeOrder(ctx, orders[0])
-		orderC <- *o
-		wg.Done()
-	}()
-
-	go func() {
-		o := s.executeOrder(ctx, orders[1])
-		orderC <- *o
-		wg.Done()
-	}()
-
-	go func() {
-		o := s.executeOrder(ctx, orders[2])
-		orderC <- *o
-		wg.Done()
-	}()
-
-	wg.Wait()
-
-	var createdOrders = make(types.OrderSlice, 3)
-	createdOrders[0] = <-orderC
-	createdOrders[1] = <-orderC
-	createdOrders[2] = <-orderC
-	close(orderC)
-
-	s.waitOrdersAndCollectTrades(ctx, session, createdOrders)
-	return nil
 }
 
 func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, timeoutDuration time.Duration) (*types.Order, error) {
@@ -661,38 +641,37 @@ func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, t
 	}
 }
 
-func (s *Strategy) waitOrdersAndCollectTrades(ctx context.Context, session *bbgo.ExchangeSession, createdOrders types.OrderSlice) {
-	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
-		updatedOrders, allFilled := waitForAllOrdersFilled(ctx, service, createdOrders, 20)
-		if allFilled {
-			log.Infof("all orders are filled")
-		}
-		createdOrders = updatedOrders
-
-		trades, err := collectOrdersTrades(context.Background(), service, updatedOrders)
-		if err != nil {
-			log.WithError(err).Errorf("failed to query order trades")
-		} else {
-			for _, t := range trades {
-				s.tradeCollector.ProcessTrade(t)
-			}
+func (s *Strategy) waitOrdersAndCollectTrades(ctx context.Context, service types.ExchangeOrderQueryService, createdOrders types.OrderSlice) (map[uint64][]types.Trade, types.OrderSlice, error) {
+	var err error
+	var orderTrades = make(map[uint64][]types.Trade)
+	var updatedOrders types.OrderSlice
+	for _, o := range createdOrders {
+		updatedOrder, err2 := waitForOrderFilled(ctx, service, o, time.Second)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+			continue
 		}
 
-		for i, o := range updatedOrders {
-			averagePrice := tradeAveragePrice(trades, o.OrderID)
-			updatedOrders[i].AveragePrice = averagePrice
-
-			if market, ok := s.markets[o.Symbol]; ok {
-				updatedOrders[i].Market = market
-			}
+		trades, err3 := service.QueryOrderTrades(ctx, types.OrderQuery{
+			Symbol:  o.Symbol,
+			OrderID: strconv.FormatUint(o.OrderID, 10),
+		})
+		if err3 != nil {
+			err = multierr.Append(err, err3)
+			continue
 		}
-		s.analyzeOrders(updatedOrders)
 
-	} else {
-		// wait for trades
-		time.Sleep(200 * time.Millisecond)
-		s.tradeCollector.Process()
+		for _, t := range trades {
+			s.tradeCollector.ProcessTrade(t)
+		}
+
+		orderTrades[o.OrderID] = trades
+		updatedOrders = append(updatedOrders, *updatedOrder)
 	}
+
+	/*
+	 */
+	return orderTrades, updatedOrders, nil
 }
 
 func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
@@ -712,20 +691,12 @@ func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
 		switch o.Side {
 		case types.SideTypeSell:
 			price := o.Price
-			if !s.MarketOrderProtectiveRatio.IsZero() {
-				price = price.Mul(one.Add(s.MarketOrderProtectiveRatio))
-			}
-
 			priceDiff := o.AveragePrice.Sub(price)
 			slippage := priceDiff.Div(price)
 			log.Infof("%-8s %-4s %-10s AVG PRICE %f PRICE %f Q %f SLIPPAGE %.3f%%", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), o.Quantity.Float64(), slippage.Float64()*100.0)
 
 		case types.SideTypeBuy:
 			price := o.Price
-			if !s.MarketOrderProtectiveRatio.IsZero() {
-				price = price.Mul(one.Sub(s.MarketOrderProtectiveRatio))
-			}
-
 			priceDiff := price.Sub(o.AveragePrice)
 			slippage := priceDiff.Div(price)
 			log.Infof("%-8s %-4s %-10s AVG PRICE %f PRICE %f Q %f SLIPPAGE %.3f%%", o.Symbol, o.Side, o.Type, o.AveragePrice.Float64(), price.Float64(), o.Quantity.Float64(), slippage.Float64()*100.0)
