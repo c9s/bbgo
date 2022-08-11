@@ -12,15 +12,13 @@ type TradeStore struct {
 
 	trades map[uint64]types.Trade
 
-	Symbol          string
 	RemoveCancelled bool
 	RemoveFilled    bool
 	AddOrderUpdate  bool
 }
 
-func NewTradeStore(symbol string) *TradeStore {
+func NewTradeStore() *TradeStore {
 	return &TradeStore{
-		Symbol: symbol,
 		trades: make(map[uint64]types.Trade),
 	}
 }
