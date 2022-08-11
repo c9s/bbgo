@@ -41,7 +41,12 @@ func toGlobalFuturesPositions(futuresPositions []*futures.AccountPosition) types
 	retFuturesPositions := make(types.FuturesPositionMap)
 	for _, futuresPosition := range futuresPositions {
 		retFuturesPositions[futuresPosition.Symbol] = types.FuturesPosition{ // TODO: types.FuturesPosition
-			Isolated: futuresPosition.Isolated,
+			Isolated:               futuresPosition.Isolated,
+			AverageCost:            fixedpoint.MustNewFromString(futuresPosition.EntryPrice),
+			ApproximateAverageCost: fixedpoint.MustNewFromString(futuresPosition.EntryPrice),
+			Base:                   fixedpoint.MustNewFromString(futuresPosition.PositionAmt),
+			Quote:                  fixedpoint.MustNewFromString(futuresPosition.Notional),
+
 			PositionRisk: &types.PositionRisk{
 				Leverage: fixedpoint.MustNewFromString(futuresPosition.Leverage),
 			},
