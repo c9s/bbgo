@@ -639,7 +639,7 @@ func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, i
 			return nil, fmt.Errorf("order wait time timeout %s", timeoutDuration)
 
 		case order := <-s.orderStore.C:
-			if order.Status == types.OrderStatusFilled || order.Status == types.OrderStatusCanceled {
+			if orderID == order.OrderID && (order.Status == types.OrderStatusFilled || order.Status == types.OrderStatusCanceled) {
 				return &order, nil
 			}
 
@@ -856,7 +856,7 @@ func collectOrdersTrades(ctx context.Context, ex types.ExchangeOrderQueryService
 }
 
 func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService, order types.Order) (*types.Order, error) {
-	prof := util.StartTimeProfile("queryOrder")
+	prof := util.StartTimeProfile("waitForOrderFilled")
 	defer prof.StopAndLog(log.Infof)
 
 	timeout := 1 * time.Minute
@@ -868,10 +868,12 @@ func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService,
 			return nil, fmt.Errorf("order wait timeout %s", timeout)
 
 		default:
+			p := util.StartTimeProfile("queryOrder")
 			remoteOrder, err2 := ex.QueryOrder(ctx, types.OrderQuery{
 				Symbol:  order.Symbol,
 				OrderID: strconv.FormatUint(order.OrderID, 10),
 			})
+			p.StopAndLog(log.Infof)
 
 			if err2 != nil {
 				log.WithError(err2).Errorf("order query error")
@@ -884,7 +886,7 @@ func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService,
 				return remoteOrder, nil
 			default:
 				log.Infof("WAITING: %s", remoteOrder.String())
-				time.Sleep(50 * time.Millisecond)
+				time.Sleep(5 * time.Millisecond)
 			}
 		}
 	}
