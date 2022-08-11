@@ -655,28 +655,8 @@ func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, i
 }
 
 func (s *Strategy) waitOrdersAndCollectTrades(ctx context.Context, session *bbgo.ExchangeSession, createdOrders types.OrderSlice) {
-	// wait for trades
-	timeoutDuration := 500 * time.Millisecond
-	timeout := time.After(timeoutDuration)
-	wait := true
-	for wait && s.activeOrders.NumOfOrders() > 0 {
-		select {
-		case <-ctx.Done():
-			wait = false
-			log.WithError(ctx.Err()).Warnf("context done")
-			break
-		case <-timeout:
-			wait = false
-			log.Warnf("order wait time timeout %s", timeoutDuration)
-			break
-
-		default:
-			time.Sleep(50 * time.Millisecond)
-		}
-	}
-
 	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
-		updatedOrders, allFilled := waitForAllOrdersFilled(context.Background(), service, createdOrders, 20)
+		updatedOrders, allFilled := waitForAllOrdersFilled(ctx, service, createdOrders, 20)
 		if allFilled {
 			log.Infof("all orders are filled")
 		}
