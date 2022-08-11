@@ -598,10 +598,16 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 			}
 			averagePrice := tradeAveragePrice(trades, order.OrderID)
 			updatedOrders[i].AveragePrice = averagePrice
+
 			if market, hasMarket := s.markets[order.Symbol]; hasMarket {
 				updatedOrders[i].Market = market
 			}
-			updatedOrders[i].Price = originalOrders[i].Price
+
+			for _, originalOrder := range originalOrders {
+				if originalOrder.Symbol == updatedOrders[i].Symbol {
+					updatedOrders[i].Price = originalOrder.Price
+				}
+			}
 		}
 		s.analyzeOrders(updatedOrders)
 	}
