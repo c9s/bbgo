@@ -124,6 +124,7 @@ type Strategy struct {
 	tradeCollector *bbgo.TradeCollector
 	Position       *MultiCurrencyPosition `persistence:"position"`
 	State          *State                 `persistence:"state"`
+	TradeState     *types.TradeStats      `persistence:"trade_stats"`
 	sigC           sigchan.Chan
 }
 
@@ -166,6 +167,11 @@ func (s *Strategy) executeOrder(ctx context.Context, order types.SubmitOrder) *t
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+
+	if s.TradeState == nil {
+		s.TradeState = types.NewTradeStats("")
+	}
+
 	s.Symbols = compileSymbols(s.Symbols)
 
 	if s.MarketOrderProtectiveRatio.IsZero() {
@@ -460,6 +466,11 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	notifyUsdPnL(profitInUSD)
+
+	s.TradeState.AddPnL(profitInUSD)
+	log.Info(s.TradeState.BriefString())
+
+	bbgo.Sync(s)
 
 	if s.CoolingDownTime > 0 {
 		log.Infof("cooling down for %s", s.CoolingDownTime.Duration().String())
