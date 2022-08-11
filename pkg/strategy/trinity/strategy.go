@@ -111,6 +111,7 @@ type Strategy struct {
 	NotifyTrade                bool                        `json:"notifyTrade"`
 	ResetPosition              bool                        `json:"resetPosition"`
 	MarketOrderProtectiveRatio fixedpoint.Value            `json:"marketOrderProtectiveRatio"`
+	IocOrderRatio              fixedpoint.Value            `json:"iocOrderRatio"`
 	DryRun                     bool                        `json:"dryRun"`
 
 	markets    map[string]types.Market
@@ -503,9 +504,8 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	originalOrders[2] = orders[2]
 	logSubmitOrders(orders)
 
-	ratioFP := fixedpoint.NewFromFloat(ratio)
-	if ratioFP.Compare(s.MinSpreadRatio) > 0 {
-		// orders[0] = s.toProtectiveMarketOrder(orders[0], ratioFP.Sub(s.MinSpreadRatio))
+	if !s.IocOrderRatio.IsZero() {
+		orders[0] = s.toProtectiveMarketOrder(orders[0], s.IocOrderRatio)
 	}
 
 	iocOrder := s.executeOrder(ctx, orders[0])
