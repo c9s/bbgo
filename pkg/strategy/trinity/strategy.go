@@ -485,7 +485,6 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 		return nil, errors.New("exchange does not support ExchangeOrderQueryService")
 	}
 
-	var err error
 	var filledQuantity = fixedpoint.Zero
 
 	// Change the first order to IOC
@@ -504,19 +503,38 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 		return nil, errors.New("ioc order submit error")
 	}
 
-	o, err := s.waitWebSocketOrderDone(ctx, iocOrder.OrderID, 2*time.Millisecond, 100*time.Millisecond)
-	if o != nil && err == nil {
-		log.Infof("IOC order is directly filled: %s", o.String())
-		filledQuantity = o.ExecutedQuantity
-	} else if err != nil {
-		log.WithError(err).Warnf("fallback to RESTful API query")
-		iocOrder, err = waitForOrderFilled(ctx, service, *iocOrder)
-		if err != nil {
-			return nil, err
-		}
+	iocOrderC := make(chan types.Order, 1)
+	defer close(iocOrderC)
 
-		filledQuantity = iocOrder.ExecutedQuantity
-	}
+	go func() {
+		o, err := s.waitWebSocketOrderDone(ctx, iocOrder.OrderID, 2*time.Millisecond, 100*time.Millisecond)
+		if err != nil {
+			log.WithError(err).Errorf("ioc order wait error")
+			return
+		} else if o != nil {
+			select {
+			case iocOrderC <- *o:
+			default:
+			}
+		}
+	}()
+
+	go func() {
+		o, err := waitForOrderFilled(ctx, service, *iocOrder)
+		if err != nil {
+			log.WithError(err).Errorf("ioc order restful wait error")
+			return
+		} else if o != nil {
+			select {
+			case iocOrderC <- *o:
+			default:
+			}
+		}
+	}()
+
+	o := <-iocOrderC
+
+	filledQuantity = o.ExecutedQuantity
 
 	if filledQuantity.IsZero() {
 		s.State.IOCLossTimes++
