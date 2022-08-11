@@ -910,12 +910,12 @@ func waitForAllOrdersFilled(ctx context.Context, ex types.ExchangeOrderQueryServ
 
 			orders[i] = *remoteOrder
 
-			if remoteOrder.Status != types.OrderStatusFilled {
+			if remoteOrder.Status != types.OrderStatusFilled && remoteOrder.Status != types.OrderStatusCanceled {
 				log.Infof(remoteOrder.String())
 				allFilled = false
 			}
 
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 	return orders, allFilled
