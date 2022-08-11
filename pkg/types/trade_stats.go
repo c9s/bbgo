@@ -193,13 +193,13 @@ func (s *TradeStats) Add(profit *Profit) {
 		return
 	}
 
-	s.add(profit.Profit)
+	s.AddPnL(profit.Profit)
 	for _, v := range s.IntervalProfits {
 		v.Update(profit)
 	}
 }
 
-func (s *TradeStats) add(pnl fixedpoint.Value) {
+func (s *TradeStats) AddPnL(pnl fixedpoint.Value) {
 	if pnl.Sign() > 0 {
 		s.NumOfProfitTrade++
 		s.Profits = append(s.Profits, pnl)
