@@ -799,26 +799,6 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 	return ranks
 }
 
-func collectOrdersTrades(ctx context.Context, ex types.ExchangeOrderQueryService, createdOrders types.OrderSlice) ([]types.Trade, error) {
-	var ordersTrades []types.Trade
-	var err2 error
-	for _, o := range createdOrders {
-		trades, err := ex.QueryOrderTrades(ctx, types.OrderQuery{
-			Symbol:  o.Symbol,
-			OrderID: strconv.FormatUint(o.OrderID, 10),
-		})
-
-		if err != nil {
-			err2 = err
-			continue
-		}
-
-		ordersTrades = append(ordersTrades, trades...)
-	}
-
-	return ordersTrades, err2
-}
-
 func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService, order types.Order, timeout time.Duration) (*types.Order, error) {
 	prof := util.StartTimeProfile("waitForOrderFilled")
 	defer prof.StopAndLog(log.Infof)
@@ -853,35 +833,6 @@ func waitForOrderFilled(ctx context.Context, ex types.ExchangeOrderQueryService,
 			}
 		}
 	}
-}
-
-func waitForAllOrdersFilled(ctx context.Context, ex types.ExchangeOrderQueryService, orders types.OrderSlice, maxTries int) (types.OrderSlice, bool) {
-	log.Infof("query order service to ensure orders are filled")
-	allFilled := false
-	for ; !allFilled && maxTries > 0; maxTries-- {
-		allFilled = true
-		for i, o := range orders {
-			remoteOrder, err2 := ex.QueryOrder(ctx, types.OrderQuery{
-				Symbol:  o.Symbol,
-				OrderID: strconv.FormatUint(o.OrderID, 10),
-			})
-
-			if err2 != nil {
-				log.WithError(err2).Errorf("order query error")
-				continue
-			}
-
-			orders[i] = *remoteOrder
-
-			if remoteOrder.Status != types.OrderStatusFilled && remoteOrder.Status != types.OrderStatusCanceled {
-				log.Infof(remoteOrder.String())
-				allFilled = false
-			}
-
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-	return orders, allFilled
 }
 
 func tradeAveragePrice(trades []types.Trade, orderID uint64) fixedpoint.Value {
