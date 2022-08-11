@@ -46,13 +46,13 @@ func (m *ArbMarket) getInitialBalance(balances types.BalanceMap, dir int) (fixed
 
 func (m *ArbMarket) calculateRatio(dir int) float64 {
 	if dir == 1 { // direct 1 = sell
-		if m.bestBid.Volume.Compare(m.market.MinQuantity) < 0 {
+		if m.bestBid.Volume.Compare(m.market.MinQuantity) <= 0 {
 			return 0.0
 		}
 
 		return m.sellRate
 	} else if dir == -1 {
-		if m.bestAsk.Volume.Compare(m.market.MinQuantity) < 0 {
+		if m.bestAsk.Volume.Compare(m.market.MinQuantity) <= 0 {
 			return 0.0
 		}
 
@@ -66,7 +66,7 @@ func (m *ArbMarket) updateRate() {
 	m.buyRate = 1.0 / m.bestAsk.Price.Float64()
 	m.sellRate = m.bestBid.Price.Float64()
 
-	if m.bestBid.Volume.Compare(m.market.MinQuantity) < 0 && m.bestAsk.Volume.Compare(m.market.MinQuantity) < 0 {
+	if m.bestBid.Volume.Compare(m.market.MinQuantity) <= 0 && m.bestAsk.Volume.Compare(m.market.MinQuantity) <= 0 {
 		return
 	}
 
