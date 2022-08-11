@@ -80,7 +80,7 @@ func (s *TrailingStop2) getRatio(price fixedpoint.Value, position *types.Positio
 		return position.AverageCost.Sub(price).Div(position.AverageCost), nil
 	case types.SideTypeSell:
 		return price.Sub(position.AverageCost).Div(position.AverageCost), nil
-	case types.SideTypeBoth:
+	default:
 		if position.IsLong() {
 			return price.Sub(position.AverageCost).Div(position.AverageCost), nil
 		} else if position.IsShort() {
@@ -123,7 +123,7 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 			s.latestHigh = fixedpoint.Min(price, s.latestHigh)
 		case types.SideTypeSell:
 			s.latestHigh = fixedpoint.Max(price, s.latestHigh)
-		case types.SideTypeBoth:
+		default:
 			if position.IsLong() {
 				s.latestHigh = fixedpoint.Max(price, s.latestHigh)
 			} else if position.IsShort() {
@@ -149,7 +149,7 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 			// submit order
 			return s.triggerStop(price)
 		}
-	case types.SideTypeBoth:
+	default:
 		if position.IsLong() {
 			change := s.latestHigh.Sub(price).Div(s.latestHigh)
 			if change.Compare(s.CallbackRate) >= 0 {
