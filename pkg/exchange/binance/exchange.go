@@ -77,6 +77,7 @@ type Exchange struct {
 	client2 *binanceapi.RestClient
 }
 
+
 var timeSetterOnce sync.Once
 
 func New(key, secret string) *Exchange {
@@ -716,6 +717,32 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	}
 
 	return toGlobalOrders(binanceOrders)
+}
+
+func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
+	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	remoteTrades, err := e.client.NewListTradesService().OrderId(orderID).Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var trades []types.Trade
+	for _, t := range remoteTrades {
+		localTrade, err := toGlobalTrade(*t, e.IsMargin)
+		if err != nil {
+			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
+			continue
+		}
+
+		trades = append(trades, *localTrade)
+	}
+
+	trades = types.SortTradesAscending(trades)
+	return trades, nil
 }
 
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
