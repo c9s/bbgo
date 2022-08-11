@@ -141,7 +141,7 @@ func (s IntervalProfitCollector) MarshalYAML() (interface{}, error) {
 // TODO: Add more stats from the reference:
 // See https://www.metatrader5.com/en/terminal/help/algotrading/testing_report
 type TradeStats struct {
-	Symbol string `json:"symbol"`
+	Symbol string `json:"symbol,omitempty"`
 
 	WinningRatio     fixedpoint.Value `json:"winningRatio" yaml:"winningRatio"`
 	NumOfLossTrade   int              `json:"numOfLossTrade" yaml:"numOfLossTrade"`
@@ -150,8 +150,8 @@ type TradeStats struct {
 	GrossProfit fixedpoint.Value `json:"grossProfit" yaml:"grossProfit"`
 	GrossLoss   fixedpoint.Value `json:"grossLoss" yaml:"grossLoss"`
 
-	Profits []fixedpoint.Value `json:"profits" yaml:"profits"`
-	Losses  []fixedpoint.Value `json:"losses" yaml:"losses"`
+	Profits []fixedpoint.Value `json:"profits,omitempty" yaml:"profits,omitempty"`
+	Losses  []fixedpoint.Value `json:"losses,omitempty" yaml:"losses,omitempty"`
 
 	LargestProfitTrade fixedpoint.Value `json:"largestProfitTrade,omitempty" yaml:"largestProfitTrade"`
 	LargestLossTrade   fixedpoint.Value `json:"largestLossTrade,omitempty" yaml:"largestLossTrade"`
