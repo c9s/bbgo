@@ -767,6 +767,12 @@ func (s *Strategy) buildArbMarkets(session *bbgo.ExchangeSession, symbols []stri
 			book.OnSnapshot(priceUpdater)
 			book.BindStream(stream)
 
+			stream.OnDisconnect(func() {
+				// reset price and volume
+				m.bestBid = types.PriceVolume{}
+				m.bestAsk = types.PriceVolume{}
+			})
+
 			m.book = book
 			m.stream = stream
 		} else {
