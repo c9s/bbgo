@@ -629,6 +629,12 @@ func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, t
 	prof := util.StartTimeProfile("waitWebSocketOrderDone")
 	defer prof.StopAndLog(log.Infof)
 
+	if order, ok := s.orderStore.Get(orderID); ok {
+		if order.Status == types.OrderStatusFilled || order.Status == types.OrderStatusCanceled {
+			return &order, nil
+		}
+	}
+
 	timeoutC := time.After(timeoutDuration)
 	for {
 		select {
