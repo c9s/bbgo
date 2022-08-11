@@ -1041,7 +1041,7 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		req.TimeInForce(futures.TimeInForceType(order.TimeInForce))
 	} else {
 		switch order.Type {
-		case types.OrderTypeLimit, types.OrderTypeStopLimit:
+		case types.OrderTypeLimit, types.OrderTypeLimitMaker, types.OrderTypeStopLimit:
 			req.TimeInForce(futures.TimeInForceTypeGTC)
 		}
 	}
