@@ -514,7 +514,10 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	}
 
 	iocOrderC := make(chan types.Order, 2)
-	defer close(iocOrderC)
+	defer func() {
+		<-iocOrderC
+		close(iocOrderC)
+	}()
 
 	go func() {
 		o, err := s.waitWebSocketOrderDone(ctx, iocOrder.OrderID, 500*time.Millisecond)
