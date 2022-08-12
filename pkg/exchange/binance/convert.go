@@ -84,14 +84,14 @@ func toGlobalFuturesMarket(symbol futures.Symbol) types.Market {
 	return market
 }
 
-//func toGlobalIsolatedMarginAccount(account *binance.IsolatedMarginAccount) *types.IsolatedMarginAccount {
+// func toGlobalIsolatedMarginAccount(account *binance.IsolatedMarginAccount) *types.IsolatedMarginAccount {
 //	return &types.IsolatedMarginAccount{
 //		TotalAssetOfBTC:     fixedpoint.MustNewFromString(account.TotalNetAssetOfBTC),
 //		TotalLiabilityOfBTC: fixedpoint.MustNewFromString(account.TotalLiabilityOfBTC),
 //		TotalNetAssetOfBTC:  fixedpoint.MustNewFromString(account.TotalNetAssetOfBTC),
 //		Assets:              toGlobalIsolatedMarginAssets(account.Assets),
 //	}
-//}
+// }
 
 func toGlobalTicker(stats *binance.PriceChangeStats) (*types.Ticker, error) {
 	return &types.Ticker{
@@ -278,7 +278,7 @@ func toGlobalOrderStatus(orderStatus binance.OrderStatusType) types.OrderStatus 
 	case binance.OrderStatusTypeRejected:
 		return types.OrderStatusRejected
 
-	case binance.OrderStatusTypeCanceled:
+	case binance.OrderStatusTypeCanceled, binance.OrderStatusTypeExpired, binance.OrderStatusTypePendingCancel:
 		return types.OrderStatusCanceled
 
 	case binance.OrderStatusTypePartiallyFilled:
