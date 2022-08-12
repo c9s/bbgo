@@ -77,7 +77,6 @@ type Exchange struct {
 	client2 *binanceapi.RestClient
 }
 
-
 var timeSetterOnce sync.Once
 
 func New(key, secret string) *Exchange {
@@ -725,7 +724,11 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 		return nil, err
 	}
 
-	remoteTrades, err := e.client.NewListTradesService().OrderId(orderID).Do(ctx)
+	if len(q.Symbol) == 0 {
+		return nil, errors.New("binance: symbol parameter is a mandatory parameter for querying order trades")
+	}
+
+	remoteTrades, err := e.client.NewListTradesService().Symbol(q.Symbol).OrderId(orderID).Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -734,7 +737,7 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 	for _, t := range remoteTrades {
 		localTrade, err := toGlobalTrade(*t, e.IsMargin)
 		if err != nil {
-			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
+			log.WithError(err).Errorf("binance: can not convert trade: %+v", t)
 			continue
 		}
 
