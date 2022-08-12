@@ -515,12 +515,11 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 
 	iocOrderC := make(chan types.Order, 2)
 	defer func() {
-		<-iocOrderC
 		close(iocOrderC)
 	}()
 
 	go func() {
-		o, err := s.waitWebSocketOrderDone(ctx, iocOrder.OrderID, 500*time.Millisecond)
+		o, err := s.waitWebSocketOrderDone(ctx, iocOrder.OrderID, 300*time.Millisecond)
 		if err != nil {
 			// log.WithError(err).Errorf("ioc order wait error")
 			return
@@ -533,7 +532,7 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 	}()
 
 	go func() {
-		o, err := waitForOrderFilled(ctx, service, *iocOrder, 5*time.Second)
+		o, err := waitForOrderFilled(ctx, service, *iocOrder, 3*time.Second)
 		if err != nil {
 			log.WithError(err).Errorf("ioc order restful wait error")
 			return
