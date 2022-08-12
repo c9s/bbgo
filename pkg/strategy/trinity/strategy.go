@@ -513,7 +513,7 @@ func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.Exchange
 		return nil, errors.New("ioc order submit error")
 	}
 
-	iocOrderC := make(chan types.Order, 1)
+	iocOrderC := make(chan types.Order, 2)
 	defer close(iocOrderC)
 
 	go func() {
