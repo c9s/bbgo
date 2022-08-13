@@ -154,7 +154,7 @@ func (c *AccountValueCalculator) AvailableQuote(ctx context.Context) (fixedpoint
 	balances := c.session.Account.Balances()
 	for _, b := range balances {
 		if b.Currency == c.quoteCurrency {
-			accountValue = accountValue.Add(b.Available)
+			accountValue = accountValue.Add(b.Net())
 			continue
 		}
 
@@ -164,7 +164,7 @@ func (c *AccountValueCalculator) AvailableQuote(ctx context.Context) (fixedpoint
 			continue
 		}
 
-		accountValue = accountValue.Add(b.Available.Mul(price))
+		accountValue = accountValue.Add(b.Net().Mul(price))
 	}
 
 	return accountValue, nil
