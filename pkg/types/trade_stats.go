@@ -1,6 +1,8 @@
 package types
 
 import (
+	"encoding/json"
+	"log"
 	"math"
 	"time"
 
@@ -10,13 +12,14 @@ import (
 )
 
 type IntervalProfitCollector struct {
-	Interval Interval      `json:"interval"`
-	Profits  *Float64Slice `json:"profits"`
-	tmpTime  time.Time     `json:"tmpTime"`
+	Interval  Interval      `json:"interval"`
+	Profits   *Float64Slice `json:"profits"`
+	Timestamp *Float64Slice `json:"timestamp"`
+	tmpTime   time.Time     `json:"tmpTime"`
 }
 
 func NewIntervalProfitCollector(i Interval, startTime time.Time) *IntervalProfitCollector {
-	return &IntervalProfitCollector{Interval: i, tmpTime: startTime, Profits: &Float64Slice{1.}}
+	return &IntervalProfitCollector{Interval: i, tmpTime: startTime, Profits: &Float64Slice{1.}, Timestamp: &Float64Slice{float64(startTime.Unix())}}
 }
 
 // Update the collector by every traded profit
@@ -31,6 +34,7 @@ func (s *IntervalProfitCollector) Update(profit *Profit) {
 			for {
 				s.Profits.Update(1.)
 				s.tmpTime = s.tmpTime.Add(duration)
+				s.Timestamp.Update(float64(s.tmpTime.Unix()))
 				if profit.TradedAt.Before(s.tmpTime.Add(duration)) {
 					(*s.Profits)[len(*s.Profits)-1] *= 1. + profit.NetProfitMargin.Float64()
 					break
@@ -38,6 +42,48 @@ func (s *IntervalProfitCollector) Update(profit *Profit) {
 			}
 		}
 	}
+}
+
+type ProfitReport struct {
+	StartTime time.Time `json:"startTime"`
+	Profit    float64   `json:"profit"`
+	Interval  Interval  `json:"interval"`
+}
+
+func (s ProfitReport) String() string {
+	b, err := json.MarshalIndent(s, "", "\t")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return string(b)
+}
+
+// Get all none-profitable intervals
+func (s *IntervalProfitCollector) GetNonProfitableIntervals() (result []ProfitReport) {
+	if s.Profits == nil {
+		return result
+	}
+	l := s.Profits.Length()
+	for i := 0; i < l; i++ {
+		if s.Profits.Index(i) <= 1. {
+			result = append(result, ProfitReport{StartTime: time.Unix(int64(s.Timestamp.Index(i)), 0), Profit: s.Profits.Index(i), Interval: s.Interval})
+		}
+	}
+	return result
+}
+
+// Get all profitable intervals
+func (s *IntervalProfitCollector) GetProfitableIntervals() (result []ProfitReport) {
+	if s.Profits == nil {
+		return result
+	}
+	l := s.Profits.Length()
+	for i := 0; i < l; i++ {
+		if s.Profits.Index(i) > 1. {
+			result = append(result, ProfitReport{StartTime: time.Unix(int64(s.Timestamp.Index(i)), 0), Profit: s.Profits.Index(i), Interval: s.Interval})
+		}
+	}
+	return result
 }
 
 // Get number of profitable traded intervals

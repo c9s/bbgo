@@ -31,25 +31,25 @@ exchangeStrategies:
     stoploss: 0.3%
     source: close
     predictOffset: 2
-    # the init value of takeProfitFactor Series, position avg +- takeProfitFactor * atr as take profit price
-    takeProfitFactor: 6
-    profitFactorWindow: 8
     noTrailingStopLoss: false
     trailingStopLossType: kline
     # stddev on high/low-source
     hlVarianceMultiplier: 0.23
     hlRangeWindow: 5
+    window1m: 24
+    smootherWindow1m: 24
+    fisherTransformWindow1m: 162
     smootherWindow: 1
     fisherTransformWindow: 9
     atrWindow: 14
     # orders not been traded will be canceled after `pendingMinutes` minutes
-    pendingMinutes: 4
+    pendingMinutes: 3
     noRebalance: true
     trendWindow: 12
     rebalanceFilter: 1.5
 
-    trailingActivationRatio: [0.008, 0.015]
-    trailingCallbackRate: [0.002, 0.001]
+    trailingActivationRatio: [0.004]
+    trailingCallbackRate: [0.001]
 
     generateGraph: true
     graphPNLDeductFee: true
@@ -88,7 +88,7 @@ sync:
 
 backtest:
   startTime: "2022-01-01"
-  endTime: "2022-07-30"
+  endTime: "2022-08-30"
   symbols:
     - ETHBUSD
   sessions: [binance]

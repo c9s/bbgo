@@ -34,6 +34,10 @@ func (inc *FisherTransform) Update(value float64) {
 	inc.prices.Update(value)
 	highest := inc.prices.Highest(inc.Window)
 	lowest := inc.prices.Lowest(inc.Window)
+	if highest == lowest {
+		inc.Values.Update(0)
+		return
+	}
 	x := 2*((value-lowest)/(highest-lowest)) - 1
 	if x == 1 {
 		x = 0.9999
