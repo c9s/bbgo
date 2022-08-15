@@ -43,6 +43,7 @@ func (s *Strategy) ParamDump(f io.Writer, seriesLength ...int) {
 		}
 		fieldName := t.Name
 		typeName := field.Type().String()
+		log.Infof("fieldName %s typeName %s", fieldName, typeName)
 		value := reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
 		isSeries := true
 		lastFunc := value.MethodByName("Last")
@@ -82,7 +83,7 @@ func (s *Strategy) ParamDump(f io.Writer, seriesLength ...int) {
 			fmt.Fprintf(f, "%s: %v", fieldName, field.Interface())
 		} else if field.Type().Kind() == reflect.Map {
 			fmt.Fprintf(f, "%s: {", fieldName)
-			iter := field.MapRange()
+			iter := value.MapRange()
 			for iter.Next() {
 				k := iter.Key().Interface()
 				v := iter.Value().Interface()
@@ -203,10 +204,7 @@ func (s *Strategy) Print(f io.Writer, pretty bool, withColor ...bool) {
 		}
 	}
 	if pretty {
-		rows = append(rows, table.Row{"takeProfitFactor(last)", "takeProfitFactor", "float64", s.takeProfitFactor.Last()})
 		t.AppendRows(rows)
 		t.Render()
-	} else {
-		hiyellow(f, "takeProfitFactor(last): %f\n", s.takeProfitFactor.Last())
 	}
 }
