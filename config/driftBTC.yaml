@@ -38,15 +38,12 @@ exchangeStrategies:
     hlRangeWindow: 5
     smootherWindow: 1
     fisherTransformWindow: 9
-    window1m: 28
-    smootherWindow1m: 14
+    window1m: 22
+    smootherWindow1m: 18
     fisherTransformWindow1m: 162
-    # the init value of takeProfitFactor Series, the coefficient of ATR as TP
-    takeProfitFactor: 4
-    profitFactorWindow: 5
     atrWindow: 14
     # orders not been traded will be canceled after `pendingMinutes` minutes
-    pendingMinutes: 3
+    pendingMinutes: 5
     noRebalance: true
     trendWindow: 60
     rebalanceFilter: 1.1
@@ -54,11 +51,11 @@ exchangeStrategies:
     # ActivationRatio should be increasing order
     # when farest price from entry goes over that ratio, start using the callback ratio accordingly to do trailingstop
     #trailingActivationRatio: [0.007, 0.011, 0.02, 0.05]
-    trailingActivationRatio: [0.002, 0.02, 0.04] 
+    trailingActivationRatio: [0.0005, 0.002, 0.04] 
     #trailingActivationRatio: []
     #trailingCallbackRate: []
     #trailingCallbackRate: [0.002, 0.001, 0.002, 0.001]
-    trailingCallbackRate: [0.0005, 0.001, 0.003]
+    trailingCallbackRate: [0.0002, 0.0004, 0.002]
 
     generateGraph: true
     graphPNLDeductFee: false
@@ -132,4 +129,4 @@ backtest:
       #takerFeeRate: 0.000
       balances:
         BTC: 0
-        USDT: 21
+        USDT: 5000
