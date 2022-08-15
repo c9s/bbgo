@@ -75,9 +75,9 @@ func (s *Strategy) ParamDump(f io.Writer, seriesLength ...int) {
 			}
 		} else if canString {
 			fmt.Fprintf(f, "%s: %s\n", fieldName, stringFunc.Call(nil)[0].String())
-		} else if field.CanInt() {
+		} else if field.CanConvert(reflect.TypeOf(int(0))) {
 			fmt.Fprintf(f, "%s: %d\n", fieldName, field.Int())
-		} else if field.CanFloat() {
+		} else if field.CanConvert(reflect.TypeOf(float64(0))) {
 			fmt.Fprintf(f, "%s: %.4f\n", fieldName, field.Float())
 		} else if field.CanInterface() {
 			fmt.Fprintf(f, "%s: %v", fieldName, field.Interface())
