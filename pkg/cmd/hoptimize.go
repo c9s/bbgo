@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"github.com/c9s/bbgo/pkg/optimizer"
 	"github.com/fatih/color"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -90,7 +93,14 @@ var hoptimizeCmd = &cobra.Command{
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		_ = ctx
+
+		go func() {
+			c := make(chan os.Signal)
+			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+			<-c
+			log.Info("Early stop by manual cancelation.")
+			cancel()
+		}()
 
 		if len(optSessionName) == 0 {
 			optSessionName = fmt.Sprintf("bbgo-hpopt-%v", time.Now().UnixMilli())
@@ -118,7 +128,8 @@ var hoptimizeCmd = &cobra.Command{
 			return err
 		}
 
-		report, err := optz.Run(executor, configJson)
+		report, err := optz.Run(ctx, executor, configJson)
+		log.Info("All test trial finished.")
 		if err != nil {
 			return err
 		}
