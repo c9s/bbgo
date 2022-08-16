@@ -447,12 +447,7 @@ func (s *Strategy) DrawIndicators(time types.Time, priceLine types.SeriesExtend,
 	hi := s.drift.drift.Abs().Highest(Length)
 	h1m := s.drift1m.Abs().Highest(Length * s.Interval.Minutes())
 	ratio := highestPrice / highestDrift
-	for i := 0; i < s.drift1m.Length(); i++ {
-		if s.drift1m.Index(i) != s.drift1m.Index(i) {
-			log.Infof("%d, %f", i, s.drift1m.Index(i-1))
-		}
-	}
-	log.Infof("%d, %v", s.drift1m.Length(), s.drift1m.Array(10))
+
 	canvas.Plot("upband", s.ma.Add(s.stdevHigh), time, Length)
 	canvas.Plot("ma", s.ma, time, Length)
 	canvas.Plot("downband", s.ma.Minus(s.stdevLow), time, Length)
@@ -592,6 +587,11 @@ func (s *Strategy) Rebalance(ctx context.Context) {
 	s.beta = beta
 }
 
+func (s *Strategy) CalcAssetValue(price fixedpoint.Value) fixedpoint.Value {
+	balances := s.Session.GetAccount().Balances()
+	return balances[s.Market.BaseCurrency].Total().Mul(price).Add(balances[s.Market.QuoteCurrency].Total())
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 	// Will be set by persistence if there's any from DB
@@ -644,8 +644,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	for _, method := range s.ExitMethods {
 		method.Bind(session, s.GeneralOrderExecutor)
 	}
-	profit := types.Float64Slice{}
-	cumProfit := types.Float64Slice{}
+
+	profit := types.Float64Slice{1.}
+	price, _ := s.Session.LastPrice(s.Symbol)
+	cumProfit := types.Float64Slice{s.CalcAssetValue(price).Float64()}
 	modify := func(p float64) float64 {
 		return p
 	}
@@ -663,16 +665,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		tag := order.Tag
 
 		price := trade.Price.Float64()
-		balances := s.Session.GetAccount().Balances()
 
 		if s.buyPrice > 0 {
 			profit.Update(modify(price / s.buyPrice))
-			asset := balances[s.Market.BaseCurrency].Total().Mul(trade.Price).Add(balances[s.Market.QuoteCurrency].Total())
-			cumProfit.Update(asset.Float64())
+			cumProfit.Update(s.CalcAssetValue(trade.Price).Float64())
 		} else if s.sellPrice > 0 {
 			profit.Update(modify(s.sellPrice / price))
-			asset := balances[s.Market.BaseCurrency].Total().Mul(trade.Price).Add(balances[s.Market.QuoteCurrency].Total())
-			cumProfit.Update(asset.Float64())
+			cumProfit.Update(s.CalcAssetValue(trade.Price).Float64())
 		}
 		s.positionLock.Lock()
 		defer s.positionLock.Unlock()
@@ -751,7 +750,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.SendPhoto(&buffer)
 	})
 
-	bbgo.RegisterCommand("/pnl", "Draw PNL per trade", func(reply interact.Reply) {
+	bbgo.RegisterCommand("/pnl", "Draw PNL(%) per trade", func(reply interact.Reply) {
 		canvas := s.DrawPNL(&profit)
 		var buffer bytes.Buffer
 		if err := canvas.Render(chart.PNG, &buffer); err != nil {
@@ -762,7 +761,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.SendPhoto(&buffer)
 	})
 
-	bbgo.RegisterCommand("/cumpnl", "Draw Cummulative PNL", func(reply interact.Reply) {
+	bbgo.RegisterCommand("/cumpnl", "Draw Cummulative PNL(Quote)", func(reply interact.Reply) {
 		canvas := s.DrawCumPNL(&cumProfit)
 		var buffer bytes.Buffer
 		if err := canvas.Render(chart.PNG, &buffer); err != nil {
@@ -903,10 +902,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.Notify("source: %.4f, price: %.4f, driftPred: %.4f, ddriftPred: %.4f, drift[1]: %.4f, ddrift[1]: %.4f, atr: %.4f, lowf %.4f, highf: %.4f lowest: %.4f highest: %.4f sp %.4f bp %.4f",
 			sourcef, pricef, driftPred, ddriftPred, drift[1], ddrift[1], atr, lowf, highf, s.lowestPrice, s.highestPrice, s.sellPrice, s.buyPrice)
 		// Notify will parse args to strings and process separately
-		bbgo.Notify("balances: [Base] %s(%vU) [Quote] %s",
+		bbgo.Notify("balances: [Base] %s(%v %s) [Quote] %s [Total] %v %s",
 			balances[s.Market.BaseCurrency].String(),
 			balances[s.Market.BaseCurrency].Total().Mul(price),
-			balances[s.Market.QuoteCurrency].String())
+			s.Market.QuoteCurrency,
+			balances[s.Market.QuoteCurrency].String(),
+			s.CalcAssetValue(price),
+			s.Market.QuoteCurrency,
+		)
 
 		shortCondition := (drift[1] >= DriftFilterNeg || ddrift[1] >= 0) && (driftPred <= DDriftFilterNeg || ddriftPred <= 0) || drift[1] < 0 && drift[0] < 0
 		longCondition := (drift[1] <= DriftFilterPos || ddrift[1] <= 0) && (driftPred >= DDriftFilterPos || ddriftPred >= 0) || drift[1] > 0 && drift[0] > 0
@@ -917,11 +920,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				shortCondition = false
 			}
 		}
-		exitShortCondition := s.sellPrice > 0 && ( //!shortCondition && !longCondition ||
-		s.sellPrice*(1.+stoploss) <= highf ||
+		exitShortCondition := s.sellPrice > 0 && !shortCondition && !longCondition && (s.sellPrice*(1.+stoploss) <= highf ||
 			s.trailingCheck(pricef, "short"))
-		exitLongCondition := s.buyPrice > 0 && ( //!longCondition && !shortCondition ||
-		s.buyPrice*(1.-stoploss) >= lowf ||
+		exitLongCondition := s.buyPrice > 0 && !longCondition && !shortCondition && (s.buyPrice*(1.-stoploss) >= lowf ||
 			s.trailingCheck(pricef, "long"))
 
 		if exitShortCondition || exitLongCondition {

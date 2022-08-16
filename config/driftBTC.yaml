@@ -45,17 +45,17 @@ exchangeStrategies:
     # orders not been traded will be canceled after `pendingMinutes` minutes
     pendingMinutes: 5
     noRebalance: true
-    trendWindow: 60
-    rebalanceFilter: 1.1
+    trendWindow: 576
+    rebalanceFilter: 0
     
     # ActivationRatio should be increasing order
     # when farest price from entry goes over that ratio, start using the callback ratio accordingly to do trailingstop
-    #trailingActivationRatio: [0.007, 0.011, 0.02, 0.05]
-    trailingActivationRatio: [0.0005, 0.002, 0.04] 
+    #trailingActivationRatio: [0.01, 0.016, 0.05]
+    trailingActivationRatio: [0.0012, 0.002, 0.01, 0.016]
     #trailingActivationRatio: []
     #trailingCallbackRate: []
-    #trailingCallbackRate: [0.002, 0.001, 0.002, 0.001]
-    trailingCallbackRate: [0.0002, 0.0004, 0.002]
+    #trailingCallbackRate: [0.002, 0.01, 0.1]
+    trailingCallbackRate: [0.0004, 0.0008, 0.002, 0.01]
 
     generateGraph: true
     graphPNLDeductFee: false
@@ -128,5 +128,5 @@ backtest:
       makerFeeRate: 0.000
       #takerFeeRate: 0.000
       balances:
-        BTC: 0
+        BTC: 1
         USDT: 5000
