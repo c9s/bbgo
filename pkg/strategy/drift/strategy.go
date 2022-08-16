@@ -397,9 +397,11 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 			var err error
 			if numPending, err = s.smartCancel(ctx, pricef, atr); err != nil {
 				log.WithError(err).Errorf("cannot cancel orders")
+				s.positionLock.Unlock()
 				return
 			}
 			if numPending > 0 {
+				s.positionLock.Unlock()
 				return
 			}
 
@@ -645,9 +647,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		method.Bind(session, s.GeneralOrderExecutor)
 	}
 
-	profit := types.Float64Slice{1.}
+	profit := types.Float64Slice{1., 1.}
 	price, _ := s.Session.LastPrice(s.Symbol)
-	cumProfit := types.Float64Slice{s.CalcAssetValue(price).Float64()}
+	initAsset := s.CalcAssetValue(price).Float64()
+	cumProfit := types.Float64Slice{initAsset, initAsset}
 	modify := func(p float64) float64 {
 		return p
 	}
