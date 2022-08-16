@@ -3,6 +3,7 @@ package binance
 import (
 	"context"
 	"fmt"
+	"github.com/adshao/go-binance/v2"
 	"os"
 	"strconv"
 	"strings"
