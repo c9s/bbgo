@@ -229,7 +229,7 @@ func (o *HyperparameterOptimizer) buildObjective(executor Executor, configJson [
 	}
 }
 
-func (o *HyperparameterOptimizer) Run(executor Executor, configJson []byte) (*HyperparameterOptimizeReport, error) {
+func (o *HyperparameterOptimizer) Run(ctx context.Context, executor Executor, configJson []byte) (*HyperparameterOptimizeReport, error) {
 	labelPaths, paramDomains := o.buildParamDomains()
 	objective := o.buildObjective(executor, configJson, paramDomains)
 
@@ -268,8 +268,8 @@ func (o *HyperparameterOptimizer) Run(executor Executor, configJson []byte) (*Hy
 	if err != nil {
 		return nil, err
 	}
-	eg, ctx := errgroup.WithContext(context.Background())
-	study.WithContext(ctx)
+	eg, studyCtx := errgroup.WithContext(ctx)
+	study.WithContext(studyCtx)
 	for i := 0; i < numOfProcesses; i++ {
 		processEvaluations := maxEvaluationPerProcess
 		if processEvaluations > maxEvaluation {
@@ -280,7 +280,7 @@ func (o *HyperparameterOptimizer) Run(executor Executor, configJson []byte) (*Hy
 		})
 		maxEvaluation -= processEvaluations
 	}
-	if err := eg.Wait(); err != nil {
+	if err := eg.Wait(); err != nil && ctx.Err() != context.Canceled {
 		return nil, err
 	}
 	close(trialFinishChan)
