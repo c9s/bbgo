@@ -21,6 +21,15 @@ func NewWriterFile(filename string) (*Writer, error) {
 	return NewWriter(f), nil
 }
 
+func AppendWriterFile(filename string) (*Writer, error) {
+	f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewWriter(f), nil
+}
+
 func NewWriter(file io.WriteCloser) *Writer {
 	tsv := csv.NewWriter(file)
 	tsv.Comma = '\t'

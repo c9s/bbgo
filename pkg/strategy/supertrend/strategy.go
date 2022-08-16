@@ -3,8 +3,8 @@ package supertrend
 import (
 	"bufio"
 	"context"
-	"encoding/csv"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/fatih/color"
 	"os"
@@ -312,15 +312,13 @@ func (s *Strategy) PrintResult(o *os.File) {
 	hiyellow(f, "\n")
 
 	if s.AccumulatedProfitReportTsv != "" {
-		tf, err := os.OpenFile(s.AccumulatedProfitReportTsv, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+		tsvwiter, err := tsv.AppendWriterFile(s.AccumulatedProfitReportTsv)
 		if err != nil {
 			panic(err)
 		}
-		defer tf.Close()
-		csvwiter := csv.NewWriter(tf)
-		csvwiter.Comma = '\t'
-		defer csvwiter.Flush()
-		csvwiter.Write([]string{s.Symbol, s.accumulatedProfit.String(), fmt.Sprintf("%f", s.accumulatedProfitMA.Last()), fmt.Sprintf("%f", s.dailyAccumulatedProfits.Sum())})
+		defer tsvwiter.Close()
+		// Output symbol, total acc. profit, acc. profit 60MA, 7d acc. profit
+		tsvwiter.Write([]string{s.Symbol, s.accumulatedProfit.String(), fmt.Sprintf("%f", s.accumulatedProfitMA.Last()), fmt.Sprintf("%f", s.dailyAccumulatedProfits.Sum())})
 	}
 }
 
