@@ -51,6 +51,27 @@ func NewCoreInteraction(environment *Environment, trader *Trader) *CoreInteracti
 	}
 }
 
+type SimpleInteraction struct {
+	Command     string
+	Description string
+	F           interface{}
+	Cmd         *interact.Command
+}
+
+func (it *SimpleInteraction) Commands(i *interact.Interact) {
+	it.Cmd = i.PrivateCommand(it.Command, it.Description, it.F)
+}
+
+func RegisterCommand(command, desc string, f interface{}) *interact.Command {
+	it := &SimpleInteraction{
+		Command:     command,
+		Description: desc,
+		F:           f,
+	}
+	interact.AddCustomInteraction(it)
+	return it.Cmd
+}
+
 func getStrategySignatures(exchangeStrategies map[string]SingleExchangeStrategy) []string {
 	var strategies []string
 	for signature := range exchangeStrategies {

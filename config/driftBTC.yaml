@@ -24,7 +24,7 @@ exchangeStrategies:
 - on: binance
   drift:
     canvasPath: "./output.png"
-    symbol: BTCBUSD
+    symbol: BTCUSDT
     # kline interval for indicators
     interval: 15m
     window: 2
@@ -32,18 +32,33 @@ exchangeStrategies:
     source: close
     predictOffset: 2
     noTrailingStopLoss: false
+    trailingStopLossType: kline
     # stddev on high/low-source
     hlVarianceMultiplier: 0.22
     hlRangeWindow: 5
-    smootherWindow: 2
+    smootherWindow: 1
     fisherTransformWindow: 9
-    # the init value of takeProfitFactor Series, the coefficient of ATR as TP
-    takeProfitFactor: 6
-    profitFactorWindow: 8
+    window1m: 22
+    smootherWindow1m: 18
+    fisherTransformWindow1m: 162
     atrWindow: 14
+    # orders not been traded will be canceled after `pendingMinutes` minutes
+    pendingMinutes: 5
+    noRebalance: true
+    trendWindow: 576
+    rebalanceFilter: 0
+    
+    # ActivationRatio should be increasing order
+    # when farest price from entry goes over that ratio, start using the callback ratio accordingly to do trailingstop
+    #trailingActivationRatio: [0.01, 0.016, 0.05]
+    trailingActivationRatio: [0.0012, 0.002, 0.01, 0.016]
+    #trailingActivationRatio: []
+    #trailingCallbackRate: []
+    #trailingCallbackRate: [0.002, 0.01, 0.1]
+    trailingCallbackRate: [0.0004, 0.0008, 0.002, 0.01]
 
     generateGraph: true
-    graphPNLDeductFee: true
+    graphPNLDeductFee: false
     graphPNLPath: "./pnl.png"
     graphCumPNLPath: "./cumpnl.png"
     #exits:
@@ -100,18 +115,18 @@ sync:
   sessions:
     - binance
   symbols:
-    - BTCBUSD
+    - BTCUSDT
 
 backtest:
   startTime: "2022-01-01"
-  endTime: "2022-07-29"
+  endTime: "2022-08-30"
   symbols:
-    - BTCBUSD
+    - BTCUSDT
   sessions: [binance]
   accounts:
     binance:
       makerFeeRate: 0.000
-      takerFeeRate: 0.00075
+      #takerFeeRate: 0.000
       balances:
         BTC: 1
-        BUSD: 5000.0
+        USDT: 5000
