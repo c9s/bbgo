@@ -651,10 +651,11 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 	for _, b := range accountBalances {
 		balanceAvailable := fixedpoint.Must(fixedpoint.NewFromString(b.AvailableBalance))
 		balanceTotal := fixedpoint.Must(fixedpoint.NewFromString(b.Balance))
+		unrealizedPnl := fixedpoint.Must(fixedpoint.NewFromString(b.CrossUnPnl))
 		balances[b.Asset] = types.Balance{
 			Currency:  b.Asset,
 			Available: balanceAvailable,
-			Locked:    balanceTotal.Sub(balanceAvailable),
+			Locked:    balanceTotal.Sub(balanceAvailable.Sub(unrealizedPnl)),
 		}
 	}
 
