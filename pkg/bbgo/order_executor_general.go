@@ -117,6 +117,10 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 			err = fmt.Errorf("can not place orders: %w", err)
 		}
 	}
+	// FIXME: map by price and volume
+	for i := 0; i < len(createdOrders); i++ {
+		createdOrders[i].Tag = formattedOrders[i].Tag
+	}
 
 	e.orderStore.Add(createdOrders...)
 	e.activeMakerOrders.Add(createdOrders...)

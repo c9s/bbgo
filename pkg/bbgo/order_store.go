@@ -104,8 +104,9 @@ func (s *OrderStore) Update(o types.Order) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, ok := s.orders[o.OrderID]
+	old, ok := s.orders[o.OrderID]
 	if ok {
+		o.Tag = old.Tag
 		s.orders[o.OrderID] = o
 	}
 	return ok
