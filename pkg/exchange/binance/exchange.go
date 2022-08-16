@@ -16,7 +16,6 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/adshao/go-binance/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -634,6 +633,9 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 	return a, nil
 }
 
+// QueryFuturesAccount gets the futures account balances from Binance
+// Balance.Available = Wallet Balance(in Binance UI) - Used Margin
+// Balance.Locked = Used Margin
 func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, error) {
 	account, err := e.futuresClient.NewGetAccountService().Do(ctx)
 	if err != nil {
@@ -646,9 +648,12 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 
 	var balances = map[string]types.Balance{}
 	for _, b := range accountBalances {
+		balanceAvailable := fixedpoint.Must(fixedpoint.NewFromString(b.AvailableBalance))
+		balanceTotal := fixedpoint.Must(fixedpoint.NewFromString(b.Balance))
 		balances[b.Asset] = types.Balance{
 			Currency:  b.Asset,
-			Available: fixedpoint.Must(fixedpoint.NewFromString(b.AvailableBalance)),
+			Available: balanceAvailable,
+			Locked:    balanceTotal.Sub(balanceAvailable),
 		}
 	}
 
