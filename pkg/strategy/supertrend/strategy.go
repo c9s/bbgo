@@ -3,6 +3,7 @@ package supertrend
 import (
 	"bufio"
 	"context"
+	"encoding/csv"
 	"fmt"
 	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/fatih/color"
@@ -100,6 +101,8 @@ type Strategy struct {
 	lastDayAccumulatedProfit  fixedpoint.Value
 	// AccumulatedProfitLastPeriodWindow Last period window of accumulated profit
 	AccumulatedProfitLastPeriodWindow int `json:"accumulatedProfitLastPeriodWindow"`
+	// AccumulatedProfitReportTsv outputs acc. profit report to specified tsv file
+	AccumulatedProfitReportTsv string `json:"accumulatedProfitReportTsv"`
 }
 
 func (s *Strategy) ID() string {
@@ -307,6 +310,18 @@ func (s *Strategy) PrintResult(o *os.File) {
 	hiyellow(f, "Accumulated Profit %dMA: %f\n", s.AccumulatedProfitMAWindow, s.accumulatedProfitMA.Last())
 	hiyellow(f, "Last %d day(s) Accumulated Profit: %f\n", s.AccumulatedProfitLastPeriodWindow, s.dailyAccumulatedProfits.Sum())
 	hiyellow(f, "\n")
+
+	if s.AccumulatedProfitReportTsv != "" {
+		tf, err := os.OpenFile(s.AccumulatedProfitReportTsv, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+		if err != nil {
+			panic(err)
+		}
+		defer tf.Close()
+		csvwiter := csv.NewWriter(tf)
+		csvwiter.Comma = '\t'
+		defer csvwiter.Flush()
+		csvwiter.Write([]string{s.Symbol, s.accumulatedProfit.String(), fmt.Sprintf("%f", s.accumulatedProfitMA.Last()), fmt.Sprintf("%f", s.dailyAccumulatedProfits.Sum())})
+	}
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
