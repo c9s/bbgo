@@ -120,7 +120,7 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("%s:%s:%v", ID, "" /*s.Symbol*/, bbgo.IsBackTesting)
+	return fmt.Sprintf("%s:%s:%v", ID, s.Symbol, bbgo.IsBackTesting)
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
