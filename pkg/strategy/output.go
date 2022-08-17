@@ -46,6 +46,11 @@ func DefaultWhiteList() []string {
 	return []string{"Window", "Interval", "Symbol"}
 }
 
+// @param s: strategy object
+// @param f: io.Writer used for writing the config dump
+// @param style: pretty print table style. Use DefaultStyle() to get default one.
+// @param withColor: whether to print with color
+// @param whiteLists: fields to be printed out from embedded struct (1st layer only)
 func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool, whiteLists ...string) {
 	t := table.NewWriter()
 	var write func(io.Writer, string, ...interface{})
