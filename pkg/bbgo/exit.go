@@ -41,39 +41,27 @@ func (e ExitMethod) String() string {
 	var buf bytes.Buffer
 	if e.RoiStopLoss != nil {
 		b, _ := json.Marshal(e.RoiStopLoss)
-		if string(b) != "null" {
-			buf.WriteString("roiStopLoss: " + string(b) + ", ")
-		}
+		buf.WriteString("roiStopLoss: " + string(b) + ", ")
 	}
 	if e.ProtectiveStopLoss != nil {
 		b, _ := json.Marshal(e.ProtectiveStopLoss)
-		if string(b) != "null" {
-			buf.WriteString("protectiveStopLoss: " + string(b) + ", ")
-		}
+		buf.WriteString("protectiveStopLoss: " + string(b) + ", ")
 	}
 	if e.RoiTakeProfit != nil {
 		b, _ := json.Marshal(e.RoiTakeProfit)
-		if string(b) != "null" {
-			buf.WriteString("rioTakeProft: " + string(b) + ", ")
-		}
+		buf.WriteString("rioTakeProft: " + string(b) + ", ")
 	}
-	if e.LowerShadowTakeProfit == nil {
+	if e.LowerShadowTakeProfit != nil {
 		b, _ := json.Marshal(e.LowerShadowTakeProfit)
-		if string(b) != "null" {
-			buf.WriteString("lowerShadowTakeProft: " + string(b) + ", ")
-		}
+		buf.WriteString("lowerShadowTakeProft: " + string(b) + ", ")
 	}
-	if e.CumulatedVolumeTakeProfit == nil {
+	if e.CumulatedVolumeTakeProfit != nil {
 		b, _ := json.Marshal(e.CumulatedVolumeTakeProfit)
-		if string(b) != "null" {
-			buf.WriteString("cumulatedVolumeTakeProfit: " + string(b) + ", ")
-		}
+		buf.WriteString("cumulatedVolumeTakeProfit: " + string(b) + ", ")
 	}
-	if e.TrailingStop == nil {
+	if e.TrailingStop != nil {
 		b, _ := json.Marshal(e.TrailingStop)
-		if string(b) != "null" {
-			buf.WriteString("trailingStop: " + string(b) + ", ")
-		}
+		buf.WriteString("trailingStop: " + string(b) + ", ")
 	}
 	return buf.String()
 }
