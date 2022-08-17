@@ -38,6 +38,7 @@ func TestSimplePriceMatching_orderUpdate(t *testing.T) {
 		MinNotional:     fixedpoint.MustNewFromString("0.001"),
 		MinAmount:       fixedpoint.MustNewFromString("10.0"),
 		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
+		StepSize:        fixedpoint.MustNewFromString("0.00001"),
 	}
 
 	t1 := time.Date(2021, 7, 1, 0, 0, 0, 0, time.UTC)
@@ -192,6 +193,7 @@ func getTestMarket() types.Market {
 		MinNotional:     fixedpoint.MustNewFromString("0.001"),
 		MinAmount:       fixedpoint.MustNewFromString("10.0"),
 		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
+		StepSize:        fixedpoint.MustNewFromString("0.00001"),
 	}
 	return market
 }
