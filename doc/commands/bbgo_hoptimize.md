@@ -1,20 +1,21 @@
-## bbgo submit-order
+## bbgo hoptimize
 
-place order to the exchange
+run hyperparameter optimizer (experimental)
 
 ```
-bbgo submit-order --session SESSION --symbol SYMBOL --side SIDE --quantity QUANTITY [--price PRICE] [flags]
+bbgo hoptimize [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help              help for submit-order
-      --price string      the trading price
-      --quantity string   the trading quantity
-      --session string    the exchange session name for sync
-      --side string       the trading side: buy or sell
-      --symbol string     the trading pair, like btcusdt
+  -h, --help                      help for hoptimize
+      --json                      print optimizer metrics in json format
+      --json-keep-all             keep all results of trials
+      --name string               assign an optimization session name
+      --optimizer-config string   config file (default "optimizer.yaml")
+      --output string             backtest report output directory (default "output")
+      --tsv                       print optimizer metrics in csv format
 ```
 
 ### Options inherited from parent commands
