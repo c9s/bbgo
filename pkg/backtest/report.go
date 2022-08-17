@@ -49,6 +49,9 @@ type SummaryReport struct {
 	TotalGrossProfit fixedpoint.Value `json:"totalGrossProfit,omitempty"`
 	TotalGrossLoss   fixedpoint.Value `json:"totalGrossLoss,omitempty"`
 
+	SharpeRatio  float64 `json:"sharpeRatio"`
+	SortinoRatio float64 `json:"sortinoRatio"`
+
 	SymbolReports []SessionSymbolReport `json:"symbolReports,omitempty"`
 
 	Manifests Manifests `json:"manifests,omitempty"`

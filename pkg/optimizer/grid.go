@@ -40,6 +40,14 @@ var TotalEquityDiff = func(summaryReport *backtest.SummaryReport) fixedpoint.Val
 	return finalEquity.Sub(initEquity)
 }
 
+var FinalSharpeRatio = func(summaryReport *backtest.SummaryReport) fixedpoint.Value {
+	return fixedpoint.NewFromFloat(summaryReport.SharpeRatio)
+}
+
+var FinalSortinoRatio = func(summaryReport *backtest.SummaryReport) fixedpoint.Value {
+	return fixedpoint.NewFromFloat(summaryReport.SortinoRatio)
+}
+
 type Metric struct {
 	// Labels is the labels of the given parameters
 	Labels []string `json:"labels,omitempty"`
@@ -199,6 +207,8 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 		"totalProfit":     TotalProfitMetricValueFunc,
 		"totalVolume":     TotalVolume,
 		"totalEquityDiff": TotalEquityDiff,
+		"sharpeRatio":     FinalSharpeRatio,
+		"sortinoRatio":    FinalSortinoRatio,
 	}
 	var metrics = map[string][]Metric{}
 

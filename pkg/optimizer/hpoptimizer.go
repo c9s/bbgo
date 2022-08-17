@@ -22,6 +22,10 @@ const (
 	HpOptimizerObjectiveProfit = "profit"
 	// HpOptimizerObjectiveVolume optimize the parameters to maximize trading volume
 	HpOptimizerObjectiveVolume = "volume"
+	// HpOptimizerObjectiveSharpeRatio optimize the parameters to maximize the Sharpe Ratio
+	HpOptimizerObjectiveSharpeRatio = "sharpe"
+	// HpOptimizerObjectiveSortinoRatio optimize the parameters to maximize the Sortino Ratio
+	HpOptimizerObjectiveSortinoRatio = "sortino"
 )
 
 const (
@@ -198,6 +202,10 @@ func (o *HyperparameterOptimizer) buildObjective(executor Executor, configJson [
 		metricValueFunc = TotalVolume
 	case HpOptimizerObjectiveEquity:
 		metricValueFunc = TotalEquityDiff
+	case HpOptimizerObjectiveSharpeRatio:
+		metricValueFunc = FinalSharpeRatio
+	case HpOptimizerObjectiveSortinoRatio:
+		metricValueFunc = FinalSortinoRatio
 	}
 
 	return func(trial goptuna.Trial) (float64, error) {

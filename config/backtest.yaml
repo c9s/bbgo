@@ -10,6 +10,12 @@ backtest:
   - max
   - kucoin
   - okex
+  accounts:
+    binance:
+      balances:
+        # Only list assets to be traded to make risk evaluation correct.
+        BTC: 0.0
+        USDT: 100.0
 
 exchangeStrategies:
 - on: binance

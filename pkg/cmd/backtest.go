@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -28,6 +30,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
+
+// Average risk-free hourly return. Calculate from CeFi stable coin lending interest, 8% APY.
+var riskFreeHourlyReturnRate = math.Pow(math.E, math.Log(1.08)/(365*24))
 
 func init() {
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
@@ -298,6 +303,43 @@ var BacktestCmd = &cobra.Command{
 		var runID = userConfig.GetSignature() + "_" + uuid.NewString()
 		var reportDir = outputDirectory
 
+		// risk calculation
+		var initTotalBalances = types.BalanceMap{}
+		for _, session := range environ.Sessions() {
+			accountConfig := userConfig.Backtest.GetAccount(session.Name)
+			initBalances := accountConfig.Balances.BalanceMap()
+			initTotalBalances = initTotalBalances.Add(initBalances)
+		}
+		var riskCalc *riskEvaluator = nil
+		tryInitRiskCalc := func(possibleStartPrices map[string]fixedpoint.Value, startTime time.Time) *riskEvaluator {
+			initAssets := initTotalBalances.Assets(possibleStartPrices, startTime)
+
+			// ensure all coin prices of initial balances are included in initial equity
+			for coin, balance := range initTotalBalances {
+				if balance.Total().IsZero() {
+					continue
+				}
+				if _, ready := initAssets[coin]; !ready {
+					return nil
+				}
+			}
+			return newRiskEvaluator(initAssets.InUSD(), startTime)
+		}
+		kLineHandlers = append(kLineHandlers, func(k types.KLine, exSource *backtest.ExchangeDataSource) {
+			balances, err := exSource.Exchange.QueryAccountBalances(ctx)
+			if err != nil {
+				log.WithError(err).Errorf("query back-test account balance error while calculating risk")
+			} else {
+				if riskCalc == nil {
+					possibleStartPrices := exSource.Session.AllStartPrices()
+					riskCalc = tryInitRiskCalc(possibleStartPrices, k.StartTime.Time())
+				}
+				if riskCalc != nil && k.Interval == types.Interval1h {
+					riskCalc.Update(balances, exSource.Session.AllLastPrices(), k.EndTime.Time())
+				}
+			}
+		})
+
 		if generatingReport {
 			if reportFileInSubDir {
 				// reportDir = filepath.Join(reportDir, backtestSessionName)
@@ -403,6 +445,7 @@ var BacktestCmd = &cobra.Command{
 		runCtx, cancelRun := context.WithCancel(ctx)
 		go func() {
 			defer cancelRun()
+			defer riskCalc.FinalizeIntervals()
 
 			// Optimize back-test speed for single exchange source
 			var numOfExchangeSources = len(exchangeSources)
@@ -453,14 +496,10 @@ var BacktestCmd = &cobra.Command{
 		log.SetLevel(log.InfoLevel)
 
 		// aggregate total balances
-		initTotalBalances := types.BalanceMap{}
 		finalTotalBalances := types.BalanceMap{}
 		var sessionNames []string
 		for _, session := range environ.Sessions() {
 			sessionNames = append(sessionNames, session.Name)
-			accountConfig := userConfig.Backtest.GetAccount(session.Name)
-			initBalances := accountConfig.Balances.BalanceMap()
-			initTotalBalances = initTotalBalances.Add(initBalances)
 
 			finalBalances := session.GetAccount().Balances()
 			finalTotalBalances = finalTotalBalances.Add(finalBalances)
@@ -517,6 +556,8 @@ var BacktestCmd = &cobra.Command{
 				}
 			}
 		}
+		summaryReport.SharpeRatio = riskCalc.CalcSharpeRatio()
+		summaryReport.SortinoRatio = riskCalc.CalcSortinoRatio()
 
 		if generatingReport {
 			summaryReportFile := filepath.Join(reportDir, "summary.json")
@@ -545,6 +586,16 @@ var BacktestCmd = &cobra.Command{
 			color.Green("END TIME: %s\n", endTime.Format(time.RFC1123))
 			color.Green("INITIAL TOTAL BALANCE: %v\n", initTotalBalances)
 			color.Green("FINAL TOTAL BALANCE: %v\n", finalTotalBalances)
+			if summaryReport.SharpeRatio > 0 {
+				color.Green("SHARPE RATIO: %v\n", summaryReport.SharpeRatio)
+			} else {
+				color.Red("SHARPE RATIO: %v\n", summaryReport.SharpeRatio)
+			}
+			if summaryReport.SortinoRatio > 0 {
+				color.Green("SORTINO RATIO: %v\n", summaryReport.SortinoRatio)
+			} else {
+				color.Red("SORTINO RATIO: %v\n", summaryReport.SortinoRatio)
+			}
 
 			for _, symbolReport := range summaryReport.SymbolReports {
 				symbolReport.Print(wantBaseAssetBaseline)
@@ -707,4 +758,118 @@ func rewriteManifestPaths(manifests backtest.Manifests, basePath string) (backte
 		filterManifests[k] = p
 	}
 	return filterManifests, nil
+}
+
+type riskEvaluator struct {
+	initEquity     fixedpoint.Value // initial equity
+	riskFreeEquity fixedpoint.Value // risk-free (hold & lend) equity
+	roiSum         fixedpoint.Value // sum of ROIs to calculate average ROI
+	roi2Sum        fixedpoint.Value // sum of ROI^2s to calculate standard deviation of ROI
+	drawdown2Sum   fixedpoint.Value // sum of negative ROI^2s to calculate standard deviation of drawdown
+	intervalCnt    int64            // number of calculation intervals (i.e. hours)
+	startTime      time.Time        // time point that initial equity being calculated
+	endTime        time.Time        // last time point
+
+	curROI fixedpoint.Value
+}
+
+func newRiskEvaluator(initEquity fixedpoint.Value, startTime time.Time) *riskEvaluator {
+	return &riskEvaluator{
+		initEquity:     initEquity,
+		riskFreeEquity: initEquity,
+		roiSum:         fixedpoint.Zero,
+		roi2Sum:        fixedpoint.Zero,
+		drawdown2Sum:   fixedpoint.Zero,
+		intervalCnt:    0,
+		startTime:      startTime,
+		endTime:        startTime,
+	}
+}
+
+func (evaluator *riskEvaluator) Update(curBalances types.BalanceMap, curPrices map[string]fixedpoint.Value, curTime time.Time) {
+	if curTime.After(evaluator.endTime) {
+		// summarize previous K-line
+		evaluator.commitInterval()
+		evaluator.endTime = curTime
+	}
+	// update ROI of current interval
+	curEquity := curBalances.Assets(curPrices, curTime).InUSD()
+	evaluator.curROI = curEquity.Div(evaluator.initEquity).Sub(fixedpoint.One)
+}
+
+func (evaluator *riskEvaluator) FinalizeIntervals() {
+	if evaluator != nil {
+		evaluator.commitInterval()
+	}
+}
+
+func (evaluator *riskEvaluator) CalcSharpeRatio() float64 {
+	//           ROI_excess    E[ROI] - ROI_risk_free      E[ROI] - ROI_risk_free
+	// sharpe = ----------- = ------------------------- = -------------------------
+	//          variability   sqrt(E[(ROI - E[ROI])^2])   sqrt(E[ROI^2] - E[ROI]^2)
+
+	if evaluator == nil {
+		return math.NaN()
+	}
+
+	kLineCnt := fixedpoint.NewFromInt(evaluator.intervalCnt)
+	avgRealROI := evaluator.roiSum.Div(kLineCnt)
+	riskFreeROI := evaluator.riskFreeEquity.Div(evaluator.initEquity).Sub(fixedpoint.One)
+	excessROI := avgRealROI.Sub(riskFreeROI)
+	variability2 := evaluator.roi2Sum.Div(kLineCnt).Float64() - avgRealROI.Mul(avgRealROI).Float64()
+	if variability2 == 0.0 {
+		switch excessROI.Sign() {
+		case 1:
+			return 999999.9
+		case -1:
+			return -999999.9
+		default:
+			return 0.0
+		}
+	}
+	variability := math.Sqrt(variability2)
+	return excessROI.Float64() / variability
+}
+
+func (evaluator *riskEvaluator) CalcSortinoRatio() float64 {
+	//           ROI_excess   E[ROI] - ROI_risk_free
+	// sortino = ---------- = -----------------------
+	//              risk      sqrt(E[ROI_drawdown^2])
+
+	if evaluator == nil {
+		return math.NaN()
+	}
+
+	intervalCnt := fixedpoint.NewFromInt(evaluator.intervalCnt)
+	avgRealROI := evaluator.roiSum.Div(intervalCnt)
+	riskFreeROI := evaluator.riskFreeEquity.Div(evaluator.initEquity).Sub(fixedpoint.One)
+	excessROI := avgRealROI.Sub(riskFreeROI)
+	risk := math.Sqrt(evaluator.drawdown2Sum.Div(intervalCnt).Float64())
+	if risk == 0.0 {
+		switch excessROI.Sign() {
+		case 1:
+			return 999999.9
+		case -1:
+			return -999999.9
+		default:
+			return 0.0
+		}
+	}
+	return excessROI.Float64() / risk
+}
+
+func (evaluator *riskEvaluator) commitInterval() {
+	totalHours := evaluator.endTime.Sub(evaluator.startTime).Hours()
+	cumRiskFreeReturnRate := fixedpoint.NewFromFloat(math.Pow(riskFreeHourlyReturnRate, totalHours))
+	evaluator.riskFreeEquity = evaluator.initEquity.Mul(cumRiskFreeReturnRate)
+
+	curROI2 := evaluator.curROI.Mul(evaluator.curROI)
+	evaluator.roiSum = evaluator.roiSum.Add(evaluator.curROI)
+	evaluator.roi2Sum = evaluator.roi2Sum.Add(curROI2)
+	if evaluator.curROI.Sign() < 0 {
+		evaluator.drawdown2Sum = evaluator.drawdown2Sum.Add(curROI2)
+	}
+
+	evaluator.curROI = fixedpoint.Zero
+	evaluator.intervalCnt++
 }
