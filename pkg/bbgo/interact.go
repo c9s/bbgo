@@ -526,7 +526,7 @@ func (it *CoreInteraction) Initialize() error {
 // getStrategySignature returns strategy instance unique signature
 func getStrategySignature(strategy SingleExchangeStrategy) (string, error) {
 	// Returns instance ID
-	var signature = callID(strategy)
+	var signature = CallID(strategy)
 	if signature != "" {
 		return signature, nil
 	}

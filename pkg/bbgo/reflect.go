@@ -10,7 +10,7 @@ type InstanceIDProvider interface {
 	InstanceID() string
 }
 
-func callID(obj interface{}) string {
+func CallID(obj interface{}) string {
 	sv := reflect.ValueOf(obj)
 	st := reflect.TypeOf(obj)
 	if st.Implements(reflect.TypeOf((*InstanceIDProvider)(nil)).Elem()) {
@@ -30,4 +30,3 @@ func callID(obj interface{}) string {
 	ret := m.Call(nil)
 	return ret[0].String() + ":"
 }
-
