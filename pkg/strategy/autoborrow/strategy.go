@@ -47,6 +47,7 @@ type MarginAsset struct {
 	MaxTotalBorrow       fixedpoint.Value `json:"maxTotalBorrow"`
 	MaxQuantityPerBorrow fixedpoint.Value `json:"maxQuantityPerBorrow"`
 	MinQuantityPerBorrow fixedpoint.Value `json:"minQuantityPerBorrow"`
+	MinDebtRatio         fixedpoint.Value `json:"debtRatio"`
 }
 
 type Strategy struct {
@@ -109,7 +110,68 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 	}
 }
 
+func (s *Strategy) reBalanceDebt(ctx context.Context) {
+	account, err := s.ExchangeSession.UpdateAccount(ctx)
+	if err != nil {
+		log.WithError(err).Errorf("can not update account")
+		return
+	}
+
+	minMarginLevel := s.MinMarginLevel
+	curMarginLevel := account.MarginLevel
+
+	balances := account.Balances()
+	if len(balances) == 0 {
+		log.Warn("balance is empty, skip autoborrow")
+		return
+	}
+
+	for _, marginAsset := range s.Assets {
+		b, ok := balances[marginAsset.Asset]
+		if !ok {
+			continue
+		}
+
+		// debt / total
+		debtRatio := b.Debt().Div(b.Total())
+		if marginAsset.MinDebtRatio.IsZero() {
+			marginAsset.MinDebtRatio = fixedpoint.One
+		}
+
+		// if debt is greater than total, skip repay
+		if b.Debt().Compare(b.Total()) > 0 {
+			continue
+		}
+
+		// the current debt ratio is less than the minimal ratio,
+		// we need to repay and reduce the debt
+		if marginAsset.MinDebtRatio.Compare(debtRatio) < 0 {
+			continue
+		}
+
+		toRepay := fixedpoint.Min(b.Borrowed, b.Available)
+		if toRepay.IsZero() {
+			return
+		}
+
+		bbgo.Notify(&MarginAction{
+			Exchange:       s.ExchangeSession.ExchangeName,
+			Action:         "Repay for Debt Ratio",
+			Asset:          b.Currency,
+			Amount:         toRepay,
+			MarginLevel:    curMarginLevel,
+			MinMarginLevel: minMarginLevel,
+		})
+
+		if err := s.marginBorrowRepay.RepayMarginAsset(context.Background(), b.Currency, toRepay); err != nil {
+			log.WithError(err).Errorf("margin repay error")
+		}
+	}
+}
+
 func (s *Strategy) checkAndBorrow(ctx context.Context) {
+	s.reBalanceDebt(ctx)
+
 	if s.MinMarginLevel.IsZero() {
 		return
 	}
@@ -148,7 +210,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 		log.Warn("balance is empty, skip autoborrow")
 		return
 	}
-
+	
 	for _, marginAsset := range s.Assets {
 		changed := false
 
