@@ -1,5 +1,11 @@
 # Release Process
 
+Create a new branch for the new release:
+
+```shell
+git checkout -b release/v1.39.0 origin/main
+```
+
 ## 1. Run the release test script
 
 ```shell
