@@ -192,13 +192,6 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 		trade := m.newTradeFromOrder(&order2, false, m.LastPrice)
 		m.executeTrade(trade)
 
-		// update the order status
-		order2.Status = types.OrderStatusFilled
-		order2.ExecutedQuantity = order2.Quantity
-		order2.IsWorking = false
-
-		m.EmitOrderUpdate(order2)
-
 		// unlock the rest balances for limit taker
 		if order.Type == types.OrderTypeLimit {
 			if order.AveragePrice.IsZero() {
@@ -225,6 +218,12 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 				}
 			}
 		}
+
+		// update the order status
+		order2.Status = types.OrderStatusFilled
+		order2.ExecutedQuantity = order2.Quantity
+		order2.IsWorking = false
+		m.EmitOrderUpdate(order2)
 
 		// let the exchange emit the "FILLED" order update (we need the closed order)
 		// m.EmitOrderUpdate(order2)
