@@ -366,8 +366,7 @@ func (m *SimplePriceMatching) buyToPrice(price fixedpoint.Value) (closedOrders [
 			if o.Price.Compare(price) >= 0 {
 				// limit buy taker order, move it to the closed order
 				// we assume that we have no price slippage here, so the latest price will be the executed price
-				// TODO: simulate slippage here
-				o.Price = price
+				o.AveragePrice = price
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -414,8 +413,7 @@ func (m *SimplePriceMatching) buyToPrice(price fixedpoint.Value) (closedOrders [
 				// limit sell order as taker, move it to the closed order
 				// we assume that we have no price slippage here, so the latest price will be the executed price
 				// TODO: simulate slippage here
-				o.Price = price
-
+				o.AveragePrice = price
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -444,7 +442,12 @@ func (m *SimplePriceMatching) buyToPrice(price fixedpoint.Value) (closedOrders [
 
 	for i := range closedOrders {
 		o := closedOrders[i]
-		trade := m.newTradeFromOrder(&o, true, o.Price)
+		executedPrice := o.Price
+		if !o.AveragePrice.IsZero() {
+			executedPrice = o.AveragePrice
+		}
+
+		trade := m.newTradeFromOrder(&o, !isTakerOrder(o), executedPrice)
 		m.executeTrade(trade)
 		closedOrders[i] = o
 
@@ -495,7 +498,7 @@ func (m *SimplePriceMatching) sellToPrice(price fixedpoint.Value) (closedOrders 
 			// if the order price is lower than the current price
 			// it's a taker order
 			if o.Price.Compare(price) <= 0 {
-				o.Price = price
+				o.AveragePrice = price
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -539,9 +542,9 @@ func (m *SimplePriceMatching) sellToPrice(price fixedpoint.Value) (closedOrders 
 
 			o.Type = types.OrderTypeLimit
 
-			// taker order?
+			// handle TAKER order
 			if o.Price.Compare(price) >= 0 {
-				o.Price = price
+				o.AveragePrice = price
 				o.ExecutedQuantity = o.Quantity
 				o.Status = types.OrderStatusFilled
 				closedOrders = append(closedOrders, o)
@@ -568,7 +571,12 @@ func (m *SimplePriceMatching) sellToPrice(price fixedpoint.Value) (closedOrders 
 
 	for i := range closedOrders {
 		o := closedOrders[i]
-		trade := m.newTradeFromOrder(&o, true, o.Price)
+		executedPrice := o.Price
+		if !o.AveragePrice.IsZero() {
+			executedPrice = o.AveragePrice
+		}
+
+		trade := m.newTradeFromOrder(&o, !isTakerOrder(o), executedPrice)
 		m.executeTrade(trade)
 		closedOrders[i] = o
 
@@ -676,6 +684,22 @@ func calculateNativeOrderFee(order *types.Order, market types.Market, feeRate fi
 
 	}
 	return fee, feeCurrency
+}
+
+func isTakerOrder(o types.Order) bool {
+	if o.AveragePrice.IsZero() {
+		return false
+	}
+
+	switch o.Side {
+	case types.SideTypeBuy:
+		return o.AveragePrice.Compare(o.Price) < 0
+
+	case types.SideTypeSell:
+		return o.AveragePrice.Compare(o.Price) > 0
+
+	}
+	return false
 }
 
 func isLimitTakerOrder(o types.SubmitOrder, currentPrice fixedpoint.Value) bool {
