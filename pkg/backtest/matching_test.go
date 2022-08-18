@@ -208,6 +208,46 @@ func getTestAccount() *types.Account {
 	return account
 }
 
+func TestSimplePriceMatching_LimitBuyTakerOrder(t *testing.T) {
+	account := getTestAccount()
+	market := getTestMarket()
+	engine := &SimplePriceMatching{
+		Account:      account,
+		Market:       market,
+		closedOrders: make(map[uint64]types.Order),
+		LastPrice:    fixedpoint.NewFromFloat(19000.0),
+	}
+
+	takerOrder := types.SubmitOrder{
+		Symbol:      market.Symbol,
+		Side:        types.SideTypeBuy,
+		Type:        types.OrderTypeLimit,
+		Quantity:    fixedpoint.NewFromFloat(0.1),
+		Price:       fixedpoint.NewFromFloat(20000.0),
+		TimeInForce: types.TimeInForceGTC,
+	}
+	createdOrder, trade, err := engine.PlaceOrder(takerOrder)
+	assert.NoError(t, err)
+	t.Logf("created order: %+v", createdOrder)
+	t.Logf("executed trade: %+v", trade)
+
+	assert.Equal(t, "19000", trade.Price.String())
+	assert.Equal(t, "19000", createdOrder.AveragePrice.String())
+	assert.Equal(t, "20000", createdOrder.Price.String())
+
+	usdt, ok := account.Balance("USDT")
+	assert.True(t, ok)
+	assert.True(t, usdt.Locked.IsZero())
+
+	btc, ok := account.Balance("BTC")
+	assert.True(t, ok)
+	assert.True(t, btc.Locked.IsZero())
+	assert.Equal(t, fixedpoint.NewFromFloat(100.0).Add(createdOrder.Quantity).String(), btc.Available.String())
+
+	usedQuoteAmount := createdOrder.AveragePrice.Mul(createdOrder.Quantity)
+	assert.Equal(t, usdt.Available.String(), fixedpoint.NewFromFloat(1000000.0).Sub(usedQuoteAmount).String())
+}
+
 func TestSimplePriceMatching_StopLimitOrderBuy(t *testing.T) {
 	account := getTestAccount()
 	market := getTestMarket()

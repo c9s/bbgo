@@ -178,6 +178,8 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 	if isTaker {
 		if order.Type == types.OrderTypeMarket {
 			order.Price = m.LastPrice
+		} else if order.Type == types.OrderTypeLimit {
+			order.AveragePrice = m.LastPrice
 		}
 
 		// emit the order update for Status:New
@@ -196,6 +198,33 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 		order2.IsWorking = false
 
 		m.EmitOrderUpdate(order2)
+
+		// unlock the rest balances for limit taker
+		if order.Type == types.OrderTypeLimit {
+			if order.AveragePrice.IsZero() {
+				return nil, nil, fmt.Errorf("the average price of the given limit taker order can not be zero")
+			}
+
+			switch o.Side {
+			case types.SideTypeBuy:
+				// limit buy taker, the order price is higher than the current best ask price
+				// the executed price is lower than the given price, so we will use less quote currency to buy the base asset.
+				amount := order.Price.Sub(order.AveragePrice).Mul(order.Quantity)
+				if amount.Sign() > 0 {
+					if err := m.Account.UnlockBalance(m.Market.QuoteCurrency, amount); err != nil {
+						return nil, nil, err
+					}
+				}
+
+			case types.SideTypeSell:
+				// limit sell taker, the order price is lower than the current best bid price
+				// the executed price is higher than the given price, so we will get more quote currency back
+				amount := order.AveragePrice.Sub(order.Price).Mul(order.Quantity)
+				if amount.Sign() > 0 {
+					m.Account.AddBalance(m.Market.QuoteCurrency, amount)
+				}
+			}
+		}
 
 		// let the exchange emit the "FILLED" order update (we need the closed order)
 		// m.EmitOrderUpdate(order2)
