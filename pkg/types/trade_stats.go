@@ -125,6 +125,18 @@ func (s *IntervalProfitCollector) GetSharpe() float64 {
 	return Sharpe(Minus(s.Profits, 1.), s.Profits.Length(), true, false)
 }
 
+// Get sortino value with the interval of profit collected.
+// No risk-free return rate and smart sortino OFF for the calculated result.
+func (s *IntervalProfitCollector) GetSortino() float64 {
+	if s.tmpTime.IsZero() {
+		panic("No valid start time. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+	}
+	if s.Profits == nil {
+		panic("profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+	}
+	return Sortino(Minus(s.Profits, 1.), 0., s.Profits.Length(), true, false)
+}
+
 func (s *IntervalProfitCollector) GetOmega() float64 {
 	return Omega(Minus(s.Profits, 1.))
 }
@@ -132,6 +144,7 @@ func (s *IntervalProfitCollector) GetOmega() float64 {
 func (s IntervalProfitCollector) MarshalYAML() (interface{}, error) {
 	result := make(map[string]interface{})
 	result["Sharpe Ratio"] = s.GetSharpe()
+	result["Sortino Ratio"] = s.GetSortino()
 	result["Omega Ratio"] = s.GetOmega()
 	result["Profitable Count"] = s.GetNumOfProfitableIntervals()
 	result["NonProfitable Count"] = s.GetNumOfNonProfitableIntervals()
