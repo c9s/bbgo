@@ -207,6 +207,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 					if err := m.Account.UnlockBalance(m.Market.QuoteCurrency, amount); err != nil {
 						return nil, nil, err
 					}
+					m.EmitBalanceUpdate(m.Account.Balances())
 				}
 
 			case types.SideTypeSell:
@@ -215,6 +216,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 				amount := order.AveragePrice.Sub(order.Price).Mul(order.Quantity)
 				if amount.Sign() > 0 {
 					m.Account.AddBalance(m.Market.QuoteCurrency, amount)
+					m.EmitBalanceUpdate(m.Account.Balances())
 				}
 			}
 		}
