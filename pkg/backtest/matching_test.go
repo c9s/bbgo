@@ -293,7 +293,7 @@ func TestSimplePriceMatching_StopLimitOrderBuy(t *testing.T) {
 	assert.Equal(t, types.OrderStatusFilled, closedOrders[0].Status)
 	assert.Equal(t, types.OrderTypeLimit, closedOrders[0].Type)
 	assert.Equal(t, "21001", trades[0].Price.String())
-	assert.Equal(t, "21001", closedOrders[0].Price.String(), "order.Price should be adjusted")
+	assert.Equal(t, "22000", closedOrders[0].Price.String(), "order.Price should not be adjusted")
 
 	assert.Equal(t, fixedpoint.NewFromFloat(21001.0).String(), engine.LastPrice.String())
 
@@ -364,7 +364,7 @@ func TestSimplePriceMatching_StopLimitOrderSell(t *testing.T) {
 
 	assert.Equal(t, types.OrderStatusFilled, closedOrders[0].Status)
 	assert.Equal(t, types.OrderTypeLimit, closedOrders[0].Type)
-	assert.Equal(t, "20990", closedOrders[0].Price.String())
+	assert.Equal(t, "20000", closedOrders[0].Price.String(), "limit order price should not be changed")
 	assert.Equal(t, "20990", trades[0].Price.String())
 	assert.Equal(t, "20990", engine.LastPrice.String())
 
