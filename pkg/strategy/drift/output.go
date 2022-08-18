@@ -6,31 +6,10 @@ import (
 	"reflect"
 	"unsafe"
 
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/strategy"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
-
-type jsonStruct struct {
-	key   string
-	json  string
-	tp    string
-	value interface{}
-}
-type jsonArr []jsonStruct
-
-func (a jsonArr) Len() int           { return len(a) }
-func (a jsonArr) Less(i, j int) bool { return a[i].key < a[j].key }
-func (a jsonArr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-
-func canInt(v reflect.Value) bool {
-	k := v.Type().Kind()
-	switch k {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return true
-	default:
-		return false
-	}
-}
 
 func (s *Strategy) ParamDump(f io.Writer, seriesLength ...int) {
 	length := 1
@@ -81,7 +60,7 @@ func (s *Strategy) ParamDump(f io.Writer, seriesLength ...int) {
 			}
 		} else if canString {
 			fmt.Fprintf(f, "%s: %s\n", fieldName, stringFunc.Call(nil)[0].String())
-		} else if canInt(field) {
+		} else if dynamic.CanInt(field) {
 			fmt.Fprintf(f, "%s: %d\n", fieldName, field.Int())
 		} else if field.CanConvert(reflect.TypeOf(float64(0))) {
 			fmt.Fprintf(f, "%s: %.4f\n", fieldName, field.Float())
