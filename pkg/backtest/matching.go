@@ -232,7 +232,6 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 	}
 
 	// For limit maker orders (open status)
-	// TODO: handle limit taker order
 	switch o.Side {
 
 	case types.SideTypeBuy:
