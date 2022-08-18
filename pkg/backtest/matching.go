@@ -142,9 +142,11 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 
 	case types.OrderTypeStopMarket:
 		// the actual price might be different.
+		o.StopPrice = m.Market.TruncatePrice(o.StopPrice)
 		price = o.StopPrice
 
 	case types.OrderTypeLimit, types.OrderTypeStopLimit, types.OrderTypeLimitMaker:
+		o.Price = m.Market.TruncatePrice(o.Price)
 		price = o.Price
 	}
 
@@ -154,7 +156,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 		return nil, nil, fmt.Errorf("order quantity %s is less than minQuantity %s, order: %+v", o.Quantity.String(), m.Market.MinQuantity.String(), o)
 	}
 
-	quoteQuantity := m.Market.TruncateQuantity(o.Quantity.Mul(price))
+	quoteQuantity := o.Quantity.Mul(price)
 	if quoteQuantity.Compare(m.Market.MinNotional) < 0 {
 		return nil, nil, fmt.Errorf("order amount %s is less than minNotional %s, order: %+v", quoteQuantity.String(), m.Market.MinNotional.String(), o)
 	}
@@ -299,7 +301,7 @@ func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool
 	// BINANCE uses 0.1% for both maker and taker
 	// MAX uses 0.050% for maker and 0.15% for taker
 	var feeRate = m.getFeeRate(isMaker)
-	var quoteQuantity = m.Market.TruncateQuantity(order.Quantity.Mul(price))
+	var quoteQuantity = order.Quantity.Mul(price)
 	var fee fixedpoint.Value
 	var feeCurrency string
 
