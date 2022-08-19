@@ -132,8 +132,6 @@ type SubmitOrder struct {
 
 	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect,omitempty"` // AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
 
-	// futures order fields
-	IsFutures     bool `json:"is_futures" db:"is_futures"`
 	ReduceOnly    bool `json:"reduceOnly" db:"reduce_only"`
 	ClosePosition bool `json:"closePosition" db:"close_position"`
 
@@ -253,6 +251,7 @@ type Order struct {
 	CreationTime     Time             `json:"creationTime" db:"created_at"`
 	UpdateTime       Time             `json:"updateTime" db:"updated_at"`
 
+	IsFutures  bool `json:"isFutures" db:"is_futures"`
 	IsMargin   bool `json:"isMargin" db:"is_margin"`
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`
 }
