@@ -3,12 +3,13 @@ package binance
 import (
 	"context"
 	"fmt"
-	"github.com/adshao/go-binance/v2"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/adshao/go-binance/v2"
 
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/spf13/viper"
@@ -696,7 +697,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 			return orders, err
 		}
 
-		return toGlobalOrders(binanceOrders)
+		return toGlobalOrders(binanceOrders, false)
 	}
 
 	if e.IsFutures {
@@ -707,7 +708,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 			return orders, err
 		}
 
-		return toGlobalFuturesOrders(binanceOrders)
+		return toGlobalFuturesOrders(binanceOrders, false)
 	}
 
 	binanceOrders, err := e.client.NewListOpenOrdersService().Symbol(symbol).Do(ctx)
@@ -715,7 +716,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		return orders, err
 	}
 
-	return toGlobalOrders(binanceOrders)
+	return toGlobalOrders(binanceOrders, false)
 }
 
 func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
@@ -802,7 +803,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 			return orders, err
 		}
 
-		return toGlobalOrders(binanceOrders)
+		return toGlobalOrders(binanceOrders, e.IsMargin)
 	}
 
 	if e.IsFutures {
@@ -821,7 +822,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		if err != nil {
 			return orders, err
 		}
-		return toGlobalFuturesOrders(binanceOrders)
+		return toGlobalFuturesOrders(binanceOrders, false)
 	}
 
 	// If orderId is set, it will get orders >= that orderId. Otherwise most recent orders are returned.
@@ -847,7 +848,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		return orders, err
 	}
 
-	return toGlobalOrders(binanceOrders)
+	return toGlobalOrders(binanceOrders, e.IsMargin)
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err error) {
@@ -1102,7 +1103,7 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		Type:             response.Type,
 		Side:             response.Side,
 		ReduceOnly:       response.ReduceOnly,
-	}, true)
+	}, false)
 
 	return createdOrder, err
 }

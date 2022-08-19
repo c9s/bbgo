@@ -121,7 +121,6 @@ func (e *ExecutionReportEvent) Order() (*types.Order, error) {
 			Price:         e.OrderPrice,
 			StopPrice:     e.StopPrice,
 			TimeInForce:   types.TimeInForce(e.TimeInForce),
-			IsFutures:     false,
 			ReduceOnly:    false,
 			ClosePosition: false,
 		},
