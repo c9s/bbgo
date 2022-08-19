@@ -46,7 +46,7 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 			},
 			Filter: func(obj interface{}) bool {
 				k := obj.(types.KLine)
-				return !k.EndTime.Before(k.StartTime.Time().Add(k.Interval.Duration() - time.Millisecond))
+				return !k.EndTime.Before(k.StartTime.Time().Add(k.Interval.Duration() - time.Second))
 			},
 			ID: func(obj interface{}) string {
 				kline := obj.(types.KLine)
