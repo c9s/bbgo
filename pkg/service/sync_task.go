@@ -35,6 +35,8 @@ type SyncTask struct {
 	OnLoad func(objs interface{})
 
 	// Filter is an optional field, which is used for filtering the remote records
+	// Return true to keep the record,
+	// Return false to filter the record.
 	Filter func(obj interface{}) bool
 
 	// BatchQuery is used for querying remote records.
