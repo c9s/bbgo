@@ -142,11 +142,15 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 
 	case types.OrderTypeStopMarket:
 		// the actual price might be different.
+		o.StopPrice = m.Market.TruncatePrice(o.StopPrice)
 		price = o.StopPrice
 
 	case types.OrderTypeLimit, types.OrderTypeStopLimit, types.OrderTypeLimitMaker:
+		o.Price = m.Market.TruncatePrice(o.Price)
 		price = o.Price
 	}
+
+	o.Quantity = m.Market.TruncateQuantity(o.Quantity)
 
 	if o.Quantity.Compare(m.Market.MinQuantity) < 0 {
 		return nil, nil, fmt.Errorf("order quantity %s is less than minQuantity %s, order: %+v", o.Quantity.String(), m.Market.MinQuantity.String(), o)

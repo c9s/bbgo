@@ -4,27 +4,12 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"sort"
-	"strings"
 	"unsafe"
 
-	"github.com/c9s/bbgo/pkg/util"
-	"github.com/fatih/color"
+	"github.com/c9s/bbgo/pkg/dynamic"
+	"github.com/c9s/bbgo/pkg/strategy"
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
 )
-
-type jsonStruct struct {
-	key   string
-	json  string
-	tp    string
-	value interface{}
-}
-type jsonArr []jsonStruct
-
-func (a jsonArr) Len() int           { return len(a) }
-func (a jsonArr) Less(i, j int) bool { return a[i].key < a[j].key }
-func (a jsonArr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 func (s *Strategy) ParamDump(f io.Writer, seriesLength ...int) {
 	length := 1
@@ -75,7 +60,7 @@ func (s *Strategy) ParamDump(f io.Writer, seriesLength ...int) {
 			}
 		} else if canString {
 			fmt.Fprintf(f, "%s: %s\n", fieldName, stringFunc.Call(nil)[0].String())
-		} else if field.CanConvert(reflect.TypeOf(int(0))) {
+		} else if dynamic.CanInt(field) {
 			fmt.Fprintf(f, "%s: %d\n", fieldName, field.Int())
 		} else if field.CanConvert(reflect.TypeOf(float64(0))) {
 			fmt.Fprintf(f, "%s: %.4f\n", fieldName, field.Float())
@@ -107,104 +92,9 @@ func (s *Strategy) ParamDump(f io.Writer, seriesLength ...int) {
 }
 
 func (s *Strategy) Print(f io.Writer, pretty bool, withColor ...bool) {
-	//b, _ := json.MarshalIndent(s.ExitMethods, "  ", "  ")
-
-	t := table.NewWriter()
-	style := table.Style{
-		Name:    "StyleRounded",
-		Box:     table.StyleBoxRounded,
-		Color:   table.ColorOptionsDefault,
-		Format:  table.FormatOptionsDefault,
-		HTML:    table.DefaultHTMLOptions,
-		Options: table.OptionsDefault,
-		Title:   table.TitleOptionsDefault,
-	}
-	var hiyellow func(io.Writer, string, ...interface{})
-	if len(withColor) > 0 && withColor[0] {
-		if pretty {
-			style.Color = table.ColorOptionsYellowWhiteOnBlack
-			style.Color.Row = text.Colors{text.FgHiYellow, text.BgHiBlack}
-			style.Color.RowAlternate = text.Colors{text.FgYellow, text.BgBlack}
-		}
-		hiyellow = color.New(color.FgHiYellow).FprintfFunc()
-	} else {
-		hiyellow = func(a io.Writer, format string, args ...interface{}) {
-			fmt.Fprintf(a, format, args...)
-		}
-	}
+	var style *table.Style
 	if pretty {
-		t.SetOutputMirror(f)
-		t.SetStyle(style)
-		t.AppendHeader(table.Row{"json", "struct field name", "type", "value"})
+		style = strategy.DefaultStyle()
 	}
-	hiyellow(f, "------ %s Settings ------\n", s.InstanceID())
-
-	embeddedWhiteSet := map[string]struct{}{"Window": {}, "Interval": {}, "Symbol": {}}
-	redundantSet := map[string]struct{}{}
-	var rows []table.Row
-	val := reflect.ValueOf(*s)
-	var values jsonArr
-	for i := 0; i < val.Type().NumField(); i++ {
-		t := val.Type().Field(i)
-		if !t.IsExported() {
-			continue
-		}
-		fieldName := t.Name
-		switch jsonTag := t.Tag.Get("json"); jsonTag {
-		case "-":
-		case "":
-			if t.Anonymous {
-				var target reflect.Type
-				if t.Type.Kind() == util.Pointer {
-					target = t.Type.Elem()
-				} else {
-					target = t.Type
-				}
-				for j := 0; j < target.NumField(); j++ {
-					tt := target.Field(j)
-					if !tt.IsExported() {
-						continue
-					}
-					fieldName := tt.Name
-					if _, ok := embeddedWhiteSet[fieldName]; !ok {
-						continue
-					}
-
-					if jtag := tt.Tag.Get("json"); jtag != "" && jtag != "-" {
-						name := strings.Split(jtag, ",")[0]
-						if _, ok := redundantSet[name]; ok {
-							continue
-						}
-						redundantSet[name] = struct{}{}
-						var value interface{}
-						if t.Type.Kind() == util.Pointer {
-							value = val.Field(i).Elem().Field(j).Interface()
-						} else {
-							value = val.Field(i).Field(j).Interface()
-						}
-						values = append(values, jsonStruct{key: fieldName, json: name, tp: tt.Type.String(), value: value})
-					}
-				}
-			}
-		default:
-			name := strings.Split(jsonTag, ",")[0]
-			if _, ok := redundantSet[name]; ok {
-				continue
-			}
-			redundantSet[name] = struct{}{}
-			values = append(values, jsonStruct{key: fieldName, json: name, tp: t.Type.String(), value: val.Field(i).Interface()})
-		}
-	}
-	sort.Sort(values)
-	for _, value := range values {
-		if pretty {
-			rows = append(rows, table.Row{value.json, value.key, value.tp, value.value})
-		} else {
-			hiyellow(f, "%s: %v\n", value.json, value.value)
-		}
-	}
-	if pretty {
-		t.AppendRows(rows)
-		t.Render()
-	}
+	strategy.PrintConfig(s, f, style, len(withColor) > 0 && withColor[0], strategy.DefaultWhiteList()...)
 }
