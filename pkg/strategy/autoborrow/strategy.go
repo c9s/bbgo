@@ -155,7 +155,8 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 
 		toRepay := fixedpoint.Min(b.Borrowed, b.Available)
 		if toRepay.IsZero() {
-			return
+			log.Warn("amount = 0, can not repay")
+			continue
 		}
 
 		bbgo.Notify(&MarginAction{
