@@ -100,8 +100,11 @@ func (m Market) IsDustQuantity(quantity, price fixedpoint.Value) bool {
 
 // TruncateQuantity uses the step size to truncate floating number, in order to avoid the rounding issue
 func (m Market) TruncateQuantity(quantity fixedpoint.Value) fixedpoint.Value {
-	stepRound := math.Pow10(-int(math.Log10(m.StepSize.Float64())))
-	return fixedpoint.NewFromFloat(math.Trunc(quantity.Float64()*stepRound) / stepRound)
+	return fixedpoint.MustNewFromString(m.FormatQuantity(quantity))
+}
+
+func (m Market) TruncatePrice(price fixedpoint.Value) fixedpoint.Value {
+	return fixedpoint.MustNewFromString(m.FormatPrice(price))
 }
 
 func (m Market) BaseCurrencyFormatter() *accounting.Accounting {
