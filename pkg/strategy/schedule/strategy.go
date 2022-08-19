@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -34,6 +35,8 @@ type Strategy struct {
 	Side types.SideType `json:"side,omitempty"`
 
 	bbgo.QuantityOrAmount
+
+	MaxBaseBalance fixedpoint.Value `json:"maxBaseBalance"`
 
 	BelowMovingAverage *bbgo.MovingAverageSettings `json:"belowMovingAverage,omitempty"`
 
@@ -161,6 +164,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// execute orders
 		switch side {
 		case types.SideTypeBuy:
+			if !s.MaxBaseBalance.IsZero() {
+				if baseBalance, ok := session.GetAccount().Balance(s.Market.BaseCurrency); ok {
+					total := baseBalance.Total()
+					if total.Add(quantity).Compare(s.MaxBaseBalance) >= 0 {
+						quantity = s.MaxBaseBalance.Sub(total)
+						quoteQuantity = quantity.Mul(closePrice)
+					}
+				}
+			}
+
 			quoteBalance, ok := session.GetAccount().Balance(s.Market.QuoteCurrency)
 			if !ok {
 				log.Errorf("can not place scheduled %s order, quote balance %s is empty", s.Symbol, s.Market.QuoteCurrency)
@@ -180,12 +193,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				return
 			}
 
-			if baseBalance.Available.Compare(quantity) < 0 {
-				bbgo.Notify("Can not place scheduled %s order: base balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, baseBalance.Available, quantity)
-				log.Errorf("can not place scheduled %s order: base balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, baseBalance.Available, quantity)
-				return
-			}
+			quantity = fixedpoint.Min(quantity, baseBalance.Available)
+			quoteQuantity = quantity.Mul(closePrice)
+		}
 
+		if s.Market.IsDustQuantity(quantity, closePrice) {
+			log.Warnf("%s: quantity %f is too small", s.Symbol, quantity.Float64())
+			return
 		}
 
 		bbgo.Notify("Submitting scheduled %s order with quantity %s at price %s", s.Symbol, quantity.String(), closePrice.String())
