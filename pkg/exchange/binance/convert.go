@@ -141,9 +141,9 @@ func toLocalOrderType(orderType types.OrderType) (binance.OrderType, error) {
 	return "", fmt.Errorf("can not convert to local order, order type %s not supported", orderType)
 }
 
-func toGlobalOrders(binanceOrders []*binance.Order) (orders []types.Order, err error) {
+func toGlobalOrders(binanceOrders []*binance.Order, isMargin bool) (orders []types.Order, err error) {
 	for _, binanceOrder := range binanceOrders {
-		order, err := toGlobalOrder(binanceOrder, false)
+		order, err := toGlobalOrder(binanceOrder, isMargin)
 		if err != nil {
 			return orders, err
 		}
