@@ -7,25 +7,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/util"
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
-
-type JsonStruct struct {
-	Key   string
-	Json  string
-	Type  string
-	Value interface{}
-}
-
-type JsonArr []JsonStruct
-
-func (a JsonArr) Len() int           { return len(a) }
-func (a JsonArr) Less(i, j int) bool { return a[i].Key < a[j].Key }
-func (a JsonArr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 func DefaultStyle() *table.Style {
 	style := table.Style{
@@ -86,7 +75,7 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 	if val.Type().Kind() == util.Pointer {
 		val = val.Elem()
 	}
-	var values JsonArr
+	var values types.JsonArr
 	for i := 0; i < val.Type().NumField(); i++ {
 		t := val.Type().Field(i)
 		if !t.IsExported() {
@@ -123,7 +112,7 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 						}
 						redundantSet[name] = struct{}{}
 						value := field.Field(j).Interface()
-						values = append(values, JsonStruct{Key: fieldName, Json: name, Type: tt.Type.String(), Value: value})
+						values = append(values, types.JsonStruct{Key: fieldName, Json: name, Type: tt.Type.String(), Value: value})
 					}
 				}
 			}
@@ -133,7 +122,7 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 				continue
 			}
 			redundantSet[name] = struct{}{}
-			values = append(values, JsonStruct{Key: fieldName, Json: name, Type: t.Type.String(), Value: val.Field(i).Interface()})
+			values = append(values, types.JsonStruct{Key: fieldName, Json: name, Type: t.Type.String(), Value: val.Field(i).Interface()})
 		}
 	}
 	sort.Sort(values)
