@@ -7,7 +7,8 @@ import (
 	"unsafe"
 
 	"github.com/c9s/bbgo/pkg/dynamic"
-	"github.com/c9s/bbgo/pkg/strategy"
+	"github.com/c9s/bbgo/pkg/util"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
@@ -94,7 +95,7 @@ func (s *Strategy) ParamDump(f io.Writer, seriesLength ...int) {
 func (s *Strategy) Print(f io.Writer, pretty bool, withColor ...bool) {
 	var style *table.Style
 	if pretty {
-		style = strategy.DefaultStyle()
+		style = util.NewDefaultTableStyle()
 	}
-	strategy.PrintConfig(s, f, style, len(withColor) > 0 && withColor[0], strategy.DefaultWhiteList()...)
+	util.PrintConfig(s, f, style, len(withColor) > 0 && withColor[0], util.DefaultWhiteList()...)
 }
