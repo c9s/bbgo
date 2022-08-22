@@ -8,7 +8,7 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/templateutil"
 )
 
 type PositionType string
@@ -352,7 +352,7 @@ func (p *Position) SlackAttachment() slack.Attachment {
 		color = "#DC143C"
 	}
 
-	title := util.Render(string(posType)+` Position {{ .Symbol }} `, p)
+	title := templateutil.Render(string(posType)+` Position {{ .Symbol }} `, p)
 
 	fields := []slack.AttachmentField{
 		{Title: "Average Cost", Value: averageCost.String() + " " + p.QuoteCurrency, Short: true},
@@ -378,7 +378,7 @@ func (p *Position) SlackAttachment() slack.Attachment {
 		Title:  title,
 		Color:  color,
 		Fields: fields,
-		Footer: util.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
+		Footer: templateutil.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
 		// FooterIcon: "",
 	}
 }

@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 var numOfDigitsOfUnixTimestamp = len(strconv.FormatInt(time.Now().Unix(), 10))
@@ -264,7 +262,7 @@ func ParseLooseFormatTime(s string) (LooseFormatTime, error) {
 
 	}
 
-	tv, err := util.ParseTimeWithFormats(s, looseTimeFormats)
+	tv, err := ParseTimeWithFormats(s, looseTimeFormats)
 	if err != nil {
 		return LooseFormatTime{}, err
 	}
@@ -294,7 +292,7 @@ func (t *LooseFormatTime) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	tv, err := util.ParseTimeWithFormats(v, looseTimeFormats)
+	tv, err := ParseTimeWithFormats(v, looseTimeFormats)
 	if err != nil {
 		return err
 	}
@@ -340,3 +338,23 @@ func (t *Timestamp) UnmarshalJSON(o []byte) error {
 	*t = Timestamp(time.Unix(timestamp, 0))
 	return nil
 }
+
+func ParseTimeWithFormats(strTime string, formats []string) (time.Time, error) {
+	for _, format := range formats {
+		tt, err := time.Parse(format, strTime)
+		if err == nil {
+			return tt, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("failed to parse time %s, valid formats are %+v", strTime, formats)
+}
+
+func BeginningOfTheDay(t time.Time) time.Time {
+	year, month, day := t.Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, t.Location())
+}
+
+func Over24Hours(since time.Time) bool {
+	return time.Since(since) >= 24*time.Hour
+}
+

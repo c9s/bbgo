@@ -7,7 +7,7 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/style"
 )
 
 type Direction int
@@ -214,11 +214,11 @@ func (k KLine) GetChange() fixedpoint.Value {
 
 func (k KLine) Color() string {
 	if k.Direction() > 0 {
-		return util.GreenColor
+		return style.GreenColor
 	} else if k.Direction() < 0 {
-		return util.RedColor
+		return style.RedColor
 	}
-	return util.GrayColor
+	return style.GrayColor
 }
 
 func (k KLine) String() string {
@@ -237,29 +237,29 @@ func (k KLine) SlackAttachment() slack.Attachment {
 		Text:  fmt.Sprintf("*%s* KLine %s", k.Symbol, k.Interval),
 		Color: k.Color(),
 		Fields: []slack.AttachmentField{
-			{Title: "Open", Value: util.FormatValue(k.Open, 2), Short: true},
-			{Title: "High", Value: util.FormatValue(k.High, 2), Short: true},
-			{Title: "Low", Value: util.FormatValue(k.Low, 2), Short: true},
-			{Title: "Close", Value: util.FormatValue(k.Close, 2), Short: true},
-			{Title: "Mid", Value: util.FormatValue(k.Mid(), 2), Short: true},
-			{Title: "Change", Value: util.FormatValue(k.GetChange(), 2), Short: true},
-			{Title: "Volume", Value: util.FormatValue(k.Volume, 2), Short: true},
-			{Title: "Taker Buy Base Volume", Value: util.FormatValue(k.TakerBuyBaseAssetVolume, 2), Short: true},
-			{Title: "Taker Buy Quote Volume", Value: util.FormatValue(k.TakerBuyQuoteAssetVolume, 2), Short: true},
-			{Title: "Max Change", Value: util.FormatValue(k.GetMaxChange(), 2), Short: true},
+			{Title: "Open", Value: k.Open.FormatString(2), Short: true},
+			{Title: "High", Value: k.High.FormatString(2), Short: true},
+			{Title: "Low", Value: k.Low.FormatString(2), Short: true},
+			{Title: "Close", Value: k.Close.FormatString(2), Short: true},
+			{Title: "Mid", Value: k.Mid().FormatString(2), Short: true},
+			{Title: "Change", Value: k.GetChange().FormatString(2), Short: true},
+			{Title: "Volume", Value: k.Volume.FormatString(2), Short: true},
+			{Title: "Taker Buy Base Volume", Value: k.TakerBuyBaseAssetVolume.FormatString(2), Short: true},
+			{Title: "Taker Buy Quote Volume", Value: k.TakerBuyQuoteAssetVolume.FormatString(2), Short: true},
+			{Title: "Max Change", Value: k.GetMaxChange().FormatString(2), Short: true},
 			{
 				Title: "Thickness",
-				Value: util.FormatValue(k.GetThickness(), 4),
+				Value: k.GetThickness().FormatString(4),
 				Short: true,
 			},
 			{
 				Title: "UpperShadowRatio",
-				Value: util.FormatValue(k.GetUpperShadowRatio(), 4),
+				Value: k.GetUpperShadowRatio().FormatString(4),
 				Short: true,
 			},
 			{
 				Title: "LowerShadowRatio",
-				Value: util.FormatValue(k.GetLowerShadowRatio(), 4),
+				Value: k.GetLowerShadowRatio().FormatString(4),
 				Short: true,
 			},
 		},
@@ -368,11 +368,11 @@ func (k KLineWindow) GetTrend() int {
 
 func (k KLineWindow) Color() string {
 	if k.GetTrend() > 0 {
-		return util.GreenColor
+		return style.GreenColor
 	} else if k.GetTrend() < 0 {
-		return util.RedColor
+		return style.RedColor
 	}
-	return util.GrayColor
+	return style.GrayColor
 }
 
 // Mid price
@@ -491,34 +491,34 @@ func (k KLineWindow) SlackAttachment() slack.Attachment {
 		Text:  fmt.Sprintf("*%s* KLineWindow %s x %d", first.Symbol, first.Interval, windowSize),
 		Color: k.Color(),
 		Fields: []slack.AttachmentField{
-			{Title: "Open", Value: util.FormatValue(k.GetOpen(), 2), Short: true},
-			{Title: "High", Value: util.FormatValue(k.GetHigh(), 2), Short: true},
-			{Title: "Low", Value: util.FormatValue(k.GetLow(), 2), Short: true},
-			{Title: "Close", Value: util.FormatValue(k.GetClose(), 2), Short: true},
-			{Title: "Mid", Value: util.FormatValue(k.Mid(), 2), Short: true},
+			{Title: "Open", Value: k.GetOpen().FormatString(2), Short: true},
+			{Title: "High", Value: k.GetHigh().FormatString(2), Short: true},
+			{Title: "Low", Value: k.GetLow().FormatString(2), Short: true},
+			{Title: "Close", Value: k.GetClose().FormatString(2), Short: true},
+			{Title: "Mid", Value: k.Mid().FormatPercentage(2), Short: true},
 			{
 				Title: "Change",
-				Value: util.FormatValue(k.GetChange(), 2),
+				Value: k.GetChange().FormatString(2),
 				Short: true,
 			},
 			{
 				Title: "Max Change",
-				Value: util.FormatValue(k.GetMaxChange(), 2),
+				Value: k.GetMaxChange().FormatString(2),
 				Short: true,
 			},
 			{
 				Title: "Thickness",
-				Value: util.FormatValue(k.GetThickness(), 4),
+				Value: k.GetThickness().FormatString(4),
 				Short: true,
 			},
 			{
 				Title: "UpperShadowRatio",
-				Value: util.FormatValue(k.GetUpperShadowRatio(), 4),
+				Value: k.GetUpperShadowRatio().FormatString(4),
 				Short: true,
 			},
 			{
 				Title: "LowerShadowRatio",
-				Value: util.FormatValue(k.GetLowerShadowRatio(), 4),
+				Value: k.GetLowerShadowRatio().FormatString(4),
 				Short: true,
 			},
 		},

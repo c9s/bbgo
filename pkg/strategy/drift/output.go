@@ -6,10 +6,10 @@ import (
 	"reflect"
 	"unsafe"
 
-	"github.com/c9s/bbgo/pkg/dynamic"
-	"github.com/c9s/bbgo/pkg/util"
-
 	"github.com/jedib0t/go-pretty/v6/table"
+
+	"github.com/c9s/bbgo/pkg/dynamic"
+	style2 "github.com/c9s/bbgo/pkg/style"
 )
 
 func (s *Strategy) ParamDump(f io.Writer, seriesLength ...int) {
@@ -95,7 +95,7 @@ func (s *Strategy) ParamDump(f io.Writer, seriesLength ...int) {
 func (s *Strategy) Print(f io.Writer, pretty bool, withColor ...bool) {
 	var style *table.Style
 	if pretty {
-		style = util.NewDefaultTableStyle()
+		style = style2.NewDefaultTableStyle()
 	}
-	util.PrintConfig(s, f, style, len(withColor) > 0 && withColor[0], util.DefaultWhiteList()...)
+	dynamic.PrintConfig(s, f, style, len(withColor) > 0 && withColor[0], dynamic.DefaultWhiteList()...)
 }

@@ -57,13 +57,13 @@ func preparePersistentServices() []service.PersistenceService {
 
 func Test_CallID(t *testing.T) {
 	t.Run("default", func(t *testing.T) {
-		id := CallID(&TestStruct{})
+		id := dynamic.CallID(&TestStruct{})
 		assert.NotEmpty(t, id)
 		assert.Equal(t, "test-struct", id)
 	})
 
 	t.Run("fallback", func(t *testing.T) {
-		id := CallID(&TestStructWithoutInstanceID{Symbol: "BTCUSDT"})
+		id := dynamic.CallID(&TestStructWithoutInstanceID{Symbol: "BTCUSDT"})
 		assert.Equal(t, "test-struct-no-instance-id:BTCUSDT", id)
 	})
 }
@@ -121,7 +121,7 @@ func Test_storePersistenceFields(t *testing.T) {
 	for _, ps := range pss {
 		psName := reflect.TypeOf(ps).Elem().String()
 		t.Run("all/"+psName, func(t *testing.T) {
-			id := CallID(a)
+			id := dynamic.CallID(a)
 			err := storePersistenceFields(a, id, ps)
 			assert.NoError(t, err)
 

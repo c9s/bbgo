@@ -11,7 +11,7 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/templateutil"
 )
 
 func init() {
@@ -384,6 +384,6 @@ func (o Order) SlackAttachment() slack.Attachment {
 		// Text:   "",
 		Fields:     fields,
 		FooterIcon: footerIcon,
-		Footer:     strings.ToLower(o.Exchange.String()) + util.Render(" creation time {{ . }}", o.CreationTime.Time().Format(time.StampMilli)),
+		Footer:     strings.ToLower(o.Exchange.String()) + templateutil.Render(" creation time {{ . }}", o.CreationTime.Time().Format(time.StampMilli)),
 	}
 }

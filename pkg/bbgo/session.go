@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/cache"
+	"github.com/c9s/bbgo/pkg/util/templateutil"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -848,7 +849,7 @@ func (session *ExchangeSession) SlackAttachment() slack.Attachment {
 		Title:      session.Name,
 		Fields:     fields,
 		FooterIcon: footerIcon,
-		Footer:     util.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
+		Footer:     templateutil.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
 	}
 }
 

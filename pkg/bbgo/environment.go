@@ -30,6 +30,7 @@ import (
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/templateutil"
 )
 
 func init() {
@@ -366,7 +367,7 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 
 		case "$session":
 			defaultOrderUpdateHandler := func(order types.Order) {
-				text := util.Render(TemplateOrderReport, order)
+				text := templateutil.Render(TemplateOrderReport, order)
 				Notify(text, &order)
 			}
 			for name := range environ.sessions {
@@ -376,7 +377,7 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 				channel, ok := Notification.SessionChannelRouter.Route(name)
 				if ok {
 					session.UserDataStream.OnOrderUpdate(func(order types.Order) {
-						text := util.Render(TemplateOrderReport, order)
+						text := templateutil.Render(TemplateOrderReport, order)
 						NotifyTo(channel, text, &order)
 					})
 				} else {
@@ -397,7 +398,7 @@ func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfi
 
 			// use same handler for each session
 			handler := func(order types.Order) {
-				text := util.Render(TemplateOrderReport, order)
+				text := templateutil.Render(TemplateOrderReport, order)
 				channel, ok := Notification.RouteObject(&order)
 				if ok {
 					NotifyTo(channel, text, &order)

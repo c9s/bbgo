@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/templateutil"
 )
 
 const ID = "xbalance"
@@ -39,7 +40,7 @@ func (s *State) IsOver24Hours() bool {
 }
 
 func (s *State) PlainText() string {
-	return util.Render(`{{ .Asset }} transfer stats:
+	return templateutil.Render(`{{ .Asset }} transfer stats:
 daily number of transfers: {{ .DailyNumberOfTransfers }}
 daily amount of transfers {{ .DailyAmountOfTransfers.Float64 }}`, s)
 }
@@ -53,12 +54,12 @@ func (s *State) SlackAttachment() slack.Attachment {
 			{Title: "Total Number of Transfers", Value: fmt.Sprintf("%d", s.DailyNumberOfTransfers), Short: true},
 			{Title: "Total Amount of Transfers", Value: util.FormatFloat(s.DailyAmountOfTransfers.Float64(), 4), Short: true},
 		},
-		Footer: util.Render("Since {{ . }}", time.Unix(s.Since, 0).Format(time.RFC822)),
+		Footer: templateutil.Render("Since {{ . }}", time.Unix(s.Since, 0).Format(time.RFC822)),
 	}
 }
 
 func (s *State) Reset() {
-	var beginningOfTheDay = util.BeginningOfTheDay(time.Now().Local())
+	var beginningOfTheDay = types.BeginningOfTheDay(time.Now().Local())
 	*s = State{
 		DailyNumberOfTransfers: 0,
 		DailyAmountOfTransfers: fixedpoint.Zero,
@@ -93,7 +94,7 @@ func (r *WithdrawalRequest) PlainText() string {
 
 func (r *WithdrawalRequest) SlackAttachment() slack.Attachment {
 	var color = "#DC143C"
-	title := util.Render(`Withdraw Request {{ .Asset }}`, r)
+	title := templateutil.Render(`Withdraw Request {{ .Asset }}`, r)
 	return slack.Attachment{
 		// Pretext:       "",
 		// Text:  text,
@@ -105,7 +106,7 @@ func (r *WithdrawalRequest) SlackAttachment() slack.Attachment {
 			{Title: "From", Value: r.FromSession},
 			{Title: "To", Value: r.ToSession},
 		},
-		Footer: util.Render("Time {{ . }}", time.Now().Format(time.RFC822)),
+		Footer: templateutil.Render("Time {{ . }}", time.Now().Format(time.RFC822)),
 		// FooterIcon: "",
 	}
 }
