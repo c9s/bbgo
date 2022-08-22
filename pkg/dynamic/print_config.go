@@ -1,4 +1,4 @@
-package util
+package dynamic
 
 import (
 	"fmt"
@@ -11,24 +11,9 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
-
-func NewDefaultTableStyle() *table.Style {
-	style := table.Style{
-		Name:    "StyleRounded",
-		Box:     table.StyleBoxRounded,
-		Format:  table.FormatOptionsDefault,
-		HTML:    table.DefaultHTMLOptions,
-		Options: table.OptionsDefault,
-		Title:   table.TitleOptionsDefault,
-		Color:   table.ColorOptionsYellowWhiteOnBlack,
-	}
-	style.Color.Row = text.Colors{text.FgHiYellow, text.BgHiBlack}
-	style.Color.RowAlternate = text.Colors{text.FgYellow, text.BgBlack}
-	return &style
-}
 
 func DefaultWhiteList() []string {
 	return []string{"Window", "Interval", "Symbol"}
@@ -58,7 +43,7 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 		})
 		t.AppendHeader(table.Row{"json", "struct field name", "type", "value"})
 	}
-	write(f, "---- %s Settings ---\n", bbgo.CallID(s))
+	write(f, "---- %s Settings ---\n", CallID(s))
 
 	embeddedWhiteSet := map[string]struct{}{}
 	for _, whiteList := range whiteLists {
@@ -71,7 +56,7 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 
 	val := reflect.ValueOf(s)
 
-	if val.Type().Kind() == Pointer {
+	if val.Type().Kind() == util.Pointer {
 		val = val.Elem()
 	}
 	var values types.JsonArr
@@ -88,7 +73,7 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 			if t.Anonymous {
 				var target reflect.Type
 				var field reflect.Value
-				if t.Type.Kind() == Pointer {
+				if t.Type.Kind() == util.Pointer {
 					target = t.Type.Elem()
 					field = val.Field(i).Elem()
 				} else {

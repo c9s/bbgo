@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/types"
@@ -526,7 +527,7 @@ func (it *CoreInteraction) Initialize() error {
 // getStrategySignature returns strategy instance unique signature
 func getStrategySignature(strategy SingleExchangeStrategy) (string, error) {
 	// Returns instance ID
-	var signature = CallID(strategy)
+	var signature = dynamic.CallID(strategy)
 	if signature != "" {
 		return signature, nil
 	}

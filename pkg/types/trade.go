@@ -11,7 +11,7 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/templateutil"
 )
 
 func init() {
@@ -184,7 +184,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 	}
 
 	liquidity := trade.Liquidity()
-	text := util.Render(slackTradeTextTemplate, trade)
+	text := templateutil.Render(slackTradeTextTemplate, trade)
 	footerIcon := ExchangeFooterIcon(trade.Exchange)
 
 	return slack.Attachment{
@@ -203,7 +203,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 			{Title: "Order ID", Value: strconv.FormatUint(trade.OrderID, 10), Short: true},
 		},
 		FooterIcon: footerIcon,
-		Footer:     strings.ToLower(trade.Exchange.String()) + util.Render(" creation time {{ . }}", trade.Time.Time().Format(time.StampMilli)),
+		Footer:     strings.ToLower(trade.Exchange.String()) + templateutil.Render(" creation time {{ . }}", trade.Time.Time().Format(time.StampMilli)),
 	}
 }
 

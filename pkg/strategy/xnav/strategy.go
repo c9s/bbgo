@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/util/templateutil"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -32,11 +33,11 @@ type State struct {
 }
 
 func (s *State) IsOver24Hours() bool {
-	return util.Over24Hours(time.Unix(s.Since, 0))
+	return types.Over24Hours(time.Unix(s.Since, 0))
 }
 
 func (s *State) PlainText() string {
-	return util.Render(`{{ .Asset }} transfer stats:
+	return templateutil.Render(`{{ .Asset }} transfer stats:
 daily number of transfers: {{ .DailyNumberOfTransfers }}
 daily amount of transfers {{ .DailyAmountOfTransfers.Float64 }}`, s)
 }
@@ -46,12 +47,12 @@ func (s *State) SlackAttachment() slack.Attachment {
 		// Pretext:       "",
 		// Text:  text,
 		Fields: []slack.AttachmentField{},
-		Footer: util.Render("Since {{ . }}", time.Unix(s.Since, 0).Format(time.RFC822)),
+		Footer: templateutil.Render("Since {{ . }}", time.Unix(s.Since, 0).Format(time.RFC822)),
 	}
 }
 
 func (s *State) Reset() {
-	var beginningOfTheDay = util.BeginningOfTheDay(time.Now().Local())
+	var beginningOfTheDay = types.BeginningOfTheDay(time.Now().Local())
 	*s = State{
 		Since: beginningOfTheDay.Unix(),
 	}

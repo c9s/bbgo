@@ -384,7 +384,7 @@ func (trader *Trader) LoadState() error {
 	log.Infof("loading strategies states...")
 
 	return trader.IterateStrategies(func(strategy StrategyID) error {
-		id := CallID(strategy)
+		id := dynamic.CallID(strategy)
 		return loadPersistenceFields(strategy, id, ps)
 	})
 }
@@ -420,7 +420,7 @@ func (trader *Trader) SaveState() error {
 
 	log.Infof("saving strategies states...")
 	return trader.IterateStrategies(func(strategy StrategyID) error {
-		id := CallID(strategy)
+		id := dynamic.CallID(strategy)
 		if len(id) == 0 {
 			return nil
 		}

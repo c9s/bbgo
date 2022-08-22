@@ -82,7 +82,7 @@ func (p *Persistence) Save(val interface{}, subIDs ...string) error {
 }
 
 func (p *Persistence) Sync(obj interface{}) error {
-	id := CallID(obj)
+	id := dynamic.CallID(obj)
 	if len(id) == 0 {
 		return nil
 	}
@@ -93,7 +93,7 @@ func (p *Persistence) Sync(obj interface{}) error {
 
 // Sync syncs the object properties into the persistence layer
 func Sync(obj interface{}) {
-	id := CallID(obj)
+	id := dynamic.CallID(obj)
 	if len(id) == 0 {
 		log.Warnf("InstanceID() is not provided, can not sync persistence")
 		return
