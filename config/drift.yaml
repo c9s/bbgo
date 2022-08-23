@@ -28,28 +28,32 @@ exchangeStrategies:
     # kline interval for indicators
     interval: 15m
     window: 2
-    stoploss: 0.3%
+    stoploss: 4.3%
     source: close
     predictOffset: 2
-    noTrailingStopLoss: false
+    noTrailingStopLoss: true
     trailingStopLossType: kline
     # stddev on high/low-source
-    hlVarianceMultiplier: 0.23
+    hlVarianceMultiplier: 0.1
     hlRangeWindow: 5
-    window1m: 24
-    smootherWindow1m: 24
-    fisherTransformWindow1m: 162
-    smootherWindow: 1
-    fisherTransformWindow: 9
+    window1m: 49
+    smootherWindow1m: 80
+    fisherTransformWindow1m: 74
+    smootherWindow: 3
+    fisherTransformWindow: 160
     atrWindow: 14
     # orders not been traded will be canceled after `pendingMinutes` minutes
-    pendingMinutes: 3
+    pendingMinutes: 10
     noRebalance: true
     trendWindow: 12
     rebalanceFilter: 1.5
 
-    trailingActivationRatio: [0.004]
-    trailingCallbackRate: [0.001]
+    trailingActivationRatio: [0.003]
+    trailingCallbackRate: [0.0006]
+    driftFilterPos: 1.2
+    driftFilterNeg: -1.2
+    ddriftFilterPos: 0.4
+    ddriftFilterNeg: -0.4
 
     generateGraph: true
     graphPNLDeductFee: true

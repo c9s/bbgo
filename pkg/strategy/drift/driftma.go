@@ -7,14 +7,14 @@ import (
 
 type DriftMA struct {
 	types.SeriesBase
+	drift *indicator.WeightedDrift
 	ma1   types.UpdatableSeriesExtend
-	drift *indicator.Drift
 	ma2   types.UpdatableSeriesExtend
 }
 
-func (s *DriftMA) Update(value float64) {
+func (s *DriftMA) Update(value, weight float64) {
 	s.ma1.Update(value)
-	s.drift.Update(s.ma1.Last())
+	s.drift.Update(s.ma1.Last(), weight)
 	s.ma2.Update(s.drift.Last())
 }
 
@@ -36,16 +36,16 @@ func (s *DriftMA) ZeroPoint() float64 {
 
 func (s *DriftMA) Clone() *DriftMA {
 	out := DriftMA{
-		ma1:   types.Clone(s.ma1),
 		drift: s.drift.Clone(),
+		ma1:   types.Clone(s.ma1),
 		ma2:   types.Clone(s.ma2),
 	}
 	out.SeriesBase.Series = &out
 	return &out
 }
 
-func (s *DriftMA) TestUpdate(v float64) *DriftMA {
+func (s *DriftMA) TestUpdate(v, weight float64) *DriftMA {
 	out := s.Clone()
-	out.Update(v)
+	out.Update(v, weight)
 	return out
 }
