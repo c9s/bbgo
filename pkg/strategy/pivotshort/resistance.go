@@ -8,6 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type ResistanceShort struct {
@@ -189,9 +190,9 @@ func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistanceP
 }
 
 func findPossibleSupportPrices(closePrice float64, groupDistance float64, lows []float64) []float64 {
-	return group(lower(lows, closePrice), groupDistance)
+	return util.Group(util.Lower(lows, closePrice), groupDistance)
 }
 
 func findPossibleResistancePrices(closePrice float64, groupDistance float64, lows []float64) []float64 {
-	return group(higher(lows, closePrice), groupDistance)
+	return util.Group(util.Higher(lows, closePrice), groupDistance)
 }
