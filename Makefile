@@ -190,6 +190,7 @@ pkg/version/version.go: .FORCE
 
 pkg/version/dev.go: .FORCE
 	BUILD_FLAGS="!release" VERSION_SUFFIX="-dev" bash utils/generate-version-file.sh > $@
+	gofmt -s -w $@
 
 dev-version: pkg/version/dev.go
 	git add $<
