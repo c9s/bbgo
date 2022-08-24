@@ -1027,7 +1027,7 @@ func buildKLines(prices []fixedpoint.Value) (klines []types.KLine) {
 func Test_calculateEWMA(t *testing.T) {
 	type args struct {
 		allKLines []types.KLine
-		priceF    KLinePriceMapper
+		priceF    KLineValueMapper
 		window    int
 	}
 	var input []fixedpoint.Value

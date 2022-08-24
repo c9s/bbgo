@@ -100,7 +100,7 @@ func (inc *VWAP) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculateVWAP(klines []types.KLine, priceF KLinePriceMapper, window int) float64 {
+func calculateVWAP(klines []types.KLine, priceF KLineValueMapper, window int) float64 {
 	vwap := VWAP{IntervalWindow: types.IntervalWindow{Window: window}}
 	for _, k := range klines {
 		vwap.Update(priceF(k), k.Volume.Float64())

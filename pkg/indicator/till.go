@@ -33,12 +33,12 @@ func (inc *TILL) Update(value float64) {
 			inc.VolumeFactor = defaultVolumeFactor
 		}
 		inc.SeriesBase.Series = inc
-		inc.e1 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
-		inc.e2 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
-		inc.e3 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
-		inc.e4 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
-		inc.e5 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
-		inc.e6 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
+		inc.e1 = &EWMA{IntervalWindow: inc.IntervalWindow}
+		inc.e2 = &EWMA{IntervalWindow: inc.IntervalWindow}
+		inc.e3 = &EWMA{IntervalWindow: inc.IntervalWindow}
+		inc.e4 = &EWMA{IntervalWindow: inc.IntervalWindow}
+		inc.e5 = &EWMA{IntervalWindow: inc.IntervalWindow}
+		inc.e6 = &EWMA{IntervalWindow: inc.IntervalWindow}
 		square := inc.VolumeFactor * inc.VolumeFactor
 		cube := inc.VolumeFactor * square
 		inc.c1 = -cube
