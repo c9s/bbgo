@@ -200,7 +200,7 @@ type Strategy struct {
 	bbgo.StrategyController
 
 	// Accumulated profit report
-	AccumulatedProfitReport AccumulatedProfitReport `json:"accumulatedProfitReport"`
+	AccumulatedProfitReport *AccumulatedProfitReport `json:"accumulatedProfitReport"`
 }
 
 func (s *Strategy) ID() string {
@@ -451,6 +451,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// Accumulated profit report
 	if bbgo.IsBackTesting {
+		if s.AccumulatedProfitReport == nil {
+			s.AccumulatedProfitReport = &AccumulatedProfitReport{}
+		}
 		s.AccumulatedProfitReport.Initialize()
 		s.orderExecutor.TradeCollector().OnProfit(func(trade types.Trade, profit *types.Profit) {
 			if profit == nil {
