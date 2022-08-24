@@ -79,6 +79,8 @@ type SessionSymbolReport struct {
 	InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
 	FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
 	Manifests       Manifests                 `json:"manifests,omitempty"`
+	Sharpe          float64                   `json:"sharpeRatio"`
+	Sortino         float64                   `json:"sortinoRatio"`
 }
 
 func (r *SessionSymbolReport) InitialEquityValue() fixedpoint.Value {
@@ -115,6 +117,18 @@ func (r *SessionSymbolReport) Print(wantBaseAssetBaseline bool) {
 		color.Green("ASSET INCREASED: +%v %s (+%s)", finalQuoteAsset.Sub(initQuoteAsset), r.Market.QuoteCurrency, finalQuoteAsset.Sub(initQuoteAsset).Div(initQuoteAsset).FormatPercentage(2))
 	} else {
 		color.Red("ASSET DECREASED: %v %s (%s)", finalQuoteAsset.Sub(initQuoteAsset), r.Market.QuoteCurrency, finalQuoteAsset.Sub(initQuoteAsset).Div(initQuoteAsset).FormatPercentage(2))
+	}
+
+	if r.Sharpe > 0.0 {
+		color.Green("REALIZED SHARPE RATIO: +%v", r.Sharpe)
+	} else {
+		color.Red("REALIZED SHARPE RATIO: +%v", r.Sharpe)
+	}
+
+	if r.Sortino > 0.0 {
+		color.Green("REALIZED SORTINO RATIO: %v", r.Sortino)
+	} else {
+		color.Red("REALIZED SORTINO RATIO: %v", r.Sortino)
 	}
 
 	if wantBaseAssetBaseline {
