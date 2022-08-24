@@ -64,8 +64,8 @@ func (inc *PivotLow) PushK(k types.KLine) {
 	inc.EmitUpdate(inc.Last())
 }
 
-func calculatePivotLow(lows types.Float64Slice, left, right int) (float64, bool) {
-	length := len(lows)
+func calculatePivotF(values types.Float64Slice, left, right int, f func(a, pivot float64) bool) (float64, bool) {
+	length := len(values)
 
 	if right == 0 {
 		right = left
@@ -77,7 +77,7 @@ func calculatePivotLow(lows types.Float64Slice, left, right int) (float64, bool)
 
 	end := length - 1
 	index := end - right
-	val := lows[index]
+	val := values[index]
 
 	for i := index - left; i <= index+right; i++ {
 		if i == index {
@@ -85,10 +85,16 @@ func calculatePivotLow(lows types.Float64Slice, left, right int) (float64, bool)
 		}
 
 		// return if we found lower value
-		if lows[i] < val {
+		if !f(values[i], val) {
 			return 0.0, false
 		}
 	}
 
 	return val, true
+}
+
+func calculatePivotLow(lows types.Float64Slice, left, right int) (float64, bool) {
+	return calculatePivotF(lows, left, right, func(a, pivot float64) bool {
+		return a > pivot
+	})
 }
