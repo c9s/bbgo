@@ -24,9 +24,9 @@ var _ types.SeriesExtend = &HULL{}
 func (inc *HULL) Update(value float64) {
 	if inc.result == nil {
 		inc.SeriesBase.Series = inc
-		inc.ma1 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window / 2}}
-		inc.ma2 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
-		inc.result = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, int(math.Sqrt(float64(inc.Window)))}}
+		inc.ma1 = &EWMA{IntervalWindow: types.IntervalWindow{Interval: inc.Interval, Window: inc.Window / 2}}
+		inc.ma2 = &EWMA{IntervalWindow: inc.IntervalWindow}
+		inc.result = &EWMA{IntervalWindow: types.IntervalWindow{Interval: inc.Interval, Window: int(math.Sqrt(float64(inc.Window)))}}
 	}
 	inc.ma1.Update(value)
 	inc.ma2.Update(value)

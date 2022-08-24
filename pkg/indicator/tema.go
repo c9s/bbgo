@@ -22,9 +22,9 @@ type TEMA struct {
 func (inc *TEMA) Update(value float64) {
 	if len(inc.Values) == 0 {
 		inc.SeriesBase.Series = inc
-		inc.A1 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
-		inc.A2 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
-		inc.A3 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
+		inc.A1 = &EWMA{IntervalWindow: inc.IntervalWindow}
+		inc.A2 = &EWMA{IntervalWindow: inc.IntervalWindow}
+		inc.A3 = &EWMA{IntervalWindow: inc.IntervalWindow}
 	}
 	inc.A1.Update(value)
 	a1 := inc.A1.Last()
