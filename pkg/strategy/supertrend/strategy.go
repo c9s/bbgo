@@ -43,6 +43,9 @@ type AccumulatedProfitReport struct {
 	// TsvReportPath The path to output report to
 	TsvReportPath string `json:"tsvReportPath"`
 
+	// AccumulatedDailyProfitWindow The window to sum up the daily profit, in days
+	AccumulatedDailyProfitWindow int `json:"accumulatedDailyProfitWindow"`
+
 	// Accumulated profit
 	accumulatedProfit         fixedpoint.Value
 	accumulatedProfitPerDay   types.Float64Slice
@@ -72,6 +75,9 @@ func (r *AccumulatedProfitReport) Initialize() {
 	}
 	if r.IntervalWindow <= 0 {
 		r.IntervalWindow = 7
+	}
+	if r.AccumulatedDailyProfitWindow <= 0 {
+		r.AccumulatedDailyProfitWindow = 7
 	}
 	if r.NumberOfInterval <= 0 {
 		r.NumberOfInterval = 1
@@ -118,10 +124,11 @@ func (r *AccumulatedProfitReport) Output(symbol string) {
 		}
 		defer tsvwiter.Close()
 		// Output symbol, total acc. profit, acc. profit 60MA, interval acc. profit, fee, win rate, profit factor
+		_ = tsvwiter.Write([]string{"#", "Symbol", "accumulatedProfit", "accumulatedProfitMA", fmt.Sprintf("%dd profit", r.AccumulatedDailyProfitWindow), "accumulatedFee", "winRatio", "profitFactor"})
 		for i := 0; i <= r.NumberOfInterval-1; i++ {
 			accumulatedProfit := fmt.Sprintf("%f", r.accumulatedProfitPerDay.Index(r.IntervalWindow*i))
 			accumulatedProfitMA := fmt.Sprintf("%f", r.accumulatedProfitMAPerDay.Index(r.IntervalWindow*i))
-			intervalAccumulatedProfit := fmt.Sprintf("%f", r.dailyProfit.Tail(r.IntervalWindow*(i+1)).Sum()-r.dailyProfit.Tail(r.IntervalWindow*i).Sum())
+			intervalAccumulatedProfit := fmt.Sprintf("%f", r.dailyProfit.Tail(r.AccumulatedDailyProfitWindow+r.IntervalWindow*i).Sum()-r.dailyProfit.Tail(r.IntervalWindow*i).Sum())
 			accumulatedFee := fmt.Sprintf("%f", r.accumulatedFeePerDay.Index(r.IntervalWindow*i))
 			winRatio := fmt.Sprintf("%f", r.winRatioPerDay.Index(r.IntervalWindow*i))
 			profitFactor := fmt.Sprintf("%f", r.profitFactorPerDay.Index(r.IntervalWindow*i))
