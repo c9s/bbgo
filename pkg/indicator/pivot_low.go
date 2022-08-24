@@ -91,6 +91,12 @@ func calculatePivotF(values types.Float64Slice, left, right int, f func(a, pivot
 	return val, true
 }
 
+func calculatePivotHigh(highs types.Float64Slice, left, right int) (float64, bool) {
+	return calculatePivotF(highs, left, right, func(a, pivot float64) bool {
+		return a < pivot
+	})
+}
+
 func calculatePivotLow(lows types.Float64Slice, left, right int) (float64, bool) {
 	return calculatePivotF(lows, left, right, func(a, pivot float64) bool {
 		return a > pivot

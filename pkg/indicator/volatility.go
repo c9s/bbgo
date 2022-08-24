@@ -91,7 +91,7 @@ func (inc *Volatility) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculateVOLATILITY(klines []types.KLine, window int, priceF KLinePriceMapper) (float64, error) {
+func calculateVOLATILITY(klines []types.KLine, window int, priceF KLineValueMapper) (float64, error) {
 	length := len(klines)
 	if length == 0 || length < window {
 		return 0.0, fmt.Errorf("insufficient elements for calculating VOL with window = %d", window)
