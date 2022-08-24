@@ -63,3 +63,4 @@ coverage_dum.txt
 /profile*.png
 
 *_local.yaml
+/.chglog/
