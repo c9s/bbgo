@@ -120,15 +120,15 @@ func (r *SessionSymbolReport) Print(wantBaseAssetBaseline bool) {
 	}
 
 	if r.Sharpe > 0.0 {
-		color.Green("REALIZED SHARPE RATIO: +%v", r.Sharpe)
+		color.Green("REALIZED SHARPE RATIO: %.4f", r.Sharpe)
 	} else {
-		color.Red("REALIZED SHARPE RATIO: +%v", r.Sharpe)
+		color.Red("REALIZED SHARPE RATIO: %.4f", r.Sharpe)
 	}
 
 	if r.Sortino > 0.0 {
-		color.Green("REALIZED SORTINO RATIO: %v", r.Sortino)
+		color.Green("REALIZED SORTINO RATIO: %.4f", r.Sortino)
 	} else {
-		color.Red("REALIZED SORTINO RATIO: %v", r.Sortino)
+		color.Red("REALIZED SORTINO RATIO: %.4f", r.Sortino)
 	}
 
 	if wantBaseAssetBaseline {
