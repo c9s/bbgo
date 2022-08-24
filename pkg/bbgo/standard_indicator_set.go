@@ -24,7 +24,6 @@ type StandardIndicatorSet struct {
 	// Standard indicators
 	// interval -> window
 	boll    map[types.IntervalWindowBandWidth]*indicator.BOLL
-	stoch   map[types.IntervalWindow]*indicator.STOCH
 	simples map[types.IntervalWindow]indicator.KLinePusher
 
 	stream types.Stream
@@ -37,9 +36,7 @@ func NewStandardIndicatorSet(symbol string, stream types.Stream, store *MarketDa
 		store:   store,
 		stream:  stream,
 		simples: make(map[types.IntervalWindow]indicator.KLinePusher),
-
-		boll:  make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
-		stoch: make(map[types.IntervalWindow]*indicator.STOCH),
+		boll:    make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
 	}
 }
 
@@ -108,14 +105,8 @@ func (s *StandardIndicatorSet) HULL(iw types.IntervalWindow) *indicator.HULL {
 }
 
 func (s *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
-	inc, ok := s.stoch[iw]
-	if !ok {
-		inc = &indicator.STOCH{IntervalWindow: iw}
-		s.initAndBind(inc, iw)
-		s.stoch[iw] = inc
-	}
-
-	return inc
+	inc := s.allocateSimpleIndicator(&indicator.STOCH{IntervalWindow: iw}, iw)
+	return inc.(*indicator.STOCH)
 }
 
 // BOLL returns the bollinger band indicator of the given interval, the window and bandwidth
