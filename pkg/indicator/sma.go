@@ -86,7 +86,7 @@ func (inc *SMA) LoadK(allKLines []types.KLine) {
 	}
 }
 
-func calculateSMA(kLines []types.KLine, window int, priceF KLinePriceMapper) (float64, error) {
+func calculateSMA(kLines []types.KLine, window int, priceF KLineValueMapper) (float64, error) {
 	length := len(kLines)
 	if length == 0 || length < window {
 		return 0.0, fmt.Errorf("insufficient elements for calculating SMA with window = %d", window)

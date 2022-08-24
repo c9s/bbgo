@@ -2,7 +2,7 @@ package indicator
 
 import "github.com/c9s/bbgo/pkg/types"
 
-type KLinePriceMapper func(k types.KLine) float64
+type KLineValueMapper func(k types.KLine) float64
 
 func KLineOpenPriceMapper(k types.KLine) float64 {
 	return k.Open.Float64()
@@ -24,7 +24,7 @@ func KLineVolumeMapper(k types.KLine) float64 {
 	return k.Volume.Float64()
 }
 
-func MapKLinePrice(kLines []types.KLine, f KLinePriceMapper) (prices []float64) {
+func MapKLinePrice(kLines []types.KLine, f KLineValueMapper) (prices []float64) {
 	for _, k := range kLines {
 		prices = append(prices, f(k))
 	}

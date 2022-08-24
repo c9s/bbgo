@@ -70,6 +70,15 @@ func (inc *VWMA) Update(price, volume float64) {
 	inc.Values.Push(vwma)
 }
 
+func (inc *VWMA) PushK(k types.KLine) {
+	if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
+		return
+	}
+
+	inc.Update(k.Close.Float64(), k.Volume.Float64())
+}
+
+
 func (inc *VWMA) CalculateAndUpdate(allKLines []types.KLine) {
 	if len(allKLines) < inc.Window {
 		return
