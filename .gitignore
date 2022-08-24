@@ -61,3 +61,5 @@ coverage_dum.txt
 /otp.png
 
 /profile*.png
+
+*_local.yaml
