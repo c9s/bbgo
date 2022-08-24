@@ -74,6 +74,13 @@ func (s *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
 	return inc.(*indicator.EWMA)
 }
 
+// VWMA
+func (s *StandardIndicatorSet) VWMA(iw types.IntervalWindow) *indicator.VWMA {
+	inc := s.allocateSimpleIndicator(&indicator.VWMA{IntervalWindow: iw}, iw)
+	return inc.(*indicator.VWMA)
+}
+
+
 func (s *StandardIndicatorSet) PivotLow(iw types.IntervalWindow) *indicator.PivotLow {
 	inc := s.allocateSimpleIndicator(&indicator.PivotLow{IntervalWindow: iw}, iw)
 	return inc.(*indicator.PivotLow)
