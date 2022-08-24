@@ -38,7 +38,7 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-var client *kucoinapi.RestClient = nil
+var client *kucoinapi.RestClient
 
 func main() {
 	if _, err := os.Stat(".env.local"); err == nil {
