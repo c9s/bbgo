@@ -14,6 +14,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -70,7 +71,7 @@ var rootCmd = &cobra.Command{
 			return fmt.Errorf("market %s is not defined", symbol)
 		}
 
-		marginAccount, err := exchange.QueryMarginAccount(ctx)
+		marginAccount, err := exchange.QueryCrossMarginAccount(ctx)
 		if err != nil {
 			return err
 		}
@@ -98,8 +99,8 @@ var rootCmd = &cobra.Command{
 			Market:           market,
 			Side:             types.SideTypeBuy,
 			Type:             types.OrderTypeLimit,
-			Price:            price,
-			Quantity:         quantity,
+			Price:            fixedpoint.NewFromFloat(price),
+			Quantity:         fixedpoint.NewFromFloat(quantity),
 			MarginSideEffect: types.SideEffectTypeMarginBuy,
 			TimeInForce:      "GTC",
 		})

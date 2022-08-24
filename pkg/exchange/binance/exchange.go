@@ -374,7 +374,7 @@ func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset st
 	return err
 }
 
-func (e *Exchange) queryCrossMarginAccount(ctx context.Context) (*types.Account, error) {
+func (e *Exchange) QueryCrossMarginAccount(ctx context.Context) (*types.Account, error) {
 	marginAccount, err := e.client.NewGetMarginAccountService().Do(ctx)
 	if err != nil {
 		return nil, err
@@ -406,7 +406,7 @@ func (e *Exchange) queryCrossMarginAccount(ctx context.Context) (*types.Account,
 	return a, nil
 }
 
-func (e *Exchange) queryIsolatedMarginAccount(ctx context.Context) (*types.Account, error) {
+func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context) (*types.Account, error) {
 	req := e.client.NewGetIsolatedMarginAccountService()
 	req.Symbols(e.IsolatedMarginSymbol)
 
@@ -677,9 +677,9 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	if e.IsFutures {
 		account, err = e.QueryFuturesAccount(ctx)
 	} else if e.IsIsolatedMargin {
-		account, err = e.queryIsolatedMarginAccount(ctx)
+		account, err = e.QueryIsolatedMarginAccount(ctx)
 	} else if e.IsMargin {
-		account, err = e.queryCrossMarginAccount(ctx)
+		account, err = e.QueryCrossMarginAccount(ctx)
 	} else {
 		account, err = e.QuerySpotAccount(ctx)
 	}
