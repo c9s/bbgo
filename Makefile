@@ -272,6 +272,6 @@ grpc-py:
 		$(PWD)/pkg/pb/bbgo.proto
 
 clean:
-	rm -rf $(BUILD_DIR) $(DIST_DIR) $(FRONTEND_EXPORT_DIR) $(GRPC_GO_DEPS) pkg/pb/*.pb.go
+	rm -rf $(BUILD_DIR) $(DIST_DIR) $(FRONTEND_EXPORT_DIR) $(GRPC_GO_DEPS) pkg/pb/*.pb.go coverage.txt
 
 .PHONY: bbgo bbgo-slim-darwin bbgo-slim-darwin-amd64 bbgo-slim-darwin-arm64 bbgo-darwin version dist pack migrations static embed desktop grpc grpc-go grpc-py .FORCE
