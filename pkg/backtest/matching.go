@@ -138,7 +138,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 
 	switch o.Type {
 	case types.OrderTypeMarket:
-		price = m.LastPrice
+		price = m.Market.TruncatePrice(m.LastPrice)
 
 	case types.OrderTypeStopMarket:
 		// the actual price might be different.
@@ -181,9 +181,9 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 
 	if isTaker {
 		if order.Type == types.OrderTypeMarket {
-			order.Price = m.LastPrice
+			order.Price = m.Market.TruncatePrice(m.LastPrice)
 		} else if order.Type == types.OrderTypeLimit {
-			order.AveragePrice = m.LastPrice
+			order.AveragePrice = m.Market.TruncatePrice(m.LastPrice)
 		}
 
 		// emit the order update for Status:New
@@ -193,7 +193,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 		var order2 = order
 
 		// emit trade before we publish order
-		trade := m.newTradeFromOrder(&order2, false, m.LastPrice)
+		trade := m.newTradeFromOrder(&order2, false, m.Market.TruncatePrice(m.LastPrice))
 		m.executeTrade(trade)
 
 		// unlock the rest balances for limit taker
