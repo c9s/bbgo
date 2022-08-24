@@ -38,8 +38,8 @@ func (inc *DEMA) TestUpdate(value float64) *DEMA {
 func (inc *DEMA) Update(value float64) {
 	if len(inc.Values) == 0 {
 		inc.SeriesBase.Series = inc
-		inc.a1 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
-		inc.a2 = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
+		inc.a1 = &EWMA{IntervalWindow: inc.IntervalWindow}
+		inc.a2 = &EWMA{IntervalWindow: inc.IntervalWindow}
 	}
 
 	inc.a1.Update(value)

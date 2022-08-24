@@ -43,7 +43,7 @@ func (inc *ZLEMA) Length() int {
 func (inc *ZLEMA) Update(value float64) {
 	if inc.lag == 0 || inc.zlema == nil {
 		inc.SeriesBase.Series = inc
-		inc.zlema = &EWMA{IntervalWindow: types.IntervalWindow{inc.Interval, inc.Window}}
+		inc.zlema = &EWMA{IntervalWindow: inc.IntervalWindow}
 		inc.lag = int((float64(inc.Window)-1.)/2. + 0.5)
 	}
 	inc.data.Push(value)
