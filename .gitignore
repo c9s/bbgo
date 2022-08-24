@@ -57,3 +57,5 @@ coverage_dum.txt
 .systemd.*
 
 /coverage.txt
+
+/otp.png
