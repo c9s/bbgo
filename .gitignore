@@ -53,3 +53,5 @@ coverage.txt
 coverage_dum.txt
 
 *.cpuprofile
+
+.systemd.*
