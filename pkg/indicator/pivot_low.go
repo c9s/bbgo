@@ -12,8 +12,6 @@ type PivotLow struct {
 
 	types.IntervalWindow
 
-	RightWindow int `json:"rightWindow"`
-
 	Lows    types.Float64Slice
 	Values  types.Float64Slice
 	EndTime time.Time
