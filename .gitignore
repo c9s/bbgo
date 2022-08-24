@@ -36,7 +36,7 @@
 
 /pkg/server/assets.go
 
-bbgo.sqlite3
+*.sqlite3
 node_modules
 output
 
