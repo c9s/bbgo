@@ -77,8 +77,11 @@ type IntervalWindow struct {
 	// The interval of kline
 	Interval Interval `json:"interval"`
 
-	// The windows size of the indicator (EWMA and SMA)
+	// The windows size of the indicator (for example, EWMA and SMA)
 	Window int `json:"window"`
+
+	// RightWindow is used by the pivot indicator
+	RightWindow int `json:"rightWindow"`
 }
 
 type IntervalWindowBandWidth struct {
