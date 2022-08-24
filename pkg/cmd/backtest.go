@@ -297,6 +297,42 @@ var BacktestCmd = &cobra.Command{
 		var manifests backtest.Manifests
 		var runID = userConfig.GetSignature() + "_" + uuid.NewString()
 		var reportDir = outputDirectory
+		var sessionTradeStats = make(map[string]map[string]*types.TradeStats)
+
+		var tradeCollectorList []*bbgo.TradeCollector
+		for _, exSource := range exchangeSources {
+			sessionName := exSource.Session.Name
+			tradeStatsMap := make(map[string]*types.TradeStats)
+			for usedSymbol := range exSource.Session.Positions() {
+				market, _ := exSource.Session.Market(usedSymbol)
+				position := types.NewPositionFromMarket(market)
+				orderStore := bbgo.NewOrderStore(usedSymbol)
+				orderStore.AddOrderUpdate = true
+				tradeCollector := bbgo.NewTradeCollector(usedSymbol, position, orderStore)
+
+				tradeStats := types.NewTradeStats(usedSymbol)
+				tradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1d, startTime))
+				tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
+					if profit == nil {
+						return
+					}
+					tradeStats.Add(profit)
+				})
+				tradeStatsMap[usedSymbol] = tradeStats
+
+				orderStore.BindStream(exSource.Session.UserDataStream)
+				tradeCollector.BindStream(exSource.Session.UserDataStream)
+				tradeCollectorList = append(tradeCollectorList, tradeCollector)
+			}
+			sessionTradeStats[sessionName] = tradeStatsMap
+		}
+		kLineHandlers = append(kLineHandlers, func(k types.KLine, _ *backtest.ExchangeDataSource) {
+			if k.Interval == types.Interval1d && k.Closed {
+				for _, collector := range tradeCollectorList {
+					collector.Process()
+				}
+			}
+		})
 
 		if generatingReport {
 			if reportFileInSubDir {
@@ -494,7 +530,8 @@ var BacktestCmd = &cobra.Command{
 
 		for _, session := range environ.Sessions() {
 			for symbol, trades := range session.Trades {
-				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Trades)
+				intervalProfits := sessionTradeStats[session.Name][symbol].IntervalProfits[types.Interval1d]
+				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Trades, intervalProfits)
 				if err != nil {
 					return err
 				}
@@ -555,7 +592,10 @@ var BacktestCmd = &cobra.Command{
 	},
 }
 
-func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, symbol string, trades []types.Trade) (*backtest.SessionSymbolReport, error) {
+func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, symbol string, trades []types.Trade, intervalProfit *types.IntervalProfitCollector) (
+	*backtest.SessionSymbolReport,
+	error,
+) {
 	backtestExchange, ok := session.Exchange.(*backtest.Exchange)
 	if !ok {
 		return nil, fmt.Errorf("unexpected error, exchange instance is not a backtest exchange")
@@ -595,6 +635,8 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 		InitialBalances: initBalances,
 		FinalBalances:   finalBalances,
 		// Manifests:       manifests,
+		Sharpe:  intervalProfit.GetSharpe(),
+		Sortino: intervalProfit.GetSortino(),
 	}
 
 	for _, s := range session.Subscriptions {
