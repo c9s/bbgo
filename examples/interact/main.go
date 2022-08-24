@@ -36,11 +36,12 @@ type closePositionTask struct {
 	confirmed  bool
 }
 
-type PositionInteraction struct {
+type positionInteraction struct {
 	closePositionTask closePositionTask
 }
 
-func (m *PositionInteraction) Commands(i *interact.Interact) {
+// Commands implements the custom interaction
+func (m *positionInteraction) Commands(i *interact.Interact) {
 	i.Command("/closePosition", "", func(reply interact.Reply) error {
 		// send symbol options
 		reply.Message("Choose your position")
@@ -142,7 +143,7 @@ func main() {
 		Token:  "123",
 	})
 
-	interact.AddCustomInteraction(&PositionInteraction{})
+	interact.AddCustomInteraction(&positionInteraction{})
 	if err := interact.Start(ctx); err != nil {
 		log.Fatal(err)
 	}
