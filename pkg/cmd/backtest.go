@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -621,6 +622,17 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 		Market:             market,
 	}
 
+	finiteRatio := func(ratio float64) float64 {
+		if math.IsInf(ratio, 1) {
+			return 99999.99
+		} else if math.IsInf(ratio, -1) {
+			return -99999.99
+		}
+		return ratio
+	}
+	sharpeRatio := finiteRatio(intervalProfit.GetSharpe())
+	sortinoRatio := finiteRatio(intervalProfit.GetSortino())
+
 	report := calculator.Calculate(symbol, trades, lastPrice)
 	accountConfig := userConfig.Backtest.GetAccount(session.Exchange.Name().String())
 	initBalances := accountConfig.Balances.BalanceMap()
@@ -635,8 +647,8 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 		InitialBalances: initBalances,
 		FinalBalances:   finalBalances,
 		// Manifests:       manifests,
-		Sharpe:  intervalProfit.GetSharpe(),
-		Sortino: intervalProfit.GetSortino(),
+		Sharpe:  sharpeRatio,
+		Sortino: sortinoRatio,
 	}
 
 	for _, s := range session.Subscriptions {
