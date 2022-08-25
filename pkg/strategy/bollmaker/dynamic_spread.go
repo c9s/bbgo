@@ -46,8 +46,8 @@ func (ds *DynamicSpreadSettings) Update(kline types.KLine) {
 
 // Initialize dynamic spreads and preload SMAs
 func (ds *DynamicSpreadSettings) Initialize(symbol string, session *bbgo.ExchangeSession) {
-	ds.DynamicBidSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: ds.Interval, Window: ds.Window}}
-	ds.DynamicAskSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: ds.Interval, Window: ds.Window}}
+	ds.DynamicBidSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{ds.Interval, ds.Window}}
+	ds.DynamicAskSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{ds.Interval, ds.Window}}
 
 	kLineStore, _ := session.MarketDataStore(symbol)
 	if klines, ok := kLineStore.KLinesOfInterval(ds.Interval); ok {
