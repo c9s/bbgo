@@ -434,8 +434,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// Setup dynamic spread
 	if s.DynamicSpread.Enabled {
-		s.DynamicSpread.DynamicBidSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.DynamicSpread.Window}}
-		s.DynamicSpread.DynamicAskSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.DynamicSpread.Window}}
+		if s.DynamicSpread.Interval == "" {
+			s.DynamicSpread.Interval = s.Interval
+		}
+		s.DynamicSpread.Initialize(s.Symbol, s.session)
 	}
 
 	if s.DisableShort {
