@@ -3,6 +3,7 @@ package factorzoo
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -15,7 +16,7 @@ type RR struct {
 	types.SeriesBase
 
 	prices  *types.Queue
-	Values  types.Float64Slice
+	Values  floats.Slice
 	EndTime time.Time
 
 	updateCallbacks []func(value float64)

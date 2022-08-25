@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/strategy/factorzoo/factors"
@@ -76,7 +77,7 @@ func (s *Linear) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.General
 
 		// take past window days' values to predict future return
 		// (e.g., 5 here in default configuration file)
-		a := []types.Float64Slice{
+		a := []floats.Slice{
 			s.divergence.Values[len(s.divergence.Values)-s.Window-2 : len(s.divergence.Values)-2],
 			s.reversion.Values[len(s.reversion.Values)-s.Window-2 : len(s.reversion.Values)-2],
 			s.drift.Values[len(s.drift.Values)-s.Window-2 : len(s.drift.Values)-2],
@@ -87,7 +88,7 @@ func (s *Linear) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.General
 		// factors array from day -4 to day 0, [[0.1, 0.2, 0.35, 0.3 , 0.25], [1.1, -0.2, 1.35, -0.3 , -0.25], ...]
 		// the binary(+/-) daily return rate from day -3 to day 1, [0, 1, 1, 0, 0]
 		// then we take the latest available factors array into linear regression model
-		b := []types.Float64Slice{filter(s.irr.Values[len(s.irr.Values)-s.Window-1:len(s.irr.Values)-1], binary)}
+		b := []floats.Slice{filter(s.irr.Values[len(s.irr.Values)-s.Window-1:len(s.irr.Values)-1], binary)}
 		var x []types.Series
 		var y []types.Series
 

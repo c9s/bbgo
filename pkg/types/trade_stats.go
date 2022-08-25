@@ -8,18 +8,19 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type IntervalProfitCollector struct {
 	Interval  Interval      `json:"interval"`
-	Profits   *Float64Slice `json:"profits"`
-	Timestamp *Float64Slice `json:"timestamp"`
+	Profits   *floats.Slice `json:"profits"`
+	Timestamp *floats.Slice `json:"timestamp"`
 	tmpTime   time.Time     `json:"tmpTime"`
 }
 
 func NewIntervalProfitCollector(i Interval, startTime time.Time) *IntervalProfitCollector {
-	return &IntervalProfitCollector{Interval: i, tmpTime: startTime, Profits: &Float64Slice{1.}, Timestamp: &Float64Slice{float64(startTime.Unix())}}
+	return &IntervalProfitCollector{Interval: i, tmpTime: startTime, Profits: &floats.Slice{1.}, Timestamp: &floats.Slice{float64(startTime.Unix())}}
 }
 
 // Update the collector by every traded profit

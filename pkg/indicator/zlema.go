@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -12,7 +13,7 @@ type ZLEMA struct {
 	types.SeriesBase
 	types.IntervalWindow
 
-	data  types.Float64Slice
+	data  floats.Slice
 	zlema *EWMA
 	lag   int
 

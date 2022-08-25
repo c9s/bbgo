@@ -3,6 +3,7 @@ package indicator
 import (
 	"math"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -19,9 +20,9 @@ type ALMA struct {
 	Sigma                int     // required: recommend to be 5
 	weight               []float64
 	sum                  float64
-	input                []float64
-	Values               types.Float64Slice
-	UpdateCallbacks      []func(value float64)
+	input           []float64
+	Values          floats.Slice
+	UpdateCallbacks []func(value float64)
 }
 
 const MaxNumOfALMA = 5_000

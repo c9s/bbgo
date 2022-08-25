@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -19,7 +20,7 @@ type Supertrend struct {
 
 	AverageTrueRange *ATR
 
-	trendPrices types.Float64Slice
+	trendPrices floats.Slice
 
 	closePrice             float64
 	previousClosePrice     float64

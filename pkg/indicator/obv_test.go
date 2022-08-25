@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -30,7 +31,7 @@ func Test_calculateOBV(t *testing.T) {
 		name   string
 		kLines []types.KLine
 		window int
-		want   types.Float64Slice
+		want   floats.Slice
 	}{
 		{
 			name: "trivial_case",
@@ -38,13 +39,13 @@ func Test_calculateOBV(t *testing.T) {
 				[]fixedpoint.Value{fixedpoint.Zero}, []fixedpoint.Value{fixedpoint.One},
 			),
 			window: 0,
-			want:   types.Float64Slice{1.0},
+			want:   floats.Slice{1.0},
 		},
 		{
 			name:   "easy_case",
 			kLines: buildKLines(input1, input2),
 			window: 0,
-			want:   types.Float64Slice{3, 1, -1, 5},
+			want:   floats.Slice{3, 1, -1, 5},
 		},
 	}
 

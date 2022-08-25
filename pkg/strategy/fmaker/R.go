@@ -2,9 +2,11 @@ package fmaker
 
 import (
 	"fmt"
+	"time"
+
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-	"time"
 )
 
 var zeroTime time.Time
@@ -16,7 +18,7 @@ type R struct {
 	types.IntervalWindow
 
 	// Values
-	Values types.Float64Slice
+	Values floats.Slice
 
 	EndTime time.Time
 
@@ -79,8 +81,8 @@ func calculateR(klines []types.KLine, valOpen KLineValueMapper, valClose KLineVa
 	if length == 0 || length < window {
 		return 0., fmt.Errorf("insufficient elements for calculating  with window = %d", window)
 	}
-	var opens types.Float64Slice
-	var closes types.Float64Slice
+	var opens floats.Slice
+	var closes floats.Slice
 
 	for _, k := range klines {
 		opens.Push(valOpen(k))

@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -9,9 +10,9 @@ import (
 //go:generate callbackgen -type CA
 type CA struct {
 	types.SeriesBase
-	Interval        types.Interval
-	Values          types.Float64Slice
-	length          float64
+	Interval types.Interval
+	Values   floats.Slice
+	length   float64
 	UpdateCallbacks []func(value float64)
 }
 

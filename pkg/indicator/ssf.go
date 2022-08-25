@@ -3,6 +3,7 @@ package indicator
 import (
 	"math"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -27,7 +28,7 @@ type SSF struct {
 	c2     float64
 	c3     float64
 	c4     float64
-	Values types.Float64Slice
+	Values floats.Slice
 
 	UpdateCallbacks []func(value float64)
 }
@@ -45,7 +46,7 @@ func (inc *SSF) Update(value float64) {
 			inc.c3 = -c0 * (1. + b0)
 			inc.c2 = c0 + b0
 			inc.c1 = 1. - inc.c2 - inc.c3 - inc.c4
-			inc.Values = types.Float64Slice{}
+			inc.Values = floats.Slice{}
 		}
 
 		result := inc.c1*value +
@@ -61,7 +62,7 @@ func (inc *SSF) Update(value float64) {
 			inc.c3 = -a0 * a0
 			inc.c2 = 2. * a0 * math.Cos(x)
 			inc.c1 = 1. - inc.c2 - inc.c3
-			inc.Values = types.Float64Slice{}
+			inc.Values = floats.Slice{}
 		}
 		result := inc.c1*value +
 			inc.c2*inc.Values.Index(0) +

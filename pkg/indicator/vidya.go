@@ -3,6 +3,7 @@ package indicator
 import (
 	"math"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -12,8 +13,8 @@ import (
 type VIDYA struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values types.Float64Slice
-	input  types.Float64Slice
+	Values floats.Slice
+	input  floats.Slice
 
 	updateCallbacks []func(value float64)
 }

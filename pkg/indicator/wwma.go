@@ -3,6 +3,7 @@ package indicator
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -17,7 +18,7 @@ const MaxNumOfWWMATruncateSize = 100
 type WWMA struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values       types.Float64Slice
+	Values       floats.Slice
 	LastOpenTime time.Time
 
 	UpdateCallbacks []func(value float64)

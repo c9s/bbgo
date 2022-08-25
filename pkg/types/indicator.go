@@ -8,6 +8,8 @@ import (
 
 	"github.com/wcharczuk/go-chart/v2"
 	"gonum.org/v1/gonum/stat"
+
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 )
 
 // Super basic Series type that simply holds the float64 data
@@ -94,7 +96,7 @@ type SeriesExtend interface {
 	Mul(b interface{}) SeriesExtend
 	Dot(b interface{}, limit ...int) float64
 	Array(limit ...int) (result []float64)
-	Reverse(limit ...int) (result Float64Slice)
+	Reverse(limit ...int) (result floats.Slice)
 	Change(offset ...int) SeriesExtend
 	PercentageChange(offset ...int) SeriesExtend
 	Stdev(params ...int) float64
@@ -649,7 +651,7 @@ func Array(a Series, limit ...int) (result []float64) {
 // the then reuse the result in multiple places (so that no recalculation will be triggered)
 //
 // notice that the return type is a Float64Slice, which implements the Series interface
-func Reverse(a Series, limit ...int) (result Float64Slice) {
+func Reverse(a Series, limit ...int) (result floats.Slice) {
 	l := a.Length()
 	if len(limit) > 0 && l > limit[0] {
 		l = limit[0]
