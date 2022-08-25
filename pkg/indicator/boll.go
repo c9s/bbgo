@@ -3,6 +3,7 @@ package indicator
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -29,8 +30,8 @@ type BOLL struct {
 	SMA    *SMA
 	StdDev *StdDev
 
-	UpBand   types.Float64Slice
-	DownBand types.Float64Slice
+	UpBand   floats.Slice
+	DownBand floats.Slice
 
 	EndTime time.Time
 

@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -11,7 +12,7 @@ import (
 type DEMA struct {
 	types.IntervalWindow
 	types.SeriesBase
-	Values types.Float64Slice
+	Values floats.Slice
 	a1     *EWMA
 	a2     *EWMA
 

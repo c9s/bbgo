@@ -15,6 +15,7 @@ import (
 	"github.com/wcharczuk/go-chart/v2"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/interact"
@@ -647,10 +648,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		method.Bind(session, s.GeneralOrderExecutor)
 	}
 
-	profit := types.Float64Slice{1., 1.}
+	profit := floats.Slice{1., 1.}
 	price, _ := s.Session.LastPrice(s.Symbol)
 	initAsset := s.CalcAssetValue(price).Float64()
-	cumProfit := types.Float64Slice{initAsset, initAsset}
+	cumProfit := floats.Slice{initAsset, initAsset}
 	modify := func(p float64) float64 {
 		return p
 	}

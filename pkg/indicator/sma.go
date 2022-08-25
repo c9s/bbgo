@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -14,7 +15,7 @@ const MaxNumOfSMATruncateSize = 100
 type SMA struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values    types.Float64Slice
+	Values    floats.Slice
 	rawValues *types.Queue
 	EndTime   time.Time
 

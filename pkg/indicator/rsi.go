@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -16,8 +17,8 @@ https://www.investopedia.com/terms/r/rsi.asp
 type RSI struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values          types.Float64Slice
-	Prices          types.Float64Slice
+	Values          floats.Slice
+	Prices          floats.Slice
 	PreviousAvgLoss float64
 	PreviousAvgGain float64
 

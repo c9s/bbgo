@@ -2,9 +2,11 @@ package fmaker
 
 import (
 	"fmt"
+	"time"
+
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-	"time"
 )
 
 //go:generate callbackgen -type A2
@@ -12,7 +14,7 @@ type A2 struct {
 	types.IntervalWindow
 
 	// Values
-	Values types.Float64Slice
+	Values floats.Slice
 
 	EndTime time.Time
 
@@ -76,9 +78,9 @@ func calculateA2(klines []types.KLine, valLow KLineValueMapper, valHigh KLineVal
 	if length == 0 || length < window {
 		return 0., fmt.Errorf("insufficient elements for calculating  with window = %d", window)
 	}
-	var lows types.Float64Slice
-	var highs types.Float64Slice
-	var closes types.Float64Slice
+	var lows floats.Slice
+	var highs floats.Slice
+	var closes floats.Slice
 
 	for _, k := range klines {
 		lows.Push(valLow(k))

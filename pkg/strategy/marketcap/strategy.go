@@ -9,6 +9,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datasource/glassnode"
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -171,7 +172,7 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 }
 
 func (s *Strategy) getTargetWeights(ctx context.Context) types.ValueMap {
-	m := types.FloatMap{}
+	m := floats.Map{}
 
 	// get market cap values
 	for _, currency := range s.TargetCurrencies {

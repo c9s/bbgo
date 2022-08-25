@@ -1,5 +1,7 @@
 package types
 
+import "github.com/c9s/bbgo/pkg/datatype/floats"
+
 func (s *SeriesBase) Index(i int) float64 {
 	if s.Series == nil {
 		return 0
@@ -81,7 +83,7 @@ func (s *SeriesBase) Array(limit ...int) (result []float64) {
 	return Array(s, limit...)
 }
 
-func (s *SeriesBase) Reverse(limit ...int) (result Float64Slice) {
+func (s *SeriesBase) Reverse(limit ...int) (result floats.Slice) {
 	return Reverse(s, limit...)
 }
 
