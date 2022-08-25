@@ -3,6 +3,7 @@ package indicator
 import (
 	"math"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -11,7 +12,7 @@ type FisherTransform struct {
 	types.SeriesBase
 	types.IntervalWindow
 	prices *types.Queue
-	Values types.Float64Slice
+	Values floats.Slice
 
 	UpdateCallbacks []func(value float64)
 }

@@ -3,6 +3,7 @@ package indicator
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -17,11 +18,11 @@ Stochastic Oscillator
 //go:generate callbackgen -type STOCH
 type STOCH struct {
 	types.IntervalWindow
-	K types.Float64Slice
-	D types.Float64Slice
+	K floats.Slice
+	D floats.Slice
 
-	HighValues types.Float64Slice
-	LowValues  types.Float64Slice
+	HighValues floats.Slice
+	LowValues  floats.Slice
 
 	EndTime         time.Time
 	UpdateCallbacks []func(k float64, d float64)

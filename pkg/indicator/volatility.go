@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -19,7 +20,7 @@ const MaxNumOfVOLTruncateSize = 100
 type Volatility struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values  types.Float64Slice
+	Values  floats.Slice
 	EndTime time.Time
 
 	UpdateCallbacks []func(value float64)

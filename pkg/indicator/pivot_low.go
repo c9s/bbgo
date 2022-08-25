@@ -3,6 +3,7 @@ package indicator
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -12,8 +13,8 @@ type PivotLow struct {
 
 	types.IntervalWindow
 
-	Lows    types.Float64Slice
-	Values  types.Float64Slice
+	Lows    floats.Slice
+	Values  floats.Slice
 	EndTime time.Time
 
 	updateCallbacks []func(value float64)
@@ -62,7 +63,7 @@ func (inc *PivotLow) PushK(k types.KLine) {
 	inc.EmitUpdate(inc.Last())
 }
 
-func calculatePivotF(values types.Float64Slice, left, right int, f func(a, pivot float64) bool) (float64, bool) {
+func calculatePivotF(values floats.Slice, left, right int, f func(a, pivot float64) bool) (float64, bool) {
 	length := len(values)
 
 	if right == 0 {
@@ -91,13 +92,13 @@ func calculatePivotF(values types.Float64Slice, left, right int, f func(a, pivot
 	return val, true
 }
 
-func calculatePivotHigh(highs types.Float64Slice, left, right int) (float64, bool) {
+func calculatePivotHigh(highs floats.Slice, left, right int) (float64, bool) {
 	return calculatePivotF(highs, left, right, func(a, pivot float64) bool {
 		return a < pivot
 	})
 }
 
-func calculatePivotLow(lows types.Float64Slice, left, right int) (float64, bool) {
+func calculatePivotLow(lows floats.Slice, left, right int) (float64, bool) {
 	return calculatePivotF(lows, left, right, func(a, pivot float64) bool {
 		return a > pivot
 	})

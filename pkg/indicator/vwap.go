@@ -3,6 +3,7 @@ package indicator
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -19,9 +20,9 @@ Volume-Weighted Average Price (VWAP) Explained
 type VWAP struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values      types.Float64Slice
-	Prices      types.Float64Slice
-	Volumes     types.Float64Slice
+	Values      floats.Slice
+	Prices      floats.Slice
+	Volumes     floats.Slice
 	WeightedSum float64
 	VolumeSum   float64
 

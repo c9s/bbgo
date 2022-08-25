@@ -3,6 +3,7 @@ package indicator
 import (
 	"math"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -13,10 +14,10 @@ import (
 type CCI struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Input        types.Float64Slice
-	TypicalPrice types.Float64Slice
-	MA           types.Float64Slice
-	Values       types.Float64Slice
+	Input        floats.Slice
+	TypicalPrice floats.Slice
+	MA           floats.Slice
+	Values       floats.Slice
 
 	UpdateCallbacks []func(value float64)
 }

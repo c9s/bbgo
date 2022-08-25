@@ -3,6 +3,7 @@ package indicator
 import (
 	"math"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -13,9 +14,9 @@ import (
 type WeightedDrift struct {
 	types.SeriesBase
 	types.IntervalWindow
-	chng            *types.Queue
-	Values          types.Float64Slice
-	MA              types.UpdatableSeriesExtend
+	chng   *types.Queue
+	Values floats.Slice
+	MA     types.UpdatableSeriesExtend
 	Weight          *types.Queue
 	LastValue       float64
 	UpdateCallbacks []func(value float64)

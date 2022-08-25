@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -18,7 +19,7 @@ import (
 type ATRP struct {
 	types.SeriesBase
 	types.IntervalWindow
-	PercentageVolatility types.Float64Slice
+	PercentageVolatility floats.Slice
 
 	PreviousClose float64
 	RMA           *RMA

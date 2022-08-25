@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -15,8 +16,8 @@ type Pivot struct {
 	types.IntervalWindow
 
 	// Values
-	Lows  types.Float64Slice // higher low
-	Highs types.Float64Slice // lower high
+	Lows  floats.Slice // higher low
+	Highs floats.Slice // lower high
 
 	EndTime time.Time
 
@@ -96,8 +97,8 @@ func calculatePivot(klines []types.KLine, window int, valLow KLineValueMapper, v
 		return 0., 0., fmt.Errorf("insufficient elements for calculating with window = %d", window)
 	}
 
-	var lows types.Float64Slice
-	var highs types.Float64Slice
+	var lows floats.Slice
+	var highs floats.Slice
 	for _, k := range klines {
 		lows.Push(valLow(k))
 		highs.Push(valHigh(k))

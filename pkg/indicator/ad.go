@@ -3,6 +3,7 @@ package indicator
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -16,7 +17,7 @@ Accumulation/Distribution Indicator (A/D)
 type AD struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values   types.Float64Slice
+	Values   floats.Slice
 	PrePrice float64
 
 	EndTime         time.Time

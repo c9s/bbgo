@@ -3,9 +3,11 @@ package factorzoo
 import (
 	"time"
 
+	"gonum.org/v1/gonum/stat"
+
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-	"gonum.org/v1/gonum/stat"
 )
 
 // price volume divergence
@@ -21,8 +23,8 @@ type PVD struct {
 	types.IntervalWindow
 	types.SeriesBase
 
-	Values  types.Float64Slice
-	Prices  *types.Queue
+	Values floats.Slice
+	Prices *types.Queue
 	Volumes *types.Queue
 	EndTime time.Time
 
