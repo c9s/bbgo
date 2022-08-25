@@ -1,11 +1,10 @@
 package supertrend
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/risk"
-	"github.com/fatih/color"
 	"os"
 	"sync"
 
@@ -28,6 +27,115 @@ func init() {
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
 	// Note: built-in strategies need to imported manually in the bbgo cmd package.
 	bbgo.RegisterStrategy(ID, &Strategy{})
+}
+
+// AccumulatedProfitReport For accumulated profit report output
+type AccumulatedProfitReport struct {
+	// AccumulatedProfitMAWindow Accumulated profit SMA window, in number of trades
+	AccumulatedProfitMAWindow int `json:"accumulatedProfitMAWindow"`
+
+	// IntervalWindow interval window, in days
+	IntervalWindow int `json:"intervalWindow"`
+
+	// NumberOfInterval How many intervals to output to TSV
+	NumberOfInterval int `json:"NumberOfInterval"`
+
+	// TsvReportPath The path to output report to
+	TsvReportPath string `json:"tsvReportPath"`
+
+	// AccumulatedDailyProfitWindow The window to sum up the daily profit, in days
+	AccumulatedDailyProfitWindow int `json:"accumulatedDailyProfitWindow"`
+
+	// Accumulated profit
+	accumulatedProfit         fixedpoint.Value
+	accumulatedProfitPerDay   types.Float64Slice
+	previousAccumulatedProfit fixedpoint.Value
+
+	// Accumulated profit MA
+	accumulatedProfitMA       *indicator.SMA
+	accumulatedProfitMAPerDay types.Float64Slice
+
+	// Daily profit
+	dailyProfit types.Float64Slice
+
+	// Accumulated fee
+	accumulatedFee       fixedpoint.Value
+	accumulatedFeePerDay types.Float64Slice
+
+	// Win ratio
+	winRatioPerDay types.Float64Slice
+
+	// Profit factor
+	profitFactorPerDay types.Float64Slice
+}
+
+func (r *AccumulatedProfitReport) Initialize() {
+	if r.AccumulatedProfitMAWindow <= 0 {
+		r.AccumulatedProfitMAWindow = 60
+	}
+	if r.IntervalWindow <= 0 {
+		r.IntervalWindow = 7
+	}
+	if r.AccumulatedDailyProfitWindow <= 0 {
+		r.AccumulatedDailyProfitWindow = 7
+	}
+	if r.NumberOfInterval <= 0 {
+		r.NumberOfInterval = 1
+	}
+	r.accumulatedProfitMA = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: types.Interval1d, Window: r.AccumulatedProfitMAWindow}}
+}
+
+func (r *AccumulatedProfitReport) RecordProfit(profit fixedpoint.Value) {
+	r.accumulatedProfit = r.accumulatedProfit.Add(profit)
+	r.accumulatedProfitMA.Update(r.accumulatedProfit.Float64())
+}
+
+func (r *AccumulatedProfitReport) RecordFee(fee fixedpoint.Value) {
+	r.accumulatedFee = r.accumulatedFee.Add(fee)
+}
+
+func (r *AccumulatedProfitReport) DailyUpdate(tradeStats *types.TradeStats) {
+	// Daily profit
+	r.dailyProfit.Update(r.accumulatedProfit.Sub(r.previousAccumulatedProfit).Float64())
+	r.previousAccumulatedProfit = r.accumulatedProfit
+
+	// Accumulated profit
+	r.accumulatedProfitPerDay.Update(r.accumulatedProfit.Float64())
+
+	// Accumulated profit MA
+	r.accumulatedProfitMAPerDay.Update(r.accumulatedProfitMA.Last())
+
+	// Accumulated Fee
+	r.accumulatedFeePerDay.Update(r.accumulatedFee.Float64())
+
+	// Win ratio
+	r.winRatioPerDay.Update(tradeStats.WinningRatio.Float64())
+
+	// Profit factor
+	r.profitFactorPerDay.Update(tradeStats.ProfitFactor.Float64())
+}
+
+// Output Accumulated profit report to a TSV file
+func (r *AccumulatedProfitReport) Output(symbol string) {
+	if r.TsvReportPath != "" {
+		tsvwiter, err := tsv.AppendWriterFile(r.TsvReportPath)
+		if err != nil {
+			panic(err)
+		}
+		defer tsvwiter.Close()
+		// Output symbol, total acc. profit, acc. profit 60MA, interval acc. profit, fee, win rate, profit factor
+		_ = tsvwiter.Write([]string{"#", "Symbol", "accumulatedProfit", "accumulatedProfitMA", fmt.Sprintf("%dd profit", r.AccumulatedDailyProfitWindow), "accumulatedFee", "winRatio", "profitFactor"})
+		for i := 0; i <= r.NumberOfInterval-1; i++ {
+			accumulatedProfit := fmt.Sprintf("%f", r.accumulatedProfitPerDay.Index(r.IntervalWindow*i))
+			accumulatedProfitMA := fmt.Sprintf("%f", r.accumulatedProfitMAPerDay.Index(r.IntervalWindow*i))
+			intervalAccumulatedProfit := fmt.Sprintf("%f", r.dailyProfit.Tail(r.AccumulatedDailyProfitWindow+r.IntervalWindow*i).Sum()-r.dailyProfit.Tail(r.IntervalWindow*i).Sum())
+			accumulatedFee := fmt.Sprintf("%f", r.accumulatedFeePerDay.Index(r.IntervalWindow*i))
+			winRatio := fmt.Sprintf("%f", r.winRatioPerDay.Index(r.IntervalWindow*i))
+			profitFactor := fmt.Sprintf("%f", r.profitFactorPerDay.Index(r.IntervalWindow*i))
+
+			_ = tsvwiter.Write([]string{fmt.Sprintf("%d", i+1), symbol, accumulatedProfit, accumulatedProfitMA, intervalAccumulatedProfit, accumulatedFee, winRatio, profitFactor})
+		}
+	}
 }
 
 type Strategy struct {
@@ -92,14 +200,7 @@ type Strategy struct {
 	bbgo.StrategyController
 
 	// Accumulated profit report
-	accumulatedProfit   fixedpoint.Value
-	accumulatedProfitMA *indicator.SMA
-	// AccumulatedProfitMAWindow Accumulated profit SMA window
-	AccumulatedProfitMAWindow int `json:"accumulatedProfitMAWindow"`
-	dailyAccumulatedProfits   types.Float64Slice
-	lastDayAccumulatedProfit  fixedpoint.Value
-	// AccumulatedProfitLastPeriodWindow Last period window of accumulated profit
-	AccumulatedProfitLastPeriodWindow int `json:"accumulatedProfitLastPeriodWindow"`
+	AccumulatedProfitReport *AccumulatedProfitReport `json:"accumulatedProfitReport"`
 }
 
 func (s *Strategy) ID() string {
@@ -296,19 +397,6 @@ func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoin
 	}
 }
 
-// PrintResult prints accumulated profit status
-func (s *Strategy) PrintResult(o *os.File) {
-	f := bufio.NewWriter(o)
-	defer f.Flush()
-	hiyellow := color.New(color.FgHiYellow).FprintfFunc()
-	hiyellow(f, "------ %s Accumulated Profit Results ------\n", s.InstanceID())
-	hiyellow(f, "Symbol: %v\n", s.Symbol)
-	hiyellow(f, "Accumulated Profit: %v\n", s.accumulatedProfit)
-	hiyellow(f, "Accumulated Profit %dMA: %f\n", s.AccumulatedProfitMAWindow, s.accumulatedProfitMA.Last())
-	hiyellow(f, "Last %d day(s) Accumulated Profit: %f\n", s.AccumulatedProfitLastPeriodWindow, s.dailyAccumulatedProfits.Sum())
-	hiyellow(f, "\n")
-}
-
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
 
@@ -362,26 +450,25 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.AccountValueCalculator = risk.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
 
 	// Accumulated profit report
-	if s.AccumulatedProfitMAWindow <= 0 {
-		s.AccumulatedProfitMAWindow = 60
-	}
-	s.accumulatedProfitMA = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.AccumulatedProfitMAWindow}}
-	s.orderExecutor.TradeCollector().OnProfit(func(trade types.Trade, profit *types.Profit) {
-		if profit == nil {
-			return
+	if bbgo.IsBackTesting {
+		if s.AccumulatedProfitReport == nil {
+			s.AccumulatedProfitReport = &AccumulatedProfitReport{}
 		}
+		s.AccumulatedProfitReport.Initialize()
+		s.orderExecutor.TradeCollector().OnProfit(func(trade types.Trade, profit *types.Profit) {
+			if profit == nil {
+				return
+			}
 
-		s.accumulatedProfit = s.accumulatedProfit.Add(profit.Profit)
-		s.accumulatedProfitMA.Update(s.accumulatedProfit.Float64())
-	})
-	if s.AccumulatedProfitLastPeriodWindow <= 0 {
-		s.AccumulatedProfitLastPeriodWindow = 7
+			s.AccumulatedProfitReport.RecordProfit(profit.Profit)
+		})
+		s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+			s.AccumulatedProfitReport.RecordFee(trade.Fee)
+		})
+		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1d, func(kline types.KLine) {
+			s.AccumulatedProfitReport.DailyUpdate(s.TradeStats)
+		}))
 	}
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1d, func(kline types.KLine) {
-		s.dailyAccumulatedProfits.Update(s.accumulatedProfit.Sub(s.lastDayAccumulatedProfit).Float64())
-		s.dailyAccumulatedProfits = s.dailyAccumulatedProfits.Tail(s.AccumulatedProfitLastPeriodWindow)
-		s.lastDayAccumulatedProfit = s.accumulatedProfit
-	}))
 
 	// Sync position to redis on trade
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
@@ -487,8 +574,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		// Print accumulated profit report
-		defer s.PrintResult(os.Stdout)
+		// Output accumulated profit report
+		if bbgo.IsBackTesting {
+			defer s.AccumulatedProfitReport.Output(s.Symbol)
+		}
 
 		_ = s.orderExecutor.GracefulCancel(ctx)
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
