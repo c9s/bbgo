@@ -138,6 +138,10 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 			marginAsset.MinDebtRatio = fixedpoint.One
 		}
 
+		if b.Total().Compare(marginAsset.Low) <= 0 {
+			continue
+		}
+
 		log.Infof("checking debtRatio: session = %s asset = %s, debtRatio = %f", s.ExchangeSession.Name, marginAsset.Asset, debtRatio.Float64())
 
 		// if debt is greater than total, skip repay
@@ -154,14 +158,16 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 		}
 
 		toRepay := fixedpoint.Min(b.Borrowed, b.Available)
-		if toRepay.IsZero() {
-			log.Warn("amount = 0, can not repay")
+		toRepay = toRepay.Sub(marginAsset.Low)
+
+		if toRepay.Sign() <= 0 {
+			log.Warnf("%s repay amount = 0, can not repay", marginAsset.Asset)
 			continue
 		}
 
 		bbgo.Notify(&MarginAction{
 			Exchange:       s.ExchangeSession.ExchangeName,
-			Action:         "Repay for Debt Ratio",
+			Action:         fmt.Sprintf("Repay for Debt Ratio %f", debtRatio.Float64()),
 			Asset:          b.Currency,
 			Amount:         toRepay,
 			MarginLevel:    curMarginLevel,
