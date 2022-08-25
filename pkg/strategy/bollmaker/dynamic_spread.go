@@ -11,8 +11,7 @@ import (
 type DynamicSpreadSettings struct {
 	Enabled bool `json:"enabled"`
 
-	// Window is the window of the SMAs of spreads
-	Window int `json:"window"`
+	types.IntervalWindow
 
 	// AskSpreadScale is used to define the ask spread range with the given percentage.
 	AskSpreadScale *bbgo.PercentageScale `json:"askSpreadScale"`
@@ -42,6 +41,19 @@ func (ds *DynamicSpreadSettings) Update(kline types.KLine) {
 	default:
 		ds.DynamicAskSpread.Update(0)
 		ds.DynamicBidSpread.Update(0)
+	}
+}
+
+// Initialize dynamic spreads and preload SMAs
+func (ds *DynamicSpreadSettings) Initialize(symbol string, session *bbgo.ExchangeSession) {
+	ds.DynamicBidSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: ds.Interval, Window: ds.Window}}
+	ds.DynamicAskSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: ds.Interval, Window: ds.Window}}
+
+	kLineStore, _ := session.MarketDataStore(symbol)
+	if klines, ok := kLineStore.KLinesOfInterval(ds.Interval); ok {
+		for i := 0; i < len(*klines); i++ {
+			ds.Update((*klines)[i])
+		}
 	}
 }
 
