@@ -429,6 +429,9 @@ func (s *Strategy) hasShortSet() bool {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	// initial required information
+	s.session = session
+
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
 
@@ -459,9 +462,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.ShadowProtectionRatio.IsZero() {
 		s.ShadowProtectionRatio = fixedpoint.NewFromFloat(0.01)
 	}
-
-	// initial required information
-	s.session = session
 
 	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
