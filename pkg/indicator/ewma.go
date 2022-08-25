@@ -83,7 +83,7 @@ func (inc *EWMA) PushK(k types.KLine) {
 	inc.EmitUpdate(inc.Last())
 }
 
-func CalculateKLinesEMA(allKLines []types.KLine, priceF KLinePriceMapper, window int) float64 {
+func CalculateKLinesEMA(allKLines []types.KLine, priceF KLineValueMapper, window int) float64 {
 	var multiplier = 2.0 / (float64(window) + 1)
 	return ewma(MapKLinePrice(allKLines, priceF), multiplier)
 }

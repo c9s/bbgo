@@ -6,6 +6,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/bollgrid"
 	_ "github.com/c9s/bbgo/pkg/strategy/bollmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/dca"
+	_ "github.com/c9s/bbgo/pkg/strategy/drift"
 	_ "github.com/c9s/bbgo/pkg/strategy/emastop"
 	_ "github.com/c9s/bbgo/pkg/strategy/etf"
 	_ "github.com/c9s/bbgo/pkg/strategy/ewoDgtrd"
@@ -33,5 +34,4 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/xmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/xnav"
 	_ "github.com/c9s/bbgo/pkg/strategy/xpuremaker"
-	_ "github.com/c9s/bbgo/pkg/strategy/drift"
 )

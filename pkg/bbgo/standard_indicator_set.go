@@ -23,9 +23,8 @@ type StandardIndicatorSet struct {
 
 	// Standard indicators
 	// interval -> window
-	boll    map[types.IntervalWindowBandWidth]*indicator.BOLL
-	stoch   map[types.IntervalWindow]*indicator.STOCH
-	simples map[types.IntervalWindow]indicator.KLinePusher
+	iwbIndicators map[types.IntervalWindowBandWidth]*indicator.BOLL
+	iwIndicators  map[types.IntervalWindow]indicator.KLinePusher
 
 	stream types.Stream
 	store  *MarketDataStore
@@ -33,35 +32,33 @@ type StandardIndicatorSet struct {
 
 func NewStandardIndicatorSet(symbol string, stream types.Stream, store *MarketDataStore) *StandardIndicatorSet {
 	return &StandardIndicatorSet{
-		Symbol:  symbol,
-		store:   store,
-		stream:  stream,
-		simples: make(map[types.IntervalWindow]indicator.KLinePusher),
-
-		boll:  make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
-		stoch: make(map[types.IntervalWindow]*indicator.STOCH),
+		Symbol:        symbol,
+		store:         store,
+		stream:        stream,
+		iwIndicators:  make(map[types.IntervalWindow]indicator.KLinePusher),
+		iwbIndicators: make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
 	}
 }
 
-func (s *StandardIndicatorSet) initAndBind(inc indicator.KLinePusher, iw types.IntervalWindow) {
-	if klines, ok := s.store.KLinesOfInterval(iw.Interval); ok {
+func (s *StandardIndicatorSet) initAndBind(inc indicator.KLinePusher, interval types.Interval) {
+	if klines, ok := s.store.KLinesOfInterval(interval); ok {
 		for _, k := range *klines {
 			inc.PushK(k)
 		}
 	}
 
-	s.stream.OnKLineClosed(types.KLineWith(s.Symbol, iw.Interval, inc.PushK))
+	s.stream.OnKLineClosed(types.KLineWith(s.Symbol, interval, inc.PushK))
 }
 
 func (s *StandardIndicatorSet) allocateSimpleIndicator(t indicator.KLinePusher, iw types.IntervalWindow) indicator.KLinePusher {
-	inc, ok := s.simples[iw]
+	inc, ok := s.iwIndicators[iw]
 	if ok {
 		return inc
 	}
 
 	inc = t
-	s.initAndBind(inc, iw)
-	s.simples[iw] = inc
+	s.initAndBind(inc, iw.Interval)
+	s.iwIndicators[iw] = inc
 	return t
 }
 
@@ -76,6 +73,13 @@ func (s *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
 	inc := s.allocateSimpleIndicator(&indicator.EWMA{IntervalWindow: iw}, iw)
 	return inc.(*indicator.EWMA)
 }
+
+// VWMA
+func (s *StandardIndicatorSet) VWMA(iw types.IntervalWindow) *indicator.VWMA {
+	inc := s.allocateSimpleIndicator(&indicator.VWMA{IntervalWindow: iw}, iw)
+	return inc.(*indicator.VWMA)
+}
+
 
 func (s *StandardIndicatorSet) PivotLow(iw types.IntervalWindow) *indicator.PivotLow {
 	inc := s.allocateSimpleIndicator(&indicator.PivotLow{IntervalWindow: iw}, iw)
@@ -108,30 +112,24 @@ func (s *StandardIndicatorSet) HULL(iw types.IntervalWindow) *indicator.HULL {
 }
 
 func (s *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
-	inc, ok := s.stoch[iw]
-	if !ok {
-		inc = &indicator.STOCH{IntervalWindow: iw}
-		s.initAndBind(inc, iw)
-		s.stoch[iw] = inc
-	}
-
-	return inc
+	inc := s.allocateSimpleIndicator(&indicator.STOCH{IntervalWindow: iw}, iw)
+	return inc.(*indicator.STOCH)
 }
 
 // BOLL returns the bollinger band indicator of the given interval, the window and bandwidth
 func (s *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) *indicator.BOLL {
 	iwb := types.IntervalWindowBandWidth{IntervalWindow: iw, BandWidth: bandWidth}
-	inc, ok := s.boll[iwb]
+	inc, ok := s.iwbIndicators[iwb]
 	if !ok {
 		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
-		s.initAndBind(inc, iw)
+		s.initAndBind(inc, iw.Interval)
 
 		if debugBOLL {
 			inc.OnUpdate(func(sma float64, upBand float64, downBand float64) {
 				logrus.Infof("%s BOLL %s: sma=%f up=%f down=%f", s.Symbol, iw.String(), sma, upBand, downBand)
 			})
 		}
-		s.boll[iwb] = inc
+		s.iwbIndicators[iwb] = inc
 	}
 
 	return inc

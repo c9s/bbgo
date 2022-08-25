@@ -19,8 +19,8 @@ func (inc *TMA) Update(value float64) {
 	if inc.s1 == nil {
 		inc.SeriesBase.Series = inc
 		w := (inc.Window + 1) / 2
-		inc.s1 = &SMA{IntervalWindow: types.IntervalWindow{inc.Interval, w}}
-		inc.s2 = &SMA{IntervalWindow: types.IntervalWindow{inc.Interval, w}}
+		inc.s1 = &SMA{IntervalWindow: types.IntervalWindow{Interval: inc.Interval, Window: w}}
+		inc.s2 = &SMA{IntervalWindow: types.IntervalWindow{Interval: inc.Interval, Window: w}}
 	}
 
 	inc.s1.Update(value)

@@ -1,10 +1,7 @@
 package indicator
 
 import (
-	"fmt"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -45,9 +42,8 @@ func (inc *PivotLow) Update(value float64) {
 		return
 	}
 
-	low, err := calculatePivotLow(inc.Lows, inc.Window)
-	if err != nil {
-		log.WithError(err).Errorf("can not calculate pivot low")
+	low, ok := calculatePivotLow(inc.Lows, inc.Window, inc.RightWindow)
+	if !ok {
 		return
 	}
 
@@ -66,17 +62,43 @@ func (inc *PivotLow) PushK(k types.KLine) {
 	inc.EmitUpdate(inc.Last())
 }
 
-func calculatePivotLow(lows types.Float64Slice, window int) (float64, error) {
-	length := len(lows)
-	if length == 0 || length < window {
-		return 0., fmt.Errorf("insufficient elements for calculating with window = %d", window)
+func calculatePivotF(values types.Float64Slice, left, right int, f func(a, pivot float64) bool) (float64, bool) {
+	length := len(values)
+
+	if right == 0 {
+		right = left
+	}
+
+	if length == 0 || length < left+right+1 {
+		return 0.0, false
 	}
 
 	end := length - 1
-	min := lows[end-(window-1):].Min()
-	if min == lows.Index(int(window/2.)-1) {
-		return min, nil
+	index := end - right
+	val := values[index]
+
+	for i := index - left; i <= index+right; i++ {
+		if i == index {
+			continue
+		}
+
+		// return if we found lower value
+		if !f(values[i], val) {
+			return 0.0, false
+		}
 	}
 
-	return 0., nil
+	return val, true
+}
+
+func calculatePivotHigh(highs types.Float64Slice, left, right int) (float64, bool) {
+	return calculatePivotF(highs, left, right, func(a, pivot float64) bool {
+		return a < pivot
+	})
+}
+
+func calculatePivotLow(lows types.Float64Slice, left, right int) (float64, bool) {
+	return calculatePivotF(lows, left, right, func(a, pivot float64) bool {
+		return a > pivot
+	})
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type KLineValueMapper func(k types.KLine) float64
 
 //go:generate callbackgen -type Pivot
 type Pivot struct {
