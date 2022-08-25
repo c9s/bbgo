@@ -3,6 +3,7 @@ package indicator
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -19,11 +20,11 @@ type MACD struct {
 	types.IntervalWindow     // 9
 	ShortPeriod          int // 12
 	LongPeriod           int // 26
-	Values               types.Float64Slice
-	FastEWMA             *EWMA
+	Values     floats.Slice
+	FastEWMA   *EWMA
 	SlowEWMA             *EWMA
-	SignalLine           *EWMA
-	Histogram            types.Float64Slice
+	SignalLine *EWMA
+	Histogram  floats.Slice
 
 	EndTime time.Time
 

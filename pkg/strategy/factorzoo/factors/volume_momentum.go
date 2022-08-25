@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -18,7 +19,7 @@ type VMOM struct {
 	types.IntervalWindow
 
 	// Values
-	Values    types.Float64Slice
+	Values    floats.Slice
 	LastValue float64
 
 	volumes *types.Queue

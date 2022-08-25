@@ -3,6 +3,7 @@ package indicator
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -11,7 +12,7 @@ type Low struct {
 	types.IntervalWindow
 	types.SeriesBase
 
-	Values  types.Float64Slice
+	Values  floats.Slice
 	EndTime time.Time
 
 	updateCallbacks []func(value float64)

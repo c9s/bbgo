@@ -10,6 +10,7 @@ import (
 	"gonum.org/v1/gonum/floats"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	floats2 "github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -322,7 +323,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			a34 := s.A34.Values[len(s.A34.Values)-i-outlook]
 
 			ret := s.R.Values[len(s.R.Values)-i]
-			rdps = append(rdps, regression.DataPoint(ret, types.Float64Slice{s0, s1, s2, s4, s5, s6, s7, a2, a3, a18, a34}))
+			rdps = append(rdps, regression.DataPoint(ret, floats2.Slice{s0, s1, s2, s4, s5, s6, s7, a2, a3, a18, a34}))
 		}
 		// for i := 40; i > 20; i-- {
 		//	s0 := preprocessing(s.S0.Values[len(s.S0.Values)-i : len(s.S0.Values)-i+20-outlook])
@@ -341,7 +342,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// }
 		r.Train(rdps...)
 		r.Run()
-		er, _ := r.Predict(types.Float64Slice{s.S0.Last(), s.S1.Last(), s.S2.Last(), s.S4.Last(), s.S5.Last(), s.S6.Last(), s.S7.Last(), s.A2.Last(), s.A3.Last(), s.A18.Last(), s.A34.Last()})
+		er, _ := r.Predict(floats2.Slice{s.S0.Last(), s.S1.Last(), s.S2.Last(), s.S4.Last(), s.S5.Last(), s.S6.Last(), s.S7.Last(), s.A2.Last(), s.A3.Last(), s.A18.Last(), s.A34.Last()})
 		log.Infof("Expected Return Rate: %f", er)
 
 		q := new(regression.Regression)
@@ -377,7 +378,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			ret := s.R.Values[len(s.R.Values)-i]
 			qty := math.Abs(ret)
-			qdps = append(qdps, regression.DataPoint(qty, types.Float64Slice{s0, s1, s2, s4, s5, s6, s7, a2, a3, a18, a34}))
+			qdps = append(qdps, regression.DataPoint(qty, floats2.Slice{s0, s1, s2, s4, s5, s6, s7, a2, a3, a18, a34}))
 		}
 		// for i := 40; i > 20; i-- {
 		//	s0 := preprocessing(s.S0.Values[len(s.S0.Values)-i : len(s.S0.Values)-i+20-outlook])
@@ -416,7 +417,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// a34 := preprocessing(s.A18.Values[len(s.A18.Values)-20 : len(s.A18.Values)-1-outlook])
 		// er, _ := r.Predict(types.Float64Slice{s0, s1, s2, s4, s5, a2, a3, a18, a34})
 		// eq, _ := q.Predict(types.Float64Slice{s0, s1, s2, s4, s5, a2, a3, a18, a34})
-		eq, _ := q.Predict(types.Float64Slice{s.S0.Last(), s.S1.Last(), s.S2.Last(), s.S4.Last(), s.S5.Last(), s.S6.Last(), s.S7.Last(), s.A2.Last(), s.A3.Last(), s.A18.Last(), s.A34.Last(), er})
+		eq, _ := q.Predict(floats2.Slice{s.S0.Last(), s.S1.Last(), s.S2.Last(), s.S4.Last(), s.S5.Last(), s.S6.Last(), s.S7.Last(), s.A2.Last(), s.A3.Last(), s.A18.Last(), s.A34.Last(), er})
 		log.Infof("Expected Order Quantity: %f", eq)
 		// if float64(s.Position.GetBase().Sign())*er < 0 {
 		//	s.ClosePosition(ctx, fixedpoint.One, kline.Close)

@@ -1,9 +1,11 @@
 package supertrend
 
 import (
+	"time"
+
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-	"time"
 )
 
 // LinReg is Linear Regression baseline
@@ -11,8 +13,8 @@ type LinReg struct {
 	types.SeriesBase
 	types.IntervalWindow
 	// Values are the slopes of linear regression baseline
-	Values  types.Float64Slice
-	klines  types.KLineWindow
+	Values floats.Slice
+	klines types.KLineWindow
 	EndTime time.Time
 }
 

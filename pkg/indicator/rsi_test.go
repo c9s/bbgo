@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -26,13 +27,13 @@ func Test_calculateRSI(t *testing.T) {
 		name   string
 		kLines []types.KLine
 		window int
-		want   types.Float64Slice
+		want   floats.Slice
 	}{
 		{
 			name:   "RSI",
 			kLines: buildKLines(values),
 			window: 14,
-			want: types.Float64Slice{
+			want: floats.Slice{
 				70.46413502109704,
 				66.24961855355505,
 				66.48094183471265,

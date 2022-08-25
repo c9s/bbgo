@@ -3,10 +3,12 @@ package supertrend
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/data/tsv"
-	"github.com/c9s/bbgo/pkg/risk"
 	"os"
 	"sync"
+
+	"github.com/c9s/bbgo/pkg/data/tsv"
+	"github.com/c9s/bbgo/pkg/datatype/floats"
+	"github.com/c9s/bbgo/pkg/risk"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -48,25 +50,25 @@ type AccumulatedProfitReport struct {
 
 	// Accumulated profit
 	accumulatedProfit         fixedpoint.Value
-	accumulatedProfitPerDay   types.Float64Slice
+	accumulatedProfitPerDay   floats.Slice
 	previousAccumulatedProfit fixedpoint.Value
 
 	// Accumulated profit MA
 	accumulatedProfitMA       *indicator.SMA
-	accumulatedProfitMAPerDay types.Float64Slice
+	accumulatedProfitMAPerDay floats.Slice
 
 	// Daily profit
-	dailyProfit types.Float64Slice
+	dailyProfit floats.Slice
 
 	// Accumulated fee
 	accumulatedFee       fixedpoint.Value
-	accumulatedFeePerDay types.Float64Slice
+	accumulatedFeePerDay floats.Slice
 
 	// Win ratio
-	winRatioPerDay types.Float64Slice
+	winRatioPerDay floats.Slice
 
 	// Profit factor
-	profitFactorPerDay types.Float64Slice
+	profitFactorPerDay floats.Slice
 }
 
 func (r *AccumulatedProfitReport) Initialize() {

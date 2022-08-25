@@ -3,6 +3,7 @@ package indicator
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -10,7 +11,7 @@ import (
 type StdDev struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values    types.Float64Slice
+	Values    floats.Slice
 	rawValues *types.Queue
 
 	EndTime         time.Time

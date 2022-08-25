@@ -3,6 +3,7 @@ package indicator
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -21,7 +22,7 @@ type VWMA struct {
 	types.SeriesBase
 	types.IntervalWindow
 
-	Values         types.Float64Slice
+	Values         floats.Slice
 	PriceVolumeSMA *SMA
 	VolumeSMA      *SMA
 

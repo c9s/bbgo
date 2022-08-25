@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -12,7 +13,7 @@ import (
 //go:generate callbackgen -type S2
 type S2 struct {
 	types.IntervalWindow
-	Values  types.Float64Slice
+	Values  floats.Slice
 	EndTime time.Time
 
 	UpdateCallbacks []func(value float64)

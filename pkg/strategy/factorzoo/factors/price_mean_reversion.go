@@ -3,9 +3,11 @@ package factorzoo
 import (
 	"time"
 
+	"gonum.org/v1/gonum/stat"
+
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-	"gonum.org/v1/gonum/stat"
 )
 
 // price mean reversion
@@ -17,8 +19,8 @@ type PMR struct {
 	types.IntervalWindow
 	types.SeriesBase
 
-	Values  types.Float64Slice
-	SMA     *indicator.SMA
+	Values floats.Slice
+	SMA    *indicator.SMA
 	EndTime time.Time
 
 	updateCallbacks []func(value float64)

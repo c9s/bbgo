@@ -2,9 +2,11 @@ package fmaker
 
 import (
 	"fmt"
+	"time"
+
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-	"time"
 )
 
 //go:generate callbackgen -type S7
@@ -12,7 +14,7 @@ type S7 struct {
 	types.IntervalWindow
 
 	// Values
-	Values types.Float64Slice
+	Values floats.Slice
 
 	EndTime time.Time
 
@@ -75,8 +77,8 @@ func calculateS7(klines []types.KLine, valOpen KLineValueMapper, valClose KLineV
 	if length == 0 || length < window {
 		return 0., fmt.Errorf("insufficient elements for calculating  with window = %d", window)
 	}
-	var opens types.Float64Slice
-	var closes types.Float64Slice
+	var opens floats.Slice
+	var closes floats.Slice
 
 	for _, k := range klines {
 		opens.Push(valOpen(k))

@@ -1,6 +1,7 @@
 package indicator
 
 import (
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -11,7 +12,7 @@ import (
 type TEMA struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Values types.Float64Slice
+	Values floats.Slice
 	A1     *EWMA
 	A2     *EWMA
 	A3     *EWMA
