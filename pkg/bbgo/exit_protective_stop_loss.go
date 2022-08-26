@@ -11,6 +11,12 @@ import (
 
 const enableMarketTradeStop = false
 
+// ProtectiveStopLoss provides a way to protect your profit but also keep a room for the price volatility
+// Set ActivationRatio to 1% means if the price is away from your average cost by 1%, we will activate the protective stop loss
+// and the StopLossRatio is the minimal profit ratio you want to keep for your position.
+// If you set StopLossRatio to 0.1% and ActivationRatio to 1%,
+// when the price goes away from your average cost by 1% and then goes back to below your (average_cost * (1 - 0.1%))
+// The stop will trigger.
 type ProtectiveStopLoss struct {
 	Symbol string `json:"symbol"`
 
