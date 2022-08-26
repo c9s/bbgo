@@ -80,6 +80,8 @@ func Multiply(inReal0 []float64, inReal1 []float64) []float64 {
 //          It assumes first values are the most recent.
 //          The crossover function does not use most recent value, since usually it's not a complete candle.
 //          The second recent values and the previous are used, instead.
+//
+// ported from https://github.com/markcheno/go-talib/blob/master/talib.go
 func CrossOver(series1 []float64, series2 []float64) bool {
 	if len(series1) < 3 || len(series2) < 3 {
 		return false
@@ -93,6 +95,8 @@ func CrossOver(series1 []float64, series2 []float64) bool {
 // CrossUnder returns true if series1 is crossing under series2.
 //
 //    NOTE: Usually this is used with Media Average Series to check if it crosses for sell signals.
+//
+// ported from https://github.com/markcheno/go-talib/blob/master/talib.go
 func CrossUnder(series1 []float64, series2 []float64) bool {
 	if len(series1) < 3 || len(series2) < 3 {
 		return false
@@ -104,6 +108,7 @@ func CrossUnder(series1 []float64, series2 []float64) bool {
 }
 
 // MinMax - Lowest and highest values over a specified period
+// ported from https://github.com/markcheno/go-talib/blob/master/talib.go
 func MinMax(inReal []float64, inTimePeriod int) (outMin []float64, outMax []float64) {
 	outMin = make([]float64, len(inReal))
 	outMax = make([]float64, len(inReal))
