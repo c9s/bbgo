@@ -11,7 +11,6 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -23,121 +22,6 @@ var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
-}
-
-type SupportTakeProfit struct {
-	Symbol string
-	types.IntervalWindow
-
-	Ratio fixedpoint.Value `json:"ratio"`
-
-	pivot               *indicator.PivotLow
-	orderExecutor       *bbgo.GeneralOrderExecutor
-	session             *bbgo.ExchangeSession
-	activeOrders        *bbgo.ActiveOrderBook
-	currentSupportPrice fixedpoint.Value
-
-	triggeredPrices []fixedpoint.Value
-}
-
-func (s *SupportTakeProfit) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
-}
-
-func (s *SupportTakeProfit) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
-	s.session = session
-	s.orderExecutor = orderExecutor
-	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
-	session.UserDataStream.OnOrderUpdate(func(order types.Order) {
-		if s.activeOrders.Exists(order) {
-			if !s.currentSupportPrice.IsZero() {
-				s.triggeredPrices = append(s.triggeredPrices, s.currentSupportPrice)
-			}
-		}
-	})
-	s.activeOrders.BindStream(session.UserDataStream)
-
-	position := orderExecutor.Position()
-
-	s.pivot = session.StandardIndicatorSet(s.Symbol).PivotLow(s.IntervalWindow)
-
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
-		if !s.updateSupportPrice(kline.Close) {
-			return
-		}
-
-		if !position.IsOpened(kline.Close) {
-			log.Infof("position is not opened, skip updating support take profit order")
-			return
-		}
-
-		buyPrice := s.currentSupportPrice.Mul(one.Add(s.Ratio))
-		quantity := position.GetQuantity()
-		ctx := context.Background()
-
-		if err := orderExecutor.GracefulCancelActiveOrderBook(ctx, s.activeOrders); err != nil {
-			log.WithError(err).Errorf("cancel order failed")
-		}
-
-		bbgo.Notify("placing %s take profit order at price %f", s.Symbol, buyPrice.Float64())
-		createdOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-			Symbol:           s.Symbol,
-			Type:             types.OrderTypeLimitMaker,
-			Side:             types.SideTypeBuy,
-			Price:            buyPrice,
-			Quantity:         quantity,
-			Tag:              "supportTakeProfit",
-			MarginSideEffect: types.SideEffectTypeAutoRepay,
-		})
-
-		if err != nil {
-			log.WithError(err).Errorf("can not submit orders: %+v", createdOrders)
-		}
-
-		s.activeOrders.Add(createdOrders...)
-	}))
-}
-
-func (s *SupportTakeProfit) updateSupportPrice(closePrice fixedpoint.Value) bool {
-	log.Infof("[supportTakeProfit] lows: %v", s.pivot.Values)
-
-	groupDistance := 0.01
-	minDistance := 0.05
-	supportPrices := findPossibleSupportPrices(closePrice.Float64()*(1.0-minDistance), groupDistance, s.pivot.Values)
-	if len(supportPrices) == 0 {
-		return false
-	}
-
-	log.Infof("[supportTakeProfit] found possible support prices: %v", supportPrices)
-
-	// nextSupportPrice are sorted in increasing order
-	nextSupportPrice := fixedpoint.NewFromFloat(supportPrices[len(supportPrices)-1])
-
-	// it's price that we have been used to take profit
-	for _, p := range s.triggeredPrices {
-		var l = p.Mul(one.Sub(fixedpoint.NewFromFloat(0.01)))
-		var h = p.Mul(one.Add(fixedpoint.NewFromFloat(0.01)))
-		if p.Compare(l) > 0 && p.Compare(h) < 0 {
-			return false
-		}
-	}
-
-	currentBuyPrice := s.currentSupportPrice.Mul(one.Add(s.Ratio))
-
-	if s.currentSupportPrice.IsZero() {
-		log.Infof("setup next support take profit price at %f", nextSupportPrice.Float64())
-		s.currentSupportPrice = nextSupportPrice
-		return true
-	}
-
-	// the close price is already lower than the support price, than we should update
-	if closePrice.Compare(currentBuyPrice) < 0 || nextSupportPrice.Compare(s.currentSupportPrice) > 0 {
-		log.Infof("setup next support take profit price at %f", nextSupportPrice.Float64())
-		s.currentSupportPrice = nextSupportPrice
-		return true
-	}
-
-	return false
 }
 
 type Strategy struct {
@@ -163,7 +47,7 @@ type Strategy struct {
 	// ResistanceShort is one of the entry method
 	ResistanceShort *ResistanceShort `json:"resistanceShort"`
 
-	SupportTakeProfit []*SupportTakeProfit `json:"supportTakeProfit"`
+	SupportTakeProfit []*bbgo.SupportTakeProfit `json:"supportTakeProfit"`
 
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
