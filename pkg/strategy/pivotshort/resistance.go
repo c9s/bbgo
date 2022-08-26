@@ -26,7 +26,7 @@ type ResistanceShort struct {
 	Leverage      fixedpoint.Value `json:"leverage"`
 	Ratio         fixedpoint.Value `json:"ratio"`
 
-	TrendEMA *TrendEMA `json:"trendEMA"`
+	TrendEMA *bbgo.TrendEMA `json:"trendEMA"`
 
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
@@ -59,9 +59,6 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	s.activeOrders.BindStream(session.UserDataStream)
 
 	if s.TrendEMA != nil {
-		if s.TrendEMA.MaxGradient == 0.0 {
-			s.TrendEMA.MaxGradient = 1.0
-		}
 		s.TrendEMA.Bind(session, orderExecutor)
 	}
 
