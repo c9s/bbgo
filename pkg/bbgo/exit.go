@@ -38,7 +38,7 @@ type ExitMethod struct {
 	// =================================================
 	LowerShadowTakeProfit     *LowerShadowTakeProfit     `json:"lowerShadowTakeProfit"`
 	CumulatedVolumeTakeProfit *CumulatedVolumeTakeProfit `json:"cumulatedVolumeTakeProfit"`
-	SupportTakeProfit         []*SupportTakeProfit       `json:"supportTakeProfit"`
+	SupportTakeProfit         *SupportTakeProfit       `json:"supportTakeProfit"`
 }
 
 func (e ExitMethod) String() string {
