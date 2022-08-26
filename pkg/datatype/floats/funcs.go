@@ -8,7 +8,7 @@ func Lower(arr []float64, x float64) []float64 {
 	var rst []float64
 	for _, a := range arr {
 		// filter prices that are Lower than the current closed price
-		if a > x {
+		if a >= x {
 			continue
 		}
 
@@ -24,7 +24,7 @@ func Higher(arr []float64, x float64) []float64 {
 	var rst []float64
 	for _, a := range arr {
 		// filter prices that are Lower than the current closed price
-		if a < x {
+		if a <= x {
 			continue
 		}
 		rst = append(rst, a)
