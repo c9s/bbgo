@@ -188,7 +188,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 	if s.ResistanceShort != nil && s.ResistanceShort.Enabled {
 		dynamic.InheritStructValues(s.ResistanceShort, s)
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.ResistanceShort.Interval})
+		s.ResistanceShort.Subscribe(session)
 	}
 
 	if s.BreakLow != nil {
