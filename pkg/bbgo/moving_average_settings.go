@@ -8,28 +8,18 @@ import (
 
 type MovingAverageSettings struct {
 	Type     string         `json:"type"`
-	Interval types.Interval `json:"interval"`
-	Window   int            `json:"window"`
+
+	types.IntervalWindow
 
 	Side *types.SideType `json:"side"`
-
 	QuantityOrAmount
 }
 
-func (settings MovingAverageSettings) IntervalWindow() types.IntervalWindow {
-	var window = 99
-	if settings.Window > 0 {
-		window = settings.Window
-	}
-
-	return types.IntervalWindow{
-		Interval: settings.Interval,
-		Window:   window,
-	}
-}
-
 func (settings *MovingAverageSettings) Indicator(indicatorSet *StandardIndicatorSet) (inc types.Float64Indicator, err error) {
-	var iw = settings.IntervalWindow()
+	var iw = settings.IntervalWindow
+	if iw.Window > 0 {
+		iw.Window = 99
+	}
 
 	switch settings.Type {
 	case "SMA":
