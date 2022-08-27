@@ -47,8 +47,6 @@ type Strategy struct {
 	// ResistanceShort is one of the entry method
 	ResistanceShort *ResistanceShort `json:"resistanceShort"`
 
-	SupportTakeProfit []*bbgo.SupportTakeProfit `json:"supportTakeProfit"`
-
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
 	session       *bbgo.ExchangeSession
@@ -78,12 +76,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	if s.BreakLow != nil {
 		dynamic.InheritStructValues(s.BreakLow, s)
 		s.BreakLow.Subscribe(session)
-	}
-
-	for i := range s.SupportTakeProfit {
-		m := s.SupportTakeProfit[i]
-		dynamic.InheritStructValues(m, s)
-		m.Subscribe(session)
 	}
 
 	if !bbgo.IsBackTesting {
@@ -155,10 +147,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.BreakLow != nil {
 		s.BreakLow.Bind(session, s.orderExecutor)
-	}
-
-	for i := range s.SupportTakeProfit {
-		s.SupportTakeProfit[i].Bind(session, s.orderExecutor)
 	}
 
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
