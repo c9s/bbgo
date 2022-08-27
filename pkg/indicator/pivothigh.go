@@ -13,8 +13,8 @@ type PivotHigh struct {
 
 	types.IntervalWindow
 
-	Lows    floats.Slice
-	Values  floats.Slice
+	Highs  floats.Slice
+	Values floats.Slice
 	EndTime time.Time
 
 	updateCallbacks []func(value float64)
@@ -33,17 +33,17 @@ func (inc *PivotHigh) Last() float64 {
 }
 
 func (inc *PivotHigh) Update(value float64) {
-	if len(inc.Lows) == 0 {
+	if len(inc.Highs) == 0 {
 		inc.SeriesBase.Series = inc
 	}
 
-	inc.Lows.Push(value)
+	inc.Highs.Push(value)
 
-	if len(inc.Lows) < inc.Window {
+	if len(inc.Highs) < inc.Window {
 		return
 	}
 
-	low, ok := calculatePivotHigh(inc.Lows, inc.Window, inc.RightWindow)
+	low, ok := calculatePivotHigh(inc.Highs, inc.Window, inc.RightWindow)
 	if !ok {
 		return
 	}
