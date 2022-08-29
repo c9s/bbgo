@@ -46,6 +46,7 @@ func (s *RoiStopLoss) checkStopPrice(closePrice fixedpoint.Value, position *type
 	}
 
 	roi := position.ROI(closePrice)
+	// logrus.Debugf("ROIStopLoss: price=%f roi=%s stop=%s", closePrice.Float64(), roi.Percentage(), s.Percentage.Neg().Percentage())
 	if roi.Compare(s.Percentage.Neg()) < 0 {
 		// stop loss
 		Notify("[RoiStopLoss] %s stop loss triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Neg().Percentage(), closePrice.Float64())

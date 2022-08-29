@@ -148,7 +148,11 @@ var BacktestCmd = &cobra.Command{
 			endTime = now
 		}
 
-		log.Infof("starting backtest with startTime %s", startTime.Format(time.ANSIC))
+		// ensure that we're using local time
+		startTime = startTime.Local()
+		endTime = endTime.Local()
+
+		log.Infof("starting backtest with startTime %s", startTime.Format(time.RFC3339))
 
 		environ := bbgo.NewEnvironment()
 		if err := BootstrapBacktestEnvironment(ctx, environ); err != nil {
@@ -200,6 +204,8 @@ var BacktestCmd = &cobra.Command{
 			if syncFromTime.After(startTime) {
 				return fmt.Errorf("sync-from time %s can not be latter than the backtest start time %s", syncFromTime, startTime)
 			}
+
+			syncFromTime = syncFromTime.Local()
 		} else {
 			// we need at least 1 month backward data for EMA and last prices
 			syncFromTime = startTime.AddDate(0, -1, 0)
@@ -208,13 +214,13 @@ var BacktestCmd = &cobra.Command{
 
 		if wantSync {
 			log.Infof("starting synchronization: %v", userConfig.Backtest.Symbols)
-			if err := sync(ctx, userConfig, backtestService, sourceExchanges, syncFromTime.Local(), endTime.Local()); err != nil {
+			if err := sync(ctx, userConfig, backtestService, sourceExchanges, syncFromTime, endTime); err != nil {
 				return err
 			}
 			log.Info("synchronization done")
 
 			if shouldVerify {
-				err := verify(userConfig, backtestService, sourceExchanges, syncFromTime.Local(), endTime.Local())
+				err := verify(userConfig, backtestService, sourceExchanges, syncFromTime, endTime)
 				if err != nil {
 					return err
 				}

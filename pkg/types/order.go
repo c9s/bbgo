@@ -281,8 +281,8 @@ func (o Order) CsvRecords() [][]string {
 			string(o.Status),
 			o.Price.String(),
 			o.Quantity.String(),
-			o.CreationTime.Time().Format(time.RFC1123),
-			o.UpdateTime.Time().Format(time.RFC1123),
+			o.CreationTime.Time().Local().Format(time.RFC1123),
+			o.UpdateTime.Time().Local().Format(time.RFC1123),
 			o.Tag,
 		},
 	}
