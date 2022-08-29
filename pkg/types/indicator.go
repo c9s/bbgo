@@ -754,6 +754,9 @@ func Stdev(a Series, params ...int) float64 {
 		diff := a.Index(i) - avg
 		s += diff * diff
 	}
+	if length-ddof == 0 {
+		return 0
+	}
 	return math.Sqrt(s / float64(length-ddof))
 }
 

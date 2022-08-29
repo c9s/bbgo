@@ -180,10 +180,20 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 	order := m.newOrder(o, orderID)
 
 	if isTaker {
+		var price fixedpoint.Value
 		if order.Type == types.OrderTypeMarket {
 			order.Price = m.Market.TruncatePrice(m.LastPrice)
+			price = order.Price
 		} else if order.Type == types.OrderTypeLimit {
-			order.AveragePrice = m.Market.TruncatePrice(m.LastPrice)
+			if m.LastKLine.High.Compare(order.Price) > 0 && order.Side == types.SideTypeBuy {
+				order.AveragePrice = order.Price
+			} else if m.LastKLine.Low.Compare(order.Price) < 0 && order.Side == types.SideTypeSell {
+				order.AveragePrice = order.Price
+			} else {
+
+				order.AveragePrice = m.Market.TruncatePrice(m.LastPrice)
+			}
+			price = order.AveragePrice
 		}
 
 		// emit the order update for Status:New
@@ -193,7 +203,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 		var order2 = order
 
 		// emit trade before we publish order
-		trade := m.newTradeFromOrder(&order2, false, m.Market.TruncatePrice(m.LastPrice))
+		trade := m.newTradeFromOrder(&order2, false, price)
 		m.executeTrade(trade)
 
 		// unlock the rest balances for limit taker
@@ -627,6 +637,7 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 			m.buyToPrice(kline.Open)
 		}
 	}
+	m.LastKLine = kline
 
 	switch kline.Direction() {
 	case types.DirectionDown:
@@ -658,8 +669,6 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 			m.buyToPrice(kline.Close)
 		}
 	}
-
-	m.LastKLine = kline
 }
 
 func (m *SimplePriceMatching) newOrder(o types.SubmitOrder, orderID uint64) types.Order {
