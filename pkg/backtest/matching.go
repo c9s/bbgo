@@ -47,6 +47,12 @@ func init() {
 	}
 }
 
+type Param struct {
+	callback []func(types.KLine, *ExchangeDataSource)
+	kline    types.KLine
+	src      *ExchangeDataSource
+}
+
 // SimplePriceMatching implements a simple kline data driven matching engine for backtest
 //go:generate callbackgen -type SimplePriceMatching
 type SimplePriceMatching struct {
@@ -58,8 +64,10 @@ type SimplePriceMatching struct {
 	askOrders    []types.Order
 	closedOrders map[uint64]types.Order
 
+	ParamCache  map[types.Interval]Param
 	LastPrice   fixedpoint.Value
 	LastKLine   types.KLine
+	NextKLine   *types.KLine
 	CurrentTime time.Time
 
 	Account *types.Account
@@ -185,9 +193,9 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 			order.Price = m.Market.TruncatePrice(m.LastPrice)
 			price = order.Price
 		} else if order.Type == types.OrderTypeLimit {
-			if m.LastKLine.High.Compare(order.Price) > 0 && order.Side == types.SideTypeBuy {
+			if m.NextKLine.High.Compare(order.Price) > 0 && order.Side == types.SideTypeBuy {
 				order.AveragePrice = order.Price
-			} else if m.LastKLine.Low.Compare(order.Price) < 0 && order.Side == types.SideTypeSell {
+			} else if m.NextKLine.Low.Compare(order.Price) < 0 && order.Side == types.SideTypeSell {
 				order.AveragePrice = order.Price
 			} else {
 
@@ -637,7 +645,6 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 			m.buyToPrice(kline.Open)
 		}
 	}
-	m.LastKLine = kline
 
 	switch kline.Direction() {
 	case types.DirectionDown:
@@ -669,6 +676,8 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 			m.buyToPrice(kline.Close)
 		}
 	}
+
+	m.LastKLine = kline
 }
 
 func (m *SimplePriceMatching) newOrder(o types.SubmitOrder, orderID uint64) types.Order {

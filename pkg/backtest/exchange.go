@@ -167,7 +167,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
 	for _, order := range orders {
 		symbol := order.Symbol
-		matching, ok := e.matchingBook(symbol)
+		matching, ok := e.MatchingBook(symbol)
 		if !ok {
 			return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 		}
@@ -192,7 +192,7 @@ func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	matching, ok := e.matchingBook(symbol)
+	matching, ok := e.MatchingBook(symbol)
 	if !ok {
 		return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 	}
@@ -211,7 +211,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	for _, order := range orders {
-		matching, ok := e.matchingBook(order.Symbol)
+		matching, ok := e.MatchingBook(order.Symbol)
 		if !ok {
 			return fmt.Errorf("matching engine is not initialized for symbol %s", order.Symbol)
 		}
@@ -250,7 +250,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	matching, ok := e.matchingBook(symbol)
+	matching, ok := e.MatchingBook(symbol)
 	if !ok {
 		return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 	}
@@ -293,7 +293,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 	return nil, nil
 }
 
-func (e *Exchange) matchingBook(symbol string) (*SimplePriceMatching, bool) {
+func (e *Exchange) MatchingBook(symbol string) (*SimplePriceMatching, bool) {
 	e.matchingBooksMutex.Lock()
 	m, ok := e.matchingBooks[symbol]
 	e.matchingBooksMutex.Unlock()
@@ -362,21 +362,36 @@ func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, extraInterv
 	return klineC, nil
 }
 
-func (e *Exchange) ConsumeKLine(k types.KLine) {
-	if k.Interval == types.Interval1m {
-		e.currentTime = k.EndTime.Time()
-
-		matching, ok := e.matchingBook(k.Symbol)
-		if !ok {
-			log.Errorf("matching book of %s is not initialized", k.Symbol)
-			return
-		}
-
-		// here we generate trades and order updates
-		matching.processKLine(k)
+func (e *Exchange) ConsumeKLine(k types.KLine, handlers []func(types.KLine, *ExchangeDataSource), src *ExchangeDataSource) {
+	matching, ok := e.MatchingBook(k.Symbol)
+	if !ok {
+		log.Errorf("matching book of %s is not initialized", k.Symbol)
+		return
 	}
-
-	e.MarketDataStream.EmitKLineClosed(k)
+	if matching.ParamCache == nil {
+		matching.ParamCache = make(map[types.Interval]Param)
+	}
+	_, ok = matching.ParamCache[k.Interval]
+	if ok { // pop out all the old
+		for _, param := range matching.ParamCache {
+			if param.kline.Interval == types.Interval1m {
+				// here we generate trades and order updates
+				matching.processKLine(param.kline)
+				matching.NextKLine = &k
+			}
+			// log.Errorf("kline %v, next %v", param.kline, matching.NextKLine)
+			e.MarketDataStream.EmitKLineClosed(param.kline)
+			for _, h := range param.callback {
+				h(param.kline, param.src)
+			}
+		}
+		matching.ParamCache = make(map[types.Interval]Param)
+	}
+	matching.ParamCache[k.Interval] = Param{
+		callback: handlers,
+		src:      src,
+		kline:    k,
+	}
 }
 
 func (e *Exchange) CloseMarketData() error {

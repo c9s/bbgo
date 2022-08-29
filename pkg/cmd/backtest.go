@@ -446,12 +446,7 @@ var BacktestCmd = &cobra.Command{
 			if numOfExchangeSources == 1 {
 				exSource := exchangeSources[0]
 				for k := range exSource.C {
-					exSource.Exchange.ConsumeKLine(k)
-
-					for _, h := range kLineHandlers {
-						h(k, &exSource)
-					}
-
+					exSource.Exchange.ConsumeKLine(k, kLineHandlers, &exSource)
 				}
 
 				if err := exSource.Exchange.CloseMarketData(); err != nil {
@@ -472,11 +467,7 @@ var BacktestCmd = &cobra.Command{
 						break RunMultiExchangeData
 					}
 
-					exK.Exchange.ConsumeKLine(k)
-
-					for _, h := range kLineHandlers {
-						h(k, &exK)
-					}
+					exK.Exchange.ConsumeKLine(k, kLineHandlers, &exK)
 				}
 			}
 		}()
