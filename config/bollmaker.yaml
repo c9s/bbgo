@@ -60,28 +60,59 @@ exchangeStrategies:
     #   Dynamic spread is an experimental feature. Use at your own risk!
     #
     #   dynamicSpread enables the automatic adjustment to bid and ask spread.
+    #   Choose one of the scaling strategy to enable dynamicSpread:
+    #     - amplitude: scales by K-line amplitude
+    #     - weightedBollWidth: scales by weighted Bollinger band width (explained below)
     # dynamicSpread:
-    #   enabled: true
-    #   # window is the window of the SMAs of spreads
-    #   window: 1
-    #   askSpreadScale:
-    #     byPercentage:
-    #       # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
-    #       exp:
-    #         # from down to up
-    #         domain: [ 0.0001, 0.005 ]
-    #         # when in down band, holds 1.0 by maximum
-    #         # when in up band, holds 0.05 by maximum
-    #         range: [ 0.001, 0.002 ]
-    #   bidSpreadScale:
-    #     byPercentage:
-    #       # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
-    #       exp:
-    #         # from down to up
-    #         domain: [ 0.0001, 0.005 ]
-    #         # when in down band, holds 1.0 by maximum
-    #         # when in up band, holds 0.05 by maximum
-    #         range: [ 0.001, 0.002 ]
+    #   amplitude: # delete other scaling strategy if this is defined
+    #     # window is the window of the SMAs of spreads
+    #     window: 1
+    #     askSpreadScale:
+    #       byPercentage:
+    #         # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+    #         exp:
+    #           # from down to up
+    #           domain: [ 0.0001, 0.005 ]
+    #           # when in down band, holds 1.0 by maximum
+    #           # when in up band, holds 0.05 by maximum
+    #           range: [ 0.001, 0.002 ]
+    #     bidSpreadScale:
+    #       byPercentage:
+    #         # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+    #         exp:
+    #           # from down to up
+    #           domain: [ 0.0001, 0.005 ]
+    #           # when in down band, holds 1.0 by maximum
+    #           # when in up band, holds 0.05 by maximum
+    #           range: [ 0.001, 0.002 ]
+    #   weightedBollWidth: # delete other scaling strategy if this is defined
+    #     # Scale spread base on weighted Bollinger band width ratio between default and neutral bands.
+    #     # Given the default band: moving average bd_mid, band from bd_lower to bd_upper.
+    #     # And the neutral band: from bn_lower to bn_upper
+    #     # Set the sigmoid weighting function:
+    #     #   - to ask spread, the weighting density function d_weight(x) is sigmoid((x - bd_mid) / (bd_upper - bd_lower))
+    #     #   - to bid spread, the weighting density function d_weight(x) is sigmoid((bd_mid - x) / (bd_upper - bd_lower))
+    #     # Then calculate the weighted band width ratio by taking integral of d_weight(x) from bx_lower to bx_upper:
+    #     #   - weighted_ratio = integral(d_weight from bn_lower to bn_upper) / integral(d_weight from bd_lower to bd_upper)
+    #     #   - The wider neutral band get greater ratio
+    #     #   - To ask spread, the higher neutral band get greater ratio
+    #     #   - To bid spread, the lower neutral band get greater ratio
+    #     # The weighted ratio always positive, and may be greater than 1 if neutral band is wider than default band.
+    #     askSpreadScale:
+    #       byPercentage:
+    #         # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+    #         linear:
+    #           # from down to up
+    #           domain: [ 0.1, 0.5 ]
+    #           range: [ 0.001, 0.002 ]
+    #     bidSpreadScale:
+    #       byPercentage:
+    #         # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+    #         linear:
+    #           # from down to up
+    #           domain: [ 0.1, 0.5 ]
+    #           range: [ 0.001, 0.002 ]
+
 
     # maxExposurePosition is the maximum position you can hold
     # +10 means you can hold 10 ETH long position by maximum

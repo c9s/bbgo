@@ -435,12 +435,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
 
+	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
+	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
+
 	// Setup dynamic spread
-	if s.DynamicSpread.Enabled {
+	if s.DynamicSpread.IsEnabled() {
 		if s.DynamicSpread.Interval == "" {
 			s.DynamicSpread.Interval = s.Interval
 		}
-		s.DynamicSpread.Initialize(s.Symbol, s.session)
+		s.DynamicSpread.Initialize(s.Symbol, s.session, s.neutralBoll, s.defaultBoll)
 	}
 
 	if s.DisableShort {
@@ -462,9 +465,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.ShadowProtectionRatio.IsZero() {
 		s.ShadowProtectionRatio = fixedpoint.NewFromFloat(0.01)
 	}
-
-	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
-	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
 
 	// calculate group id for orders
 	instanceID := s.InstanceID()
@@ -538,7 +538,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// Update spreads with dynamic spread
-		if s.DynamicSpread.Enabled {
+		if s.DynamicSpread.IsEnabled() {
 			s.DynamicSpread.Update(kline)
 			dynamicBidSpread, err := s.DynamicSpread.GetBidSpread()
 			if err == nil && dynamicBidSpread > 0 {
