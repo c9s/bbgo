@@ -70,6 +70,8 @@ type Exchange struct {
 	matchingBooksMutex sync.Mutex
 
 	markets types.MarketMap
+
+	Src *ExchangeDataSource
 }
 
 func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, srv *service.BacktestService, config *bbgo.Backtest) (*Exchange, error) {
@@ -362,36 +364,35 @@ func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, extraInterv
 	return klineC, nil
 }
 
-func (e *Exchange) ConsumeKLine(k types.KLine, handlers []func(types.KLine, *ExchangeDataSource), src *ExchangeDataSource) {
+func (e *Exchange) ConsumeKLine(k types.KLine) {
 	matching, ok := e.matchingBook(k.Symbol)
 	if !ok {
 		log.Errorf("matching book of %s is not initialized", k.Symbol)
 		return
 	}
-	if matching.ParamCache == nil {
-		matching.ParamCache = make(map[types.Interval]Param)
+	if matching.klineCache == nil {
+		matching.klineCache = make(map[types.Interval]types.KLine)
 	}
-	_, ok = matching.ParamCache[k.Interval]
+
+	kline1m, ok := matching.klineCache[k.Interval]
 	if ok { // pop out all the old
-		for _, param := range matching.ParamCache {
-			if param.kline.Interval == types.Interval1m {
-				// here we generate trades and order updates
-				matching.processKLine(param.kline)
-				matching.NextKLine = &k
-			}
+		if kline1m.Interval != types.Interval1m {
+			panic("expect 1m kline, get " + kline1m.Interval.String())
+		}
+		// here we generate trades and order updates
+		matching.processKLine(kline1m)
+		matching.NextKLine = &k
+		for _, kline := range matching.klineCache {
 			// log.Errorf("kline %v, next %v", param.kline, matching.NextKLine)
-			e.MarketDataStream.EmitKLineClosed(param.kline)
-			for _, h := range param.callbacks {
-				h(param.kline, param.src)
+			e.MarketDataStream.EmitKLineClosed(kline)
+			for _, h := range e.Src.Callbacks {
+				h(kline, e.Src)
 			}
 		}
-		matching.ParamCache = make(map[types.Interval]Param)
+		// reset the paramcache
+		matching.klineCache = make(map[types.Interval]types.KLine)
 	}
-	matching.ParamCache[k.Interval] = Param{
-		callbacks: handlers,
-		src:       src,
-		kline:     k,
-	}
+	matching.klineCache[k.Interval] = k
 }
 
 func (e *Exchange) CloseMarketData() error {

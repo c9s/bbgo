@@ -438,6 +438,9 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		runCtx, cancelRun := context.WithCancel(ctx)
+		for _, exK := range exchangeSources {
+			exK.Callbacks = kLineHandlers
+		}
 		go func() {
 			defer cancelRun()
 
@@ -446,7 +449,7 @@ var BacktestCmd = &cobra.Command{
 			if numOfExchangeSources == 1 {
 				exSource := exchangeSources[0]
 				for k := range exSource.C {
-					exSource.Exchange.ConsumeKLine(k, kLineHandlers, &exSource)
+					exSource.Exchange.ConsumeKLine(k)
 				}
 
 				if err := exSource.Exchange.CloseMarketData(); err != nil {
@@ -467,7 +470,7 @@ var BacktestCmd = &cobra.Command{
 						break RunMultiExchangeData
 					}
 
-					exK.Exchange.ConsumeKLine(k, kLineHandlers, &exK)
+					exK.Exchange.ConsumeKLine(k)
 				}
 			}
 		}()
@@ -694,11 +697,13 @@ func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, startTime, end
 		}
 
 		sessionCopy := session
-		exchangeSources = append(exchangeSources, backtest.ExchangeDataSource{
+		src := backtest.ExchangeDataSource{
 			C:        c,
 			Exchange: backtestEx,
 			Session:  sessionCopy,
-		})
+		}
+		backtestEx.Src = &src
+		exchangeSources = append(exchangeSources, src)
 	}
 	return exchangeSources, nil
 }

@@ -23,6 +23,8 @@ type Value int64
 const Zero = Value(0)
 const One = Value(1e8)
 const NegOne = Value(-1e8)
+const PosInf = Value(math.MaxInt64)
+const NegInf = Value(math.MinInt64)
 
 type RoundingMode int
 
@@ -81,6 +83,11 @@ func (v *Value) Scan(src interface{}) error {
 }
 
 func (v Value) Float64() float64 {
+	if v == PosInf {
+		return math.Inf(1)
+	} else if v == NegInf {
+		return math.Inf(-1)
+	}
 	return float64(v) / DefaultPow
 }
 
@@ -92,10 +99,20 @@ func (v Value) Abs() Value {
 }
 
 func (v Value) String() string {
+	if v == PosInf {
+		return "inf"
+	} else if v == NegInf {
+		return "-inf"
+	}
 	return strconv.FormatFloat(float64(v)/DefaultPow, 'f', -1, 64)
 }
 
 func (v Value) FormatString(prec int) string {
+	if v == PosInf {
+		return "inf"
+	} else if v == NegInf {
+		return "-inf"
+	}
 	pow := math.Pow10(prec)
 	return strconv.FormatFloat(
 		math.Trunc(float64(v)/DefaultPow*pow)/pow, 'f', prec, 64)
@@ -105,12 +122,22 @@ func (v Value) Percentage() string {
 	if v == 0 {
 		return "0"
 	}
+	if v == PosInf {
+		return "inf%"
+	} else if v == NegInf {
+		return "-inf%"
+	}
 	return strconv.FormatFloat(float64(v)/DefaultPow*100., 'f', -1, 64) + "%"
 }
 
 func (v Value) FormatPercentage(prec int) string {
 	if v == 0 {
 		return "0"
+	}
+	if v == PosInf {
+		return "inf%"
+	} else if v == NegInf {
+		return "-inf%"
 	}
 	pow := math.Pow10(prec)
 	result := strconv.FormatFloat(
@@ -407,6 +434,11 @@ func Must(v Value, err error) Value {
 }
 
 func NewFromFloat(val float64) Value {
+	if math.IsInf(val, 1) {
+		return PosInf
+	} else if math.IsInf(val, -1) {
+		return NegInf
+	}
 	return Value(int64(math.Trunc(val * DefaultPow)))
 }
 
