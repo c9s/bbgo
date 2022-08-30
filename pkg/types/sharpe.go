@@ -16,6 +16,16 @@ func Sharpe(returns Series, periods int, annualize bool, smart bool) float64 {
 	if smart {
 		divisor *= autocorrPenalty(returns)
 	}
+	if divisor == 0 {
+		mean := Mean(data)
+		if mean > 0 {
+			return math.Inf(1)
+		} else if mean < 0 {
+			return math.Inf(-1)
+		} else {
+			return 0
+		}
+	}
 	result := Mean(data) / divisor
 	if annualize {
 		return result * math.Sqrt(float64(periods))
