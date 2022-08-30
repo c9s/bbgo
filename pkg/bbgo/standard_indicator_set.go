@@ -24,10 +24,15 @@ type StandardIndicatorSet struct {
 	// Standard indicators
 	// interval -> window
 	iwbIndicators map[types.IntervalWindowBandWidth]*indicator.BOLL
-	iwIndicators  map[types.IntervalWindow]indicator.KLinePusher
+	iwIndicators  map[indicatorKey]indicator.KLinePusher
 
 	stream types.Stream
 	store  *MarketDataStore
+}
+
+type indicatorKey struct {
+	iw types.IntervalWindow
+	id string
 }
 
 func NewStandardIndicatorSet(symbol string, stream types.Stream, store *MarketDataStore) *StandardIndicatorSet {
@@ -35,7 +40,7 @@ func NewStandardIndicatorSet(symbol string, stream types.Stream, store *MarketDa
 		Symbol:        symbol,
 		store:         store,
 		stream:        stream,
-		iwIndicators:  make(map[types.IntervalWindow]indicator.KLinePusher),
+		iwIndicators:  make(map[indicatorKey]indicator.KLinePusher),
 		iwbIndicators: make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
 	}
 }
@@ -50,74 +55,77 @@ func (s *StandardIndicatorSet) initAndBind(inc indicator.KLinePusher, interval t
 	s.stream.OnKLineClosed(types.KLineWith(s.Symbol, interval, inc.PushK))
 }
 
-func (s *StandardIndicatorSet) allocateSimpleIndicator(t indicator.KLinePusher, iw types.IntervalWindow) indicator.KLinePusher {
-	inc, ok := s.iwIndicators[iw]
+func (s *StandardIndicatorSet) allocateSimpleIndicator(t indicator.KLinePusher, iw types.IntervalWindow, id string) indicator.KLinePusher {
+	k := indicatorKey{
+		iw: iw,
+		id: id,
+	}
+	inc, ok := s.iwIndicators[k]
 	if ok {
 		return inc
 	}
 
 	inc = t
 	s.initAndBind(inc, iw.Interval)
-	s.iwIndicators[iw] = inc
+	s.iwIndicators[k] = inc
 	return t
 }
 
 // SMA is a helper function that returns the simple moving average indicator of the given interval and the window size.
 func (s *StandardIndicatorSet) SMA(iw types.IntervalWindow) *indicator.SMA {
-	inc := s.allocateSimpleIndicator(&indicator.SMA{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.SMA{IntervalWindow: iw}, iw, "sma")
 	return inc.(*indicator.SMA)
 }
 
 // EWMA is a helper function that returns the exponential weighed moving average indicator of the given interval and the window size.
 func (s *StandardIndicatorSet) EWMA(iw types.IntervalWindow) *indicator.EWMA {
-	inc := s.allocateSimpleIndicator(&indicator.EWMA{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.EWMA{IntervalWindow: iw}, iw, "ewma")
 	return inc.(*indicator.EWMA)
 }
 
 // VWMA
 func (s *StandardIndicatorSet) VWMA(iw types.IntervalWindow) *indicator.VWMA {
-	inc := s.allocateSimpleIndicator(&indicator.VWMA{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.VWMA{IntervalWindow: iw}, iw, "vwma")
 	return inc.(*indicator.VWMA)
 }
 
-
 func (s *StandardIndicatorSet) PivotHigh(iw types.IntervalWindow) *indicator.PivotHigh {
-	inc := s.allocateSimpleIndicator(&indicator.PivotHigh{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.PivotHigh{IntervalWindow: iw}, iw, "pivothigh")
 	return inc.(*indicator.PivotHigh)
 }
 
 func (s *StandardIndicatorSet) PivotLow(iw types.IntervalWindow) *indicator.PivotLow {
-	inc := s.allocateSimpleIndicator(&indicator.PivotLow{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.PivotLow{IntervalWindow: iw}, iw, "pivotlow")
 	return inc.(*indicator.PivotLow)
 }
 
 func (s *StandardIndicatorSet) ATR(iw types.IntervalWindow) *indicator.ATR {
-	inc := s.allocateSimpleIndicator(&indicator.ATR{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.ATR{IntervalWindow: iw}, iw, "atr")
 	return inc.(*indicator.ATR)
 }
 
 func (s *StandardIndicatorSet) ATRP(iw types.IntervalWindow) *indicator.ATRP {
-	inc := s.allocateSimpleIndicator(&indicator.ATRP{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.ATRP{IntervalWindow: iw}, iw, "atrp")
 	return inc.(*indicator.ATRP)
 }
 
 func (s *StandardIndicatorSet) EMV(iw types.IntervalWindow) *indicator.EMV {
-	inc := s.allocateSimpleIndicator(&indicator.EMV{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.EMV{IntervalWindow: iw}, iw, "emv")
 	return inc.(*indicator.EMV)
 }
 
 func (s *StandardIndicatorSet) CCI(iw types.IntervalWindow) *indicator.CCI {
-	inc := s.allocateSimpleIndicator(&indicator.CCI{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.CCI{IntervalWindow: iw}, iw, "cci")
 	return inc.(*indicator.CCI)
 }
 
 func (s *StandardIndicatorSet) HULL(iw types.IntervalWindow) *indicator.HULL {
-	inc := s.allocateSimpleIndicator(&indicator.HULL{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.HULL{IntervalWindow: iw}, iw, "hull")
 	return inc.(*indicator.HULL)
 }
 
 func (s *StandardIndicatorSet) STOCH(iw types.IntervalWindow) *indicator.STOCH {
-	inc := s.allocateSimpleIndicator(&indicator.STOCH{IntervalWindow: iw}, iw)
+	inc := s.allocateSimpleIndicator(&indicator.STOCH{IntervalWindow: iw}, iw, "stoch")
 	return inc.(*indicator.STOCH)
 }
 
