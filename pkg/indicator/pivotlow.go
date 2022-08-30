@@ -13,8 +13,10 @@ type PivotLow struct {
 
 	types.IntervalWindow
 
-	Lows    floats.Slice
-	Values  floats.Slice
+	Lows   floats.Slice
+	Values floats.Slice
+	KLines []types.KLine
+
 	EndTime time.Time
 
 	updateCallbacks []func(value float64)
@@ -32,7 +34,7 @@ func (inc *PivotLow) Last() float64 {
 	return inc.Values.Last()
 }
 
-func (inc *PivotLow) Update(value float64) {
+func (inc *PivotLow) update(value float64, k types.KLine) {
 	if len(inc.Lows) == 0 {
 		inc.SeriesBase.Series = inc
 	}
@@ -50,6 +52,7 @@ func (inc *PivotLow) Update(value float64) {
 
 	if low > 0.0 {
 		inc.Values.Push(low)
+		inc.KLines = append(inc.KLines, k)
 	}
 }
 
@@ -58,7 +61,7 @@ func (inc *PivotLow) PushK(k types.KLine) {
 		return
 	}
 
-	inc.Update(k.Low.Float64())
+	inc.update(k.Low.Float64(), k)
 	inc.EndTime = k.EndTime.Time()
 	inc.EmitUpdate(inc.Last())
 }
