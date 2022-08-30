@@ -47,12 +47,6 @@ func init() {
 	}
 }
 
-type Param struct {
-	callbacks []func(types.KLine, *ExchangeDataSource)
-	kline     types.KLine
-	src       *ExchangeDataSource
-}
-
 // SimplePriceMatching implements a simple kline data driven matching engine for backtest
 //go:generate callbackgen -type SimplePriceMatching
 type SimplePriceMatching struct {
@@ -64,7 +58,7 @@ type SimplePriceMatching struct {
 	askOrders    []types.Order
 	closedOrders map[uint64]types.Order
 
-	ParamCache  map[types.Interval]Param
+	klineCache  map[types.Interval]types.KLine
 	LastPrice   fixedpoint.Value
 	LastKLine   types.KLine
 	NextKLine   *types.KLine
