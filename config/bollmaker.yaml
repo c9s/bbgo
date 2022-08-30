@@ -98,6 +98,11 @@ exchangeStrategies:
     #     #   - To ask spread, the higher neutral band get greater ratio
     #     #   - To bid spread, the lower neutral band get greater ratio
     #     # The weighted ratio always positive, and may be greater than 1 if neutral band is wider than default band.
+    #
+    #     # Sensitivity factor of the weighting function: 1 / (1 + exp(-(x - bd_mid) * sensitivity / (bd_upper - bd_lower)))
+    #     # A positive number. The greater factor, the sharper weighting function. Default set to 1.0 .
+    #     sensitivity: 1.0
+    #
     #     askSpreadScale:
     #       byPercentage:
     #         # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
