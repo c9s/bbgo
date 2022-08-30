@@ -1,0 +1,21 @@
+persistence:
+  json:
+    directory: var/data
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+#    futures: true
+
+exchangeStrategies:
+- on: binance
+  ktrade:
+    symbol: ETHBUSD
+    minute:
+      interval: 1m
+      quantity: 0.01
