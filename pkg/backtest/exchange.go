@@ -379,6 +379,7 @@ func (e *Exchange) ConsumeKLine(k types.KLine) {
 		if kline1m.Interval != types.Interval1m {
 			panic("expect 1m kline, get " + kline1m.Interval.String())
 		}
+		e.currentTime = kline1m.EndTime.Time()
 		// here we generate trades and order updates
 		matching.processKLine(kline1m)
 		matching.NextKLine = &k
