@@ -242,6 +242,9 @@ func (v Value) MarshalYAML() (interface{}, error) {
 }
 
 func (v Value) MarshalJSON() ([]byte, error) {
+	if v.IsInf() {
+		return []byte("\"" + v.String() + "\""), nil
+	}
 	return []byte(v.FormatString(DefaultPrecision)), nil
 }
 
@@ -444,6 +447,10 @@ func NewFromFloat(val float64) Value {
 
 func NewFromInt(val int64) Value {
 	return Value(val * DefaultPow)
+}
+
+func (a Value) IsInf() bool {
+	return a == PosInf || a == NegInf
 }
 
 func (a Value) MulExp(exp int) Value {

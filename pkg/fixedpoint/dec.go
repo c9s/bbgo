@@ -1033,7 +1033,7 @@ func (x Value) Compare(y Value) int {
 }
 
 func (v Value) MarshalYAML() (interface{}, error) {
-        return v.FormatString(8), nil
+	return v.FormatString(8), nil
 }
 
 func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
@@ -1061,6 +1061,9 @@ func (v *Value) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
 
 // FIXME: should we limit to 8 prec?
 func (v Value) MarshalJSON() ([]byte, error) {
+	if v.IsInf() {
+		return []byte("\"" + v.String() + "\""), nil
+	}
 	return []byte(v.FormatString(8)), nil
 }
 
