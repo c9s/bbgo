@@ -72,7 +72,10 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	s.pivotHigh = standardIndicator.PivotHigh(s.IntervalWindow)
 
 	if s.VWMA != nil {
-		s.vwma = standardIndicator.VWMA(*s.VWMA)
+		s.vwma = standardIndicator.VWMA(types.IntervalWindow{
+			Interval: s.Interval,
+			Window:   s.VWMA.Window,
+		})
 	}
 
 	if s.StopEMA != nil {
@@ -132,7 +135,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		}
 	}))
 
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval5m, func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
 		if len(s.PivotHighPrices) == 0 || s.lastHigh.IsZero() {
 			log.Infof("currently there is no pivot high prices, can not check failed break high...")
 			return
