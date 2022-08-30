@@ -60,14 +60,14 @@ func (s *Minute) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.General
 			// update ask price
 			newAskPrice := s.midPrice.Mul(fixedpoint.NewFromFloat(0.25)).Add(trade.Price.Mul(fixedpoint.NewFromFloat(0.75)))
 			log.Infof("short @ %f", newAskPrice.Float64())
-			s.placeOrder(context.Background(), types.SideTypeSell, s.Quantity, newAskPrice.Ceil(), symbol)
+			s.placeOrder(context.Background(), types.SideTypeSell, s.Quantity, newAskPrice.Round(2, 1), symbol)
 
 		} else if trade.Side == types.SideTypeSell && trade.Price.Compare(s.midPrice) < 0 && trade.Price.Compare(bestBid.Price) >= 0 {
 			_ = s.orderExecutor.GracefulCancel(context.Background())
 			// update bid price
 			newBidPrice := s.midPrice.Mul(fixedpoint.NewFromFloat(0.25)).Add(trade.Price.Mul(fixedpoint.NewFromFloat(0.75)))
 			log.Infof("long @ %f", newBidPrice.Float64())
-			s.placeOrder(context.Background(), types.SideTypeBuy, s.Quantity, newBidPrice.Floor(), symbol)
+			s.placeOrder(context.Background(), types.SideTypeBuy, s.Quantity, newBidPrice.Round(2, 1), symbol)
 
 		}
 
