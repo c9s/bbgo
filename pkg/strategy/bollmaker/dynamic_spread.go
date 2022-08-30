@@ -153,6 +153,10 @@ type DynamicSpreadBollWidthRatioSettings struct {
 	// BidSpreadScale is used to define the bid spread range with the given percentage.
 	BidSpreadScale *bbgo.PercentageScale `json:"bidSpreadScale"`
 
+	// Sensitivity factor of the weighting function: 1 / (1 + exp(-(x - mid) * sensitivity / width))
+	// A positive number. The greater factor, the sharper weighting function. Default set to 1.0 .
+	Sensitivity float64 `json:"sensitivity"`
+
 	neutralBoll *indicator.BOLL
 	defaultBoll *indicator.BOLL
 }
@@ -160,6 +164,9 @@ type DynamicSpreadBollWidthRatioSettings struct {
 func (ds *DynamicSpreadBollWidthRatioSettings) initialize(neutralBoll, defaultBoll *indicator.BOLL) {
 	ds.neutralBoll = neutralBoll
 	ds.defaultBoll = defaultBoll
+	if ds.Sensitivity <= 0. {
+		ds.Sensitivity = 1.
+	}
 }
 
 func (ds *DynamicSpreadBollWidthRatioSettings) getAskSpread() (askSpread float64, err error) {
@@ -187,40 +194,48 @@ func (ds *DynamicSpreadBollWidthRatioSettings) getWeightedBBWidthRatio(positiveS
 	//
 	// Given the default band: moving average default_BB_mid, band from default_BB_lower to default_BB_upper.
 	// And the neutral band: from neutral_BB_lower to neutral_BB_upper.
+	// And a sensitivity factor alpha, which is a positive constant.
+	//
+	// width of default BB w = default_BB_upper - default_BB_lower
 	//
 	//                                         1                  x - default_BB_mid
 	// sigmoid weighting function f(y) = ------------- where y = --------------------
-	//                                    1 + exp(-y)              default_BB_width
+	//                                    1 + exp(-y)                 w / alpha
 	// Set the sigmoid weighting function:
-	//   - to ask spread, the weighting density function d_weight(x) is sigmoid((x - default_BB_mid) / (default_BB_upper - default_BB_lower))
-	//   - to bid spread, the weighting density function d_weight(x) is sigmoid((default_BB_mid - x) / (default_BB_upper - default_BB_lower))
+	//   - To ask spread, the weighting density function d_weight(x) is sigmoid((x - default_BB_mid) / (w / alpha))
+	//   - To bid spread, the weighting density function d_weight(x) is sigmoid((default_BB_mid - x) / (w / alpha))
+	//   - The higher sensitivity factor alpha, the sharper weighting function.
 	//
-	// Then calculate the weighted band width ratio by taking integral of d_weight(x) from bx_lower to bx_upper:
-	//   infinite integral of ask spread sigmoid weighting density function F(y) = ln(1 + exp(y))
-	//   infinite integral of bid spread sigmoid weighting density function F(y) = y - ln(1 + exp(y))
+	// Then calculate the weighted band width ratio by taking integral of d_weight(x) from neutral_BB_lower to neutral_BB_upper:
+	//   infinite integral of ask spread sigmoid weighting density function F(x) = (w / alpha) * ln(exp(x / (w / alpha)) + exp(default_BB_mid / (w / alpha)))
+	//   infinite integral of bid spread sigmoid weighting density function F(x) = x - (w / alpha) * ln(exp(x / (w / alpha)) + exp(default_BB_mid / (w / alpha)))
 	//   Note that we've rescaled the sigmoid function to fit default BB,
-	//   the weighted default BB width is always calculated by integral(f of y from -1 to 1) = F(1) - F(-1)
-	//                     F(y_upper) - F(y_lower)     F(y_upper) - F(y_lower)
-	//   weighted ratio = ------------------------- = -------------------------
-	//                          F(1) - F(-1)                      1
-	//     where y_upper = (neutral_BB_upper - default_BB_mid) / default_BB_width
-	//           y_lower = (neutral_BB_lower - default_BB_mid) / default_BB_width
+	//   the weighted default BB width is always calculated by integral(f of x from default_BB_lower to default_BB_upper)
+	//                     F(neutral_BB_upper) - F(neutral_BB_lower)
+	//   weighted ratio = -------------------------------------------
+	//                     F(default_BB_upper) - F(default_BB_lower)
 	//   - The wider neutral band get greater ratio
 	//   - To ask spread, the higher neutral band get greater ratio
 	//   - To bid spread, the lower neutral band get greater ratio
 
 	defaultMid := ds.defaultBoll.SMA.Last()
-	defaultWidth := ds.defaultBoll.UpBand.Last() - ds.defaultBoll.DownBand.Last()
-	yUpper := (ds.neutralBoll.UpBand.Last() - defaultMid) / defaultWidth
-	yLower := (ds.neutralBoll.DownBand.Last() - defaultMid) / defaultWidth
-	var weightedUpper, weightedLower float64
+	defaultUpper := ds.defaultBoll.UpBand.Last()
+	defaultLower := ds.defaultBoll.DownBand.Last()
+	defaultWidth := defaultUpper - defaultLower
+	neutralUpper := ds.neutralBoll.UpBand.Last()
+	neutralLower := ds.neutralBoll.DownBand.Last()
+	factor := defaultWidth / ds.Sensitivity
+	var weightedUpper, weightedLower, weightedDivUpper, weightedDivLower float64
 	if positiveSigmoid {
-		weightedUpper = math.Log(1 + math.Pow(math.E, yUpper))
-		weightedLower = math.Log(1 + math.Pow(math.E, yLower))
+		weightedUpper = factor * math.Log(math.Exp(neutralUpper/factor)+math.Exp(defaultMid/factor))
+		weightedLower = factor * math.Log(math.Exp(neutralLower/factor)+math.Exp(defaultMid/factor))
+		weightedDivUpper = factor * math.Log(math.Exp(defaultUpper/factor)+math.Exp(defaultMid/factor))
+		weightedDivLower = factor * math.Log(math.Exp(defaultLower/factor)+math.Exp(defaultMid/factor))
 	} else {
-		weightedUpper = yUpper - math.Log(1+math.Pow(math.E, yUpper))
-		weightedLower = yLower - math.Log(1+math.Pow(math.E, yLower))
+		weightedUpper = neutralUpper - factor*math.Log(math.Exp(neutralUpper/factor)+math.Exp(defaultMid/factor))
+		weightedLower = neutralLower - factor*math.Log(math.Exp(neutralLower/factor)+math.Exp(defaultMid/factor))
+		weightedDivUpper = defaultUpper - factor*math.Log(math.Exp(defaultUpper/factor)+math.Exp(defaultMid/factor))
+		weightedDivLower = defaultLower - factor*math.Log(math.Exp(defaultLower/factor)+math.Exp(defaultMid/factor))
 	}
-	// The weighted ratio always positive, and may be greater than 1 if neutral band is wider than default band.
-	return (weightedUpper - weightedLower) / 1.
+	return (weightedUpper - weightedLower) / (weightedDivUpper - weightedDivLower)
 }
