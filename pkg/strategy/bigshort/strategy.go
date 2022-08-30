@@ -124,6 +124,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.ExitMethods.Bind(session, s.orderExecutor)
 
+	pivotLow := session.StandardIndicatorSet(s.Symbol).PivotLow(s.IntervalWindow)
+	_ = pivotLow
+
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
