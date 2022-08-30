@@ -2,9 +2,6 @@ package ktrade
 
 import (
 	"context"
-	"github.com/c9s/bbgo/pkg/util"
-	"time"
-
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -32,9 +29,9 @@ type Minute struct {
 }
 
 func (s *Minute) updateQuote(ctx context.Context, symbol string) {
-	bestBid, bestAsk, _ := s.StreamBook.BestBidAndAsk()
+	//bestBid, bestAsk, _ := s.StreamBook.BestBidAndAsk()
 
-	s.midPrice = bestBid.Price.Add(bestAsk.Price).Div(fixedpoint.NewFromInt(2))
+	//s.midPrice = bestBid.Price.Add(bestAsk.Price).Div(fixedpoint.NewFromInt(2))
 	//log.Info(s.midPrice)
 }
 
@@ -52,8 +49,9 @@ func (s *Minute) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.General
 	session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
 
 		log.Infof("%s trade @ %f", trade.Side, trade.Price.Float64())
-		//bestAsk, _ := s.StreamBook.BestAsk()
-		//bestBid, _ := s.StreamBook.BestBid()
+		bestAsk, _ := s.StreamBook.BestAsk()
+		bestBid, _ := s.StreamBook.BestBid()
+		s.midPrice = bestBid.Price.Add(bestAsk.Price).Div(fixedpoint.NewFromInt(2))
 
 		if trade.Side == types.SideTypeBuy && trade.Price.Compare(s.midPrice) > 0 {
 			_ = s.orderExecutor.GracefulCancel(context.Background())
@@ -61,8 +59,9 @@ func (s *Minute) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.General
 			newAskPrice := s.midPrice.Mul(fixedpoint.NewFromFloat(0.25)).Add(trade.Price.Mul(fixedpoint.NewFromFloat(0.75)))
 			log.Infof("short @ %f", newAskPrice.Float64())
 			if trade.Price.Compare(newAskPrice) > 0 {
-				s.placeOrder(context.Background(), types.SideTypeSell, s.Quantity, trade.Price.Mul(fixedpoint.NewFromFloat(1.001)), symbol)
+				s.placeOrder(context.Background(), types.SideTypeSell, s.Quantity, s.midPrice.Mul(fixedpoint.NewFromFloat(1.001)), symbol)
 			} else {
+				log.Infof("new")
 				s.placeOrder(context.Background(), types.SideTypeSell, s.Quantity, newAskPrice.Round(2, 1), symbol)
 			}
 
@@ -72,8 +71,9 @@ func (s *Minute) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.General
 			newBidPrice := s.midPrice.Mul(fixedpoint.NewFromFloat(0.25)).Add(trade.Price.Mul(fixedpoint.NewFromFloat(0.75)))
 			log.Infof("long @ %f", newBidPrice.Float64())
 			if trade.Price.Compare(newBidPrice) < 0 {
-				s.placeOrder(context.Background(), types.SideTypeBuy, s.Quantity, trade.Price.Mul(fixedpoint.NewFromFloat(0.999)), symbol)
+				s.placeOrder(context.Background(), types.SideTypeBuy, s.Quantity, s.midPrice.Mul(fixedpoint.NewFromFloat(0.999)), symbol)
 			} else {
+				log.Infof("new")
 				s.placeOrder(context.Background(), types.SideTypeBuy, s.Quantity, newBidPrice.Round(2, 1), symbol)
 			}
 		}
@@ -86,17 +86,17 @@ func (s *Minute) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.General
 
 	}))
 
-	go func() {
-		quoteTicker := time.NewTicker(util.MillisecondsJitter(time.Millisecond*10, 200))
-		defer quoteTicker.Stop()
-
-		for {
-			select {
-			case <-quoteTicker.C:
-				s.updateQuote(context.Background(), symbol)
-			}
-		}
-	}()
+	//go func() {
+	//	quoteTicker := time.NewTicker(util.MillisecondsJitter(time.Millisecond*10, 200))
+	//	defer quoteTicker.Stop()
+	//
+	//	for {
+	//		select {
+	//		case <-quoteTicker.C:
+	//			s.updateQuote(context.Background(), symbol)
+	//		}
+	//	}
+	//}()
 
 	if !bbgo.IsBackTesting {
 		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
