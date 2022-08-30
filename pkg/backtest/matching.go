@@ -187,12 +187,15 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 			order.Price = m.Market.TruncatePrice(m.LastPrice)
 			price = order.Price
 		} else if order.Type == types.OrderTypeLimit {
+			// if limit order's price is with the range of next kline
+			// we assume it will be traded as a maker trade, and is traded at its original price
+			// TODO: if it is treated as a maker trade, fee should be specially handled
+			// otherwise, set NextKLine.Close(i.e., m.LastPrice) to be the taker traded price
 			if m.NextKLine != nil && m.NextKLine.High.Compare(order.Price) > 0 && order.Side == types.SideTypeBuy {
 				order.AveragePrice = order.Price
 			} else if m.NextKLine != nil && m.NextKLine.Low.Compare(order.Price) < 0 && order.Side == types.SideTypeSell {
 				order.AveragePrice = order.Price
 			} else {
-
 				order.AveragePrice = m.Market.TruncatePrice(m.LastPrice)
 			}
 			price = order.AveragePrice
