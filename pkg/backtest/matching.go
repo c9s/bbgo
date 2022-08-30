@@ -48,9 +48,9 @@ func init() {
 }
 
 type Param struct {
-	callback []func(types.KLine, *ExchangeDataSource)
-	kline    types.KLine
-	src      *ExchangeDataSource
+	callbacks []func(types.KLine, *ExchangeDataSource)
+	kline     types.KLine
+	src       *ExchangeDataSource
 }
 
 // SimplePriceMatching implements a simple kline data driven matching engine for backtest
@@ -193,9 +193,9 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 			order.Price = m.Market.TruncatePrice(m.LastPrice)
 			price = order.Price
 		} else if order.Type == types.OrderTypeLimit {
-			if m.NextKLine.High.Compare(order.Price) > 0 && order.Side == types.SideTypeBuy {
+			if m.NextKLine != nil && m.NextKLine.High.Compare(order.Price) > 0 && order.Side == types.SideTypeBuy {
 				order.AveragePrice = order.Price
-			} else if m.NextKLine.Low.Compare(order.Price) < 0 && order.Side == types.SideTypeSell {
+			} else if m.NextKLine != nil && m.NextKLine.Low.Compare(order.Price) < 0 && order.Side == types.SideTypeSell {
 				order.AveragePrice = order.Price
 			} else {
 
