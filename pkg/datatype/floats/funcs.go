@@ -166,7 +166,6 @@ func MinMax(inReal []float64, inTimePeriod int) (outMin []float64, outMax []floa
 	return outMin, outMax
 }
 
-
 func Min(values []float64) float64 {
 	if len(values) == 0 {
 		return 0.0
@@ -195,6 +194,10 @@ func Max(values []float64) float64 {
 	return max
 }
 
+func Tail(values []float64, n int) []float64 {
+	if len(values) < n {
+		return values
+	}
 
-
-
+	return values[len(values)-n:]
+}

@@ -136,18 +136,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return fmt.Errorf("%s market data store not found", s.Symbol)
 	}
 
-	for _, interval := range []types.Interval{types.Interval1h} {
-		if kLines, ok := dataStore.KLinesOfInterval(interval); ok {
-			analyzer := &Analyzer{
-				pivotLow:  &indicator.PivotLow{IntervalWindow: s.IntervalWindow},
-				pivotHigh: &indicator.PivotHigh{IntervalWindow: s.IntervalWindow},
-				vwma:      &indicator.VWMA{IntervalWindow: s.IntervalWindow},
-			}
-			for _, k := range *kLines {
-				analyzer.addKLine(k)
-			}
+	analyzer := &Analyzer{
+		pivotLow:  &indicator.PivotLow{IntervalWindow: s.IntervalWindow},
+		pivotHigh: &indicator.PivotHigh{IntervalWindow: s.IntervalWindow},
+		vwma:      &indicator.VWMA{IntervalWindow: s.IntervalWindow},
+	}
+
+	if kLines, ok := dataStore.KLinesOfInterval(types.Interval1h); ok {
+		for _, k := range *kLines {
+			analyzer.addKLine(k)
 		}
 	}
+
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+		analyzer.addKLine(k)
+	}))
 
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -165,18 +168,35 @@ type Area struct {
 	// upper and lower are the price range of this area
 	upper, lower float64
 
+	pivots []float64
+
 	testCount int
 	weight    float64
 
 	kLines []types.KLine
 }
 
+func (a *Area) String() string {
+	return fmt.Sprintf("AREA %s range:%f,%f pivots:%d %+v", a.interval, a.lower, a.upper, len(a.pivots), a.pivots)
+}
+
 func (a *Area) InRange(price float64) bool {
-	return a.lower >= price && price <= a.upper
+	return a.lower <= price && price <= a.upper
 }
 
 func (a *Area) IsNear(price float64, distance float64) bool {
-	return (a.lower*(1.0-distance)) >= price && price <= (a.upper*(1.0+distance))
+	return (a.lower*(1.0-distance)) <= price && price <= (a.upper*(1.0+distance))
+}
+
+func (a *Area) AddPivot(price float64) {
+	for _, p := range a.pivots {
+		if p == price {
+			return
+		}
+	}
+
+	a.pivots = append(a.pivots, price)
+	sort.Float64s(a.pivots)
 }
 
 func (a *Area) Extend(price float64) {
@@ -185,6 +205,7 @@ func (a *Area) Extend(price float64) {
 	} else if price > a.upper {
 		a.upper = price
 	}
+	a.AddPivot(price)
 }
 
 type Analyzer struct {
@@ -209,24 +230,30 @@ func (a *Analyzer) addKLine(k types.KLine) {
 
 	closePrice := k.Close.Float64()
 
-	if a.pivotLow.Last() != a.previousLow {
+	if a.pivotLow.Last() != a.lastLow {
 		low := a.pivotLow.Last()
 		a.previousLow = a.lastLow
 		a.lastLow = low
 		a.lows = append(a.lows, low)
 
+		// lows := floats.Lower(floats.Tail(a.lows, 10), closePrice)
 		lows := floats.Lower(a.lows, closePrice)
-		a.updateAreas(lows, k)
+		if len(lows) > 0 {
+			a.updateAreas(lows, k)
+		}
 	}
 
-	if a.pivotHigh.Last() != a.previousHigh {
+	if a.pivotHigh.Last() != a.lastHigh {
 		high := a.pivotHigh.Last()
 		a.previousHigh = a.lastHigh
 		a.lastHigh = high
 		a.highs = append(a.highs, high)
 
+		// highs := floats.Higher(floats.Tail(a.highs, 10), closePrice)
 		highs := floats.Higher(a.highs, closePrice)
-		a.updateAreas(highs, k)
+		if len(highs) > 0 {
+			a.updateAreas(highs, k)
+		}
 	}
 }
 
@@ -237,20 +264,26 @@ func (a *Analyzer) sortAreas() {
 }
 
 func (a *Analyzer) updateAreas(pivotPrices []float64, k types.KLine) {
-	pivotGroups := groupPivots(pivotPrices, 0.005)
+	pivotGroups := groupPivots(pivotPrices, 0.01)
+	log.Infof("pivot groups: %+v", pivotGroups)
 	for _, groupPrices := range pivotGroups {
+		// ignore price group that has only one price
+		if len(groupPrices) < 2 {
+			continue
+		}
+
+		upper := floats.Max(groupPrices)
+		lower := floats.Min(groupPrices)
 		for _, p := range groupPrices {
 			_, ok := a.findAndExtendArea(p)
-			if ok {
-				continue
-			} else {
+			if !ok {
 				// allocate a new area for this
-				upper := floats.Max(groupPrices)
-				lower := floats.Min(groupPrices)
+				log.Debugf("add new area: %f ~ %f for %v", lower, upper, groupPrices)
 				a.areas = append(a.areas, &Area{
 					interval:  k.Interval,
 					upper:     upper,
 					lower:     lower,
+					pivots:    []float64{lower, upper},
 					testCount: 0,
 					weight:    0,
 					kLines:    nil,
@@ -259,13 +292,18 @@ func (a *Analyzer) updateAreas(pivotPrices []float64, k types.KLine) {
 		}
 	}
 	a.sortAreas()
+
+	for i, area := range a.areas {
+		log.Infof("Area #%2d: %s", i, area.String())
+	}
 }
 
 func (a *Analyzer) findAndExtendArea(price float64) (*Area, bool) {
 	for _, area := range a.areas {
 		if area.InRange(price) {
+			area.AddPivot(price)
 			return area, true
-		} else if area.IsNear(price, 0.005) {
+		} else if area.IsNear(price, 0.003) {
 			area.Extend(price)
 			return area, true
 		}
