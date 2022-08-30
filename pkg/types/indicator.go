@@ -180,6 +180,9 @@ func Sum(a Series, limit ...int) (sum float64) {
 // otherwise will operate on all elements
 func Mean(a Series, limit ...int) (mean float64) {
 	l := a.Length()
+	if l == 0 {
+		return 0
+	}
 	if len(limit) > 0 && limit[0] < l {
 		l = limit[0]
 	}
@@ -741,6 +744,9 @@ func PercentageChange(a Series, offset ...int) SeriesExtend {
 
 func Stdev(a Series, params ...int) float64 {
 	length := a.Length()
+	if length == 0 {
+		return 0
+	}
 	if len(params) > 0 && params[0] < length {
 		length = params[0]
 	}
