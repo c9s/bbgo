@@ -165,3 +165,36 @@ func MinMax(inReal []float64, inTimePeriod int) (outMin []float64, outMax []floa
 	}
 	return outMin, outMax
 }
+
+
+func Min(values []float64) float64 {
+	if len(values) == 0 {
+		return 0.0
+	}
+
+	var min = values[0]
+	for _, b := range values {
+		if b < min {
+			min = b
+		}
+	}
+	return min
+}
+
+func Max(values []float64) float64 {
+	if len(values) == 0 {
+		return 0.0
+	}
+
+	var max = values[0]
+	for _, b := range values {
+		if b > max {
+			max = b
+		}
+	}
+	return max
+}
+
+
+
+
