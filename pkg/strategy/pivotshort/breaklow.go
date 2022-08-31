@@ -38,13 +38,13 @@ type BreakLow struct {
 
 	FakeBreakStop *FakeBreakStop `json:"fakeBreakStop"`
 
-	lastLow fixedpoint.Value
+	lastLow, lastFastLow fixedpoint.Value
 
 	// lastBreakLow is the low that the price just break
 	lastBreakLow fixedpoint.Value
 
-	pivotLow       *indicator.PivotLow
-	pivotLowPrices []fixedpoint.Value
+	pivotLow, fastPivotLow *indicator.PivotLow
+	pivotLowPrices         []fixedpoint.Value
 
 	trendEWMALast, trendEWMACurrent float64
 
@@ -84,8 +84,11 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	standardIndicator := session.StandardIndicatorSet(s.Symbol)
 
 	s.lastLow = fixedpoint.Zero
-
 	s.pivotLow = standardIndicator.PivotLow(s.IntervalWindow)
+	s.fastPivotLow = standardIndicator.PivotLow(types.IntervalWindow{
+		Interval: s.Interval,
+		Window:   3, // make it faster
+	})
 
 	if s.StopEMA != nil {
 		s.StopEMA.Bind(session, orderExecutor)
@@ -143,12 +146,12 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	}
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
-		if len(s.pivotLowPrices) == 0 {
+		if len(s.pivotLowPrices) == 0 || s.lastLow.IsZero() {
 			log.Infof("currently there is no pivot low prices, can not check break low...")
 			return
 		}
 
-		previousLow := s.pivotLowPrices[len(s.pivotLowPrices)-1]
+		previousLow := s.lastLow
 		ratio := fixedpoint.One.Add(s.Ratio)
 		breakPrice := previousLow.Mul(ratio)
 
@@ -266,11 +269,25 @@ func (s *BreakLow) pilotQuantityCalculation() {
 
 func (s *BreakLow) updatePivotLow() bool {
 	lastLow := fixedpoint.NewFromFloat(s.pivotLow.Last())
-	if lastLow.IsZero() || lastLow.Compare(s.lastLow) == 0 {
+	if lastLow.IsZero() {
 		return false
 	}
 
-	s.lastLow = lastLow
-	s.pivotLowPrices = append(s.pivotLowPrices, lastLow)
-	return true
+	lastLowChanged := lastLow.Compare(s.lastLow) != 0
+	if lastLowChanged {
+		s.lastLow = lastLow
+		s.pivotLowPrices = append(s.pivotLowPrices, lastLow)
+	}
+
+	lastFastLow := fixedpoint.NewFromFloat(s.fastPivotLow.Last())
+	if !lastFastLow.IsZero() {
+		if lastFastLow.Compare(s.lastLow) < 0 {
+			// invalidate the last low
+			s.lastLow = fixedpoint.Zero
+			lastLowChanged = false
+		}
+		s.lastFastLow = lastFastLow
+	}
+
+	return lastLowChanged
 }
