@@ -14,7 +14,12 @@ import (
 type FailedBreakHigh struct {
 	Symbol string
 	Market types.Market
+
+	// IntervalWindow is used for finding the pivot high
 	types.IntervalWindow
+
+	// BreakInterval is used for checking failed break
+	BreakInterval types.Interval `json:"breakInterval"`
 
 	Enabled bool `json:"enabled"`
 
@@ -44,8 +49,13 @@ type FailedBreakHigh struct {
 }
 
 func (s *FailedBreakHigh) Subscribe(session *bbgo.ExchangeSession) {
+	if s.BreakInterval == "" {
+		s.BreakInterval = types.Interval1m
+	}
+
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.BreakInterval})
 
 	if s.StopEMA != nil {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.StopEMA.Interval})
@@ -73,7 +83,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 	if s.VWMA != nil {
 		s.vwma = standardIndicator.VWMA(types.IntervalWindow{
-			Interval: s.Interval,
+			Interval: s.BreakInterval,
 			Window:   s.VWMA.Window,
 		})
 	}
@@ -108,7 +118,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 	// if the position is already opened, and we just break the low, this checks if the kline closed above the low,
 	// so that we can close the position earlier
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.BreakInterval, func(k types.KLine) {
 		if !s.Enabled {
 			return
 		}
@@ -135,7 +145,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		}
 	}))
 
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.BreakInterval, func(kline types.KLine) {
 		if len(s.PivotHighPrices) == 0 || s.lastHigh.IsZero() {
 			log.Infof("currently there is no pivot high prices, can not check failed break high...")
 			return
