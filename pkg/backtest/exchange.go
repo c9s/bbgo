@@ -377,14 +377,13 @@ func (e *Exchange) ConsumeKLine(k types.KLine) {
 	kline1m, ok := matching.klineCache[k.Interval]
 	if ok { // pop out all the old
 		if kline1m.Interval != types.Interval1m {
-			panic("expect 1m kline, get " + kline1m.Interval.String())
+			panic("expect 1m kline, got " + kline1m.Interval.String())
 		}
 		e.currentTime = kline1m.EndTime.Time()
 		// here we generate trades and order updates
 		matching.processKLine(kline1m)
 		matching.NextKLine = &k
 		for _, kline := range matching.klineCache {
-			// log.Errorf("kline %v, next %v", param.kline, matching.NextKLine)
 			e.MarketDataStream.EmitKLineClosed(kline)
 			for _, h := range e.Src.Callbacks {
 				h(kline, e.Src)
