@@ -37,11 +37,11 @@ type FailedBreakHigh struct {
 
 	TrendEMA *bbgo.TrendEMA `json:"trendEMA"`
 
-	lastFailedBreakHigh, lastHigh fixedpoint.Value
+	lastFailedBreakHigh, lastHigh, lastFastHigh fixedpoint.Value
 
-	pivotHigh       *indicator.PivotHigh
-	vwma            *indicator.VWMA
-	PivotHighPrices []fixedpoint.Value
+	pivotHigh, fastPivotHigh *indicator.PivotHigh
+	vwma                     *indicator.VWMA
+	pivotHighPrices          []fixedpoint.Value
 
 	orderExecutor *bbgo.GeneralOrderExecutor
 	session       *bbgo.ExchangeSession
@@ -82,6 +82,10 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 	s.lastHigh = fixedpoint.Zero
 	s.pivotHigh = standardIndicator.PivotHigh(s.IntervalWindow)
+	s.fastPivotHigh = standardIndicator.PivotHigh(types.IntervalWindow{
+		Interval: s.IntervalWindow.Interval,
+		Window:   3,
+	})
 
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
@@ -156,7 +160,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	}))
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.BreakInterval, func(kline types.KLine) {
-		if len(s.PivotHighPrices) == 0 || s.lastHigh.IsZero() {
+		if len(s.pivotHighPrices) == 0 || s.lastHigh.IsZero() {
 			log.Infof("currently there is no pivot high prices, can not check failed break high...")
 			return
 		}
@@ -290,11 +294,25 @@ func (s *FailedBreakHigh) pilotQuantityCalculation() {
 
 func (s *FailedBreakHigh) updatePivotHigh() bool {
 	lastHigh := fixedpoint.NewFromFloat(s.pivotHigh.Last())
-	if lastHigh.IsZero() || lastHigh.Compare(s.lastHigh) == 0 {
+	if lastHigh.IsZero() {
 		return false
 	}
 
-	s.lastHigh = lastHigh
-	s.PivotHighPrices = append(s.PivotHighPrices, lastHigh)
-	return true
+	lastHighChanged := lastHigh.Compare(s.lastHigh) != 0
+	if lastHighChanged {
+		s.lastHigh = lastHigh
+		s.pivotHighPrices = append(s.pivotHighPrices, lastHigh)
+	}
+
+	lastFastHigh := fixedpoint.NewFromFloat(s.fastPivotHigh.Last())
+	if !lastFastHigh.IsZero() {
+		if lastFastHigh.Compare(s.lastHigh) > 0 {
+			// invalidate the last low
+			s.lastHigh = fixedpoint.Zero
+			lastHighChanged = false
+		}
+		s.lastFastHigh = lastFastHigh
+	}
+
+	return lastHighChanged
 }
