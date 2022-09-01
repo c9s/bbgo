@@ -39,16 +39,16 @@ func feeModeFunctionQuote(order *types.Order, market *types.Market, feeRate fixe
 	return fee, feeCurrency
 }
 
-func getFeeModeFunction(feeMode bbgo.BackTestFeeMode) FeeModeFunction {
+func getFeeModeFunction(feeMode bbgo.BacktestFeeMode) FeeModeFunction {
 	switch feeMode {
 
-	case bbgo.BackTestFeeModeNative:
+	case bbgo.BacktestFeeModeNative:
 		return feeModeFunctionNative
 
-	case bbgo.BackTestFeeModeQuote:
+	case bbgo.BacktestFeeModeQuote:
 		return feeModeFunctionQuote
 
-	case bbgo.BackTestFeeModeToken:
+	case bbgo.BacktestFeeModeToken:
 		return feeModeFunctionToken
 
 	default:

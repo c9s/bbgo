@@ -101,26 +101,26 @@ type Session struct {
 	IsolatedMarginSymbol string `json:"isolatedMarginSymbol,omitempty" yaml:"isolatedMarginSymbol,omitempty"`
 }
 
-//go:generate go run github.com/dmarkham/enumer -type=BackTestFeeMode -transform=snake -trimprefix BackTestFeeMode -yaml -json
-type BackTestFeeMode int
+//go:generate go run github.com/dmarkham/enumer -type=BacktestFeeMode -transform=snake -trimprefix BacktestFeeMode -yaml -json
+type BacktestFeeMode int
 
 const (
 	// BackTestFeeModeQuoteFee is designed for clean position but which also counts the fee in the quote balance.
 	// buy order = quote currency fee
 	// sell order = quote currency fee
-	BackTestFeeModeQuote BackTestFeeMode = iota // quote
+	BacktestFeeModeQuote BacktestFeeMode = iota // quote
 
 	// BackTestFeeModeNativeFee is the default crypto exchange fee mode.
 	// buy order = base currency fee
 	// sell order = quote currency fee
-	BackTestFeeModeNative // BackTestFeeMode = "native"
+	BacktestFeeModeNative // BackTestFeeMode = "native"
 
 	// BackTestFeeModeFeeToken is the mode which calculates fee from the outside of the balances.
 	// the fee will not be included in the balances nor the profit.
-	BackTestFeeModeToken // BackTestFeeMode = "token"
+	BacktestFeeModeToken // BackTestFeeMode = "token"
 )
 
-type BackTest struct {
+type Backtest struct {
 	StartTime types.LooseFormatTime  `json:"startTime,omitempty" yaml:"startTime,omitempty"`
 	EndTime   *types.LooseFormatTime `json:"endTime,omitempty" yaml:"endTime,omitempty"`
 
@@ -131,14 +131,14 @@ type BackTest struct {
 	// Account is deprecated, use Accounts instead
 	Account map[string]BacktestAccount `json:"account" yaml:"account"`
 
-	FeeMode BackTestFeeMode `json:"feeMode" yaml:"feeMode"`
+	FeeMode BacktestFeeMode `json:"feeMode" yaml:"feeMode"`
 
 	Accounts map[string]BacktestAccount `json:"accounts" yaml:"accounts"`
 	Symbols  []string                   `json:"symbols" yaml:"symbols"`
 	Sessions []string                   `json:"sessions" yaml:"sessions"`
 }
 
-func (b *BackTest) GetAccount(n string) BacktestAccount {
+func (b *Backtest) GetAccount(n string) BacktestAccount {
 	accountConfig, ok := b.Accounts[n]
 	if ok {
 		return accountConfig
@@ -309,7 +309,7 @@ type Config struct {
 	// Deprecated: use BuildConfig instead
 	Imports []string `json:"imports,omitempty" yaml:"imports,omitempty"`
 
-	Backtest *BackTest `json:"backtest,omitempty" yaml:"backtest,omitempty"`
+	Backtest *Backtest `json:"backtest,omitempty" yaml:"backtest,omitempty"`
 
 	Sync *SyncConfig `json:"sync,omitempty" yaml:"sync,omitempty"`
 

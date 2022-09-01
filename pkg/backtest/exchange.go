@@ -56,7 +56,7 @@ type Exchange struct {
 	currentTime    time.Time
 
 	account *types.Account
-	config  *bbgo.BackTest
+	config  *bbgo.Backtest
 
 	MarketDataStream types.StandardStreamEmitter
 
@@ -74,7 +74,7 @@ type Exchange struct {
 	Src *ExchangeDataSource
 }
 
-func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, srv *service.BacktestService, config *bbgo.BackTest) (*Exchange, error) {
+func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, srv *service.BacktestService, config *bbgo.Backtest) (*Exchange, error) {
 	ex := sourceExchange
 
 	markets, err := cache.LoadExchangeMarketsWithCache(context.Background(), ex)
