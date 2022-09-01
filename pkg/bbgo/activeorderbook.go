@@ -101,7 +101,7 @@ func (b *ActiveOrderBook) Cancel(ctx context.Context, ex types.Exchange, order t
 	if IsBackTesting {
 		return ex.CancelOrders(context.Background(), order)
 	}
-	log.Debugf("[ActiveOrderBook] gracefully cancelling %s order...", order.OrderID)
+	log.Debugf("[ActiveOrderBook] gracefully cancelling %v order...", order.OrderID)
 	waitTime := CancelOrderWaitTime
 
 	startTime := time.Now()
@@ -115,9 +115,9 @@ func (b *ActiveOrderBook) Cancel(ctx context.Context, ex types.Exchange, order t
 		// since ctx might be canceled, we should use background context here
 
 		if err := ex.CancelOrders(context.Background(), order); err != nil {
-			log.WithError(err).Errorf("[ActiveORderBook] can not cancel %s order", order.OrderID)
+			log.WithError(err).Errorf("[ActiveORderBook] can not cancel %v order", order.OrderID)
 		}
-		log.Debugf("[ActiveOrderBook] waiting %s for %s order to be cancelled...", waitTime, order.OrderID)
+		log.Debugf("[ActiveOrderBook] waiting %s for %v order to be cancelled...", waitTime, order.OrderID)
 		clear, err := b.waitClear(ctx, order, waitTime, 5*time.Second)
 		if clear || err != nil {
 			break
@@ -137,7 +137,7 @@ func (b *ActiveOrderBook) Cancel(ctx context.Context, ex types.Exchange, order t
 			b.Remove(order)
 		}
 	}
-	log.Debugf("[ActiveOrderBook] %s order is cancelled successfully in %s", order.OrderID, b.Symbol, time.Since(startTime))
+	log.Debugf("[ActiveOrderBook] %v(%s) order is cancelled successfully in %s", order.OrderID, b.Symbol, time.Since(startTime))
 	return nil
 }
 
