@@ -210,10 +210,12 @@ func (s *BacktestService) QueryKLinesCh(since, until time.Time, exchange types.E
 	tableName := targetKlineTable(exchange.Name())
 	var query string
 
+	// need to sort by start_time desc in order to let matching engine process 1m first
+	// otherwise any other close event could peek on the final close price
 	if len(symbols) == 1 {
-		query = "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` = :symbols AND `interval` IN (:intervals) ORDER BY end_time ASC"
+		query = "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` = :symbols AND `interval` IN (:intervals) ORDER BY end_time ASC, start_time DESC"
 	} else {
-		query = "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` IN (:symbols) AND `interval` IN (:intervals) ORDER BY end_time ASC"
+		query = "SELECT * FROM `binance_klines` WHERE `end_time` BETWEEN :since AND :until AND `symbol` IN (:symbols) AND `interval` IN (:intervals) ORDER BY end_time ASC, start_time DESC"
 	}
 
 	query = strings.ReplaceAll(query, "binance_klines", tableName)

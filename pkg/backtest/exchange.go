@@ -70,6 +70,8 @@ type Exchange struct {
 	matchingBooksMutex sync.Mutex
 
 	markets types.MarketMap
+
+	Src *ExchangeDataSource
 }
 
 func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, srv *service.BacktestService, config *bbgo.Backtest) (*Exchange, error) {
@@ -363,20 +365,34 @@ func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, extraInterv
 }
 
 func (e *Exchange) ConsumeKLine(k types.KLine) {
-	if k.Interval == types.Interval1m {
-		e.currentTime = k.EndTime.Time()
-
-		matching, ok := e.matchingBook(k.Symbol)
-		if !ok {
-			log.Errorf("matching book of %s is not initialized", k.Symbol)
-			return
-		}
-
-		// here we generate trades and order updates
-		matching.processKLine(k)
+	matching, ok := e.matchingBook(k.Symbol)
+	if !ok {
+		log.Errorf("matching book of %s is not initialized", k.Symbol)
+		return
+	}
+	if matching.klineCache == nil {
+		matching.klineCache = make(map[types.Interval]types.KLine)
 	}
 
-	e.MarketDataStream.EmitKLineClosed(k)
+	kline1m, ok := matching.klineCache[k.Interval]
+	if ok { // pop out all the old
+		if kline1m.Interval != types.Interval1m {
+			panic("expect 1m kline, got " + kline1m.Interval.String())
+		}
+		e.currentTime = kline1m.EndTime.Time()
+		// here we generate trades and order updates
+		matching.processKLine(kline1m)
+		matching.NextKLine = &k
+		for _, kline := range matching.klineCache {
+			e.MarketDataStream.EmitKLineClosed(kline)
+			for _, h := range e.Src.Callbacks {
+				h(kline, e.Src)
+			}
+		}
+		// reset the paramcache
+		matching.klineCache = make(map[types.Interval]types.KLine)
+	}
+	matching.klineCache[k.Interval] = k
 }
 
 func (e *Exchange) CloseMarketData() error {

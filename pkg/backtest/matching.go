@@ -58,8 +58,10 @@ type SimplePriceMatching struct {
 	askOrders    []types.Order
 	closedOrders map[uint64]types.Order
 
+	klineCache  map[types.Interval]types.KLine
 	LastPrice   fixedpoint.Value
 	LastKLine   types.KLine
+	NextKLine   *types.KLine
 	CurrentTime time.Time
 
 	Account *types.Account
@@ -180,10 +182,23 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 	order := m.newOrder(o, orderID)
 
 	if isTaker {
+		var price fixedpoint.Value
 		if order.Type == types.OrderTypeMarket {
 			order.Price = m.Market.TruncatePrice(m.LastPrice)
+			price = order.Price
 		} else if order.Type == types.OrderTypeLimit {
-			order.AveragePrice = m.Market.TruncatePrice(m.LastPrice)
+			// if limit order's price is with the range of next kline
+			// we assume it will be traded as a maker trade, and is traded at its original price
+			// TODO: if it is treated as a maker trade, fee should be specially handled
+			// otherwise, set NextKLine.Close(i.e., m.LastPrice) to be the taker traded price
+			if m.NextKLine != nil && m.NextKLine.High.Compare(order.Price) > 0 && order.Side == types.SideTypeBuy {
+				order.AveragePrice = order.Price
+			} else if m.NextKLine != nil && m.NextKLine.Low.Compare(order.Price) < 0 && order.Side == types.SideTypeSell {
+				order.AveragePrice = order.Price
+			} else {
+				order.AveragePrice = m.Market.TruncatePrice(m.LastPrice)
+			}
+			price = order.AveragePrice
 		}
 
 		// emit the order update for Status:New
@@ -193,7 +208,7 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 		var order2 = order
 
 		// emit trade before we publish order
-		trade := m.newTradeFromOrder(&order2, false, m.Market.TruncatePrice(m.LastPrice))
+		trade := m.newTradeFromOrder(&order2, false, price)
 		m.executeTrade(trade)
 
 		// unlock the rest balances for limit taker

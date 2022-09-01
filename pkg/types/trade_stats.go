@@ -2,9 +2,10 @@ package types
 
 import (
 	"encoding/json"
-	"log"
 	"math"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"gopkg.in/yaml.v3"
 
