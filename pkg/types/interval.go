@@ -41,6 +41,7 @@ func (s IntervalSlice) StringSlice() (slice []string) {
 }
 
 var Interval1m = Interval("1m")
+var Interval3m = Interval("3m")
 var Interval5m = Interval("5m")
 var Interval15m = Interval("15m")
 var Interval30m = Interval("30m")
@@ -57,6 +58,7 @@ var Interval1mo = Interval("1mo")
 
 var SupportedIntervals = map[Interval]int{
 	Interval1m:  1,
+	Interval3m:  3,
 	Interval5m:  5,
 	Interval15m: 15,
 	Interval30m: 30,

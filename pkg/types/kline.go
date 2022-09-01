@@ -91,6 +91,20 @@ func (k *KLine) Set(o *KLine) {
 	k.Closed = o.Closed
 }
 
+func (k *KLine) Merge(o *KLine) {
+	k.EndTime = o.EndTime
+	k.Close = o.Close
+	k.High = fixedpoint.Max(k.High, o.High)
+	k.Low = fixedpoint.Min(k.Low, o.Low)
+	k.Volume = k.Volume.Add(o.Volume)
+	k.QuoteVolume = k.QuoteVolume.Add(o.QuoteVolume)
+	k.TakerBuyBaseAssetVolume = k.TakerBuyBaseAssetVolume.Add(o.TakerBuyBaseAssetVolume)
+	k.TakerBuyQuoteAssetVolume = k.TakerBuyQuoteAssetVolume.Add(o.TakerBuyQuoteAssetVolume)
+	k.LastTradeID = o.LastTradeID
+	k.NumberOfTrades += o.NumberOfTrades
+	k.Closed = o.Closed
+}
+
 func (k KLine) GetStartTime() Time {
 	return k.StartTime
 }
