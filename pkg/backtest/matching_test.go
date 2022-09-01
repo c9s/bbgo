@@ -44,11 +44,11 @@ func TestSimplePriceMatching_orderUpdate(t *testing.T) {
 
 	t1 := time.Date(2021, 7, 1, 0, 0, 0, 0, time.UTC)
 	engine := &SimplePriceMatching{
-		Account:      account,
+		account:      account,
 		Market:       market,
-		CurrentTime:  t1,
+		currentTime:  t1,
 		closedOrders: make(map[uint64]types.Order),
-		LastPrice:    fixedpoint.NewFromFloat(25000),
+		lastPrice:    fixedpoint.NewFromFloat(25000),
 	}
 
 	orderUpdateCnt := 0
@@ -97,11 +97,11 @@ func TestSimplePriceMatching_CancelOrder(t *testing.T) {
 	market := getTestMarket()
 	t1 := time.Date(2021, 7, 1, 0, 0, 0, 0, time.UTC)
 	engine := &SimplePriceMatching{
-		Account:      account,
+		account:      account,
 		Market:       market,
-		CurrentTime:  t1,
+		currentTime:  t1,
 		closedOrders: make(map[uint64]types.Order),
-		LastPrice:    fixedpoint.NewFromFloat(30000.0),
+		lastPrice:    fixedpoint.NewFromFloat(30000.0),
 	}
 
 	createdOrder1, trade1, err := engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeBuy, 20000.0, 0.1))
@@ -139,11 +139,11 @@ func TestSimplePriceMatching_processKLine(t *testing.T) {
 
 	t1 := time.Date(2021, 7, 1, 0, 0, 0, 0, time.UTC)
 	engine := &SimplePriceMatching{
-		Account:      account,
+		account:      account,
 		Market:       market,
-		CurrentTime:  t1,
+		currentTime:  t1,
 		closedOrders: make(map[uint64]types.Order),
-		LastPrice:    fixedpoint.NewFromFloat(30000.0),
+		lastPrice:    fixedpoint.NewFromFloat(30000.0),
 	}
 
 	for i := 0; i <= 5; i++ {
@@ -216,10 +216,10 @@ func TestSimplePriceMatching_LimitBuyTakerOrder(t *testing.T) {
 	account := getTestAccount()
 	market := getTestMarket()
 	engine := &SimplePriceMatching{
-		Account:      account,
+		account:      account,
 		Market:       market,
 		closedOrders: make(map[uint64]types.Order),
-		LastPrice:    fixedpoint.NewFromFloat(19000.0),
+		lastPrice:    fixedpoint.NewFromFloat(19000.0),
 	}
 
 	takerOrder := types.SubmitOrder{
@@ -256,10 +256,10 @@ func TestSimplePriceMatching_StopLimitOrderBuy(t *testing.T) {
 	account := getTestAccount()
 	market := getTestMarket()
 	engine := &SimplePriceMatching{
-		Account:      account,
+		account:      account,
 		Market:       market,
 		closedOrders: make(map[uint64]types.Order),
-		LastPrice:    fixedpoint.NewFromFloat(19000.0),
+		lastPrice:    fixedpoint.NewFromFloat(19000.0),
 	}
 
 	stopBuyOrder := types.SubmitOrder{
@@ -299,7 +299,7 @@ func TestSimplePriceMatching_StopLimitOrderBuy(t *testing.T) {
 	assert.Equal(t, "21001", trades[0].Price.String())
 	assert.Equal(t, "22000", closedOrders[0].Price.String(), "order.Price should not be adjusted")
 
-	assert.Equal(t, fixedpoint.NewFromFloat(21001.0).String(), engine.LastPrice.String())
+	assert.Equal(t, fixedpoint.NewFromFloat(21001.0).String(), engine.lastPrice.String())
 
 	stopOrder2 := types.SubmitOrder{
 		Symbol:      market.Symbol,
@@ -326,10 +326,10 @@ func TestSimplePriceMatching_StopLimitOrderSell(t *testing.T) {
 	account := getTestAccount()
 	market := getTestMarket()
 	engine := &SimplePriceMatching{
-		Account:      account,
+		account:      account,
 		Market:       market,
 		closedOrders: make(map[uint64]types.Order),
-		LastPrice:    fixedpoint.NewFromFloat(22000.0),
+		lastPrice:    fixedpoint.NewFromFloat(22000.0),
 	}
 
 	stopSellOrder := types.SubmitOrder{
@@ -370,7 +370,7 @@ func TestSimplePriceMatching_StopLimitOrderSell(t *testing.T) {
 	assert.Equal(t, types.OrderTypeLimit, closedOrders[0].Type)
 	assert.Equal(t, "20000", closedOrders[0].Price.String(), "limit order price should not be changed")
 	assert.Equal(t, "20990", trades[0].Price.String())
-	assert.Equal(t, "20990", engine.LastPrice.String())
+	assert.Equal(t, "20990", engine.lastPrice.String())
 
 	// place a stop limit sell order with a higher price than the current price
 	stopOrder2 := types.SubmitOrder{
@@ -395,7 +395,7 @@ func TestSimplePriceMatching_StopLimitOrderSell(t *testing.T) {
 		assert.Equal(t, types.OrderStatusFilled, closedOrders[0].Status)
 		assert.Equal(t, types.OrderTypeLimit, closedOrders[0].Type)
 		assert.Equal(t, "21000", trades[0].Price.String(), "trade price should be the kline price not the order price")
-		assert.Equal(t, "21000", engine.LastPrice.String(), "engine last price should be updated correctly")
+		assert.Equal(t, "21000", engine.lastPrice.String(), "engine last price should be updated correctly")
 	}
 }
 
@@ -403,10 +403,10 @@ func TestSimplePriceMatching_StopMarketOrderSell(t *testing.T) {
 	account := getTestAccount()
 	market := getTestMarket()
 	engine := &SimplePriceMatching{
-		Account:      account,
+		account:      account,
 		Market:       market,
 		closedOrders: make(map[uint64]types.Order),
-		LastPrice:    fixedpoint.NewFromFloat(22000.0),
+		lastPrice:    fixedpoint.NewFromFloat(22000.0),
 	}
 
 	stopOrder := types.SubmitOrder{
@@ -440,7 +440,7 @@ func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
 	account := getTestAccount()
 	market := getTestMarket()
 	engine := &SimplePriceMatching{
-		Account:      account,
+		account:      account,
 		Market:       market,
 		closedOrders: make(map[uint64]types.Order),
 	}
@@ -540,10 +540,10 @@ func TestSimplePriceMatching_LimitTakerOrder(t *testing.T) {
 	account := getTestAccount()
 	market := getTestMarket()
 	engine := &SimplePriceMatching{
-		Account:      account,
+		account:      account,
 		Market:       market,
 		closedOrders: make(map[uint64]types.Order),
-		LastPrice:    fixedpoint.NewFromFloat(20000.0),
+		lastPrice:    fixedpoint.NewFromFloat(20000.0),
 	}
 
 	closedOrder, trade, err := engine.PlaceOrder(newLimitOrder("BTCUSDT", types.SideTypeBuy, 21000.0, 1.0))

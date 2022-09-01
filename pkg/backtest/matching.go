@@ -59,12 +59,14 @@ type SimplePriceMatching struct {
 	closedOrders map[uint64]types.Order
 
 	klineCache  map[types.Interval]types.KLine
-	LastPrice   fixedpoint.Value
-	LastKLine   types.KLine
-	NextKLine   *types.KLine
-	CurrentTime time.Time
+	lastPrice   fixedpoint.Value
+	lastKLine   types.KLine
+	nextKLine   *types.KLine
+	currentTime time.Time
 
-	Account *types.Account
+	feeModeFunction FeeModeFunction
+
+	account *types.Account
 
 	tradeUpdateCallbacks   []func(trade types.Trade)
 	orderUpdateCallbacks   []func(order types.Order)
@@ -109,38 +111,38 @@ func (m *SimplePriceMatching) CancelOrder(o types.Order) (types.Order, error) {
 
 	switch o.Side {
 	case types.SideTypeBuy:
-		if err := m.Account.UnlockBalance(m.Market.QuoteCurrency, o.Price.Mul(o.Quantity)); err != nil {
+		if err := m.account.UnlockBalance(m.Market.QuoteCurrency, o.Price.Mul(o.Quantity)); err != nil {
 			return o, err
 		}
 
 	case types.SideTypeSell:
-		if err := m.Account.UnlockBalance(m.Market.BaseCurrency, o.Quantity); err != nil {
+		if err := m.account.UnlockBalance(m.Market.BaseCurrency, o.Quantity); err != nil {
 			return o, err
 		}
 	}
 
 	o.Status = types.OrderStatusCanceled
 	m.EmitOrderUpdate(o)
-	m.EmitBalanceUpdate(m.Account.Balances())
+	m.EmitBalanceUpdate(m.account.Balances())
 	return o, nil
 }
 
 // PlaceOrder returns the created order object, executed trade (if any) and error
 func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *types.Trade, error) {
 	if o.Type == types.OrderTypeMarket {
-		if m.LastPrice.IsZero() {
+		if m.lastPrice.IsZero() {
 			panic("unexpected error: for market order, the last price can not be zero")
 		}
 	}
 
-	isTaker := o.Type == types.OrderTypeMarket || isLimitTakerOrder(o, m.LastPrice)
+	isTaker := o.Type == types.OrderTypeMarket || isLimitTakerOrder(o, m.lastPrice)
 
 	// price for checking account balance, default price
 	price := o.Price
 
 	switch o.Type {
 	case types.OrderTypeMarket:
-		price = m.Market.TruncatePrice(m.LastPrice)
+		price = m.Market.TruncatePrice(m.lastPrice)
 
 	case types.OrderTypeStopMarket:
 		// the actual price might be different.
@@ -165,17 +167,17 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 
 	switch o.Side {
 	case types.SideTypeBuy:
-		if err := m.Account.LockBalance(m.Market.QuoteCurrency, quoteQuantity); err != nil {
+		if err := m.account.LockBalance(m.Market.QuoteCurrency, quoteQuantity); err != nil {
 			return nil, nil, err
 		}
 
 	case types.SideTypeSell:
-		if err := m.Account.LockBalance(m.Market.BaseCurrency, o.Quantity); err != nil {
+		if err := m.account.LockBalance(m.Market.BaseCurrency, o.Quantity); err != nil {
 			return nil, nil, err
 		}
 	}
 
-	m.EmitBalanceUpdate(m.Account.Balances())
+	m.EmitBalanceUpdate(m.account.Balances())
 
 	// start from one
 	orderID := incOrderID()
@@ -184,19 +186,19 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 	if isTaker {
 		var price fixedpoint.Value
 		if order.Type == types.OrderTypeMarket {
-			order.Price = m.Market.TruncatePrice(m.LastPrice)
+			order.Price = m.Market.TruncatePrice(m.lastPrice)
 			price = order.Price
 		} else if order.Type == types.OrderTypeLimit {
 			// if limit order's price is with the range of next kline
 			// we assume it will be traded as a maker trade, and is traded at its original price
 			// TODO: if it is treated as a maker trade, fee should be specially handled
 			// otherwise, set NextKLine.Close(i.e., m.LastPrice) to be the taker traded price
-			if m.NextKLine != nil && m.NextKLine.High.Compare(order.Price) > 0 && order.Side == types.SideTypeBuy {
+			if m.nextKLine != nil && m.nextKLine.High.Compare(order.Price) > 0 && order.Side == types.SideTypeBuy {
 				order.AveragePrice = order.Price
-			} else if m.NextKLine != nil && m.NextKLine.Low.Compare(order.Price) < 0 && order.Side == types.SideTypeSell {
+			} else if m.nextKLine != nil && m.nextKLine.Low.Compare(order.Price) < 0 && order.Side == types.SideTypeSell {
 				order.AveragePrice = order.Price
 			} else {
-				order.AveragePrice = m.Market.TruncatePrice(m.LastPrice)
+				order.AveragePrice = m.Market.TruncatePrice(m.lastPrice)
 			}
 			price = order.AveragePrice
 		}
@@ -223,10 +225,10 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 				// the executed price is lower than the given price, so we will use less quote currency to buy the base asset.
 				amount := order.Price.Sub(order.AveragePrice).Mul(order.Quantity)
 				if amount.Sign() > 0 {
-					if err := m.Account.UnlockBalance(m.Market.QuoteCurrency, amount); err != nil {
+					if err := m.account.UnlockBalance(m.Market.QuoteCurrency, amount); err != nil {
 						return nil, nil, err
 					}
-					m.EmitBalanceUpdate(m.Account.Balances())
+					m.EmitBalanceUpdate(m.account.Balances())
 				}
 
 			case types.SideTypeSell:
@@ -234,8 +236,8 @@ func (m *SimplePriceMatching) PlaceOrder(o types.SubmitOrder) (*types.Order, *ty
 				// the executed price is higher than the given price, so we will get more quote currency back
 				amount := order.AveragePrice.Sub(order.Price).Mul(order.Quantity)
 				if amount.Sign() > 0 {
-					m.Account.AddBalance(m.Market.QuoteCurrency, amount)
-					m.EmitBalanceUpdate(m.Account.Balances())
+					m.account.AddBalance(m.Market.QuoteCurrency, amount)
+					m.EmitBalanceUpdate(m.account.Balances())
 				}
 			}
 		}
@@ -273,7 +275,7 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 	var err error
 	// execute trade, update account balances
 	if trade.IsBuyer {
-		err = m.Account.UseLockedBalance(m.Market.QuoteCurrency, trade.QuoteQuantity)
+		err = m.account.UseLockedBalance(m.Market.QuoteCurrency, trade.QuoteQuantity)
 
 		// here the fee currency is the base currency
 		q := trade.Quantity
@@ -281,16 +283,16 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 			q = q.Sub(trade.Fee)
 		}
 
-		m.Account.AddBalance(m.Market.BaseCurrency, q)
+		m.account.AddBalance(m.Market.BaseCurrency, q)
 	} else {
-		err = m.Account.UseLockedBalance(m.Market.BaseCurrency, trade.Quantity)
+		err = m.account.UseLockedBalance(m.Market.BaseCurrency, trade.Quantity)
 
 		// here the fee currency is the quote currency
 		qq := trade.QuoteQuantity
 		if trade.FeeCurrency == m.Market.QuoteCurrency {
 			qq = qq.Sub(trade.Fee)
 		}
-		m.Account.AddBalance(m.Market.QuoteCurrency, qq)
+		m.account.AddBalance(m.Market.QuoteCurrency, qq)
 	}
 
 	if err != nil {
@@ -298,16 +300,16 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 	}
 
 	m.EmitTradeUpdate(trade)
-	m.EmitBalanceUpdate(m.Account.Balances())
+	m.EmitBalanceUpdate(m.account.Balances())
 }
 
 func (m *SimplePriceMatching) getFeeRate(isMaker bool) (feeRate fixedpoint.Value) {
 	// BINANCE uses 0.1% for both maker and taker
 	// MAX uses 0.050% for maker and 0.15% for taker
 	if isMaker {
-		feeRate = m.Account.MakerFeeRate
+		feeRate = m.account.MakerFeeRate
 	} else {
-		feeRate = m.Account.TakerFeeRate
+		feeRate = m.account.TakerFeeRate
 	}
 	return feeRate
 }
@@ -320,15 +322,14 @@ func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool
 	var fee fixedpoint.Value
 	var feeCurrency string
 
-	if useFeeToken {
-		feeCurrency = FeeToken
-		fee = quoteQuantity.Mul(feeRate)
+	if m.feeModeFunction != nil {
+		fee, feeCurrency = m.feeModeFunction(order, &m.Market, feeRate)
 	} else {
-		fee, feeCurrency = calculateNativeOrderFee(order, m.Market, feeRate)
+		fee, feeCurrency = feeModeFunctionQuote(order, &m.Market, feeRate)
 	}
 
 	// update order time
-	order.UpdateTime = types.Time(m.CurrentTime)
+	order.UpdateTime = types.Time(m.currentTime)
 
 	var id = incTradeID()
 	return types.Trade{
@@ -342,7 +343,7 @@ func (m *SimplePriceMatching) newTradeFromOrder(order *types.Order, isMaker bool
 		Side:          order.Side,
 		IsBuyer:       order.Side == types.SideTypeBuy,
 		IsMaker:       isMaker,
-		Time:          types.Time(m.CurrentTime),
+		Time:          types.Time(m.currentTime),
 		Fee:           fee,
 		FeeCurrency:   feeCurrency,
 	}
@@ -458,7 +459,7 @@ func (m *SimplePriceMatching) buyToPrice(price fixedpoint.Value) (closedOrders [
 	}
 
 	m.askOrders = askOrders
-	m.LastPrice = price
+	m.lastPrice = price
 
 	for i := range closedOrders {
 		o := closedOrders[i]
@@ -587,7 +588,7 @@ func (m *SimplePriceMatching) sellToPrice(price fixedpoint.Value) (closedOrders 
 	}
 
 	m.bidOrders = bidOrders
-	m.LastPrice = price
+	m.lastPrice = price
 
 	for i := range closedOrders {
 		o := closedOrders[i]
@@ -631,12 +632,12 @@ func (m *SimplePriceMatching) getOrder(orderID uint64) (types.Order, bool) {
 }
 
 func (m *SimplePriceMatching) processKLine(kline types.KLine) {
-	m.CurrentTime = kline.EndTime.Time()
+	m.currentTime = kline.EndTime.Time()
 
-	if m.LastPrice.IsZero() {
-		m.LastPrice = kline.Open
+	if m.lastPrice.IsZero() {
+		m.lastPrice = kline.Open
 	} else {
-		if m.LastPrice.Compare(kline.Open) > 0 {
+		if m.lastPrice.Compare(kline.Open) > 0 {
 			m.sellToPrice(kline.Open)
 		} else {
 			m.buyToPrice(kline.Open)
@@ -669,12 +670,12 @@ func (m *SimplePriceMatching) processKLine(kline types.KLine) {
 			m.buyToPrice(kline.Close)
 		}
 	default: // no trade up or down
-		if m.LastPrice.IsZero() {
+		if m.lastPrice.IsZero() {
 			m.buyToPrice(kline.Close)
 		}
 	}
 
-	m.LastKLine = kline
+	m.lastKLine = kline
 }
 
 func (m *SimplePriceMatching) newOrder(o types.SubmitOrder, orderID uint64) types.Order {
@@ -685,25 +686,9 @@ func (m *SimplePriceMatching) newOrder(o types.SubmitOrder, orderID uint64) type
 		Status:           types.OrderStatusNew,
 		ExecutedQuantity: fixedpoint.Zero,
 		IsWorking:        true,
-		CreationTime:     types.Time(m.CurrentTime),
-		UpdateTime:       types.Time(m.CurrentTime),
+		CreationTime:     types.Time(m.currentTime),
+		UpdateTime:       types.Time(m.currentTime),
 	}
-}
-
-func calculateNativeOrderFee(order *types.Order, market types.Market, feeRate fixedpoint.Value) (fee fixedpoint.Value, feeCurrency string) {
-	switch order.Side {
-
-	case types.SideTypeBuy:
-		fee = order.Quantity.Mul(feeRate)
-		feeCurrency = market.BaseCurrency
-
-	case types.SideTypeSell:
-		quoteQuantity := order.Quantity.Mul(order.Price)
-		fee = quoteQuantity.Mul(feeRate)
-		feeCurrency = market.QuoteCurrency
-
-	}
-	return fee, feeCurrency
 }
 
 func isTakerOrder(o types.Order) bool {
