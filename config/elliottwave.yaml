@@ -1,0 +1,116 @@
+---
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  binance:
+    exchange: binance
+    futures: false
+    envVarPrefix: binance
+    heikinAshi: false
+
+    # Drift strategy intends to place buy/sell orders as much value mas it could be. To exchanges that requires to
+    # calculate fees before placing limit orders (e.g. FTX Pro), make sure the fee rate is configured correctly and
+    # enable modifyOrderAmountForFee to prevent order rejection.
+    makerFeeRate: 0.0002
+    takerFeeRate: 0.0007
+    modifyOrderAmountForFee: false
+
+exchangeStrategies:
+ 
+- on: binance
+  elliottwave:
+    symbol: BTCUSDT
+    # kline interval for indicators
+    interval: 3m
+    stoploss: 0.15%
+    windowATR: 14
+    windowQuick: 3
+    windowSlow: 19
+    source: hl2
+    pendingMinutes: 8
+    
+    
+    # ActivationRatio should be increasing order
+    # when farest price from entry goes over that ratio, start using the callback ratio accordingly to do trailingstop
+    #trailingActivationRatio: [0.01, 0.016, 0.05]
+    #trailingActivationRatio: [0.001, 0.0081, 0.022]
+    trailingActivationRatio: [0.0006, 0.0008, 0.0012, 0.0017, 0.01]
+    #trailingActivationRatio: []
+    #trailingCallbackRate: []
+    #trailingCallbackRate: [0.002, 0.01, 0.1]
+    #trailingCallbackRate: [0.0004, 0.0009, 0.018]
+    trailingCallbackRate: [0.0001, 0.0002, 0.0003, 0.0006, 0.0049]
+
+    #exits:
+    #   - roiStopLoss:
+    #           percentage: 0.35%
+       #- roiTakeProfit:
+       #        percentage: 0.7%
+       #- protectiveStopLoss:
+       #  activationRatio: 0.5%
+       #  stopLossRatio: 0.2%
+       #  placeStopOrder: false
+    #- trailingStop:
+    #    callbackRate: 0.3%
+        # activationRatio is relative to the average cost,
+        # when side is buy, 1% means lower 1% than the average cost.
+        # when side is sell, 1% means higher 1% than the average cost.
+    #    activationRatio: 0.7%
+        # minProfit uses the position ROI to calculate the profit ratio
+    
+    #    minProfit: 1.5%
+    #    interval: 1m
+    #    side: sell
+    #    closePosition: 100%
+
+    #- trailingStop:
+    #    callbackRate: 0.3%
+        # activationRatio is relative to the average cost,
+        # when side is buy, 1% means lower 1% than the average cost.
+        # when side is sell, 1% means higher 1% than the average cost.
+    #    activationRatio: 0.7%
+        # minProfit uses the position ROI to calculate the profit ratio
+    
+    #    minProfit: 1.5%
+    #    interval: 1m
+    #    side: buy
+    #    closePosition: 100%
+    #- protectiveStopLoss:
+    #   activationRatio: 5%
+    #   stopLossRatio: 1%
+    #   placeStopOrder: false
+    #- cumulatedVolumeTakeProfit:
+    #   interval: 5m
+    #   window: 2
+    #   minQuoteVolume: 200_000_000
+    #- protectiveStopLoss:
+    #    activationRatio: 2%
+    #    stopLossRatio: 1%
+    #    placeStopOrder: false
+
+sync:
+  userDataStream:
+    trades: true
+    filledOrders: true
+  sessions:
+    - binance
+  symbols:
+    - BTCUSDT
+
+backtest:
+  startTime: "2022-08-30"
+  endTime: "2022-09-30"
+  symbols:
+    - BTCUSDT
+  sessions: [binance]
+  accounts:
+    binance:
+      makerFeeRate: 0.000
+      #takerFeeRate: 0.000
+      balances:
+        BTC: 0
+        USDT: 5000
