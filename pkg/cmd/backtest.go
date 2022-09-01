@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -25,6 +24,7 @@ import (
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/exchange"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -135,15 +135,15 @@ var BacktestCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		var now = time.Now()
+		var now = time.Now().Local()
 		var startTime, endTime time.Time
 
-		startTime = userConfig.Backtest.StartTime.Time()
+		startTime = userConfig.Backtest.StartTime.Time().Local()
 
 		// set default start time to the past 6 months
 		// userConfig.Backtest.StartTime = now.AddDate(0, -6, 0).Format("2006-01-02")
 		if userConfig.Backtest.EndTime != nil {
-			endTime = userConfig.Backtest.EndTime.Time()
+			endTime = userConfig.Backtest.EndTime.Time().Local()
 		} else {
 			endTime = now
 		}
@@ -444,6 +444,9 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		runCtx, cancelRun := context.WithCancel(ctx)
+		for _, exK := range exchangeSources {
+			exK.Callbacks = kLineHandlers
+		}
 		go func() {
 			defer cancelRun()
 
@@ -453,11 +456,6 @@ var BacktestCmd = &cobra.Command{
 				exSource := exchangeSources[0]
 				for k := range exSource.C {
 					exSource.Exchange.ConsumeKLine(k)
-
-					for _, h := range kLineHandlers {
-						h(k, &exSource)
-					}
-
 				}
 
 				if err := exSource.Exchange.CloseMarketData(); err != nil {
@@ -479,10 +477,6 @@ var BacktestCmd = &cobra.Command{
 					}
 
 					exK.Exchange.ConsumeKLine(k)
-
-					for _, h := range kLineHandlers {
-						h(k, &exK)
-					}
 				}
 			}
 		}()
@@ -628,16 +622,8 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 		Market:             market,
 	}
 
-	finiteRatio := func(ratio float64) float64 {
-		if math.IsInf(ratio, 1) {
-			return 99999.99
-		} else if math.IsInf(ratio, -1) {
-			return -99999.99
-		}
-		return ratio
-	}
-	sharpeRatio := finiteRatio(intervalProfit.GetSharpe())
-	sortinoRatio := finiteRatio(intervalProfit.GetSortino())
+	sharpeRatio := fixedpoint.NewFromFloat(intervalProfit.GetSharpe())
+	sortinoRatio := fixedpoint.NewFromFloat(intervalProfit.GetSortino())
 
 	report := calculator.Calculate(symbol, trades, lastPrice)
 	accountConfig := userConfig.Backtest.GetAccount(session.Exchange.Name().String())
@@ -717,11 +703,13 @@ func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, startTime, end
 		}
 
 		sessionCopy := session
-		exchangeSources = append(exchangeSources, backtest.ExchangeDataSource{
+		src := backtest.ExchangeDataSource{
 			C:        c,
 			Exchange: backtestEx,
 			Session:  sessionCopy,
-		})
+		}
+		backtestEx.Src = &src
+		exchangeSources = append(exchangeSources, src)
 	}
 	return exchangeSources, nil
 }

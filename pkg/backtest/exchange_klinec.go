@@ -6,7 +6,8 @@ import (
 )
 
 type ExchangeDataSource struct {
-	C        chan types.KLine
-	Exchange *Exchange
-	Session  *bbgo.ExchangeSession
+	C         chan types.KLine
+	Exchange  *Exchange
+	Session   *bbgo.ExchangeSession
+	Callbacks []func(types.KLine, *ExchangeDataSource)
 }
