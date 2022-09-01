@@ -75,7 +75,7 @@ type SessionSymbolReport struct {
 	Market          types.Market              `json:"market"`
 	LastPrice       fixedpoint.Value          `json:"lastPrice,omitempty"`
 	StartPrice      fixedpoint.Value          `json:"startPrice,omitempty"`
-	PnL             *pnl.AverageCostPnlReport `json:"pnl,omitempty"`
+	PnL             *pnl.AverageCostPnLReport `json:"pnl,omitempty"`
 	InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
 	FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
 	Manifests       Manifests                 `json:"manifests,omitempty"`
