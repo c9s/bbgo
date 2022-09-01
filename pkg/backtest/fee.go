@@ -65,19 +65,3 @@ func getFeeModeFunction(feeMode bbgo.BackTestFeeMode) FeeModeFunction {
 		return feeModeFunctionNative
 	}
 }
-
-func calculateNativeOrderFee(order *types.Order, market types.Market, feeRate fixedpoint.Value) (fee fixedpoint.Value, feeCurrency string) {
-	switch order.Side {
-
-	case types.SideTypeBuy:
-		fee = order.Quantity.Mul(feeRate)
-		feeCurrency = market.BaseCurrency
-
-	case types.SideTypeSell:
-		quoteQuantity := order.Quantity.Mul(order.Price)
-		fee = quoteQuantity.Mul(feeRate)
-		feeCurrency = market.QuoteCurrency
-
-	}
-	return fee, feeCurrency
-}
