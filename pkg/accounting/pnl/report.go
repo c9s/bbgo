@@ -14,7 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type AverageCostPnlReport struct {
+type AverageCostPnLReport struct {
 	LastPrice fixedpoint.Value `json:"lastPrice"`
 	StartTime time.Time        `json:"startTime"`
 	Symbol    string           `json:"symbol"`
@@ -27,6 +27,7 @@ type AverageCostPnlReport struct {
 	NetProfit   fixedpoint.Value `json:"netProfit"`
 	GrossProfit fixedpoint.Value `json:"grossProfit"`
 	GrossLoss   fixedpoint.Value `json:"grossLoss"`
+	Position    *types.Position  `json:"position,omitempty"`
 
 	AverageCost       fixedpoint.Value            `json:"averageCost"`
 	BuyVolume         fixedpoint.Value            `json:"buyVolume,omitempty"`
@@ -36,14 +37,14 @@ type AverageCostPnlReport struct {
 	CurrencyFees      map[string]fixedpoint.Value `json:"currencyFees"`
 }
 
-func (report *AverageCostPnlReport) JSON() ([]byte, error) {
+func (report *AverageCostPnLReport) JSON() ([]byte, error) {
 	return json.MarshalIndent(report, "", "  ")
 }
 
-func (report AverageCostPnlReport) Print() {
+func (report AverageCostPnLReport) Print() {
 	color.Green("TRADES SINCE: %v", report.StartTime)
 	color.Green("NUMBER OF TRADES: %d", report.NumTrades)
-
+	color.Green(report.Position.String())
 	color.Green("AVERAGE COST: %s", types.USD.FormatMoney(report.AverageCost))
 	color.Green("BASE ASSET POSITION: %s", report.BaseAssetPosition.String())
 
@@ -69,7 +70,7 @@ func (report AverageCostPnlReport) Print() {
 	}
 }
 
-func (report AverageCostPnlReport) SlackAttachment() slack.Attachment {
+func (report AverageCostPnLReport) SlackAttachment() slack.Attachment {
 	var color = slackstyle.Red
 
 	if report.UnrealizedProfit.Sign() > 0 {
