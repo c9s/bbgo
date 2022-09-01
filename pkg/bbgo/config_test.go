@@ -254,6 +254,13 @@ func TestSyncSymbol(t *testing.T) {
 	})
 }
 
+func TestBackTestFeeMode(t *testing.T) {
+	var mode BackTestFeeMode
+	var err = yaml.Unmarshal([]byte(`quote`), &mode)
+	assert.NoError(t, err)
+	assert.Equal(t, BackTestFeeModeQuote, mode)
+}
+
 func Test_categorizeSyncSymbol(t *testing.T) {
 	var ss []SyncSymbol
 	var err = yaml.Unmarshal([]byte(`

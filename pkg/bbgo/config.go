@@ -101,22 +101,23 @@ type Session struct {
 	IsolatedMarginSymbol string `json:"isolatedMarginSymbol,omitempty" yaml:"isolatedMarginSymbol,omitempty"`
 }
 
-type BackTestFeeMode string
+//go:generate go run github.com/dmarkham/enumer -type=BackTestFeeMode -transform=snake -trimprefix BackTestFeeMode -yaml -json
+type BackTestFeeMode int
 
 const (
 	// BackTestFeeModeQuoteFee is designed for clean position but which also counts the fee in the quote balance.
 	// buy order = quote currency fee
 	// sell order = quote currency fee
-	BackTestFeeModeQuoteFee BackTestFeeMode = "quote_fee"
+	BackTestFeeModeQuote BackTestFeeMode = iota // quote
 
 	// BackTestFeeModeNativeFee is the default crypto exchange fee mode.
 	// buy order = base currency fee
 	// sell order = quote currency fee
-	BackTestFeeModeNativeFee BackTestFeeMode = "native"
+	BackTestFeeModeNative // BackTestFeeMode = "native"
 
 	// BackTestFeeModeFeeToken is the mode which calculates fee from the outside of the balances.
 	// the fee will not be included in the balances nor the profit.
-	BackTestFeeModeFeeToken BackTestFeeMode = "fee_token"
+	BackTestFeeModeToken // BackTestFeeMode = "token"
 )
 
 type BackTest struct {
