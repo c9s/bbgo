@@ -34,18 +34,8 @@ func feeModeFunctionNative(order *types.Order, market *types.Market, feeRate fix
 
 func feeModeFunctionQuote(order *types.Order, market *types.Market, feeRate fixedpoint.Value) (fee fixedpoint.Value, feeCurrency string) {
 	feeCurrency = market.QuoteCurrency
-
 	quoteQuantity := order.Quantity.Mul(order.Price)
-	switch order.Side {
-
-	case types.SideTypeBuy:
-		fee = quoteQuantity.Mul(feeRate)
-
-	case types.SideTypeSell:
-		fee = quoteQuantity.Mul(feeRate)
-
-	}
-
+	fee = quoteQuantity.Mul(feeRate)
 	return fee, feeCurrency
 }
 

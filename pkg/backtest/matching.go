@@ -278,33 +278,24 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 		err = m.account.UseLockedBalance(m.Market.QuoteCurrency, trade.QuoteQuantity)
 
 		// all-in buy trade, we can only deduct the fee from the quote quantity and re-calculate the base quantity
-		q := trade.Quantity
-		qq := trade.QuoteQuantity
 		switch trade.FeeCurrency {
 		case m.Market.QuoteCurrency:
-			quoteFee := trade.Fee
-			qq = qq.Sub(quoteFee)
-			q = qq.Div(trade.Price) // re-calculate the base quantity according to the quote quantity and fee.
+			m.account.AddBalance(m.Market.QuoteCurrency, trade.Fee.Neg())
+			m.account.AddBalance(m.Market.BaseCurrency, trade.Quantity)
 		case m.Market.BaseCurrency:
-			q = q.Sub(trade.Fee)
+			m.account.AddBalance(m.Market.BaseCurrency, trade.Quantity.Sub(trade.Fee))
 		}
 
-		m.account.AddBalance(m.Market.BaseCurrency, q)
-	} else {
+	} else { // sell trade
 		err = m.account.UseLockedBalance(m.Market.BaseCurrency, trade.Quantity)
 
-		// all-in sell trade
-		q := trade.Quantity
-		qq := trade.QuoteQuantity
 		switch trade.FeeCurrency {
 		case m.Market.QuoteCurrency:
-			qq = qq.Sub(trade.Fee)
+			m.account.AddBalance(m.Market.QuoteCurrency, trade.QuoteQuantity.Sub(trade.Fee))
 		case m.Market.BaseCurrency:
-			q = q.Sub(trade.Fee)
-			qq = q.Div(trade.Price)
+			m.account.AddBalance(m.Market.BaseCurrency, trade.Fee.Neg())
+			m.account.AddBalance(m.Market.QuoteCurrency, trade.QuoteQuantity)
 		}
-
-		m.account.AddBalance(m.Market.QuoteCurrency, qq)
 	}
 
 	if err != nil {
