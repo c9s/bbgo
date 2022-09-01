@@ -497,44 +497,6 @@ func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
 	assert.Len(t, trades, 4)
 }
 
-func Test_calculateNativeOrderFee(t *testing.T) {
-	market := getTestMarket()
-
-	t.Run("sellOrder", func(t *testing.T) {
-		order := types.Order{
-			SubmitOrder: types.SubmitOrder{
-				Symbol:      market.Symbol,
-				Side:        types.SideTypeSell,
-				Type:        types.OrderTypeLimit,
-				Quantity:    fixedpoint.NewFromFloat(0.1),
-				Price:       fixedpoint.NewFromFloat(20000.0),
-				TimeInForce: types.TimeInForceGTC,
-			},
-		}
-		feeRate := fixedpoint.MustNewFromString("0.075%")
-		fee, feeCurrency := calculateNativeOrderFee(&order, market, feeRate)
-		assert.Equal(t, "1.5", fee.String())
-		assert.Equal(t, "USDT", feeCurrency)
-	})
-
-	t.Run("buyOrder", func(t *testing.T) {
-		order := types.Order{
-			SubmitOrder: types.SubmitOrder{
-				Symbol:      market.Symbol,
-				Side:        types.SideTypeBuy,
-				Type:        types.OrderTypeLimit,
-				Quantity:    fixedpoint.NewFromFloat(0.1),
-				Price:       fixedpoint.NewFromFloat(20000.0),
-				TimeInForce: types.TimeInForceGTC,
-			},
-		}
-
-		feeRate := fixedpoint.MustNewFromString("0.075%")
-		fee, feeCurrency := calculateNativeOrderFee(&order, market, feeRate)
-		assert.Equal(t, "0.000075", fee.String())
-		assert.Equal(t, "BTC", feeCurrency)
-	})
-}
 
 func TestSimplePriceMatching_LimitTakerOrder(t *testing.T) {
 	account := getTestAccount()
