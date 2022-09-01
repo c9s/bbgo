@@ -36,9 +36,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/cache"
-
 	"github.com/pkg/errors"
+
+	"github.com/c9s/bbgo/pkg/cache"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/service"
@@ -138,12 +138,15 @@ func (e *Exchange) addMatchingBook(symbol string, market types.Market) {
 }
 
 func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
-	e.matchingBooks[symbol] = &SimplePriceMatching{
-		CurrentTime:  e.currentTime,
-		Account:      e.account,
-		Market:       market,
-		closedOrders: make(map[uint64]types.Order),
+	matching := &SimplePriceMatching{
+		currentTime:     e.currentTime,
+		account:         e.account,
+		Market:          market,
+		closedOrders:    make(map[uint64]types.Order),
+		feeModeFunction: getFeeModeFunction(e.config.FeeMode),
 	}
+
+	e.matchingBooks[symbol] = matching
 }
 
 func (e *Exchange) NewStream() types.Stream {
@@ -257,7 +260,7 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 		return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
 	}
 
-	kline := matching.LastKLine
+	kline := matching.lastKLine
 	return &types.Ticker{
 		Time:   kline.EndTime.Time(),
 		Volume: kline.Volume,
@@ -382,7 +385,7 @@ func (e *Exchange) ConsumeKLine(k types.KLine) {
 		e.currentTime = kline1m.EndTime.Time()
 		// here we generate trades and order updates
 		matching.processKLine(kline1m)
-		matching.NextKLine = &k
+		matching.nextKLine = &k
 		for _, kline := range matching.klineCache {
 			e.MarketDataStream.EmitKLineClosed(kline)
 			for _, h := range e.Src.Callbacks {
