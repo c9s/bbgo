@@ -52,6 +52,6 @@ func getFeeModeFunction(feeMode bbgo.BackTestFeeMode) FeeModeFunction {
 		return feeModeFunctionToken
 
 	default:
-		return feeModeFunctionNative
+		return feeModeFunctionQuote
 	}
 }
