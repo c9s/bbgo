@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"math"
+	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -201,6 +202,38 @@ func NewTradeStats(symbol string) *TradeStats {
 // Set IntervalProfitCollector explicitly to enable the sharpe ratio calculation
 func (s *TradeStats) SetIntervalProfitCollector(c *IntervalProfitCollector) {
 	s.IntervalProfits[c.Interval] = c
+}
+
+func (s *TradeStats) CsvHeader() []string {
+	return []string{
+		"winningRatio",
+		"numOfProfitTrade",
+		"numOfLossTrade",
+		"grossProfit",
+		"grossLoss",
+		"profitFactor",
+		"largestProfitTrade",
+		"largestLossTrade",
+		"maximumConsecutiveWins",
+		"maximumConsecutiveLosses",
+	}
+}
+
+func (s *TradeStats) CsvRecords() [][]string {
+	return [][]string{
+		{
+			s.WinningRatio.String(),
+			strconv.Itoa(s.NumOfProfitTrade),
+			strconv.Itoa(s.NumOfLossTrade),
+			s.GrossProfit.String(),
+			s.GrossLoss.String(),
+			s.ProfitFactor.String(),
+			s.LargestProfitTrade.String(),
+			s.LargestLossTrade.String(),
+			strconv.Itoa(s.MaximumConsecutiveWins),
+			strconv.Itoa(s.MaximumConsecutiveLosses),
+		},
+	}
 }
 
 func (s *TradeStats) Add(profit *Profit) {
