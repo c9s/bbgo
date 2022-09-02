@@ -138,6 +138,15 @@ func TestFromString(t *testing.T) {
 	assert.Equal(t, Zero, f)
 	f = MustNewFromString("")
 	assert.Equal(t, Zero, f)
+
+	for _, s := range []string{"inf", "Inf", "INF", "iNF"} {
+		f = MustNewFromString(s)
+		assert.Equal(t, PosInf, f)
+		f = MustNewFromString("+" + s)
+		assert.Equal(t, PosInf, f)
+		f = MustNewFromString("-" + s)
+		assert.Equal(t, NegInf, f)
+	}
 }
 
 func TestJson(t *testing.T) {
@@ -177,6 +186,10 @@ func TestJson(t *testing.T) {
 	_ = json.Unmarshal([]byte("0.000062"), &q)
 	assert.Equal(t, "0.00006194", q.Sub(p).String())
 
+	assert.NoError(t, json.Unmarshal([]byte(`"inf"`), &p))
+	assert.NoError(t, json.Unmarshal([]byte(`"+Inf"`), &q))
+	assert.Equal(t, PosInf, p)
+	assert.Equal(t, p, q)
 }
 
 func TestYaml(t *testing.T) {
@@ -216,6 +229,10 @@ func TestYaml(t *testing.T) {
 	_ = yaml.Unmarshal([]byte("0.000062"), &q)
 	assert.Equal(t, "0.00006194", q.Sub(p).String())
 
+	assert.NoError(t, json.Unmarshal([]byte(`"inf"`), &p))
+	assert.NoError(t, json.Unmarshal([]byte(`"+Inf"`), &q))
+	assert.Equal(t, PosInf, p)
+	assert.Equal(t, p, q)
 }
 
 func TestNumFractionalDigits(t *testing.T) {
