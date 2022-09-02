@@ -144,7 +144,7 @@ func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context
 	return nil
 }
 
-func (e *GeneralOrderExecutor) Cancel(ctx context.Context, order types.Order) error {
+func (e *GeneralOrderExecutor) GracefulCancelOrder(ctx context.Context, order types.Order) error {
 	if e.activeMakerOrders.NumOfOrders() == 0 {
 		return nil
 	}
