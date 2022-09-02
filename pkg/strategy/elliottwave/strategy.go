@@ -14,12 +14,10 @@ import (
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/strategy"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/sirupsen/logrus"
-	"github.com/wcharczuk/go-chart/v2"
 )
 
 const ID = "elliottwave"
@@ -50,6 +48,12 @@ type Strategy struct {
 	WindowQuick    int              `json:"windowQuick"`
 	WindowSlow     int              `json:"windowSlow"`
 	PendingMinutes int              `json:"pendingMinutes"`
+
+	// whether to draw graph or not by the end of backtest
+	DrawGraph          bool   `json:"drawGraph"`
+	GraphIndicatorPath string `json:"graphIndicatorPath"`
+	GraphPNLPath       string `json:"graphPNLPath"`
+	GraphCumPNLPath    string `json:"graphCumPNLPath"`
 
 	*bbgo.Environment
 	*bbgo.GeneralOrderExecutor
@@ -347,24 +351,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if !ok {
 		panic("cannot get 1m history")
 	}
-	bbgo.RegisterCommand("/draw", "Draw Indicators", func(reply interact.Reply) {
-		canvas := s.DrawIndicators(store)
-		if canvas == nil {
-			reply.Message("cannot render indicators")
-			return
-		}
-		var buffer bytes.Buffer
-		if err := canvas.Render(chart.PNG, &buffer); err != nil {
-			log.WithError(err).Errorf("cannot render indicators in ewo")
-			reply.Message(fmt.Sprintf("[error] cannot render indicators in ewo: %v", err))
-			return
-		}
-		bbgo.SendPhoto(&buffer)
-	})
 	if err := s.initIndicators(store); err != nil {
 		log.WithError(err).Errorf("initIndicator failed")
 		return nil
 	}
+	s.InitDrawCommands(store, &profit, &cumProfit)
 	store.OnKLineClosed(func(kline types.KLine) {
 		s.minutesCounter = int(kline.StartTime.Time().Sub(s.startTime).Minutes())
 		if kline.Interval == types.Interval1m {
@@ -381,6 +372,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		fmt.Fprintln(&buffer, s.TradeStats.BriefString())
 		os.Stdout.Write(buffer.Bytes())
+		if s.DrawGraph {
+			s.Draw(store, &profit, &cumProfit)
+		}
 		wg.Done()
 	})
 	return nil
@@ -442,12 +436,13 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 
 	s.smartCancel(ctx, pricef)
 
+	atr := s.atr.Last()
 	ewo := types.Array(s.ewo, 3)
 	shortCondition := ewo[0] < ewo[1] && ewo[1] > ewo[2] || s.sellPrice == 0 && ewo[0] < ewo[1] && ewo[1] < ewo[2]
 	longCondition := ewo[0] > ewo[1] && ewo[1] < ewo[2] || s.buyPrice == 0 && ewo[0] > ewo[1] && ewo[1] > ewo[2]
 
-	exitShortCondition := s.sellPrice > 0 && !shortCondition && s.sellPrice*(1.+stoploss) <= highf || s.trailingCheck(highf, "short")
-	exitLongCondition := s.buyPrice > 0 && !longCondition && s.buyPrice*(1.-stoploss) >= lowf || s.trailingCheck(lowf, "long")
+	exitShortCondition := s.sellPrice > 0 && !shortCondition && s.sellPrice*(1.+stoploss) <= highf || s.sellPrice+atr <= sourcef || s.trailingCheck(highf, "short")
+	exitLongCondition := s.buyPrice > 0 && !longCondition && s.buyPrice*(1.-stoploss) >= lowf || s.buyPrice-atr >= sourcef || s.trailingCheck(lowf, "long")
 
 	if exitShortCondition || exitLongCondition {
 		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
