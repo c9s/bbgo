@@ -693,7 +693,7 @@ func confirmation(s string) bool {
 	}
 }
 
-func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, startTime, endTime time.Time, extraIntervals ...types.Interval) (exchangeSources []backtest.ExchangeDataSource, err error) {
+func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, startTime, endTime time.Time, extraIntervals ...types.Interval) (exchangeSources []*backtest.ExchangeDataSource, err error) {
 	for _, session := range sessions {
 		backtestEx := session.Exchange.(*backtest.Exchange)
 
@@ -703,12 +703,12 @@ func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, startTime, end
 		}
 
 		sessionCopy := session
-		src := backtest.ExchangeDataSource{
+		src := &backtest.ExchangeDataSource{
 			C:        c,
 			Exchange: backtestEx,
 			Session:  sessionCopy,
 		}
-		backtestEx.Src = &src
+		backtestEx.Src = src
 		exchangeSources = append(exchangeSources, src)
 	}
 	return exchangeSources, nil
