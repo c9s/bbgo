@@ -249,7 +249,8 @@ func TestSimplePriceMatching_LimitBuyTakerOrder(t *testing.T) {
 	assert.Equal(t, fixedpoint.NewFromFloat(100.0).Add(createdOrder.Quantity).String(), btc.Available.String())
 
 	usedQuoteAmount := createdOrder.AveragePrice.Mul(createdOrder.Quantity)
-	assert.Equal(t, usdt.Available.String(), fixedpoint.NewFromFloat(1000000.0).Sub(usedQuoteAmount).String())
+	assert.Equal(t, "USDT", trade.FeeCurrency)
+	assert.Equal(t, usdt.Available.String(), fixedpoint.NewFromFloat(1000000.0).Sub(usedQuoteAmount).Sub(trade.Fee).String())
 }
 
 func TestSimplePriceMatching_StopLimitOrderBuy(t *testing.T) {
@@ -496,7 +497,6 @@ func TestSimplePriceMatching_PlaceLimitOrder(t *testing.T) {
 	assert.Len(t, closedOrders, 4)
 	assert.Len(t, trades, 4)
 }
-
 
 func TestSimplePriceMatching_LimitTakerOrder(t *testing.T) {
 	account := getTestAccount()
