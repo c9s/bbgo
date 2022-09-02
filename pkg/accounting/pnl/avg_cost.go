@@ -14,7 +14,7 @@ type AverageCostCalculator struct {
 	Market             types.Market
 }
 
-func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, currentPrice fixedpoint.Value) *AverageCostPnlReport {
+func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, currentPrice fixedpoint.Value) *AverageCostPnLReport {
 	// copy trades, so that we can truncate it.
 	var bidVolume = fixedpoint.Zero
 	var askVolume = fixedpoint.Zero
@@ -23,7 +23,7 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 	var grossLoss = fixedpoint.Zero
 
 	if len(trades) == 0 {
-		return &AverageCostPnlReport{
+		return &AverageCostPnLReport{
 			Symbol:     symbol,
 			Market:     c.Market,
 			LastPrice:  currentPrice,
@@ -90,12 +90,13 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 	unrealizedProfit := currentPrice.Sub(position.AverageCost).
 		Mul(position.GetBase())
 
-	return &AverageCostPnlReport{
+	return &AverageCostPnLReport{
 		Symbol:    symbol,
 		Market:    c.Market,
 		LastPrice: currentPrice,
 		NumTrades: len(trades),
 		StartTime: time.Time(trades[0].Time),
+		Position:  position,
 
 		BuyVolume:  bidVolume,
 		SellVolume: askVolume,
