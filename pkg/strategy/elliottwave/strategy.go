@@ -187,7 +187,7 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef float64) int {
 				panic("not supported side for the order")
 			}
 			if toCancel {
-				err := s.GeneralOrderExecutor.Cancel(ctx, order)
+				err := s.GeneralOrderExecutor.GracefulCancelOrder(ctx, order)
 				if err == nil {
 					delete(s.orderPendingCounter, order.OrderID)
 				} else {
