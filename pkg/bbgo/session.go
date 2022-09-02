@@ -499,6 +499,28 @@ func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataSto
 	return s, ok
 }
 
+// KLine updates will be received in the order listend in intervals array
+func (session *ExchangeSession) SerialMarketDataStore(symbol string, intervals []types.Interval) (store *SerialMarketDataStore, ok bool) {
+	st, ok := session.MarketDataStore(symbol)
+	if !ok {
+		return nil, false
+	}
+	store = NewSerialMarketDataStore(symbol)
+	klines, ok := st.KLinesOfInterval(types.Interval1m)
+	if !ok {
+		log.Errorf("SerialMarketDataStore: cannot get 1m history")
+		return nil, false
+	}
+	for _, interval := range intervals {
+		store.Subscribe(interval)
+	}
+	for _, kline := range *klines {
+		store.AddKLine(kline)
+	}
+	store.BindStream(session.MarketDataStream)
+	return store, true
+}
+
 // OrderBook returns the personal orderbook of a symbol
 func (session *ExchangeSession) OrderBook(symbol string) (s *types.StreamOrderBook, ok bool) {
 	s, ok = session.orderBooks[symbol]

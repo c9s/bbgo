@@ -11,12 +11,15 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/strategy"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/sirupsen/logrus"
+	"github.com/wcharczuk/go-chart/v2"
 )
 
 const ID = "elliottwave"
@@ -56,6 +59,8 @@ type Strategy struct {
 
 	ewo *ElliottWave
 	atr *indicator.ATR
+
+	priceLines *types.Queue
 
 	getLastPrice func() fixedpoint.Value
 
@@ -133,6 +138,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 }
 
 func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
+	s.priceLines = types.NewQueue(300)
 	maSlow := &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.WindowSlow}}
 	maQuick := &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.WindowQuick}}
 	s.ewo = &ElliottWave{
@@ -150,6 +156,7 @@ func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
 		source := s.GetSource(&kline).Float64()
 		s.ewo.Update(source)
 		s.atr.PushK(kline)
+		s.priceLines.Update(source)
 	}
 	return nil
 }
@@ -296,19 +303,34 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	for _, method := range s.ExitMethods {
 		method.Bind(session, s.GeneralOrderExecutor)
 	}
+	profit := floats.Slice{1., 1.}
+	price, _ := s.Session.LastPrice(s.Symbol)
+	initAsset := s.CalcAssetValue(price).Float64()
+	cumProfit := floats.Slice{initAsset, initAsset}
+	modify := func(p float64) float64 {
+		return p
+	}
 	s.GeneralOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _profit, _netProfit fixedpoint.Value) {
+		price := trade.Price.Float64()
+		if s.buyPrice > 0 {
+			profit.Update(modify(price / s.buyPrice))
+			cumProfit.Update(s.CalcAssetValue(trade.Price).Float64())
+		} else if s.sellPrice > 0 {
+			profit.Update(modify(s.sellPrice / price))
+			cumProfit.Update(s.CalcAssetValue(trade.Price).Float64())
+		}
 		if s.Position.IsDust(trade.Price) {
 			s.buyPrice = 0
 			s.sellPrice = 0
 			s.highestPrice = 0
 			s.lowestPrice = 0
 		} else if s.Position.IsLong() {
-			s.buyPrice = trade.Price.Float64()
+			s.buyPrice = price
 			s.sellPrice = 0
 			s.highestPrice = s.buyPrice
 			s.lowestPrice = 0
 		} else {
-			s.sellPrice = trade.Price.Float64()
+			s.sellPrice = price
 			s.buyPrice = 0
 			s.highestPrice = 0
 			s.lowestPrice = s.sellPrice
@@ -320,17 +342,28 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1d, startTime))
 	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1w, startTime))
 
-	st, _ := session.MarketDataStore(s.Symbol)
-	store := bbgo.NewSerialMarketDataStore(s.Symbol)
-	klines, ok := st.KLinesOfInterval(types.Interval1m)
+	// event trigger order: s.Interval => Interval1m
+	store, ok := session.SerialMarketDataStore(s.Symbol, []types.Interval{s.Interval, types.Interval1m})
 	if !ok {
 		panic("cannot get 1m history")
 	}
-	// event trigger order: s.Interval => Interval1m
-	store.Subscribe(s.Interval)
-	store.Subscribe(types.Interval1m)
-	for _, kline := range *klines {
-		store.AddKLine(kline)
+	bbgo.RegisterCommand("/draw", "Draw Indicators", func(reply interact.Reply) {
+		canvas := s.DrawIndicators(store)
+		if canvas == nil {
+			reply.Message("cannot render indicators")
+			return
+		}
+		var buffer bytes.Buffer
+		if err := canvas.Render(chart.PNG, &buffer); err != nil {
+			log.WithError(err).Errorf("cannot render indicators in ewo")
+			reply.Message(fmt.Sprintf("[error] cannot render indicators in ewo: %v", err))
+			return
+		}
+		bbgo.SendPhoto(&buffer)
+	})
+	if err := s.initIndicators(store); err != nil {
+		log.WithError(err).Errorf("initIndicator failed")
+		return nil
 	}
 	store.OnKLineClosed(func(kline types.KLine) {
 		s.minutesCounter = int(kline.StartTime.Time().Sub(s.startTime).Minutes())
@@ -340,11 +373,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.klineHandler(ctx, kline)
 		}
 	})
-	store.BindStream(session.MarketDataStream)
-	if err := s.initIndicators(store); err != nil {
-		log.WithError(err).Errorf("initIndicator failed")
-		return nil
-	}
 
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
 		var buffer bytes.Buffer
@@ -356,6 +384,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		wg.Done()
 	})
 	return nil
+}
+
+func (s *Strategy) CalcAssetValue(price fixedpoint.Value) fixedpoint.Value {
+	balances := s.Session.GetAccount().Balances()
+	return balances[s.Market.BaseCurrency].Total().Mul(price).Add(balances[s.Market.QuoteCurrency].Total())
 }
 
 func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
@@ -393,6 +426,7 @@ func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
 func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	source := s.GetSource(&kline)
 	sourcef := source.Float64()
+	s.priceLines.Update(sourcef)
 	s.ewo.Update(sourcef)
 	s.atr.PushK(kline)
 
@@ -409,8 +443,8 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	s.smartCancel(ctx, pricef)
 
 	ewo := types.Array(s.ewo, 3)
-	shortCondition := ewo[0] < ewo[1] && ewo[1] > ewo[2]
-	longCondition := ewo[0] > ewo[1] && ewo[1] < ewo[2]
+	shortCondition := ewo[0] < ewo[1] && ewo[1] > ewo[2] || s.sellPrice == 0 && ewo[0] < ewo[1] && ewo[1] < ewo[2]
+	longCondition := ewo[0] > ewo[1] && ewo[1] < ewo[2] || s.buyPrice == 0 && ewo[0] > ewo[1] && ewo[1] > ewo[2]
 
 	exitShortCondition := s.sellPrice > 0 && !shortCondition && s.sellPrice*(1.+stoploss) <= highf || s.trailingCheck(highf, "short")
 	exitLongCondition := s.buyPrice > 0 && !longCondition && s.buyPrice*(1.-stoploss) >= lowf || s.trailingCheck(lowf, "long")
