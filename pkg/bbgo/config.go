@@ -101,6 +101,25 @@ type Session struct {
 	IsolatedMarginSymbol string `json:"isolatedMarginSymbol,omitempty" yaml:"isolatedMarginSymbol,omitempty"`
 }
 
+//go:generate go run github.com/dmarkham/enumer -type=BacktestFeeMode -transform=snake -trimprefix BacktestFeeMode -yaml -json
+type BacktestFeeMode int
+
+const (
+	// BackTestFeeModeQuoteFee is designed for clean position but which also counts the fee in the quote balance.
+	// buy order = quote currency fee
+	// sell order = quote currency fee
+	BacktestFeeModeQuote BacktestFeeMode = iota // quote
+
+	// BackTestFeeModeNativeFee is the default crypto exchange fee mode.
+	// buy order = base currency fee
+	// sell order = quote currency fee
+	BacktestFeeModeNative // BackTestFeeMode = "native"
+
+	// BackTestFeeModeFeeToken is the mode which calculates fee from the outside of the balances.
+	// the fee will not be included in the balances nor the profit.
+	BacktestFeeModeToken // BackTestFeeMode = "token"
+)
+
 type Backtest struct {
 	StartTime types.LooseFormatTime  `json:"startTime,omitempty" yaml:"startTime,omitempty"`
 	EndTime   *types.LooseFormatTime `json:"endTime,omitempty" yaml:"endTime,omitempty"`
@@ -111,6 +130,8 @@ type Backtest struct {
 	// Deprecated:
 	// Account is deprecated, use Accounts instead
 	Account map[string]BacktestAccount `json:"account" yaml:"account"`
+
+	FeeMode BacktestFeeMode `json:"feeMode" yaml:"feeMode"`
 
 	Accounts map[string]BacktestAccount `json:"accounts" yaml:"accounts"`
 	Symbols  []string                   `json:"symbols" yaml:"symbols"`

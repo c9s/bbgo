@@ -21,6 +21,13 @@ backtest:
   sessions:
   - binance
   
+  # feeMode is optional
+  # valid values are: quote, native, token
+  #   quote: always deduct fee from the quote balance
+  #   native: the crypto exchange fee deduction, base fee for buy order, quote fee for sell order.
+  #   token: count fee as crypto exchange fee token
+  # feeMode: quote
+  
   accounts:
     # the initial account balance you want to start with
     binance: # exchange name
