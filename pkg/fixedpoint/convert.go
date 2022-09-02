@@ -347,6 +347,7 @@ func NewFromString(input string) (Value, error) {
 	decimalCount := 0
 	// if is decimal, we don't need this
 	hasScientificNotion := false
+	hasIChar := false
 	scIndex := -1
 	for i, c := range input {
 		if hasDecimal {
@@ -363,6 +364,10 @@ func NewFromString(input string) (Value, error) {
 		if c == 'e' || c == 'E' {
 			hasScientificNotion = true
 			scIndex = i
+			break
+		}
+		if c == 'i' || c == 'I' {
+			hasIChar = true
 			break
 		}
 	}
@@ -395,6 +400,16 @@ func NewFromString(input string) (Value, error) {
 			return 0, err
 		}
 		return Value(int64(math.Trunc(v))), nil
+	} else if hasIChar {
+		if floatV, err := strconv.ParseFloat(input, 64); nil != err {
+			return 0, err
+		} else if math.IsInf(floatV, 1) {
+			return PosInf, nil
+		} else if math.IsInf(floatV, -1) {
+			return NegInf, nil
+		} else {
+			return 0, fmt.Errorf("fixedpoint.Value parse error, invalid input string %s", input)
+		}
 	} else {
 		v, err := strconv.ParseInt(input, 10, 64)
 		if err != nil {

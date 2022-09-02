@@ -500,7 +500,7 @@ func NewFromString(s string) (Value, error) {
 	}
 	r := &reader{s, 0}
 	sign := r.getSign()
-	if r.matchStr("inf") {
+	if r.matchStrIgnoreCase("inf") {
 		return Inf(sign), nil
 	}
 	coef, exp := r.getCoef()
@@ -550,7 +550,7 @@ func NewFromBytes(s []byte) (Value, error) {
 	}
 	r := &readerBytes{s, 0}
 	sign := r.getSign()
-	if r.matchStr("inf") {
+	if r.matchStrIgnoreCase("inf") {
 		return Inf(sign), nil
 	}
 	coef, exp := r.getCoef()
@@ -631,13 +631,18 @@ func (r *readerBytes) matchDigit() bool {
 	return false
 }
 
-func (r *readerBytes) matchStr(pre string) bool {
-	for i, c := range r.s[r.i:] {
+func (r *readerBytes) matchStrIgnoreCase(pre string) bool {
+	pre = strings.ToLower(pre)
+	boundary := r.i + len(pre)
+	if boundary > len(r.s) {
+		return false
+	}
+	for i, c := range bytes.ToLower(r.s[r.i:boundary]) {
 		if pre[i] != c {
 			return false
 		}
 	}
-	r.i += len(pre)
+	r.i = boundary
 	return true
 }
 
@@ -745,9 +750,15 @@ func (r *reader) matchDigit() bool {
 	return false
 }
 
-func (r *reader) matchStr(pre string) bool {
-	if strings.HasPrefix(r.s[r.i:], pre) {
-		r.i += len(pre)
+func (r *reader) matchStrIgnoreCase(pre string) bool {
+	boundary := r.i + len(pre)
+	if boundary > len(r.s) {
+		return false
+	}
+	data := strings.ToLower(r.s[r.i:boundary])
+	pre = strings.ToLower(pre)
+	if data == pre {
+		r.i = boundary
 		return true
 	}
 	return false
