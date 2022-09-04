@@ -1101,7 +1101,7 @@ To scan your OTP QR code, please run the following command:
 	
 	open %s
 
-For telegram, send the auth command with the generated one-time password to the bbo bot you created to enable the notification:
+For telegram, send the auth command with the generated one-time password to the bbgo bot you created to enable the notification:
 
 	/auth
 
