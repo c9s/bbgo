@@ -18,8 +18,8 @@ if [[ -n $VERSION_SUFFIX ]] ; then
 fi
 
 cat <<END
-//go:build !release
-// +build !release
+//go:build $BUILD_FLAGS
+// +build $BUILD_FLAGS
 
 package $PACKAGE_NAME
 
