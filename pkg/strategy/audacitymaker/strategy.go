@@ -1,4 +1,4 @@
-package ktrade
+package audacitymaker
 
 import (
 	"context"
@@ -41,7 +41,7 @@ type Strategy struct {
 
 	activeOrders *bbgo.ActiveOrderBook
 
-	Minute *Minute `json:"minute"`
+	PerTrade *PerTrade `json:"pertrade"`
 
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
@@ -55,7 +55,7 @@ type Strategy struct {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
 	session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Minute.Interval})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.PerTrade.Interval})
 
 	if !bbgo.IsBackTesting {
 		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
@@ -119,8 +119,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		method.Bind(session, s.orderExecutor)
 	}
 
-	if s.Minute != nil {
-		s.Minute.Bind(session, s.orderExecutor)
+	if s.PerTrade != nil {
+		s.PerTrade.Bind(session, s.orderExecutor)
 	}
 
 	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
