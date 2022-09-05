@@ -77,32 +77,10 @@ func (inc *KalmanFilter) Last() float64 {
 	return inc.Values.Last()
 }
 
+// interfaces implementation check
+var _ Simple = &KalmanFilter{}
 var _ types.SeriesExtend = &KalmanFilter{}
 
 func (inc *KalmanFilter) PushK(k types.KLine) {
 	inc.update(k.Close.Float64(), (k.High.Float64()-k.Low.Float64())/2)
-}
-
-func (inc *KalmanFilter) CalculateAndUpdate(allKLines []types.KLine) {
-	if inc.Values != nil {
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
-		return
-	}
-	for _, k := range allKLines {
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
-	}
-}
-
-func (inc *KalmanFilter) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *KalmanFilter) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
