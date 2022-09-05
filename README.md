@@ -572,6 +572,12 @@ twitter <https://twitter.com/c9s>, we can discuss.
 If you want BBGO to support a new crypto exchange that is not included in the current BBGO, we can implement it for you.
 The cost is 10 ETH. If you're interested in it, DM me in telegram <https://t.me/c123456789s>.
 
+## Community
+
+- Telegram Group <https://t.me/bbgo_intl>
+- Telegram Group (Taiwan) <https://t.me/bbgocrypto>
+- Twitter <https://twitter.com/bbgotrading>
+
 ## Contributing
 
 See [Contributing](./CONTRIBUTING.md)
