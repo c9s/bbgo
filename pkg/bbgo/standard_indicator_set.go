@@ -147,3 +147,16 @@ func (s *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) 
 
 	return inc
 }
+
+// GHFilter is a helper function that returns the G-H (alpha beta) digital filter of the given interval and the window size.
+func (s *StandardIndicatorSet) GHFilter(iw types.IntervalWindow) *indicator.GHFilter {
+	inc := s.allocateSimpleIndicator(&indicator.GHFilter{IntervalWindow: iw}, iw, "ghfilter")
+	return inc.(*indicator.GHFilter)
+}
+
+// KalmanFilter is a helper function that returns the Kalman digital filter of the given interval and the window size.
+// Note that the additional smooth window is set to zero in standard indicator set. Users have to create their own instance and push K-lines if a smoother filter is needed.
+func (s *StandardIndicatorSet) KalmanFilter(iw types.IntervalWindow) *indicator.KalmanFilter {
+	inc := s.allocateSimpleIndicator(&indicator.KalmanFilter{IntervalWindow: iw, AdditionalSmoothWindow: 0}, iw, "kalmanfilter")
+	return inc.(*indicator.KalmanFilter)
+}
