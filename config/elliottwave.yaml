@@ -25,13 +25,14 @@ exchangeStrategies:
   elliottwave:
     symbol: BTCUSDT
     # kline interval for indicators
-    interval: 3m
-    stoploss: 0.15%
+    interval: 4m
+    stoploss: 0.5%
     windowATR: 14
-    windowQuick: 3
-    windowSlow: 13
-    source: hl2
-    pendingMinutes: 8
+    windowQuick: 10
+    windowSlow: 96
+    source: hlc3
+    pendingMinutes: 10
+    useHeikinAshi: true
 
     drawGraph: true
     graphIndicatorPath: "./indicator.png"
@@ -107,7 +108,7 @@ sync:
     - BTCUSDT
 
 backtest:
-  startTime: "2022-08-30"
+  startTime: "2022-08-01"
   endTime: "2022-09-30"
   symbols:
     - BTCUSDT
@@ -115,7 +116,7 @@ backtest:
   accounts:
     binance:
       makerFeeRate: 0.000
-      #takerFeeRate: 0.000
+      takerFeeRate: 0.000
       balances:
         BTC: 0
         USDT: 5000
