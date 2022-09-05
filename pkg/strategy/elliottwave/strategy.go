@@ -48,6 +48,7 @@ type Strategy struct {
 	WindowQuick    int              `json:"windowQuick"`
 	WindowSlow     int              `json:"windowSlow"`
 	PendingMinutes int              `json:"pendingMinutes"`
+	UseHeikinAshi  bool             `json:"useHeikinAshi"`
 
 	// whether to draw graph or not by the end of backtest
 	DrawGraph          bool   `json:"drawGraph"`
@@ -61,8 +62,9 @@ type Strategy struct {
 	*types.ProfitStats `persistence:"profit_stats"`
 	*types.TradeStats  `persistence:"trade_stats"`
 
-	ewo *ElliottWave
-	atr *indicator.ATR
+	ewo        *ElliottWave
+	atr        *indicator.ATR
+	heikinAshi *HeikinAshi
 
 	priceLines *types.Queue
 
@@ -155,12 +157,14 @@ func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
 		return errors.New("klines not exists")
 	}
 	s.startTime = (*klines)[klineLength-1].EndTime.Time()
+	s.heikinAshi = NewHeikinAshi(500)
 
 	for _, kline := range *klines {
 		source := s.GetSource(&kline).Float64()
 		s.ewo.Update(source)
 		s.atr.PushK(kline)
 		s.priceLines.Update(source)
+		s.heikinAshi.Update(kline)
 	}
 	return nil
 }
@@ -418,10 +422,17 @@ func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
 }
 
 func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
+	s.heikinAshi.Update(kline)
 	source := s.GetSource(&kline)
 	sourcef := source.Float64()
 	s.priceLines.Update(sourcef)
-	s.ewo.Update(sourcef)
+	if s.UseHeikinAshi {
+		source := s.GetSource(s.heikinAshi.Last())
+		sourcef := source.Float64()
+		s.ewo.Update(sourcef)
+	} else {
+		s.ewo.Update(sourcef)
+	}
 	s.atr.PushK(kline)
 
 	if s.Status != types.StrategyStatusRunning {
@@ -437,9 +448,11 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	s.smartCancel(ctx, pricef)
 
 	atr := s.atr.Last()
-	ewo := types.Array(s.ewo, 3)
-	shortCondition := ewo[0] < ewo[1] && ewo[1] > ewo[2] || s.sellPrice == 0 && ewo[0] < ewo[1] && ewo[1] < ewo[2]
-	longCondition := ewo[0] > ewo[1] && ewo[1] < ewo[2] || s.buyPrice == 0 && ewo[0] > ewo[1] && ewo[1] > ewo[2]
+	ewo := types.Array(s.ewo, 4)
+	bull := kline.Close.Compare(kline.Open) > 0
+
+	shortCondition := ewo[0] < ewo[1] && ewo[1] >= ewo[2] && (ewo[1] <= ewo[2] || ewo[2] >= ewo[3]) || s.sellPrice == 0 && ewo[0] < ewo[1] && ewo[1] < ewo[2]
+	longCondition := ewo[0] > ewo[1] && ewo[1] <= ewo[2] && (ewo[1] >= ewo[2] || ewo[2] <= ewo[3]) || s.buyPrice == 0 && ewo[0] > ewo[1] && ewo[1] > ewo[2]
 
 	exitShortCondition := s.sellPrice > 0 && !shortCondition && s.sellPrice*(1.+stoploss) <= highf || s.sellPrice+atr <= sourcef || s.trailingCheck(highf, "short")
 	exitLongCondition := s.buyPrice > 0 && !longCondition && s.buyPrice*(1.-stoploss) >= lowf || s.buyPrice-atr >= sourcef || s.trailingCheck(lowf, "long")
@@ -451,7 +464,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		}
 		s.ClosePosition(ctx, fixedpoint.One)
 	}
-	if longCondition {
+	if longCondition && bull {
 		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
 			log.WithError(err).Errorf("cannot cancel orders")
 			return
@@ -487,7 +500,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		s.orderPendingCounter[createdOrders[0].OrderID] = s.minutesCounter
 		return
 	}
-	if shortCondition {
+	if shortCondition && !bull {
 		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
 			log.WithError(err).Errorf("cannot cancel orders")
 			return
