@@ -65,32 +65,10 @@ func (inc *GHFilter) Last() float64 {
 	return inc.Values.Last()
 }
 
+// interfaces implementation check
+var _ Simple = &GHFilter{}
 var _ types.SeriesExtend = &GHFilter{}
 
 func (inc *GHFilter) PushK(k types.KLine) {
 	inc.update(k.Close.Float64(), k.High.Float64()-k.Low.Float64())
-}
-
-func (inc *GHFilter) CalculateAndUpdate(allKLines []types.KLine) {
-	if inc.Values != nil {
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
-		return
-	}
-	for _, k := range allKLines {
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
-	}
-}
-
-func (inc *GHFilter) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *GHFilter) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
