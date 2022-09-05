@@ -23,6 +23,8 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+var KLineLimit int64 = 1000
+
 // ExchangeSession presents the exchange connection Session
 // It also maintains and collects the data returned from the stream.
 type ExchangeSession struct {
@@ -418,29 +420,35 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	for interval := range klineSubscriptions {
 		// avoid querying the last unclosed kline
 		endTime := environ.startTime
-		kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
-			EndTime: &endTime,
-			Limit:   1000, // indicators need at least 100
-		})
-		if err != nil {
-			return err
-		}
+		var i int64
+		for i = 0; i < KLineLimit; i += 1000 {
+			var duration time.Duration = time.Duration(-i * int64(interval.Duration()))
+			e := endTime.Add(duration)
 
-		if len(kLines) == 0 {
-			log.Warnf("no kline data for %s %s (end time <= %s)", symbol, interval, environ.startTime)
-			continue
-		}
+			kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
+				EndTime: &e,
+				Limit:   1000, // indicators need at least 100
+			})
+			if err != nil {
+				return err
+			}
 
-		// update last prices by the given kline
-		lastKLine := kLines[len(kLines)-1]
-		if interval == types.Interval1m {
-			log.Infof("last kline %+v", lastKLine)
-			session.lastPrices[symbol] = lastKLine.Close
-		}
+			if len(kLines) == 0 {
+				log.Warnf("no kline data for %s %s (end time <= %s)", symbol, interval, e)
+				continue
+			}
 
-		for _, k := range kLines {
-			// let market data store trigger the update, so that the indicator could be updated too.
-			marketDataStore.AddKLine(k)
+			// update last prices by the given kline
+			lastKLine := kLines[len(kLines)-1]
+			if interval == types.Interval1m {
+				log.Infof("last kline %+v", lastKLine)
+				session.lastPrices[symbol] = lastKLine.Close
+			}
+
+			for _, k := range kLines {
+				// let market data store trigger the update, so that the indicator could be updated too.
+				marketDataStore.AddKLine(k)
+			}
 		}
 	}
 
