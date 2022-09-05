@@ -16,6 +16,6 @@ exchangeStrategies:
 - on: binance
   audacitymaker:
     symbol: ETHBUSD
-    pertrade:
+    perTrade:
       interval: 1m
       quantity: 0.01
