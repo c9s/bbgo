@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const ID = "ktrade"
+const ID = "audacitymaker"
 
 var one = fixedpoint.One
 var zero = fixedpoint.Zero
