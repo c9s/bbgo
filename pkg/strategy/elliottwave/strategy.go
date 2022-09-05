@@ -98,6 +98,9 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	// by default, bbgo only pre-subscribe 1000 klines.
+	// this is not enough if we're subscribing 30m intervals using SerialMarketDataStore
+	bbgo.KLineLimit = int64(s.Interval.Minutes()*s.WindowSlow + 1000)
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: types.Interval1m,
 	})
