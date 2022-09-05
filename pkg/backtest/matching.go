@@ -284,6 +284,8 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 			m.account.AddBalance(m.Market.BaseCurrency, trade.Quantity)
 		case m.Market.BaseCurrency:
 			m.account.AddBalance(m.Market.BaseCurrency, trade.Quantity.Sub(trade.Fee))
+		default:
+			m.account.AddBalance(m.Market.BaseCurrency, trade.Quantity)
 		}
 
 	} else { // sell trade
@@ -294,6 +296,8 @@ func (m *SimplePriceMatching) executeTrade(trade types.Trade) {
 			m.account.AddBalance(m.Market.QuoteCurrency, trade.QuoteQuantity.Sub(trade.Fee))
 		case m.Market.BaseCurrency:
 			m.account.AddBalance(m.Market.BaseCurrency, trade.Fee.Neg())
+			m.account.AddBalance(m.Market.QuoteCurrency, trade.QuoteQuantity)
+		default:
 			m.account.AddBalance(m.Market.QuoteCurrency, trade.QuoteQuantity)
 		}
 	}
