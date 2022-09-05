@@ -14,8 +14,8 @@ sessions:
 
 exchangeStrategies:
 - on: binance
-  ktrade:
+  audacitymaker:
     symbol: ETHBUSD
-    minute:
+    pertrade:
       interval: 1m
       quantity: 0.01
