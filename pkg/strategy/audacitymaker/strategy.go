@@ -41,7 +41,7 @@ type Strategy struct {
 
 	activeOrders *bbgo.ActiveOrderBook
 
-	PerTrade *PerTrade `json:"pertrade"`
+	PerTrade *PerTrade `json:"perTrade"`
 
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
