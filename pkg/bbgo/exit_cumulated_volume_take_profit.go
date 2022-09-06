@@ -66,13 +66,13 @@ func (s *CumulatedVolumeTakeProfit) Bind(session *ExchangeSession, orderExecutor
 		}
 
 		if cqv.Compare(s.MinQuoteVolume) > 0 {
-			Notify("%s TakeProfit triggered by cumulated volume (window: %d) %f > %f, price = %f",
+			Notify("[CumulatedVolumeTakeProfit] %s TakeProfit triggered by cumulated volume (window: %d) %f > %f, price = %f",
 				position.Symbol,
 				s.Window,
 				cqv.Float64(),
 				s.MinQuoteVolume.Float64(), kline.Close.Float64())
 
-			if err := orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "cumulatedVolumeTakeProfit") ; err != nil {
+			if err := orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "cumulatedVolumeTakeProfit"); err != nil {
 				log.WithError(err).Errorf("close position error")
 			}
 			return
