@@ -38,8 +38,6 @@ type ProtectiveStopLoss struct {
 	stopLossOrder *types.Order
 }
 
-var one = fixedpoint.One
-
 func (s *ProtectiveStopLoss) Subscribe(session *ExchangeSession) {
 	// use 1m kline to handle roi stop
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
