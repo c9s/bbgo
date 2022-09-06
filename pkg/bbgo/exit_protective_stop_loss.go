@@ -175,7 +175,7 @@ func (s *ProtectiveStopLoss) handleChange(ctx context.Context, position *types.P
 				s.stopLossPrice = position.AverageCost.Mul(one.Add(s.StopLossRatio))
 			}
 
-			log.Infof("[ProtectiveStopLoss] %s protection stop loss activated, current price = %f, average cost = %f, stop loss price = %f",
+			Notify("[ProtectiveStopLoss] %s protection stop loss activated, current price = %f, average cost = %f, stop loss price = %f",
 				position.Symbol, closePrice.Float64(), position.AverageCost.Float64(), s.stopLossPrice.Float64())
 
 			if s.PlaceStopOrder {
@@ -200,7 +200,7 @@ func (s *ProtectiveStopLoss) checkStopPrice(closePrice fixedpoint.Value, positio
 	}
 
 	if s.shouldStop(closePrice, position) {
-		log.Infof("[ProtectiveStopLoss] protection stop order is triggered at price %f, position = %+v", closePrice.Float64(), position)
+		Notify("[ProtectiveStopLoss] protection stop order is triggered at price %f", closePrice.Float64(), position)
 		if err := s.orderExecutor.ClosePosition(context.Background(), one, "protectiveStopLoss"); err != nil {
 			log.WithError(err).Errorf("failed to close position")
 		}
