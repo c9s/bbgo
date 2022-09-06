@@ -14,7 +14,6 @@ import (
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/c9s/bbgo/pkg/strategy"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/sirupsen/logrus"
@@ -38,8 +37,8 @@ type Strategy struct {
 	Symbol string `json:"symbol"`
 
 	bbgo.StrategyController
+	bbgo.SourceSelector
 	types.Market
-	strategy.SourceSelector
 	Session *bbgo.ExchangeSession
 
 	Interval       types.Interval   `json:"interval"`

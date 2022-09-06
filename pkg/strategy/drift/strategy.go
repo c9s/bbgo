@@ -19,7 +19,6 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/interact"
-	"github.com/c9s/bbgo/pkg/strategy"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -43,7 +42,7 @@ type Strategy struct {
 	bbgo.StrategyController
 	types.Market
 	types.IntervalWindow
-	strategy.SourceSelector
+	bbgo.SourceSelector
 
 	*bbgo.Environment
 	*types.Position    `persistence:"position"`
