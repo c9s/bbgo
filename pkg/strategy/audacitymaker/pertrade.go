@@ -2,11 +2,14 @@ package audacitymaker
 
 import (
 	"context"
+	"math"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"math"
+
+	"gonum.org/v1/gonum/stat"
 )
 
 type PerTrade struct {
@@ -105,13 +108,14 @@ func (s *PerTrade) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		if orderFlowSizeMinMaxArcCos.Length() > 100 && orderFlowNumberMinMaxArcCos.Length() > 100 {
-			if outlier(orderFlowSizeMinMaxArcCos.Tail(100), 0.2) > 0 && outlier(orderFlowNumberMinMaxArcCos.Tail(100), 0.2) > 0 {
+			bid, ask, _ := s.StreamBook.BestBidAndAsk()
+			if outlier(orderFlowSizeMinMaxArcCos.Tail(100), 2) > 0 && outlier(orderFlowNumberMinMaxArcCos.Tail(100), 2) > 0 {
 				log.Infof("long!!")
-				_ = s.placeTrade(ctx, types.SideTypeBuy, s.Quantity, symbol)
+				_ = s.placeOrder(ctx, types.SideTypeBuy, s.Quantity, bid.Price, symbol)
 				_ = s.placeOrder(ctx, types.SideTypeSell, s.Quantity, trade.Price.Mul(fixedpoint.NewFromFloat(1.0005)), symbol)
-			} else if outlier(orderFlowSizeMinMaxArcCos.Tail(100), 0.2) < 0 && outlier(orderFlowNumberMinMaxArcCos.Tail(100), 0.2) < 0 {
+			} else if outlier(orderFlowSizeMinMaxArcCos.Tail(100), 2) < 0 && outlier(orderFlowNumberMinMaxArcCos.Tail(100), 2) < 0 {
 				log.Infof("short!!")
-				_ = s.placeTrade(ctx, types.SideTypeSell, s.Quantity, symbol)
+				_ = s.placeOrder(ctx, types.SideTypeSell, s.Quantity, ask.Price, symbol)
 				_ = s.placeOrder(ctx, types.SideTypeBuy, s.Quantity, trade.Price.Mul(fixedpoint.NewFromFloat(0.9995)), symbol)
 			}
 		}
@@ -139,7 +143,7 @@ func (s *PerTrade) placeOrder(ctx context.Context, side types.SideType, quantity
 		Type:     types.OrderTypeLimitMaker,
 		Quantity: quantity,
 		Price:    price,
-		Tag:      "ktrade-limit",
+		Tag:      "audacity-limit",
 	})
 	return err
 }
@@ -152,15 +156,16 @@ func (s *PerTrade) placeTrade(ctx context.Context, side types.SideType, quantity
 		Side:     side,
 		Type:     types.OrderTypeMarket,
 		Quantity: quantity,
-		Tag:      "ktrade-market",
+		Tag:      "audacity-market",
 	})
 	return err
 }
 
-func outlier(fs floats.Slice, threshold float64) int {
-	if fs.Last() > fs.Mean()*(1+threshold) {
+func outlier(fs floats.Slice, multiplier float64) int {
+	stddev := stat.StdDev(fs, nil)
+	if fs.Last() > fs.Mean()+multiplier*stddev {
 		return 1
-	} else if fs.Last() < fs.Mean()*(1-threshold) {
+	} else if fs.Last() < fs.Mean()-multiplier*stddev {
 		return -1
 	}
 	return 0
