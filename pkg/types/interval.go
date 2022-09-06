@@ -3,13 +3,18 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
 type Interval string
 
 func (i Interval) Minutes() int {
-	return SupportedIntervals[i]
+	m, ok := SupportedIntervals[i]
+	if !ok {
+		return ParseInterval(i)
+	}
+	return m
 }
 
 func (i Interval) Duration() time.Duration {
@@ -55,6 +60,34 @@ var Interval3d = Interval("3d")
 var Interval1w = Interval("1w")
 var Interval2w = Interval("2w")
 var Interval1mo = Interval("1mo")
+
+func ParseInterval(input Interval) int {
+	t := 0
+	index := 0
+	for i, rn := range string(input) {
+		if rn >= '0' && rn <= '9' {
+			t = t*10 + int(rn-'0')
+		} else {
+			index = i
+			break
+		}
+	}
+	switch strings.ToLower(string(input[index:])) {
+	case "m":
+		return t
+	case "h":
+		t *= 60
+	case "d":
+		t *= 60 * 24
+	case "w":
+		t *= 60 * 24 * 7
+	case "mo":
+		t *= 60 * 24 * 30
+	default:
+		panic("unknown input: " + input)
+	}
+	return t
+}
 
 var SupportedIntervals = map[Interval]int{
 	Interval1m:  1,
