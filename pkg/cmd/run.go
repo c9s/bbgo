@@ -80,32 +80,6 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	return nil
 }
 
-func BootstrapBacktestEnvironment(ctx context.Context, environ *bbgo.Environment) error {
-	return environ.ConfigureDatabase(ctx)
-}
-
-func BootstrapEnvironment(ctx context.Context, environ *bbgo.Environment, userConfig *bbgo.Config) error {
-	if err := environ.ConfigureDatabase(ctx); err != nil {
-		return err
-	}
-
-	if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
-		return errors.Wrap(err, "exchange session configure error")
-	}
-
-	if userConfig.Persistence != nil {
-		if err := environ.ConfigurePersistence(userConfig.Persistence); err != nil {
-			return errors.Wrap(err, "persistence configure error")
-		}
-	}
-
-	if err := environ.ConfigureNotificationSystem(userConfig); err != nil {
-		return errors.Wrap(err, "notification configure error")
-	}
-
-	return nil
-}
-
 func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Config) error {
 	noSync, err := cmd.Flags().GetBool("no-sync")
 	if err != nil {
@@ -148,7 +122,7 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	defer cancelTrading()
 
 	environ := bbgo.NewEnvironment()
-	if err := BootstrapEnvironment(ctx, environ, userConfig); err != nil {
+	if err := bbgo.BootstrapEnvironment(ctx, environ, userConfig); err != nil {
 		return err
 	}
 
