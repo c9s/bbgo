@@ -548,7 +548,7 @@ var BacktestCmd = &cobra.Command{
 
 				// write report to a file
 				if generatingReport {
-					reportFileName := fmt.Sprintf("symbol_report_%s.json", symbol)
+					reportFileName := fmt.Sprintf("symbol_report_%s_%s.json", session.Name, symbol)
 					if err := util.WriteJsonFile(filepath.Join(reportDir, reportFileName), &symbolReport); err != nil {
 						return err
 					}
@@ -563,7 +563,12 @@ var BacktestCmd = &cobra.Command{
 			fmt.Println(summaryReportFile)
 
 			if err := util.WriteJsonFile(summaryReportFile, summaryReport); err != nil {
-				return err
+				return errors.Wrapf(err, "can not write summary report json file: %s", summaryReportFile)
+			}
+
+			configJsonFile := filepath.Join(reportDir, "config.json")
+			if err := util.WriteJsonFile(configJsonFile, userConfig); err != nil {
+				return errors.Wrapf(err, "can not write config json file: %s", configJsonFile)
 			}
 
 			// append report index
