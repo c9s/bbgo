@@ -15,7 +15,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/cmd"
 	"github.com/c9s/bbgo/pkg/server"
 )
 
@@ -92,7 +91,7 @@ func main() {
 
 	// we could initialize the environment from the settings
 	if setup == nil {
-		if err := cmd.BootstrapEnvironment(ctx, environ, userConfig); err != nil {
+		if err := bbgo.BootstrapEnvironment(ctx, environ, userConfig); err != nil {
 			log.WithError(err).Error("failed to bootstrap environment")
 			return
 		}

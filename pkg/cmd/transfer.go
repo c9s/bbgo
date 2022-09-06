@@ -59,7 +59,7 @@ var TransferHistoryCmd = &cobra.Command{
 		}
 
 		environ := bbgo.NewEnvironment()
-		if err := BootstrapEnvironment(ctx, environ, userConfig); err != nil {
+		if err := bbgo.BootstrapEnvironment(ctx, environ, userConfig); err != nil {
 			return err
 		}
 
