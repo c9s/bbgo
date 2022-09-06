@@ -12,8 +12,8 @@ import (
 type SourceFunc func(*types.KLine) fixedpoint.Value
 
 type selectorInternal struct {
-	Source    string
-	getSource SourceFunc
+	Source       string
+	sourceGetter SourceFunc
 }
 
 func (s *selectorInternal) UnmarshalJSON(d []byte) error {
@@ -39,26 +39,26 @@ type SourceSelector struct {
 func (s *selectorInternal) init() {
 	switch strings.ToLower(s.Source) {
 	case "close":
-		s.getSource = func(kline *types.KLine) fixedpoint.Value { return kline.Close }
+		s.sourceGetter = func(kline *types.KLine) fixedpoint.Value { return kline.Close }
 	case "high":
-		s.getSource = func(kline *types.KLine) fixedpoint.Value { return kline.High }
+		s.sourceGetter = func(kline *types.KLine) fixedpoint.Value { return kline.High }
 	case "low":
-		s.getSource = func(kline *types.KLine) fixedpoint.Value { return kline.Low }
+		s.sourceGetter = func(kline *types.KLine) fixedpoint.Value { return kline.Low }
 	case "hl2":
-		s.getSource = func(kline *types.KLine) fixedpoint.Value { return kline.High.Add(kline.Low).Div(fixedpoint.Two) }
+		s.sourceGetter = func(kline *types.KLine) fixedpoint.Value { return kline.High.Add(kline.Low).Div(fixedpoint.Two) }
 	case "hlc3":
-		s.getSource = func(kline *types.KLine) fixedpoint.Value {
+		s.sourceGetter = func(kline *types.KLine) fixedpoint.Value {
 			return kline.High.Add(kline.Low).Add(kline.Close).Div(fixedpoint.Three)
 		}
 	case "ohlc4":
-		s.getSource = func(kline *types.KLine) fixedpoint.Value {
+		s.sourceGetter = func(kline *types.KLine) fixedpoint.Value {
 			return kline.High.Add(kline.Low).Add(kline.Close).Add(kline.Open).Div(fixedpoint.Four)
 		}
 	case "open":
-		s.getSource = func(kline *types.KLine) fixedpoint.Value { return kline.Open }
+		s.sourceGetter = func(kline *types.KLine) fixedpoint.Value { return kline.Open }
 	default:
 		log.Infof("source not set: %s, use hl2 by default", s.Source)
-		s.getSource = func(kline *types.KLine) fixedpoint.Value { return kline.High.Add(kline.Low).Div(fixedpoint.Two) }
+		s.sourceGetter = func(kline *types.KLine) fixedpoint.Value { return kline.High.Add(kline.Low).Div(fixedpoint.Two) }
 	}
 }
 
@@ -76,5 +76,5 @@ func (s *SourceSelector) GetSource(kline *types.KLine) fixedpoint.Value {
 		s.Source.Source = "close"
 		s.Source.init()
 	}
-	return s.Source.getSource(kline)
+	return s.Source.sourceGetter(kline)
 }
