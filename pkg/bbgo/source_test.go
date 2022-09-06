@@ -17,7 +17,7 @@ func TestSource(t *testing.T) {
 	s := Strategy{}
 	assert.NoError(t, json.Unmarshal([]byte(input), &s))
 	assert.Equal(t, s.Source.Source, "high")
-	assert.NotNil(t, s.Source.getSource)
+	assert.NotNil(t, s.Source.sourceGetter)
 	e, err := json.Marshal(&s)
 	assert.NoError(t, err)
 	assert.Equal(t, input, string(e))
