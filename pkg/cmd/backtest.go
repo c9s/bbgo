@@ -563,7 +563,12 @@ var BacktestCmd = &cobra.Command{
 			fmt.Println(summaryReportFile)
 
 			if err := util.WriteJsonFile(summaryReportFile, summaryReport); err != nil {
-				return err
+				return errors.Wrapf(err, "can not write summary report json file: %s", summaryReportFile)
+			}
+
+			configJsonFile := filepath.Join(reportDir, "config.json")
+			if err := util.WriteJsonFile(configJsonFile, userConfig); err != nil {
+				return errors.Wrapf(err, "can not write config json file: %s", configJsonFile)
 			}
 
 			// append report index
