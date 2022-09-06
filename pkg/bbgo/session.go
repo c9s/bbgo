@@ -23,7 +23,7 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-var KLineLimit int64 = 1000
+var KLinePreloadLimit int64 = 1000
 
 // ExchangeSession presents the exchange connection Session
 // It also maintains and collects the data returned from the stream.
@@ -421,7 +421,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		// avoid querying the last unclosed kline
 		endTime := environ.startTime
 		var i int64
-		for i = 0; i < KLineLimit; i += 1000 {
+		for i = 0; i < KLinePreloadLimit; i += 1000 {
 			var duration time.Duration = time.Duration(-i * int64(interval.Duration()))
 			e := endTime.Add(duration)
 
@@ -441,7 +441,6 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 			// update last prices by the given kline
 			lastKLine := kLines[len(kLines)-1]
 			if interval == types.Interval1m {
-				log.Infof("last kline %+v", lastKLine)
 				session.lastPrices[symbol] = lastKLine.Close
 			}
 

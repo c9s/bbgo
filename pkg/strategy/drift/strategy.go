@@ -126,7 +126,7 @@ func (s *Strategy) InstanceID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// by default, bbgo only pre-subscribe 1000 klines.
 	// this is not enough if we're subscribing 30m intervals using SerialMarketDataStore
-	bbgo.KLineLimit = int64((s.Interval.Minutes()*s.Window/1000 + 1) * 1000)
+	bbgo.KLinePreloadLimit = int64((s.Interval.Minutes()*s.Window/1000 + 1) * 1000)
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: types.Interval1m,
 	})
@@ -255,6 +255,9 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64) (int, e
 
 		drift := s.drift1m.Array(2)
 		for _, order := range nonTraded {
+			if order.Status != types.OrderStatusNew && order.Status != types.OrderStatusPartiallyFilled {
+				continue
+			}
 			log.Warnf("%v | counter: %d, system: %d", order, s.orderPendingCounter[order.OrderID], s.minutesCounter)
 			if s.minutesCounter-s.orderPendingCounter[order.OrderID] > s.PendingMinutes {
 				if order.Side == types.SideTypeBuy && drift[1] < drift[0] {
@@ -801,8 +804,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
-	// Get source function from config input
-	s.SourceSelector.Init()
 
 	s.OnSuspend(func() {
 		_ = s.GeneralOrderExecutor.GracefulCancel(ctx)

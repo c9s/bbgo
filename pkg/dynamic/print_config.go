@@ -1,6 +1,7 @@
 package dynamic
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
@@ -16,7 +17,7 @@ import (
 )
 
 func DefaultWhiteList() []string {
-	return []string{"Window", "Interval", "Symbol"}
+	return []string{"Window", "RightWindow", "Interval", "Symbol", "Source"}
 }
 
 // @param s: strategy object
@@ -96,6 +97,9 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 						}
 						redundantSet[name] = struct{}{}
 						value := field.Field(j).Interface()
+						if e, err := json.Marshal(value); err == nil {
+							value = string(e)
+						}
 						values = append(values, types.JsonStruct{Key: fieldName, Json: name, Type: tt.Type.String(), Value: value})
 					}
 				}
@@ -106,7 +110,11 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 				continue
 			}
 			redundantSet[name] = struct{}{}
-			values = append(values, types.JsonStruct{Key: fieldName, Json: name, Type: t.Type.String(), Value: val.Field(i).Interface()})
+			value := val.Field(i).Interface()
+			if e, err := json.Marshal(value); err == nil {
+				value = string(e)
+			}
+			values = append(values, types.JsonStruct{Key: fieldName, Json: name, Type: t.Type.String(), Value: value})
 		}
 	}
 	sort.Sort(values)
