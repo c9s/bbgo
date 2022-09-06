@@ -1,4 +1,4 @@
-package strategy
+package bbgo
 
 import (
 	"strings"
