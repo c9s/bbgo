@@ -2,8 +2,6 @@ package audacitymaker
 
 import (
 	"context"
-	"math"
-
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -54,12 +52,14 @@ func (s *PerTrade) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	var orderFlowSize floats.Slice
 	var orderFlowNumber floats.Slice
 
-	var orderFlowSizeMinMaxArcCos floats.Slice
-	var orderFlowNumberMinMaxArcCos floats.Slice
+	var orderFlowSizeMinMax floats.Slice
+	var orderFlowNumberMinMax floats.Slice
+
+	threshold := 3.
 
 	session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
 
-		log.Infof("%s trade @ %f", trade.Side, trade.Price.Float64())
+		//log.Infof("%s trade @ %f", trade.Side, trade.Price.Float64())
 
 		ctx := context.Background()
 
@@ -80,43 +80,47 @@ func (s *PerTrade) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			sellTradesNumber.Update(1)
 		}
 
-		canceled := s.orderExecutor.GracefulCancel(ctx)
-		if canceled != nil {
-			_ = s.orderExecutor.GracefulCancel(ctx)
-		}
+		//canceled := s.orderExecutor.GracefulCancel(ctx)
+		//if canceled != nil {
+		//	_ = s.orderExecutor.GracefulCancel(ctx)
+		//}
 
 		sizeFraction := buyTradeSize.Sum() / sellTradeSize.Sum()
 		numberFraction := buyTradesNumber.Sum() / sellTradesNumber.Sum()
 		orderFlowSize.Push(sizeFraction)
 		if orderFlowSize.Length() > 100 {
 			// min-max scaling
-			oaMax := orderFlowSize.Tail(100).Max()
-			oaMin := orderFlowSize.Tail(100).Min()
-			oaMinMax := (orderFlowSize.Last() - oaMin) / (oaMax - oaMin)
+			ofsMax := orderFlowSize.Tail(100).Max()
+			ofsMin := orderFlowSize.Tail(100).Min()
+			ofsMinMax := (orderFlowSize.Last() - ofsMin) / (ofsMax - ofsMin)
 			// preserves temporal dependency via polar encoded angles
-			orderFlowSizeMinMaxArcCos.Push(math.Cosh(oaMinMax))
+			orderFlowSizeMinMax.Push(ofsMinMax)
 		}
 
 		orderFlowNumber.Push(numberFraction)
 		if orderFlowNumber.Length() > 100 {
 			// min-max scaling
-			ofMax := orderFlowNumber.Tail(100).Max()
-			ofMin := orderFlowNumber.Tail(100).Min()
-			ofMinMax := (orderFlowNumber.Last() - ofMin) / (ofMax - ofMin)
+			ofnMax := orderFlowNumber.Tail(100).Max()
+			ofnMin := orderFlowNumber.Tail(100).Min()
+			ofnMinMax := (orderFlowNumber.Last() - ofnMin) / (ofnMax - ofnMin)
 			// preserves temporal dependency via polar encoded angles
-			orderFlowNumberMinMaxArcCos.Push(math.Cosh(ofMinMax))
+			orderFlowNumberMinMax.Push(ofnMinMax)
 		}
 
-		if orderFlowSizeMinMaxArcCos.Length() > 100 && orderFlowNumberMinMaxArcCos.Length() > 100 {
+		if orderFlowSizeMinMax.Length() > 100 && orderFlowNumberMinMax.Length() > 100 {
 			bid, ask, _ := s.StreamBook.BestBidAndAsk()
-			if outlier(orderFlowSizeMinMaxArcCos.Tail(100), 2) > 0 && outlier(orderFlowNumberMinMaxArcCos.Tail(100), 2) > 0 {
+			if outlier(orderFlowSizeMinMax.Tail(100), threshold) > 0 && outlier(orderFlowNumberMinMax.Tail(100), threshold) > 0 {
+				_ = s.orderExecutor.GracefulCancel(ctx)
 				log.Infof("long!!")
+				//_ = s.placeTrade(ctx, types.SideTypeBuy, s.Quantity, symbol)
 				_ = s.placeOrder(ctx, types.SideTypeBuy, s.Quantity, bid.Price, symbol)
-				_ = s.placeOrder(ctx, types.SideTypeSell, s.Quantity, trade.Price.Mul(fixedpoint.NewFromFloat(1.0005)), symbol)
-			} else if outlier(orderFlowSizeMinMaxArcCos.Tail(100), 2) < 0 && outlier(orderFlowNumberMinMaxArcCos.Tail(100), 2) < 0 {
+				//_ = s.placeOrder(ctx, types.SideTypeSell, s.Quantity, ask.Price.Mul(fixedpoint.NewFromFloat(1.0005)), symbol)
+			} else if outlier(orderFlowSizeMinMax.Tail(100), threshold) < 0 && outlier(orderFlowNumberMinMax.Tail(100), threshold) < 0 {
+				_ = s.orderExecutor.GracefulCancel(ctx)
 				log.Infof("short!!")
+				//_ = s.placeTrade(ctx, types.SideTypeSell, s.Quantity, symbol)
 				_ = s.placeOrder(ctx, types.SideTypeSell, s.Quantity, ask.Price, symbol)
-				_ = s.placeOrder(ctx, types.SideTypeBuy, s.Quantity, trade.Price.Mul(fixedpoint.NewFromFloat(0.9995)), symbol)
+				//_ = s.placeOrder(ctx, types.SideTypeBuy, s.Quantity, bid.Price.Mul(fixedpoint.NewFromFloat(0.9995)), symbol)
 			}
 		}
 
