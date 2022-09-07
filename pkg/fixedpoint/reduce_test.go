@@ -31,7 +31,7 @@ func TestReduce(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, Reduce(tt.args.values, tt.args.init, tt.args.reducer), "Reduce(%v, %v, %v)", tt.args.values, tt.args.init, tt.args.reducer)
+			assert.Equalf(t, tt.want, Reduce(tt.args.values, tt.args.reducer, tt.args.init), "Reduce(%v, %v, %v)", tt.args.values, tt.args.init, tt.args.reducer)
 		})
 	}
 }

@@ -2,8 +2,8 @@ package fixedpoint
 
 type Slice []Value
 
-func (s Slice) Reduce(init Value, reducer Reducer) Value {
-	return Reduce(s, init, reducer)
+func (s Slice) Reduce(reducer Reducer, a ...Value) Value {
+	return Reduce(s, reducer, a...)
 }
 
 // Defaults to ascending sort
