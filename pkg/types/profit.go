@@ -37,6 +37,7 @@ type Profit struct {
 	// trade related fields
 	// --------------------------------------------
 	// TradeID is the exchange trade id of that trade
+	Trade         *Trade           `json:"trade,omitempty" db:"-"`
 	TradeID       uint64           `json:"tradeID" db:"trade_id"`
 	OrderID       uint64           `json:"orderID,omitempty"`
 	Side          SideType         `json:"side" db:"side"`
