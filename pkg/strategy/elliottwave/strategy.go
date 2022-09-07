@@ -218,7 +218,7 @@ func (s *Strategy) trailingCheck(price float64, direction string) bool {
 	if s.highestPrice > 0 && s.highestPrice < price {
 		s.highestPrice = price
 	}
-	if s.lowestPrice > 0 && s.lowestPrice < price {
+	if s.lowestPrice > 0 && s.lowestPrice > price {
 		s.lowestPrice = price
 	}
 	isShort := direction == "short"
@@ -402,6 +402,7 @@ func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
 	stoploss := s.Stoploss.Float64()
 	price := s.getLastPrice()
 	pricef := price.Float64()
+	atr := s.atr.Last()
 
 	numPending := s.smartCancel(ctx, pricef)
 	if numPending > 0 {
@@ -416,9 +417,9 @@ func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
 	if s.highestPrice > 0 && highf > s.highestPrice {
 		s.highestPrice = highf
 	}
-	exitShortCondition := s.sellPrice > 0 && (s.sellPrice*(1.+stoploss) <= highf ||
+	exitShortCondition := s.sellPrice > 0 && (s.sellPrice*(1.+stoploss) <= highf || s.sellPrice+atr <= highf ||
 		s.trailingCheck(highf, "short"))
-	exitLongCondition := s.buyPrice > 0 && (s.buyPrice*(1.-stoploss) >= lowf ||
+	exitLongCondition := s.buyPrice > 0 && (s.buyPrice*(1.-stoploss) >= lowf || s.buyPrice-atr >= lowf ||
 		s.trailingCheck(lowf, "long"))
 
 	if exitShortCondition || exitLongCondition {
@@ -456,11 +457,22 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	ewo := types.Array(s.ewo, 4)
 	bull := kline.Close.Compare(kline.Open) > 0
 
+	balances := s.GeneralOrderExecutor.Session().GetAccount().Balances()
+	bbgo.Notify("source: %.4f, price: %.4f lowest: %.4f highest: %.4f sp %.4f bp %.4f", sourcef, pricef, s.lowestPrice, s.highestPrice, s.sellPrice, s.buyPrice)
+	bbgo.Notify("balances: [Total] %v %s [Base] %s(%v %s) [Quote] %s",
+		s.CalcAssetValue(price),
+		s.Market.QuoteCurrency,
+		balances[s.Market.BaseCurrency].String(),
+		balances[s.Market.BaseCurrency].Total().Mul(price),
+		s.Market.QuoteCurrency,
+		balances[s.Market.QuoteCurrency].String(),
+	)
+
 	shortCondition := ewo[0] < ewo[1] && ewo[1] >= ewo[2] && (ewo[1] <= ewo[2] || ewo[2] >= ewo[3]) || s.sellPrice == 0 && ewo[0] < ewo[1] && ewo[1] < ewo[2]
 	longCondition := ewo[0] > ewo[1] && ewo[1] <= ewo[2] && (ewo[1] >= ewo[2] || ewo[2] <= ewo[3]) || s.buyPrice == 0 && ewo[0] > ewo[1] && ewo[1] > ewo[2]
 
-	exitShortCondition := s.sellPrice > 0 && !shortCondition && s.sellPrice*(1.+stoploss) <= highf || s.sellPrice+atr <= sourcef || s.trailingCheck(highf, "short")
-	exitLongCondition := s.buyPrice > 0 && !longCondition && s.buyPrice*(1.-stoploss) >= lowf || s.buyPrice-atr >= sourcef || s.trailingCheck(lowf, "long")
+	exitShortCondition := s.sellPrice > 0 && !shortCondition && s.sellPrice*(1.+stoploss) <= highf || s.sellPrice+atr <= highf || s.trailingCheck(highf, "short")
+	exitLongCondition := s.buyPrice > 0 && !longCondition && s.buyPrice*(1.-stoploss) >= lowf || s.buyPrice-atr >= lowf || s.trailingCheck(lowf, "long")
 
 	if exitShortCondition || exitLongCondition {
 		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
