@@ -106,6 +106,7 @@ func (p *Position) NewProfit(trade Trade, profit, netProfit fixedpoint.Value) Pr
 		NetProfitMargin: netProfit.Div(trade.QuoteQuantity),
 		// trade related fields
 		TradeID:       trade.ID,
+		OrderID:       trade.OrderID,
 		Side:          trade.Side,
 		IsBuyer:       trade.IsBuyer,
 		IsMaker:       trade.IsMaker,
