@@ -304,6 +304,8 @@ func (s *TradeStats) update() {
 	sort.Sort(fixedpoint.Descending(profitsByOrder))
 	sort.Sort(fixedpoint.Descending(netProfitsByOrder))
 
+	s.Losses = fixedpoint.Filter(profitsByOrder, fixedpoint.NegativeTester)
+	s.Profits = fixedpoint.Filter(profitsByOrder, fixedpoint.PositiveTester)
 	s.LargestProfitTrade = profitsByOrder[0]
 	s.LargestLossTrade = profitsByOrder[len(profitsByOrder)-1]
 	if s.LargestLossTrade.Sign() > 0 {
