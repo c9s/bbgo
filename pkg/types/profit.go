@@ -38,6 +38,7 @@ type Profit struct {
 	// --------------------------------------------
 	// TradeID is the exchange trade id of that trade
 	TradeID       uint64           `json:"tradeID" db:"trade_id"`
+	OrderID       uint64           `json:"orderID,omitempty"`
 	Side          SideType         `json:"side" db:"side"`
 	IsBuyer       bool             `json:"isBuyer" db:"is_buyer"`
 	IsMaker       bool             `json:"isMaker" db:"is_maker"`

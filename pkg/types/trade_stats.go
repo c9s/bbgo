@@ -169,6 +169,8 @@ type TradeStats struct {
 	Profits []fixedpoint.Value `json:"profits,omitempty" yaml:"profits,omitempty"`
 	Losses  []fixedpoint.Value `json:"losses,omitempty" yaml:"losses,omitempty"`
 
+	orderProfits map[uint64]*Profit
+
 	LargestProfitTrade fixedpoint.Value `json:"largestProfitTrade,omitempty" yaml:"largestProfitTrade"`
 	LargestLossTrade   fixedpoint.Value `json:"largestLossTrade,omitempty" yaml:"largestLossTrade"`
 	AverageProfitTrade fixedpoint.Value `json:"averageProfitTrade" yaml:"averageProfitTrade"`
@@ -241,7 +243,12 @@ func (s *TradeStats) Add(profit *Profit) {
 		return
 	}
 
+	if s.orderProfits == nil {
+		s.orderProfits = make(map[uint64]*Profit)
+	}
+
 	s.add(profit.Profit)
+
 	for _, v := range s.IntervalProfits {
 		v.Update(profit)
 	}
