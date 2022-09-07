@@ -69,6 +69,11 @@ type AccumulatedProfitReport struct {
 
 	// Profit factor
 	profitFactorPerDay floats.Slice
+
+	// Trade number
+	dailyTrades               floats.Slice
+	accumulatedTrades         int
+	previousAccumulatedTrades int
 }
 
 func (r *AccumulatedProfitReport) Initialize() {
@@ -89,11 +94,11 @@ func (r *AccumulatedProfitReport) Initialize() {
 
 func (r *AccumulatedProfitReport) RecordProfit(profit fixedpoint.Value) {
 	r.accumulatedProfit = r.accumulatedProfit.Add(profit)
-	r.accumulatedProfitMA.Update(r.accumulatedProfit.Float64())
 }
 
-func (r *AccumulatedProfitReport) RecordFee(fee fixedpoint.Value) {
+func (r *AccumulatedProfitReport) RecordTrade(fee fixedpoint.Value) {
 	r.accumulatedFee = r.accumulatedFee.Add(fee)
+	r.accumulatedTrades += 1
 }
 
 func (r *AccumulatedProfitReport) DailyUpdate(tradeStats *types.TradeStats) {
@@ -105,6 +110,7 @@ func (r *AccumulatedProfitReport) DailyUpdate(tradeStats *types.TradeStats) {
 	r.accumulatedProfitPerDay.Update(r.accumulatedProfit.Float64())
 
 	// Accumulated profit MA
+	r.accumulatedProfitMA.Update(r.accumulatedProfit.Float64())
 	r.accumulatedProfitMAPerDay.Update(r.accumulatedProfitMA.Last())
 
 	// Accumulated Fee
@@ -115,6 +121,10 @@ func (r *AccumulatedProfitReport) DailyUpdate(tradeStats *types.TradeStats) {
 
 	// Profit factor
 	r.profitFactorPerDay.Update(tradeStats.ProfitFactor.Float64())
+
+	// Daily trades
+	r.dailyTrades.Update(float64(r.accumulatedTrades - r.previousAccumulatedTrades))
+	r.previousAccumulatedTrades = r.accumulatedTrades
 }
 
 // Output Accumulated profit report to a TSV file
@@ -126,16 +136,21 @@ func (r *AccumulatedProfitReport) Output(symbol string) {
 		}
 		defer tsvwiter.Close()
 		// Output symbol, total acc. profit, acc. profit 60MA, interval acc. profit, fee, win rate, profit factor
-		_ = tsvwiter.Write([]string{"#", "Symbol", "accumulatedProfit", "accumulatedProfitMA", fmt.Sprintf("%dd profit", r.AccumulatedDailyProfitWindow), "accumulatedFee", "winRatio", "profitFactor"})
+		_ = tsvwiter.Write([]string{"#", "Symbol", "accumulatedProfit", "accumulatedProfitMA", fmt.Sprintf("%dd profit", r.AccumulatedDailyProfitWindow), "accumulatedFee", "winRatio", "profitFactor", "60D trades"})
 		for i := 0; i <= r.NumberOfInterval-1; i++ {
-			accumulatedProfit := fmt.Sprintf("%f", r.accumulatedProfitPerDay.Index(r.IntervalWindow*i))
-			accumulatedProfitMA := fmt.Sprintf("%f", r.accumulatedProfitMAPerDay.Index(r.IntervalWindow*i))
-			intervalAccumulatedProfit := fmt.Sprintf("%f", r.dailyProfit.Tail(r.AccumulatedDailyProfitWindow+r.IntervalWindow*i).Sum()-r.dailyProfit.Tail(r.IntervalWindow*i).Sum())
+			accumulatedProfit := r.accumulatedProfitPerDay.Index(r.IntervalWindow * i)
+			accumulatedProfitStr := fmt.Sprintf("%f", accumulatedProfit)
+			accumulatedProfitMA := r.accumulatedProfitMAPerDay.Index(r.IntervalWindow * i)
+			accumulatedProfitMAStr := fmt.Sprintf("%f", accumulatedProfitMA)
+			intervalAccumulatedProfit := r.dailyProfit.Tail(r.AccumulatedDailyProfitWindow+r.IntervalWindow*i).Sum() - r.dailyProfit.Tail(r.IntervalWindow*i).Sum()
+			intervalAccumulatedProfitStr := fmt.Sprintf("%f", intervalAccumulatedProfit)
 			accumulatedFee := fmt.Sprintf("%f", r.accumulatedFeePerDay.Index(r.IntervalWindow*i))
 			winRatio := fmt.Sprintf("%f", r.winRatioPerDay.Index(r.IntervalWindow*i))
 			profitFactor := fmt.Sprintf("%f", r.profitFactorPerDay.Index(r.IntervalWindow*i))
+			trades := r.dailyTrades.Tail(60+r.IntervalWindow*i).Sum() - r.dailyTrades.Tail(r.IntervalWindow*i).Sum()
+			tradesStr := fmt.Sprintf("%f", trades)
 
-			_ = tsvwiter.Write([]string{fmt.Sprintf("%d", i+1), symbol, accumulatedProfit, accumulatedProfitMA, intervalAccumulatedProfit, accumulatedFee, winRatio, profitFactor})
+			_ = tsvwiter.Write([]string{fmt.Sprintf("%d", i+1), symbol, accumulatedProfitStr, accumulatedProfitMAStr, intervalAccumulatedProfitStr, accumulatedFee, winRatio, profitFactor, tradesStr})
 		}
 	}
 }
@@ -465,7 +480,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.AccumulatedProfitReport.RecordProfit(profit.Profit)
 		})
 		s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-			s.AccumulatedProfitReport.RecordFee(trade.Fee)
+			s.AccumulatedProfitReport.RecordTrade(trade.Fee)
 		})
 		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1d, func(kline types.KLine) {
 			s.AccumulatedProfitReport.DailyUpdate(s.TradeStats)
