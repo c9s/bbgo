@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"math"
+	"sort"
 	"strconv"
 	"time"
 
@@ -255,6 +256,52 @@ func (s *TradeStats) Add(profit *Profit) {
 
 	for _, v := range s.IntervalProfits {
 		v.Update(profit)
+	}
+}
+
+func grossLossReducer(prev, curr fixedpoint.Value) fixedpoint.Value {
+	if curr.Sign() < 0 {
+		return prev.Add(curr)
+	}
+
+	return prev
+}
+
+func grossProfitReducer(prev, curr fixedpoint.Value) fixedpoint.Value {
+	if curr.Sign() > 0 {
+		return prev.Add(curr)
+	}
+
+	return prev
+}
+
+// update the trade stats fields from the orderProfits
+func (s *TradeStats) update() {
+	var profitsByOrder []fixedpoint.Value
+	var netProfitsByOrder []fixedpoint.Value
+	for _, profits := range s.orderProfits {
+		var sumProfit = fixedpoint.Zero
+		var sumNetProfit = fixedpoint.Zero
+		for _, p := range profits {
+			sumProfit = sumProfit.Add(p.Profit)
+			sumNetProfit = sumNetProfit.Add(p.NetProfit)
+		}
+
+		profitsByOrder = append(profitsByOrder, sumProfit)
+		netProfitsByOrder = append(netProfitsByOrder, sumNetProfit)
+	}
+
+	s.TotalNetProfit = fixedpoint.Reduce(profitsByOrder, fixedpoint.SumReducer)
+	s.GrossProfit = fixedpoint.Reduce(profitsByOrder, grossProfitReducer)
+	s.GrossLoss = fixedpoint.Reduce(profitsByOrder, grossLossReducer)
+
+	sort.Sort(fixedpoint.Descending(profitsByOrder))
+	sort.Sort(fixedpoint.Descending(netProfitsByOrder))
+
+	s.LargestProfitTrade = profitsByOrder[0]
+	s.LargestLossTrade = profitsByOrder[len(profitsByOrder)-1]
+	if s.LargestLossTrade.Sign() > 0 {
+		s.LargestLossTrade = fixedpoint.Zero
 	}
 }
 
