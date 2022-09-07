@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"math"
+	"sort"
 	"strconv"
 	"time"
 
@@ -169,6 +170,8 @@ type TradeStats struct {
 	Profits []fixedpoint.Value `json:"profits,omitempty" yaml:"profits,omitempty"`
 	Losses  []fixedpoint.Value `json:"losses,omitempty" yaml:"losses,omitempty"`
 
+	orderProfits map[uint64][]*Profit
+
 	LargestProfitTrade fixedpoint.Value `json:"largestProfitTrade,omitempty" yaml:"largestProfitTrade"`
 	LargestLossTrade   fixedpoint.Value `json:"largestLossTrade,omitempty" yaml:"largestLossTrade"`
 	AverageProfitTrade fixedpoint.Value `json:"averageProfitTrade" yaml:"averageProfitTrade"`
@@ -241,9 +244,72 @@ func (s *TradeStats) Add(profit *Profit) {
 		return
 	}
 
+	if s.orderProfits == nil {
+		s.orderProfits = make(map[uint64][]*Profit)
+	}
+
+	if profit.OrderID > 0 {
+		s.orderProfits[profit.OrderID] = append(s.orderProfits[profit.OrderID], profit)
+	}
+
 	s.add(profit.Profit)
+
 	for _, v := range s.IntervalProfits {
 		v.Update(profit)
+	}
+}
+
+func grossLossReducer(prev, curr fixedpoint.Value) fixedpoint.Value {
+	if curr.Sign() < 0 {
+		return prev.Add(curr)
+	}
+
+	return prev
+}
+
+func grossProfitReducer(prev, curr fixedpoint.Value) fixedpoint.Value {
+	if curr.Sign() > 0 {
+		return prev.Add(curr)
+	}
+
+	return prev
+}
+
+// update the trade stats fields from the orderProfits
+func (s *TradeStats) update() {
+	var profitsByOrder []fixedpoint.Value
+	var netProfitsByOrder []fixedpoint.Value
+	for _, profits := range s.orderProfits {
+		var sumProfit = fixedpoint.Zero
+		var sumNetProfit = fixedpoint.Zero
+		for _, p := range profits {
+			sumProfit = sumProfit.Add(p.Profit)
+			sumNetProfit = sumNetProfit.Add(p.NetProfit)
+		}
+
+		profitsByOrder = append(profitsByOrder, sumProfit)
+		netProfitsByOrder = append(netProfitsByOrder, sumNetProfit)
+	}
+
+	s.NumOfProfitTrade = fixedpoint.Count(profitsByOrder, func(a fixedpoint.Value) bool {
+		return a.Sign() > 0
+	})
+	s.NumOfLossTrade = fixedpoint.Count(profitsByOrder, func(a fixedpoint.Value) bool {
+		return a.Sign() < 0
+	})
+	s.TotalNetProfit = fixedpoint.Reduce(profitsByOrder, fixedpoint.SumReducer)
+	s.GrossProfit = fixedpoint.Reduce(profitsByOrder, grossProfitReducer)
+	s.GrossLoss = fixedpoint.Reduce(profitsByOrder, grossLossReducer)
+
+	sort.Sort(fixedpoint.Descending(profitsByOrder))
+	sort.Sort(fixedpoint.Descending(netProfitsByOrder))
+
+	s.Losses = fixedpoint.Filter(profitsByOrder, fixedpoint.NegativeTester)
+	s.Profits = fixedpoint.Filter(profitsByOrder, fixedpoint.PositiveTester)
+	s.LargestProfitTrade = profitsByOrder[0]
+	s.LargestLossTrade = profitsByOrder[len(profitsByOrder)-1]
+	if s.LargestLossTrade.Sign() > 0 {
+		s.LargestLossTrade = fixedpoint.Zero
 	}
 }
 
