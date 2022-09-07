@@ -29,6 +29,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/support"
 	_ "github.com/c9s/bbgo/pkg/strategy/swing"
 	_ "github.com/c9s/bbgo/pkg/strategy/techsignal"
+	_ "github.com/c9s/bbgo/pkg/strategy/trendtrader"
 	_ "github.com/c9s/bbgo/pkg/strategy/wall"
 	_ "github.com/c9s/bbgo/pkg/strategy/xbalance"
 	_ "github.com/c9s/bbgo/pkg/strategy/xgap"
