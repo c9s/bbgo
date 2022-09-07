@@ -144,6 +144,20 @@ func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context
 	return nil
 }
 
+func (e *GeneralOrderExecutor) GracefulCancelOrder(ctx context.Context, order types.Order) error {
+	if e.activeMakerOrders.NumOfOrders() == 0 {
+		return nil
+	}
+	if err := e.activeMakerOrders.Cancel(ctx, e.session.Exchange, order); err != nil {
+		// Retry once
+		if err = e.activeMakerOrders.Cancel(ctx, e.session.Exchange, order); err != nil {
+			return fmt.Errorf("cancel order error: %w", err)
+		}
+	}
+	e.tradeCollector.Process()
+	return nil
+}
+
 // GracefulCancel cancels all active maker orders
 func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context) error {
 	return e.GracefulCancelActiveOrderBook(ctx, e.activeMakerOrders)
