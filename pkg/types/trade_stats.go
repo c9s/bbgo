@@ -291,6 +291,12 @@ func (s *TradeStats) update() {
 		netProfitsByOrder = append(netProfitsByOrder, sumNetProfit)
 	}
 
+	s.NumOfProfitTrade = fixedpoint.Count(profitsByOrder, func(a fixedpoint.Value) bool {
+		return a.Sign() > 0
+	})
+	s.NumOfLossTrade = fixedpoint.Count(profitsByOrder, func(a fixedpoint.Value) bool {
+		return a.Sign() < 0
+	})
 	s.TotalNetProfit = fixedpoint.Reduce(profitsByOrder, fixedpoint.SumReducer)
 	s.GrossProfit = fixedpoint.Reduce(profitsByOrder, grossProfitReducer)
 	s.GrossLoss = fixedpoint.Reduce(profitsByOrder, grossLossReducer)
