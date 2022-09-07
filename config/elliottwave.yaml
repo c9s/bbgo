@@ -22,51 +22,35 @@ sessions:
 exchangeStrategies:
  
 - on: binance
-  drift:
-    canvasPath: "./output.png"
-    symbol: BTCUSDT
+  elliottwave:
+    symbol: BNBBUSD
     # kline interval for indicators
-    interval: 15m
-    window: 1
-    stoploss: 1.2%
-    source: close
-    predictOffset: 2
-    noTrailingStopLoss: false
-    trailingStopLossType: kline
-    # stddev on high/low-source
-    hlVarianceMultiplier: 0.1
-    hlRangeWindow: 5
-    smootherWindow: 1
-    fisherTransformWindow: 34
-    window1m: 58
-    smootherWindow1m: 118
-    fisherTransformWindow1m: 319
-    atrWindow: 14
-    # orders not been traded will be canceled after `pendingMinutes` minutes
+    interval: 3m
+    stoploss: 0.2%
+    windowATR: 14
+    windowQuick: 5
+    windowSlow: 19
+    source: hl2
     pendingMinutes: 10
-    noRebalance: true
-    trendWindow: 576
-    rebalanceFilter: 0
-    driftFilterPos: 1.8
-    driftFilterNeg: -1.8
-    ddriftFilterPos: 0.5
-    ddriftFilterNeg: -0.5 #-1.6
+    useHeikinAshi: true
+
+    drawGraph: true
+    graphIndicatorPath: "./indicator.png"
+    graphPNLPath: "./pnl.png"
+    graphCumPNLPath: "./cumpnl.png"
+    
     
     # ActivationRatio should be increasing order
     # when farest price from entry goes over that ratio, start using the callback ratio accordingly to do trailingstop
     #trailingActivationRatio: [0.01, 0.016, 0.05]
     #trailingActivationRatio: [0.001, 0.0081, 0.022]
-    trailingActivationRatio: [0.0012, 0.01]
+    trailingActivationRatio: [0.0017, 0.01, 0.015]
     #trailingActivationRatio: []
     #trailingCallbackRate: []
     #trailingCallbackRate: [0.002, 0.01, 0.1]
     #trailingCallbackRate: [0.0004, 0.0009, 0.018]
-    trailingCallbackRate: [0.0006, 0.0049]
+    trailingCallbackRate: [0.0006, 0.0049, 0.006]
 
-    generateGraph: true
-    graphPNLDeductFee: false
-    graphPNLPath: "./pnl.png"
-    graphCumPNLPath: "./cumpnl.png"
     #exits:
     #   - roiStopLoss:
     #           percentage: 0.35%
@@ -121,18 +105,18 @@ sync:
   sessions:
     - binance
   symbols:
-    - BTCUSDT
+    - BNBBUSD
 
 backtest:
   startTime: "2022-09-01"
-  endTime: "2022-09-15"
+  endTime: "2022-09-30"
   symbols:
-    - BTCUSDT
+    - BNBBUSD
   sessions: [binance]
   accounts:
     binance:
       makerFeeRate: 0.000
       takerFeeRate: 0.000
       balances:
-        BTC: 0
-        USDT: 21
+        BNB: 0
+        BUSD: 20
