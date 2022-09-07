@@ -56,6 +56,8 @@ func (s *selectorInternal) init() {
 		}
 	case "open":
 		s.sourceGetter = func(kline *types.KLine) fixedpoint.Value { return kline.Open }
+	case "oc2":
+		s.sourceGetter = func(kline *types.KLine) fixedpoint.Value { return kline.Open.Add(kline.Close).Div(fixedpoint.Two) }
 	default:
 		log.Infof("source not set: %s, use hl2 by default", s.Source)
 		s.sourceGetter = func(kline *types.KLine) fixedpoint.Value { return kline.High.Add(kline.Low).Div(fixedpoint.Two) }
