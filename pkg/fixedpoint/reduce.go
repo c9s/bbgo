@@ -2,7 +2,16 @@ package fixedpoint
 
 type Reducer func(prev, curr Value) Value
 
-func Reduce(values []Value, init Value, reducer Reducer) Value {
+func SumReducer(prev, curr Value) Value {
+	return prev.Add(curr)
+}
+
+func Reduce(values []Value, reducer Reducer, a ...Value) Value {
+	init := Zero
+	if len(a) > 0 {
+		init = a[0]
+	}
+
 	if len(values) == 0 {
 		return init
 	}
