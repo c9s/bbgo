@@ -199,6 +199,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		// stop EMA protection
 		if s.StopEMA != nil {
 			if !s.StopEMA.Allowed(closePrice) {
+				bbgo.Notify("stopEMA protection: close price %f %s", kline.Close.Float64(), s.StopEMA.String())
 				return
 			}
 		}
