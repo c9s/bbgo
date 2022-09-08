@@ -193,6 +193,7 @@ type TradeStats struct {
 	// MaximumConsecutiveLoss - ($) the longest series of losing trades and their total loss;
 	MaximumConsecutiveLoss fixedpoint.Value `json:"maximumConsecutiveLoss" yaml:"maximumConsecutiveLoss"`
 
+	lastOrderID        uint64
 	consecutiveSide    int
 	consecutiveCounter int
 	consecutiveAmount  fixedpoint.Value
@@ -252,7 +253,7 @@ func (s *TradeStats) Add(profit *Profit) {
 		s.orderProfits[profit.OrderID] = append(s.orderProfits[profit.OrderID], profit)
 	}
 
-	s.add(profit.Profit)
+	s.add(profit)
 
 	for _, v := range s.IntervalProfits {
 		v.Update(profit)
@@ -275,8 +276,13 @@ func grossProfitReducer(prev, curr fixedpoint.Value) fixedpoint.Value {
 	return prev
 }
 
-// update the trade stats fields from the orderProfits
-func (s *TradeStats) update() {
+// Recalculate the trade stats fields from the orderProfits
+// this is for live-trading, one order may have many trades, and we need to merge them.
+func (s *TradeStats) Recalculate() {
+	if len(s.orderProfits) == 0 {
+		return
+	}
+
 	var profitsByOrder []fixedpoint.Value
 	var netProfitsByOrder []fixedpoint.Value
 	for _, profits := range s.orderProfits {
@@ -291,12 +297,8 @@ func (s *TradeStats) update() {
 		netProfitsByOrder = append(netProfitsByOrder, sumNetProfit)
 	}
 
-	s.NumOfProfitTrade = fixedpoint.Count(profitsByOrder, func(a fixedpoint.Value) bool {
-		return a.Sign() > 0
-	})
-	s.NumOfLossTrade = fixedpoint.Count(profitsByOrder, func(a fixedpoint.Value) bool {
-		return a.Sign() < 0
-	})
+	s.NumOfProfitTrade = fixedpoint.Count(profitsByOrder, fixedpoint.PositiveTester)
+	s.NumOfLossTrade = fixedpoint.Count(profitsByOrder, fixedpoint.NegativeTester)
 	s.TotalNetProfit = fixedpoint.Reduce(profitsByOrder, fixedpoint.SumReducer)
 	s.GrossProfit = fixedpoint.Reduce(profitsByOrder, grossProfitReducer)
 	s.GrossLoss = fixedpoint.Reduce(profitsByOrder, grossLossReducer)
@@ -304,66 +306,12 @@ func (s *TradeStats) update() {
 	sort.Sort(fixedpoint.Descending(profitsByOrder))
 	sort.Sort(fixedpoint.Descending(netProfitsByOrder))
 
-	s.Losses = fixedpoint.Filter(profitsByOrder, fixedpoint.NegativeTester)
 	s.Profits = fixedpoint.Filter(profitsByOrder, fixedpoint.PositiveTester)
+	s.Losses = fixedpoint.Filter(profitsByOrder, fixedpoint.NegativeTester)
 	s.LargestProfitTrade = profitsByOrder[0]
 	s.LargestLossTrade = profitsByOrder[len(profitsByOrder)-1]
 	if s.LargestLossTrade.Sign() > 0 {
 		s.LargestLossTrade = fixedpoint.Zero
-	}
-}
-
-func (s *TradeStats) add(pnl fixedpoint.Value) {
-	if pnl.Sign() > 0 {
-		s.NumOfProfitTrade++
-		s.Profits = append(s.Profits, pnl)
-		s.GrossProfit = s.GrossProfit.Add(pnl)
-		s.LargestProfitTrade = fixedpoint.Max(s.LargestProfitTrade, pnl)
-
-		// consecutive same side (made profit last time)
-		if s.consecutiveSide == 0 || s.consecutiveSide == 1 {
-			s.consecutiveSide = 1
-			s.consecutiveCounter++
-			s.consecutiveAmount = s.consecutiveAmount.Add(pnl)
-		} else { // was loss, now profit, store the last loss and the loss amount
-			s.MaximumConsecutiveLosses = int(math.Max(float64(s.MaximumConsecutiveLosses), float64(s.consecutiveCounter)))
-			s.MaximumConsecutiveLoss = fixedpoint.Min(s.MaximumConsecutiveLoss, s.consecutiveAmount)
-
-			s.consecutiveSide = 1
-			s.consecutiveCounter = 0
-			s.consecutiveAmount = pnl
-		}
-
-	} else {
-		s.NumOfLossTrade++
-		s.Losses = append(s.Losses, pnl)
-		s.GrossLoss = s.GrossLoss.Add(pnl)
-		s.LargestLossTrade = fixedpoint.Min(s.LargestLossTrade, pnl)
-
-		// consecutive same side (made loss last time)
-		if s.consecutiveSide == 0 || s.consecutiveSide == -1 {
-			s.consecutiveSide = -1
-			s.consecutiveCounter++
-			s.consecutiveAmount = s.consecutiveAmount.Add(pnl)
-		} else { // was profit, now loss, store the last win and profit
-			s.MaximumConsecutiveWins = int(math.Max(float64(s.MaximumConsecutiveWins), float64(s.consecutiveCounter)))
-			s.MaximumConsecutiveProfit = fixedpoint.Max(s.MaximumConsecutiveProfit, s.consecutiveAmount)
-
-			s.consecutiveSide = -1
-			s.consecutiveCounter = 0
-			s.consecutiveAmount = pnl
-		}
-
-	}
-	s.TotalNetProfit = s.TotalNetProfit.Add(pnl)
-
-	// The win/loss ratio is your wins divided by your losses.
-	// In the example, suppose for the sake of simplicity that 60 trades were winners, and 40 were losers.
-	// Your win/loss ratio would be 60/40 = 1.5. That would mean that you are winning 50% more often than you are losing.
-	if s.NumOfLossTrade == 0 && s.NumOfProfitTrade > 0 {
-		s.WinningRatio = fixedpoint.One
-	} else {
-		s.WinningRatio = fixedpoint.NewFromFloat(float64(s.NumOfProfitTrade) / float64(s.NumOfLossTrade))
 	}
 
 	s.ProfitFactor = s.GrossProfit.Div(s.GrossLoss.Abs())
@@ -373,10 +321,83 @@ func (s *TradeStats) add(pnl fixedpoint.Value) {
 	if len(s.Losses) > 0 {
 		s.AverageLossTrade = fixedpoint.Avg(s.Losses)
 	}
+
+	s.updateWinningRatio()
+}
+
+func (s *TradeStats) add(profit *Profit) {
+	pnl := profit.Profit
+
+	// order id changed
+	if s.lastOrderID != profit.OrderID {
+		if pnl.Sign() > 0 {
+			s.NumOfProfitTrade++
+			s.GrossProfit = s.GrossProfit.Add(pnl)
+
+			if s.consecutiveSide == 0 {
+				s.consecutiveSide = 1
+				s.consecutiveCounter = 1
+				s.consecutiveAmount = pnl
+			} else if s.consecutiveSide == 1 {
+				s.consecutiveCounter++
+				s.consecutiveAmount = s.consecutiveAmount.Add(pnl)
+				s.MaximumConsecutiveWins = int(math.Max(float64(s.MaximumConsecutiveWins), float64(s.consecutiveCounter)))
+				s.MaximumConsecutiveProfit = fixedpoint.Max(s.MaximumConsecutiveProfit, s.consecutiveAmount)
+			} else {
+				s.MaximumConsecutiveLosses = int(math.Max(float64(s.MaximumConsecutiveLosses), float64(s.consecutiveCounter)))
+				s.MaximumConsecutiveLoss = fixedpoint.Min(s.MaximumConsecutiveLoss, s.consecutiveAmount)
+				s.consecutiveSide = 1
+				s.consecutiveCounter = 1
+				s.consecutiveAmount = pnl
+			}
+		} else {
+			s.NumOfLossTrade++
+			s.GrossLoss = s.GrossLoss.Add(pnl)
+
+			if s.consecutiveSide == 0 {
+				s.consecutiveSide = -1
+				s.consecutiveCounter = 1
+				s.consecutiveAmount = pnl
+			} else if s.consecutiveSide == -1 {
+				s.consecutiveCounter++
+				s.consecutiveAmount = s.consecutiveAmount.Add(pnl)
+				s.MaximumConsecutiveLosses = int(math.Max(float64(s.MaximumConsecutiveLosses), float64(s.consecutiveCounter)))
+				s.MaximumConsecutiveLoss = fixedpoint.Min(s.MaximumConsecutiveLoss, s.consecutiveAmount)
+			} else { // was profit, now loss, store the last win and profit
+				s.MaximumConsecutiveWins = int(math.Max(float64(s.MaximumConsecutiveWins), float64(s.consecutiveCounter)))
+				s.MaximumConsecutiveProfit = fixedpoint.Max(s.MaximumConsecutiveProfit, s.consecutiveAmount)
+				s.consecutiveSide = -1
+				s.consecutiveCounter = 1
+				s.consecutiveAmount = pnl
+			}
+		}
+	} else {
+		s.consecutiveAmount = s.consecutiveAmount.Add(pnl)
+	}
+
+	s.lastOrderID = profit.OrderID
+	s.TotalNetProfit = s.TotalNetProfit.Add(pnl)
+	s.ProfitFactor = s.GrossProfit.Div(s.GrossLoss.Abs())
+
+	s.updateWinningRatio()
+}
+
+func (s *TradeStats) updateWinningRatio() {
+	// The win/loss ratio is your wins divided by your losses.
+	// In the example, suppose for the sake of simplicity that 60 trades were winners, and 40 were losers.
+	// Your win/loss ratio would be 60/40 = 1.5. That would mean that you are winning 50% more often than you are losing.
+	if s.NumOfLossTrade == 0 && s.NumOfProfitTrade == 0 {
+		s.WinningRatio = fixedpoint.Zero
+	} else if s.NumOfLossTrade == 0 && s.NumOfProfitTrade > 0 {
+		s.WinningRatio = fixedpoint.One
+	} else {
+		s.WinningRatio = fixedpoint.NewFromFloat(float64(s.NumOfProfitTrade) / float64(s.NumOfLossTrade))
+	}
 }
 
 // Output TradeStats without Profits and Losses
 func (s *TradeStats) BriefString() string {
+	s.Recalculate()
 	out, _ := yaml.Marshal(&TradeStats{
 		Symbol:                   s.Symbol,
 		WinningRatio:             s.WinningRatio,
@@ -400,6 +421,7 @@ func (s *TradeStats) BriefString() string {
 }
 
 func (s *TradeStats) String() string {
+	s.Recalculate()
 	out, _ := yaml.Marshal(s)
 	return string(out)
 }
