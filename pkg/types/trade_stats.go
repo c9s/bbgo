@@ -390,6 +390,7 @@ func (s *TradeStats) add(profit *Profit) {
 
 // Output TradeStats without Profits and Losses
 func (s *TradeStats) BriefString() string {
+	s.update()
 	out, _ := yaml.Marshal(&TradeStats{
 		Symbol:                   s.Symbol,
 		WinningRatio:             s.WinningRatio,
@@ -413,6 +414,7 @@ func (s *TradeStats) BriefString() string {
 }
 
 func (s *TradeStats) String() string {
+	s.update()
 	out, _ := yaml.Marshal(s)
 	return string(out)
 }
