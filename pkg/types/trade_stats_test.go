@@ -43,3 +43,17 @@ func TestTradeStats_consecutiveCounterAndAmount(t *testing.T) {
 	assert.Equal(t, "-200", stats.MaximumConsecutiveLoss.String())
 	assert.Equal(t, 2, stats.MaximumConsecutiveLosses)
 }
+
+func TestTradeStats_Recalculate(t *testing.T) {
+	stats := NewTradeStats("BTCUSDT")
+	stats.add(&Profit{OrderID: 1, Profit: number(20.0)})
+	stats.add(&Profit{OrderID: 1, Profit: number(30.0)})
+	stats.add(&Profit{OrderID: 2, Profit: number(50.0)})
+	stats.add(&Profit{OrderID: 2, Profit: number(50.0)})
+	stats.add(&Profit{OrderID: 3, Profit: number(-50.0)})
+	stats.add(&Profit{OrderID: 3, Profit: number(-50.0)})
+	assert.Equal(t, "50", stats.TotalNetProfit.String())
+
+	stats.Recalculate()
+	assert.Equal(t, "50", stats.TotalNetProfit.String())
+}
