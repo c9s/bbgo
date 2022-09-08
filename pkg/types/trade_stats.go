@@ -276,8 +276,13 @@ func grossProfitReducer(prev, curr fixedpoint.Value) fixedpoint.Value {
 	return prev
 }
 
-// update the trade stats fields from the orderProfits
-func (s *TradeStats) update() {
+// Recalculate the trade stats fields from the orderProfits
+// this is for live-trading, one order may have many trades, and we need to merge them.
+func (s *TradeStats) Recalculate() {
+	if len(s.orderProfits) == 0 {
+		return
+	}
+
 	var profitsByOrder []fixedpoint.Value
 	var netProfitsByOrder []fixedpoint.Value
 	for _, profits := range s.orderProfits {
@@ -320,6 +325,8 @@ func (s *TradeStats) update() {
 	if len(s.Losses) > 0 {
 		s.AverageLossTrade = fixedpoint.Avg(s.Losses)
 	}
+
+	s.updateWinningRatio()
 }
 
 func (s *TradeStats) add(profit *Profit) {
@@ -376,6 +383,10 @@ func (s *TradeStats) add(profit *Profit) {
 	s.TotalNetProfit = s.TotalNetProfit.Add(pnl)
 	s.ProfitFactor = s.GrossProfit.Div(s.GrossLoss.Abs())
 
+	s.updateWinningRatio()
+}
+
+func (s *TradeStats) updateWinningRatio() {
 	// The win/loss ratio is your wins divided by your losses.
 	// In the example, suppose for the sake of simplicity that 60 trades were winners, and 40 were losers.
 	// Your win/loss ratio would be 60/40 = 1.5. That would mean that you are winning 50% more often than you are losing.
@@ -390,7 +401,7 @@ func (s *TradeStats) add(profit *Profit) {
 
 // Output TradeStats without Profits and Losses
 func (s *TradeStats) BriefString() string {
-	s.update()
+	s.Recalculate()
 	out, _ := yaml.Marshal(&TradeStats{
 		Symbol:                   s.Symbol,
 		WinningRatio:             s.WinningRatio,
@@ -414,7 +425,7 @@ func (s *TradeStats) BriefString() string {
 }
 
 func (s *TradeStats) String() string {
-	s.update()
+	s.Recalculate()
 	out, _ := yaml.Marshal(s)
 	return string(out)
 }
