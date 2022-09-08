@@ -297,12 +297,8 @@ func (s *TradeStats) Recalculate() {
 		netProfitsByOrder = append(netProfitsByOrder, sumNetProfit)
 	}
 
-	s.NumOfProfitTrade = fixedpoint.Count(profitsByOrder, func(a fixedpoint.Value) bool {
-		return a.Sign() > 0
-	})
-	s.NumOfLossTrade = fixedpoint.Count(profitsByOrder, func(a fixedpoint.Value) bool {
-		return a.Sign() < 0
-	})
+	s.NumOfProfitTrade = fixedpoint.Count(profitsByOrder, fixedpoint.PositiveTester)
+	s.NumOfLossTrade = fixedpoint.Count(profitsByOrder, fixedpoint.NegativeTester)
 	s.TotalNetProfit = fixedpoint.Reduce(profitsByOrder, fixedpoint.SumReducer)
 	s.GrossProfit = fixedpoint.Reduce(profitsByOrder, grossProfitReducer)
 	s.GrossLoss = fixedpoint.Reduce(profitsByOrder, grossLossReducer)
@@ -310,8 +306,8 @@ func (s *TradeStats) Recalculate() {
 	sort.Sort(fixedpoint.Descending(profitsByOrder))
 	sort.Sort(fixedpoint.Descending(netProfitsByOrder))
 
-	s.Losses = fixedpoint.Filter(profitsByOrder, fixedpoint.NegativeTester)
 	s.Profits = fixedpoint.Filter(profitsByOrder, fixedpoint.PositiveTester)
+	s.Losses = fixedpoint.Filter(profitsByOrder, fixedpoint.NegativeTester)
 	s.LargestProfitTrade = profitsByOrder[0]
 	s.LargestLossTrade = profitsByOrder[len(profitsByOrder)-1]
 	if s.LargestLossTrade.Sign() > 0 {
