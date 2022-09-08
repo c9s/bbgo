@@ -220,8 +220,8 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		}
 
 		if s.MarketOrder {
-			bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, submitting market sell to open a short position", symbol, kline.Close.Float64(), previousHigh.Float64(), s.Ratio.Float64())
-			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, submitting market sell %f to open a short position", symbol, kline.Close.Float64(), previousHigh.Float64(), s.Ratio.Float64(), quantity.Float64())
+			_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:           s.Symbol,
 				Side:             types.SideTypeSell,
 				Type:             types.OrderTypeMarket,
@@ -229,12 +229,15 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 				MarginSideEffect: types.SideEffectTypeMarginBuy,
 				Tag:              "FailedBreakHighMarket",
 			})
+			if err != nil {
+				bbgo.Notify(err.Error())
+			}
 
 		} else {
 			sellPrice := previousHigh
 
 			bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, submitting limit sell @ %f", symbol, kline.Close.Float64(), previousHigh.Float64(), s.Ratio.Float64(), sellPrice.Float64())
-			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:           kline.Symbol,
 				Side:             types.SideTypeSell,
 				Type:             types.OrderTypeLimit,
@@ -243,6 +246,10 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 				MarginSideEffect: types.SideEffectTypeMarginBuy,
 				Tag:              "FailedBreakHighLimit",
 			})
+
+			if err != nil {
+				bbgo.Notify(err.Error())
+			}
 		}
 	}))
 }
