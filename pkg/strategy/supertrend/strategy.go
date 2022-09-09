@@ -389,7 +389,7 @@ func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoin
 
 		return balance.Available.Mul(fixedpoint.Min(s.Leverage, fixedpoint.One))
 	} else { // Using leverage or spot buy
-		quoteQty, err := risk.CalculateQuoteQuantity(s.session, ctx, s.Market.QuoteCurrency, s.Leverage)
+		quoteQty, err := risk.CalculateQuoteQuantity(ctx, s.session, s.Market.QuoteCurrency, s.Leverage)
 		if err != nil {
 			log.WithError(err).Errorf("can not update %s quote balance from exchange", s.Symbol)
 			return fixedpoint.Zero

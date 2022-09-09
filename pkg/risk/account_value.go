@@ -16,6 +16,8 @@ var log = logrus.WithField("risk", "AccountValueCalculator")
 
 var one = fixedpoint.One
 
+var defaultLeverage = fixedpoint.NewFromInt(3)
+
 var maxLeverage = fixedpoint.NewFromInt(10)
 
 type AccountValueCalculator struct {
@@ -191,7 +193,7 @@ func (c *AccountValueCalculator) MarginLevel(ctx context.Context) (fixedpoint.Va
 func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
 	// default leverage guard
 	if leverage.IsZero() {
-		leverage = fixedpoint.NewFromInt(3)
+		leverage = defaultLeverage
 	}
 
 	baseBalance, _ := session.Account.Balance(market.BaseCurrency)
@@ -271,10 +273,10 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 	return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your settings")
 }
 
-func CalculateQuoteQuantity(session *bbgo.ExchangeSession, ctx context.Context, quoteCurrency string, leverage fixedpoint.Value) (fixedpoint.Value, error) {
+func CalculateQuoteQuantity(ctx context.Context, session *bbgo.ExchangeSession, quoteCurrency string, leverage fixedpoint.Value) (fixedpoint.Value, error) {
 	// default leverage guard
 	if leverage.IsZero() {
-		leverage = fixedpoint.NewFromInt(3)
+		leverage = defaultLeverage
 	}
 
 	quoteBalance, _ := session.Account.Balance(quoteCurrency)
