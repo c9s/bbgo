@@ -1251,33 +1251,20 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 	return createdOrder, err
 }
 
-func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
-	for _, order := range orders {
-		if err := orderLimiter.Wait(ctx); err != nil {
-			log.WithError(err).Errorf("order rate limiter wait error")
-		}
-
-		var createdOrder *types.Order
-		if e.IsMargin {
-			createdOrder, err = e.submitMarginOrder(ctx, order)
-		} else if e.IsFutures {
-			createdOrder, err = e.submitFuturesOrder(ctx, order)
-		} else {
-			createdOrder, err = e.submitSpotOrder(ctx, order)
-		}
-
-		if err != nil {
-			return createdOrders, err
-		}
-
-		if createdOrder == nil {
-			return createdOrders, errors.New("nil converted order")
-		}
-
-		createdOrders = append(createdOrders, *createdOrder)
+func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
+	if err := orderLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("order rate limiter wait error")
 	}
 
-	return createdOrders, err
+	if e.IsMargin {
+		createdOrder, err = e.submitMarginOrder(ctx, order)
+	} else if e.IsFutures {
+		createdOrder, err = e.submitFuturesOrder(ctx, order)
+	} else {
+		createdOrder, err = e.submitSpotOrder(ctx, order)
+	}
+
+	return createdOrder, err
 }
 
 // QueryKLines queries the Kline/candlestick bars for a symbol. Klines are uniquely identified by their open time.

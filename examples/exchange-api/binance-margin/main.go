@@ -94,7 +94,7 @@ var rootCmd = &cobra.Command{
 
 		time.Sleep(time.Second)
 
-		createdOrders, err := exchange.SubmitOrders(ctx, types.SubmitOrder{
+		createdOrders, err := exchange.SubmitOrder(ctx, types.SubmitOrder{
 			Symbol:           symbol,
 			Market:           market,
 			Side:             types.SideTypeBuy,

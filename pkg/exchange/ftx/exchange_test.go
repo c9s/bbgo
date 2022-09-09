@@ -34,7 +34,7 @@ func TestExchange_IOCOrder(t *testing.T) {
 	}
 
 	ex := NewExchange(key, secret, "")
-	createdOrder, err := ex.SubmitOrders(context.Background(), types.SubmitOrder{
+	createdOrder, err := ex.SubmitOrder(context.Background(), types.SubmitOrder{
 		Symbol:   "LTCUSDT",
 		Side:     types.SideTypeBuy,
 		Type:     types.OrderTypeLimitMaker,

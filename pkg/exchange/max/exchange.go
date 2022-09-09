@@ -485,80 +485,73 @@ func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint
 	return nil
 }
 
-func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
+func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
 	walletType := maxapi.WalletTypeSpot
 	if e.MarginSettings.IsMargin {
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	for _, o := range orders {
-		orderType, err := toLocalOrderType(o.Type)
-		if err != nil {
-			return createdOrders, err
-		}
-
-		// case IOC type
-		if orderType == maxapi.OrderTypeLimit && o.TimeInForce == types.TimeInForceIOC {
-			orderType = maxapi.OrderTypeIOCLimit
-		}
-
-		var quantityString string
-		if o.Market.Symbol != "" {
-			quantityString = o.Market.FormatQuantity(o.Quantity)
-		} else {
-			quantityString = o.Quantity.String()
-		}
-
-		clientOrderID := NewClientOrderID(o.ClientOrderID)
-
-		req := e.v3order.NewCreateWalletOrderRequest(walletType)
-		req.Market(toLocalSymbol(o.Symbol)).
-			Side(toLocalSideType(o.Side)).
-			Volume(quantityString).
-			OrderType(orderType).
-			ClientOrderID(clientOrderID)
-
-		switch o.Type {
-		case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
-			var priceInString string
-			if o.Market.Symbol != "" {
-				priceInString = o.Market.FormatPrice(o.Price)
-			} else {
-				priceInString = o.Price.String()
-			}
-			req.Price(priceInString)
-		}
-
-		// set stop price field for limit orders
-		switch o.Type {
-		case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
-			var priceInString string
-			if o.Market.Symbol != "" {
-				priceInString = o.Market.FormatPrice(o.StopPrice)
-			} else {
-				priceInString = o.StopPrice.String()
-			}
-			req.StopPrice(priceInString)
-		}
-
-		retOrder, err := req.Do(ctx)
-		if err != nil {
-			return createdOrders, err
-		}
-
-		if retOrder == nil {
-			return createdOrders, errors.New("returned nil order")
-		}
-
-		createdOrder, err := toGlobalOrder(*retOrder)
-		if err != nil {
-			return createdOrders, err
-		}
-
-		createdOrders = append(createdOrders, *createdOrder)
+	o := order
+	orderType, err := toLocalOrderType(o.Type)
+	if err != nil {
+		return createdOrder, err
 	}
 
-	return createdOrders, err
+	// case IOC type
+	if orderType == maxapi.OrderTypeLimit && o.TimeInForce == types.TimeInForceIOC {
+		orderType = maxapi.OrderTypeIOCLimit
+	}
+
+	var quantityString string
+	if o.Market.Symbol != "" {
+		quantityString = o.Market.FormatQuantity(o.Quantity)
+	} else {
+		quantityString = o.Quantity.String()
+	}
+
+	clientOrderID := NewClientOrderID(o.ClientOrderID)
+
+	req := e.v3order.NewCreateWalletOrderRequest(walletType)
+	req.Market(toLocalSymbol(o.Symbol)).
+		Side(toLocalSideType(o.Side)).
+		Volume(quantityString).
+		OrderType(orderType).
+		ClientOrderID(clientOrderID)
+
+	switch o.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
+		var priceInString string
+		if o.Market.Symbol != "" {
+			priceInString = o.Market.FormatPrice(o.Price)
+		} else {
+			priceInString = o.Price.String()
+		}
+		req.Price(priceInString)
+	}
+
+	// set stop price field for limit orders
+	switch o.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
+		var priceInString string
+		if o.Market.Symbol != "" {
+			priceInString = o.Market.FormatPrice(o.StopPrice)
+		} else {
+			priceInString = o.StopPrice.String()
+		}
+		req.StopPrice(priceInString)
+	}
+
+	retOrder, err := req.Do(ctx)
+	if err != nil {
+		return createdOrder, err
+	}
+
+	if retOrder == nil {
+		return createdOrder, errors.New("returned nil order")
+	}
+
+	createdOrder, err = toGlobalOrder(*retOrder)
+	return createdOrder, err
 }
 
 // PlatformFeeCurrency

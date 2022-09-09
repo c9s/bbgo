@@ -169,31 +169,23 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	return nil, nil
 }
 
-func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
-	for _, order := range orders {
-		symbol := order.Symbol
-		matching, ok := e.matchingBook(symbol)
-		if !ok {
-			return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
-		}
+func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
+	symbol := order.Symbol
+	matching, ok := e.matchingBook(symbol)
+	if !ok {
+		return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
+	}
 
-		createdOrder, _, err := matching.PlaceOrder(order)
-		if err != nil {
-			return nil, err
-		}
-
-		if createdOrder != nil {
-			createdOrders = append(createdOrders, *createdOrder)
-
-			// market order can be closed immediately.
-			switch createdOrder.Status {
-			case types.OrderStatusFilled, types.OrderStatusCanceled, types.OrderStatusRejected:
-				e.addClosedOrder(*createdOrder)
-			}
+	createdOrder, _, err = matching.PlaceOrder(order)
+	if createdOrder != nil {
+		// market order can be closed immediately.
+		switch createdOrder.Status {
+		case types.OrderStatusFilled, types.OrderStatusCanceled, types.OrderStatusRejected:
+			e.addClosedOrder(*createdOrder)
 		}
 	}
 
-	return createdOrders, nil
+	return createdOrder, err
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
