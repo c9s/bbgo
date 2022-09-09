@@ -207,78 +207,74 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	return klines, nil
 }
 
-func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
-	for _, order := range orders {
-		req := e.client.TradeService.NewPlaceOrderRequest()
-		req.Symbol(toLocalSymbol(order.Symbol))
-		req.Side(toLocalSide(order.Side))
+func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
+	req := e.client.TradeService.NewPlaceOrderRequest()
+	req.Symbol(toLocalSymbol(order.Symbol))
+	req.Side(toLocalSide(order.Side))
 
-		if order.ClientOrderID != "" {
-			req.ClientOrderID(order.ClientOrderID)
-		}
-
-		if order.Market.Symbol != "" {
-			req.Size(order.Market.FormatQuantity(order.Quantity))
-		} else {
-			// TODO: report error?
-			req.Size(order.Quantity.FormatString(8))
-		}
-
-		// set price field for limit orders
-		switch order.Type {
-		case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
-			if order.Market.Symbol != "" {
-				req.Price(order.Market.FormatPrice(order.Price))
-			} else {
-				// TODO: report error?
-				req.Price(order.Price.FormatString(8))
-			}
-		}
-
-		if order.Type == types.OrderTypeLimitMaker {
-			req.PostOnly(true)
-		}
-
-		switch order.TimeInForce {
-		case "FOK":
-			req.TimeInForce(kucoinapi.TimeInForceFOK)
-		case "IOC":
-			req.TimeInForce(kucoinapi.TimeInForceIOC)
-		default:
-			// default to GTC
-			req.TimeInForce(kucoinapi.TimeInForceGTC)
-		}
-
-		switch order.Type {
-		case types.OrderTypeStopLimit:
-			req.OrderType(kucoinapi.OrderTypeStopLimit)
-
-		case types.OrderTypeLimit, types.OrderTypeLimitMaker:
-			req.OrderType(kucoinapi.OrderTypeLimit)
-
-		case types.OrderTypeMarket:
-			req.OrderType(kucoinapi.OrderTypeMarket)
-		}
-
-		orderResponse, err := req.Do(ctx)
-		if err != nil {
-			return createdOrders, err
-		}
-
-		createdOrders = append(createdOrders, types.Order{
-			SubmitOrder:      order,
-			Exchange:         types.ExchangeKucoin,
-			OrderID:          hashStringID(orderResponse.OrderID),
-			UUID:             orderResponse.OrderID,
-			Status:           types.OrderStatusNew,
-			ExecutedQuantity: fixedpoint.Zero,
-			IsWorking:        true,
-			CreationTime:     types.Time(time.Now()),
-			UpdateTime:       types.Time(time.Now()),
-		})
+	if order.ClientOrderID != "" {
+		req.ClientOrderID(order.ClientOrderID)
 	}
 
-	return createdOrders, err
+	if order.Market.Symbol != "" {
+		req.Size(order.Market.FormatQuantity(order.Quantity))
+	} else {
+		// TODO: report error?
+		req.Size(order.Quantity.FormatString(8))
+	}
+
+	// set price field for limit orders
+	switch order.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
+		if order.Market.Symbol != "" {
+			req.Price(order.Market.FormatPrice(order.Price))
+		} else {
+			// TODO: report error?
+			req.Price(order.Price.FormatString(8))
+		}
+	}
+
+	if order.Type == types.OrderTypeLimitMaker {
+		req.PostOnly(true)
+	}
+
+	switch order.TimeInForce {
+	case "FOK":
+		req.TimeInForce(kucoinapi.TimeInForceFOK)
+	case "IOC":
+		req.TimeInForce(kucoinapi.TimeInForceIOC)
+	default:
+		// default to GTC
+		req.TimeInForce(kucoinapi.TimeInForceGTC)
+	}
+
+	switch order.Type {
+	case types.OrderTypeStopLimit:
+		req.OrderType(kucoinapi.OrderTypeStopLimit)
+
+	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
+		req.OrderType(kucoinapi.OrderTypeLimit)
+
+	case types.OrderTypeMarket:
+		req.OrderType(kucoinapi.OrderTypeMarket)
+	}
+
+	orderResponse, err := req.Do(ctx)
+	if err != nil {
+		return createdOrder, err
+	}
+
+	return &types.Order{
+		SubmitOrder:      order,
+		Exchange:         types.ExchangeKucoin,
+		OrderID:          hashStringID(orderResponse.OrderID),
+		UUID:             orderResponse.OrderID,
+		Status:           types.OrderStatusNew,
+		ExecutedQuantity: fixedpoint.Zero,
+		IsWorking:        true,
+		CreationTime:     types.Time(time.Now()),
+		UpdateTime:       types.Time(time.Now()),
+	}, nil
 }
 
 // QueryOpenOrders

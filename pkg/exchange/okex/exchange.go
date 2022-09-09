@@ -159,78 +159,97 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return balanceMap, nil
 }
 
-func (e *Exchange) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error) {
-	var reqs []*okexapi.PlaceOrderRequest
-	for _, order := range orders {
-		orderReq := e.client.TradeService.NewPlaceOrderRequest()
+func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
+	orderReq := e.client.TradeService.NewPlaceOrderRequest()
 
-		orderType, err := toLocalOrderType(order.Type)
-		if err != nil {
-			return nil, err
-		}
-
-		orderReq.InstrumentID(toLocalSymbol(order.Symbol))
-		orderReq.Side(toLocalSideType(order.Side))
-
-		if order.Market.Symbol != "" {
-			orderReq.Quantity(order.Market.FormatQuantity(order.Quantity))
-		} else {
-			// TODO report error
-			orderReq.Quantity(order.Quantity.FormatString(8))
-		}
-
-		// set price field for limit orders
-		switch order.Type {
-		case types.OrderTypeStopLimit, types.OrderTypeLimit:
-			if order.Market.Symbol != "" {
-				orderReq.Price(order.Market.FormatPrice(order.Price))
-			} else {
-				// TODO report error
-				orderReq.Price(order.Price.FormatString(8))
-			}
-		}
-
-		switch order.TimeInForce {
-		case "FOK":
-			orderReq.OrderType(okexapi.OrderTypeFOK)
-		case "IOC":
-			orderReq.OrderType(okexapi.OrderTypeIOC)
-		default:
-			orderReq.OrderType(orderType)
-		}
-
-		reqs = append(reqs, orderReq)
-	}
-
-	batchReq := e.client.TradeService.NewBatchPlaceOrderRequest()
-	batchReq.Add(reqs...)
-	orderHeads, err := batchReq.Do(ctx)
+	orderType, err := toLocalOrderType(order.Type)
 	if err != nil {
 		return nil, err
 	}
 
-	for idx, orderHead := range orderHeads {
-		orderID, err := strconv.ParseInt(orderHead.OrderID, 10, 64)
-		if err != nil {
-			return createdOrders, err
-		}
+	orderReq.InstrumentID(toLocalSymbol(order.Symbol))
+	orderReq.Side(toLocalSideType(order.Side))
 
-		submitOrder := orders[idx]
-		createdOrders = append(createdOrders, types.Order{
-			SubmitOrder:      submitOrder,
-			Exchange:         types.ExchangeOKEx,
-			OrderID:          uint64(orderID),
-			Status:           types.OrderStatusNew,
-			ExecutedQuantity: fixedpoint.Zero,
-			IsWorking:        true,
-			CreationTime:     types.Time(time.Now()),
-			UpdateTime:       types.Time(time.Now()),
-			IsMargin:         false,
-			IsIsolated:       false,
-		})
+	if order.Market.Symbol != "" {
+		orderReq.Quantity(order.Market.FormatQuantity(order.Quantity))
+	} else {
+		// TODO report error
+		orderReq.Quantity(order.Quantity.FormatString(8))
 	}
 
-	return createdOrders, nil
+	// set price field for limit orders
+	switch order.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeLimit:
+		if order.Market.Symbol != "" {
+			orderReq.Price(order.Market.FormatPrice(order.Price))
+		} else {
+			// TODO report error
+			orderReq.Price(order.Price.FormatString(8))
+		}
+	}
+
+	switch order.TimeInForce {
+	case "FOK":
+		orderReq.OrderType(okexapi.OrderTypeFOK)
+	case "IOC":
+		orderReq.OrderType(okexapi.OrderTypeIOC)
+	default:
+		orderReq.OrderType(orderType)
+	}
+
+	orderHead, err := orderReq.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	orderID, err := strconv.ParseInt(orderHead.OrderID, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Order{
+		SubmitOrder:      order,
+		Exchange:         types.ExchangeOKEx,
+		OrderID:          uint64(orderID),
+		Status:           types.OrderStatusNew,
+		ExecutedQuantity: fixedpoint.Zero,
+		IsWorking:        true,
+		CreationTime:     types.Time(time.Now()),
+		UpdateTime:       types.Time(time.Now()),
+		IsMargin:         false,
+		IsIsolated:       false,
+	}, nil
+
+	// TODO: move this to batch place orders interface
+	/*
+		batchReq := e.client.TradeService.NewBatchPlaceOrderRequest()
+		batchReq.Add(reqs...)
+		orderHeads, err := batchReq.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for idx, orderHead := range orderHeads {
+			orderID, err := strconv.ParseInt(orderHead.OrderID, 10, 64)
+			if err != nil {
+				return createdOrder, err
+			}
+
+			submitOrder := order[idx]
+			createdOrder = append(createdOrder, types.Order{
+				SubmitOrder:      submitOrder,
+				Exchange:         types.ExchangeOKEx,
+				OrderID:          uint64(orderID),
+				Status:           types.OrderStatusNew,
+				ExecutedQuantity: fixedpoint.Zero,
+				IsWorking:        true,
+				CreationTime:     types.Time(time.Now()),
+				UpdateTime:       types.Time(time.Now()),
+				IsMargin:         false,
+				IsIsolated:       false,
+			})
+		}
+	*/
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {

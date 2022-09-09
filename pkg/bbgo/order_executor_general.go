@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -110,28 +111,14 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 		return nil, err
 	}
 
-	var createdOrders types.OrderSlice
-
-	retOrders, err := e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
-	if len(retOrders) > 0 {
-		createdOrders = append(createdOrders, retOrders...)
-	}
-
-	if err != nil {
-		// retry once
-		retOrders, err = e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
-		if len(retOrders) > 0 {
-			createdOrders = append(createdOrders, retOrders...)
+	createdOrders, errIdx, err := BatchPlaceOrder(ctx, e.session.Exchange, formattedOrders...)
+	if len(errIdx) > 0 {
+		createdOrders2, err2 := BatchRetryPlaceOrder(ctx, e.session.Exchange, errIdx, formattedOrders...)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+		} else {
+			createdOrders = append(createdOrders, createdOrders2...)
 		}
-
-		if err != nil {
-			err = fmt.Errorf("can not place orders: %w", err)
-		}
-	}
-
-	// FIXME: map by price and volume
-	for i := 0; i < len(createdOrders); i++ {
-		createdOrders[i].Tag = formattedOrders[i].Tag
 	}
 
 	e.orderStore.Add(createdOrders...)
