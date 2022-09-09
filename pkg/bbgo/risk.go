@@ -1,34 +1,30 @@
-package risk
+package bbgo
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-var log = logrus.WithField("risk", "AccountValueCalculator")
-
-var one = fixedpoint.One
 
 var defaultLeverage = fixedpoint.NewFromInt(3)
 
 var maxLeverage = fixedpoint.NewFromInt(10)
 
 type AccountValueCalculator struct {
-	session       *bbgo.ExchangeSession
+	session       *ExchangeSession
 	quoteCurrency string
 	prices        map[string]fixedpoint.Value
 	tickers       map[string]types.Ticker
 	updateTime    time.Time
 }
 
-func NewAccountValueCalculator(session *bbgo.ExchangeSession, quoteCurrency string) *AccountValueCalculator {
+func NewAccountValueCalculator(session *ExchangeSession, quoteCurrency string) *AccountValueCalculator {
 	return &AccountValueCalculator{
 		session:       session,
 		quoteCurrency: quoteCurrency,
@@ -190,7 +186,7 @@ func (c *AccountValueCalculator) MarginLevel(ctx context.Context) (fixedpoint.Va
 	return marginLevel, nil
 }
 
-func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
+func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
 	// default leverage guard
 	if leverage.IsZero() {
 		leverage = defaultLeverage
@@ -205,7 +201,7 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 		balance, hasBalance := session.Account.Balance(market.BaseCurrency)
 		if hasBalance {
 			if quantity.IsZero() {
-				logrus.Warnf("sell quantity is not set, using all available base balance: %v", balance)
+				log.Warnf("sell quantity is not set, using all available base balance: %v", balance)
 				if !balance.Available.IsZero() {
 					return balance.Available, nil
 				}
@@ -222,7 +218,7 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 	}
 
 	// using leverage -- starts from here
-	logrus.Infof("calculating available leveraged base quantity: base balance = %+v, quote balance = %+v", baseBalance, quoteBalance)
+	log.Infof("calculating available leveraged base quantity: base balance = %+v, quote balance = %+v", baseBalance, quoteBalance)
 
 	// calculate the quantity automatically
 	if session.Margin || session.IsolatedMargin {
@@ -232,22 +228,22 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 		// avoid using all account value since there will be some trade loss for interests and the fee
 		accountValue = accountValue.Mul(one.Sub(fixedpoint.NewFromFloat(0.01)))
 
-		logrus.Infof("calculated account value %f %s", accountValue.Float64(), market.QuoteCurrency)
+		log.Infof("calculated account value %f %s", accountValue.Float64(), market.QuoteCurrency)
 
 		if session.IsolatedMargin {
 			originLeverage := leverage
 			leverage = fixedpoint.Min(leverage, maxLeverage)
-			logrus.Infof("using isolated margin, maxLeverage=10 originalLeverage=%f currentLeverage=%f",
+			log.Infof("using isolated margin, maxLeverage=10 originalLeverage=%f currentLeverage=%f",
 				originLeverage.Float64(),
 				leverage.Float64())
 		}
 
 		// spot margin use the equity value, so we use the total quote balance here
-		maxPosition := CalculateMaxPosition(price, accountValue, leverage)
+		maxPosition := risk.CalculateMaxPosition(price, accountValue, leverage)
 		debt := baseBalance.Debt()
 		maxQuantity := maxPosition.Sub(debt)
 
-		logrus.Infof("margin leverage: calculated maxQuantity=%f maxPosition=%f debt=%f price=%f accountValue=%f %s leverage=%f",
+		log.Infof("margin leverage: calculated maxQuantity=%f maxPosition=%f debt=%f price=%f accountValue=%f %s leverage=%f",
 			maxQuantity.Float64(),
 			maxPosition.Float64(),
 			debt.Float64(),
@@ -261,8 +257,8 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 
 	if session.Futures || session.IsolatedFutures {
 		// TODO: get mark price here
-		maxPositionQuantity := CalculateMaxPosition(price, quoteBalance.Available, leverage)
-		requiredPositionCost := CalculatePositionCost(price, price, maxPositionQuantity, leverage, types.SideTypeSell)
+		maxPositionQuantity := risk.CalculateMaxPosition(price, quoteBalance.Available, leverage)
+		requiredPositionCost := risk.CalculatePositionCost(price, price, maxPositionQuantity, leverage, types.SideTypeSell)
 		if quoteBalance.Available.Compare(requiredPositionCost) < 0 {
 			return maxPositionQuantity, fmt.Errorf("available margin %f %s is not enough, can not submit order", quoteBalance.Available.Float64(), market.QuoteCurrency)
 		}
@@ -273,7 +269,7 @@ func CalculateBaseQuantity(session *bbgo.ExchangeSession, market types.Market, p
 	return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your settings")
 }
 
-func CalculateQuoteQuantity(ctx context.Context, session *bbgo.ExchangeSession, quoteCurrency string, leverage fixedpoint.Value) (fixedpoint.Value, error) {
+func CalculateQuoteQuantity(ctx context.Context, session *ExchangeSession, quoteCurrency string, leverage fixedpoint.Value) (fixedpoint.Value, error) {
 	// default leverage guard
 	if leverage.IsZero() {
 		leverage = defaultLeverage
@@ -294,7 +290,8 @@ func CalculateQuoteQuantity(ctx context.Context, session *bbgo.ExchangeSession, 
 		log.WithError(err).Errorf("can not update available quote")
 		return fixedpoint.Zero, err
 	}
-	logrus.Infof("calculating available leveraged quote quantity: account available quote = %+v", availableQuote)
+
+	log.Infof("calculating available leveraged quote quantity: account available quote = %+v", availableQuote)
 
 	return availableQuote.Mul(leverage), nil
 }

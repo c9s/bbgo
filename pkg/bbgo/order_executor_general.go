@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -180,7 +179,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 
 	if options.Long {
 		if quantity.IsZero() {
-			quoteQuantity, err := risk.CalculateQuoteQuantity(ctx, e.session, e.position.QuoteCurrency, options.Leverage)
+			quoteQuantity, err := CalculateQuoteQuantity(ctx, e.session, e.position.QuoteCurrency, options.Leverage)
 			if err != nil {
 				return err
 			}
@@ -200,7 +199,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 	} else if options.Short {
 		if quantity.IsZero() {
 			var err error
-			quantity, err = risk.CalculateBaseQuantity(e.session, e.position.Market, price, quantity, options.Leverage)
+			quantity, err = CalculateBaseQuantity(e.session, e.position.Market, price, quantity, options.Leverage)
 			if err != nil {
 				return err
 			}

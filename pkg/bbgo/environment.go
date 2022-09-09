@@ -21,7 +21,7 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/tucnak/telebot.v2"
 
-	exchange2 "github.com/c9s/bbgo/pkg/exchange"
+	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
@@ -223,12 +223,12 @@ func (environ *Environment) ConfigureExchangeSessions(userConfig *Config) error 
 func (environ *Environment) AddExchangesByViperKeys() error {
 	for _, n := range types.SupportedExchanges {
 		if viper.IsSet(string(n) + "-api-key") {
-			exchange, err := exchange2.NewWithEnvVarPrefix(n, "")
+			ex, err := exchange.NewWithEnvVarPrefix(n, "")
 			if err != nil {
 				return err
 			}
 
-			environ.AddExchange(n.String(), exchange)
+			environ.AddExchange(n.String(), ex)
 		}
 	}
 
