@@ -1,4 +1,4 @@
-package risk
+package bbgo
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
@@ -40,7 +39,7 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 			"BTCUSDT": newTestTicker(),
 		}, nil)
 
-		session := bbgo.NewExchangeSession("test", mockEx)
+		session := NewExchangeSession("test", mockEx)
 		session.Account.UpdateBalances(types.BalanceMap{
 			"BTC": {
 				Currency:  "BTC",
@@ -81,7 +80,7 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 			"BTCUSDT": newTestTicker(),
 		}, nil)
 
-		session := bbgo.NewExchangeSession("test", mockEx)
+		session := NewExchangeSession("test", mockEx)
 		session.Account.UpdateBalances(types.BalanceMap{
 			"BTC": {
 				Currency:  "BTC",
@@ -123,7 +122,7 @@ func TestNewAccountValueCalculator_MarginLevel(t *testing.T) {
 		"BTCUSDT": newTestTicker(),
 	}, nil)
 
-	session := bbgo.NewExchangeSession("test", mockEx)
+	session := NewExchangeSession("test", mockEx)
 	session.Account.UpdateBalances(types.BalanceMap{
 		"BTC": {
 			Currency:  "BTC",

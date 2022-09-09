@@ -6,7 +6,6 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -197,7 +196,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		// graceful cancel all active orders
 		_ = orderExecutor.GracefulCancel(ctx)
 
-		quantity, err := risk.CalculateBaseQuantity(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
+		quantity, err := bbgo.CalculateBaseQuantity(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
 		if err != nil {
 			log.WithError(err).Errorf("quantity calculation error")
 		}
@@ -241,7 +240,7 @@ func (s *BreakLow) pilotQuantityCalculation() {
 		s.Quantity.Float64(),
 		s.Leverage.Float64())
 
-	quantity, err := risk.CalculateBaseQuantity(s.session, s.Market, s.lastLow, s.Quantity, s.Leverage)
+	quantity, err := bbgo.CalculateBaseQuantity(s.session, s.Market, s.lastLow, s.Quantity, s.Leverage)
 	if err != nil {
 		log.WithError(err).Errorf("quantity calculation error")
 	}

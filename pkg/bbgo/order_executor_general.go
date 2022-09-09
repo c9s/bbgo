@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -126,6 +127,96 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 	e.activeMakerOrders.Add(createdOrders...)
 	e.tradeCollector.Process()
 	return createdOrders, err
+}
+
+type OpenPositionOptions struct {
+	// Long is for open a long position
+	// Long or Short must be set
+	Long bool
+
+	// Short is for open a short position
+	// Long or Short must be set
+	Short bool
+
+	// Leverage is used for leveraged position and account
+	Leverage fixedpoint.Value
+
+	Quantity        fixedpoint.Value
+	MarketOrder     bool
+	LimitOrder      bool
+	LimitTakerRatio fixedpoint.Value
+	CurrentPrice    fixedpoint.Value
+	Tag             string
+}
+
+func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) error {
+	price := options.CurrentPrice
+	submitOrder := types.SubmitOrder{
+		Symbol:           e.position.Symbol,
+		Type:             types.OrderTypeMarket,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
+		Tag:              options.Tag,
+	}
+
+	if !options.LimitTakerRatio.IsZero() {
+		if options.Long {
+			// use higher price to buy (this ensures that our order will be filled)
+			price = price.Mul(one.Add(options.LimitTakerRatio))
+		} else if options.Short {
+			// use lower price to sell (this ensures that our order will be filled)
+			price = price.Mul(one.Sub(options.LimitTakerRatio))
+		}
+	}
+
+	if options.MarketOrder {
+		submitOrder.Type = types.OrderTypeMarket
+	} else if options.LimitOrder {
+		submitOrder.Type = types.OrderTypeLimit
+		submitOrder.Price = price
+	}
+
+	quantity := options.Quantity
+
+	if options.Long {
+		if quantity.IsZero() {
+			quoteQuantity, err := CalculateQuoteQuantity(ctx, e.session, e.position.QuoteCurrency, options.Leverage)
+			if err != nil {
+				return err
+			}
+
+			quantity = quoteQuantity.Div(price)
+		}
+
+		submitOrder.Side = types.SideTypeBuy
+		submitOrder.Quantity = quantity
+
+		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
+		if err2 != nil {
+			return err2
+		}
+		_ = createdOrder
+		return nil
+	} else if options.Short {
+		if quantity.IsZero() {
+			var err error
+			quantity, err = CalculateBaseQuantity(e.session, e.position.Market, price, quantity, options.Leverage)
+			if err != nil {
+				return err
+			}
+		}
+
+		submitOrder.Side = types.SideTypeSell
+		submitOrder.Quantity = quantity
+
+		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
+		if err2 != nil {
+			return err2
+		}
+		_ = createdOrder
+		return nil
+	}
+
+	return errors.New("options Long or Short must be set")
 }
 
 // GracefulCancelActiveOrderBook cancels the orders from the active orderbook.

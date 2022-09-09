@@ -6,7 +6,6 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -199,6 +198,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		// stop EMA protection
 		if s.StopEMA != nil {
 			if !s.StopEMA.Allowed(closePrice) {
+				bbgo.Notify("stopEMA protection: close price %f %s", kline.Close.Float64(), s.StopEMA.String())
 				return
 			}
 		}
@@ -208,7 +208,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		// graceful cancel all active orders
 		_ = orderExecutor.GracefulCancel(ctx)
 
-		quantity, err := risk.CalculateBaseQuantity(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
+		quantity, err := bbgo.CalculateBaseQuantity(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
 		if err != nil {
 			log.WithError(err).Errorf("quantity calculation error")
 		}
@@ -219,8 +219,8 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		}
 
 		if s.MarketOrder {
-			bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, submitting market sell to open a short position", symbol, kline.Close.Float64(), previousHigh.Float64(), s.Ratio.Float64())
-			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, submitting market sell %f to open a short position", symbol, kline.Close.Float64(), previousHigh.Float64(), s.Ratio.Float64(), quantity.Float64())
+			_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:           s.Symbol,
 				Side:             types.SideTypeSell,
 				Type:             types.OrderTypeMarket,
@@ -228,12 +228,15 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 				MarginSideEffect: types.SideEffectTypeMarginBuy,
 				Tag:              "FailedBreakHighMarket",
 			})
+			if err != nil {
+				bbgo.Notify(err.Error())
+			}
 
 		} else {
 			sellPrice := previousHigh
 
 			bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, submitting limit sell @ %f", symbol, kline.Close.Float64(), previousHigh.Float64(), s.Ratio.Float64(), sellPrice.Float64())
-			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:           kline.Symbol,
 				Side:             types.SideTypeSell,
 				Type:             types.OrderTypeLimit,
@@ -242,6 +245,10 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 				MarginSideEffect: types.SideEffectTypeMarginBuy,
 				Tag:              "FailedBreakHighLimit",
 			})
+
+			if err != nil {
+				bbgo.Notify(err.Error())
+			}
 		}
 	}))
 }
@@ -252,7 +259,7 @@ func (s *FailedBreakHigh) pilotQuantityCalculation() {
 		s.Quantity.Float64(),
 		s.Leverage.Float64())
 
-	quantity, err := risk.CalculateBaseQuantity(s.session, s.Market, s.lastHigh, s.Quantity, s.Leverage)
+	quantity, err := bbgo.CalculateBaseQuantity(s.session, s.Market, s.lastHigh, s.Quantity, s.Leverage)
 	if err != nil {
 		log.WithError(err).Errorf("quantity calculation error")
 	}
