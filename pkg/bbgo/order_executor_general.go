@@ -110,14 +110,25 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 		return nil, err
 	}
 
-	createdOrders, err := e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
+	var createdOrders types.OrderSlice
+
+	retOrders, err := e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
+	if len(retOrders) > 0 {
+		createdOrders = append(createdOrders, retOrders...)
+	}
+
 	if err != nil {
-		// Retry once
-		createdOrders, err = e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
+		// retry once
+		retOrders, err = e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
+		if len(retOrders) > 0 {
+			createdOrders = append(createdOrders, retOrders...)
+		}
+
 		if err != nil {
 			err = fmt.Errorf("can not place orders: %w", err)
 		}
 	}
+
 	// FIXME: map by price and volume
 	for i := 0; i < len(createdOrders); i++ {
 		createdOrders[i].Tag = formattedOrders[i].Tag
