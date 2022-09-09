@@ -7,7 +7,6 @@ import (
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -128,7 +127,7 @@ func (s *ResistanceShort) updateResistanceOrders(closePrice fixedpoint.Value) {
 }
 
 func (s *ResistanceShort) placeResistanceOrders(ctx context.Context, resistancePrice fixedpoint.Value) {
-	totalQuantity, err := risk.CalculateBaseQuantity(s.session, s.Market, resistancePrice, s.Quantity, s.Leverage)
+	totalQuantity, err := bbgo.CalculateBaseQuantity(s.session, s.Market, resistancePrice, s.Quantity, s.Leverage)
 	if err != nil {
 		log.WithError(err).Errorf("quantity calculation error")
 	}

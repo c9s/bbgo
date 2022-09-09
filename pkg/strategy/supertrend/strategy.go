@@ -6,12 +6,11 @@ import (
 	"os"
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/data/tsv"
-	"github.com/c9s/bbgo/pkg/datatype/floats"
-	"github.com/c9s/bbgo/pkg/risk"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/data/tsv"
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -188,7 +187,7 @@ type Strategy struct {
 	Leverage fixedpoint.Value `json:"leverage"`
 	// Quantity sets the fixed order qty, takes precedence over Leverage
 	Quantity               fixedpoint.Value `json:"quantity"`
-	AccountValueCalculator *risk.AccountValueCalculator
+	AccountValueCalculator *bbgo.AccountValueCalculator
 
 	// TakeProfitAtrMultiplier TP according to ATR multiple, 0 to disable this
 	TakeProfitAtrMultiplier float64 `json:"takeProfitAtrMultiplier"`
@@ -404,7 +403,7 @@ func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoin
 
 		return balance.Available.Mul(fixedpoint.Min(s.Leverage, fixedpoint.One))
 	} else { // Using leverage or spot buy
-		quoteQty, err := risk.CalculateQuoteQuantity(s.session, ctx, s.Market.QuoteCurrency, s.Leverage)
+		quoteQty, err := bbgo.CalculateQuoteQuantity(ctx, s.session, s.Market.QuoteCurrency, s.Leverage)
 		if err != nil {
 			log.WithError(err).Errorf("can not update %s quote balance from exchange", s.Symbol)
 			return fixedpoint.Zero
@@ -464,7 +463,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.Bind()
 
 	// AccountValueCalculator
-	s.AccountValueCalculator = risk.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
+	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
 
 	// Accumulated profit report
 	if bbgo.IsBackTesting {
