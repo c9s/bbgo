@@ -18,6 +18,10 @@ type PositionCloser interface {
 	ClosePosition(ctx context.Context, percentage fixedpoint.Value) error
 }
 
+type PositionResetter interface {
+	ResetPosition() error
+}
+
 type PositionReader interface {
 	CurrentPosition() *types.Position
 }
@@ -172,7 +176,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			reply.AddMultipleButtons(generateStrategyButtonsForm(strategies))
 			reply.Message("Please choose one strategy")
 		} else {
-			reply.Message("No strategy supports PositionReader")
+			reply.Message("No any strategy supports PositionReader")
 		}
 		return nil
 	}).Cycle(func(signature string, reply interact.Reply) error {
@@ -206,6 +210,33 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		return nil
 	})
 
+	i.PrivateCommand("/resetposition", "Reset position", func(reply interact.Reply) error {
+		// it.trader.exchangeStrategies
+		// send symbol options
+		if strategies, found := filterStrategyByInterface((*PositionResetter)(nil), it.exchangeStrategies); found {
+			reply.AddMultipleButtons(generateStrategyButtonsForm(strategies))
+			reply.Message("Please choose one strategy")
+		} else {
+			reply.Message("No strategy supports PositionResetter interface")
+		}
+		return nil
+	}).Next(func(signature string, reply interact.Reply) error {
+		strategy, ok := it.exchangeStrategies[signature]
+		if !ok {
+			reply.Message("Strategy not found")
+			return fmt.Errorf("strategy %s not found", signature)
+		}
+
+		resetter, implemented := strategy.(PositionResetter)
+		if !implemented {
+			reply.Message(fmt.Sprintf("Strategy %s does not support PositionResetter", signature))
+			return fmt.Errorf("strategy %s does not implement PositionResetter interface", signature)
+		}
+
+		err := resetter.ResetPosition()
+		return err
+	})
+
 	i.PrivateCommand("/closeposition", "Close position", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
@@ -213,7 +244,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			reply.AddMultipleButtons(generateStrategyButtonsForm(strategies))
 			reply.Message("Please choose one strategy")
 		} else {
-			reply.Message("No strategy supports PositionCloser")
+			reply.Message("No strategy supports PositionCloser interface")
 		}
 		return nil
 	}).Next(func(signature string, reply interact.Reply) error {
