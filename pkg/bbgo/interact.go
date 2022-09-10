@@ -228,12 +228,26 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 
 		resetter, implemented := strategy.(PositionResetter)
-		if !implemented {
-			reply.Message(fmt.Sprintf("Strategy %s does not support PositionResetter", signature))
-			return fmt.Errorf("strategy %s does not implement PositionResetter interface", signature)
+		if implemented {
+			return resetter.ResetPosition()
 		}
 
-		err := resetter.ResetPosition()
+		reset := false
+		err := dynamic.IterateFields(strategy, func(ft reflect.StructField, fv reflect.Value) error {
+			posType := reflect.TypeOf(&types.Position{})
+			if ft.Type == posType {
+				if pos, typeOk := fv.Interface().(*types.Position); typeOk {
+					pos.Reset()
+					reset = true
+				}
+			}
+			return nil
+		})
+
+		if reset {
+			reply.Message("Position is reset")
+		}
+
 		return err
 	})
 
