@@ -62,6 +62,7 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 	return createdOrders, err
 }
 
+// BatchPlaceOrder
 func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
 	var createdOrders types.OrderSlice
 	var err error
