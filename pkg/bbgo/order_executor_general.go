@@ -143,27 +143,25 @@ type OpenPositionOptions struct {
 	Quantity fixedpoint.Value `json:"quantity,omitempty"`
 
 	// MarketOrder set to true to open a position with a market order
-	MarketOrder bool
+	MarketOrder bool `json:"marketOrder,omitempty"`
 
 	// LimitOrder set to true to open a position with a limit order
-	LimitOrder bool
+	LimitOrder bool `json:"limitOrder,omitempty"`
 
 	// LimitTakerRatio is used when LimitOrder = true, it adjusts the price of the limit order with a ratio.
 	// So you can ensure that the limit order can be a taker order. Higher the ratio, higher the chance it could be a taker order.
-	LimitTakerRatio fixedpoint.Value
-	CurrentPrice    fixedpoint.Value
-	Tag             string
+	LimitTakerRatio fixedpoint.Value `json:"limitTakerRatio,omitempty"`
+	CurrentPrice    fixedpoint.Value `json:"currentPrice,omitempty"`
+	Tags            []string         `json:"tags"`
 }
 
 func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) error {
-	log.Infof("opening %s position: %+v", e.position.Symbol, options)
-
 	price := options.CurrentPrice
 	submitOrder := types.SubmitOrder{
 		Symbol:           e.position.Symbol,
 		Type:             types.OrderTypeMarket,
 		MarginSideEffect: types.SideEffectTypeMarginBuy,
-		Tag:              options.Tag,
+		Tag:              strings.Join(options.Tags, ","),
 	}
 
 	if !options.LimitTakerRatio.IsZero() {
@@ -198,6 +196,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Side = types.SideTypeBuy
 		submitOrder.Quantity = quantity
 
+		Notify("Opening %s long position with quantity %f at price %f", e.position.Symbol, quantity.Float64(), price.Float64())
 		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
 		if err2 != nil {
 			return err2
@@ -216,6 +215,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Side = types.SideTypeSell
 		submitOrder.Quantity = quantity
 
+		Notify("Opening %s short position with quantity %f at price %f", e.position.Symbol, quantity.Float64(), price.Float64())
 		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
 		if err2 != nil {
 			return err2
@@ -261,7 +261,7 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	submitOrder.Tag = tagStr
 
 	Notify("closing %s position %s with tags: %v", e.symbol, percentage.Percentage(), tagStr)
-	
+
 	_, err := e.SubmitOrders(ctx, *submitOrder)
 	return err
 }
