@@ -248,6 +248,9 @@ func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context) error {
 	return e.GracefulCancelActiveOrderBook(ctx, e.activeMakerOrders)
 }
 
+// ClosePosition closes the current position by a percentage.
+// percentage 0.1 means close 10% position
+// tag is the order tag you want to attach, you may pass multiple tags, the tags will be combined into one tag string by commas.
 func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fixedpoint.Value, tags ...string) error {
 	submitOrder := e.position.NewMarketCloseOrder(percentage)
 	if submitOrder == nil {
