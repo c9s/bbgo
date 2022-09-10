@@ -94,7 +94,7 @@ var rootCmd = &cobra.Command{
 
 		time.Sleep(time.Second)
 
-		createdOrders, err := exchange.SubmitOrder(ctx, types.SubmitOrder{
+		createdOrder, err := exchange.SubmitOrder(ctx, types.SubmitOrder{
 			Symbol:           symbol,
 			Market:           market,
 			Side:             types.SideTypeBuy,
@@ -108,7 +108,7 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 
-		log.Info(createdOrders)
+		log.Info(createdOrder)
 
 		cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 		return nil
