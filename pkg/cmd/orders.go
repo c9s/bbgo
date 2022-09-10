@@ -384,12 +384,12 @@ var submitOrderCmd = &cobra.Command{
 			so.TimeInForce = types.TimeInForceGTC
 		}
 
-		co, err := session.Exchange.SubmitOrders(ctx, so)
+		co, err := session.Exchange.SubmitOrder(ctx, so)
 		if err != nil {
 			return err
 		}
 
-		log.Infof("submitted order: %+v\ncreated order: %+v", so, co[0])
+		log.Infof("submitted order: %+v\ncreated order: %+v", so, co)
 		return nil
 	},
 }

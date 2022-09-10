@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -110,28 +111,14 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 		return nil, err
 	}
 
-	var createdOrders types.OrderSlice
-
-	retOrders, err := e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
-	if len(retOrders) > 0 {
-		createdOrders = append(createdOrders, retOrders...)
-	}
-
-	if err != nil {
-		// retry once
-		retOrders, err = e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
-		if len(retOrders) > 0 {
-			createdOrders = append(createdOrders, retOrders...)
+	createdOrders, errIdx, err := BatchPlaceOrder(ctx, e.session.Exchange, formattedOrders...)
+	if len(errIdx) > 0 {
+		createdOrders2, err2 := BatchRetryPlaceOrder(ctx, e.session.Exchange, errIdx, formattedOrders...)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+		} else {
+			createdOrders = append(createdOrders, createdOrders2...)
 		}
-
-		if err != nil {
-			err = fmt.Errorf("can not place orders: %w", err)
-		}
-	}
-
-	// FIXME: map by price and volume
-	for i := 0; i < len(createdOrders); i++ {
-		createdOrders[i].Tag = formattedOrders[i].Tag
 	}
 
 	e.orderStore.Add(createdOrders...)
@@ -156,27 +143,25 @@ type OpenPositionOptions struct {
 	Quantity fixedpoint.Value `json:"quantity,omitempty"`
 
 	// MarketOrder set to true to open a position with a market order
-	MarketOrder bool
+	MarketOrder bool `json:"marketOrder,omitempty"`
 
 	// LimitOrder set to true to open a position with a limit order
-	LimitOrder bool
+	LimitOrder bool `json:"limitOrder,omitempty"`
 
 	// LimitTakerRatio is used when LimitOrder = true, it adjusts the price of the limit order with a ratio.
 	// So you can ensure that the limit order can be a taker order. Higher the ratio, higher the chance it could be a taker order.
-	LimitTakerRatio fixedpoint.Value
-	CurrentPrice    fixedpoint.Value
-	Tag             string
+	LimitTakerRatio fixedpoint.Value `json:"limitTakerRatio,omitempty"`
+	CurrentPrice    fixedpoint.Value `json:"currentPrice,omitempty"`
+	Tags            []string         `json:"tags"`
 }
 
 func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) error {
-	log.Infof("opening %s position: %+v", e.position.Symbol, options)
-
 	price := options.CurrentPrice
 	submitOrder := types.SubmitOrder{
 		Symbol:           e.position.Symbol,
 		Type:             types.OrderTypeMarket,
 		MarginSideEffect: types.SideEffectTypeMarginBuy,
-		Tag:              options.Tag,
+		Tag:              strings.Join(options.Tags, ","),
 	}
 
 	if !options.LimitTakerRatio.IsZero() {
@@ -211,6 +196,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Side = types.SideTypeBuy
 		submitOrder.Quantity = quantity
 
+		Notify("Opening %s long position with quantity %f at price %f", e.position.Symbol, quantity.Float64(), price.Float64())
 		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
 		if err2 != nil {
 			return err2
@@ -229,6 +215,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Side = types.SideTypeSell
 		submitOrder.Quantity = quantity
 
+		Notify("Opening %s short position with quantity %f at price %f", e.position.Symbol, quantity.Float64(), price.Float64())
 		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
 		if err2 != nil {
 			return err2
@@ -275,14 +262,20 @@ func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context) error {
 	return e.GracefulCancelActiveOrderBook(ctx, e.activeMakerOrders)
 }
 
+// ClosePosition closes the current position by a percentage.
+// percentage 0.1 means close 10% position
+// tag is the order tag you want to attach, you may pass multiple tags, the tags will be combined into one tag string by commas.
 func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fixedpoint.Value, tags ...string) error {
 	submitOrder := e.position.NewMarketCloseOrder(percentage)
 	if submitOrder == nil {
 		return nil
 	}
 
-	log.Infof("closing %s position with tags: %v", e.symbol, tags)
-	submitOrder.Tag = strings.Join(tags, ",")
+	tagStr := strings.Join(tags, ",")
+	submitOrder.Tag = tagStr
+
+	Notify("closing %s position %s with tags: %v", e.symbol, percentage.Percentage(), tagStr)
+
 	_, err := e.SubmitOrders(ctx, *submitOrder)
 	return err
 }

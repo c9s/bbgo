@@ -206,22 +206,17 @@ func (mr *MockExchangeMockRecorder) QueryTickers(arg0 interface{}, arg1 ...inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryTickers", reflect.TypeOf((*MockExchange)(nil).QueryTickers), varargs...)
 }
 
-// SubmitOrders mocks base method.
-func (m *MockExchange) SubmitOrders(arg0 context.Context, arg1 ...types.SubmitOrder) (types.OrderSlice, error) {
+// SubmitOrder mocks base method.
+func (m *MockExchange) SubmitOrder(arg0 context.Context, arg1 types.SubmitOrder) (*types.Order, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0}
-	for _, a := range arg1 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "SubmitOrders", varargs...)
-	ret0, _ := ret[0].(types.OrderSlice)
+	ret := m.ctrl.Call(m, "SubmitOrder", arg0, arg1)
+	ret0, _ := ret[0].(*types.Order)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// SubmitOrders indicates an expected call of SubmitOrders.
-func (mr *MockExchangeMockRecorder) SubmitOrders(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
+// SubmitOrder indicates an expected call of SubmitOrder.
+func (mr *MockExchangeMockRecorder) SubmitOrder(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0}, arg1...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitOrders", reflect.TypeOf((*MockExchange)(nil).SubmitOrders), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitOrder", reflect.TypeOf((*MockExchange)(nil).SubmitOrder), arg0, arg1)
 }

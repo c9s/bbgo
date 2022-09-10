@@ -350,7 +350,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 						s.tradingMarket.MinNotional.Mul(NotionModifier).Div(price))
 				}
 
-				createdOrders, err := tradingSession.Exchange.SubmitOrders(ctx, types.SubmitOrder{
+				createdOrders, _, err := bbgo.BatchPlaceOrder(ctx, tradingSession.Exchange, types.SubmitOrder{
 					Symbol:   s.Symbol,
 					Side:     types.SideTypeBuy,
 					Type:     types.OrderTypeLimit,
@@ -369,6 +369,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 					// TimeInForce: types.TimeInForceGTC,
 					GroupID: s.groupID,
 				})
+
 				if err != nil {
 					log.WithError(err).Error("order submit error")
 				}
