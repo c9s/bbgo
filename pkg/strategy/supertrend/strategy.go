@@ -207,6 +207,17 @@ type Strategy struct {
 	// ExitMethods Exit methods
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
+	// whether to draw graph or not by the end of backtest
+	DrawGraph       bool   `json:"drawGraph"`
+	GraphPNLPath    string `json:"graphPNLPath"`
+	GraphCumPNLPath string `json:"graphCumPNLPath"`
+
+	// for position
+	buyPrice     float64 `persistence:"buy_price"`
+	sellPrice    float64 `persistence:"sell_price"`
+	highestPrice float64 `persistence:"highest_price"`
+	lowestPrice  float64 `persistence:"lowest_price"`
+
 	session                *bbgo.ExchangeSession
 	orderExecutor          *bbgo.GeneralOrderExecutor
 	currentTakeProfitPrice fixedpoint.Value
@@ -413,6 +424,11 @@ func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoin
 	}
 }
 
+func (s *Strategy) CalcAssetValue(price fixedpoint.Value) fixedpoint.Value {
+	balances := s.session.GetAccount().Balances()
+	return balances[s.Market.BaseCurrency].Total().Mul(price).Add(balances[s.Market.QuoteCurrency].Total())
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
 
@@ -478,13 +494,58 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			s.AccumulatedProfitReport.RecordProfit(profit.Profit)
 		})
-		s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-			s.AccumulatedProfitReport.RecordTrade(trade.Fee)
-		})
+		// s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		// 	s.AccumulatedProfitReport.RecordTrade(trade.Fee)
+		// })
 		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1d, func(kline types.KLine) {
 			s.AccumulatedProfitReport.DailyUpdate(s.TradeStats)
 		}))
 	}
+
+	// For drawing
+	profitt := floats.Slice{1., 1.}
+	price, _ := session.LastPrice(s.Symbol)
+	initAsset := s.CalcAssetValue(price).Float64()
+	cumProfit := floats.Slice{initAsset, initAsset}
+
+	s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		if bbgo.IsBackTesting {
+			s.AccumulatedProfitReport.RecordTrade(trade.Fee)
+		}
+
+		// For drawing/charting
+		price := trade.Price.Float64()
+		if s.buyPrice > 0 {
+			profitt.Update(price / s.buyPrice)
+			cumProfit.Update(s.CalcAssetValue(trade.Price).Float64())
+		} else if s.sellPrice > 0 {
+			profitt.Update(s.sellPrice / price)
+			cumProfit.Update(s.CalcAssetValue(trade.Price).Float64())
+		}
+		if s.Position.IsDust(trade.Price) {
+			s.buyPrice = 0
+			s.sellPrice = 0
+			s.highestPrice = 0
+			s.lowestPrice = 0
+		} else if s.Position.IsLong() {
+			s.buyPrice = price
+			s.sellPrice = 0
+			s.highestPrice = s.buyPrice
+			s.lowestPrice = 0
+		} else {
+			s.sellPrice = price
+			s.buyPrice = 0
+			s.highestPrice = 0
+			s.lowestPrice = s.sellPrice
+		}
+	})
+
+	// event trigger order: s.Interval => Interval1m
+	store, ok := session.SerialMarketDataStore(s.Symbol, []types.Interval{s.Interval, types.Interval1m})
+	if !ok {
+		panic("cannot get 1m history")
+	}
+	s.InitDrawCommands(store, &profitt, &cumProfit)
 
 	// Sync position to redis on trade
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
@@ -593,6 +654,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Output accumulated profit report
 		if bbgo.IsBackTesting {
 			defer s.AccumulatedProfitReport.Output(s.Symbol)
+
+			if s.DrawGraph {
+				s.Draw(store, &profitt, &cumProfit)
+			}
 		}
 
 		_ = s.orderExecutor.GracefulCancel(ctx)

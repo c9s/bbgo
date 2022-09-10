@@ -72,6 +72,11 @@ exchangeStrategies:
     # TP/SL by reversed linear regression signal
     stopByReversedLinGre: false
 
+    # Draw pnl
+    drawGraph: true
+    graphPNLPath: "./pnl.png"
+    graphCumPNLPath: "./cumpnl.png"
+
     exits:
       # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
       - roiStopLoss:
