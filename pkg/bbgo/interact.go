@@ -77,71 +77,6 @@ func RegisterCommand(command, desc string, f interface{}) *interact.Command {
 	return it.Cmd
 }
 
-func getStrategySignatures(exchangeStrategies map[string]SingleExchangeStrategy) []string {
-	var strategies []string
-	for signature := range exchangeStrategies {
-		strategies = append(strategies, signature)
-	}
-
-	return strategies
-}
-
-// filterStrategies filters the exchange strategies by a filter tester function
-// if filter() returns true, the strategy will be added to the returned map.
-func filterStrategies(exchangeStrategies map[string]SingleExchangeStrategy, filter func(s SingleExchangeStrategy) bool) (map[string]SingleExchangeStrategy, error) {
-	retStrategies := make(map[string]SingleExchangeStrategy)
-	for signature, strategy := range exchangeStrategies {
-		if ok := filter(strategy); ok {
-			retStrategies[signature] = strategy
-		}
-	}
-
-	return retStrategies, nil
-}
-
-func hasTypeField(obj interface{}, typ interface{}) bool {
-	targetType := reflect.TypeOf(typ)
-	found := false
-	_ = dynamic.IterateFields(obj, func(ft reflect.StructField, fv reflect.Value) error {
-		if fv.Type() == targetType {
-			found = true
-		}
-
-		return nil
-	})
-	return found
-}
-
-func testInterface(obj interface{}, checkType interface{}) bool {
-	rt := reflect.TypeOf(checkType).Elem()
-	return reflect.TypeOf(obj).Implements(rt)
-}
-
-func filterStrategiesByInterface(exchangeStrategies map[string]SingleExchangeStrategy, checkInterface interface{}) (map[string]SingleExchangeStrategy, error) {
-	rt := reflect.TypeOf(checkInterface).Elem()
-	return filterStrategies(exchangeStrategies, func(s SingleExchangeStrategy) bool {
-		return reflect.TypeOf(s).Implements(rt)
-	})
-}
-
-func filterStrategiesByField(exchangeStrategies map[string]SingleExchangeStrategy, fieldName string, fieldType reflect.Type) (map[string]SingleExchangeStrategy, error) {
-	return filterStrategies(exchangeStrategies, func(s SingleExchangeStrategy) bool {
-		r := reflect.ValueOf(s).Elem()
-		f := r.FieldByName(fieldName)
-		return !f.IsZero() && f.Type() == fieldType
-	})
-}
-
-func generateStrategyButtonsForm(strategies map[string]SingleExchangeStrategy) [][3]string {
-	var buttonsForm [][3]string
-	signatures := getStrategySignatures(strategies)
-	for _, signature := range signatures {
-		buttonsForm = append(buttonsForm, [3]string{signature, "strategy", signature})
-	}
-
-	return buttonsForm
-}
-
 func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/sessions", "List Exchange Sessions", func(reply interact.Reply) error {
 		switch r := reply.(type) {
@@ -628,4 +563,69 @@ func parseFloatPercent(s string, bitSize int) (f float64, err error) {
 		return 0, err
 	}
 	return f / 100.0, nil
+}
+
+func getStrategySignatures(exchangeStrategies map[string]SingleExchangeStrategy) []string {
+	var strategies []string
+	for signature := range exchangeStrategies {
+		strategies = append(strategies, signature)
+	}
+
+	return strategies
+}
+
+// filterStrategies filters the exchange strategies by a filter tester function
+// if filter() returns true, the strategy will be added to the returned map.
+func filterStrategies(exchangeStrategies map[string]SingleExchangeStrategy, filter func(s SingleExchangeStrategy) bool) (map[string]SingleExchangeStrategy, error) {
+	retStrategies := make(map[string]SingleExchangeStrategy)
+	for signature, strategy := range exchangeStrategies {
+		if ok := filter(strategy); ok {
+			retStrategies[signature] = strategy
+		}
+	}
+
+	return retStrategies, nil
+}
+
+func hasTypeField(obj interface{}, typ interface{}) bool {
+	targetType := reflect.TypeOf(typ)
+	found := false
+	_ = dynamic.IterateFields(obj, func(ft reflect.StructField, fv reflect.Value) error {
+		if fv.Type() == targetType {
+			found = true
+		}
+
+		return nil
+	})
+	return found
+}
+
+func testInterface(obj interface{}, checkType interface{}) bool {
+	rt := reflect.TypeOf(checkType).Elem()
+	return reflect.TypeOf(obj).Implements(rt)
+}
+
+func filterStrategiesByInterface(exchangeStrategies map[string]SingleExchangeStrategy, checkInterface interface{}) (map[string]SingleExchangeStrategy, error) {
+	rt := reflect.TypeOf(checkInterface).Elem()
+	return filterStrategies(exchangeStrategies, func(s SingleExchangeStrategy) bool {
+		return reflect.TypeOf(s).Implements(rt)
+	})
+}
+
+func filterStrategiesByField(exchangeStrategies map[string]SingleExchangeStrategy, fieldName string, fieldType reflect.Type) (map[string]SingleExchangeStrategy, error) {
+	return filterStrategies(exchangeStrategies, func(s SingleExchangeStrategy) bool {
+		r := reflect.ValueOf(s).Elem()
+		f := r.FieldByName(fieldName)
+		return !f.IsZero() && f.Type() == fieldType
+	})
+}
+
+func generateStrategyButtonsForm(strategies map[string]SingleExchangeStrategy) [][3]string {
+	var buttonsForm [][3]string
+	signatures := getStrategySignatures(strategies)
+	for _, signature := range signatures {
+		buttonsForm = append(buttonsForm, [3]string{signature, "strategy", signature})
+	}
+
+	return buttonsForm
 }
