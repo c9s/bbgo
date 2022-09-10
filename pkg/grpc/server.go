@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
@@ -46,20 +47,27 @@ func (s *TradingService) SubmitOrder(ctx context.Context, request *pb.SubmitOrde
 		}
 	}
 
-	createdOrders, err := session.Exchange.SubmitOrders(ctx, submitOrders...)
-	if err != nil {
-		return nil, err
+	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, session.Exchange, submitOrders...)
+	if len(errIdx) > 0 {
+		createdOrders2, err2 := bbgo.BatchRetryPlaceOrder(ctx, session.Exchange, errIdx, submitOrders...)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+		} else {
+			createdOrders = append(createdOrders, createdOrders2...)
+		}
 	}
 
+	// convert response
 	resp := &pb.SubmitOrderResponse{
 		Session: sessionName,
 		Orders:  nil,
 	}
+
 	for _, createdOrder := range createdOrders {
 		resp.Orders = append(resp.Orders, transOrder(session, createdOrder))
 	}
 
-	return resp, nil
+	return resp, err
 }
 
 func (s *TradingService) CancelOrder(ctx context.Context, request *pb.CancelOrderRequest) (*pb.CancelOrderResponse, error) {

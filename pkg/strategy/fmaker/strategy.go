@@ -132,13 +132,14 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 	// s.Notify("Submitting %s %s order to close position by %v", s.Symbol, side.String(), percentage, submitOrder)
 
-	createdOrders, err := s.session.Exchange.SubmitOrders(ctx, submitOrder)
+	createdOrder, err := s.session.Exchange.SubmitOrder(ctx, submitOrder)
 	if err != nil {
 		log.WithError(err).Errorf("can not place position close order")
+	} else if createdOrder != nil {
+		s.orderStore.Add(*createdOrder)
+		s.activeMakerOrders.Add(*createdOrder)
 	}
 
-	s.orderStore.Add(createdOrders...)
-	s.activeMakerOrders.Add(createdOrders...)
 	return err
 }
 func (s *Strategy) InstanceID() string {
@@ -464,7 +465,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			//	Price:    kline.Close.Mul(fixedpoint.One.Add(s.Spread)),
 			//	Quantity: fixedpoint.NewFromFloat(math.Max(math.Min(eq, 0.003), 0.0005)), //0.0005
 			// }
-			// createdOrders, err = orderExecutor.SubmitOrders(ctx, submitOrder)
+			// createdOrders, err = orderExecutor.SubmitOrder(ctx, submitOrder)
 			// if err != nil {
 			//	log.WithError(err).Errorf("can not place orders")
 			// }
@@ -495,7 +496,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			//	Price:    kline.Close.Mul(fixedpoint.One.Sub(s.Spread)),
 			//	Quantity: fixedpoint.NewFromFloat(math.Max(math.Min(eq, 0.003), 0.0005)), //0.0005
 			// }
-			// createdOrders, err = orderExecutor.SubmitOrders(ctx, submitOrder)
+			// createdOrders, err = orderExecutor.SubmitOrder(ctx, submitOrder)
 			// if err != nil {
 			//	log.WithError(err).Errorf("can not place orders")
 			// }

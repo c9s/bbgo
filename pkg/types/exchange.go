@@ -96,7 +96,7 @@ type ExchangeTradeService interface {
 
 	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
 
-	SubmitOrders(ctx context.Context, orders ...SubmitOrder) (createdOrders OrderSlice, err error)
+	SubmitOrder(ctx context.Context, order SubmitOrder) (createdOrder *Order, err error)
 
 	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
 
