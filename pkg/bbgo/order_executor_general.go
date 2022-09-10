@@ -257,8 +257,11 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 		return nil
 	}
 
-	log.Infof("closing %s position with tags: %v", e.symbol, tags)
-	submitOrder.Tag = strings.Join(tags, ",")
+	tagStr := strings.Join(tags, ",")
+	submitOrder.Tag = tagStr
+
+	Notify("closing %s position %s with tags: %v", e.symbol, percentage.Percentage(), tagStr)
+	
 	_, err := e.SubmitOrders(ctx, *submitOrder)
 	return err
 }
