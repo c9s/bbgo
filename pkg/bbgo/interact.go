@@ -99,6 +99,24 @@ func filterStrategies(exchangeStrategies map[string]SingleExchangeStrategy, filt
 	return retStrategies, nil
 }
 
+func hasTypeField(obj interface{}, typ interface{}) bool {
+	targetType := reflect.TypeOf(typ)
+	found := false
+	_ = dynamic.IterateFields(obj, func(ft reflect.StructField, fv reflect.Value) error {
+		if fv.Type() == targetType {
+			found = true
+		}
+
+		return nil
+	})
+	return found
+}
+
+func testInterface(obj interface{}, checkType interface{}) bool {
+	rt := reflect.TypeOf(checkType).Elem()
+	return reflect.TypeOf(obj).Implements(rt)
+}
+
 func filterStrategiesByInterface(exchangeStrategies map[string]SingleExchangeStrategy, checkInterface interface{}) (map[string]SingleExchangeStrategy, error) {
 	rt := reflect.TypeOf(checkInterface).Elem()
 	return filterStrategies(exchangeStrategies, func(s SingleExchangeStrategy) bool {
@@ -210,9 +228,11 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	})
 
 	i.PrivateCommand("/resetposition", "Reset position", func(reply interact.Reply) error {
-		// it.trader.exchangeStrategies
-		// send symbol options
-		if strategies, err := filterStrategiesByInterface(it.exchangeStrategies, (*PositionResetter)(nil)); err == nil && len(strategies) > 0 {
+		strategies, err := filterStrategies(it.exchangeStrategies, func(s SingleExchangeStrategy) bool {
+			return testInterface(s, (*PositionResetter)(nil)) || hasTypeField(s, &types.Position{})
+		})
+
+		if err == nil && len(strategies) > 0 {
 			reply.AddMultipleButtons(generateStrategyButtonsForm(strategies))
 			reply.Message("Please choose one strategy")
 		} else {
@@ -481,7 +501,7 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 	i.PrivateCommand("/modifyposition", "Modify Strategy Position", func(reply interact.Reply) error {
 		// it.trader.exchangeStrategies
 		// send symbol options
-		if strategies, err := filterStrategiesByField(it.exchangeStrategies, "Position", reflect.TypeOf(types.NewPosition("", "", ""))); err == nil && len(strategies) > 0 {
+		if strategies, err := filterStrategiesByField(it.exchangeStrategies, "Position", reflect.TypeOf(&types.Position{})); err == nil && len(strategies) > 0 {
 			reply.AddMultipleButtons(generateStrategyButtonsForm(strategies))
 			reply.Message("Please choose one strategy")
 		} else {
