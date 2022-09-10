@@ -110,14 +110,25 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 		return nil, err
 	}
 
-	createdOrders, err := e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
+	var createdOrders types.OrderSlice
+
+	retOrders, err := e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
+	if len(retOrders) > 0 {
+		createdOrders = append(createdOrders, retOrders...)
+	}
+
 	if err != nil {
-		// Retry once
-		createdOrders, err = e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
+		// retry once
+		retOrders, err = e.session.Exchange.SubmitOrders(ctx, formattedOrders...)
+		if len(retOrders) > 0 {
+			createdOrders = append(createdOrders, retOrders...)
+		}
+
 		if err != nil {
 			err = fmt.Errorf("can not place orders: %w", err)
 		}
 	}
+
 	// FIXME: map by price and volume
 	for i := 0; i < len(createdOrders); i++ {
 		createdOrders[i].Tag = formattedOrders[i].Tag
@@ -132,24 +143,34 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 type OpenPositionOptions struct {
 	// Long is for open a long position
 	// Long or Short must be set
-	Long bool
+	Long bool `json:"long"`
 
 	// Short is for open a short position
 	// Long or Short must be set
-	Short bool
+	Short bool `json:"short"`
 
 	// Leverage is used for leveraged position and account
-	Leverage fixedpoint.Value
+	Leverage fixedpoint.Value `json:"leverage,omitempty"`
 
-	Quantity        fixedpoint.Value
-	MarketOrder     bool
-	LimitOrder      bool
+	// Quantity will be used first, it will override the leverage if it's given.
+	Quantity fixedpoint.Value `json:"quantity,omitempty"`
+
+	// MarketOrder set to true to open a position with a market order
+	MarketOrder bool
+
+	// LimitOrder set to true to open a position with a limit order
+	LimitOrder bool
+
+	// LimitTakerRatio is used when LimitOrder = true, it adjusts the price of the limit order with a ratio.
+	// So you can ensure that the limit order can be a taker order. Higher the ratio, higher the chance it could be a taker order.
 	LimitTakerRatio fixedpoint.Value
 	CurrentPrice    fixedpoint.Value
 	Tag             string
 }
 
 func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) error {
+	log.Infof("opening %s position: %+v", e.position.Symbol, options)
+
 	price := options.CurrentPrice
 	submitOrder := types.SubmitOrder{
 		Symbol:           e.position.Symbol,
