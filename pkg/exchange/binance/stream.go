@@ -62,6 +62,8 @@ type Stream struct {
 	accountUpdateEventCallbacks       []func(e *AccountUpdateEvent)
 	accountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
 
+	listenKeyExpiredCallbacks []func(e *ListenKeyExpired)
+
 	depthBuffers map[string]*depth.Buffer
 }
 
@@ -125,6 +127,9 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnOrderTradeUpdateEvent(stream.handleOrderTradeUpdateEvent)
 	stream.OnDisconnect(stream.handleDisconnect)
 	stream.OnConnect(stream.handleConnect)
+	stream.OnListenKeyExpired(func(e *ListenKeyExpired) {
+		stream.Reconnect()
+	})
 	return stream
 }
 
@@ -363,6 +368,10 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *AccountConfigUpdateEvent:
 		s.EmitAccountConfigUpdateEvent(e)
+
+	case *ListenKeyExpired:
+		s.EmitListenKeyExpired(e)
+
 	}
 }
 
