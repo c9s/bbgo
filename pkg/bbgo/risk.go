@@ -14,7 +14,9 @@ import (
 
 var defaultLeverage = fixedpoint.NewFromInt(3)
 
-var maxLeverage = fixedpoint.NewFromInt(10)
+var maxIsolatedMarginLeverage = fixedpoint.NewFromInt(10)
+
+var maxCrossMarginLeverage = fixedpoint.NewFromInt(3)
 
 type AccountValueCalculator struct {
 	session       *ExchangeSession
@@ -217,11 +219,16 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 		return quantity, nil
 	}
 
+	if price.IsZero() {
+		return quantity, fmt.Errorf("%s price can not be zero", market.Symbol)
+	}
+
 	// using leverage -- starts from here
 	log.Infof("calculating available leveraged base quantity: base balance = %+v, quote balance = %+v", baseBalance, quoteBalance)
 
 	// calculate the quantity automatically
 	if session.Margin || session.IsolatedMargin {
+
 		baseBalanceValue := baseBalance.Net().Mul(price)
 		accountValue := baseBalanceValue.Add(quoteBalance.Net())
 
@@ -230,10 +237,17 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 
 		log.Infof("calculated account value %f %s", accountValue.Float64(), market.QuoteCurrency)
 
+		originLeverage := leverage
 		if session.IsolatedMargin {
-			originLeverage := leverage
-			leverage = fixedpoint.Min(leverage, maxLeverage)
-			log.Infof("using isolated margin, maxLeverage=10 originalLeverage=%f currentLeverage=%f",
+			leverage = fixedpoint.Min(leverage, maxIsolatedMarginLeverage)
+			log.Infof("using isolated margin, maxLeverage=%f originalLeverage=%f currentLeverage=%f",
+				maxIsolatedMarginLeverage.Float64(),
+				originLeverage.Float64(),
+				leverage.Float64())
+		} else {
+			leverage = fixedpoint.Min(leverage, maxCrossMarginLeverage)
+			log.Infof("using cross margin, maxLeverage=%f originalLeverage=%f currentLeverage=%f",
+				maxCrossMarginLeverage.Float64(),
 				originLeverage.Float64(),
 				leverage.Float64())
 		}
