@@ -540,12 +540,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	// event trigger order: s.Interval => Interval1m
-	store, ok := session.SerialMarketDataStore(s.Symbol, []types.Interval{s.Interval, types.Interval1m})
-	if !ok {
-		panic("cannot get 1m history")
-	}
-	s.InitDrawCommands(store, &profitSlice, &cumProfitSlice)
+	s.InitDrawCommands(&profitSlice, &cumProfitSlice)
 
 	// Sync position to redis on trade
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
@@ -656,7 +651,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			defer s.AccumulatedProfitReport.Output(s.Symbol)
 
 			if s.DrawGraph {
-				s.Draw(store, &profitSlice, &cumProfitSlice)
+				if err := s.Draw(&profitSlice, &cumProfitSlice); err != nil {
+					log.WithError(err).Errorf("cannot draw graph")
+				}
 			}
 		}
 
