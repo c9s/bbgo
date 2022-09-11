@@ -63,20 +63,24 @@ exchangeStrategies:
     # when EMA goes up (the last > the previous), allow buy and sell
     # when EMA goes down (the last < the previous), disable buy, allow sell
     # uncomment this to enable it:
-    #
     trendEMA:
       interval: 1d
       window: 7
       maxGradient: 1.5
       minGradient: 1.01
 
-    # EXPERIMENTAL
-    #   Dynamic spread is an experimental feature. Use at your own risk!
+    # ==================================================================
+    # Dynamic spread is an experimental feature. it will override the fixed spread settings above.
     #
-    #   dynamicSpread enables the automatic adjustment to bid and ask spread.
-    #   Choose one of the scaling strategy to enable dynamicSpread:
-    #     - amplitude: scales by K-line amplitude
-    #     - weightedBollWidth: scales by weighted Bollinger band width (explained below)
+    # dynamicSpread enables the automatic adjustment to bid and ask spread.
+    # Choose one of the scaling strategy to enable dynamicSpread:
+    #   - amplitude: scales by K-line amplitude
+    #   - weightedBollWidth: scales by weighted Bollinger band width (explained below)
+    # ==================================================================
+    #
+    # =========================================
+    # dynamicSpread with amplitude
+    # =========================================
     # dynamicSpread:
     #   amplitude: # delete other scaling strategy if this is defined
     #     # window is the window of the SMAs of spreads
@@ -100,6 +104,10 @@ exchangeStrategies:
     #           # when in up band, holds 0.05 by maximum
     #           range: [ 0.001, 0.002 ]
     #
+    # =========================================
+    # dynamicSpread with weightedBollWidth
+    # =========================================
+    # dynamicSpread:
     #   # weightedBollWidth scales spread base on weighted Bollinger bandwidth ratio between default and neutral bands.
     #   #
     #   # Given the default band: moving average bd_mid, band from bd_lower to bd_upper.
@@ -113,8 +121,8 @@ exchangeStrategies:
     #   #   - To ask spread, the higher neutral band get greater ratio
     #   #   - To bid spread, the lower neutral band get greater ratio
     #   # The weighted ratio always positive, and may be greater than 1 if neutral band is wider than default band.
-    #   weightedBollWidth: # delete other scaling strategy if this is defined
     #
+    #   weightedBollWidth: # delete other scaling strategy if this is defined
     #     # sensitivity is a factor of the weighting function: 1 / (1 + exp(-(x - bd_mid) * sensitivity / (bd_upper - bd_lower)))
     #     # A positive number. The greater factor, the sharper weighting function. Default set to 1.0 .
     #     sensitivity: 1.0
