@@ -127,6 +127,9 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnOrderTradeUpdateEvent(stream.handleOrderTradeUpdateEvent)
 	stream.OnDisconnect(stream.handleDisconnect)
 	stream.OnConnect(stream.handleConnect)
+	stream.OnListenKeyExpired(func(e *ListenKeyExpired) {
+		stream.Reconnect()
+	})
 	return stream
 }
 
@@ -368,7 +371,7 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *ListenKeyExpired:
 		s.EmitListenKeyExpired(e)
-	
+
 	}
 }
 
