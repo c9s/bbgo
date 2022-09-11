@@ -16,8 +16,8 @@ backtest:
   # for testing max draw down (MDD) at 03-12
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
-  startTime: "2022-01-01"
-  endTime: "2022-07-18"
+  startTime: "2022-05-01"
+  endTime: "2022-08-14"
   sessions:
   - binance
   symbols:
@@ -40,6 +40,9 @@ exchangeStrategies:
     # quantity is the base order quantity for your buy/sell order.
     quantity: 0.05
 
+    # amount is used for fixed-amount order, for example, use fixed 20 USDT order for BTCUSDT market
+    # amount: 20
+
     # useTickerPrice use the ticker api to get the mid price instead of the closed kline price.
     # The back-test engine is kline-based, so the ticker price api is not supported.
     # Turn this on if you want to do real trading.
@@ -55,6 +58,17 @@ exchangeStrategies:
     # For long position, you will only place sell order above the price (= average cost * (1 + minProfitSpread))
     # For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
     minProfitSpread: 0.1%
+
+    # trendEMA detects the trend by a given EMA
+    # when EMA goes up (the last > the previous), allow buy and sell
+    # when EMA goes down (the last < the previous), disable buy, allow sell
+    # uncomment this to enable it:
+    #
+    trendEMA:
+      interval: 1d
+      window: 7
+      maxGradient: 1.5
+      minGradient: 1.01
 
     # EXPERIMENTAL
     #   Dynamic spread is an experimental feature. Use at your own risk!
@@ -85,21 +99,23 @@ exchangeStrategies:
     #           # when in down band, holds 1.0 by maximum
     #           # when in up band, holds 0.05 by maximum
     #           range: [ 0.001, 0.002 ]
-    #   weightedBollWidth: # delete other scaling strategy if this is defined
-    #     # Scale spread base on weighted Bollinger band width ratio between default and neutral bands.
-    #     # Given the default band: moving average bd_mid, band from bd_lower to bd_upper.
-    #     # And the neutral band: from bn_lower to bn_upper
-    #     # Set the sigmoid weighting function:
-    #     #   - to ask spread, the weighting density function d_weight(x) is sigmoid((x - bd_mid) / (bd_upper - bd_lower))
-    #     #   - to bid spread, the weighting density function d_weight(x) is sigmoid((bd_mid - x) / (bd_upper - bd_lower))
-    #     # Then calculate the weighted band width ratio by taking integral of d_weight(x) from bx_lower to bx_upper:
-    #     #   - weighted_ratio = integral(d_weight from bn_lower to bn_upper) / integral(d_weight from bd_lower to bd_upper)
-    #     #   - The wider neutral band get greater ratio
-    #     #   - To ask spread, the higher neutral band get greater ratio
-    #     #   - To bid spread, the lower neutral band get greater ratio
-    #     # The weighted ratio always positive, and may be greater than 1 if neutral band is wider than default band.
     #
-    #     # Sensitivity factor of the weighting function: 1 / (1 + exp(-(x - bd_mid) * sensitivity / (bd_upper - bd_lower)))
+    #   # weightedBollWidth scales spread base on weighted Bollinger bandwidth ratio between default and neutral bands.
+    #   #
+    #   # Given the default band: moving average bd_mid, band from bd_lower to bd_upper.
+    #   # And the neutral band: from bn_lower to bn_upper
+    #   # Set the sigmoid weighting function:
+    #   #   - to ask spread, the weighting density function d_weight(x) is sigmoid((x - bd_mid) / (bd_upper - bd_lower))
+    #   #   - to bid spread, the weighting density function d_weight(x) is sigmoid((bd_mid - x) / (bd_upper - bd_lower))
+    #   # Then calculate the weighted band width ratio by taking integral of d_weight(x) from bx_lower to bx_upper:
+    #   #   - weighted_ratio = integral(d_weight from bn_lower to bn_upper) / integral(d_weight from bd_lower to bd_upper)
+    #   #   - The wider neutral band get greater ratio
+    #   #   - To ask spread, the higher neutral band get greater ratio
+    #   #   - To bid spread, the lower neutral band get greater ratio
+    #   # The weighted ratio always positive, and may be greater than 1 if neutral band is wider than default band.
+    #   weightedBollWidth: # delete other scaling strategy if this is defined
+    #
+    #     # sensitivity is a factor of the weighting function: 1 / (1 + exp(-(x - bd_mid) * sensitivity / (bd_upper - bd_lower)))
     #     # A positive number. The greater factor, the sharper weighting function. Default set to 1.0 .
     #     sensitivity: 1.0
     #
@@ -118,10 +134,10 @@ exchangeStrategies:
     #           domain: [ 0.1, 0.5 ]
     #           range: [ 0.001, 0.002 ]
 
-
     # maxExposurePosition is the maximum position you can hold
     # +10 means you can hold 10 ETH long position by maximum
     # -10 means you can hold -10 ETH short position by maximum
+    # uncomment this if you want a fixed position exposure.
     # maxExposurePosition: 3.0
     maxExposurePosition: 10
 
@@ -151,6 +167,10 @@ exchangeStrategies:
     # downtrendSkew, like the strongDowntrendSkew, but the price is still in the default band.
     downtrendSkew: 1.2
 
+    # defaultBollinger is a long-term time frame bollinger
+    # this bollinger band is used for controlling your position (how much you can hold)
+    # when price is near the upper band, it holds less.
+    # when price is near the lower band, it holds more.
     defaultBollinger:
       interval: "1h"
       window: 21
@@ -164,10 +184,10 @@ exchangeStrategies:
       bandWidth: 2.0
 
     # tradeInBand: when tradeInBand is set, you will only place orders in the bollinger band.
-    tradeInBand: false
+    tradeInBand: true
 
     # buyBelowNeutralSMA: when this set, it will only place buy order when the current price is below the SMA line.
-    buyBelowNeutralSMA: false
+    # buyBelowNeutralSMA: false
 
     exits:
 
