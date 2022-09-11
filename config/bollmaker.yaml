@@ -195,7 +195,7 @@ exchangeStrategies:
     tradeInBand: true
 
     # buyBelowNeutralSMA: when this set, it will only place buy order when the current price is below the SMA line.
-    # buyBelowNeutralSMA: false
+    buyBelowNeutralSMA: false
 
     exits:
 
