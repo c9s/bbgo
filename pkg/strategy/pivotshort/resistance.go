@@ -35,6 +35,9 @@ type ResistanceShort struct {
 	currentResistancePrice fixedpoint.Value
 
 	activeOrders *bbgo.ActiveOrderBook
+
+	// StrategyController
+	bbgo.StrategyController
 }
 
 func (s *ResistanceShort) Subscribe(session *bbgo.ExchangeSession) {
@@ -59,6 +62,9 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	})
 	s.activeOrders.BindStream(session.UserDataStream)
 
+	// StrategyController
+	s.Status = types.StrategyStatusRunning
+
 	if s.TrendEMA != nil {
 		s.TrendEMA.Bind(session, orderExecutor)
 	}
@@ -69,6 +75,11 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	s.updateResistanceOrders(fixedpoint.NewFromFloat(s.resistancePivot.Last()))
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
+		// StrategyController
+		if s.Status != types.StrategyStatusRunning {
+			return
+		}
+
 		// trend EMA protection
 		if s.TrendEMA != nil && !s.TrendEMA.GradientAllowed() {
 			return

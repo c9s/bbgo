@@ -125,6 +125,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.OnSuspend(func() {
 		// Cancel active orders
 		_ = s.orderExecutor.GracefulCancel(ctx)
+
+		if s.BreakLow != nil {
+			s.BreakLow.Suspend()
+		}
+
+		if s.ResistanceShort != nil {
+			s.ResistanceShort.Suspend()
+		}
+
+		if s.FailedBreakHigh != nil {
+			s.FailedBreakHigh.Suspend()
+		}
 	})
 
 	s.OnEmergencyStop(func() {
@@ -132,6 +144,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		_ = s.orderExecutor.GracefulCancel(ctx)
 		// Close 100% position
 		_ = s.ClosePosition(ctx, fixedpoint.One)
+
+		if s.BreakLow != nil {
+			s.BreakLow.EmergencyStop()
+		}
+
+		if s.ResistanceShort != nil {
+			s.ResistanceShort.EmergencyStop()
+		}
+
+		if s.FailedBreakHigh != nil {
+			s.FailedBreakHigh.EmergencyStop()
+		}
 	})
 
 	// initial required information
