@@ -12,6 +12,7 @@ import (
 type AverageCostCalculator struct {
 	TradingFeeCurrency string
 	Market             types.Market
+	ExchangeFee        *types.ExchangeFee
 }
 
 func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, currentPrice fixedpoint.Value) *AverageCostPnLReport {
@@ -22,12 +23,31 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 	var grossProfit = fixedpoint.Zero
 	var grossLoss = fixedpoint.Zero
 
+	var position = types.NewPositionFromMarket(c.Market)
+
+	if c.ExchangeFee != nil {
+		position.SetFeeRate(*c.ExchangeFee)
+	} else {
+		makerFeeRate := 0.075 * 0.01
+
+		if c.Market.QuoteCurrency == "BUSD" {
+			makerFeeRate = 0
+		}
+
+		position.SetFeeRate(types.ExchangeFee{
+			// binance vip 0 uses 0.075%
+			MakerFeeRate: fixedpoint.NewFromFloat(makerFeeRate),
+			TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
+		})
+	}
+
 	if len(trades) == 0 {
 		return &AverageCostPnLReport{
 			Symbol:     symbol,
 			Market:     c.Market,
 			LastPrice:  currentPrice,
 			NumTrades:  0,
+			Position:   position,
 			BuyVolume:  bidVolume,
 			SellVolume: askVolume,
 			FeeInUSD:   feeUSD,
@@ -35,13 +55,6 @@ func (c *AverageCostCalculator) Calculate(symbol string, trades []types.Trade, c
 	}
 
 	var currencyFees = map[string]fixedpoint.Value{}
-
-	var position = types.NewPositionFromMarket(c.Market)
-	position.SetFeeRate(types.ExchangeFee{
-		// binance vip 0 uses 0.075%
-		MakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
-		TakerFeeRate: fixedpoint.NewFromFloat(0.075 * 0.01),
-	})
 
 	// TODO: configure the exchange fee rate here later
 	// position.SetExchangeFeeRate()
