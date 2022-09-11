@@ -50,6 +50,9 @@ type BreakLow struct {
 
 	orderExecutor *bbgo.GeneralOrderExecutor
 	session       *bbgo.ExchangeSession
+
+	// StrategyController
+	bbgo.StrategyController
 }
 
 func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
@@ -72,6 +75,9 @@ func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
 func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
+
+	// StrategyController
+	s.Status = types.StrategyStatusRunning
 
 	position := orderExecutor.Position()
 	symbol := position.Symbol
@@ -145,6 +151,11 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		previousLow := s.pivotLowPrices[len(s.pivotLowPrices)-1]
 		ratio := fixedpoint.One.Add(s.Ratio)
 		breakPrice := previousLow.Mul(ratio)
+
+		// StrategyController
+		if s.Status != types.StrategyStatusRunning {
+			return
+		}
 
 		openPrice := kline.Open
 		closePrice := kline.Close
