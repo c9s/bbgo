@@ -155,3 +155,74 @@ func TestNewAccountValueCalculator_MarginLevel(t *testing.T) {
 		fixedpoint.NewFromFloat(21000.0).Div(fixedpoint.NewFromFloat(19000.0).Mul(fixedpoint.NewFromFloat(1.003))).FormatString(6),
 		marginLevel.FormatString(6))
 }
+
+func number(n float64) fixedpoint.Value {
+	return fixedpoint.NewFromFloat(n)
+}
+
+func Test_aggregateUsdValue(t *testing.T) {
+	type args struct {
+		balances types.BalanceMap
+	}
+	tests := []struct {
+		name string
+		args args
+		want fixedpoint.Value
+	}{
+		{
+			name: "mixed",
+			args: args{
+				balances: types.BalanceMap{
+					"USDC": types.Balance{Currency: "USDC", Available: number(70.0)},
+					"USDT": types.Balance{Currency: "USDT", Available: number(100.0)},
+					"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
+					"BTC":  types.Balance{Currency: "BTC", Available: number(0.01)},
+				},
+			},
+			want: number(250.0),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, aggregateUsdValue(tt.args.balances), "aggregateUsdValue(%v)", tt.args.balances)
+		})
+	}
+}
+
+func Test_usdFiatBalances(t *testing.T) {
+	type args struct {
+		balances types.BalanceMap
+	}
+	tests := []struct {
+		name      string
+		args      args
+		wantFiats types.BalanceMap
+		wantRest  types.BalanceMap
+	}{
+		{
+			args: args{
+				balances: types.BalanceMap{
+					"USDC": types.Balance{Currency: "USDC", Available: number(70.0)},
+					"USDT": types.Balance{Currency: "USDT", Available: number(100.0)},
+					"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
+					"BTC":  types.Balance{Currency: "BTC", Available: number(0.01)},
+				},
+			},
+			wantFiats: types.BalanceMap{
+				"USDC": types.Balance{Currency: "USDC", Available: number(70.0)},
+				"USDT": types.Balance{Currency: "USDT", Available: number(100.0)},
+				"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
+			},
+			wantRest: types.BalanceMap{
+				"BTC": types.Balance{Currency: "BTC", Available: number(0.01)},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotFiats, gotRest := usdFiatBalances(tt.args.balances)
+			assert.Equalf(t, tt.wantFiats, gotFiats, "usdFiatBalances(%v)", tt.args.balances)
+			assert.Equalf(t, tt.wantRest, gotRest, "usdFiatBalances(%v)", tt.args.balances)
+		})
+	}
+}
