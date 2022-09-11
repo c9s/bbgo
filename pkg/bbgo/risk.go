@@ -221,27 +221,27 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 		leverage = defaultLeverage
 	}
 
+	baseBalance, hasBaseBalance := session.Account.Balance(market.BaseCurrency)
+	quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
+	balances := session.Account.Balances()
+
 	usingLeverage := session.Margin || session.IsolatedMargin || session.Futures || session.IsolatedFutures
 	if !usingLeverage {
 		// For spot, we simply sell the base quoteCurrency
-		balance, hasBalance := session.Account.Balance(market.BaseCurrency)
-		if hasBalance {
+		if hasBaseBalance {
 			if quantity.IsZero() {
-				log.Warnf("sell quantity is not set, using all available base balance: %v", balance)
-				if !balance.Available.IsZero() {
-					return balance.Available, nil
+				log.Warnf("sell quantity is not set, using all available base balance: %v", baseBalance)
+				if !baseBalance.Available.IsZero() {
+					return baseBalance.Available, nil
 				}
 			} else {
-				return fixedpoint.Min(quantity, balance.Available), nil
+				return fixedpoint.Min(quantity, baseBalance.Available), nil
 			}
 		}
 
-		return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your quantity settings")
+		return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your quantity settings, your account balances: %+v", balances)
 	}
 
-	baseBalance, _ := session.Account.Balance(market.BaseCurrency)
-	quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
-	balances := session.Account.Balances()
 	usdBalances, restBalances := usdFiatBalances(balances)
 
 	// for isolated margin we can calculate from these two pair
