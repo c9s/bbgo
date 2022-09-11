@@ -29,7 +29,11 @@ type DynamicSpreadSettings struct {
 // Initialize dynamic spreads and preload SMAs
 func (ds *DynamicSpreadSettings) Initialize(symbol string, session *bbgo.ExchangeSession, neutralBoll, defaultBoll *indicator.BOLL) {
 	switch {
-	case ds.Enabled != nil && !*ds.Enabled:
+	case ds.AmpSpreadSettings != nil:
+		ds.AmpSpreadSettings.initialize(symbol, session)
+	case ds.WeightedBollWidthRatioSpreadSettings != nil:
+		ds.WeightedBollWidthRatioSpreadSettings.initialize(neutralBoll, defaultBoll)
+	case ds.Enabled != nil && *ds.Enabled:
 		// backward compatibility
 		ds.AmpSpreadSettings = &DynamicSpreadAmpSettings{
 			IntervalWindow: ds.IntervalWindow,
@@ -37,10 +41,6 @@ func (ds *DynamicSpreadSettings) Initialize(symbol string, session *bbgo.Exchang
 			BidSpreadScale: ds.BidSpreadScale,
 		}
 		ds.AmpSpreadSettings.initialize(symbol, session)
-	case ds.AmpSpreadSettings != nil:
-		ds.AmpSpreadSettings.initialize(symbol, session)
-	case ds.WeightedBollWidthRatioSpreadSettings != nil:
-		ds.WeightedBollWidthRatioSpreadSettings.initialize(neutralBoll, defaultBoll)
 	}
 }
 
