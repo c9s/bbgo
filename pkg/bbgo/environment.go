@@ -1012,6 +1012,8 @@ func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken s
 	var notifier = telegramnotifier.New(bot, opts...)
 	Notification.AddNotifier(notifier)
 
+	log.AddHook(telegramnotifier.NewLogHook(notifier))
+
 	// allocate a store, so that we can save the chatID for the owner
 	var messenger = interact.NewTelegram(bot)
 
