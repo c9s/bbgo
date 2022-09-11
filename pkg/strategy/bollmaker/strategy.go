@@ -58,6 +58,10 @@ type Strategy struct {
 
 	bbgo.QuantityOrAmount
 
+	// TrendEMA is used for detecting the trend by a given EMA
+	// you can define interval and window
+	TrendEMA *bbgo.TrendEMA `json:"trendEMA"`
+
 	// Spread is the price spread from the middle price.
 	// For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
 	// For bid orders, the bid price is ((bestAsk + bestBid) / 2 * (1.0 - spread))
@@ -185,6 +189,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		})
 	}
 
+	if s.TrendEMA != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
+	}
+
 	s.ExitMethods.SetAndSubscribe(session, s)
 }
 
@@ -287,6 +295,8 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		log.Infof("current %s unrealized profit: %f %s", s.Symbol, s.Position.UnrealizedProfit(midPrice).Float64(), s.Market.QuoteCurrency)
 	}
 
+	// by default, we turn both sell and buy on,
+	// which means we will place buy and sell orders
 	canSell := true
 	canBuy := true
 
@@ -360,6 +370,7 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 
 	}
 
+	// check balance and switch the orders
 	if !hasQuoteBalance || buyOrder.Quantity.Mul(buyOrder.Price).Compare(quoteBalance.Available) > 0 {
 		canBuy = false
 	}
@@ -377,11 +388,13 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 
 	if isLongPosition {
 		// for long position if the current price is lower than the minimal profitable price then we should stop sell
+		// this avoid loss trade
 		if midPrice.Compare(minProfitPrice) < 0 {
 			canSell = false
 		}
 	} else if isShortPosition {
 		// for short position if the current price is higher than the minimal profitable price then we should stop buy
+		// this avoid loss trade
 		if midPrice.Compare(minProfitPrice) > 0 {
 			canBuy = false
 		}
@@ -393,6 +406,14 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 
 	if s.BuyBelowNeutralSMA && midPrice.Float64() > s.neutralBoll.SMA.Last() {
 		canBuy = false
+	}
+
+	// trend EMA protection
+	if s.TrendEMA != nil {
+		if !s.TrendEMA.GradientAllowed() {
+			log.Infof("trendEMA protection: midPrice price %f, gradient %f, turning buy order off", midPrice.Float64(), s.TrendEMA.Gradient())
+			canBuy = false
+		}
 	}
 
 	if canSell {
@@ -498,6 +519,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.Sync(s)
 	})
 	s.ExitMethods.Bind(session, s.orderExecutor)
+
+	if s.TrendEMA != nil {
+		s.TrendEMA.Bind(session, s.orderExecutor)
+	}
 
 	if bbgo.IsBackTesting {
 		log.Warn("turning of useTickerPrice option in the back-testing environment...")
