@@ -154,6 +154,16 @@ func (s *Stream) EmitAccountConfigUpdateEvent(e *AccountConfigUpdateEvent) {
 	}
 }
 
+func (s *Stream) OnListenKeyExpired(cb func(e *ListenKeyExpired)) {
+	s.listenKeyExpiredCallbacks = append(s.listenKeyExpiredCallbacks, cb)
+}
+
+func (s *Stream) EmitListenKeyExpired(e *ListenKeyExpired) {
+	for _, cb := range s.listenKeyExpiredCallbacks {
+		cb(e)
+	}
+}
+
 type StreamEventHub interface {
 	OnDepthEvent(cb func(e *DepthEvent))
 
@@ -184,4 +194,6 @@ type StreamEventHub interface {
 	OnAccountUpdateEvent(cb func(e *AccountUpdateEvent))
 
 	OnAccountConfigUpdateEvent(cb func(e *AccountConfigUpdateEvent))
+
+	OnListenKeyExpired(cb func(e *ListenKeyExpired))
 }
