@@ -271,6 +271,11 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 		return nil
 	}
 
+	// check base balance and adjust the close position order
+	if baseBalance, ok := e.session.Account.Balance(e.position.Market.BaseCurrency); ok {
+		submitOrder.Quantity = fixedpoint.Min(submitOrder.Quantity, baseBalance.Available)
+	}
+
 	tagStr := strings.Join(tags, ",")
 	submitOrder.Tag = tagStr
 
