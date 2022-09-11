@@ -503,10 +503,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	// For drawing
-	profitt := floats.Slice{1., 1.}
+	profitSlice := floats.Slice{1., 1.}
 	price, _ := session.LastPrice(s.Symbol)
 	initAsset := s.CalcAssetValue(price).Float64()
-	cumProfit := floats.Slice{initAsset, initAsset}
+	cumProfitSlice := floats.Slice{initAsset, initAsset}
 
 	s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
 		if bbgo.IsBackTesting {
@@ -516,11 +516,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// For drawing/charting
 		price := trade.Price.Float64()
 		if s.buyPrice > 0 {
-			profitt.Update(price / s.buyPrice)
-			cumProfit.Update(s.CalcAssetValue(trade.Price).Float64())
+			profitSlice.Update(price / s.buyPrice)
+			cumProfitSlice.Update(s.CalcAssetValue(trade.Price).Float64())
 		} else if s.sellPrice > 0 {
-			profitt.Update(s.sellPrice / price)
-			cumProfit.Update(s.CalcAssetValue(trade.Price).Float64())
+			profitSlice.Update(s.sellPrice / price)
+			cumProfitSlice.Update(s.CalcAssetValue(trade.Price).Float64())
 		}
 		if s.Position.IsDust(trade.Price) {
 			s.buyPrice = 0
@@ -545,7 +545,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if !ok {
 		panic("cannot get 1m history")
 	}
-	s.InitDrawCommands(store, &profitt, &cumProfit)
+	s.InitDrawCommands(store, &profitSlice, &cumProfitSlice)
 
 	// Sync position to redis on trade
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
@@ -656,7 +656,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			defer s.AccumulatedProfitReport.Output(s.Symbol)
 
 			if s.DrawGraph {
-				s.Draw(store, &profitt, &cumProfit)
+				s.Draw(store, &profitSlice, &cumProfitSlice)
 			}
 		}
 
