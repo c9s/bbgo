@@ -30,7 +30,13 @@ type DynamicSpreadSettings struct {
 func (ds *DynamicSpreadSettings) Initialize(symbol string, session *bbgo.ExchangeSession, neutralBoll, defaultBoll *indicator.BOLL) {
 	switch {
 	case ds.Enabled != nil && !*ds.Enabled:
-		// do nothing
+		// backward compatibility
+		ds.AmpSpreadSettings = &DynamicSpreadAmpSettings{
+			IntervalWindow: ds.IntervalWindow,
+			AskSpreadScale: ds.AskSpreadScale,
+			BidSpreadScale: ds.BidSpreadScale,
+		}
+		ds.AmpSpreadSettings.initialize(symbol, session)
 	case ds.AmpSpreadSettings != nil:
 		ds.AmpSpreadSettings.initialize(symbol, session)
 	case ds.WeightedBollWidthRatioSpreadSettings != nil:
