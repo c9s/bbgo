@@ -188,14 +188,23 @@ func (c *AccountValueCalculator) MarginLevel(ctx context.Context) (fixedpoint.Va
 	return marginLevel, nil
 }
 
+func aggregateUsdValue(balances types.BalanceMap) fixedpoint.Value {
+	totalUsdValue := fixedpoint.Zero
+	// get all usd value if any
+	for currency, balance := range balances {
+		if types.IsUSDFiatCurrency(currency) {
+			totalUsdValue = totalUsdValue.Add(balance.Net())
+		}
+	}
+
+	return totalUsdValue
+}
+
 func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
 	// default leverage guard
 	if leverage.IsZero() {
 		leverage = defaultLeverage
 	}
-
-	baseBalance, _ := session.Account.Balance(market.BaseCurrency)
-	quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
 
 	usingLeverage := session.Margin || session.IsolatedMargin || session.Futures || session.IsolatedFutures
 	if !usingLeverage {
@@ -215,6 +224,19 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 		return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your quantity settings")
 	}
 
+	baseBalance, _ := session.Account.Balance(market.BaseCurrency)
+	quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
+	balances := session.Account.Balances()
+
+	// for isolated margin we can calculate from these two pair
+	totalUsdValue := fixedpoint.Zero
+	if types.IsUSDFiatCurrency(market.QuoteCurrency) {
+		totalUsdValue = aggregateUsdValue(balances)
+	} else {
+		// TODO: translate quote currency like BTC of ETH/BTC to usd value
+		totalUsdValue = quoteBalance.Net()
+	}
+
 	if !quantity.IsZero() {
 		return quantity, nil
 	}
@@ -228,14 +250,13 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 
 	// calculate the quantity automatically
 	if session.Margin || session.IsolatedMargin {
-
 		baseBalanceValue := baseBalance.Net().Mul(price)
-		accountValue := baseBalanceValue.Add(quoteBalance.Net())
+		accountUsdValue := baseBalanceValue.Add(totalUsdValue)
 
 		// avoid using all account value since there will be some trade loss for interests and the fee
-		accountValue = accountValue.Mul(one.Sub(fixedpoint.NewFromFloat(0.01)))
+		accountUsdValue = accountUsdValue.Mul(one.Sub(fixedpoint.NewFromFloat(0.01)))
 
-		log.Infof("calculated account value %f %s", accountValue.Float64(), market.QuoteCurrency)
+		log.Infof("calculated account usd value %f %s", accountUsdValue.Float64(), market.QuoteCurrency)
 
 		originLeverage := leverage
 		if session.IsolatedMargin {
@@ -253,7 +274,7 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 		}
 
 		// spot margin use the equity value, so we use the total quote balance here
-		maxPosition := risk.CalculateMaxPosition(price, accountValue, leverage)
+		maxPosition := risk.CalculateMaxPosition(price, accountUsdValue, leverage)
 		debt := baseBalance.Debt()
 		maxQuantity := maxPosition.Sub(debt)
 
@@ -262,7 +283,7 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 			maxPosition.Float64(),
 			debt.Float64(),
 			price.Float64(),
-			accountValue.Float64(),
+			accountUsdValue.Float64(),
 			market.QuoteCurrency,
 			leverage.Float64())
 
@@ -271,10 +292,10 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 
 	if session.Futures || session.IsolatedFutures {
 		// TODO: get mark price here
-		maxPositionQuantity := risk.CalculateMaxPosition(price, quoteBalance.Available, leverage)
+		maxPositionQuantity := risk.CalculateMaxPosition(price, totalUsdValue, leverage)
 		requiredPositionCost := risk.CalculatePositionCost(price, price, maxPositionQuantity, leverage, types.SideTypeSell)
 		if quoteBalance.Available.Compare(requiredPositionCost) < 0 {
-			return maxPositionQuantity, fmt.Errorf("available margin %f %s is not enough, can not submit order", quoteBalance.Available.Float64(), market.QuoteCurrency)
+			return maxPositionQuantity, fmt.Errorf("margin total usd value %f is not enough, can not submit order", totalUsdValue.Float64())
 		}
 
 		return maxPositionQuantity, nil
@@ -290,7 +311,6 @@ func CalculateQuoteQuantity(ctx context.Context, session *ExchangeSession, quote
 	}
 
 	quoteBalance, _ := session.Account.Balance(quoteCurrency)
-	accountValue := NewAccountValueCalculator(session, quoteCurrency)
 
 	usingLeverage := session.Margin || session.IsolatedMargin || session.Futures || session.IsolatedFutures
 	if !usingLeverage {
@@ -298,7 +318,23 @@ func CalculateQuoteQuantity(ctx context.Context, session *ExchangeSession, quote
 		return quoteBalance.Available.Mul(fixedpoint.Min(leverage, fixedpoint.One)), nil
 	}
 
+	originLeverage := leverage
+	if session.IsolatedMargin {
+		leverage = fixedpoint.Min(leverage, maxIsolatedMarginLeverage)
+		log.Infof("using isolated margin, maxLeverage=%f originalLeverage=%f currentLeverage=%f",
+			maxIsolatedMarginLeverage.Float64(),
+			originLeverage.Float64(),
+			leverage.Float64())
+	} else {
+		leverage = fixedpoint.Min(leverage, maxCrossMarginLeverage)
+		log.Infof("using cross margin, maxLeverage=%f originalLeverage=%f currentLeverage=%f",
+			maxCrossMarginLeverage.Float64(),
+			originLeverage.Float64(),
+			leverage.Float64())
+	}
+
 	// using leverage -- starts from here
+	accountValue := NewAccountValueCalculator(session, quoteCurrency)
 	availableQuote, err := accountValue.AvailableQuote(ctx)
 	if err != nil {
 		log.WithError(err).Errorf("can not update available quote")
