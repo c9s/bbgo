@@ -130,13 +130,14 @@ func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value
 			continue
 		}
 
-		symbol := b.Currency + c.quoteCurrency
-		price, ok := c.prices[symbol]
-		if !ok {
-			continue
+		symbol := b.Currency + c.quoteCurrency        // for BTC/USDT, ETH/USDT pairs
+		symbolReverse := c.quoteCurrency + b.Currency // for USDT/USDC or USDT/TWD pairs
+		if price, ok := c.prices[symbol]; ok {
+			accountValue = accountValue.Add(b.Net().Mul(price))
+		} else if priceReverse, ok2 := c.prices[symbolReverse]; ok2 {
+			price2 := one.Div(priceReverse)
+			accountValue = accountValue.Add(b.Net().Mul(price2))
 		}
-
-		accountValue = accountValue.Add(b.Net().Mul(price))
 	}
 
 	return accountValue, nil
@@ -200,6 +201,20 @@ func aggregateUsdValue(balances types.BalanceMap) fixedpoint.Value {
 	return totalUsdValue
 }
 
+func usdFiatBalances(balances types.BalanceMap) (fiats types.BalanceMap, rest types.BalanceMap) {
+	rest = make(types.BalanceMap)
+	fiats = make(types.BalanceMap)
+	for currency, balance := range balances {
+		if types.IsUSDFiatCurrency(currency) {
+			fiats[currency] = balance
+		} else {
+			rest[currency] = balance
+		}
+	}
+
+	return fiats, rest
+}
+
 func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
 	// default leverage guard
 	if leverage.IsZero() {
@@ -227,14 +242,23 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 	baseBalance, _ := session.Account.Balance(market.BaseCurrency)
 	quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
 	balances := session.Account.Balances()
+	usdBalances, restBalances := usdFiatBalances(balances)
 
 	// for isolated margin we can calculate from these two pair
 	totalUsdValue := fixedpoint.Zero
-	if types.IsUSDFiatCurrency(market.QuoteCurrency) {
+	if len(restBalances) == 1 && types.IsUSDFiatCurrency(market.QuoteCurrency) {
 		totalUsdValue = aggregateUsdValue(balances)
+	} else if len(restBalances) > 1 {
+		accountValue := NewAccountValueCalculator(session, "USDT")
+		netValue, err := accountValue.NetValue(context.Background())
+		if err != nil {
+			return quantity, err
+		}
+
+		totalUsdValue = netValue
 	} else {
 		// TODO: translate quote currency like BTC of ETH/BTC to usd value
-		totalUsdValue = quoteBalance.Net()
+		totalUsdValue = aggregateUsdValue(usdBalances)
 	}
 
 	if !quantity.IsZero() {
