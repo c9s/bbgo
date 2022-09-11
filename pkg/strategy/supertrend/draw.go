@@ -11,9 +11,9 @@ import (
 	"github.com/wcharczuk/go-chart/v2"
 )
 
-func (s *Strategy) InitDrawCommands(store *bbgo.SerialMarketDataStore, profit, cumProfit types.Series) {
+func (s *Strategy) InitDrawCommands(profit, cumProfit types.Series) {
 	bbgo.RegisterCommand("/pnl", "Draw PNL(%) per trade", func(reply interact.Reply) {
-		canvas := s.DrawPNL(profit)
+		canvas := DrawPNL(s.InstanceID(), profit)
 		var buffer bytes.Buffer
 		if err := canvas.Render(chart.PNG, &buffer); err != nil {
 			log.WithError(err).Errorf("cannot render pnl in drift")
@@ -23,7 +23,7 @@ func (s *Strategy) InitDrawCommands(store *bbgo.SerialMarketDataStore, profit, c
 		bbgo.SendPhoto(&buffer)
 	})
 	bbgo.RegisterCommand("/cumpnl", "Draw Cummulative PNL(Quote)", func(reply interact.Reply) {
-		canvas := s.DrawCumPNL(cumProfit)
+		canvas := DrawCumPNL(s.InstanceID(), cumProfit)
 		var buffer bytes.Buffer
 		if err := canvas.Render(chart.PNG, &buffer); err != nil {
 			log.WithError(err).Errorf("cannot render cumpnl in drift")
@@ -34,10 +34,34 @@ func (s *Strategy) InitDrawCommands(store *bbgo.SerialMarketDataStore, profit, c
 	})
 }
 
-func (s *Strategy) DrawPNL(profit types.Series) *types.Canvas {
-	canvas := types.NewCanvas(s.InstanceID())
+func (s *Strategy) Draw(profit, cumProfit types.Series) error {
+
+	canvas := DrawPNL(s.InstanceID(), profit)
+	f, err := os.Create(s.GraphPNLPath)
+	if err != nil {
+		return fmt.Errorf("cannot create on path " + s.GraphPNLPath)
+	}
+	defer f.Close()
+	if err = canvas.Render(chart.PNG, f); err != nil {
+		return fmt.Errorf("cannot render pnl")
+	}
+	canvas = DrawCumPNL(s.InstanceID(), cumProfit)
+	f, err = os.Create(s.GraphCumPNLPath)
+	if err != nil {
+		return fmt.Errorf("cannot create on path " + s.GraphCumPNLPath)
+	}
+	defer f.Close()
+	if err = canvas.Render(chart.PNG, f); err != nil {
+		return fmt.Errorf("cannot render cumpnl")
+	}
+
+	return nil
+}
+
+func DrawPNL(instanceID string, profit types.Series) *types.Canvas {
+	canvas := types.NewCanvas(instanceID)
 	length := profit.Length()
-	log.Errorf("pnl Highest: %f, Lowest: %f", types.Highest(profit, length), types.Lowest(profit, length))
+	log.Infof("pnl Highest: %f, Lowest: %f", types.Highest(profit, length), types.Lowest(profit, length))
 	canvas.PlotRaw("pnl %", profit, length)
 	canvas.YAxis = chart.YAxis{
 		ValueFormatter: func(v interface{}) string {
@@ -51,8 +75,8 @@ func (s *Strategy) DrawPNL(profit types.Series) *types.Canvas {
 	return canvas
 }
 
-func (s *Strategy) DrawCumPNL(cumProfit types.Series) *types.Canvas {
-	canvas := types.NewCanvas(s.InstanceID())
+func DrawCumPNL(instanceID string, cumProfit types.Series) *types.Canvas {
+	canvas := types.NewCanvas(instanceID)
 	canvas.PlotRaw("cummulative pnl", cumProfit, cumProfit.Length())
 	canvas.YAxis = chart.YAxis{
 		ValueFormatter: func(v interface{}) string {
@@ -63,29 +87,4 @@ func (s *Strategy) DrawCumPNL(cumProfit types.Series) *types.Canvas {
 		},
 	}
 	return canvas
-}
-
-func (s *Strategy) Draw(store *bbgo.SerialMarketDataStore, profit, cumProfit types.Series) {
-
-	canvas := s.DrawPNL(profit)
-	f, err := os.Create(s.GraphPNLPath)
-	if err != nil {
-		log.WithError(err).Errorf("cannot create on path " + s.GraphPNLPath)
-		return
-	}
-	defer f.Close()
-	if err = canvas.Render(chart.PNG, f); err != nil {
-		log.WithError(err).Errorf("cannot render pnl")
-		return
-	}
-	canvas = s.DrawCumPNL(cumProfit)
-	f, err = os.Create(s.GraphCumPNLPath)
-	if err != nil {
-		log.WithError(err).Errorf("cannot create on path " + s.GraphCumPNLPath)
-		return
-	}
-	defer f.Close()
-	if err = canvas.Render(chart.PNG, f); err != nil {
-		log.WithError(err).Errorf("cannot render cumpnl")
-	}
 }
