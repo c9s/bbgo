@@ -291,22 +291,22 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 
 	case "outboundAccountPosition":
 		var event OutboundAccountPositionEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
 	case "outboundAccountInfo":
 		var event OutboundAccountInfoEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
 	case "balanceUpdate":
 		var event BalanceUpdateEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
 	case "executionReport":
 		var event ExecutionReportEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
 	case "depthUpdate":
@@ -314,35 +314,40 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 
 	case "markPriceUpdate":
 		var event MarkPriceUpdateEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	case "listenKeyExpired":
+		var event ListenKeyExpired
+		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
 	// Binance futures data --------------
 	case "continuousKline":
 		var event ContinuousKLineEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
 	case "ORDER_TRADE_UPDATE":
 		var event OrderTradeUpdateEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
 	// Event: Balance and Position Update
 	case "ACCOUNT_UPDATE":
 		var event AccountUpdateEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
 	// Event: Order Update
 	case "ACCOUNT_CONFIG_UPDATE":
 		var event AccountConfigUpdateEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
 	case "trade":
 		var event MarketTradeEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
 	default:
@@ -616,6 +621,10 @@ func (k *KLine) KLine() types.KLine {
 		NumberOfTrades:           uint64(k.NumberOfTrades),
 		Closed:                   k.Closed,
 	}
+}
+
+type ListenKeyExpired struct {
+	EventBase
 }
 
 type MarkPriceUpdateEvent struct {
