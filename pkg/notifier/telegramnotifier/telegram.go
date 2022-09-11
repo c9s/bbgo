@@ -35,7 +35,7 @@ func UseBroadcast() Option {
 	}
 }
 
-// New
+// New returns a telegram notifier instance
 func New(bot *telebot.Bot, options ...Option) *Notifier {
 	notifier := &Notifier{
 		bot:         bot,
