@@ -272,8 +272,13 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	}
 
 	// check base balance and adjust the close position order
-	if baseBalance, ok := e.session.Account.Balance(e.position.Market.BaseCurrency); ok {
-		submitOrder.Quantity = fixedpoint.Min(submitOrder.Quantity, baseBalance.Available)
+	if e.position.IsLong() {
+		if baseBalance, ok := e.session.Account.Balance(e.position.Market.BaseCurrency); ok {
+			submitOrder.Quantity = fixedpoint.Min(submitOrder.Quantity, baseBalance.Available)
+		}
+		if submitOrder.Quantity.IsZero() {
+			return fmt.Errorf("insufficient base balance, can not sell: %+v", submitOrder)
+		}
 	}
 
 	tagStr := strings.Join(tags, ",")
