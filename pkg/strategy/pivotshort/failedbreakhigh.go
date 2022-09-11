@@ -45,6 +45,9 @@ type FailedBreakHigh struct {
 
 	orderExecutor *bbgo.GeneralOrderExecutor
 	session       *bbgo.ExchangeSession
+
+	// StrategyController
+	bbgo.StrategyController
 }
 
 func (s *FailedBreakHigh) Subscribe(session *bbgo.ExchangeSession) {
@@ -79,6 +82,9 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 	s.lastHigh = fixedpoint.Zero
 	s.pivotHigh = standardIndicator.PivotHigh(s.IntervalWindow)
+
+	// StrategyController
+	s.Status = types.StrategyStatusRunning
 
 	if s.VWMA != nil {
 		s.vwma = standardIndicator.VWMA(types.IntervalWindow{
@@ -122,6 +128,11 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 			return
 		}
 
+		// StrategyController
+		if s.Status != types.StrategyStatusRunning {
+			return
+		}
+
 		// make sure the position is opened, and it's a short position
 		if !position.IsOpened(k.Close) || !position.IsShort() {
 			return
@@ -147,6 +158,11 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.BreakInterval, func(kline types.KLine) {
 		if len(s.PivotHighPrices) == 0 || s.lastHigh.IsZero() {
 			log.Infof("currently there is no pivot high prices, can not check failed break high...")
+			return
+		}
+
+		// StrategyController
+		if s.Status != types.StrategyStatusRunning {
 			return
 		}
 

@@ -44,7 +44,7 @@ func (s *TrendEMA) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExe
 
 func (s *TrendEMA) Gradient() float64 {
 	if s.last > 0.0 && s.current > 0.0 {
-		return s.last / s.current
+		return s.current / s.last
 	}
 	return 0.0
 }
@@ -58,11 +58,7 @@ func (s *TrendEMA) GradientAllowed() bool {
 		return false
 	}
 
-	if s.MaxGradient > 0.0 && gradient < s.MaxGradient {
-		return true
-	}
-
-	if s.MinGradient > 0.0 && gradient > s.MinGradient {
+	if s.MaxGradient > 0.0 && gradient < s.MaxGradient && gradient > s.MinGradient {
 		return true
 	}
 
