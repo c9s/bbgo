@@ -62,6 +62,8 @@ type Stream struct {
 	accountUpdateEventCallbacks       []func(e *AccountUpdateEvent)
 	accountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
 
+	listenKeyExpiredCallbacks []func(e *ListenKeyExpired)
+
 	depthBuffers map[string]*depth.Buffer
 }
 
@@ -363,6 +365,10 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *AccountConfigUpdateEvent:
 		s.EmitAccountConfigUpdateEvent(e)
+
+	case *ListenKeyExpired:
+		s.EmitListenKeyExpired(e)
+	
 	}
 }
 
