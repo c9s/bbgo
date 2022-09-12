@@ -39,8 +39,12 @@ const FutureTestBaseURL = "https://testnet.binancefuture.com"
 const FuturesWebSocketURL = "wss://fstream.binance.com"
 const FuturesWebSocketTestURL = "wss://stream.binancefuture.com"
 
-// 5 per second and a 2 initial bucket
+// orderLimiter - the default order limiter apply 5 requests per second and a 2 initial bucket
+// this includes SubmitOrder, CancelOrder and QueryClosedOrders
+//
+// Limit defines the maximum frequency of some events. Limit is represented as number of events per second. A zero Limit allows no events.
 var orderLimiter = rate.NewLimiter(5, 2)
+var queryTradeLimiter = rate.NewLimiter(1, 2)
 
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
@@ -50,6 +54,14 @@ func init() {
 	_ = types.Exchange(&Exchange{})
 	_ = types.MarginExchange(&Exchange{})
 	_ = types.FuturesExchange(&Exchange{})
+
+	if n, ok := util.GetEnvVarInt("BINANCE_ORDER_RATE_LIMITER"); ok {
+		orderLimiter = rate.NewLimiter(rate.Limit(n), 2)
+	}
+
+	if n, ok := util.GetEnvVarInt("BINANCE_QUERY_TRADES_RATE_LIMITER"); ok {
+		queryTradeLimiter = rate.NewLimiter(rate.Limit(n), 2)
+	}
 }
 
 func isBinanceUs() bool {
@@ -1532,14 +1544,17 @@ func (e *Exchange) querySpotTrades(ctx context.Context, symbol string, options *
 	return trades, nil
 }
 
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
+	if err := queryTradeLimiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+
 	if e.IsMargin {
 		return e.queryMarginTrades(ctx, symbol, options)
 	} else if e.IsFutures {
 		return e.queryFuturesTrades(ctx, symbol, options)
-	} else {
-		return e.querySpotTrades(ctx, symbol, options)
 	}
+	return e.querySpotTrades(ctx, symbol, options)
 }
 
 // DefaultFeeRates returns the Binance VIP 0 fee schedule
