@@ -154,6 +154,7 @@ setup, please refer to [Dnum Installation](doc/topics/dnum-binary.md)
 - BBGO LINK/TWD Grid Trading on MAX <https://cloud.linode.com/stackscripts/797774>
 - BBGO USDC/USDT Grid Trading on MAX <https://cloud.linode.com/stackscripts/797777>
 - BBGO Standard Grid Trading on MAX <https://cloud.linode.com/stackscripts/795788>
+- BBGO bollmaker on Binance <https://cloud.linode.com/stackscripts/1002384>
 
 ### Build from source
 
