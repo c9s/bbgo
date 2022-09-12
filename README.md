@@ -148,12 +148,14 @@ setup, please refer to [Dnum Installation](doc/topics/dnum-binary.md)
 
 ### One-click Linode StackScript
 
-- BBGO Grid Trading on Binance <https://cloud.linode.com/stackscripts/950715>
-- BBGO USDT/TWD Grid Trading on MAX <https://cloud.linode.com/stackscripts/793380>
-- BBGO USDC/TWD Grid Trading on MAX <https://cloud.linode.com/stackscripts/797776>
-- BBGO LINK/TWD Grid Trading on MAX <https://cloud.linode.com/stackscripts/797774>
-- BBGO USDC/USDT Grid Trading on MAX <https://cloud.linode.com/stackscripts/797777>
-- BBGO Standard Grid Trading on MAX <https://cloud.linode.com/stackscripts/795788>
+StackScript allows you to one-click deploy a lightweight instance with bbgo.
+
+- BBGO grid on Binance <https://cloud.linode.com/stackscripts/950715>
+- BBGO grid USDT/TWD on MAX <https://cloud.linode.com/stackscripts/793380>
+- BBGO grid USDC/TWD on MAX <https://cloud.linode.com/stackscripts/797776>
+- BBGO grid LINK/TWD on MAX <https://cloud.linode.com/stackscripts/797774>
+- BBGO grid USDC/USDT on MAX <https://cloud.linode.com/stackscripts/797777>
+- BBGO grid on MAX <https://cloud.linode.com/stackscripts/795788>
 - BBGO bollmaker on Binance <https://cloud.linode.com/stackscripts/1002384>
 
 ### Build from source
