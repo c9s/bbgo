@@ -33,7 +33,18 @@ exchangeStrategies:
       quantity: 10.0
 
       # marketOrder submits the market sell order when the closed price is lower than the previous pivot low.
+      # by default we will use market order
       marketOrder: true
+
+      # limitOrder place limit order to open the short position instead of using market order
+      # this is useful when your quantity or leverage is quiet large.
+      limitOrder: false
+
+      # limitOrderTakerRatio is the price ratio to adjust your limit order as a taker order. e.g., 0.1%
+      # for sell order, 0.1% ratio means your final price = price * (1 - 0.1%)
+      # for buy order, 0.1% ratio means your final price = price * (1 + 0.1%)
+      # this is only enabled when the limitOrder option set to true
+      limitOrderTakerRatio: 0
 
       # bounceRatio is used for calculating the price of the limit sell order.
       # it's ratio of pivot low bounce when a new pivot low is detected.

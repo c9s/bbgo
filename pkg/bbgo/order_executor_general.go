@@ -138,12 +138,14 @@ type OpenPositionOptions struct {
 	Short bool `json:"-" yaml:"-"`
 
 	// Leverage is used for leveraged position and account
+	// Leverage is not effected when using non-leverage spot account
 	Leverage fixedpoint.Value `json:"leverage,omitempty"`
 
-	// Quantity will be used first, it will override the leverage if it's given.
+	// Quantity will be used first, it will override the leverage if it's given
 	Quantity fixedpoint.Value `json:"quantity,omitempty"`
 
 	// MarketOrder set to true to open a position with a market order
+	// default is MarketOrder = true
 	MarketOrder bool `json:"marketOrder,omitempty"`
 
 	// LimitOrder set to true to open a position with a limit order
@@ -151,6 +153,11 @@ type OpenPositionOptions struct {
 
 	// LimitOrderTakerRatio is used when LimitOrder = true, it adjusts the price of the limit order with a ratio.
 	// So you can ensure that the limit order can be a taker order. Higher the ratio, higher the chance it could be a taker order.
+	//
+	// limitOrderTakerRatio is the price ratio to adjust your limit order as a taker order. e.g., 0.1%
+	// for sell order, 0.1% ratio means your final price = price * (1 - 0.1%)
+	// for buy order, 0.1% ratio means your final price = price * (1 + 0.1%)
+	// this is only enabled when the limitOrder option set to true
 	LimitOrderTakerRatio fixedpoint.Value `json:"limitOrderTakerRatio,omitempty"`
 
 	Price fixedpoint.Value `json:"-" yaml:"-"`
