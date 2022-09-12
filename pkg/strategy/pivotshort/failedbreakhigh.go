@@ -17,6 +17,8 @@ type FailedBreakHigh struct {
 	// IntervalWindow is used for finding the pivot high
 	types.IntervalWindow
 
+	bbgo.OpenPositionOptions
+
 	// BreakInterval is used for checking failed break
 	BreakInterval types.Interval `json:"breakInterval"`
 
@@ -24,12 +26,6 @@ type FailedBreakHigh struct {
 
 	// Ratio is a number less than 1.0, price * ratio will be the price triggers the short order.
 	Ratio fixedpoint.Value `json:"ratio"`
-
-	// MarketOrder is the option to enable market order short.
-	MarketOrder bool `json:"marketOrder"`
-
-	Leverage fixedpoint.Value `json:"leverage"`
-	Quantity fixedpoint.Value `json:"quantity"`
 
 	VWMA *types.IntervalWindow `json:"vwma"`
 
@@ -225,50 +221,21 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 		ctx := context.Background()
 
+		bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, opening short position",
+			symbol,
+			kline.Close.Float64(),
+			previousHigh.Float64(),
+			s.Ratio.Float64())
+
 		// graceful cancel all active orders
 		_ = orderExecutor.GracefulCancel(ctx)
 
-		quantity, err := bbgo.CalculateBaseQuantity(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
-		if err != nil {
-			log.WithError(err).Errorf("quantity calculation error")
-		}
-
-		if quantity.IsZero() {
-			log.Warn("quantity is zero, can not submit order, skip")
-			return
-		}
-
-		if s.MarketOrder {
-			bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, submitting market sell %f to open a short position", symbol, kline.Close.Float64(), previousHigh.Float64(), s.Ratio.Float64(), quantity.Float64())
-			_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:           s.Symbol,
-				Side:             types.SideTypeSell,
-				Type:             types.OrderTypeMarket,
-				Quantity:         quantity,
-				MarginSideEffect: types.SideEffectTypeMarginBuy,
-				Tag:              "FailedBreakHighMarket",
-			})
-			if err != nil {
-				bbgo.Notify(err.Error())
-			}
-
-		} else {
-			sellPrice := previousHigh
-
-			bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, submitting limit sell @ %f", symbol, kline.Close.Float64(), previousHigh.Float64(), s.Ratio.Float64(), sellPrice.Float64())
-			_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:           kline.Symbol,
-				Side:             types.SideTypeSell,
-				Type:             types.OrderTypeLimit,
-				Price:            sellPrice,
-				Quantity:         quantity,
-				MarginSideEffect: types.SideEffectTypeMarginBuy,
-				Tag:              "FailedBreakHighLimit",
-			})
-
-			if err != nil {
-				bbgo.Notify(err.Error())
-			}
+		opts := s.OpenPositionOptions
+		opts.Short = true
+		opts.Price = closePrice
+		opts.Tags = []string{"FailedBreakHighMarket"}
+		if err := s.orderExecutor.OpenPosition(ctx, opts); err != nil {
+			log.WithError(err).Errorf("failed to open short position")
 		}
 	}))
 }
