@@ -28,6 +28,7 @@ func init() {
 	RunCmd.Flags().Bool("enable-webserver", false, "enable webserver")
 	RunCmd.Flags().Bool("enable-web-server", false, "legacy option, this is renamed to --enable-webserver")
 	RunCmd.Flags().String("webserver-bind", ":8080", "webserver binding")
+	RunCmd.Flags().Bool("lightweight", false, "lightweight mode")
 
 	RunCmd.Flags().Bool("enable-grpc", false, "enable grpc server")
 	RunCmd.Flags().String("grpc-bind", ":50051", "grpc server binding")
@@ -122,8 +123,20 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	defer cancelTrading()
 
 	environ := bbgo.NewEnvironment()
-	if err := bbgo.BootstrapEnvironment(ctx, environ, userConfig); err != nil {
+
+	lightweight, err := cmd.Flags().GetBool("lightweight")
+	if err != nil {
 		return err
+	}
+
+	if lightweight {
+		if err := bbgo.BootstrapEnvironmentLightweight(ctx, environ, userConfig); err != nil {
+			return err
+		}
+	} else {
+		if err := bbgo.BootstrapEnvironment(ctx, environ, userConfig); err != nil {
+			return err
+		}
 	}
 
 	if err := environ.Init(ctx); err != nil {
