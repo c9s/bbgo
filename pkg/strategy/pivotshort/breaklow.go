@@ -25,12 +25,17 @@ type BreakLow struct {
 	// MarketOrder is the option to enable market order short.
 	MarketOrder bool `json:"marketOrder"`
 
+	// LimitOrder is the option to use limit order instead of market order to short
+	LimitOrder      bool             `json:"limitOrder"`
+	LimitTakerRatio fixedpoint.Value `json:"limitTakerRatio"`
+	Leverage        fixedpoint.Value `json:"leverage"`
+	Quantity        fixedpoint.Value `json:"quantity"`
+
+	bbgo.OpenPositionOptions
+
 	// BounceRatio is a ratio used for placing the limit order sell price
 	// limit sell price = breakLowPrice * (1 + BounceRatio)
 	BounceRatio fixedpoint.Value `json:"bounceRatio"`
-
-	Leverage fixedpoint.Value `json:"leverage"`
-	Quantity fixedpoint.Value `json:"quantity"`
 
 	StopEMA *bbgo.StopEMA `json:"stopEMA"`
 
@@ -210,40 +215,17 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		// graceful cancel all active orders
 		_ = orderExecutor.GracefulCancel(ctx)
 
-		quantity, err := bbgo.CalculateBaseQuantity(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
-		if err != nil {
-			log.WithError(err).Errorf("quantity calculation error")
+		bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, opening short position", symbol, kline.Close.Float64(), previousLow.Float64(), s.Ratio.Float64())
+		opts := s.OpenPositionOptions
+		opts.Short = true
+		opts.Price = closePrice
+		opts.Tags = []string{"breakLowMarket"}
+		if opts.LimitOrder && !s.BounceRatio.IsZero() {
+			opts.Price = previousLow.Mul(fixedpoint.One.Add(s.BounceRatio))
 		}
 
-		if quantity.IsZero() {
-			log.Warn("quantity is zero, can not submit order, skip")
-			return
-		}
-
-		if s.MarketOrder {
-			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting market sell to open a short position", symbol, kline.Close.Float64(), previousLow.Float64(), s.Ratio.Float64())
-			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:           s.Symbol,
-				Side:             types.SideTypeSell,
-				Type:             types.OrderTypeMarket,
-				Quantity:         quantity,
-				MarginSideEffect: types.SideEffectTypeMarginBuy,
-				Tag:              "breakLowMarket",
-			})
-
-		} else {
-			sellPrice := previousLow.Mul(fixedpoint.One.Add(s.BounceRatio))
-
-			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting limit sell @ %f", symbol, kline.Close.Float64(), previousLow.Float64(), s.Ratio.Float64(), sellPrice.Float64())
-			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:           kline.Symbol,
-				Side:             types.SideTypeSell,
-				Type:             types.OrderTypeLimit,
-				Price:            sellPrice,
-				Quantity:         quantity,
-				MarginSideEffect: types.SideEffectTypeMarginBuy,
-				Tag:              "breakLowLimit",
-			})
+		if err := s.orderExecutor.OpenPosition(ctx, opts); err != nil {
+			log.WithError(err).Errorf("failed to open short position")
 		}
 	}))
 }
