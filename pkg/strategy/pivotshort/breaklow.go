@@ -19,6 +19,9 @@ type BreakLow struct {
 	Market types.Market
 	types.IntervalWindow
 
+	// FastWindow is used for fast pivot (this is to to filter the nearest high/low)
+	FastWindow int `json:"fastWindow"`
+
 	// Ratio is a number less than 1.0, price * ratio will be the price triggers the short order.
 	Ratio fixedpoint.Value `json:"ratio"`
 
@@ -78,6 +81,10 @@ func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
+	if s.FastWindow == 0 {
+		s.FastWindow = 3
+	}
+
 	s.session = session
 	s.orderExecutor = orderExecutor
 
@@ -92,7 +99,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	s.pivotLow = standardIndicator.PivotLow(s.IntervalWindow)
 	s.fastPivotLow = standardIndicator.PivotLow(types.IntervalWindow{
 		Interval: s.Interval,
-		Window:   3, // make it faster
+		Window:   s.FastWindow, // make it faster
 	})
 
 	if s.StopEMA != nil {
