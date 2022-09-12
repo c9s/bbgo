@@ -129,12 +129,13 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 
 type OpenPositionOptions struct {
 	// Long is for open a long position
-	// Long or Short must be set
-	Long bool `json:"long"`
+	// Long or Short must be set, avoid loading it from the config file
+	// it should be set from the strategy code
+	Long bool `json:"-" yaml:"-"`
 
 	// Short is for open a short position
 	// Long or Short must be set
-	Short bool `json:"short"`
+	Short bool `json:"-" yaml:"-"`
 
 	// Leverage is used for leveraged position and account
 	Leverage fixedpoint.Value `json:"leverage,omitempty"`
@@ -148,15 +149,16 @@ type OpenPositionOptions struct {
 	// LimitOrder set to true to open a position with a limit order
 	LimitOrder bool `json:"limitOrder,omitempty"`
 
-	// LimitTakerRatio is used when LimitOrder = true, it adjusts the price of the limit order with a ratio.
+	// LimitOrderTakerRatio is used when LimitOrder = true, it adjusts the price of the limit order with a ratio.
 	// So you can ensure that the limit order can be a taker order. Higher the ratio, higher the chance it could be a taker order.
-	LimitTakerRatio fixedpoint.Value `json:"limitTakerRatio,omitempty"`
-	CurrentPrice    fixedpoint.Value `json:"currentPrice,omitempty"`
-	Tags            []string         `json:"tags"`
+	LimitOrderTakerRatio fixedpoint.Value `json:"limitOrderTakerRatio,omitempty"`
+
+	Price fixedpoint.Value `json:"-" yaml:"-"`
+	Tags  []string         `json:"-" yaml:"-"`
 }
 
 func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) error {
-	price := options.CurrentPrice
+	price := options.Price
 	submitOrder := types.SubmitOrder{
 		Symbol:           e.position.Symbol,
 		Type:             types.OrderTypeMarket,
@@ -164,13 +166,13 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		Tag:              strings.Join(options.Tags, ","),
 	}
 
-	if !options.LimitTakerRatio.IsZero() {
+	if !options.LimitOrderTakerRatio.IsZero() {
 		if options.Long {
 			// use higher price to buy (this ensures that our order will be filled)
-			price = price.Mul(one.Add(options.LimitTakerRatio))
+			price = price.Mul(one.Add(options.LimitOrderTakerRatio))
 		} else if options.Short {
 			// use lower price to sell (this ensures that our order will be filled)
-			price = price.Mul(one.Sub(options.LimitTakerRatio))
+			price = price.Mul(one.Sub(options.LimitOrderTakerRatio))
 		}
 	}
 
