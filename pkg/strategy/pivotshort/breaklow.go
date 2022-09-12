@@ -257,25 +257,27 @@ func (s *BreakLow) pilotQuantityCalculation() {
 }
 
 func (s *BreakLow) updatePivotLow() bool {
-	lastLow := fixedpoint.NewFromFloat(s.pivotLow.Last())
-	if lastLow.IsZero() {
+	low := fixedpoint.NewFromFloat(s.pivotLow.Last())
+	if low.IsZero() {
 		return false
 	}
 
-	lastLowChanged := lastLow.Compare(s.lastLow) != 0
+	lastLowChanged := low.Compare(s.lastLow) != 0
 	if lastLowChanged {
-		s.lastLow = lastLow
-		s.pivotLowPrices = append(s.pivotLowPrices, lastLow)
+		if s.lastFastLow.IsZero() || low.Compare(s.lastFastLow) > 0 {
+			s.lastLow = low
+			s.pivotLowPrices = append(s.pivotLowPrices, low)
+		}
 	}
 
-	lastFastLow := fixedpoint.NewFromFloat(s.fastPivotLow.Last())
-	if !lastFastLow.IsZero() {
-		if lastFastLow.Compare(s.lastLow) < 0 {
+	fastLow := fixedpoint.NewFromFloat(s.fastPivotLow.Last())
+	if !fastLow.IsZero() {
+		if fastLow.Compare(s.lastLow) < 0 {
 			// invalidate the last low
 			s.lastLow = fixedpoint.Zero
 			lastLowChanged = false
 		}
-		s.lastFastLow = lastFastLow
+		s.lastFastLow = fastLow
 	}
 
 	return lastLowChanged
