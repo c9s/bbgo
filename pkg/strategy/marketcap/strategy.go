@@ -23,7 +23,7 @@ func init() {
 }
 
 type Strategy struct {
-	Datasource *coinmarketcap.DataSource
+	datasource *coinmarketcap.DataSource
 
 	Interval         types.Interval   `json:"interval"`
 	BaseCurrency     string           `json:"baseCurrency"`
@@ -40,7 +40,7 @@ type Strategy struct {
 
 func (s *Strategy) Initialize() error {
 	apiKey := os.Getenv("COINMARKETCAP_API_KEY")
-	s.Datasource = coinmarketcap.New(apiKey)
+	s.datasource = coinmarketcap.New(apiKey)
 	return nil
 }
 
@@ -178,7 +178,7 @@ func (s *Strategy) getTargetWeights(ctx context.Context) types.ValueMap {
 
 	// get marketcap from coinmarketcap
 	// set higher query limit to avoid target currency not in the list
-	marketcaps, err := s.Datasource.QueryMarketCapInUSD(ctx, 100)
+	marketcaps, err := s.datasource.QueryMarketCapInUSD(ctx, 100)
 	if err != nil {
 		log.WithError(err).Error("failed to query market cap")
 	}
