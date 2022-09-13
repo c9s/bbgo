@@ -17,6 +17,8 @@ type FailedBreakHigh struct {
 	// IntervalWindow is used for finding the pivot high
 	types.IntervalWindow
 
+	FastWindow int
+
 	bbgo.OpenPositionOptions
 
 	// BreakInterval is used for checking failed break
@@ -72,6 +74,10 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		return
 	}
 
+	if s.FastWindow == 0 {
+		s.FastWindow = 3
+	}
+
 	position := orderExecutor.Position()
 	symbol := position.Symbol
 	standardIndicator := session.StandardIndicatorSet(s.Symbol)
@@ -80,7 +86,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	s.pivotHigh = standardIndicator.PivotHigh(s.IntervalWindow)
 	s.fastPivotHigh = standardIndicator.PivotHigh(types.IntervalWindow{
 		Interval: s.IntervalWindow.Interval,
-		Window:   3,
+		Window:   s.FastWindow,
 	})
 
 	// StrategyController
@@ -260,25 +266,27 @@ func (s *FailedBreakHigh) pilotQuantityCalculation() {
 }
 
 func (s *FailedBreakHigh) updatePivotHigh() bool {
-	lastHigh := fixedpoint.NewFromFloat(s.pivotHigh.Last())
-	if lastHigh.IsZero() {
+	high := fixedpoint.NewFromFloat(s.pivotHigh.Last())
+	if high.IsZero() {
 		return false
 	}
 
-	lastHighChanged := lastHigh.Compare(s.lastHigh) != 0
+	lastHighChanged := high.Compare(s.lastHigh) != 0
 	if lastHighChanged {
-		s.lastHigh = lastHigh
-		s.pivotHighPrices = append(s.pivotHighPrices, lastHigh)
+		if s.lastHigh.IsZero() || high.Compare(s.lastHigh) > 0 {
+			s.lastHigh = high
+			s.pivotHighPrices = append(s.pivotHighPrices, high)
+		}
 	}
 
-	lastFastHigh := fixedpoint.NewFromFloat(s.fastPivotHigh.Last())
-	if !lastFastHigh.IsZero() {
-		if lastFastHigh.Compare(s.lastHigh) > 0 {
+	fastHigh := fixedpoint.NewFromFloat(s.fastPivotHigh.Last())
+	if !fastHigh.IsZero() {
+		if fastHigh.Compare(s.lastHigh) > 0 {
 			// invalidate the last low
 			s.lastHigh = fixedpoint.Zero
 			lastHighChanged = false
 		}
-		s.lastFastHigh = lastFastHigh
+		s.lastFastHigh = fastHigh
 	}
 
 	return lastHighChanged
