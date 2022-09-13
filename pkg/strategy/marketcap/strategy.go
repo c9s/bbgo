@@ -30,7 +30,6 @@ type Strategy struct {
 	BaseWeight       fixedpoint.Value `json:"baseWeight"`
 	TargetCurrencies []string         `json:"targetCurrencies"`
 	Threshold        fixedpoint.Value `json:"threshold"`
-	Verbose          bool             `json:"verbose"`
 	DryRun           bool             `json:"dryRun"`
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
