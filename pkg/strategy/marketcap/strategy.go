@@ -116,6 +116,9 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 	currentWeights := marketValues.Normalize()
 
 	for currency, targetWeight := range targetWeights {
+		if currency == s.BaseCurrency {
+			continue
+		}
 		symbol := currency + s.BaseCurrency
 		currentWeight := currentWeights[currency]
 		currentPrice := prices[currency]
