@@ -283,6 +283,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 		return nil
 	}).Next(func(signature string, reply interact.Reply) error {
+		defer func() {
+			if kc, ok := reply.(interact.KeyboardController); ok {
+				kc.RemoveKeyboard()
+			}
+		}()
+
 		strategy, ok := it.exchangeStrategies[signature]
 		if !ok {
 			reply.Message("Strategy not found")
@@ -296,10 +302,6 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 
 		status := controller.GetStatus()
-
-		if kc, ok := reply.(interact.KeyboardController); ok {
-			kc.RemoveKeyboard()
-		}
 
 		if status == types.StrategyStatusRunning {
 			reply.Message(fmt.Sprintf("Strategy %s is running.", signature))
@@ -321,6 +323,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 		return nil
 	}).Next(func(signature string, reply interact.Reply) error {
+		defer func() {
+			if kc, ok := reply.(interact.KeyboardController); ok {
+				kc.RemoveKeyboard()
+			}
+		}()
+
 		strategy, ok := it.exchangeStrategies[signature]
 		if !ok {
 			reply.Message("Strategy not found")
@@ -339,16 +347,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return nil
 		}
 
-		if kc, ok := reply.(interact.KeyboardController); ok {
-			kc.RemoveKeyboard()
-		}
-
 		if err := controller.Suspend(); err != nil {
 			reply.Message(fmt.Sprintf("Failed to suspend the strategy, %s", err.Error()))
 			return err
 		}
 
-		reply.Message(fmt.Sprintf("Strategy %s suspended.", signature))
+		reply.Message(fmt.Sprintf("Strategy %s is now suspended.", signature))
 		return nil
 	})
 
@@ -363,6 +367,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 		return nil
 	}).Next(func(signature string, reply interact.Reply) error {
+		defer func() {
+			if kc, ok := reply.(interact.KeyboardController); ok {
+				kc.RemoveKeyboard()
+			}
+		}()
+
 		strategy, ok := it.exchangeStrategies[signature]
 		if !ok {
 			reply.Message("Strategy not found")
@@ -381,16 +391,12 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 			return nil
 		}
 
-		if kc, ok := reply.(interact.KeyboardController); ok {
-			kc.RemoveKeyboard()
-		}
-
 		if err := controller.Resume(); err != nil {
 			reply.Message(fmt.Sprintf("Failed to resume the strategy, %s", err.Error()))
 			return err
 		}
 
-		reply.Message(fmt.Sprintf("Strategy %s resumed.", signature))
+		reply.Message(fmt.Sprintf("Strategy %s is now resumed.", signature))
 		return nil
 	})
 
