@@ -140,8 +140,7 @@ func calculateNetValueInQuote(balances types.BalanceMap, prices types.PriceMap, 
 		if price, ok := prices[symbol]; ok {
 			accountValue = accountValue.Add(b.Net().Mul(price))
 		} else if priceReverse, ok2 := prices[symbolReverse]; ok2 {
-			price2 := one.Div(priceReverse)
-			accountValue = accountValue.Add(b.Net().Mul(price2))
+			accountValue = accountValue.Add(b.Net().Div(priceReverse))
 		}
 	}
 
