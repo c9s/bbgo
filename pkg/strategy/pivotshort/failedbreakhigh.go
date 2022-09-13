@@ -29,6 +29,10 @@ type FailedBreakHigh struct {
 	// Ratio is a number less than 1.0, price * ratio will be the price triggers the short order.
 	Ratio fixedpoint.Value `json:"ratio"`
 
+	// EarlyStopRatio adjusts the break high price with the given ratio
+	// this is for stop loss earlier if the price goes above the previous price
+	EarlyStopRatio fixedpoint.Value `json:"earlyStopRatio"`
+
 	VWMA *types.IntervalWindow `json:"vwma"`
 
 	StopEMA *bbgo.StopEMA `json:"stopEMA"`
@@ -123,7 +127,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 				return
 			}
 
-			bbgo.Notify("%s new pivot low: %f", s.Symbol, s.pivotHigh.Last())
+			bbgo.Notify("%s new pivot high: %f", s.Symbol, s.pivotHigh.Last())
 		}
 	}))
 
@@ -149,9 +153,16 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 			return
 		}
 
+		lastHigh := s.lastFastHigh
+
+		if !s.EarlyStopRatio.IsZero() {
+			lastHigh = lastHigh.Mul(one.Add(s.EarlyStopRatio))
+		}
+
 		// the kline opened below the last break low, and closed above the last break low
-		if k.Open.Compare(s.lastFailedBreakHigh) < 0 && k.Close.Compare(s.lastFailedBreakHigh) > 0 {
-			bbgo.Notify("kLine closed above the last break high, triggering stop earlier")
+		if k.Open.Compare(lastHigh) < 0 && k.Close.Compare(lastHigh) > 0 && k.Open.Compare(k.Close) > 0 {
+			bbgo.Notify("kLine closed %f above the last break high %f (ratio %f), triggering stop earlier", k.Close.Float64(), lastHigh.Float64(), s.EarlyStopRatio.Float64())
+
 			if err := s.orderExecutor.ClosePosition(context.Background(), one, "failedBreakHighStop"); err != nil {
 				log.WithError(err).Error("position close error")
 			}
@@ -182,13 +193,13 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		// we need few conditions:
 		// 1) kline.High is higher than the previous high
 		// 2) kline.Close is lower than the previous high
-		// 3) kline.Close is lower than kline.Open
 		if kline.High.Compare(breakPrice) < 0 || closePrice.Compare(breakPrice) >= 0 {
 			return
 		}
 
+		// 3) kline.Close is lower than kline.Open
 		if closePrice.Compare(openPrice) > 0 {
-			bbgo.Notify("the closed price is higher than the open price, skip failed break high short")
+			bbgo.Notify("the %s closed price %f is higher than the open price %f, skip failed break high short", s.Symbol, closePrice.Float64(), openPrice.Float64())
 			return
 		}
 
