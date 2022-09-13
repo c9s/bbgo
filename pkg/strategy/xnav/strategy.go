@@ -117,7 +117,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 	for currency, asset := range totalAssets {
 		// calculated if it's dust only when InUSD (usd value) is defined.
-		if s.IgnoreDusts && !asset.InUSD.IsZero() && asset.InUSD.Compare(Ten) < 0 {
+		if s.IgnoreDusts && !asset.InUSD.IsZero() && asset.InUSD.Compare(Ten) < 0 && asset.InUSD.Compare(Ten.Neg()) > 0 {
 			continue
 		}
 
