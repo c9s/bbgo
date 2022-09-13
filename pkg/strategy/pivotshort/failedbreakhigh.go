@@ -150,8 +150,9 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		}
 
 		// the kline opened below the last break low, and closed above the last break low
-		if k.Open.Compare(s.lastFailedBreakHigh) < 0 && k.Close.Compare(s.lastFailedBreakHigh) > 0 {
+		if k.Open.Compare(s.lastFailedBreakHigh) < 0 && k.Close.Compare(s.lastFailedBreakHigh) > 0 && k.Open.Compare(k.Close) > 0 {
 			bbgo.Notify("kLine closed above the last break high, triggering stop earlier")
+
 			if err := s.orderExecutor.ClosePosition(context.Background(), one, "failedBreakHighStop"); err != nil {
 				log.WithError(err).Error("position close error")
 			}
