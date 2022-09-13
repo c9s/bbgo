@@ -50,7 +50,7 @@ func (b Balance) Debt() fixedpoint.Value {
 }
 
 func (b Balance) ValueString() (o string) {
-	o = b.Available.String()
+	o = b.Net().String()
 
 	if b.Locked.Sign() > 0 {
 		o += fmt.Sprintf(" (locked %v)", b.Locked)
@@ -64,7 +64,7 @@ func (b Balance) ValueString() (o string) {
 }
 
 func (b Balance) String() (o string) {
-	o = fmt.Sprintf("%s: %s", b.Currency, b.Available.String())
+	o = fmt.Sprintf("%s: %s", b.Currency, b.Net().String())
 
 	if b.Locked.Sign() > 0 {
 		o += fmt.Sprintf(" (locked %v)", b.Locked)
@@ -72,6 +72,10 @@ func (b Balance) String() (o string) {
 
 	if b.Borrowed.Sign() > 0 {
 		o += fmt.Sprintf(" (borrowed: %v)", b.Borrowed)
+	}
+
+	if b.Interest.Sign() > 0 {
+		o += fmt.Sprintf(" (interest: %v)", b.Interest)
 	}
 
 	return o
