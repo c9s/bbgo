@@ -145,15 +145,13 @@ func (it *CoreInteraction) Commands(i *interact.Interact) {
 		}
 
 		position := reader.CurrentPosition()
-		if position != nil {
-			reply.Send("Your current position:")
-			reply.Send(position.PlainText())
-
-			if position.Base.IsZero() {
-				reply.Message(fmt.Sprintf("Strategy %q has no opened position", signature))
-				return fmt.Errorf("strategy %T has no opened position", strategy)
-			}
+		if position == nil || position.Base.IsZero() {
+			reply.Message(fmt.Sprintf("Strategy %q has no opened position", signature))
+			return fmt.Errorf("strategy %T has no opened position", strategy)
 		}
+
+		reply.Send("Your current position:")
+		reply.Message(position.PlainText())
 
 		if kc, ok := reply.(interact.KeyboardController); ok {
 			kc.RemoveKeyboard()
