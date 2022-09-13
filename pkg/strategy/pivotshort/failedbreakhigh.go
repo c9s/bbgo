@@ -258,6 +258,10 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 }
 
 func (s *FailedBreakHigh) pilotQuantityCalculation() {
+	if s.lastHigh.IsZero() {
+		return
+	}
+
 	log.Infof("pilot calculation for max position: last low = %f, quantity = %f, leverage = %f",
 		s.lastHigh.Float64(),
 		s.Quantity.Float64(),
