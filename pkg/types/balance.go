@@ -12,6 +12,8 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+type PriceMap map[string]fixedpoint.Value
+
 type Balance struct {
 	Currency  string           `json:"currency"`
 	Available fixedpoint.Value `json:"available"`
@@ -159,7 +161,7 @@ func (m BalanceMap) Copy() (d BalanceMap) {
 }
 
 // Assets converts balances into assets with the given prices
-func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Time) AssetMap {
+func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) AssetMap {
 	assets := make(AssetMap)
 
 	_, btcInUSD, hasBtcPrice := findUSDMarketPrice("BTC", prices)
@@ -182,7 +184,7 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 			NetAsset:  netAsset,
 		}
 
-		if strings.HasPrefix(currency, "USD") { // for usd
+		if IsUSDFiatCurrency(currency) { // for usd
 			asset.InUSD = netAsset
 			asset.PriceInUSD = fixedpoint.One
 			if hasBtcPrice && !asset.InUSD.IsZero() {
@@ -191,7 +193,7 @@ func (m BalanceMap) Assets(prices map[string]fixedpoint.Value, priceTime time.Ti
 		} else { // for crypto
 			if market, usdPrice, ok := findUSDMarketPrice(currency, prices); ok {
 				// this includes USDT, USD, USDC and so on
-				if strings.HasPrefix(market, "USD") { // for prices like USDT/TWD
+				if strings.HasPrefix(market, "USD") || strings.HasPrefix(market, "BUSD") { // for prices like USDT/TWD, BUSD/USDT
 					if !asset.NetAsset.IsZero() {
 						asset.InUSD = asset.NetAsset.Div(usdPrice)
 					}

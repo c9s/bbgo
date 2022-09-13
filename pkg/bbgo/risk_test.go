@@ -230,7 +230,7 @@ func Test_usdFiatBalances(t *testing.T) {
 func Test_calculateNetValueInQuote(t *testing.T) {
 	type args struct {
 		balances      types.BalanceMap
-		prices        map[string]fixedpoint.Value
+		prices        types.PriceMap
 		quoteCurrency string
 	}
 	tests := []struct {
@@ -247,7 +247,7 @@ func Test_calculateNetValueInQuote(t *testing.T) {
 					"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
 					"BTC":  types.Balance{Currency: "BTC", Available: number(0.01)},
 				},
-				prices: map[string]fixedpoint.Value{
+				prices: types.PriceMap{
 					"USDCUSDT": number(1.0),
 					"BUSDUSDT": number(1.0),
 					"BTCUSDT":  number(19000.0),
@@ -265,7 +265,7 @@ func Test_calculateNetValueInQuote(t *testing.T) {
 					"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
 					"BTC":  types.Balance{Currency: "BTC", Available: number(0), Borrowed: number(2.0)},
 				},
-				prices: map[string]fixedpoint.Value{
+				prices: types.PriceMap{
 					"USDCUSDT": number(1.0),
 					"BUSDUSDT": number(1.0),
 					"BTCUSDT":  number(19000.0),
@@ -284,7 +284,7 @@ func Test_calculateNetValueInQuote(t *testing.T) {
 					"ETH":  types.Balance{Currency: "ETH", Available: number(10.0)},
 					"BTC":  types.Balance{Currency: "BTC", Available: number(0), Borrowed: number(2.0)},
 				},
-				prices: map[string]fixedpoint.Value{
+				prices: types.PriceMap{
 					"USDCUSDT": number(1.0),
 					"BUSDUSDT": number(1.0),
 					"ETHUSDT":  number(1700.0),

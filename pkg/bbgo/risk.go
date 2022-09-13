@@ -126,7 +126,7 @@ func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value
 	return accountValue, nil
 }
 
-func calculateNetValueInQuote(balances types.BalanceMap, prices map[string]fixedpoint.Value, quoteCurrency string) (accountValue fixedpoint.Value) {
+func calculateNetValueInQuote(balances types.BalanceMap, prices types.PriceMap, quoteCurrency string) (accountValue fixedpoint.Value) {
 	accountValue = fixedpoint.Zero
 
 	for _, b := range balances {
