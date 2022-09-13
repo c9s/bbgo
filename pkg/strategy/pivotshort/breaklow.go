@@ -19,18 +19,26 @@ type BreakLow struct {
 	Market types.Market
 	types.IntervalWindow
 
+	// FastWindow is used for fast pivot (this is to to filter the nearest high/low)
+	FastWindow int `json:"fastWindow"`
+
 	// Ratio is a number less than 1.0, price * ratio will be the price triggers the short order.
 	Ratio fixedpoint.Value `json:"ratio"`
 
 	// MarketOrder is the option to enable market order short.
 	MarketOrder bool `json:"marketOrder"`
 
+	// LimitOrder is the option to use limit order instead of market order to short
+	LimitOrder      bool             `json:"limitOrder"`
+	LimitTakerRatio fixedpoint.Value `json:"limitTakerRatio"`
+	Leverage        fixedpoint.Value `json:"leverage"`
+	Quantity        fixedpoint.Value `json:"quantity"`
+
+	bbgo.OpenPositionOptions
+
 	// BounceRatio is a ratio used for placing the limit order sell price
 	// limit sell price = breakLowPrice * (1 + BounceRatio)
 	BounceRatio fixedpoint.Value `json:"bounceRatio"`
-
-	Leverage fixedpoint.Value `json:"leverage"`
-	Quantity fixedpoint.Value `json:"quantity"`
 
 	StopEMA *bbgo.StopEMA `json:"stopEMA"`
 
@@ -38,13 +46,13 @@ type BreakLow struct {
 
 	FakeBreakStop *FakeBreakStop `json:"fakeBreakStop"`
 
-	lastLow fixedpoint.Value
+	lastLow, lastFastLow fixedpoint.Value
 
 	// lastBreakLow is the low that the price just break
 	lastBreakLow fixedpoint.Value
 
-	pivotLow       *indicator.PivotLow
-	pivotLowPrices []fixedpoint.Value
+	pivotLow, fastPivotLow *indicator.PivotLow
+	pivotLowPrices         []fixedpoint.Value
 
 	trendEWMALast, trendEWMACurrent float64
 
@@ -73,6 +81,10 @@ func (s *BreakLow) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
+	if s.FastWindow == 0 {
+		s.FastWindow = 3
+	}
+
 	s.session = session
 	s.orderExecutor = orderExecutor
 
@@ -84,8 +96,11 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	standardIndicator := session.StandardIndicatorSet(s.Symbol)
 
 	s.lastLow = fixedpoint.Zero
-
 	s.pivotLow = standardIndicator.PivotLow(s.IntervalWindow)
+	s.fastPivotLow = standardIndicator.PivotLow(types.IntervalWindow{
+		Interval: s.Interval,
+		Window:   s.FastWindow, // make it faster
+	})
 
 	if s.StopEMA != nil {
 		s.StopEMA.Bind(session, orderExecutor)
@@ -143,12 +158,12 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	}
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
-		if len(s.pivotLowPrices) == 0 {
+		if len(s.pivotLowPrices) == 0 || s.lastLow.IsZero() {
 			log.Infof("currently there is no pivot low prices, can not check break low...")
 			return
 		}
 
-		previousLow := s.pivotLowPrices[len(s.pivotLowPrices)-1]
+		previousLow := s.lastLow
 		ratio := fixedpoint.One.Add(s.Ratio)
 		breakPrice := previousLow.Mul(ratio)
 
@@ -207,40 +222,17 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		// graceful cancel all active orders
 		_ = orderExecutor.GracefulCancel(ctx)
 
-		quantity, err := bbgo.CalculateBaseQuantity(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
-		if err != nil {
-			log.WithError(err).Errorf("quantity calculation error")
+		bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, opening short position", symbol, kline.Close.Float64(), previousLow.Float64(), s.Ratio.Float64())
+		opts := s.OpenPositionOptions
+		opts.Short = true
+		opts.Price = closePrice
+		opts.Tags = []string{"breakLowMarket"}
+		if opts.LimitOrder && !s.BounceRatio.IsZero() {
+			opts.Price = previousLow.Mul(fixedpoint.One.Add(s.BounceRatio))
 		}
 
-		if quantity.IsZero() {
-			log.Warn("quantity is zero, can not submit order, skip")
-			return
-		}
-
-		if s.MarketOrder {
-			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting market sell to open a short position", symbol, kline.Close.Float64(), previousLow.Float64(), s.Ratio.Float64())
-			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:           s.Symbol,
-				Side:             types.SideTypeSell,
-				Type:             types.OrderTypeMarket,
-				Quantity:         quantity,
-				MarginSideEffect: types.SideEffectTypeMarginBuy,
-				Tag:              "breakLowMarket",
-			})
-
-		} else {
-			sellPrice := previousLow.Mul(fixedpoint.One.Add(s.BounceRatio))
-
-			bbgo.Notify("%s price %f breaks the previous low %f with ratio %f, submitting limit sell @ %f", symbol, kline.Close.Float64(), previousLow.Float64(), s.Ratio.Float64(), sellPrice.Float64())
-			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:           kline.Symbol,
-				Side:             types.SideTypeSell,
-				Type:             types.OrderTypeLimit,
-				Price:            sellPrice,
-				Quantity:         quantity,
-				MarginSideEffect: types.SideEffectTypeMarginBuy,
-				Tag:              "breakLowLimit",
-			})
+		if err := s.orderExecutor.OpenPosition(ctx, opts); err != nil {
+			log.WithError(err).Errorf("failed to open short position")
 		}
 	}))
 }
@@ -265,12 +257,28 @@ func (s *BreakLow) pilotQuantityCalculation() {
 }
 
 func (s *BreakLow) updatePivotLow() bool {
-	lastLow := fixedpoint.NewFromFloat(s.pivotLow.Last())
-	if lastLow.IsZero() || lastLow.Compare(s.lastLow) == 0 {
+	low := fixedpoint.NewFromFloat(s.pivotLow.Last())
+	if low.IsZero() {
 		return false
 	}
 
-	s.lastLow = lastLow
-	s.pivotLowPrices = append(s.pivotLowPrices, lastLow)
-	return true
+	lastLowChanged := low.Compare(s.lastLow) != 0
+	if lastLowChanged {
+		if s.lastFastLow.IsZero() || low.Compare(s.lastFastLow) > 0 {
+			s.lastLow = low
+			s.pivotLowPrices = append(s.pivotLowPrices, low)
+		}
+	}
+
+	fastLow := fixedpoint.NewFromFloat(s.fastPivotLow.Last())
+	if !fastLow.IsZero() {
+		if fastLow.Compare(s.lastLow) < 0 {
+			// invalidate the last low
+			s.lastLow = fixedpoint.Zero
+			lastLowChanged = false
+		}
+		s.lastFastLow = fastLow
+	}
+
+	return lastLowChanged
 }

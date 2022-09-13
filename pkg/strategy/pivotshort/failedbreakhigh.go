@@ -17,6 +17,8 @@ type FailedBreakHigh struct {
 	// IntervalWindow is used for finding the pivot high
 	types.IntervalWindow
 
+	bbgo.OpenPositionOptions
+
 	// BreakInterval is used for checking failed break
 	BreakInterval types.Interval `json:"breakInterval"`
 
@@ -25,23 +27,17 @@ type FailedBreakHigh struct {
 	// Ratio is a number less than 1.0, price * ratio will be the price triggers the short order.
 	Ratio fixedpoint.Value `json:"ratio"`
 
-	// MarketOrder is the option to enable market order short.
-	MarketOrder bool `json:"marketOrder"`
-
-	Leverage fixedpoint.Value `json:"leverage"`
-	Quantity fixedpoint.Value `json:"quantity"`
-
 	VWMA *types.IntervalWindow `json:"vwma"`
 
 	StopEMA *bbgo.StopEMA `json:"stopEMA"`
 
 	TrendEMA *bbgo.TrendEMA `json:"trendEMA"`
 
-	lastFailedBreakHigh, lastHigh fixedpoint.Value
+	lastFailedBreakHigh, lastHigh, lastFastHigh fixedpoint.Value
 
-	pivotHigh       *indicator.PivotHigh
-	vwma            *indicator.VWMA
-	PivotHighPrices []fixedpoint.Value
+	pivotHigh, fastPivotHigh *indicator.PivotHigh
+	vwma                     *indicator.VWMA
+	pivotHighPrices          []fixedpoint.Value
 
 	orderExecutor *bbgo.GeneralOrderExecutor
 	session       *bbgo.ExchangeSession
@@ -82,6 +78,10 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 	s.lastHigh = fixedpoint.Zero
 	s.pivotHigh = standardIndicator.PivotHigh(s.IntervalWindow)
+	s.fastPivotHigh = standardIndicator.PivotHigh(types.IntervalWindow{
+		Interval: s.IntervalWindow.Interval,
+		Window:   3,
+	})
 
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
@@ -156,7 +156,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	}))
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.BreakInterval, func(kline types.KLine) {
-		if len(s.PivotHighPrices) == 0 || s.lastHigh.IsZero() {
+		if len(s.pivotHighPrices) == 0 || s.lastHigh.IsZero() {
 			log.Infof("currently there is no pivot high prices, can not check failed break high...")
 			return
 		}
@@ -221,50 +221,21 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 		ctx := context.Background()
 
+		bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, opening short position",
+			symbol,
+			kline.Close.Float64(),
+			previousHigh.Float64(),
+			s.Ratio.Float64())
+
 		// graceful cancel all active orders
 		_ = orderExecutor.GracefulCancel(ctx)
 
-		quantity, err := bbgo.CalculateBaseQuantity(s.session, s.Market, closePrice, s.Quantity, s.Leverage)
-		if err != nil {
-			log.WithError(err).Errorf("quantity calculation error")
-		}
-
-		if quantity.IsZero() {
-			log.Warn("quantity is zero, can not submit order, skip")
-			return
-		}
-
-		if s.MarketOrder {
-			bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, submitting market sell %f to open a short position", symbol, kline.Close.Float64(), previousHigh.Float64(), s.Ratio.Float64(), quantity.Float64())
-			_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:           s.Symbol,
-				Side:             types.SideTypeSell,
-				Type:             types.OrderTypeMarket,
-				Quantity:         quantity,
-				MarginSideEffect: types.SideEffectTypeMarginBuy,
-				Tag:              "FailedBreakHighMarket",
-			})
-			if err != nil {
-				bbgo.Notify(err.Error())
-			}
-
-		} else {
-			sellPrice := previousHigh
-
-			bbgo.Notify("%s price %f failed breaking the previous high %f with ratio %f, submitting limit sell @ %f", symbol, kline.Close.Float64(), previousHigh.Float64(), s.Ratio.Float64(), sellPrice.Float64())
-			_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:           kline.Symbol,
-				Side:             types.SideTypeSell,
-				Type:             types.OrderTypeLimit,
-				Price:            sellPrice,
-				Quantity:         quantity,
-				MarginSideEffect: types.SideEffectTypeMarginBuy,
-				Tag:              "FailedBreakHighLimit",
-			})
-
-			if err != nil {
-				bbgo.Notify(err.Error())
-			}
+		opts := s.OpenPositionOptions
+		opts.Short = true
+		opts.Price = closePrice
+		opts.Tags = []string{"FailedBreakHighMarket"}
+		if err := s.orderExecutor.OpenPosition(ctx, opts); err != nil {
+			log.WithError(err).Errorf("failed to open short position")
 		}
 	}))
 }
@@ -290,11 +261,25 @@ func (s *FailedBreakHigh) pilotQuantityCalculation() {
 
 func (s *FailedBreakHigh) updatePivotHigh() bool {
 	lastHigh := fixedpoint.NewFromFloat(s.pivotHigh.Last())
-	if lastHigh.IsZero() || lastHigh.Compare(s.lastHigh) == 0 {
+	if lastHigh.IsZero() {
 		return false
 	}
 
-	s.lastHigh = lastHigh
-	s.PivotHighPrices = append(s.PivotHighPrices, lastHigh)
-	return true
+	lastHighChanged := lastHigh.Compare(s.lastHigh) != 0
+	if lastHighChanged {
+		s.lastHigh = lastHigh
+		s.pivotHighPrices = append(s.pivotHighPrices, lastHigh)
+	}
+
+	lastFastHigh := fixedpoint.NewFromFloat(s.fastPivotHigh.Last())
+	if !lastFastHigh.IsZero() {
+		if lastFastHigh.Compare(s.lastHigh) > 0 {
+			// invalidate the last low
+			s.lastHigh = fixedpoint.Zero
+			lastHighChanged = false
+		}
+		s.lastFastHigh = lastFastHigh
+	}
+
+	return lastHighChanged
 }
