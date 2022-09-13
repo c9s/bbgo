@@ -17,6 +17,8 @@ type FailedBreakHigh struct {
 	// IntervalWindow is used for finding the pivot high
 	types.IntervalWindow
 
+	FastWindow int
+
 	bbgo.OpenPositionOptions
 
 	// BreakInterval is used for checking failed break
@@ -72,6 +74,10 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		return
 	}
 
+	if s.FastWindow == 0 {
+		s.FastWindow = 3
+	}
+
 	position := orderExecutor.Position()
 	symbol := position.Symbol
 	standardIndicator := session.StandardIndicatorSet(s.Symbol)
@@ -80,7 +86,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	s.pivotHigh = standardIndicator.PivotHigh(s.IntervalWindow)
 	s.fastPivotHigh = standardIndicator.PivotHigh(types.IntervalWindow{
 		Interval: s.IntervalWindow.Interval,
-		Window:   3,
+		Window:   s.FastWindow,
 	})
 
 	// StrategyController
