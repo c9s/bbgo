@@ -260,25 +260,27 @@ func (s *FailedBreakHigh) pilotQuantityCalculation() {
 }
 
 func (s *FailedBreakHigh) updatePivotHigh() bool {
-	lastHigh := fixedpoint.NewFromFloat(s.pivotHigh.Last())
-	if lastHigh.IsZero() {
+	high := fixedpoint.NewFromFloat(s.pivotHigh.Last())
+	if high.IsZero() {
 		return false
 	}
 
-	lastHighChanged := lastHigh.Compare(s.lastHigh) != 0
+	lastHighChanged := high.Compare(s.lastHigh) != 0
 	if lastHighChanged {
-		s.lastHigh = lastHigh
-		s.pivotHighPrices = append(s.pivotHighPrices, lastHigh)
+		if s.lastHigh.IsZero() || high.Compare(s.lastHigh) > 0 {
+			s.lastHigh = high
+			s.pivotHighPrices = append(s.pivotHighPrices, high)
+		}
 	}
 
-	lastFastHigh := fixedpoint.NewFromFloat(s.fastPivotHigh.Last())
-	if !lastFastHigh.IsZero() {
-		if lastFastHigh.Compare(s.lastHigh) > 0 {
+	fastHigh := fixedpoint.NewFromFloat(s.fastPivotHigh.Last())
+	if !fastHigh.IsZero() {
+		if fastHigh.Compare(s.lastHigh) > 0 {
 			// invalidate the last low
 			s.lastHigh = fixedpoint.Zero
 			lastHighChanged = false
 		}
-		s.lastFastHigh = lastFastHigh
+		s.lastFastHigh = fastHigh
 	}
 
 	return lastHighChanged
