@@ -40,6 +40,7 @@ type ExchangeSession struct {
 	Secret       string             `json:"secret,omitempty" yaml:"secret,omitempty"`
 	Passphrase   string             `json:"passphrase,omitempty" yaml:"passphrase,omitempty"`
 	SubAccount   string             `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
+	ConfigPath   string
 
 	// Withdrawal is used for enabling withdrawal functions
 	Withdrawal              bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`

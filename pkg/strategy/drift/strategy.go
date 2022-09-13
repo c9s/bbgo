@@ -70,12 +70,12 @@ type Strategy struct {
 
 	beta float64
 
-	StopLoss                  fixedpoint.Value `json:"stoploss"`
+	StopLoss                  fixedpoint.Value `json:"stoploss" modifiable:"true"`
 	CanvasPath                string           `json:"canvasPath"`
 	PredictOffset             int              `json:"predictOffset"`
-	HighLowVarianceMultiplier float64          `json:"hlVarianceMultiplier"`
-	NoTrailingStopLoss        bool             `json:"noTrailingStopLoss"`
-	TrailingStopLossType      string           `json:"trailingStopLossType"` // trailing stop sources. Possible options are `kline` for 1m kline and `realtime` from order updates
+	HighLowVarianceMultiplier float64          `json:"hlVarianceMultiplier" modifiable:"true"`
+	NoTrailingStopLoss        bool             `json:"noTrailingStopLoss" modifiable:"true"`
+	TrailingStopLossType      string           `json:"trailingStopLossType" modifiable:"true"` // trailing stop sources. Possible options are `kline` for 1m kline and `realtime` from order updates
 	HLRangeWindow             int              `json:"hlRangeWindow"`
 	Window1m                  int              `json:"window1m"`
 	FisherTransformWindow1m   int              `json:"fisherTransformWindow1m"`
@@ -83,17 +83,17 @@ type Strategy struct {
 	SmootherWindow            int              `json:"smootherWindow"`
 	FisherTransformWindow     int              `json:"fisherTransformWindow"`
 	ATRWindow                 int              `json:"atrWindow"`
-	PendingMinutes            int              `json:"pendingMinutes"`  // if order not be traded for pendingMinutes of time, cancel it.
-	NoRebalance               bool             `json:"noRebalance"`     // disable rebalance
-	TrendWindow               int              `json:"trendWindow"`     // trendLine is used for rebalancing the position. When trendLine goes up, hold base, otherwise hold quote
-	RebalanceFilter           float64          `json:"rebalanceFilter"` // beta filter on the Linear Regression of trendLine
-	TrailingCallbackRate      []float64        `json:"trailingCallbackRate"`
-	TrailingActivationRatio   []float64        `json:"trailingActivationRatio"`
+	PendingMinutes            int              `json:"pendingMinutes" modifiable:"true"`  // if order not be traded for pendingMinutes of time, cancel it.
+	NoRebalance               bool             `json:"noRebalance" modifiable:"true"`     // disable rebalance
+	TrendWindow               int              `json:"trendWindow"`                       // trendLine is used for rebalancing the position. When trendLine goes up, hold base, otherwise hold quote
+	RebalanceFilter           float64          `json:"rebalanceFilter" modifiable:"true"` // beta filter on the Linear Regression of trendLine
+	TrailingCallbackRate      []float64        `json:"trailingCallbackRate" modifiable:"true"`
+	TrailingActivationRatio   []float64        `json:"trailingActivationRatio" modifiable:"true"`
 
-	DriftFilterNeg  float64 `json:"driftFilterNeg"`
-	DriftFilterPos  float64 `json:"driftFilterPos"`
-	DDriftFilterNeg float64 `json:"ddriftFilterNeg"`
-	DDriftFilterPos float64 `json:"ddriftFilterPos"`
+	DriftFilterNeg  float64 `json:"driftFilterNeg" modifiable:"true"`
+	DriftFilterPos  float64 `json:"driftFilterPos" modifiable:"true"`
+	DDriftFilterNeg float64 `json:"ddriftFilterNeg" modifiable:"true"`
+	DDriftFilterPos float64 `json:"ddriftFilterPos" modifiable:"true"`
 
 	buyPrice     float64 `persistence:"buy_price"`
 	sellPrice    float64 `persistence:"sell_price"`
@@ -333,7 +333,7 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 			bestBid := ticker.Buy
 			bestAsk := ticker.Sell
 
-			var pricef, atr float64
+			var pricef float64
 			if !util.TryLock(&s.lock) {
 				return
 			}
@@ -365,18 +365,6 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 			}
 
 			stoploss := s.StopLoss.Float64()
-			atr = s.atr.Last()
-			numPending := 0
-			var err error
-			if numPending, err = s.smartCancel(ctx, pricef, atr); err != nil {
-				log.WithError(err).Errorf("cannot cancel orders")
-				s.positionLock.Unlock()
-				return
-			}
-			if numPending > 0 {
-				s.positionLock.Unlock()
-				return
-			}
 
 			exitShortCondition := s.sellPrice > 0 && (s.sellPrice*(1.+stoploss) <= pricef ||
 				s.trailingCheck(pricef, "short"))
@@ -572,25 +560,11 @@ func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
 	if s.Status != types.StrategyStatusRunning {
 		return
 	}
-	if s.NoTrailingStopLoss || s.TrailingStopLossType == "realtime" {
-		return
-	}
 	// for doing the trailing stoploss during backtesting
 	atr := s.atr.Last()
 	price := s.getLastPrice()
 	pricef := price.Float64()
 	stoploss := s.StopLoss.Float64()
-
-	var err error
-	numPending := 0
-	if numPending, err = s.smartCancel(ctx, pricef, atr); err != nil {
-		log.WithError(err).Errorf("cannot cancel orders")
-		return
-	}
-	if numPending > 0 {
-		log.Infof("pending orders: %d, exit", numPending)
-		return
-	}
 
 	lowf := math.Min(kline.Low.Float64(), pricef)
 	highf := math.Max(kline.High.Float64(), pricef)
@@ -601,6 +575,24 @@ func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
 	if s.highestPrice > 0 && highf > s.highestPrice {
 		s.highestPrice = highf
 	}
+
+	numPending := 0
+	var err error
+	if numPending, err = s.smartCancel(ctx, pricef, atr); err != nil {
+		log.WithError(err).Errorf("cannot cancel orders")
+		s.positionLock.Unlock()
+		return
+	}
+	if numPending > 0 {
+		s.positionLock.Unlock()
+		return
+	}
+
+	if s.NoTrailingStopLoss || s.TrailingStopLossType == "realtime" {
+		s.positionLock.Unlock()
+		return
+	}
+
 	//log.Infof("d1m: %f, hf: %f, lf: %f", s.drift1m.Last(), highf, lowf)
 	exitShortCondition := s.sellPrice > 0 && (s.sellPrice*(1.+stoploss) <= highf ||
 		s.trailingCheck(highf, "short") /* || s.drift1m.Last() > 0*/)
@@ -629,7 +621,13 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 
 	s.atr.PushK(kline)
 	drift = s.drift.Array(2)
+	if len(drift) < 2 || len(drift) < s.PredictOffset {
+		return
+	}
 	ddrift := s.drift.drift.Array(2)
+	if len(ddrift) < 2 || len(ddrift) < s.PredictOffset {
+		return
+	}
 	driftPred = s.drift.Predict(s.PredictOffset)
 	ddriftPred := s.drift.drift.Predict(s.PredictOffset)
 	atr = s.atr.Last()
@@ -695,7 +693,6 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		}
 		s.positionLock.Unlock()
 		_ = s.ClosePosition(ctx, fixedpoint.One)
-		return
 	}
 	if longCondition {
 		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
@@ -980,6 +977,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		reply.Message(buffer.String())
 	})
 
+	bbgo.RegisterModifier(s)
+
 	// event trigger order: s.Interval => Interval1m
 	store, ok := session.SerialMarketDataStore(s.Symbol, []types.Interval{s.Interval, types.Interval1m})
 	if !ok {
@@ -1015,7 +1014,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if s.GenerateGraph {
 			s.Draw(s.frameKLine.StartTime, &profit, &cumProfit)
 		}
-
 		wg.Done()
 	})
 	return nil
