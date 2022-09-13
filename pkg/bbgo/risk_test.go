@@ -257,6 +257,26 @@ func Test_calculateNetValueInQuote(t *testing.T) {
 			wantAccountValue: number(19000.0*0.01 + 100.0 + 80.0 + 70.0),
 		},
 		{
+			name: "reversed usdt price",
+			args: args{
+				balances: types.BalanceMap{
+					"USDC": types.Balance{Currency: "USDC", Available: number(70.0)},
+					"TWD":  types.Balance{Currency: "TWD", Available: number(3000.0)},
+					"USDT": types.Balance{Currency: "USDT", Available: number(100.0)},
+					"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
+					"BTC":  types.Balance{Currency: "BTC", Available: number(0.01)},
+				},
+				prices: types.PriceMap{
+					"USDTTWD":  number(30.0),
+					"USDCUSDT": number(1.0),
+					"BUSDUSDT": number(1.0),
+					"BTCUSDT":  number(19000.0),
+				},
+				quoteCurrency: "USDT",
+			},
+			wantAccountValue: number(19000.0*0.01 + 100.0 + 80.0 + 70.0 + (3000.0 / 30.0)),
+		},
+		{
 			name: "borrow base asset",
 			args: args{
 				balances: types.BalanceMap{
