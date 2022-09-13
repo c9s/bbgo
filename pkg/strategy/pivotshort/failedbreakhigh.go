@@ -183,13 +183,13 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		// we need few conditions:
 		// 1) kline.High is higher than the previous high
 		// 2) kline.Close is lower than the previous high
-		// 3) kline.Close is lower than kline.Open
 		if kline.High.Compare(breakPrice) < 0 || closePrice.Compare(breakPrice) >= 0 {
 			return
 		}
 
+		// 3) kline.Close is lower than kline.Open
 		if closePrice.Compare(openPrice) > 0 {
-			bbgo.Notify("the closed price is higher than the open price, skip failed break high short")
+			bbgo.Notify("the %s closed price %f is higher than the open price %f, skip failed break high short", s.Symbol, closePrice.Float64(), openPrice.Float64())
 			return
 		}
 
