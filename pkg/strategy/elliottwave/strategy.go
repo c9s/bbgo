@@ -455,6 +455,9 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 
 	atr := s.atr.Last()
 	ewo := types.Array(s.ewo, 4)
+	if len(ewo) < 4 {
+		return
+	}
 	bull := kline.Close.Compare(kline.Open) > 0
 
 	balances := s.GeneralOrderExecutor.Session().GetAccount().Balances()

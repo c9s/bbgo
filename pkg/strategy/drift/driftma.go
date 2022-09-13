@@ -14,7 +14,13 @@ type DriftMA struct {
 
 func (s *DriftMA) Update(value, weight float64) {
 	s.ma1.Update(value)
+	if s.ma1.Length() == 0 {
+		return
+	}
 	s.drift.Update(s.ma1.Last(), weight)
+	if s.drift.Length() == 0 {
+		return
+	}
 	s.ma2.Update(s.drift.Last())
 }
 
