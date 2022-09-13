@@ -23,8 +23,7 @@ func init() {
 }
 
 type Strategy struct {
-	Notifiability *bbgo.Notifiability
-	Datasource    *coinmarketcap.DataSource
+	Datasource *coinmarketcap.DataSource
 
 	Interval         types.Interval   `json:"interval"`
 	BaseCurrency     string           `json:"baseCurrency"`
