@@ -76,9 +76,11 @@ func (s *CumulatedVolumeTakeProfit) Bind(session *ExchangeSession, orderExecutor
 			return
 		}
 
-		kline.GetUpperShadowHeight()
-		if kline.High.Sub(closePrice).Compare(closePrice.Sub(kline.Low)) < 0 {
-
+		upperShadow := kline.GetUpperShadowHeight()
+		lowerShadow := kline.GetLowerShadowHeight()
+		if upperShadow.Compare(lowerShadow) > 0 {
+			log.Infof("[CumulatedVolumeTakeProfit] upper shadow is longer than the lower shadow, skip taking profit")
+			return
 		}
 
 		Notify("[CumulatedVolumeTakeProfit] %s TakeProfit triggered by cumulated volume (window: %d) %f > %f, price = %f",
