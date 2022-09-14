@@ -267,7 +267,6 @@ var BacktestCmd = &cobra.Command{
 			exchangeFromConfig := userConfig.Sessions[name.String()]
 			if exchangeFromConfig != nil {
 				session.UseHeikinAshi = exchangeFromConfig.UseHeikinAshi
-				session.ConfigPath = exchangeFromConfig.ConfigPath
 			}
 		}
 
