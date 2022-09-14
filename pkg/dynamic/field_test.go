@@ -1,6 +1,7 @@
 package dynamic
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -9,23 +10,28 @@ import (
 )
 
 type Strategy struct {
-	Field1 fixedpoint.Value `json:"field1" modifiable:"true"`
-	Field2 float64          `json:"field2"`
-	field3 float64          `json:"field3" modifiable:"true"`
+	Field1 fixedpoint.Value  `json:"field1" modifiable:"true"`
+	Field2 float64           `json:"field2"`
+	field3 float64           `json:"field3" modifiable:"true"`
+	Field4 *fixedpoint.Value `json:"field4" modifiable:"true"`
 }
 
 func TestGetModifiableFields(t *testing.T) {
 	s := Strategy{}
 	val := reflect.ValueOf(s)
 	GetModifiableFields(val, func(tagName, name string) {
-		assert.Equal(t, tagName, "field1")
-		assert.Equal(t, name, "Field1")
+		assert.NotEqual(t, tagName, "field2")
+		assert.NotEqual(t, name, "Field2")
+		assert.NotEqual(t, tagName, "field3")
+		assert.NotEqual(t, name, "Field3")
+
 	})
 }
 
 func TestGetModifiableField(t *testing.T) {
-	s := Strategy{}
-	val := reflect.ValueOf(s)
+	// val must be get from pointer.Elem(), otherwise the fields will be unaddressable
+	s := &Strategy{Field1: fixedpoint.NewFromInt(1)}
+	val := reflect.ValueOf(s).Elem()
 	_, ok := GetModifiableField(val, "Field1")
 	assert.True(t, ok)
 	_, ok = GetModifiableField(val, "Field2")
@@ -34,4 +40,18 @@ func TestGetModifiableField(t *testing.T) {
 	assert.False(t, ok)
 	_, ok = GetModifiableField(val, "Random")
 	assert.False(t, ok)
+	field, ok := GetModifiableField(val, "Field1")
+	assert.True(t, ok)
+	x := reflect.New(field.Type())
+	xi := x.Interface()
+	assert.NoError(t, json.Unmarshal([]byte("\"3.1415%\""), &xi))
+	assert.True(t, field.CanAddr())
+	field.Set(x.Elem())
+	assert.Equal(t, s.Field1.String(), "0.031415")
+	field, _ = GetModifiableField(val, "Field4")
+	x = reflect.New(field.Type())
+	xi = x.Interface()
+	assert.NoError(t, json.Unmarshal([]byte("311"), &xi))
+	field.Set(x.Elem())
+	assert.Equal(t, s.Field4.String(), "311")
 }
