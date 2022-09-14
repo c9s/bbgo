@@ -56,8 +56,6 @@ type BreakLow struct {
 	pivotLow, fastPivotLow *indicator.PivotLow
 	pivotLowPrices         []fixedpoint.Value
 
-	trendEWMALast, trendEWMACurrent float64
-
 	orderExecutor *bbgo.GeneralOrderExecutor
 	session       *bbgo.ExchangeSession
 
