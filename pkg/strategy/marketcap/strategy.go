@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/datasource/glassnode"
+	"github.com/c9s/bbgo/pkg/datasource/coinmarketcap"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -23,15 +23,13 @@ func init() {
 }
 
 type Strategy struct {
-	Notifiability *bbgo.Notifiability
-	glassnode     *glassnode.DataSource
+	datasource *coinmarketcap.DataSource
 
 	Interval         types.Interval   `json:"interval"`
 	BaseCurrency     string           `json:"baseCurrency"`
 	BaseWeight       fixedpoint.Value `json:"baseWeight"`
 	TargetCurrencies []string         `json:"targetCurrencies"`
 	Threshold        fixedpoint.Value `json:"threshold"`
-	Verbose          bool             `json:"verbose"`
 	DryRun           bool             `json:"dryRun"`
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
@@ -40,8 +38,8 @@ type Strategy struct {
 }
 
 func (s *Strategy) Initialize() error {
-	apiKey := os.Getenv("GLASSNODE_API_KEY")
-	s.glassnode = glassnode.New(apiKey)
+	apiKey := os.Getenv("COINMARKETCAP_API_KEY")
+	s.datasource = coinmarketcap.New(apiKey)
 	return nil
 }
 
@@ -177,14 +175,15 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 func (s *Strategy) getTargetWeights(ctx context.Context) types.ValueMap {
 	m := floats.Map{}
 
-	// get market cap values
+	// get marketcap from coinmarketcap
+	// set higher query limit to avoid target currency not in the list
+	marketcaps, err := s.datasource.QueryMarketCapInUSD(ctx, 100)
+	if err != nil {
+		log.WithError(err).Error("failed to query market cap")
+	}
+
 	for _, currency := range s.TargetCurrencies {
-		marketCap, err := s.glassnode.QueryMarketCapInUSD(ctx, currency)
-		if err != nil {
-			log.WithError(err).Error("failed to query market cap")
-			return nil
-		}
-		m[currency] = marketCap
+		m[currency] = marketcaps[currency]
 	}
 
 	// normalize
