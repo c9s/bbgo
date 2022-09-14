@@ -25,15 +25,6 @@ type BreakLow struct {
 	// Ratio is a number less than 1.0, price * ratio will be the price triggers the short order.
 	Ratio fixedpoint.Value `json:"ratio"`
 
-	// MarketOrder is the option to enable market order short.
-	MarketOrder bool `json:"marketOrder"`
-
-	// LimitOrder is the option to use limit order instead of market order to short
-	LimitOrder      bool             `json:"limitOrder"`
-	LimitTakerRatio fixedpoint.Value `json:"limitTakerRatio"`
-	Leverage        fixedpoint.Value `json:"leverage"`
-	Quantity        fixedpoint.Value `json:"quantity"`
-
 	bbgo.OpenPositionOptions
 
 	// BounceRatio is a ratio used for placing the limit order sell price
