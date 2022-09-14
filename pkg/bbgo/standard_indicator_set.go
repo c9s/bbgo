@@ -42,11 +42,12 @@ type indicatorKey struct {
 
 func NewStandardIndicatorSet(symbol string, stream types.Stream, store *MarketDataStore) *StandardIndicatorSet {
 	return &StandardIndicatorSet{
-		Symbol:        symbol,
-		store:         store,
-		stream:        stream,
-		iwIndicators:  make(map[indicatorKey]indicator.KLinePusher),
-		iwbIndicators: make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
+		Symbol:         symbol,
+		store:          store,
+		stream:         stream,
+		iwIndicators:   make(map[indicatorKey]indicator.KLinePusher),
+		iwbIndicators:  make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
+		macdIndicators: make(map[indicator.MACDConfig]*indicator.MACD),
 	}
 }
 
