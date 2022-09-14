@@ -201,7 +201,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			return
 		}
 
-		bbgo.Notify("%s breakLow signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64())
+		bbgo.Notify("%s breakLow signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64(), kline)
 
 		if s.lastBreakLow.IsZero() || previousLow.Compare(s.lastBreakLow) < 0 {
 			s.lastBreakLow = previousLow
