@@ -40,7 +40,7 @@ func Test_calculateMACD(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			iw := types.IntervalWindow{Window: 9}
-			macd := MACD{IntervalWindow: iw, ShortPeriod: 12, LongPeriod: 26}
+			macd := MACD{MACDConfig: MACDConfig{IntervalWindow: iw, ShortPeriod: 12, LongPeriod: 26}}
 			for _, k := range tt.kLines {
 				macd.PushK(k)
 			}
