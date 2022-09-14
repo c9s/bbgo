@@ -63,8 +63,4 @@ func RegisterModifier(s interface{}) {
 		}
 		reply.Message(fmt.Sprintf("update to %v successfully", newVal))
 	})
-
-	RegisterCommand("/save", "Save config", func(reply interact.Reply) {
-		reply.Message("")
-	})
 }
