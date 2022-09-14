@@ -3,6 +3,8 @@ package bbgo
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -11,6 +13,10 @@ import (
 type RoiTakeProfit struct {
 	Symbol     string           `json:"symbol"`
 	Percentage fixedpoint.Value `json:"percentage"`
+
+	// Partial is a percentage of the position to be closed
+	// 50% means you will close halt the position
+	Partial fixedpoint.Value `json:"partial,omitempty"`
 
 	session       *ExchangeSession
 	orderExecutor *GeneralOrderExecutor
@@ -33,11 +39,26 @@ func (s *RoiTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 		}
 
 		roi := position.ROI(closePrice)
-		if roi.Compare(s.Percentage) >= 0 {
-			// stop loss
-			Notify("[RoiTakeProfit] %s take profit is triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Percentage(), kline.Close.Float64())
-			_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "roiTakeProfit")
+		if roi.Compare(s.Percentage) < 0 {
 			return
+		}
+
+		// default to close the whole position
+		percent := one
+		if !s.Partial.IsZero() {
+			percent = s.Partial
+		}
+
+		// stop loss
+		Notify("[RoiTakeProfit] %s take profit is triggered by ROI %s/%s, price: %f, closing: %s",
+			position.Symbol,
+			roi.Percentage(),
+			s.Percentage.Percentage(),
+			kline.Close.Float64(),
+			percent.Percentage())
+
+		if err := orderExecutor.ClosePosition(context.Background(), percent, "roiTakeProfit"); err != nil {
+			log.WithError(err).Error("failed to close position")
 		}
 	}))
 }

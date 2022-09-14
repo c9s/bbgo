@@ -3,13 +3,22 @@ package bbgo
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type RoiStopLoss struct {
-	Symbol     string
+	Symbol string
+
+	// Percentage is the ROI loss percentage
+	// 1% means when you loss 1% and it will close the position
 	Percentage fixedpoint.Value `json:"percentage"`
+
+	// Partial is a percentage of the position to be closed
+	// 50% means you will close halt the position
+	Partial fixedpoint.Value `json:"partial,omitempty"`
 
 	session       *ExchangeSession
 	orderExecutor *GeneralOrderExecutor
@@ -47,10 +56,25 @@ func (s *RoiStopLoss) checkStopPrice(closePrice fixedpoint.Value, position *type
 
 	roi := position.ROI(closePrice)
 	// logrus.Debugf("ROIStopLoss: price=%f roi=%s stop=%s", closePrice.Float64(), roi.Percentage(), s.Percentage.Neg().Percentage())
-	if roi.Compare(s.Percentage.Neg()) < 0 {
-		// stop loss
-		Notify("[RoiStopLoss] %s stop loss triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Neg().Percentage(), closePrice.Float64())
-		_ = s.orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "roiStopLoss")
+
+	if roi.Compare(s.Percentage.Neg()) > 0 {
 		return
+	}
+
+	// default to close the whole position
+	percent := one
+	if !s.Partial.IsZero() {
+		percent = s.Partial
+	}
+
+	Notify("[RoiStopLoss] %s stop loss triggered by ROI %s/%s, price: %f, closing: %s",
+		position.Symbol,
+		roi.Percentage(),
+		s.Percentage.Neg().Percentage(),
+		closePrice.Float64(),
+		percent.Percentage())
+
+	if err := s.orderExecutor.ClosePosition(context.Background(), percent, "roiStopLoss"); err != nil {
+		log.WithError(err).Error("failed to close position")
 	}
 }
