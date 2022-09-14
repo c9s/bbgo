@@ -48,6 +48,8 @@ type BreakLow struct {
 
 	lastLow, lastFastLow fixedpoint.Value
 
+	lastLowInvalidated bool
+
 	// lastBreakLow is the low that the price just break
 	lastBreakLow fixedpoint.Value
 
@@ -163,6 +165,11 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			return
 		}
 
+		if s.lastLowInvalidated {
+			log.Infof("the last low is invalidated, skip")
+			return
+		}
+
 		previousLow := s.lastLow
 		ratio := fixedpoint.One.Add(s.Ratio)
 		breakPrice := previousLow.Mul(ratio)
@@ -266,19 +273,18 @@ func (s *BreakLow) updatePivotLow() bool {
 		return false
 	}
 
+	// if the last low is different
 	lastLowChanged := low.Compare(s.lastLow) != 0
 	if lastLowChanged {
-		if s.lastFastLow.IsZero() || low.Compare(s.lastFastLow) > 0 {
-			s.lastLow = low
-			s.pivotLowPrices = append(s.pivotLowPrices, low)
-		}
+		s.lastLow = low
+		s.lastLowInvalidated = false
+		s.pivotLowPrices = append(s.pivotLowPrices, low)
 	}
 
 	fastLow := fixedpoint.NewFromFloat(s.fastPivotLow.Last())
 	if !fastLow.IsZero() {
 		if fastLow.Compare(s.lastLow) < 0 {
-			// invalidate the last low
-			s.lastLow = fixedpoint.Zero
+			s.lastLowInvalidated = true
 			lastLowChanged = false
 		}
 		s.lastFastLow = fastLow

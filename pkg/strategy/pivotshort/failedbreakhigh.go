@@ -40,10 +40,11 @@ type FailedBreakHigh struct {
 	TrendEMA *bbgo.TrendEMA `json:"trendEMA"`
 
 	lastFailedBreakHigh, lastHigh, lastFastHigh fixedpoint.Value
+	lastHighInvalidated                         bool
+	pivotHighPrices                             []fixedpoint.Value
 
 	pivotHigh, fastPivotHigh *indicator.PivotHigh
 	vwma                     *indicator.VWMA
-	pivotHighPrices          []fixedpoint.Value
 
 	orderExecutor *bbgo.GeneralOrderExecutor
 	session       *bbgo.ExchangeSession
@@ -174,7 +175,12 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.BreakInterval, func(kline types.KLine) {
 		if len(s.pivotHighPrices) == 0 || s.lastHigh.IsZero() {
-			log.Infof("currently there is no pivot high prices, can not check failed break high...")
+			log.Infof("%s currently there is no pivot high prices, can not check failed break high...", s.Symbol)
+			return
+		}
+
+		if s.lastHighInvalidated {
+			log.Infof("%s last high %f is invalidated", s.Symbol, s.lastHigh.Float64())
 			return
 		}
 
@@ -288,18 +294,17 @@ func (s *FailedBreakHigh) updatePivotHigh() bool {
 
 	lastHighChanged := high.Compare(s.lastHigh) != 0
 	if lastHighChanged {
-		if s.lastHigh.IsZero() || high.Compare(s.lastHigh) > 0 {
-			s.lastHigh = high
-			s.pivotHighPrices = append(s.pivotHighPrices, high)
-		}
+		s.lastHigh = high
+		s.lastHighInvalidated = false
+		s.pivotHighPrices = append(s.pivotHighPrices, high)
 	}
 
 	fastHigh := fixedpoint.NewFromFloat(s.fastPivotHigh.Last())
 	if !fastHigh.IsZero() {
 		if fastHigh.Compare(s.lastHigh) > 0 {
 			// invalidate the last low
-			s.lastHigh = fixedpoint.Zero
 			lastHighChanged = false
+			s.lastHighInvalidated = true
 		}
 		s.lastFastHigh = fastHigh
 	}
