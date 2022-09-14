@@ -47,19 +47,19 @@ func GetModifiableFields(val reflect.Value, callback func(tagName, name string))
 	}
 }
 
-var ZeroValue reflect.Value = reflect.Zero(reflect.TypeOf(0))
+var zeroValue reflect.Value = reflect.Zero(reflect.TypeOf(0))
 
 func GetModifiableField(val reflect.Value, name string) (reflect.Value, bool) {
 	field, ok := val.Type().FieldByName(name)
 	if !ok {
-		return ZeroValue, ok
+		return zeroValue, ok
 	}
 	if field.Tag.Get("modifiable") != "true" {
-		return ZeroValue, false
+		return zeroValue, false
 	}
 	jsonTag := field.Tag.Get("json")
 	if jsonTag == "" || jsonTag == "-" {
-		return ZeroValue, false
+		return zeroValue, false
 	}
 	return val.FieldByName(name), true
 }
