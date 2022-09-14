@@ -19,7 +19,12 @@ type TrailingStop2 struct {
 	ActivationRatio fixedpoint.Value `json:"activationRatio,omitempty"`
 
 	// ClosePosition is a percentage of the position to be closed
+	// Deprecated: please use Partial instead
 	ClosePosition fixedpoint.Value `json:"closePosition,omitempty"`
+
+	// Partial is a percentage of the position to be closed
+	// 50% means you will close halt the position
+	Partial fixedpoint.Value `json:"partial,omitempty"`
 
 	// MinProfit is the percentage of the minimum profit ratio.
 	// Stop order will be activated only when the price reaches above this threshold.
@@ -177,8 +182,14 @@ func (s *TrailingStop2) triggerStop(price fixedpoint.Value) error {
 	Notify("[TrailingStop] %s stop loss triggered. price: %f callback rate: %f", s.Symbol, price.Float64(), s.CallbackRate.Float64())
 	ctx := context.Background()
 	p := fixedpoint.One
+
+	// this is for legacy
 	if !s.ClosePosition.IsZero() {
 		p = s.ClosePosition
+	}
+
+	if !s.Partial.IsZero() {
+		p = s.Partial
 	}
 
 	return s.orderExecutor.ClosePosition(ctx, p, "trailingStop")
