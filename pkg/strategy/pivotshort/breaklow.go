@@ -186,8 +186,11 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		// we need the price cross the break line, or we do nothing:
-		// open > break price > close price
-		if !(openPrice.Compare(breakPrice) > 0 && closePrice.Compare(breakPrice) < 0) {
+		// 1) open > break price > close price
+		// 2) high > break price > open price and close price
+		// v2
+		if !((openPrice.Compare(breakPrice) > 0 && closePrice.Compare(breakPrice) < 0) ||
+			(kline.High.Compare(breakPrice) > 0 && openPrice.Compare(breakPrice) < 0 && closePrice.Compare(breakPrice) < 0)) {
 			return
 		}
 
