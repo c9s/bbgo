@@ -13,6 +13,11 @@ exchangeStrategies:
       targetCurrencies:
         - BTC
         - ETH
+        # - BNB
+        # - ADA
+        # - SOL
+        # - DOT
+        # - DOGE
         - MATIC
       threshold: 2%
       # max amount to buy or sell per order
