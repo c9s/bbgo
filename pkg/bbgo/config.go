@@ -325,8 +325,6 @@ type Config struct {
 	CrossExchangeStrategies []CrossExchangeStrategy `json:"-" yaml:"-"`
 
 	PnLReporters []PnLReporterConfig `json:"reportPnL,omitempty" yaml:"reportPnL,omitempty"`
-
-	ConfigFile string
 }
 
 func (c *Config) Map() (map[string]interface{}, error) {
@@ -479,10 +477,6 @@ func Load(configFile string, loadStrategies bool) (*Config, error) {
 
 	if err := yaml.Unmarshal(content, &config); err != nil {
 		return nil, err
-	}
-	config.ConfigFile = configFile
-	for _, session := range config.Sessions {
-		session.ConfigPath = config.ConfigFile
 	}
 
 	// for backward compatible

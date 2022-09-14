@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/util"
 	log "github.com/sirupsen/logrus"
@@ -23,37 +23,33 @@ func RegisterModifier(s interface{}) {
 	RegisterCommand("/modify", "Modify config", func(reply interact.Reply) {
 		reply.Message("Please choose the field name in config to modify:")
 		mapping = make(map[string]string)
-		for i := 0; i < val.Type().NumField(); i++ {
-			t := val.Type().Field(i)
-			if !t.IsExported() {
-				continue
-			}
-			modifiable := t.Tag.Get("modifiable")
-			if modifiable != "true" {
-				continue
-			}
-			jsonTag := t.Tag.Get("json")
-			if jsonTag == "" || jsonTag == "-" {
-				continue
-			}
-			name := strings.Split(jsonTag, ",")[0]
-			mapping[name] = t.Name
-			reply.AddButton(name, name, name)
-		}
-	}).Next(func(target string, reply interact.Reply) {
+		dynamic.GetModifiableFields(val, func(tagName, name string) {
+			mapping[tagName] = name
+			reply.AddButton(tagName, tagName, tagName)
+		})
+	}).Next(func(target string, reply interact.Reply) error {
 		targetName = mapping[target]
-		field := val.FieldByName(targetName)
+		field, ok := dynamic.GetModifiableField(val, targetName)
+		if !ok {
+			reply.Message(fmt.Sprintf("target %s is not modifiable", targetName))
+			return fmt.Errorf("target %s is not modifiable", targetName)
+		}
 		currVal = field.Interface()
 		if e, err := json.Marshal(currVal); err == nil {
 			currVal = string(e)
 		}
 		reply.Message(fmt.Sprintf("Please enter the new value, current value: %v", currVal))
+		return nil
 	}).Next(func(value string, reply interact.Reply) {
-		log.Infof("%s", value)
+		log.Infof("try to modify from %s to %s", currVal, value)
 		if kc, ok := reply.(interact.KeyboardController); ok {
 			kc.RemoveKeyboard()
 		}
-		field := val.FieldByName(targetName)
+		field, ok := dynamic.GetModifiableField(val, targetName)
+		if !ok {
+			reply.Message(fmt.Sprintf("target %s is not modifiable", targetName))
+			return
+		}
 		x := reflect.New(field.Type())
 		xi := x.Interface()
 		if err := json.Unmarshal([]byte(value), &xi); err != nil {
