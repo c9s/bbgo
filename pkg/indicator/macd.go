@@ -28,18 +28,18 @@ type MACD struct {
 	MACDConfig
 
 	Values                         floats.Slice `json:"-"`
-	lastEWMA, slowEWMA, signalLine *EWMA
+	fastEWMA, slowEWMA, signalLine *EWMA
 	Histogram                      floats.Slice `json:"-"`
 
 	EndTime time.Time
 
-	updateCallbacks []func(value float64)
+	updateCallbacks []func(fast, slow, signal, histogram float64)
 }
 
 func (inc *MACD) Update(x float64) {
 	if len(inc.Values) == 0 {
 		// apply default values
-		inc.lastEWMA = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.ShortPeriod}}
+		inc.fastEWMA = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.ShortPeriod}}
 		inc.slowEWMA = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.LongPeriod}}
 		inc.signalLine = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.Window}}
 		if inc.ShortPeriod == 0 {
@@ -52,18 +52,21 @@ func (inc *MACD) Update(x float64) {
 	}
 
 	// update fast and slow ema
-	inc.lastEWMA.Update(x)
+	inc.fastEWMA.Update(x)
 	inc.slowEWMA.Update(x)
 
-	// update macd
-	macd := inc.lastEWMA.Last() - inc.slowEWMA.Last()
+	// update MACD value, it's also the signal line
+	macd := inc.fastEWMA.Last() - inc.slowEWMA.Last()
 	inc.Values.Push(macd)
 
 	// update signal line
 	inc.signalLine.Update(macd)
 
 	// update histogram
-	inc.Histogram.Push(macd - inc.signalLine.Last())
+	histogram := macd - inc.signalLine.Last()
+	inc.Histogram.Push(histogram)
+
+	inc.EmitUpdate(inc.fastEWMA.Last(), inc.slowEWMA.Last(), macd, histogram)
 }
 
 func (inc *MACD) Last() float64 {

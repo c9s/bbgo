@@ -39,6 +39,9 @@ type FailedBreakHigh struct {
 
 	TrendEMA *bbgo.TrendEMA `json:"trendEMA"`
 
+	MACDConfig *indicator.MACDConfig `json:"macd"`
+	macd       *indicator.MACD
+
 	lastFailedBreakHigh, lastHigh, lastFastHigh fixedpoint.Value
 	lastHighInvalidated                         bool
 	pivotHighPrices                             []fixedpoint.Value
@@ -69,6 +72,10 @@ func (s *FailedBreakHigh) Subscribe(session *bbgo.ExchangeSession) {
 	if s.TrendEMA != nil {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
 	}
+
+	if s.MACDConfig != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.MACDConfig.Interval})
+	}
 }
 
 func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
@@ -78,6 +85,9 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	if !s.Enabled {
 		return
 	}
+
+	// set default value for StrategyController
+	s.Status = types.StrategyStatusRunning
 
 	if s.FastWindow == 0 {
 		s.FastWindow = 3
@@ -94,8 +104,12 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		Window:   s.FastWindow,
 	})
 
-	// StrategyController
-	s.Status = types.StrategyStatusRunning
+	if s.MACDConfig != nil {
+		s.macd = standardIndicator.MACD(s.MACDConfig.IntervalWindow, s.MACDConfig.ShortPeriod, s.MACDConfig.LongPeriod)
+		s.macd.OnUpdate(func(fast float64, slow float64, signal float64, histogram float64) {
+			log.Infof("MACD %+v: fast: %f slow: %f, signal: %f histogram: %f", s.macd.IntervalWindow, fast, slow, signal, histogram)
+		})
+	}
 
 	if s.VWMA != nil {
 		s.vwma = standardIndicator.VWMA(types.IntervalWindow{
