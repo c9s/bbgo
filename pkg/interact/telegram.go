@@ -157,7 +157,9 @@ func (tm *Telegram) Start(context.Context) {
 
 		if reply.set {
 			reply.build()
-			checkSendErr(tm.Bot.Send(m.Chat, reply.message, reply.menu))
+			if len(reply.message) > 0 || reply.menu != nil {
+				checkSendErr(tm.Bot.Send(m.Chat, reply.message, reply.menu))
+			}
 		}
 	})
 
