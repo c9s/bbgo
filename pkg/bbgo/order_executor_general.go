@@ -310,3 +310,14 @@ func (e *GeneralOrderExecutor) Session() *ExchangeSession {
 func (e *GeneralOrderExecutor) Position() *types.Position {
 	return e.position
 }
+
+// This implements PositionReader interface
+func (e *GeneralOrderExecutor) CurrentPosition() *types.Position {
+	return e.position
+}
+
+// This implements PositionResetter interface
+func (e *GeneralOrderExecutor) ResetPosition() error {
+	e.position.Reset()
+	return nil
+}
