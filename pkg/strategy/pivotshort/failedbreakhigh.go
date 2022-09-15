@@ -106,8 +106,8 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 	if s.MACDConfig != nil {
 		s.macd = standardIndicator.MACD(s.MACDConfig.IntervalWindow, s.MACDConfig.ShortPeriod, s.MACDConfig.LongPeriod)
-		s.macd.OnUpdate(func(fast float64, slow float64, signal float64, histogram float64) {
-			log.Infof("MACD %+v: fast: %f slow: %f, signal: %f histogram: %f", s.macd.IntervalWindow, fast, slow, signal, histogram)
+		s.macd.OnUpdate(func(macd, signal, histogram float64) {
+			log.Infof("MACD %+v: macd: %f, signal: %f histogram: %f", s.macd.IntervalWindow, macd, signal, histogram)
 		})
 	}
 
