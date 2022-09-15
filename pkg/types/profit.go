@@ -194,12 +194,12 @@ func (s *ProfitStats) AddProfit(profit Profit) {
 	s.TodayPnL = s.TodayPnL.Add(profit.Profit)
 	s.TodayNetProfit = s.TodayNetProfit.Add(profit.NetProfit)
 
-	if profit.Profit.Sign() < 0 {
+	if profit.Profit.Sign() > 0 {
+		s.AccumulatedGrossProfit = s.AccumulatedGrossProfit.Add(profit.Profit)
+		s.TodayGrossProfit = s.TodayGrossProfit.Add(profit.Profit)
+	} else if profit.Profit.Sign() < 0 {
 		s.AccumulatedGrossLoss = s.AccumulatedGrossLoss.Add(profit.Profit)
 		s.TodayGrossLoss = s.TodayGrossLoss.Add(profit.Profit)
-	} else if profit.Profit.Sign() > 0 {
-		s.AccumulatedGrossProfit = s.AccumulatedGrossLoss.Add(profit.Profit)
-		s.TodayGrossProfit = s.TodayGrossProfit.Add(profit.Profit)
 	}
 }
 
