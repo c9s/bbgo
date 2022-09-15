@@ -4,10 +4,15 @@ import (
 	"context"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+type MACDDivergence struct {
+	*indicator.MACDConfig
+}
 
 // FailedBreakHigh -- when price breaks the previous pivot low, we set a trade entry
 type FailedBreakHigh struct {
@@ -39,8 +44,11 @@ type FailedBreakHigh struct {
 
 	TrendEMA *bbgo.TrendEMA `json:"trendEMA"`
 
-	MACDConfig *indicator.MACDConfig `json:"macd"`
-	macd       *indicator.MACD
+	MACDDivergence *MACDDivergence `json:"macdDivergence"`
+
+	macd *indicator.MACD
+	
+	macdTopDivergence bool
 
 	lastFailedBreakHigh, lastHigh, lastFastHigh fixedpoint.Value
 	lastHighInvalidated                         bool
@@ -73,8 +81,8 @@ func (s *FailedBreakHigh) Subscribe(session *bbgo.ExchangeSession) {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
 	}
 
-	if s.MACDConfig != nil {
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.MACDConfig.Interval})
+	if s.MACDDivergence != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.MACDDivergence.Interval})
 	}
 }
 
@@ -104,11 +112,15 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		Window:   s.FastWindow,
 	})
 
-	if s.MACDConfig != nil {
-		s.macd = standardIndicator.MACD(s.MACDConfig.IntervalWindow, s.MACDConfig.ShortPeriod, s.MACDConfig.LongPeriod)
+	// Experimental: MACD divergence detection
+	if s.MACDDivergence != nil {
+		log.Infof("MACD divergence detection is enabled")
+		s.macd = standardIndicator.MACD(s.MACDDivergence.IntervalWindow, s.MACDDivergence.ShortPeriod, s.MACDDivergence.LongPeriod)
 		s.macd.OnUpdate(func(macd, signal, histogram float64) {
 			log.Infof("MACD %+v: macd: %f, signal: %f histogram: %f", s.macd.IntervalWindow, macd, signal, histogram)
+			s.detectMacdDivergence()
 		})
+		s.detectMacdDivergence()
 	}
 
 	if s.VWMA != nil {
@@ -194,7 +206,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		}
 
 		if s.lastHighInvalidated {
-			log.Infof("%s last high %f is invalidated", s.Symbol, s.lastHigh.Float64())
+			log.Infof("%s last high %f is invalidated by the fast pivot", s.Symbol, s.lastHigh.Float64())
 			return
 		}
 
@@ -233,12 +245,8 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 		bbgo.Notify("%s FailedBreakHigh signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64())
 
-		if s.lastFailedBreakHigh.IsZero() || previousHigh.Compare(s.lastFailedBreakHigh) < 0 {
-			s.lastFailedBreakHigh = previousHigh
-		}
-
 		if position.IsOpened(kline.Close) {
-			bbgo.Notify("position is already opened, skip")
+			bbgo.Notify("%s position is already opened, skip", s.Symbol)
 			return
 		}
 
@@ -254,6 +262,15 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 				bbgo.Notify("stopEMA protection: close price %f %s", kline.Close.Float64(), s.StopEMA.String())
 				return
 			}
+		}
+
+		if s.macd != nil && !s.macdTopDivergence {
+			bbgo.Notify("Detected MACD top divergence")
+			return
+		}
+
+		if s.lastFailedBreakHigh.IsZero() || previousHigh.Compare(s.lastFailedBreakHigh) < 0 {
+			s.lastFailedBreakHigh = previousHigh
 		}
 
 		ctx := context.Background()
@@ -298,6 +315,58 @@ func (s *FailedBreakHigh) pilotQuantityCalculation() {
 	}
 
 	bbgo.Notify("%s %f quantity will be used for failed break high short", s.Symbol, quantity.Float64())
+}
+
+func (s *FailedBreakHigh) detectMacdDivergence() {
+	s.macdTopDivergence = false
+
+	// macdValues := s.macd.Values
+	histogramValues := s.macd.Histogram
+
+	// log.Infof("histogram values: %+v", histogramValues)
+	pivotWindow := 3
+	if len(histogramValues) < pivotWindow*2 {
+		log.Warnf("histogram values is not enough for finding pivots, length=%d", len(histogramValues))
+		return
+	}
+
+	var histogramPivots floats.Slice
+	for i := pivotWindow; i > 0 && i < len(histogramValues); i++ {
+		// find positive histogram and the top
+		pivot, ok := floats.CalculatePivot(histogramValues[0:i], pivotWindow, pivotWindow, func(a, pivot float64) bool {
+			return pivot > 0 && pivot > a
+		})
+		if ok {
+			histogramPivots = append(histogramPivots, pivot)
+		}
+	}
+	log.Infof("histogram pivots: %+v", histogramPivots)
+
+	// take the last 2-3 pivots to check if there is a divergence
+	if len(histogramPivots) < 3 {
+		return
+	}
+
+	histogramPivots = histogramPivots[len(histogramPivots)-3:]
+	minDiff := 0.01
+	for i := len(histogramPivots) - 1; i > 0; i-- {
+		p1 := histogramPivots[i]
+		p2 := histogramPivots[i-1]
+		diff := p1 - p2
+
+		if diff > -minDiff || diff > minDiff {
+			continue
+		}
+
+		// negative value = MACD top divergence
+		if diff < -minDiff {
+			log.Infof("MACD TOP DIVERGENCE DETECTED: diff %f", diff)
+			s.macdTopDivergence = true
+		} else {
+			s.macdTopDivergence = false
+		}
+		return
+	}
 }
 
 func (s *FailedBreakHigh) updatePivotHigh() bool {

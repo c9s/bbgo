@@ -3,9 +3,13 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
+
+    # uncomment this to enable cross margin
     margin: true
-    isolatedMargin: true
-    isolatedMarginSymbol: ETHUSDT
+
+    # uncomment this to enable isolated margin
+    # isolatedMargin: true
+    # isolatedMarginSymbol: ETHUSDT
 
 exchangeStrategies:
 - on: binance
