@@ -193,7 +193,7 @@ func (s *ProfitStats) AddProfit(profit Profit) {
 
 	// since field guard
 	if s.AccumulatedSince == 0 {
-		s.AccumulatedSince = time.Now().Unix()
+		s.AccumulatedSince = profit.TradedAt.Unix()
 	}
 
 	s.AccumulatedPnL = s.AccumulatedPnL.Add(profit.Profit)
