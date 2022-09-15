@@ -351,6 +351,8 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
 - `support` strategy uses K-lines with high volume as support [support](pkg/strategy/support). See
   [document](./doc/strategy/support.md).
 - `flashcrash` strategy implements a strategy that catches the flashcrash [flashcrash](pkg/strategy/flashcrash)
+- `marketcap` strategy implements a strategy that rebalances the portfolio based on the
+  market capitalization [marketcap](pkg/strategy/marketcap). See [document](./doc/strategy/marketcap.md).
 
 To run these built-in strategies, just modify the config file to make the configuration suitable for you, for example if
 you want to run
