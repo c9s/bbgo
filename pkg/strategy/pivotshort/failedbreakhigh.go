@@ -12,6 +12,7 @@ import (
 
 type MACDDivergence struct {
 	*indicator.MACDConfig
+	PivotWindow int `json:"pivotWindow"`
 }
 
 // FailedBreakHigh -- when price breaks the previous pivot low, we set a trade entry
@@ -47,7 +48,7 @@ type FailedBreakHigh struct {
 	MACDDivergence *MACDDivergence `json:"macdDivergence"`
 
 	macd *indicator.MACD
-	
+
 	macdTopDivergence bool
 
 	lastFailedBreakHigh, lastHigh, lastFastHigh fixedpoint.Value
@@ -318,13 +319,21 @@ func (s *FailedBreakHigh) pilotQuantityCalculation() {
 }
 
 func (s *FailedBreakHigh) detectMacdDivergence() {
+	if s.MACDDivergence == nil {
+		return
+	}
+
 	s.macdTopDivergence = false
 
 	// macdValues := s.macd.Values
 	histogramValues := s.macd.Histogram
 
 	// log.Infof("histogram values: %+v", histogramValues)
-	pivotWindow := 3
+	pivotWindow := s.MACDDivergence.PivotWindow
+	if pivotWindow == 0 {
+		pivotWindow = 3
+	}
+
 	if len(histogramValues) < pivotWindow*2 {
 		log.Warnf("histogram values is not enough for finding pivots, length=%d", len(histogramValues))
 		return
