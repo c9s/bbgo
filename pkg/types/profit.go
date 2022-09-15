@@ -196,6 +196,11 @@ func (s *ProfitStats) AddProfit(profit Profit) {
 		s.AccumulatedSince = profit.TradedAt.Unix()
 	}
 
+	if s.TodaySince == 0 {
+		var beginningOfTheDay = BeginningOfTheDay(profit.TradedAt.Local())
+		s.TodaySince = beginningOfTheDay.Unix()
+	}
+
 	s.AccumulatedPnL = s.AccumulatedPnL.Add(profit.Profit)
 	s.AccumulatedNetProfit = s.AccumulatedNetProfit.Add(profit.NetProfit)
 	s.TodayPnL = s.TodayPnL.Add(profit.Profit)
