@@ -323,12 +323,11 @@ func (s *FailedBreakHigh) detectMacdDivergence() {
 		return
 	}
 
+	// always reset the top divergence to false
 	s.macdTopDivergence = false
 
-	// macdValues := s.macd.Values
 	histogramValues := s.macd.Histogram
 
-	// log.Infof("histogram values: %+v", histogramValues)
 	pivotWindow := s.MACDDivergence.PivotWindow
 	if pivotWindow == 0 {
 		pivotWindow = 3
