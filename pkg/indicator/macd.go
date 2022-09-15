@@ -33,7 +33,7 @@ type MACD struct {
 
 	EndTime time.Time
 
-	updateCallbacks []func(fast, slow, signal, histogram float64)
+	updateCallbacks []func(macd, signal, histogram float64)
 }
 
 func (inc *MACD) Update(x float64) {
@@ -56,17 +56,20 @@ func (inc *MACD) Update(x float64) {
 	inc.slowEWMA.Update(x)
 
 	// update MACD value, it's also the signal line
-	macd := inc.fastEWMA.Last() - inc.slowEWMA.Last()
+	fast := inc.fastEWMA.Last()
+	slow := inc.slowEWMA.Last()
+	macd := fast - slow
 	inc.Values.Push(macd)
 
 	// update signal line
 	inc.signalLine.Update(macd)
+	signal := inc.signalLine.Last()
 
 	// update histogram
-	histogram := macd - inc.signalLine.Last()
+	histogram := macd - signal
 	inc.Histogram.Push(histogram)
 
-	inc.EmitUpdate(inc.fastEWMA.Last(), inc.slowEWMA.Last(), macd, histogram)
+	inc.EmitUpdate(macd, signal, histogram)
 }
 
 func (inc *MACD) Last() float64 {

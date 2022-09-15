@@ -4,12 +4,12 @@ package indicator
 
 import ()
 
-func (inc *MACD) OnUpdate(cb func(fast float64, slow float64, signal float64, histogram float64)) {
+func (inc *MACD) OnUpdate(cb func(macd float64, signal float64, histogram float64)) {
 	inc.updateCallbacks = append(inc.updateCallbacks, cb)
 }
 
-func (inc *MACD) EmitUpdate(fast float64, slow float64, signal float64, histogram float64) {
+func (inc *MACD) EmitUpdate(macd float64, signal float64, histogram float64) {
 	for _, cb := range inc.updateCallbacks {
-		cb(fast, slow, signal, histogram)
+		cb(macd, signal, histogram)
 	}
 }
