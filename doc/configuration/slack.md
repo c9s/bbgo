@@ -4,9 +4,9 @@ Go to the Slack apps page to create your own slack app:
 
 <https://api.slack.com/apps>
 
-Click "Install your app" -> "Install to Workspace"
+Click "Install your app" -> "Install to Workspace" in *Settings/Basic Information*.
 
-Copy the *Bot User OAuth Token*.
+Copy the *Bot User OAuth Token* in *Features/OAuth & Permissions*.
 
 Put your slack bot token in the `.env.local` file:
 
