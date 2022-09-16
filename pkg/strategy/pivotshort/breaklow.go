@@ -199,13 +199,13 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 		}
 
 		if position.IsOpened(kline.Close) {
-			bbgo.Notify("position is already opened, skip")
+			bbgo.Notify("%s position is already opened, skip", s.Symbol)
 			return
 		}
 
 		// trend EMA protection
 		if s.TrendEMA != nil && !s.TrendEMA.GradientAllowed() {
-			bbgo.Notify("trendEMA protection: close price %f, gradient %f", kline.Close.Float64(), s.TrendEMA.Gradient())
+			bbgo.Notify("trendEMA protection: %s close price %f, gradient %f", s.Symbol, kline.Close.Float64(), s.TrendEMA.Gradient())
 			return
 		}
 
