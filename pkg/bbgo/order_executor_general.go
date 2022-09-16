@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type NotifyFunc func(obj interface{}, args ...interface{})
@@ -25,6 +27,8 @@ type GeneralOrderExecutor struct {
 	activeMakerOrders  *ActiveOrderBook
 	orderStore         *OrderStore
 	tradeCollector     *TradeCollector
+
+	marginBaseMaxBorrowable, marginQuoteMaxBorrowable fixedpoint.Value
 }
 
 func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strategyInstanceID string, position *types.Position) *GeneralOrderExecutor {
@@ -33,7 +37,8 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 	position.StrategyInstanceID = strategyInstanceID
 
 	orderStore := NewOrderStore(symbol)
-	return &GeneralOrderExecutor{
+
+	executor := &GeneralOrderExecutor{
 		session:            session,
 		symbol:             symbol,
 		strategy:           strategy,
@@ -42,6 +47,56 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 		activeMakerOrders:  NewActiveOrderBook(symbol),
 		orderStore:         orderStore,
 		tradeCollector:     NewTradeCollector(symbol, position, orderStore),
+	}
+
+	if session.Margin {
+		executor.startMarginAssetUpdater(context.Background())
+	}
+
+	return executor
+}
+
+func (e *GeneralOrderExecutor) startMarginAssetUpdater(ctx context.Context) {
+	marginService, ok := e.session.Exchange.(types.MarginBorrowRepayService)
+	if !ok {
+		log.Warnf("session %s (%T) exchange does not support MarginBorrowRepayService", e.session.Name, e.session.Exchange)
+		return
+	}
+
+	go e.marginAssetMaxBorrowableUpdater(ctx, 30*time.Minute, marginService, e.position.Market)
+}
+
+func (e *GeneralOrderExecutor) marginAssetMaxBorrowableUpdater(ctx context.Context, interval time.Duration, marginService types.MarginBorrowRepayService, market types.Market) {
+	t1 := time.NewTicker(util.MillisecondsJitter(30*time.Minute, 500))
+	t2 := time.NewTicker(util.MillisecondsJitter(30*time.Minute, 500))
+	defer t1.Stop()
+	defer t2.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-t1.C:
+			maxBorrowable, err := marginService.QueryMarginAssetMaxBorrowable(ctx, market.BaseCurrency)
+			if err != nil {
+				log.WithError(err).Errorf("can not query margin base asset max borrowable")
+				continue
+			}
+
+			log.Infof("updating margin base asset %s max borrowable amount: %f", market.BaseCurrency, maxBorrowable.Float64())
+			e.marginBaseMaxBorrowable = maxBorrowable
+
+		case <-t2.C:
+			maxBorrowable, err := marginService.QueryMarginAssetMaxBorrowable(ctx, market.QuoteCurrency)
+			if err != nil {
+				log.WithError(err).Errorf("can not query margin base asset max borrowable")
+				continue
+			}
+
+			log.Infof("updating margin quote asset %s max borrowable amount: %f", market.QuoteCurrency, maxBorrowable.Float64())
+			e.marginQuoteMaxBorrowable = maxBorrowable
+		}
 	}
 }
 
