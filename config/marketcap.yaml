@@ -9,17 +9,13 @@ exchangeStrategies:
     marketcap:
       interval: 1m
       baseCurrency: TWD
-      baseWeight: 2%
+      baseWeight: 0%
       targetCurrencies:
         - BTC
         - ETH
-        # - BNB
-        # - ADA
-        # - SOL
-        # - DOT
-        # - DOGE
         - MATIC
-      threshold: 2%
+      threshold: 1%
       # max amount to buy or sell per order
       maxAmount: 1_000
       dryRun: true
+      queryInterval: 1h
