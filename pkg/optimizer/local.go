@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/cheggaaa/pb/v3"
+	"github.com/pkg/errors"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -81,15 +82,19 @@ func (e *LocalProcessExecutor) readReport(reportPath string) (*backtest.SummaryR
 // Prepare prepares the environment for the following back tests
 // this is a blocking operation
 func (e *LocalProcessExecutor) Prepare(configJson []byte) error {
-	log.Debugln("Sync database before launching backtests...")
+	log.Debugln("syncing backtest data before starting backtests...")
 	tf, err := jsonToYamlConfig(e.ConfigDir, configJson)
 	if err != nil {
 		return err
 	}
 
 	c := exec.Command(e.Bin, "backtest", "--sync", "--sync-only", "--config", tf.Name())
-	_, err = c.Output()
-	return err
+	output, err := c.Output()
+	if err != nil {
+		return errors.Wrapf(err, "failed to sync backtest data: %s", string(output))
+	}
+
+	return nil
 }
 
 func (e *LocalProcessExecutor) Run(ctx context.Context, taskC chan BacktestTask, bar *pb.ProgressBar) (chan BacktestTask, error) {
