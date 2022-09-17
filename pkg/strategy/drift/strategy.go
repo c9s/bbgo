@@ -126,7 +126,13 @@ func (s *Strategy) InstanceID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// by default, bbgo only pre-subscribe 1000 klines.
 	// this is not enough if we're subscribing 30m intervals using SerialMarketDataStore
-	bbgo.KLinePreloadLimit = int64((s.Interval.Minutes()*s.Window/1000 + 1) * 1000)
+	maxWindow := (s.Window + s.SmootherWindow + s.FisherTransformWindow) * s.Interval.Minutes()
+	maxWindow1m := s.Window1m + s.SmootherWindow1m + s.FisherTransformWindow1m
+	if maxWindow < maxWindow1m {
+		maxWindow = maxWindow1m
+	}
+	bbgo.KLinePreloadLimit = int64((maxWindow/1000 + 1) * 1000)
+	log.Errorf("set kLinePreloadLimit to %d, %d %d", bbgo.KLinePreloadLimit, s.Interval.Minutes(), maxWindow)
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: types.Interval1m,
 	})
@@ -218,7 +224,7 @@ func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
 		s.ma.Update(source)
 		s.stdevHigh.Update(high - s.ma.Last())
 		s.stdevLow.Update(s.ma.Last() - low)
-		s.drift.Update(source, kline.Volume.Float64())
+		s.drift.Update(source, kline.Volume.Abs().Float64())
 		s.trendLine.Update(source)
 		s.atr.PushK(kline)
 		s.priceLines.Update(source)
@@ -233,7 +239,7 @@ func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
 	}
 	for _, kline := range *klines {
 		source := s.GetSource(&kline).Float64()
-		s.drift1m.Update(source, kline.Volume.Float64())
+		s.drift1m.Update(source, kline.Volume.Abs().Float64())
 		if s.drift1m.Last() != s.drift1m.Last() {
 			panic(fmt.Sprintf("%f %v %f %f", source, s.drift1m.drift.Values.Index(1), s.drift1m.ma2.Last(), s.drift1m.drift.LastValue))
 		}
@@ -411,9 +417,15 @@ func (s *Strategy) DrawIndicators(time types.Time) *types.Canvas {
 	h1m := s.drift1m.Abs().Highest(Length * s.Interval.Minutes())
 	ratio := highestPrice / highestDrift
 
-	canvas.Plot("upband", s.ma.Add(s.stdevHigh), time, Length)
+	//canvas.Plot("upband", s.ma.Add(s.stdevHigh), time, Length)
 	canvas.Plot("ma", s.ma, time, Length)
-	canvas.Plot("downband", s.ma.Minus(s.stdevLow), time, Length)
+	//canvas.Plot("downband", s.ma.Minus(s.stdevLow), time, Length)
+	canvas.Plot("pos", types.NumberSeries(s.DriftFilterPos*ratio+mean), time, Length)
+	canvas.Plot("neg", types.NumberSeries(s.DriftFilterNeg*ratio+mean), time, Length)
+	fmt.Printf("%f %f\n", highestPrice, hi)
+	canvas.Plot("ppos", types.NumberSeries(s.DDriftFilterPos*(highestPrice/hi)+mean), time, Length)
+	canvas.Plot("nneg", types.NumberSeries(s.DDriftFilterNeg*(highestPrice/hi)+mean), time, Length)
+
 	canvas.Plot("drift", s.drift.Mul(ratio).Add(mean), time, Length)
 	canvas.Plot("driftOrig", s.drift.drift.Mul(highestPrice/hi).Add(mean), time, Length)
 	canvas.Plot("drift1m", s.drift1m.Mul(highestPrice/h1m).Add(mean), time, Length*s.Interval.Minutes(), types.Interval1m)
@@ -556,7 +568,7 @@ func (s *Strategy) CalcAssetValue(price fixedpoint.Value) fixedpoint.Value {
 
 func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
 	s.kline1m.Set(&kline)
-	s.drift1m.Update(s.GetSource(&kline).Float64(), kline.Volume.Float64())
+	s.drift1m.Update(s.GetSource(&kline).Float64(), kline.Volume.Abs().Float64())
 	if s.Status != types.StrategyStatusRunning {
 		return
 	}
@@ -574,6 +586,11 @@ func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
 	}
 	if s.highestPrice > 0 && highf > s.highestPrice {
 		s.highestPrice = highf
+	}
+	drift := s.drift1m.Array(2)
+	if len(drift) < 2 {
+		s.positionLock.Unlock()
+		return
 	}
 
 	numPending := 0
@@ -617,17 +634,10 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	s.priceLines.Update(sourcef)
 	s.ma.Update(sourcef)
 	s.trendLine.Update(sourcef)
-	s.drift.Update(sourcef, kline.Volume.Float64())
+	s.drift.Update(sourcef, kline.Volume.Abs().Float64())
 
 	s.atr.PushK(kline)
-	drift = s.drift.Array(2)
-	if len(drift) < 2 || len(drift) < s.PredictOffset {
-		return
-	}
-	ddrift := s.drift.drift.Array(2)
-	if len(ddrift) < 2 || len(ddrift) < s.PredictOffset {
-		return
-	}
+
 	driftPred = s.drift.Predict(s.PredictOffset)
 	ddriftPred := s.drift.drift.Predict(s.PredictOffset)
 	atr = s.atr.Last()
@@ -639,6 +649,14 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	s.stdevLow.Update(lowdiff)
 	highdiff := highf - s.ma.Last()
 	s.stdevHigh.Update(highdiff)
+	drift = s.drift.Array(2)
+	if len(drift) < 2 || len(drift) < s.PredictOffset {
+		return
+	}
+	ddrift := s.drift.drift.Array(2)
+	if len(ddrift) < 2 || len(ddrift) < s.PredictOffset {
+		return
+	}
 
 	if s.Status != types.StrategyStatusRunning {
 		return
@@ -646,7 +664,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	stoploss := s.StopLoss.Float64()
 
 	s.positionLock.Lock()
-	log.Errorf("highdiff: %3.2f ma: %.2f, close: %8v, high: %8v, low: %8v, time: %v %v", s.stdevHigh.Last(), s.ma.Last(), kline.Close, kline.High, kline.Low, kline.StartTime, kline.EndTime)
+	log.Infof("highdiff: %3.2f ma: %.2f, close: %8v, high: %8v, low: %8v, time: %v %v", s.stdevHigh.Last(), s.ma.Last(), kline.Close, kline.High, kline.Low, kline.StartTime, kline.EndTime)
 	if s.lowestPrice > 0 && lowf < s.lowestPrice {
 		s.lowestPrice = lowf
 	}

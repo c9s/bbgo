@@ -26,42 +26,42 @@ exchangeStrategies:
     canvasPath: "./output.png"
     symbol: BTCUSDT
     # kline interval for indicators
-    interval: 15m
+    interval: 4m
     window: 1
-    stoploss: 1.2%
-    source: close
+    stoploss: 0.22%
+    source: hl2
     predictOffset: 2
     noTrailingStopLoss: false
-    trailingStopLossType: kline
+    trailingStopLossType: realtime
     # stddev on high/low-source
-    hlVarianceMultiplier: 0.1
+    hlVarianceMultiplier: 0.01
     hlRangeWindow: 5
-    smootherWindow: 1
-    fisherTransformWindow: 34
+    smootherWindow: 2
+    fisherTransformWindow: 27
     window1m: 58
     smootherWindow1m: 118
     fisherTransformWindow1m: 319
     atrWindow: 14
     # orders not been traded will be canceled after `pendingMinutes` minutes
-    pendingMinutes: 10
+    pendingMinutes: 2
     noRebalance: true
     trendWindow: 576
     rebalanceFilter: 0
-    driftFilterPos: 1.8
-    driftFilterNeg: -1.8
-    ddriftFilterPos: 0.5
-    ddriftFilterNeg: -0.5 #-1.6
+    driftFilterPos: 0.6
+    driftFilterNeg: -0.6
+    ddriftFilterPos: 0.00008
+    ddriftFilterNeg: -0.00008
     
     # ActivationRatio should be increasing order
     # when farest price from entry goes over that ratio, start using the callback ratio accordingly to do trailingstop
     #trailingActivationRatio: [0.01, 0.016, 0.05]
     #trailingActivationRatio: [0.001, 0.0081, 0.022]
-    trailingActivationRatio: [0.0012, 0.01]
+    trailingActivationRatio: [0.0012, 0.0016, 0.01]
     #trailingActivationRatio: []
     #trailingCallbackRate: []
     #trailingCallbackRate: [0.002, 0.01, 0.1]
     #trailingCallbackRate: [0.0004, 0.0009, 0.018]
-    trailingCallbackRate: [0.0006, 0.0049]
+    trailingCallbackRate: [0.0003, 0.0006, 0.0019]
 
     generateGraph: true
     graphPNLDeductFee: false
@@ -125,7 +125,7 @@ sync:
 
 backtest:
   startTime: "2022-09-01"
-  endTime: "2022-09-15"
+  endTime: "2022-09-30"
   symbols:
     - BTCUSDT
   sessions: [binance]
