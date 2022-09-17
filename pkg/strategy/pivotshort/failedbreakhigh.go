@@ -4,10 +4,16 @@ import (
 	"context"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+type MACDDivergence struct {
+	*indicator.MACDConfig
+	PivotWindow int `json:"pivotWindow"`
+}
 
 // FailedBreakHigh -- when price breaks the previous pivot low, we set a trade entry
 type FailedBreakHigh struct {
@@ -39,11 +45,18 @@ type FailedBreakHigh struct {
 
 	TrendEMA *bbgo.TrendEMA `json:"trendEMA"`
 
+	MACDDivergence *MACDDivergence `json:"macdDivergence"`
+
+	macd *indicator.MACD
+
+	macdTopDivergence bool
+
 	lastFailedBreakHigh, lastHigh, lastFastHigh fixedpoint.Value
+	lastHighInvalidated                         bool
+	pivotHighPrices                             []fixedpoint.Value
 
 	pivotHigh, fastPivotHigh *indicator.PivotHigh
 	vwma                     *indicator.VWMA
-	pivotHighPrices          []fixedpoint.Value
 
 	orderExecutor *bbgo.GeneralOrderExecutor
 	session       *bbgo.ExchangeSession
@@ -68,6 +81,10 @@ func (s *FailedBreakHigh) Subscribe(session *bbgo.ExchangeSession) {
 	if s.TrendEMA != nil {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
 	}
+
+	if s.MACDDivergence != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.MACDDivergence.Interval})
+	}
 }
 
 func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.GeneralOrderExecutor) {
@@ -77,6 +94,9 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	if !s.Enabled {
 		return
 	}
+
+	// set default value for StrategyController
+	s.Status = types.StrategyStatusRunning
 
 	if s.FastWindow == 0 {
 		s.FastWindow = 3
@@ -93,8 +113,16 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		Window:   s.FastWindow,
 	})
 
-	// StrategyController
-	s.Status = types.StrategyStatusRunning
+	// Experimental: MACD divergence detection
+	if s.MACDDivergence != nil {
+		log.Infof("MACD divergence detection is enabled")
+		s.macd = standardIndicator.MACD(s.MACDDivergence.IntervalWindow, s.MACDDivergence.ShortPeriod, s.MACDDivergence.LongPeriod)
+		s.macd.OnUpdate(func(macd, signal, histogram float64) {
+			log.Infof("MACD %+v: macd: %f, signal: %f histogram: %f", s.macd.IntervalWindow, macd, signal, histogram)
+			s.detectMacdDivergence()
+		})
+		s.detectMacdDivergence()
+	}
 
 	if s.VWMA != nil {
 		s.vwma = standardIndicator.VWMA(types.IntervalWindow{
@@ -174,7 +202,12 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.BreakInterval, func(kline types.KLine) {
 		if len(s.pivotHighPrices) == 0 || s.lastHigh.IsZero() {
-			log.Infof("currently there is no pivot high prices, can not check failed break high...")
+			log.Infof("%s currently there is no pivot high prices, can not check failed break high...", s.Symbol)
+			return
+		}
+
+		if s.lastHighInvalidated {
+			log.Infof("%s last high %f is invalidated by the fast pivot", s.Symbol, s.lastHigh.Float64())
 			return
 		}
 
@@ -213,12 +246,8 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 
 		bbgo.Notify("%s FailedBreakHigh signal detected, closed price %f < breakPrice %f", kline.Symbol, closePrice.Float64(), breakPrice.Float64())
 
-		if s.lastFailedBreakHigh.IsZero() || previousHigh.Compare(s.lastFailedBreakHigh) < 0 {
-			s.lastFailedBreakHigh = previousHigh
-		}
-
 		if position.IsOpened(kline.Close) {
-			bbgo.Notify("position is already opened, skip")
+			bbgo.Notify("%s position is already opened, skip", s.Symbol)
 			return
 		}
 
@@ -234,6 +263,15 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 				bbgo.Notify("stopEMA protection: close price %f %s", kline.Close.Float64(), s.StopEMA.String())
 				return
 			}
+		}
+
+		if s.macd != nil && !s.macdTopDivergence {
+			bbgo.Notify("Detected MACD top divergence")
+			return
+		}
+
+		if s.lastFailedBreakHigh.IsZero() || previousHigh.Compare(s.lastFailedBreakHigh) < 0 {
+			s.lastFailedBreakHigh = previousHigh
 		}
 
 		ctx := context.Background()
@@ -280,6 +318,65 @@ func (s *FailedBreakHigh) pilotQuantityCalculation() {
 	bbgo.Notify("%s %f quantity will be used for failed break high short", s.Symbol, quantity.Float64())
 }
 
+func (s *FailedBreakHigh) detectMacdDivergence() {
+	if s.MACDDivergence == nil {
+		return
+	}
+
+	// always reset the top divergence to false
+	s.macdTopDivergence = false
+
+	histogramValues := s.macd.Histogram
+
+	pivotWindow := s.MACDDivergence.PivotWindow
+	if pivotWindow == 0 {
+		pivotWindow = 3
+	}
+
+	if len(histogramValues) < pivotWindow*2 {
+		log.Warnf("histogram values is not enough for finding pivots, length=%d", len(histogramValues))
+		return
+	}
+
+	var histogramPivots floats.Slice
+	for i := pivotWindow; i > 0 && i < len(histogramValues); i++ {
+		// find positive histogram and the top
+		pivot, ok := floats.CalculatePivot(histogramValues[0:i], pivotWindow, pivotWindow, func(a, pivot float64) bool {
+			return pivot > 0 && pivot > a
+		})
+		if ok {
+			histogramPivots = append(histogramPivots, pivot)
+		}
+	}
+	log.Infof("histogram pivots: %+v", histogramPivots)
+
+	// take the last 2-3 pivots to check if there is a divergence
+	if len(histogramPivots) < 3 {
+		return
+	}
+
+	histogramPivots = histogramPivots[len(histogramPivots)-3:]
+	minDiff := 0.01
+	for i := len(histogramPivots) - 1; i > 0; i-- {
+		p1 := histogramPivots[i]
+		p2 := histogramPivots[i-1]
+		diff := p1 - p2
+
+		if diff > -minDiff || diff > minDiff {
+			continue
+		}
+
+		// negative value = MACD top divergence
+		if diff < -minDiff {
+			log.Infof("MACD TOP DIVERGENCE DETECTED: diff %f", diff)
+			s.macdTopDivergence = true
+		} else {
+			s.macdTopDivergence = false
+		}
+		return
+	}
+}
+
 func (s *FailedBreakHigh) updatePivotHigh() bool {
 	high := fixedpoint.NewFromFloat(s.pivotHigh.Last())
 	if high.IsZero() {
@@ -288,18 +385,17 @@ func (s *FailedBreakHigh) updatePivotHigh() bool {
 
 	lastHighChanged := high.Compare(s.lastHigh) != 0
 	if lastHighChanged {
-		if s.lastHigh.IsZero() || high.Compare(s.lastHigh) > 0 {
-			s.lastHigh = high
-			s.pivotHighPrices = append(s.pivotHighPrices, high)
-		}
+		s.lastHigh = high
+		s.lastHighInvalidated = false
+		s.pivotHighPrices = append(s.pivotHighPrices, high)
 	}
 
 	fastHigh := fixedpoint.NewFromFloat(s.fastPivotHigh.Last())
 	if !fastHigh.IsZero() {
 		if fastHigh.Compare(s.lastHigh) > 0 {
 			// invalidate the last low
-			s.lastHigh = fixedpoint.Zero
 			lastHighChanged = false
+			s.lastHighInvalidated = true
 		}
 		s.lastFastHigh = fastHigh
 	}

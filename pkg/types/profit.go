@@ -175,6 +175,8 @@ func NewProfitStats(market Market) *ProfitStats {
 	}
 }
 
+// Init
+// Deprecated: use NewProfitStats instead
 func (s *ProfitStats) Init(market Market) {
 	s.Symbol = market.Symbol
 	s.BaseCurrency = market.BaseCurrency
@@ -187,6 +189,16 @@ func (s *ProfitStats) Init(market Market) {
 func (s *ProfitStats) AddProfit(profit Profit) {
 	if s.IsOver24Hours() {
 		s.ResetToday()
+	}
+
+	// since field guard
+	if s.AccumulatedSince == 0 {
+		s.AccumulatedSince = profit.TradedAt.Unix()
+	}
+
+	if s.TodaySince == 0 {
+		var beginningOfTheDay = BeginningOfTheDay(profit.TradedAt.Local())
+		s.TodaySince = beginningOfTheDay.Unix()
 	}
 
 	s.AccumulatedPnL = s.AccumulatedPnL.Add(profit.Profit)

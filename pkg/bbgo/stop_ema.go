@@ -29,9 +29,9 @@ func (s *StopEMA) Allowed(closePrice fixedpoint.Value) bool {
 
 	emaStopShortPrice := ema.Mul(fixedpoint.One.Sub(s.Range))
 	if closePrice.Compare(emaStopShortPrice) < 0 {
-		Notify("stopEMA protection: close price %f less than stopEMA %f = EMA(%f) * (1 - RANGE %f)",
-			closePrice.Float64(),
+		Notify("stopEMA %s protection: close price %f less than stopEMA %f = EMA(%f) * (1 - RANGE %f)",
 			s.IntervalWindow.String(),
+			closePrice.Float64(),
 			emaStopShortPrice.Float64(),
 			ema.Float64(),
 			s.Range.Float64())

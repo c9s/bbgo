@@ -14,43 +14,62 @@ Moving Average Convergence Divergence (MACD)
 - https://www.investopedia.com/terms/m/macd.asp
 - https://school.stockcharts.com/doku.php?id=technical_indicators:macd-histogram
 */
+type MACDConfig struct {
+	types.IntervalWindow // 9
+
+	// ShortPeriod is the short term period EMA, usually 12
+	ShortPeriod int `json:"short"`
+	// LongPeriod is the long term period EMA, usually 26
+	LongPeriod int `json:"long"`
+}
 
 //go:generate callbackgen -type MACD
 type MACD struct {
-	types.IntervalWindow     // 9
-	ShortPeriod          int // 12
-	LongPeriod           int // 26
-	Values     floats.Slice
-	FastEWMA   *EWMA
-	SlowEWMA             *EWMA
-	SignalLine *EWMA
-	Histogram  floats.Slice
+	MACDConfig
+
+	Values                         floats.Slice `json:"-"`
+	fastEWMA, slowEWMA, signalLine *EWMA
+	Histogram                      floats.Slice `json:"-"`
 
 	EndTime time.Time
 
-	updateCallbacks []func(value float64)
+	updateCallbacks []func(macd, signal, histogram float64)
 }
 
 func (inc *MACD) Update(x float64) {
 	if len(inc.Values) == 0 {
-		inc.FastEWMA = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.ShortPeriod}}
-		inc.SlowEWMA = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.LongPeriod}}
-		inc.SignalLine = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.Window}}
+		// apply default values
+		inc.fastEWMA = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.ShortPeriod}}
+		inc.slowEWMA = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.LongPeriod}}
+		inc.signalLine = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.Window}}
+		if inc.ShortPeriod == 0 {
+			inc.ShortPeriod = 12
+		}
+
+		if inc.LongPeriod == 0 {
+			inc.LongPeriod = 26
+		}
 	}
 
 	// update fast and slow ema
-	inc.FastEWMA.Update(x)
-	inc.SlowEWMA.Update(x)
+	inc.fastEWMA.Update(x)
+	inc.slowEWMA.Update(x)
 
-	// update macd
-	macd := inc.FastEWMA.Last() - inc.SlowEWMA.Last()
+	// update MACD value, it's also the signal line
+	fast := inc.fastEWMA.Last()
+	slow := inc.slowEWMA.Last()
+	macd := fast - slow
 	inc.Values.Push(macd)
 
 	// update signal line
-	inc.SignalLine.Update(macd)
+	inc.signalLine.Update(macd)
+	signal := inc.signalLine.Last()
 
 	// update histogram
-	inc.Histogram.Push(macd - inc.SignalLine.Last())
+	histogram := macd - signal
+	inc.Histogram.Push(histogram)
+
+	inc.EmitUpdate(macd, signal, histogram)
 }
 
 func (inc *MACD) Last() float64 {
@@ -76,7 +95,7 @@ func (inc *MACD) MACD() types.SeriesExtend {
 }
 
 func (inc *MACD) Singals() types.SeriesExtend {
-	return inc.SignalLine
+	return inc.signalLine
 }
 
 type MACDValues struct {
