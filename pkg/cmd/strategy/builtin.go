@@ -19,6 +19,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/grid"
 	_ "github.com/c9s/bbgo/pkg/strategy/kline"
 	_ "github.com/c9s/bbgo/pkg/strategy/marketcap"
+	_ "github.com/c9s/bbgo/pkg/strategy/oneliner"
 	_ "github.com/c9s/bbgo/pkg/strategy/pivotshort"
 	_ "github.com/c9s/bbgo/pkg/strategy/pricealert"
 	_ "github.com/c9s/bbgo/pkg/strategy/pricedrop"
