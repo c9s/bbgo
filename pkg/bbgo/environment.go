@@ -301,13 +301,6 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 	return nil
 }
 
-// ConfigureNotificationRouting configures the notification rules
-// for symbol-based routes, we should register the same symbol rules for each session.
-// for session-based routes, we should set the fixed callbacks for each session
-func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfig) error {
-	return nil
-}
-
 func (environ *Environment) SetStartTime(t time.Time) *Environment {
 	environ.startTime = t
 	return environ
@@ -659,8 +652,34 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 	}
 
 	if userConfig.Notifications != nil {
-		if err := environ.ConfigureNotificationRouting(userConfig.Notifications); err != nil {
+		if err := environ.ConfigureNotification(userConfig.Notifications); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func (environ *Environment) ConfigureNotification(config *NotificationConfig) error {
+	if config.Switches != nil {
+		if config.Switches.Trade {
+			tradeHandler := func(trade types.Trade) {
+				Notify(trade)
+			}
+
+			for _, session := range environ.sessions {
+				session.UserDataStream.OnTradeUpdate(tradeHandler)
+			}
+		}
+
+		if config.Switches.OrderUpdate {
+			orderUpdateHandler := func(order types.Order) {
+				Notify(order)
+			}
+
+			for _, session := range environ.sessions {
+				session.UserDataStream.OnOrderUpdate(orderUpdateHandler)
+			}
 		}
 	}
 
