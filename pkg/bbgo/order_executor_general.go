@@ -357,7 +357,13 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 		return nil
 	}
 
+	if e.closing > 0 {
+		log.Errorf("position is already closing")
+		return nil
+	}
+
 	atomic.AddInt64(&e.closing, 1)
+	defer atomic.StoreInt64(&e.closing, 0)
 
 	// check base balance and adjust the close position order
 	if e.position.IsLong() {
@@ -367,6 +373,14 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 		if submitOrder.Quantity.IsZero() {
 			return fmt.Errorf("insufficient base balance, can not sell: %+v", submitOrder)
 		}
+	} else if e.position.IsShort() {
+		// TODO: check quote balance here, we also need the current price to validate, need to design.
+		/*
+			if quoteBalance, ok := e.session.Account.Balance(e.position.Market.QuoteCurrency); ok {
+				// AdjustQuantityByMaxAmount(submitOrder.Quantity, quoteBalance.Available)
+				// submitOrder.Quantity = fixedpoint.Min(submitOrder.Quantity,)
+			}
+		*/
 	}
 
 	tagStr := strings.Join(tags, ",")
