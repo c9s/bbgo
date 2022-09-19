@@ -4,22 +4,10 @@ notifications:
     defaultChannel: "dev-bbgo"
     errorChannel: "bbgo-error"
 
-  # if you want to route channel by symbol
-  symbolChannels:
-    "^BTC": "btc"
-    "^ETH": "eth"
-
-  # if you want to route channel by exchange session
-  sessionChannels:
-    max: "bbgo-max"
-    binance: "bbgo-binance"
-
-  # routing rules
-  routing:
-    trade: "$silent"
-    order: "$silent"
-    submitOrder: "$silent"
-    pnL: "bbgo-pnl"
+  switches:
+    trade: true
+    orderUpdate: true
+    submitOrder: true
 
 persistence:
   json:

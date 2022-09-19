@@ -3,16 +3,10 @@ notifications:
   slack:
     defaultChannel: "bbgo"
     errorChannel: "bbgo-error"
-
-reportPnL:
-- averageCostBySymbols:
-  - "BTCUSDT"
-  - "ETHUSDT"
-  - "BNBUSDT"
-  of: binance
-  when:
-  - "@daily"
-  - "@hourly"
+  switches:
+    trade: true
+    orderUpdate: true
+    submitOrder: true
 
 sessions:
   binance:
