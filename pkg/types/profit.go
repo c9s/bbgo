@@ -168,10 +168,20 @@ type ProfitStats struct {
 
 func NewProfitStats(market Market) *ProfitStats {
 	return &ProfitStats{
-		Symbol:           market.Symbol,
-		BaseCurrency:     market.BaseCurrency,
-		QuoteCurrency:    market.QuoteCurrency,
-		AccumulatedSince: time.Now().Unix(),
+		Symbol:                 market.Symbol,
+		QuoteCurrency:          market.QuoteCurrency,
+		BaseCurrency:           market.BaseCurrency,
+		AccumulatedPnL:         fixedpoint.Zero,
+		AccumulatedNetProfit:   fixedpoint.Zero,
+		AccumulatedGrossProfit: fixedpoint.Zero,
+		AccumulatedGrossLoss:   fixedpoint.Zero,
+		AccumulatedVolume:      fixedpoint.Zero,
+		AccumulatedSince:       0,
+		TodayPnL:               fixedpoint.Zero,
+		TodayNetProfit:         fixedpoint.Zero,
+		TodayGrossProfit:       fixedpoint.Zero,
+		TodayGrossLoss:         fixedpoint.Zero,
+		TodaySince:             0,
 	}
 }
 
