@@ -98,8 +98,6 @@ func (e *ExchangeOrderExecutionRouter) CancelOrdersTo(ctx context.Context, sessi
 type ExchangeOrderExecutor struct {
 	// MinQuoteBalance fixedpoint.Value `json:"minQuoteBalance,omitempty" yaml:"minQuoteBalance,omitempty"`
 
-	Notifiability `json:"-" yaml:"-"`
-
 	Session *ExchangeSession `json:"-" yaml:"-"`
 
 	// private trade update callbacks

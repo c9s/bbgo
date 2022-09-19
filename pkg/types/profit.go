@@ -154,24 +154,34 @@ type ProfitStats struct {
 
 	AccumulatedPnL         fixedpoint.Value `json:"accumulatedPnL,omitempty"`
 	AccumulatedNetProfit   fixedpoint.Value `json:"accumulatedNetProfit,omitempty"`
-	AccumulatedGrossProfit fixedpoint.Value `json:"accumulatedProfit,omitempty"`
-	AccumulatedGrossLoss   fixedpoint.Value `json:"accumulatedLoss,omitempty"`
+	AccumulatedGrossProfit fixedpoint.Value `json:"accumulatedGrossProfit,omitempty"`
+	AccumulatedGrossLoss   fixedpoint.Value `json:"accumulatedGrossLoss,omitempty"`
 	AccumulatedVolume      fixedpoint.Value `json:"accumulatedVolume,omitempty"`
 	AccumulatedSince       int64            `json:"accumulatedSince,omitempty"`
 
 	TodayPnL         fixedpoint.Value `json:"todayPnL,omitempty"`
 	TodayNetProfit   fixedpoint.Value `json:"todayNetProfit,omitempty"`
-	TodayGrossProfit fixedpoint.Value `json:"todayProfit,omitempty"`
-	TodayGrossLoss   fixedpoint.Value `json:"todayLoss,omitempty"`
+	TodayGrossProfit fixedpoint.Value `json:"todayGrossProfit,omitempty"`
+	TodayGrossLoss   fixedpoint.Value `json:"todayGrossLoss,omitempty"`
 	TodaySince       int64            `json:"todaySince,omitempty"`
 }
 
 func NewProfitStats(market Market) *ProfitStats {
 	return &ProfitStats{
-		Symbol:           market.Symbol,
-		BaseCurrency:     market.BaseCurrency,
-		QuoteCurrency:    market.QuoteCurrency,
-		AccumulatedSince: time.Now().Unix(),
+		Symbol:                 market.Symbol,
+		QuoteCurrency:          market.QuoteCurrency,
+		BaseCurrency:           market.BaseCurrency,
+		AccumulatedPnL:         fixedpoint.Zero,
+		AccumulatedNetProfit:   fixedpoint.Zero,
+		AccumulatedGrossProfit: fixedpoint.Zero,
+		AccumulatedGrossLoss:   fixedpoint.Zero,
+		AccumulatedVolume:      fixedpoint.Zero,
+		AccumulatedSince:       0,
+		TodayPnL:               fixedpoint.Zero,
+		TodayNetProfit:         fixedpoint.Zero,
+		TodayGrossProfit:       fixedpoint.Zero,
+		TodayGrossLoss:         fixedpoint.Zero,
+		TodaySince:             0,
 	}
 }
 
@@ -188,7 +198,7 @@ func (s *ProfitStats) Init(market Market) {
 
 func (s *ProfitStats) AddProfit(profit Profit) {
 	if s.IsOver24Hours() {
-		s.ResetToday()
+		s.ResetToday(profit.TradedAt)
 	}
 
 	// since field guard
@@ -217,7 +227,7 @@ func (s *ProfitStats) AddProfit(profit Profit) {
 
 func (s *ProfitStats) AddTrade(trade Trade) {
 	if s.IsOver24Hours() {
-		s.ResetToday()
+		s.ResetToday(trade.Time.Time())
 	}
 
 	s.AccumulatedVolume = s.AccumulatedVolume.Add(trade.Quantity)
@@ -228,13 +238,13 @@ func (s *ProfitStats) IsOver24Hours() bool {
 	return time.Since(time.Unix(s.TodaySince, 0)) >= 24*time.Hour
 }
 
-func (s *ProfitStats) ResetToday() {
+func (s *ProfitStats) ResetToday(t time.Time) {
 	s.TodayPnL = fixedpoint.Zero
 	s.TodayNetProfit = fixedpoint.Zero
 	s.TodayGrossProfit = fixedpoint.Zero
 	s.TodayGrossLoss = fixedpoint.Zero
 
-	var beginningOfTheDay = BeginningOfTheDay(time.Now().Local())
+	var beginningOfTheDay = BeginningOfTheDay(t.Local())
 	s.TodaySince = beginningOfTheDay.Unix()
 }
 

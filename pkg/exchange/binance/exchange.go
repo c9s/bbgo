@@ -307,17 +307,18 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error) {
-	req := e.client.NewGetMaxBorrowableService()
+	req := e.client2.NewGetMarginMaxBorrowableRequest()
 	req.Asset(asset)
 	if e.IsIsolatedMargin {
 		req.IsolatedSymbol(e.IsolatedMarginSymbol)
 	}
+
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return fixedpoint.Zero, err
 	}
 
-	return fixedpoint.NewFromString(resp.Amount)
+	return resp.Amount, nil
 }
 
 func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
@@ -325,7 +326,7 @@ func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fi
 	req.Asset(asset)
 	req.Amount(amount.String())
 	if e.IsIsolatedMargin {
-		req.IsolatedSymbol(e.IsolatedMarginSymbol)
+		req.Symbol(e.IsolatedMarginSymbol)
 	}
 
 	log.Infof("repaying margin asset %s amount %f", asset, amount.Float64())
@@ -343,7 +344,7 @@ func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount f
 	req.Asset(asset)
 	req.Amount(amount.String())
 	if e.IsIsolatedMargin {
-		req.IsolatedSymbol(e.IsolatedMarginSymbol)
+		req.Symbol(e.IsolatedMarginSymbol)
 	}
 
 	log.Infof("borrowing margin asset %s amount %f", asset, amount.Float64())

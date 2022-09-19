@@ -2,6 +2,7 @@ package xmaker
 
 import (
 	"sync"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -57,7 +58,7 @@ func (s *ProfitStats) AddTrade(trade types.Trade) {
 }
 
 func (s *ProfitStats) ResetToday() {
-	s.ProfitStats.ResetToday()
+	s.ProfitStats.ResetToday(time.Now())
 
 	s.lock.Lock()
 	s.TodayMakerVolume = fixedpoint.Zero

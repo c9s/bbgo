@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -29,6 +30,8 @@ type GeneralOrderExecutor struct {
 	tradeCollector     *TradeCollector
 
 	marginBaseMaxBorrowable, marginQuoteMaxBorrowable fixedpoint.Value
+
+	closing int64
 }
 
 func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strategyInstanceID string, position *types.Position) *GeneralOrderExecutor {
@@ -69,7 +72,7 @@ func (e *GeneralOrderExecutor) startMarginAssetUpdater(ctx context.Context) {
 func (e *GeneralOrderExecutor) updateMarginAssetMaxBorrowable(ctx context.Context, marginService types.MarginBorrowRepayService, market types.Market) {
 	maxBorrowable, err := marginService.QueryMarginAssetMaxBorrowable(ctx, market.BaseCurrency)
 	if err != nil {
-		log.WithError(err).Errorf("can not query margin base asset max borrowable")
+		log.WithError(err).Errorf("can not query margin base asset %s max borrowable", market.BaseCurrency)
 	} else {
 		log.Infof("updating margin base asset %s max borrowable amount: %f", market.BaseCurrency, maxBorrowable.Float64())
 		e.marginBaseMaxBorrowable = maxBorrowable
@@ -77,7 +80,7 @@ func (e *GeneralOrderExecutor) updateMarginAssetMaxBorrowable(ctx context.Contex
 
 	maxBorrowable, err = marginService.QueryMarginAssetMaxBorrowable(ctx, market.QuoteCurrency)
 	if err != nil {
-		log.WithError(err).Errorf("can not query margin base asset max borrowable")
+		log.WithError(err).Errorf("can not query margin quote asset %s max borrowable", market.QuoteCurrency)
 	} else {
 		log.Infof("updating margin quote asset %s max borrowable amount: %f", market.QuoteCurrency, maxBorrowable.Float64())
 		e.marginQuoteMaxBorrowable = maxBorrowable
@@ -88,6 +91,7 @@ func (e *GeneralOrderExecutor) marginAssetMaxBorrowableUpdater(ctx context.Conte
 	t := time.NewTicker(util.MillisecondsJitter(interval, 500))
 	defer t.Stop()
 
+	e.updateMarginAssetMaxBorrowable(ctx, marginService, market)
 	for {
 		select {
 		case <-ctx.Done():
@@ -227,6 +231,11 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		Tag:              strings.Join(options.Tags, ","),
 	}
 
+	baseBalance, _ := e.session.Account.Balance(e.position.Market.BaseCurrency)
+
+	// FIXME: fix the max quote borrowing checking
+	// quoteBalance, _ := e.session.Account.Balance(e.position.Market.QuoteCurrency)
+
 	if !options.LimitOrderTakerRatio.IsZero() {
 		if options.Long {
 			// use higher price to buy (this ensures that our order will be filled)
@@ -257,7 +266,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		}
 
 		quoteQuantity := quantity.Mul(price)
-		if quoteQuantity.Compare(e.marginQuoteMaxBorrowable) > 0 {
+		if e.session.Margin && !e.marginQuoteMaxBorrowable.IsZero() && quoteQuantity.Compare(e.marginQuoteMaxBorrowable) > 0 {
 			log.Warnf("adjusting quantity %f according to the max margin quote borrowable amount: %f", quantity.Float64(), e.marginQuoteMaxBorrowable.Float64())
 			quantity = AdjustQuantityByMaxAmount(quantity, price, e.marginQuoteMaxBorrowable)
 		}
@@ -282,9 +291,10 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 			}
 		}
 
-		if quantity.Compare(e.marginBaseMaxBorrowable) > 0 {
+		if e.session.Margin && !e.marginBaseMaxBorrowable.IsZero() && quantity.Sub(baseBalance.Available).Compare(e.marginBaseMaxBorrowable) > 0 {
 			log.Warnf("adjusting %f quantity according to the max margin base borrowable amount: %f", quantity.Float64(), e.marginBaseMaxBorrowable.Float64())
-			quantity = fixedpoint.Min(quantity, e.marginBaseMaxBorrowable)
+			// quantity = fixedpoint.Min(quantity, e.marginBaseMaxBorrowable)
+			quantity = baseBalance.Available.Add(e.marginBaseMaxBorrowable)
 		}
 
 		submitOrder.Side = types.SideTypeSell
@@ -347,6 +357,14 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 		return nil
 	}
 
+	if e.closing > 0 {
+		log.Errorf("position is already closing")
+		return nil
+	}
+
+	atomic.AddInt64(&e.closing, 1)
+	defer atomic.StoreInt64(&e.closing, 0)
+
 	// check base balance and adjust the close position order
 	if e.position.IsLong() {
 		if baseBalance, ok := e.session.Account.Balance(e.position.Market.BaseCurrency); ok {
@@ -355,12 +373,20 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 		if submitOrder.Quantity.IsZero() {
 			return fmt.Errorf("insufficient base balance, can not sell: %+v", submitOrder)
 		}
+	} else if e.position.IsShort() {
+		// TODO: check quote balance here, we also need the current price to validate, need to design.
+		/*
+			if quoteBalance, ok := e.session.Account.Balance(e.position.Market.QuoteCurrency); ok {
+				// AdjustQuantityByMaxAmount(submitOrder.Quantity, quoteBalance.Available)
+				// submitOrder.Quantity = fixedpoint.Min(submitOrder.Quantity,)
+			}
+		*/
 	}
 
 	tagStr := strings.Join(tags, ",")
 	submitOrder.Tag = tagStr
 
-	Notify("closing %s position %s with tags: %v", e.symbol, percentage.Percentage(), tagStr)
+	Notify("Closing %s position %s with tags: %v", e.symbol, percentage.Percentage(), tagStr)
 
 	_, err := e.SubmitOrders(ctx, *submitOrder)
 	return err
