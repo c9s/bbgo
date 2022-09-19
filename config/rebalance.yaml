@@ -3,6 +3,10 @@ notifications:
   slack:
     defaultChannel: "bbgo"
     errorChannel: "bbgo-error"
+  switches:
+    trade: true
+    orderUpdate: true
+    submitOrder: true
 
 exchangeStrategies:
   - on: max
