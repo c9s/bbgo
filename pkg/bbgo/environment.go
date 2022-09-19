@@ -30,7 +30,6 @@ import (
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/c9s/bbgo/pkg/util/templateutil"
 )
 
 func init() {
@@ -306,146 +305,6 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 // for symbol-based routes, we should register the same symbol rules for each session.
 // for session-based routes, we should set the fixed callbacks for each session
 func (environ *Environment) ConfigureNotificationRouting(conf *NotificationConfig) error {
-	// configure routing here
-	if conf.SymbolChannels != nil {
-		Notification.SymbolChannelRouter.AddRoute(conf.SymbolChannels)
-	}
-	if conf.SessionChannels != nil {
-		Notification.SessionChannelRouter.AddRoute(conf.SessionChannels)
-	}
-	if conf.Routing != nil {
-		// configure passive object notification routing
-		switch conf.Routing.Trade {
-		case "$silent": // silent, do not setup notification
-
-		case "$session":
-			defaultTradeUpdateHandler := func(trade types.Trade) {
-				Notify(&trade)
-			}
-			for name := range environ.sessions {
-				session := environ.sessions[name]
-
-				// if we can route session name to channel successfully...
-				channel, ok := Notification.SessionChannelRouter.Route(name)
-				if ok {
-					session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-						Notification.NotifyTo(channel, &trade)
-					})
-				} else {
-					session.UserDataStream.OnTradeUpdate(defaultTradeUpdateHandler)
-				}
-			}
-
-		case "$symbol":
-			// configure object routes for Trade
-			Notification.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
-				trade, matched := obj.(*types.Trade)
-				if !matched {
-					return
-				}
-				channel, ok = Notification.SymbolChannelRouter.Route(trade.Symbol)
-				return
-			})
-
-			// use same handler for each session
-			handler := func(trade types.Trade) {
-				channel, ok := Notification.RouteObject(&trade)
-				if ok {
-					NotifyTo(channel, &trade)
-				} else {
-					Notify(&trade)
-				}
-			}
-			for _, session := range environ.sessions {
-				session.UserDataStream.OnTradeUpdate(handler)
-			}
-		}
-
-		switch conf.Routing.Order {
-
-		case "$silent": // silent, do not setup notification
-
-		case "$session":
-			defaultOrderUpdateHandler := func(order types.Order) {
-				text := templateutil.Render(TemplateOrderReport, order)
-				Notify(text, &order)
-			}
-			for name := range environ.sessions {
-				session := environ.sessions[name]
-
-				// if we can route session name to channel successfully...
-				channel, ok := Notification.SessionChannelRouter.Route(name)
-				if ok {
-					session.UserDataStream.OnOrderUpdate(func(order types.Order) {
-						text := templateutil.Render(TemplateOrderReport, order)
-						NotifyTo(channel, text, &order)
-					})
-				} else {
-					session.UserDataStream.OnOrderUpdate(defaultOrderUpdateHandler)
-				}
-			}
-
-		case "$symbol":
-			// add object route
-			Notification.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
-				order, matched := obj.(*types.Order)
-				if !matched {
-					return
-				}
-				channel, ok = Notification.SymbolChannelRouter.Route(order.Symbol)
-				return
-			})
-
-			// use same handler for each session
-			handler := func(order types.Order) {
-				text := templateutil.Render(TemplateOrderReport, order)
-				channel, ok := Notification.RouteObject(&order)
-				if ok {
-					NotifyTo(channel, text, &order)
-				} else {
-					Notify(text, &order)
-				}
-			}
-			for _, session := range environ.sessions {
-				session.UserDataStream.OnOrderUpdate(handler)
-			}
-		}
-
-		switch conf.Routing.SubmitOrder {
-
-		case "$silent": // silent, do not setup notification
-
-		case "$symbol":
-			// add object route
-			Notification.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
-				order, matched := obj.(*types.SubmitOrder)
-				if !matched {
-					return
-				}
-
-				channel, ok = Notification.SymbolChannelRouter.Route(order.Symbol)
-				return
-			})
-
-		}
-
-		// currently, not used
-		// FIXME: this is causing cyclic import
-		/*
-			switch conf.Routing.PnL {
-			case "$symbol":
-				environ.ObjectChannelRouter.Route(func(obj interface{}) (channel string, ok bool) {
-					report, matched := obj.(*pnl.AverageCostPnlReport)
-					if !matched {
-						return
-					}
-					channel, ok = environ.SymbolChannelRouter.Route(report.Symbol)
-					return
-				})
-			}
-		*/
-
-	}
 	return nil
 }
 
@@ -773,16 +632,9 @@ func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSe
 }
 
 func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) error {
-
 	// setup default notification config
 	if userConfig.Notifications == nil {
-		userConfig.Notifications = &NotificationConfig{
-			Routing: &SlackNotificationRouting{
-				Trade:       "$session",
-				Order:       "$silent",
-				SubmitOrder: "$silent",
-			},
-		}
+		userConfig.Notifications = &NotificationConfig{}
 	}
 
 	var persistence = PersistenceServiceFacade.Get()
