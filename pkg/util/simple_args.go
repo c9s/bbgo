@@ -12,7 +12,7 @@ import (
 func FilterSimpleArgs(args []interface{}) (simpleArgs []interface{}) {
 	for _, arg := range args {
 		switch arg.(type) {
-		case int, int64, int32, uint64, uint32, string, []byte, float64, float32, fixedpoint.Value, time.Time:
+		case int, int64, int32, uint64, uint32, string, []string, []byte, float64, []float64, float32, fixedpoint.Value, time.Time:
 			simpleArgs = append(simpleArgs, arg)
 		default:
 			rt := reflect.TypeOf(arg)
