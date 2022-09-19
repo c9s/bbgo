@@ -59,25 +59,26 @@ func (m AssetMap) PlainText() (o string) {
 		usd := a.InUSD
 		btc := a.InBTC
 		if !a.InUSD.IsZero() {
-			o += fmt.Sprintf("  %s: %s (≈ %s) (≈ %s)",
+			o += fmt.Sprintf(" %s: %s (≈ %s) (≈ %s)",
 				a.Currency,
-				a.Total.String(),
+				a.NetAsset.String(),
 				USD.FormatMoney(usd),
 				BTC.FormatMoney(btc),
 			) + "\n"
 			sumUsd = sumUsd.Add(usd)
 			sumBTC = sumBTC.Add(btc)
 		} else {
-			o += fmt.Sprintf("  %s: %s",
+			o += fmt.Sprintf(" %s: %s",
 				a.Currency,
-				a.Total.String(),
+				a.NetAsset.String(),
 			) + "\n"
 		}
 	}
-	o += fmt.Sprintf(" Summary: (≈ %s) (≈ %s)",
+
+	o += fmt.Sprintf("Net Asset Value: (≈ %s) (≈ %s)",
 		USD.FormatMoney(sumUsd),
 		BTC.FormatMoney(sumBTC),
-	) + "\n"
+	)
 	return o
 }
 
