@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -29,6 +30,8 @@ type GeneralOrderExecutor struct {
 	tradeCollector     *TradeCollector
 
 	marginBaseMaxBorrowable, marginQuoteMaxBorrowable fixedpoint.Value
+
+	closing int64
 }
 
 func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strategyInstanceID string, position *types.Position) *GeneralOrderExecutor {
@@ -228,6 +231,11 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		Tag:              strings.Join(options.Tags, ","),
 	}
 
+	baseBalance, _ := e.session.Account.Balance(e.position.Market.BaseCurrency)
+
+	// FIXME: fix the max quote borrowing checking
+	// quoteBalance, _ := e.session.Account.Balance(e.position.Market.QuoteCurrency)
+
 	if !options.LimitOrderTakerRatio.IsZero() {
 		if options.Long {
 			// use higher price to buy (this ensures that our order will be filled)
@@ -258,7 +266,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		}
 
 		quoteQuantity := quantity.Mul(price)
-		if quoteQuantity.Compare(e.marginQuoteMaxBorrowable) > 0 {
+		if !e.marginQuoteMaxBorrowable.IsZero() && quoteQuantity.Compare(e.marginQuoteMaxBorrowable) > 0 {
 			log.Warnf("adjusting quantity %f according to the max margin quote borrowable amount: %f", quantity.Float64(), e.marginQuoteMaxBorrowable.Float64())
 			quantity = AdjustQuantityByMaxAmount(quantity, price, e.marginQuoteMaxBorrowable)
 		}
@@ -283,9 +291,10 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 			}
 		}
 
-		if quantity.Compare(e.marginBaseMaxBorrowable) > 0 {
+		if !e.marginBaseMaxBorrowable.IsZero() && quantity.Sub(baseBalance.Available).Compare(e.marginBaseMaxBorrowable) > 0 {
 			log.Warnf("adjusting %f quantity according to the max margin base borrowable amount: %f", quantity.Float64(), e.marginBaseMaxBorrowable.Float64())
-			quantity = fixedpoint.Min(quantity, e.marginBaseMaxBorrowable)
+			// quantity = fixedpoint.Min(quantity, e.marginBaseMaxBorrowable)
+			quantity = baseBalance.Available.Add(e.marginBaseMaxBorrowable)
 		}
 
 		submitOrder.Side = types.SideTypeSell
@@ -347,6 +356,8 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	if submitOrder == nil {
 		return nil
 	}
+
+	atomic.AddInt64(&e.closing, 1)
 
 	// check base balance and adjust the close position order
 	if e.position.IsLong() {
