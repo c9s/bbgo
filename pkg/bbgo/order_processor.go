@@ -1,8 +1,9 @@
 package bbgo
 
 import (
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/pkg/errors"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 var (
@@ -14,7 +15,7 @@ var (
 	ErrAssetBalanceLevelTooHigh = errors.New("asset balance level too high")
 )
 
-// AdjustQuantityByMaxAmount adjusts the quantity to make the amount greater than the given minAmount
+// AdjustQuantityByMaxAmount adjusts the quantity to make the amount less than the given maxAmount
 func AdjustQuantityByMaxAmount(quantity, currentPrice, maxAmount fixedpoint.Value) fixedpoint.Value {
 	// modify quantity for the min amount
 	amount := currentPrice.Mul(quantity)
