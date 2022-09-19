@@ -266,7 +266,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		}
 
 		quoteQuantity := quantity.Mul(price)
-		if !e.marginQuoteMaxBorrowable.IsZero() && quoteQuantity.Compare(e.marginQuoteMaxBorrowable) > 0 {
+		if e.session.Margin && !e.marginQuoteMaxBorrowable.IsZero() && quoteQuantity.Compare(e.marginQuoteMaxBorrowable) > 0 {
 			log.Warnf("adjusting quantity %f according to the max margin quote borrowable amount: %f", quantity.Float64(), e.marginQuoteMaxBorrowable.Float64())
 			quantity = AdjustQuantityByMaxAmount(quantity, price, e.marginQuoteMaxBorrowable)
 		}
@@ -291,7 +291,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 			}
 		}
 
-		if !e.marginBaseMaxBorrowable.IsZero() && quantity.Sub(baseBalance.Available).Compare(e.marginBaseMaxBorrowable) > 0 {
+		if e.session.Margin && !e.marginBaseMaxBorrowable.IsZero() && quantity.Sub(baseBalance.Available).Compare(e.marginBaseMaxBorrowable) > 0 {
 			log.Warnf("adjusting %f quantity according to the max margin base borrowable amount: %f", quantity.Float64(), e.marginBaseMaxBorrowable.Float64())
 			// quantity = fixedpoint.Min(quantity, e.marginBaseMaxBorrowable)
 			quantity = baseBalance.Available.Add(e.marginBaseMaxBorrowable)
