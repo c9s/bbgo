@@ -66,36 +66,35 @@ func (e *GeneralOrderExecutor) startMarginAssetUpdater(ctx context.Context) {
 	go e.marginAssetMaxBorrowableUpdater(ctx, 30*time.Minute, marginService, e.position.Market)
 }
 
+func (e *GeneralOrderExecutor) updateMarginAssetMaxBorrowable(ctx context.Context, marginService types.MarginBorrowRepayService, market types.Market) {
+	maxBorrowable, err := marginService.QueryMarginAssetMaxBorrowable(ctx, market.BaseCurrency)
+	if err != nil {
+		log.WithError(err).Errorf("can not query margin base asset max borrowable")
+	} else {
+		log.Infof("updating margin base asset %s max borrowable amount: %f", market.BaseCurrency, maxBorrowable.Float64())
+		e.marginBaseMaxBorrowable = maxBorrowable
+	}
+
+	maxBorrowable, err = marginService.QueryMarginAssetMaxBorrowable(ctx, market.QuoteCurrency)
+	if err != nil {
+		log.WithError(err).Errorf("can not query margin base asset max borrowable")
+	} else {
+		log.Infof("updating margin quote asset %s max borrowable amount: %f", market.QuoteCurrency, maxBorrowable.Float64())
+		e.marginQuoteMaxBorrowable = maxBorrowable
+	}
+}
+
 func (e *GeneralOrderExecutor) marginAssetMaxBorrowableUpdater(ctx context.Context, interval time.Duration, marginService types.MarginBorrowRepayService, market types.Market) {
-	t1 := time.NewTicker(util.MillisecondsJitter(30*time.Minute, 500))
-	t2 := time.NewTicker(util.MillisecondsJitter(30*time.Minute, 500))
-	defer t1.Stop()
-	defer t2.Stop()
+	t := time.NewTicker(util.MillisecondsJitter(interval, 500))
+	defer t.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 
-		case <-t1.C:
-			maxBorrowable, err := marginService.QueryMarginAssetMaxBorrowable(ctx, market.BaseCurrency)
-			if err != nil {
-				log.WithError(err).Errorf("can not query margin base asset max borrowable")
-				continue
-			}
-
-			log.Infof("updating margin base asset %s max borrowable amount: %f", market.BaseCurrency, maxBorrowable.Float64())
-			e.marginBaseMaxBorrowable = maxBorrowable
-
-		case <-t2.C:
-			maxBorrowable, err := marginService.QueryMarginAssetMaxBorrowable(ctx, market.QuoteCurrency)
-			if err != nil {
-				log.WithError(err).Errorf("can not query margin base asset max borrowable")
-				continue
-			}
-
-			log.Infof("updating margin quote asset %s max borrowable amount: %f", market.QuoteCurrency, maxBorrowable.Float64())
-			e.marginQuoteMaxBorrowable = maxBorrowable
+		case <-t.C:
+			e.updateMarginAssetMaxBorrowable(ctx, marginService, market)
 		}
 	}
 }
@@ -257,6 +256,12 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 			quantity = quoteQuantity.Div(price)
 		}
 
+		quoteQuantity := quantity.Mul(price)
+		if quoteQuantity.Compare(e.marginQuoteMaxBorrowable) > 0 {
+			log.Warnf("adjusting quantity %f according to the max margin quote borrowable amount: %f", quantity.Float64(), e.marginQuoteMaxBorrowable.Float64())
+			quantity = AdjustQuantityByMaxAmount(quantity, price, e.marginQuoteMaxBorrowable)
+		}
+
 		submitOrder.Side = types.SideTypeBuy
 		submitOrder.Quantity = quantity
 
@@ -265,7 +270,8 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		if err2 != nil {
 			return err2
 		}
-		_ = createdOrder
+
+		log.Infof("created order: %+v", createdOrder)
 		return nil
 	} else if options.Short {
 		if quantity.IsZero() {
@@ -276,6 +282,11 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 			}
 		}
 
+		if quantity.Compare(e.marginBaseMaxBorrowable) > 0 {
+			log.Warnf("adjusting %f quantity according to the max margin base borrowable amount: %f", quantity.Float64(), e.marginBaseMaxBorrowable.Float64())
+			quantity = fixedpoint.Min(quantity, e.marginBaseMaxBorrowable)
+		}
+
 		submitOrder.Side = types.SideTypeSell
 		submitOrder.Quantity = quantity
 
@@ -284,7 +295,8 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		if err2 != nil {
 			return err2
 		}
-		_ = createdOrder
+
+		log.Infof("created order: %+v", createdOrder)
 		return nil
 	}
 
