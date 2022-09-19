@@ -198,7 +198,7 @@ func (s *ProfitStats) Init(market Market) {
 
 func (s *ProfitStats) AddProfit(profit Profit) {
 	if s.IsOver24Hours() {
-		s.ResetToday()
+		s.ResetToday(profit.TradedAt)
 	}
 
 	// since field guard
@@ -227,7 +227,7 @@ func (s *ProfitStats) AddProfit(profit Profit) {
 
 func (s *ProfitStats) AddTrade(trade Trade) {
 	if s.IsOver24Hours() {
-		s.ResetToday()
+		s.ResetToday(trade.Time.Time())
 	}
 
 	s.AccumulatedVolume = s.AccumulatedVolume.Add(trade.Quantity)
@@ -238,13 +238,13 @@ func (s *ProfitStats) IsOver24Hours() bool {
 	return time.Since(time.Unix(s.TodaySince, 0)) >= 24*time.Hour
 }
 
-func (s *ProfitStats) ResetToday() {
+func (s *ProfitStats) ResetToday(t time.Time) {
 	s.TodayPnL = fixedpoint.Zero
 	s.TodayNetProfit = fixedpoint.Zero
 	s.TodayGrossProfit = fixedpoint.Zero
 	s.TodayGrossLoss = fixedpoint.Zero
 
-	var beginningOfTheDay = BeginningOfTheDay(time.Now().Local())
+	var beginningOfTheDay = BeginningOfTheDay(t.Local())
 	s.TodaySince = beginningOfTheDay.Unix()
 }
 
