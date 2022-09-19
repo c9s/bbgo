@@ -72,7 +72,7 @@ func (e *GeneralOrderExecutor) startMarginAssetUpdater(ctx context.Context) {
 func (e *GeneralOrderExecutor) updateMarginAssetMaxBorrowable(ctx context.Context, marginService types.MarginBorrowRepayService, market types.Market) {
 	maxBorrowable, err := marginService.QueryMarginAssetMaxBorrowable(ctx, market.BaseCurrency)
 	if err != nil {
-		log.WithError(err).Errorf("can not query margin base asset max borrowable")
+		log.WithError(err).Errorf("can not query margin base asset %s max borrowable", market.BaseCurrency)
 	} else {
 		log.Infof("updating margin base asset %s max borrowable amount: %f", market.BaseCurrency, maxBorrowable.Float64())
 		e.marginBaseMaxBorrowable = maxBorrowable
@@ -80,7 +80,7 @@ func (e *GeneralOrderExecutor) updateMarginAssetMaxBorrowable(ctx context.Contex
 
 	maxBorrowable, err = marginService.QueryMarginAssetMaxBorrowable(ctx, market.QuoteCurrency)
 	if err != nil {
-		log.WithError(err).Errorf("can not query margin base asset max borrowable")
+		log.WithError(err).Errorf("can not query margin quote asset %s max borrowable", market.QuoteCurrency)
 	} else {
 		log.Infof("updating margin quote asset %s max borrowable amount: %f", market.QuoteCurrency, maxBorrowable.Float64())
 		e.marginQuoteMaxBorrowable = maxBorrowable
