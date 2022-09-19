@@ -88,6 +88,7 @@ func (e *GeneralOrderExecutor) marginAssetMaxBorrowableUpdater(ctx context.Conte
 	t := time.NewTicker(util.MillisecondsJitter(interval, 500))
 	defer t.Stop()
 
+	e.updateMarginAssetMaxBorrowable(ctx, marginService, market)
 	for {
 		select {
 		case <-ctx.Done():
