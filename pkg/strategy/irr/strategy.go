@@ -1,4 +1,4 @@
-package oneliner
+package irr
 
 import (
 	"bytes"
@@ -30,10 +30,6 @@ var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
-}
-
-type IntervalWindowSetting struct {
-	types.IntervalWindow
 }
 
 type Strategy struct {
@@ -100,16 +96,6 @@ type Strategy struct {
 	RebalanceFilter           float64          `json:"rebalanceFilter"` // beta filter on the Linear Regression of trendLine
 	TrailingCallbackRate      []float64        `json:"trailingCallbackRate"`
 	TrailingActivationRatio   []float64        `json:"trailingActivationRatio"`
-
-	DriftFilterNeg  float64 `json:"driftFilterNeg"`
-	DriftFilterPos  float64 `json:"driftFilterPos"`
-	DDriftFilterNeg float64 `json:"ddriftFilterNeg"`
-	DDriftFilterPos float64 `json:"ddriftFilterPos"`
-
-	buyPrice     float64 `persistence:"buy_price"`
-	sellPrice    float64 `persistence:"sell_price"`
-	highestPrice float64 `persistence:"highest_price"`
-	lowestPrice  float64 `persistence:"lowest_price"`
 
 	// This is not related to trade but for statistics graph generation
 	// Will deduct fee in percentage from every trade
@@ -202,20 +188,22 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		method.Bind(session, s.orderExecutor)
 	}
 
-	store, _ := session.MarketDataStore(s.Symbol)
+	kLineStore, _ := s.session.MarketDataStore(s.Symbol)
 	s.nrr = &NRR{IntervalWindow: types.IntervalWindow{Window: 2, Interval: s.Interval}, RankingWindow: s.Window}
-	s.nrr.Bind(store)
+	s.nrr.BindK(s.session.MarketDataStream, s.Symbol, s.Interval)
+	if klines, ok := kLineStore.KLinesOfInterval(s.nrr.Interval); ok {
+		s.nrr.LoadK((*klines)[0:])
+	}
 
 	//startTime := s.Environment.StartTime()
 	//s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1h, startTime))
 
-	// queued first signal as its initial process
-	//alphaLst := types.NewQueue(2)
-
 	s.session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 
-		// transformed to [0~1] which divided equally
-		//alpha := s.nrr.RankedValues.Last()
+		// ts_rank(): transformed to [0~1] which divided equally
+		// queued first signal as its initial process
+		// important: delayed signal in order to submit order at current kline close (a.k.a. next open while in production)
+		// instead of right in current kline open
 
 		// alpha-weighted assets (inventory and capital)
 		targetBase := s.QuantityOrAmount.CalculateQuantity(kline.Close).Mul(fixedpoint.NewFromFloat(s.nrr.RankedValues.Index(1)))
@@ -230,9 +218,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.orderExecutor.OpenPosition(context.Background(), bbgo.OpenPositionOptions{Quantity: diffQty.Abs(), Short: true, MarketOrder: true})
 		}
 
-		// important: delayed signal in order to submit order at current kline close (a.k.a. next open while in production)
-		// instead of right in current kline open
-		//alphaLst.Update(alpha)
 	}))
 
 	bbgo.RegisterCommand("/draw", "Draw Indicators", func(reply interact.Reply) {
@@ -374,10 +359,7 @@ func (s *Strategy) DrawIndicators(time types.Time) *types.Canvas {
 	hi := s.alpha.Abs().Highest(Length)
 	ratio := highestPrice / highestDrift
 
-	canvas.Plot("upband", s.ma.Add(s.stdevHigh), time, Length)
-	canvas.Plot("ma", s.ma, time, Length)
-	canvas.Plot("downband", s.ma.Minus(s.stdevLow), time, Length)
-	canvas.Plot("drift", s.alpha.Mul(ratio).Add(mean), time, Length)
+	canvas.Plot("alpha", s.alpha.Mul(ratio).Add(mean), time, Length)
 	canvas.Plot("driftOrig", s.alpha.Mul(highestPrice/hi).Add(mean), time, Length)
 	canvas.Plot("zero", types.NumberSeries(mean), time, Length)
 	canvas.Plot("price", s.priceLines, time, Length)
