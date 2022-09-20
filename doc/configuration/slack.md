@@ -23,11 +23,10 @@ notifications:
     defaultChannel: "bbgo-xarb"
     errorChannel: "bbgo-error"
 
-  # routing rules
-  routing:
-    trade: "$silent"
-    order: "$slient"
-    submitOrder: "$slient"
+  switches:
+    trade: true
+    orderUpdate: true
+    submitOrder: true
 ```
 
 Besure to add your bot to the public channel by clicking "Add slack app to channel".
