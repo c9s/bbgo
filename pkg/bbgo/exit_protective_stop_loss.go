@@ -67,14 +67,15 @@ func (s *ProtectiveStopLoss) placeStopOrder(ctx context.Context, position *types
 	}
 
 	createdOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-		Symbol:    position.Symbol,
-		Side:      types.SideTypeBuy,
-		Type:      types.OrderTypeStopLimit,
-		Quantity:  position.GetQuantity(),
-		Price:     s.stopLossPrice.Mul(one.Add(fixedpoint.NewFromFloat(0.005))), // +0.5% from the trigger price, slippage protection
-		StopPrice: s.stopLossPrice,
-		Market:    position.Market,
-		Tag:       "protectiveStopLoss",
+		Symbol:           position.Symbol,
+		Side:             types.SideTypeBuy,
+		Type:             types.OrderTypeStopLimit,
+		Quantity:         position.GetQuantity(),
+		Price:            s.stopLossPrice.Mul(one.Add(fixedpoint.NewFromFloat(0.005))), // +0.5% from the trigger price, slippage protection
+		StopPrice:        s.stopLossPrice,
+		Market:           position.Market,
+		Tag:              "protectiveStopLoss",
+		MarginSideEffect: types.SideEffectTypeAutoRepay,
 	})
 
 	if len(createdOrders) > 0 {
