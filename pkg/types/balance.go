@@ -220,7 +220,7 @@ func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) AssetMap {
 
 func (m BalanceMap) Print() {
 	for _, balance := range m {
-		if balance.Available.IsZero() && balance.Locked.IsZero() {
+		if balance.Net().IsZero() {
 			continue
 		}
 
