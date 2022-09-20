@@ -9,15 +9,6 @@ notifications:
     orderUpdate: true
     submitOrder: true
 
-reportPnL:
-- averageCostBySymbols:
-  - "BTCUSDT"
-  - "BNBUSDT"
-  of: binance
-  when:
-  - "@daily"
-  - "@hourly"
-
 persistence:
   json:
     directory: var/data
