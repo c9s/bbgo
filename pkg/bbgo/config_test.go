@@ -48,13 +48,6 @@ func TestLoadConfig(t *testing.T) {
 			wantErr: false,
 			f: func(t *testing.T, config *Config) {
 				assert.NotNil(t, config.Notifications)
-				assert.NotNil(t, config.Notifications.SessionChannels)
-				assert.NotNil(t, config.Notifications.SymbolChannels)
-				assert.Equal(t, map[string]string{
-					"^BTC": "#btc",
-					"^ETH": "#eth",
-				}, config.Notifications.SymbolChannels)
-				assert.NotNil(t, config.Notifications.Routing)
 				assert.Equal(t, "#dev-bbgo", config.Notifications.Slack.DefaultChannel)
 				assert.Equal(t, "#error", config.Notifications.Slack.ErrorChannel)
 			},
