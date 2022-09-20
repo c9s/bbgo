@@ -1,4 +1,4 @@
-package oneliner
+package irr
 
 import (
 	"time"
@@ -64,31 +64,6 @@ func (inc *NRR) Index(i int) float64 {
 
 func (inc *NRR) Length() int {
 	return len(inc.Values)
-}
-
-func (inc *NRR) CalculateAndUpdate(allKLines []types.KLine) {
-	if len(inc.Values) == 0 {
-		for _, k := range allKLines {
-			inc.PushK(k)
-		}
-		inc.EmitUpdate(inc.Last())
-	} else {
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
-	}
-}
-
-func (inc *NRR) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *NRR) Bind(updater indicator.KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
 func (inc *NRR) BindK(target indicator.KLineClosedEmitter, symbol string, interval types.Interval) {
