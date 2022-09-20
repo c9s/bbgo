@@ -76,15 +76,17 @@ type TelegramNotification struct {
 	Broadcast bool `json:"broadcast" yaml:"broadcast"`
 }
 
+type NotificationSwitches struct {
+	Trade       bool `json:"trade" yaml:"trade"`
+	Position    bool `json:"position" yaml:"position"`
+	OrderUpdate bool `json:"orderUpdate" yaml:"orderUpdate"`
+	SubmitOrder bool `json:"submitOrder" yaml:"submitOrder"`
+}
+
 type NotificationConfig struct {
-	Slack *SlackNotification `json:"slack,omitempty" yaml:"slack,omitempty"`
-
+	Slack    *SlackNotification    `json:"slack,omitempty" yaml:"slack,omitempty"`
 	Telegram *TelegramNotification `json:"telegram,omitempty" yaml:"telegram,omitempty"`
-
-	SymbolChannels  map[string]string `json:"symbolChannels,omitempty" yaml:"symbolChannels,omitempty"`
-	SessionChannels map[string]string `json:"sessionChannels,omitempty" yaml:"sessionChannels,omitempty"`
-
-	Routing *SlackNotificationRouting `json:"routing,omitempty" yaml:"routing,omitempty"`
+	Switches *NotificationSwitches `json:"switches" yaml:"switches"`
 }
 
 type Session struct {

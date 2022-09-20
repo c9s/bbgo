@@ -4,11 +4,10 @@ notifications:
     defaultChannel: "dev-bbgo"
     errorChannel: "bbgo-error"
 
-  # routing rules
-  routing:
-    trade: "$silent"
-    order: "$silent"
-    submitOrder: "$silent"
+  switches:
+    trade: true
+    orderUpdate: false
+    submitOrder: false
 
 persistence:
   json:

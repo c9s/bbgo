@@ -3,11 +3,10 @@ notifications:
   slack:
     defaultChannel: "dev-bbgo"
     errorChannel: "bbgo-error"
-  # object routing rules
-  routing:
-    trade: "$symbol"
-    order: "$symbol"
-    submitOrder: "$session" # not supported yet
+  switches:
+    trade: true
+    orderUpdate: true
+    submitOrder: true
 
 sessions:
   binance:
