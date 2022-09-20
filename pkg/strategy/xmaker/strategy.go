@@ -840,7 +840,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				s.updateQuote(ctx, orderExecutionRouter)
 
 			case <-reportTicker.C:
-				bbgo.Notify(&s.ProfitStats)
+				bbgo.Notify(s.ProfitStats)
 
 			case <-tradeScanTicker.C:
 				log.Infof("scanning trades from %s ago...", tradeScanInterval)
