@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/util"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 	"gopkg.in/tucnak/telebot.v2"
 )
 
@@ -14,6 +16,10 @@ func init() {
 	// force interface type check
 	_ = Reply(&TelegramReply{})
 }
+
+var sendLimiter = rate.NewLimiter(10, 2)
+
+const maxMessageSize int = 3000
 
 type TelegramSessionMap map[int64]*TelegramSession
 
@@ -62,7 +68,14 @@ type TelegramReply struct {
 }
 
 func (r *TelegramReply) Send(message string) {
-	checkSendErr(r.bot.Send(r.session.Chat, message))
+	ctx := context.Background()
+	splits := util.StringSplitByLength(message, maxMessageSize)
+	for _, split := range splits {
+		if err := sendLimiter.Wait(ctx); err != nil {
+			log.WithError(err).Errorf("telegram send limit exceeded")
+		}
+		checkSendErr(r.bot.Send(r.session.Chat, split))
+	}
 }
 
 func (r *TelegramReply) Message(message string) {
@@ -132,7 +145,7 @@ func (tm *Telegram) SetTextMessageResponder(responder Responder) {
 	tm.textMessageResponder = responder
 }
 
-func (tm *Telegram) Start(context.Context) {
+func (tm *Telegram) Start(ctx context.Context) {
 	tm.Bot.Handle(telebot.OnCallback, func(c *telebot.Callback) {
 		log.Infof("[telegram] onCallback: %+v", c)
 	})
@@ -158,7 +171,18 @@ func (tm *Telegram) Start(context.Context) {
 		if reply.set {
 			reply.build()
 			if len(reply.message) > 0 || reply.menu != nil {
-				checkSendErr(tm.Bot.Send(m.Chat, reply.message, reply.menu))
+				splits := util.StringSplitByLength(reply.message, maxMessageSize)
+				for i, split := range splits {
+					if err := sendLimiter.Wait(ctx); err != nil {
+						log.WithError(err).Errorf("telegram send limit exceeded")
+					}
+					if i == len(splits)-1 {
+						// only set menu on the last message
+						checkSendErr(tm.Bot.Send(m.Chat, split, reply.menu))
+					} else {
+						checkSendErr(tm.Bot.Send(m.Chat, split))
+					}
+				}
 			}
 		}
 	})
