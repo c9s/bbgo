@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode/utf8"
 
+	"github.com/c9s/bbgo/pkg/util"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 	"gopkg.in/tucnak/telebot.v2"
@@ -68,14 +68,13 @@ type TelegramReply struct {
 }
 
 func (r *TelegramReply) Send(message string) {
-	var left, right int
-	for left, right = 0, maxMessageSize; right < len(message); left, right = right, right+maxMessageSize {
-		for !utf8.RuneStart(message[right]) {
-			right--
+	splits := util.StringSplitByLength(message, maxMessageSize)
+	for _, split := range splits {
+		if err := sendLimiter.Wait(ctx); err != nil {
+			log.WithError(err).Errorf("telegram send limit exceeded")
 		}
-		checkSendErr(r.bot.Send(r.session.Chat, message[left:right]))
+		checkSendErr(r.bot.Send(r.session.Chat, split))
 	}
-	checkSendErr(r.bot.Send(r.session.Chat, message[left:]))
 }
 
 func (r *TelegramReply) Message(message string) {
@@ -171,23 +170,17 @@ func (tm *Telegram) Start(ctx context.Context) {
 		if reply.set {
 			reply.build()
 			if len(reply.message) > 0 || reply.menu != nil {
-				var left, right int
-				for left, right = 0, maxMessageSize; right < len(reply.message); left, right = right, right+maxMessageSize {
-					for !utf8.RuneStart(reply.message[right]) {
-						right--
-					}
+				splits := util.StringSplitByLength(reply.message, maxMessageSize)
+				for i, split := range splits {
 					if err := sendLimiter.Wait(ctx); err != nil {
 						log.WithError(err).Errorf("telegram send limit exceeded")
 					}
-					checkSendErr(tm.Bot.Send(m.Chat, reply.message[left:right]))
-
-				}
-				if left < len(reply.message) {
-					if err := sendLimiter.Wait(ctx); err != nil {
-						log.WithError(err).Errorf("telegram send limit exceeded")
+					if i == len(splits)-1 {
+						// only set menu on the last message
+						checkSendErr(tm.Bot.Send(m.Chat, split, reply.menu))
+					} else {
+						checkSendErr(tm.Bot.Send(m.Chat, split))
 					}
-					// only set menu on the last message
-					checkSendErr(tm.Bot.Send(m.Chat, reply.message[left:], reply.menu))
 				}
 			}
 		}

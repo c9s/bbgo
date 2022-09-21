@@ -1,6 +1,10 @@
 package util
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestMaskKey(t *testing.T) {
 	type args struct {
@@ -39,4 +43,11 @@ func TestMaskKey(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStringSplitByLength(t *testing.T) {
+	result := StringSplitByLength("1234567890", 3)
+	assert.Equal(t, result, []string{"123", "456", "789", "0"})
+	result = StringSplitByLength("123許456", 4)
+	assert.Equal(t, result, []string{"123", "許4", "56"})
 }
