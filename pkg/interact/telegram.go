@@ -68,6 +68,7 @@ type TelegramReply struct {
 }
 
 func (r *TelegramReply) Send(message string) {
+	ctx := context.Background()
 	splits := util.StringSplitByLength(message, maxMessageSize)
 	for _, split := range splits {
 		if err := sendLimiter.Wait(ctx); err != nil {
