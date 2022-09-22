@@ -197,17 +197,14 @@ type OpenPositionOptions struct {
 
 	// Leverage is used for leveraged position and account
 	// Leverage is not effected when using non-leverage spot account
-	Leverage fixedpoint.Value `json:"leverage,omitempty"`
+	Leverage fixedpoint.Value `json:"leverage,omitempty" modifiable:"true"`
 
 	// Quantity will be used first, it will override the leverage if it's given
 	Quantity fixedpoint.Value `json:"quantity,omitempty"`
 
-	// MarketOrder set to true to open a position with a market order
-	// default is MarketOrder = true
-	MarketOrder bool `json:"marketOrder,omitempty"`
-
 	// LimitOrder set to true to open a position with a limit order
-	LimitOrder bool `json:"limitOrder,omitempty"`
+	// default is false, and will send MarketOrder
+	LimitOrder bool `json:"limitOrder,omitempty" modifiable:"true"`
 
 	// LimitOrderTakerRatio is used when LimitOrder = true, it adjusts the price of the limit order with a ratio.
 	// So you can ensure that the limit order can be a taker order. Higher the ratio, higher the chance it could be a taker order.
@@ -222,7 +219,9 @@ type OpenPositionOptions struct {
 	Tags  []string         `json:"-" yaml:"-"`
 }
 
-func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) error {
+var Delta fixedpoint.Value = fixedpoint.NewFromFloat(0.005)
+
+func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) (types.OrderSlice, error) {
 	price := options.Price
 	submitOrder := types.SubmitOrder{
 		Symbol:           e.position.Symbol,
@@ -246,23 +245,33 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		}
 	}
 
-	if options.MarketOrder {
-		submitOrder.Type = types.OrderTypeMarket
-	} else if options.LimitOrder {
+	if options.LimitOrder {
 		submitOrder.Type = types.OrderTypeLimit
 		submitOrder.Price = price
 	}
 
 	quantity := options.Quantity
 
+	market, ok := e.session.Market(e.symbol)
+	if !ok {
+		return nil, errors.New("cannot find market with symbol " + e.symbol)
+	}
+
 	if options.Long {
 		if quantity.IsZero() {
 			quoteQuantity, err := CalculateQuoteQuantity(ctx, e.session, e.position.QuoteCurrency, options.Leverage)
-			if err != nil {
-				return err
+			if quoteQuantity.IsZero() {
+				log.Warnf("dust quantity: %v", quantity)
+				return nil, nil
 			}
-
+			if err != nil {
+				return nil, err
+			}
 			quantity = quoteQuantity.Div(price)
+		}
+		if market.IsDustQuantity(quantity, price) {
+			log.Warnf("dust quantity: %v", quantity)
+			return nil, nil
 		}
 
 		quoteQuantity := quantity.Mul(price)
@@ -274,21 +283,34 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Side = types.SideTypeBuy
 		submitOrder.Quantity = quantity
 
-		Notify("Opening %s long position with quantity %f at price %f", e.position.Symbol, quantity.Float64(), price.Float64())
-		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
-		if err2 != nil {
-			return err2
+		Notify("Opening %s long position with quantity %v at price %v", e.position.Symbol, quantity, price)
+		for {
+			createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
+			if err2 != nil {
+				submitOrder.Quantity = submitOrder.Quantity.Mul(fixedpoint.One.Sub(Delta))
+				if market.IsDustQuantity(submitOrder.Quantity, price) {
+					return nil, err2
+				}
+				continue
+			}
+			log.Infof("created order: %+v", createdOrder)
+			return createdOrder, nil
 		}
-
-		log.Infof("created order: %+v", createdOrder)
-		return nil
 	} else if options.Short {
 		if quantity.IsZero() {
 			var err error
 			quantity, err = CalculateBaseQuantity(e.session, e.position.Market, price, quantity, options.Leverage)
-			if err != nil {
-				return err
+			if quantity.IsZero() {
+				log.Warnf("dust quantity: %v", quantity)
+				return nil, nil
 			}
+			if err != nil {
+				return nil, err
+			}
+		}
+		if market.IsDustQuantity(quantity, price) {
+			log.Warnf("dust quantity: %v", quantity)
+			return nil, nil
 		}
 
 		if e.session.Margin && !e.marginBaseMaxBorrowable.IsZero() && quantity.Sub(baseBalance.Available).Compare(e.marginBaseMaxBorrowable) > 0 {
@@ -300,17 +322,22 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Side = types.SideTypeSell
 		submitOrder.Quantity = quantity
 
-		Notify("Opening %s short position with quantity %f at price %f", e.position.Symbol, quantity.Float64(), price.Float64())
-		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
-		if err2 != nil {
-			return err2
+		Notify("Opening %s short position with quantity %v at price %v", e.position.Symbol, quantity, price)
+		for {
+			createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
+			if err2 != nil {
+				submitOrder.Quantity = submitOrder.Quantity.Mul(fixedpoint.One.Sub(Delta))
+				if market.IsDustQuantity(submitOrder.Quantity, price) {
+					return nil, err2
+				}
+				continue
+			}
+			log.Infof("created order: %+v", createdOrder)
+			return createdOrder, nil
 		}
-
-		log.Infof("created order: %+v", createdOrder)
-		return nil
 	}
 
-	return errors.New("options Long or Short must be set")
+	return nil, errors.New("options Long or Short must be set")
 }
 
 // GracefulCancelActiveOrderBook cancels the orders from the active orderbook.

@@ -146,3 +146,7 @@ func (s *SeriesBase) Entropy(window int) float64 {
 func (s *SeriesBase) CrossEntropy(b Series, window int) float64 {
 	return CrossEntropy(s, b, window)
 }
+
+func (s *SeriesBase) Filter(b func(int, float64) bool, length int) SeriesExtend {
+	return Filter(s, b, length)
+}

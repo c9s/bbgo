@@ -29,10 +29,19 @@ func LookupSymbolField(rs reflect.Value) (string, bool) {
 
 // Used by bbgo/interact_modify.go
 func GetModifiableFields(val reflect.Value, callback func(tagName, name string)) {
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if !val.IsValid() {
+		return
+	}
 	for i := 0; i < val.Type().NumField(); i++ {
 		t := val.Type().Field(i)
 		if !t.IsExported() {
 			continue
+		}
+		if t.Anonymous {
+			GetModifiableFields(val.Field(i), callback)
 		}
 		modifiable := t.Tag.Get("modifiable")
 		if modifiable != "true" {
@@ -50,6 +59,17 @@ func GetModifiableFields(val reflect.Value, callback func(tagName, name string))
 var zeroValue reflect.Value = reflect.Zero(reflect.TypeOf(0))
 
 func GetModifiableField(val reflect.Value, name string) (reflect.Value, bool) {
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return zeroValue, false
+		}
+	}
+	if val.Kind() != reflect.Struct {
+		return zeroValue, false
+	}
+	if !val.IsValid() {
+		return zeroValue, false
+	}
 	field, ok := val.Type().FieldByName(name)
 	if !ok {
 		return zeroValue, ok
@@ -61,5 +81,9 @@ func GetModifiableField(val reflect.Value, name string) (reflect.Value, bool) {
 	if jsonTag == "" || jsonTag == "-" {
 		return zeroValue, false
 	}
-	return val.FieldByName(name), true
+	value, err := val.FieldByIndexErr(field.Index)
+	if err != nil {
+		return zeroValue, false
+	}
+	return value, true
 }
