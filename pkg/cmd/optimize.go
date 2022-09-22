@@ -130,12 +130,12 @@ var optimizeCmd = &cobra.Command{
 					continue
 				}
 
-				if len(values) < resultLimit || resultLimit == 0 {
-					resultLimit = len(values)
+				if len(values) < resultLimit && resultLimit != 0 {
+					values = values[:resultLimit]
 				}
 
 				fmt.Printf("%v => %s\n", values[0].Labels, n)
-				for _, m := range values[:resultLimit] {
+				for _, m := range values {
 					fmt.Printf("%v => %s %v\n", m.Params, n, m.Value)
 				}
 			}
