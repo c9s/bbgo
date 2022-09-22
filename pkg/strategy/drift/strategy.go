@@ -71,7 +71,6 @@ type Strategy struct {
 
 	beta float64
 
-	Leverage                  fixedpoint.Value `json:"leverage" modifiable:"true"`
 	StopLoss                  fixedpoint.Value `json:"stoploss" modifiable:"true"`
 	CanvasPath                string           `json:"canvasPath"`
 	PredictOffset             int              `json:"predictOffset"`
