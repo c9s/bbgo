@@ -36,7 +36,8 @@ func GetModifiableFields(val reflect.Value, callback func(tagName, name string))
 	if !val.IsValid() {
 		return
 	}
-	for i := 0; i < val.Type().NumField(); i++ {
+	num := val.Type().NumField()
+	for i := 0; i < num; i++ {
 		t := val.Type().Field(i)
 		if !t.IsExported() {
 			continue

@@ -2,7 +2,6 @@ package dynamic
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -35,7 +34,6 @@ func TestGetModifiableFields(t *testing.T) {
 		assert.NotEqual(t, name, "Field2")
 		assert.NotEqual(t, tagName, "field3")
 		assert.NotEqual(t, name, "Field3")
-		fmt.Println(tagName, name)
 	})
 }
 
