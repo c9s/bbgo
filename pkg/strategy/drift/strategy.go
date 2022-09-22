@@ -384,7 +384,7 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 				s.trailingCheck(pricef, "long"))
 			if exitShortCondition || exitLongCondition {
 				if s.ClosePosition(ctx, fixedpoint.One) {
-					log.Infof("Close position by orderbook changes")
+					log.Infof("close position by orderbook changes")
 				}
 			} else {
 				s.positionLock.Unlock()
@@ -752,11 +752,14 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		opt.Price = source
 		opt.Tags = []string{"long"}
 		createdOrders, err := s.GeneralOrderExecutor.OpenPosition(ctx, opt)
-		log.Infof("orders %v", createdOrders)
 		if err != nil {
+			if _, ok := err.(types.ZeroAssetError); ok {
+				return
+			}
 			log.WithError(err).Errorf("cannot place buy order")
 			return
 		}
+		log.Infof("orders %v", createdOrders)
 		if createdOrders != nil {
 			s.orderPendingCounter[createdOrders[0].OrderID] = s.minutesCounter
 		}
@@ -786,11 +789,14 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		opt.Price = source
 		opt.Tags = []string{"long"}
 		createdOrders, err := s.GeneralOrderExecutor.OpenPosition(ctx, opt)
-		log.Infof("orders %v", createdOrders)
 		if err != nil {
+			if _, ok := err.(types.ZeroAssetError); ok {
+				return
+			}
 			log.WithError(err).Errorf("cannot place buy order")
 			return
 		}
+		log.Infof("orders %v", createdOrders)
 		if createdOrders != nil {
 			s.orderPendingCounter[createdOrders[0].OrderID] = s.minutesCounter
 		}

@@ -219,7 +219,23 @@ type OpenPositionOptions struct {
 	Tags  []string         `json:"-" yaml:"-"`
 }
 
-var Delta fixedpoint.Value = fixedpoint.NewFromFloat(0.005)
+// Delta used to modify the order to submit, especially for the market order
+var QuantityReduceDelta fixedpoint.Value = fixedpoint.NewFromFloat(0.005)
+
+func (e *GeneralOrderExecutor) reduceQuantityAndSubmitOrder(ctx context.Context, price fixedpoint.Value, submitOrder types.SubmitOrder) (types.OrderSlice, error) {
+	for {
+		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
+		if err2 != nil {
+			submitOrder.Quantity = submitOrder.Quantity.Mul(fixedpoint.One.Sub(QuantityReduceDelta))
+			if e.position.Market.IsDustQuantity(submitOrder.Quantity, price) {
+				return nil, err2
+			}
+			continue
+		}
+		log.Infof("created order: %+v", createdOrder)
+		return createdOrder, nil
+	}
+}
 
 func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) (types.OrderSlice, error) {
 	price := options.Price
@@ -252,24 +268,16 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 
 	quantity := options.Quantity
 
-	market, ok := e.session.Market(e.symbol)
-	if !ok {
-		return nil, errors.New("cannot find market with symbol " + e.symbol)
-	}
-
 	if options.Long {
 		if quantity.IsZero() {
 			quoteQuantity, err := CalculateQuoteQuantity(ctx, e.session, e.position.QuoteCurrency, options.Leverage)
-			if quoteQuantity.IsZero() {
-				log.Warnf("dust quantity: %v", quantity)
-				return nil, nil
-			}
 			if err != nil {
 				return nil, err
 			}
+
 			quantity = quoteQuantity.Div(price)
 		}
-		if market.IsDustQuantity(quantity, price) {
+		if e.position.Market.IsDustQuantity(quantity, price) {
 			log.Warnf("dust quantity: %v", quantity)
 			return nil, nil
 		}
@@ -284,31 +292,16 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Quantity = quantity
 
 		Notify("Opening %s long position with quantity %v at price %v", e.position.Symbol, quantity, price)
-		for {
-			createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
-			if err2 != nil {
-				submitOrder.Quantity = submitOrder.Quantity.Mul(fixedpoint.One.Sub(Delta))
-				if market.IsDustQuantity(submitOrder.Quantity, price) {
-					return nil, err2
-				}
-				continue
-			}
-			log.Infof("created order: %+v", createdOrder)
-			return createdOrder, nil
-		}
+		return e.reduceQuantityAndSubmitOrder(ctx, price, submitOrder)
 	} else if options.Short {
 		if quantity.IsZero() {
 			var err error
 			quantity, err = CalculateBaseQuantity(e.session, e.position.Market, price, quantity, options.Leverage)
-			if quantity.IsZero() {
-				log.Warnf("dust quantity: %v", quantity)
-				return nil, nil
-			}
 			if err != nil {
 				return nil, err
 			}
 		}
-		if market.IsDustQuantity(quantity, price) {
+		if e.position.Market.IsDustQuantity(quantity, price) {
 			log.Warnf("dust quantity: %v", quantity)
 			return nil, nil
 		}
@@ -323,18 +316,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Quantity = quantity
 
 		Notify("Opening %s short position with quantity %v at price %v", e.position.Symbol, quantity, price)
-		for {
-			createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
-			if err2 != nil {
-				submitOrder.Quantity = submitOrder.Quantity.Mul(fixedpoint.One.Sub(Delta))
-				if market.IsDustQuantity(submitOrder.Quantity, price) {
-					return nil, err2
-				}
-				continue
-			}
-			log.Infof("created order: %+v", createdOrder)
-			return createdOrder, nil
-		}
+		return e.reduceQuantityAndSubmitOrder(ctx, price, submitOrder)
 	}
 
 	return nil, errors.New("options Long or Short must be set")
