@@ -1,6 +1,7 @@
 package dynamic
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 )
@@ -81,9 +82,31 @@ func GetModifiableField(val reflect.Value, name string) (reflect.Value, bool) {
 	if jsonTag == "" || jsonTag == "-" {
 		return zeroValue, false
 	}
-	value, err := val.FieldByIndexErr(field.Index)
+	value, err := FieldByIndexErr(val, field.Index)
 	if err != nil {
 		return zeroValue, false
 	}
 	return value, true
+}
+
+// Modified from golang 1.19.1 reflect to eliminate all possible panic
+func FieldByIndexErr(v reflect.Value, index []int) (reflect.Value, error) {
+	if len(index) == 1 {
+		return v.Field(index[0]), nil
+	}
+	if v.Kind() != reflect.Struct {
+		return zeroValue, errors.New("should receive a Struct")
+	}
+	for i, x := range index {
+		if i > 0 {
+			if v.Kind() == reflect.Ptr && v.Type().Elem().Kind() == reflect.Struct {
+				if v.IsNil() {
+					return zeroValue, errors.New("reflect: indirection through nil pointer to embedded struct field ")
+				}
+				v = v.Elem()
+			}
+		}
+		v = v.Field(x)
+	}
+	return v, nil
 }
