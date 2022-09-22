@@ -8,7 +8,10 @@ persistence:
 sessions:
   binance:
     exchange: binance
-    futures: false
+    #futures: true
+    #margin: true
+    #isolatedMargin: true
+    #isolatedMarginSymbol: BTCUSDT
     envVarPrefix: binance
     heikinAshi: false
 
@@ -23,34 +26,35 @@ exchangeStrategies:
  
 - on: binance
   drift:
+    limitOrder: false
     canvasPath: "./output.png"
     symbol: BTCUSDT
     # kline interval for indicators
     interval: 4m
-    window: 1
-    stoploss: 0.22%
-    source: hl2
+    window: 2
+    stoploss: 0.13%
+    source: ohlc4
     predictOffset: 2
     noTrailingStopLoss: false
-    trailingStopLossType: realtime
+    trailingStopLossType: kline
     # stddev on high/low-source
-    hlVarianceMultiplier: 0.01
-    hlRangeWindow: 5
-    smootherWindow: 2
-    fisherTransformWindow: 27
-    window1m: 58
-    smootherWindow1m: 118
-    fisherTransformWindow1m: 319
+    hlVarianceMultiplier: 0.22
+    hlRangeWindow: 4
+    smootherWindow: 1
+    fisherTransformWindow: 96
+    window1m: 8
+    smootherWindow1m: 4
+    fisherTransformWindow1m: 320
     atrWindow: 14
     # orders not been traded will be canceled after `pendingMinutes` minutes
-    pendingMinutes: 2
+    pendingMinutes: 10
     noRebalance: true
     trendWindow: 576
-    rebalanceFilter: 0
-    driftFilterPos: 0.6
-    driftFilterNeg: -0.6
-    ddriftFilterPos: 0.00008
-    ddriftFilterNeg: -0.00008
+    rebalanceFilter: 1.2
+    #driftFilterPos: 0.5
+    #driftFilterNeg: -0.5
+    #ddriftFilterPos: 0.0008
+    #ddriftFilterNeg: -0.0008
     
     # ActivationRatio should be increasing order
     # when farest price from entry goes over that ratio, start using the callback ratio accordingly to do trailingstop
@@ -135,4 +139,4 @@ backtest:
       takerFeeRate: 0.000
       balances:
         BTC: 0
-        USDT: 21
+        USDT: 1000
