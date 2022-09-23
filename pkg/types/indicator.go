@@ -112,6 +112,7 @@ type SeriesExtend interface {
 	Softmax(window int) SeriesExtend
 	Entropy(window int) float64
 	CrossEntropy(b Series, window int) float64
+	Filter(b func(i int, value float64) bool, length int) SeriesExtend
 }
 
 type SeriesBase struct {

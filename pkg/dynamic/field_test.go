@@ -9,7 +9,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type Inner struct {
+	Field5 float64 `json:"field5,omitempty" modifiable:"true"`
+}
+
+type InnerPointer struct {
+	Field6 float64 `json:"field6" modifiable:"true"`
+}
+
 type Strategy struct {
+	Inner
+	*InnerPointer
 	Field1 fixedpoint.Value  `json:"field1" modifiable:"true"`
 	Field2 float64           `json:"field2"`
 	field3 float64           `json:"field3" modifiable:"true"`
@@ -24,7 +34,6 @@ func TestGetModifiableFields(t *testing.T) {
 		assert.NotEqual(t, name, "Field2")
 		assert.NotEqual(t, tagName, "field3")
 		assert.NotEqual(t, name, "Field3")
-
 	})
 }
 
@@ -33,6 +42,13 @@ func TestGetModifiableField(t *testing.T) {
 	s := &Strategy{Field1: fixedpoint.NewFromInt(1)}
 	val := reflect.ValueOf(s).Elem()
 	_, ok := GetModifiableField(val, "Field1")
+	assert.True(t, ok)
+	_, ok = GetModifiableField(val, "Field5")
+	assert.True(t, ok)
+	_, ok = GetModifiableField(val, "Field6")
+	assert.False(t, ok)
+	s.InnerPointer = &InnerPointer{}
+	_, ok = GetModifiableField(val, "Field6")
 	assert.True(t, ok)
 	_, ok = GetModifiableField(val, "Field2")
 	assert.False(t, ok)

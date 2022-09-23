@@ -170,3 +170,13 @@ func TestPlot(t *testing.T) {
 	//defer f.Close()
 	//ct.Render(chart.PNG, f)
 }
+
+func TestFilter(t *testing.T) {
+	a := floats.Slice{200., -200, 0, 1000, -100}
+	b := Filter(&a, func(i int, val float64) bool {
+		return val > 0
+	}, 4)
+	assert.Equal(t, b.Length(), 4)
+	assert.Equal(t, b.Last(), 1000.)
+	assert.Equal(t, b.Sum(3), 1200.)
+}

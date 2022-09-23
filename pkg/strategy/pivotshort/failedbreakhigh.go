@@ -289,7 +289,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		opts.Short = true
 		opts.Price = closePrice
 		opts.Tags = []string{"FailedBreakHighMarket"}
-		if err := s.orderExecutor.OpenPosition(ctx, opts); err != nil {
+		if _, err := s.orderExecutor.OpenPosition(ctx, opts); err != nil {
 			log.WithError(err).Errorf("failed to open short position")
 		}
 	}))
