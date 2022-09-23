@@ -25,6 +25,7 @@ func init() {
 type Strategy struct {
 	datasource *coinmarketcap.DataSource
 
+	// interval to rebalance the portfolio
 	Interval         types.Interval   `json:"interval"`
 	BaseCurrency     string           `json:"baseCurrency"`
 	BaseWeight       fixedpoint.Value `json:"baseWeight"`
@@ -33,13 +34,23 @@ type Strategy struct {
 	DryRun           bool             `json:"dryRun"`
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
+	// interval to query marketcap data from coinmarketcap
+	QueryInterval types.Interval `json:"queryInterval"`
 
+	subscribeSymbol string
 	activeOrderBook *bbgo.ActiveOrderBook
+	targetWeights   types.ValueMap
 }
 
 func (s *Strategy) Initialize() error {
 	apiKey := os.Getenv("COINMARKETCAP_API_KEY")
 	s.datasource = coinmarketcap.New(apiKey)
+
+	// select one symbol to subscribe
+	s.subscribeSymbol = s.TargetCurrencies[0] + s.BaseCurrency
+
+	s.activeOrderBook = bbgo.NewActiveOrderBook("")
+	s.targetWeights = types.ValueMap{}
 	return nil
 }
 
@@ -70,17 +81,23 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	for _, symbol := range s.symbols() {
-		session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval})
-	}
+	symbol := s.TargetCurrencies[0] + s.BaseCurrency
+	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval})
+	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.QueryInterval})
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.activeOrderBook = bbgo.NewActiveOrderBook("")
 	s.activeOrderBook.BindStream(session.UserDataStream)
 
+	s.updateTargetWeights(ctx)
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		s.rebalance(ctx, orderExecutor, session)
+		if kline.Interval == s.QueryInterval {
+			s.updateTargetWeights(ctx)
+		}
+
+		if kline.Interval == s.Interval {
+			s.rebalance(ctx, orderExecutor, session)
+		}
 	})
 	return nil
 }
@@ -109,12 +126,11 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 }
 
 func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.ExchangeSession) (submitOrders []types.SubmitOrder) {
-	targetWeights := s.getTargetWeights(ctx)
 	prices := s.prices(ctx, session)
 	marketValues := prices.Mul(s.quantities(session))
 	currentWeights := marketValues.Normalize()
 
-	for currency, targetWeight := range targetWeights {
+	for currency, targetWeight := range s.targetWeights {
 		if currency == s.BaseCurrency {
 			continue
 		}
@@ -172,7 +188,7 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 	return submitOrders
 }
 
-func (s *Strategy) getTargetWeights(ctx context.Context) types.ValueMap {
+func (s *Strategy) updateTargetWeights(ctx context.Context) {
 	m := floats.Map{}
 
 	// get marketcap from coinmarketcap
@@ -196,12 +212,11 @@ func (s *Strategy) getTargetWeights(ctx context.Context) types.ValueMap {
 	m[s.BaseCurrency] = s.BaseWeight.Float64()
 
 	// convert to types.ValueMap
-	targetWeights := types.ValueMap{}
 	for currency, weight := range m {
-		targetWeights[currency] = fixedpoint.NewFromFloat(weight)
+		s.targetWeights[currency] = fixedpoint.NewFromFloat(weight)
 	}
 
-	return targetWeights
+	log.Infof("target weights: %v", s.targetWeights)
 }
 
 func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) types.ValueMap {
