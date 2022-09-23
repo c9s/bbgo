@@ -266,6 +266,10 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 	// quoteBalance, _ := e.session.Account.Balance(e.position.Market.QuoteCurrency)
 
 	if !options.LimitOrderTakerRatio.IsZero() {
+		if options.Price.IsZero() {
+			return nil, fmt.Errorf("OpenPositionOptions.Price is zero, can not adjust limit taker order price, options given: %+v", options)
+		}
+
 		if options.Long {
 			// use higher price to buy (this ensures that our order will be filled)
 			price = price.Mul(one.Add(options.LimitOrderTakerRatio))
