@@ -25,35 +25,36 @@ exchangeStrategies:
   drift:
     canvasPath: "./output.png"
     symbol: ETHBUSD
+    limitOrder: false
     # kline interval for indicators
-    interval: 15m
-    window: 2
-    stoploss: 4.3%
-    source: close
+    interval: 2m
+    window: 6
+    stoploss: 0.23%
+    source: ohlc4
     predictOffset: 2
-    noTrailingStopLoss: true
+    noTrailingStopLoss: false
     trailingStopLossType: kline
     # stddev on high/low-source
-    hlVarianceMultiplier: 0.1
-    hlRangeWindow: 5
-    window1m: 49
-    smootherWindow1m: 80
-    fisherTransformWindow1m: 74
+    hlVarianceMultiplier: 0.03
+    hlRangeWindow: 4
     smootherWindow: 3
-    fisherTransformWindow: 160
+    fisherTransformWindow: 117
+    window1m: 42
+    smootherWindow1m: 118
+    fisherTransformWindow1m: 319
     atrWindow: 14
     # orders not been traded will be canceled after `pendingMinutes` minutes
-    pendingMinutes: 10
+    pendingMinutes: 3
     noRebalance: true
     trendWindow: 12
-    rebalanceFilter: 1.5
+    rebalanceFilter: 2
 
-    trailingActivationRatio: [0.003]
-    trailingCallbackRate: [0.0006]
-    driftFilterPos: 1.2
-    driftFilterNeg: -1.2
-    ddriftFilterPos: 0.4
-    ddriftFilterNeg: -0.4
+    trailingActivationRatio: [0.0015, 0.002, 0.004, 0.01]
+    trailingCallbackRate: [0.0001, 0.00012, 0.001, 0.002]
+    #driftFilterPos: 0.4
+    #driftFilterNeg: -0.42
+    #ddriftFilterPos: 0
+    #ddriftFilterNeg: 0
 
     generateGraph: true
     graphPNLDeductFee: true
@@ -91,15 +92,15 @@ sync:
     - ETHBUSD
 
 backtest:
-  startTime: "2022-01-01"
-  endTime: "2022-08-30"
+  startTime: "2022-09-01"
+  endTime: "2022-09-30"
   symbols:
     - ETHBUSD
   sessions: [binance]
   accounts:
     binance:
       makerFeeRate: 0.0000
-      #takerFeeRate: 0.00001
+      takerFeeRate: 0.0000
       balances:
-        ETH: 10
-        BUSD: 5000.0
+        ETH: 0
+        BUSD: 1000.0

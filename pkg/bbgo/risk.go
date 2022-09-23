@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -243,7 +244,8 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 			}
 		}
 
-		return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your quantity settings, your account balances: %+v", balances)
+		return quantity, types.NewZeroAssetError(
+			fmt.Errorf("quantity is zero, can not submit sell order, please check your quantity settings, your account balances: %+v", balances))
 	}
 
 	usdBalances, restBalances := usdFiatBalances(balances)
@@ -329,7 +331,8 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 		return maxPositionQuantity, nil
 	}
 
-	return quantity, fmt.Errorf("quantity is zero, can not submit sell order, please check your settings")
+	return quantity, types.NewZeroAssetError(
+		errors.New("quantity is zero, can not submit sell order, please check your settings"))
 }
 
 func CalculateQuoteQuantity(ctx context.Context, session *ExchangeSession, quoteCurrency string, leverage fixedpoint.Value) (fixedpoint.Value, error) {

@@ -230,7 +230,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			opts.Price = previousLow.Mul(fixedpoint.One.Add(s.BounceRatio))
 		}
 
-		if err := s.orderExecutor.OpenPosition(ctx, opts); err != nil {
+		if _, err := s.orderExecutor.OpenPosition(ctx, opts); err != nil {
 			log.WithError(err).Errorf("failed to open short position")
 		}
 	}))

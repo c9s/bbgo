@@ -21,3 +21,13 @@ func NewOrderError(e error, o Order) error {
 		order: o,
 	}
 }
+
+type ZeroAssetError struct {
+	error
+}
+
+func NewZeroAssetError(e error) ZeroAssetError {
+	return ZeroAssetError{
+		error: e,
+	}
+}
