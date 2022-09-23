@@ -16,8 +16,6 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-type NotifyFunc func(obj interface{}, args ...interface{})
-
 // GeneralOrderExecutor implements the general order executor for strategy
 type GeneralOrderExecutor struct {
 	session            *ExchangeSession
