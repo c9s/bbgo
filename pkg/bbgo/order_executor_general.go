@@ -16,6 +16,15 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+var ErrExceededSubmitOrderRetryLimit = errors.New("exceeded submit order retry limit")
+
+// quantityReduceDelta is used to modify the order to submit, especially for the market order
+var quantityReduceDelta = fixedpoint.NewFromFloat(0.005)
+
+// submitOrderRetryLimit is used when SubmitOrder failed, we will re-submit the order.
+// This is for the maximum retries
+const submitOrderRetryLimit = 5
+
 // GeneralOrderExecutor implements the general order executor for strategy
 type GeneralOrderExecutor struct {
 	session            *ExchangeSession
@@ -217,22 +226,29 @@ type OpenPositionOptions struct {
 	Tags  []string         `json:"-" yaml:"-"`
 }
 
-// Delta used to modify the order to submit, especially for the market order
-var QuantityReduceDelta fixedpoint.Value = fixedpoint.NewFromFloat(0.005)
-
 func (e *GeneralOrderExecutor) reduceQuantityAndSubmitOrder(ctx context.Context, price fixedpoint.Value, submitOrder types.SubmitOrder) (types.OrderSlice, error) {
-	for {
+	var err error
+	for i := 0; i < submitOrderRetryLimit; i++ {
+		q := submitOrder.Quantity.Mul(fixedpoint.One.Sub(quantityReduceDelta))
+		log.Warnf("retrying order, adjusting order quantity: %f -> %f", submitOrder.Quantity.Float64(), q.Float64())
+
+		submitOrder.Quantity = q
+		if e.position.Market.IsDustQuantity(submitOrder.Quantity, price) {
+			return nil, types.NewZeroAssetError(nil)
+		}
+
 		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
 		if err2 != nil {
-			submitOrder.Quantity = submitOrder.Quantity.Mul(fixedpoint.One.Sub(QuantityReduceDelta))
-			if e.position.Market.IsDustQuantity(submitOrder.Quantity, price) {
-				return nil, err2
-			}
+			// collect the error object
+			err = multierr.Append(err, err2)
 			continue
 		}
+
 		log.Infof("created order: %+v", createdOrder)
 		return createdOrder, nil
 	}
+
+	return nil, multierr.Append(ErrExceededSubmitOrderRetryLimit, err)
 }
 
 func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) (types.OrderSlice, error) {
@@ -290,6 +306,12 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Quantity = quantity
 
 		Notify("Opening %s long position with quantity %v at price %v", e.position.Symbol, quantity, price)
+
+		createdOrder, err := e.SubmitOrders(ctx, submitOrder)
+		if err == nil {
+			return createdOrder, nil
+		}
+
 		return e.reduceQuantityAndSubmitOrder(ctx, price, submitOrder)
 	} else if options.Short {
 		if quantity.IsZero() {
