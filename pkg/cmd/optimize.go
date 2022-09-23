@@ -18,6 +18,7 @@ func init() {
 	optimizeCmd.Flags().String("output", "output", "backtest report output directory")
 	optimizeCmd.Flags().Bool("json", false, "print optimizer metrics in json format")
 	optimizeCmd.Flags().Bool("tsv", false, "print optimizer metrics in csv format")
+	optimizeCmd.Flags().Int("limit", 50, "limit how many results to print pr metric")
 	RootCmd.AddCommand(optimizeCmd)
 }
 
@@ -50,6 +51,11 @@ var optimizeCmd = &cobra.Command{
 		}
 
 		outputDirectory, err := cmd.Flags().GetString("output")
+		if err != nil {
+			return err
+		}
+
+		resultLimit, err := cmd.Flags().GetInt("limit")
 		if err != nil {
 			return err
 		}
@@ -122,6 +128,10 @@ var optimizeCmd = &cobra.Command{
 			for n, values := range metrics {
 				if len(values) == 0 {
 					continue
+				}
+
+				if len(values) < resultLimit && resultLimit != 0 {
+					values = values[:resultLimit]
 				}
 
 				fmt.Printf("%v => %s\n", values[0].Labels, n)
