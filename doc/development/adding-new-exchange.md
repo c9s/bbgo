@@ -11,7 +11,7 @@ requests.
 
 ## Checklist
 
-Exchange Interface - the minimum requirement for spot trading
+Exchange Interface - (required) the minimum requirement for spot trading
 
 - [ ] QueryMarkets
 - [ ] QueryTickers
@@ -29,11 +29,11 @@ Order Query Service Interface - (optional) used for querying order status
 
 - [ ] QueryOrder
 
-Back-testing service - kline data is used for back-testing
+Back-testing service - (optional, required by backtesting) kline data is used for back-testing
 
 - [ ] QueryKLines
 
-Convert functions:
+Convert functions (required):
 
 - [ ] MarketData convert functions
     - [ ] toGlobalMarket
@@ -54,16 +54,16 @@ Stream
     - [ ] Balance message parser
 - [ ] MarketDataStream
     - [ ] OrderBook message parser (or depth)
-    - [ ] KLine message parser (required for backtesting)
+    - [ ] KLine message parser (required for backtesting and strategy)
     - [ ] Public trade message parser (optional)
     - [ ] Ticker message parser (optional)
-- [ ] ping/pong handling.
-- [ ] heart-beat hanlding or keep-alive handling.
-- [ ] handling reconnect
+- [ ] ping/pong handling. (you can reuse the existing types.StandardStream)
+- [ ] heart-beat hanlding or keep-alive handling. (already included in types.StandardStream)
+- [ ] handling reconnect. (already included in types.StandardStream)
 
 Database
 
-- [ ] Add a new kline table for the exchange (this is required for back-testing)
+- [ ] Add a new kline table for the exchange (required for back-testing)
     - [ ] Add MySQL migration SQL
     - [ ] Add SQLite migration SQL
 
