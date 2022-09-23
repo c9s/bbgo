@@ -300,6 +300,18 @@ func (s *Stream) getEndpointUrl(listenKey string) string {
 	} else {
 		url = WebSocketURL + "/ws"
 	}
+	if paperTrade() {
+		if s.IsFutures {
+			url = FuturesWebSocketTestURL + "/ws"
+		} else if isBinanceUs() {
+			url = WebSocketTestURL + "/ws"
+		} else {
+			url = WebSocketTestURL + "/ws"
+		}
+		fmt.Println("cao ni ma ")
+
+	}
+
 
 	if !s.PublicOnly {
 		url += "/" + listenKey
