@@ -308,10 +308,8 @@ func (s *Stream) getEndpointUrl(listenKey string) string {
 		} else {
 			url = WebSocketTestURL + "/ws"
 		}
-		fmt.Println("cao ni ma ")
 
 	}
-
 
 	if !s.PublicOnly {
 		url += "/" + listenKey
