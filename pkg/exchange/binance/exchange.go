@@ -1041,12 +1041,27 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	if err != nil {
 		return nil, err
 	}
-
 	req := e.futuresClient.NewCreateOrderService().
 		Symbol(order.Symbol).
 		Type(orderType).
-		Side(futures.SideType(order.Side)).
-		ReduceOnly(order.ReduceOnly)
+		Side(futures.SideType(order.Side))
+	switch order.Side {
+	case types.SideTypeBuy:
+		if order.ReduceOnly {
+			req.PositionSide(futures.PositionSideTypeShort)
+			req.ReduceOnly(order.ReduceOnly)
+		} else {
+			req.PositionSide(futures.PositionSideTypeLong)
+		}
+	case types.SideTypeSell:
+		if order.ReduceOnly {
+			req.PositionSide(futures.PositionSideTypeLong)
+			req.ReduceOnly(order.ReduceOnly)
+		} else {
+			req.PositionSide(futures.PositionSideTypeShort)
+		}
+
+	}
 
 	clientOrderID := newFuturesClientOrderID(order.ClientOrderID)
 	if len(clientOrderID) > 0 {
