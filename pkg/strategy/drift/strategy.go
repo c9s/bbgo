@@ -695,16 +695,16 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	)
 	s.DriftFilterPos = s.drift.Filter(func(i int, v float64) bool {
 		return v >= 0
-	}, 30).Mean(30)
+	}, 50).Mean(50)
 	s.DriftFilterNeg = s.drift.Filter(func(i int, v float64) bool {
 		return v <= 0
-	}, 30).Mean(30)
+	}, 50).Mean(50)
 	s.DDriftFilterPos = s.drift.drift.Filter(func(i int, v float64) bool {
 		return v >= 0
-	}, 30).Mean(30)
+	}, 50).Mean(50)
 	s.DDriftFilterNeg = s.drift.drift.Filter(func(i int, v float64) bool {
 		return v <= 0
-	}, 30).Mean(30)
+	}, 50).Mean(50)
 
 	shortCondition := (drift[1] >= s.DriftFilterNeg || ddrift[1] >= 0) && (driftPred <= s.DDriftFilterNeg || ddriftPred <= 0) || drift[1] < 0 && drift[0] < 0
 	longCondition := (drift[1] <= s.DriftFilterPos || ddrift[1] <= 0) && (driftPred >= s.DDriftFilterPos || ddriftPred >= 0) || drift[1] > 0 && drift[0] > 0
@@ -715,9 +715,9 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 			shortCondition = false
 		}
 	}
-	exitShortCondition := s.sellPrice > 0 && !shortCondition && !longCondition && (s.sellPrice*(1.+stoploss) <= highf ||
+	exitShortCondition := s.sellPrice > 0 && (s.sellPrice*(1.+stoploss) <= highf ||
 		s.trailingCheck(pricef, "short"))
-	exitLongCondition := s.buyPrice > 0 && !longCondition && !shortCondition && (s.buyPrice*(1.-stoploss) >= lowf ||
+	exitLongCondition := s.buyPrice > 0 && (s.buyPrice*(1.-stoploss) >= lowf ||
 		s.trailingCheck(pricef, "long"))
 
 	if exitShortCondition || exitLongCondition {
@@ -727,6 +727,9 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 			return
 		}
 		_ = s.ClosePosition(ctx, fixedpoint.One)
+		if longCondition || shortCondition {
+			s.positionLock.Lock()
+		}
 	}
 
 	if longCondition {
@@ -787,7 +790,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		opt := s.OpenPositionOptions
 		opt.Short = true
 		opt.Price = source
-		opt.Tags = []string{"long"}
+		opt.Tags = []string{"short"}
 		createdOrders, err := s.GeneralOrderExecutor.OpenPosition(ctx, opt)
 		if err != nil {
 			if _, ok := err.(types.ZeroAssetError); ok {
@@ -1013,10 +1016,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 	store.OnKLineClosed(func(kline types.KLine) {
 		s.minutesCounter = int(kline.StartTime.Time().Add(kline.Interval.Duration()).Sub(s.startTime).Minutes())
-		if kline.Interval == types.Interval1m {
-			s.klineHandler1m(ctx, kline)
-		} else if kline.Interval == s.Interval {
+		if kline.Interval == s.Interval {
 			s.klineHandler(ctx, kline)
+		} else if kline.Interval == types.Interval1m {
+			s.klineHandler1m(ctx, kline)
 		}
 	})
 
