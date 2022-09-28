@@ -213,9 +213,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// use kline direction to prevent reversing position too soon
 		if diffQty.Sign() > 0 { // && kline.Direction() >= 0
-			s.orderExecutor.OpenPosition(context.Background(), bbgo.OpenPositionOptions{Quantity: diffQty.Abs(), Long: true, MarketOrder: true})
+			s.orderExecutor.OpenPosition(context.Background(), bbgo.OpenPositionOptions{Quantity: diffQty.Abs(), Long: true, LimitOrder: false})
 		} else if diffQty.Sign() < 0 { // && kline.Direction() <= 0
-			s.orderExecutor.OpenPosition(context.Background(), bbgo.OpenPositionOptions{Quantity: diffQty.Abs(), Short: true, MarketOrder: true})
+			s.orderExecutor.OpenPosition(context.Background(), bbgo.OpenPositionOptions{Quantity: diffQty.Abs(), Short: true, LimitOrder: false})
 		}
 
 	}))
