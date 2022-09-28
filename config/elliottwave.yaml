@@ -24,12 +24,14 @@ exchangeStrategies:
 - on: binance
   elliottwave:
     symbol: BNBBUSD
+    limitOrder: true
+    quantity: 0.16
     # kline interval for indicators
-    interval: 3m
-    stoploss: 0.2%
+    interval: 1m
+    stoploss: 0.01%
     windowATR: 14
     windowQuick: 5
-    windowSlow: 19
+    windowSlow: 9
     source: hl2
     pendingMinutes: 10
     useHeikinAshi: true
@@ -49,7 +51,7 @@ exchangeStrategies:
     #trailingCallbackRate: []
     #trailingCallbackRate: [0.002, 0.01, 0.1]
     #trailingCallbackRate: [0.0004, 0.0009, 0.018]
-    trailingCallbackRate: [0.0006, 0.0049, 0.006]
+    trailingCallbackRate: [0.0006, 0.0019, 0.006]
 
     #exits:
     #   - roiStopLoss:
@@ -119,4 +121,4 @@ backtest:
       takerFeeRate: 0.000
       balances:
         BNB: 0
-        BUSD: 20
+        BUSD: 100
