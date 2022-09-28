@@ -131,7 +131,7 @@ func toGlobalFuturesOrder(futuresOrder *futures.Order, isIsolated bool) (*types.
 		ExecutedQuantity: fixedpoint.MustNewFromString(futuresOrder.ExecutedQuantity),
 		CreationTime:     types.Time(millisecondTime(futuresOrder.Time)),
 		UpdateTime:       types.Time(millisecondTime(futuresOrder.UpdateTime)),
-		IsFutures: true,
+		IsFutures:        true,
 	}, nil
 }
 
@@ -203,21 +203,26 @@ func toGlobalFuturesSideType(side futures.SideType) types.SideType {
 
 func toGlobalFuturesOrderType(orderType futures.OrderType) types.OrderType {
 	switch orderType {
-	// TODO
-	case futures.OrderTypeLimit: // , futures.OrderTypeLimitMaker, futures.OrderTypeTakeProfitLimit:
+	// FIXME: handle this order type
+	// case futures.OrderTypeTrailingStopMarket:
+
+	case futures.OrderTypeTakeProfit:
+		return types.OrderTypeStopLimit
+
+	case futures.OrderTypeTakeProfitMarket:
+		return types.OrderTypeStopMarket
+
+	case futures.OrderTypeStopMarket:
+		return types.OrderTypeStopMarket
+
+	case futures.OrderTypeLimit:
 		return types.OrderTypeLimit
 
 	case futures.OrderTypeMarket:
 		return types.OrderTypeMarket
-	// TODO
-	// case futures.OrderTypeStopLossLimit:
-	// 	return types.OrderTypeStopLimit
-	// TODO
-	// case futures.OrderTypeStopLoss:
-	// 	return types.OrderTypeStopMarket
 
 	default:
-		log.Errorf("unsupported order type: %v", orderType)
+		log.Errorf("unsupported binance futures order type: %s", orderType)
 		return ""
 	}
 }
