@@ -16,6 +16,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/interact"
@@ -148,11 +149,11 @@ func (s *Strategy) CurrentPosition() *types.Position {
 	return s.Position
 }
 
-func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) bool {
+func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
 	order := s.p.NewMarketCloseOrder(percentage)
 	if order == nil {
 		s.positionLock.Unlock()
-		return false
+		return nil
 	}
 	order.Tag = "close"
 	order.TimeInForce = ""
@@ -171,14 +172,14 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	s.positionLock.Unlock()
 	for {
 		if s.Market.IsDustQuantity(order.Quantity, price) {
-			return false
+			return nil
 		}
 		_, err := s.GeneralOrderExecutor.SubmitOrders(ctx, *order)
 		if err != nil {
 			order.Quantity = order.Quantity.Mul(fixedpoint.One.Sub(Delta))
 			continue
 		}
-		return true
+		return nil
 	}
 }
 
@@ -383,9 +384,8 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 			exitLongCondition := s.buyPrice > 0 && (s.buyPrice*(1.-stoploss) >= pricef ||
 				s.trailingCheck(pricef, "long"))
 			if exitShortCondition || exitLongCondition {
-				if s.ClosePosition(ctx, fixedpoint.One) {
-					log.Infof("close position by orderbook changes")
-				}
+				s.ClosePosition(ctx, fixedpoint.One)
+				log.Infof("close position by orderbook changes")
 			} else {
 				s.positionLock.Unlock()
 			}
@@ -996,9 +996,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		var buffer bytes.Buffer
 		l, err := strconv.Atoi(length)
 		if err != nil {
-			s.ParamDump(&buffer)
+			dynamic.ParamDump(s, &buffer)
 		} else {
-			s.ParamDump(&buffer, l)
+			dynamic.ParamDump(s, &buffer, l)
 		}
 		reply.Message(buffer.String())
 	})
