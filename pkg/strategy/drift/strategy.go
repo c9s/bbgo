@@ -13,6 +13,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/wcharczuk/go-chart/v2"
+	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
@@ -35,6 +36,19 @@ var Fee = 0.0008 // taker fee % * 2, for upper bound
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
+}
+
+func filterErrors(errs []error) (es []error) {
+	for _, e := range errs {
+		if _, ok := e.(types.ZeroAssetError); ok {
+			continue
+		}
+		if bbgo.ErrExceededSubmitOrderRetryLimit == e {
+			continue
+		}
+		es = append(es, e)
+	}
+	return es
 }
 
 type Strategy struct {
@@ -152,7 +166,6 @@ func (s *Strategy) CurrentPosition() *types.Position {
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
 	order := s.p.NewMarketCloseOrder(percentage)
 	if order == nil {
-		s.positionLock.Unlock()
 		return nil
 	}
 	order.Tag = "close"
@@ -169,7 +182,6 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		order.Quantity = baseBalance
 	}
 	order.MarginSideEffect = types.SideEffectTypeAutoRepay
-	s.positionLock.Unlock()
 	for {
 		if s.Market.IsDustQuantity(order.Quantity, price) {
 			return nil
@@ -383,11 +395,11 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 				s.trailingCheck(pricef, "short"))
 			exitLongCondition := s.buyPrice > 0 && (s.buyPrice*(1.-stoploss) >= pricef ||
 				s.trailingCheck(pricef, "long"))
+
+			s.positionLock.Unlock()
 			if exitShortCondition || exitLongCondition {
 				s.ClosePosition(ctx, fixedpoint.One)
 				log.Infof("close position by orderbook changes")
-			} else {
-				s.positionLock.Unlock()
 			}
 		})
 		s.getLastPrice = func() (lastPrice fixedpoint.Value) {
@@ -621,10 +633,9 @@ func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
 		s.trailingCheck(highf, "short") /* || s.drift1m.Last() > 0*/)
 	exitLongCondition := s.buyPrice > 0 && (s.buyPrice*(1.-stoploss) >= lowf ||
 		s.trailingCheck(lowf, "long") /* || s.drift1m.Last() < 0*/)
+	s.positionLock.Unlock()
 	if exitShortCondition || exitLongCondition {
 		_ = s.ClosePosition(ctx, fixedpoint.One)
-	} else {
-		s.positionLock.Unlock()
 	}
 }
 
@@ -706,8 +717,8 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		return v <= 0
 	}, 50).Mean(50)
 
-	shortCondition := (drift[1] >= s.DriftFilterNeg || ddrift[1] >= 0) && (driftPred <= s.DDriftFilterNeg || ddriftPred <= 0) || drift[1] < 0 && drift[0] < 0
-	longCondition := (drift[1] <= s.DriftFilterPos || ddrift[1] <= 0) && (driftPred >= s.DDriftFilterPos || ddriftPred >= 0) || drift[1] > 0 && drift[0] > 0
+	shortCondition := drift[1] >= 0 && drift[0] <= 0 || (drift[1] >= drift[0] && drift[1] <= 0) || ddrift[1] >= 0 && ddrift[0] <= 0 || (ddrift[1] >= ddrift[0] && ddrift[1] <= 0)
+	longCondition := drift[1] <= 0 && drift[0] >= 0 || (drift[1] <= drift[0] && drift[1] >= 0) || ddrift[1] <= 0 && ddrift[0] >= 0 || (ddrift[1] <= ddrift[0] && ddrift[1] >= 0)
 	if shortCondition && longCondition {
 		if drift[1] > drift[0] {
 			longCondition = false
@@ -721,14 +732,16 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		s.trailingCheck(pricef, "long"))
 
 	if exitShortCondition || exitLongCondition {
+		s.positionLock.Unlock()
 		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
 			log.WithError(err).Errorf("cannot cancel orders")
-			s.positionLock.Unlock()
 			return
 		}
 		_ = s.ClosePosition(ctx, fixedpoint.One)
-		if longCondition || shortCondition {
+		if shortCondition || longCondition {
 			s.positionLock.Lock()
+		} else {
+			return
 		}
 	}
 
@@ -756,10 +769,11 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		opt.Tags = []string{"long"}
 		createdOrders, err := s.GeneralOrderExecutor.OpenPosition(ctx, opt)
 		if err != nil {
-			if _, ok := err.(types.ZeroAssetError); ok {
-				return
+			errs := filterErrors(multierr.Errors(err))
+			if len(errs) > 0 {
+				log.Errorf("%v", errs)
+				log.WithError(err).Errorf("cannot place buy order")
 			}
-			log.WithError(err).Errorf("cannot place buy order")
 			return
 		}
 		log.Infof("orders %v", createdOrders)
@@ -774,6 +788,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 			s.positionLock.Unlock()
 			return
 		}
+
 		/*source = source.Add(fixedpoint.NewFromFloat(s.stdevHigh.Last() * s.HighLowVarianceMultiplier))
 		if source.Compare(price) < 0 {
 			source = price
@@ -793,10 +808,10 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		opt.Tags = []string{"short"}
 		createdOrders, err := s.GeneralOrderExecutor.OpenPosition(ctx, opt)
 		if err != nil {
-			if _, ok := err.(types.ZeroAssetError); ok {
-				return
+			errs := filterErrors(multierr.Errors(err))
+			if len(errs) > 0 {
+				log.WithError(err).Errorf("cannot place sell order")
 			}
-			log.WithError(err).Errorf("cannot place buy order")
 			return
 		}
 		log.Infof("orders %v", createdOrders)
@@ -889,46 +904,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		s.positionLock.Lock()
 		defer s.positionLock.Unlock()
-		// tag == "" is for exits trades
-		if tag == "close" || tag == "" {
-			if s.p.IsDust(trade.Price) {
-				s.buyPrice = 0
-				s.sellPrice = 0
-				s.highestPrice = 0
-				s.lowestPrice = 0
-			} else if s.p.IsLong() {
-				s.sellPrice = 0
-				s.lowestPrice = 0
-			} else {
-				s.buyPrice = 0
-				s.highestPrice = 0
-			}
-		} else if tag == "long" {
-			if s.p.IsDust(trade.Price) {
-				s.buyPrice = 0
-				s.sellPrice = 0
-				s.highestPrice = 0
-				s.lowestPrice = 0
-			} else if s.p.IsLong() {
-				s.buyPrice = trade.Price.Float64()
-				s.sellPrice = 0
-				s.highestPrice = s.buyPrice
-				s.lowestPrice = 0
-			}
-		} else if tag == "short" {
-			if s.p.IsDust(trade.Price) {
-				s.sellPrice = 0
-				s.buyPrice = 0
-				s.highestPrice = 0
-				s.lowestPrice = 0
-			} else if s.p.IsShort() {
-				s.sellPrice = trade.Price.Float64()
-				s.buyPrice = 0
-				s.highestPrice = 0
-				s.lowestPrice = s.sellPrice
-			}
-		} else {
-			panic("tag unknown")
+		if s.p.IsDust(trade.Price) {
+			s.buyPrice = 0
+			s.sellPrice = 0
+			s.highestPrice = 0
+			s.lowestPrice = 0
+		} else if s.p.IsLong() {
+			s.buyPrice = s.p.ApproximateAverageCost.Float64() //trade.Price.Float64()
+			s.sellPrice = 0
+			s.highestPrice = math.Max(s.buyPrice, s.highestPrice)
+			s.lowestPrice = 0
+		} else if s.p.IsShort() {
+			s.sellPrice = s.p.ApproximateAverageCost.Float64() //trade.Price.Float64()
+			s.buyPrice = 0
+			s.highestPrice = 0
+			s.lowestPrice = math.Min(s.lowestPrice, s.sellPrice)
 		}
 		bbgo.Notify("tag: %s, sp: %.4f bp: %.4f hp: %.4f lp: %.4f, trade: %s, pos: %s", tag, s.sellPrice, s.buyPrice, s.highestPrice, s.lowestPrice, trade.String(), s.p.String())
 	})

@@ -14,9 +14,9 @@ import (
 type Drift struct {
 	types.SeriesBase
 	types.IntervalWindow
-	chng   *types.Queue
-	Values floats.Slice
-	MA     types.UpdatableSeriesExtend
+	chng      *types.Queue
+	Values    floats.Slice
+	MA        types.UpdatableSeriesExtend
 	LastValue float64
 
 	UpdateCallbacks []func(value float64)
