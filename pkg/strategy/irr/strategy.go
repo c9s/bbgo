@@ -20,7 +20,7 @@ import (
 	"github.com/wcharczuk/go-chart/v2"
 )
 
-const ID = "oneliner"
+const ID = "irr"
 
 var one = fixedpoint.One
 var zero = fixedpoint.Zero
