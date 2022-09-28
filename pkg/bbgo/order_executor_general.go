@@ -230,7 +230,16 @@ func (e *GeneralOrderExecutor) reduceQuantityAndSubmitOrder(ctx context.Context,
 	var err error
 	for i := 0; i < submitOrderRetryLimit; i++ {
 		q := submitOrder.Quantity.Mul(fixedpoint.One.Sub(quantityReduceDelta))
-		log.Warnf("retrying order, adjusting order quantity: %f -> %f", submitOrder.Quantity.Float64(), q.Float64())
+		if submitOrder.Side == types.SideTypeSell {
+			if baseBalance, ok := e.session.GetAccount().Balance(e.position.Market.BaseCurrency); ok {
+				q = fixedpoint.Min(q, baseBalance.Available)
+			}
+		} else {
+			if quoteBalance, ok := e.session.GetAccount().Balance(e.position.Market.QuoteCurrency); ok {
+				q = fixedpoint.Min(q, quoteBalance.Available.Div(price))
+			}
+		}
+		log.Warnf("retrying order, adjusting order quantity: %v -> %v", submitOrder.Quantity, q)
 
 		submitOrder.Quantity = q
 		if e.position.Market.IsDustQuantity(submitOrder.Quantity, price) {
@@ -260,7 +269,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		Tag:              strings.Join(options.Tags, ","),
 	}
 
-	baseBalance, _ := e.session.Account.Balance(e.position.Market.BaseCurrency)
+	baseBalance, _ := e.session.GetAccount().Balance(e.position.Market.BaseCurrency)
 
 	// FIXME: fix the max quote borrowing checking
 	// quoteBalance, _ := e.session.Account.Balance(e.position.Market.QuoteCurrency)

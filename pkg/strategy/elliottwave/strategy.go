@@ -152,7 +152,8 @@ func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
 	maSlow := &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.WindowSlow}}
 	maQuick := &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.WindowQuick}}
 	s.ewo = &ElliottWave{
-		maSlow, maQuick,
+		maSlow:  maSlow,
+		maQuick: maQuick,
 	}
 	s.atr = &indicator.ATR{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.WindowATR}}
 	klines, ok := store.KLinesOfInterval(s.Interval)
@@ -371,10 +372,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.InitDrawCommands(store, &profit, &cumProfit)
 	store.OnKLineClosed(func(kline types.KLine) {
 		s.minutesCounter = int(kline.StartTime.Time().Add(kline.Interval.Duration()).Sub(s.startTime).Minutes())
-		if kline.Interval == types.Interval1m {
-			s.klineHandler1m(ctx, kline)
-		} else if kline.Interval == s.Interval {
+		if kline.Interval == s.Interval {
 			s.klineHandler(ctx, kline)
+		} else if kline.Interval == types.Interval1m {
+			s.klineHandler1m(ctx, kline)
 		}
 	})
 

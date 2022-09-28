@@ -27,29 +27,30 @@ exchangeStrategies:
 - on: binance
   drift:
     limitOrder: false
+    quantity: 0.001
     canvasPath: "./output.png"
     symbol: BTCUSDT
     # kline interval for indicators
-    interval: 4m
-    window: 2
-    stoploss: 0.13%
-    source: ohlc4
+    interval: 1m
+    window: 4
+    stoploss: 0.02%
+    source: hl2
     predictOffset: 2
     noTrailingStopLoss: false
-    trailingStopLossType: kline
+    trailingStopLossType: realtime
     # stddev on high/low-source
-    hlVarianceMultiplier: 0.22
+    hlVarianceMultiplier: 0.2
     hlRangeWindow: 4
-    smootherWindow: 1
-    fisherTransformWindow: 96
+    smootherWindow: 31
+    fisherTransformWindow: 80
     window1m: 8
     smootherWindow1m: 4
     fisherTransformWindow1m: 320
     atrWindow: 14
     # orders not been traded will be canceled after `pendingMinutes` minutes
-    pendingMinutes: 10
+    pendingMinutes: 3
     noRebalance: true
-    trendWindow: 576
+    trendWindow: 185
     rebalanceFilter: 1.2
     #driftFilterPos: 0.5
     #driftFilterNeg: -0.5
@@ -60,12 +61,12 @@ exchangeStrategies:
     # when farest price from entry goes over that ratio, start using the callback ratio accordingly to do trailingstop
     #trailingActivationRatio: [0.01, 0.016, 0.05]
     #trailingActivationRatio: [0.001, 0.0081, 0.022]
-    trailingActivationRatio: [0.0012, 0.0016, 0.01]
+    trailingActivationRatio: [0.0007, 0.0016, 0.008, 0.01]
     #trailingActivationRatio: []
     #trailingCallbackRate: []
     #trailingCallbackRate: [0.002, 0.01, 0.1]
     #trailingCallbackRate: [0.0004, 0.0009, 0.018]
-    trailingCallbackRate: [0.0003, 0.0006, 0.0019]
+    trailingCallbackRate: [0.0003, 0.0005, 0.0010, 0.0016]
 
     generateGraph: true
     graphPNLDeductFee: false
@@ -128,7 +129,7 @@ sync:
     - BTCUSDT
 
 backtest:
-  startTime: "2022-09-01"
+  startTime: "2022-09-26"
   endTime: "2022-09-30"
   symbols:
     - BTCUSDT
@@ -139,4 +140,4 @@ backtest:
       takerFeeRate: 0.000
       balances:
         BTC: 0
-        USDT: 1000
+        USDT: 50
