@@ -1,0 +1,34 @@
+persistence:
+  json:
+    directory: var/data
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+exchangeStrategies:
+- on: binance
+  oneliner:
+    symbol: BTCBUSD
+    interval: 1m
+    window: 120
+    amount: 5_000.0
+
+backtest:
+  sessions:
+    - binance
+  startTime: "2021-01-01"
+  endTime: "2022-09-30"
+  symbols:
+    - BTCBUSD
+  accounts:
+    binance:
+      takerFeeRate: 0.0
+      balances:
+#        ETH: 1
+        BUSD: 5_000.0
