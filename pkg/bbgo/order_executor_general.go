@@ -207,7 +207,7 @@ type OpenPositionOptions struct {
 	Leverage fixedpoint.Value `json:"leverage,omitempty" modifiable:"true"`
 
 	// Quantity will be used first, it will override the leverage if it's given
-	Quantity fixedpoint.Value `json:"quantity,omitempty"`
+	Quantity fixedpoint.Value `json:"quantity,omitempty" modifiable:"true"`
 
 	// LimitOrder set to true to open a position with a limit order
 	// default is false, and will send MarketOrder
