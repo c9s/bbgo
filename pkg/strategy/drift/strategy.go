@@ -152,6 +152,8 @@ func (s *Strategy) CurrentPosition() *types.Position {
 	return s.Position
 }
 
+const closeOrderRetryLimit = 5
+
 func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Value) error {
 	order := s.p.NewMarketCloseOrder(percentage)
 	if order == nil {
@@ -159,19 +161,20 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	}
 	order.Tag = "close"
 	order.TimeInForce = ""
-	balances := s.GeneralOrderExecutor.Session().GetAccount().Balances()
-	baseBalance := balances[s.Market.BaseCurrency].Available
-	price := s.getLastPrice()
-	if order.Side == types.SideTypeBuy {
-		quoteAmount := balances[s.Market.QuoteCurrency].Available.Div(price)
-		if order.Quantity.Compare(quoteAmount) > 0 {
-			order.Quantity = quoteAmount
-		}
-	} else if order.Side == types.SideTypeSell && order.Quantity.Compare(baseBalance) > 0 {
-		order.Quantity = baseBalance
-	}
+
 	order.MarginSideEffect = types.SideEffectTypeAutoRepay
-	for {
+	for i := 0; i < closeOrderRetryLimit; i++ {
+		price := s.getLastPrice()
+		balances := s.GeneralOrderExecutor.Session().GetAccount().Balances()
+		baseBalance := balances[s.Market.BaseCurrency].Available
+		if order.Side == types.SideTypeBuy {
+			quoteAmount := balances[s.Market.QuoteCurrency].Available.Div(price)
+			if order.Quantity.Compare(quoteAmount) > 0 {
+				order.Quantity = quoteAmount
+			}
+		} else if order.Side == types.SideTypeSell && order.Quantity.Compare(baseBalance) > 0 {
+			order.Quantity = baseBalance
+		}
 		if s.Market.IsDustQuantity(order.Quantity, price) {
 			return nil
 		}
@@ -182,6 +185,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 		}
 		return nil
 	}
+	return errors.New("exceed retry limit")
 }
 
 func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
@@ -360,7 +364,6 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 			s.positionLock.Unlock()
 			if exitCondition {
 				s.ClosePosition(ctx, fixedpoint.One)
-				log.Infof("close position by orderbook changes")
 			}
 		})
 		s.getLastPrice = func() (lastPrice fixedpoint.Value) {
