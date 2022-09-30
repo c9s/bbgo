@@ -221,8 +221,7 @@ func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy Si
 	}
 
 	if shutdown, ok := strategy.(StrategyShutdown); ok {
-		// Register the shutdown callback
-		OnShutdown(shutdown.Shutdown)
+		trader.gracefulShutdown.OnShutdown(shutdown.Shutdown)
 	}
 
 	return strategy.Run(ctx, orderExecutor, session)
