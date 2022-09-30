@@ -88,6 +88,9 @@ type Trader struct {
 	crossExchangeStrategies []CrossExchangeStrategy
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
+	// graceful shutdown handlers
+	gracefulShutdown Graceful
+
 	logger Logger
 }
 
@@ -427,6 +430,10 @@ func (trader *Trader) SaveState() error {
 
 		return storePersistenceFields(strategy, id, ps)
 	})
+}
+
+func (trader *Trader) Shutdown(ctx context.Context) {
+	trader.gracefulShutdown.Shutdown(ctx)
 }
 
 var defaultPersistenceSelector = &PersistenceSelector{
