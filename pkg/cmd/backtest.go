@@ -4,6 +4,11 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/data/tsv"
+	"github.com/c9s/bbgo/pkg/util"
+	"github.com/fatih/color"
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,8 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fatih/color"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -21,13 +24,10 @@ import (
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
-	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 func init() {
@@ -295,7 +295,11 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		backTestIntervals := []types.Interval{types.Interval1h, types.Interval1d}
-		exchangeSources, err := toExchangeSources(environ.Sessions(), startTime, endTime, backTestIntervals...)
+		// default interval is 1m for all exchanges
+		requiredInterval := types.Interval1m
+		allKLineIntervals, requiredInterval := collectSubscriptionIntervals(backTestIntervals, requiredInterval, environ)
+
+		exchangeSources, err := toExchangeSources(environ.Sessions(), startTime, endTime, requiredInterval, backTestIntervals...)
 		if err != nil {
 			return err
 		}
@@ -455,7 +459,7 @@ var BacktestCmd = &cobra.Command{
 			if numOfExchangeSources == 1 {
 				exSource := exchangeSources[0]
 				for k := range exSource.C {
-					exSource.Exchange.ConsumeKLine(k)
+					exSource.Exchange.ConsumeKLine(k, requiredInterval)
 				}
 
 				if err := exSource.Exchange.CloseMarketData(); err != nil {
@@ -476,7 +480,7 @@ var BacktestCmd = &cobra.Command{
 						break RunMultiExchangeData
 					}
 
-					exK.Exchange.ConsumeKLine(k)
+					exK.Exchange.ConsumeKLine(k, requiredInterval)
 				}
 			}
 		}()
@@ -513,18 +517,6 @@ var BacktestCmd = &cobra.Command{
 			Symbols:              nil,
 		}
 
-		allKLineIntervals := map[types.Interval]struct{}{}
-		for _, interval := range backTestIntervals {
-			allKLineIntervals[interval] = struct{}{}
-		}
-
-		for _, session := range environ.Sessions() {
-			for _, sub := range session.Subscriptions {
-				if sub.Channel == types.KLineChannel {
-					allKLineIntervals[sub.Options.Interval] = struct{}{}
-				}
-			}
-		}
 		for interval := range allKLineIntervals {
 			summaryReport.Intervals = append(summaryReport.Intervals, interval)
 		}
@@ -595,6 +587,27 @@ var BacktestCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func collectSubscriptionIntervals(backTestIntervals []types.Interval, requiredInterval types.Interval, environ *bbgo.Environment) (map[types.Interval]struct{}, types.Interval) {
+	allKLineIntervals := make(map[types.Interval]struct{})
+	for _, interval := range backTestIntervals {
+		allKLineIntervals[interval] = struct{}{}
+	}
+
+	for _, session := range environ.Sessions() {
+		for _, sub := range session.Subscriptions {
+			if sub.Channel == types.KLineChannel {
+				if sub.Options.Interval == types.Interval1s {
+					// if any subscription is 1s, then we will use 1s for back-testing
+					requiredInterval = sub.Options.Interval
+					log.Warnf("found 1s kline subscription, modify default backtest interval to 1s")
+				}
+				allKLineIntervals[sub.Options.Interval] = struct{}{}
+			}
+		}
+	}
+	return allKLineIntervals, requiredInterval
 }
 
 func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, symbol string, trades []types.Trade, intervalProfit *types.IntervalProfitCollector) (
@@ -697,11 +710,11 @@ func confirmation(s string) bool {
 	}
 }
 
-func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, startTime, endTime time.Time, extraIntervals ...types.Interval) (exchangeSources []*backtest.ExchangeDataSource, err error) {
+func toExchangeSources(sessions map[string]*bbgo.ExchangeSession, startTime, endTime time.Time, requiredInterval types.Interval, extraIntervals ...types.Interval) (exchangeSources []*backtest.ExchangeDataSource, err error) {
 	for _, session := range sessions {
 		backtestEx := session.Exchange.(*backtest.Exchange)
 
-		c, err := backtestEx.SubscribeMarketData(startTime, endTime, extraIntervals...)
+		c, err := backtestEx.SubscribeMarketData(startTime, endTime, requiredInterval, extraIntervals...)
 		if err != nil {
 			return exchangeSources, err
 		}

@@ -17,8 +17,16 @@ func (i Interval) Minutes() int {
 	return m
 }
 
+func (i Interval) Seconds() int {
+	m, ok := SupportedIntervals[i]
+	if !ok {
+		return ParseIntervalSeconds(i)
+	}
+	return m
+}
+
 func (i Interval) Duration() time.Duration {
-	return time.Duration(i.Minutes()) * time.Minute
+	return time.Duration(i.Seconds()) * time.Minute
 }
 
 func (i *Interval) UnmarshalJSON(b []byte) (err error) {
@@ -45,6 +53,7 @@ func (s IntervalSlice) StringSlice() (slice []string) {
 	return slice
 }
 
+var Interval1s = Interval("1s")
 var Interval1m = Interval("1m")
 var Interval3m = Interval("3m")
 var Interval5m = Interval("5m")
@@ -75,6 +84,36 @@ func ParseInterval(input Interval) int {
 	switch strings.ToLower(string(input[index:])) {
 	case "m":
 		return t
+	case "h":
+		t *= 60
+	case "d":
+		t *= 60 * 24
+	case "w":
+		t *= 60 * 24 * 7
+	case "mo":
+		t *= 60 * 24 * 30
+	default:
+		panic("unknown input: " + input)
+	}
+	return t
+}
+
+func ParseIntervalSeconds(input Interval) int {
+	t := 0
+	index := 0
+	for i, rn := range string(input) {
+		if rn >= '0' && rn <= '9' {
+			t = t*10 + int(rn-'0')
+		} else {
+			index = i
+			break
+		}
+	}
+	switch strings.ToLower(string(input[index:])) {
+	case "s":
+		return t
+	case "m":
+		t *= 60
 	case "h":
 		t *= 60
 	case "d":
