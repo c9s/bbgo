@@ -89,7 +89,7 @@ type Trader struct {
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
 	// graceful shutdown handlers
-	gracefulShutdown Graceful
+	gracefulShutdown GracefulShutdown
 
 	logger Logger
 }

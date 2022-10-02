@@ -8,17 +8,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var graceful = &Graceful{}
-
 type ShutdownHandler func(ctx context.Context, wg *sync.WaitGroup)
 
-//go:generate callbackgen -type Graceful
-type Graceful struct {
+var graceful = &GracefulShutdown{}
+
+//go:generate callbackgen -type GracefulShutdown
+type GracefulShutdown struct {
 	shutdownCallbacks []ShutdownHandler
 }
 
 // Shutdown is a blocking call to emit all shutdown callbacks at the same time.
-func (g *Graceful) Shutdown(ctx context.Context) {
+func (g *GracefulShutdown) Shutdown(ctx context.Context) {
 	var wg sync.WaitGroup
 	wg.Add(len(g.shutdownCallbacks))
 
