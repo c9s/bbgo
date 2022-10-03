@@ -151,7 +151,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Cancel active orders
 		_ = s.orderExecutor.GracefulCancel(ctx)
 		// Close 100% position
-		//_ = s.ClosePosition(ctx, fixedpoint.One)
+		// _ = s.ClosePosition(ctx, fixedpoint.One)
 	})
 
 	// initial required information
@@ -162,14 +162,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.BindTradeStats(s.TradeStats)
 
-	//modify := func(p float64) float64 {
+	// modify := func(p float64) float64 {
 	//	return p
-	//}
-	//if s.GraphPNLDeductFee {
+	// }
+	// if s.GraphPNLDeductFee {
 	//	modify = func(p float64) float64 {
 	//		return p * (1. - Fee)
 	//	}
-	//}
+	// }
 	profit := floats.Slice{1., 1.}
 	price, _ := s.session.LastPrice(s.Symbol)
 	initAsset := s.CalcAssetValue(price).Float64()
@@ -195,8 +195,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.nrr.LoadK((*klines)[0:])
 	}
 
-	//startTime := s.Environment.StartTime()
-	//s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1h, startTime))
+	// startTime := s.Environment.StartTime()
+	// s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1h, startTime))
 
 	s.session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 
@@ -253,7 +253,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.SendPhoto(&buffer)
 	})
 
-	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
@@ -270,7 +270,7 @@ func (s *Strategy) CalcAssetValue(price fixedpoint.Value) fixedpoint.Value {
 
 func (s *Strategy) DrawPNL(profit types.Series) *types.Canvas {
 	canvas := types.NewCanvas(s.InstanceID())
-	//log.Errorf("pnl Highest: %f, Lowest: %f", types.Highest(profit, profit.Length()), types.Lowest(profit, profit.Length()))
+	// log.Errorf("pnl Highest: %f, Lowest: %f", types.Highest(profit, profit.Length()), types.Lowest(profit, profit.Length()))
 	length := profit.Length()
 	if s.GraphPNLDeductFee {
 		canvas.PlotRaw("pnl (with Fee Deducted)", profit, length)

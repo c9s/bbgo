@@ -347,7 +347,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.profitOrders.BindStream(session.UserDataStream)
 
 	// setup graceful shutting down handler
-	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		// call Done to notify the main process.
 		defer wg.Done()
 		log.Infof("canceling active orders...")
