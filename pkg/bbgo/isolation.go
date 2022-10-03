@@ -2,6 +2,8 @@ package bbgo
 
 import (
 	"context"
+
+	"github.com/c9s/bbgo/pkg/service"
 )
 
 const IsolationContextKey = "bbgo"
@@ -9,11 +11,15 @@ const IsolationContextKey = "bbgo"
 var defaultIsolation = NewIsolation()
 
 type Isolation struct {
-	gracefulShutdown GracefulShutdown
+	gracefulShutdown         GracefulShutdown
+	persistenceServiceFacade *service.PersistenceServiceFacade
 }
 
 func NewIsolation() *Isolation {
-	return &Isolation{}
+	return &Isolation{
+		gracefulShutdown:         GracefulShutdown{},
+		persistenceServiceFacade: DefaultPersistenceServiceFacade,
+	}
 }
 
 func NewIsolationFromContext(ctx context.Context) *Isolation {
