@@ -434,11 +434,6 @@ func (trader *Trader) Shutdown(ctx context.Context) {
 	trader.gracefulShutdown.Shutdown(ctx)
 }
 
-var defaultPersistenceSelector = &PersistenceSelector{
-	StoreID: "default",
-	Type:    "memory",
-}
-
 func (trader *Trader) injectCommonServices(s interface{}) error {
 	// a special injection for persistence selector:
 	// if user defined the selector, the facade pointer will be nil, hence we need to update the persistence facade pointer

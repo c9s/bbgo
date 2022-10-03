@@ -30,8 +30,6 @@ func init() {
 }
 
 type Strategy struct {
-	*bbgo.Persistence
-
 	Environment          *bbgo.Environment
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 	Market               types.Market

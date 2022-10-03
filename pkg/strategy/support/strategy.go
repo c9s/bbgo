@@ -132,7 +132,6 @@ func (control *TrailingStopControl) GenerateStopOrder(quantity fixedpoint.Value)
 // }
 
 type Strategy struct {
-	*bbgo.Persistence `json:"-"`
 	*bbgo.Environment `json:"-"`
 
 	session *bbgo.ExchangeSession
@@ -175,8 +174,6 @@ type Strategy struct {
 	ProfitStats         *types.ProfitStats `persistence:"profit_stats"`
 	TradeStats          *types.TradeStats  `persistence:"trade_stats"`
 	CurrentHighestPrice fixedpoint.Value   `persistence:"current_highest_price"`
-
-	state *State
 
 	triggerEMA  *indicator.EWMA
 	longTermEMA *indicator.EWMA
