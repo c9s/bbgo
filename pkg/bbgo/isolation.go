@@ -6,11 +6,7 @@ import (
 
 const IsolationContextKey = "bbgo"
 
-var defaultIsolation *Isolation = nil
-
-func init() {
-	defaultIsolation = NewIsolation()
-}
+var defaultIsolation = NewIsolation()
 
 type Isolation struct {
 	gracefulShutdown GracefulShutdown
@@ -27,4 +23,8 @@ func NewIsolationFromContext(ctx context.Context) *Isolation {
 	}
 
 	return defaultIsolation
+}
+
+func NewContextWithIsolation(parent context.Context, isolation *Isolation) context.Context {
+	return context.WithValue(parent, IsolationContextKey, isolation)
 }
