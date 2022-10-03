@@ -440,10 +440,6 @@ var defaultPersistenceSelector = &PersistenceSelector{
 }
 
 func (trader *Trader) injectCommonServices(s interface{}) error {
-	persistence := &Persistence{
-		PersistenceSelector: defaultPersistenceSelector,
-	}
-
 	// a special injection for persistence selector:
 	// if user defined the selector, the facade pointer will be nil, hence we need to update the persistence facade pointer
 	sv := reflect.ValueOf(s).Elem()
@@ -475,7 +471,6 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 		trader.environment.DatabaseService,
 		trader.environment.AccountService,
 		trader.environment,
-		persistence,
 		PersistenceServiceFacade, // if the strategy use persistence facade separately
 	)
 }
