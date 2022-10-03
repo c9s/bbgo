@@ -88,7 +88,6 @@ type Trader struct {
 	crossExchangeStrategies []CrossExchangeStrategy
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
-	// graceful shutdown handlers
 	gracefulShutdown GracefulShutdown
 
 	logger Logger

@@ -10,8 +10,6 @@ import (
 
 type ShutdownHandler func(ctx context.Context, wg *sync.WaitGroup)
 
-var graceful = &GracefulShutdown{}
-
 //go:generate callbackgen -type GracefulShutdown
 type GracefulShutdown struct {
 	shutdownCallbacks []ShutdownHandler
@@ -31,14 +29,18 @@ func (g *GracefulShutdown) Shutdown(ctx context.Context) {
 	cancel()
 }
 
-func OnShutdown(f ShutdownHandler) {
-	graceful.OnShutdown(f)
+func OnShutdown(ctx context.Context, f ShutdownHandler) {
+	isolatedContext := NewIsolationFromContext(ctx)
+	isolatedContext.gracefulShutdown.OnShutdown(f)
 }
 
-func Shutdown() {
+func Shutdown(ctx context.Context) {
 	logrus.Infof("shutting down...")
 
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	graceful.Shutdown(ctx)
+	isolatedContext := NewIsolationFromContext(ctx)
+	todo := context.WithValue(context.TODO(), IsolationContextKey, isolatedContext)
+
+	timeoutCtx, cancel := context.WithTimeout(todo, 30*time.Second)
+	defaultIsolationContext.gracefulShutdown.Shutdown(timeoutCtx)
 	cancel()
 }

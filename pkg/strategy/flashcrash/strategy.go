@@ -110,7 +110,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeOrders.BindStream(session.UserDataStream)
 
-	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
 		log.Infof("canceling active orders...")

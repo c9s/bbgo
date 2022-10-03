@@ -77,7 +77,7 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 	cancelTrading()
 
-	bbgo.Shutdown()
+	bbgo.Shutdown(ctx)
 	return nil
 }
 
@@ -196,7 +196,7 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 	cancelTrading()
 
-	bbgo.Shutdown()
+	bbgo.Shutdown(ctx)
 
 	if err := trader.SaveState(); err != nil {
 		log.WithError(err).Errorf("can not save strategy states")

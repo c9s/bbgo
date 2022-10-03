@@ -3,14 +3,16 @@ package trendtrader
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/dynamic"
 	"os"
 	"sync"
+
+	"github.com/c9s/bbgo/pkg/dynamic"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/sirupsen/logrus"
 )
 
 const ID = "trendtrader"
@@ -54,8 +56,8 @@ type Strategy struct {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	//session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Trend.Interval})
-	//session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Trend.Interval})
+	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
 
 	if s.TrendLine != nil {
 		dynamic.InheritStructValues(s.TrendLine, s)
@@ -99,7 +101,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Cancel active orders
 		_ = s.orderExecutor.GracefulCancel(ctx)
 		// Close 100% position
-		//_ = s.ClosePosition(ctx, fixedpoint.One)
+		// _ = s.ClosePosition(ctx, fixedpoint.One)
 	})
 
 	// initial required information
@@ -123,7 +125,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.TrendLine.Bind(session, s.orderExecutor)
 	}
 
-	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
