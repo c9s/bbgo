@@ -516,7 +516,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.Bind()
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(s)
+		bbgo.Sync(ctx, s)
 	})
 	s.ExitMethods.Bind(session, s.orderExecutor)
 
@@ -531,7 +531,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.OnSuspend(func() {
 		_ = s.orderExecutor.GracefulCancel(ctx)
-		bbgo.Sync(s)
+		bbgo.Sync(ctx, s)
 	})
 
 	s.OnEmergencyStop(func() {

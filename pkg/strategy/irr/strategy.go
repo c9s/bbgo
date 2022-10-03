@@ -179,7 +179,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		cumProfit.Update(s.CalcAssetValue(trade.Price).Float64())
 	})
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(s)
+		bbgo.Sync(ctx, s)
 	})
 	s.orderExecutor.Bind()
 	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)

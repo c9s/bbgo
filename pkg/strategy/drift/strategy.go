@@ -795,7 +795,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.GeneralOrderExecutor.BindProfitStats(s.ProfitStats)
 	s.GeneralOrderExecutor.BindTradeStats(s.TradeStats)
 	s.GeneralOrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(s)
+		bbgo.Sync(ctx, s)
 	})
 	s.GeneralOrderExecutor.Bind()
 

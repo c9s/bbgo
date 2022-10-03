@@ -104,7 +104,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Update our counter and sync the changes to the persistence layer on time
 		// If you don't do this, BBGO will sync it automatically when BBGO shuts down.
 		s.State.Counter++
-		bbgo.Sync(s)
+		bbgo.Sync(ctx, s)
 
 		// To check if we have the quote balance
 		// When symbol = "BTCUSDT", the quote currency is USDT
