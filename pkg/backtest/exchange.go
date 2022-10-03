@@ -321,13 +321,13 @@ func (e *Exchange) BindUserData(userDataStream types.StandardStreamEmitter) {
 	e.matchingBooksMutex.Unlock()
 }
 
-func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, extraIntervals ...types.Interval) (chan types.KLine, error) {
+func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, requiredInterval types.Interval, extraIntervals ...types.Interval) (chan types.KLine, error) {
 	log.Infof("collecting backtest configurations...")
 
 	loadedSymbols := map[string]struct{}{}
 	loadedIntervals := map[types.Interval]struct{}{
 		// 1m interval is required for the backtest matching engine
-		types.Interval1m: {},
+		requiredInterval: {},
 	}
 
 	for _, it := range extraIntervals {
@@ -369,7 +369,7 @@ func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, extraInterv
 	return klineC, nil
 }
 
-func (e *Exchange) ConsumeKLine(k types.KLine) {
+func (e *Exchange) ConsumeKLine(k types.KLine, requiredInterval types.Interval) {
 	matching, ok := e.matchingBook(k.Symbol)
 	if !ok {
 		log.Errorf("matching book of %s is not initialized", k.Symbol)
@@ -379,14 +379,14 @@ func (e *Exchange) ConsumeKLine(k types.KLine) {
 		matching.klineCache = make(map[types.Interval]types.KLine)
 	}
 
-	kline1m, ok := matching.klineCache[k.Interval]
+	requiredKline, ok := matching.klineCache[k.Interval]
 	if ok { // pop out all the old
-		if kline1m.Interval != types.Interval1m {
-			panic("expect 1m kline, got " + kline1m.Interval.String())
+		if requiredKline.Interval.Seconds() < requiredInterval.Seconds() {
+			panic(fmt.Sprintf("expect required kline interval %s, got interval %s", requiredInterval.String(), requiredKline.Interval.String()))
 		}
-		e.currentTime = kline1m.EndTime.Time()
+		e.currentTime = requiredKline.EndTime.Time()
 		// here we generate trades and order updates
-		matching.processKLine(kline1m)
+		matching.processKLine(requiredKline)
 		matching.nextKLine = &k
 		for _, kline := range matching.klineCache {
 			e.MarketDataStream.EmitKLineClosed(kline)
