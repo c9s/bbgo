@@ -34,7 +34,7 @@ func (t *LogHook) Fire(e *logrus.Entry) error {
 	}
 
 	var message = fmt.Sprintf("[%s] %s", e.Level.String(), e.Message)
-	if errData, ok := e.Data[logrus.ErrorKey]; ok {
+	if errData, ok := e.Data[logrus.ErrorKey]; ok && errData != nil {
 		if err, isErr := errData.(error); isErr {
 			message += " Error: " + err.Error()
 		}
