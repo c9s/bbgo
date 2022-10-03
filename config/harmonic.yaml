@@ -16,9 +16,8 @@ exchangeStrategies:
   harmonic:
     symbol: BTCBUSD
     interval: 1s
-    quantity: 0.001
-
-
+    window: 500
+    quantity: 0.05
 
 backtest:
   sessions:
