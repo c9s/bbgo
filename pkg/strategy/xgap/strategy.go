@@ -12,7 +12,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -57,8 +56,6 @@ func (s *State) Reset() {
 }
 
 type Strategy struct {
-	*bbgo.Persistence
-
 	Symbol          string           `json:"symbol"`
 	SourceExchange  string           `json:"sourceExchange"`
 	TradingExchange string           `json:"tradingExchange"`
@@ -73,7 +70,7 @@ type Strategy struct {
 	sourceSession, tradingSession *bbgo.ExchangeSession
 	sourceMarket, tradingMarket   types.Market
 
-	state *State
+	State *State `persistence:"state"`
 
 	mu                                sync.Mutex
 	lastSourceKLine, lastTradingKLine types.KLine
@@ -88,12 +85,12 @@ func (s *Strategy) isBudgetAllowed() bool {
 		return true
 	}
 
-	if s.state.AccumulatedFees == nil {
+	if s.State.AccumulatedFees == nil {
 		return true
 	}
 
 	for asset, budget := range s.DailyFeeBudgets {
-		if fee, ok := s.state.AccumulatedFees[asset]; ok {
+		if fee, ok := s.State.AccumulatedFees[asset]; ok {
 			if fee.Compare(budget) >= 0 {
 				log.Warnf("accumulative fee %s exceeded the fee budget %s, skipping...", fee.String(), budget.String())
 				return false
@@ -111,18 +108,18 @@ func (s *Strategy) handleTradeUpdate(trade types.Trade) {
 		return
 	}
 
-	if s.state.IsOver24Hours() {
-		s.state.Reset()
+	if s.State.IsOver24Hours() {
+		s.State.Reset()
 	}
 
 	// safe check
-	if s.state.AccumulatedFees == nil {
-		s.state.AccumulatedFees = make(map[string]fixedpoint.Value)
+	if s.State.AccumulatedFees == nil {
+		s.State.AccumulatedFees = make(map[string]fixedpoint.Value)
 	}
 
-	s.state.AccumulatedFees[trade.FeeCurrency] = s.state.AccumulatedFees[trade.FeeCurrency].Add(trade.Fee)
-	s.state.AccumulatedVolume = s.state.AccumulatedVolume.Add(trade.Quantity)
-	log.Infof("accumulated fee: %s %s", s.state.AccumulatedFees[trade.FeeCurrency].String(), trade.FeeCurrency)
+	s.State.AccumulatedFees[trade.FeeCurrency] = s.State.AccumulatedFees[trade.FeeCurrency].Add(trade.Fee)
+	s.State.AccumulatedVolume = s.State.AccumulatedVolume.Add(trade.Quantity)
+	log.Infof("accumulated fee: %s %s", s.State.AccumulatedFees[trade.FeeCurrency].String(), trade.FeeCurrency)
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
@@ -172,36 +169,20 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	s.stopC = make(chan struct{})
 
-	var state State
-	// load position
-	if err := s.Persistence.Load(&state, ID, stateKey); err != nil {
-		if err != service.ErrPersistenceNotExists {
-			return err
-		}
+	if s.State == nil {
+		s.State = &State{}
+		s.State.Reset()
+	}
 
-		s.state = &State{}
-		s.state.Reset()
-	} else {
-		// loaded successfully
-		s.state = &state
-		log.Infof("state is restored: %+v", s.state)
-
-		if s.state.IsOver24Hours() {
-			log.Warn("state is over 24 hours, resetting to zero")
-			s.state.Reset()
-		}
+	if s.State.IsOver24Hours() {
+		log.Warn("state is over 24 hours, resetting to zero")
+		s.State.Reset()
 	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-
 		close(s.stopC)
-
-		if err := s.Persistence.Save(&s.state, ID, stateKey); err != nil {
-			log.WithError(err).Errorf("can not save state: %+v", s.state)
-		} else {
-			log.Infof("state is saved => %+v", s.state)
-		}
+		bbgo.Sync(s)
 	})
 
 	// from here, set data binding
