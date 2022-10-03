@@ -88,7 +88,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	instanceID := s.InstanceID()
 	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(s)
+		bbgo.Sync(ctx, s)
 	})
 	s.orderExecutor.Bind()
 

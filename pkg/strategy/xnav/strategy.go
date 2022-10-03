@@ -129,7 +129,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		if s.State.IsOver24Hours() {
 			s.State.Reset()
 		}
-		bbgo.Sync(s)
+		bbgo.Sync(ctx, s)
 	}
 }
 
@@ -146,7 +146,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		bbgo.Sync(s)
+		bbgo.Sync(ctx, s)
 	})
 
 	if s.ReportOnStart {

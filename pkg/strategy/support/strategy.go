@@ -346,7 +346,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.OnSuspend(func() {
 		// Cancel all order
 		_ = s.orderExecutor.GracefulCancel(ctx)
-		bbgo.Sync(s)
+		bbgo.Sync(ctx, s)
 	})
 
 	s.OnEmergencyStop(func() {

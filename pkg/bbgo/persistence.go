@@ -1,6 +1,7 @@
 package bbgo
 
 import (
+	"context"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
@@ -16,7 +17,7 @@ var DefaultPersistenceServiceFacade = &service.PersistenceServiceFacade{
 var PersistenceServiceFacade = DefaultPersistenceServiceFacade
 
 // Sync syncs the object properties into the persistence layer
-func Sync(obj interface{}) {
+func Sync(ctx context.Context, obj interface{}) {
 	id := dynamic.CallID(obj)
 	if len(id) == 0 {
 		log.Warnf("InstanceID() is not provided, can not sync persistence")

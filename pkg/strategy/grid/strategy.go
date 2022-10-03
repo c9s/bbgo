@@ -533,14 +533,6 @@ func (s *Strategy) LoadState() error {
 	return nil
 }
 
-func (s *Strategy) SaveState() error {
-	log.Infof("backing up grid state...")
-	submitOrders := s.activeOrders.Backup()
-	s.State.Orders = submitOrders
-	bbgo.Sync(s)
-	return nil
-}
-
 // InstanceID returns the instance identifier from the current grid configuration parameters
 func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s-%s-%d-%d-%d", ID, s.Symbol, s.GridNum, s.UpperPrice.Int(), s.LowerPrice.Int())
@@ -603,11 +595,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		if err := s.SaveState(); err != nil {
-			log.WithError(err).Errorf("can not save state: %+v", s.State)
-		} else {
-			bbgo.Notify("%s: %s grid is saved", ID, s.Symbol)
-		}
+		submitOrders := s.activeOrders.Backup()
+		s.State.Orders = submitOrders
+		bbgo.Sync(ctx, s)
 
 		// now we can cancel the open orders
 		log.Infof("canceling active orders...")
