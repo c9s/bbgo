@@ -400,9 +400,9 @@ func (s *Strategy) DrawIndicators(time types.Time) *types.Canvas {
 	hi := s.drift.drift.Abs().Highest(Length)
 	ratio := highestPrice / highestDrift
 
-	//canvas.Plot("upband", s.ma.Add(s.stdevHigh), time, Length)
+	// canvas.Plot("upband", s.ma.Add(s.stdevHigh), time, Length)
 	canvas.Plot("ma", s.ma, time, Length)
-	//canvas.Plot("downband", s.ma.Minus(s.stdevLow), time, Length)
+	// canvas.Plot("downband", s.ma.Minus(s.stdevLow), time, Length)
 	fmt.Printf("%f %f\n", highestPrice, hi)
 
 	canvas.Plot("trend", s.trendLine, time, Length)
@@ -844,12 +844,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.highestPrice = 0
 			s.lowestPrice = 0
 		} else if s.p.IsLong() {
-			s.buyPrice = s.p.ApproximateAverageCost.Float64() //trade.Price.Float64()
+			s.buyPrice = s.p.ApproximateAverageCost.Float64() // trade.Price.Float64()
 			s.sellPrice = 0
 			s.highestPrice = math.Max(s.buyPrice, s.highestPrice)
 			s.lowestPrice = s.buyPrice
 		} else if s.p.IsShort() {
-			s.sellPrice = s.p.ApproximateAverageCost.Float64() //trade.Price.Float64()
+			s.sellPrice = s.p.ApproximateAverageCost.Float64() // trade.Price.Float64()
 			s.buyPrice = 0
 			s.highestPrice = s.sellPrice
 			if s.lowestPrice == 0 {
@@ -951,7 +951,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
-	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 
 		var buffer bytes.Buffer
 

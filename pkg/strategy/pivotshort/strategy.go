@@ -183,7 +183,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.FailedBreakHigh.Bind(session, s.orderExecutor)
 	}
 
-	bbgo.OnShutdown(func(ctx context.Context, wg *sync.WaitGroup) {
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
