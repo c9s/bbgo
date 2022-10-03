@@ -6,25 +6,25 @@ import (
 
 const IsolationContextKey = "bbgo"
 
-var defaultIsolationContext *IsolationContext = nil
+var defaultIsolation *Isolation = nil
 
 func init() {
-	defaultIsolationContext = NewIsolation()
+	defaultIsolation = NewIsolation()
 }
 
-type IsolationContext struct {
+type Isolation struct {
 	gracefulShutdown GracefulShutdown
 }
 
-func NewIsolation() *IsolationContext {
-	return &IsolationContext{}
+func NewIsolation() *Isolation {
+	return &Isolation{}
 }
 
-func NewIsolationFromContext(ctx context.Context) *IsolationContext {
-	isolatedContext, ok := ctx.Value(IsolationContextKey).(*IsolationContext)
+func NewIsolationFromContext(ctx context.Context) *Isolation {
+	isolatedContext, ok := ctx.Value(IsolationContextKey).(*Isolation)
 	if ok {
 		return isolatedContext
 	}
 
-	return defaultIsolationContext
+	return defaultIsolation
 }
