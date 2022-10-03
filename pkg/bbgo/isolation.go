@@ -28,3 +28,7 @@ func NewIsolationFromContext(ctx context.Context) *Isolation {
 func NewContextWithIsolation(parent context.Context, isolation *Isolation) context.Context {
 	return context.WithValue(parent, IsolationContextKey, isolation)
 }
+
+func NewContextWithDefaultIsolation(parent context.Context) context.Context {
+	return context.WithValue(parent, IsolationContextKey, defaultIsolation)
+}
