@@ -7,6 +7,7 @@ import (
 )
 
 func TestParseInterval(t *testing.T) {
+	assert.Equal(t, ParseIntervalSeconds("1s"), 1)
 	assert.Equal(t, ParseInterval("3m"), 3)
 	assert.Equal(t, ParseInterval("15h"), 15*60)
 	assert.Equal(t, ParseInterval("72d"), 72*24*60)
