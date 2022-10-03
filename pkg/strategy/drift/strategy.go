@@ -274,10 +274,8 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64) (int, e
 		if toCancel {
 			err := s.GeneralOrderExecutor.GracefulCancel(ctx)
 			// TODO: clean orderPendingCounter on cancel/trade
-			if err == nil {
-				for _, order := range nonTraded {
-					delete(s.orderPendingCounter, order.OrderID)
-				}
+			for _, order := range nonTraded {
+				delete(s.orderPendingCounter, order.OrderID)
 			}
 			log.Warnf("cancel all %v", err)
 			return 0, err
@@ -306,7 +304,7 @@ func (s *Strategy) trailingCheck(price float64, direction string) bool {
 			}
 		} else {
 			if (s.highestPrice-s.buyPrice)/s.buyPrice > trailingActivationRatio {
-				return (s.highestPrice-price)/price > trailingCallbackRate
+				return (s.highestPrice-price)/s.buyPrice > trailingCallbackRate
 			}
 		}
 	}
@@ -352,14 +350,18 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 			if s.lowestPrice > 0 && s.lowestPrice > pricef {
 				s.lowestPrice = pricef
 			}
+			if s.CheckStopLoss() {
+				s.positionLock.Unlock()
+				s.ClosePosition(ctx, fixedpoint.One)
+				return
+			}
 			// for trailing stoploss during the realtime
 			if s.NoTrailingStopLoss || s.TrailingStopLossType == "kline" {
 				s.positionLock.Unlock()
 				return
 			}
 
-			exitCondition := s.CheckStopLoss() ||
-				s.trailingCheck(pricef, "short") || s.trailingCheck(pricef, "long")
+			exitCondition := s.trailingCheck(pricef, "short") || s.trailingCheck(pricef, "long")
 
 			s.positionLock.Unlock()
 			if exitCondition {
@@ -683,15 +685,15 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 			s.positionLock.Unlock()
 			return
 		}
-		/*source = source.Sub(fixedpoint.NewFromFloat(s.stdevLow.Last() * s.HighLowVarianceMultiplier))
-		if source.Compare(price) > 0 {
-			source = price
-		}*/
-		source = fixedpoint.NewFromFloat(s.ma.Last() - s.stdevLow.Last()*s.HighLowVarianceMultiplier)
+		source = source.Sub(fixedpoint.NewFromFloat(s.stdevLow.Last() * s.HighLowVarianceMultiplier))
 		if source.Compare(price) > 0 {
 			source = price
 		}
-		sourcef = source.Float64()
+		/*source = fixedpoint.NewFromFloat(s.ma.Last() - s.stdevLow.Last()*s.HighLowVarianceMultiplier)
+		if source.Compare(price) > 0 {
+			source = price
+		}
+		sourcef = source.Float64()*/
 		log.Infof("source in long %v %v %f", source, price, s.stdevLow.Last())
 
 		s.positionLock.Unlock()
@@ -721,15 +723,15 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 			return
 		}
 
-		/*source = source.Add(fixedpoint.NewFromFloat(s.stdevHigh.Last() * s.HighLowVarianceMultiplier))
-		if source.Compare(price) < 0 {
-			source = price
-		}*/
-		source = fixedpoint.NewFromFloat(s.ma.Last() + s.stdevHigh.Last()*s.HighLowVarianceMultiplier)
+		source = source.Add(fixedpoint.NewFromFloat(s.stdevHigh.Last() * s.HighLowVarianceMultiplier))
 		if source.Compare(price) < 0 {
 			source = price
 		}
-		sourcef = source.Float64()
+		/*source = fixedpoint.NewFromFloat(s.ma.Last() + s.stdevHigh.Last()*s.HighLowVarianceMultiplier)
+		if source.Compare(price) < 0 {
+			source = price
+		}
+		sourcef = source.Float64()*/
 
 		log.Infof("source in short: %v", source)
 
@@ -845,11 +847,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.buyPrice = s.p.ApproximateAverageCost.Float64() //trade.Price.Float64()
 			s.sellPrice = 0
 			s.highestPrice = math.Max(s.buyPrice, s.highestPrice)
-			s.lowestPrice = 0
+			s.lowestPrice = s.buyPrice
 		} else if s.p.IsShort() {
 			s.sellPrice = s.p.ApproximateAverageCost.Float64() //trade.Price.Float64()
 			s.buyPrice = 0
-			s.highestPrice = 0
+			s.highestPrice = s.sellPrice
 			if s.lowestPrice == 0 {
 				s.lowestPrice = s.sellPrice
 			} else {

@@ -26,7 +26,7 @@ exchangeStrategies:
  
 - on: binance
   drift:
-    limitOrder: false
+    limitOrder: true
     #quantity: 0.0012
     canvasPath: "./output.png"
     symbol: BTCUSDT
@@ -34,21 +34,21 @@ exchangeStrategies:
     interval: 1m
     window: 6
     useAtr: true
-    useStopLoss: false
-    stoploss: 0.04%
+    useStopLoss: true
+    stoploss: 0.05%
     source: hl2
     predictOffset: 2
     noTrailingStopLoss: false
-    trailingStopLossType: realtime
+    trailingStopLossType: kline
     # stddev on high/low-source
-    hlVarianceMultiplier: 0.15
+    hlVarianceMultiplier: 0.14
     hlRangeWindow: 4
     smootherWindow: 3
-    fisherTransformWindow: 181
+    fisherTransformWindow: 125
     #fisherTransformWindow: 117
     atrWindow: 24
     # orders not been traded will be canceled after `pendingMinutes` minutes
-    pendingMinutes: 5
+    pendingMinutes: 10
     noRebalance: true
     trendWindow: 15
     rebalanceFilter: -0.1
@@ -57,12 +57,12 @@ exchangeStrategies:
     # when farest price from entry goes over that ratio, start using the callback ratio accordingly to do trailingstop
     #trailingActivationRatio: [0.01, 0.016, 0.05]
     #trailingActivationRatio: [0.001, 0.0081, 0.022]
-    trailingActivationRatio: [0.0004, 0.008, 0.002, 0.01]
+    trailingActivationRatio: [0.0008, 0.002, 0.01]
     #trailingActivationRatio: []
     #trailingCallbackRate: []
     #trailingCallbackRate: [0.002, 0.01, 0.1]
     #trailingCallbackRate: [0.0004, 0.0009, 0.018]
-    trailingCallbackRate: [0.00005, 0.00012, 0.0008, 0.0016]
+    trailingCallbackRate: [0.00014, 0.0003, 0.0016]
 
     generateGraph: true
     graphPNLDeductFee: false
@@ -126,7 +126,7 @@ sync:
 
 backtest:
   startTime: "2022-09-25"
-  endTime: "2022-09-30"
+  endTime: "2022-10-30"
   symbols:
     - BTCUSDT
   sessions: [binance]
