@@ -41,6 +41,6 @@ func Shutdown(ctx context.Context) {
 	todo := context.WithValue(context.TODO(), IsolationContextKey, isolatedContext)
 
 	timeoutCtx, cancel := context.WithTimeout(todo, 30*time.Second)
-	defaultIsolationContext.gracefulShutdown.Shutdown(timeoutCtx)
+	defaultIsolation.gracefulShutdown.Shutdown(timeoutCtx)
 	cancel()
 }
