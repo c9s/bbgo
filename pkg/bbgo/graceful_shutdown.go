@@ -8,17 +8,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var graceful = &Graceful{}
-
 type ShutdownHandler func(ctx context.Context, wg *sync.WaitGroup)
 
-//go:generate callbackgen -type Graceful
-type Graceful struct {
+//go:generate callbackgen -type GracefulShutdown
+type GracefulShutdown struct {
 	shutdownCallbacks []ShutdownHandler
 }
 
 // Shutdown is a blocking call to emit all shutdown callbacks at the same time.
-func (g *Graceful) Shutdown(ctx context.Context) {
+func (g *GracefulShutdown) Shutdown(ctx context.Context) {
 	var wg sync.WaitGroup
 	wg.Add(len(g.shutdownCallbacks))
 
@@ -31,14 +29,18 @@ func (g *Graceful) Shutdown(ctx context.Context) {
 	cancel()
 }
 
-func OnShutdown(f ShutdownHandler) {
-	graceful.OnShutdown(f)
+func OnShutdown(ctx context.Context, f ShutdownHandler) {
+	isolatedContext := NewIsolationFromContext(ctx)
+	isolatedContext.gracefulShutdown.OnShutdown(f)
 }
 
-func Shutdown() {
+func Shutdown(ctx context.Context) {
 	logrus.Infof("shutting down...")
 
-	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
-	graceful.Shutdown(ctx)
+	isolatedContext := NewIsolationFromContext(ctx)
+	todo := context.WithValue(context.TODO(), IsolationContextKey, isolatedContext)
+
+	timeoutCtx, cancel := context.WithTimeout(todo, 30*time.Second)
+	defaultIsolation.gracefulShutdown.Shutdown(timeoutCtx)
 	cancel()
 }
