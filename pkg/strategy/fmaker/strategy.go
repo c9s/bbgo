@@ -32,8 +32,6 @@ type IntervalWindowSetting struct {
 }
 
 type Strategy struct {
-	*bbgo.Persistence
-
 	Environment *bbgo.Environment
 	Symbol      string `json:"symbol"`
 	Market      types.Market

@@ -175,7 +175,7 @@ func (s *Strategy) Suspend(ctx context.Context) error {
 		log.WithError(err).Errorf("graceful cancel order error")
 	}
 
-	bbgo.Sync(s)
+	bbgo.Sync(ctx, s)
 	return nil
 }
 
@@ -416,7 +416,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.BindTradeStats(s.TradeStats)
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(s)
+		bbgo.Sync(ctx, s)
 	})
 	s.orderExecutor.Bind()
 

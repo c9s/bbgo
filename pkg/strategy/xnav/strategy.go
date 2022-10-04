@@ -13,7 +13,6 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -59,13 +58,13 @@ func (s *State) Reset() {
 }
 
 type Strategy struct {
-	*bbgo.Persistence
 	*bbgo.Environment
 
 	Interval      types.Interval `json:"interval"`
 	ReportOnStart bool           `json:"reportOnStart"`
 	IgnoreDusts   bool           `json:"ignoreDusts"`
-	state         *State
+
+	State *State `persistence:"state"`
 }
 
 func (s *Strategy) ID() string {
@@ -126,49 +125,12 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 	bbgo.Notify(displayAssets)
 
-	if s.state != nil {
-		if s.state.IsOver24Hours() {
-			s.state.Reset()
+	if s.State != nil {
+		if s.State.IsOver24Hours() {
+			s.State.Reset()
 		}
-
-		s.SaveState()
+		bbgo.Sync(ctx, s)
 	}
-}
-
-func (s *Strategy) SaveState() {
-	if err := s.Persistence.Save(s.state, ID, stateKey); err != nil {
-		log.WithError(err).Errorf("%s can not save state: %+v", ID, s.state)
-	} else {
-		log.Infof("%s state is saved: %+v", ID, s.state)
-		// s.Notifiability.Notify("%s %s state is saved", ID, s.Asset, s.state)
-	}
-}
-
-func (s *Strategy) newDefaultState() *State {
-	return &State{}
-}
-
-func (s *Strategy) LoadState() error {
-	var state State
-	if err := s.Persistence.Load(&state, ID, stateKey); err != nil {
-		if err != service.ErrPersistenceNotExists {
-			return err
-		}
-
-		s.state = s.newDefaultState()
-		s.state.Reset()
-	} else {
-		// we loaded it successfully
-		s.state = &state
-
-		// update Asset name for legacy caches
-		// s.state.Asset = s.Asset
-
-		log.Infof("%s state is restored: %+v", ID, s.state)
-		bbgo.Notify("%s state is restored", ID, s.state)
-	}
-
-	return nil
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
@@ -176,14 +138,15 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		return errors.New("interval can not be empty")
 	}
 
-	if err := s.LoadState(); err != nil {
-		return err
+	if s.State == nil {
+		s.State = &State{}
+		s.State.Reset()
 	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		s.SaveState()
+		bbgo.Sync(ctx, s)
 	})
 
 	if s.ReportOnStart {

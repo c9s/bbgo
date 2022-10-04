@@ -376,11 +376,11 @@ func (trader *Trader) LoadState() error {
 		return nil
 	}
 
-	if PersistenceServiceFacade == nil {
+	if persistenceServiceFacade == nil {
 		return nil
 	}
 
-	ps := PersistenceServiceFacade.Get()
+	ps := persistenceServiceFacade.Get()
 
 	log.Infof("loading strategies states...")
 
@@ -413,11 +413,11 @@ func (trader *Trader) SaveState() error {
 		return nil
 	}
 
-	if PersistenceServiceFacade == nil {
+	if persistenceServiceFacade == nil {
 		return nil
 	}
 
-	ps := PersistenceServiceFacade.Get()
+	ps := persistenceServiceFacade.Get()
 
 	log.Infof("saving strategies states...")
 	return trader.IterateStrategies(func(strategy StrategyID) error {
@@ -434,16 +434,7 @@ func (trader *Trader) Shutdown(ctx context.Context) {
 	trader.gracefulShutdown.Shutdown(ctx)
 }
 
-var defaultPersistenceSelector = &PersistenceSelector{
-	StoreID: "default",
-	Type:    "memory",
-}
-
 func (trader *Trader) injectCommonServices(s interface{}) error {
-	persistence := &Persistence{
-		PersistenceSelector: defaultPersistenceSelector,
-	}
-
 	// a special injection for persistence selector:
 	// if user defined the selector, the facade pointer will be nil, hence we need to update the persistence facade pointer
 	sv := reflect.ValueOf(s).Elem()
@@ -455,7 +446,7 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 				return fmt.Errorf("field Persistence is not a struct element, %s given", field)
 			}
 
-			if err := dynamic.InjectField(elem, "Facade", PersistenceServiceFacade, true); err != nil {
+			if err := dynamic.InjectField(elem, "Facade", persistenceServiceFacade, true); err != nil {
 				return err
 			}
 
@@ -475,7 +466,6 @@ func (trader *Trader) injectCommonServices(s interface{}) error {
 		trader.environment.DatabaseService,
 		trader.environment.AccountService,
 		trader.environment,
-		persistence,
-		PersistenceServiceFacade, // if the strategy use persistence facade separately
+		persistenceServiceFacade, // if the strategy use persistence facade separately
 	)
 }

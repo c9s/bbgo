@@ -283,7 +283,7 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 		}
 
 		redisPersistence := service.NewRedisPersistenceService(conf.Redis)
-		PersistenceServiceFacade.Redis = redisPersistence
+		persistenceServiceFacade.Redis = redisPersistence
 	}
 
 	if conf.Json != nil {
@@ -295,7 +295,7 @@ func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error 
 		}
 
 		jsonPersistence := &service.JsonPersistenceService{Directory: conf.Json.Directory}
-		PersistenceServiceFacade.Json = jsonPersistence
+		persistenceServiceFacade.Json = jsonPersistence
 	}
 
 	return nil
@@ -630,7 +630,7 @@ func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) erro
 		userConfig.Notifications = &NotificationConfig{}
 	}
 
-	var persistence = PersistenceServiceFacade.Get()
+	var persistence = persistenceServiceFacade.Get()
 
 	err := environ.setupInteraction(persistence)
 	if err != nil {
