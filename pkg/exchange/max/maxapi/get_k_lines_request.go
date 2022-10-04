@@ -14,7 +14,7 @@ type KLineData []float64
 
 //go:generate GetRequest -url "/api/v2/k" -type GetKLinesRequest -responseType []KLineData
 type GetKLinesRequest struct {
-	client requestgen.AuthenticatedAPIClient
+	client requestgen.APIClient
 
 	market    string    `param:"market,required"`
 	limit     *int      `param:"limit"`
