@@ -30,14 +30,14 @@ func (g *GracefulShutdown) Shutdown(ctx context.Context) {
 }
 
 func OnShutdown(ctx context.Context, f ShutdownHandler) {
-	isolatedContext := NewIsolationFromContext(ctx)
+	isolatedContext := GetIsolationFromContext(ctx)
 	isolatedContext.gracefulShutdown.OnShutdown(f)
 }
 
 func Shutdown(ctx context.Context) {
 	logrus.Infof("shutting down...")
 
-	isolatedContext := NewIsolationFromContext(ctx)
+	isolatedContext := GetIsolationFromContext(ctx)
 	todo := context.WithValue(context.TODO(), IsolationContextKey, isolatedContext)
 
 	timeoutCtx, cancel := context.WithTimeout(todo, 30*time.Second)
