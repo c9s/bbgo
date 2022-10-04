@@ -37,21 +37,21 @@ func (s *Strategy) InitDrawCommands(profit, cumProfit types.Series) {
 func (s *Strategy) Draw(profit, cumProfit types.Series) error {
 
 	canvas := DrawPNL(s.InstanceID(), profit)
-	f, err := os.Create(s.GraphPNLPath)
+	fPnL, err := os.Create(s.GraphPNLPath)
 	if err != nil {
 		return fmt.Errorf("cannot create on path " + s.GraphPNLPath)
 	}
-	defer f.Close()
-	if err = canvas.Render(chart.PNG, f); err != nil {
+	defer fPnL.Close()
+	if err = canvas.Render(chart.PNG, fPnL); err != nil {
 		return fmt.Errorf("cannot render pnl")
 	}
 	canvas = DrawCumPNL(s.InstanceID(), cumProfit)
-	f, err = os.Create(s.GraphCumPNLPath)
+	fCumPnL, err := os.Create(s.GraphCumPNLPath)
 	if err != nil {
 		return fmt.Errorf("cannot create on path " + s.GraphCumPNLPath)
 	}
-	defer f.Close()
-	if err = canvas.Render(chart.PNG, f); err != nil {
+	defer fCumPnL.Close()
+	if err = canvas.Render(chart.PNG, fCumPnL); err != nil {
 		return fmt.Errorf("cannot render cumpnl")
 	}
 
