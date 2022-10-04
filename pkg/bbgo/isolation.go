@@ -8,21 +8,21 @@ import (
 
 const IsolationContextKey = "bbgo"
 
-var defaultIsolation = NewIsolation()
+var defaultIsolation = NewDefaultIsolation()
 
 type Isolation struct {
 	gracefulShutdown         GracefulShutdown
 	persistenceServiceFacade *service.PersistenceServiceFacade
 }
 
-func NewIsolation() *Isolation {
+func NewDefaultIsolation() *Isolation {
 	return &Isolation{
 		gracefulShutdown:         GracefulShutdown{},
-		persistenceServiceFacade: DefaultPersistenceServiceFacade,
+		persistenceServiceFacade: persistenceServiceFacade,
 	}
 }
 
-func NewIsolationFromContext(ctx context.Context) *Isolation {
+func GetIsolationFromContext(ctx context.Context) *Isolation {
 	isolatedContext, ok := ctx.Value(IsolationContextKey).(*Isolation)
 	if ok {
 		return isolatedContext

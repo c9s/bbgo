@@ -10,11 +10,11 @@ import (
 	"github.com/c9s/bbgo/pkg/service"
 )
 
-var DefaultPersistenceServiceFacade = &service.PersistenceServiceFacade{
+var defaultPersistenceServiceFacade = &service.PersistenceServiceFacade{
 	Memory: service.NewMemoryService(),
 }
 
-var persistenceServiceFacade = DefaultPersistenceServiceFacade
+var persistenceServiceFacade = defaultPersistenceServiceFacade
 
 // Sync syncs the object properties into the persistence layer
 func Sync(ctx context.Context, obj interface{}) {
@@ -24,7 +24,9 @@ func Sync(ctx context.Context, obj interface{}) {
 		return
 	}
 
-	ps := persistenceServiceFacade.Get()
+	isolation := GetIsolationFromContext(ctx)
+
+	ps := isolation.persistenceServiceFacade.Get()
 	err := storePersistenceFields(obj, id, ps)
 	if err != nil {
 		log.WithError(err).Errorf("persistence sync failed")
