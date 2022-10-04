@@ -233,13 +233,13 @@ func (e *Exchange) SetModifyOrderAmountForFee(feeRate types.ExchangeFee) {
 // resolution field in api
 // window length in seconds. options: 15, 60, 300, 900, 3600, 14400, 86400, or any multiple of 86400 up to 30*86400
 var supportedIntervals = map[types.Interval]int{
-	types.Interval1m:  1,
-	types.Interval5m:  5,
-	types.Interval15m: 15,
-	types.Interval1h:  60,
-	types.Interval4h:  60 * 4,
-	types.Interval1d:  60 * 24,
-	types.Interval3d:  60 * 24 * 3,
+	types.Interval1m:  1 * 60,
+	types.Interval5m:  5 * 60,
+	types.Interval15m: 15 * 60,
+	types.Interval1h:  60 * 60,
+	types.Interval4h:  60 * 60 * 4,
+	types.Interval1d:  60 * 60 * 24,
+	types.Interval3d:  60 * 60 * 24 * 3,
 }
 
 func (e *Exchange) SupportedInterval() map[types.Interval]int {

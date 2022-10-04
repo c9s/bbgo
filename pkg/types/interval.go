@@ -12,9 +12,9 @@ type Interval string
 func (i Interval) Minutes() int {
 	m, ok := SupportedIntervals[i]
 	if !ok {
-		return int(ParseInterval(i) / 60.)
+		return ParseInterval(i) / 60
 	}
-	return m
+	return m / 60
 }
 
 func (i Interval) Seconds() int {
@@ -87,13 +87,13 @@ func ParseInterval(input Interval) int {
 	case "m":
 		t *= 60
 	case "h":
-		t *= 60
+		t *= 60 * 60
 	case "d":
-		t *= 60 * 24
+		t *= 60 * 60 * 24
 	case "w":
-		t *= 60 * 24 * 7
+		t *= 60 * 60 * 24 * 7
 	case "mo":
-		t *= 60 * 24 * 30
+		t *= 60 * 60 * 24 * 30
 	default:
 		panic("unknown interval input: " + input)
 	}

@@ -381,7 +381,7 @@ func (e *Exchange) ConsumeKLine(k types.KLine, requiredInterval types.Interval) 
 
 	requiredKline, ok := matching.klineCache[k.Interval]
 	if ok { // pop out all the old
-		if requiredKline.Interval.Seconds() < requiredInterval.Seconds() {
+		if requiredKline.Interval != requiredInterval {
 			panic(fmt.Sprintf("expect required kline interval %s, got interval %s", requiredInterval.String(), requiredKline.Interval.String()))
 		}
 		e.currentTime = requiredKline.EndTime.Time()
