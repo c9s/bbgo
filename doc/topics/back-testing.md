@@ -44,6 +44,12 @@ Note on date formats, the following date formats are supported:
 And then, you can sync remote exchange k-lines (candle bars) data for back-testing:
 
 ```sh
+bbgo backtest -v --sync --config config/grid.yaml
+```
+
+To customize the sync data range, add `--sync-from`:
+
+```sh
 bbgo backtest -v --sync --sync-only --sync-from 2020-11-01 --config config/grid.yaml
 ```
 
