@@ -747,6 +747,9 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 			} else {
 				supportIntervals = types.SupportedIntervals
 			}
+			if !userConfig.Backtest.SyncSecKLines {
+				delete(supportIntervals, types.Interval1s)
+			}
 
 			// sort intervals
 			var intervals []types.Interval

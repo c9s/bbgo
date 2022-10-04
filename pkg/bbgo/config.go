@@ -138,6 +138,9 @@ type Backtest struct {
 	Accounts map[string]BacktestAccount `json:"accounts" yaml:"accounts"`
 	Symbols  []string                   `json:"symbols" yaml:"symbols"`
 	Sessions []string                   `json:"sessions" yaml:"sessions"`
+
+	// sync 1 second interval KLines
+	SyncSecKLines bool `json:"syncSecKLines,omitempty" yaml:"syncSecKLines,omitempty"`
 }
 
 func (b *Backtest) GetAccount(n string) BacktestAccount {
