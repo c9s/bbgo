@@ -47,7 +47,6 @@ func (b BudgetPeriod) Duration() time.Duration {
 
 // Strategy is the Dollar-Cost-Average strategy
 type Strategy struct {
-
 	Environment *bbgo.Environment
 	Symbol      string `json:"symbol"`
 	Market      types.Market
@@ -110,7 +109,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.orderExecutor.BindEnvironment(s.Environment)
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(s)
+		bbgo.Sync(ctx, s)
 	})
 	s.orderExecutor.Bind()
 

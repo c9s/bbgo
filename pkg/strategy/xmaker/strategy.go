@@ -24,8 +24,6 @@ const priceUpdateTimeout = 30 * time.Second
 
 const ID = "xmaker"
 
-const stateKey = "state-v1"
-
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -33,7 +31,6 @@ func init() {
 }
 
 type Strategy struct {
-	*bbgo.Persistence
 	Environment *bbgo.Environment
 
 	Symbol string `json:"symbol"`
@@ -602,17 +599,6 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
-func (s *Strategy) LoadState() error {
-	var state State
-
-	// load position
-	if err := s.Persistence.Load(&state, ID, s.Symbol, stateKey); err == nil {
-		s.state = &state
-	}
-
-	return nil
-}
-
 func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
 	if s.BollBandInterval == "" {
 		s.BollBandInterval = types.Interval1m
@@ -704,16 +690,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.groupID = util.FNV32(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
-	if err := s.LoadState(); err != nil {
-		return err
-	}
-
 	if s.Position == nil {
-		if s.state != nil && s.state.Position != nil {
-			s.Position = s.state.Position
-		} else {
-			s.Position = types.NewPositionFromMarket(s.makerMarket)
-		}
+		s.Position = types.NewPositionFromMarket(s.makerMarket)
 
 		// force update for legacy code
 		s.Position.Market = s.makerMarket
@@ -722,14 +700,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
 	if s.ProfitStats == nil {
-		if s.state != nil {
-			p2 := s.state.ProfitStats
-			s.ProfitStats = &p2
-		} else {
-			s.ProfitStats = &ProfitStats{
-				ProfitStats:   types.NewProfitStats(s.makerMarket),
-				MakerExchange: s.makerSession.ExchangeName,
-			}
+		s.ProfitStats = &ProfitStats{
+			ProfitStats:   types.NewProfitStats(s.makerMarket),
+			MakerExchange: s.makerSession.ExchangeName,
 		}
 	}
 
