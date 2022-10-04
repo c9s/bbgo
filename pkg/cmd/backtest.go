@@ -603,10 +603,10 @@ func collectSubscriptionIntervals(environ *bbgo.Environment) (allKLineIntervals 
 	for _, session := range environ.Sessions() {
 		for _, sub := range session.Subscriptions {
 			if sub.Channel == types.KLineChannel {
-				if sub.Options.Interval == types.Interval1s {
-					// if any subscription is 1s, then we will use 1s for back-testing
-					requiredInterval = sub.Options.Interval
-					log.Warnf("found 1s kline subscription, modify default backtest interval to 1s")
+				if sub.Options.Interval.Seconds()%60 > 0 {
+					// if any subscription interval is less than 60s, then we will use 1s for back-testing
+					requiredInterval = types.Interval1s
+					log.Warnf("found kline subscription interval less than 60s, modify default backtest interval to 1s")
 				}
 				allKLineIntervals[sub.Options.Interval] = struct{}{}
 			}
