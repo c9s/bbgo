@@ -18,6 +18,10 @@ exchangeStrategies:
       interval: 1s
       window: 500
       quantity: 0.05
+      # Draw pnl
+      drawGraph: true
+      graphPNLPath: "./pnl.png"
+      graphCumPNLPath: "./cumpnl.png"
 
 backtest:
   sessions:
