@@ -73,6 +73,8 @@ type Exchange struct {
 
 	markets types.MarketMap
 
+	minInterval types.Interval
+
 	Src *ExchangeDataSource
 }
 
@@ -104,6 +106,7 @@ func NewExchange(sourceName types.ExchangeName, sourceExchange types.Exchange, s
 		config:         config,
 		account:        account,
 		currentTime:    startTime,
+		minInterval:    types.Interval1m,
 		closedOrders:   make(map[string][]types.Order),
 		trades:         make(map[string][]types.Trade),
 	}
@@ -325,10 +328,7 @@ func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, extraInterv
 	log.Infof("collecting backtest configurations...")
 
 	loadedSymbols := map[string]struct{}{}
-	loadedIntervals := map[types.Interval]struct{}{
-		// 1m interval is required for the backtest matching engine
-		types.Interval1m: {},
-	}
+	loadedIntervals := map[types.Interval]struct{}{}
 
 	for _, it := range extraIntervals {
 		loadedIntervals[it] = struct{}{}
@@ -356,7 +356,12 @@ func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, extraInterv
 	var intervals []types.Interval
 	for interval := range loadedIntervals {
 		intervals = append(intervals, interval)
+		if interval.Seconds()%60 > 0 {
+			e.minInterval = types.Interval1s
+		}
 	}
+	loadedIntervals[e.minInterval] = struct{}{}
+	intervals = append(intervals, e.minInterval)
 
 	log.Infof("using symbols: %v and intervals: %v for back-testing", symbols, intervals)
 	log.Infof("querying klines from database...")
@@ -379,14 +384,14 @@ func (e *Exchange) ConsumeKLine(k types.KLine) {
 		matching.klineCache = make(map[types.Interval]types.KLine)
 	}
 
-	kline1m, ok := matching.klineCache[k.Interval]
+	klineMin, ok := matching.klineCache[k.Interval]
 	if ok { // pop out all the old
-		if kline1m.Interval != types.Interval1m {
-			panic("expect 1m kline, got " + kline1m.Interval.String())
+		if klineMin.Interval != e.minInterval {
+			panic("expect " + e.minInterval.String() + " kline, got " + klineMin.Interval.String())
 		}
-		e.currentTime = kline1m.EndTime.Time()
+		e.currentTime = klineMin.EndTime.Time()
 		// here we generate trades and order updates
-		matching.processKLine(kline1m)
+		matching.processKLine(klineMin)
 		matching.nextKLine = &k
 		for _, kline := range matching.klineCache {
 			e.MarketDataStream.EmitKLineClosed(kline)

@@ -65,7 +65,8 @@ type Strategy struct {
 	*types.ProfitStats `persistence:"profit_stats"`
 	*types.TradeStats  `persistence:"trade_stats"`
 
-	p *types.Position
+	p           *types.Position
+	minInterval types.Interval
 
 	priceLines          *types.Queue
 	trendLine           types.UpdatableSeriesExtend
@@ -78,10 +79,10 @@ type Strategy struct {
 	lock                sync.RWMutex `ignore:"true"`
 	positionLock        sync.RWMutex `ignore:"true"`
 	startTime           time.Time
-	minutesCounter      int
+	secondsCounter      int
 	orderPendingCounter map[uint64]int
 	frameKLine          *types.KLine
-	kline1m             *types.KLine
+	klineMin            *types.KLine
 
 	beta float64
 
@@ -135,11 +136,18 @@ func (s *Strategy) InstanceID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// by default, bbgo only pre-subscribe 1000 klines.
 	// this is not enough if we're subscribing 30m intervals using SerialMarketDataStore
-	maxWindow := (s.Window + s.SmootherWindow + s.FisherTransformWindow) * s.Interval.Minutes()
+	s.minInterval = types.Interval1m
+	if s.Interval.Seconds()%60 > 0 {
+		s.minInterval = types.Interval1s
+	}
+	maxWindow := (s.Window + s.SmootherWindow + s.FisherTransformWindow) * s.Interval.Seconds() / s.minInterval.Seconds()
 	bbgo.KLinePreloadLimit = int64((maxWindow/1000 + 1) * 1000)
-	log.Errorf("set kLinePreloadLimit to %d, %d %d", bbgo.KLinePreloadLimit, s.Interval.Minutes(), maxWindow)
+	log.Errorf("set kLinePreloadLimit to %d, %d %d", bbgo.KLinePreloadLimit, s.Interval.Seconds()/s.minInterval.Seconds(), maxWindow)
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-		Interval: types.Interval1m,
+		Interval: s.minInterval,
+	})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+		Interval: s.Interval,
 	})
 
 	if !bbgo.IsBackTesting {
@@ -209,6 +217,9 @@ func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
 	s.trendLine = &indicator.EWMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.TrendWindow}}
 
 	klines, ok := store.KLinesOfInterval(s.Interval)
+	if klines == nil {
+		return errors.New("kline of " + string(s.Interval) + " doesn't exist")
+	}
 	klinesLength := len(*klines)
 	if !ok || klinesLength == 0 {
 		return errors.New("klines not exists")
@@ -229,16 +240,16 @@ func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
 	if s.frameKLine != nil && klines != nil {
 		s.frameKLine.Set(&(*klines)[len(*klines)-1])
 	}
-	klines, ok = store.KLinesOfInterval(types.Interval1m)
+	klines, ok = store.KLinesOfInterval(s.minInterval)
 	klinesLength = len(*klines)
 	if !ok || klinesLength == 0 {
 		return errors.New("klines not exists")
 	}
-	log.Infof("loaded %d klines1m", klinesLength)
-	if s.kline1m != nil && klines != nil {
-		s.kline1m.Set(&(*klines)[len(*klines)-1])
+	log.Infof("loaded %d klines of %s", klinesLength, s.minInterval)
+	if s.klineMin != nil && klines != nil {
+		s.klineMin.Set(&(*klines)[len(*klines)-1])
 	}
-	s.startTime = s.kline1m.StartTime.Time().Add(s.kline1m.Interval.Duration())
+	s.startTime = s.klineMin.StartTime.Time().Add(s.klineMin.Interval.Duration())
 	return nil
 }
 
@@ -254,8 +265,8 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64) (int, e
 			if order.Status != types.OrderStatusNew && order.Status != types.OrderStatusPartiallyFilled {
 				continue
 			}
-			log.Warnf("%v | counter: %d, system: %d", order, s.orderPendingCounter[order.OrderID], s.minutesCounter)
-			if s.minutesCounter-s.orderPendingCounter[order.OrderID] > s.PendingMinutes {
+			log.Warnf("%v | counter: %d, system: %d", order, s.orderPendingCounter[order.OrderID], s.secondsCounter)
+			if s.secondsCounter-s.orderPendingCounter[order.OrderID] > s.PendingMinutes {
 				toCancel = true
 			} else if order.Side == types.SideTypeBuy {
 				// 75% of the probability
@@ -350,14 +361,15 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 			if s.lowestPrice > 0 && s.lowestPrice > pricef {
 				s.lowestPrice = pricef
 			}
-			if s.CheckStopLoss() {
-				s.positionLock.Unlock()
-				s.ClosePosition(ctx, fixedpoint.One)
-				return
-			}
+
 			// for trailing stoploss during the realtime
 			if s.NoTrailingStopLoss || s.TrailingStopLossType == "kline" {
 				s.positionLock.Unlock()
+				return
+			}
+			if s.CheckStopLoss() {
+				s.positionLock.Unlock()
+				s.ClosePosition(ctx, fixedpoint.One)
 				return
 			}
 
@@ -545,8 +557,8 @@ func (s *Strategy) CalcAssetValue(price fixedpoint.Value) fixedpoint.Value {
 	return balances[s.Market.BaseCurrency].Total().Mul(price).Add(balances[s.Market.QuoteCurrency].Total())
 }
 
-func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
-	s.kline1m.Set(&kline)
+func (s *Strategy) klineHandlerMin(ctx context.Context, kline types.KLine) {
+	s.klineMin.Set(&kline)
 	if s.Status != types.StrategyStatusRunning {
 		return
 	}
@@ -665,12 +677,26 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	}
 	exitCondition := s.CheckStopLoss() || s.trailingCheck(pricef, "short") || s.trailingCheck(pricef, "long")
 
-	if exitCondition {
-		s.positionLock.Unlock()
+	if exitCondition || longCondition || shortCondition {
+		// this is super expensive, so shouldn't execute twice in the same round
 		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
+			s.positionLock.Unlock()
 			log.WithError(err).Errorf("cannot cancel orders")
 			return
 		}
+	} else {
+		s.positionLock.Unlock()
+		atr := s.atr.Last()
+		// this is super expensive, so shouldn't execute twice in the same round
+		if _, err := s.smartCancel(ctx, sourcef, atr); err != nil {
+			log.WithError(err).Errorf("cannot cancel orders")
+		}
+		return
+
+	}
+
+	if exitCondition {
+		s.positionLock.Unlock()
 		_ = s.ClosePosition(ctx, fixedpoint.One)
 		if shortCondition || longCondition {
 			s.positionLock.Lock()
@@ -680,11 +706,6 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	}
 
 	if longCondition {
-		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
-			log.WithError(err).Errorf("cannot cancel orders")
-			s.positionLock.Unlock()
-			return
-		}
 		source = source.Sub(fixedpoint.NewFromFloat(s.stdevLow.Last() * s.HighLowVarianceMultiplier))
 		if source.Compare(price) > 0 {
 			source = price
@@ -712,17 +733,11 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		}
 		log.Infof("orders %v", createdOrders)
 		if createdOrders != nil {
-			s.orderPendingCounter[createdOrders[0].OrderID] = s.minutesCounter
+			s.orderPendingCounter[createdOrders[0].OrderID] = s.secondsCounter
 		}
 		return
 	}
 	if shortCondition {
-		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
-			log.WithError(err).Errorf("cannot cancel orders")
-			s.positionLock.Unlock()
-			return
-		}
-
 		source = source.Add(fixedpoint.NewFromFloat(s.stdevHigh.Last() * s.HighLowVarianceMultiplier))
 		if source.Compare(price) < 0 {
 			source = price
@@ -750,11 +765,10 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		}
 		log.Infof("orders %v", createdOrders)
 		if createdOrders != nil {
-			s.orderPendingCounter[createdOrders[0].OrderID] = s.minutesCounter
+			s.orderPendingCounter[createdOrders[0].OrderID] = s.secondsCounter
 		}
 		return
 	}
-	s.positionLock.Unlock()
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -800,7 +814,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.GeneralOrderExecutor.Bind()
 
 	s.orderPendingCounter = make(map[uint64]int)
-	s.minutesCounter = 0
+	s.secondsCounter = 0
 
 	// Exit methods from config
 	for _, method := range s.ExitMethods {
@@ -862,7 +876,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	s.frameKLine = &types.KLine{}
-	s.kline1m = &types.KLine{}
+	s.klineMin = &types.KLine{}
 	s.priceLines = types.NewQueue(300)
 
 	s.initTickerFunctions(ctx)
@@ -933,21 +947,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	bbgo.RegisterModifier(s)
 
-	// event trigger order: s.Interval => Interval1m
-	store, ok := session.SerialMarketDataStore(s.Symbol, []types.Interval{s.Interval, types.Interval1m})
-	if !ok {
-		panic("cannot get 1m history")
+	// event trigger order: s.Interval => s.minInterval
+	store, ok := session.SerialMarketDataStore(s.Symbol, []types.Interval{s.Interval, s.minInterval})
+	if !ok || store == nil {
+		panic("cannot get " + s.minInterval + " history")
 	}
 	if err := s.initIndicators(store); err != nil {
 		log.WithError(err).Errorf("initIndicator failed")
 		return nil
 	}
 	store.OnKLineClosed(func(kline types.KLine) {
-		s.minutesCounter = int(kline.StartTime.Time().Add(kline.Interval.Duration()).Sub(s.startTime).Minutes())
+		s.secondsCounter = int(kline.StartTime.Time().Add(kline.Interval.Duration()).Sub(s.startTime).Seconds())
 		if kline.Interval == s.Interval {
 			s.klineHandler(ctx, kline)
-		} else if kline.Interval == types.Interval1m {
-			s.klineHandler1m(ctx, kline)
+		} else if kline.Interval == s.minInterval {
+			s.klineHandlerMin(ctx, kline)
 		}
 	})
 

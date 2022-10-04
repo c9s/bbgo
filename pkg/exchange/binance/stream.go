@@ -376,6 +376,9 @@ func (s *Stream) dispatchEvent(e interface{}) {
 }
 
 func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
 			log.Debugf("isolated margin %s is enabled, requesting margin user stream listen key...", s.IsolatedMarginSymbol)
@@ -398,6 +401,9 @@ func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 }
 
 func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	log.Debugf("keepalive listen key: %s", util.MaskKey(listenKey))
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
@@ -418,6 +424,9 @@ func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error
 func (s *Stream) closeListenKey(ctx context.Context, listenKey string) (err error) {
 	// should use background context to invalidate the user stream
 	log.Debugf("closing listen key: %s", util.MaskKey(listenKey))
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 
 	if s.IsMargin {
 		if s.IsIsolatedMargin {

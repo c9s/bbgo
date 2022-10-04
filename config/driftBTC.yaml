@@ -31,20 +31,20 @@ exchangeStrategies:
     canvasPath: "./output.png"
     symbol: BTCUSDT
     # kline interval for indicators
-    interval: 1m
-    window: 6
+    interval: 1s
+    window: 2
     useAtr: true
     useStopLoss: true
     stoploss: 0.05%
     source: hl2
     predictOffset: 2
-    noTrailingStopLoss: false
+    noTrailingStopLoss: true
     trailingStopLossType: kline
     # stddev on high/low-source
     hlVarianceMultiplier: 0.14
     hlRangeWindow: 4
-    smootherWindow: 3
-    fisherTransformWindow: 125
+    smootherWindow: 17
+    fisherTransformWindow: 9
     #fisherTransformWindow: 117
     atrWindow: 24
     # orders not been traded will be canceled after `pendingMinutes` minutes
@@ -125,7 +125,7 @@ sync:
     - BTCUSDT
 
 backtest:
-  startTime: "2022-09-25"
+  startTime: "2022-10-03"
   endTime: "2022-10-30"
   symbols:
     - BTCUSDT

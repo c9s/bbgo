@@ -45,6 +45,7 @@ const FuturesWebSocketTestURL = "wss://stream.binancefuture.com"
 // Limit defines the maximum frequency of some events. Limit is represented as number of events per second. A zero Limit allows no events.
 var orderLimiter = rate.NewLimiter(5, 2)
 var queryTradeLimiter = rate.NewLimiter(1, 2)
+var requestLimiter = rate.NewLimiter(20.33, 20)
 
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
@@ -61,6 +62,10 @@ func init() {
 
 	if n, ok := util.GetEnvVarInt("BINANCE_QUERY_TRADES_RATE_LIMITER"); ok {
 		queryTradeLimiter = rate.NewLimiter(rate.Limit(n), 2)
+	}
+
+	if n, ok := util.GetEnvVarInt("BINANCE_REQUEST_RATE_LIMITER"); ok {
+		requestLimiter = rate.NewLimiter(rate.Limit(n), 20)
 	}
 }
 
@@ -165,6 +170,9 @@ func (e *Exchange) Name() types.ExchangeName {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	if e.IsFutures {
 		req := e.futuresClient.NewListPriceChangeStatsService()
 		req.Symbol(strings.ToUpper(symbol))
@@ -186,6 +194,9 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	var tickers = make(map[string]types.Ticker)
 
 	if len(symbol) == 1 {
@@ -262,7 +273,9 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-
+	if err := requestLimiter.WaitN(ctx, 10); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	if e.IsFutures {
 		exchangeInfo, err := e.futuresClient.NewExchangeInfoService().Do(ctx)
 		if err != nil {
@@ -291,6 +304,9 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedpoint.Value, error) {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	resp, err := e.client.NewAveragePriceService().Symbol(symbol).Do(ctx)
 	if err != nil {
 		return fixedpoint.Zero, err
@@ -307,6 +323,9 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error) {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	req := e.client2.NewGetMarginMaxBorrowableRequest()
 	req.Asset(asset)
 	if e.IsIsolatedMargin {
@@ -322,6 +341,9 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 }
 
 func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	req := e.client.NewMarginRepayService()
 	req.Asset(asset)
 	req.Amount(amount.String())
@@ -340,6 +362,9 @@ func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fi
 }
 
 func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	req := e.client.NewMarginLoanService()
 	req.Asset(asset)
 	req.Amount(amount.String())
@@ -357,6 +382,9 @@ func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount f
 }
 
 func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) error {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	req := e.client.NewListMarginLoansService()
 	req.Asset(asset)
 	history, err := req.Do(ctx)
@@ -369,6 +397,9 @@ func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) e
 
 // transferCrossMarginAccountAsset transfer asset to the cross margin account or to the main account
 func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io int) error {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	req := e.client.NewMarginTransferService()
 	req.Asset(asset)
 	req.Amount(amount.String())
@@ -388,6 +419,9 @@ func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset st
 }
 
 func (e *Exchange) QueryCrossMarginAccount(ctx context.Context) (*types.Account, error) {
+	if err := requestLimiter.WaitN(ctx, 10); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	marginAccount, err := e.client.NewGetMarginAccountService().Do(ctx)
 	if err != nil {
 		return nil, err
@@ -420,6 +454,9 @@ func (e *Exchange) QueryCrossMarginAccount(ctx context.Context) (*types.Account,
 }
 
 func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context) (*types.Account, error) {
+	if err := requestLimiter.WaitN(ctx, 10); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	req := e.client.NewGetIsolatedMarginAccountService()
 	req.Symbols(e.IsolatedMarginSymbol)
 
@@ -476,6 +513,9 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 }
 
 func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	req := e.client2.NewWithdrawRequest()
 	req.Coin(asset)
 	req.Address(address)
@@ -500,6 +540,9 @@ func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint
 }
 
 func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (withdraws []types.Withdraw, err error) {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	var emptyTime = time.Time{}
 	if since == emptyTime {
 		since, err = getLaunchDate()
@@ -554,6 +597,9 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 }
 
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	var emptyTime = time.Time{}
 	if since == emptyTime {
 		since, err = getLaunchDate()
@@ -624,6 +670,9 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error) {
+	if err := requestLimiter.WaitN(ctx, 10); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	account, err := e.client.NewGetAccountService().Do(ctx)
 	if err != nil {
 		return nil, err
@@ -652,6 +701,9 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 // Balance.Available = Wallet Balance(in Binance UI) - Used Margin
 // Balance.Locked = Used Margin
 func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, error) {
+	if err := requestLimiter.WaitN(ctx, 10); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	account, err := e.futuresClient.NewGetAccountService().Do(ctx)
 	if err != nil {
 		return nil, err
@@ -701,6 +753,9 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
+	if err := requestLimiter.WaitN(ctx, 3); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	if e.IsMargin {
 		req := e.client.NewListMarginOpenOrdersService().Symbol(symbol)
 		req.IsIsolated(e.IsIsolatedMargin)
@@ -723,7 +778,6 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 		return toGlobalFuturesOrders(binanceOrders, false)
 	}
-
 	binanceOrders, err := e.client.NewListOpenOrdersService().Symbol(symbol).Do(ctx)
 	if err != nil {
 		return orders, err
@@ -733,6 +787,9 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 }
 
 func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
 	if err != nil {
 		return nil, err
@@ -763,6 +820,9 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 }
 
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	if err := requestLimiter.WaitN(ctx, 2); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
 	if err != nil {
 		return nil, err
@@ -794,6 +854,9 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 
 	if err := orderLimiter.Wait(ctx); err != nil {
 		log.WithError(err).Errorf("order rate limiter wait error")
+	}
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
 	}
 
 	log.Infof("querying closed orders %s from %s <=> %s ...", symbol, since, until)
@@ -867,6 +930,9 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err error) {
 	if err := orderLimiter.Wait(ctx); err != nil {
 		log.WithError(err).Errorf("order rate limiter wait error")
+	}
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
 	}
 
 	if e.IsFutures {
@@ -1268,6 +1334,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	if err := orderLimiter.Wait(ctx); err != nil {
 		log.WithError(err).Errorf("order rate limiter wait error")
 	}
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 
 	if e.IsMargin {
 		createdOrder, err = e.submitMarginOrder(ctx, order)
@@ -1549,6 +1618,9 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	if err := queryTradeLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
+	if err := requestLimiter.WaitN(ctx, 10); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 
 	if e.IsMargin {
 		return e.queryMarginTrades(ctx, symbol, options)
@@ -1569,6 +1641,9 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 
 // QueryDepth query the order book depth of a symbol
 func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	if err := requestLimiter.Wait(ctx); err != nil {
+		log.WithError(err).Errorf("request rate limiter wait error")
+	}
 	var response *binance.DepthResponse
 	if e.IsFutures {
 		res, err := e.futuresClient.NewDepthService().Symbol(symbol).Do(ctx)
@@ -1669,18 +1744,19 @@ func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) (*types
 }
 
 var SupportedIntervals = map[types.Interval]int{
-	types.Interval1m:  1,
-	types.Interval5m:  5,
-	types.Interval15m: 15,
-	types.Interval30m: 30,
-	types.Interval1h:  60,
-	types.Interval2h:  60 * 2,
-	types.Interval4h:  60 * 4,
-	types.Interval6h:  60 * 6,
-	types.Interval12h: 60 * 12,
-	types.Interval1d:  60 * 24,
-	types.Interval3d:  60 * 24 * 3,
-	types.Interval1w:  60 * 24 * 7,
+	types.Interval1s:  1,
+	types.Interval1m:  60,
+	types.Interval5m:  300,
+	types.Interval15m: 900,
+	types.Interval30m: 1800,
+	types.Interval1h:  3600,
+	types.Interval2h:  3600 * 2,
+	types.Interval4h:  3600 * 4,
+	types.Interval6h:  3600 * 6,
+	types.Interval12h: 3600 * 12,
+	types.Interval1d:  3600 * 24,
+	types.Interval3d:  3600 * 24 * 3,
+	types.Interval1w:  3600 * 24 * 7,
 }
 
 func (e *Exchange) SupportedInterval() map[types.Interval]int {

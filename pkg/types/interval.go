@@ -12,13 +12,21 @@ type Interval string
 func (i Interval) Minutes() int {
 	m, ok := SupportedIntervals[i]
 	if !ok {
+		return ParseInterval(i) / 60
+	}
+	return m / 60
+}
+
+func (i Interval) Seconds() int {
+	m, ok := SupportedIntervals[i]
+	if !ok {
 		return ParseInterval(i)
 	}
 	return m
 }
 
 func (i Interval) Duration() time.Duration {
-	return time.Duration(i.Minutes()) * time.Minute
+	return time.Duration(i.Seconds()) * time.Second
 }
 
 func (i *Interval) UnmarshalJSON(b []byte) (err error) {
@@ -45,6 +53,7 @@ func (s IntervalSlice) StringSlice() (slice []string) {
 	return slice
 }
 
+var Interval1s = Interval("1s")
 var Interval1m = Interval("1m")
 var Interval3m = Interval("3m")
 var Interval5m = Interval("5m")
@@ -73,16 +82,18 @@ func ParseInterval(input Interval) int {
 		}
 	}
 	switch strings.ToLower(string(input[index:])) {
-	case "m":
+	case "s":
 		return t
-	case "h":
+	case "m":
 		t *= 60
+	case "h":
+		t *= 3600
 	case "d":
-		t *= 60 * 24
+		t *= 3600 * 24
 	case "w":
-		t *= 60 * 24 * 7
+		t *= 3600 * 24 * 7
 	case "mo":
-		t *= 60 * 24 * 30
+		t *= 3600 * 24 * 30
 	default:
 		panic("unknown input: " + input)
 	}
@@ -90,21 +101,22 @@ func ParseInterval(input Interval) int {
 }
 
 var SupportedIntervals = map[Interval]int{
-	Interval1m:  1,
-	Interval3m:  3,
-	Interval5m:  5,
-	Interval15m: 15,
-	Interval30m: 30,
-	Interval1h:  60,
-	Interval2h:  60 * 2,
-	Interval4h:  60 * 4,
-	Interval6h:  60 * 6,
-	Interval12h: 60 * 12,
-	Interval1d:  60 * 24,
-	Interval3d:  60 * 24 * 3,
-	Interval1w:  60 * 24 * 7,
-	Interval2w:  60 * 24 * 14,
-	Interval1mo: 60 * 24 * 30,
+	Interval1s:  1,
+	Interval1m:  60,
+	Interval3m:  180,
+	Interval5m:  300,
+	Interval15m: 900,
+	Interval30m: 1800,
+	Interval1h:  3600,
+	Interval2h:  3600 * 2,
+	Interval4h:  3600 * 4,
+	Interval6h:  3600 * 6,
+	Interval12h: 3600 * 12,
+	Interval1d:  3600 * 24,
+	Interval3d:  3600 * 24 * 3,
+	Interval1w:  3600 * 24 * 7,
+	Interval2w:  3600 * 24 * 14,
+	Interval1mo: 3600 * 24 * 30,
 }
 
 // IntervalWindow is used by the indicators

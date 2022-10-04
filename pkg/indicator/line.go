@@ -28,7 +28,7 @@ func (l *Line) handleKLineWindowUpdate(interval types.Interval, allKLines types.
 	}
 
 	newTime := allKLines.Last().EndTime.Time()
-	delta := int(newTime.Sub(l.currentTime).Minutes()) / l.Interval.Minutes()
+	delta := int(newTime.Sub(l.currentTime).Seconds()) / l.Interval.Seconds()
 	l.startIndex += delta
 	l.endIndex += delta
 	l.currentTime = newTime

@@ -1009,17 +1009,17 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 }
 
 var SupportedIntervals = map[types.Interval]int{
-	types.Interval1m:  1,
-	types.Interval5m:  5,
-	types.Interval15m: 15,
-	types.Interval30m: 30,
-	types.Interval1h:  60,
-	types.Interval2h:  60 * 2,
-	types.Interval4h:  60 * 4,
-	types.Interval6h:  60 * 6,
-	types.Interval12h: 60 * 12,
-	types.Interval1d:  60 * 24,
-	types.Interval3d:  60 * 24 * 3,
+	types.Interval1m:  1 * 60,
+	types.Interval5m:  5 * 60,
+	types.Interval15m: 15 * 60,
+	types.Interval30m: 30 * 60,
+	types.Interval1h:  60 * 60,
+	types.Interval2h:  60 * 60 * 2,
+	types.Interval4h:  60 * 60 * 4,
+	types.Interval6h:  60 * 60 * 6,
+	types.Interval12h: 60 * 60 * 12,
+	types.Interval1d:  60 * 60 * 24,
+	types.Interval3d:  60 * 60 * 24 * 3,
 }
 
 func (e *Exchange) SupportedInterval() map[types.Interval]int {

@@ -1,8 +1,6 @@
 package bbgo
 
 import (
-	"time"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -10,13 +8,15 @@ type SerialMarketDataStore struct {
 	*MarketDataStore
 	KLines       map[types.Interval]*types.KLine
 	Subscription []types.Interval
+	MinInterval  types.Interval
 }
 
-func NewSerialMarketDataStore(symbol string) *SerialMarketDataStore {
+func NewSerialMarketDataStore(symbol string, minInterval types.Interval) *SerialMarketDataStore {
 	return &SerialMarketDataStore{
 		MarketDataStore: NewMarketDataStore(symbol),
 		KLines:          make(map[types.Interval]*types.KLine),
 		Subscription:    []types.Interval{},
+		MinInterval:     minInterval,
 	}
 }
 
@@ -42,12 +42,12 @@ func (store *SerialMarketDataStore) AddKLine(kline types.KLine) {
 	if kline.Symbol != store.Symbol {
 		return
 	}
-	// only consumes kline1m
-	if kline.Interval != types.Interval1m {
+	// only consumes MinInterval
+	if kline.Interval != store.MinInterval {
 		return
 	}
 	// endtime in minutes
-	timestamp := kline.StartTime.Time().Add(time.Minute)
+	timestamp := kline.StartTime.Time().Add(store.MinInterval.Duration())
 	for _, val := range store.Subscription {
 		k, ok := store.KLines[val]
 		if !ok {
