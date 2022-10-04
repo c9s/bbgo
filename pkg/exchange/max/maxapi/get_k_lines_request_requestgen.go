@@ -175,7 +175,7 @@ func (g *GetKLinesRequest) Do(ctx context.Context) ([]KLineData, error) {
 
 	apiURL := "/api/v2/k"
 
-	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
+	req, err := g.client.NewRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}
