@@ -213,9 +213,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// use kline direction to prevent reversing position too soon
 		if diffQty.Sign() > 0 { // && kline.Direction() >= 0
-			s.orderExecutor.OpenPosition(context.Background(), bbgo.OpenPositionOptions{Quantity: diffQty.Abs(), Long: true, LimitOrder: false})
+			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Side:     types.SideTypeBuy,
+				Quantity: diffQty.Abs(),
+				Type:     types.OrderTypeMarket,
+				Tag:      "irr buy more",
+			})
 		} else if diffQty.Sign() < 0 { // && kline.Direction() <= 0
-			s.orderExecutor.OpenPosition(context.Background(), bbgo.OpenPositionOptions{Quantity: diffQty.Abs(), Short: true, LimitOrder: false})
+			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Side:     types.SideTypeSell,
+				Quantity: diffQty.Abs(),
+				Type:     types.OrderTypeMarket,
+				Tag:      "irr sell more",
+			})
 		}
 
 	}))
