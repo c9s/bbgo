@@ -139,10 +139,10 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 // From the doc
 // Type of candlestick patterns: 1min, 3min, 5min, 15min, 30min, 1hour, 2hour, 4hour, 6hour, 8hour, 12hour, 1day, 1week
 var supportedIntervals = map[types.Interval]int{
-	types.Interval1m:  60,
-	types.Interval5m:  60 * 5,
-	types.Interval15m: 60 * 15,
-	types.Interval30m: 60 * 30,
+	types.Interval1m:  1 * 60,
+	types.Interval5m:  5 * 60,
+	types.Interval15m: 15 * 60,
+	types.Interval30m: 30 * 60,
 	types.Interval1h:  60 * 60,
 	types.Interval2h:  60 * 60 * 2,
 	types.Interval4h:  60 * 60 * 4,
