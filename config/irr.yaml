@@ -13,22 +13,21 @@ sessions:
 
 exchangeStrategies:
 - on: binance
-  oneliner:
+  irr:
     symbol: BTCBUSD
-    interval: 1m
+    interval: 1s
     window: 120
     amount: 5_000.0
 
 backtest:
   sessions:
     - binance
-  startTime: "2021-01-01"
-  endTime: "2022-09-30"
+  startTime: "2022-10-01"
+  endTime: "2022-10-04"
   symbols:
     - BTCBUSD
   accounts:
     binance:
       takerFeeRate: 0.0
       balances:
-#        ETH: 1
         BUSD: 5_000.0
