@@ -1,0 +1,37 @@
+persistence:
+json:
+  directory: var/data
+redis:
+  host: 127.0.0.1
+  port: 6379
+  db: 0
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+exchangeStrategies:
+  - on: binance
+    harmonic:
+      symbol: BTCBUSD
+      interval: 1s
+      window: 500
+      quantity: 0.05
+      # Draw pnl
+      drawGraph: true
+      graphPNLPath: "./pnl.png"
+      graphCumPNLPath: "./cumpnl.png"
+
+backtest:
+  sessions:
+    - binance
+  startTime: "2022-09-30"
+  endTime: "2022-10-01"
+  symbols:
+    - BTCBUSD
+  accounts:
+    binance:
+      balances:
+        BTC: 1.0
+        BUSD: 40_000.0
