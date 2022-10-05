@@ -130,7 +130,7 @@ var optimizeCmd = &cobra.Command{
 					continue
 				}
 
-				if len(values) < resultLimit && resultLimit != 0 {
+				if len(values) > resultLimit && resultLimit != 0 {
 					values = values[:resultLimit]
 				}
 
