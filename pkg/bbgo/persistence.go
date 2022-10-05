@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/codingconcepts/env"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/dynamic"
@@ -73,27 +74,40 @@ func storePersistenceFields(obj interface{}, id string, persistence service.Pers
 	})
 }
 
-func ConfigurePersistence(conf *PersistenceConfig) error {
+func NewPersistenceServiceFacade(conf *PersistenceConfig) (*service.PersistenceServiceFacade, error) {
+	facade := &service.PersistenceServiceFacade{
+		Memory: service.NewMemoryService(),
+	}
+
 	if conf.Redis != nil {
 		if err := env.Set(conf.Redis); err != nil {
-			return err
+			return nil, err
 		}
 
 		redisPersistence := service.NewRedisPersistenceService(conf.Redis)
-		persistenceServiceFacade.Redis = redisPersistence
+		facade.Redis = redisPersistence
 	}
 
 	if conf.Json != nil {
 		if _, err := os.Stat(conf.Json.Directory); os.IsNotExist(err) {
 			if err2 := os.MkdirAll(conf.Json.Directory, 0777); err2 != nil {
-				log.WithError(err2).Errorf("can not create directory: %s", conf.Json.Directory)
-				return err2
+				return nil, errors.Wrapf(err2, "can not create directory: %s", conf.Json.Directory)
 			}
 		}
 
 		jsonPersistence := &service.JsonPersistenceService{Directory: conf.Json.Directory}
-		persistenceServiceFacade.Json = jsonPersistence
+		facade.Json = jsonPersistence
 	}
 
+	return facade, nil
+}
+
+func ConfigurePersistence(conf *PersistenceConfig) error {
+	facade, err := NewPersistenceServiceFacade(conf)
+	if err != nil {
+		return err
+	}
+
+	persistenceServiceFacade = facade
 	return nil
 }
