@@ -15,7 +15,7 @@ func BootstrapEnvironmentLightweight(ctx context.Context, environ *Environment, 
 	}
 
 	if userConfig.Persistence != nil {
-		if err := ConfigurePersistence(userConfig.Persistence); err != nil {
+		if err := ConfigurePersistence(ctx, userConfig.Persistence); err != nil {
 			return errors.Wrap(err, "persistence configure error")
 		}
 	}
@@ -33,7 +33,7 @@ func BootstrapEnvironment(ctx context.Context, environ *Environment, userConfig 
 	}
 
 	if userConfig.Persistence != nil {
-		if err := ConfigurePersistence(userConfig.Persistence); err != nil {
+		if err := ConfigurePersistence(ctx, userConfig.Persistence); err != nil {
 			return errors.Wrap(err, "persistence configure error")
 		}
 	}
