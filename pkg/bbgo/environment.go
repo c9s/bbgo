@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/codingconcepts/env"
 	"github.com/pkg/errors"
 	"github.com/pquerna/otp"
 	log "github.com/sirupsen/logrus"
@@ -274,31 +273,6 @@ func (environ *Environment) Start(ctx context.Context) (err error) {
 		}
 	}
 	return
-}
-
-func (environ *Environment) ConfigurePersistence(conf *PersistenceConfig) error {
-	if conf.Redis != nil {
-		if err := env.Set(conf.Redis); err != nil {
-			return err
-		}
-
-		redisPersistence := service.NewRedisPersistenceService(conf.Redis)
-		persistenceServiceFacade.Redis = redisPersistence
-	}
-
-	if conf.Json != nil {
-		if _, err := os.Stat(conf.Json.Directory); os.IsNotExist(err) {
-			if err2 := os.MkdirAll(conf.Json.Directory, 0777); err2 != nil {
-				log.WithError(err2).Errorf("can not create directory: %s", conf.Json.Directory)
-				return err2
-			}
-		}
-
-		jsonPersistence := &service.JsonPersistenceService{Directory: conf.Json.Directory}
-		persistenceServiceFacade.Json = jsonPersistence
-	}
-
-	return nil
 }
 
 func (environ *Environment) SetStartTime(t time.Time) *Environment {

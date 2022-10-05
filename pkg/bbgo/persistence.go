@@ -2,8 +2,10 @@ package bbgo
 
 import (
 	"context"
+	"os"
 	"reflect"
 
+	"github.com/codingconcepts/env"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/dynamic"
@@ -69,4 +71,29 @@ func storePersistenceFields(obj interface{}, id string, persistence service.Pers
 		store := persistence.NewStore("state", id, tag)
 		return store.Save(inf)
 	})
+}
+
+func ConfigurePersistence(conf *PersistenceConfig) error {
+	if conf.Redis != nil {
+		if err := env.Set(conf.Redis); err != nil {
+			return err
+		}
+
+		redisPersistence := service.NewRedisPersistenceService(conf.Redis)
+		persistenceServiceFacade.Redis = redisPersistence
+	}
+
+	if conf.Json != nil {
+		if _, err := os.Stat(conf.Json.Directory); os.IsNotExist(err) {
+			if err2 := os.MkdirAll(conf.Json.Directory, 0777); err2 != nil {
+				log.WithError(err2).Errorf("can not create directory: %s", conf.Json.Directory)
+				return err2
+			}
+		}
+
+		jsonPersistence := &service.JsonPersistenceService{Directory: conf.Json.Directory}
+		persistenceServiceFacade.Json = jsonPersistence
+	}
+
+	return nil
 }

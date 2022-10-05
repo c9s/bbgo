@@ -22,6 +22,13 @@ func NewDefaultIsolation() *Isolation {
 	}
 }
 
+func NewIsolation(persistenceFacade *service.PersistenceServiceFacade) *Isolation {
+	return &Isolation{
+		gracefulShutdown:         GracefulShutdown{},
+		persistenceServiceFacade: persistenceFacade,
+	}
+}
+
 func GetIsolationFromContext(ctx context.Context) *Isolation {
 	isolatedContext, ok := ctx.Value(IsolationContextKey).(*Isolation)
 	if ok {
