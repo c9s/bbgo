@@ -48,6 +48,8 @@ import (
 var log = logrus.WithField("cmd", "backtest")
 
 var ErrUnimplemented = errors.New("unimplemented method")
+var ErrNegativeQuantity = errors.New("order quantity can not be negative")
+var ErrZeroQuantity = errors.New("order quantity can not be zero")
 
 type Exchange struct {
 	sourceName     types.ExchangeName
@@ -174,6 +176,14 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	matching, ok := e.matchingBook(symbol)
 	if !ok {
 		return nil, fmt.Errorf("matching engine is not initialized for symbol %s", symbol)
+	}
+
+	if order.Quantity.Sign() < 0 {
+		return nil, ErrNegativeQuantity
+	}
+
+	if order.Quantity.IsZero() {
+		return nil, ErrZeroQuantity
 	}
 
 	createdOrder, _, err = matching.PlaceOrder(order)
