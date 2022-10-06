@@ -16,8 +16,8 @@ exchangeStrategies:
     harmonic:
       symbol: BTCBUSD
       interval: 1s
-      window: 500
-      quantity: 0.05
+      window: 60
+      quantity: 0.005
       # Draw pnl
       drawGraph: true
       graphPNLPath: "./pnl.png"
@@ -26,12 +26,12 @@ exchangeStrategies:
 backtest:
   sessions:
     - binance
-  startTime: "2022-09-30"
-  endTime: "2022-10-01"
+  startTime: "2022-10-01"
+  endTime: "2022-10-07"
   symbols:
     - BTCBUSD
   accounts:
     binance:
       balances:
         BTC: 1.0
-        BUSD: 40_000.0
+        BUSD: 60_000.0
