@@ -31,10 +31,11 @@ backtest:
   - max
   symbols:
   - USDTTWD
-  account:
+  feeMode: quote
+  accounts:
     max:
-      makerFeeRate: 15
-      takerFeeRate: 15
+      makerFeeRate: 0.0125%
+      takerFeeRate: 0.075%
       balances:
         BTC: 0.0
         USDT: 10_000.0
