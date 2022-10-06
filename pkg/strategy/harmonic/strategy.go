@@ -3,14 +3,17 @@ package harmonic
 import (
 	"context"
 	"fmt"
+	"os"
+	"sync"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-
 	"github.com/sirupsen/logrus"
+	floats2 "gonum.org/v1/gonum/floats"
 )
 
 const ID = "harmonic"
@@ -317,6 +320,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
+	s.InitDrawCommands(&profitSlice, &cumProfitSlice)
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
@@ -332,66 +336,131 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if klines, ok := kLineStore.KLinesOfInterval(s.shark.Interval); ok {
 		s.shark.LoadK((*klines)[0:])
 	}
+
+	states := types.NewQueue(s.Window)
+
+	states.Update(0)
 	s.session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 
 		log.Infof("Shark Score: %f, Current Price: %f", s.shark.Last(), kline.Close.Float64())
 
-		//previousRegime := s.shark.Values.Tail(10).Mean()
-		//zeroThreshold := 5.
+		nextState := alpha(s.shark.Array(s.Window), states.Array(s.Window), s.Window)
+		states.Update(nextState)
+		log.Infof("Denoised signal via HMM: %f", states.Last())
 
-		if s.shark.Rank(s.Window).Last()/float64(s.Window) > 0.99 { // && ((previousRegime < zeroThreshold && previousRegime > -zeroThreshold) || s.shark.Index(1) < 0)
-			if s.Position.IsShort() {
-				_ = s.orderExecutor.GracefulCancel(ctx)
-				s.orderExecutor.ClosePosition(ctx, fixedpoint.One, "close short position")
-			}
-			_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		if states.Length() < s.Window {
+			return
+		}
+		direction := 0.
+		if s.Position.IsLong() {
+			direction = 1.
+		} else if s.Position.IsShort() {
+			direction = -1.
+		}
+
+		if s.Position.IsOpened(kline.Close) && states.Mean(5) == 0 {
+			s.orderExecutor.ClosePosition(ctx, fixedpoint.One)
+		}
+		if states.Mean(5) == 1 && direction != 1 {
+			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:   s.Symbol,
 				Side:     types.SideTypeBuy,
 				Quantity: s.Quantity,
 				Type:     types.OrderTypeMarket,
-				Tag:      "shark long: buy in",
+				Tag:      "shark long",
 			})
-			if err == nil {
-				_, err = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-					Symbol:   s.Symbol,
-					Side:     types.SideTypeSell,
-					Quantity: s.Quantity,
-					Price:    fixedpoint.NewFromFloat(s.shark.Highs.Tail(100).Max()),
-					Type:     types.OrderTypeLimit,
-					Tag:      "shark long: sell back",
-				})
-			}
-			if err != nil {
-				log.Errorln(err)
-			}
-
-		} else if s.shark.Rank(s.Window).Last()/float64(s.Window) < 0.01 { // && ((previousRegime < zeroThreshold && previousRegime > -zeroThreshold) || s.shark.Index(1) > 0)
-			if s.Position.IsLong() {
-				_ = s.orderExecutor.GracefulCancel(ctx)
-				s.orderExecutor.ClosePosition(ctx, fixedpoint.One, "close long position")
-			}
-			_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		} else if states.Mean(5) == -1 && direction != -1 {
+			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:   s.Symbol,
 				Side:     types.SideTypeSell,
 				Quantity: s.Quantity,
 				Type:     types.OrderTypeMarket,
-				Tag:      "shark short: sell in",
+				Tag:      "shark short",
 			})
-			if err == nil {
-				_, err = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-					Symbol:   s.Symbol,
-					Side:     types.SideTypeBuy,
-					Quantity: s.Quantity,
-					Price:    fixedpoint.NewFromFloat(s.shark.Lows.Tail(100).Min()),
-					Type:     types.OrderTypeLimit,
-					Tag:      "shark short: buy back",
-				})
-			}
-			if err != nil {
-				log.Errorln(err)
-			}
 		}
 	}))
 
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+
+		// Output accumulated profit report
+		if bbgo.IsBackTesting {
+			defer s.AccumulatedProfitReport.Output(s.Symbol)
+
+			if s.DrawGraph {
+				if err := s.Draw(&profitSlice, &cumProfitSlice); err != nil {
+					log.WithError(err).Errorf("cannot draw graph")
+				}
+			}
+		}
+
+		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
+		_ = s.orderExecutor.GracefulCancel(ctx)
+	})
+
 	return nil
+}
+
+// TODO: dirichlet distribution is a too naive solution
+func observationDistribution(y_t, x_t float64) float64 {
+	if x_t == 0. && y_t == 0 {
+		// observed zero value from indicator when in neutral state
+		return 1.
+	} else if x_t > 0. && y_t > 0. {
+		// observed positive value from indicator when in long state
+		return 1.
+	} else if x_t < 0. && y_t < 0. {
+		// observed negative value from indicator when in short state
+		return 1.
+	} else {
+		return 0.
+	}
+}
+
+func transitionProbability(x_t0, x_t1 int) float64 {
+	// stick to the same sate
+	if x_t0 == x_t1 {
+		return 0.99
+	}
+	// transit to next new state
+	return 1 - 0.99
+}
+
+func alpha(y_t []float64, x_t []float64, l int) float64 {
+	al := make([]float64, l)
+	an := make([]float64, l)
+	as := make([]float64, l)
+	long := 0.
+	neut := 0.
+	short := 0.
+	// n is the incremental time steps
+	for n := 2; n <= len(x_t); n++ {
+		for j := -1; j <= 1; j++ {
+			sil := make([]float64, 3)
+			sin := make([]float64, 3)
+			sis := make([]float64, 3)
+			for i := -1; i <= 1; i++ {
+				sil = append(sil, x_t[n-1-1]*transitionProbability(i, j))
+				sin = append(sin, x_t[n-1-1]*transitionProbability(i, j))
+				sis = append(sis, x_t[n-1-1]*transitionProbability(i, j))
+			}
+			if j > 0 {
+				long = floats2.Max(sil) * observationDistribution(y_t[n-1], float64(j))
+				al = append(al, long)
+			} else if j == 0 {
+				neut = floats2.Max(sin) * observationDistribution(y_t[n-1], float64(j))
+				an = append(an, neut)
+			} else if j < 0 {
+				short = floats2.Max(sis) * observationDistribution(y_t[n-1], float64(j))
+				as = append(as, short)
+			}
+		}
+	}
+	maximum := floats2.Max([]float64{long, neut, short})
+	if maximum == long {
+		return 1
+	} else if maximum == short {
+		return -1
+	}
+	return 0
 }
