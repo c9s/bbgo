@@ -412,8 +412,15 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 		submitOrder.ReduceOnly = true
 		if e.position.IsLong() {
 			submitOrder.Side = types.SideTypeSell
-		} else {
+		} else if e.position.IsShort() {
 			submitOrder.Side = types.SideTypeBuy
+		} else {
+			submitOrder.Side = types.SideTypeSelf
+			submitOrder.Quantity = fixedpoint.Zero
+		}
+
+		if submitOrder.Quantity.IsZero() {
+			return fmt.Errorf("no position to close: %+v", submitOrder)
 		}
 	} else { // Spot and spot margin
 		// check base balance and adjust the close position order
