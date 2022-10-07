@@ -13,8 +13,8 @@ type LinReg struct {
 	types.SeriesBase
 	types.IntervalWindow
 	// Values are the slopes of linear regression baseline
-	Values floats.Slice
-	klines types.KLineWindow
+	Values  floats.Slice
+	klines  types.KLineWindow
 	EndTime time.Time
 }
 
@@ -66,7 +66,7 @@ func (lr *LinReg) Update(kline types.KLine) {
 	average := sumY / length
 	endPrice := average - slope*sumX/length + slope
 	startPrice := endPrice + slope*(length-1)
-	lr.Values.Push((length - 1) / (endPrice - startPrice))
+	lr.Values.Push((endPrice - startPrice) / (length - 1))
 
 	log.Debugf("linear regression baseline slope: %f", lr.Last())
 }
