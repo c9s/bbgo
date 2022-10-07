@@ -407,22 +407,32 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	atomic.AddInt64(&e.closing, 1)
 	defer atomic.StoreInt64(&e.closing, 0)
 
-	// check base balance and adjust the close position order
-	if e.position.IsLong() {
-		if baseBalance, ok := e.session.Account.Balance(e.position.Market.BaseCurrency); ok {
-			submitOrder.Quantity = fixedpoint.Min(submitOrder.Quantity, baseBalance.Available)
+	if e.session.Futures { // Futures: Use base qty in e.position
+		submitOrder.Quantity = e.position.GetBase().Abs()
+		submitOrder.ReduceOnly = true
+		if e.position.IsLong() {
+			submitOrder.Side = types.SideTypeSell
+		} else {
+			submitOrder.Side = types.SideTypeBuy
 		}
-		if submitOrder.Quantity.IsZero() {
-			return fmt.Errorf("insufficient base balance, can not sell: %+v", submitOrder)
-		}
-	} else if e.position.IsShort() {
-		// TODO: check quote balance here, we also need the current price to validate, need to design.
-		/*
-			if quoteBalance, ok := e.session.Account.Balance(e.position.Market.QuoteCurrency); ok {
-				// AdjustQuantityByMaxAmount(submitOrder.Quantity, quoteBalance.Available)
-				// submitOrder.Quantity = fixedpoint.Min(submitOrder.Quantity,)
+	} else { // Spot and spot margin
+		// check base balance and adjust the close position order
+		if e.position.IsLong() {
+			if baseBalance, ok := e.session.Account.Balance(e.position.Market.BaseCurrency); ok {
+				submitOrder.Quantity = fixedpoint.Min(submitOrder.Quantity, baseBalance.Available)
 			}
-		*/
+			if submitOrder.Quantity.IsZero() {
+				return fmt.Errorf("insufficient base balance, can not sell: %+v", submitOrder)
+			}
+		} else if e.position.IsShort() {
+			// TODO: check quote balance here, we also need the current price to validate, need to design.
+			/*
+				if quoteBalance, ok := e.session.Account.Balance(e.position.Market.QuoteCurrency); ok {
+					// AdjustQuantityByMaxAmount(submitOrder.Quantity, quoteBalance.Available)
+					// submitOrder.Quantity = fixedpoint.Min(submitOrder.Quantity,)
+				}
+			*/
+		}
 	}
 
 	tagStr := strings.Join(tags, ",")
