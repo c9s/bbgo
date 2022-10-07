@@ -16,29 +16,29 @@ backtest:
   # for testing max draw down (MDD) at 03-12
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
-  startTime: "2022-05-01"
-  endTime: "2022-08-14"
+  startTime: "2022-09-01"
+  endTime: "2022-09-30"
   sessions:
   - binance
   symbols:
-  - ETHUSDT
+  - BTCUSDT
   accounts:
     binance:
       balances:
-        ETH: 0.0
-        USDT: 10_000.0
+        BTC: 0.0
+        USDT: 50.0
 
 exchangeStrategies:
 
 - on: binance
   bollmaker:
-    symbol: ETHUSDT
+    symbol: BTCUSDT
 
     # interval is how long do you want to update your order price and quantity
-    interval: 1m
+    interval: 1s
 
     # quantity is the base order quantity for your buy/sell order.
-    quantity: 0.05
+    quantity: 0.001
 
     # amount is used for fixed-amount order, for example, use fixed 20 USDT order for BTCUSDT market
     # amount: 20
@@ -46,7 +46,7 @@ exchangeStrategies:
     # useTickerPrice use the ticker api to get the mid price instead of the closed kline price.
     # The back-test engine is kline-based, so the ticker price api is not supported.
     # Turn this on if you want to do real trading.
-    useTickerPrice: true
+    useTickerPrice: false
 
     # spread is the price spread from the middle price.
     # For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
@@ -143,8 +143,8 @@ exchangeStrategies:
     #           range: [ 0.001, 0.002 ]
 
     # maxExposurePosition is the maximum position you can hold
-    # +10 means you can hold 10 ETH long position by maximum
-    # -10 means you can hold -10 ETH short position by maximum
+    # +10 means you can hold 10 BTC long position by maximum
+    # -10 means you can hold -10 BTC short position by maximum
     # uncomment this if you want a fixed position exposure.
     # maxExposurePosition: 3.0
     maxExposurePosition: 10
@@ -180,7 +180,7 @@ exchangeStrategies:
     # when price is near the upper band, it holds less.
     # when price is near the lower band, it holds more.
     defaultBollinger:
-      interval: "1h"
+      interval: "15m"
       window: 21
       bandWidth: 2.0
 

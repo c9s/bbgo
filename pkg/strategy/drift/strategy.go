@@ -98,7 +98,7 @@ type Strategy struct {
 	SmootherWindow            int              `json:"smootherWindow"`
 	FisherTransformWindow     int              `json:"fisherTransformWindow"`
 	ATRWindow                 int              `json:"atrWindow"`
-	PendingMinutes            int              `json:"pendingMinutes" modifiable:"true"`  // if order not be traded for pendingMinutes of time, cancel it.
+	PendingSeconds            int              `json:"pendingSeconds" modifiable:"true"`  // if order not be traded for pendingMinutes of time, cancel it.
 	NoRebalance               bool             `json:"noRebalance" modifiable:"true"`     // disable rebalance
 	TrendWindow               int              `json:"trendWindow"`                       // trendLine is used for rebalancing the position. When trendLine goes up, hold base, otherwise hold quote
 	RebalanceFilter           float64          `json:"rebalanceFilter" modifiable:"true"` // beta filter on the Linear Regression of trendLine
@@ -109,6 +109,9 @@ type Strategy struct {
 	sellPrice    float64 `persistence:"sell_price"`
 	highestPrice float64 `persistence:"highest_price"`
 	lowestPrice  float64 `persistence:"lowest_price"`
+
+	innerHigh float64
+	innerLow  float64
 
 	// This is not related to trade but for statistics graph generation
 	// Will deduct fee in percentage from every trade
@@ -266,7 +269,7 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64) (int, e
 				continue
 			}
 			log.Warnf("%v | counter: %d, system: %d", order, s.orderPendingCounter[order.OrderID], s.secondsCounter)
-			if s.secondsCounter-s.orderPendingCounter[order.OrderID] > s.PendingMinutes {
+			if s.secondsCounter-s.orderPendingCounter[order.OrderID] > s.PendingSeconds {
 				toCancel = true
 			} else if order.Side == types.SideTypeBuy {
 				// 75% of the probability
@@ -283,7 +286,7 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64) (int, e
 			}
 		}
 		if toCancel {
-			err := s.GeneralOrderExecutor.GracefulCancel(ctx)
+			err := s.GeneralOrderExecutor.CancelNoWait(ctx)
 			// TODO: clean orderPendingCounter on cancel/trade
 			for _, order := range nonTraded {
 				delete(s.orderPendingCounter, order.OrderID)
@@ -355,6 +358,18 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 				return
 			}
 
+			if s.innerHigh > 0 && s.innerHigh < pricef {
+				s.innerHigh = pricef
+			} else if s.innerHigh == 0 {
+				s.innerHigh = pricef
+			}
+
+			if s.innerLow > 0 && s.innerLow > pricef {
+				s.innerLow = pricef
+			} else if s.innerLow == 0 {
+				s.innerLow = pricef
+			}
+
 			if s.highestPrice > 0 && s.highestPrice < pricef {
 				s.highestPrice = pricef
 			}
@@ -367,13 +382,8 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 				s.positionLock.Unlock()
 				return
 			}
-			if s.CheckStopLoss() {
-				s.positionLock.Unlock()
-				s.ClosePosition(ctx, fixedpoint.One)
-				return
-			}
 
-			exitCondition := s.trailingCheck(pricef, "short") || s.trailingCheck(pricef, "long")
+			exitCondition := s.CheckStopLoss() || s.trailingCheck(pricef, "short") || s.trailingCheck(pricef, "long")
 
 			s.positionLock.Unlock()
 			if exitCondition {
@@ -399,6 +409,13 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 
 }
 
+func (s *Strategy) resetHighLow() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.innerHigh = 0
+	s.innerLow = 0
+}
+
 func (s *Strategy) DrawIndicators(time types.Time) *types.Canvas {
 	canvas := types.NewCanvas(s.InstanceID(), s.Interval)
 	Length := s.priceLines.Length()
@@ -412,9 +429,7 @@ func (s *Strategy) DrawIndicators(time types.Time) *types.Canvas {
 	hi := s.drift.drift.Abs().Highest(Length)
 	ratio := highestPrice / highestDrift
 
-	// canvas.Plot("upband", s.ma.Add(s.stdevHigh), time, Length)
 	canvas.Plot("ma", s.ma, time, Length)
-	// canvas.Plot("downband", s.ma.Minus(s.stdevLow), time, Length)
 	fmt.Printf("%f %f\n", highestPrice, hi)
 
 	canvas.Plot("trend", s.trendLine, time, Length)
@@ -602,13 +617,21 @@ func (s *Strategy) klineHandlerMin(ctx context.Context, kline types.KLine) {
 }
 
 func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
-	var driftPred, atr float64
 	var drift []float64
+	var source fixedpoint.Value
 
 	s.frameKLine.Set(&kline)
 
-	source := s.GetSource(&kline)
-	sourcef := source.Float64()
+	price := s.getLastPrice()
+
+	sourcef := (s.innerHigh + s.innerLow) / 2
+	s.resetHighLow()
+	if sourcef == 0 {
+		source = s.GetSource(&kline)
+		sourcef = source.Float64()
+	} else {
+		source = fixedpoint.NewFromFloat(sourcef)
+	}
 	s.priceLines.Update(sourcef)
 	s.ma.Update(sourcef)
 	s.trendLine.Update(sourcef)
@@ -616,10 +639,9 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 
 	s.atr.PushK(kline)
 
-	driftPred = s.drift.Predict(s.PredictOffset)
+	driftPred := s.drift.Predict(s.PredictOffset)
 	ddriftPred := s.drift.drift.Predict(s.PredictOffset)
-	atr = s.atr.Last()
-	price := s.getLastPrice()
+	atr := s.atr.Last()
 	pricef := price.Float64()
 	lowf := math.Min(kline.Low.Float64(), pricef)
 	highf := math.Max(kline.High.Float64(), pricef)
@@ -654,22 +676,26 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	}
 
 	balances := s.GeneralOrderExecutor.Session().GetAccount().Balances()
-	bbgo.Notify("source: %.4f, price: %.4f, driftPred: %.4f, ddriftPred: %.4f, drift[1]: %.4f, ddrift[1]: %.4f, atr: %.4f, lowf %.4f, highf: %.4f lowest: %.4f highest: %.4f sp %.4f bp %.4f",
-		sourcef, pricef, driftPred, ddriftPred, drift[1], ddrift[1], atr, lowf, highf, s.lowestPrice, s.highestPrice, s.sellPrice, s.buyPrice)
-	// Notify will parse args to strings and process separately
-	bbgo.Notify("balances: [Total] %v %s [Base] %s(%v %s) [Quote] %s",
-		s.CalcAssetValue(price),
-		s.Market.QuoteCurrency,
-		balances[s.Market.BaseCurrency].String(),
-		balances[s.Market.BaseCurrency].Total().Mul(price),
-		s.Market.QuoteCurrency,
-		balances[s.Market.QuoteCurrency].String(),
-	)
+
+	startTime := kline.StartTime.Time()
+	if startTime.Round(time.Second) == startTime.Round(time.Minute) {
+		bbgo.Notify("source: %.4f, price: %.4f, driftPred: %.4f, ddriftPred: %.4f, drift[1]: %.4f, ddrift[1]: %.4f, atr: %.4f, lowf %.4f, highf: %.4f lowest: %.4f highest: %.4f sp %.4f bp %.4f",
+			sourcef, pricef, driftPred, ddriftPred, drift[1], ddrift[1], atr, lowf, highf, s.lowestPrice, s.highestPrice, s.sellPrice, s.buyPrice)
+		// Notify will parse args to strings and process separately
+		bbgo.Notify("balances: [Total] %v %s [Base] %s(%v %s) [Quote] %s",
+			s.CalcAssetValue(price),
+			s.Market.QuoteCurrency,
+			balances[s.Market.BaseCurrency].String(),
+			balances[s.Market.BaseCurrency].Total().Mul(price),
+			s.Market.QuoteCurrency,
+			balances[s.Market.QuoteCurrency].String(),
+		)
+	}
 
 	shortCondition := drift[1] >= 0 && drift[0] <= 0 || (drift[1] >= drift[0] && drift[1] <= 0) || ddrift[1] >= 0 && ddrift[0] <= 0 || (ddrift[1] >= ddrift[0] && ddrift[1] <= 0)
 	longCondition := drift[1] <= 0 && drift[0] >= 0 || (drift[1] <= drift[0] && drift[1] >= 0) || ddrift[1] <= 0 && ddrift[0] >= 0 || (ddrift[1] <= ddrift[0] && ddrift[1] >= 0)
 	if shortCondition && longCondition {
-		if drift[1] > drift[0] {
+		if kline.Open.Compare(kline.Close) > 0 {
 			longCondition = false
 		} else {
 			shortCondition = false
@@ -678,10 +704,15 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	exitCondition := s.CheckStopLoss() || s.trailingCheck(pricef, "short") || s.trailingCheck(pricef, "long")
 
 	if exitCondition || longCondition || shortCondition {
+		var err error
+		var hold int
+		atr := s.atr.Last()
 		// this is super expensive, so shouldn't execute twice in the same round
-		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
-			s.positionLock.Unlock()
+		if hold, err = s.smartCancel(ctx, sourcef, atr); err != nil {
 			log.WithError(err).Errorf("cannot cancel orders")
+		}
+		if hold > 0 {
+			s.positionLock.Unlock()
 			return
 		}
 	} else {
@@ -697,7 +728,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 
 	if exitCondition {
 		s.positionLock.Unlock()
-		_ = s.ClosePosition(ctx, fixedpoint.One)
+		//_ = s.ClosePosition(ctx, fixedpoint.One)
 		if shortCondition || longCondition {
 			s.positionLock.Lock()
 		} else {
@@ -707,11 +738,8 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 
 	if longCondition {
 		source = source.Sub(fixedpoint.NewFromFloat(s.stdevLow.Last() * s.HighLowVarianceMultiplier))
-		if source.Compare(price) > 0 {
-			source = price
-		}
-		/*source = fixedpoint.NewFromFloat(s.ma.Last() - s.stdevLow.Last()*s.HighLowVarianceMultiplier)
-		if source.Compare(price) > 0 {
+		//source = fixedpoint.NewFromFloat(s.ma.Last() - s.stdevLow.Last()*s.HighLowVarianceMultiplier)
+		/*if source.Compare(price) > 0 {
 			source = price
 		}
 		sourcef = source.Float64()*/
@@ -720,6 +748,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		s.positionLock.Unlock()
 		opt := s.OpenPositionOptions
 		opt.Long = true
+		opt.LimitOrder = s.trendLine.Last() > s.trendLine.Index(1)
 		opt.Price = source
 		opt.Tags = []string{"long"}
 		createdOrders, err := s.GeneralOrderExecutor.OpenPosition(ctx, opt)
@@ -739,9 +768,6 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	}
 	if shortCondition {
 		source = source.Add(fixedpoint.NewFromFloat(s.stdevHigh.Last() * s.HighLowVarianceMultiplier))
-		if source.Compare(price) < 0 {
-			source = price
-		}
 		/*source = fixedpoint.NewFromFloat(s.ma.Last() + s.stdevHigh.Last()*s.HighLowVarianceMultiplier)
 		if source.Compare(price) < 0 {
 			source = price
@@ -752,6 +778,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 
 		s.positionLock.Unlock()
 		opt := s.OpenPositionOptions
+		opt.LimitOrder = s.trendLine.Last() < s.trendLine.Index(1)
 		opt.Short = true
 		opt.Price = source
 		opt.Tags = []string{"short"}
@@ -963,6 +990,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		} else if kline.Interval == s.minInterval {
 			s.klineHandlerMin(ctx, kline)
 		}
+		/*if strings.HasPrefix(kline.EndTime.String(), "2022-10-05 21:46:13") {
+			panic("done")
+		}*/
 	})
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
