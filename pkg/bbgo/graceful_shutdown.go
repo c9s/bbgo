@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -16,17 +15,12 @@ type GracefulShutdown struct {
 }
 
 // Shutdown is a blocking call to emit all shutdown callbacks at the same time.
-func (g *GracefulShutdown) Shutdown(ctx context.Context) {
+// The context object here should not be canceled context, you need to create a todo context.
+func (g *GracefulShutdown) Shutdown(shutdownCtx context.Context) {
 	var wg sync.WaitGroup
 	wg.Add(len(g.shutdownCallbacks))
-
-	// for each shutdown callback, we give them 10 second
-	shtCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-
-	go g.EmitShutdown(shtCtx, &wg)
-
+	go g.EmitShutdown(shutdownCtx, &wg)
 	wg.Wait()
-	cancel()
 }
 
 func OnShutdown(ctx context.Context, f ShutdownHandler) {
@@ -34,13 +28,7 @@ func OnShutdown(ctx context.Context, f ShutdownHandler) {
 	isolatedContext.gracefulShutdown.OnShutdown(f)
 }
 
-func Shutdown(ctx context.Context) {
+func Shutdown(shutdownCtx context.Context) {
 	logrus.Infof("shutting down...")
-
-	isolatedContext := GetIsolationFromContext(ctx)
-	todo := context.WithValue(context.TODO(), IsolationContextKey, isolatedContext)
-
-	timeoutCtx, cancel := context.WithTimeout(todo, 30*time.Second)
-	defaultIsolation.gracefulShutdown.Shutdown(timeoutCtx)
-	cancel()
+	defaultIsolation.gracefulShutdown.Shutdown(shutdownCtx)
 }
