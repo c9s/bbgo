@@ -9,17 +9,19 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
+	"github.com/sirupsen/logrus"
+	"math"
 	"os"
 	"sync"
-
-	"github.com/sirupsen/logrus"
+	"time"
 )
 
 const ID = "irr"
 
 var one = fixedpoint.One
 var zero = fixedpoint.Zero
-var Fee = 0.0008 // taker fee % * 2, for upper bound
+var Fee = 0.000 // taker fee % * 2, for upper bound
 
 var log = logrus.WithField("strategy", ID)
 
@@ -47,7 +49,16 @@ type Strategy struct {
 	orderExecutor *bbgo.GeneralOrderExecutor
 
 	bbgo.QuantityOrAmount
-	nrr *NRR
+
+	HumpThreshold float64 `json:"humpThreshold"`
+
+	lastTwoPrices *types.Queue
+	// for back-test
+	Nrr *NRR
+	// for realtime book ticker
+	lastPrice fixedpoint.Value
+	rtNrr     *types.Queue
+	stopC     chan struct{}
 
 	// StrategyController
 	bbgo.StrategyController
@@ -194,10 +205,10 @@ func (r *AccumulatedProfitReport) Output(symbol string) {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
-
 	if !bbgo.IsBackTesting {
-		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+		session.Subscribe(types.BookTickerChannel, s.Symbol, types.SubscribeOptions{})
+	} else {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 	}
 
 	s.ExitMethods.SetAndSubscribe(session, s)
@@ -273,9 +284,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			s.AccumulatedProfitReport.RecordProfit(profit.Profit)
 		})
-		// s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		// 	s.AccumulatedProfitReport.RecordTrade(trade.Fee)
-		// })
 		session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1d, func(kline types.KLine) {
 			s.AccumulatedProfitReport.DailyUpdate(s.TradeStats)
 		}))
@@ -319,63 +327,59 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
+	s.InitDrawCommands(&profitSlice, &cumProfitSlice)
+
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
 	s.orderExecutor.Bind()
 	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
 
-	for _, method := range s.ExitMethods {
-		method.Bind(session, s.orderExecutor)
-	}
-
+	//back-test only, because 1s delayed a lot
 	kLineStore, _ := s.session.MarketDataStore(s.Symbol)
-	s.nrr = &NRR{IntervalWindow: types.IntervalWindow{Window: 2, Interval: s.Interval}, RankingWindow: s.Window}
-	s.nrr.BindK(s.session.MarketDataStream, s.Symbol, s.Interval)
-	if klines, ok := kLineStore.KLinesOfInterval(s.nrr.Interval); ok {
-		s.nrr.LoadK((*klines)[0:])
+	s.Nrr = &NRR{IntervalWindow: types.IntervalWindow{Window: 2, Interval: s.Interval}, RankingWindow: s.Window}
+	s.Nrr.BindK(s.session.MarketDataStream, s.Symbol, s.Interval)
+	if klines, ok := kLineStore.KLinesOfInterval(s.Nrr.Interval); ok {
+		s.Nrr.LoadK((*klines)[0:])
 	}
 
-	// startTime := s.Environment.StartTime()
-	// s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1h, startTime))
+	s.lastTwoPrices = types.NewQueue(2) // current price & previous price
+	s.rtNrr = types.NewQueue(s.Window)
+	if !bbgo.IsBackTesting {
 
-	s.session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
+		s.stopC = make(chan struct{})
 
-		// ts_rank(): transformed to [0~1] which divided equally
-		// queued first signal as its initial process
-		// important: delayed signal in order to submit order at current kline close (a.k.a. next open while in production)
-		// instead of right in current kline open
+		go func() {
+			secondTicker := time.NewTicker(util.MillisecondsJitter(s.Interval.Duration(), 200))
+			defer secondTicker.Stop()
 
-		// alpha-weighted assets (inventory and capital)
-		targetBase := s.QuantityOrAmount.CalculateQuantity(kline.Close).Mul(fixedpoint.NewFromFloat(s.nrr.RankedValues.Index(1)))
-		diffQty := targetBase.Sub(s.Position.Base)
+			for {
+				select {
+				case <-secondTicker.C:
+					s.rebalancePosition(true)
+				case <-s.stopC:
+					log.Warnf("%s goroutine stopped, due to the stop signal", s.Symbol)
+					return
 
-		log.Infof("decision alpah: %f, ranked negative return: %f, current position: %f, target position diff: %f", s.nrr.RankedValues.Index(1), s.nrr.RankedValues.Last(), s.Position.Base.Float64(), diffQty.Float64())
+				case <-ctx.Done():
+					log.Warnf("%s goroutine stopped, due to the cancelled context", s.Symbol)
+					return
+				}
+			}
+		}()
 
-		// use kline direction to prevent reversing position too soon
-		if diffQty.Sign() > 0 { // && kline.Direction() >= 0
-			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:   s.Symbol,
-				Side:     types.SideTypeBuy,
-				Quantity: diffQty.Abs(),
-				Type:     types.OrderTypeMarket,
-				Tag:      "irr buy more",
-			})
-		} else if diffQty.Sign() < 0 { // && kline.Direction() <= 0
-			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:   s.Symbol,
-				Side:     types.SideTypeSell,
-				Quantity: diffQty.Abs(),
-				Type:     types.OrderTypeMarket,
-				Tag:      "irr sell more",
-			})
-		}
-
-	}))
+		s.session.MarketDataStream.OnBookTickerUpdate(func(bt types.BookTicker) {
+			s.lastPrice = bt.Buy.Add(bt.Sell).Div(fixedpoint.Two)
+		})
+	} else {
+		s.session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+			s.lastPrice = kline.Close
+			s.rebalancePosition(false)
+		})
+	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-
 		// Output accumulated profit report
 		if bbgo.IsBackTesting {
 			defer s.AccumulatedProfitReport.Output(s.Symbol)
@@ -385,8 +389,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					log.WithError(err).Errorf("cannot draw graph")
 				}
 			}
+		} else {
+			close(s.stopC)
 		}
-		
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
 		_ = s.orderExecutor.GracefulCancel(ctx)
 	})
@@ -397,4 +402,76 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 func (s *Strategy) CalcAssetValue(price fixedpoint.Value) fixedpoint.Value {
 	balances := s.session.GetAccount().Balances()
 	return balances[s.Market.BaseCurrency].Total().Mul(price).Add(balances[s.Market.QuoteCurrency].Total())
+}
+
+func (s *Strategy) rebalancePosition(rt bool) {
+
+	s.lastTwoPrices.Update(s.lastPrice.Float64())
+	if s.lastTwoPrices.Length() >= 2 {
+		log.Infof("Interval Closed Price: %f", s.lastTwoPrices.Last())
+		// main idea: negative return
+		nr := -1 * (s.lastTwoPrices.Last()/s.lastTwoPrices.Index(1) - 1)
+		if rt {
+			// hump operation to reduce noise
+			// update nirr indicator when above threshold
+			if math.Abs(s.rtNrr.Last()-nr) < s.HumpThreshold {
+				s.rtNrr.Update(s.rtNrr.Last())
+			} else {
+				s.rtNrr.Update(nr)
+				return
+			}
+		} else {
+			if math.Abs(s.Nrr.Last()-s.Nrr.Index(1)) < s.HumpThreshold {
+				return
+			}
+		}
+
+		// when have enough Nrr to do ts_rank()
+		if (s.rtNrr.Length() >= s.Window && rt) || (s.Nrr.Length() >= s.Window && !rt) {
+
+			// alpha-weighted assets (inventory and capital)
+			position := s.orderExecutor.Position()
+			// weight: 0~1, since it's a long only strategy
+			weight := fixedpoint.NewFromFloat(s.rtNrr.Rank(s.Window).Last() / float64(s.Window))
+			if !rt {
+				weight = fixedpoint.NewFromFloat(s.Nrr.Rank(s.Window).Last() / float64(s.Window))
+			}
+			targetBase := s.QuantityOrAmount.CalculateQuantity(fixedpoint.NewFromFloat(s.lastTwoPrices.Mean(2))).Mul(weight)
+
+			// to buy/sell quantity
+			diffQty := targetBase.Sub(position.Base)
+			log.Infof("Alpha: %f/1.0, Target Position Diff: %f", weight.Float64(), diffQty.Float64())
+
+			// ignore small changes
+			if diffQty.Abs().Float64() < 0.001 {
+				return
+			}
+			// re-balance position
+			if diffQty.Sign() > 0 {
+				_, err := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
+					Symbol:   s.Symbol,
+					Side:     types.SideTypeBuy,
+					Quantity: diffQty.Abs(),
+					Type:     types.OrderTypeMarket,
+					//Price:    bt.Sell,
+					Tag: "irr re-balance: buy",
+				})
+				if err != nil {
+					log.WithError(err)
+				}
+			} else if diffQty.Sign() < 0 {
+				_, err := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
+					Symbol:   s.Symbol,
+					Side:     types.SideTypeSell,
+					Quantity: diffQty.Abs(),
+					Type:     types.OrderTypeMarket,
+					//Price:    bt.Buy,
+					Tag: "irr re-balance: sell",
+				})
+				if err != nil {
+					log.WithError(err)
+				}
+			}
+		}
+	}
 }
