@@ -15,9 +15,10 @@ exchangeStrategies:
 - on: binance
   irr:
     symbol: BTCBUSD
-    interval: 1m
+    interval: 1s
     window: 120
-    amount: 5_000.0
+    amount: 500.0
+    humpThreshold: 0.000025
     # Draw pnl
     drawGraph: true
     graphPNLPath: "./pnl.png"
@@ -26,8 +27,9 @@ exchangeStrategies:
 backtest:
   sessions:
     - binance
-  startTime: "2022-09-01"
-  endTime: "2022-10-04"
+  startTime: "2022-10-09"
+  endTime: "2022-10-11"
+#  syncSecKLines: true
   symbols:
     - BTCBUSD
   accounts:
