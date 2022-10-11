@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -77,7 +78,11 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 	cancelTrading()
 
-	bbgo.Shutdown(ctx)
+	gracefulShutdownPeriod := 30 * time.Second
+	shtCtx, cancelShutdown := context.WithTimeout(bbgo.NewTodoContextWithExistingIsolation(ctx), gracefulShutdownPeriod)
+	bbgo.Shutdown(shtCtx)
+	cancelShutdown()
+
 	return nil
 }
 
@@ -196,7 +201,10 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
 	cancelTrading()
 
-	bbgo.Shutdown(ctx)
+	gracefulShutdownPeriod := 30 * time.Second
+	shtCtx, cancelShutdown := context.WithTimeout(bbgo.NewTodoContextWithExistingIsolation(ctx), gracefulShutdownPeriod)
+	bbgo.Shutdown(shtCtx)
+	cancelShutdown()
 
 	if err := trader.SaveState(); err != nil {
 		log.WithError(err).Errorf("can not save strategy states")
