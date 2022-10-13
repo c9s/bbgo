@@ -13,9 +13,9 @@ exchangeStrategies:
   - on: max
     marketcap:
       interval: 1m
-      baseCurrency: TWD
-      baseWeight: 0%
-      targetCurrencies:
+      quoteCurrency: TWD
+      quoteCurrencyWeight: 0%
+      baseCurrencies:
         - BTC
         - ETH
         - MATIC
