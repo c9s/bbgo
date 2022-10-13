@@ -338,13 +338,15 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 		s.Session.MarketDataStream.OnBookTickerUpdate(func(ticker types.BookTicker) {
 			bestBid := ticker.Buy
 			bestAsk := ticker.Sell
+			bidVol := ticker.BuySize
+			askVol := ticker.SellSize
 
 			var pricef float64
 			if !util.TryLock(&s.lock) {
 				return
 			}
 			if !bestAsk.IsZero() && !bestBid.IsZero() {
-				s.midPrice = bestAsk.Add(bestBid).Div(Two)
+				s.midPrice = bestAsk.Mul(askVol).Add(bestBid.Mul(bidVol)).Div(bidVol.Add(askVol))
 			} else if !bestAsk.IsZero() {
 				s.midPrice = bestAsk
 			} else {
@@ -409,11 +411,14 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 
 }
 
-func (s *Strategy) resetHighLow() {
+func (s *Strategy) resetHighLow() (innerHigh, innerLow float64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	innerHigh = s.innerHigh
+	innerLow = s.innerLow
 	s.innerHigh = 0
 	s.innerLow = 0
+	return s.innerLow, s.innerHigh
 }
 
 func (s *Strategy) DrawIndicators(time types.Time) *types.Canvas {
@@ -619,18 +624,26 @@ func (s *Strategy) klineHandlerMin(ctx context.Context, kline types.KLine) {
 func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	var drift []float64
 	var source fixedpoint.Value
+	var lowf, highf float64
 
 	s.frameKLine.Set(&kline)
 
 	price := s.getLastPrice()
+	pricef := price.Float64()
 
-	sourcef := (s.innerHigh + s.innerLow) / 2
-	s.resetHighLow()
+	innerHigh, innerLow := s.resetHighLow()
+	sourcef := (innerHigh + innerLow) / 2
 	if sourcef == 0 {
 		source = s.GetSource(&kline)
 		sourcef = source.Float64()
+		highf = math.Min(kline.High.Float64(), pricef)
+		lowf = math.Max(kline.High.Float64(), pricef)
+		s.atr.PushK(kline)
 	} else {
 		source = fixedpoint.NewFromFloat(sourcef)
+		lowf = math.Min(innerLow, pricef)
+		highf = math.Max(innerHigh, pricef)
+		s.atr.Update(innerHigh, innerLow, pricef)
 	}
 	s.priceLines.Update(sourcef)
 	s.ma.Update(sourcef)
@@ -642,9 +655,6 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	driftPred := s.drift.Predict(s.PredictOffset)
 	ddriftPred := s.drift.drift.Predict(s.PredictOffset)
 	atr := s.atr.Last()
-	pricef := price.Float64()
-	lowf := math.Min(kline.Low.Float64(), pricef)
-	highf := math.Max(kline.High.Float64(), pricef)
 	lowdiff := s.ma.Last() - lowf
 	s.stdevLow.Update(lowdiff)
 	highdiff := highf - s.ma.Last()
@@ -885,12 +895,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.highestPrice = 0
 			s.lowestPrice = 0
 		} else if s.p.IsLong() {
-			s.buyPrice = s.p.ApproximateAverageCost.Float64() // trade.Price.Float64()
+			s.buyPrice = s.p.ApproximateAverageCost.Float64()
 			s.sellPrice = 0
 			s.highestPrice = math.Max(s.buyPrice, s.highestPrice)
 			s.lowestPrice = s.buyPrice
 		} else if s.p.IsShort() {
-			s.sellPrice = s.p.ApproximateAverageCost.Float64() // trade.Price.Float64()
+			s.sellPrice = s.p.ApproximateAverageCost.Float64()
 			s.buyPrice = 0
 			s.highestPrice = s.sellPrice
 			if s.lowestPrice == 0 {

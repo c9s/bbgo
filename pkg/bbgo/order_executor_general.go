@@ -380,7 +380,6 @@ func (e *GeneralOrderExecutor) CancelActiveOrderBookNoWait(ctx context.Context, 
 		return fmt.Errorf("cancel order error: %w", err)
 	}
 
-	//e.tradeCollector.Process()
 	return nil
 }
 

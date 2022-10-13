@@ -50,7 +50,7 @@ exchangeStrategies:
     # orders not been traded will be canceled after `pendingSeconds` seconds
     pendingSeconds: 10
     noRebalance: true
-    trendWindow: 15
+    trendWindow: 12
     rebalanceFilter: 2
     
     # ActivationRatio should be increasing order
@@ -125,8 +125,8 @@ sync:
     - BTCUSDT
 
 backtest:
-  startTime: "2022-10-07"
-  endTime: "2022-10-08"
+  startTime: "2022-10-12"
+  endTime: "2022-10-13"
   symbols:
     - BTCUSDT
   sessions: [binance]

@@ -156,10 +156,6 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 		}
 
 		log.Debugf("[ActiveOrderBook] waiting %s for %s orders to be cancelled...", waitTime, b.Symbol)
-		for _, o := range b.Orders() {
-			b.Remove(o)
-		}
-		break
 
 		clear, err := b.waitAllClear(ctx, waitTime, 5*time.Second)
 		if clear || err != nil {

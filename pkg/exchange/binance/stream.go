@@ -48,6 +48,7 @@ type Stream struct {
 
 	markPriceUpdateEventCallbacks []func(e *MarkPriceUpdateEvent)
 	marketTradeEventCallbacks     []func(e *MarketTradeEvent)
+	aggTradeEventCallbacks        []func(e *AggTradeEvent)
 
 	continuousKLineEventCallbacks       []func(e *ContinuousKLineEvent)
 	continuousKLineClosedEventCallbacks []func(e *ContinuousKLineEvent)
@@ -341,6 +342,9 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *MarketTradeEvent:
 		s.EmitMarketTradeEvent(e)
+
+	case *AggTradeEvent:
+		s.EmitAggTradeEvent(e)
 
 	case *KLineEvent:
 		s.EmitKLineEvent(e)
