@@ -21,7 +21,7 @@ func init() {
 
 type Strategy struct {
 	Interval      types.Interval   `json:"interval"`
-	BaseCurrency  string           `json:"baseCurrency"`
+	QuoteCurrency string           `json:"quoteCurrency"`
 	TargetWeights types.ValueMap   `json:"targetWeights"`
 	Threshold     fixedpoint.Value `json:"threshold"`
 	DryRun        bool             `json:"dryRun"`
@@ -121,11 +121,11 @@ func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) ty
 	}
 
 	for currency := range s.TargetWeights {
-		if currency == s.BaseCurrency {
-			m[s.BaseCurrency] = fixedpoint.One
+		if currency == s.QuoteCurrency {
+			m[s.QuoteCurrency] = fixedpoint.One
 			continue
 		}
-		m[currency] = tickers[currency+s.BaseCurrency].Last
+		m[currency] = tickers[currency+s.QuoteCurrency].Last
 	}
 
 	return m
@@ -148,11 +148,11 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 	currentWeights := marketValues.Normalize()
 
 	for currency, targetWeight := range s.TargetWeights {
-		if currency == s.BaseCurrency {
+		if currency == s.QuoteCurrency {
 			continue
 		}
 
-		symbol := currency + s.BaseCurrency
+		symbol := currency + s.QuoteCurrency
 		currentWeight := currentWeights[currency]
 		currentPrice := prices[currency]
 
@@ -211,10 +211,10 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 
 func (s *Strategy) symbols() (symbols []string) {
 	for currency := range s.TargetWeights {
-		if currency == s.BaseCurrency {
+		if currency == s.QuoteCurrency {
 			continue
 		}
-		symbols = append(symbols, currency+s.BaseCurrency)
+		symbols = append(symbols, currency+s.QuoteCurrency)
 	}
 	return symbols
 }
