@@ -12,7 +12,7 @@ exchangeStrategies:
   - on: max
     rebalance:
       interval: 1d
-      baseCurrency: TWD
+      quoteCurrency: TWD
       targetWeights:
         BTC: 40%
         ETH: 20%
