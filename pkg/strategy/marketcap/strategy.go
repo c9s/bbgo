@@ -26,12 +26,12 @@ type Strategy struct {
 	datasource *coinmarketcap.DataSource
 
 	// interval to rebalance the portfolio
-	Interval         types.Interval   `json:"interval"`
-	BaseCurrency     string           `json:"baseCurrency"`
-	BaseWeight       fixedpoint.Value `json:"baseWeight"`
-	TargetCurrencies []string         `json:"targetCurrencies"`
-	Threshold        fixedpoint.Value `json:"threshold"`
-	DryRun           bool             `json:"dryRun"`
+	Interval            types.Interval   `json:"interval"`
+	QuoteCurrency       string           `json:"quoteCurrency"`
+	QuoteCurrencyWeight fixedpoint.Value `json:"quoteCurrencyWeight"`
+	BaseCurrencies      []string         `json:"baseCurrencies"`
+	Threshold           fixedpoint.Value `json:"threshold"`
+	DryRun              bool             `json:"dryRun"`
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
 	// interval to query marketcap data from coinmarketcap
@@ -47,7 +47,7 @@ func (s *Strategy) Initialize() error {
 	s.datasource = coinmarketcap.New(apiKey)
 
 	// select one symbol to subscribe
-	s.subscribeSymbol = s.TargetCurrencies[0] + s.BaseCurrency
+	s.subscribeSymbol = s.BaseCurrencies[0] + s.QuoteCurrency
 
 	s.activeOrderBook = bbgo.NewActiveOrderBook("")
 	s.targetWeights = types.ValueMap{}
@@ -59,12 +59,12 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if len(s.TargetCurrencies) == 0 {
+	if len(s.BaseCurrencies) == 0 {
 		return fmt.Errorf("taretCurrencies should not be empty")
 	}
 
-	for _, c := range s.TargetCurrencies {
-		if c == s.BaseCurrency {
+	for _, c := range s.BaseCurrencies {
+		if c == s.QuoteCurrency {
 			return fmt.Errorf("targetCurrencies contain baseCurrency")
 		}
 	}
@@ -81,7 +81,7 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	symbol := s.TargetCurrencies[0] + s.BaseCurrency
+	symbol := s.BaseCurrencies[0] + s.QuoteCurrency
 	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval})
 	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.QueryInterval})
 }
@@ -131,10 +131,10 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 	currentWeights := marketValues.Normalize()
 
 	for currency, targetWeight := range s.targetWeights {
-		if currency == s.BaseCurrency {
+		if currency == s.QuoteCurrency {
 			continue
 		}
-		symbol := currency + s.BaseCurrency
+		symbol := currency + s.QuoteCurrency
 		currentWeight := currentWeights[currency]
 		currentPrice := prices[currency]
 
@@ -198,7 +198,7 @@ func (s *Strategy) updateTargetWeights(ctx context.Context) {
 		log.WithError(err).Error("failed to query market cap")
 	}
 
-	for _, currency := range s.TargetCurrencies {
+	for _, currency := range s.BaseCurrencies {
 		m[currency] = marketcaps[currency]
 	}
 
@@ -206,10 +206,10 @@ func (s *Strategy) updateTargetWeights(ctx context.Context) {
 	m = m.Normalize()
 
 	// rescale by 1 - baseWeight
-	m = m.MulScalar(1.0 - s.BaseWeight.Float64())
+	m = m.MulScalar(1.0 - s.QuoteCurrencyWeight.Float64())
 
 	// append base weight
-	m[s.BaseCurrency] = s.BaseWeight.Float64()
+	m[s.QuoteCurrency] = s.QuoteCurrencyWeight.Float64()
 
 	// convert to types.ValueMap
 	for currency, weight := range m {
@@ -227,12 +227,12 @@ func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) ty
 	}
 
 	prices := types.ValueMap{}
-	for _, currency := range s.TargetCurrencies {
-		prices[currency] = tickers[currency+s.BaseCurrency].Last
+	for _, currency := range s.BaseCurrencies {
+		prices[currency] = tickers[currency+s.QuoteCurrency].Last
 	}
 
 	// append base currency price
-	prices[s.BaseCurrency] = fixedpoint.One
+	prices[s.QuoteCurrency] = fixedpoint.One
 
 	return prices
 }
@@ -249,14 +249,14 @@ func (s *Strategy) quantities(session *bbgo.ExchangeSession) types.ValueMap {
 }
 
 func (s *Strategy) symbols() (symbols []string) {
-	for _, currency := range s.TargetCurrencies {
-		symbols = append(symbols, currency+s.BaseCurrency)
+	for _, currency := range s.BaseCurrencies {
+		symbols = append(symbols, currency+s.QuoteCurrency)
 	}
 	return symbols
 }
 
 func (s *Strategy) currencies() (currencies []string) {
-	currencies = append(currencies, s.TargetCurrencies...)
-	currencies = append(currencies, s.BaseCurrency)
+	currencies = append(currencies, s.BaseCurrencies...)
+	currencies = append(currencies, s.QuoteCurrency)
 	return currencies
 }
