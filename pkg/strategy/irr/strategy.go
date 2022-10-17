@@ -48,7 +48,9 @@ type Strategy struct {
 
 	bbgo.QuantityOrAmount
 
-	Interval int `json:"hftInterval"`
+	Interval int  `json:"hftInterval"`
+	NR       bool `json:"NR"`
+	MR       bool `json:"MR"`
 
 	// for back-test
 	Nrr *NRR
@@ -411,7 +413,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				if s.rtMr.Length() >= 100 {
 					rtMrRank = s.rtMr.Rank(s.rtMr.Length()).Last() / float64(s.rtMr.Length())
 				}
-				s.rtWeight.Update((rtNrRank + rtMrRank) / 2)
+				alpha := 0.
+				if s.NR && s.MR {
+					alpha = (rtNrRank + rtMrRank) / 2
+				} else if s.NR && !s.MR {
+					alpha = rtNrRank
+				} else if !s.NR && s.MR {
+					alpha = rtMrRank
+				}
+				s.rtWeight.Update(alpha)
 				//rtWeightRank := 0.
 				//if s.rtWeight.Length() >= 100 {
 				//	rtWeightRank = s.rtWeight.Rank(s.rtWeight.Length()).Last() / float64(s.rtWeight.Length())
