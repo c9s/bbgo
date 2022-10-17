@@ -3,6 +3,10 @@ package irr
 import (
 	"context"
 	"fmt"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
@@ -11,8 +15,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/atomic"
-	"os"
-	"sync"
 )
 
 const ID = "irr"
@@ -58,6 +60,8 @@ type Strategy struct {
 	// realtime book ticker to submit order
 	obBuyPrice  *atomic.Float64
 	obSellPrice *atomic.Float64
+	// for getting close price
+	currentTradePrice *atomic.Float64
 	// for negative return rate
 	openPrice  float64
 	closePrice float64
@@ -369,11 +373,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.rtWeight = types.NewQueue(100)
 
-	currentRoundTime := int64(0)
-	previousRoundTime := int64(0)
-
-	currentTradePrice := 0.
-	previousTradePrice := 0.
+	s.currentTradePrice = atomic.NewFloat64(0)
 
 	if !bbgo.IsBackTesting {
 
@@ -384,55 +384,80 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		})
 
 		s.session.MarketDataStream.OnAggTrade(func(trade types.Trade) {
-			// rounding to 1000 milliseconds if hftInterval is set to 1000
-			currentRoundTime = trade.Time.UnixMilli() % int64(s.Interval)
-			currentTradePrice = trade.Price.Float64()
-			if currentRoundTime < previousRoundTime {
-
-				s.openPrice = s.closePrice
-				// D0 strategy can use now data
-				// D1 strategy only use previous data (we're here)
-				s.closePrice = previousTradePrice
-				//log.Infof("Previous Close Price: %f", s.closePrice)
-				//log.Infof("Previous Open Price: %f", s.openPrice)
-				log.Infof("Now Open Price: %f", currentTradePrice)
-				s.orderExecutor.CancelNoWait(ctx)
-				// calculate real-time Negative Return
-				s.rtNr.Update(s.openPrice - s.closePrice)
-				// calculate real-time Negative Return Rank
-				rtNrRank := 0.
-				if s.rtNr.Length() >= 100 {
-					rtNrRank = s.rtNr.Rank(s.rtNr.Length()).Last() / float64(s.rtNr.Length())
-				}
-				// calculate real-time Mean Reversion
-				s.rtMaFast.Update(s.closePrice)
-				s.rtMaSlow.Update(s.closePrice)
-				s.rtMr.Update((s.rtMaSlow.Mean() - s.rtMaFast.Mean()) / s.rtMaSlow.Mean())
-				// calculate real-time Mean Reversion Rank
-				rtMrRank := 0.
-				if s.rtMr.Length() >= 100 {
-					rtMrRank = s.rtMr.Rank(s.rtMr.Length()).Last() / float64(s.rtMr.Length())
-				}
-				alpha := 0.
-				if s.NR && s.MR {
-					alpha = (rtNrRank + rtMrRank) / 2
-				} else if s.NR && !s.MR {
-					alpha = rtNrRank
-				} else if !s.NR && s.MR {
-					alpha = rtMrRank
-				}
-				s.rtWeight.Update(alpha)
-				//rtWeightRank := 0.
-				//if s.rtWeight.Length() >= 100 {
-				//	rtWeightRank = s.rtWeight.Rank(s.rtWeight.Length()).Last() / float64(s.rtWeight.Length())
-				//}
-				log.Infof("Alpha: %f/1.0", s.rtWeight.Last())
-				s.rebalancePosition(s.obBuyPrice.Load(), s.obSellPrice.Load(), s.rtWeight.Last())
-			}
-
-			previousRoundTime = currentRoundTime
-			previousTradePrice = currentTradePrice
+			s.currentTradePrice = atomic.NewFloat64(trade.Price.Float64())
 		})
+
+		go func() {
+			intervalCloseTicker := time.NewTicker(time.Duration(s.Interval) * time.Millisecond)
+			defer intervalCloseTicker.Stop()
+
+			for {
+				select {
+				case <-intervalCloseTicker.C:
+					if s.currentTradePrice.Load() > 0 {
+						s.closePrice = s.currentTradePrice.Load()
+						//log.Infof("Close Price: %f", s.closePrice)
+						// calculate real-time Negative Return
+						s.rtNr.Update((s.openPrice - s.closePrice) / s.openPrice)
+						// calculate real-time Negative Return Rank
+						rtNrRank := 0.
+						if s.rtNr.Length() > 2 {
+							rtNrRank = s.rtNr.Rank(s.rtNr.Length()).Last() / float64(s.rtNr.Length())
+						}
+						// calculate real-time Mean Reversion
+						s.rtMaFast.Update(s.closePrice)
+						s.rtMaSlow.Update(s.closePrice)
+						s.rtMr.Update((s.rtMaSlow.Mean() - s.rtMaFast.Mean()) / s.rtMaSlow.Mean())
+						// calculate real-time Mean Reversion Rank
+						rtMrRank := 0.
+						if s.rtMr.Length() > 2 {
+							rtMrRank = s.rtMr.Rank(s.rtMr.Length()).Last() / float64(s.rtMr.Length())
+						}
+						alpha := 0.
+						if s.NR && s.MR {
+							alpha = (rtNrRank + rtMrRank) / 2
+						} else if s.NR && !s.MR {
+							alpha = rtNrRank
+						} else if !s.NR && s.MR {
+							alpha = rtMrRank
+						}
+						s.rtWeight.Update(alpha)
+						log.Infof("Alpha: %f/1.0", s.rtWeight.Last())
+						s.rebalancePosition(s.obBuyPrice.Load(), s.obSellPrice.Load(), s.rtWeight.Last())
+						s.orderExecutor.CancelNoWait(context.Background())
+					}
+				case <-s.stopC:
+					log.Warnf("%s goroutine stopped, due to the stop signal", s.Symbol)
+					return
+
+				case <-ctx.Done():
+					log.Warnf("%s goroutine stopped, due to the cancelled context", s.Symbol)
+					return
+				}
+			}
+		}()
+
+		go func() {
+			intervalOpenTicker := time.NewTicker(time.Duration(s.Interval) * time.Millisecond)
+			defer intervalOpenTicker.Stop()
+			for {
+				select {
+				case <-intervalOpenTicker.C:
+					time.Sleep(200 * time.Microsecond)
+					if s.currentTradePrice.Load() > 0 {
+						s.openPrice = s.currentTradePrice.Load()
+						//log.Infof("Open Price: %f", s.openPrice)
+					}
+				case <-s.stopC:
+					log.Warnf("%s goroutine stopped, due to the stop signal", s.Symbol)
+					return
+
+				case <-ctx.Done():
+					log.Warnf("%s goroutine stopped, due to the cancelled context", s.Symbol)
+					return
+				}
+			}
+		}()
 	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
