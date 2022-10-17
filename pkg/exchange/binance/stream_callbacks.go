@@ -54,6 +54,16 @@ func (s *Stream) EmitMarketTradeEvent(e *MarketTradeEvent) {
 	}
 }
 
+func (s *Stream) OnAggTradeEvent(cb func(e *AggTradeEvent)) {
+	s.aggTradeEventCallbacks = append(s.aggTradeEventCallbacks, cb)
+}
+
+func (s *Stream) EmitAggTradeEvent(e *AggTradeEvent) {
+	for _, cb := range s.aggTradeEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnContinuousKLineEvent(cb func(e *ContinuousKLineEvent)) {
 	s.continuousKLineEventCallbacks = append(s.continuousKLineEventCallbacks, cb)
 }
@@ -174,6 +184,8 @@ type StreamEventHub interface {
 	OnMarkPriceUpdateEvent(cb func(e *MarkPriceUpdateEvent))
 
 	OnMarketTradeEvent(cb func(e *MarketTradeEvent))
+
+	OnAggTradeEvent(cb func(e *AggTradeEvent))
 
 	OnContinuousKLineEvent(cb func(e *ContinuousKLineEvent))
 

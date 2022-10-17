@@ -295,6 +295,8 @@ func convertSubscription(s types.Subscription) string {
 	// binance uses lower case symbol name,
 	// for kline, it's "<symbol>@kline_<interval>"
 	// for depth, it's "<symbol>@depth OR <symbol>@depth@100ms"
+	// for trade, it's "<symbol>@trade"
+	// for aggregated trade, it's "<symbol>@aggTrade"
 	switch s.Channel {
 	case types.KLineChannel:
 		return fmt.Sprintf("%s@%s_%s", strings.ToLower(s.Symbol), s.Channel, s.Options.String())
@@ -326,6 +328,10 @@ func convertSubscription(s types.Subscription) string {
 		return n
 	case types.BookTickerChannel:
 		return fmt.Sprintf("%s@bookTicker", strings.ToLower(s.Symbol))
+	case types.MarketTradeChannel:
+		return fmt.Sprintf("%s@trade", strings.ToLower(s.Symbol))
+	case types.AggTradeChannel:
+		return fmt.Sprintf("%s@aggTrade", strings.ToLower(s.Symbol))
 	}
 
 	return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)

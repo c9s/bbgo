@@ -48,6 +48,7 @@ type Stream struct {
 
 	markPriceUpdateEventCallbacks []func(e *MarkPriceUpdateEvent)
 	marketTradeEventCallbacks     []func(e *MarketTradeEvent)
+	aggTradeEventCallbacks        []func(e *AggTradeEvent)
 
 	continuousKLineEventCallbacks       []func(e *ContinuousKLineEvent)
 	continuousKLineClosedEventCallbacks []func(e *ContinuousKLineEvent)
@@ -120,6 +121,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnExecutionReportEvent(stream.handleExecutionReportEvent)
 	stream.OnContinuousKLineEvent(stream.handleContinuousKLineEvent)
 	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
+	stream.OnAggTradeEvent(stream.handleAggTradeEvent)
 
 	// Event type ACCOUNT_UPDATE from user data stream updates Balance and FuturesPosition.
 	stream.OnAccountUpdateEvent(stream.handleAccountUpdateEvent)
@@ -216,6 +218,10 @@ func (s *Stream) handleBookTickerEvent(e *BookTickerEvent) {
 
 func (s *Stream) handleMarketTradeEvent(e *MarketTradeEvent) {
 	s.EmitMarketTrade(e.Trade())
+}
+
+func (s *Stream) handleAggTradeEvent(e *AggTradeEvent) {
+	s.EmitAggTrade(e.Trade())
 }
 
 func (s *Stream) handleKLineEvent(e *KLineEvent) {
@@ -341,6 +347,9 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *MarketTradeEvent:
 		s.EmitMarketTradeEvent(e)
+
+	case *AggTradeEvent:
+		s.EmitAggTradeEvent(e)
 
 	case *KLineEvent:
 		s.EmitKLineEvent(e)
