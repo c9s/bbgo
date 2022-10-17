@@ -227,7 +227,6 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 	}
 
 	baseBalance, hasBaseBalance := session.Account.Balance(market.BaseCurrency)
-	quoteBalance, _ := session.Account.Balance(market.QuoteCurrency)
 	balances := session.Account.Balances()
 
 	usingLeverage := session.Margin || session.IsolatedMargin || session.Futures || session.IsolatedFutures
@@ -321,12 +320,7 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 	}
 
 	if session.Futures || session.IsolatedFutures {
-		// TODO: get mark price here
 		maxPositionQuantity := risk.CalculateMaxPosition(price, totalUsdValue, leverage)
-		requiredPositionCost := risk.CalculatePositionCost(price, price, maxPositionQuantity, leverage, types.SideTypeSell)
-		if quoteBalance.Available.Compare(requiredPositionCost) < 0 {
-			return maxPositionQuantity, fmt.Errorf("margin total usd value %f is not enough, can not submit order", totalUsdValue.Float64())
-		}
 
 		return maxPositionQuantity, nil
 	}
