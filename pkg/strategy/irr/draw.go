@@ -16,44 +16,38 @@ func (s *Strategy) InitDrawCommands(profit, cumProfit, cumProfitDollar types.Ser
 
 		canvas := DrawPNL(s.InstanceID(), profit)
 		var buffer bytes.Buffer
-		go func() {
-			if err := canvas.Render(chart.PNG, &buffer); err != nil {
-				log.WithError(err).Errorf("cannot render return in irr")
-				reply.Message(fmt.Sprintf("[error] cannot render return in irr: %v", err))
-				return
-			}
-			bbgo.SendPhoto(&buffer)
+		if err := canvas.Render(chart.PNG, &buffer); err != nil {
+			log.WithError(err).Errorf("cannot render return in irr")
+			reply.Message(fmt.Sprintf("[error] cannot render return in irr: %v", err))
 			return
-		}()
+		}
+		bbgo.SendPhoto(&buffer)
+		return
 	})
 	bbgo.RegisterCommand("/nav", "Draw Net Assets Value", func(reply interact.Reply) {
 
 		canvas := DrawCumPNL(s.InstanceID(), cumProfit)
 		var buffer bytes.Buffer
-		go func() {
-			if err := canvas.Render(chart.PNG, &buffer); err != nil {
-				log.WithError(err).Errorf("cannot render nav in irr")
-				reply.Message(fmt.Sprintf("[error] canot render nav in irr: %v", err))
-				return
-			}
-			bbgo.SendPhoto(&buffer)
+		if err := canvas.Render(chart.PNG, &buffer); err != nil {
+			log.WithError(err).Errorf("cannot render nav in irr")
+			reply.Message(fmt.Sprintf("[error] canot render nav in irr: %v", err))
 			return
-		}()
+		}
+		bbgo.SendPhoto(&buffer)
+		return
 
 	})
 	bbgo.RegisterCommand("/pnl", "Draw Cumulative Profit & Loss", func(reply interact.Reply) {
 
 		canvas := DrawCumPNL(s.InstanceID(), cumProfitDollar)
 		var buffer bytes.Buffer
-		go func() {
-			if err := canvas.Render(chart.PNG, &buffer); err != nil {
-				log.WithError(err).Errorf("cannot render pnl in irr")
-				reply.Message(fmt.Sprintf("[error] canot render pnl in irr: %v", err))
-				return
-			}
-			bbgo.SendPhoto(&buffer)
+		if err := canvas.Render(chart.PNG, &buffer); err != nil {
+			log.WithError(err).Errorf("cannot render pnl in irr")
+			reply.Message(fmt.Sprintf("[error] canot render pnl in irr: %v", err))
 			return
-		}()
+		}
+		bbgo.SendPhoto(&buffer)
+		return
 	})
 }
 
