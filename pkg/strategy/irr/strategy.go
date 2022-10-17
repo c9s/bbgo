@@ -412,12 +412,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					rtMrRank = s.rtMr.Rank(s.rtMr.Length()).Last() / float64(s.rtMr.Length())
 				}
 				s.rtWeight.Update((rtNrRank + rtMrRank) / 2)
-				rtWeightRank := 0.
-				if s.rtWeight.Length() >= 100 {
-					rtWeightRank = s.rtWeight.Rank(s.rtWeight.Length()).Last() / float64(s.rtWeight.Length())
-				}
-				log.Infof("Alpha: %f/1.0", rtWeightRank)
-				s.rebalancePosition(s.obBuyPrice.Load(), s.obSellPrice.Load(), rtWeightRank)
+				//rtWeightRank := 0.
+				//if s.rtWeight.Length() >= 100 {
+				//	rtWeightRank = s.rtWeight.Rank(s.rtWeight.Length()).Last() / float64(s.rtWeight.Length())
+				//}
+				log.Infof("Alpha: %f/1.0", s.rtWeight.Last())
+				s.rebalancePosition(s.obBuyPrice.Load(), s.obSellPrice.Load(), s.rtWeight.Last())
 			}
 
 			previousRoundTime = currentRoundTime
