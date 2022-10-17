@@ -19,6 +19,10 @@ exchangeStrategies:
     hftInterval: 1000
     # maxima position in USD
     amount: 500.0
+    # alpha1: negative return reversion
+    NR: false
+    # alpha2: moving average reversion
+    MR: true
     # Draw pnl
     drawGraph: true
     graphPNLPath: "./pnl.png"
