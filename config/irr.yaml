@@ -17,8 +17,12 @@ exchangeStrategies:
     symbol: BTCBUSD
     # in milliseconds(ms)
     hftInterval: 5
-    # maxima position in USD
-    amount: 500.0
+    # indicator window
+    window: 100
+    # limit maker order quantity
+    quantity: 0.01
+    # bonus spread in USD
+    spread: 0.25
     # alpha1: negative return reversion
     NR: true
     # alpha2: moving average reversion
