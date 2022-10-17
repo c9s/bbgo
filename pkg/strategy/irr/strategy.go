@@ -49,6 +49,7 @@ type Strategy struct {
 	orderExecutor *bbgo.GeneralOrderExecutor
 
 	bbgo.QuantityOrAmount
+	Spread float64 `json:"spread"`
 
 	Interval int  `json:"hftInterval"`
 	NR       bool `json:"NR"`
@@ -365,13 +366,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	//	s.Ma.LoadK((*klines)[0:])
 	//}
 
-	s.rtNr = types.NewQueue(100)
+	s.rtNr = types.NewQueue(s.Window)
 
 	s.rtMaFast = types.NewQueue(1)
 	s.rtMaSlow = types.NewQueue(5)
-	s.rtMr = types.NewQueue(100)
+	s.rtMr = types.NewQueue(s.Window)
 
-	s.rtWeight = types.NewQueue(100)
+	s.rtWeight = types.NewQueue(s.Window)
 
 	s.currentTradePrice = atomic.NewFloat64(0)
 
@@ -395,6 +396,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				select {
 				case <-intervalCloseTicker.C:
 					if s.currentTradePrice.Load() > 0 {
+						s.orderExecutor.CancelNoWait(context.Background())
 						s.closePrice = s.currentTradePrice.Load()
 						//log.Infof("Close Price: %f", s.closePrice)
 						// calculate real-time Negative Return
@@ -424,7 +426,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 						s.rtWeight.Update(alpha)
 						log.Infof("Alpha: %f/1.0", s.rtWeight.Last())
 						s.rebalancePosition(s.obBuyPrice.Load(), s.obSellPrice.Load(), s.rtWeight.Last())
-						s.orderExecutor.CancelNoWait(context.Background())
 					}
 				case <-s.stopC:
 					log.Warnf("%s goroutine stopped, due to the stop signal", s.Symbol)
@@ -443,7 +444,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			for {
 				select {
 				case <-intervalOpenTicker.C:
-					time.Sleep(200 * time.Microsecond)
+					time.Sleep(50 * time.Microsecond)
 					if s.currentTradePrice.Load() > 0 {
 						s.openPrice = s.currentTradePrice.Load()
 						//log.Infof("Open Price: %f", s.openPrice)
@@ -487,44 +488,29 @@ func (s *Strategy) CalcAssetValue(price fixedpoint.Value) fixedpoint.Value {
 }
 
 func (s *Strategy) rebalancePosition(bestBid, bestAsk float64, w float64) {
-	// alpha-weighted assets (inventory and capital)
-	position := s.orderExecutor.Position()
-	p := fixedpoint.NewFromFloat((bestBid + bestAsk) / 2)
-
-	targetBase := s.QuantityOrAmount.CalculateQuantity(p).Mul(fixedpoint.NewFromFloat(w))
-
-	// to buy/sell quantity
-	diffQty := targetBase.Sub(position.Base)
-	log.Infof("Target Position Diff: %f", diffQty.Float64())
-
-	// ignore small changes
-	if diffQty.Abs().Float64() < 0.0005 {
-		return
-	}
-
-	if diffQty.Sign() > 0 {
-		_, err := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
+	if w < 0.5 {
+		_, errB := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeBuy,
-			Quantity: diffQty.Abs(),
-			Type:     types.OrderTypeLimit,
-			Price:    fixedpoint.NewFromFloat(bestBid),
-			Tag:      "irr re-balance: buy",
+			Quantity: s.Quantity,
+			Type:     types.OrderTypeLimitMaker,
+			Price:    fixedpoint.NewFromFloat(bestBid - s.Spread),
+			Tag:      "irr short: buy",
 		})
-		if err != nil {
-			log.WithError(err)
+		if errB != nil {
+			log.WithError(errB)
 		}
-	} else if diffQty.Sign() < 0 {
-		_, err := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
+	} else if w > 0.5 {
+		_, errA := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeSell,
-			Quantity: diffQty.Abs(),
-			Type:     types.OrderTypeLimit,
-			Price:    fixedpoint.NewFromFloat(bestAsk),
-			Tag:      "irr re-balance: sell",
+			Quantity: s.Quantity,
+			Type:     types.OrderTypeLimitMaker,
+			Price:    fixedpoint.NewFromFloat(bestAsk + s.Spread),
+			Tag:      "irr long: buy",
 		})
-		if err != nil {
-			log.WithError(err)
+		if errA != nil {
+			log.WithError(errA)
 		}
 	}
 }
