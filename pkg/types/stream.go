@@ -100,6 +100,8 @@ type StandardStream struct {
 
 	marketTradeCallbacks []func(trade Trade)
 
+	aggTradeCallbacks []func(trade Trade)
+
 	// Futures
 	FuturesPositionUpdateCallbacks []func(futuresPositions FuturesPositionMap)
 
@@ -121,6 +123,7 @@ type StandardStreamEmitter interface {
 	EmitBookTickerUpdate(BookTicker)
 	EmitBookSnapshot(SliceOrderBook)
 	EmitMarketTrade(Trade)
+	EmitAggTrade(Trade)
 	EmitFuturesPositionUpdate(FuturesPositionMap)
 	EmitFuturesPositionSnapshot(FuturesPositionMap)
 }
