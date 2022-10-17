@@ -16,11 +16,11 @@ exchangeStrategies:
   irr:
     symbol: BTCBUSD
     # in milliseconds(ms)
-    hftInterval: 1000
+    hftInterval: 5
     # maxima position in USD
     amount: 500.0
     # alpha1: negative return reversion
-    NR: false
+    NR: true
     # alpha2: moving average reversion
     MR: true
     # Draw pnl
