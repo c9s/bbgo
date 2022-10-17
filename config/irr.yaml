@@ -15,25 +15,11 @@ exchangeStrategies:
 - on: binance
   irr:
     symbol: BTCBUSD
-    interval: 1s
-    window: 120
+    # in milliseconds(ms)
+    hftInterval: 1000
+    # maxima position in USD
     amount: 500.0
-    humpThreshold: 0.000025
     # Draw pnl
     drawGraph: true
     graphPNLPath: "./pnl.png"
     graphCumPNLPath: "./cumpnl.png"
-
-backtest:
-  sessions:
-    - binance
-  startTime: "2022-10-09"
-  endTime: "2022-10-11"
-#  syncSecKLines: true
-  symbols:
-    - BTCBUSD
-  accounts:
-    binance:
-      takerFeeRate: 0.0
-      balances:
-        BUSD: 5_000.0
