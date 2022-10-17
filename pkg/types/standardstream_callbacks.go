@@ -134,6 +134,16 @@ func (s *StandardStream) EmitMarketTrade(trade Trade) {
 	}
 }
 
+func (s *StandardStream) OnAggTrade(cb func(trade Trade)) {
+	s.aggTradeCallbacks = append(s.aggTradeCallbacks, cb)
+}
+
+func (s *StandardStream) EmitAggTrade(trade Trade) {
+	for _, cb := range s.aggTradeCallbacks {
+		cb(trade)
+	}
+}
+
 func (s *StandardStream) OnFuturesPositionUpdate(cb func(futuresPositions FuturesPositionMap)) {
 	s.FuturesPositionUpdateCallbacks = append(s.FuturesPositionUpdateCallbacks, cb)
 }
@@ -180,6 +190,8 @@ type StandardStreamEventHub interface {
 	OnBookSnapshot(cb func(book SliceOrderBook))
 
 	OnMarketTrade(cb func(trade Trade))
+
+	OnAggTrade(cb func(trade Trade))
 
 	OnFuturesPositionUpdate(cb func(futuresPositions FuturesPositionMap))
 
