@@ -1179,9 +1179,9 @@ func NewCanvas(title string, intervals ...Interval) *Canvas {
 	interval := Interval1m
 	if len(intervals) > 0 {
 		interval = intervals[0]
-		if interval.Minutes() > 24*60 {
+		if interval.Seconds() > 24*60*60 {
 			valueFormatter = chart.TimeDateValueFormatter
-		} else if interval.Minutes() > 60 {
+		} else if interval.Seconds() > 60*60 {
 			valueFormatter = chart.TimeHourValueFormatter
 		} else {
 			valueFormatter = chart.TimeMinuteValueFormatter
@@ -1227,7 +1227,7 @@ func (canvas *Canvas) Plot(tag string, a Series, endTime Time, length int, inter
 		interval = intervals[0]
 	}
 	for i := length - 1; i >= 0; i-- {
-		shiftedT := e.Add(-time.Duration(i*interval.Minutes()) * time.Minute)
+		shiftedT := e.Add(-time.Duration(i*interval.Seconds()) * time.Second)
 		timeline = append(timeline, shiftedT)
 	}
 	canvas.Series = append(canvas.Series, chart.TimeSeries{
