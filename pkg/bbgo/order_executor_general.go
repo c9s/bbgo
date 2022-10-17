@@ -356,11 +356,11 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 }
 
 // GracefulCancelActiveOrderBook cancels the orders from the active orderbook.
-func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context, activeOrders *ActiveOrderBook) error {
+func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context, activeOrders *ActiveOrderBook, orders ...types.Order) error {
 	if activeOrders.NumOfOrders() == 0 {
 		return nil
 	}
-	if err := activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
+	if err := activeOrders.GracefulCancel(ctx, e.session.Exchange, orders...); err != nil {
 		// Retry once
 		if err = activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
 			return fmt.Errorf("graceful cancel order error: %w", err)
@@ -371,23 +371,25 @@ func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context
 	return nil
 }
 
-func (e *GeneralOrderExecutor) GracefulCancelOrder(ctx context.Context, order types.Order) error {
-	if e.activeMakerOrders.NumOfOrders() == 0 {
+// CancelActiveOrderBookNoWait cancels the orders from the active orderbook without waiting
+func (e *GeneralOrderExecutor) CancelActiveOrderBookNoWait(ctx context.Context, activeOrders *ActiveOrderBook, orders ...types.Order) error {
+	if activeOrders.NumOfOrders() == 0 {
 		return nil
 	}
-	if err := e.activeMakerOrders.Cancel(ctx, e.session.Exchange, order); err != nil {
-		// Retry once
-		if err = e.activeMakerOrders.Cancel(ctx, e.session.Exchange, order); err != nil {
-			return fmt.Errorf("cancel order error: %w", err)
-		}
+	if err := activeOrders.CancelNoWait(ctx, e.session.Exchange, orders...); err != nil {
+		return fmt.Errorf("cancel order error: %w", err)
 	}
-	e.tradeCollector.Process()
 	return nil
 }
 
-// GracefulCancel cancels all active maker orders
-func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context) error {
-	return e.GracefulCancelActiveOrderBook(ctx, e.activeMakerOrders)
+// GracefulCancel cancels all active maker orders if orders are not given, otherwise cancel all the given orders
+func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context, orders ...types.Order) error {
+	return e.GracefulCancelActiveOrderBook(ctx, e.activeMakerOrders, orders...)
+}
+
+// CancelNoWait cancels all active maker orders if orders is not given, otherwise cancel the given orders
+func (e *GeneralOrderExecutor) CancelNoWait(ctx context.Context, orders ...types.Order) error {
+	return e.CancelActiveOrderBookNoWait(ctx, e.activeMakerOrders, orders...)
 }
 
 // ClosePosition closes the current position by a percentage.

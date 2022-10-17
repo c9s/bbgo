@@ -3,9 +3,9 @@ package bbgo
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -92,60 +92,49 @@ func (b *ActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeout ti
 	}
 }
 
-// Cancel cancels the given order from activeOrderBook gracefully
-func (b *ActiveOrderBook) Cancel(ctx context.Context, ex types.Exchange, order types.Order) error {
-	if !b.Exists(order) {
-		return fmt.Errorf("cannot find %v in orderbook", order)
+// Cancel orders without confirmation
+func (b *ActiveOrderBook) CancelNoWait(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
+	// if no orders are given, set to cancelAll
+	if len(orders) == 0 {
+		orders = b.Orders()
+	} else {
+		// simple check on given input
+		for _, o := range orders {
+			if o.Symbol != b.Symbol {
+				return errors.New("[ActiveOrderBook] cancel " + b.Symbol + " orderbook with different symbol: " + o.Symbol)
+			}
+		}
 	}
 	// optimize order cancel for back-testing
 	if IsBackTesting {
-		return ex.CancelOrders(context.Background(), order)
+		return ex.CancelOrders(context.Background(), orders...)
 	}
-	log.Debugf("[ActiveOrderBook] gracefully cancelling %v order...", order.OrderID)
-	waitTime := CancelOrderWaitTime
-
-	startTime := time.Now()
-	// ensure order is cancelled
-	for {
-		// Some orders in the variable are not created on the server side yet,
-		// If we cancel these orders directly, we will get an unsent order error
-		// We wait here for a while for server to create these orders.
-		// time.Sleep(SentOrderWaitTime)
-
-		// since ctx might be canceled, we should use background context here
-
-		if err := ex.CancelOrders(context.Background(), order); err != nil {
-			log.WithError(err).Errorf("[ActiveORderBook] can not cancel %v order", order.OrderID)
-		}
-		log.Debugf("[ActiveOrderBook] waiting %s for %v order to be cancelled...", waitTime, order.OrderID)
-		clear, err := b.waitClear(ctx, order, waitTime, 5*time.Second)
-		if clear || err != nil {
-			break
-		}
-		b.Print()
-
-		openOrders, err := ex.QueryOpenOrders(ctx, order.Symbol)
-		if err != nil {
-			log.WithError(err).Errorf("can not query %s open orders", order.Symbol)
-			continue
-		}
-
-		openOrderStore := NewOrderStore(order.Symbol)
-		openOrderStore.Add(openOrders...)
-		// if it's not on the order book (open orders), we should remove it from our local side
-		if !openOrderStore.Exists(order.OrderID) {
-			b.Remove(order)
-		}
+	log.Debugf("[ActiveOrderBook] no wait cancelling %s orders...", b.Symbol)
+	// since ctx might be canceled, we should use background context here
+	if err := ex.CancelOrders(context.Background(), orders...); err != nil {
+		log.WithError(err).Errorf("[ActiveOrderBook] no wait can not cancel %s orders", b.Symbol)
 	}
-	log.Debugf("[ActiveOrderBook] %v(%s) order is cancelled successfully in %s", order.OrderID, b.Symbol, time.Since(startTime))
+	for _, o := range orders {
+		b.Remove(o)
+	}
 	return nil
 }
 
 // GracefulCancel cancels the active orders gracefully
-func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange) error {
+func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
+	// if no orders are given, set to cancelAll
+	if len(orders) == 0 {
+		orders = b.Orders()
+	} else {
+		// simple check on given input
+		for _, o := range orders {
+			if b.Symbol != "" && o.Symbol != b.Symbol {
+				return errors.New("[ActiveOrderBook] cancel " + b.Symbol + " orderbook with different symbol: " + o.Symbol)
+			}
+		}
+	}
 	// optimize order cancel for back-testing
 	if IsBackTesting {
-		orders := b.Orders()
 		return ex.CancelOrders(context.Background(), orders...)
 	}
 
@@ -155,8 +144,6 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange)
 	startTime := time.Now()
 	// ensure every order is cancelled
 	for {
-		orders := b.Orders()
-
 		// Some orders in the variable are not created on the server side yet,
 		// If we cancel these orders directly, we will get an unsent order error
 		// We wait here for a while for server to create these orders.
@@ -180,12 +167,12 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange)
 		// verify the current open orders via the RESTful API
 		log.Warnf("[ActiveOrderBook] using REStful API to verify active orders...")
 
-		orders = b.Orders()
 		var symbols = map[string]struct{}{}
 		for _, order := range orders {
 			symbols[order.Symbol] = struct{}{}
 
 		}
+		var leftOrders []types.Order
 
 		for symbol := range symbols {
 			openOrders, err := ex.QueryOpenOrders(ctx, symbol)
@@ -200,9 +187,12 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange)
 				// if it's not on the order book (open orders), we should remove it from our local side
 				if !openOrderStore.Exists(o.OrderID) {
 					b.Remove(o)
+				} else {
+					leftOrders = append(leftOrders, o)
 				}
 			}
 		}
+		orders = leftOrders
 	}
 
 	log.Debugf("[ActiveOrderBook] all %s orders are cancelled successfully in %s", b.Symbol, time.Since(startTime))
