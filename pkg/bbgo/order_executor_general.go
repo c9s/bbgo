@@ -230,13 +230,15 @@ func (e *GeneralOrderExecutor) reduceQuantityAndSubmitOrder(ctx context.Context,
 	var err error
 	for i := 0; i < submitOrderRetryLimit; i++ {
 		q := submitOrder.Quantity.Mul(fixedpoint.One.Sub(quantityReduceDelta))
-		if submitOrder.Side == types.SideTypeSell {
-			if baseBalance, ok := e.session.GetAccount().Balance(e.position.Market.BaseCurrency); ok {
-				q = fixedpoint.Min(q, baseBalance.Available)
-			}
-		} else {
-			if quoteBalance, ok := e.session.GetAccount().Balance(e.position.Market.QuoteCurrency); ok {
-				q = fixedpoint.Min(q, quoteBalance.Available.Div(price))
+		if !e.session.Futures {
+			if submitOrder.Side == types.SideTypeSell {
+				if baseBalance, ok := e.session.GetAccount().Balance(e.position.Market.BaseCurrency); ok {
+					q = fixedpoint.Min(q, baseBalance.Available)
+				}
+			} else {
+				if quoteBalance, ok := e.session.GetAccount().Balance(e.position.Market.QuoteCurrency); ok {
+					q = fixedpoint.Min(q, quoteBalance.Available.Div(price))
+				}
 			}
 		}
 		log.Warnf("retrying order, adjusting order quantity: %v -> %v", submitOrder.Quantity, q)
