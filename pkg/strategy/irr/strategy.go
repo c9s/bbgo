@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -14,7 +15,6 @@ import (
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/atomic"
 )
 
 const ID = "irr"
@@ -58,26 +58,15 @@ type Strategy struct {
 	Nrr *NRR
 	Ma  *indicator.SMA
 	// realtime book ticker to submit order
-	obBuyPrice  *atomic.Float64
-	obSellPrice *atomic.Float64
-	// for posting LO
-	canBuy  bool
-	canSell bool
+	obBuyPrice  uint64
+	obSellPrice uint64
 	// for getting close price
-	currentTradePrice *atomic.Float64
-	tradePriceSeries  *types.Queue
+	currentTradePrice uint64
 	// for negative return rate
 	openPrice  float64
 	closePrice float64
-	rtNr       *types.Queue
-	// for moving average reversion
-	rtMaFast *types.Queue
-	rtMaSlow *types.Queue
-	rtMr     *types.Queue
 
-	// for final alpha (Nr+Mr)/2
-	rtWeight *types.Queue
-	stopC    chan struct{}
+	stopC chan struct{}
 
 	// StrategyController
 	bbgo.StrategyController
@@ -346,14 +335,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.highestPrice = 0
 			s.lowestPrice = s.sellPrice
 		}
-
-		if trade.Side == types.SideTypeBuy {
-			s.canSell = true
-			s.canBuy = false
-		} else if trade.Side == types.SideTypeSell {
-			s.canBuy = true
-			s.canSell = false
-		}
 	})
 
 	s.InitDrawCommands(&profitSlice, &cumProfitSlice, &cumProfitDollarSlice)
@@ -364,36 +345,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.Bind()
 	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
 
-	//back-test only, because 1s delayed a lot
-	//kLineStore, _ := s.session.MarketDataStore(s.Symbol)
-	//s.Nrr = &NRR{IntervalWindow: types.IntervalWindow{Window: 2, Interval: s.Interval}, RankingWindow: s.Window}
-	//s.Nrr.BindK(s.session.MarketDataStream, s.Symbol, s.Interval)
-	//if klines, ok := kLineStore.KLinesOfInterval(s.Nrr.Interval); ok {
-	//	s.Nrr.LoadK((*klines)[0:])
-	//}
-	//s.Ma = &indicator.SMA{IntervalWindow: types.IntervalWindow{Window: s.Window, Interval: s.Interval}}
-	//s.Ma.BindK(s.session.MarketDataStream, s.Symbol, s.Interval)
-	//if klines, ok := kLineStore.KLinesOfInterval(s.Ma.Interval); ok {
-	//	s.Ma.LoadK((*klines)[0:])
-	//}
-
-	s.rtNr = types.NewQueue(s.Window)
-
-	s.rtMaFast = types.NewQueue(1)
-	s.rtMaSlow = types.NewQueue(5)
-	s.rtMr = types.NewQueue(s.Window)
-
-	s.rtWeight = types.NewQueue(s.Window)
-
-	s.currentTradePrice = atomic.NewFloat64(0.)
-	s.tradePriceSeries = types.NewQueue(2)
-
-	// adverse selection based on order flow dynamics
-	s.canBuy = true
-	s.canSell = true
-
-	s.closePrice = 0. // atomic.NewFloat64(0)
-	s.openPrice = 0.  //atomic.NewFloat64(0)
+	atomic.SwapUint64(&s.currentTradePrice, 0.)
+	s.closePrice = 0.
+	s.openPrice = 0.
 	klinDirections := types.NewQueue(100)
 	started := false
 	boxOpenPrice := 0.
@@ -404,40 +358,43 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		s.session.MarketDataStream.OnBookTickerUpdate(func(bt types.BookTicker) {
 			// quote order book price
-			s.obBuyPrice = atomic.NewFloat64(bt.Buy.Float64())
-			s.obSellPrice = atomic.NewFloat64(bt.Sell.Float64())
+			newBid := uint64(bt.Buy.Float64())
+			newAsk := uint64(bt.Sell.Float64())
+			atomic.SwapUint64(&s.obBuyPrice, newBid)
+			atomic.SwapUint64(&s.obSellPrice, newAsk)
 		})
 
 		s.session.MarketDataStream.OnAggTrade(func(trade types.Trade) {
-			s.currentTradePrice = atomic.NewFloat64(trade.Price.Float64())
+			tradePrice := uint64(trade.Price.Float64())
+			atomic.SwapUint64(&s.currentTradePrice, tradePrice)
 		})
 
+		closeTime := <-time.After(time.Duration(s.Interval-int(time.Now().UnixMilli())%s.Interval) * time.Millisecond)
+		log.Infof("kline close timing synced @ %s", closeTime.Format("2006-01-02 15:04:05.000000"))
 		go func() {
-			time.Sleep(time.Duration(s.Interval-int(time.Now().UnixMilli())%s.Interval) * time.Millisecond)
-
 			intervalCloseTicker := time.NewTicker(time.Duration(s.Interval) * time.Millisecond)
 			defer intervalCloseTicker.Stop()
-
 			for {
 				select {
 				case <-intervalCloseTicker.C:
+					log.Infof("kline close time @ %s", time.Now().Format("2006-01-02 15:04:05.000000"))
 
 					s.orderExecutor.CancelNoWait(context.Background())
 
-					if s.currentTradePrice.Load() > 0 {
-						s.closePrice = s.currentTradePrice.Load()
-						log.Infof("Close Price: %f", s.closePrice)
+					if s.currentTradePrice > 0 {
+						s.closePrice = float64(s.currentTradePrice)
+						log.Infof("Close Price: %f", float64(s.closePrice))
 						if s.closePrice > 0 && s.openPrice > 0 {
 							direction := s.closePrice - s.openPrice
-							klinDirections.Update(direction)
+							klinDirections.Update(float64(direction))
 							regimeShift := klinDirections.Index(0)*klinDirections.Index(1) < 0
 							if regimeShift && !started {
-								boxOpenPrice = s.openPrice
+								boxOpenPrice = float64(s.openPrice)
 								started = true
 								boxCounter = 0
 								log.Infof("box started at price: %f", boxOpenPrice)
 							} else if regimeShift && started {
-								boxClosePrice = s.openPrice
+								boxClosePrice = float64(s.openPrice)
 								started = false
 								log.Infof("box ended at price: %f with time length: %d", boxClosePrice, boxCounter)
 								// box ending, should re-balance position
@@ -451,7 +408,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 										Side:     types.SideTypeSell,
 										Quantity: s.Quantity,
 										Type:     types.OrderTypeLimitMaker,
-										Price:    fixedpoint.NewFromFloat(s.obSellPrice.Load()),
+										Price:    fixedpoint.NewFromFloat(float64(s.obSellPrice)),
 										Tag:      "irr re-balance: sell",
 									})
 									if err != nil {
@@ -463,7 +420,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 										Side:     types.SideTypeBuy,
 										Quantity: s.Quantity,
 										Type:     types.OrderTypeLimitMaker,
-										Price:    fixedpoint.NewFromFloat(s.obBuyPrice.Load()),
+										Price:    fixedpoint.NewFromFloat(float64(s.obBuyPrice)),
 										Tag:      "irr re-balance: buy",
 									})
 									if err != nil {
@@ -484,18 +441,22 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 					return
 				}
 			}
+
 		}()
 
+		openTime := <-time.After(time.Duration(s.Interval-int(time.Now().UnixMilli())%s.Interval) * time.Millisecond)
+		log.Infof("kline open timing synced @ %s", openTime.Format("2006-01-02 15:04:05.000000"))
 		go func() {
-			time.Sleep(time.Duration(s.Interval-int(time.Now().UnixMilli())%s.Interval) * time.Millisecond)
 			intervalOpenTicker := time.NewTicker(time.Duration(s.Interval) * time.Millisecond)
 			defer intervalOpenTicker.Stop()
 			for {
 				select {
 				case <-intervalOpenTicker.C:
 					time.Sleep(time.Duration(s.Interval/10) * time.Millisecond)
-					if s.currentTradePrice.Load() > 0 && s.closePrice > 0 {
-						s.openPrice = s.currentTradePrice.Load()
+					log.Infof("kline open time @ %s", time.Now().Format("2006-01-02 15:04:05.000000"))
+
+					if s.currentTradePrice > 0 && s.closePrice > 0 {
+						s.openPrice = float64(s.currentTradePrice)
 						log.Infof("Open Price: %f", s.openPrice)
 					}
 				case <-s.stopC:
@@ -527,7 +488,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
 		_ = s.orderExecutor.GracefulCancel(ctx)
 	})
-
 	return nil
 }
 
