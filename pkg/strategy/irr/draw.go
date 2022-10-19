@@ -22,7 +22,6 @@ func (s *Strategy) InitDrawCommands(profit, cumProfit, cumProfitDollar types.Ser
 			return
 		}
 		bbgo.SendPhoto(&buffer)
-		return
 	})
 	bbgo.RegisterCommand("/nav", "Draw Net Assets Value", func(reply interact.Reply) {
 
@@ -34,8 +33,6 @@ func (s *Strategy) InitDrawCommands(profit, cumProfit, cumProfitDollar types.Ser
 			return
 		}
 		bbgo.SendPhoto(&buffer)
-		return
-
 	})
 	bbgo.RegisterCommand("/pnl", "Draw Cumulative Profit & Loss", func(reply interact.Reply) {
 
@@ -47,7 +44,6 @@ func (s *Strategy) InitDrawCommands(profit, cumProfit, cumProfitDollar types.Ser
 			return
 		}
 		bbgo.SendPhoto(&buffer)
-		return
 	})
 }
 

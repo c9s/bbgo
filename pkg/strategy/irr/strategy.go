@@ -21,7 +21,6 @@ const ID = "irr"
 
 var one = fixedpoint.One
 var zero = fixedpoint.Zero
-var Fee = 0.000 // taker fee % * 2, for upper bound
 
 var log = logrus.WithField("strategy", ID)
 
@@ -49,7 +48,7 @@ type Strategy struct {
 	orderExecutor *bbgo.GeneralOrderExecutor
 
 	bbgo.QuantityOrAmount
-	Spread float64 `json:"spread"`
+	MinProfit float64 `json:"pips"`
 
 	Interval int  `json:"hftInterval"`
 	NR       bool `json:"NR"`
@@ -61,8 +60,12 @@ type Strategy struct {
 	// realtime book ticker to submit order
 	obBuyPrice  *atomic.Float64
 	obSellPrice *atomic.Float64
+	// for posting LO
+	canBuy  bool
+	canSell bool
 	// for getting close price
 	currentTradePrice *atomic.Float64
+	tradePriceSeries  *types.Queue
 	// for negative return rate
 	openPrice  float64
 	closePrice float64
@@ -343,6 +346,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.highestPrice = 0
 			s.lowestPrice = s.sellPrice
 		}
+
+		if trade.Side == types.SideTypeBuy {
+			s.canSell = true
+			s.canBuy = false
+		} else if trade.Side == types.SideTypeSell {
+			s.canBuy = true
+			s.canSell = false
+		}
 	})
 
 	s.InitDrawCommands(&profitSlice, &cumProfitSlice, &cumProfitDollarSlice)
@@ -374,7 +385,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.rtWeight = types.NewQueue(s.Window)
 
-	s.currentTradePrice = atomic.NewFloat64(0)
+	s.currentTradePrice = atomic.NewFloat64(0.)
+	s.tradePriceSeries = types.NewQueue(2)
+
+	// adverse selection based on order flow dynamics
+	s.canBuy = true
+	s.canSell = true
+
+	s.closePrice = 0. // atomic.NewFloat64(0)
+	s.openPrice = 0.  //atomic.NewFloat64(0)
+	klinDirections := types.NewQueue(100)
+	started := false
+	boxOpenPrice := 0.
+	boxClosePrice := 0.
+	boxCounter := 0
 
 	if !bbgo.IsBackTesting {
 
@@ -389,43 +413,67 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		})
 
 		go func() {
+			time.Sleep(time.Duration(s.Interval-int(time.Now().UnixMilli())%s.Interval) * time.Millisecond)
+
 			intervalCloseTicker := time.NewTicker(time.Duration(s.Interval) * time.Millisecond)
 			defer intervalCloseTicker.Stop()
 
 			for {
 				select {
 				case <-intervalCloseTicker.C:
+
+					s.orderExecutor.CancelNoWait(context.Background())
+
 					if s.currentTradePrice.Load() > 0 {
-						s.orderExecutor.CancelNoWait(context.Background())
 						s.closePrice = s.currentTradePrice.Load()
-						//log.Infof("Close Price: %f", s.closePrice)
-						// calculate real-time Negative Return
-						s.rtNr.Update((s.openPrice - s.closePrice) / s.openPrice)
-						// calculate real-time Negative Return Rank
-						rtNrRank := 0.
-						if s.rtNr.Length() > 2 {
-							rtNrRank = s.rtNr.Rank(s.rtNr.Length()).Last() / float64(s.rtNr.Length())
+						log.Infof("Close Price: %f", s.closePrice)
+						if s.closePrice > 0 && s.openPrice > 0 {
+							direction := s.closePrice - s.openPrice
+							klinDirections.Update(direction)
+							regimeShift := klinDirections.Index(0)*klinDirections.Index(1) < 0
+							if regimeShift && !started {
+								boxOpenPrice = s.openPrice
+								started = true
+								boxCounter = 0
+								log.Infof("box started at price: %f", boxOpenPrice)
+							} else if regimeShift && started {
+								boxClosePrice = s.openPrice
+								started = false
+								log.Infof("box ended at price: %f with time length: %d", boxClosePrice, boxCounter)
+								// box ending, should re-balance position
+								nirr := fixedpoint.NewFromFloat(((boxOpenPrice - boxClosePrice) / boxOpenPrice) / (float64(boxCounter) + 1))
+								qty := s.QuantityOrAmount.CalculateQuantity(fixedpoint.Value(boxClosePrice))
+								qty = qty.Mul(nirr.Abs().Div(fixedpoint.NewFromInt(1000)))
+								log.Infof("Alpha: %f with Diff Qty: %f", nirr.Float64(), qty.Float64())
+								if nirr.Float64() < 0 {
+									_, err := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
+										Symbol:   s.Symbol,
+										Side:     types.SideTypeSell,
+										Quantity: s.Quantity,
+										Type:     types.OrderTypeLimitMaker,
+										Price:    fixedpoint.NewFromFloat(s.obSellPrice.Load()),
+										Tag:      "irr re-balance: sell",
+									})
+									if err != nil {
+										log.WithError(err)
+									}
+								} else if nirr.Float64() > 0 {
+									_, err := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
+										Symbol:   s.Symbol,
+										Side:     types.SideTypeBuy,
+										Quantity: s.Quantity,
+										Type:     types.OrderTypeLimitMaker,
+										Price:    fixedpoint.NewFromFloat(s.obBuyPrice.Load()),
+										Tag:      "irr re-balance: buy",
+									})
+									if err != nil {
+										log.WithError(err)
+									}
+								}
+							} else {
+								boxCounter++
+							}
 						}
-						// calculate real-time Mean Reversion
-						s.rtMaFast.Update(s.closePrice)
-						s.rtMaSlow.Update(s.closePrice)
-						s.rtMr.Update((s.rtMaSlow.Mean() - s.rtMaFast.Mean()) / s.rtMaSlow.Mean())
-						// calculate real-time Mean Reversion Rank
-						rtMrRank := 0.
-						if s.rtMr.Length() > 2 {
-							rtMrRank = s.rtMr.Rank(s.rtMr.Length()).Last() / float64(s.rtMr.Length())
-						}
-						alpha := 0.
-						if s.NR && s.MR {
-							alpha = (rtNrRank + rtMrRank) / 2
-						} else if s.NR && !s.MR {
-							alpha = rtNrRank
-						} else if !s.NR && s.MR {
-							alpha = rtMrRank
-						}
-						s.rtWeight.Update(alpha)
-						log.Infof("Alpha: %f/1.0", s.rtWeight.Last())
-						s.rebalancePosition(s.obBuyPrice.Load(), s.obSellPrice.Load(), s.rtWeight.Last())
 					}
 				case <-s.stopC:
 					log.Warnf("%s goroutine stopped, due to the stop signal", s.Symbol)
@@ -439,15 +487,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}()
 
 		go func() {
+			time.Sleep(time.Duration(s.Interval-int(time.Now().UnixMilli())%s.Interval) * time.Millisecond)
 			intervalOpenTicker := time.NewTicker(time.Duration(s.Interval) * time.Millisecond)
 			defer intervalOpenTicker.Stop()
 			for {
 				select {
 				case <-intervalOpenTicker.C:
-					time.Sleep(50 * time.Microsecond)
-					if s.currentTradePrice.Load() > 0 {
+					time.Sleep(time.Duration(s.Interval/10) * time.Millisecond)
+					if s.currentTradePrice.Load() > 0 && s.closePrice > 0 {
 						s.openPrice = s.currentTradePrice.Load()
-						//log.Infof("Open Price: %f", s.openPrice)
+						log.Infof("Open Price: %f", s.openPrice)
 					}
 				case <-s.stopC:
 					log.Warnf("%s goroutine stopped, due to the stop signal", s.Symbol)
@@ -485,32 +534,4 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 func (s *Strategy) CalcAssetValue(price fixedpoint.Value) fixedpoint.Value {
 	balances := s.session.GetAccount().Balances()
 	return balances[s.Market.BaseCurrency].Total().Mul(price).Add(balances[s.Market.QuoteCurrency].Total())
-}
-
-func (s *Strategy) rebalancePosition(bestBid, bestAsk float64, w float64) {
-	if w < 0.5 {
-		_, errB := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeBuy,
-			Quantity: s.Quantity,
-			Type:     types.OrderTypeLimitMaker,
-			Price:    fixedpoint.NewFromFloat(bestBid - s.Spread),
-			Tag:      "irr short: buy",
-		})
-		if errB != nil {
-			log.WithError(errB)
-		}
-	} else if w > 0.5 {
-		_, errA := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeSell,
-			Quantity: s.Quantity,
-			Type:     types.OrderTypeLimitMaker,
-			Price:    fixedpoint.NewFromFloat(bestAsk + s.Spread),
-			Tag:      "irr long: buy",
-		})
-		if errA != nil {
-			log.WithError(errA)
-		}
-	}
 }
