@@ -16,7 +16,7 @@ type SerialMarketDataStore struct {
 	MinInterval              types.Interval
 	Subscription             []types.Interval
 	o, h, l, c, v, qv, price fixedpoint.Value
-	lock                     sync.Mutex
+	mu                       sync.Mutex
 }
 
 // @param symbol: symbol to trace on
@@ -56,7 +56,7 @@ func (store *SerialMarketDataStore) handleKLineClosed(kline types.KLine) {
 }
 
 func (store *SerialMarketDataStore) handleMarketTrade(trade types.Trade) {
-	store.lock.Lock()
+	store.mu.Lock()
 	store.price = trade.Price
 	store.c = store.price
 	if store.price.Compare(store.h) > 0 {
@@ -74,7 +74,7 @@ func (store *SerialMarketDataStore) handleMarketTrade(trade types.Trade) {
 	}
 	store.v.Add(trade.Quantity)
 	store.qv.Add(trade.QuoteQuantity)
-	store.lock.Unlock()
+	store.mu.Unlock()
 }
 
 func (store *SerialMarketDataStore) tickerProcessor(ctx context.Context) {
@@ -92,7 +92,7 @@ func (store *SerialMarketDataStore) tickerProcessor(ctx context.Context) {
 				Interval:  store.MinInterval,
 				Closed:    true,
 			}
-			store.lock.Lock()
+			store.mu.Lock()
 			if store.c.IsZero() {
 				kline.Open = store.price
 				kline.Close = store.price
@@ -114,7 +114,7 @@ func (store *SerialMarketDataStore) tickerProcessor(ctx context.Context) {
 				store.v = fixedpoint.Zero
 				store.qv = fixedpoint.Zero
 			}
-			store.lock.Unlock()
+			store.mu.Unlock()
 			store.AddKLine(kline, true)
 		case <-ctx.Done():
 			return
