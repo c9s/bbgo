@@ -43,14 +43,14 @@ type Strategy struct {
 	types.Market
 	Session *bbgo.ExchangeSession
 
-	Interval       types.Interval   `json:"interval"`
-	MinInterval    types.Interval   `json:"minInterval"`
-	Stoploss       fixedpoint.Value `json:"stoploss" modifiable:"true"`
-	WindowATR      int              `json:"windowATR"`
-	WindowQuick    int              `json:"windowQuick"`
-	WindowSlow     int              `json:"windowSlow"`
-	PendingMinutes int              `json:"pendingMinutes" modifiable:"true"`
-	UseHeikinAshi  bool             `json:"useHeikinAshi"`
+	Interval           types.Interval   `json:"interval"`
+	MinInterval        types.Interval   `json:"minInterval"`
+	Stoploss           fixedpoint.Value `json:"stoploss" modifiable:"true"`
+	WindowATR          int              `json:"windowATR"`
+	WindowQuick        int              `json:"windowQuick"`
+	WindowSlow         int              `json:"windowSlow"`
+	PendingMinInterval int              `json:"pendingMinInterval" modifiable:"true"`
+	UseHeikinAshi      bool             `json:"useHeikinAshi"`
 
 	// whether to draw graph or not by the end of backtest
 	DrawGraph          bool   `json:"drawGraph"`
@@ -196,7 +196,7 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef float64) int {
 			}
 			log.Warnf("%v | counter: %d, system: %d", order, s.orderPendingCounter[order.OrderID], s.counter)
 			toCancel := false
-			if s.counter-s.orderPendingCounter[order.OrderID] >= s.PendingMinutes {
+			if s.counter-s.orderPendingCounter[order.OrderID] >= s.PendingMinInterval {
 				toCancel = true
 			} else if order.Side == types.SideTypeBuy {
 				if order.Price.Float64()+s.atr.Last()*2 <= pricef {
@@ -211,7 +211,7 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef float64) int {
 				panic("not supported side for the order")
 			}
 			if toCancel {
-				err := s.GeneralOrderExecutor.GracefulCancel(ctx, order)
+				err := s.GeneralOrderExecutor.CancelNoWait(ctx, order)
 				if err == nil {
 					delete(s.orderPendingCounter, order.OrderID)
 				} else {
@@ -235,6 +235,9 @@ func (s *Strategy) trailingCheck(price float64, direction string) bool {
 		s.lowestPrice = price
 	}
 	isShort := direction == "short"
+	if isShort && s.sellPrice == 0 || !isShort && s.buyPrice == 0 {
+		return false
+	}
 	for i := len(s.TrailingCallbackRate) - 1; i >= 0; i-- {
 		trailingCallbackRate := s.TrailingCallbackRate[i]
 		trailingActivationRatio := s.TrailingActivationRatio[i]
@@ -244,7 +247,7 @@ func (s *Strategy) trailingCheck(price float64, direction string) bool {
 			}
 		} else {
 			if (s.highestPrice-s.buyPrice)/s.buyPrice > trailingActivationRatio {
-				return (s.highestPrice-price)/price > trailingCallbackRate
+				return (s.highestPrice-price)/s.buyPrice > trailingCallbackRate
 			}
 		}
 	}
@@ -351,15 +354,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.highestPrice = 0
 			s.lowestPrice = 0
 		} else if s.Position.IsLong() {
-			s.buyPrice = price
+			s.buyPrice = s.Position.ApproximateAverageCost.Float64()
 			s.sellPrice = 0
-			s.highestPrice = s.buyPrice
+			s.highestPrice = math.Max(s.buyPrice, s.highestPrice)
 			s.lowestPrice = 0
 		} else {
-			s.sellPrice = price
+			s.sellPrice = s.Position.ApproximateAverageCost.Float64()
 			s.buyPrice = 0
 			s.highestPrice = 0
-			s.lowestPrice = s.sellPrice
+			if s.lowestPrice == 0 {
+				s.lowestPrice = s.sellPrice
+			} else {
+				s.lowestPrice = math.Min(s.lowestPrice, s.sellPrice)
+			}
 		}
 	})
 	s.initTickerFunctions()
@@ -477,15 +484,18 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	bull := kline.Close.Compare(kline.Open) > 0
 
 	balances := s.GeneralOrderExecutor.Session().GetAccount().Balances()
-	bbgo.Notify("source: %.4f, price: %.4f lowest: %.4f highest: %.4f sp %.4f bp %.4f", sourcef, pricef, s.lowestPrice, s.highestPrice, s.sellPrice, s.buyPrice)
-	bbgo.Notify("balances: [Total] %v %s [Base] %s(%v %s) [Quote] %s",
-		s.CalcAssetValue(price),
-		s.Market.QuoteCurrency,
-		balances[s.Market.BaseCurrency].String(),
-		balances[s.Market.BaseCurrency].Total().Mul(price),
-		s.Market.QuoteCurrency,
-		balances[s.Market.QuoteCurrency].String(),
-	)
+	startTime := kline.StartTime.Time()
+	if startTime.Round(time.Second) == startTime.Round(time.Minute) {
+		bbgo.Notify("source: %.4f, price: %.4f lowest: %.4f highest: %.4f sp %.4f bp %.4f", sourcef, pricef, s.lowestPrice, s.highestPrice, s.sellPrice, s.buyPrice)
+		bbgo.Notify("balances: [Total] %v %s [Base] %s(%v %s) [Quote] %s",
+			s.CalcAssetValue(price),
+			s.Market.QuoteCurrency,
+			balances[s.Market.BaseCurrency].String(),
+			balances[s.Market.BaseCurrency].Total().Mul(price),
+			s.Market.QuoteCurrency,
+			balances[s.Market.QuoteCurrency].String(),
+		)
+	}
 
 	shortCondition := ewo[0] < ewo[1] && ewo[1] >= ewo[2] && (ewo[1] <= ewo[2] || ewo[2] >= ewo[3]) || s.sellPrice == 0 && ewo[0] < ewo[1] && ewo[1] < ewo[2]
 	longCondition := ewo[0] > ewo[1] && ewo[1] <= ewo[2] && (ewo[1] >= ewo[2] || ewo[2] <= ewo[3]) || s.buyPrice == 0 && ewo[0] > ewo[1] && ewo[1] > ewo[2]
@@ -493,18 +503,19 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	exitShortCondition := s.sellPrice > 0 && !shortCondition && s.sellPrice*(1.+stoploss) <= highf || s.sellPrice+atr <= highf || s.trailingCheck(highf, "short")
 	exitLongCondition := s.buyPrice > 0 && !longCondition && s.buyPrice*(1.-stoploss) >= lowf || s.buyPrice-atr >= lowf || s.trailingCheck(lowf, "long")
 
-	if exitShortCondition || exitLongCondition {
-		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
-			log.WithError(err).Errorf("cannot cancel orders")
+	if exitShortCondition || exitLongCondition || (longCondition && bull) || (shortCondition && !bull) {
+		if hold := s.smartCancel(ctx, pricef); hold > 0 {
 			return
 		}
+	} else {
+		s.smartCancel(ctx, pricef)
+		return
+	}
+	if exitShortCondition || exitLongCondition {
 		s.ClosePosition(ctx, fixedpoint.One)
 	}
+
 	if longCondition && bull {
-		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
-			log.WithError(err).Errorf("cannot cancel orders")
-			return
-		}
 		if source.Compare(price) > 0 {
 			source = price
 		}
@@ -527,10 +538,6 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		return
 	}
 	if shortCondition && !bull {
-		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
-			log.WithError(err).Errorf("cannot cancel orders")
-			return
-		}
 		if source.Compare(price) < 0 {
 			source = price
 		}

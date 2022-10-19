@@ -46,7 +46,7 @@ func (store *SerialMarketDataStore) Subscribe(interval types.Interval) {
 func (store *SerialMarketDataStore) BindStream(ctx context.Context, stream types.Stream) {
 	if store.UseAggTrade {
 		if IsBackTesting {
-			log.Errorf("Right now in backtesting, aggTrade event is not yet supported. Use OnKLineClosed instead.")
+			log.Errorf("right now in backtesting, aggTrade event is not yet supported. Use OnKLineClosed instead.")
 			stream.OnKLineClosed(store.handleKLineClosed)
 			return
 		}
@@ -85,6 +85,10 @@ func (store *SerialMarketDataStore) handleMarketTrade(trade types.Trade) {
 
 func (store *SerialMarketDataStore) tickerProcessor(ctx context.Context) {
 	duration := store.MinInterval.Duration()
+	relativeTime := time.Now().UnixNano() % int64(duration)
+	waitTime := int64(duration) - relativeTime
+	ch := time.After(time.Duration(waitTime))
+	<-ch
 	intervalCloseTicker := time.NewTicker(duration)
 	defer intervalCloseTicker.Stop()
 
