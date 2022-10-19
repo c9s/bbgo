@@ -25,7 +25,8 @@ func (i Interval) Seconds() int {
 	return m
 }
 
-// specially handled, for better precision
+// Milliseconds is specially handled, for better precision
+// for ms level interval, calling Seconds and Minutes directly might trigger panic error
 func (i Interval) Milliseconds() int {
 	t := 0
 	index := 0
