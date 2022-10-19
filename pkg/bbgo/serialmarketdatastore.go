@@ -7,6 +7,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	log "github.com/sirupsen/logrus"
 )
 
 type SerialMarketDataStore struct {
@@ -44,6 +45,11 @@ func (store *SerialMarketDataStore) Subscribe(interval types.Interval) {
 
 func (store *SerialMarketDataStore) BindStream(ctx context.Context, stream types.Stream) {
 	if store.UseAggTrade {
+		if IsBackTesting {
+			log.Errorf("Right now in backtesting, aggTrade event is not yet supported. Use OnKLineClosed instead.")
+			stream.OnKLineClosed(store.handleKLineClosed)
+			return
+		}
 		go store.tickerProcessor(ctx)
 		stream.OnAggTrade(store.handleMarketTrade)
 	} else {
