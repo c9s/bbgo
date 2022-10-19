@@ -23,6 +23,7 @@ exchangeStrategies:
  
 - on: binance
   elliottwave:
+    minInterval: 1s
     symbol: BNBBUSD
     limitOrder: true
     quantity: 0.16
@@ -115,6 +116,7 @@ backtest:
   symbols:
     - BNBBUSD
   sessions: [binance]
+  syncSecKLines: true
   accounts:
     binance:
       makerFeeRate: 0.000

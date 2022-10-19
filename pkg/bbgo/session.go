@@ -395,8 +395,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	// used kline intervals by the given symbol
 	var klineSubscriptions = map[types.Interval]struct{}{}
 
-	// always subscribe the 1m kline so we can make sure the connection persists.
-	klineSubscriptions[types.Interval1m] = struct{}{}
+	minInterval := types.Interval1m
 
 	// Aggregate the intervals that we are using in the subscriptions.
 	for _, sub := range session.Subscriptions {
@@ -411,11 +410,19 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 				continue
 			}
 
+			if minInterval.Seconds() > sub.Options.Interval.Seconds() {
+				minInterval = sub.Options.Interval
+			}
+
 			if sub.Symbol == symbol {
 				klineSubscriptions[types.Interval(sub.Options.Interval)] = struct{}{}
 			}
 		}
 	}
+
+	// always subscribe the 1m kline so we can make sure the connection persists.
+	klineSubscriptions[minInterval] = struct{}{}
+	log.Warnf("sub: %v", klineSubscriptions)
 
 	for interval := range klineSubscriptions {
 		// avoid querying the last unclosed kline
@@ -440,9 +447,11 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 
 			// update last prices by the given kline
 			lastKLine := kLines[len(kLines)-1]
-			if interval == types.Interval1m {
+			if interval == minInterval {
 				session.lastPrices[symbol] = lastKLine.Close
 			}
+
+			log.Warnf("load %s", interval)
 
 			for _, k := range kLines {
 				// let market data store trigger the update, so that the indicator could be updated too.
@@ -497,6 +506,7 @@ func (session *ExchangeSession) Positions() map[string]*types.Position {
 // MarketDataStore returns the market data store of a symbol
 func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
+	// FIXME: the returned MarketDataStore when !ok will be empty
 	if !ok {
 		s = NewMarketDataStore(symbol)
 		s.BindStream(session.MarketDataStream)
@@ -507,15 +517,21 @@ func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataSto
 }
 
 // KLine updates will be received in the order listend in intervals array
-func (session *ExchangeSession) SerialMarketDataStore(symbol string, intervals []types.Interval) (store *SerialMarketDataStore, ok bool) {
+func (session *ExchangeSession) SerialMarketDataStore(ctx context.Context, symbol string, intervals []types.Interval, useAggTrade ...bool) (store *SerialMarketDataStore, ok bool) {
 	st, ok := session.MarketDataStore(symbol)
 	if !ok {
 		return nil, false
 	}
-	store = NewSerialMarketDataStore(symbol)
-	klines, ok := st.KLinesOfInterval(types.Interval1m)
+	minInterval := types.Interval1m
+	for _, i := range intervals {
+		if minInterval.Seconds() > i.Seconds() {
+			minInterval = i
+		}
+	}
+	store = NewSerialMarketDataStore(symbol, minInterval, useAggTrade...)
+	klines, ok := st.KLinesOfInterval(minInterval)
 	if !ok {
-		log.Errorf("SerialMarketDataStore: cannot get 1m history")
+		log.Errorf("SerialMarketDataStore: cannot get %s history", minInterval)
 		return nil, false
 	}
 	for _, interval := range intervals {
@@ -524,7 +540,7 @@ func (session *ExchangeSession) SerialMarketDataStore(symbol string, intervals [
 	for _, kline := range *klines {
 		store.AddKLine(kline)
 	}
-	store.BindStream(session.MarketDataStream)
+	store.BindStream(ctx, session.MarketDataStream)
 	return store, true
 }
 
