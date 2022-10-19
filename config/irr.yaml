@@ -10,19 +10,26 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
+  max:
+    exchange: max
+    envVarPrefix:  max
+  ftx:
+    exchange: ftx
+    envVarPrefix: ftx
 
 exchangeStrategies:
 - on: binance
   irr:
     symbol: BTCBUSD
     # in milliseconds(ms)
-    hftInterval: 5
+    hftInterval: 1000
     # indicator window
-    window: 100
-    # limit maker order quantity
-    quantity: 0.01
-    # bonus spread in USD
-    spread: 0.25
+    window: 0
+    # maxima position in USD
+    amount: 100
+    quantity: 0.001
+    # minProfit pips in USD
+    pips: 0.0
     # alpha1: negative return reversion
     NR: true
     # alpha2: moving average reversion
