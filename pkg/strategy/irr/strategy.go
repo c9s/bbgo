@@ -48,15 +48,9 @@ type Strategy struct {
 	orderExecutor *bbgo.GeneralOrderExecutor
 
 	bbgo.QuantityOrAmount
-	MinProfit float64 `json:"pips"`
 
-	Interval int  `json:"hftInterval"`
-	NR       bool `json:"NR"`
-	MR       bool `json:"MR"`
+	Interval int `json:"hftInterval"`
 
-	// for back-test
-	Nrr *NRR
-	Ma  *indicator.SMA
 	// realtime book ticker to submit order
 	obBuyPrice  uint64
 	obSellPrice uint64
@@ -399,9 +393,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 								log.Infof("box ended at price: %f with time length: %d", boxClosePrice, boxCounter)
 								// box ending, should re-balance position
 								nirr := fixedpoint.NewFromFloat(((boxOpenPrice - boxClosePrice) / boxOpenPrice) / (float64(boxCounter) + 1))
-								qty := s.QuantityOrAmount.CalculateQuantity(fixedpoint.Value(boxClosePrice))
-								qty = qty.Mul(nirr.Abs().Div(fixedpoint.NewFromInt(1000)))
-								log.Infof("Alpha: %f with Diff Qty: %f", nirr.Float64(), qty.Float64())
+								log.Infof("Alpha: %f", nirr.Float64())
 								if nirr.Float64() < 0 {
 									_, err := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
 										Symbol:   s.Symbol,
@@ -409,7 +401,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 										Quantity: s.Quantity,
 										Type:     types.OrderTypeLimitMaker,
 										Price:    fixedpoint.NewFromFloat(float64(s.obSellPrice)),
-										Tag:      "irr re-balance: sell",
+										Tag:      "irrSell",
 									})
 									if err != nil {
 										log.WithError(err)
@@ -421,7 +413,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 										Quantity: s.Quantity,
 										Type:     types.OrderTypeLimitMaker,
 										Price:    fixedpoint.NewFromFloat(float64(s.obBuyPrice)),
-										Tag:      "irr re-balance: buy",
+										Tag:      "irrBuy",
 									})
 									if err != nil {
 										log.WithError(err)
@@ -452,7 +444,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			for {
 				select {
 				case <-intervalOpenTicker.C:
-					time.Sleep(time.Duration(s.Interval/10) * time.Millisecond)
+					time.Sleep(10 * time.Millisecond)
 					log.Infof("kline open time @ %s", time.Now().Format("2006-01-02 15:04:05.000000"))
 
 					if s.currentTradePrice > 0 && s.closePrice > 0 {
