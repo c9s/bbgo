@@ -262,7 +262,7 @@ func (trader *Trader) RunAllSingleExchangeStrategy(ctx context.Context) error {
 	return nil
 }
 
-func (trader *Trader) injectFields() error {
+func (trader *Trader) injectFields(ctx context.Context) error {
 	// load and run Session strategies
 	for sessionName, strategies := range trader.exchangeStrategies {
 		var session = trader.environment.sessions[sessionName]
@@ -285,8 +285,30 @@ func (trader *Trader) injectFields() error {
 				return errors.Wrapf(err, "failed to inject OrderExecutor on %T", strategy)
 			}
 
+			if defaulter, ok := strategy.(StrategyDefaulter); ok {
+				if err := defaulter.Defaults(); err != nil {
+					panic(err)
+				}
+			}
+
+			if initializer, ok := strategy.(StrategyInitializer); ok {
+				if err := initializer.Initialize(); err != nil {
+					panic(err)
+				}
+			}
+
+			if subscriber, ok := strategy.(ExchangeSessionSubscriber); ok {
+				subscriber.Subscribe(session)
+			} else {
+				log.Errorf("strategy %s does not implement ExchangeSessionSubscriber", strategy.ID())
+			}
+
 			if symbol, ok := dynamic.LookupSymbolField(rs); ok {
-				log.Infof("found symbol based strategy from %s", rs.Type())
+				log.Infof("found symbol %s based strategy from %s", symbol, rs.Type())
+
+				if err := session.initSymbol(ctx, trader.environment, symbol); err != nil {
+					return errors.Wrapf(err, "failed to inject object into %T when initSymbol", strategy)
+				}
 
 				market, ok := session.Market(symbol)
 				if !ok {
@@ -339,11 +361,9 @@ func (trader *Trader) Run(ctx context.Context) error {
 	// trader.environment.Connect will call interact.Start
 	interact.AddCustomInteraction(NewCoreInteraction(trader.environment, trader))
 
-	if err := trader.injectFields(); err != nil {
+	if err := trader.injectFields(ctx); err != nil {
 		return err
 	}
-
-	trader.Subscribe()
 
 	if err := trader.environment.Start(ctx); err != nil {
 		return err

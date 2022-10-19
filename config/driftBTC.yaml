@@ -26,12 +26,13 @@ exchangeStrategies:
  
 - on: binance
   drift:
+    minInterval: 1s
     limitOrder: true
     #quantity: 0.0012
     canvasPath: "./output.png"
     symbol: BTCUSDT
     # kline interval for indicators
-    interval: 1m
+    interval: 1s
     window: 6
     useAtr: true
     useStopLoss: true
@@ -125,11 +126,12 @@ sync:
     - BTCUSDT
 
 backtest:
-  startTime: "2022-09-25"
-  endTime: "2022-10-30"
+  startTime: "2022-10-18"
+  endTime: "2022-10-19"
   symbols:
     - BTCUSDT
   sessions: [binance]
+  syncSecKLines: true
   accounts:
     binance:
       makerFeeRate: 0.000
