@@ -98,10 +98,10 @@ type Strategy struct {
 	SmootherWindow            int              `json:"smootherWindow"`
 	FisherTransformWindow     int              `json:"fisherTransformWindow"`
 	ATRWindow                 int              `json:"atrWindow"`
-	PendingMinutes            int              `json:"pendingMinutes" modifiable:"true"`  // if order not be traded for pendingMinutes of time, cancel it.
-	NoRebalance               bool             `json:"noRebalance" modifiable:"true"`     // disable rebalance
-	TrendWindow               int              `json:"trendWindow"`                       // trendLine is used for rebalancing the position. When trendLine goes up, hold base, otherwise hold quote
-	RebalanceFilter           float64          `json:"rebalanceFilter" modifiable:"true"` // beta filter on the Linear Regression of trendLine
+	PendingMinInterval        int              `json:"pendingMinInterval" modifiable:"true"` // if order not be traded for pendingMinInterval of time, cancel it.
+	NoRebalance               bool             `json:"noRebalance" modifiable:"true"`        // disable rebalance
+	TrendWindow               int              `json:"trendWindow"`                          // trendLine is used for rebalancing the position. When trendLine goes up, hold base, otherwise hold quote
+	RebalanceFilter           float64          `json:"rebalanceFilter" modifiable:"true"`    // beta filter on the Linear Regression of trendLine
 	TrailingCallbackRate      []float64        `json:"trailingCallbackRate" modifiable:"true"`
 	TrailingActivationRatio   []float64        `json:"trailingActivationRatio" modifiable:"true"`
 
@@ -276,7 +276,7 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64) (int, e
 				continue
 			}
 			log.Warnf("%v | counter: %d, system: %d", order, s.orderPendingCounter[order.OrderID], s.counter)
-			if s.counter-s.orderPendingCounter[order.OrderID] > s.PendingMinutes {
+			if s.counter-s.orderPendingCounter[order.OrderID] > s.PendingMinInterval {
 				toCancel = true
 			} else if order.Side == types.SideTypeBuy {
 				// 75% of the probability

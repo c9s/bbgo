@@ -166,52 +166,6 @@ func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 	trader.riskControls = riskControls
 }
 
-func (trader *Trader) Subscribe() {
-	// pre-subscribe the data
-	for sessionName, strategies := range trader.exchangeStrategies {
-		session := trader.environment.sessions[sessionName]
-		for _, strategy := range strategies {
-			if defaulter, ok := strategy.(StrategyDefaulter); ok {
-				if err := defaulter.Defaults(); err != nil {
-					panic(err)
-				}
-			}
-
-			if initializer, ok := strategy.(StrategyInitializer); ok {
-				if err := initializer.Initialize(); err != nil {
-					panic(err)
-				}
-			}
-
-			if subscriber, ok := strategy.(ExchangeSessionSubscriber); ok {
-				subscriber.Subscribe(session)
-			} else {
-				log.Errorf("strategy %s does not implement ExchangeSessionSubscriber", strategy.ID())
-			}
-		}
-	}
-
-	for _, strategy := range trader.crossExchangeStrategies {
-		if defaulter, ok := strategy.(StrategyDefaulter); ok {
-			if err := defaulter.Defaults(); err != nil {
-				panic(err)
-			}
-		}
-
-		if initializer, ok := strategy.(StrategyInitializer); ok {
-			if err := initializer.Initialize(); err != nil {
-				panic(err)
-			}
-		}
-
-		if subscriber, ok := strategy.(CrossExchangeSessionSubscriber); ok {
-			subscriber.CrossSubscribe(trader.environment.sessions)
-		} else {
-			log.Errorf("strategy %s does not implement CrossExchangeSessionSubscriber", strategy.ID())
-		}
-	}
-}
-
 func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy SingleExchangeStrategy, session *ExchangeSession, orderExecutor OrderExecutor) error {
 	if v, ok := strategy.(StrategyValidator); ok {
 		if err := v.Validate(); err != nil {
@@ -262,7 +216,7 @@ func (trader *Trader) RunAllSingleExchangeStrategy(ctx context.Context) error {
 	return nil
 }
 
-func (trader *Trader) injectFields(ctx context.Context) error {
+func (trader *Trader) injectFieldsAndSubscribe(ctx context.Context) error {
 	// load and run Session strategies
 	for sessionName, strategies := range trader.exchangeStrategies {
 		var session = trader.environment.sessions[sessionName]
@@ -350,6 +304,24 @@ func (trader *Trader) injectFields(ctx context.Context) error {
 		if err := trader.injectCommonServices(strategy); err != nil {
 			return err
 		}
+
+		if defaulter, ok := strategy.(StrategyDefaulter); ok {
+			if err := defaulter.Defaults(); err != nil {
+				return err
+			}
+		}
+
+		if initializer, ok := strategy.(StrategyInitializer); ok {
+			if err := initializer.Initialize(); err != nil {
+				return err
+			}
+		}
+
+		if subscriber, ok := strategy.(CrossExchangeSessionSubscriber); ok {
+			subscriber.CrossSubscribe(trader.environment.sessions)
+		} else {
+			log.Errorf("strategy %s does not implement CrossExchangeSessionSubscriber", strategy.ID())
+		}
 	}
 
 	return nil
@@ -361,7 +333,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 	// trader.environment.Connect will call interact.Start
 	interact.AddCustomInteraction(NewCoreInteraction(trader.environment, trader))
 
-	if err := trader.injectFields(ctx); err != nil {
+	if err := trader.injectFieldsAndSubscribe(ctx); err != nil {
 		return err
 	}
 
