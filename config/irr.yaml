@@ -22,18 +22,10 @@ exchangeStrategies:
   irr:
     symbol: BTCBUSD
     # in milliseconds(ms)
+    # must > 10 ms
     hftInterval: 1000
-    # indicator window
-    window: 0
-    # maxima position in USD
-    amount: 100
+    # qty per trade
     quantity: 0.001
-    # minProfit pips in USD
-    pips: 0.0
-    # alpha1: negative return reversion
-    NR: true
-    # alpha2: moving average reversion
-    MR: true
     # Draw pnl
     drawGraph: true
     graphPNLPath: "./pnl.png"
