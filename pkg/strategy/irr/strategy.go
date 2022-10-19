@@ -377,18 +377,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 					if s.currentTradePrice > 0 {
 						s.closePrice = float64(s.currentTradePrice)
-						log.Infof("Close Price: %f", float64(s.closePrice))
+						log.Infof("Close Price: %f", s.closePrice)
 						if s.closePrice > 0 && s.openPrice > 0 {
 							direction := s.closePrice - s.openPrice
-							klinDirections.Update(float64(direction))
+							klinDirections.Update(direction)
 							regimeShift := klinDirections.Index(0)*klinDirections.Index(1) < 0
 							if regimeShift && !started {
-								boxOpenPrice = float64(s.openPrice)
+								boxOpenPrice = s.openPrice
 								started = true
 								boxCounter = 0
 								log.Infof("box started at price: %f", boxOpenPrice)
 							} else if regimeShift && started {
-								boxClosePrice = float64(s.openPrice)
+								boxClosePrice = s.closePrice
 								started = false
 								log.Infof("box ended at price: %f with time length: %d", boxClosePrice, boxCounter)
 								// box ending, should re-balance position
