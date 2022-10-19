@@ -422,7 +422,6 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 
 	// always subscribe the 1m kline so we can make sure the connection persists.
 	klineSubscriptions[minInterval] = struct{}{}
-	log.Warnf("sub: %v", klineSubscriptions)
 
 	for interval := range klineSubscriptions {
 		// avoid querying the last unclosed kline
@@ -450,8 +449,6 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 			if interval == minInterval {
 				session.lastPrices[symbol] = lastKLine.Close
 			}
-
-			log.Warnf("load %s", interval)
 
 			for _, k := range kLines {
 				// let market data store trigger the update, so that the indicator could be updated too.
