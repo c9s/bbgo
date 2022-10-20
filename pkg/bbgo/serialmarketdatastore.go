@@ -51,7 +51,7 @@ func (store *SerialMarketDataStore) BindStream(ctx context.Context, stream types
 			return
 		}
 		go store.tickerProcessor(ctx)
-		stream.OnAggTrade(store.handleMarketTrade)
+		stream.OnMarketTrade(store.handleMarketTrade)
 	} else {
 		stream.OnKLineClosed(store.handleKLineClosed)
 	}
@@ -78,8 +78,8 @@ func (store *SerialMarketDataStore) handleMarketTrade(trade types.Trade) {
 	if store.o.IsZero() {
 		store.o = store.price
 	}
-	store.v.Add(trade.Quantity)
-	store.qv.Add(trade.QuoteQuantity)
+	store.v = store.v.Add(trade.Quantity)
+	store.qv = store.qv.Add(trade.QuoteQuantity)
 	store.mu.Unlock()
 }
 
@@ -97,7 +97,7 @@ func (store *SerialMarketDataStore) tickerProcessor(ctx context.Context) {
 		case time := <-intervalCloseTicker.C:
 			kline := types.KLine{
 				Symbol:    store.Symbol,
-				StartTime: types.Time(time.Add(-1 * duration)),
+				StartTime: types.Time(time.Add(-1 * duration).Round(duration)),
 				EndTime:   types.Time(time),
 				Interval:  store.MinInterval,
 				Closed:    true,
@@ -143,7 +143,7 @@ func (store *SerialMarketDataStore) AddKLine(kline types.KLine, async ...bool) {
 	}
 	// endtime
 	duration := store.MinInterval.Duration()
-	timestamp := kline.StartTime.Time().Round(duration).Add(duration)
+	timestamp := kline.StartTime.Time().Add(duration)
 	for _, val := range store.Subscription {
 		k, ok := store.KLines[val]
 		if !ok {
