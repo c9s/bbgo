@@ -12,7 +12,7 @@ import (
 
 type SerialMarketDataStore struct {
 	*MarketDataStore
-	UseAggTrade              bool
+	UseMarketTrade           bool
 	KLines                   map[types.Interval]*types.KLine
 	MinInterval              types.Interval
 	Subscription             []types.Interval
@@ -22,12 +22,12 @@ type SerialMarketDataStore struct {
 
 // @param symbol: symbol to trace on
 // @param minInterval: unit interval, related to your signal timeframe
-// @param useAggTrade: if not assigned, default to false. if assigned to true, will use AggTrade signal to generate klines
-func NewSerialMarketDataStore(symbol string, minInterval types.Interval, useAggTrade ...bool) *SerialMarketDataStore {
+// @param useMarketTrade: if not assigned, default to false. if assigned to true, will use MarketTrade signal to generate klines
+func NewSerialMarketDataStore(symbol string, minInterval types.Interval, useMarketTrade ...bool) *SerialMarketDataStore {
 	return &SerialMarketDataStore{
 		MarketDataStore: NewMarketDataStore(symbol),
 		KLines:          make(map[types.Interval]*types.KLine),
-		UseAggTrade:     len(useAggTrade) > 0 && useAggTrade[0],
+		UseMarketTrade:  len(useMarketTrade) > 0 && useMarketTrade[0],
 		Subscription:    []types.Interval{},
 		MinInterval:     minInterval,
 	}
@@ -44,7 +44,7 @@ func (store *SerialMarketDataStore) Subscribe(interval types.Interval) {
 }
 
 func (store *SerialMarketDataStore) BindStream(ctx context.Context, stream types.Stream) {
-	if store.UseAggTrade {
+	if store.UseMarketTrade {
 		if IsBackTesting {
 			log.Errorf("right now in backtesting, aggTrade event is not yet supported. Use OnKLineClosed instead.")
 			stream.OnKLineClosed(store.handleKLineClosed)
