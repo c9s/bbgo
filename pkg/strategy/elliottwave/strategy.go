@@ -104,7 +104,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// this is not enough if we're subscribing 30m intervals using SerialMarketDataStore
 	if !bbgo.IsBackTesting {
 		session.Subscribe(types.BookTickerChannel, s.Symbol, types.SubscribeOptions{})
-		session.Subscribe(types.AggTradeChannel, s.Symbol, types.SubscribeOptions{})
+		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
 		if s.MinInterval.Milliseconds() >= types.Interval1s.Milliseconds() && s.MinInterval.Milliseconds()%types.Interval1s.Milliseconds() == 0 {
 			bbgo.KLinePreloadLimit = int64(((s.Interval.Milliseconds()/s.MinInterval.Milliseconds())*s.WindowSlow/1000 + 1) + 1000)
 			session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
