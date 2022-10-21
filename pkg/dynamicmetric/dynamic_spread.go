@@ -160,12 +160,6 @@ func (ds *DynamicSpreadAmp) getBidSpread() (bidSpread float64, err error) {
 	return 0, errors.New("incomplete dynamic spread settings or not enough data yet")
 }
 
-// BollingerSetting is for Bollinger Band settings
-type BollingerSetting struct {
-	types.IntervalWindow
-	BandWidth float64 `json:"bandWidth"`
-}
-
 type DynamicSpreadBollWidthRatio struct {
 	// AskSpreadScale is used to define the ask spread range with the given percentage.
 	AskSpreadScale *bbgo.PercentageScale `json:"askSpreadScale"`
