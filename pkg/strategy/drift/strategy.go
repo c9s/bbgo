@@ -857,7 +857,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			var buffer bytes.Buffer
 			if err := canvas.Render(chart.PNG, &buffer); err != nil {
 				log.WithError(err).Errorf("cannot render indicators in drift")
-				reply.Message(fmt.Sprintf("[error] cannot render indicators in drift: %v", err))
 				return
 			}
 			bbgo.SendPhoto(&buffer)
@@ -870,7 +869,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			var buffer bytes.Buffer
 			if err := canvas.Render(chart.PNG, &buffer); err != nil {
 				log.WithError(err).Errorf("cannot render pnl in drift")
-				reply.Message(fmt.Sprintf("[error] cannot render pnl in drift: %v", err))
 				return
 			}
 			bbgo.SendPhoto(&buffer)
@@ -883,7 +881,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			var buffer bytes.Buffer
 			if err := canvas.Render(chart.PNG, &buffer); err != nil {
 				log.WithError(err).Errorf("cannot render cumpnl in drift")
-				reply.Message(fmt.Sprintf("[error] canot render cumpnl in drift: %v", err))
 				return
 			}
 			bbgo.SendPhoto(&buffer)

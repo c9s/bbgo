@@ -87,8 +87,11 @@ func (store *SerialMarketDataStore) tickerProcessor(ctx context.Context) {
 	duration := store.MinInterval.Duration()
 	relativeTime := time.Now().UnixNano() % int64(duration)
 	waitTime := int64(duration) - relativeTime
-	ch := time.After(time.Duration(waitTime))
-	<-ch
+	select {
+	case <-time.After(time.Duration(waitTime)):
+	case <-ctx.Done():
+		return
+	}
 	intervalCloseTicker := time.NewTicker(duration)
 	defer intervalCloseTicker.Stop()
 
