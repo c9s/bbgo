@@ -22,7 +22,6 @@ func (s *Strategy) InitDrawCommands(store *bbgo.SerialMarketDataStore, profit, c
 			var buffer bytes.Buffer
 			if err := canvas.Render(chart.PNG, &buffer); err != nil {
 				log.WithError(err).Errorf("cannot render indicators in ewo")
-				reply.Message(fmt.Sprintf("[error] cannot render indicators in ewo: %v", err))
 				return
 			}
 			bbgo.SendPhoto(&buffer)
@@ -34,7 +33,6 @@ func (s *Strategy) InitDrawCommands(store *bbgo.SerialMarketDataStore, profit, c
 			var buffer bytes.Buffer
 			if err := canvas.Render(chart.PNG, &buffer); err != nil {
 				log.WithError(err).Errorf("cannot render pnl in ewo")
-				reply.Message(fmt.Sprintf("[error] cannot render pnl in ewo: %v", err))
 				return
 			}
 			bbgo.SendPhoto(&buffer)
@@ -46,7 +44,6 @@ func (s *Strategy) InitDrawCommands(store *bbgo.SerialMarketDataStore, profit, c
 			var buffer bytes.Buffer
 			if err := canvas.Render(chart.PNG, &buffer); err != nil {
 				log.WithError(err).Errorf("cannot render cumpnl in ewo")
-				reply.Message(fmt.Sprintf("[error] canot render cumpnl in ewo: %v", err))
 				return
 			}
 			bbgo.SendPhoto(&buffer)
