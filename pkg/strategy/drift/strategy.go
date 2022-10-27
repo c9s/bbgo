@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/wcharczuk/go-chart/v2"
 	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -68,6 +67,7 @@ type Strategy struct {
 	p           *types.Position
 	MinInterval types.Interval `json:"MinInterval"` // minimum interval referred for doing stoploss/trailing exists and updating highest/lowest
 
+	elapsed                *types.Queue
 	priceLines             *types.Queue
 	trendLine              types.UpdatableSeriesExtend
 	ma                     types.UpdatableSeriesExtend
@@ -78,8 +78,8 @@ type Strategy struct {
 	midPrice               fixedpoint.Value // the midPrice is the average of bestBid and bestAsk in public orderbook
 	lock                   sync.RWMutex     `ignore:"true"` // lock for midPrice
 	positionLock           sync.RWMutex     `ignore:"true"` // lock for highest/lowest and p
+	pendingLock            sync.Mutex       `ignore:"true"`
 	startTime              time.Time        // trading start time
-	counter                int              // number of MinInterval since startTime
 	maxCounterBuyCanceled  int              // the largest counter of the order on the buy side been cancelled. meaning the latest cancelled buy order.
 	maxCounterSellCanceled int              // the largest counter of the order on the sell side been cancelled. meaning the latest cancelled sell order.
 	orderPendingCounter    map[uint64]int   // records the timepoint when the orders are created, using the counter at the time.
@@ -114,10 +114,11 @@ type Strategy struct {
 	// This is not related to trade but for statistics graph generation
 	// Will deduct fee in percentage from every trade
 	GraphPNLDeductFee bool   `json:"graphPNLDeductFee"`
-	CanvasPath        string `json:"canvasPath"`      // backtest related. the path to store the indicator graph
-	GraphPNLPath      string `json:"graphPNLPath"`    // backtest related. the path to store the pnl % graph per trade graph.
-	GraphCumPNLPath   string `json:"graphCumPNLPath"` // backtest related. the path to store the asset changes in graph
-	GenerateGraph     bool   `json:"generateGraph"`   // whether to generate graph when shutdown
+	CanvasPath        string `json:"canvasPath"`       // backtest related. the path to store the indicator graph
+	GraphPNLPath      string `json:"graphPNLPath"`     // backtest related. the path to store the pnl % graph per trade graph.
+	GraphCumPNLPath   string `json:"graphCumPNLPath"`  // backtest related. the path to store the asset changes in graph
+	GraphElapsedPath  string `json:"graphElapsedPath"` // the path to store the elapsed time in ms
+	GenerateGraph     bool   `json:"generateGraph"`    // whether to generate graph when shutdown
 
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 	Session     *bbgo.ExchangeSession
@@ -264,7 +265,7 @@ func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
 	return nil
 }
 
-func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64) (int, error) {
+func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64, syscounter int) (int, error) {
 	nonTraded := s.GeneralOrderExecutor.ActiveMakerOrders().Orders()
 	if len(nonTraded) > 0 {
 		if len(nonTraded) > 1 {
@@ -276,17 +277,21 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64) (int, e
 			if order.Status != types.OrderStatusNew && order.Status != types.OrderStatusPartiallyFilled {
 				continue
 			}
-			log.Warnf("%v | counter: %d, system: %d", order, s.orderPendingCounter[order.OrderID], s.counter)
-			if s.counter-s.orderPendingCounter[order.OrderID] > s.PendingMinInterval {
+			s.pendingLock.Lock()
+			counter := s.orderPendingCounter[order.OrderID]
+			s.pendingLock.Unlock()
+
+			log.Warnf("%v | counter: %d, system: %d", order, counter, syscounter)
+			if syscounter-counter > s.PendingMinInterval {
 				toCancel = true
 			} else if order.Side == types.SideTypeBuy {
 				// 75% of the probability
-				if order.Price.Float64()+s.stdevHigh.Last()*2 <= pricef {
+				if order.Price.Float64()+atr*2 <= pricef {
 					toCancel = true
 				}
 			} else if order.Side == types.SideTypeSell {
 				// 75% of the probability
-				if order.Price.Float64()-s.stdevLow.Last()*2 >= pricef {
+				if order.Price.Float64()-atr*2 >= pricef {
 					toCancel = true
 				}
 			} else {
@@ -297,16 +302,19 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64) (int, e
 			err := s.GeneralOrderExecutor.CancelNoWait(ctx)
 			// TODO: clean orderPendingCounter on cancel/trade
 			for _, order := range nonTraded {
+				s.pendingLock.Lock()
+				counter := s.orderPendingCounter[order.OrderID]
+				delete(s.orderPendingCounter, order.OrderID)
+				s.pendingLock.Unlock()
 				if order.Side == types.SideTypeSell {
-					if s.maxCounterSellCanceled < s.orderPendingCounter[order.OrderID] {
-						s.maxCounterSellCanceled = s.orderPendingCounter[order.OrderID]
+					if s.maxCounterSellCanceled < counter {
+						s.maxCounterSellCanceled = counter
 					}
 				} else {
-					if s.maxCounterBuyCanceled < s.orderPendingCounter[order.OrderID] {
-						s.maxCounterBuyCanceled = s.orderPendingCounter[order.OrderID]
+					if s.maxCounterBuyCanceled < counter {
+						s.maxCounterBuyCanceled = counter
 					}
 				}
-				delete(s.orderPendingCounter, order.OrderID)
 			}
 			log.Warnf("cancel all %v", err)
 			return 0, err
@@ -390,102 +398,6 @@ func (s *Strategy) initTickerFunctions(ctx context.Context) {
 
 }
 
-func (s *Strategy) DrawIndicators(time types.Time) *types.Canvas {
-	canvas := types.NewCanvas(s.InstanceID(), s.Interval)
-	Length := s.priceLines.Length()
-	if Length > 300 {
-		Length = 300
-	}
-	log.Infof("draw indicators with %d data", Length)
-	mean := s.priceLines.Mean(Length)
-	highestPrice := s.priceLines.Minus(mean).Abs().Highest(Length)
-	highestDrift := s.drift.Abs().Highest(Length)
-	hi := s.drift.drift.Abs().Highest(Length)
-	ratio := highestPrice / highestDrift
-
-	// canvas.Plot("upband", s.ma.Add(s.stdevHigh), time, Length)
-	canvas.Plot("ma", s.ma, time, Length)
-	// canvas.Plot("downband", s.ma.Minus(s.stdevLow), time, Length)
-	fmt.Printf("%f %f\n", highestPrice, hi)
-
-	canvas.Plot("trend", s.trendLine, time, Length)
-	canvas.Plot("drift", s.drift.Mul(ratio).Add(mean), time, Length)
-	canvas.Plot("driftOrig", s.drift.drift.Mul(highestPrice/hi).Add(mean), time, Length)
-	canvas.Plot("zero", types.NumberSeries(mean), time, Length)
-	canvas.Plot("price", s.priceLines, time, Length)
-	return canvas
-}
-
-func (s *Strategy) DrawPNL(profit types.Series) *types.Canvas {
-	canvas := types.NewCanvas(s.InstanceID())
-	log.Errorf("pnl Highest: %f, Lowest: %f", types.Highest(profit, profit.Length()), types.Lowest(profit, profit.Length()))
-	length := profit.Length()
-	if s.GraphPNLDeductFee {
-		canvas.PlotRaw("pnl % (with Fee Deducted)", profit, length)
-	} else {
-		canvas.PlotRaw("pnl %", profit, length)
-	}
-	canvas.YAxis = chart.YAxis{
-		ValueFormatter: func(v interface{}) string {
-			if vf, isFloat := v.(float64); isFloat {
-				return fmt.Sprintf("%.4f", vf)
-			}
-			return ""
-		},
-	}
-	canvas.PlotRaw("1", types.NumberSeries(1), length)
-	return canvas
-}
-
-func (s *Strategy) DrawCumPNL(cumProfit types.Series) *types.Canvas {
-	canvas := types.NewCanvas(s.InstanceID())
-	canvas.PlotRaw("cummulative pnl", cumProfit, cumProfit.Length())
-	canvas.YAxis = chart.YAxis{
-		ValueFormatter: func(v interface{}) string {
-			if vf, isFloat := v.(float64); isFloat {
-				return fmt.Sprintf("%.4f", vf)
-			}
-			return ""
-		},
-	}
-	return canvas
-}
-
-func (s *Strategy) Draw(time types.Time, profit types.Series, cumProfit types.Series) {
-	canvas := s.DrawIndicators(time)
-	f, err := os.Create(s.CanvasPath)
-	if err != nil {
-		log.WithError(err).Errorf("cannot create on %s", s.CanvasPath)
-		return
-	}
-	defer f.Close()
-	if err := canvas.Render(chart.PNG, f); err != nil {
-		log.WithError(err).Errorf("cannot render in drift")
-	}
-
-	canvas = s.DrawPNL(profit)
-	f, err = os.Create(s.GraphPNLPath)
-	if err != nil {
-		log.WithError(err).Errorf("open pnl")
-		return
-	}
-	defer f.Close()
-	if err := canvas.Render(chart.PNG, f); err != nil {
-		log.WithError(err).Errorf("render pnl")
-	}
-
-	canvas = s.DrawCumPNL(cumProfit)
-	f, err = os.Create(s.GraphCumPNLPath)
-	if err != nil {
-		log.WithError(err).Errorf("open cumpnl")
-		return
-	}
-	defer f.Close()
-	if err := canvas.Render(chart.PNG, f); err != nil {
-		log.WithError(err).Errorf("render cumpnl")
-	}
-}
-
 // Sending new rebalance orders cost too much.
 // Modify the position instead to expect the strategy itself rebalance on Close
 func (s *Strategy) Rebalance(ctx context.Context) {
@@ -548,7 +460,7 @@ func (s *Strategy) CalcAssetValue(price fixedpoint.Value) fixedpoint.Value {
 	return balances[s.Market.BaseCurrency].Total().Mul(price).Add(balances[s.Market.QuoteCurrency].Total())
 }
 
-func (s *Strategy) klineHandlerMin(ctx context.Context, kline types.KLine) {
+func (s *Strategy) klineHandlerMin(ctx context.Context, kline types.KLine, counter int) {
 	s.klineMin.Set(&kline)
 	if s.Status != types.StrategyStatusRunning {
 		return
@@ -571,7 +483,7 @@ func (s *Strategy) klineHandlerMin(ctx context.Context, kline types.KLine) {
 
 	numPending := 0
 	var err error
-	if numPending, err = s.smartCancel(ctx, pricef, atr); err != nil {
+	if numPending, err = s.smartCancel(ctx, pricef, atr, counter); err != nil {
 		log.WithError(err).Errorf("cannot cancel orders")
 		return
 	}
@@ -589,28 +501,37 @@ func (s *Strategy) klineHandlerMin(ctx context.Context, kline types.KLine) {
 	}
 }
 
-func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
+func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter int) {
+	start := time.Now()
+	defer func() {
+		end := time.Now()
+		elapsed := end.Sub(start)
+		s.elapsed.Update(float64(elapsed) / 1000000)
+	}()
 	s.frameKLine.Set(&kline)
 
 	source := s.GetSource(&kline)
 	sourcef := source.Float64()
+
 	s.priceLines.Update(sourcef)
-	s.ma.Update(sourcef)
+	//s.ma.Update(sourcef)
 	s.trendLine.Update(sourcef)
+
 	s.drift.Update(sourcef, kline.Volume.Abs().Float64())
-
 	s.atr.PushK(kline)
-
 	atr := s.atr.Last()
-	price := s.getLastPrice()
+
+	price := kline.Close //s.getLastPrice()
 	pricef := price.Float64()
 	lowf := math.Min(kline.Low.Float64(), pricef)
 	highf := math.Max(kline.High.Float64(), pricef)
-	lowdiff := s.ma.Last() - lowf
+	lowdiff := pricef - lowf
 	s.stdevLow.Update(lowdiff)
-	highdiff := highf - s.ma.Last()
+	highdiff := highf - pricef
 	s.stdevHigh.Update(highdiff)
+
 	drift := s.drift.Array(2)
+
 	if len(drift) < 2 || len(drift) < s.PredictOffset {
 		return
 	}
@@ -623,7 +544,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		return
 	}
 
-	log.Infof("highdiff: %3.2f ma: %.2f, open: %8v, close: %8v, high: %8v, low: %8v, time: %v %v", s.stdevHigh.Last(), s.ma.Last(), kline.Open, kline.Close, kline.High, kline.Low, kline.StartTime, kline.EndTime)
+	log.Infof("highdiff: %3.2f open: %8v, close: %8v, high: %8v, low: %8v, time: %v %v", s.stdevHigh.Last(), kline.Open, kline.Close, kline.High, kline.Low, kline.StartTime, kline.EndTime)
 
 	s.positionLock.Lock()
 	if s.lowestPrice > 0 && lowf < s.lowestPrice {
@@ -667,14 +588,14 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	if exitCondition || longCondition || shortCondition {
 		var err error
 		var hold int
-		if hold, err = s.smartCancel(ctx, sourcef, atr); err != nil {
+		if hold, err = s.smartCancel(ctx, pricef, atr, counter); err != nil {
 			log.WithError(err).Errorf("cannot cancel orders")
 		}
 		if hold > 0 {
 			return
 		}
 	} else {
-		if _, err := s.smartCancel(ctx, sourcef, atr); err != nil {
+		if _, err := s.smartCancel(ctx, pricef, atr, counter); err != nil {
 			log.WithError(err).Errorf("cannot cancel orders")
 		}
 		return
@@ -692,11 +613,12 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		opt.Long = true
 		opt.LimitOrder = true
 		// force to use market taker
-		if s.counter-s.maxCounterBuyCanceled <= 1 {
+		if counter-s.maxCounterBuyCanceled <= s.PendingMinInterval {
 			opt.LimitOrder = false
 		}
 		opt.Price = source
 		opt.Tags = []string{"long"}
+
 		createdOrders, err := s.GeneralOrderExecutor.OpenPosition(ctx, opt)
 		if err != nil {
 			errs := filterErrors(multierr.Errors(err))
@@ -706,9 +628,16 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 			}
 			return
 		}
+
 		log.Infof("orders %v", createdOrders)
 		if createdOrders != nil {
-			s.orderPendingCounter[createdOrders[0].OrderID] = s.counter
+			for _, o := range createdOrders {
+				if o.Status == types.OrderStatusNew || o.Status == types.OrderStatusPartiallyFilled {
+					s.pendingLock.Lock()
+					s.orderPendingCounter[o.OrderID] = counter
+					s.pendingLock.Unlock()
+				}
+			}
 		}
 		return
 	}
@@ -724,7 +653,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		opt.Short = true
 		opt.Price = source
 		opt.LimitOrder = true
-		if s.counter-s.maxCounterSellCanceled <= 1 {
+		if counter-s.maxCounterSellCanceled <= s.PendingMinInterval {
 			opt.LimitOrder = false
 		}
 		opt.Tags = []string{"short"}
@@ -738,7 +667,13 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 		}
 		log.Infof("orders %v", createdOrders)
 		if createdOrders != nil {
-			s.orderPendingCounter[createdOrders[0].OrderID] = s.counter
+			for _, o := range createdOrders {
+				if o.Status == types.OrderStatusNew || o.Status == types.OrderStatusPartiallyFilled {
+					s.pendingLock.Lock()
+					s.orderPendingCounter[o.OrderID] = counter
+					s.pendingLock.Unlock()
+				}
+			}
 		}
 		return
 	}
@@ -787,7 +722,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.GeneralOrderExecutor.Bind()
 
 	s.orderPendingCounter = make(map[uint64]int)
-	s.counter = 0
 
 	// Exit methods from config
 	for _, method := range s.ExitMethods {
@@ -845,47 +779,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.frameKLine = &types.KLine{}
 	s.klineMin = &types.KLine{}
 	s.priceLines = types.NewQueue(300)
+	s.elapsed = types.NewQueue(60000)
 
 	s.initTickerFunctions(ctx)
 	s.startTime = s.Environment.StartTime()
 	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1d, s.startTime))
 	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1w, s.startTime))
 
-	bbgo.RegisterCommand("/draw", "Draw Indicators", func(reply interact.Reply) {
-		go func() {
-			canvas := s.DrawIndicators(s.frameKLine.StartTime)
-			var buffer bytes.Buffer
-			if err := canvas.Render(chart.PNG, &buffer); err != nil {
-				log.WithError(err).Errorf("cannot render indicators in drift")
-				return
-			}
-			bbgo.SendPhoto(&buffer)
-		}()
-	})
-
-	bbgo.RegisterCommand("/pnl", "Draw PNL(%) per trade", func(reply interact.Reply) {
-		go func() {
-			canvas := s.DrawPNL(&profit)
-			var buffer bytes.Buffer
-			if err := canvas.Render(chart.PNG, &buffer); err != nil {
-				log.WithError(err).Errorf("cannot render pnl in drift")
-				return
-			}
-			bbgo.SendPhoto(&buffer)
-		}()
-	})
-
-	bbgo.RegisterCommand("/cumpnl", "Draw Cummulative PNL(Quote)", func(reply interact.Reply) {
-		go func() {
-			canvas := s.DrawCumPNL(&cumProfit)
-			var buffer bytes.Buffer
-			if err := canvas.Render(chart.PNG, &buffer); err != nil {
-				log.WithError(err).Errorf("cannot render cumpnl in drift")
-				return
-			}
-			bbgo.SendPhoto(&buffer)
-		}()
-	})
+	s.InitDrawCommands(&profit, &cumProfit)
 
 	bbgo.RegisterCommand("/config", "Show latest config", func(reply interact.Reply) {
 		var buffer bytes.Buffer
@@ -922,12 +823,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return nil
 	}
 
+	//var lastK types.KLine
 	store.OnKLineClosed(func(kline types.KLine) {
-		s.counter = int(kline.StartTime.Time().Add(kline.Interval.Duration()).Sub(s.startTime).Milliseconds()) / s.MinInterval.Milliseconds()
+		counter := int(kline.StartTime.Time().Add(kline.Interval.Duration()).Sub(s.startTime).Milliseconds()) / s.MinInterval.Milliseconds()
 		if kline.Interval == s.Interval {
-			s.klineHandler(ctx, kline)
+			s.klineHandler(ctx, kline, counter)
 		} else if kline.Interval == s.MinInterval {
-			s.klineHandlerMin(ctx, kline)
+			s.klineHandlerMin(ctx, kline, counter)
 		}
 	})
 

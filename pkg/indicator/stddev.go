@@ -7,6 +7,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const MaxNumOfStdev = 600
+const MaxNumOfStdevTruncateSize = 300
+
 //go:generate callbackgen -type StdDev
 type StdDev struct {
 	types.SeriesBase
@@ -49,6 +52,9 @@ func (inc *StdDev) Update(value float64) {
 
 	var std = inc.rawValues.Stdev()
 	inc.Values.Push(std)
+	if len(inc.Values) > MaxNumOfStdev {
+		inc.Values = inc.Values[MaxNumOfStdevTruncateSize-1:]
+	}
 }
 
 func (inc *StdDev) PushK(k types.KLine) {

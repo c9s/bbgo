@@ -8,6 +8,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const MaxNumOfATR = 1000
+const MaxNumOfATRTruncateSize = 500
+
 //go:generate callbackgen -type ATR
 type ATR struct {
 	types.SeriesBase
@@ -73,6 +76,9 @@ func (inc *ATR) Update(high, low, cloze float64) {
 	inc.RMA.Update(trueRange)
 	atr := inc.RMA.Last()
 	inc.PercentageVolatility.Push(atr / cloze)
+	if len(inc.PercentageVolatility) > MaxNumOfATR {
+		inc.PercentageVolatility = inc.PercentageVolatility[MaxNumOfATRTruncateSize-1:]
+	}
 }
 
 func (inc *ATR) Last() float64 {

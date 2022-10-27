@@ -8,8 +8,8 @@ import (
 )
 
 // These numbers should be aligned with bbgo MaxNumOfKLines and MaxNumOfKLinesTruncate
-const MaxNumOfEWMA = 5_000
-const MaxNumOfEWMATruncateSize = 100
+const MaxNumOfEWMA = 1_000
+const MaxNumOfEWMATruncateSize = 500
 
 //go:generate callbackgen -type EWMA
 type EWMA struct {

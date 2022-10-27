@@ -16,7 +16,7 @@ func (s *Strategy) InitDrawCommands(store *bbgo.SerialMarketDataStore, profit, c
 		go func() {
 			canvas := s.DrawIndicators(store)
 			if canvas == nil {
-				reply.Message("cannot render indicators")
+				reply.Send("cannot render indicators")
 				return
 			}
 			var buffer bytes.Buffer
