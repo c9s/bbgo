@@ -7,6 +7,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const MaxNumOfRMA = 1000
+const MaxNumOfRMATruncateSize = 500
+
 // Running Moving Average
 // Refer: https://github.com/twopirllc/pandas-ta/blob/main/pandas_ta/overlap/rma.py#L5
 // Refer: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.ewm.html#pandas-dataframe-ewm
@@ -62,6 +65,9 @@ func (inc *RMA) Update(x float64) {
 	}
 
 	inc.Values.Push(inc.tmp)
+	if len(inc.Values) > MaxNumOfRMA {
+		inc.Values = inc.Values[MaxNumOfRMATruncateSize-1:]
+	}
 }
 
 func (inc *RMA) Last() float64 {

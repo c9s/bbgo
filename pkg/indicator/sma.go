@@ -65,6 +65,9 @@ func (inc *SMA) Update(value float64) {
 	}
 
 	inc.Values.Push(types.Mean(inc.rawValues))
+	if len(inc.Values) > MaxNumOfSMA {
+		inc.Values = inc.Values[MaxNumOfSMATruncateSize-1:]
+	}
 }
 
 func (inc *SMA) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {

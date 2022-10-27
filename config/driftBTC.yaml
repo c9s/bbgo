@@ -68,6 +68,7 @@ exchangeStrategies:
     graphPNLDeductFee: false
     graphPNLPath: "./pnl.png"
     graphCumPNLPath: "./cumpnl.png"
+    graphElapsedPath: "./elapsed.png"
     #exits:
     #   - roiStopLoss:
     #           percentage: 0.35%
