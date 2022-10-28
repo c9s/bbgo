@@ -9,8 +9,9 @@ import (
 
 // RoiTakeProfit force takes the profit by the given ROI percentage.
 type RoiTakeProfit struct {
-	Symbol     string           `json:"symbol"`
-	Percentage fixedpoint.Value `json:"percentage"`
+	Symbol             string           `json:"symbol"`
+	Percentage         fixedpoint.Value `json:"percentage"`
+	CancelActiveOrders bool             `json:"cancelActiveOrders"`
 
 	session       *ExchangeSession
 	orderExecutor *GeneralOrderExecutor
@@ -36,6 +37,9 @@ func (s *RoiTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 		if roi.Compare(s.Percentage) >= 0 {
 			// stop loss
 			Notify("[RoiTakeProfit] %s take profit is triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Percentage(), kline.Close.Float64())
+			if s.CancelActiveOrders {
+				_ = s.orderExecutor.GracefulCancel(context.Background())
+			}
 			_ = orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "roiTakeProfit")
 			return
 		}

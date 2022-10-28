@@ -8,8 +8,9 @@ import (
 )
 
 type RoiStopLoss struct {
-	Symbol     string
-	Percentage fixedpoint.Value `json:"percentage"`
+	Symbol             string
+	Percentage         fixedpoint.Value `json:"percentage"`
+	CancelActiveOrders bool             `json:"cancelActiveOrders"`
 
 	session       *ExchangeSession
 	orderExecutor *GeneralOrderExecutor
@@ -50,6 +51,9 @@ func (s *RoiStopLoss) checkStopPrice(closePrice fixedpoint.Value, position *type
 	if roi.Compare(s.Percentage.Neg()) < 0 {
 		// stop loss
 		Notify("[RoiStopLoss] %s stop loss triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Neg().Percentage(), closePrice.Float64())
+		if s.CancelActiveOrders {
+			_ = s.orderExecutor.GracefulCancel(context.Background())
+		}
 		_ = s.orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "roiStopLoss")
 		return
 	}
