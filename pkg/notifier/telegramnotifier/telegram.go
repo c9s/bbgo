@@ -15,7 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var apiLimiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
+var apiLimiter = rate.NewLimiter(rate.Every(50*time.Millisecond), 20)
 
 var log = logrus.WithField("service", "telegram")
 

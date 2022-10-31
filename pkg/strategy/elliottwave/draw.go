@@ -13,47 +13,46 @@ import (
 
 func (s *Strategy) InitDrawCommands(store *bbgo.SerialMarketDataStore, profit, cumProfit types.Series) {
 	bbgo.RegisterCommand("/draw", "Draw Indicators", func(reply interact.Reply) {
-		canvas := s.DrawIndicators(store)
-		if canvas == nil {
-			reply.Message("cannot render indicators")
-			return
-		}
-		var buffer bytes.Buffer
-		if err := canvas.Render(chart.PNG, &buffer); err != nil {
-			log.WithError(err).Errorf("cannot render indicators in ewo")
-			reply.Message(fmt.Sprintf("[error] cannot render indicators in ewo: %v", err))
-			return
-		}
-		bbgo.SendPhoto(&buffer)
+		go func() {
+			canvas := s.DrawIndicators(store)
+			if canvas == nil {
+				reply.Send("cannot render indicators")
+				return
+			}
+			var buffer bytes.Buffer
+			if err := canvas.Render(chart.PNG, &buffer); err != nil {
+				log.WithError(err).Errorf("cannot render indicators in ewo")
+				return
+			}
+			bbgo.SendPhoto(&buffer)
+		}()
 	})
 	bbgo.RegisterCommand("/pnl", "Draw PNL(%) per trade", func(reply interact.Reply) {
-		canvas := s.DrawPNL(profit)
-		var buffer bytes.Buffer
-		if err := canvas.Render(chart.PNG, &buffer); err != nil {
-			log.WithError(err).Errorf("cannot render pnl in drift")
-			reply.Message(fmt.Sprintf("[error] cannot render pnl in ewo: %v", err))
-			return
-		}
-		bbgo.SendPhoto(&buffer)
+		go func() {
+			canvas := s.DrawPNL(profit)
+			var buffer bytes.Buffer
+			if err := canvas.Render(chart.PNG, &buffer); err != nil {
+				log.WithError(err).Errorf("cannot render pnl in ewo")
+				return
+			}
+			bbgo.SendPhoto(&buffer)
+		}()
 	})
 	bbgo.RegisterCommand("/cumpnl", "Draw Cummulative PNL(Quote)", func(reply interact.Reply) {
-		canvas := s.DrawCumPNL(cumProfit)
-		var buffer bytes.Buffer
-		if err := canvas.Render(chart.PNG, &buffer); err != nil {
-			log.WithError(err).Errorf("cannot render cumpnl in drift")
-			reply.Message(fmt.Sprintf("[error] canot render cumpnl in drift: %v", err))
-			return
-		}
-		bbgo.SendPhoto(&buffer)
+		go func() {
+			canvas := s.DrawCumPNL(cumProfit)
+			var buffer bytes.Buffer
+			if err := canvas.Render(chart.PNG, &buffer); err != nil {
+				log.WithError(err).Errorf("cannot render cumpnl in ewo")
+				return
+			}
+			bbgo.SendPhoto(&buffer)
+		}()
 	})
 }
 
 func (s *Strategy) DrawIndicators(store *bbgo.SerialMarketDataStore) *types.Canvas {
-	klines, ok := store.KLinesOfInterval(types.Interval1m)
-	if !ok {
-		return nil
-	}
-	time := (*klines)[len(*klines)-1].StartTime
+	time := types.Time(s.startTime)
 	canvas := types.NewCanvas(s.InstanceID(), s.Interval)
 	Length := s.priceLines.Length()
 	if Length > 300 {
@@ -109,10 +108,10 @@ func (s *Strategy) Draw(store *bbgo.SerialMarketDataStore, profit, cumProfit typ
 		log.WithError(err).Errorf("cannot create on path " + s.GraphIndicatorPath)
 		return
 	}
-	defer f.Close()
 	if err = canvas.Render(chart.PNG, f); err != nil {
 		log.WithError(err).Errorf("cannot render elliottwave")
 	}
+	f.Close()
 
 	canvas = s.DrawPNL(profit)
 	f, err = os.Create(s.GraphPNLPath)
@@ -120,19 +119,19 @@ func (s *Strategy) Draw(store *bbgo.SerialMarketDataStore, profit, cumProfit typ
 		log.WithError(err).Errorf("cannot create on path " + s.GraphPNLPath)
 		return
 	}
-	defer f.Close()
 	if err = canvas.Render(chart.PNG, f); err != nil {
 		log.WithError(err).Errorf("cannot render pnl")
 		return
 	}
+	f.Close()
 	canvas = s.DrawCumPNL(cumProfit)
 	f, err = os.Create(s.GraphCumPNLPath)
 	if err != nil {
 		log.WithError(err).Errorf("cannot create on path " + s.GraphCumPNLPath)
 		return
 	}
-	defer f.Close()
 	if err = canvas.Render(chart.PNG, f); err != nil {
 		log.WithError(err).Errorf("cannot render cumpnl")
 	}
+	f.Close()
 }

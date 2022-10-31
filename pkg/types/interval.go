@@ -25,8 +25,42 @@ func (i Interval) Seconds() int {
 	return m
 }
 
+// Milliseconds is specially handled, for better precision
+// for ms level interval, calling Seconds and Minutes directly might trigger panic error
+func (i Interval) Milliseconds() int {
+	t := 0
+	index := 0
+	for i, rn := range string(i) {
+		if rn >= '0' && rn <= '9' {
+			t = t*10 + int(rn-'0')
+		} else {
+			index = i
+			break
+		}
+	}
+	switch strings.ToLower(string(i[index:])) {
+	case "ms":
+		return t
+	case "s":
+		return t * 1000
+	case "m":
+		t *= 60
+	case "h":
+		t *= 60 * 60
+	case "d":
+		t *= 60 * 60 * 24
+	case "w":
+		t *= 60 * 60 * 24 * 7
+	case "mo":
+		t *= 60 * 60 * 24 * 30
+	default:
+		panic("unknown interval input: " + i)
+	}
+	return t * 1000
+}
+
 func (i Interval) Duration() time.Duration {
-	return time.Duration(i.Seconds()) * time.Second
+	return time.Duration(i.Milliseconds()) * time.Millisecond
 }
 
 func (i *Interval) UnmarshalJSON(b []byte) (err error) {
@@ -53,6 +87,7 @@ func (s IntervalSlice) StringSlice() (slice []string) {
 	return slice
 }
 
+var Interval1ms = Interval("1ms")
 var Interval1s = Interval("1s")
 var Interval1m = Interval("1m")
 var Interval3m = Interval("3m")
