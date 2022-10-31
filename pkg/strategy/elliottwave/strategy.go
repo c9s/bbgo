@@ -43,13 +43,14 @@ type Strategy struct {
 	types.Market
 	Session *bbgo.ExchangeSession
 
-	Interval       types.Interval   `json:"interval"`
-	Stoploss       fixedpoint.Value `json:"stoploss" modifiable:"true"`
-	WindowATR      int              `json:"windowATR"`
-	WindowQuick    int              `json:"windowQuick"`
-	WindowSlow     int              `json:"windowSlow"`
-	PendingMinutes int              `json:"pendingMinutes" modifiable:"true"`
-	UseHeikinAshi  bool             `json:"useHeikinAshi"`
+	Interval           types.Interval   `json:"interval"`
+	MinInterval        types.Interval   `json:"minInterval"`
+	Stoploss           fixedpoint.Value `json:"stoploss" modifiable:"true"`
+	WindowATR          int              `json:"windowATR"`
+	WindowQuick        int              `json:"windowQuick"`
+	WindowSlow         int              `json:"windowSlow"`
+	PendingMinInterval int              `json:"pendingMinInterval" modifiable:"true"`
+	UseHeikinAshi      bool             `json:"useHeikinAshi"`
 
 	// whether to draw graph or not by the end of backtest
 	DrawGraph          bool   `json:"drawGraph"`
@@ -74,7 +75,7 @@ type Strategy struct {
 	// for smart cancel
 	orderPendingCounter map[uint64]int
 	startTime           time.Time
-	minutesCounter      int
+	counter             int
 
 	// for position
 	buyPrice     float64 `persistence:"buy_price"`
@@ -101,12 +102,22 @@ func (s *Strategy) InstanceID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// by default, bbgo only pre-subscribe 1000 klines.
 	// this is not enough if we're subscribing 30m intervals using SerialMarketDataStore
-	bbgo.KLinePreloadLimit = int64((s.Interval.Minutes()*s.WindowSlow/1000 + 1) + 1000)
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-		Interval: types.Interval1m,
-	})
 	if !bbgo.IsBackTesting {
 		session.Subscribe(types.BookTickerChannel, s.Symbol, types.SubscribeOptions{})
+		session.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+		if s.MinInterval.Milliseconds() >= types.Interval1s.Milliseconds() && s.MinInterval.Milliseconds()%types.Interval1s.Milliseconds() == 0 {
+			bbgo.KLinePreloadLimit = int64(((s.Interval.Milliseconds()/s.MinInterval.Milliseconds())*s.WindowSlow/1000 + 1) + 1000)
+			session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+				Interval: s.MinInterval,
+			})
+		} else {
+			bbgo.KLinePreloadLimit = 0
+		}
+	} else {
+		bbgo.KLinePreloadLimit = int64((s.Interval.Milliseconds()/s.MinInterval.Milliseconds()*s.WindowSlow/1000 + 1) + 1000)
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+			Interval: s.MinInterval,
+		})
 	}
 	s.ExitMethods.SetAndSubscribe(session, s)
 }
@@ -162,8 +173,6 @@ func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
 	if !ok || klineLength == 0 {
 		return errors.New("klines not exists")
 	}
-	tmpK := (*klines)[klineLength-1]
-	s.startTime = tmpK.StartTime.Time().Add(tmpK.Interval.Duration())
 	s.heikinAshi = NewHeikinAshi(500)
 
 	for _, kline := range *klines {
@@ -185,9 +194,9 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef float64) int {
 			if order.Status != types.OrderStatusNew && order.Status != types.OrderStatusPartiallyFilled {
 				continue
 			}
-			log.Warnf("%v | counter: %d, system: %d", order, s.orderPendingCounter[order.OrderID], s.minutesCounter)
+			log.Warnf("%v | counter: %d, system: %d", order, s.orderPendingCounter[order.OrderID], s.counter)
 			toCancel := false
-			if s.minutesCounter-s.orderPendingCounter[order.OrderID] >= s.PendingMinutes {
+			if s.counter-s.orderPendingCounter[order.OrderID] >= s.PendingMinInterval {
 				toCancel = true
 			} else if order.Side == types.SideTypeBuy {
 				if order.Price.Float64()+s.atr.Last()*2 <= pricef {
@@ -202,7 +211,7 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef float64) int {
 				panic("not supported side for the order")
 			}
 			if toCancel {
-				err := s.GeneralOrderExecutor.GracefulCancel(ctx, order)
+				err := s.GeneralOrderExecutor.CancelNoWait(ctx, order)
 				if err == nil {
 					delete(s.orderPendingCounter, order.OrderID)
 				} else {
@@ -226,6 +235,9 @@ func (s *Strategy) trailingCheck(price float64, direction string) bool {
 		s.lowestPrice = price
 	}
 	isShort := direction == "short"
+	if isShort && s.sellPrice == 0 || !isShort && s.buyPrice == 0 {
+		return false
+	}
 	for i := len(s.TrailingCallbackRate) - 1; i >= 0; i-- {
 		trailingCallbackRate := s.TrailingCallbackRate[i]
 		trailingActivationRatio := s.TrailingActivationRatio[i]
@@ -235,7 +247,7 @@ func (s *Strategy) trailingCheck(price float64, direction string) bool {
 			}
 		} else {
 			if (s.highestPrice-s.buyPrice)/s.buyPrice > trailingActivationRatio {
-				return (s.highestPrice-price)/price > trailingCallbackRate
+				return (s.highestPrice-price)/s.buyPrice > trailingCallbackRate
 			}
 		}
 	}
@@ -315,7 +327,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.GeneralOrderExecutor.Bind()
 
 	s.orderPendingCounter = make(map[uint64]int)
-	s.minutesCounter = 0
+	s.counter = 0
 
 	for _, method := range s.ExitMethods {
 		method.Bind(session, s.GeneralOrderExecutor)
@@ -342,29 +354,33 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.highestPrice = 0
 			s.lowestPrice = 0
 		} else if s.Position.IsLong() {
-			s.buyPrice = price
+			s.buyPrice = s.Position.ApproximateAverageCost.Float64()
 			s.sellPrice = 0
-			s.highestPrice = s.buyPrice
+			s.highestPrice = math.Max(s.buyPrice, s.highestPrice)
 			s.lowestPrice = 0
 		} else {
-			s.sellPrice = price
+			s.sellPrice = s.Position.ApproximateAverageCost.Float64()
 			s.buyPrice = 0
 			s.highestPrice = 0
-			s.lowestPrice = s.sellPrice
+			if s.lowestPrice == 0 {
+				s.lowestPrice = s.sellPrice
+			} else {
+				s.lowestPrice = math.Min(s.lowestPrice, s.sellPrice)
+			}
 		}
 	})
 	s.initTickerFunctions()
 
-	startTime := s.Environment.StartTime()
-	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1d, startTime))
-	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1w, startTime))
+	s.startTime = s.Environment.StartTime()
+	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1d, s.startTime))
+	s.TradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1w, s.startTime))
 
 	s.initOutputCommands()
 
-	// event trigger order: s.Interval => Interval1m
-	store, ok := session.SerialMarketDataStore(s.Symbol, []types.Interval{s.Interval, types.Interval1m})
+	// event trigger order: s.Interval => minInterval
+	store, ok := session.SerialMarketDataStore(ctx, s.Symbol, []types.Interval{s.Interval, s.MinInterval}, !bbgo.IsBackTesting)
 	if !ok {
-		panic("cannot get 1m history")
+		panic("cannot get " + s.MinInterval + " history")
 	}
 	if err := s.initIndicators(store); err != nil {
 		log.WithError(err).Errorf("initIndicator failed")
@@ -372,11 +388,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 	s.InitDrawCommands(store, &profit, &cumProfit)
 	store.OnKLineClosed(func(kline types.KLine) {
-		s.minutesCounter = int(kline.StartTime.Time().Add(kline.Interval.Duration()).Sub(s.startTime).Minutes())
+		s.counter = int(kline.StartTime.Time().Add(kline.Interval.Duration()).Sub(s.startTime).Milliseconds())
 		if kline.Interval == s.Interval {
 			s.klineHandler(ctx, kline)
-		} else if kline.Interval == types.Interval1m {
-			s.klineHandler1m(ctx, kline)
+		} else if kline.Interval == s.MinInterval {
+			s.klineHandlerMin(ctx, kline)
 		}
 	})
 
@@ -401,7 +417,7 @@ func (s *Strategy) CalcAssetValue(price fixedpoint.Value) fixedpoint.Value {
 	return balances[s.Market.BaseCurrency].Total().Mul(price).Add(balances[s.Market.QuoteCurrency].Total())
 }
 
-func (s *Strategy) klineHandler1m(ctx context.Context, kline types.KLine) {
+func (s *Strategy) klineHandlerMin(ctx context.Context, kline types.KLine) {
 	if s.Status != types.StrategyStatusRunning {
 		return
 	}
@@ -468,15 +484,18 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	bull := kline.Close.Compare(kline.Open) > 0
 
 	balances := s.GeneralOrderExecutor.Session().GetAccount().Balances()
-	bbgo.Notify("source: %.4f, price: %.4f lowest: %.4f highest: %.4f sp %.4f bp %.4f", sourcef, pricef, s.lowestPrice, s.highestPrice, s.sellPrice, s.buyPrice)
-	bbgo.Notify("balances: [Total] %v %s [Base] %s(%v %s) [Quote] %s",
-		s.CalcAssetValue(price),
-		s.Market.QuoteCurrency,
-		balances[s.Market.BaseCurrency].String(),
-		balances[s.Market.BaseCurrency].Total().Mul(price),
-		s.Market.QuoteCurrency,
-		balances[s.Market.QuoteCurrency].String(),
-	)
+	startTime := kline.StartTime.Time()
+	if startTime.Round(time.Second) == startTime.Round(time.Minute) {
+		bbgo.Notify("source: %.4f, price: %.4f lowest: %.4f highest: %.4f sp %.4f bp %.4f", sourcef, pricef, s.lowestPrice, s.highestPrice, s.sellPrice, s.buyPrice)
+		bbgo.Notify("balances: [Total] %v %s [Base] %s(%v %s) [Quote] %s",
+			s.CalcAssetValue(price),
+			s.Market.QuoteCurrency,
+			balances[s.Market.BaseCurrency].String(),
+			balances[s.Market.BaseCurrency].Total().Mul(price),
+			s.Market.QuoteCurrency,
+			balances[s.Market.QuoteCurrency].String(),
+		)
+	}
 
 	shortCondition := ewo[0] < ewo[1] && ewo[1] >= ewo[2] && (ewo[1] <= ewo[2] || ewo[2] >= ewo[3]) || s.sellPrice == 0 && ewo[0] < ewo[1] && ewo[1] < ewo[2]
 	longCondition := ewo[0] > ewo[1] && ewo[1] <= ewo[2] && (ewo[1] >= ewo[2] || ewo[2] <= ewo[3]) || s.buyPrice == 0 && ewo[0] > ewo[1] && ewo[1] > ewo[2]
@@ -484,18 +503,19 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 	exitShortCondition := s.sellPrice > 0 && !shortCondition && s.sellPrice*(1.+stoploss) <= highf || s.sellPrice+atr <= highf || s.trailingCheck(highf, "short")
 	exitLongCondition := s.buyPrice > 0 && !longCondition && s.buyPrice*(1.-stoploss) >= lowf || s.buyPrice-atr >= lowf || s.trailingCheck(lowf, "long")
 
-	if exitShortCondition || exitLongCondition {
-		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
-			log.WithError(err).Errorf("cannot cancel orders")
+	if exitShortCondition || exitLongCondition || (longCondition && bull) || (shortCondition && !bull) {
+		if hold := s.smartCancel(ctx, pricef); hold > 0 {
 			return
 		}
+	} else {
+		s.smartCancel(ctx, pricef)
+		return
+	}
+	if exitShortCondition || exitLongCondition {
 		s.ClosePosition(ctx, fixedpoint.One)
 	}
+
 	if longCondition && bull {
-		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
-			log.WithError(err).Errorf("cannot cancel orders")
-			return
-		}
 		if source.Compare(price) > 0 {
 			source = price
 		}
@@ -513,15 +533,11 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 			return
 		}
 		if createdOrders != nil {
-			s.orderPendingCounter[createdOrders[0].OrderID] = s.minutesCounter
+			s.orderPendingCounter[createdOrders[0].OrderID] = s.counter
 		}
 		return
 	}
 	if shortCondition && !bull {
-		if err := s.GeneralOrderExecutor.GracefulCancel(ctx); err != nil {
-			log.WithError(err).Errorf("cannot cancel orders")
-			return
-		}
 		if source.Compare(price) < 0 {
 			source = price
 		}
@@ -539,7 +555,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 			return
 		}
 		if createdOrders != nil {
-			s.orderPendingCounter[createdOrders[0].OrderID] = s.minutesCounter
+			s.orderPendingCounter[createdOrders[0].OrderID] = s.counter
 		}
 		return
 	}

@@ -145,7 +145,7 @@ func (inc *CCISTOCH) Update(cloze float64) {
 
 func (inc *CCISTOCH) BuySignal() bool {
 	hasGrey := false
-	for i := 0; i < len(inc.ma.Values); i++ {
+	for i := 0; i < inc.ma.Values.Length(); i++ {
 		v := inc.ma.Index(i)
 		if v > inc.filterHigh {
 			return false
@@ -161,7 +161,7 @@ func (inc *CCISTOCH) BuySignal() bool {
 
 func (inc *CCISTOCH) SellSignal() bool {
 	hasGrey := false
-	for i := 0; i < len(inc.ma.Values); i++ {
+	for i := 0; i < inc.ma.Values.Length(); i++ {
 		v := inc.ma.Index(i)
 		if v < inc.filterLow {
 			return false

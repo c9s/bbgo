@@ -23,17 +23,18 @@ exchangeStrategies:
  
 - on: binance
   elliottwave:
-    symbol: BNBBUSD
+    minInterval: 1s
+    symbol: BTCUSDT
     limitOrder: true
-    quantity: 0.16
+    #quantity: 0.16
     # kline interval for indicators
-    interval: 1m
+    interval: 1s
     stoploss: 0.01%
     windowATR: 14
-    windowQuick: 5
-    windowSlow: 9
+    windowQuick: 4
+    windowSlow: 155
     source: hl2
-    pendingMinutes: 10
+    pendingMinInterval: 5
     useHeikinAshi: true
 
     drawGraph: true
@@ -46,12 +47,12 @@ exchangeStrategies:
     # when farest price from entry goes over that ratio, start using the callback ratio accordingly to do trailingstop
     #trailingActivationRatio: [0.01, 0.016, 0.05]
     #trailingActivationRatio: [0.001, 0.0081, 0.022]
-    trailingActivationRatio: [0.0017, 0.01, 0.015]
-    #trailingActivationRatio: []
-    #trailingCallbackRate: []
+    #trailingActivationRatio: [0.0017, 0.01, 0.015]
+    trailingActivationRatio: []
+    trailingCallbackRate: []
     #trailingCallbackRate: [0.002, 0.01, 0.1]
     #trailingCallbackRate: [0.0004, 0.0009, 0.018]
-    trailingCallbackRate: [0.0006, 0.0019, 0.006]
+    #trailingCallbackRate: [0.0006, 0.0019, 0.006]
 
     #exits:
     #   - roiStopLoss:
@@ -107,18 +108,19 @@ sync:
   sessions:
     - binance
   symbols:
-    - BNBBUSD
+    - BTCUSDT
 
 backtest:
-  startTime: "2022-09-01"
-  endTime: "2022-09-30"
+  startTime: "2022-10-15"
+  endTime: "2022-10-19"
   symbols:
-    - BNBBUSD
+    - BTCUSDT
   sessions: [binance]
+  syncSecKLines: true
   accounts:
     binance:
       makerFeeRate: 0.000
       takerFeeRate: 0.000
       balances:
-        BNB: 0
-        BUSD: 100
+        BTC: 0
+        USDT: 100

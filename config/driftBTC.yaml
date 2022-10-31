@@ -26,32 +26,32 @@ exchangeStrategies:
  
 - on: binance
   drift:
+    debug: false
+    minInterval: 1s
     limitOrder: true
     #quantity: 0.0012
     canvasPath: "./output.png"
     symbol: BTCUSDT
     # kline interval for indicators
-    interval: 1m
-    window: 6
+    interval: 1s
+    window: 2
     useAtr: true
     useStopLoss: true
-    stoploss: 0.05%
+    stoploss: 0.01%
     source: hl2
     predictOffset: 2
-    noTrailingStopLoss: false
-    trailingStopLossType: kline
+    noTrailingStopLoss: true
     # stddev on high/low-source
-    hlVarianceMultiplier: 0.14
-    hlRangeWindow: 4
-    smootherWindow: 3
-    fisherTransformWindow: 125
-    #fisherTransformWindow: 117
+    hlVarianceMultiplier: 0.7
+    hlRangeWindow: 6
+    smootherWindow: 10
+    fisherTransformWindow: 45
     atrWindow: 24
     # orders not been traded will be canceled after `pendingMinutes` minutes
-    pendingMinutes: 10
+    pendingMinInterval: 6
     noRebalance: true
-    trendWindow: 15
-    rebalanceFilter: -0.1
+    trendWindow: 4
+    rebalanceFilter: 2
     
     # ActivationRatio should be increasing order
     # when farest price from entry goes over that ratio, start using the callback ratio accordingly to do trailingstop
@@ -68,6 +68,7 @@ exchangeStrategies:
     graphPNLDeductFee: false
     graphPNLPath: "./pnl.png"
     graphCumPNLPath: "./cumpnl.png"
+    graphElapsedPath: "./elapsed.png"
     #exits:
     #   - roiStopLoss:
     #           percentage: 0.35%
@@ -125,11 +126,12 @@ sync:
     - BTCUSDT
 
 backtest:
-  startTime: "2022-09-25"
-  endTime: "2022-10-30"
+  startTime: "2022-10-19"
+  endTime: "2022-10-20"
   symbols:
     - BTCUSDT
   sessions: [binance]
+  syncSecKLines: true
   accounts:
     binance:
       makerFeeRate: 0.000
