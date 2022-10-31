@@ -743,7 +743,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.GeneralOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _profit, _netProfit fixedpoint.Value) {
 		s.p.AddTrade(trade)
 		price := trade.Price.Float64()
+		s.pendingLock.Lock()
 		delete(s.orderPendingCounter, trade.OrderID)
+		s.pendingLock.Unlock()
 
 		if s.buyPrice > 0 {
 			profit.Update(modify(price / s.buyPrice))
