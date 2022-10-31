@@ -63,27 +63,27 @@ func (s *Strategy) InitDrawCommands(profit, cumProfit types.Series) {
 
 func (s *Strategy) DrawIndicators(time types.Time) *types.Canvas {
 	canvas := types.NewCanvas(s.InstanceID(), s.Interval)
-	Length := s.priceLines.Length()
-	if Length > 300 {
-		Length = 300
+	length := s.priceLines.Length()
+	if length > 300 {
+		length = 300
 	}
-	log.Infof("draw indicators with %d data", Length)
-	mean := s.priceLines.Mean(Length)
-	highestPrice := s.priceLines.Minus(mean).Abs().Highest(Length)
-	highestDrift := s.drift.Abs().Highest(Length)
-	hi := s.drift.drift.Abs().Highest(Length)
+	log.Infof("draw indicators with %d data", length)
+	mean := s.priceLines.Mean(length)
+	highestPrice := s.priceLines.Minus(mean).Abs().Highest(length)
+	highestDrift := s.drift.Abs().Highest(length)
+	hi := s.drift.drift.Abs().Highest(length)
 	ratio := highestPrice / highestDrift
 
-	// canvas.Plot("upband", s.ma.Add(s.stdevHigh), time, Length)
-	canvas.Plot("ma", s.ma, time, Length)
-	// canvas.Plot("downband", s.ma.Minus(s.stdevLow), time, Length)
+	// canvas.Plot("upband", s.ma.Add(s.stdevHigh), time, length)
+	canvas.Plot("ma", s.ma, time, length)
+	// canvas.Plot("downband", s.ma.Minus(s.stdevLow), time, length)
 	fmt.Printf("%f %f\n", highestPrice, hi)
 
-	canvas.Plot("trend", s.trendLine, time, Length)
-	canvas.Plot("drift", s.drift.Mul(ratio).Add(mean), time, Length)
-	canvas.Plot("driftOrig", s.drift.drift.Mul(highestPrice/hi).Add(mean), time, Length)
-	canvas.Plot("zero", types.NumberSeries(mean), time, Length)
-	canvas.Plot("price", s.priceLines, time, Length)
+	canvas.Plot("trend", s.trendLine, time, length)
+	canvas.Plot("drift", s.drift.Mul(ratio).Add(mean), time, length)
+	canvas.Plot("driftOrig", s.drift.drift.Mul(highestPrice/hi).Add(mean), time, length)
+	canvas.Plot("zero", types.NumberSeries(mean), time, length)
+	canvas.Plot("price", s.priceLines, time, length)
 	return canvas
 }
 
