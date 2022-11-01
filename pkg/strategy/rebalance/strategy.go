@@ -66,7 +66,9 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, s.symbols()[0], types.SubscribeOptions{Interval: s.Interval})
+	for _, symbol := range s.symbols() {
+		session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.Interval})
+	}
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -113,21 +115,20 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 
 func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) types.ValueMap {
 	m := make(types.ValueMap)
-
-	tickers, err := session.Exchange.QueryTickers(ctx, s.symbols()...)
-	if err != nil {
-		log.WithError(err).Error("failed to query tickers")
-		return nil
-	}
-
 	for currency := range s.TargetWeights {
 		if currency == s.QuoteCurrency {
 			m[s.QuoteCurrency] = fixedpoint.One
 			continue
 		}
-		m[currency] = tickers[currency+s.QuoteCurrency].Last
-	}
 
+		ticker, err := session.Exchange.QueryTicker(ctx, currency+s.QuoteCurrency)
+		if err != nil {
+			log.WithError(err).Error("failed to query tickers")
+			return nil
+		}
+
+		m[currency] = ticker.Last
+	}
 	return m
 }
 
