@@ -8,18 +8,34 @@ notifications:
     orderUpdate: true
     submitOrder: true
 
+backtest:
+  startTime: "2022-01-01"
+  endTime: "2022-10-01"
+  symbols:
+  - BTCUSDT
+  - ETHUSDT
+  - MAXUSDT
+  account:
+    max:
+      makerFeeRate: 0.075%
+      takerFeeRate: 0.075%
+      balances:
+        BTC: 0.0
+        ETH: 0.0
+        MAX: 0.0
+        USDT: 10000.0
+
 exchangeStrategies:
   - on: max
     rebalance:
       interval: 1d
-      quoteCurrency: TWD
+      quoteCurrency: USDT
       targetWeights:
-        BTC: 40%
-        ETH: 20%
-        MAX: 10%
-        USDT: 15%
-        TWD: 15%
-      threshold: 2%
+        BTC: 50%
+        ETH: 25%
+        MAX: 15%
+        USDT: 10%
+      threshold: 1%
       # max amount to buy or sell per order
-      maxAmount: 10_000
+      maxAmount: 1_000
       dryRun: false
