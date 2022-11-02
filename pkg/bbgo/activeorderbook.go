@@ -92,7 +92,8 @@ func (b *ActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeout ti
 	}
 }
 
-// Cancel orders without confirmation
+// FastCancel cancels the orders without verification
+// It calls the exchange cancel order api and then remove the orders from the active orderbook directly.
 func (b *ActiveOrderBook) FastCancel(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
 	// if no orders are given, set to cancelAll
 	if len(orders) == 0 {
@@ -100,11 +101,12 @@ func (b *ActiveOrderBook) FastCancel(ctx context.Context, ex types.Exchange, ord
 	} else {
 		// simple check on given input
 		for _, o := range orders {
-			if o.Symbol != b.Symbol {
-				return errors.New("[ActiveOrderBook] cancel " + b.Symbol + " orderbook with different symbol: " + o.Symbol)
+			if b.Symbol != "" && o.Symbol != b.Symbol {
+				return errors.New("[ActiveOrderBook] cancel " + b.Symbol + " orderbook with different order symbol: " + o.Symbol)
 			}
 		}
 	}
+
 	// optimize order cancel for back-testing
 	if IsBackTesting {
 		return ex.CancelOrders(context.Background(), orders...)
