@@ -362,6 +362,7 @@ func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context
 	if activeOrders.NumOfOrders() == 0 {
 		return nil
 	}
+
 	if err := activeOrders.GracefulCancel(ctx, e.session.Exchange, orders...); err != nil {
 		// Retry once
 		if err = activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
@@ -373,12 +374,12 @@ func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context
 	return nil
 }
 
-// CancelActiveOrderBookNoWait cancels the orders from the active orderbook without waiting
-func (e *GeneralOrderExecutor) CancelActiveOrderBookNoWait(ctx context.Context, activeOrders *ActiveOrderBook, orders ...types.Order) error {
+// FastCancelActiveOrderBook cancels the orders from the active orderbook without waiting
+func (e *GeneralOrderExecutor) FastCancelActiveOrderBook(ctx context.Context, activeOrders *ActiveOrderBook, orders ...types.Order) error {
 	if activeOrders.NumOfOrders() == 0 {
 		return nil
 	}
-	if err := activeOrders.CancelNoWait(ctx, e.session.Exchange, orders...); err != nil {
+	if err := activeOrders.FastCancel(ctx, e.session.Exchange, orders...); err != nil {
 		return fmt.Errorf("cancel order error: %w", err)
 	}
 	return nil
@@ -389,9 +390,9 @@ func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context, orders ...typ
 	return e.GracefulCancelActiveOrderBook(ctx, e.activeMakerOrders, orders...)
 }
 
-// CancelNoWait cancels all active maker orders if orders is not given, otherwise cancel the given orders
-func (e *GeneralOrderExecutor) CancelNoWait(ctx context.Context, orders ...types.Order) error {
-	return e.CancelActiveOrderBookNoWait(ctx, e.activeMakerOrders, orders...)
+// FastCancel cancels all active maker orders if orders is not given, otherwise cancel the given orders
+func (e *GeneralOrderExecutor) FastCancel(ctx context.Context, orders ...types.Order) error {
+	return e.FastCancelActiveOrderBook(ctx, e.activeMakerOrders, orders...)
 }
 
 // ClosePosition closes the current position by a percentage.

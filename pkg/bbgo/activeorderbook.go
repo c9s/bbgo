@@ -93,7 +93,7 @@ func (b *ActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeout ti
 }
 
 // Cancel orders without confirmation
-func (b *ActiveOrderBook) CancelNoWait(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
+func (b *ActiveOrderBook) FastCancel(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
 	// if no orders are given, set to cancelAll
 	if len(orders) == 0 {
 		orders = b.Orders()
@@ -109,11 +109,13 @@ func (b *ActiveOrderBook) CancelNoWait(ctx context.Context, ex types.Exchange, o
 	if IsBackTesting {
 		return ex.CancelOrders(context.Background(), orders...)
 	}
+
 	log.Debugf("[ActiveOrderBook] no wait cancelling %s orders...", b.Symbol)
 	// since ctx might be canceled, we should use background context here
 	if err := ex.CancelOrders(context.Background(), orders...); err != nil {
 		log.WithError(err).Errorf("[ActiveOrderBook] no wait can not cancel %s orders", b.Symbol)
 	}
+
 	for _, o := range orders {
 		b.Remove(o)
 	}

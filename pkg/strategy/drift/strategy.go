@@ -299,7 +299,7 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64, syscoun
 			}
 		}
 		if toCancel {
-			err := s.GeneralOrderExecutor.CancelNoWait(ctx)
+			err := s.GeneralOrderExecutor.FastCancel(ctx)
 			// TODO: clean orderPendingCounter on cancel/trade
 			for _, order := range nonTraded {
 				s.pendingLock.Lock()
@@ -514,14 +514,14 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 	sourcef := source.Float64()
 
 	s.priceLines.Update(sourcef)
-	//s.ma.Update(sourcef)
+	// s.ma.Update(sourcef)
 	s.trendLine.Update(sourcef)
 
 	s.drift.Update(sourcef, kline.Volume.Abs().Float64())
 	s.atr.PushK(kline)
 	atr := s.atr.Last()
 
-	price := kline.Close //s.getLastPrice()
+	price := kline.Close // s.getLastPrice()
 	pricef := price.Float64()
 	lowf := math.Min(kline.Low.Float64(), pricef)
 	highf := math.Max(kline.High.Float64(), pricef)
@@ -825,7 +825,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return nil
 	}
 
-	//var lastK types.KLine
+	// var lastK types.KLine
 	store.OnKLineClosed(func(kline types.KLine) {
 		counter := int(kline.StartTime.Time().Add(kline.Interval.Duration()).Sub(s.startTime).Milliseconds()) / s.MinInterval.Milliseconds()
 		if kline.Interval == s.Interval {
