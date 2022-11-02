@@ -54,8 +54,13 @@ func (b *ActiveOrderBook) waitClear(ctx context.Context, order types.Order, wait
 
 	timeoutC := time.After(timeout)
 	for {
-		time.Sleep(waitTime)
+		select {
+		case <-time.After(waitTime):
+		case <-b.C:
+		}
+
 		clear := !b.Exists(order)
+
 		select {
 		case <-timeoutC:
 			return clear, nil
@@ -71,18 +76,24 @@ func (b *ActiveOrderBook) waitClear(ctx context.Context, order types.Order, wait
 	}
 }
 
+// waitAllClear waits for the order book be clear (meaning every order is removed)
+// if err != nil, it's the context error.
 func (b *ActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeout time.Duration) (bool, error) {
-	numOfOrders := b.NumOfOrders()
-	clear := numOfOrders == 0
+	clear := b.NumOfOrders() == 0
 	if clear {
 		return clear, nil
 	}
 
 	timeoutC := time.After(timeout)
 	for {
-		time.Sleep(waitTime)
-		numOfOrders = b.NumOfOrders()
-		clear = numOfOrders == 0
+		select {
+		case <-time.After(waitTime):
+		case <-b.C:
+		}
+
+		// update clear flag
+		clear = b.NumOfOrders() == 0
+
 		select {
 		case <-timeoutC:
 			return clear, nil
