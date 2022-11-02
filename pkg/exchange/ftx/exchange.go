@@ -21,8 +21,9 @@ import (
 )
 
 const (
-	restEndpoint       = "https://ftx.com"
-	defaultHTTPTimeout = 15 * time.Second
+	restEndpoint         = "https://ftx.com"
+	optimizedRestBaseURL = "https://api.ftx.com"
+	defaultHTTPTimeout   = 15 * time.Second
 )
 
 var logger = logrus.WithField("exchange", "ftx")
@@ -35,11 +36,13 @@ var marketDataLimiter = rate.NewLimiter(rate.Every(500*time.Millisecond), 2)
 //go:generate go run generate_symbol_map.go
 
 type Exchange struct {
-	client *ftxapi.RestClient
+	client          *ftxapi.RestClient
+	optimizedClient *ftxapi.RestClient
 
 	key, secret             string
 	subAccount              string
 	restEndpoint            *url.URL
+	optimizedRestEndpoint   *url.URL
 	orderAmountReduceFactor fixedpoint.Value
 }
 
@@ -84,13 +87,22 @@ func NewExchange(key, secret string, subAccount string) *Exchange {
 	if err != nil {
 		panic(err)
 	}
+	ou, err := url.Parse(optimizedRestBaseURL)
+	if err != nil {
+		panic(err)
+	}
 
 	client := ftxapi.NewClient()
 	client.Auth(key, secret, subAccount)
+	optimizedClient := ftxapi.NewOptimizedClient()
+	optimizedClient.Auth(key, secret, subAccount)
+
 	return &Exchange{
-		client:       client,
-		restEndpoint: u,
-		key:          key,
+		client:                client,
+		optimizedClient:       optimizedClient,
+		restEndpoint:          u,
+		optimizedRestEndpoint: ou,
+		key:                   key,
 		// pragma: allowlist nextline secret
 		secret:                  secret,
 		subAccount:              subAccount,
@@ -420,7 +432,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		submitQuantity = so.Quantity.Div(e.orderAmountReduceFactor)
 	}
 
-	req := e.client.NewPlaceOrderRequest()
+	req := e.optimizedClient.NewPlaceOrderRequest()
 	req.Market(toLocalSymbol(TrimUpperString(so.Symbol)))
 	req.OrderType(orderType)
 	req.Side(ftxapi.Side(TrimLowerString(string(so.Side))))

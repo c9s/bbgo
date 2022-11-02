@@ -22,6 +22,7 @@ import (
 
 const defaultHTTPTimeout = time.Second * 15
 const RestBaseURL = "https://ftx.com/api"
+const OptimizedRestBaseURL = "https://api.ftx.com"
 
 type APIResponse struct {
 	Success     bool            `json:"success"`
@@ -46,6 +47,28 @@ type RestClient struct {
 
 func NewClient() *RestClient {
 	u, err := url.Parse(RestBaseURL)
+	if err != nil {
+		panic(err)
+	}
+
+	client := &RestClient{
+		BaseURL: u,
+		client: &http.Client{
+			Timeout: defaultHTTPTimeout,
+		},
+	}
+
+	/*
+		client.AccountService = &AccountService{client: client}
+		client.MarketDataService = &MarketDataService{client: client}
+		client.TradeService = &TradeService{client: client}
+		client.BulletService = &BulletService{client: client}
+	*/
+	return client
+}
+
+func NewOptimizedClient() *RestClient {
+	u, err := url.Parse(OptimizedRestBaseURL)
 	if err != nil {
 		panic(err)
 	}
