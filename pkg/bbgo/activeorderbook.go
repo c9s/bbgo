@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -19,12 +20,17 @@ type ActiveOrderBook struct {
 	Symbol          string
 	orders          *types.SyncOrderMap
 	filledCallbacks []func(o types.Order)
+
+	// sig is the order update signal
+	// this signal will be emitted when a new order is added or removed.
+	C sigchan.Chan
 }
 
 func NewActiveOrderBook(symbol string) *ActiveOrderBook {
 	return &ActiveOrderBook{
 		Symbol: symbol,
 		orders: types.NewSyncOrderMap(),
+		C:      sigchan.New(1),
 	}
 }
 
@@ -215,13 +221,19 @@ func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
 		if b.Remove(order) {
 			b.EmitFilled(order)
 		}
+		b.C.Emit()
 
-	case types.OrderStatusPartiallyFilled, types.OrderStatusNew:
+	case types.OrderStatusPartiallyFilled:
 		b.Update(order)
+
+	case types.OrderStatusNew:
+		b.Update(order)
+		b.C.Emit()
 
 	case types.OrderStatusCanceled, types.OrderStatusRejected:
 		log.Debugf("[ActiveOrderBook] order status %s, removing order %s", order.Status, order)
 		b.Remove(order)
+		b.C.Emit()
 
 	default:
 		log.Warnf("unhandled order status: %s", order.Status)
