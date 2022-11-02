@@ -18,10 +18,12 @@ type NRR struct {
 	types.SeriesBase
 
 	RankingWindow int
+	delay         bool
+	prices        *types.Queue
 
-	Prices       *types.Queue
 	Values       floats.Slice
 	RankedValues floats.Slice
+	ReturnValues floats.Slice
 
 	EndTime time.Time
 
@@ -33,20 +35,22 @@ var _ types.SeriesExtend = &NRR{}
 func (inc *NRR) Update(openPrice, closePrice float64) {
 	if inc.SeriesBase.Series == nil {
 		inc.SeriesBase.Series = inc
-		inc.Prices = types.NewQueue(inc.Window)
+		inc.prices = types.NewQueue(inc.Window)
 	}
-	inc.Prices.Update(closePrice)
-	if inc.Prices.Length() < inc.Window {
-		return
-	}
+	inc.prices.Update(closePrice)
+
 	// D0
-	irr := openPrice - closePrice
-	// D1
-	// -1*((inc.Prices.Last() / inc.Prices.Index(inc.Window-1)) - 1)
+	nirr := (openPrice - closePrice) / openPrice
+	irr := (closePrice - openPrice) / openPrice
+	if inc.prices.Length() >= inc.Window && inc.delay {
+		// D1
+		nirr = -1 * ((inc.prices.Last() / inc.prices.Index(inc.Window-1)) - 1)
+		irr = (inc.prices.Last() / inc.prices.Index(inc.Window-1)) - 1
+	}
 
-	inc.Values.Push(irr)                                                                   // neg ret here
+	inc.Values.Push(nirr)                                                                  // neg ret here
 	inc.RankedValues.Push(inc.Rank(inc.RankingWindow).Last() / float64(inc.RankingWindow)) // ranked neg ret here
-
+	inc.ReturnValues.Push(irr)
 }
 
 func (inc *NRR) Last() float64 {
