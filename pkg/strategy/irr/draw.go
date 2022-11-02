@@ -11,23 +11,36 @@ import (
 	"github.com/wcharczuk/go-chart/v2"
 )
 
-func (s *Strategy) InitDrawCommands(profit, cumProfit types.Series) {
-	bbgo.RegisterCommand("/pnl", "Draw PNL(%) per trade", func(reply interact.Reply) {
+func (s *Strategy) InitDrawCommands(profit, cumProfit, cumProfitDollar types.Series) {
+	bbgo.RegisterCommand("/rt", "Draw Return Rate(%) Per Trade", func(reply interact.Reply) {
+
 		canvas := DrawPNL(s.InstanceID(), profit)
 		var buffer bytes.Buffer
 		if err := canvas.Render(chart.PNG, &buffer); err != nil {
-			log.WithError(err).Errorf("cannot render pnl in drift")
-			reply.Message(fmt.Sprintf("[error] cannot render pnl in ewo: %v", err))
+			log.WithError(err).Errorf("cannot render return in irr")
+			reply.Message(fmt.Sprintf("[error] cannot render return in irr: %v", err))
 			return
 		}
 		bbgo.SendPhoto(&buffer)
 	})
-	bbgo.RegisterCommand("/cumpnl", "Draw Cummulative PNL(Quote)", func(reply interact.Reply) {
+	bbgo.RegisterCommand("/nav", "Draw Net Assets Value", func(reply interact.Reply) {
+
 		canvas := DrawCumPNL(s.InstanceID(), cumProfit)
 		var buffer bytes.Buffer
 		if err := canvas.Render(chart.PNG, &buffer); err != nil {
-			log.WithError(err).Errorf("cannot render cumpnl in drift")
-			reply.Message(fmt.Sprintf("[error] canot render cumpnl in drift: %v", err))
+			log.WithError(err).Errorf("cannot render nav in irr")
+			reply.Message(fmt.Sprintf("[error] canot render nav in irr: %v", err))
+			return
+		}
+		bbgo.SendPhoto(&buffer)
+	})
+	bbgo.RegisterCommand("/pnl", "Draw Cumulative Profit & Loss", func(reply interact.Reply) {
+
+		canvas := DrawCumPNL(s.InstanceID(), cumProfitDollar)
+		var buffer bytes.Buffer
+		if err := canvas.Render(chart.PNG, &buffer); err != nil {
+			log.WithError(err).Errorf("cannot render pnl in irr")
+			reply.Message(fmt.Sprintf("[error] canot render pnl in irr: %v", err))
 			return
 		}
 		bbgo.SendPhoto(&buffer)
@@ -77,7 +90,7 @@ func DrawPNL(instanceID string, profit types.Series) *types.Canvas {
 
 func DrawCumPNL(instanceID string, cumProfit types.Series) *types.Canvas {
 	canvas := types.NewCanvas(instanceID)
-	canvas.PlotRaw("cummulative pnl", cumProfit, cumProfit.Length())
+	canvas.PlotRaw("cumulative pnl", cumProfit, cumProfit.Length())
 	canvas.YAxis = chart.YAxis{
 		ValueFormatter: func(v interface{}) string {
 			if vf, isFloat := v.(float64); isFloat {

@@ -10,28 +10,23 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
+  max:
+    exchange: max
+    envVarPrefix:  max
+  ftx:
+    exchange: ftx
+    envVarPrefix: ftx
 
 exchangeStrategies:
 - on: binance
   irr:
     symbol: BTCBUSD
-    interval: 1m
-    window: 120
-    amount: 5_000.0
+    # in milliseconds(ms)
+    # must > 10 ms
+    hftInterval: 1000
+    # qty per trade
+    quantity: 0.001
     # Draw pnl
     drawGraph: true
     graphPNLPath: "./pnl.png"
     graphCumPNLPath: "./cumpnl.png"
-
-backtest:
-  sessions:
-    - binance
-  startTime: "2022-09-01"
-  endTime: "2022-10-04"
-  symbols:
-    - BTCBUSD
-  accounts:
-    binance:
-      takerFeeRate: 0.0
-      balances:
-        BUSD: 5_000.0
