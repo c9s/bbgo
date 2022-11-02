@@ -30,18 +30,21 @@ type NRR struct {
 
 var _ types.SeriesExtend = &NRR{}
 
-func (inc *NRR) Update(price float64) {
+func (inc *NRR) Update(openPrice, closePrice float64) {
 	if inc.SeriesBase.Series == nil {
 		inc.SeriesBase.Series = inc
 		inc.Prices = types.NewQueue(inc.Window)
 	}
-	inc.Prices.Update(price)
+	inc.Prices.Update(closePrice)
 	if inc.Prices.Length() < inc.Window {
 		return
 	}
-	irr := (inc.Prices.Last() / inc.Prices.Index(inc.Window-1)) - 1
+	// D0
+	irr := openPrice - closePrice
+	// D1
+	// -1*((inc.Prices.Last() / inc.Prices.Index(inc.Window-1)) - 1)
 
-	inc.Values.Push(-irr)                                                                  // neg ret here
+	inc.Values.Push(irr)                                                                   // neg ret here
 	inc.RankedValues.Push(inc.Rank(inc.RankingWindow).Last() / float64(inc.RankingWindow)) // ranked neg ret here
 
 }
@@ -75,7 +78,7 @@ func (inc *NRR) PushK(k types.KLine) {
 		return
 	}
 
-	inc.Update(indicator.KLineClosePriceMapper(k))
+	inc.Update(indicator.KLineOpenPriceMapper(k), indicator.KLineClosePriceMapper(k))
 	inc.EndTime = k.EndTime.Time()
 	inc.EmitUpdate(inc.Last())
 }
@@ -86,14 +89,3 @@ func (inc *NRR) LoadK(allKLines []types.KLine) {
 	}
 	inc.EmitUpdate(inc.Last())
 }
-
-//func calculateReturn(klines []types.KLine, window int, val KLineValueMapper) (float64, error) {
-//	length := len(klines)
-//	if length == 0 || length < window {
-//		return 0.0, fmt.Errorf("insufficient elements for calculating VOL with window = %d", window)
-//	}
-//
-//	rate := val(klines[length-1])/val(klines[length-2]) - 1
-//
-//	return rate, nil
-//}
