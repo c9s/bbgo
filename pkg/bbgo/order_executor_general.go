@@ -358,15 +358,15 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 }
 
 // GracefulCancelActiveOrderBook cancels the orders from the active orderbook.
-func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context, activeOrders *ActiveOrderBook, orders ...types.Order) error {
+func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context, activeOrders *ActiveOrderBook) error {
 	if activeOrders.NumOfOrders() == 0 {
 		return nil
 	}
 
-	if err := activeOrders.GracefulCancel(ctx, e.session.Exchange, orders...); err != nil {
+	if err := activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
 		// Retry once
 		if err = activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
-			return fmt.Errorf("graceful cancel order error: %w", err)
+			return errors.Wrap(err, "graceful cancel error")
 		}
 	}
 
@@ -376,7 +376,11 @@ func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context
 
 // GracefulCancel cancels all active maker orders if orders are not given, otherwise cancel all the given orders
 func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context, orders ...types.Order) error {
-	return e.GracefulCancelActiveOrderBook(ctx, e.activeMakerOrders, orders...)
+	if err := e.activeMakerOrders.GracefulCancel(ctx, e.session.Exchange, orders...); err != nil {
+		return errors.Wrap(err, "graceful cancel error")
+	}
+
+	return nil
 }
 
 // FastCancel cancels all active maker orders if orders is not given, otherwise cancel the given orders
