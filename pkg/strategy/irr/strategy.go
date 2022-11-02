@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/data/tsv"
@@ -14,6 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -42,23 +41,14 @@ type Strategy struct {
 
 	activeOrders *bbgo.ActiveOrderBook
 
-	ExitMethods bbgo.ExitMethodSet `json:"exits"`
-
+	ExitMethods   bbgo.ExitMethodSet `json:"exits"`
 	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 
 	bbgo.QuantityOrAmount
 
-	Interval int `json:"hftInterval"`
-
-	// realtime book ticker to submit order
-	obBuyPrice  uint64
-	obSellPrice uint64
-	// for getting close price
-	currentTradePrice uint64
 	// for negative return rate
-	openPrice  float64
-	closePrice float64
+	nrr *NRR
 
 	stopC chan struct{}
 
@@ -207,11 +197,7 @@ func (r *AccumulatedProfitReport) Output(symbol string) {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	if !bbgo.IsBackTesting {
-		session.Subscribe(types.AggTradeChannel, s.Symbol, types.SubscribeOptions{})
-		session.Subscribe(types.BookTickerChannel, s.Symbol, types.SubscribeOptions{})
-	}
-	//session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *Strategy) ID() string {
@@ -339,129 +325,43 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.Bind()
 	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
 
-	atomic.SwapUint64(&s.currentTradePrice, 0.)
-	s.closePrice = 0.
-	s.openPrice = 0.
-	klinDirections := types.NewQueue(100)
-	started := false
-	boxOpenPrice := 0.
-	boxClosePrice := 0.
-	boxCounter := 0
-
-	if !bbgo.IsBackTesting {
-
-		s.session.MarketDataStream.OnBookTickerUpdate(func(bt types.BookTicker) {
-			// quote order book price
-			newBid := uint64(bt.Buy.Float64())
-			newAsk := uint64(bt.Sell.Float64())
-			atomic.SwapUint64(&s.obBuyPrice, newBid)
-			atomic.SwapUint64(&s.obSellPrice, newAsk)
-		})
-
-		s.session.MarketDataStream.OnAggTrade(func(trade types.Trade) {
-			tradePrice := uint64(trade.Price.Float64())
-			atomic.SwapUint64(&s.currentTradePrice, tradePrice)
-		})
-
-		closeTime := <-time.After(time.Duration(s.Interval-int(time.Now().UnixMilli())%s.Interval) * time.Millisecond)
-		log.Infof("kline close timing synced @ %s", closeTime.Format("2006-01-02 15:04:05.000000"))
-		go func() {
-			intervalCloseTicker := time.NewTicker(time.Duration(s.Interval) * time.Millisecond)
-			defer intervalCloseTicker.Stop()
-			for {
-				select {
-				case <-intervalCloseTicker.C:
-					log.Infof("kline close time @ %s", time.Now().Format("2006-01-02 15:04:05.000000"))
-
-					s.orderExecutor.CancelNoWait(context.Background())
-
-					if s.currentTradePrice > 0 {
-						s.closePrice = float64(s.currentTradePrice)
-						log.Infof("Close Price: %f", s.closePrice)
-						if s.closePrice > 0 && s.openPrice > 0 {
-							direction := s.closePrice - s.openPrice
-							klinDirections.Update(direction)
-							regimeShift := klinDirections.Index(0)*klinDirections.Index(1) < 0
-							if regimeShift && !started {
-								boxOpenPrice = s.openPrice
-								started = true
-								boxCounter = 0
-								log.Infof("box started at price: %f", boxOpenPrice)
-							} else if regimeShift && started {
-								boxClosePrice = s.closePrice
-								started = false
-								log.Infof("box ended at price: %f with time length: %d", boxClosePrice, boxCounter)
-								// box ending, should re-balance position
-								nirr := fixedpoint.NewFromFloat(((boxOpenPrice - boxClosePrice) / boxOpenPrice) / (float64(boxCounter) + 1))
-								log.Infof("Alpha: %f", nirr.Float64())
-								if nirr.Float64() < 0 {
-									_, err := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
-										Symbol:   s.Symbol,
-										Side:     types.SideTypeSell,
-										Quantity: s.Quantity,
-										Type:     types.OrderTypeLimitMaker,
-										Price:    fixedpoint.NewFromFloat(float64(s.obSellPrice)),
-										Tag:      "irrSell",
-									})
-									if err != nil {
-										log.WithError(err)
-									}
-								} else if nirr.Float64() > 0 {
-									_, err := s.orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
-										Symbol:   s.Symbol,
-										Side:     types.SideTypeBuy,
-										Quantity: s.Quantity,
-										Type:     types.OrderTypeLimitMaker,
-										Price:    fixedpoint.NewFromFloat(float64(s.obBuyPrice)),
-										Tag:      "irrBuy",
-									})
-									if err != nil {
-										log.WithError(err)
-									}
-								}
-							} else {
-								boxCounter++
-							}
-						}
-					}
-				case <-s.stopC:
-					log.Warnf("%s goroutine stopped, due to the stop signal", s.Symbol)
-					return
-
-				case <-ctx.Done():
-					log.Warnf("%s goroutine stopped, due to the cancelled context", s.Symbol)
-					return
-				}
-			}
-
-		}()
-
-		openTime := <-time.After(time.Duration(s.Interval-int(time.Now().UnixMilli())%s.Interval) * time.Millisecond)
-		log.Infof("kline open timing synced @ %s", openTime.Format("2006-01-02 15:04:05.000000"))
-		go func() {
-			intervalOpenTicker := time.NewTicker(time.Duration(s.Interval) * time.Millisecond)
-			defer intervalOpenTicker.Stop()
-			for {
-				select {
-				case <-intervalOpenTicker.C:
-					time.Sleep(10 * time.Millisecond)
-					log.Infof("kline open time @ %s", time.Now().Format("2006-01-02 15:04:05.000000"))
-
-					if s.currentTradePrice > 0 && s.closePrice > 0 {
-						s.openPrice = float64(s.currentTradePrice)
-						log.Infof("Open Price: %f", s.openPrice)
-					}
-				case <-s.stopC:
-					log.Warnf("%s goroutine stopped, due to the stop signal", s.Symbol)
-					return
-
-				case <-ctx.Done():
-					log.Warnf("%s goroutine stopped, due to the cancelled context", s.Symbol)
-					return
-				}
-			}
-		}()
+	kLineStore, _ := s.session.MarketDataStore(s.Symbol)
+	// window = 2 means day-to-day return, previousClose/currentClose -1
+	// delay = false means use open/close-1 as D0 return (default)
+	// delay = true means use open/close-1 as 10 return
+	s.nrr = &NRR{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: 2}, RankingWindow: s.Window, delay: true}
+	s.nrr.BindK(s.session.MarketDataStream, s.Symbol, s.nrr.Interval)
+	if klines, ok := kLineStore.KLinesOfInterval(s.nrr.Interval); ok {
+		s.nrr.LoadK((*klines)[0:])
 	}
+
+	s.session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
+		alphaNrr := fixedpoint.NewFromFloat(s.nrr.RankedValues.Index(1))
+
+		// alpha-weighted inventory and cash
+		targetBase := s.QuantityOrAmount.CalculateQuantity(kline.Close).Mul(alphaNrr)
+		diffQty := targetBase.Sub(s.Position.Base)
+		log.Info(alphaNrr.Float64(), s.Position.Base, diffQty.Float64())
+
+		s.orderExecutor.CancelNoWait(ctx)
+		if diffQty.Sign() > 0 {
+			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Side:     types.SideTypeBuy,
+				Quantity: diffQty.Abs(),
+				Type:     types.OrderTypeMarket,
+				Tag:      "irrBuy",
+			})
+		} else if diffQty.Sign() < 0 {
+			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Side:     types.SideTypeSell,
+				Quantity: diffQty.Abs(),
+				Type:     types.OrderTypeMarket,
+				Tag:      "irrSell",
+			})
+		}
+	}))
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
