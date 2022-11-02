@@ -2,12 +2,12 @@ package bbgo
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
 
@@ -374,17 +374,6 @@ func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context
 	return nil
 }
 
-// FastCancelActiveOrderBook cancels the orders from the active orderbook without waiting
-func (e *GeneralOrderExecutor) FastCancelActiveOrderBook(ctx context.Context, activeOrders *ActiveOrderBook, orders ...types.Order) error {
-	if activeOrders.NumOfOrders() == 0 {
-		return nil
-	}
-	if err := activeOrders.FastCancel(ctx, e.session.Exchange, orders...); err != nil {
-		return fmt.Errorf("cancel order error: %w", err)
-	}
-	return nil
-}
-
 // GracefulCancel cancels all active maker orders if orders are not given, otherwise cancel all the given orders
 func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context, orders ...types.Order) error {
 	return e.GracefulCancelActiveOrderBook(ctx, e.activeMakerOrders, orders...)
@@ -392,7 +381,15 @@ func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context, orders ...typ
 
 // FastCancel cancels all active maker orders if orders is not given, otherwise cancel the given orders
 func (e *GeneralOrderExecutor) FastCancel(ctx context.Context, orders ...types.Order) error {
-	return e.FastCancelActiveOrderBook(ctx, e.activeMakerOrders, orders...)
+	if e.activeMakerOrders.NumOfOrders() == 0 {
+		return nil
+	}
+
+	if err := e.activeMakerOrders.FastCancel(ctx, e.session.Exchange, orders...); err != nil {
+		return errors.Wrap(err, "fast cancel order error")
+	}
+
+	return nil
 }
 
 // ClosePosition closes the current position by a percentage.
