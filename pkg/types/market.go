@@ -150,10 +150,10 @@ func (m Market) FormatPriceCurrency(val fixedpoint.Value) string {
 
 func (m Market) FormatPrice(val fixedpoint.Value) string {
 	// p := math.Pow10(m.PricePrecision)
-	return formatPrice(val, m.TickSize)
+	return FormatPrice(val, m.TickSize)
 }
 
-func formatPrice(price fixedpoint.Value, tickSize fixedpoint.Value) string {
+func FormatPrice(price fixedpoint.Value, tickSize fixedpoint.Value) string {
 	prec := int(math.Round(math.Abs(math.Log10(tickSize.Float64()))))
 	return price.FormatString(prec)
 }
