@@ -1,6 +1,8 @@
 package grid2
 
 import (
+	"math"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -15,64 +17,83 @@ type Grid struct {
 	Size fixedpoint.Value `json:"size"`
 
 	// Pins are the pinned grid prices, from low to high
-	Pins []fixedpoint.Value `json:"pins"`
+	Pins []Pin `json:"pins"`
 
-	pinsCache map[fixedpoint.Value]struct{} `json:"-"`
+	pinsCache map[Pin]struct{} `json:"-"`
 }
 
-func NewGrid(lower, upper, density fixedpoint.Value) *Grid {
-	var height = upper - lower
-	var size = height.Div(density)
-	var pins []fixedpoint.Value
+type Pin fixedpoint.Value
 
-	for p := lower; p <= upper; p += size {
-		pins = append(pins, p)
+func calculateArithmeticPins(lower, upper, size, tickSize fixedpoint.Value) []Pin {
+	var height = upper.Sub(lower)
+	var spread = height.Div(size)
+
+	var pins []Pin
+	for p := lower; p.Compare(upper) <= 0; p = p.Add(spread) {
+		// tickSize here = 0.01
+		pp := math.Trunc(p.Float64()/tickSize.Float64()) * tickSize.Float64()
+		pins = append(pins, Pin(fixedpoint.NewFromFloat(pp)))
 	}
+
+	return pins
+}
+
+func buildPinCache(pins []Pin) map[Pin]struct{} {
+	cache := make(map[Pin]struct{}, len(pins))
+	for _, pin := range pins {
+		cache[pin] = struct{}{}
+	}
+
+	return cache
+}
+
+func NewGrid(lower, upper, size, tickSize fixedpoint.Value) *Grid {
+	var height = upper.Sub(lower)
+	var spread = height.Div(size)
+	var pins = calculateArithmeticPins(lower, upper, size, tickSize)
 
 	grid := &Grid{
 		UpperPrice: upper,
 		LowerPrice: lower,
-		Size:       density,
-		Spread:     size,
+		Size:       size,
+		Spread:     spread,
 		Pins:       pins,
-		pinsCache:  make(map[fixedpoint.Value]struct{}, len(pins)),
+		pinsCache:  buildPinCache(pins),
 	}
-	grid.updatePinsCache()
+
 	return grid
 }
 
 func (g *Grid) Above(price fixedpoint.Value) bool {
-	return price > g.UpperPrice
+	return price.Compare(g.UpperPrice) > 0
 }
 
 func (g *Grid) Below(price fixedpoint.Value) bool {
-	return price < g.LowerPrice
+	return price.Compare(g.LowerPrice) < 0
 }
 
 func (g *Grid) OutOfRange(price fixedpoint.Value) bool {
-	return price < g.LowerPrice || price > g.UpperPrice
+	return price.Compare(g.LowerPrice) < 0 || price.Compare(g.UpperPrice) > 0
 }
 
 func (g *Grid) updatePinsCache() {
-	for _, pin := range g.Pins {
-		g.pinsCache[pin] = struct{}{}
-	}
+	g.pinsCache = buildPinCache(g.Pins)
 }
 
-func (g *Grid) HasPin(pin fixedpoint.Value) (ok bool) {
+func (g *Grid) HasPin(pin Pin) (ok bool) {
 	_, ok = g.pinsCache[pin]
 	return ok
 }
 
-func (g *Grid) ExtendUpperPrice(upper fixedpoint.Value) (newPins []fixedpoint.Value) {
+func (g *Grid) ExtendUpperPrice(upper fixedpoint.Value) (newPins []Pin) {
 	g.UpperPrice = upper
 
 	// since the grid is extended, the size should be updated as well
 	g.Size = (g.UpperPrice - g.LowerPrice).Div(g.Spread).Floor()
 
-	lastPin := g.Pins[len(g.Pins)-1]
-	for p := lastPin + g.Spread; p <= g.UpperPrice; p += g.Spread {
-		newPins = append(newPins, p)
+	lastPinPrice := fixedpoint.Value(g.Pins[len(g.Pins)-1])
+	for p := lastPinPrice.Add(g.Spread); p <= g.UpperPrice; p += g.Spread {
+		newPins = append(newPins, Pin(p))
 	}
 
 	g.Pins = append(g.Pins, newPins...)
@@ -80,20 +101,20 @@ func (g *Grid) ExtendUpperPrice(upper fixedpoint.Value) (newPins []fixedpoint.Va
 	return newPins
 }
 
-func (g *Grid) ExtendLowerPrice(lower fixedpoint.Value) (newPins []fixedpoint.Value) {
+func (g *Grid) ExtendLowerPrice(lower fixedpoint.Value) (newPins []Pin) {
 	g.LowerPrice = lower
 
 	// since the grid is extended, the size should be updated as well
 	g.Size = (g.UpperPrice - g.LowerPrice).Div(g.Spread).Floor()
 
-	firstPin := g.Pins[0]
-	numToAdd := (firstPin - g.LowerPrice).Div(g.Spread).Floor()
+	firstPinPrice := fixedpoint.Value(g.Pins[0])
+	numToAdd := (firstPinPrice.Sub(g.LowerPrice)).Div(g.Spread).Floor()
 	if numToAdd == 0 {
 		return newPins
 	}
 
-	for p := firstPin - g.Spread.Mul(numToAdd); p < firstPin; p += g.Spread {
-		newPins = append(newPins, p)
+	for p := firstPinPrice.Sub(g.Spread.Mul(numToAdd)); p.Compare(firstPinPrice) < 0; p = p.Add(g.Spread) {
+		newPins = append(newPins, Pin(p))
 	}
 
 	g.Pins = append(newPins, g.Pins...)
