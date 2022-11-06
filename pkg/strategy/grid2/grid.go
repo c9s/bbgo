@@ -114,6 +114,7 @@ func (g *Grid) ExtendLowerPrice(lower fixedpoint.Value) (newPins []Pin) {
 		newPins = append(newPins, Pin(p))
 	}
 
+	g.LowerPrice = lower
 	g.addPins(newPins)
 	return newPins
 }
