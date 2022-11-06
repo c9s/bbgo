@@ -90,19 +90,15 @@ func (g *Grid) HasPin(pin Pin) (ok bool) {
 }
 
 func (g *Grid) ExtendUpperPrice(upper fixedpoint.Value) (newPins []Pin) {
-	g.UpperPrice = upper
-
-	// since the grid is extended, the size should be updated as well
 	spread := g.Spread()
-	g.Size = (g.UpperPrice - g.LowerPrice).Div(spread).Floor()
 
-	lastPinPrice := fixedpoint.Value(g.Pins[len(g.Pins)-1])
-	for p := lastPinPrice.Add(spread); p <= g.UpperPrice; p = p.Add(spread) {
+	startPrice := g.UpperPrice.Add(spread)
+	for p := startPrice; p.Compare(upper) <= 0; p = p.Add(spread) {
 		newPins = append(newPins, Pin(p))
 	}
 
-	g.Pins = append(g.Pins, newPins...)
-	g.updatePinsCache()
+	g.UpperPrice = upper
+	g.addPins(newPins)
 	return newPins
 }
 
