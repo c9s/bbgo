@@ -2,6 +2,7 @@ package grid2
 
 import (
 	"math"
+	"sort"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
@@ -108,24 +109,23 @@ func (g *Grid) ExtendUpperPrice(upper fixedpoint.Value) (newPins []Pin) {
 func (g *Grid) ExtendLowerPrice(lower fixedpoint.Value) (newPins []Pin) {
 	spread := g.Spread()
 
-	g.LowerPrice = lower
-
-	height := g.Height()
-
-	// since the grid is extended, the size should be updated as well
-	g.Size = height.Div(spread).Floor()
-
-	firstPinPrice := fixedpoint.Value(g.Pins[0])
-	numToAdd := (firstPinPrice.Sub(g.LowerPrice)).Div(spread).Floor()
-	if numToAdd == 0 {
-		return newPins
-	}
-
-	for p := firstPinPrice.Sub(spread.Mul(numToAdd)); p.Compare(firstPinPrice) < 0; p = p.Add(spread) {
+	startPrice := g.LowerPrice.Sub(spread)
+	for p := startPrice; p.Compare(lower) >= 0; p = p.Sub(spread) {
 		newPins = append(newPins, Pin(p))
 	}
 
-	g.Pins = append(newPins, g.Pins...)
-	g.updatePinsCache()
+	g.addPins(newPins)
 	return newPins
+}
+
+func (g *Grid) addPins(pins []Pin) {
+	g.Pins = append(g.Pins, pins...)
+
+	sort.Slice(g.Pins, func(i, j int) bool {
+		a := fixedpoint.Value(g.Pins[i])
+		b := fixedpoint.Value(g.Pins[j])
+		return a.Compare(b) < 0
+	})
+
+	g.updatePinsCache()
 }
