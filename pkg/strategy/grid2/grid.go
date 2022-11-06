@@ -10,9 +10,6 @@ type Grid struct {
 	UpperPrice fixedpoint.Value `json:"upperPrice"`
 	LowerPrice fixedpoint.Value `json:"lowerPrice"`
 
-	// Spread is the spread of each grid
-	Spread fixedpoint.Value `json:"spread"`
-
 	// Size is the number of total grids
 	Size fixedpoint.Value `json:"size"`
 
@@ -48,20 +45,26 @@ func buildPinCache(pins []Pin) map[Pin]struct{} {
 }
 
 func NewGrid(lower, upper, size, tickSize fixedpoint.Value) *Grid {
-	var height = upper.Sub(lower)
-	var spread = height.Div(size)
 	var pins = calculateArithmeticPins(lower, upper, size, tickSize)
 
 	grid := &Grid{
 		UpperPrice: upper,
 		LowerPrice: lower,
 		Size:       size,
-		Spread:     spread,
 		Pins:       pins,
 		pinsCache:  buildPinCache(pins),
 	}
 
 	return grid
+}
+
+func (g *Grid) Height() fixedpoint.Value {
+	return g.UpperPrice.Sub(g.LowerPrice)
+}
+
+// Spread returns the spread of each grid
+func (g *Grid) Spread() fixedpoint.Value {
+	return g.Height().Div(g.Size)
 }
 
 func (g *Grid) Above(price fixedpoint.Value) bool {
@@ -89,10 +92,11 @@ func (g *Grid) ExtendUpperPrice(upper fixedpoint.Value) (newPins []Pin) {
 	g.UpperPrice = upper
 
 	// since the grid is extended, the size should be updated as well
-	g.Size = (g.UpperPrice - g.LowerPrice).Div(g.Spread).Floor()
+	spread := g.Spread()
+	g.Size = (g.UpperPrice - g.LowerPrice).Div(spread).Floor()
 
 	lastPinPrice := fixedpoint.Value(g.Pins[len(g.Pins)-1])
-	for p := lastPinPrice.Add(g.Spread); p <= g.UpperPrice; p += g.Spread {
+	for p := lastPinPrice.Add(spread); p <= g.UpperPrice; p = p.Add(spread) {
 		newPins = append(newPins, Pin(p))
 	}
 
@@ -102,18 +106,22 @@ func (g *Grid) ExtendUpperPrice(upper fixedpoint.Value) (newPins []Pin) {
 }
 
 func (g *Grid) ExtendLowerPrice(lower fixedpoint.Value) (newPins []Pin) {
+	spread := g.Spread()
+
 	g.LowerPrice = lower
 
+	height := g.Height()
+
 	// since the grid is extended, the size should be updated as well
-	g.Size = (g.UpperPrice - g.LowerPrice).Div(g.Spread).Floor()
+	g.Size = height.Div(spread).Floor()
 
 	firstPinPrice := fixedpoint.Value(g.Pins[0])
-	numToAdd := (firstPinPrice.Sub(g.LowerPrice)).Div(g.Spread).Floor()
+	numToAdd := (firstPinPrice.Sub(g.LowerPrice)).Div(spread).Floor()
 	if numToAdd == 0 {
 		return newPins
 	}
 
-	for p := firstPinPrice.Sub(g.Spread.Mul(numToAdd)); p.Compare(firstPinPrice) < 0; p = p.Add(g.Spread) {
+	for p := firstPinPrice.Sub(spread.Mul(numToAdd)); p.Compare(firstPinPrice) < 0; p = p.Add(spread) {
 		newPins = append(newPins, Pin(p))
 	}
 
