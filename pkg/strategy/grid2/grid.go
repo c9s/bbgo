@@ -14,6 +14,9 @@ type Grid struct {
 	// Size is the number of total grids
 	Size fixedpoint.Value `json:"size"`
 
+	// TickSize is the price tick size, this is used for truncating price
+	TickSize fixedpoint.Value `json:"tickSize"`
+
 	// Pins are the pinned grid prices, from low to high
 	Pins []Pin `json:"pins"`
 
@@ -22,10 +25,7 @@ type Grid struct {
 
 type Pin fixedpoint.Value
 
-func calculateArithmeticPins(lower, upper, size, tickSize fixedpoint.Value) []Pin {
-	var height = upper.Sub(lower)
-	var spread = height.Div(size)
-
+func calculateArithmeticPins(lower, upper, spread, tickSize fixedpoint.Value) []Pin {
 	var pins []Pin
 	for p := lower; p.Compare(upper) <= 0; p = p.Add(spread) {
 		// tickSize here = 0.01
@@ -46,16 +46,16 @@ func buildPinCache(pins []Pin) map[Pin]struct{} {
 }
 
 func NewGrid(lower, upper, size, tickSize fixedpoint.Value) *Grid {
-	var pins = calculateArithmeticPins(lower, upper, size, tickSize)
-
 	grid := &Grid{
 		UpperPrice: upper,
 		LowerPrice: lower,
 		Size:       size,
-		Pins:       pins,
-		pinsCache:  buildPinCache(pins),
+		TickSize:   tickSize,
 	}
 
+	var spread = grid.Spread()
+	var pins = calculateArithmeticPins(lower, upper, spread, tickSize)
+	grid.addPins(pins)
 	return grid
 }
 
@@ -78,10 +78,6 @@ func (g *Grid) Below(price fixedpoint.Value) bool {
 
 func (g *Grid) OutOfRange(price fixedpoint.Value) bool {
 	return price.Compare(g.LowerPrice) < 0 || price.Compare(g.UpperPrice) > 0
-}
-
-func (g *Grid) updatePinsCache() {
-	g.pinsCache = buildPinCache(g.Pins)
 }
 
 func (g *Grid) HasPin(pin Pin) (ok bool) {
@@ -125,4 +121,8 @@ func (g *Grid) addPins(pins []Pin) {
 	})
 
 	g.updatePinsCache()
+}
+
+func (g *Grid) updatePinsCache() {
+	g.pinsCache = buildPinCache(g.Pins)
 }
