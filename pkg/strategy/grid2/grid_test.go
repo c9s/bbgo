@@ -104,6 +104,7 @@ func Test_calculateArithmeticPins(t *testing.T) {
 		want []Pin
 	}{
 		{
+			// (3000-1000)/30 = 66.6666666
 			name: "simple",
 			args: args{
 				lower:    number(1000.0),
@@ -148,7 +149,8 @@ func Test_calculateArithmeticPins(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, calculateArithmeticPins(tt.args.lower, tt.args.upper, tt.args.size, tt.args.tickSize), "calculateArithmeticPins(%v, %v, %v, %v)", tt.args.lower, tt.args.upper, tt.args.size, tt.args.tickSize)
+			spread := tt.args.upper.Sub(tt.args.lower).Div(tt.args.size)
+			assert.Equalf(t, tt.want, calculateArithmeticPins(tt.args.lower, tt.args.upper, spread, tt.args.tickSize), "calculateArithmeticPins(%v, %v, %v, %v)", tt.args.lower, tt.args.upper, tt.args.size, tt.args.tickSize)
 		})
 	}
 }
