@@ -45,48 +45,50 @@ func TestGrid_HasPin(t *testing.T) {
 func TestGrid_ExtendUpperPrice(t *testing.T) {
 	upper := number(500.0)
 	lower := number(100.0)
-	size := number(100.0)
-	grid := NewGrid(lower, upper, size, number(2.0))
-
+	size := number(40.0)
+	grid := NewGrid(lower, upper, size, number(0.01))
 	originalSpread := grid.Spread
+
+	assert.Equal(t, number(10.0), originalSpread)
+	assert.Len(t, grid.Pins, 40) // (1000-500) / 4
+
 	newPins := grid.ExtendUpperPrice(number(1000.0))
 	assert.Equal(t, originalSpread, grid.Spread)
-	assert.Len(t, newPins, 125) // (1000-500) / 4
-	assert.Equal(t, fixedpoint.NewFromFloat(4), grid.Spread)
-	if assert.Len(t, grid.Pins, 226) {
-		assert.Equal(t, fixedpoint.NewFromFloat(100.0), grid.Pins[0])
-		assert.Equal(t, fixedpoint.NewFromFloat(1000.0), grid.Pins[225])
-	}
+	assert.Len(t, newPins, 51) // (1000-500) / 4
 }
 
 func TestGrid_ExtendLowerPrice(t *testing.T) {
 	upper := fixedpoint.NewFromFloat(3000.0)
 	lower := fixedpoint.NewFromFloat(2000.0)
-	size := fixedpoint.NewFromFloat(100.0)
-	grid := NewGrid(lower, upper, size, number(2.0))
+	size := fixedpoint.NewFromFloat(10.0)
+	grid := NewGrid(lower, upper, size, number(0.01))
 
-	// spread = (3000 - 2000) / 100.0
-	expectedSpread := fixedpoint.NewFromFloat(10.0)
+	assert.Equal(t, Pin(number(2000.0)), grid.BottomPin(), "bottom pin should be 1000.0")
+	assert.Equal(t, Pin(number(3000.0)), grid.TopPin(), "top pin should be 3000.0")
+	assert.Len(t, grid.Pins, 11)
+
+	// spread = (3000 - 2000) / 10.0
+	expectedSpread := fixedpoint.NewFromFloat(100.0)
 	assert.Equal(t, expectedSpread, grid.Spread)
 
 	originalSpread := grid.Spread
 	newPins := grid.ExtendLowerPrice(fixedpoint.NewFromFloat(1000.0))
 	assert.Equal(t, originalSpread, grid.Spread)
 
+	t.Logf("newPins: %+v", newPins)
+
 	// 100 = (2000-1000) / 10
-	if assert.Len(t, newPins, 100) {
-		assert.Equal(t, fixedpoint.NewFromFloat(2000.0)-expectedSpread, newPins[99])
+	if assert.Len(t, newPins, 10) {
+		assert.Equal(t, Pin(number(1000.0)), newPins[0])
+		assert.Equal(t, Pin(number(1900.0)), newPins[len(newPins)-1])
 	}
 
 	assert.Equal(t, expectedSpread, grid.Spread)
-	if assert.Len(t, grid.Pins, 201) {
-		assert.Equal(t, fixedpoint.NewFromFloat(1000.0), grid.Pins[0])
-		assert.Equal(t, fixedpoint.NewFromFloat(3000.0), grid.Pins[200])
-	}
 
-	newPins2 := grid.ExtendLowerPrice(
-		fixedpoint.NewFromFloat(1000.0 - 1.0))
-	assert.Len(t, newPins2, 0) // should have no new pin generated
+	if assert.Len(t, grid.Pins, 21) {
+		assert.Equal(t, Pin(number(1000.0)), grid.BottomPin(), "bottom pin should be 1000.0")
+		assert.Equal(t, Pin(number(3000.0)), grid.TopPin(), "top pin should be 3000.0")
+	}
 }
 
 func Test_calculateArithmeticPins(t *testing.T) {
