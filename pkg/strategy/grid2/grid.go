@@ -17,6 +17,9 @@ type Grid struct {
 	// TickSize is the price tick size, this is used for truncating price
 	TickSize fixedpoint.Value `json:"tickSize"`
 
+	// Spread is a immutable number
+	Spread fixedpoint.Value `json:"spread"`
+
 	// Pins are the pinned grid prices, from low to high
 	Pins []Pin `json:"pins"`
 
@@ -46,14 +49,17 @@ func buildPinCache(pins []Pin) map[Pin]struct{} {
 }
 
 func NewGrid(lower, upper, size, tickSize fixedpoint.Value) *Grid {
+	height := upper.Sub(lower)
+	spread := height.Div(size)
+
 	grid := &Grid{
 		UpperPrice: upper,
 		LowerPrice: lower,
 		Size:       size,
 		TickSize:   tickSize,
+		Spread:     spread,
 	}
 
-	var spread = grid.Spread()
 	var pins = calculateArithmeticPins(lower, upper, spread, tickSize)
 	grid.addPins(pins)
 	return grid
@@ -61,11 +67,6 @@ func NewGrid(lower, upper, size, tickSize fixedpoint.Value) *Grid {
 
 func (g *Grid) Height() fixedpoint.Value {
 	return g.UpperPrice.Sub(g.LowerPrice)
-}
-
-// Spread returns the spread of each grid
-func (g *Grid) Spread() fixedpoint.Value {
-	return g.Height().Div(g.Size)
 }
 
 func (g *Grid) Above(price fixedpoint.Value) bool {
@@ -86,29 +87,32 @@ func (g *Grid) HasPin(pin Pin) (ok bool) {
 }
 
 func (g *Grid) ExtendUpperPrice(upper fixedpoint.Value) (newPins []Pin) {
-	spread := g.Spread()
-
-	startPrice := g.UpperPrice.Add(spread)
-	for p := startPrice; p.Compare(upper) <= 0; p = p.Add(spread) {
-		newPins = append(newPins, Pin(p))
-	}
-
+	newPins = calculateArithmeticPins(g.UpperPrice, upper, g.Spread, g.TickSize)
 	g.UpperPrice = upper
 	g.addPins(newPins)
 	return newPins
 }
 
 func (g *Grid) ExtendLowerPrice(lower fixedpoint.Value) (newPins []Pin) {
-	spread := g.Spread()
-
-	startPrice := g.LowerPrice.Sub(spread)
-	for p := startPrice; p.Compare(lower) >= 0; p = p.Sub(spread) {
-		newPins = append(newPins, Pin(p))
+	if lower.Compare(g.LowerPrice) >= 0 {
+		return nil
 	}
+
+	n := g.LowerPrice.Sub(lower).Div(g.Spread).Floor()
+	lower = g.LowerPrice.Sub(g.Spread.Mul(n))
+	newPins = calculateArithmeticPins(lower, g.LowerPrice.Sub(g.Spread), g.Spread, g.TickSize)
 
 	g.LowerPrice = lower
 	g.addPins(newPins)
 	return newPins
+}
+
+func (g *Grid) TopPin() Pin {
+	return g.Pins[len(g.Pins)-1]
+}
+
+func (g *Grid) BottomPin() Pin {
+	return g.Pins[0]
 }
 
 func (g *Grid) addPins(pins []Pin) {
