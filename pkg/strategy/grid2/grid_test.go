@@ -26,8 +26,8 @@ func TestNewGrid(t *testing.T) {
 	assert.Equal(t, lower, grid.LowerPrice)
 	assert.Equal(t, fixedpoint.NewFromFloat(4), grid.Spread)
 	if assert.Len(t, grid.Pins, 101) {
-		assert.Equal(t, fixedpoint.NewFromFloat(100.0), grid.Pins[0])
-		assert.Equal(t, fixedpoint.NewFromFloat(500.0), grid.Pins[100])
+		assert.Equal(t, Pin(number(100.0)), grid.Pins[0])
+		assert.Equal(t, Pin(number(500.0)), grid.Pins[100])
 	}
 }
 
