@@ -9,19 +9,25 @@ import (
 )
 
 func number(a interface{}) fixedpoint.Value {
-	if s, ok := a.(string); ok {
-		return fixedpoint.MustNewFromString(s)
+	switch v := a.(type) {
+	case string:
+		return fixedpoint.MustNewFromString(v)
+	case int:
+		return fixedpoint.NewFromInt(int64(v))
+	case int64:
+		return fixedpoint.NewFromInt(int64(v))
+	case float64:
+		return fixedpoint.NewFromFloat(v)
 	}
 
-	f := a.(float64)
-	return fixedpoint.NewFromFloat(f)
+	return fixedpoint.Zero
 }
 
 func TestNewGrid(t *testing.T) {
 	upper := fixedpoint.NewFromFloat(500.0)
 	lower := fixedpoint.NewFromFloat(100.0)
 	size := fixedpoint.NewFromFloat(100.0)
-	grid := NewGrid(lower, upper, size, number(2.0))
+	grid := NewGrid(lower, upper, size, number(0.01))
 	assert.Equal(t, upper, grid.UpperPrice)
 	assert.Equal(t, lower, grid.LowerPrice)
 	assert.Equal(t, fixedpoint.NewFromFloat(4), grid.Spread)
@@ -35,7 +41,7 @@ func TestGrid_HasPin(t *testing.T) {
 	upper := fixedpoint.NewFromFloat(500.0)
 	lower := fixedpoint.NewFromFloat(100.0)
 	size := fixedpoint.NewFromFloat(100.0)
-	grid := NewGrid(lower, upper, size, number(2))
+	grid := NewGrid(lower, upper, size, number(0.01))
 
 	assert.True(t, grid.HasPin(Pin(number(100.0))))
 	assert.True(t, grid.HasPin(Pin(number(500.0))))
