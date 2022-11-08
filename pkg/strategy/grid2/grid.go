@@ -87,7 +87,11 @@ func (g *Grid) HasPin(pin Pin) (ok bool) {
 }
 
 func (g *Grid) ExtendUpperPrice(upper fixedpoint.Value) (newPins []Pin) {
-	newPins = calculateArithmeticPins(g.UpperPrice, upper, g.Spread, g.TickSize)
+	if upper.Compare(g.UpperPrice) <= 0 {
+		return nil
+	}
+
+	newPins = calculateArithmeticPins(g.UpperPrice.Add(g.Spread), upper, g.Spread, g.TickSize)
 	g.UpperPrice = upper
 	g.addPins(newPins)
 	return newPins

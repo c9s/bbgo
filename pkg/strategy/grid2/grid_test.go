@@ -51,16 +51,19 @@ func TestGrid_HasPin(t *testing.T) {
 func TestGrid_ExtendUpperPrice(t *testing.T) {
 	upper := number(500.0)
 	lower := number(100.0)
-	size := number(40.0)
+	size := number(4.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
 	originalSpread := grid.Spread
 
-	assert.Equal(t, number(10.0), originalSpread)
-	assert.Len(t, grid.Pins, 40) // (1000-500) / 4
+	t.Logf("pins: %+v", grid.Pins)
+	assert.Equal(t, number(100.0), originalSpread)
+	assert.Len(t, grid.Pins, 5) // (1000-500) / 4
 
 	newPins := grid.ExtendUpperPrice(number(1000.0))
+	assert.Len(t, grid.Pins, 10)
+	assert.Len(t, newPins, 5)
 	assert.Equal(t, originalSpread, grid.Spread)
-	assert.Len(t, newPins, 51) // (1000-500) / 4
+	t.Logf("pins: %+v", grid.Pins)
 }
 
 func TestGrid_ExtendLowerPrice(t *testing.T) {
