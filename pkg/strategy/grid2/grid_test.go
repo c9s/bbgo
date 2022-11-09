@@ -28,6 +28,8 @@ func TestNewGrid(t *testing.T) {
 	lower := fixedpoint.NewFromFloat(100.0)
 	size := fixedpoint.NewFromFloat(100.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
+	grid.CalculatePins()
+
 	assert.Equal(t, upper, grid.UpperPrice)
 	assert.Equal(t, lower, grid.LowerPrice)
 	assert.Equal(t, fixedpoint.NewFromFloat(4), grid.Spread)
@@ -42,6 +44,7 @@ func TestGrid_HasPin(t *testing.T) {
 	lower := fixedpoint.NewFromFloat(100.0)
 	size := fixedpoint.NewFromFloat(100.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
+	grid.CalculatePins()
 
 	assert.True(t, grid.HasPin(Pin(number(100.0))))
 	assert.True(t, grid.HasPin(Pin(number(500.0))))
@@ -53,6 +56,8 @@ func TestGrid_ExtendUpperPrice(t *testing.T) {
 	lower := number(100.0)
 	size := number(4.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
+	grid.CalculatePins()
+
 	originalSpread := grid.Spread
 
 	t.Logf("pins: %+v", grid.Pins)
@@ -71,6 +76,7 @@ func TestGrid_ExtendLowerPrice(t *testing.T) {
 	lower := fixedpoint.NewFromFloat(2000.0)
 	size := fixedpoint.NewFromFloat(10.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
+	grid.CalculatePins()
 
 	assert.Equal(t, Pin(number(2000.0)), grid.BottomPin(), "bottom pin should be 1000.0")
 	assert.Equal(t, Pin(number(3000.0)), grid.TopPin(), "top pin should be 3000.0")
@@ -105,6 +111,8 @@ func TestGrid_NextLowerPin(t *testing.T) {
 	lower := number(100.0)
 	size := number(4.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
+	grid.CalculatePins()
+
 	t.Logf("pins: %+v", grid.Pins)
 
 	next, ok := grid.NextLowerPin(number(200.0))
@@ -121,6 +129,7 @@ func TestGrid_NextHigherPin(t *testing.T) {
 	lower := number(100.0)
 	size := number(4.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
+	grid.CalculatePins()
 	t.Logf("pins: %+v", grid.Pins)
 
 	next, ok := grid.NextHigherPin(number(100.0))
