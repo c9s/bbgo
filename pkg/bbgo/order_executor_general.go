@@ -144,19 +144,21 @@ func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats) {
 	})
 }
 
-func (e *GeneralOrderExecutor) Bind() {
+func (e *GeneralOrderExecutor) Bind(notify ...bool) {
 	e.activeMakerOrders.BindStream(e.session.UserDataStream)
 	e.orderStore.BindStream(e.session.UserDataStream)
 
-	// trade notify
-	e.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		Notify(trade)
-	})
+	if len(notify) > 0 && notify[0] {
+		// trade notify
+		e.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+			Notify(trade)
+		})
 
-	e.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		log.Infof("position changed: %s", position)
-		Notify(position)
-	})
+		e.tradeCollector.OnPositionUpdate(func(position *types.Position) {
+			log.Infof("position changed: %s", position)
+			Notify(position)
+		})
+	}
 
 	e.tradeCollector.BindStream(e.session.UserDataStream)
 }
@@ -168,6 +170,30 @@ func (e *GeneralOrderExecutor) CancelOrders(ctx context.Context, orders ...types
 		err = e.session.Exchange.CancelOrders(ctx, orders...)
 	}
 	return err
+}
+
+func (e *GeneralOrderExecutor) FastSubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
+	formattedOrders, err := e.session.FormatOrders(submitOrders)
+	if err != nil {
+		return nil, err
+	}
+	createdOrders, errIdx, err := BatchPlaceOrder(ctx, e.session.Exchange, formattedOrders...)
+	if len(errIdx) > 0 {
+		return nil, err
+	}
+	if IsBackTesting {
+		e.orderStore.Add(createdOrders...)
+		e.activeMakerOrders.Add(createdOrders...)
+		e.tradeCollector.Process()
+	} else {
+		go func() {
+			e.orderStore.Add(createdOrders...)
+			e.activeMakerOrders.Add(createdOrders...)
+			e.tradeCollector.Process()
+		}()
+	}
+	return createdOrders, err
+
 }
 
 func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
@@ -262,7 +288,7 @@ func (e *GeneralOrderExecutor) reduceQuantityAndSubmitOrder(ctx context.Context,
 	return nil, multierr.Append(ErrExceededSubmitOrderRetryLimit, err)
 }
 
-func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) (types.OrderSlice, error) {
+func (e *GeneralOrderExecutor) OpenPositionPrepare(ctx context.Context, options *OpenPositionOptions) (*types.SubmitOrder, error) {
 	price := options.Price
 	submitOrder := types.SubmitOrder{
 		Symbol:           e.position.Symbol,
@@ -284,9 +310,11 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		if options.Long {
 			// use higher price to buy (this ensures that our order will be filled)
 			price = price.Mul(one.Add(options.LimitOrderTakerRatio))
+			options.Price = price
 		} else if options.Short {
 			// use lower price to sell (this ensures that our order will be filled)
 			price = price.Mul(one.Sub(options.LimitOrderTakerRatio))
+			options.Price = price
 		}
 	}
 
@@ -320,14 +348,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Side = types.SideTypeBuy
 		submitOrder.Quantity = quantity
 
-		Notify("Opening %s long position with quantity %v at price %v", e.position.Symbol, quantity, price)
-
-		createdOrder, err := e.SubmitOrders(ctx, submitOrder)
-		if err == nil {
-			return createdOrder, nil
-		}
-
-		return e.reduceQuantityAndSubmitOrder(ctx, price, submitOrder)
+		return &submitOrder, nil
 	} else if options.Short {
 		if quantity.IsZero() {
 			var err error
@@ -350,11 +371,35 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Side = types.SideTypeSell
 		submitOrder.Quantity = quantity
 
-		Notify("Opening %s short position with quantity %v at price %v", e.position.Symbol, quantity, price)
-		return e.reduceQuantityAndSubmitOrder(ctx, price, submitOrder)
+		return &submitOrder, nil
 	}
 
 	return nil, errors.New("options Long or Short must be set")
+}
+
+func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) (types.OrderSlice, error) {
+	submitOrder, err := e.OpenPositionPrepare(ctx, &options)
+	if err != nil {
+		return nil, err
+	}
+	if submitOrder == nil {
+		return nil, nil
+	}
+	price := options.Price
+
+	side := "long"
+	if submitOrder.Side == types.SideTypeSell {
+		side = "short"
+	}
+
+	Notify("Opening %s %s position with quantity %v at price %v", e.position.Symbol, side, submitOrder.Quantity, price)
+
+	createdOrder, err := e.SubmitOrders(ctx, *submitOrder)
+	if err == nil {
+		return createdOrder, nil
+	}
+
+	return e.reduceQuantityAndSubmitOrder(ctx, price, *submitOrder)
 }
 
 // GracefulCancelActiveOrderBook cancels the orders from the active orderbook.
