@@ -126,7 +126,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
-	s.grid.CalculatePins()
+	s.grid.CalculateArithmeticPins()
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
