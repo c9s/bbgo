@@ -60,9 +60,13 @@ func NewGrid(lower, upper, size, tickSize fixedpoint.Value) *Grid {
 		Spread:     spread,
 	}
 
-	var pins = calculateArithmeticPins(lower, upper, spread, tickSize)
-	grid.addPins(pins)
+	grid.CalculatePins()
 	return grid
+}
+
+func (g *Grid) CalculatePins() {
+	var pins = calculateArithmeticPins(g.LowerPrice, g.UpperPrice, g.Spread, g.TickSize)
+	g.addPins(pins)
 }
 
 func (g *Grid) Height() fixedpoint.Value {
