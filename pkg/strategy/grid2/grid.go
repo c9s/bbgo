@@ -60,7 +60,6 @@ func NewGrid(lower, upper, size, tickSize fixedpoint.Value) *Grid {
 		Spread:     spread,
 	}
 
-	grid.CalculatePins()
 	return grid
 }
 
