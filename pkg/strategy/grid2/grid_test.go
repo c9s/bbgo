@@ -100,6 +100,42 @@ func TestGrid_ExtendLowerPrice(t *testing.T) {
 	}
 }
 
+func TestGrid_NextLowerPin(t *testing.T) {
+	upper := number(500.0)
+	lower := number(100.0)
+	size := number(4.0)
+	grid := NewGrid(lower, upper, size, number(0.01))
+	t.Logf("pins: %+v", grid.Pins)
+
+	next, ok := grid.NextLowerPin(number(200.0))
+	assert.True(t, ok)
+	assert.Equal(t, Pin(number(100.0)), next)
+
+	next, ok = grid.NextLowerPin(number(150.0))
+	assert.False(t, ok)
+	assert.Equal(t, Pin(fixedpoint.Zero), next)
+}
+
+func TestGrid_NextHigherPin(t *testing.T) {
+	upper := number(500.0)
+	lower := number(100.0)
+	size := number(4.0)
+	grid := NewGrid(lower, upper, size, number(0.01))
+	t.Logf("pins: %+v", grid.Pins)
+
+	next, ok := grid.NextHigherPin(number(100.0))
+	assert.True(t, ok)
+	assert.Equal(t, Pin(number(200.0)), next)
+
+	next, ok = grid.NextHigherPin(number(400.0))
+	assert.True(t, ok)
+	assert.Equal(t, Pin(number(500.0)), next)
+
+	next, ok = grid.NextHigherPin(number(500.0))
+	assert.False(t, ok)
+	assert.Equal(t, Pin(fixedpoint.Zero), next)
+}
+
 func Test_calculateArithmeticPins(t *testing.T) {
 	type args struct {
 		lower    fixedpoint.Value
