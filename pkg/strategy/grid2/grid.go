@@ -7,6 +7,8 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+type PinCalculator func() []Pin
+
 type Grid struct {
 	UpperPrice fixedpoint.Value `json:"upperPrice"`
 	LowerPrice fixedpoint.Value `json:"lowerPrice"`
@@ -24,6 +26,8 @@ type Grid struct {
 	Pins []Pin `json:"pins"`
 
 	pinsCache map[Pin]struct{} `json:"-"`
+
+	calculator PinCalculator
 }
 
 type Pin fixedpoint.Value
@@ -63,9 +67,21 @@ func NewGrid(lower, upper, size, tickSize fixedpoint.Value) *Grid {
 	return grid
 }
 
-func (g *Grid) CalculatePins() {
-	var pins = calculateArithmeticPins(g.LowerPrice, g.UpperPrice, g.Spread, g.TickSize)
-	g.addPins(pins)
+func (g *Grid) CalculateGeometricPins() {
+	g.calculator = func() []Pin {
+		// return calculateArithmeticPins(g.LowerPrice, g.UpperPrice, g.Spread, g.TickSize)
+		return nil
+	}
+
+	g.addPins(g.calculator())
+}
+
+func (g *Grid) CalculateArithmeticPins() {
+	g.calculator = func() []Pin {
+		return calculateArithmeticPins(g.LowerPrice, g.UpperPrice, g.Spread, g.TickSize)
+	}
+
+	g.addPins(g.calculator())
 }
 
 func (g *Grid) Height() fixedpoint.Value {
