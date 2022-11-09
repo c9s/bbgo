@@ -86,6 +86,34 @@ func (g *Grid) HasPin(pin Pin) (ok bool) {
 	return ok
 }
 
+// NextHigherPin finds the next higher pin
+func (g *Grid) NextHigherPin(price fixedpoint.Value) (Pin, bool) {
+	i := g.SearchPin(price)
+	if i < len(g.Pins) && fixedpoint.Value(g.Pins[i]).Compare(price) == 0 && i+1 < len(g.Pins) {
+		return g.Pins[i+1], true
+	}
+
+	return Pin(fixedpoint.Zero), false
+}
+
+// NextLowerPin finds the next lower pin
+func (g *Grid) NextLowerPin(price fixedpoint.Value) (Pin, bool) {
+	i := g.SearchPin(price)
+	if i < len(g.Pins) && fixedpoint.Value(g.Pins[i]).Compare(price) == 0 && i-1 >= 0 {
+		return g.Pins[i-1], true
+	}
+
+	return Pin(fixedpoint.Zero), false
+}
+
+func (g *Grid) SearchPin(price fixedpoint.Value) int {
+	i := sort.Search(len(g.Pins), func(i int) bool {
+		a := fixedpoint.Value(g.Pins[i])
+		return a.Compare(price) >= 0
+	})
+	return i
+}
+
 func (g *Grid) ExtendUpperPrice(upper fixedpoint.Value) (newPins []Pin) {
 	if upper.Compare(g.UpperPrice) <= 0 {
 		return nil
