@@ -45,6 +45,8 @@ type Strategy struct {
 
 	LowerPrice fixedpoint.Value `json:"lowerPrice" yaml:"lowerPrice"`
 
+	grid *Grid
+
 	bbgo.QuantityOrAmount
 
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
@@ -122,6 +124,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
+
+	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
 
 	s.orderStore = bbgo.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
