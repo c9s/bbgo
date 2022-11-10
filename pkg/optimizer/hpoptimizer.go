@@ -3,6 +3,9 @@ package optimizer
 import (
 	"context"
 	"fmt"
+	"math"
+	"sync"
+
 	"github.com/c-bata/goptuna"
 	goptunaCMAES "github.com/c-bata/goptuna/cmaes"
 	goptunaSOBOL "github.com/c-bata/goptuna/sobol"
@@ -11,10 +14,9 @@ import (
 	"github.com/cheggaaa/pb/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	"math"
-	"sync"
 )
 
+// WARNING: the text here could only be lower cases
 const (
 	// HpOptimizerObjectiveEquity optimize the parameters to maximize equity gain
 	HpOptimizerObjectiveEquity = "equity"
@@ -22,6 +24,8 @@ const (
 	HpOptimizerObjectiveProfit = "profit"
 	// HpOptimizerObjectiveVolume optimize the parameters to maximize trading volume
 	HpOptimizerObjectiveVolume = "volume"
+	// HpOptimizerObjectiveProfitFactor optimize the parameters to maximize profit factor
+	HpOptimizerObjectiveProfitFactor = "profitfactor"
 )
 
 const (
@@ -198,6 +202,8 @@ func (o *HyperparameterOptimizer) buildObjective(executor Executor, configJson [
 		metricValueFunc = TotalVolume
 	case HpOptimizerObjectiveEquity:
 		metricValueFunc = TotalEquityDiff
+	case HpOptimizerObjectiveProfitFactor:
+		metricValueFunc = ProfitFactorMetricValueFunc
 	}
 
 	return func(trial goptuna.Trial) (float64, error) {
@@ -225,7 +231,7 @@ func (o *HyperparameterOptimizer) buildObjective(executor Executor, configJson [
 			return 0.0, err
 		}
 		// By config, the Goptuna optimize the parameters by maximize the objective output.
-		return metricValueFunc(summary).Float64(), nil
+		return metricValueFunc(summary), nil
 	}
 }
 
