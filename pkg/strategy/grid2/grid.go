@@ -69,6 +69,7 @@ func NewGrid(lower, upper, size, tickSize fixedpoint.Value) *Grid {
 
 func (g *Grid) CalculateGeometricPins() {
 	g.calculator = func() []Pin {
+		// TODO: implement geometric calculator
 		// return calculateArithmeticPins(g.LowerPrice, g.UpperPrice, g.Spread, g.TickSize)
 		return nil
 	}
