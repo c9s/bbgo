@@ -14,30 +14,43 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
-type MetricValueFunc func(summaryReport *backtest.SummaryReport) fixedpoint.Value
+type MetricValueFunc func(summaryReport *backtest.SummaryReport) float64
 
-var TotalProfitMetricValueFunc = func(summaryReport *backtest.SummaryReport) fixedpoint.Value {
-	return summaryReport.TotalProfit
+var TotalProfitMetricValueFunc = func(summaryReport *backtest.SummaryReport) float64 {
+	return summaryReport.TotalProfit.Float64()
 }
 
-var TotalVolume = func(summaryReport *backtest.SummaryReport) fixedpoint.Value {
+var TotalVolume = func(summaryReport *backtest.SummaryReport) float64 {
 	if len(summaryReport.SymbolReports) == 0 {
-		return fixedpoint.Zero
+		return 0
 	}
 
-	buyVolume := summaryReport.SymbolReports[0].PnL.BuyVolume
-	sellVolume := summaryReport.SymbolReports[0].PnL.SellVolume
-	return buyVolume.Add(sellVolume)
+	buyVolume := summaryReport.SymbolReports[0].PnL.BuyVolume.Float64()
+	sellVolume := summaryReport.SymbolReports[0].PnL.SellVolume.Float64()
+	return buyVolume + sellVolume
 }
 
-var TotalEquityDiff = func(summaryReport *backtest.SummaryReport) fixedpoint.Value {
+var TotalEquityDiff = func(summaryReport *backtest.SummaryReport) float64 {
 	if len(summaryReport.SymbolReports) == 0 {
-		return fixedpoint.Zero
+		return 0
 	}
 
-	initEquity := summaryReport.InitialEquityValue
-	finalEquity := summaryReport.FinalEquityValue
-	return finalEquity.Sub(initEquity)
+	initEquity := summaryReport.InitialEquityValue.Float64()
+	finalEquity := summaryReport.FinalEquityValue.Float64()
+	return finalEquity - initEquity
+}
+
+var ProfitFactorMetricValueFunc = func(summaryReport *backtest.SummaryReport) float64 {
+	if len(summaryReport.SymbolReports) == 0 {
+		return 0
+	}
+	if len(summaryReport.SymbolReports) > 1 {
+		panic("multiple symbols' profitfactor optimization not supported")
+	}
+	report := summaryReport.SymbolReports[0]
+	pf := report.ProfitFactor.Float64()
+	win := report.WinningRatio.Float64()
+	return pf*0.9 + win*0.1
 }
 
 type Metric struct {
@@ -51,7 +64,7 @@ type Metric struct {
 	Key string `json:"key"`
 
 	// Value is the metric value of the metric
-	Value fixedpoint.Value `json:"value,omitempty"`
+	Value float64 `json:"value,omitempty"`
 }
 
 func copyParams(params []interface{}) []interface{} {
@@ -199,6 +212,7 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 		"totalProfit":     TotalProfitMetricValueFunc,
 		"totalVolume":     TotalVolume,
 		"totalEquityDiff": TotalEquityDiff,
+		"profitFactor":    ProfitFactorMetricValueFunc,
 	}
 	var metrics = map[string][]Metric{}
 
@@ -287,7 +301,7 @@ func (o *GridOptimizer) Run(executor Executor, configJson []byte) (map[string][]
 		sort.Slice(metrics[n], func(i, j int) bool {
 			a := metrics[n][i].Value
 			b := metrics[n][j].Value
-			return a.Compare(b) > 0
+			return a > b
 		})
 	}
 
