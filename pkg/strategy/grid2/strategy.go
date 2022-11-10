@@ -28,6 +28,8 @@ func init() {
 }
 
 type Strategy struct {
+	Environment *bbgo.Environment
+
 	// Market stores the configuration of the market, for example, VolumePrecision, PricePrecision, MinLotSize... etc
 	// This field will be injected automatically since we defined the Symbol field.
 	types.Market `json:"-" yaml:"-"`
@@ -59,6 +61,8 @@ type Strategy struct {
 	activeOrders *bbgo.ActiveOrderBook
 
 	tradeCollector *bbgo.TradeCollector
+
+	orderExecutor *bbgo.GeneralOrderExecutor
 
 	// groupID is the group ID used for the strategy instance for canceling orders
 	groupID uint32
@@ -125,29 +129,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
 
+	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.orderExecutor.BindEnvironment(s.Environment)
+	s.orderExecutor.BindProfitStats(s.ProfitStats)
+	s.orderExecutor.Bind()
+	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		bbgo.Sync(ctx, s)
+	})
+
 	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
 	s.grid.CalculateArithmeticPins()
-
-	s.orderStore = bbgo.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(session.UserDataStream)
-
-	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
-	s.activeOrders = bbgo.NewActiveOrderBook(s.Symbol)
-	s.activeOrders.OnFilled(s.handleOrderFilled)
-	s.activeOrders.BindStream(session.UserDataStream)
-
-	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
-
-	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		bbgo.Notify(trade)
-		s.ProfitStats.AddTrade(trade)
-	})
-
-	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		bbgo.Notify(position)
-	})
-
-	s.tradeCollector.BindStream(session.UserDataStream)
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -162,8 +153,79 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	session.UserDataStream.OnStart(func() {
-
+		if err := s.setupGridOrders(ctx, session); err != nil {
+			log.WithError(err).Errorf("failed to setup grid orders")
+		}
 	})
 
 	return nil
+}
+
+func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
+	lastPrice, err := s.getLastTradePrice(ctx, session)
+	if err != nil {
+		return errors.Wrap(err, "failed to get the last trade price")
+	}
+
+	// shift 1 grid because we will start from the buy order
+	// if the buy order is filled, then we will submit another sell order at the higher grid.
+	for i := len(s.grid.Pins) - 2; i >= 0; i++ {
+		pin := s.grid.Pins[i]
+		price := fixedpoint.Value(pin)
+
+		if price.Compare(lastPrice) >= 0 {
+			if s.QuantityOrAmount.Quantity.Sign() > 0 {
+				quantity := s.QuantityOrAmount.Quantity
+
+				createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+					Symbol:      s.Symbol,
+					Side:        types.SideTypeBuy,
+					Type:        types.OrderTypeLimit,
+					Quantity:    quantity,
+					Price:       price,
+					Market:      s.Market,
+					TimeInForce: types.TimeInForceGTC,
+					Tag:         "grid",
+				})
+
+				if err2 != nil {
+					return err2
+				}
+
+				_ = createdOrders
+
+			} else if s.QuantityOrAmount.Amount.Sign() > 0 {
+
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.ExchangeSession) (fixedpoint.Value, error) {
+	if bbgo.IsBackTesting {
+		price, ok := session.LastPrice(s.Symbol)
+		if !ok {
+			return fixedpoint.Zero, fmt.Errorf("last price of %s not found", s.Symbol)
+		}
+
+		return price, nil
+	}
+
+	tickers, err := session.Exchange.QueryTickers(ctx, s.Symbol)
+	if err != nil {
+		return fixedpoint.Zero, err
+	}
+
+	if ticker, ok := tickers[s.Symbol]; ok {
+		if !ticker.Last.IsZero() {
+			return ticker.Last, nil
+		}
+
+		// fallback to buy price
+		return ticker.Buy, nil
+	}
+
+	return fixedpoint.Zero, fmt.Errorf("%s ticker price not found", s.Symbol)
 }
