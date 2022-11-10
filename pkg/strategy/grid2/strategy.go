@@ -200,12 +200,32 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 			pin := s.grid.Pins[i]
 			price := fixedpoint.Value(pin)
 
-			q := s.QuantityOrAmount.CalculateQuantity(price)
 			if price.Compare(lastPrice) >= 0 {
-				// sell
-				requiredBase = requiredBase.Add(q)
+				// sell orders
+				if requiredBase.Compare(totalBase) < 0 {
+					if q := s.QuantityOrAmount.Quantity; !q.IsZero() {
+						requiredBase = requiredBase.Add(s.QuantityOrAmount.Quantity)
+					} else if amount := s.QuantityOrAmount.Amount; !amount.IsZero() {
+						qq := s.QuantityOrAmount.CalculateQuantity(price)
+						requiredBase = requiredBase.Add(qq)
+					}
+				} else if i > 0 {
+					// convert buy quote to requiredQuote
+					nextLowerPin := s.grid.Pins[i-1]
+					nextLowerPrice := fixedpoint.Value(nextLowerPin)
+					if q := s.QuantityOrAmount.Quantity; !q.IsZero() {
+						requiredQuote = requiredQuote.Add(q.Mul(nextLowerPrice))
+					} else if amount := s.QuantityOrAmount.Amount; !amount.IsZero() {
+						requiredQuote = requiredQuote.Add(amount)
+					}
+				}
 			} else {
-				requiredQuote = requiredQuote.Add(q)
+				// buy orders
+				if q := s.QuantityOrAmount.Quantity; !q.IsZero() {
+					requiredQuote = requiredQuote.Add(q.Mul(price))
+				} else if amount := s.QuantityOrAmount.Amount; !amount.IsZero() {
+					requiredQuote = requiredQuote.Add(amount)
+				}
 			}
 		}
 
