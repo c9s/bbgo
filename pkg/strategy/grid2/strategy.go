@@ -32,24 +32,32 @@ type Strategy struct {
 
 	// Market stores the configuration of the market, for example, VolumePrecision, PricePrecision, MinLotSize... etc
 	// This field will be injected automatically since we defined the Symbol field.
-	types.Market `json:"-" yaml:"-"`
+	types.Market `json:"-"`
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
-	Symbol string `json:"symbol" yaml:"symbol"`
+	Symbol string `json:"symbol"`
 
 	// ProfitSpread is the fixed profit spread you want to submit the sell order
-	ProfitSpread fixedpoint.Value `json:"profitSpread" yaml:"profitSpread"`
+	ProfitSpread fixedpoint.Value `json:"profitSpread"`
 
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
-	GridNum int64 `json:"gridNumber" yaml:"gridNumber"`
+	GridNum int64 `json:"gridNumber"`
 
-	UpperPrice fixedpoint.Value `json:"upperPrice" yaml:"upperPrice"`
+	UpperPrice fixedpoint.Value `json:"upperPrice"`
 
-	LowerPrice fixedpoint.Value `json:"lowerPrice" yaml:"lowerPrice"`
+	LowerPrice fixedpoint.Value `json:"lowerPrice"`
+
+	// QuantityOrAmount embeds the Quantity field and the Amount field
+	// If you set up the Quantity field or the Amount field, you don't need to set the QuoteInvestment and BaseInvestment
+	bbgo.QuantityOrAmount
+
+	// If Quantity and Amount is not set, we can use the quote investment to calculate our quantity.
+	QuoteInvestment fixedpoint.Value `json:"quoteInvestment"`
+
+	// BaseInvestment is the total base quantity you want to place as the sell order.
+	BaseInvestment fixedpoint.Value `json:"baseInvestment"`
 
 	grid *Grid
-
-	bbgo.QuantityOrAmount
 
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	Position    *types.Position    `persistence:"position"`
@@ -169,33 +177,83 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 
 	// shift 1 grid because we will start from the buy order
 	// if the buy order is filled, then we will submit another sell order at the higher grid.
+	quantityOrAmountIsSet := s.QuantityOrAmount.IsSet()
+
+	// check if base and quote are enough
+	baseBalance, ok := session.Account.Balance(s.Market.BaseCurrency)
+	if !ok {
+		return fmt.Errorf("base %s balance not found", s.Market.BaseCurrency)
+	}
+
+	quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
+	if !ok {
+		return fmt.Errorf("quote %s balance not found", s.Market.QuoteCurrency)
+	}
+
+	totalBase := baseBalance.Available
+	totalQuote := quoteBalance.Available
+
+	if quantityOrAmountIsSet {
+		requiredBase := fixedpoint.Zero
+		requiredQuote := fixedpoint.Zero
+		for i := len(s.grid.Pins) - 1; i >= 0; i++ {
+			pin := s.grid.Pins[i]
+			price := fixedpoint.Value(pin)
+
+			q := s.QuantityOrAmount.CalculateQuantity(price)
+			if price.Compare(lastPrice) >= 0 {
+				// sell
+				requiredBase = requiredBase.Add(q)
+			} else {
+				requiredQuote = requiredQuote.Add(q)
+			}
+		}
+
+		if requiredBase.Compare(totalBase) < 0 && requiredQuote.Compare(totalQuote) < 0 {
+			return fmt.Errorf("both base balance (%f %s) and quote balance (%f %s) are not enought",
+				totalBase.Float64(), s.Market.BaseCurrency,
+				totalQuote.Float64(), s.Market.QuoteCurrency)
+		}
+
+		if requiredBase.Compare(totalBase) < 0 {
+			// see if we can convert some quotes to base
+		}
+	}
+
 	for i := len(s.grid.Pins) - 2; i >= 0; i++ {
 		pin := s.grid.Pins[i]
 		price := fixedpoint.Value(pin)
 
 		if price.Compare(lastPrice) >= 0 {
-			if s.QuantityOrAmount.Quantity.Sign() > 0 {
-				quantity := s.QuantityOrAmount.Quantity
+			// check sell order
+			if quantityOrAmountIsSet {
+				if s.QuantityOrAmount.Quantity.Sign() > 0 {
+					quantity := s.QuantityOrAmount.Quantity
 
-				createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-					Symbol:      s.Symbol,
-					Side:        types.SideTypeBuy,
-					Type:        types.OrderTypeLimit,
-					Quantity:    quantity,
-					Price:       price,
-					Market:      s.Market,
-					TimeInForce: types.TimeInForceGTC,
-					Tag:         "grid",
-				})
+					createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+						Symbol:      s.Symbol,
+						Side:        types.SideTypeBuy,
+						Type:        types.OrderTypeLimit,
+						Quantity:    quantity,
+						Price:       price,
+						Market:      s.Market,
+						TimeInForce: types.TimeInForceGTC,
+						Tag:         "grid",
+					})
 
-				if err2 != nil {
-					return err2
+					if err2 != nil {
+						return err2
+					}
+
+					_ = createdOrders
+
+				} else if s.QuantityOrAmount.Amount.Sign() > 0 {
+
 				}
+			} else if s.BaseInvestment.Sign() > 0 {
 
-				_ = createdOrders
-
-			} else if s.QuantityOrAmount.Amount.Sign() > 0 {
-
+			} else {
+				// error: either quantity, amount, baseInvestment is not set.
 			}
 		}
 	}
