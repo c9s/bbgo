@@ -79,7 +79,7 @@ func LoadConfig(yamlConfigFileName string) (*Config, error) {
 	switch objective := strings.ToLower(optConfig.Objective); objective {
 	case "", "default":
 		optConfig.Objective = HpOptimizerObjectiveEquity
-	case HpOptimizerObjectiveEquity, HpOptimizerObjectiveProfit, HpOptimizerObjectiveVolume:
+	case HpOptimizerObjectiveEquity, HpOptimizerObjectiveProfit, HpOptimizerObjectiveVolume, HpOptimizerObjectiveProfitFactor:
 		optConfig.Objective = objective
 	default:
 		return nil, fmt.Errorf(`unknown objective "%s"`, optConfig.Objective)

@@ -81,6 +81,8 @@ type SessionSymbolReport struct {
 	Manifests       Manifests                 `json:"manifests,omitempty"`
 	Sharpe          fixedpoint.Value          `json:"sharpeRatio"`
 	Sortino         fixedpoint.Value          `json:"sortinoRatio"`
+	ProfitFactor    fixedpoint.Value          `json:"profitFactor"`
+	WinningRatio    fixedpoint.Value          `json:"winningRatio"`
 }
 
 func (r *SessionSymbolReport) InitialEquityValue() fixedpoint.Value {
