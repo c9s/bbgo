@@ -4,17 +4,18 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
-	"github.com/c9s/bbgo/pkg/data/tsv"
-	"github.com/c9s/bbgo/pkg/util"
-	"github.com/fatih/color"
-	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/data/tsv"
+	"github.com/c9s/bbgo/pkg/util"
+	"github.com/fatih/color"
+	"github.com/google/uuid"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -523,8 +524,11 @@ var BacktestCmd = &cobra.Command{
 
 		for _, session := range environ.Sessions() {
 			for symbol, trades := range session.Trades {
-				intervalProfits := sessionTradeStats[session.Name][symbol].IntervalProfits[types.Interval1d]
-				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Trades, intervalProfits)
+				tradeState := sessionTradeStats[session.Name][symbol]
+				profitFactor := tradeState.ProfitFactor
+				winningRatio := tradeState.WinningRatio
+				intervalProfits := tradeState.IntervalProfits[types.Interval1d]
+				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Trades, intervalProfits, profitFactor, winningRatio)
 				if err != nil {
 					return err
 				}
@@ -615,7 +619,8 @@ func collectSubscriptionIntervals(environ *bbgo.Environment) (allKLineIntervals 
 	return allKLineIntervals, requiredInterval, backTestIntervals
 }
 
-func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, symbol string, trades []types.Trade, intervalProfit *types.IntervalProfitCollector) (
+func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, symbol string, trades []types.Trade, intervalProfit *types.IntervalProfitCollector,
+	profitFactor, winningRatio fixedpoint.Value) (
 	*backtest.SessionSymbolReport,
 	error,
 ) {
@@ -661,8 +666,10 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 		InitialBalances: initBalances,
 		FinalBalances:   finalBalances,
 		// Manifests:       manifests,
-		Sharpe:  sharpeRatio,
-		Sortino: sortinoRatio,
+		Sharpe:       sharpeRatio,
+		Sortino:      sortinoRatio,
+		ProfitFactor: profitFactor,
+		WinningRatio: winningRatio,
 	}
 
 	for _, s := range session.Subscriptions {
