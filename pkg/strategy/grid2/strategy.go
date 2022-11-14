@@ -27,6 +27,13 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+type GridProfitStats struct {
+	TotalProfit    fixedpoint.Value `json:"totalProfit"`
+	FloatProfit    fixedpoint.Value `json:"floatProfit"`
+	GridProfit     fixedpoint.Value `json:"gridProfit"`
+	ArbitrageCount int              `json:"arbitrageCount"`
+}
+
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -169,15 +176,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
+func (s *Strategy) calculateRequiredInvestment(baseInvestment, quoteInvestment, totalBaseBalance, totalQuoteBalance fixedpoint.Value) {
+
+}
+
 func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
 	lastPrice, err := s.getLastTradePrice(ctx, session)
 	if err != nil {
 		return errors.Wrap(err, "failed to get the last trade price")
 	}
-
-	// shift 1 grid because we will start from the buy order
-	// if the buy order is filled, then we will submit another sell order at the higher grid.
-	quantityOrAmountIsSet := s.QuantityOrAmount.IsSet()
 
 	// check if base and quote are enough
 	baseBalance, ok := session.Account.Balance(s.Market.BaseCurrency)
@@ -192,7 +199,11 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 
 	totalBase := baseBalance.Available
 	totalQuote := quoteBalance.Available
+	s.calculateRequiredInvestment(s.BaseInvestment, s.QuoteInvestment, totalBase, totalQuote)
 
+	// shift 1 grid because we will start from the buy order
+	// if the buy order is filled, then we will submit another sell order at the higher grid.
+	quantityOrAmountIsSet := s.QuantityOrAmount.IsSet()
 	if quantityOrAmountIsSet {
 		requiredBase := fixedpoint.Zero
 		requiredQuote := fixedpoint.Zero
@@ -201,7 +212,8 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 			price := fixedpoint.Value(pin)
 
 			if price.Compare(lastPrice) >= 0 {
-				// sell orders
+				// for orders that sell
+				// if we still have the base balance
 				if requiredBase.Compare(totalBase) < 0 {
 					if q := s.QuantityOrAmount.Quantity; !q.IsZero() {
 						requiredBase = requiredBase.Add(s.QuantityOrAmount.Quantity)
@@ -220,7 +232,7 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 					}
 				}
 			} else {
-				// buy orders
+				// for orders that buy
 				if q := s.QuantityOrAmount.Quantity; !q.IsZero() {
 					requiredQuote = requiredQuote.Add(q.Mul(price))
 				} else if amount := s.QuantityOrAmount.Amount; !amount.IsZero() {
