@@ -18,8 +18,6 @@ const ID = "grid2"
 
 var log = logrus.WithField("strategy", ID)
 
-var notionalModifier = fixedpoint.NewFromFloat(1.0001)
-
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
