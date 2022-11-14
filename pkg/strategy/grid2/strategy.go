@@ -32,6 +32,8 @@ type GridProfitStats struct {
 	FloatProfit    fixedpoint.Value `json:"floatProfit"`
 	GridProfit     fixedpoint.Value `json:"gridProfit"`
 	ArbitrageCount int              `json:"arbitrageCount"`
+	TotalFee       fixedpoint.Value `json:"totalFee"`
+	Volume         fixedpoint.Value `json:"volume"`
 }
 
 type Strategy struct {
