@@ -176,8 +176,42 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
-func (s *Strategy) calculateRequiredInvestment(baseInvestment, quoteInvestment, totalBaseBalance, totalQuoteBalance fixedpoint.Value) {
+func (s *Strategy) checkRequiredInvestmentByQuantity(baseInvestment, quoteInvestment, totalBaseBalance, totalQuoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin) error {
+	requiredBase := fixedpoint.Zero
+	requiredQuote := fixedpoint.Zero
+	for i := len(s.grid.Pins) - 1; i >= 0; i++ {
+		pin := s.grid.Pins[i]
+		price := fixedpoint.Value(pin)
 
+		// TODO: add fee if we don't have the platform token. BNB, OKEX or MAX...
+		if price.Compare(lastPrice) >= 0 {
+			// for orders that sell
+			// if we still have the base balance
+			if requiredBase.Compare(totalBaseBalance) < 0 {
+				requiredBase = requiredBase.Add(quantity)
+			} else if i > 0 {
+				// convert buy quote to requiredQuote
+				nextLowerPin := s.grid.Pins[i-1]
+				nextLowerPrice := fixedpoint.Value(nextLowerPin)
+				requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
+
+			}
+		} else {
+			requiredQuote = requiredQuote.Add(quantity.Mul(price))
+		}
+	}
+
+	if requiredBase.Compare(totalBaseBalance) < 0 && requiredQuote.Compare(totalQuoteBalance) < 0 {
+		return fmt.Errorf("both base balance (%f %s) and quote balance (%f %s) are not enought",
+			totalBaseBalance.Float64(), s.Market.BaseCurrency,
+			totalQuoteBalance.Float64(), s.Market.QuoteCurrency)
+	}
+
+	if requiredBase.Compare(totalBaseBalance) < 0 {
+		// see if we can convert some quotes to base
+	}
+
+	return nil
 }
 
 func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
@@ -199,56 +233,16 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 
 	totalBase := baseBalance.Available
 	totalQuote := quoteBalance.Available
-	s.calculateRequiredInvestment(s.BaseInvestment, s.QuoteInvestment, totalBase, totalQuote)
 
 	// shift 1 grid because we will start from the buy order
 	// if the buy order is filled, then we will submit another sell order at the higher grid.
 	quantityOrAmountIsSet := s.QuantityOrAmount.IsSet()
 	if quantityOrAmountIsSet {
-		requiredBase := fixedpoint.Zero
-		requiredQuote := fixedpoint.Zero
-		for i := len(s.grid.Pins) - 1; i >= 0; i++ {
-			pin := s.grid.Pins[i]
-			price := fixedpoint.Value(pin)
-
-			if price.Compare(lastPrice) >= 0 {
-				// for orders that sell
-				// if we still have the base balance
-				if requiredBase.Compare(totalBase) < 0 {
-					if q := s.QuantityOrAmount.Quantity; !q.IsZero() {
-						requiredBase = requiredBase.Add(s.QuantityOrAmount.Quantity)
-					} else if amount := s.QuantityOrAmount.Amount; !amount.IsZero() {
-						qq := s.QuantityOrAmount.CalculateQuantity(price)
-						requiredBase = requiredBase.Add(qq)
-					}
-				} else if i > 0 {
-					// convert buy quote to requiredQuote
-					nextLowerPin := s.grid.Pins[i-1]
-					nextLowerPrice := fixedpoint.Value(nextLowerPin)
-					if q := s.QuantityOrAmount.Quantity; !q.IsZero() {
-						requiredQuote = requiredQuote.Add(q.Mul(nextLowerPrice))
-					} else if amount := s.QuantityOrAmount.Amount; !amount.IsZero() {
-						requiredQuote = requiredQuote.Add(amount)
-					}
-				}
-			} else {
-				// for orders that buy
-				if q := s.QuantityOrAmount.Quantity; !q.IsZero() {
-					requiredQuote = requiredQuote.Add(q.Mul(price))
-				} else if amount := s.QuantityOrAmount.Amount; !amount.IsZero() {
-					requiredQuote = requiredQuote.Add(amount)
-				}
-			}
-		}
-
-		if requiredBase.Compare(totalBase) < 0 && requiredQuote.Compare(totalQuote) < 0 {
-			return fmt.Errorf("both base balance (%f %s) and quote balance (%f %s) are not enought",
-				totalBase.Float64(), s.Market.BaseCurrency,
-				totalQuote.Float64(), s.Market.QuoteCurrency)
-		}
-
-		if requiredBase.Compare(totalBase) < 0 {
-			// see if we can convert some quotes to base
+		if err2 := s.checkRequiredInvestmentByQuantity(
+			s.BaseInvestment, s.QuoteInvestment,
+			totalBase, totalQuote,
+			lastPrice, s.QuantityOrAmount.Quantity, s.grid.Pins); err != nil {
+			return err2
 		}
 	}
 
