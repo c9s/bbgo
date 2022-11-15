@@ -176,38 +176,54 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
-func (s *Strategy) checkRequiredInvestmentByQuantity(baseInvestment, quoteInvestment, totalBaseBalance, totalQuoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin) error {
+type InvestmentBudget struct {
+	baseInvestment  fixedpoint.Value
+	quoteInvestment fixedpoint.Value
+	baseBalance     fixedpoint.Value
+	quoteBalance    fixedpoint.Value
+}
+
+func (s *Strategy) checkRequiredInvestmentByQuantity(baseInvestment, quoteInvestment, baseBalance, quoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin) error {
+	if baseInvestment.Compare(baseBalance) > 0 {
+		return fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", baseInvestment.Float64(), baseBalance.Float64())
+	}
+
+	if quoteInvestment.Compare(quoteBalance) > 0 {
+		return fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", quoteInvestment.Float64(), quoteBalance.Float64())
+	}
+
+	// check more investment budget details
 	requiredBase := fixedpoint.Zero
 	requiredQuote := fixedpoint.Zero
-	for i := len(s.grid.Pins) - 1; i >= 0; i++ {
-		pin := s.grid.Pins[i]
+	for i := len(pins) - 1; i >= 0; i++ {
+		pin := pins[i]
 		price := fixedpoint.Value(pin)
 
-		// TODO: add fee if we don't have the platform token. BNB, OKEX or MAX...
+		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
 		if price.Compare(lastPrice) >= 0 {
 			// for orders that sell
 			// if we still have the base balance
-			if requiredBase.Compare(totalBaseBalance) < 0 {
+			if requiredBase.Compare(baseBalance) < 0 {
 				requiredBase = requiredBase.Add(quantity)
-			} else if i > 0 {
-				// convert buy quote to requiredQuote
+			} else if i > 0 { // we do not want to sell at i == 0
+				// convert sell to buy quote and add to requiredQuote
 				nextLowerPin := s.grid.Pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
-
 			}
 		} else {
+			// for orders that buy
 			requiredQuote = requiredQuote.Add(quantity.Mul(price))
 		}
 	}
 
-	if requiredBase.Compare(totalBaseBalance) < 0 && requiredQuote.Compare(totalQuoteBalance) < 0 {
+	if requiredBase.Compare(baseBalance) > 0 && requiredQuote.Compare(quoteBalance) > 0 {
 		return fmt.Errorf("both base balance (%f %s) and quote balance (%f %s) are not enought",
-			totalBaseBalance.Float64(), s.Market.BaseCurrency,
-			totalQuoteBalance.Float64(), s.Market.QuoteCurrency)
+			baseBalance.Float64(), s.Market.BaseCurrency,
+			quoteBalance.Float64(), s.Market.QuoteCurrency)
 	}
 
-	if requiredBase.Compare(totalBaseBalance) < 0 {
+	if requiredBase.Compare(baseBalance) < 0 {
 		// see if we can convert some quotes to base
 	}
 
