@@ -249,6 +249,73 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseInvestment, quoteInvest
 	return requiredBase, requiredQuote, nil
 }
 
+func (s *Strategy) checkRequiredInvestmentByAmount(baseInvestment, quoteInvestment, baseBalance, quoteBalance, amount, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
+	if baseInvestment.Compare(baseBalance) > 0 {
+		return fixedpoint.Zero, fixedpoint.Zero, fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", baseInvestment.Float64(), baseBalance.Float64())
+	}
+
+	if quoteInvestment.Compare(quoteBalance) > 0 {
+		return fixedpoint.Zero, fixedpoint.Zero, fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", quoteInvestment.Float64(), quoteBalance.Float64())
+	}
+
+	// check more investment budget details
+	requiredBase = fixedpoint.Zero
+	requiredQuote = fixedpoint.Zero
+
+	// when we need to place a buy-to-sell conversion order, we need to mark the price
+	buyPlacedPrice := fixedpoint.Zero
+	for i := len(pins) - 1; i >= 0; i-- {
+		pin := pins[i]
+		price := fixedpoint.Value(pin)
+
+		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
+		if price.Compare(lastPrice) >= 0 {
+			// for orders that sell
+			// if we still have the base balance
+			quantity := amount.Div(lastPrice)
+			if requiredBase.Add(quantity).Compare(baseBalance) <= 0 {
+				requiredBase = requiredBase.Add(quantity)
+			} else if i > 0 { // we do not want to sell at i == 0
+				// convert sell to buy quote and add to requiredQuote
+				nextLowerPin := pins[i-1]
+				nextLowerPrice := fixedpoint.Value(nextLowerPin)
+				requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
+				buyPlacedPrice = nextLowerPrice
+			}
+		} else {
+			// for orders that buy
+			if price.Compare(buyPlacedPrice) == 0 {
+				continue
+			}
+			requiredQuote = requiredQuote.Add(amount)
+		}
+	}
+
+	if requiredBase.Compare(baseBalance) > 0 && requiredQuote.Compare(quoteBalance) > 0 {
+		return requiredBase, requiredQuote, fmt.Errorf("both base balance (%f %s) or quote balance (%f %s) is not enough, required = base %f + quote %f",
+			baseBalance.Float64(), s.Market.BaseCurrency,
+			quoteBalance.Float64(), s.Market.QuoteCurrency,
+			requiredBase.Float64(),
+			requiredQuote.Float64())
+	}
+
+	if requiredBase.Compare(baseBalance) > 0 {
+		return requiredBase, requiredQuote, fmt.Errorf("base balance (%f %s), required = base %f",
+			baseBalance.Float64(), s.Market.BaseCurrency,
+			requiredBase.Float64(),
+		)
+	}
+
+	if requiredQuote.Compare(quoteBalance) > 0 {
+		return requiredBase, requiredQuote, fmt.Errorf("quote balance (%f %s) is not enough, required = quote %f",
+			quoteBalance.Float64(), s.Market.QuoteCurrency,
+			requiredQuote.Float64(),
+		)
+	}
+
+	return requiredBase, requiredQuote, nil
+}
+
 func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
 	lastPrice, err := s.getLastTradePrice(ctx, session)
 	if err != nil {

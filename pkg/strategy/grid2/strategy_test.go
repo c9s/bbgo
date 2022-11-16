@@ -61,5 +61,29 @@ func TestStrategy_checkRequiredInvestmentByQuantity(t *testing.T) {
 		assert.EqualError(t, err, "quote balance (5000.000000 USDT) is not enough, required = quote 6000.000000")
 		assert.Equal(t, number(6000.0), requiredQuote)
 	})
+}
 
+func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
+	s := &Strategy{
+		Market: types.Market{
+			BaseCurrency:  "BTC",
+			QuoteCurrency: "USDT",
+		},
+	}
+
+	t.Run("quote to base balance conversion", func(t *testing.T) {
+		_, requiredQuote, err := s.checkRequiredInvestmentByAmount(number(0.0), number(3_000.0),
+			number(0.0), number(3_000.0),
+			number(1000.0),
+			number(13_500.0), []Pin{
+				Pin(number(10_000.0)),
+				Pin(number(11_000.0)),
+				Pin(number(12_000.0)),
+				Pin(number(13_000.0)),
+				Pin(number(14_000.0)),
+				Pin(number(15_000.0)),
+			})
+		assert.EqualError(t, err, "quote balance (3000.000000 USDT) is not enough, required = quote 4999.999890")
+		assert.Equal(t, number(4999.99989), requiredQuote)
+	})
 }
