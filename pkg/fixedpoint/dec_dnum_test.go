@@ -3,14 +3,21 @@
 package fixedpoint
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDelta(t *testing.T) {
 	f1 := MustNewFromString("0.0009763593380614657")
 	f2 := NewFromInt(42300)
 	assert.InDelta(t, f1.Mul(f2).Float64(), 41.3, 1e-14)
+}
+
+func TestFloor(t *testing.T) {
+	f1 := MustNewFromString("10.333333")
+	f2 := f1.Floor()
+	assert.Equal(t, "10", f2.String())
 }
 
 func TestInternal(t *testing.T) {
