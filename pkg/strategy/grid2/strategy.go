@@ -225,9 +225,25 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseInvestment, quoteInvest
 	}
 
 	if requiredBase.Compare(baseBalance) > 0 && requiredQuote.Compare(quoteBalance) > 0 {
-		return requiredBase, requiredQuote, fmt.Errorf("both base balance (%f %s) and quote balance (%f %s) are not enough",
+		return requiredBase, requiredQuote, fmt.Errorf("both base balance (%f %s) or quote balance (%f %s) is not enough, required = base %f + quote %f",
 			baseBalance.Float64(), s.Market.BaseCurrency,
-			quoteBalance.Float64(), s.Market.QuoteCurrency)
+			quoteBalance.Float64(), s.Market.QuoteCurrency,
+			requiredBase.Float64(),
+			requiredQuote.Float64())
+	}
+
+	if requiredBase.Compare(baseBalance) > 0 {
+		return requiredBase, requiredQuote, fmt.Errorf("base balance (%f %s), required = base %f",
+			baseBalance.Float64(), s.Market.BaseCurrency,
+			requiredBase.Float64(),
+		)
+	}
+
+	if requiredQuote.Compare(quoteBalance) > 0 {
+		return requiredBase, requiredQuote, fmt.Errorf("quote balance (%f %s) is not enough, required = quote %f",
+			quoteBalance.Float64(), s.Market.QuoteCurrency,
+			requiredQuote.Float64(),
+		)
 	}
 
 	return requiredBase, requiredQuote, nil
