@@ -250,13 +250,6 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseInvestment, quoteInvest
 }
 
 func (s *Strategy) checkRequiredInvestmentByAmount(baseInvestment, quoteInvestment, baseBalance, quoteBalance, amount, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
-	if baseInvestment.Compare(baseBalance) > 0 {
-		return fixedpoint.Zero, fixedpoint.Zero, fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", baseInvestment.Float64(), baseBalance.Float64())
-	}
-
-	if quoteInvestment.Compare(quoteBalance) > 0 {
-		return fixedpoint.Zero, fixedpoint.Zero, fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", quoteInvestment.Float64(), quoteBalance.Float64())
-	}
 
 	// check more investment budget details
 	requiredBase = fixedpoint.Zero
@@ -335,6 +328,15 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 
 	totalBase := baseBalance.Available
 	totalQuote := quoteBalance.Available
+
+	if !s.BaseInvestment.IsZero() && !s.QuoteInvestment.IsZero() {
+		if s.BaseInvestment.Compare(totalBase) > 0 {
+			return fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", s.BaseInvestment.Float64(), totalBase.Float64())
+		}
+		if s.QuoteInvestment.Compare(totalQuote) > 0 {
+			return fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", s.QuoteInvestment.Float64(), totalQuote.Float64())
+		}
+	}
 
 	// shift 1 grid because we will start from the buy order
 	// if the buy order is filled, then we will submit another sell order at the higher grid.
