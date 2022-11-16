@@ -183,19 +183,22 @@ type InvestmentBudget struct {
 	quoteBalance    fixedpoint.Value
 }
 
-func (s *Strategy) checkRequiredInvestmentByQuantity(baseInvestment, quoteInvestment, baseBalance, quoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin) error {
+func (s *Strategy) checkRequiredInvestmentByQuantity(baseInvestment, quoteInvestment, baseBalance, quoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
 	if baseInvestment.Compare(baseBalance) > 0 {
-		return fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", baseInvestment.Float64(), baseBalance.Float64())
+		return fixedpoint.Zero, fixedpoint.Zero, fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", baseInvestment.Float64(), baseBalance.Float64())
 	}
 
 	if quoteInvestment.Compare(quoteBalance) > 0 {
-		return fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", quoteInvestment.Float64(), quoteBalance.Float64())
+		return fixedpoint.Zero, fixedpoint.Zero, fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", quoteInvestment.Float64(), quoteBalance.Float64())
 	}
 
 	// check more investment budget details
-	requiredBase := fixedpoint.Zero
-	requiredQuote := fixedpoint.Zero
-	for i := len(pins) - 1; i >= 0; i++ {
+	requiredBase = fixedpoint.Zero
+	requiredQuote = fixedpoint.Zero
+
+	// when we need to place a buy-to-sell conversion order, we need to mark the price
+	buyPlacedPrice := fixedpoint.Zero
+	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
 
@@ -203,31 +206,31 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseInvestment, quoteInvest
 		if price.Compare(lastPrice) >= 0 {
 			// for orders that sell
 			// if we still have the base balance
-			if requiredBase.Compare(baseBalance) < 0 {
+			if requiredBase.Add(quantity).Compare(baseBalance) <= 0 {
 				requiredBase = requiredBase.Add(quantity)
 			} else if i > 0 { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
-				nextLowerPin := s.grid.Pins[i-1]
+				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
+				buyPlacedPrice = nextLowerPrice
 			}
 		} else {
 			// for orders that buy
+			if price.Compare(buyPlacedPrice) == 0 {
+				continue
+			}
 			requiredQuote = requiredQuote.Add(quantity.Mul(price))
 		}
 	}
 
 	if requiredBase.Compare(baseBalance) > 0 && requiredQuote.Compare(quoteBalance) > 0 {
-		return fmt.Errorf("both base balance (%f %s) and quote balance (%f %s) are not enought",
+		return requiredBase, requiredQuote, fmt.Errorf("both base balance (%f %s) and quote balance (%f %s) are not enough",
 			baseBalance.Float64(), s.Market.BaseCurrency,
 			quoteBalance.Float64(), s.Market.QuoteCurrency)
 	}
 
-	if requiredBase.Compare(baseBalance) < 0 {
-		// see if we can convert some quotes to base
-	}
-
-	return nil
+	return requiredBase, requiredQuote, nil
 }
 
 func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
@@ -254,7 +257,7 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 	// if the buy order is filled, then we will submit another sell order at the higher grid.
 	quantityOrAmountIsSet := s.QuantityOrAmount.IsSet()
 	if quantityOrAmountIsSet {
-		if err2 := s.checkRequiredInvestmentByQuantity(
+		if _, _, err2 := s.checkRequiredInvestmentByQuantity(
 			s.BaseInvestment, s.QuoteInvestment,
 			totalBase, totalQuote,
 			lastPrice, s.QuantityOrAmount.Quantity, s.grid.Pins); err != nil {
