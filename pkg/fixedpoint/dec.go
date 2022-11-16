@@ -131,7 +131,7 @@ func NewFromInt(n int64) Value {
 	if n == 0 {
 		return Zero
 	}
-	//n0 := n
+	// n0 := n
 	sign := int8(signPos)
 	if n < 0 {
 		n = -n
@@ -527,7 +527,7 @@ func NewFromString(s string) (Value, error) {
 		coef *= pow10[p]
 		exp -= p
 	}
-	//check(coefMin <= coef && coef <= coefMax)
+	// check(coefMin <= coef && coef <= coefMax)
 	return Value{coef, sign, exp}, nil
 }
 
@@ -577,7 +577,7 @@ func NewFromBytes(s []byte) (Value, error) {
 		coef *= pow10[p]
 		exp -= p
 	}
-	//check(coefMin <= coef && coef <= coefMax)
+	// check(coefMin <= coef && coef <= coefMax)
 	return Value{coef, sign, exp}, nil
 }
 
@@ -958,6 +958,10 @@ func (dn Value) integer(mode RoundingMode) Value {
 	return Value{i, dn.sign, dn.exp}
 }
 
+func (dn Value) Floor() Value {
+	return dn.Round(0, Down)
+}
+
 func (dn Value) Round(r int, mode RoundingMode) Value {
 	if dn.sign == 0 || dn.sign == signNegInf || dn.sign == signPosInf ||
 		r >= digitsMax {
@@ -1171,9 +1175,9 @@ func align(x, y *Value) bool {
 		return false
 	}
 	yshift = e
-	//check(0 <= yshift && yshift <= 20)
+	// check(0 <= yshift && yshift <= 20)
 	y.coef = (y.coef + halfpow10[yshift]) / pow10[yshift]
-	//check(int(y.exp)+yshift == int(x.exp))
+	// check(int(y.exp)+yshift == int(x.exp))
 	return true
 }
 
@@ -1278,7 +1282,7 @@ func (dn Value) Format(mask string) string {
 	nd := len(digits)
 
 	di := e - before
-	//check(di <= 0)
+	// check(di <= 0)
 	var buf strings.Builder
 	sign := n.Sign()
 	signok := (sign >= 0)
