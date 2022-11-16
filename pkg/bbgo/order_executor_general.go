@@ -38,7 +38,8 @@ type GeneralOrderExecutor struct {
 
 	marginBaseMaxBorrowable, marginQuoteMaxBorrowable fixedpoint.Value
 
-	closing int64
+	disableNotify bool
+	closing       int64
 }
 
 func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strategyInstanceID string, position *types.Position) *GeneralOrderExecutor {
@@ -64,6 +65,10 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 	}
 
 	return executor
+}
+
+func (e *GeneralOrderExecutor) DisableNotify() {
+	e.disableNotify = true
 }
 
 func (e *GeneralOrderExecutor) startMarginAssetUpdater(ctx context.Context) {
@@ -110,6 +115,10 @@ func (e *GeneralOrderExecutor) marginAssetMaxBorrowableUpdater(ctx context.Conte
 	}
 }
 
+func (e *GeneralOrderExecutor) OrderStore() *OrderStore {
+	return e.orderStore
+}
+
 func (e *GeneralOrderExecutor) ActiveMakerOrders() *ActiveOrderBook {
 	return e.activeMakerOrders
 }
@@ -144,11 +153,11 @@ func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats) {
 	})
 }
 
-func (e *GeneralOrderExecutor) Bind(notify ...bool) {
+func (e *GeneralOrderExecutor) Bind() {
 	e.activeMakerOrders.BindStream(e.session.UserDataStream)
 	e.orderStore.BindStream(e.session.UserDataStream)
 
-	if len(notify) > 0 && notify[0] {
+	if !e.disableNotify {
 		// trade notify
 		e.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 			Notify(trade)

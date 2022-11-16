@@ -26,14 +26,14 @@ const RestBaseURL = "https://api.binance.com"
 const SandboxRestBaseURL = "https://testnet.binance.vision"
 const DebugRequestResponse = false
 
-var Dialer = &net.Dialer{
+var dialer = &net.Dialer{
 	Timeout:   30 * time.Second,
 	KeepAlive: 30 * time.Second,
 }
 
-var DefaultTransport = &http.Transport{
+var defaultTransport = &http.Transport{
 	Proxy:               http.ProxyFromEnvironment,
-	DialContext:         Dialer.DialContext,
+	DialContext:         dialer.DialContext,
 	MaxIdleConns:        100,
 	MaxConnsPerHost:     100,
 	MaxIdleConnsPerHost: 100,
@@ -45,7 +45,7 @@ var DefaultTransport = &http.Transport{
 
 var DefaultHttpClient = &http.Client{
 	Timeout:   defaultHTTPTimeout,
-	Transport: DefaultTransport,
+	Transport: defaultTransport,
 }
 
 type RestClient struct {
