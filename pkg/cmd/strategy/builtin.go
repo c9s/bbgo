@@ -20,6 +20,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/harmonic"
 	_ "github.com/c9s/bbgo/pkg/strategy/irr"
 	_ "github.com/c9s/bbgo/pkg/strategy/kline"
+	_ "github.com/c9s/bbgo/pkg/strategy/linregmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/marketcap"
 	_ "github.com/c9s/bbgo/pkg/strategy/pivotshort"
 	_ "github.com/c9s/bbgo/pkg/strategy/pricealert"
