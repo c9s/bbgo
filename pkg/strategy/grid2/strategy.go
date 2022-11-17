@@ -183,15 +183,7 @@ type InvestmentBudget struct {
 	quoteBalance    fixedpoint.Value
 }
 
-func (s *Strategy) checkRequiredInvestmentByQuantity(baseInvestment, quoteInvestment, baseBalance, quoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
-	if baseInvestment.Compare(baseBalance) > 0 {
-		return fixedpoint.Zero, fixedpoint.Zero, fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", baseInvestment.Float64(), baseBalance.Float64())
-	}
-
-	if quoteInvestment.Compare(quoteBalance) > 0 {
-		return fixedpoint.Zero, fixedpoint.Zero, fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", quoteInvestment.Float64(), quoteBalance.Float64())
-	}
-
+func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
 	// check more investment budget details
 	requiredBase = fixedpoint.Zero
 	requiredQuote = fixedpoint.Zero
@@ -249,7 +241,7 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseInvestment, quoteInvest
 	return requiredBase, requiredQuote, nil
 }
 
-func (s *Strategy) checkRequiredInvestmentByAmount(baseInvestment, quoteInvestment, baseBalance, quoteBalance, amount, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
+func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, amount, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
 
 	// check more investment budget details
 	requiredBase = fixedpoint.Zero
@@ -340,13 +332,16 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 
 	// shift 1 grid because we will start from the buy order
 	// if the buy order is filled, then we will submit another sell order at the higher grid.
-	quantityOrAmountIsSet := s.QuantityOrAmount.IsSet()
-	if quantityOrAmountIsSet {
-		if _, _, err2 := s.checkRequiredInvestmentByQuantity(
-			s.BaseInvestment, s.QuoteInvestment,
-			totalBase, totalQuote,
-			lastPrice, s.QuantityOrAmount.Quantity, s.grid.Pins); err != nil {
-			return err2
+	if s.QuantityOrAmount.IsSet() {
+		if quantity := s.QuantityOrAmount.Quantity; !quantity.IsZero() {
+			if _, _, err2 := s.checkRequiredInvestmentByQuantity(totalBase, totalQuote, lastPrice, s.QuantityOrAmount.Quantity, s.grid.Pins); err != nil {
+				return err2
+			}
+		}
+		if amount := s.QuantityOrAmount.Amount; !amount.IsZero() {
+			if _, _, err2 := s.checkRequiredInvestmentByAmount(totalBase, totalQuote, lastPrice, amount, s.grid.Pins); err != nil {
+				return err2
+			}
 		}
 	}
 
