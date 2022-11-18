@@ -49,7 +49,7 @@ type DynamicExposureBollBand struct {
 	dynamicExposureBollBand *indicator.BOLL
 }
 
-// Initialize DynamicExposureBollBand
+// initialize dynamic exposure with Bollinger Band
 func (d *DynamicExposureBollBand) initialize(symbol string, session *bbgo.ExchangeSession) {
 	d.dynamicExposureBollBand = d.StandardIndicatorSet.BOLL(d.IntervalWindow, d.BandWidth)
 

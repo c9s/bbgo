@@ -48,8 +48,6 @@ type Strategy struct {
 
 	types.IntervalWindow
 
-	bbgo.QuantityOrAmount
-
 	// ReverseEMA is used to determine the long-term trend.
 	// Above the ReverseEMA is the long trend and vise versa.
 	// All the opposite trend position will be closed upon the trend change
@@ -109,14 +107,20 @@ type Strategy struct {
 	DynamicSpread dynamicmetric.DynamicSpread `json:"dynamicSpread,omitempty"`
 
 	// MaxExposurePosition is the maximum position you can hold
-	// +10 means you can hold 10 ETH long position by maximum
-	// -10 means you can hold -10 ETH short position by maximum
+	// 10 means you can hold 10 ETH long/short position by maximum
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
 	// DynamicExposure is used to define the exposure position range with the given percentage.
-	// When DynamicExposure is set, your MaxExposurePosition will be calculated dynamically according to the bollinger
-	// band you set.
+	// When DynamicExposure is set, your MaxExposurePosition will be calculated dynamically
 	DynamicExposure dynamicmetric.DynamicExposure `json:"dynamicExposure"`
+
+	bbgo.QuantityOrAmount
+
+	// DynamicQuantityIncrease calculates the increase position order quantity dynamically
+	DynamicQuantityIncrease dynamicmetric.DynamicQuantitySet `json:"dynamicQuantityIncrease"`
+
+	// DynamicQuantityDecrease calculates the decrease position order quantity dynamically
+	DynamicQuantityDecrease dynamicmetric.DynamicQuantitySet `json:"dynamicQuantityDecrease"`
 
 	session *bbgo.ExchangeSession
 
@@ -197,6 +201,14 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	if s.DynamicExposure.IsEnabled() {
 		s.DynamicExposure.Initialize(s.Symbol, session)
 	}
+
+	// Setup dynamic quantities
+	if len(s.DynamicQuantityIncrease) > 0 {
+		s.DynamicQuantityIncrease.Initialize(s.Symbol, session)
+	}
+	if len(s.DynamicQuantityDecrease) > 0 {
+		s.DynamicQuantityDecrease.Initialize(s.Symbol, session)
+	}
 }
 
 func (s *Strategy) Validate() error {
@@ -266,10 +278,42 @@ func (s *Strategy) getOrderPrices(midPrice fixedpoint.Value) (askPrice fixedpoin
 
 // getOrderQuantities returns sell and buy qty
 func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedpoint.Value) (sellQuantity fixedpoint.Value, buyQuantity fixedpoint.Value) {
-	// TODO: dynamic qty to determine qty
 	// TODO: spot, margin, and futures
-	sellQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
-	buyQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
+
+	// Dynamic qty
+	switch {
+	case s.mainTrendCurrent == types.DirectionUp:
+		var err error
+		if len(s.DynamicQuantityIncrease) > 0 {
+			buyQuantity, err = s.DynamicQuantityIncrease.GetQuantity()
+			if err != nil {
+				buyQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
+			}
+		}
+		if len(s.DynamicQuantityDecrease) > 0 {
+			sellQuantity, err = s.DynamicQuantityDecrease.GetQuantity()
+			if err != nil {
+				sellQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
+			}
+		}
+	case s.mainTrendCurrent == types.DirectionDown:
+		var err error
+		if len(s.DynamicQuantityIncrease) > 0 {
+			sellQuantity, err = s.DynamicQuantityIncrease.GetQuantity()
+			if err != nil {
+				sellQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
+			}
+		}
+		if len(s.DynamicQuantityDecrease) > 0 {
+			buyQuantity, err = s.DynamicQuantityDecrease.GetQuantity()
+			if err != nil {
+				buyQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
+			}
+		}
+	default:
+		sellQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
+		buyQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
+	}
 
 	// Faster position decrease
 	if s.mainTrendCurrent == types.DirectionUp && s.FastLinReg.Last() < 0 && s.SlowLinReg.Last() < 0 {
