@@ -70,6 +70,14 @@ type Strategy struct {
 	// allowed.
 	SlowLinReg *indicator.LinReg `json:"slowLinReg,omitempty"`
 
+	// AllowOppositePosition if true, the creation of opposite position is allowed when both fast and slow LinReg are in
+	// the opposite direction to main trend
+	AllowOppositePosition bool `json:"allowOppositePosition"`
+
+	// FasterDecreaseRatio the quantity of decreasing position orders are multiplied by this ratio when both fast and
+	// slow LinReg are in the opposite direction to main trend
+	FasterDecreaseRatio fixedpoint.Value `json:"FasterDecreaseRatio,omitempty"`
+
 	// NeutralBollinger is the smaller range of the bollinger band
 	// If price is in this band, it usually means the price is oscillating.
 	// If price goes out of this band, we tend to not place sell orders or buy orders
@@ -259,8 +267,17 @@ func (s *Strategy) getOrderPrices(midPrice fixedpoint.Value) (askPrice fixedpoin
 // getOrderQuantities returns sell and buy qty
 func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedpoint.Value) (sellQuantity fixedpoint.Value, buyQuantity fixedpoint.Value) {
 	// TODO: dynamic qty to determine qty
+	// TODO: spot, margin, and futures
 	sellQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
 	buyQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
+
+	// Faster position decrease
+	if s.mainTrendCurrent == types.DirectionUp && s.FastLinReg.Last() < 0 && s.SlowLinReg.Last() < 0 {
+		sellQuantity = sellQuantity * s.FasterDecreaseRatio
+	} else if s.mainTrendCurrent == types.DirectionDown && s.FastLinReg.Last() > 0 && s.SlowLinReg.Last() > 0 {
+		buyQuantity = buyQuantity * s.FasterDecreaseRatio
+	}
+
 	log.Infof("sell qty:%v buy qty: %v", sellQuantity, buyQuantity)
 
 	return sellQuantity, buyQuantity
@@ -291,6 +308,15 @@ func (s *Strategy) getCanBuySell(midPrice fixedpoint.Value) (canBuy bool, canSel
 		if midPrice.Float64() < s.neutralBoll.DownBand.Last() {
 			canSell = false
 			log.Infof("tradeInBand is set, skip sell when the price is lower than the neutralBB")
+		}
+	}
+
+	// Stop decrease when position closed unless both LinRegs are in the opposite direction to the main trend
+	if s.Position.IsClosed() || s.Position.IsDust(midPrice) {
+		if s.mainTrendCurrent == types.DirectionUp && !(s.AllowOppositePosition && s.FastLinReg.Last() < 0 && s.SlowLinReg.Last() < 0) {
+			canSell = false
+		} else if s.mainTrendCurrent == types.DirectionDown && !(s.AllowOppositePosition && s.FastLinReg.Last() > 0 && s.SlowLinReg.Last() > 0) {
+			canBuy = false
 		}
 	}
 
