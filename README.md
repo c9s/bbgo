@@ -108,7 +108,6 @@ Get your exchange API key and secret after you register the accounts (you can ch
 
 - MAX: <https://max.maicoin.com/signup?r=c7982718>
 - Binance: <https://accounts.binance.com/en/register?ref=38192708>
-- FTX: <https://ftx.com/#a=7710474>
 - OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
 - Kucoin: <https://www.kucoin.com/ucenter/signup?rcode=r3KX2D4>
 
@@ -177,12 +176,6 @@ BINANCE_US=0
 # for MAX exchange, if you have one
 MAX_API_KEY=
 MAX_API_SECRET=
-
-# for FTX exchange, if you have one
-FTX_API_KEY=
-FTX_API_SECRET=
-# specify it if credentials are for subaccount
-FTX_SUBACCOUNT=
 
 # for OKEx exchange, if you have one
 OKEX_API_KEY=
@@ -445,7 +438,6 @@ bbgo submit-order --session=okex --symbol=OKBUSDT --side=buy --price=10.0 --quan
 
 ```sh
 bbgo list-orders open --session=okex --symbol=OKBUSDT
-bbgo list-orders open --session=ftx --symbol=FTTUSDT
 bbgo list-orders open --session=max --symbol=MAXUSDT
 bbgo list-orders open --session=binance --symbol=BNBUSDT
 ```
