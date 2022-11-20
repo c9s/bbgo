@@ -93,7 +93,6 @@ the implementation.
 ## Supported Exchanges
 
 - Binance Spot Exchange (and binance.us)
-- FTX Spot Exchange
 - OKEx Spot Exchange
 - Kucoin Spot Exchange
 - MAX Spot Exchange (located in Taiwan)
