@@ -74,7 +74,7 @@ type Strategy struct {
 
 	// FasterDecreaseRatio the quantity of decreasing position orders are multiplied by this ratio when both fast and
 	// slow LinReg are in the opposite direction to main trend
-	FasterDecreaseRatio fixedpoint.Value `json:"FasterDecreaseRatio,omitempty"`
+	FasterDecreaseRatio fixedpoint.Value `json:"fasterDecreaseRatio,omitempty"`
 
 	// NeutralBollinger is the smaller range of the bollinger band
 	// If price is in this band, it usually means the price is oscillating.
@@ -135,9 +135,6 @@ type Strategy struct {
 	orderExecutor *bbgo.GeneralOrderExecutor
 
 	groupID uint32
-
-	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
-	defaultBoll *indicator.BOLL
 
 	// neutralBoll is the neutral price section
 	neutralBoll *indicator.BOLL
