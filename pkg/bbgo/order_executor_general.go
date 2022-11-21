@@ -181,6 +181,12 @@ func (e *GeneralOrderExecutor) CancelOrders(ctx context.Context, orders ...types
 	return err
 }
 
+// FastSubmitOrders send []types.SubmitOrder directly to the exchange without blocking wait on the status update.
+// This is a faster version of SubmitOrders(). Created orders will be consumed in newly created goroutine (in non-backteset session).
+// @param ctx: golang context type.
+// @param submitOrders: Lists of types.SubmitOrder to be sent to the exchange.
+// @return *types.SubmitOrder: SubmitOrder with calculated quantity and price.
+// @return error: Error message.
 func (e *GeneralOrderExecutor) FastSubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
 	formattedOrders, err := e.session.FormatOrders(submitOrders)
 	if err != nil {
@@ -297,7 +303,12 @@ func (e *GeneralOrderExecutor) reduceQuantityAndSubmitOrder(ctx context.Context,
 	return nil, multierr.Append(ErrExceededSubmitOrderRetryLimit, err)
 }
 
-func (e *GeneralOrderExecutor) OpenPositionPrepare(ctx context.Context, options *OpenPositionOptions) (*types.SubmitOrder, error) {
+// Create new submitOrder from OpenPositionOptions.
+// @param ctx: golang context type.
+// @param options: OpenPositionOptions to control the generated SubmitOrder in a higher level way. Notice that the Price in options will be updated as the submitOrder price.
+// @return *types.SubmitOrder: SubmitOrder with calculated quantity and price.
+// @return error: Error message.
+func (e *GeneralOrderExecutor) NewOrderFromOpenPosition(ctx context.Context, options *OpenPositionOptions) (*types.SubmitOrder, error) {
 	price := options.Price
 	submitOrder := types.SubmitOrder{
 		Symbol:           e.position.Symbol,
@@ -386,8 +397,13 @@ func (e *GeneralOrderExecutor) OpenPositionPrepare(ctx context.Context, options 
 	return nil, errors.New("options Long or Short must be set")
 }
 
+// OpenPosition sends the orders generated from OpenPositionOptions to the exchange by calling SubmitOrders or reduceQuantityAndSubmitOrder.
+// @param ctx: golang context type.
+// @param options: OpenPositionOptions to control the generated SubmitOrder in a higher level way. Notice that the Price in options will be updated as the submitOrder price.
+// @return types.OrderSlice: Created orders with information from exchange.
+// @return error: Error message.
 func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) (types.OrderSlice, error) {
-	submitOrder, err := e.OpenPositionPrepare(ctx, &options)
+	submitOrder, err := e.NewOrderFromOpenPosition(ctx, &options)
 	if err != nil {
 		return nil, err
 	}
