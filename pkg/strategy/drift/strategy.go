@@ -640,7 +640,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 		opt.Price = source
 		opt.Tags = []string{"long"}
 
-		submitOrder, err := s.GeneralOrderExecutor.OpenPositionPrepare(ctx, &opt)
+		submitOrder, err := s.GeneralOrderExecutor.NewOrderFromOpenPosition(ctx, &opt)
 		if err != nil {
 			errs := filterErrors(multierr.Errors(err))
 			if len(errs) > 0 {
@@ -690,7 +690,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 		}
 		opt.Price = source
 		opt.Tags = []string{"short"}
-		submitOrder, err := s.GeneralOrderExecutor.OpenPositionPrepare(ctx, &opt)
+		submitOrder, err := s.GeneralOrderExecutor.NewOrderFromOpenPosition(ctx, &opt)
 		if err != nil {
 			errs := filterErrors(multierr.Errors(err))
 			if len(errs) > 0 {
