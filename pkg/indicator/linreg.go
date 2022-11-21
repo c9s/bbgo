@@ -8,7 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var log = logrus.WithField("indicator", "supertrend")
+var logLinReg = logrus.WithField("indicator", "LinReg")
 
 // LinReg is Linear Regression baseline
 //go:generate callbackgen -type LinReg
@@ -74,7 +74,7 @@ func (lr *LinReg) Update(kline types.KLine) {
 	startPrice := endPrice + slope*(length-1)
 	lr.Values.Push((endPrice - startPrice) / (length - 1))
 
-	log.Debugf("linear regression baseline slope: %f", lr.Last())
+	logLinReg.Debugf("linear regression baseline slope: %f", lr.Last())
 }
 
 func (lr *LinReg) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
