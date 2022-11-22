@@ -17,11 +17,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// TODO:
-// - TradeInBand: no buy order above the band, no sell order below the band
-// - DynamicQuantity
-// - Validate()
-
 const ID = "linregmaker"
 
 var notionModifier = fixedpoint.NewFromFloat(1.1)
@@ -115,7 +110,7 @@ type Strategy struct {
 	DynamicExposure dynamicmetric.DynamicExposure `json:"dynamicExposure"`
 
 	bbgo.QuantityOrAmount
-
+	// TODO: Should work w/o dynamic qty
 	// DynamicQuantityIncrease calculates the increase position order quantity dynamically
 	DynamicQuantityIncrease dynamicmetric.DynamicQuantitySet `json:"dynamicQuantityIncrease"`
 
@@ -208,6 +203,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
+// TODO
 func (s *Strategy) Validate() error {
 	if len(s.Symbol) == 0 {
 		return errors.New("symbol is required")
@@ -450,7 +446,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		} else if closePrice.Compare(priceReverseEMA) < 0 {
 			s.mainTrendCurrent = types.DirectionDown
 		}
-		// TODO: everything should works for both direction
 
 		// Trend reversal
 		if s.mainTrendCurrent != s.mainTrendPrevious {
