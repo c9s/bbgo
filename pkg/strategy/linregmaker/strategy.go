@@ -191,7 +191,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 	// Setup dynamic exposure
 	if s.DynamicExposure.IsEnabled() {
-		s.DynamicExposure.Initialize(s.Symbol, session)
+		s.DynamicExposure.Initialize(s.Symbol, session, s.StandardIndicatorSet)
 	}
 
 	// Setup dynamic quantities

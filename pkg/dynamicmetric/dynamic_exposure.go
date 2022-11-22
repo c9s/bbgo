@@ -16,10 +16,10 @@ type DynamicExposure struct {
 }
 
 // Initialize dynamic exposure
-func (d *DynamicExposure) Initialize(symbol string, session *bbgo.ExchangeSession) {
+func (d *DynamicExposure) Initialize(symbol string, session *bbgo.ExchangeSession, standardIndicatorSet *bbgo.StandardIndicatorSet) {
 	switch {
 	case d.BollBandExposure != nil:
-		d.BollBandExposure.initialize(symbol, session)
+		d.BollBandExposure.initialize(symbol, session, standardIndicatorSet)
 	}
 }
 
@@ -42,7 +42,7 @@ type DynamicExposureBollBand struct {
 	// DynamicExposureBollBandScale is used to define the exposure range with the given percentage.
 	DynamicExposureBollBandScale *bbgo.PercentageScale `json:"dynamicExposurePositionScale"`
 
-	*BollingerSetting
+	types.IntervalWindowBandWidth
 
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 
@@ -50,7 +50,8 @@ type DynamicExposureBollBand struct {
 }
 
 // initialize dynamic exposure with Bollinger Band
-func (d *DynamicExposureBollBand) initialize(symbol string, session *bbgo.ExchangeSession) {
+func (d *DynamicExposureBollBand) initialize(symbol string, session *bbgo.ExchangeSession, standardIndicatorSet *bbgo.StandardIndicatorSet) {
+	d.StandardIndicatorSet = standardIndicatorSet
 	d.dynamicExposureBollBand = d.StandardIndicatorSet.BOLL(d.IntervalWindow, d.BandWidth)
 
 	// Subscribe kline

@@ -142,6 +142,7 @@ func (s *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) 
 	if !ok {
 		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
 		s.initAndBind(inc, iw.Interval)
+		inc.SMA = &indicator.SMA{IntervalWindow: iw}
 
 		if debugBOLL {
 			inc.OnUpdate(func(sma float64, upBand float64, downBand float64) {
