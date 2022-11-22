@@ -18,6 +18,9 @@ type LinReg struct {
 
 	// Values are the slopes of linear regression baseline
 	Values floats.Slice
+	// ValueRatios are the ratio of slope to the price
+	ValueRatios floats.Slice
+
 	klines types.KLineWindow
 
 	EndTime         time.Time
@@ -32,6 +35,14 @@ func (lr *LinReg) Last() float64 {
 	return lr.Values.Last()
 }
 
+// LastRatio of slope to price
+func (lr *LinReg) LastRatio() float64 {
+	if lr.ValueRatios.Length() == 0 {
+		return 0.0
+	}
+	return lr.ValueRatios.Last()
+}
+
 // Index returns the slope of specified index
 func (lr *LinReg) Index(i int) float64 {
 	if i >= lr.Values.Length() {
@@ -41,9 +52,23 @@ func (lr *LinReg) Index(i int) float64 {
 	return lr.Values.Index(i)
 }
 
+// IndexRatio returns the slope ratio
+func (lr *LinReg) IndexRatio(i int) float64 {
+	if i >= lr.ValueRatios.Length() {
+		return 0.0
+	}
+
+	return lr.ValueRatios.Index(i)
+}
+
 // Length of the slope values
 func (lr *LinReg) Length() int {
 	return lr.Values.Length()
+}
+
+// LengthRatio of the slope ratio values
+func (lr *LinReg) LengthRatio() int {
+	return lr.ValueRatios.Length()
 }
 
 var _ types.SeriesExtend = &LinReg{}
@@ -54,6 +79,7 @@ func (lr *LinReg) Update(kline types.KLine) {
 	lr.klines.Truncate(lr.Window)
 	if len(lr.klines) < lr.Window {
 		lr.Values.Push(0)
+		lr.ValueRatios.Push(0)
 		return
 	}
 
@@ -73,6 +99,7 @@ func (lr *LinReg) Update(kline types.KLine) {
 	endPrice := average - slope*sumX/length + slope
 	startPrice := endPrice + slope*(length-1)
 	lr.Values.Push((endPrice - startPrice) / (length - 1))
+	lr.ValueRatios.Push(lr.Values.Last() / kline.GetClose().Float64())
 
 	logLinReg.Debugf("linear regression baseline slope: %f", lr.Last())
 }

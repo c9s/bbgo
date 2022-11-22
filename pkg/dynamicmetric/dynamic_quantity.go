@@ -85,7 +85,7 @@ func (d *DynamicQuantityLinReg) initialize(symbol string, session *bbgo.Exchange
 
 // getQuantity returns quantity
 func (d *DynamicQuantityLinReg) getQuantity() (fixedpoint.Value, error) {
-	v, err := d.DynamicQuantityLinRegScale.Scale(d.QuantityLinReg.Last())
+	v, err := d.DynamicQuantityLinRegScale.Scale(d.QuantityLinReg.LastRatio())
 	if err != nil {
 		return fixedpoint.Zero, err
 	}
