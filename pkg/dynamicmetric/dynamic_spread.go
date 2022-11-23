@@ -16,18 +16,6 @@ type DynamicSpread struct {
 
 	// WeightedBollWidthRatioSpread calculates spreads based on two Bollinger Bands
 	WeightedBollWidthRatioSpread *DynamicSpreadBollWidthRatio `json:"weightedBollWidth"`
-
-	// deprecated
-	Enabled *bool `json:"enabled"`
-
-	// deprecated
-	types.IntervalWindow
-
-	// deprecated. AskSpreadScale is used to define the ask spread range with the given percentage.
-	AskSpreadScale *bbgo.PercentageScale `json:"askSpreadScale"`
-
-	// deprecated. BidSpreadScale is used to define the bid spread range with the given percentage.
-	BidSpreadScale *bbgo.PercentageScale `json:"bidSpreadScale"`
 }
 
 // Initialize dynamic spread
@@ -37,14 +25,6 @@ func (ds *DynamicSpread) Initialize(symbol string, session *bbgo.ExchangeSession
 		ds.AmpSpread.initialize(symbol, session)
 	case ds.WeightedBollWidthRatioSpread != nil:
 		ds.WeightedBollWidthRatioSpread.initialize(symbol, session)
-	case ds.Enabled != nil && *ds.Enabled:
-		// backward compatibility
-		ds.AmpSpread = &DynamicSpreadAmp{
-			IntervalWindow: ds.IntervalWindow,
-			AskSpreadScale: ds.AskSpreadScale,
-			BidSpreadScale: ds.BidSpreadScale,
-		}
-		ds.AmpSpread.initialize(symbol, session)
 	}
 }
 
@@ -171,8 +151,8 @@ type DynamicSpreadBollWidthRatio struct {
 	// A positive number. The greater factor, the sharper weighting function. Default set to 1.0 .
 	Sensitivity float64 `json:"sensitivity"`
 
-	DefaultBollinger *BollingerSetting `json:"defaultBollinger"`
-	NeutralBollinger *BollingerSetting `json:"neutralBollinger"`
+	DefaultBollinger types.IntervalWindowBandWidth `json:"defaultBollinger"`
+	NeutralBollinger types.IntervalWindowBandWidth `json:"neutralBollinger"`
 
 	neutralBoll *indicator.BOLL
 	defaultBoll *indicator.BOLL
@@ -232,7 +212,7 @@ func (ds *DynamicSpreadBollWidthRatio) getWeightedBBWidthRatio(positiveSigmoid b
 	//   - To bid spread, the weighting density function d_weight(x) is sigmoid((default_BB_mid - x) / (w / alpha))
 	//   - The higher sensitivity factor alpha, the sharper weighting function.
 	//
-	// Then calculate the weighted band width ratio by taking integral of d_weight(x) from neutral_BB_lower to neutral_BB_upper:
+	// Then calculate the weighted bandwidth ratio by taking integral of d_weight(x) from neutral_BB_lower to neutral_BB_upper:
 	//   infinite integral of ask spread sigmoid weighting density function F(x) = (w / alpha) * ln(exp(x / (w / alpha)) + exp(default_BB_mid / (w / alpha)))
 	//   infinite integral of bid spread sigmoid weighting density function F(x) = x - (w / alpha) * ln(exp(x / (w / alpha)) + exp(default_BB_mid / (w / alpha)))
 	//   Note that we've rescaled the sigmoid function to fit default BB,
