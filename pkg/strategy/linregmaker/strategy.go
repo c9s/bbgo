@@ -25,15 +25,10 @@ var two = fixedpoint.NewFromInt(2)
 var log = logrus.WithField("strategy", ID)
 
 //TODO: Logic for backtest
+// TODO: Dynamic exposure should work on both side
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
-}
-
-// TODO: Remove BollingerSetting and bollsetting.go
-type BollingerSetting struct {
-	types.IntervalWindow
-	BandWidth float64 `json:"bandWidth"`
 }
 
 type Strategy struct {
@@ -77,7 +72,10 @@ type Strategy struct {
 	// NeutralBollinger is the smaller range of the bollinger band
 	// If price is in this band, it usually means the price is oscillating.
 	// If price goes out of this band, we tend to not place sell orders or buy orders
-	NeutralBollinger *BollingerSetting `json:"neutralBollinger"`
+	NeutralBollinger types.IntervalWindowBandWidth `json:"neutralBollinger"`
+
+	// neutralBoll is the neutral price section for TradeInBand
+	neutralBoll *indicator.BOLL
 
 	// TradeInBand
 	// When this is on, places orders only when the current price is in the bollinger band.
@@ -113,7 +111,7 @@ type Strategy struct {
 	DynamicExposure dynamicmetric.DynamicExposure `json:"dynamicExposure"`
 
 	bbgo.QuantityOrAmount
-	// TODO: Should work w/o dynamic qty
+
 	// DynamicQuantityIncrease calculates the increase position order quantity dynamically
 	DynamicQuantityIncrease dynamicmetric.DynamicQuantitySet `json:"dynamicQuantityIncrease"`
 
@@ -133,9 +131,6 @@ type Strategy struct {
 	orderExecutor *bbgo.GeneralOrderExecutor
 
 	groupID uint32
-
-	// neutralBoll is the neutral price section
-	neutralBoll *indicator.BOLL
 
 	// StrategyController
 	bbgo.StrategyController
@@ -176,7 +171,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 
 	// Subscribe for BBs
-	if s.NeutralBollinger != nil && s.NeutralBollinger.Interval != "" {
+	if s.NeutralBollinger.Interval != "" {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 			Interval: s.NeutralBollinger.Interval,
 		})
@@ -276,39 +271,38 @@ func (s *Strategy) getOrderPrices(midPrice fixedpoint.Value) (askPrice fixedpoin
 func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedpoint.Value) (sellQuantity fixedpoint.Value, buyQuantity fixedpoint.Value) {
 	// TODO: spot, margin, and futures
 
+	// Default
+	sellQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
+	buyQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
+
 	// Dynamic qty
 	switch {
 	case s.mainTrendCurrent == types.DirectionUp:
-		var err error
 		if len(s.DynamicQuantityIncrease) > 0 {
-			buyQuantity, err = s.DynamicQuantityIncrease.GetQuantity()
-			if err != nil {
-				buyQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
+			qty, err := s.DynamicQuantityIncrease.GetQuantity()
+			if err == nil {
+				buyQuantity = qty
 			}
 		}
 		if len(s.DynamicQuantityDecrease) > 0 {
-			sellQuantity, err = s.DynamicQuantityDecrease.GetQuantity()
-			if err != nil {
-				sellQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
+			qty, err := s.DynamicQuantityDecrease.GetQuantity()
+			if err == nil {
+				sellQuantity = qty
 			}
 		}
 	case s.mainTrendCurrent == types.DirectionDown:
-		var err error
 		if len(s.DynamicQuantityIncrease) > 0 {
-			sellQuantity, err = s.DynamicQuantityIncrease.GetQuantity()
-			if err != nil {
-				sellQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
+			qty, err := s.DynamicQuantityIncrease.GetQuantity()
+			if err == nil {
+				sellQuantity = qty
 			}
 		}
 		if len(s.DynamicQuantityDecrease) > 0 {
-			buyQuantity, err = s.DynamicQuantityDecrease.GetQuantity()
-			if err != nil {
-				buyQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
+			qty, err := s.DynamicQuantityDecrease.GetQuantity()
+			if err == nil {
+				buyQuantity = qty
 			}
 		}
-	default:
-		sellQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
-		buyQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
 	}
 
 	// Faster position decrease
