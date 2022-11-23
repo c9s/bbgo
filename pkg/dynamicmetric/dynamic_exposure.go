@@ -28,10 +28,10 @@ func (d *DynamicExposure) IsEnabled() bool {
 }
 
 // GetMaxExposure returns the max exposure
-func (d *DynamicExposure) GetMaxExposure(price float64) (maxExposure fixedpoint.Value, err error) {
+func (d *DynamicExposure) GetMaxExposure(price float64, trend types.Direction) (maxExposure fixedpoint.Value, err error) {
 	switch {
 	case d.BollBandExposure != nil:
-		return d.BollBandExposure.getMaxExposure(price)
+		return d.BollBandExposure.getMaxExposure(price, trend)
 	default:
 		return fixedpoint.Zero, errors.New("dynamic exposure is not enabled")
 	}
@@ -58,7 +58,7 @@ func (d *DynamicExposureBollBand) initialize(symbol string, session *bbgo.Exchan
 }
 
 // getMaxExposure returns the max exposure
-func (d *DynamicExposureBollBand) getMaxExposure(price float64) (fixedpoint.Value, error) {
+func (d *DynamicExposureBollBand) getMaxExposure(price float64, trend types.Direction) (fixedpoint.Value, error) {
 	downBand := d.dynamicExposureBollBand.DownBand.Last()
 	upBand := d.dynamicExposureBollBand.UpBand.Last()
 	sma := d.dynamicExposureBollBand.SMA.Last()
@@ -71,6 +71,11 @@ func (d *DynamicExposureBollBand) getMaxExposure(price float64) (fixedpoint.Valu
 	} else if price > sma {
 		// should be positive percentage
 		bandPercentage = (price - sma) / math.Abs(upBand-sma)
+	}
+
+	// Reverse if downtrend
+	if trend == types.DirectionDown {
+		bandPercentage = 0 - bandPercentage
 	}
 
 	v, err := d.DynamicExposureBollBandScale.Scale(bandPercentage)

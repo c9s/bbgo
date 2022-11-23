@@ -24,8 +24,7 @@ var two = fixedpoint.NewFromInt(2)
 
 var log = logrus.WithField("strategy", ID)
 
-//TODO: Logic for backtest
-// TODO: Dynamic exposure should work on both side
+// TODO: Logic for backtest
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -81,7 +80,7 @@ type Strategy struct {
 	// When this is on, places orders only when the current price is in the bollinger band.
 	TradeInBand bool `json:"tradeInBand"`
 
-	// useTickerPrice use the ticker api to get the mid price instead of the closed kline price.
+	// useTickerPrice use the ticker api to get the mid-price instead of the closed kline price.
 	// The back-test engine is kline-based, so the ticker price api is not supported.
 	// Turn this on if you want to do real trading.
 	useTickerPrice bool
@@ -146,7 +145,8 @@ func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
 
-// Validate basic config parameters. TODO LATER: Validate more
+// Validate basic config parameters
+// TODO LATER: Validate more
 func (s *Strategy) Validate() error {
 	if len(s.Symbol) == 0 {
 		return errors.New("symbol is required")
@@ -154,10 +154,6 @@ func (s *Strategy) Validate() error {
 
 	if len(s.Interval) == 0 {
 		return errors.New("interval is required")
-	}
-
-	if s.Window <= 0 {
-		return errors.New("window must be more than 0")
 	}
 
 	if s.ReverseEMA == nil {
@@ -270,7 +266,7 @@ func (s *Strategy) updateMaxExposure(midPrice fixedpoint.Value) {
 	// Calculate max exposure
 	if s.DynamicExposure.IsEnabled() {
 		var err error
-		maxExposurePosition, err := s.DynamicExposure.GetMaxExposure(midPrice.Float64())
+		maxExposurePosition, err := s.DynamicExposure.GetMaxExposure(midPrice.Float64(), s.mainTrendCurrent)
 		if err != nil {
 			log.WithError(err).Errorf("can not calculate DynamicExposure of %s, use previous MaxExposurePosition instead", s.Symbol)
 		} else {
@@ -560,7 +556,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
-// TODO adjustOrderQuantity()
+// adjustOrderQuantity to meet the min notional and qty requirement
 func adjustOrderQuantity(submitOrder types.SubmitOrder, market types.Market) types.SubmitOrder {
 	if submitOrder.Quantity.Mul(submitOrder.Price).Compare(market.MinNotional) < 0 {
 		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, market.MinNotional.Mul(notionModifier))
