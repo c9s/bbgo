@@ -174,15 +174,13 @@ type DynamicSpreadBollWidthRatio struct {
 	DefaultBollinger *BollingerSetting `json:"defaultBollinger"`
 	NeutralBollinger *BollingerSetting `json:"neutralBollinger"`
 
-	StandardIndicatorSet *bbgo.StandardIndicatorSet
-
 	neutralBoll *indicator.BOLL
 	defaultBoll *indicator.BOLL
 }
 
 func (ds *DynamicSpreadBollWidthRatio) initialize(symbol string, session *bbgo.ExchangeSession) {
-	ds.neutralBoll = ds.StandardIndicatorSet.BOLL(ds.NeutralBollinger.IntervalWindow, ds.NeutralBollinger.BandWidth)
-	ds.defaultBoll = ds.StandardIndicatorSet.BOLL(ds.DefaultBollinger.IntervalWindow, ds.DefaultBollinger.BandWidth)
+	ds.neutralBoll = session.StandardIndicatorSet(symbol).BOLL(ds.NeutralBollinger.IntervalWindow, ds.NeutralBollinger.BandWidth)
+	ds.defaultBoll = session.StandardIndicatorSet(symbol).BOLL(ds.DefaultBollinger.IntervalWindow, ds.DefaultBollinger.BandWidth)
 
 	// Subscribe kline
 	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{

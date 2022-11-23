@@ -16,10 +16,10 @@ type DynamicExposure struct {
 }
 
 // Initialize dynamic exposure
-func (d *DynamicExposure) Initialize(symbol string, session *bbgo.ExchangeSession, standardIndicatorSet *bbgo.StandardIndicatorSet) {
+func (d *DynamicExposure) Initialize(symbol string, session *bbgo.ExchangeSession) {
 	switch {
 	case d.BollBandExposure != nil:
-		d.BollBandExposure.initialize(symbol, session, standardIndicatorSet)
+		d.BollBandExposure.initialize(symbol, session)
 	}
 }
 
@@ -44,15 +44,12 @@ type DynamicExposureBollBand struct {
 
 	types.IntervalWindowBandWidth
 
-	StandardIndicatorSet *bbgo.StandardIndicatorSet
-
 	dynamicExposureBollBand *indicator.BOLL
 }
 
 // initialize dynamic exposure with Bollinger Band
-func (d *DynamicExposureBollBand) initialize(symbol string, session *bbgo.ExchangeSession, standardIndicatorSet *bbgo.StandardIndicatorSet) {
-	d.StandardIndicatorSet = standardIndicatorSet
-	d.dynamicExposureBollBand = d.StandardIndicatorSet.BOLL(d.IntervalWindow, d.BandWidth)
+func (d *DynamicExposureBollBand) initialize(symbol string, session *bbgo.ExchangeSession) {
+	d.dynamicExposureBollBand = session.StandardIndicatorSet(symbol).BOLL(d.IntervalWindow, d.BandWidth)
 
 	// Subscribe kline
 	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{
