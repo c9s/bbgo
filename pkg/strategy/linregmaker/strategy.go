@@ -89,8 +89,7 @@ type Strategy struct {
 	// For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
 	// For bid orders, the bid price is ((bestAsk + bestBid) / 2 * (1.0 - spread))
 	// Spread can be set by percentage or floating number. e.g., 0.1% or 0.001
-	// TODO: if nil?
-	Spread fixedpoint.Value `json:"spread,omitempty"`
+	Spread fixedpoint.Value `json:"spread"`
 
 	// BidSpread overrides the spread setting, this spread will be used for the buy order
 	BidSpread fixedpoint.Value `json:"bidSpread,omitempty"`
@@ -104,8 +103,7 @@ type Strategy struct {
 
 	// MaxExposurePosition is the maximum position you can hold
 	// 10 means you can hold 10 ETH long/short position by maximum
-	// TODO: if nil?
-	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition,omitempty"`
+	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
 	// DynamicExposure is used to define the exposure position range with the given percentage.
 	// When DynamicExposure is set, your MaxExposurePosition will be calculated dynamically
@@ -427,6 +425,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.useTickerPrice = false
 	} else {
 		s.useTickerPrice = true
+	}
+
+	// Default spread
+	if s.Spread == fixedpoint.Zero {
+		s.Spread = fixedpoint.NewFromFloat(0.001)
 	}
 
 	// StrategyController

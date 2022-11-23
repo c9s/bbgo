@@ -27,7 +27,7 @@ backtest:
       makerCommission: 10  # 0.15%
       takerCommission: 15  # 0.15%
       balances:
-        BTC: 10.0
+        BTC: 2.0
         USDT: 10000.0
 
 exchangeStrategies:
@@ -70,7 +70,6 @@ exchangeStrategies:
 
     # spread
     spread: 0.1%
-
     # dynamicSpread
     dynamicSpread:
       amplitude: # delete other scaling strategy if this is defined
@@ -96,7 +95,7 @@ exchangeStrategies:
               # when in up band, holds 0.05 by maximum
               range: [ 0.001, 0.002 ]
 
-    maxExposurePosition: 10
+    #maxExposurePosition: 10
     DynamicExposure:
       bollBandExposure:
         interval: "1h"
@@ -142,3 +141,8 @@ exchangeStrategies:
                 # when in down band, holds 1.0 by maximum
                 # when in up band, holds 0.05 by maximum
                 range: [ 0, 0.1 ]
+
+    exits:
+      # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
+      - roiStopLoss:
+          percentage: 20%
