@@ -24,10 +24,13 @@ var two = fixedpoint.NewFromInt(2)
 
 var log = logrus.WithField("strategy", ID)
 
+//TODO: Logic for backtest
+
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+// TODO: Remove BollingerSetting and bollsetting.go
 type BollingerSetting struct {
 	types.IntervalWindow
 	BandWidth float64 `json:"bandWidth"`
@@ -191,7 +194,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 	// Setup dynamic exposure
 	if s.DynamicExposure.IsEnabled() {
-		s.DynamicExposure.Initialize(s.Symbol, session, s.StandardIndicatorSet)
+		s.DynamicExposure.Initialize(s.Symbol, session)
 	}
 
 	// Setup dynamic quantities
@@ -203,7 +206,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
-// TODO
+// TODO Validate()
 func (s *Strategy) Validate() error {
 	if len(s.Symbol) == 0 {
 		return errors.New("symbol is required")
@@ -541,7 +544,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
-// TODO
+// TODO adjustOrderQuantity()
 func adjustOrderQuantity(submitOrder types.SubmitOrder, market types.Market) types.SubmitOrder {
 	if submitOrder.Quantity.Mul(submitOrder.Price).Compare(market.MinNotional) < 0 {
 		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, market.MinNotional.Mul(notionModifier))
