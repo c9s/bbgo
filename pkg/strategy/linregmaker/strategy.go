@@ -54,12 +54,12 @@ type Strategy struct {
 	// FastLinReg is to determine the short-term trend.
 	// Buy/sell orders are placed if the FastLinReg and the ReverseEMA trend are in the same direction, and only orders
 	// that reduce position are placed if the FastLinReg and the ReverseEMA trend are in different directions.
-	FastLinReg *indicator.LinReg `json:"fastLinReg,omitempty"`
+	FastLinReg *indicator.LinReg `json:"fastLinReg"`
 
 	// SlowLinReg is to determine the midterm trend.
 	// When the SlowLinReg and the ReverseEMA trend are in different directions, creation of opposite position is
 	// allowed.
-	SlowLinReg *indicator.LinReg `json:"slowLinReg,omitempty"`
+	SlowLinReg *indicator.LinReg `json:"slowLinReg"`
 
 	// AllowOppositePosition if true, the creation of opposite position is allowed when both fast and slow LinReg are in
 	// the opposite direction to main trend
@@ -90,7 +90,8 @@ type Strategy struct {
 	// For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
 	// For bid orders, the bid price is ((bestAsk + bestBid) / 2 * (1.0 - spread))
 	// Spread can be set by percentage or floating number. e.g., 0.1% or 0.001
-	Spread fixedpoint.Value `json:"spread"`
+	// TODO: if nil?
+	Spread fixedpoint.Value `json:"spread,omitempty"`
 
 	// BidSpread overrides the spread setting, this spread will be used for the buy order
 	BidSpread fixedpoint.Value `json:"bidSpread,omitempty"`
@@ -104,7 +105,8 @@ type Strategy struct {
 
 	// MaxExposurePosition is the maximum position you can hold
 	// 10 means you can hold 10 ETH long/short position by maximum
-	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
+	// TODO: if nil?
+	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition,omitempty"`
 
 	// DynamicExposure is used to define the exposure position range with the given percentage.
 	// When DynamicExposure is set, your MaxExposurePosition will be calculated dynamically
@@ -142,6 +144,35 @@ func (s *Strategy) ID() string {
 
 func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s:%s", ID, s.Symbol)
+}
+
+// Validate basic config parameters. TODO LATER: Validate more
+func (s *Strategy) Validate() error {
+	if len(s.Symbol) == 0 {
+		return errors.New("symbol is required")
+	}
+
+	if len(s.Interval) == 0 {
+		return errors.New("interval is required")
+	}
+
+	if s.Window <= 0 {
+		return errors.New("window must be more than 0")
+	}
+
+	if s.ReverseEMA == nil {
+		return errors.New("reverseEMA must be set")
+	}
+
+	if s.FastLinReg == nil {
+		return errors.New("fastLinReg must be set")
+	}
+
+	if s.SlowLinReg == nil {
+		return errors.New("slowLinReg must be set")
+	}
+
+	return nil
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -199,15 +230,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	if len(s.DynamicQuantityDecrease) > 0 {
 		s.DynamicQuantityDecrease.Initialize(s.Symbol, session)
 	}
-}
-
-// TODO Validate()
-func (s *Strategy) Validate() error {
-	if len(s.Symbol) == 0 {
-		return errors.New("symbol is required")
-	}
-
-	return nil
 }
 
 func (s *Strategy) CurrentPosition() *types.Position {
