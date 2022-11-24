@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/c9s/bbgo/pkg/exchange/binance"
-	"github.com/c9s/bbgo/pkg/exchange/ftx"
 	"github.com/c9s/bbgo/pkg/exchange/kucoin"
 	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/exchange/okex"
@@ -19,9 +18,6 @@ func NewPublic(exchangeName types.ExchangeName) (types.Exchange, error) {
 
 func NewStandard(n types.ExchangeName, key, secret, passphrase, subAccount string) (types.Exchange, error) {
 	switch n {
-
-	case types.ExchangeFTX:
-		return ftx.NewExchange(key, secret, subAccount), nil
 
 	case types.ExchangeBinance:
 		return binance.New(key, secret), nil

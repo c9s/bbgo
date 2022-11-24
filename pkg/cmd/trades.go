@@ -14,7 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// go run ./cmd/bbgo trades --session=ftx --symbol="BTC/USD"
+// go run ./cmd/bbgo trades --session=binance --symbol="BTC/USD"
 var tradesCmd = &cobra.Command{
 	Use:          "trades --session=[exchange_name] --symbol=[pair_name]",
 	Short:        "Query trading history",
