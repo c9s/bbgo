@@ -43,15 +43,18 @@ exchangeStrategies:
       interval: 1d
       window: 60
 
+    # reverseInterval
+    reverseInterval: 4h
+
     # fastLinReg
     fastLinReg:
       interval: 1m
-      window: 20
+      window: 30
 
     # slowLinReg
     slowLinReg:
       interval: 1m
-      window: 60
+      window: 120
 
     # allowOppositePosition
     allowOppositePosition: true
@@ -61,7 +64,7 @@ exchangeStrategies:
 
     # neutralBollinger
     neutralBollinger:
-      interval: "5m"
+      interval: "15m"
       window: 21
       bandWidth: 2.0
 
@@ -120,8 +123,8 @@ exchangeStrategies:
             window: 20
           dynamicQuantityLinRegScale:
             byPercentage:
-              # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
-              exp:
+              # log means we want to use log scale, you can replace "log" with "linear" for linear scale
+              linear:
                 # from lower band -100% (-1) to upper band 100% (+1)
                 domain: [ -1, 1 ]
                 # when in down band, holds 1.0 by maximum
@@ -134,8 +137,8 @@ exchangeStrategies:
             window: 20
           dynamicQuantityLinRegScale:
             byPercentage:
-              # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
-              exp:
+              # log means we want to use log scale, you can replace "log" with "linear" for linear scale
+              linear:
                 # from lower band -100% (-1) to upper band 100% (+1)
                 domain: [ 1, -1 ]
                 # when in down band, holds 1.0 by maximum
@@ -145,4 +148,4 @@ exchangeStrategies:
     exits:
       # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
       - roiStopLoss:
-          percentage: 20%
+          percentage: 30%
