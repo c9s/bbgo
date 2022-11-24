@@ -19,7 +19,7 @@ func init() {
 	RootCmd.AddCommand(accountCmd)
 }
 
-// go run ./cmd/bbgo account --session=ftx --config=config/bbgo.yaml
+// go run ./cmd/bbgo account --session=binance --config=config/bbgo.yaml
 var accountCmd = &cobra.Command{
 	Use:          "account [--session SESSION]",
 	Short:        "show user account details (ex: balance)",

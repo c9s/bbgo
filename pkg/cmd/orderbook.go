@@ -14,7 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// go run ./cmd/bbgo orderbook --session=ftx --symbol=BTCUSDT
+// go run ./cmd/bbgo orderbook --session=binance --symbol=BTCUSDT
 var orderbookCmd = &cobra.Command{
 	Use:   "orderbook --session=[exchange_name] --symbol=[pair_name]",
 	Short: "connect to the order book market data streaming service of an exchange",
