@@ -14,7 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// go run ./cmd/bbgo userdatastream --session=ftx
+// go run ./cmd/bbgo userdatastream --session=binance
 var userDataStreamCmd = &cobra.Command{
 	Use:   "userdatastream",
 	Short: "Listen to session events (orderUpdate, tradeUpdate, balanceUpdate, balanceSnapshot)",

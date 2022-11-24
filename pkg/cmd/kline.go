@@ -14,7 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// go run ./cmd/bbgo kline --exchange=ftx --symbol=BTCUSDT
+// go run ./cmd/bbgo kline --exchange=binance --symbol=BTCUSDT
 var klineCmd = &cobra.Command{
 	Use:   "kline",
 	Short: "connect to the kline market data streaming service of an exchange",
