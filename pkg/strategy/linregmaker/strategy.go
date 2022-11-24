@@ -84,11 +84,6 @@ type Strategy struct {
 	// When this is on, places orders only when the current price is in the bollinger band.
 	TradeInBand bool `json:"tradeInBand"`
 
-	// useTickerPrice use the ticker api to get the mid-price instead of the closed kline price.
-	// The back-test engine is kline-based, so the ticker price api is not supported.
-	// Turn this on if you want to do real trading.
-	useTickerPrice bool
-
 	// Spread is the price spread from the middle price.
 	// For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
 	// For bid orders, the bid price is ((bestAsk + bestBid) / 2 * (1.0 - spread))
@@ -148,7 +143,6 @@ func (s *Strategy) InstanceID() string {
 }
 
 // Validate basic config parameters
-// TODO LATER: Validate more
 func (s *Strategy) Validate() error {
 	if len(s.Symbol) == 0 {
 		return errors.New("symbol is required")
@@ -160,11 +154,6 @@ func (s *Strategy) Validate() error {
 
 	if s.ReverseEMA == nil {
 		return errors.New("reverseEMA must be set")
-	}
-
-	// Use interval of ReverseEMA if ReverseInterval is omitted
-	if s.ReverseInterval == "" {
-		s.ReverseInterval = s.ReverseEMA.Interval
 	}
 
 	if s.FastLinReg == nil {
@@ -186,7 +175,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// Initialize ReverseEMA
 	s.ReverseEMA = s.StandardIndicatorSet.EWMA(s.ReverseEMA.IntervalWindow)
 
-	// Subscribe for ReverseInterval
+	// Subscribe for ReverseInterval. Use interval of ReverseEMA if ReverseInterval is omitted
+	if s.ReverseInterval == "" {
+		s.ReverseInterval = s.ReverseEMA.Interval
+	}
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: s.ReverseInterval,
 	})
@@ -435,12 +427,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 	s.ExitMethods.Bind(session, s.orderExecutor)
 
-	if bbgo.IsBackTesting {
-		s.useTickerPrice = false
-	} else {
-		s.useTickerPrice = true
-	}
-
 	// Default spread
 	if s.Spread == fixedpoint.Zero {
 		s.Spread = fixedpoint.NewFromFloat(0.001)
@@ -501,7 +487,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// midPrice for ask and bid prices
 		var midPrice fixedpoint.Value
-		if s.useTickerPrice {
+		if !bbgo.IsBackTesting {
 			ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)
 			if err != nil {
 				return
