@@ -15,7 +15,7 @@ func init() {
 	RootCmd.AddCommand(balancesCmd)
 }
 
-// go run ./cmd/bbgo balances --session=ftx
+// go run ./cmd/bbgo balances --session=binance
 var balancesCmd = &cobra.Command{
 	Use:          "balances [--session SESSION]",
 	Short:        "Show user account balances",
