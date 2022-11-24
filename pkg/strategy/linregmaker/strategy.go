@@ -45,6 +45,10 @@ type Strategy struct {
 	// All the opposite trend position will be closed upon the trend change
 	ReverseEMA *indicator.EWMA `json:"reverseEMA"`
 
+	// ReverseInterval is the interval to check trend reverse against ReverseEMA. Close price of this interval crossing
+	// the ReverseEMA triggers main trend change.
+	ReverseInterval types.Interval `json:"reverseInterval"`
+
 	// mainTrendCurrent is the current long-term trend
 	mainTrendCurrent types.Direction
 	// mainTrendPrevious is the long-term trend of previous kline
@@ -158,6 +162,11 @@ func (s *Strategy) Validate() error {
 		return errors.New("reverseEMA must be set")
 	}
 
+	// Use interval of ReverseEMA if ReverseInterval is omitted
+	if s.ReverseInterval == "" {
+		s.ReverseInterval = s.ReverseEMA.Interval
+	}
+
 	if s.FastLinReg == nil {
 		return errors.New("fastLinReg must be set")
 	}
@@ -176,6 +185,11 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	})
 	// Initialize ReverseEMA
 	s.ReverseEMA = s.StandardIndicatorSet.EWMA(s.ReverseEMA.IntervalWindow)
+
+	// Subscribe for ReverseInterval
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+		Interval: s.ReverseInterval,
+	})
 
 	// Subscribe for LinRegs
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
@@ -443,15 +457,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		_ = s.ClosePosition(ctx, fixedpoint.NewFromFloat(1.0))
 	})
 
-	// Main interval
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
-		// StrategyController
-		if s.Status != types.StrategyStatusRunning {
-			return
-		}
-
-		_ = s.orderExecutor.GracefulCancel(ctx)
-
+	// Check trend reversal
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.ReverseInterval, func(kline types.KLine) {
 		// closePrice is the close price of current kline
 		closePrice := kline.GetClose()
 		// priceReverseEMA is the current ReverseEMA price
@@ -464,6 +471,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		} else if closePrice.Compare(priceReverseEMA) < 0 {
 			s.mainTrendCurrent = types.DirectionDown
 		}
+	}))
+
+	// Main interval
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
+		// StrategyController
+		if s.Status != types.StrategyStatusRunning {
+			return
+		}
+
+		_ = s.orderExecutor.GracefulCancel(ctx)
+
+		// closePrice is the close price of current kline
+		closePrice := kline.GetClose()
 
 		// Trend reversal
 		if s.mainTrendCurrent != s.mainTrendPrevious {
