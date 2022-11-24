@@ -301,6 +301,9 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 	return requiredBase, requiredQuote, nil
 }
 
+// setupGridOrders
+// 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
+// 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
 func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
 	lastPrice, err := s.getLastTradePrice(ctx, session)
 	if err != nil {
@@ -321,15 +324,6 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 	totalBase := baseBalance.Available
 	totalQuote := quoteBalance.Available
 
-	if !s.BaseInvestment.IsZero() && !s.QuoteInvestment.IsZero() {
-		if s.BaseInvestment.Compare(totalBase) > 0 {
-			return fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", s.BaseInvestment.Float64(), totalBase.Float64())
-		}
-		if s.QuoteInvestment.Compare(totalQuote) > 0 {
-			return fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", s.QuoteInvestment.Float64(), totalQuote.Float64())
-		}
-	}
-
 	// shift 1 grid because we will start from the buy order
 	// if the buy order is filled, then we will submit another sell order at the higher grid.
 	if s.QuantityOrAmount.IsSet() {
@@ -345,42 +339,77 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 		}
 	}
 
-	for i := len(s.grid.Pins) - 2; i >= 0; i++ {
-		pin := s.grid.Pins[i]
-		price := fixedpoint.Value(pin)
-
-		if price.Compare(lastPrice) >= 0 {
-			// check sell order
-			if quantityOrAmountIsSet {
-				if s.QuantityOrAmount.Quantity.Sign() > 0 {
-					quantity := s.QuantityOrAmount.Quantity
-
-					createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-						Symbol:      s.Symbol,
-						Side:        types.SideTypeBuy,
-						Type:        types.OrderTypeLimit,
-						Quantity:    quantity,
-						Price:       price,
-						Market:      s.Market,
-						TimeInForce: types.TimeInForceGTC,
-						Tag:         "grid",
-					})
-
-					if err2 != nil {
-						return err2
-					}
-
-					_ = createdOrders
-
-				} else if s.QuantityOrAmount.Amount.Sign() > 0 {
-
-				}
-			} else if s.BaseInvestment.Sign() > 0 {
-
-			} else {
-				// error: either quantity, amount, baseInvestment is not set.
-			}
+	if !s.BaseInvestment.IsZero() && !s.QuoteInvestment.IsZero() {
+		if s.BaseInvestment.Compare(totalBase) > 0 {
+			return fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", s.BaseInvestment.Float64(), totalBase.Float64())
 		}
+		if s.QuoteInvestment.Compare(totalQuote) > 0 {
+			return fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", s.QuoteInvestment.Float64(), totalQuote.Float64())
+		}
+
+		if !s.QuantityOrAmount.IsSet() {
+			// TODO: calculate and override the quantity here
+		}
+	}
+
+	var buyPlacedPrice = fixedpoint.Zero
+	var pins = s.grid.Pins
+	var usedBase = fixedpoint.Zero
+	var usedQuote = fixedpoint.Zero
+	var submitOrders []types.SubmitOrder
+	for i := len(pins) - 1; i >= 0; i-- {
+		pin := pins[i]
+		price := fixedpoint.Value(pin)
+		quantity := s.QuantityOrAmount.Quantity
+		if quantity.IsZero() {
+			quantity = s.QuantityOrAmount.Amount.Div(price)
+		}
+
+		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
+		if price.Compare(lastPrice) >= 0 {
+			if usedBase.Add(quantity).Compare(totalBase) < 0 {
+				submitOrders = append(submitOrders, types.SubmitOrder{
+					Symbol:   s.Symbol,
+					Type:     types.OrderTypeLimitMaker,
+					Side:     types.SideTypeSell,
+					Price:    price,
+					Quantity: quantity,
+				})
+				usedBase = usedBase.Add(quantity)
+			} else if i > 0 {
+				// next price
+				nextPin := pins[i-1]
+				nextPrice := fixedpoint.Value(nextPin)
+				submitOrders = append(submitOrders, types.SubmitOrder{
+					Symbol:   s.Symbol,
+					Type:     types.OrderTypeLimitMaker,
+					Side:     types.SideTypeBuy,
+					Price:    nextPrice,
+					Quantity: quantity,
+				})
+				quoteQuantity := quantity.Mul(price)
+				usedQuote = usedQuote.Add(quoteQuantity)
+				buyPlacedPrice = nextPrice
+			}
+		} else {
+		}
+
+		/*
+			createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:      s.Symbol,
+				Side:        types.SideTypeBuy,
+				Type:        types.OrderTypeLimit,
+				Quantity:    quantity,
+				Price:       price,
+				Market:      s.Market,
+				TimeInForce: types.TimeInForceGTC,
+				Tag:         "grid",
+			})
+
+			if err2 != nil {
+				return err2
+			}
+		*/
 	}
 
 	return nil
