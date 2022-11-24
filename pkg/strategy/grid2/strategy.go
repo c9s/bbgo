@@ -369,11 +369,14 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 		if price.Compare(lastPrice) >= 0 {
 			if usedBase.Add(quantity).Compare(totalBase) < 0 {
 				submitOrders = append(submitOrders, types.SubmitOrder{
-					Symbol:   s.Symbol,
-					Type:     types.OrderTypeLimitMaker,
-					Side:     types.SideTypeSell,
-					Price:    price,
-					Quantity: quantity,
+					Symbol:      s.Symbol,
+					Type:        types.OrderTypeLimitMaker,
+					Side:        types.SideTypeSell,
+					Price:       price,
+					Quantity:    quantity,
+					Market:      s.Market,
+					TimeInForce: types.TimeInForceGTC,
+					Tag:         "grid",
 				})
 				usedBase = usedBase.Add(quantity)
 			} else if i > 0 {
@@ -381,35 +384,43 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 				nextPin := pins[i-1]
 				nextPrice := fixedpoint.Value(nextPin)
 				submitOrders = append(submitOrders, types.SubmitOrder{
-					Symbol:   s.Symbol,
-					Type:     types.OrderTypeLimitMaker,
-					Side:     types.SideTypeBuy,
-					Price:    nextPrice,
-					Quantity: quantity,
+					Symbol:      s.Symbol,
+					Type:        types.OrderTypeLimitMaker,
+					Side:        types.SideTypeBuy,
+					Price:       nextPrice,
+					Quantity:    quantity,
+					Market:      s.Market,
+					TimeInForce: types.TimeInForceGTC,
+					Tag:         "grid",
 				})
 				quoteQuantity := quantity.Mul(price)
 				usedQuote = usedQuote.Add(quoteQuantity)
 				buyPlacedPrice = nextPrice
 			}
 		} else {
-		}
+			if price.Compare(buyPlacedPrice) >= 0 {
+				continue
+			}
 
-		/*
-			createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			submitOrders = append(submitOrders, types.SubmitOrder{
 				Symbol:      s.Symbol,
+				Type:        types.OrderTypeLimitMaker,
 				Side:        types.SideTypeBuy,
-				Type:        types.OrderTypeLimit,
-				Quantity:    quantity,
 				Price:       price,
+				Quantity:    quantity,
 				Market:      s.Market,
 				TimeInForce: types.TimeInForceGTC,
 				Tag:         "grid",
 			})
+			quoteQuantity := quantity.Mul(price)
+			usedQuote = usedQuote.Add(quoteQuantity)
+		}
 
-			if err2 != nil {
-				return err2
-			}
-		*/
+		createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, submitOrders...)
+		if err2 != nil {
+			return err
+		}
+		_ = createdOrders
 	}
 
 	return nil
