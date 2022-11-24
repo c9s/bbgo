@@ -89,6 +89,10 @@ func (s *OrderStore) Add(orders ...types.Order) {
 	defer s.mu.Unlock()
 
 	for _, o := range orders {
+		old, ok := s.orders[o.OrderID]
+		if ok && o.Tag == "" && old.Tag != "" {
+			o.Tag = old.Tag
+		}
 		s.orders[o.OrderID] = o
 	}
 }
@@ -120,11 +124,11 @@ func (s *OrderStore) BindStream(stream types.Stream) {
 			return
 		}
 
-		s.handleOrderUpdate(order)
+		s.HandleOrderUpdate(order)
 	})
 }
 
-func (s *OrderStore) handleOrderUpdate(order types.Order) {
+func (s *OrderStore) HandleOrderUpdate(order types.Order) {
 	switch order.Status {
 
 	case types.OrderStatusNew, types.OrderStatusPartiallyFilled, types.OrderStatusFilled:

@@ -56,6 +56,10 @@ func (c *TradeCollector) Position() *types.Position {
 	return c.position
 }
 
+func (c *TradeCollector) TradeStore() *TradeStore {
+	return c.tradeStore
+}
+
 func (c *TradeCollector) SetPosition(position *types.Position) {
 	c.position = position
 }
@@ -197,9 +201,11 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 func (c *TradeCollector) ProcessTrade(trade types.Trade) bool {
 	key := trade.Key()
 	// if it's already done, remove the trade from the trade store
+	c.mu.Lock()
 	if _, done := c.doneTrades[key]; done {
 		return false
 	}
+	c.mu.Unlock()
 
 	if c.processTrade(trade) {
 		return true

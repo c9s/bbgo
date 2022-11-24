@@ -5,8 +5,10 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -19,13 +21,31 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const defaultHTTPTimeout = time.Second * 15
+const defaultHTTPTimeout = time.Second * 2
 const RestBaseURL = "https://api.binance.com"
 const SandboxRestBaseURL = "https://testnet.binance.vision"
 const DebugRequestResponse = false
 
+var dialer = &net.Dialer{
+	Timeout:   30 * time.Second,
+	KeepAlive: 30 * time.Second,
+}
+
+var defaultTransport = &http.Transport{
+	Proxy:               http.ProxyFromEnvironment,
+	DialContext:         dialer.DialContext,
+	MaxIdleConns:        100,
+	MaxConnsPerHost:     100,
+	MaxIdleConnsPerHost: 100,
+	//TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
+	ExpectContinueTimeout: 0,
+	ForceAttemptHTTP2:     true,
+	TLSClientConfig:       &tls.Config{},
+}
+
 var DefaultHttpClient = &http.Client{
-	Timeout: defaultHTTPTimeout,
+	Timeout:   defaultHTTPTimeout,
+	Transport: defaultTransport,
 }
 
 type RestClient struct {

@@ -38,7 +38,8 @@ type GeneralOrderExecutor struct {
 
 	marginBaseMaxBorrowable, marginQuoteMaxBorrowable fixedpoint.Value
 
-	closing int64
+	disableNotify bool
+	closing       int64
 }
 
 func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strategyInstanceID string, position *types.Position) *GeneralOrderExecutor {
@@ -64,6 +65,10 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 	}
 
 	return executor
+}
+
+func (e *GeneralOrderExecutor) DisableNotify() {
+	e.disableNotify = true
 }
 
 func (e *GeneralOrderExecutor) startMarginAssetUpdater(ctx context.Context) {
@@ -110,6 +115,10 @@ func (e *GeneralOrderExecutor) marginAssetMaxBorrowableUpdater(ctx context.Conte
 	}
 }
 
+func (e *GeneralOrderExecutor) OrderStore() *OrderStore {
+	return e.orderStore
+}
+
 func (e *GeneralOrderExecutor) ActiveMakerOrders() *ActiveOrderBook {
 	return e.activeMakerOrders
 }
@@ -148,15 +157,17 @@ func (e *GeneralOrderExecutor) Bind() {
 	e.activeMakerOrders.BindStream(e.session.UserDataStream)
 	e.orderStore.BindStream(e.session.UserDataStream)
 
-	// trade notify
-	e.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		Notify(trade)
-	})
+	if !e.disableNotify {
+		// trade notify
+		e.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+			Notify(trade)
+		})
 
-	e.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		log.Infof("position changed: %s", position)
-		Notify(position)
-	})
+		e.tradeCollector.OnPositionUpdate(func(position *types.Position) {
+			log.Infof("position changed: %s", position)
+			Notify(position)
+		})
+	}
 
 	e.tradeCollector.BindStream(e.session.UserDataStream)
 }
@@ -168,6 +179,36 @@ func (e *GeneralOrderExecutor) CancelOrders(ctx context.Context, orders ...types
 		err = e.session.Exchange.CancelOrders(ctx, orders...)
 	}
 	return err
+}
+
+// FastSubmitOrders send []types.SubmitOrder directly to the exchange without blocking wait on the status update.
+// This is a faster version of SubmitOrders(). Created orders will be consumed in newly created goroutine (in non-backteset session).
+// @param ctx: golang context type.
+// @param submitOrders: Lists of types.SubmitOrder to be sent to the exchange.
+// @return *types.SubmitOrder: SubmitOrder with calculated quantity and price.
+// @return error: Error message.
+func (e *GeneralOrderExecutor) FastSubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
+	formattedOrders, err := e.session.FormatOrders(submitOrders)
+	if err != nil {
+		return nil, err
+	}
+	createdOrders, errIdx, err := BatchPlaceOrder(ctx, e.session.Exchange, formattedOrders...)
+	if len(errIdx) > 0 {
+		return nil, err
+	}
+	if IsBackTesting {
+		e.orderStore.Add(createdOrders...)
+		e.activeMakerOrders.Add(createdOrders...)
+		e.tradeCollector.Process()
+	} else {
+		go func() {
+			e.orderStore.Add(createdOrders...)
+			e.activeMakerOrders.Add(createdOrders...)
+			e.tradeCollector.Process()
+		}()
+	}
+	return createdOrders, err
+
 }
 
 func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
@@ -262,7 +303,12 @@ func (e *GeneralOrderExecutor) reduceQuantityAndSubmitOrder(ctx context.Context,
 	return nil, multierr.Append(ErrExceededSubmitOrderRetryLimit, err)
 }
 
-func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) (types.OrderSlice, error) {
+// Create new submitOrder from OpenPositionOptions.
+// @param ctx: golang context type.
+// @param options: OpenPositionOptions to control the generated SubmitOrder in a higher level way. Notice that the Price in options will be updated as the submitOrder price.
+// @return *types.SubmitOrder: SubmitOrder with calculated quantity and price.
+// @return error: Error message.
+func (e *GeneralOrderExecutor) NewOrderFromOpenPosition(ctx context.Context, options *OpenPositionOptions) (*types.SubmitOrder, error) {
 	price := options.Price
 	submitOrder := types.SubmitOrder{
 		Symbol:           e.position.Symbol,
@@ -284,9 +330,11 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		if options.Long {
 			// use higher price to buy (this ensures that our order will be filled)
 			price = price.Mul(one.Add(options.LimitOrderTakerRatio))
+			options.Price = price
 		} else if options.Short {
 			// use lower price to sell (this ensures that our order will be filled)
 			price = price.Mul(one.Sub(options.LimitOrderTakerRatio))
+			options.Price = price
 		}
 	}
 
@@ -320,14 +368,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Side = types.SideTypeBuy
 		submitOrder.Quantity = quantity
 
-		Notify("Opening %s long position with quantity %v at price %v", e.position.Symbol, quantity, price)
-
-		createdOrder, err := e.SubmitOrders(ctx, submitOrder)
-		if err == nil {
-			return createdOrder, nil
-		}
-
-		return e.reduceQuantityAndSubmitOrder(ctx, price, submitOrder)
+		return &submitOrder, nil
 	} else if options.Short {
 		if quantity.IsZero() {
 			var err error
@@ -350,11 +391,40 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		submitOrder.Side = types.SideTypeSell
 		submitOrder.Quantity = quantity
 
-		Notify("Opening %s short position with quantity %v at price %v", e.position.Symbol, quantity, price)
-		return e.reduceQuantityAndSubmitOrder(ctx, price, submitOrder)
+		return &submitOrder, nil
 	}
 
 	return nil, errors.New("options Long or Short must be set")
+}
+
+// OpenPosition sends the orders generated from OpenPositionOptions to the exchange by calling SubmitOrders or reduceQuantityAndSubmitOrder.
+// @param ctx: golang context type.
+// @param options: OpenPositionOptions to control the generated SubmitOrder in a higher level way. Notice that the Price in options will be updated as the submitOrder price.
+// @return types.OrderSlice: Created orders with information from exchange.
+// @return error: Error message.
+func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) (types.OrderSlice, error) {
+	submitOrder, err := e.NewOrderFromOpenPosition(ctx, &options)
+	if err != nil {
+		return nil, err
+	}
+	if submitOrder == nil {
+		return nil, nil
+	}
+	price := options.Price
+
+	side := "long"
+	if submitOrder.Side == types.SideTypeSell {
+		side = "short"
+	}
+
+	Notify("Opening %s %s position with quantity %v at price %v", e.position.Symbol, side, submitOrder.Quantity, price)
+
+	createdOrder, err := e.SubmitOrders(ctx, *submitOrder)
+	if err == nil {
+		return createdOrder, nil
+	}
+
+	return e.reduceQuantityAndSubmitOrder(ctx, price, *submitOrder)
 }
 
 // GracefulCancelActiveOrderBook cancels the orders from the active orderbook.
