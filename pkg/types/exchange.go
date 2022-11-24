@@ -26,13 +26,13 @@ func (n *ExchangeName) UnmarshalJSON(data []byte) error {
 	}
 
 	switch s {
-	case "max", "binance", "ftx", "okex":
+	case "max", "binance", "okex", "kucoin":
 		*n = ExchangeName(s)
 		return nil
 
 	}
 
-	return fmt.Errorf("unknown or unsupported exchange name: %s, valid names are: max, binance, ftx", s)
+	return fmt.Errorf("unknown or unsupported exchange name: %s, valid names are: max, binance, okex, kucoin", s)
 }
 
 func (n ExchangeName) String() string {
@@ -42,7 +42,6 @@ func (n ExchangeName) String() string {
 const (
 	ExchangeMax      ExchangeName = "max"
 	ExchangeBinance  ExchangeName = "binance"
-	ExchangeFTX      ExchangeName = "ftx"
 	ExchangeOKEx     ExchangeName = "okex"
 	ExchangeKucoin   ExchangeName = "kucoin"
 	ExchangeBacktest ExchangeName = "backtest"
@@ -51,7 +50,6 @@ const (
 var SupportedExchanges = []ExchangeName{
 	ExchangeMax,
 	ExchangeBinance,
-	ExchangeFTX,
 	ExchangeOKEx,
 	ExchangeKucoin,
 	// note: we are not using "backtest"
@@ -63,8 +61,6 @@ func ValidExchangeName(a string) (ExchangeName, error) {
 		return ExchangeMax, nil
 	case "binance", "bn":
 		return ExchangeBinance, nil
-	case "ftx":
-		return ExchangeFTX, nil
 	case "okex":
 		return ExchangeOKEx, nil
 	case "kucoin":

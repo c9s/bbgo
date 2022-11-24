@@ -17,7 +17,7 @@ func init() {
 	RootCmd.AddCommand(marketCmd)
 }
 
-// go run ./cmd/bbgo market --session=ftx --config=config/bbgo.yaml
+// go run ./cmd/bbgo market --session=binance --config=config/bbgo.yaml
 var marketCmd = &cobra.Command{
 	Use:          "market",
 	Short:        "List the symbols that the are available to be traded in the exchange",
