@@ -32,3 +32,18 @@ const (
 	OrderStatusTypeRejected        OrderStatusType = binance.OrderStatusTypeRejected
 	OrderStatusTypeExpired         OrderStatusType = binance.OrderStatusTypeExpired
 )
+
+type CancelReplaceModeType string
+
+const (
+	StopOnFailure CancelReplaceModeType = "STOP_ON_FAILURE"
+	AllowFailure  CancelReplaceModeType = "ALLOW_FAILURE"
+)
+
+type OrderRespType string
+
+const (
+	Ack    OrderRespType = "ACK"
+	Result OrderRespType = "RESULT"
+	Full   OrderRespType = "FULL"
+)

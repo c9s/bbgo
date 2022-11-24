@@ -20,6 +20,13 @@ func init() {
 	_ = PlainText(&Order{})
 }
 
+type CancelReplaceModeType string
+
+var (
+	StopOnFailure CancelReplaceModeType = "STOP_ON_FAILURE"
+	AllowFailure  CancelReplaceModeType = "ALLOW_FAILURE"
+)
+
 type TimeInForce string
 
 var (
