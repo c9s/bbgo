@@ -34,10 +34,13 @@ type Pin fixedpoint.Value
 
 func calculateArithmeticPins(lower, upper, spread, tickSize fixedpoint.Value) []Pin {
 	var pins []Pin
+	var ts = tickSize.Float64()
 	for p := lower; p.Compare(upper) <= 0; p = p.Add(spread) {
 		// tickSize here = 0.01
-		pp := math.Trunc(p.Float64()/tickSize.Float64()) * tickSize.Float64()
-		pins = append(pins, Pin(fixedpoint.NewFromFloat(pp)))
+		pp := p.Float64() / ts
+		pp = math.Trunc(pp) * ts
+		pin := Pin(fixedpoint.NewFromFloat(pp))
+		pins = append(pins, pin)
 	}
 
 	return pins
