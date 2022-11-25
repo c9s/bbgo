@@ -209,7 +209,7 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, 
 			}
 		} else {
 			// for orders that buy
-			if price.Compare(buyPlacedPrice) == 0 {
+			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) == 0 {
 				continue
 			}
 			requiredQuote = requiredQuote.Add(quantity.Mul(price))
@@ -269,7 +269,7 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 			}
 		} else {
 			// for orders that buy
-			if price.Compare(buyPlacedPrice) == 0 {
+			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) == 0 {
 				continue
 			}
 			requiredQuote = requiredQuote.Add(amount)
@@ -398,7 +398,7 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 				buyPlacedPrice = nextPrice
 			}
 		} else {
-			if price.Compare(buyPlacedPrice) >= 0 {
+			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) >= 0 {
 				continue
 			}
 
