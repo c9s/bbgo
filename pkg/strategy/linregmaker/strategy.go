@@ -25,7 +25,6 @@ var two = fixedpoint.NewFromInt(2)
 var log = logrus.WithField("strategy", ID)
 
 // TODO: Logic for backtest
-// TODO: initial trend
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -584,6 +583,31 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.OnEmergencyStop(func() {
 		// Close whole position
 		_ = s.ClosePosition(ctx, fixedpoint.NewFromFloat(1.0))
+	})
+
+	// Initial trend
+	session.UserDataStream.OnStart(func() {
+		var closePrice fixedpoint.Value
+		if !bbgo.IsBackTesting {
+			ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)
+			if err != nil {
+				return
+			}
+
+			closePrice = ticker.Buy.Add(ticker.Sell).Div(two)
+		} else {
+			if price, ok := session.LastPrice(s.Symbol); ok {
+				closePrice = price
+			}
+		}
+		priceReverseEMA := fixedpoint.NewFromFloat(s.ReverseEMA.Last())
+
+		// Main trend by ReverseEMA
+		if closePrice.Compare(priceReverseEMA) > 0 {
+			s.mainTrendCurrent = types.DirectionUp
+		} else if closePrice.Compare(priceReverseEMA) < 0 {
+			s.mainTrendCurrent = types.DirectionDown
+		}
 	})
 
 	// Check trend reversal
