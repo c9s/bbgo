@@ -126,7 +126,7 @@ exchangeStrategies:
               # log means we want to use log scale, you can replace "log" with "linear" for linear scale
               linear:
                 # from lower band -100% (-1) to upper band 100% (+1)
-                domain: [ -1, 1 ]
+                domain: [ -0.05, 0.05 ]
                 # when in down band, holds 1.0 by maximum
                 # when in up band, holds 0.05 by maximum
                 range: [ 0, 0.1 ]
@@ -140,7 +140,7 @@ exchangeStrategies:
               # log means we want to use log scale, you can replace "log" with "linear" for linear scale
               linear:
                 # from lower band -100% (-1) to upper band 100% (+1)
-                domain: [ 1, -1 ]
+                domain: [0.05, -0.05 ]
                 # when in down band, holds 1.0 by maximum
                 # when in up band, holds 0.05 by maximum
                 range: [ 0, 0.1 ]

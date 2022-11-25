@@ -24,7 +24,7 @@ var two = fixedpoint.NewFromInt(2)
 
 var log = logrus.WithField("strategy", ID)
 
-// TODO: Logic for backtest
+// TODO: Check logic of dynamic qty
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -303,6 +303,20 @@ func (s *Strategy) getOrderPrices(midPrice fixedpoint.Value) (askPrice fixedpoin
 	return askPrice, bidPrice
 }
 
+// adjustQuantity to meet the min notional and qty requirement
+func (s *Strategy) adjustQuantity(quantity, price fixedpoint.Value) fixedpoint.Value {
+	adjustedQty := quantity
+	if quantity.Mul(price).Compare(s.Market.MinNotional) < 0 {
+		adjustedQty = bbgo.AdjustFloatQuantityByMinAmount(quantity, price, s.Market.MinNotional.Mul(notionModifier))
+	}
+
+	if adjustedQty.Compare(s.Market.MinQuantity) < 0 {
+		adjustedQty = fixedpoint.Max(adjustedQty, s.Market.MinQuantity)
+	}
+
+	return adjustedQty
+}
+
 // getOrderQuantities returns sell and buy qty
 func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedpoint.Value) (sellQuantity fixedpoint.Value, buyQuantity fixedpoint.Value) {
 	// Default
@@ -357,6 +371,9 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 		}
 	}
 
+	buyQuantity = s.adjustQuantity(buyQuantity, bidPrice)
+	sellQuantity = s.adjustQuantity(sellQuantity, askPrice)
+
 	log.Infof("sell qty:%v buy qty: %v", sellQuantity, buyQuantity)
 
 	return sellQuantity, buyQuantity
@@ -373,12 +390,18 @@ func (s *Strategy) getAllowedBalance() (baseQty, quoteQty fixedpoint.Value) {
 	baseBalance, hasBaseBalance := balances[s.Market.BaseCurrency]
 	quoteBalance, hasQuoteBalance := balances[s.Market.QuoteCurrency]
 
-	isMargin := s.session.Margin || s.session.IsolatedMargin
-	isFutures := s.session.Futures || s.session.IsolatedFutures
+	if bbgo.IsBackTesting {
+		if !hasQuoteBalance {
+			baseQty = fixedpoint.Zero
+			quoteQty = fixedpoint.Zero
+		} else {
+			lastPrice, _ := s.session.LastPrice(s.Symbol)
+			baseQty = quoteBalance.Available.Div(lastPrice)
+			quoteQty = quoteBalance.Available
+		}
+	} else if s.session.Margin || s.session.IsolatedMargin {
 
-	if isMargin {
-
-	} else if isFutures {
+	} else if s.session.Futures || s.session.IsolatedFutures {
 
 	} else {
 		if !hasBaseBalance {
@@ -513,10 +536,6 @@ func (s *Strategy) getOrderForms(buyQuantity, bidPrice, sellQuantity, askPrice f
 			}
 		}
 	}
-
-	// TODO: Move these to qty calculation
-	sellOrder = adjustOrderQuantity(sellOrder, s.Market)
-	buyOrder = adjustOrderQuantity(buyOrder, s.Market)
 
 	return buyOrder, sellOrder
 }
@@ -710,17 +729,4 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	return nil
-}
-
-// adjustOrderQuantity to meet the min notional and qty requirement
-func adjustOrderQuantity(submitOrder types.SubmitOrder, market types.Market) types.SubmitOrder {
-	if submitOrder.Quantity.Mul(submitOrder.Price).Compare(market.MinNotional) < 0 {
-		submitOrder.Quantity = bbgo.AdjustFloatQuantityByMinAmount(submitOrder.Quantity, submitOrder.Price, market.MinNotional.Mul(notionModifier))
-	}
-
-	if submitOrder.Quantity.Compare(market.MinQuantity) < 0 {
-		submitOrder.Quantity = fixedpoint.Max(submitOrder.Quantity, market.MinQuantity)
-	}
-
-	return submitOrder
 }
