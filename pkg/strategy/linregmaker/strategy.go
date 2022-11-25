@@ -25,6 +25,7 @@ var two = fixedpoint.NewFromInt(2)
 var log = logrus.WithField("strategy", ID)
 
 // TODO: Logic for backtest
+// TODO: initial trend
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -240,6 +241,20 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	return s.orderExecutor.ClosePosition(ctx, percentage)
 }
 
+// isAllowOppositePosition returns if opening opposite position is allowed
+func (s *Strategy) isAllowOppositePosition() bool {
+	if !s.AllowOppositePosition {
+		return false
+	}
+
+	if (s.mainTrendCurrent == types.DirectionUp && s.FastLinReg.Last() < 0 && s.SlowLinReg.Last() < 0) ||
+		(s.mainTrendCurrent == types.DirectionDown && s.FastLinReg.Last() > 0 && s.SlowLinReg.Last() > 0) {
+		return true
+	}
+
+	return false
+}
+
 // updateSpread for ask and bid price
 func (s *Strategy) updateSpread() {
 	// Update spreads with dynamic spread
@@ -291,8 +306,6 @@ func (s *Strategy) getOrderPrices(midPrice fixedpoint.Value) (askPrice fixedpoin
 
 // getOrderQuantities returns sell and buy qty
 func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedpoint.Value) (sellQuantity fixedpoint.Value, buyQuantity fixedpoint.Value) {
-	// TODO: spot, margin, and futures
-
 	// Default
 	sellQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
 	buyQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
@@ -328,10 +341,21 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 	}
 
 	// Faster position decrease
-	if s.mainTrendCurrent == types.DirectionUp && s.FastLinReg.Last() < 0 && s.SlowLinReg.Last() < 0 {
-		sellQuantity = sellQuantity * s.FasterDecreaseRatio
-	} else if s.mainTrendCurrent == types.DirectionDown && s.FastLinReg.Last() > 0 && s.SlowLinReg.Last() > 0 {
-		buyQuantity = buyQuantity * s.FasterDecreaseRatio
+	if s.isAllowOppositePosition() {
+		if s.mainTrendCurrent == types.DirectionUp {
+			sellQuantity = sellQuantity * s.FasterDecreaseRatio
+		} else if s.mainTrendCurrent == types.DirectionDown {
+			buyQuantity = buyQuantity * s.FasterDecreaseRatio
+		}
+	}
+
+	// Reduce order qty to fit current position
+	if !s.isAllowOppositePosition() {
+		if s.Position.IsLong() && s.Position.Base.Abs().Compare(sellQuantity) < 0 {
+			sellQuantity = s.Position.Base.Abs()
+		} else if s.Position.IsShort() && s.Position.Base.Abs().Compare(buyQuantity) < 0 {
+			buyQuantity = s.Position.Base.Abs()
+		}
 	}
 
 	log.Infof("sell qty:%v buy qty: %v", sellQuantity, buyQuantity)
@@ -339,8 +363,42 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 	return sellQuantity, buyQuantity
 }
 
+// getAllowedBalance returns the allowed qty of orders
+// TODO LATER: Check max qty of margin and futures
+func (s *Strategy) getAllowedBalance() (baseQty, quoteQty fixedpoint.Value) {
+	// Default
+	baseQty = fixedpoint.PosInf
+	quoteQty = fixedpoint.PosInf
+
+	balances := s.session.GetAccount().Balances()
+	baseBalance, hasBaseBalance := balances[s.Market.BaseCurrency]
+	quoteBalance, hasQuoteBalance := balances[s.Market.QuoteCurrency]
+
+	isMargin := s.session.Margin || s.session.IsolatedMargin
+	isFutures := s.session.Futures || s.session.IsolatedFutures
+
+	if isMargin {
+
+	} else if isFutures {
+
+	} else {
+		if !hasBaseBalance {
+			baseQty = fixedpoint.Zero
+		} else {
+			baseQty = baseBalance.Available
+		}
+		if !hasQuoteBalance {
+			quoteQty = fixedpoint.Zero
+		} else {
+			quoteQty = quoteBalance.Available
+		}
+	}
+
+	return baseQty, quoteQty
+}
+
 // getCanBuySell returns the buy sell switches
-func (s *Strategy) getCanBuySell(midPrice fixedpoint.Value) (canBuy bool, canSell bool) {
+func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice fixedpoint.Value) (canBuy bool, canSell bool) {
 	// By default, both buy and sell are on, which means we will place buy and sell orders
 	canBuy = true
 	canSell = true
@@ -352,31 +410,116 @@ func (s *Strategy) getCanBuySell(midPrice fixedpoint.Value) (canBuy bool, canSel
 		} else if s.mainTrendCurrent == types.DirectionDown {
 			canSell = false
 		}
+		log.Infof("current position %v larger than max exposure %v, skip increase position", s.Position.GetBase().Abs(), s.MaxExposurePosition)
 	}
 
+	// Check TradeInBand
 	if s.TradeInBand {
 		// Price too high
-		if midPrice.Float64() > s.neutralBoll.UpBand.Last() {
+		if bidPrice.Float64() > s.neutralBoll.UpBand.Last() {
 			canBuy = false
 			log.Infof("tradeInBand is set, skip buy when the price is higher than the neutralBB")
 		}
 		// Price too low in uptrend
-		if midPrice.Float64() < s.neutralBoll.DownBand.Last() {
+		if askPrice.Float64() < s.neutralBoll.DownBand.Last() {
 			canSell = false
 			log.Infof("tradeInBand is set, skip sell when the price is lower than the neutralBB")
 		}
 	}
 
 	// Stop decrease when position closed unless both LinRegs are in the opposite direction to the main trend
-	if s.Position.IsClosed() || s.Position.IsDust(midPrice) {
-		if s.mainTrendCurrent == types.DirectionUp && !(s.AllowOppositePosition && s.FastLinReg.Last() < 0 && s.SlowLinReg.Last() < 0) {
+	if !s.isAllowOppositePosition() {
+		if s.mainTrendCurrent == types.DirectionUp && (s.Position.IsClosed() || s.Position.IsDust(askPrice)) {
 			canSell = false
-		} else if s.mainTrendCurrent == types.DirectionDown && !(s.AllowOppositePosition && s.FastLinReg.Last() > 0 && s.SlowLinReg.Last() > 0) {
+		} else if s.mainTrendCurrent == types.DirectionDown && (s.Position.IsClosed() || s.Position.IsDust(bidPrice)) {
 			canBuy = false
 		}
 	}
 
+	// Check against account balance
+	baseQty, quoteQty := s.getAllowedBalance()
+	if buyQuantity.Compare(quoteQty.Div(bidPrice)) > 0 {
+		canBuy = false
+	}
+	if sellQuantity.Compare(baseQty) > 0 {
+		canSell = false
+	}
+
 	return canBuy, canSell
+}
+
+// getOrderForms returns buy and sell order form for submission
+// TODO: Simplify
+func (s *Strategy) getOrderForms(buyQuantity, bidPrice, sellQuantity, askPrice fixedpoint.Value) (buyOrder types.SubmitOrder, sellOrder types.SubmitOrder) {
+	sellOrder = types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeLimitMaker,
+		Quantity: sellQuantity,
+		Price:    askPrice,
+		Market:   s.Market,
+		GroupID:  s.groupID,
+	}
+	buyOrder = types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeBuy,
+		Type:     types.OrderTypeLimitMaker,
+		Quantity: buyQuantity,
+		Price:    bidPrice,
+		Market:   s.Market,
+		GroupID:  s.groupID,
+	}
+
+	isMargin := s.session.Margin || s.session.IsolatedMargin
+	isFutures := s.session.Futures || s.session.IsolatedFutures
+
+	if s.Position.IsClosed() {
+		if isMargin {
+			buyOrder.MarginSideEffect = types.SideEffectTypeMarginBuy
+			sellOrder.MarginSideEffect = types.SideEffectTypeMarginBuy
+		} else if isFutures {
+			buyOrder.ReduceOnly = false
+			sellOrder.ReduceOnly = false
+		}
+	} else if s.Position.IsLong() {
+		if isMargin {
+			buyOrder.MarginSideEffect = types.SideEffectTypeMarginBuy
+			sellOrder.MarginSideEffect = types.SideEffectTypeAutoRepay
+		} else if isFutures {
+			buyOrder.ReduceOnly = false
+			sellOrder.ReduceOnly = true
+		}
+
+		if s.Position.Base.Abs().Compare(sellOrder.Quantity) < 0 {
+			if isMargin {
+				sellOrder.MarginSideEffect = types.SideEffectTypeMarginBuy
+			} else if isFutures {
+				sellOrder.ReduceOnly = false
+			}
+		}
+	} else if s.Position.IsShort() {
+		if isMargin {
+			buyOrder.MarginSideEffect = types.SideEffectTypeAutoRepay
+			sellOrder.MarginSideEffect = types.SideEffectTypeMarginBuy
+		} else if isFutures {
+			buyOrder.ReduceOnly = true
+			sellOrder.ReduceOnly = false
+		}
+
+		if s.Position.Base.Abs().Compare(buyOrder.Quantity) < 0 {
+			if isMargin {
+				sellOrder.MarginSideEffect = types.SideEffectTypeMarginBuy
+			} else if isFutures {
+				sellOrder.ReduceOnly = false
+			}
+		}
+	}
+
+	// TODO: Move these to qty calculation
+	sellOrder = adjustOrderQuantity(sellOrder, s.Market)
+	buyOrder = adjustOrderQuantity(buyOrder, s.Market)
+
+	return buyOrder, sellOrder
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -517,37 +660,17 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Order qty
 		sellQuantity, buyQuantity := s.getOrderQuantities(askPrice, bidPrice)
 
-		// TODO: Reduce only in margin and futures
-		sellOrder := types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeSell,
-			Type:     types.OrderTypeLimitMaker,
-			Quantity: sellQuantity,
-			Price:    askPrice,
-			Market:   s.Market,
-			GroupID:  s.groupID,
-		}
-		buyOrder := types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeBuy,
-			Type:     types.OrderTypeLimitMaker,
-			Quantity: buyQuantity,
-			Price:    bidPrice,
-			Market:   s.Market,
-			GroupID:  s.groupID,
-		}
+		buyOrder, sellOrder := s.getOrderForms(buyQuantity, bidPrice, sellQuantity, askPrice)
 
-		canBuy, canSell := s.getCanBuySell(midPrice)
-
-		// TODO: check enough balance?
+		canBuy, canSell := s.getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice)
 
 		// Submit orders
 		var submitOrders []types.SubmitOrder
 		if canSell {
-			submitOrders = append(submitOrders, adjustOrderQuantity(sellOrder, s.Market))
+			submitOrders = append(submitOrders, sellOrder)
 		}
 		if canBuy {
-			submitOrders = append(submitOrders, adjustOrderQuantity(buyOrder, s.Market))
+			submitOrders = append(submitOrders, buyOrder)
 		}
 
 		if len(submitOrders) == 0 {
