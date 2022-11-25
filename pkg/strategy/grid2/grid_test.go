@@ -1,3 +1,5 @@
+//go:build !dnum
+
 package grid2
 
 import (
@@ -170,7 +172,7 @@ func Test_calculateArithmeticPins(t *testing.T) {
 				Pin(number(1000.0)),
 				Pin(number(1066.660)),
 				Pin(number(1133.330)),
-				Pin(number(1199.990)),
+				Pin(number("1199.99")),
 				Pin(number(1266.660)),
 				Pin(number(1333.330)),
 				Pin(number(1399.990)),
@@ -197,14 +199,19 @@ func Test_calculateArithmeticPins(t *testing.T) {
 				Pin(number(2799.990)),
 				Pin(number(2866.660)),
 				Pin(number(2933.330)),
-				Pin(number(2999.990)),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			spread := tt.args.upper.Sub(tt.args.lower).Div(tt.args.size)
-			assert.Equalf(t, tt.want, calculateArithmeticPins(tt.args.lower, tt.args.upper, spread, tt.args.tickSize), "calculateArithmeticPins(%v, %v, %v, %v)", tt.args.lower, tt.args.upper, tt.args.size, tt.args.tickSize)
+			pins := calculateArithmeticPins(tt.args.lower, tt.args.upper, spread, tt.args.tickSize)
+			for i := 0; i < len(tt.want); i++ {
+				assert.InDelta(t, fixedpoint.Value(tt.want[i]).Float64(),
+					fixedpoint.Value(pins[i]).Float64(),
+					0.001,
+					"calculateArithmeticPins(%v, %v, %v, %v)", tt.args.lower, tt.args.upper, tt.args.size, tt.args.tickSize)
+			}
 		})
 	}
 }
