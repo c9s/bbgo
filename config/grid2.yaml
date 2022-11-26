@@ -1,0 +1,33 @@
+---
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+  max:
+    exchange: max
+    envVarPrefix: max
+
+# example command:
+#    godotenv -f .env.local -- go run ./cmd/bbgo backtest --sync-from 2020-11-01 --config config/grid.yaml --base-asset-baseline
+backtest:
+  startTime: "2022-01-01"
+  endTime: "2022-11-25"
+  symbols:
+  - BTCUSDT
+  sessions: [max]
+  accounts:
+    binance:
+      balances:
+        BTC: 0.0
+        USDT: 10000.0
+
+exchangeStrategies:
+
+- on: max
+  grid2:
+    symbol: BTCUSDT
+    upperPrice: 10_000.0
+    lowerPrice: 15_000.0
+    gridNumber: 10
+    quantity: 0.001
+    # profitSpread: 1000.0  # The profit price spread that you want to add to your sell order when your buy order is executed
