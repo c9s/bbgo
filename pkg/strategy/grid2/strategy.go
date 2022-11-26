@@ -337,6 +337,8 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 				return err2
 			}
 		}
+	} else {
+		// TODO: calculate the quantity from the investment configuration
 	}
 
 	if !s.BaseInvestment.IsZero() && !s.QuoteInvestment.IsZero() {
@@ -420,7 +422,9 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 		if err2 != nil {
 			return err
 		}
-		_ = createdOrders
+		for _, order := range createdOrders {
+			log.Infof(order.String())
+		}
 	}
 
 	return nil
