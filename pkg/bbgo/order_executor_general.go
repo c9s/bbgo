@@ -286,7 +286,7 @@ func (e *GeneralOrderExecutor) reduceQuantityAndSubmitOrder(ctx context.Context,
 
 		submitOrder.Quantity = q
 		if e.position.Market.IsDustQuantity(submitOrder.Quantity, price) {
-			return nil, types.NewZeroAssetError(nil)
+			return nil, types.NewZeroAssetError(fmt.Errorf("dust quantity"))
 		}
 
 		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
