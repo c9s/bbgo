@@ -69,3 +69,29 @@ func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
 		assert.InDelta(t, 4999.99989, requiredQuote.Float64(), number(0.001).Float64())
 	})
 }
+
+func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
+	s := &Strategy{
+		Market: types.Market{
+			BaseCurrency:  "BTC",
+			QuoteCurrency: "USDT",
+		},
+	}
+
+	t.Run("calculate quote quantity from quote investment", func(t *testing.T) {
+		// quoteInvestment = (10,000 + 11,000 + 12,000 + 13,000 + 14,000) * q
+		// q = quoteInvestment / (10,000 + 11,000 + 12,000 + 13,000 + 14,000)
+		// q = 12_000 / (10,000 + 11,000 + 12,000 + 13,000 + 14,000)
+		// q = 0.2
+		quantity, err := s.calculateQuoteInvestmentQuantity(number(12_000.0), number(13_500.0), []Pin{
+			Pin(number(10_000.0)), // buy
+			Pin(number(11_000.0)), // buy
+			Pin(number(12_000.0)), // buy
+			Pin(number(13_000.0)), // buy
+			Pin(number(14_000.0)), // buy
+			Pin(number(15_000.0)),
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, number(0.2).String(), quantity.String())
+	})
+}
