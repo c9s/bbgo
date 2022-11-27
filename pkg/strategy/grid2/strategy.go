@@ -301,6 +301,43 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 	return requiredBase, requiredQuote, nil
 }
 
+func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice fixedpoint.Value, pins []Pin) (fixedpoint.Value, error) {
+	buyPlacedPrice := fixedpoint.Zero
+
+	// quoteInvestment = (p1 * q) + (p2 * q) + (p3 * q) + ....
+	// =>
+	// quoteInvestment = (p1 + p2 + p3) * q
+	// q = quoteInvestment / (p1 + p2 + p3)
+	totalQuotePrice := fixedpoint.Zero
+	for i := len(pins) - 1; i >= 0; i-- {
+		pin := pins[i]
+		price := fixedpoint.Value(pin)
+
+		if price.Compare(lastPrice) >= 0 {
+			// for orders that sell
+			// if we still have the base balance
+			// quantity := amount.Div(lastPrice)
+			if i > 0 { // we do not want to sell at i == 0
+				// convert sell to buy quote and add to requiredQuote
+				nextLowerPin := pins[i-1]
+				nextLowerPrice := fixedpoint.Value(nextLowerPin)
+				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
+				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
+				buyPlacedPrice = nextLowerPrice
+			}
+		} else {
+			// for orders that buy
+			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) == 0 {
+				continue
+			}
+
+			totalQuotePrice = totalQuotePrice.Add(price)
+		}
+	}
+
+	return quoteInvestment.Div(totalQuotePrice), nil
+}
+
 // setupGridOrders
 // 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
@@ -339,6 +376,13 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 		}
 	} else {
 		// TODO: calculate the quantity from the investment configuration
+		if !s.QuoteInvestment.IsZero() {
+			quantity, err2 := s.calculateQuoteInvestmentQuantity(s.QuoteInvestment, lastPrice, s.grid.Pins)
+			if err2 != nil {
+				return err2
+			}
+			_ = quantity
+		}
 	}
 
 	if !s.BaseInvestment.IsZero() && !s.QuoteInvestment.IsZero() {
