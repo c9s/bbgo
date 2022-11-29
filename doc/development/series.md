@@ -41,3 +41,21 @@ var _ types.Series = &INDICATOR_TYPENAME{}
 ```
 
 and if any of the method in the interface not been implemented, this would generate compile time error messages.
+
+#### Extended Series
+
+Instead of simple Series interface, we have `types.SeriesExtend` interface that enriches the functionality of `types.Series`. An indicator struct could simply be extended to `types.SeriesExtend` type by embedding anonymous struct `types.SeriesBase`, and instanced by `types.NewSeries()` function. The `types.SeriesExtend` interface binds commonly used functions, such as `Add`, `Reverse`, `Shfit`, `Covariance` and `Entropy`, to the original `types.Series` object. Please check [pkg/types/seriesbase_imp.go](../../pkg/types/seriesbase_imp.go) for the extendable functions.
+
+Example:
+
+```go
+a := types.NewQueue(3) // types.Queue is a SeriesExtend container type that holds limit number of floats
+a.Update(100.)
+a.Update(200.)
+a.Update(300.)
+assert.Equal(t, a.Sum(3), 600.)
+```
+
+#### Cautions
+
+Avoid using `floats.Slice` to hold unlimited number of floats, unless you clean up the memory regularly. Manipulate large array of numbers will give huge impact on the computation speed due to long malloc/dealloc time.
