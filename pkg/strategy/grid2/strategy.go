@@ -357,12 +357,12 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 
 	// if the maxBaseQuantity is less than minQuantity, then we need to reduce the number of the sell orders
 	// so that the quantity can be increased.
-	numberOfSellOrders++
+	maxNumberOfSellOrders := numberOfSellOrders + 1
 	minBaseQuantity := fixedpoint.Max(s.Market.MinNotional.Div(lastPrice), s.Market.MinQuantity)
 	maxBaseQuantity := fixedpoint.Zero
 	for maxBaseQuantity.Compare(s.Market.MinQuantity) <= 0 {
-		numberOfSellOrders--
-		maxBaseQuantity = baseInvestment.Div(fixedpoint.NewFromInt(int64(numberOfSellOrders)))
+		maxNumberOfSellOrders--
+		maxBaseQuantity = baseInvestment.Div(fixedpoint.NewFromInt(int64(maxNumberOfSellOrders)))
 	}
 	log.Infof("grid %s base investment quantity range: %f <=> %f", s.Symbol, minBaseQuantity.Float64(), maxBaseQuantity.Float64())
 
