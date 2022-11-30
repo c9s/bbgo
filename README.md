@@ -232,6 +232,23 @@ bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 
 ## Advanced Configuration
 
+### Synchronize System Time With Binance
+
+BBGO provides the script for UNIX systems/subsystems to synchronize date with Binance. `jq` and `bc` are required to be installed in previous.
+To install the dependencies in Ubuntu, try the following commands:
+
+```bash
+sudo apt install -y bc jq
+```
+
+And to synchronize the date, try:
+
+```bash
+sudo ./scripts/sync_time.sh
+```
+
+You could also add the script to crontab so that the system time could get synchronized with Binance regularly.
+
 ### Testnet (Paper Trading)
 
 Currently only supports binance testnet. To run bbgo in testnet, apply new API keys
