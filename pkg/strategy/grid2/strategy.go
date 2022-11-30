@@ -338,6 +338,65 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 	return quoteInvestment.Div(totalQuotePrice), nil
 }
 
+func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice fixedpoint.Value, pins []Pin) (fixedpoint.Value, error) {
+	// q_p1 = q_p2 = q_p3 = q_p4
+	// baseInvestment = q_p1 + q_p2 + q_p3 + q_p4 + ....
+	// baseInvestment = numberOfSellOrders * q
+	// maxBaseQuantity = baseInvestment / numberOfSellOrders
+	// if maxBaseQuantity < minQuantity or maxBaseQuantity * priceLowest < minNotional
+	// then reduce the numberOfSellOrders
+	numberOfSellOrders := 0
+	for i := len(pins) - 1; i >= 0; i-- {
+		pin := pins[i]
+		price := fixedpoint.Value(pin)
+		if price.Compare(lastPrice) < 0 {
+			break
+		}
+		numberOfSellOrders++
+	}
+
+	numberOfSellOrders++
+	maxBaseQuantity := fixedpoint.Zero
+	for maxBaseQuantity.Compare(s.Market.MinQuantity) <= 0 {
+		numberOfSellOrders--
+		maxBaseQuantity = baseInvestment.Div(fixedpoint.NewFromInt(int64(numberOfSellOrders)))
+	}
+
+	buyPlacedPrice := fixedpoint.Zero
+	totalQuotePrice := fixedpoint.Zero
+	// quoteInvestment = (p1 * q) + (p2 * q) + (p3 * q) + ....
+	// =>
+	// quoteInvestment = (p1 + p2 + p3) * q
+	// maxBuyQuantity = quoteInvestment / (p1 + p2 + p3)
+	for i := len(pins) - 1; i >= 0; i-- {
+		pin := pins[i]
+		price := fixedpoint.Value(pin)
+
+		if price.Compare(lastPrice) >= 0 {
+			// for orders that sell
+			// if we still have the base balance
+			// quantity := amount.Div(lastPrice)
+			if i > 0 { // we do not want to sell at i == 0
+				// convert sell to buy quote and add to requiredQuote
+				nextLowerPin := pins[i-1]
+				nextLowerPrice := fixedpoint.Value(nextLowerPin)
+				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
+				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
+				buyPlacedPrice = nextLowerPrice
+			}
+		} else {
+			// for orders that buy
+			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) == 0 {
+				continue
+			}
+
+			totalQuotePrice = totalQuotePrice.Add(price)
+		}
+	}
+
+	return quoteInvestment.Div(totalQuotePrice), nil
+}
+
 // setupGridOrders
 // 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
@@ -376,12 +435,19 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 		}
 	} else {
 		// TODO: calculate the quantity from the investment configuration
-		if !s.QuoteInvestment.IsZero() {
+		if !s.QuoteInvestment.IsZero() && !s.BaseInvestment.IsZero() {
+			quantity, err2 := s.calculateQuoteBaseInvestmentQuantity(s.QuoteInvestment, s.BaseInvestment, lastPrice, s.grid.Pins)
+			if err2 != nil {
+				return err2
+			}
+			s.QuantityOrAmount.Quantity = quantity
+
+		} else if !s.QuoteInvestment.IsZero() {
 			quantity, err2 := s.calculateQuoteInvestmentQuantity(s.QuoteInvestment, lastPrice, s.grid.Pins)
 			if err2 != nil {
 				return err2
 			}
-			_ = quantity
+			s.QuantityOrAmount.Quantity = quantity
 		}
 	}
 
