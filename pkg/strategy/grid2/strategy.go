@@ -355,6 +355,8 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 		numberOfSellOrders++
 	}
 
+	// if the maxBaseQuantity is less than minQuantity, then we need to reduce the number of the sell orders
+	// so that the quantity can be increased.
 	numberOfSellOrders++
 	maxBaseQuantity := fixedpoint.Zero
 	for maxBaseQuantity.Compare(s.Market.MinQuantity) <= 0 {
