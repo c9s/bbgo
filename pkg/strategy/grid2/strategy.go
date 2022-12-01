@@ -439,7 +439,7 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 			}
 		}
 	} else {
-		// TODO: calculate the quantity from the investment configuration
+		// calculate the quantity from the investment configuration
 		if !s.QuoteInvestment.IsZero() && !s.BaseInvestment.IsZero() {
 			quantity, err2 := s.calculateQuoteBaseInvestmentQuantity(s.QuoteInvestment, s.BaseInvestment, lastPrice, s.grid.Pins)
 			if err2 != nil {
