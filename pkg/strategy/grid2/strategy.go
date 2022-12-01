@@ -456,6 +456,8 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 		}
 	}
 
+	// if base investment and quote investment is set, when we should check if the
+	// investment configuration is valid with the current balances
 	if !s.BaseInvestment.IsZero() && !s.QuoteInvestment.IsZero() {
 		if s.BaseInvestment.Compare(totalBase) > 0 {
 			return fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", s.BaseInvestment.Float64(), totalBase.Float64())
