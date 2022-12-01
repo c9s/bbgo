@@ -360,7 +360,7 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 	maxNumberOfSellOrders := numberOfSellOrders + 1
 	minBaseQuantity := fixedpoint.Max(s.Market.MinNotional.Div(lastPrice), s.Market.MinQuantity)
 	maxBaseQuantity := fixedpoint.Zero
-	for maxBaseQuantity.Compare(s.Market.MinQuantity) <= 0 {
+	for maxBaseQuantity.Compare(s.Market.MinQuantity) <= 0 || maxBaseQuantity.Compare(minBaseQuantity) <= 0 {
 		maxNumberOfSellOrders--
 		maxBaseQuantity = baseInvestment.Div(fixedpoint.NewFromInt(int64(maxNumberOfSellOrders)))
 	}
@@ -398,7 +398,8 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 		}
 	}
 
-	return quoteInvestment.Div(totalQuotePrice), nil
+	quoteSideQuantity := quoteInvestment.Div(totalQuotePrice)
+	return fixedpoint.Max(quoteSideQuantity, maxBaseQuantity), nil
 }
 
 // setupGridOrders
