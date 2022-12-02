@@ -15,6 +15,7 @@ backtest:
   symbols:
   - BTCUSDT
   sessions: [max]
+  # sessions: [binance]
   accounts:
     binance:
       balances:
@@ -29,5 +30,25 @@ exchangeStrategies:
     upperPrice: 10_000.0
     lowerPrice: 15_000.0
     gridNumber: 10
-    quantity: 0.001
-    # profitSpread: 1000.0  # The profit price spread that you want to add to your sell order when your buy order is executed
+
+    ## profitSpread is the profit spread of the arbitrage order (sell order)
+    ## greater the profitSpread, greater the profit you make when the sell order is filled.
+    ## you can set this instead of the default grid profit spread.
+    ## by default, profitSpread = (upperPrice - lowerPrice) / gridNumber
+    ## that is, greater the gridNumber, lesser the profit of each grid.
+    # profitSpread: 1000.0
+
+    ## There are 3 kinds of setup
+    ## NOTICE: you can only choose one, uncomment the config to enable it
+    ##
+    ## 1) fixed amount: amount is the quote unit (e.g. USDT in BTCUSDT)
+    # amount: 10.0
+
+    ## 2) fixed quantity: it will use your balance to place orders with the fixed quantity. e.g. 0.001 BTC
+    # quantity: 0.001
+
+    ## 3) quoteInvestment and baseInvestment: when using quoteInvestment, the strategy will automatically calculate your best quantity for the whole grid.
+    ##    quoteInvestment is required, and baseInvestment is optional (could be zero)
+    ##    if you have existing BTC position and want to reuse it you can set the baseInvestment.
+    quoteInvestment: 10_000
+    baseInvestment: 1.0
