@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"net/http/httputil"
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,6 +14,10 @@ import (
 )
 
 func getTestClientOrSkip(t *testing.T) *RestClient {
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
 	key, secret, ok := testutil.IntegrationTestConfigured(t, "BINANCE")
 	if !ok {
 		t.SkipNow()
@@ -101,6 +107,10 @@ func TestClient_NewGetMarginInterestRateHistoryRequest(t *testing.T) {
 }
 
 func TestClient_privateCall(t *testing.T) {
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
 	key, secret, ok := testutil.IntegrationTestConfigured(t, "BINANCE")
 	if !ok {
 		t.SkipNow()
@@ -136,6 +146,10 @@ func TestClient_privateCall(t *testing.T) {
 }
 
 func TestClient_setTimeOffsetFromServer(t *testing.T) {
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
 	client := NewClient("")
 	err := client.SetTimeOffsetFromServer(context.Background())
 	assert.NoError(t, err)
