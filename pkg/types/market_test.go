@@ -26,12 +26,12 @@ func TestFormatQuantity(t *testing.T) {
 }
 
 func TestFormatPrice(t *testing.T) {
-	price := formatPrice(
+	price := FormatPrice(
 		s("26.288256"),
 		s("0.0001"))
 	assert.Equal(t, "26.2882", price)
 
-	price = formatPrice(s("26.288656"), s("0.001"))
+	price = FormatPrice(s("26.288656"), s("0.001"))
 	assert.Equal(t, "26.288", price)
 }
 
@@ -78,7 +78,7 @@ func TestDurationParse(t *testing.T) {
 	}
 }
 
-func Test_formatPrice(t *testing.T) {
+func Test_FormatPrice(t *testing.T) {
 	type args struct {
 		price    fixedpoint.Value
 		tickSize fixedpoint.Value
@@ -125,9 +125,9 @@ func Test_formatPrice(t *testing.T) {
 	binanceFormatRE := regexp.MustCompile("^([0-9]{1,20})(.[0-9]{1,20})?$")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := formatPrice(tt.args.price, tt.args.tickSize)
+			got := FormatPrice(tt.args.price, tt.args.tickSize)
 			if got != tt.want {
-				t.Errorf("formatPrice() = %v, want %v", got, tt.want)
+				t.Errorf("FormatPrice() = %v, want %v", got, tt.want)
 			}
 
 			assert.Regexp(t, binanceFormatRE, got)

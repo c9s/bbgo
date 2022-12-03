@@ -2,6 +2,7 @@ package trendtrader
 
 import (
 	"context"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
@@ -149,8 +150,5 @@ func line(p1, p2, p3 float64) int64 {
 }
 
 func converge(mr, ms float64) bool {
-	if ms > mr {
-		return true
-	}
-	return false
+	return ms > mr
 }
