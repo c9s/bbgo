@@ -152,7 +152,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		}
 
 		// use the profit to buy more inventory in the grid
-		if s.Compound {
+		if s.Compound || s.EarnBase {
 			quoteQuantity := o.Quantity.Mul(o.Price)
 			newQuantity = quoteQuantity.Div(newPrice)
 		}
@@ -161,6 +161,11 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		newSide = types.SideTypeSell
 		if pin, ok := s.grid.NextHigherPin(newPrice); ok {
 			newPrice = fixedpoint.Value(pin)
+		}
+
+		if s.EarnBase {
+			quoteQuantity := o.Quantity.Mul(o.Price)
+			newQuantity = quoteQuantity.Div(newPrice)
 		}
 	}
 
