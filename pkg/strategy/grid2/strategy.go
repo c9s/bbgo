@@ -72,15 +72,14 @@ type Strategy struct {
 	// orderStore is used to store all the created orders, so that we can filter the trades.
 	orderStore *bbgo.OrderStore
 
-	// activeOrders is the locally maintained active order book of the maker orders.
-	activeOrders *bbgo.ActiveOrderBook
-
 	tradeCollector *bbgo.TradeCollector
 
 	orderExecutor *bbgo.GeneralOrderExecutor
 
 	// groupID is the group ID used for the strategy instance for canceling orders
 	groupID uint32
+
+	logger *logrus.Entry
 }
 
 func (s *Strategy) ID() string {
@@ -133,9 +132,13 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 
+	s.logger = log.WithFields(logrus.Fields{
+		"symbol": s.Symbol,
+	})
+
 	s.groupID = util.FNV32(instanceID)
 
-	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
+	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	if s.ProfitStats == nil {
 		s.ProfitStats = types.NewProfitStats(s.Market)
@@ -162,9 +165,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.Sync(ctx, s)
 
 		// now we can cancel the open orders
-		log.Infof("canceling active orders...")
-		if err := session.Exchange.CancelOrders(context.Background(), s.activeOrders.Orders()...); err != nil {
-			log.WithError(err).Errorf("cancel order error")
+		s.logger.Infof("canceling active orders...")
+
+		if err := s.orderExecutor.GracefulCancel(ctx); err != nil {
+			log.WithError(err).Errorf("graceful order cancel error")
 		}
 	})
 
@@ -340,7 +344,7 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 }
 
 func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice fixedpoint.Value, pins []Pin) (fixedpoint.Value, error) {
-	log.Infof("calculating quantity by quote/base investment: %f / %f", baseInvestment.Float64(), quoteInvestment.Float64())
+	s.logger.Infof("calculating quantity by quote/base investment: %f / %f", baseInvestment.Float64(), quoteInvestment.Float64())
 	// q_p1 = q_p2 = q_p3 = q_p4
 	// baseInvestment = q_p1 + q_p2 + q_p3 + q_p4 + ....
 	// baseInvestment = numberOfSellOrders * q
