@@ -32,6 +32,9 @@ exchangeStrategies:
     # default: false
     compound: true
 
+    stopLossPrice: 10_000.0
+    takeProfitPrice: 20_000.0
+
     ## profitSpread is the profit spread of the arbitrage order (sell order)
     ## greater the profitSpread, greater the profit you make when the sell order is filled.
     ## you can set this instead of the default grid profit spread.
