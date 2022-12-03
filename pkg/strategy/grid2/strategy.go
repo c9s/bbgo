@@ -126,6 +126,8 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) handleOrderFilled(o types.Order) {
+	s.logger.Infof("order filled: %s", o.String())
+
 	// check order fee
 	newSide := types.SideTypeSell
 	newPrice := o.Price
@@ -195,6 +197,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
 	s.grid.CalculateArithmeticPins()
+
+	s.logger.Info(s.grid.String())
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -407,9 +411,9 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 		maxNumberOfSellOrders--
 		maxBaseQuantity = baseInvestment.Div(fixedpoint.NewFromInt(int64(maxNumberOfSellOrders)))
 	}
-	s.logger.Infof("grid %s base investment sell orders: %d", s.Symbol, maxNumberOfSellOrders)
+	s.logger.Infof("grid base investment sell orders: %d", maxNumberOfSellOrders)
 	if maxNumberOfSellOrders > 0 {
-		s.logger.Infof("grid %s base investment quantity range: %f <=> %f", s.Symbol, minBaseQuantity.Float64(), maxBaseQuantity.Float64())
+		s.logger.Infof("grid base investment quantity range: %f <=> %f", minBaseQuantity.Float64(), maxBaseQuantity.Float64())
 	}
 
 	buyPlacedPrice := fixedpoint.Zero
