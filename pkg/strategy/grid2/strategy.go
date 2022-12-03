@@ -108,6 +108,14 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("upperPrice (%s) should not be less than or equal to lowerPrice (%s)", s.UpperPrice.String(), s.LowerPrice.String())
 	}
 
+	if !s.ProfitSpread.IsZero() {
+		percent := s.ProfitSpread.Div(s.LowerPrice)
+		feeRate := fixedpoint.NewFromFloat(0.075 * 0.01)
+		if percent.Compare(feeRate) < 0 {
+			return fmt.Errorf("profitSpread %f %s is too small, less than the fee rate: %s", s.ProfitSpread.Float64(), percent.Percentage(), feeRate.Percentage())
+		}
+	}
+
 	if s.GridNum == 0 {
 		return fmt.Errorf("gridNum can not be zero")
 	}
@@ -147,8 +155,13 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	switch o.Side {
 	case types.SideTypeSell:
 		newSide = types.SideTypeBuy
-		if pin, ok := s.grid.NextLowerPin(newPrice); ok {
-			newPrice = fixedpoint.Value(pin)
+
+		if !s.ProfitSpread.IsZero() {
+			newPrice = newPrice.Sub(s.ProfitSpread)
+		} else {
+			if pin, ok := s.grid.NextLowerPin(newPrice); ok {
+				newPrice = fixedpoint.Value(pin)
+			}
 		}
 
 		// use the profit to buy more inventory in the grid
@@ -159,8 +172,12 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 
 	case types.SideTypeBuy:
 		newSide = types.SideTypeSell
-		if pin, ok := s.grid.NextHigherPin(newPrice); ok {
-			newPrice = fixedpoint.Value(pin)
+		if !s.ProfitSpread.IsZero() {
+			newPrice = newPrice.Add(s.ProfitSpread)
+		} else {
+			if pin, ok := s.grid.NextHigherPin(newPrice); ok {
+				newPrice = fixedpoint.Value(pin)
+			}
 		}
 
 		if s.EarnBase {
