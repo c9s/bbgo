@@ -27,10 +27,14 @@ exchangeStrategies:
     lowerPrice: 12_000.0
     gridNumber: 100
 
-    # compound is used for buying more inventory when the profit is made by the filled SELL order.
-    # when compound is disabled, fixed quantity is used for each grid order.
-    # default: false
+    ## compound is used for buying more inventory when the profit is made by the filled SELL order.
+    ## when compound is disabled, fixed quantity is used for each grid order.
+    ## default: false
     compound: true
+
+    ## earnBase is used to profit base quantity instead of quote quantity.
+    ## meaning that earn BTC instead of USDT when trading in the BTCUSDT pair.
+    # earnBase: true
 
     stopLossPrice: 10_000.0
     takeProfitPrice: 20_000.0
