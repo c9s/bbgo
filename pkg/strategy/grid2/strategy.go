@@ -58,6 +58,11 @@ type Strategy struct {
 	// the profit is made by the filled sell order.
 	Compound bool `json:"compound"`
 
+	// EarnBase option is used for earning profit in base currency.
+	// e.g. earn BTC in BTCUSDT and earn ETH in ETHUSDT
+	// instead of earn USDT in BTCUSD
+	EarnBase bool `json:"earnBase"`
+
 	// QuantityOrAmount embeds the Quantity field and the Amount field
 	// If you set up the Quantity field or the Amount field, you don't need to set the QuoteInvestment and BaseInvestment
 	bbgo.QuantityOrAmount
