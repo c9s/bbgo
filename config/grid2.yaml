@@ -35,7 +35,7 @@ exchangeStrategies:
     ## earnBase is used to profit base quantity instead of quote quantity.
     ## meaning that earn BTC instead of USDT when trading in the BTCUSDT pair.
     # earnBase: true
-    
+
     ## profitSpread is the profit spread of the arbitrage order (sell order)
     ## greater the profitSpread, greater the profit you make when the sell order is filled.
     ## you can set this instead of the default grid profit spread.
