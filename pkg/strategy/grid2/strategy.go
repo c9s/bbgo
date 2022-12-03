@@ -370,9 +370,9 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 		maxNumberOfSellOrders--
 		maxBaseQuantity = baseInvestment.Div(fixedpoint.NewFromInt(int64(maxNumberOfSellOrders)))
 	}
-	log.Infof("grid %s base investment sell orders: %d", s.Symbol, maxNumberOfSellOrders)
+	s.logger.Infof("grid %s base investment sell orders: %d", s.Symbol, maxNumberOfSellOrders)
 	if maxNumberOfSellOrders > 0 {
-		log.Infof("grid %s base investment quantity range: %f <=> %f", s.Symbol, minBaseQuantity.Float64(), maxBaseQuantity.Float64())
+		s.logger.Infof("grid %s base investment quantity range: %f <=> %f", s.Symbol, minBaseQuantity.Float64(), maxBaseQuantity.Float64())
 	}
 
 	buyPlacedPrice := fixedpoint.Zero
@@ -553,7 +553,7 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 			return err
 		}
 		for _, order := range createdOrders {
-			log.Infof(order.String())
+			s.logger.Infof(order.String())
 		}
 	}
 
