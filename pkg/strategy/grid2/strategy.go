@@ -54,6 +54,10 @@ type Strategy struct {
 
 	LowerPrice fixedpoint.Value `json:"lowerPrice"`
 
+	// Compound option is used for buying more inventory when
+	// the profit is made by the filled sell order.
+	Compound bool `json:"compound"`
+
 	// QuantityOrAmount embeds the Quantity field and the Amount field
 	// If you set up the Quantity field or the Amount field, you don't need to set the QuoteInvestment and BaseInvestment
 	bbgo.QuantityOrAmount
@@ -143,8 +147,10 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		}
 
 		// use the profit to buy more inventory in the grid
-		quoteQuantity := o.Quantity.Mul(o.Price)
-		newQuantity = quoteQuantity.Div(newPrice)
+		if s.Compound {
+			quoteQuantity := o.Quantity.Mul(o.Price)
+			newQuantity = quoteQuantity.Div(newPrice)
+		}
 
 	case types.SideTypeBuy:
 		newSide = types.SideTypeSell
