@@ -100,17 +100,18 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("upperPrice (%s) should not be less than or equal to lowerPrice (%s)", s.UpperPrice.String(), s.LowerPrice.String())
 	}
 
-	if s.ProfitSpread.Sign() <= 0 {
-		// If profitSpread is empty or its value is negative
-		return fmt.Errorf("profit spread should bigger than 0")
-	}
-
 	if s.GridNum == 0 {
 		return fmt.Errorf("gridNum can not be zero")
 	}
 
 	if err := s.QuantityOrAmount.Validate(); err != nil {
-		return err
+		if s.QuoteInvestment.IsZero() && s.BaseInvestment.IsZero() {
+			return err
+		}
+	}
+
+	if !s.QuantityOrAmount.IsSet() && s.QuoteInvestment.IsZero() && s.BaseInvestment.IsZero() {
+		return fmt.Errorf("one of quantity, amount, quoteInvestment must be set")
 	}
 
 	return nil
