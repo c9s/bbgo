@@ -23,9 +23,9 @@ exchangeStrategies:
 - on: max
   grid2:
     symbol: BTCUSDT
-    upperPrice: 15_000.0
+    upperPrice: 20_000.0
     lowerPrice: 10_000.0
-    gridNumber: 10
+    gridNumber: 50
 
     ## profitSpread is the profit spread of the arbitrage order (sell order)
     ## greater the profitSpread, greater the profit you make when the sell order is filled.
