@@ -126,7 +126,43 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) handleOrderFilled(o types.Order) {
+	// check order fee
+	newSide := types.SideTypeSell
+	newPrice := o.Price
+	newQuantity := o.Quantity
 
+	// quantityReduction := fixedpoint.Zero
+
+	switch o.Side {
+	case types.SideTypeSell:
+		newSide = types.SideTypeBuy
+		if pin, ok := s.grid.NextLowerPin(newPrice); ok {
+			newPrice = fixedpoint.Value(pin)
+		}
+
+	case types.SideTypeBuy:
+		newSide = types.SideTypeSell
+		if pin, ok := s.grid.NextHigherPin(newPrice); ok {
+			newPrice = fixedpoint.Value(pin)
+		}
+	}
+
+	orderForm := types.SubmitOrder{
+		Symbol:      s.Symbol,
+		Market:      s.Market,
+		Type:        types.OrderTypeLimit,
+		Price:       newPrice,
+		Side:        newSide,
+		TimeInForce: types.TimeInForceGTC,
+		Tag:         "grid",
+		Quantity:    newQuantity,
+	}
+
+	if createdOrders, err := s.orderExecutor.SubmitOrders(context.Background(), orderForm); err != nil {
+		s.logger.WithError(err).Errorf("can not submit arbitrage order")
+	} else {
+		s.logger.Infof("order created: %+v", createdOrders)
+	}
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -155,6 +191,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
+	s.orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
 
 	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
 	s.grid.CalculateArithmeticPins()
@@ -502,7 +539,7 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 			if usedBase.Add(quantity).Compare(totalBase) < 0 {
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
-					Type:        types.OrderTypeLimitMaker,
+					Type:        types.OrderTypeLimit,
 					Side:        types.SideTypeSell,
 					Price:       price,
 					Quantity:    quantity,
@@ -517,7 +554,7 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 				nextPrice := fixedpoint.Value(nextPin)
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
-					Type:        types.OrderTypeLimitMaker,
+					Type:        types.OrderTypeLimit,
 					Side:        types.SideTypeBuy,
 					Price:       nextPrice,
 					Quantity:    quantity,
@@ -536,7 +573,7 @@ func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSe
 
 			submitOrders = append(submitOrders, types.SubmitOrder{
 				Symbol:      s.Symbol,
-				Type:        types.OrderTypeLimitMaker,
+				Type:        types.OrderTypeLimit,
 				Side:        types.SideTypeBuy,
 				Price:       price,
 				Quantity:    quantity,
