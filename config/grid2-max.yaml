@@ -27,6 +27,11 @@ exchangeStrategies:
     lowerPrice: 12_000.0
     gridNumber: 100
 
+    # compound is used for buying more inventory when the profit is made by the filled SELL order.
+    # when compound is disabled, fixed quantity is used for each grid order.
+    # default: false
+    compound: true
+
     ## profitSpread is the profit spread of the arbitrage order (sell order)
     ## greater the profitSpread, greater the profit you make when the sell order is filled.
     ## you can set this instead of the default grid profit spread.
