@@ -5,6 +5,7 @@ package grid2
 import (
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -12,6 +13,8 @@ import (
 
 func TestStrategy_checkRequiredInvestmentByQuantity(t *testing.T) {
 	s := &Strategy{
+		logger: logrus.NewEntry(logrus.New()),
+
 		Market: types.Market{
 			BaseCurrency:  "BTC",
 			QuoteCurrency: "USDT",
@@ -47,6 +50,8 @@ func TestStrategy_checkRequiredInvestmentByQuantity(t *testing.T) {
 
 func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
 	s := &Strategy{
+
+		logger: logrus.NewEntry(logrus.New()),
 		Market: types.Market{
 			BaseCurrency:  "BTC",
 			QuoteCurrency: "USDT",
@@ -72,6 +77,7 @@ func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
 
 func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 	s := &Strategy{
+		logger: logrus.NewEntry(logrus.New()),
 		Market: types.Market{
 			BaseCurrency:  "BTC",
 			QuoteCurrency: "USDT",
