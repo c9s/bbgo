@@ -142,6 +142,10 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 			newPrice = fixedpoint.Value(pin)
 		}
 
+		// use the profit to buy more inventory in the grid
+		quoteQuantity := o.Quantity.Mul(o.Price)
+		newQuantity = quoteQuantity.Div(newPrice)
+
 	case types.SideTypeBuy:
 		newSide = types.SideTypeSell
 		if pin, ok := s.grid.NextHigherPin(newPrice); ok {
@@ -156,8 +160,8 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		Price:       newPrice,
 		Side:        newSide,
 		TimeInForce: types.TimeInForceGTC,
-		Tag:         "grid",
 		Quantity:    newQuantity,
+		Tag:         "grid",
 	}
 
 	s.logger.Infof("SUBMIT ORDER: %s", orderForm.String())
