@@ -340,6 +340,7 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 }
 
 func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice fixedpoint.Value, pins []Pin) (fixedpoint.Value, error) {
+	log.Infof("calculating quantity by quote/base investment: %f / %f", baseInvestment.Float64(), quoteInvestment.Float64())
 	// q_p1 = q_p2 = q_p3 = q_p4
 	// baseInvestment = q_p1 + q_p2 + q_p3 + q_p4 + ....
 	// baseInvestment = numberOfSellOrders * q
@@ -365,7 +366,10 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 		maxNumberOfSellOrders--
 		maxBaseQuantity = baseInvestment.Div(fixedpoint.NewFromInt(int64(maxNumberOfSellOrders)))
 	}
-	log.Infof("grid %s base investment quantity range: %f <=> %f", s.Symbol, minBaseQuantity.Float64(), maxBaseQuantity.Float64())
+	log.Infof("grid %s base investment sell orders: %d", s.Symbol, maxNumberOfSellOrders)
+	if maxNumberOfSellOrders > 0 {
+		log.Infof("grid %s base investment quantity range: %f <=> %f", s.Symbol, minBaseQuantity.Float64(), maxBaseQuantity.Float64())
+	}
 
 	buyPlacedPrice := fixedpoint.Zero
 	totalQuotePrice := fixedpoint.Zero
@@ -400,7 +404,11 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 	}
 
 	quoteSideQuantity := quoteInvestment.Div(totalQuotePrice)
-	return fixedpoint.Max(quoteSideQuantity, maxBaseQuantity), nil
+	if maxNumberOfSellOrders > 0 {
+		return fixedpoint.Max(quoteSideQuantity, maxBaseQuantity), nil
+	}
+
+	return quoteSideQuantity, nil
 }
 
 // setupGridOrders
