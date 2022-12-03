@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"database/sql"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,6 +17,10 @@ import (
 )
 
 func TestBacktestService_FindMissingTimeRanges_EmptyData(t *testing.T) {
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
 	db, err := prepareDB(t)
 	if err != nil {
 		t.Fatal(err)
@@ -40,6 +46,10 @@ func TestBacktestService_FindMissingTimeRanges_EmptyData(t *testing.T) {
 }
 
 func TestBacktestService_QueryExistingDataRange(t *testing.T) {
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
 	db, err := prepareDB(t)
 	if err != nil {
 		t.Fatal(err)
@@ -67,6 +77,10 @@ func TestBacktestService_QueryExistingDataRange(t *testing.T) {
 }
 
 func TestBacktestService_SyncPartial(t *testing.T) {
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
 	db, err := prepareDB(t)
 	if err != nil {
 		t.Fatal(err)
@@ -113,6 +127,10 @@ func TestBacktestService_SyncPartial(t *testing.T) {
 }
 
 func TestBacktestService_FindMissingTimeRanges(t *testing.T) {
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
 	db, err := prepareDB(t)
 	if err != nil {
 		t.Fatal(err)
