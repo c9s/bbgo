@@ -126,7 +126,7 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) handleOrderFilled(o types.Order) {
-	s.logger.Infof("order filled: %s", o.String())
+	s.logger.Infof("GRID ORDER FILLED: %s", o.String())
 
 	// check order fee
 	newSide := types.SideTypeSell
@@ -159,6 +159,8 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		Tag:         "grid",
 		Quantity:    newQuantity,
 	}
+
+	s.logger.Infof("SUBMIT ORDER: %s", orderForm.String())
 
 	if createdOrders, err := s.orderExecutor.SubmitOrders(context.Background(), orderForm); err != nil {
 		s.logger.WithError(err).Errorf("can not submit arbitrage order")
