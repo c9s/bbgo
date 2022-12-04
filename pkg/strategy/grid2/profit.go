@@ -29,8 +29,16 @@ type GridProfitStats struct {
 
 func newGridProfitStats(market types.Market) *GridProfitStats {
 	return &GridProfitStats{
-		Symbol: market.Symbol,
-		Market: market,
+		Symbol:           market.Symbol,
+		TotalBaseProfit:  fixedpoint.Zero,
+		TotalQuoteProfit: fixedpoint.Zero,
+		FloatProfit:      fixedpoint.Zero,
+		GridProfit:       fixedpoint.Zero,
+		ArbitrageCount:   0,
+		TotalFee:         fixedpoint.Zero,
+		Volume:           fixedpoint.Zero,
+		Market:           market,
+		ProfitEntries:    nil,
 	}
 }
 
