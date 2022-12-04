@@ -16,15 +16,15 @@ type GridProfit struct {
 
 type GridProfitStats struct {
 	Symbol           string           `json:"symbol"`
-	TotalBaseProfit  fixedpoint.Value `json:"totalBaseProfit"`
-	TotalQuoteProfit fixedpoint.Value `json:"totalQuoteProfit"`
-	FloatProfit      fixedpoint.Value `json:"floatProfit"`
-	GridProfit       fixedpoint.Value `json:"gridProfit"`
-	ArbitrageCount   int              `json:"arbitrageCount"`
-	TotalFee         fixedpoint.Value `json:"totalFee"`
-	Volume           fixedpoint.Value `json:"volume"`
-	Market           types.Market     `json:"market"`
-	ProfitEntries    []*GridProfit    `json:"profitEntries"`
+	TotalBaseProfit  fixedpoint.Value `json:"totalBaseProfit,omitempty"`
+	TotalQuoteProfit fixedpoint.Value `json:"totalQuoteProfit,omitempty"`
+	FloatProfit      fixedpoint.Value `json:"floatProfit,omitempty"`
+	GridProfit       fixedpoint.Value `json:"gridProfit,omitempty"`
+	ArbitrageCount   int              `json:"arbitrageCount,omitempty"`
+	TotalFee         fixedpoint.Value `json:"totalFee,omitempty"`
+	Volume           fixedpoint.Value `json:"volume,omitempty"`
+	Market           types.Market     `json:"market,omitempty"`
+	ProfitEntries    []*GridProfit    `json:"profitEntries,omitempty"`
 }
 
 func newGridProfitStats(market types.Market) *GridProfitStats {
