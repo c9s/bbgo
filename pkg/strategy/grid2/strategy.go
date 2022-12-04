@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -24,28 +23,6 @@ func init() {
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
 	// Note: built-in strategies need to imported manually in the bbgo cmd package.
 	bbgo.RegisterStrategy(ID, &Strategy{})
-}
-
-type GridProfit struct {
-	Currency string
-	Profit   fixedpoint.Value
-	Time     time.Time
-}
-
-type GridProfitStats struct {
-	Symbol         string           `json:"symbol"`
-	TotalProfit    fixedpoint.Value `json:"totalProfit"`
-	FloatProfit    fixedpoint.Value `json:"floatProfit"`
-	GridProfit     fixedpoint.Value `json:"gridProfit"`
-	ArbitrageCount int              `json:"arbitrageCount"`
-	TotalFee       fixedpoint.Value `json:"totalFee"`
-	Volume         fixedpoint.Value `json:"volume"`
-}
-
-func newGridProfitStats(symbol string) *GridProfitStats {
-	return &GridProfitStats{
-		Symbol: symbol,
-	}
 }
 
 type Strategy struct {
@@ -238,6 +215,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		// calculate profit
 		profit := s.calculateProfit(o, newPrice, newQuantity)
 		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
+		s.GridProfitStats.AddProfit(profit)
 
 	case types.SideTypeBuy:
 		newSide = types.SideTypeSell
@@ -743,7 +721,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	if s.GridProfitStats == nil {
-		s.GridProfitStats = newGridProfitStats(s.Symbol)
+		s.GridProfitStats = newGridProfitStats(s.Market)
 	}
 
 	if s.ProfitStats == nil {
