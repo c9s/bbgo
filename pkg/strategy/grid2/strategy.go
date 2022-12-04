@@ -64,7 +64,8 @@ type Strategy struct {
 	// BaseInvestment is the total base quantity you want to place as the sell order.
 	BaseInvestment fixedpoint.Value `json:"baseInvestment"`
 
-	TriggerPrice    fixedpoint.Value `json:"triggerPrice"`
+	TriggerPrice fixedpoint.Value `json:"triggerPrice"`
+
 	StopLossPrice   fixedpoint.Value `json:"stopLossPrice"`
 	TakeProfitPrice fixedpoint.Value `json:"takeProfitPrice"`
 
@@ -498,6 +499,25 @@ func (s *Strategy) newTriggerPriceHandler(ctx context.Context, session *bbgo.Exc
 
 		if err := s.openGrid(ctx, session); err != nil {
 			s.logger.WithError(err).Errorf("failed to setup grid orders")
+			return
+		}
+	})
+}
+
+func (s *Strategy) newStopLossPriceHandler(ctx context.Context, session *bbgo.ExchangeSession) types.KLineCallback {
+	return types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
+		if s.StopLossPrice.Compare(k.Low) < 0 {
+			return
+		}
+
+		if err := s.closeGrid(ctx); err != nil {
+			s.logger.WithError(err).Errorf("can not close grid")
+			return
+		}
+
+		if err := s.orderExecutor.ClosePosition(ctx, fixedpoint.One, "grid2:stopLoss"); err != nil {
+			s.logger.WithError(err).Errorf("can not close position")
+			return
 		}
 	})
 }
@@ -770,6 +790,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if !s.TriggerPrice.IsZero() {
 		session.MarketDataStream.OnKLineClosed(s.newTriggerPriceHandler(ctx, session))
+	}
+
+	if !s.StopLossPrice.IsZero() {
+		session.MarketDataStream.OnKLineClosed(s.newStopLossPriceHandler(ctx, session))
 	}
 
 	session.UserDataStream.OnStart(func() {
