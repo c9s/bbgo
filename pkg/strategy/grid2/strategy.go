@@ -73,6 +73,10 @@ type Strategy struct {
 	// BaseInvestment is the total base quantity you want to place as the sell order.
 	BaseInvestment fixedpoint.Value `json:"baseInvestment"`
 
+	TriggerPrice    fixedpoint.Value `json:"triggerPrice"`
+	StopLossPrice   fixedpoint.Value `json:"stopLossPrice"`
+	TakeProfitPrice fixedpoint.Value `json:"takeProfitPrice"`
+
 	// CloseWhenCancelOrder option is used to close the grid if any of the order is canceled.
 	// This option let you simply remote control the grid from the crypto exchange mobile app.
 	CloseWhenCancelOrder bool `json:"closeWhenCancelOrder"`
@@ -140,7 +144,7 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
 }
 
 // InstanceID returns the instance identifier from the current grid configuration parameters
@@ -458,6 +462,18 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 	return quoteSideQuantity, nil
 }
 
+func (s *Strategy) newTriggerPriceHandler(ctx context.Context, session *bbgo.ExchangeSession) types.KLineCallback {
+	return types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
+		if s.TriggerPrice.Compare(k.High) > 0 || s.TriggerPrice.Compare(k.Low) < 0 {
+			return
+		}
+
+		if err := s.openGrid(ctx, session); err != nil {
+			s.logger.WithError(err).Errorf("failed to setup grid orders")
+		}
+	})
+}
+
 // closeGrid closes the grid orders
 func (s *Strategy) closeGrid(ctx context.Context) error {
 	bbgo.Sync(ctx, s)
@@ -476,6 +492,14 @@ func (s *Strategy) closeGrid(ctx context.Context) error {
 // 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
 func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
+	if s.grid != nil {
+		return nil
+	}
+
+	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+	s.grid.CalculateArithmeticPins()
+	s.logger.Info(s.grid.String())
+
 	lastPrice, err := s.getLastTradePrice(ctx, session)
 	if err != nil {
 		return errors.Wrap(err, "failed to get the last trade price")
@@ -693,11 +717,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	}
 
-	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
-	s.grid.CalculateArithmeticPins()
-
-	s.logger.Info(s.grid.String())
-
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
@@ -710,7 +729,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	})
 
+	if !s.TriggerPrice.IsZero() {
+		session.MarketDataStream.OnKLineClosed(s.newTriggerPriceHandler(ctx, session))
+	}
+
 	session.UserDataStream.OnStart(func() {
+		if !s.TriggerPrice.IsZero() {
+			return
+		}
+
 		if err := s.openGrid(ctx, session); err != nil {
 			s.logger.WithError(err).Errorf("failed to setup grid orders")
 		}
