@@ -35,8 +35,8 @@ exchangeStrategies:
   grid2:
     symbol: BTCUSDT
     upperPrice: 18_000.0
-    lowerPrice: 13_000.0
-    gridNumber: 100
+    lowerPrice: 15_000.0
+    gridNumber: 30
 
     ## compound is used for buying more inventory when the profit is made by the filled SELL order.
     ## when compound is disabled, fixed quantity is used for each grid order.
