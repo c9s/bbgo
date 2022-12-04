@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -26,7 +27,9 @@ func init() {
 }
 
 type GridProfit struct {
-	Profit fixedpoint.Value
+	Currency string
+	Profit   fixedpoint.Value
+	Time     time.Time
 }
 
 type GridProfitStats struct {
@@ -176,6 +179,30 @@ func (s *Strategy) handleOrderCanceled(o types.Order) {
 	}
 }
 
+// TODO: consider order fee
+func (s *Strategy) calculateProfit(o types.Order, buyPrice, buyQuantity fixedpoint.Value) *GridProfit {
+	if s.EarnBase {
+		// sell quantity - buy quantity
+		profitQuantity := o.Quantity.Sub(buyQuantity)
+		profit := &GridProfit{
+			Currency: s.Market.BaseCurrency,
+			Profit:   profitQuantity,
+			Time:     o.UpdateTime.Time(),
+		}
+		return profit
+	}
+
+	// earn quote
+	// (sell_price - buy_price) * quantity
+	profitQuantity := o.Price.Sub(buyPrice).Mul(o.Quantity)
+	profit := &GridProfit{
+		Currency: s.Market.QuoteCurrency,
+		Profit:   profitQuantity,
+		Time:     o.UpdateTime.Time(),
+	}
+	return profit
+}
+
 func (s *Strategy) handleOrderFilled(o types.Order) {
 	if s.grid == nil {
 		return
@@ -183,14 +210,13 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 
 	s.logger.Infof("GRID ORDER FILLED: %s", o.String())
 
-	var profit *GridProfit = nil
+	// var profit *GridProfit = nil
 
 	// check order fee
 	newSide := types.SideTypeSell
 	newPrice := o.Price
 	newQuantity := o.Quantity
-
-	// quantityReduction := fixedpoint.Zero
+	quoteQuantity := o.Quantity.Mul(o.Price)
 
 	switch o.Side {
 	case types.SideTypeSell:
@@ -206,9 +232,12 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 
 		// use the profit to buy more inventory in the grid
 		if s.Compound || s.EarnBase {
-			quoteQuantity := o.Quantity.Mul(o.Price)
 			newQuantity = quoteQuantity.Div(newPrice)
 		}
+
+		// calculate profit
+		profit := s.calculateProfit(o, newPrice, newQuantity)
+		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
 
 	case types.SideTypeBuy:
 		newSide = types.SideTypeSell
