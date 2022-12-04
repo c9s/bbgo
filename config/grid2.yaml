@@ -50,6 +50,8 @@ exchangeStrategies:
     ## for example, when the last price hit 17_000.0 then open a grid with the price range 13_000 to 20_000
     triggerPrice: 17_000.0
 
+    stopLossPrice: 10_000.0
+
     ## profitSpread is the profit spread of the arbitrage order (sell order)
     ## greater the profitSpread, greater the profit you make when the sell order is filled.
     ## you can set this instead of the default grid profit spread.
