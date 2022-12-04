@@ -216,7 +216,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	newSide := types.SideTypeSell
 	newPrice := o.Price
 	newQuantity := o.Quantity
-	quoteQuantity := o.Quantity.Mul(o.Price)
+	orderQuoteQuantity := o.Quantity.Mul(o.Price)
 
 	switch o.Side {
 	case types.SideTypeSell:
@@ -232,7 +232,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 
 		// use the profit to buy more inventory in the grid
 		if s.Compound || s.EarnBase {
-			newQuantity = quoteQuantity.Div(newPrice)
+			newQuantity = orderQuoteQuantity.Div(newPrice)
 		}
 
 		// calculate profit
@@ -250,8 +250,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		}
 
 		if s.EarnBase {
-			quoteQuantity := o.Quantity.Mul(o.Price)
-			newQuantity = quoteQuantity.Div(newPrice)
+			newQuantity = orderQuoteQuantity.Div(newPrice)
 		}
 	}
 
