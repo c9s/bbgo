@@ -165,6 +165,7 @@ func (s *Strategy) calculateProfit(o types.Order, buyPrice, buyQuantity fixedpoi
 			Currency: s.Market.BaseCurrency,
 			Profit:   profitQuantity,
 			Time:     o.UpdateTime.Time(),
+			Order:    o,
 		}
 		return profit
 	}
@@ -176,6 +177,7 @@ func (s *Strategy) calculateProfit(o types.Order, buyPrice, buyQuantity fixedpoi
 		Currency: s.Market.QuoteCurrency,
 		Profit:   profitQuantity,
 		Time:     o.UpdateTime.Time(),
+		Order:    o,
 	}
 	return profit
 }
