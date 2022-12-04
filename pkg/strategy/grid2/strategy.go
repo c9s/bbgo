@@ -73,6 +73,10 @@ type Strategy struct {
 	// BaseInvestment is the total base quantity you want to place as the sell order.
 	BaseInvestment fixedpoint.Value `json:"baseInvestment"`
 
+	// CloseWhenCancelOrder option is used to close the grid if any of the order is canceled.
+	// This option let you simply remote control the grid from the crypto exchange mobile app.
+	CloseWhenCancelOrder bool `json:"closeWhenCancelOrder"`
+
 	grid *Grid
 
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
@@ -140,6 +144,31 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 // InstanceID returns the instance identifier from the current grid configuration parameters
 func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s-%s-%d-%d-%d", ID, s.Symbol, s.GridNum, s.UpperPrice.Int(), s.LowerPrice.Int())
+}
+
+func (s *Strategy) CloseGrid(ctx context.Context) error {
+	bbgo.Sync(ctx, s)
+
+	// now we can cancel the open orders
+	s.logger.Infof("canceling grid orders...")
+
+	if err := s.orderExecutor.GracefulCancel(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Strategy) handleOrderCanceled(o types.Order) {
+	s.logger.Infof("GRID ORDER CANCELED: %s", o.String())
+
+	ctx := context.Background()
+	if s.CloseWhenCancelOrder {
+		s.logger.Infof("one of the grid orders is canceled, now closing grid...")
+		if err := s.CloseGrid(ctx); err != nil {
+			s.logger.WithError(err).Errorf("graceful order cancel error")
+		}
+	}
 }
 
 func (s *Strategy) handleOrderFilled(o types.Order) {
@@ -241,20 +270,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-
-		bbgo.Sync(ctx, s)
-
-		// now we can cancel the open orders
-		s.logger.Infof("canceling active orders...")
-
-		if err := s.orderExecutor.GracefulCancel(ctx); err != nil {
-			log.WithError(err).Errorf("graceful order cancel error")
+		if err := s.CloseGrid(ctx); err != nil {
+			s.logger.WithError(err).Errorf("grid graceful order cancel error")
 		}
 	})
 
 	session.UserDataStream.OnStart(func() {
 		if err := s.setupGridOrders(ctx, session); err != nil {
-			log.WithError(err).Errorf("failed to setup grid orders")
+			s.logger.WithError(err).Errorf("failed to setup grid orders")
 		}
 	})
 
