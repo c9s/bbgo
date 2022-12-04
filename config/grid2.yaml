@@ -1,4 +1,13 @@
 ---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+  switches:
+    trade: false
+    orderUpdate: false
+    submitOrder: false
+
 sessions:
   binance:
     exchange: binance

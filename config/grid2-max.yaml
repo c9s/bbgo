@@ -1,4 +1,13 @@
 ---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+  switches:
+    trade: false
+    orderUpdate: false
+    submitOrder: false
+
 sessions:
   max:
     exchange: max
@@ -11,7 +20,7 @@ backtest:
   endTime: "2022-11-25"
   symbols:
   - BTCUSDT
-  sessions: [max]
+  sessions: [ max ]
   accounts:
     binance:
       balances:
@@ -26,8 +35,8 @@ exchangeStrategies:
   grid2:
     symbol: BTCUSDT
     upperPrice: 18_000.0
-    lowerPrice: 12_000.0
-    gridNumber: 10
+    lowerPrice: 13_000.0
+    gridNumber: 100
 
     ## compound is used for buying more inventory when the profit is made by the filled SELL order.
     ## when compound is disabled, fixed quantity is used for each grid order.
