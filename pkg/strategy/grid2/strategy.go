@@ -83,8 +83,10 @@ type Strategy struct {
 	ProfitStats     *types.ProfitStats `persistence:"profit_stats"`
 	Position        *types.Position    `persistence:"position"`
 
-	grid          *Grid
-	session       *bbgo.ExchangeSession
+	grid              *Grid
+	session           *bbgo.ExchangeSession
+	orderQueryService types.ExchangeOrderQueryService
+
 	orderExecutor *bbgo.GeneralOrderExecutor
 
 	// groupID is the group ID used for the strategy instance for canceling orders
@@ -715,6 +717,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	instanceID := s.InstanceID()
 
 	s.session = session
+
+	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
+		s.orderQueryService = service
+	}
+
 	s.logger = log.WithFields(logrus.Fields{
 		"symbol": s.Symbol,
 	})
