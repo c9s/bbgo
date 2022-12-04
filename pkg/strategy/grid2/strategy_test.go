@@ -107,10 +107,14 @@ func newTestStrategy() *Strategy {
 		BaseCurrency:  "BTC",
 		QuoteCurrency: "USDT",
 	}
+
 	s := &Strategy{
 		logger:          logrus.NewEntry(logrus.New()),
 		Market:          market,
 		GridProfitStats: newGridProfitStats(market),
+		UpperPrice:      number(20_000),
+		LowerPrice:      number(10_000),
+		GridNum:         10,
 	}
 	return s
 }
