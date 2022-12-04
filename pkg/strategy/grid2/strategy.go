@@ -283,7 +283,8 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, 
 				requiredBase = requiredBase.Add(quantity)
 			} else if i > 0 { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
-				nextLowerPin := pins[i-1]
+				i--
+				nextLowerPin := pins[i]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				buyPlacedPrice = nextLowerPrice
@@ -343,7 +344,8 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 				requiredBase = requiredBase.Add(quantity)
 			} else if i > 0 { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
-				nextLowerPin := pins[i-1]
+				i--
+				nextLowerPin := pins[i]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				buyPlacedPrice = nextLowerPrice
@@ -400,7 +402,8 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 			// quantity := amount.Div(lastPrice)
 			if i > 0 { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
-				nextLowerPin := pins[i-1]
+				i--
+				nextLowerPin := pins[i]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
@@ -467,7 +470,8 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 			// quantity := amount.Div(lastPrice)
 			if i > 0 { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
-				nextLowerPin := pins[i-1]
+				i--
+				nextLowerPin := pins[i]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
@@ -517,6 +521,10 @@ func (s *Strategy) newStopLossPriceHandler(ctx context.Context, session *bbgo.Ex
 
 		if err := s.closeGrid(ctx); err != nil {
 			s.logger.WithError(err).Errorf("can not close grid")
+			return
+		}
+
+		if s.Position.GetBase().Sign() < 0 {
 			return
 		}
 
