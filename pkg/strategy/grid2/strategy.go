@@ -651,7 +651,8 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 				usedBase = usedBase.Add(quantity)
 			} else if i > 0 {
 				// next price
-				nextPin := pins[i-1]
+				i--
+				nextPin := pins[i]
 				nextPrice := fixedpoint.Value(nextPin)
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
