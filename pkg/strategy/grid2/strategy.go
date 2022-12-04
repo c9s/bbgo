@@ -804,7 +804,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	session.UserDataStream.OnStart(func() {
-		if !s.TriggerPrice.IsZero() {
+		if s.TriggerPrice.IsZero() {
 			if err := s.openGrid(ctx, session); err != nil {
 				s.logger.WithError(err).Errorf("failed to setup grid orders")
 			}
