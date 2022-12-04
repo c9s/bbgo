@@ -101,3 +101,70 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 		assert.Equal(t, number(0.2).String(), quantity.String())
 	})
 }
+
+func newTestStrategy() *Strategy {
+	market := types.Market{
+		BaseCurrency:  "BTC",
+		QuoteCurrency: "USDT",
+	}
+	s := &Strategy{
+		logger:          logrus.NewEntry(logrus.New()),
+		Market:          market,
+		GridProfitStats: newGridProfitStats(market),
+	}
+	return s
+}
+
+func TestStrategy_calculateProfit(t *testing.T) {
+	t.Run("earn quote without compound", func(t *testing.T) {
+		s := newTestStrategy()
+		profit := s.calculateProfit(types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Price:    number(13_000),
+				Quantity: number(1.0),
+			},
+		}, number(12_000), number(1.0))
+		assert.NotNil(t, profit)
+		assert.Equal(t, "USDT", profit.Currency)
+		assert.InDelta(t, 1000.0, profit.Profit.Float64(), 0.1)
+	})
+
+	t.Run("earn quote with compound", func(t *testing.T) {
+		s := newTestStrategy()
+		s.Compound = true
+
+		profit := s.calculateProfit(types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Price:    number(13_000),
+				Quantity: number(1.0),
+			},
+		}, number(12_000), number(1.0))
+		assert.NotNil(t, profit)
+		assert.Equal(t, "USDT", profit.Currency)
+		assert.InDelta(t, 1000.0, profit.Profit.Float64(), 0.1)
+	})
+
+	t.Run("earn base without compound", func(t *testing.T) {
+		s := newTestStrategy()
+		s.EarnBase = true
+		s.Compound = false
+
+		quoteQuantity := number(12_000).Mul(number(1.0))
+		sellQuantity := quoteQuantity.Div(number(13_000.0))
+
+		buyOrder := types.SubmitOrder{
+			Price:    number(12_000.0),
+			Quantity: number(1.0),
+		}
+
+		profit := s.calculateProfit(types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Price:    number(13_000.0),
+				Quantity: sellQuantity,
+			},
+		}, buyOrder.Price, buyOrder.Quantity)
+		assert.NotNil(t, profit)
+		assert.Equal(t, "BTC", profit.Currency)
+		assert.InDelta(t, sellQuantity.Float64()-buyOrder.Quantity.Float64(), profit.Profit.Float64(), 0.001)
+	})
+}

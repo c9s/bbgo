@@ -47,6 +47,7 @@ exchangeStrategies:
     ## meaning that earn BTC instead of USDT when trading in the BTCUSDT pair.
     # earnBase: true
 
+    triggerPrice: 17_000.0
     stopLossPrice: 10_000.0
     takeProfitPrice: 20_000.0
 
@@ -70,4 +71,4 @@ exchangeStrategies:
     ##    quoteInvestment is required, and baseInvestment is optional (could be zero)
     ##    if you have existing BTC position and want to reuse it you can set the baseInvestment.
     quoteInvestment: 10_000
-    baseInvestment: 1.0
+    # baseInvestment: 1.0
