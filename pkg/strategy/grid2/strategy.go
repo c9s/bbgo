@@ -685,22 +685,22 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 			quoteQuantity := quantity.Mul(price)
 			usedQuote = usedQuote.Add(quoteQuantity)
 		}
+	}
 
-		createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, submitOrders...)
-		if err2 != nil {
-			return err
-		}
+	createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, submitOrders...)
+	if err2 != nil {
+		return err
+	}
 
-		// debug info
-		s.logger.Infof("GRID ORDERS: [")
-		for _, order := range submitOrders {
-			s.logger.Info("  - ", order.String())
-		}
-		s.logger.Infof("] END OF GRID ORDERS")
+	// debug info
+	s.logger.Infof("GRID ORDERS: [")
+	for _, order := range submitOrders {
+		s.logger.Info("  - ", order.String())
+	}
+	s.logger.Infof("] END OF GRID ORDERS")
 
-		for _, order := range createdOrders {
-			s.logger.Info(order.String())
-		}
+	for _, order := range createdOrders {
+		s.logger.Info(order.String())
 	}
 
 	return nil
