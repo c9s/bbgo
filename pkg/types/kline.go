@@ -544,7 +544,7 @@ func (k KLineWindow) SlackAttachment() slack.Attachment {
 	}
 }
 
-type KLineCallback func(kline KLine)
+type KLineCallback func(k KLine)
 
 type KValueType int
 
@@ -642,9 +642,7 @@ func (k *KLineSeries) Length() int {
 
 var _ Series = &KLineSeries{}
 
-type KLineCallBack func(k KLine)
-
-func KLineWith(symbol string, interval Interval, callback KLineCallBack) KLineCallBack {
+func KLineWith(symbol string, interval Interval, callback KLineCallback) KLineCallback {
 	return func(k KLine) {
 		if k.Symbol != symbol || (k.Interval != "" && k.Interval != interval) {
 			return
