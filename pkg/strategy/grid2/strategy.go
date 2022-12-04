@@ -25,13 +25,24 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+type GridProfit struct {
+	Profit fixedpoint.Value
+}
+
 type GridProfitStats struct {
+	Symbol         string           `json:"symbol"`
 	TotalProfit    fixedpoint.Value `json:"totalProfit"`
 	FloatProfit    fixedpoint.Value `json:"floatProfit"`
 	GridProfit     fixedpoint.Value `json:"gridProfit"`
 	ArbitrageCount int              `json:"arbitrageCount"`
 	TotalFee       fixedpoint.Value `json:"totalFee"`
 	Volume         fixedpoint.Value `json:"volume"`
+}
+
+func newGridProfitStats(symbol string) *GridProfitStats {
+	return &GridProfitStats{
+		Symbol: symbol,
+	}
 }
 
 type Strategy struct {
@@ -88,8 +99,9 @@ type Strategy struct {
 	// If this is set, when bbgo started, it will clear the open orders in the same market (by symbol)
 	ClearOpenOrdersWhenStart bool `json:"clearOpenOrdersWhenStart"`
 
-	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
-	Position    *types.Position    `persistence:"position"`
+	GridProfitStats *GridProfitStats   `persistence:"grid_profit_stats"`
+	ProfitStats     *types.ProfitStats `persistence:"profit_stats"`
+	Position        *types.Position    `persistence:"position"`
 
 	grid          *Grid
 	session       *bbgo.ExchangeSession
@@ -170,6 +182,8 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	}
 
 	s.logger.Infof("GRID ORDER FILLED: %s", o.String())
+
+	var profit *GridProfit = nil
 
 	// check order fee
 	newSide := types.SideTypeSell
@@ -699,6 +713,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.groupID = util.FNV32(instanceID)
 	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
+
+	if s.GridProfitStats == nil {
+		s.GridProfitStats = newGridProfitStats(s.Symbol)
+	}
 
 	if s.ProfitStats == nil {
 		s.ProfitStats = types.NewProfitStats(s.Market)
