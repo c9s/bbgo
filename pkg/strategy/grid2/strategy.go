@@ -690,8 +690,16 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		if err2 != nil {
 			return err
 		}
+
+		// debug info
+		s.logger.Infof("GRID ORDERS: [")
+		for _, order := range submitOrders {
+			s.logger.Info("  - ", order.String())
+		}
+		s.logger.Infof("] END OF GRID ORDERS")
+
 		for _, order := range createdOrders {
-			s.logger.Infof(order.String())
+			s.logger.Info(order.String())
 		}
 	}
 
