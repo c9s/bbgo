@@ -80,6 +80,10 @@ type Strategy struct {
 	// KeepOrdersWhenShutdown option is used for keeping the grid orders when shutting down bbgo
 	KeepOrdersWhenShutdown bool `json:"keepOrdersWhenShutdown"`
 
+	// ClearOpenOrdersWhenStart
+	// If this is set, when bbgo started, it will clear the open orders in the same market (by symbol)
+	ClearOpenOrdersWhenStart bool `json:"clearOpenOrdersWhenStart"`
+
 	grid *Grid
 
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
@@ -150,7 +154,7 @@ func (s *Strategy) handleOrderCanceled(o types.Order) {
 	ctx := context.Background()
 	if s.CloseWhenCancelOrder {
 		s.logger.Infof("one of the grid orders is canceled, now closing grid...")
-		if err := s.CloseGrid(ctx); err != nil {
+		if err := s.closeGrid(ctx); err != nil {
 			s.logger.WithError(err).Errorf("graceful order cancel error")
 		}
 	}
@@ -454,8 +458,8 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 	return quoteSideQuantity, nil
 }
 
-// CloseGrid closes the grid orders
-func (s *Strategy) CloseGrid(ctx context.Context) error {
+// closeGrid closes the grid orders
+func (s *Strategy) closeGrid(ctx context.Context) error {
 	bbgo.Sync(ctx, s)
 
 	// now we can cancel the open orders
@@ -468,10 +472,10 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 	return nil
 }
 
-// OpenGrid
+// openGrid
 // 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
-func (s *Strategy) OpenGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
+func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	lastPrice, err := s.getLastTradePrice(ctx, session)
 	if err != nil {
 		return errors.Wrap(err, "failed to get the last trade price")
@@ -613,6 +617,21 @@ func (s *Strategy) OpenGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	return nil
 }
 
+func (s *Strategy) clearOpenOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
+	// clear open orders when start
+	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	err = session.Exchange.CancelOrders(ctx, openOrders...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.ExchangeSession) (fixedpoint.Value, error) {
 	if bbgo.IsBackTesting {
 		price, ok := session.LastPrice(s.Symbol)
@@ -668,6 +687,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 	s.orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
 
+	if s.ClearOpenOrdersWhenStart {
+		if err := s.clearOpenOrders(ctx, session); err != nil {
+			return err
+		}
+	}
+
 	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
 	s.grid.CalculateArithmeticPins()
 
@@ -680,13 +705,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		if err := s.CloseGrid(ctx); err != nil {
+		if err := s.closeGrid(ctx); err != nil {
 			s.logger.WithError(err).Errorf("grid graceful order cancel error")
 		}
 	})
 
 	session.UserDataStream.OnStart(func() {
-		if err := s.OpenGrid(ctx, session); err != nil {
+		if err := s.openGrid(ctx, session); err != nil {
 			s.logger.WithError(err).Errorf("failed to setup grid orders")
 		}
 	})
