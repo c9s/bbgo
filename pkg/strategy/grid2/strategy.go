@@ -77,6 +77,9 @@ type Strategy struct {
 	// This option let you simply remote control the grid from the crypto exchange mobile app.
 	CloseWhenCancelOrder bool `json:"closeWhenCancelOrder"`
 
+	// KeepOrdersWhenShutdown option is used for keeping the grid orders when shutting down bbgo
+	KeepOrdersWhenShutdown bool `json:"keepOrdersWhenShutdown"`
+
 	grid *Grid
 
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
@@ -139,19 +142,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 // InstanceID returns the instance identifier from the current grid configuration parameters
 func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s-%s-%d-%d-%d", ID, s.Symbol, s.GridNum, s.UpperPrice.Int(), s.LowerPrice.Int())
-}
-
-func (s *Strategy) CloseGrid(ctx context.Context) error {
-	bbgo.Sync(ctx, s)
-
-	// now we can cancel the open orders
-	s.logger.Infof("canceling grid orders...")
-
-	if err := s.orderExecutor.GracefulCancel(ctx); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (s *Strategy) handleOrderCanceled(o types.Order) {
@@ -228,55 +218,6 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	} else {
 		s.logger.Infof("order created: %+v", createdOrders)
 	}
-}
-
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	instanceID := s.InstanceID()
-
-	s.logger = log.WithFields(logrus.Fields{
-		"symbol": s.Symbol,
-	})
-
-	s.groupID = util.FNV32(instanceID)
-
-	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
-
-	if s.ProfitStats == nil {
-		s.ProfitStats = types.NewProfitStats(s.Market)
-	}
-
-	if s.Position == nil {
-		s.Position = types.NewPositionFromMarket(s.Market)
-	}
-
-	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
-	s.orderExecutor.BindEnvironment(s.Environment)
-	s.orderExecutor.BindProfitStats(s.ProfitStats)
-	s.orderExecutor.Bind()
-	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(ctx, s)
-	})
-	s.orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
-
-	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
-	s.grid.CalculateArithmeticPins()
-
-	s.logger.Info(s.grid.String())
-
-	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
-		defer wg.Done()
-		if err := s.CloseGrid(ctx); err != nil {
-			s.logger.WithError(err).Errorf("grid graceful order cancel error")
-		}
-	})
-
-	session.UserDataStream.OnStart(func() {
-		if err := s.setupGridOrders(ctx, session); err != nil {
-			s.logger.WithError(err).Errorf("failed to setup grid orders")
-		}
-	})
-
-	return nil
 }
 
 type InvestmentBudget struct {
@@ -513,10 +454,24 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 	return quoteSideQuantity, nil
 }
 
-// setupGridOrders
+// CloseGrid closes the grid orders
+func (s *Strategy) CloseGrid(ctx context.Context) error {
+	bbgo.Sync(ctx, s)
+
+	// now we can cancel the open orders
+	s.logger.Infof("canceling grid orders...")
+
+	if err := s.orderExecutor.GracefulCancel(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// OpenGrid
 // 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
-func (s *Strategy) setupGridOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
+func (s *Strategy) OpenGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	lastPrice, err := s.getLastTradePrice(ctx, session)
 	if err != nil {
 		return errors.Wrap(err, "failed to get the last trade price")
@@ -683,4 +638,58 @@ func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.Exchange
 	}
 
 	return fixedpoint.Zero, fmt.Errorf("%s ticker price not found", s.Symbol)
+}
+
+func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	instanceID := s.InstanceID()
+
+	s.logger = log.WithFields(logrus.Fields{
+		"symbol": s.Symbol,
+	})
+
+	s.groupID = util.FNV32(instanceID)
+
+	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
+
+	if s.ProfitStats == nil {
+		s.ProfitStats = types.NewProfitStats(s.Market)
+	}
+
+	if s.Position == nil {
+		s.Position = types.NewPositionFromMarket(s.Market)
+	}
+
+	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.orderExecutor.BindEnvironment(s.Environment)
+	s.orderExecutor.BindProfitStats(s.ProfitStats)
+	s.orderExecutor.Bind()
+	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		bbgo.Sync(ctx, s)
+	})
+	s.orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
+
+	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+	s.grid.CalculateArithmeticPins()
+
+	s.logger.Info(s.grid.String())
+
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+
+		if s.KeepOrdersWhenShutdown {
+			return
+		}
+
+		if err := s.CloseGrid(ctx); err != nil {
+			s.logger.WithError(err).Errorf("grid graceful order cancel error")
+		}
+	})
+
+	session.UserDataStream.OnStart(func() {
+		if err := s.OpenGrid(ctx, session); err != nil {
+			s.logger.WithError(err).Errorf("failed to setup grid orders")
+		}
+	})
+
+	return nil
 }
