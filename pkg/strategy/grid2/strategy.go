@@ -658,7 +658,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 					Quantity:    quantity,
 					Market:      s.Market,
 					TimeInForce: types.TimeInForceGTC,
-					Tag:         "grid",
+					Tag:         "grid2",
 				})
 				usedBase = usedBase.Add(quantity)
 			} else if i > 0 {
@@ -674,7 +674,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 					Quantity:    quantity,
 					Market:      s.Market,
 					TimeInForce: types.TimeInForceGTC,
-					Tag:         "grid",
+					Tag:         "grid2",
 				})
 				quoteQuantity := quantity.Mul(price)
 				usedQuote = usedQuote.Add(quoteQuantity)
