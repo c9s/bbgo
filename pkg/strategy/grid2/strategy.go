@@ -82,11 +82,6 @@ type Strategy struct {
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	Position    *types.Position    `persistence:"position"`
 
-	// orderStore is used to store all the created orders, so that we can filter the trades.
-	orderStore *bbgo.OrderStore
-
-	tradeCollector *bbgo.TradeCollector
-
 	orderExecutor *bbgo.GeneralOrderExecutor
 
 	// groupID is the group ID used for the strategy instance for canceling orders
