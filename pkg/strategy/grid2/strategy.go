@@ -519,15 +519,19 @@ func (s *Strategy) newStopLossPriceHandler(ctx context.Context, session *bbgo.Ex
 			return
 		}
 
+		s.logger.Infof("last low price %f hits stopLossPrice %f, closing grid", k.Low.Float64(), s.StopLossPrice.Float64())
+
 		if err := s.closeGrid(ctx); err != nil {
 			s.logger.WithError(err).Errorf("can not close grid")
 			return
 		}
 
-		if s.Position.GetBase().Sign() < 0 {
+		base := s.Position.GetBase()
+		if base.Sign() < 0 {
 			return
 		}
 
+		s.logger.Infof("position base %f > 0, closing position...", base.Float64())
 		if err := s.orderExecutor.ClosePosition(ctx, fixedpoint.One, "grid2:stopLoss"); err != nil {
 			s.logger.WithError(err).Errorf("can not close position")
 			return
