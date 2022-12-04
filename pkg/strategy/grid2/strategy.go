@@ -547,12 +547,14 @@ func (s *Strategy) closeGrid(ctx context.Context) error {
 // 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
 func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
+	// grid object guard
 	if s.grid != nil {
 		return nil
 	}
 
 	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
 	s.grid.CalculateArithmeticPins()
+
 	s.logger.Info(s.grid.String())
 
 	lastPrice, err := s.getLastTradePrice(ctx, session)
@@ -803,11 +805,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	session.UserDataStream.OnStart(func() {
 		if !s.TriggerPrice.IsZero() {
+			if err := s.openGrid(ctx, session); err != nil {
+				s.logger.WithError(err).Errorf("failed to setup grid orders")
+			}
 			return
-		}
-
-		if err := s.openGrid(ctx, session); err != nil {
-			s.logger.WithError(err).Errorf("failed to setup grid orders")
 		}
 	})
 
