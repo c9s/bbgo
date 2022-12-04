@@ -15,3 +15,13 @@ func (b *ActiveOrderBook) EmitFilled(o types.Order) {
 		cb(o)
 	}
 }
+
+func (b *ActiveOrderBook) OnCanceled(cb func(o types.Order)) {
+	b.canceledCallbacks = append(b.canceledCallbacks, cb)
+}
+
+func (b *ActiveOrderBook) EmitCanceled(o types.Order) {
+	for _, cb := range b.canceledCallbacks {
+		cb(o)
+	}
+}

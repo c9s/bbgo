@@ -17,9 +17,10 @@ const CancelOrderWaitTime = 20 * time.Millisecond
 // ActiveOrderBook manages the local active order books.
 //go:generate callbackgen -type ActiveOrderBook
 type ActiveOrderBook struct {
-	Symbol          string
-	orders          *types.SyncOrderMap
-	filledCallbacks []func(o types.Order)
+	Symbol            string
+	orders            *types.SyncOrderMap
+	filledCallbacks   []func(o types.Order)
+	canceledCallbacks []func(o types.Order)
 
 	// sig is the order update signal
 	// this signal will be emitted when a new order is added or removed.
@@ -242,7 +243,11 @@ func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
 		b.C.Emit()
 
 	case types.OrderStatusCanceled, types.OrderStatusRejected:
-		log.Debugf("[ActiveOrderBook] order status %s, removing order %s", order.Status, order)
+		if order.Status == types.OrderStatusCanceled {
+			b.EmitCanceled(order)
+		}
+
+		log.Debugf("[ActiveOrderBook] order is %s, removing order %s", order.Status, order)
 		b.Remove(order)
 		b.C.Emit()
 
