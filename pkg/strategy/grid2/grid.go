@@ -188,5 +188,5 @@ func (g *Grid) updatePinsCache() {
 }
 
 func (g *Grid) String() string {
-	return fmt.Sprintf("grid: priceRange: %f <=> %f size: %f spread: %f", g.LowerPrice.Float64(), g.UpperPrice.Float64(), g.Size.Float64(), g.Spread.Float64())
+	return fmt.Sprintf("GRID: priceRange: %f <=> %f size: %f spread: %f", g.LowerPrice.Float64(), g.UpperPrice.Float64(), g.Size.Float64(), g.Spread.Float64())
 }
