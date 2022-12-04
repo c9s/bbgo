@@ -114,7 +114,7 @@ func (s *Strategy) Validate() error {
 
 	if !s.ProfitSpread.IsZero() {
 		percent := s.ProfitSpread.Div(s.LowerPrice)
-		feeRate := fixedpoint.NewFromFloat(0.075 * 0.01)
+		feeRate := fixedpoint.NewFromFloat(0.1 * 0.01) // 0.1%, 0.075% with BNB
 		if percent.Compare(feeRate) < 0 {
 			return fmt.Errorf("profitSpread %f %s is too small, less than the fee rate: %s", s.ProfitSpread.Float64(), percent.Percentage(), feeRate.Percentage())
 		}
