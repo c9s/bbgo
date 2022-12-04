@@ -50,9 +50,10 @@ exchangeStrategies:
     ## triggerPrice is used for opening your grid only when the last price touches your pre-set price.
     ## this is useful when you don't want to create a grid from a higher price.
     ## for example, when the last price hit 17_000.0 then open a grid with the price range 13_000 to 20_000
-    triggerPrice: 17_000.0
+    triggerPrice: 16_900.0
 
-    stopLossPrice: 10_000.0
+    stopLossPrice: 16_000.0
+
     takeProfitPrice: 20_000.0
 
     ## profitSpread is the profit spread of the arbitrage order (sell order)
