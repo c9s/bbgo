@@ -165,6 +165,10 @@ func (s *Strategy) handleOrderCanceled(o types.Order) {
 }
 
 func (s *Strategy) handleOrderFilled(o types.Order) {
+	if s.grid == nil {
+		return
+	}
+
 	s.logger.Infof("GRID ORDER FILLED: %s", o.String())
 
 	// check order fee
@@ -485,6 +489,8 @@ func (s *Strategy) closeGrid(ctx context.Context) error {
 		return err
 	}
 
+	// free the grid object
+	s.grid = nil
 	return nil
 }
 
