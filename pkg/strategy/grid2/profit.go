@@ -8,9 +8,10 @@ import (
 )
 
 type GridProfit struct {
-	Currency string
-	Profit   fixedpoint.Value
-	Time     time.Time
+	Currency string           `json:"currency"`
+	Profit   fixedpoint.Value `json:"profit"`
+	Time     time.Time        `json:"time"`
+	Order    types.Order      `json:"order"`
 }
 
 type GridProfitStats struct {
