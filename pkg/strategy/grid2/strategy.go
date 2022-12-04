@@ -634,11 +634,39 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		}
 	}
 
+	submitOrders, err := s.generateGridOrders(totalQuote, totalBase, lastPrice)
+	if err != nil {
+		return err
+	}
+
+	createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, submitOrders...)
+	if err2 != nil {
+		return err
+	}
+
+	// debug info
+	s.logger.Infof("GRID ORDERS: [")
+	for _, order := range submitOrders {
+		s.logger.Info("  - ", order.String())
+	}
+	s.logger.Infof("] END OF GRID ORDERS")
+
+	for _, order := range createdOrders {
+		s.logger.Info(order.String())
+	}
+
+	return nil
+}
+
+func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoint.Value) ([]types.SubmitOrder, error) {
 	var buyPlacedPrice = fixedpoint.Zero
 	var pins = s.grid.Pins
 	var usedBase = fixedpoint.Zero
 	var usedQuote = fixedpoint.Zero
 	var submitOrders []types.SubmitOrder
+
+	// si is for sell order price index
+	var si = len(pins) - 1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
@@ -649,6 +677,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
 		if price.Compare(lastPrice) >= 0 {
+			si = i
 			if usedBase.Add(quantity).Compare(totalBase) < 0 {
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
@@ -679,8 +708,14 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 				quoteQuantity := quantity.Mul(price)
 				usedQuote = usedQuote.Add(quoteQuantity)
 				buyPlacedPrice = nextPrice
+			} else if i == 0 {
+				// skip i == 0
 			}
 		} else {
+			if i+1 == si {
+				continue
+			}
+
 			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) >= 0 {
 				continue
 			}
@@ -700,23 +735,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		}
 	}
 
-	createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, submitOrders...)
-	if err2 != nil {
-		return err
-	}
-
-	// debug info
-	s.logger.Infof("GRID ORDERS: [")
-	for _, order := range submitOrders {
-		s.logger.Info("  - ", order.String())
-	}
-	s.logger.Infof("] END OF GRID ORDERS")
-
-	for _, order := range createdOrders {
-		s.logger.Info(order.String())
-	}
-
-	return nil
+	return submitOrders, nil
 }
 
 func (s *Strategy) clearOpenOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
