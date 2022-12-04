@@ -88,11 +88,11 @@ type Strategy struct {
 	// If this is set, when bbgo started, it will clear the open orders in the same market (by symbol)
 	ClearOpenOrdersWhenStart bool `json:"clearOpenOrdersWhenStart"`
 
-	grid *Grid
-
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	Position    *types.Position    `persistence:"position"`
 
+	grid          *Grid
+	session       *bbgo.ExchangeSession
 	orderExecutor *bbgo.GeneralOrderExecutor
 
 	// groupID is the group ID used for the strategy instance for canceling orders
@@ -692,12 +692,12 @@ func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.Exchange
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 
+	s.session = session
 	s.logger = log.WithFields(logrus.Fields{
 		"symbol": s.Symbol,
 	})
 
 	s.groupID = util.FNV32(instanceID)
-
 	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	if s.ProfitStats == nil {
