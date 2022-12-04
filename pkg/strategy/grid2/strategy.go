@@ -497,6 +497,7 @@ func (s *Strategy) newTriggerPriceHandler(ctx context.Context, session *bbgo.Exc
 			return
 		}
 
+		s.logger.Infof("the last price %f hits triggerPrice %f, opening grid", k.Close.Float64(), s.TriggerPrice.Float64())
 		if err := s.openGrid(ctx, session); err != nil {
 			s.logger.WithError(err).Errorf("failed to setup grid orders")
 			return
