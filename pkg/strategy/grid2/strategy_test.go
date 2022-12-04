@@ -70,8 +70,8 @@ func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
 				Pin(number(14_000.0)),
 				Pin(number(15_000.0)),
 			})
-		assert.EqualError(t, err, "quote balance (3000.000000 USDT) is not enough, required = quote 4999.999890")
-		assert.InDelta(t, 4999.99989, requiredQuote.Float64(), number(0.001).Float64())
+		assert.EqualError(t, err, "quote balance (3000.000000 USDT) is not enough, required = quote 5037.036980")
+		assert.InDelta(t, 5037.036980, requiredQuote.Float64(), number(0.001).Float64())
 	})
 }
 
