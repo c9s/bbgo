@@ -26,6 +26,9 @@ jobs:
     steps:
 
     - uses: actions/checkout@v2
+      with:
+        lfs: 'true'
+        ssh-key: ${{ secrets.git_ssh_key }}
 
     - uses: actions/cache@v2
       with:
