@@ -69,6 +69,12 @@ jobs:
     - name: Build
       run: go build -v ./cmd/bbgo
 
+    - name: Link Market Data
+      run: |
+        mkdir -p ~/.bbgo/cache
+        ln -s $PWD/data/binance-markets.json ~/.bbgo/cache/binance-markets.json
+        touch data/binance-markets.json
+
     - name: Test
       run: |
         go test -race -coverprofile coverage.txt -covermode atomic ./pkg/...
