@@ -3,12 +3,17 @@
 package grid2
 
 import (
+	"context"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/backtest"
+	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -321,4 +326,84 @@ func TestStrategy_calculateProfit(t *testing.T) {
 		assert.Equal(t, "BTC", profit.Currency)
 		assert.InDelta(t, sellQuantity.Float64()-buyOrder.Quantity.Float64(), profit.Profit.Float64(), 0.001)
 	})
+}
+
+func TestBacktestStrategy(t *testing.T) {
+	startTime, err := types.ParseLooseFormatTime("2021-06-01")
+	assert.NoError(t, err)
+
+	endTime, err := types.ParseLooseFormatTime("2021-06-30")
+	assert.NoError(t, err)
+
+	backtestConfig := &bbgo.Backtest{
+		StartTime:    startTime,
+		EndTime:      &endTime,
+		RecordTrades: false,
+		FeeMode:      bbgo.BacktestFeeModeToken,
+		Accounts: map[string]bbgo.BacktestAccount{
+			"binance": {
+				MakerFeeRate: number(0.075 * 0.01),
+				TakerFeeRate: number(0.075 * 0.01),
+				Balances: bbgo.BacktestAccountBalanceMap{
+					"USDT": number(10_000.0),
+					"BTC":  number(1.0),
+				},
+			},
+		},
+		Symbols:       []string{"BTCUSDT"},
+		Sessions:      []string{"binance"},
+		SyncSecKLines: false,
+	}
+
+	t.Logf("backtestConfig: %+v", backtestConfig)
+
+	ctx := context.Background()
+	environ := bbgo.NewEnvironment()
+	err = environ.ConfigureDatabaseDriver(ctx, "sqlite3", "../../../data/bbgo_test.sqlite3")
+	assert.NoError(t, err)
+
+	backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
+	defer func() {
+		err := environ.DatabaseService.DB.Close()
+		assert.NoError(t, err)
+	}()
+
+	environ.BacktestService = backtestService
+	bbgo.SetBackTesting(backtestService)
+	defer bbgo.SetBackTesting(nil)
+
+	exName, err := types.ValidExchangeName("binance")
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	publicExchange, err := exchange.NewPublic(exName)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	backtestExchange, err := backtest.NewExchange(publicExchange.Name(), publicExchange, backtestService, backtestConfig)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	session := environ.AddExchange(exName.String(), backtestExchange)
+	assert.NotNil(t, session)
+
+	err = environ.Init(ctx)
+	assert.NoError(t, err)
+
+	for _, ses := range environ.Sessions() {
+		userDataStream := ses.UserDataStream.(types.StandardStreamEmitter)
+		backtestEx := ses.Exchange.(*backtest.Exchange)
+		backtestEx.MarketDataStream = ses.MarketDataStream.(types.StandardStreamEmitter)
+		backtestEx.BindUserData(userDataStream)
+	}
+
+	trader := bbgo.NewTrader(environ)
+	if assert.NotNil(t, trader) {
+		trader.DisableLogging()
+	}
+
+	// TODO: add grid2 to the user config and run backtest
 }
