@@ -16,8 +16,8 @@ sessions:
 # example command:
 #   go run ./cmd/bbgo backtest --config config/grid2.yaml --base-asset-baseline
 backtest:
-  startTime: "2022-06-01"
-  endTime: "2022-06-30"
+  startTime: "2021-06-01"
+  endTime: "2021-12-31"
   symbols:
   - BTCUSDT
   sessions: [binance]
@@ -25,16 +25,16 @@ backtest:
     binance:
       balances:
         BTC: 0.0
-        USDT: 10000.0
+        USDT: 21_000.0
 
 exchangeStrategies:
 
 - on: binance
   grid2:
     symbol: BTCUSDT
-    upperPrice: 15_000.0
-    lowerPrice: 10_000.0
-    gridNumber: 10
+    upperPrice: 60_000.0
+    lowerPrice: 28_000.0
+    gridNumber: 1000
 
     ## compound is used for buying more inventory when the profit is made by the filled SELL order.
     ## when compound is disabled, fixed quantity is used for each grid order.
@@ -45,14 +45,14 @@ exchangeStrategies:
     ## meaning that earn BTC instead of USDT when trading in the BTCUSDT pair.
     # earnBase: true
 
-    ## triggerPrice is used for opening your grid only when the last price touches your trigger price.
+    ## triggerPrice (optional) is used for opening your grid only when the last price touches your trigger price.
     ## this is useful when you don't want to create a grid from a higher price.
     ## for example, when the last price hit 17_000.0 then open a grid with the price range 13_000 to 20_000
-    triggerPrice: 17_000.0
+    # triggerPrice: 17_000.0
 
-    ## triggerPrice is used for closing your grid only when the last price touches your stop loss price.
+    ## triggerPrice (optional) is used for closing your grid only when the last price touches your stop loss price.
     ## for example, when the price drops to 17_000.0 then close the grid and sell all base inventory.
-    stopLossPrice: 10_000.0
+    # stopLossPrice: 10_000.0
 
     ## profitSpread is the profit spread of the arbitrage order (sell order)
     ## greater the profitSpread, greater the profit you make when the sell order is filled.
@@ -73,12 +73,20 @@ exchangeStrategies:
     ## 3) quoteInvestment and baseInvestment: when using quoteInvestment, the strategy will automatically calculate your best quantity for the whole grid.
     ##    quoteInvestment is required, and baseInvestment is optional (could be zero)
     ##    if you have existing BTC position and want to reuse it you can set the baseInvestment.
-    quoteInvestment: 10_000
+    quoteInvestment: 20_000
 
-    ## baseInvestment is optional
+    ## baseInvestment (optional) can be useful when you have existing inventory, maybe bought at much lower price
     baseInvestment: 0.0
 
+    ## closeWhenCancelOrder (optional)
+    ## default to false
     closeWhenCancelOrder: true
+
+    ## resetPositionWhenStart (optional)
+    ## default to false
     resetPositionWhenStart: false
+
+    ## clearOpenOrdersWhenStart (optional)
+    ## default to false
     clearOpenOrdersWhenStart: false
     keepOrdersWhenShutdown: false
