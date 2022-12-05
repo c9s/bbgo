@@ -2,9 +2,12 @@ package bbgo
 
 import (
 	"sync"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+const TradeExpiryTime = 24 * time.Hour
 
 type TradeStore struct {
 	// any created trades for tracking trades
@@ -94,6 +97,29 @@ func (s *TradeStore) Add(trades ...types.Trade) {
 	for _, trade := range trades {
 		s.trades[trade.ID] = trade
 	}
+}
+
+// pruneExpiredTrades prunes trades that are older than the expiry time
+// see TradeExpiryTime
+func (s *TradeStore) pruneExpiredTrades(curTime time.Time) {
+	s.Lock()
+	defer s.Unlock()
+
+	var trades = make(map[uint64]types.Trade)
+	var cutOffTime = curTime.Add(-TradeExpiryTime)
+	for _, trade := range s.trades {
+		if trade.Time.Before(cutOffTime) {
+			continue
+		}
+
+		trades[trade.ID] = trade
+	}
+
+	s.trades = trades
+}
+
+func (s *TradeStore) Prune(curTime time.Time) {
+	s.pruneExpiredTrades(curTime)
 }
 
 func (s *TradeStore) BindStream(stream types.Stream) {
