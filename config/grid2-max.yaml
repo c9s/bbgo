@@ -79,7 +79,7 @@ exchangeStrategies:
     # baseInvestment: 1.0
 
     feeRate: 0.075%
-    closeWhenCancelOrder: false
+    closeWhenCancelOrder: true
     resetPositionWhenStart: true
     clearOpenOrdersWhenStart: false
     keepOrdersWhenShutdown: false
