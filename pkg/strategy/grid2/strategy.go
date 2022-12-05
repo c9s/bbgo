@@ -735,7 +735,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	for i, order := range submitOrders {
 
 		if i > 0 && lastPrice.Compare(order.Price) >= 0 && lastPrice.Compare(submitOrders[i-1].Price) <= 0 {
-			s.logger.Info("  - LAST PRICE: %f", lastPrice.Float64())
+			s.logger.Infof("  - LAST PRICE: %f", lastPrice.Float64())
 		}
 
 		s.logger.Info("  - ", order.String())
