@@ -17,7 +17,7 @@ sessions:
 #   go run ./cmd/bbgo backtest --config config/grid2.yaml --base-asset-baseline
 backtest:
   startTime: "2021-06-01"
-  endTime: "2021-12-31"
+  endTime: "2021-06-30"
   symbols:
   - BTCUSDT
   sessions: [binance]
