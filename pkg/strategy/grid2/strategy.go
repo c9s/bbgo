@@ -197,6 +197,19 @@ func (s *Strategy) calculateProfit(o types.Order, buyPrice, buyQuantity fixedpoi
 	return profit
 }
 
+// collectTradeFee collects the fee from the given trade slice
+func collectTradeFee(trades []types.Trade) map[string]fixedpoint.Value {
+	fees := make(map[string]fixedpoint.Value)
+	for _, t := range trades {
+		if fee, ok := fees[t.FeeCurrency]; ok {
+			fees[t.FeeCurrency] = fee.Add(t.Fee)
+		} else {
+			fees[t.FeeCurrency] = t.Fee
+		}
+	}
+	return fees
+}
+
 func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 	tq := fixedpoint.Zero
 	for _, t := range trades {
@@ -227,11 +240,9 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	s.logger.Infof("GRID ORDER FILLED: %s", o.String())
 
 	// collect trades
+	baseSellQuantityReduction := fixedpoint.Zero
 	if s.orderQueryService != nil {
-		tradeCollector := s.orderExecutor.TradeCollector()
-		// tradeCollector.Process()
-
-		orderTrades := tradeCollector.TradeStore().GetOrderTrades(o)
+		orderTrades := s.historicalTrades.GetOrderTrades(o)
 		s.logger.Infof("FILLED ORDER TRADES: %+v", orderTrades)
 
 		// TODO: check if there is no missing trades
@@ -246,6 +257,15 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 				s.logger.WithError(err).Errorf("query order trades error")
 			} else {
 				orderTrades = apiOrderTrades
+			}
+		}
+
+		if s.verifyOrderTrades(o, orderTrades) {
+			// check if there is a BaseCurrency fee collected
+			fees := collectTradeFee(orderTrades)
+			if fee, ok := fees[s.Market.BaseCurrency]; ok {
+				baseSellQuantityReduction = fee
+				s.logger.Infof("baseSellQuantityReduction: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
 			}
 		}
 	}
