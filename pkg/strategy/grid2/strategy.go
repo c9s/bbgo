@@ -81,6 +81,8 @@ type Strategy struct {
 	// If this is set, when bbgo started, it will clear the open orders in the same market (by symbol)
 	ClearOpenOrdersWhenStart bool `json:"clearOpenOrdersWhenStart"`
 
+	ResetPositionWhenStart bool `json:"resetPositionWhenStart"`
+
 	// FeeRate is used for calculating the minimal profit spread.
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
@@ -239,45 +241,52 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 
 	s.logger.Infof("GRID ORDER FILLED: %s", o.String())
 
-	// collect trades
-	baseSellQuantityReduction := fixedpoint.Zero
-	orderTrades := s.historicalTrades.GetOrderTrades(o)
-	if len(orderTrades) > 0 {
-		s.logger.Infof("FOUND FILLED ORDER TRADES: %+v", orderTrades)
-	}
-
-	// TODO: should be only for BUY order
-	if !s.verifyOrderTrades(o, orderTrades) {
-		s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
-
-		// if orderQueryService is supported, use it to query the trades of the filled order
-		if s.orderQueryService != nil {
-			apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
-				Symbol:  o.Symbol,
-				OrderID: strconv.FormatUint(o.OrderID, 10),
-			})
-			if err != nil {
-				s.logger.WithError(err).Errorf("query order trades error")
-			} else {
-				orderTrades = apiOrderTrades
-			}
-		}
-	}
-
-	if s.verifyOrderTrades(o, orderTrades) {
-		// check if there is a BaseCurrency fee collected
-		fees := collectTradeFee(orderTrades)
-		if fee, ok := fees[s.Market.BaseCurrency]; ok {
-			baseSellQuantityReduction = fee
-			s.logger.Infof("baseSellQuantityReduction: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
-		}
-	}
-
 	// check order fee
 	newSide := types.SideTypeSell
 	newPrice := o.Price
 	newQuantity := o.Quantity
 	orderQuoteQuantity := o.Quantity.Mul(o.Price)
+
+	// collect trades
+	baseSellQuantityReduction := fixedpoint.Zero
+
+	// baseSellQuantityReduction calculation should be only for BUY order
+	// because when 1.0 BTC buy order is filled without FEE token, then we will actually get 1.0 * (1 - feeRate) BTC
+	// if we don't reduce the sell quantity, than we might fail to place the sell order
+	if o.Side == types.SideTypeBuy {
+		orderTrades := s.historicalTrades.GetOrderTrades(o)
+		if len(orderTrades) > 0 {
+			s.logger.Infof("FOUND FILLED ORDER TRADES: %+v", orderTrades)
+		}
+
+		if !s.verifyOrderTrades(o, orderTrades) {
+			s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
+
+			// if orderQueryService is supported, use it to query the trades of the filled order
+			if s.orderQueryService != nil {
+				apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
+					Symbol:  o.Symbol,
+					OrderID: strconv.FormatUint(o.OrderID, 10),
+				})
+				if err != nil {
+					s.logger.WithError(err).Errorf("query order trades error")
+				} else {
+					orderTrades = apiOrderTrades
+				}
+			}
+		}
+
+		if s.verifyOrderTrades(o, orderTrades) {
+			// check if there is a BaseCurrency fee collected
+			fees := collectTradeFee(orderTrades)
+			if fee, ok := fees[s.Market.BaseCurrency]; ok {
+				baseSellQuantityReduction = fee
+				s.logger.Infof("baseSellQuantityReduction: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
+
+				newQuantity = newQuantity.Sub(baseSellQuantityReduction)
+			}
+		}
+	}
 
 	switch o.Side {
 	case types.SideTypeSell:
@@ -313,7 +322,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		}
 
 		if s.EarnBase {
-			newQuantity = orderQuoteQuantity.Div(newPrice)
+			newQuantity = orderQuoteQuantity.Div(newPrice).Sub(baseSellQuantityReduction)
 		}
 	}
 
@@ -878,8 +887,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
 
-	// make this an option
-	// s.Position.Reset()
+	if s.ResetPositionWhenStart {
+		s.Position.Reset()
+	}
+
 	s.historicalTrades = bbgo.NewTradeStore()
 	s.historicalTrades.BindStream(session.UserDataStream)
 
