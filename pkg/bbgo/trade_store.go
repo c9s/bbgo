@@ -69,10 +69,21 @@ func (s *TradeStore) Filter(filter TradeFilter) {
 	s.Unlock()
 }
 
+func (s *TradeStore) GetOrderTrades(o types.Order) (trades []types.Trade) {
+	s.Lock()
+	for _, t := range s.trades {
+		if t.OrderID == o.OrderID {
+			trades = append(trades, t)
+		}
+	}
+	s.Unlock()
+	return trades
+}
+
 func (s *TradeStore) GetAndClear() (trades []types.Trade) {
 	s.Lock()
-	for _, o := range s.trades {
-		trades = append(trades, o)
+	for _, t := range s.trades {
+		trades = append(trades, t)
 	}
 	s.trades = make(map[uint64]types.Trade)
 	s.Unlock()
