@@ -37,6 +37,11 @@ type Strategy struct {
 	Symbol string `json:"symbol"`
 
 	// ProfitSpread is the fixed profit spread you want to submit the sell order
+	// When ProfitSpread is enabled, the grid will shift up, e.g.,
+	// If you opened a grid with the price range 10_000 to 20_000
+	// With profit spread set to 3_000
+	// The sell orders will be placed in the range 13_000 to 23_000
+	// And the buy orders will be placed in the original price range 10_000 to 20_000
 	ProfitSpread fixedpoint.Value `json:"profitSpread"`
 
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
@@ -302,7 +307,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 
 		// use the profit to buy more inventory in the grid
 		if s.Compound || s.EarnBase {
-			newQuantity = orderQuoteQuantity.Div(newPrice)
+			newQuantity = fixedpoint.Max(orderQuoteQuantity.Div(newPrice), s.Market.MinQuantity)
 		}
 
 		// calculate profit
@@ -322,7 +327,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		}
 
 		if s.EarnBase {
-			newQuantity = orderQuoteQuantity.Div(newPrice).Sub(baseSellQuantityReduction)
+			newQuantity = fixedpoint.Max(orderQuoteQuantity.Div(newPrice).Sub(baseSellQuantityReduction), s.Market.MinQuantity)
 		}
 	}
 
@@ -359,7 +364,7 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, 
 	requiredQuote = fixedpoint.Zero
 
 	// when we need to place a buy-to-sell conversion order, we need to mark the price
-	si := len(pins) - 1
+	si := -1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
@@ -418,7 +423,7 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 	requiredQuote = fixedpoint.Zero
 
 	// when we need to place a buy-to-sell conversion order, we need to mark the price
-	si := len(pins) - 1
+	si := -1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
@@ -439,9 +444,10 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 			}
 		} else {
 			// for orders that buy
-			if i+1 == si {
+			if s.ProfitSpread.IsZero() && i+1 == si {
 				continue
 			}
+
 			requiredQuote = requiredQuote.Add(amount)
 		}
 	}
@@ -478,7 +484,7 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 	// quoteInvestment = (p1 + p2 + p3) * q
 	// q = quoteInvestment / (p1 + p2 + p3)
 	totalQuotePrice := fixedpoint.Zero
-	si := len(pins) - 1
+	si := -1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
@@ -488,16 +494,17 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 			// for orders that sell
 			// if we still have the base balance
 			// quantity := amount.Div(lastPrice)
-			if i > 0 { // we do not want to sell at i == 0
+			if s.ProfitSpread.Sign() > 0 {
+				totalQuotePrice = totalQuotePrice.Add(price)
+			} else if i > 0 { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
 				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
-				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
 			}
 		} else {
 			// for orders that buy
-			if i+1 == si {
+			if s.ProfitSpread.IsZero() && i+1 == si {
 				continue
 			}
 
@@ -520,9 +527,15 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
-		if price.Compare(lastPrice) < 0 {
+		sellPrice := price
+		if s.ProfitSpread.Sign() > 0 {
+			sellPrice = sellPrice.Add(s.ProfitSpread)
+		}
+
+		if sellPrice.Compare(lastPrice) < 0 {
 			break
 		}
+
 		numberOfSellOrders++
 	}
 
@@ -540,31 +553,36 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 		s.logger.Infof("grid base investment quantity range: %f <=> %f", minBaseQuantity.Float64(), maxBaseQuantity.Float64())
 	}
 
-	buyPlacedPrice := fixedpoint.Zero
+	// calculate quantity with quote investment
 	totalQuotePrice := fixedpoint.Zero
 	// quoteInvestment = (p1 * q) + (p2 * q) + (p3 * q) + ....
 	// =>
 	// quoteInvestment = (p1 + p2 + p3) * q
 	// maxBuyQuantity = quoteInvestment / (p1 + p2 + p3)
-	for i := len(pins) - 1; i >= 0; i-- {
+	si := -1
+	for i := len(pins) - 1 - maxNumberOfSellOrders; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
 
+		// buy price greater than the last price will trigger taker order.
 		if price.Compare(lastPrice) >= 0 {
-			// for orders that sell
-			// if we still have the base balance
-			// quantity := amount.Div(lastPrice)
-			if i > 0 { // we do not want to sell at i == 0
-				// convert sell to buy quote and add to requiredQuote
+			si = i
+
+			// when profit spread is set, we count all the grid prices as buy prices
+			if s.ProfitSpread.Sign() > 0 {
+				totalQuotePrice = totalQuotePrice.Add(price)
+			} else if i > 0 {
+				// when profit spread is not set
+				// we do not want to place sell order at i == 0
+				// here we submit an order to convert a buy order into a sell order
 				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
-				buyPlacedPrice = nextLowerPrice
 			}
 		} else {
 			// for orders that buy
-			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) == 0 {
+			if s.ProfitSpread.IsZero() && i+1 == si {
 				continue
 			}
 
@@ -626,7 +644,7 @@ func (s *Strategy) newStopLossPriceHandler(ctx context.Context, session *bbgo.Ex
 
 func (s *Strategy) newTakeProfitHandler(ctx context.Context, session *bbgo.ExchangeSession) types.KLineCallback {
 	return types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
-		if s.TakeProfitPrice.Compare(k.High) < 0 {
+		if s.TakeProfitPrice.Compare(k.High) > 0 {
 			return
 		}
 
@@ -786,6 +804,13 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
+		sellPrice := price
+
+		// when profitSpread is set, the sell price is shift upper with the given spread
+		if s.ProfitSpread.Sign() > 0 {
+			sellPrice = sellPrice.Add(s.ProfitSpread)
+		}
+
 		quantity := s.QuantityOrAmount.Quantity
 		if quantity.IsZero() {
 			quantity = s.QuantityOrAmount.Amount.Div(price)
@@ -799,7 +824,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					Symbol:      s.Symbol,
 					Type:        types.OrderTypeLimit,
 					Side:        types.SideTypeSell,
-					Price:       price,
+					Price:       sellPrice,
 					Quantity:    quantity,
 					Market:      s.Market,
 					TimeInForce: types.TimeInForceGTC,
@@ -826,7 +851,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				// skip i == 0
 			}
 		} else {
-			if i+1 == si {
+			if s.ProfitSpread.IsZero() && i+1 == si {
 				continue
 			}
 
@@ -906,6 +931,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.groupID = util.FNV32(instanceID)
 	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
+	if s.ProfitSpread.Sign() > 0 {
+		s.ProfitSpread = s.Market.TruncatePrice(s.ProfitSpread)
+	}
+
 	if s.GridProfitStats == nil {
 		s.GridProfitStats = newGridProfitStats(s.Market)
 	}
@@ -923,6 +952,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	s.historicalTrades = bbgo.NewTradeStore()
+	s.historicalTrades.EnablePrune = true
 	s.historicalTrades.BindStream(session.UserDataStream)
 
 	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
