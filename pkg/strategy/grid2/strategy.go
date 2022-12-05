@@ -3,6 +3,7 @@ package grid2
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -92,7 +93,8 @@ type Strategy struct {
 	session           *bbgo.ExchangeSession
 	orderQueryService types.ExchangeOrderQueryService
 
-	orderExecutor *bbgo.GeneralOrderExecutor
+	orderExecutor    *bbgo.GeneralOrderExecutor
+	historicalTrades *bbgo.TradeStore
 
 	// groupID is the group ID used for the strategy instance for canceling orders
 	groupID uint32
@@ -195,6 +197,28 @@ func (s *Strategy) calculateProfit(o types.Order, buyPrice, buyQuantity fixedpoi
 	return profit
 }
 
+func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
+	tq := fixedpoint.Zero
+	for _, t := range trades {
+		if t.Fee.IsZero() && t.FeeCurrency == "" {
+			s.logger.Warnf("trade fee and feeCurrency is zero: %+v", t)
+			return false
+		}
+
+		tq = tq.Add(t.Quantity)
+	}
+
+	if tq.Compare(o.Quantity) != 0 {
+		s.logger.Warnf("order trades missing. expected: %f actual: %f",
+			o.Quantity.Float64(),
+			tq.Float64())
+		return false
+	}
+
+	return true
+}
+
+// handleOrderFilled is called when a order status is FILLED
 func (s *Strategy) handleOrderFilled(o types.Order) {
 	if s.grid == nil {
 		return
@@ -202,7 +226,29 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 
 	s.logger.Infof("GRID ORDER FILLED: %s", o.String())
 
-	// var profit *GridProfit = nil
+	// collect trades
+	if s.orderQueryService != nil {
+		tradeCollector := s.orderExecutor.TradeCollector()
+		// tradeCollector.Process()
+
+		orderTrades := tradeCollector.TradeStore().GetOrderTrades(o)
+		s.logger.Infof("FILLED ORDER TRADES: %+v", orderTrades)
+
+		// TODO: check if there is no missing trades
+		if !s.verifyOrderTrades(o, orderTrades) {
+			s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
+
+			apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
+				Symbol:  o.Symbol,
+				OrderID: strconv.FormatUint(o.OrderID, 10),
+			})
+			if err != nil {
+				s.logger.WithError(err).Errorf("query order trades error")
+			} else {
+				orderTrades = apiOrderTrades
+			}
+		}
+	}
 
 	// check order fee
 	newSide := types.SideTypeSell
@@ -228,6 +274,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		}
 
 		// calculate profit
+		// TODO: send profit notification
 		profit := s.calculateProfit(o, newPrice, newQuantity)
 		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
 		s.GridProfitStats.AddProfit(profit)
@@ -564,6 +611,7 @@ func (s *Strategy) closeGrid(ctx context.Context) error {
 // openGrid
 // 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
+// TODO: fix sell order placement for profitSpread
 func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	// grid object guard
 	if s.grid != nil {
@@ -809,6 +857,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// make this an option
 	// s.Position.Reset()
+	s.historicalTrades = bbgo.NewTradeStore()
+	s.historicalTrades.BindStream(session.UserDataStream)
 
 	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
 	s.orderExecutor.BindEnvironment(s.Environment)
