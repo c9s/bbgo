@@ -1,4 +1,13 @@
 ---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+  switches:
+    trade: false
+    orderUpdate: false
+    submitOrder: false
+
 sessions:
   max:
     exchange: max
@@ -11,7 +20,7 @@ backtest:
   endTime: "2022-11-25"
   symbols:
   - BTCUSDT
-  sessions: [max]
+  sessions: [ max ]
   accounts:
     binance:
       balances:
@@ -20,12 +29,32 @@ backtest:
 
 exchangeStrategies:
 
+## You can run the following command to cancel all grid orders if the orders are not successfully canceled:
+## go run ./cmd/bbgo --dotenv .env.local.max-staging cancel-order --all --symbol BTCUSDT --config config/grid2-max.yaml
 - on: max
   grid2:
     symbol: BTCUSDT
-    upperPrice: 20_000.0
-    lowerPrice: 10_000.0
-    gridNumber: 50
+    upperPrice: 18_000.0
+    lowerPrice: 16_000.0
+    gridNumber: 200
+
+    ## compound is used for buying more inventory when the profit is made by the filled SELL order.
+    ## when compound is disabled, fixed quantity is used for each grid order.
+    ## default: false
+    compound: true
+
+    ## earnBase is used to profit base quantity instead of quote quantity.
+    ## meaning that earn BTC instead of USDT when trading in the BTCUSDT pair.
+    # earnBase: true
+
+    ## triggerPrice is used for opening your grid only when the last price touches your pre-set price.
+    ## this is useful when you don't want to create a grid from a higher price.
+    ## for example, when the last price hit 17_000.0 then open a grid with the price range 13_000 to 20_000
+    # triggerPrice: 16_900.0
+
+    stopLossPrice: 16_000.0
+
+    takeProfitPrice: 20_000.0
 
     ## profitSpread is the profit spread of the arbitrage order (sell order)
     ## greater the profitSpread, greater the profit you make when the sell order is filled.
@@ -47,4 +76,10 @@ exchangeStrategies:
     ##    quoteInvestment is required, and baseInvestment is optional (could be zero)
     ##    if you have existing BTC position and want to reuse it you can set the baseInvestment.
     quoteInvestment: 10_000
-    baseInvestment: 1.0
+    # baseInvestment: 1.0
+
+    feeRate: 0.075%
+    closeWhenCancelOrder: true
+    resetPositionWhenStart: true
+    clearOpenOrdersWhenStart: false
+    keepOrdersWhenShutdown: false

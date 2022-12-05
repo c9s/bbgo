@@ -11,10 +11,6 @@ type TradeStore struct {
 	sync.Mutex
 
 	trades map[uint64]types.Trade
-
-	RemoveCancelled bool
-	RemoveFilled    bool
-	AddOrderUpdate  bool
 }
 
 func NewTradeStore() *TradeStore {
@@ -69,10 +65,21 @@ func (s *TradeStore) Filter(filter TradeFilter) {
 	s.Unlock()
 }
 
+func (s *TradeStore) GetOrderTrades(o types.Order) (trades []types.Trade) {
+	s.Lock()
+	for _, t := range s.trades {
+		if t.OrderID == o.OrderID {
+			trades = append(trades, t)
+		}
+	}
+	s.Unlock()
+	return trades
+}
+
 func (s *TradeStore) GetAndClear() (trades []types.Trade) {
 	s.Lock()
-	for _, o := range s.trades {
-		trades = append(trades, o)
+	for _, t := range s.trades {
+		trades = append(trades, t)
 	}
 	s.trades = make(map[uint64]types.Trade)
 	s.Unlock()
@@ -87,4 +94,10 @@ func (s *TradeStore) Add(trades ...types.Trade) {
 	for _, trade := range trades {
 		s.trades[trade.ID] = trade
 	}
+}
+
+func (s *TradeStore) BindStream(stream types.Stream) {
+	stream.OnTradeUpdate(func(trade types.Trade) {
+		s.Add(trade)
+	})
 }
