@@ -923,6 +923,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	s.historicalTrades = bbgo.NewTradeStore()
+	s.historicalTrades.EnablePrune = true
 	s.historicalTrades.BindStream(session.UserDataStream)
 
 	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
