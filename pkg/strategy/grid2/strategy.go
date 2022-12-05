@@ -241,14 +241,17 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 
 	// collect trades
 	baseSellQuantityReduction := fixedpoint.Zero
-	if s.orderQueryService != nil {
-		orderTrades := s.historicalTrades.GetOrderTrades(o)
-		s.logger.Infof("FILLED ORDER TRADES: %+v", orderTrades)
+	orderTrades := s.historicalTrades.GetOrderTrades(o)
+	if len(orderTrades) > 0 {
+		s.logger.Infof("FOUND FILLED ORDER TRADES: %+v", orderTrades)
+	}
 
-		// TODO: check if there is no missing trades
-		if !s.verifyOrderTrades(o, orderTrades) {
-			s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
+	// TODO: should be only for BUY order
+	if !s.verifyOrderTrades(o, orderTrades) {
+		s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
 
+		// if orderQueryService is supported, use it to query the trades of the filled order
+		if s.orderQueryService != nil {
 			apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
 				Symbol:  o.Symbol,
 				OrderID: strconv.FormatUint(o.OrderID, 10),
@@ -259,14 +262,14 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 				orderTrades = apiOrderTrades
 			}
 		}
+	}
 
-		if s.verifyOrderTrades(o, orderTrades) {
-			// check if there is a BaseCurrency fee collected
-			fees := collectTradeFee(orderTrades)
-			if fee, ok := fees[s.Market.BaseCurrency]; ok {
-				baseSellQuantityReduction = fee
-				s.logger.Infof("baseSellQuantityReduction: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
-			}
+	if s.verifyOrderTrades(o, orderTrades) {
+		// check if there is a BaseCurrency fee collected
+		fees := collectTradeFee(orderTrades)
+		if fee, ok := fees[s.Market.BaseCurrency]; ok {
+			baseSellQuantityReduction = fee
+			s.logger.Infof("baseSellQuantityReduction: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
 		}
 	}
 
