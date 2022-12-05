@@ -626,7 +626,7 @@ func (s *Strategy) newStopLossPriceHandler(ctx context.Context, session *bbgo.Ex
 
 func (s *Strategy) newTakeProfitHandler(ctx context.Context, session *bbgo.ExchangeSession) types.KLineCallback {
 	return types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
-		if s.TakeProfitPrice.Compare(k.High) < 0 {
+		if s.TakeProfitPrice.Compare(k.High) > 0 {
 			return
 		}
 
