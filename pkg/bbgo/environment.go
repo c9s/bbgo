@@ -43,7 +43,7 @@ var BackTestService *service.BacktestService
 
 func SetBackTesting(s *service.BacktestService) {
 	BackTestService = s
-	IsBackTesting = true
+	IsBackTesting = s != nil
 }
 
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
