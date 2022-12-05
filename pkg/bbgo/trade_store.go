@@ -14,6 +14,8 @@ type TradeStore struct {
 	// any created trades for tracking trades
 	sync.Mutex
 
+	EnablePrune bool
+
 	trades        map[uint64]types.Trade
 	lastTradeTime time.Time
 }
@@ -139,8 +141,13 @@ func (s *TradeStore) isCoolTrade(trade types.Trade) bool {
 func (s *TradeStore) BindStream(stream types.Stream) {
 	stream.OnTradeUpdate(func(trade types.Trade) {
 		s.Add(trade)
-		if s.isCoolTrade(trade) {
-			s.Prune(time.Time(trade.Time))
-		}
 	})
+
+	if s.EnablePrune {
+		stream.OnTradeUpdate(func(trade types.Trade) {
+			if s.isCoolTrade(trade) {
+				s.Prune(time.Time(trade.Time))
+			}
+		})
+	}
 }
