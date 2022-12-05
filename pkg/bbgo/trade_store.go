@@ -8,12 +8,14 @@ import (
 )
 
 const TradeExpiryTime = 24 * time.Hour
+const PruneTriggerNumOfTrades = 10_000
 
 type TradeStore struct {
 	// any created trades for tracking trades
 	sync.Mutex
 
-	trades map[uint64]types.Trade
+	trades        map[uint64]types.Trade
+	lastTradeTime time.Time
 }
 
 func NewTradeStore() *TradeStore {
@@ -96,6 +98,13 @@ func (s *TradeStore) Add(trades ...types.Trade) {
 
 	for _, trade := range trades {
 		s.trades[trade.ID] = trade
+		s.touchLastTradeTime(trade)
+	}
+}
+
+func (s *TradeStore) touchLastTradeTime(trade types.Trade) {
+	if trade.Time.Time().After(s.lastTradeTime) {
+		s.lastTradeTime = trade.Time.Time()
 	}
 }
 
@@ -122,8 +131,16 @@ func (s *TradeStore) Prune(curTime time.Time) {
 	s.pruneExpiredTrades(curTime)
 }
 
+func (s *TradeStore) isCoolTrade(trade types.Trade) bool {
+	// if the time of last trade is over 1 hour, we call it's cool trade
+	return s.lastTradeTime != (time.Time{}) && time.Time(trade.Time).Sub(s.lastTradeTime) > time.Hour
+}
+
 func (s *TradeStore) BindStream(stream types.Stream) {
 	stream.OnTradeUpdate(func(trade types.Trade) {
 		s.Add(trade)
+		if s.isCoolTrade(trade) {
+			s.Prune(time.Time(trade.Time))
+		}
 	})
 }
