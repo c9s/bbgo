@@ -80,6 +80,10 @@ type Strategy struct {
 	// If this is set, when bbgo started, it will clear the open orders in the same market (by symbol)
 	ClearOpenOrdersWhenStart bool `json:"clearOpenOrdersWhenStart"`
 
+	// FeeRate is used for calculating the minimal profit spread.
+	// it makes sure that your grid configuration is profitable.
+	FeeRate fixedpoint.Value `json:"feeRate"`
+
 	GridProfitStats *GridProfitStats   `persistence:"grid_profit_stats"`
 	ProfitStats     *types.ProfitStats `persistence:"profit_stats"`
 	Position        *types.Position    `persistence:"position"`
@@ -113,10 +117,16 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("upperPrice (%s) should not be less than or equal to lowerPrice (%s)", s.UpperPrice.String(), s.LowerPrice.String())
 	}
 
+	if s.FeeRate.IsZero() {
+		s.FeeRate = fixedpoint.NewFromFloat(0.1 * 0.01) // 0.1%, 0.075% with BNB
+	}
+
 	if !s.ProfitSpread.IsZero() {
 		percent := s.ProfitSpread.Div(s.LowerPrice)
-		feeRate := fixedpoint.NewFromFloat(0.1 * 0.01) // 0.1%, 0.075% with BNB
-		if percent.Compare(feeRate) < 0 {
+
+		// the min fee rate from 2 maker/taker orders
+		minProfitSpread := s.FeeRate.Mul(fixedpoint.NewFromInt(2))
+		if percent.Compare(minProfitSpread) < 0 {
 			return fmt.Errorf("profitSpread %f %s is too small, less than the fee rate: %s", s.ProfitSpread.Float64(), percent.Percentage(), feeRate.Percentage())
 		}
 	}
