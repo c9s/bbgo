@@ -270,13 +270,14 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, 
 	requiredQuote = fixedpoint.Zero
 
 	// when we need to place a buy-to-sell conversion order, we need to mark the price
-	buyPlacedPrice := fixedpoint.Zero
+	si := len(pins) - 1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
 
 		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
 		if price.Compare(lastPrice) >= 0 {
+			si = i
 			// for orders that sell
 			// if we still have the base balance
 			if requiredBase.Add(quantity).Compare(baseBalance) <= 0 {
@@ -286,11 +287,10 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, 
 				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
-				buyPlacedPrice = nextLowerPrice
 			}
 		} else {
 			// for orders that buy
-			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) == 0 {
+			if i+1 == si {
 				continue
 			}
 			requiredQuote = requiredQuote.Add(quantity.Mul(price))
@@ -329,13 +329,14 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 	requiredQuote = fixedpoint.Zero
 
 	// when we need to place a buy-to-sell conversion order, we need to mark the price
-	buyPlacedPrice := fixedpoint.Zero
+	si := len(pins) - 1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
 
 		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
 		if price.Compare(lastPrice) >= 0 {
+			si = i
 			// for orders that sell
 			// if we still have the base balance
 			quantity := amount.Div(lastPrice)
@@ -346,11 +347,10 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
-				buyPlacedPrice = nextLowerPrice
 			}
 		} else {
 			// for orders that buy
-			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) == 0 {
+			if i+1 == si {
 				continue
 			}
 			requiredQuote = requiredQuote.Add(amount)
@@ -383,18 +383,19 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 }
 
 func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice fixedpoint.Value, pins []Pin) (fixedpoint.Value, error) {
-	buyPlacedPrice := fixedpoint.Zero
 
 	// quoteInvestment = (p1 * q) + (p2 * q) + (p3 * q) + ....
 	// =>
 	// quoteInvestment = (p1 + p2 + p3) * q
 	// q = quoteInvestment / (p1 + p2 + p3)
 	totalQuotePrice := fixedpoint.Zero
+	si := len(pins) - 1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
 
 		if price.Compare(lastPrice) >= 0 {
+			si = i
 			// for orders that sell
 			// if we still have the base balance
 			// quantity := amount.Div(lastPrice)
@@ -404,11 +405,10 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
-				buyPlacedPrice = nextLowerPrice
 			}
 		} else {
 			// for orders that buy
-			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) == 0 {
+			if i+1 == si {
 				continue
 			}
 
