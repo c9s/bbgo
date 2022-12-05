@@ -56,8 +56,8 @@ type PriceSideAssert struct {
 
 func assertPriceSide(t *testing.T, priceSideAsserts []PriceSideAssert, orders []types.SubmitOrder) {
 	for i, a := range priceSideAsserts {
-		assert.Equal(t, a.Side, orders[i].Side)
-		assert.Equal(t, a.Price, orders[i].Price)
+		assert.Equalf(t, a.Price, orders[i].Price, "order #%d price should be %f", i+1, a.Price.Float64())
+		assert.Equalf(t, a.Side, orders[i].Side, "order at price %f should be %s", a.Price.Float64(), a.Side)
 	}
 }
 
@@ -141,6 +141,38 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 			{number(18000.0), types.SideTypeSell},
 			{number(17000.0), types.SideTypeSell},
 			{number(16000.0), types.SideTypeSell},
+			{number(14000.0), types.SideTypeBuy},
+			{number(13000.0), types.SideTypeBuy},
+			{number(12000.0), types.SideTypeBuy},
+			{number(11000.0), types.SideTypeBuy},
+			{number(10000.0), types.SideTypeBuy},
+		}, orders)
+	})
+
+	t.Run("enough base + quote + profitSpread", func(t *testing.T) {
+		s := newTestStrategy()
+		s.ProfitSpread = number(1_000)
+		s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+		s.grid.CalculateArithmeticPins()
+		s.QuantityOrAmount.Quantity = number(0.01)
+
+		lastPrice := number(15300)
+		orders, err := s.generateGridOrders(number(10000.0), number(1.0), lastPrice)
+		assert.NoError(t, err)
+		if !assert.Equal(t, 11, len(orders)) {
+			for _, o := range orders {
+				t.Logf("- %s %s", o.Price.String(), o.Side)
+			}
+		}
+
+		assertPriceSide(t, []PriceSideAssert{
+			{number(21000.0), types.SideTypeSell},
+			{number(20000.0), types.SideTypeSell},
+			{number(19000.0), types.SideTypeSell},
+			{number(18000.0), types.SideTypeSell},
+			{number(17000.0), types.SideTypeSell},
+
+			{number(15000.0), types.SideTypeBuy},
 			{number(14000.0), types.SideTypeBuy},
 			{number(13000.0), types.SideTypeBuy},
 			{number(12000.0), types.SideTypeBuy},
