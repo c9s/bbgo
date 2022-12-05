@@ -258,9 +258,11 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 
 func newTestStrategy() *Strategy {
 	market := types.Market{
-		BaseCurrency:  "BTC",
-		QuoteCurrency: "USDT",
-		TickSize:      number(0.01),
+		BaseCurrency:    "BTC",
+		QuoteCurrency:   "USDT",
+		TickSize:        number(0.01),
+		PricePrecision:  2,
+		VolumePrecision: 8,
 	}
 
 	s := &Strategy{
@@ -270,6 +272,8 @@ func newTestStrategy() *Strategy {
 		UpperPrice:      number(20_000),
 		LowerPrice:      number(10_000),
 		GridNum:         10,
+
+		// QuoteInvestment: number(9000.0),
 	}
 	return s
 }
@@ -329,6 +333,25 @@ func TestStrategy_calculateProfit(t *testing.T) {
 }
 
 func TestBacktestStrategy(t *testing.T) {
+	market := types.Market{
+		BaseCurrency:    "BTC",
+		QuoteCurrency:   "USDT",
+		TickSize:        number(0.01),
+		PricePrecision:  2,
+		VolumePrecision: 8,
+	}
+	strategy := &Strategy{
+		logger:          logrus.NewEntry(logrus.New()),
+		Symbol:          "BTCUSDT",
+		Market:          market,
+		GridProfitStats: newGridProfitStats(market),
+		UpperPrice:      number(60_000),
+		LowerPrice:      number(28_000),
+		GridNum:         100,
+		QuoteInvestment: number(9000.0),
+	}
+
+	// TEMPLATE {{{ start backtest
 	startTime, err := types.ParseLooseFormatTime("2021-06-01")
 	assert.NoError(t, err)
 
@@ -359,6 +382,8 @@ func TestBacktestStrategy(t *testing.T) {
 
 	ctx := context.Background()
 	environ := bbgo.NewEnvironment()
+	environ.SetStartTime(startTime.Time())
+
 	err = environ.ConfigureDatabaseDriver(ctx, "sqlite3", "../../../data/bbgo_test.sqlite3")
 	assert.NoError(t, err)
 
@@ -406,4 +431,19 @@ func TestBacktestStrategy(t *testing.T) {
 	}
 
 	// TODO: add grid2 to the user config and run backtest
+	userConfig := &bbgo.Config{
+		ExchangeStrategies: []bbgo.ExchangeStrategyMount{
+			{
+				Mounts:   []string{"binance"},
+				Strategy: strategy,
+			},
+		},
+	}
+
+	err = trader.Configure(userConfig)
+	assert.NoError(t, err)
+
+	err = trader.Run(ctx)
+	assert.NoError(t, err)
+	// }}}
 }
