@@ -296,6 +296,7 @@ func (p *Position) Reset() {
 	p.Base = fixedpoint.Zero
 	p.Quote = fixedpoint.Zero
 	p.AverageCost = fixedpoint.Zero
+	p.TotalFee = make(map[string]fixedpoint.Value)
 }
 
 func (p *Position) SetFeeRate(exchangeFee ExchangeFee) {

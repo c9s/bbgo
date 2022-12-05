@@ -809,6 +809,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 	s.orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
 
+	// TODO: detect if there are previous grid orders on the order book
 	if s.ClearOpenOrdersWhenStart {
 		if err := s.clearOpenOrders(ctx, session); err != nil {
 			return err
@@ -819,6 +820,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		defer wg.Done()
 
 		if s.KeepOrdersWhenShutdown {
+			s.logger.Infof("KeepOrdersWhenShutdown is set, will keep the orders on the exchange")
 			return
 		}
 
