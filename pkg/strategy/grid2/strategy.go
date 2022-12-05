@@ -534,7 +534,7 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 		if sellPrice.Compare(lastPrice) < 0 {
 			break
 		}
-	
+
 		numberOfSellOrders++
 	}
 
@@ -552,17 +552,25 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 		s.logger.Infof("grid base investment quantity range: %f <=> %f", minBaseQuantity.Float64(), maxBaseQuantity.Float64())
 	}
 
-	buyPlacedPrice := fixedpoint.Zero
 	totalQuotePrice := fixedpoint.Zero
 	// quoteInvestment = (p1 * q) + (p2 * q) + (p3 * q) + ....
 	// =>
 	// quoteInvestment = (p1 + p2 + p3) * q
 	// maxBuyQuantity = quoteInvestment / (p1 + p2 + p3)
+	si := len(pins) - 1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
+		sellPrice := price
+
+		// when profitSpread is set, the sell price is shift upper with the given spread
+		if s.ProfitSpread.Sign() > 0 {
+			sellPrice = sellPrice.Add(s.ProfitSpread)
+		}
 
 		if price.Compare(lastPrice) >= 0 {
+			si = i
+
 			// for orders that sell
 			// if we still have the base balance
 			// quantity := amount.Div(lastPrice)
@@ -572,11 +580,10 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
-				buyPlacedPrice = nextLowerPrice
 			}
 		} else {
 			// for orders that buy
-			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) == 0 {
+			if s.ProfitSpread.IsZero() && i+1 == si {
 				continue
 			}
 
