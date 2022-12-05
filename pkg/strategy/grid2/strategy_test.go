@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -48,9 +49,80 @@ func TestStrategy_checkRequiredInvestmentByQuantity(t *testing.T) {
 	})
 }
 
+type PriceSideAssert struct {
+	Price fixedpoint.Value
+	Side  types.SideType
+}
+
+func assertPriceSide(t *testing.T, priceSideAsserts []PriceSideAssert, orders []types.SubmitOrder) {
+	for i, a := range priceSideAsserts {
+		assert.Equal(t, a.Side, orders[i].Side)
+		assert.Equal(t, a.Price, orders[i].Price)
+	}
+}
+
+func TestStrategy_generateGridOrders(t *testing.T) {
+	t.Run("quote only", func(t *testing.T) {
+		s := newTestStrategy()
+		s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+		s.grid.CalculateArithmeticPins()
+		s.QuantityOrAmount.Quantity = number(0.01)
+
+		lastPrice := number(15300)
+		orders, err := s.generateGridOrders(number(10000.0), number(0), lastPrice)
+		assert.NoError(t, err)
+		if !assert.Equal(t, 10, len(orders)) {
+			for _, o := range orders {
+				t.Logf("- %s %s", o.Price.String(), o.Side)
+			}
+		}
+
+		assertPriceSide(t, []PriceSideAssert{
+			{number(19000.0), types.SideTypeBuy},
+			{number(18000.0), types.SideTypeBuy},
+			{number(17000.0), types.SideTypeBuy},
+			{number(16000.0), types.SideTypeBuy},
+			{number(15000.0), types.SideTypeBuy},
+			{number(14000.0), types.SideTypeBuy},
+			{number(13000.0), types.SideTypeBuy},
+			{number(12000.0), types.SideTypeBuy},
+			{number(11000.0), types.SideTypeBuy},
+			{number(10000.0), types.SideTypeBuy},
+		}, orders)
+	})
+
+	t.Run("base + quote", func(t *testing.T) {
+		s := newTestStrategy()
+		s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+		s.grid.CalculateArithmeticPins()
+		s.QuantityOrAmount.Quantity = number(0.01)
+
+		lastPrice := number(15300)
+		orders, err := s.generateGridOrders(number(10000.0), number(0.021), lastPrice)
+		assert.NoError(t, err)
+		if !assert.Equal(t, 10, len(orders)) {
+			for _, o := range orders {
+				t.Logf("- %s %s", o.Price.String(), o.Side)
+			}
+		}
+
+		assertPriceSide(t, []PriceSideAssert{
+			{number(20000.0), types.SideTypeSell},
+			{number(19000.0), types.SideTypeSell},
+			{number(17000.0), types.SideTypeBuy},
+			{number(16000.0), types.SideTypeBuy},
+			{number(15000.0), types.SideTypeBuy},
+			{number(14000.0), types.SideTypeBuy},
+			{number(13000.0), types.SideTypeBuy},
+			{number(12000.0), types.SideTypeBuy},
+			{number(11000.0), types.SideTypeBuy},
+			{number(10000.0), types.SideTypeBuy},
+		}, orders)
+	})
+}
+
 func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
 	s := &Strategy{
-
 		logger: logrus.NewEntry(logrus.New()),
 		Market: types.Market{
 			BaseCurrency:  "BTC",
@@ -70,8 +142,8 @@ func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
 				Pin(number(14_000.0)),
 				Pin(number(15_000.0)),
 			})
-		assert.EqualError(t, err, "quote balance (3000.000000 USDT) is not enough, required = quote 5037.036980")
-		assert.InDelta(t, 5037.036980, requiredQuote.Float64(), number(0.001).Float64())
+		assert.EqualError(t, err, "quote balance (3000.000000 USDT) is not enough, required = quote 4999.999890")
+		assert.InDelta(t, 4999.999890, requiredQuote.Float64(), number(0.001).Float64())
 	})
 }
 
@@ -106,6 +178,7 @@ func newTestStrategy() *Strategy {
 	market := types.Market{
 		BaseCurrency:  "BTC",
 		QuoteCurrency: "USDT",
+		TickSize:      number(0.01),
 	}
 
 	s := &Strategy{
