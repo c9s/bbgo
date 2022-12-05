@@ -444,9 +444,10 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 			}
 		} else {
 			// for orders that buy
-			if i+1 == si {
+			if s.ProfitSpread.IsZero() && i+1 == si {
 				continue
 			}
+
 			requiredQuote = requiredQuote.Add(amount)
 		}
 	}
@@ -502,7 +503,7 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 			}
 		} else {
 			// for orders that buy
-			if i+1 == si {
+			if s.ProfitSpread.IsZero() && i+1 == si {
 				continue
 			}
 
@@ -525,9 +526,15 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
-		if price.Compare(lastPrice) < 0 {
+		sellPrice := price
+		if s.ProfitSpread.Sign() > 0 {
+			sellPrice = sellPrice.Add(s.ProfitSpread)
+		}
+
+		if sellPrice.Compare(lastPrice) < 0 {
 			break
 		}
+	
 		numberOfSellOrders++
 	}
 
