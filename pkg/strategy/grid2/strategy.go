@@ -653,7 +653,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
 	s.grid.CalculateArithmeticPins()
 
-	s.logger.Info(s.grid.String())
+	s.logger.Info("OPENING GRID: ", s.grid.String())
 
 	lastPrice, err := s.getLastTradePrice(ctx, session)
 	if err != nil {
@@ -732,7 +732,12 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	// debug info
 	s.logger.Infof("GRID ORDERS: [")
-	for _, order := range submitOrders {
+	for i, order := range submitOrders {
+
+		if i > 0 && lastPrice.Compare(order.Price) >= 0 && lastPrice.Compare(submitOrders[i-1].Price) <= 0 {
+			s.logger.Info("  - LAST PRICE: %f", lastPrice.Float64())
+		}
+
 		s.logger.Info("  - ", order.String())
 	}
 	s.logger.Infof("] END OF GRID ORDERS")
