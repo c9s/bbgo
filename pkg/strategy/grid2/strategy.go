@@ -307,7 +307,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 
 		// use the profit to buy more inventory in the grid
 		if s.Compound || s.EarnBase {
-			newQuantity = orderQuoteQuantity.Div(newPrice)
+			newQuantity = fixedpoint.Max(orderQuoteQuantity.Div(newPrice), s.Market.MinQuantity)
 		}
 
 		// calculate profit
@@ -327,7 +327,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		}
 
 		if s.EarnBase {
-			newQuantity = orderQuoteQuantity.Div(newPrice).Sub(baseSellQuantityReduction)
+			newQuantity = fixedpoint.Max(orderQuoteQuantity.Div(newPrice).Sub(baseSellQuantityReduction), s.Market.MinQuantity)
 		}
 	}
 
