@@ -74,4 +74,11 @@ exchangeStrategies:
     ##    quoteInvestment is required, and baseInvestment is optional (could be zero)
     ##    if you have existing BTC position and want to reuse it you can set the baseInvestment.
     quoteInvestment: 10_000
-    baseInvestment: 1.0
+
+    ## baseInvestment is optional
+    baseInvestment: 0.0
+
+    closeWhenCancelOrder: true
+    resetPositionWhenStart: false
+    clearOpenOrdersWhenStart: false
+    keepOrdersWhenShutdown: false
