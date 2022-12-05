@@ -1,6 +1,7 @@
 package grid2
 
 import (
+	"fmt"
 	"math"
 	"sort"
 
@@ -184,4 +185,8 @@ func (g *Grid) addPins(pins []Pin) {
 
 func (g *Grid) updatePinsCache() {
 	g.pinsCache = buildPinCache(g.Pins)
+}
+
+func (g *Grid) String() string {
+	return fmt.Sprintf("GRID: priceRange: %f <=> %f size: %f spread: %f", g.LowerPrice.Float64(), g.UpperPrice.Float64(), g.Size.Float64(), g.Spread.Float64())
 }
