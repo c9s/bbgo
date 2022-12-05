@@ -11,10 +11,6 @@ type TradeStore struct {
 	sync.Mutex
 
 	trades map[uint64]types.Trade
-
-	RemoveCancelled bool
-	RemoveFilled    bool
-	AddOrderUpdate  bool
 }
 
 func NewTradeStore() *TradeStore {
@@ -98,4 +94,10 @@ func (s *TradeStore) Add(trades ...types.Trade) {
 	for _, trade := range trades {
 		s.trades[trade.ID] = trade
 	}
+}
+
+func (s *TradeStore) BindStream(stream types.Stream) {
+	stream.OnTradeUpdate(func(trade types.Trade) {
+		s.Add(trade)
+	})
 }
