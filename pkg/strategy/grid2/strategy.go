@@ -37,6 +37,11 @@ type Strategy struct {
 	Symbol string `json:"symbol"`
 
 	// ProfitSpread is the fixed profit spread you want to submit the sell order
+	// When ProfitSpread is enabled, the grid will shift up, e.g.,
+	// If you opened a grid with the price range 10_000 to 20_000
+	// With profit spread set to 3_000
+	// The sell orders will be placed in the range 13_000 to 23_000
+	// And the buy orders will be placed in the original price range 10_000 to 20_000
 	ProfitSpread fixedpoint.Value `json:"profitSpread"`
 
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
@@ -786,6 +791,13 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
+		sellPrice := price
+
+		// when profitSpread is set, the sell price is shift upper with the given spread
+		if s.ProfitSpread.Sign() > 0 {
+			sellPrice = sellPrice.Add(s.ProfitSpread)
+		}
+
 		quantity := s.QuantityOrAmount.Quantity
 		if quantity.IsZero() {
 			quantity = s.QuantityOrAmount.Amount.Div(price)
@@ -799,7 +811,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					Symbol:      s.Symbol,
 					Type:        types.OrderTypeLimit,
 					Side:        types.SideTypeSell,
-					Price:       price,
+					Price:       sellPrice,
 					Quantity:    quantity,
 					Market:      s.Market,
 					TimeInForce: types.TimeInForceGTC,
@@ -826,7 +838,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				// skip i == 0
 			}
 		} else {
-			if i+1 == si {
+			if s.ProfitSpread.IsZero() && i+1 == si {
 				continue
 			}
 
