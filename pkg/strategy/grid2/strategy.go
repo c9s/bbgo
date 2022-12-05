@@ -364,7 +364,7 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, 
 	requiredQuote = fixedpoint.Zero
 
 	// when we need to place a buy-to-sell conversion order, we need to mark the price
-	si := len(pins) - 1
+	si := -1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
@@ -423,7 +423,7 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 	requiredQuote = fixedpoint.Zero
 
 	// when we need to place a buy-to-sell conversion order, we need to mark the price
-	si := len(pins) - 1
+	si := -1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
@@ -484,7 +484,7 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 	// quoteInvestment = (p1 + p2 + p3) * q
 	// q = quoteInvestment / (p1 + p2 + p3)
 	totalQuotePrice := fixedpoint.Zero
-	si := len(pins) - 1
+	si := -1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
@@ -494,11 +494,12 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 			// for orders that sell
 			// if we still have the base balance
 			// quantity := amount.Div(lastPrice)
-			if i > 0 { // we do not want to sell at i == 0
+			if s.ProfitSpread.Sign() > 0 {
+				totalQuotePrice = totalQuotePrice.Add(price)
+			} else if i > 0 { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
 				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
-				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
 			}
 		} else {
@@ -557,7 +558,7 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 	// =>
 	// quoteInvestment = (p1 + p2 + p3) * q
 	// maxBuyQuantity = quoteInvestment / (p1 + p2 + p3)
-	si := len(pins) - 1
+	si := -1
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
@@ -568,13 +569,15 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 			sellPrice = sellPrice.Add(s.ProfitSpread)
 		}
 
+		// buy price greater than the last price will trigger taker order.
 		if price.Compare(lastPrice) >= 0 {
 			si = i
 
 			// for orders that sell
 			// if we still have the base balance
 			// quantity := amount.Div(lastPrice)
-			if i > 0 { // we do not want to sell at i == 0
+			if i > 0 {
+				// we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
 				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
