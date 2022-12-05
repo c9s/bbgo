@@ -283,8 +283,7 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, 
 				requiredBase = requiredBase.Add(quantity)
 			} else if i > 0 { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
-				i--
-				nextLowerPin := pins[i]
+				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				buyPlacedPrice = nextLowerPrice
@@ -344,8 +343,7 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 				requiredBase = requiredBase.Add(quantity)
 			} else if i > 0 { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
-				i--
-				nextLowerPin := pins[i]
+				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				buyPlacedPrice = nextLowerPrice
@@ -402,8 +400,7 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 			// quantity := amount.Div(lastPrice)
 			if i > 0 { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
-				i--
-				nextLowerPin := pins[i]
+				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
@@ -470,8 +467,7 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 			// quantity := amount.Div(lastPrice)
 			if i > 0 { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
-				i--
-				nextLowerPin := pins[i]
+				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
@@ -659,7 +655,6 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 }
 
 func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoint.Value) ([]types.SubmitOrder, error) {
-	var buyPlacedPrice = fixedpoint.Zero
 	var pins = s.grid.Pins
 	var usedBase = fixedpoint.Zero
 	var usedQuote = fixedpoint.Zero
@@ -692,8 +687,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				usedBase = usedBase.Add(quantity)
 			} else if i > 0 {
 				// next price
-				i--
-				nextPin := pins[i]
+				nextPin := pins[i-1]
 				nextPrice := fixedpoint.Value(nextPin)
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
@@ -707,16 +701,11 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				})
 				quoteQuantity := quantity.Mul(price)
 				usedQuote = usedQuote.Add(quoteQuantity)
-				buyPlacedPrice = nextPrice
 			} else if i == 0 {
 				// skip i == 0
 			}
 		} else {
 			if i+1 == si {
-				continue
-			}
-
-			if !buyPlacedPrice.IsZero() && price.Compare(buyPlacedPrice) >= 0 {
 				continue
 			}
 
