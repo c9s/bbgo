@@ -119,6 +119,36 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 			{number(10000.0), types.SideTypeBuy},
 		}, orders)
 	})
+
+	t.Run("enough base + quote", func(t *testing.T) {
+		s := newTestStrategy()
+		s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+		s.grid.CalculateArithmeticPins()
+		s.QuantityOrAmount.Quantity = number(0.01)
+
+		lastPrice := number(15300)
+		orders, err := s.generateGridOrders(number(10000.0), number(1.0), lastPrice)
+		assert.NoError(t, err)
+		if !assert.Equal(t, 10, len(orders)) {
+			for _, o := range orders {
+				t.Logf("- %s %s", o.Price.String(), o.Side)
+			}
+		}
+
+		assertPriceSide(t, []PriceSideAssert{
+			{number(20000.0), types.SideTypeSell},
+			{number(19000.0), types.SideTypeSell},
+			{number(18000.0), types.SideTypeSell},
+			{number(17000.0), types.SideTypeSell},
+			{number(16000.0), types.SideTypeSell},
+			{number(14000.0), types.SideTypeBuy},
+			{number(13000.0), types.SideTypeBuy},
+			{number(12000.0), types.SideTypeBuy},
+			{number(11000.0), types.SideTypeBuy},
+			{number(10000.0), types.SideTypeBuy},
+		}, orders)
+	})
+
 }
 
 func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
