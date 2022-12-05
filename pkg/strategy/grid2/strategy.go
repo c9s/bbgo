@@ -553,32 +553,28 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 		s.logger.Infof("grid base investment quantity range: %f <=> %f", minBaseQuantity.Float64(), maxBaseQuantity.Float64())
 	}
 
+	// calculate quantity with quote investment
 	totalQuotePrice := fixedpoint.Zero
 	// quoteInvestment = (p1 * q) + (p2 * q) + (p3 * q) + ....
 	// =>
 	// quoteInvestment = (p1 + p2 + p3) * q
 	// maxBuyQuantity = quoteInvestment / (p1 + p2 + p3)
 	si := -1
-	for i := len(pins) - 1; i >= 0; i-- {
+	for i := len(pins) - 1 - maxNumberOfSellOrders; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
-		sellPrice := price
-
-		// when profitSpread is set, the sell price is shift upper with the given spread
-		if s.ProfitSpread.Sign() > 0 {
-			sellPrice = sellPrice.Add(s.ProfitSpread)
-		}
 
 		// buy price greater than the last price will trigger taker order.
 		if price.Compare(lastPrice) >= 0 {
 			si = i
 
-			// for orders that sell
-			// if we still have the base balance
-			// quantity := amount.Div(lastPrice)
-			if i > 0 {
-				// we do not want to sell at i == 0
-				// convert sell to buy quote and add to requiredQuote
+			// when profit spread is set, we count all the grid prices as buy prices
+			if s.ProfitSpread.Sign() > 0 {
+				totalQuotePrice = totalQuotePrice.Add(price)
+			} else if i > 0 {
+				// when profit spread is not set
+				// we do not want to place sell order at i == 0
+				// here we submit an order to convert a buy order into a sell order
 				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
