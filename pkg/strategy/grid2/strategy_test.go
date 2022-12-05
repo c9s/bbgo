@@ -445,5 +445,8 @@ func TestBacktestStrategy(t *testing.T) {
 
 	err = trader.Run(ctx)
 	assert.NoError(t, err)
+
+	// TODO: feed data
+
 	// }}}
 }
