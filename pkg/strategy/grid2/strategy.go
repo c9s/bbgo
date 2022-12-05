@@ -624,6 +624,32 @@ func (s *Strategy) newStopLossPriceHandler(ctx context.Context, session *bbgo.Ex
 	})
 }
 
+func (s *Strategy) newTakeProfitHandler(ctx context.Context, session *bbgo.ExchangeSession) types.KLineCallback {
+	return types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
+		if s.TakeProfitPrice.Compare(k.High) < 0 {
+			return
+		}
+
+		s.logger.Infof("last high price %f hits takeProfitPrice %f, closing grid", k.High.Float64(), s.TakeProfitPrice.Float64())
+
+		if err := s.closeGrid(ctx); err != nil {
+			s.logger.WithError(err).Errorf("can not close grid")
+			return
+		}
+
+		base := s.Position.GetBase()
+		if base.Sign() < 0 {
+			return
+		}
+
+		s.logger.Infof("position base %f > 0, closing position...", base.Float64())
+		if err := s.orderExecutor.ClosePosition(ctx, fixedpoint.One, "grid2:takeProfit"); err != nil {
+			s.logger.WithError(err).Errorf("can not close position")
+			return
+		}
+	})
+}
+
 // closeGrid closes the grid orders
 func (s *Strategy) closeGrid(ctx context.Context) error {
 	bbgo.Sync(ctx, s)
@@ -934,6 +960,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if !s.StopLossPrice.IsZero() {
 		session.MarketDataStream.OnKLineClosed(s.newStopLossPriceHandler(ctx, session))
+	}
+
+	if !s.TakeProfitPrice.IsZero() {
+		session.MarketDataStream.OnKLineClosed(s.newTakeProfitHandler(ctx, session))
 	}
 
 	session.UserDataStream.OnStart(func() {
