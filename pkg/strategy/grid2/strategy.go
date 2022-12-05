@@ -931,6 +931,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.groupID = util.FNV32(instanceID)
 	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
+	if s.ProfitSpread.Sign() > 0 {
+		s.ProfitSpread = s.Market.TruncatePrice(s.ProfitSpread)
+	}
+
 	if s.GridProfitStats == nil {
 		s.GridProfitStats = newGridProfitStats(s.Market)
 	}
