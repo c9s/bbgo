@@ -127,7 +127,7 @@ func (s *Strategy) Validate() error {
 		// the min fee rate from 2 maker/taker orders
 		minProfitSpread := s.FeeRate.Mul(fixedpoint.NewFromInt(2))
 		if percent.Compare(minProfitSpread) < 0 {
-			return fmt.Errorf("profitSpread %f %s is too small, less than the fee rate: %s", s.ProfitSpread.Float64(), percent.Percentage(), feeRate.Percentage())
+			return fmt.Errorf("profitSpread %f %s is too small, less than the fee rate: %s", s.ProfitSpread.Float64(), percent.Percentage(), s.FeeRate.Percentage())
 		}
 	}
 
