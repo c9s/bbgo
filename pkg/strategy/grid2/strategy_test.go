@@ -210,20 +210,14 @@ func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
 }
 
 func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
-	s := &Strategy{
-		logger: logrus.NewEntry(logrus.New()),
-		Market: types.Market{
-			BaseCurrency:  "BTC",
-			QuoteCurrency: "USDT",
-		},
-	}
-
-	t.Run("calculate quote quantity from quote investment", func(t *testing.T) {
+	t.Run("quote quantity", func(t *testing.T) {
 		// quoteInvestment = (10,000 + 11,000 + 12,000 + 13,000 + 14,000) * q
 		// q = quoteInvestment / (10,000 + 11,000 + 12,000 + 13,000 + 14,000)
 		// q = 12_000 / (10,000 + 11,000 + 12,000 + 13,000 + 14,000)
 		// q = 0.2
-		quantity, err := s.calculateQuoteInvestmentQuantity(number(12_000.0), number(13_500.0), []Pin{
+		s := newTestStrategy()
+		lastPrice := number(13_500.0)
+		quantity, err := s.calculateQuoteInvestmentQuantity(number(12_000.0), lastPrice, []Pin{
 			Pin(number(10_000.0)), // buy
 			Pin(number(11_000.0)), // buy
 			Pin(number(12_000.0)), // buy
@@ -234,6 +228,27 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, number(0.2).String(), quantity.String())
 	})
+
+	t.Run("profit spread", func(t *testing.T) {
+		// quoteInvestment = (10,000 + 11,000 + 12,000 + 13,000 + 14,000 + 15,000) * q
+		// q = quoteInvestment / (10,000 + 11,000 + 12,000 + 13,000 + 14,000 + 15,000)
+		// q = 7500 / (10,000 + 11,000 + 12,000 + 13,000 + 14,000 + 15,000)
+		// q = 0.1
+		s := newTestStrategy()
+		s.ProfitSpread = number(2000.0)
+		lastPrice := number(13_500.0)
+		quantity, err := s.calculateQuoteInvestmentQuantity(number(7500.0), lastPrice, []Pin{
+			Pin(number(10_000.0)), // sell order @ 12_000
+			Pin(number(11_000.0)), // sell order @ 13_000
+			Pin(number(12_000.0)), // sell order @ 14_000
+			Pin(number(13_000.0)), // sell order @ 15_000
+			Pin(number(14_000.0)), // sell order @ 16_000
+			Pin(number(15_000.0)), // sell order @ 17_000
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, number(0.1).String(), quantity.String())
+	})
+
 }
 
 func newTestStrategy() *Strategy {
