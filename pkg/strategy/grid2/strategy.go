@@ -261,7 +261,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	if o.Side == types.SideTypeBuy {
 		orderTrades := s.historicalTrades.GetOrderTrades(o)
 		if len(orderTrades) > 0 {
-			s.logger.Infof("FOUND FILLED ORDER TRADES: %+v", orderTrades)
+			s.logger.Infof("found filled order trades: %+v", orderTrades)
 		}
 
 		if !s.verifyOrderTrades(o, orderTrades) {
@@ -276,6 +276,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 				if err != nil {
 					s.logger.WithError(err).Errorf("query order trades error")
 				} else {
+					s.logger.Infof("fetch api trades: %+v", apiOrderTrades)
 					orderTrades = apiOrderTrades
 				}
 			}
@@ -959,9 +960,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindEnvironment(s.Environment)
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.Bind()
+
+	s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
+		s.GridProfitStats.AddTrade(trade)
+	})
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
+
 	s.orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
 
 	// TODO: detect if there are previous grid orders on the order book
