@@ -25,7 +25,7 @@ backtest:
   accounts:
     binance:
       balances:
-        BTC: 0.0
+        BTC: 1.0
         USDT: 21_000.0
 
 exchangeStrategies:
@@ -77,7 +77,7 @@ exchangeStrategies:
     quoteInvestment: 20_000
 
     ## baseInvestment (optional) can be useful when you have existing inventory, maybe bought at much lower price
-    baseInvestment: 0.0
+    baseInvestment: 1.0
 
     ## closeWhenCancelOrder (optional)
     ## default to false
