@@ -222,11 +222,16 @@ func collectTradeFee(trades []types.Trade) map[string]fixedpoint.Value {
 	return fees
 }
 
-func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
+func aggregateTradesQuantity(trades []types.Trade) fixedpoint.Value {
 	tq := fixedpoint.Zero
 	for _, t := range trades {
 		tq = tq.Add(t.Quantity)
 	}
+	return tq
+}
+
+func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
+	tq := aggregateTradesQuantity(trades)
 
 	if tq.Compare(o.Quantity) != 0 {
 		s.logger.Warnf("order trades missing. expected: %f actual: %f",
