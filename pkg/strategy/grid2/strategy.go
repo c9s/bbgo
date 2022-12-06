@@ -929,12 +929,15 @@ func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.Exchange
 	return fixedpoint.Zero, fmt.Errorf("%s ticker price not found", s.Symbol)
 }
 
+func calculateMinimalQuoteInvestment(market types.Market, lowerPrice, upperPrice fixedpoint.Value, gridNum int64) fixedpoint.Value {
+	num := fixedpoint.NewFromInt(gridNum)
+	minimalAmountLowerPrice := fixedpoint.Max(lowerPrice.Mul(market.MinQuantity), market.MinNotional)
+	minimalAmountUpperPrice := fixedpoint.Max(upperPrice.Mul(market.MinQuantity), market.MinNotional)
+	return fixedpoint.Max(minimalAmountLowerPrice, minimalAmountUpperPrice).Mul(num)
+}
+
 func (s *Strategy) checkMinimalQuoteInvestment() error {
-	gridNum := fixedpoint.NewFromInt(s.GridNum)
-	// gridSpread := s.UpperPrice.Sub(s.LowerPrice).Div(gridNum)
-	minimalAmountLowerPrice := fixedpoint.Max(s.LowerPrice.Mul(s.Market.MinQuantity), s.Market.MinNotional)
-	minimalAmountUpperPrice := fixedpoint.Max(s.UpperPrice.Mul(s.Market.MinQuantity), s.Market.MinNotional)
-	minimalQuoteInvestment := fixedpoint.Max(minimalAmountLowerPrice, minimalAmountUpperPrice).Mul(gridNum)
+	minimalQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, s.LowerPrice, s.UpperPrice, s.GridNum)
 	if s.QuoteInvestment.Compare(minimalQuoteInvestment) <= 0 {
 		return fmt.Errorf("need at least %f %s for quote investment, %f %s given",
 			minimalQuoteInvestment.Float64(),
