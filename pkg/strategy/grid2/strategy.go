@@ -128,6 +128,10 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("upperPrice (%s) should not be less than or equal to lowerPrice (%s)", s.UpperPrice.String(), s.LowerPrice.String())
 	}
 
+	if s.GridNum == 0 {
+		return fmt.Errorf("gridNum can not be zero")
+	}
+
 	if s.FeeRate.IsZero() {
 		s.FeeRate = fixedpoint.NewFromFloat(0.1 * 0.01) // 0.1%, 0.075% with BNB
 	}
@@ -143,10 +147,6 @@ func (s *Strategy) Validate() error {
 		if s.ProfitSpread.Div(s.UpperPrice).Compare(gridFeeRate) < 0 {
 			return fmt.Errorf("profitSpread %f %s is too small for upper price, less than the fee rate: %s", s.ProfitSpread.Float64(), s.ProfitSpread.Div(s.UpperPrice).Percentage(), s.FeeRate.Percentage())
 		}
-	}
-
-	if s.GridNum == 0 {
-		return fmt.Errorf("gridNum can not be zero")
 	}
 
 	if err := s.QuantityOrAmount.Validate(); err != nil {
@@ -936,6 +936,22 @@ func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.Exchange
 	return fixedpoint.Zero, fmt.Errorf("%s ticker price not found", s.Symbol)
 }
 
+func (s *Strategy) checkMinimalQuoteInvestment() error {
+	gridNum := fixedpoint.NewFromInt(s.GridNum)
+	// gridSpread := s.UpperPrice.Sub(s.LowerPrice).Div(gridNum)
+	minimalAmountLowerPrice := fixedpoint.Max(s.LowerPrice.Mul(s.Market.MinQuantity), s.Market.MinNotional)
+	minimalAmountUpperPrice := fixedpoint.Max(s.UpperPrice.Mul(s.Market.MinQuantity), s.Market.MinNotional)
+	minimalQuoteInvestment := fixedpoint.Max(minimalAmountLowerPrice, minimalAmountUpperPrice).Mul(gridNum)
+	if s.QuoteInvestment.Compare(minimalQuoteInvestment) <= 0 {
+		return fmt.Errorf("need at least %f %s for quote investment, %f %s given",
+			minimalQuoteInvestment.Float64(),
+			s.Market.QuoteCurrency,
+			s.QuoteInvestment.Float64(),
+			s.Market.QuoteCurrency)
+	}
+	return nil
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 
@@ -970,6 +986,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.ResetPositionWhenStart {
 		s.Position.Reset()
+	}
+
+	// we need to check the minimal quote investment here, because we need the market info
+	if s.QuoteInvestment.Sign() > 0 {
+		if err := s.checkMinimalQuoteInvestment(); err != nil {
+			return err
+		}
 	}
 
 	s.historicalTrades = bbgo.NewTradeStore()
