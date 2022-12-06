@@ -24,6 +24,8 @@ backtest:
   feeMode: token
   accounts:
     binance:
+      makerFeeRate: 0.075%
+      takerFeeRate: 0.075%
       balances:
         BTC: 1.0
         USDT: 21_000.0
