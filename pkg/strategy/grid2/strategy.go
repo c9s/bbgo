@@ -131,12 +131,15 @@ func (s *Strategy) Validate() error {
 	}
 
 	if !s.ProfitSpread.IsZero() {
-		percent := s.ProfitSpread.Div(s.LowerPrice)
+		// the min fee rate from 2 maker/taker orders (with 0.1 rate for profit)
+		gridFeeRate := s.FeeRate.Mul(fixedpoint.NewFromFloat(2.01))
 
-		// the min fee rate from 2 maker/taker orders
-		minProfitSpread := s.FeeRate.Mul(fixedpoint.NewFromInt(2))
-		if percent.Compare(minProfitSpread) < 0 {
-			return fmt.Errorf("profitSpread %f %s is too small, less than the fee rate: %s", s.ProfitSpread.Float64(), percent.Percentage(), s.FeeRate.Percentage())
+		if s.ProfitSpread.Div(s.LowerPrice).Compare(gridFeeRate) < 0 {
+			return fmt.Errorf("profitSpread %f %s is too small for lower price, less than the fee rate: %s", s.ProfitSpread.Float64(), s.ProfitSpread.Div(s.LowerPrice).Percentage(), s.FeeRate.Percentage())
+		}
+
+		if s.ProfitSpread.Div(s.UpperPrice).Compare(gridFeeRate) < 0 {
+			return fmt.Errorf("profitSpread %f %s is too small for upper price, less than the fee rate: %s", s.ProfitSpread.Float64(), s.ProfitSpread.Div(s.UpperPrice).Percentage(), s.FeeRate.Percentage())
 		}
 	}
 
