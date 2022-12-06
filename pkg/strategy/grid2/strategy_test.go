@@ -468,6 +468,9 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 	s := newTestStrategy()
 
 	t.Run("10 grids", func(t *testing.T) {
+		// 10_000 * 0.001 = 10USDT
+		// 20_000 * 0.001 = 20USDT
+		// hence we should have at least: 20USDT * 10 grids
 		s.QuoteInvestment = number(10_000)
 		s.GridNum = 10
 		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, s.LowerPrice, s.UpperPrice, s.GridNum)
