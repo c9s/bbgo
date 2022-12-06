@@ -19,6 +19,8 @@ const ID = "grid2"
 
 var log = logrus.WithField("strategy", ID)
 
+var maxNumberOfOrderTradesQueryTries = 10
+
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
@@ -131,12 +133,15 @@ func (s *Strategy) Validate() error {
 	}
 
 	if !s.ProfitSpread.IsZero() {
-		percent := s.ProfitSpread.Div(s.LowerPrice)
+		// the min fee rate from 2 maker/taker orders (with 0.1 rate for profit)
+		gridFeeRate := s.FeeRate.Mul(fixedpoint.NewFromFloat(2.01))
 
-		// the min fee rate from 2 maker/taker orders
-		minProfitSpread := s.FeeRate.Mul(fixedpoint.NewFromInt(2))
-		if percent.Compare(minProfitSpread) < 0 {
-			return fmt.Errorf("profitSpread %f %s is too small, less than the fee rate: %s", s.ProfitSpread.Float64(), percent.Percentage(), s.FeeRate.Percentage())
+		if s.ProfitSpread.Div(s.LowerPrice).Compare(gridFeeRate) < 0 {
+			return fmt.Errorf("profitSpread %f %s is too small for lower price, less than the fee rate: %s", s.ProfitSpread.Float64(), s.ProfitSpread.Div(s.LowerPrice).Percentage(), s.FeeRate.Percentage())
+		}
+
+		if s.ProfitSpread.Div(s.UpperPrice).Compare(gridFeeRate) < 0 {
+			return fmt.Errorf("profitSpread %f %s is too small for upper price, less than the fee rate: %s", s.ProfitSpread.Float64(), s.ProfitSpread.Div(s.UpperPrice).Percentage(), s.FeeRate.Percentage())
 		}
 	}
 
@@ -238,7 +243,50 @@ func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 	return true
 }
 
-// handleOrderFilled is called when a order status is FILLED
+// aggregateOrderBaseFee collects the base fee quantity from the given order
+// it falls back to query the trades via the RESTful API when the websocket trades are not all received.
+func (s *Strategy) aggregateOrderBaseFee(o types.Order) fixedpoint.Value {
+	// try to get the received trades (websocket trades)
+	orderTrades := s.historicalTrades.GetOrderTrades(o)
+	if len(orderTrades) > 0 {
+		s.logger.Infof("found filled order trades: %+v", orderTrades)
+	}
+
+	for maxTries := maxNumberOfOrderTradesQueryTries; maxTries > 0; maxTries-- {
+		// if one of the trades is missing, we need to query the trades from the RESTful API
+		if s.verifyOrderTrades(o, orderTrades) {
+			// if trades are verified
+			fees := collectTradeFee(orderTrades)
+			if fee, ok := fees[s.Market.BaseCurrency]; ok {
+				return fee
+			}
+			return fixedpoint.Zero
+		}
+
+		// if we don't support orderQueryService, then we should just skip
+		if s.orderQueryService == nil {
+			return fixedpoint.Zero
+		}
+
+		s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
+
+		// if orderQueryService is supported, use it to query the trades of the filled order
+		apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
+			Symbol:  o.Symbol,
+			OrderID: strconv.FormatUint(o.OrderID, 10),
+		})
+		if err != nil {
+			s.logger.WithError(err).Errorf("query order trades error")
+		} else {
+			s.logger.Infof("fetched api trades: %+v", apiOrderTrades)
+			orderTrades = apiOrderTrades
+		}
+	}
+
+	return fixedpoint.Zero
+}
+
+// handleOrderFilled is called when an order status is FILLED
 func (s *Strategy) handleOrderFilled(o types.Order) {
 	if s.grid == nil {
 		return
@@ -259,38 +307,11 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	// because when 1.0 BTC buy order is filled without FEE token, then we will actually get 1.0 * (1 - feeRate) BTC
 	// if we don't reduce the sell quantity, than we might fail to place the sell order
 	if o.Side == types.SideTypeBuy {
-		orderTrades := s.historicalTrades.GetOrderTrades(o)
-		if len(orderTrades) > 0 {
-			s.logger.Infof("FOUND FILLED ORDER TRADES: %+v", orderTrades)
-		}
+		baseSellQuantityReduction = s.aggregateOrderBaseFee(o)
 
-		if !s.verifyOrderTrades(o, orderTrades) {
-			s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
+		s.logger.Infof("base fee: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
 
-			// if orderQueryService is supported, use it to query the trades of the filled order
-			if s.orderQueryService != nil {
-				apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
-					Symbol:  o.Symbol,
-					OrderID: strconv.FormatUint(o.OrderID, 10),
-				})
-				if err != nil {
-					s.logger.WithError(err).Errorf("query order trades error")
-				} else {
-					orderTrades = apiOrderTrades
-				}
-			}
-		}
-
-		if s.verifyOrderTrades(o, orderTrades) {
-			// check if there is a BaseCurrency fee collected
-			fees := collectTradeFee(orderTrades)
-			if fee, ok := fees[s.Market.BaseCurrency]; ok {
-				baseSellQuantityReduction = fee
-				s.logger.Infof("baseSellQuantityReduction: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
-
-				newQuantity = newQuantity.Sub(baseSellQuantityReduction)
-			}
-		}
+		newQuantity = newQuantity.Sub(baseSellQuantityReduction)
 	}
 
 	switch o.Side {
@@ -959,9 +980,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindEnvironment(s.Environment)
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.Bind()
+
+	s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
+		s.GridProfitStats.AddTrade(trade)
+	})
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
+
 	s.orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
 
 	// TODO: detect if there are previous grid orders on the order book
