@@ -471,7 +471,7 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 		s.QuoteInvestment = number(10_000)
 		s.GridNum = 10
 		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, s.LowerPrice, s.UpperPrice, s.GridNum)
-		assert.Equal(t, "20", minQuoteInvestment.String())
+		assert.Equal(t, "200", minQuoteInvestment.String())
 
 		err := s.checkMinimalQuoteInvestment()
 		assert.NoError(t, err)
