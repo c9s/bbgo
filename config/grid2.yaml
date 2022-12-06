@@ -21,10 +21,13 @@ backtest:
   symbols:
   - BTCUSDT
   sessions: [binance]
+  feeMode: token
   accounts:
     binance:
+      makerFeeRate: 0.075%
+      takerFeeRate: 0.075%
       balances:
-        BTC: 0.0
+        BTC: 1.0
         USDT: 21_000.0
 
 exchangeStrategies:
@@ -32,9 +35,13 @@ exchangeStrategies:
 - on: binance
   grid2:
     symbol: BTCUSDT
-    upperPrice: 60_000.0
     lowerPrice: 28_000.0
-    gridNumber: 1000
+    upperPrice: 50_000.0
+
+    ## gridNumber is the total orders between the upper price and the lower price
+    ## gridSpread = (upperPrice - lowerPrice) / gridNumber
+    ## Make sure your gridNumber satisfy this: MIN(gridSpread/lowerPrice, gridSpread/upperPrice) > (makerFeeRate * 2)
+    gridNumber: 150
 
     ## compound is used for buying more inventory when the profit is made by the filled SELL order.
     ## when compound is disabled, fixed quantity is used for each grid order.
@@ -76,7 +83,7 @@ exchangeStrategies:
     quoteInvestment: 20_000
 
     ## baseInvestment (optional) can be useful when you have existing inventory, maybe bought at much lower price
-    baseInvestment: 0.0
+    baseInvestment: 1.0
 
     ## closeWhenCancelOrder (optional)
     ## default to false
