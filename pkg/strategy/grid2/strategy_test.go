@@ -4,6 +4,7 @@ package grid2
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -342,6 +343,73 @@ func TestStrategy_aggregateOrderBaseFee(t *testing.T) {
 	s.orderQueryService = mockService
 
 	ctx := context.Background()
+	mockService.EXPECT().QueryOrderTrades(ctx, types.OrderQuery{
+		Symbol:  "BTCUSDT",
+		OrderID: "3",
+	}).Return([]types.Trade{
+		{
+			ID:          1,
+			OrderID:     3,
+			Exchange:    "binance",
+			Price:       number(20000.0),
+			Quantity:    number(0.2),
+			Symbol:      "BTCUSDT",
+			Side:        types.SideTypeBuy,
+			IsBuyer:     true,
+			FeeCurrency: "BTC",
+			Fee:         number(0.2 * 0.01),
+		},
+		{
+			ID:          1,
+			OrderID:     3,
+			Exchange:    "binance",
+			Price:       number(20000.0),
+			Quantity:    number(0.8),
+			Symbol:      "BTCUSDT",
+			Side:        types.SideTypeBuy,
+			IsBuyer:     true,
+			FeeCurrency: "BTC",
+			Fee:         number(0.8 * 0.01),
+		},
+	}, nil)
+
+	baseFee := s.aggregateOrderBaseFee(types.Order{
+		SubmitOrder: types.SubmitOrder{
+			Symbol:       "BTCUSDT",
+			Side:         types.SideTypeBuy,
+			Type:         types.OrderTypeLimit,
+			Quantity:     number(1.0),
+			Price:        number(20000.0),
+			AveragePrice: number(0),
+			StopPrice:    number(0),
+			Market:       types.Market{},
+			TimeInForce:  types.TimeInForceGTC,
+		},
+		Exchange:         "binance",
+		GID:              1,
+		OrderID:          3,
+		Status:           types.OrderStatusFilled,
+		ExecutedQuantity: number(1.0),
+		IsWorking:        false,
+	})
+	assert.Equal(t, "0.01", baseFee.String())
+}
+
+func TestStrategy_aggregateOrderBaseFeeRetry(t *testing.T) {
+	s := newTestStrategy()
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+	s.orderQueryService = mockService
+
+	ctx := context.Background()
+	mockService.EXPECT().QueryOrderTrades(ctx, types.OrderQuery{
+		Symbol:  "BTCUSDT",
+		OrderID: "3",
+	}).Return(nil, errors.New("api error"))
+
 	mockService.EXPECT().QueryOrderTrades(ctx, types.OrderQuery{
 		Symbol:  "BTCUSDT",
 		OrderID: "3",
