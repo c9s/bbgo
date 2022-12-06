@@ -82,6 +82,7 @@ type Exchange interface {
 }
 
 // ExchangeOrderQueryService provides an interface for querying the order status via order ID or client order ID
+//go:generate mockgen -destination=mocks/mock_exchange_order_query.go -package=mocks . ExchangeOrderQueryService
 type ExchangeOrderQueryService interface {
 	QueryOrder(ctx context.Context, q OrderQuery) (*Order, error)
 	QueryOrderTrades(ctx context.Context, q OrderQuery) ([]Trade, error)

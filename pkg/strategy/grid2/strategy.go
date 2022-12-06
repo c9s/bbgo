@@ -128,6 +128,10 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("upperPrice (%s) should not be less than or equal to lowerPrice (%s)", s.UpperPrice.String(), s.LowerPrice.String())
 	}
 
+	if s.GridNum == 0 {
+		return fmt.Errorf("gridNum can not be zero")
+	}
+
 	if s.FeeRate.IsZero() {
 		s.FeeRate = fixedpoint.NewFromFloat(0.1 * 0.01) // 0.1%, 0.075% with BNB
 	}
@@ -143,10 +147,6 @@ func (s *Strategy) Validate() error {
 		if s.ProfitSpread.Div(s.UpperPrice).Compare(gridFeeRate) < 0 {
 			return fmt.Errorf("profitSpread %f %s is too small for upper price, less than the fee rate: %s", s.ProfitSpread.Float64(), s.ProfitSpread.Div(s.UpperPrice).Percentage(), s.FeeRate.Percentage())
 		}
-	}
-
-	if s.GridNum == 0 {
-		return fmt.Errorf("gridNum can not be zero")
 	}
 
 	if err := s.QuantityOrAmount.Validate(); err != nil {
@@ -222,16 +222,16 @@ func collectTradeFee(trades []types.Trade) map[string]fixedpoint.Value {
 	return fees
 }
 
-func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
+func aggregateTradesQuantity(trades []types.Trade) fixedpoint.Value {
 	tq := fixedpoint.Zero
 	for _, t := range trades {
-		if t.Fee.IsZero() && t.FeeCurrency == "" {
-			s.logger.Warnf("trade fee and feeCurrency is zero: %+v", t)
-			return false
-		}
-
 		tq = tq.Add(t.Quantity)
 	}
+	return tq
+}
+
+func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
+	tq := aggregateTradesQuantity(trades)
 
 	if tq.Compare(o.Quantity) != 0 {
 		s.logger.Warnf("order trades missing. expected: %f actual: %f",
@@ -363,20 +363,13 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		Tag:         "grid",
 	}
 
-	s.logger.Infof("SUBMIT ORDER: %s", orderForm.String())
+	s.logger.Infof("SUBMIT GRID REVERSE ORDER: %s", orderForm.String())
 
 	if createdOrders, err := s.orderExecutor.SubmitOrders(context.Background(), orderForm); err != nil {
 		s.logger.WithError(err).Errorf("can not submit arbitrage order")
 	} else {
 		s.logger.Infof("order created: %+v", createdOrders)
 	}
-}
-
-type InvestmentBudget struct {
-	baseInvestment  fixedpoint.Value
-	quoteInvestment fixedpoint.Value
-	baseBalance     fixedpoint.Value
-	quoteBalance    fixedpoint.Value
 }
 
 func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
@@ -795,10 +788,18 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		return err
 	}
 
-	// debug info
+	s.debugGridOrders(submitOrders, lastPrice)
+
+	for _, order := range createdOrders {
+		s.logger.Info(order.String())
+	}
+
+	return nil
+}
+
+func (s *Strategy) debugGridOrders(submitOrders []types.SubmitOrder, lastPrice fixedpoint.Value) {
 	s.logger.Infof("GRID ORDERS: [")
 	for i, order := range submitOrders {
-
 		if i > 0 && lastPrice.Compare(order.Price) >= 0 && lastPrice.Compare(submitOrders[i-1].Price) <= 0 {
 			s.logger.Infof("  - LAST PRICE: %f", lastPrice.Float64())
 		}
@@ -806,12 +807,6 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		s.logger.Info("  - ", order.String())
 	}
 	s.logger.Infof("] END OF GRID ORDERS")
-
-	for _, order := range createdOrders {
-		s.logger.Info(order.String())
-	}
-
-	return nil
 }
 
 func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoint.Value) ([]types.SubmitOrder, error) {
@@ -936,6 +931,25 @@ func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.Exchange
 	return fixedpoint.Zero, fmt.Errorf("%s ticker price not found", s.Symbol)
 }
 
+func calculateMinimalQuoteInvestment(market types.Market, lowerPrice, upperPrice fixedpoint.Value, gridNum int64) fixedpoint.Value {
+	num := fixedpoint.NewFromInt(gridNum)
+	minimalAmountLowerPrice := fixedpoint.Max(lowerPrice.Mul(market.MinQuantity), market.MinNotional)
+	minimalAmountUpperPrice := fixedpoint.Max(upperPrice.Mul(market.MinQuantity), market.MinNotional)
+	return fixedpoint.Max(minimalAmountLowerPrice, minimalAmountUpperPrice).Mul(num)
+}
+
+func (s *Strategy) checkMinimalQuoteInvestment() error {
+	minimalQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, s.LowerPrice, s.UpperPrice, s.GridNum)
+	if s.QuoteInvestment.Compare(minimalQuoteInvestment) <= 0 {
+		return fmt.Errorf("need at least %f %s for quote investment, %f %s given",
+			minimalQuoteInvestment.Float64(),
+			s.Market.QuoteCurrency,
+			s.QuoteInvestment.Float64(),
+			s.Market.QuoteCurrency)
+	}
+	return nil
+}
+
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 
@@ -970,6 +984,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if s.ResetPositionWhenStart {
 		s.Position.Reset()
+	}
+
+	// we need to check the minimal quote investment here, because we need the market info
+	if s.QuoteInvestment.Sign() > 0 {
+		if err := s.checkMinimalQuoteInvestment(); err != nil {
+			return err
+		}
 	}
 
 	s.historicalTrades = bbgo.NewTradeStore()
