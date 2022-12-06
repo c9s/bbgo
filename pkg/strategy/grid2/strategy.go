@@ -19,6 +19,8 @@ const ID = "grid2"
 
 var log = logrus.WithField("strategy", ID)
 
+var maxNumberOfOrderTradesQueryTries = 10
+
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
@@ -244,16 +246,26 @@ func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 // aggregateOrderBaseFee collects the base fee quantity from the given order
 // it falls back to query the trades via the RESTful API when the websocket trades are not all received.
 func (s *Strategy) aggregateOrderBaseFee(o types.Order) fixedpoint.Value {
-	baseSellQuantityReduction := fixedpoint.Zero
-
+	// try to get the received trades (websocket trades)
 	orderTrades := s.historicalTrades.GetOrderTrades(o)
 	if len(orderTrades) > 0 {
 		s.logger.Infof("found filled order trades: %+v", orderTrades)
 	}
 
-	if !s.verifyOrderTrades(o, orderTrades) {
+	for maxTries := maxNumberOfOrderTradesQueryTries; maxTries > 0; maxTries-- {
+		// if one of the trades is missing, we need to query the trades from the RESTful API
+		if s.verifyOrderTrades(o, orderTrades) {
+			// if trades are verified
+			fees := collectTradeFee(orderTrades)
+			if fee, ok := fees[s.Market.BaseCurrency]; ok {
+				return fee
+			}
+			return fixedpoint.Zero
+		}
+
+		// if we don't support orderQueryService, then we should just skip
 		if s.orderQueryService == nil {
-			return baseSellQuantityReduction
+			return fixedpoint.Zero
 		}
 
 		s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
@@ -266,22 +278,12 @@ func (s *Strategy) aggregateOrderBaseFee(o types.Order) fixedpoint.Value {
 		if err != nil {
 			s.logger.WithError(err).Errorf("query order trades error")
 		} else {
-			s.logger.Infof("fetch api trades: %+v", apiOrderTrades)
+			s.logger.Infof("fetched api trades: %+v", apiOrderTrades)
 			orderTrades = apiOrderTrades
 		}
 	}
 
-	if s.verifyOrderTrades(o, orderTrades) {
-		// check if there is a BaseCurrency fee collected
-		fees := collectTradeFee(orderTrades)
-		if fee, ok := fees[s.Market.BaseCurrency]; ok {
-			baseSellQuantityReduction = fee
-			s.logger.Infof("baseSellQuantityReduction: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
-			return baseSellQuantityReduction
-		}
-	}
-
-	return baseSellQuantityReduction
+	return fixedpoint.Zero
 }
 
 // handleOrderFilled is called when an order status is FILLED
@@ -306,6 +308,9 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	// if we don't reduce the sell quantity, than we might fail to place the sell order
 	if o.Side == types.SideTypeBuy {
 		baseSellQuantityReduction = s.aggregateOrderBaseFee(o)
+
+		s.logger.Infof("base fee: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
+
 		newQuantity = newQuantity.Sub(baseSellQuantityReduction)
 	}
 
