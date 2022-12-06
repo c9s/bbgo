@@ -358,8 +358,7 @@ func (e *Exchange) SubscribeMarketData(startTime, endTime time.Time, requiredInt
 		intervals = append(intervals, interval)
 	}
 
-	log.Infof("using symbols: %v and intervals: %v for back-testing", symbols, intervals)
-	log.Infof("querying klines from database...")
+	log.Infof("querying klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
 	klineC, errC := e.srv.QueryKLinesCh(startTime, endTime, e, symbols, intervals)
 	go func() {
 		if err := <-errC; err != nil {
