@@ -1,6 +1,7 @@
 package grid2
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -12,4 +13,8 @@ type GridProfit struct {
 	Profit   fixedpoint.Value `json:"profit"`
 	Time     time.Time        `json:"time"`
 	Order    types.Order      `json:"order"`
+}
+
+func (p *GridProfit) String() string {
+	return fmt.Sprintf("GRID PROFIT: %f %s @ %s orderID %d", p.Profit.Float64(), p.Currency, p.Time.String(), p.Order.OrderID)
 }
