@@ -241,7 +241,50 @@ func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 	return true
 }
 
-// handleOrderFilled is called when a order status is FILLED
+// aggregateOrderBaseFee collects the base fee quantity from the given order
+// it falls back to query the trades via the RESTful API when the websocket trades are not all received.
+func (s *Strategy) aggregateOrderBaseFee(o types.Order) fixedpoint.Value {
+	baseSellQuantityReduction := fixedpoint.Zero
+
+	orderTrades := s.historicalTrades.GetOrderTrades(o)
+	if len(orderTrades) > 0 {
+		s.logger.Infof("found filled order trades: %+v", orderTrades)
+	}
+
+	if !s.verifyOrderTrades(o, orderTrades) {
+		if s.orderQueryService == nil {
+			return baseSellQuantityReduction
+		}
+
+		s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
+
+		// if orderQueryService is supported, use it to query the trades of the filled order
+		apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
+			Symbol:  o.Symbol,
+			OrderID: strconv.FormatUint(o.OrderID, 10),
+		})
+		if err != nil {
+			s.logger.WithError(err).Errorf("query order trades error")
+		} else {
+			s.logger.Infof("fetch api trades: %+v", apiOrderTrades)
+			orderTrades = apiOrderTrades
+		}
+	}
+
+	if s.verifyOrderTrades(o, orderTrades) {
+		// check if there is a BaseCurrency fee collected
+		fees := collectTradeFee(orderTrades)
+		if fee, ok := fees[s.Market.BaseCurrency]; ok {
+			baseSellQuantityReduction = fee
+			s.logger.Infof("baseSellQuantityReduction: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
+			return baseSellQuantityReduction
+		}
+	}
+
+	return baseSellQuantityReduction
+}
+
+// handleOrderFilled is called when an order status is FILLED
 func (s *Strategy) handleOrderFilled(o types.Order) {
 	if s.grid == nil {
 		return
@@ -262,39 +305,8 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	// because when 1.0 BTC buy order is filled without FEE token, then we will actually get 1.0 * (1 - feeRate) BTC
 	// if we don't reduce the sell quantity, than we might fail to place the sell order
 	if o.Side == types.SideTypeBuy {
-		orderTrades := s.historicalTrades.GetOrderTrades(o)
-		if len(orderTrades) > 0 {
-			s.logger.Infof("found filled order trades: %+v", orderTrades)
-		}
-
-		if !s.verifyOrderTrades(o, orderTrades) {
-			s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
-
-			// if orderQueryService is supported, use it to query the trades of the filled order
-			if s.orderQueryService != nil {
-				apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
-					Symbol:  o.Symbol,
-					OrderID: strconv.FormatUint(o.OrderID, 10),
-				})
-				if err != nil {
-					s.logger.WithError(err).Errorf("query order trades error")
-				} else {
-					s.logger.Infof("fetch api trades: %+v", apiOrderTrades)
-					orderTrades = apiOrderTrades
-				}
-			}
-		}
-
-		if s.verifyOrderTrades(o, orderTrades) {
-			// check if there is a BaseCurrency fee collected
-			fees := collectTradeFee(orderTrades)
-			if fee, ok := fees[s.Market.BaseCurrency]; ok {
-				baseSellQuantityReduction = fee
-				s.logger.Infof("baseSellQuantityReduction: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
-
-				newQuantity = newQuantity.Sub(baseSellQuantityReduction)
-			}
-		}
+		baseSellQuantityReduction = s.aggregateOrderBaseFee(o)
+		newQuantity = newQuantity.Sub(baseSellQuantityReduction)
 	}
 
 	switch o.Side {
