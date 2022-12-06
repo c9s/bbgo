@@ -225,11 +225,6 @@ func collectTradeFee(trades []types.Trade) map[string]fixedpoint.Value {
 func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 	tq := fixedpoint.Zero
 	for _, t := range trades {
-		if t.Fee.IsZero() && t.FeeCurrency == "" {
-			s.logger.Warnf("trade fee and feeCurrency is zero: %+v", t)
-			return false
-		}
-
 		tq = tq.Add(t.Quantity)
 	}
 
