@@ -35,9 +35,13 @@ exchangeStrategies:
 - on: binance
   grid2:
     symbol: BTCUSDT
-    upperPrice: 50_000.0
     lowerPrice: 28_000.0
-    gridNumber: 1000
+    upperPrice: 50_000.0
+
+    ## gridNumber is the total orders between the upper price and the lower price
+    ## gridSpread = (upperPrice - lowerPrice) / gridNumber
+    ## Make sure your gridNumber satisfy this: MIN(gridSpread/lowerPrice, gridSpread/upperPrice) > (makerFeeRate * 2)
+    gridNumber: 150
 
     ## compound is used for buying more inventory when the profit is made by the filled SELL order.
     ## when compound is disabled, fixed quantity is used for each grid order.
