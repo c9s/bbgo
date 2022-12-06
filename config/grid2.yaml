@@ -21,6 +21,7 @@ backtest:
   symbols:
   - BTCUSDT
   sessions: [binance]
+  feeMode: token
   accounts:
     binance:
       balances:
@@ -32,7 +33,7 @@ exchangeStrategies:
 - on: binance
   grid2:
     symbol: BTCUSDT
-    upperPrice: 60_000.0
+    upperPrice: 50_000.0
     lowerPrice: 28_000.0
     gridNumber: 1000
 
