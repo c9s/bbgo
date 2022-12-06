@@ -363,20 +363,13 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		Tag:         "grid",
 	}
 
-	s.logger.Infof("SUBMIT ORDER: %s", orderForm.String())
+	s.logger.Infof("SUBMIT GRID REVERSE ORDER: %s", orderForm.String())
 
 	if createdOrders, err := s.orderExecutor.SubmitOrders(context.Background(), orderForm); err != nil {
 		s.logger.WithError(err).Errorf("can not submit arbitrage order")
 	} else {
 		s.logger.Infof("order created: %+v", createdOrders)
 	}
-}
-
-type InvestmentBudget struct {
-	baseInvestment  fixedpoint.Value
-	quoteInvestment fixedpoint.Value
-	baseBalance     fixedpoint.Value
-	quoteBalance    fixedpoint.Value
 }
 
 func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
