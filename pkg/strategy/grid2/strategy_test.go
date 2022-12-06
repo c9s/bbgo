@@ -4,6 +4,7 @@ package grid2
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -350,12 +351,20 @@ func TestBacktestStrategy(t *testing.T) {
 		GridNum:         100,
 		QuoteInvestment: number(9000.0),
 	}
+	RunBacktest(t, strategy)
+}
 
+func RunBacktest(t *testing.T, strategy bbgo.SingleExchangeStrategy) {
 	// TEMPLATE {{{ start backtest
-	startTime, err := types.ParseLooseFormatTime("2021-06-01")
+	const sqliteDbFile = "../../../data/bbgo_test.sqlite3"
+	const backtestExchangeName = "binance"
+	const backtestStartTime = "2022-06-01"
+	const backtestEndTime = "2022-06-30"
+
+	startTime, err := types.ParseLooseFormatTime(backtestStartTime)
 	assert.NoError(t, err)
 
-	endTime, err := types.ParseLooseFormatTime("2021-06-30")
+	endTime, err := types.ParseLooseFormatTime(backtestEndTime)
 	assert.NoError(t, err)
 
 	backtestConfig := &bbgo.Backtest{
@@ -364,7 +373,7 @@ func TestBacktestStrategy(t *testing.T) {
 		RecordTrades: false,
 		FeeMode:      bbgo.BacktestFeeModeToken,
 		Accounts: map[string]bbgo.BacktestAccount{
-			"binance": {
+			backtestExchangeName: {
 				MakerFeeRate: number(0.075 * 0.01),
 				TakerFeeRate: number(0.075 * 0.01),
 				Balances: bbgo.BacktestAccountBalanceMap{
@@ -374,7 +383,7 @@ func TestBacktestStrategy(t *testing.T) {
 			},
 		},
 		Symbols:       []string{"BTCUSDT"},
-		Sessions:      []string{"binance"},
+		Sessions:      []string{backtestExchangeName},
 		SyncSecKLines: false,
 	}
 
@@ -384,8 +393,14 @@ func TestBacktestStrategy(t *testing.T) {
 	environ := bbgo.NewEnvironment()
 	environ.SetStartTime(startTime.Time())
 
-	err = environ.ConfigureDatabaseDriver(ctx, "sqlite3", "../../../data/bbgo_test.sqlite3")
+	info, err := os.Stat(sqliteDbFile)
 	assert.NoError(t, err)
+	t.Logf("sqlite: %+v", info)
+
+	err = environ.ConfigureDatabaseDriver(ctx, "sqlite3", sqliteDbFile)
+	if !assert.NoError(t, err) {
+		return
+	}
 
 	backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
 	defer func() {
@@ -397,22 +412,24 @@ func TestBacktestStrategy(t *testing.T) {
 	bbgo.SetBackTesting(backtestService)
 	defer bbgo.SetBackTesting(nil)
 
-	exName, err := types.ValidExchangeName("binance")
+	exName, err := types.ValidExchangeName(backtestExchangeName)
 	if !assert.NoError(t, err) {
 		return
 	}
+
+	t.Logf("using exchange source: %s", exName)
 
 	publicExchange, err := exchange.NewPublic(exName)
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	backtestExchange, err := backtest.NewExchange(publicExchange.Name(), publicExchange, backtestService, backtestConfig)
+	backtestExchange, err := backtest.NewExchange(exName, publicExchange, backtestService, backtestConfig)
 	if !assert.NoError(t, err) {
 		return
 	}
 
-	session := environ.AddExchange(exName.String(), backtestExchange)
+	session := environ.AddExchange(backtestExchangeName, backtestExchange)
 	assert.NotNil(t, session)
 
 	err = environ.Init(ctx)
@@ -430,11 +447,11 @@ func TestBacktestStrategy(t *testing.T) {
 		trader.DisableLogging()
 	}
 
-	// TODO: add grid2 to the user config and run backtest
 	userConfig := &bbgo.Config{
+		Backtest: backtestConfig,
 		ExchangeStrategies: []bbgo.ExchangeStrategyMount{
 			{
-				Mounts:   []string{"binance"},
+				Mounts:   []string{backtestExchangeName},
 				Strategy: strategy,
 			},
 		},
@@ -446,7 +463,32 @@ func TestBacktestStrategy(t *testing.T) {
 	err = trader.Run(ctx)
 	assert.NoError(t, err)
 
-	// TODO: feed data
+	allKLineIntervals, requiredInterval, backTestIntervals := backtest.CollectSubscriptionIntervals(environ)
+	t.Logf("requiredInterval: %s backTestIntervals: %v", requiredInterval, backTestIntervals)
 
+	_ = allKLineIntervals
+	exchangeSources, err := backtest.InitializeExchangeSources(environ.Sessions(), startTime.Time(), endTime.Time(), requiredInterval, backTestIntervals...)
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	doneC := make(chan struct{})
+	go func() {
+		count := 0
+		exSource := exchangeSources[0]
+		for k := range exSource.C {
+			exSource.Exchange.ConsumeKLine(k, requiredInterval)
+			count++
+		}
+
+		err = exSource.Exchange.CloseMarketData()
+		assert.NoError(t, err)
+
+		assert.Greater(t, count, 0, "kLines count must be greater than 0, please check your backtest date range and symbol settings")
+
+		close(doneC)
+	}()
+
+	<-doneC
 	// }}}
 }
