@@ -263,6 +263,8 @@ func newTestStrategy() *Strategy {
 		TickSize:        number(0.01),
 		PricePrecision:  2,
 		VolumePrecision: 8,
+		MinNotional:     number(10.0),
+		MinQuantity:     number(0.001),
 	}
 
 	s := &Strategy{
@@ -460,6 +462,31 @@ func TestStrategy_aggregateOrderBaseFeeRetry(t *testing.T) {
 		IsWorking:        false,
 	})
 	assert.Equal(t, "0.01", baseFee.String())
+}
+
+func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
+	s := newTestStrategy()
+
+	t.Run("10 grids", func(t *testing.T) {
+		s.QuoteInvestment = number(10_000)
+		s.GridNum = 10
+		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, s.LowerPrice, s.UpperPrice, s.GridNum)
+		assert.Equal(t, "20", minQuoteInvestment.String())
+
+		err := s.checkMinimalQuoteInvestment()
+		assert.NoError(t, err)
+	})
+
+	t.Run("1000 grids", func(t *testing.T) {
+		s.QuoteInvestment = number(10_000)
+		s.GridNum = 1000
+		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, s.LowerPrice, s.UpperPrice, s.GridNum)
+		assert.Equal(t, "20000", minQuoteInvestment.String())
+
+		err := s.checkMinimalQuoteInvestment()
+		assert.Error(t, err)
+		assert.EqualError(t, err, "need at least 20000.000000 USDT for quote investment, 10000.000000 USDT given")
+	})
 }
 
 func TestBacktestStrategy(t *testing.T) {
