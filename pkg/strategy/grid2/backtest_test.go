@@ -1,3 +1,5 @@
+//go:build !dnum
+
 package grid2
 
 import (
