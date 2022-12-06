@@ -788,10 +788,18 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		return err
 	}
 
-	// debug info
+	s.debugGridOrders(submitOrders, lastPrice)
+
+	for _, order := range createdOrders {
+		s.logger.Info(order.String())
+	}
+
+	return nil
+}
+
+func (s *Strategy) debugGridOrders(submitOrders []types.SubmitOrder, lastPrice fixedpoint.Value) {
 	s.logger.Infof("GRID ORDERS: [")
 	for i, order := range submitOrders {
-
 		if i > 0 && lastPrice.Compare(order.Price) >= 0 && lastPrice.Compare(submitOrders[i-1].Price) <= 0 {
 			s.logger.Infof("  - LAST PRICE: %f", lastPrice.Float64())
 		}
@@ -799,12 +807,6 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		s.logger.Info("  - ", order.String())
 	}
 	s.logger.Infof("] END OF GRID ORDERS")
-
-	for _, order := range createdOrders {
-		s.logger.Info(order.String())
-	}
-
-	return nil
 }
 
 func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoint.Value) ([]types.SubmitOrder, error) {
