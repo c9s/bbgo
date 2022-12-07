@@ -136,17 +136,8 @@ func (s *Strategy) Validate() error {
 		s.FeeRate = fixedpoint.NewFromFloat(0.1 * 0.01) // 0.1%, 0.075% with BNB
 	}
 
-	if !s.ProfitSpread.IsZero() {
-		// the min fee rate from 2 maker/taker orders (with 0.1 rate for profit)
-		gridFeeRate := s.FeeRate.Mul(fixedpoint.NewFromFloat(2.01))
-
-		if s.ProfitSpread.Div(s.LowerPrice).Compare(gridFeeRate) < 0 {
-			return fmt.Errorf("profitSpread %f %s is too small for lower price, less than the fee rate: %s", s.ProfitSpread.Float64(), s.ProfitSpread.Div(s.LowerPrice).Percentage(), s.FeeRate.Percentage())
-		}
-
-		if s.ProfitSpread.Div(s.UpperPrice).Compare(gridFeeRate) < 0 {
-			return fmt.Errorf("profitSpread %f %s is too small for upper price, less than the fee rate: %s", s.ProfitSpread.Float64(), s.ProfitSpread.Div(s.UpperPrice).Percentage(), s.FeeRate.Percentage())
-		}
+	if err := s.checkSpread(); err != nil {
+		return err
 	}
 
 	if err := s.QuantityOrAmount.Validate(); err != nil {
@@ -169,6 +160,32 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 // InstanceID returns the instance identifier from the current grid configuration parameters
 func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s-%s-%d-%d-%d", ID, s.Symbol, s.GridNum, s.UpperPrice.Int(), s.LowerPrice.Int())
+}
+
+func (s *Strategy) checkSpread() error {
+	gridNum := fixedpoint.NewFromInt(s.GridNum)
+	spread := s.ProfitSpread
+	if spread.IsZero() {
+		spread = s.UpperPrice.Sub(s.LowerPrice).Div(gridNum)
+	}
+
+	feeRate := s.FeeRate
+	if feeRate.IsZero() {
+		feeRate = fixedpoint.NewFromFloat(0.075 * 0.01)
+	}
+
+	// the min fee rate from 2 maker/taker orders (with 0.1 rate for profit)
+	gridFeeRate := feeRate.Mul(fixedpoint.NewFromFloat(2.01))
+
+	if spread.Div(s.LowerPrice).Compare(gridFeeRate) < 0 {
+		return fmt.Errorf("profitSpread %f %s is too small for lower price, less than the grid fee rate: %s", spread.Float64(), spread.Div(s.LowerPrice).Percentage(), gridFeeRate.Percentage())
+	}
+
+	if spread.Div(s.UpperPrice).Compare(gridFeeRate) < 0 {
+		return fmt.Errorf("profitSpread %f %s is too small for upper price, less than the grid fee rate: %s", spread.Float64(), spread.Div(s.UpperPrice).Percentage(), gridFeeRate.Percentage())
+	}
+
+	return nil
 }
 
 func (s *Strategy) handleOrderCanceled(o types.Order) {
