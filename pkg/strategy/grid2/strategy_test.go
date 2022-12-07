@@ -15,6 +15,8 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
+
+	gridmocks "github.com/c9s/bbgo/pkg/strategy/grid2/mocks"
 )
 
 func TestStrategy_checkRequiredInvestmentByQuantity(t *testing.T) {
@@ -269,6 +271,7 @@ func newTestStrategy() *Strategy {
 
 	s := &Strategy{
 		logger:           logrus.NewEntry(logrus.New()),
+		Symbol:           "BTCUSDT",
 		Market:           market,
 		GridProfitStats:  newGridProfitStats(market),
 		UpperPrice:       number(20_000),
@@ -395,6 +398,326 @@ func TestStrategy_aggregateOrderBaseFee(t *testing.T) {
 		IsWorking:        false,
 	})
 	assert.Equal(t, "0.01", baseFee.String())
+}
+
+func TestStrategy_handleOrderFilled(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("no fee token", func(t *testing.T) {
+		gridQuantity := number(0.1)
+		orderID := uint64(1)
+
+		s := newTestStrategy()
+		s.Quantity = gridQuantity
+		s.grid = s.newGrid()
+
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+
+		mockService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+		mockService.EXPECT().QueryOrderTrades(ctx, types.OrderQuery{
+			Symbol:  "BTCUSDT",
+			OrderID: "1",
+		}).Return([]types.Trade{
+			{
+				ID:          1,
+				OrderID:     orderID,
+				Exchange:    "binance",
+				Price:       number(11000.0),
+				Quantity:    gridQuantity,
+				Symbol:      "BTCUSDT",
+				Side:        types.SideTypeBuy,
+				IsBuyer:     true,
+				FeeCurrency: "BTC",
+				Fee:         number(gridQuantity.Float64() * 0.1 * 0.01),
+			},
+		}, nil)
+
+		s.orderQueryService = mockService
+
+		expectedSubmitOrder := types.SubmitOrder{
+			Symbol:      "BTCUSDT",
+			Type:        types.OrderTypeLimit,
+			Price:       number(12_000.0),
+			Quantity:    number(0.0999),
+			Side:        types.SideTypeSell,
+			TimeInForce: types.TimeInForceGTC,
+			Market:      s.Market,
+			Tag:         "grid",
+		}
+
+		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
+		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder).Return([]types.Order{
+			{SubmitOrder: expectedSubmitOrder},
+		}, nil)
+		s.orderExecutor = orderExecutor
+
+		s.handleOrderFilled(types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Symbol:      "BTCUSDT",
+				Side:        types.SideTypeBuy,
+				Type:        types.OrderTypeLimit,
+				Quantity:    gridQuantity,
+				Price:       number(11000.0),
+				TimeInForce: types.TimeInForceGTC,
+			},
+			Exchange:         "binance",
+			OrderID:          orderID,
+			Status:           types.OrderStatusFilled,
+			ExecutedQuantity: gridQuantity,
+		})
+	})
+
+	t.Run("with fee token", func(t *testing.T) {
+		gridQuantity := number(0.1)
+		orderID := uint64(1)
+
+		s := newTestStrategy()
+		s.Quantity = gridQuantity
+		s.grid = s.newGrid()
+
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+
+		mockService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+		mockService.EXPECT().QueryOrderTrades(ctx, types.OrderQuery{
+			Symbol:  "BTCUSDT",
+			OrderID: "1",
+		}).Return([]types.Trade{
+			{
+				ID:          1,
+				OrderID:     orderID,
+				Exchange:    "binance",
+				Price:       number(11000.0),
+				Quantity:    gridQuantity,
+				Symbol:      "BTCUSDT",
+				Side:        types.SideTypeBuy,
+				IsBuyer:     true,
+				FeeCurrency: "BTC",
+				Fee:         fixedpoint.Zero,
+			},
+		}, nil)
+
+		s.orderQueryService = mockService
+
+		expectedSubmitOrder := types.SubmitOrder{
+			Symbol:      "BTCUSDT",
+			Type:        types.OrderTypeLimit,
+			Price:       number(12_000.0),
+			Quantity:    gridQuantity,
+			Side:        types.SideTypeSell,
+			TimeInForce: types.TimeInForceGTC,
+			Market:      s.Market,
+			Tag:         "grid",
+		}
+
+		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
+		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder).Return([]types.Order{
+			{SubmitOrder: expectedSubmitOrder},
+		}, nil)
+		s.orderExecutor = orderExecutor
+
+		s.handleOrderFilled(types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Symbol:      "BTCUSDT",
+				Side:        types.SideTypeBuy,
+				Type:        types.OrderTypeLimit,
+				Quantity:    gridQuantity,
+				Price:       number(11000.0),
+				TimeInForce: types.TimeInForceGTC,
+			},
+			Exchange:         "binance",
+			OrderID:          orderID,
+			Status:           types.OrderStatusFilled,
+			ExecutedQuantity: gridQuantity,
+		})
+	})
+
+	t.Run("with fee token and EarnBase", func(t *testing.T) {
+		gridQuantity := number(0.1)
+		orderID := uint64(1)
+
+		s := newTestStrategy()
+		s.Quantity = gridQuantity
+		s.EarnBase = true
+		s.grid = s.newGrid()
+
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+
+		mockService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+		mockService.EXPECT().QueryOrderTrades(ctx, types.OrderQuery{
+			Symbol:  "BTCUSDT",
+			OrderID: "1",
+		}).Return([]types.Trade{
+			{
+				ID:          1,
+				OrderID:     orderID,
+				Exchange:    "binance",
+				Price:       number(11000.0),
+				Quantity:    gridQuantity,
+				Symbol:      "BTCUSDT",
+				Side:        types.SideTypeBuy,
+				IsBuyer:     true,
+				FeeCurrency: "BTC",
+				Fee:         fixedpoint.Zero,
+			},
+		}, nil)
+
+		s.orderQueryService = mockService
+
+		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
+
+		expectedSubmitOrder := types.SubmitOrder{
+			Symbol:      "BTCUSDT",
+			Type:        types.OrderTypeLimit,
+			Side:        types.SideTypeSell,
+			Price:       number(12_000.0),
+			Quantity:    number(0.09166666),
+			TimeInForce: types.TimeInForceGTC,
+			Market:      s.Market,
+			Tag:         "grid",
+		}
+		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder).Return([]types.Order{
+			{SubmitOrder: expectedSubmitOrder},
+		}, nil)
+
+		expectedSubmitOrder2 := types.SubmitOrder{
+			Symbol:      "BTCUSDT",
+			Type:        types.OrderTypeLimit,
+			Side:        types.SideTypeBuy,
+			Price:       number(11_000.0),
+			Quantity:    number(0.09999999),
+			TimeInForce: types.TimeInForceGTC,
+			Market:      s.Market,
+			Tag:         "grid",
+		}
+		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder2).Return([]types.Order{
+			{SubmitOrder: expectedSubmitOrder2},
+		}, nil)
+
+		s.orderExecutor = orderExecutor
+
+		s.handleOrderFilled(types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Symbol:      "BTCUSDT",
+				Side:        types.SideTypeBuy,
+				Type:        types.OrderTypeLimit,
+				Quantity:    gridQuantity,
+				Price:       number(11000.0),
+				TimeInForce: types.TimeInForceGTC,
+			},
+			Exchange:         "binance",
+			OrderID:          1,
+			Status:           types.OrderStatusFilled,
+			ExecutedQuantity: gridQuantity,
+		})
+
+		s.handleOrderFilled(types.Order{
+			SubmitOrder:      expectedSubmitOrder,
+			Exchange:         "binance",
+			OrderID:          2,
+			Status:           types.OrderStatusFilled,
+			ExecutedQuantity: expectedSubmitOrder.Quantity,
+		})
+	})
+
+	t.Run("with fee token and compound", func(t *testing.T) {
+		gridQuantity := number(0.1)
+		orderID := uint64(1)
+
+		s := newTestStrategy()
+		s.Quantity = gridQuantity
+		s.Compound = true
+		s.grid = s.newGrid()
+
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+
+		mockService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+		mockService.EXPECT().QueryOrderTrades(ctx, types.OrderQuery{
+			Symbol:  "BTCUSDT",
+			OrderID: "1",
+		}).Return([]types.Trade{
+			{
+				ID:          1,
+				OrderID:     orderID,
+				Exchange:    "binance",
+				Price:       number(11000.0),
+				Quantity:    gridQuantity,
+				Symbol:      "BTCUSDT",
+				Side:        types.SideTypeBuy,
+				IsBuyer:     true,
+				FeeCurrency: "BTC",
+				Fee:         fixedpoint.Zero,
+			},
+		}, nil)
+
+		s.orderQueryService = mockService
+
+		expectedSubmitOrder := types.SubmitOrder{
+			Symbol:      "BTCUSDT",
+			Type:        types.OrderTypeLimit,
+			Price:       number(12_000.0),
+			Quantity:    gridQuantity,
+			Side:        types.SideTypeSell,
+			TimeInForce: types.TimeInForceGTC,
+			Market:      s.Market,
+			Tag:         "grid",
+		}
+
+		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
+		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder).Return([]types.Order{
+			{SubmitOrder: expectedSubmitOrder},
+		}, nil)
+
+		expectedSubmitOrder2 := types.SubmitOrder{
+			Symbol:      "BTCUSDT",
+			Type:        types.OrderTypeLimit,
+			Price:       number(11_000.0),
+			Quantity:    number(0.1090909),
+			Side:        types.SideTypeBuy,
+			TimeInForce: types.TimeInForceGTC,
+			Market:      s.Market,
+			Tag:         "grid",
+		}
+
+		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder2).Return([]types.Order{
+			{SubmitOrder: expectedSubmitOrder2},
+		}, nil)
+		s.orderExecutor = orderExecutor
+
+		s.handleOrderFilled(types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Symbol:      "BTCUSDT",
+				Side:        types.SideTypeBuy,
+				Type:        types.OrderTypeLimit,
+				Quantity:    gridQuantity,
+				Price:       number(11000.0),
+				TimeInForce: types.TimeInForceGTC,
+			},
+			Exchange:         "binance",
+			OrderID:          1,
+			Status:           types.OrderStatusFilled,
+			ExecutedQuantity: gridQuantity,
+		})
+
+		s.handleOrderFilled(types.Order{
+			SubmitOrder: types.SubmitOrder{
+				Symbol:      "BTCUSDT",
+				Side:        types.SideTypeSell,
+				Type:        types.OrderTypeLimit,
+				Quantity:    gridQuantity,
+				Price:       number(12000.0),
+				TimeInForce: types.TimeInForceGTC,
+			},
+			Exchange:         "binance",
+			OrderID:          2,
+			Status:           types.OrderStatusFilled,
+			ExecutedQuantity: gridQuantity,
+		})
+
+	})
 }
 
 func TestStrategy_aggregateOrderBaseFeeRetry(t *testing.T) {
