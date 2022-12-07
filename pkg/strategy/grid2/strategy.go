@@ -133,17 +133,11 @@ func (s *Strategy) Validate() error {
 	}
 
 	if err := s.checkSpread(); err != nil {
-		return err
+		return errors.Wrapf(err, "spread is too small, please try to reduce your gridNum or increase the price range (upperPrice and lowerPrice)")
 	}
 
-	if err := s.QuantityOrAmount.Validate(); err != nil {
-		if s.QuoteInvestment.IsZero() && s.BaseInvestment.IsZero() {
-			return err
-		}
-	}
-
-	if !s.QuantityOrAmount.IsSet() && s.QuoteInvestment.IsZero() && s.BaseInvestment.IsZero() {
-		return fmt.Errorf("one of quantity, amount, quoteInvestment must be set")
+	if !s.QuantityOrAmount.IsSet() && s.QuoteInvestment.IsZero() {
+		return fmt.Errorf("either quantity, amount or quoteInvestment must be set")
 	}
 
 	return nil
