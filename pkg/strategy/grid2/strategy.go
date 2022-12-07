@@ -28,6 +28,13 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+//go:generate mockgen -destination=mocks/order_executor.go -package=mocks . OrderExecutor
+type OrderExecutor interface {
+	SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error)
+	ClosePosition(ctx context.Context, percentage fixedpoint.Value, tags ...string) error
+	GracefulCancel(ctx context.Context, orders ...types.Order) error
+}
+
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -102,7 +109,7 @@ type Strategy struct {
 	session           *bbgo.ExchangeSession
 	orderQueryService types.ExchangeOrderQueryService
 
-	orderExecutor    *bbgo.GeneralOrderExecutor
+	orderExecutor    OrderExecutor
 	historicalTrades *bbgo.TradeStore
 
 	// groupID is the group ID used for the strategy instance for canceling orders
@@ -705,6 +712,12 @@ func (s *Strategy) closeGrid(ctx context.Context) error {
 	return nil
 }
 
+func (s *Strategy) newGrid() *Grid {
+	grid := NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+	grid.CalculateArithmeticPins()
+	return grid
+}
+
 // openGrid
 // 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
@@ -715,9 +728,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		return nil
 	}
 
-	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
-	s.grid.CalculateArithmeticPins()
-
+	s.grid = s.newGrid()
 	s.logger.Info("OPENING GRID: ", s.grid.String())
 
 	lastPrice, err := s.getLastTradePrice(ctx, session)
@@ -957,7 +968,7 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 	return nil
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 
 	s.session = session
@@ -1004,19 +1015,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.historicalTrades.EnablePrune = true
 	s.historicalTrades.BindStream(session.UserDataStream)
 
-	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
-	s.orderExecutor.BindEnvironment(s.Environment)
-	s.orderExecutor.BindProfitStats(s.ProfitStats)
-	s.orderExecutor.Bind()
-
-	s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
+	orderExecutor := bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	orderExecutor.BindEnvironment(s.Environment)
+	orderExecutor.BindProfitStats(s.ProfitStats)
+	orderExecutor.Bind()
+	orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
 		s.GridProfitStats.AddTrade(trade)
 	})
-	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
-
-	s.orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
+	orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
+	s.orderExecutor = orderExecutor
 
 	// TODO: detect if there are previous grid orders on the order book
 	if s.ClearOpenOrdersWhenStart {
