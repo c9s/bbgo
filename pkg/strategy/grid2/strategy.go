@@ -866,7 +866,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					Quantity:    quantity,
 					Market:      s.Market,
 					TimeInForce: types.TimeInForceGTC,
-					Tag:         "grid2",
+					Tag:         orderTag,
 				})
 				usedBase = usedBase.Add(quantity)
 			} else if i > 0 {
@@ -881,7 +881,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					Quantity:    quantity,
 					Market:      s.Market,
 					TimeInForce: types.TimeInForceGTC,
-					Tag:         "grid2",
+					Tag:         orderTag,
 				})
 				quoteQuantity := quantity.Mul(price)
 				usedQuote = usedQuote.Add(quoteQuantity)
