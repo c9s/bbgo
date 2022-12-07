@@ -28,6 +28,13 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+//go:generate mockgen -destination=mocks/order_executor.go -package=mocks . OrderExecutor
+type OrderExecutor interface {
+	SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error)
+	ClosePosition(ctx context.Context, percentage fixedpoint.Value, tags ...string) error
+	GracefulCancel(ctx context.Context, orders ...types.Order) error
+}
+
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -102,7 +109,7 @@ type Strategy struct {
 	session           *bbgo.ExchangeSession
 	orderQueryService types.ExchangeOrderQueryService
 
-	orderExecutor    *bbgo.GeneralOrderExecutor
+	orderExecutor    OrderExecutor
 	historicalTrades *bbgo.TradeStore
 
 	// groupID is the group ID used for the strategy instance for canceling orders
@@ -132,31 +139,12 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("gridNum can not be zero")
 	}
 
-	if s.FeeRate.IsZero() {
-		s.FeeRate = fixedpoint.NewFromFloat(0.1 * 0.01) // 0.1%, 0.075% with BNB
+	if err := s.checkSpread(); err != nil {
+		return errors.Wrapf(err, "spread is too small, please try to reduce your gridNum or increase the price range (upperPrice and lowerPrice)")
 	}
 
-	if !s.ProfitSpread.IsZero() {
-		// the min fee rate from 2 maker/taker orders (with 0.1 rate for profit)
-		gridFeeRate := s.FeeRate.Mul(fixedpoint.NewFromFloat(2.01))
-
-		if s.ProfitSpread.Div(s.LowerPrice).Compare(gridFeeRate) < 0 {
-			return fmt.Errorf("profitSpread %f %s is too small for lower price, less than the fee rate: %s", s.ProfitSpread.Float64(), s.ProfitSpread.Div(s.LowerPrice).Percentage(), s.FeeRate.Percentage())
-		}
-
-		if s.ProfitSpread.Div(s.UpperPrice).Compare(gridFeeRate) < 0 {
-			return fmt.Errorf("profitSpread %f %s is too small for upper price, less than the fee rate: %s", s.ProfitSpread.Float64(), s.ProfitSpread.Div(s.UpperPrice).Percentage(), s.FeeRate.Percentage())
-		}
-	}
-
-	if err := s.QuantityOrAmount.Validate(); err != nil {
-		if s.QuoteInvestment.IsZero() && s.BaseInvestment.IsZero() {
-			return err
-		}
-	}
-
-	if !s.QuantityOrAmount.IsSet() && s.QuoteInvestment.IsZero() && s.BaseInvestment.IsZero() {
-		return fmt.Errorf("one of quantity, amount, quoteInvestment must be set")
+	if !s.QuantityOrAmount.IsSet() && s.QuoteInvestment.IsZero() {
+		return fmt.Errorf("either quantity, amount or quoteInvestment must be set")
 	}
 
 	return nil
@@ -169,6 +157,32 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 // InstanceID returns the instance identifier from the current grid configuration parameters
 func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s-%s-%d-%d-%d", ID, s.Symbol, s.GridNum, s.UpperPrice.Int(), s.LowerPrice.Int())
+}
+
+func (s *Strategy) checkSpread() error {
+	gridNum := fixedpoint.NewFromInt(s.GridNum)
+	spread := s.ProfitSpread
+	if spread.IsZero() {
+		spread = s.UpperPrice.Sub(s.LowerPrice).Div(gridNum)
+	}
+
+	feeRate := s.FeeRate
+	if feeRate.IsZero() {
+		feeRate = fixedpoint.NewFromFloat(0.075 * 0.01)
+	}
+
+	// the min fee rate from 2 maker/taker orders (with 0.1 rate for profit)
+	gridFeeRate := feeRate.Mul(fixedpoint.NewFromFloat(2.01))
+
+	if spread.Div(s.LowerPrice).Compare(gridFeeRate) < 0 {
+		return fmt.Errorf("profitSpread %f %s is too small for lower price, less than the grid fee rate: %s", spread.Float64(), spread.Div(s.LowerPrice).Percentage(), gridFeeRate.Percentage())
+	}
+
+	if spread.Div(s.UpperPrice).Compare(gridFeeRate) < 0 {
+		return fmt.Errorf("profitSpread %f %s is too small for upper price, less than the grid fee rate: %s", spread.Float64(), spread.Div(s.UpperPrice).Percentage(), gridFeeRate.Percentage())
+	}
+
+	return nil
 }
 
 func (s *Strategy) handleOrderCanceled(o types.Order) {
@@ -606,7 +620,7 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 
 	quoteSideQuantity := quoteInvestment.Div(totalQuotePrice)
 	if maxNumberOfSellOrders > 0 {
-		return fixedpoint.Max(quoteSideQuantity, maxBaseQuantity), nil
+		return fixedpoint.Min(quoteSideQuantity, maxBaseQuantity), nil
 	}
 
 	return quoteSideQuantity, nil
@@ -698,6 +712,12 @@ func (s *Strategy) closeGrid(ctx context.Context) error {
 	return nil
 }
 
+func (s *Strategy) newGrid() *Grid {
+	grid := NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+	grid.CalculateArithmeticPins()
+	return grid
+}
+
 // openGrid
 // 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
@@ -708,9 +728,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		return nil
 	}
 
-	s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
-	s.grid.CalculateArithmeticPins()
-
+	s.grid = s.newGrid()
 	s.logger.Info("OPENING GRID: ", s.grid.String())
 
 	lastPrice, err := s.getLastTradePrice(ctx, session)
@@ -950,7 +968,7 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 	return nil
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 
 	s.session = session
@@ -997,19 +1015,18 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.historicalTrades.EnablePrune = true
 	s.historicalTrades.BindStream(session.UserDataStream)
 
-	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
-	s.orderExecutor.BindEnvironment(s.Environment)
-	s.orderExecutor.BindProfitStats(s.ProfitStats)
-	s.orderExecutor.Bind()
-
-	s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
+	orderExecutor := bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	orderExecutor.BindEnvironment(s.Environment)
+	orderExecutor.BindProfitStats(s.ProfitStats)
+	orderExecutor.Bind()
+	orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
 		s.GridProfitStats.AddTrade(trade)
 	})
-	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
-
-	s.orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
+	orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
+	s.orderExecutor = orderExecutor
 
 	// TODO: detect if there are previous grid orders on the order book
 	if s.ClearOpenOrdersWhenStart {
