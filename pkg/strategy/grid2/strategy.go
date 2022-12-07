@@ -606,7 +606,7 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 
 	quoteSideQuantity := quoteInvestment.Div(totalQuotePrice)
 	if maxNumberOfSellOrders > 0 {
-		return fixedpoint.Max(quoteSideQuantity, maxBaseQuantity), nil
+		return fixedpoint.Min(quoteSideQuantity, maxBaseQuantity), nil
 	}
 
 	return quoteSideQuantity, nil
