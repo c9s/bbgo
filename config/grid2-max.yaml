@@ -36,7 +36,7 @@ exchangeStrategies:
     symbol: BTCUSDT
     upperPrice: 18_000.0
     lowerPrice: 16_000.0
-    gridNumber: 200
+    gridNumber: 100
 
     ## compound is used for buying more inventory when the profit is made by the filled SELL order.
     ## when compound is disabled, fixed quantity is used for each grid order.
@@ -70,12 +70,12 @@ exchangeStrategies:
     # amount: 10.0
 
     ## 2) fixed quantity: it will use your balance to place orders with the fixed quantity. e.g. 0.001 BTC
-    # quantity: 0.001
+    quantity: 0.001
 
     ## 3) quoteInvestment and baseInvestment: when using quoteInvestment, the strategy will automatically calculate your best quantity for the whole grid.
     ##    quoteInvestment is required, and baseInvestment is optional (could be zero)
     ##    if you have existing BTC position and want to reuse it you can set the baseInvestment.
-    quoteInvestment: 10_000
+    # quoteInvestment: 10_000
     # baseInvestment: 1.0
 
     feeRate: 0.075%
