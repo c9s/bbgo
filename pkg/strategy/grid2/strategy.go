@@ -17,6 +17,8 @@ import (
 
 const ID = "grid2"
 
+const orderTag = "grid2"
+
 var log = logrus.WithField("strategy", ID)
 
 var maxNumberOfOrderTradesQueryTries = 10
@@ -366,7 +368,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		Side:        newSide,
 		TimeInForce: types.TimeInForceGTC,
 		Quantity:    newQuantity,
-		Tag:         "grid",
+		Tag:         orderTag,
 	}
 
 	s.logger.Infof("SUBMIT GRID REVERSE ORDER: %s", orderForm.String())
@@ -899,7 +901,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				Quantity:    quantity,
 				Market:      s.Market,
 				TimeInForce: types.TimeInForceGTC,
-				Tag:         "grid",
+				Tag:         orderTag,
 			})
 			quoteQuantity := quantity.Mul(price)
 			usedQuote = usedQuote.Add(quoteQuantity)
