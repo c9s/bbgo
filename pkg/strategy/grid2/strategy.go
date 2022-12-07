@@ -132,10 +132,6 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("gridNum can not be zero")
 	}
 
-	if s.FeeRate.IsZero() {
-		s.FeeRate = fixedpoint.NewFromFloat(0.1 * 0.01) // 0.1%, 0.075% with BNB
-	}
-
 	if err := s.checkSpread(); err != nil {
 		return err
 	}
