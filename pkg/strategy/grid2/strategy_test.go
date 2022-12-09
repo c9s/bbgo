@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
+	"github.com/c9s/bbgo/pkg/util"
 
 	gridmocks "github.com/c9s/bbgo/pkg/strategy/grid2/mocks"
 )
@@ -816,6 +817,11 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 }
 
 func TestBacktestStrategy(t *testing.T) {
+	if v, ok := util.GetEnvVarBool("TEST_BACKTEST"); !ok || !v {
+		t.Skip("backtest flag is required")
+		return
+	}
+
 	market := types.Market{
 		BaseCurrency:    "BTC",
 		QuoteCurrency:   "USDT",
