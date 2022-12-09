@@ -7,7 +7,7 @@ go 1.17
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Masterminds/squirrel v1.5.3
-	github.com/adshao/go-binance/v2 v2.3.8
+	github.com/adshao/go-binance/v2 v2.3.10
 	github.com/c-bata/goptuna v0.8.1
 	github.com/c9s/requestgen v1.3.0
 	github.com/c9s/rockhopper v1.2.2-0.20220617053729-ffdc87df194b
