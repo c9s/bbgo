@@ -21,7 +21,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const defaultHTTPTimeout = time.Second * 2
+const defaultHTTPTimeout = time.Second * 10
 const RestBaseURL = "https://api.binance.com"
 const SandboxRestBaseURL = "https://testnet.binance.vision"
 const DebugRequestResponse = false
@@ -37,7 +37,7 @@ var defaultTransport = &http.Transport{
 	MaxIdleConns:        100,
 	MaxConnsPerHost:     100,
 	MaxIdleConnsPerHost: 100,
-	//TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
+	// TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
 	ExpectContinueTimeout: 0,
 	ForceAttemptHTTP2:     true,
 	TLSClientConfig:       &tls.Config{},
