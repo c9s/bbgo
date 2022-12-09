@@ -1506,19 +1506,19 @@ func (e *Exchange) querySpotTrades(ctx context.Context, symbol string, options *
 	// BINANCE uses inclusive last trade ID
 	if options.LastTradeID > 0 {
 		req.FromID(options.LastTradeID)
-	}
-
-	if options.StartTime != nil && options.EndTime != nil {
-		if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
+	} else {
+		if options.StartTime != nil && options.EndTime != nil {
+			if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
+				req.StartTime(*options.StartTime)
+				req.EndTime(*options.EndTime)
+			} else {
+				req.StartTime(*options.StartTime)
+			}
+		} else if options.StartTime != nil {
 			req.StartTime(*options.StartTime)
+		} else if options.EndTime != nil {
 			req.EndTime(*options.EndTime)
-		} else {
-			req.StartTime(*options.StartTime)
 		}
-	} else if options.StartTime != nil {
-		req.StartTime(*options.StartTime)
-	} else if options.EndTime != nil {
-		req.EndTime(*options.EndTime)
 	}
 
 	if options.Limit > 0 {
