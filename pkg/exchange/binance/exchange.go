@@ -1499,40 +1499,40 @@ func (e *Exchange) queryFuturesTrades(ctx context.Context, symbol string, option
 }
 
 func (e *Exchange) querySpotTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
-	var remoteTrades []*binance.TradeV3
-	req := e.client.NewListTradesService().
-		Symbol(symbol)
-
-	if options.Limit > 0 {
-		req.Limit(int(options.Limit))
-	} else {
-		req.Limit(1000)
-	}
+	req := e.client2.NewGetMyTradesRequest()
+	req.Symbol(symbol)
 
 	// BINANCE uses inclusive last trade ID
 	if options.LastTradeID > 0 {
-		req.FromID(int64(options.LastTradeID))
+		req.FromID(options.LastTradeID)
 	}
 
 	if options.StartTime != nil && options.EndTime != nil {
 		if options.EndTime.Sub(*options.StartTime) < 24*time.Hour {
-			req.StartTime(options.StartTime.UnixMilli())
-			req.EndTime(options.EndTime.UnixMilli())
+			req.StartTime(*options.StartTime)
+			req.EndTime(*options.EndTime)
 		} else {
-			req.StartTime(options.StartTime.UnixMilli())
+			req.StartTime(*options.StartTime)
 		}
 	} else if options.StartTime != nil {
-		req.StartTime(options.StartTime.UnixMilli())
+		req.StartTime(*options.StartTime)
 	} else if options.EndTime != nil {
-		req.EndTime(options.EndTime.UnixMilli())
+		req.EndTime(*options.EndTime)
 	}
 
-	remoteTrades, err = req.Do(ctx)
+	if options.Limit > 0 {
+		req.Limit(uint64(options.Limit))
+	} else {
+		req.Limit(1000)
+	}
+
+	remoteTrades, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	for _, t := range remoteTrades {
-		localTrade, err := toGlobalTrade(*t, e.IsMargin)
+		localTrade, err := toGlobalTrade(t, e.IsMargin)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert binance trade: %+v", t)
 			continue
