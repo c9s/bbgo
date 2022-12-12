@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/heroku/rollrus"
 	"github.com/joho/godotenv"
 	"github.com/lestrrat-go/file-rotatelogs"
 	"github.com/pkg/errors"
@@ -19,6 +20,7 @@ import (
 	"github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/util"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -42,6 +44,20 @@ var RootCmd = &cobra.Command{
 		if viper.GetBool("debug") {
 			log.Infof("debug mode is enabled")
 			log.SetLevel(log.DebugLevel)
+		}
+
+		env := os.Getenv("BBGO_ENV")
+		if env == "" {
+			env = "development"
+		}
+
+		if token := viper.GetString("rollbar-token"); token != "" {
+			log.Infof("found rollbar token %q, setting up rollbar hook...", util.MaskKey(token))
+
+			log.AddHook(rollrus.NewHook(
+				token,
+				env,
+			))
 		}
 
 		if viper.GetBool("metrics") {
@@ -148,6 +164,8 @@ func init() {
 	RootCmd.PersistentFlags().String("dotenv", ".env.local", "the dotenv file you want to load")
 
 	RootCmd.PersistentFlags().String("config", "bbgo.yaml", "config file")
+
+	RootCmd.PersistentFlags().String("rollbar-token", "", "rollbar token")
 
 	// A flag can be 'persistent' meaning that this flag will be available to
 	// the command it's assigned to as well as every command under that command.
