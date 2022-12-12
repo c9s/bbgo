@@ -20,6 +20,7 @@ import (
 	"github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/util"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -50,9 +51,11 @@ var RootCmd = &cobra.Command{
 			env = "development"
 		}
 
-		if viper.GetString("rollbar-token") != "" {
+		if token := viper.GetString("rollbar-token"); token != "" {
+			log.Infof("found rollbar token %q, setting up rollbar hook...", util.MaskKey(token))
+
 			log.AddHook(rollrus.NewHook(
-				viper.GetString("rollbar-token"),
+				token,
 				env,
 			))
 		}
