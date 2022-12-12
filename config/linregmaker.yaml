@@ -41,7 +41,7 @@ exchangeStrategies:
     # reverseEMA
     reverseEMA:
       interval: 1d
-      window: 60
+      window: 5
 
     # reverseInterval
     reverseInterval: 4h
@@ -126,10 +126,10 @@ exchangeStrategies:
               # log means we want to use log scale, you can replace "log" with "linear" for linear scale
               linear:
                 # from lower band -100% (-1) to upper band 100% (+1)
-                domain: [ -0.02, 0.02 ]
+                domain: [ -0.000002, 0.000002 ]
                 # when in down band, holds 1.0 by maximum
                 # when in up band, holds 0.05 by maximum
-                range: [ 0, 0.1 ]
+                range: [ 0, 0.001 ]
     dynamicQuantityDecrease:
       - linRegDynamicQuantity:
           quantityLinReg:
@@ -140,10 +140,10 @@ exchangeStrategies:
               # log means we want to use log scale, you can replace "log" with "linear" for linear scale
               linear:
                 # from lower band -100% (-1) to upper band 100% (+1)
-                domain: [0.02, -0.02 ]
+                domain: [0.000002, -0.000002 ]
                 # when in down band, holds 1.0 by maximum
                 # when in up band, holds 0.05 by maximum
-                range: [ 0, 0.1 ]
+                range: [ 0, 0.001 ]
 
     exits:
       # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)

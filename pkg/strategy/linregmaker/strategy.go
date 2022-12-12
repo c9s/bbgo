@@ -25,6 +25,7 @@ var two = fixedpoint.NewFromInt(2)
 var log = logrus.WithField("strategy", ID)
 
 // TODO: Check logic of dynamic qty
+// TODO: Add tg logs
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -248,8 +249,10 @@ func (s *Strategy) isAllowOppositePosition() bool {
 
 	if (s.mainTrendCurrent == types.DirectionUp && s.FastLinReg.Last() < 0 && s.SlowLinReg.Last() < 0) ||
 		(s.mainTrendCurrent == types.DirectionDown && s.FastLinReg.Last() > 0 && s.SlowLinReg.Last() > 0) {
+		log.Infof("%s allow opposite position is enabled: MainTrend %v, FastLinReg: %f, SlowLinReg: %f", s.Symbol, s.mainTrendCurrent, s.FastLinReg.Last(), s.SlowLinReg.Last())
 		return true
 	}
+	log.Infof("%s allow opposite position is disabled: MainTrend %v, FastLinReg: %f, SlowLinReg: %f", s.Symbol, s.mainTrendCurrent, s.FastLinReg.Last(), s.SlowLinReg.Last())
 
 	return false
 }
@@ -298,7 +301,7 @@ func (s *Strategy) updateMaxExposure(midPrice fixedpoint.Value) {
 func (s *Strategy) getOrderPrices(midPrice fixedpoint.Value) (askPrice fixedpoint.Value, bidPrice fixedpoint.Value) {
 	askPrice = midPrice.Mul(fixedpoint.One.Add(s.AskSpread))
 	bidPrice = midPrice.Mul(fixedpoint.One.Sub(s.BidSpread))
-	log.Infof("mid price:%v ask:%v bid: %v", midPrice, askPrice, bidPrice)
+	log.Infof("%s mid price:%v ask:%v bid: %v", s.Symbol, midPrice, askPrice, bidPrice)
 
 	return askPrice, bidPrice
 }
@@ -352,14 +355,16 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 			}
 		}
 	}
+	log.Infof("%s caculated buy qty %v, sell qty %v", s.Symbol, buyQuantity, sellQuantity)
 
 	// Faster position decrease
 	if s.isAllowOppositePosition() {
 		if s.mainTrendCurrent == types.DirectionUp {
-			sellQuantity = sellQuantity * s.FasterDecreaseRatio
+			sellQuantity = sellQuantity.Mul(s.FasterDecreaseRatio)
 		} else if s.mainTrendCurrent == types.DirectionDown {
-			buyQuantity = buyQuantity * s.FasterDecreaseRatio
+			buyQuantity = buyQuantity.Mul(s.FasterDecreaseRatio)
 		}
+		log.Infof("%s faster position decrease: buy qty %v, sell qty %v", s.Symbol, buyQuantity, sellQuantity)
 	}
 
 	// Reduce order qty to fit current position
@@ -371,10 +376,14 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 		}
 	}
 
-	buyQuantity = s.adjustQuantity(buyQuantity, bidPrice)
-	sellQuantity = s.adjustQuantity(sellQuantity, askPrice)
+	if buyQuantity.Compare(fixedpoint.Zero) > 0 {
+		buyQuantity = s.adjustQuantity(buyQuantity, bidPrice)
+	}
+	if sellQuantity.Compare(fixedpoint.Zero) > 0 {
+		sellQuantity = s.adjustQuantity(sellQuantity, askPrice)
+	}
 
-	log.Infof("sell qty:%v buy qty: %v", sellQuantity, buyQuantity)
+	log.Infof("adjusted sell qty:%v buy qty: %v", sellQuantity, buyQuantity)
 
 	return sellQuantity, buyQuantity
 }
@@ -467,6 +476,7 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 		canSell = false
 	}
 
+	log.Infof("canBuy %t, canSell %t", canBuy, canSell)
 	return canBuy, canSell
 }
 
@@ -643,6 +653,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		} else if closePrice.Compare(priceReverseEMA) < 0 {
 			s.mainTrendCurrent = types.DirectionDown
 		}
+		log.Infof("%s current trend is %v", s.Symbol, s.mainTrendCurrent)
+
+		// Trend reversal
+		if s.mainTrendCurrent != s.mainTrendPrevious {
+			// Close on-hand position that is not in the same direction as the new trend
+			if !s.Position.IsDust(closePrice) &&
+				((s.Position.IsLong() && s.mainTrendCurrent == types.DirectionDown) ||
+					(s.Position.IsShort() && s.mainTrendCurrent == types.DirectionUp)) {
+				log.Infof("%s trend reverse to %v. closing on-hand position", s.Symbol, s.mainTrendCurrent)
+				bbgo.Notify("%s trend reverse to %v. closing on-hand position", s.Symbol, s.mainTrendCurrent)
+				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
+					log.WithError(err).Errorf("cannot close on-hand position of %s", s.Symbol)
+					bbgo.Notify("cannot close on-hand position of %s", s.Symbol)
+					// TODO: close position failed. retry?
+				}
+			}
+		}
 	}))
 
 	// Main interval
@@ -656,20 +683,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// closePrice is the close price of current kline
 		closePrice := kline.GetClose()
-
-		// Trend reversal
-		if s.mainTrendCurrent != s.mainTrendPrevious {
-			// Close on-hand position that is not in the same direction as the new trend
-			if !s.Position.IsDust(closePrice) &&
-				((s.Position.IsLong() && s.mainTrendCurrent == types.DirectionDown) ||
-					(s.Position.IsShort() && s.mainTrendCurrent == types.DirectionUp)) {
-				log.Infof("trend reverse to %v. closing on-hand position", s.mainTrendCurrent)
-				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
-					log.WithError(err).Errorf("cannot close on-hand position of %s", s.Symbol)
-					// TODO: close position failed. retry?
-				}
-			}
-		}
 
 		// midPrice for ask and bid prices
 		var midPrice fixedpoint.Value
@@ -719,6 +732,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if len(submitOrders) == 0 {
 			return
 		}
+		log.Infof("submitting order(s): %v", submitOrders)
 		_, _ = s.orderExecutor.SubmitOrders(ctx, submitOrders...)
 	}))
 
