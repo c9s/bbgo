@@ -17,6 +17,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// TODO: Docs
+
 const ID = "linregmaker"
 
 var notionModifier = fixedpoint.NewFromFloat(1.1)
@@ -403,7 +405,6 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 }
 
 // getAllowedBalance returns the allowed qty of orders
-// TODO LATER: Check max qty of margin and futures
 func (s *Strategy) getAllowedBalance() (baseQty, quoteQty fixedpoint.Value) {
 	// Default
 	baseQty = fixedpoint.PosInf
