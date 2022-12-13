@@ -657,12 +657,13 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// Trend reversal
 		if s.mainTrendCurrent != s.mainTrendPrevious {
+			log.Infof("%s trend reverse to %v", s.Symbol, s.mainTrendCurrent)
 			// Close on-hand position that is not in the same direction as the new trend
 			if !s.Position.IsDust(closePrice) &&
 				((s.Position.IsLong() && s.mainTrendCurrent == types.DirectionDown) ||
 					(s.Position.IsShort() && s.mainTrendCurrent == types.DirectionUp)) {
-				log.Infof("%s trend reverse to %v. closing on-hand position", s.Symbol, s.mainTrendCurrent)
-				bbgo.Notify("%s trend reverse to %v. closing on-hand position", s.Symbol, s.mainTrendCurrent)
+				log.Infof("%s closing on-hand position due to trend reverse", s.Symbol)
+				bbgo.Notify("%s closing on-hand position due to trend reverse", s.Symbol)
 				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
 					log.WithError(err).Errorf("cannot close on-hand position of %s", s.Symbol)
 					bbgo.Notify("cannot close on-hand position of %s", s.Symbol)
