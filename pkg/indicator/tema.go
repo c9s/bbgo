@@ -7,6 +7,14 @@ import (
 
 // Refer: Triple Exponential Moving Average (TEMA)
 // URL: https://investopedia.com/terms/t/triple-exponential-moving-average.asp
+//
+// The Triple Exponential Moving Average (TEMA) is a technical analysis indicator that is used to smooth price data and reduce the lag
+// associated with traditional moving averages. It is calculated by taking the exponentially weighted moving average of the input data,
+// and then taking the exponentially weighted moving average of that result, and then taking the exponentially weighted moving average of
+// that result. This triple-smoothing process helps to eliminate much of the noise in the original data and provides a more accurate
+// representation of the underlying trend. The TEMA line is then plotted on the price chart, which can be used to make predictions about
+// future price movements. The TEMA is typically more responsive to changes in the underlying data than a simple moving average, but may be
+// less reliable in trending markets.
 
 //go:generate callbackgen -type TEMA
 type TEMA struct {

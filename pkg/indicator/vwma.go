@@ -7,16 +7,21 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-/*
-vwma implements the volume weighted moving average (VWMA) indicator:
+// vwma implements the volume weighted moving average (VWMA) indicator:
+//
+// Calculation:
+//	pv = element-wise multiplication of close prices and volumes
+//	VWMA = SMA(pv, window) / SMA(volumes, window)
+//
+// Volume Weighted Moving Average
+//- https://www.motivewave.com/studies/volume_weighted_moving_average.htm
+//
+// The Volume Weighted Moving Average (VWMA) is a technical analysis indicator that is used to smooth price data and reduce the lag
+// associated with traditional moving averages. It is calculated by taking the weighted moving average of the input data, with the
+// weighting factors determined by the volume of the security. This resulting average is then plotted on the price chart as a line,
+// which can be used to make predictions about future price movements. The VWMA is typically more accurate than other simple moving
+// averages, as it takes into account the volume of the security, but may be less reliable in markets with low trading volume.
 
-Calculation:
-	pv = element-wise multiplication of close prices and volumes
-	VWMA = SMA(pv, window) / SMA(volumes, window)
-
-Volume Weighted Moving Average
-- https://www.motivewave.com/studies/volume_weighted_moving_average.htm
-*/
 //go:generate callbackgen -type VWMA
 type VWMA struct {
 	types.SeriesBase
@@ -78,7 +83,6 @@ func (inc *VWMA) PushK(k types.KLine) {
 
 	inc.Update(k.Close.Float64(), k.Volume.Float64())
 }
-
 
 func (inc *VWMA) CalculateAndUpdate(allKLines []types.KLine) {
 	if len(allKLines) < inc.Window {

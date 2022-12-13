@@ -7,6 +7,13 @@ import (
 
 // Refer: Double Exponential Moving Average
 // Refer URL: https://investopedia.com/terms/d/double-exponential-moving-average.asp
+//
+// The Double Exponential Moving Average (DEMA) is a technical analysis indicator that is used to smooth price data and reduce the lag
+// associated with traditional moving averages. It is calculated by taking the exponentially weighted moving average of the input data,
+// and then taking the exponentially weighted moving average of that result. This double-smoothing process helps to eliminate much of the noise
+// in the original data and provides a more accurate representation of the underlying trend. The DEMA line is then plotted on the price chart,
+// which can be used to make predictions about future price movements. The DEMA is typically more responsive to changes in the underlying data
+// than a simple moving average, but may be less reliable in trending markets.
 
 //go:generate callbackgen -type DEMA
 type DEMA struct {

@@ -7,13 +7,17 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-/*
-macd implements moving average convergence divergence indicator
+// macd implements moving average convergence divergence indicator
+//
+// Moving Average Convergence Divergence (MACD)
+// - https://www.investopedia.com/terms/m/macd.asp
+// - https://school.stockcharts.com/doku.php?id=technical_indicators:macd-histogram
+// The Moving Average Convergence Divergence (MACD) is a technical analysis indicator that is used to measure the relationship between
+// two moving averages of a security's price. It is calculated by subtracting the longer-term moving average from the shorter-term moving
+// average, and then plotting the resulting value on the price chart as a line. This line is known as the MACD line, and is typically
+// used to identify potential buy or sell signals. The MACD is typically used in conjunction with a signal line, which is a moving average
+// of the MACD line, to generate more accurate buy and sell signals.
 
-Moving Average Convergence Divergence (MACD)
-- https://www.investopedia.com/terms/m/macd.asp
-- https://school.stockcharts.com/doku.php?id=technical_indicators:macd-histogram
-*/
 type MACDConfig struct {
 	types.IntervalWindow // 9
 

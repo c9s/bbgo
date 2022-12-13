@@ -8,11 +8,16 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-/*
-rsi implements Relative Strength Index (RSI)
+// rsi implements Relative Strength Index (RSI)
+// https://www.investopedia.com/terms/r/rsi.asp
+//
+// The Relative Strength Index (RSI) is a technical analysis indicator that is used to measure the strength of a security's price. It is
+// calculated by taking the average of the gains and losses of the security over a specified period of time, and then dividing the average gain
+// by the average loss. This resulting value is then plotted as a line on the price chart, with values above 70 indicating overbought conditions
+// and values below 30 indicating oversold conditions. The RSI can be used by traders to identify potential entry and exit points for trades,
+// or to confirm other technical analysis signals. It is typically used in conjunction with other indicators to provide a more comprehensive
+// view of the security's price.
 
-https://www.investopedia.com/terms/r/rsi.asp
-*/
 //go:generate callbackgen -type RSI
 type RSI struct {
 	types.SeriesBase
