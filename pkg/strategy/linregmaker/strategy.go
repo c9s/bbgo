@@ -24,9 +24,6 @@ var two = fixedpoint.NewFromInt(2)
 
 var log = logrus.WithField("strategy", ID)
 
-// TODO: Check logic of dynamic qty
-// TODO: Add tg logs
-
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -290,6 +287,7 @@ func (s *Strategy) updateMaxExposure(midPrice fixedpoint.Value) {
 		maxExposurePosition, err := s.DynamicExposure.GetMaxExposure(midPrice.Float64(), s.mainTrendCurrent)
 		if err != nil {
 			log.WithError(err).Errorf("can not calculate DynamicExposure of %s, use previous MaxExposurePosition instead", s.Symbol)
+			bbgo.Notify("can not calculate DynamicExposure of %s, use previous MaxExposurePosition instead", s.Symbol)
 		} else {
 			s.MaxExposurePosition = maxExposurePosition
 		}
@@ -333,12 +331,18 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 			qty, err := s.DynamicQuantityIncrease.GetQuantity()
 			if err == nil {
 				buyQuantity = qty
+			} else {
+				log.WithError(err).Errorf("cannot get dynamic buy qty of %s, use default qty instead", s.Symbol)
+				bbgo.Notify("cannot get dynamic buy qty of %s, use default qty instead", s.Symbol)
 			}
 		}
 		if len(s.DynamicQuantityDecrease) > 0 {
 			qty, err := s.DynamicQuantityDecrease.GetQuantity()
 			if err == nil {
 				sellQuantity = qty
+			} else {
+				log.WithError(err).Errorf("cannot get dynamic sell qty of %s, use default qty instead", s.Symbol)
+				bbgo.Notify("cannot get dynamic sell qty of %s, use default qty instead", s.Symbol)
 			}
 		}
 	case s.mainTrendCurrent == types.DirectionDown:
@@ -346,12 +350,18 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 			qty, err := s.DynamicQuantityIncrease.GetQuantity()
 			if err == nil {
 				sellQuantity = qty
+			} else {
+				log.WithError(err).Errorf("cannot get dynamic sell qty of %s, use default qty instead", s.Symbol)
+				bbgo.Notify("cannot get dynamic sell qty of %s, use default qty instead", s.Symbol)
 			}
 		}
 		if len(s.DynamicQuantityDecrease) > 0 {
 			qty, err := s.DynamicQuantityDecrease.GetQuantity()
 			if err == nil {
 				buyQuantity = qty
+			} else {
+				log.WithError(err).Errorf("cannot get dynamic buy qty of %s, use default qty instead", s.Symbol)
+				bbgo.Notify("cannot get dynamic buy qty of %s, use default qty instead", s.Symbol)
 			}
 		}
 	}
@@ -658,6 +668,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Trend reversal
 		if s.mainTrendCurrent != s.mainTrendPrevious {
 			log.Infof("%s trend reverse to %v", s.Symbol, s.mainTrendCurrent)
+			bbgo.Notify("%s trend reverse to %v", s.Symbol, s.mainTrendCurrent)
 			// Close on-hand position that is not in the same direction as the new trend
 			if !s.Position.IsDust(closePrice) &&
 				((s.Position.IsLong() && s.mainTrendCurrent == types.DirectionDown) ||
@@ -667,7 +678,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				if err := s.ClosePosition(ctx, fixedpoint.One); err != nil {
 					log.WithError(err).Errorf("cannot close on-hand position of %s", s.Symbol)
 					bbgo.Notify("cannot close on-hand position of %s", s.Symbol)
-					// TODO: close position failed. retry?
 				}
 			}
 		}
