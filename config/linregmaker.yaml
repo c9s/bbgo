@@ -38,33 +38,45 @@ exchangeStrategies:
     # interval is how long do you want to update your order price and quantity
     interval: 1m
 
+    # leverage uses the account net value to calculate the allowed margin
     leverage: 1
 
-    # reverseEMA
+    # reverseEMA is used to determine the long-term trend.
+    # Above the ReverseEMA is the long trend and vise versa.
+    # All the opposite trend position will be closed upon the trend change
     reverseEMA:
       interval: 1d
       window: 60
 
-    # reverseInterval
+    # reverseInterval is the interval to check trend reverse against ReverseEMA. Close price of this interval crossing
+    # the ReverseEMA triggers main trend change.
     reverseInterval: 4h
 
-    # fastLinReg
+    # fastLinReg is to determine the short-term trend.
+    # Buy/sell orders are placed if the FastLinReg and the ReverseEMA trend are in the same direction, and only orders
+    # that reduce position are placed if the FastLinReg and the ReverseEMA trend are in different directions.
     fastLinReg:
       interval: 1m
       window: 30
 
-    # slowLinReg
+    # slowLinReg is to determine the midterm trend.
+    # When the SlowLinReg and the ReverseEMA trend are in different directions, creation of opposite position is
+    # allowed.
     slowLinReg:
       interval: 1m
       window: 120
 
-    # allowOppositePosition
+    # allowOppositePosition if true, the creation of opposite position is allowed when both fast and slow LinReg are in
+    # the opposite direction to main trend
     allowOppositePosition: true
 
-    # fasterDecreaseRatio
+    # fasterDecreaseRatio the quantity of decreasing position orders are multiplied by this ratio when both fast and
+    # slow LinReg are in the opposite direction to main trend
     fasterDecreaseRatio: 2
 
-    # neutralBollinger
+    # neutralBollinger is the smaller range of the bollinger band
+    # If price is in this band, it usually means the price is oscillating.
+    # If price goes out of this band, we tend to not place sell orders or buy orders
     neutralBollinger:
       interval: "15m"
       window: 21
@@ -73,9 +85,13 @@ exchangeStrategies:
     # tradeInBand: when tradeInBand is set, you will only place orders in the bollinger band.
     tradeInBand: true
 
-    # spread
+    # spread is the price spread from the middle price.
+    # For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
+    # For bid orders, the bid price is ((bestAsk + bestBid) / 2 * (1.0 - spread))
+    # Spread can be set by percentage or floating number. e.g., 0.1% or 0.001
     spread: 0.1%
-    # dynamicSpread
+    # dynamicSpread enables the automatic adjustment to bid and ask spread.
+    # Overrides Spread, BidSpread, and AskSpread
     dynamicSpread:
       amplitude: # delete other scaling strategy if this is defined
         # window is the window of the SMAs of spreads
@@ -87,8 +103,7 @@ exchangeStrategies:
             exp:
               # from down to up
               domain: [ 0.0001, 0.005 ]
-              # when in down band, holds 1.0 by maximum
-              # when in up band, holds 0.05 by maximum
+              # the spread range
               range: [ 0.001, 0.002 ]
         bidSpreadScale:
           byPercentage:
@@ -96,12 +111,15 @@ exchangeStrategies:
             exp:
               # from down to up
               domain: [ 0.0001, 0.005 ]
-              # when in down band, holds 1.0 by maximum
-              # when in up band, holds 0.05 by maximum
+              # the spread range
               range: [ 0.001, 0.002 ]
 
+    # maxExposurePosition is the maximum position you can hold
+    # 10 means you can hold 10 ETH long/short position by maximum
     #maxExposurePosition: 10
-    DynamicExposure:
+    # dynamicExposure is used to define the exposure position range with the given percentage.
+    # When DynamicExposure is set, your MaxExposurePosition will be calculated dynamically
+    dynamicExposure:
       bollBandExposure:
         interval: "1h"
         window: 21
@@ -112,12 +130,13 @@ exchangeStrategies:
             exp:
               # from lower band -100% (-1) to upper band 100% (+1)
               domain: [ -1, 1 ]
-              # when in down band, holds 1.0 by maximum
-              # when in up band, holds 0.05 by maximum
-              range: [ 0.1, 10 ]
+              # when in down band, holds 0.1 by maximum
+              # when in up band, holds 1 by maximum
+              range: [ 0.1, 1 ]
 
     # quantity is the base order quantity for your buy/sell order.
     quantity: 0.1
+    # dynamicQuantityIncrease calculates the increase position order quantity dynamically
     dynamicQuantityIncrease:
       - linRegDynamicQuantity:
           quantityLinReg:
@@ -125,13 +144,10 @@ exchangeStrategies:
             window: 20
           dynamicQuantityLinRegScale:
             byPercentage:
-              # log means we want to use log scale, you can replace "log" with "linear" for linear scale
               linear:
-                # from lower band -100% (-1) to upper band 100% (+1)
                 domain: [ -0.000002, 0.000002 ]
-                # when in down band, holds 1.0 by maximum
-                # when in up band, holds 0.05 by maximum
                 range: [ 0, 0.001 ]
+    # dynamicQuantityDecrease calculates the decrease position order quantity dynamically
     dynamicQuantityDecrease:
       - linRegDynamicQuantity:
           quantityLinReg:
@@ -139,12 +155,8 @@ exchangeStrategies:
             window: 20
           dynamicQuantityLinRegScale:
             byPercentage:
-              # log means we want to use log scale, you can replace "log" with "linear" for linear scale
               linear:
-                # from lower band -100% (-1) to upper band 100% (+1)
                 domain: [0.000002, -0.000002 ]
-                # when in down band, holds 1.0 by maximum
-                # when in up band, holds 0.05 by maximum
                 range: [ 0, 0.001 ]
 
     exits:
