@@ -13,6 +13,14 @@ const MaxNumOfRMATruncateSize = 500
 // Running Moving Average
 // Refer: https://github.com/twopirllc/pandas-ta/blob/main/pandas_ta/overlap/rma.py#L5
 // Refer: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.ewm.html#pandas-dataframe-ewm
+//
+// The Running Moving Average (RMA) is a technical analysis indicator that is used to smooth price data and reduce the lag associated
+// with traditional moving averages. It is calculated by taking the weighted moving average of the input data, with the weighting factors
+// determined by the length of the moving average. The resulting average is then plotted on the price chart as a line, which can be used to
+// make predictions about future price movements. The RMA is typically more responsive to changes in the underlying data than a simple
+// moving average, but may be less reliable in trending markets. It is often used in conjunction with other technical analysis indicators
+// to confirm signals or provide additional information about the security's price.
+
 //go:generate callbackgen -type RMA
 type RMA struct {
 	types.SeriesBase

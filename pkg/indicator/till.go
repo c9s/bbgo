@@ -8,6 +8,15 @@ const defaultVolumeFactor = 0.7
 
 // Refer: Tillson T3 Moving Average
 // Refer URL: https://tradingpedia.com/forex-trading-indicator/t3-moving-average-indicator/
+//
+// The Tillson T3 Moving Average (T3) is a technical analysis indicator that is used to smooth price data and reduce the lag associated
+// with traditional moving averages. It was developed by Tim Tillson and is based on the exponential moving average, with the weighting
+// factors determined using a modified version of the cubic polynomial. The T3 is calculated by taking the weighted moving average of the
+// input data using weighting factors that are based on the standard deviation of the data and the specified length of the moving average.
+// This resulting average is then plotted on the price chart as a line, which can be used to make predictions about future price movements.
+// The T3 is typically more responsive to changes in the underlying data than a simple moving average, but may be less reliable in trending
+// markets.
+
 //go:generate callbackgen -type TILL
 type TILL struct {
 	types.SeriesBase

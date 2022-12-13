@@ -7,6 +7,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// Fisher Transform
+//
+// The Fisher Transform is a technical analysis indicator that is used to identify potential turning points in the price of a security.
+// It is based on the idea that prices tend to be normally distributed, with most price movements being small and relatively insignificant.
+// The Fisher Transform converts this normal distribution into a symmetrical, Gaussian distribution, with a peak at zero and a range of -1 to +1.
+// This transformation allows for more accurate identification of price extremes, which can be used to make predictions about potential trend reversals.
+// The Fisher Transform is calculated by taking the natural logarithm of the ratio of the security's current price to its moving average,
+// and then double-smoothing the result. This resulting line is called the Fisher Transform line, and can be plotted on the price chart
+// along with the security's price.
 //go:generate callbackgen -type FisherTransform
 type FisherTransform struct {
 	types.SeriesBase

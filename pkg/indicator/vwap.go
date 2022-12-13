@@ -7,15 +7,21 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-/*
-vwap implements the volume weighted average price (VWAP) indicator:
+// vwap implements the volume weighted average price (VWAP) indicator:
+//
+// Volume Weighted Average Price (VWAP) Definition
+// - https://www.investopedia.com/terms/v/vwap.asp
+//
+// Volume-Weighted Average Price (VWAP) Explained
+// - https://academy.binance.com/en/articles/volume-weighted-average-price-vwap-explained
+//
+// The Volume Weighted Average Price (VWAP) is a technical analysis indicator that is used to measure the average price of a security
+// over a specified period of time, with the weighting factors determined by the volume of the security. It is calculated by taking the
+// sum of the product of the price and volume for each trade, and then dividing that sum by the total volume of the security over the
+// specified period of time. This resulting average is then plotted on the price chart as a line, which can be used to make predictions
+// about future price movements. The VWAP is typically more accurate than other simple moving averages, as it takes into account the
+// volume of the security, but may be less reliable in markets with low trading volume.
 
-Volume Weighted Average Price (VWAP) Definition
-- https://www.investopedia.com/terms/v/vwap.asp
-
-Volume-Weighted Average Price (VWAP) Explained
-- https://academy.binance.com/en/articles/volume-weighted-average-price-vwap-explained
-*/
 //go:generate callbackgen -type VWAP
 type VWAP struct {
 	types.SeriesBase
