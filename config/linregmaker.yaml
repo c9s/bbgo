@@ -18,8 +18,8 @@ backtest:
   # for testing max draw down (MDD) at 03-12
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
-  startTime: "2022-03-15"
-  endTime: "2022-03-23"
+  startTime: "2022-05-01"
+  endTime: "2022-10-31"
   symbols:
   - BTCUSDT
   accounts:
@@ -37,6 +37,8 @@ exchangeStrategies:
 
     # interval is how long do you want to update your order price and quantity
     interval: 1m
+
+    leverage: 1
 
     # reverseEMA
     reverseEMA:

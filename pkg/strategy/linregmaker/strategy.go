@@ -32,9 +32,13 @@ type Strategy struct {
 	Environment          *bbgo.Environment
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 	Market               types.Market
+	ctx                  context.Context
 
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
+
+	// Leverage uses the account net value to calculate the allowed margin
+	Leverage fixedpoint.Value `json:"leverage"`
 
 	types.IntervalWindow
 
@@ -408,20 +412,23 @@ func (s *Strategy) getAllowedBalance() (baseQty, quoteQty fixedpoint.Value) {
 	balances := s.session.GetAccount().Balances()
 	baseBalance, hasBaseBalance := balances[s.Market.BaseCurrency]
 	quoteBalance, hasQuoteBalance := balances[s.Market.QuoteCurrency]
+	lastPrice, _ := s.session.LastPrice(s.Symbol)
 
 	if bbgo.IsBackTesting {
 		if !hasQuoteBalance {
 			baseQty = fixedpoint.Zero
 			quoteQty = fixedpoint.Zero
 		} else {
-			lastPrice, _ := s.session.LastPrice(s.Symbol)
 			baseQty = quoteBalance.Available.Div(lastPrice)
 			quoteQty = quoteBalance.Available
 		}
-	} else if s.session.Margin || s.session.IsolatedMargin {
-
-	} else if s.session.Futures || s.session.IsolatedFutures {
-
+	} else if s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures {
+		quoteQ, err := bbgo.CalculateQuoteQuantity(s.ctx, s.session, s.Market.QuoteCurrency, s.Leverage)
+		if err != nil {
+			quoteQ = fixedpoint.Zero
+		}
+		quoteQty = quoteQ
+		baseQty = quoteQ.Div(lastPrice)
 	} else {
 		if !hasBaseBalance {
 			baseQty = fixedpoint.Zero
@@ -479,11 +486,21 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 
 	// Check against account balance
 	baseQty, quoteQty := s.getAllowedBalance()
-	if buyQuantity.Compare(quoteQty.Div(bidPrice)) > 0 {
-		canBuy = false
-	}
-	if sellQuantity.Compare(baseQty) > 0 {
-		canSell = false
+	if s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures { // Leveraged
+		if quoteQty.Compare(fixedpoint.Zero) <= 0 {
+			if s.Position.IsLong() {
+				canBuy = false
+			} else if s.Position.IsShort() {
+				canSell = false
+			}
+		}
+	} else {
+		if buyQuantity.Compare(quoteQty.Div(bidPrice)) > 0 { // Spot
+			canBuy = false
+		}
+		if sellQuantity.Compare(baseQty) > 0 {
+			canSell = false
+		}
 	}
 
 	log.Infof("canBuy %t, canSell %t", canBuy, canSell)
@@ -491,7 +508,6 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 }
 
 // getOrderForms returns buy and sell order form for submission
-// TODO: Simplify
 func (s *Strategy) getOrderForms(buyQuantity, bidPrice, sellQuantity, askPrice fixedpoint.Value) (buyOrder types.SubmitOrder, sellOrder types.SubmitOrder) {
 	sellOrder = types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -563,6 +579,7 @@ func (s *Strategy) getOrderForms(buyQuantity, bidPrice, sellQuantity, askPrice f
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	// initial required information
 	s.session = session
+	s.ctx = ctx
 
 	// Calculate group id for orders
 	instanceID := s.InstanceID()
