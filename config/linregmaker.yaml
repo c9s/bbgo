@@ -135,7 +135,11 @@ exchangeStrategies:
               range: [ 0.1, 1 ]
 
     # quantity is the base order quantity for your buy/sell order.
-    quantity: 0.1
+    quantity: 0.001
+    # amount: fixed amount instead of qty
+    #amount: 10
+    # useDynamicQuantityAsAmount calculates amount instead of quantity
+    useDynamicQuantityAsAmount: false
     # dynamicQuantityIncrease calculates the increase position order quantity dynamically
     dynamicQuantityIncrease:
       - linRegDynamicQuantity:
@@ -145,8 +149,8 @@ exchangeStrategies:
           dynamicQuantityLinRegScale:
             byPercentage:
               linear:
-                domain: [ -0.000002, 0.000002 ]
-                range: [ 0, 0.001 ]
+                domain: [ -0.0001, 0.00005 ]
+                range: [ 0, 0.02 ]
     # dynamicQuantityDecrease calculates the decrease position order quantity dynamically
     dynamicQuantityDecrease:
       - linRegDynamicQuantity:
@@ -156,8 +160,8 @@ exchangeStrategies:
           dynamicQuantityLinRegScale:
             byPercentage:
               linear:
-                domain: [0.000002, -0.000002 ]
-                range: [ 0, 0.001 ]
+                domain: [ -0.00005, 0.0001 ]
+                range: [ 0.02, 0 ]
 
     exits:
       # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
