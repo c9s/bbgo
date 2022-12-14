@@ -120,6 +120,9 @@ type Strategy struct {
 	// DynamicQuantityDecrease calculates the decrease position order quantity dynamically
 	DynamicQuantityDecrease dynamicmetric.DynamicQuantitySet `json:"dynamicQuantityDecrease"`
 
+	// UseDynamicQuantityAsAmount calculates amount instead of quantity
+	UseDynamicQuantityAsAmount bool `json:"useDynamicQuantityAsAmount"`
+
 	session *bbgo.ExchangeSession
 
 	// ExitMethods are various TP/SL methods
@@ -371,15 +374,25 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 			}
 		}
 	}
-	log.Infof("%s caculated buy qty %v, sell qty %v", s.Symbol, buyQuantity, sellQuantity)
+	if s.UseDynamicQuantityAsAmount {
+		log.Infof("caculated %s buy amount %v, sell amount %v", s.Symbol, buyQuantity, sellQuantity)
+		qtyAmount := bbgo.QuantityOrAmount{Amount: buyQuantity}
+		buyQuantity = qtyAmount.CalculateQuantity(bidPrice)
+		qtyAmount.Amount = sellQuantity
+		sellQuantity = qtyAmount.CalculateQuantity(askPrice)
+		log.Infof("convert %s amount to buy qty %v, sell qty %v", s.Symbol, buyQuantity, sellQuantity)
+	} else {
+		log.Infof("caculated %s buy qty %v, sell qty %v", s.Symbol, buyQuantity, sellQuantity)
+	}
 
 	// Faster position decrease
 	if s.mainTrendCurrent == types.DirectionUp && s.SlowLinReg.Last() < 0 {
 		sellQuantity = sellQuantity.Mul(s.FasterDecreaseRatio)
+		log.Infof("faster %s position decrease: sell qty %v", s.Symbol, sellQuantity)
 	} else if s.mainTrendCurrent == types.DirectionDown && s.SlowLinReg.Last() > 0 {
 		buyQuantity = buyQuantity.Mul(s.FasterDecreaseRatio)
+		log.Infof("faster %s position decrease: buy qty %v", s.Symbol, buyQuantity)
 	}
-	log.Infof("%s faster position decrease: buy qty %v, sell qty %v", s.Symbol, buyQuantity, sellQuantity)
 
 	// Reduce order qty to fit current position
 	if !s.isAllowOppositePosition() {
@@ -749,10 +762,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// Submit orders
 		var submitOrders []types.SubmitOrder
-		if canSell {
+		if canSell && sellOrder.Quantity.Compare(fixedpoint.Zero) > 0 {
 			submitOrders = append(submitOrders, sellOrder)
 		}
-		if canBuy {
+		if canBuy && buyOrder.Quantity.Compare(fixedpoint.Zero) > 0 {
 			submitOrders = append(submitOrders, buyOrder)
 		}
 
