@@ -334,7 +334,7 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 	switch {
 	case s.mainTrendCurrent == types.DirectionUp:
 		if len(s.DynamicQuantityIncrease) > 0 {
-			qty, err := s.DynamicQuantityIncrease.GetQuantity()
+			qty, err := s.DynamicQuantityIncrease.GetQuantity(false)
 			if err == nil {
 				buyQuantity = qty
 			} else {
@@ -343,7 +343,7 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 			}
 		}
 		if len(s.DynamicQuantityDecrease) > 0 {
-			qty, err := s.DynamicQuantityDecrease.GetQuantity()
+			qty, err := s.DynamicQuantityDecrease.GetQuantity(false)
 			if err == nil {
 				sellQuantity = qty
 			} else {
@@ -353,7 +353,7 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 		}
 	case s.mainTrendCurrent == types.DirectionDown:
 		if len(s.DynamicQuantityIncrease) > 0 {
-			qty, err := s.DynamicQuantityIncrease.GetQuantity()
+			qty, err := s.DynamicQuantityIncrease.GetQuantity(true)
 			if err == nil {
 				sellQuantity = qty
 			} else {
@@ -362,7 +362,7 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 			}
 		}
 		if len(s.DynamicQuantityDecrease) > 0 {
-			qty, err := s.DynamicQuantityDecrease.GetQuantity()
+			qty, err := s.DynamicQuantityDecrease.GetQuantity(true)
 			if err == nil {
 				buyQuantity = qty
 			} else {

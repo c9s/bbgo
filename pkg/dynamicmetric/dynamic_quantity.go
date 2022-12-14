@@ -19,10 +19,10 @@ func (d *DynamicQuantitySet) Initialize(symbol string, session *bbgo.ExchangeSes
 }
 
 // GetQuantity returns the quantity
-func (d *DynamicQuantitySet) GetQuantity() (fixedpoint.Value, error) {
+func (d *DynamicQuantitySet) GetQuantity(reverse bool) (fixedpoint.Value, error) {
 	quantity := fixedpoint.Zero
 	for i := range *d {
-		v, err := (*d)[i].getQuantity()
+		v, err := (*d)[i].getQuantity(reverse)
 		if err != nil {
 			return fixedpoint.Zero, err
 		}
@@ -50,10 +50,10 @@ func (d *DynamicQuantity) IsEnabled() bool {
 }
 
 // getQuantity returns quantity
-func (d *DynamicQuantity) getQuantity() (fixedpoint.Value, error) {
+func (d *DynamicQuantity) getQuantity(reverse bool) (fixedpoint.Value, error) {
 	switch {
 	case d.LinRegDynamicQuantity != nil:
-		return d.LinRegDynamicQuantity.getQuantity()
+		return d.LinRegDynamicQuantity.getQuantity(reverse)
 	default:
 		return fixedpoint.Zero, errors.New("dynamic quantity is not enabled")
 	}
@@ -84,8 +84,14 @@ func (d *DynamicQuantityLinReg) initialize(symbol string, session *bbgo.Exchange
 }
 
 // getQuantity returns quantity
-func (d *DynamicQuantityLinReg) getQuantity() (fixedpoint.Value, error) {
-	v, err := d.DynamicQuantityLinRegScale.Scale(d.QuantityLinReg.LastRatio())
+func (d *DynamicQuantityLinReg) getQuantity(reverse bool) (fixedpoint.Value, error) {
+	var linregRatio float64
+	if reverse {
+		linregRatio = -d.QuantityLinReg.LastRatio()
+	} else {
+		linregRatio = d.QuantityLinReg.LastRatio()
+	}
+	v, err := d.DynamicQuantityLinRegScale.Scale(linregRatio)
 	if err != nil {
 		return fixedpoint.Zero, err
 	}
