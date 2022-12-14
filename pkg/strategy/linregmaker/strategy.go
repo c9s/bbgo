@@ -374,14 +374,12 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 	log.Infof("%s caculated buy qty %v, sell qty %v", s.Symbol, buyQuantity, sellQuantity)
 
 	// Faster position decrease
-	if s.isAllowOppositePosition() {
-		if s.mainTrendCurrent == types.DirectionUp {
-			sellQuantity = sellQuantity.Mul(s.FasterDecreaseRatio)
-		} else if s.mainTrendCurrent == types.DirectionDown {
-			buyQuantity = buyQuantity.Mul(s.FasterDecreaseRatio)
-		}
-		log.Infof("%s faster position decrease: buy qty %v, sell qty %v", s.Symbol, buyQuantity, sellQuantity)
+	if s.mainTrendCurrent == types.DirectionUp && s.SlowLinReg.Last() < 0 {
+		sellQuantity = sellQuantity.Mul(s.FasterDecreaseRatio)
+	} else if s.mainTrendCurrent == types.DirectionDown && s.SlowLinReg.Last() > 0 {
+		buyQuantity = buyQuantity.Mul(s.FasterDecreaseRatio)
 	}
+	log.Infof("%s faster position decrease: buy qty %v, sell qty %v", s.Symbol, buyQuantity, sellQuantity)
 
 	// Reduce order qty to fit current position
 	if !s.isAllowOppositePosition() {
