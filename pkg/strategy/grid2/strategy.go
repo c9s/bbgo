@@ -388,6 +388,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 // handleOrderFilled is called when an order status is FILLED
 func (s *Strategy) handleOrderFilled(o types.Order) {
 	if s.grid == nil {
+		s.logger.Warn("grid is not opened yet, skip order update event")
 		return
 	}
 
