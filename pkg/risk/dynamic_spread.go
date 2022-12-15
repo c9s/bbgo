@@ -12,7 +12,7 @@ import (
 
 type DynamicSpread struct {
 	// AmpSpread calculates spreads based on kline amplitude
-	AmpSpread *DynamicSpreadAmp `json:"amplitude"`
+	AmpSpread *DynamicAmpSpread `json:"amplitude"`
 
 	// WeightedBollWidthRatioSpread calculates spreads based on two Bollinger Bands
 	WeightedBollWidthRatioSpread *DynamicSpreadBollWidthRatio `json:"weightedBollWidth"`
@@ -57,7 +57,7 @@ func (ds *DynamicSpread) GetBidSpread() (bidSpread float64, err error) {
 }
 
 // DynamicSpreadAmp uses kline amplitude to calculate spreads
-type DynamicSpreadAmp struct {
+type DynamicAmpSpread struct {
 	types.IntervalWindow
 
 	// AskSpreadScale is used to define the ask spread range with the given percentage.
@@ -71,7 +71,7 @@ type DynamicSpreadAmp struct {
 }
 
 // initialize amplitude dynamic spread and preload SMAs
-func (ds *DynamicSpreadAmp) initialize(symbol string, session *bbgo.ExchangeSession) {
+func (ds *DynamicAmpSpread) initialize(symbol string, session *bbgo.ExchangeSession) {
 	ds.dynamicBidSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: ds.Interval, Window: ds.Window}}
 	ds.dynamicAskSpread = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: ds.Interval, Window: ds.Window}}
 
@@ -95,7 +95,7 @@ func (ds *DynamicSpreadAmp) initialize(symbol string, session *bbgo.ExchangeSess
 }
 
 // update amplitude dynamic spread with kline
-func (ds *DynamicSpreadAmp) update(kline types.KLine) {
+func (ds *DynamicAmpSpread) update(kline types.KLine) {
 	// ampl is the amplitude of kline
 	ampl := (kline.GetHigh().Float64() - kline.GetLow().Float64()) / kline.GetOpen().Float64()
 
@@ -112,7 +112,7 @@ func (ds *DynamicSpreadAmp) update(kline types.KLine) {
 	}
 }
 
-func (ds *DynamicSpreadAmp) getAskSpread() (askSpread float64, err error) {
+func (ds *DynamicAmpSpread) getAskSpread() (askSpread float64, err error) {
 	if ds.AskSpreadScale != nil && ds.dynamicAskSpread.Length() >= ds.Window {
 		askSpread, err = ds.AskSpreadScale.Scale(ds.dynamicAskSpread.Last())
 		if err != nil {
@@ -126,7 +126,7 @@ func (ds *DynamicSpreadAmp) getAskSpread() (askSpread float64, err error) {
 	return 0, errors.New("incomplete dynamic spread settings or not enough data yet")
 }
 
-func (ds *DynamicSpreadAmp) getBidSpread() (bidSpread float64, err error) {
+func (ds *DynamicAmpSpread) getBidSpread() (bidSpread float64, err error) {
 	if ds.BidSpreadScale != nil && ds.dynamicBidSpread.Length() >= ds.Window {
 		bidSpread, err = ds.BidSpreadScale.Scale(ds.dynamicBidSpread.Last())
 		if err != nil {
