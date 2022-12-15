@@ -349,6 +349,9 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
 		s.GridProfitStats.AddProfit(profit)
 
+		bbgo.Notify(profit)
+		bbgo.Notify(s.GridProfitStats)
+
 	case types.SideTypeBuy:
 		newSide = types.SideTypeSell
 		if !s.ProfitSpread.IsZero() {
@@ -650,6 +653,13 @@ func (s *Strategy) newTriggerPriceHandler(ctx context.Context, session *bbgo.Exc
 			return
 		}
 	})
+}
+
+func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.ExchangeSession) func(o types.Order) {
+	return func(o types.Order) {
+		s.handleOrderFilled(o)
+		bbgo.Sync(ctx, s)
+	}
 }
 
 func (s *Strategy) newStopLossPriceHandler(ctx context.Context, session *bbgo.ExchangeSession) types.KLineCallback {
@@ -1034,10 +1044,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
-	orderExecutor.ActiveMakerOrders().OnFilled(func(o types.Order) {
-		s.handleOrderFilled(o)
-		bbgo.Sync(context.Background(), s)
-	})
+	orderExecutor.ActiveMakerOrders().OnFilled(s.newOrderUpdateHandler(ctx, session))
 
 	s.orderExecutor = orderExecutor
 
