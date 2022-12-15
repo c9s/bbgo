@@ -51,6 +51,11 @@ func (s *GridProfitStats) AddTrade(trade types.Trade) {
 	} else {
 		s.TotalFee[trade.FeeCurrency] = trade.Fee
 	}
+
+	if s.Since == nil {
+		t := trade.Time.Time()
+		s.Since = &t
+	}
 }
 
 func (s *GridProfitStats) AddProfit(profit *GridProfit) {
@@ -115,13 +120,18 @@ func (s *GridProfitStats) SlackAttachment() slack.Attachment {
 				Value: fee.String() + " " + feeCurrency,
 				Short: true,
 			})
-
 		}
+	}
+
+	footer := "Total grid profit stats"
+	if s.Since != nil {
+		footer += fmt.Sprintf(" since %s", s.Since.String())
 	}
 
 	return slack.Attachment{
 		Title:  "Grid Profit Stats",
 		Color:  "warning",
 		Fields: fields,
+		Footer: footer,
 	}
 }
