@@ -128,8 +128,9 @@ func (s *GridProfitStats) SlackAttachment() slack.Attachment {
 		footer += fmt.Sprintf(" since %s", s.Since.String())
 	}
 
+	title := fmt.Sprintf("%s Grid Profit Stats", s.Symbol)
 	return slack.Attachment{
-		Title:  "Grid Profit Stats",
+		Title:  title,
 		Color:  "warning",
 		Fields: fields,
 		Footer: footer,

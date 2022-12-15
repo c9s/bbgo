@@ -83,3 +83,6 @@ exchangeStrategies:
     resetPositionWhenStart: true
     clearOpenOrdersWhenStart: false
     keepOrdersWhenShutdown: false
+
+    ## skipSpreadCheck skips the minimal spread check for the grid profit
+    # skipSpreadCheck: true
