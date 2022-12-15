@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/c9s/bbgo/pkg/dynamicmetric"
+	"github.com/c9s/bbgo/pkg/risk"
 	"sync"
 
 	"github.com/c9s/bbgo/pkg/indicator"
@@ -110,7 +111,7 @@ type Strategy struct {
 
 	// DynamicExposure is used to define the exposure position range with the given percentage.
 	// When DynamicExposure is set, your MaxExposurePosition will be calculated dynamically
-	DynamicExposure dynamicmetric.DynamicExposure `json:"dynamicExposure"`
+	DynamicExposure risk.DynamicExposure `json:"dynamicExposure"`
 
 	bbgo.QuantityOrAmount
 
