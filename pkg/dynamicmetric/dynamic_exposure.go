@@ -1,4 +1,4 @@
-package risk
+package dynamicmetric
 
 import (
 	"github.com/c9s/bbgo/pkg/bbgo"
