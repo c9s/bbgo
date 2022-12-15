@@ -218,6 +218,10 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 	}
 
 	createdOrders, errIdx, err := BatchPlaceOrder(ctx, e.session.Exchange, formattedOrders...)
+	if err != nil {
+		log.WithError(err).Errorf("place order error, will retry orders: %v", errIdx)
+	}
+
 	if len(errIdx) > 0 {
 		createdOrders2, err2 := BatchRetryPlaceOrder(ctx, e.session.Exchange, errIdx, formattedOrders...)
 		if err2 != nil {

@@ -826,11 +826,11 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		return err
 	}
 
-	s.logger.Infof("grid orders submitted:")
 	for _, order := range createdOrders {
 		s.logger.Info(order.String())
 	}
 
+	s.logger.Infof("ALL GRID ORDERS SUBMITTED")
 	return nil
 }
 
