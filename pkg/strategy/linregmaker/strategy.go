@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/c9s/bbgo/pkg/dynamicmetric"
-	"github.com/c9s/bbgo/pkg/risk"
 	"sync"
 
 	"github.com/c9s/bbgo/pkg/indicator"
@@ -98,7 +97,7 @@ type Strategy struct {
 
 	// DynamicSpread enables the automatic adjustment to bid and ask spread.
 	// Overrides Spread, BidSpread, and AskSpread
-	DynamicSpread risk.DynamicSpread `json:"dynamicSpread,omitempty"`
+	DynamicSpread dynamicmetric.DynamicSpread `json:"dynamicSpread,omitempty"`
 
 	// MaxExposurePosition is the maximum position you can hold
 	// 10 means you can hold 10 ETH long/short position by maximum
@@ -106,7 +105,7 @@ type Strategy struct {
 
 	// DynamicExposure is used to define the exposure position range with the given percentage.
 	// When DynamicExposure is set, your MaxExposurePosition will be calculated dynamically
-	DynamicExposure risk.DynamicExposure `json:"dynamicExposure"`
+	DynamicExposure dynamicmetric.DynamicExposure `json:"dynamicExposure"`
 
 	bbgo.QuantityOrAmount
 
