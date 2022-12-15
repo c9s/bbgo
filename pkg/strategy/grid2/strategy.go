@@ -1034,7 +1034,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
-	orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
+	orderExecutor.ActiveMakerOrders().OnFilled(func(o types.Order) {
+		s.handleOrderFilled(o)
+		bbgo.Sync(context.Background(), s)
+	})
+
 	s.orderExecutor = orderExecutor
 
 	// TODO: detect if there are previous grid orders on the order book
