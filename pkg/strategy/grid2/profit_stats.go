@@ -3,6 +3,7 @@ package grid2
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/slack-go/slack"
 
@@ -22,6 +23,7 @@ type GridProfitStats struct {
 	Volume           fixedpoint.Value            `json:"volume,omitempty"`
 	Market           types.Market                `json:"market,omitempty"`
 	ProfitEntries    []*GridProfit               `json:"profitEntries,omitempty"`
+	Since            *time.Time                  `json:"since,omitempty"`
 }
 
 func newGridProfitStats(market types.Market) *GridProfitStats {
