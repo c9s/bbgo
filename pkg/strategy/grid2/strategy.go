@@ -315,7 +315,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	if o.Side == types.SideTypeBuy {
 		baseSellQuantityReduction = s.aggregateOrderBaseFee(o)
 
-		s.logger.Infof("base fee: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
+		s.logger.Infof("buy order base fee: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
 
 		newQuantity = newQuantity.Sub(baseSellQuantityReduction)
 	}
