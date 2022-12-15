@@ -5,8 +5,8 @@ notifications:
     errorChannel: "bbgo-error"
   switches:
     trade: false
-    orderUpdate: false
-    submitOrder: false
+    orderUpdate: true
+    submitOrder: true
 
 sessions:
   max:
