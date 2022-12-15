@@ -140,9 +140,8 @@ func (s *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) 
 	iwb := types.IntervalWindowBandWidth{IntervalWindow: iw, BandWidth: bandWidth}
 	inc, ok := s.iwbIndicators[iwb]
 	if !ok {
-		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth}
+		inc = &indicator.BOLL{IntervalWindow: iw, K: bandWidth, SMA: &indicator.SMA{IntervalWindow: iw}}
 		s.initAndBind(inc, iw.Interval)
-		inc.SMA = &indicator.SMA{IntervalWindow: iw}
 
 		if debugBOLL {
 			inc.OnUpdate(func(sma float64, upBand float64, downBand float64) {
