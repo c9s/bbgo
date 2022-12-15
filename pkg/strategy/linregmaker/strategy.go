@@ -103,7 +103,7 @@ type Strategy struct {
 
 	// DynamicSpread enables the automatic adjustment to bid and ask spread.
 	// Overrides Spread, BidSpread, and AskSpread
-	DynamicSpread dynamicmetric.DynamicSpread `json:"dynamicSpread,omitempty"`
+	DynamicSpread risk.DynamicSpread `json:"dynamicSpread,omitempty"`
 
 	// MaxExposurePosition is the maximum position you can hold
 	// 10 means you can hold 10 ETH long/short position by maximum
