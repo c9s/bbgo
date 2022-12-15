@@ -809,12 +809,12 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		return err
 	}
 
+	s.debugGridOrders(submitOrders, lastPrice)
+
 	createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err2 != nil {
 		return err
 	}
-
-	s.debugGridOrders(submitOrders, lastPrice)
 
 	for _, order := range createdOrders {
 		s.logger.Info(order.String())
