@@ -84,6 +84,7 @@ func (d *DynamicQuantityLinReg) initialize(symbol string, session *bbgo.Exchange
 }
 
 // getQuantity returns quantity
+// If reverse is true, the LinReg slope ratio is reversed, ie -0.01 becomes 0.01. This is for short orders.
 func (d *DynamicQuantityLinReg) getQuantity(reverse bool) (fixedpoint.Value, error) {
 	var linregRatio float64
 	if reverse {
