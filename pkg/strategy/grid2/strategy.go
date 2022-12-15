@@ -343,8 +343,6 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 			newQuantity = fixedpoint.Max(orderQuoteQuantity.Div(newPrice), s.Market.MinQuantity)
 		}
 
-		// calculate profit
-		// TODO: send profit notification
 		profit := s.calculateProfit(o, newPrice, newQuantity)
 		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
 		s.GridProfitStats.AddProfit(profit)
