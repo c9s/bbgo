@@ -1,7 +1,13 @@
 package grid2
 
 import (
+	"fmt"
+	"strconv"
+
+	"github.com/slack-go/slack"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/style"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -57,4 +63,63 @@ func (s *GridProfitStats) AddProfit(profit *GridProfit) {
 	}
 
 	s.ProfitEntries = append(s.ProfitEntries, profit)
+}
+
+func (s *GridProfitStats) SlackAttachment() slack.Attachment {
+	var fields = []slack.AttachmentField{
+		{
+			Title: "Arbitrage Count",
+			Value: strconv.Itoa(s.ArbitrageCount),
+			Short: true,
+		},
+	}
+
+	if !s.FloatProfit.IsZero() {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Float Profit",
+			Value: style.PnLSignString(s.FloatProfit),
+			Short: true,
+		})
+	}
+
+	if !s.GridProfit.IsZero() {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Total Grid Profit",
+			Value: style.PnLSignString(s.GridProfit),
+			Short: true,
+		})
+	}
+
+	if !s.TotalQuoteProfit.IsZero() {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Total Quote Profit",
+			Value: style.PnLSignString(s.TotalQuoteProfit),
+			Short: true,
+		})
+	}
+
+	if !s.TotalBaseProfit.IsZero() {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Total Base Profit",
+			Value: style.PnLSignString(s.TotalBaseProfit),
+			Short: true,
+		})
+	}
+
+	if len(s.TotalFee) > 0 {
+		for feeCurrency, fee := range s.TotalFee {
+			fields = append(fields, slack.AttachmentField{
+				Title: fmt.Sprintf("Fee (%s)", feeCurrency),
+				Value: fee.String() + " " + feeCurrency,
+				Short: true,
+			})
+
+		}
+	}
+
+	return slack.Attachment{
+		Title:  "Grid Profit Stats",
+		Color:  "warning",
+		Fields: fields,
+	}
 }
