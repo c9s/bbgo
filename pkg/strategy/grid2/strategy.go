@@ -103,6 +103,8 @@ type Strategy struct {
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
 
+	SkipSpreadCheck bool `json:"skipSpreadCheck"`
+
 	GridProfitStats *GridProfitStats   `persistence:"grid_profit_stats"`
 	ProfitStats     *types.ProfitStats `persistence:"profit_stats"`
 	Position        *types.Position    `persistence:"position"`
@@ -141,8 +143,10 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("gridNum can not be zero")
 	}
 
-	if err := s.checkSpread(); err != nil {
-		return errors.Wrapf(err, "spread is too small, please try to reduce your gridNum or increase the price range (upperPrice and lowerPrice)")
+	if !s.SkipSpreadCheck {
+		if err := s.checkSpread(); err != nil {
+			return errors.Wrapf(err, "spread is too small, please try to reduce your gridNum or increase the price range (upperPrice and lowerPrice)")
+		}
 	}
 
 	if !s.QuantityOrAmount.IsSet() && s.QuoteInvestment.IsZero() {
