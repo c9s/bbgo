@@ -18,3 +18,7 @@ type GridProfit struct {
 func (p *GridProfit) String() string {
 	return fmt.Sprintf("GRID PROFIT: %f %s @ %s orderID %d", p.Profit.Float64(), p.Currency, p.Time.String(), p.Order.OrderID)
 }
+
+func (p *GridProfit) PlainText() string {
+	return fmt.Sprintf("Grid profit: %f %s @ %s orderID %d", p.Profit.Float64(), p.Currency, p.Time.String(), p.Order.OrderID)
+}
