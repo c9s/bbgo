@@ -32,11 +32,6 @@ func init() {
 }
 
 type Strategy struct {
-	Environment          *bbgo.Environment
-	StandardIndicatorSet *bbgo.StandardIndicatorSet
-	Market               types.Market
-	ctx                  context.Context
-
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
 
@@ -124,8 +119,6 @@ type Strategy struct {
 	// UseDynamicQuantityAsAmount calculates amount instead of quantity
 	UseDynamicQuantityAsAmount bool `json:"useDynamicQuantityAsAmount"`
 
-	session *bbgo.ExchangeSession
-
 	// ExitMethods are various TP/SL methods
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
@@ -133,6 +126,13 @@ type Strategy struct {
 	Position    *types.Position    `persistence:"position"`
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
+
+	Environment          *bbgo.Environment
+	StandardIndicatorSet *bbgo.StandardIndicatorSet
+	Market               types.Market
+	ctx                  context.Context
+
+	session *bbgo.ExchangeSession
 
 	orderExecutor *bbgo.GeneralOrderExecutor
 
