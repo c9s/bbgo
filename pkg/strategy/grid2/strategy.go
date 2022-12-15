@@ -197,7 +197,6 @@ func (s *Strategy) handleOrderCanceled(o types.Order) {
 	}
 }
 
-// TODO: consider order fee
 func (s *Strategy) calculateProfit(o types.Order, buyPrice, buyQuantity fixedpoint.Value) *GridProfit {
 	if s.EarnBase {
 		// sell quantity - buy quantity
@@ -300,14 +299,7 @@ func (s *Strategy) aggregateOrderBaseFee(o types.Order) fixedpoint.Value {
 	return fixedpoint.Zero
 }
 
-// handleOrderFilled is called when an order status is FILLED
-func (s *Strategy) handleOrderFilled(o types.Order) {
-	if s.grid == nil {
-		return
-	}
-
-	s.logger.Infof("GRID ORDER FILLED: %s", o.String())
-
+func (s *Strategy) processFilledOrder(o types.Order) {
 	// check order fee
 	newSide := types.SideTypeSell
 	newPrice := o.Price
@@ -384,6 +376,16 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	} else {
 		s.logger.Infof("order created: %+v", createdOrders)
 	}
+}
+
+// handleOrderFilled is called when an order status is FILLED
+func (s *Strategy) handleOrderFilled(o types.Order) {
+	if s.grid == nil {
+		return
+	}
+
+	s.logger.Infof("GRID ORDER FILLED: %s", o.String())
+	s.processFilledOrder(o)
 }
 
 func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
