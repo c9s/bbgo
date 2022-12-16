@@ -1,4 +1,4 @@
-package dynamicmetric
+package dynamicrisk
 
 import (
 	"github.com/pkg/errors"

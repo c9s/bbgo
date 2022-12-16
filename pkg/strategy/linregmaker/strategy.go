@@ -3,7 +3,7 @@ package linregmaker
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/dynamicmetric"
+	"github.com/c9s/bbgo/pkg/risk/dynamicrisk"
 	"sync"
 
 	"github.com/c9s/bbgo/pkg/indicator"
@@ -97,7 +97,7 @@ type Strategy struct {
 
 	// DynamicSpread enables the automatic adjustment to bid and ask spread.
 	// Overrides Spread, BidSpread, and AskSpread
-	DynamicSpread dynamicmetric.DynamicSpread `json:"dynamicSpread,omitempty"`
+	DynamicSpread dynamicrisk.DynamicSpread `json:"dynamicSpread,omitempty"`
 
 	// MaxExposurePosition is the maximum position you can hold
 	// 10 means you can hold 10 ETH long/short position by maximum
@@ -105,15 +105,15 @@ type Strategy struct {
 
 	// DynamicExposure is used to define the exposure position range with the given percentage.
 	// When DynamicExposure is set, your MaxExposurePosition will be calculated dynamically
-	DynamicExposure dynamicmetric.DynamicExposure `json:"dynamicExposure"`
+	DynamicExposure dynamicrisk.DynamicExposure `json:"dynamicExposure"`
 
 	bbgo.QuantityOrAmount
 
 	// DynamicQuantityIncrease calculates the increase position order quantity dynamically
-	DynamicQuantityIncrease dynamicmetric.DynamicQuantitySet `json:"dynamicQuantityIncrease"`
+	DynamicQuantityIncrease dynamicrisk.DynamicQuantitySet `json:"dynamicQuantityIncrease"`
 
 	// DynamicQuantityDecrease calculates the decrease position order quantity dynamically
-	DynamicQuantityDecrease dynamicmetric.DynamicQuantitySet `json:"dynamicQuantityDecrease"`
+	DynamicQuantityDecrease dynamicrisk.DynamicQuantitySet `json:"dynamicQuantityDecrease"`
 
 	// UseDynamicQuantityAsAmount calculates amount instead of quantity
 	UseDynamicQuantityAsAmount bool `json:"useDynamicQuantityAsAmount"`
