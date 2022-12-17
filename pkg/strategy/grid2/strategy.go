@@ -381,7 +381,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	if createdOrders, err := s.orderExecutor.SubmitOrders(context.Background(), orderForm); err != nil {
 		s.logger.WithError(err).Errorf("can not submit arbitrage order")
 	} else {
-		s.logger.Infof("order created: %+v", createdOrders)
+		s.logger.Infof("GRID REVERSE ORDER IS CREATED: %+v", createdOrders)
 	}
 }
 
