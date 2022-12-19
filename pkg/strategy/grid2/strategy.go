@@ -17,6 +17,8 @@ import (
 
 const ID = "grid2"
 
+const orderTag = "grid2"
+
 var log = logrus.WithField("strategy", ID)
 
 var maxNumberOfOrderTradesQueryTries = 10
@@ -101,6 +103,8 @@ type Strategy struct {
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
 
+	SkipSpreadCheck bool `json:"skipSpreadCheck"`
+
 	GridProfitStats *GridProfitStats   `persistence:"grid_profit_stats"`
 	ProfitStats     *types.ProfitStats `persistence:"profit_stats"`
 	Position        *types.Position    `persistence:"position"`
@@ -139,8 +143,10 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("gridNum can not be zero")
 	}
 
-	if err := s.checkSpread(); err != nil {
-		return errors.Wrapf(err, "spread is too small, please try to reduce your gridNum or increase the price range (upperPrice and lowerPrice)")
+	if !s.SkipSpreadCheck {
+		if err := s.checkSpread(); err != nil {
+			return errors.Wrapf(err, "spread is too small, please try to reduce your gridNum or increase the price range (upperPrice and lowerPrice)")
+		}
 	}
 
 	if !s.QuantityOrAmount.IsSet() && s.QuoteInvestment.IsZero() {
@@ -315,7 +321,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	if o.Side == types.SideTypeBuy {
 		baseSellQuantityReduction = s.aggregateOrderBaseFee(o)
 
-		s.logger.Infof("buy order base fee: %f %s", baseSellQuantityReduction.Float64(), s.Market.BaseCurrency)
+		s.logger.Infof("GRID BUY ORDER BASE FEE: %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
 
 		newQuantity = newQuantity.Sub(baseSellQuantityReduction)
 	}
@@ -337,11 +343,12 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 			newQuantity = fixedpoint.Max(orderQuoteQuantity.Div(newPrice), s.Market.MinQuantity)
 		}
 
-		// calculate profit
-		// TODO: send profit notification
 		profit := s.calculateProfit(o, newPrice, newQuantity)
 		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
 		s.GridProfitStats.AddProfit(profit)
+
+		bbgo.Notify(profit)
+		bbgo.Notify(s.GridProfitStats)
 
 	case types.SideTypeBuy:
 		newSide = types.SideTypeSell
@@ -366,7 +373,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		Side:        newSide,
 		TimeInForce: types.TimeInForceGTC,
 		Quantity:    newQuantity,
-		Tag:         "grid",
+		Tag:         orderTag,
 	}
 
 	s.logger.Infof("SUBMIT GRID REVERSE ORDER: %s", orderForm.String())
@@ -374,13 +381,14 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	if createdOrders, err := s.orderExecutor.SubmitOrders(context.Background(), orderForm); err != nil {
 		s.logger.WithError(err).Errorf("can not submit arbitrage order")
 	} else {
-		s.logger.Infof("order created: %+v", createdOrders)
+		s.logger.Infof("GRID REVERSE ORDER IS CREATED: %+v", createdOrders)
 	}
 }
 
 // handleOrderFilled is called when an order status is FILLED
 func (s *Strategy) handleOrderFilled(o types.Order) {
 	if s.grid == nil {
+		s.logger.Warn("grid is not opened yet, skip order update event")
 		return
 	}
 
@@ -646,6 +654,13 @@ func (s *Strategy) newTriggerPriceHandler(ctx context.Context, session *bbgo.Exc
 	})
 }
 
+func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.ExchangeSession) func(o types.Order) {
+	return func(o types.Order) {
+		s.handleOrderFilled(o)
+		bbgo.Sync(ctx, s)
+	}
+}
+
 func (s *Strategy) newStopLossPriceHandler(ctx context.Context, session *bbgo.ExchangeSession) types.KLineCallback {
 	return types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
 		if s.StopLossPrice.Compare(k.Low) < 0 {
@@ -803,17 +818,18 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		return err
 	}
 
+	s.debugGridOrders(submitOrders, lastPrice)
+
 	createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err2 != nil {
 		return err
 	}
 
-	s.debugGridOrders(submitOrders, lastPrice)
-
 	for _, order := range createdOrders {
 		s.logger.Info(order.String())
 	}
 
+	s.logger.Infof("ALL GRID ORDERS SUBMITTED")
 	return nil
 }
 
@@ -864,7 +880,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					Quantity:    quantity,
 					Market:      s.Market,
 					TimeInForce: types.TimeInForceGTC,
-					Tag:         "grid2",
+					Tag:         orderTag,
 				})
 				usedBase = usedBase.Add(quantity)
 			} else if i > 0 {
@@ -879,7 +895,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					Quantity:    quantity,
 					Market:      s.Market,
 					TimeInForce: types.TimeInForceGTC,
-					Tag:         "grid2",
+					Tag:         orderTag,
 				})
 				quoteQuantity := quantity.Mul(price)
 				usedQuote = usedQuote.Add(quoteQuantity)
@@ -899,7 +915,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				Quantity:    quantity,
 				Market:      s.Market,
 				TimeInForce: types.TimeInForceGTC,
-				Tag:         "grid",
+				Tag:         orderTag,
 			})
 			quoteQuantity := quantity.Mul(price)
 			usedQuote = usedQuote.Add(quoteQuantity)
@@ -1027,7 +1043,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
-	orderExecutor.ActiveMakerOrders().OnFilled(s.handleOrderFilled)
+	orderExecutor.ActiveMakerOrders().OnFilled(s.newOrderUpdateHandler(ctx, session))
+
 	s.orderExecutor = orderExecutor
 
 	// TODO: detect if there are previous grid orders on the order book

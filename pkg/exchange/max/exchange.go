@@ -25,6 +25,7 @@ var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
 var tradeQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 var accountQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 var marketDataLimiter = rate.NewLimiter(rate.Every(2*time.Second), 10)
+var submitOrderLimiter = rate.NewLimiter(rate.Every(300*time.Millisecond), 10)
 
 var log = logrus.WithField("exchange", "max")
 
@@ -486,6 +487,10 @@ func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
+	if err := submitOrderLimiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+
 	walletType := maxapi.WalletTypeSpot
 	if e.MarginSettings.IsMargin {
 		walletType = maxapi.WalletTypeMargin

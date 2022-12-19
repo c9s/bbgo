@@ -13,6 +13,26 @@ sessions:
     exchange: binance
     envVarPrefix: binance
 
+sync:
+  # userDataStream is used to sync the trading data in real-time
+  # it uses the websocket connection to insert the trades
+  userDataStream:
+    trades: false
+    filledOrders: false
+
+  # since is the start date of your trading data
+  since: 2019-01-01
+
+  # sessions is the list of session names you want to sync
+  # by default, BBGO sync all your available sessions.
+  sessions:
+  - binance
+
+  # symbols is the list of symbols you want to sync
+  # by default, BBGO try to guess your symbols by your existing account balances.
+  symbols:
+  - BTCUSDT
+
 # example command:
 #   go run ./cmd/bbgo backtest --config config/grid2.yaml --base-asset-baseline
 backtest:

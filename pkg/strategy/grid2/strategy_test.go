@@ -444,7 +444,7 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Side:        types.SideTypeSell,
 			TimeInForce: types.TimeInForceGTC,
 			Market:      s.Market,
-			Tag:         "grid",
+			Tag:         orderTag,
 		}
 
 		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
@@ -509,7 +509,7 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Side:        types.SideTypeSell,
 			TimeInForce: types.TimeInForceGTC,
 			Market:      s.Market,
-			Tag:         "grid",
+			Tag:         orderTag,
 		}
 
 		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
@@ -577,7 +577,7 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Quantity:    number(0.09166666),
 			TimeInForce: types.TimeInForceGTC,
 			Market:      s.Market,
-			Tag:         "grid",
+			Tag:         orderTag,
 		}
 		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder).Return([]types.Order{
 			{SubmitOrder: expectedSubmitOrder},
@@ -591,7 +591,7 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Quantity:    number(0.09999999),
 			TimeInForce: types.TimeInForceGTC,
 			Market:      s.Market,
-			Tag:         "grid",
+			Tag:         orderTag,
 		}
 		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder2).Return([]types.Order{
 			{SubmitOrder: expectedSubmitOrder2},
@@ -664,7 +664,7 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Side:        types.SideTypeSell,
 			TimeInForce: types.TimeInForceGTC,
 			Market:      s.Market,
-			Tag:         "grid",
+			Tag:         orderTag,
 		}
 
 		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
@@ -680,7 +680,7 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Side:        types.SideTypeBuy,
 			TimeInForce: types.TimeInForceGTC,
 			Market:      s.Market,
-			Tag:         "grid",
+			Tag:         orderTag,
 		}
 
 		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder2).Return([]types.Order{
