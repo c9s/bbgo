@@ -5,8 +5,8 @@ notifications:
     errorChannel: "bbgo-error"
   switches:
     trade: false
-    orderUpdate: false
-    submitOrder: false
+    orderUpdate: true
+    submitOrder: true
 
 sessions:
   max:
@@ -52,8 +52,12 @@ exchangeStrategies:
     ## for example, when the last price hit 17_000.0 then open a grid with the price range 13_000 to 20_000
     # triggerPrice: 16_900.0
 
+    ## stopLossPrice is used for closing the grid and sell all the inventory to stop loss.
+    ## (optional)
     stopLossPrice: 16_000.0
 
+    ## takeProfitPrice is used for closing the grid and sell all the inventory at higher price to take profit
+    ## (optional)
     takeProfitPrice: 20_000.0
 
     ## profitSpread is the profit spread of the arbitrage order (sell order)
@@ -83,3 +87,6 @@ exchangeStrategies:
     resetPositionWhenStart: true
     clearOpenOrdersWhenStart: false
     keepOrdersWhenShutdown: false
+
+    ## skipSpreadCheck skips the minimal spread check for the grid profit
+    skipSpreadCheck: true
