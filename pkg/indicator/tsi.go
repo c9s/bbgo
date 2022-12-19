@@ -12,7 +12,9 @@ import (
 //go:generate callbackgen -type TSI
 type TSI struct {
 	types.SeriesBase
-	types.IntervalWindow
+	types.Interval
+	FastWindow      int
+	SlowWindow      int
 	PrevValue       float64
 	Values          floats.Slice
 	Pcs             *EWMA
@@ -24,48 +26,58 @@ type TSI struct {
 
 func (inc *TSI) Update(value float64) {
 	if inc.Pcs == nil {
+		if inc.FastWindow == 0 {
+			inc.FastWindow = 13
+		}
+		if inc.SlowWindow == 0 {
+			inc.SlowWindow = 25
+		}
 		inc.Pcs = &EWMA{
 			IntervalWindow: types.IntervalWindow{
-				Window:   25,
+				Window:   inc.SlowWindow,
 				Interval: inc.Interval,
 			},
 		}
 		inc.Pcds = &EWMA{
 			IntervalWindow: types.IntervalWindow{
-				Window:   13,
+				Window:   inc.FastWindow,
 				Interval: inc.Interval,
 			},
 		}
 		inc.Apcs = &EWMA{
 			IntervalWindow: types.IntervalWindow{
-				Window:   25,
+				Window:   inc.SlowWindow,
 				Interval: inc.Interval,
 			},
 		}
 		inc.Apcds = &EWMA{
 			IntervalWindow: types.IntervalWindow{
-				Window:   13,
+				Window:   inc.FastWindow,
 				Interval: inc.Interval,
 			},
 		}
 		inc.SeriesBase.Series = inc
-	}
-	if inc.PrevValue == 0 {
 		inc.PrevValue = value
 		return
 	}
 	pc := value - inc.PrevValue
+	inc.PrevValue = value
 	inc.Pcs.Update(pc)
-	inc.Pcds.Update(inc.Pcs.Last())
 	apc := math.Abs(pc)
 	inc.Apcs.Update(apc)
+
+	inc.Pcds.Update(inc.Pcs.Last())
 	inc.Apcds.Update(inc.Apcs.Last())
+
 	tsi := (inc.Pcds.Last() / inc.Apcds.Last()) * 100.
 	inc.Values.Push(tsi)
 	if inc.Values.Length() > MaxNumOfEWMA {
 		inc.Values = inc.Values[MaxNumOfEWMATruncateSize-1:]
 	}
-	inc.PrevValue = value
+}
+
+func (inc *TSI) Length() int {
+	return inc.Values.Length()
 }
 
 func (inc *TSI) Last() float64 {
