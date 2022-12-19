@@ -11,9 +11,19 @@ sessions:
     margin: true
     #
     # The following API key/secret will be used:
-    # BINANCE2_API_KEY=
-    # BINANCE2_API_SECRET=
-    envVarPrefix: binance2
+    # BINANCE_CROSS_MARGIN_API_KEY=____YOUR_MARGIN_API_KEY____
+    # BINANCE_CROSS_MARGIN_API_SECRET=____YOUR_MARGIN_API_SECRET____
+    envVarPrefix: BINANCE_CROSS_MARGIN
+    
+  binance:
+    exchange: binance
+    #
+    # The following API key/secret will be used:
+    # BINANCE_SPOT_API_KEY=____YOUR_SPOT_API_KEY____
+    # BINANCE_SPOT_API_SECRET=____YOUR_SPOT_API_SECRET____
+    envVarPrefix: BINANCE_SPOT
+
+
 
 exchangeStrategies:
 
