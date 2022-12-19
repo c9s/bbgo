@@ -75,7 +75,9 @@ type ExecutionReportEvent struct {
 	OrderPrice fixedpoint.Value `json:"p"`
 	StopPrice  fixedpoint.Value `json:"P"`
 
-	IsOnBook bool `json:"w"`
+	IsOnBook     bool                       `json:"w"`
+	WorkingTime  types.MillisecondTimestamp `json:"W"`
+	TrailingTime types.MillisecondTimestamp `json:"D"`
 
 	IsMaker bool `json:"m"`
 	Ignore  bool `json:"M"`
