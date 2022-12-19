@@ -242,7 +242,7 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 			if s.parser != nil {
 				e, err = s.parser(message)
 				if err != nil {
-					log.WithError(err).Errorf("websocket event parse error")
+					log.WithError(err).Errorf("websocket event parse error, message: %s", message)
 					continue
 				}
 			}
