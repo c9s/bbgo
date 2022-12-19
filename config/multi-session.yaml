@@ -1,0 +1,40 @@
+---
+sessions:
+  binance_margin_linkusdt:
+    exchange: binance
+    margin: true
+    isolatedMargin: true
+    isolatedMarginSymbol: LINKUSDT
+
+  binance_cross_margin:
+    exchange: binance
+    margin: true
+    #
+    # The following API key/secret will be used:
+    # BINANCE2_API_KEY=
+    # BINANCE2_API_SECRET=
+    envVarPrefix: binance2
+
+exchangeStrategies:
+
+- on: binance_margin_linkusdt
+  support:
+    symbol: LINKUSDT
+    interval: 1m
+    minVolume: 2_000
+    marginOrderSideEffect: borrow
+
+    scaleQuantity:
+      byVolume:
+        exp:
+          domain: [ 1_000, 200_000 ]
+          range: [ 3.0, 5.0 ]
+
+    maxBaseAssetBalance: 1000.0
+    minQuoteAssetBalance: 2000.0
+
+    targets:
+    - profitPercentage: 0.02
+      quantityPercentage: 0.5
+      marginOrderSideEffect: repay
+
