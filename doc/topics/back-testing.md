@@ -76,7 +76,6 @@ godotenv -f .env.local -- go run ./cmd/bbgo backtest --config config/grid.yaml -
 
 ## See Also
 
-If you want to test the max draw down (MDD) you can adjust the start date to somewhere near 2020-03-12
+* [apps/backtest-report](../../apps/backtest-report) - BBGO's built-in backtest report viewer
 
-See <https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp>
-
+* [MDD](https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp) - If you want to test the max draw down (MDD) you can adjust the start date to somewhere near 2020-03-12.
