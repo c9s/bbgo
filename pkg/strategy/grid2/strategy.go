@@ -1048,7 +1048,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 		if existingOrder == nil {
 			orderBook.Add(closedOrder)
 		} else {
-			// Compare update time and create time
+			// TODO: Compare update time and create time
 			orderBook.Update(closedOrder)
 		}
 	}
