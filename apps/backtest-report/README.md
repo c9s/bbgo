@@ -19,7 +19,7 @@ Create a symlink to your back-test report output directory:
 Generate some back-test reports:
 
 ```
-(cd ../.. && go run ./cmd/bbgo backtest --config bollmaker_ethusdt.yaml  --debug --session binance  --output output --subdir)
+(cd ../.. && go run ./cmd/bbgo backtest --config bollmaker_ethusdt.yaml --debug --output output --subdir)
 ```
 
 Start the development server:
