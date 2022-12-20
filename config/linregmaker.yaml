@@ -1,0 +1,169 @@
+---
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+    margin: true
+    isolatedMargin: true
+    isolatedMarginSymbol: BTCUSDT
+
+backtest:
+  sessions: [binance]
+  # for testing max draw down (MDD) at 03-12
+  # see here for more details
+  # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
+  startTime: "2022-05-01"
+  endTime: "2022-10-31"
+  symbols:
+  - BTCUSDT
+  accounts:
+    binance:
+      makerCommission: 10  # 0.15%
+      takerCommission: 15  # 0.15%
+      balances:
+        BTC: 2.0
+        USDT: 10000.0
+
+exchangeStrategies:
+- on: binance
+  linregmaker:
+    symbol: BTCUSDT
+
+    # interval is how long do you want to update your order price and quantity
+    interval: 1m
+
+    # leverage uses the account net value to calculate the allowed margin
+    leverage: 1
+
+    # reverseEMA is used to determine the long-term trend.
+    # Above the ReverseEMA is the long trend and vise versa.
+    # All the opposite trend position will be closed upon the trend change
+    reverseEMA:
+      interval: 1d
+      window: 60
+
+    # reverseInterval is the interval to check trend reverse against ReverseEMA. Close price of this interval crossing
+    # the ReverseEMA triggers main trend change.
+    reverseInterval: 4h
+
+    # fastLinReg is to determine the short-term trend.
+    # Buy/sell orders are placed if the FastLinReg and the ReverseEMA trend are in the same direction, and only orders
+    # that reduce position are placed if the FastLinReg and the ReverseEMA trend are in different directions.
+    fastLinReg:
+      interval: 1m
+      window: 30
+
+    # slowLinReg is to determine the midterm trend.
+    # When the SlowLinReg and the ReverseEMA trend are in different directions, creation of opposite position is
+    # allowed.
+    slowLinReg:
+      interval: 1m
+      window: 120
+
+    # allowOppositePosition if true, the creation of opposite position is allowed when both fast and slow LinReg are in
+    # the opposite direction to main trend
+    allowOppositePosition: true
+
+    # fasterDecreaseRatio the quantity of decreasing position orders are multiplied by this ratio when both fast and
+    # slow LinReg are in the opposite direction to main trend
+    fasterDecreaseRatio: 2
+
+    # neutralBollinger is the smaller range of the bollinger band
+    # If price is in this band, it usually means the price is oscillating.
+    # If price goes out of this band, we tend to not place sell orders or buy orders
+    neutralBollinger:
+      interval: "15m"
+      window: 21
+      bandWidth: 2.0
+
+    # tradeInBand: when tradeInBand is set, you will only place orders in the bollinger band.
+    tradeInBand: true
+
+    # spread is the price spread from the middle price.
+    # For ask orders, the ask price is ((bestAsk + bestBid) / 2 * (1.0 + spread))
+    # For bid orders, the bid price is ((bestAsk + bestBid) / 2 * (1.0 - spread))
+    # Spread can be set by percentage or floating number. e.g., 0.1% or 0.001
+    spread: 0.1%
+    # dynamicSpread enables the automatic adjustment to bid and ask spread.
+    # Overrides Spread, BidSpread, and AskSpread
+    dynamicSpread:
+      amplitude: # delete other scaling strategy if this is defined
+        # window is the window of the SMAs of spreads
+        window: 1
+        interval: "1m"
+        askSpreadScale:
+          byPercentage:
+            # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+            exp:
+              # from down to up
+              domain: [ 0.0001, 0.005 ]
+              # the spread range
+              range: [ 0.001, 0.002 ]
+        bidSpreadScale:
+          byPercentage:
+            # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+            exp:
+              # from down to up
+              domain: [ 0.0001, 0.005 ]
+              # the spread range
+              range: [ 0.001, 0.002 ]
+
+    # maxExposurePosition is the maximum position you can hold
+    # 10 means you can hold 10 ETH long/short position by maximum
+    #maxExposurePosition: 10
+    # dynamicExposure is used to define the exposure position range with the given percentage.
+    # When DynamicExposure is set, your MaxExposurePosition will be calculated dynamically
+    dynamicExposure:
+      bollBandExposure:
+        interval: "1h"
+        window: 21
+        bandWidth: 2.0
+        dynamicExposurePositionScale:
+          byPercentage:
+            # exp means we want to use exponential scale, you can replace "exp" with "linear" for linear scale
+            exp:
+              # from lower band -100% (-1) to upper band 100% (+1)
+              domain: [ -1, 1 ]
+              # when in down band, holds 0.1 by maximum
+              # when in up band, holds 1 by maximum
+              range: [ 0.1, 1 ]
+
+    # quantity is the base order quantity for your buy/sell order.
+    quantity: 0.001
+    # amount: fixed amount instead of qty
+    #amount: 10
+    # useDynamicQuantityAsAmount calculates amount instead of quantity
+    useDynamicQuantityAsAmount: false
+    # dynamicQuantityIncrease calculates the increase position order quantity dynamically
+    dynamicQuantityIncrease:
+      - linRegDynamicQuantity:
+          quantityLinReg:
+            interval: 1m
+            window: 20
+          dynamicQuantityLinRegScale:
+            byPercentage:
+              linear:
+                domain: [ -0.0001, 0.00005 ]
+                range: [ 0, 0.02 ]
+    # dynamicQuantityDecrease calculates the decrease position order quantity dynamically
+    dynamicQuantityDecrease:
+      - linRegDynamicQuantity:
+          quantityLinReg:
+            interval: 1m
+            window: 20
+          dynamicQuantityLinRegScale:
+            byPercentage:
+              linear:
+                domain: [ -0.00005, 0.0001 ]
+                range: [ 0.02, 0 ]
+
+    exits:
+      # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
+      - roiStopLoss:
+          percentage: 30%
