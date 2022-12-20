@@ -988,20 +988,43 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 }
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
-	historyService, ok := session.Exchange.(types.ExchangeTradeHistoryService)
-	if !ok {
+	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
+	if !implemented {
 		return nil
 	}
 
-	orders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
 	if err != nil {
 		return err
 	}
 
-	firstOrderTime := orders[0].CreationTime.Time()
-	for _, o := range orders {
+	// no open orders, the grid is not placed yet
+	if len(openOrders) == 0 {
+		return nil
+	}
+
+	firstOrderTime := openOrders[0].CreationTime.Time()
+	for _, o := range openOrders {
 		if o.CreationTime.Before(firstOrderTime) {
 			firstOrderTime = o.CreationTime.Time()
+		}
+	}
+
+	// Allocate a local order book
+	orderBook := bbgo.NewActiveOrderBook(s.Symbol)
+
+	// Add all open orders to the local order book
+	gridPriceMap := make(map[string]fixedpoint.Value)
+	for _, pin := range s.grid.Pins {
+		price := fixedpoint.Value(pin)
+		gridPriceMap[price.String()] = price
+	}
+
+	// Ensure that orders are grid orders
+	// The price must be at the grid pin
+	for _, openOrder := range openOrders {
+		if _, exists := gridPriceMap[openOrder.Price.String()]; exists {
+			orderBook.Add(openOrder)
 		}
 	}
 
@@ -1010,7 +1033,26 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 		return err
 	}
 
-	_ = closedOrders
+	// types.SortOrdersAscending()
+	// for each closed order, if it's newer than the open order's update time, we will update it.
+	for _, closedOrder := range closedOrders {
+		// skip non-grid order prices
+		if _, ok := gridPriceMap[closedOrder.Price.String()]; !ok {
+			continue
+		}
+
+		existingOrder := orderBook.Lookup(func(o types.Order) bool {
+			return o.Price.Compare(closedOrder.Price) == 0
+		})
+
+		if existingOrder == nil {
+			orderBook.Add(closedOrder)
+		} else {
+			// Compare update time and create time
+			orderBook.Update(closedOrder)
+		}
+	}
+
 	return nil
 }
 
