@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -983,6 +984,33 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 			s.QuoteInvestment.Float64(),
 			s.Market.QuoteCurrency)
 	}
+	return nil
+}
+
+func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
+	historyService, ok := session.Exchange.(types.ExchangeTradeHistoryService)
+	if !ok {
+		return nil
+	}
+
+	orders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	firstOrderTime := orders[0].CreationTime.Time()
+	for _, o := range orders {
+		if o.CreationTime.Before(firstOrderTime) {
+			firstOrderTime = o.CreationTime.Time()
+		}
+	}
+
+	closedOrders, err := historyService.QueryClosedOrders(ctx, s.Symbol, firstOrderTime, time.Now(), 0)
+	if err != nil {
+		return err
+	}
+
+	_ = closedOrders
 	return nil
 }
 
