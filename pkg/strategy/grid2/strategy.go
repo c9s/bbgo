@@ -1003,10 +1003,19 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 		return nil
 	}
 
+	lastOrderID := uint64(0)
 	firstOrderTime := openOrders[0].CreationTime.Time()
+	lastOrderTime := firstOrderTime
 	for _, o := range openOrders {
-		if o.CreationTime.Before(firstOrderTime) {
-			firstOrderTime = o.CreationTime.Time()
+		if o.OrderID > lastOrderID {
+			lastOrderID = o.OrderID
+		}
+
+		createTime := o.CreationTime.Time()
+		if createTime.Before(firstOrderTime) {
+			firstOrderTime = createTime
+		} else if createTime.After(lastOrderTime) {
+			lastOrderTime = createTime
 		}
 	}
 
@@ -1028,7 +1037,9 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 		}
 	}
 
-	closedOrders, err := historyService.QueryClosedOrders(ctx, s.Symbol, firstOrderTime, time.Now(), 0)
+	// Note that for MAX Exchange, the order history API only uses fromID parameter to query history order.
+	// The time range does not matter.
+	closedOrders, err := historyService.QueryClosedOrders(ctx, s.Symbol, firstOrderTime, time.Now(), lastOrderID)
 	if err != nil {
 		return err
 	}
