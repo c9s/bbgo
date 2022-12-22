@@ -33,22 +33,26 @@ func (inc *VolumeProfile) Update(price, volume float64, timestamp types.Time) {
 	if inc.maxPrice == 0 {
 		inc.maxPrice = math.Inf(-1)
 	}
+	if inc.profile == nil {
+		inc.profile = make(map[float64]float64)
+	}
 	inc.profile[math.Round(price/inc.Delta)] += volume
 	filter := timestamp.Time().Add(-time.Duration(inc.Window) * inc.Interval.Duration())
-	var i int
-	for i = 0; i < len(inc.trades); i++ {
-		td := inc.trades[i]
-		if td.timestamp.After(filter) {
-			break
-		}
-		inc.profile[math.Round(td.price/inc.Delta)] -= td.volume
-	}
-	inc.trades = inc.trades[i : len(inc.trades)-1]
 	inc.trades = append(inc.trades, trade{
 		price:     price,
 		volume:    volume,
 		timestamp: timestamp,
 	})
+	var i int
+	for i = 0; i < len(inc.trades); i++ {
+		td := inc.trades[i]
+		if td.timestamp.After(filter) {
+			inc.trades = inc.trades[i : len(inc.trades)-1]
+			break
+		}
+		inc.profile[math.Round(td.price/inc.Delta)] -= td.volume
+	}
+
 	for k, _ := range inc.profile {
 		if k < inc.minPrice {
 			inc.minPrice = k
