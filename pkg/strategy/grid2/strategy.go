@@ -1060,6 +1060,11 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 				continue
 			}
 
+			// skip canceled orders (?)
+			if closedOrder.Status == types.OrderStatusCanceled {
+				continue
+			}
+
 			creationTime := closedOrder.CreationTime.Time()
 			if creationTime.After(startTime) {
 				startTime = creationTime

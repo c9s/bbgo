@@ -244,8 +244,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 // lastOrderID is not supported on MAX
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error) {
-	log.Warn("!!!MAX EXCHANGE API NOTICE!!!")
-	log.Warn("the since/until conditions will not be effected on closed orders query, max exchange does not support time-range-based query")
+	log.Warn("!!!MAX EXCHANGE API NOTICE!!! the since/until conditions will not be effected on closed orders query, max exchange does not support time-range-based query")
 	return e.queryClosedOrdersByLastOrderID(ctx, symbol, lastOrderID)
 }
 
