@@ -316,7 +316,7 @@ func (o Order) String() string {
 
 	desc := fmt.Sprintf("ORDER %s | %s | %s | %s | %s %-4s | %s/%s @ %s",
 		o.Exchange.String(),
-		o.CreationTime.Time().Local().Format(time.RFC1123),
+		o.CreationTime.Time().Local().Format(time.StampMilli),
 		orderID,
 		o.Symbol,
 		o.Type,
