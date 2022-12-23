@@ -989,35 +989,22 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 	return nil
 }
 
-func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
-	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
-	if !implemented {
-		return nil
-	}
-
-	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
-	if err != nil {
-		return err
-	}
-
-	// no open orders, the grid is not placed yet
-	if len(openOrders) == 0 {
-		return nil
-	}
-
+func (s *Strategy) recoverGrid(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
 	lastOrderID := uint64(0)
-	firstOrderTime := openOrders[0].CreationTime.Time()
-	lastOrderTime := firstOrderTime
-	for _, o := range openOrders {
-		if o.OrderID > lastOrderID {
-			lastOrderID = o.OrderID
-		}
+	if len(openOrders) > 0 {
+		firstOrderTime := openOrders[0].CreationTime.Time()
+		lastOrderTime := firstOrderTime
+		for _, o := range openOrders {
+			if o.OrderID > lastOrderID {
+				lastOrderID = o.OrderID
+			}
 
-		createTime := o.CreationTime.Time()
-		if createTime.Before(firstOrderTime) {
-			firstOrderTime = createTime
-		} else if createTime.After(lastOrderTime) {
-			lastOrderTime = createTime
+			createTime := o.CreationTime.Time()
+			if createTime.Before(firstOrderTime) {
+				firstOrderTime = createTime
+			} else if createTime.After(lastOrderTime) {
+				lastOrderTime = createTime
+			}
 		}
 	}
 
@@ -1092,6 +1079,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 	return nil
 }
 
+// scanMissingGridOrders finds the missing grid order prices
 func (s *Strategy) scanMissingGridOrders(orderBook *bbgo.ActiveOrderBook, grid *Grid) PriceMap {
 	// Add all open orders to the local order book
 	gridPrices := make(PriceMap)
@@ -1176,6 +1164,20 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	if s.ClearOpenOrdersWhenStart {
 		if err := s.clearOpenOrders(ctx, session); err != nil {
 			return err
+		}
+	}
+
+	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	if len(openOrders) > 0 {
+		historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
+		if implemented {
+			if err := s.recoverGrid(ctx, historyService, openOrders); err != nil {
+				return err
+			}
 		}
 	}
 
