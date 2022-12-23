@@ -96,8 +96,8 @@ type Strategy struct {
 	// KeepOrdersWhenShutdown option is used for keeping the grid orders when shutting down bbgo
 	KeepOrdersWhenShutdown bool `json:"keepOrdersWhenShutdown"`
 
-	// RecoverWhenStart option is used for recovering grid orders
-	RecoverWhenStart bool `json:"recoverWhenStart"`
+	// RecoverOrdersWhenStart option is used for recovering grid orders
+	RecoverOrdersWhenStart bool `json:"recoverOrdersWhenStart"`
 
 	// ClearOpenOrdersWhenStart
 	// If this is set, when bbgo started, it will clear the open orders in the same market (by symbol)
@@ -993,22 +993,25 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 }
 
 func (s *Strategy) recoverGrid(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
+	grid := s.newGrid()
+
 	// Add all open orders to the local order book
 	gridPriceMap := make(PriceMap)
-	for _, pin := range s.grid.Pins {
+	for _, pin := range grid.Pins {
 		price := fixedpoint.Value(pin)
 		gridPriceMap[price.String()] = price
 	}
 
-	lastOrderID := uint64(0)
+	lastOrderID := uint64(1)
 	now := time.Now()
 	firstOrderTime := now.AddDate(0, -1, 0)
 	lastOrderTime := firstOrderTime
 	if len(openOrders) > 0 {
+		lastOrderID = openOrders[0].OrderID
 		firstOrderTime = openOrders[0].CreationTime.Time()
 		lastOrderTime = firstOrderTime
 		for _, o := range openOrders {
-			if o.OrderID > lastOrderID {
+			if o.OrderID < lastOrderID {
 				lastOrderID = o.OrderID
 			}
 
@@ -1051,6 +1054,11 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 
 		// for each closed order, if it's newer than the open order's update time, we will update it.
 		for _, closedOrder := range closedOrders {
+			// skip orders that are not limit order
+			if closedOrder.Type != types.OrderTypeLimit {
+				continue
+			}
+
 			creationTime := closedOrder.CreationTime.Time()
 			if creationTime.After(startTime) {
 				startTime = creationTime
@@ -1062,31 +1070,70 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 			}
 
 			existingOrder := orderBook.Lookup(func(o types.Order) bool {
-				return o.Price.Compare(closedOrder.Price) == 0
+				return o.Price.Eq(closedOrder.Price)
 			})
 
-			if existingOrder != nil {
+			if existingOrder == nil {
+				orderBook.Add(closedOrder)
+			} else {
 				// To update order, we need to remove the old order, because it's using order ID as the key of the map.
-				if existingOrder.CreationTime.Time().Before(closedOrder.CreationTime.Time()) {
+				if creationTime.After(existingOrder.CreationTime.Time()) {
 					orderBook.Remove(*existingOrder)
 					orderBook.Add(closedOrder)
 				}
-			} else {
-				orderBook.Add(closedOrder)
 			}
 		}
 
-		missingPrices := s.scanMissingGridOrders(orderBook, s.grid)
+		orderBook.Print()
+
+		missingPrices := scanMissingGridOrders(orderBook, grid)
 		if len(missingPrices) == 0 {
+			s.logger.Infof("no missing grid prices, stop re-playing order history")
 			break
 		}
 	}
 
+	s.logger.Infof("orderbook:")
+	orderBook.Print()
+
+	tmpOrders := orderBook.Orders()
+	types.SortOrdersUpdateTimeAscending(tmpOrders)
+
+	// TODO: make sure that the number of orders matches the grid number - 1
+
+	filledOrders := ordersFilled(tmpOrders)
+
+	s.logger.Infof("found %d filled orders", len(filledOrders))
+
+	if len(filledOrders) > 1 {
+		// remove the oldest updated order (for empty slot)
+		filledOrders = filledOrders[1:]
+	}
+
+	s.grid = grid
+	for _, o := range filledOrders {
+		s.processFilledOrder(o)
+	}
+
+	s.logger.Infof("recover complete")
+
+	// recover complete
 	return nil
 }
 
+func ordersFilled(in []types.Order) (out []types.Order) {
+	for _, o := range in {
+		switch o.Status {
+		case types.OrderStatusFilled:
+			o2 := o
+			out = append(out, o2)
+		}
+	}
+	return out
+}
+
 // scanMissingGridOrders finds the missing grid order prices
-func (s *Strategy) scanMissingGridOrders(orderBook *bbgo.ActiveOrderBook, grid *Grid) PriceMap {
+func scanMissingGridOrders(orderBook *bbgo.ActiveOrderBook, grid *Grid) PriceMap {
 	// Add all open orders to the local order book
 	gridPrices := make(PriceMap)
 	missingPrices := make(PriceMap)
@@ -1178,7 +1225,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		return err
 	}
 
-	if s.RecoverWhenStart && len(openOrders) > 0 {
+	if s.RecoverOrdersWhenStart && len(openOrders) > 0 {
 		s.logger.Infof("recoverWhenStart is set, found %d open orders, trying to recover grid orders...", len(openOrders))
 
 		historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
