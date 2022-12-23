@@ -1036,7 +1036,8 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 			return err
 		}
 
-		if len(closedOrders) == 0 {
+		// need to prevent infinite loop for: len(closedOrders) == 1 and it's creationTime = startTime
+		if len(closedOrders) == 0 || len(closedOrders) == 1 && closedOrders[0].CreationTime.Time().Equal(startTime) {
 			break
 		}
 
