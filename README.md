@@ -362,6 +362,10 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
 - `flashcrash` strategy implements a strategy that catches the flashcrash [flashcrash](pkg/strategy/flashcrash)
 - `marketcap` strategy implements a strategy that rebalances the portfolio based on the
   market capitalization [marketcap](pkg/strategy/marketcap). See [document](./doc/strategy/marketcap.md).
+- `pivotshort` - shorting focused strategy.
+- `irr` - return rate strategy.
+- `drift` - drift strategy.
+- `grid2` - the second-generation grid strategy.
 
 To run these built-in strategies, just modify the config file to make the configuration suitable for you, for example if
 you want to run
