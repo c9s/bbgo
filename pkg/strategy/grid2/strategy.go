@@ -20,6 +20,8 @@ const ID = "grid2"
 
 const orderTag = "grid2"
 
+type PriceMap map[string]fixedpoint.Value
+
 var log = logrus.WithField("strategy", ID)
 
 var maxNumberOfOrderTradesQueryTries = 10
@@ -1023,7 +1025,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 	orderBook := bbgo.NewActiveOrderBook(s.Symbol)
 
 	// Add all open orders to the local order book
-	gridPriceMap := make(map[string]fixedpoint.Value)
+	gridPriceMap := make(PriceMap)
 	for _, pin := range s.grid.Pins {
 		price := fixedpoint.Value(pin)
 		gridPriceMap[price.String()] = price
@@ -1039,32 +1041,74 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 
 	// Note that for MAX Exchange, the order history API only uses fromID parameter to query history order.
 	// The time range does not matter.
-	closedOrders, err := historyService.QueryClosedOrders(ctx, s.Symbol, firstOrderTime, time.Now(), lastOrderID)
-	if err != nil {
-		return err
-	}
+	startTime := firstOrderTime
+	endTime := time.Now()
 
-	// types.SortOrdersAscending()
-	// for each closed order, if it's newer than the open order's update time, we will update it.
-	for _, closedOrder := range closedOrders {
-		// skip non-grid order prices
-		if _, ok := gridPriceMap[closedOrder.Price.String()]; !ok {
-			continue
+	// a simple guard, in reality, this startTime is not possible to exceed the endTime
+	// because the queries closed orders might still in the range.
+	for startTime.Before(endTime) {
+		closedOrders, err := historyService.QueryClosedOrders(ctx, s.Symbol, startTime, endTime, lastOrderID)
+		if err != nil {
+			return err
 		}
 
-		existingOrder := orderBook.Lookup(func(o types.Order) bool {
-			return o.Price.Compare(closedOrder.Price) == 0
-		})
+		if len(closedOrders) == 0 {
+			break
+		}
 
-		if existingOrder == nil {
-			orderBook.Add(closedOrder)
-		} else {
-			// TODO: Compare update time and create time
-			orderBook.Update(closedOrder)
+		// for each closed order, if it's newer than the open order's update time, we will update it.
+		for _, closedOrder := range closedOrders {
+			creationTime := closedOrder.CreationTime.Time()
+			if creationTime.After(startTime) {
+				startTime = creationTime
+			}
+
+			// skip non-grid order prices
+			if _, ok := gridPriceMap[closedOrder.Price.String()]; !ok {
+				continue
+			}
+
+			existingOrder := orderBook.Lookup(func(o types.Order) bool {
+				return o.Price.Compare(closedOrder.Price) == 0
+			})
+
+			if existingOrder != nil {
+				// update order
+				if existingOrder.CreationTime.Time().Before(closedOrder.CreationTime.Time()) {
+					orderBook.Remove(*existingOrder)
+					orderBook.Add(closedOrder)
+				}
+			} else {
+				orderBook.Add(closedOrder)
+			}
+		}
+
+		missingPrices := s.scanMissingGridOrders(orderBook, s.grid)
+		if len(missingPrices) == 0 {
+			break
 		}
 	}
 
 	return nil
+}
+
+func (s *Strategy) scanMissingGridOrders(orderBook *bbgo.ActiveOrderBook, grid *Grid) PriceMap {
+	// Add all open orders to the local order book
+	gridPrices := make(PriceMap)
+	missingPrices := make(PriceMap)
+	for _, pin := range grid.Pins {
+		price := fixedpoint.Value(pin)
+		gridPrices[price.String()] = price
+
+		existingOrder := orderBook.Lookup(func(o types.Order) bool {
+			return o.Price.Compare(price) == 0
+		})
+		if existingOrder == nil {
+			missingPrices[price.String()] = price
+		}
+	}
+
+	return missingPrices
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
