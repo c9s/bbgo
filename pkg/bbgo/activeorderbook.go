@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"time"
 
 	"github.com/pkg/errors"
@@ -257,7 +258,16 @@ func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
 }
 
 func (b *ActiveOrderBook) Print() {
-	for _, o := range b.orders.Orders() {
+	orders := b.orders.Orders()
+
+	// sort orders by price
+	sort.Slice(orders, func(i, j int) bool {
+		o1 := orders[i]
+		o2 := orders[j]
+		return o1.Price.Compare(o2.Price) > 0
+	})
+
+	for _, o := range orders {
 		log.Infof("%s", o)
 	}
 }

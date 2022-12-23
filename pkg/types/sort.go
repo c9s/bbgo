@@ -12,9 +12,18 @@ func SortTradesAscending(trades []Trade) []Trade {
 	return trades
 }
 
+// SortOrdersAscending sorts by creation time ascending-ly
 func SortOrdersAscending(orders []Order) []Order {
 	sort.Slice(orders, func(i, j int) bool {
 		return orders[i].CreationTime.Time().Before(orders[j].CreationTime.Time())
+	})
+	return orders
+}
+
+// SortOrdersAscending sorts by update time ascending-ly
+func SortOrdersUpdateTimeAscending(orders []Order) []Order {
+	sort.Slice(orders, func(i, j int) bool {
+		return orders[i].UpdateTime.Time().Before(orders[j].UpdateTime.Time())
 	})
 	return orders
 }
