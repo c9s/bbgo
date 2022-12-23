@@ -1006,23 +1006,11 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	now := time.Now()
 	firstOrderTime := now.AddDate(0, -1, 0)
 	lastOrderTime := firstOrderTime
-	if len(openOrders) > 0 {
-		lastOrderID = openOrders[0].OrderID
-		firstOrderTime = openOrders[0].CreationTime.Time()
-		lastOrderTime = firstOrderTime
-		for _, o := range openOrders {
-			if o.OrderID < lastOrderID {
-				lastOrderID = o.OrderID
-			}
-
-			createTime := o.CreationTime.Time()
-			if createTime.Before(firstOrderTime) {
-				firstOrderTime = createTime
-			} else if createTime.After(lastOrderTime) {
-				lastOrderTime = createTime
-			}
-		}
+	if since, until, ok := scanOrderCreationTimeRange(openOrders); ok {
+		firstOrderTime = since
+		lastOrderTime = until
 	}
+	_ = lastOrderTime
 
 	// Allocate a local order book
 	orderBook := bbgo.NewActiveOrderBook(s.Symbol)
@@ -1130,6 +1118,26 @@ func ordersFilled(in []types.Order) (out []types.Order) {
 		}
 	}
 	return out
+}
+
+// scanOrderCreationTimeRange finds the earliest creation time and the latest creation time from the given orders
+func scanOrderCreationTimeRange(orders []types.Order) (time.Time, time.Time, bool) {
+	if len(orders) == 0 {
+		return time.Time{}, time.Time{}, false
+	}
+
+	firstOrderTime := orders[0].CreationTime.Time()
+	lastOrderTime := firstOrderTime
+	for _, o := range orders {
+		createTime := o.CreationTime.Time()
+		if createTime.Before(firstOrderTime) {
+			firstOrderTime = createTime
+		} else if createTime.After(lastOrderTime) {
+			lastOrderTime = createTime
+		}
+	}
+
+	return firstOrderTime, lastOrderTime, true
 }
 
 // scanMissingGridOrders finds the missing grid order prices
