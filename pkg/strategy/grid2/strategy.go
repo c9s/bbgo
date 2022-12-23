@@ -96,6 +96,9 @@ type Strategy struct {
 	// KeepOrdersWhenShutdown option is used for keeping the grid orders when shutting down bbgo
 	KeepOrdersWhenShutdown bool `json:"keepOrdersWhenShutdown"`
 
+	// RecoverWhenStart option is used for recovering grid orders
+	RecoverWhenStart bool `json:"recoverWhenStart"`
+
 	// ClearOpenOrdersWhenStart
 	// If this is set, when bbgo started, it will clear the open orders in the same market (by symbol)
 	ClearOpenOrdersWhenStart bool `json:"clearOpenOrdersWhenStart"`
@@ -990,10 +993,20 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 }
 
 func (s *Strategy) recoverGrid(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
+	// Add all open orders to the local order book
+	gridPriceMap := make(PriceMap)
+	for _, pin := range s.grid.Pins {
+		price := fixedpoint.Value(pin)
+		gridPriceMap[price.String()] = price
+	}
+
 	lastOrderID := uint64(0)
+	now := time.Now()
+	firstOrderTime := now.AddDate(0, -1, 0)
+	lastOrderTime := firstOrderTime
 	if len(openOrders) > 0 {
-		firstOrderTime := openOrders[0].CreationTime.Time()
-		lastOrderTime := firstOrderTime
+		firstOrderTime = openOrders[0].CreationTime.Time()
+		lastOrderTime = firstOrderTime
 		for _, o := range openOrders {
 			if o.OrderID > lastOrderID {
 				lastOrderID = o.OrderID
@@ -1011,13 +1024,6 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	// Allocate a local order book
 	orderBook := bbgo.NewActiveOrderBook(s.Symbol)
 
-	// Add all open orders to the local order book
-	gridPriceMap := make(PriceMap)
-	for _, pin := range s.grid.Pins {
-		price := fixedpoint.Value(pin)
-		gridPriceMap[price.String()] = price
-	}
-
 	// Ensure that orders are grid orders
 	// The price must be at the grid pin
 	for _, openOrder := range openOrders {
@@ -1029,7 +1035,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	// Note that for MAX Exchange, the order history API only uses fromID parameter to query history order.
 	// The time range does not matter.
 	startTime := firstOrderTime
-	endTime := time.Now()
+	endTime := now
 
 	// a simple guard, in reality, this startTime is not possible to exceed the endTime
 	// because the queries closed orders might still in the range.
@@ -1060,7 +1066,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 			})
 
 			if existingOrder != nil {
-				// update order
+				// To update order, we need to remove the old order, because it's using order ID as the key of the map.
 				if existingOrder.CreationTime.Time().Before(closedOrder.CreationTime.Time()) {
 					orderBook.Remove(*existingOrder)
 					orderBook.Add(closedOrder)
@@ -1172,11 +1178,15 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		return err
 	}
 
-	if len(openOrders) > 0 {
+	if s.RecoverWhenStart && len(openOrders) > 0 {
+		s.logger.Infof("recoverWhenStart is set, found %d open orders, trying to recover grid orders...", len(openOrders))
+
 		historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
-		if implemented {
+		if !implemented {
+			s.logger.Warn("ExchangeTradeHistoryService is not implemented, can not recover grid")
+		} else {
 			if err := s.recoverGrid(ctx, historyService, openOrders); err != nil {
-				return err
+				return errors.Wrap(err, "recover grid error")
 			}
 		}
 	}
@@ -1185,7 +1195,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		defer wg.Done()
 
 		if s.KeepOrdersWhenShutdown {
-			s.logger.Infof("KeepOrdersWhenShutdown is set, will keep the orders on the exchange")
+			s.logger.Infof("keepOrdersWhenShutdown is set, will keep the orders on the exchange")
 			return
 		}
 
