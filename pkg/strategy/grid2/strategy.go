@@ -38,6 +38,7 @@ type OrderExecutor interface {
 	SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error)
 	ClosePosition(ctx context.Context, percentage fixedpoint.Value, tags ...string) error
 	GracefulCancel(ctx context.Context, orders ...types.Order) error
+	ActiveMakerOrders() *bbgo.ActiveOrderBook
 }
 
 type Strategy struct {
@@ -1004,13 +1005,21 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 
 	lastOrderID := uint64(1)
 	now := time.Now()
-	firstOrderTime := now.AddDate(0, -1, 0)
+	firstOrderTime := now.AddDate(0, 0, -7)
 	lastOrderTime := firstOrderTime
 	if since, until, ok := scanOrderCreationTimeRange(openOrders); ok {
 		firstOrderTime = since
 		lastOrderTime = until
 	}
+
+	// for MAX exchange we need the order ID to query the closed order history
+	if oid, ok := findEarliestOrderID(openOrders); ok {
+		lastOrderID = oid
+	}
+
 	_ = lastOrderTime
+
+	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
 
 	// Allocate a local order book
 	orderBook := bbgo.NewActiveOrderBook(s.Symbol)
@@ -1020,6 +1029,9 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	for _, openOrder := range openOrders {
 		if _, exists := gridPriceMap[openOrder.Price.String()]; exists {
 			orderBook.Add(openOrder)
+
+			// put the order back to the active order book so that we can receive order update
+			activeOrderBook.Add(openOrder)
 		}
 	}
 
@@ -1073,41 +1085,60 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 			}
 		}
 
-		orderBook.Print()
-
 		missingPrices := scanMissingGridOrders(orderBook, grid)
 		if len(missingPrices) == 0 {
-			s.logger.Infof("no missing grid prices, stop re-playing order history")
+			s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
 			break
 		}
 	}
 
-	s.logger.Infof("orderbook:")
-	orderBook.Print()
+	debugOrderBook(orderBook, grid.Pins)
 
 	tmpOrders := orderBook.Orders()
+
+	// if all orders on the order book are active orders, we don't need to recover.
+	if isCompleteGridOrderBook(orderBook, s.GridNum) {
+		s.logger.Infof("GRID RECOVER: all orders are active orders, do not need recover")
+		return nil
+	}
+
+	// for reverse order recovering, we need the orders to be sort by update time ascending-ly
 	types.SortOrdersUpdateTimeAscending(tmpOrders)
 
-	// TODO: make sure that the number of orders matches the grid number - 1
+	if len(tmpOrders) > 1 && len(tmpOrders) == int(s.GridNum)+1 {
+		// remove the latest updated order because it's near the empty slot
+		tmpOrders = tmpOrders[:len(tmpOrders)-1]
+	}
 
+	// we will only submit reverse orders for filled orders
 	filledOrders := ordersFilled(tmpOrders)
 
-	s.logger.Infof("found %d filled orders", len(filledOrders))
-
-	if len(filledOrders) > 1 {
-		// remove the oldest updated order (for empty slot)
-		filledOrders = filledOrders[1:]
-	}
+	s.logger.Infof("GRID RECOVER: found %d filled grid orders", len(filledOrders))
 
 	s.grid = grid
 	for _, o := range filledOrders {
 		s.processFilledOrder(o)
 	}
 
-	s.logger.Infof("recover complete")
+	s.logger.Infof("GRID RECOVER COMPLETE")
 
-	// recover complete
+	debugOrderBook(s.orderExecutor.ActiveMakerOrders(), grid.Pins)
+
 	return nil
+}
+
+func isActiveOrder(o types.Order) bool {
+	return o.Status == types.OrderStatusNew || o.Status == types.OrderStatusPartiallyFilled
+}
+
+func isCompleteGridOrderBook(orderBook *bbgo.ActiveOrderBook, gridNum int64) bool {
+	tmpOrders := orderBook.Orders()
+
+	if len(tmpOrders) == int(gridNum) && ordersAll(tmpOrders, isActiveOrder) {
+		return true
+	}
+
+	return false
 }
 
 func ordersFilled(in []types.Order) (out []types.Order) {
@@ -1119,6 +1150,87 @@ func ordersFilled(in []types.Order) (out []types.Order) {
 		}
 	}
 	return out
+}
+
+func ordersAll(orders []types.Order, f func(o types.Order) bool) bool {
+	for _, o := range orders {
+		if !f(o) {
+			return false
+		}
+	}
+	return true
+}
+
+func ordersAny(orders []types.Order, f func(o types.Order) bool) bool {
+	for _, o := range orders {
+		if f(o) {
+			return true
+		}
+	}
+	return false
+}
+
+func debugOrderBook(b *bbgo.ActiveOrderBook, pins []Pin) {
+	fmt.Println("================== GRID ORDERS ==================")
+
+	// scan missing orders
+	missing := 0
+	for i := len(pins) - 1; i >= 0; i-- {
+		pin := pins[i]
+		price := fixedpoint.Value(pin)
+		existingOrder := b.Lookup(func(o types.Order) bool {
+			return o.Price.Eq(price)
+		})
+		if existingOrder == nil {
+			missing++
+		}
+	}
+
+	for i := len(pins) - 1; i >= 0; i-- {
+		pin := pins[i]
+		price := fixedpoint.Value(pin)
+
+		fmt.Printf("%s -> ", price.String())
+
+		existingOrder := b.Lookup(func(o types.Order) bool {
+			return o.Price.Eq(price)
+		})
+
+		if existingOrder != nil {
+			fmt.Printf("%s", existingOrder.String())
+
+			switch existingOrder.Status {
+			case types.OrderStatusFilled:
+				fmt.Printf(" | 🔧")
+			case types.OrderStatusCanceled:
+				fmt.Printf(" | 🔄")
+			default:
+				fmt.Printf(" | ✅")
+			}
+		} else {
+			fmt.Printf("ORDER MISSING ⚠️ ")
+			if missing == 1 {
+				fmt.Printf(" COULD BE EMPTY SLOT")
+			}
+		}
+		fmt.Printf("\n")
+	}
+	fmt.Println("================== END OF GRID ORDERS ===================")
+}
+
+func findEarliestOrderID(orders []types.Order) (uint64, bool) {
+	if len(orders) == 0 {
+		return 0, false
+	}
+
+	earliestOrderID := orders[0].OrderID
+	for _, o := range orders {
+		if o.OrderID < earliestOrderID {
+			earliestOrderID = o.OrderID
+		}
+	}
+
+	return earliestOrderID, true
 }
 
 // scanOrderCreationTimeRange finds the earliest creation time and the latest creation time from the given orders

@@ -8,6 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	bbgo "github.com/c9s/bbgo/pkg/bbgo"
 	fixedpoint "github.com/c9s/bbgo/pkg/fixedpoint"
 	types "github.com/c9s/bbgo/pkg/types"
 	gomock "github.com/golang/mock/gomock"
@@ -34,6 +35,20 @@ func NewMockOrderExecutor(ctrl *gomock.Controller) *MockOrderExecutor {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockOrderExecutor) EXPECT() *MockOrderExecutorMockRecorder {
 	return m.recorder
+}
+
+// ActiveMakerOrders mocks base method.
+func (m *MockOrderExecutor) ActiveMakerOrders() *bbgo.ActiveOrderBook {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ActiveMakerOrders")
+	ret0, _ := ret[0].(*bbgo.ActiveOrderBook)
+	return ret0
+}
+
+// ActiveMakerOrders indicates an expected call of ActiveMakerOrders.
+func (mr *MockOrderExecutorMockRecorder) ActiveMakerOrders() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ActiveMakerOrders", reflect.TypeOf((*MockOrderExecutor)(nil).ActiveMakerOrders))
 }
 
 // ClosePosition mocks base method.
