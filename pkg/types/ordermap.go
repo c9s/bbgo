@@ -16,15 +16,27 @@ func (m OrderMap) Backup() (orderForms []SubmitOrder) {
 	return orderForms
 }
 
+// Add the order the the map
 func (m OrderMap) Add(o Order) {
 	m[o.OrderID] = o
 }
 
-// Update only updates the order when the order exists in the map
+// Update only updates the order when the order ID exists in the map
 func (m OrderMap) Update(o Order) {
 	if _, ok := m[o.OrderID]; ok {
 		m[o.OrderID] = o
 	}
+}
+
+func (m OrderMap) Lookup(f func(o Order) bool) *Order {
+	for _, order := range m {
+		if f(order) {
+			// copy and return
+			o := order
+			return &o
+		}
+	}
+	return nil
 }
 
 func (m OrderMap) Remove(orderID uint64) {
@@ -151,6 +163,12 @@ func (m *SyncOrderMap) Exists(orderID uint64) (exists bool) {
 	exists = m.orders.Exists(orderID)
 	m.Unlock()
 	return exists
+}
+
+func (m *SyncOrderMap) Lookup(f func(o Order) bool) *Order {
+	m.Lock()
+	defer m.Unlock()
+	return m.orders.Lookup(f)
 }
 
 func (m *SyncOrderMap) Len() int {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -983,6 +984,86 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 			s.QuoteInvestment.Float64(),
 			s.Market.QuoteCurrency)
 	}
+	return nil
+}
+
+func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
+	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
+	if !implemented {
+		return nil
+	}
+
+	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	// no open orders, the grid is not placed yet
+	if len(openOrders) == 0 {
+		return nil
+	}
+
+	lastOrderID := uint64(0)
+	firstOrderTime := openOrders[0].CreationTime.Time()
+	lastOrderTime := firstOrderTime
+	for _, o := range openOrders {
+		if o.OrderID > lastOrderID {
+			lastOrderID = o.OrderID
+		}
+
+		createTime := o.CreationTime.Time()
+		if createTime.Before(firstOrderTime) {
+			firstOrderTime = createTime
+		} else if createTime.After(lastOrderTime) {
+			lastOrderTime = createTime
+		}
+	}
+
+	// Allocate a local order book
+	orderBook := bbgo.NewActiveOrderBook(s.Symbol)
+
+	// Add all open orders to the local order book
+	gridPriceMap := make(map[string]fixedpoint.Value)
+	for _, pin := range s.grid.Pins {
+		price := fixedpoint.Value(pin)
+		gridPriceMap[price.String()] = price
+	}
+
+	// Ensure that orders are grid orders
+	// The price must be at the grid pin
+	for _, openOrder := range openOrders {
+		if _, exists := gridPriceMap[openOrder.Price.String()]; exists {
+			orderBook.Add(openOrder)
+		}
+	}
+
+	// Note that for MAX Exchange, the order history API only uses fromID parameter to query history order.
+	// The time range does not matter.
+	closedOrders, err := historyService.QueryClosedOrders(ctx, s.Symbol, firstOrderTime, time.Now(), lastOrderID)
+	if err != nil {
+		return err
+	}
+
+	// types.SortOrdersAscending()
+	// for each closed order, if it's newer than the open order's update time, we will update it.
+	for _, closedOrder := range closedOrders {
+		// skip non-grid order prices
+		if _, ok := gridPriceMap[closedOrder.Price.String()]; !ok {
+			continue
+		}
+
+		existingOrder := orderBook.Lookup(func(o types.Order) bool {
+			return o.Price.Compare(closedOrder.Price) == 0
+		})
+
+		if existingOrder == nil {
+			orderBook.Add(closedOrder)
+		} else {
+			// TODO: Compare update time and create time
+			orderBook.Update(closedOrder)
+		}
+	}
+
 	return nil
 }
 

@@ -34,7 +34,7 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 
 	tasks := []SyncTask{
 		{
-			Select: SelectLastMarginLoans(ex.Name(), 100),
+			Select: SelectLastMarginLoans(ex.Name(), asset, 100),
 			Type:   types.MarginLoan{},
 			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
 				query := &batch.MarginLoanBatchQuery{
@@ -51,7 +51,7 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 			LogInsert: true,
 		},
 		{
-			Select: SelectLastMarginRepays(ex.Name(), 100),
+			Select: SelectLastMarginRepays(ex.Name(), asset, 100),
 			Type:   types.MarginRepay{},
 			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
 				query := &batch.MarginRepayBatchQuery{
@@ -68,7 +68,7 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 			LogInsert: true,
 		},
 		{
-			Select: SelectLastMarginInterests(ex.Name(), 100),
+			Select: SelectLastMarginInterests(ex.Name(), asset, 100),
 			Type:   types.MarginInterest{},
 			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
 				query := &batch.MarginInterestBatchQuery{
@@ -114,26 +114,26 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 	return nil
 }
 
-func SelectLastMarginLoans(ex types.ExchangeName, limit uint64) sq.SelectBuilder {
+func SelectLastMarginLoans(ex types.ExchangeName, asset string, limit uint64) sq.SelectBuilder {
 	return sq.Select("*").
 		From("margin_loans").
-		Where(sq.Eq{"exchange": ex}).
+		Where(sq.Eq{"exchange": ex, "asset": asset}).
 		OrderBy("time DESC").
 		Limit(limit)
 }
 
-func SelectLastMarginRepays(ex types.ExchangeName, limit uint64) sq.SelectBuilder {
+func SelectLastMarginRepays(ex types.ExchangeName, asset string, limit uint64) sq.SelectBuilder {
 	return sq.Select("*").
 		From("margin_repays").
-		Where(sq.Eq{"exchange": ex}).
+		Where(sq.Eq{"exchange": ex, "asset": asset}).
 		OrderBy("time DESC").
 		Limit(limit)
 }
 
-func SelectLastMarginInterests(ex types.ExchangeName, limit uint64) sq.SelectBuilder {
+func SelectLastMarginInterests(ex types.ExchangeName, asset string, limit uint64) sq.SelectBuilder {
 	return sq.Select("*").
 		From("margin_interests").
-		Where(sq.Eq{"exchange": ex}).
+		Where(sq.Eq{"exchange": ex, "asset": asset}).
 		OrderBy("time DESC").
 		Limit(limit)
 }

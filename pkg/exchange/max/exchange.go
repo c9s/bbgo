@@ -384,67 +384,6 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	return err2
 }
 
-func toMaxSubmitOrder(o types.SubmitOrder) (*maxapi.SubmitOrder, error) {
-	symbol := toLocalSymbol(o.Symbol)
-	orderType, err := toLocalOrderType(o.Type)
-	if err != nil {
-		return nil, err
-	}
-
-	// case IOC type
-	if orderType == maxapi.OrderTypeLimit && o.TimeInForce == types.TimeInForceIOC {
-		orderType = maxapi.OrderTypeIOCLimit
-	}
-
-	var quantityString string
-	if o.Market.Symbol != "" {
-		quantityString = o.Market.FormatQuantity(o.Quantity)
-	} else {
-		quantityString = o.Quantity.String()
-	}
-
-	maxOrder := maxapi.SubmitOrder{
-		Market:    symbol,
-		Side:      toLocalSideType(o.Side),
-		OrderType: orderType,
-		Volume:    quantityString,
-	}
-
-	if o.GroupID > 0 {
-		maxOrder.GroupID = o.GroupID
-	}
-
-	clientOrderID := NewClientOrderID(o.ClientOrderID)
-	if len(clientOrderID) > 0 {
-		maxOrder.ClientOID = clientOrderID
-	}
-
-	switch o.Type {
-	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
-		var priceInString string
-		if o.Market.Symbol != "" {
-			priceInString = o.Market.FormatPrice(o.Price)
-		} else {
-			priceInString = o.Price.String()
-		}
-		maxOrder.Price = priceInString
-	}
-
-	// set stop price field for limit orders
-	switch o.Type {
-	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
-		var priceInString string
-		if o.Market.Symbol != "" {
-			priceInString = o.Market.FormatPrice(o.StopPrice)
-		} else {
-			priceInString = o.StopPrice.String()
-		}
-		maxOrder.StopPrice = priceInString
-	}
-
-	return &maxOrder, nil
-}
-
 func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
 	asset = toLocalCurrency(asset)
 
