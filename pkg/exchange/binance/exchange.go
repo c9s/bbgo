@@ -56,11 +56,11 @@ func init() {
 	_ = types.FuturesExchange(&Exchange{})
 
 	if n, ok := util.GetEnvVarInt("BINANCE_ORDER_RATE_LIMITER"); ok {
-		orderLimiter = rate.NewLimiter(rate.Limit(n), 2)
+		orderLimiter = rate.NewLimiter(rate.Every(time.Duration(n)*time.Minute), 2)
 	}
 
 	if n, ok := util.GetEnvVarInt("BINANCE_QUERY_TRADES_RATE_LIMITER"); ok {
-		queryTradeLimiter = rate.NewLimiter(rate.Limit(n), 2)
+		queryTradeLimiter = rate.NewLimiter(rate.Every(time.Duration(n)*time.Minute), 2)
 	}
 }
 

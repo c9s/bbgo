@@ -295,3 +295,7 @@ func (b *ActiveOrderBook) NumOfOrders() int {
 func (b *ActiveOrderBook) Orders() types.OrderSlice {
 	return b.orders.Orders()
 }
+
+func (b *ActiveOrderBook) Lookup(f func(o types.Order) bool) *types.Order {
+	return b.orders.Lookup(f)
+}
