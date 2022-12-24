@@ -394,3 +394,36 @@ func (o Order) SlackAttachment() slack.Attachment {
 		Footer:     strings.ToLower(o.Exchange.String()) + templateutil.Render(" creation time {{ . }}", o.CreationTime.Time().Format(time.StampMilli)),
 	}
 }
+
+func OrdersFilled(in []Order) (out []Order) {
+	for _, o := range in {
+		switch o.Status {
+		case OrderStatusFilled:
+			o2 := o
+			out = append(out, o2)
+		}
+	}
+	return out
+}
+
+func OrdersAll(orders []Order, f func(o Order) bool) bool {
+	for _, o := range orders {
+		if !f(o) {
+			return false
+		}
+	}
+	return true
+}
+
+func OrdersAny(orders []Order, f func(o Order) bool) bool {
+	for _, o := range orders {
+		if f(o) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsActiveOrder(o Order) bool {
+	return o.Status == OrderStatusNew || o.Status == OrderStatusPartiallyFilled
+}
