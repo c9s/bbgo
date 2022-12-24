@@ -26,6 +26,12 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 
 	switch t := o.(type) {
 	case string:
+		sd, err := ParseSimpleDuration(t)
+		if err == nil {
+			*d = sd.Duration
+			return nil
+		}
+
 		dd, err := time.ParseDuration(t)
 		if err != nil {
 			return err
