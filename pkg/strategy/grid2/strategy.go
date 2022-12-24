@@ -1068,7 +1068,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	}
 
 	// we will only submit reverse orders for filled orders
-	filledOrders := ordersFilled(tmpOrders)
+	filledOrders := types.OrdersFilled(tmpOrders)
 
 	s.logger.Infof("GRID RECOVER: found %d filled grid orders", len(filledOrders))
 
@@ -1146,46 +1146,13 @@ func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook
 	return nil
 }
 
-func isActiveOrder(o types.Order) bool {
-	return o.Status == types.OrderStatusNew || o.Status == types.OrderStatusPartiallyFilled
-}
-
 func isCompleteGridOrderBook(orderBook *bbgo.ActiveOrderBook, gridNum int64) bool {
 	tmpOrders := orderBook.Orders()
 
-	if len(tmpOrders) == int(gridNum) && ordersAll(tmpOrders, isActiveOrder) {
+	if len(tmpOrders) == int(gridNum) && types.OrdersAll(tmpOrders, types.IsActiveOrder) {
 		return true
 	}
 
-	return false
-}
-
-func ordersFilled(in []types.Order) (out []types.Order) {
-	for _, o := range in {
-		switch o.Status {
-		case types.OrderStatusFilled:
-			o2 := o
-			out = append(out, o2)
-		}
-	}
-	return out
-}
-
-func ordersAll(orders []types.Order, f func(o types.Order) bool) bool {
-	for _, o := range orders {
-		if !f(o) {
-			return false
-		}
-	}
-	return true
-}
-
-func ordersAny(orders []types.Order, f func(o types.Order) bool) bool {
-	for _, o := range orders {
-		if f(o) {
-			return true
-		}
-	}
 	return false
 }
 
