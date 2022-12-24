@@ -1042,6 +1042,12 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 		}
 	}
 
+	missingPrices := scanMissingPinPrices(orderBook, grid.Pins)
+	if len(missingPrices) == 0 {
+		s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
+		return nil
+	}
+
 	// Note that for MAX Exchange, the order history API only uses fromID parameter to query history order.
 	// The time range does not matter.
 	// TODO: handle context correctly
@@ -1083,24 +1089,34 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	return nil
 }
 
+// replayOrderHistory queries the closed order history from the API and rebuild the orderbook from the order history.
+// startTime, endTime is the time range of the order history.
 func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook *bbgo.ActiveOrderBook, historyService types.ExchangeTradeHistoryService, startTime, endTime time.Time, lastOrderID uint64) error {
 	gridPriceMap := buildGridPriceMap(grid)
 
 	// a simple guard, in reality, this startTime is not possible to exceed the endTime
 	// because the queries closed orders might still in the range.
-	for startTime.Before(endTime) {
+	orderIdChanged := true
+	for startTime.Before(endTime) && orderIdChanged {
 		closedOrders, err := historyService.QueryClosedOrders(ctx, s.Symbol, startTime, endTime, lastOrderID)
 		if err != nil {
 			return err
 		}
 
-		// need to prevent infinite loop for: len(closedOrders) == 1 and it's creationTime = startTime
-		if len(closedOrders) == 0 || len(closedOrders) == 1 && closedOrders[0].CreationTime.Time().Equal(startTime) {
+		// need to prevent infinite loop for:
+		// if there is only one order and the order creation time matches our startTime
+		if len(closedOrders) == 0 || len(closedOrders) == 1 && closedOrders[0].OrderID == lastOrderID {
 			break
 		}
 
 		// for each closed order, if it's newer than the open order's update time, we will update it.
+		orderIdChanged = false
 		for _, closedOrder := range closedOrders {
+			if closedOrder.OrderID > lastOrderID {
+				lastOrderID = closedOrder.OrderID
+				orderIdChanged = true
+			}
+
 			// skip orders that are not limit order
 			if closedOrder.Type != types.OrderTypeLimit {
 				continue
@@ -1134,12 +1150,6 @@ func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook
 					orderBook.Add(closedOrder)
 				}
 			}
-		}
-
-		missingPrices := scanMissingPinPrices(orderBook, grid.Pins)
-		if len(missingPrices) == 0 {
-			s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
-			break
 		}
 	}
 
