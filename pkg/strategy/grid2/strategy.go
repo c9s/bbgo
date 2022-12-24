@@ -1049,7 +1049,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 		return err
 	}
 
-	debugOrderBook(orderBook, grid.Pins)
+	debugGrid(grid, orderBook)
 
 	tmpOrders := orderBook.Orders()
 
@@ -1079,7 +1079,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 
 	s.logger.Infof("GRID RECOVER COMPLETE")
 
-	debugOrderBook(s.orderExecutor.ActiveMakerOrders(), grid.Pins)
+	debugGrid(grid, s.orderExecutor.ActiveMakerOrders())
 	return nil
 }
 
@@ -1189,10 +1189,11 @@ func ordersAny(orders []types.Order, f func(o types.Order) bool) bool {
 	return false
 }
 
-func debugOrderBook(b *bbgo.ActiveOrderBook, pins []Pin) {
+func debugGrid(grid *Grid, book *bbgo.ActiveOrderBook) {
 	fmt.Println("================== GRID ORDERS ==================")
 
-	missingPins := scanMissingPinPrices(b, pins)
+	pins := grid.Pins
+	missingPins := scanMissingPinPrices(book, pins)
 	missing := len(missingPins)
 
 	for i := len(pins) - 1; i >= 0; i-- {
@@ -1201,7 +1202,7 @@ func debugOrderBook(b *bbgo.ActiveOrderBook, pins []Pin) {
 
 		fmt.Printf("%s -> ", price.String())
 
-		existingOrder := b.Lookup(func(o types.Order) bool {
+		existingOrder := book.Lookup(func(o types.Order) bool {
 			return o.Price.Eq(price)
 		})
 
