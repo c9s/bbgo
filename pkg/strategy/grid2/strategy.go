@@ -26,6 +26,9 @@ var log = logrus.WithField("strategy", ID)
 
 var maxNumberOfOrderTradesQueryTries = 10
 
+const historyRollbackDuration = 3 * 24 * time.Hour
+const historyRollbackOrderIdRange = 1000
+
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
@@ -1018,13 +1021,12 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 		firstOrderTime = since
 		lastOrderTime = until
 	}
+	_ = lastOrderTime
 
 	// for MAX exchange we need the order ID to query the closed order history
 	if oid, ok := findEarliestOrderID(openOrders); ok {
 		lastOrderID = oid
 	}
-
-	_ = lastOrderTime
 
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
 
@@ -1042,17 +1044,39 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 		}
 	}
 
+	// if all open orders are the grid orders, then we don't have to recover
 	missingPrices := scanMissingPinPrices(orderBook, grid.Pins)
-	if len(missingPrices) == 0 {
+	if numMissing := len(missingPrices); numMissing <= 1 {
 		s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
 		return nil
-	}
+	} else {
+		// Note that for MAX Exchange, the order history API only uses fromID parameter to query history order.
+		// The time range does not matter.
+		// TODO: handle context correctly
+		startTime := firstOrderTime
+		endTime := now
+		maxTries := 3
+		for maxTries > 0 {
+			maxTries--
+			if err := s.replayOrderHistory(ctx, grid, orderBook, historyService, startTime, endTime, lastOrderID); err != nil {
+				return err
+			}
 
-	// Note that for MAX Exchange, the order history API only uses fromID parameter to query history order.
-	// The time range does not matter.
-	// TODO: handle context correctly
-	if err := s.replayOrderHistory(ctx, grid, orderBook, historyService, firstOrderTime, now, lastOrderID); err != nil {
-		return err
+			// Verify if there are still missing prices
+			missingPrices = scanMissingPinPrices(orderBook, grid.Pins)
+			if len(missingPrices) <= 1 {
+				// skip this order history loop and start recovering
+				break
+			}
+
+			// history rollback range
+			startTime = startTime.Add(-historyRollbackDuration)
+			if newFromOrderID := lastOrderID - historyRollbackOrderIdRange; newFromOrderID > 1 {
+				lastOrderID = newFromOrderID
+			}
+
+			s.logger.Infof("GRID RECOVER: there are still more than two missing orders, rolling back query start time to earlier time point %s, fromID %d", startTime.String(), lastOrderID)
+		}
 	}
 
 	debugGrid(grid, orderBook)
