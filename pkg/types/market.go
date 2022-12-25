@@ -1,53 +1,12 @@
 package types
 
 import (
-	"encoding/json"
-	"fmt"
 	"math"
-	"time"
 
 	"github.com/leekchan/accounting"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
-
-type Duration time.Duration
-
-func (d Duration) Duration() time.Duration {
-	return time.Duration(d)
-}
-
-func (d *Duration) UnmarshalJSON(data []byte) error {
-	var o interface{}
-
-	if err := json.Unmarshal(data, &o); err != nil {
-		return err
-	}
-
-	switch t := o.(type) {
-	case string:
-		dd, err := time.ParseDuration(t)
-		if err != nil {
-			return err
-		}
-
-		*d = Duration(dd)
-
-	case float64:
-		*d = Duration(int64(t * float64(time.Second)))
-
-	case int64:
-		*d = Duration(t * int64(time.Second))
-	case int:
-		*d = Duration(t * int(time.Second))
-
-	default:
-		return fmt.Errorf("unsupported type %T value: %v", t, t)
-
-	}
-
-	return nil
-}
 
 type Market struct {
 	Symbol string `json:"symbol"`
