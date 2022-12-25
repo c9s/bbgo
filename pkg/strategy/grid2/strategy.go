@@ -65,7 +65,7 @@ type Strategy struct {
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
 	GridNum int64 `json:"gridNumber"`
 
-	AutoRange types.Duration `json:"autoRange"`
+	AutoRange types.SimpleDuration `json:"autoRange"`
 
 	UpperPrice fixedpoint.Value `json:"upperPrice"`
 
