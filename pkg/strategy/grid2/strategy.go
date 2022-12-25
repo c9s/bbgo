@@ -3,6 +3,7 @@ package grid2
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -819,8 +820,21 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		return err
 	}
 
+	var orderIds []uint64
+
 	for _, order := range createdOrders {
+		orderIds = append(orderIds, order.OrderID)
+
 		s.logger.Info(order.String())
+	}
+
+	sort.Slice(orderIds, func(i, j int) bool {
+		return orderIds[i] < orderIds[j]
+	})
+
+	if len(orderIds) > 0 {
+		s.GridProfitStats.InitialOrderID = orderIds[0]
+		bbgo.Sync(ctx, s)
 	}
 
 	s.logger.Infof("ALL GRID ORDERS SUBMITTED")
@@ -997,8 +1011,12 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	_ = lastOrderTime
 
 	// for MAX exchange we need the order ID to query the closed order history
-	if oid, ok := findEarliestOrderID(openOrders); ok {
-		lastOrderID = oid
+	if s.GridProfitStats != nil && s.GridProfitStats.InitialOrderID > 0 {
+		lastOrderID = s.GridProfitStats.InitialOrderID
+	} else {
+		if oid, ok := findEarliestOrderID(openOrders); ok {
+			lastOrderID = oid
+		}
 	}
 
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
@@ -1332,14 +1350,14 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		session.MarketDataStream.OnKLineClosed(s.newTakeProfitHandler(ctx, session))
 	}
 
-	session.UserDataStream.OnStart(func() {
-		if s.TriggerPrice.IsZero() {
+	// if TriggerPrice is zero, that means we need to open the grid when start up
+	if s.TriggerPrice.IsZero() {
+		session.UserDataStream.OnStart(func() {
 			if err := s.openGrid(ctx, session); err != nil {
 				s.logger.WithError(err).Errorf("failed to setup grid orders")
 			}
-			return
-		}
-	})
+		})
+	}
 
 	return nil
 }
