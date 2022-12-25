@@ -65,7 +65,7 @@ type Strategy struct {
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
 	GridNum int64 `json:"gridNumber"`
 
-	AutoRange types.SimpleDuration `json:"autoRange"`
+	AutoRange *types.SimpleDuration `json:"autoRange"`
 
 	UpperPrice fixedpoint.Value `json:"upperPrice"`
 
@@ -139,16 +139,18 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if s.UpperPrice.IsZero() {
-		return errors.New("upperPrice can not be zero, you forgot to set?")
-	}
+	if s.AutoRange == nil {
+		if s.UpperPrice.IsZero() {
+			return errors.New("upperPrice can not be zero, you forgot to set?")
+		}
 
-	if s.LowerPrice.IsZero() {
-		return errors.New("lowerPrice can not be zero, you forgot to set?")
-	}
+		if s.LowerPrice.IsZero() {
+			return errors.New("lowerPrice can not be zero, you forgot to set?")
+		}
 
-	if s.UpperPrice.Compare(s.LowerPrice) <= 0 {
-		return fmt.Errorf("upperPrice (%s) should not be less than or equal to lowerPrice (%s)", s.UpperPrice.String(), s.LowerPrice.String())
+		if s.UpperPrice.Compare(s.LowerPrice) <= 0 {
+			return fmt.Errorf("upperPrice (%s) should not be less than or equal to lowerPrice (%s)", s.UpperPrice.String(), s.LowerPrice.String())
+		}
 	}
 
 	if s.GridNum == 0 {
