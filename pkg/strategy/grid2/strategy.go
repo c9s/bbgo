@@ -172,6 +172,11 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+
+	if s.AutoRange != nil {
+		interval := s.AutoRange.Interval()
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: interval})
+	}
 }
 
 // InstanceID returns the instance identifier from the current grid configuration parameters
@@ -1301,7 +1306,16 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	s.groupID = util.FNV32(instanceID)
-	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
+
+	if s.AutoRange != nil {
+		indicatorSet := session.StandardIndicatorSet(s.Symbol)
+		interval := s.AutoRange.Interval()
+		pivotLow := indicatorSet.PivotLow(types.IntervalWindow{Interval: interval, Window: s.AutoRange.Num})
+		pivotHigh := indicatorSet.PivotHigh(types.IntervalWindow{Interval: interval, Window: s.AutoRange.Num})
+		s.UpperPrice = fixedpoint.NewFromFloat(pivotHigh.Last())
+		s.LowerPrice = fixedpoint.NewFromFloat(pivotLow.Last())
+		s.logger.Infof("autoRange is enabled, using pivot high %f and pivot low %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	}
 
 	if s.ProfitSpread.Sign() > 0 {
 		s.ProfitSpread = s.Market.TruncatePrice(s.ProfitSpread)

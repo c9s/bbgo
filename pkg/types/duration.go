@@ -15,9 +15,25 @@ var simpleDurationRegExp = regexp.MustCompile("^(\\d+)([hdw])$")
 var ErrNotSimpleDuration = errors.New("the given input is not simple duration format, valid format: [1-9][0-9]*[hdw]")
 
 type SimpleDuration struct {
-	Num      int64
+	Num      int
 	Unit     string
 	Duration Duration
+}
+
+func (d *SimpleDuration) Interval() Interval {
+	switch d.Unit {
+
+	case "d":
+		return Interval1d
+	case "h":
+		return Interval1h
+
+	case "w":
+		return Interval1w
+
+	}
+
+	return ""
 }
 
 func (d *SimpleDuration) UnmarshalJSON(data []byte) error {
@@ -49,7 +65,7 @@ func ParseSimpleDuration(s string) (*SimpleDuration, error) {
 	matches := simpleDurationRegExp.FindStringSubmatch(s)
 	numStr := matches[1]
 	unit := matches[2]
-	num, err := strconv.ParseInt(numStr, 10, 64)
+	num, err := strconv.Atoi(numStr)
 	if err != nil {
 		return nil, err
 	}
