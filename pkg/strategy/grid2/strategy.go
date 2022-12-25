@@ -20,8 +20,6 @@ const ID = "grid2"
 
 const orderTag = "grid2"
 
-type PriceMap map[string]fixedpoint.Value
-
 var log = logrus.WithField("strategy", ID)
 
 var maxNumberOfOrderTradesQueryTries = 10
@@ -245,27 +243,6 @@ func (s *Strategy) calculateProfit(o types.Order, buyPrice, buyQuantity fixedpoi
 		Order:    o,
 	}
 	return profit
-}
-
-// collectTradeFee collects the fee from the given trade slice
-func collectTradeFee(trades []types.Trade) map[string]fixedpoint.Value {
-	fees := make(map[string]fixedpoint.Value)
-	for _, t := range trades {
-		if fee, ok := fees[t.FeeCurrency]; ok {
-			fees[t.FeeCurrency] = fee.Add(t.Fee)
-		} else {
-			fees[t.FeeCurrency] = t.Fee
-		}
-	}
-	return fees
-}
-
-func aggregateTradesQuantity(trades []types.Trade) fixedpoint.Value {
-	tq := fixedpoint.Zero
-	for _, t := range trades {
-		tq = tq.Add(t.Quantity)
-	}
-	return tq
 }
 
 func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
@@ -757,7 +734,6 @@ func (s *Strategy) newGrid() *Grid {
 // openGrid
 // 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
-// TODO: fix sell order placement for profitSpread
 func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	// grid object guard
 	if s.grid != nil {
@@ -1005,17 +981,6 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 	return nil
 }
 
-func buildGridPriceMap(grid *Grid) PriceMap {
-	// Add all open orders to the local order book
-	gridPriceMap := make(PriceMap)
-	for _, pin := range grid.Pins {
-		price := fixedpoint.Value(pin)
-		gridPriceMap[price.String()] = price
-	}
-
-	return gridPriceMap
-}
-
 func (s *Strategy) recoverGrid(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
 	grid := s.newGrid()
 
@@ -1197,45 +1162,6 @@ func isCompleteGridOrderBook(orderBook *bbgo.ActiveOrderBook, gridNum int64) boo
 	}
 
 	return false
-}
-
-func debugGrid(grid *Grid, book *bbgo.ActiveOrderBook) {
-	fmt.Println("================== GRID ORDERS ==================")
-
-	pins := grid.Pins
-	missingPins := scanMissingPinPrices(book, pins)
-	missing := len(missingPins)
-
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
-		price := fixedpoint.Value(pin)
-
-		fmt.Printf("%s -> ", price.String())
-
-		existingOrder := book.Lookup(func(o types.Order) bool {
-			return o.Price.Eq(price)
-		})
-
-		if existingOrder != nil {
-			fmt.Printf("%s", existingOrder.String())
-
-			switch existingOrder.Status {
-			case types.OrderStatusFilled:
-				fmt.Printf(" | 🔧")
-			case types.OrderStatusCanceled:
-				fmt.Printf(" | 🔄")
-			default:
-				fmt.Printf(" | ✅")
-			}
-		} else {
-			fmt.Printf("ORDER MISSING ⚠️ ")
-			if missing == 1 {
-				fmt.Printf(" COULD BE EMPTY SLOT")
-			}
-		}
-		fmt.Printf("\n")
-	}
-	fmt.Println("================== END OF GRID ORDERS ===================")
 }
 
 func findEarliestOrderID(orders []types.Order) (uint64, bool) {
