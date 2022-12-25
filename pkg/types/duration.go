@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var simpleDurationRegExp = regexp.MustCompile("^(\\d+)([hdw])$")
+var simpleDurationRegExp = regexp.MustCompile(`^(\d+)([hdw])$`)
 
 var ErrNotSimpleDuration = errors.New("the given input is not simple duration format, valid format: [1-9][0-9]*[hdw]")
 
