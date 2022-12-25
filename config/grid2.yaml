@@ -55,6 +55,15 @@ exchangeStrategies:
 - on: binance
   grid2:
     symbol: BTCUSDT
+
+    ## autoRange can be used to detect a price range from a specific time frame
+    ## the pivot low / pivot high of the given range will be used for lowerPrice and upperPrice.
+    ## when autoRange is set, it will override the upperPrice/lowerPrice settings.
+    ##
+    ## the valid format is [1-9][hdw]
+    ## example: "14d" means it will find the highest/lowest price that is higher/lower than left 14d and right 14d.
+    # autoRange: 14d
+
     lowerPrice: 28_000.0
     upperPrice: 50_000.0
 
