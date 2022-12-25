@@ -179,7 +179,15 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 // InstanceID returns the instance identifier from the current grid configuration parameters
 func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("%s-%s-%d-%d-%d", ID, s.Symbol, s.GridNum, s.UpperPrice.Int(), s.LowerPrice.Int())
+	id := fmt.Sprintf("%s-%s-size-%d", ID, s.Symbol, s.GridNum)
+
+	if s.AutoRange != nil {
+		id += "-autoRange-" + s.AutoRange.String()
+	} else {
+		id += "-" + s.UpperPrice.String() + "-" + s.LowerPrice.String()
+	}
+
+	return id
 }
 
 func (s *Strategy) checkSpread() error {

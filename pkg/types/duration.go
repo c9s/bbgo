@@ -20,6 +20,10 @@ type SimpleDuration struct {
 	Duration Duration
 }
 
+func (d *SimpleDuration) String() string {
+	return fmt.Sprintf("%d%s", d.Num, d.Unit)
+}
+
 func (d *SimpleDuration) Interval() Interval {
 	switch d.Unit {
 
