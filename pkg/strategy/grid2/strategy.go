@@ -20,11 +20,12 @@ const ID = "grid2"
 
 const orderTag = "grid2"
 
-type PriceMap map[string]fixedpoint.Value
-
 var log = logrus.WithField("strategy", ID)
 
 var maxNumberOfOrderTradesQueryTries = 10
+
+const historyRollbackDuration = 3 * 24 * time.Hour
+const historyRollbackOrderIdRange = 1000
 
 func init() {
 	// Register the pointer of the strategy struct,
@@ -61,6 +62,8 @@ type Strategy struct {
 
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
 	GridNum int64 `json:"gridNumber"`
+
+	AutoRange *types.SimpleDuration `json:"autoRange"`
 
 	UpperPrice fixedpoint.Value `json:"upperPrice"`
 
@@ -134,16 +137,18 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if s.UpperPrice.IsZero() {
-		return errors.New("upperPrice can not be zero, you forgot to set?")
-	}
+	if s.AutoRange == nil {
+		if s.UpperPrice.IsZero() {
+			return errors.New("upperPrice can not be zero, you forgot to set?")
+		}
 
-	if s.LowerPrice.IsZero() {
-		return errors.New("lowerPrice can not be zero, you forgot to set?")
-	}
+		if s.LowerPrice.IsZero() {
+			return errors.New("lowerPrice can not be zero, you forgot to set?")
+		}
 
-	if s.UpperPrice.Compare(s.LowerPrice) <= 0 {
-		return fmt.Errorf("upperPrice (%s) should not be less than or equal to lowerPrice (%s)", s.UpperPrice.String(), s.LowerPrice.String())
+		if s.UpperPrice.Compare(s.LowerPrice) <= 0 {
+			return fmt.Errorf("upperPrice (%s) should not be less than or equal to lowerPrice (%s)", s.UpperPrice.String(), s.LowerPrice.String())
+		}
 	}
 
 	if s.GridNum == 0 {
@@ -165,6 +170,11 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+
+	if s.AutoRange != nil {
+		interval := s.AutoRange.Interval()
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: interval})
+	}
 }
 
 // InstanceID returns the instance identifier from the current grid configuration parameters
@@ -233,27 +243,6 @@ func (s *Strategy) calculateProfit(o types.Order, buyPrice, buyQuantity fixedpoi
 		Order:    o,
 	}
 	return profit
-}
-
-// collectTradeFee collects the fee from the given trade slice
-func collectTradeFee(trades []types.Trade) map[string]fixedpoint.Value {
-	fees := make(map[string]fixedpoint.Value)
-	for _, t := range trades {
-		if fee, ok := fees[t.FeeCurrency]; ok {
-			fees[t.FeeCurrency] = fee.Add(t.Fee)
-		} else {
-			fees[t.FeeCurrency] = t.Fee
-		}
-	}
-	return fees
-}
-
-func aggregateTradesQuantity(trades []types.Trade) fixedpoint.Value {
-	tq := fixedpoint.Zero
-	for _, t := range trades {
-		tq = tq.Add(t.Quantity)
-	}
-	return tq
 }
 
 func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
@@ -745,7 +734,6 @@ func (s *Strategy) newGrid() *Grid {
 // openGrid
 // 1) if quantity or amount is set, we should use quantity/amount directly instead of using investment amount to calculate.
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
-// TODO: fix sell order placement for profitSpread
 func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	// grid object guard
 	if s.grid != nil {
@@ -997,11 +985,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	grid := s.newGrid()
 
 	// Add all open orders to the local order book
-	gridPriceMap := make(PriceMap)
-	for _, pin := range grid.Pins {
-		price := fixedpoint.Value(pin)
-		gridPriceMap[price.String()] = price
-	}
+	gridPriceMap := buildGridPriceMap(grid)
 
 	lastOrderID := uint64(1)
 	now := time.Now()
@@ -1011,13 +995,12 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 		firstOrderTime = since
 		lastOrderTime = until
 	}
+	_ = lastOrderTime
 
 	// for MAX exchange we need the order ID to query the closed order history
 	if oid, ok := findEarliestOrderID(openOrders); ok {
 		lastOrderID = oid
 	}
-
-	_ = lastOrderTime
 
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
 
@@ -1035,26 +1018,103 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 		}
 	}
 
-	// Note that for MAX Exchange, the order history API only uses fromID parameter to query history order.
-	// The time range does not matter.
-	startTime := firstOrderTime
-	endTime := now
+	// if all open orders are the grid orders, then we don't have to recover
+	missingPrices := scanMissingPinPrices(orderBook, grid.Pins)
+	if numMissing := len(missingPrices); numMissing <= 1 {
+		s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
+		return nil
+	} else {
+		// Note that for MAX Exchange, the order history API only uses fromID parameter to query history order.
+		// The time range does not matter.
+		// TODO: handle context correctly
+		startTime := firstOrderTime
+		endTime := now
+		maxTries := 3
+		for maxTries > 0 {
+			maxTries--
+			if err := s.replayOrderHistory(ctx, grid, orderBook, historyService, startTime, endTime, lastOrderID); err != nil {
+				return err
+			}
+
+			// Verify if there are still missing prices
+			missingPrices = scanMissingPinPrices(orderBook, grid.Pins)
+			if len(missingPrices) <= 1 {
+				// skip this order history loop and start recovering
+				break
+			}
+
+			// history rollback range
+			startTime = startTime.Add(-historyRollbackDuration)
+			if newFromOrderID := lastOrderID - historyRollbackOrderIdRange; newFromOrderID > 1 {
+				lastOrderID = newFromOrderID
+			}
+
+			s.logger.Infof("GRID RECOVER: there are still more than two missing orders, rolling back query start time to earlier time point %s, fromID %d", startTime.String(), lastOrderID)
+		}
+	}
+
+	debugGrid(grid, orderBook)
+
+	tmpOrders := orderBook.Orders()
+
+	// if all orders on the order book are active orders, we don't need to recover.
+	if isCompleteGridOrderBook(orderBook, s.GridNum) {
+		s.logger.Infof("GRID RECOVER: all orders are active orders, do not need recover")
+		return nil
+	}
+
+	// for reverse order recovering, we need the orders to be sort by update time ascending-ly
+	types.SortOrdersUpdateTimeAscending(tmpOrders)
+
+	if len(tmpOrders) > 1 && len(tmpOrders) == int(s.GridNum)+1 {
+		// remove the latest updated order because it's near the empty slot
+		tmpOrders = tmpOrders[:len(tmpOrders)-1]
+	}
+
+	// we will only submit reverse orders for filled orders
+	filledOrders := types.OrdersFilled(tmpOrders)
+
+	s.logger.Infof("GRID RECOVER: found %d filled grid orders", len(filledOrders))
+
+	s.grid = grid
+	for _, o := range filledOrders {
+		s.processFilledOrder(o)
+	}
+
+	s.logger.Infof("GRID RECOVER COMPLETE")
+
+	debugGrid(grid, s.orderExecutor.ActiveMakerOrders())
+	return nil
+}
+
+// replayOrderHistory queries the closed order history from the API and rebuild the orderbook from the order history.
+// startTime, endTime is the time range of the order history.
+func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook *bbgo.ActiveOrderBook, historyService types.ExchangeTradeHistoryService, startTime, endTime time.Time, lastOrderID uint64) error {
+	gridPriceMap := buildGridPriceMap(grid)
 
 	// a simple guard, in reality, this startTime is not possible to exceed the endTime
 	// because the queries closed orders might still in the range.
-	for startTime.Before(endTime) {
+	orderIdChanged := true
+	for startTime.Before(endTime) && orderIdChanged {
 		closedOrders, err := historyService.QueryClosedOrders(ctx, s.Symbol, startTime, endTime, lastOrderID)
 		if err != nil {
 			return err
 		}
 
-		// need to prevent infinite loop for: len(closedOrders) == 1 and it's creationTime = startTime
-		if len(closedOrders) == 0 || len(closedOrders) == 1 && closedOrders[0].CreationTime.Time().Equal(startTime) {
+		// need to prevent infinite loop for:
+		// if there is only one order and the order creation time matches our startTime
+		if len(closedOrders) == 0 || len(closedOrders) == 1 && closedOrders[0].OrderID == lastOrderID {
 			break
 		}
 
 		// for each closed order, if it's newer than the open order's update time, we will update it.
+		orderIdChanged = false
 		for _, closedOrder := range closedOrders {
+			if closedOrder.OrderID > lastOrderID {
+				lastOrderID = closedOrder.OrderID
+				orderIdChanged = true
+			}
+
 			// skip orders that are not limit order
 			if closedOrder.Type != types.OrderTypeLimit {
 				continue
@@ -1089,138 +1149,19 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 				}
 			}
 		}
-
-		missingPrices := scanMissingGridOrders(orderBook, grid)
-		if len(missingPrices) == 0 {
-			s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
-			break
-		}
 	}
-
-	debugOrderBook(orderBook, grid.Pins)
-
-	tmpOrders := orderBook.Orders()
-
-	// if all orders on the order book are active orders, we don't need to recover.
-	if isCompleteGridOrderBook(orderBook, s.GridNum) {
-		s.logger.Infof("GRID RECOVER: all orders are active orders, do not need recover")
-		return nil
-	}
-
-	// for reverse order recovering, we need the orders to be sort by update time ascending-ly
-	types.SortOrdersUpdateTimeAscending(tmpOrders)
-
-	if len(tmpOrders) > 1 && len(tmpOrders) == int(s.GridNum)+1 {
-		// remove the latest updated order because it's near the empty slot
-		tmpOrders = tmpOrders[:len(tmpOrders)-1]
-	}
-
-	// we will only submit reverse orders for filled orders
-	filledOrders := ordersFilled(tmpOrders)
-
-	s.logger.Infof("GRID RECOVER: found %d filled grid orders", len(filledOrders))
-
-	s.grid = grid
-	for _, o := range filledOrders {
-		s.processFilledOrder(o)
-	}
-
-	s.logger.Infof("GRID RECOVER COMPLETE")
-
-	debugOrderBook(s.orderExecutor.ActiveMakerOrders(), grid.Pins)
 
 	return nil
-}
-
-func isActiveOrder(o types.Order) bool {
-	return o.Status == types.OrderStatusNew || o.Status == types.OrderStatusPartiallyFilled
 }
 
 func isCompleteGridOrderBook(orderBook *bbgo.ActiveOrderBook, gridNum int64) bool {
 	tmpOrders := orderBook.Orders()
 
-	if len(tmpOrders) == int(gridNum) && ordersAll(tmpOrders, isActiveOrder) {
+	if len(tmpOrders) == int(gridNum) && types.OrdersAll(tmpOrders, types.IsActiveOrder) {
 		return true
 	}
 
 	return false
-}
-
-func ordersFilled(in []types.Order) (out []types.Order) {
-	for _, o := range in {
-		switch o.Status {
-		case types.OrderStatusFilled:
-			o2 := o
-			out = append(out, o2)
-		}
-	}
-	return out
-}
-
-func ordersAll(orders []types.Order, f func(o types.Order) bool) bool {
-	for _, o := range orders {
-		if !f(o) {
-			return false
-		}
-	}
-	return true
-}
-
-func ordersAny(orders []types.Order, f func(o types.Order) bool) bool {
-	for _, o := range orders {
-		if f(o) {
-			return true
-		}
-	}
-	return false
-}
-
-func debugOrderBook(b *bbgo.ActiveOrderBook, pins []Pin) {
-	fmt.Println("================== GRID ORDERS ==================")
-
-	// scan missing orders
-	missing := 0
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
-		price := fixedpoint.Value(pin)
-		existingOrder := b.Lookup(func(o types.Order) bool {
-			return o.Price.Eq(price)
-		})
-		if existingOrder == nil {
-			missing++
-		}
-	}
-
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
-		price := fixedpoint.Value(pin)
-
-		fmt.Printf("%s -> ", price.String())
-
-		existingOrder := b.Lookup(func(o types.Order) bool {
-			return o.Price.Eq(price)
-		})
-
-		if existingOrder != nil {
-			fmt.Printf("%s", existingOrder.String())
-
-			switch existingOrder.Status {
-			case types.OrderStatusFilled:
-				fmt.Printf(" | 🔧")
-			case types.OrderStatusCanceled:
-				fmt.Printf(" | 🔄")
-			default:
-				fmt.Printf(" | ✅")
-			}
-		} else {
-			fmt.Printf("ORDER MISSING ⚠️ ")
-			if missing == 1 {
-				fmt.Printf(" COULD BE EMPTY SLOT")
-			}
-		}
-		fmt.Printf("\n")
-	}
-	fmt.Println("================== END OF GRID ORDERS ===================")
 }
 
 func findEarliestOrderID(orders []types.Order) (uint64, bool) {
@@ -1258,15 +1199,14 @@ func scanOrderCreationTimeRange(orders []types.Order) (time.Time, time.Time, boo
 	return firstOrderTime, lastOrderTime, true
 }
 
-// scanMissingGridOrders finds the missing grid order prices
-func scanMissingGridOrders(orderBook *bbgo.ActiveOrderBook, grid *Grid) PriceMap {
+// scanMissingPinPrices finds the missing grid order prices
+func scanMissingPinPrices(orderBook *bbgo.ActiveOrderBook, pins []Pin) PriceMap {
 	// Add all open orders to the local order book
 	gridPrices := make(PriceMap)
 	missingPrices := make(PriceMap)
-	for _, pin := range grid.Pins {
+	for _, pin := range pins {
 		price := fixedpoint.Value(pin)
 		gridPrices[price.String()] = price
-
 		existingOrder := orderBook.Lookup(func(o types.Order) bool {
 			return o.Price.Compare(price) == 0
 		})
@@ -1292,7 +1232,16 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	s.groupID = util.FNV32(instanceID)
-	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
+
+	if s.AutoRange != nil {
+		indicatorSet := session.StandardIndicatorSet(s.Symbol)
+		interval := s.AutoRange.Interval()
+		pivotLow := indicatorSet.PivotLow(types.IntervalWindow{Interval: interval, Window: s.AutoRange.Num})
+		pivotHigh := indicatorSet.PivotHigh(types.IntervalWindow{Interval: interval, Window: s.AutoRange.Num})
+		s.UpperPrice = fixedpoint.NewFromFloat(pivotHigh.Last())
+		s.LowerPrice = fixedpoint.NewFromFloat(pivotLow.Last())
+		s.logger.Infof("autoRange is enabled, using pivot high %f and pivot low %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
+	}
 
 	if s.ProfitSpread.Sign() > 0 {
 		s.ProfitSpread = s.Market.TruncatePrice(s.ProfitSpread)
