@@ -24,6 +24,7 @@ type GridProfitStats struct {
 	Market           types.Market                `json:"market,omitempty"`
 	ProfitEntries    []*GridProfit               `json:"profitEntries,omitempty"`
 	Since            *time.Time                  `json:"since,omitempty"`
+	InitialOrderID   uint64                      `json:"initialOrderID"`
 }
 
 func newGridProfitStats(market types.Market) *GridProfitStats {
