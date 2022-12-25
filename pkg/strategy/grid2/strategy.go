@@ -115,9 +115,8 @@ type Strategy struct {
 
 	SkipSpreadCheck bool `json:"skipSpreadCheck"`
 
-	GridProfitStats *GridProfitStats   `persistence:"grid_profit_stats"`
-	ProfitStats     *types.ProfitStats `persistence:"profit_stats"`
-	Position        *types.Position    `persistence:"position"`
+	GridProfitStats *GridProfitStats `persistence:"grid_profit_stats"`
+	Position        *types.Position  `persistence:"position"`
 
 	grid              *Grid
 	session           *bbgo.ExchangeSession
@@ -1251,10 +1250,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.GridProfitStats = newGridProfitStats(s.Market)
 	}
 
-	if s.ProfitStats == nil {
-		s.ProfitStats = types.NewProfitStats(s.Market)
-	}
-
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
@@ -1276,7 +1271,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	orderExecutor := bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
 	orderExecutor.BindEnvironment(s.Environment)
-	orderExecutor.BindProfitStats(s.ProfitStats)
 	orderExecutor.Bind()
 	orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
 		s.GridProfitStats.AddTrade(trade)
