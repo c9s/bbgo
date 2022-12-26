@@ -43,6 +43,7 @@ type OrderExecutor interface {
 	ActiveMakerOrders() *bbgo.ActiveOrderBook
 }
 
+//go:generate callbackgen -type Strategy
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -130,6 +131,10 @@ type Strategy struct {
 	groupID uint32
 
 	logger *logrus.Entry
+
+	gridReadyCallbacks  []func()
+	gridProfitCallbacks []func(stats *GridProfitStats, profit *GridProfit)
+	gridClosedCallbacks []func()
 }
 
 func (s *Strategy) ID() string {
@@ -351,6 +356,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
 		s.GridProfitStats.AddProfit(profit)
 
+		s.EmitGridProfit(s.GridProfitStats, profit)
 		bbgo.Notify(profit)
 		bbgo.Notify(s.GridProfitStats)
 
@@ -730,6 +736,7 @@ func (s *Strategy) closeGrid(ctx context.Context) error {
 
 	// free the grid object
 	s.grid = nil
+	s.EmitGridClosed()
 	return nil
 }
 
@@ -846,6 +853,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	}
 
 	s.logger.Infof("ALL GRID ORDERS SUBMITTED")
+	s.EmitGridReady()
 	return nil
 }
 
@@ -1054,7 +1062,8 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 		// TODO: handle context correctly
 		startTime := firstOrderTime
 		endTime := now
-		maxTries := 3
+		maxTries := 5
+		localHistoryRollbackDuration := historyRollbackDuration
 		for maxTries > 0 {
 			maxTries--
 			if err := s.replayOrderHistory(ctx, grid, orderBook, historyService, startTime, endTime, lastOrderID); err != nil {
@@ -1069,12 +1078,13 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 			}
 
 			// history rollback range
-			startTime = startTime.Add(-historyRollbackDuration)
+			startTime = startTime.Add(-localHistoryRollbackDuration)
 			if newFromOrderID := lastOrderID - historyRollbackOrderIdRange; newFromOrderID > 1 {
 				lastOrderID = newFromOrderID
 			}
 
 			s.logger.Infof("GRID RECOVER: there are still more than two missing orders, rolling back query start time to earlier time point %s, fromID %d", startTime.String(), lastOrderID)
+			localHistoryRollbackDuration = localHistoryRollbackDuration * 2
 		}
 	}
 
