@@ -1054,7 +1054,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 		// TODO: handle context correctly
 		startTime := firstOrderTime
 		endTime := now
-		maxTries := 3
+		maxTries := 5
 		localHistoryRollbackDuration := historyRollbackDuration
 		for maxTries > 0 {
 			maxTries--
