@@ -1055,6 +1055,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 		startTime := firstOrderTime
 		endTime := now
 		maxTries := 3
+		localHistoryRollbackDuration := historyRollbackDuration
 		for maxTries > 0 {
 			maxTries--
 			if err := s.replayOrderHistory(ctx, grid, orderBook, historyService, startTime, endTime, lastOrderID); err != nil {
@@ -1069,12 +1070,13 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 			}
 
 			// history rollback range
-			startTime = startTime.Add(-historyRollbackDuration)
+			startTime = startTime.Add(-localHistoryRollbackDuration)
 			if newFromOrderID := lastOrderID - historyRollbackOrderIdRange; newFromOrderID > 1 {
 				lastOrderID = newFromOrderID
 			}
 
 			s.logger.Infof("GRID RECOVER: there are still more than two missing orders, rolling back query start time to earlier time point %s, fromID %d", startTime.String(), lastOrderID)
+			localHistoryRollbackDuration = localHistoryRollbackDuration * 2
 		}
 	}
 
