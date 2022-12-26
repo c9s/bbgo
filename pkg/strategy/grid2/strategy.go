@@ -43,6 +43,7 @@ type OrderExecutor interface {
 	ActiveMakerOrders() *bbgo.ActiveOrderBook
 }
 
+//go:generate callbackgen -type Strategy
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -130,6 +131,10 @@ type Strategy struct {
 	groupID uint32
 
 	logger *logrus.Entry
+
+	gridReadyCallbacks  []func()
+	gridProfitCallbacks []func(stats *GridProfitStats, profit *GridProfit)
+	gridClosedCallbacks []func()
 }
 
 func (s *Strategy) ID() string {
@@ -351,6 +356,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
 		s.GridProfitStats.AddProfit(profit)
 
+		s.EmitGridProfit(s.GridProfitStats, profit)
 		bbgo.Notify(profit)
 		bbgo.Notify(s.GridProfitStats)
 
@@ -730,6 +736,7 @@ func (s *Strategy) closeGrid(ctx context.Context) error {
 
 	// free the grid object
 	s.grid = nil
+	s.EmitGridClosed()
 	return nil
 }
 
@@ -846,6 +853,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	}
 
 	s.logger.Infof("ALL GRID ORDERS SUBMITTED")
+	s.EmitGridReady()
 	return nil
 }
 
