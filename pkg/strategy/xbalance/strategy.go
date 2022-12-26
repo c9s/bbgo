@@ -52,7 +52,7 @@ func (s *State) SlackAttachment() slack.Attachment {
 		Title: s.Asset + " Transfer States",
 		Fields: []slack.AttachmentField{
 			{Title: "Total Number of Transfers", Value: fmt.Sprintf("%d", s.DailyNumberOfTransfers), Short: true},
-			{Title: "Total Amount of Transfers", Value: util.FormatFloat(s.DailyAmountOfTransfers.Float64(), 4), Short: true},
+			{Title: "Total Amount of Transfers", Value: s.DailyAmountOfTransfers.String(), Short: true},
 		},
 		Footer: templateutil.Render("Since {{ . }}", time.Unix(s.Since, 0).Format(time.RFC822)),
 	}
