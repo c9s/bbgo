@@ -10,14 +10,14 @@ import (
 
 	"github.com/heroku/rollrus"
 	"github.com/joho/godotenv"
-	"github.com/lestrrat-go/file-rotatelogs"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rifflock/lfshook"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/x-cray/logrus-prefixed-formatter"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/util"
@@ -219,11 +219,14 @@ func init() {
 
 func Execute() {
 	environment := os.Getenv("BBGO_ENV")
+	logDir := "log"
 	switch environment {
 	case "production", "prod":
-
+		if err := os.MkdirAll(logDir, 0777); err != nil {
+			log.Panic(err)
+		}
 		writer, err := rotatelogs.New(
-			path.Join("log", "access_log.%Y%m%d"),
+			path.Join(logDir, "access_log.%Y%m%d"),
 			rotatelogs.WithLinkName("access_log"),
 			// rotatelogs.WithMaxAge(24 * time.Hour),
 			rotatelogs.WithRotationTime(time.Duration(24)*time.Hour),
