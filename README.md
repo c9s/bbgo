@@ -1,6 +1,6 @@
 # BBGO
 
-A crypto trading bot framework written in Go. The name bbgo comes from the BB8 bot in the Star Wars movie.
+A modern crypto trading bot framework written in Go.
 
 ## Current Status
 
