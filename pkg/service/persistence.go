@@ -11,10 +11,11 @@ type Store interface {
 }
 
 type RedisPersistenceConfig struct {
-	Host     string `yaml:"host" json:"host" env:"REDIS_HOST"`
-	Port     string `yaml:"port" json:"port" env:"REDIS_PORT"`
-	Password string `yaml:"password,omitempty" json:"password,omitempty" env:"REDIS_PASSWORD"`
-	DB       int    `yaml:"db" json:"db" env:"REDIS_DB"`
+	Host      string `yaml:"host" json:"host" env:"REDIS_HOST"`
+	Port      string `yaml:"port" json:"port" env:"REDIS_PORT"`
+	Password  string `yaml:"password,omitempty" json:"password,omitempty" env:"REDIS_PASSWORD"`
+	DB        int    `yaml:"db" json:"db" env:"REDIS_DB"`
+	Namespace string `yaml:"namespace" json:"namespace" env:"REDIS_NAMESPACE"`
 }
 
 type JsonPersistenceConfig struct {
