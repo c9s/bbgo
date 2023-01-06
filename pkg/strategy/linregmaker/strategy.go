@@ -473,12 +473,12 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 		// Price too high
 		if bidPrice.Float64() > s.neutralBoll.UpBand.Last() {
 			canBuy = false
-			log.Infof("tradeInBand is set, skip buy when the price is higher than the neutralBB")
+			log.Infof("tradeInBand is set, skip buy due to the price is higher than the neutralBB")
 		}
 		// Price too low in uptrend
 		if askPrice.Float64() < s.neutralBoll.DownBand.Last() {
 			canSell = false
-			log.Infof("tradeInBand is set, skip sell when the price is lower than the neutralBB")
+			log.Infof("tradeInBand is set, skip sell due to the price is lower than the neutralBB")
 		}
 	}
 
@@ -486,8 +486,10 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 	if !s.isAllowOppositePosition() {
 		if s.mainTrendCurrent == types.DirectionUp && (s.Position.IsClosed() || s.Position.IsDust(askPrice)) {
 			canSell = false
+			log.Infof("Skip sell due to the long position is closed")
 		} else if s.mainTrendCurrent == types.DirectionDown && (s.Position.IsClosed() || s.Position.IsDust(bidPrice)) {
 			canBuy = false
+			log.Infof("Skip buy due to the short position is closed")
 		}
 	}
 
@@ -497,16 +499,20 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 		if quoteQty.Compare(fixedpoint.Zero) <= 0 {
 			if s.Position.IsLong() {
 				canBuy = false
+				log.Infof("Skip buy due to the account has no available balance")
 			} else if s.Position.IsShort() {
 				canSell = false
+				log.Infof("Skip sell due to the account has no available balance")
 			}
 		}
 	} else {
 		if buyQuantity.Compare(quoteQty.Div(bidPrice)) > 0 { // Spot
 			canBuy = false
+			log.Infof("Skip buy due to the account has no available balance")
 		}
 		if sellQuantity.Compare(baseQty) > 0 {
 			canSell = false
+			log.Infof("Skip sell due to the account has no available balance")
 		}
 	}
 
