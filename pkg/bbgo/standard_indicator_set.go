@@ -167,6 +167,11 @@ func (s *StandardIndicatorSet) MACD(iw types.IntervalWindow, shortPeriod, longPe
 	return inc
 }
 
+func (s *StandardIndicatorSet) RSI(iw types.IntervalWindow) *indicator.RSI {
+	inc := s.allocateSimpleIndicator(&indicator.RSI{IntervalWindow: iw}, iw, "rsi")
+	return inc.(*indicator.RSI)
+}
+
 // GHFilter is a helper function that returns the G-H (alpha beta) digital filter of the given interval and the window size.
 func (s *StandardIndicatorSet) GHFilter(iw types.IntervalWindow) *indicator.GHFilter {
 	inc := s.allocateSimpleIndicator(&indicator.GHFilter{IntervalWindow: iw}, iw, "ghfilter")
