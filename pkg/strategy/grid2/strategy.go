@@ -884,6 +884,7 @@ func (s *Strategy) updateOpenOrderPricesMetrics(orders []types.Order) {
 	metricsGridOrderPrices.Reset()
 	for idx, order := range orders {
 		labels := s.newPrometheusLabels()
+		labels["side"] = order.Side.String()
 		labels["ith"] = strconv.Itoa(num - idx)
 		metricsGridOrderPrices.With(labels).Set(order.Price.Float64())
 	}

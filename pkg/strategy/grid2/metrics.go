@@ -52,6 +52,7 @@ func initMetrics(extendedLabels []string) {
 			"exchange", // exchange name
 			"symbol",   // symbol of the market
 			"ith",
+			"side",
 		}, extendedLabels...),
 	)
 
