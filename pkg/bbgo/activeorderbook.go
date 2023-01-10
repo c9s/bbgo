@@ -18,8 +18,10 @@ const CancelOrderWaitTime = 20 * time.Millisecond
 // ActiveOrderBook manages the local active order books.
 //go:generate callbackgen -type ActiveOrderBook
 type ActiveOrderBook struct {
-	Symbol            string
-	orders            *types.SyncOrderMap
+	Symbol string
+	orders *types.SyncOrderMap
+
+	newCallbacks      []func(o types.Order)
 	filledCallbacks   []func(o types.Order)
 	canceledCallbacks []func(o types.Order)
 

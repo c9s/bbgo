@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -111,6 +112,9 @@ type Strategy struct {
 
 	ResetPositionWhenStart bool `json:"resetPositionWhenStart"`
 
+	// PrometheusLabels will be used as the base prometheus labels
+	PrometheusLabels prometheus.Labels `json:"prometheusLabels"`
+
 	// FeeRate is used for calculating the minimal profit spread.
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
@@ -135,6 +139,7 @@ type Strategy struct {
 	gridReadyCallbacks  []func()
 	gridProfitCallbacks []func(stats *GridProfitStats, profit *GridProfit)
 	gridClosedCallbacks []func()
+	gridErrorCallbacks  []func(err error)
 }
 
 func (s *Strategy) ID() string {
@@ -170,6 +175,10 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("either quantity, amount or quoteInvestment must be set")
 	}
 
+	return nil
+}
+
+func (s *Strategy) Defaults() error {
 	return nil
 }
 
@@ -355,10 +364,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		profit := s.calculateProfit(o, newPrice, newQuantity)
 		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
 		s.GridProfitStats.AddProfit(profit)
-
 		s.EmitGridProfit(s.GridProfitStats, profit)
-		bbgo.Notify(profit)
-		bbgo.Notify(s.GridProfitStats)
 
 	case types.SideTypeBuy:
 		newSide = types.SideTypeSell
@@ -668,6 +674,8 @@ func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.Exch
 	return func(o types.Order) {
 		s.handleOrderFilled(o)
 		bbgo.Sync(ctx, s)
+
+		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 	}
 }
 
@@ -835,6 +843,10 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		return err
 	}
 
+	// update the number of orders to metrics
+	baseLabels := s.newPrometheusLabels()
+	metricsGridNumOfOrders.With(baseLabels).Set(float64(len(createdOrders)))
+
 	var orderIds []uint64
 
 	for _, order := range createdOrders {
@@ -854,7 +866,30 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	s.logger.Infof("ALL GRID ORDERS SUBMITTED")
 	s.EmitGridReady()
+
+	s.updateOpenOrderPricesMetrics(createdOrders)
 	return nil
+}
+
+func (s *Strategy) updateOpenOrderPricesMetrics(orders []types.Order) {
+	orders = sortOrdersByPriceAscending(orders)
+	num := len(orders)
+	metricsGridOrderPrices.Reset()
+	for idx, order := range orders {
+		labels := s.newPrometheusLabels()
+		labels["side"] = order.Side.String()
+		labels["ith"] = strconv.Itoa(num - idx)
+		metricsGridOrderPrices.With(labels).Set(order.Price.Float64())
+	}
+}
+
+func sortOrdersByPriceAscending(orders []types.Order) []types.Order {
+	sort.Slice(orders, func(i, j int) bool {
+		a := orders[i]
+		b := orders[j]
+		return a.Price.Compare(b.Price) < 0
+	})
+	return orders
 }
 
 func (s *Strategy) debugGridOrders(submitOrders []types.SubmitOrder, lastPrice fixedpoint.Value) {
@@ -1253,6 +1288,19 @@ func scanMissingPinPrices(orderBook *bbgo.ActiveOrderBook, pins []Pin) PriceMap 
 	return missingPrices
 }
 
+func (s *Strategy) newPrometheusLabels() prometheus.Labels {
+	labels := prometheus.Labels{
+		"exchange": s.session.Name,
+		"symbol":   s.Symbol,
+	}
+
+	if s.PrometheusLabels == nil {
+		return labels
+	}
+
+	return mergeLabels(s.PrometheusLabels, labels)
+}
+
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 
@@ -1290,6 +1338,14 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
 
+	// initialize and register prometheus metrics
+	if s.PrometheusLabels != nil {
+		initMetrics(labelKeys(s.PrometheusLabels))
+	} else {
+		initMetrics(nil)
+	}
+	registerMetrics()
+
 	if s.ResetPositionWhenStart {
 		s.Position.Reset()
 	}
@@ -1317,6 +1373,16 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	orderExecutor.ActiveMakerOrders().OnFilled(s.newOrderUpdateHandler(ctx, session))
 
 	s.orderExecutor = orderExecutor
+
+	s.OnGridProfit(func(stats *GridProfitStats, profit *GridProfit) {
+		bbgo.Notify(profit)
+		bbgo.Notify(stats)
+	})
+
+	s.OnGridProfit(func(stats *GridProfitStats, profit *GridProfit) {
+		labels := s.newPrometheusLabels()
+		metricsGridProfit.With(labels).Set(stats.TotalQuoteProfit.Float64())
+	})
 
 	// TODO: detect if there are previous grid orders on the order book
 	if s.ClearOpenOrdersWhenStart {
