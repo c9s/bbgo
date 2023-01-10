@@ -36,7 +36,6 @@ func initMetrics(extendedLabels []string) {
 			Help: "number of orders",
 		},
 		append([]string{
-			"strategy_instance",
 			"exchange", // exchange name
 			"symbol",   // symbol of the market
 		}, extendedLabels...),
@@ -48,7 +47,6 @@ func initMetrics(extendedLabels []string) {
 			Help: "order prices",
 		},
 		append([]string{
-			"strategy_instance",
 			"exchange", // exchange name
 			"symbol",   // symbol of the market
 			"ith",
@@ -62,7 +60,6 @@ func initMetrics(extendedLabels []string) {
 			Help: "realized grid profit",
 		},
 		append([]string{
-			"strategy_instance",
 			"exchange", // exchange name
 			"symbol",   // symbol of the market
 		}, extendedLabels...),

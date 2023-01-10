@@ -112,10 +112,6 @@ type Strategy struct {
 
 	ResetPositionWhenStart bool `json:"resetPositionWhenStart"`
 
-	// StrategyInstance
-	// an optional field for prometheus metrics
-	StrategyInstance string `json:"strategyInstance"`
-
 	// PrometheusLabels will be used as the base prometheus labels
 	PrometheusLabels prometheus.Labels `json:"prometheusLabels"`
 
@@ -183,9 +179,6 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Defaults() error {
-	if s.StrategyInstance == "" {
-		s.StrategyInstance = "main"
-	}
 	return nil
 }
 
@@ -1297,9 +1290,8 @@ func scanMissingPinPrices(orderBook *bbgo.ActiveOrderBook, pins []Pin) PriceMap 
 
 func (s *Strategy) newPrometheusLabels() prometheus.Labels {
 	labels := prometheus.Labels{
-		"strategy_instance": s.StrategyInstance,
-		"exchange":          s.session.Name,
-		"symbol":            s.Symbol,
+		"exchange": s.session.Name,
+		"symbol":   s.Symbol,
 	}
 
 	if s.PrometheusLabels == nil {
