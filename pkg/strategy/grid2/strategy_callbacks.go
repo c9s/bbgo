@@ -33,3 +33,13 @@ func (s *Strategy) EmitGridClosed() {
 		cb()
 	}
 }
+
+func (s *Strategy) OnGridError(cb func(err error)) {
+	s.gridErrorCallbacks = append(s.gridErrorCallbacks, cb)
+}
+
+func (s *Strategy) EmitGridError(err error) {
+	for _, cb := range s.gridErrorCallbacks {
+		cb(err)
+	}
+}
