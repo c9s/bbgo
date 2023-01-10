@@ -881,6 +881,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 func (s *Strategy) updateOpenOrderPricesMetrics(orders []types.Order) {
 	orders = sortOrdersByPriceAscending(orders)
 	num := len(orders)
+	metricsGridOrderPrices.Reset()
 	for idx, order := range orders {
 		labels := s.newPrometheusLabels()
 		labels["ith"] = strconv.Itoa(num - idx)
