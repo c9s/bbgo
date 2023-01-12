@@ -236,7 +236,7 @@ func (s *Strategy) handleOrderCanceled(o types.Order) {
 	ctx := context.Background()
 	if s.CloseWhenCancelOrder {
 		s.logger.Infof("one of the grid orders is canceled, now closing grid...")
-		if err := s.closeGrid(ctx); err != nil {
+		if err := s.CloseGrid(ctx); err != nil {
 			s.logger.WithError(err).Errorf("graceful order cancel error")
 		}
 	}
@@ -687,7 +687,7 @@ func (s *Strategy) newStopLossPriceHandler(ctx context.Context, session *bbgo.Ex
 
 		s.logger.Infof("last low price %f hits stopLossPrice %f, closing grid", k.Low.Float64(), s.StopLossPrice.Float64())
 
-		if err := s.closeGrid(ctx); err != nil {
+		if err := s.CloseGrid(ctx); err != nil {
 			s.logger.WithError(err).Errorf("can not close grid")
 			return
 		}
@@ -713,7 +713,7 @@ func (s *Strategy) newTakeProfitHandler(ctx context.Context, session *bbgo.Excha
 
 		s.logger.Infof("last high price %f hits takeProfitPrice %f, closing grid", k.High.Float64(), s.TakeProfitPrice.Float64())
 
-		if err := s.closeGrid(ctx); err != nil {
+		if err := s.CloseGrid(ctx); err != nil {
 			s.logger.WithError(err).Errorf("can not close grid")
 			return
 		}
@@ -731,8 +731,12 @@ func (s *Strategy) newTakeProfitHandler(ctx context.Context, session *bbgo.Excha
 	})
 }
 
-// closeGrid closes the grid orders
-func (s *Strategy) closeGrid(ctx context.Context) error {
+func (s *Strategy) OpenGrid(ctx context.Context) error {
+	return s.openGrid(ctx, s.session)
+}
+
+// CloseGrid closes the grid orders
+func (s *Strategy) CloseGrid(ctx context.Context) error {
 	bbgo.Sync(ctx, s)
 
 	// now we can cancel the open orders
@@ -1417,7 +1421,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			return
 		}
 
-		if err := s.closeGrid(ctx); err != nil {
+		if err := s.CloseGrid(ctx); err != nil {
 			s.logger.WithError(err).Errorf("grid graceful order cancel error")
 		}
 	})
