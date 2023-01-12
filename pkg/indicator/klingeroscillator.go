@@ -1,6 +1,8 @@
 package indicator
 
-import "github.com/c9s/bbgo/pkg/types"
+import (
+	"github.com/c9s/bbgo/pkg/types"
+)
 
 // Refer: Klinger Oscillator
 // Refer URL: https://www.investopedia.com/terms/k/klingeroscillator.asp
@@ -14,8 +16,8 @@ import "github.com/c9s/bbgo/pkg/types"
 type KlingerOscillator struct {
 	types.SeriesBase
 	types.IntervalWindow
-	Fast *EWMA
-	Slow *EWMA
+	Fast types.UpdatableSeries
+	Slow types.UpdatableSeries
 	VF   VolumeForce
 
 	updateCallbacks []func(value float64)
@@ -47,9 +49,14 @@ func (inc *KlingerOscillator) Update(high, low, cloze, volume float64) {
 		inc.Fast = &EWMA{IntervalWindow: types.IntervalWindow{Window: 34, Interval: inc.Interval}}
 		inc.Slow = &EWMA{IntervalWindow: types.IntervalWindow{Window: 55, Interval: inc.Interval}}
 	}
-	inc.VF.Update(high, low, cloze, volume)
-	inc.Fast.Update(inc.VF.Value)
-	inc.Slow.Update(inc.VF.Value)
+
+	if inc.VF.lastSum > 0 {
+		inc.VF.Update(high, low, cloze, volume)
+		inc.Fast.Update(inc.VF.Value)
+		inc.Slow.Update(inc.VF.Value)
+	} else {
+		inc.VF.Update(high, low, cloze, volume)
+	}
 }
 
 var _ types.SeriesExtend = &KlingerOscillator{}
@@ -58,29 +65,8 @@ func (inc *KlingerOscillator) PushK(k types.KLine) {
 	inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64(), k.Volume.Float64())
 }
 
-func (inc *KlingerOscillator) CalculateAndUpdate(allKLines []types.KLine) {
-	if inc.Fast == nil {
-		for _, k := range allKLines {
-			inc.PushK(k)
-			inc.EmitUpdate(inc.Last())
-		}
-	} else {
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
-	}
-}
-
-func (inc *KlingerOscillator) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *KlingerOscillator) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
+func (inc *KlingerOscillator) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
+	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
 }
 
 // Utility to hold the state of calculation
@@ -93,12 +79,12 @@ type VolumeForce struct {
 }
 
 func (inc *VolumeForce) Update(high, low, cloze, volume float64) {
-	if inc.Value == 0 {
+	if inc.lastSum == 0 {
 		inc.dm = high - low
 		inc.cm = inc.dm
 		inc.trend = 1.
 		inc.lastSum = high + low + cloze
-		inc.Value = volume * 100.
+		inc.Value = volume // first volume is not calculated
 		return
 	}
 	trend := 1.
@@ -114,5 +100,5 @@ func (inc *VolumeForce) Update(high, low, cloze, volume float64) {
 	inc.trend = trend
 	inc.lastSum = high + low + cloze
 	inc.dm = dm
-	inc.Value = volume * (2.*(inc.dm/inc.cm) - 1.) * trend * 100.
+	inc.Value = volume * (2.*(inc.dm/inc.cm) - 1.) * trend
 }
