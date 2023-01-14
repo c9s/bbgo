@@ -20,7 +20,9 @@ type Supertrend struct {
 
 	AverageTrueRange *ATR
 
-	trendPrices floats.Slice
+	trendPrices    floats.Slice // Value of the trend line (buy or sell)
+	supportLine    floats.Slice // The support line in an uptrend (green)
+	resistanceLine floats.Slice // The resistance line in a downtrend (red)
 
 	closePrice             float64
 	previousClosePrice     float64
@@ -119,6 +121,10 @@ func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 		inc.trendPrices.Push(inc.uptrendPrice)
 	}
 
+	// Save the trend lines
+	inc.supportLine.Push(inc.uptrendPrice)
+	inc.resistanceLine.Push(inc.downtrendPrice)
+
 	logst.Debugf("Update supertrend result: closePrice: %v, uptrendPrice: %v, downtrendPrice: %v, trend: %v,"+
 		" tradeSignal: %v, AverageTrueRange.Last(): %v", inc.closePrice, inc.uptrendPrice, inc.downtrendPrice,
 		inc.trend, inc.tradeSignal, inc.AverageTrueRange.Last())
@@ -126,6 +132,21 @@ func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 
 func (inc *Supertrend) GetSignal() types.Direction {
 	return inc.tradeSignal
+}
+
+// GetDirection returns current trend
+func (inc *Supertrend) GetDirection() types.Direction {
+	return inc.trend
+}
+
+// GetCurrentSupertrendSupport returns last supertrend support
+func (inc *Supertrend) GetCurrentSupertrendSupport() float64 {
+	return inc.supportLine.Last()
+}
+
+// GetCurrentSupertrendResistance returns last supertrend resistance
+func (inc *Supertrend) GetCurrentSupertrendResistance() float64 {
+	return inc.resistanceLine.Last()
 }
 
 var _ types.SeriesExtend = &Supertrend{}
