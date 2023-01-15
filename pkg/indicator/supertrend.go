@@ -134,18 +134,18 @@ func (inc *Supertrend) GetSignal() types.Direction {
 	return inc.tradeSignal
 }
 
-// GetDirection returns current trend
-func (inc *Supertrend) GetDirection() types.Direction {
+// GetDirection return the current trend
+func (inc *Supertrend) Direction() types.Direction {
 	return inc.trend
 }
 
-// GetCurrentSupertrendSupport returns last supertrend support
-func (inc *Supertrend) GetCurrentSupertrendSupport() float64 {
+// LastSupertrendSupport return the current supertrend support
+func (inc *Supertrend) LastSupertrendSupport() float64 {
 	return inc.supportLine.Last()
 }
 
-// GetCurrentSupertrendResistance returns last supertrend resistance
-func (inc *Supertrend) GetCurrentSupertrendResistance() float64 {
+// LastSupertrendResistance return the current supertrend resistance
+func (inc *Supertrend) LastSupertrendResistance() float64 {
 	return inc.resistanceLine.Last()
 }
 

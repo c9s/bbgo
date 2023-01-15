@@ -178,18 +178,18 @@ func (inc *PivotSupertrend) GetSignal() types.Direction {
 	return inc.tradeSignal
 }
 
-// GetDirection returns current trend
-func (inc *PivotSupertrend) GetDirection() types.Direction {
+// GetDirection return the current trend
+func (inc *PivotSupertrend) Direction() types.Direction {
 	return inc.trend
 }
 
-// GetCurrentSupertrendSupport returns last supertrend support value
-func (inc *PivotSupertrend) GetCurrentSupertrendSupport() float64 {
+// LastSupertrendSupport return the current supertrend support value
+func (inc *PivotSupertrend) LastSupertrendSupport() float64 {
 	return inc.supportLine.Last()
 }
 
-// GetCurrentSupertrendResistance returns last supertrend resistance value
-func (inc *PivotSupertrend) GetCurrentSupertrendResistance() float64 {
+// LastSupertrendResistance return the current supertrend resistance value
+func (inc *PivotSupertrend) LastSupertrendResistance() float64 {
 	return inc.resistanceLine.Last()
 }
 
