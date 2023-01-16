@@ -179,8 +179,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: s.ReverseEMA.Interval,
 	})
-	// Initialize ReverseEMA
-	s.ReverseEMA = s.StandardIndicatorSet.EWMA(s.ReverseEMA.IntervalWindow)
 
 	// Subscribe for ReverseInterval. Use interval of ReverseEMA if ReverseInterval is omitted
 	if s.ReverseInterval == "" {
@@ -214,8 +212,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 			Interval: s.NeutralBollinger.Interval,
 		})
 	}
-	// Initialize BBs
-	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 
 	// Setup Exits
 	s.ExitMethods.SetAndSubscribe(session, s)
@@ -638,6 +634,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.Sync(ctx, s)
 	})
 	s.ExitMethods.Bind(session, s.orderExecutor)
+
+	// Indicators initialized by StandardIndicatorSet must be initialized in Run()
+	// Initialize ReverseEMA
+	s.ReverseEMA = s.StandardIndicatorSet.EWMA(s.ReverseEMA.IntervalWindow)
+	// Initialize BBs
+	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 
 	// Default spread
 	if s.Spread == fixedpoint.Zero {
