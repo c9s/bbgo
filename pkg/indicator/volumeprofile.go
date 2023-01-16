@@ -27,12 +27,8 @@ type VolumeProfile struct {
 }
 
 func (inc *VolumeProfile) Update(price, volume float64, timestamp types.Time) {
-	if inc.minPrice == 0 {
-		inc.minPrice = math.Inf(1)
-	}
-	if inc.maxPrice == 0 {
-		inc.maxPrice = math.Inf(-1)
-	}
+	inc.minPrice = math.Inf(1)
+	inc.maxPrice = math.Inf(-1)
 	if inc.profile == nil {
 		inc.profile = make(map[float64]float64)
 	}
@@ -47,13 +43,14 @@ func (inc *VolumeProfile) Update(price, volume float64, timestamp types.Time) {
 	for i = 0; i < len(inc.trades); i++ {
 		td := inc.trades[i]
 		if td.timestamp.After(filter) {
-			inc.trades = inc.trades[i : len(inc.trades)-1]
+			inc.trades = inc.trades[i:len(inc.trades)]
 			break
 		}
 		inc.profile[math.Round(td.price/inc.Delta)] -= td.volume
 	}
 
-	for k, _ := range inc.profile {
+	for i = 0; i < len(inc.trades); i++ {
+		k := math.Round(inc.trades[i].price / inc.Delta)
 		if k < inc.minPrice {
 			inc.minPrice = k
 		}
@@ -74,8 +71,14 @@ func (inc *VolumeProfile) PointOfControlAboveEqual(price float64, limit ...float
 	if len(limit) > 0 {
 		filter = limit[0]
 	}
+	if inc.Delta == 0 {
+		panic("Delta for volumeprofile shouldn't be zero")
+	}
 	start := math.Round(price / inc.Delta)
 	vol = math.Inf(-1)
+	if start > filter {
+		return 0, 0
+	}
 	for ; start <= filter; start += inc.Delta {
 		abs := math.Abs(inc.profile[start])
 		if vol < abs {
@@ -93,8 +96,16 @@ func (inc *VolumeProfile) PointOfControlBelowEqual(price float64, limit ...float
 	if len(limit) > 0 {
 		filter = limit[0]
 	}
+	if inc.Delta == 0 {
+		panic("Delta for volumeprofile shouldn't be zero")
+	}
 	start := math.Round(price / inc.Delta)
 	vol = math.Inf(-1)
+
+	if start < filter {
+		return 0, 0
+	}
+
 	for ; start >= filter; start -= inc.Delta {
 		abs := math.Abs(inc.profile[start])
 		if vol < abs {
