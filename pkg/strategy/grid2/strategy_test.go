@@ -277,7 +277,7 @@ func newTestStrategy() *Strategy {
 		GridProfitStats:  newGridProfitStats(market),
 		UpperPrice:       number(20_000),
 		LowerPrice:       number(10_000),
-		GridNum:          10,
+		GridNum:          11,
 		historicalTrades: bbgo.NewTradeStore(),
 
 		// QuoteInvestment: number(9000.0),

@@ -28,7 +28,7 @@ func number(a interface{}) fixedpoint.Value {
 func TestNewGrid(t *testing.T) {
 	upper := fixedpoint.NewFromFloat(500.0)
 	lower := fixedpoint.NewFromFloat(100.0)
-	size := fixedpoint.NewFromFloat(100.0)
+	size := fixedpoint.NewFromFloat(101.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
 	grid.CalculateArithmeticPins()
 
@@ -44,7 +44,7 @@ func TestNewGrid(t *testing.T) {
 func TestGrid_HasPin(t *testing.T) {
 	upper := fixedpoint.NewFromFloat(500.0)
 	lower := fixedpoint.NewFromFloat(100.0)
-	size := fixedpoint.NewFromFloat(100.0)
+	size := fixedpoint.NewFromFloat(101.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
 	grid.CalculateArithmeticPins()
 
@@ -56,7 +56,7 @@ func TestGrid_HasPin(t *testing.T) {
 func TestGrid_ExtendUpperPrice(t *testing.T) {
 	upper := number(500.0)
 	lower := number(100.0)
-	size := number(4.0)
+	size := number(5.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
 	grid.CalculateArithmeticPins()
 
@@ -64,7 +64,7 @@ func TestGrid_ExtendUpperPrice(t *testing.T) {
 
 	t.Logf("pins: %+v", grid.Pins)
 	assert.Equal(t, number(100.0), originalSpread)
-	assert.Len(t, grid.Pins, 5) // (1000-500) / 4
+	assert.Len(t, grid.Pins, 5)
 
 	newPins := grid.ExtendUpperPrice(number(1000.0))
 	assert.Len(t, grid.Pins, 10)
@@ -76,7 +76,7 @@ func TestGrid_ExtendUpperPrice(t *testing.T) {
 func TestGrid_ExtendLowerPrice(t *testing.T) {
 	upper := fixedpoint.NewFromFloat(3000.0)
 	lower := fixedpoint.NewFromFloat(2000.0)
-	size := fixedpoint.NewFromFloat(10.0)
+	size := fixedpoint.NewFromFloat(11.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
 	grid.CalculateArithmeticPins()
 
@@ -111,7 +111,7 @@ func TestGrid_ExtendLowerPrice(t *testing.T) {
 func TestGrid_NextLowerPin(t *testing.T) {
 	upper := number(500.0)
 	lower := number(100.0)
-	size := number(4.0)
+	size := number(5.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
 	grid.CalculateArithmeticPins()
 
@@ -129,7 +129,7 @@ func TestGrid_NextLowerPin(t *testing.T) {
 func TestGrid_NextHigherPin(t *testing.T) {
 	upper := number(500.0)
 	lower := number(100.0)
-	size := number(4.0)
+	size := number(5.0)
 	grid := NewGrid(lower, upper, size, number(0.01))
 	grid.CalculateArithmeticPins()
 	t.Logf("pins: %+v", grid.Pins)

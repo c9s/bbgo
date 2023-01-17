@@ -58,7 +58,8 @@ func buildPinCache(pins []Pin) map[Pin]struct{} {
 
 func NewGrid(lower, upper, size, tickSize fixedpoint.Value) *Grid {
 	height := upper.Sub(lower)
-	spread := height.Div(size)
+	one := fixedpoint.NewFromInt(1)
+	spread := height.Div(size.Sub(one))
 
 	grid := &Grid{
 		UpperPrice: upper,
@@ -83,7 +84,10 @@ func (g *Grid) CalculateGeometricPins() {
 
 func (g *Grid) CalculateArithmeticPins() {
 	g.calculator = func() []Pin {
-		return calculateArithmeticPins(g.LowerPrice, g.UpperPrice, g.Spread, g.TickSize)
+		one := fixedpoint.NewFromInt(1)
+		height := g.UpperPrice.Sub(g.LowerPrice)
+		spread := height.Div(g.Size.Sub(one))
+		return calculateArithmeticPins(g.LowerPrice, g.UpperPrice, spread, g.TickSize)
 	}
 
 	g.addPins(g.calculator())
