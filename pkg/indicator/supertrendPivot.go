@@ -10,17 +10,23 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var logst = logrus.WithField("indicator", "supertrend")
+// based on "Pivot Point Supertrend by LonesomeTheBlue" from tradingview
 
-//go:generate callbackgen -type Supertrend
-type Supertrend struct {
+var logpst = logrus.WithField("indicator", "pivotSupertrend")
+
+//go:generate callbackgen -type PivotSupertrend
+type PivotSupertrend struct {
 	types.SeriesBase
 	types.IntervalWindow
 	ATRMultiplier float64 `json:"atrMultiplier"`
+	PivotWindow   int     `json:"pivotWindow"`
 
-	AverageTrueRange *ATR
+	AverageTrueRange *ATR // Value must be set when initialized in strategy
 
-	trendPrices    floats.Slice // Value of the trend line (buy or sell)
+	PivotLow  *PivotLow  // Value must be set when initialized in strategy
+	PivotHigh *PivotHigh // Value must be set when initialized in strategy
+
+	trendPrices    floats.Slice // Tsl: value of the trend line (buy or sell)
 	supportLine    floats.Slice // The support line in an uptrend (green)
 	resistanceLine floats.Slice // The resistance line in a downtrend (red)
 
@@ -31,6 +37,11 @@ type Supertrend struct {
 	downtrendPrice         float64
 	previousDowntrendPrice float64
 
+	lastPp            float64
+	src               float64 // center
+	previousPivotHigh float64 // temp variable to save the last value
+	previousPivotLow  float64 // temp variable to save the last value
+
 	trend         types.Direction
 	previousTrend types.Direction
 	tradeSignal   types.Direction
@@ -39,11 +50,11 @@ type Supertrend struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *Supertrend) Last() float64 {
+func (inc *PivotSupertrend) Last() float64 {
 	return inc.trendPrices.Last()
 }
 
-func (inc *Supertrend) Index(i int) float64 {
+func (inc *PivotSupertrend) Index(i int) float64 {
 	length := inc.Length()
 	if length == 0 || length-i-1 < 0 {
 		return 0
@@ -51,11 +62,11 @@ func (inc *Supertrend) Index(i int) float64 {
 	return inc.trendPrices[length-i-1]
 }
 
-func (inc *Supertrend) Length() int {
+func (inc *PivotSupertrend) Length() int {
 	return len(inc.trendPrices)
 }
 
-func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
+func (inc *PivotSupertrend) Update(highPrice, lowPrice, closePrice float64) {
 	if inc.Window <= 0 {
 		panic("window must be greater than 0")
 	}
@@ -69,6 +80,13 @@ func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 		inc.trend = types.DirectionUp
 	}
 
+	inc.previousPivotLow = inc.PivotLow.Last()
+	inc.previousPivotHigh = inc.PivotHigh.Last()
+
+	// Update High / Low pivots
+	inc.PivotLow.Update(lowPrice)
+	inc.PivotHigh.Update(highPrice)
+
 	// Update ATR
 	inc.AverageTrueRange.Update(highPrice, lowPrice, closePrice)
 
@@ -80,16 +98,41 @@ func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 
 	inc.closePrice = closePrice
 
-	src := (highPrice + lowPrice) / 2
+	// Initialize lastPp as soon as pivots are made
+	if inc.lastPp == 0 || math.IsNaN(inc.lastPp) {
+		if inc.PivotHigh.Length() > 0 {
+			inc.lastPp = inc.PivotHigh.Last()
+		} else if inc.PivotLow.Length() > 0 {
+			inc.lastPp = inc.PivotLow.Last()
+		} else {
+			inc.lastPp = math.NaN()
+			return
+		}
+	}
+
+	// Set lastPp to the latest pivotPoint (only changed when new pivot is found)
+	if inc.PivotHigh.Last() != inc.previousPivotHigh {
+		inc.lastPp = inc.PivotHigh.Last()
+	} else if inc.PivotLow.Last() != inc.previousPivotLow {
+		inc.lastPp = inc.PivotLow.Last()
+	}
+
+	// calculate the Center line using pivot points
+	if inc.src == 0 || math.IsNaN(inc.src) {
+		inc.src = inc.lastPp
+	} else {
+		//weighted calculation
+		inc.src = (inc.src*2 + inc.lastPp) / 3
+	}
 
 	// Update uptrend
-	inc.uptrendPrice = src - inc.AverageTrueRange.Last()*inc.ATRMultiplier
+	inc.uptrendPrice = inc.src - inc.AverageTrueRange.Last()*inc.ATRMultiplier
 	if inc.previousClosePrice > inc.previousUptrendPrice {
 		inc.uptrendPrice = math.Max(inc.uptrendPrice, inc.previousUptrendPrice)
 	}
 
 	// Update downtrend
-	inc.downtrendPrice = src + inc.AverageTrueRange.Last()*inc.ATRMultiplier
+	inc.downtrendPrice = inc.src + inc.AverageTrueRange.Last()*inc.ATRMultiplier
 	if inc.previousClosePrice < inc.previousDowntrendPrice {
 		inc.downtrendPrice = math.Min(inc.downtrendPrice, inc.previousDowntrendPrice)
 	}
@@ -125,74 +168,50 @@ func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 	inc.supportLine.Push(inc.uptrendPrice)
 	inc.resistanceLine.Push(inc.downtrendPrice)
 
-	logst.Debugf("Update supertrend result: closePrice: %v, uptrendPrice: %v, downtrendPrice: %v, trend: %v,"+
+	logpst.Debugf("Update pivot point supertrend result: closePrice: %v, uptrendPrice: %v, downtrendPrice: %v, trend: %v,"+
 		" tradeSignal: %v, AverageTrueRange.Last(): %v", inc.closePrice, inc.uptrendPrice, inc.downtrendPrice,
 		inc.trend, inc.tradeSignal, inc.AverageTrueRange.Last())
 }
 
-func (inc *Supertrend) GetSignal() types.Direction {
+// GetSignal returns signal (Down, None or Up)
+func (inc *PivotSupertrend) GetSignal() types.Direction {
 	return inc.tradeSignal
 }
 
 // GetDirection return the current trend
-func (inc *Supertrend) Direction() types.Direction {
+func (inc *PivotSupertrend) Direction() types.Direction {
 	return inc.trend
 }
 
-// LastSupertrendSupport return the current supertrend support
-func (inc *Supertrend) LastSupertrendSupport() float64 {
+// LastSupertrendSupport return the current supertrend support value
+func (inc *PivotSupertrend) LastSupertrendSupport() float64 {
 	return inc.supportLine.Last()
 }
 
-// LastSupertrendResistance return the current supertrend resistance
-func (inc *Supertrend) LastSupertrendResistance() float64 {
+// LastSupertrendResistance return the current supertrend resistance value
+func (inc *PivotSupertrend) LastSupertrendResistance() float64 {
 	return inc.resistanceLine.Last()
 }
 
-var _ types.SeriesExtend = &Supertrend{}
+var _ types.SeriesExtend = &PivotSupertrend{}
 
-func (inc *Supertrend) PushK(k types.KLine) {
-	if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
+func (inc *PivotSupertrend) PushK(k types.KLine) {
+	if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
 		return
 	}
 
 	inc.Update(k.GetHigh().Float64(), k.GetLow().Float64(), k.GetClose().Float64())
 	inc.EndTime = k.EndTime.Time()
 	inc.EmitUpdate(inc.Last())
-
 }
 
-func (inc *Supertrend) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
+func (inc *PivotSupertrend) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
 	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
 }
 
-func (inc *Supertrend) LoadK(allKLines []types.KLine) {
+func (inc *PivotSupertrend) LoadK(allKLines []types.KLine) {
+	inc.SeriesBase.Series = inc
 	for _, k := range allKLines {
 		inc.PushK(k)
 	}
-}
-
-func (inc *Supertrend) CalculateAndUpdate(kLines []types.KLine) {
-	for _, k := range kLines {
-		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
-			continue
-		}
-
-		inc.PushK(k)
-	}
-
-	inc.EmitUpdate(inc.Last())
-	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
-}
-
-func (inc *Supertrend) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *Supertrend) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
