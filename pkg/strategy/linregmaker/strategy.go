@@ -118,6 +118,14 @@ type Strategy struct {
 	// UseDynamicQuantityAsAmount calculates amount instead of quantity
 	UseDynamicQuantityAsAmount bool `json:"useDynamicQuantityAsAmount"`
 
+	// MinProfitSpread is the minimal order price spread from the current average cost.
+	// For long position, you will only place sell order above the price (= average cost * (1 + minProfitSpread))
+	// For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
+	MinProfitSpread fixedpoint.Value `json:"minProfitSpread"`
+
+	// MinProfitDisableOn disables MinProfitSpread when position RoI drops below specified percentage
+	MinProfitDisableOn fixedpoint.Value `json:"minProfitDisableOn"`
+
 	// ExitMethods are various TP/SL methods
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
@@ -449,7 +457,7 @@ func (s *Strategy) getAllowedBalance() (baseQty, quoteQty fixedpoint.Value) {
 }
 
 // getCanBuySell returns the buy sell switches
-func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice fixedpoint.Value) (canBuy bool, canSell bool) {
+func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice, midPrice fixedpoint.Value) (canBuy bool, canSell bool) {
 	// By default, both buy and sell are on, which means we will place buy and sell orders
 	canBuy = true
 	canSell = true
@@ -482,11 +490,31 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 	if !s.isAllowOppositePosition() {
 		if s.mainTrendCurrent == types.DirectionUp && (s.Position.IsClosed() || s.Position.IsDust(askPrice)) {
 			canSell = false
-			log.Infof("Skip sell due to the long position is closed")
+			log.Infof("skip sell due to the long position is closed")
 		} else if s.mainTrendCurrent == types.DirectionDown && (s.Position.IsClosed() || s.Position.IsDust(bidPrice)) {
 			canBuy = false
-			log.Infof("Skip buy due to the short position is closed")
+			log.Infof("skip buy due to the short position is closed")
 		}
+	}
+
+	// Min profit
+	roi := s.Position.ROI(midPrice)
+	if roi.Compare(s.MinProfitDisableOn) >= 0 {
+		if s.Position.IsLong() && !s.Position.IsDust(askPrice) {
+			minProfitPrice := s.Position.AverageCost.Mul(fixedpoint.One.Add(s.MinProfitSpread))
+			if askPrice.Compare(minProfitPrice) < 0 {
+				canSell = false
+				log.Infof("askPrice %v is less than minProfitPrice %v. skip sell", askPrice, minProfitPrice)
+			}
+		} else if s.Position.IsShort() && s.Position.IsDust(bidPrice) {
+			minProfitPrice := s.Position.AverageCost.Mul(fixedpoint.One.Sub(s.MinProfitSpread))
+			if bidPrice.Compare(minProfitPrice) > 0 {
+				canBuy = false
+				log.Infof("bidPrice %v is greater than minProfitPrice %v. skip buy", bidPrice, minProfitPrice)
+			}
+		}
+	} else {
+		log.Infof("position RoI %v is less than MinProfitDisableOn %v. disable min profit protection", roi, s.MinProfitDisableOn)
 	}
 
 	// Check against account balance
@@ -495,20 +523,20 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 		if quoteQty.Compare(fixedpoint.Zero) <= 0 {
 			if s.Position.IsLong() {
 				canBuy = false
-				log.Infof("Skip buy due to the account has no available balance")
+				log.Infof("skip buy due to the account has no available balance")
 			} else if s.Position.IsShort() {
 				canSell = false
-				log.Infof("Skip sell due to the account has no available balance")
+				log.Infof("skip sell due to the account has no available balance")
 			}
 		}
 	} else {
 		if buyQuantity.Compare(quoteQty.Div(bidPrice)) > 0 { // Spot
 			canBuy = false
-			log.Infof("Skip buy due to the account has no available balance")
+			log.Infof("skip buy due to the account has no available balance")
 		}
 		if sellQuantity.Compare(baseQty) > 0 {
 			canSell = false
-			log.Infof("Skip sell due to the account has no available balance")
+			log.Infof("skip sell due to the account has no available balance")
 		}
 	}
 
@@ -762,7 +790,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		buyOrder, sellOrder := s.getOrderForms(buyQuantity, bidPrice, sellQuantity, askPrice)
 
-		canBuy, canSell := s.getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice)
+		canBuy, canSell := s.getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice, midPrice)
 
 		// Submit orders
 		var submitOrders []types.SubmitOrder
