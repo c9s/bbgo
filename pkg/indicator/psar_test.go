@@ -27,14 +27,13 @@ func Test_PSAR(t *testing.T) {
 	psar := PSAR{
 		IntervalWindow: types.IntervalWindow{Window: 2},
 	}
-	var klines []types.KLine
 	for _, v := range input {
-		klines = append(klines, types.KLine{
+		kline := types.KLine{
 			High: v,
 			Low:  v,
-		})
+		}
+		psar.PushK(kline)
 	}
-	psar.CalculateAndUpdate(klines)
 	assert.Equal(t, psar.Length(), 29)
 	assert.Equal(t, psar.AF, 0.04)
 	assert.Equal(t, psar.Last(), 0.16)

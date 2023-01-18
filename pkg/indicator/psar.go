@@ -115,26 +115,10 @@ func (inc *PSAR) Update(high, low float64) {
 
 var _ types.SeriesExtend = &PSAR{}
 
-func (inc *PSAR) CalculateAndUpdate(kLines []types.KLine) {
-	for _, k := range kLines {
-		if inc.EndTime != zeroTime && !k.EndTime.After(inc.EndTime) {
-			continue
-		}
-		inc.Update(k.High.Float64(), k.Low.Float64())
-	}
-
-	inc.EmitUpdate(inc.Last())
-	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
+func (inc *PSAR) PushK(k types.KLine) {
+	inc.Update(k.High.Float64(), k.Low.Float64())
 }
 
-func (inc *PSAR) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *PSAR) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
+func (inc *PSAR) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {
+	target.OnKLineClosed(types.KLineWith(symbol, interval, inc.PushK))
 }
