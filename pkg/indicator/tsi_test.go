@@ -27,7 +27,9 @@ func Test_TSI(t *testing.T) {
 	}
 	tsi := TSI{}
 	klines := buildKLines(input)
-	tsi.CalculateAndUpdate(klines)
+	for _, kline := range klines {
+		tsi.PushK(kline)
+	}
 	assert.Equal(t, tsi.Length(), 29)
 	Delta := 1.5e-2
 	assert.InDelta(t, tsi.Last(), 22.89, Delta)
