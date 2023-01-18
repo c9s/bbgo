@@ -7,6 +7,13 @@ import (
 )
 
 // Geometric Moving Average
+//
+// The Geometric Moving Average (GMA) is a technical analysis indicator that uses the geometric mean of a set of data points instead of
+// the simple arithmetic mean used by traditional moving averages. It is calculated by taking the nth root of the product of the last n
+// data points, where n is the length of the moving average. The resulting average is then plotted on the price chart as a line, which can
+// be used to make predictions about future price movements. Because the GMA gives more weight to recent data points, it is typically more
+// responsive to changes in the underlying data than a simple moving average.
+
 //go:generate callbackgen -type GMA
 type GMA struct {
 	types.SeriesBase

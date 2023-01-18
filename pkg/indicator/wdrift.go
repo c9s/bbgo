@@ -23,23 +23,23 @@ type WeightedDrift struct {
 }
 
 func (inc *WeightedDrift) Update(value float64, weight float64) {
-	win := 10
-	if inc.Window > win {
-		win = inc.Window
+	if weight == 0 {
+		inc.LastValue = value
+		return
 	}
 	if inc.chng == nil {
 		inc.SeriesBase.Series = inc
 		if inc.MA == nil {
 			inc.MA = &SMA{IntervalWindow: types.IntervalWindow{Interval: inc.Interval, Window: inc.Window}}
 		}
-		inc.Weight = types.NewQueue(win)
+		inc.Weight = types.NewQueue(inc.Window)
 		inc.chng = types.NewQueue(inc.Window)
 		inc.LastValue = value
 		inc.Weight.Update(weight)
 		return
 	}
 	inc.Weight.Update(weight)
-	base := inc.Weight.Lowest(win)
+	base := inc.Weight.Lowest(inc.Window)
 	multiplier := int(weight / base)
 	var chng float64
 	if value == 0 {

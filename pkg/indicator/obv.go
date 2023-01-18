@@ -12,6 +12,13 @@ obv implements on-balance volume indicator
 
 On-Balance Volume (OBV) Definition
 - https://www.investopedia.com/terms/o/onbalancevolume.asp
+
+On-Balance Volume (OBV) is a technical analysis indicator that uses volume information to predict changes in stock price.
+The idea behind OBV is that volume precedes price: when the OBV is rising, it means that buyers are becoming more aggressive and
+that the stock price is likely to follow suit. When the OBV is falling, it indicates that sellers are becoming more aggressive and
+that the stock price is likely to decrease. OBV is calculated by adding the volume on days when the stock price closes higher and
+subtracting the volume on days when the stock price closes lower. This running total forms the OBV line, which can then be used
+to make predictions about future stock price movements.
 */
 //go:generate callbackgen -type OBV
 type OBV struct {

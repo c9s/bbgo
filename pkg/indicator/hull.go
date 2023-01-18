@@ -8,6 +8,12 @@ import (
 
 // Refer: Hull Moving Average
 // Refer URL: https://fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/hull-moving-average
+//
+// The Hull Moving Average (HMA) is a technical analysis indicator that uses a weighted moving average to reduce the lag in simple moving averages.
+// It was developed by Alan Hull, who sought to create a moving average that was both fast and smooth. The HMA is calculated by first taking
+// the weighted moving average of the input data using a weighting factor of W, where W is the square root of the length of the moving average.
+// The result is then double-smoothed by taking the weighted moving average of this result using a weighting factor of W/2. This final average
+// forms the HMA line, which can be used to make predictions about future price movements.
 //go:generate callbackgen -type HULL
 type HULL struct {
 	types.SeriesBase

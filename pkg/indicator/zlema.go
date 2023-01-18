@@ -7,6 +7,12 @@ import (
 
 // Refer: Zero Lag Exponential Moving Average
 // Refer URL: https://en.wikipedia.org/wiki/Zero_lag_exponential_moving_average
+//
+// The Zero Lag Exponential Moving Average (ZLEMA) is a technical analysis indicator that is used to smooth price data and reduce the
+// lag associated with traditional moving averages. It is calculated by taking the exponentially weighted moving average of the input
+// data, and then applying a digital filter to the resulting average to eliminate any remaining lag. This filtered average is then
+// plotted on the price chart as a line, which can be used to make predictions about future price movements. The ZLEMA is typically more
+// responsive to changes in the underlying data than a simple moving average, but may be less reliable in trending markets.
 
 //go:generate callbackgen -type ZLEMA
 type ZLEMA struct {

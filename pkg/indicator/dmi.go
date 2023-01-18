@@ -10,8 +10,15 @@ import (
 // Refer: https://github.com/twopirllc/pandas-ta/blob/main/pandas_ta/trend/adx.py
 //
 // Directional Movement Index
-// an indicator developed by J. Welles Wilder in 1978 that identifies in which
-// direction the price of an asset is moving.
+//
+// The Directional Movement Index (DMI) is a technical analysis indicator that is used to identify the direction and strength of a trend
+// in a security's price. It was developed by J. Welles Wilder and is based on the concept of the +DI and -DI lines, which measure the strength
+// of upward and downward price movements, respectively. The DMI is calculated by taking the difference between the +DI and -DI lines, and then
+// smoothing the result using a moving average. This resulting line is called the Average Directional Index (ADX), and is used to identify whether
+// a security is trending or not. If the ADX is above a certain threshold, typically 20, it indicates that the security is in a strong trend,
+// and if it is below that threshold it indicates that the security is in a sideways or choppy market. The DMI can be used by traders to confirm
+// the direction and strength of a trend, or to identify potential entry and exit points for trades.
+
 //go:generate callbackgen -type DMI
 type DMI struct {
 	types.IntervalWindow

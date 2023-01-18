@@ -9,6 +9,13 @@ import (
 
 // Refer: Variable Index Dynamic Average
 // Refer URL: https://metatrader5.com/en/terminal/help/indicators/trend_indicators/vida
+// The Variable Index Dynamic Average (VIDYA) is a technical analysis indicator that is used to smooth price data and reduce the lag
+// associated with traditional moving averages. It is calculated by taking the weighted moving average of the input data, with the
+// weighting factors determined using a variable index that is based on the standard deviation of the data and the specified length of
+// the moving average. This resulting average is then plotted on the price chart as a line, which can be used to make predictions about
+// future price movements. The VIDYA is typically more responsive to changes in the underlying data than a simple moving average, but may
+// be less reliable in trending markets.
+
 //go:generate callbackgen -type VIDYA
 type VIDYA struct {
 	types.SeriesBase
