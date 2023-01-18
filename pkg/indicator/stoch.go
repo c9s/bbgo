@@ -9,12 +9,16 @@ import (
 
 const DPeriod int = 3
 
-/*
-stoch implements stochastic oscillator indicator
+// Stochastic Oscillator
+// - https://www.investopedia.com/terms/s/stochasticoscillator.asp
+//
+// The Stochastic Oscillator is a technical analysis indicator that is used to identify potential overbought or oversold conditions
+// in a security's price. It is calculated by taking the current closing price of the security and comparing it to the high and low prices
+// over a specified period of time. This comparison is then plotted as a line on the price chart, with values above 80 indicating overbought
+// conditions and values below 20 indicating oversold conditions. The Stochastic Oscillator can be used by traders to identify potential
+// entry and exit points for trades, or to confirm other technical analysis signals. It is typically used in conjunction with other indicators
+// to provide a more comprehensive view of the security's price.
 
-Stochastic Oscillator
-- https://www.investopedia.com/terms/s/stochasticoscillator.asp
-*/
 //go:generate callbackgen -type STOCH
 type STOCH struct {
 	types.IntervalWindow

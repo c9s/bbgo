@@ -12,6 +12,17 @@ import (
 
 var logst = logrus.WithField("indicator", "supertrend")
 
+// The Super Trend is a technical analysis indicator that is used to identify potential buy and sell signals in a security's price. It is
+// calculated by combining the exponential moving average (EMA) and the average true range (ATR) of the security's price, and then plotting
+// the resulting value on the price chart as a line. The Super Trend line is typically used to identify potential entry and exit points
+// for trades, and can be used to confirm other technical analysis signals. It is typically more responsive to changes in the underlying
+// data than other trend-following indicators, but may be less reliable in trending markets. It is important to note that the Super Trend is a
+// lagging indicator, which means that it may not always provide accurate or timely signals.
+//
+// To use Super Trend, identify potential entry and exit points for trades by looking for crossovers or divergences between the Super Trend line
+// and the security's price. For example, a buy signal may be generated when the Super Trend line crosses above the security's price, while a sell
+// signal may be generated when the Super Trend line crosses below the security's price.
+
 //go:generate callbackgen -type Supertrend
 type Supertrend struct {
 	types.SeriesBase

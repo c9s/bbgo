@@ -11,6 +11,14 @@ import (
 // ATRP is the average true range percentage
 // See also https://www.fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/atrp
 //
+// The Average True Range Percentage (ATRP) is a technical analysis indicator that measures the volatility of a security's price. It is
+// calculated by dividing the Average True Range (ATR) of the security by its closing price, and then multiplying the result by 100 to convert
+// it to a percentage. The ATR is a measure of the range of a security's price, taking into account gaps between trading periods and any limit
+// moves (sharp price movements that are allowed under certain exchange rules). The ATR is typically smoothed using a moving average to make it
+// more responsive to changes in the underlying price data. The ATRP is a useful indicator for traders because it provides a way to compare the
+// volatility of different securities, regardless of their individual prices. It can also be used to identify potential entry and exit points
+// for trades based on changes in the security's volatility.
+//
 // Calculation:
 //
 //     ATRP = (Average True Range / Close) * 100
