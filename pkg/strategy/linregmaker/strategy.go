@@ -426,22 +426,17 @@ func (s *Strategy) getAllowedBalance() (baseQty, quoteQty fixedpoint.Value) {
 	quoteBalance, hasQuoteBalance := balances[s.Market.QuoteCurrency]
 	lastPrice, _ := s.session.LastPrice(s.Symbol)
 
-	if bbgo.IsBackTesting {
-		if !hasQuoteBalance {
-			baseQty = fixedpoint.Zero
-			quoteQty = fixedpoint.Zero
-		} else {
-			baseQty = quoteBalance.Available.Div(lastPrice)
-			quoteQty = quoteBalance.Available
-		}
-	} else if s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures {
+	if bbgo.IsBackTesting { // Backtesting
+		baseQty = s.Position.Base
+		quoteQty = quoteBalance.Available - fixedpoint.Max(s.Position.Quote.Mul(fixedpoint.Two), fixedpoint.Zero)
+	} else if s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures { // Leveraged
 		quoteQ, err := bbgo.CalculateQuoteQuantity(s.ctx, s.session, s.Market.QuoteCurrency, s.Leverage)
 		if err != nil {
 			quoteQ = fixedpoint.Zero
 		}
 		quoteQty = quoteQ
 		baseQty = quoteQ.Div(lastPrice)
-	} else {
+	} else { // Spot
 		if !hasBaseBalance {
 			baseQty = fixedpoint.Zero
 		} else {
@@ -465,9 +460,9 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 
 	// Check if current position > maxExposurePosition
 	if s.Position.GetBase().Abs().Compare(s.MaxExposurePosition) > 0 {
-		if s.mainTrendCurrent == types.DirectionUp {
+		if s.Position.IsLong() {
 			canBuy = false
-		} else if s.mainTrendCurrent == types.DirectionDown {
+		} else if s.Position.IsShort() {
 			canSell = false
 		}
 		log.Infof("current position %v larger than max exposure %v, skip increase position", s.Position.GetBase().Abs(), s.MaxExposurePosition)
@@ -589,6 +584,7 @@ func (s *Strategy) getOrderForms(buyQuantity, bidPrice, sellQuantity, askPrice f
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	log.Debugf("%v", orderExecutor) // Here just to suppress GoLand warning
 	// initial required information
 	s.session = session
 	s.ctx = ctx
