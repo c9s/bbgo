@@ -123,8 +123,8 @@ type Strategy struct {
 	// For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
 	MinProfitSpread fixedpoint.Value `json:"minProfitSpread"`
 
-	// MinProfitDisableOn disables MinProfitSpread when position RoI drops below specified percentage
-	MinProfitDisableOn fixedpoint.Value `json:"minProfitDisableOn"`
+	// MinProfitActivationRate activates MinProfitSpread when position RoI higher than the specified percentage
+	MinProfitActivationRate fixedpoint.Value `json:"minProfitActivationRate"`
 
 	// ExitMethods are various TP/SL methods
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
@@ -499,7 +499,7 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice, 
 
 	// Min profit
 	roi := s.Position.ROI(midPrice)
-	if roi.Compare(s.MinProfitDisableOn) >= 0 {
+	if roi.Compare(s.MinProfitActivationRate) >= 0 {
 		if s.Position.IsLong() && !s.Position.IsDust(askPrice) {
 			minProfitPrice := s.Position.AverageCost.Mul(fixedpoint.One.Add(s.MinProfitSpread))
 			if askPrice.Compare(minProfitPrice) < 0 {
@@ -514,7 +514,7 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice, 
 			}
 		}
 	} else {
-		log.Infof("position RoI %v is less than MinProfitDisableOn %v. disable min profit protection", roi, s.MinProfitDisableOn)
+		log.Infof("position RoI %v is less than minProfitActivationRate %v. min profit protection is not active", roi, s.MinProfitActivationRate)
 	}
 
 	// Check against account balance

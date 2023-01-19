@@ -168,8 +168,8 @@ exchangeStrategies:
     # For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
     minProfitSpread: 0.1%
 
-    # minProfitDisableOn disables MinProfitSpread when position RoI drops below specified percentage
-    minProfitDisableOn: -10%
+    # minProfitActivationRate activates MinProfitSpread when position RoI higher than the specified percentage
+    minProfitActivationRate: -10%
 
     exits:
       # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
