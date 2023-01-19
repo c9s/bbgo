@@ -59,6 +59,9 @@ exchangeStrategies:
     # For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
     minProfitSpread: 0.1%
 
+    # minProfitActivationRate activates MinProfitSpread when position RoI higher than the specified percentage
+    minProfitActivationRate: -10%
+
     # trendEMA detects the trend by a given EMA
     # when EMA goes up (the last > the previous), allow buy and sell
     # when EMA goes down (the last < the previous), disable buy, allow sell
