@@ -66,10 +66,17 @@ func initMetrics(extendedLabels []string) {
 	)
 }
 
+var metricsRegistered = false
+
 func registerMetrics() {
+	if metricsRegistered {
+		return
+	}
+
 	prometheus.MustRegister(
 		metricsGridNumOfOrders,
 		metricsGridProfit,
 		metricsGridOrderPrices,
 	)
+	metricsRegistered = true
 }
