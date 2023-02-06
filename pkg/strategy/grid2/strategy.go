@@ -140,6 +140,9 @@ type Strategy struct {
 	gridProfitCallbacks []func(stats *GridProfitStats, profit *GridProfit)
 	gridClosedCallbacks []func()
 	gridErrorCallbacks  []func(err error)
+
+	// mu is used for locking the grid object field, avoid double grid opening
+	mu sync.Mutex
 }
 
 func (s *Strategy) ID() string {
@@ -764,6 +767,9 @@ func (s *Strategy) newGrid() *Grid {
 // 2) if baseInvestment, quoteInvestment is set, then we should calculate the quantity from the given base investment and quote investment.
 func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	// grid object guard
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.grid != nil {
 		return nil
 	}
@@ -1151,7 +1157,10 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 
 	s.logger.Infof("GRID RECOVER: found %d filled grid orders", len(filledOrders))
 
+	s.mu.Lock()
 	s.grid = grid
+	s.mu.Unlock()
+
 	for _, o := range filledOrders {
 		s.processFilledOrder(o)
 	}
