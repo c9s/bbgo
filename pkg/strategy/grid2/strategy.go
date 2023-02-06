@@ -737,11 +737,12 @@ func (s *Strategy) OpenGrid(ctx context.Context) error {
 
 // CloseGrid closes the grid orders
 func (s *Strategy) CloseGrid(ctx context.Context) error {
+	s.logger.Infof("closing %s grid", s.Symbol)
+
 	bbgo.Sync(ctx, s)
 
 	// now we can cancel the open orders
 	s.logger.Infof("canceling grid orders...")
-
 	if err := s.orderExecutor.GracefulCancel(ctx); err != nil {
 		return err
 	}
