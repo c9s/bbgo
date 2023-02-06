@@ -137,3 +137,43 @@ func (s *GridProfitStats) SlackAttachment() slack.Attachment {
 		Footer: footer,
 	}
 }
+
+func (s *GridProfitStats) String() string {
+	return s.PlainText()
+}
+
+func (s *GridProfitStats) PlainText() string {
+	var o string
+
+	o = fmt.Sprintf("%s Grid Profit Stats", s.Symbol)
+
+	o += fmt.Sprintf(" Arbitrage count: %d", s.ArbitrageCount)
+
+	if !s.FloatProfit.IsZero() {
+		o += " Float profit: " + style.PnLSignString(s.FloatProfit)
+	}
+
+	if !s.GridProfit.IsZero() {
+		o += " Grid profit: " + style.PnLSignString(s.GridProfit)
+	}
+
+	if !s.TotalQuoteProfit.IsZero() {
+		o += " Total quote profit: " + style.PnLSignString(s.TotalQuoteProfit) + " " + s.Market.QuoteCurrency
+	}
+
+	if !s.TotalBaseProfit.IsZero() {
+		o += " Total base profit: " + style.PnLSignString(s.TotalBaseProfit) + " " + s.Market.BaseCurrency
+	}
+
+	if len(s.TotalFee) > 0 {
+		for feeCurrency, fee := range s.TotalFee {
+			o += fmt.Sprintf(" Fee (%s)", feeCurrency) + fee.String() + " " + feeCurrency
+		}
+	}
+
+	if s.Since != nil {
+		o += fmt.Sprintf(" Since %s", s.Since.String())
+	}
+
+	return o
+}
