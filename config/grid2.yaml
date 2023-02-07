@@ -100,7 +100,7 @@ exchangeStrategies:
     ## There are 3 kinds of setup
     ## NOTICE: you can only choose one, uncomment the config to enable it
     ##
-    ## 1) fixed amount: amount is the quote unit (e.g. USDT in BTCUSDT)
+    ## 1) fixed amount: amount is the quote unit (e.g. 10 USDT in BTCUSDT)
     # amount: 10.0
 
     ## 2) fixed quantity: it will use your balance to place orders with the fixed quantity. e.g. 0.001 BTC
