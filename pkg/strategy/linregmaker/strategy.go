@@ -432,7 +432,7 @@ func (s *Strategy) getAllowedBalance() (baseQty, quoteQty fixedpoint.Value) {
 
 	if bbgo.IsBackTesting { // Backtesting
 		baseQty = s.Position.Base
-		quoteQty = quoteBalance.Available - fixedpoint.Max(s.Position.Quote.Mul(fixedpoint.Two), fixedpoint.Zero)
+		quoteQty = quoteBalance.Available.Sub(fixedpoint.Max(s.Position.Quote.Mul(fixedpoint.Two), fixedpoint.Zero))
 	} else if s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures { // Leveraged
 		quoteQ, err := bbgo.CalculateQuoteQuantity(s.ctx, s.session, s.Market.QuoteCurrency, s.Leverage)
 		if err != nil {
