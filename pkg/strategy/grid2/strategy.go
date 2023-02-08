@@ -115,6 +115,9 @@ type Strategy struct {
 	// PrometheusLabels will be used as the base prometheus labels
 	PrometheusLabels prometheus.Labels `json:"prometheusLabels"`
 
+	// OrderGroupID is the group ID used for the strategy instance for canceling orders
+	OrderGroupID uint32 `json:"orderGroupID"`
+
 	// FeeRate is used for calculating the minimal profit spread.
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
@@ -130,9 +133,6 @@ type Strategy struct {
 
 	orderExecutor    OrderExecutor
 	historicalTrades *bbgo.TradeStore
-
-	// groupID is the group ID used for the strategy instance for canceling orders
-	groupID uint32
 
 	logger *logrus.Entry
 
@@ -1328,7 +1328,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		"symbol": s.Symbol,
 	})
 
-	s.groupID = util.FNV32(instanceID)
+	if s.OrderGroupID == 0 {
+		s.OrderGroupID = util.FNV32(instanceID)
+	}
 
 	if s.AutoRange != nil {
 		indicatorSet := session.StandardIndicatorSet(s.Symbol)
