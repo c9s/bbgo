@@ -29,7 +29,13 @@ func OnShutdown(ctx context.Context, f ShutdownHandler) {
 }
 
 func Shutdown(shutdownCtx context.Context) {
-	logrus.Infof("shutting down...")
+
 	isolatedContext := GetIsolationFromContext(shutdownCtx)
+	if isolatedContext == defaultIsolation {
+		logrus.Infof("bbgo shutting down...")
+	} else {
+		logrus.Infof("bbgo shutting down (custom isolation)...")
+	}
+
 	isolatedContext.gracefulShutdown.Shutdown(shutdownCtx)
 }
