@@ -1402,7 +1402,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		metricsGridProfit.With(labels).Set(stats.TotalQuoteProfit.Float64())
 	})
 
-	// TODO: detect if there are previous grid orders on the order book
+	// detect if there are previous grid orders on the order book
 	if s.ClearOpenOrdersWhenStart {
 		if err := s.clearOpenOrders(ctx, session); err != nil {
 			return err
