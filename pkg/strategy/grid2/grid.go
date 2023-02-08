@@ -137,6 +137,11 @@ func (g *Grid) NextLowerPin(price fixedpoint.Value) (Pin, bool) {
 	return Pin(fixedpoint.Zero), false
 }
 
+func (g *Grid) HasPrice(price fixedpoint.Value) bool {
+	i := g.SearchPin(price)
+	return fixedpoint.Value(g.Pins[i]).Compare(price) == 0
+}
+
 func (g *Grid) SearchPin(price fixedpoint.Value) int {
 	i := sort.Search(len(g.Pins), func(i int) bool {
 		a := fixedpoint.Value(g.Pins[i])

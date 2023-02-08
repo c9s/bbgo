@@ -110,6 +110,8 @@ type Strategy struct {
 	// If this is set, when bbgo started, it will clear the open orders in the same market (by symbol)
 	ClearOpenOrdersWhenStart bool `json:"clearOpenOrdersWhenStart"`
 
+	ClearOpenOrdersIfMismatch bool `json:"clearOpenOrdersIfMismatch"`
+
 	ResetPositionWhenStart bool `json:"resetPositionWhenStart"`
 
 	// PrometheusLabels will be used as the base prometheus labels
@@ -1407,20 +1409,33 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		}
 	}
 
-	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
-	if err != nil {
-		return err
+	if s.ClearOpenOrdersIfMismatch {
+		mismatch, err := s.openOrdersMismatches(ctx, session)
+		if err != nil {
+			s.logger.WithError(err).Errorf("clearOpenOrdersIfMismatch error")
+		} else if mismatch {
+			if err2 := s.clearOpenOrders(ctx, session); err2 != nil {
+				s.logger.WithError(err2).Errorf("clearOpenOrders error")
+			}
+		}
 	}
 
-	if s.RecoverOrdersWhenStart && len(openOrders) > 0 {
+	if s.RecoverOrdersWhenStart {
+		openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+		if err != nil {
+			return err
+		}
+
 		s.logger.Infof("recoverWhenStart is set, found %d open orders, trying to recover grid orders...", len(openOrders))
 
-		historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
-		if !implemented {
-			s.logger.Warn("ExchangeTradeHistoryService is not implemented, can not recover grid")
-		} else {
-			if err := s.recoverGrid(ctx, historyService, openOrders); err != nil {
-				return errors.Wrap(err, "recover grid error")
+		if len(openOrders) > 0 {
+			historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
+			if !implemented {
+				s.logger.Warn("ExchangeTradeHistoryService is not implemented, can not recover grid")
+			} else {
+				if err := s.recoverGrid(ctx, historyService, openOrders); err != nil {
+					return errors.Wrap(err, "recover grid error")
+				}
 			}
 		}
 	}
@@ -1460,4 +1475,28 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	return nil
+}
+
+// openOrdersMismatches verifies if the open orders are on the grid pins
+// return true if mismatches
+func (s *Strategy) openOrdersMismatches(ctx context.Context, session *bbgo.ExchangeSession) (bool, error) {
+	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		return false, err
+	}
+
+	if len(openOrders) == 0 {
+		return false, nil
+	}
+
+	grid := s.newGrid()
+	for _, o := range openOrders {
+		// if any of the open order is not on the grid, or out of the range
+		// we should cancel all of them
+		if !grid.HasPrice(o.Price) || grid.OutOfRange(o.Price) {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
