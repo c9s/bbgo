@@ -956,7 +956,8 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				})
 				usedBase = usedBase.Add(quantity)
 			} else if i > 0 {
-				// next price
+				// if we don't have enough base asset
+				// then we need to place a buy order at the next price.
 				nextPin := pins[i-1]
 				nextPrice := fixedpoint.Value(nextPin)
 				submitOrders = append(submitOrders, types.SubmitOrder{
@@ -975,7 +976,14 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				// skip i == 0
 			}
 		} else {
+			// if price spread is not enabled, and we have already placed a sell order index on the top of this price,
+			// then we should skip
 			if s.ProfitSpread.IsZero() && i+1 == si {
+				continue
+			}
+
+			// should never place a buy order at the upper price
+			if i == len(pins)-1 {
 				continue
 			}
 
