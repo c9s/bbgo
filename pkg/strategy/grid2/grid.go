@@ -40,12 +40,15 @@ func calculateArithmeticPins(lower, upper, spread, tickSize fixedpoint.Value) []
 	var ts = tickSize.Float64()
 	var prec = int(math.Round(math.Log10(ts) * -1.0))
 	var pow10 = math.Pow10(prec)
-	for p := lower; p.Compare(upper) <= 0; p = p.Add(spread) {
+	for p := lower; p.Compare(upper.Sub(spread)) <= 0; p = p.Add(spread) {
 		pp := math.Round(p.Float64()*pow10*10.0) / 10.0
 		pp = math.Trunc(pp) / pow10
 		pin := Pin(fixedpoint.NewFromFloat(pp))
 		pins = append(pins, pin)
 	}
+
+	// this makes sure there is no error at the upper price
+	pins = append(pins, Pin(upper))
 
 	return pins
 }
