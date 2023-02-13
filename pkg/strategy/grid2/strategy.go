@@ -166,8 +166,8 @@ func (s *Strategy) Validate() error {
 		}
 	}
 
-	if s.GridNum == 0 {
-		return fmt.Errorf("gridNum can not be zero")
+	if s.GridNum == 0 || s.GridNum == 1 {
+		return fmt.Errorf("gridNum can not be zero or one")
 	}
 
 	if !s.SkipSpreadCheck {
