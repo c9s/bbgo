@@ -567,6 +567,11 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 				continue
 			}
 
+			// should never place a buy order at the upper price
+			if i == len(pins)-1 {
+				continue
+			}
+
 			totalQuotePrice = totalQuotePrice.Add(price)
 		}
 	}
@@ -642,6 +647,11 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 		} else {
 			// for orders that buy
 			if s.ProfitSpread.IsZero() && i+1 == si {
+				continue
+			}
+
+			// should never place a buy order at the upper price
+			if i == len(pins)-1 {
 				continue
 			}
 
