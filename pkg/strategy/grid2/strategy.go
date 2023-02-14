@@ -795,18 +795,18 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	}
 
 	// check if base and quote are enough
+	var totalBase = fixedpoint.Zero
+	var totalQuote = fixedpoint.Zero
+
 	baseBalance, ok := session.Account.Balance(s.Market.BaseCurrency)
-	if !ok {
-		return fmt.Errorf("base %s balance not found", s.Market.BaseCurrency)
+	if ok {
+		totalBase = baseBalance.Available
 	}
 
 	quoteBalance, ok := session.Account.Balance(s.Market.QuoteCurrency)
-	if !ok {
-		return fmt.Errorf("quote %s balance not found", s.Market.QuoteCurrency)
+	if ok {
+		totalQuote = quoteBalance.Available
 	}
-
-	totalBase := baseBalance.Available
-	totalQuote := quoteBalance.Available
 
 	// shift 1 grid because we will start from the buy order
 	// if the buy order is filled, then we will submit another sell order at the higher grid.
