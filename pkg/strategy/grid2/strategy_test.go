@@ -218,6 +218,7 @@ func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
 }
 
 func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
+
 	t.Run("quote quantity", func(t *testing.T) {
 		// quoteInvestment = (10,000 + 11,000 + 12,000 + 13,000 + 14,000) * q
 		// q = quoteInvestment / (10,000 + 11,000 + 12,000 + 13,000 + 14,000)
@@ -235,6 +236,23 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, number(0.2).String(), quantity.String())
+	})
+
+	t.Run("quote quantity #2", func(t *testing.T) {
+		s := newTestStrategy()
+		lastPrice := number(160.0)
+		quoteInvestment := number(1_000.0)
+		quantity, err := s.calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice, []Pin{
+			Pin(number(100.0)),  // buy
+			Pin(number(116.67)), // buy
+			Pin(number(133.33)), // buy
+			Pin(number(150.00)), // buy
+			Pin(number(166.67)), // buy
+			Pin(number(183.33)),
+			Pin(number(200.00)),
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, number(1.17647058).String(), quantity.String())
 	})
 
 	t.Run("profit spread", func(t *testing.T) {
