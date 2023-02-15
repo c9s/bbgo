@@ -120,6 +120,8 @@ type Strategy struct {
 	// OrderGroupID is the group ID used for the strategy instance for canceling orders
 	OrderGroupID uint32 `json:"orderGroupID"`
 
+	LogFields logrus.Fields `json:"logFields"`
+
 	// FeeRate is used for calculating the minimal profit spread.
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
@@ -1344,9 +1346,12 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.orderQueryService = service
 	}
 
-	s.logger = log.WithFields(logrus.Fields{
-		"symbol": s.Symbol,
-	})
+	if s.LogFields == nil {
+		s.LogFields = logrus.Fields{}
+	}
+
+	s.LogFields["symbol"] = s.Symbol
+	s.logger = log.WithFields(s.LogFields)
 
 	if s.OrderGroupID == 0 {
 		s.OrderGroupID = util.FNV32(instanceID)
