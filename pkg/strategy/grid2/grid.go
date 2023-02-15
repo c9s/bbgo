@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
@@ -43,8 +44,10 @@ func calculateArithmeticPins(lower, upper, spread, tickSize fixedpoint.Value) []
 	for p := lower; p.Compare(upper.Sub(spread)) <= 0; p = p.Add(spread) {
 		pp := math.Round(p.Float64()*pow10*10.0) / 10.0
 		pp = math.Trunc(pp) / pow10
-		pin := Pin(fixedpoint.NewFromFloat(pp))
-		pins = append(pins, pin)
+
+		pps := strconv.FormatFloat(pp, 'f', prec, 64)
+		price := fixedpoint.MustNewFromString(pps)
+		pins = append(pins, Pin(price))
 	}
 
 	// this makes sure there is no error at the upper price
@@ -210,5 +213,5 @@ func (g *Grid) updatePinsCache() {
 }
 
 func (g *Grid) String() string {
-	return fmt.Sprintf("GRID: priceRange: %f <=> %f size: %f spread: %f", g.LowerPrice.Float64(), g.UpperPrice.Float64(), g.Size.Float64(), g.Spread.Float64())
+	return fmt.Sprintf("GRID: priceRange: %f <=> %f size: %f spread: %f tickSize: %f", g.LowerPrice.Float64(), g.UpperPrice.Float64(), g.Size.Float64(), g.Spread.Float64(), g.TickSize.Float64())
 }
