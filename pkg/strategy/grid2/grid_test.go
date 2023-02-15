@@ -126,6 +126,19 @@ func TestGrid_NextLowerPin(t *testing.T) {
 	assert.Equal(t, Pin(fixedpoint.Zero), next)
 }
 
+func TestGrid_HasPrice(t *testing.T) {
+	upper := number(500.0)
+	lower := number(100.0)
+	size := number(5.0)
+	grid := NewGrid(lower, upper, size, number(0.01))
+	grid.CalculateArithmeticPins()
+
+	assert.True(t, grid.HasPrice(number(500.0)), "upper price")
+	assert.True(t, grid.HasPrice(number(100.0)), "lower price")
+	assert.True(t, grid.HasPrice(number(200.0)), "found 200 price ok")
+	assert.True(t, grid.HasPrice(number(300.0)), "found 300 price ok")
+}
+
 func TestGrid_NextHigherPin(t *testing.T) {
 	upper := number(500.0)
 	lower := number(100.0)
