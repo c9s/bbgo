@@ -77,7 +77,9 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 		s.QuantityOrAmount.Quantity = number(0.01)
 
 		lastPrice := number(15300)
-		orders, err := s.generateGridOrders(number(10000.0), number(0), lastPrice)
+		quoteInvestment := number(10000.0)
+		baseInvestment := number(0)
+		orders, err := s.generateGridOrders(quoteInvestment, baseInvestment, lastPrice)
 		assert.NoError(t, err)
 		if !assert.Equal(t, 10, len(orders)) {
 			for _, o := range orders {
@@ -96,6 +98,52 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 			{number(12000.0), types.SideTypeBuy},
 			{number(11000.0), types.SideTypeBuy},
 			{number(10000.0), types.SideTypeBuy},
+		}, orders)
+	})
+
+	t.Run("quote only + buy only", func(t *testing.T) {
+		s := newTestStrategy()
+		s.UpperPrice = number(0.9)
+		s.LowerPrice = number(0.1)
+		s.GridNum = 7
+		s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+		s.grid.CalculateArithmeticPins()
+
+		assert.Equal(t, []Pin{
+			Pin(number(0.1)),
+			Pin(number(0.23)),
+			Pin(number(0.36)),
+			Pin(number(0.50)),
+			Pin(number(0.63)),
+			Pin(number(0.76)),
+			Pin(number(0.9)),
+		}, s.grid.Pins, "pins are correct")
+
+		lastPrice := number(22100)
+		quoteInvestment := number(100.0)
+		baseInvestment := number(0)
+
+		quantity, err := s.calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice, s.grid.Pins)
+		assert.NoError(t, err)
+		assert.Equal(t, number(38.75968992).String(), quantity.String())
+
+		s.QuantityOrAmount.Quantity = quantity
+
+		orders, err := s.generateGridOrders(quoteInvestment, baseInvestment, lastPrice)
+		assert.NoError(t, err)
+		if !assert.Equal(t, 6, len(orders)) {
+			for _, o := range orders {
+				t.Logf("- %s %s", o.Price.String(), o.Side)
+			}
+		}
+
+		assertPriceSide(t, []PriceSideAssert{
+			{number(0.76), types.SideTypeBuy},
+			{number(0.63), types.SideTypeBuy},
+			{number(0.5), types.SideTypeBuy},
+			{number(0.36), types.SideTypeBuy},
+			{number(0.23), types.SideTypeBuy},
+			{number(0.1), types.SideTypeBuy},
 		}, orders)
 	})
 

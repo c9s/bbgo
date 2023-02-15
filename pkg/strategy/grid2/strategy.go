@@ -934,7 +934,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 	var submitOrders []types.SubmitOrder
 
 	// si is for sell order price index
-	var si = len(pins) - 1
+	var si = len(pins)
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
