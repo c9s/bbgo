@@ -1140,6 +1140,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	missingPrices := scanMissingPinPrices(orderBook, grid.Pins)
 	if numMissing := len(missingPrices); numMissing <= 1 {
 		s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
+		s.setGrid(grid)
 		return nil
 	} else {
 		s.logger.Infof("GRID RECOVER: found missing prices: %v", missingPrices)
@@ -1181,6 +1182,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	// if all orders on the order book are active orders, we don't need to recover.
 	if isCompleteGridOrderBook(orderBook, s.GridNum) {
 		s.logger.Infof("GRID RECOVER: all orders are active orders, do not need recover")
+		s.setGrid(grid)
 		return nil
 	}
 
@@ -1196,10 +1198,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	filledOrders := types.OrdersFilled(tmpOrders)
 
 	s.logger.Infof("GRID RECOVER: found %d filled grid orders", len(filledOrders))
-
-	s.mu.Lock()
-	s.grid = grid
-	s.mu.Unlock()
+	s.setGrid(grid)
 
 	for _, o := range filledOrders {
 		s.processFilledOrder(o)
@@ -1209,6 +1208,12 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 
 	debugGrid(grid, s.orderExecutor.ActiveMakerOrders())
 	return nil
+}
+
+func (s *Strategy) setGrid(grid *Grid) {
+	s.mu.Lock()
+	s.grid = grid
+	s.mu.Unlock()
 }
 
 // replayOrderHistory queries the closed order history from the API and rebuild the orderbook from the order history.
