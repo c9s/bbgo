@@ -955,6 +955,12 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
 		if price.Compare(lastPrice) >= 0 {
 			si = i
+
+			// do not place sell order when i == 0
+			if i == 0 {
+				continue
+			}
+
 			if usedBase.Add(quantity).Compare(totalBase) < 0 {
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
@@ -967,7 +973,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					Tag:         orderTag,
 				})
 				usedBase = usedBase.Add(quantity)
-			} else if i > 0 {
+			} else {
 				// if we don't have enough base asset
 				// then we need to place a buy order at the next price.
 				nextPin := pins[i-1]
@@ -984,8 +990,6 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				})
 				quoteQuantity := quantity.Mul(price)
 				usedQuote = usedQuote.Add(quoteQuantity)
-			} else if i == 0 {
-				// skip i == 0
 			}
 		} else {
 			// if price spread is not enabled, and we have already placed a sell order index on the top of this price,
