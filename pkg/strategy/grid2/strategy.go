@@ -36,6 +36,19 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+type PrettyPins []Pin
+
+func (pp PrettyPins) String() string {
+	var ss []string
+
+	for _, p := range pp {
+		price := fixedpoint.Value(p)
+		ss = append(ss, price.String())
+	}
+
+	return fmt.Sprintf("%v", ss)
+}
+
 //go:generate mockgen -destination=mocks/order_executor.go -package=mocks . OrderExecutor
 type OrderExecutor interface {
 	SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error)
@@ -955,6 +968,12 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
 		if price.Compare(lastPrice) >= 0 {
 			si = i
+
+			// do not place sell order when i == 0
+			if i == 0 {
+				continue
+			}
+
 			if usedBase.Add(quantity).Compare(totalBase) < 0 {
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
@@ -967,7 +986,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					Tag:         orderTag,
 				})
 				usedBase = usedBase.Add(quantity)
-			} else if i > 0 {
+			} else {
 				// if we don't have enough base asset
 				// then we need to place a buy order at the next price.
 				nextPin := pins[i-1]
@@ -984,8 +1003,6 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				})
 				quoteQuantity := quantity.Mul(price)
 				usedQuote = usedQuote.Add(quoteQuantity)
-			} else if i == 0 {
-				// skip i == 0
 			}
 		} else {
 			// if price spread is not enabled, and we have already placed a sell order index on the top of this price,
@@ -1078,11 +1095,10 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 	return nil
 }
 
-func (s *Strategy) recoverGrid(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
+func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
 	grid := s.newGrid()
 
-	// Add all open orders to the local order book
-	gridPriceMap := buildGridPriceMap(grid)
+	s.logger.Infof("GRID RECOVER: %s", grid.String())
 
 	lastOrderID := uint64(1)
 	now := time.Now()
@@ -1111,7 +1127,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	// Ensure that orders are grid orders
 	// The price must be at the grid pin
 	for _, openOrder := range openOrders {
-		if _, exists := gridPriceMap[openOrder.Price.String()]; exists {
+		if grid.HasPrice(openOrder.Price) {
 			orderBook.Add(openOrder)
 
 			// put the order back to the active order book so that we can receive order update
@@ -1120,11 +1136,14 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	}
 
 	// if all open orders are the grid orders, then we don't have to recover
+	s.logger.Infof("GRID RECOVER: verifying pins %v", PrettyPins(grid.Pins))
 	missingPrices := scanMissingPinPrices(orderBook, grid.Pins)
 	if numMissing := len(missingPrices); numMissing <= 1 {
 		s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
+		s.setGrid(grid)
 		return nil
 	} else {
+		s.logger.Infof("GRID RECOVER: found missing prices: %v", missingPrices)
 		// Note that for MAX Exchange, the order history API only uses fromID parameter to query history order.
 		// The time range does not matter.
 		// TODO: handle context correctly
@@ -1163,6 +1182,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	// if all orders on the order book are active orders, we don't need to recover.
 	if isCompleteGridOrderBook(orderBook, s.GridNum) {
 		s.logger.Infof("GRID RECOVER: all orders are active orders, do not need recover")
+		s.setGrid(grid)
 		return nil
 	}
 
@@ -1178,10 +1198,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	filledOrders := types.OrdersFilled(tmpOrders)
 
 	s.logger.Infof("GRID RECOVER: found %d filled grid orders", len(filledOrders))
-
-	s.mu.Lock()
-	s.grid = grid
-	s.mu.Unlock()
+	s.setGrid(grid)
 
 	for _, o := range filledOrders {
 		s.processFilledOrder(o)
@@ -1193,11 +1210,15 @@ func (s *Strategy) recoverGrid(ctx context.Context, historyService types.Exchang
 	return nil
 }
 
+func (s *Strategy) setGrid(grid *Grid) {
+	s.mu.Lock()
+	s.grid = grid
+	s.mu.Unlock()
+}
+
 // replayOrderHistory queries the closed order history from the API and rebuild the orderbook from the order history.
 // startTime, endTime is the time range of the order history.
 func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook *bbgo.ActiveOrderBook, historyService types.ExchangeTradeHistoryService, startTime, endTime time.Time, lastOrderID uint64) error {
-	gridPriceMap := buildGridPriceMap(grid)
-
 	// a simple guard, in reality, this startTime is not possible to exceed the endTime
 	// because the queries closed orders might still in the range.
 	orderIdChanged := true
@@ -1237,7 +1258,8 @@ func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook
 			}
 
 			// skip non-grid order prices
-			if _, ok := gridPriceMap[closedOrder.Price.String()]; !ok {
+
+			if !grid.HasPrice(closedOrder.Price) {
 				continue
 			}
 
@@ -1444,26 +1466,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		}
 	}
 
-	if s.RecoverOrdersWhenStart {
-		openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
-		if err != nil {
-			return err
-		}
-
-		s.logger.Infof("recoverWhenStart is set, found %d open orders, trying to recover grid orders...", len(openOrders))
-
-		if len(openOrders) > 0 {
-			historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
-			if !implemented {
-				s.logger.Warn("ExchangeTradeHistoryService is not implemented, can not recover grid")
-			} else {
-				if err := s.recoverGrid(ctx, historyService, openOrders); err != nil {
-					return errors.Wrap(err, "recover grid error")
-				}
-			}
-		}
-	}
-
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
@@ -1492,10 +1494,44 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	// if TriggerPrice is zero, that means we need to open the grid when start up
 	if s.TriggerPrice.IsZero() {
 		session.UserDataStream.OnStart(func() {
+			s.logger.Infof("user data stream started, initializing grid...")
+
+			// do recover only when triggerPrice is not set.
+			if s.RecoverOrdersWhenStart {
+				s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
+				if err := s.recoverGrid(ctx, session); err != nil {
+					log.WithError(err).Errorf("recover error")
+				}
+			}
+
 			if err := s.openGrid(ctx, session); err != nil {
 				s.logger.WithError(err).Errorf("failed to setup grid orders")
 			}
 		})
+	}
+
+	return nil
+}
+
+func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
+	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Infof("found %d open orders left on the %s order book", len(openOrders), s.Symbol)
+
+	// do recover only when openOrders > 0
+	if len(openOrders) > 0 {
+		historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
+		if !implemented {
+			s.logger.Warn("ExchangeTradeHistoryService is not implemented, can not recover grid")
+			return nil
+		}
+
+		if err := s.recoverGridWithOpenOrders(ctx, historyService, openOrders); err != nil {
+			return errors.Wrap(err, "recover grid error")
+		}
 	}
 
 	return nil
