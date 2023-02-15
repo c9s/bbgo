@@ -1351,6 +1351,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	s.LogFields["symbol"] = s.Symbol
+	s.LogFields["strategy"] = ID
 	s.logger = log.WithFields(s.LogFields)
 
 	if s.OrderGroupID == 0 {
