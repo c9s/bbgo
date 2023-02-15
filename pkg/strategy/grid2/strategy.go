@@ -579,8 +579,8 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 	return quoteInvestment.Div(totalQuotePrice), nil
 }
 
-func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice fixedpoint.Value, pins []Pin) (fixedpoint.Value, error) {
-	s.logger.Infof("calculating quantity by quote/base investment: %f / %f", baseInvestment.Float64(), quoteInvestment.Float64())
+func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice fixedpoint.Value, pins []Pin) (fixedpoint.Value, error) {
+	s.logger.Infof("calculating quantity by base/quote investment: %f / %f", baseInvestment.Float64(), quoteInvestment.Float64())
 	// q_p1 = q_p2 = q_p3 = q_p4
 	// baseInvestment = q_p1 + q_p2 + q_p3 + q_p4 + ....
 	// baseInvestment = numberOfSellOrders * q
@@ -824,7 +824,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	} else {
 		// calculate the quantity from the investment configuration
 		if !s.QuoteInvestment.IsZero() && !s.BaseInvestment.IsZero() {
-			quantity, err2 := s.calculateQuoteBaseInvestmentQuantity(s.QuoteInvestment, s.BaseInvestment, lastPrice, s.grid.Pins)
+			quantity, err2 := s.calculateBaseQuoteInvestmentQuantity(s.QuoteInvestment, s.BaseInvestment, lastPrice, s.grid.Pins)
 			if err2 != nil {
 				return err2
 			}
