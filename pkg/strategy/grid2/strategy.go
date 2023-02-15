@@ -614,7 +614,7 @@ func (s *Strategy) calculateQuoteBaseInvestmentQuantity(quoteInvestment, baseInv
 	}
 	s.logger.Infof("grid base investment sell orders: %d", maxNumberOfSellOrders)
 	if maxNumberOfSellOrders > 0 {
-		s.logger.Infof("grid base investment quantity range: %f <=> %f", minBaseQuantity.Float64(), maxBaseQuantity.Float64())
+		s.logger.Infof("grid base investment quantity: %f (base investment) / %d (number of sell orders) = %f (base quantity per order)", baseInvestment.Float64(), maxNumberOfSellOrders, maxBaseQuantity.Float64())
 	}
 
 	// calculate quantity with quote investment
