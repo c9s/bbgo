@@ -1078,7 +1078,7 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 	return nil
 }
 
-func (s *Strategy) recoverGrid(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
+func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
 	grid := s.newGrid()
 
 	// Add all open orders to the local order book
@@ -1444,26 +1444,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		}
 	}
 
-	if s.RecoverOrdersWhenStart {
-		openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
-		if err != nil {
-			return err
-		}
-
-		s.logger.Infof("recoverWhenStart is set, found %d open orders, trying to recover grid orders...", len(openOrders))
-
-		if len(openOrders) > 0 {
-			historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
-			if !implemented {
-				s.logger.Warn("ExchangeTradeHistoryService is not implemented, can not recover grid")
-			} else {
-				if err := s.recoverGrid(ctx, historyService, openOrders); err != nil {
-					return errors.Wrap(err, "recover grid error")
-				}
-			}
-		}
-	}
-
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
@@ -1492,10 +1472,42 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	// if TriggerPrice is zero, that means we need to open the grid when start up
 	if s.TriggerPrice.IsZero() {
 		session.UserDataStream.OnStart(func() {
+			// do recover only when triggerPrice is not set.
+			if s.RecoverOrdersWhenStart {
+				s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
+				if err := s.recoverGrid(ctx, session); err != nil {
+					log.WithError(err).Errorf("recover error")
+				}
+			}
+
 			if err := s.openGrid(ctx, session); err != nil {
 				s.logger.WithError(err).Errorf("failed to setup grid orders")
 			}
 		})
+	}
+
+	return nil
+}
+
+func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
+	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Infof("found %d open orders left on the %s order book", len(openOrders), s.Symbol)
+
+	// do recover only when openOrders > 0
+	if len(openOrders) > 0 {
+		historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
+		if !implemented {
+			s.logger.Warn("ExchangeTradeHistoryService is not implemented, can not recover grid")
+			return nil
+		}
+
+		if err := s.recoverGridWithOpenOrders(ctx, historyService, openOrders); err != nil {
+			return errors.Wrap(err, "recover grid error")
+		}
 	}
 
 	return nil
