@@ -226,7 +226,8 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 		// q = 0.2
 		s := newTestStrategy()
 		lastPrice := number(13_500.0)
-		quantity, err := s.calculateQuoteInvestmentQuantity(number(12_000.0), lastPrice, []Pin{
+		quoteInvestment := number(12_000.0)
+		quantity, err := s.calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice, []Pin{
 			Pin(number(10_000.0)), // buy
 			Pin(number(11_000.0)), // buy
 			Pin(number(12_000.0)), // buy
@@ -263,7 +264,8 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 		s := newTestStrategy()
 		s.ProfitSpread = number(2000.0)
 		lastPrice := number(13_500.0)
-		quantity, err := s.calculateQuoteInvestmentQuantity(number(7500.0), lastPrice, []Pin{
+		quoteInvestment := number(7500.0)
+		quantity, err := s.calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice, []Pin{
 			Pin(number(10_000.0)), // sell order @ 12_000
 			Pin(number(11_000.0)), // sell order @ 13_000
 			Pin(number(12_000.0)), // sell order @ 14_000
