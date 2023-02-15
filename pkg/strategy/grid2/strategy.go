@@ -1098,6 +1098,8 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
 	grid := s.newGrid()
 
+	s.logger.Infof("GRID RECOVER: %s", grid.String())
+
 	lastOrderID := uint64(1)
 	now := time.Now()
 	firstOrderTime := now.AddDate(0, 0, -7)
