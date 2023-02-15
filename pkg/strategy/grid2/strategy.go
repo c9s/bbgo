@@ -1489,6 +1489,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	// if TriggerPrice is zero, that means we need to open the grid when start up
 	if s.TriggerPrice.IsZero() {
 		session.UserDataStream.OnStart(func() {
+			s.logger.Infof("user data stream started, initializing grid...")
+
 			// do recover only when triggerPrice is not set.
 			if s.RecoverOrdersWhenStart {
 				s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
