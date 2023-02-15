@@ -36,6 +36,19 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+type PrettyPins []Pin
+
+func (pp PrettyPins) String() string {
+	var ss []string
+
+	for _, p := range pp {
+		price := fixedpoint.Value(p)
+		ss = append(ss, price.String())
+	}
+
+	return fmt.Sprintf("%v", ss)
+}
+
 //go:generate mockgen -destination=mocks/order_executor.go -package=mocks . OrderExecutor
 type OrderExecutor interface {
 	SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error)
@@ -1085,9 +1098,6 @@ func (s *Strategy) checkMinimalQuoteInvestment() error {
 func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
 	grid := s.newGrid()
 
-	// Add all open orders to the local order book
-	gridPriceMap := buildGridPriceMap(grid)
-
 	lastOrderID := uint64(1)
 	now := time.Now()
 	firstOrderTime := now.AddDate(0, 0, -7)
@@ -1115,7 +1125,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	// Ensure that orders are grid orders
 	// The price must be at the grid pin
 	for _, openOrder := range openOrders {
-		if _, exists := gridPriceMap[openOrder.Price.String()]; exists {
+		if grid.HasPrice(openOrder.Price) {
 			orderBook.Add(openOrder)
 
 			// put the order back to the active order book so that we can receive order update
@@ -1124,11 +1134,13 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	}
 
 	// if all open orders are the grid orders, then we don't have to recover
+	s.logger.Infof("GRID RECOVER: verifying pins %v", PrettyPins(grid.Pins))
 	missingPrices := scanMissingPinPrices(orderBook, grid.Pins)
 	if numMissing := len(missingPrices); numMissing <= 1 {
 		s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
 		return nil
 	} else {
+		s.logger.Infof("GRID RECOVER: found missing prices: %v", missingPrices)
 		// Note that for MAX Exchange, the order history API only uses fromID parameter to query history order.
 		// The time range does not matter.
 		// TODO: handle context correctly
@@ -1200,8 +1212,6 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 // replayOrderHistory queries the closed order history from the API and rebuild the orderbook from the order history.
 // startTime, endTime is the time range of the order history.
 func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook *bbgo.ActiveOrderBook, historyService types.ExchangeTradeHistoryService, startTime, endTime time.Time, lastOrderID uint64) error {
-	gridPriceMap := buildGridPriceMap(grid)
-
 	// a simple guard, in reality, this startTime is not possible to exceed the endTime
 	// because the queries closed orders might still in the range.
 	orderIdChanged := true
@@ -1241,7 +1251,8 @@ func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook
 			}
 
 			// skip non-grid order prices
-			if _, ok := gridPriceMap[closedOrder.Price.String()]; !ok {
+
+			if !grid.HasPrice(closedOrder.Price) {
 				continue
 			}
 
