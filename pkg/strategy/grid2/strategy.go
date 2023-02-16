@@ -891,13 +891,13 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	s.debugGridOrders(submitOrders, lastPrice)
 
-	// try to always emit grid ready
-	defer s.EmitGridReady()
-
 	createdOrders, err2 := s.orderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err2 != nil {
 		return err
 	}
+
+	// try to always emit grid ready
+	defer s.EmitGridReady()
 
 	// update the number of orders to metrics
 	baseLabels := s.newPrometheusLabels()
