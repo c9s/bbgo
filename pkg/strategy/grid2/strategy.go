@@ -776,6 +776,8 @@ func (s *Strategy) OpenGrid(ctx context.Context) error {
 func (s *Strategy) CloseGrid(ctx context.Context) error {
 	s.logger.Infof("closing %s grid", s.Symbol)
 
+	defer s.EmitGridClosed()
+
 	bbgo.Sync(ctx, s)
 
 	// now we can cancel the open orders
@@ -786,7 +788,6 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 
 	// free the grid object
 	s.setGrid(nil)
-	s.EmitGridClosed()
 	return nil
 }
 
