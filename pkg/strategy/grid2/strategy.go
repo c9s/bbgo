@@ -1026,6 +1026,13 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				continue
 			}
 
+			quoteQuantity := quantity.Mul(price)
+
+			if usedQuote.Add(quoteQuantity).Compare(totalQuote) > 0 {
+				s.logger.Warnf("used quote %f > total quote %f, this should not happen", usedQuote.Float64(), totalQuote.Float64())
+				continue
+			}
+
 			submitOrders = append(submitOrders, types.SubmitOrder{
 				Symbol:      s.Symbol,
 				Type:        types.OrderTypeLimit,
@@ -1036,7 +1043,6 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				TimeInForce: types.TimeInForceGTC,
 				Tag:         orderTag,
 			})
-			quoteQuantity := quantity.Mul(price)
 			usedQuote = usedQuote.Add(quoteQuantity)
 		}
 	}
