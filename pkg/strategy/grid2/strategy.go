@@ -552,25 +552,30 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 }
 
 func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice fixedpoint.Value, pins []Pin) (fixedpoint.Value, error) {
-
 	// quoteInvestment = (p1 * q) + (p2 * q) + (p3 * q) + ....
 	// =>
 	// quoteInvestment = (p1 + p2 + p3) * q
 	// q = quoteInvestment / (p1 + p2 + p3)
 	totalQuotePrice := fixedpoint.Zero
-	si := -1
+	si := len(pins)
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
 
 		if price.Compare(lastPrice) >= 0 {
 			si = i
+
+			// do not place sell order on the bottom price
+			if i == 0 {
+				continue
+			}
+
 			// for orders that sell
 			// if we still have the base balance
 			// quantity := amount.Div(lastPrice)
 			if s.ProfitSpread.Sign() > 0 {
 				totalQuotePrice = totalQuotePrice.Add(price)
-			} else if i > 0 { // we do not want to sell at i == 0
+			} else { // we do not want to sell at i == 0
 				// convert sell to buy quote and add to requiredQuote
 				nextLowerPin := pins[i-1]
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
@@ -591,7 +596,9 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 		}
 	}
 
-	return quoteInvestment.Div(totalQuotePrice), nil
+	q := quoteInvestment.Div(totalQuotePrice)
+	s.logger.Infof("calculateQuoteInvestmentQuantity: sumOfPrice=%f quantity=%f", totalQuotePrice.Float64(), q.Float64())
+	return q, nil
 }
 
 func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice fixedpoint.Value, pins []Pin) (fixedpoint.Value, error) {
