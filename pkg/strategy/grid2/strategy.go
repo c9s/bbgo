@@ -3,6 +3,7 @@ package grid2
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"sync"
@@ -558,6 +559,7 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 	// q = quoteInvestment / (p1 + p2 + p3)
 	totalQuotePrice := fixedpoint.Zero
 	si := len(pins)
+	cntOrder := 0
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
@@ -581,6 +583,8 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
 			}
+
+			cntOrder++
 		} else {
 			// for orders that buy
 			if s.ProfitSpread.IsZero() && i+1 == si {
@@ -593,11 +597,14 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 			}
 
 			totalQuotePrice = totalQuotePrice.Add(price)
+			cntOrder++
 		}
 	}
 
-	q := quoteInvestment.Div(totalQuotePrice)
-	s.logger.Infof("calculateQuoteInvestmentQuantity: sumOfPrice=%f quantity=%f", totalQuotePrice.Float64(), q.Float64())
+	orderDusts := fixedpoint.NewFromFloat(math.Pow10(-s.Market.PricePrecision) * float64(cntOrder))
+	adjustedQuoteInvestment := quoteInvestment.Sub(orderDusts)
+	q := adjustedQuoteInvestment.Div(totalQuotePrice)
+	s.logger.Infof("calculateQuoteInvestmentQuantity: adjustedQuoteInvestment=%f sumOfPrice=%f quantity=%f", adjustedQuoteInvestment.Float64(), totalQuotePrice.Float64(), q.Float64())
 	return q, nil
 }
 
@@ -1026,6 +1033,13 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				continue
 			}
 
+			quoteQuantity := quantity.Mul(price)
+
+			if usedQuote.Add(quoteQuantity).Compare(totalQuote) > 0 {
+				s.logger.Warnf("used quote %f > total quote %f, this should not happen", usedQuote.Float64(), totalQuote.Float64())
+				continue
+			}
+
 			submitOrders = append(submitOrders, types.SubmitOrder{
 				Symbol:      s.Symbol,
 				Type:        types.OrderTypeLimit,
@@ -1036,7 +1050,6 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				TimeInForce: types.TimeInForceGTC,
 				Tag:         orderTag,
 			})
-			quoteQuantity := quantity.Mul(price)
 			usedQuote = usedQuote.Add(quoteQuantity)
 		}
 	}
@@ -1151,6 +1164,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	if numMissing := len(missingPrices); numMissing <= 1 {
 		s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
 		s.setGrid(grid)
+		s.EmitGridReady()
 		return nil
 	} else {
 		s.logger.Infof("GRID RECOVER: found missing prices: %v", missingPrices)
@@ -1193,6 +1207,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	if isCompleteGridOrderBook(orderBook, s.GridNum) {
 		s.logger.Infof("GRID RECOVER: all orders are active orders, do not need recover")
 		s.setGrid(grid)
+		s.EmitGridReady()
 		return nil
 	}
 
@@ -1209,6 +1224,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 
 	s.logger.Infof("GRID RECOVER: found %d filled grid orders", len(filledOrders))
 	s.setGrid(grid)
+	s.EmitGridReady()
 
 	for _, o := range filledOrders {
 		s.processFilledOrder(o)

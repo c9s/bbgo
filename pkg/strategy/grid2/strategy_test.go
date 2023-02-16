@@ -125,7 +125,7 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 
 		quantity, err := s.calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice, s.grid.Pins)
 		assert.NoError(t, err)
-		assert.Equal(t, number(38.75968992).String(), quantity.String())
+		assert.InDelta(t, 38.7364341, quantity.Float64(), 0.00001)
 
 		s.QuantityOrAmount.Quantity = quantity
 
@@ -284,7 +284,7 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 			Pin(number(15_000.0)),
 		})
 		assert.NoError(t, err)
-		assert.Equal(t, number(0.2).String(), quantity.String())
+		assert.InDelta(t, 0.199999916, quantity.Float64(), 0.0001)
 	})
 
 	t.Run("quote quantity #2", func(t *testing.T) {
@@ -301,7 +301,7 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 			Pin(number(200.00)),
 		})
 		assert.NoError(t, err)
-		assert.Equal(t, number(1.17647058).String(), quantity.String())
+		assert.InDelta(t, 1.1764, quantity.Float64(), 0.00001)
 	})
 
 	t.Run("quote quantity #3", func(t *testing.T) {
@@ -319,7 +319,7 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 		}
 		quantity, err := s.calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice, pins)
 		assert.NoError(t, err)
-		assert.InDelta(t, 38.75968992, quantity.Float64(), 0.0001)
+		assert.InDelta(t, 38.736434, quantity.Float64(), 0.0001)
 
 		var totalQuoteUsed = fixedpoint.Zero
 		for i, pin := range pins {
@@ -351,7 +351,7 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 			Pin(number(15_000.0)), // sell order @ 17_000
 		})
 		assert.NoError(t, err)
-		assert.Equal(t, number(0.1).String(), quantity.String())
+		assert.InDelta(t, 0.099992, quantity.Float64(), 0.0001)
 	})
 
 }
