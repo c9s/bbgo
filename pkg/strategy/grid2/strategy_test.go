@@ -304,6 +304,35 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 		assert.Equal(t, number(1.17647058).String(), quantity.String())
 	})
 
+	t.Run("quote quantity #3", func(t *testing.T) {
+		s := newTestStrategy()
+		lastPrice := number(22000.0)
+		quoteInvestment := number(100.0)
+		pins := []Pin{
+			Pin(number(0.1)),
+			Pin(number(0.23)),
+			Pin(number(0.36)),
+			Pin(number(0.50)),
+			Pin(number(0.63)),
+			Pin(number(0.76)),
+			Pin(number(0.90)),
+		}
+		quantity, err := s.calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice, pins)
+		assert.NoError(t, err)
+		assert.InDelta(t, 38.75968992, quantity.Float64(), 0.0001)
+
+		var totalQuoteUsed = fixedpoint.Zero
+		for i, pin := range pins {
+			if i == len(pins)-1 {
+				continue
+			}
+
+			price := fixedpoint.Value(pin)
+			totalQuoteUsed = totalQuoteUsed.Add(price.Mul(quantity))
+		}
+		assert.LessOrEqualf(t, totalQuoteUsed, number(100.0), "total quote used: %f", totalQuoteUsed.Float64())
+	})
+
 	t.Run("profit spread", func(t *testing.T) {
 		// quoteInvestment = (10,000 + 11,000 + 12,000 + 13,000 + 14,000 + 15,000) * q
 		// q = quoteInvestment / (10,000 + 11,000 + 12,000 + 13,000 + 14,000 + 15,000)
