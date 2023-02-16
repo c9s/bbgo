@@ -3,6 +3,7 @@ package grid2
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"sync"
@@ -558,6 +559,7 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 	// q = quoteInvestment / (p1 + p2 + p3)
 	totalQuotePrice := fixedpoint.Zero
 	si := len(pins)
+	cntOrder := 0
 	for i := len(pins) - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
@@ -581,6 +583,8 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 				nextLowerPrice := fixedpoint.Value(nextLowerPin)
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
 			}
+
+			cntOrder++
 		} else {
 			// for orders that buy
 			if s.ProfitSpread.IsZero() && i+1 == si {
@@ -593,11 +597,14 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 			}
 
 			totalQuotePrice = totalQuotePrice.Add(price)
+			cntOrder++
 		}
 	}
 
-	q := quoteInvestment.Div(totalQuotePrice)
-	s.logger.Infof("calculateQuoteInvestmentQuantity: sumOfPrice=%f quantity=%f", totalQuotePrice.Float64(), q.Float64())
+	orderDusts := fixedpoint.NewFromFloat(math.Pow10(-s.Market.PricePrecision) * float64(cntOrder))
+	adjustedQuoteInvestment := quoteInvestment.Sub(orderDusts)
+	q := adjustedQuoteInvestment.Div(totalQuotePrice)
+	s.logger.Infof("calculateQuoteInvestmentQuantity: adjustedQuoteInvestment=%f sumOfPrice=%f quantity=%f", adjustedQuoteInvestment.Float64(), totalQuotePrice.Float64(), q.Float64())
 	return q, nil
 }
 
