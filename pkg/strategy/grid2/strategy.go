@@ -1151,6 +1151,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	if numMissing := len(missingPrices); numMissing <= 1 {
 		s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
 		s.setGrid(grid)
+		s.EmitGridReady()
 		return nil
 	} else {
 		s.logger.Infof("GRID RECOVER: found missing prices: %v", missingPrices)
@@ -1193,6 +1194,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	if isCompleteGridOrderBook(orderBook, s.GridNum) {
 		s.logger.Infof("GRID RECOVER: all orders are active orders, do not need recover")
 		s.setGrid(grid)
+		s.EmitGridReady()
 		return nil
 	}
 
@@ -1209,6 +1211,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 
 	s.logger.Infof("GRID RECOVER: found %d filled grid orders", len(filledOrders))
 	s.setGrid(grid)
+	s.EmitGridReady()
 
 	for _, o := range filledOrders {
 		s.processFilledOrder(o)
