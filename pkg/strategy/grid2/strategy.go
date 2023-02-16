@@ -785,7 +785,7 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 	}
 
 	// free the grid object
-	s.grid = nil
+	s.setGrid(nil)
 	s.EmitGridClosed()
 	return nil
 }
