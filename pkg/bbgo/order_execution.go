@@ -62,6 +62,33 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 	return createdOrders, err
 }
 
+// BatchPlaceOrderChan post orders with a channel, the created order will be sent to this channel immediately, so that
+// the caller can add the created order to the active order book or the order store to collect trades.
+// this method is used when you have large amount of orders to be sent and most of the orders might be filled as taker order.
+// channel orderC will be closed when all the submit orders are submitted.
+func BatchPlaceOrderChan(ctx context.Context, exchange types.Exchange, orderC chan types.Order, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
+	defer close(orderC)
+
+	var createdOrders types.OrderSlice
+	var err error
+	var errIndexes []int
+	for i, submitOrder := range submitOrders {
+		createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+			errIndexes = append(errIndexes, i)
+		} else if createdOrder != nil {
+			createdOrder.Tag = submitOrder.Tag
+
+			orderC <- *createdOrder
+
+			createdOrders = append(createdOrders, *createdOrder)
+		}
+	}
+
+	return createdOrders, errIndexes, err
+}
+
 // BatchPlaceOrder
 func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
 	var createdOrders types.OrderSlice
