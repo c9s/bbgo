@@ -25,6 +25,8 @@ type ActiveOrderBook struct {
 	filledCallbacks   []func(o types.Order)
 	canceledCallbacks []func(o types.Order)
 
+	pendingOrderUpdates *types.SyncOrderMap
+
 	// sig is the order update signal
 	// this signal will be emitted when a new order is added or removed.
 	C sigchan.Chan
@@ -32,9 +34,10 @@ type ActiveOrderBook struct {
 
 func NewActiveOrderBook(symbol string) *ActiveOrderBook {
 	return &ActiveOrderBook{
-		Symbol: symbol,
-		orders: types.NewSyncOrderMap(),
-		C:      sigchan.New(1),
+		Symbol:              symbol,
+		orders:              types.NewSyncOrderMap(),
+		pendingOrderUpdates: types.NewSyncOrderMap(),
+		C:                   sigchan.New(1),
 	}
 }
 
@@ -230,6 +233,11 @@ func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
 		return
 	}
 
+	if !b.orders.Exists(order.OrderID) {
+		b.pendingOrderUpdates.Add(order)
+		return
+	}
+
 	switch order.Status {
 	case types.OrderStatusFilled:
 		// make sure we have the order and we remove it
@@ -277,23 +285,46 @@ func (b *ActiveOrderBook) Print() {
 func (b *ActiveOrderBook) Update(orders ...types.Order) {
 	hasSymbol := len(b.Symbol) > 0
 	for _, order := range orders {
-		if hasSymbol && b.Symbol == order.Symbol {
-			b.orders.Update(order)
+		if hasSymbol && b.Symbol != order.Symbol {
+			continue
 		}
+
+		b.orders.Update(order)
 	}
 }
 
 func (b *ActiveOrderBook) Add(orders ...types.Order) {
 	hasSymbol := len(b.Symbol) > 0
 	for _, order := range orders {
-		if hasSymbol && b.Symbol == order.Symbol {
+		if hasSymbol && b.Symbol != order.Symbol {
+			continue
+		}
+
+		b.add(order)
+	}
+}
+
+// add the order to the active order book and check the pending order
+func (b *ActiveOrderBook) add(order types.Order) {
+	if pendingOrder, ok := b.pendingOrderUpdates.Get(order.OrderID); ok {
+		if pendingOrder.UpdateTime.Time().After(order.UpdateTime.Time()) {
+			b.orders.Add(pendingOrder)
+		} else {
 			b.orders.Add(order)
 		}
+
+		b.pendingOrderUpdates.Remove(order.OrderID)
+	} else {
+		b.orders.Add(order)
 	}
 }
 
 func (b *ActiveOrderBook) Exists(order types.Order) bool {
 	return b.orders.Exists(order.OrderID)
+}
+
+func (b *ActiveOrderBook) Get(orderID uint64) (types.Order, bool) {
+	return b.orders.Get(orderID)
 }
 
 func (b *ActiveOrderBook) Remove(order types.Order) bool {
