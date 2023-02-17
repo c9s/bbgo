@@ -1025,7 +1025,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					TimeInForce: types.TimeInForceGTC,
 					Tag:         orderTag,
 				})
-				quoteQuantity := quantity.Mul(price)
+				quoteQuantity := quantity.Mul(nextPrice)
 				usedQuote = usedQuote.Add(quoteQuantity)
 			}
 		} else {
@@ -1043,7 +1043,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 			quoteQuantity := quantity.Mul(price)
 
 			if usedQuote.Add(quoteQuantity).Compare(totalQuote) > 0 {
-				s.logger.Warnf("used quote %f > total quote %f, this should not happen", usedQuote.Float64(), totalQuote.Float64())
+				s.logger.Warnf("used quote %f > total quote %f, this should not happen", usedQuote.Add(quoteQuantity).Float64(), totalQuote.Float64())
 				continue
 			}
 
