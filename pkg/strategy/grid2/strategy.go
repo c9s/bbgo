@@ -1100,7 +1100,7 @@ func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.Exchange
 }
 
 func calculateMinimalQuoteInvestment(market types.Market, lowerPrice, upperPrice fixedpoint.Value, gridNum int64) fixedpoint.Value {
-	num := fixedpoint.NewFromInt(gridNum)
+	num := fixedpoint.NewFromInt(gridNum - 1)
 	minimalAmountLowerPrice := fixedpoint.Max(lowerPrice.Mul(market.MinQuantity), market.MinNotional)
 	minimalAmountUpperPrice := fixedpoint.Max(upperPrice.Mul(market.MinQuantity), market.MinNotional)
 	return fixedpoint.Max(minimalAmountLowerPrice, minimalAmountUpperPrice).Mul(num)
