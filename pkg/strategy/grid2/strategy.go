@@ -878,13 +878,16 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		if s.QuoteInvestment.Compare(totalQuote) > 0 {
 			return fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", s.QuoteInvestment.Float64(), totalQuote.Float64())
 		}
-
-		if !s.QuantityOrAmount.IsSet() {
-			// TODO: calculate and override the quantity here
-		}
 	}
 
-	submitOrders, err := s.generateGridOrders(totalQuote, totalBase, lastPrice)
+	var submitOrders []types.SubmitOrder
+
+	if !s.BaseInvestment.IsZero() || !s.QuoteInvestment.IsZero() {
+		submitOrders, err = s.generateGridOrders(s.QuoteInvestment, s.BaseInvestment, lastPrice)
+	} else {
+		submitOrders, err = s.generateGridOrders(totalQuote, totalBase, lastPrice)
+	}
+
 	if err != nil {
 		return err
 	}
