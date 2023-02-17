@@ -312,6 +312,8 @@ func (b *ActiveOrderBook) add(order types.Order) {
 		} else {
 			b.orders.Add(order)
 		}
+
+		b.pendingOrderUpdates.Remove(order.OrderID)
 	} else {
 		b.orders.Add(order)
 	}
@@ -319,6 +321,10 @@ func (b *ActiveOrderBook) add(order types.Order) {
 
 func (b *ActiveOrderBook) Exists(order types.Order) bool {
 	return b.orders.Exists(order.OrderID)
+}
+
+func (b *ActiveOrderBook) Get(orderID uint64) (types.Order, bool) {
+	return b.orders.Get(orderID)
 }
 
 func (b *ActiveOrderBook) Remove(order types.Order) bool {
