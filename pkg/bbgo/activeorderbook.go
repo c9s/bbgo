@@ -285,26 +285,22 @@ func (b *ActiveOrderBook) Print() {
 func (b *ActiveOrderBook) Update(orders ...types.Order) {
 	hasSymbol := len(b.Symbol) > 0
 	for _, order := range orders {
-		if hasSymbol {
-			if b.Symbol == order.Symbol {
-				b.orders.Update(order)
-			}
-		} else {
-			b.orders.Update(order)
+		if hasSymbol && b.Symbol != order.Symbol {
+			continue
 		}
+
+		b.orders.Update(order)
 	}
 }
 
 func (b *ActiveOrderBook) Add(orders ...types.Order) {
 	hasSymbol := len(b.Symbol) > 0
 	for _, order := range orders {
-		if hasSymbol {
-			if b.Symbol == order.Symbol {
-				b.add(order)
-			}
-		} else {
-			b.add(order)
+		if hasSymbol && b.Symbol != order.Symbol {
+			continue
 		}
+
+		b.add(order)
 	}
 }
 
