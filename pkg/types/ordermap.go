@@ -56,6 +56,11 @@ func (m OrderMap) Exists(orderID uint64) bool {
 	return ok
 }
 
+func (m OrderMap) Get(orderID uint64) (Order, bool) {
+	order, ok := m[orderID]
+	return order, ok
+}
+
 func (m OrderMap) FindByStatus(status OrderStatus) (orders OrderSlice) {
 	for _, o := range m {
 		if o.Status == status {
@@ -163,6 +168,13 @@ func (m *SyncOrderMap) Exists(orderID uint64) (exists bool) {
 	exists = m.orders.Exists(orderID)
 	m.Unlock()
 	return exists
+}
+
+func (m *SyncOrderMap) Get(orderID uint64) (Order, bool) {
+	m.Lock()
+	order, ok := m.orders.Get(orderID)
+	m.Unlock()
+	return order, ok
 }
 
 func (m *SyncOrderMap) Lookup(f func(o Order) bool) *Order {
