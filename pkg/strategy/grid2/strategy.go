@@ -145,6 +145,9 @@ type Strategy struct {
 	GridProfitStats *GridProfitStats `persistence:"grid_profit_stats"`
 	Position        *types.Position  `persistence:"position"`
 
+	// ExchangeSession is an injection field
+	ExchangeSession *bbgo.ExchangeSession
+
 	grid              *Grid
 	session           *bbgo.ExchangeSession
 	orderQueryService types.ExchangeOrderQueryService
@@ -200,6 +203,17 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Defaults() error {
+	if s.LogFields == nil {
+		s.LogFields = logrus.Fields{}
+	}
+
+	s.LogFields["symbol"] = s.Symbol
+	s.LogFields["strategy"] = ID
+	return nil
+}
+
+func (s *Strategy) Initialize() error {
+	s.logger = log.WithFields(s.LogFields)
 	return nil
 }
 
@@ -1392,6 +1406,20 @@ func (s *Strategy) newPrometheusLabels() prometheus.Labels {
 	return mergeLabels(s.PrometheusLabels, labels)
 }
 
+func (s *Strategy) CleanUp(ctx context.Context) error {
+	if s.ExchangeSession == nil {
+		return errors.New("ExchangeSession is nil, can not clean up")
+	}
+
+	openOrders, err := s.ExchangeSession.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	err = s.ExchangeSession.Exchange.CancelOrders(ctx, openOrders...)
+	return errors.Wrapf(err, "can not cancel %s orders", s.Symbol)
+}
+
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 
@@ -1400,14 +1428,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	if service, ok := session.Exchange.(types.ExchangeOrderQueryService); ok {
 		s.orderQueryService = service
 	}
-
-	if s.LogFields == nil {
-		s.LogFields = logrus.Fields{}
-	}
-
-	s.LogFields["symbol"] = s.Symbol
-	s.LogFields["strategy"] = ID
-	s.logger = log.WithFields(s.LogFields)
 
 	if s.OrderGroupID == 0 {
 		s.OrderGroupID = util.FNV32(instanceID)
