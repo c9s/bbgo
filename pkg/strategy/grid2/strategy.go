@@ -1243,7 +1243,11 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	// we will only submit reverse orders for filled orders
 	filledOrders := types.OrdersFilled(tmpOrders)
 
-	s.logger.Infof("GRID RECOVER: found %d filled grid orders", len(filledOrders))
+	s.logger.Infof("GRID RECOVER: found %d filled grid orders, will re-replay the order event in the following order:", len(filledOrders))
+	for i, o := range filledOrders {
+		s.logger.Infof("- %d) %s", i, o.String())
+	}
+
 	s.setGrid(grid)
 	s.EmitGridReady()
 
