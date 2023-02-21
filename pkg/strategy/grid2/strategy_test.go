@@ -894,22 +894,25 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 		// hence we should have at least: 20USDT * 10 grids
 		s.QuoteInvestment = number(10_000)
 		s.GridNum = 10
-		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, s.LowerPrice, s.UpperPrice, s.GridNum)
-		assert.Equal(t, "180", minQuoteInvestment.String())
+		grid := s.newGrid()
+		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, grid)
+		assert.InDelta(t, 129.9999, minQuoteInvestment.Float64(), 0.01)
 
-		err := s.checkMinimalQuoteInvestment()
+		err := s.checkMinimalQuoteInvestment(grid)
 		assert.NoError(t, err)
 	})
 
 	t.Run("1000 grids", func(t *testing.T) {
 		s.QuoteInvestment = number(10_000)
 		s.GridNum = 1000
-		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, s.LowerPrice, s.UpperPrice, s.GridNum)
-		assert.Equal(t, "19980", minQuoteInvestment.String())
 
-		err := s.checkMinimalQuoteInvestment()
+		grid := s.newGrid()
+		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, grid)
+		assert.InDelta(t, 14979.995499, minQuoteInvestment.Float64(), 0.001)
+
+		err := s.checkMinimalQuoteInvestment(grid)
 		assert.Error(t, err)
-		assert.EqualError(t, err, "need at least 19980.000000 USDT for quote investment, 10000.000000 USDT given")
+		assert.EqualError(t, err, "need at least 14979.995500 USDT for quote investment, 10000.000000 USDT given")
 	})
 }
 
