@@ -1266,6 +1266,9 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 		s.processFilledOrder(o)
 	}
 
+	// wait for the reverse order to be placed
+	time.Sleep(2 * time.Second)
+
 	s.logger.Infof("GRID RECOVER COMPLETE")
 
 	debugGrid(grid, s.orderExecutor.ActiveMakerOrders())
