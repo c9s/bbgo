@@ -1264,6 +1264,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 
 	for _, o := range filledOrders {
 		s.processFilledOrder(o)
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	// wait for the reverse order to be placed
