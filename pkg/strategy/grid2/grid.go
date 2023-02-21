@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type PinCalculator func() []Pin
@@ -141,6 +142,18 @@ func (g *Grid) NextLowerPin(price fixedpoint.Value) (Pin, bool) {
 	}
 
 	return Pin(fixedpoint.Zero), false
+}
+
+func (g *Grid) FilterOrders(orders []types.Order) (ret []types.Order) {
+	for _, o := range orders {
+		if !g.HasPrice(o.Price) {
+			continue
+		}
+
+		ret = append(ret, o)
+	}
+
+	return ret
 }
 
 func (g *Grid) HasPrice(price fixedpoint.Value) bool {
