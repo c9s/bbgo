@@ -1163,20 +1163,14 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 		}
 	}
 
-	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
-
-	// Allocate a local order book
+	// Allocate a local order book for querying the history orders
 	orderBook := bbgo.NewActiveOrderBook(s.Symbol)
 
 	// Ensure that orders are grid orders
 	// The price must be at the grid pin
-	for _, openOrder := range openOrders {
-		if grid.HasPrice(openOrder.Price) {
-			orderBook.Add(openOrder)
-
-			// put the order back to the active order book so that we can receive order update
-			activeOrderBook.Add(openOrder)
-		}
+	gridOrders := grid.FilterOrders(openOrders)
+	for _, gridOrder := range gridOrders {
+		orderBook.Add(gridOrder)
 	}
 
 	// if all open orders are the grid orders, then we don't have to recover
@@ -1246,6 +1240,14 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	s.logger.Infof("GRID RECOVER: found %d filled grid orders, will re-replay the order event in the following order:", len(filledOrders))
 	for i, o := range filledOrders {
 		s.logger.Infof("%d) %s", i, o.String())
+	}
+
+	// before we re-play the orders,
+	// we need to add these open orders to the active order book
+	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
+	for _, gridOrder := range gridOrders {
+		// put the order back to the active order book so that we can receive order update
+		activeOrderBook.Add(gridOrder)
 	}
 
 	s.setGrid(grid)
