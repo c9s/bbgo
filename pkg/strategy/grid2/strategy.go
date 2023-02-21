@@ -1248,7 +1248,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 
 	s.logger.Infof("GRID RECOVER: found %d filled grid orders, will re-replay the order event in the following order:", len(filledOrders))
 	for i, o := range filledOrders {
-		s.logger.Infof("%d) %s", i, o.String())
+		s.logger.Infof("%d) %s", i+1, o.String())
 	}
 
 	// before we re-play the orders,
