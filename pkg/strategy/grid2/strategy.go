@@ -1238,9 +1238,9 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	// for reverse order recovering, we need the orders to be sort by update time ascending-ly
 	types.SortOrdersUpdateTimeAscending(tmpOrders)
 
-	if len(tmpOrders) > 1 && len(tmpOrders) == int(s.GridNum)+1 {
+	if len(tmpOrders) > 1 && len(tmpOrders) == int(s.GridNum) {
 		// remove the latest updated order because it's near the empty slot
-		tmpOrders = tmpOrders[:len(tmpOrders)-1]
+		tmpOrders = tmpOrders[1:]
 	}
 
 	// we will only submit reverse orders for filled orders
