@@ -1120,15 +1120,27 @@ func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.Exchange
 	return fixedpoint.Zero, fmt.Errorf("%s ticker price not found", s.Symbol)
 }
 
-func calculateMinimalQuoteInvestment(market types.Market, lowerPrice, upperPrice fixedpoint.Value, gridNum int64) fixedpoint.Value {
-	num := fixedpoint.NewFromInt(gridNum - 1)
-	minimalAmountLowerPrice := fixedpoint.Max(lowerPrice.Mul(market.MinQuantity), market.MinNotional)
-	minimalAmountUpperPrice := fixedpoint.Max(upperPrice.Mul(market.MinQuantity), market.MinNotional)
-	return fixedpoint.Max(minimalAmountLowerPrice, minimalAmountUpperPrice).Mul(num)
+func calculateMinimalQuoteInvestment(market types.Market, grid *Grid) fixedpoint.Value {
+	// upperPrice for buy order
+	upperPrice := grid.UpperPrice.Sub(grid.Spread)
+	minQuantity := fixedpoint.Max(
+		fixedpoint.Max(upperPrice.Mul(market.MinQuantity), market.MinNotional).Div(upperPrice),
+		market.MinQuantity,
+	)
+
+	var pins = grid.Pins
+	var totalQuote = fixedpoint.Zero
+	for i := len(pins) - 2; i >= 0; i-- {
+		pin := pins[i]
+		price := fixedpoint.Value(pin)
+		totalQuote = totalQuote.Add(price.Mul(minQuantity))
+	}
+
+	return totalQuote
 }
 
-func (s *Strategy) checkMinimalQuoteInvestment() error {
-	minimalQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, s.LowerPrice, s.UpperPrice, s.GridNum)
+func (s *Strategy) checkMinimalQuoteInvestment(grid *Grid) error {
+	minimalQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, grid)
 	if s.QuoteInvestment.Compare(minimalQuoteInvestment) <= 0 {
 		return fmt.Errorf("need at least %f %s for quote investment, %f %s given",
 			minimalQuoteInvestment.Float64(),
@@ -1475,7 +1487,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	// we need to check the minimal quote investment here, because we need the market info
 	if s.QuoteInvestment.Sign() > 0 {
-		if err := s.checkMinimalQuoteInvestment(); err != nil {
+		grid := s.newGrid()
+		if err := s.checkMinimalQuoteInvestment(grid); err != nil {
 			return err
 		}
 	}
