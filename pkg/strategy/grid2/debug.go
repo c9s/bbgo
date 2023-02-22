@@ -31,7 +31,7 @@ func debugGrid(logger logrus.FieldLogger, grid *Grid, book *bbgo.ActiveOrderBook
 		})
 
 		if existingOrder != nil {
-			sb.WriteString(fmt.Sprintf("%s", existingOrder.String()))
+			sb.WriteString(existingOrder.String())
 
 			switch existingOrder.Status {
 			case types.OrderStatusFilled:
