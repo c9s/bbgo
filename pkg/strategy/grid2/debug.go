@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func debugGrid(grid *Grid, book *bbgo.ActiveOrderBook) {
+func debugGrid(logger logrus.FieldLogger, grid *Grid, book *bbgo.ActiveOrderBook) {
 	var sb strings.Builder
 
 	sb.WriteString("================== GRID ORDERS ==================\n")
@@ -50,5 +52,5 @@ func debugGrid(grid *Grid, book *bbgo.ActiveOrderBook) {
 
 	sb.WriteString("================== END OF GRID ORDERS ===================")
 
-	fmt.Println(sb.String())
+	logger.Infoln(sb.String())
 }
