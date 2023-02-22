@@ -102,6 +102,8 @@ type Environment struct {
 	syncStatus      SyncStatus
 	syncConfig      *SyncConfig
 
+	loggingConfig *LoggingConfig
+
 	sessions map[string]*ExchangeSession
 }
 
@@ -125,6 +127,10 @@ func (environ *Environment) Session(name string) (*ExchangeSession, bool) {
 
 func (environ *Environment) Sessions() map[string]*ExchangeSession {
 	return environ.sessions
+}
+
+func (environ *Environment) SetLogging(config *LoggingConfig) {
+	environ.loggingConfig = config
 }
 
 func (environ *Environment) SelectSessions(names ...string) map[string]*ExchangeSession {
