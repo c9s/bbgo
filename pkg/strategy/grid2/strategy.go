@@ -1223,7 +1223,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 		}
 	}
 
-	debugGrid(grid, orderBook)
+	debugGrid(s.logger, grid, orderBook)
 
 	tmpOrders := orderBook.Orders()
 
@@ -1272,7 +1272,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 
 	s.logger.Infof("GRID RECOVER COMPLETE")
 
-	debugGrid(grid, s.orderExecutor.ActiveMakerOrders())
+	debugGrid(s.logger, grid, s.orderExecutor.ActiveMakerOrders())
 	return nil
 }
 
