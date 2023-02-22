@@ -14,6 +14,10 @@ func BootstrapEnvironmentLightweight(ctx context.Context, environ *Environment, 
 		return errors.Wrap(err, "exchange session configure error")
 	}
 
+	if userConfig.Logging != nil {
+		environ.SetLogging(userConfig.Logging)
+	}
+
 	if userConfig.Persistence != nil {
 		if err := ConfigurePersistence(ctx, userConfig.Persistence); err != nil {
 			return errors.Wrap(err, "persistence configure error")
@@ -30,6 +34,10 @@ func BootstrapEnvironment(ctx context.Context, environ *Environment, userConfig 
 
 	if err := environ.ConfigureExchangeSessions(userConfig); err != nil {
 		return errors.Wrap(err, "exchange session configure error")
+	}
+
+	if userConfig.Logging != nil {
+		environ.SetLogging(userConfig.Logging)
 	}
 
 	if userConfig.Persistence != nil {

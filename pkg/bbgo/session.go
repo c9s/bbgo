@@ -261,10 +261,25 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		}
 	}
 
-	// add trade logger
-	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-		log.Info(trade.String())
-	})
+	if environ.loggingConfig != nil {
+		if environ.loggingConfig.Trade {
+			session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+				log.Info(trade.String())
+			})
+		}
+
+		if environ.loggingConfig.Order {
+			session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+				log.Info(order.String())
+			})
+		}
+	} else {
+		// if logging config is nil, then apply default logging setup
+		// add trade logger
+		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+			log.Info(trade.String())
+		})
+	}
 
 	if viper.GetBool("debug-kline") {
 		session.MarketDataStream.OnKLine(func(kline types.KLine) {

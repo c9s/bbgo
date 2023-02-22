@@ -2,14 +2,19 @@ package grid2
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func debugGrid(grid *Grid, book *bbgo.ActiveOrderBook) {
-	fmt.Println("================== GRID ORDERS ==================")
+func debugGrid(logger logrus.FieldLogger, grid *Grid, book *bbgo.ActiveOrderBook) {
+	var sb strings.Builder
+
+	sb.WriteString("================== GRID ORDERS ==================\n")
 
 	pins := grid.Pins
 	missingPins := scanMissingPinPrices(book, pins)
@@ -19,30 +24,33 @@ func debugGrid(grid *Grid, book *bbgo.ActiveOrderBook) {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
 
-		fmt.Printf("%s -> ", price.String())
+		sb.WriteString(fmt.Sprintf("%s -> ", price.String()))
 
 		existingOrder := book.Lookup(func(o types.Order) bool {
 			return o.Price.Eq(price)
 		})
 
 		if existingOrder != nil {
-			fmt.Printf("%s", existingOrder.String())
+			sb.WriteString(existingOrder.String())
 
 			switch existingOrder.Status {
 			case types.OrderStatusFilled:
-				fmt.Printf(" | 🔧")
+				sb.WriteString(" | 🔧")
 			case types.OrderStatusCanceled:
-				fmt.Printf(" | 🔄")
+				sb.WriteString(" | 🔄")
 			default:
-				fmt.Printf(" | ✅")
+				sb.WriteString(" | ✅")
 			}
 		} else {
-			fmt.Printf("ORDER MISSING ⚠️ ")
+			sb.WriteString("ORDER MISSING ⚠️ ")
 			if missing == 1 {
-				fmt.Printf(" COULD BE EMPTY SLOT")
+				sb.WriteString(" COULD BE EMPTY SLOT")
 			}
 		}
-		fmt.Printf("\n")
+		sb.WriteString("\n")
 	}
-	fmt.Println("================== END OF GRID ORDERS ===================")
+
+	sb.WriteString("================== END OF GRID ORDERS ===================")
+
+	logger.Infoln(sb.String())
 }
