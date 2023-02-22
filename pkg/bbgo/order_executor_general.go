@@ -223,6 +223,8 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 	}
 
 	if len(errIdx) > 0 {
+		time.Sleep(200 * time.Millisecond)
+
 		createdOrders2, err2 := BatchRetryPlaceOrder(ctx, e.session.Exchange, errIdx, formattedOrders...)
 		if err2 != nil {
 			err = multierr.Append(err, err2)

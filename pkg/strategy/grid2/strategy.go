@@ -1238,9 +1238,9 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	// for reverse order recovering, we need the orders to be sort by update time ascending-ly
 	types.SortOrdersUpdateTimeAscending(tmpOrders)
 
-	if len(tmpOrders) > 1 && len(tmpOrders) == int(s.GridNum)+1 {
+	if len(tmpOrders) > 1 && len(tmpOrders) == int(s.GridNum) {
 		// remove the latest updated order because it's near the empty slot
-		tmpOrders = tmpOrders[:len(tmpOrders)-1]
+		tmpOrders = tmpOrders[1:]
 	}
 
 	// we will only submit reverse orders for filled orders
@@ -1248,7 +1248,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 
 	s.logger.Infof("GRID RECOVER: found %d filled grid orders, will re-replay the order event in the following order:", len(filledOrders))
 	for i, o := range filledOrders {
-		s.logger.Infof("%d) %s", i, o.String())
+		s.logger.Infof("%d) %s", i+1, o.String())
 	}
 
 	// before we re-play the orders,
@@ -1264,7 +1264,11 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 
 	for _, o := range filledOrders {
 		s.processFilledOrder(o)
+		time.Sleep(100 * time.Millisecond)
 	}
+
+	// wait for the reverse order to be placed
+	time.Sleep(2 * time.Second)
 
 	s.logger.Infof("GRID RECOVER COMPLETE")
 
