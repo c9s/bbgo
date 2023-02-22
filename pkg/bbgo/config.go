@@ -89,6 +89,11 @@ type NotificationConfig struct {
 	Switches *NotificationSwitches `json:"switches" yaml:"switches"`
 }
 
+type LoggingConfig struct {
+	Trade bool `json:"trade,omitempty"`
+	Order bool `json:"order,omitempty"`
+}
+
 type Session struct {
 	Name         string `json:"name,omitempty" yaml:"name,omitempty"`
 	ExchangeName string `json:"exchange" yaml:"exchange"`
@@ -325,6 +330,8 @@ type Config struct {
 	Sessions map[string]*ExchangeSession `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
 	RiskControls *RiskControls `json:"riskControls,omitempty" yaml:"riskControls,omitempty"`
+
+	Logging *LoggingConfig `json:"logging,omitempty"`
 
 	ExchangeStrategies      []ExchangeStrategyMount `json:"-" yaml:"-"`
 	CrossExchangeStrategies []CrossExchangeStrategy `json:"-" yaml:"-"`
