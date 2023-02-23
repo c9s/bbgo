@@ -434,6 +434,9 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	} else {
 		s.logger.Infof("GRID REVERSE ORDER IS CREATED: %+v", createdOrders)
 	}
+
+	s.updateGridNumOfOrdersMetrics()
+	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 }
 
 // handleOrderFilled is called when an order status is FILLED
@@ -732,8 +735,6 @@ func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.Exch
 	return func(o types.Order) {
 		s.handleOrderFilled(o)
 		bbgo.Sync(ctx, s)
-
-		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 	}
 }
 
@@ -809,6 +810,7 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 
 	// free the grid object
 	s.setGrid(nil)
+	s.updateGridNumOfOrdersMetrics()
 	return nil
 }
 
@@ -945,6 +947,11 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	s.updateOpenOrderPricesMetrics(createdOrders)
 	return nil
+}
+
+func (s *Strategy) updateGridNumOfOrdersMetrics() {
+	baseLabels := s.newPrometheusLabels()
+	metricsGridNumOfOrders.With(baseLabels).Set(float64(s.orderExecutor.ActiveMakerOrders().NumOfOrders()))
 }
 
 func (s *Strategy) updateOpenOrderPricesMetrics(orders []types.Order) {
@@ -1273,6 +1280,9 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	s.logger.Infof("GRID RECOVER COMPLETE")
 
 	debugGrid(s.logger, grid, s.orderExecutor.ActiveMakerOrders())
+
+	s.updateGridNumOfOrdersMetrics()
+	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 	return nil
 }
 
@@ -1614,7 +1624,6 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 		return errors.Wrap(err, "recover grid error")
 	}
 
-	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 	return nil
 }
 
