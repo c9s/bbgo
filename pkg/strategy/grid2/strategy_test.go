@@ -20,6 +20,10 @@ import (
 	gridmocks "github.com/c9s/bbgo/pkg/strategy/grid2/mocks"
 )
 
+func init() {
+	registerMetrics()
+}
+
 func TestStrategy_checkRequiredInvestmentByQuantity(t *testing.T) {
 	s := &Strategy{
 		logger: logrus.NewEntry(logrus.New()),

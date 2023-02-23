@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -45,67 +46,6 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 
 	createdOrders, _, err := BatchPlaceOrder(ctx, es.Exchange, formattedOrders...)
 	return createdOrders, err
-}
-
-func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx []int, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
-	var createdOrders types.OrderSlice
-	var err error
-	for _, idx := range errIdx {
-		createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrders[idx])
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-		} else if createdOrder != nil {
-			createdOrders = append(createdOrders, *createdOrder)
-		}
-	}
-
-	return createdOrders, err
-}
-
-// BatchPlaceOrderChan post orders with a channel, the created order will be sent to this channel immediately, so that
-// the caller can add the created order to the active order book or the order store to collect trades.
-// this method is used when you have large amount of orders to be sent and most of the orders might be filled as taker order.
-// channel orderC will be closed when all the submit orders are submitted.
-func BatchPlaceOrderChan(ctx context.Context, exchange types.Exchange, orderC chan types.Order, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
-	defer close(orderC)
-
-	var createdOrders types.OrderSlice
-	var err error
-	var errIndexes []int
-	for i, submitOrder := range submitOrders {
-		createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-			errIndexes = append(errIndexes, i)
-		} else if createdOrder != nil {
-			createdOrder.Tag = submitOrder.Tag
-
-			orderC <- *createdOrder
-
-			createdOrders = append(createdOrders, *createdOrder)
-		}
-	}
-
-	return createdOrders, errIndexes, err
-}
-
-// BatchPlaceOrder
-func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
-	var createdOrders types.OrderSlice
-	var err error
-	var errIndexes []int
-	for i, submitOrder := range submitOrders {
-		createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-			errIndexes = append(errIndexes, i)
-		} else if createdOrder != nil {
-			createdOrder.Tag = submitOrder.Tag
-			createdOrders = append(createdOrders, *createdOrder)
-		}
-	}
-
-	return createdOrders, errIndexes, err
 }
 
 func (e *ExchangeOrderExecutionRouter) CancelOrdersTo(ctx context.Context, session string, orders ...types.Order) error {
@@ -347,9 +287,81 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 	return outOrders, nil
 }
 
-func max(a, b int64) int64 {
-	if a > b {
-		return a
+// BatchPlaceOrder
+func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
+	var createdOrders types.OrderSlice
+	var err error
+	var errIndexes []int
+	for i, submitOrder := range submitOrders {
+		createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+			errIndexes = append(errIndexes, i)
+		} else if createdOrder != nil {
+			createdOrder.Tag = submitOrder.Tag
+			createdOrders = append(createdOrders, *createdOrder)
+		}
 	}
-	return b
+
+	return createdOrders, errIndexes, err
+}
+
+type OrderCallback func(order types.Order)
+
+// BatchRetryPlaceOrder places the orders and retries the failed orders
+func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx []int, orderCallback OrderCallback, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
+	var createdOrders types.OrderSlice
+	var err error
+
+	// if the errIdx is nil, then we should iterate all the submit orders
+	if len(errIdx) == 0 {
+		for i, submitOrder := range submitOrders {
+			createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
+			if err2 != nil {
+				err = multierr.Append(err, err2)
+				errIdx = append(errIdx, i)
+			} else if createdOrder != nil {
+				// if the order is successfully created, than we should copy the order tag
+				createdOrder.Tag = submitOrder.Tag
+
+				if orderCallback != nil {
+					orderCallback(*createdOrder)
+				}
+
+				createdOrders = append(createdOrders, *createdOrder)
+			}
+		}
+	}
+
+	// if we got any error, we should re-iterate the errored orders
+	for len(errIdx) > 0 {
+		time.Sleep(200 * time.Millisecond)
+
+		// allocate a variable for new error index
+		var errIdxNext []int
+
+		// iterate the error index and re-submit the order
+		for _, idx := range errIdx {
+			submitOrder := submitOrders[idx]
+			createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
+			if err2 != nil {
+				err = multierr.Append(err, err2)
+				errIdxNext = append(errIdxNext, idx)
+			} else if createdOrder != nil {
+				// if the order is successfully created, than we should copy the order tag
+				createdOrder.Tag = submitOrder.Tag
+
+				if orderCallback != nil {
+					orderCallback(*createdOrder)
+				}
+
+				createdOrders = append(createdOrders, *createdOrder)
+			}
+		}
+
+		// update the error index
+		errIdx = errIdxNext
+	}
+
+	return createdOrders, err
 }
