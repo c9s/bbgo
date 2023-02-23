@@ -951,7 +951,15 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 func (s *Strategy) updateGridNumOfOrdersMetrics() {
 	baseLabels := s.newPrometheusLabels()
-	metricsGridNumOfOrders.With(baseLabels).Set(float64(s.orderExecutor.ActiveMakerOrders().NumOfOrders()))
+	numOfOrders := s.orderExecutor.ActiveMakerOrders().NumOfOrders()
+	metricsGridNumOfOrders.With(baseLabels).Set(float64(numOfOrders))
+
+	if grid := s.getGrid(); grid != nil {
+		gridNum := grid.Size.Int()
+		metricsGridNum.With(baseLabels).Set(float64(gridNum))
+		numOfMissingOrders := gridNum - 1 - numOfOrders
+		metricsGridNumOfMissingOrders.With(baseLabels).Set(float64(numOfMissingOrders))
+	}
 }
 
 func (s *Strategy) updateOpenOrderPricesMetrics(orders []types.Order) {
@@ -1290,6 +1298,13 @@ func (s *Strategy) setGrid(grid *Grid) {
 	s.mu.Lock()
 	s.grid = grid
 	s.mu.Unlock()
+}
+
+func (s *Strategy) getGrid() *Grid {
+	s.mu.Lock()
+	grid := s.grid
+	s.mu.Unlock()
+	return grid
 }
 
 // replayOrderHistory queries the closed order history from the API and rebuild the orderbook from the order history.
