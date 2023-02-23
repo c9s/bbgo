@@ -217,24 +217,12 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 		return nil, err
 	}
 
-	createdOrders, errIdx, err := BatchPlaceOrder(ctx, e.session.Exchange, formattedOrders...)
-	if err != nil {
-		log.WithError(err).Errorf("place order error, will retry orders: %v", errIdx)
+	orderCreateCallback := func(createdOrder types.Order) {
+		e.orderStore.Add(createdOrder)
+		e.activeMakerOrders.Add(createdOrder)
 	}
 
-	if len(errIdx) > 0 {
-		time.Sleep(200 * time.Millisecond)
-
-		createdOrders2, err2 := BatchRetryPlaceOrder(ctx, e.session.Exchange, errIdx, formattedOrders...)
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-		} else {
-			createdOrders = append(createdOrders, createdOrders2...)
-		}
-	}
-
-	e.orderStore.Add(createdOrders...)
-	e.activeMakerOrders.Add(createdOrders...)
+	createdOrders, err := BatchRetryPlaceOrder(ctx, e.session.Exchange, nil, orderCreateCallback, formattedOrders...)
 	e.tradeCollector.Process()
 	return createdOrders, err
 }

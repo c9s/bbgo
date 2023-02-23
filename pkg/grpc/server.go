@@ -9,7 +9,6 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"go.uber.org/multierr"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
@@ -47,15 +46,8 @@ func (s *TradingService) SubmitOrder(ctx context.Context, request *pb.SubmitOrde
 		}
 	}
 
-	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, session.Exchange, submitOrders...)
-	if len(errIdx) > 0 {
-		createdOrders2, err2 := bbgo.BatchRetryPlaceOrder(ctx, session.Exchange, errIdx, submitOrders...)
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-		} else {
-			createdOrders = append(createdOrders, createdOrders2...)
-		}
-	}
+	// we will return this error later because some orders could be succeeded
+	createdOrders, err := bbgo.BatchRetryPlaceOrder(ctx, session.Exchange, nil, nil, submitOrders...)
 
 	// convert response
 	resp := &pb.SubmitOrderResponse{

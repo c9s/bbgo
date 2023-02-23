@@ -3,8 +3,8 @@ package grid2
 import "github.com/prometheus/client_golang/prometheus"
 
 var (
-	metricsGridNumOfOrders        *prometheus.GaugeVec
 	metricsGridNum                *prometheus.GaugeVec
+	metricsGridNumOfOrders        *prometheus.GaugeVec
 	metricsGridNumOfMissingOrders *prometheus.GaugeVec
 	metricsGridOrderPrices        *prometheus.GaugeVec
 	metricsGridProfit             *prometheus.GaugeVec
@@ -95,6 +95,11 @@ var metricsRegistered = false
 func registerMetrics() {
 	if metricsRegistered {
 		return
+	}
+
+	if metricsGridNum == nil {
+		// default setup
+		initMetrics(nil)
 	}
 
 	prometheus.MustRegister(
