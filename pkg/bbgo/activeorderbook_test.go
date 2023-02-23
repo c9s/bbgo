@@ -12,7 +12,13 @@ import (
 
 func TestActiveOrderBook_pendingOrders(t *testing.T) {
 	now := time.Now()
+
 	ob := NewActiveOrderBook("")
+
+	filled := false
+	ob.OnFilled(func(o types.Order) {
+		filled = true
+	})
 
 	// if we received filled order first
 	// should be added to pending orders
@@ -34,6 +40,11 @@ func TestActiveOrderBook_pendingOrders(t *testing.T) {
 
 	assert.Len(t, ob.pendingOrderUpdates.Orders(), 1)
 
+	o99, ok := ob.pendingOrderUpdates.Get(99)
+	if assert.True(t, ok) {
+		assert.Equal(t, types.OrderStatusFilled, o99.Status)
+	}
+
 	// should be added to pending orders
 	ob.Add(types.Order{
 		OrderID: 99,
@@ -51,7 +62,6 @@ func TestActiveOrderBook_pendingOrders(t *testing.T) {
 		UpdateTime:   types.Time(now.Add(-time.Second)),
 	})
 
-	o99, ok := ob.Get(99)
-	assert.True(t, ok)
-	assert.Equal(t, types.OrderStatusFilled, o99.Status)
+	assert.True(t, filled, "filled event should be fired")
+
 }
