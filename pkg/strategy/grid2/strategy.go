@@ -1546,24 +1546,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		metricsGridProfit.With(labels).Set(stats.TotalQuoteProfit.Float64())
 	})
 
-	// detect if there are previous grid orders on the order book
-	if s.ClearOpenOrdersWhenStart {
-		if err := s.clearOpenOrders(ctx, session); err != nil {
-			return err
-		}
-	}
-
-	if s.ClearOpenOrdersIfMismatch {
-		mismatch, err := s.openOrdersMismatches(ctx, session)
-		if err != nil {
-			s.logger.WithError(err).Errorf("clearOpenOrdersIfMismatch error")
-		} else if mismatch {
-			if err2 := s.clearOpenOrders(ctx, session); err2 != nil {
-				s.logger.WithError(err2).Errorf("clearOpenOrders error")
-			}
-		}
-	}
-
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
@@ -1588,6 +1570,28 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	if !s.TakeProfitPrice.IsZero() {
 		session.MarketDataStream.OnKLineClosed(s.newTakeProfitHandler(ctx, session))
 	}
+
+	// detect if there are previous grid orders on the order book
+	session.UserDataStream.OnStart(func() {
+		if s.ClearOpenOrdersWhenStart {
+			s.logger.Infof("clearOpenOrdersWhenStart is set, clearing open orders...")
+			if err := s.clearOpenOrders(ctx, session); err != nil {
+				s.logger.WithError(err).Errorf("clearOpenOrdersWhenStart error")
+			}
+		}
+
+		if s.ClearOpenOrdersIfMismatch {
+			s.logger.Infof("clearOpenOrdersIfMismatch is set, checking mismatched orders...")
+			mismatch, err := s.openOrdersMismatches(ctx, session)
+			if err != nil {
+				s.logger.WithError(err).Errorf("clearOpenOrdersIfMismatch error")
+			} else if mismatch {
+				if err2 := s.clearOpenOrders(ctx, session); err2 != nil {
+					s.logger.WithError(err2).Errorf("clearOpenOrders error")
+				}
+			}
+		}
+	})
 
 	// if TriggerPrice is zero, that means we need to open the grid when start up
 	if s.TriggerPrice.IsZero() {

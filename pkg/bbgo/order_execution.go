@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -305,8 +306,10 @@ func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, submitOrders 
 	return createdOrders, errIndexes, err
 }
 
+type OrderCallback func(order types.Order)
+
 // BatchRetryPlaceOrder places the orders and retries the failed orders
-func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx []int, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
+func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx []int, orderCallback OrderCallback, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
 	var createdOrders types.OrderSlice
 	var err error
 
@@ -320,6 +323,11 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 			} else if createdOrder != nil {
 				// if the order is successfully created, than we should copy the order tag
 				createdOrder.Tag = submitOrder.Tag
+
+				if orderCallback != nil {
+					orderCallback(*createdOrder)
+				}
+
 				createdOrders = append(createdOrders, *createdOrder)
 			}
 		}
@@ -327,6 +335,8 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 
 	// if we got any error, we should re-iterate the errored orders
 	for len(errIdx) > 0 {
+		time.Sleep(200 * time.Millisecond)
+
 		// allocate a variable for new error index
 		var errIdxNext []int
 
@@ -340,6 +350,11 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 			} else if createdOrder != nil {
 				// if the order is successfully created, than we should copy the order tag
 				createdOrder.Tag = submitOrder.Tag
+
+				if orderCallback != nil {
+					orderCallback(*createdOrder)
+				}
+
 				createdOrders = append(createdOrders, *createdOrder)
 			}
 		}
