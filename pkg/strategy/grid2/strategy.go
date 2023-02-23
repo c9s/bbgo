@@ -435,8 +435,6 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		s.logger.Infof("GRID REVERSE ORDER IS CREATED: %+v", createdOrders)
 	}
 
-	s.updateGridNumOfOrdersMetrics()
-	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 }
 
 // handleOrderFilled is called when an order status is FILLED
@@ -735,6 +733,9 @@ func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.Exch
 	return func(o types.Order) {
 		s.handleOrderFilled(o)
 		bbgo.Sync(ctx, s)
+
+		s.updateGridNumOfOrdersMetrics()
+		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 	}
 }
 
@@ -1439,8 +1440,12 @@ func scanMissingPinPrices(orderBook *bbgo.ActiveOrderBook, pins []Pin) PriceMap 
 
 func (s *Strategy) newPrometheusLabels() prometheus.Labels {
 	labels := prometheus.Labels{
-		"exchange": s.session.Name,
+		"exchange": "default",
 		"symbol":   s.Symbol,
+	}
+
+	if s.session != nil {
+		labels["exchange"] = s.session.Name
 	}
 
 	if s.PrometheusLabels == nil {
