@@ -307,13 +307,23 @@ func (b *ActiveOrderBook) Add(orders ...types.Order) {
 // add the order to the active order book and check the pending order
 func (b *ActiveOrderBook) add(order types.Order) {
 	if pendingOrder, ok := b.pendingOrderUpdates.Get(order.OrderID); ok {
+		// if the pending order update time is newer than the adding order
+		// we should use the pending order rather than the adding order.
+		// if pending order is older, than we should add the new one, and drop the pending order
 		if pendingOrder.UpdateTime.Time().After(order.UpdateTime.Time()) {
-			b.orders.Add(pendingOrder)
-		} else {
-			b.orders.Add(order)
+			order = pendingOrder
 		}
 
-		b.pendingOrderUpdates.Remove(order.OrderID)
+		b.orders.Add(order)
+		b.pendingOrderUpdates.Remove(pendingOrder.OrderID)
+
+		// when using add(order), it's usually a new maker order on the order book.
+		// so, when it's not status=new, we should trigger order update handler
+		if order.Status != types.OrderStatusNew {
+			// emit the order update handle function to trigger callback
+			b.orderUpdateHandler(order)
+		}
+
 	} else {
 		b.orders.Add(order)
 	}

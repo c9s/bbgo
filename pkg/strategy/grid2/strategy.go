@@ -1578,6 +1578,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 					if err := s.recoverGrid(ctx, session); err != nil {
 						log.WithError(err).Errorf("recover error")
 					}
+
 				}
 
 				if err := s.openGrid(ctx, session); err != nil {
@@ -1596,21 +1597,24 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 		return err
 	}
 
-	s.logger.Infof("found %d open orders left on the %s order book", len(openOrders), s.Symbol)
-
 	// do recover only when openOrders > 0
-	if len(openOrders) > 0 {
-		historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
-		if !implemented {
-			s.logger.Warn("ExchangeTradeHistoryService is not implemented, can not recover grid")
-			return nil
-		}
-
-		if err := s.recoverGridWithOpenOrders(ctx, historyService, openOrders); err != nil {
-			return errors.Wrap(err, "recover grid error")
-		}
+	if len(openOrders) == 0 {
+		return nil
 	}
 
+	s.logger.Infof("found %d open orders left on the %s order book", len(openOrders), s.Symbol)
+
+	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
+	if !implemented {
+		s.logger.Warn("ExchangeTradeHistoryService is not implemented, can not recover grid")
+		return nil
+	}
+
+	if err := s.recoverGridWithOpenOrders(ctx, historyService, openOrders); err != nil {
+		return errors.Wrap(err, "recover grid error")
+	}
+
+	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 	return nil
 }
 
