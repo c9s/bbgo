@@ -1615,6 +1615,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
+	return nil
 }
 
 // openOrdersMismatches verifies if the open orders are on the grid pins
