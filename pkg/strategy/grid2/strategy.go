@@ -396,8 +396,11 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		// use the profit to buy more inventory in the grid
 		if s.Compound || s.EarnBase {
 			newQuantity = fixedpoint.Max(orderQuoteQuantity.Div(newPrice), s.Market.MinQuantity)
+		} else if s.QuantityOrAmount.Quantity.Sign() > 0 {
+			newQuantity = s.QuantityOrAmount.Quantity
 		}
 
+		// TODO: need to consider sell order fee for the profit calculation
 		profit := s.calculateProfit(o, newPrice, newQuantity)
 		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
 		s.GridProfitStats.AddProfit(profit)
