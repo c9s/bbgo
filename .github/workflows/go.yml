@@ -16,7 +16,6 @@ jobs:
         redis-version:
         - 6.2
         go-version:
-        - 1.17
         - 1.18
     env:
       MYSQL_DATABASE: bbgo
