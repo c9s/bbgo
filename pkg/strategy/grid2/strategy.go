@@ -373,8 +373,10 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	// if we don't reduce the sell quantity, than we might fail to place the sell order
 	if o.Side == types.SideTypeBuy {
 		baseSellQuantityReduction = s.aggregateOrderBaseFee(o)
-
 		s.logger.Infof("GRID BUY ORDER BASE FEE: %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
+
+		baseSellQuantityReduction = baseSellQuantityReduction.Round(s.Market.VolumePrecision, fixedpoint.Up)
+		s.logger.Infof("GRID BUY ORDER BASE FEE (Rounding): %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
 
 		newQuantity = newQuantity.Sub(baseSellQuantityReduction)
 	}
