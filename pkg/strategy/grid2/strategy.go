@@ -363,7 +363,13 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	newSide := types.SideTypeSell
 	newPrice := o.Price
 	newQuantity := o.Quantity
-	orderQuoteQuantity := o.Quantity.Mul(o.Price)
+	executedPrice := o.Price
+	if o.AveragePrice.Sign() > 0 {
+		executedPrice = o.AveragePrice
+	}
+
+	// will be used for calculating quantity
+	orderExecutedQuoteAmount := o.Quantity.Mul(executedPrice)
 
 	// collect trades
 	baseSellQuantityReduction := fixedpoint.Zero
@@ -382,7 +388,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 
 		// use the profit to buy more inventory in the grid
 		if s.Compound || s.EarnBase {
-			newQuantity = fixedpoint.Max(orderQuoteQuantity.Div(newPrice), s.Market.MinQuantity)
+			newQuantity = fixedpoint.Max(orderExecutedQuoteAmount.Div(newPrice), s.Market.MinQuantity)
 		} else if s.QuantityOrAmount.Quantity.Sign() > 0 {
 			newQuantity = s.QuantityOrAmount.Quantity
 		}
@@ -415,7 +421,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		}
 
 		if s.EarnBase {
-			newQuantity = fixedpoint.Max(orderQuoteQuantity.Div(newPrice).Sub(baseSellQuantityReduction), s.Market.MinQuantity)
+			newQuantity = fixedpoint.Max(orderExecutedQuoteAmount.Div(newPrice).Sub(baseSellQuantityReduction), s.Market.MinQuantity)
 		}
 	}
 
