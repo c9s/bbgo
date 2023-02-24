@@ -368,19 +368,6 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	// collect trades
 	baseSellQuantityReduction := fixedpoint.Zero
 
-	// baseSellQuantityReduction calculation should be only for BUY order
-	// because when 1.0 BTC buy order is filled without FEE token, then we will actually get 1.0 * (1 - feeRate) BTC
-	// if we don't reduce the sell quantity, than we might fail to place the sell order
-	if o.Side == types.SideTypeBuy {
-		baseSellQuantityReduction = s.aggregateOrderBaseFee(o)
-		s.logger.Infof("GRID BUY ORDER BASE FEE: %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
-
-		baseSellQuantityReduction = baseSellQuantityReduction.Round(s.Market.VolumePrecision, fixedpoint.Up)
-		s.logger.Infof("GRID BUY ORDER BASE FEE (Rounding): %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
-
-		newQuantity = newQuantity.Sub(baseSellQuantityReduction)
-	}
-
 	switch o.Side {
 	case types.SideTypeSell:
 		newSide = types.SideTypeBuy
@@ -407,6 +394,17 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		s.EmitGridProfit(s.GridProfitStats, profit)
 
 	case types.SideTypeBuy:
+		// baseSellQuantityReduction calculation should be only for BUY order
+		// because when 1.0 BTC buy order is filled without FEE token, then we will actually get 1.0 * (1 - feeRate) BTC
+		// if we don't reduce the sell quantity, than we might fail to place the sell order
+		baseSellQuantityReduction = s.aggregateOrderBaseFee(o)
+		s.logger.Infof("GRID BUY ORDER BASE FEE: %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
+
+		baseSellQuantityReduction = baseSellQuantityReduction.Round(s.Market.VolumePrecision, fixedpoint.Up)
+		s.logger.Infof("GRID BUY ORDER BASE FEE (Rounding): %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
+
+		newQuantity = newQuantity.Sub(baseSellQuantityReduction)
+
 		newSide = types.SideTypeSell
 		if !s.ProfitSpread.IsZero() {
 			newPrice = newPrice.Add(s.ProfitSpread)
