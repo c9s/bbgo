@@ -220,11 +220,10 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 	orderCreateCallback := func(createdOrder types.Order) {
 		e.orderStore.Add(createdOrder)
 		e.activeMakerOrders.Add(createdOrder)
+		e.tradeCollector.Process()
 	}
 
-	createdOrders, err := BatchRetryPlaceOrder(ctx, e.session.Exchange, nil, orderCreateCallback, formattedOrders...)
-	e.tradeCollector.Process()
-	return createdOrders, err
+	return BatchRetryPlaceOrder(ctx, e.session.Exchange, nil, orderCreateCallback, formattedOrders...)
 }
 
 type OpenPositionOptions struct {

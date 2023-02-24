@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
@@ -311,14 +312,14 @@ type OrderCallback func(order types.Order)
 // BatchRetryPlaceOrder places the orders and retries the failed orders
 func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx []int, orderCallback OrderCallback, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
 	var createdOrders types.OrderSlice
-	var err error
+	var werr error
 
 	// if the errIdx is nil, then we should iterate all the submit orders
 	if len(errIdx) == 0 {
 		for i, submitOrder := range submitOrders {
 			createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
 			if err2 != nil {
-				err = multierr.Append(err, err2)
+				werr = multierr.Append(werr, err2)
 				errIdx = append(errIdx, i)
 			} else if createdOrder != nil {
 				// if the order is successfully created, than we should copy the order tag
@@ -343,19 +344,28 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 		// iterate the error index and re-submit the order
 		for _, idx := range errIdx {
 			submitOrder := submitOrders[idx]
-			createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
-			if err2 != nil {
-				err = multierr.Append(err, err2)
-				errIdxNext = append(errIdxNext, idx)
-			} else if createdOrder != nil {
-				// if the order is successfully created, than we should copy the order tag
-				createdOrder.Tag = submitOrder.Tag
 
-				if orderCallback != nil {
-					orderCallback(*createdOrder)
+			op := func() error {
+				// can allocate permanent error backoff.Permanent(err) to stop backoff
+				createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
+				if err2 == nil && createdOrder != nil {
+					// if the order is successfully created, than we should copy the order tag
+					createdOrder.Tag = submitOrder.Tag
+
+					if orderCallback != nil {
+						orderCallback(*createdOrder)
+					}
+
+					createdOrders = append(createdOrders, *createdOrder)
 				}
 
-				createdOrders = append(createdOrders, *createdOrder)
+				return err2
+			}
+
+			// if err2 := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 99)); err2 != nil {
+			if err2 := backoff.Retry(op, backoff.NewExponentialBackOff()); err2 != nil {
+				werr = multierr.Append(werr, err2)
+				errIdxNext = append(errIdxNext, idx)
 			}
 		}
 
@@ -363,5 +373,5 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 		errIdx = errIdxNext
 	}
 
-	return createdOrders, err
+	return createdOrders, werr
 }
