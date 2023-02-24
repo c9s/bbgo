@@ -1287,7 +1287,9 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	s.setGrid(grid)
 	s.EmitGridReady()
 
-	for _, o := range filledOrders {
+	for i := range filledOrders {
+		// avoid using the iterator
+		o := filledOrders[i]
 		s.processFilledOrder(o)
 		time.Sleep(100 * time.Millisecond)
 	}
