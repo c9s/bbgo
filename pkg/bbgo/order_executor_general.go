@@ -223,7 +223,8 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 		e.tradeCollector.Process()
 	}
 
-	return BatchRetryPlaceOrder(ctx, e.session.Exchange, nil, orderCreateCallback, formattedOrders...)
+	createdOrders, _, err := BatchRetryPlaceOrder(ctx, e.session.Exchange, nil, orderCreateCallback, formattedOrders...)
+	return createdOrders, err
 }
 
 type OpenPositionOptions struct {
