@@ -759,6 +759,8 @@ func (s *Strategy) newTriggerPriceHandler(ctx context.Context, session *bbgo.Exc
 func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.ExchangeSession) func(o types.Order) {
 	return func(o types.Order) {
 		s.handleOrderFilled(o)
+
+		// sync the profits to redis
 		bbgo.Sync(ctx, s)
 
 		s.updateGridNumOfOrdersMetrics()
