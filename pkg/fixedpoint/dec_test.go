@@ -2,10 +2,11 @@ package fixedpoint
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
 	"math/big"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 const Delta = 1e-9
@@ -122,6 +123,12 @@ func TestRound(t *testing.T) {
 	assert.Equal(t, "1", w.String())
 	s := NewFromFloat(1.2345)
 	assert.Equal(t, "1.23", s.Round(2, Down).String())
+}
+
+func TestNewFromString(t *testing.T) {
+	f, err := NewFromString("0.00000003")
+	assert.NoError(t, err)
+	assert.Equal(t, "0.00000003", f.String())
 }
 
 func TestFromString(t *testing.T) {

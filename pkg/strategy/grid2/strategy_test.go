@@ -917,3 +917,13 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 		assert.EqualError(t, err, "need at least 14979.995500 USDT for quote investment, 10000.000000 USDT given")
 	})
 }
+
+func Test_roundUpMarketQuantity(t *testing.T) {
+	q := number("0.00000003")
+	assert.Equal(t, "0.00000003", q.String())
+
+	q3 := roundUpMarketQuantity(types.Market{
+		VolumePrecision: 8,
+	}, q)
+	assert.Equal(t, "0.00000003", q3.String(), "rounding prec 8")
+}
