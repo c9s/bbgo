@@ -417,7 +417,10 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		s.logger.Infof("GRID BUY ORDER BASE FEE: %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
 
 		baseSellQuantityReduction = baseSellQuantityReduction.Round(s.Market.VolumePrecision, fixedpoint.Up)
-		s.logger.Infof("GRID BUY ORDER BASE FEE (Rounding): %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
+		s.logger.Infof("GRID BUY ORDER BASE FEE (Rounding with precision %d): %s %s",
+			s.Market.VolumePrecision,
+			baseSellQuantityReduction.String(),
+			s.Market.BaseCurrency)
 
 		newQuantity = newQuantity.Sub(baseSellQuantityReduction)
 
