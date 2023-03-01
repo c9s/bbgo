@@ -41,16 +41,18 @@ func (v Value) Trunc() Value {
 
 func (v Value) Round(r int, mode RoundingMode) Value {
 	pow := math.Pow10(r)
-	result := v.Float64() * pow
+	f := v.Float64() * pow
 	switch mode {
 	case Up:
-		return NewFromFloat(math.Ceil(result) / pow)
+		f = math.Ceil(f) / pow
 	case HalfUp:
-		return NewFromFloat(math.Floor(result+0.5) / pow)
+		f = math.Floor(f+0.5) / pow
 	case Down:
-		return NewFromFloat(math.Floor(result) / pow)
+		f = math.Floor(f) / pow
 	}
-	return v
+
+	s := strconv.FormatFloat(f, 'f', r, 64)
+	return MustNewFromString(s)
 }
 
 func (v Value) Value() (driver.Value, error) {
