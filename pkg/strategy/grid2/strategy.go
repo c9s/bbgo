@@ -416,7 +416,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		baseSellQuantityReduction = s.aggregateOrderBaseFee(o)
 		s.logger.Infof("GRID BUY ORDER BASE FEE: %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
 
-		baseSellQuantityReduction = baseSellQuantityReduction.Round(s.Market.VolumePrecision, fixedpoint.Up)
+		baseSellQuantityReduction = roundUpMarketQuantity(s.Market, baseSellQuantityReduction)
 		s.logger.Infof("GRID BUY ORDER BASE FEE (Rounding with precision %d): %s %s",
 			s.Market.VolumePrecision,
 			baseSellQuantityReduction.String(),
@@ -1765,4 +1765,8 @@ func (s *Strategy) openOrdersMismatches(ctx context.Context, session *bbgo.Excha
 	}
 
 	return false, nil
+}
+
+func roundUpMarketQuantity(market types.Market, v fixedpoint.Value) fixedpoint.Value {
+	return v.Round(market.VolumePrecision, fixedpoint.Up)
 }
