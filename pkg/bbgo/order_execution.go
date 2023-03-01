@@ -346,6 +346,7 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 
 	// set backoff max retries to 101 because https://ja.wikipedia.org/wiki/101%E5%9B%9E%E7%9B%AE%E3%81%AE%E3%83%97%E3%83%AD%E3%83%9D%E3%83%BC%E3%82%BA
 	backoffMaxRetries := uint64(101)
+batchRetryOrder:
 	for retryRound := 0; len(errIdx) > 0 && retryRound < 10; retryRound++ {
 		// sleep for 200 millisecond between each retry
 		log.Warnf("retry round #%d, cooling down for %s", retryRound+1, coolDownTime)
@@ -380,6 +381,10 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 			bo = backoff.WithMaxRetries(bo, backoffMaxRetries)
 			bo = backoff.WithContext(bo, timeoutCtx)
 			if err2 := backoff.Retry(op, bo); err2 != nil {
+				if err2 == context.Canceled {
+					break batchRetryOrder
+				}
+
 				werr = multierr.Append(werr, err2)
 				errIdxNext = append(errIdxNext, idx)
 			}
