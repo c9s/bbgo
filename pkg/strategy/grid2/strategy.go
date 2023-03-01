@@ -61,8 +61,9 @@ type OrderExecutor interface {
 }
 
 type advancedOrderCancelApi interface {
+	CancelAllOrders(ctx context.Context) ([]types.Order, error)
 	CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error)
-	CancelOrdersByGroupID(ctx context.Context, groupID int64) ([]types.Order, error)
+	CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([]types.Order, error)
 }
 
 //go:generate callbackgen -type Strategy
@@ -827,41 +828,57 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 	// now we can cancel the open orders
 	s.logger.Infof("canceling grid orders...")
 
+	service, support := s.session.Exchange.(advancedOrderCancelApi)
+
+	if s.UseCancelAllOrdersApiWhenClose && !support {
+		s.logger.Warnf("advancedOrderCancelApi interface is not implemented, fallback to default graceful cancel, exchange %T", s.session.Exchange)
+		s.UseCancelAllOrdersApiWhenClose = false
+	}
+
 	if s.UseCancelAllOrdersApiWhenClose {
 		s.logger.Infof("useCancelAllOrdersApiWhenClose is set, using advanced order cancel api for canceling...")
-		if service, ok := s.session.Exchange.(advancedOrderCancelApi); ok {
-			if s.OrderGroupID > 0 {
-				s.logger.Infof("found OrderGroupID (%d), using group ID for canceling orders...", s.OrderGroupID)
 
-				op := func() error {
-					_, cancelErr := service.CancelOrdersByGroupID(ctx, int64(s.OrderGroupID))
-					return cancelErr
-				}
-				err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
-				if err != nil {
-					werr = multierr.Append(werr, err)
-				}
+		if s.OrderGroupID > 0 {
+			s.logger.Infof("found OrderGroupID (%d), using group ID for canceling orders...", s.OrderGroupID)
+
+			op := func() error {
+				_, cancelErr := service.CancelOrdersByGroupID(ctx, s.OrderGroupID)
+				return cancelErr
 			}
-
-			time.Sleep(5 * time.Second)
-
-			s.logger.Infof("checking %s open orders...", s.Symbol)
-
-			openOrders, err := s.session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+			err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
 			if err != nil {
-				return err
+				werr = multierr.Append(werr, err)
 			}
+		} else {
+			s.logger.Infof("canceling all orders...")
+			op := func() error {
+				_, cancelErr := service.CancelAllOrders(ctx)
+				return cancelErr
+			}
+			err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
+			if err != nil {
+				werr = multierr.Append(werr, err)
+			}
+		}
 
-			if len(openOrders) > 0 {
-				s.logger.Infof("found %d open orders left, using cancel all orders api", len(openOrders))
+		time.Sleep(5 * time.Second)
 
-				op := func() error {
-					_, cancelErr := service.CancelOrdersBySymbol(ctx, s.Symbol)
-					return cancelErr
-				}
-				if err2 := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101)); err2 != nil {
-					werr = multierr.Append(werr, err2)
-				}
+		s.logger.Infof("checking %s open orders...", s.Symbol)
+
+		openOrders, err := s.session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+		if err != nil {
+			return err
+		}
+
+		if len(openOrders) > 0 {
+			s.logger.Infof("found %d open orders left, using cancel all orders api", len(openOrders))
+
+			op := func() error {
+				_, cancelErr := service.CancelOrdersBySymbol(ctx, s.Symbol)
+				return cancelErr
+			}
+			if err2 := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101)); err2 != nil {
+				werr = multierr.Append(werr, err2)
 			}
 		}
 	} else {
