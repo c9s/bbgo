@@ -100,7 +100,7 @@ func toGlobalOrderStatus(orderState max.OrderState, executedVolume, remainingVol
 
 	}
 
-	log.Errorf("unknown order status: %v", orderState)
+	log.Errorf("can not convert MAX exchange order status, unknown order state: %q", orderState)
 	return types.OrderStatus(orderState)
 }
 
@@ -157,9 +157,9 @@ func toGlobalOrders(maxOrders []max.Order) (orders []types.Order, err error) {
 		o, err := toGlobalOrder(localOrder)
 		if err != nil {
 			log.WithError(err).Error("order convert error")
+		} else {
+			orders = append(orders, *o)
 		}
-
-		orders = append(orders, *o)
 	}
 
 	return orders, err
