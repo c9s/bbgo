@@ -293,9 +293,16 @@ func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
 	}
 
 	req := e.v3order.NewCancelWalletOrderAllRequest(walletType)
-	var maxOrders, err = req.Do(ctx)
+	var orderResponses, err = req.Do(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	var maxOrders []maxapi.Order
+	for _, resp := range orderResponses {
+		if resp.Error == nil {
+			maxOrders = append(maxOrders, resp.Order)
+		}
 	}
 
 	return toGlobalOrders(maxOrders)
@@ -311,9 +318,16 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 	req := e.v3order.NewCancelWalletOrderAllRequest(walletType)
 	req.Market(market)
 
-	maxOrders, err := req.Do(ctx)
+	var orderResponses, err = req.Do(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	var maxOrders []maxapi.Order
+	for _, resp := range orderResponses {
+		if resp.Error == nil {
+			maxOrders = append(maxOrders, resp.Order)
+		}
 	}
 
 	return toGlobalOrders(maxOrders)
@@ -328,9 +342,16 @@ func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([
 	req := e.v3order.NewCancelWalletOrderAllRequest(walletType)
 	req.GroupID(groupID)
 
-	maxOrders, err := req.Do(ctx)
+	var orderResponses, err = req.Do(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	var maxOrders []maxapi.Order
+	for _, resp := range orderResponses {
+		if resp.Error == nil {
+			maxOrders = append(maxOrders, resp.Order)
+		}
 	}
 
 	return toGlobalOrders(maxOrders)
