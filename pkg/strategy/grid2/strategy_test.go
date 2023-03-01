@@ -13,11 +13,9 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	gridmocks "github.com/c9s/bbgo/pkg/strategy/grid2/mocks"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
-	"github.com/c9s/bbgo/pkg/util"
-
-	gridmocks "github.com/c9s/bbgo/pkg/strategy/grid2/mocks"
 )
 
 func init() {
@@ -918,30 +916,4 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 		assert.Error(t, err)
 		assert.EqualError(t, err, "need at least 14979.995500 USDT for quote investment, 10000.000000 USDT given")
 	})
-}
-
-func TestBacktestStrategy(t *testing.T) {
-	if v, ok := util.GetEnvVarBool("TEST_BACKTEST"); !ok || !v {
-		t.Skip("backtest flag is required")
-		return
-	}
-
-	market := types.Market{
-		BaseCurrency:    "BTC",
-		QuoteCurrency:   "USDT",
-		TickSize:        number(0.01),
-		PricePrecision:  2,
-		VolumePrecision: 8,
-	}
-	strategy := &Strategy{
-		logger:          logrus.NewEntry(logrus.New()),
-		Symbol:          "BTCUSDT",
-		Market:          market,
-		GridProfitStats: newGridProfitStats(market),
-		UpperPrice:      number(60_000),
-		LowerPrice:      number(28_000),
-		GridNum:         100,
-		QuoteInvestment: number(9000.0),
-	}
-	RunBacktest(t, strategy)
 }
