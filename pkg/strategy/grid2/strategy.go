@@ -370,6 +370,8 @@ func (s *Strategy) aggregateOrderBaseFee(o types.Order) fixedpoint.Value {
 }
 
 func (s *Strategy) processFilledOrder(o types.Order) {
+	var profit *GridProfit = nil
+
 	// check order fee
 	newSide := types.SideTypeSell
 	newPrice := o.Price
@@ -405,10 +407,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		}
 
 		// TODO: need to consider sell order fee for the profit calculation
-		profit := s.calculateProfit(o, newPrice, newQuantity)
-		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
-		s.GridProfitStats.AddProfit(profit)
-		s.EmitGridProfit(s.GridProfitStats, profit)
+		profit = s.calculateProfit(o, newPrice, newQuantity)
 
 	case types.SideTypeBuy:
 		// baseSellQuantityReduction calculation should be only for BUY order
@@ -449,12 +448,20 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 
 	s.logger.Infof("SUBMIT GRID REVERSE ORDER: %s", orderForm.String())
 
-	if createdOrders, err := s.orderExecutor.SubmitOrders(context.Background(), orderForm); err != nil {
-		s.logger.WithError(err).Errorf("can not submit arbitrage order")
-	} else {
-		s.logger.Infof("GRID REVERSE ORDER IS CREATED: %+v", createdOrders)
+	createdOrders, err := s.orderExecutor.SubmitOrders(context.Background(), orderForm)
+	if err != nil {
+		s.logger.WithError(err).Errorf("GRID REVERSE ORDER SUBMISSION ERROR: order: %s", orderForm.String())
+		return
 	}
 
+	s.logger.Infof("GRID REVERSE ORDER IS CREATED: %+v", createdOrders)
+
+	// we calculate profit only when the order is placed successfully
+	if profit != nil {
+		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
+		s.GridProfitStats.AddProfit(profit)
+		s.EmitGridProfit(s.GridProfitStats, profit)
+	}
 }
 
 // handleOrderFilled is called when an order status is FILLED
