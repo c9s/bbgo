@@ -24,9 +24,9 @@ type Strategy struct {
 	QuoteCurrency string           `json:"quoteCurrency"`
 	TargetWeights types.ValueMap   `json:"targetWeights"`
 	Threshold     fixedpoint.Value `json:"threshold"`
+	MaxAmount     fixedpoint.Value `json:"maxAmount"` // max amount to buy or sell per order
+	OrderType     types.OrderType  `json:"orderType"`
 	DryRun        bool             `json:"dryRun"`
-	// max amount to buy or sell per order
-	MaxAmount fixedpoint.Value `json:"maxAmount"`
 
 	activeOrderBook *bbgo.ActiveOrderBook
 }
@@ -199,7 +199,7 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 		order := types.SubmitOrder{
 			Symbol:   symbol,
 			Side:     side,
-			Type:     types.OrderTypeLimit,
+			Type:     s.OrderType,
 			Quantity: quantity,
 			Price:    currentPrice,
 		}
