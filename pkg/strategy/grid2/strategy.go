@@ -1568,6 +1568,8 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	}
 
 	_ = s.Initialize()
+
+	defer s.EmitGridClosed()
 	return s.cancelAll(ctx)
 }
 
