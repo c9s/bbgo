@@ -102,7 +102,7 @@ func NewPersistenceServiceFacade(conf *PersistenceConfig) (*service.PersistenceS
 	return facade, nil
 }
 
-func ConfigurePersistence(ctx context.Context, conf *PersistenceConfig) error {
+func ConfigurePersistence(ctx context.Context, environ *Environment, conf *PersistenceConfig) error {
 	facade, err := NewPersistenceServiceFacade(conf)
 	if err != nil {
 		return err
@@ -112,5 +112,6 @@ func ConfigurePersistence(ctx context.Context, conf *PersistenceConfig) error {
 	isolation.persistenceServiceFacade = facade
 
 	persistenceServiceFacade = facade
+	environ.PersistentService = facade
 	return nil
 }
