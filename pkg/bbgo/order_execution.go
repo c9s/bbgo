@@ -12,7 +12,16 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
+
+var DefaultSubmitOrderRetryTimeout = 5 * time.Minute
+
+func init() {
+	if du, ok := util.GetEnvVarDuration("BBGO_SUBMIT_ORDER_RETRY_TIMEOUT"); ok && du > 0 {
+		DefaultSubmitOrderRetryTimeout = du
+	}
+}
 
 type OrderExecutor interface {
 	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
@@ -342,7 +351,7 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 		errIdx = errIdxNext
 	}
 
-	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, 30*time.Minute)
+	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, DefaultSubmitOrderRetryTimeout)
 	defer cancelTimeout()
 
 	// if we got any error, we should re-iterate the errored orders
