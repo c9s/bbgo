@@ -78,18 +78,19 @@ const (
 
 // Environment presents the real exchange data layer
 type Environment struct {
-	DatabaseService *service.DatabaseService
-	OrderService    *service.OrderService
-	TradeService    *service.TradeService
-	ProfitService   *service.ProfitService
-	PositionService *service.PositionService
-	BacktestService *service.BacktestService
-	RewardService   *service.RewardService
-	MarginService   *service.MarginService
-	SyncService     *service.SyncService
-	AccountService  *service.AccountService
-	WithdrawService *service.WithdrawService
-	DepositService  *service.DepositService
+	DatabaseService   *service.DatabaseService
+	OrderService      *service.OrderService
+	TradeService      *service.TradeService
+	ProfitService     *service.ProfitService
+	PositionService   *service.PositionService
+	BacktestService   *service.BacktestService
+	RewardService     *service.RewardService
+	MarginService     *service.MarginService
+	SyncService       *service.SyncService
+	AccountService    *service.AccountService
+	WithdrawService   *service.WithdrawService
+	DepositService    *service.DepositService
+	PersistentService *service.PersistenceServiceFacade
 
 	// startTime is the time of start point (which is used in the backtest)
 	startTime time.Time
