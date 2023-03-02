@@ -1612,6 +1612,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	if s.QuoteInvestment.Sign() > 0 {
 		grid := s.newGrid()
 		if err := s.checkMinimalQuoteInvestment(grid); err != nil {
+			s.logger.Errorf("check minimal quote investment failed, market info: %+v", s.Market)
 			return err
 		}
 	}
