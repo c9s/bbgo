@@ -140,6 +140,7 @@ type Strategy struct {
 	// ResetPositionWhenStart resets the position when the strategy is started
 	ResetPositionWhenStart bool `json:"resetPositionWhenStart"`
 
+	// StopIfLessThanMinimalQuoteInvestment stops the strategy if the quote investment does not match
 	StopIfLessThanMinimalQuoteInvestment bool `json:"stopIfLessThanMinimalQuoteInvestment"`
 
 	// PrometheusLabels will be used as the base prometheus labels
