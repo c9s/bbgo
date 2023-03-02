@@ -137,7 +137,10 @@ type Strategy struct {
 	// UseCancelAllOrdersApiWhenClose uses a different API to cancel all the orders on the market when closing a grid
 	UseCancelAllOrdersApiWhenClose bool `json:"useCancelAllOrdersApiWhenClose"`
 
+	// ResetPositionWhenStart resets the position when the strategy is started
 	ResetPositionWhenStart bool `json:"resetPositionWhenStart"`
+
+	StopIfLessThanMinimalQuoteInvestment bool `json:"stopIfLessThanMinimalQuoteInvestment"`
 
 	// PrometheusLabels will be used as the base prometheus labels
 	PrometheusLabels prometheus.Labels `json:"prometheusLabels"`
@@ -1612,8 +1615,13 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	if s.QuoteInvestment.Sign() > 0 {
 		grid := s.newGrid()
 		if err := s.checkMinimalQuoteInvestment(grid); err != nil {
-			s.logger.Errorf("check minimal quote investment failed, market info: %+v", s.Market)
-			return err
+			if s.StopIfLessThanMinimalQuoteInvestment {
+				s.logger.WithError(err).Errorf("check minimal quote investment failed, market info: %+v", s.Market)
+				return err
+			} else {
+				// if no, just warning
+				s.logger.WithError(err).Warnf("minimal quote investment may be not enough, market info: %+v", s.Market)
+			}
 		}
 	}
 
