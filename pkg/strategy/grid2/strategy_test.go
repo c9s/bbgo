@@ -888,9 +888,23 @@ func TestStrategy_aggregateOrderBaseFeeRetry(t *testing.T) {
 }
 
 func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
-	s := newTestStrategy()
+
+	t.Run("7 grids", func(t *testing.T) {
+		s := newTestStrategy()
+		s.UpperPrice = number(1660)
+		s.LowerPrice = number(1630)
+		s.QuoteInvestment = number(61)
+		s.GridNum = 7
+		grid := s.newGrid()
+		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, grid)
+		assert.InDelta(t, 60.46, minQuoteInvestment.Float64(), 0.01)
+
+		err := s.checkMinimalQuoteInvestment(grid)
+		assert.NoError(t, err)
+	})
 
 	t.Run("10 grids", func(t *testing.T) {
+		s := newTestStrategy()
 		// 10_000 * 0.001 = 10USDT
 		// 20_000 * 0.001 = 20USDT
 		// hence we should have at least: 20USDT * 10 grids
@@ -905,6 +919,7 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 	})
 
 	t.Run("1000 grids", func(t *testing.T) {
+		s := newTestStrategy()
 		s.QuoteInvestment = number(10_000)
 		s.GridNum = 1000
 
