@@ -1567,6 +1567,7 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 		s.session = s.ExchangeSession
 	}
 
+	_ = s.Initialize()
 	return s.cancelAll(ctx)
 }
 
