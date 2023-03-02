@@ -36,6 +36,6 @@ exchangeStrategies:
         MAX: 15%
         USDT: 10%
       threshold: 1%
-      # max amount to buy or sell per order
-      maxAmount: 1_000
+      maxAmount: 1_000 # max amount to buy or sell per order
+      orderType: LIMIT_MAKER # LIMIT, LIMIT_MAKER or MARKET
       dryRun: false
