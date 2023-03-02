@@ -310,7 +310,11 @@ func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, submitOrders 
 type OrderCallback func(order types.Order)
 
 // BatchRetryPlaceOrder places the orders and retries the failed orders
-func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx []int, orderCallback OrderCallback, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
+func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx []int, orderCallback OrderCallback, logger log.FieldLogger, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
+	if logger == nil {
+		logger = log.StandardLogger()
+	}
+
 	var createdOrders types.OrderSlice
 	var werr error
 
@@ -349,14 +353,14 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 batchRetryOrder:
 	for retryRound := 0; len(errIdx) > 0 && retryRound < 10; retryRound++ {
 		// sleep for 200 millisecond between each retry
-		log.Warnf("retry round #%d, cooling down for %s", retryRound+1, coolDownTime)
+		logger.Warnf("retry round #%d, cooling down for %s", retryRound+1, coolDownTime)
 		time.Sleep(coolDownTime)
 
 		// reset error index since it's a new retry
 		errIdxNext = nil
 
 		// iterate the error index and re-submit the order
-		log.Warnf("starting retry round #%d...", retryRound+1)
+		logger.Warnf("starting retry round #%d...", retryRound+1)
 		for _, idx := range errIdx {
 			submitOrder := submitOrders[idx]
 
@@ -386,7 +390,7 @@ batchRetryOrder:
 			// bo = backoff.WithContext(bo, timeoutCtx)
 			if err2 := backoff.Retry(op, bo); err2 != nil {
 				if err2 == context.Canceled {
-					log.Warnf("context canceled error, stop retry")
+					logger.Warnf("context canceled error, stop retry")
 					break batchRetryOrder
 				}
 

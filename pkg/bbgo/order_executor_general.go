@@ -36,6 +36,8 @@ type GeneralOrderExecutor struct {
 	orderStore         *OrderStore
 	tradeCollector     *TradeCollector
 
+	logger log.FieldLogger
+
 	marginBaseMaxBorrowable, marginQuoteMaxBorrowable fixedpoint.Value
 
 	disableNotify bool
@@ -211,6 +213,10 @@ func (e *GeneralOrderExecutor) FastSubmitOrders(ctx context.Context, submitOrder
 
 }
 
+func (e *GeneralOrderExecutor) SetLogger(logger log.FieldLogger) {
+	e.logger = logger
+}
+
 func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
 	formattedOrders, err := e.session.FormatOrders(submitOrders)
 	if err != nil {
@@ -223,7 +229,7 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 		e.tradeCollector.Process()
 	}
 
-	createdOrders, _, err := BatchRetryPlaceOrder(ctx, e.session.Exchange, nil, orderCreateCallback, formattedOrders...)
+	createdOrders, _, err := BatchRetryPlaceOrder(ctx, e.session.Exchange, nil, orderCreateCallback, log.StandardLogger(), formattedOrders...)
 	return createdOrders, err
 }
 
