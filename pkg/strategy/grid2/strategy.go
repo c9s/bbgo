@@ -1563,10 +1563,6 @@ func (s *Strategy) newPrometheusLabels() prometheus.Labels {
 }
 
 func (s *Strategy) CleanUp(ctx context.Context) error {
-	if s.ExchangeSession == nil {
-		return errors.New("ExchangeSession is nil, can not clean up")
-	}
-	
 	return s.cancelAll(ctx)
 }
 
