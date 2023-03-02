@@ -387,7 +387,7 @@ batchRetryOrder:
 
 			var bo backoff.BackOff = backoff.NewExponentialBackOff()
 			bo = backoff.WithMaxRetries(bo, backoffMaxRetries)
-			// bo = backoff.WithContext(bo, timeoutCtx)
+			bo = backoff.WithContext(bo, timeoutCtx)
 			if err2 := backoff.Retry(op, bo); err2 != nil {
 				if err2 == context.Canceled {
 					logger.Warnf("context canceled error, stop retry")
