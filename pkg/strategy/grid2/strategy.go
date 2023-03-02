@@ -842,7 +842,7 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 	service, support := session.Exchange.(advancedOrderCancelApi)
 
 	if s.UseCancelAllOrdersApiWhenClose && !support {
-		s.logger.Warnf("advancedOrderCancelApi interface is not implemented, fallback to default graceful cancel, exchange %T", s.session.Exchange)
+		s.logger.Warnf("advancedOrderCancelApi interface is not implemented, fallback to default graceful cancel, exchange %T", session)
 		s.UseCancelAllOrdersApiWhenClose = false
 	}
 
@@ -876,7 +876,7 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 
 		s.logger.Infof("checking %s open orders...", s.Symbol)
 
-		openOrders, err := s.session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+		openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
 		if err != nil {
 			return err
 		}
@@ -1563,6 +1563,10 @@ func (s *Strategy) newPrometheusLabels() prometheus.Labels {
 }
 
 func (s *Strategy) CleanUp(ctx context.Context) error {
+	if s.ExchangeSession != nil {
+		s.session = s.ExchangeSession
+	}
+
 	return s.cancelAll(ctx)
 }
 
