@@ -229,7 +229,7 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 		e.tradeCollector.Process()
 	}
 
-	createdOrders, _, err := BatchRetryPlaceOrder(ctx, e.session.Exchange, nil, orderCreateCallback, log.StandardLogger(), formattedOrders...)
+	createdOrders, _, err := BatchRetryPlaceOrder(ctx, e.session.Exchange, nil, orderCreateCallback, e.logger, formattedOrders...)
 	return createdOrders, err
 }
 
