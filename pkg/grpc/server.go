@@ -47,7 +47,7 @@ func (s *TradingService) SubmitOrder(ctx context.Context, request *pb.SubmitOrde
 	}
 
 	// we will return this error later because some orders could be succeeded
-	createdOrders, _, err := bbgo.BatchRetryPlaceOrder(ctx, session.Exchange, nil, nil, submitOrders...)
+	createdOrders, _, err := bbgo.BatchRetryPlaceOrder(ctx, session.Exchange, nil, nil, log.StandardLogger(), submitOrders...)
 
 	// convert response
 	resp := &pb.SubmitOrderResponse{

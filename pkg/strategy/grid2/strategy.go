@@ -1641,6 +1641,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 	orderExecutor.ActiveMakerOrders().OnFilled(s.newOrderUpdateHandler(ctx, session))
 
+	if s.logger != nil {
+		orderExecutor.SetLogger(s.logger)
+	}
+
 	s.orderExecutor = orderExecutor
 
 	s.OnGridProfit(func(stats *GridProfitStats, profit *GridProfit) {
