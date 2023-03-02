@@ -357,12 +357,16 @@ batchRetryOrder:
 
 		// iterate the error index and re-submit the order
 		log.Warnf("starting retry round #%d...", retryRound+1)
-		for _, idx := range errIdxNext {
+		for _, idx := range errIdx {
 			submitOrder := submitOrders[idx]
 
 			op := func() error {
 				// can allocate permanent error backoff.Permanent(err) to stop backoff
 				createdOrder, err2 := exchange.SubmitOrder(timeoutCtx, submitOrder)
+				if err2 != nil {
+					log.WithError(err2).Errorf("submit order error")
+				}
+
 				if err2 == nil && createdOrder != nil {
 					// if the order is successfully created, then we should copy the order tag
 					createdOrder.Tag = submitOrder.Tag
@@ -379,9 +383,10 @@ batchRetryOrder:
 
 			var bo backoff.BackOff = backoff.NewExponentialBackOff()
 			bo = backoff.WithMaxRetries(bo, backoffMaxRetries)
-			bo = backoff.WithContext(bo, timeoutCtx)
+			// bo = backoff.WithContext(bo, timeoutCtx)
 			if err2 := backoff.Retry(op, bo); err2 != nil {
 				if err2 == context.Canceled {
+					log.Warnf("context canceled error, stop retry")
 					break batchRetryOrder
 				}
 
