@@ -11,6 +11,7 @@ require (
 	github.com/c-bata/goptuna v0.8.1
 	github.com/c9s/requestgen v1.3.0
 	github.com/c9s/rockhopper v1.2.2-0.20220617053729-ffdc87df194b
+	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/cheggaaa/pb/v3 v3.0.8
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
 	github.com/ethereum/go-ethereum v1.10.23
@@ -26,6 +27,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
+	github.com/heroku/rollrus v0.2.0
 	github.com/jedib0t/go-pretty/v6 v6.3.6
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/joho/godotenv v1.3.0
@@ -68,7 +70,6 @@ require (
 	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
-	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
@@ -91,7 +92,6 @@ require (
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/heroku/rollrus v0.2.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/jehiah/go-strftime v0.0.0-20171201141054-1d33003b3869 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
