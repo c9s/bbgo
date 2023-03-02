@@ -831,20 +831,15 @@ func (s *Strategy) OpenGrid(ctx context.Context) error {
 	return s.openGrid(ctx, s.session)
 }
 
-// CloseGrid closes the grid orders
-func (s *Strategy) CloseGrid(ctx context.Context) error {
-	s.logger.Infof("closing %s grid", s.Symbol)
-
-	defer s.EmitGridClosed()
-
-	bbgo.Sync(ctx, s)
-
+func (s *Strategy) cancelAll(ctx context.Context) error {
 	var werr error
 
-	// now we can cancel the open orders
-	s.logger.Infof("canceling grid orders...")
+	session := s.session
+	if session == nil {
+		session = s.ExchangeSession
+	}
 
-	service, support := s.session.Exchange.(advancedOrderCancelApi)
+	service, support := session.Exchange.(advancedOrderCancelApi)
 
 	if s.UseCancelAllOrdersApiWhenClose && !support {
 		s.logger.Warnf("advancedOrderCancelApi interface is not implemented, fallback to default graceful cancel, exchange %T", s.session.Exchange)
@@ -903,10 +898,26 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 		}
 	}
 
+	return werr
+}
+
+// CloseGrid closes the grid orders
+func (s *Strategy) CloseGrid(ctx context.Context) error {
+	s.logger.Infof("closing %s grid", s.Symbol)
+
+	defer s.EmitGridClosed()
+
+	bbgo.Sync(ctx, s)
+
+	// now we can cancel the open orders
+	s.logger.Infof("canceling grid orders...")
+
+	err := s.cancelAll(ctx)
+
 	// free the grid object
 	s.setGrid(nil)
 	s.updateGridNumOfOrdersMetrics()
-	return werr
+	return err
 }
 
 func (s *Strategy) newGrid() *Grid {
@@ -1555,14 +1566,8 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	if s.ExchangeSession == nil {
 		return errors.New("ExchangeSession is nil, can not clean up")
 	}
-
-	openOrders, err := s.ExchangeSession.Exchange.QueryOpenOrders(ctx, s.Symbol)
-	if err != nil {
-		return err
-	}
-
-	err = s.ExchangeSession.Exchange.CancelOrders(ctx, openOrders...)
-	return errors.Wrapf(err, "can not cancel %s orders", s.Symbol)
+	
+	return s.cancelAll(ctx)
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
