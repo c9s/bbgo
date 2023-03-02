@@ -445,6 +445,7 @@ See also:
 - <https://github.com/narumiruna/bbgo-marketcap>
 - <https://github.com/austin362667/shadow>
 - <https://github.com/jnlin/bbgo-strategy-infinite-grid>
+- <https://github.com/yubing744/trading-gpt>
 
 ## Command Usages
 
