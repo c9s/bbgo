@@ -143,6 +143,8 @@ type Strategy struct {
 	// StopIfLessThanMinimalQuoteInvestment stops the strategy if the quote investment does not match
 	StopIfLessThanMinimalQuoteInvestment bool `json:"stopIfLessThanMinimalQuoteInvestment"`
 
+	OrderFillDelay types.Duration `json:"orderFillDelay"`
+
 	// PrometheusLabels will be used as the base prometheus labels
 	PrometheusLabels prometheus.Labels `json:"prometheusLabels"`
 
@@ -785,6 +787,10 @@ func (s *Strategy) newTriggerPriceHandler(ctx context.Context, session *bbgo.Exc
 
 func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.ExchangeSession) func(o types.Order) {
 	return func(o types.Order) {
+		if s.OrderFillDelay > 0 {
+			time.Sleep(s.OrderFillDelay.Duration())
+		}
+
 		s.handleOrderFilled(o)
 
 		// sync the profits to redis
