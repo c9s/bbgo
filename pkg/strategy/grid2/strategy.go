@@ -1611,7 +1611,6 @@ func (s *Strategy) getWriteContext(fallbackCtxList ...context.Context) context.C
 		return s.writeCtx
 	}
 
-	// fallback to context background
 	for _, c := range fallbackCtxList {
 		if c != nil {
 			return c
