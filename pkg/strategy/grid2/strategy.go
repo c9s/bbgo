@@ -386,9 +386,12 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	newPrice := o.Price
 	newQuantity := o.Quantity
 	executedPrice := o.Price
-	if o.AveragePrice.Sign() > 0 {
-		executedPrice = o.AveragePrice
-	}
+
+	/*
+		if o.AveragePrice.Sign() > 0 {
+			executedPrice = o.AveragePrice
+		}
+	*/
 
 	// will be used for calculating quantity
 	orderExecutedQuoteAmount := o.Quantity.Mul(executedPrice)
@@ -441,7 +444,9 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		profit = s.calculateProfit(o, newPrice, newQuantity)
 
 	case types.SideTypeBuy:
-		newQuantity = newQuantity.Sub(feeQuantityReduction)
+		if feeCurrency == s.Market.BaseCurrency {
+			newQuantity = newQuantity.Sub(feeQuantityReduction)
+		}
 
 		newSide = types.SideTypeSell
 		if !s.ProfitSpread.IsZero() {
