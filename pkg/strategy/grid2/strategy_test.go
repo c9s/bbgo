@@ -478,7 +478,7 @@ func TestStrategy_aggregateOrderBaseFee(t *testing.T) {
 		},
 	}, nil)
 
-	baseFee := s.aggregateOrderBaseFee(types.Order{
+	baseFee, _ := s.aggregateOrderFee(types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:       "BTCUSDT",
 			Side:         types.SideTypeBuy,
@@ -646,6 +646,7 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 		defer mockCtrl.Finish()
 
 		mockService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+
 		mockService.EXPECT().QueryOrderTrades(ctx, types.OrderQuery{
 			Symbol:  "BTCUSDT",
 			OrderID: "1",
@@ -655,14 +656,32 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 				OrderID:     orderID,
 				Exchange:    "binance",
 				Price:       number(11000.0),
-				Quantity:    gridQuantity,
+				Quantity:    number("0.1"),
 				Symbol:      "BTCUSDT",
 				Side:        types.SideTypeBuy,
 				IsBuyer:     true,
 				FeeCurrency: "BTC",
 				Fee:         fixedpoint.Zero,
 			},
-		}, nil)
+		}, nil).Times(1)
+
+		mockService.EXPECT().QueryOrderTrades(ctx, types.OrderQuery{
+			Symbol:  "BTCUSDT",
+			OrderID: "2",
+		}).Return([]types.Trade{
+			{
+				ID:          2,
+				OrderID:     orderID,
+				Exchange:    "binance",
+				Price:       number(12000.0),
+				Quantity:    number(0.09166666666),
+				Symbol:      "BTCUSDT",
+				Side:        types.SideTypeSell,
+				IsBuyer:     true,
+				FeeCurrency: "BTC",
+				Fee:         fixedpoint.Zero,
+			},
+		}, nil).Times(1)
 
 		s.orderQueryService = mockService
 
@@ -735,6 +754,7 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 		defer mockCtrl.Finish()
 
 		mockService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+
 		mockService.EXPECT().QueryOrderTrades(ctx, types.OrderQuery{
 			Symbol:  "BTCUSDT",
 			OrderID: "1",
@@ -749,7 +769,25 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 				Side:        types.SideTypeBuy,
 				IsBuyer:     true,
 				FeeCurrency: "BTC",
-				Fee:         fixedpoint.Zero,
+				Fee:         number("0.00001"),
+			},
+		}, nil)
+
+		mockService.EXPECT().QueryOrderTrades(ctx, types.OrderQuery{
+			Symbol:  "BTCUSDT",
+			OrderID: "2",
+		}).Return([]types.Trade{
+			{
+				ID:          2,
+				OrderID:     orderID,
+				Exchange:    "binance",
+				Price:       number(12000.0),
+				Quantity:    gridQuantity,
+				Symbol:      "BTCUSDT",
+				Side:        types.SideTypeSell,
+				IsBuyer:     true,
+				FeeCurrency: "USDT",
+				Fee:         number("0.01"),
 			},
 		}, nil)
 
@@ -759,7 +797,7 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Symbol:      "BTCUSDT",
 			Type:        types.OrderTypeLimit,
 			Price:       number(12_000.0),
-			Quantity:    gridQuantity,
+			Quantity:    number(0.09998999),
 			Side:        types.SideTypeSell,
 			TimeInForce: types.TimeInForceGTC,
 			Market:      s.Market,
@@ -775,7 +813,7 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Symbol:      "BTCUSDT",
 			Type:        types.OrderTypeLimit,
 			Price:       number(11_000.0),
-			Quantity:    number(0.1090909),
+			Quantity:    number(0.10909),
 			Side:        types.SideTypeBuy,
 			TimeInForce: types.TimeInForceGTC,
 			Market:      s.Market,
@@ -865,7 +903,7 @@ func TestStrategy_aggregateOrderBaseFeeRetry(t *testing.T) {
 		},
 	}, nil)
 
-	baseFee := s.aggregateOrderBaseFee(types.Order{
+	baseFee, _ := s.aggregateOrderFee(types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:       "BTCUSDT",
 			Side:         types.SideTypeBuy,
@@ -937,8 +975,9 @@ func Test_roundUpMarketQuantity(t *testing.T) {
 	q := number("0.00000003")
 	assert.Equal(t, "0.00000003", q.String())
 
-	q3 := roundUpMarketQuantity(types.Market{
+	q3, prec := roundUpMarketQuantity(types.Market{
 		VolumePrecision: 8,
-	}, q)
+	}, q, "BTC")
 	assert.Equal(t, "0.00000003", q3.String(), "rounding prec 8")
+	assert.Equal(t, 8, prec)
 }

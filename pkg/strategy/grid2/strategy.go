@@ -143,6 +143,8 @@ type Strategy struct {
 	// StopIfLessThanMinimalQuoteInvestment stops the strategy if the quote investment does not match
 	StopIfLessThanMinimalQuoteInvestment bool `json:"stopIfLessThanMinimalQuoteInvestment"`
 
+	OrderFillDelay types.Duration `json:"orderFillDelay"`
+
 	// PrometheusLabels will be used as the base prometheus labels
 	PrometheusLabels prometheus.Labels `json:"prometheusLabels"`
 
@@ -321,22 +323,27 @@ func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 	tq := aggregateTradesQuantity(trades)
 
 	if tq.Compare(o.Quantity) != 0 {
-		s.logger.Warnf("order trades missing. expected: %f actual: %f",
-			o.Quantity.Float64(),
-			tq.Float64())
+		s.logger.Warnf("order trades missing. expected: %s got: %s",
+			o.Quantity.String(),
+			tq.String())
 		return false
 	}
 
 	return true
 }
 
-// aggregateOrderBaseFee collects the base fee quantity from the given order
+// aggregateOrderFee collects the base fee quantity from the given order
 // it falls back to query the trades via the RESTful API when the websocket trades are not all received.
-func (s *Strategy) aggregateOrderBaseFee(o types.Order) fixedpoint.Value {
+func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 	// try to get the received trades (websocket trades)
 	orderTrades := s.historicalTrades.GetOrderTrades(o)
 	if len(orderTrades) > 0 {
 		s.logger.Infof("found filled order trades: %+v", orderTrades)
+	}
+
+	feeCurrency := s.Market.BaseCurrency
+	if o.Side == types.SideTypeSell {
+		feeCurrency = s.Market.QuoteCurrency
 	}
 
 	for maxTries := maxNumberOfOrderTradesQueryTries; maxTries > 0; maxTries-- {
@@ -344,15 +351,15 @@ func (s *Strategy) aggregateOrderBaseFee(o types.Order) fixedpoint.Value {
 		if s.verifyOrderTrades(o, orderTrades) {
 			// if trades are verified
 			fees := collectTradeFee(orderTrades)
-			if fee, ok := fees[s.Market.BaseCurrency]; ok {
-				return fee
+			if fee, ok := fees[feeCurrency]; ok {
+				return fee, feeCurrency
 			}
-			return fixedpoint.Zero
+			return fixedpoint.Zero, feeCurrency
 		}
 
 		// if we don't support orderQueryService, then we should just skip
 		if s.orderQueryService == nil {
-			return fixedpoint.Zero
+			return fixedpoint.Zero, feeCurrency
 		}
 
 		s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
@@ -370,7 +377,7 @@ func (s *Strategy) aggregateOrderBaseFee(o types.Order) fixedpoint.Value {
 		}
 	}
 
-	return fixedpoint.Zero
+	return fixedpoint.Zero, feeCurrency
 }
 
 func (s *Strategy) processFilledOrder(o types.Order) {
@@ -381,15 +388,35 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	newPrice := o.Price
 	newQuantity := o.Quantity
 	executedPrice := o.Price
-	if o.AveragePrice.Sign() > 0 {
-		executedPrice = o.AveragePrice
-	}
+
+	/*
+		if o.AveragePrice.Sign() > 0 {
+			executedPrice = o.AveragePrice
+		}
+	*/
 
 	// will be used for calculating quantity
 	orderExecutedQuoteAmount := o.Quantity.Mul(executedPrice)
 
 	// collect trades
-	baseSellQuantityReduction := fixedpoint.Zero
+	feeQuantityReduction := fixedpoint.Zero
+	feeCurrency := ""
+	feePrec := 2
+
+	// feeQuantityReduction calculation is used to reduce the order quantity
+	// because when 1.0 BTC buy order is filled without FEE token, then we will actually get 1.0 * (1 - feeRate) BTC
+	// if we don't reduce the sell quantity, than we might fail to place the sell order
+	feeQuantityReduction, feeCurrency = s.aggregateOrderFee(o)
+	s.logger.Infof("GRID ORDER #%d %s FEE: %s %s",
+		o.OrderID, o.Side,
+		feeQuantityReduction.String(), feeCurrency)
+
+	feeQuantityReduction, feePrec = roundUpMarketQuantity(s.Market, feeQuantityReduction, feeCurrency)
+	s.logger.Infof("GRID ORDER #%d %s FEE (rounding precision %d): %s %s",
+		o.OrderID, o.Side,
+		feePrec,
+		feeQuantityReduction.String(),
+		feeCurrency)
 
 	switch o.Side {
 	case types.SideTypeSell:
@@ -405,6 +432,11 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 
 		// use the profit to buy more inventory in the grid
 		if s.Compound || s.EarnBase {
+			// if it's not using the platform fee currency, reduce the quote quantity for the buy order
+			if feeCurrency == s.Market.QuoteCurrency {
+				orderExecutedQuoteAmount = orderExecutedQuoteAmount.Sub(feeQuantityReduction)
+			}
+
 			newQuantity = fixedpoint.Max(orderExecutedQuoteAmount.Div(newPrice), s.Market.MinQuantity)
 		} else if s.QuantityOrAmount.Quantity.Sign() > 0 {
 			newQuantity = s.QuantityOrAmount.Quantity
@@ -414,19 +446,9 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		profit = s.calculateProfit(o, newPrice, newQuantity)
 
 	case types.SideTypeBuy:
-		// baseSellQuantityReduction calculation should be only for BUY order
-		// because when 1.0 BTC buy order is filled without FEE token, then we will actually get 1.0 * (1 - feeRate) BTC
-		// if we don't reduce the sell quantity, than we might fail to place the sell order
-		baseSellQuantityReduction = s.aggregateOrderBaseFee(o)
-		s.logger.Infof("GRID BUY ORDER BASE FEE: %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
-
-		baseSellQuantityReduction = roundUpMarketQuantity(s.Market, baseSellQuantityReduction)
-		s.logger.Infof("GRID BUY ORDER BASE FEE (Rounding with precision %d): %s %s",
-			s.Market.VolumePrecision,
-			baseSellQuantityReduction.String(),
-			s.Market.BaseCurrency)
-
-		newQuantity = newQuantity.Sub(baseSellQuantityReduction)
+		if feeCurrency == s.Market.BaseCurrency {
+			newQuantity = newQuantity.Sub(feeQuantityReduction)
+		}
 
 		newSide = types.SideTypeSell
 		if !s.ProfitSpread.IsZero() {
@@ -438,7 +460,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		}
 
 		if s.EarnBase {
-			newQuantity = fixedpoint.Max(orderExecutedQuoteAmount.Div(newPrice).Sub(baseSellQuantityReduction), s.Market.MinQuantity)
+			newQuantity = fixedpoint.Max(orderExecutedQuoteAmount.Div(newPrice).Sub(feeQuantityReduction), s.Market.MinQuantity)
 		}
 	}
 
@@ -765,6 +787,10 @@ func (s *Strategy) newTriggerPriceHandler(ctx context.Context, session *bbgo.Exc
 
 func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.ExchangeSession) func(o types.Order) {
 	return func(o types.Order) {
+		if s.OrderFillDelay > 0 {
+			time.Sleep(s.OrderFillDelay.Duration())
+		}
+
 		s.handleOrderFilled(o)
 
 		// sync the profits to redis
@@ -1789,6 +1815,11 @@ func (s *Strategy) openOrdersMismatches(ctx context.Context, session *bbgo.Excha
 	return false, nil
 }
 
-func roundUpMarketQuantity(market types.Market, v fixedpoint.Value) fixedpoint.Value {
-	return v.Round(market.VolumePrecision, fixedpoint.Up)
+func roundUpMarketQuantity(market types.Market, v fixedpoint.Value, c string) (fixedpoint.Value, int) {
+	prec := market.VolumePrecision
+	if c == market.QuoteCurrency {
+		prec = market.PricePrecision
+	}
+
+	return v.Round(prec, fixedpoint.Up), prec
 }
