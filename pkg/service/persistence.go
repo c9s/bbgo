@@ -1,5 +1,7 @@
 package service
 
+import "time"
+
 type PersistenceService interface {
 	NewStore(id string, subIDs ...string) Store
 }
@@ -8,6 +10,10 @@ type Store interface {
 	Load(val interface{}) error
 	Save(val interface{}) error
 	Reset() error
+}
+
+type Expirable interface {
+	Expiration() time.Duration
 }
 
 type RedisPersistenceConfig struct {
