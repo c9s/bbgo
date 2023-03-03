@@ -181,6 +181,9 @@ type Strategy struct {
 
 	// mu is used for locking the grid object field, avoid double grid opening
 	mu sync.Mutex
+
+	tradingCtx, writeCtx context.Context
+	cancelWrite          context.CancelFunc
 }
 
 func (s *Strategy) ID() string {
@@ -477,7 +480,8 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 
 	s.logger.Infof("SUBMIT GRID REVERSE ORDER: %s", orderForm.String())
 
-	createdOrders, err := s.orderExecutor.SubmitOrders(context.Background(), orderForm)
+	writeCtx := s.getWriteContext()
+	createdOrders, err := s.orderExecutor.SubmitOrders(writeCtx, orderForm)
 	if err != nil {
 		s.logger.WithError(err).Errorf("GRID REVERSE ORDER SUBMISSION ERROR: order: %s", orderForm.String())
 		return
@@ -1047,9 +1051,11 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	s.debugGridOrders(submitOrders, lastPrice)
 
+	writeCtx := s.getWriteContext(ctx)
+
 	var createdOrders []types.Order
 	for _, submitOrder := range submitOrders {
-		ret, err2 := s.orderExecutor.SubmitOrders(ctx, submitOrder)
+		ret, err2 := s.orderExecutor.SubmitOrders(writeCtx, submitOrder)
 		if err2 != nil {
 			return err2
 		}
@@ -1604,8 +1610,32 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	return s.cancelAll(ctx)
 }
 
+func (s *Strategy) getWriteContext(fallbackCtxList ...context.Context) context.Context {
+	if s.writeCtx != nil {
+		return s.writeCtx
+	}
+
+	// fallback to context background
+	for _, c := range fallbackCtxList {
+		if c != nil {
+			return c
+		}
+	}
+
+	if s.tradingCtx != nil {
+		return s.tradingCtx
+	}
+
+	// final fallback to context background
+	return context.Background()
+}
+
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
+
+	// allocate a context for write operation (submitting orders)
+	s.tradingCtx = ctx
+	s.writeCtx, s.cancelWrite = context.WithCancel(ctx)
 
 	s.session = session
 
@@ -1702,6 +1732,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		if s.KeepOrdersWhenShutdown {
 			s.logger.Infof("keepOrdersWhenShutdown is set, will keep the orders on the exchange")
 			return
+		}
+
+		if s.cancelWrite != nil {
+			s.cancelWrite()
 		}
 
 		if err := s.CloseGrid(ctx); err != nil {
