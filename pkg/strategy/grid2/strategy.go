@@ -446,10 +446,6 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		profit = s.calculateProfit(o, newPrice, newQuantity)
 
 	case types.SideTypeBuy:
-		if feeCurrency == s.Market.BaseCurrency {
-			newQuantity = newQuantity.Sub(feeQuantityReduction)
-		}
-
 		newSide = types.SideTypeSell
 		if !s.ProfitSpread.IsZero() {
 			newPrice = newPrice.Add(s.ProfitSpread)
@@ -459,9 +455,19 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 			}
 		}
 
-		if s.EarnBase {
-			newQuantity = fixedpoint.Max(orderExecutedQuoteAmount.Div(newPrice).Sub(feeQuantityReduction), s.Market.MinQuantity)
+		if feeCurrency == s.Market.QuoteCurrency {
+			orderExecutedQuoteAmount = orderExecutedQuoteAmount.Sub(feeQuantityReduction)
 		}
+
+		if s.EarnBase {
+			newQuantity = orderExecutedQuoteAmount.Div(newPrice)
+		} else {
+			if feeCurrency == s.Market.BaseCurrency {
+				newQuantity = newQuantity.Sub(feeQuantityReduction)
+			}
+		}
+
+		newQuantity = fixedpoint.Max(newQuantity, s.Market.MinQuantity)
 	}
 
 	orderForm := types.SubmitOrder{
