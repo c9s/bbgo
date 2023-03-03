@@ -857,6 +857,7 @@ func (s *Strategy) OpenGrid(ctx context.Context) error {
 	return s.openGrid(ctx, s.session)
 }
 
+// TODO: make sure the context here is the trading context or the shutdown context?
 func (s *Strategy) cancelAll(ctx context.Context) error {
 	var werr error
 
@@ -866,7 +867,6 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 	}
 
 	service, support := session.Exchange.(advancedOrderCancelApi)
-
 	if s.UseCancelAllOrdersApiWhenClose && !support {
 		s.logger.Warnf("advancedOrderCancelApi interface is not implemented, fallback to default graceful cancel, exchange %T", session)
 		s.UseCancelAllOrdersApiWhenClose = false
@@ -875,48 +875,48 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 	if s.UseCancelAllOrdersApiWhenClose {
 		s.logger.Infof("useCancelAllOrdersApiWhenClose is set, using advanced order cancel api for canceling...")
 
-		if s.OrderGroupID > 0 {
-			s.logger.Infof("found OrderGroupID (%d), using group ID for canceling orders...", s.OrderGroupID)
+		for {
+			s.logger.Infof("checking %s open orders...", s.Symbol)
 
-			op := func() error {
-				_, cancelErr := service.CancelOrdersByGroupID(ctx, s.OrderGroupID)
-				return cancelErr
-			}
-			err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
+			openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
 			if err != nil {
-				werr = multierr.Append(werr, err)
+				return err
 			}
-		} else {
-			s.logger.Infof("canceling all orders...")
-			op := func() error {
-				_, cancelErr := service.CancelAllOrders(ctx)
-				return cancelErr
+
+			if len(openOrders) == 0 {
+				break
 			}
-			err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
-			if err != nil {
-				werr = multierr.Append(werr, err)
-			}
-		}
 
-		time.Sleep(5 * time.Second)
-
-		s.logger.Infof("checking %s open orders...", s.Symbol)
-
-		openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
-		if err != nil {
-			return err
-		}
-
-		if len(openOrders) > 0 {
 			s.logger.Infof("found %d open orders left, using cancel all orders api", len(openOrders))
 
-			op := func() error {
-				_, cancelErr := service.CancelOrdersBySymbol(ctx, s.Symbol)
-				return cancelErr
+			if s.OrderGroupID > 0 {
+				s.logger.Infof("found OrderGroupID (%d), using group ID for canceling grid orders...", s.OrderGroupID)
+
+				op := func() error {
+					_, cancelErr := service.CancelOrdersByGroupID(ctx, s.OrderGroupID)
+					return cancelErr
+				}
+				err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
+				if err != nil {
+					s.logger.WithError(err).Errorf("CancelOrdersByGroupID api call error")
+					werr = multierr.Append(werr, err)
+				}
+
+			} else {
+				s.logger.Infof("using cancal all orders api for canceling grid orders...")
+				op := func() error {
+					_, cancelErr := service.CancelAllOrders(ctx)
+					return cancelErr
+				}
+
+				err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
+				if err != nil {
+					s.logger.WithError(err).Errorf("CancelAllOrders api call error")
+					werr = multierr.Append(werr, err)
+				}
 			}
-			if err2 := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101)); err2 != nil {
-				werr = multierr.Append(werr, err2)
-			}
+
+			time.Sleep(1 * time.Second)
 		}
 	} else {
 		if err := s.orderExecutor.GracefulCancel(ctx); err != nil {
@@ -1743,22 +1743,26 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		session.UserDataStream.OnStart(func() {
 			s.logger.Infof("user data stream started, initializing grid...")
 
-			// avoid blocking the user data stream
-			// callbacks are blocking operation
-			go func() {
+			if s.RecoverOrdersWhenStart {
+				// avoid blocking the user data stream
+				// callbacks are blocking operation
 				// do recover only when triggerPrice is not set.
-				if s.RecoverOrdersWhenStart {
+				go func() {
 					s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
 					if err := s.recoverGrid(ctx, session); err != nil {
 						log.WithError(err).Errorf("recover error")
 					}
 
-				}
-
+					if err := s.openGrid(ctx, session); err != nil {
+						s.logger.WithError(err).Errorf("failed to setup grid orders")
+					}
+				}()
+			} else {
+				// avoid using goroutine here for back-test
 				if err := s.openGrid(ctx, session); err != nil {
 					s.logger.WithError(err).Errorf("failed to setup grid orders")
 				}
-			}()
+			}
 		})
 	}
 
