@@ -62,6 +62,10 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("maxAmount shoud not less than 0")
 	}
 
+	if s.OrderType == "" {
+		s.OrderType = types.OrderTypeLimitMaker
+	}
+
 	return nil
 }
 
