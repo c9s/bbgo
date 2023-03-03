@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 	log "github.com/sirupsen/logrus"
@@ -87,15 +88,20 @@ func (store *RedisStore) Save(val interface{}) error {
 		return nil
 	}
 
+	var expiration time.Duration
+	if expiringData, ok := val.(Expirable); ok {
+		expiration = expiringData.Expiration()
+	}
+
 	data, err := json.Marshal(val)
 	if err != nil {
 		return err
 	}
 
-	cmd := store.redis.Set(context.Background(), store.ID, data, 0)
+	cmd := store.redis.Set(context.Background(), store.ID, data, expiration)
 	_, err = cmd.Result()
 
-	redisLogger.Debugf("[redis] set key %q, data = %s", store.ID, string(data))
+	redisLogger.Debugf("[redis] set key %q, data = %s, expiration = %s", store.ID, string(data), expiration)
 
 	return err
 }
