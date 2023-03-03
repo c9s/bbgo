@@ -1740,28 +1740,25 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	// if TriggerPrice is zero, that means we need to open the grid when start up
 	if s.TriggerPrice.IsZero() {
+		// must call the openGrid method inside the OnStart callback because
+		// it needs to receive the trades from the user data stream
+		//
+		// should try to avoid blocking the user data stream
+		// callbacks are blocking operation
 		session.UserDataStream.OnStart(func() {
 			s.logger.Infof("user data stream started, initializing grid...")
 
-			if s.RecoverOrdersWhenStart {
-				// avoid blocking the user data stream
-				// callbacks are blocking operation
-				// do recover only when triggerPrice is not set.
-				go func() {
-					s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
-					if err := s.recoverGrid(ctx, session); err != nil {
-						log.WithError(err).Errorf("recover error")
-					}
-
-					if err := s.openGrid(ctx, session); err != nil {
-						s.logger.WithError(err).Errorf("failed to setup grid orders")
-					}
-				}()
-			} else {
-				// avoid using goroutine here for back-test
-				if err := s.openGrid(ctx, session); err != nil {
-					s.logger.WithError(err).Errorf("failed to setup grid orders")
+			if s.RecoverOrdersWhenStart && !bbgo.IsBackTesting {
+				// do recover only when triggerPrice is not set and not in the back-test mode
+				s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
+				if err := s.recoverGrid(ctx, session); err != nil {
+					log.WithError(err).Errorf("recover error")
 				}
+			}
+
+			// avoid using goroutine here for back-test
+			if err := s.openGrid(ctx, session); err != nil {
+				s.logger.WithError(err).Errorf("failed to setup grid orders")
 			}
 		})
 	}
