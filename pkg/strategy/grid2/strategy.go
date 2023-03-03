@@ -878,9 +878,14 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 		for {
 			s.logger.Infof("checking %s open orders...", s.Symbol)
 
-			openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
-			if err != nil {
+			var openOrders []types.Order
+			if err := backoff.Retry(func() error {
+				var err error
+				openOrders, err = session.Exchange.QueryOpenOrders(ctx, s.Symbol)
 				return err
+			}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101)); err != nil {
+				s.logger.WithError(err).Errorf("CancelOrdersByGroupID api call error")
+				werr = multierr.Append(werr, err)
 			}
 
 			if len(openOrders) == 0 {
