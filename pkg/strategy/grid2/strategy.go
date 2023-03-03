@@ -1053,13 +1053,9 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	writeCtx := s.getWriteContext(ctx)
 
-	var createdOrders []types.Order
-	for _, submitOrder := range submitOrders {
-		ret, err2 := s.orderExecutor.SubmitOrders(writeCtx, submitOrder)
-		if err2 != nil {
-			return err2
-		}
-		createdOrders = append(createdOrders, ret...)
+	createdOrders, err2 := s.orderExecutor.SubmitOrders(writeCtx, submitOrders...)
+	if err2 != nil {
+		return err2
 	}
 
 	// try to always emit grid ready
