@@ -330,13 +330,18 @@ func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 	return true
 }
 
-// aggregateOrderBaseFee collects the base fee quantity from the given order
+// aggregateOrderFee collects the base fee quantity from the given order
 // it falls back to query the trades via the RESTful API when the websocket trades are not all received.
-func (s *Strategy) aggregateOrderBaseFee(o types.Order) fixedpoint.Value {
+func (s *Strategy) aggregateOrderFee(o types.Order) fixedpoint.Value {
 	// try to get the received trades (websocket trades)
 	orderTrades := s.historicalTrades.GetOrderTrades(o)
 	if len(orderTrades) > 0 {
 		s.logger.Infof("found filled order trades: %+v", orderTrades)
+	}
+
+	feeCurrency := s.Market.BaseCurrency
+	if o.Side == types.SideTypeSell {
+		feeCurrency = s.Market.QuoteCurrency
 	}
 
 	for maxTries := maxNumberOfOrderTradesQueryTries; maxTries > 0; maxTries-- {
@@ -344,7 +349,7 @@ func (s *Strategy) aggregateOrderBaseFee(o types.Order) fixedpoint.Value {
 		if s.verifyOrderTrades(o, orderTrades) {
 			// if trades are verified
 			fees := collectTradeFee(orderTrades)
-			if fee, ok := fees[s.Market.BaseCurrency]; ok {
+			if fee, ok := fees[feeCurrency]; ok {
 				return fee
 			}
 			return fixedpoint.Zero
@@ -417,7 +422,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		// baseSellQuantityReduction calculation should be only for BUY order
 		// because when 1.0 BTC buy order is filled without FEE token, then we will actually get 1.0 * (1 - feeRate) BTC
 		// if we don't reduce the sell quantity, than we might fail to place the sell order
-		baseSellQuantityReduction = s.aggregateOrderBaseFee(o)
+		baseSellQuantityReduction = s.aggregateOrderFee(o)
 		s.logger.Infof("GRID BUY ORDER BASE FEE: %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
 
 		baseSellQuantityReduction = roundUpMarketQuantity(s.Market, baseSellQuantityReduction)

@@ -478,7 +478,7 @@ func TestStrategy_aggregateOrderBaseFee(t *testing.T) {
 		},
 	}, nil)
 
-	baseFee := s.aggregateOrderBaseFee(types.Order{
+	baseFee := s.aggregateOrderFee(types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:       "BTCUSDT",
 			Side:         types.SideTypeBuy,
@@ -865,7 +865,7 @@ func TestStrategy_aggregateOrderBaseFeeRetry(t *testing.T) {
 		},
 	}, nil)
 
-	baseFee := s.aggregateOrderBaseFee(types.Order{
+	baseFee := s.aggregateOrderFee(types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:       "BTCUSDT",
 			Side:         types.SideTypeBuy,
