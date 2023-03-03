@@ -332,7 +332,7 @@ func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 
 // aggregateOrderFee collects the base fee quantity from the given order
 // it falls back to query the trades via the RESTful API when the websocket trades are not all received.
-func (s *Strategy) aggregateOrderFee(o types.Order) fixedpoint.Value {
+func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 	// try to get the received trades (websocket trades)
 	orderTrades := s.historicalTrades.GetOrderTrades(o)
 	if len(orderTrades) > 0 {
@@ -350,14 +350,14 @@ func (s *Strategy) aggregateOrderFee(o types.Order) fixedpoint.Value {
 			// if trades are verified
 			fees := collectTradeFee(orderTrades)
 			if fee, ok := fees[feeCurrency]; ok {
-				return fee
+				return fee, ""
 			}
-			return fixedpoint.Zero
+			return fixedpoint.Zero, feeCurrency
 		}
 
 		// if we don't support orderQueryService, then we should just skip
 		if s.orderQueryService == nil {
-			return fixedpoint.Zero
+			return fixedpoint.Zero, feeCurrency
 		}
 
 		s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
@@ -375,7 +375,7 @@ func (s *Strategy) aggregateOrderFee(o types.Order) fixedpoint.Value {
 		}
 	}
 
-	return fixedpoint.Zero
+	return fixedpoint.Zero, feeCurrency
 }
 
 func (s *Strategy) processFilledOrder(o types.Order) {
@@ -422,7 +422,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		// baseSellQuantityReduction calculation should be only for BUY order
 		// because when 1.0 BTC buy order is filled without FEE token, then we will actually get 1.0 * (1 - feeRate) BTC
 		// if we don't reduce the sell quantity, than we might fail to place the sell order
-		baseSellQuantityReduction = s.aggregateOrderFee(o)
+		baseSellQuantityReduction, _ = s.aggregateOrderFee(o)
 		s.logger.Infof("GRID BUY ORDER BASE FEE: %s %s", baseSellQuantityReduction.String(), s.Market.BaseCurrency)
 
 		baseSellQuantityReduction = roundUpMarketQuantity(s.Market, baseSellQuantityReduction)
