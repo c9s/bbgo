@@ -476,6 +476,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		TimeInForce: types.TimeInForceGTC,
 		Quantity:    newQuantity,
 		Tag:         orderTag,
+		GroupID:     s.OrderGroupID,
 	}
 
 	s.logger.Infof("SUBMIT GRID REVERSE ORDER: %s", orderForm.String())
@@ -1176,6 +1177,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					Market:      s.Market,
 					TimeInForce: types.TimeInForceGTC,
 					Tag:         orderTag,
+					GroupID:     s.OrderGroupID,
 				})
 				usedBase = usedBase.Add(quantity)
 			} else {
@@ -1192,6 +1194,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					Market:      s.Market,
 					TimeInForce: types.TimeInForceGTC,
 					Tag:         orderTag,
+					GroupID:     s.OrderGroupID,
 				})
 				quoteQuantity := quantity.Mul(nextPrice)
 				usedQuote = usedQuote.Add(quoteQuantity)
@@ -1224,6 +1227,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				Market:      s.Market,
 				TimeInForce: types.TimeInForceGTC,
 				Tag:         orderTag,
+				GroupID:     s.OrderGroupID,
 			})
 			usedQuote = usedQuote.Add(quoteQuantity)
 		}
