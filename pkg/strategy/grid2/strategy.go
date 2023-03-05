@@ -1405,7 +1405,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	filledOrders := types.OrdersFilled(tmpOrders)
 
 	// if the number of FILLED orders and NEW orders equals to GridNum, then we need to remove an extra filled order for the replay events
-	if len(tmpOrders) == int(s.GridNum) && len(filledOrders) > 1 {
+	if len(tmpOrders) == int(s.GridNum) && len(filledOrders) > 0 {
 		// remove the latest updated order because it's near the empty slot
 		filledOrders = filledOrders[1:]
 	}
