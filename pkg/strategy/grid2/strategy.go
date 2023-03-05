@@ -1320,9 +1320,11 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	// for MAX exchange we need the order ID to query the closed order history
 	if s.GridProfitStats != nil && s.GridProfitStats.InitialOrderID > 0 {
 		lastOrderID = s.GridProfitStats.InitialOrderID
+		s.logger.Infof("found initial order id #%d from grid stats", lastOrderID)
 	} else {
 		if oid, ok := findEarliestOrderID(openOrders); ok {
 			lastOrderID = oid
+			s.logger.Infof("found earliest order id #%d from open orders", lastOrderID)
 		}
 	}
 
@@ -1826,6 +1828,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 
 	// do recover only when openOrders > 0
 	if len(openOrders) == 0 {
+		s.logger.Warn("0 open orders, skip recovery process")
 		return nil
 	}
 
@@ -1838,7 +1841,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	if err := s.recoverGridWithOpenOrders(ctx, historyService, openOrders); err != nil {
-		return errors.Wrap(err, "recover grid error")
+		return errors.Wrap(err, "grid recover error")
 	}
 
 	return nil
