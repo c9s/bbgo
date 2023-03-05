@@ -1734,13 +1734,13 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
+		if s.cancelWrite != nil {
+			s.cancelWrite()
+		}
+
 		if s.KeepOrdersWhenShutdown {
 			s.logger.Infof("keepOrdersWhenShutdown is set, will keep the orders on the exchange")
 			return
-		}
-
-		if s.cancelWrite != nil {
-			s.cancelWrite()
 		}
 
 		if err := s.CloseGrid(ctx); err != nil {
