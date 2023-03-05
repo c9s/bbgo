@@ -1384,6 +1384,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 
 	debugGrid(s.logger, grid, orderBook)
 
+	// note that the tmpOrders contains FILLED and NEW orders
 	tmpOrders := orderBook.Orders()
 
 	// if all orders on the order book are active orders, we don't need to recover.
@@ -1400,13 +1401,14 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	// for reverse order recovering, we need the orders to be sort by update time ascending-ly
 	types.SortOrdersUpdateTimeAscending(tmpOrders)
 
-	if len(tmpOrders) > 1 && len(tmpOrders) == int(s.GridNum) {
-		// remove the latest updated order because it's near the empty slot
-		tmpOrders = tmpOrders[1:]
-	}
-
 	// we will only submit reverse orders for filled orders
 	filledOrders := types.OrdersFilled(tmpOrders)
+
+	// if the number of FILLED orders and NEW orders equals to GridNum, then we need to remove an extra filled order for the replay events
+	if len(tmpOrders) == int(s.GridNum) && len(filledOrders) > 1 {
+		// remove the latest updated order because it's near the empty slot
+		filledOrders = filledOrders[1:]
+	}
 
 	s.logger.Infof("GRID RECOVER: found %d filled grid orders, will re-replay the order event in the following order:", len(filledOrders))
 	for i, o := range filledOrders {
