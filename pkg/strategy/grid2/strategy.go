@@ -1341,8 +1341,11 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	missingPrices := scanMissingPinPrices(orderBook, grid.Pins)
 	if numMissing := len(missingPrices); numMissing <= 1 {
 		s.logger.Infof("GRID RECOVER: no missing grid prices, stop re-playing order history")
+		s.addOrdersToActiveOrderBook(gridOrders)
 		s.setGrid(grid)
 		s.EmitGridReady()
+		s.updateGridNumOfOrdersMetrics()
+		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 		return nil
 	} else {
 		s.logger.Infof("GRID RECOVER: found missing prices: %v", missingPrices)
@@ -1384,8 +1387,11 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	// if all orders on the order book are active orders, we don't need to recover.
 	if isCompleteGridOrderBook(orderBook, s.GridNum) {
 		s.logger.Infof("GRID RECOVER: all orders are active orders, do not need recover")
+		s.addOrdersToActiveOrderBook(gridOrders)
 		s.setGrid(grid)
 		s.EmitGridReady()
+		s.updateGridNumOfOrdersMetrics()
+		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 		return nil
 	}
 
@@ -1407,11 +1413,7 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 
 	// before we re-play the orders,
 	// we need to add these open orders to the active order book
-	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
-	for _, gridOrder := range gridOrders {
-		// put the order back to the active order book so that we can receive order update
-		activeOrderBook.Add(gridOrder)
-	}
+	s.addOrdersToActiveOrderBook(gridOrders)
 
 	s.setGrid(grid)
 	s.EmitGridReady()
@@ -1433,6 +1435,14 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	s.updateGridNumOfOrdersMetrics()
 	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 	return nil
+}
+
+func (s *Strategy) addOrdersToActiveOrderBook(gridOrders []types.Order) {
+	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
+	for _, gridOrder := range gridOrders {
+		// put the order back to the active order book so that we can receive order update
+		activeOrderBook.Add(gridOrder)
+	}
 }
 
 func (s *Strategy) setGrid(grid *Grid) {
