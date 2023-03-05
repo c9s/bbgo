@@ -1792,22 +1792,30 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		session.UserDataStream.OnStart(func() {
 			s.logger.Infof("user data stream started, initializing grid...")
 
-			if s.RecoverOrdersWhenStart && !bbgo.IsBackTesting {
-				// do recover only when triggerPrice is not set and not in the back-test mode
-				s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
-				if err := s.recoverGrid(ctx, session); err != nil {
-					log.WithError(err).Errorf("recover error")
-				}
-			}
-
-			// avoid using goroutine here for back-test
-			if err := s.openGrid(ctx, session); err != nil {
-				s.logger.WithError(err).Errorf("failed to setup grid orders")
+			if !bbgo.IsBackTesting {
+				go s.startProcess(ctx, session)
+			} else {
+				s.startProcess(ctx, session)
 			}
 		})
 	}
 
 	return nil
+}
+
+func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSession) {
+	if s.RecoverOrdersWhenStart {
+		// do recover only when triggerPrice is not set and not in the back-test mode
+		s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
+		if err := s.recoverGrid(ctx, session); err != nil {
+			s.logger.WithError(err).Errorf("recover error")
+		}
+	}
+
+	// avoid using goroutine here for back-test
+	if err := s.openGrid(ctx, session); err != nil {
+		s.logger.WithError(err).Errorf("failed to setup grid orders")
+	}
 }
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
