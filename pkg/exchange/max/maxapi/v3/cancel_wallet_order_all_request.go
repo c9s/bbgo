@@ -22,5 +22,5 @@ type CancelWalletOrderAllRequest struct {
 	walletType WalletType `param:"walletType,slug,required"`
 	side       *string    `param:"side"`
 	market     *string    `param:"market"`
-	groupID    *uint32    `param:"groupID"`
+	groupID    *uint32    `param:"group_id"`
 }
