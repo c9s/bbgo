@@ -899,31 +899,16 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 
 			s.logger.Infof("found %d open orders left, using cancel all orders api", len(openOrders))
 
-			if s.OrderGroupID > 0 {
-				s.logger.Infof("found OrderGroupID (%d), using group ID for canceling grid orders...", s.OrderGroupID)
+			s.logger.Infof("using cancal all orders api for canceling grid orders...")
+			op := func() error {
+				_, cancelErr := service.CancelAllOrders(ctx)
+				return cancelErr
+			}
 
-				op := func() error {
-					_, cancelErr := service.CancelOrdersByGroupID(ctx, s.OrderGroupID)
-					return cancelErr
-				}
-				err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
-				if err != nil {
-					s.logger.WithError(err).Errorf("CancelOrdersByGroupID api call error")
-					werr = multierr.Append(werr, err)
-				}
-
-			} else {
-				s.logger.Infof("using cancal all orders api for canceling grid orders...")
-				op := func() error {
-					_, cancelErr := service.CancelAllOrders(ctx)
-					return cancelErr
-				}
-
-				err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
-				if err != nil {
-					s.logger.WithError(err).Errorf("CancelAllOrders api call error")
-					werr = multierr.Append(werr, err)
-				}
+			err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
+			if err != nil {
+				s.logger.WithError(err).Errorf("CancelAllOrders api call error")
+				werr = multierr.Append(werr, err)
 			}
 
 			time.Sleep(1 * time.Second)
