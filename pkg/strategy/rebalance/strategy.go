@@ -31,6 +31,12 @@ type Strategy struct {
 	activeOrderBook *bbgo.ActiveOrderBook
 }
 
+func (s *Strategy) Defaults() error {
+	if s.OrderType == "" {
+		s.OrderType = types.OrderTypeLimitMaker
+	}
+}
+
 func (s *Strategy) Initialize() error {
 	return nil
 }
@@ -61,11 +67,6 @@ func (s *Strategy) Validate() error {
 	if s.MaxAmount.Sign() < 0 {
 		return fmt.Errorf("maxAmount shoud not less than 0")
 	}
-
-	if s.OrderType == "" {
-		s.OrderType = types.OrderTypeLimitMaker
-	}
-
 	return nil
 }
 
