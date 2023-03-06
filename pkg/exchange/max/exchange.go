@@ -480,7 +480,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		Side(toLocalSideType(o.Side)).
 		Volume(quantityString).
 		OrderType(orderType).
-		ClientOrderID(clientOrderID)
+		ClientOrderID(clientOrderID).
+		// TODO: make sure MAX API support uint32 group id
+		GroupID(fmt.Sprintf("%d", o.GroupID))
 
 	switch o.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:

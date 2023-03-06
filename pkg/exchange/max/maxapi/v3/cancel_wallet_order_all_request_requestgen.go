@@ -64,12 +64,12 @@ func (c *CancelWalletOrderAllRequest) GetParameters() (map[string]interface{}, e
 		params["market"] = market
 	} else {
 	}
-	// check groupID field -> json key groupID
+	// check groupID field -> json key group_id
 	if c.groupID != nil {
 		groupID := *c.groupID
 
 		// assign parameter of groupID
-		params["groupID"] = groupID
+		params["group_id"] = groupID
 	} else {
 	}
 
