@@ -35,6 +35,7 @@ func (s *Strategy) Defaults() error {
 	if s.OrderType == "" {
 		s.OrderType = types.OrderTypeLimitMaker
 	}
+	return nil
 }
 
 func (s *Strategy) Initialize() error {
