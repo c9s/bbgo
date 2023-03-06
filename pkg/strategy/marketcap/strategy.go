@@ -43,6 +43,12 @@ type Strategy struct {
 	targetWeights   types.ValueMap
 }
 
+func (s *Strategy) Defaults() error {
+	if s.OrderType == "" {
+		s.OrderType = types.OrderTypeLimitMaker
+	}
+}
+
 func (s *Strategy) Initialize() error {
 	apiKey := os.Getenv("COINMARKETCAP_API_KEY")
 	s.datasource = coinmarketcap.New(apiKey)
@@ -77,11 +83,6 @@ func (s *Strategy) Validate() error {
 	if s.MaxAmount.Sign() < 0 {
 		return fmt.Errorf("maxAmount shoud not less than 0")
 	}
-
-	if s.OrderType == "" {
-		s.OrderType = types.OrderTypeLimitMaker
-	}
-
 	return nil
 }
 
