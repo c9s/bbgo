@@ -482,6 +482,11 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		OrderType(orderType).
 		ClientOrderID(clientOrderID)
 
+	if o.GroupID > 0 {
+		// TODO: MAX API only support 0 ~ 2^31-1 (2147483647)
+		req.GroupID(strconv.FormatUint(uint64(o.GroupID), 10))
+	}
+
 	switch o.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		var priceInString string
