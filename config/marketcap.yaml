@@ -22,5 +22,6 @@ exchangeStrategies:
       threshold: 1%
       # max amount to buy or sell per order
       maxAmount: 1_000
-      dryRun: true
       queryInterval: 1h
+      orderType: LIMIT_MAKER # LIMIT_MAKER, LIMIT, MARKET
+      dryRun: true

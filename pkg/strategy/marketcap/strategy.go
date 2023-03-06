@@ -31,15 +31,23 @@ type Strategy struct {
 	QuoteCurrencyWeight fixedpoint.Value `json:"quoteCurrencyWeight"`
 	BaseCurrencies      []string         `json:"baseCurrencies"`
 	Threshold           fixedpoint.Value `json:"threshold"`
-	DryRun              bool             `json:"dryRun"`
 	// max amount to buy or sell per order
 	MaxAmount fixedpoint.Value `json:"maxAmount"`
 	// interval to query marketcap data from coinmarketcap
-	QueryInterval types.Interval `json:"queryInterval"`
+	QueryInterval types.Interval  `json:"queryInterval"`
+	OrderType     types.OrderType `json:"orderType"`
+	DryRun        bool            `json:"dryRun"`
 
 	subscribeSymbol string
 	activeOrderBook *bbgo.ActiveOrderBook
 	targetWeights   types.ValueMap
+}
+
+func (s *Strategy) Defaults() error {
+	if s.OrderType == "" {
+		s.OrderType = types.OrderTypeLimitMaker
+	}
+	return nil
 }
 
 func (s *Strategy) Initialize() error {
@@ -76,7 +84,6 @@ func (s *Strategy) Validate() error {
 	if s.MaxAmount.Sign() < 0 {
 		return fmt.Errorf("maxAmount shoud not less than 0")
 	}
-
 	return nil
 }
 
@@ -178,7 +185,7 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.Excha
 		order := types.SubmitOrder{
 			Symbol:   symbol,
 			Side:     side,
-			Type:     types.OrderTypeLimit,
+			Type:     s.OrderType,
 			Quantity: quantity,
 			Price:    currentPrice,
 		}
