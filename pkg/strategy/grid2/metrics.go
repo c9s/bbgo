@@ -1,6 +1,8 @@
 package grid2
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 var (
 	metricsGridNum                *prometheus.GaugeVec
@@ -32,6 +34,10 @@ func mergeLabels(a, b prometheus.Labels) prometheus.Labels {
 }
 
 func initMetrics(extendedLabels []string) {
+	if metricsGridNum != nil {
+		return
+	}
+
 	metricsGridNum = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "bbgo_grid2_num",
