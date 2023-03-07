@@ -1524,6 +1524,7 @@ func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook
 	return nil
 }
 
+// isCompleteGridOrderBook checks if the number of open orders == gridNum - 1 and all orders are active order
 func isCompleteGridOrderBook(orderBook *bbgo.ActiveOrderBook, gridNum int64) bool {
 	tmpOrders := orderBook.Orders()
 	return len(tmpOrders) == int(gridNum)-1 && types.OrdersAll(tmpOrders, types.IsActiveOrder)
