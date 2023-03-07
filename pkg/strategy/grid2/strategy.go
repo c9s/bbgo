@@ -1526,12 +1526,7 @@ func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook
 
 func isCompleteGridOrderBook(orderBook *bbgo.ActiveOrderBook, gridNum int64) bool {
 	tmpOrders := orderBook.Orders()
-
-	if len(tmpOrders) == int(gridNum) && types.OrdersAll(tmpOrders, types.IsActiveOrder) {
-		return true
-	}
-
-	return false
+	return len(tmpOrders) == int(gridNum)-1 && types.OrdersAll(tmpOrders, types.IsActiveOrder)
 }
 
 func findEarliestOrderID(orders []types.Order) (uint64, bool) {
