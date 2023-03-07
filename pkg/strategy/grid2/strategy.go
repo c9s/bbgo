@@ -401,25 +401,14 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	// will be used for calculating quantity
 	orderExecutedQuoteAmount := o.Quantity.Mul(executedPrice)
 
-	// collect trades
-	feeQuantityReduction := fixedpoint.Zero
-	feeCurrency := ""
-	feePrec := 2
-
-	// feeQuantityReduction calculation is used to reduce the order quantity
+	// collect trades for fee
+	// fee calculation is used to reduce the order quantity
 	// because when 1.0 BTC buy order is filled without FEE token, then we will actually get 1.0 * (1 - feeRate) BTC
 	// if we don't reduce the sell quantity, than we might fail to place the sell order
-	feeQuantityReduction, feeCurrency = s.aggregateOrderFee(o)
+	fee, feeCurrency := s.aggregateOrderFee(o)
 	s.logger.Infof("GRID ORDER #%d %s FEE: %s %s",
 		o.OrderID, o.Side,
-		feeQuantityReduction.String(), feeCurrency)
-
-	feeQuantityReduction, feePrec = roundUpMarketQuantity(s.Market, feeQuantityReduction, feeCurrency)
-	s.logger.Infof("GRID ORDER #%d %s FEE (rounding precision %d): %s %s",
-		o.OrderID, o.Side,
-		feePrec,
-		feeQuantityReduction.String(),
-		feeCurrency)
+		fee.String(), feeCurrency)
 
 	switch o.Side {
 	case types.SideTypeSell:
@@ -437,8 +426,14 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		if s.Compound || s.EarnBase {
 			// if it's not using the platform fee currency, reduce the quote quantity for the buy order
 			if feeCurrency == s.Market.QuoteCurrency {
-				orderExecutedQuoteAmount = orderExecutedQuoteAmount.Sub(feeQuantityReduction)
+				orderExecutedQuoteAmount = orderExecutedQuoteAmount.Sub(fee)
 			}
+
+			// for quote amount, always round down with price precision to prevent the quote currency fund locking rounding issue
+			origQuoteAmount := orderExecutedQuoteAmount
+			orderExecutedQuoteAmount = orderExecutedQuoteAmount.Round(s.Market.PricePrecision, fixedpoint.Down)
+
+			s.logger.Infof("round down buy order quote quantity %s to %s by quote quantity precision %d", origQuoteAmount.String(), orderExecutedQuoteAmount.String(), s.Market.PricePrecision)
 
 			newQuantity = fixedpoint.Max(orderExecutedQuoteAmount.Div(newPrice), s.Market.MinQuantity)
 		} else if s.QuantityOrAmount.Quantity.Sign() > 0 {
@@ -449,10 +444,6 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		profit = s.calculateProfit(o, newPrice, newQuantity)
 
 	case types.SideTypeBuy:
-		if feeCurrency == s.Market.BaseCurrency {
-			newQuantity = newQuantity.Sub(feeQuantityReduction)
-		}
-
 		newSide = types.SideTypeSell
 		if !s.ProfitSpread.IsZero() {
 			newPrice = newPrice.Add(s.ProfitSpread)
@@ -462,9 +453,19 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 			}
 		}
 
-		if s.EarnBase {
-			newQuantity = fixedpoint.Max(orderExecutedQuoteAmount.Div(newPrice).Sub(feeQuantityReduction), s.Market.MinQuantity)
+		if feeCurrency == s.Market.BaseCurrency {
+			newQuantity = newQuantity.Sub(fee)
 		}
+
+		// if EarnBase is enabled, we should sell less to get the same quote amount back
+		if s.EarnBase {
+			newQuantity = fixedpoint.Max(orderExecutedQuoteAmount.Div(newPrice).Sub(fee), s.Market.MinQuantity)
+		}
+
+		// always round down the base quantity for placing sell order to avoid the base currency fund locking issue
+		origQuantity := newQuantity
+		newQuantity = newQuantity.Round(s.Market.VolumePrecision, fixedpoint.Down)
+		s.logger.Infof("round down sell order quantity %s to %s by base quantity precision %d", origQuantity.String(), newQuantity.String(), s.Market.VolumePrecision)
 	}
 
 	orderForm := types.SubmitOrder{
