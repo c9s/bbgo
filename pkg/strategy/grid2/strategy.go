@@ -432,10 +432,15 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 			// for quote amount, always round down with price precision to prevent the quote currency fund locking rounding issue
 			origQuoteAmount := orderExecutedQuoteAmount
 			orderExecutedQuoteAmount = orderExecutedQuoteAmount.Round(s.Market.PricePrecision, fixedpoint.Down)
+			s.logger.Infof("round down %s %s order quote quantity %s to %s by quote precision %d", s.Symbol, newSide, origQuoteAmount.String(), orderExecutedQuoteAmount.String(), s.Market.PricePrecision)
 
-			s.logger.Infof("round down buy order quote quantity %s to %s by quote quantity precision %d", origQuoteAmount.String(), orderExecutedQuoteAmount.String(), s.Market.PricePrecision)
+			newQuantity = orderExecutedQuoteAmount.Div(newPrice)
 
-			newQuantity = fixedpoint.Max(orderExecutedQuoteAmount.Div(newPrice), s.Market.MinQuantity)
+			origQuantity := newQuantity
+			newQuantity = newQuantity.Round(s.Market.VolumePrecision, fixedpoint.Down)
+			s.logger.Infof("round down %s %s order base quantity %s to %s by base precision %d", s.Symbol, newSide, origQuantity.String(), newQuantity.String(), s.Market.VolumePrecision)
+
+			newQuantity = fixedpoint.Max(newQuantity, s.Market.MinQuantity)
 		} else if s.QuantityOrAmount.Quantity.Sign() > 0 {
 			newQuantity = s.QuantityOrAmount.Quantity
 		}
