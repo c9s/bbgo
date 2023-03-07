@@ -1413,9 +1413,10 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	// before we re-play the orders,
 	// we need to add these open orders to the active order book
 	s.addOrdersToActiveOrderBook(gridOrders)
-
 	s.setGrid(grid)
 	s.EmitGridReady()
+	s.updateGridNumOfOrdersMetrics()
+	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 
 	for i := range filledOrders {
 		// avoid using the iterator
