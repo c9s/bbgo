@@ -1642,7 +1642,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	if s.OrderGroupID == 0 {
-		s.OrderGroupID = util.FNV32(instanceID)
+		s.OrderGroupID = util.FNV32(instanceID) % math.MaxInt32
 	}
 
 	if s.AutoRange != nil {
