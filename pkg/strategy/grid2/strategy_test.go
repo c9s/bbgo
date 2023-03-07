@@ -981,3 +981,118 @@ func Test_roundUpMarketQuantity(t *testing.T) {
 	assert.Equal(t, "0.00000003", q3.String(), "rounding prec 8")
 	assert.Equal(t, 8, prec)
 }
+
+func Test_buildPinOrderMap(t *testing.T) {
+	assert := assert.New(t)
+	s := newTestStrategy()
+	s.UpperPrice = number(2000.0)
+	s.LowerPrice = number(1000.0)
+	s.GridNum = 11
+	s.grid = s.newGrid()
+
+	t.Run("successful case", func(t *testing.T) {
+		openOrders := []types.Order{
+			types.Order{
+				SubmitOrder: types.SubmitOrder{
+					Symbol:       s.Symbol,
+					Side:         types.SideTypeBuy,
+					Type:         types.OrderTypeLimit,
+					Quantity:     number(1.0),
+					Price:        number(1000.0),
+					AveragePrice: number(0),
+					StopPrice:    number(0),
+					Market:       s.Market,
+					TimeInForce:  types.TimeInForceGTC,
+				},
+				Exchange:         "max",
+				GID:              1,
+				OrderID:          1,
+				Status:           types.OrderStatusNew,
+				ExecutedQuantity: number(0.0),
+				IsWorking:        false,
+			},
+		}
+		m, err := s.buildPinOrderMap(s.grid, openOrders)
+		assert.NoError(err)
+		assert.Len(m, 11)
+
+		for pin, order := range m {
+			if pin == s.FormatPrice(openOrders[0].Price) {
+				assert.Equal(openOrders[0].OrderID, order.OrderID)
+			} else {
+				assert.Equal(uint64(0), order.OrderID)
+			}
+		}
+	})
+
+	t.Run("there is one order with non-pin price in openOrders", func(t *testing.T) {
+		openOrders := []types.Order{
+			types.Order{
+				SubmitOrder: types.SubmitOrder{
+					Symbol:       s.Symbol,
+					Side:         types.SideTypeBuy,
+					Type:         types.OrderTypeLimit,
+					Quantity:     number(1.0),
+					Price:        number(1111.0),
+					AveragePrice: number(0),
+					StopPrice:    number(0),
+					Market:       s.Market,
+					TimeInForce:  types.TimeInForceGTC,
+				},
+				Exchange:         "max",
+				GID:              1,
+				OrderID:          1,
+				Status:           types.OrderStatusNew,
+				ExecutedQuantity: number(0.0),
+				IsWorking:        false,
+			},
+		}
+		_, err := s.buildPinOrderMap(s.grid, openOrders)
+		assert.Error(err)
+	})
+
+	t.Run("there are duplicated open orders at same pin", func(t *testing.T) {
+		openOrders := []types.Order{
+			types.Order{
+				SubmitOrder: types.SubmitOrder{
+					Symbol:       s.Symbol,
+					Side:         types.SideTypeBuy,
+					Type:         types.OrderTypeLimit,
+					Quantity:     number(1.0),
+					Price:        number(1000.0),
+					AveragePrice: number(0),
+					StopPrice:    number(0),
+					Market:       s.Market,
+					TimeInForce:  types.TimeInForceGTC,
+				},
+				Exchange:         "max",
+				GID:              1,
+				OrderID:          1,
+				Status:           types.OrderStatusNew,
+				ExecutedQuantity: number(0.0),
+				IsWorking:        false,
+			},
+			types.Order{
+				SubmitOrder: types.SubmitOrder{
+					Symbol:       s.Symbol,
+					Side:         types.SideTypeBuy,
+					Type:         types.OrderTypeLimit,
+					Quantity:     number(1.0),
+					Price:        number(1000.0),
+					AveragePrice: number(0),
+					StopPrice:    number(0),
+					Market:       s.Market,
+					TimeInForce:  types.TimeInForceGTC,
+				},
+				Exchange:         "max",
+				GID:              2,
+				OrderID:          2,
+				Status:           types.OrderStatusNew,
+				ExecutedQuantity: number(0.0),
+				IsWorking:        false,
+			},
+		}
+		_, err := s.buildPinOrderMap(s.grid, openOrders)
+		assert.Error(err)
+	})
+}
