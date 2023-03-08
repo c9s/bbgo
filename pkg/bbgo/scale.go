@@ -167,7 +167,7 @@ func (s *LinearScale) Formula() string {
 }
 
 func (s *LinearScale) FormulaOf(x float64) string {
-	return fmt.Sprintf("f(%f) = %f + (%f - %f) * %f", s.Range[0], x, s.Domain[0], s.a)
+	return fmt.Sprintf("f(%f) = %f + (%f - %f) * %f", x, s.Range[0], x, s.Domain[0], s.a)
 }
 
 // see also: http://www.vb-helper.com/howto_find_quadratic_curve.html
