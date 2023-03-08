@@ -5,7 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
+	max "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
+	v3 "github.com/c9s/bbgo/pkg/exchange/max/maxapi/v3"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -193,7 +194,50 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 	}, nil
 }
 
-func toGlobalTrade(t max.Trade) (*types.Trade, error) {
+func toGlobalTradeV3(t v3.Trade) ([]types.Trade, error) {
+	var trades []types.Trade
+	isMargin := t.WalletType == max.WalletTypeMargin
+	side := toGlobalSideType(t.Side)
+
+	trade := types.Trade{
+		ID:            t.ID,
+		OrderID:       t.OrderID,
+		Price:         t.Price,
+		Symbol:        toGlobalSymbol(t.Market),
+		Exchange:      types.ExchangeMax,
+		Quantity:      t.Volume,
+		Side:          side,
+		IsBuyer:       t.IsBuyer(),
+		IsMaker:       t.IsMaker(),
+		Fee:           t.Fee,
+		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
+		QuoteQuantity: t.Funds,
+		Time:          types.Time(t.CreatedAt),
+		IsMargin:      isMargin,
+		IsIsolated:    false,
+		IsFutures:     false,
+	}
+
+	if t.Side == "self-trade" {
+		trade.Side = types.SideTypeSell
+
+		// create trade for bid
+		bidTrade := trade
+		bidTrade.Side = types.SideTypeBuy
+		bidTrade.OrderID = t.SelfTradeBidOrderID
+		bidTrade.Fee = t.SelfTradeBidFee
+		bidTrade.FeeCurrency = t.SelfTradeBidFeeCurrency
+		bidTrade.IsBuyer = !trade.IsBuyer
+		bidTrade.IsMaker = !trade.IsMaker
+		trades = append(trades, bidTrade)
+	}
+
+	trades = append(trades, trade)
+
+	return trades, nil
+}
+
+func toGlobalTradeV2(t max.Trade) (*types.Trade, error) {
 	isMargin := t.WalletType == max.WalletTypeMargin
 	side := toGlobalSideType(t.Side)
 	return &types.Trade{
