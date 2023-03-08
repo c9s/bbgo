@@ -395,15 +395,23 @@ func (o Order) SlackAttachment() slack.Attachment {
 	}
 }
 
-func OrdersFilled(in []Order) (out []Order) {
+func OrdersFilter(in []Order, f func(o Order) bool) (out []Order) {
 	for _, o := range in {
-		switch o.Status {
-		case OrderStatusFilled:
-			o2 := o
-			out = append(out, o2)
+		if f(o) {
+			out = append(out, o)
 		}
 	}
 	return out
+}
+
+func OrdersActive(in []Order) []Order {
+	return OrdersFilter(in, IsActiveOrder)
+}
+
+func OrdersFilled(in []Order) (out []Order) {
+	return OrdersFilter(in, func(o Order) bool {
+		return o.Status == OrderStatusFilled
+	})
 }
 
 func OrdersAll(orders []Order, f func(o Order) bool) bool {
