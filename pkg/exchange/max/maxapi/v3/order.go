@@ -15,7 +15,6 @@ type WalletType = maxapi.WalletType
 type OrderType = maxapi.OrderType
 
 type Order = maxapi.Order
-type Trade = maxapi.Trade
 type Account = maxapi.Account
 
 // OrderService manages the Order endpoint.
