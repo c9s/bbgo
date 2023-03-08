@@ -1413,9 +1413,10 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	// before we re-play the orders,
 	// we need to add these open orders to the active order book
 	s.addOrdersToActiveOrderBook(gridOrders)
-
 	s.setGrid(grid)
 	s.EmitGridReady()
+	s.updateGridNumOfOrdersMetrics()
+	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 
 	for i := range filledOrders {
 		// avoid using the iterator
@@ -1523,14 +1524,11 @@ func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook
 	return nil
 }
 
+// isCompleteGridOrderBook checks if the number of open orders == gridNum - 1 and all orders are active order
 func isCompleteGridOrderBook(orderBook *bbgo.ActiveOrderBook, gridNum int64) bool {
 	tmpOrders := orderBook.Orders()
-
-	if len(tmpOrders) == int(gridNum) && types.OrdersAll(tmpOrders, types.IsActiveOrder) {
-		return true
-	}
-
-	return false
+	activeOrders := types.OrdersActive(tmpOrders)
+	return len(activeOrders) == int(gridNum)-1
 }
 
 func findEarliestOrderID(orders []types.Order) (uint64, bool) {
