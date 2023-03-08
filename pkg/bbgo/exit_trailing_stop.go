@@ -100,7 +100,7 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 		// check if we have the minimal profit
 		roi := position.ROI(price)
 		if roi.Compare(s.MinProfit) >= 0 {
-			Notify("[trailingStop] activated: ROI %f > minimal profit ratio %f", roi.Float64(), s.MinProfit.Float64())
+			Notify("[trailingStop] activated: %s ROI %f > minimal profit ratio %f", s.Symbol, roi.Percentage(), s.MinProfit.Float64())
 			s.activated = true
 		}
 	} else if !s.ActivationRatio.IsZero() {
@@ -174,7 +174,7 @@ func (s *TrailingStop2) triggerStop(price fixedpoint.Value) error {
 		s.activated = false
 		s.latestHigh = fixedpoint.Zero
 	}()
-	Notify("[TrailingStop] %s stop loss triggered. price: %f callback rate: %f", s.Symbol, price.Float64(), s.CallbackRate.Float64())
+	Notify("[TrailingStop] %s %s stop loss triggered. price: %f callback rate: %f", s.Symbol, s, price.Float64(), s.CallbackRate.Float64())
 	ctx := context.Background()
 	p := fixedpoint.One
 	if !s.ClosePosition.IsZero() {
