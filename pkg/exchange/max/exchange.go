@@ -186,13 +186,13 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 
 	var trades []types.Trade
 	for _, t := range maxTrades {
-		localTrade, err := toGlobalTrade(t)
+		localTrades, err := toGlobalTradeV3(t)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert trade: %+v", t)
 			continue
 		}
 
-		trades = append(trades, *localTrade)
+		trades = append(trades, localTrades...)
 	}
 
 	// ensure everything is sorted ascending
@@ -806,13 +806,13 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	for _, t := range maxTrades {
-		localTrade, err := toGlobalTrade(t)
+		localTrades, err := toGlobalTradeV3(t)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert trade: %+v", t)
 			continue
 		}
 
-		trades = append(trades, *localTrade)
+		trades = append(trades, localTrades...)
 	}
 
 	// ensure everything is sorted ascending
