@@ -20,6 +20,8 @@ func init() {
 }
 
 type Strategy struct {
+	Environment *bbgo.Environment
+
 	Interval      types.Interval   `json:"interval"`
 	QuoteCurrency string           `json:"quoteCurrency"`
 	TargetWeights types.ValueMap   `json:"targetWeights"`
@@ -28,7 +30,12 @@ type Strategy struct {
 	OrderType     types.OrderType  `json:"orderType"`
 	DryRun        bool             `json:"dryRun"`
 
-	activeOrderBook *bbgo.ActiveOrderBook
+	PositionMap    map[string]*types.Position    `persistence:"positionMap"`
+	ProfitStatsMap map[string]*types.ProfitStats `persistence:"profitStatsMap"`
+
+	session          *bbgo.ExchangeSession
+	orderExecutorMap map[string]*bbgo.GeneralOrderExecutor
+	activeOrderBook  *bbgo.ActiveOrderBook
 }
 
 func (s *Strategy) Defaults() error {
@@ -44,6 +51,10 @@ func (s *Strategy) Initialize() error {
 
 func (s *Strategy) ID() string {
 	return ID
+}
+
+func (s *Strategy) InstanceID(symbol string) string {
+	return fmt.Sprintf("%s:%s", ID, symbol)
 }
 
 func (s *Strategy) Validate() error {
@@ -77,31 +88,75 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.activeOrderBook = bbgo.NewActiveOrderBook("")
-	s.activeOrderBook.BindStream(session.UserDataStream)
+func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	s.session = session
 
-	markets := session.Markets()
-	for _, symbol := range s.symbols() {
-		if _, ok := markets[symbol]; !ok {
-			return fmt.Errorf("exchange: %s does not supoort matket: %s", session.Exchange.Name(), symbol)
-		}
+	markets, err := s.markets()
+	if err != nil {
+		return err
 	}
 
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		s.rebalance(ctx, orderExecutor, session)
+	if s.PositionMap == nil {
+		s.initPositionMapFromMarkets(markets)
+	}
+
+	if s.ProfitStatsMap == nil {
+		s.initProfitStatsMapFromMarkets(markets)
+	}
+
+	s.initOrderExecutorMapFromMarkets(ctx, markets)
+
+	s.activeOrderBook = bbgo.NewActiveOrderBook("")
+	s.activeOrderBook.BindStream(s.session.UserDataStream)
+
+	s.session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+		s.rebalance(ctx)
 	})
 
 	return nil
 }
 
-func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) {
+func (s *Strategy) initPositionMapFromMarkets(markets []types.Market) {
+	s.PositionMap = make(map[string]*types.Position)
+	for _, market := range markets {
+		position := types.NewPositionFromMarket(market)
+		position.Strategy = s.ID()
+		position.StrategyInstanceID = s.InstanceID(market.Symbol)
+		s.PositionMap[market.Symbol] = position
+	}
+}
+
+func (s *Strategy) initProfitStatsMapFromMarkets(markets []types.Market) {
+	s.ProfitStatsMap = make(map[string]*types.ProfitStats)
+	for _, market := range markets {
+		s.ProfitStatsMap[market.Symbol] = types.NewProfitStats(market)
+	}
+}
+
+func (s *Strategy) initOrderExecutorMapFromMarkets(ctx context.Context, markets []types.Market) {
+	s.orderExecutorMap = make(map[string]*bbgo.GeneralOrderExecutor)
+	for _, market := range markets {
+		symbol := market.Symbol
+
+		orderExecutor := bbgo.NewGeneralOrderExecutor(s.session, symbol, ID, s.InstanceID(symbol), s.PositionMap[symbol])
+		orderExecutor.BindEnvironment(s.Environment)
+		orderExecutor.BindProfitStats(s.ProfitStatsMap[symbol])
+		orderExecutor.Bind()
+		orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+			bbgo.Sync(ctx, s)
+		})
+
+		s.orderExecutorMap[market.Symbol] = orderExecutor
+	}
+}
+
+func (s *Strategy) rebalance(ctx context.Context) {
 	// cancel active orders before rebalance
-	if err := session.Exchange.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
+	if err := s.session.Exchange.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
 		log.WithError(err).Errorf("failed to cancel orders")
 	}
 
-	submitOrders := s.generateSubmitOrders(ctx, session)
+	submitOrders := s.generateSubmitOrders(ctx)
 	for _, order := range submitOrders {
 		log.Infof("generated submit order: %s", order.String())
 	}
@@ -110,16 +165,17 @@ func (s *Strategy) rebalance(ctx context.Context, orderExecutor bbgo.OrderExecut
 		return
 	}
 
-	createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrders...)
-	if err != nil {
-		log.WithError(err).Error("failed to submit orders")
-		return
+	for _, submitOrder := range submitOrders {
+		createdOrders, err := s.orderExecutorMap[submitOrder.Symbol].SubmitOrders(ctx, submitOrder)
+		if err != nil {
+			log.WithError(err).Error("failed to submit orders")
+			return
+		}
+		s.activeOrderBook.Add(createdOrders...)
 	}
-
-	s.activeOrderBook.Add(createdOrders...)
 }
 
-func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) types.ValueMap {
+func (s *Strategy) prices(ctx context.Context) types.ValueMap {
 	m := make(types.ValueMap)
 	for currency := range s.TargetWeights {
 		if currency == s.QuoteCurrency {
@@ -127,7 +183,7 @@ func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) ty
 			continue
 		}
 
-		ticker, err := session.Exchange.QueryTicker(ctx, currency+s.QuoteCurrency)
+		ticker, err := s.session.Exchange.QueryTicker(ctx, currency+s.QuoteCurrency)
 		if err != nil {
 			log.WithError(err).Error("failed to query tickers")
 			return nil
@@ -138,10 +194,10 @@ func (s *Strategy) prices(ctx context.Context, session *bbgo.ExchangeSession) ty
 	return m
 }
 
-func (s *Strategy) quantities(session *bbgo.ExchangeSession) types.ValueMap {
+func (s *Strategy) quantities() types.ValueMap {
 	m := make(types.ValueMap)
 
-	balances := session.GetAccount().Balances()
+	balances := s.session.GetAccount().Balances()
 	for currency := range s.TargetWeights {
 		m[currency] = balances[currency].Total()
 	}
@@ -149,9 +205,9 @@ func (s *Strategy) quantities(session *bbgo.ExchangeSession) types.ValueMap {
 	return m
 }
 
-func (s *Strategy) generateSubmitOrders(ctx context.Context, session *bbgo.ExchangeSession) (submitOrders []types.SubmitOrder) {
-	prices := s.prices(ctx, session)
-	marketValues := prices.Mul(s.quantities(session))
+func (s *Strategy) generateSubmitOrders(ctx context.Context) (submitOrders []types.SubmitOrder) {
+	prices := s.prices(ctx)
+	marketValues := prices.Mul(s.quantities())
 	currentWeights := marketValues.Normalize()
 
 	for currency, targetWeight := range s.TargetWeights {
@@ -224,4 +280,16 @@ func (s *Strategy) symbols() (symbols []string) {
 		symbols = append(symbols, currency+s.QuoteCurrency)
 	}
 	return symbols
+}
+
+func (s *Strategy) markets() ([]types.Market, error) {
+	markets := []types.Market{}
+	for _, symbol := range s.symbols() {
+		market, ok := s.session.Market(symbol)
+		if !ok {
+			return nil, fmt.Errorf("market %s not found", symbol)
+		}
+		markets = append(markets, market)
+	}
+	return markets, nil
 }
