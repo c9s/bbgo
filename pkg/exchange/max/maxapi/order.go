@@ -91,4 +91,5 @@ type Order struct {
 	GroupID         uint32                     `json:"group_id,omitempty"`
 	ClientOID       string                     `json:"client_oid,omitempty"`
 	CreatedAt       types.MillisecondTimestamp `json:"created_at"`
+	UpdatedAt       types.MillisecondTimestamp `json:"updated_at"`
 }
