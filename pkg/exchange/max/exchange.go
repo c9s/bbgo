@@ -192,7 +192,13 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 			continue
 		}
 
-		trades = append(trades, localTrades...)
+		// because self-trades will contains ask and bid orders in its struct
+		// we need to make sure the trade's order is what we want
+		for _, localTrade := range localTrades {
+			if localTrade.OrderID == uint64(orderID) {
+				trades = append(trades, localTrade)
+			}
+		}
 	}
 
 	// ensure everything is sorted ascending
