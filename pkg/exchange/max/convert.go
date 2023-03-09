@@ -188,7 +188,7 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),
 		ExecutedQuantity: executedVolume,
 		CreationTime:     types.Time(maxOrder.CreatedAt.Time()),
-		UpdateTime:       types.Time(maxOrder.CreatedAt.Time()),
+		UpdateTime:       types.Time(maxOrder.UpdatedAt.Time()),
 		IsMargin:         isMargin,
 		IsIsolated:       false, // isolated margin is not supported
 	}, nil
