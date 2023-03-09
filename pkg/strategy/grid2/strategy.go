@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -133,6 +134,8 @@ type Strategy struct {
 	ClearOpenOrdersWhenStart bool `json:"clearOpenOrdersWhenStart"`
 
 	ClearOpenOrdersIfMismatch bool `json:"clearOpenOrdersIfMismatch"`
+
+	ClearDuplicatedPriceOpenOrders bool `json:"clearDuplicatedPriceOpenOrders"`
 
 	// UseCancelAllOrdersApiWhenClose uses a different API to cancel all the orders on the market when closing a grid
 	UseCancelAllOrdersApiWhenClose bool `json:"useCancelAllOrdersApiWhenClose"`
@@ -1158,15 +1161,35 @@ func sortOrdersByPriceAscending(orders []types.Order) []types.Order {
 }
 
 func (s *Strategy) debugGridOrders(submitOrders []types.SubmitOrder, lastPrice fixedpoint.Value) {
-	s.logger.Infof("GRID ORDERS: [")
+	var sb strings.Builder
+
+	sb.WriteString("GRID ORDERS [")
 	for i, order := range submitOrders {
 		if i > 0 && lastPrice.Compare(order.Price) >= 0 && lastPrice.Compare(submitOrders[i-1].Price) <= 0 {
-			s.logger.Infof("  - LAST PRICE: %f", lastPrice.Float64())
+			sb.WriteString(fmt.Sprintf("  - LAST PRICE: %f", lastPrice.Float64()))
 		}
 
-		s.logger.Info("  - ", order.String())
+		sb.WriteString("  - " + order.String())
 	}
-	s.logger.Infof("] END OF GRID ORDERS")
+	sb.WriteString("] END OF GRID ORDERS")
+
+	s.logger.Infof(sb.String())
+}
+
+func (s *Strategy) debugOrders(desc string, orders []types.Order) {
+	var sb strings.Builder
+
+	if desc == "" {
+		desc = "ORDERS"
+	}
+
+	sb.WriteString(desc + " [")
+	for i, order := range orders {
+		sb.WriteString(fmt.Sprintf("  - %d) %s", i, order.String()))
+	}
+	sb.WriteString("]")
+
+	s.logger.Infof(sb.String())
 }
 
 func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoint.Value) ([]types.SubmitOrder, error) {
@@ -1884,6 +1907,13 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 				}
 			}
 		}
+
+		if s.ClearDuplicatedPriceOpenOrders {
+			s.logger.Infof("clearDuplicatedPriceOpenOrders is set, finding duplicated open orders...")
+			if err := s.cancelDuplicatedPriceOpenOrders(ctx, session); err != nil {
+				s.logger.WithError(err).Errorf("cancelDuplicatedPriceOpenOrders error")
+			}
+		}
 	})
 
 	// if TriggerPrice is zero, that means we need to open the grid when start up
@@ -2020,11 +2050,55 @@ func (s *Strategy) openOrdersMismatches(ctx context.Context, session *bbgo.Excha
 	return false, nil
 }
 
-func roundUpMarketQuantity(market types.Market, v fixedpoint.Value, c string) (fixedpoint.Value, int) {
-	prec := market.VolumePrecision
-	if c == market.QuoteCurrency {
-		prec = market.PricePrecision
+func (s *Strategy) cancelDuplicatedPriceOpenOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
+	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		return err
 	}
 
-	return v.Round(prec, fixedpoint.Up), prec
+	if len(openOrders) == 0 {
+		return nil
+	}
+
+	dupOrders := s.findDuplicatedPriceOpenOrders(openOrders)
+
+	if len(dupOrders) > 0 {
+		s.debugOrders("DUPLICATED ORDERS", dupOrders)
+		return session.Exchange.CancelOrders(ctx, dupOrders...)
+	}
+
+	s.logger.Infof("no duplicated order found")
+	return nil
+}
+
+func (s *Strategy) findDuplicatedPriceOpenOrders(openOrders []types.Order) (dupOrders []types.Order) {
+	orderBook := bbgo.NewActiveOrderBook(s.Symbol)
+	for _, openOrder := range openOrders {
+		existingOrder := orderBook.Lookup(func(o types.Order) bool {
+			return o.Price.Compare(openOrder.Price) == 0
+		})
+
+		if existingOrder != nil {
+			// found duplicated order
+			// compare creation time and remove the latest created order
+			// if the creation time equals, then we can just cancel one of them
+			s.debugOrders(
+				fmt.Sprintf("found duplicated order at price %s, comparing orders", openOrder.Price.String()),
+				[]types.Order{*existingOrder, openOrder})
+
+			dupOrder := *existingOrder
+			if openOrder.CreationTime.After(existingOrder.CreationTime.Time()) {
+				dupOrder = openOrder
+			} else if openOrder.CreationTime.Before(existingOrder.CreationTime.Time()) {
+				// override the existing order and take the existing order as a duplicated one
+				orderBook.Add(openOrder)
+			}
+
+			dupOrders = append(dupOrders, dupOrder)
+		} else {
+			orderBook.Add(openOrder)
+		}
+	}
+
+	return dupOrders
 }
