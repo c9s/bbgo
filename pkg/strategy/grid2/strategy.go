@@ -960,16 +960,14 @@ func (s *Strategy) newGrid() *Grid {
 func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	// grid object guard
 	s.mu.Lock()
-	defer func() {
-		s.mu.Unlock()
-		s.updateGridNumOfOrdersMetricsWithLock()
-	}()
+	defer s.mu.Unlock()
 
 	if s.grid != nil {
 		return nil
 	}
 
-	s.grid = s.newGrid()
+	grid := s.newGrid()
+	s.grid = grid
 	s.logger.Info("OPENING GRID: ", s.grid.String())
 
 	lastPrice, err := s.getLastTradePrice(ctx, session)
@@ -1080,6 +1078,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	s.logger.Infof("ALL GRID ORDERS SUBMITTED")
 
+	s.updateGridNumOfOrdersMetrics(grid)
 	s.updateOpenOrderPricesMetrics(createdOrders)
 	return nil
 }
@@ -1091,6 +1090,10 @@ func (s *Strategy) updateFilledOrderMetrics(order types.Order) {
 }
 
 func (s *Strategy) updateGridNumOfOrdersMetricsWithLock() {
+	s.updateGridNumOfOrdersMetrics(s.getGrid())
+}
+
+func (s *Strategy) updateGridNumOfOrdersMetrics(grid *Grid) {
 	baseLabels := s.newPrometheusLabels()
 	makerOrders := s.orderExecutor.ActiveMakerOrders()
 	numOfOrders := makerOrders.NumOfOrders()
@@ -1100,7 +1103,7 @@ func (s *Strategy) updateGridNumOfOrdersMetricsWithLock() {
 	metricsGridQuoteInvestment.With(baseLabels).Set(s.QuoteInvestment.Float64())
 	metricsGridBaseInvestment.With(baseLabels).Set(s.BaseInvestment.Float64())
 
-	if grid := s.getGrid(); grid != nil {
+	if grid != nil {
 		gridNum := grid.Size.Int()
 		metricsGridNum.With(baseLabels).Set(float64(gridNum))
 		numOfMissingOrders := gridNum - 1 - numOfOrders
