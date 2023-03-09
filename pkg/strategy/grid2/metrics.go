@@ -5,11 +5,20 @@ import (
 )
 
 var (
-	metricsGridNum                *prometheus.GaugeVec
-	metricsGridNumOfOrders        *prometheus.GaugeVec
-	metricsGridNumOfMissingOrders *prometheus.GaugeVec
-	metricsGridOrderPrices        *prometheus.GaugeVec
-	metricsGridProfit             *prometheus.GaugeVec
+	metricsGridNum                                *prometheus.GaugeVec
+	metricsGridNumOfOrders                        *prometheus.GaugeVec
+	metricsGridNumOfOrdersWithCorrectPrice        *prometheus.GaugeVec
+	metricsGridNumOfMissingOrders                 *prometheus.GaugeVec
+	metricsGridNumOfMissingOrdersWithCorrectPrice *prometheus.GaugeVec
+	metricsGridOrderPrices                        *prometheus.GaugeVec
+	metricsGridProfit                             *prometheus.GaugeVec
+
+	metricsGridUpperPrice      *prometheus.GaugeVec
+	metricsGridLowerPrice      *prometheus.GaugeVec
+	metricsGridQuoteInvestment *prometheus.GaugeVec
+	metricsGridBaseInvestment  *prometheus.GaugeVec
+
+	metricsGridFilledOrderPrice *prometheus.GaugeVec
 )
 
 func labelKeys(labels prometheus.Labels) []string {
@@ -60,10 +69,32 @@ func initMetrics(extendedLabels []string) {
 		}, extendedLabels...),
 	)
 
+	metricsGridNumOfOrdersWithCorrectPrice = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_grid2_num_of_correct_price_orders",
+			Help: "number of orders with correct grid prices",
+		},
+		append([]string{
+			"exchange", // exchange name
+			"symbol",   // symbol of the market
+		}, extendedLabels...),
+	)
+
 	metricsGridNumOfMissingOrders = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "bbgo_grid2_num_of_missing_orders",
 			Help: "number of missing orders",
+		},
+		append([]string{
+			"exchange", // exchange name
+			"symbol",   // symbol of the market
+		}, extendedLabels...),
+	)
+
+	metricsGridNumOfMissingOrdersWithCorrectPrice = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_grid2_num_of_missing_correct_price_orders",
+			Help: "number of missing orders with correct prices",
 		},
 		append([]string{
 			"exchange", // exchange name
@@ -86,12 +117,68 @@ func initMetrics(extendedLabels []string) {
 
 	metricsGridProfit = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "bbgo_grid2_grid_profit",
+			Name: "bbgo_grid2_profit",
 			Help: "realized grid profit",
 		},
 		append([]string{
 			"exchange", // exchange name
 			"symbol",   // symbol of the market
+		}, extendedLabels...),
+	)
+
+	metricsGridUpperPrice = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_grid2_upper_price",
+			Help: "the upper price of grid",
+		},
+		append([]string{
+			"exchange", // exchange name
+			"symbol",   // symbol of the market
+		}, extendedLabels...),
+	)
+
+	metricsGridLowerPrice = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_grid2_lower_price",
+			Help: "the lower price of grid",
+		},
+		append([]string{
+			"exchange", // exchange name
+			"symbol",   // symbol of the market
+		}, extendedLabels...),
+	)
+
+	metricsGridQuoteInvestment = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_grid2_quote_investment",
+			Help: "the quote investment of grid",
+		},
+		append([]string{
+			"exchange", // exchange name
+			"symbol",   // symbol of the market
+		}, extendedLabels...),
+	)
+
+	metricsGridBaseInvestment = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_grid2_base_investment",
+			Help: "the base investment of grid",
+		},
+		append([]string{
+			"exchange", // exchange name
+			"symbol",   // symbol of the market
+		}, extendedLabels...),
+	)
+
+	metricsGridFilledOrderPrice = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_grid2_filled_order_price",
+			Help: "the price of filled grid order",
+		},
+		append([]string{
+			"exchange", // exchange name
+			"symbol",   // symbol of the market
+			"side",
 		}, extendedLabels...),
 	)
 }
@@ -111,9 +198,16 @@ func registerMetrics() {
 	prometheus.MustRegister(
 		metricsGridNum,
 		metricsGridNumOfOrders,
+		metricsGridNumOfOrdersWithCorrectPrice,
 		metricsGridNumOfMissingOrders,
+		metricsGridNumOfMissingOrdersWithCorrectPrice,
 		metricsGridProfit,
 		metricsGridOrderPrices,
+		metricsGridLowerPrice,
+		metricsGridUpperPrice,
+		metricsGridQuoteInvestment,
+		metricsGridBaseInvestment,
+		metricsGridFilledOrderPrice,
 	)
 	metricsRegistered = true
 }
