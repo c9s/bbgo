@@ -163,6 +163,9 @@ type Strategy struct {
 	SkipSpreadCheck             bool `json:"skipSpreadCheck"`
 	RecoverGridByScanningTrades bool `json:"recoverGridByScanningTrades"`
 
+	// Debug enables the debug mode
+	Debug bool `json:"debug"`
+
 	GridProfitStats *GridProfitStats `persistence:"grid_profit_stats"`
 	Position        *types.Position  `persistence:"position"`
 
@@ -1161,6 +1164,10 @@ func sortOrdersByPriceAscending(orders []types.Order) []types.Order {
 }
 
 func (s *Strategy) debugGridOrders(submitOrders []types.SubmitOrder, lastPrice fixedpoint.Value) {
+	if !s.Debug {
+		return
+	}
+
 	var sb strings.Builder
 
 	sb.WriteString("GRID ORDERS [")
@@ -1177,6 +1184,10 @@ func (s *Strategy) debugGridOrders(submitOrders []types.SubmitOrder, lastPrice f
 }
 
 func (s *Strategy) debugOrders(desc string, orders []types.Order) {
+	if !s.Debug {
+		return
+	}
+
 	var sb strings.Builder
 
 	if desc == "" {
