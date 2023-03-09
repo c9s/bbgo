@@ -157,7 +157,8 @@ type Strategy struct {
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
 
-	SkipSpreadCheck bool `json:"skipSpreadCheck"`
+	SkipSpreadCheck             bool `json:"skipSpreadCheck"`
+	RecoverGridByScanningTrades bool `json:"recoverGridByScanningTrades"`
 
 	GridProfitStats *GridProfitStats `persistence:"grid_profit_stats"`
 	Position        *types.Position  `persistence:"position"`
@@ -1369,7 +1370,7 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 
 	// 6. debug and send metrics
 	debugGrid(s.logger, grid, s.orderExecutor.ActiveMakerOrders())
-	s.updateGridNumOfOrdersMetrics()
+	s.updateGridNumOfOrdersMetricsWithLock()
 	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 
 	return nil
@@ -1910,7 +1911,7 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 	if s.RecoverOrdersWhenStart {
 		// do recover only when triggerPrice is not set and not in the back-test mode
 		s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
-		if err := s.recoverGridByScanningOrders(ctx, session); err != nil {
+		if err := s.recoverGrid(ctx, session); err != nil {
 			s.logger.WithError(err).Errorf("recover error")
 		}
 	}
@@ -1919,6 +1920,14 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 	if err := s.openGrid(ctx, session); err != nil {
 		s.logger.WithError(err).Errorf("failed to setup grid orders")
 	}
+}
+
+func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
+	if s.RecoverGridByScanningTrades {
+		return s.recoverGridByScanningTrades(ctx, session)
+	}
+
+	return s.recoverGridByScanningOrders(ctx, session)
 }
 
 func (s *Strategy) recoverGridByScanningOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
