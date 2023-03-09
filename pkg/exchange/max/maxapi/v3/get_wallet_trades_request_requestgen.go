@@ -198,7 +198,7 @@ func (g *GetWalletTradesRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
-func (g *GetWalletTradesRequest) Do(ctx context.Context) ([]max.Trade, error) {
+func (g *GetWalletTradesRequest) Do(ctx context.Context) ([]Trade, error) {
 
 	// empty params for GET operation
 	var params interface{}
@@ -225,7 +225,7 @@ func (g *GetWalletTradesRequest) Do(ctx context.Context) ([]max.Trade, error) {
 		return nil, err
 	}
 
-	var apiResponse []max.Trade
+	var apiResponse []Trade
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
 	}

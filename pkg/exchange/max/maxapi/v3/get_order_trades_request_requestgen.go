@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -136,7 +135,7 @@ func (g *GetOrderTradesRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
-func (g *GetOrderTradesRequest) Do(ctx context.Context) ([]max.Trade, error) {
+func (g *GetOrderTradesRequest) Do(ctx context.Context) ([]Trade, error) {
 
 	// empty params for GET operation
 	var params interface{}
@@ -157,7 +156,7 @@ func (g *GetOrderTradesRequest) Do(ctx context.Context) ([]max.Trade, error) {
 		return nil, err
 	}
 
-	var apiResponse []max.Trade
+	var apiResponse []Trade
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
 	}
