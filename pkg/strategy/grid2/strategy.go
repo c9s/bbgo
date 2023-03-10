@@ -2062,7 +2062,7 @@ func (s *Strategy) openOrdersMismatches(ctx context.Context, session *bbgo.Excha
 }
 
 func (s *Strategy) cancelDuplicatedPriceOpenOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
-	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	openOrders, err := queryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
 	if err != nil {
 		return err
 	}
@@ -2112,4 +2112,13 @@ func (s *Strategy) findDuplicatedPriceOpenOrders(openOrders []types.Order) (dupO
 	}
 
 	return dupOrders
+}
+
+func queryOpenOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, symbol string) (openOrders []types.Order, err error) {
+	var op = func() (err2 error) {
+		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
+		return err2
+	}
+	err = backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
+	return openOrders, err
 }
