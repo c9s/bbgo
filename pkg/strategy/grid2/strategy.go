@@ -157,7 +157,8 @@ type Strategy struct {
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
 
-	SkipSpreadCheck bool `json:"skipSpreadCheck"`
+	SkipSpreadCheck             bool `json:"skipSpreadCheck"`
+	RecoverGridByScanningTrades bool `json:"recoverGridByScanningTrades"`
 
 	GridProfitStats *GridProfitStats `persistence:"grid_profit_stats"`
 	Position        *types.Position  `persistence:"position"`
@@ -1339,6 +1340,70 @@ func (s *Strategy) checkMinimalQuoteInvestment(grid *Grid) error {
 	return nil
 }
 
+func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrdersOnGrid []types.Order) error {
+	if s.orderQueryService == nil {
+		return fmt.Errorf("orderQueryService is nil, it can't get orders by trade")
+	}
+
+	// set grid
+	grid := s.newGrid()
+	s.setGrid(grid)
+
+	// add open orders to active order book
+	s.addOrdersToActiveOrderBook(openOrdersOnGrid)
+
+	expectedOrderNums := s.GridNum - 1
+	openOrdersOnGridNums := int64(len(openOrdersOnGrid))
+	s.logger.Infof("[DEBUG] open orders nums: %d, expected nums: %d", openOrdersOnGridNums, expectedOrderNums)
+	if expectedOrderNums == openOrdersOnGridNums {
+		// no need to recover
+		return nil
+	}
+
+	// 1. build pin-order map
+	// 2. fill the pin-order map by querying trades
+	// 3. get the filled orders from pin-order map
+	// 4. emit the filled orders
+
+	// 5. emit grid ready
+	s.EmitGridReady()
+
+	// 6. debug and send metrics
+	debugGrid(s.logger, grid, s.orderExecutor.ActiveMakerOrders())
+	s.updateGridNumOfOrdersMetricsWithLock()
+	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
+
+	return nil
+}
+
+// buildPinOrderMap build the pin-order map with grid and open orders.
+// The keys of this map contains all required pins of this grid.
+// If the Order of the pin is empty types.Order (OrderID == 0), it means there is no open orders at this pin.
+func (s *Strategy) buildPinOrderMap(grid *Grid, openOrders []types.Order) (map[string]types.Order, error) {
+	pinOrderMap := make(map[string]types.Order)
+
+	for _, pin := range grid.Pins {
+		priceStr := s.FormatPrice(fixedpoint.Value(pin))
+		pinOrderMap[priceStr] = types.Order{}
+	}
+
+	for _, openOrder := range openOrders {
+		priceStr := s.FormatPrice(openOrder.Price)
+		v, exist := pinOrderMap[priceStr]
+		if !exist {
+			return nil, fmt.Errorf("the price of the order (id: %d) is not in pins", openOrder.OrderID)
+		}
+
+		if v.OrderID != 0 {
+			return nil, fmt.Errorf("there are duplicated open orders at the same pin")
+		}
+
+		pinOrderMap[priceStr] = openOrder
+	}
+
+	return pinOrderMap, nil
+}
+
 func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
 	grid := s.newGrid()
 
@@ -1858,6 +1923,14 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 }
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
+	if s.RecoverGridByScanningTrades {
+		return s.recoverGridByScanningTrades(ctx, session)
+	}
+
+	return s.recoverGridByScanningOrders(ctx, session)
+}
+
+func (s *Strategy) recoverGridByScanningOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
 	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
 	if err != nil {
 		return err
@@ -1878,6 +1951,45 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 	}
 
 	if err := s.recoverGridWithOpenOrders(ctx, historyService, openOrders); err != nil {
+		return errors.Wrap(err, "grid recover error")
+	}
+
+	return nil
+}
+
+func (s *Strategy) recoverGridByScanningTrades(ctx context.Context, session *bbgo.ExchangeSession) error {
+	// no initial order id means we don't need to recover
+	if s.GridProfitStats.InitialOrderID == 0 {
+		s.logger.Info("[DEBUG] new strategy, no need to recover")
+		return nil
+	}
+
+	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Infof("found %d open orders left on the %s order book", len(openOrders), s.Symbol)
+
+	s.logger.Infof("[DEBUG] recover grid with group id: %d", s.OrderGroupID)
+	// filter out the order with the group id belongs to this grid
+	var openOrdersOnGrid []types.Order
+	for _, order := range openOrders {
+		s.logger.Infof("[DEBUG] order (%d) group id: %d", order.OrderID, order.GroupID)
+		if order.GroupID == s.OrderGroupID {
+			openOrdersOnGrid = append(openOrdersOnGrid, order)
+		}
+	}
+
+	s.logger.Infof("found %d open orders belong to this grid on the %s order book", len(openOrdersOnGrid), s.Symbol)
+
+	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
+	if !implemented {
+		s.logger.Warn("ExchangeTradeHistoryService is not implemented, can not recover grid")
+		return nil
+	}
+
+	if err := s.recoverGridWithOpenOrdersByScanningTrades(ctx, historyService, openOrdersOnGrid); err != nil {
 		return errors.Wrap(err, "grid recover error")
 	}
 
