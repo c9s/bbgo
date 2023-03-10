@@ -13,6 +13,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/etf"
 	_ "github.com/c9s/bbgo/pkg/strategy/ewoDgtrd"
 	_ "github.com/c9s/bbgo/pkg/strategy/factorzoo"
+	_ "github.com/c9s/bbgo/pkg/strategy/fixedmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/flashcrash"
 	_ "github.com/c9s/bbgo/pkg/strategy/fmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/funding"

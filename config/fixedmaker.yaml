@@ -1,7 +1,7 @@
 ---
 exchangeStrategies:
   - on: max
-    fixedmm:
+    fixedmaker:
       interval: 5m
       symbol: BTCUSDT
       halfSpreadRatio: 0.05%
