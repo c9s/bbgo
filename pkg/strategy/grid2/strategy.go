@@ -2119,6 +2119,10 @@ func queryOpenOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, symb
 		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
 		return err2
 	}
-	err = backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
+	err = backoff.Retry(op, backoff.WithContext(
+		backoff.WithMaxRetries(
+			backoff.NewExponentialBackOff(),
+			101),
+		ctx))
 	return openOrders, err
 }
