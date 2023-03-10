@@ -115,9 +115,50 @@ func (v Value) FormatString(prec int) string {
 	} else if v == NegInf {
 		return "-inf"
 	}
-	pow := math.Pow10(prec)
-	return strconv.FormatFloat(
-		math.Trunc(float64(v)/DefaultPow*pow)/pow, 'f', prec, 64)
+
+	u := int64(v)
+
+	// trunc precision
+	precDiff := DefaultPrecision - prec
+	if precDiff > 0 {
+		powDiff := int64(math.Pow10(precDiff))
+		u = int64(v) / powDiff * powDiff
+	}
+
+	// check sign
+	sign := Value(u).Sign()
+
+	basePow := int64(DefaultPow)
+	a := u / basePow
+	b := u % basePow
+
+	if a < 0 {
+		a = -a
+	}
+
+	if b < 0 {
+		b = -b
+	}
+
+	str := strconv.FormatInt(a, 10)
+	if prec > 0 {
+		bStr := fmt.Sprintf(".%08d", b)
+		if prec <= DefaultPrecision {
+			bStr = bStr[0 : prec+1]
+		} else {
+			for i := prec - DefaultPrecision; i > 0; i-- {
+				bStr += "0"
+			}
+		}
+
+		str += bStr
+	}
+
+	if sign < 0 {
+		str = "-" + str
+	}
+
+	return str
 }
 
 func (v Value) Percentage() string {

@@ -113,7 +113,7 @@ func (m Market) FormatPrice(val fixedpoint.Value) string {
 }
 
 func FormatPrice(price fixedpoint.Value, tickSize fixedpoint.Value) string {
-	prec := int(math.Round(math.Abs(math.Log10(tickSize.Float64()))))
+	prec := int(math.Round(math.Log10(tickSize.Float64()) * -1.0))
 	return price.FormatString(prec)
 }
 
