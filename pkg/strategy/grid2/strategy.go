@@ -1400,9 +1400,36 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 	}
 
 	// 1. build pin-order map
-	// 2. fill the pin-order map by querying trades
+	pinOrderMapWithOpenOrders, err := s.buildPinOrderMap(grid, openOrdersOnGrid)
+	if err != nil {
+		return errors.Wrapf(err, "failed to build pin order map with open orders")
+	}
+
+	// 2. build the filled pin-order map by querying trades
+	pinOrderMapWithFilledOrders, err := s.buildFilledPinOrderMapFromTrades(ctx, historyService, pinOrderMapWithOpenOrders)
+	if err != nil {
+		return errors.Wrapf(err, "failed to build filled pin order map")
+	}
+
 	// 3. get the filled orders from pin-order map
+	filledOrders := getOrdersFromPinOrderMapInAscOrder(pinOrderMapWithFilledOrders)
+	numsFilledOrders := len(filledOrders)
+	i := 0
+	if numsFilledOrders == int(expectedOrderNums-openOrdersOnGridNums) {
+		// nums of filled order is the same as Size - 1 - num(open orders)
+	} else if numsFilledOrders == int(expectedOrderNums-openOrdersOnGridNums+1) {
+		i++
+	} else {
+		return fmt.Errorf("not reasonable num of filled orders")
+	}
+
 	// 4. emit the filled orders
+	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
+	for ; i < numsFilledOrders; i++ {
+		filledOrder := filledOrders[i]
+		s.logger.Infof("[DEBUG] emit filled order: %s (%s)", filledOrder.String(), filledOrder.UpdateTime)
+		activeOrderBook.EmitFilled(filledOrder)
+	}
 
 	// 5. emit grid ready
 	s.EmitGridReady()
@@ -1441,6 +1468,96 @@ func (s *Strategy) buildPinOrderMap(grid *Grid, openOrders []types.Order) (map[s
 	}
 
 	return pinOrderMap, nil
+}
+
+// buildFilledPinOrderMapFromTrades will query the trades from last 24 hour and use them to build a pin order map
+// It will skip the orders on pins at which open orders are already
+func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, openPinOrderMap map[string]types.Order) (map[string]types.Order, error) {
+	filledPinOrderMap := make(map[string]types.Order)
+	var limit int64 = 1000
+	// get the filled orders when bbgo is down in order from trades
+	// [NOTE] only retrieve from last 24 hours !!!
+	var fromTradeID uint64 = 0
+	for {
+		trades, err := historyService.QueryTrades(ctx, s.Symbol, &types.TradeQueryOptions{
+			LastTradeID: fromTradeID,
+			Limit:       limit,
+		})
+
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to query trades to recover the grid with open orders")
+		}
+
+		s.logger.Infof("[DEBUG] len of trades: %d", len(trades))
+
+		for _, trade := range trades {
+			order, err := s.orderQueryService.QueryOrder(ctx, types.OrderQuery{
+				OrderID: strconv.FormatUint(trade.OrderID, 10),
+			})
+
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to query order by trade")
+			}
+
+			s.logger.Infof("[DEBUG] trade: %s", trade.String())
+			s.logger.Infof("[DEBUG] (group_id: %d) order: %s", order.GroupID, order.String())
+
+			// add 1 to avoid duplicate
+			fromTradeID = trade.ID + 1
+
+			// this trade doesn't belong to this grid
+			if order.GroupID != s.OrderGroupID {
+				continue
+			}
+
+			// checked the trade's order is filled order
+			priceStr := s.FormatPrice(order.Price)
+			v, exist := openPinOrderMap[priceStr]
+			if !exist {
+				return nil, fmt.Errorf("the price of the order with the same GroupID is not in pins")
+			}
+
+			// skip open orders on grid
+			if v.OrderID != 0 {
+				continue
+			}
+
+			// check the order's creation time
+			if pinOrder, exist := filledPinOrderMap[priceStr]; exist && pinOrder.CreationTime.Time().After(order.CreationTime.Time()) {
+				// do not replace the pin order if the order's creation time is not after pin order's creation time
+				// this situation should not happen actually, because the trades is already sorted.
+				s.logger.Infof("pinOrder's creation time (%s) should not be after order's creation time (%s)", pinOrder.CreationTime, order.CreationTime)
+				continue
+			}
+			filledPinOrderMap[priceStr] = *order
+		}
+
+		// stop condition
+		if int64(len(trades)) < limit {
+			break
+		}
+	}
+
+	return filledPinOrderMap, nil
+}
+
+// get the orders from pin order map and sort it in asc order
+func getOrdersFromPinOrderMapInAscOrder(pinOrderMap map[string]types.Order) []types.Order {
+	var orders []types.Order
+	for _, order := range pinOrderMap {
+		// skip empty order
+		if order.OrderID == 0 {
+			continue
+		}
+
+		orders = append(orders, order)
+	}
+
+	sort.Slice(orders, func(i, j int) bool {
+		return orders[i].UpdateTime.Before(orders[j].UpdateTime.Time())
+	})
+
+	return orders
 }
 
 func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {

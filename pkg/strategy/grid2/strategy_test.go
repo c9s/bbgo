@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/sirupsen/logrus"
@@ -1177,4 +1178,34 @@ func Test_buildPinOrderMap(t *testing.T) {
 		_, err := s.buildPinOrderMap(s.grid, openOrders)
 		assert.Error(err)
 	})
+}
+
+func Test_getOrdersFromPinOrderMapInAscOrder(t *testing.T) {
+	assert := assert.New(t)
+	now := time.Now()
+	pinOrderMap := map[string]types.Order{
+		"1000": types.Order{
+			OrderID:      1,
+			CreationTime: types.Time(now.Add(1 * time.Hour)),
+			UpdateTime:   types.Time(now.Add(5 * time.Hour)),
+		},
+		"1100": types.Order{},
+		"1200": types.Order{},
+		"1300": types.Order{
+			OrderID:      3,
+			CreationTime: types.Time(now.Add(3 * time.Hour)),
+			UpdateTime:   types.Time(now.Add(6 * time.Hour)),
+		},
+		"1400": types.Order{
+			OrderID:      2,
+			CreationTime: types.Time(now.Add(2 * time.Hour)),
+			UpdateTime:   types.Time(now.Add(4 * time.Hour)),
+		},
+	}
+
+	orders := getOrdersFromPinOrderMapInAscOrder(pinOrderMap)
+	assert.Len(orders, 3)
+	assert.Equal(uint64(2), orders[0].OrderID)
+	assert.Equal(uint64(1), orders[1].OrderID)
+	assert.Equal(uint64(3), orders[2].OrderID)
 }
