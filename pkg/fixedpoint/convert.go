@@ -121,7 +121,7 @@ func (v Value) FormatString(prec int) string {
 	// trunc precision
 	precDiff := DefaultPrecision - prec
 	if precDiff > 0 {
-		powDiff := int64(math.Pow10(precDiff))
+		powDiff := int64(math.Round(math.Pow10(precDiff)))
 		u = int64(v) / powDiff * powDiff
 	}
 
