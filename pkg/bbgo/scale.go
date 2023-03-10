@@ -134,33 +134,27 @@ type LinearScale struct {
 	Domain [2]float64 `json:"domain"`
 	Range  [2]float64 `json:"range"`
 
-	a, b float64
+	// a is the ratio for Range to Domain
+	a float64
 }
 
 func (s *LinearScale) Solve() error {
 	xs := s.Domain
 	ys := s.Range
-	// y1 = a * x1 + b
-	// y2 = a * x2 + b
-	// y2 - y1 = (a * x2 + b) - (a * x1 + b)
-	// y2 - y1 = (a * x2) - (a * x1)
-	// y2 - y1 = a * (x2 - x1)
 
-	// a = (y2 - y1) / (x2 - x1)
-	// b = y1 - (a * x1)
 	s.a = (ys[1] - ys[0]) / (xs[1] - xs[0])
-	s.b = ys[0] - (s.a * xs[0])
+
 	return nil
 }
 
 func (s *LinearScale) Call(x float64) (y float64) {
-	if x < s.Domain[0] {
-		x = s.Domain[0]
-	} else if x > s.Domain[1] {
-		x = s.Domain[1]
+	if x <= s.Domain[0] {
+		return s.Range[0]
+	} else if x >= s.Domain[1] {
+		return s.Range[1]
 	}
 
-	y = s.a*x + s.b
+	y = s.Range[0] + (x-s.Domain[0])*s.a
 	return y
 }
 
@@ -169,11 +163,11 @@ func (s *LinearScale) String() string {
 }
 
 func (s *LinearScale) Formula() string {
-	return fmt.Sprintf("f(x) = %f * x + %f", s.a, s.b)
+	return fmt.Sprintf("f(x) = %f + (x - %f) * %f", s.Range[0], s.Domain[0], s.a)
 }
 
 func (s *LinearScale) FormulaOf(x float64) string {
-	return fmt.Sprintf("f(%f) = %f * %f + %f", x, s.a, x, s.b)
+	return fmt.Sprintf("f(%f) = %f + (%f - %f) * %f", x, s.Range[0], x, s.Domain[0], s.a)
 }
 
 // see also: http://www.vb-helper.com/howto_find_quadratic_curve.html
