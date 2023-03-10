@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -485,15 +486,16 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	}
 
 	orderForm := types.SubmitOrder{
-		Symbol:      s.Symbol,
-		Market:      s.Market,
-		Type:        types.OrderTypeLimit,
-		Price:       newPrice,
-		Side:        newSide,
-		TimeInForce: types.TimeInForceGTC,
-		Quantity:    newQuantity,
-		Tag:         orderTag,
-		GroupID:     s.OrderGroupID,
+		Symbol:        s.Symbol,
+		Market:        s.Market,
+		Type:          types.OrderTypeLimit,
+		Price:         newPrice,
+		Side:          newSide,
+		TimeInForce:   types.TimeInForceGTC,
+		Quantity:      newQuantity,
+		Tag:           orderTag,
+		GroupID:       s.OrderGroupID,
+		ClientOrderID: uuid.New().String(),
 	}
 
 	s.logger.Infof("SUBMIT GRID REVERSE ORDER: %s", orderForm.String())
@@ -1242,15 +1244,16 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 
 			if usedBase.Add(quantity).Compare(totalBase) < 0 {
 				submitOrders = append(submitOrders, types.SubmitOrder{
-					Symbol:      s.Symbol,
-					Type:        types.OrderTypeLimit,
-					Side:        types.SideTypeSell,
-					Price:       sellPrice,
-					Quantity:    quantity,
-					Market:      s.Market,
-					TimeInForce: types.TimeInForceGTC,
-					Tag:         orderTag,
-					GroupID:     s.OrderGroupID,
+					Symbol:        s.Symbol,
+					Type:          types.OrderTypeLimit,
+					Side:          types.SideTypeSell,
+					Price:         sellPrice,
+					Quantity:      quantity,
+					Market:        s.Market,
+					TimeInForce:   types.TimeInForceGTC,
+					Tag:           orderTag,
+					GroupID:       s.OrderGroupID,
+					ClientOrderID: uuid.New().String(),
 				})
 				usedBase = usedBase.Add(quantity)
 			} else {
@@ -1259,15 +1262,16 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				nextPin := pins[i-1]
 				nextPrice := fixedpoint.Value(nextPin)
 				submitOrders = append(submitOrders, types.SubmitOrder{
-					Symbol:      s.Symbol,
-					Type:        types.OrderTypeLimit,
-					Side:        types.SideTypeBuy,
-					Price:       nextPrice,
-					Quantity:    quantity,
-					Market:      s.Market,
-					TimeInForce: types.TimeInForceGTC,
-					Tag:         orderTag,
-					GroupID:     s.OrderGroupID,
+					Symbol:        s.Symbol,
+					Type:          types.OrderTypeLimit,
+					Side:          types.SideTypeBuy,
+					Price:         nextPrice,
+					Quantity:      quantity,
+					Market:        s.Market,
+					TimeInForce:   types.TimeInForceGTC,
+					Tag:           orderTag,
+					GroupID:       s.OrderGroupID,
+					ClientOrderID: uuid.New().String(),
 				})
 				quoteQuantity := quantity.Mul(nextPrice)
 				usedQuote = usedQuote.Add(quoteQuantity)
@@ -1292,15 +1296,16 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 			}
 
 			submitOrders = append(submitOrders, types.SubmitOrder{
-				Symbol:      s.Symbol,
-				Type:        types.OrderTypeLimit,
-				Side:        types.SideTypeBuy,
-				Price:       price,
-				Quantity:    quantity,
-				Market:      s.Market,
-				TimeInForce: types.TimeInForceGTC,
-				Tag:         orderTag,
-				GroupID:     s.OrderGroupID,
+				Symbol:        s.Symbol,
+				Type:          types.OrderTypeLimit,
+				Side:          types.SideTypeBuy,
+				Price:         price,
+				Quantity:      quantity,
+				Market:        s.Market,
+				TimeInForce:   types.TimeInForceGTC,
+				Tag:           orderTag,
+				GroupID:       s.OrderGroupID,
+				ClientOrderID: uuid.New().String(),
 			})
 			usedQuote = usedQuote.Add(quoteQuantity)
 		}
