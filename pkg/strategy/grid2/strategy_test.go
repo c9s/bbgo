@@ -408,6 +408,8 @@ func newTestStrategy() *Strategy {
 		GridNum:          11,
 		historicalTrades: bbgo.NewTradeStore(),
 
+		filledOrderIDMap: types.NewSyncOrderMap(),
+
 		// QuoteInvestment: number(9000.0),
 	}
 	return s
