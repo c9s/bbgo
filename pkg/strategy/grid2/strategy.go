@@ -523,7 +523,7 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	}
 
 	if s.filledOrderIDMap.Exists(o.OrderID) {
-		s.logger.Warn("duplicated id (%d) of filled order detected", o.OrderID)
+		s.logger.Warnf("duplicated id (%d) of filled order detected", o.OrderID)
 		return
 	}
 	s.filledOrderIDMap.Add(o)
