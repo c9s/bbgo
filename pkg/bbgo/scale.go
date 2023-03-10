@@ -151,7 +151,7 @@ func (s *LinearScale) Call(x float64) (y float64) {
 	if x <= s.Domain[0] {
 		return s.Range[0]
 	} else if x >= s.Domain[1] {
-		return s.Range[0]
+		return s.Range[1]
 	}
 
 	y = s.Range[0] + (x-s.Domain[0])*s.a
