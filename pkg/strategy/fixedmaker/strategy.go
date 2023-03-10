@@ -26,11 +26,12 @@ type Strategy struct {
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 	Market               types.Market
 
-	Interval   types.Interval   `json:"interval"`
-	Symbol     string           `json:"symbol"`
-	Quantity   fixedpoint.Value `json:"quantity"`
-	halfSpread fixedpoint.Value `json:"halfSpreadRatio"`
-	DryRun     bool             `json:"dryRun"`
+	Interval        types.Interval   `json:"interval"`
+	Symbol          string           `json:"symbol"`
+	Quantity        fixedpoint.Value `json:"quantity"`
+	HalfSpreadRatio fixedpoint.Value `json:"halfSpreadRatio"`
+	OrderType       types.OrderType  `json:"orderType"`
+	DryRun          bool             `json:"dryRun"`
 
 	// persistence fields
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
@@ -41,6 +42,12 @@ type Strategy struct {
 	activeOrderBook *bbgo.ActiveOrderBook
 }
 
+func (s *Strategy) Defaults() error {
+	if s.OrderType == "" {
+		s.OrderType = types.OrderTypeLimitMaker
+	}
+	return nil
+}
 func (s *Strategy) Initialize() error {
 	return nil
 }
@@ -58,7 +65,7 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("quantity should be positive")
 	}
 
-	if s.halfSpread.Float64() <= 0 {
+	if s.HalfSpreadRatio.Float64() <= 0 {
 		return fmt.Errorf("halfSpreadRatio should be positive")
 	}
 	return nil
@@ -178,10 +185,10 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 
 	// calculate buy and sell price
 	// buy price = mid price * (1 - r)
-	buyPrice := midPrice.Mul(fixedpoint.One.Sub(s.halfSpread))
+	buyPrice := midPrice.Mul(fixedpoint.One.Sub(s.HalfSpreadRatio))
 	log.Infof("buy price: %+v", buyPrice)
 	// sell price = mid price * (1 + r)
-	sellPrice := midPrice.Mul(fixedpoint.One.Add(s.halfSpread))
+	sellPrice := midPrice.Mul(fixedpoint.One.Add(s.HalfSpreadRatio))
 	log.Infof("sell price: %+v", sellPrice)
 
 	// check balance and generate orders
@@ -190,7 +197,7 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 		orders = append(orders, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeBuy,
-			Type:     types.OrderTypeLimitMaker,
+			Type:     s.OrderType,
 			Price:    buyPrice,
 			Quantity: s.Quantity,
 		})
@@ -202,7 +209,7 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 		orders = append(orders, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeSell,
-			Type:     types.OrderTypeLimitMaker,
+			Type:     s.OrderType,
 			Price:    sellPrice,
 			Quantity: s.Quantity,
 		})
