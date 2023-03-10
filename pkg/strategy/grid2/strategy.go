@@ -897,12 +897,8 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 		for {
 			s.logger.Infof("checking %s open orders...", s.Symbol)
 
-			var openOrders []types.Order
-			if err := backoff.Retry(func() error {
-				var err error
-				openOrders, err = session.Exchange.QueryOpenOrders(ctx, s.Symbol)
-				return err
-			}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101)); err != nil {
+			openOrders, err := queryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
+			if err != nil {
 				s.logger.WithError(err).Errorf("CancelOrdersByGroupID api call error")
 				werr = multierr.Append(werr, err)
 			}
@@ -919,8 +915,7 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 				return cancelErr
 			}
 
-			err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101))
-			if err != nil {
+			if err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101)); err != nil {
 				s.logger.WithError(err).Errorf("CancelAllOrders api call error")
 				werr = multierr.Append(werr, err)
 			}
@@ -1306,17 +1301,12 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 
 func (s *Strategy) clearOpenOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
 	// clear open orders when start
-	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	openOrders, err := queryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
 	if err != nil {
 		return err
 	}
 
-	err = session.Exchange.CancelOrders(ctx, openOrders...)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return cancelOrdersUntilSuccessful(ctx, session.Exchange, openOrders...)
 }
 
 func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.ExchangeSession) (fixedpoint.Value, error) {
@@ -1972,7 +1962,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 }
 
 func (s *Strategy) recoverGridByScanningOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
-	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	openOrders, err := queryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
 	if err != nil {
 		return err
 	}
@@ -2114,15 +2104,30 @@ func (s *Strategy) findDuplicatedPriceOpenOrders(openOrders []types.Order) (dupO
 	return dupOrders
 }
 
-func queryOpenOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, symbol string) (openOrders []types.Order, err error) {
-	var op = func() (err2 error) {
-		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
-		return err2
-	}
+func generalBackoff(ctx context.Context, op backoff.Operation) (err error) {
 	err = backoff.Retry(op, backoff.WithContext(
 		backoff.WithMaxRetries(
 			backoff.NewExponentialBackOff(),
 			101),
 		ctx))
+	return err
+}
+
+func cancelOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
+	var op = func() (err2 error) {
+		err2 = ex.CancelOrders(ctx, orders...)
+		return err2
+	}
+
+	return generalBackoff(ctx, op)
+}
+
+func queryOpenOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, symbol string) (openOrders []types.Order, err error) {
+	var op = func() (err2 error) {
+		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
+		return err2
+	}
+
+	err = generalBackoff(ctx, op)
 	return openOrders, err
 }
