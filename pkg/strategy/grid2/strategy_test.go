@@ -355,11 +355,10 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 		assert.NoError(t, err)
 		assert.InDelta(t, 0.099992, quantity.Float64(), 0.0001)
 	})
-
 }
 
-func newTestStrategy() *Strategy {
-	market := types.Market{
+func newTestMarket() types.Market {
+	return types.Market{
 		BaseCurrency:    "BTC",
 		QuoteCurrency:   "USDT",
 		TickSize:        number(0.01),
@@ -368,6 +367,36 @@ func newTestStrategy() *Strategy {
 		MinNotional:     number(10.0),
 		MinQuantity:     number(0.001),
 	}
+}
+
+var testOrderID = uint64(0)
+
+func newTestOrder(price, quantity fixedpoint.Value, side types.SideType) types.Order {
+	market := newTestMarket()
+	testOrderID++
+	return types.Order{
+		SubmitOrder: types.SubmitOrder{
+			Symbol:       "BTCUSDT",
+			Side:         side,
+			Type:         types.OrderTypeLimit,
+			Quantity:     quantity,
+			Price:        price,
+			AveragePrice: fixedpoint.Zero,
+			StopPrice:    fixedpoint.Zero,
+			Market:       market,
+			TimeInForce:  types.TimeInForceGTC,
+		},
+		Exchange:         "binance",
+		GID:              testOrderID,
+		OrderID:          testOrderID,
+		Status:           types.OrderStatusNew,
+		ExecutedQuantity: fixedpoint.Zero,
+		IsWorking:        true,
+	}
+}
+
+func newTestStrategy() *Strategy {
+	market := newTestMarket()
 
 	s := &Strategy{
 		logger:           logrus.NewEntry(logrus.New()),
@@ -498,6 +527,33 @@ func TestStrategy_aggregateOrderBaseFee(t *testing.T) {
 		IsWorking:        false,
 	})
 	assert.Equal(t, "0.01", baseFee.String())
+}
+
+func TestStrategy_findDuplicatedPriceOpenOrders(t *testing.T) {
+	t.Run("no duplicated open orders", func(t *testing.T) {
+		s := newTestStrategy()
+		s.grid = s.newGrid()
+
+		dupOrders := s.findDuplicatedPriceOpenOrders([]types.Order{
+			newTestOrder(number(1900.0), number(0.1), types.SideTypeSell),
+			newTestOrder(number(1800.0), number(0.1), types.SideTypeSell),
+			newTestOrder(number(1700.0), number(0.1), types.SideTypeSell),
+		})
+		assert.Empty(t, dupOrders)
+		assert.Len(t, dupOrders, 0)
+	})
+
+	t.Run("1 duplicated open order SELL", func(t *testing.T) {
+		s := newTestStrategy()
+		s.grid = s.newGrid()
+
+		dupOrders := s.findDuplicatedPriceOpenOrders([]types.Order{
+			newTestOrder(number(1900.0), number(0.1), types.SideTypeSell),
+			newTestOrder(number(1900.0), number(0.1), types.SideTypeSell),
+			newTestOrder(number(1800.0), number(0.1), types.SideTypeSell),
+		})
+		assert.Len(t, dupOrders, 1)
+	})
 }
 
 func TestStrategy_handleOrderFilled(t *testing.T) {
@@ -969,17 +1025,6 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 		assert.Error(t, err)
 		assert.EqualError(t, err, "need at least 14979.995500 USDT for quote investment, 10000.000000 USDT given")
 	})
-}
-
-func Test_roundUpMarketQuantity(t *testing.T) {
-	q := number("0.00000003")
-	assert.Equal(t, "0.00000003", q.String())
-
-	q3, prec := roundUpMarketQuantity(types.Market{
-		VolumePrecision: 8,
-	}, q, "BTC")
-	assert.Equal(t, "0.00000003", q3.String(), "rounding prec 8")
-	assert.Equal(t, 8, prec)
 }
 
 func Test_buildPinOrderMap(t *testing.T) {
