@@ -186,6 +186,9 @@ type Strategy struct {
 	gridClosedCallbacks []func()
 	gridErrorCallbacks  []func(err error)
 
+	// filledOrderIDMap is used to prevent processing the same order ID twice.
+	filledOrderIDMap *types.SyncOrderMap
+
 	// mu is used for locking the grid object field, avoid double grid opening
 	mu sync.Mutex
 
@@ -240,6 +243,7 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Initialize() error {
+	s.filledOrderIDMap = types.NewSyncOrderMap()
 	s.logger = log.WithFields(s.LogFields)
 	return nil
 }
@@ -505,8 +509,8 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 
 	// we calculate profit only when the order is placed successfully
 	if profit != nil {
-		s.logger.Infof("GENERATED GRID PROFIT: %+v", profit)
 		s.GridProfitStats.AddProfit(profit)
+		s.logger.Infof("GENERATED GRID PROFIT: %+v; TOTAL GRID PROFIT BECOMES: %f", profit, s.GridProfitStats.TotalQuoteProfit.Float64())
 		s.EmitGridProfit(s.GridProfitStats, profit)
 	}
 }
@@ -517,6 +521,12 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 		s.logger.Warn("grid is not opened yet, skip order update event")
 		return
 	}
+
+	if s.filledOrderIDMap.Exists(o.OrderID) {
+		s.logger.Warn("duplicated id (%d) of filled order detected", o.OrderID)
+		return
+	}
+	s.filledOrderIDMap.Add(o)
 
 	s.logger.Infof("GRID ORDER FILLED: %s", o.String())
 	s.updateFilledOrderMetrics(o)
