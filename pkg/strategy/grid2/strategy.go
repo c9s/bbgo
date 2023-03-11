@@ -1178,10 +1178,10 @@ func (s *Strategy) debugGridOrders(submitOrders []types.SubmitOrder, lastPrice f
 	sb.WriteString("GRID ORDERS [")
 	for i, order := range submitOrders {
 		if i > 0 && lastPrice.Compare(order.Price) >= 0 && lastPrice.Compare(submitOrders[i-1].Price) <= 0 {
-			sb.WriteString(fmt.Sprintf("  - LAST PRICE: %f", lastPrice.Float64()))
+			sb.WriteString(fmt.Sprintf("  - LAST PRICE: %f\n", lastPrice.Float64()))
 		}
 
-		sb.WriteString("  - " + order.String())
+		sb.WriteString("  - " + order.String() + "\n")
 	}
 	sb.WriteString("] END OF GRID ORDERS")
 
@@ -1201,7 +1201,7 @@ func (s *Strategy) debugOrders(desc string, orders []types.Order) {
 
 	sb.WriteString(desc + " [")
 	for i, order := range orders {
-		sb.WriteString(fmt.Sprintf("  - %d) %s", i, order.String()))
+		sb.WriteString(fmt.Sprintf("  - %d) %s\n", i, order.String()))
 	}
 	sb.WriteString("]")
 
