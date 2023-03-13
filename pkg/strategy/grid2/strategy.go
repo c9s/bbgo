@@ -495,7 +495,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		Quantity:      newQuantity,
 		Tag:           orderTag,
 		GroupID:       s.OrderGroupID,
-		ClientOrderID: uuid.New().String(),
+		ClientOrderID: s.newClientOrderID(),
 	}
 
 	s.logger.Infof("SUBMIT GRID REVERSE ORDER: %s", orderForm.String())
@@ -1253,7 +1253,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					TimeInForce:   types.TimeInForceGTC,
 					Tag:           orderTag,
 					GroupID:       s.OrderGroupID,
-					ClientOrderID: uuid.New().String(),
+					ClientOrderID: s.newClientOrderID(),
 				})
 				usedBase = usedBase.Add(quantity)
 			} else {
@@ -1271,7 +1271,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					TimeInForce:   types.TimeInForceGTC,
 					Tag:           orderTag,
 					GroupID:       s.OrderGroupID,
-					ClientOrderID: uuid.New().String(),
+					ClientOrderID: s.newClientOrderID(),
 				})
 				quoteQuantity := quantity.Mul(nextPrice)
 				usedQuote = usedQuote.Add(quoteQuantity)
@@ -1305,7 +1305,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				TimeInForce:   types.TimeInForceGTC,
 				Tag:           orderTag,
 				GroupID:       s.OrderGroupID,
-				ClientOrderID: uuid.New().String(),
+				ClientOrderID: s.newClientOrderID(),
 			})
 			usedQuote = usedQuote.Add(quoteQuantity)
 		}
@@ -2117,6 +2117,13 @@ func (s *Strategy) findDuplicatedPriceOpenOrders(openOrders []types.Order) (dupO
 	}
 
 	return dupOrders
+}
+
+func (s *Strategy) newClientOrderID() string {
+	if s.session != nil && s.session.ExchangeName == types.ExchangeMax {
+		return uuid.New().String()
+	}
+	return ""
 }
 
 func generalBackoff(ctx context.Context, op backoff.Operation) (err error) {
