@@ -3,6 +3,7 @@ package rebalance
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 
@@ -19,6 +20,10 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+func instanceID(symbol string) string {
+	return fmt.Sprintf("%s:%s", ID, symbol)
+}
+
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -30,11 +35,11 @@ type Strategy struct {
 	OrderType     types.OrderType  `json:"orderType"`
 	DryRun        bool             `json:"dryRun"`
 
-	PositionMap    map[string]*types.Position    `persistence:"positionMap"`
-	ProfitStatsMap map[string]*types.ProfitStats `persistence:"profitStatsMap"`
+	PositionMap    PositionMap    `persistence:"positionMap"`
+	ProfitStatsMap ProfitStatsMap `persistence:"profitStatsMap"`
 
 	session          *bbgo.ExchangeSession
-	orderExecutorMap map[string]*bbgo.GeneralOrderExecutor
+	orderExecutorMap GeneralOrderExecutorMap
 	activeOrderBook  *bbgo.ActiveOrderBook
 }
 
@@ -51,10 +56,6 @@ func (s *Strategy) Initialize() error {
 
 func (s *Strategy) ID() string {
 	return ID
-}
-
-func (s *Strategy) InstanceID(symbol string) string {
-	return fmt.Sprintf("%s:%s", ID, symbol)
 }
 
 func (s *Strategy) Validate() error {
@@ -97,14 +98,18 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	if s.PositionMap == nil {
-		s.initPositionMapFromMarkets(markets)
+		s.PositionMap = NewPositionMap(markets)
 	}
 
 	if s.ProfitStatsMap == nil {
-		s.initProfitStatsMapFromMarkets(markets)
+		s.ProfitStatsMap = NewProfitStatsMap(markets)
 	}
 
-	s.initOrderExecutorMapFromMarkets(ctx, markets)
+	s.orderExecutorMap = NewGeneralOrderExecutorMap(session, s.PositionMap)
+	s.orderExecutorMap.BindEnvironment(s.Environment)
+	s.orderExecutorMap.BindProfitStats(s.ProfitStatsMap)
+	s.orderExecutorMap.Bind()
+	s.orderExecutorMap.Sync(ctx, s)
 
 	s.activeOrderBook = bbgo.NewActiveOrderBook("")
 	s.activeOrderBook.BindStream(s.session.UserDataStream)
@@ -113,41 +118,13 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.rebalance(ctx)
 	})
 
+	// the shutdown handler, you can cancel all orders
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+		_ = s.orderExecutorMap.GracefulCancel(ctx)
+	})
+
 	return nil
-}
-
-func (s *Strategy) initPositionMapFromMarkets(markets []types.Market) {
-	s.PositionMap = make(map[string]*types.Position)
-	for _, market := range markets {
-		position := types.NewPositionFromMarket(market)
-		position.Strategy = s.ID()
-		position.StrategyInstanceID = s.InstanceID(market.Symbol)
-		s.PositionMap[market.Symbol] = position
-	}
-}
-
-func (s *Strategy) initProfitStatsMapFromMarkets(markets []types.Market) {
-	s.ProfitStatsMap = make(map[string]*types.ProfitStats)
-	for _, market := range markets {
-		s.ProfitStatsMap[market.Symbol] = types.NewProfitStats(market)
-	}
-}
-
-func (s *Strategy) initOrderExecutorMapFromMarkets(ctx context.Context, markets []types.Market) {
-	s.orderExecutorMap = make(map[string]*bbgo.GeneralOrderExecutor)
-	for _, market := range markets {
-		symbol := market.Symbol
-
-		orderExecutor := bbgo.NewGeneralOrderExecutor(s.session, symbol, ID, s.InstanceID(symbol), s.PositionMap[symbol])
-		orderExecutor.BindEnvironment(s.Environment)
-		orderExecutor.BindProfitStats(s.ProfitStatsMap[symbol])
-		orderExecutor.Bind()
-		orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-			bbgo.Sync(ctx, s)
-		})
-
-		s.orderExecutorMap[market.Symbol] = orderExecutor
-	}
 }
 
 func (s *Strategy) rebalance(ctx context.Context) {
@@ -165,14 +142,12 @@ func (s *Strategy) rebalance(ctx context.Context) {
 		return
 	}
 
-	for _, submitOrder := range submitOrders {
-		createdOrders, err := s.orderExecutorMap[submitOrder.Symbol].SubmitOrders(ctx, submitOrder)
-		if err != nil {
-			log.WithError(err).Error("failed to submit orders")
-			return
-		}
-		s.activeOrderBook.Add(createdOrders...)
+	createdOrders, err := s.orderExecutorMap.SubmitOrders(ctx, submitOrders...)
+	if err != nil {
+		log.WithError(err).Error("failed to submit orders")
+		return
 	}
+	s.activeOrderBook.Add(createdOrders...)
 }
 
 func (s *Strategy) prices(ctx context.Context) types.ValueMap {
