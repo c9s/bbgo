@@ -1095,7 +1095,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 				IsWorking:        false,
 			},
 		}
-		m, err := s.buildPinOrderMap(s.grid, openOrders)
+		m, err := s.buildPinOrderMap(s.grid.Pins, openOrders)
 		assert.NoError(err)
 		assert.Len(m, 11)
 
@@ -1130,7 +1130,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 				IsWorking:        false,
 			},
 		}
-		_, err := s.buildPinOrderMap(s.grid, openOrders)
+		_, err := s.buildPinOrderMap(s.grid.Pins, openOrders)
 		assert.Error(err)
 	})
 
@@ -1175,7 +1175,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 				IsWorking:        false,
 			},
 		}
-		_, err := s.buildPinOrderMap(s.grid, openOrders)
+		_, err := s.buildPinOrderMap(s.grid.Pins, openOrders)
 		assert.Error(err)
 	})
 }
@@ -1183,7 +1183,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 func Test_getOrdersFromPinOrderMapInAscOrder(t *testing.T) {
 	assert := assert.New(t)
 	now := time.Now()
-	pinOrderMap := map[string]types.Order{
+	pinOrderMap := PinOrderMap{
 		"1000": types.Order{
 			OrderID:      1,
 			CreationTime: types.Time(now.Add(1 * time.Hour)),
@@ -1203,7 +1203,7 @@ func Test_getOrdersFromPinOrderMapInAscOrder(t *testing.T) {
 		},
 	}
 
-	orders := getOrdersFromPinOrderMapInAscOrder(pinOrderMap)
+	orders := pinOrderMap.AscendingOrders()
 	assert.Len(orders, 3)
 	assert.Equal(uint64(2), orders[0].OrderID)
 	assert.Equal(uint64(1), orders[1].OrderID)
