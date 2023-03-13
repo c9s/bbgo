@@ -118,6 +118,14 @@ type Strategy struct {
 	// UseDynamicQuantityAsAmount calculates amount instead of quantity
 	UseDynamicQuantityAsAmount bool `json:"useDynamicQuantityAsAmount"`
 
+	// MinProfitSpread is the minimal order price spread from the current average cost.
+	// For long position, you will only place sell order above the price (= average cost * (1 + minProfitSpread))
+	// For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
+	MinProfitSpread fixedpoint.Value `json:"minProfitSpread"`
+
+	// MinProfitActivationRate activates MinProfitSpread when position RoI higher than the specified percentage
+	MinProfitActivationRate fixedpoint.Value `json:"minProfitActivationRate"`
+
 	// ExitMethods are various TP/SL methods
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
@@ -179,8 +187,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 		Interval: s.ReverseEMA.Interval,
 	})
-	// Initialize ReverseEMA
-	s.ReverseEMA = s.StandardIndicatorSet.EWMA(s.ReverseEMA.IntervalWindow)
 
 	// Subscribe for ReverseInterval. Use interval of ReverseEMA if ReverseInterval is omitted
 	if s.ReverseInterval == "" {
@@ -214,8 +220,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 			Interval: s.NeutralBollinger.Interval,
 		})
 	}
-	// Initialize BBs
-	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 
 	// Setup Exits
 	s.ExitMethods.SetAndSubscribe(session, s)
@@ -426,22 +430,17 @@ func (s *Strategy) getAllowedBalance() (baseQty, quoteQty fixedpoint.Value) {
 	quoteBalance, hasQuoteBalance := balances[s.Market.QuoteCurrency]
 	lastPrice, _ := s.session.LastPrice(s.Symbol)
 
-	if bbgo.IsBackTesting {
-		if !hasQuoteBalance {
-			baseQty = fixedpoint.Zero
-			quoteQty = fixedpoint.Zero
-		} else {
-			baseQty = quoteBalance.Available.Div(lastPrice)
-			quoteQty = quoteBalance.Available
-		}
-	} else if s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures {
+	if bbgo.IsBackTesting { // Backtesting
+		baseQty = s.Position.Base
+		quoteQty = quoteBalance.Available.Sub(fixedpoint.Max(s.Position.Quote.Mul(fixedpoint.Two), fixedpoint.Zero))
+	} else if s.session.Margin || s.session.IsolatedMargin || s.session.Futures || s.session.IsolatedFutures { // Leveraged
 		quoteQ, err := bbgo.CalculateQuoteQuantity(s.ctx, s.session, s.Market.QuoteCurrency, s.Leverage)
 		if err != nil {
 			quoteQ = fixedpoint.Zero
 		}
 		quoteQty = quoteQ
 		baseQty = quoteQ.Div(lastPrice)
-	} else {
+	} else { // Spot
 		if !hasBaseBalance {
 			baseQty = fixedpoint.Zero
 		} else {
@@ -458,16 +457,16 @@ func (s *Strategy) getAllowedBalance() (baseQty, quoteQty fixedpoint.Value) {
 }
 
 // getCanBuySell returns the buy sell switches
-func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice fixedpoint.Value) (canBuy bool, canSell bool) {
+func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice, midPrice fixedpoint.Value) (canBuy bool, canSell bool) {
 	// By default, both buy and sell are on, which means we will place buy and sell orders
 	canBuy = true
 	canSell = true
 
 	// Check if current position > maxExposurePosition
 	if s.Position.GetBase().Abs().Compare(s.MaxExposurePosition) > 0 {
-		if s.mainTrendCurrent == types.DirectionUp {
+		if s.Position.IsLong() {
 			canBuy = false
-		} else if s.mainTrendCurrent == types.DirectionDown {
+		} else if s.Position.IsShort() {
 			canSell = false
 		}
 		log.Infof("current position %v larger than max exposure %v, skip increase position", s.Position.GetBase().Abs(), s.MaxExposurePosition)
@@ -478,12 +477,12 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 		// Price too high
 		if bidPrice.Float64() > s.neutralBoll.UpBand.Last() {
 			canBuy = false
-			log.Infof("tradeInBand is set, skip buy when the price is higher than the neutralBB")
+			log.Infof("tradeInBand is set, skip buy due to the price is higher than the neutralBB")
 		}
 		// Price too low in uptrend
 		if askPrice.Float64() < s.neutralBoll.DownBand.Last() {
 			canSell = false
-			log.Infof("tradeInBand is set, skip sell when the price is lower than the neutralBB")
+			log.Infof("tradeInBand is set, skip sell due to the price is lower than the neutralBB")
 		}
 	}
 
@@ -491,9 +490,31 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 	if !s.isAllowOppositePosition() {
 		if s.mainTrendCurrent == types.DirectionUp && (s.Position.IsClosed() || s.Position.IsDust(askPrice)) {
 			canSell = false
+			log.Infof("skip sell due to the long position is closed")
 		} else if s.mainTrendCurrent == types.DirectionDown && (s.Position.IsClosed() || s.Position.IsDust(bidPrice)) {
 			canBuy = false
+			log.Infof("skip buy due to the short position is closed")
 		}
+	}
+
+	// Min profit
+	roi := s.Position.ROI(midPrice)
+	if roi.Compare(s.MinProfitActivationRate) >= 0 {
+		if s.Position.IsLong() && !s.Position.IsDust(askPrice) {
+			minProfitPrice := s.Position.AverageCost.Mul(fixedpoint.One.Add(s.MinProfitSpread))
+			if askPrice.Compare(minProfitPrice) < 0 {
+				canSell = false
+				log.Infof("askPrice %v is less than minProfitPrice %v. skip sell", askPrice, minProfitPrice)
+			}
+		} else if s.Position.IsShort() && s.Position.IsDust(bidPrice) {
+			minProfitPrice := s.Position.AverageCost.Mul(fixedpoint.One.Sub(s.MinProfitSpread))
+			if bidPrice.Compare(minProfitPrice) > 0 {
+				canBuy = false
+				log.Infof("bidPrice %v is greater than minProfitPrice %v. skip buy", bidPrice, minProfitPrice)
+			}
+		}
+	} else {
+		log.Infof("position RoI %v is less than minProfitActivationRate %v. min profit protection is not active", roi, s.MinProfitActivationRate)
 	}
 
 	// Check against account balance
@@ -502,16 +523,20 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice f
 		if quoteQty.Compare(fixedpoint.Zero) <= 0 {
 			if s.Position.IsLong() {
 				canBuy = false
+				log.Infof("skip buy due to the account has no available balance")
 			} else if s.Position.IsShort() {
 				canSell = false
+				log.Infof("skip sell due to the account has no available balance")
 			}
 		}
 	} else {
 		if buyQuantity.Compare(quoteQty.Div(bidPrice)) > 0 { // Spot
 			canBuy = false
+			log.Infof("skip buy due to the account has no available balance")
 		}
 		if sellQuantity.Compare(baseQty) > 0 {
 			canSell = false
+			log.Infof("skip sell due to the account has no available balance")
 		}
 	}
 
@@ -589,6 +614,7 @@ func (s *Strategy) getOrderForms(buyQuantity, bidPrice, sellQuantity, askPrice f
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	log.Debugf("%v", orderExecutor) // Here just to suppress GoLand warning
 	// initial required information
 	s.session = session
 	s.ctx = ctx
@@ -636,6 +662,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.Sync(ctx, s)
 	})
 	s.ExitMethods.Bind(session, s.orderExecutor)
+
+	// Indicators initialized by StandardIndicatorSet must be initialized in Run()
+	// Initialize ReverseEMA
+	s.ReverseEMA = s.StandardIndicatorSet.EWMA(s.ReverseEMA.IntervalWindow)
+	// Initialize BBs
+	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 
 	// Default spread
 	if s.Spread == fixedpoint.Zero {
@@ -758,7 +790,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		buyOrder, sellOrder := s.getOrderForms(buyQuantity, bidPrice, sellQuantity, askPrice)
 
-		canBuy, canSell := s.getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice)
+		canBuy, canSell := s.getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice, midPrice)
 
 		// Submit orders
 		var submitOrders []types.SubmitOrder
