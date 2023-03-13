@@ -22,6 +22,23 @@ func init() {
 	registerMetrics()
 }
 
+func equalOrdersIgnoreClientOrderID(a, b types.SubmitOrder) bool {
+	return a.Symbol == b.Symbol &&
+		a.Side == b.Side &&
+		a.Type == b.Type &&
+		a.Quantity == b.Quantity &&
+		a.Price == b.Price &&
+		a.AveragePrice == b.AveragePrice &&
+		a.StopPrice == b.StopPrice &&
+		a.Market == b.Market &&
+		a.TimeInForce == b.TimeInForce &&
+		a.GroupID == b.GroupID &&
+		a.MarginSideEffect == b.MarginSideEffect &&
+		a.ReduceOnly == b.ReduceOnly &&
+		a.ClosePosition == b.ClosePosition &&
+		a.Tag == b.Tag
+}
+
 func TestStrategy_checkRequiredInvestmentByQuantity(t *testing.T) {
 	s := &Strategy{
 		logger: logrus.NewEntry(logrus.New()),
@@ -605,9 +622,12 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 		}
 
 		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
-		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder).Return([]types.Order{
-			{SubmitOrder: expectedSubmitOrder},
-		}, nil)
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder, order), "%+v is not equal to %+v", order, expectedSubmitOrder)
+			return []types.Order{
+				{SubmitOrder: expectedSubmitOrder},
+			}, nil
+		})
 		s.orderExecutor = orderExecutor
 
 		s.handleOrderFilled(types.Order{
@@ -670,9 +690,12 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 		}
 
 		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
-		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder).Return([]types.Order{
-			{SubmitOrder: expectedSubmitOrder},
-		}, nil)
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder, order), "%+v is not equal to %+v", order, expectedSubmitOrder)
+			return []types.Order{
+				{SubmitOrder: expectedSubmitOrder},
+			}, nil
+		})
 		s.orderExecutor = orderExecutor
 
 		s.handleOrderFilled(types.Order{
@@ -755,9 +778,12 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Market:      s.Market,
 			Tag:         orderTag,
 		}
-		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder).Return([]types.Order{
-			{SubmitOrder: expectedSubmitOrder},
-		}, nil)
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder, order), "%+v is not equal to %+v", order, expectedSubmitOrder)
+			return []types.Order{
+				{SubmitOrder: expectedSubmitOrder},
+			}, nil
+		})
 
 		expectedSubmitOrder2 := types.SubmitOrder{
 			Symbol:      "BTCUSDT",
@@ -769,9 +795,12 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Market:      s.Market,
 			Tag:         orderTag,
 		}
-		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder2).Return([]types.Order{
-			{SubmitOrder: expectedSubmitOrder2},
-		}, nil)
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder2, order), "%+v is not equal to %+v", order, expectedSubmitOrder2)
+			return []types.Order{
+				{SubmitOrder: expectedSubmitOrder2},
+			}, nil
+		})
 
 		s.orderExecutor = orderExecutor
 
@@ -863,9 +892,12 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 		}
 
 		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
-		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder).Return([]types.Order{
-			{SubmitOrder: expectedSubmitOrder},
-		}, nil)
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder, order), "%+v is not equal to %+v", order, expectedSubmitOrder)
+			return []types.Order{
+				{SubmitOrder: expectedSubmitOrder},
+			}, nil
+		})
 
 		expectedSubmitOrder2 := types.SubmitOrder{
 			Symbol:      "BTCUSDT",
@@ -878,9 +910,12 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Tag:         orderTag,
 		}
 
-		orderExecutor.EXPECT().SubmitOrders(ctx, expectedSubmitOrder2).Return([]types.Order{
-			{SubmitOrder: expectedSubmitOrder2},
-		}, nil)
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder2, order), "%+v is not equal to %+v", order, expectedSubmitOrder2)
+			return []types.Order{
+				{SubmitOrder: expectedSubmitOrder2},
+			}, nil
+		})
 		s.orderExecutor = orderExecutor
 
 		s.handleOrderFilled(types.Order{
