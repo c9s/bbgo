@@ -255,7 +255,9 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) (submitOrders []typ
 			Price:    currentPrice,
 		}
 
-		submitOrders = append(submitOrders, order)
+		if ok := s.checkMinimalOrderQuantity(order); ok {
+			submitOrders = append(submitOrders, order)
+		}
 	}
 
 	return submitOrders, err
