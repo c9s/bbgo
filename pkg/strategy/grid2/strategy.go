@@ -54,6 +54,28 @@ func (pp PrettyPins) String() string {
 	return fmt.Sprintf("%v", ss)
 }
 
+// PinOrderMap store the pin-order's relation, we will change key from string to fixedpoint.Value when FormatString fixed
+type PinOrderMap map[string]types.Order
+
+// AscendingOrders get the orders from pin order map and sort it in asc order
+func (m PinOrderMap) AscendingOrders() []types.Order {
+	var orders []types.Order
+	for _, order := range m {
+		// skip empty order
+		if order.OrderID == 0 {
+			continue
+		}
+
+		orders = append(orders, order)
+	}
+
+	sort.Slice(orders, func(i, j int) bool {
+		return orders[i].UpdateTime.Before(orders[j].UpdateTime.Time())
+	})
+
+	return orders
+}
+
 //go:generate mockgen -destination=mocks/order_executor.go -package=mocks . OrderExecutor
 type OrderExecutor interface {
 	SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error)
@@ -1400,7 +1422,7 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 	}
 
 	// 1. build pin-order map
-	pinOrderMapWithOpenOrders, err := s.buildPinOrderMap(grid, openOrdersOnGrid)
+	pinOrderMapWithOpenOrders, err := s.buildPinOrderMap(grid.Pins, openOrdersOnGrid)
 	if err != nil {
 		return errors.Wrapf(err, "failed to build pin order map with open orders")
 	}
@@ -1412,7 +1434,7 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 	}
 
 	// 3. get the filled orders from pin-order map
-	filledOrders := getOrdersFromPinOrderMapInAscOrder(pinOrderMapWithFilledOrders)
+	filledOrders := pinOrderMapWithFilledOrders.AscendingOrders()
 	numsFilledOrders := len(filledOrders)
 	i := 0
 	if numsFilledOrders == int(expectedOrderNums-openOrdersOnGridNums) {
@@ -1445,10 +1467,10 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 // buildPinOrderMap build the pin-order map with grid and open orders.
 // The keys of this map contains all required pins of this grid.
 // If the Order of the pin is empty types.Order (OrderID == 0), it means there is no open orders at this pin.
-func (s *Strategy) buildPinOrderMap(grid *Grid, openOrders []types.Order) (map[string]types.Order, error) {
-	pinOrderMap := make(map[string]types.Order)
+func (s *Strategy) buildPinOrderMap(pins []Pin, openOrders []types.Order) (PinOrderMap, error) {
+	pinOrderMap := make(PinOrderMap)
 
-	for _, pin := range grid.Pins {
+	for _, pin := range pins {
 		priceStr := s.FormatPrice(fixedpoint.Value(pin))
 		pinOrderMap[priceStr] = types.Order{}
 	}
@@ -1472,8 +1494,9 @@ func (s *Strategy) buildPinOrderMap(grid *Grid, openOrders []types.Order) (map[s
 
 // buildFilledPinOrderMapFromTrades will query the trades from last 24 hour and use them to build a pin order map
 // It will skip the orders on pins at which open orders are already
-func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, openPinOrderMap map[string]types.Order) (map[string]types.Order, error) {
-	filledPinOrderMap := make(map[string]types.Order)
+func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, openPinOrderMap PinOrderMap) (PinOrderMap, error) {
+	filledPinOrderMap := make(PinOrderMap)
+
 	var limit int64 = 1000
 	// get the filled orders when bbgo is down in order from trades
 	// [NOTE] only retrieve from last 24 hours !!!
@@ -1539,25 +1562,6 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 	}
 
 	return filledPinOrderMap, nil
-}
-
-// get the orders from pin order map and sort it in asc order
-func getOrdersFromPinOrderMapInAscOrder(pinOrderMap map[string]types.Order) []types.Order {
-	var orders []types.Order
-	for _, order := range pinOrderMap {
-		// skip empty order
-		if order.OrderID == 0 {
-			continue
-		}
-
-		orders = append(orders, order)
-	}
-
-	sort.Slice(orders, func(i, j int) bool {
-		return orders[i].UpdateTime.Before(orders[j].UpdateTime.Time())
-	})
-
-	return orders
 }
 
 func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
