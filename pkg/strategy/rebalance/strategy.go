@@ -175,7 +175,7 @@ func (s *Strategy) prices(ctx context.Context) (types.ValueMap, error) {
 			return nil, err
 		}
 
-		m[currency] = ticker.Last
+		m[currency] = ticker.Buy.Add(ticker.Sell).Div(fixedpoint.NewFromFloat(2.0))
 	}
 	return m, nil
 }
