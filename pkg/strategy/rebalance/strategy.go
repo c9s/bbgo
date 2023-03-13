@@ -143,6 +143,7 @@ func (s *Strategy) rebalance(ctx context.Context) {
 	}
 
 	if s.DryRun {
+		log.Infof("dry run, not submitting orders")
 		return
 	}
 
