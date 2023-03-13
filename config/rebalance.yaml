@@ -39,3 +39,4 @@ exchangeStrategies:
       maxAmount: 1_000 # max amount to buy or sell per order
       orderType: LIMIT_MAKER # LIMIT, LIMIT_MAKER or MARKET
       dryRun: false
+      onStart: false
