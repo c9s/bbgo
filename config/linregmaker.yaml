@@ -163,6 +163,14 @@ exchangeStrategies:
                 domain: [ -0.00005, 0.0001 ]
                 range: [ 0.02, 0 ]
 
+    # minProfitSpread is the minimal order price spread from the current average cost.
+    # For long position, you will only place sell order above the price (= average cost * (1 + minProfitSpread))
+    # For short position, you will only place buy order below the price (= average cost * (1 - minProfitSpread))
+    minProfitSpread: 0.1%
+
+    # minProfitActivationRate activates MinProfitSpread when position RoI higher than the specified percentage
+    minProfitActivationRate: -10%
+
     exits:
       # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
       - roiStopLoss:
