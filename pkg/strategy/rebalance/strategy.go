@@ -34,6 +34,7 @@ type Strategy struct {
 	MaxAmount     fixedpoint.Value `json:"maxAmount"` // max amount to buy or sell per order
 	OrderType     types.OrderType  `json:"orderType"`
 	DryRun        bool             `json:"dryRun"`
+	OnStart       bool             `json:"onStart"` // rebalance on start
 
 	PositionMap    PositionMap    `persistence:"positionMap"`
 	ProfitStatsMap ProfitStatsMap `persistence:"profitStatsMap"`
@@ -113,6 +114,12 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	s.activeOrderBook = bbgo.NewActiveOrderBook("")
 	s.activeOrderBook.BindStream(s.session.UserDataStream)
+
+	session.UserDataStream.OnStart(func() {
+		if s.OnStart {
+			s.rebalance(ctx)
+		}
+	})
 
 	s.session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		s.rebalance(ctx)
