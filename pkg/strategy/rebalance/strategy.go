@@ -133,7 +133,11 @@ func (s *Strategy) rebalance(ctx context.Context) {
 		log.WithError(err).Errorf("failed to cancel orders")
 	}
 
-	submitOrders := s.generateSubmitOrders(ctx)
+	submitOrders, err := s.generateSubmitOrders(ctx)
+	if err != nil {
+		log.WithError(err).Error("failed to generate submit orders")
+		return
+	}
 	for _, order := range submitOrders {
 		log.Infof("generated submit order: %s", order.String())
 	}
@@ -150,7 +154,7 @@ func (s *Strategy) rebalance(ctx context.Context) {
 	s.activeOrderBook.Add(createdOrders...)
 }
 
-func (s *Strategy) prices(ctx context.Context) types.ValueMap {
+func (s *Strategy) prices(ctx context.Context) (types.ValueMap, error) {
 	m := make(types.ValueMap)
 	for currency := range s.TargetWeights {
 		if currency == s.QuoteCurrency {
@@ -160,29 +164,37 @@ func (s *Strategy) prices(ctx context.Context) types.ValueMap {
 
 		ticker, err := s.session.Exchange.QueryTicker(ctx, currency+s.QuoteCurrency)
 		if err != nil {
-			log.WithError(err).Error("failed to query tickers")
-			return nil
+			return nil, err
 		}
 
 		m[currency] = ticker.Last
 	}
-	return m
+	return m, nil
 }
 
-func (s *Strategy) quantities() types.ValueMap {
-	m := make(types.ValueMap)
-
+func (s *Strategy) balances() (types.BalanceMap, error) {
+	m := make(types.BalanceMap)
 	balances := s.session.GetAccount().Balances()
 	for currency := range s.TargetWeights {
-		m[currency] = balances[currency].Total()
+		balance, ok := balances[currency]
+		if !ok {
+			return nil, fmt.Errorf("no balance for %s", currency)
+		}
+		m[currency] = balance
 	}
-
-	return m
+	return m, nil
 }
 
-func (s *Strategy) generateSubmitOrders(ctx context.Context) (submitOrders []types.SubmitOrder) {
-	prices := s.prices(ctx)
-	marketValues := prices.Mul(s.quantities())
+func (s *Strategy) generateSubmitOrders(ctx context.Context) (submitOrders []types.SubmitOrder, err error) {
+	prices, err := s.prices(ctx)
+	if err != nil {
+		return nil, err
+	}
+	balances, err := s.balances()
+	if err != nil {
+		return nil, err
+	}
+	marketValues := prices.Mul(balanceToTotal(balances))
 	currentWeights := marketValues.Normalize()
 
 	for currency, targetWeight := range s.TargetWeights {
@@ -221,8 +233,9 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) (submitOrders []typ
 			quantity = quantity.Abs()
 		}
 
-		if s.MaxAmount.Sign() > 0 {
-			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, currentPrice, s.MaxAmount)
+		maxAmount := s.adjustMaxAmountByBalance(side, currency, currentPrice, balances)
+		if maxAmount.Sign() > 0 {
+			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, currentPrice, maxAmount)
 			log.Infof("adjust the quantity %v (%s %s @ %v) by max amount %v",
 				quantity,
 				symbol,
@@ -244,7 +257,7 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) (submitOrders []typ
 		submitOrders = append(submitOrders, order)
 	}
 
-	return submitOrders
+	return submitOrders, err
 }
 
 func (s *Strategy) symbols() (symbols []string) {
@@ -267,4 +280,45 @@ func (s *Strategy) markets() ([]types.Market, error) {
 		markets = append(markets, market)
 	}
 	return markets, nil
+}
+
+func (s *Strategy) adjustMaxAmountByBalance(side types.SideType, currency string, currentPrice fixedpoint.Value, balances types.BalanceMap) fixedpoint.Value {
+	var maxAmount fixedpoint.Value
+
+	switch side {
+	case types.SideTypeBuy:
+		maxAmount = balances[s.QuoteCurrency].Available
+	case types.SideTypeSell:
+		maxAmount = balances[currency].Available.Mul(currentPrice)
+	default:
+		log.Errorf("unknown side type: %s", side)
+		return fixedpoint.Zero
+	}
+
+	if s.MaxAmount.Sign() > 0 {
+		maxAmount = fixedpoint.Min(s.MaxAmount, maxAmount)
+	}
+
+	return maxAmount
+}
+
+func (s *Strategy) checkMinimalOrderQuantity(order types.SubmitOrder) bool {
+	if order.Quantity.Compare(order.Market.MinQuantity) < 0 {
+		log.Infof("order quantity is too small: %f < %f", order.Quantity.Float64(), order.Market.MinQuantity.Float64())
+		return false
+	}
+
+	if order.Quantity.Mul(order.Price).Compare(order.Market.MinNotional) < 0 {
+		log.Infof("order min notional is too small: %f < %f", order.Quantity.Mul(order.Price).Float64(), order.Market.MinNotional.Float64())
+		return false
+	}
+	return true
+}
+
+func balanceToTotal(balances types.BalanceMap) types.ValueMap {
+	m := make(types.ValueMap)
+	for _, b := range balances {
+		m[b.Currency] = b.Total()
+	}
+	return m
 }
