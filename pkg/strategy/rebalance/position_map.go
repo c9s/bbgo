@@ -6,15 +6,17 @@ import (
 
 type PositionMap map[string]*types.Position
 
-func NewPositionMap(markets []types.Market) PositionMap {
-	m := make(PositionMap)
-
+func (m PositionMap) createPositions(markets []types.Market) PositionMap {
 	for _, market := range markets {
+		if _, ok := m[market.Symbol]; ok {
+			continue
+		}
+
+		log.Infof("creating position for symbol %s", market.Symbol)
 		position := types.NewPositionFromMarket(market)
 		position.Strategy = ID
 		position.StrategyInstanceID = instanceID(market.Symbol)
 		m[market.Symbol] = position
 	}
-
 	return m
 }
