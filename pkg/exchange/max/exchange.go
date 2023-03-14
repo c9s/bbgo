@@ -780,6 +780,17 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 	return allDeposits, err
 }
 
+// QueryTrades
+// For MAX API spec
+// start_time and end_time need to be within 3 days
+// without any parameters      -> return trades within 24 hours
+// give start_time or end_time -> ignore parameter from_id
+// give start_time or from_id  -> order by time asc
+// give end_time               -> order by time desc
+// limit should b1 1~1000
+// For this QueryTrades spec (to be compatible with batch.TradeBatchQuery)
+// give LastTradeID       -> ignore start_time (but still can filter the end_time)
+// without any parameters -> return trades within 24 hours
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	if err := tradeQueryLimiter.Wait(ctx); err != nil {
 		return nil, err
@@ -800,10 +811,28 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		req.Limit(1000)
 	}
 
-	// MAX uses exclusive last trade ID
-	// the timestamp parameter is used for reverse order, we can't use it.
+	// If we use start_time as parameter, MAX will ignore from_id.
+	// However, we want to use from_id as main parameter for batch.TradeBatchQuery
 	if options.LastTradeID > 0 {
+		// MAX uses inclusive last trade ID
 		req.From(options.LastTradeID)
+	} else {
+		// option's start_time and end_time need to be within 3 days
+		// so if the start_time and end_time is over 3 days, we make end_time down to start_time + 3 days
+		if options.StartTime != nil && options.EndTime != nil {
+			endTime := *options.EndTime
+			startTime := *options.StartTime
+			if endTime.Sub(startTime) > 72*time.Hour {
+				startTime := *options.StartTime
+				endTime = startTime.Add(72 * time.Hour)
+			}
+			req.StartTime(startTime)
+			req.EndTime(endTime)
+		} else if options.StartTime != nil {
+			req.StartTime(*options.StartTime)
+		} else if options.EndTime != nil {
+			req.EndTime(*options.EndTime)
+		}
 	}
 
 	maxTrades, err := req.Do(ctx)
