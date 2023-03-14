@@ -54,28 +54,6 @@ func (pp PrettyPins) String() string {
 	return fmt.Sprintf("%v", ss)
 }
 
-// PinOrderMap store the pin-order's relation, we will change key from string to fixedpoint.Value when FormatString fixed
-type PinOrderMap map[string]types.Order
-
-// AscendingOrders get the orders from pin order map and sort it in asc order
-func (m PinOrderMap) AscendingOrders() []types.Order {
-	var orders []types.Order
-	for _, order := range m {
-		// skip empty order
-		if order.OrderID == 0 {
-			continue
-		}
-
-		orders = append(orders, order)
-	}
-
-	sort.Slice(orders, func(i, j int) bool {
-		return orders[i].UpdateTime.Before(orders[j].UpdateTime.Time())
-	})
-
-	return orders
-}
-
 //go:generate mockgen -destination=mocks/order_executor.go -package=mocks . OrderExecutor
 type OrderExecutor interface {
 	SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error)
@@ -1422,19 +1400,19 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 	}
 
 	// 1. build pin-order map
-	pinOrderMapWithOpenOrders, err := s.buildPinOrderMap(grid.Pins, openOrdersOnGrid)
+	pinOrdersOpen, err := s.buildPinOrderMap(grid.Pins, openOrdersOnGrid)
 	if err != nil {
 		return errors.Wrapf(err, "failed to build pin order map with open orders")
 	}
 
 	// 2. build the filled pin-order map by querying trades
-	pinOrderMapWithFilledOrders, err := s.buildFilledPinOrderMapFromTrades(ctx, historyService, pinOrderMapWithOpenOrders)
+	pinOrdersFilled, err := s.buildFilledPinOrderMapFromTrades(ctx, historyService, pinOrdersOpen)
 	if err != nil {
 		return errors.Wrapf(err, "failed to build filled pin order map")
 	}
 
 	// 3. get the filled orders from pin-order map
-	filledOrders := pinOrderMapWithFilledOrders.AscendingOrders()
+	filledOrders := pinOrdersFilled.AscendingOrders()
 	numsFilledOrders := len(filledOrders)
 	i := 0
 	if numsFilledOrders == int(expectedOrderNums-openOrdersOnGridNums) {
@@ -1471,12 +1449,12 @@ func (s *Strategy) buildPinOrderMap(pins []Pin, openOrders []types.Order) (PinOr
 	pinOrderMap := make(PinOrderMap)
 
 	for _, pin := range pins {
-		priceStr := s.FormatPrice(fixedpoint.Value(pin))
+		priceStr := s.Market.FormatPrice(fixedpoint.Value(pin))
 		pinOrderMap[priceStr] = types.Order{}
 	}
 
 	for _, openOrder := range openOrders {
-		priceStr := s.FormatPrice(openOrder.Price)
+		priceStr := s.Market.FormatPrice(openOrder.Price)
 		v, exist := pinOrderMap[priceStr]
 		if !exist {
 			return nil, fmt.Errorf("the price of the order (id: %d) is not in pins", openOrder.OrderID)
@@ -1494,8 +1472,11 @@ func (s *Strategy) buildPinOrderMap(pins []Pin, openOrders []types.Order) (PinOr
 
 // buildFilledPinOrderMapFromTrades will query the trades from last 24 hour and use them to build a pin order map
 // It will skip the orders on pins at which open orders are already
-func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, openPinOrderMap PinOrderMap) (PinOrderMap, error) {
-	filledPinOrderMap := make(PinOrderMap)
+func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, pinOrdersOpen PinOrderMap) (PinOrderMap, error) {
+	pinOrdersFilled := make(PinOrderMap)
+
+	// existedOrders is used to avoid re-query the same orders
+	existedOrders := pinOrdersOpen.buildSyncOrderMap()
 
 	var limit int64 = 1000
 	// get the filled orders when bbgo is down in order from trades
@@ -1514,6 +1495,11 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 		s.logger.Infof("[DEBUG] len of trades: %d", len(trades))
 
 		for _, trade := range trades {
+			if existedOrders.Exists(trade.OrderID) {
+				// already queries, skip
+				continue
+			}
+
 			order, err := s.orderQueryService.QueryOrder(ctx, types.OrderQuery{
 				OrderID: strconv.FormatUint(trade.OrderID, 10),
 			})
@@ -1525,6 +1511,9 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 			s.logger.Infof("[DEBUG] trade: %s", trade.String())
 			s.logger.Infof("[DEBUG] (group_id: %d) order: %s", order.GroupID, order.String())
 
+			// avoid query this order again
+			existedOrders.Add(*order)
+
 			// add 1 to avoid duplicate
 			fromTradeID = trade.ID + 1
 
@@ -1534,8 +1523,8 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 			}
 
 			// checked the trade's order is filled order
-			priceStr := s.FormatPrice(order.Price)
-			v, exist := openPinOrderMap[priceStr]
+			priceStr := s.Market.FormatPrice(order.Price)
+			v, exist := pinOrdersOpen[priceStr]
 			if !exist {
 				return nil, fmt.Errorf("the price of the order with the same GroupID is not in pins")
 			}
@@ -1546,13 +1535,16 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 			}
 
 			// check the order's creation time
-			if pinOrder, exist := filledPinOrderMap[priceStr]; exist && pinOrder.CreationTime.Time().After(order.CreationTime.Time()) {
+			if pinOrder, exist := pinOrdersFilled[priceStr]; exist && pinOrder.CreationTime.Time().After(order.CreationTime.Time()) {
 				// do not replace the pin order if the order's creation time is not after pin order's creation time
 				// this situation should not happen actually, because the trades is already sorted.
 				s.logger.Infof("pinOrder's creation time (%s) should not be after order's creation time (%s)", pinOrder.CreationTime, order.CreationTime)
 				continue
 			}
-			filledPinOrderMap[priceStr] = *order
+			pinOrdersFilled[priceStr] = *order
+
+			// wait 100 ms to avoid rate limit
+			time.Sleep(100 * time.Millisecond)
 		}
 
 		// stop condition
@@ -1561,7 +1553,7 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 		}
 	}
 
-	return filledPinOrderMap, nil
+	return pinOrdersFilled, nil
 }
 
 func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
