@@ -94,6 +94,9 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 		} else {
 			f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
 				log.Infof("fetching %s depth...", e.Symbol)
+				if stream.IsFutures {
+					return ex.QueryFuturesDepth(context.Background(), e.Symbol)
+				}
 				return ex.QueryDepth(context.Background(), e.Symbol)
 			})
 			f.SetBufferingPeriod(time.Second)

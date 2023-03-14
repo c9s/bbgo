@@ -1622,6 +1622,60 @@ func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot type
 	return snapshot, finalUpdateID, nil
 }
 
+// QueryDepth query the order book depth of a symbol
+func (e *Exchange) QueryFuturesDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	var response *futures.DepthResponse
+	if e.IsFutures {
+		res, err := e.futuresClient.NewDepthService().Symbol(symbol).Do(ctx)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
+		response = &futures.DepthResponse{
+			LastUpdateID: res.LastUpdateID,
+			Bids:         res.Bids,
+			Asks:         res.Asks,
+		}
+	} else {
+		response, err = e.futuresClient.NewDepthService().Symbol(symbol).Do(ctx)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
+	}
+
+	snapshot.Symbol = symbol
+	finalUpdateID = response.LastUpdateID
+	for _, entry := range response.Bids {
+		// entry.Price, Quantity: entry.Quantity
+		price, err := fixedpoint.NewFromString(entry.Price)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
+
+		quantity, err := fixedpoint.NewFromString(entry.Quantity)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
+
+		snapshot.Bids = append(snapshot.Bids, types.PriceVolume{Price: price, Volume: quantity})
+	}
+
+	for _, entry := range response.Asks {
+		price, err := fixedpoint.NewFromString(entry.Price)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
+
+		quantity, err := fixedpoint.NewFromString(entry.Quantity)
+		if err != nil {
+			return snapshot, finalUpdateID, err
+		}
+
+		snapshot.Asks = append(snapshot.Asks, types.PriceVolume{Price: price, Volume: quantity})
+	}
+
+	return snapshot, finalUpdateID, nil
+}
+
 // QueryPremiumIndex is only for futures
 func (e *Exchange) QueryPremiumIndex(ctx context.Context, symbol string) (*types.PremiumIndex, error) {
 	// when symbol is set, only one index will be returned.
