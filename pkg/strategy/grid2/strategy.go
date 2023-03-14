@@ -1476,7 +1476,7 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 	pinOrdersFilled := make(PinOrderMap)
 
 	// existedOrders is used to avoid re-query the same orders
-	existedOrders := pinOrdersOpen.buildSyncOrderMap()
+	existedOrders := pinOrdersOpen.SyncOrderMap()
 
 	var limit int64 = 1000
 	// get the filled orders when bbgo is down in order from trades

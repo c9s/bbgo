@@ -24,7 +24,7 @@ func (m PinOrderMap) AscendingOrders() []types.Order {
 	return orders
 }
 
-func (m PinOrderMap) buildSyncOrderMap() *types.SyncOrderMap {
+func (m PinOrderMap) SyncOrderMap() *types.SyncOrderMap {
 	orderMap := types.NewSyncOrderMap()
 	for _, order := range m {
 		orderMap.Add(order)
