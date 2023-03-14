@@ -40,6 +40,7 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 			}
 			return trade.Key().String()
 		},
+		JumpIfEmpty: 24 * time.Hour,
 	}
 
 	c = make(chan types.Trade, 100)

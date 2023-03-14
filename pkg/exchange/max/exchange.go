@@ -790,7 +790,6 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 // limit should b1 1~1000
 // For this QueryTrades spec (to be compatible with batch.TradeBatchQuery)
 // give LastTradeID       -> ignore start_time (but still can filter the end_time)
-// give only end_time     -> start_time will be set as end_time - 3 days
 // without any parameters -> return trades within 24 hours
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	if err := tradeQueryLimiter.Wait(ctx); err != nil {
@@ -818,18 +817,23 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		// MAX uses inclusive last trade ID
 		req.From(options.LastTradeID)
 	} else {
-		if options.StartTime != nil {
+		// option's start_time and end_time need to be within 3 days
+		// so if the start_time and end_time is over 3 days, we make end_time down to start_time + 3 days
+		if options.StartTime != nil && options.EndTime != nil {
+			endTime := *options.EndTime
+			startTime := *options.StartTime
+			if endTime.Sub(startTime) > 72*time.Hour {
+				startTime := *options.StartTime
+				endTime = startTime.Add(72 * time.Hour)
+			}
+			req.StartTime(startTime)
+			req.EndTime(endTime)
+		} else if options.StartTime != nil {
 			req.StartTime(*options.StartTime)
 		} else if options.EndTime != nil {
-			// if only give end_time, we automatically add start_time within 3 days limit
-			endTime := *options.EndTime
-			req.StartTime(endTime.Add(-72 * time.Hour))
-			req.EndTime(endTime)
+			req.EndTime(*options.EndTime)
 		}
 	}
-
-	// option's start_time and end_time need to be within 3 days
-	// so if the start_time and end_time is over 3 days, we only give start_time as parameter and then filter the time > end_time
 
 	maxTrades, err := req.Do(ctx)
 	if err != nil {
@@ -837,10 +841,6 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	for _, t := range maxTrades {
-		if options.EndTime != nil && t.CreatedAt.Time().After(*options.EndTime) {
-			continue
-		}
-
 		localTrades, err := toGlobalTradeV3(t)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert trade: %+v", t)
