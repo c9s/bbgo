@@ -33,10 +33,9 @@ exchangeStrategies:
       targetWeights:
         BTC: 50%
         ETH: 25%
-        MAX: 15%
-        USDT: 10%
+        USDT: 25%
       threshold: 1%
       maxAmount: 1_000 # max amount to buy or sell per order
       orderType: LIMIT_MAKER # LIMIT, LIMIT_MAKER or MARKET
       dryRun: false
-      onStart: false
+      onStart: true
