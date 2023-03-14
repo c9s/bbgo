@@ -55,7 +55,7 @@ func (m GeneralOrderExecutorMap) SubmitOrders(ctx context.Context, submitOrders 
 			return nil, fmt.Errorf("order executor not found for symbol %s", submitOrder.Symbol)
 		}
 
-		createdOrders, err := orderExecutor.SubmitOrders(ctx)
+		createdOrders, err := orderExecutor.SubmitOrders(ctx, submitOrder)
 		if err != nil {
 			return nil, err
 		}
