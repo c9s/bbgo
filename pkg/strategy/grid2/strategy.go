@@ -1393,7 +1393,7 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 
 	expectedOrderNums := s.GridNum - 1
 	openOrdersOnGridNums := int64(len(openOrdersOnGrid))
-	s.logger.Infof("[DEBUG] open orders nums: %d, expected nums: %d", openOrdersOnGridNums, expectedOrderNums)
+	s.logger.Debugf("open orders nums: %d, expected nums: %d", openOrdersOnGridNums, expectedOrderNums)
 	if expectedOrderNums == openOrdersOnGridNums {
 		// no need to recover
 		return nil
@@ -1415,10 +1415,10 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 
 	// 3. get the filled orders from pin-order map
 	filledOrders := pinOrdersFilled.AscendingOrders()
-	numsFilledOrders := len(filledOrders)
-	if numsFilledOrders == int(expectedOrderNums-openOrdersOnGridNums) {
+	numFilledOrders := len(filledOrders)
+	if numFilledOrders == int(expectedOrderNums-openOrdersOnGridNums) {
 		// nums of filled order is the same as Size - 1 - num(open orders)
-	} else if numsFilledOrders == int(expectedOrderNums-openOrdersOnGridNums+1) {
+	} else if numFilledOrders == int(expectedOrderNums-openOrdersOnGridNums+1) {
 		filledOrders = filledOrders[1:]
 	} else {
 		return fmt.Errorf("not reasonable num of filled orders")
@@ -1429,10 +1429,11 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 		return errors.Wrapf(err, "verify grid with error")
 	}
 
+	s.logger.Debugf("emit filled orders %+v", filledOrders)
+
 	// 5. emit the filled orders
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
 	for _, filledOrder := range filledOrders {
-		s.logger.Infof("[DEBUG] emit filled order: %s (%s)", filledOrder.String(), filledOrder.UpdateTime)
 		activeOrderBook.EmitFilled(filledOrder)
 	}
 
@@ -1440,6 +1441,8 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 	s.EmitGridReady()
 
 	// 7. debug and send metrics
+	// wait for the reverse order to be placed
+	time.Sleep(2 * time.Second)
 	debugGrid(s.logger, grid, s.orderExecutor.ActiveMakerOrders())
 	s.updateGridNumOfOrdersMetricsWithLock()
 	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
@@ -1448,6 +1451,10 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 }
 
 func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrders []types.Order) error {
+	s.logger.Debugf("pins: %+v", pins)
+	s.logger.Debugf("open pin orders: %+v", pinOrders)
+	s.logger.Debugf("filled orders: %+v", filledOrders)
+
 	for _, filledOrder := range filledOrders {
 		price := s.Market.FormatPrice(filledOrder.Price)
 		if o, exist := pinOrders[price]; !exist {
@@ -1458,6 +1465,8 @@ func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrd
 			pinOrders[price] = filledOrder
 		}
 	}
+
+	s.logger.Debugf("filled pin orders: %+v", pinOrders)
 
 	side := types.SideTypeBuy
 	for _, pin := range pins {
@@ -1480,12 +1489,12 @@ func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrd
 		}
 
 		if order.Side != side {
-			return fmt.Errorf("the side is wrong !!!")
+			return fmt.Errorf("the side is wrong")
 		}
 	}
 
 	if side != types.SideTypeSell {
-		return fmt.Errorf("there is no empty pin in the grid !")
+		return fmt.Errorf("there is no empty pin in the grid")
 	}
 
 	return nil
@@ -1541,10 +1550,10 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 			return nil, errors.Wrapf(err, "failed to query trades to recover the grid with open orders")
 		}
 
-		s.logger.Infof("[DEBUG] len of trades: %d", len(trades))
+		s.logger.Debugf("QueryTrades return %d trades", len(trades))
 
 		for _, trade := range trades {
-			s.logger.Infof("[DEBUG] %s", trade.String())
+			s.logger.Debugf(trade.String())
 			if existedOrders.Exists(trade.OrderID) {
 				// already queries, skip
 				continue
@@ -1558,7 +1567,7 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 				return nil, errors.Wrapf(err, "failed to query order by trade")
 			}
 
-			s.logger.Infof("[DEBUG] order: %s (group_id: %d)", order.String(), order.GroupID)
+			s.logger.Debugf("%s (group_id: %d)", order.String(), order.GroupID)
 
 			// avoid query this order again
 			existedOrders.Add(*order)
@@ -2132,11 +2141,11 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	if s.RecoverGridByScanningTrades {
-		s.logger.Infof("[DEBUG] recover grid by scanning trades")
+		s.logger.Debugf("recover grid by scanning trades")
 		return s.recoverGridByScanningTrades(ctx, session)
 	}
 
-	s.logger.Infof("[DEBUG] recover grid by scanning orders")
+	s.logger.Debugf("recover grid by scanning orders")
 	return s.recoverGridByScanningOrders(ctx, session)
 }
 
@@ -2170,7 +2179,7 @@ func (s *Strategy) recoverGridByScanningOrders(ctx context.Context, session *bbg
 func (s *Strategy) recoverGridByScanningTrades(ctx context.Context, session *bbgo.ExchangeSession) error {
 	// no initial order id means we don't need to recover
 	if s.GridProfitStats.InitialOrderID == 0 {
-		s.logger.Info("[DEBUG] new strategy, no need to recover")
+		s.logger.Debug("new strategy, no need to recover")
 		return nil
 	}
 
@@ -2181,11 +2190,10 @@ func (s *Strategy) recoverGridByScanningTrades(ctx context.Context, session *bbg
 
 	s.logger.Infof("found %d open orders left on the %s order book", len(openOrders), s.Symbol)
 
-	s.logger.Infof("[DEBUG] recover grid with group id: %d", s.OrderGroupID)
+	s.logger.Debugf("recover grid with group id: %d", s.OrderGroupID)
 	// filter out the order with the group id belongs to this grid
 	var openOrdersOnGrid []types.Order
 	for _, order := range openOrders {
-		s.logger.Infof("[DEBUG] order (%d) group id: %d", order.OrderID, order.GroupID)
 		if order.GroupID == s.OrderGroupID {
 			openOrdersOnGrid = append(openOrdersOnGrid, order)
 		}
