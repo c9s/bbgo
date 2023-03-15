@@ -206,7 +206,7 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	bbgo.Shutdown(shtCtx)
 	cancelShutdown()
 
-	if err := trader.SaveState(); err != nil {
+	if err := trader.SaveState(nil); err != nil {
 		log.WithError(err).Errorf("can not save strategy states")
 	}
 
