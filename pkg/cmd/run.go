@@ -124,7 +124,7 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	_ = grpcBind
 	_ = enableGrpc
 
-	ctx, cancelTrading := context.WithCancel(basectx)
+	tradingCtx, cancelTrading := context.WithCancel(basectx)
 	defer cancelTrading()
 
 	environ := bbgo.NewEnvironment()
@@ -135,21 +135,21 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	}
 
 	if lightweight {
-		if err := bbgo.BootstrapEnvironmentLightweight(ctx, environ, userConfig); err != nil {
+		if err := bbgo.BootstrapEnvironmentLightweight(tradingCtx, environ, userConfig); err != nil {
 			return err
 		}
 	} else {
-		if err := bbgo.BootstrapEnvironment(ctx, environ, userConfig); err != nil {
+		if err := bbgo.BootstrapEnvironment(tradingCtx, environ, userConfig); err != nil {
 			return err
 		}
 	}
 
-	if err := environ.Init(ctx); err != nil {
+	if err := environ.Init(tradingCtx); err != nil {
 		return err
 	}
 
 	if !noSync {
-		if err := environ.Sync(ctx, userConfig); err != nil {
+		if err := environ.Sync(tradingCtx, userConfig); err != nil {
 			return err
 		}
 
@@ -167,7 +167,7 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 		return err
 	}
 
-	if err := trader.Run(ctx); err != nil {
+	if err := trader.Run(tradingCtx); err != nil {
 		return err
 	}
 
@@ -179,7 +179,7 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 				Trader:  trader,
 			}
 
-			if err := s.Run(ctx, webServerBind); err != nil {
+			if err := s.Run(tradingCtx, webServerBind); err != nil {
 				log.WithError(err).Errorf("http server bind error")
 			}
 		}()
@@ -198,17 +198,18 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 		}()
 	}
 
-	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
+	cmdutil.WaitForSignal(tradingCtx, syscall.SIGINT, syscall.SIGTERM)
 	cancelTrading()
 
 	gracefulShutdownPeriod := 30 * time.Second
-	shtCtx, cancelShutdown := context.WithTimeout(bbgo.NewTodoContextWithExistingIsolation(ctx), gracefulShutdownPeriod)
+	shtCtx, cancelShutdown := context.WithTimeout(bbgo.NewTodoContextWithExistingIsolation(tradingCtx), gracefulShutdownPeriod)
 	bbgo.Shutdown(shtCtx)
-	cancelShutdown()
 
-	if err := trader.SaveState(nil); err != nil {
-		log.WithError(err).Errorf("can not save strategy states")
+	if err := trader.SaveState(shtCtx); err != nil {
+		log.WithError(err).Errorf("can not save strategy persistence states")
 	}
+
+	cancelShutdown()
 
 	for _, session := range environ.Sessions() {
 		if err := session.MarketDataStream.Close(); err != nil {

@@ -402,6 +402,7 @@ func (trader *Trader) IterateStrategies(f func(st StrategyID) error) error {
 	return nil
 }
 
+// NOTICE: the ctx here is the trading context, which could already be canceled.
 func (trader *Trader) SaveState(ctx context.Context) error {
 	if trader.environment.BacktestService != nil {
 		return nil
