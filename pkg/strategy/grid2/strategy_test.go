@@ -1209,3 +1209,214 @@ func Test_getOrdersFromPinOrderMapInAscOrder(t *testing.T) {
 	assert.Equal(uint64(1), orders[1].OrderID)
 	assert.Equal(uint64(3), orders[2].OrderID)
 }
+
+func Test_verifyFilledGrid(t *testing.T) {
+	assert := assert.New(t)
+	s := newTestStrategy()
+	s.UpperPrice = number(400.0)
+	s.LowerPrice = number(100.0)
+	s.GridNum = 4
+	s.grid = s.newGrid()
+
+	t.Run("valid grid with buy/sell orders", func(t *testing.T) {
+		pinOrderMap := PinOrderMap{
+			"100.00": types.Order{
+				OrderID: 1,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+			"200.00": types.Order{},
+			"300.00": types.Order{
+				OrderID: 3,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+			"400.00": types.Order{
+				OrderID: 4,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+		}
+
+		assert.NoError(s.verifyFilledGrid(s.grid.Pins, pinOrderMap, nil))
+	})
+	t.Run("valid grid with only buy orders", func(t *testing.T) {
+		pinOrderMap := PinOrderMap{
+			"100.00": types.Order{
+				OrderID: 1,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+			"200.00": types.Order{
+				OrderID: 2,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+			"300.00": types.Order{
+				OrderID: 3,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+			"400.00": types.Order{},
+		}
+
+		assert.NoError(s.verifyFilledGrid(s.grid.Pins, pinOrderMap, nil))
+	})
+	t.Run("valid grid with only sell orders", func(t *testing.T) {
+		pinOrderMap := PinOrderMap{
+			"100.00": types.Order{},
+			"200.00": types.Order{
+				OrderID: 2,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+			"300.00": types.Order{
+				OrderID: 3,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+			"400.00": types.Order{
+				OrderID: 4,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+		}
+
+		assert.NoError(s.verifyFilledGrid(s.grid.Pins, pinOrderMap, nil))
+	})
+	t.Run("invalid grid with multiple empty pins", func(t *testing.T) {
+		pinOrderMap := PinOrderMap{
+			"100.00": types.Order{
+				OrderID: 1,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+			"200.00": types.Order{},
+			"300.00": types.Order{},
+			"400.00": types.Order{
+				OrderID: 4,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+		}
+
+		assert.Error(s.verifyFilledGrid(s.grid.Pins, pinOrderMap, nil))
+	})
+	t.Run("invalid grid without empty pin", func(t *testing.T) {
+		pinOrderMap := PinOrderMap{
+			"100.00": types.Order{
+				OrderID: 1,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+			"200.00": types.Order{
+				OrderID: 2,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+			"300.00": types.Order{
+				OrderID: 3,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+			"400.00": types.Order{
+				OrderID: 4,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+		}
+
+		assert.Error(s.verifyFilledGrid(s.grid.Pins, pinOrderMap, nil))
+	})
+	t.Run("invalid grid with Buy-empty-Sell-Buy order", func(t *testing.T) {
+		pinOrderMap := PinOrderMap{
+			"100.00": types.Order{
+				OrderID: 1,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+			"200.00": types.Order{},
+			"300.00": types.Order{
+				OrderID: 3,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+			"400.00": types.Order{
+				OrderID: 4,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+		}
+
+		assert.Error(s.verifyFilledGrid(s.grid.Pins, pinOrderMap, nil))
+	})
+	t.Run("invalid grid with Sell-empty order", func(t *testing.T) {
+		pinOrderMap := PinOrderMap{
+			"100.00": types.Order{
+				OrderID: 1,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+			"200.00": types.Order{
+				OrderID: 2,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+			"300.00": types.Order{
+				OrderID: 3,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeSell,
+				},
+			},
+			"400.00": types.Order{},
+		}
+
+		assert.Error(s.verifyFilledGrid(s.grid.Pins, pinOrderMap, nil))
+	})
+	t.Run("invalid grid with empty-Buy order", func(t *testing.T) {
+		pinOrderMap := PinOrderMap{
+			"100.00": types.Order{},
+			"200.00": types.Order{
+				OrderID: 2,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+			"300.00": types.Order{
+				OrderID: 3,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+			"400.00": types.Order{
+				OrderID: 4,
+				SubmitOrder: types.SubmitOrder{
+					Side: types.SideTypeBuy,
+				},
+			},
+		}
+
+		assert.Error(s.verifyFilledGrid(s.grid.Pins, pinOrderMap, nil))
+	})
+
+}
