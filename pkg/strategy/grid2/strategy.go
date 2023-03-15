@@ -1429,7 +1429,7 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 		return errors.Wrapf(err, "verify grid with error")
 	}
 
-	s.logger.Debugf("emit filled orders %+v", filledOrders)
+	s.debugOrders("emit filled orders", filledOrders)
 
 	// 5. emit the filled orders
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
@@ -1453,7 +1453,7 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrders []types.Order) error {
 	s.logger.Debugf("pins: %+v", pins)
 	s.logger.Debugf("open pin orders: %+v", pinOrders)
-	s.logger.Debugf("filled orders: %+v", filledOrders)
+	s.debugOrders("filled orders", filledOrders)
 
 	for _, filledOrder := range filledOrders {
 		price := s.Market.FormatPrice(filledOrder.Price)
