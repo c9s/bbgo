@@ -14,6 +14,7 @@ func NewGeneralOrderExecutorMap(session *bbgo.ExchangeSession, positionMap Posit
 	m := make(GeneralOrderExecutorMap)
 
 	for symbol, position := range positionMap {
+		log.Infof("creating order executor for symbol %s", symbol)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(session, symbol, ID, instanceID(symbol), position)
 		m[symbol] = orderExecutor
 	}
@@ -29,6 +30,7 @@ func (m GeneralOrderExecutorMap) BindEnvironment(environ *bbgo.Environment) {
 
 func (m GeneralOrderExecutorMap) BindProfitStats(profitStatsMap ProfitStatsMap) {
 	for symbol, orderExecutor := range m {
+		log.Infof("binding profit stats for symbol %s", symbol)
 		orderExecutor.BindProfitStats(profitStatsMap[symbol])
 	}
 }
@@ -50,6 +52,7 @@ func (m GeneralOrderExecutorMap) Sync(ctx context.Context, obj interface{}) {
 func (m GeneralOrderExecutorMap) SubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
 	var allCreatedOrders types.OrderSlice
 	for _, submitOrder := range submitOrders {
+		log.Infof("submitting order: %+v", submitOrder)
 		orderExecutor, ok := m[submitOrder.Symbol]
 		if !ok {
 			return nil, fmt.Errorf("order executor not found for symbol %s", submitOrder.Symbol)
