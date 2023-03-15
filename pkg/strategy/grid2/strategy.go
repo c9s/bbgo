@@ -1397,6 +1397,8 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 	if expectedOrderNums == openOrdersOnGridNums {
 		// no need to recover
 		return nil
+	} else if expectedOrderNums < openOrdersOnGridNums {
+		return fmt.Errorf("amount of grid's open orders should not > amount of expected grid's orders")
 	}
 
 	// 1. build pin-order map
@@ -1414,30 +1416,77 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 	// 3. get the filled orders from pin-order map
 	filledOrders := pinOrdersFilled.AscendingOrders()
 	numsFilledOrders := len(filledOrders)
-	i := 0
 	if numsFilledOrders == int(expectedOrderNums-openOrdersOnGridNums) {
 		// nums of filled order is the same as Size - 1 - num(open orders)
 	} else if numsFilledOrders == int(expectedOrderNums-openOrdersOnGridNums+1) {
-		i++
+		filledOrders = filledOrders[1:]
 	} else {
 		return fmt.Errorf("not reasonable num of filled orders")
 	}
 
-	// 4. emit the filled orders
+	// 4. verify the grid
+	if err := s.verifyFilledGrid(s.grid.Pins, pinOrdersOpen, filledOrders); err != nil {
+		return errors.Wrapf(err, "verify grid with error")
+	}
+
+	// 5. emit the filled orders
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
-	for ; i < numsFilledOrders; i++ {
-		filledOrder := filledOrders[i]
+	for _, filledOrder := range filledOrders {
 		s.logger.Infof("[DEBUG] emit filled order: %s (%s)", filledOrder.String(), filledOrder.UpdateTime)
 		activeOrderBook.EmitFilled(filledOrder)
 	}
 
-	// 5. emit grid ready
+	// 6. emit grid ready
 	s.EmitGridReady()
 
-	// 6. debug and send metrics
+	// 7. debug and send metrics
 	debugGrid(s.logger, grid, s.orderExecutor.ActiveMakerOrders())
 	s.updateGridNumOfOrdersMetricsWithLock()
 	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
+
+	return nil
+}
+
+func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrders []types.Order) error {
+	for _, filledOrder := range filledOrders {
+		price := s.Market.FormatPrice(filledOrder.Price)
+		if o, exist := pinOrders[price]; !exist {
+			return fmt.Errorf("the price (%s) is not in pins", price)
+		} else if o.OrderID != 0 {
+			return fmt.Errorf("there is already an order at this price (%s)", price)
+		} else {
+			pinOrders[price] = filledOrder
+		}
+	}
+
+	side := types.SideTypeBuy
+	for _, pin := range pins {
+		price := s.Market.FormatPrice(fixedpoint.Value(pin))
+		order, exist := pinOrders[price]
+		if !exist {
+			return fmt.Errorf("there is no order at price (%s)", price)
+		}
+
+		// if there is order with OrderID = 0, means we hit the empty pin
+		// there must be only one empty pin in the grid
+		// all orders below this pin need to be bid orders, above this pin need to be ask orders
+		if order.OrderID == 0 {
+			if side == types.SideTypeBuy {
+				side = types.SideTypeSell
+				continue
+			}
+
+			return fmt.Errorf("not only one empty order in this grid")
+		}
+
+		if order.Side != side {
+			return fmt.Errorf("the side is wrong !!!")
+		}
+	}
+
+	if side != types.SideTypeSell {
+		return fmt.Errorf("there is no empty pin in the grid !")
+	}
 
 	return nil
 }
@@ -1495,6 +1544,7 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 		s.logger.Infof("[DEBUG] len of trades: %d", len(trades))
 
 		for _, trade := range trades {
+			s.logger.Infof("[DEBUG] %s", trade.String())
 			if existedOrders.Exists(trade.OrderID) {
 				// already queries, skip
 				continue
@@ -1508,8 +1558,7 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 				return nil, errors.Wrapf(err, "failed to query order by trade")
 			}
 
-			s.logger.Infof("[DEBUG] trade: %s", trade.String())
-			s.logger.Infof("[DEBUG] (group_id: %d) order: %s", order.GroupID, order.String())
+			s.logger.Infof("[DEBUG] order: %s (group_id: %d)", order.String(), order.GroupID)
 
 			// avoid query this order again
 			existedOrders.Add(*order)
@@ -2083,9 +2132,11 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	if s.RecoverGridByScanningTrades {
+		s.logger.Infof("[DEBUG] recover grid by scanning trades")
 		return s.recoverGridByScanningTrades(ctx, session)
 	}
 
+	s.logger.Infof("[DEBUG] recover grid by scanning orders")
 	return s.recoverGridByScanningOrders(ctx, session)
 }
 
