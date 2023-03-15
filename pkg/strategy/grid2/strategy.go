@@ -360,7 +360,6 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 	if o.Side == types.SideTypeSell {
 		feeCurrency = s.Market.QuoteCurrency
 	}
-	feeCurrency = strings.ToUpper(feeCurrency)
 
 	for maxTries := maxNumberOfOrderTradesQueryTries; maxTries > 0; maxTries-- {
 		// if one of the trades is missing, we need to query the trades from the RESTful API
