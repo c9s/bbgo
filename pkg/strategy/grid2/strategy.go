@@ -1122,7 +1122,14 @@ func (s *Strategy) updateGridNumOfOrdersMetrics(grid *Grid) {
 		metricsGridNumOfMissingOrders.With(baseLabels).Set(float64(numOfMissingOrders))
 
 		var numOfOrdersWithCorrectPrice int
+		priceSet := make(map[fixedpoint.Value]struct{})
 		for _, order := range makerOrders.Orders() {
+			// filter out duplicated prices
+			if _, ok := priceSet[order.Price]; ok {
+				continue
+			}
+			priceSet[order.Price] = struct{}{}
+
 			if grid.HasPin(Pin(order.Price)) {
 				numOfOrdersWithCorrectPrice++
 			}
