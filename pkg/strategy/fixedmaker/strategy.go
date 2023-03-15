@@ -33,6 +33,10 @@ type Strategy struct {
 	OrderType       types.OrderType  `json:"orderType"`
 	DryRun          bool             `json:"dryRun"`
 
+	// SkewFactor is used to calculate the skew of bid/ask price
+	SkewFactor   fixedpoint.Value `json:"skewFactor"`
+	TargetWeight fixedpoint.Value `json:"targetWeight"`
+
 	// persistence fields
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
@@ -162,6 +166,8 @@ func (s *Strategy) replenish(ctx context.Context) {
 }
 
 func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrder, error) {
+	orders := []types.SubmitOrder{}
+
 	baseBalance, ok := s.session.GetAccount().Balance(s.Market.BaseCurrency)
 	if !ok {
 		return nil, fmt.Errorf("base currency %s balance not found", s.Market.BaseCurrency)
@@ -181,24 +187,29 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 	midPrice := ticker.Buy.Add(ticker.Sell).Div(fixedpoint.NewFromFloat(2.0))
 	log.Infof("mid price: %+v", midPrice)
 
-	orders := []types.SubmitOrder{}
+	// calcualte skew by the difference between base weight and target weight
+	baseValue := baseBalance.Total().Mul(midPrice)
+	baseWeight := baseValue.Div(baseValue.Add(quoteBalance.Total()))
+	skew := s.SkewFactor.Mul(baseWeight.Sub(s.TargetWeight))
 
-	// calculate buy and sell price
-	// buy price = mid price * (1 - r)
-	buyPrice := midPrice.Mul(fixedpoint.One.Sub(s.HalfSpreadRatio))
-	log.Infof("buy price: %+v", buyPrice)
-	// sell price = mid price * (1 + r)
-	sellPrice := midPrice.Mul(fixedpoint.One.Add(s.HalfSpreadRatio))
-	log.Infof("sell price: %+v", sellPrice)
+	// calculate bid and ask price
+	// bid price = mid price * (1 - max(r + skew, 0))
+	bidSpreadRatio := fixedpoint.Max(s.HalfSpreadRatio.Add(skew), fixedpoint.Zero)
+	bidPrice := midPrice.Mul(fixedpoint.One.Sub(bidSpreadRatio))
+	log.Infof("bid price: %s", bidPrice.String())
+	// ask price = mid price * (1 + max(r - skew, 0))
+	askSrasedRatio := fixedpoint.Max(s.HalfSpreadRatio.Sub(skew), fixedpoint.Zero)
+	askPrice := midPrice.Mul(fixedpoint.One.Add(askSrasedRatio))
+	log.Infof("ask price: %s", askPrice.String())
 
 	// check balance and generate orders
-	amount := s.Quantity.Mul(buyPrice)
+	amount := s.Quantity.Mul(bidPrice)
 	if quoteBalance.Available.Compare(amount) > 0 {
 		orders = append(orders, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeBuy,
 			Type:     s.OrderType,
-			Price:    buyPrice,
+			Price:    bidPrice,
 			Quantity: s.Quantity,
 		})
 	} else {
@@ -210,7 +221,7 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeSell,
 			Type:     s.OrderType,
-			Price:    sellPrice,
+			Price:    askPrice,
 			Quantity: s.Quantity,
 		})
 	} else {
