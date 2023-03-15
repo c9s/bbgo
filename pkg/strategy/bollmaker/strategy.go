@@ -83,7 +83,7 @@ type Strategy struct {
 	MinProfitSpread fixedpoint.Value `json:"minProfitSpread"`
 
 	// MinProfitActivationRate activates MinProfitSpread when position RoI higher than the specified percentage
-	MinProfitActivationRate fixedpoint.Value `json:"minProfitActivationRate"`
+	MinProfitActivationRate *fixedpoint.Value `json:"minProfitActivationRate"`
 
 	// UseTickerPrice use the ticker api to get the mid price instead of the closed kline price.
 	// The back-test engine is kline-based, so the ticker price api is not supported.
@@ -385,7 +385,7 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 	isLongPosition := s.Position.IsLong()
 	isShortPosition := s.Position.IsShort()
 
-	if s.Position.ROI(midPrice).Compare(s.MinProfitActivationRate) >= 0 {
+	if s.MinProfitActivationRate == nil || s.Position.ROI(midPrice).Compare(*s.MinProfitActivationRate) >= 0 {
 		minProfitPrice := s.Position.AverageCost.Mul(fixedpoint.One.Add(s.MinProfitSpread))
 		if isShortPosition {
 			minProfitPrice = s.Position.AverageCost.Mul(fixedpoint.One.Sub(s.MinProfitSpread))
