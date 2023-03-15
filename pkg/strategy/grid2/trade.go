@@ -1,6 +1,8 @@
 package grid2
 
 import (
+	"strings"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -9,10 +11,11 @@ import (
 func collectTradeFee(trades []types.Trade) map[string]fixedpoint.Value {
 	fees := make(map[string]fixedpoint.Value)
 	for _, t := range trades {
-		if fee, ok := fees[t.FeeCurrency]; ok {
-			fees[t.FeeCurrency] = fee.Add(t.Fee)
+		feeCurrency := strings.ToUpper(t.FeeCurrency)
+		if fee, ok := fees[feeCurrency]; ok {
+			fees[feeCurrency] = fee.Add(t.Fee)
 		} else {
-			fees[t.FeeCurrency] = t.Fee
+			fees[feeCurrency] = t.Fee
 		}
 	}
 	return fees
