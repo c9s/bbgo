@@ -99,12 +99,14 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	if s.PositionMap == nil {
-		s.PositionMap = NewPositionMap(markets)
+		s.PositionMap = make(PositionMap)
 	}
+	s.PositionMap.createPositions(markets)
 
 	if s.ProfitStatsMap == nil {
-		s.ProfitStatsMap = NewProfitStatsMap(markets)
+		s.ProfitStatsMap = make(ProfitStatsMap)
 	}
+	s.ProfitStatsMap.createProfitStats(markets)
 
 	s.orderExecutorMap = NewGeneralOrderExecutorMap(session, s.PositionMap)
 	s.orderExecutorMap.BindEnvironment(s.Environment)
