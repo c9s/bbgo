@@ -4,7 +4,7 @@ import "github.com/c9s/bbgo/pkg/types"
 
 type ProfitStatsMap map[string]*types.ProfitStats
 
-func (m ProfitStatsMap) createProfitStats(markets []types.Market) ProfitStatsMap {
+func (m ProfitStatsMap) CreateProfitStats(markets []types.Market) ProfitStatsMap {
 	for _, market := range markets {
 		if _, ok := m[market.Symbol]; ok {
 			continue
