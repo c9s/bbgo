@@ -444,7 +444,10 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		submitOrders[i] = adjustOrderQuantity(submitOrders[i], s.Market)
 	}
 
-	_, _ = s.orderExecutor.SubmitOrders(ctx, submitOrders...)
+	_, err = s.orderExecutor.SubmitOrders(ctx, submitOrders...)
+	if err != nil {
+		log.WithError(err).Errorf("submit order error")
+	}
 }
 
 func (s *Strategy) hasLongSet() bool {
