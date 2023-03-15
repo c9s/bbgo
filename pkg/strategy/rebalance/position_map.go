@@ -6,7 +6,7 @@ import (
 
 type PositionMap map[string]*types.Position
 
-func (m PositionMap) createPositions(markets []types.Market) PositionMap {
+func (m PositionMap) CreatePositions(markets []types.Market) PositionMap {
 	for _, market := range markets {
 		if _, ok := m[market.Symbol]; ok {
 			continue
