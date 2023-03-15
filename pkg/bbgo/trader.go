@@ -88,6 +88,8 @@ type Trader struct {
 	crossExchangeStrategies []CrossExchangeStrategy
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
+	// gracefulShutdown is used for registering strategy's Shutdown calls
+	// when strategy implements Shutdown(ctx), the func ref will be stored in the callback.
 	gracefulShutdown GracefulShutdown
 
 	logger Logger
@@ -400,18 +402,17 @@ func (trader *Trader) IterateStrategies(f func(st StrategyID) error) error {
 	return nil
 }
 
-func (trader *Trader) SaveState() error {
+// NOTICE: the ctx here is the trading context, which could already be canceled.
+func (trader *Trader) SaveState(ctx context.Context) error {
 	if trader.environment.BacktestService != nil {
 		return nil
 	}
 
-	if persistenceServiceFacade == nil {
-		return nil
-	}
+	isolation := GetIsolationFromContext(ctx)
 
-	ps := persistenceServiceFacade.Get()
+	ps := isolation.persistenceServiceFacade.Get()
 
-	log.Infof("saving strategies states...")
+	log.Debugf("saving strategy persistence states...")
 	return trader.IterateStrategies(func(strategy StrategyID) error {
 		id := dynamic.CallID(strategy)
 		if len(id) == 0 {
