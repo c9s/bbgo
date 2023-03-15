@@ -9,6 +9,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -37,6 +38,10 @@ type Strategy struct {
 	SkewFactor   fixedpoint.Value `json:"skewFactor"`
 	TargetWeight fixedpoint.Value `json:"targetWeight"`
 
+	// replace halfSpreadRatio by ATR
+	ATRMultiplier fixedpoint.Value `json:"atrMultiplier"`
+	ATRWindow     int              `json:"atrWindow"`
+
 	// persistence fields
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
@@ -44,11 +49,16 @@ type Strategy struct {
 	session         *bbgo.ExchangeSession
 	orderExecutor   *bbgo.GeneralOrderExecutor
 	activeOrderBook *bbgo.ActiveOrderBook
+	atr             *indicator.ATR
 }
 
 func (s *Strategy) Defaults() error {
 	if s.OrderType == "" {
 		s.OrderType = types.OrderTypeLimitMaker
+	}
+
+	if s.ATRWindow == 0 {
+		s.ATRWindow = 14
 	}
 	return nil
 }
@@ -71,6 +81,18 @@ func (s *Strategy) Validate() error {
 
 	if s.HalfSpreadRatio.Float64() <= 0 {
 		return fmt.Errorf("halfSpreadRatio should be positive")
+	}
+
+	if s.SkewFactor.Float64() < 0 {
+		return fmt.Errorf("skewFactor should be non-negative")
+	}
+
+	if s.ATRMultiplier.Float64() < 0 {
+		return fmt.Errorf("atrMultiplier should be non-negative")
+	}
+
+	if s.ATRWindow < 0 {
+		return fmt.Errorf("atrWindow should be non-negative")
 	}
 	return nil
 }
@@ -108,6 +130,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
+
+	s.atr = s.StandardIndicatorSet.ATR(types.IntervalWindow{Interval: s.Interval, Window: s.ATRWindow})
 
 	session.UserDataStream.OnStart(func() {
 		// you can place orders here when bbgo is started, this will be called only once.
@@ -191,6 +215,13 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 	baseValue := baseBalance.Total().Mul(midPrice)
 	baseWeight := baseValue.Div(baseValue.Add(quoteBalance.Total()))
 	skew := s.SkewFactor.Mul(baseWeight.Sub(s.TargetWeight))
+
+	if s.ATRMultiplier.Float64() > 0 {
+		atr := fixedpoint.NewFromFloat(s.atr.Last())
+		log.Infof("atr: %s", atr.String())
+		s.HalfSpreadRatio = s.ATRMultiplier.Mul(atr).Div(midPrice)
+		log.Infof("half spread ratio: %s", s.HalfSpreadRatio.String())
+	}
 
 	// calculate bid and ask price
 	// bid price = mid price * (1 - max(r + skew, 0))
