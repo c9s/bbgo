@@ -226,7 +226,7 @@ func toGlobalTradeV3(t v3.Trade) ([]types.Trade, error) {
 		bidTrade.Side = types.SideTypeBuy
 		bidTrade.OrderID = t.SelfTradeBidOrderID
 		bidTrade.Fee = t.SelfTradeBidFee
-		bidTrade.FeeCurrency = t.SelfTradeBidFeeCurrency
+		bidTrade.FeeCurrency = toGlobalCurrency(t.SelfTradeBidFeeCurrency)
 		bidTrade.IsBuyer = !trade.IsBuyer
 		bidTrade.IsMaker = !trade.IsMaker
 		trades = append(trades, bidTrade)
