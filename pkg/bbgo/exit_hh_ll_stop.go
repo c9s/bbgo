@@ -8,7 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type HigherHighLowerLowStopLoss struct {
+type HigherHighLowerLowStop struct {
 	Symbol string `json:"symbol"`
 
 	Side types.SideType `json:"side"`
@@ -45,14 +45,14 @@ type HigherHighLowerLowStopLoss struct {
 }
 
 // Subscribe required k-line stream
-func (s *HigherHighLowerLowStopLoss) Subscribe(session *ExchangeSession) {
+func (s *HigherHighLowerLowStop) Subscribe(session *ExchangeSession) {
 	// use 1m kline to handle roi stop
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 // updateActivated checks the position cost against the close price, activation ratio, and deactivation ratio to
 // determine whether this stop should be activated
-func (s *HigherHighLowerLowStopLoss) updateActivated(position *types.Position, closePrice fixedpoint.Value) {
+func (s *HigherHighLowerLowStop) updateActivated(position *types.Position, closePrice fixedpoint.Value) {
 	if position.IsClosed() || position.IsDust(closePrice) {
 		s.activated = false
 	} else if s.activated {
@@ -88,7 +88,7 @@ func (s *HigherHighLowerLowStopLoss) updateActivated(position *types.Position, c
 	}
 }
 
-func (s *HigherHighLowerLowStopLoss) updateHighLowNumber(kline types.KLine) {
+func (s *HigherHighLowerLowStop) updateHighLowNumber(kline types.KLine) {
 	if !s.activated {
 		s.reset()
 		return
@@ -116,7 +116,7 @@ func (s *HigherHighLowerLowStopLoss) updateHighLowNumber(kline types.KLine) {
 	s.klines.Truncate(s.Window - 1)
 }
 
-func (s *HigherHighLowerLowStopLoss) shouldStop(position *types.Position) bool {
+func (s *HigherHighLowerLowStop) shouldStop(position *types.Position) bool {
 	if s.activated {
 		highs := 0
 		lows := 0
@@ -146,12 +146,12 @@ func (s *HigherHighLowerLowStopLoss) shouldStop(position *types.Position) bool {
 	return false
 }
 
-func (s *HigherHighLowerLowStopLoss) reset() {
+func (s *HigherHighLowerLowStop) reset() {
 	s.highLows = []types.Direction{}
 	s.klines.Truncate(0)
 }
 
-func (s *HigherHighLowerLowStopLoss) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
+func (s *HigherHighLowerLowStop) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
 
