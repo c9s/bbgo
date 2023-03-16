@@ -8,10 +8,12 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// TODO: if parameter not set
+// TODO: log and notify
+// TODO: check all procedures
+
 type HigherHighLowerLowStop struct {
 	Symbol string `json:"symbol"`
-
-	Side types.SideType `json:"side"`
 
 	types.IntervalWindow
 
@@ -94,22 +96,26 @@ func (s *HigherHighLowerLowStop) updateHighLowNumber(kline types.KLine) {
 		return
 	}
 
-	if s.klines.GetHigh().Compare(kline.GetHigh()) < 0 {
-		s.highLows = append(s.highLows, types.DirectionUp)
-	} else if s.klines.GetLow().Compare(kline.GetLow()) > 0 {
-		s.highLows = append(s.highLows, types.DirectionDown)
+	if s.klines.Len() > 0 {
+		if s.klines.GetHigh().Compare(kline.GetHigh()) < 0 {
+			s.highLows = append(s.highLows, types.DirectionUp)
+		} else if s.klines.GetLow().Compare(kline.GetLow()) > 0 {
+			s.highLows = append(s.highLows, types.DirectionDown)
+		} else {
+			s.highLows = append(s.highLows, types.DirectionNone)
+		}
+		// Truncate highLows
+		if len(s.highLows) > s.HighLowWindow {
+			end := len(s.highLows)
+			start := end - s.HighLowWindow
+			if start < 0 {
+				start = 0
+			}
+			kn := s.highLows[start:]
+			s.highLows = kn
+		}
 	} else {
 		s.highLows = append(s.highLows, types.DirectionNone)
-	}
-	// Truncate highLows
-	if len(s.highLows) > s.HighLowWindow {
-		end := len(s.highLows)
-		start := end - s.HighLowWindow
-		if start < 0 {
-			start = 0
-		}
-		kn := s.highLows[start:]
-		s.highLows = kn
 	}
 
 	s.klines.Add(kline)
