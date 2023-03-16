@@ -1470,7 +1470,7 @@ func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrd
 	s.debugOrders("filled orders", filledOrders)
 
 	for _, filledOrder := range filledOrders {
-		price := Pin(filledOrder.Price)
+		price := filledOrder.Price
 		if o, exist := pinOrders[price]; !exist {
 			return fmt.Errorf("the price (%+v) is not in pins", price)
 		} else if o.OrderID != 0 {
@@ -1484,7 +1484,7 @@ func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrd
 
 	side := types.SideTypeBuy
 	for _, pin := range pins {
-		order, exist := pinOrders[pin]
+		order, exist := pinOrders[fixedpoint.Value(pin)]
 		if !exist {
 			return fmt.Errorf("there is no order at price (%+v)", pin)
 		}
@@ -1520,11 +1520,11 @@ func (s *Strategy) buildPinOrderMap(pins []Pin, openOrders []types.Order) (PinOr
 	pinOrderMap := make(PinOrderMap)
 
 	for _, pin := range pins {
-		pinOrderMap[pin] = types.Order{}
+		pinOrderMap[fixedpoint.Value(pin)] = types.Order{}
 	}
 
 	for _, openOrder := range openOrders {
-		pin := Pin(openOrder.Price)
+		pin := openOrder.Price
 		v, exist := pinOrderMap[pin]
 		if !exist {
 			return nil, fmt.Errorf("the price of the order (id: %d) is not in pins", openOrder.OrderID)
@@ -1593,7 +1593,7 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 			}
 
 			// checked the trade's order is filled order
-			pin := Pin(order.Price)
+			pin := order.Price
 			v, exist := pinOrdersOpen[pin]
 			if !exist {
 				return nil, fmt.Errorf("the price of the order with the same GroupID is not in pins")
