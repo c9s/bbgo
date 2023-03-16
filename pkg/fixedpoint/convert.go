@@ -590,3 +590,23 @@ func Abs(a Value) Value {
 	}
 	return a
 }
+
+func Clamp(x, min, max Value) Value {
+	if x < min {
+		return min
+	}
+	if x > max {
+		return max
+	}
+	return x
+}
+
+func (x Value) Clamp(min, max Value) Value {
+	if x < min {
+		return min
+	}
+	if x > max {
+		return max
+	}
+	return x
+}
