@@ -8,7 +8,7 @@ import (
 )
 
 // PinOrderMap store the pin-order's relation, we will change key from string to fixedpoint.Value when FormatString fixed
-type PinOrderMap map[string]types.Order
+type PinOrderMap map[Pin]types.Order
 
 // AscendingOrders get the orders from pin order map and sort it in asc order
 func (m PinOrderMap) AscendingOrders() []types.Order {
@@ -41,7 +41,7 @@ func (m PinOrderMap) String() string {
 
 	sb.WriteString("================== PIN ORDER MAP ==================\n")
 	for pin, order := range m {
-		sb.WriteString(fmt.Sprintf("%s -> %s\n", pin, order.String()))
+		sb.WriteString(fmt.Sprintf("%+v -> %s\n", pin, order.String()))
 	}
 	sb.WriteString("================== END OF PIN ORDER MAP ==================\n")
 	return sb.String()
