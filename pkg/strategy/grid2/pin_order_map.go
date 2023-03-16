@@ -1,6 +1,9 @@
 package grid2
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -31,4 +34,15 @@ func (m PinOrderMap) SyncOrderMap() *types.SyncOrderMap {
 	}
 
 	return orderMap
+}
+
+func (m PinOrderMap) String() string {
+	var sb strings.Builder
+
+	sb.WriteString("================== PIN ORDER MAP ==================\n")
+	for pin, order := range m {
+		sb.WriteString(fmt.Sprintf("%s -> %s\n", pin, order.String()))
+	}
+	sb.WriteString("================== END OF PIN ORDER MAP ==================\n")
+	return sb.String()
 }
