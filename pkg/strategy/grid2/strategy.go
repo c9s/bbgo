@@ -911,7 +911,7 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 
 			openOrders, err := queryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
 			if err != nil {
-				s.logger.WithError(err).Errorf("CancelOrdersByGroupID api call error")
+				s.logger.WithError(err).Errorf("queryOpenOrders api call error")
 				werr = multierr.Append(werr, err)
 			}
 
