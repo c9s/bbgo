@@ -1217,6 +1217,13 @@ func (s *Strategy) debugOrders(desc string, orders []types.Order) {
 	s.logger.Infof(sb.String())
 }
 
+func (s *Strategy) debugLog(format string, args ...interface{}) {
+	if !s.Debug {
+		return
+	}
+
+	s.logger.Infof(format, args...)
+}
 func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoint.Value) ([]types.SubmitOrder, error) {
 	var pins = s.grid.Pins
 	var usedBase = fixedpoint.Zero
@@ -1400,7 +1407,7 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 
 	expectedOrderNums := s.GridNum - 1
 	openOrdersOnGridNums := int64(len(openOrdersOnGrid))
-	s.logger.Debugf("open orders nums: %d, expected nums: %d", openOrdersOnGridNums, expectedOrderNums)
+	s.debugLog("open orders nums: %d, expected nums: %d", openOrdersOnGridNums, expectedOrderNums)
 	if expectedOrderNums == openOrdersOnGridNums {
 		// no need to recover
 		return nil
@@ -1458,8 +1465,8 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 }
 
 func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrders []types.Order) error {
-	s.logger.Debugf("pins: %+v", pins)
-	s.logger.Debugf("open pin orders: %+v", pinOrders)
+	s.debugLog("pins: %+v", pins)
+	s.debugLog("open pin orders:\n%s", pinOrders.String())
 	s.debugOrders("filled orders", filledOrders)
 
 	for _, filledOrder := range filledOrders {
@@ -1473,7 +1480,7 @@ func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrd
 		}
 	}
 
-	s.logger.Debugf("filled pin orders: %+v", pinOrders)
+	s.debugLog("filled pin orders:\n%+v", pinOrders.String())
 
 	side := types.SideTypeBuy
 	for _, pin := range pins {
@@ -1557,10 +1564,10 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 			return nil, errors.Wrapf(err, "failed to query trades to recover the grid with open orders")
 		}
 
-		s.logger.Debugf("QueryTrades return %d trades", len(trades))
+		s.debugLog("QueryTrades return %d trades", len(trades))
 
 		for _, trade := range trades {
-			s.logger.Debugf(trade.String())
+			s.debugLog(trade.String())
 			if existedOrders.Exists(trade.OrderID) {
 				// already queries, skip
 				continue
@@ -1574,7 +1581,7 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 				return nil, errors.Wrapf(err, "failed to query order by trade")
 			}
 
-			s.logger.Debugf("%s (group_id: %d)", order.String(), order.GroupID)
+			s.debugLog("%s (group_id: %d)", order.String(), order.GroupID)
 
 			// avoid query this order again
 			existedOrders.Add(*order)
@@ -2148,11 +2155,11 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	if s.RecoverGridByScanningTrades {
-		s.logger.Debugf("recover grid by scanning trades")
+		s.debugLog("recover grid by scanning trades")
 		return s.recoverGridByScanningTrades(ctx, session)
 	}
 
-	s.logger.Debugf("recover grid by scanning orders")
+	s.debugLog("recover grid by scanning orders")
 	return s.recoverGridByScanningOrders(ctx, session)
 }
 
@@ -2197,7 +2204,7 @@ func (s *Strategy) recoverGridByScanningTrades(ctx context.Context, session *bbg
 
 	s.logger.Infof("found %d open orders left on the %s order book", len(openOrders), s.Symbol)
 
-	s.logger.Debugf("recover grid with group id: %d", s.OrderGroupID)
+	s.debugLog("recover grid with group id: %d", s.OrderGroupID)
 	// filter out the order with the group id belongs to this grid
 	var openOrdersOnGrid []types.Order
 	for _, order := range openOrders {
