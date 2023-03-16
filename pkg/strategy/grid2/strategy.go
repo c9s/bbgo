@@ -922,12 +922,7 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 			s.logger.Infof("found %d open orders left, using cancel all orders api", len(openOrders))
 
 			s.logger.Infof("using cancal all orders api for canceling grid orders...")
-			op := func() error {
-				_, cancelErr := service.CancelAllOrders(ctx)
-				return cancelErr
-			}
-
-			if err := backoff.Retry(op, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 101)); err != nil {
+			if err := cancelAllOrdersUntilSuccessful(ctx, service); err != nil {
 				s.logger.WithError(err).Errorf("CancelAllOrders api call error")
 				werr = multierr.Append(werr, err)
 			}
@@ -2319,6 +2314,15 @@ func generalBackoff(ctx context.Context, op backoff.Operation) (err error) {
 			101),
 		ctx))
 	return err
+}
+
+func cancelAllOrdersUntilSuccessful(ctx context.Context, service advancedOrderCancelApi) error {
+	var op = func() (err2 error) {
+		_, err2 = service.CancelAllOrders(ctx)
+		return err2
+	}
+
+	return generalBackoff(ctx, op)
 }
 
 func cancelOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
