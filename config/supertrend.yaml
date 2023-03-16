@@ -80,19 +80,29 @@ exchangeStrategies:
     exits:
       # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
       - roiStopLoss:
-          percentage: 4.6%
-      - protectiveStopLoss:
-          activationRatio: 3.5%
-          stopLossRatio: 2.9%
-          placeStopOrder: false
-      - protectiveStopLoss:
-          activationRatio: 11.1%
-          stopLossRatio: 9.5%
-          placeStopOrder: false
+          percentage: 2%
       - trailingStop:
-          callbackRate: 1.1%
+          callbackRate: 2%
           #activationRatio: 20%
-          minProfit: 19.5%
+          minProfit: 10%
           interval: 1m
           side: both
           closePosition: 100%
+      - higherHighLowerLowStopLoss:
+          interval: 1h
+          window: 20
+          highLowWindow: 5
+          minHighLow: 2
+          maxHighLow: 0
+          activationRatio: 0.5%
+          deactivationRatio: 10%
+          oppositeDirectionAsPosition: false
+      - higherHighLowerLowStopLoss:
+          interval: 1h
+          window: 20
+          highLowWindow: 5
+          minHighLow: 0
+          maxHighLow: 3
+          activationRatio: 0.5%
+          deactivationRatio: 10%
+          oppositeDirectionAsPosition: true
