@@ -29,16 +29,17 @@ func (s *ExitMethodSet) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 }
 
 type ExitMethod struct {
-	RoiStopLoss               *RoiStopLoss               `json:"roiStopLoss"`
-	ProtectiveStopLoss        *ProtectiveStopLoss        `json:"protectiveStopLoss"`
-	RoiTakeProfit             *RoiTakeProfit             `json:"roiTakeProfit"`
-	TrailingStop              *TrailingStop2             `json:"trailingStop"`
+	RoiStopLoss            *RoiStopLoss            `json:"roiStopLoss"`
+	ProtectiveStopLoss     *ProtectiveStopLoss     `json:"protectiveStopLoss"`
+	RoiTakeProfit          *RoiTakeProfit          `json:"roiTakeProfit"`
+	TrailingStop           *TrailingStop2          `json:"trailingStop"`
+	HigherHighLowerLowStop *HigherHighLowerLowStop `json:"higherHighLowerLowStopLoss"`
 
 	// Exit methods for short positions
 	// =================================================
 	LowerShadowTakeProfit     *LowerShadowTakeProfit     `json:"lowerShadowTakeProfit"`
 	CumulatedVolumeTakeProfit *CumulatedVolumeTakeProfit `json:"cumulatedVolumeTakeProfit"`
-	SupportTakeProfit         *SupportTakeProfit       `json:"supportTakeProfit"`
+	SupportTakeProfit         *SupportTakeProfit         `json:"supportTakeProfit"`
 }
 
 func (e ExitMethod) String() string {
@@ -76,6 +77,11 @@ func (e ExitMethod) String() string {
 	if e.SupportTakeProfit != nil {
 		b, _ := json.Marshal(e.SupportTakeProfit)
 		buf.WriteString("supportTakeProfit: " + string(b) + ", ")
+	}
+
+	if e.HigherHighLowerLowStop != nil {
+		b, _ := json.Marshal(e.HigherHighLowerLowStop)
+		buf.WriteString("hhllStop: " + string(b) + ", ")
 	}
 
 	return buf.String()
@@ -134,5 +140,9 @@ func (m *ExitMethod) Bind(session *ExchangeSession, orderExecutor *GeneralOrderE
 
 	if m.TrailingStop != nil {
 		m.TrailingStop.Bind(session, orderExecutor)
+	}
+
+	if m.HigherHighLowerLowStop != nil {
+		m.HigherHighLowerLowStop.Bind(session, orderExecutor)
 	}
 }
