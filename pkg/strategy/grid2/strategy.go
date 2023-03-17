@@ -1465,11 +1465,11 @@ func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrd
 	s.debugOrders("filled orders", filledOrders)
 
 	for _, filledOrder := range filledOrders {
-		price := s.Market.FormatPrice(filledOrder.Price)
+		price := filledOrder.Price
 		if o, exist := pinOrders[price]; !exist {
-			return fmt.Errorf("the price (%s) is not in pins", price)
+			return fmt.Errorf("the price (%+v) is not in pins", price)
 		} else if o.OrderID != 0 {
-			return fmt.Errorf("there is already an order at this price (%s)", price)
+			return fmt.Errorf("there is already an order at this price (%+v)", price)
 		} else {
 			pinOrders[price] = filledOrder
 		}
@@ -1479,10 +1479,9 @@ func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrd
 
 	side := types.SideTypeBuy
 	for _, pin := range pins {
-		price := s.Market.FormatPrice(fixedpoint.Value(pin))
-		order, exist := pinOrders[price]
+		order, exist := pinOrders[fixedpoint.Value(pin)]
 		if !exist {
-			return fmt.Errorf("there is no order at price (%s)", price)
+			return fmt.Errorf("there is no order at price (%+v)", pin)
 		}
 
 		// if there is order with OrderID = 0, means we hit the empty pin
@@ -1516,13 +1515,12 @@ func (s *Strategy) buildPinOrderMap(pins []Pin, openOrders []types.Order) (PinOr
 	pinOrderMap := make(PinOrderMap)
 
 	for _, pin := range pins {
-		priceStr := s.Market.FormatPrice(fixedpoint.Value(pin))
-		pinOrderMap[priceStr] = types.Order{}
+		pinOrderMap[fixedpoint.Value(pin)] = types.Order{}
 	}
 
 	for _, openOrder := range openOrders {
-		priceStr := s.Market.FormatPrice(openOrder.Price)
-		v, exist := pinOrderMap[priceStr]
+		pin := openOrder.Price
+		v, exist := pinOrderMap[pin]
 		if !exist {
 			return nil, fmt.Errorf("the price of the order (id: %d) is not in pins", openOrder.OrderID)
 		}
@@ -1531,7 +1529,7 @@ func (s *Strategy) buildPinOrderMap(pins []Pin, openOrders []types.Order) (PinOr
 			return nil, fmt.Errorf("there are duplicated open orders at the same pin")
 		}
 
-		pinOrderMap[priceStr] = openOrder
+		pinOrderMap[pin] = openOrder
 	}
 
 	return pinOrderMap, nil
@@ -1590,8 +1588,8 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 			}
 
 			// checked the trade's order is filled order
-			priceStr := s.Market.FormatPrice(order.Price)
-			v, exist := pinOrdersOpen[priceStr]
+			pin := order.Price
+			v, exist := pinOrdersOpen[pin]
 			if !exist {
 				return nil, fmt.Errorf("the price of the order with the same GroupID is not in pins")
 			}
@@ -1602,13 +1600,13 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 			}
 
 			// check the order's creation time
-			if pinOrder, exist := pinOrdersFilled[priceStr]; exist && pinOrder.CreationTime.Time().After(order.CreationTime.Time()) {
+			if pinOrder, exist := pinOrdersFilled[pin]; exist && pinOrder.CreationTime.Time().After(order.CreationTime.Time()) {
 				// do not replace the pin order if the order's creation time is not after pin order's creation time
 				// this situation should not happen actually, because the trades is already sorted.
 				s.logger.Infof("pinOrder's creation time (%s) should not be after order's creation time (%s)", pinOrder.CreationTime, order.CreationTime)
 				continue
 			}
-			pinOrdersFilled[priceStr] = *order
+			pinOrdersFilled[pin] = *order
 
 			// wait 100 ms to avoid rate limit
 			time.Sleep(100 * time.Millisecond)
