@@ -1323,3 +1323,23 @@ func (dn Value) Format(mask string) string {
 	}
 	return buf.String()
 }
+
+func Clamp(x, min, max Value) Value {
+	if x.Compare(min) < 0 {
+		return min
+	}
+	if x.Compare(max) > 0 {
+		return max
+	}
+	return x
+}
+
+func (x Value) Clamp(min, max Value) Value {
+	if x.Compare(min) < 0 {
+		return min
+	}
+	if x.Compare(max) > 0 {
+		return max
+	}
+	return x
+}
