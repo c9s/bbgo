@@ -211,11 +211,6 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 	midPrice := ticker.Buy.Add(ticker.Sell).Div(fixedpoint.NewFromFloat(2.0))
 	log.Infof("mid price: %+v", midPrice)
 
-	// calcualte skew by the difference between base weight and target weight
-	baseValue := baseBalance.Total().Mul(midPrice)
-	baseWeight := baseValue.Div(baseValue.Add(quoteBalance.Total()))
-	skew := s.SkewFactor.Mul(baseWeight.Sub(s.TargetWeight))
-
 	if s.ATRMultiplier.Float64() > 0 {
 		atr := fixedpoint.NewFromFloat(s.atr.Last())
 		log.Infof("atr: %s", atr.String())
@@ -223,12 +218,20 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 		log.Infof("half spread ratio: %s", s.HalfSpreadRatio.String())
 	}
 
+	// calcualte skew by the difference between base weight and target weight
+	baseValue := baseBalance.Total().Mul(midPrice)
+	baseWeight := baseValue.Div(baseValue.Add(quoteBalance.Total()))
+	skew := s.SkewFactor.Mul(s.HalfSpreadRatio).Mul(baseWeight.Sub(s.TargetWeight))
+
+	// let the skew be in the range of [-r, r]
+	skew = skew.Clamp(s.HalfSpreadRatio.Neg(), s.HalfSpreadRatio)
+
 	// calculate bid and ask price
-	// bid price = mid price * (1 - max(r + skew, 0))
+	// bid price = mid price * (1 - r - skew))
 	bidSpreadRatio := fixedpoint.Max(s.HalfSpreadRatio.Add(skew), fixedpoint.Zero)
 	bidPrice := midPrice.Mul(fixedpoint.One.Sub(bidSpreadRatio))
 	log.Infof("bid price: %s", bidPrice.String())
-	// ask price = mid price * (1 + max(r - skew, 0))
+	// ask price = mid price * (1 + r - skew))
 	askSrasedRatio := fixedpoint.Max(s.HalfSpreadRatio.Sub(skew), fixedpoint.Zero)
 	askPrice := midPrice.Mul(fixedpoint.One.Add(askSrasedRatio))
 	log.Infof("ask price: %s", askPrice.String())
