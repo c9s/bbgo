@@ -62,14 +62,14 @@ func (s *HigherHighLowerLowStop) updateActivated(position *types.Position, close
 			r := fixedpoint.One.Add(s.DeactivationRatio)
 			if closePrice.Compare(position.AverageCost.Mul(r)) >= 0 {
 				s.activated = false
-				Notify("[hhllStop] Stop of %s deactivated for long position, deactivation ratio %f:", s.Symbol, s.DeactivationRatio)
+				Notify("[hhllStop] Stop of %s deactivated for long position, deactivation ratio %s:", s.Symbol, s.DeactivationRatio.Percentage())
 			}
 		} else if position.IsShort() {
 			r := fixedpoint.One.Sub(s.DeactivationRatio)
 			// for short position, if the close price is less than the activation price then this is a profit position.
 			if closePrice.Compare(position.AverageCost.Mul(r)) <= 0 {
 				s.activated = false
-				Notify("[hhllStop] Stop of %s deactivated for short position, deactivation ratio %f:", s.Symbol, s.DeactivationRatio)
+				Notify("[hhllStop] Stop of %s deactivated for short position, deactivation ratio %s:", s.Symbol, s.DeactivationRatio.Percentage())
 			}
 		}
 	} else {
@@ -77,20 +77,22 @@ func (s *HigherHighLowerLowStop) updateActivated(position *types.Position, close
 			r := fixedpoint.One.Add(s.ActivationRatio)
 			if closePrice.Compare(position.AverageCost.Mul(r)) >= 0 {
 				s.activated = true
-				Notify("[hhllStop] Stop of %s activated for long position, activation ratio %f:", s.Symbol, s.ActivationRatio)
+				Notify("[hhllStop] Stop of %s activated for long position, activation ratio %s:", s.Symbol, s.ActivationRatio.Percentage())
 			}
 		} else if position.IsShort() {
 			r := fixedpoint.One.Sub(s.ActivationRatio)
 			// for short position, if the close price is less than the activation price then this is a profit position.
 			if closePrice.Compare(position.AverageCost.Mul(r)) <= 0 {
 				s.activated = true
-				Notify("[hhllStop] Stop of %s activated for short position, activation ratio %f:", s.Symbol, s.ActivationRatio)
+				Notify("[hhllStop] Stop of %s activated for short position, activation ratio %s:", s.Symbol, s.ActivationRatio.Percentage())
 			}
 		}
 	}
 }
 
 func (s *HigherHighLowerLowStop) updateHighLowNumber(kline types.KLine) {
+	s.klines.Truncate(s.Window - 1)
+
 	if s.klines.Len() > 0 {
 		if s.klines.GetHigh().Compare(kline.GetHigh()) < 0 {
 			s.highLows = append(s.highLows, types.DirectionUp)
@@ -114,10 +116,14 @@ func (s *HigherHighLowerLowStop) updateHighLowNumber(kline types.KLine) {
 	}
 
 	s.klines.Add(kline)
-	s.klines.Truncate(s.Window - 1)
 }
 
 func (s *HigherHighLowerLowStop) shouldStop(position *types.Position) bool {
+	if s.klines.Len() < s.Window || len(s.highLows) < s.HighLowWindow {
+		log.Debugf("[hhllStop] not enough data for %s yet", s.Symbol)
+		return false
+	}
+
 	if s.activated {
 		highs := 0
 		lows := 0
