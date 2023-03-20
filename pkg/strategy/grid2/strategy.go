@@ -2136,13 +2136,16 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 		// do recover only when triggerPrice is not set and not in the back-test mode
 		s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
 		if err := s.recoverGrid(ctx, session); err != nil {
-			s.logger.WithError(err).Errorf("recover error")
+			// if recover fail, return and do not open grid
+			s.EmitGridError(errors.Wrapf(err, "failed to start process, recover error"))
+			return
 		}
 	}
 
 	// avoid using goroutine here for back-test
 	if err := s.openGrid(ctx, session); err != nil {
-		s.logger.WithError(err).Errorf("failed to setup grid orders")
+		s.EmitGridError(errors.Wrapf(err, "failed to start process, setup grid orders error"))
+		return
 	}
 }
 
