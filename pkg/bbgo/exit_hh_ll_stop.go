@@ -91,11 +91,6 @@ func (s *HigherHighLowerLowStop) updateActivated(position *types.Position, close
 }
 
 func (s *HigherHighLowerLowStop) updateHighLowNumber(kline types.KLine) {
-	if !s.activated {
-		s.reset()
-		return
-	}
-
 	if s.klines.Len() > 0 {
 		if s.klines.GetHigh().Compare(kline.GetHigh()) < 0 {
 			s.highLows = append(s.highLows, types.DirectionUp)
@@ -152,11 +147,6 @@ func (s *HigherHighLowerLowStop) shouldStop(position *types.Position) bool {
 	return false
 }
 
-func (s *HigherHighLowerLowStop) reset() {
-	s.highLows = []types.Direction{}
-	s.klines.Truncate(0)
-}
-
 func (s *HigherHighLowerLowStop) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
 	s.session = session
 	s.orderExecutor = orderExecutor
@@ -173,7 +163,6 @@ func (s *HigherHighLowerLowStop) Bind(session *ExchangeSession, orderExecutor *G
 			if err != nil {
 				Notify("[hhllStop] Stop of %s triggered but failed to close %s position:", s.Symbol, err)
 			} else {
-				s.reset()
 				s.activated = false
 				Notify("[hhllStop] Stop of %s triggered and position closed", s.Symbol)
 			}
@@ -183,7 +172,6 @@ func (s *HigherHighLowerLowStop) Bind(session *ExchangeSession, orderExecutor *G
 	// Make sure the stop is reset when position is closed or dust
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		if position.IsClosed() || position.IsDust(position.AverageCost) {
-			s.reset()
 			s.activated = false
 		}
 	})
