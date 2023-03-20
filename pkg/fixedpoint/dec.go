@@ -270,25 +270,46 @@ func (dn Value) FormatString(prec int) string {
 	nd := len(digits)
 	e := int(dn.exp) - nd
 	if -maxLeadingZeros <= dn.exp && dn.exp <= 0 {
+		if prec < 0 {
+			return "0"
+		}
 		// decimal to the left
 		if prec+e+nd > 0 {
 			return sign + "0." + strings.Repeat("0", -e-nd) + digits[:min(prec+e+nd, nd)] + strings.Repeat("0", max(0, prec-nd+e+nd))
-		} else if -e-nd > 0 {
-			return "0." + strings.Repeat("0", -e-nd)
+		} else if -e-nd > 0 && prec != 0 {
+			return "0." + strings.Repeat("0", min(prec, -e-nd))
 		} else {
 			return "0"
 		}
 	} else if -nd < e && e <= -1 {
 		// decimal within
 		dec := nd + e
-		decimals := digits[dec:min(dec+prec, nd)]
-		return sign + digits[:dec] + "." + decimals + strings.Repeat("0", max(0, prec-len(decimals)))
+		if prec > 0 {
+			decimals := digits[dec:min(dec+prec, nd)]
+			return sign + digits[:dec] + "." + decimals + strings.Repeat("0", max(0, prec-len(decimals)))
+		} else if prec == 0 {
+			return sign + digits[:dec]
+		}
+
+		sigFigures := digits[0:max(dec+prec, 0)]
+		if len(sigFigures) == 0 {
+			return "0"
+		}
+
+		return sign + sigFigures + strings.Repeat("0", max(-prec, 0))
+
 	} else if 0 < dn.exp && dn.exp <= digitsMax {
 		// decimal to the right
 		if prec > 0 {
 			return sign + digits + strings.Repeat("0", e) + "." + strings.Repeat("0", prec)
-		} else {
+		} else if prec+e >= 0 {
 			return sign + digits + strings.Repeat("0", e)
+		} else {
+			if len(digits) <= -prec-e {
+				return "0"
+			}
+
+			return sign + digits[0:len(digits)+prec+e] + strings.Repeat("0", -prec)
 		}
 	} else {
 		// scientific notation
