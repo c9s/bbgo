@@ -22,7 +22,6 @@ import (
 
 // closedOrderQueryLimiter is used for the closed orders query rate limit, 1 request per second
 var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
-var tradeQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 var accountQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 var marketDataLimiter = rate.NewLimiter(rate.Every(2*time.Second), 10)
 
@@ -37,7 +36,7 @@ type Exchange struct {
 	v3order  *v3.OrderService
 	v3margin *v3.MarginService
 
-	submitOrderLimiter *rate.Limiter
+	submitOrderLimiter, queryTradeLimiter *rate.Limiter
 }
 
 func New(key, secret string) *Exchange {
@@ -56,6 +55,7 @@ func New(key, secret string) *Exchange {
 		v3order:  &v3.OrderService{Client: client},
 		v3margin: &v3.MarginService{Client: client},
 
+		queryTradeLimiter:  rate.NewLimiter(rate.Every(1*time.Second), 2),
 		submitOrderLimiter: rate.NewLimiter(rate.Every(100*time.Millisecond), 10),
 	}
 }
@@ -795,7 +795,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 // give LastTradeID       -> ignore start_time (but still can filter the end_time)
 // without any parameters -> return trades within 24 hours
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
-	if err := tradeQueryLimiter.Wait(ctx); err != nil {
+	if err := e.queryTradeLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
