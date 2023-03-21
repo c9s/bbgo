@@ -25,7 +25,6 @@ var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
 var tradeQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 var accountQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
 var marketDataLimiter = rate.NewLimiter(rate.Every(2*time.Second), 10)
-var submitOrderLimiter = rate.NewLimiter(rate.Every(300*time.Millisecond), 10)
 
 var log = logrus.WithField("exchange", "max")
 
@@ -37,6 +36,8 @@ type Exchange struct {
 
 	v3order  *v3.OrderService
 	v3margin *v3.MarginService
+
+	submitOrderLimiter *rate.Limiter
 }
 
 func New(key, secret string) *Exchange {
@@ -54,6 +55,8 @@ func New(key, secret string) *Exchange {
 		secret:   secret,
 		v3order:  &v3.OrderService{Client: client},
 		v3margin: &v3.MarginService{Client: client},
+
+		submitOrderLimiter: rate.NewLimiter(rate.Every(100*time.Millisecond), 10),
 	}
 }
 
@@ -452,7 +455,7 @@ func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
-	if err := submitOrderLimiter.Wait(ctx); err != nil {
+	if err := e.submitOrderLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
