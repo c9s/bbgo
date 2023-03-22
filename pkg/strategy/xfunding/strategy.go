@@ -186,11 +186,25 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	instanceID := s.InstanceID()
 
 	s.usedQuoteInvestment = fixedpoint.Zero
+
 	s.spotSession = sessions[s.SpotSession]
 	s.futuresSession = sessions[s.FuturesSession]
 
 	s.spotMarket, _ = s.spotSession.Market(s.Symbol)
 	s.futuresMarket, _ = s.futuresSession.Market(s.Symbol)
+
+	// adjust QuoteInvestment
+	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
+		originalQuoteInvestment := s.QuoteInvestment
+		s.QuoteInvestment = fixedpoint.Min(b.Available, s.QuoteInvestment)
+
+		if originalQuoteInvestment.Compare(s.QuoteInvestment) != 0 {
+			log.Infof("adjusted quoteInvestment from %s to %s according to the balance",
+				originalQuoteInvestment.String(),
+				s.QuoteInvestment.String(),
+			)
+		}
+	}
 
 	if s.ProfitStats == nil {
 		s.ProfitStats = types.NewProfitStats(s.Market)
@@ -203,6 +217,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	if s.SpotPosition == nil {
 		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
 	}
+
+	binanceFutures := s.futuresSession.Exchange.(*binance.Exchange)
+	binanceSpot := s.spotSession.Exchange.(*binance.Exchange)
+	_ = binanceSpot
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
 	s.spotOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
@@ -224,13 +242,14 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				s.usedQuoteInvestment = s.usedQuoteInvestment.Add(trade.QuoteQuantity)
 				if s.usedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
 					s.positionAction = PositionNoOp
-
-					// 1) if we have trade, try to query the balance and transfer the balance to the futures wallet account
-
-					// 2) transferred successfully, sync futures position
-
-					// 3) compare spot position and futures position, increase the position size until they are the same size
 				}
+
+				// 1) if we have trade, try to query the balance and transfer the balance to the futures wallet account
+				// balances, err := binanceSpot.QueryAccountBalances(ctx)
+
+				// 2) transferred successfully, sync futures position
+
+				// 3) compare spot position and futures position, increase the position size until they are the same size
 
 			case PositionClosing:
 				if trade.Side != types.SideTypeBuy {
@@ -244,9 +263,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.futuresOrderExecutor = s.allocateOrderExecutor(ctx, s.futuresSession, instanceID, s.FuturesPosition)
 
-	binanceExchange := s.futuresSession.Exchange.(*binance.Exchange)
 	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
-		premiumIndex, err := binanceExchange.QueryPremiumIndex(ctx, s.Symbol)
+		premiumIndex, err := binanceFutures.QueryPremiumIndex(ctx, s.Symbol)
 		if err != nil {
 			log.WithError(err).Error("premium index query error")
 			return
@@ -260,6 +278,25 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.triggerPositionAction(ctx)
 	}))
 
+	return nil
+}
+
+// TODO: replace type binance.Exchange with an interface
+func (s *Strategy) transferIn(ctx context.Context, ex *binance.Exchange, trade types.Trade) error {
+	balances, err := ex.QueryAccountBalances(ctx)
+	if err != nil {
+		return err
+	}
+
+	b, ok := balances[s.spotMarket.BaseCurrency]
+	if !ok {
+		return nil
+	}
+
+	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity
+	if b.Available.Compare(trade.Quantity) >= 0 {
+
+	}
 	return nil
 }
 
