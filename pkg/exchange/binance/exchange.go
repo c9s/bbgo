@@ -367,6 +367,22 @@ func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) e
 	return nil
 }
 
+func (e *Exchange) TransferFuturesAsset(ctx context.Context, asset string, amount fixedpoint.Value, io int) error {
+	req := e.client2.NewFuturesTransferRequest()
+	req.Asset(asset)
+	req.Amount(amount.String())
+
+	if io > 0 { // int
+		req.TransferType(binanceapi.FuturesTransferSpotToUsdtFutures)
+	} else if io < 0 { // out
+		req.TransferType(binanceapi.FuturesTransferUsdtFuturesToSpot)
+	}
+
+	resp, err := req.Do(ctx)
+	log.Debugf("futures transfer %s %s, transaction = %+v", amount.String(), asset, resp)
+	return err
+}
+
 // transferCrossMarginAccountAsset transfer asset to the cross margin account or to the main account
 func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io int) error {
 	req := e.client.NewMarginTransferService()
