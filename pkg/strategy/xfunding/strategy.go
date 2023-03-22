@@ -169,6 +169,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			})
 		}
 	}
+	_ = ma
 
 	return nil
 }
