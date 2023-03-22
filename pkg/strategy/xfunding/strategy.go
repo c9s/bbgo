@@ -196,7 +196,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	// adjust QuoteInvestment
 	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
 		originalQuoteInvestment := s.QuoteInvestment
-		s.QuoteInvestment = fixedpoint.Min(b.Available, s.QuoteInvestment)
+
+		// adjust available quote with the fee rate
+		available := b.Available.Mul(fixedpoint.NewFromFloat(1.0 - (0.01 * 0.075)))
+		s.QuoteInvestment = fixedpoint.Min(available, s.QuoteInvestment)
 
 		if originalQuoteInvestment.Compare(s.QuoteInvestment) != 0 {
 			log.Infof("adjusted quoteInvestment from %s to %s according to the balance",
