@@ -107,12 +107,6 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	// session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
-
-	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-	//	Interval: string(s.Interval),
-	// })
-
 	for _, detection := range s.SupportDetection {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
 			Interval: detection.Interval,
