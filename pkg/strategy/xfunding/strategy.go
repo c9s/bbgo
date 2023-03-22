@@ -17,8 +17,10 @@ import (
 
 const ID = "xfunding"
 
+type PositionAction int
+
 const (
-	PositionNoOp = iota
+	PositionNoOp PositionAction = iota
 	PositionOpening
 	PositionClosing
 )
@@ -81,6 +83,9 @@ type Strategy struct {
 
 	SpotSession    string `json:"spotSession"`
 	FuturesSession string `json:"futuresSession"`
+
+	// positionAction is default to NoOp
+	positionAction PositionAction
 }
 
 func (s *Strategy) ID() string {
@@ -88,8 +93,17 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
-	// TODO implement me
-	panic("implement me")
+	// TODO: add safety check
+	spotSession := sessions[s.SpotSession]
+	futuresSession := sessions[s.FuturesSession]
+
+	spotSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+		Interval: types.Interval1m,
+	})
+
+	futuresSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
+		Interval: types.Interval1m,
+	})
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
