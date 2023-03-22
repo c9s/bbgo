@@ -206,19 +206,22 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			return
 		}
 
-		fundingRate := premiumIndex.LastFundingRate
-
-		if s.ShortFundingRate != nil {
-			if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
-				s.positionAction = PositionOpening
-				s.positionType = types.PositionShort
-			} else if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
-				s.positionAction = PositionClosing
-			}
-		}
+		s.detectPremiumIndex(premiumIndex)
 	}))
 
 	return nil
+}
+
+func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) {
+	fundingRate := premiumIndex.LastFundingRate
+	if s.ShortFundingRate != nil {
+		if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
+			s.positionAction = PositionOpening
+			s.positionType = types.PositionShort
+		} else if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
+			s.positionAction = PositionClosing
+		}
+	}
 }
 
 func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.ExchangeSession, instanceID string, position *types.Position) *bbgo.GeneralOrderExecutor {
