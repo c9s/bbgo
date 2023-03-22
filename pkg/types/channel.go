@@ -10,7 +10,10 @@ const (
 	AggTradeChannel    = Channel("aggTrade")
 
 	// channels for futures
-	MarkPriceChannel        = Channel("markPrice")
+	MarkPriceChannel = Channel("markPrice")
+
 	LiquidationOrderChannel = Channel("liquidationOrder")
-	ContractChannel         = Channel("contract")
+
+	// ContractInfoChannel is the contract info provided by the exchange
+	ContractInfoChannel = Channel("contractInfo")
 )
