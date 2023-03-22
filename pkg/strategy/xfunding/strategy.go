@@ -1,4 +1,4 @@
-package funding
+package xfunding
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const ID = "funding"
+const ID = "xfunding"
 
 var log = logrus.WithField("strategy", ID)
 
@@ -66,6 +66,11 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
+func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
+	// TODO implement me
+	panic("implement me")
+}
+
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
 
@@ -99,11 +104,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return nil
 	}
 
-	premiumIndex, err := session.Exchange.(*binance.Exchange).QueryPremiumIndex(ctx, s.Symbol)
-	if err != nil {
-		log.Error("exchange does not support funding rate api")
-	}
-
 	var ma types.Float64Indicator
 	for _, detection := range s.SupportDetection {
 
@@ -124,10 +124,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				Window:   detection.MovingAverageIntervalWindow.Window,
 			})
 		}
-
 	}
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
+		premiumIndex, err := session.Exchange.(*binance.Exchange).QueryPremiumIndex(ctx, s.Symbol)
+		if err != nil {
+			log.Error("exchange does not support funding rate api")
+		}
+
 		// skip k-lines from other symbols
 		for _, detection := range s.SupportDetection {
 			var lastMA = ma.Last()
@@ -194,4 +198,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	}))
 	return nil
+}
+
+func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+	// TODO implement me
+	panic("implement me")
 }
