@@ -44,10 +44,12 @@ type Strategy struct {
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 	// Interval            types.Interval   `json:"interval"`
 
-	FundingRate *struct {
-		High    fixedpoint.Value `json:"high"`
-		Neutral fixedpoint.Value `json:"neutral"`
-	} `json:"fundingRate"`
+	// ShortFundingRate is the funding rate range for short positions
+	// TODO: right now we don't support negative funding rate (long position) since it's rarer
+	ShortFundingRate *struct {
+		High fixedpoint.Value `json:"high"`
+		Low  fixedpoint.Value `json:"low"`
+	} `json:"shortFundingRate"`
 
 	SupportDetection []struct {
 		Interval types.Interval `json:"interval"`
@@ -86,6 +88,7 @@ type Strategy struct {
 
 	// positionAction is default to NoOp
 	positionAction PositionAction
+	positionType   types.PositionType
 }
 
 func (s *Strategy) ID() string {
@@ -167,77 +170,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	}
 
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
-		premiumIndex, err := session.Exchange.(*binance.Exchange).QueryPremiumIndex(ctx, s.Symbol)
-		if err != nil {
-			log.Error("exchange does not support funding rate api")
-		}
-
-		// skip k-lines from other symbols
-		for _, detection := range s.SupportDetection {
-			var lastMA = ma.Last()
-
-			closePrice := kline.GetClose()
-			closePriceF := closePrice.Float64()
-			// skip if the closed price is under the moving average
-			if closePriceF < lastMA {
-				log.Infof("skip %s closed price %v < last ma %f", s.Symbol, closePrice, lastMA)
-				return
-			}
-
-			fundingRate := premiumIndex.LastFundingRate
-
-			if fundingRate.Compare(s.FundingRate.High) >= 0 {
-				bbgo.Notify("%s funding rate %s is too high! threshold %s",
-					s.Symbol,
-					fundingRate.Percentage(),
-					s.FundingRate.High.Percentage(),
-				)
-			} else {
-				log.Infof("skip funding rate is too low")
-				return
-			}
-
-			prettyBaseVolume := s.Market.BaseCurrencyFormatter()
-			prettyQuoteVolume := s.Market.QuoteCurrencyFormatter()
-
-			if detection.MinVolume.Sign() > 0 && kline.Volume.Compare(detection.MinVolume) > 0 {
-				bbgo.Notify("Detected %s %s resistance base volume %s > min base volume %s, quote volume %s",
-					s.Symbol, detection.Interval.String(),
-					prettyBaseVolume.FormatMoney(kline.Volume.Trunc()),
-					prettyBaseVolume.FormatMoney(detection.MinVolume.Trunc()),
-					prettyQuoteVolume.FormatMoney(kline.QuoteVolume.Trunc()),
-				)
-				bbgo.Notify(kline)
-
-				baseBalance, ok := session.GetAccount().Balance(s.Market.BaseCurrency)
-				if !ok {
-					return
-				}
-
-				if baseBalance.Available.Sign() > 0 && baseBalance.Total().Compare(s.MaxExposurePosition) < 0 {
-					log.Infof("opening a short position")
-					_, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-						Symbol:   kline.Symbol,
-						Side:     types.SideTypeSell,
-						Type:     types.OrderTypeMarket,
-						Quantity: s.Quantity,
-					})
-					if err != nil {
-						log.WithError(err).Error("submit order error")
-					}
-				}
-			} else if detection.MinQuoteVolume.Sign() > 0 && kline.QuoteVolume.Compare(detection.MinQuoteVolume) > 0 {
-				bbgo.Notify("Detected %s %s resistance quote volume %s > min quote volume %s, base volume %s",
-					s.Symbol, detection.Interval.String(),
-					prettyQuoteVolume.FormatMoney(kline.QuoteVolume.Trunc()),
-					prettyQuoteVolume.FormatMoney(detection.MinQuoteVolume.Trunc()),
-					prettyBaseVolume.FormatMoney(kline.Volume.Trunc()),
-				)
-				bbgo.Notify(kline)
-			}
-		}
-	}))
 	return nil
 }
 
@@ -265,6 +197,26 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
 	s.futuresOrderExecutor = s.allocateOrderExecutor(ctx, s.futuresSession, instanceID, s.FuturesPosition)
+
+	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
+		premiumIndex, err := s.futuresSession.Exchange.(*binance.Exchange).QueryPremiumIndex(ctx, s.Symbol)
+		if err != nil {
+			log.WithError(err).Error("premium index query error")
+			return
+		}
+
+		fundingRate := premiumIndex.LastFundingRate
+
+		if s.ShortFundingRate != nil {
+			if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
+				s.positionAction = PositionOpening
+				s.positionType = types.PositionShort
+			} else if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
+				s.positionAction = PositionClosing
+			}
+		}
+	}))
+
 	return nil
 }
 
