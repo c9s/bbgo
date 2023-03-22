@@ -128,6 +128,14 @@ func (s *Strategy) Validate() error {
 		return errors.New("symbol is required")
 	}
 
+	if len(s.SpotSession) == 0 {
+		return errors.New("spotSession name is required")
+	}
+
+	if len(s.FuturesSession) == 0 {
+		return errors.New("futuresSession name is required")
+	}
+
 	return nil
 }
 
