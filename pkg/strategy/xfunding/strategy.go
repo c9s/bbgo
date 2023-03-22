@@ -3,6 +3,7 @@ package xfunding
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -26,6 +27,8 @@ func init() {
 }
 
 type Strategy struct {
+	Environment *bbgo.Environment
+
 	// These fields will be filled from the config file (it translates YAML to JSON)
 	Symbol              string           `json:"symbol"`
 	Market              types.Market     `json:"-"`
@@ -34,9 +37,8 @@ type Strategy struct {
 	// Interval            types.Interval   `json:"interval"`
 
 	FundingRate *struct {
-		High          fixedpoint.Value `json:"high"`
-		Neutral       fixedpoint.Value `json:"neutral"`
-		DiffThreshold fixedpoint.Value `json:"diffThreshold"`
+		High    fixedpoint.Value `json:"high"`
+		Neutral fixedpoint.Value `json:"neutral"`
 	} `json:"fundingRate"`
 
 	SupportDetection []struct {
@@ -60,6 +62,19 @@ type Strategy struct {
 
 		MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
 	} `json:"supportDetection"`
+
+	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
+
+	SpotPosition    *types.Position `persistence:"spot_position"`
+	FuturesPosition *types.Position `persistence:"futures_position"`
+
+	spotSession, futuresSession *bbgo.ExchangeSession
+
+	spotOrderExecutor, futuresOrderExecutor bbgo.OrderExecutor
+	spotMarket, futuresMarket               types.Market
+
+	SpotSession    string `json:"spotSession"`
+	FuturesSession string `json:"futuresSession"`
 }
 
 func (s *Strategy) ID() string {
@@ -94,6 +109,10 @@ func (s *Strategy) Validate() error {
 	}
 
 	return nil
+}
+
+func (s *Strategy) InstanceID() string {
+	return fmt.Sprintf("%s-%s", ID, s.Symbol)
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -201,6 +220,41 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 }
 
 func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
-	// TODO implement me
-	panic("implement me")
+	instanceID := s.InstanceID()
+
+	// TODO: add safety check
+	s.spotSession = sessions[s.SpotSession]
+	s.futuresSession = sessions[s.FuturesSession]
+
+	s.spotMarket, _ = s.spotSession.Market(s.Symbol)
+	s.futuresMarket, _ = s.futuresSession.Market(s.Symbol)
+
+	if s.ProfitStats == nil {
+		s.ProfitStats = types.NewProfitStats(s.Market)
+	}
+
+	if s.FuturesPosition == nil {
+		s.FuturesPosition = types.NewPositionFromMarket(s.futuresMarket)
+	}
+
+	if s.SpotPosition == nil {
+		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
+	}
+
+	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
+	s.futuresOrderExecutor = s.allocateOrderExecutor(ctx, s.futuresSession, instanceID, s.FuturesPosition)
+	return nil
+}
+
+func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.ExchangeSession, instanceID string, position *types.Position) *bbgo.GeneralOrderExecutor {
+	orderExecutor := bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, position)
+	orderExecutor.BindEnvironment(s.Environment)
+	orderExecutor.Bind()
+	orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
+		s.ProfitStats.AddTrade(trade)
+	})
+	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		bbgo.Sync(ctx, s)
+	})
+	return orderExecutor
 }
