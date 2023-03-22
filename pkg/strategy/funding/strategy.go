@@ -127,11 +127,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	}
 
-	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
 		// skip k-lines from other symbols
-		if kline.Symbol != s.Symbol {
-			return
-		}
 		for _, detection := range s.SupportDetection {
 			var lastMA = ma.Last()
 
@@ -195,6 +192,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				bbgo.Notify(kline)
 			}
 		}
-	})
+	}))
 	return nil
 }
