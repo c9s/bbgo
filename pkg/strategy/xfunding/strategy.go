@@ -17,6 +17,12 @@ import (
 
 const ID = "xfunding"
 
+const (
+	PositionNoOp = iota
+	PositionOpening
+	PositionClosing
+)
+
 var log = logrus.WithField("strategy", ID)
 
 func init() {
