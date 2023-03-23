@@ -54,7 +54,7 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, sessi
 		return nil, err
 	}
 
-	createdOrders, _, err := BatchPlaceOrder(ctx, es.Exchange, formattedOrders...)
+	createdOrders, _, err := BatchPlaceOrder(ctx, es.Exchange, nil, formattedOrders...)
 	return createdOrders, err
 }
 
@@ -94,7 +94,7 @@ func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...type
 		log.Infof("submitting order: %s", order.String())
 	}
 
-	createdOrders, _, err := BatchPlaceOrder(ctx, e.Session.Exchange, formattedOrders...)
+	createdOrders, _, err := BatchPlaceOrder(ctx, e.Session.Exchange, nil, formattedOrders...)
 	return createdOrders, err
 }
 
@@ -297,10 +297,13 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 	return outOrders, nil
 }
 
+type OrderCallback func(order types.Order)
+
 // BatchPlaceOrder
-func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
+func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, orderCallback OrderCallback, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
 	var createdOrders types.OrderSlice
 	var err error
+
 	var errIndexes []int
 	for i, submitOrder := range submitOrders {
 		createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
@@ -309,14 +312,17 @@ func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, submitOrders 
 			errIndexes = append(errIndexes, i)
 		} else if createdOrder != nil {
 			createdOrder.Tag = submitOrder.Tag
+
+			if orderCallback != nil {
+				orderCallback(*createdOrder)
+			}
+
 			createdOrders = append(createdOrders, *createdOrder)
 		}
 	}
 
 	return createdOrders, errIndexes, err
 }
-
-type OrderCallback func(order types.Order)
 
 // BatchRetryPlaceOrder places the orders and retries the failed orders
 func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx []int, orderCallback OrderCallback, logger log.FieldLogger, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
@@ -329,26 +335,12 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 
 	// if the errIdx is nil, then we should iterate all the submit orders
 	// allocate a variable for new error index
-	var errIdxNext []int
 	if len(errIdx) == 0 {
-		for i, submitOrder := range submitOrders {
-			createdOrder, err2 := exchange.SubmitOrder(ctx, submitOrder)
-			if err2 != nil {
-				werr = multierr.Append(werr, err2)
-				errIdxNext = append(errIdxNext, i)
-			} else if createdOrder != nil {
-				// if the order is successfully created, than we should copy the order tag
-				createdOrder.Tag = submitOrder.Tag
-
-				if orderCallback != nil {
-					orderCallback(*createdOrder)
-				}
-
-				createdOrders = append(createdOrders, *createdOrder)
-			}
+		var err2 error
+		createdOrders, errIdx, err2 = BatchPlaceOrder(ctx, exchange, orderCallback, submitOrders...)
+		if err2 != nil {
+			werr = multierr.Append(werr, err2)
 		}
-
-		errIdx = errIdxNext
 	}
 
 	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, DefaultSubmitOrderRetryTimeout)
@@ -359,6 +351,7 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 
 	// set backoff max retries to 101 because https://ja.wikipedia.org/wiki/101%E5%9B%9E%E7%9B%AE%E3%81%AE%E3%83%97%E3%83%AD%E3%83%9D%E3%83%BC%E3%82%BA
 	backoffMaxRetries := uint64(101)
+	var errIdxNext []int
 batchRetryOrder:
 	for retryRound := 0; len(errIdx) > 0 && retryRound < 10; retryRound++ {
 		// sleep for 200 millisecond between each retry
