@@ -578,6 +578,10 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 			s.State.TotalBaseTransfer = fixedpoint.Zero
 			changed = true
 		} else if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
+
+			log.Infof("funding rate %s is lower than the Low threshold %s, start closing position...",
+				fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
+
 			s.positionAction = PositionClosing
 
 			// reset the transfer stats
