@@ -524,7 +524,92 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 }
 
 func (s *Strategy) syncSpotPosition(ctx context.Context) {
+	if s.positionType != types.PositionShort {
+		return
+	}
 
+	if s.notPositionState(PositionClosing) {
+		return
+	}
+
+	spotBase := s.SpotPosition.GetBase()       // should be positive base quantity here
+	futuresBase := s.FuturesPosition.GetBase() // should be negative base quantity here
+
+	if spotBase.IsZero() {
+		s.setPositionState(PositionClosed)
+		return
+	}
+
+	// skip short spot position
+	if spotBase.Sign() < 0 {
+		return
+	}
+
+	log.Infof("spot/futures positions: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
+
+	if futuresBase.Sign() > 0 {
+		// unexpected error
+		log.Errorf("unexpected futures position (got positive, expecting negative)")
+		return
+	}
+
+	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
+
+	ticker, err := s.spotSession.Exchange.QueryTicker(ctx, s.Symbol)
+	if err != nil {
+		log.WithError(err).Errorf("can not query ticker")
+		return
+	}
+
+	if s.SpotPosition.IsDust(ticker.Sell) {
+		dust := s.SpotPosition.GetBase().Abs()
+		cost := s.SpotPosition.AverageCost
+
+		log.Warnf("spot dust loss: %f %s (average cost = %f)", dust.Float64(), s.spotMarket.BaseCurrency, cost.Float64())
+
+		s.SpotPosition.Reset()
+
+		s.setPositionState(PositionClosed)
+		return
+	}
+
+	// spot pos size > futures pos size ==> reduce spot position
+	if spotBase.Compare(futuresBase.Neg()) > 0 {
+		diffQuantity := spotBase.Sub(futuresBase.Neg())
+
+		if diffQuantity.Sign() < 0 {
+			log.Errorf("unexpected negative position diff: %s", diffQuantity.String())
+			return
+		}
+
+		orderPrice := ticker.Sell
+		orderQuantity := diffQuantity
+		if b, ok := s.spotSession.Account.Balance(s.spotMarket.BaseCurrency); ok {
+			orderQuantity = fixedpoint.Min(b.Available, orderQuantity)
+		}
+
+		// avoid increase the order size
+		if s.spotMarket.IsDustQuantity(orderQuantity, orderPrice) {
+			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.spotMarket)
+			return
+		}
+
+		createdOrders, err := s.spotOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			Symbol:   s.Symbol,
+			Side:     types.SideTypeSell,
+			Type:     types.OrderTypeLimitMaker,
+			Quantity: orderQuantity,
+			Price:    orderPrice,
+			Market:   s.futuresMarket,
+		})
+
+		if err != nil {
+			log.WithError(err).Errorf("can not submit spot order")
+			return
+		}
+
+		log.Infof("created spot orders: %+v", createdOrders)
+	}
 }
 
 func (s *Strategy) increaseSpotPosition(ctx context.Context) {
