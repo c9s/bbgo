@@ -349,7 +349,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 			case <-ticker.C:
 				s.queryAndDetectPremiumIndex(ctx, binanceFutures)
-
+				s.sync(ctx)
 			}
 		}
 	}()
@@ -370,13 +370,11 @@ func (s *Strategy) queryAndDetectPremiumIndex(ctx context.Context, binanceFuture
 		return
 	}
 
-	log.Infof("premiumIndex: %+v", premiumIndex)
+	log.Info(premiumIndex)
 
 	if changed := s.detectPremiumIndex(premiumIndex); changed {
-		log.Infof("position state changed: %s %s", s.positionType, s.State.PositionState.String())
+		log.Infof("position state changed to -> %s %s", s.positionType, s.State.PositionState.String())
 	}
-
-	s.sync(ctx)
 }
 
 func (s *Strategy) sync(ctx context.Context) {
@@ -548,6 +546,8 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 	if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
 		// stop increase the position
 		s.State.PositionState = PositionReady
+
+		s.startClosingPosition()
 		return
 	}
 
@@ -642,6 +642,7 @@ func (s *Strategy) startOpeningPosition(pt types.PositionType, t time.Time) {
 		return
 	}
 
+	log.Infof("startOpeningPosition")
 	s.State.PositionState = PositionOpening
 	s.positionType = pt
 
@@ -657,6 +658,7 @@ func (s *Strategy) startClosingPosition() {
 		return
 	}
 
+	log.Infof("startClosingPosition")
 	s.State.PositionState = PositionClosing
 
 	// reset the transfer stats
