@@ -57,6 +57,8 @@ type Strategy struct {
 
 	QuoteInvestment fixedpoint.Value `json:"quoteInvestment"`
 
+	MinHoldingPeriod types.Duration `json:"minHoldingPeriod"`
+
 	// ShortFundingRate is the funding rate range for short positions
 	// TODO: right now we don't support negative funding rate (long position) since it's rarer
 	ShortFundingRate *struct {
@@ -111,6 +113,7 @@ type Strategy struct {
 }
 
 type State struct {
+	PositionStartTime   time.Time        `json:"positionStartTime"`
 	PendingBaseTransfer fixedpoint.Value `json:"pendingBaseTransfer"`
 	TotalBaseTransfer   fixedpoint.Value `json:"totalBaseTransfer"`
 	UsedQuoteInvestment fixedpoint.Value `json:"usedQuoteInvestment"`
@@ -146,7 +149,14 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Defaults() error {
-	s.Leverage = fixedpoint.One
+	if s.Leverage.IsZero() {
+		s.Leverage = fixedpoint.One
+	}
+
+	if s.MinHoldingPeriod == 0 {
+		s.MinHoldingPeriod = types.Duration(3 * 24 * time.Hour)
+	}
+
 	return nil
 }
 
@@ -574,6 +584,7 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 			s.positionType = types.PositionShort
 
 			// reset the transfer stats
+			s.State.PositionStartTime = premiumIndex.Time
 			s.State.PendingBaseTransfer = fixedpoint.Zero
 			s.State.TotalBaseTransfer = fixedpoint.Zero
 			changed = true
@@ -581,6 +592,12 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 
 			log.Infof("funding rate %s is lower than the Low threshold %s, start closing position...",
 				fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
+
+			holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
+			if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
+				log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod)
+				return
+			}
 
 			s.positionAction = PositionClosing
 
