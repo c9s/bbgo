@@ -8,7 +8,7 @@ import (
 
 var MaxRetries uint64 = 101
 
-func RetryGeneric(ctx context.Context, op backoff.Operation) (err error) {
+func RetryGeneral(ctx context.Context, op backoff.Operation) (err error) {
 	err = backoff.Retry(op, backoff.WithContext(
 		backoff.WithMaxRetries(
 			backoff.NewExponentialBackOff(),

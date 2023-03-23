@@ -273,45 +273,60 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		//
 		// when closing a position, we place orders on the futures account first, then the spot account
 		// we need to close the position according to its base quantity instead of quote quantity
-		if s.positionType == types.PositionShort {
-			switch s.positionAction {
-			case PositionOpening:
-				if trade.Side != types.SideTypeBuy {
-					log.Errorf("unexpected trade side: %+v, expecting BUY trade", trade)
-					return
-				}
+		if s.positionType != types.PositionShort {
+			return
+		}
 
-				s.mu.Lock()
-				defer s.mu.Unlock()
-
-				s.State.UsedQuoteInvestment = s.State.UsedQuoteInvestment.Add(trade.QuoteQuantity)
-				if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
-					s.positionAction = PositionNoOp
-				}
-
-				// 1) if we have trade, try to query the balance and transfer the balance to the futures wallet account
-				// TODO: handle missing trades here. If the process crashed during the transfer, how to recover?
-				if err := backoff.RetryGeneric(ctx, func() error {
-					return s.transferIn(ctx, binanceSpot, trade)
-				}); err != nil {
-					log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
-					return
-				}
-
-				// 2) transferred successfully, sync futures position
-				// compare spot position and futures position, increase the position size until they are the same size
-
-			case PositionClosing:
-				if trade.Side != types.SideTypeSell {
-					log.Errorf("unexpected trade side: %+v, expecting SELL trade", trade)
-					return
-				}
-
+		switch s.positionAction {
+		case PositionOpening:
+			if trade.Side != types.SideTypeBuy {
+				log.Errorf("unexpected trade side: %+v, expecting BUY trade", trade)
+				return
 			}
+
+			s.mu.Lock()
+			defer s.mu.Unlock()
+
+			s.State.UsedQuoteInvestment = s.State.UsedQuoteInvestment.Add(trade.QuoteQuantity)
+			if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
+				s.positionAction = PositionNoOp
+			}
+
+			// if we have trade, try to query the balance and transfer the balance to the futures wallet account
+			// TODO: handle missing trades here. If the process crashed during the transfer, how to recover?
+			if err := backoff.RetryGeneral(ctx, func() error {
+				return s.transferIn(ctx, binanceSpot, s.spotMarket.BaseCurrency, trade)
+			}); err != nil {
+				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
+				return
+			}
+
+		case PositionClosing:
+			if trade.Side != types.SideTypeSell {
+				log.Errorf("unexpected trade side: %+v, expecting SELL trade", trade)
+				return
+			}
+
 		}
 	})
 
 	s.futuresOrderExecutor = s.allocateOrderExecutor(ctx, s.futuresSession, instanceID, s.FuturesPosition)
+	s.futuresOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		if s.positionType != types.PositionShort {
+			return
+		}
+
+		switch s.positionAction {
+		case PositionClosing:
+			if err := backoff.RetryGeneral(ctx, func() error {
+				return s.transferOut(ctx, binanceSpot, s.spotMarket.BaseCurrency, trade)
+			}); err != nil {
+				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
+				return
+			}
+
+		}
+	})
 
 	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
 		// s.queryAndDetectPremiumIndex(ctx, binanceFutures)
@@ -421,6 +436,8 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 }
 
 // syncFuturesPosition syncs the futures position with the given spot position
+// when the spot is transferred successfully, sync futures position
+// compare spot position and futures position, increase the position size until they are the same size
 func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	if s.positionType != types.PositionShort {
 		return
@@ -495,7 +512,6 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 			Quantity: orderQuantity,
 			Price:    orderPrice,
 			Market:   s.futuresMarket,
-			// TimeInForce: types.TimeInForceGTC,
 		})
 
 		if err != nil {
@@ -574,38 +590,40 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 
 	log.Infof("last %s funding rate: %s", s.Symbol, fundingRate.Percentage())
 
-	if s.ShortFundingRate != nil {
-		if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
+	if s.ShortFundingRate == nil {
+		return changed
+	}
 
-			log.Infof("funding rate %s is higher than the High threshold %s, start opening position...",
-				fundingRate.Percentage(), s.ShortFundingRate.High.Percentage())
+	if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
 
-			s.positionAction = PositionOpening
-			s.positionType = types.PositionShort
+		log.Infof("funding rate %s is higher than the High threshold %s, start opening position...",
+			fundingRate.Percentage(), s.ShortFundingRate.High.Percentage())
 
-			// reset the transfer stats
-			s.State.PositionStartTime = premiumIndex.Time
-			s.State.PendingBaseTransfer = fixedpoint.Zero
-			s.State.TotalBaseTransfer = fixedpoint.Zero
-			changed = true
-		} else if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
+		s.positionAction = PositionOpening
+		s.positionType = types.PositionShort
 
-			log.Infof("funding rate %s is lower than the Low threshold %s, start closing position...",
-				fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
+		// reset the transfer stats
+		s.State.PositionStartTime = premiumIndex.Time
+		s.State.PendingBaseTransfer = fixedpoint.Zero
+		s.State.TotalBaseTransfer = fixedpoint.Zero
+		changed = true
+	} else if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
 
-			holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
-			if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
-				log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod)
-				return
-			}
+		log.Infof("funding rate %s is lower than the Low threshold %s, start closing position...",
+			fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
 
-			s.positionAction = PositionClosing
-
-			// reset the transfer stats
-			s.State.PendingBaseTransfer = fixedpoint.Zero
-			s.State.TotalBaseTransfer = fixedpoint.Zero
-			changed = true
+		holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
+		if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
+			log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod)
+			return
 		}
+
+		s.positionAction = PositionClosing
+
+		// reset the transfer stats
+		s.State.PendingBaseTransfer = fixedpoint.Zero
+		s.State.TotalBaseTransfer = fixedpoint.Zero
+		changed = true
 	}
 
 	return changed

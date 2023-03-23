@@ -13,15 +13,13 @@ type FuturesTransfer interface {
 	QueryAccountBalances(ctx context.Context) (types.BalanceMap, error)
 }
 
-func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, trade types.Trade) error {
-	currency := s.spotMarket.BaseCurrency
-
+func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, currency string, trade types.Trade) error {
 	// base asset needs BUY trades
 	if trade.Side == types.SideTypeBuy {
 		return nil
 	}
 
-	balances, err := ex.QueryAccountBalances(ctx)
+	balances, err := s.futuresSession.Exchange.QueryAccountBalances(ctx)
 	if err != nil {
 		return err
 	}
@@ -31,16 +29,23 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, trade ty
 		return fmt.Errorf("%s balance not found", currency)
 	}
 
+	quantity := trade.Quantity
+
+	if s.Leverage.Compare(fixedpoint.One) > 0 {
+		// de-leverage and get the collateral base quantity for transfer
+		quantity = quantity.Div(s.Leverage)
+	}
+
 	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
-	if b.Available.Compare(trade.Quantity) < 0 {
-		log.Infof("adding to pending base transfer: %s %s", trade.Quantity, currency)
-		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(trade.Quantity)
+	if b.Available.IsZero() || b.Available.Compare(quantity) < 0 {
+		log.Infof("adding to pending base transfer: %s %s", quantity, currency)
+		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return nil
 	}
 
-	amount := s.State.PendingBaseTransfer.Add(trade.Quantity)
+	amount := s.State.PendingBaseTransfer.Add(quantity)
 
-	pos := s.SpotPosition.GetBase()
+	pos := s.FuturesPosition.GetBase().Abs().Div(s.Leverage)
 	rest := pos.Sub(s.State.TotalBaseTransfer)
 
 	if rest.Sign() < 0 {
@@ -62,15 +67,14 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, trade ty
 	return nil
 }
 
-func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, trade types.Trade) error {
-	currency := s.spotMarket.BaseCurrency
+func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, currency string, trade types.Trade) error {
 
 	// base asset needs BUY trades
 	if trade.Side == types.SideTypeSell {
 		return nil
 	}
 
-	balances, err := ex.QueryAccountBalances(ctx)
+	balances, err := s.spotSession.Exchange.QueryAccountBalances(ctx)
 	if err != nil {
 		return err
 	}
@@ -81,15 +85,16 @@ func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, trade typ
 	}
 
 	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
-	if b.Available.Compare(trade.Quantity) < 0 {
-		log.Infof("adding to pending base transfer: %s %s", trade.Quantity, currency)
-		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(trade.Quantity)
+	quantity := trade.Quantity
+	if b.Available.Compare(quantity) < 0 {
+		log.Infof("adding to pending base transfer: %s %s", quantity, currency)
+		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return nil
 	}
 
-	amount := s.State.PendingBaseTransfer.Add(trade.Quantity)
+	amount := s.State.PendingBaseTransfer.Add(quantity)
 
-	pos := s.SpotPosition.GetBase()
+	pos := s.SpotPosition.GetBase().Abs()
 	rest := pos.Sub(s.State.TotalBaseTransfer)
 
 	if rest.Sign() < 0 {
