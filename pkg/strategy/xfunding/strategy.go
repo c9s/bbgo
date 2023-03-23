@@ -408,7 +408,57 @@ func (s *Strategy) triggerPositionAction(ctx context.Context) {
 	}
 }
 
-func (s *Strategy) reduceFuturesPosition(ctx context.Context) {}
+func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
+	switch s.positionAction {
+	case PositionOpening, PositionNoOp:
+		return
+	}
+
+	futuresBase := s.FuturesPosition.GetBase() // should be negative base quantity here
+
+	if futuresBase.Sign() > 0 {
+		// unexpected error
+		log.Errorf("unexpected futures position (got positive, expecting negative)")
+		return
+	}
+
+	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
+
+	ticker, err := s.futuresSession.Exchange.QueryTicker(ctx, s.Symbol)
+	if err != nil {
+		log.WithError(err).Errorf("can not query ticker")
+		return
+	}
+
+	if futuresBase.Compare(fixedpoint.Zero) < 0 {
+		orderPrice := ticker.Sell
+
+		orderQuantity := futuresBase.Abs()
+		orderQuantity = fixedpoint.Max(orderQuantity, s.futuresMarket.MinQuantity)
+		orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
+		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
+			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
+			return
+		}
+
+		createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			Symbol:     s.Symbol,
+			Side:       types.SideTypeBuy,
+			Type:       types.OrderTypeLimitMaker,
+			Quantity:   orderQuantity,
+			Price:      orderPrice,
+			Market:     s.futuresMarket,
+			ReduceOnly: true,
+		})
+
+		if err != nil {
+			log.WithError(err).Errorf("can not submit order")
+			return
+		}
+
+		log.Infof("created orders: %+v", createdOrders)
+	}
+}
 
 // syncFuturesPosition syncs the futures position with the given spot position
 func (s *Strategy) syncFuturesPosition(ctx context.Context) {
@@ -420,14 +470,6 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	case PositionClosing:
 		return
 	case PositionOpening, PositionNoOp:
-	}
-
-	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
-
-	ticker, err := s.futuresSession.Exchange.QueryTicker(ctx, s.Symbol)
-	if err != nil {
-		log.WithError(err).Errorf("can not query ticker")
-		return
 	}
 
 	spotBase := s.SpotPosition.GetBase()       // should be positive base quantity here
@@ -443,6 +485,14 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	if futuresBase.Sign() > 0 {
 		// unexpected error
 		log.Errorf("unexpected futures position (got positive, expecting negative)")
+		return
+	}
+
+	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
+
+	ticker, err := s.futuresSession.Exchange.QueryTicker(ctx, s.Symbol)
+	if err != nil {
+		log.WithError(err).Errorf("can not query ticker")
 		return
 	}
 
