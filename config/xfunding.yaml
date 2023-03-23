@@ -37,3 +37,4 @@ crossExchangeStrategies:
     shortFundingRate:
       high: 0.000%
       low: -0.01%
+    reset: true

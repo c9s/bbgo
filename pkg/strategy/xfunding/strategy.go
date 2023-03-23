@@ -43,6 +43,24 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+type State struct {
+	PositionStartTime time.Time `json:"positionStartTime"`
+
+	// PositionState is default to NoOp
+	PositionState PositionState
+
+	PendingBaseTransfer fixedpoint.Value `json:"pendingBaseTransfer"`
+	TotalBaseTransfer   fixedpoint.Value `json:"totalBaseTransfer"`
+	UsedQuoteInvestment fixedpoint.Value `json:"usedQuoteInvestment"`
+}
+
+func (s *State) Reset() {
+	s.PositionState = PositionClosed
+	s.PendingBaseTransfer = fixedpoint.Zero
+	s.TotalBaseTransfer = fixedpoint.Zero
+	s.UsedQuoteInvestment = fixedpoint.Zero
+}
+
 // Strategy is the xfunding fee strategy
 // Right now it only supports short position in the USDT futures account.
 // When opening the short position, it uses spot account to buy inventory, then transfer the inventory to the futures account as collateral assets.
@@ -95,6 +113,7 @@ type Strategy struct {
 
 	SpotSession    string `json:"spotSession"`
 	FuturesSession string `json:"futuresSession"`
+	Reset          bool   `json:"reset"`
 
 	ProfitStats     *types.ProfitStats `persistence:"profit_stats"`
 	SpotPosition    *types.Position    `persistence:"spot_position"`
@@ -112,17 +131,6 @@ type Strategy struct {
 	// positionType is the futures position type
 	// currently we only support short position for the positive funding rate
 	positionType types.PositionType
-}
-
-type State struct {
-	PositionStartTime time.Time `json:"positionStartTime"`
-
-	// PositionState is default to NoOp
-	PositionState PositionState
-
-	PendingBaseTransfer fixedpoint.Value `json:"pendingBaseTransfer"`
-	TotalBaseTransfer   fixedpoint.Value `json:"totalBaseTransfer"`
-	UsedQuoteInvestment fixedpoint.Value `json:"usedQuoteInvestment"`
 }
 
 func (s *Strategy) ID() string {
@@ -235,19 +243,19 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 	}
 
-	if s.ProfitStats == nil {
+	if s.ProfitStats == nil || s.Reset {
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
-	if s.FuturesPosition == nil {
+	if s.FuturesPosition == nil || s.Reset {
 		s.FuturesPosition = types.NewPositionFromMarket(s.futuresMarket)
 	}
 
-	if s.SpotPosition == nil {
+	if s.SpotPosition == nil || s.Reset {
 		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
 	}
 
-	if s.State == nil {
+	if s.State == nil || s.Reset {
 		s.State = &State{
 			PositionState:       PositionClosed,
 			PendingBaseTransfer: fixedpoint.Zero,
@@ -365,12 +373,13 @@ func (s *Strategy) queryAndDetectPremiumIndex(ctx context.Context, binanceFuture
 	log.Infof("premiumIndex: %+v", premiumIndex)
 
 	if changed := s.detectPremiumIndex(premiumIndex); changed {
-		log.Infof("position action: %s %s", s.positionType, s.State.PositionState.String())
-		s.triggerPositionAction(ctx)
+		log.Infof("position state changed: %s %s", s.positionType, s.State.PositionState.String())
 	}
+
+	s.sync(ctx)
 }
 
-func (s *Strategy) triggerPositionAction(ctx context.Context) {
+func (s *Strategy) sync(ctx context.Context) {
 	switch s.State.PositionState {
 	case PositionOpening:
 		s.increaseSpotPosition(ctx)
@@ -441,10 +450,8 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		return
 	}
 
-	switch s.State.PositionState {
-	case PositionClosing:
+	if s.State.PositionState != PositionOpening {
 		return
-	case PositionOpening, PositionClosed:
 	}
 
 	spotBase := s.SpotPosition.GetBase()       // should be positive base quantity here
