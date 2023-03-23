@@ -620,6 +620,10 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 }
 
 func (s *Strategy) startOpeningPosition(pt types.PositionType, t time.Time) {
+	if s.positionAction == PositionOpening {
+		return
+	}
+
 	s.positionAction = PositionOpening
 	s.positionType = pt
 
@@ -630,6 +634,10 @@ func (s *Strategy) startOpeningPosition(pt types.PositionType, t time.Time) {
 }
 
 func (s *Strategy) startClosingPosition() {
+	if s.positionAction == PositionClosing {
+		return
+	}
+
 	s.positionAction = PositionClosing
 
 	// reset the transfer stats
