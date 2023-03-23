@@ -374,11 +374,7 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {}
 
 // syncFuturesPosition syncs the futures position with the given spot position
 func (s *Strategy) syncFuturesPosition(ctx context.Context) {
-	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
-
-	ticker, err := s.futuresSession.Exchange.QueryTicker(ctx, s.Symbol)
-	if err != nil {
-		log.WithError(err).Errorf("can not query ticker")
+	if s.positionType != types.PositionShort {
 		return
 	}
 
@@ -388,7 +384,11 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	case PositionOpening, PositionNoOp:
 	}
 
-	if s.positionType != types.PositionShort {
+	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
+
+	ticker, err := s.futuresSession.Exchange.QueryTicker(ctx, s.Symbol)
+	if err != nil {
+		log.WithError(err).Errorf("can not query ticker")
 		return
 	}
 
