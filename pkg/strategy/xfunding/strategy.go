@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -93,6 +94,7 @@ type Strategy struct {
 	FuturesPosition *types.Position    `persistence:"futures_position"`
 
 	State *State `persistence:"state"`
+	mu    sync.Mutex
 
 	spotSession, futuresSession             *bbgo.ExchangeSession
 	spotOrderExecutor, futuresOrderExecutor *bbgo.GeneralOrderExecutor
@@ -264,7 +266,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 					return
 				}
 
-				// TODO: add mutex lock for this modification
+				s.mu.Lock()
+				defer s.mu.Unlock()
+
 				s.State.UsedQuoteInvestment = s.State.UsedQuoteInvestment.Add(trade.QuoteQuantity)
 				if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
 					s.positionAction = PositionNoOp
@@ -492,43 +496,43 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 		log.Errorf("funding long position type is not supported")
 		return
 	}
-
-	switch s.positionAction {
-
-	case PositionClosing:
-		// TODO: compare with the futures position and reduce the position
-
-	case PositionOpening:
-		if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
-			return
-		}
-
-		leftQuote := s.QuoteInvestment.Sub(s.State.UsedQuoteInvestment)
-		orderPrice := ticker.Buy
-		orderQuantity := fixedpoint.Min(s.IncrementalQuoteQuantity, leftQuote).Div(orderPrice)
-		orderQuantity = fixedpoint.Max(orderQuantity, s.spotMarket.MinQuantity)
-
-		_ = s.spotOrderExecutor.GracefulCancel(ctx)
-
-		submitOrder := types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeBuy,
-			Type:     types.OrderTypeLimitMaker,
-			Quantity: orderQuantity,
-			Price:    orderPrice,
-			Market:   s.spotMarket,
-		}
-
-		log.Infof("placing spot order: %+v", submitOrder)
-
-		createdOrders, err := s.spotOrderExecutor.SubmitOrders(ctx, submitOrder)
-		if err != nil {
-			log.WithError(err).Errorf("can not submit order")
-			return
-		}
-
-		log.Infof("created orders: %+v", createdOrders)
+	if s.positionAction != PositionOpening {
+		return
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
+		return
+	}
+
+	leftQuota := s.QuoteInvestment.Sub(s.State.UsedQuoteInvestment)
+
+	orderPrice := ticker.Buy
+	orderQuantity := fixedpoint.Min(s.IncrementalQuoteQuantity, leftQuota).Div(orderPrice)
+	orderQuantity = fixedpoint.Max(orderQuantity, s.spotMarket.MinQuantity)
+
+	_ = s.spotOrderExecutor.GracefulCancel(ctx)
+
+	submitOrder := types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeBuy,
+		Type:     types.OrderTypeLimitMaker,
+		Quantity: orderQuantity,
+		Price:    orderPrice,
+		Market:   s.spotMarket,
+	}
+
+	log.Infof("placing spot order: %+v", submitOrder)
+
+	createdOrders, err := s.spotOrderExecutor.SubmitOrders(ctx, submitOrder)
+	if err != nil {
+		log.WithError(err).Errorf("can not submit order")
+		return
+	}
+
+	log.Infof("created orders: %+v", createdOrders)
 }
 
 func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed bool) {
