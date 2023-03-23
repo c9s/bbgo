@@ -347,56 +347,6 @@ func (s *Strategy) queryAndDetectPremiumIndex(ctx context.Context, binanceFuture
 	}
 }
 
-// TODO: replace type binance.Exchange with an interface
-func (s *Strategy) transferIn(ctx context.Context, ex *binance.Exchange, trade types.Trade) error {
-	currency := s.spotMarket.BaseCurrency
-
-	// base asset needs BUY trades
-	if trade.Side == types.SideTypeSell {
-		return nil
-	}
-
-	balances, err := ex.QueryAccountBalances(ctx)
-	if err != nil {
-		return err
-	}
-
-	b, ok := balances[currency]
-	if !ok {
-		return fmt.Errorf("%s balance not found", currency)
-	}
-
-	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
-	if b.Available.Compare(trade.Quantity) < 0 {
-		log.Infof("adding to pending base transfer: %s %s", trade.Quantity, currency)
-		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(trade.Quantity)
-		return nil
-	}
-
-	amount := s.State.PendingBaseTransfer.Add(trade.Quantity)
-
-	pos := s.SpotPosition.GetBase()
-	rest := pos.Sub(s.State.TotalBaseTransfer)
-
-	if rest.Sign() < 0 {
-		return nil
-	}
-
-	amount = fixedpoint.Min(rest, amount)
-
-	log.Infof("transfering futures account asset %s %s", amount, currency)
-	if err := ex.TransferFuturesAccountAsset(ctx, currency, amount, types.TransferIn); err != nil {
-		return err
-	}
-
-	// reset pending transfer
-	s.State.PendingBaseTransfer = fixedpoint.Zero
-
-	// record the transfer in the total base transfer
-	s.State.TotalBaseTransfer = s.State.TotalBaseTransfer.Add(amount)
-	return nil
-}
-
 func (s *Strategy) triggerPositionAction(ctx context.Context) {
 	switch s.positionAction {
 	case PositionOpening:
@@ -622,9 +572,17 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 
 			s.positionAction = PositionOpening
 			s.positionType = types.PositionShort
+
+			// reset the transfer stats
+			s.State.PendingBaseTransfer = fixedpoint.Zero
+			s.State.TotalBaseTransfer = fixedpoint.Zero
 			changed = true
 		} else if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
 			s.positionAction = PositionClosing
+
+			// reset the transfer stats
+			s.State.PendingBaseTransfer = fixedpoint.Zero
+			s.State.TotalBaseTransfer = fixedpoint.Zero
 			changed = true
 		}
 	}
