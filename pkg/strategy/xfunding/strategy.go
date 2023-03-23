@@ -362,14 +362,17 @@ func (s *Strategy) transferIn(ctx context.Context, ex *binance.Exchange, trade t
 func (s *Strategy) triggerPositionAction(ctx context.Context) {
 	switch s.positionAction {
 	case PositionOpening:
-		s.syncSpotPosition(ctx)
+		s.increaseSpotPosition(ctx)
 		s.syncFuturesPosition(ctx)
 	case PositionClosing:
-		s.syncFuturesPosition(ctx)
+		s.reduceFuturesPosition(ctx)
 		s.syncSpotPosition(ctx)
 	}
 }
 
+func (s *Strategy) reduceFuturesPosition(ctx context.Context) {}
+
+// syncFuturesPosition syncs the futures position with the given spot position
 func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
 
@@ -380,73 +383,76 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	}
 
 	switch s.positionAction {
-
 	case PositionClosing:
+		return
+	case PositionOpening, PositionNoOp:
+	}
 
-	case PositionOpening:
+	if s.positionType != types.PositionShort {
+		return
+	}
 
-		if s.positionType != types.PositionShort {
+	spotBase := s.SpotPosition.GetBase()       // should be positive base quantity here
+	futuresBase := s.FuturesPosition.GetBase() // should be negative base quantity here
+
+	if spotBase.IsZero() {
+		// skip when spot base is zero
+		return
+	}
+
+	log.Infof("position comparision: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
+
+	if futuresBase.Sign() > 0 {
+		// unexpected error
+		log.Errorf("unexpected futures position (got positive, expecting negative)")
+		return
+	}
+
+	// compare with the spot position and increase the position
+	quoteValue, err := bbgo.CalculateQuoteQuantity(ctx, s.futuresSession, s.futuresMarket.QuoteCurrency, s.Leverage)
+	if err != nil {
+		log.WithError(err).Errorf("can not calculate futures account quote value")
+		return
+	}
+	log.Infof("calculated futures account quote value = %s", quoteValue.String())
+
+	if spotBase.Sign() > 0 && futuresBase.Neg().Compare(spotBase) < 0 {
+		orderPrice := ticker.Sell
+		diffQuantity := spotBase.Sub(futuresBase.Neg().Mul(s.Leverage))
+
+		log.Infof("position diff quantity: %s", diffQuantity.String())
+
+		orderQuantity := fixedpoint.Max(diffQuantity, s.futuresMarket.MinQuantity)
+		orderQuantity = bbgo.AdjustQuantityByMinAmount(orderQuantity, orderPrice, s.futuresMarket.MinNotional)
+		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
+			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
 			return
 		}
 
-		spotBase := s.SpotPosition.GetBase()       // should be positive base quantity here
-		futuresBase := s.FuturesPosition.GetBase() // should be negative base quantity here
+		createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			Symbol:   s.Symbol,
+			Side:     types.SideTypeSell,
+			Type:     types.OrderTypeLimitMaker,
+			Quantity: orderQuantity,
+			Price:    orderPrice,
+			Market:   s.futuresMarket,
+			// TimeInForce: types.TimeInForceGTC,
+		})
 
-		if spotBase.IsZero() {
-			// skip when spot base is zero
-			return
-		}
-
-		log.Infof("position comparision: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
-
-		if futuresBase.Sign() > 0 {
-			// unexpected error
-			log.Errorf("unexpected futures position (got positive, expecting negative)")
-			return
-		}
-
-		// compare with the spot position and increase the position
-		quoteValue, err := bbgo.CalculateQuoteQuantity(ctx, s.futuresSession, s.futuresMarket.QuoteCurrency, s.Leverage)
 		if err != nil {
-			log.WithError(err).Errorf("can not calculate futures account quote value")
+			log.WithError(err).Errorf("can not submit order")
 			return
 		}
-		log.Infof("calculated futures account quote value = %s", quoteValue.String())
 
-		if spotBase.Sign() > 0 && futuresBase.Neg().Compare(spotBase) < 0 {
-			orderPrice := ticker.Sell
-			diffQuantity := spotBase.Sub(futuresBase.Neg().Mul(s.Leverage))
-
-			log.Infof("position diff quantity: %s", diffQuantity.String())
-
-			orderQuantity := fixedpoint.Max(diffQuantity, s.futuresMarket.MinQuantity)
-			orderQuantity = bbgo.AdjustQuantityByMinAmount(orderQuantity, orderPrice, s.futuresMarket.MinNotional)
-			if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
-				log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
-				return
-			}
-
-			createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-				Symbol:   s.Symbol,
-				Side:     types.SideTypeSell,
-				Type:     types.OrderTypeLimitMaker,
-				Quantity: orderQuantity,
-				Price:    orderPrice,
-				Market:   s.futuresMarket,
-				// TimeInForce: types.TimeInForceGTC,
-			})
-
-			if err != nil {
-				log.WithError(err).Errorf("can not submit order")
-				return
-			}
-
-			log.Infof("created orders: %+v", createdOrders)
-		}
+		log.Infof("created orders: %+v", createdOrders)
 	}
 }
 
 func (s *Strategy) syncSpotPosition(ctx context.Context) {
+
+}
+
+func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 	ticker, err := s.spotSession.Exchange.QueryTicker(ctx, s.Symbol)
 	if err != nil {
 		log.WithError(err).Errorf("can not query ticker")
