@@ -21,15 +21,16 @@ import (
 const ID = "xfunding"
 
 // Position State Transitions:
-// NoOp -> Opening | Closing
-// Opening -> NoOp -> Closing
-// Closing -> NoOp -> Opening
+// NoOp -> Opening
+// Opening -> Ready -> Closing
+// Closing -> Closed -> Opening
 //go:generate stringer -type=PositionState
 type PositionState int
 
 const (
-	PositionNoOp PositionState = iota
+	PositionClosed PositionState = iota
 	PositionOpening
+	PositionReady
 	PositionClosing
 )
 
@@ -142,16 +143,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	})
 }
 
-func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	for _, detection := range s.SupportDetection {
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-			Interval: detection.Interval,
-		})
-		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-			Interval: detection.MovingAverageIntervalWindow.Interval,
-		})
-	}
-}
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
 
 func (s *Strategy) Defaults() error {
 	if s.Leverage.IsZero() {
@@ -257,7 +249,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	if s.State == nil {
 		s.State = &State{
-			PositionState:       PositionNoOp,
+			PositionState:       PositionClosed,
 			PendingBaseTransfer: fixedpoint.Zero,
 			TotalBaseTransfer:   fixedpoint.Zero,
 			UsedQuoteInvestment: fixedpoint.Zero,
@@ -295,7 +287,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 			s.State.UsedQuoteInvestment = s.State.UsedQuoteInvestment.Add(trade.QuoteQuantity)
 			if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
-				s.State.PositionState = PositionNoOp
+				s.State.PositionState = PositionClosed
 			}
 
 			// if we have trade, try to query the balance and transfer the balance to the futures wallet account
@@ -391,7 +383,7 @@ func (s *Strategy) triggerPositionAction(ctx context.Context) {
 
 func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 	switch s.State.PositionState {
-	case PositionOpening, PositionNoOp:
+	case PositionOpening, PositionClosed:
 		return
 	}
 
@@ -452,7 +444,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	switch s.State.PositionState {
 	case PositionClosing:
 		return
-	case PositionOpening, PositionNoOp:
+	case PositionOpening, PositionClosed:
 	}
 
 	spotBase := s.SpotPosition.GetBase()       // should be positive base quantity here
@@ -539,16 +531,16 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 		return
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.State.PositionState != PositionOpening {
 		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
 		// stop increase the position
-		s.State.PositionState = PositionNoOp
+		s.State.PositionState = PositionReady
 		return
 	}
 
@@ -595,7 +587,7 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 }
 
 func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed bool) {
-	if s.State.PositionState != PositionNoOp {
+	if s.State.PositionState != PositionClosed {
 		return changed
 	}
 
@@ -607,34 +599,39 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 		return changed
 	}
 
-	if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
+	switch s.State.PositionState {
 
-		log.Infof("funding rate %s is higher than the High threshold %s, start opening position...",
-			fundingRate.Percentage(), s.ShortFundingRate.High.Percentage())
+	case PositionClosed:
+		if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
+			log.Infof("funding rate %s is higher than the High threshold %s, start opening position...",
+				fundingRate.Percentage(), s.ShortFundingRate.High.Percentage())
 
-		s.startOpeningPosition(types.PositionShort, premiumIndex.Time)
-		changed = true
-	} else if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
-
-		log.Infof("funding rate %s is lower than the Low threshold %s, start closing position...",
-			fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
-
-		holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
-		if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
-			log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod)
-			return
+			s.startOpeningPosition(types.PositionShort, premiumIndex.Time)
+			changed = true
 		}
 
-		s.startClosingPosition()
-		changed = true
+	case PositionReady:
+		if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
+			log.Infof("funding rate %s is lower than the Low threshold %s, start closing position...",
+				fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
+
+			holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
+			if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
+				log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod)
+				return
+			}
+
+			s.startClosingPosition()
+			changed = true
+		}
 	}
 
 	return changed
 }
 
 func (s *Strategy) startOpeningPosition(pt types.PositionType, t time.Time) {
-	// we should only open a new position when there is no op on the position
-	if s.State.PositionState != PositionNoOp {
+	// only open a new position when there is no position
+	if s.State.PositionState != PositionClosed {
 		return
 	}
 
@@ -648,7 +645,8 @@ func (s *Strategy) startOpeningPosition(pt types.PositionType, t time.Time) {
 }
 
 func (s *Strategy) startClosingPosition() {
-	if s.State.PositionState != PositionNoOp {
+	// we can't close a position that is not ready
+	if s.State.PositionState != PositionReady {
 		return
 	}
 
