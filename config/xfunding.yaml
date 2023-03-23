@@ -12,20 +12,22 @@ notifications:
 sessions:
   binance:
     exchange: binance
-    envVarPrefix: binance
+    envVarPrefix: BINANCE
+
+  binance_futures:
+    exchange: binance
+    envVarPrefix: BINANCE
     futures: true
 
-exchangeStrategies:
-- on: binance
-  funding:
+crossExchangeStrategies:
+
+- xfunding:
+    spotSession: binance
+    futuresSession: binance_futures
     symbol: ETHUSDT
-    quantity: 0.0001
-    fundingRate:
-      high: 0.01%
-    supportDetection:
-      - interval: 1m
-        movingAverageType: EMA
-        movingAverageIntervalWindow:
-          interval: 15m
-          window: 60
-        minVolume: 8_000
+    leverage: 1.0
+    incrementalQuoteQuantity: 11
+    quoteInvestment: 110
+    shortFundingRate:
+      high: 0.000%
+      low: -0.01%
