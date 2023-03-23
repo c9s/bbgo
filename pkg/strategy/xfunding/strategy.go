@@ -618,7 +618,7 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) bool {
 
 			holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
 			if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
-				log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod)
+				log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod.Duration())
 				return false
 			}
 
