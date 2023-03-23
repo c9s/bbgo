@@ -108,6 +108,7 @@ type Strategy struct {
 
 type State struct {
 	PendingBaseTransfer fixedpoint.Value `json:"pendingBaseTransfer"`
+	TotalBaseTransfer   fixedpoint.Value `json:"totalBaseTransfer"`
 	UsedQuoteInvestment fixedpoint.Value `json:"usedQuoteInvestment"`
 }
 
@@ -238,6 +239,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	if s.State == nil {
 		s.State = &State{
 			PendingBaseTransfer: fixedpoint.Zero,
+			TotalBaseTransfer:   fixedpoint.Zero,
 			UsedQuoteInvestment: fixedpoint.Zero,
 		}
 	}
@@ -364,12 +366,25 @@ func (s *Strategy) transferIn(ctx context.Context, ex *binance.Exchange, trade t
 
 	amount := s.State.PendingBaseTransfer.Add(trade.Quantity)
 
+	pos := s.SpotPosition.GetBase()
+	rest := pos.Sub(s.State.TotalBaseTransfer)
+
+	if rest.Sign() < 0 {
+		return nil
+	}
+
+	amount = fixedpoint.Min(rest, amount)
+
 	log.Infof("transfering futures account asset %s %s", amount, currency)
 	if err := ex.TransferFuturesAccountAsset(ctx, currency, amount, types.TransferIn); err != nil {
 		return err
 	}
 
+	// reset pending transfer
 	s.State.PendingBaseTransfer = fixedpoint.Zero
+
+	// record the transfer in the total base transfer
+	s.State.TotalBaseTransfer = s.State.TotalBaseTransfer.Add(amount)
 	return nil
 }
 
