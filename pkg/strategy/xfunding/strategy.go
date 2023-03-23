@@ -291,12 +291,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			}
 
 			s.mu.Lock()
-			defer s.mu.Unlock()
-
 			s.State.UsedQuoteInvestment = s.State.UsedQuoteInvestment.Add(trade.QuoteQuantity)
-			if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
-				s.State.PositionState = PositionClosed
-			}
+			s.mu.Unlock()
 
 			// if we have trade, try to query the balance and transfer the balance to the futures wallet account
 			// TODO: handle missing trades here. If the process crashed during the transfer, how to recover?
@@ -318,11 +314,14 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.futuresOrderExecutor = s.allocateOrderExecutor(ctx, s.futuresSession, instanceID, s.FuturesPosition)
 	s.futuresOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+
+		log.Infof("futures trade: %v", trade)
+
 		if s.positionType != types.PositionShort {
 			return
 		}
 
-		switch s.State.PositionState {
+		switch s.getPositionState() {
 		case PositionClosing:
 			if err := backoff.RetryGeneral(ctx, func() error {
 				return s.transferOut(ctx, binanceSpot, s.spotMarket.BaseCurrency, trade)
@@ -378,7 +377,7 @@ func (s *Strategy) queryAndDetectPremiumIndex(ctx context.Context, binanceFuture
 }
 
 func (s *Strategy) sync(ctx context.Context) {
-	switch s.State.PositionState {
+	switch s.getPositionState() {
 	case PositionOpening:
 		s.increaseSpotPosition(ctx)
 		s.syncFuturesPosition(ctx)
@@ -389,8 +388,7 @@ func (s *Strategy) sync(ctx context.Context) {
 }
 
 func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
-	switch s.State.PositionState {
-	case PositionOpening, PositionClosed:
+	if s.notPositionState(PositionClosing) {
 		return
 	}
 
@@ -411,8 +409,7 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 	}
 
 	if futuresBase.Compare(fixedpoint.Zero) < 0 {
-		orderPrice := ticker.Sell
-
+		orderPrice := ticker.Buy
 		orderQuantity := futuresBase.Abs()
 		orderQuantity = fixedpoint.Max(orderQuantity, s.futuresMarket.MinQuantity)
 		orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
@@ -448,7 +445,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		return
 	}
 
-	if s.State.PositionState != PositionOpening {
+	if s.notPositionState(PositionOpening) {
 		return
 	}
 
@@ -539,14 +536,15 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.State.PositionState != PositionOpening {
+	if s.notPositionState(PositionOpening) {
 		return
 	}
 
 	if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
 		// stop increase the position
-		s.State.PositionState = PositionReady
+		s.setPositionState(PositionReady)
 
+		// DEBUG CODE - triggering closing position automatically
 		s.startClosingPosition()
 		return
 	}
@@ -593,20 +591,16 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 	log.Infof("created orders: %+v", createdOrders)
 }
 
-func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed bool) {
-	if s.State.PositionState != PositionClosed {
-		return changed
-	}
-
+func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) bool {
 	fundingRate := premiumIndex.LastFundingRate
 
 	log.Infof("last %s funding rate: %s", s.Symbol, fundingRate.Percentage())
 
 	if s.ShortFundingRate == nil {
-		return changed
+		return false
 	}
 
-	switch s.State.PositionState {
+	switch s.getPositionState() {
 
 	case PositionClosed:
 		if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
@@ -614,7 +608,7 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 				fundingRate.Percentage(), s.ShortFundingRate.High.Percentage())
 
 			s.startOpeningPosition(types.PositionShort, premiumIndex.Time)
-			changed = true
+			return true
 		}
 
 	case PositionReady:
@@ -625,25 +619,26 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 			holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
 			if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
 				log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod)
-				return
+				return false
 			}
 
 			s.startClosingPosition()
-			changed = true
+			return true
 		}
 	}
 
-	return changed
+	return false
 }
 
 func (s *Strategy) startOpeningPosition(pt types.PositionType, t time.Time) {
 	// only open a new position when there is no position
-	if s.State.PositionState != PositionClosed {
+	if s.notPositionState(PositionClosed) {
 		return
 	}
 
 	log.Infof("startOpeningPosition")
-	s.State.PositionState = PositionOpening
+	s.setPositionState(PositionOpening)
+
 	s.positionType = pt
 
 	// reset the transfer stats
@@ -654,16 +649,33 @@ func (s *Strategy) startOpeningPosition(pt types.PositionType, t time.Time) {
 
 func (s *Strategy) startClosingPosition() {
 	// we can't close a position that is not ready
-	if s.State.PositionState != PositionReady {
+	if s.notPositionState(PositionReady) {
 		return
 	}
 
 	log.Infof("startClosingPosition")
-	s.State.PositionState = PositionClosing
+	s.setPositionState(PositionClosing)
 
 	// reset the transfer stats
 	s.State.PendingBaseTransfer = fixedpoint.Zero
-	s.State.TotalBaseTransfer = fixedpoint.Zero
+}
+
+func (s *Strategy) setPositionState(state PositionState) {
+	origState := s.State.PositionState
+	s.State.PositionState = state
+	log.Infof("position state transition: %s -> %s", origState.String(), state.String())
+}
+
+func (s *Strategy) isPositionState(state PositionState) bool {
+	return s.State.PositionState == state
+}
+
+func (s *Strategy) getPositionState() PositionState {
+	return s.State.PositionState
+}
+
+func (s *Strategy) notPositionState(state PositionState) bool {
+	return s.State.PositionState != state
 }
 
 func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.ExchangeSession, instanceID string, position *types.Position) *bbgo.GeneralOrderExecutor {
