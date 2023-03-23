@@ -599,13 +599,7 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 		log.Infof("funding rate %s is higher than the High threshold %s, start opening position...",
 			fundingRate.Percentage(), s.ShortFundingRate.High.Percentage())
 
-		s.positionAction = PositionOpening
-		s.positionType = types.PositionShort
-
-		// reset the transfer stats
-		s.State.PositionStartTime = premiumIndex.Time
-		s.State.PendingBaseTransfer = fixedpoint.Zero
-		s.State.TotalBaseTransfer = fixedpoint.Zero
+		s.startOpeningPosition(types.PositionShort, premiumIndex.Time)
 		changed = true
 	} else if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
 
@@ -618,15 +612,29 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 			return
 		}
 
-		s.positionAction = PositionClosing
-
-		// reset the transfer stats
-		s.State.PendingBaseTransfer = fixedpoint.Zero
-		s.State.TotalBaseTransfer = fixedpoint.Zero
+		s.startClosingPosition()
 		changed = true
 	}
 
 	return changed
+}
+
+func (s *Strategy) startOpeningPosition(pt types.PositionType, t time.Time) {
+	s.positionAction = PositionOpening
+	s.positionType = pt
+
+	// reset the transfer stats
+	s.State.PositionStartTime = t
+	s.State.PendingBaseTransfer = fixedpoint.Zero
+	s.State.TotalBaseTransfer = fixedpoint.Zero
+}
+
+func (s *Strategy) startClosingPosition() {
+	s.positionAction = PositionClosing
+
+	// reset the transfer stats
+	s.State.PendingBaseTransfer = fixedpoint.Zero
+	s.State.TotalBaseTransfer = fixedpoint.Zero
 }
 
 func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.ExchangeSession, instanceID string, position *types.Position) *bbgo.GeneralOrderExecutor {
