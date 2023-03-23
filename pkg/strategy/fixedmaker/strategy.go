@@ -135,6 +135,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	session.UserDataStream.OnStart(func() {
 		// you can place orders here when bbgo is started, this will be called only once.
+		s.replenish(ctx)
 	})
 
 	s.activeOrderBook.OnFilled(func(order types.Order) {
