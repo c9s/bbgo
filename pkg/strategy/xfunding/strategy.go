@@ -20,11 +20,15 @@ import (
 
 const ID = "xfunding"
 
-//go:generate stringer -type=PositionAction
-type PositionAction int
+// Position State Transitions:
+// NoOp -> Opening | Closing
+// Opening -> NoOp -> Closing
+// Closing -> NoOp -> Opening
+//go:generate stringer -type=PositionState
+type PositionState int
 
 const (
-	PositionNoOp PositionAction = iota
+	PositionNoOp PositionState = iota
 	PositionOpening
 	PositionClosing
 )
@@ -104,16 +108,17 @@ type Strategy struct {
 	spotOrderExecutor, futuresOrderExecutor *bbgo.GeneralOrderExecutor
 	spotMarket, futuresMarket               types.Market
 
-	// positionAction is default to NoOp
-	positionAction PositionAction
-
 	// positionType is the futures position type
 	// currently we only support short position for the positive funding rate
 	positionType types.PositionType
 }
 
 type State struct {
-	PositionStartTime   time.Time        `json:"positionStartTime"`
+	PositionStartTime time.Time `json:"positionStartTime"`
+
+	// PositionState is default to NoOp
+	PositionState PositionState
+
 	PendingBaseTransfer fixedpoint.Value `json:"pendingBaseTransfer"`
 	TotalBaseTransfer   fixedpoint.Value `json:"totalBaseTransfer"`
 	UsedQuoteInvestment fixedpoint.Value `json:"usedQuoteInvestment"`
@@ -252,6 +257,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	if s.State == nil {
 		s.State = &State{
+			PositionState:       PositionNoOp,
 			PendingBaseTransfer: fixedpoint.Zero,
 			TotalBaseTransfer:   fixedpoint.Zero,
 			UsedQuoteInvestment: fixedpoint.Zero,
@@ -277,7 +283,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			return
 		}
 
-		switch s.positionAction {
+		switch s.State.PositionState {
 		case PositionOpening:
 			if trade.Side != types.SideTypeBuy {
 				log.Errorf("unexpected trade side: %+v, expecting BUY trade", trade)
@@ -289,7 +295,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 			s.State.UsedQuoteInvestment = s.State.UsedQuoteInvestment.Add(trade.QuoteQuantity)
 			if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
-				s.positionAction = PositionNoOp
+				s.State.PositionState = PositionNoOp
 			}
 
 			// if we have trade, try to query the balance and transfer the balance to the futures wallet account
@@ -316,7 +322,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			return
 		}
 
-		switch s.positionAction {
+		switch s.State.PositionState {
 		case PositionClosing:
 			if err := backoff.RetryGeneral(ctx, func() error {
 				return s.transferOut(ctx, binanceSpot, s.spotMarket.BaseCurrency, trade)
@@ -367,13 +373,13 @@ func (s *Strategy) queryAndDetectPremiumIndex(ctx context.Context, binanceFuture
 	log.Infof("premiumIndex: %+v", premiumIndex)
 
 	if changed := s.detectPremiumIndex(premiumIndex); changed {
-		log.Infof("position action: %s %s", s.positionType, s.positionAction.String())
+		log.Infof("position action: %s %s", s.positionType, s.State.PositionState.String())
 		s.triggerPositionAction(ctx)
 	}
 }
 
 func (s *Strategy) triggerPositionAction(ctx context.Context) {
-	switch s.positionAction {
+	switch s.State.PositionState {
 	case PositionOpening:
 		s.increaseSpotPosition(ctx)
 		s.syncFuturesPosition(ctx)
@@ -384,7 +390,7 @@ func (s *Strategy) triggerPositionAction(ctx context.Context) {
 }
 
 func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
-	switch s.positionAction {
+	switch s.State.PositionState {
 	case PositionOpening, PositionNoOp:
 		return
 	}
@@ -443,7 +449,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		return
 	}
 
-	switch s.positionAction {
+	switch s.State.PositionState {
 	case PositionClosing:
 		return
 	case PositionOpening, PositionNoOp:
@@ -532,7 +538,8 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 		log.Errorf("funding long position type is not supported")
 		return
 	}
-	if s.positionAction != PositionOpening {
+
+	if s.State.PositionState != PositionOpening {
 		return
 	}
 
@@ -540,6 +547,8 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 	defer s.mu.Unlock()
 
 	if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
+		// stop increase the position
+		s.State.PositionState = PositionNoOp
 		return
 	}
 
@@ -586,6 +595,10 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 }
 
 func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed bool) {
+	if s.State.PositionState != PositionNoOp {
+		return changed
+	}
+
 	fundingRate := premiumIndex.LastFundingRate
 
 	log.Infof("last %s funding rate: %s", s.Symbol, fundingRate.Percentage())
@@ -620,11 +633,12 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 }
 
 func (s *Strategy) startOpeningPosition(pt types.PositionType, t time.Time) {
-	if s.positionAction == PositionOpening {
+	// we should only open a new position when there is no op on the position
+	if s.State.PositionState != PositionNoOp {
 		return
 	}
 
-	s.positionAction = PositionOpening
+	s.State.PositionState = PositionOpening
 	s.positionType = pt
 
 	// reset the transfer stats
@@ -634,11 +648,11 @@ func (s *Strategy) startOpeningPosition(pt types.PositionType, t time.Time) {
 }
 
 func (s *Strategy) startClosingPosition() {
-	if s.positionAction == PositionClosing {
+	if s.State.PositionState != PositionNoOp {
 		return
 	}
 
-	s.positionAction = PositionClosing
+	s.State.PositionState = PositionClosing
 
 	// reset the transfer stats
 	s.State.PendingBaseTransfer = fixedpoint.Zero
