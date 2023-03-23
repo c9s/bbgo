@@ -94,7 +94,9 @@ type Strategy struct {
 	FuturesPosition *types.Position    `persistence:"futures_position"`
 
 	State *State `persistence:"state"`
-	mu    sync.Mutex
+
+	// mu is used for locking state
+	mu sync.Mutex
 
 	spotSession, futuresSession             *bbgo.ExchangeSession
 	spotOrderExecutor, futuresOrderExecutor *bbgo.GeneralOrderExecutor
@@ -245,6 +247,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			UsedQuoteInvestment: fixedpoint.Zero,
 		}
 	}
+
+	log.Infof("loaded spot position: %s", s.SpotPosition.String())
+	log.Infof("loaded futures position: %s", s.FuturesPosition.String())
 
 	binanceFutures := s.futuresSession.Exchange.(*binance.Exchange)
 	binanceSpot := s.spotSession.Exchange.(*binance.Exchange)
@@ -428,7 +433,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	spotBase := s.SpotPosition.GetBase()       // should be positive base quantity here
 	futuresBase := s.FuturesPosition.GetBase() // should be negative base quantity here
 
-	if spotBase.IsZero() {
+	if spotBase.IsZero() || spotBase.Sign() < 0 {
 		// skip when spot base is zero
 		return
 	}
@@ -449,14 +454,25 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	}
 	log.Infof("calculated futures account quote value = %s", quoteValue.String())
 
-	if spotBase.Sign() > 0 && futuresBase.Neg().Compare(spotBase) < 0 {
+	// max futures base position (without negative sign)
+	maxFuturesBasePosition := fixedpoint.Min(
+		spotBase.Mul(s.Leverage),
+		s.State.TotalBaseTransfer.Mul(s.Leverage))
+
+	// if - futures position < max futures position, increase it
+	if futuresBase.Neg().Compare(maxFuturesBasePosition) < 0 {
 		orderPrice := ticker.Sell
-		diffQuantity := spotBase.Sub(futuresBase.Neg().Mul(s.Leverage))
+		diffQuantity := maxFuturesBasePosition.Sub(futuresBase.Neg())
+
+		if diffQuantity.Sign() < 0 {
+			log.Errorf("unexpected negative position diff: %s", diffQuantity.String())
+			return
+		}
 
 		log.Infof("position diff quantity: %s", diffQuantity.String())
 
 		orderQuantity := fixedpoint.Max(diffQuantity, s.futuresMarket.MinQuantity)
-		orderQuantity = bbgo.AdjustQuantityByMinAmount(orderQuantity, orderPrice, s.futuresMarket.MinNotional)
+		orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
 		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
 			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
 			return
@@ -486,12 +502,6 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 }
 
 func (s *Strategy) increaseSpotPosition(ctx context.Context) {
-	ticker, err := s.spotSession.Exchange.QueryTicker(ctx, s.Symbol)
-	if err != nil {
-		log.WithError(err).Errorf("can not query ticker")
-		return
-	}
-
 	if s.positionType != types.PositionShort {
 		log.Errorf("funding long position type is not supported")
 		return
@@ -507,13 +517,27 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 		return
 	}
 
+	_ = s.spotOrderExecutor.GracefulCancel(ctx)
+
+	ticker, err := s.spotSession.Exchange.QueryTicker(ctx, s.Symbol)
+	if err != nil {
+		log.WithError(err).Errorf("can not query ticker")
+		return
+	}
+
 	leftQuota := s.QuoteInvestment.Sub(s.State.UsedQuoteInvestment)
 
 	orderPrice := ticker.Buy
 	orderQuantity := fixedpoint.Min(s.IncrementalQuoteQuantity, leftQuota).Div(orderPrice)
-	orderQuantity = fixedpoint.Max(orderQuantity, s.spotMarket.MinQuantity)
 
-	_ = s.spotOrderExecutor.GracefulCancel(ctx)
+	log.Infof("initial spot order quantity %s", orderQuantity.String())
+
+	orderQuantity = fixedpoint.Max(orderQuantity, s.spotMarket.MinQuantity)
+	orderQuantity = s.spotMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
+
+	if s.spotMarket.IsDustQuantity(orderQuantity, orderPrice) {
+		return
+	}
 
 	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -542,6 +566,10 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed
 
 	if s.ShortFundingRate != nil {
 		if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
+
+			log.Infof("funding rate %s is higher than the High threshold %s, start opening position...",
+				fundingRate.Percentage(), s.ShortFundingRate.High.Percentage())
+
 			s.positionAction = PositionOpening
 			s.positionType = types.PositionShort
 			changed = true

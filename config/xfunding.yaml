@@ -9,6 +9,12 @@ notifications:
     orderUpdate: true
     submitOrder: true
 
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 1
+
 sessions:
   binance:
     exchange: binance
