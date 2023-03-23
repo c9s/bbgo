@@ -85,18 +85,18 @@ type Strategy struct {
 		MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
 	} `json:"supportDetection"`
 
-	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
-
-	SpotPosition    *types.Position `persistence:"spot_position"`
-	FuturesPosition *types.Position `persistence:"futures_position"`
-
-	spotSession, futuresSession *bbgo.ExchangeSession
-
-	spotOrderExecutor, futuresOrderExecutor *bbgo.GeneralOrderExecutor
-	spotMarket, futuresMarket               types.Market
-
 	SpotSession    string `json:"spotSession"`
 	FuturesSession string `json:"futuresSession"`
+
+	ProfitStats     *types.ProfitStats `persistence:"profit_stats"`
+	SpotPosition    *types.Position    `persistence:"spot_position"`
+	FuturesPosition *types.Position    `persistence:"futures_position"`
+
+	State *State `persistence:"state"`
+
+	spotSession, futuresSession             *bbgo.ExchangeSession
+	spotOrderExecutor, futuresOrderExecutor *bbgo.GeneralOrderExecutor
+	spotMarket, futuresMarket               types.Market
 
 	// positionAction is default to NoOp
 	positionAction PositionAction
@@ -104,8 +104,11 @@ type Strategy struct {
 	// positionType is the futures position type
 	// currently we only support short position for the positive funding rate
 	positionType types.PositionType
+}
 
-	usedQuoteInvestment fixedpoint.Value
+type State struct {
+	PendingBaseTransfer fixedpoint.Value `json:"pendingBaseTransfer"`
+	UsedQuoteInvestment fixedpoint.Value `json:"usedQuoteInvestment"`
 }
 
 func (s *Strategy) ID() string {
@@ -198,8 +201,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 
-	s.usedQuoteInvestment = fixedpoint.Zero
-
 	s.spotSession = sessions[s.SpotSession]
 	s.futuresSession = sessions[s.FuturesSession]
 
@@ -234,6 +235,13 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
 	}
 
+	if s.State == nil {
+		s.State = &State{
+			PendingBaseTransfer: fixedpoint.Zero,
+			UsedQuoteInvestment: fixedpoint.Zero,
+		}
+	}
+
 	binanceFutures := s.futuresSession.Exchange.(*binance.Exchange)
 	binanceSpot := s.spotSession.Exchange.(*binance.Exchange)
 	_ = binanceSpot
@@ -255,8 +263,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				}
 
 				// TODO: add mutex lock for this modification
-				s.usedQuoteInvestment = s.usedQuoteInvestment.Add(trade.QuoteQuantity)
-				if s.usedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
+				s.State.UsedQuoteInvestment = s.State.UsedQuoteInvestment.Add(trade.QuoteQuantity)
+				if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
 					s.positionAction = PositionNoOp
 				}
 
@@ -265,7 +273,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				if err := backoff.RetryGeneric(ctx, func() error {
 					return s.transferIn(ctx, binanceSpot, trade)
 				}); err != nil {
-					log.WithError(err).Errorf("transfer in retry failed")
+					log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
 					return
 				}
 
@@ -348,14 +356,20 @@ func (s *Strategy) transferIn(ctx context.Context, ex *binance.Exchange, trade t
 	}
 
 	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
-	if b.Available.Compare(trade.Quantity) >= 0 {
-		log.Infof("transfering futures account asset %s %s", trade.Quantity, currency)
-		if err := ex.TransferFuturesAccountAsset(ctx, currency, trade.Quantity, types.TransferIn); err != nil {
-			log.WithError(err).Errorf("spot-to-futures transfer error")
-			return err
-		}
+	if b.Available.Compare(trade.Quantity) < 0 {
+		log.Infof("adding to pending base transfer: %s %s", trade.Quantity, currency)
+		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(trade.Quantity)
+		return nil
 	}
 
+	amount := s.State.PendingBaseTransfer.Add(trade.Quantity)
+
+	log.Infof("transfering futures account asset %s %s", amount, currency)
+	if err := ex.TransferFuturesAccountAsset(ctx, currency, amount, types.TransferIn); err != nil {
+		return err
+	}
+
+	s.State.PendingBaseTransfer = fixedpoint.Zero
 	return nil
 }
 
@@ -470,11 +484,11 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 		// TODO: compare with the futures position and reduce the position
 
 	case PositionOpening:
-		if s.usedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
+		if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
 			return
 		}
 
-		leftQuote := s.QuoteInvestment.Sub(s.usedQuoteInvestment)
+		leftQuote := s.QuoteInvestment.Sub(s.State.UsedQuoteInvestment)
 		orderPrice := ticker.Buy
 		orderQuantity := fixedpoint.Min(s.IncrementalQuoteQuantity, leftQuote).Div(orderPrice)
 		orderQuantity = fixedpoint.Max(orderQuantity, s.spotMarket.MinQuantity)
