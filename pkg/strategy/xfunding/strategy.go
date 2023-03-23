@@ -314,9 +314,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.futuresOrderExecutor = s.allocateOrderExecutor(ctx, s.futuresSession, instanceID, s.FuturesPosition)
 	s.futuresOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-
-		log.Infof("futures trade: %v", trade)
-
 		if s.positionType != types.PositionShort {
 			return
 		}
@@ -630,7 +627,7 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 		s.setPositionState(PositionReady)
 
 		// DEBUG CODE - triggering closing position automatically
-		s.startClosingPosition()
+		// s.startClosingPosition()
 		return
 	}
 
