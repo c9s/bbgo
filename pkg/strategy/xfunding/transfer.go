@@ -15,44 +15,54 @@ type FuturesTransfer interface {
 
 func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, currency string, trade types.Trade) error {
 	// base asset needs BUY trades
-	if trade.Side == types.SideTypeBuy {
+	if trade.Side != types.SideTypeBuy {
 		return nil
 	}
 
+	// if transfer done
+	if s.State.TotalBaseTransfer.IsZero() {
+		return nil
+	}
+
+	// de-leverage and get the collateral base quantity for transfer
+	quantity := trade.Quantity
+	quantity = quantity.Div(s.Leverage)
+
 	balances, err := s.futuresSession.Exchange.QueryAccountBalances(ctx)
 	if err != nil {
+		log.Infof("adding to pending base transfer: %s %s + %s", quantity.String(), currency, s.State.PendingBaseTransfer.String())
+		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return err
 	}
 
 	b, ok := balances[currency]
 	if !ok {
+		log.Infof("adding to pending base transfer: %s %s + %s", quantity.String(), currency, s.State.PendingBaseTransfer.String())
+		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return fmt.Errorf("%s balance not found", currency)
 	}
 
-	quantity := trade.Quantity
+	// add the previous pending base transfer and the current trade quantity
+	amount := s.State.PendingBaseTransfer.Add(quantity)
 
-	if s.Leverage.Compare(fixedpoint.One) > 0 {
-		// de-leverage and get the collateral base quantity for transfer
-		quantity = quantity.Div(s.Leverage)
-	}
+	// try to transfer more if we enough balance
+	amount = fixedpoint.Min(amount, b.Available)
+
+	// we can only transfer the rest quota (total base transfer)
+	amount = fixedpoint.Min(s.State.TotalBaseTransfer, amount)
 
 	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
-	if b.Available.IsZero() || b.Available.Compare(quantity) < 0 {
-		log.Infof("adding to pending base transfer: %s %s", quantity, currency)
+	if amount.IsZero() {
+		log.Infof("adding to pending base transfer: %s %s + %s ", quantity.String(), currency, s.State.PendingBaseTransfer.String())
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return nil
 	}
 
-	amount := s.State.PendingBaseTransfer.Add(quantity)
+	// de-leverage and get the collateral base quantity
+	collateralBase := s.FuturesPosition.GetBase().Abs().Div(s.Leverage)
+	_ = collateralBase
 
-	pos := s.FuturesPosition.GetBase().Abs().Div(s.Leverage)
-	rest := pos.Sub(s.State.TotalBaseTransfer)
-
-	if rest.Sign() < 0 {
-		return nil
-	}
-
-	amount = fixedpoint.Min(rest, amount)
+	// if s.State.TotalBaseTransfer.Compare(collateralBase)
 
 	log.Infof("transfering out futures account asset %s %s", amount, currency)
 	if err := ex.TransferFuturesAccountAsset(ctx, currency, amount, types.TransferOut); err != nil {
@@ -62,8 +72,8 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, currency
 	// reset pending transfer
 	s.State.PendingBaseTransfer = fixedpoint.Zero
 
-	// record the transfer in the total base transfer
-	s.State.TotalBaseTransfer = s.State.TotalBaseTransfer.Add(amount)
+	// reduce the transfer in the total base transfer
+	s.State.TotalBaseTransfer = s.State.TotalBaseTransfer.Sub(amount)
 	return nil
 }
 
