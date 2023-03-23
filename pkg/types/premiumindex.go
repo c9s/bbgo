@@ -16,5 +16,5 @@ type PremiumIndex struct {
 }
 
 func (i *PremiumIndex) String() string {
-	return fmt.Sprintf("%s %s %s %s NEXT: %s", i.Symbol, i.MarkPrice.String(), i.LastFundingRate.Percentage(), i.Time, i.NextFundingTime)
+	return fmt.Sprintf("PremiumIndex | %s | %.4f | %s | %s | NEXT FUNDING TIME: %s", i.Symbol, i.MarkPrice.Float64(), i.LastFundingRate.Percentage(), i.Time, i.NextFundingTime)
 }
