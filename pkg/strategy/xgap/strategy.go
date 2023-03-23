@@ -331,7 +331,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 						s.tradingMarket.MinNotional.Mul(NotionModifier).Div(price))
 				}
 
-				createdOrders, _, err := bbgo.BatchPlaceOrder(ctx, tradingSession.Exchange, types.SubmitOrder{
+				createdOrders, _, err := bbgo.BatchPlaceOrder(ctx, tradingSession.Exchange, nil, types.SubmitOrder{
 					Symbol:   s.Symbol,
 					Side:     types.SideTypeBuy,
 					Type:     types.OrderTypeLimit,

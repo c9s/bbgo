@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/util/backoff"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -17,6 +19,7 @@ import (
 
 const ID = "xfunding"
 
+//go:generate stringer -type=PositionAction
 type PositionAction int
 
 const (
@@ -34,13 +37,18 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+// Strategy is the xfunding fee strategy
+// Right now it only supports short position in the USDT futures account.
+// When opening the short position, it uses spot account to buy inventory, then transfer the inventory to the futures account as collateral assets.
 type Strategy struct {
 	Environment *bbgo.Environment
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
-	Symbol   string           `json:"symbol"`
-	Market   types.Market     `json:"-"`
-	Quantity fixedpoint.Value `json:"quantity,omitempty"`
+	Symbol string       `json:"symbol"`
+	Market types.Market `json:"-"`
+
+	// Leverage is the leverage of the futures position
+	Leverage fixedpoint.Value `json:"leverage,omitempty"`
 
 	// IncrementalQuoteQuantity is used for opening position incrementally with a small fixed quote quantity
 	// for example, 100usdt per order
@@ -127,6 +135,11 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 			Interval: detection.MovingAverageIntervalWindow.Interval,
 		})
 	}
+}
+
+func (s *Strategy) Defaults() error {
+	s.Leverage = fixedpoint.One
+	return nil
 }
 
 func (s *Strategy) Validate() error {
@@ -236,8 +249,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		if s.positionType == types.PositionShort {
 			switch s.positionAction {
 			case PositionOpening:
-				if trade.Side != types.SideTypeSell {
-					log.Errorf("unexpected trade side: %+v, expecting SELL trade", trade)
+				if trade.Side != types.SideTypeBuy {
+					log.Errorf("unexpected trade side: %+v, expecting BUY trade", trade)
 					return
 				}
 
@@ -248,15 +261,20 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				}
 
 				// 1) if we have trade, try to query the balance and transfer the balance to the futures wallet account
-				// balances, err := binanceSpot.QueryAccountBalances(ctx)
+				// TODO: handle missing trades here. If the process crashed during the transfer, how to recover?
+				if err := backoff.RetryGeneric(ctx, func() error {
+					return s.transferIn(ctx, binanceSpot, trade)
+				}); err != nil {
+					log.WithError(err).Errorf("transfer in retry failed")
+					return
+				}
 
 				// 2) transferred successfully, sync futures position
-
-				// 3) compare spot position and futures position, increase the position size until they are the same size
+				// compare spot position and futures position, increase the position size until they are the same size
 
 			case PositionClosing:
-				if trade.Side != types.SideTypeBuy {
-					log.Errorf("unexpected trade side: %+v, expecting BUY trade", trade)
+				if trade.Side != types.SideTypeSell {
+					log.Errorf("unexpected trade side: %+v, expecting SELL trade", trade)
 					return
 				}
 
@@ -267,40 +285,165 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.futuresOrderExecutor = s.allocateOrderExecutor(ctx, s.futuresSession, instanceID, s.FuturesPosition)
 
 	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
-		premiumIndex, err := binanceFutures.QueryPremiumIndex(ctx, s.Symbol)
-		if err != nil {
-			log.WithError(err).Error("premium index query error")
-			return
+		// s.queryAndDetectPremiumIndex(ctx, binanceFutures)
+	}))
+
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case <-ticker.C:
+				s.queryAndDetectPremiumIndex(ctx, binanceFutures)
+
+			}
 		}
+	}()
 
-		s.detectPremiumIndex(premiumIndex)
-	}))
-
-	s.spotSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
-		// TODO: use go routine and time.Ticker
-		s.triggerPositionAction(ctx)
-	}))
+	// TODO: use go routine and time.Ticker to trigger spot sync and futures sync
+	/*
+		s.spotSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
+		}))
+	*/
 
 	return nil
 }
 
+func (s *Strategy) queryAndDetectPremiumIndex(ctx context.Context, binanceFutures *binance.Exchange) {
+	premiumIndex, err := binanceFutures.QueryPremiumIndex(ctx, s.Symbol)
+	if err != nil {
+		log.WithError(err).Error("premium index query error")
+		return
+	}
+
+	log.Infof("premiumIndex: %+v", premiumIndex)
+
+	if changed := s.detectPremiumIndex(premiumIndex); changed {
+		log.Infof("position action: %s %s", s.positionType, s.positionAction.String())
+		s.triggerPositionAction(ctx)
+	}
+}
+
 // TODO: replace type binance.Exchange with an interface
 func (s *Strategy) transferIn(ctx context.Context, ex *binance.Exchange, trade types.Trade) error {
+	currency := s.spotMarket.BaseCurrency
+
+	// base asset needs BUY trades
+	if trade.Side == types.SideTypeSell {
+		return nil
+	}
+
 	balances, err := ex.QueryAccountBalances(ctx)
 	if err != nil {
 		return err
 	}
 
-	b, ok := balances[s.spotMarket.BaseCurrency]
+	b, ok := balances[currency]
 	if !ok {
-		return nil
+		return fmt.Errorf("%s balance not found", currency)
 	}
 
-	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity
+	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
 	if b.Available.Compare(trade.Quantity) >= 0 {
-
+		log.Infof("transfering futures account asset %s %s", trade.Quantity, currency)
+		if err := ex.TransferFuturesAccountAsset(ctx, currency, trade.Quantity, types.TransferIn); err != nil {
+			log.WithError(err).Errorf("spot-to-futures transfer error")
+			return err
+		}
 	}
+
 	return nil
+}
+
+func (s *Strategy) triggerPositionAction(ctx context.Context) {
+	switch s.positionAction {
+	case PositionOpening:
+		s.syncSpotPosition(ctx)
+		s.syncFuturesPosition(ctx)
+	case PositionClosing:
+		s.syncFuturesPosition(ctx)
+		s.syncSpotPosition(ctx)
+	}
+}
+
+func (s *Strategy) syncFuturesPosition(ctx context.Context) {
+	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
+
+	ticker, err := s.futuresSession.Exchange.QueryTicker(ctx, s.Symbol)
+	if err != nil {
+		log.WithError(err).Errorf("can not query ticker")
+		return
+	}
+
+	switch s.positionAction {
+
+	case PositionClosing:
+
+	case PositionOpening:
+
+		if s.positionType != types.PositionShort {
+			return
+		}
+
+		spotBase := s.SpotPosition.GetBase()       // should be positive base quantity here
+		futuresBase := s.FuturesPosition.GetBase() // should be negative base quantity here
+
+		if spotBase.IsZero() {
+			// skip when spot base is zero
+			return
+		}
+
+		log.Infof("position comparision: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
+
+		if futuresBase.Sign() > 0 {
+			// unexpected error
+			log.Errorf("unexpected futures position (got positive, expecting negative)")
+			return
+		}
+
+		// compare with the spot position and increase the position
+		quoteValue, err := bbgo.CalculateQuoteQuantity(ctx, s.futuresSession, s.futuresMarket.QuoteCurrency, s.Leverage)
+		if err != nil {
+			log.WithError(err).Errorf("can not calculate futures account quote value")
+			return
+		}
+		log.Infof("calculated futures account quote value = %s", quoteValue.String())
+
+		if spotBase.Sign() > 0 && futuresBase.Neg().Compare(spotBase) < 0 {
+			orderPrice := ticker.Sell
+			diffQuantity := spotBase.Sub(futuresBase.Neg().Mul(s.Leverage))
+
+			log.Infof("position diff quantity: %s", diffQuantity.String())
+
+			orderQuantity := fixedpoint.Max(diffQuantity, s.futuresMarket.MinQuantity)
+			orderQuantity = bbgo.AdjustQuantityByMinAmount(orderQuantity, orderPrice, s.futuresMarket.MinNotional)
+			if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
+				log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
+				return
+			}
+
+			createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Side:     types.SideTypeSell,
+				Type:     types.OrderTypeLimitMaker,
+				Quantity: orderQuantity,
+				Price:    orderPrice,
+				Market:   s.futuresMarket,
+				// TimeInForce: types.TimeInForceGTC,
+			})
+
+			if err != nil {
+				log.WithError(err).Errorf("can not submit order")
+				return
+			}
+
+			log.Infof("created orders: %+v", createdOrders)
+		}
+	}
 }
 
 func (s *Strategy) syncSpotPosition(ctx context.Context) {
@@ -318,26 +461,32 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 	switch s.positionAction {
 
 	case PositionClosing:
+		// TODO: compare with the futures position and reduce the position
 
 	case PositionOpening:
-		if s.usedQuoteInvestment.IsZero() || s.usedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
-			// stop
+		if s.usedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
 			return
 		}
 
 		leftQuote := s.QuoteInvestment.Sub(s.usedQuoteInvestment)
-		orderPrice := ticker.Sell
+		orderPrice := ticker.Buy
 		orderQuantity := fixedpoint.Min(s.IncrementalQuoteQuantity, leftQuote).Div(orderPrice)
 		orderQuantity = fixedpoint.Max(orderQuantity, s.spotMarket.MinQuantity)
-		createdOrders, err := s.spotOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-			Symbol:      s.Symbol,
-			Side:        types.SideTypeSell,
-			Type:        types.OrderTypeLimitMaker,
-			Quantity:    orderQuantity,
-			Price:       orderPrice,
-			Market:      s.spotMarket,
-			TimeInForce: types.TimeInForceGTC,
-		})
+
+		_ = s.spotOrderExecutor.GracefulCancel(ctx)
+
+		submitOrder := types.SubmitOrder{
+			Symbol:   s.Symbol,
+			Side:     types.SideTypeBuy,
+			Type:     types.OrderTypeLimitMaker,
+			Quantity: orderQuantity,
+			Price:    orderPrice,
+			Market:   s.spotMarket,
+		}
+
+		log.Infof("placing spot order: %+v", submitOrder)
+
+		createdOrders, err := s.spotOrderExecutor.SubmitOrders(ctx, submitOrder)
 		if err != nil {
 			log.WithError(err).Errorf("can not submit order")
 			return
@@ -347,30 +496,28 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 	}
 }
 
-func (s *Strategy) triggerPositionAction(ctx context.Context) {
-	switch s.positionAction {
-	case PositionOpening:
-		s.syncSpotPosition(ctx)
-
-	case PositionClosing:
-
-	}
-}
-
-func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) {
+func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) (changed bool) {
 	fundingRate := premiumIndex.LastFundingRate
+
+	log.Infof("last %s funding rate: %s", s.Symbol, fundingRate.Percentage())
+
 	if s.ShortFundingRate != nil {
 		if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
 			s.positionAction = PositionOpening
 			s.positionType = types.PositionShort
+			changed = true
 		} else if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
 			s.positionAction = PositionClosing
+			changed = true
 		}
 	}
+
+	return changed
 }
 
 func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.ExchangeSession, instanceID string, position *types.Position) *bbgo.GeneralOrderExecutor {
 	orderExecutor := bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, position)
+	orderExecutor.SetMaxRetries(0)
 	orderExecutor.BindEnvironment(s.Environment)
 	orderExecutor.Bind()
 	orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
