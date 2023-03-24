@@ -615,13 +615,12 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if s.notPositionState(PositionOpening) {
 		return
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
 		// stop increase the position
 		s.setPositionState(PositionReady)
@@ -743,13 +742,18 @@ func (s *Strategy) startClosingPosition() {
 }
 
 func (s *Strategy) setPositionState(state PositionState) {
+	s.mu.Lock()
 	origState := s.State.PositionState
 	s.State.PositionState = state
+	s.mu.Unlock()
 	log.Infof("position state transition: %s -> %s", origState.String(), state.String())
 }
 
 func (s *Strategy) isPositionState(state PositionState) bool {
-	return s.State.PositionState == state
+	s.mu.Lock()
+	ret := s.State.PositionState == state
+	s.mu.Unlock()
+	return ret
 }
 
 func (s *Strategy) getPositionState() PositionState {
@@ -757,7 +761,10 @@ func (s *Strategy) getPositionState() PositionState {
 }
 
 func (s *Strategy) notPositionState(state PositionState) bool {
-	return s.State.PositionState != state
+	s.mu.Lock()
+	ret := s.State.PositionState != state
+	s.mu.Unlock()
+	return ret
 }
 
 func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.ExchangeSession, instanceID string, position *types.Position) *bbgo.GeneralOrderExecutor {
