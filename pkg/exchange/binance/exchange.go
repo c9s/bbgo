@@ -1275,9 +1275,16 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 // DefaultFeeRates returns the Binance VIP 0 fee schedule
 // See also https://www.binance.com/en/fee/schedule
 func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
+	if e.IsFutures {
+		return types.ExchangeFee{
+			MakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.0180), // 0.0180% -USDT with BNB
+			TakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.0360), // 0.0360% -USDT with BNB
+		}
+	}
+
 	return types.ExchangeFee{
-		MakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.075), // 0.075%
-		TakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.075), // 0.075%
+		MakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.075), // 0.075% with BNB
+		TakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.075), // 0.075% with BNB
 	}
 }
 
