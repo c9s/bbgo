@@ -718,28 +718,32 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) bool {
 	switch s.getPositionState() {
 
 	case PositionClosed:
-		if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
-			log.Infof("funding rate %s is higher than the High threshold %s, start opening position...",
-				fundingRate.Percentage(), s.ShortFundingRate.High.Percentage())
-
-			s.startOpeningPosition(types.PositionShort, premiumIndex.Time)
-			return true
+		if fundingRate.Compare(s.ShortFundingRate.High) < 0 {
+			return false
 		}
+
+		log.Infof("funding rate %s is higher than the High threshold %s, start opening position...",
+			fundingRate.Percentage(), s.ShortFundingRate.High.Percentage())
+
+		s.startOpeningPosition(types.PositionShort, premiumIndex.Time)
+		return true
 
 	case PositionReady:
-		if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
-			log.Infof("funding rate %s is lower than the Low threshold %s, start closing position...",
-				fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
-
-			holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
-			if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
-				log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod.Duration())
-				return false
-			}
-
-			s.startClosingPosition()
-			return true
+		if fundingRate.Compare(s.ShortFundingRate.Low) > 0 {
+			return false
 		}
+
+		log.Infof("funding rate %s is lower than the Low threshold %s, start closing position...",
+			fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
+
+		holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
+		if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
+			log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod.Duration())
+			return false
+		}
+
+		s.startClosingPosition()
+		return true
 	}
 
 	return false
