@@ -2,6 +2,7 @@ package types
 
 import (
 	"math"
+	"strconv"
 
 	"github.com/leekchan/accounting"
 
@@ -59,7 +60,14 @@ func (m Market) IsDustQuantity(quantity, price fixedpoint.Value) bool {
 
 // TruncateQuantity uses the step size to truncate floating number, in order to avoid the rounding issue
 func (m Market) TruncateQuantity(quantity fixedpoint.Value) fixedpoint.Value {
-	return fixedpoint.MustNewFromString(m.FormatQuantity(quantity))
+	var ts = m.StepSize.Float64()
+	var prec = int(math.Round(math.Log10(ts) * -1.0))
+	var pow10 = math.Pow10(prec)
+
+	qf := math.Trunc(quantity.Float64() * pow10)
+	qf = qf / pow10
+	qs := strconv.FormatFloat(qf, 'f', prec, 64)
+	return fixedpoint.MustNewFromString(qs)
 }
 
 func (m Market) TruncatePrice(price fixedpoint.Value) fixedpoint.Value {
@@ -134,6 +142,23 @@ func (m Market) CanonicalizeVolume(val fixedpoint.Value) float64 {
 	// TODO Round
 	p := math.Pow10(m.VolumePrecision)
 	return math.Trunc(p*val.Float64()) / p
+}
+
+// AdjustQuantityByMinNotional adjusts the quantity to make the amount greater than the given minAmount
+func (m Market) AdjustQuantityByMinNotional(quantity, currentPrice fixedpoint.Value) fixedpoint.Value {
+	// modify quantity for the min amount
+	quantity = m.TruncateQuantity(quantity)
+	amount := currentPrice.Mul(quantity)
+	if amount.Compare(m.MinNotional) < 0 {
+		ratio := m.MinNotional.Div(amount)
+		quantity = quantity.Mul(ratio)
+
+		ts := m.StepSize.Float64()
+		prec := int(math.Round(math.Log10(ts) * -1.0))
+		return quantity.Round(prec, fixedpoint.Up)
+	}
+
+	return quantity
 }
 
 type MarketMap map[string]Market

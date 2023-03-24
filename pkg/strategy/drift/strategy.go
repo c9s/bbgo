@@ -177,7 +177,7 @@ func (s *Strategy) SubmitOrder(ctx context.Context, submitOrder types.SubmitOrde
 	if err != nil {
 		return nil, err
 	}
-	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, s.Session.Exchange, formattedOrder)
+	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, s.Session.Exchange, nil, formattedOrder)
 	if len(errIdx) > 0 {
 		return nil, err
 	}
@@ -539,7 +539,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 	s.atr.PushK(kline)
 	atr := s.atr.Last()
 
-	price := kline.Close //s.getLastPrice()
+	price := kline.Close // s.getLastPrice()
 	pricef := price.Float64()
 	lowf := math.Min(kline.Low.Float64(), pricef)
 	highf := math.Max(kline.High.Float64(), pricef)

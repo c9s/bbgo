@@ -233,6 +233,14 @@ func castPayload(payload interface{}) ([]byte, error) {
 		case []byte:
 			return v, nil
 
+		case map[string]interface{}:
+			var params = url.Values{}
+			for a, b := range v {
+				params.Add(a, fmt.Sprintf("%v", b))
+			}
+
+			return []byte(params.Encode()), nil
+
 		default:
 			body, err := json.Marshal(v)
 			return body, err

@@ -367,17 +367,45 @@ func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) e
 	return nil
 }
 
+func (e *Exchange) TransferFuturesAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+	req := e.client2.NewFuturesTransferRequest()
+	req.Asset(asset)
+	req.Amount(amount.String())
+
+	if io == types.TransferIn {
+		req.TransferType(binanceapi.FuturesTransferSpotToUsdtFutures)
+	} else if io == types.TransferOut {
+		req.TransferType(binanceapi.FuturesTransferUsdtFuturesToSpot)
+	} else {
+		return fmt.Errorf("unexpected transfer direction: %d given", io)
+	}
+
+	resp, err := req.Do(ctx)
+
+	switch io {
+	case types.TransferIn:
+		log.Infof("internal transfer (spot) => (futures) %s %s, transaction = %+v, err = %+v", amount.String(), asset, resp, err)
+	case types.TransferOut:
+		log.Infof("internal transfer (futures) => (spot) %s %s, transaction = %+v, err = %+v", amount.String(), asset, resp, err)
+	}
+
+	return err
+}
+
 // transferCrossMarginAccountAsset transfer asset to the cross margin account or to the main account
-func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io int) error {
+func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
 	req := e.client.NewMarginTransferService()
 	req.Asset(asset)
 	req.Amount(amount.String())
 
-	if io > 0 { // in
+	if io == types.TransferIn {
 		req.Type(binance.MarginTransferTypeToMargin)
-	} else if io < 0 { // out
+	} else if io == types.TransferOut {
 		req.Type(binance.MarginTransferTypeToMain)
+	} else {
+		return fmt.Errorf("unexpected transfer direction: %d given", io)
 	}
+
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return err

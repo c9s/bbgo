@@ -40,6 +40,7 @@ type GeneralOrderExecutor struct {
 
 	marginBaseMaxBorrowable, marginQuoteMaxBorrowable fixedpoint.Value
 
+	maxRetries    uint
 	disableNotify bool
 	closing       int64
 }
@@ -71,6 +72,10 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 
 func (e *GeneralOrderExecutor) DisableNotify() {
 	e.disableNotify = true
+}
+
+func (e *GeneralOrderExecutor) SetMaxRetries(maxRetries uint) {
+	e.maxRetries = maxRetries
 }
 
 func (e *GeneralOrderExecutor) startMarginAssetUpdater(ctx context.Context) {
@@ -194,10 +199,12 @@ func (e *GeneralOrderExecutor) FastSubmitOrders(ctx context.Context, submitOrder
 	if err != nil {
 		return nil, err
 	}
-	createdOrders, errIdx, err := BatchPlaceOrder(ctx, e.session.Exchange, formattedOrders...)
+
+	createdOrders, errIdx, err := BatchPlaceOrder(ctx, e.session.Exchange, nil, formattedOrders...)
 	if len(errIdx) > 0 {
 		return nil, err
 	}
+
 	if IsBackTesting {
 		e.orderStore.Add(createdOrders...)
 		e.activeMakerOrders.Add(createdOrders...)
@@ -227,6 +234,11 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 		e.orderStore.Add(createdOrder)
 		e.activeMakerOrders.Add(createdOrder)
 		e.tradeCollector.Process()
+	}
+
+	if e.maxRetries == 0 {
+		createdOrders, _, err := BatchPlaceOrder(ctx, e.session.Exchange, orderCreateCallback, formattedOrders...)
+		return createdOrders, err
 	}
 
 	createdOrders, _, err := BatchRetryPlaceOrder(ctx, e.session.Exchange, nil, orderCreateCallback, e.logger, formattedOrders...)
