@@ -15,6 +15,11 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type EventBase struct {
+	Event string `json:"e"` // event name
+	Time  int64  `json:"E"` // event time
+}
+
 /*
 
 executionReport
@@ -314,22 +319,40 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 	case "depthUpdate":
 		return parseDepthEvent(val)
 
-	case "markPriceUpdate":
-		var event MarkPriceUpdateEvent
-		err = json.Unmarshal([]byte(message), &event)
-		return &event, err
-
 	case "listenKeyExpired":
 		var event ListenKeyExpired
 		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
-	// Binance futures data --------------
+	case "trade":
+		var event MarketTradeEvent
+		err = json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	case "aggTrade":
+		var event AggTradeEvent
+		err = json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	}
+
+	// futures stream
+	switch eventType {
+
+	// futures market data stream
+	// ========================================================
 	case "continuousKline":
 		var event ContinuousKLineEvent
 		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
+	case "markPriceUpdate":
+		var event MarkPriceUpdateEvent
+		err = json.Unmarshal([]byte(message), &event)
+		return &event, err
+
+	// futures user data stream
+	// ========================================================
 	case "ORDER_TRADE_UPDATE":
 		var event OrderTradeUpdateEvent
 		err = json.Unmarshal([]byte(message), &event)
@@ -347,13 +370,8 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
-	case "trade":
-		var event MarketTradeEvent
-		err = json.Unmarshal([]byte(message), &event)
-		return &event, err
-
-	case "aggTrade":
-		var event AggTradeEvent
+	case "MARGIN_CALL":
+		var event MarginCallEvent
 		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
@@ -939,6 +957,22 @@ type AccountUpdate struct {
 	Positions       []FuturesStreamPosition      `json:"P,omitempty"`
 }
 
+type MarginCallEvent struct {
+	EventBase
+
+	CrossWalletBalance fixedpoint.Value `json:"cw"`
+	P                  []struct {
+		Symbol                    string           `json:"s"`
+		PositionSide              string           `json:"ps"`
+		PositionAmount            fixedpoint.Value `json:"pa"`
+		MarginType                string           `json:"mt"`
+		IsolatedWallet            fixedpoint.Value `json:"iw"`
+		MarkPrice                 fixedpoint.Value `json:"mp"`
+		UnrealizedPnL             fixedpoint.Value `json:"up"`
+		MaintenanceMarginRequired fixedpoint.Value `json:"mm"`
+	} `json:"p"` // Position(s) of Margin Call
+}
+
 // AccountUpdateEvent is only used in the futures user data stream
 type AccountUpdateEvent struct {
 	EventBase
@@ -946,21 +980,23 @@ type AccountUpdateEvent struct {
 	AccountUpdate AccountUpdate `json:"a"`
 }
 
-type AccountConfig struct {
-	Symbol   string           `json:"s"`
-	Leverage fixedpoint.Value `json:"l"`
-}
-
 type AccountConfigUpdateEvent struct {
 	EventBase
 	Transaction int64 `json:"T"`
 
-	AccountConfig AccountConfig `json:"ac"`
-}
+	// When the leverage of a trade pair changes,
+	// the payload will contain the object ac to represent the account configuration of the trade pair,
+	// where s represents the specific trade pair and l represents the leverage
+	AccountConfig struct {
+		Symbol   string           `json:"s"`
+		Leverage fixedpoint.Value `json:"l"`
+	} `json:"ac"`
 
-type EventBase struct {
-	Event string `json:"e"` // event
-	Time  int64  `json:"E"`
+	// When the user Multi-Assets margin mode changes the payload will contain the object ai representing the user account configuration,
+	// where j represents the user Multi-Assets margin mode
+	MarginModeConfig struct {
+		MultiAssetsMode bool `json:"j"`
+	} `json:"ai"`
 }
 
 type BookTickerEvent struct {
