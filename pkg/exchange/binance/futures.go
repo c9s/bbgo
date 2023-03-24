@@ -307,6 +307,19 @@ func (e *Exchange) queryFuturesTrades(ctx context.Context, symbol string, option
 	return trades, nil
 }
 
+func (e *Exchange) QueryFuturesPositionRisks(ctx context.Context, symbol string) error {
+	req := e.futuresClient.NewGetPositionRiskService()
+	req.Symbol(symbol)
+	res, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
+
+	_ = res
+
+	return nil
+}
+
 // BBGO is a futures broker on Binance
 const futuresBrokerID = "gBhMvywy"
 
