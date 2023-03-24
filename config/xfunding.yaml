@@ -1,0 +1,45 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+  switches:
+    trade: true
+    orderUpdate: true
+    submitOrder: true
+
+persistence:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 1
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: BINANCE
+
+  binance_futures:
+    exchange: binance
+    envVarPrefix: BINANCE
+    futures: true
+
+crossExchangeStrategies:
+
+- xfunding:
+    spotSession: binance
+    futuresSession: binance_futures
+    symbol: ETHUSDT
+    leverage: 1.0
+    incrementalQuoteQuantity: 20
+    quoteInvestment: 50
+
+    shortFundingRate:
+      ## when funding rate is higher than this high value, the strategy will start buying spot and opening a short position
+      high: 0.001%
+      ## when funding rate is lower than this low value, the strategy will start closing futures position and sell the spot
+      low: -0.01%
+
+    ## reset will reset the spot/futures positions, the transfer stats and the position state.
+    # reset: true

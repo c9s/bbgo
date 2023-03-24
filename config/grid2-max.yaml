@@ -11,7 +11,8 @@ notifications:
 sessions:
   max:
     exchange: max
-    envVarPrefix: max
+    envVarPrefix: MAX
+
 
 # example command:
 #    godotenv -f .env.local -- go run ./cmd/bbgo backtest --config config/grid2-max.yaml --base-asset-baseline

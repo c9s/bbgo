@@ -247,9 +247,9 @@ func (it *Interact) Start(ctx context.Context) error {
 	}
 
 	for _, custom := range it.customInteractions {
-		log.Infof("checking %T custom interaction...", custom)
+		log.Debugf("checking %T custom interaction...", custom)
 		if initializer, ok := custom.(Initializer); ok {
-			log.Infof("initializing %T custom interaction...", custom)
+			log.Debugf("initializing %T custom interaction...", custom)
 			if err := initializer.Initialize(); err != nil {
 				return err
 			}

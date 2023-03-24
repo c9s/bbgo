@@ -33,7 +33,7 @@ func AdjustQuantityByMinAmount(quantity, currentPrice, minAmount fixedpoint.Valu
 	amount := currentPrice.Mul(quantity)
 	if amount.Compare(minAmount) < 0 {
 		ratio := minAmount.Div(amount)
-		quantity = quantity.Mul(ratio)
+		return quantity.Mul(ratio)
 	}
 
 	return quantity
