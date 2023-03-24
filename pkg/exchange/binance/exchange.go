@@ -892,34 +892,38 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	return toGlobalOrders(binanceOrders, e.IsMargin)
 }
 
+func (e *Exchange) cancelFuturesOrders(ctx context.Context, orders ...types.Order) (err error) {
+	for _, o := range orders {
+		var req = e.futuresClient.NewCancelOrderService()
+
+		// Mandatory
+		req.Symbol(o.Symbol)
+
+		if o.OrderID > 0 {
+			req.OrderID(int64(o.OrderID))
+		} else {
+			err = multierr.Append(err, types.NewOrderError(
+				fmt.Errorf("can not cancel %s order, order does not contain orderID or clientOrderID", o.Symbol),
+				o))
+			continue
+		}
+
+		_, err2 := req.Do(ctx)
+		if err2 != nil {
+			err = multierr.Append(err, types.NewOrderError(err2, o))
+		}
+	}
+
+	return err
+}
+
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err error) {
 	if err := orderLimiter.Wait(ctx); err != nil {
 		log.WithError(err).Errorf("order rate limiter wait error")
 	}
 
 	if e.IsFutures {
-		for _, o := range orders {
-			var req = e.futuresClient.NewCancelOrderService()
-
-			// Mandatory
-			req.Symbol(o.Symbol)
-
-			if o.OrderID > 0 {
-				req.OrderID(int64(o.OrderID))
-			} else {
-				err = multierr.Append(err, types.NewOrderError(
-					fmt.Errorf("can not cancel %s order, order does not contain orderID or clientOrderID", o.Symbol),
-					o))
-				continue
-			}
-
-			_, err2 := req.Do(ctx)
-			if err2 != nil {
-				err = multierr.Append(err, types.NewOrderError(err2, o))
-			}
-		}
-
-		return err
+		return e.cancelFuturesOrders(ctx, orders...)
 	}
 
 	for _, o := range orders {
