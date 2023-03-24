@@ -6,12 +6,32 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2/futures"
+	"github.com/google/uuid"
 	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+func (e *Exchange) queryFuturesClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+	req := e.futuresClient.NewListOrdersService().Symbol(symbol)
+
+	if lastOrderID > 0 {
+		req.OrderID(int64(lastOrderID))
+	} else {
+		req.StartTime(since.UnixNano() / int64(time.Millisecond))
+		if until.Sub(since) < 24*time.Hour {
+			req.EndTime(until.UnixNano() / int64(time.Millisecond))
+		}
+	}
+
+	binanceOrders, err := req.Do(ctx)
+	if err != nil {
+		return orders, err
+	}
+	return toGlobalFuturesOrders(binanceOrders, false)
+}
 
 func (e *Exchange) TransferFuturesAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
 	req := e.client2.NewFuturesTransferRequest()
@@ -285,4 +305,34 @@ func (e *Exchange) queryFuturesTrades(ctx context.Context, symbol string, option
 
 	trades = types.SortTradesAscending(trades)
 	return trades, nil
+}
+
+// BBGO is a futures broker on Binance
+const futuresBrokerID = "gBhMvywy"
+
+func newFuturesClientOrderID(originalID string) (clientOrderID string) {
+	if originalID == types.NoClientOrderID {
+		return ""
+	}
+
+	prefix := "x-" + futuresBrokerID
+	prefixLen := len(prefix)
+
+	if originalID != "" {
+		// try to keep the whole original client order ID if user specifies it.
+		if prefixLen+len(originalID) > 32 {
+			return originalID
+		}
+
+		clientOrderID = prefix + originalID
+		return clientOrderID
+	}
+
+	clientOrderID = uuid.New().String()
+	clientOrderID = prefix + clientOrderID
+	if len(clientOrderID) > 32 {
+		return clientOrderID[0:32]
+	}
+
+	return clientOrderID
 }

@@ -787,22 +787,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	}
 
 	if e.IsFutures {
-		req := e.futuresClient.NewListOrdersService().Symbol(symbol)
-
-		if lastOrderID > 0 {
-			req.OrderID(int64(lastOrderID))
-		} else {
-			req.StartTime(since.UnixNano() / int64(time.Millisecond))
-			if until.Sub(since) < 24*time.Hour {
-				req.EndTime(until.UnixNano() / int64(time.Millisecond))
-			}
-		}
-
-		binanceOrders, err := req.Do(ctx)
-		if err != nil {
-			return orders, err
-		}
-		return toGlobalFuturesOrders(binanceOrders, false)
+		return e.queryFuturesClosedOrders(ctx, symbol, since, until, lastOrderID)
 	}
 
 	// If orderId is set, it will get orders >= that orderId. Otherwise most recent orders are returned.
@@ -991,36 +976,6 @@ func newSpotClientOrderID(originalID string) (clientOrderID string) {
 	}
 
 	prefix := "x-" + spotBrokerID
-	prefixLen := len(prefix)
-
-	if originalID != "" {
-		// try to keep the whole original client order ID if user specifies it.
-		if prefixLen+len(originalID) > 32 {
-			return originalID
-		}
-
-		clientOrderID = prefix + originalID
-		return clientOrderID
-	}
-
-	clientOrderID = uuid.New().String()
-	clientOrderID = prefix + clientOrderID
-	if len(clientOrderID) > 32 {
-		return clientOrderID[0:32]
-	}
-
-	return clientOrderID
-}
-
-// BBGO is a futures broker on Binance
-const futuresBrokerID = "gBhMvywy"
-
-func newFuturesClientOrderID(originalID string) (clientOrderID string) {
-	if originalID == types.NoClientOrderID {
-		return ""
-	}
-
-	prefix := "x-" + futuresBrokerID
 	prefixLen := len(prefix)
 
 	if originalID != "" {
@@ -1326,26 +1281,36 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 	}
 }
 
-// QueryDepth query the order book depth of a symbol
-func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
-	var response *binance.DepthResponse
-	if e.IsFutures {
-		res, err := e.futuresClient.NewDepthService().Symbol(symbol).Do(ctx)
-		if err != nil {
-			return snapshot, finalUpdateID, err
-		}
-		response = &binance.DepthResponse{
-			LastUpdateID: res.LastUpdateID,
-			Bids:         res.Bids,
-			Asks:         res.Asks,
-		}
-	} else {
-		response, err = e.client.NewDepthService().Symbol(symbol).Do(ctx)
-		if err != nil {
-			return snapshot, finalUpdateID, err
-		}
+func (e *Exchange) queryFuturesDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	res, err := e.futuresClient.NewDepthService().Symbol(symbol).Do(ctx)
+	if err != nil {
+		return snapshot, finalUpdateID, err
 	}
 
+	response := &binance.DepthResponse{
+		LastUpdateID: res.LastUpdateID,
+		Bids:         res.Bids,
+		Asks:         res.Asks,
+	}
+
+	return convertDepth(snapshot, symbol, finalUpdateID, response)
+}
+
+// QueryDepth query the order book depth of a symbol
+func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	if e.IsFutures {
+		return e.queryFuturesDepth(ctx, symbol)
+	}
+
+	response, err := e.client.NewDepthService().Symbol(symbol).Do(ctx)
+	if err != nil {
+		return snapshot, finalUpdateID, err
+	}
+
+	return convertDepth(snapshot, symbol, finalUpdateID, response)
+}
+
+func convertDepth(snapshot types.SliceOrderBook, symbol string, finalUpdateID int64, response *binance.DepthResponse) (types.SliceOrderBook, int64, error) {
 	snapshot.Symbol = symbol
 	finalUpdateID = response.LastUpdateID
 	for _, entry := range response.Bids {
