@@ -39,7 +39,7 @@ type FuturesIncome struct {
 	TradeId    string                     `json:"tradeId"`
 }
 
-//go:generate requestgen -method GET -url "/fapi/v2/positionRisk" -type FuturesGetIncomeHistoryRequest -responseType []FuturesIncome
+//go:generate requestgen -method GET -url "/fapi/v1/income" -type FuturesGetIncomeHistoryRequest -responseType []FuturesIncome
 type FuturesGetIncomeHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
