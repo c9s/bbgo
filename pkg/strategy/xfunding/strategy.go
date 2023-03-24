@@ -333,8 +333,23 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	})
 
 	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
-		// s.queryAndDetectPremiumIndex(ctx, binanceFutures)
+		s.queryAndDetectPremiumIndex(ctx, binanceFutures)
 	}))
+
+	if binanceStream, ok := s.futuresSession.UserDataStream.(*binance.Stream); ok {
+		binanceStream.OnAccountUpdateEvent(func(e *binance.AccountUpdateEvent) {
+			log.Infof("onAccountUpdateEvent: %+v", e)
+			switch e.AccountUpdate.EventReasonType {
+
+			case binance.AccountUpdateEventReasonDeposit:
+
+			case binance.AccountUpdateEventReasonWithdraw:
+
+			case binance.AccountUpdateEventReasonFundingFee:
+
+			}
+		})
+	}
 
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
@@ -346,17 +361,25 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 				return
 
 			case <-ticker.C:
-				s.queryAndDetectPremiumIndex(ctx, binanceFutures)
-				s.sync(ctx)
+				s.syncSpotAccount(ctx)
 			}
 		}
 	}()
 
-	// TODO: use go routine and time.Ticker to trigger spot sync and futures sync
-	/*
-		s.spotSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
-		}))
-	*/
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case <-ticker.C:
+				s.syncFuturesAccount(ctx)
+			}
+		}
+	}()
 
 	return nil
 }
@@ -375,14 +398,21 @@ func (s *Strategy) queryAndDetectPremiumIndex(ctx context.Context, binanceFuture
 	}
 }
 
-func (s *Strategy) sync(ctx context.Context) {
+func (s *Strategy) syncSpotAccount(ctx context.Context) {
 	switch s.getPositionState() {
 	case PositionOpening:
 		s.increaseSpotPosition(ctx)
+	case PositionClosing:
+		s.syncSpotPosition(ctx)
+	}
+}
+
+func (s *Strategy) syncFuturesAccount(ctx context.Context) {
+	switch s.getPositionState() {
+	case PositionOpening:
 		s.syncFuturesPosition(ctx)
 	case PositionClosing:
 		s.reduceFuturesPosition(ctx)
-		s.syncSpotPosition(ctx)
 	}
 }
 
@@ -622,8 +652,10 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.State.UsedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
+	usedQuoteInvestment := s.State.UsedQuoteInvestment
+	s.mu.Unlock()
+
+	if usedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
 		// stop increase the position
 		s.setPositionState(PositionReady)
 
@@ -640,7 +672,7 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 		return
 	}
 
-	leftQuota := s.QuoteInvestment.Sub(s.State.UsedQuoteInvestment)
+	leftQuota := s.QuoteInvestment.Sub(usedQuoteInvestment)
 
 	orderPrice := ticker.Buy
 	orderQuantity := fixedpoint.Min(s.IncrementalQuoteQuantity, leftQuota).Div(orderPrice)
@@ -686,28 +718,32 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) bool {
 	switch s.getPositionState() {
 
 	case PositionClosed:
-		if fundingRate.Compare(s.ShortFundingRate.High) >= 0 {
-			log.Infof("funding rate %s is higher than the High threshold %s, start opening position...",
-				fundingRate.Percentage(), s.ShortFundingRate.High.Percentage())
-
-			s.startOpeningPosition(types.PositionShort, premiumIndex.Time)
-			return true
+		if fundingRate.Compare(s.ShortFundingRate.High) < 0 {
+			return false
 		}
+
+		log.Infof("funding rate %s is higher than the High threshold %s, start opening position...",
+			fundingRate.Percentage(), s.ShortFundingRate.High.Percentage())
+
+		s.startOpeningPosition(types.PositionShort, premiumIndex.Time)
+		return true
 
 	case PositionReady:
-		if fundingRate.Compare(s.ShortFundingRate.Low) <= 0 {
-			log.Infof("funding rate %s is lower than the Low threshold %s, start closing position...",
-				fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
-
-			holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
-			if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
-				log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod.Duration())
-				return false
-			}
-
-			s.startClosingPosition()
-			return true
+		if fundingRate.Compare(s.ShortFundingRate.Low) > 0 {
+			return false
 		}
+
+		log.Infof("funding rate %s is lower than the Low threshold %s, start closing position...",
+			fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
+
+		holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
+		if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
+			log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod.Duration())
+			return false
+		}
+
+		s.startClosingPosition()
+		return true
 	}
 
 	return false

@@ -46,12 +46,8 @@ type Stream struct {
 	kLineEventCallbacks       []func(e *KLineEvent)
 	kLineClosedEventCallbacks []func(e *KLineEvent)
 
-	markPriceUpdateEventCallbacks []func(e *MarkPriceUpdateEvent)
-	marketTradeEventCallbacks     []func(e *MarketTradeEvent)
-	aggTradeEventCallbacks        []func(e *AggTradeEvent)
-
-	continuousKLineEventCallbacks       []func(e *ContinuousKLineEvent)
-	continuousKLineClosedEventCallbacks []func(e *ContinuousKLineEvent)
+	marketTradeEventCallbacks []func(e *MarketTradeEvent)
+	aggTradeEventCallbacks    []func(e *AggTradeEvent)
 
 	balanceUpdateEventCallbacks           []func(event *BalanceUpdateEvent)
 	outboundAccountInfoEventCallbacks     []func(event *OutboundAccountInfoEvent)
@@ -59,12 +55,19 @@ type Stream struct {
 	executionReportEventCallbacks         []func(event *ExecutionReportEvent)
 	bookTickerEventCallbacks              []func(event *BookTickerEvent)
 
+	// futures market data stream
+	markPriceUpdateEventCallbacks       []func(e *MarkPriceUpdateEvent)
+	continuousKLineEventCallbacks       []func(e *ContinuousKLineEvent)
+	continuousKLineClosedEventCallbacks []func(e *ContinuousKLineEvent)
+
+	// futures user data stream event callbacks
 	orderTradeUpdateEventCallbacks    []func(e *OrderTradeUpdateEvent)
 	accountUpdateEventCallbacks       []func(e *AccountUpdateEvent)
 	accountConfigUpdateEventCallbacks []func(e *AccountConfigUpdateEvent)
+	marginCallEventCallbacks          []func(e *MarginCallEvent)
+	listenKeyExpiredCallbacks         []func(e *ListenKeyExpired)
 
-	listenKeyExpiredCallbacks []func(e *ListenKeyExpired)
-
+	// depthBuffers is used for storing the depth info
 	depthBuffers map[string]*depth.Buffer
 }
 
@@ -123,10 +126,12 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
 	stream.OnAggTradeEvent(stream.handleAggTradeEvent)
 
+	// Futures User Data Stream
+	// ===================================
 	// Event type ACCOUNT_UPDATE from user data stream updates Balance and FuturesPosition.
-	stream.OnAccountUpdateEvent(stream.handleAccountUpdateEvent)
-	stream.OnAccountConfigUpdateEvent(stream.handleAccountConfigUpdateEvent)
 	stream.OnOrderTradeUpdateEvent(stream.handleOrderTradeUpdateEvent)
+	// ===================================
+
 	stream.OnDisconnect(stream.handleDisconnect)
 	stream.OnConnect(stream.handleConnect)
 	stream.OnListenKeyExpired(func(e *ListenKeyExpired) {
@@ -244,18 +249,6 @@ func (s *Stream) handleOutboundAccountPositionEvent(e *OutboundAccountPositionEv
 		}
 	}
 	s.EmitBalanceSnapshot(snapshot)
-}
-
-func (s *Stream) handleAccountUpdateEvent(e *AccountUpdateEvent) {
-	futuresPositionSnapshot := toGlobalFuturesPositions(e.AccountUpdate.Positions)
-	s.EmitFuturesPositionSnapshot(futuresPositionSnapshot)
-
-	balanceSnapshot := toGlobalFuturesBalance(e.AccountUpdate.Balances)
-	s.EmitBalanceSnapshot(balanceSnapshot)
-}
-
-// TODO: emit account config leverage updates
-func (s *Stream) handleAccountConfigUpdateEvent(e *AccountConfigUpdateEvent) {
 }
 
 func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
@@ -380,6 +373,8 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *ListenKeyExpired:
 		s.EmitListenKeyExpired(e)
+
+	case *MarginCallEvent:
 
 	}
 }
