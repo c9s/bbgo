@@ -381,7 +381,14 @@ func (e *Exchange) TransferFuturesAccountAsset(ctx context.Context, asset string
 	}
 
 	resp, err := req.Do(ctx)
-	log.Infof("futures transfer %s %s, transaction = %+v, err = %+v", amount.String(), asset, resp, err)
+
+	switch io {
+	case types.TransferIn:
+		log.Infof("internal transfer (spot) => (futures) %s %s, transaction = %+v, err = %+v", amount.String(), asset, resp, err)
+	case types.TransferOut:
+		log.Infof("internal transfer (futures) => (spot) %s %s, transaction = %+v, err = %+v", amount.String(), asset, resp, err)
+	}
+
 	return err
 }
 

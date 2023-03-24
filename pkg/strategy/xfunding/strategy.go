@@ -162,6 +162,8 @@ func (s *Strategy) Defaults() error {
 		s.MinHoldingPeriod = types.Duration(3 * 24 * time.Hour)
 	}
 
+	s.positionType = types.PositionShort
+
 	return nil
 }
 
