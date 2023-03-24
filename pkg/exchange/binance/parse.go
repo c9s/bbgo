@@ -891,16 +891,58 @@ func (e *OrderTradeUpdateEvent) TradeFutures() (*types.Trade, error) {
 	}, nil
 }
 
-type AccountUpdate struct {
-	EventReasonType string                     `json:"m"`
-	Balances        []*futures.Balance         `json:"B,omitempty"`
-	Positions       []*futures.AccountPosition `json:"P,omitempty"`
+type FuturesStreamBalance struct {
+	Asset              string           `json:"a"`
+	WalletBalance      fixedpoint.Value `json:"wb"`
+	CrossWalletBalance fixedpoint.Value `json:"cw"`
+	BalanceChange      fixedpoint.Value `json:"bc"`
 }
 
+type FuturesStreamPosition struct {
+	Symbol                 string           `json:"s"`
+	PositionAmount         fixedpoint.Value `json:"pa"`
+	EntryPrice             fixedpoint.Value `json:"ep"`
+	AccumulatedRealizedPnL fixedpoint.Value `json:"cr"` // (Pre-fee) Accumulated Realized PnL
+	UnrealizedPnL          fixedpoint.Value `json:"up"`
+	MarginType             string           `json:"mt"`
+	IsolatedWallet         fixedpoint.Value `json:"iw"`
+	PositionSide           string           `json:"ps"`
+}
+
+type AccountUpdateEventReasonType string
+
+const (
+	AccountUpdateEventReasonDeposit          AccountUpdateEventReasonType = "DEPOSIT"
+	AccountUpdateEventReasonWithdraw         AccountUpdateEventReasonType = "WITHDRAW"
+	AccountUpdateEventReasonOrder            AccountUpdateEventReasonType = "ORDER"
+	AccountUpdateEventReasonFundingFee       AccountUpdateEventReasonType = "FUNDING_FEE"
+	AccountUpdateEventReasonMarginTransfer   AccountUpdateEventReasonType = "MARGIN_TRANSFER"
+	AccountUpdateEventReasonMarginTypeChange AccountUpdateEventReasonType = "MARGIN_TYPE_CHANGE"
+	AccountUpdateEventReasonAssetTransfer    AccountUpdateEventReasonType = "ASSET_TRANSFER"
+	AccountUpdateEventReasonAdminDeposit     AccountUpdateEventReasonType = "ADMIN_DEPOSIT"
+	AccountUpdateEventReasonAdminWithdraw    AccountUpdateEventReasonType = "ADMIN_WITHDRAW"
+)
+
+type AccountUpdate struct {
+	// m: DEPOSIT WITHDRAW
+	// ORDER FUNDING_FEE
+	// WITHDRAW_REJECT ADJUSTMENT
+	// INSURANCE_CLEAR
+	// ADMIN_DEPOSIT ADMIN_WITHDRAW
+	// MARGIN_TRANSFER MARGIN_TYPE_CHANGE
+	// ASSET_TRANSFER
+	// OPTIONS_PREMIUM_FEE OPTIONS_SETTLE_PROFIT
+	// AUTO_EXCHANGE
+	// COIN_SWAP_DEPOSIT COIN_SWAP_WITHDRAW
+	EventReasonType AccountUpdateEventReasonType `json:"m"`
+	Balances        []FuturesStreamBalance       `json:"B,omitempty"`
+	Positions       []FuturesStreamPosition      `json:"P,omitempty"`
+}
+
+// AccountUpdateEvent is only used in the futures user data stream
 type AccountUpdateEvent struct {
 	EventBase
-	Transaction int64 `json:"T"`
-
+	Transaction   int64         `json:"T"`
 	AccountUpdate AccountUpdate `json:"a"`
 }
 
