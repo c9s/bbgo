@@ -1274,6 +1274,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 // DefaultFeeRates returns the Binance VIP 0 fee schedule
 // See also https://www.binance.com/en/fee/schedule
+// See futures fee at: https://www.binance.com/en/fee/futureFee
 func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 	if e.IsFutures {
 		return types.ExchangeFee{
