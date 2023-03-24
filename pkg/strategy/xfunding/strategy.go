@@ -332,9 +332,22 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 	})
 
-	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
-		// s.queryAndDetectPremiumIndex(ctx, binanceFutures)
-	}))
+	// s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {}))
+
+	if binanceStream, ok := s.futuresSession.UserDataStream.(*binance.Stream); ok {
+		binanceStream.OnAccountUpdateEvent(func(e *binance.AccountUpdateEvent) {
+			log.Infof("onAccountUpdateEvent: %+v", e)
+			switch e.AccountUpdate.EventReasonType {
+
+			case binance.AccountUpdateEventReasonDeposit:
+
+			case binance.AccountUpdateEventReasonWithdraw:
+
+			case binance.AccountUpdateEventReasonFundingFee:
+
+			}
+		})
+	}
 
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
