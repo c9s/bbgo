@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -187,31 +186,29 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
-
-	var ma types.Float64Indicator
-	for _, detection := range s.SupportDetection {
-
-		switch strings.ToLower(detection.MovingAverageType) {
-		case "sma":
-			ma = standardIndicatorSet.SMA(types.IntervalWindow{
-				Interval: detection.MovingAverageIntervalWindow.Interval,
-				Window:   detection.MovingAverageIntervalWindow.Window,
-			})
-		case "ema", "ewma":
-			ma = standardIndicatorSet.EWMA(types.IntervalWindow{
-				Interval: detection.MovingAverageIntervalWindow.Interval,
-				Window:   detection.MovingAverageIntervalWindow.Window,
-			})
-		default:
-			ma = standardIndicatorSet.EWMA(types.IntervalWindow{
-				Interval: detection.MovingAverageIntervalWindow.Interval,
-				Window:   detection.MovingAverageIntervalWindow.Window,
-			})
+	// standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
+	/*
+		var ma types.Float64Indicator
+		for _, detection := range s.SupportDetection {
+			switch strings.ToLower(detection.MovingAverageType) {
+			case "sma":
+				ma = standardIndicatorSet.SMA(types.IntervalWindow{
+					Interval: detection.MovingAverageIntervalWindow.Interval,
+					Window:   detection.MovingAverageIntervalWindow.Window,
+				})
+			case "ema", "ewma":
+				ma = standardIndicatorSet.EWMA(types.IntervalWindow{
+					Interval: detection.MovingAverageIntervalWindow.Interval,
+					Window:   detection.MovingAverageIntervalWindow.Window,
+				})
+			default:
+				ma = standardIndicatorSet.EWMA(types.IntervalWindow{
+					Interval: detection.MovingAverageIntervalWindow.Interval,
+					Window:   detection.MovingAverageIntervalWindow.Window,
+				})
+			}
 		}
-	}
-	_ = ma
-
+	*/
 	return nil
 }
 
