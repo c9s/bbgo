@@ -406,6 +406,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 						log.WithError(err).Error("unable to add funding fee to profitStats")
 					}
 				}
+
+				log.Infof("total collected funding fee: %f %s", s.ProfitStats.TotalFundingFee.Float64(), s.ProfitStats.FundingFeeCurrency)
 				bbgo.Sync(ctx, s)
 			}
 		})
