@@ -29,6 +29,10 @@ func (s *ProfitStats) AddFundingFee(fee FundingFee) error {
 		return fmt.Errorf("unexpected error, funding fee currency is not matched, given: %s, wanted: %s", fee.Asset, s.FundingFeeCurrency)
 	}
 
+	if s.LastFundingFeeTxn == fee.Txn {
+		return errDuplicatedFundingFeeTxnId
+	}
+
 	s.FundingFeeRecords = append(s.FundingFeeRecords, fee)
 	s.TotalFundingFee = s.TotalFundingFee.Add(fee.Amount)
 	s.LastFundingFeeTxn = fee.Txn

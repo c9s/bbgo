@@ -62,6 +62,8 @@ var log = logrus.WithField("strategy", ID)
 
 var errNotBinanceExchange = errors.New("not binance exchange, currently only support binance exchange")
 
+var errDuplicatedFundingFeeTxnId = errors.New("duplicated funding fee txn id")
+
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
