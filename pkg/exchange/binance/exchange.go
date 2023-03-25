@@ -88,6 +88,8 @@ type Exchange struct {
 
 	// client2 is a newer version of the binance api client implemented by ourselves.
 	client2 *binanceapi.RestClient
+
+	futuresClient2 *binanceapi.FuturesRestClient
 }
 
 var timeSetterOnce sync.Once
@@ -111,13 +113,15 @@ func New(key, secret string) *Exchange {
 	}
 
 	client2 := binanceapi.NewClient(client.BaseURL)
+	futuresClient2 := binanceapi.NewFuturesRestClient(futuresClient.BaseURL)
 
 	ex := &Exchange{
-		key:           key,
-		secret:        secret,
-		client:        client,
-		futuresClient: futuresClient,
-		client2:       client2,
+		key:            key,
+		secret:         secret,
+		client:         client,
+		futuresClient:  futuresClient,
+		client2:        client2,
+		futuresClient2: futuresClient2,
 	}
 
 	if len(key) > 0 && len(secret) > 0 {
