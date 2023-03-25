@@ -109,9 +109,21 @@ type Strategy struct {
 	FuturesSession string `json:"futuresSession"`
 	Reset          bool   `json:"reset"`
 
-	ProfitStats     *types.ProfitStats `persistence:"profit_stats"`
-	SpotPosition    *types.Position    `persistence:"spot_position"`
-	FuturesPosition *types.Position    `persistence:"futures_position"`
+	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
+
+	// SpotPosition is used for the spot position (usually long position)
+	// so that we know how much spot we have bought and the average cost of the spot.
+	SpotPosition *types.Position `persistence:"spot_position"`
+
+	// FuturesPosition is used for the futures position
+	// this position is the reverse side of the spot position, when spot position is long, then the futures position will be short.
+	// but the base quantity should be the same as the spot position
+	FuturesPosition *types.Position `persistence:"futures_position"`
+
+	// NeutralPosition is used for sharing spot/futures position
+	// when creating the spot position and futures position, there will be a spread between the spot position and the futures position.
+	// this neutral position can calculate the spread cost between these two positions
+	NeutralPosition *types.Position `persistence:"neutral_position"`
 
 	State *State `persistence:"state"`
 
@@ -241,12 +253,16 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
+	if s.SpotPosition == nil || s.Reset {
+		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
+	}
+
 	if s.FuturesPosition == nil || s.Reset {
 		s.FuturesPosition = types.NewPositionFromMarket(s.futuresMarket)
 	}
 
-	if s.SpotPosition == nil || s.Reset {
-		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
+	if s.NeutralPosition == nil || s.Reset {
+		s.NeutralPosition = types.NewPositionFromMarket(s.futuresMarket)
 	}
 
 	if s.State == nil || s.Reset {
