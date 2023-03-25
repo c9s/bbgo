@@ -306,8 +306,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
 	s.spotOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		s.NeutralPosition.AddTrade(trade)
-
 		// we act differently on the spot account
 		// when opening a position, we place orders on the spot account first, then the futures account,
 		// and we need to accumulate the used quote amount
@@ -349,8 +347,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.futuresOrderExecutor = s.allocateOrderExecutor(ctx, s.futuresSession, instanceID, s.FuturesPosition)
 	s.futuresOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		s.NeutralPosition.AddTrade(trade)
-
 		if s.positionType != types.PositionShort {
 			return
 		}
@@ -878,6 +874,12 @@ func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.Exch
 	orderExecutor.Bind()
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
+	})
+	orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _ fixedpoint.Value, _ fixedpoint.Value) {
+		if profit, netProfit, madeProfit := s.NeutralPosition.AddTrade(trade); madeProfit {
+			_ = profit
+			_ = netProfit
+		}
 	})
 	orderExecutor.BindProfitStats(s.ProfitStats.ProfitStats)
 	return orderExecutor
