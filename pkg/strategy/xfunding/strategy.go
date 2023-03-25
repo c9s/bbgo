@@ -402,6 +402,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 					err := s.ProfitStats.AddFundingFee(FundingFee{
 						Asset:  b.Asset,
 						Amount: b.BalanceChange,
+						Txn:    e.Transaction,
 					})
 					if err != nil {
 						log.WithError(err).Error("unable to add funding fee to profitStats")
