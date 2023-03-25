@@ -88,9 +88,9 @@ var marginLoansCmd = &cobra.Command{
 			return errors.New("session is not set")
 		}
 
-		marginHistoryService, ok := selectedSession.Exchange.(types.MarginHistory)
+		marginHistoryService, ok := selectedSession.Exchange.(types.MarginHistoryService)
 		if !ok {
-			return fmt.Errorf("exchange %s does not support MarginHistory service", selectedSession.ExchangeName)
+			return fmt.Errorf("exchange %s does not support MarginHistoryService service", selectedSession.ExchangeName)
 		}
 
 		now := time.Now()
@@ -127,9 +127,9 @@ var marginRepaysCmd = &cobra.Command{
 			return errors.New("session is not set")
 		}
 
-		marginHistoryService, ok := selectedSession.Exchange.(types.MarginHistory)
+		marginHistoryService, ok := selectedSession.Exchange.(types.MarginHistoryService)
 		if !ok {
-			return fmt.Errorf("exchange %s does not support MarginHistory service", selectedSession.ExchangeName)
+			return fmt.Errorf("exchange %s does not support MarginHistoryService service", selectedSession.ExchangeName)
 		}
 
 		now := time.Now()
@@ -166,9 +166,9 @@ var marginInterestsCmd = &cobra.Command{
 			return errors.New("session is not set")
 		}
 
-		marginHistoryService, ok := selectedSession.Exchange.(types.MarginHistory)
+		marginHistoryService, ok := selectedSession.Exchange.(types.MarginHistoryService)
 		if !ok {
-			return fmt.Errorf("exchange %s does not support MarginHistory service", selectedSession.ExchangeName)
+			return fmt.Errorf("exchange %s does not support MarginHistoryService service", selectedSession.ExchangeName)
 		}
 
 		now := time.Now()

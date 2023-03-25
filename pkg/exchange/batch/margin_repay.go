@@ -11,7 +11,7 @@ import (
 )
 
 type MarginRepayBatchQuery struct {
-	types.MarginHistory
+	types.MarginHistoryService
 }
 
 func (e *MarginRepayBatchQuery) Query(ctx context.Context, asset string, startTime, endTime time.Time) (c chan types.MarginRepay, errC chan error) {
