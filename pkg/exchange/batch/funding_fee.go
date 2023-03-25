@@ -18,7 +18,7 @@ type BinanceFuturesIncomeBatchQuery struct {
 	BinanceFuturesIncomeHistoryService
 }
 
-func (e *BinanceFuturesIncomeBatchQuery) Query(ctx context.Context, symbol string, incomeType binanceapi.FuturesIncomeType, startTime, endTime time.Time) (c chan types.MarginInterest, errC chan error) {
+func (e *BinanceFuturesIncomeBatchQuery) Query(ctx context.Context, symbol string, incomeType binanceapi.FuturesIncomeType, startTime, endTime time.Time) (c chan binanceapi.FuturesIncome, errC chan error) {
 	query := &AsyncTimeRangedBatchQuery{
 		Type:        types.MarginInterest{},
 		Limiter:     rate.NewLimiter(rate.Every(3*time.Second), 1),
