@@ -94,7 +94,9 @@ type Strategy struct {
 	Environment *bbgo.Environment
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
-	Symbol string       `json:"symbol"`
+	Symbol   string         `json:"symbol"`
+	Interval types.Interval `json:"interval"`
+
 	Market types.Market `json:"-"`
 
 	// Leverage is the leverage of the futures position
@@ -158,13 +160,8 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	spotSession := sessions[s.SpotSession]
 	futuresSession := sessions[s.FuturesSession]
 
-	spotSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-		Interval: types.Interval1m,
-	})
-
-	futuresSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-		Interval: types.Interval1m,
-	})
+	spotSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	futuresSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
@@ -176,6 +173,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.MinHoldingPeriod == 0 {
 		s.MinHoldingPeriod = types.Duration(3 * 24 * time.Hour)
+	}
+
+	if s.Interval == "" {
+		s.Interval = types.Interval1m
 	}
 
 	s.positionType = types.PositionShort
@@ -364,7 +365,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 	})
 
-	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
+	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		s.queryAndDetectPremiumIndex(ctx, binanceFutures)
 	}))
 
