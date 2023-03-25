@@ -365,3 +365,15 @@ func (e *Exchange) queryFuturesDepth(ctx context.Context, symbol string) (snapsh
 
 	return convertDepth(snapshot, symbol, finalUpdateID, response)
 }
+
+// QueryFuturesIncomeHistory queries the income history on the binance futures account
+// This is more binance futures specific API, the convert function is not designed yet.
+// TODO: consider other futures platforms and design the common data structure for this
+func (e *Exchange) QueryFuturesIncomeHistory(ctx context.Context, symbol string, startTime, endTime time.Time) ([]binanceapi.FuturesIncome, error) {
+	req := e.futuresClient2.NewFuturesGetIncomeHistoryRequest()
+	req.Symbol(symbol)
+	req.StartTime(startTime)
+	req.EndTime(endTime)
+	resp, err := req.Do(ctx)
+	return resp, err
+}
