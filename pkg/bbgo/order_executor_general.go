@@ -155,8 +155,10 @@ func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats) {
 
 		profitStats.AddProfit(*profit)
 
-		Notify(profit)
-		Notify(profitStats)
+		if !e.disableNotify {
+			Notify(profit)
+			Notify(profitStats)
+		}
 	})
 }
 
