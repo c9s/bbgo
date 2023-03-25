@@ -119,7 +119,7 @@ type Strategy struct {
 	FuturesSession string `json:"futuresSession"`
 	Reset          bool   `json:"reset"`
 
-	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
+	ProfitStats *ProfitStats `persistence:"profit_stats"`
 
 	// SpotPosition is used for the spot position (usually long position)
 	// so that we know how much spot we have bought and the average cost of the spot.
@@ -260,7 +260,12 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	}
 
 	if s.ProfitStats == nil || s.Reset {
-		s.ProfitStats = types.NewProfitStats(s.Market)
+		s.ProfitStats = &ProfitStats{
+			ProfitStats: types.NewProfitStats(s.Market),
+
+			// when receiving funding fee, the funding fee asset is the quote currency of that market.
+			FundingFeeCurrency: s.futuresMarket.QuoteCurrency,
+		}
 	}
 
 	if s.SpotPosition == nil || s.Reset {
@@ -373,7 +378,35 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			case binance.AccountUpdateEventReasonWithdraw:
 
 			case binance.AccountUpdateEventReasonFundingFee:
+				//  EventBase:{
+				// 		Event:ACCOUNT_UPDATE
+				// 		Time:1679760000932
+				// 	}
+				// 	Transaction:1679760000927
+				// 	AccountUpdate:{
+				// 			EventReasonType:FUNDING_FEE
+				// 			Balances:[{
+				// 					Asset:USDT
+				// 					WalletBalance:56.64251742
+				// 					CrossWalletBalance:56.64251742
+				// 					BalanceChange:-0.00037648
+				// 			}]
+				// 		}
+				// 	}
+				for _, b := range e.AccountUpdate.Balances {
+					if b.Asset != s.ProfitStats.FundingFeeCurrency {
+						continue
+					}
 
+					err := s.ProfitStats.AddFundingFee(FundingFee{
+						Asset:  b.Asset,
+						Amount: b.BalanceChange,
+					})
+					if err != nil {
+						log.WithError(err).Error("unable to add funding fee to profitStats")
+					}
+				}
+				bbgo.Sync(ctx, s)
 			}
 		})
 	}
@@ -840,6 +873,6 @@ func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.Exch
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
-	orderExecutor.BindProfitStats(s.ProfitStats)
+	orderExecutor.BindProfitStats(s.ProfitStats.ProfitStats)
 	return orderExecutor
 }
