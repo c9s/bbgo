@@ -876,11 +876,12 @@ func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.Exch
 		bbgo.Sync(ctx, s)
 	})
 	orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _ fixedpoint.Value, _ fixedpoint.Value) {
+		s.ProfitStats.AddTrade(trade)
+
 		if profit, netProfit, madeProfit := s.NeutralPosition.AddTrade(trade); madeProfit {
-			_ = profit
-			_ = netProfit
+			p := s.NeutralPosition.NewProfit(trade, profit, netProfit)
+			s.ProfitStats.AddProfit(p)
 		}
 	})
-	orderExecutor.BindProfitStats(s.ProfitStats.ProfitStats)
 	return orderExecutor
 }
