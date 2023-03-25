@@ -1289,21 +1289,6 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 	}
 }
 
-func (e *Exchange) queryFuturesDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
-	res, err := e.futuresClient.NewDepthService().Symbol(symbol).Do(ctx)
-	if err != nil {
-		return snapshot, finalUpdateID, err
-	}
-
-	response := &binance.DepthResponse{
-		LastUpdateID: res.LastUpdateID,
-		Bids:         res.Bids,
-		Asks:         res.Asks,
-	}
-
-	return convertDepth(snapshot, symbol, finalUpdateID, response)
-}
-
 // QueryDepth query the order book depth of a symbol
 func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	if e.IsFutures {
