@@ -14,17 +14,17 @@ type BinanceFuturesIncomeHistoryService interface {
 	QueryFuturesIncomeHistory(ctx context.Context, symbol string, incomeType binanceapi.FuturesIncomeType, startTime, endTime *time.Time) ([]binanceapi.FuturesIncome, error)
 }
 
-type FuturesFundingFeeBatchQuery struct {
+type BinanceFuturesIncomeBatchQuery struct {
 	BinanceFuturesIncomeHistoryService
 }
 
-func (e *FuturesFundingFeeBatchQuery) Query(ctx context.Context, symbol string, startTime, endTime time.Time) (c chan types.MarginInterest, errC chan error) {
+func (e *BinanceFuturesIncomeBatchQuery) Query(ctx context.Context, symbol string, incomeType binanceapi.FuturesIncomeType, startTime, endTime time.Time) (c chan types.MarginInterest, errC chan error) {
 	query := &AsyncTimeRangedBatchQuery{
 		Type:        types.MarginInterest{},
 		Limiter:     rate.NewLimiter(rate.Every(3*time.Second), 1),
 		JumpIfEmpty: time.Hour * 24 * 30,
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
-			return e.QueryFuturesIncomeHistory(ctx, symbol, binanceapi.FuturesIncomeFundingFee, &startTime, &endTime)
+			return e.QueryFuturesIncomeHistory(ctx, symbol, incomeType, &startTime, &endTime)
 		},
 		T: func(obj interface{}) time.Time {
 			return time.Time(obj.(binanceapi.FuturesIncome).Time)
@@ -35,7 +35,7 @@ func (e *FuturesFundingFeeBatchQuery) Query(ctx context.Context, symbol string, 
 		},
 	}
 
-	c = make(chan types.MarginInterest, 100)
+	c = make(chan binanceapi.FuturesIncome, 100)
 	errC = query.Query(ctx, c, startTime, endTime)
 	return c, errC
 }
