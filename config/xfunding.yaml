@@ -30,11 +30,28 @@ crossExchangeStrategies:
 - xfunding:
     spotSession: binance
     futuresSession: binance_futures
+
+    ## symbol is the symbol name of the spot market and the futures market
+    ## todo: provide option to separate the futures market symbol
     symbol: ETHUSDT
+
+    ## interval is the interval for checking futures premium and the funding rate
+    interval: 1m
+
+    ## leverage is the leverage of the reverse futures position size.
+    ## for example, you can buy 1 BTC and short 3 BTC in the futures account with 3x leverage.
     leverage: 1.0
+
+    ## incrementalQuoteQuantity is the quote quantity per maker order when creating the positions
+    ## when in BTC-USDT 20 means 20 USDT, each buy order will hold 20 USDT quote amount.
     incrementalQuoteQuantity: 20
+
+    ## quoteInvestment is how much you want to invest to create your position.
+    ## for example, when 10k USDT is given as the quote investment, and the average executed price of your position is around BTC 18k
+    ## you will be holding around 0.555555 BTC
     quoteInvestment: 50
 
+    ## shortFundingRate is the funding rate range you want to create your position
     shortFundingRate:
       ## when funding rate is higher than this high value, the strategy will start buying spot and opening a short position
       high: 0.001%
@@ -42,4 +59,4 @@ crossExchangeStrategies:
       low: -0.01%
 
     ## reset will reset the spot/futures positions, the transfer stats and the position state.
-    # reset: true
+    reset: true
