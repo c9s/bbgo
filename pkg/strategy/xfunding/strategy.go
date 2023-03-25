@@ -52,6 +52,8 @@ type MovingAverageConfig struct {
 
 var log = logrus.WithField("strategy", ID)
 
+var errNotBinanceExchange = errors.New("not binance exchange, currently only support binance exchange")
+
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
@@ -277,9 +279,14 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	log.Infof("loaded spot position: %s", s.SpotPosition.String())
 	log.Infof("loaded futures position: %s", s.FuturesPosition.String())
 
-	binanceFutures := s.futuresSession.Exchange.(*binance.Exchange)
-	binanceSpot := s.spotSession.Exchange.(*binance.Exchange)
-	_ = binanceSpot
+	binanceFutures, ok := s.futuresSession.Exchange.(*binance.Exchange)
+	if !ok {
+		return errNotBinanceExchange
+	}
+	binanceSpot, ok := s.spotSession.Exchange.(*binance.Exchange)
+	if !ok {
+		return errNotBinanceExchange
+	}
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
 	s.spotOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
