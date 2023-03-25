@@ -10,7 +10,7 @@ import (
 )
 
 type MarginInterestBatchQuery struct {
-	types.MarginHistory
+	types.MarginHistoryService
 }
 
 func (e *MarginInterestBatchQuery) Query(ctx context.Context, asset string, startTime, endTime time.Time) (c chan types.MarginInterest, errC chan error) {
