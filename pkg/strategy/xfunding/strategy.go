@@ -843,5 +843,6 @@ func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.Exch
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
+	orderExecutor.BindProfitStats(s.ProfitStats)
 	return orderExecutor
 }
