@@ -34,6 +34,23 @@ const (
 	PositionClosing
 )
 
+type MovingAverageConfig struct {
+	Interval types.Interval `json:"interval"`
+	// MovingAverageType is the moving average indicator type that we want to use,
+	// it could be SMA or EWMA
+	MovingAverageType string `json:"movingAverageType"`
+
+	// MovingAverageInterval is the interval of k-lines for the moving average indicator to calculate,
+	// it could be "1m", "5m", "1h" and so on.  note that, the moving averages are calculated from
+	// the k-line data we subscribed
+	// MovingAverageInterval types.Interval `json:"movingAverageInterval"`
+	//
+	// // MovingAverageWindow is the number of the window size of the moving average indicator.
+	// // The number of k-lines in the window. generally used window sizes are 7, 25 and 99 in the TradingView.
+	// MovingAverageWindow int `json:"movingAverageWindow"`
+	MovingAverageIntervalWindow types.IntervalWindow `json:"movingAverageIntervalWindow"`
+}
+
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -88,28 +105,6 @@ type Strategy struct {
 		High fixedpoint.Value `json:"high"`
 		Low  fixedpoint.Value `json:"low"`
 	} `json:"shortFundingRate"`
-
-	SupportDetection []struct {
-		Interval types.Interval `json:"interval"`
-		// MovingAverageType is the moving average indicator type that we want to use,
-		// it could be SMA or EWMA
-		MovingAverageType string `json:"movingAverageType"`
-
-		// MovingAverageInterval is the interval of k-lines for the moving average indicator to calculate,
-		// it could be "1m", "5m", "1h" and so on.  note that, the moving averages are calculated from
-		// the k-line data we subscribed
-		// MovingAverageInterval types.Interval `json:"movingAverageInterval"`
-		//
-		// // MovingAverageWindow is the number of the window size of the moving average indicator.
-		// // The number of k-lines in the window. generally used window sizes are 7, 25 and 99 in the TradingView.
-		// MovingAverageWindow int `json:"movingAverageWindow"`
-
-		MovingAverageIntervalWindow types.IntervalWindow `json:"movingAverageIntervalWindow"`
-
-		MinVolume fixedpoint.Value `json:"minVolume"`
-
-		MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
-	} `json:"supportDetection"`
 
 	SpotSession    string `json:"spotSession"`
 	FuturesSession string `json:"futuresSession"`
