@@ -837,9 +837,6 @@ func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.Exch
 	orderExecutor.SetMaxRetries(0)
 	orderExecutor.BindEnvironment(s.Environment)
 	orderExecutor.Bind()
-	orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
-		s.ProfitStats.AddTrade(trade)
-	})
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
 	})
