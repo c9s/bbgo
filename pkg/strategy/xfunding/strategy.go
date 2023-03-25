@@ -17,6 +17,14 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// WIP:
+// - track fee token price for cost
+// - buy enough BNB before creating positions
+// - transfer the rest BNB into the futures account
+// - add slack notification support
+// - use neutral position to calculate the position cost
+// - customize profit stats for this funding fee strategy
+
 const ID = "xfunding"
 
 // Position State Transitions:
@@ -290,6 +298,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
 	s.spotOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		s.NeutralPosition.AddTrade(trade)
+
 		// we act differently on the spot account
 		// when opening a position, we place orders on the spot account first, then the futures account,
 		// and we need to accumulate the used quote amount
@@ -331,6 +341,8 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.futuresOrderExecutor = s.allocateOrderExecutor(ctx, s.futuresSession, instanceID, s.FuturesPosition)
 	s.futuresOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		s.NeutralPosition.AddTrade(trade)
+
 		if s.positionType != types.PositionShort {
 			return
 		}
