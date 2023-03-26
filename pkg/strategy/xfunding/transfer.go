@@ -77,27 +77,20 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, currency
 	return nil
 }
 
-func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, currency string, trade types.Trade) error {
-
-	// base asset needs BUY trades
-	if trade.Side == types.SideTypeSell {
-		return nil
-	}
-
+func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, asset string, quantity fixedpoint.Value) error {
 	balances, err := s.spotSession.Exchange.QueryAccountBalances(ctx)
 	if err != nil {
 		return err
 	}
 
-	b, ok := balances[currency]
+	b, ok := balances[asset]
 	if !ok {
-		return fmt.Errorf("%s balance not found", currency)
+		return fmt.Errorf("%s balance not found", asset)
 	}
 
 	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
-	quantity := trade.Quantity
 	if b.Available.Compare(quantity) < 0 {
-		log.Infof("adding to pending base transfer: %s %s", quantity, currency)
+		log.Infof("adding to pending base transfer: %s %s", quantity, asset)
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return nil
 	}
@@ -113,8 +106,8 @@ func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, currency 
 
 	amount = fixedpoint.Min(rest, amount)
 
-	log.Infof("transfering in futures account asset %s %s", amount, currency)
-	if err := ex.TransferFuturesAccountAsset(ctx, currency, amount, types.TransferIn); err != nil {
+	log.Infof("transfering in futures account asset %s %s", amount, asset)
+	if err := ex.TransferFuturesAccountAsset(ctx, asset, amount, types.TransferIn); err != nil {
 		return err
 	}
 
