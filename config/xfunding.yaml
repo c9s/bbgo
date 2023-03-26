@@ -59,4 +59,4 @@ crossExchangeStrategies:
       low: -0.01%
 
     ## reset will reset the spot/futures positions, the transfer stats and the position state.
-    reset: true
+    # reset: true

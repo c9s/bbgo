@@ -9,7 +9,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/util/backoff"
 
@@ -157,6 +159,8 @@ type Strategy struct {
 	spotOrderExecutor, futuresOrderExecutor *bbgo.GeneralOrderExecutor
 	spotMarket, futuresMarket               types.Market
 
+	binanceFutures, binanceSpot *binance.Exchange
+
 	// positionType is the futures position type
 	// currently we only support short position for the positive funding rate
 	positionType types.PositionType
@@ -255,11 +259,13 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.spotMarket, _ = s.spotSession.Market(s.Symbol)
 	s.futuresMarket, _ = s.futuresSession.Market(s.Symbol)
 
-	binanceFutures, ok := s.futuresSession.Exchange.(*binance.Exchange)
+	var ok bool
+	s.binanceFutures, ok = s.futuresSession.Exchange.(*binance.Exchange)
 	if !ok {
 		return errNotBinanceExchange
 	}
-	binanceSpot, ok := s.spotSession.Exchange.(*binance.Exchange)
+
+	s.binanceSpot, ok = s.spotSession.Exchange.(*binance.Exchange)
 	if !ok {
 		return errNotBinanceExchange
 	}
@@ -283,9 +289,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	if s.ProfitStats == nil || s.Reset {
 		s.ProfitStats = &ProfitStats{
 			ProfitStats: types.NewProfitStats(s.Market),
-
 			// when receiving funding fee, the funding fee asset is the quote currency of that market.
 			FundingFeeCurrency: s.futuresMarket.QuoteCurrency,
+			TotalFundingFee:    fixedpoint.Zero,
+			FundingFeeRecords:  nil,
 		}
 	}
 
@@ -307,6 +314,12 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	log.Infof("loaded spot position: %s", s.SpotPosition.String())
 	log.Infof("loaded futures position: %s", s.FuturesPosition.String())
+	log.Infof("loaded neutral position: %s", s.NeutralPosition.String())
+
+	// sync funding fee txns
+	if !s.ProfitStats.LastFundingFeeTime.IsZero() {
+		s.syncFundingFeeRecords(ctx, s.ProfitStats.LastFundingFeeTime)
+	}
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
 	s.spotOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
@@ -334,7 +347,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			// if we have trade, try to query the balance and transfer the balance to the futures wallet account
 			// TODO: handle missing trades here. If the process crashed during the transfer, how to recover?
 			if err := backoff.RetryGeneral(ctx, func() error {
-				return s.transferIn(ctx, binanceSpot, s.spotMarket.BaseCurrency, trade)
+				return s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade)
 			}); err != nil {
 				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
 				return
@@ -358,7 +371,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		switch s.getPositionState() {
 		case PositionClosing:
 			if err := backoff.RetryGeneral(ctx, func() error {
-				return s.transferOut(ctx, binanceSpot, s.spotMarket.BaseCurrency, trade)
+				return s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade)
 			}); err != nil {
 				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
 				return
@@ -368,7 +381,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	})
 
 	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
-		s.queryAndDetectPremiumIndex(ctx, binanceFutures)
+		s.queryAndDetectPremiumIndex(ctx, s.binanceFutures)
 	}))
 
 	if binanceStream, ok := s.futuresSession.UserDataStream.(*binance.Stream); ok {
@@ -446,6 +459,29 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	}()
 
 	return nil
+}
+
+func (s *Strategy) syncFundingFeeRecords(ctx context.Context, since time.Time) {
+	now := time.Now()
+	q := batch.BinanceFuturesIncomeBatchQuery{
+		BinanceFuturesIncomeHistoryService: s.binanceFutures,
+	}
+
+	dataC, errC := q.Query(ctx, s.Symbol, binanceapi.FuturesIncomeFundingFee, since, now)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case income := <-dataC:
+			log.Infof("income: %+v", income)
+
+		case err := <-errC:
+			log.WithError(err).Errorf("unable to query futures income history")
+			return
+
+		}
+	}
 }
 
 func (s *Strategy) queryAndDetectPremiumIndex(ctx context.Context, binanceFutures *binance.Exchange) {
