@@ -708,7 +708,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	orderQuantity := fixedpoint.Max(diffQuantity, s.futuresMarket.MinQuantity)
 	orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
 	if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
-		log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
+		log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
 		return
 	}
 
