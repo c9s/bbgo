@@ -4,19 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/util/backoff"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+// WIP:
+// - track fee token price for cost
+// - buy enough BNB before creating positions
+// - transfer the rest BNB into the futures account
+// - add slack notification support
+// - use neutral position to calculate the position cost
+// - customize profit stats for this funding fee strategy
 
 const ID = "xfunding"
 
@@ -34,7 +43,28 @@ const (
 	PositionClosing
 )
 
+type MovingAverageConfig struct {
+	Interval types.Interval `json:"interval"`
+	// MovingAverageType is the moving average indicator type that we want to use,
+	// it could be SMA or EWMA
+	MovingAverageType string `json:"movingAverageType"`
+
+	// MovingAverageInterval is the interval of k-lines for the moving average indicator to calculate,
+	// it could be "1m", "5m", "1h" and so on.  note that, the moving averages are calculated from
+	// the k-line data we subscribed
+	// MovingAverageInterval types.Interval `json:"movingAverageInterval"`
+	//
+	// // MovingAverageWindow is the number of the window size of the moving average indicator.
+	// // The number of k-lines in the window. generally used window sizes are 7, 25 and 99 in the TradingView.
+	// MovingAverageWindow int `json:"movingAverageWindow"`
+	MovingAverageIntervalWindow types.IntervalWindow `json:"movingAverageIntervalWindow"`
+}
+
 var log = logrus.WithField("strategy", ID)
+
+var errNotBinanceExchange = errors.New("not binance exchange, currently only support binance exchange")
+
+var errDuplicatedFundingFeeTxnId = errors.New("duplicated funding fee txn id")
 
 func init() {
 	// Register the pointer of the strategy struct,
@@ -54,6 +84,15 @@ type State struct {
 	UsedQuoteInvestment fixedpoint.Value `json:"usedQuoteInvestment"`
 }
 
+func newState() *State {
+	return &State{
+		PositionState:       PositionClosed,
+		PendingBaseTransfer: fixedpoint.Zero,
+		TotalBaseTransfer:   fixedpoint.Zero,
+		UsedQuoteInvestment: fixedpoint.Zero,
+	}
+}
+
 func (s *State) Reset() {
 	s.PositionState = PositionClosed
 	s.PendingBaseTransfer = fixedpoint.Zero
@@ -68,7 +107,9 @@ type Strategy struct {
 	Environment *bbgo.Environment
 
 	// These fields will be filled from the config file (it translates YAML to JSON)
-	Symbol string       `json:"symbol"`
+	Symbol   string         `json:"symbol"`
+	Interval types.Interval `json:"interval"`
+
 	Market types.Market `json:"-"`
 
 	// Leverage is the leverage of the futures position
@@ -89,35 +130,25 @@ type Strategy struct {
 		Low  fixedpoint.Value `json:"low"`
 	} `json:"shortFundingRate"`
 
-	SupportDetection []struct {
-		Interval types.Interval `json:"interval"`
-		// MovingAverageType is the moving average indicator type that we want to use,
-		// it could be SMA or EWMA
-		MovingAverageType string `json:"movingAverageType"`
-
-		// MovingAverageInterval is the interval of k-lines for the moving average indicator to calculate,
-		// it could be "1m", "5m", "1h" and so on.  note that, the moving averages are calculated from
-		// the k-line data we subscribed
-		// MovingAverageInterval types.Interval `json:"movingAverageInterval"`
-		//
-		// // MovingAverageWindow is the number of the window size of the moving average indicator.
-		// // The number of k-lines in the window. generally used window sizes are 7, 25 and 99 in the TradingView.
-		// MovingAverageWindow int `json:"movingAverageWindow"`
-
-		MovingAverageIntervalWindow types.IntervalWindow `json:"movingAverageIntervalWindow"`
-
-		MinVolume fixedpoint.Value `json:"minVolume"`
-
-		MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
-	} `json:"supportDetection"`
-
 	SpotSession    string `json:"spotSession"`
 	FuturesSession string `json:"futuresSession"`
 	Reset          bool   `json:"reset"`
 
-	ProfitStats     *types.ProfitStats `persistence:"profit_stats"`
-	SpotPosition    *types.Position    `persistence:"spot_position"`
-	FuturesPosition *types.Position    `persistence:"futures_position"`
+	ProfitStats *ProfitStats `persistence:"profit_stats"`
+
+	// SpotPosition is used for the spot position (usually long position)
+	// so that we know how much spot we have bought and the average cost of the spot.
+	SpotPosition *types.Position `persistence:"spot_position"`
+
+	// FuturesPosition is used for the futures position
+	// this position is the reverse side of the spot position, when spot position is long, then the futures position will be short.
+	// but the base quantity should be the same as the spot position
+	FuturesPosition *types.Position `persistence:"futures_position"`
+
+	// NeutralPosition is used for sharing spot/futures position
+	// when creating the spot position and futures position, there will be a spread between the spot position and the futures position.
+	// this neutral position can calculate the spread cost between these two positions
+	NeutralPosition *types.Position `persistence:"neutral_position"`
 
 	State *State `persistence:"state"`
 
@@ -127,6 +158,8 @@ type Strategy struct {
 	spotSession, futuresSession             *bbgo.ExchangeSession
 	spotOrderExecutor, futuresOrderExecutor *bbgo.GeneralOrderExecutor
 	spotMarket, futuresMarket               types.Market
+
+	binanceFutures, binanceSpot *binance.Exchange
 
 	// positionType is the futures position type
 	// currently we only support short position for the positive funding rate
@@ -142,13 +175,8 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	spotSession := sessions[s.SpotSession]
 	futuresSession := sessions[s.FuturesSession]
 
-	spotSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-		Interval: types.Interval1m,
-	})
-
-	futuresSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{
-		Interval: types.Interval1m,
-	})
+	spotSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	futuresSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
@@ -160,6 +188,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.MinHoldingPeriod == 0 {
 		s.MinHoldingPeriod = types.Duration(3 * 24 * time.Hour)
+	}
+
+	if s.Interval == "" {
+		s.Interval = types.Interval1m
 	}
 
 	s.positionType = types.PositionShort
@@ -192,31 +224,29 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
-
-	var ma types.Float64Indicator
-	for _, detection := range s.SupportDetection {
-
-		switch strings.ToLower(detection.MovingAverageType) {
-		case "sma":
-			ma = standardIndicatorSet.SMA(types.IntervalWindow{
-				Interval: detection.MovingAverageIntervalWindow.Interval,
-				Window:   detection.MovingAverageIntervalWindow.Window,
-			})
-		case "ema", "ewma":
-			ma = standardIndicatorSet.EWMA(types.IntervalWindow{
-				Interval: detection.MovingAverageIntervalWindow.Interval,
-				Window:   detection.MovingAverageIntervalWindow.Window,
-			})
-		default:
-			ma = standardIndicatorSet.EWMA(types.IntervalWindow{
-				Interval: detection.MovingAverageIntervalWindow.Interval,
-				Window:   detection.MovingAverageIntervalWindow.Window,
-			})
+	// standardIndicatorSet := session.StandardIndicatorSet(s.Symbol)
+	/*
+		var ma types.Float64Indicator
+		for _, detection := range s.SupportDetection {
+			switch strings.ToLower(detection.MovingAverageType) {
+			case "sma":
+				ma = standardIndicatorSet.SMA(types.IntervalWindow{
+					Interval: detection.MovingAverageIntervalWindow.Interval,
+					Window:   detection.MovingAverageIntervalWindow.Window,
+				})
+			case "ema", "ewma":
+				ma = standardIndicatorSet.EWMA(types.IntervalWindow{
+					Interval: detection.MovingAverageIntervalWindow.Interval,
+					Window:   detection.MovingAverageIntervalWindow.Window,
+				})
+			default:
+				ma = standardIndicatorSet.EWMA(types.IntervalWindow{
+					Interval: detection.MovingAverageIntervalWindow.Interval,
+					Window:   detection.MovingAverageIntervalWindow.Window,
+				})
+			}
 		}
-	}
-	_ = ma
-
+	*/
 	return nil
 }
 
@@ -228,6 +258,17 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.spotMarket, _ = s.spotSession.Market(s.Symbol)
 	s.futuresMarket, _ = s.futuresSession.Market(s.Symbol)
+
+	var ok bool
+	s.binanceFutures, ok = s.futuresSession.Exchange.(*binance.Exchange)
+	if !ok {
+		return errNotBinanceExchange
+	}
+
+	s.binanceSpot, ok = s.spotSession.Exchange.(*binance.Exchange)
+	if !ok {
+		return errNotBinanceExchange
+	}
 
 	// adjust QuoteInvestment
 	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
@@ -246,32 +287,42 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	}
 
 	if s.ProfitStats == nil || s.Reset {
-		s.ProfitStats = types.NewProfitStats(s.Market)
-	}
-
-	if s.FuturesPosition == nil || s.Reset {
-		s.FuturesPosition = types.NewPositionFromMarket(s.futuresMarket)
+		s.ProfitStats = &ProfitStats{
+			ProfitStats: types.NewProfitStats(s.Market),
+			// when receiving funding fee, the funding fee asset is the quote currency of that market.
+			FundingFeeCurrency: s.futuresMarket.QuoteCurrency,
+			TotalFundingFee:    fixedpoint.Zero,
+			FundingFeeRecords:  nil,
+		}
 	}
 
 	if s.SpotPosition == nil || s.Reset {
 		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
 	}
 
+	if s.FuturesPosition == nil || s.Reset {
+		s.FuturesPosition = types.NewPositionFromMarket(s.futuresMarket)
+	}
+
+	if s.NeutralPosition == nil || s.Reset {
+		s.NeutralPosition = types.NewPositionFromMarket(s.futuresMarket)
+	}
+
 	if s.State == nil || s.Reset {
-		s.State = &State{
-			PositionState:       PositionClosed,
-			PendingBaseTransfer: fixedpoint.Zero,
-			TotalBaseTransfer:   fixedpoint.Zero,
-			UsedQuoteInvestment: fixedpoint.Zero,
-		}
+		s.State = newState()
 	}
 
 	log.Infof("loaded spot position: %s", s.SpotPosition.String())
 	log.Infof("loaded futures position: %s", s.FuturesPosition.String())
+	log.Infof("loaded neutral position: %s", s.NeutralPosition.String())
 
-	binanceFutures := s.futuresSession.Exchange.(*binance.Exchange)
-	binanceSpot := s.spotSession.Exchange.(*binance.Exchange)
-	_ = binanceSpot
+	// sync funding fee txns
+	if !s.ProfitStats.LastFundingFeeTime.IsZero() {
+		s.syncFundingFeeRecords(ctx, s.ProfitStats.LastFundingFeeTime)
+	}
+
+	// TEST CODE:
+	// s.syncFundingFeeRecords(ctx, time.Now().Add(-3*24*time.Hour))
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
 	s.spotOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
@@ -299,7 +350,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			// if we have trade, try to query the balance and transfer the balance to the futures wallet account
 			// TODO: handle missing trades here. If the process crashed during the transfer, how to recover?
 			if err := backoff.RetryGeneral(ctx, func() error {
-				return s.transferIn(ctx, binanceSpot, s.spotMarket.BaseCurrency, trade)
+				return s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade)
 			}); err != nil {
 				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
 				return
@@ -323,7 +374,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		switch s.getPositionState() {
 		case PositionClosing:
 			if err := backoff.RetryGeneral(ctx, func() error {
-				return s.transferOut(ctx, binanceSpot, s.spotMarket.BaseCurrency, trade)
+				return s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade)
 			}); err != nil {
 				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
 				return
@@ -332,21 +383,50 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 	})
 
-	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
-		s.queryAndDetectPremiumIndex(ctx, binanceFutures)
+	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
+		s.queryAndDetectPremiumIndex(ctx, s.binanceFutures)
 	}))
 
 	if binanceStream, ok := s.futuresSession.UserDataStream.(*binance.Stream); ok {
 		binanceStream.OnAccountUpdateEvent(func(e *binance.AccountUpdateEvent) {
-			log.Infof("onAccountUpdateEvent: %+v", e)
 			switch e.AccountUpdate.EventReasonType {
-
 			case binance.AccountUpdateEventReasonDeposit:
-
 			case binance.AccountUpdateEventReasonWithdraw:
-
 			case binance.AccountUpdateEventReasonFundingFee:
+				//  EventBase:{
+				// 		Event:ACCOUNT_UPDATE
+				// 		Time:1679760000932
+				// 	}
+				// 	Transaction:1679760000927
+				// 	AccountUpdate:{
+				// 			EventReasonType:FUNDING_FEE
+				// 			Balances:[{
+				// 					Asset:USDT
+				// 					WalletBalance:56.64251742
+				// 					CrossWalletBalance:56.64251742
+				// 					BalanceChange:-0.00037648
+				// 			}]
+				// 		}
+				// 	}
+				for _, b := range e.AccountUpdate.Balances {
+					if b.Asset != s.ProfitStats.FundingFeeCurrency {
+						continue
+					}
 
+					txnTime := time.UnixMilli(e.Time)
+					err := s.ProfitStats.AddFundingFee(FundingFee{
+						Asset:  b.Asset,
+						Amount: b.BalanceChange,
+						Txn:    e.Transaction,
+						Time:   txnTime,
+					})
+					if err != nil {
+						log.WithError(err).Error("unable to add funding fee to profitStats")
+					}
+				}
+
+				log.Infof("total collected funding fee: %f %s", s.ProfitStats.TotalFundingFee.Float64(), s.ProfitStats.FundingFeeCurrency)
+				bbgo.Sync(ctx, s)
 			}
 		})
 	}
@@ -382,6 +462,54 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	}()
 
 	return nil
+}
+
+func (s *Strategy) syncFundingFeeRecords(ctx context.Context, since time.Time) {
+	now := time.Now()
+
+	log.Infof("syncing funding fee records from the income history query: %s <=> %s", since, now)
+
+	defer log.Infof("sync funding fee records done")
+
+	q := batch.BinanceFuturesIncomeBatchQuery{
+		BinanceFuturesIncomeHistoryService: s.binanceFutures,
+	}
+
+	dataC, errC := q.Query(ctx, s.Symbol, binanceapi.FuturesIncomeFundingFee, since, now)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case income, ok := <-dataC:
+			if !ok {
+				return
+			}
+
+			log.Infof("income: %+v", income)
+			switch income.IncomeType {
+			case binanceapi.FuturesIncomeFundingFee:
+				err := s.ProfitStats.AddFundingFee(FundingFee{
+					Asset:  income.Asset,
+					Amount: income.Income,
+					Txn:    income.TranId,
+					Time:   income.Time.Time(),
+				})
+				if err != nil {
+					log.WithError(err).Errorf("can not add funding fee record to ProfitStats")
+				}
+			}
+
+		case err, ok := <-errC:
+			if !ok {
+				return
+			}
+
+			log.WithError(err).Errorf("unable to query futures income history")
+			return
+
+		}
+	}
 }
 
 func (s *Strategy) queryAndDetectPremiumIndex(ctx context.Context, binanceFutures *binance.Exchange) {
@@ -810,11 +938,16 @@ func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.Exch
 	orderExecutor.SetMaxRetries(0)
 	orderExecutor.BindEnvironment(s.Environment)
 	orderExecutor.Bind()
-	orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
-		s.ProfitStats.AddTrade(trade)
-	})
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		bbgo.Sync(ctx, s)
+	})
+	orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _ fixedpoint.Value, _ fixedpoint.Value) {
+		s.ProfitStats.AddTrade(trade)
+
+		if profit, netProfit, madeProfit := s.NeutralPosition.AddTrade(trade); madeProfit {
+			p := s.NeutralPosition.NewProfit(trade, profit, netProfit)
+			s.ProfitStats.AddProfit(p)
+		}
 	})
 	return orderExecutor
 }

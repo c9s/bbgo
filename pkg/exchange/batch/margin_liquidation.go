@@ -11,7 +11,7 @@ import (
 )
 
 type MarginLiquidationBatchQuery struct {
-	types.MarginHistory
+	types.MarginHistoryService
 }
 
 func (e *MarginLiquidationBatchQuery) Query(ctx context.Context, startTime, endTime time.Time) (c chan types.MarginLiquidation, errC chan error) {

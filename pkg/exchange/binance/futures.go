@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/google/uuid"
 	"go.uber.org/multierr"
@@ -348,4 +349,38 @@ func newFuturesClientOrderID(originalID string) (clientOrderID string) {
 	}
 
 	return clientOrderID
+}
+
+func (e *Exchange) queryFuturesDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	res, err := e.futuresClient.NewDepthService().Symbol(symbol).Do(ctx)
+	if err != nil {
+		return snapshot, finalUpdateID, err
+	}
+
+	response := &binance.DepthResponse{
+		LastUpdateID: res.LastUpdateID,
+		Bids:         res.Bids,
+		Asks:         res.Asks,
+	}
+
+	return convertDepth(snapshot, symbol, finalUpdateID, response)
+}
+
+// QueryFuturesIncomeHistory queries the income history on the binance futures account
+// This is more binance futures specific API, the convert function is not designed yet.
+// TODO: consider other futures platforms and design the common data structure for this
+func (e *Exchange) QueryFuturesIncomeHistory(ctx context.Context, symbol string, incomeType binanceapi.FuturesIncomeType, startTime, endTime *time.Time) ([]binanceapi.FuturesIncome, error) {
+	req := e.futuresClient2.NewFuturesGetIncomeHistoryRequest()
+	req.Symbol(symbol)
+	req.IncomeType(incomeType)
+	if startTime != nil {
+		req.StartTime(*startTime)
+	}
+
+	if endTime != nil {
+		req.EndTime(*endTime)
+	}
+
+	resp, err := req.Do(ctx)
+	return resp, err
 }

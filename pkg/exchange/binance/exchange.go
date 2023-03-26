@@ -88,6 +88,8 @@ type Exchange struct {
 
 	// client2 is a newer version of the binance api client implemented by ourselves.
 	client2 *binanceapi.RestClient
+
+	futuresClient2 *binanceapi.FuturesRestClient
 }
 
 var timeSetterOnce sync.Once
@@ -111,17 +113,20 @@ func New(key, secret string) *Exchange {
 	}
 
 	client2 := binanceapi.NewClient(client.BaseURL)
+	futuresClient2 := binanceapi.NewFuturesRestClient(futuresClient.BaseURL)
 
 	ex := &Exchange{
-		key:           key,
-		secret:        secret,
-		client:        client,
-		futuresClient: futuresClient,
-		client2:       client2,
+		key:            key,
+		secret:         secret,
+		client:         client,
+		futuresClient:  futuresClient,
+		client2:        client2,
+		futuresClient2: futuresClient2,
 	}
 
 	if len(key) > 0 && len(secret) > 0 {
 		client2.Auth(key, secret)
+		futuresClient2.Auth(key, secret)
 
 		ctx := context.Background()
 		go timeSetterOnce.Do(func() {
@@ -1287,21 +1292,6 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 		MakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.075), // 0.075% with BNB
 		TakerFeeRate: fixedpoint.NewFromFloat(0.01 * 0.075), // 0.075% with BNB
 	}
-}
-
-func (e *Exchange) queryFuturesDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
-	res, err := e.futuresClient.NewDepthService().Symbol(symbol).Do(ctx)
-	if err != nil {
-		return snapshot, finalUpdateID, err
-	}
-
-	response := &binance.DepthResponse{
-		LastUpdateID: res.LastUpdateID,
-		Bids:         res.Bids,
-		Asks:         res.Asks,
-	}
-
-	return convertDepth(snapshot, symbol, finalUpdateID, response)
 }
 
 // QueryDepth query the order book depth of a symbol

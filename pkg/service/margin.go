@@ -17,7 +17,7 @@ type MarginService struct {
 }
 
 func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset string, startTime time.Time) error {
-	api, ok := ex.(types.MarginHistory)
+	api, ok := ex.(types.MarginHistoryService)
 	if !ok {
 		return nil
 	}
@@ -38,7 +38,7 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 			Type:   types.MarginLoan{},
 			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
 				query := &batch.MarginLoanBatchQuery{
-					MarginHistory: api,
+					MarginHistoryService: api,
 				}
 				return query.Query(ctx, asset, startTime, endTime)
 			},
@@ -55,7 +55,7 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 			Type:   types.MarginRepay{},
 			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
 				query := &batch.MarginRepayBatchQuery{
-					MarginHistory: api,
+					MarginHistoryService: api,
 				}
 				return query.Query(ctx, asset, startTime, endTime)
 			},
@@ -72,7 +72,7 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 			Type:   types.MarginInterest{},
 			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
 				query := &batch.MarginInterestBatchQuery{
-					MarginHistory: api,
+					MarginHistoryService: api,
 				}
 				return query.Query(ctx, asset, startTime, endTime)
 			},
@@ -90,7 +90,7 @@ func (s *MarginService) Sync(ctx context.Context, ex types.Exchange, asset strin
 			Type:   types.MarginLiquidation{},
 			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
 				query := &batch.MarginLiquidationBatchQuery{
-					MarginHistory: api,
+					MarginHistoryService: api,
 				}
 				return query.Query(ctx, startTime, endTime)
 			},
