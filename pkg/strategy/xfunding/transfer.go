@@ -13,33 +13,27 @@ type FuturesTransfer interface {
 	QueryAccountBalances(ctx context.Context) (types.BalanceMap, error)
 }
 
-func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, currency string, trade types.Trade) error {
-	// base asset needs BUY trades
-	if trade.Side != types.SideTypeBuy {
-		return nil
-	}
-
+func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset string, tradeQuantity fixedpoint.Value) error {
 	// if transfer done
 	if s.State.TotalBaseTransfer.IsZero() {
 		return nil
 	}
 
 	// de-leverage and get the collateral base quantity for transfer
-	quantity := trade.Quantity
-	quantity = quantity.Div(s.Leverage)
+	quantity := tradeQuantity.Div(s.Leverage)
 
 	balances, err := s.futuresSession.Exchange.QueryAccountBalances(ctx)
 	if err != nil {
-		log.Infof("adding to pending base transfer: %s %s + %s", quantity.String(), currency, s.State.PendingBaseTransfer.String())
+		log.Infof("adding to pending base transfer: %s %s + %s", quantity.String(), asset, s.State.PendingBaseTransfer.String())
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return err
 	}
 
-	b, ok := balances[currency]
+	b, ok := balances[asset]
 	if !ok {
-		log.Infof("adding to pending base transfer: %s %s + %s", quantity.String(), currency, s.State.PendingBaseTransfer.String())
+		log.Infof("adding to pending base transfer: %s %s + %s", quantity.String(), asset, s.State.PendingBaseTransfer.String())
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
-		return fmt.Errorf("%s balance not found", currency)
+		return fmt.Errorf("%s balance not found", asset)
 	}
 
 	// add the previous pending base transfer and the current trade quantity
@@ -53,7 +47,7 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, currency
 
 	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
 	if amount.IsZero() {
-		log.Infof("adding to pending base transfer: %s %s + %s ", quantity.String(), currency, s.State.PendingBaseTransfer.String())
+		log.Infof("adding to pending base transfer: %s %s + %s ", quantity.String(), asset, s.State.PendingBaseTransfer.String())
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return nil
 	}
@@ -64,8 +58,8 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, currency
 
 	// if s.State.TotalBaseTransfer.Compare(collateralBase)
 
-	log.Infof("transfering out futures account asset %s %s", amount, currency)
-	if err := ex.TransferFuturesAccountAsset(ctx, currency, amount, types.TransferOut); err != nil {
+	log.Infof("transfering out futures account asset %s %s", amount, asset)
+	if err := ex.TransferFuturesAccountAsset(ctx, asset, amount, types.TransferOut); err != nil {
 		return err
 	}
 
