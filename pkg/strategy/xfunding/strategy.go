@@ -481,19 +481,25 @@ func (s *Strategy) handleAccountUpdate(ctx context.Context, e *binance.AccountUp
 			}
 
 			txnTime := time.UnixMilli(e.Time)
-			err := s.ProfitStats.AddFundingFee(FundingFee{
+			fee := FundingFee{
 				Asset:  b.Asset,
 				Amount: b.BalanceChange,
 				Txn:    e.Transaction,
 				Time:   txnTime,
-			})
+			}
+			err := s.ProfitStats.AddFundingFee(fee)
 			if err != nil {
 				log.WithError(err).Error("unable to add funding fee to profitStats")
+				continue
 			}
+
+			bbgo.Notify(fee)
 		}
 
 		log.Infof("total collected funding fee: %f %s", s.ProfitStats.TotalFundingFee.Float64(), s.ProfitStats.FundingFeeCurrency)
 		bbgo.Sync(ctx, s)
+
+		bbgo.Notify(s.ProfitStats)
 	}
 }
 
@@ -679,6 +685,10 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	// if - futures position < max futures position, increase it
 	if futuresBase.Neg().Compare(maxFuturesBasePosition) >= 0 {
 		s.setPositionState(PositionReady)
+
+		bbgo.Notify("SpotPosition", s.SpotPosition)
+		bbgo.Notify("FuturesPosition", s.FuturesPosition)
+		bbgo.Notify("NeutralPosition", s.NeutralPosition)
 
 		// DEBUG CODE - triggering closing position automatically
 		// s.startClosingPosition()
