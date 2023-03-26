@@ -376,7 +376,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			// if we have trade, try to query the balance and transfer the balance to the futures wallet account
 			// TODO: handle missing trades here. If the process crashed during the transfer, how to recover?
 			if err := backoff.RetryGeneral(ctx, func() error {
-				return s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade)
+				return s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade.Quantity)
 			}); err != nil {
 				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
 				return
