@@ -168,6 +168,8 @@ type Strategy struct {
 	// positionType is the futures position type
 	// currently we only support short position for the positive funding rate
 	positionType types.PositionType
+
+	minQuantity fixedpoint.Value
 }
 
 func (s *Strategy) ID() string {
@@ -307,6 +309,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			FundingFeeRecords:  nil,
 		}
 	}
+
+	// common min quantity
+	s.minQuantity = fixedpoint.Max(s.futuresMarket.MinQuantity, s.spotMarket.MinQuantity)
 
 	if s.SpotPosition == nil || s.Reset {
 		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
@@ -607,7 +612,7 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 	if futuresBase.Compare(fixedpoint.Zero) < 0 {
 		orderPrice := ticker.Buy
 		orderQuantity := futuresBase.Abs()
-		orderQuantity = fixedpoint.Max(orderQuantity, s.futuresMarket.MinQuantity)
+		orderQuantity = fixedpoint.Max(orderQuantity, s.minQuantity)
 		orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
 		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
 			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
@@ -705,7 +710,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 
 	log.Infof("position diff quantity: %s", diffQuantity.String())
 
-	orderQuantity := fixedpoint.Max(diffQuantity, s.futuresMarket.MinQuantity)
+	orderQuantity := fixedpoint.Max(diffQuantity, s.minQuantity)
 	orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
 	if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
 		log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
@@ -852,7 +857,7 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 
 	log.Infof("initial spot order quantity %s", orderQuantity.String())
 
-	orderQuantity = fixedpoint.Max(orderQuantity, s.spotMarket.MinQuantity)
+	orderQuantity = fixedpoint.Max(orderQuantity, s.minQuantity)
 	orderQuantity = s.spotMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
 
 	if s.spotMarket.IsDustQuantity(orderQuantity, orderPrice) {
