@@ -54,7 +54,7 @@ crossExchangeStrategies:
     ## shortFundingRate is the funding rate range you want to create your position
     shortFundingRate:
       ## when funding rate is higher than this high value, the strategy will start buying spot and opening a short position
-      high: 0.0005%
+      high: 0.0001%
       ## when funding rate is lower than this low value, the strategy will start closing futures position and sell the spot
       low: -0.01%
 

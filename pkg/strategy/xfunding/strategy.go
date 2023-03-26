@@ -332,6 +332,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		return errors.New("reset and closeFuturesPosition can not be used together")
 	}
 
+	log.Infof("state: %+v", s.State)
 	log.Infof("loaded spot position: %s", s.SpotPosition.String())
 	log.Infof("loaded futures position: %s", s.FuturesPosition.String())
 	log.Infof("loaded neutral position: %s", s.NeutralPosition.String())
@@ -672,40 +673,46 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		s.State.TotalBaseTransfer.Mul(s.Leverage))
 
 	// if - futures position < max futures position, increase it
-	if futuresBase.Neg().Compare(maxFuturesBasePosition) < 0 {
-		orderPrice := ticker.Sell
-		diffQuantity := maxFuturesBasePosition.Sub(futuresBase.Neg())
+	if futuresBase.Neg().Compare(maxFuturesBasePosition) >= 0 {
+		s.setPositionState(PositionReady)
 
-		if diffQuantity.Sign() < 0 {
-			log.Errorf("unexpected negative position diff: %s", diffQuantity.String())
-			return
-		}
-
-		log.Infof("position diff quantity: %s", diffQuantity.String())
-
-		orderQuantity := fixedpoint.Max(diffQuantity, s.futuresMarket.MinQuantity)
-		orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
-		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
-			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
-			return
-		}
-
-		createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeSell,
-			Type:     types.OrderTypeLimitMaker,
-			Quantity: orderQuantity,
-			Price:    orderPrice,
-			Market:   s.futuresMarket,
-		})
-
-		if err != nil {
-			log.WithError(err).Errorf("can not submit order")
-			return
-		}
-
-		log.Infof("created orders: %+v", createdOrders)
+		// DEBUG CODE - triggering closing position automatically
+		// s.startClosingPosition()
+		return
 	}
+
+	orderPrice := ticker.Sell
+	diffQuantity := maxFuturesBasePosition.Sub(futuresBase.Neg())
+
+	if diffQuantity.Sign() < 0 {
+		log.Errorf("unexpected negative position diff: %s", diffQuantity.String())
+		return
+	}
+
+	log.Infof("position diff quantity: %s", diffQuantity.String())
+
+	orderQuantity := fixedpoint.Max(diffQuantity, s.futuresMarket.MinQuantity)
+	orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
+	if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
+		log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
+		return
+	}
+
+	createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeLimitMaker,
+		Quantity: orderQuantity,
+		Price:    orderPrice,
+		Market:   s.futuresMarket,
+	})
+
+	if err != nil {
+		log.WithError(err).Errorf("can not submit order")
+		return
+	}
+
+	log.Infof("created orders: %+v", createdOrders)
 }
 
 func (s *Strategy) syncSpotPosition(ctx context.Context) {
@@ -812,11 +819,7 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 	s.mu.Unlock()
 
 	if usedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
-		// stop increase the position
-		s.setPositionState(PositionReady)
-
-		// DEBUG CODE - triggering closing position automatically
-		// s.startClosingPosition()
+		// stop increase the stop position
 		return
 	}
 
