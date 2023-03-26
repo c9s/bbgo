@@ -8,13 +8,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type FundingFee struct {
-	Asset  string           `json:"asset"`
-	Amount fixedpoint.Value `json:"amount"`
-	Txn    int64            `json:"txn"`
-	Time   time.Time        `json:"time"`
-}
-
 type ProfitStats struct {
 	*types.ProfitStats
 
