@@ -82,6 +82,15 @@ type State struct {
 	UsedQuoteInvestment fixedpoint.Value `json:"usedQuoteInvestment"`
 }
 
+func newState() *State {
+	return &State{
+		PositionState:       PositionClosed,
+		PendingBaseTransfer: fixedpoint.Zero,
+		TotalBaseTransfer:   fixedpoint.Zero,
+		UsedQuoteInvestment: fixedpoint.Zero,
+	}
+}
+
 func (s *State) Reset() {
 	s.PositionState = PositionClosed
 	s.PendingBaseTransfer = fixedpoint.Zero
@@ -246,6 +255,15 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.spotMarket, _ = s.spotSession.Market(s.Symbol)
 	s.futuresMarket, _ = s.futuresSession.Market(s.Symbol)
 
+	binanceFutures, ok := s.futuresSession.Exchange.(*binance.Exchange)
+	if !ok {
+		return errNotBinanceExchange
+	}
+	binanceSpot, ok := s.spotSession.Exchange.(*binance.Exchange)
+	if !ok {
+		return errNotBinanceExchange
+	}
+
 	// adjust QuoteInvestment
 	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
 		originalQuoteInvestment := s.QuoteInvestment
@@ -284,25 +302,11 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	}
 
 	if s.State == nil || s.Reset {
-		s.State = &State{
-			PositionState:       PositionClosed,
-			PendingBaseTransfer: fixedpoint.Zero,
-			TotalBaseTransfer:   fixedpoint.Zero,
-			UsedQuoteInvestment: fixedpoint.Zero,
-		}
+		s.State = newState()
 	}
 
 	log.Infof("loaded spot position: %s", s.SpotPosition.String())
 	log.Infof("loaded futures position: %s", s.FuturesPosition.String())
-
-	binanceFutures, ok := s.futuresSession.Exchange.(*binance.Exchange)
-	if !ok {
-		return errNotBinanceExchange
-	}
-	binanceSpot, ok := s.spotSession.Exchange.(*binance.Exchange)
-	if !ok {
-		return errNotBinanceExchange
-	}
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
 	s.spotOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
