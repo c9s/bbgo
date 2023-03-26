@@ -126,6 +126,7 @@ func New(key, secret string) *Exchange {
 
 	if len(key) > 0 && len(secret) > 0 {
 		client2.Auth(key, secret)
+		futuresClient2.Auth(key, secret)
 
 		ctx := context.Background()
 		go timeSetterOnce.Do(func() {
