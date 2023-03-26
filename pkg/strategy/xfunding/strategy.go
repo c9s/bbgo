@@ -418,45 +418,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	if binanceStream, ok := s.futuresSession.UserDataStream.(*binance.Stream); ok {
 		binanceStream.OnAccountUpdateEvent(func(e *binance.AccountUpdateEvent) {
-			switch e.AccountUpdate.EventReasonType {
-			case binance.AccountUpdateEventReasonDeposit:
-			case binance.AccountUpdateEventReasonWithdraw:
-			case binance.AccountUpdateEventReasonFundingFee:
-				//  EventBase:{
-				// 		Event:ACCOUNT_UPDATE
-				// 		Time:1679760000932
-				// 	}
-				// 	Transaction:1679760000927
-				// 	AccountUpdate:{
-				// 			EventReasonType:FUNDING_FEE
-				// 			Balances:[{
-				// 					Asset:USDT
-				// 					WalletBalance:56.64251742
-				// 					CrossWalletBalance:56.64251742
-				// 					BalanceChange:-0.00037648
-				// 			}]
-				// 		}
-				// 	}
-				for _, b := range e.AccountUpdate.Balances {
-					if b.Asset != s.ProfitStats.FundingFeeCurrency {
-						continue
-					}
-
-					txnTime := time.UnixMilli(e.Time)
-					err := s.ProfitStats.AddFundingFee(FundingFee{
-						Asset:  b.Asset,
-						Amount: b.BalanceChange,
-						Txn:    e.Transaction,
-						Time:   txnTime,
-					})
-					if err != nil {
-						log.WithError(err).Error("unable to add funding fee to profitStats")
-					}
-				}
-
-				log.Infof("total collected funding fee: %f %s", s.ProfitStats.TotalFundingFee.Float64(), s.ProfitStats.FundingFeeCurrency)
-				bbgo.Sync(ctx, s)
-			}
+			s.handleAccountUpdate(ctx, e)
 		})
 	}
 
@@ -491,6 +453,48 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	}()
 
 	return nil
+}
+
+func (s *Strategy) handleAccountUpdate(ctx context.Context, e *binance.AccountUpdateEvent) {
+	switch e.AccountUpdate.EventReasonType {
+	case binance.AccountUpdateEventReasonDeposit:
+	case binance.AccountUpdateEventReasonWithdraw:
+	case binance.AccountUpdateEventReasonFundingFee:
+		//  EventBase:{
+		// 		Event:ACCOUNT_UPDATE
+		// 		Time:1679760000932
+		// 	}
+		// 	Transaction:1679760000927
+		// 	AccountUpdate:{
+		// 			EventReasonType:FUNDING_FEE
+		// 			Balances:[{
+		// 					Asset:USDT
+		// 					WalletBalance:56.64251742
+		// 					CrossWalletBalance:56.64251742
+		// 					BalanceChange:-0.00037648
+		// 			}]
+		// 		}
+		// 	}
+		for _, b := range e.AccountUpdate.Balances {
+			if b.Asset != s.ProfitStats.FundingFeeCurrency {
+				continue
+			}
+
+			txnTime := time.UnixMilli(e.Time)
+			err := s.ProfitStats.AddFundingFee(FundingFee{
+				Asset:  b.Asset,
+				Amount: b.BalanceChange,
+				Txn:    e.Transaction,
+				Time:   txnTime,
+			})
+			if err != nil {
+				log.WithError(err).Error("unable to add funding fee to profitStats")
+			}
+		}
+
+		log.Infof("total collected funding fee: %f %s", s.ProfitStats.TotalFundingFee.Float64(), s.ProfitStats.FundingFeeCurrency)
+		bbgo.Sync(ctx, s)
+	}
 }
 
 func (s *Strategy) syncFundingFeeRecords(ctx context.Context, since time.Time) {
