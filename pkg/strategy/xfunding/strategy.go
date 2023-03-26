@@ -321,6 +321,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		s.syncFundingFeeRecords(ctx, s.ProfitStats.LastFundingFeeTime)
 	}
 
+	// TEST CODE:
+	// s.syncFundingFeeRecords(ctx, time.Now().Add(-3*24*time.Hour))
+
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
 	s.spotOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
 		// we act differently on the spot account
@@ -463,6 +466,11 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 func (s *Strategy) syncFundingFeeRecords(ctx context.Context, since time.Time) {
 	now := time.Now()
+
+	log.Infof("syncing funding fee records from the income history query: %s <=> %s", since, now)
+
+	defer log.Infof("sync funding fee records done")
+
 	q := batch.BinanceFuturesIncomeBatchQuery{
 		BinanceFuturesIncomeHistoryService: s.binanceFutures,
 	}
@@ -473,10 +481,30 @@ func (s *Strategy) syncFundingFeeRecords(ctx context.Context, since time.Time) {
 		case <-ctx.Done():
 			return
 
-		case income := <-dataC:
-			log.Infof("income: %+v", income)
+		case income, ok := <-dataC:
+			if !ok {
+				return
+			}
 
-		case err := <-errC:
+			log.Infof("income: %+v", income)
+			switch income.IncomeType {
+			case binanceapi.FuturesIncomeFundingFee:
+				err := s.ProfitStats.AddFundingFee(FundingFee{
+					Asset:  income.Asset,
+					Amount: income.Income,
+					Txn:    income.TranId,
+					Time:   income.Time.Time(),
+				})
+				if err != nil {
+					log.WithError(err).Errorf("can not add funding fee record to ProfitStats")
+				}
+			}
+
+		case err, ok := <-errC:
+			if !ok {
+				return
+			}
+
 			log.WithError(err).Errorf("unable to query futures income history")
 			return
 
