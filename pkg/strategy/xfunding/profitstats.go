@@ -2,6 +2,7 @@ package xfunding
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -11,6 +12,7 @@ type FundingFee struct {
 	Asset  string           `json:"asset"`
 	Amount fixedpoint.Value `json:"amount"`
 	Txn    int64            `json:"txn"`
+	Time   time.Time        `json:"time"`
 }
 
 type ProfitStats struct {
@@ -20,6 +22,7 @@ type ProfitStats struct {
 	TotalFundingFee    fixedpoint.Value `json:"totalFundingFee"`
 	FundingFeeRecords  []FundingFee     `json:"fundingFeeRecords"`
 	LastFundingFeeTxn  int64            `json:"lastFundingFeeTxn"`
+	LastFundingFeeTime time.Time        `json:"lastFundingFeeTime"`
 }
 
 func (s *ProfitStats) AddFundingFee(fee FundingFee) error {
@@ -36,5 +39,6 @@ func (s *ProfitStats) AddFundingFee(fee FundingFee) error {
 	s.FundingFeeRecords = append(s.FundingFeeRecords, fee)
 	s.TotalFundingFee = s.TotalFundingFee.Add(fee.Amount)
 	s.LastFundingFeeTxn = fee.Txn
+	s.LastFundingFeeTime = fee.Time
 	return nil
 }
