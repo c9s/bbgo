@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/slack-go/slack"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/style"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -16,6 +19,20 @@ type ProfitStats struct {
 	FundingFeeRecords  []FundingFee     `json:"fundingFeeRecords"`
 	LastFundingFeeTxn  int64            `json:"lastFundingFeeTxn"`
 	LastFundingFeeTime time.Time        `json:"lastFundingFeeTime"`
+}
+
+func (s *ProfitStats) SlackAttachment() slack.Attachment {
+	var fields []slack.AttachmentField
+	var totalProfit = fmt.Sprintf("Total Funding Fee Profit: %s %s", style.PnLSignString(s.TotalFundingFee), s.FundingFeeCurrency)
+
+	return slack.Attachment{
+		Title: totalProfit,
+		Color: style.PnLColor(s.TotalFundingFee),
+		// Pretext:       "",
+		// Text:  text,
+		Fields: fields,
+		Footer: fmt.Sprintf("Last Funding Fee Transation ID: %d Last Funding Fee Time %s", s.LastFundingFeeTxn, s.LastFundingFeeTime.Format(time.RFC822)),
+	}
 }
 
 func (s *ProfitStats) AddFundingFee(fee FundingFee) error {
