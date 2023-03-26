@@ -369,13 +369,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	if binanceStream, ok := s.futuresSession.UserDataStream.(*binance.Stream); ok {
 		binanceStream.OnAccountUpdateEvent(func(e *binance.AccountUpdateEvent) {
-			log.Infof("onAccountUpdateEvent: %+v", e)
 			switch e.AccountUpdate.EventReasonType {
-
 			case binance.AccountUpdateEventReasonDeposit:
-
 			case binance.AccountUpdateEventReasonWithdraw:
-
 			case binance.AccountUpdateEventReasonFundingFee:
 				//  EventBase:{
 				// 		Event:ACCOUNT_UPDATE
@@ -397,10 +393,12 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 						continue
 					}
 
+					txnTime := time.UnixMilli(e.Time)
 					err := s.ProfitStats.AddFundingFee(FundingFee{
 						Asset:  b.Asset,
 						Amount: b.BalanceChange,
 						Txn:    e.Transaction,
+						Time:   txnTime,
 					})
 					if err != nil {
 						log.WithError(err).Error("unable to add funding fee to profitStats")
