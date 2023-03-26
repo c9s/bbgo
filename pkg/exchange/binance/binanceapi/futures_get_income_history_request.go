@@ -35,7 +35,7 @@ type FuturesIncome struct {
 	Asset      string                     `json:"asset"`
 	Info       string                     `json:"info"`
 	Time       types.MillisecondTimestamp `json:"time"`
-	TranId     string                     `json:"tranId"`
+	TranId     int64                      `json:"tranId"`
 	TradeId    string                     `json:"tradeId"`
 }
 
