@@ -691,6 +691,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	if futuresBase.Neg().Compare(maxFuturesBasePosition) >= 0 {
 		s.setPositionState(PositionReady)
 
+		bbgo.Notify("Position Ready")
 		bbgo.Notify("SpotPosition", s.SpotPosition)
 		bbgo.Notify("FuturesPosition", s.FuturesPosition)
 		bbgo.Notify("NeutralPosition", s.NeutralPosition)
