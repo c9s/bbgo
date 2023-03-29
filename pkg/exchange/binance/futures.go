@@ -67,6 +67,9 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 	if err != nil {
 		return nil, err
 	}
+
+	// req := e.futuresClient2.NewFuturesGetAccountBalanceRequest()
+
 	accountBalances, err := e.futuresClient.NewGetBalanceService().Do(ctx)
 	if err != nil {
 		return nil, err
