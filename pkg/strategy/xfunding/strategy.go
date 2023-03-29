@@ -418,7 +418,12 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			if err := s.futuresOrderExecutor.ClosePosition(ctx, fixedpoint.One); err != nil {
 				log.WithError(err).Errorf("close position error")
 			}
+
+			if err := s.resetTransfer(ctx, s.binanceSpot, s.spotMarket.BaseCurrency); err != nil {
+				log.WithError(err).Errorf("transfer error")
+			}
 		}
+
 	})
 
 	if binanceStream, ok := s.futuresSession.UserDataStream.(*binance.Stream); ok {

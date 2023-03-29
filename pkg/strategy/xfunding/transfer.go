@@ -13,6 +13,21 @@ type FuturesTransfer interface {
 	QueryAccountBalances(ctx context.Context) (types.BalanceMap, error)
 }
 
+func (s *Strategy) resetTransfer(ctx context.Context, ex FuturesTransfer, asset string) error {
+	balances, err := s.futuresSession.Exchange.QueryAccountBalances(ctx)
+	if err != nil {
+		return err
+	}
+
+	b, ok := balances[asset]
+	if !ok {
+		return fmt.Errorf("%s balance not found", asset)
+	}
+
+	log.Infof("transfering out futures account asset %s %s", b.Available, asset)
+	return ex.TransferFuturesAccountAsset(ctx, asset, b.Available, types.TransferOut)
+}
+
 func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset string, tradeQuantity fixedpoint.Value) error {
 	// if transfer done
 	if s.State.TotalBaseTransfer.IsZero() {
