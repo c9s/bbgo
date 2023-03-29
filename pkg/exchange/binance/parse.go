@@ -793,8 +793,8 @@ type OrderTrade struct {
 	CommissionAmount fixedpoint.Value `json:"n"`
 	CommissionAsset  string           `json:"N"`
 
-	OrderTradeTime int64 `json:"T"`
-	TradeId        int64 `json:"t"`
+	OrderTradeTime types.MillisecondTimestamp `json:"T"`
+	TradeId        int64                      `json:"t"`
 
 	BidsNotional string `json:"b"`
 	AskNotional  string `json:"a"`
@@ -867,7 +867,6 @@ func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
 		return nil, errors.New("execution report type is not for futures order")
 	}
 
-	orderCreationTime := time.Unix(0, e.OrderTrade.OrderTradeTime*int64(time.Millisecond))
 	return &types.Order{
 		Exchange: types.ExchangeBinance,
 		SubmitOrder: types.SubmitOrder{
@@ -882,7 +881,8 @@ func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
 		OrderID:          uint64(e.OrderTrade.OrderId),
 		Status:           toGlobalFuturesOrderStatus(futures.OrderStatusType(e.OrderTrade.CurrentOrderStatus)),
 		ExecutedQuantity: e.OrderTrade.OrderFilledAccumulatedQuantity,
-		CreationTime:     types.Time(orderCreationTime),
+		CreationTime:     types.Time(e.OrderTrade.OrderTradeTime.Time()), // FIXME: find the correct field for creation time
+		UpdateTime:       types.Time(e.OrderTrade.OrderTradeTime.Time()),
 	}, nil
 }
 
@@ -891,7 +891,6 @@ func (e *OrderTradeUpdateEvent) TradeFutures() (*types.Trade, error) {
 		return nil, errors.New("execution report is not a futures trade")
 	}
 
-	tt := time.Unix(0, e.OrderTrade.OrderTradeTime*int64(time.Millisecond))
 	return &types.Trade{
 		ID:            uint64(e.OrderTrade.TradeId),
 		Exchange:      types.ExchangeBinance,
@@ -903,7 +902,7 @@ func (e *OrderTradeUpdateEvent) TradeFutures() (*types.Trade, error) {
 		QuoteQuantity: e.OrderTrade.LastFilledPrice.Mul(e.OrderTrade.OrderLastFilledQuantity),
 		IsBuyer:       e.OrderTrade.Side == "BUY",
 		IsMaker:       e.OrderTrade.IsMaker,
-		Time:          types.Time(tt),
+		Time:          types.Time(e.OrderTrade.OrderTradeTime.Time()),
 		Fee:           e.OrderTrade.CommissionAmount,
 		FeeCurrency:   e.OrderTrade.CommissionAsset,
 	}, nil
