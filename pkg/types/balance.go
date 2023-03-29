@@ -25,6 +25,8 @@ type Balance struct {
 
 	// NetAsset = (Available + Locked) - Borrowed - Interest
 	NetAsset fixedpoint.Value `json:"net,omitempty"`
+
+	MaxWithdrawAmount fixedpoint.Value `json:"maxWithdrawAmount,omitempty"`
 }
 
 func (b Balance) Add(b2 Balance) Balance {
