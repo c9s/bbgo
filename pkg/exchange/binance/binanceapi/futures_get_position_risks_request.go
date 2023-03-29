@@ -8,7 +8,7 @@ import (
 )
 
 type FuturesPositionRisk struct {
-	EntryPrice       string                     `json:"entryPrice"`
+	EntryPrice       fixedpoint.Value           `json:"entryPrice"`
 	MarginType       string                     `json:"marginType"`
 	IsAutoAddMargin  string                     `json:"isAutoAddMargin"`
 	IsolatedMargin   string                     `json:"isolatedMargin"`
@@ -32,6 +32,6 @@ type FuturesGetPositionRisksRequest struct {
 	symbol string `param:"symbol"`
 }
 
-func (c *FuturesRestClient) NewGetPositionRisksRequest() *FuturesGetPositionRisksRequest {
+func (c *FuturesRestClient) NewFuturesGetPositionRisksRequest() *FuturesGetPositionRisksRequest {
 	return &FuturesGetPositionRisksRequest{client: c}
 }

@@ -132,7 +132,11 @@ type Strategy struct {
 
 	SpotSession    string `json:"spotSession"`
 	FuturesSession string `json:"futuresSession"`
-	Reset          bool   `json:"reset"`
+
+	// Reset your position info
+	Reset bool `json:"reset"`
+
+	CloseFuturesPosition bool `json:"closeFuturesPosition"`
 
 	ProfitStats *ProfitStats `persistence:"profit_stats"`
 
@@ -278,6 +282,14 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		return err
 	}
 
+	if err := s.checkPositionRisks(ctx); err != nil {
+		return err
+	}
+
+	if s.CloseFuturesPosition && s.Reset {
+		return errors.New("reset and closeFuturesPosition can not be used together")
+	}
+
 	// adjust QuoteInvestment
 	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
 		originalQuoteInvestment := s.QuoteInvestment
@@ -394,6 +406,14 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.futuresSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		s.queryAndDetectPremiumIndex(ctx, s.binanceFutures)
 	}))
+
+	s.futuresSession.UserDataStream.OnStart(func() {
+		if s.CloseFuturesPosition {
+			if err := s.futuresOrderExecutor.ClosePosition(ctx, fixedpoint.One); err != nil {
+				log.WithError(err).Errorf("close position error")
+			}
+		}
+	})
 
 	if binanceStream, ok := s.futuresSession.UserDataStream.(*binance.Stream); ok {
 		binanceStream.OnAccountUpdateEvent(func(e *binance.AccountUpdateEvent) {
@@ -994,5 +1014,18 @@ func (s *Strategy) checkAndFixMarginMode(ctx context.Context) error {
 	}
 
 	log.Infof("changeMultiAssetsMode response: %+v", fixResp)
+	return nil
+}
+
+func (s *Strategy) checkPositionRisks(ctx context.Context) error {
+	futuresClient := s.binanceFutures.GetFuturesClient()
+	req := futuresClient.NewFuturesGetPositionRisksRequest()
+	req.Symbol(s.Symbol)
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("positions: %+v", resp)
 	return nil
 }
