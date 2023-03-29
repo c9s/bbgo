@@ -24,13 +24,14 @@ func (s *Strategy) resetTransfer(ctx context.Context, ex FuturesTransfer, asset 
 		return nil
 	}
 
-	if b.Available.IsZero() {
+	amount := b.MaxWithdrawAmount
+	if amount.IsZero() {
 		return nil
 	}
 
-	log.Infof("transfering out futures account asset %s %s", b.Available, asset)
+	log.Infof("transfering out futures account asset %s %s", amount, asset)
 
-	err = ex.TransferFuturesAccountAsset(ctx, asset, b.Available, types.TransferOut)
+	err = ex.TransferFuturesAccountAsset(ctx, asset, amount, types.TransferOut)
 	if err != nil {
 		return err
 	}
@@ -67,7 +68,7 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset st
 	amount := s.State.PendingBaseTransfer.Add(quantity)
 
 	// try to transfer more if we enough balance
-	amount = fixedpoint.Min(amount, b.Available)
+	amount = fixedpoint.Min(amount, b.MaxWithdrawAmount)
 
 	// we can only transfer the rest quota (total base transfer)
 	amount = fixedpoint.Min(s.State.TotalBaseTransfer, amount)
@@ -110,7 +111,7 @@ func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, asset str
 	}
 
 	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
-	if b.Available.Compare(quantity) < 0 {
+	if b.MaxWithdrawAmount.Compare(quantity) < 0 {
 		log.Infof("adding to pending base transfer: %s %s", quantity, asset)
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return nil
