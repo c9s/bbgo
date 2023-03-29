@@ -519,7 +519,7 @@ func (s *Strategy) handleAccountUpdate(ctx context.Context, e *binance.AccountUp
 				continue
 			}
 
-			bbgo.Notify(fee)
+			bbgo.Notify(&fee)
 		}
 
 		log.Infof("total collected funding fee: %f %s", s.ProfitStats.TotalFundingFee.Float64(), s.ProfitStats.FundingFeeCurrency)
