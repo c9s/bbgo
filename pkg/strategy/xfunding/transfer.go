@@ -25,7 +25,15 @@ func (s *Strategy) resetTransfer(ctx context.Context, ex FuturesTransfer, asset 
 	}
 
 	log.Infof("transfering out futures account asset %s %s", b.Available, asset)
-	return ex.TransferFuturesAccountAsset(ctx, asset, b.Available, types.TransferOut)
+
+	err = ex.TransferFuturesAccountAsset(ctx, asset, b.Available, types.TransferOut)
+	if err != nil {
+		return err
+	}
+
+	s.State.PendingBaseTransfer = fixedpoint.Zero
+	s.State.TotalBaseTransfer = fixedpoint.Zero
+	return nil
 }
 
 func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset string, tradeQuantity fixedpoint.Value) error {
