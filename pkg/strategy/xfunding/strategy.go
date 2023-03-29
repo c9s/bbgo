@@ -282,14 +282,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		return err
 	}
 
-	if err := s.checkPositionRisks(ctx); err != nil {
-		return err
-	}
-
-	if s.CloseFuturesPosition && s.Reset {
-		return errors.New("reset and closeFuturesPosition can not be used together")
-	}
-
 	// adjust QuoteInvestment
 	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
 		originalQuoteInvestment := s.QuoteInvestment
@@ -330,6 +322,14 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	if s.State == nil || s.Reset {
 		s.State = newState()
+	}
+
+	if err := s.checkAndRestorePositionRisks(ctx); err != nil {
+		return err
+	}
+
+	if s.CloseFuturesPosition && s.Reset {
+		return errors.New("reset and closeFuturesPosition can not be used together")
 	}
 
 	log.Infof("loaded spot position: %s", s.SpotPosition.String())
@@ -1017,15 +1017,22 @@ func (s *Strategy) checkAndFixMarginMode(ctx context.Context) error {
 	return nil
 }
 
-func (s *Strategy) checkPositionRisks(ctx context.Context) error {
+func (s *Strategy) checkAndRestorePositionRisks(ctx context.Context) error {
 	futuresClient := s.binanceFutures.GetFuturesClient()
 	req := futuresClient.NewFuturesGetPositionRisksRequest()
 	req.Symbol(s.Symbol)
-	resp, err := req.Do(ctx)
+	positionRisks, err := req.Do(ctx)
 	if err != nil {
 		return err
 	}
 
-	log.Infof("positions: %+v", resp)
+	for _, positionRisk := range positionRisks {
+		if positionRisk.Symbol == s.Symbol {
+			s.FuturesPosition.Base = positionRisk.PositionAmount
+			s.FuturesPosition.AverageCost = positionRisk.EntryPrice
+		}
+	}
+
+	log.Infof("positions: %+v", positionRisks)
 	return nil
 }
