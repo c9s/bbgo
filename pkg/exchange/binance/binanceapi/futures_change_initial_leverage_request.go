@@ -12,7 +12,7 @@ type FuturesChangeInitialLeverageResponse struct {
 	Symbol           string           `json:"symbol"`
 }
 
-//go:generate requestgen -method POST -url "/fapi/v1/multiAssetsMargin" -type FuturesChangeInitialLeverageRequest -responseType FuturesChangeInitialLeverageResponse
+//go:generate requestgen -method POST -url "/fapi/v1/leverage" -type FuturesChangeInitialLeverageRequest -responseType FuturesChangeInitialLeverageResponse
 type FuturesChangeInitialLeverageRequest struct {
 	client requestgen.AuthenticatedAPIClient
 

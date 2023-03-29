@@ -274,6 +274,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		return err
 	}
 
+	if err := s.setInitialLeverage(ctx); err != nil {
+		return err
+	}
+
 	// adjust QuoteInvestment
 	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
 		originalQuoteInvestment := s.QuoteInvestment
@@ -954,6 +958,20 @@ func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.Exch
 		}
 	})
 	return orderExecutor
+}
+
+func (s *Strategy) setInitialLeverage(ctx context.Context) error {
+	futuresClient := s.binanceFutures.GetFuturesClient()
+	req := futuresClient.NewFuturesChangeInitialLeverageRequest()
+	req.Symbol(s.Symbol)
+	req.Leverage(s.Leverage.Int() + 1)
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("adjusted initial leverage: %+v", resp)
+	return nil
 }
 
 func (s *Strategy) checkAndFixMarginMode(ctx context.Context) error {
