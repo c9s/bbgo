@@ -434,6 +434,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			if err := s.resetTransfer(ctx, s.binanceSpot, s.spotMarket.BaseCurrency); err != nil {
 				log.WithError(err).Errorf("transfer error")
 			}
+
+			if err := s.resetTransfer(ctx, s.binanceSpot, s.spotMarket.QuoteCurrency); err != nil {
+				log.WithError(err).Errorf("transfer error")
+			}
 		}
 
 	})
