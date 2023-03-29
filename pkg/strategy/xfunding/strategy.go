@@ -624,7 +624,7 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 			return
 		}
 
-		createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		submitOrder := types.SubmitOrder{
 			Symbol:     s.Symbol,
 			Side:       types.SideTypeBuy,
 			Type:       types.OrderTypeLimitMaker,
@@ -632,10 +632,11 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 			Price:      orderPrice,
 			Market:     s.futuresMarket,
 			ReduceOnly: true,
-		})
+		}
+		createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, submitOrder)
 
 		if err != nil {
-			log.WithError(err).Errorf("can not submit order")
+			log.WithError(err).Errorf("can not submit futures order: %+v", submitOrder)
 			return
 		}
 
@@ -723,17 +724,18 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		return
 	}
 
-	createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeSell,
 		Type:     types.OrderTypeLimitMaker,
 		Quantity: orderQuantity,
 		Price:    orderPrice,
 		Market:   s.futuresMarket,
-	})
+	}
+	createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, submitOrder)
 
 	if err != nil {
-		log.WithError(err).Errorf("can not submit order")
+		log.WithError(err).Errorf("can not submit spot order: %+v", submitOrder)
 		return
 	}
 
