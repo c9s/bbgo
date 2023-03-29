@@ -8,7 +8,7 @@ type FuturesMultiAssetsModeResponse struct {
 	MultiAssetsMargin bool `json:"multiAssetsMargin"`
 }
 
-//go:generate requestgen -method POST -url "/fapi/v1/multiAssetsMargin" -type FuturesGetMultiAssetsModeRequest -responseType FuturesMultiAssetsModeResponse
+//go:generate requestgen -method GET -url "/fapi/v1/multiAssetsMargin" -type FuturesGetMultiAssetsModeRequest -responseType FuturesMultiAssetsModeResponse
 type FuturesGetMultiAssetsModeRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }

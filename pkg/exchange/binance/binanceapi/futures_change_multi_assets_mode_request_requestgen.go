@@ -11,6 +11,11 @@ import (
 	"regexp"
 )
 
+func (f *FuturesChangeMultiAssetsModeRequest) MultiAssetsMargin(multiAssetsMargin MultiAssetsMarginMode) *FuturesChangeMultiAssetsModeRequest {
+	f.multiAssetsMargin = multiAssetsMargin
+	return f
+}
+
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (f *FuturesChangeMultiAssetsModeRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
@@ -26,6 +31,22 @@ func (f *FuturesChangeMultiAssetsModeRequest) GetQueryParameters() (url.Values, 
 // GetParameters builds and checks the parameters and return the result in a map object
 func (f *FuturesChangeMultiAssetsModeRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
+	// check multiAssetsMargin field -> json key multiAssetsMargin
+	multiAssetsMargin := f.multiAssetsMargin
+
+	// TEMPLATE check-valid-values
+	switch multiAssetsMargin {
+	case MultiAssetsMarginModeOn, MultiAssetsMarginModeOff:
+		params["multiAssetsMargin"] = multiAssetsMargin
+
+	default:
+		return nil, fmt.Errorf("multiAssetsMargin value %v is invalid", multiAssetsMargin)
+
+	}
+	// END TEMPLATE check-valid-values
+
+	// assign parameter of multiAssetsMargin
+	params["multiAssetsMargin"] = multiAssetsMargin
 
 	return params, nil
 }
@@ -111,8 +132,10 @@ func (f *FuturesChangeMultiAssetsModeRequest) GetSlugsMap() (map[string]string, 
 
 func (f *FuturesChangeMultiAssetsModeRequest) Do(ctx context.Context) (*FuturesChangeMultiAssetsModeResponse, error) {
 
-	// no body params
-	var params interface{}
+	params, err := f.GetParameters()
+	if err != nil {
+		return nil, err
+	}
 	query := url.Values{}
 
 	apiURL := "/fapi/v1/multiAssetsMargin"
