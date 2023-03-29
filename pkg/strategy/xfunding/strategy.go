@@ -270,6 +270,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		return errNotBinanceExchange
 	}
 
+	if err := s.checkAndFixMarginMode(ctx); err != nil {
+		return err
+	}
+
 	// adjust QuoteInvestment
 	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
 		originalQuoteInvestment := s.QuoteInvestment
@@ -950,4 +954,27 @@ func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.Exch
 		}
 	})
 	return orderExecutor
+}
+
+func (s *Strategy) checkAndFixMarginMode(ctx context.Context) error {
+	futuresClient := s.binanceFutures.GetFuturesClient()
+	req := futuresClient.NewFuturesGetMultiAssetsModeRequest()
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
+
+	if resp.MultiAssetsMargin {
+		return nil
+	}
+
+	fixReq := futuresClient.NewFuturesChangeMultiAssetsModeRequest()
+	fixReq.MultiAssetsMargin(binanceapi.MultiAssetsMarginModeOn)
+	fixResp, err := fixReq.Do(ctx)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("changeMultiAssetsMode response: %+v", fixResp)
+	return nil
 }
