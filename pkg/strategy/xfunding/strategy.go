@@ -136,6 +136,7 @@ type Strategy struct {
 	// Reset your position info
 	Reset bool `json:"reset"`
 
+	// CloseFuturesPosition can be enabled to close the futures position and then transfer the collateral asset back to the spot account.
 	CloseFuturesPosition bool `json:"closeFuturesPosition"`
 
 	ProfitStats *ProfitStats `persistence:"profit_stats"`
@@ -1011,6 +1012,8 @@ func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.Exch
 }
 
 func (s *Strategy) setInitialLeverage(ctx context.Context) error {
+	log.Infof("setting futures leverage to %d", s.Leverage.Int()+1)
+
 	futuresClient := s.binanceFutures.GetFuturesClient()
 	req := futuresClient.NewFuturesChangeInitialLeverageRequest()
 	req.Symbol(s.Symbol)
