@@ -498,20 +498,22 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	defer atomic.StoreInt64(&e.closing, 0)
 
 	if e.session.Futures { // Futures: Use base qty in e.position
-		submitOrder.Quantity = e.position.GetBase().Abs()
-		submitOrder.ReduceOnly = true
+		if percentage.Compare(fixedpoint.One) == 0 {
+			submitOrder.ClosePosition = true
+			submitOrder.Quantity = fixedpoint.Zero
+		} else {
+			submitOrder.Quantity = e.position.GetBase().Abs()
+			submitOrder.ReduceOnly = true
+		}
+
 		if e.position.IsLong() {
 			submitOrder.Side = types.SideTypeSell
 		} else if e.position.IsShort() {
 			submitOrder.Side = types.SideTypeBuy
 		} else {
-			submitOrder.Side = types.SideTypeSelf
-			submitOrder.Quantity = fixedpoint.Zero
+			return fmt.Errorf("unexpected position side: %+v", e.position)
 		}
 
-		if submitOrder.Quantity.IsZero() {
-			return fmt.Errorf("no position to close: %+v", submitOrder)
-		}
 	} else { // Spot and spot margin
 		// check base balance and adjust the close position order
 		if e.position.IsLong() {
@@ -535,7 +537,7 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	tagStr := strings.Join(tags, ",")
 	submitOrder.Tag = tagStr
 
-	Notify("Closing %s position %s with tags: %v", e.symbol, percentage.Percentage(), tagStr)
+	Notify("Closing %s position %s with tags: %s", e.symbol, percentage.Percentage(), tagStr)
 
 	_, err := e.SubmitOrders(ctx, *submitOrder)
 	return err
