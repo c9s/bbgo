@@ -343,6 +343,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	log.Infof("loaded futures position: %s", s.FuturesPosition.String())
 	log.Infof("loaded neutral position: %s", s.NeutralPosition.String())
 
+	bbgo.Notify("Spot Position", s.SpotPosition)
+	bbgo.Notify("Futures Position", s.FuturesPosition)
+	bbgo.Notify("Neutral Position", s.NeutralPosition)
+
 	// sync funding fee txns
 	if !s.ProfitStats.LastFundingFeeTime.IsZero() {
 		s.syncFundingFeeRecords(ctx, s.ProfitStats.LastFundingFeeTime)
