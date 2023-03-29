@@ -1027,12 +1027,21 @@ func (s *Strategy) checkAndRestorePositionRisks(ctx context.Context) error {
 	}
 
 	for _, positionRisk := range positionRisks {
-		if positionRisk.Symbol == s.Symbol {
-			s.FuturesPosition.Base = positionRisk.PositionAmount
-			s.FuturesPosition.AverageCost = positionRisk.EntryPrice
+		if positionRisk.Symbol != s.Symbol {
+			continue
 		}
+
+		if positionRisk.PositionAmount.IsZero() || positionRisk.EntryPrice.IsZero() {
+			continue
+		}
+
+		s.FuturesPosition.Base = positionRisk.PositionAmount
+		s.FuturesPosition.AverageCost = positionRisk.EntryPrice
+		log.Infof("restored futures position from positionRisk: base=%s, average_cost=%s, position_risk=%+v",
+			s.FuturesPosition.Base.String(),
+			s.FuturesPosition.AverageCost.String(),
+			positionRisk)
 	}
 
-	log.Infof("positions: %+v", positionRisks)
 	return nil
 }
