@@ -416,6 +416,17 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.futuresSession.UserDataStream.OnStart(func() {
 		if s.CloseFuturesPosition {
+
+			openOrders, err := s.futuresSession.Exchange.QueryOpenOrders(ctx, s.Symbol)
+			if err != nil {
+				log.WithError(err).Errorf("query open orders error")
+			} else {
+				// canceling open orders
+				if err = s.futuresSession.Exchange.CancelOrders(ctx, openOrders...); err != nil {
+					log.WithError(err).Errorf("query open orders error")
+				}
+			}
+
 			if err := s.futuresOrderExecutor.ClosePosition(ctx, fixedpoint.One); err != nil {
 				log.WithError(err).Errorf("close position error")
 			}
