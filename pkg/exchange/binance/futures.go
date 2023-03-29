@@ -129,8 +129,13 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	req := e.futuresClient.NewCreateOrderService().
 		Symbol(order.Symbol).
 		Type(orderType).
-		Side(futures.SideType(order.Side)).
-		ReduceOnly(order.ReduceOnly)
+		Side(futures.SideType(order.Side))
+
+	if order.ReduceOnly {
+		req.ReduceOnly(order.ReduceOnly)
+	} else if order.ClosePosition {
+		req.ClosePosition(order.ClosePosition)
+	}
 
 	clientOrderID := newFuturesClientOrderID(order.ClientOrderID)
 	if len(clientOrderID) > 0 {
@@ -140,11 +145,13 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	// use response result format
 	req.NewOrderResponseType(futures.NewOrderRespTypeRESULT)
 
-	if order.Market.Symbol != "" {
-		req.Quantity(order.Market.FormatQuantity(order.Quantity))
-	} else {
-		// TODO report error
-		req.Quantity(order.Quantity.FormatString(8))
+	if !order.ClosePosition {
+		if order.Market.Symbol != "" {
+			req.Quantity(order.Market.FormatQuantity(order.Quantity))
+		} else {
+			// TODO report error
+			req.Quantity(order.Quantity.FormatString(8))
+		}
 	}
 
 	// set price field for limit orders

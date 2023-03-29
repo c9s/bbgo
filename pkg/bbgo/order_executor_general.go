@@ -498,13 +498,8 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	defer atomic.StoreInt64(&e.closing, 0)
 
 	if e.session.Futures { // Futures: Use base qty in e.position
-		if percentage.Compare(fixedpoint.One) == 0 {
-			submitOrder.ClosePosition = true
-			submitOrder.Quantity = fixedpoint.Zero
-		} else {
-			submitOrder.Quantity = e.position.GetBase().Abs()
-			submitOrder.ReduceOnly = true
-		}
+		submitOrder.Quantity = e.position.GetBase().Abs()
+		submitOrder.ReduceOnly = true
 
 		if e.position.IsLong() {
 			submitOrder.Side = types.SideTypeSell
