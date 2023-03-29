@@ -703,11 +703,18 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		return
 	}
 	log.Infof("calculated futures account quote value = %s", quoteValue.String())
+	if quoteValue.IsZero() {
+		return
+	}
 
 	// max futures base position (without negative sign)
 	maxFuturesBasePosition := fixedpoint.Min(
 		spotBase.Mul(s.Leverage),
 		s.State.TotalBaseTransfer.Mul(s.Leverage))
+
+	if maxFuturesBasePosition.IsZero() {
+		return
+	}
 
 	// if - futures position < max futures position, increase it
 	if futuresBase.Neg().Compare(maxFuturesBasePosition) >= 0 {
