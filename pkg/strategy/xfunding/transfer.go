@@ -21,7 +21,11 @@ func (s *Strategy) resetTransfer(ctx context.Context, ex FuturesTransfer, asset 
 
 	b, ok := balances[asset]
 	if !ok {
-		return fmt.Errorf("%s balance not found", asset)
+		return nil
+	}
+
+	if b.Available.IsZero() {
+		return nil
 	}
 
 	log.Infof("transfering out futures account asset %s %s", b.Available, asset)
