@@ -29,7 +29,7 @@ const orderTag = "grid2"
 
 var log = logrus.WithField("strategy", ID)
 
-var maxNumberOfOrderTradesQueryTries = 10
+const maxNumberOfOrderTradesQueryTries = 10
 
 const historyRollbackDuration = 3 * 24 * time.Hour
 const historyRollbackOrderIdRange = 1000
@@ -377,7 +377,7 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 			return fixedpoint.Zero, feeCurrency
 		}
 
-		s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
+		s.logger.Warnf("missing order trades or missing trade fee of order #%d, pulling order trades from the RESTful API", o.OrderID)
 
 		// if orderQueryService is supported, use it to query the trades of the filled order
 		apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
@@ -385,9 +385,9 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 			OrderID: strconv.FormatUint(o.OrderID, 10),
 		})
 		if err != nil {
-			s.logger.WithError(err).Errorf("query order trades error")
+			s.logger.WithError(err).Errorf("query order #%d trades error", o.OrderID)
 		} else {
-			s.logger.Infof("fetched api trades: %+v", apiOrderTrades)
+			s.logger.Infof("fetched api trades of order #%d: %+v", o.OrderID, apiOrderTrades)
 			orderTrades = apiOrderTrades
 		}
 	}
@@ -421,6 +421,15 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	s.logger.Infof("GRID ORDER #%d %s FEE: %s %s",
 		o.OrderID, o.Side,
 		fee.String(), feeCurrency)
+
+	if fee.IsZero() || feeCurrency == "" {
+		fee, feeCurrency = s.aggregateOrderFee(o)
+		if !fee.IsZero() {
+			s.logger.Infof("FIXED GRID ORDER #%d %s FEE: %s %s",
+				o.OrderID, o.Side,
+				fee.String(), feeCurrency)
+		}
+	}
 
 	switch o.Side {
 	case types.SideTypeSell:
