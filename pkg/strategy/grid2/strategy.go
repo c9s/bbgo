@@ -34,6 +34,8 @@ const maxNumberOfOrderTradesQueryTries = 10
 const historyRollbackDuration = 3 * 24 * time.Hour
 const historyRollbackOrderIdRange = 1000
 
+const queryOrderTradesRetryDelay = 500 * time.Millisecond
+
 func init() {
 	// Register the pointer of the strategy struct,
 	// so that bbgo knows what struct to be used to unmarshal the configs (YAML or JSON)
@@ -422,7 +424,10 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		o.OrderID, o.Side,
 		fee.String(), feeCurrency)
 
+	// do 1 time retry
 	if fee.IsZero() || feeCurrency == "" {
+		time.Sleep(queryOrderTradesRetryDelay)
+
 		fee, feeCurrency = s.aggregateOrderFee(o)
 		if !fee.IsZero() {
 			s.logger.Infof("FIXED GRID ORDER #%d %s FEE: %s %s",
