@@ -163,6 +163,11 @@ type Strategy struct {
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
 
+	// UpdateZeroOrderFee - this option adds an extra retry when the order fee returns zero
+	// sometimes the fee is not ready yet, the exchange did not finish the fee calculation.
+	// and there is a delay between the fee is calculated
+	UpdateZeroOrderFee bool `json:"updateZeroOrderFee"`
+
 	SkipSpreadCheck             bool `json:"skipSpreadCheck"`
 	RecoverGridByScanningTrades bool `json:"recoverGridByScanningTrades"`
 
@@ -425,7 +430,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		fee.String(), feeCurrency)
 
 	// do 1 time retry
-	if fee.IsZero() || feeCurrency == "" {
+	if s.UpdateZeroOrderFee && (fee.IsZero() || feeCurrency == "") {
 		time.Sleep(queryOrderTradesRetryDelay)
 
 		fee, feeCurrency = s.aggregateOrderFee(o)
