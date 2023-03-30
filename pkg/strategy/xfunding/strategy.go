@@ -136,6 +136,7 @@ type Strategy struct {
 	// Reset your position info
 	Reset bool `json:"reset"`
 
+	// CloseFuturesPosition can be enabled to close the futures position and then transfer the collateral asset back to the spot account.
 	CloseFuturesPosition bool `json:"closeFuturesPosition"`
 
 	ProfitStats *ProfitStats `persistence:"profit_stats"`
@@ -168,6 +169,8 @@ type Strategy struct {
 	// positionType is the futures position type
 	// currently we only support short position for the positive funding rate
 	positionType types.PositionType
+
+	minQuantity fixedpoint.Value
 }
 
 func (s *Strategy) ID() string {
@@ -308,6 +311,9 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		}
 	}
 
+	// common min quantity
+	s.minQuantity = fixedpoint.Max(s.futuresMarket.MinQuantity, s.spotMarket.MinQuantity)
+
 	if s.SpotPosition == nil || s.Reset {
 		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
 	}
@@ -332,9 +338,14 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		return errors.New("reset and closeFuturesPosition can not be used together")
 	}
 
+	log.Infof("state: %+v", s.State)
 	log.Infof("loaded spot position: %s", s.SpotPosition.String())
 	log.Infof("loaded futures position: %s", s.FuturesPosition.String())
 	log.Infof("loaded neutral position: %s", s.NeutralPosition.String())
+
+	bbgo.Notify("Spot Position", s.SpotPosition)
+	bbgo.Notify("Futures Position", s.FuturesPosition)
+	bbgo.Notify("Neutral Position", s.NeutralPosition)
 
 	// sync funding fee txns
 	if !s.ProfitStats.LastFundingFeeTime.IsZero() {
@@ -370,7 +381,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			// if we have trade, try to query the balance and transfer the balance to the futures wallet account
 			// TODO: handle missing trades here. If the process crashed during the transfer, how to recover?
 			if err := backoff.RetryGeneral(ctx, func() error {
-				return s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade)
+				return s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade.Quantity)
 			}); err != nil {
 				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
 				return
@@ -394,7 +405,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		switch s.getPositionState() {
 		case PositionClosing:
 			if err := backoff.RetryGeneral(ctx, func() error {
-				return s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade)
+				return s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade.Quantity)
 			}); err != nil {
 				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
 				return
@@ -409,53 +420,35 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.futuresSession.UserDataStream.OnStart(func() {
 		if s.CloseFuturesPosition {
+
+			openOrders, err := s.futuresSession.Exchange.QueryOpenOrders(ctx, s.Symbol)
+			if err != nil {
+				log.WithError(err).Errorf("query open orders error")
+			} else {
+				// canceling open orders
+				if err = s.futuresSession.Exchange.CancelOrders(ctx, openOrders...); err != nil {
+					log.WithError(err).Errorf("query open orders error")
+				}
+			}
+
 			if err := s.futuresOrderExecutor.ClosePosition(ctx, fixedpoint.One); err != nil {
 				log.WithError(err).Errorf("close position error")
 			}
+
+			if err := s.resetTransfer(ctx, s.binanceSpot, s.spotMarket.BaseCurrency); err != nil {
+				log.WithError(err).Errorf("transfer error")
+			}
+
+			if err := s.resetTransfer(ctx, s.binanceSpot, s.spotMarket.QuoteCurrency); err != nil {
+				log.WithError(err).Errorf("transfer error")
+			}
 		}
+
 	})
 
 	if binanceStream, ok := s.futuresSession.UserDataStream.(*binance.Stream); ok {
 		binanceStream.OnAccountUpdateEvent(func(e *binance.AccountUpdateEvent) {
-			switch e.AccountUpdate.EventReasonType {
-			case binance.AccountUpdateEventReasonDeposit:
-			case binance.AccountUpdateEventReasonWithdraw:
-			case binance.AccountUpdateEventReasonFundingFee:
-				//  EventBase:{
-				// 		Event:ACCOUNT_UPDATE
-				// 		Time:1679760000932
-				// 	}
-				// 	Transaction:1679760000927
-				// 	AccountUpdate:{
-				// 			EventReasonType:FUNDING_FEE
-				// 			Balances:[{
-				// 					Asset:USDT
-				// 					WalletBalance:56.64251742
-				// 					CrossWalletBalance:56.64251742
-				// 					BalanceChange:-0.00037648
-				// 			}]
-				// 		}
-				// 	}
-				for _, b := range e.AccountUpdate.Balances {
-					if b.Asset != s.ProfitStats.FundingFeeCurrency {
-						continue
-					}
-
-					txnTime := time.UnixMilli(e.Time)
-					err := s.ProfitStats.AddFundingFee(FundingFee{
-						Asset:  b.Asset,
-						Amount: b.BalanceChange,
-						Txn:    e.Transaction,
-						Time:   txnTime,
-					})
-					if err != nil {
-						log.WithError(err).Error("unable to add funding fee to profitStats")
-					}
-				}
-
-				log.Infof("total collected funding fee: %f %s", s.ProfitStats.TotalFundingFee.Float64(), s.ProfitStats.FundingFeeCurrency)
-				bbgo.Sync(ctx, s)
-			}
+			s.handleAccountUpdate(ctx, e)
 		})
 	}
 
@@ -490,6 +483,54 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	}()
 
 	return nil
+}
+
+func (s *Strategy) handleAccountUpdate(ctx context.Context, e *binance.AccountUpdateEvent) {
+	switch e.AccountUpdate.EventReasonType {
+	case binance.AccountUpdateEventReasonDeposit:
+	case binance.AccountUpdateEventReasonWithdraw:
+	case binance.AccountUpdateEventReasonFundingFee:
+		//  EventBase:{
+		// 		Event:ACCOUNT_UPDATE
+		// 		Time:1679760000932
+		// 	}
+		// 	Transaction:1679760000927
+		// 	AccountUpdate:{
+		// 			EventReasonType:FUNDING_FEE
+		// 			Balances:[{
+		// 					Asset:USDT
+		// 					WalletBalance:56.64251742
+		// 					CrossWalletBalance:56.64251742
+		// 					BalanceChange:-0.00037648
+		// 			}]
+		// 		}
+		// 	}
+		for _, b := range e.AccountUpdate.Balances {
+			if b.Asset != s.ProfitStats.FundingFeeCurrency {
+				continue
+			}
+
+			txnTime := time.UnixMilli(e.Time)
+			fee := FundingFee{
+				Asset:  b.Asset,
+				Amount: b.BalanceChange,
+				Txn:    e.Transaction,
+				Time:   txnTime,
+			}
+			err := s.ProfitStats.AddFundingFee(fee)
+			if err != nil {
+				log.WithError(err).Error("unable to add funding fee to profitStats")
+				continue
+			}
+
+			bbgo.Notify(&fee)
+		}
+
+		log.Infof("total collected funding fee: %f %s", s.ProfitStats.TotalFundingFee.Float64(), s.ProfitStats.FundingFeeCurrency)
+		bbgo.Sync(ctx, s)
+
+		bbgo.Notify(s.ProfitStats)
+	}
 }
 
 func (s *Strategy) syncFundingFeeRecords(ctx context.Context, since time.Time) {
@@ -596,14 +637,14 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 	if futuresBase.Compare(fixedpoint.Zero) < 0 {
 		orderPrice := ticker.Buy
 		orderQuantity := futuresBase.Abs()
-		orderQuantity = fixedpoint.Max(orderQuantity, s.futuresMarket.MinQuantity)
+		orderQuantity = fixedpoint.Max(orderQuantity, s.minQuantity)
 		orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
 		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
 			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
 			return
 		}
 
-		createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		submitOrder := types.SubmitOrder{
 			Symbol:     s.Symbol,
 			Side:       types.SideTypeBuy,
 			Type:       types.OrderTypeLimitMaker,
@@ -611,10 +652,11 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 			Price:      orderPrice,
 			Market:     s.futuresMarket,
 			ReduceOnly: true,
-		})
+		}
+		createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, submitOrder)
 
 		if err != nil {
-			log.WithError(err).Errorf("can not submit order")
+			log.WithError(err).Errorf("can not submit futures order: %+v", submitOrder)
 			return
 		}
 
@@ -665,47 +707,66 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		return
 	}
 	log.Infof("calculated futures account quote value = %s", quoteValue.String())
+	if quoteValue.IsZero() {
+		return
+	}
 
 	// max futures base position (without negative sign)
 	maxFuturesBasePosition := fixedpoint.Min(
 		spotBase.Mul(s.Leverage),
 		s.State.TotalBaseTransfer.Mul(s.Leverage))
 
-	// if - futures position < max futures position, increase it
-	if futuresBase.Neg().Compare(maxFuturesBasePosition) < 0 {
-		orderPrice := ticker.Sell
-		diffQuantity := maxFuturesBasePosition.Sub(futuresBase.Neg())
-
-		if diffQuantity.Sign() < 0 {
-			log.Errorf("unexpected negative position diff: %s", diffQuantity.String())
-			return
-		}
-
-		log.Infof("position diff quantity: %s", diffQuantity.String())
-
-		orderQuantity := fixedpoint.Max(diffQuantity, s.futuresMarket.MinQuantity)
-		orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
-		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
-			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
-			return
-		}
-
-		createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeSell,
-			Type:     types.OrderTypeLimitMaker,
-			Quantity: orderQuantity,
-			Price:    orderPrice,
-			Market:   s.futuresMarket,
-		})
-
-		if err != nil {
-			log.WithError(err).Errorf("can not submit order")
-			return
-		}
-
-		log.Infof("created orders: %+v", createdOrders)
+	if maxFuturesBasePosition.IsZero() {
+		return
 	}
+
+	// if - futures position < max futures position, increase it
+	if futuresBase.Neg().Compare(maxFuturesBasePosition) >= 0 {
+		s.setPositionState(PositionReady)
+
+		bbgo.Notify("Position Ready")
+		bbgo.Notify("SpotPosition", s.SpotPosition)
+		bbgo.Notify("FuturesPosition", s.FuturesPosition)
+		bbgo.Notify("NeutralPosition", s.NeutralPosition)
+
+		// DEBUG CODE - triggering closing position automatically
+		// s.startClosingPosition()
+		return
+	}
+
+	orderPrice := ticker.Sell
+	diffQuantity := maxFuturesBasePosition.Sub(futuresBase.Neg())
+
+	if diffQuantity.Sign() < 0 {
+		log.Errorf("unexpected negative position diff: %s", diffQuantity.String())
+		return
+	}
+
+	log.Infof("position diff quantity: %s", diffQuantity.String())
+
+	orderQuantity := fixedpoint.Max(diffQuantity, s.minQuantity)
+	orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
+	if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
+		log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
+		return
+	}
+
+	submitOrder := types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeLimitMaker,
+		Quantity: orderQuantity,
+		Price:    orderPrice,
+		Market:   s.futuresMarket,
+	}
+	createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, submitOrder)
+
+	if err != nil {
+		log.WithError(err).Errorf("can not submit spot order: %+v", submitOrder)
+		return
+	}
+
+	log.Infof("created orders: %+v", createdOrders)
 }
 
 func (s *Strategy) syncSpotPosition(ctx context.Context) {
@@ -812,11 +873,7 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 	s.mu.Unlock()
 
 	if usedQuoteInvestment.Compare(s.QuoteInvestment) >= 0 {
-		// stop increase the position
-		s.setPositionState(PositionReady)
-
-		// DEBUG CODE - triggering closing position automatically
-		// s.startClosingPosition()
+		// stop increase the stop position
 		return
 	}
 
@@ -835,7 +892,7 @@ func (s *Strategy) increaseSpotPosition(ctx context.Context) {
 
 	log.Infof("initial spot order quantity %s", orderQuantity.String())
 
-	orderQuantity = fixedpoint.Max(orderQuantity, s.spotMarket.MinQuantity)
+	orderQuantity = fixedpoint.Max(orderQuantity, s.minQuantity)
 	orderQuantity = s.spotMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
 
 	if s.spotMarket.IsDustQuantity(orderQuantity, orderPrice) {
@@ -981,6 +1038,8 @@ func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.Exch
 }
 
 func (s *Strategy) setInitialLeverage(ctx context.Context) error {
+	log.Infof("setting futures leverage to %d", s.Leverage.Int()+1)
+
 	futuresClient := s.binanceFutures.GetFuturesClient()
 	req := futuresClient.NewFuturesChangeInitialLeverageRequest()
 	req.Symbol(s.Symbol)

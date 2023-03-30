@@ -44,7 +44,7 @@ crossExchangeStrategies:
 
     ## incrementalQuoteQuantity is the quote quantity per maker order when creating the positions
     ## when in BTC-USDT 20 means 20 USDT, each buy order will hold 20 USDT quote amount.
-    incrementalQuoteQuantity: 20
+    incrementalQuoteQuantity: 10
 
     ## quoteInvestment is how much you want to invest to create your position.
     ## for example, when 10k USDT is given as the quote investment, and the average executed price of your position is around BTC 18k
@@ -54,7 +54,7 @@ crossExchangeStrategies:
     ## shortFundingRate is the funding rate range you want to create your position
     shortFundingRate:
       ## when funding rate is higher than this high value, the strategy will start buying spot and opening a short position
-      high: 0.001%
+      high: 0.0001%
       ## when funding rate is lower than this low value, the strategy will start closing futures position and sell the spot
       low: -0.01%
 

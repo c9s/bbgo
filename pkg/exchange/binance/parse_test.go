@@ -3,10 +3,12 @@ package binance
 import (
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 var jsCommentTrimmer = regexp.MustCompile("(?m)//.*$")
@@ -391,20 +393,20 @@ func TestParseOrderFuturesUpdate(t *testing.T) {
 	assert.True(t, ok)
 	assert.NotNil(t, orderTradeEvent)
 
-	assert.Equal(t, orderTradeEvent.OrderTrade.Symbol, "BTCUSDT")
-	assert.Equal(t, orderTradeEvent.OrderTrade.Side, "SELL")
-	assert.Equal(t, orderTradeEvent.OrderTrade.ClientOrderID, "x-NSUYEBKMe60cf610-f5c7-49a4-9c1")
-	assert.Equal(t, orderTradeEvent.OrderTrade.OrderType, "MARKET")
-	assert.Equal(t, orderTradeEvent.Time, int64(1639933384763))
-	assert.Equal(t, orderTradeEvent.OrderTrade.OrderTradeTime, int64(1639933384755))
-	assert.Equal(t, orderTradeEvent.OrderTrade.OriginalQuantity, fixedpoint.MustNewFromString("0.001"))
-	assert.Equal(t, orderTradeEvent.OrderTrade.OrderLastFilledQuantity, fixedpoint.MustNewFromString("0.001"))
-	assert.Equal(t, orderTradeEvent.OrderTrade.OrderFilledAccumulatedQuantity, fixedpoint.MustNewFromString("0.001"))
-	assert.Equal(t, orderTradeEvent.OrderTrade.CurrentExecutionType, "TRADE")
-	assert.Equal(t, orderTradeEvent.OrderTrade.CurrentOrderStatus, "FILLED")
-	assert.Equal(t, orderTradeEvent.OrderTrade.LastFilledPrice, fixedpoint.MustNewFromString("47202.40"))
-	assert.Equal(t, orderTradeEvent.OrderTrade.OrderId, int64(38541728873))
-	assert.Equal(t, orderTradeEvent.OrderTrade.TradeId, int64(1741505949))
+	assert.Equal(t, "BTCUSDT", orderTradeEvent.OrderTrade.Symbol)
+	assert.Equal(t, "SELL", orderTradeEvent.OrderTrade.Side)
+	assert.Equal(t, "x-NSUYEBKMe60cf610-f5c7-49a4-9c1", orderTradeEvent.OrderTrade.ClientOrderID)
+	assert.Equal(t, "MARKET", orderTradeEvent.OrderTrade.OrderType)
+	assert.Equal(t, int64(1639933384763), orderTradeEvent.Time)
+	assert.Equal(t, types.MillisecondTimestamp(time.UnixMilli(1639933384755)), orderTradeEvent.OrderTrade.OrderTradeTime)
+	assert.Equal(t, fixedpoint.MustNewFromString("0.001"), orderTradeEvent.OrderTrade.OriginalQuantity)
+	assert.Equal(t, fixedpoint.MustNewFromString("0.001"), orderTradeEvent.OrderTrade.OrderLastFilledQuantity)
+	assert.Equal(t, fixedpoint.MustNewFromString("0.001"), orderTradeEvent.OrderTrade.OrderFilledAccumulatedQuantity)
+	assert.Equal(t, "TRADE", orderTradeEvent.OrderTrade.CurrentExecutionType)
+	assert.Equal(t, "FILLED", orderTradeEvent.OrderTrade.CurrentOrderStatus)
+	assert.Equal(t, fixedpoint.MustNewFromString("47202.40"), orderTradeEvent.OrderTrade.LastFilledPrice)
+	assert.Equal(t, int64(38541728873), orderTradeEvent.OrderTrade.OrderId)
+	assert.Equal(t, int64(1741505949), orderTradeEvent.OrderTrade.TradeId)
 
 	orderUpdate, err := orderTradeEvent.OrderFutures()
 	assert.NoError(t, err)

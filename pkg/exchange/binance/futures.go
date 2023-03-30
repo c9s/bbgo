@@ -67,20 +67,24 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 	if err != nil {
 		return nil, err
 	}
-	accountBalances, err := e.futuresClient.NewGetBalanceService().Do(ctx)
+
+	req := e.futuresClient2.NewFuturesGetAccountBalanceRequest()
+	accountBalances, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var balances = map[string]types.Balance{}
 	for _, b := range accountBalances {
-		balanceAvailable := fixedpoint.Must(fixedpoint.NewFromString(b.AvailableBalance))
-		balanceTotal := fixedpoint.Must(fixedpoint.NewFromString(b.Balance))
-		unrealizedPnl := fixedpoint.Must(fixedpoint.NewFromString(b.CrossUnPnl))
+		// The futures account balance is much different from the spot balance:
+		// - Balance is the actual balance of the asset
+		// - AvailableBalance is the available margin balance (can be used as notional)
+		// - CrossWalletBalance (this will be meaningful when using isolated margin)
 		balances[b.Asset] = types.Balance{
-			Currency:  b.Asset,
-			Available: balanceAvailable,
-			Locked:    balanceTotal.Sub(balanceAvailable.Sub(unrealizedPnl)),
+			Currency:          b.Asset,
+			Available:         b.AvailableBalance,                                  // AvailableBalance here is the available margin, like how much quantity/notional you can SHORT/LONG, not what you can withdraw
+			Locked:            b.Balance.Sub(b.AvailableBalance.Sub(b.CrossUnPnl)), // FIXME: AvailableBalance is the available margin balance, it could be re-calculated by the current formula.
+			MaxWithdrawAmount: b.MaxWithdrawAmount,
 		}
 	}
 
