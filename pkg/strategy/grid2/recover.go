@@ -83,16 +83,16 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 	// add open orders to active order book
 	s.addOrdersToActiveOrderBook(openOrdersOnGrid)
 
-	expectedOrderNums := s.GridNum - 1
-	openOrdersOnGridNums := int64(len(openOrdersOnGrid))
-	s.debugLog("open orders nums: %d, expected nums: %d", openOrdersOnGridNums, expectedOrderNums)
-	if expectedOrderNums == openOrdersOnGridNums {
+	expectedNumOfOrders := s.GridNum - 1
+	numGridOpenOrders := int64(len(openOrdersOnGrid))
+	s.debugLog("open orders nums: %d, expected nums: %d", numGridOpenOrders, expectedNumOfOrders)
+	if expectedNumOfOrders == numGridOpenOrders {
 		// no need to recover
 		s.EmitGridReady()
 		s.updateGridNumOfOrdersMetricsWithLock()
 		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 		return nil
-	} else if expectedOrderNums < openOrdersOnGridNums {
+	} else if expectedNumOfOrders < numGridOpenOrders {
 		return fmt.Errorf("amount of grid's open orders should not > amount of expected grid's orders")
 	}
 
@@ -111,9 +111,10 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 	// 3. get the filled orders from pin-order map
 	filledOrders := pinOrdersFilled.AscendingOrders()
 	numFilledOrders := len(filledOrders)
-	if numFilledOrders == int(expectedOrderNums-openOrdersOnGridNums) {
+	if numFilledOrders == int(expectedNumOfOrders-numGridOpenOrders) {
 		// nums of filled order is the same as Size - 1 - num(open orders)
-	} else if numFilledOrders == int(expectedOrderNums-openOrdersOnGridNums+1) {
+		s.logger.Infof("nums of filled order is the same as Size - 1 - len(open orders) : %d = %d - 1 - %d", numFilledOrders, s.grid.Size, numGridOpenOrders)
+	} else if numFilledOrders == int(expectedNumOfOrders-numGridOpenOrders+1) {
 		filledOrders = filledOrders[1:]
 	} else {
 		return fmt.Errorf("not reasonable num of filled orders")
@@ -136,24 +137,17 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 }
 
 func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrders []types.Order) error {
-	s.debugLog("pins: %+v", pins)
-	s.debugLog("open pin orders:\n%s", pinOrders.String())
-	s.debugOrders("filled orders", filledOrders)
+	s.debugLog("verifying filled grid - pins: %+v", pins)
+	s.debugLog("verifying filled grid - open pin orders:\n%s", pinOrders.String())
+	s.debugOrders("verifying filled grid - filled orders", filledOrders)
 
-	for _, filledOrder := range filledOrders {
-		price := filledOrder.Price
-		if o, exist := pinOrders[price]; !exist {
-			return fmt.Errorf("the price (%+v) is not in pins", price)
-		} else if o.OrderID != 0 {
-			return fmt.Errorf("there is already an order at this price (%+v)", price)
-		} else {
-			pinOrders[price] = filledOrder
-		}
+	if err := addOrdersIntoPinOrderMap(pinOrders, filledOrders); err != nil {
+		return errors.Wrapf(err, "verifying filled grid error when add orders into pin order map")
 	}
 
-	s.debugLog("filled pin orders:\n%+v", pinOrders.String())
+	s.debugLog("verifying filled grid - filled pin orders:\n%+v", pinOrders.String())
 
-	side := types.SideTypeBuy
+	expectedSide := types.SideTypeBuy
 	for _, pin := range pins {
 		order, exist := pinOrders[fixedpoint.Value(pin)]
 		if !exist {
@@ -164,20 +158,20 @@ func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrd
 		// there must be only one empty pin in the grid
 		// all orders below this pin need to be bid orders, above this pin need to be ask orders
 		if order.OrderID == 0 {
-			if side == types.SideTypeBuy {
-				side = types.SideTypeSell
+			if expectedSide == types.SideTypeBuy {
+				expectedSide = types.SideTypeSell
 				continue
 			}
 
-			return fmt.Errorf("not only one empty order in this grid")
+			return fmt.Errorf("found more than one empty pins")
 		}
 
-		if order.Side != side {
-			return fmt.Errorf("the side is wrong")
+		if order.Side != expectedSide {
+			return fmt.Errorf("the side of order (%s) is wrong, expected: %s", order.Side, expectedSide)
 		}
 	}
 
-	if side != types.SideTypeSell {
+	if expectedSide != types.SideTypeSell {
 		return fmt.Errorf("there is no empty pin in the grid")
 	}
 
@@ -278,9 +272,6 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 				continue
 			}
 			pinOrdersFilled[pin] = *order
-
-			// wait 100 ms to avoid rate limit
-			time.Sleep(100 * time.Millisecond)
 		}
 
 		// stop condition
@@ -290,4 +281,19 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 	}
 
 	return pinOrdersFilled, nil
+}
+
+func addOrdersIntoPinOrderMap(pinOrders PinOrderMap, orders []types.Order) error {
+	for _, order := range orders {
+		price := order.Price
+		if o, exist := pinOrders[price]; !exist {
+			return fmt.Errorf("the price (%+v) is not in pins", price)
+		} else if o.OrderID != 0 {
+			return fmt.Errorf("there is already an order at this price (%+v)", price)
+		} else {
+			pinOrders[price] = order
+		}
+	}
+
+	return nil
 }

@@ -1216,7 +1216,7 @@ func (s *Strategy) debugOrders(desc string, orders []types.Order) {
 	s.logger.Infof(sb.String())
 }
 
-func (s *Strategy) debugGridProfitStats(where string) {
+func (s *Strategy) debugGridProfitStats(trigger string) {
 	if !s.Debug {
 		return
 	}
@@ -1226,11 +1226,11 @@ func (s *Strategy) debugGridProfitStats(where string) {
 	stats.ProfitEntries = nil
 	b, err := json.Marshal(stats)
 	if err != nil {
-		s.logger.WithError(err).Errorf("[%s] failed to debug grid profit stats", where)
+		s.logger.WithError(err).Errorf("[%s] failed to debug grid profit stats", trigger)
 		return
 	}
 
-	s.logger.Infof("[%s] grid profit stats: %s", where, string(b))
+	s.logger.Infof("trigger %s => grid profit stats : %s", trigger, string(b))
 }
 
 func (s *Strategy) debugLog(format string, args ...interface{}) {
@@ -1941,11 +1941,11 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	if s.RecoverGridByScanningTrades {
-		s.debugLog("recover grid by scanning trades")
+		s.debugLog("recovering grid by scanning trades")
 		return s.recoverByScanningTrades(ctx, session)
 	}
 
-	s.debugLog("recover grid by scanning orders")
+	s.debugLog("recovering grid by scanning orders")
 	return s.recoverByScanningOrders(ctx, session)
 }
 
