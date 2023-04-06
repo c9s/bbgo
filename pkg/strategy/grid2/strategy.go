@@ -2,6 +2,7 @@ package grid2
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
@@ -825,6 +826,7 @@ func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.Exch
 		s.handleOrderFilled(o)
 
 		// sync the profits to redis
+		s.debugGridProfitStats("OrderUpdate")
 		bbgo.Sync(ctx, s)
 
 		s.updateGridNumOfOrdersMetricsWithLock()
@@ -944,6 +946,7 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 
 	defer s.EmitGridClosed()
 
+	s.debugGridProfitStats("CloseGrid")
 	bbgo.Sync(ctx, s)
 
 	// now we can cancel the open orders
@@ -1082,6 +1085,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	if len(orderIds) > 0 {
 		s.GridProfitStats.InitialOrderID = orderIds[0]
+		s.debugGridProfitStats("openGrid")
 		bbgo.Sync(ctx, s)
 	}
 
@@ -1210,6 +1214,23 @@ func (s *Strategy) debugOrders(desc string, orders []types.Order) {
 	sb.WriteString("]")
 
 	s.logger.Infof(sb.String())
+}
+
+func (s *Strategy) debugGridProfitStats(where string) {
+	if !s.Debug {
+		return
+	}
+
+	stats := *s.GridProfitStats
+	// ProfitEntries may have too many profits, make it nil to readable
+	stats.ProfitEntries = nil
+	b, err := json.Marshal(stats)
+	if err != nil {
+		s.logger.WithError(err).Errorf("[%s] failed to debug grid profit stats", where)
+		return
+	}
+
+	s.logger.Infof("[%s] grid profit stats: %s", where, string(b))
 }
 
 func (s *Strategy) debugLog(format string, args ...interface{}) {
@@ -1441,10 +1462,12 @@ func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context
 	s.debugOrders("emit filled orders", filledOrders)
 
 	// 5. emit the filled orders
-	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
-	for _, filledOrder := range filledOrders {
-		activeOrderBook.EmitFilled(filledOrder)
-	}
+	/*
+		activeOrderBook := s.orderExecutor.ActiveMakerOrders()
+		for _, filledOrder := range filledOrders {
+			activeOrderBook.EmitFilled(filledOrder)
+		}
+	*/
 
 	// 6. emit grid ready
 	s.EmitGridReady()
@@ -2032,6 +2055,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.GridProfitStats.AddTrade(trade)
 	})
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		s.debugGridProfitStats("OnPositionUpdate")
 		bbgo.Sync(ctx, s)
 	})
 	orderExecutor.ActiveMakerOrders().OnFilled(s.newOrderUpdateHandler(ctx, session))
@@ -2132,6 +2156,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 }
 
 func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSession) {
+	s.debugGridProfitStats("startProcess")
 	if s.RecoverOrdersWhenStart {
 		// do recover only when triggerPrice is not set and not in the back-test mode
 		s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
@@ -2187,19 +2212,12 @@ func (s *Strategy) recoverGridByScanningOrders(ctx context.Context, session *bbg
 }
 
 func (s *Strategy) recoverGridByScanningTrades(ctx context.Context, session *bbgo.ExchangeSession) error {
-	// no initial order id means we don't need to recover
-	if s.GridProfitStats.InitialOrderID == 0 {
-		s.logger.Debug("new strategy, no need to recover")
-		return nil
-	}
-
 	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
 	if err != nil {
 		return err
 	}
 
 	s.logger.Infof("found %d open orders left on the %s order book", len(openOrders), s.Symbol)
-
 	s.debugLog("recover grid with group id: %d", s.OrderGroupID)
 	// filter out the order with the group id belongs to this grid
 	var openOrdersOnGrid []types.Order
@@ -2210,6 +2228,13 @@ func (s *Strategy) recoverGridByScanningTrades(ctx context.Context, session *bbg
 	}
 
 	s.logger.Infof("found %d open orders belong to this grid on the %s order book", len(openOrdersOnGrid), s.Symbol)
+
+	// no initial order id means we don't need to recover
+	// 3/31 updated : Find there may be 0 initial order id when the strategy is not strategy, so we need to add more checking on it.
+	if s.GridProfitStats.InitialOrderID == 0 && len(openOrdersOnGrid) == 0 {
+		s.debugLog("new strategy, no need to recover")
+		return nil
+	}
 
 	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
 	if !implemented {
