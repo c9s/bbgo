@@ -24,26 +24,22 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 
 	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
 	if err != nil {
-		return errors.Wrapf(err, "check if strategy exists error when query open orders")
+		return errors.Wrapf(err, "unable to query open orders when recovering")
 	}
 
 	s.logger.Infof("found %d open orders left on the %s order book", len(openOrders), s.Symbol)
 
 	// filter out the order with the group id belongs to this grid
-	var openOrdersOnGrid []types.Order
-	for _, order := range openOrders {
-		if order.GroupID == s.OrderGroupID {
-			openOrdersOnGrid = append(openOrdersOnGrid, order)
-		}
-	}
+	openOrdersOnGrid := filterOrdersOnGrid(s.OrderGroupID, openOrders)
 
 	s.logger.Infof("found %d open orders belong to this grid on the %s order book", len(openOrdersOnGrid), s.Symbol)
 
 	if s.GridProfitStats.InitialOrderID != 0 {
-		// existiting strategy, need recover
+		s.logger.Info("InitialOrderID is already there, need to recover")
 	} else if len(openOrdersOnGrid) != 0 {
-		// open orders on grid is not 0. this strategy is existing, need recover
+		s.logger.Info("even though InitialOrderID is 0, there are open orders on grid so need to recover")
 	} else {
+		s.logger.Info("InitialOrderID is 0 and there is no open orders on grid, query trades to check it")
 		// initial order id may be new strategy or lost data in redis, so we need to check trades + open orders
 		// if there are open orders or trades, we need to recover
 		trades, err := historyService.QueryTrades(ctx, s.Symbol, &types.TradeQueryOptions{
@@ -54,16 +50,16 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 		})
 
 		if err != nil {
-			return errors.Wrapf(err, "check if strategy exists error when query trades")
+			return errors.Wrapf(err, "unable to query trades when recovering")
 		}
 
 		if len(trades) == 0 {
-			s.logger.Info("new strategy, no need to recover")
+			s.logger.Info("0 trades found, it's a new strategy so no need to recover")
 			return nil
 		}
 	}
 
-	s.logger.Infof("start to recover")
+	s.logger.Infof("start recovering")
 	if err := s.recoverWithOpenOrdersByScanningTrades(ctx, historyService, openOrdersOnGrid); err != nil {
 		return errors.Wrap(err, "grid recover error")
 	}
@@ -302,4 +298,17 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 	}
 
 	return pinOrdersFilled, nil
+}
+
+func filterOrdersOnGrid(groupID uint32, orders []types.Order) []types.Order {
+	var filteredOrders []types.Order
+	for _, order := range orders {
+		if order.GroupID != groupID {
+			continue
+		}
+
+		filteredOrders = append(filteredOrders, order)
+	}
+
+	return filteredOrders
 }
