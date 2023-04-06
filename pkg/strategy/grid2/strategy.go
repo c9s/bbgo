@@ -1942,14 +1942,14 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	if s.RecoverGridByScanningTrades {
 		s.debugLog("recover grid by scanning trades")
-		return s.recoverGridByScanningTrades(ctx, session)
+		return s.recoverByScanningTrades(ctx, session)
 	}
 
 	s.debugLog("recover grid by scanning orders")
-	return s.recoverGridByScanningOrders(ctx, session)
+	return s.recoverByScanningOrders(ctx, session)
 }
 
-func (s *Strategy) recoverGridByScanningOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
+func (s *Strategy) recoverByScanningOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
 	openOrders, err := queryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
 	if err != nil {
 		return err

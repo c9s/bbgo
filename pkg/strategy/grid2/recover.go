@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (s *Strategy) recoverGridByScanningTrades(ctx context.Context, session *bbgo.ExchangeSession) error {
+func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.ExchangeSession) error {
 	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
 	// if the exchange doesn't support ExchangeTradeHistoryService, do not run recover
 	if !implemented {
@@ -64,14 +64,14 @@ func (s *Strategy) recoverGridByScanningTrades(ctx context.Context, session *bbg
 	}
 
 	s.logger.Infof("start to recover")
-	if err := s.recoverGridWithOpenOrdersByScanningTrades(ctx, historyService, openOrdersOnGrid); err != nil {
+	if err := s.recoverWithOpenOrdersByScanningTrades(ctx, historyService, openOrdersOnGrid); err != nil {
 		return errors.Wrap(err, "grid recover error")
 	}
 
 	return nil
 }
 
-func (s *Strategy) recoverGridWithOpenOrdersByScanningTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrdersOnGrid []types.Order) error {
+func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrdersOnGrid []types.Order) error {
 	if s.orderQueryService == nil {
 		return fmt.Errorf("orderQueryService is nil, it can't get orders by trade")
 	}
