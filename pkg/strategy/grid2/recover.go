@@ -6,10 +6,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/pkg/errors"
 )
 
 func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.ExchangeSession) error {
@@ -77,6 +78,9 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 	s.debugLog("open orders nums: %d, expected nums: %d", openOrdersOnGridNums, expectedOrderNums)
 	if expectedOrderNums == openOrdersOnGridNums {
 		// no need to recover
+		s.EmitGridReady()
+		s.updateGridNumOfOrdersMetricsWithLock()
+		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 		return nil
 	} else if expectedOrderNums < openOrdersOnGridNums {
 		return fmt.Errorf("amount of grid's open orders should not > amount of expected grid's orders")
