@@ -551,7 +551,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, err
 	}
 
-	vipLevel, err := e.client.AccountService.NewGetVipLevelRequest().Do(ctx)
+	vipLevel, err := e.client.NewGetVipLevelRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
