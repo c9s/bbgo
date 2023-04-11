@@ -23,6 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/backoff"
 	"github.com/c9s/bbgo/pkg/version"
 )
 
@@ -68,11 +69,11 @@ var htmlTagPattern = regexp.MustCompile("<[/]?[a-zA-Z-]+.*?>")
 
 // The following variables are used for nonce.
 
-// timeOffset is used for nonce
-var timeOffset int64 = 0
+// globalTimeOffset is used for nonce
+var globalTimeOffset int64 = 0
 
-// serverTimestamp is used for storing the server timestamp, default to Now
-var serverTimestamp = time.Now().Unix()
+// globalServerTimestamp is used for storing the server timestamp, default to Now
+var globalServerTimestamp = time.Now().Unix()
 
 // reqCount is used for nonce, this variable counts the API request count.
 var reqCount int64 = 1
@@ -147,16 +148,41 @@ func (c *RestClient) Auth(key string, secret string) *RestClient {
 	return c
 }
 
-func (c *RestClient) initNonce() {
-	var clientTime = time.Now()
-	var err error
-	serverTimestamp, err = c.PublicService.Timestamp()
-	if err != nil {
-		logger.WithError(err).Panic("failed to sync timestamp with max")
-	}
+func (c *RestClient) queryAndUpdateServerTimestamp(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
 
-	timeOffset = serverTimestamp - clientTime.Unix()
-	logger.Infof("loaded max server timestamp: %d offset=%d", serverTimestamp, timeOffset)
+		default:
+			op := func() error {
+				serverTs, err := c.PublicService.Timestamp()
+				if err != nil {
+					return err
+				}
+				if serverTs == 0 {
+					return errors.New("unexpected zero server timestamp")
+				}
+
+				clientTime := time.Now()
+				offset := serverTs - clientTime.Unix()
+
+				atomic.StoreInt64(&globalServerTimestamp, serverTs)
+				atomic.StoreInt64(&globalTimeOffset, offset)
+
+				logger.Debugf("loaded max server timestamp: %d offset=%d", globalServerTimestamp, offset)
+				return nil
+			}
+
+			if err := backoff.RetryGeneral(ctx, op); err != nil {
+				logger.WithError(err).Error("unable to sync timestamp with max")
+			}
+		}
+	}
+}
+
+func (c *RestClient) initNonce() {
+	go c.queryAndUpdateServerTimestamp(context.Background())
 }
 
 func (c *RestClient) getNonce() int64 {
@@ -164,7 +190,8 @@ func (c *RestClient) getNonce() int64 {
 	// nonce 與伺服器的時間差不得超過正負30秒，每個 nonce 只能使用一次。
 	var seconds = time.Now().Unix()
 	var rc = atomic.AddInt64(&reqCount, 1)
-	return (seconds+timeOffset)*1000 - 1 + int64(math.Mod(float64(rc), 1000.0))
+	var offset = atomic.LoadInt64(&globalTimeOffset)
+	return (seconds+offset)*1000 - 1 + int64(math.Mod(float64(rc), 1000.0))
 }
 
 func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, m string, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
