@@ -12,12 +12,19 @@ import (
 type HigherHighLowerLowStop struct {
 	Symbol string `json:"symbol"`
 
+	// Interval is the kline interval used by this exit. Window is used as the range to determining higher highs and
+	// lower lows
 	types.IntervalWindow
 
+	// HighLowWindow is the range to calculate the number of higher highs and lower lows
 	HighLowWindow int `json:"highLowWindow"`
 
+	// If the number of higher highs or lower lows with in HighLowWindow is more than MaxHighLow, the exit is triggered.
+	// 0 disables this parameter. Either one of MaxHighLow and MinHighLow must be larger than 0
 	MaxHighLow int `json:"maxHighLow"`
 
+	// If the number of higher highs or lower lows with in HighLowWindow is less than MinHighLow, the exit is triggered.
+	// 0 disables this parameter. Either one of MaxHighLow and MinHighLow must be larger than 0
 	MinHighLow int `json:"minHighLow"`
 
 	// ActivationRatio is the trigger condition
@@ -30,11 +37,13 @@ type HigherHighLowerLowStop struct {
 	// You can use this to combine several exits
 	DeactivationRatio fixedpoint.Value `json:"deactivationRatio"`
 
+	// If true, looking for lower lows in long position and higher highs in short position. If false, looking for higher
+	// highs in long position and lower lows in short position
 	OppositeDirectionAsPosition bool `json:"oppositeDirectionAsPosition"`
 
 	klines types.KLineWindow
 
-	// activated: when the price reaches the min profit price, we set the activated to true to enable trailing stop
+	// activated: when the price reaches the min profit price, we set the activated to true to enable hhll stop
 	activated bool
 
 	highLows []types.Direction
