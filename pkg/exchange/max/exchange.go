@@ -690,7 +690,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			txIDs[d.TxID] = struct{}{}
 			withdraw := types.Withdraw{
 				Exchange:               types.ExchangeMax,
-				ApplyTime:              types.Time(time.Unix(d.CreatedAt, 0)),
+				ApplyTime:              types.Time(d.CreatedAt),
 				Asset:                  toGlobalCurrency(d.Currency),
 				Amount:                 d.Amount,
 				Address:                "",
@@ -710,7 +710,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			startTime = endTime
 		} else {
 			// its in descending order, so we get the first record
-			startTime = time.Unix(withdraws[0].CreatedAt, 0)
+			startTime = withdraws[0].CreatedAt.Time()
 		}
 	}
 
