@@ -93,11 +93,13 @@ func (s *HigherHighLowerLowStop) updateActivated(position *types.Position, close
 func (s *HigherHighLowerLowStop) updateHighLowNumber(kline types.KLine) {
 	s.klines.Truncate(s.Window - 1)
 
-	if s.klines.Len() > 0 {
+	if s.klines.Len() >= s.Window-1 {
 		if s.klines.GetHigh().Compare(kline.GetHigh()) < 0 {
 			s.highLows = append(s.highLows, types.DirectionUp)
+			log.Debugf("[hhllStop] new higher high for %s", s.Symbol)
 		} else if s.klines.GetLow().Compare(kline.GetLow()) > 0 {
 			s.highLows = append(s.highLows, types.DirectionDown)
+			log.Debugf("[hhllStop] new lower low for %s", s.Symbol)
 		} else {
 			s.highLows = append(s.highLows, types.DirectionNone)
 		}
@@ -164,7 +166,7 @@ func (s *HigherHighLowerLowStop) Bind(session *ExchangeSession, orderExecutor *G
 		s.updateHighLowNumber(kline)
 
 		// Close position & reset
-		if s.activated && s.shouldStop(position) {
+		if s.shouldStop(position) {
 			err := s.orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "hhllStop")
 			if err != nil {
 				Notify("[hhllStop] Stop of %s triggered but failed to close %s position:", s.Symbol, err)
