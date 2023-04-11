@@ -648,8 +648,8 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 		}
 
 		withdraws, err := req.
-			From(startTime.Unix()).
-			To(endTime.Unix()).
+			From(startTime).
+			To(endTime).
 			Limit(limit).
 			Do(ctx)
 
