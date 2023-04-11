@@ -41,8 +41,8 @@ func (g *GetDepositHistoryRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
 
 	query := url.Values{}
-	for k, v := range params {
-		query.Add(k, fmt.Sprintf("%v", v))
+	for _k, _v := range params {
+		query.Add(_k, fmt.Sprintf("%v", _v))
 	}
 
 	return query, nil
@@ -63,6 +63,17 @@ func (g *GetDepositHistoryRequest) GetParameters() (map[string]interface{}, erro
 	if g.from != nil {
 		from := *g.from
 
+		// TEMPLATE check-valid-values
+		switch from {
+		case globalTimeOffset, reqCount:
+			params["from"] = from
+
+		default:
+			return nil, fmt.Errorf("from value %v is invalid", from)
+
+		}
+		// END TEMPLATE check-valid-values
+
 		// assign parameter of from
 		params["from"] = from
 	} else {
@@ -70,6 +81,17 @@ func (g *GetDepositHistoryRequest) GetParameters() (map[string]interface{}, erro
 	// check to field -> json key to
 	if g.to != nil {
 		to := *g.to
+
+		// TEMPLATE check-valid-values
+		switch to {
+		case globalTimeOffset, reqCount:
+			params["to"] = to
+
+		default:
+			return nil, fmt.Errorf("to value %v is invalid", to)
+
+		}
+		// END TEMPLATE check-valid-values
 
 		// assign parameter of to
 		params["to"] = to
@@ -104,13 +126,13 @@ func (g *GetDepositHistoryRequest) GetParametersQuery() (url.Values, error) {
 		return query, err
 	}
 
-	for k, v := range params {
-		if g.isVarSlice(v) {
-			g.iterateSlice(v, func(it interface{}) {
-				query.Add(k+"[]", fmt.Sprintf("%v", it))
+	for _k, _v := range params {
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
 			})
 		} else {
-			query.Add(k, fmt.Sprintf("%v", v))
+			query.Add(_k, fmt.Sprintf("%v", _v))
 		}
 	}
 
@@ -135,24 +157,24 @@ func (g *GetDepositHistoryRequest) GetSlugParameters() (map[string]interface{}, 
 }
 
 func (g *GetDepositHistoryRequest) applySlugsToUrl(url string, slugs map[string]string) string {
-	for k, v := range slugs {
-		needleRE := regexp.MustCompile(":" + k + "\\b")
-		url = needleRE.ReplaceAllString(url, v)
+	for _k, _v := range slugs {
+		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		url = needleRE.ReplaceAllString(url, _v)
 	}
 
 	return url
 }
 
-func (g *GetDepositHistoryRequest) iterateSlice(slice interface{}, f func(it interface{})) {
+func (g *GetDepositHistoryRequest) iterateSlice(slice interface{}, _f func(it interface{})) {
 	sliceValue := reflect.ValueOf(slice)
-	for i := 0; i < sliceValue.Len(); i++ {
-		it := sliceValue.Index(i).Interface()
-		f(it)
+	for _i := 0; _i < sliceValue.Len(); _i++ {
+		it := sliceValue.Index(_i).Interface()
+		_f(it)
 	}
 }
 
-func (g *GetDepositHistoryRequest) isVarSlice(v interface{}) bool {
-	rt := reflect.TypeOf(v)
+func (g *GetDepositHistoryRequest) isVarSlice(_v interface{}) bool {
+	rt := reflect.TypeOf(_v)
 	switch rt.Kind() {
 	case reflect.Slice:
 		return true
@@ -167,8 +189,8 @@ func (g *GetDepositHistoryRequest) GetSlugsMap() (map[string]string, error) {
 		return slugs, nil
 	}
 
-	for k, v := range params {
-		slugs[k] = fmt.Sprintf("%v", v)
+	for _k, _v := range params {
+		slugs[_k] = fmt.Sprintf("%v", _v)
 	}
 
 	return slugs, nil
