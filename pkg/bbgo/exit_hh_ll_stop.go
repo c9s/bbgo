@@ -2,15 +2,12 @@ package bbgo
 
 import (
 	"context"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-// TODO: if parameter not set
-// TODO: log and notify
-// TODO: check all procedures
 
 type HigherHighLowerLowStop struct {
 	Symbol string `json:"symbol"`
@@ -156,6 +153,17 @@ func (s *HigherHighLowerLowStop) shouldStop(position *types.Position) bool {
 }
 
 func (s *HigherHighLowerLowStop) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
+	// Check parameters
+	if s.Window <= 0 {
+		panic(fmt.Errorf("[hhllStop] window must be larger than zero"))
+	}
+	if s.HighLowWindow <= 0 {
+		panic(fmt.Errorf("[hhllStop] highLowWindow must be larger than zero"))
+	}
+	if s.MaxHighLow <= 0 && s.MinHighLow <= 0 {
+		panic(fmt.Errorf("[hhllStop] either maxHighLow or minHighLow must be larger than zero"))
+	}
+
 	s.session = session
 	s.orderExecutor = orderExecutor
 
