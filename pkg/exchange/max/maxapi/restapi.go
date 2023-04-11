@@ -69,11 +69,11 @@ var htmlTagPattern = regexp.MustCompile("<[/]?[a-zA-Z-]+.*?>")
 
 // The following variables are used for nonce.
 
-// timeOffset is used for nonce
-var timeOffset int64 = 0
+// globalTimeOffset is used for nonce
+var globalTimeOffset int64 = 0
 
-// serverTimestamp is used for storing the server timestamp, default to Now
-var serverTimestamp = time.Now().Unix()
+// globalServerTimestamp is used for storing the server timestamp, default to Now
+var globalServerTimestamp = time.Now().Unix()
 
 // reqCount is used for nonce, this variable counts the API request count.
 var reqCount int64 = 1
@@ -167,10 +167,10 @@ func (c *RestClient) queryAndUpdateServerTimestamp(ctx context.Context) {
 				clientTime := time.Now()
 				offset := serverTs - clientTime.Unix()
 
-				atomic.StoreInt64(&serverTimestamp, serverTs)
-				atomic.StoreInt64(&timeOffset, offset)
+				atomic.StoreInt64(&globalServerTimestamp, serverTs)
+				atomic.StoreInt64(&globalTimeOffset, offset)
 
-				logger.Infof("loaded max server timestamp: %d offset=%d", serverTimestamp, offset)
+				logger.Infof("loaded max server timestamp: %d offset=%d", globalServerTimestamp, offset)
 				return nil
 			}
 
@@ -190,7 +190,7 @@ func (c *RestClient) getNonce() int64 {
 	// nonce 與伺服器的時間差不得超過正負30秒，每個 nonce 只能使用一次。
 	var seconds = time.Now().Unix()
 	var rc = atomic.AddInt64(&reqCount, 1)
-	var offset = atomic.LoadInt64(&timeOffset)
+	var offset = atomic.LoadInt64(&globalTimeOffset)
 	return (seconds+offset)*1000 - 1 + int64(math.Mod(float64(rc), 1000.0))
 }
 
