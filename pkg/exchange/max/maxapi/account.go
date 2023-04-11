@@ -5,6 +5,8 @@ package max
 //go:generate -command DeleteRequest requestgen -method DELETE
 
 import (
+	"time"
+
 	"github.com/c9s/requestgen"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -159,11 +161,11 @@ type Withdraw struct {
 type GetWithdrawHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	currency string  `param:"currency"`
-	from     *int64  `param:"from"`  // seconds
-	to       *int64  `param:"to"`    // seconds
-	state    *string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	limit    *int    `param:"limit"`
+	currency string     `param:"currency"`
+	from     *time.Time `param:"from,seconds"` // seconds
+	to       *time.Time `param:"to,seconds"`   // seconds
+	state    *string    `param:"state"`        // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	limit    *int       `param:"limit"`
 }
 
 func (c *RestClient) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
