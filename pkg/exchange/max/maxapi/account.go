@@ -8,6 +8,7 @@ import (
 	"github.com/c9s/requestgen"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type AccountService struct {
@@ -147,11 +148,11 @@ type Withdraw struct {
 	//     "failed", "pending", "confirmed",
 	//     "kgi_manually_processing", "kgi_manually_confirmed", "kgi_possible_failed",
 	//     "sygna_verifying"
-	State         string `json:"state"`
-	Confirmations int    `json:"confirmations"`
-	CreatedAt     int64  `json:"created_at"`
-	UpdatedAt     int64  `json:"updated_at"`
-	Notes         string `json:"notes"`
+	State         string                     `json:"state"`
+	Confirmations int                        `json:"confirmations"`
+	CreatedAt     types.MillisecondTimestamp `json:"created_at"`
+	UpdatedAt     types.MillisecondTimestamp `json:"updated_at"`
+	Notes         string                     `json:"notes"`
 }
 
 //go:generate GetRequest -url "v2/withdrawals" -type GetWithdrawHistoryRequest -responseType []Withdraw
