@@ -99,8 +99,8 @@ type GetAccountsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
 
-func (s *AccountService) NewGetAccountsRequest() *GetAccountsRequest {
-	return &GetAccountsRequest{client: s.client}
+func (c *RestClient) NewGetAccountsRequest() *GetAccountsRequest {
+	return &GetAccountsRequest{client: c}
 }
 
 type Deposit struct {
@@ -126,9 +126,9 @@ type GetDepositHistoryRequest struct {
 	limit    *int    `param:"limit"`
 }
 
-func (s *AccountService) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {
+func (c *RestClient) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {
 	return &GetDepositHistoryRequest{
-		client: s.client,
+		client: c,
 	}
 }
 
@@ -165,8 +165,8 @@ type GetWithdrawHistoryRequest struct {
 	limit    *int    `param:"limit"`
 }
 
-func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
+func (c *RestClient) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
 	return &GetWithdrawHistoryRequest{
-		client: s.client,
+		client: c,
 	}
 }
