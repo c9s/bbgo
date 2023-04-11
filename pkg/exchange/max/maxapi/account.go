@@ -79,8 +79,8 @@ type GetVipLevelRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
 
-func (s *AccountService) NewGetVipLevelRequest() *GetVipLevelRequest {
-	return &GetVipLevelRequest{client: s.client}
+func (c *RestClient) NewGetVipLevelRequest() *GetVipLevelRequest {
+	return &GetVipLevelRequest{client: c}
 }
 
 //go:generate GetRequest -url "v2/members/accounts/:currency" -type GetAccountRequest -responseType .Account
@@ -90,8 +90,8 @@ type GetAccountRequest struct {
 	currency string `param:"currency,slug"`
 }
 
-func (s *AccountService) NewGetAccountRequest() *GetAccountRequest {
-	return &GetAccountRequest{client: s.client}
+func (c *RestClient) NewGetAccountRequest() *GetAccountRequest {
+	return &GetAccountRequest{client: c}
 }
 
 //go:generate GetRequest -url "v2/members/accounts" -type GetAccountsRequest -responseType []Account
