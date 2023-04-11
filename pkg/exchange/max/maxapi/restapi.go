@@ -170,7 +170,7 @@ func (c *RestClient) queryAndUpdateServerTimestamp(ctx context.Context) {
 				atomic.StoreInt64(&globalServerTimestamp, serverTs)
 				atomic.StoreInt64(&globalTimeOffset, offset)
 
-				logger.Infof("loaded max server timestamp: %d offset=%d", globalServerTimestamp, offset)
+				logger.Debugf("loaded max server timestamp: %d offset=%d", globalServerTimestamp, offset)
 				return nil
 			}
 
