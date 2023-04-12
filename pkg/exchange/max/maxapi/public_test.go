@@ -25,6 +25,16 @@ func TestPublicService(t *testing.T) {
 		assert.NotZero(t, serverTimestamp)
 	})
 
+	t.Run("v2/markets", func(t *testing.T) {
+		req := client.NewGetMarketsRequest()
+		markets, err := req.Do(context.Background())
+		assert.NoError(t, err)
+		if assert.NotEmpty(t, markets) {
+			assert.NotZero(t, markets[0].MinBaseAmount)
+			assert.NotZero(t, markets[0].MinQuoteAmount)
+		}
+	})
+
 	t.Run("v2/tickers", func(t *testing.T) {
 		req := client.NewGetTickersRequest()
 		tickers, err := req.Do(ctx)
