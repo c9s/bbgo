@@ -72,13 +72,13 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 
 	return &types.Ticker{
 		Time:   ticker.Time,
-		Volume: fixedpoint.MustNewFromString(ticker.Volume),
-		Last:   fixedpoint.MustNewFromString(ticker.Last),
-		Open:   fixedpoint.MustNewFromString(ticker.Open),
-		High:   fixedpoint.MustNewFromString(ticker.High),
-		Low:    fixedpoint.MustNewFromString(ticker.Low),
-		Buy:    fixedpoint.MustNewFromString(ticker.Buy),
-		Sell:   fixedpoint.MustNewFromString(ticker.Sell),
+		Volume: ticker.Volume,
+		Last:   ticker.Last,
+		Open:   ticker.Open,
+		High:   ticker.High,
+		Low:    ticker.Low,
+		Buy:    ticker.Buy,
+		Sell:   ticker.Sell,
 	}, nil
 }
 
@@ -112,15 +112,16 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 			if _, ok := m[toGlobalSymbol(k)]; len(symbol) != 0 && !ok {
 				continue
 			}
+
 			tickers[toGlobalSymbol(k)] = types.Ticker{
 				Time:   v.Time,
-				Volume: fixedpoint.MustNewFromString(v.Volume),
-				Last:   fixedpoint.MustNewFromString(v.Last),
-				Open:   fixedpoint.MustNewFromString(v.Open),
-				High:   fixedpoint.MustNewFromString(v.High),
-				Low:    fixedpoint.MustNewFromString(v.Low),
-				Buy:    fixedpoint.MustNewFromString(v.Buy),
-				Sell:   fixedpoint.MustNewFromString(v.Sell),
+				Volume: v.Volume,
+				Last:   v.Last,
+				Open:   v.Open,
+				High:   v.High,
+				Low:    v.Low,
+				Buy:    v.Buy,
+				Sell:   v.Sell,
 			}
 		}
 	}
@@ -959,8 +960,7 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedp
 		return fixedpoint.Zero, err
 	}
 
-	return fixedpoint.MustNewFromString(ticker.Sell).
-		Add(fixedpoint.MustNewFromString(ticker.Buy)).Div(Two), nil
+	return ticker.Sell.Add(ticker.Buy).Div(Two), nil
 }
 
 func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {

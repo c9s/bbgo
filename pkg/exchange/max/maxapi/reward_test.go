@@ -32,6 +32,15 @@ func TestPublicService(t *testing.T) {
 		assert.NotEmpty(t, tickers)
 		assert.NotEmpty(t, tickers["btcusdt"])
 	})
+
+	t.Run("v2/ticker/:market", func(t *testing.T) {
+		req := client.NewGetTickerRequest()
+		req.Market("btcusdt")
+		ticker, err := req.Do(ctx)
+		assert.NoError(t, err)
+		assert.NotNil(t, ticker)
+		assert.NotEmpty(t, ticker.Sell)
+	})
 }
 
 func TestRewardService_GetRewardsRequest(t *testing.T) {
