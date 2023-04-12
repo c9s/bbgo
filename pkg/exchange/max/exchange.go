@@ -55,7 +55,7 @@ func New(key, secret string) *Exchange {
 
 		// closedOrderQueryLimiter is used for the closed orders query rate limit, 1 request per second
 		closedOrderQueryLimiter: rate.NewLimiter(rate.Every(1*time.Second), 1),
-		accountQueryLimiter:     rate.NewLimiter(rate.Every(3*time.Second), 1),
+		accountQueryLimiter:     rate.NewLimiter(rate.Every(1*time.Second), 1),
 		marketDataLimiter:       rate.NewLimiter(rate.Every(2*time.Second), 10),
 	}
 }
