@@ -13,7 +13,6 @@ require (
 	github.com/c9s/rockhopper v1.2.2-0.20220617053729-ffdc87df194b
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/cheggaaa/pb/v3 v3.0.8
-	github.com/cloudflare/cfssl v0.0.0-20190808011637-b1ec8c586c2a
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
 	github.com/ethereum/go-ethereum v1.10.23
 	github.com/evanphx/json-patch/v5 v5.6.0
