@@ -18,7 +18,7 @@ func TestAccountService_GetAccountsRequest(t *testing.T) {
 	client := NewRestClient(ProductionAPIURL)
 	client.Auth(key, secret)
 
-	req := client.AccountService.NewGetAccountsRequest()
+	req := client.NewGetAccountsRequest()
 	accounts, err := req.Do(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, accounts)
@@ -38,14 +38,14 @@ func TestAccountService_GetAccountRequest(t *testing.T) {
 	client := NewRestClient(ProductionAPIURL)
 	client.Auth(key, secret)
 
-	req := client.AccountService.NewGetAccountRequest()
+	req := client.NewGetAccountRequest()
 	req.Currency("twd")
 	account, err := req.Do(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, account)
 	t.Logf("account: %+v", account)
 
-	req2 := client.AccountService.NewGetAccountRequest()
+	req2 := client.NewGetAccountRequest()
 	req2.Currency("usdt")
 	account, err = req.Do(ctx)
 	assert.NoError(t, err)
@@ -64,7 +64,7 @@ func TestAccountService_GetVipLevelRequest(t *testing.T) {
 	client := NewRestClient(ProductionAPIURL)
 	client.Auth(key, secret)
 
-	req := client.AccountService.NewGetVipLevelRequest()
+	req := client.NewGetVipLevelRequest()
 	vipLevel, err := req.Do(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, vipLevel)
@@ -82,7 +82,7 @@ func TestAccountService_GetWithdrawHistoryRequest(t *testing.T) {
 	client := NewRestClient(ProductionAPIURL)
 	client.Auth(key, secret)
 
-	req := client.AccountService.NewGetWithdrawalHistoryRequest()
+	req := client.NewGetWithdrawalHistoryRequest()
 	req.Currency("usdt")
 	withdraws, err := req.Do(ctx)
 	assert.NoError(t, err)
@@ -102,7 +102,7 @@ func TestAccountService_NewGetDepositHistoryRequest(t *testing.T) {
 	client := NewRestClient(ProductionAPIURL)
 	client.Auth(key, secret)
 
-	req := client.AccountService.NewGetDepositHistoryRequest()
+	req := client.NewGetDepositHistoryRequest()
 	req.Currency("usdt")
 	deposits, err := req.Do(ctx)
 	assert.NoError(t, err)

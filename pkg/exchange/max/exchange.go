@@ -72,13 +72,13 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 
 	return &types.Ticker{
 		Time:   ticker.Time,
-		Volume: fixedpoint.MustNewFromString(ticker.Volume),
-		Last:   fixedpoint.MustNewFromString(ticker.Last),
-		Open:   fixedpoint.MustNewFromString(ticker.Open),
-		High:   fixedpoint.MustNewFromString(ticker.High),
-		Low:    fixedpoint.MustNewFromString(ticker.Low),
-		Buy:    fixedpoint.MustNewFromString(ticker.Buy),
-		Sell:   fixedpoint.MustNewFromString(ticker.Sell),
+		Volume: ticker.Volume,
+		Last:   ticker.Last,
+		Open:   ticker.Open,
+		High:   ticker.High,
+		Low:    ticker.Low,
+		Buy:    ticker.Buy,
+		Sell:   ticker.Sell,
 	}, nil
 }
 
@@ -112,15 +112,16 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 			if _, ok := m[toGlobalSymbol(k)]; len(symbol) != 0 && !ok {
 				continue
 			}
+
 			tickers[toGlobalSymbol(k)] = types.Ticker{
 				Time:   v.Time,
-				Volume: fixedpoint.MustNewFromString(v.Volume),
-				Last:   fixedpoint.MustNewFromString(v.Last),
-				Open:   fixedpoint.MustNewFromString(v.Open),
-				High:   fixedpoint.MustNewFromString(v.High),
-				Low:    fixedpoint.MustNewFromString(v.Low),
-				Buy:    fixedpoint.MustNewFromString(v.Buy),
-				Sell:   fixedpoint.MustNewFromString(v.Sell),
+				Volume: v.Volume,
+				Last:   v.Last,
+				Open:   v.Open,
+				High:   v.High,
+				Low:    v.Low,
+				Buy:    v.Buy,
+				Sell:   v.Sell,
 			}
 		}
 	}
@@ -551,7 +552,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, err
 	}
 
-	vipLevel, err := e.client.AccountService.NewGetVipLevelRequest().Do(ctx)
+	vipLevel, err := e.client.NewGetVipLevelRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -642,14 +643,14 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 		}
 
 		log.Infof("querying withdraw %s: %s <=> %s", asset, startTime, endTime)
-		req := e.client.AccountService.NewGetWithdrawalHistoryRequest()
+		req := e.client.NewGetWithdrawalHistoryRequest()
 		if len(asset) > 0 {
 			req.Currency(toLocalCurrency(asset))
 		}
 
 		withdraws, err := req.
-			From(startTime.Unix()).
-			To(endTime.Unix()).
+			From(startTime).
+			To(endTime).
 			Limit(limit).
 			Do(ctx)
 
@@ -690,7 +691,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			txIDs[d.TxID] = struct{}{}
 			withdraw := types.Withdraw{
 				Exchange:               types.ExchangeMax,
-				ApplyTime:              types.Time(time.Unix(d.CreatedAt, 0)),
+				ApplyTime:              types.Time(d.CreatedAt),
 				Asset:                  toGlobalCurrency(d.Currency),
 				Amount:                 d.Amount,
 				Address:                "",
@@ -710,7 +711,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			startTime = endTime
 		} else {
 			// its in descending order, so we get the first record
-			startTime = time.Unix(withdraws[0].CreatedAt, 0)
+			startTime = withdraws[0].CreatedAt.Time()
 		}
 	}
 
@@ -739,14 +740,14 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 
 		log.Infof("querying deposit history %s: %s <=> %s", asset, startTime, endTime)
 
-		req := e.client.AccountService.NewGetDepositHistoryRequest()
+		req := e.client.NewGetDepositHistoryRequest()
 		if len(asset) > 0 {
 			req.Currency(toLocalCurrency(asset))
 		}
 
 		deposits, err := req.
-			From(startTime.Unix()).
-			To(endTime.Unix()).
+			From(startTime).
+			To(endTime).
 			Limit(limit).
 			Do(ctx)
 
@@ -762,7 +763,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 
 			allDeposits = append(allDeposits, types.Deposit{
 				Exchange:      types.ExchangeMax,
-				Time:          types.Time(time.Unix(d.CreatedAt, 0)),
+				Time:          types.Time(d.CreatedAt),
 				Amount:        d.Amount,
 				Asset:         toGlobalCurrency(d.Currency),
 				Address:       "", // not supported
@@ -775,7 +776,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 		if len(deposits) < limit {
 			startTime = endTime
 		} else {
-			startTime = time.Unix(deposits[0].CreatedAt, 0)
+			startTime = time.Time(deposits[0].CreatedAt)
 		}
 	}
 
@@ -959,8 +960,7 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedp
 		return fixedpoint.Zero, err
 	}
 
-	return fixedpoint.MustNewFromString(ticker.Sell).
-		Add(fixedpoint.MustNewFromString(ticker.Buy)).Div(Two), nil
+	return ticker.Sell.Add(ticker.Buy).Div(Two), nil
 }
 
 func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
