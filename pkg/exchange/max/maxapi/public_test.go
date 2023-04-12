@@ -35,6 +35,16 @@ func TestPublicService(t *testing.T) {
 		}
 	})
 
+	t.Run("v2/k", func(t *testing.T) {
+		req := client.NewGetKLinesRequest()
+		data, err := req.Market("btcusdt").Period(int(60)).Limit(100).Do(ctx)
+		assert.NoError(t, err)
+		if assert.NotEmpty(t, data) {
+			assert.NotEmpty(t, data[0])
+			assert.Len(t, data[0], 6)
+		}
+	})
+
 	t.Run("v2/tickers", func(t *testing.T) {
 		req := client.NewGetTickersRequest()
 		tickers, err := req.Do(ctx)
