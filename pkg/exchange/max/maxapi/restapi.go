@@ -39,7 +39,7 @@ const (
 	// 2018-09-01 08:00:00 +0800 CST
 	TimestampSince = 1535760000
 
-	maxAllowedDelayedTimeOffset = -20
+	maxAllowedNegativeTimeOffset = -20
 )
 
 var httpTransportMaxIdleConnsPerHost = http.DefaultMaxIdleConnsPerHost
@@ -174,12 +174,12 @@ func (c *RestClient) queryAndUpdateServerTimestamp(ctx context.Context) {
 
 				if offset < 0 {
 					// avoid updating a negative offset: server time is before the local time
-					if offset > maxAllowedDelayedTimeOffset {
+					if offset > maxAllowedNegativeTimeOffset {
 						return nil
 					}
 
 					// if the offset is greater than 15 seconds, we should restart
-					logger.Panicf("max exchange server timestamp offset %d > %d seconds", offset, maxAllowedDelayedTimeOffset)
+					logger.Panicf("max exchange server timestamp offset %d is less than the negative offset %d", offset, maxAllowedNegativeTimeOffset)
 				}
 
 				atomic.StoreInt64(&globalServerTimestamp, serverTs)
