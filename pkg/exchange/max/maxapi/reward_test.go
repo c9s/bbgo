@@ -7,6 +7,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestPublicService(t *testing.T) {
+	key, secret, ok := integrationTestConfigured(t, "MAX")
+	if !ok {
+		t.SkipNow()
+	}
+
+	ctx := context.Background()
+	client := NewRestClient(ProductionAPIURL)
+	client.Auth(key, secret)
+
+	t.Run("v2/timestamp", func(t *testing.T) {
+		req := client.NewGetTimestampRequest()
+		serverTimestamp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		assert.NotZero(t, serverTimestamp)
+	})
+
+	t.Run("v2/tickers", func(t *testing.T) {
+		req := client.NewGetTickersRequest()
+		tickers, err := req.Do(ctx)
+		assert.NoError(t, err)
+		assert.NotNil(t, tickers)
+		assert.NotEmpty(t, tickers)
+		assert.NotEmpty(t, tickers["btcusdt"])
+	})
+}
+
 func TestRewardService_GetRewardsRequest(t *testing.T) {
 	key, secret, ok := integrationTestConfigured(t, "MAX")
 	if !ok {
