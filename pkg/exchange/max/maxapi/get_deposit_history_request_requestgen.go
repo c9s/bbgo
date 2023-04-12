@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"strconv"
+	"time"
 )
 
 func (g *GetDepositHistoryRequest) Currency(currency string) *GetDepositHistoryRequest {
@@ -16,12 +18,12 @@ func (g *GetDepositHistoryRequest) Currency(currency string) *GetDepositHistoryR
 	return g
 }
 
-func (g *GetDepositHistoryRequest) From(from int64) *GetDepositHistoryRequest {
+func (g *GetDepositHistoryRequest) From(from time.Time) *GetDepositHistoryRequest {
 	g.from = &from
 	return g
 }
 
-func (g *GetDepositHistoryRequest) To(to int64) *GetDepositHistoryRequest {
+func (g *GetDepositHistoryRequest) To(to time.Time) *GetDepositHistoryRequest {
 	g.to = &to
 	return g
 }
@@ -63,38 +65,18 @@ func (g *GetDepositHistoryRequest) GetParameters() (map[string]interface{}, erro
 	if g.from != nil {
 		from := *g.from
 
-		// TEMPLATE check-valid-values
-		switch from {
-		case globalTimeOffset, reqCount:
-			params["from"] = from
-
-		default:
-			return nil, fmt.Errorf("from value %v is invalid", from)
-
-		}
-		// END TEMPLATE check-valid-values
-
 		// assign parameter of from
-		params["from"] = from
+		// convert time.Time to seconds time stamp
+		params["from"] = strconv.FormatInt(from.Unix(), 10)
 	} else {
 	}
 	// check to field -> json key to
 	if g.to != nil {
 		to := *g.to
 
-		// TEMPLATE check-valid-values
-		switch to {
-		case globalTimeOffset, reqCount:
-			params["to"] = to
-
-		default:
-			return nil, fmt.Errorf("to value %v is invalid", to)
-
-		}
-		// END TEMPLATE check-valid-values
-
 		// assign parameter of to
-		params["to"] = to
+		// convert time.Time to seconds time stamp
+		params["to"] = strconv.FormatInt(to.Unix(), 10)
 	} else {
 	}
 	// check state field -> json key state
