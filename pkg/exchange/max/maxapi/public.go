@@ -6,9 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/valyala/fastjson"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -189,52 +186,4 @@ func (s *PublicService) KLines(symbol string, resolution string, start time.Time
 	}
 	return kLines, nil
 	// return parseKLines(resp.Body, symbol, resolution, interval)
-}
-
-func parseKLines(payload []byte, symbol, resolution string, interval Interval) (klines []KLine, err error) {
-	var parser fastjson.Parser
-
-	v, err := parser.ParseBytes(payload)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse payload: %s", payload)
-	}
-
-	arr, err := v.Array()
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get array: %s", payload)
-	}
-
-	for _, x := range arr {
-		slice, err := x.Array()
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to get array: %s", payload)
-		}
-
-		if len(slice) < 6 {
-			return nil, fmt.Errorf("unexpected length of ohlc elements: %s", payload)
-		}
-
-		ts, err := slice[0].Int64()
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse timestamp: %s", payload)
-		}
-
-		startTime := time.Unix(ts, 0)
-		endTime := time.Unix(ts, 0).Add(time.Duration(interval)*time.Minute - time.Millisecond)
-		isClosed := time.Now().Before(endTime)
-		klines = append(klines, KLine{
-			Symbol:    symbol,
-			Interval:  resolution,
-			StartTime: startTime,
-			EndTime:   endTime,
-			Open:      fixedpoint.NewFromFloat(slice[1].GetFloat64()),
-			High:      fixedpoint.NewFromFloat(slice[2].GetFloat64()),
-			Low:       fixedpoint.NewFromFloat(slice[3].GetFloat64()),
-			Close:     fixedpoint.NewFromFloat(slice[4].GetFloat64()),
-			Volume:    fixedpoint.NewFromFloat(slice[5].GetFloat64()),
-			Closed:    isClosed,
-		})
-	}
-
-	return klines, nil
 }
