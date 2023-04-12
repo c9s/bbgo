@@ -65,35 +65,9 @@ func (s *PublicService) Markets() ([]Market, error) {
 	return markets, nil
 }
 
-func (s *PublicService) Tickers() (map[string]Ticker, error) {
-	var endPoint = "v2/tickers"
-	req, err := s.client.NewRequest(context.Background(), "GET", endPoint, url.Values{}, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	v, err := fastjson.ParseBytes(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	o, err := v.Object()
-	if err != nil {
-		return nil, err
-	}
-
-	var tickers = make(map[string]Ticker)
-	o.Visit(func(key []byte, v *fastjson.Value) {
-		var ticker = mustParseTicker(v)
-		tickers[string(key)] = ticker
-	})
-
-	return tickers, nil
+func (s *PublicService) Tickers() (TickerMap, error) {
+	req := s.client.NewGetTickersRequest()
+	return req.Do(context.Background())
 }
 
 func (s *PublicService) Ticker(market string) (*Ticker, error) {
