@@ -745,8 +745,8 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 		}
 
 		deposits, err := req.
-			From(startTime.Unix()).
-			To(endTime.Unix()).
+			From(startTime).
+			To(endTime).
 			Limit(limit).
 			Do(ctx)
 
@@ -762,7 +762,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 
 			allDeposits = append(allDeposits, types.Deposit{
 				Exchange:      types.ExchangeMax,
-				Time:          types.Time(time.Unix(d.CreatedAt, 0)),
+				Time:          types.Time(d.CreatedAt),
 				Amount:        d.Amount,
 				Asset:         toGlobalCurrency(d.Currency),
 				Address:       "", // not supported
@@ -775,7 +775,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 		if len(deposits) < limit {
 			startTime = endTime
 		} else {
-			startTime = time.Unix(deposits[0].CreatedAt, 0)
+			startTime = time.Time(deposits[0].CreatedAt)
 		}
 	}
 

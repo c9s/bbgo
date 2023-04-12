@@ -107,26 +107,26 @@ func (c *RestClient) NewGetAccountsRequest() *GetAccountsRequest {
 }
 
 type Deposit struct {
-	Currency        string           `json:"currency"`
-	CurrencyVersion string           `json:"currency_version"` // "eth"
-	Amount          fixedpoint.Value `json:"amount"`
-	Fee             fixedpoint.Value `json:"fee"`
-	TxID            string           `json:"txid"`
-	State           string           `json:"state"`
-	Confirmations   int64            `json:"confirmations"`
-	CreatedAt       int64            `json:"created_at"`
-	UpdatedAt       int64            `json:"updated_at"`
+	Currency        string                     `json:"currency"`
+	CurrencyVersion string                     `json:"currency_version"` // "eth"
+	Amount          fixedpoint.Value           `json:"amount"`
+	Fee             fixedpoint.Value           `json:"fee"`
+	TxID            string                     `json:"txid"`
+	State           string                     `json:"state"`
+	Confirmations   int64                      `json:"confirmations"`
+	CreatedAt       types.MillisecondTimestamp `json:"created_at"`
+	UpdatedAt       types.MillisecondTimestamp `json:"updated_at"`
 }
 
 //go:generate GetRequest -url "v2/deposits" -type GetDepositHistoryRequest -responseType []Deposit
 type GetDepositHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	currency *string `param:"currency"`
-	from     *int64  `param:"from"`  // seconds
-	to       *int64  `param:"to"`    // seconds
-	state    *string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	limit    *int    `param:"limit"`
+	currency *string    `param:"currency"`
+	from     *time.Time `param:"from,seconds"` // seconds
+	to       *time.Time `param:"to,seconds"`   // seconds
+	state    *string    `param:"state"`        // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	limit    *int       `param:"limit"`
 }
 
 func (c *RestClient) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {
