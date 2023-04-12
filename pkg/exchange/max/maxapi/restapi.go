@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -37,6 +38,8 @@ const (
 
 	// 2018-09-01 08:00:00 +0800 CST
 	TimestampSince = 1535760000
+
+	maxAllowedDelayedTimeOffset = -20
 )
 
 var httpTransportMaxIdleConnsPerHost = http.DefaultMaxIdleConnsPerHost
@@ -76,7 +79,9 @@ var globalTimeOffset int64 = 0
 var globalServerTimestamp = time.Now().Unix()
 
 // reqCount is used for nonce, this variable counts the API request count.
-var reqCount int64 = 1
+var reqCount uint64 = 1
+
+var nonceOnce sync.Once
 
 // create an isolated http httpTransport rather than the default one
 var httpTransport = &http.Transport{
@@ -167,6 +172,16 @@ func (c *RestClient) queryAndUpdateServerTimestamp(ctx context.Context) {
 				clientTime := time.Now()
 				offset := serverTs - clientTime.Unix()
 
+				if offset < 0 {
+					// avoid updating a negative offset: server time is before the local time
+					if offset > maxAllowedDelayedTimeOffset {
+						return nil
+					}
+
+					// if the offset is greater than 15 seconds, we should restart
+					logger.Panicf("max exchange server timestamp offset %d > %d seconds", offset, maxAllowedDelayedTimeOffset)
+				}
+
 				atomic.StoreInt64(&globalServerTimestamp, serverTs)
 				atomic.StoreInt64(&globalTimeOffset, offset)
 
@@ -182,14 +197,16 @@ func (c *RestClient) queryAndUpdateServerTimestamp(ctx context.Context) {
 }
 
 func (c *RestClient) initNonce() {
-	go c.queryAndUpdateServerTimestamp(context.Background())
+	nonceOnce.Do(func() {
+		go c.queryAndUpdateServerTimestamp(context.Background())
+	})
 }
 
 func (c *RestClient) getNonce() int64 {
 	// nonce 是以正整數表示的時間戳記，代表了從 Unix epoch 到當前時間所經過的毫秒數(ms)。
 	// nonce 與伺服器的時間差不得超過正負30秒，每個 nonce 只能使用一次。
 	var seconds = time.Now().Unix()
-	var rc = atomic.AddInt64(&reqCount, 1)
+	var rc = atomic.AddUint64(&reqCount, 1)
 	var offset = atomic.LoadInt64(&globalTimeOffset)
 	return (seconds+offset)*1000 - 1 + int64(math.Mod(float64(rc), 1000.0))
 }
