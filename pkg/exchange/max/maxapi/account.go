@@ -5,9 +5,12 @@ package max
 //go:generate -command DeleteRequest requestgen -method DELETE
 
 import (
+	"time"
+
 	"github.com/c9s/requestgen"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type AccountService struct {
@@ -79,8 +82,8 @@ type GetVipLevelRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
 
-func (s *AccountService) NewGetVipLevelRequest() *GetVipLevelRequest {
-	return &GetVipLevelRequest{client: s.client}
+func (c *RestClient) NewGetVipLevelRequest() *GetVipLevelRequest {
+	return &GetVipLevelRequest{client: c}
 }
 
 //go:generate GetRequest -url "v2/members/accounts/:currency" -type GetAccountRequest -responseType .Account
@@ -90,8 +93,8 @@ type GetAccountRequest struct {
 	currency string `param:"currency,slug"`
 }
 
-func (s *AccountService) NewGetAccountRequest() *GetAccountRequest {
-	return &GetAccountRequest{client: s.client}
+func (c *RestClient) NewGetAccountRequest() *GetAccountRequest {
+	return &GetAccountRequest{client: c}
 }
 
 //go:generate GetRequest -url "v2/members/accounts" -type GetAccountsRequest -responseType []Account
@@ -99,36 +102,36 @@ type GetAccountsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
 
-func (s *AccountService) NewGetAccountsRequest() *GetAccountsRequest {
-	return &GetAccountsRequest{client: s.client}
+func (c *RestClient) NewGetAccountsRequest() *GetAccountsRequest {
+	return &GetAccountsRequest{client: c}
 }
 
 type Deposit struct {
-	Currency        string           `json:"currency"`
-	CurrencyVersion string           `json:"currency_version"` // "eth"
-	Amount          fixedpoint.Value `json:"amount"`
-	Fee             fixedpoint.Value `json:"fee"`
-	TxID            string           `json:"txid"`
-	State           string           `json:"state"`
-	Confirmations   int64            `json:"confirmations"`
-	CreatedAt       int64            `json:"created_at"`
-	UpdatedAt       int64            `json:"updated_at"`
+	Currency        string                     `json:"currency"`
+	CurrencyVersion string                     `json:"currency_version"` // "eth"
+	Amount          fixedpoint.Value           `json:"amount"`
+	Fee             fixedpoint.Value           `json:"fee"`
+	TxID            string                     `json:"txid"`
+	State           string                     `json:"state"`
+	Confirmations   int64                      `json:"confirmations"`
+	CreatedAt       types.MillisecondTimestamp `json:"created_at"`
+	UpdatedAt       types.MillisecondTimestamp `json:"updated_at"`
 }
 
 //go:generate GetRequest -url "v2/deposits" -type GetDepositHistoryRequest -responseType []Deposit
 type GetDepositHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	currency *string `param:"currency"`
-	from     *int64  `param:"from"`  // seconds
-	to       *int64  `param:"to"`    // seconds
-	state    *string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	limit    *int    `param:"limit"`
+	currency *string    `param:"currency"`
+	from     *time.Time `param:"from,seconds"` // seconds
+	to       *time.Time `param:"to,seconds"`   // seconds
+	state    *string    `param:"state"`        // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	limit    *int       `param:"limit"`
 }
 
-func (s *AccountService) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {
+func (c *RestClient) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {
 	return &GetDepositHistoryRequest{
-		client: s.client,
+		client: c,
 	}
 }
 
@@ -147,26 +150,26 @@ type Withdraw struct {
 	//     "failed", "pending", "confirmed",
 	//     "kgi_manually_processing", "kgi_manually_confirmed", "kgi_possible_failed",
 	//     "sygna_verifying"
-	State         string `json:"state"`
-	Confirmations int    `json:"confirmations"`
-	CreatedAt     int64  `json:"created_at"`
-	UpdatedAt     int64  `json:"updated_at"`
-	Notes         string `json:"notes"`
+	State         string                     `json:"state"`
+	Confirmations int                        `json:"confirmations"`
+	CreatedAt     types.MillisecondTimestamp `json:"created_at"`
+	UpdatedAt     types.MillisecondTimestamp `json:"updated_at"`
+	Notes         string                     `json:"notes"`
 }
 
 //go:generate GetRequest -url "v2/withdrawals" -type GetWithdrawHistoryRequest -responseType []Withdraw
 type GetWithdrawHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	currency string  `param:"currency"`
-	from     *int64  `param:"from"`  // seconds
-	to       *int64  `param:"to"`    // seconds
-	state    *string `param:"state"` // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	limit    *int    `param:"limit"`
+	currency string     `param:"currency"`
+	from     *time.Time `param:"from,seconds"` // seconds
+	to       *time.Time `param:"to,seconds"`   // seconds
+	state    *string    `param:"state"`        // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	limit    *int       `param:"limit"`
 }
 
-func (s *AccountService) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
+func (c *RestClient) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
 	return &GetWithdrawHistoryRequest{
-		client: s.client,
+		client: c,
 	}
 }
