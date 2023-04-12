@@ -3,7 +3,6 @@ package max
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -34,15 +33,15 @@ type Market struct {
 type Ticker struct {
 	Time time.Time
 
-	At          int64  `json:"at"`
-	Buy         string `json:"buy"`
-	Sell        string `json:"sell"`
-	Open        string `json:"open"`
-	High        string `json:"high"`
-	Low         string `json:"low"`
-	Last        string `json:"last"`
-	Volume      string `json:"vol"`
-	VolumeInBTC string `json:"vol_in_btc"`
+	At          int64            `json:"at"`
+	Buy         fixedpoint.Value `json:"buy"`
+	Sell        fixedpoint.Value `json:"sell"`
+	Open        fixedpoint.Value `json:"open"`
+	High        fixedpoint.Value `json:"high"`
+	Low         fixedpoint.Value `json:"low"`
+	Last        fixedpoint.Value `json:"last"`
+	Volume      fixedpoint.Value `json:"vol"`
+	VolumeInBTC fixedpoint.Value `json:"vol_in_btc"`
 }
 
 func (s *PublicService) Timestamp() (int64, error) {
@@ -71,40 +70,9 @@ func (s *PublicService) Tickers() (TickerMap, error) {
 }
 
 func (s *PublicService) Ticker(market string) (*Ticker, error) {
-	var endPoint = "v2/tickers/" + market
-	req, err := s.client.NewRequest(context.Background(), "GET", endPoint, url.Values{}, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	v, err := fastjson.ParseBytes(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var ticker = mustParseTicker(v)
-	return &ticker, nil
-}
-
-func mustParseTicker(v *fastjson.Value) Ticker {
-	var at = v.GetInt64("at")
-	return Ticker{
-		Time:        time.Unix(at, 0),
-		At:          at,
-		Buy:         string(v.GetStringBytes("buy")),
-		Sell:        string(v.GetStringBytes("sell")),
-		Volume:      string(v.GetStringBytes("vol")),
-		VolumeInBTC: string(v.GetStringBytes("vol_in_btc")),
-		Last:        string(v.GetStringBytes("last")),
-		Open:        string(v.GetStringBytes("open")),
-		High:        string(v.GetStringBytes("high")),
-		Low:         string(v.GetStringBytes("low")),
-	}
+	req := s.client.NewGetTickerRequest()
+	req.Market(market)
+	return req.Do(context.Background())
 }
 
 type Interval int64
