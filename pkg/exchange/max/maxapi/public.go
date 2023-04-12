@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
 	"github.com/valyala/fastjson"
 
@@ -16,7 +15,7 @@ import (
 )
 
 type PublicService struct {
-	client requestgen.AuthenticatedAPIClient
+	client *RestClient
 }
 
 type Market struct {
@@ -46,43 +45,24 @@ type Ticker struct {
 	VolumeInBTC string `json:"vol_in_btc"`
 }
 
-func (s *PublicService) Timestamp() (serverTimestamp int64, err error) {
-	// sync timestamp with server
-	req, err := s.client.NewRequest(context.Background(), "GET", "v2/timestamp", nil, nil)
-	if err != nil {
-		return 0, err
+func (s *PublicService) Timestamp() (int64, error) {
+	req := s.client.NewGetTimestampRequest()
+	ts, err := req.Do(context.Background())
+	if err != nil || ts == nil {
+		return 0, nil
 	}
 
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return 0, err
-	}
-
-	err = response.DecodeJSON(&serverTimestamp)
-	if err != nil {
-		return 0, err
-	}
-
-	return serverTimestamp, nil
+	return int64(*ts), nil
 }
 
 func (s *PublicService) Markets() ([]Market, error) {
-	req, err := s.client.NewRequest(context.Background(), "GET", "v2/markets", url.Values{}, nil)
+	req := s.client.NewGetMarketsRequest()
+	markets, err := req.Do(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var m []Market
-	if err := response.DecodeJSON(&m); err != nil {
-		return nil, err
-	}
-
-	return m, nil
+	return markets, nil
 }
 
 func (s *PublicService) Tickers() (map[string]Ticker, error) {
