@@ -15,7 +15,8 @@ func TestPublicService(t *testing.T) {
 
 	ctx := context.Background()
 	client := NewRestClient(ProductionAPIURL)
-	client.Auth(key, secret)
+	_ = key
+	_ = secret
 
 	t.Run("v2/timestamp", func(t *testing.T) {
 		req := client.NewGetTimestampRequest()
