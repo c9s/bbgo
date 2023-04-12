@@ -153,7 +153,7 @@ func (s *PublicService) KLines(symbol string, resolution string, start time.Time
 		return nil, err
 	}
 
-	req := s.NewGetKLinesRequest()
+	req := s.client.NewGetKLinesRequest()
 	req.Market(symbol).Period(int(interval)).Timestamp(start).Limit(limit)
 	data, err := req.Do(context.Background())
 	if err != nil {

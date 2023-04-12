@@ -22,6 +22,6 @@ type GetKLinesRequest struct {
 	timestamp time.Time `param:"timestamp,seconds"`
 }
 
-func (s *PublicService) NewGetKLinesRequest() *GetKLinesRequest {
-	return &GetKLinesRequest{client: s.client}
+func (c *RestClient) NewGetKLinesRequest() *GetKLinesRequest {
+	return &GetKLinesRequest{client: c}
 }
