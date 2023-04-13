@@ -20,11 +20,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// closedOrderQueryLimiter is used for the closed orders query rate limit, 1 request per second
-var closedOrderQueryLimiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
-var accountQueryLimiter = rate.NewLimiter(rate.Every(3*time.Second), 1)
-var marketDataLimiter = rate.NewLimiter(rate.Every(2*time.Second), 10)
-
 var log = logrus.WithField("exchange", "max")
 
 type Exchange struct {
@@ -36,7 +31,7 @@ type Exchange struct {
 	v3order  *v3.OrderService
 	v3margin *v3.MarginService
 
-	submitOrderLimiter, queryTradeLimiter *rate.Limiter
+	submitOrderLimiter, queryTradeLimiter, accountQueryLimiter, closedOrderQueryLimiter, marketDataLimiter *rate.Limiter
 }
 
 func New(key, secret string) *Exchange {
@@ -57,6 +52,11 @@ func New(key, secret string) *Exchange {
 
 		queryTradeLimiter:  rate.NewLimiter(rate.Every(1*time.Second), 2),
 		submitOrderLimiter: rate.NewLimiter(rate.Every(100*time.Millisecond), 10),
+
+		// closedOrderQueryLimiter is used for the closed orders query rate limit, 1 request per second
+		closedOrderQueryLimiter: rate.NewLimiter(rate.Every(1*time.Second), 1),
+		accountQueryLimiter:     rate.NewLimiter(rate.Every(1*time.Second), 1),
+		marketDataLimiter:       rate.NewLimiter(rate.Every(2*time.Second), 10),
 	}
 }
 
@@ -83,7 +83,7 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
-	if err := marketDataLimiter.Wait(ctx); err != nil {
+	if err := e.marketDataLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
@@ -259,7 +259,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 }
 
 func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol string, lastOrderID uint64) (orders []types.Order, err error) {
-	if err := closedOrderQueryLimiter.Wait(ctx); err != nil {
+	if err := e.closedOrderQueryLimiter.Wait(ctx); err != nil {
 		return orders, err
 	}
 
@@ -548,7 +548,7 @@ func (e *Exchange) getLaunchDate() (time.Time, error) {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	if err := accountQueryLimiter.Wait(ctx); err != nil {
+	if err := e.accountQueryLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
@@ -591,7 +591,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	if err := accountQueryLimiter.Wait(ctx); err != nil {
+	if err := e.accountQueryLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
@@ -913,7 +913,7 @@ func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]typ
 // The above query will return a kline that starts with 1620202440 (unix timestamp) without endTime.
 // We need to calculate the endTime by ourself.
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	if err := marketDataLimiter.Wait(ctx); err != nil {
+	if err := e.marketDataLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
