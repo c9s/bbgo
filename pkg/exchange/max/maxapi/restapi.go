@@ -154,48 +154,38 @@ func (c *RestClient) Auth(key string, secret string) *RestClient {
 }
 
 func (c *RestClient) queryAndUpdateServerTimestamp(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
+	op := func() error {
+		serverTs, err := c.PublicService.Timestamp(ctx)
+		if err != nil {
+			return err
+		}
 
-		default:
-			op := func() error {
-				serverTs, err := c.PublicService.Timestamp(ctx)
-				if err != nil {
-					return err
-				}
+		if serverTs == 0 {
+			return errors.New("unexpected zero server timestamp")
+		}
 
-				if serverTs == 0 {
-					return errors.New("unexpected zero server timestamp")
-				}
+		clientTime := time.Now()
+		offset := serverTs - clientTime.Unix()
 
-				clientTime := time.Now()
-				offset := serverTs - clientTime.Unix()
-
-				if offset < 0 {
-					// avoid updating a negative offset: server time is before the local time
-					if offset > maxAllowedNegativeTimeOffset {
-						return nil
-					}
-
-					// if the offset is greater than 15 seconds, we should restart
-					logger.Panicf("max exchange server timestamp offset %d is less than the negative offset %d", offset, maxAllowedNegativeTimeOffset)
-				}
-
-				atomic.StoreInt64(&globalServerTimestamp, serverTs)
-				atomic.StoreInt64(&globalTimeOffset, offset)
-
-				logger.Debugf("loaded max server timestamp: %d offset=%d", globalServerTimestamp, offset)
+		if offset < 0 {
+			// avoid updating a negative offset: server time is before the local time
+			if offset > maxAllowedNegativeTimeOffset {
 				return nil
 			}
 
-			if err := backoff.RetryGeneral(ctx, op); err != nil {
-				logger.WithError(err).Error("unable to sync timestamp with max")
-			} else {
-				return
-			}
+			// if the offset is greater than 15 seconds, we should restart
+			logger.Panicf("max exchange server timestamp offset %d is less than the negative offset %d", offset, maxAllowedNegativeTimeOffset)
 		}
+
+		atomic.StoreInt64(&globalServerTimestamp, serverTs)
+		atomic.StoreInt64(&globalTimeOffset, offset)
+
+		logger.Debugf("loaded max server timestamp: %d offset=%d", globalServerTimestamp, offset)
+		return nil
+	}
+
+	if err := backoff.RetryGeneral(ctx, op); err != nil {
+		logger.WithError(err).Error("unable to sync timestamp with max")
 	}
 }
 
