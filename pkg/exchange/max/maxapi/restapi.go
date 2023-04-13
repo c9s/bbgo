@@ -161,7 +161,7 @@ func (c *RestClient) queryAndUpdateServerTimestamp(ctx context.Context) {
 
 		default:
 			op := func() error {
-				serverTs, err := c.PublicService.Timestamp()
+				serverTs, err := c.PublicService.Timestamp(ctx)
 				if err != nil {
 					return err
 				}
