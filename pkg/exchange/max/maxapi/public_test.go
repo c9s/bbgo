@@ -32,6 +32,11 @@ func TestPublicService(t *testing.T) {
 		if assert.NotEmpty(t, markets) {
 			assert.NotZero(t, markets[0].MinBaseAmount)
 			assert.NotZero(t, markets[0].MinQuoteAmount)
+			assert.NotEmpty(t, markets[0].Name)
+			assert.NotEmpty(t, markets[0].ID)
+			assert.NotEmpty(t, markets[0].BaseUnit)
+			assert.NotEmpty(t, markets[0].QuoteUnit)
+			t.Logf("%+v", markets[0])
 		}
 	})
 
