@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -24,6 +25,8 @@ import (
 )
 
 var KLinePreloadLimit int64 = 1000
+
+var ErrEmptyMarketInfo = errors.New("market info should not be empty, 0 markets loaded")
 
 // ExchangeSession presents the exchange connection Session
 // It also maintains and collects the data returned from the stream.
@@ -177,6 +180,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	var log = log.WithField("session", session.Name)
 
 	// load markets first
+	log.Infof("querying market info from %s...", session.Name)
 
 	var disableMarketsCache = false
 	var markets types.MarketMap
@@ -191,7 +195,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	}
 
 	if len(markets) == 0 {
-		return fmt.Errorf("market config should not be empty")
+		return ErrEmptyMarketInfo
 	}
 
 	session.markets = markets
@@ -224,6 +228,8 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	// query and initialize the balances
 	if !session.PublicOnly {
+		log.Infof("querying account balances...")
+
 		account, err := session.Exchange.QueryAccount(ctx)
 		if err != nil {
 			return err
@@ -233,7 +239,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		session.Account = account
 		session.accountMutex.Unlock()
 
-		log.Infof("%s account", session.Name)
+		log.Infof("account %s balances:", session.Name)
 		account.Balances().Print()
 
 		// forward trade updates and order updates to the order executor
