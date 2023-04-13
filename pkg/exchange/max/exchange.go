@@ -96,8 +96,8 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 
 		tickers[toGlobalSymbol(symbol[0])] = *ticker
 	} else {
-
-		maxTickers, err := e.client.PublicService.Tickers()
+		req := e.client.NewGetTickersRequest()
+		maxTickers, err := req.Do(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -130,9 +130,8 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-	log.Info("querying market info...")
-
-	remoteMarkets, err := e.client.PublicService.Markets()
+	req := e.client.NewGetMarketsRequest()
+	remoteMarkets, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
