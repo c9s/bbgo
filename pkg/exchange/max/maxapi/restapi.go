@@ -165,6 +165,7 @@ func (c *RestClient) queryAndUpdateServerTimestamp(ctx context.Context) {
 				if err != nil {
 					return err
 				}
+
 				if serverTs == 0 {
 					return errors.New("unexpected zero server timestamp")
 				}
@@ -191,6 +192,8 @@ func (c *RestClient) queryAndUpdateServerTimestamp(ctx context.Context) {
 
 			if err := backoff.RetryGeneral(ctx, op); err != nil {
 				logger.WithError(err).Error("unable to sync timestamp with max")
+			} else {
+				return
 			}
 		}
 	}
