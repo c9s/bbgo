@@ -53,12 +53,7 @@ func (s *PublicService) Timestamp() (int64, error) {
 
 func (s *PublicService) Markets() ([]Market, error) {
 	req := s.client.NewGetMarketsRequest()
-	markets, err := req.Do(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
-	return markets, nil
+	return req.Do(context.Background())
 }
 
 func (s *PublicService) Tickers() (TickerMap, error) {
@@ -158,7 +153,7 @@ func (s *PublicService) KLines(symbol string, resolution string, start time.Time
 		return nil, err
 	}
 
-	req := s.NewGetKLinesRequest()
+	req := s.client.NewGetKLinesRequest()
 	req.Market(symbol).Period(int(interval)).Timestamp(start).Limit(limit)
 	data, err := req.Do(context.Background())
 	if err != nil {
