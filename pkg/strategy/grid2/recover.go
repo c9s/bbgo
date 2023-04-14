@@ -58,13 +58,12 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 		return errors.Wrap(err, "grid recover error")
 	}
 
-	// emit ready after recover
-	s.EmitGridReady()
-
 	// debug and send metrics
 	// wait for the reverse order to be placed
 	time.Sleep(2 * time.Second)
 	debugGrid(s.logger, s.grid, s.orderExecutor.ActiveMakerOrders())
+	// emit ready after recover
+	s.EmitGridReady()
 	s.updateGridNumOfOrdersMetricsWithLock()
 	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 
@@ -88,9 +87,6 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 	s.debugLog("open orders nums: %d, expected nums: %d", numGridOpenOrders, expectedNumOfOrders)
 	if expectedNumOfOrders == numGridOpenOrders {
 		// no need to recover
-		s.EmitGridReady()
-		s.updateGridNumOfOrdersMetricsWithLock()
-		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 		return nil
 	} else if expectedNumOfOrders < numGridOpenOrders {
 		return fmt.Errorf("amount of grid's open orders should not > amount of expected grid's orders")
