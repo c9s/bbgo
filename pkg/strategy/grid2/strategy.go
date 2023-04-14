@@ -1941,6 +1941,7 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 		s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
 		if err := s.recoverGrid(ctx, session); err != nil {
 			// if recover fail, return and do not open grid
+			s.logger.WithError(err).Error("failed to start process, recover error")
 			s.EmitGridError(errors.Wrapf(err, "failed to start process, recover error"))
 			return
 		}
