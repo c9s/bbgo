@@ -984,7 +984,9 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	lastPrice, err := s.getLastTradePrice(ctx, session)
 	if err != nil {
-		return errors.Wrap(err, "failed to get the last trade price")
+		err2 := errors.Wrap(err, "unable to get the last trade price")
+		s.EmitGridError(err2)
+		return err2
 	}
 
 	// check if base and quote are enough
@@ -1006,11 +1008,13 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	if s.QuantityOrAmount.IsSet() {
 		if quantity := s.QuantityOrAmount.Quantity; !quantity.IsZero() {
 			if _, _, err2 := s.checkRequiredInvestmentByQuantity(totalBase, totalQuote, lastPrice, s.QuantityOrAmount.Quantity, s.grid.Pins); err != nil {
+				s.EmitGridError(err2)
 				return err2
 			}
 		}
 		if amount := s.QuantityOrAmount.Amount; !amount.IsZero() {
 			if _, _, err2 := s.checkRequiredInvestmentByAmount(totalBase, totalQuote, lastPrice, amount, s.grid.Pins); err != nil {
+				s.EmitGridError(err2)
 				return err2
 			}
 		}
@@ -1019,15 +1023,19 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		if !s.QuoteInvestment.IsZero() && !s.BaseInvestment.IsZero() {
 			quantity, err2 := s.calculateBaseQuoteInvestmentQuantity(s.QuoteInvestment, s.BaseInvestment, lastPrice, s.grid.Pins)
 			if err2 != nil {
+				s.EmitGridError(err2)
 				return err2
 			}
+
 			s.QuantityOrAmount.Quantity = quantity
 
 		} else if !s.QuoteInvestment.IsZero() {
 			quantity, err2 := s.calculateQuoteInvestmentQuantity(s.QuoteInvestment, lastPrice, s.grid.Pins)
 			if err2 != nil {
+				s.EmitGridError(err2)
 				return err2
 			}
+
 			s.QuantityOrAmount.Quantity = quantity
 		}
 	}
@@ -1036,10 +1044,14 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	// investment configuration is valid with the current balances
 	if !s.BaseInvestment.IsZero() && !s.QuoteInvestment.IsZero() {
 		if s.BaseInvestment.Compare(totalBase) > 0 {
-			return fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", s.BaseInvestment.Float64(), totalBase.Float64())
+			err2 := fmt.Errorf("baseInvestment setup %f is greater than the total base balance %f", s.BaseInvestment.Float64(), totalBase.Float64())
+			s.EmitGridError(err2)
+			return err2
 		}
 		if s.QuoteInvestment.Compare(totalQuote) > 0 {
-			return fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", s.QuoteInvestment.Float64(), totalQuote.Float64())
+			err2 := fmt.Errorf("quoteInvestment setup %f is greater than the total quote balance %f", s.QuoteInvestment.Float64(), totalQuote.Float64())
+			s.EmitGridError(err2)
+			return err2
 		}
 	}
 
@@ -1052,6 +1064,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	}
 
 	if err != nil {
+		s.EmitGridError(err)
 		return err
 	}
 
@@ -1061,6 +1074,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	createdOrders, err2 := s.orderExecutor.SubmitOrders(writeCtx, submitOrders...)
 	if err2 != nil {
+		s.EmitGridError(err2)
 		return err2
 	}
 
