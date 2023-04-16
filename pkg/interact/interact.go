@@ -3,6 +3,7 @@ package interact
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -49,6 +50,8 @@ type Interact struct {
 	customInteractions []CustomInteraction
 
 	messengers []Messenger
+
+	mu sync.Mutex
 }
 
 func New() *Interact {
@@ -63,25 +66,36 @@ func New() *Interact {
 
 func (it *Interact) AddCustomInteraction(custom CustomInteraction) {
 	custom.Commands(it)
+
+	it.mu.Lock()
 	it.customInteractions = append(it.customInteractions, custom)
+	it.mu.Unlock()
 }
 
 func (it *Interact) PrivateCommand(command, desc string, f interface{}) *Command {
 	cmd := NewCommand(command, desc, f)
+	it.mu.Lock()
 	it.privateCommands[command] = cmd
+	it.mu.Unlock()
 	return cmd
 }
 
 func (it *Interact) Command(command string, desc string, f interface{}) *Command {
 	cmd := NewCommand(command, desc, f)
+	it.mu.Lock()
 	it.commands[command] = cmd
+	it.mu.Unlock()
 	return cmd
 }
 
 func (it *Interact) getNextState(session Session, currentState State) (nextState State, final bool) {
 	var ok bool
 	final = false
+
+	it.mu.Lock()
 	nextState, ok = it.states[currentState]
+	it.mu.Unlock()
+
 	if ok {
 		// check if it's the final state
 		if _, hasTransition := it.statesFunc[nextState]; !hasTransition {
@@ -128,6 +142,9 @@ func (it *Interact) handleResponse(session Session, text string, ctxObjects ...i
 }
 
 func (it *Interact) getCommand(session Session, command string) (*Command, error) {
+	it.mu.Lock()
+	defer it.mu.Unlock()
+
 	if session.IsAuthorized() {
 		if cmd, ok := it.privateCommands[command]; ok {
 			return cmd, nil
