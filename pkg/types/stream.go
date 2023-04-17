@@ -203,14 +203,12 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 
 				// if it's a websocket related error
 				case *websocket.CloseError:
-					if err.Code == websocket.CloseNormalClosure {
-						return
+					if err.Code != websocket.CloseNormalClosure {
+						log.WithError(err).Errorf("websocket error abnormal close: %+v", err)
 					}
 
-					log.WithError(err).Errorf("websocket error abnormal close: %+v", err)
-
 					_ = conn.Close()
-					// for unexpected close error, we should re-connect
+					// for close error, we should re-connect
 					// emit reconnect to start a new connection
 					s.Reconnect()
 					return
