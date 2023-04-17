@@ -210,16 +210,30 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 }
 
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
-	if q.OrderID == "" {
-		return nil, errors.New("max.QueryOrder: OrderID is required parameter")
+	if len(q.OrderID) == 0 && len(q.ClientOrderID) == 0 {
+		return nil, errors.New("max.QueryOrder: one of OrderID/ClientOrderID is required parameter")
 	}
 
-	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
-	if err != nil {
-		return nil, err
+	if len(q.OrderID) != 0 && len(q.ClientOrderID) != 0 {
+		return nil, errors.New("max.QueryOrder: only accept one parameter of OrderID/ClientOrderID")
 	}
 
-	maxOrder, err := e.v3order.NewGetOrderRequest().Id(uint64(orderID)).Do(ctx)
+	request := e.v3order.NewGetOrderRequest()
+
+	if len(q.OrderID) != 0 {
+		orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+
+		request.Id(uint64(orderID))
+	}
+
+	if len(q.ClientOrderID) != 0 {
+		request.ClientOrderID(q.ClientOrderID)
+	}
+
+	maxOrder, err := request.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
