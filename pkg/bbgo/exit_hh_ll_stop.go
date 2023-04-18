@@ -54,7 +54,6 @@ type HigherHighLowerLowStop struct {
 
 // Subscribe required k-line stream
 func (s *HigherHighLowerLowStop) Subscribe(session *ExchangeSession) {
-	// use 1m kline to handle roi stop
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
