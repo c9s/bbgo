@@ -86,7 +86,8 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 	numGridOpenOrders := int64(len(openOrdersOnGrid))
 	s.debugLog("open orders nums: %d, expected nums: %d", numGridOpenOrders, expectedNumOfOrders)
 	if expectedNumOfOrders == numGridOpenOrders {
-		// no need to recover
+		// no need to recover, only need to add open orders back to active order book
+		s.addOrdersToActiveOrderBook(openOrdersOnGrid)
 		return nil
 	} else if expectedNumOfOrders < numGridOpenOrders {
 		return fmt.Errorf("amount of grid's open orders should not > amount of expected grid's orders")
@@ -121,7 +122,7 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 		return errors.Wrapf(err, "verify grid with error")
 	}
 
-	// 5. add open orders to active order book
+	// 5. add open orders to active order book.
 	s.addOrdersToActiveOrderBook(openOrdersOnGrid)
 
 	// 6. emit the filled orders
