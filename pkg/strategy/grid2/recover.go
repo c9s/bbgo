@@ -14,6 +14,11 @@ import (
 )
 
 func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.ExchangeSession) error {
+	defer func() {
+		s.updateGridNumOfOrdersMetricsWithLock()
+		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
+	}()
+
 	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
 	// if the exchange doesn't support ExchangeTradeHistoryService, do not run recover
 	if !implemented {
@@ -64,8 +69,6 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 	debugGrid(s.logger, s.grid, s.orderExecutor.ActiveMakerOrders())
 	// emit ready after recover
 	s.EmitGridReady()
-	s.updateGridNumOfOrdersMetricsWithLock()
-	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 
 	return nil
 }
@@ -78,9 +81,6 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 	// set grid
 	grid := s.newGrid()
 	s.setGrid(grid)
-
-	// add open orders to active order book
-	s.addOrdersToActiveOrderBook(openOrdersOnGrid)
 
 	expectedNumOfOrders := s.GridNum - 1
 	numGridOpenOrders := int64(len(openOrdersOnGrid))
@@ -121,9 +121,11 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 		return errors.Wrapf(err, "verify grid with error")
 	}
 
-	s.debugOrders("emit filled orders", filledOrders)
+	// 5. add open orders to active order book
+	s.addOrdersToActiveOrderBook(openOrdersOnGrid)
 
-	// 5. emit the filled orders
+	// 6. emit the filled orders
+	s.debugOrders("emit filled orders", filledOrders)
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
 	for _, filledOrder := range filledOrders {
 		activeOrderBook.EmitFilled(filledOrder)
