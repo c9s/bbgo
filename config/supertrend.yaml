@@ -80,19 +80,35 @@ exchangeStrategies:
     exits:
       # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
       - roiStopLoss:
-          percentage: 4.6%
-      - protectiveStopLoss:
-          activationRatio: 3.5%
-          stopLossRatio: 2.9%
-          placeStopOrder: false
-      - protectiveStopLoss:
-          activationRatio: 11.1%
-          stopLossRatio: 9.5%
-          placeStopOrder: false
+          percentage: 2%
       - trailingStop:
-          callbackRate: 1.1%
+          callbackRate: 2%
           #activationRatio: 20%
-          minProfit: 19.5%
+          minProfit: 10%
           interval: 1m
           side: both
           closePosition: 100%
+      - higherHighLowerLowStopLoss:
+          # interval is the kline interval used by this exit
+          interval: 15
+          # window is used as the range to determining higher highs and lower lows
+          window: 5
+          # highLowWindow is the range to calculate the number of higher highs and lower lows
+          highLowWindow: 12
+          # If the number of higher highs or lower lows with in HighLowWindow is less than MinHighLow, the exit is
+          # triggered. 0 disables this parameter. Either one of MaxHighLow and MinHighLow must be larger than 0
+          minHighLow: 2
+          # If the number of higher highs or lower lows with in HighLowWindow is more than MaxHighLow, the exit is
+          # triggered. 0 disables this parameter. Either one of MaxHighLow and MinHighLow must be larger than 0
+          maxHighLow: 0
+          # ActivationRatio is the trigger condition
+          # When the price goes higher (lower for short position) than this ratio, the stop will be activated.
+          # You can use this to combine several exits
+          activationRatio: 0.5%
+          # DeactivationRatio is the kill condition
+          #	When the price goes higher (lower for short position) than this ratio, the stop will be deactivated.
+          #	You can use this to combine several exits
+          deactivationRatio: 10%
+          # If true, looking for lower lows in long position and higher highs in short position. If false, looking for
+          # higher highs in long position and lower lows in short position
+          oppositeDirectionAsPosition: false
