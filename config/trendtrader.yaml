@@ -15,7 +15,7 @@ sessions:
 exchangeStrategies:
 - on: binance
   trendtrader:
-    symbol: BTCBUSD
+    symbol: BTCUSDT
     trendLine:
       interval: 30m
       pivotRightWindow: 40
@@ -39,12 +39,12 @@ exchangeStrategies:
 backtest:
   sessions:
     - binance
-  startTime: "2021-01-01"
-  endTime: "2022-08-31"
+  startTime: "2022-01-01"
+  endTime: "2023-04-01"
   symbols:
-    - BTCBUSD
+    - BTCUSDT
   accounts:
     binance:
       balances:
-        BTC: 1
-        BUSD: 50_000.0
+        BTC: 1.0
+        USDT: 50_000.0
