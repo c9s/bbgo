@@ -26,10 +26,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-type IntervalWindowSetting struct {
-	types.IntervalWindow
-}
-
 type Strategy struct {
 	Environment *bbgo.Environment
 	Symbol      string `json:"symbol"`
