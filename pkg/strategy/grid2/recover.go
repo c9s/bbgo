@@ -99,8 +99,9 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 		return errors.Wrapf(err, "failed to build pin order map with open orders")
 	}
 
+	expectedNumOfQueriedOrders := int(expectedNumOfOrders - numGridOpenOrders)
 	// 2. build the filled pin-order map by querying trades
-	pinOrdersFilled, err := s.buildFilledPinOrderMapFromTrades(ctx, historyService, pinOrdersOpen)
+	pinOrdersFilled, err := s.buildFilledPinOrderMapFromTrades(ctx, historyService, pinOrdersOpen, expectedNumOfQueriedOrders)
 	if err != nil {
 		return errors.Wrapf(err, "failed to build filled pin order map")
 	}
@@ -108,10 +109,10 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 	// 3. get the filled orders from pin-order map
 	filledOrders := pinOrdersFilled.AscendingOrders()
 	numFilledOrders := len(filledOrders)
-	if numFilledOrders == int(expectedNumOfOrders-numGridOpenOrders) {
+	if numFilledOrders == expectedNumOfQueriedOrders {
 		// nums of filled order is the same as Size - 1 - num(open orders)
 		s.logger.Infof("nums of filled order is the same as Size - 1 - len(open orders) : %d = %d - 1 - %d", numFilledOrders, s.grid.Size, numGridOpenOrders)
-	} else if numFilledOrders == int(expectedNumOfOrders-numGridOpenOrders+1) {
+	} else if numFilledOrders == expectedNumOfQueriedOrders+1 {
 		filledOrders = filledOrders[1:]
 	} else {
 		return fmt.Errorf("not reasonable num of filled orders")
@@ -206,30 +207,77 @@ func (s *Strategy) buildPinOrderMap(pins []Pin, openOrders []types.Order) (PinOr
 
 // buildFilledPinOrderMapFromTrades will query the trades from last 24 hour and use them to build a pin order map
 // It will skip the orders on pins at which open orders are already
-func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, pinOrdersOpen PinOrderMap) (PinOrderMap, error) {
+func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, pinOrdersOpen PinOrderMap, expectedQueryNums int) (PinOrderMap, error) {
 	pinOrdersFilled := make(PinOrderMap)
 
 	// existedOrders is used to avoid re-query the same orders
 	existedOrders := pinOrdersOpen.SyncOrderMap()
 
-	var limit int64 = 1000
 	// get the filled orders when bbgo is down in order from trades
-	// [NOTE] only retrieve from last 24 hours !!!
+	until := time.Now()
+
+	// the first query only query the last 1 hour, because mostly shutdown and recovery happens within 1 hour
+	since := until.Add(-1 * time.Hour)
+
+	// hard limit for recover
+	recoverSinceLimit := time.Date(2023, time.March, 10, 0, 0, 0, 0, time.UTC)
+
+	// if the RecoverWithin is set and is > hard limit, we need to assign it to recoverSinceLimit
+	if s.RecoverWithin != 0 && until.Add(-1*s.RecoverWithin).After(recoverSinceLimit) {
+		recoverSinceLimit = until.Add(-1 * s.RecoverWithin)
+	}
+
+	for {
+		if err := s.queryTradesToUpdatePinOrdersMap(ctx, historyService, pinOrdersOpen, pinOrdersFilled, existedOrders, since, until); err != nil {
+			return nil, errors.Wrapf(err, "failed to query trades to update pin orders map")
+		}
+
+		until = since
+		since = until.Add(-6 * time.Hour)
+
+		if len(pinOrdersFilled) >= expectedQueryNums {
+			s.logger.Infof("stop querying trades because pin orders filled (%d) > expected query nums (%d)", len(pinOrdersFilled), expectedQueryNums)
+			break
+		}
+
+		if s.GridProfitStats != nil && s.GridProfitStats.Since != nil && until.Before(*s.GridProfitStats.Since) {
+			s.logger.Infof("stop querying trades because the time range is out of the strategy's since (%s)", *s.GridProfitStats.Since)
+			break
+		}
+
+		if until.Before(recoverSinceLimit) {
+			s.logger.Infof("stop querying trades because the time range is out of the limit (%s)", recoverSinceLimit)
+			break
+		}
+	}
+
+	return pinOrdersFilled, nil
+}
+
+func (s *Strategy) queryTradesToUpdatePinOrdersMap(ctx context.Context, historyService types.ExchangeTradeHistoryService, pinOrdersOpen, pinOrdersFilled PinOrderMap, existedOrders *types.SyncOrderMap, since, until time.Time) error {
 	var fromTradeID uint64 = 0
+	var limit int64 = 1000
 	for {
 		trades, err := historyService.QueryTrades(ctx, s.Symbol, &types.TradeQueryOptions{
+			StartTime:   &since,
+			EndTime:     &until,
 			LastTradeID: fromTradeID,
 			Limit:       limit,
 		})
 
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to query trades to recover the grid with open orders")
+			return errors.Wrapf(err, "failed to query trades to recover the grid with open orders")
 		}
 
-		s.debugLog("QueryTrades return %d trades", len(trades))
+		s.debugLog("QueryTrades from %s <-> %s (from: %d) return %d trades", since, until, fromTradeID, len(trades))
 
 		for _, trade := range trades {
+			if trade.Time.After(until) {
+				return nil
+			}
+
 			s.debugLog(trade.String())
+
 			if existedOrders.Exists(trade.OrderID) {
 				// already queries, skip
 				continue
@@ -240,7 +288,7 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 			})
 
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to query order by trade")
+				return errors.Wrapf(err, "failed to query order by trade")
 			}
 
 			s.debugLog("%s (group_id: %d)", order.String(), order.GroupID)
@@ -255,7 +303,7 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 			pin := order.Price
 			v, exist := pinOrdersOpen[pin]
 			if !exist {
-				return nil, fmt.Errorf("the price of the order with the same GroupID is not in pins")
+				return fmt.Errorf("the price of the order with the same GroupID is not in pins")
 			}
 
 			// skip open orders on grid
@@ -275,11 +323,9 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 
 		// stop condition
 		if int64(len(trades)) < limit {
-			break
+			return nil
 		}
 	}
-
-	return pinOrdersFilled, nil
 }
 
 func addOrdersIntoPinOrderMap(pinOrders PinOrderMap, orders []types.Order) error {

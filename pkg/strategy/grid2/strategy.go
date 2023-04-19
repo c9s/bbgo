@@ -162,8 +162,11 @@ type Strategy struct {
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
 
-	SkipSpreadCheck             bool `json:"skipSpreadCheck"`
-	RecoverGridByScanningTrades bool `json:"recoverGridByScanningTrades"`
+	SkipSpreadCheck bool `json:"skipSpreadCheck"`
+
+	// recover related config
+	RecoverGridByScanningTrades bool          `json:"recoverGridByScanningTrades"`
+	RecoverWithin               time.Duration `json:"recoverWithin"`
 
 	// Debug enables the debug mode
 	Debug bool `json:"debug"`

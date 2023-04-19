@@ -2,6 +2,7 @@ package grid2
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -41,9 +42,19 @@ func (m PinOrderMap) String() string {
 	var sb strings.Builder
 
 	sb.WriteString("================== PIN ORDER MAP ==================\n")
-	for pin, order := range m {
-		sb.WriteString(fmt.Sprintf("%+v -> %s\n", pin, order.String()))
+	var pins []fixedpoint.Value
+	for pin, _ := range m {
+		pins = append(pins, pin)
 	}
+
+	sort.Slice(pins, func(i, j int) bool {
+		return pins[j] < pins[i]
+	})
+
+	for _, pin := range pins {
+		sb.WriteString(fmt.Sprintf("- %8s) %s\n", pin, m[pin].String()))
+	}
+
 	sb.WriteString("================== END OF PIN ORDER MAP ==================\n")
 	return sb.String()
 }
