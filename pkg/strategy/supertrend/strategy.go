@@ -626,8 +626,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			// Add opposite position amount if any
 			if (side == types.SideTypeSell && s.Position.IsLong()) || (side == types.SideTypeBuy && s.Position.IsShort()) {
-				bbgo.Notify("add existing opposite position amount of %s to the amount of open new position order", s.Symbol)
-				amount = amount.Add(s.Position.GetQuantity())
+				if bbgo.IsBackTesting {
+					_ = s.ClosePosition(ctx, fixedpoint.One)
+					bbgo.Notify("close existing %s position before open a new position", s.Symbol)
+					amount = s.calculateQuantity(ctx, closePrice, side)
+				} else {
+					bbgo.Notify("add existing opposite position amount %f of %s to the amount %f of open new position order", s.Position.GetQuantity().Float64(), s.Symbol, amount.Float64())
+					amount = amount.Add(s.Position.GetQuantity())
+				}
 			} else if !s.Position.IsDust(closePrice) {
 				bbgo.Notify("existing %s position has the same direction as the signal", s.Symbol)
 				return
