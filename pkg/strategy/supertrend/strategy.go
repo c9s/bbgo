@@ -621,18 +621,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// The default value of side is an empty string. Unless side is set by the checks above, the result of the following condition is false
 		if side == types.SideTypeSell || side == types.SideTypeBuy {
 			bbgo.Notify("open %s position for signal %v", s.Symbol, side)
-			// Close opposite position if any
-			if !s.Position.IsDust(closePrice) {
-				if (side == types.SideTypeSell && s.Position.IsLong()) || (side == types.SideTypeBuy && s.Position.IsShort()) {
-					bbgo.Notify("close existing %s position before open a new position", s.Symbol)
-					_ = s.ClosePosition(ctx, fixedpoint.One)
-				} else {
-					bbgo.Notify("existing %s position has the same direction with the signal", s.Symbol)
-					return
-				}
+
+			amount := s.calculateQuantity(ctx, closePrice, side)
+
+			// Add opposite position amount if any
+			if (side == types.SideTypeSell && s.Position.IsLong()) || (side == types.SideTypeBuy && s.Position.IsShort()) {
+				bbgo.Notify("add existing opposite position amount of %s to the amount of open new position order", s.Symbol)
+				amount = amount + s.Position.GetQuantity()
+			} else if !s.Position.IsDust(closePrice) {
+				bbgo.Notify("existing %s position has the same direction as the signal", s.Symbol)
+				return
 			}
 
-			orderForm := s.generateOrderForm(side, s.calculateQuantity(ctx, closePrice, side), types.SideEffectTypeMarginBuy)
+			orderForm := s.generateOrderForm(side, amount, types.SideEffectTypeMarginBuy)
 			log.Infof("submit open position order %v", orderForm)
 			_, err := s.orderExecutor.SubmitOrders(ctx, orderForm)
 			if err != nil {
