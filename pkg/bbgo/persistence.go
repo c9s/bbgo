@@ -17,8 +17,6 @@ var defaultPersistenceServiceFacade = &service.PersistenceServiceFacade{
 	Memory: service.NewMemoryService(),
 }
 
-var persistenceServiceFacade = defaultPersistenceServiceFacade
-
 // Sync syncs the object properties into the persistence layer
 func Sync(ctx context.Context, obj interface{}) {
 	id := dynamic.CallID(obj)
