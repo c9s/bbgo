@@ -605,13 +605,14 @@ func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSe
 	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, environ.syncStartTime, symbols...)
 }
 
-func (environ *Environment) ConfigureNotificationSystem(userConfig *Config) error {
+func (environ *Environment) ConfigureNotificationSystem(ctx context.Context, userConfig *Config) error {
 	// setup default notification config
 	if userConfig.Notifications == nil {
 		userConfig.Notifications = &NotificationConfig{}
 	}
 
-	var persistence = persistenceServiceFacade.Get()
+	var isolation = GetIsolationFromContext(ctx)
+	var persistence = isolation.persistenceServiceFacade.Get()
 
 	err := environ.setupInteraction(persistence)
 	if err != nil {

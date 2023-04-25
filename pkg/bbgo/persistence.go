@@ -111,7 +111,6 @@ func ConfigurePersistence(ctx context.Context, environ *Environment, conf *Persi
 	isolation := GetIsolationFromContext(ctx)
 	isolation.persistenceServiceFacade = facade
 
-	persistenceServiceFacade = facade
 	environ.PersistentService = facade
 	return nil
 }
