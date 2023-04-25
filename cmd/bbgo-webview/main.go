@@ -109,7 +109,7 @@ func main() {
 				return
 			}
 
-			if err := trader.LoadState(); err != nil {
+			if err := trader.LoadState(ctx); err != nil {
 				log.WithError(err).Error("failed to load strategy states")
 				return
 			}
