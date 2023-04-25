@@ -46,7 +46,7 @@ func BootstrapEnvironment(ctx context.Context, environ *Environment, userConfig 
 		}
 	}
 
-	if err := environ.ConfigureNotificationSystem(userConfig); err != nil {
+	if err := environ.ConfigureNotificationSystem(ctx, userConfig); err != nil {
 		return errors.Wrap(err, "notification configure error")
 	}
 
