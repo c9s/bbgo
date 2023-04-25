@@ -365,16 +365,14 @@ func (trader *Trader) Run(ctx context.Context) error {
 	return trader.environment.Connect(ctx)
 }
 
-func (trader *Trader) LoadState() error {
+func (trader *Trader) LoadState(ctx context.Context) error {
 	if trader.environment.BacktestService != nil {
 		return nil
 	}
 
-	if persistenceServiceFacade == nil {
-		return nil
-	}
+	isolation := GetIsolationFromContext(ctx)
 
-	ps := persistenceServiceFacade.Get()
+	ps := isolation.persistenceServiceFacade.Get()
 
 	log.Infof("loading strategies states...")
 
