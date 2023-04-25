@@ -18,7 +18,7 @@ type Isolation struct {
 func NewDefaultIsolation() *Isolation {
 	return &Isolation{
 		gracefulShutdown:         GracefulShutdown{},
-		persistenceServiceFacade: persistenceServiceFacade,
+		persistenceServiceFacade: defaultPersistenceServiceFacade,
 	}
 }
 

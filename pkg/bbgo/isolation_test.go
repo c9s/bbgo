@@ -20,5 +20,5 @@ func TestNewDefaultIsolation(t *testing.T) {
 	assert.NotNil(t, isolation)
 	assert.NotNil(t, isolation.persistenceServiceFacade)
 	assert.NotNil(t, isolation.gracefulShutdown)
-	assert.Equal(t, persistenceServiceFacade, isolation.persistenceServiceFacade)
+	assert.Equal(t, defaultPersistenceServiceFacade, isolation.persistenceServiceFacade)
 }
