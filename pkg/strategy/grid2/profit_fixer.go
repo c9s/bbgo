@@ -51,8 +51,13 @@ func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, initialOr
 				continue
 			}
 
-			if profitStats.InitialOrderID == 0 {
+			if profitStats.InitialOrderID == 0 || order.OrderID < profitStats.InitialOrderID {
 				profitStats.InitialOrderID = order.OrderID
+			}
+
+			if profitStats.Since == nil || profitStats.Since.IsZero() || order.CreationTime.Time().Before(*profitStats.Since) {
+				ct := order.CreationTime.Time()
+				profitStats.Since = &ct
 			}
 
 			if order.Status != types.OrderStatusFilled {
