@@ -51,7 +51,7 @@ func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, initialOr
 				continue
 			}
 
-			if profitStats.InitialOrderID == 0 {
+			if profitStats.InitialOrderID == 0 || order.OrderID < profitStats.InitialOrderID {
 				profitStats.InitialOrderID = order.OrderID
 			}
 
