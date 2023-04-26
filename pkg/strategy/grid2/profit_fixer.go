@@ -27,8 +27,18 @@ func newProfitFixer(grid *Grid, symbol string, historyService types.ExchangeTrad
 
 // Fix fixes the total quote profit of the given grid
 func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, initialOrderID uint64, profitStats *GridProfitStats) error {
+	// reset profit
 	profitStats.TotalQuoteProfit = fixedpoint.Zero
 	profitStats.ArbitrageCount = 0
+
+	defer log.Infof("profit fix is done")
+
+	/*
+		if profitStats.Since != nil && profitStats.Since.Before(since) {
+			log.Infof("profitStats.since %s is ealier than the given since %s, setting since to %s", profitStats.Since, since, profitStats.Since)
+			since = *profitStats.Since
+		}
+	*/
 
 	q := &batch.ClosedOrderBatchQuery{ExchangeTradeHistoryService: f.historyService}
 	orderC, errC := q.Query(ctx, f.symbol, since, until, initialOrderID)
