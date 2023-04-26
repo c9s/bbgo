@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -15,6 +16,8 @@ type ProfitFixer struct {
 	symbol         string
 	grid           *Grid
 	historyService types.ExchangeTradeHistoryService
+
+	logger logrus.FieldLogger
 }
 
 func newProfitFixer(grid *Grid, symbol string, historyService types.ExchangeTradeHistoryService) *ProfitFixer {
@@ -22,7 +25,12 @@ func newProfitFixer(grid *Grid, symbol string, historyService types.ExchangeTrad
 		symbol:         symbol,
 		grid:           grid,
 		historyService: historyService,
+		logger:         logrus.StandardLogger(),
 	}
+}
+
+func (f *ProfitFixer) SetLogger(logger logrus.FieldLogger) {
+	f.logger = logger
 }
 
 // Fix fixes the total quote profit of the given grid
@@ -31,10 +39,10 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 	profitStats.TotalQuoteProfit = fixedpoint.Zero
 	profitStats.ArbitrageCount = 0
 
-	defer log.Infof("profitFixer: done")
+	defer f.logger.Infof("profitFixer: done")
 
 	if profitStats.Since != nil && !profitStats.Since.IsZero() && profitStats.Since.Before(since) {
-		log.Infof("profitFixer: profitStats.since %s is earlier than the given since %s, setting since to %s", profitStats.Since, since, profitStats.Since)
+		f.logger.Infof("profitFixer: profitStats.since %s is earlier than the given since %s, setting since to %s", profitStats.Since, since, profitStats.Since)
 		since = *profitStats.Since
 	}
 
@@ -45,7 +53,7 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 	orderC, errC := q.Query(ctx, f.symbol, since, until, initialOrderID)
 
 	defer func() {
-		log.Infof("profitFixer: fixed profitStats=%#v", profitStats)
+		f.logger.Infof("profitFixer: fixed profitStats=%#v", profitStats)
 	}()
 
 	for {
@@ -91,7 +99,7 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 			profitStats.TotalQuoteProfit = profitStats.TotalQuoteProfit.Add(quoteProfit)
 			profitStats.ArbitrageCount++
 
-			log.Debugf("profitFixer: filledSellOrder=%#v", order)
+			f.logger.Debugf("profitFixer: filledSellOrder=%#v", order)
 		}
 	}
 }
