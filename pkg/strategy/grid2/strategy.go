@@ -1852,7 +1852,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.orderExecutor = orderExecutor
 
 	s.OnGridProfit(func(stats *GridProfitStats, profit *GridProfit) {
-		bbgo.Notify(profit)
+		if profit != nil {
+			bbgo.Notify(profit)
+		}
 		bbgo.Notify(stats)
 	})
 

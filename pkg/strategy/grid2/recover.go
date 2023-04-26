@@ -89,6 +89,8 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 		}
 
 		s.logger.Infof("fixed profitStats: %#v", s.GridProfitStats)
+
+		s.EmitGridProfit(s.GridProfitStats, nil)
 	}
 
 	return nil
