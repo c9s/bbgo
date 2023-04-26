@@ -32,6 +32,8 @@ func init() {
 
 // AccumulatedProfitReport For accumulated profit report output
 type AccumulatedProfitReport struct {
+	s *Strategy
+
 	// AccumulatedProfitMAWindow Accumulated profit SMA window, in number of trades
 	AccumulatedProfitMAWindow int `json:"accumulatedProfitMAWindow"`
 
@@ -75,7 +77,9 @@ type AccumulatedProfitReport struct {
 	previousAccumulatedTrades int
 }
 
-func (r *AccumulatedProfitReport) Initialize() {
+func (r *AccumulatedProfitReport) Initialize(strategy *Strategy) {
+	r.s = strategy
+
 	if r.AccumulatedProfitMAWindow <= 0 {
 		r.AccumulatedProfitMAWindow = 60
 	}
@@ -135,7 +139,7 @@ func (r *AccumulatedProfitReport) Output(symbol string) {
 		}
 		defer tsvwiter.Close()
 		// Output symbol, total acc. profit, acc. profit 60MA, interval acc. profit, fee, win rate, profit factor
-		_ = tsvwiter.Write([]string{"#", "Symbol", "accumulatedProfit", "accumulatedProfitMA", fmt.Sprintf("%dd profit", r.AccumulatedDailyProfitWindow), "accumulatedFee", "winRatio", "profitFactor", "60D trades"})
+		_ = tsvwiter.Write([]string{"#", "Symbol", "accumulatedProfit", "accumulatedProfitMA", fmt.Sprintf("%dd profit", r.AccumulatedDailyProfitWindow), "accumulatedFee", "winRatio", "profitFactor", "60D trades", "Window", "Multiplier", "FastDEMA", "SlowDEMA", "LinReg"})
 		for i := 0; i <= r.NumberOfInterval-1; i++ {
 			accumulatedProfit := r.accumulatedProfitPerDay.Index(r.IntervalWindow * i)
 			accumulatedProfitStr := fmt.Sprintf("%f", accumulatedProfit)
@@ -148,8 +152,13 @@ func (r *AccumulatedProfitReport) Output(symbol string) {
 			profitFactor := fmt.Sprintf("%f", r.profitFactorPerDay.Index(r.IntervalWindow*i))
 			trades := r.dailyTrades.Tail(60+r.IntervalWindow*i).Sum() - r.dailyTrades.Tail(r.IntervalWindow*i).Sum()
 			tradesStr := fmt.Sprintf("%f", trades)
+			windowStr := fmt.Sprintf("%d", r.s.Window)
+			multiplierStr := fmt.Sprintf("%f", r.s.SupertrendMultiplier)
+			fastDEMAStr := fmt.Sprintf("%d", r.s.FastDEMAWindow)
+			slowDEMAStr := fmt.Sprintf("%d", r.s.SlowDEMAWindow)
+			linRegStr := fmt.Sprintf("%d", r.s.LinearRegression.Window)
 
-			_ = tsvwiter.Write([]string{fmt.Sprintf("%d", i+1), symbol, accumulatedProfitStr, accumulatedProfitMAStr, intervalAccumulatedProfitStr, accumulatedFee, winRatio, profitFactor, tradesStr})
+			_ = tsvwiter.Write([]string{fmt.Sprintf("%d", i+1), symbol, accumulatedProfitStr, accumulatedProfitMAStr, intervalAccumulatedProfitStr, accumulatedFee, winRatio, profitFactor, tradesStr, windowStr, multiplierStr, fastDEMAStr, slowDEMAStr, linRegStr})
 		}
 	}
 }
@@ -486,7 +495,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if s.AccumulatedProfitReport == nil {
 			s.AccumulatedProfitReport = &AccumulatedProfitReport{}
 		}
-		s.AccumulatedProfitReport.Initialize()
+		s.AccumulatedProfitReport.Initialize(s)
 		s.orderExecutor.TradeCollector().OnProfit(func(trade types.Trade, profit *types.Profit) {
 			if profit == nil {
 				return
