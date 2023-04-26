@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"reflect"
+	"sync"
 
 	"github.com/codingconcepts/env"
 	"github.com/pkg/errors"
@@ -28,6 +29,13 @@ func Sync(ctx context.Context, obj interface{}) {
 	isolation := GetIsolationFromContext(ctx)
 
 	ps := isolation.persistenceServiceFacade.Get()
+
+	locker, ok := obj.(sync.Locker)
+	if ok {
+		locker.Lock()
+		defer locker.Unlock()
+	}
+
 	err := storePersistenceFields(obj, id, ps)
 	if err != nil {
 		log.WithError(err).Errorf("persistence sync failed")

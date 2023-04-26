@@ -199,6 +199,9 @@ type Strategy struct {
 
 	tradingCtx, writeCtx context.Context
 	cancelWrite          context.CancelFunc
+
+	// this ensures that bbgo.Sync to lock the object
+	sync.Mutex
 }
 
 func (s *Strategy) ID() string {
