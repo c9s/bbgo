@@ -34,7 +34,7 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 	defer log.Infof("profitFixer: done")
 
 	if profitStats.Since != nil && !profitStats.Since.IsZero() && profitStats.Since.Before(since) {
-		log.Infof("profitFixer: profitStats.since %s is ealier than the given since %s, setting since to %s", profitStats.Since, since, profitStats.Since)
+		log.Infof("profitFixer: profitStats.since %s is earlier than the given since %s, setting since to %s", profitStats.Since, since, profitStats.Since)
 		since = *profitStats.Since
 	}
 
