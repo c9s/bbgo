@@ -31,20 +31,22 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 	profitStats.TotalQuoteProfit = fixedpoint.Zero
 	profitStats.ArbitrageCount = 0
 
-	defer log.Infof("profit fix is done")
+	defer log.Infof("profitFixer: done")
 
-	/*
-		if profitStats.Since != nil && profitStats.Since.Before(since) {
-			log.Infof("profitStats.since %s is ealier than the given since %s, setting since to %s", profitStats.Since, since, profitStats.Since)
-			since = *profitStats.Since
-		}
-	*/
+	if profitStats.Since != nil && profitStats.Since.Before(since) {
+		log.Infof("profitFixer: profitStats.since %s is ealier than the given since %s, setting since to %s", profitStats.Since, since, profitStats.Since)
+		since = *profitStats.Since
+	}
 
 	ctx, cancel := context.WithTimeout(parent, 15*time.Minute)
 	defer cancel()
 
 	q := &batch.ClosedOrderBatchQuery{ExchangeTradeHistoryService: f.historyService}
 	orderC, errC := q.Query(ctx, f.symbol, since, until, initialOrderID)
+
+	defer func() {
+		log.Infof("profitFixer: fixed profitStats=%#v", profitStats)
+	}()
 
 	for {
 		select {
@@ -90,7 +92,6 @@ func (f *ProfitFixer) Fix(parent context.Context, since, until time.Time, initia
 			profitStats.ArbitrageCount++
 
 			log.Debugf("profitFixer: filledSellOrder=%#v", order)
-			log.Debugf("profitFixer: profitStats=%#v", profitStats)
 		}
 	}
 }
