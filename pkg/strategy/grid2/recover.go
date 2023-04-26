@@ -63,12 +63,27 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 		return errors.Wrap(err, "grid recover error")
 	}
 
+	// emit ready after recover
+	s.EmitGridReady()
+
 	// debug and send metrics
 	// wait for the reverse order to be placed
 	time.Sleep(2 * time.Second)
 	debugGrid(s.logger, s.grid, s.orderExecutor.ActiveMakerOrders())
-	// emit ready after recover
-	s.EmitGridReady()
+
+	defer bbgo.Sync(ctx, s)
+
+	if s.EnableProfitFixer {
+		until := time.Now()
+		since := until.Add(-7 * 24 * time.Hour)
+		if s.FixProfitSince != nil {
+			since = s.FixProfitSince.Time()
+		}
+
+		fixer := newProfitFixer(s.grid, s.Symbol, historyService)
+		// set initial order ID = 0 instead of s.GridProfitStats.InitialOrderID because the order ID could be incorrect
+		return fixer.Fix(ctx, since, until, 0, s.GridProfitStats)
+	}
 
 	return nil
 }

@@ -165,6 +165,9 @@ type Strategy struct {
 	SkipSpreadCheck             bool `json:"skipSpreadCheck"`
 	RecoverGridByScanningTrades bool `json:"recoverGridByScanningTrades"`
 
+	EnableProfitFixer bool        `json:"enableProfitFixer"`
+	FixProfitSince    *types.Time `json:"fixProfitSince"`
+
 	// Debug enables the debug mode
 	Debug bool `json:"debug"`
 
@@ -196,6 +199,9 @@ type Strategy struct {
 
 	tradingCtx, writeCtx context.Context
 	cancelWrite          context.CancelFunc
+
+	// this ensures that bbgo.Sync to lock the object
+	sync.Mutex
 }
 
 func (s *Strategy) ID() string {
