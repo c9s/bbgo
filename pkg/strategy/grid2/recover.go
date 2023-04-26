@@ -81,9 +81,10 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 		}
 
 		fixer := newProfitFixer(s.grid, s.Symbol, historyService)
+		fixer.SetLogger(s.logger)
+
 		// set initial order ID = 0 instead of s.GridProfitStats.InitialOrderID because the order ID could be incorrect
-		err := fixer.Fix(ctx, since, until, 0, s.GridProfitStats)
-		if err != nil {
+		if err := fixer.Fix(ctx, since, until, 0, s.GridProfitStats); err != nil {
 			return err
 		}
 
