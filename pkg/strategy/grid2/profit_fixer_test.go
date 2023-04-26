@@ -62,7 +62,7 @@ func TestProfitFixer(t *testing.T) {
 	ctx := context.Background()
 	mockHistoryService := mocks.NewMockExchangeTradeHistoryService(mockCtrl)
 
-	mockHistoryService.EXPECT().QueryClosedOrders(ctx, "ETHUSDT", mustNewTime("2022-01-01T00:00:00Z"), mustNewTime("2022-01-07T00:00:00Z"), uint64(0)).
+	mockHistoryService.EXPECT().QueryClosedOrders(gomock.Any(), "ETHUSDT", mustNewTime("2022-01-01T00:00:00Z"), mustNewTime("2022-01-07T00:00:00Z"), uint64(0)).
 		Return([]types.Order{
 			newClosedLimitOrder("ETHUSDT", types.SideTypeBuy, number(1800.0), number(0.1), mustNewTime("2022-01-01T00:01:00Z")),
 			newClosedLimitOrder("ETHUSDT", types.SideTypeBuy, number(1700.0), number(0.1), mustNewTime("2022-01-01T00:01:00Z")),
@@ -71,7 +71,7 @@ func TestProfitFixer(t *testing.T) {
 			newClosedLimitOrder("ETHUSDT", types.SideTypeSell, number(1905.0), number(0.1), mustNewTime("2022-01-01T00:03:00Z")),
 		}, nil)
 
-	mockHistoryService.EXPECT().QueryClosedOrders(ctx, "ETHUSDT", mustNewTime("2022-01-01T00:03:00Z"), mustNewTime("2022-01-07T00:00:00Z"), uint64(5)).
+	mockHistoryService.EXPECT().QueryClosedOrders(gomock.Any(), "ETHUSDT", mustNewTime("2022-01-01T00:03:00Z"), mustNewTime("2022-01-07T00:00:00Z"), uint64(5)).
 		Return([]types.Order{
 			newClosedLimitOrder("ETHUSDT", types.SideTypeBuy, number(1900.0), number(0.1), mustNewTime("2022-01-01T00:04:00Z")),
 			newClosedLimitOrder("ETHUSDT", types.SideTypeBuy, number(1800.0), number(0.1), mustNewTime("2022-01-01T00:04:00Z")),
@@ -80,7 +80,7 @@ func TestProfitFixer(t *testing.T) {
 			newClosedLimitOrder("ETHUSDT", types.SideTypeSell, number(1900.0), number(0.1), mustNewTime("2022-01-01T00:08:00Z")),
 		}, nil)
 
-	mockHistoryService.EXPECT().QueryClosedOrders(ctx, "ETHUSDT", mustNewTime("2022-01-01T00:08:00Z"), mustNewTime("2022-01-07T00:00:00Z"), uint64(10)).
+	mockHistoryService.EXPECT().QueryClosedOrders(gomock.Any(), "ETHUSDT", mustNewTime("2022-01-01T00:08:00Z"), mustNewTime("2022-01-07T00:00:00Z"), uint64(10)).
 		Return([]types.Order{}, nil)
 
 	grid := NewGrid(number(1000.0), number(2000.0), number(11), number(0.01))
