@@ -54,7 +54,7 @@ func newClosedLimitOrder(symbol string, side types.SideType, price, quantity fix
 }
 
 func TestProfitFixer(t *testing.T) {
-	testOrderID = 0
+	testClosedOrderID = 0
 
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
