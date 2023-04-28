@@ -344,13 +344,32 @@ func (s *Strategy) calculateProfit(o types.Order, buyPrice, buyQuantity fixedpoi
 func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 	tq := aggregateTradesQuantity(trades)
 
-	if tq.Compare(o.Quantity) != 0 {
+	// on MAX: if order.status == filled, it does not mean order.executedQuantity == order.quantity
+	// order.executedQuantity can be less than order.quantity
+	// so here we use executed quantity to check if the total trade quantity matches to order.executedQuantity
+	executedQuantity := o.ExecutedQuantity
+	if executedQuantity.IsZero() {
+		// fall back to the original quantity if the executed quantity is zero
+		executedQuantity = o.Quantity
+	}
+
+	// early return here if it matches
+	c := tq.Compare(executedQuantity)
+	if c == 0 {
+		return true
+	}
+
+	if c < 0 {
 		s.logger.Warnf("order trades missing. expected: %s got: %s",
 			o.Quantity.String(),
 			tq.String())
 		return false
+	} else if c > 0 {
+		s.logger.Errorf("aggregated trade quantity > order.quantity, something is wrong, please check")
+		return true
 	}
 
+	// shouldn't reach here
 	return true
 }
 
@@ -408,8 +427,19 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	// check order fee
 	newSide := types.SideTypeSell
 	newPrice := o.Price
-	newQuantity := o.Quantity
+
+	executedQuantity := o.ExecutedQuantity
+	// A safeguard check, fallback to the original quantity
+	if executedQuantity.IsZero() {
+		executedQuantity = o.Quantity
+	}
+
+	newQuantity := executedQuantity
 	executedPrice := o.Price
+
+	if o.ExecutedQuantity.Compare(o.Quantity) != 0 {
+		s.logger.Warnf("order executed quantity %s != order quantity %s, something is wrong", o.ExecutedQuantity, o.Quantity)
+	}
 
 	/*
 		if o.AveragePrice.Sign() > 0 {
@@ -418,7 +448,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	*/
 
 	// will be used for calculating quantity
-	orderExecutedQuoteAmount := o.Quantity.Mul(executedPrice)
+	orderExecutedQuoteAmount := executedQuantity.Mul(executedPrice)
 
 	// collect trades for fee
 	// fee calculation is used to reduce the order quantity
