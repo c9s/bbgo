@@ -419,11 +419,9 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 	}
 
 	// still try to aggregate the trades quantity if we can:
-	if len(orderTrades) > 0 {
-		fees := collectTradeFee(orderTrades)
-		if fee, ok := fees[feeCurrency]; ok {
-			return fee, feeCurrency
-		}
+	fees := collectTradeFee(orderTrades)
+	if fee, ok := fees[feeCurrency]; ok {
+		return fee, feeCurrency
 	}
 
 	return fixedpoint.Zero, feeCurrency
