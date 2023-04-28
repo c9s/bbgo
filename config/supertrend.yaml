@@ -90,7 +90,7 @@ exchangeStrategies:
           closePosition: 100%
       - higherHighLowerLowStopLoss:
           # interval is the kline interval used by this exit
-          interval: 15
+          interval: 15m
           # window is used as the range to determining higher highs and lower lows
           window: 5
           # highLowWindow is the range to calculate the number of higher highs and lower lows
