@@ -361,11 +361,11 @@ func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 
 	if c < 0 {
 		s.logger.Warnf("order trades missing. expected: %s got: %s",
-			o.Quantity.String(),
+			executedQuantity.String(),
 			tq.String())
 		return false
 	} else if c > 0 {
-		s.logger.Errorf("aggregated trade quantity > order.quantity, something is wrong, please check")
+		s.logger.Errorf("aggregated trade quantity %s > order executed quantity %s, something is wrong, please check", tq.String(), executedQuantity.String())
 		return true
 	}
 
@@ -379,7 +379,7 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 	// try to get the received trades (websocket trades)
 	orderTrades := s.historicalTrades.GetOrderTrades(o)
 	if len(orderTrades) > 0 {
-		s.logger.Infof("found filled order trades: %+v", orderTrades)
+		s.logger.Infof("GRID: found filled order trades: %+v", orderTrades)
 	}
 
 	feeCurrency := s.Market.BaseCurrency
@@ -403,7 +403,7 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 			return fixedpoint.Zero, feeCurrency
 		}
 
-		s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
+		s.logger.Warnf("GRID: missing #%d order trades or missing trade fee, pulling order trades from API", o.OrderID)
 
 		// if orderQueryService is supported, use it to query the trades of the filled order
 		apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
@@ -411,10 +411,18 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 			OrderID: strconv.FormatUint(o.OrderID, 10),
 		})
 		if err != nil {
-			s.logger.WithError(err).Errorf("query order trades error")
+			s.logger.WithError(err).Errorf("query #%d order trades error", o.OrderID)
 		} else {
-			s.logger.Infof("fetched api trades: %+v", apiOrderTrades)
+			s.logger.Infof("GRID: fetched api #%d order trades: %+v", o.OrderID, apiOrderTrades)
 			orderTrades = apiOrderTrades
+		}
+	}
+
+	// still try to aggregate the trades quantity if we can:
+	if len(orderTrades) > 0 {
+		fees := collectTradeFee(orderTrades)
+		if fee, ok := fees[feeCurrency]; ok {
+			return fee, feeCurrency
 		}
 	}
 
