@@ -444,7 +444,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	executedPrice := o.Price
 
 	if o.ExecutedQuantity.Compare(o.Quantity) != 0 {
-		s.logger.Warnf("order executed quantity %s != order quantity %s, something is wrong", o.ExecutedQuantity, o.Quantity)
+		s.logger.Warnf("order #%d is filled, but order executed quantity %s != order quantity %s, something is wrong", o.OrderID, o.ExecutedQuantity, o.Quantity)
 	}
 
 	/*
