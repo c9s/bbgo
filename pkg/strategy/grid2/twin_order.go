@@ -68,13 +68,13 @@ func findTwinOrderMapKey(grid *Grid, order types.Order) (fixedpoint.Value, error
 
 func (m TwinOrderMap) AscendingOrders() []types.Order {
 	var orders []types.Order
-	for _, order := range m {
+	for _, twinOrder := range m {
 		// skip empty order
-		if !order.Exist() {
+		if !twinOrder.Exist() {
 			continue
 		}
 
-		orders = append(orders, order.GetOrder())
+		orders = append(orders, twinOrder.GetOrder())
 	}
 
 	types.SortOrdersUpdateTimeAscending(orders)

@@ -313,8 +313,8 @@ func addOrdersIntoPinOrderMap(pinOrders PinOrderMap, orders []types.Order) error
 
 func (s *Strategy) verifyFilledTwinGrid(pins []Pin, twinOrders TwinOrderMap, filledOrders []types.Order) error {
 	s.debugLog("verifying filled grid - pins: %+v", pins)
-	s.debugLog("verifying filled grid - open twin orders:\n%s", twinOrders.String())
 	s.debugOrders("verifying filled grid - filled orders", filledOrders)
+	s.debugLog("verifying filled grid - open twin orders:\n%s", twinOrders.String())
 
 	if err := s.addOrdersIntoTwinOrderMap(twinOrders, filledOrders); err != nil {
 		return errors.Wrapf(err, "verifying filled grid error when add orders into twin order map")
@@ -323,6 +323,7 @@ func (s *Strategy) verifyFilledTwinGrid(pins []Pin, twinOrders TwinOrderMap, fil
 	s.debugLog("verifying filled grid - filled twin orders:\n%+v", twinOrders.String())
 
 	for i, pin := range pins {
+		// we use twinOrderMap to make sure there are no duplicated order at one grid, and we use the sell price as key so we skip the pins[0] which is only for buy price
 		if i == 0 {
 			continue
 		}
@@ -334,6 +335,10 @@ func (s *Strategy) verifyFilledTwinGrid(pins []Pin, twinOrders TwinOrderMap, fil
 
 		if !twin.Exist() {
 			return fmt.Errorf("all the price need a twin")
+		}
+
+		if !twin.IsValid() {
+			return fmt.Errorf("all the twins need to be valid")
 		}
 	}
 
@@ -420,6 +425,10 @@ func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, histor
 
 			// avoid query this order again
 			existedOrders.Add(*order)
+
+			if order.GroupID != s.OrderGroupID {
+				continue
+			}
 
 			// add 1 to avoid duplicate
 			fromTradeID = trade.ID + 1
