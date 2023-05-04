@@ -6,14 +6,14 @@ package v3
 
 import "github.com/c9s/requestgen"
 
-func (s *Client) NewMarginRepayRequest() *MarginRepayRequest {
-	return &MarginRepayRequest{client: s.Client}
-}
-
 //go:generate PostRequest -url "/api/v3/wallet/m/repayment" -type MarginRepayRequest -responseType .RepaymentRecord
 type MarginRepayRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	currency string `param:"currency,required"`
 	amount   string `param:"amount"`
+}
+
+func (s *Client) NewMarginRepayRequest() *MarginRepayRequest {
+	return &MarginRepayRequest{client: s.Client}
 }
