@@ -10,9 +10,10 @@ func (s *Client) NewMarginLoanRequest() *MarginLoanRequest {
 	return &MarginLoanRequest{client: s.Client}
 }
 
-//go:generate PostRequest -url "/api/v3/wallet/m/loan/:currency" -type MarginLoanRequest -responseType .LoanRecord
+//go:generate PostRequest -url "/api/v3/wallet/m/loan" -type MarginLoanRequest -responseType .LoanRecord
 type MarginLoanRequest struct {
-	client   requestgen.AuthenticatedAPIClient
-	currency string `param:"currency,slug,required"`
+	client requestgen.AuthenticatedAPIClient
+
+	currency string `param:"currency,required"`
 	amount   string `param:"amount"`
 }

@@ -1,5 +1,9 @@
 package v3
 
+//go:generate -command GetRequest requestgen -method GET
+//go:generate -command PostRequest requestgen -method POST
+//go:generate -command DeleteRequest requestgen -method DELETE
+
 import (
 	"time"
 
@@ -19,11 +23,11 @@ type RepaymentRecord struct {
 	State     string                     `json:"state"`
 }
 
-//go:generate GetRequest -url "/api/v3/wallet/m/repayments/:currency" -type GetMarginRepaymentHistoryRequest -responseType []RepaymentRecord
+//go:generate GetRequest -url "/api/v3/wallet/m/repayments" -type GetMarginRepaymentHistoryRequest -responseType []RepaymentRecord
 type GetMarginRepaymentHistoryRequest struct {
-	client   requestgen.AuthenticatedAPIClient
-	currency string `param:"currency,slug,required"`
+	client requestgen.AuthenticatedAPIClient
 
+	currency  string     `param:"currency,required"`
 	startTime *time.Time `param:"startTime,milliseconds"`
 	endTime   *time.Time `param:"endTime,milliseconds"`
 	limit     *int       `param:"limit"`
