@@ -1,5 +1,9 @@
 package v3
 
+//go:generate -command GetRequest requestgen -method GET
+//go:generate -command PostRequest requestgen -method POST
+//go:generate -command DeleteRequest requestgen -method DELETE
+
 import (
 	"time"
 
@@ -22,10 +26,11 @@ type LoanRecord struct {
 	InterestRate fixedpoint.Value           `json:"interest_rate"`
 }
 
-//go:generate GetRequest -url "/api/v3/wallet/m/loans/:currency" -type GetMarginLoanHistoryRequest -responseType []LoanRecord
+//go:generate GetRequest -url "/api/v3/wallet/m/loans" -type GetMarginLoanHistoryRequest -responseType []LoanRecord
 type GetMarginLoanHistoryRequest struct {
-	client   requestgen.AuthenticatedAPIClient
-	currency string `param:"currency,slug,required"`
+	client requestgen.AuthenticatedAPIClient
+
+	currency string `param:"currency,required"`
 
 	startTime *time.Time `param:"startTime,milliseconds"`
 	endTime   *time.Time `param:"endTime,milliseconds"`
