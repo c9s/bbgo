@@ -14,7 +14,7 @@ type CreateWalletOrderRequest struct {
 	market     string     `param:"market,required"`
 	side       string     `param:"side,required"`
 	volume     string     `param:"volume,required"`
-	orderType  OrderType     `param:"ord_type"`
+	orderType  OrderType  `param:"ord_type"`
 
 	price         *string `param:"price"`
 	stopPrice     *string `param:"stop_price"`
@@ -22,6 +22,6 @@ type CreateWalletOrderRequest struct {
 	groupID       *string `param:"group_id"`
 }
 
-func (s *OrderService) NewCreateWalletOrderRequest(walletType WalletType) *CreateWalletOrderRequest {
+func (s *Client) NewCreateWalletOrderRequest(walletType WalletType) *CreateWalletOrderRequest {
 	return &CreateWalletOrderRequest{client: s.Client, walletType: walletType}
 }

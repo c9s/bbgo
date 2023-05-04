@@ -28,7 +28,7 @@ type Exchange struct {
 	key, secret string
 	client      *maxapi.RestClient
 
-	v3order  *v3.OrderService
+	v3client *v3.Client
 	v3margin *v3.MarginService
 
 	submitOrderLimiter, queryTradeLimiter, accountQueryLimiter, closedOrderQueryLimiter, marketDataLimiter *rate.Limiter
@@ -47,7 +47,7 @@ func New(key, secret string) *Exchange {
 		key:    key,
 		// pragma: allowlist nextline secret
 		secret:   secret,
-		v3order:  &v3.OrderService{Client: client},
+		v3client: &v3.Client{Client: client},
 		v3margin: &v3.MarginService{Client: client},
 
 		queryTradeLimiter:  rate.NewLimiter(rate.Every(1*time.Second), 2),
@@ -182,7 +182,7 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 		return nil, err
 	}
 
-	maxTrades, err := e.v3order.NewGetOrderTradesRequest().OrderID(uint64(orderID)).Do(ctx)
+	maxTrades, err := e.v3client.NewGetOrderTradesRequest().OrderID(uint64(orderID)).Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		return nil, errors.New("max.QueryOrder: only accept one parameter of OrderID/ClientOrderID")
 	}
 
-	request := e.v3order.NewGetOrderRequest()
+	request := e.v3client.NewGetOrderRequest()
 
 	if len(q.OrderID) != 0 {
 		orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
@@ -248,7 +248,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	maxOrders, err := e.v3order.NewGetWalletOpenOrdersRequest(walletType).Market(market).Do(ctx)
+	maxOrders, err := e.v3client.NewGetWalletOpenOrdersRequest(walletType).Market(market).Do(ctx)
 	if err != nil {
 		return orders, err
 	}
@@ -282,7 +282,7 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol st
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3order.NewGetWalletOrderHistoryRequest(walletType).Market(market)
+	req := e.v3client.NewGetWalletOrderHistoryRequest(walletType).Market(market)
 	if lastOrderID == 0 {
 		lastOrderID = 1
 	}
@@ -315,7 +315,7 @@ func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3order.NewCancelWalletOrderAllRequest(walletType)
+	req := e.v3client.NewCancelWalletOrderAllRequest(walletType)
 	var orderResponses, err = req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -338,7 +338,7 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3order.NewCancelWalletOrderAllRequest(walletType)
+	req := e.v3client.NewCancelWalletOrderAllRequest(walletType)
 	req.Market(market)
 
 	var orderResponses, err = req.Do(ctx)
@@ -362,7 +362,7 @@ func (e *Exchange) CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3order.NewCancelWalletOrderAllRequest(walletType)
+	req := e.v3client.NewCancelWalletOrderAllRequest(walletType)
 	req.GroupID(groupID)
 
 	var orderResponses, err = req.Do(ctx)
@@ -398,7 +398,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 	if len(groupIDs) > 0 {
 		for groupID := range groupIDs {
-			req := e.v3order.NewCancelWalletOrderAllRequest(walletType)
+			req := e.v3client.NewCancelWalletOrderAllRequest(walletType)
 			req.GroupID(groupID)
 
 			if _, err := req.Do(ctx); err != nil {
@@ -409,7 +409,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	}
 
 	for _, o := range orphanOrders {
-		req := e.v3order.NewCancelOrderRequest()
+		req := e.v3client.NewCancelOrderRequest()
 		if o.OrderID > 0 {
 			req.Id(o.OrderID)
 		} else if len(o.ClientOrderID) > 0 && o.ClientOrderID != types.NoClientOrderID {
@@ -498,7 +498,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 
 	clientOrderID := NewClientOrderID(o.ClientOrderID)
 
-	req := e.v3order.NewCreateWalletOrderRequest(walletType)
+	req := e.v3client.NewCreateWalletOrderRequest(walletType)
 	req.Market(toLocalSymbol(o.Symbol)).
 		Side(toLocalSideType(o.Side)).
 		Volume(quantityString).
@@ -590,7 +590,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	if e.MarginSettings.IsMargin {
 		a.AccountType = types.AccountTypeMargin
 
-		req := e.v3margin.NewGetMarginADRatioRequest()
+		req := e.v3client.NewGetMarginADRatioRequest()
 		adRatio, err := req.Do(ctx)
 		if err != nil {
 			return a, err
@@ -613,7 +613,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3order.NewGetWalletAccountsRequest(walletType)
+	req := e.v3client.NewGetWalletAccountsRequest(walletType)
 	accounts, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -818,7 +818,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3order.NewGetWalletTradesRequest(walletType)
+	req := e.v3client.NewGetWalletTradesRequest(walletType)
 	req.Market(market)
 
 	if options.Limit > 0 {
@@ -977,7 +977,7 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedp
 }
 
 func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
-	req := e.v3margin.NewMarginRepayRequest()
+	req := e.v3client.NewMarginRepayRequest()
 	req.Currency(toLocalCurrency(asset))
 	req.Amount(amount.String())
 	resp, err := req.Do(ctx)
@@ -990,7 +990,7 @@ func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fi
 }
 
 func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
-	req := e.v3margin.NewMarginLoanRequest()
+	req := e.v3client.NewMarginLoanRequest()
 	req.Currency(toLocalCurrency(asset))
 	req.Amount(amount.String())
 	resp, err := req.Do(ctx)
@@ -1003,7 +1003,7 @@ func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount f
 }
 
 func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error) {
-	req := e.v3margin.NewGetMarginBorrowingLimitsRequest()
+	req := e.v3client.NewGetMarginBorrowingLimitsRequest()
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return fixedpoint.Zero, err

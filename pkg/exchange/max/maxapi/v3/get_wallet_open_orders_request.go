@@ -6,7 +6,7 @@ import "github.com/c9s/requestgen"
 //go:generate -command PostRequest requestgen -method POST
 //go:generate -command DeleteRequest requestgen -method DELETE
 
-func (s *OrderService) NewGetWalletOpenOrdersRequest(walletType WalletType) *GetWalletOpenOrdersRequest {
+func (s *Client) NewGetWalletOpenOrdersRequest(walletType WalletType) *GetWalletOpenOrdersRequest {
 	return &GetWalletOpenOrdersRequest{client: s.Client, walletType: walletType}
 }
 
