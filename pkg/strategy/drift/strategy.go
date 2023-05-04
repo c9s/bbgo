@@ -121,7 +121,8 @@ type Strategy struct {
 
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 	Session     *bbgo.ExchangeSession
-	*bbgo.GeneralOrderExecutor
+
+	*bbgo.FastOrderExecutor
 
 	getLastPrice func() fixedpoint.Value
 }
@@ -283,7 +284,7 @@ func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
 }
 
 func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64, syscounter int) (int, error) {
-	nonTraded := s.GeneralOrderExecutor.ActiveMakerOrders().Orders()
+	nonTraded := s.FastOrderExecutor.ActiveMakerOrders().Orders()
 	if len(nonTraded) > 0 {
 		if len(nonTraded) > 1 {
 			log.Errorf("should only have one order to cancel, got %d", len(nonTraded))
@@ -316,7 +317,7 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef, atr float64, syscoun
 			}
 		}
 		if toCancel {
-			err := s.GeneralOrderExecutor.FastCancel(ctx)
+			err := s.FastOrderExecutor.Cancel(ctx)
 			s.pendingLock.Lock()
 			counters := s.orderPendingCounter
 			s.orderPendingCounter = make(map[uint64]int)
@@ -424,7 +425,7 @@ func (s *Strategy) Rebalance(ctx context.Context) {
 	if math.Abs(beta) > s.RebalanceFilter && math.Abs(s.beta) > s.RebalanceFilter || math.Abs(s.beta) < s.RebalanceFilter && math.Abs(beta) < s.RebalanceFilter {
 		return
 	}
-	balances := s.GeneralOrderExecutor.Session().GetAccount().Balances()
+	balances := s.FastOrderExecutor.Session().GetAccount().Balances()
 	baseBalance := balances[s.Market.BaseCurrency].Total()
 	quoteBalance := balances[s.Market.QuoteCurrency].Total()
 	total := baseBalance.Add(quoteBalance.Div(price))
@@ -578,7 +579,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 	}
 
 	if s.Debug {
-		balances := s.GeneralOrderExecutor.Session().GetAccount().Balances()
+		balances := s.FastOrderExecutor.Session().GetAccount().Balances()
 		bbgo.Notify("source: %.4f, price: %.4f, drift[0]: %.4f, ddrift[0]: %.4f, lowf %.4f, highf: %.4f lowest: %.4f highest: %.4f sp %.4f bp %.4f",
 			sourcef, pricef, drift[0], ddrift[0], atr, lowf, highf, s.lowestPrice, s.highestPrice, s.sellPrice, s.buyPrice)
 		// Notify will parse args to strings and process separately
@@ -640,7 +641,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 		opt.Price = source
 		opt.Tags = []string{"long"}
 
-		submitOrder, err := s.GeneralOrderExecutor.NewOrderFromOpenPosition(ctx, &opt)
+		submitOrder, err := s.FastOrderExecutor.NewOrderFromOpenPosition(ctx, &opt)
 		if err != nil {
 			errs := filterErrors(multierr.Errors(err))
 			if len(errs) > 0 {
@@ -690,7 +691,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 		}
 		opt.Price = source
 		opt.Tags = []string{"short"}
-		submitOrder, err := s.GeneralOrderExecutor.NewOrderFromOpenPosition(ctx, &opt)
+		submitOrder, err := s.FastOrderExecutor.NewOrderFromOpenPosition(ctx, &opt)
 		if err != nil {
 			errs := filterErrors(multierr.Errors(err))
 			if len(errs) > 0 {
@@ -745,11 +746,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Status = types.StrategyStatusRunning
 
 	s.OnSuspend(func() {
-		_ = s.GeneralOrderExecutor.GracefulCancel(ctx)
+		_ = s.FastOrderExecutor.GracefulCancel(ctx)
 	})
 
 	s.OnEmergencyStop(func() {
-		_ = s.GeneralOrderExecutor.GracefulCancel(ctx)
+		_ = s.FastOrderExecutor.GracefulCancel(ctx)
 		_ = s.ClosePosition(ctx, fixedpoint.One)
 	})
 
@@ -766,14 +767,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	}
 
-	s.GeneralOrderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
-	s.GeneralOrderExecutor.DisableNotify()
-	orderStore := s.GeneralOrderExecutor.OrderStore()
+	s.FastOrderExecutor = bbgo.NewFastOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.FastOrderExecutor.DisableNotify()
+	orderStore := s.FastOrderExecutor.OrderStore()
 	orderStore.AddOrderUpdate = true
 	orderStore.RemoveCancelled = true
 	orderStore.RemoveFilled = true
-	activeOrders := s.GeneralOrderExecutor.ActiveMakerOrders()
-	tradeCollector := s.GeneralOrderExecutor.TradeCollector()
+	activeOrders := s.FastOrderExecutor.ActiveMakerOrders()
+	tradeCollector := s.FastOrderExecutor.TradeCollector()
 	tradeStore := tradeCollector.TradeStore()
 
 	syscounter := 0
