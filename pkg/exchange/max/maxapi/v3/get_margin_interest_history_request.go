@@ -20,7 +20,7 @@ type MarginInterestRecord struct {
 	CreatedAt    types.MillisecondTimestamp `json:"created_at"`
 }
 
-//go:generate GetRequest -url "/api/v3/wallet/m/interests/history" -type GetMarginInterestHistoryRequest -responseType []MarginInterestRecord
+//go:generate GetRequest -url "/api/v3/wallet/m/interests" -type GetMarginInterestHistoryRequest -responseType []MarginInterestRecord
 type GetMarginInterestHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
