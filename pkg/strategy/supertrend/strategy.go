@@ -139,7 +139,7 @@ func (r *AccumulatedProfitReport) Output(symbol string) {
 		}
 		defer tsvwiter.Close()
 		// Output symbol, total acc. profit, acc. profit 60MA, interval acc. profit, fee, win rate, profit factor
-		_ = tsvwiter.Write([]string{"#", "Symbol", "accumulatedProfit", "accumulatedProfitMA", fmt.Sprintf("%dd profit", r.AccumulatedDailyProfitWindow), "accumulatedFee", "winRatio", "profitFactor", "60D trades", "Window", "Multiplier", "FastDEMA", "SlowDEMA", "LinReg"})
+		_ = tsvwiter.Write([]string{"#", "Symbol", "accumulatedProfit", "accumulatedProfitMA", fmt.Sprintf("%dd profit", r.AccumulatedDailyProfitWindow), "accumulatedFee", "accumulatedNetProfit", "winRatio", "profitFactor", "60D trades", "Window", "Multiplier", "FastDEMA", "SlowDEMA", "LinReg"})
 		for i := 0; i <= r.NumberOfInterval-1; i++ {
 			accumulatedProfit := r.accumulatedProfitPerDay.Index(r.IntervalWindow * i)
 			accumulatedProfitStr := fmt.Sprintf("%f", accumulatedProfit)
@@ -148,6 +148,7 @@ func (r *AccumulatedProfitReport) Output(symbol string) {
 			intervalAccumulatedProfit := r.dailyProfit.Tail(r.AccumulatedDailyProfitWindow+r.IntervalWindow*i).Sum() - r.dailyProfit.Tail(r.IntervalWindow*i).Sum()
 			intervalAccumulatedProfitStr := fmt.Sprintf("%f", intervalAccumulatedProfit)
 			accumulatedFee := fmt.Sprintf("%f", r.accumulatedFeePerDay.Index(r.IntervalWindow*i))
+			accumulatedNetProfit := fmt.Sprintf("%f", accumulatedProfit-r.accumulatedFeePerDay.Index(r.IntervalWindow*i))
 			winRatio := fmt.Sprintf("%f", r.winRatioPerDay.Index(r.IntervalWindow*i))
 			profitFactor := fmt.Sprintf("%f", r.profitFactorPerDay.Index(r.IntervalWindow*i))
 			trades := r.dailyTrades.Tail(60+r.IntervalWindow*i).Sum() - r.dailyTrades.Tail(r.IntervalWindow*i).Sum()
@@ -158,7 +159,7 @@ func (r *AccumulatedProfitReport) Output(symbol string) {
 			slowDEMAStr := fmt.Sprintf("%d", r.s.SlowDEMAWindow)
 			linRegStr := fmt.Sprintf("%d", r.s.LinearRegression.Window)
 
-			_ = tsvwiter.Write([]string{fmt.Sprintf("%d", i+1), symbol, accumulatedProfitStr, accumulatedProfitMAStr, intervalAccumulatedProfitStr, accumulatedFee, winRatio, profitFactor, tradesStr, windowStr, multiplierStr, fastDEMAStr, slowDEMAStr, linRegStr})
+			_ = tsvwiter.Write([]string{fmt.Sprintf("%d", i+1), symbol, accumulatedProfitStr, accumulatedProfitMAStr, intervalAccumulatedProfitStr, accumulatedFee, accumulatedNetProfit, winRatio, profitFactor, tradesStr, windowStr, multiplierStr, fastDEMAStr, slowDEMAStr, linRegStr})
 		}
 	}
 }
