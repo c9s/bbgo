@@ -1800,6 +1800,57 @@ func (s *Strategy) getWriteContext(fallbackCtxList ...context.Context) context.C
 	return context.Background()
 }
 
+type orderPollerRequirement interface {
+	types.ExchangeOrderQueryService
+	types.ExchangeTradeHistoryService
+}
+
+type OrderPoller struct {
+	filledOrders *bbgo.OrderStore
+	lastSyncTime time.Time
+	service      orderPollerRequirement
+}
+
+func newOrderPoller(symbol string, service orderPollerRequirement) *OrderPoller {
+	orderStore := bbgo.NewOrderStore(symbol)
+	orderStore.AddOrderUpdate = true
+	orderStore.RemoveFilled = false
+	return &OrderPoller{
+		filledOrders: orderStore,
+	}
+}
+
+func (p *OrderPoller) Bind(stream types.Stream) {
+	p.filledOrders.BindStream(stream)
+}
+
+func (p *OrderPoller) Run(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+
+		}
+	}
+}
+
+func (p *OrderPoller) Start(ctx context.Context) {
+	go p.Run(ctx, 5*time.Minute)
+}
+
+func (s *Strategy) bindOrderPoller(session *bbgo.ExchangeSession) {
+	service, support := session.Exchange.(orderPollerRequirement)
+	if !support {
+		return
+	}
+
+	poller := newOrderPoller(s.Symbol, service)
+	poller.Bind(session.UserDataStream)
+}
+
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 
@@ -2154,4 +2205,23 @@ func queryOpenOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, symb
 
 	err = generalBackoff(ctx, op)
 	return openOrders, err
+}
+
+func queryOrderUntilSuccessful(ctx context.Context, service types.ExchangeOrderQueryService, orderId uint64) (*types.Order, error) {
+	var retOrder *types.Order
+	id := strconv.FormatUint(orderId, 10)
+
+	var op = func() (err2 error) {
+		order, err2 := service.QueryOrder(ctx, types.OrderQuery{OrderID: id})
+		if err2 != nil {
+			return err2
+		} else if order != nil {
+			retOrder = order
+		}
+
+		return nil
+	}
+
+	err := generalBackoff(ctx, op)
+	return retOrder, err
 }

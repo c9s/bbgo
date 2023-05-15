@@ -258,6 +258,7 @@ func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, history
 				continue
 			}
 
+			// TODO: replace this with queryOrderUntilSuccessful
 			order, err := s.orderQueryService.QueryOrder(ctx, types.OrderQuery{
 				OrderID: strconv.FormatUint(trade.OrderID, 10),
 			})
