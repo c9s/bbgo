@@ -13,10 +13,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (s *Client) NewGetMarginLoanHistoryRequest() *GetMarginLoanHistoryRequest {
-	return &GetMarginLoanHistoryRequest{client: s.Client}
-}
-
 type LoanRecord struct {
 	SN           string                     `json:"sn"`
 	Currency     string                     `json:"currency"`
@@ -35,4 +31,8 @@ type GetMarginLoanHistoryRequest struct {
 	startTime *time.Time `param:"startTime,milliseconds"`
 	endTime   *time.Time `param:"endTime,milliseconds"`
 	limit     *int       `param:"limit"`
+}
+
+func (s *Client) NewGetMarginLoanHistoryRequest() *GetMarginLoanHistoryRequest {
+	return &GetMarginLoanHistoryRequest{client: s.Client}
 }
