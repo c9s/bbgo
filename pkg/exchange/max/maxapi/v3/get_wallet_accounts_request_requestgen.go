@@ -12,6 +12,11 @@ import (
 	"regexp"
 )
 
+func (g *GetWalletAccountsRequest) Currency(currency string) *GetWalletAccountsRequest {
+	g.currency = currency
+	return g
+}
+
 func (g *GetWalletAccountsRequest) WalletType(walletType max.WalletType) *GetWalletAccountsRequest {
 	g.walletType = walletType
 	return g
@@ -32,6 +37,11 @@ func (g *GetWalletAccountsRequest) GetQueryParameters() (url.Values, error) {
 // GetParameters builds and checks the parameters and return the result in a map object
 func (g *GetWalletAccountsRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
+	// check currency field -> json key currency
+	currency := g.currency
+
+	// assign parameter of currency
+	params["currency"] = currency
 
 	return params, nil
 }
@@ -128,9 +138,12 @@ func (g *GetWalletAccountsRequest) GetSlugsMap() (map[string]string, error) {
 
 func (g *GetWalletAccountsRequest) Do(ctx context.Context) ([]max.Account, error) {
 
-	// no body params
+	// empty params for GET operation
 	var params interface{}
-	query := url.Values{}
+	query, err := g.GetParametersQuery()
+	if err != nil {
+		return nil, err
+	}
 
 	apiURL := "/api/v3/wallet/:walletType/accounts"
 	slugs, err := g.GetSlugsMap()

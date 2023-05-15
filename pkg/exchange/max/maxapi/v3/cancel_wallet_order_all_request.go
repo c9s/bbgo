@@ -11,7 +11,7 @@ type OrderCancelResponse struct {
 	Error *string
 }
 
-func (s *OrderService) NewCancelWalletOrderAllRequest(walletType WalletType) *CancelWalletOrderAllRequest {
+func (s *Client) NewCancelWalletOrderAllRequest(walletType WalletType) *CancelWalletOrderAllRequest {
 	return &CancelWalletOrderAllRequest{client: s.Client, walletType: walletType}
 }
 

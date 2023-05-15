@@ -6,7 +6,7 @@ package v3
 
 import "github.com/c9s/requestgen"
 
-func (s *OrderService) NewGetOrderRequest() *GetOrderRequest {
+func (s *Client) NewGetOrderRequest() *GetOrderRequest {
 	return &GetOrderRequest{client: s.Client}
 }
 
