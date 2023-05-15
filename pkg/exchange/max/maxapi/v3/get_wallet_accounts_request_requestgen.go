@@ -13,7 +13,7 @@ import (
 )
 
 func (g *GetWalletAccountsRequest) Currency(currency string) *GetWalletAccountsRequest {
-	g.currency = currency
+	g.currency = &currency
 	return g
 }
 
@@ -25,6 +25,14 @@ func (g *GetWalletAccountsRequest) WalletType(walletType max.WalletType) *GetWal
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (g *GetWalletAccountsRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
+	// check currency field -> json key currency
+	if g.currency != nil {
+		currency := *g.currency
+
+		// assign parameter of currency
+		params["currency"] = currency
+	} else {
+	}
 
 	query := url.Values{}
 	for _k, _v := range params {
@@ -37,11 +45,6 @@ func (g *GetWalletAccountsRequest) GetQueryParameters() (url.Values, error) {
 // GetParameters builds and checks the parameters and return the result in a map object
 func (g *GetWalletAccountsRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
-	// check currency field -> json key currency
-	currency := g.currency
-
-	// assign parameter of currency
-	params["currency"] = currency
 
 	return params, nil
 }
@@ -138,9 +141,9 @@ func (g *GetWalletAccountsRequest) GetSlugsMap() (map[string]string, error) {
 
 func (g *GetWalletAccountsRequest) Do(ctx context.Context) ([]max.Account, error) {
 
-	// empty params for GET operation
+	// no body params
 	var params interface{}
-	query, err := g.GetParametersQuery()
+	query, err := g.GetQueryParameters()
 	if err != nil {
 		return nil, err
 	}

@@ -11,7 +11,7 @@ type GetWalletAccountsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	walletType WalletType `param:"walletType,slug,required"`
-	currency   string     `param:"currency"`
+	currency   *string    `param:"currency,query"`
 }
 
 func (s *Client) NewGetWalletAccountsRequest(walletType WalletType) *GetWalletAccountsRequest {
