@@ -31,6 +31,9 @@ func New(n types.ExchangeName, key, secret, passphrase string) (types.Exchange, 
 	case types.ExchangeKucoin:
 		return kucoin.New(key, secret, passphrase), nil
 
+	// case types.ExchangeBitget:
+	// 	return bitget.New(key, secret, passphrase), nil
+
 	default:
 		return nil, fmt.Errorf("unsupported exchange: %v", n)
 
@@ -53,6 +56,5 @@ func NewWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.Exchange
 	}
 
 	passphrase := os.Getenv(varPrefix + "_API_PASSPHRASE")
-	subAccount := os.Getenv(varPrefix + "_SUBACCOUNT")
 	return New(n, key, secret, passphrase)
 }
