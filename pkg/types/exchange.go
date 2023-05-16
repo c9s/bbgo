@@ -70,11 +70,14 @@ func ValidExchangeName(a string) (ExchangeName, error) {
 	return "", fmt.Errorf("invalid exchange name: %s", a)
 }
 
+type ExchangeMinimal interface {
+	Name() ExchangeName
+	PlatformFeeCurrency() string
+}
+
 //go:generate mockgen -destination=mocks/mock_exchange.go -package=mocks . Exchange
 type Exchange interface {
-	Name() ExchangeName
-
-	PlatformFeeCurrency() string
+	ExchangeMinimal
 
 	ExchangeMarketDataService
 
@@ -82,6 +85,7 @@ type Exchange interface {
 }
 
 // ExchangeOrderQueryService provides an interface for querying the order status via order ID or client order ID
+//
 //go:generate mockgen -destination=mocks/mock_exchange_order_query.go -package=mocks . ExchangeOrderQueryService
 type ExchangeOrderQueryService interface {
 	QueryOrder(ctx context.Context, q OrderQuery) (*Order, error)
