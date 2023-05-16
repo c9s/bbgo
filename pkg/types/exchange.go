@@ -58,15 +58,11 @@ var SupportedExchanges = []ExchangeName{
 }
 
 func ValidExchangeName(a string) (ExchangeName, error) {
-	switch strings.ToLower(a) {
-	case "max":
-		return ExchangeMax, nil
-	case "binance", "bn":
-		return ExchangeBinance, nil
-	case "okex":
-		return ExchangeOKEx, nil
-	case "kucoin":
-		return ExchangeKucoin, nil
+	aa := strings.ToLower(a)
+	for _, n := range SupportedExchanges {
+		if string(n) == aa {
+			return n, nil
+		}
 	}
 
 	return "", fmt.Errorf("invalid exchange name: %s", a)
