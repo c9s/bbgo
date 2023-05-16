@@ -13,10 +13,10 @@ import (
 )
 
 func NewPublic(exchangeName types.ExchangeName) (types.Exchange, error) {
-	return NewStandard(exchangeName, "", "", "")
+	return New(exchangeName, "", "", "")
 }
 
-func NewStandard(n types.ExchangeName, key, secret, passphrase string) (types.Exchange, error) {
+func New(n types.ExchangeName, key, secret, passphrase string) (types.Exchange, error) {
 	switch n {
 
 	case types.ExchangeBinance:
@@ -54,5 +54,5 @@ func NewWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.Exchange
 
 	passphrase := os.Getenv(varPrefix + "_API_PASSPHRASE")
 	subAccount := os.Getenv(varPrefix + "_SUBACCOUNT")
-	return NewStandard(n, key, secret, passphrase)
+	return New(n, key, secret, passphrase)
 }
