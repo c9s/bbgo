@@ -44,6 +44,7 @@ const (
 	ExchangeBinance  ExchangeName = "binance"
 	ExchangeOKEx     ExchangeName = "okex"
 	ExchangeKucoin   ExchangeName = "kucoin"
+	ExchangeBitget   ExchangeName = "bitget"
 	ExchangeBacktest ExchangeName = "backtest"
 )
 
@@ -52,6 +53,7 @@ var SupportedExchanges = []ExchangeName{
 	ExchangeBinance,
 	ExchangeOKEx,
 	ExchangeKucoin,
+	ExchangeBitget,
 	// note: we are not using "backtest"
 }
 
