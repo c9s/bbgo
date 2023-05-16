@@ -56,8 +56,3 @@ func NewWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.Exchange
 	subAccount := os.Getenv(varPrefix + "_SUBACCOUNT")
 	return NewStandard(n, key, secret, passphrase, subAccount)
 }
-
-// New constructor exchange object from viper config.
-func New(n types.ExchangeName) (types.Exchange, error) {
-	return NewWithEnvVarPrefix(n, "")
-}
