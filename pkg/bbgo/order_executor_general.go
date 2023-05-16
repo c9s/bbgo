@@ -190,38 +190,6 @@ func (e *GeneralOrderExecutor) CancelOrders(ctx context.Context, orders ...types
 	return err
 }
 
-// FastSubmitOrders send []types.SubmitOrder directly to the exchange without blocking wait on the status update.
-// This is a faster version of SubmitOrders(). Created orders will be consumed in newly created goroutine (in non-backteset session).
-// @param ctx: golang context type.
-// @param submitOrders: Lists of types.SubmitOrder to be sent to the exchange.
-// @return *types.SubmitOrder: SubmitOrder with calculated quantity and price.
-// @return error: Error message.
-func (e *GeneralOrderExecutor) FastSubmitOrders(ctx context.Context, submitOrders ...types.SubmitOrder) (types.OrderSlice, error) {
-	formattedOrders, err := e.session.FormatOrders(submitOrders)
-	if err != nil {
-		return nil, err
-	}
-
-	createdOrders, errIdx, err := BatchPlaceOrder(ctx, e.session.Exchange, nil, formattedOrders...)
-	if len(errIdx) > 0 {
-		return nil, err
-	}
-
-	if IsBackTesting {
-		e.orderStore.Add(createdOrders...)
-		e.activeMakerOrders.Add(createdOrders...)
-		e.tradeCollector.Process()
-	} else {
-		go func() {
-			e.orderStore.Add(createdOrders...)
-			e.activeMakerOrders.Add(createdOrders...)
-			e.tradeCollector.Process()
-		}()
-	}
-	return createdOrders, err
-
-}
-
 func (e *GeneralOrderExecutor) SetLogger(logger log.FieldLogger) {
 	e.logger = logger
 }
@@ -462,19 +430,6 @@ func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context
 func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context, orders ...types.Order) error {
 	if err := e.activeMakerOrders.GracefulCancel(ctx, e.session.Exchange, orders...); err != nil {
 		return errors.Wrap(err, "graceful cancel error")
-	}
-
-	return nil
-}
-
-// FastCancel cancels all active maker orders if orders is not given, otherwise cancel the given orders
-func (e *GeneralOrderExecutor) FastCancel(ctx context.Context, orders ...types.Order) error {
-	if e.activeMakerOrders.NumOfOrders() == 0 {
-		return nil
-	}
-
-	if err := e.activeMakerOrders.FastCancel(ctx, e.session.Exchange, orders...); err != nil {
-		return errors.Wrap(err, "fast cancel order error")
 	}
 
 	return nil
