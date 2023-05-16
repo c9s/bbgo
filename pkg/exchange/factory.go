@@ -37,6 +37,8 @@ func NewStandard(n types.ExchangeName, key, secret, passphrase, subAccount strin
 	}
 }
 
+// NewWithEnvVarPrefix allocate and initialize the exchange instance with the given environment variable prefix
+// When the varPrefix is a empty string, the default exchange name will be used as the prefix
 func NewWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.Exchange, error) {
 	if len(varPrefix) == 0 {
 		varPrefix = n.String()
