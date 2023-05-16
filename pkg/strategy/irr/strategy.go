@@ -343,7 +343,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		diffQty := targetBase.Sub(s.Position.Base)
 		log.Info(alphaNrr.Float64(), s.Position.Base, diffQty.Float64())
 
-		s.orderExecutor.FastCancel(ctx)
+		if err := s.orderExecutor.CancelOrders(ctx); err != nil {
+			log.WithError(err).Errorf("cancel order error")
+		}
+
 		if diffQty.Sign() > 0 {
 			_, _ = s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 				Symbol:   s.Symbol,
