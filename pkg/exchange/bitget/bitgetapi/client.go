@@ -24,7 +24,7 @@ const PrivateWebSocketURL = "wss://ws.bitget.com/spot/v1/stream"
 type RestClient struct {
 	requestgen.BaseAPIClient
 
-	Key, Secret, Passphrase string
+	key, secret, passphrase string
 }
 
 func NewClient() *RestClient {
@@ -44,18 +44,18 @@ func NewClient() *RestClient {
 }
 
 func (c *RestClient) Auth(key, secret, passphrase string) {
-	c.Key = key
-	c.Secret = secret
-	c.Passphrase = passphrase
+	c.key = key
+	c.secret = secret
+	c.passphrase = passphrase
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
 func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
-	if len(c.Key) == 0 {
+	if len(c.key) == 0 {
 		return nil, errors.New("empty api key")
 	}
 
-	if len(c.Secret) == 0 {
+	if len(c.secret) == 0 {
 		return nil, errors.New("empty api secret")
 	}
 
@@ -84,7 +84,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	}
 
 	signKey := timestamp + strings.ToUpper(method) + path + string(body)
-	signature := sign(signKey, c.Secret)
+	signature := sign(signKey, c.secret)
 
 	req, err := http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
 	if err != nil {
@@ -93,10 +93,10 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
-	req.Header.Add("ACCESS-KEY", c.Key)
+	req.Header.Add("ACCESS-KEY", c.key)
 	req.Header.Add("ACCESS-SIGN", signature)
 	req.Header.Add("ACCESS-TIMESTAMP", timestamp)
-	req.Header.Add("ACCESS-PASSPHRASE", c.Passphrase)
+	req.Header.Add("ACCESS-PASSPHRASE", c.passphrase)
 	return req, nil
 }
 
