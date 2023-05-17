@@ -31,6 +31,8 @@ type Ticker struct {
 //go:generate GetRequest -url "/api/spot/v1/market/ticker" -type GetTickerRequest -responseDataType .Ticker
 type GetTickerRequest struct {
 	client requestgen.APIClient
+
+	symbol string `param:"symbol"`
 }
 
 func (c *RestClient) NewGetTickerRequest() *GetTickerRequest {

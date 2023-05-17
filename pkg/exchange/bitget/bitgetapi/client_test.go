@@ -35,3 +35,13 @@ func TestClient_GetAccountAssetsRequest(t *testing.T) {
 	assert.NoError(t, err)
 	t.Logf("assets: %+v", assets)
 }
+
+func TestClient_GetTickerRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	req := client.NewGetTickerRequest()
+	req.Symbol("BTCUSDT_SPBL")
+	ticker, err := req.Do(ctx)
+	assert.NoError(t, err)
+	t.Logf("ticker: %+v", ticker)
+}
