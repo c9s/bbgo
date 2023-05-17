@@ -135,3 +135,29 @@ func castPayload(payload interface{}) ([]byte, error) {
 	}
 	return json.Marshal(payload)
 }
+
+/*
+sample:
+
+	{
+	    "code": "00000",
+	    "msg": "success",
+	    "data": {
+	        "user_id": "714229403",
+	        "inviter_id": "682221498",
+	        "ips": "172.23.88.91",
+	        "authorities": [
+	            "trade",
+	            "readonly"
+	        ],
+	        "parentId":"566624801",
+	        "trader":false
+	    }
+	}
+*/
+
+type APIResponse struct {
+	Code    string          `json:"code"`
+	Message string          `json:"msg"`
+	Data    json.RawMessage `json:"data"`
+}
