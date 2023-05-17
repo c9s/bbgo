@@ -703,21 +703,39 @@ func (session *ExchangeSession) FindPossibleSymbols() (symbols []string, err err
 	return symbols, nil
 }
 
+// newBasicPrivateExchange allocates a basic exchange instance with the user private credentials
+func (session *ExchangeSession) newBasicPrivateExchange(exchangeName types.ExchangeName) (types.Exchange, error) {
+	var err error
+	var exMinimal types.ExchangeMinimal
+	if session.Key != "" && session.Secret != "" {
+		exMinimal, err = exchange2.New(exchangeName, session.Key, session.Secret, session.Passphrase)
+	} else {
+		exMinimal, err = exchange2.NewWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if ex, ok := exMinimal.(types.Exchange); ok {
+		return ex, nil
+	}
+
+	return nil, fmt.Errorf("exchange %T does not implement types.Exchange", exMinimal)
+}
+
 // InitExchange initialize the exchange instance and allocate memory for fields
 // In this stage, the session var could be loaded from the JSON config, so the pointer fields are still nil
 // The Init method will be called after this stage, environment.Init will call the session.Init method later.
 func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) error {
 	var err error
 	var exchangeName = session.ExchangeName
+
 	if ex == nil {
 		if session.PublicOnly {
 			ex, err = exchange2.NewPublic(exchangeName)
 		} else {
-			if session.Key != "" && session.Secret != "" {
-				ex, err = exchange2.New(exchangeName, session.Key, session.Secret, session.Passphrase)
-			} else {
-				ex, err = exchange2.NewWithEnvVarPrefix(exchangeName, session.EnvVarPrefix)
-			}
+			ex, err = session.newBasicPrivateExchange(exchangeName)
 		}
 	}
 
