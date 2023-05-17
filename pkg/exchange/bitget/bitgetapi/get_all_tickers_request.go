@@ -9,7 +9,7 @@ import (
 
 //go:generate GetRequest -url "/api/spot/v1/market/tickers" -type GetAllTickersRequest -responseDataType []Ticker
 type GetAllTickersRequest struct {
-	client requestgen.AuthenticatedAPIClient
+	client requestgen.APIClient
 }
 
 func (c *RestClient) NewGetAllTickersRequest() *GetAllTickersRequest {

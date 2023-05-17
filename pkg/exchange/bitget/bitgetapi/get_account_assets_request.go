@@ -11,7 +11,7 @@ import (
 )
 
 type AccountAsset struct {
-	CoinId    string                     `json:"coinId"`
+	CoinId    int64                      `json:"coinId"`
 	CoinName  string                     `json:"coinName"`
 	Available fixedpoint.Value           `json:"available"`
 	Frozen    fixedpoint.Value           `json:"frozen"`

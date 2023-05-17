@@ -13,7 +13,7 @@ type ServerTime = types.MillisecondTimestamp
 
 //go:generate GetRequest -url "/api/spot/v1/public/time" -type GetServerTimeRequest -responseDataType .ServerTime
 type GetServerTimeRequest struct {
-	client requestgen.AuthenticatedAPIClient
+	client requestgen.APIClient
 }
 
 func (c *RestClient) NewGetServerTimeRequest() *GetServerTimeRequest {

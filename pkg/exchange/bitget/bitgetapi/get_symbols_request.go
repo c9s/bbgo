@@ -28,7 +28,7 @@ type Symbol struct {
 
 //go:generate GetRequest -url "/api/spot/v1/public/products" -type GetSymbolsRequest -responseDataType []Symbol
 type GetSymbolsRequest struct {
-	client requestgen.AuthenticatedAPIClient
+	client requestgen.APIClient
 }
 
 func (c *RestClient) NewGetSymbolsRequest() *GetSymbolsRequest {
