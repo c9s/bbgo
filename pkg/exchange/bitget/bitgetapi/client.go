@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -74,9 +75,18 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 		path += "?" + rel.RawQuery
 	}
 
+	// See https://bitgetlimited.github.io/apidoc/en/spot/#signature
+	// sign(
+	//    timestamp +
+	// 	  method.toUpperCase() +
+	// 	  requestPath + "?" + queryString +
+	// 	  body **string
+	// )
+	// (+ means string concat) encrypt by **HMAC SHA256 **algorithm, and encode the encrypted result through **BASE64.
+
 	// set location to UTC so that it outputs "2020-12-08T09:08:57.715Z"
 	t := time.Now().In(time.UTC)
-	timestamp := t.Format("2006-01-02T15:04:05.999Z07:00")
+	timestamp := strconv.FormatInt(t.UnixMilli(), 10)
 
 	body, err := castPayload(payload)
 	if err != nil {
