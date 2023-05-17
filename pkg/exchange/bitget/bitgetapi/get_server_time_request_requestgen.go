@@ -118,7 +118,7 @@ func (g *GetServerTimeRequest) Do(ctx context.Context) (*types.MillisecondTimest
 
 	apiURL := "/api/spot/v1/public/time"
 
-	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
+	req, err := g.client.NewRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}

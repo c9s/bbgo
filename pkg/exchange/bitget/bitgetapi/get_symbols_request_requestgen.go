@@ -117,7 +117,7 @@ func (g *GetSymbolsRequest) Do(ctx context.Context) ([]Symbol, error) {
 
 	apiURL := "/api/spot/v1/public/products"
 
-	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
+	req, err := g.client.NewRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}

@@ -117,7 +117,7 @@ func (g *GetAllTickersRequest) Do(ctx context.Context) ([]Ticker, error) {
 
 	apiURL := "/api/spot/v1/market/tickers"
 
-	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
+	req, err := g.client.NewRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}
