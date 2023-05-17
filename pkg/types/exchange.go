@@ -76,9 +76,8 @@ type ExchangeMinimal interface {
 //go:generate mockgen -destination=mocks/mock_exchange.go -package=mocks . Exchange
 type Exchange interface {
 	ExchangeMinimal
-
 	ExchangeMarketDataService
-
+	ExchangeAccountService
 	ExchangeTradeService
 }
 
@@ -90,11 +89,13 @@ type ExchangeOrderQueryService interface {
 	QueryOrderTrades(ctx context.Context, q OrderQuery) ([]Trade, error)
 }
 
-type ExchangeTradeService interface {
+type ExchangeAccountService interface {
 	QueryAccount(ctx context.Context) (*Account, error)
 
 	QueryAccountBalances(ctx context.Context) (BalanceMap, error)
+}
 
+type ExchangeTradeService interface {
 	SubmitOrder(ctx context.Context, order SubmitOrder) (createdOrder *Order, err error)
 
 	QueryOpenOrders(ctx context.Context, symbol string) (orders []Order, err error)
