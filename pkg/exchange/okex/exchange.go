@@ -17,11 +17,13 @@ import (
 
 var marketDataLimiter = rate.NewLimiter(rate.Every(time.Second/10), 1)
 
-// OKB is the platform currency of OKEx, pre-allocate static string here
-const OKB = "OKB"
+const ID = "okex"
+
+// PlatformToken is the platform currency of OKEx, pre-allocate static string here
+const PlatformToken = "OKB"
 
 var log = logrus.WithFields(logrus.Fields{
-	"exchange": "okex",
+	"exchange": ID,
 })
 
 type Exchange struct {
@@ -38,8 +40,7 @@ func New(key, secret, passphrase string) *Exchange {
 	}
 
 	return &Exchange{
-		key: key,
-		// pragma: allowlist nextline secret
+		key:        key,
 		secret:     secret,
 		passphrase: passphrase,
 		client:     client,
@@ -131,7 +132,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 }
 
 func (e *Exchange) PlatformFeeCurrency() string {
-	return OKB
+	return PlatformToken
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
