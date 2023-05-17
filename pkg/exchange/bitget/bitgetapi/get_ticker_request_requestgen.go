@@ -11,6 +11,11 @@ import (
 	"regexp"
 )
 
+func (g *GetTickerRequest) Symbol(symbol string) *GetTickerRequest {
+	g.symbol = symbol
+	return g
+}
+
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (g *GetTickerRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
@@ -26,6 +31,11 @@ func (g *GetTickerRequest) GetQueryParameters() (url.Values, error) {
 // GetParameters builds and checks the parameters and return the result in a map object
 func (g *GetTickerRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
+	// check symbol field -> json key symbol
+	symbol := g.symbol
+
+	// assign parameter of symbol
+	params["symbol"] = symbol
 
 	return params, nil
 }
@@ -111,9 +121,12 @@ func (g *GetTickerRequest) GetSlugsMap() (map[string]string, error) {
 
 func (g *GetTickerRequest) Do(ctx context.Context) (*Ticker, error) {
 
-	// no body params
+	// empty params for GET operation
 	var params interface{}
-	query := url.Values{}
+	query, err := g.GetParametersQuery()
+	if err != nil {
+		return nil, err
+	}
 
 	apiURL := "/api/spot/v1/market/ticker"
 
