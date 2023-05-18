@@ -19,7 +19,7 @@ type OrderDetail struct {
 	Quantity         fixedpoint.Value           `json:"quantity"`
 	OrderType        OrderType                  `json:"orderType"`
 	Side             OrderSide                  `json:"side"`
-	Status           string                     `json:"status"`
+	Status           OrderStatus                `json:"status"`
 	FillPrice        fixedpoint.Value           `json:"fillPrice"`
 	FillQuantity     fixedpoint.Value           `json:"fillQuantity"`
 	FillTotalAmount  fixedpoint.Value           `json:"fillTotalAmount"`

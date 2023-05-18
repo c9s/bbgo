@@ -29,3 +29,13 @@ const (
 	OrderForceFOK      OrderForce = "fok"
 	OrderForceIOC      OrderForce = "ioc"
 )
+
+type OrderStatus string
+
+const (
+	OrderStatusInit        OrderStatus = "init"
+	OrderStatusNew         OrderStatus = "new"
+	OrderStatusPartialFill OrderStatus = "partial_fill"
+	OrderStatusFullFill    OrderStatus = "full_fill"
+	OrderStatusCancelled   OrderStatus = "cancelled"
+)
