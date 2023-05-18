@@ -785,7 +785,11 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 	for maxBaseQuantity.Compare(s.Market.MinQuantity) <= 0 || maxBaseQuantity.Compare(minBaseQuantity) <= 0 {
 		maxNumberOfSellOrders--
 		maxBaseQuantity = baseInvestment.Div(fixedpoint.NewFromInt(int64(maxNumberOfSellOrders)))
+
+		// maxBaseQuantity = s.Market.RoundDownQuantityByPrecision(maxBaseQuantity)
+		maxBaseQuantity = s.Market.TruncateQuantity(maxBaseQuantity)
 	}
+
 	s.logger.Infof("grid base investment sell orders: %d", maxNumberOfSellOrders)
 	if maxNumberOfSellOrders > 0 {
 		s.logger.Infof("grid base investment quantity: %f (base investment) / %d (number of sell orders) = %f (base quantity per order)", baseInvestment.Float64(), maxNumberOfSellOrders, maxBaseQuantity.Float64())
