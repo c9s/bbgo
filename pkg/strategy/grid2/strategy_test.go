@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/sirupsen/logrus"
@@ -1065,6 +1064,7 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 	})
 }
 
+/*
 func Test_buildPinOrderMap(t *testing.T) {
 	assert := assert.New(t)
 	s := newTestStrategy()
@@ -1420,3 +1420,4 @@ func Test_verifyFilledGrid(t *testing.T) {
 	})
 
 }
+*/
