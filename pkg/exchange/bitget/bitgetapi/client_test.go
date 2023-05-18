@@ -27,21 +27,36 @@ func getTestClientOrSkip(t *testing.T) *RestClient {
 	return client
 }
 
-func TestClient_GetAccountAssetsRequest(t *testing.T) {
+func TestClient(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	req := client.NewGetAccountAssetsRequest()
-	assets, err := req.Do(ctx)
-	assert.NoError(t, err)
-	t.Logf("assets: %+v", assets)
-}
 
-func TestClient_GetTickerRequest(t *testing.T) {
-	client := getTestClientOrSkip(t)
-	ctx := context.Background()
-	req := client.NewGetTickerRequest()
-	req.Symbol("BTCUSDT_SPBL")
-	ticker, err := req.Do(ctx)
-	assert.NoError(t, err)
-	t.Logf("ticker: %+v", ticker)
+	t.Run("GetAllTickersRequest", func(t *testing.T) {
+		req := client.NewGetAllTickersRequest()
+		tickers, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("tickers: %+v", tickers)
+	})
+
+	t.Run("GetTickerRequest", func(t *testing.T) {
+		req := client.NewGetTickerRequest()
+		req.Symbol("BTCUSDT_SPBL")
+		ticker, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("ticker: %+v", ticker)
+	})
+
+	t.Run("GetServerTime", func(t *testing.T) {
+		req := client.NewGetServerTimeRequest()
+		serverTime, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("time: %+v", serverTime)
+	})
+
+	t.Run("GetAccountAssetsRequest", func(t *testing.T) {
+		req := client.NewGetAccountAssetsRequest()
+		assets, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("assets: %+v", assets)
+	})
 }
