@@ -14,12 +14,12 @@ type GetOrderHistoryRequest struct {
 	symbol string `param:"symbol"`
 
 	// after - order id
-	after string `param:"after"`
+	after *string `param:"after"`
 
 	// before - order id
-	before string `param:"before"`
+	before *string `param:"before"`
 
-	limit string `param:"limit"`
+	limit *string `param:"limit"`
 }
 
 func (c *RestClient) NewGetOrderHistoryRequest() *GetOrderHistoryRequest {
