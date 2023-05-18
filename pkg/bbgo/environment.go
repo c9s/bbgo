@@ -228,12 +228,16 @@ func (environ *Environment) ConfigureExchangeSessions(userConfig *Config) error 
 func (environ *Environment) AddExchangesByViperKeys() error {
 	for _, n := range types.SupportedExchanges {
 		if viper.IsSet(string(n) + "-api-key") {
-			ex, err := exchange.NewWithEnvVarPrefix(n, "")
+			exMinimal, err := exchange.NewWithEnvVarPrefix(n, "")
 			if err != nil {
 				return err
 			}
 
-			environ.AddExchange(n.String(), ex)
+			if ex, ok := exMinimal.(types.Exchange); ok {
+				environ.AddExchange(n.String(), ex)
+			} else {
+				log.Errorf("exchange %T does not implement types.Exchange", exMinimal)
+			}
 		}
 	}
 

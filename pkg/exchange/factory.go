@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/exchange/bitget"
 	"github.com/c9s/bbgo/pkg/exchange/kucoin"
 	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/exchange/okex"
@@ -13,10 +14,19 @@ import (
 )
 
 func NewPublic(exchangeName types.ExchangeName) (types.Exchange, error) {
-	return NewStandard(exchangeName, "", "", "", "")
+	exMinimal, err := New(exchangeName, "", "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	if ex, ok := exMinimal.(types.Exchange); ok {
+		return ex, nil
+	}
+
+	return nil, fmt.Errorf("exchange %T does not implement types.Exchange", exMinimal)
 }
 
-func NewStandard(n types.ExchangeName, key, secret, passphrase, subAccount string) (types.Exchange, error) {
+func New(n types.ExchangeName, key, secret, passphrase string) (types.ExchangeMinimal, error) {
 	switch n {
 
 	case types.ExchangeBinance:
@@ -31,13 +41,18 @@ func NewStandard(n types.ExchangeName, key, secret, passphrase, subAccount strin
 	case types.ExchangeKucoin:
 		return kucoin.New(key, secret, passphrase), nil
 
+	case types.ExchangeBitget:
+		return bitget.New(key, secret, passphrase), nil
+
 	default:
 		return nil, fmt.Errorf("unsupported exchange: %v", n)
 
 	}
 }
 
-func NewWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.Exchange, error) {
+// NewWithEnvVarPrefix allocate and initialize the exchange instance with the given environment variable prefix
+// When the varPrefix is a empty string, the default exchange name will be used as the prefix
+func NewWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.ExchangeMinimal, error) {
 	if len(varPrefix) == 0 {
 		varPrefix = n.String()
 	}
@@ -51,11 +66,5 @@ func NewWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.Exchange
 	}
 
 	passphrase := os.Getenv(varPrefix + "_API_PASSPHRASE")
-	subAccount := os.Getenv(varPrefix + "_SUBACCOUNT")
-	return NewStandard(n, key, secret, passphrase, subAccount)
-}
-
-// New constructor exchange object from viper config.
-func New(n types.ExchangeName) (types.Exchange, error) {
-	return NewWithEnvVarPrefix(n, "")
+	return New(n, key, secret, passphrase)
 }
