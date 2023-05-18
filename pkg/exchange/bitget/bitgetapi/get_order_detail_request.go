@@ -11,9 +11,9 @@ import (
 )
 
 type OrderDetail struct {
-	AccountId        string                     `json:"accountId"`
+	AccountId        types.StrInt64             `json:"accountId"`
 	Symbol           string                     `json:"symbol"`
-	OrderId          string                     `json:"orderId"`
+	OrderId          types.StrInt64             `json:"orderId"`
 	ClientOrderId    string                     `json:"clientOrderId"`
 	Price            fixedpoint.Value           `json:"price"`
 	Quantity         fixedpoint.Value           `json:"quantity"`
