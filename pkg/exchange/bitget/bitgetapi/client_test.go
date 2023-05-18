@@ -46,7 +46,15 @@ func TestClient(t *testing.T) {
 		t.Logf("ticker: %+v", ticker)
 	})
 
-	t.Run("GetServerTime", func(t *testing.T) {
+	t.Run("GetDepthRequest", func(t *testing.T) {
+		req := client.NewGetDepthRequest()
+		req.Symbol("BTCUSDT_SPBL")
+		depth, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("depth: %+v", depth)
+	})
+
+	t.Run("GetServerTimeRequest", func(t *testing.T) {
 		req := client.NewGetServerTimeRequest()
 		serverTime, err := req.Do(ctx)
 		assert.NoError(t, err)
