@@ -11,10 +11,10 @@ import (
 )
 
 type Fill struct {
-	AccountId       string                     `json:"accountId"`
+	AccountId       types.StrInt64             `json:"accountId"`
 	Symbol          string                     `json:"symbol"`
-	OrderId         string                     `json:"orderId"`
-	FillId          string                     `json:"fillId"`
+	OrderId         types.StrInt64             `json:"orderId"`
+	FillId          types.StrInt64             `json:"fillId"`
 	OrderType       OrderType                  `json:"orderType"`
 	Side            OrderSide                  `json:"side"`
 	FillPrice       fixedpoint.Value           `json:"fillPrice"`
