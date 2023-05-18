@@ -27,7 +27,7 @@ type OrderDetail struct {
 	CTime            types.MillisecondTimestamp `json:"cTime"`
 }
 
-//go:generate PostRequest -url "/api/spot/v1/trade/orderInfo" -type GetOrderDetailRequest -responseDataType .OrderDetail
+//go:generate PostRequest -url "/api/spot/v1/trade/orderInfo" -type GetOrderDetailRequest -responseDataType []OrderDetail
 type GetOrderDetailRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
