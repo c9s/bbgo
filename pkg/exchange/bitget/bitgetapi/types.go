@@ -10,27 +10,22 @@ const (
 type OrderType string
 
 const (
-	OrderTypeMarket   OrderType = "market"
-	OrderTypeLimit    OrderType = "limit"
-	OrderTypePostOnly OrderType = "post_only"
-	OrderTypeFOK      OrderType = "fok"
-	OrderTypeIOC      OrderType = "ioc"
+	OrderTypeLimit  OrderType = "limit"
+	OrderTypeMarket OrderType = "market"
 )
 
-type InstrumentType string
+type OrderSide string
 
 const (
-	InstrumentTypeSpot    InstrumentType = "SPOT"
-	InstrumentTypeSwap    InstrumentType = "SWAP"
-	InstrumentTypeFutures InstrumentType = "FUTURES"
-	InstrumentTypeOption  InstrumentType = "OPTION"
+	OrderSideBuy  OrderSide = "buy"
+	OrderSideSell OrderSide = "sell"
 )
 
-type OrderState string
+type OrderForce string
 
 const (
-	OrderStateCanceled        OrderState = "canceled"
-	OrderStateLive            OrderState = "live"
-	OrderStatePartiallyFilled OrderState = "partially_filled"
-	OrderStateFilled          OrderState = "filled"
+	OrderForceGTC      OrderForce = "normal"
+	OrderForcePostOnly OrderForce = "post_only"
+	OrderForceFOK      OrderForce = "fok"
+	OrderForceIOC      OrderForce = "ioc"
 )
