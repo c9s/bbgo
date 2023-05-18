@@ -8,6 +8,11 @@ import (
 
 type StrInt64 int64
 
+func (s *StrInt64) MarshalJSON() ([]byte, error) {
+	ss := strconv.FormatInt(int64(*s), 10)
+	return json.Marshal(ss)
+}
+
 func (s *StrInt64) UnmarshalJSON(body []byte) error {
 	var arg interface{}
 	if err := json.Unmarshal(body, &arg); err != nil {
