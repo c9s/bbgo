@@ -777,6 +777,9 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 		numberOfSellOrders++
 	}
 
+	// avoid placing a sell order above the last price
+	numberOfSellOrders--
+
 	// if the maxBaseQuantity is less than minQuantity, then we need to reduce the number of the sell orders
 	// so that the quantity can be increased.
 	baseQuantity := s.Market.TruncateQuantity(
@@ -785,7 +788,7 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 				int64(numberOfSellOrders))))
 
 	minBaseQuantity := fixedpoint.Max(
-		s.Market.MinNotional.Div(lastPrice),
+		s.Market.MinNotional.Div(s.UpperPrice),
 		s.Market.MinQuantity)
 
 	if baseQuantity.Compare(minBaseQuantity) <= 0 {

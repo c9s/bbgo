@@ -285,6 +285,41 @@ func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
 	})
 }
 
+func TestStrategy_calculateBaseQuoteInvestmentQuantity(t *testing.T) {
+	t.Run("basic", func(t *testing.T) {
+		s := newTestStrategy()
+		s.Market = types.Market{
+			BaseCurrency:    "ETH",
+			QuoteCurrency:   "USDT",
+			TickSize:        number(0.01),
+			StepSize:        number(0.00001),
+			PricePrecision:  2,
+			VolumePrecision: 6,
+			MinNotional:     number(8.000),
+			MinQuantity:     number(0.00030),
+		}
+		s.UpperPrice = number(200.0)
+		s.LowerPrice = number(100.0)
+		s.GridNum = 7
+		s.Compound = true
+
+		lastPrice := number(180.0)
+		quoteInvestment := number(334.0) // 333.33
+		baseInvestment := number(0.5)
+		quantity, err := s.calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice, []Pin{
+			Pin(number(100.00)),
+			Pin(number(116.67)),
+			Pin(number(133.33)),
+			Pin(number(150.00)),
+			Pin(number(166.67)),
+			Pin(number(183.33)),
+			Pin(number(200.00)),
+		})
+		assert.NoError(t, err)
+		assert.InDelta(t, 0.5, quantity.Float64(), 0.0001)
+	})
+}
+
 func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 
 	t.Run("quote quantity", func(t *testing.T) {
@@ -380,6 +415,7 @@ func newTestMarket() types.Market {
 		BaseCurrency:    "BTC",
 		QuoteCurrency:   "USDT",
 		TickSize:        number(0.01),
+		StepSize:        number(0.00001),
 		PricePrecision:  2,
 		VolumePrecision: 8,
 		MinNotional:     number(10.0),
