@@ -76,6 +76,11 @@ func (m Market) RoundDownQuantityByPrecision(quantity fixedpoint.Value) fixedpoi
 	return quantity.Round(m.VolumePrecision, fixedpoint.Down)
 }
 
+// RoundUpQuantityByPrecision uses the volume precision to round up the quantity
+func (m Market) RoundUpQuantityByPrecision(quantity fixedpoint.Value) fixedpoint.Value {
+	return quantity.Round(m.VolumePrecision, fixedpoint.Up)
+}
+
 func (m Market) TruncatePrice(price fixedpoint.Value) fixedpoint.Value {
 	return fixedpoint.MustNewFromString(m.FormatPrice(price))
 }
