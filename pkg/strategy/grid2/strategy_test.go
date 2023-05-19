@@ -286,18 +286,9 @@ func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
 }
 
 func TestStrategy_calculateBaseQuoteInvestmentQuantity(t *testing.T) {
-	t.Run("basic", func(t *testing.T) {
+	t.Run("1 sell", func(t *testing.T) {
 		s := newTestStrategy()
-		s.Market = types.Market{
-			BaseCurrency:    "ETH",
-			QuoteCurrency:   "USDT",
-			TickSize:        number(0.01),
-			StepSize:        number(0.00001),
-			PricePrecision:  2,
-			VolumePrecision: 6,
-			MinNotional:     number(8.000),
-			MinQuantity:     number(0.00030),
-		}
+		s.Market = newTestMarket("ETHUSDT")
 		s.UpperPrice = number(200.0)
 		s.LowerPrice = number(100.0)
 		s.GridNum = 7
@@ -318,10 +309,34 @@ func TestStrategy_calculateBaseQuoteInvestmentQuantity(t *testing.T) {
 		assert.NoError(t, err)
 		assert.InDelta(t, 0.5, quantity.Float64(), 0.0001)
 	})
+
+	t.Run("6 sell", func(t *testing.T) {
+		s := newTestStrategy()
+		s.Market = newTestMarket("ETHUSDT")
+		s.UpperPrice = number(200.0)
+		s.LowerPrice = number(100.0)
+		s.GridNum = 7
+		s.Compound = true
+
+		lastPrice := number(95.0)
+		quoteInvestment := number(334.0) // 333.33
+		baseInvestment := number(0.5)
+		quantity, err := s.calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice, []Pin{
+			Pin(number(100.00)),
+			Pin(number(116.67)),
+			Pin(number(133.33)),
+			Pin(number(150.00)),
+			Pin(number(166.67)),
+			Pin(number(183.33)),
+			Pin(number(200.00)),
+		})
+		assert.NoError(t, err)
+		assert.InDelta(t, 0.08333, quantity.Float64(), 0.0001)
+	})
+
 }
 
 func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
-
 	t.Run("quote quantity", func(t *testing.T) {
 		// quoteInvestment = (10,000 + 11,000 + 12,000 + 13,000 + 14,000) * q
 		// q = quoteInvestment / (10,000 + 11,000 + 12,000 + 13,000 + 14,000)
@@ -410,7 +425,33 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 	})
 }
 
-func newTestMarket() types.Market {
+func newTestMarket(symbol string) types.Market {
+	switch symbol {
+	case "BTCUSDT":
+		return types.Market{
+			BaseCurrency:    "BTC",
+			QuoteCurrency:   "USDT",
+			TickSize:        number(0.01),
+			StepSize:        number(0.00001),
+			PricePrecision:  2,
+			VolumePrecision: 8,
+			MinNotional:     number(10.0),
+			MinQuantity:     number(0.001),
+		}
+	case "ETHUSDT":
+		return types.Market{
+			BaseCurrency:    "ETH",
+			QuoteCurrency:   "USDT",
+			TickSize:        number(0.01),
+			StepSize:        number(0.00001),
+			PricePrecision:  2,
+			VolumePrecision: 6,
+			MinNotional:     number(8.000),
+			MinQuantity:     number(0.00030),
+		}
+	}
+
+	// default
 	return types.Market{
 		BaseCurrency:    "BTC",
 		QuoteCurrency:   "USDT",
@@ -426,7 +467,7 @@ func newTestMarket() types.Market {
 var testOrderID = uint64(0)
 
 func newTestOrder(price, quantity fixedpoint.Value, side types.SideType) types.Order {
-	market := newTestMarket()
+	market := newTestMarket("BTCUSDT")
 	testOrderID++
 	return types.Order{
 		SubmitOrder: types.SubmitOrder{
@@ -450,7 +491,7 @@ func newTestOrder(price, quantity fixedpoint.Value, side types.SideType) types.O
 }
 
 func newTestStrategy() *Strategy {
-	market := newTestMarket()
+	market := newTestMarket("BTCUSDT")
 
 	s := &Strategy{
 		logger:           logrus.NewEntry(logrus.New()),
