@@ -137,7 +137,8 @@ func (s *Strategy) getFilledOrdersByScanningTrades(ctx context.Context, queryTra
 	}
 
 	// 2. build the filled twin-order map by querying trades
-	twinOrdersFilled, err := s.buildFilledTwinOrderMapFromTrades(ctx, queryTradesService, queryOrderService, twinOrdersOpen)
+	expectedFilledNum := int(expectedNumOfOrders - numGridOpenOrders)
+	twinOrdersFilled, err := s.buildFilledTwinOrderMapFromTrades(ctx, queryTradesService, queryOrderService, twinOrdersOpen, expectedFilledNum)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to build filled pin order map")
 	}
@@ -226,63 +227,100 @@ func (s *Strategy) buildTwinOrderMap(pins []Pin, openOrders []types.Order) (Twin
 
 // buildFilledTwinOrderMapFromTrades will query the trades from last 24 hour and use them to build a pin order map
 // It will skip the orders on pins at which open orders are already
-func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryTradesService QueryTradesService, queryOrderService QueryOrderService, twinOrdersOpen TwinOrderMap) (TwinOrderMap, error) {
+func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryTradesService QueryTradesService, queryOrderService QueryOrderService, twinOrdersOpen TwinOrderMap, expectedFillNum int) (TwinOrderMap, error) {
 	twinOrdersFilled := make(TwinOrderMap)
 
 	// existedOrders is used to avoid re-query the same orders
 	existedOrders := twinOrdersOpen.SyncOrderMap()
 
-	var limit int64 = 1000
 	// get the filled orders when bbgo is down in order from trades
-	// [NOTE] only retrieve from last 24 hours !!!
+	until := time.Now()
+	// the first query only query the last 1 hour, because mostly shutdown and recovery happens within 1 hour
+	since := until.Add(-1 * time.Hour)
+	// hard limit for recover
+	recoverSinceLimit := time.Date(2023, time.March, 10, 0, 0, 0, 0, time.UTC)
+
+	if s.RecoverWithin != 0 && until.Add(-1*s.RecoverWithin).After(recoverSinceLimit) {
+		recoverSinceLimit = until.Add(-1 * s.RecoverWithin)
+	}
+
+	for {
+		if err := s.queryTradesToUpdateTwinOrdersMap(ctx, queryTradesService, queryOrderService, twinOrdersOpen, twinOrdersFilled, existedOrders, since, until); err != nil {
+			return nil, errors.Wrapf(err, "failed to query trades to update twin orders map")
+		}
+
+		until = since
+		since = until.Add(-6 * time.Hour)
+
+		if len(twinOrdersFilled) >= expectedFillNum {
+			s.logger.Infof("stop querying trades because twin orders filled (%d) >= expected filled nums (%d)", len(twinOrdersFilled), expectedFillNum)
+			break
+		}
+
+		if s.GridProfitStats != nil && s.GridProfitStats.Since != nil && until.Before(*s.GridProfitStats.Since) {
+			s.logger.Infof("stop querying trades because the time range is out of the strategy's since (%s)", *s.GridProfitStats.Since)
+			break
+		}
+
+		if until.Before(recoverSinceLimit) {
+			s.logger.Infof("stop querying trades because the time range is out of the limit (%s)", recoverSinceLimit)
+			break
+		}
+	}
+
+	return twinOrdersFilled, nil
+}
+
+func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTradesService QueryTradesService, queryOrderService QueryOrderService, twinOrdersOpen, twinOrdersFilled TwinOrderMap, existedOrders *types.SyncOrderMap, since, until time.Time) error {
 	var fromTradeID uint64 = 0
+	var limit int64 = 1000
 	for {
 		trades, err := queryTradesService.QueryTrades(ctx, s.Symbol, &types.TradeQueryOptions{
+			StartTime:   &since,
+			EndTime:     &until,
 			LastTradeID: fromTradeID,
 			Limit:       limit,
 		})
 
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to query trades to recover the grid with open orders")
+			return errors.Wrapf(err, "failed to query trades to recover the grid with open orders")
 		}
 
-		s.debugLog("QueryTrades return %d trades", len(trades))
+		s.debugLog("QueryTrades from %s <-> %s (from: %d) return %d trades", since, until, fromTradeID, len(trades))
 
 		for _, trade := range trades {
+			if trade.Time.After(until) {
+				return nil
+			}
+
 			s.debugLog(trade.String())
+
 			if existedOrders.Exists(trade.OrderID) {
 				// already queries, skip
 				continue
 			}
-
 			order, err := queryOrderService.QueryOrder(ctx, types.OrderQuery{
 				OrderID: strconv.FormatUint(trade.OrderID, 10),
 			})
 
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to query order by trade")
+				return errors.Wrapf(err, "failed to query order by trade")
 			}
 
-			s.debugLog("%s (group_id: %d)", order.String(), order.GroupID)
-
+			s.debugLog(order.String())
 			// avoid query this order again
 			existedOrders.Add(*order)
-
-			if order.GroupID != s.OrderGroupID {
-				continue
-			}
-
 			// add 1 to avoid duplicate
 			fromTradeID = trade.ID + 1
 
 			twinOrderKey, err := findTwinOrderMapKey(s.grid, *order)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to find grid order map's key when recover")
+				return errors.Wrapf(err, "failed to find grid order map's key when recover")
 			}
 
 			twinOrderOpen, exist := twinOrdersOpen[twinOrderKey]
 			if !exist {
-				return nil, fmt.Errorf("the price of the order with the same GroupID is not in pins")
+				return fmt.Errorf("the price of the order with the same GroupID is not in pins")
 			}
 
 			if twinOrderOpen.Exist() {
@@ -304,11 +342,9 @@ func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryT
 
 		// stop condition
 		if int64(len(trades)) < limit {
-			break
+			return nil
 		}
 	}
-
-	return twinOrdersFilled, nil
 }
 
 func (s *Strategy) addOrdersIntoTwinOrderMap(twinOrders TwinOrderMap, orders []types.Order) error {

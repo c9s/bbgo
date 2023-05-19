@@ -165,8 +165,9 @@ type Strategy struct {
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
 
-	SkipSpreadCheck             bool `json:"skipSpreadCheck"`
-	RecoverGridByScanningTrades bool `json:"recoverGridByScanningTrades"`
+	SkipSpreadCheck             bool          `json:"skipSpreadCheck"`
+	RecoverGridByScanningTrades bool          `json:"recoverGridByScanningTrades"`
+	RecoverWithin               time.Duration `json:"recoverWithin"`
 
 	EnableProfitFixer bool        `json:"enableProfitFixer"`
 	FixProfitSince    *types.Time `json:"fixProfitSince"`
