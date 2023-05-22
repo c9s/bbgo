@@ -795,8 +795,8 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 		s.Market.MinQuantity)
 
 	if baseQuantity.Compare(minBaseQuantity) <= 0 {
-		numberOfSellOrders = int(math.Floor(baseInvestment.Div(minBaseQuantity).Float64()))
 		baseQuantity = s.Market.RoundUpQuantityByPrecision(minBaseQuantity)
+		numberOfSellOrders = int(math.Floor(baseInvestment.Div(baseQuantity).Float64()))
 	}
 
 	s.logger.Infof("grid base investment sell orders: %d", numberOfSellOrders)
