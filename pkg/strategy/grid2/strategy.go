@@ -91,6 +91,9 @@ type Strategy struct {
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
 	GridNum int64 `json:"gridNumber"`
 
+	// BaseGridNum is an optional field used for base investment sell orders
+	BaseGridNum int `json:"baseGridNumber,omitempty"`
+
 	AutoRange *types.SimpleDuration `json:"autoRange"`
 
 	UpperPrice fixedpoint.Value `json:"upperPrice"`
@@ -761,25 +764,29 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 	// maxBaseQuantity = baseInvestment / numberOfSellOrders
 	// if maxBaseQuantity < minQuantity or maxBaseQuantity * priceLowest < minNotional
 	// then reduce the numberOfSellOrders
-	numberOfSellOrders := 0
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
-		price := fixedpoint.Value(pin)
-		sellPrice := price
-		if s.ProfitSpread.Sign() > 0 {
-			sellPrice = sellPrice.Add(s.ProfitSpread)
+	numberOfSellOrders := s.BaseGridNum
+
+	// if it's not configured
+	if numberOfSellOrders == 0 {
+		for i := len(pins) - 1; i >= 0; i-- {
+			pin := pins[i]
+			price := fixedpoint.Value(pin)
+			sellPrice := price
+			if s.ProfitSpread.Sign() > 0 {
+				sellPrice = sellPrice.Add(s.ProfitSpread)
+			}
+
+			if sellPrice.Compare(lastPrice) < 0 {
+				break
+			}
+
+			numberOfSellOrders++
 		}
 
-		if sellPrice.Compare(lastPrice) < 0 {
-			break
+		// avoid placing a sell order above the last price
+		if numberOfSellOrders > 0 {
+			numberOfSellOrders--
 		}
-
-		numberOfSellOrders++
-	}
-
-	// avoid placing a sell order above the last price
-	if numberOfSellOrders > 0 {
-		numberOfSellOrders--
 	}
 
 	// if the maxBaseQuantity is less than minQuantity, then we need to reduce the number of the sell orders
