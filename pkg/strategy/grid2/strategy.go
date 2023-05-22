@@ -778,9 +778,8 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 	}
 
 	// avoid placing a sell order above the last price
-	numberOfSellOrders--
-	if numberOfSellOrders < 0 {
-		numberOfSellOrders = 0
+	if numberOfSellOrders > 0 {
+		numberOfSellOrders--
 	}
 
 	// if the maxBaseQuantity is less than minQuantity, then we need to reduce the number of the sell orders
