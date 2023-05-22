@@ -1336,8 +1336,8 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 			quantity = s.QuantityOrAmount.Amount.Div(price)
 		}
 
-		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
-		if price.Compare(lastPrice) >= 0 {
+		placeSell := price.Compare(lastPrice) >= 0
+		if placeSell {
 			si = i
 
 			// do not place sell order when i == 0 (the bottom of grid)
