@@ -1337,6 +1337,12 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 		}
 
 		placeSell := price.Compare(lastPrice) >= 0
+
+		// override the relative price position for sell order if BaseGridNum is defined
+		if s.BaseGridNum > 0 && i > len(pins)-1-s.BaseGridNum {
+			placeSell = true
+		}
+
 		if placeSell {
 			si = i
 
