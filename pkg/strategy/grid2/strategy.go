@@ -777,19 +777,29 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 		numberOfSellOrders++
 	}
 
+	// avoid placing a sell order above the last price
+	if numberOfSellOrders > 0 {
+		numberOfSellOrders--
+	}
+
 	// if the maxBaseQuantity is less than minQuantity, then we need to reduce the number of the sell orders
 	// so that the quantity can be increased.
-	maxNumberOfSellOrders := numberOfSellOrders + 1
-	minBaseQuantity := fixedpoint.Max(s.Market.MinNotional.Div(lastPrice), s.Market.MinQuantity)
-	maxBaseQuantity := fixedpoint.Zero
-	for maxBaseQuantity.Compare(s.Market.MinQuantity) <= 0 || maxBaseQuantity.Compare(minBaseQuantity) <= 0 {
-		maxNumberOfSellOrders--
-		maxBaseQuantity = baseInvestment.Div(fixedpoint.NewFromInt(int64(maxNumberOfSellOrders)))
+	baseQuantity := s.Market.TruncateQuantity(
+		baseInvestment.Div(
+			fixedpoint.NewFromInt(
+				int64(numberOfSellOrders))))
+
+	minBaseQuantity := fixedpoint.Max(
+		s.Market.MinNotional.Div(s.UpperPrice),
+		s.Market.MinQuantity)
+
+	if baseQuantity.Compare(minBaseQuantity) <= 0 {
+		baseQuantity = s.Market.RoundUpQuantityByPrecision(minBaseQuantity)
+		numberOfSellOrders = int(math.Floor(baseInvestment.Div(baseQuantity).Float64()))
 	}
-	s.logger.Infof("grid base investment sell orders: %d", maxNumberOfSellOrders)
-	if maxNumberOfSellOrders > 0 {
-		s.logger.Infof("grid base investment quantity: %f (base investment) / %d (number of sell orders) = %f (base quantity per order)", baseInvestment.Float64(), maxNumberOfSellOrders, maxBaseQuantity.Float64())
-	}
+
+	s.logger.Infof("grid base investment sell orders: %d", numberOfSellOrders)
+	s.logger.Infof("grid base investment quantity: %f (base investment) / %d (number of sell orders) = %f (base quantity per order)", baseInvestment.Float64(), numberOfSellOrders, baseQuantity.Float64())
 
 	// calculate quantity with quote investment
 	totalQuotePrice := fixedpoint.Zero
@@ -798,7 +808,7 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 	// quoteInvestment = (p1 + p2 + p3) * q
 	// maxBuyQuantity = quoteInvestment / (p1 + p2 + p3)
 	si := -1
-	for i := len(pins) - 1 - maxNumberOfSellOrders; i >= 0; i-- {
+	for i := len(pins) - 1 - numberOfSellOrders; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
 
@@ -834,8 +844,8 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 	}
 
 	quoteSideQuantity := quoteInvestment.Div(totalQuotePrice)
-	if maxNumberOfSellOrders > 0 {
-		return fixedpoint.Min(quoteSideQuantity, maxBaseQuantity), nil
+	if numberOfSellOrders > 0 {
+		return fixedpoint.Min(quoteSideQuantity, baseQuantity), nil
 	}
 
 	return quoteSideQuantity, nil
@@ -1323,7 +1333,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 		if price.Compare(lastPrice) >= 0 {
 			si = i
 
-			// do not place sell order when i == 0
+			// do not place sell order when i == 0 (the bottom of grid)
 			if i == 0 {
 				continue
 			}
