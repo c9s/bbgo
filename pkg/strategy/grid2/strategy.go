@@ -779,6 +779,9 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 
 	// avoid placing a sell order above the last price
 	numberOfSellOrders--
+	if numberOfSellOrders < 0 {
+		numberOfSellOrders = 0
+	}
 
 	// if the maxBaseQuantity is less than minQuantity, then we need to reduce the number of the sell orders
 	// so that the quantity can be increased.
@@ -1331,7 +1334,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 		if price.Compare(lastPrice) >= 0 {
 			si = i
 
-			// do not place sell order when i == 0
+			// do not place sell order when i == 0 (the bottom of grid)
 			if i == 0 {
 				continue
 			}
