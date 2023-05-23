@@ -1351,7 +1351,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				continue
 			}
 
-			if usedBase.Add(quantity).Compare(totalBase) < 0 {
+			if usedBase.Add(quantity).Compare(totalBase) <= 0 {
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:        s.Symbol,
 					Type:          types.OrderTypeLimit,

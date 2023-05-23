@@ -167,14 +167,22 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 		}, orders)
 	})
 
-	t.Run("base + quote", func(t *testing.T) {
+	t.Run("base and quote", func(t *testing.T) {
 		s := newTestStrategy()
 		s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
 		s.grid.CalculateArithmeticPins()
-		s.QuantityOrAmount.Quantity = number(0.01)
 
+		quoteInvestment := number(10_000.0)
+		baseInvestment := number(0.1)
 		lastPrice := number(15300)
-		orders, err := s.generateGridOrders(number(10000.0), number(0.021), lastPrice)
+
+		quantity, err := s.calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice, s.grid.Pins)
+		assert.NoError(t, err)
+		assert.Equal(t, number(0.025), quantity)
+
+		s.QuantityOrAmount.Quantity = quantity
+
+		orders, err := s.generateGridOrders(quoteInvestment, baseInvestment, lastPrice)
 		assert.NoError(t, err)
 		if !assert.Equal(t, 10, len(orders)) {
 			for _, o := range orders {
@@ -185,8 +193,9 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 		assertPriceSide(t, []PriceSideAssert{
 			{number(20000.0), types.SideTypeSell},
 			{number(19000.0), types.SideTypeSell},
-			{number(17000.0), types.SideTypeBuy},
-			{number(16000.0), types.SideTypeBuy},
+			{number(18000.0), types.SideTypeSell},
+			{number(17000.0), types.SideTypeSell},
+			// -- 16_000 should be empty
 			{number(15000.0), types.SideTypeBuy},
 			{number(14000.0), types.SideTypeBuy},
 			{number(13000.0), types.SideTypeBuy},
