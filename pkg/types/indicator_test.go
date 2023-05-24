@@ -2,6 +2,7 @@ package types
 
 import (
 	//"os"
+	"math"
 	"testing"
 	"time"
 
@@ -11,6 +12,14 @@ import (
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 )
+
+func TestQueue(t *testing.T) {
+	zeroq := NewQueue(0)
+	assert.Equal(t, zeroq.Last(), 0.)
+	assert.Equal(t, zeroq.Index(0), 0.)
+	zeroq.Update(1.)
+	assert.Equal(t, zeroq.Length(), 0)
+}
 
 func TestFloat(t *testing.T) {
 	var a Series = Minus(3., 2.)
@@ -121,6 +130,64 @@ func TestSigmoid(t *testing.T) {
 	for i := 0; i < out.Length(); i++ {
 		assert.InDelta(t, r.Index(i), out.Index(i), 0.001)
 	}
+}
+
+func TestHighLowest(t *testing.T) {
+	a := floats.Slice{3.0, 1.0, 2.1}
+	assert.Equal(t, 3.0, Highest(&a, 4))
+	assert.Equal(t, 1.0, Lowest(&a, 4))
+}
+
+func TestAdd(t *testing.T) {
+	var a NumberSeries = 3.0
+	var b NumberSeries = 2.0
+	out := Add(&a, &b)
+	assert.Equal(t, out.Last(), 5.0)
+	assert.Equal(t, out.Index(0), 5.0)
+	assert.Equal(t, out.Length(), math.MaxInt32)
+}
+
+func TestDiv(t *testing.T) {
+	a := floats.Slice{3.0, 1.0, 2.0}
+	b := NumberSeries(2.0)
+	out := Div(&a, &b)
+	assert.Equal(t, out.Last(), 1.0)
+	assert.Equal(t, out.Length(), 3)
+	assert.Equal(t, out.Index(1), 0.5)
+}
+
+func TestMul(t *testing.T) {
+	a := floats.Slice{3.0, 1.0, 2.0}
+	b := NumberSeries(2.0)
+	out := Mul(&a, &b)
+	assert.Equal(t, out.Last(), 4.0)
+	assert.Equal(t, out.Length(), 3)
+	assert.Equal(t, out.Index(1), 2.0)
+}
+
+func TestArray(t *testing.T) {
+	a := floats.Slice{3.0, 1.0, 2.0}
+	out := Array(&a, 1)
+	assert.Equal(t, len(out), 1)
+	out = Array(&a, 4)
+	assert.Equal(t, len(out), 3)
+}
+
+func TestSwitchInterface(t *testing.T) {
+	var a int = 1
+	var af float64 = 1.0
+	var b int32 = 2
+	var bf float64 = 2.0
+	var c int64 = 3
+	var cf float64 = 3.0
+	var d float32 = 4.0
+	var df float64 = 4.0
+	var e float64 = 5.0
+	assert.Equal(t, switchIface(a).Last(), af)
+	assert.Equal(t, switchIface(b).Last(), bf)
+	assert.Equal(t, switchIface(c).Last(), cf)
+	assert.Equal(t, switchIface(d).Last(), df)
+	assert.Equal(t, switchIface(e).Last(), e)
 }
 
 // from https://en.wikipedia.org/wiki/Logistic_regression

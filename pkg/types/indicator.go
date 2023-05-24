@@ -383,27 +383,8 @@ type AddSeriesResult struct {
 
 // Add two series, result[i] = a[i] + b[i]
 func Add(a interface{}, b interface{}) SeriesExtend {
-	var aa Series
-	var bb Series
-
-	switch tp := a.(type) {
-	case float64:
-		aa = NumberSeries(tp)
-	case Series:
-		aa = tp
-	default:
-		panic("input should be either *Series or float64")
-
-	}
-	switch tp := b.(type) {
-	case float64:
-		bb = NumberSeries(tp)
-	case Series:
-		bb = tp
-	default:
-		panic("input should be either *Series or float64")
-
-	}
+	aa := switchIface(a)
+	bb := switchIface(b)
 	return NewSeries(&AddSeriesResult{aa, bb})
 }
 
@@ -473,7 +454,7 @@ func switchIface(b interface{}) Series {
 		return tp
 	default:
 		fmt.Println(reflect.TypeOf(b))
-		panic("input should be either *Series or float64")
+		panic("input should be either *Series or numbers")
 
 	}
 }
@@ -515,28 +496,9 @@ var _ Series = &DivSeriesResult{}
 
 // Multiple two series, result[i] = a[i] * b[i]
 func Mul(a interface{}, b interface{}) SeriesExtend {
-	var aa Series
-	var bb Series
-
-	switch tp := a.(type) {
-	case float64:
-		aa = NumberSeries(tp)
-	case Series:
-		aa = tp
-	default:
-		panic("input should be either Series or float64")
-	}
-	switch tp := b.(type) {
-	case float64:
-		bb = NumberSeries(tp)
-	case Series:
-		bb = tp
-	default:
-		panic("input should be either Series or float64")
-
-	}
+	aa := switchIface(a)
+	bb := switchIface(b)
 	return NewSeries(&MulSeriesResult{aa, bb})
-
 }
 
 type MulSeriesResult struct {
@@ -577,6 +539,18 @@ func Dot(a interface{}, b interface{}, limit ...int) float64 {
 	case float64:
 		aaf = tp
 		isaf = true
+	case int32:
+		aaf = float64(tp)
+		isaf = true
+	case int64:
+		aaf = float64(tp)
+		isaf = true
+	case float32:
+		aaf = float64(tp)
+		isaf = true
+	case int:
+		aaf = float64(tp)
+		isaf = true
 	case Series:
 		aas = tp
 		isaf = false
@@ -587,6 +561,18 @@ func Dot(a interface{}, b interface{}, limit ...int) float64 {
 	case float64:
 		bbf = tp
 		isbf = true
+	case int32:
+		aaf = float64(tp)
+		isaf = true
+	case int64:
+		aaf = float64(tp)
+		isaf = true
+	case float32:
+		aaf = float64(tp)
+		isaf = true
+	case int:
+		aaf = float64(tp)
+		isaf = true
 	case Series:
 		bbs = tp
 		isbf = false
