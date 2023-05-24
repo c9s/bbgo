@@ -13,14 +13,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type QueryTradesService interface {
-	QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error)
-}
-
-type QueryOrderService interface {
-	QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error)
-}
-
 func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.ExchangeSession) error {
 	defer func() {
 		s.updateGridNumOfOrdersMetricsWithLock()
@@ -115,7 +107,7 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 	return nil
 }
 
-func (s *Strategy) getFilledOrdersByScanningTrades(ctx context.Context, queryTradesService QueryTradesService, queryOrderService QueryOrderService, openOrdersOnGrid []types.Order) ([]types.Order, error) {
+func (s *Strategy) getFilledOrdersByScanningTrades(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, openOrdersOnGrid []types.Order) ([]types.Order, error) {
 	// set grid
 	grid := s.newGrid()
 	s.setGrid(grid)
@@ -227,7 +219,7 @@ func (s *Strategy) buildTwinOrderMap(pins []Pin, openOrders []types.Order) (Twin
 
 // buildFilledTwinOrderMapFromTrades will query the trades from last 24 hour and use them to build a pin order map
 // It will skip the orders on pins at which open orders are already
-func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryTradesService QueryTradesService, queryOrderService QueryOrderService, twinOrdersOpen TwinOrderMap, expectedFillNum int) (TwinOrderMap, error) {
+func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, twinOrdersOpen TwinOrderMap, expectedFillNum int) (TwinOrderMap, error) {
 	twinOrdersFilled := make(TwinOrderMap)
 
 	// existedOrders is used to avoid re-query the same orders
@@ -240,8 +232,8 @@ func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryT
 	// hard limit for recover
 	recoverSinceLimit := time.Date(2023, time.March, 10, 0, 0, 0, 0, time.UTC)
 
-	if s.RecoverWithin != 0 && until.Add(-1*s.RecoverWithin).After(recoverSinceLimit) {
-		recoverSinceLimit = until.Add(-1 * s.RecoverWithin)
+	if s.RecoverGridWithin != 0 && until.Add(-1*s.RecoverGridWithin).After(recoverSinceLimit) {
+		recoverSinceLimit = until.Add(-1 * s.RecoverGridWithin)
 	}
 
 	for {
@@ -271,7 +263,7 @@ func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryT
 	return twinOrdersFilled, nil
 }
 
-func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTradesService QueryTradesService, queryOrderService QueryOrderService, twinOrdersOpen, twinOrdersFilled TwinOrderMap, existedOrders *types.SyncOrderMap, since, until time.Time) error {
+func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, twinOrdersOpen, twinOrdersFilled TwinOrderMap, existedOrders *types.SyncOrderMap, since, until time.Time) error {
 	var fromTradeID uint64 = 0
 	var limit int64 = 1000
 	for {
