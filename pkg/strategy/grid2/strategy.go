@@ -167,7 +167,7 @@ type Strategy struct {
 
 	SkipSpreadCheck             bool          `json:"skipSpreadCheck"`
 	RecoverGridByScanningTrades bool          `json:"recoverGridByScanningTrades"`
-	RecoverWithin               time.Duration `json:"recoverWithin"`
+	RecoverGridWithin           time.Duration `json:"recoverGridWithin"`
 
 	EnableProfitFixer bool        `json:"enableProfitFixer"`
 	FixProfitSince    *types.Time `json:"fixProfitSince"`
