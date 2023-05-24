@@ -99,7 +99,7 @@ func (m TwinOrderMap) String() string {
 	}
 
 	sort.Slice(pins, func(i, j int) bool {
-		return pins[j] < pins[i]
+		return pins[j].Compare(pins[i]) < 0
 	})
 
 	sb.WriteString("================== TWIN ORDER MAP ==================\n")

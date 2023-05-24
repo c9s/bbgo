@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -63,6 +64,16 @@ func (t *TestDataService) QueryOrder(ctx context.Context, q types.OrderQuery) (*
 	}
 
 	return &order, nil
+}
+
+// dummy method for interface
+func (t *TestDataService) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+	return nil, nil
+}
+
+// dummy method for interface
+func (t *TestDataService) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
+	return nil, nil
 }
 
 func NewStrategy(t *TestData) *Strategy {
