@@ -1240,7 +1240,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 
 	t.Run("successful case", func(t *testing.T) {
 		openOrders := []types.Order{
-			types.Order{
+			{
 				SubmitOrder: types.SubmitOrder{
 					Symbol:       s.Symbol,
 					Side:         types.SideTypeBuy,
@@ -1275,7 +1275,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 
 	t.Run("there is one order with non-pin price in openOrders", func(t *testing.T) {
 		openOrders := []types.Order{
-			types.Order{
+			{
 				SubmitOrder: types.SubmitOrder{
 					Symbol:       s.Symbol,
 					Side:         types.SideTypeBuy,
@@ -1301,7 +1301,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 
 	t.Run("there are duplicated open orders at same pin", func(t *testing.T) {
 		openOrders := []types.Order{
-			types.Order{
+			{
 				SubmitOrder: types.SubmitOrder{
 					Symbol:       s.Symbol,
 					Side:         types.SideTypeBuy,
@@ -1320,7 +1320,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 				ExecutedQuantity: number(0.0),
 				IsWorking:        false,
 			},
-			types.Order{
+			{
 				SubmitOrder: types.SubmitOrder{
 					Symbol:       s.Symbol,
 					Side:         types.SideTypeBuy,
