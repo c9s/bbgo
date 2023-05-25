@@ -16,6 +16,12 @@ func (s *Slice) Push(v float64) {
 	*s = append(*s, v)
 }
 
+func (s *Slice) Append(vs ...float64) {
+	*s = append(*s, vs...)
+}
+
+// Update equals to Push()
+// which push an element into the slice
 func (s *Slice) Update(v float64) {
 	*s = append(*s, v)
 }
@@ -32,6 +38,38 @@ func (s Slice) Max() float64 {
 
 func (s Slice) Min() float64 {
 	return floats.Min(s)
+}
+
+func (s Slice) Sub(b Slice) (c Slice) {
+	if len(s) != len(b) {
+		return c
+	}
+
+	c = make(Slice, len(s))
+	for i := 0; i < len(s); i++ {
+		ai := s[i]
+		bi := b[i]
+		ci := ai - bi
+		c[i] = ci
+	}
+
+	return c
+}
+
+func (s Slice) Add(b Slice) (c Slice) {
+	if len(s) != len(b) {
+		return c
+	}
+
+	c = make(Slice, len(s))
+	for i := 0; i < len(s); i++ {
+		ai := s[i]
+		bi := b[i]
+		ci := ai + bi
+		c[i] = ci
+	}
+
+	return c
 }
 
 func (s Slice) Sum() (sum float64) {
@@ -125,27 +163,27 @@ func (s Slice) Normalize() Slice {
 	return s.DivScalar(s.Sum())
 }
 
-func (s *Slice) Last() float64 {
-	length := len(*s)
-	if length > 0 {
-		return (*s)[length-1]
-	}
-	return 0.0
-}
-
-func (s *Slice) Index(i int) float64 {
-	length := len(*s)
-	if length-i <= 0 || i < 0 {
-		return 0.0
-	}
-	return (*s)[length-i-1]
-}
-
-func (s *Slice) Length() int {
-	return len(*s)
-}
-
 func (s Slice) Addr() *Slice {
 	return &s
 }
 
+// Last, Index, Length implements the types.Series interface
+func (s Slice) Last() float64 {
+	length := len(s)
+	if length > 0 {
+		return (s)[length-1]
+	}
+	return 0.0
+}
+
+func (s Slice) Index(i int) float64 {
+	length := len(s)
+	if length-i <= 0 || i < 0 {
+		return 0.0
+	}
+	return (s)[length-i-1]
+}
+
+func (s Slice) Length() int {
+	return len(s)
+}

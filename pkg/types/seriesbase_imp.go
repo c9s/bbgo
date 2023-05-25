@@ -2,6 +2,10 @@ package types
 
 import "github.com/c9s/bbgo/pkg/datatype/floats"
 
+type SeriesBase struct {
+	Series
+}
+
 func (s *SeriesBase) Index(i int) float64 {
 	if s.Series == nil {
 		return 0
