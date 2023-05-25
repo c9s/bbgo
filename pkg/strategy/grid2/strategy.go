@@ -91,6 +91,9 @@ type Strategy struct {
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
 	GridNum int64 `json:"gridNumber"`
 
+	// BaseGridNum is an optional field used for base investment sell orders
+	BaseGridNum int `json:"baseGridNumber,omitempty"`
+
 	AutoRange *types.SimpleDuration `json:"autoRange"`
 
 	UpperPrice fixedpoint.Value `json:"upperPrice"`
@@ -761,25 +764,29 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 	// maxBaseQuantity = baseInvestment / numberOfSellOrders
 	// if maxBaseQuantity < minQuantity or maxBaseQuantity * priceLowest < minNotional
 	// then reduce the numberOfSellOrders
-	numberOfSellOrders := 0
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
-		price := fixedpoint.Value(pin)
-		sellPrice := price
-		if s.ProfitSpread.Sign() > 0 {
-			sellPrice = sellPrice.Add(s.ProfitSpread)
+	numberOfSellOrders := s.BaseGridNum
+
+	// if it's not configured
+	if numberOfSellOrders == 0 {
+		for i := len(pins) - 1; i >= 0; i-- {
+			pin := pins[i]
+			price := fixedpoint.Value(pin)
+			sellPrice := price
+			if s.ProfitSpread.Sign() > 0 {
+				sellPrice = sellPrice.Add(s.ProfitSpread)
+			}
+
+			if sellPrice.Compare(lastPrice) < 0 {
+				break
+			}
+
+			numberOfSellOrders++
 		}
 
-		if sellPrice.Compare(lastPrice) < 0 {
-			break
+		// avoid placing a sell order above the last price
+		if numberOfSellOrders > 0 {
+			numberOfSellOrders--
 		}
-
-		numberOfSellOrders++
-	}
-
-	// avoid placing a sell order above the last price
-	if numberOfSellOrders > 0 {
-		numberOfSellOrders--
 	}
 
 	// if the maxBaseQuantity is less than minQuantity, then we need to reduce the number of the sell orders
@@ -1329,8 +1336,14 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 			quantity = s.QuantityOrAmount.Amount.Div(price)
 		}
 
-		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
-		if price.Compare(lastPrice) >= 0 {
+		placeSell := price.Compare(lastPrice) >= 0
+
+		// override the relative price position for sell order if BaseGridNum is defined
+		if s.BaseGridNum > 0 {
+			placeSell = i >= len(pins)-1-s.BaseGridNum
+		}
+
+		if placeSell {
 			si = i
 
 			// do not place sell order when i == 0 (the bottom of grid)
@@ -1338,7 +1351,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				continue
 			}
 
-			if usedBase.Add(quantity).Compare(totalBase) < 0 {
+			if usedBase.Add(quantity).Compare(totalBase) <= 0 {
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:        s.Symbol,
 					Type:          types.OrderTypeLimit,
