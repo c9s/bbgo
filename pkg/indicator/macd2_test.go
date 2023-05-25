@@ -16,7 +16,6 @@ func TestSubtract(t *testing.T) {
 	fastEMA := EWMA2(closePrices, 10)
 	slowEMA := EWMA2(closePrices, 25)
 	subtract := Subtract(fastEMA, slowEMA)
-	_ = subtract
 
 	for i := .0; i < 50.0; i++ {
 		stream.EmitKLineClosed(types.KLine{Close: fixedpoint.NewFromFloat(19_000.0 + i)})
