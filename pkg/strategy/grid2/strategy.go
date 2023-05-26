@@ -236,7 +236,7 @@ func (s *Strategy) Validate() error {
 		}
 	}
 
-	if !s.QuantityOrAmount.IsSet() && s.QuoteInvestment.IsZero() {
+	if !s.QuantityOrAmount.IsSet() && s.QuoteInvestment.IsZero() && s.BaseInvestment.IsZero() {
 		return fmt.Errorf("either quantity, amount or quoteInvestment must be set")
 	}
 
