@@ -126,7 +126,7 @@ func (s *IntervalProfitCollector) GetSharpe() float64 {
 	if s.Profits == nil {
 		panic("profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
 	}
-	return Sharpe(Minus(s.Profits, 1.), s.Profits.Length(), true, false)
+	return Sharpe(Sub(s.Profits, 1.), s.Profits.Length(), true, false)
 }
 
 // Get sortino value with the interval of profit collected.
@@ -138,11 +138,11 @@ func (s *IntervalProfitCollector) GetSortino() float64 {
 	if s.Profits == nil {
 		panic("profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
 	}
-	return Sortino(Minus(s.Profits, 1.), 0., s.Profits.Length(), true, false)
+	return Sortino(Sub(s.Profits, 1.), 0., s.Profits.Length(), true, false)
 }
 
 func (s *IntervalProfitCollector) GetOmega() float64 {
-	return Omega(Minus(s.Profits, 1.))
+	return Omega(Sub(s.Profits, 1.))
 }
 
 func (s IntervalProfitCollector) MarshalYAML() (interface{}, error) {

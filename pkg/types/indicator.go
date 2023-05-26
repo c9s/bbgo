@@ -408,8 +408,8 @@ type MinusSeriesResult struct {
 	b Series
 }
 
-// Minus two series, result[i] = a[i] - b[i]
-func Minus(a interface{}, b interface{}) SeriesExtend {
+// Sub two series, result[i] = a[i] - b[i]
+func Sub(a interface{}, b interface{}) SeriesExtend {
 	aa := switchIface(a)
 	bb := switchIface(b)
 	return NewSeries(&MinusSeriesResult{aa, bb})
