@@ -28,6 +28,11 @@ type Float64Source interface {
 	OnUpdate(f func(v float64))
 }
 
+type Float64Subscription interface {
+	types.Series
+	AddSubscriber(f func(v float64))
+}
+
 //go:generate callbackgen -type EWMAStream
 type EWMAStream struct {
 	Float64Updater
@@ -46,12 +51,20 @@ func EWMA2(source Float64Source, window int) *EWMAStream {
 	}
 
 	s.SeriesBase.Series = s.slice
-	source.OnUpdate(func(v float64) {
-		v2 := s.calculate(v)
-		s.slice.Push(v2)
-		s.EmitUpdate(v2)
-	})
+
+	if sub, ok := source.(Float64Subscription); ok {
+		sub.AddSubscriber(s.calculateAndPush)
+	} else {
+		source.OnUpdate(s.calculateAndPush)
+	}
+
 	return s
+}
+
+func (s *EWMAStream) calculateAndPush(v float64) {
+	v2 := s.calculate(v)
+	s.slice.Push(v2)
+	s.EmitUpdate(v2)
 }
 
 func (s *EWMAStream) calculate(v float64) float64 {
