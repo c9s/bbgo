@@ -850,12 +850,16 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 		}
 	}
 
-	quoteSideQuantity := quoteInvestment.Div(totalQuotePrice)
-	if numberOfSellOrders > 0 {
-		return fixedpoint.Min(quoteSideQuantity, baseQuantity), nil
+	if totalQuotePrice.Sign() > 0 && quoteInvestment.Sign() > 0 {
+		quoteSideQuantity := quoteInvestment.Div(totalQuotePrice)
+		if numberOfSellOrders > 0 {
+			return fixedpoint.Min(quoteSideQuantity, baseQuantity), nil
+		}
+
+		return quoteSideQuantity, nil
 	}
 
-	return quoteSideQuantity, nil
+	return baseQuantity, nil
 }
 
 func (s *Strategy) newTriggerPriceHandler(ctx context.Context, session *bbgo.ExchangeSession) types.KLineCallback {
@@ -1079,7 +1083,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		}
 	} else {
 		// calculate the quantity from the investment configuration
-		if !s.QuoteInvestment.IsZero() && !s.BaseInvestment.IsZero() {
+		if !s.BaseInvestment.IsZero() {
 			quantity, err2 := s.calculateBaseQuoteInvestmentQuantity(s.QuoteInvestment, s.BaseInvestment, lastPrice, s.grid.Pins)
 			if err2 != nil {
 				s.EmitGridError(err2)
