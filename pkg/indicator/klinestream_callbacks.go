@@ -6,12 +6,12 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (K *KLineStream) OnUpdate(cb func(k types.KLine)) {
-	K.updateCallbacks = append(K.updateCallbacks, cb)
+func (s *KLineStream) OnUpdate(cb func(k types.KLine)) {
+	s.updateCallbacks = append(s.updateCallbacks, cb)
 }
 
-func (K *KLineStream) EmitUpdate(k types.KLine) {
-	for _, cb := range K.updateCallbacks {
+func (s *KLineStream) EmitUpdate(k types.KLine) {
+	for _, cb := range s.updateCallbacks {
 		cb(k)
 	}
 }

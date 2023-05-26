@@ -47,7 +47,7 @@ type FailedBreakHigh struct {
 
 	MACDDivergence *MACDDivergence `json:"macdDivergence"`
 
-	macd *indicator.MACD
+	macd *indicator.MACDLegacy
 
 	macdTopDivergence bool
 
