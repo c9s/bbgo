@@ -5,8 +5,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type KLineSource interface {
-	OnUpdate(f func(k types.KLine))
+type KLineSubscription interface {
+	AddSubscriber(f func(k types.KLine))
 }
 
 type PriceStream struct {
@@ -17,12 +17,14 @@ type PriceStream struct {
 	mapper KLineValueMapper
 }
 
-func Price(source KLineSource, mapper KLineValueMapper) *PriceStream {
+func Price(source KLineSubscription, mapper KLineValueMapper) *PriceStream {
 	s := &PriceStream{
 		mapper: mapper,
 	}
+
 	s.SeriesBase.Series = s.slice
-	source.OnUpdate(func(k types.KLine) {
+
+	source.AddSubscriber(func(k types.KLine) {
 		v := s.mapper(k)
 		s.slice.Push(v)
 		s.EmitUpdate(v)
@@ -30,18 +32,18 @@ func Price(source KLineSource, mapper KLineValueMapper) *PriceStream {
 	return s
 }
 
-func ClosePrices(source KLineSource) *PriceStream {
+func ClosePrices(source KLineSubscription) *PriceStream {
 	return Price(source, KLineClosePriceMapper)
 }
 
-func LowPrices(source KLineSource) *PriceStream {
+func LowPrices(source KLineSubscription) *PriceStream {
 	return Price(source, KLineLowPriceMapper)
 }
 
-func HighPrices(source KLineSource) *PriceStream {
+func HighPrices(source KLineSubscription) *PriceStream {
 	return Price(source, KLineHighPriceMapper)
 }
 
-func OpenPrices(source KLineSource) *PriceStream {
+func OpenPrices(source KLineSubscription) *PriceStream {
 	return Price(source, KLineOpenPriceMapper)
 }

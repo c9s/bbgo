@@ -11,12 +11,14 @@ type KLineStream struct {
 	kLines []types.KLine
 }
 
-// AddSubscriber adds the subscriber function and push histrical data to the subscriber
+// AddSubscriber adds the subscriber function and push historical data to the subscriber
 func (s *KLineStream) AddSubscriber(f func(k types.KLine)) {
 	if len(s.kLines) > 0 {
 		// push historical klines to the subscriber
+		for _, k := range s.kLines {
+			f(k)
+		}
 	}
-
 	s.OnUpdate(f)
 }
 
