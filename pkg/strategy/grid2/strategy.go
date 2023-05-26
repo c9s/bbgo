@@ -766,7 +766,7 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 	// then reduce the numberOfSellOrders
 	numberOfSellOrders := s.BaseGridNum
 
-	// if it's not configured
+	// if it's not configured, calculate the number of sell orders
 	if numberOfSellOrders == 0 {
 		for i := len(pins) - 1; i >= 0; i-- {
 			pin := pins[i]
