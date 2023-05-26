@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/wcharczuk/go-chart/v2"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/interact"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/wcharczuk/go-chart/v2"
 )
 
 func (s *Strategy) InitDrawCommands(profit, cumProfit types.Series) {
@@ -76,7 +77,7 @@ func (s *Strategy) DrawIndicators(time types.Time) *types.Canvas {
 
 	// canvas.Plot("upband", s.ma.Add(s.stdevHigh), time, length)
 	canvas.Plot("ma", s.ma, time, length)
-	// canvas.Plot("downband", s.ma.Minus(s.stdevLow), time, length)
+	// canvas.Plot("downband", s.ma.Sub(s.stdevLow), time, length)
 	fmt.Printf("%f %f\n", highestPrice, hi)
 
 	canvas.Plot("trend", s.trendLine, time, length)
