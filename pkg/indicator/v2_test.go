@@ -9,7 +9,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func TestSubtract(t *testing.T) {
+func Test_v2_Subtract(t *testing.T) {
 	stream := &types.StandardStream{}
 	kLines := KLines(stream)
 	closePrices := ClosePrices(kLines)
