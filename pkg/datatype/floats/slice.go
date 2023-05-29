@@ -192,6 +192,7 @@ func (s Slice) LSM() float64 {
 	return LSM(s)
 }
 
+// LSM is the least squares method for linear regression
 func LSM(values Slice) float64 {
 	var sumX, sumY, sumXSqr, sumXY = .0, .0, .0, .0
 
