@@ -2,6 +2,13 @@ package types
 
 import "github.com/c9s/bbgo/pkg/datatype/floats"
 
+// SeriesBase is a wrapper of the Series interface
+// You can assign a data container that implements the Series interface
+// And this SeriesBase struct provides the implemented methods for manipulating your data
+type SeriesBase struct {
+	Series
+}
+
 func (s *SeriesBase) Index(i int) float64 {
 	if s.Series == nil {
 		return 0
@@ -64,7 +71,7 @@ func (s *SeriesBase) Add(b interface{}) SeriesExtend {
 }
 
 func (s *SeriesBase) Minus(b interface{}) SeriesExtend {
-	return Minus(s, b)
+	return Sub(s, b)
 }
 
 func (s *SeriesBase) Div(b interface{}) SeriesExtend {
