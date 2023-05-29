@@ -1,7 +1,7 @@
 package types
 
 import (
-	//"os"
+	// "os"
 	"math"
 	"testing"
 	"time"
@@ -22,7 +22,7 @@ func TestQueue(t *testing.T) {
 }
 
 func TestFloat(t *testing.T) {
-	var a Series = Minus(3., 2.)
+	var a Series = Sub(3., 2.)
 	assert.Equal(t, a.Last(), 1.)
 	assert.Equal(t, a.Index(100), 1.)
 }
@@ -44,7 +44,7 @@ func TestNextCross(t *testing.T) {
 func TestFloat64Slice(t *testing.T) {
 	var a = floats.Slice{1.0, 2.0, 3.0}
 	var b = floats.Slice{1.0, 2.0, 3.0}
-	var c Series = Minus(&a, &b)
+	var c Series = Sub(&a, &b)
 	a = append(a, 4.0)
 	b = append(b, 3.0)
 	assert.Equal(t, c.Last(), 1.)
@@ -233,9 +233,9 @@ func TestPlot(t *testing.T) {
 	ct.Plot("test", &a, Time(time.Now()), 4)
 	assert.Equal(t, ct.Interval, Interval5m)
 	assert.Equal(t, ct.Series[0].(chart.TimeSeries).Len(), 4)
-	//f, _ := os.Create("output.png")
-	//defer f.Close()
-	//ct.Render(chart.PNG, f)
+	// f, _ := os.Create("output.png")
+	// defer f.Close()
+	// ct.Render(chart.PNG, f)
 }
 
 func TestFilter(t *testing.T) {

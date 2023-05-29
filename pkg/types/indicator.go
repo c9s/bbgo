@@ -115,10 +115,6 @@ type SeriesExtend interface {
 	Filter(b func(i int, value float64) bool, length int) SeriesExtend
 }
 
-type SeriesBase struct {
-	Series
-}
-
 func NewSeries(a Series) SeriesExtend {
 	return &SeriesBase{
 		Series: a,
@@ -412,8 +408,8 @@ type MinusSeriesResult struct {
 	b Series
 }
 
-// Minus two series, result[i] = a[i] - b[i]
-func Minus(a interface{}, b interface{}) SeriesExtend {
+// Sub two series, result[i] = a[i] - b[i]
+func Sub(a interface{}, b interface{}) SeriesExtend {
 	aa := switchIface(a)
 	bb := switchIface(b)
 	return NewSeries(&MinusSeriesResult{aa, bb})
@@ -618,7 +614,7 @@ func Dot(a interface{}, b interface{}, limit ...int) float64 {
 	}
 }
 
-// Extract elements from the Series to a float64 array, following the order of Index(0..limit)
+// Array extracts elements from the Series to a float64 array, following the order of Index(0..limit)
 // if limit is given, will only take the first limit numbers (a.Index[0..limit])
 // otherwise will operate on all elements
 func Array(a Series, limit ...int) (result []float64) {
