@@ -10,11 +10,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type MACDDivergence struct {
-	*indicator.MACDConfig
-	PivotWindow int `json:"pivotWindow"`
-}
-
 // FailedBreakHigh -- when price breaks the previous pivot low, we set a trade entry
 type FailedBreakHigh struct {
 	Symbol string
@@ -45,7 +40,7 @@ type FailedBreakHigh struct {
 
 	TrendEMA *bbgo.TrendEMA `json:"trendEMA"`
 
-	MACDDivergence *MACDDivergence `json:"macdDivergence"`
+	MACDDivergence *indicator.MacdMomentum `json:"macdDivergence"`
 
 	macd *indicator.MACD
 
@@ -341,7 +336,7 @@ func (s *FailedBreakHigh) detectMacdDivergence() {
 	var histogramPivots floats.Slice
 	for i := pivotWindow; i > 0 && i < len(histogramValues); i++ {
 		// find positive histogram and the top
-		pivot, ok := floats.CalculatePivot(histogramValues[0:i], pivotWindow, pivotWindow, func(a, pivot float64) bool {
+		pivot, ok := floats.FindPivot(histogramValues[0:i], pivotWindow, pivotWindow, func(a, pivot float64) bool {
 			return pivot > 0 && pivot > a
 		})
 		if ok {
