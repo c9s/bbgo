@@ -4,12 +4,12 @@ package indicator
 
 import ()
 
-func (F *Float64Updater) OnUpdate(cb func(v float64)) {
-	F.updateCallbacks = append(F.updateCallbacks, cb)
+func (f *Float64Updater) OnUpdate(cb func(v float64)) {
+	f.updateCallbacks = append(f.updateCallbacks, cb)
 }
 
-func (F *Float64Updater) EmitUpdate(v float64) {
-	for _, cb := range F.updateCallbacks {
+func (f *Float64Updater) EmitUpdate(v float64) {
+	for _, cb := range f.updateCallbacks {
 		cb(v)
 	}
 }
