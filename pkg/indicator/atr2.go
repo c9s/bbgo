@@ -6,8 +6,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// ATRStream is a RMAStream
-// This ATRStream calcualtes the ATR first, and then push it to the RMAStream
+// This ATRStream calculates the ATR first
 type ATRStream struct {
 	// embedded struct
 	Float64Series
