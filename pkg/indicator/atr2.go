@@ -5,7 +5,7 @@ import (
 )
 
 type ATRStream struct {
-	Float64Updater
+	Float64Series
 
 	types.SeriesBase
 
@@ -15,11 +15,10 @@ type ATRStream struct {
 
 func ATR2(source KLineSubscription, window int) *ATRStream {
 	s := &ATRStream{
-		window:     window,
-		multiplier: 2.0 / float64(1+window),
+		Float64Series: NewFloat64Series(),
+		window:        window,
+		multiplier:    2.0 / float64(1+window),
 	}
-
-	s.SeriesBase.Series = s.slice
 
 	source.AddSubscriber(func(k types.KLine) {
 		// v := s.mapper(k)

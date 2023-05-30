@@ -2,13 +2,11 @@ package indicator
 
 import (
 	"github.com/c9s/bbgo/pkg/datatype/floats"
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 // SubtractStream subscribes 2 upstream data, and then subtract these 2 values
 type SubtractStream struct {
-	Float64Updater
-	types.SeriesBase
+	Float64Series
 
 	a, b floats.Slice
 	i    int
@@ -17,8 +15,9 @@ type SubtractStream struct {
 // Subtract creates the SubtractStream object
 // subtract := Subtract(longEWMA, shortEWMA)
 func Subtract(a, b Float64Source) *SubtractStream {
-	s := &SubtractStream{}
-	s.SeriesBase.Series = s.slice
+	s := &SubtractStream{
+		Float64Series: NewFloat64Series(),
+	}
 
 	a.OnUpdate(func(v float64) {
 		s.a.Push(v)

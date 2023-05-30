@@ -8,13 +8,19 @@ import (
 //go:generate callbackgen -type Float64Updater
 type Float64Updater struct {
 	updateCallbacks []func(v float64)
-
-	slice floats.Slice
 }
 
 type Float64Series struct {
 	types.SeriesBase
 	Float64Updater
+	slice floats.Slice
+}
+
+func NewFloat64Series(v ...float64) Float64Series {
+	s := Float64Series{}
+	s.slice = v
+	s.SeriesBase.Series = s.slice
+	return s
 }
 
 func (f *Float64Series) Last() float64 {
