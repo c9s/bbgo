@@ -1,25 +1,22 @@
 package indicator
 
-import (
-	"github.com/c9s/bbgo/pkg/types"
-)
-
 type RMAStream struct {
 	// embedded structs
 	Float64Series
 
 	// config fields
-	types.IntervalWindow
 	Adjust bool
 
+	window        int
 	counter       int
 	sum, previous float64
 }
 
-func RMA2(source Float64Source, iw types.IntervalWindow) *RMAStream {
+func RMA2(source Float64Source, window int, adjust bool) *RMAStream {
 	s := &RMAStream{
-		Float64Series:  NewFloat64Series(),
-		IntervalWindow: iw,
+		Float64Series: NewFloat64Series(),
+		window:        window,
+		Adjust:        adjust,
 	}
 
 	if sub, ok := source.(Float64Subscription); ok {
@@ -39,7 +36,7 @@ func (s *RMAStream) calculateAndPush(v float64) {
 }
 
 func (s *RMAStream) calculate(x float64) float64 {
-	lambda := 1 / float64(s.Window)
+	lambda := 1 / float64(s.window)
 	tmp := 0.0
 	if s.counter == 0 {
 		s.sum = 1
@@ -54,7 +51,7 @@ func (s *RMAStream) calculate(x float64) float64 {
 	}
 	s.counter++
 
-	if s.counter < s.Window {
+	if s.counter < s.window {
 		// we can use x, but we need to use 0. to make the same behavior as the result from python pandas_ta
 		s.slice.Push(0)
 	}

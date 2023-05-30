@@ -1,36 +1,55 @@
 package indicator
 
 import (
+	"math"
+
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type ATRStream struct {
+	// embedded struct
 	Float64Series
 
-	types.SeriesBase
+	// parameters
+	types.IntervalWindow
 
-	window     int
-	multiplier float64
+	// private states
+	rma *RMAStream
+
+	window        int
+	previousClose float64
 }
 
 func ATR2(source KLineSubscription, window int) *ATRStream {
 	s := &ATRStream{
 		Float64Series: NewFloat64Series(),
 		window:        window,
-		multiplier:    2.0 / float64(1+window),
 	}
+	s.rma = RMA2(s, window, true)
 
 	source.AddSubscriber(func(k types.KLine) {
-		// v := s.mapper(k)
-		// s.slice.Push(v)
-		// s.EmitUpdate(v)
+		s.calculateAndPush(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
 	})
-
 	return s
 }
 
-func (s *ATRStream) calculateAndPush(k types.KLine) {
-	// v2 := s.calculate(v)
-	// s.slice.Push(v2)
-	// s.EmitUpdate(v2)
+func (s *ATRStream) calculateAndPush(high, low, cls float64) {
+	if s.previousClose == .0 {
+		s.previousClose = cls
+		return
+	}
+
+	trueRange := high - low
+	hc := math.Abs(high - s.previousClose)
+	lc := math.Abs(low - s.previousClose)
+	if trueRange < hc {
+		trueRange = hc
+	}
+	if trueRange < lc {
+		trueRange = lc
+	}
+
+	s.previousClose = cls
+	s.slice.Push(trueRange)
+	s.rma.EmitUpdate(trueRange)
 }
