@@ -6,26 +6,20 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// ATRStream is a RMAStream
+// This ATRStream calcualtes the ATR first, and then push it to the RMAStream
 type ATRStream struct {
 	// embedded struct
 	Float64Series
 
-	// parameters
-	types.IntervalWindow
-
 	// private states
-	rma *RMAStream
-
-	window        int
 	previousClose float64
 }
 
-func ATR2(source KLineSubscription, window int) *ATRStream {
+func ATR2(source KLineSubscription) *ATRStream {
 	s := &ATRStream{
 		Float64Series: NewFloat64Series(),
-		window:        window,
 	}
-	s.rma = RMA2(s, window, true)
 
 	source.AddSubscriber(func(k types.KLine) {
 		s.calculateAndPush(k.High.Float64(), k.Low.Float64(), k.Close.Float64())
@@ -50,6 +44,5 @@ func (s *ATRStream) calculateAndPush(high, low, cls float64) {
 	}
 
 	s.previousClose = cls
-	s.slice.Push(trueRange)
-	s.rma.EmitUpdate(trueRange)
+	s.EmitUpdate(trueRange)
 }
