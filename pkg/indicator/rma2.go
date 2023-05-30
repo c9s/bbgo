@@ -12,16 +12,15 @@ type RMAStream struct {
 	types.IntervalWindow
 	Adjust bool
 
-	counter  int
-	sum, tmp float64
+	counter       int
+	sum, previous float64
 }
 
 func RMA2(source Float64Source, iw types.IntervalWindow) *RMAStream {
 	s := &RMAStream{
+		Float64Series:  NewFloat64Series(),
 		IntervalWindow: iw,
 	}
-
-	s.SeriesBase.Series = s.slice
 
 	if sub, ok := source.(Float64Subscription); ok {
 		sub.AddSubscriber(s.calculateAndPush)
@@ -36,32 +35,38 @@ func (s *RMAStream) calculateAndPush(v float64) {
 	v2 := s.calculate(v)
 	s.slice.Push(v2)
 	s.EmitUpdate(v2)
+	s.truncate()
 }
 
 func (s *RMAStream) calculate(x float64) float64 {
 	lambda := 1 / float64(s.Window)
+	tmp := 0.0
 	if s.counter == 0 {
 		s.sum = 1
-		s.tmp = x
+		tmp = x
 	} else {
 		if s.Adjust {
 			s.sum = s.sum*(1-lambda) + 1
-			s.tmp = s.tmp + (x-s.tmp)/s.sum
+			tmp = s.previous + (x-s.previous)/s.sum
 		} else {
-			s.tmp = s.tmp*(1-lambda) + x*lambda
+			tmp = s.previous*(1-lambda) + x*lambda
 		}
 	}
 	s.counter++
 
 	if s.counter < s.Window {
+		// we can use x, but we need to use 0. to make the same behavior as the result from python pandas_ta
 		s.slice.Push(0)
 	}
 
-	s.slice.Push(s.tmp)
+	s.slice.Push(tmp)
+	s.previous = tmp
 
+	return tmp
+}
+
+func (s *RMAStream) truncate() {
 	if len(s.slice) > MaxNumOfRMA {
 		s.slice = s.slice[MaxNumOfRMATruncateSize-1:]
 	}
-
-	return s.tmp
 }

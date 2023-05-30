@@ -9,11 +9,10 @@ type EWMAStream struct {
 
 func EWMA2(source Float64Source, window int) *EWMAStream {
 	s := &EWMAStream{
-		window:     window,
-		multiplier: 2.0 / float64(1+window),
+		Float64Series: NewFloat64Series(),
+		window:        window,
+		multiplier:    2.0 / float64(1+window),
 	}
-
-	s.SeriesBase.Series = s.slice
 
 	if sub, ok := source.(Float64Subscription); ok {
 		sub.AddSubscriber(s.calculateAndPush)
