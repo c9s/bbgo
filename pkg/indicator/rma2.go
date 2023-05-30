@@ -6,8 +6,7 @@ import (
 
 type RMAStream struct {
 	// embedded structs
-	Float64Updater
-	types.SeriesBase
+	Float64Series
 
 	// config fields
 	types.IntervalWindow
