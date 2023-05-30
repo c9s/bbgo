@@ -6,8 +6,7 @@ type ATRStream struct {
 }
 
 func ATR2(source KLineSubscription, window int) *ATRStream {
-	s := &ATRStream{}
 	tr := TR2(source)
-	s.RMAStream = RMA2(tr, window, true)
-	return s
+	rma := RMA2(tr, window, true)
+	return &ATRStream{RMAStream: rma}
 }
