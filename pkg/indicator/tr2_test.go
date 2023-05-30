@@ -29,7 +29,7 @@ close = pd.Series(data['close'])
 result = ta.atr(high, low, close, length=14)
 print(result)
 */
-func Test_ATR2(t *testing.T) {
+func Test_TR_and_RMA(t *testing.T) {
 	var bytes = []byte(`{
 		"high": [40145.0, 40186.36, 40196.39, 40344.6, 40245.48, 40273.24, 40464.0, 40699.0, 40627.48, 40436.31, 40370.0, 40376.8, 40227.03, 40056.52, 39721.7, 39597.94, 39750.15, 39927.0, 40289.02, 40189.0], 
 		"low": [39870.71, 39834.98, 39866.31, 40108.31, 40016.09, 40094.66, 40105.0, 40196.48, 40154.99, 39800.0, 39959.21, 39922.98, 39940.02, 39632.0, 39261.39, 39254.63, 39473.91, 39555.51, 39819.0, 40006.84],
@@ -65,16 +65,17 @@ func Test_ATR2(t *testing.T) {
 			stream := &types.StandardStream{}
 
 			kLines := KLines(stream)
-			atr := ATR2(kLines, tt.window)
+			atr := TR2(kLines)
+			rma := RMA2(atr, tt.window, true)
 
 			for _, k := range tt.kLines {
 				stream.EmitKLineClosed(k)
 			}
 
-			got := atr.Last()
+			got := rma.Last()
 			diff := math.Trunc((got-tt.want)*100) / 100
 			if diff != 0 {
-				t.Errorf("ATR2() = %v, want %v", got, tt.want)
+				t.Errorf("RMA(TR()) = %v, want %v", got, tt.want)
 			}
 		})
 	}
