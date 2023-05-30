@@ -1,7 +1,6 @@
 package indicator
 
 import (
-	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -10,10 +9,8 @@ type KLineSubscription interface {
 }
 
 type PriceStream struct {
-	types.SeriesBase
-	Float64Updater
+	Float64Series
 
-	slice  floats.Slice
 	mapper KLineValueMapper
 }
 

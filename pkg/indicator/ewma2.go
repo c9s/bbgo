@@ -1,16 +1,7 @@
 package indicator
 
-import (
-	"github.com/c9s/bbgo/pkg/datatype/floats"
-	"github.com/c9s/bbgo/pkg/types"
-)
-
-//go:generate callbackgen -type EWMAStream
 type EWMAStream struct {
-	Float64Updater
-	types.SeriesBase
-
-	slice floats.Slice
+	Float64Series
 
 	window     int
 	multiplier float64

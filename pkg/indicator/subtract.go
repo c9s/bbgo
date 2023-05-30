@@ -10,15 +10,15 @@ type SubtractStream struct {
 	Float64Updater
 	types.SeriesBase
 
-	a, b, c floats.Slice
-	i       int
+	a, b floats.Slice
+	i    int
 }
 
 // Subtract creates the SubtractStream object
 // subtract := Subtract(longEWMA, shortEWMA)
 func Subtract(a, b Float64Source) *SubtractStream {
 	s := &SubtractStream{}
-	s.SeriesBase.Series = s.c
+	s.SeriesBase.Series = s.slice
 
 	a.OnUpdate(func(v float64) {
 		s.a.Push(v)
@@ -36,13 +36,13 @@ func (s *SubtractStream) calculate() {
 		return
 	}
 
-	if s.a.Length() > s.c.Length() {
-		var numNewElems = s.a.Length() - s.c.Length()
+	if s.a.Length() > s.slice.Length() {
+		var numNewElems = s.a.Length() - s.slice.Length()
 		var tailA = s.a.Tail(numNewElems)
 		var tailB = s.b.Tail(numNewElems)
 		var tailC = tailA.Sub(tailB)
 		for _, f := range tailC {
-			s.c.Push(f)
+			s.slice.Push(f)
 			s.EmitUpdate(f)
 		}
 	}
