@@ -1,7 +1,6 @@
 package indicator
 
 import (
-	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -10,10 +9,8 @@ type KLineSubscription interface {
 }
 
 type PriceStream struct {
-	types.SeriesBase
-	Float64Updater
+	Float64Series
 
-	slice  floats.Slice
 	mapper KLineValueMapper
 }
 
@@ -26,10 +23,14 @@ func Price(source KLineSubscription, mapper KLineValueMapper) *PriceStream {
 
 	source.AddSubscriber(func(k types.KLine) {
 		v := s.mapper(k)
-		s.slice.Push(v)
-		s.EmitUpdate(v)
+		s.PushAndEmit(v)
 	})
 	return s
+}
+
+func (s *PriceStream) PushAndEmit(v float64) {
+	s.slice.Push(v)
+	s.EmitUpdate(v)
 }
 
 func ClosePrices(source KLineSubscription) *PriceStream {
