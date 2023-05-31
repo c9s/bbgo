@@ -1849,8 +1849,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		interval := s.AutoRange.Interval()
 		pivotLow := indicatorSet.PivotLow(types.IntervalWindow{Interval: interval, Window: s.AutoRange.Num})
 		pivotHigh := indicatorSet.PivotHigh(types.IntervalWindow{Interval: interval, Window: s.AutoRange.Num})
-		s.UpperPrice = fixedpoint.NewFromFloat(pivotHigh.Last())
-		s.LowerPrice = fixedpoint.NewFromFloat(pivotLow.Last())
+		s.UpperPrice = fixedpoint.NewFromFloat(pivotHigh.Last(0))
+		s.LowerPrice = fixedpoint.NewFromFloat(pivotLow.Last(0))
 		s.logger.Infof("autoRange is enabled, using pivot high %f and pivot low %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
 

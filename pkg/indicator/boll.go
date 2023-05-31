@@ -84,8 +84,8 @@ func (inc *BOLL) Update(value float64) {
 	inc.SMA.Update(value)
 	inc.StdDev.Update(value)
 
-	var sma = inc.SMA.Last()
-	var stdDev = inc.StdDev.Last()
+	var sma = inc.SMA.Last(0)
+	var stdDev = inc.StdDev.Last(0)
 	var band = inc.K * stdDev
 
 	var upBand = sma + band
@@ -105,7 +105,7 @@ func (inc *BOLL) PushK(k types.KLine) {
 	}
 	inc.Update(k.Close.Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.SMA.Last(), inc.UpBand.Last(), inc.DownBand.Last())
+	inc.EmitUpdate(inc.SMA.Last(0), inc.UpBand.Last(0), inc.DownBand.Last(0))
 }
 
 func (inc *BOLL) LoadK(allKLines []types.KLine) {
@@ -113,7 +113,7 @@ func (inc *BOLL) LoadK(allKLines []types.KLine) {
 		inc.PushK(k)
 	}
 
-	inc.EmitUpdate(inc.SMA.Last(), inc.UpBand.Last(), inc.DownBand.Last())
+	inc.EmitUpdate(inc.SMA.Last(0), inc.UpBand.Last(0), inc.DownBand.Last(0))
 }
 
 func (inc *BOLL) CalculateAndUpdate(allKLines []types.KLine) {

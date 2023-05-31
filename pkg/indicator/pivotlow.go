@@ -24,12 +24,12 @@ func (inc *PivotLow) Length() int {
 	return inc.Values.Length()
 }
 
-func (inc *PivotLow) Last() float64 {
+func (inc *PivotLow) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
 
-	return inc.Values.Last()
+	return inc.Values.Last(0)
 }
 
 func (inc *PivotLow) Update(value float64) {
@@ -60,7 +60,7 @@ func (inc *PivotLow) PushK(k types.KLine) {
 
 	inc.Update(k.Low.Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func calculatePivotHigh(highs floats.Slice, left, right int) (float64, bool) {

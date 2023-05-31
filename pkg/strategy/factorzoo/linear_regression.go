@@ -104,11 +104,11 @@ func (s *Linear) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.General
 
 		// use the last value from indicators, or the SeriesExtends' predict function. (e.g., look back: 5)
 		input := []float64{
-			s.divergence.Last(),
-			s.reversion.Last(),
-			s.drift.Last(),
-			s.momentum.Last(),
-			s.volume.Last(),
+			s.divergence.Last(0),
+			s.reversion.Last(0),
+			s.drift.Last(0),
+			s.momentum.Last(0),
+			s.volume.Last(0),
 		}
 		pred := model.Predict(input)
 		predLst.Update(pred)

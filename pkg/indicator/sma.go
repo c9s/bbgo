@@ -22,19 +22,12 @@ type SMA struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *SMA) Last() float64 {
-	if inc.Values.Length() == 0 {
-		return 0.0
-	}
-	return inc.Values.Last()
+func (inc *SMA) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *SMA) Index(i int) float64 {
-	if i >= inc.Values.Length() {
-		return 0.0
-	}
-
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *SMA) Length() int {
@@ -81,7 +74,7 @@ func (inc *SMA) PushK(k types.KLine) {
 
 	inc.Update(k.Close.Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Values.Last())
+	inc.EmitUpdate(inc.Values.Last(0))
 }
 
 func (inc *SMA) LoadK(allKLines []types.KLine) {

@@ -70,20 +70,20 @@ func (inc *UtBotAlert) Update(highPrice, lowPrice, closePrice float64) {
 	// Update ATR
 	inc.AverageTrueRange.Update(highPrice, lowPrice, closePrice)
 
-	nLoss := inc.AverageTrueRange.Last() * inc.KeyValue
+	nLoss := inc.AverageTrueRange.Last(0) * inc.KeyValue
 
 	// xATRTrailingStop
 	if inc.xATRTrailingStop.Length() == 0 {
 		// For first run
 		inc.xATRTrailingStop.Update(0)
 
-	} else if closePrice > inc.xATRTrailingStop.Index(1) && inc.previousClosePrice > inc.xATRTrailingStop.Index(1) {
-		inc.xATRTrailingStop.Update(math.Max(inc.xATRTrailingStop.Index(1), closePrice-nLoss))
+	} else if closePrice > inc.xATRTrailingStop.Last(1) && inc.previousClosePrice > inc.xATRTrailingStop.Last(1) {
+		inc.xATRTrailingStop.Update(math.Max(inc.xATRTrailingStop.Last(1), closePrice-nLoss))
 
-	} else if closePrice < inc.xATRTrailingStop.Index(1) && inc.previousClosePrice < inc.xATRTrailingStop.Index(1) {
-		inc.xATRTrailingStop.Update(math.Min(inc.xATRTrailingStop.Index(1), closePrice+nLoss))
+	} else if closePrice < inc.xATRTrailingStop.Last(1) && inc.previousClosePrice < inc.xATRTrailingStop.Last(1) {
+		inc.xATRTrailingStop.Update(math.Min(inc.xATRTrailingStop.Last(1), closePrice+nLoss))
 
-	} else if closePrice > inc.xATRTrailingStop.Index(1) {
+	} else if closePrice > inc.xATRTrailingStop.Last(1) {
 		inc.xATRTrailingStop.Update(closePrice - nLoss)
 
 	} else {
@@ -91,19 +91,19 @@ func (inc *UtBotAlert) Update(highPrice, lowPrice, closePrice float64) {
 	}
 
 	// pos
-	if inc.previousClosePrice < inc.xATRTrailingStop.Index(1) && closePrice > inc.xATRTrailingStop.Index(1) {
+	if inc.previousClosePrice < inc.xATRTrailingStop.Last(1) && closePrice > inc.xATRTrailingStop.Last(1) {
 		inc.pos = types.DirectionUp
-	} else if inc.previousClosePrice > inc.xATRTrailingStop.Index(1) && closePrice < inc.xATRTrailingStop.Index(1) {
+	} else if inc.previousClosePrice > inc.xATRTrailingStop.Last(1) && closePrice < inc.xATRTrailingStop.Last(1) {
 		inc.pos = types.DirectionDown
 	} else {
 		inc.pos = inc.previousPos
 	}
 
-	above := closePrice > inc.xATRTrailingStop.Last() && inc.previousClosePrice < inc.xATRTrailingStop.Index(1)
-	below := closePrice < inc.xATRTrailingStop.Last() && inc.previousClosePrice > inc.xATRTrailingStop.Index(1)
+	above := closePrice > inc.xATRTrailingStop.Last(0) && inc.previousClosePrice < inc.xATRTrailingStop.Last(1)
+	below := closePrice < inc.xATRTrailingStop.Last(0) && inc.previousClosePrice > inc.xATRTrailingStop.Last(1)
 
-	buy := closePrice > inc.xATRTrailingStop.Last() && above  // buy
-	sell := closePrice < inc.xATRTrailingStop.Last() && below // sell
+	buy := closePrice > inc.xATRTrailingStop.Last(0) && above  // buy
+	sell := closePrice < inc.xATRTrailingStop.Last(0) && below // sell
 
 	inc.buyValue.Push(buy)
 	inc.sellValue.Push(sell)

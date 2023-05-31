@@ -21,19 +21,12 @@ type StdDev struct {
 	updateCallbacks []func(value float64)
 }
 
-func (inc *StdDev) Last() float64 {
-	if inc.Values.Length() == 0 {
-		return 0.0
-	}
-	return inc.Values.Last()
+func (inc *StdDev) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *StdDev) Index(i int) float64 {
-	if i >= inc.Values.Length() {
-		return 0.0
-	}
-
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *StdDev) Length() int {
@@ -76,7 +69,7 @@ func (inc *StdDev) CalculateAndUpdate(allKLines []types.KLine) {
 		inc.PushK(last)
 	}
 
-	inc.EmitUpdate(inc.Values.Last())
+	inc.EmitUpdate(inc.Values.Last(0))
 }
 
 func (inc *StdDev) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {

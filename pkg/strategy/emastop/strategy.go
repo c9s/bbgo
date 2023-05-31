@@ -93,7 +93,7 @@ func (s *Strategy) clear(ctx context.Context, orderExecutor bbgo.OrderExecutor) 
 
 func (s *Strategy) place(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession, indicator types.Float64Indicator, closePrice fixedpoint.Value) {
 	closePriceF := closePrice.Float64()
-	movingAveragePriceF := indicator.Last()
+	movingAveragePriceF := indicator.Last(0)
 
 	// skip it if it's near zero because it's not loaded yet
 	if movingAveragePriceF < 0.0001 {

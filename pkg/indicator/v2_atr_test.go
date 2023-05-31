@@ -71,7 +71,7 @@ func Test_ATR2(t *testing.T) {
 				stream.EmitKLineClosed(k)
 			}
 
-			got := atr.Last()
+			got := atr.Last(0)
 			diff := math.Trunc((got-tt.want)*100) / 100
 			if diff != 0 {
 				t.Errorf("ATR2() = %v, want %v", got, tt.want)

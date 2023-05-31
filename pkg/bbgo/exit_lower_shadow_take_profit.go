@@ -48,7 +48,7 @@ func (s *LowerShadowTakeProfit) Bind(session *ExchangeSession, orderExecutor *Ge
 		}
 
 		// skip close price higher than the ewma
-		if closePrice.Float64() > ewma.Last() {
+		if closePrice.Float64() > ewma.Last(0) {
 			return
 		}
 

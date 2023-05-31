@@ -29,7 +29,7 @@ func Test_CCI(t *testing.T) {
 			cci.Update(value)
 		}
 
-		last := cci.Last()
+		last := cci.Last(0)
 		assert.InDelta(t, 93.250481, last, Delta)
 		assert.InDelta(t, 81.813449, cci.Index(1), Delta)
 		assert.Equal(t, 50-16+1, cci.Length())

@@ -22,18 +22,15 @@ type GMA struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *GMA) Last() float64 {
+func (inc *GMA) Last(i int) float64 {
 	if inc.SMA == nil {
 		return 0.0
 	}
-	return math.Exp(inc.SMA.Last())
+	return math.Exp(inc.SMA.Last(i))
 }
 
 func (inc *GMA) Index(i int) float64 {
-	if inc.SMA == nil {
-		return 0.0
-	}
-	return math.Exp(inc.SMA.Index(i))
+	return inc.Last(i)
 }
 
 func (inc *GMA) Length() int {

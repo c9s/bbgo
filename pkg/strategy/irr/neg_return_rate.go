@@ -44,16 +44,16 @@ func (inc *NRR) Update(openPrice, closePrice float64) {
 	irr := (closePrice - openPrice) / openPrice
 	if inc.prices.Length() >= inc.Window && inc.delay {
 		// D1
-		nirr = -1 * ((inc.prices.Last() / inc.prices.Index(inc.Window-1)) - 1)
-		irr = (inc.prices.Last() / inc.prices.Index(inc.Window-1)) - 1
+		nirr = -1 * ((inc.prices.Last(0) / inc.prices.Index(inc.Window-1)) - 1)
+		irr = (inc.prices.Last(0) / inc.prices.Index(inc.Window-1)) - 1
 	}
 
-	inc.Values.Push(nirr)                                                                  // neg ret here
-	inc.RankedValues.Push(inc.Rank(inc.RankingWindow).Last() / float64(inc.RankingWindow)) // ranked neg ret here
+	inc.Values.Push(nirr)                                                                   // neg ret here
+	inc.RankedValues.Push(inc.Rank(inc.RankingWindow).Last(0) / float64(inc.RankingWindow)) // ranked neg ret here
 	inc.ReturnValues.Push(irr)
 }
 
-func (inc *NRR) Last() float64 {
+func (inc *NRR) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0
 	}
@@ -84,12 +84,12 @@ func (inc *NRR) PushK(k types.KLine) {
 
 	inc.Update(indicator.KLineOpenPriceMapper(k), indicator.KLineClosePriceMapper(k))
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func (inc *NRR) LoadK(allKLines []types.KLine) {
 	for _, k := range allKLines {
 		inc.PushK(k)
 	}
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }

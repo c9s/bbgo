@@ -38,12 +38,12 @@ func (l *Line) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(l.handleKLineWindowUpdate)
 }
 
-func (l *Line) Last() float64 {
-	return (l.end-l.start)/float64(l.startIndex-l.endIndex)*float64(l.endIndex) + l.end
+func (l *Line) Last(i int) float64 {
+	return (l.end-l.start)/float64(l.startIndex-l.endIndex)*float64(l.endIndex-i) + l.end
 }
 
 func (l *Line) Index(i int) float64 {
-	return (l.end-l.start)/float64(l.startIndex-l.endIndex)*float64(l.endIndex-i) + l.end
+	return l.Last(i)
 }
 
 func (l *Line) Length() int {

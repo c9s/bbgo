@@ -50,16 +50,12 @@ type Supertrend struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *Supertrend) Last() float64 {
-	return inc.trendPrices.Last()
+func (inc *Supertrend) Last(i int) float64 {
+	return inc.trendPrices.Last(i)
 }
 
 func (inc *Supertrend) Index(i int) float64 {
-	length := inc.Length()
-	if length == 0 || length-i-1 < 0 {
-		return 0
-	}
-	return inc.trendPrices[length-i-1]
+	return inc.Last(i)
 }
 
 func (inc *Supertrend) Length() int {
@@ -94,13 +90,13 @@ func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 	src := (highPrice + lowPrice) / 2
 
 	// Update uptrend
-	inc.uptrendPrice = src - inc.AverageTrueRange.Last()*inc.ATRMultiplier
+	inc.uptrendPrice = src - inc.AverageTrueRange.Last(0)*inc.ATRMultiplier
 	if inc.previousClosePrice > inc.previousUptrendPrice {
 		inc.uptrendPrice = math.Max(inc.uptrendPrice, inc.previousUptrendPrice)
 	}
 
 	// Update downtrend
-	inc.downtrendPrice = src + inc.AverageTrueRange.Last()*inc.ATRMultiplier
+	inc.downtrendPrice = src + inc.AverageTrueRange.Last(0)*inc.ATRMultiplier
 	if inc.previousClosePrice < inc.previousDowntrendPrice {
 		inc.downtrendPrice = math.Min(inc.downtrendPrice, inc.previousDowntrendPrice)
 	}
@@ -115,7 +111,7 @@ func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 	}
 
 	// Update signal
-	if inc.AverageTrueRange.Last() <= 0 {
+	if inc.AverageTrueRange.Last(0) <= 0 {
 		inc.tradeSignal = types.DirectionNone
 	} else if inc.trend == types.DirectionUp && inc.previousTrend == types.DirectionDown {
 		inc.tradeSignal = types.DirectionUp
@@ -138,7 +134,7 @@ func (inc *Supertrend) Update(highPrice, lowPrice, closePrice float64) {
 
 	logst.Debugf("Update supertrend result: closePrice: %v, uptrendPrice: %v, downtrendPrice: %v, trend: %v,"+
 		" tradeSignal: %v, AverageTrueRange.Last(): %v", inc.closePrice, inc.uptrendPrice, inc.downtrendPrice,
-		inc.trend, inc.tradeSignal, inc.AverageTrueRange.Last())
+		inc.trend, inc.tradeSignal, inc.AverageTrueRange.Last(0))
 }
 
 func (inc *Supertrend) GetSignal() types.Direction {
@@ -152,12 +148,12 @@ func (inc *Supertrend) Direction() types.Direction {
 
 // LastSupertrendSupport return the current supertrend support
 func (inc *Supertrend) LastSupertrendSupport() float64 {
-	return inc.supportLine.Last()
+	return inc.supportLine.Last(0)
 }
 
 // LastSupertrendResistance return the current supertrend resistance
 func (inc *Supertrend) LastSupertrendResistance() float64 {
-	return inc.resistanceLine.Last()
+	return inc.resistanceLine.Last(0)
 }
 
 var _ types.SeriesExtend = &Supertrend{}
@@ -169,7 +165,7 @@ func (inc *Supertrend) PushK(k types.KLine) {
 
 	inc.Update(k.GetHigh().Float64(), k.GetLow().Float64(), k.GetClose().Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 
 }
 
@@ -192,7 +188,7 @@ func (inc *Supertrend) CalculateAndUpdate(kLines []types.KLine) {
 		inc.PushK(k)
 	}
 
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
 }
 

@@ -21,7 +21,7 @@ type A18 struct {
 	UpdateCallbacks []func(val float64)
 }
 
-func (inc *A18) Last() float64 {
+func (inc *A18) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
@@ -84,8 +84,8 @@ func calculateA18(klines []types.KLine, valClose KLineValueMapper) (float64, err
 		closes.Push(valClose(k))
 	}
 
-	delay5 := closes.Index(4)
-	curr := closes.Index(0)
+	delay5 := closes.Last(4)
+	curr := closes.Last(0)
 	alpha := curr / delay5
 
 	return alpha, nil

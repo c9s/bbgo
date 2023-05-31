@@ -45,7 +45,7 @@ func Test_calculateMACD(t *testing.T) {
 				macd.PushK(k)
 			}
 
-			got := macd.Last()
+			got := macd.Last(0)
 			diff := math.Trunc((got-tt.want)*100) / 100
 			if diff != 0 {
 				t.Errorf("calculateMACD() = %v, want %v", got, tt.want)

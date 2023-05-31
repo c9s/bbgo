@@ -127,7 +127,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 			match := false
 			// if any of the conditions satisfies then we execute order
-			if belowMA != nil && closePriceF < belowMA.Last() {
+			if belowMA != nil && closePriceF < belowMA.Last(0) {
 				match = true
 				if s.BelowMovingAverage != nil {
 					if s.BelowMovingAverage.Side != nil {
@@ -139,7 +139,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 						quantity = s.BelowMovingAverage.QuantityOrAmount.CalculateQuantity(closePrice)
 					}
 				}
-			} else if aboveMA != nil && closePriceF > aboveMA.Last() {
+			} else if aboveMA != nil && closePriceF > aboveMA.Last(0) {
 				match = true
 				if s.AboveMovingAverage != nil {
 					if s.AboveMovingAverage.Side != nil {

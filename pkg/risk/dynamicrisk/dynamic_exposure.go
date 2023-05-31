@@ -59,9 +59,9 @@ func (d *DynamicExposureBollBand) initialize(symbol string, session *bbgo.Exchan
 
 // getMaxExposure returns the max exposure
 func (d *DynamicExposureBollBand) getMaxExposure(price float64, trend types.Direction) (fixedpoint.Value, error) {
-	downBand := d.dynamicExposureBollBand.DownBand.Last()
-	upBand := d.dynamicExposureBollBand.UpBand.Last()
-	sma := d.dynamicExposureBollBand.SMA.Last()
+	downBand := d.dynamicExposureBollBand.DownBand.Last(0)
+	upBand := d.dynamicExposureBollBand.UpBand.Last(0)
+	sma := d.dynamicExposureBollBand.SMA.Last(0)
 	log.Infof("dynamicExposureBollBand bollinger band: up %f sma %f down %f", upBand, sma, downBand)
 
 	bandPercentage := 0.0

@@ -1,6 +1,8 @@
 package types
 
-import "github.com/c9s/bbgo/pkg/datatype/floats"
+import (
+	"github.com/c9s/bbgo/pkg/datatype/floats"
+)
 
 // SeriesBase is a wrapper of the Series interface
 // You can assign a data container that implements the Series interface
@@ -13,14 +15,14 @@ func (s *SeriesBase) Index(i int) float64 {
 	if s.Series == nil {
 		return 0
 	}
-	return s.Series.Index(i)
+	return s.Series.Last(i)
 }
 
-func (s *SeriesBase) Last() float64 {
+func (s *SeriesBase) Last(int) float64 {
 	if s.Series == nil {
 		return 0
 	}
-	return s.Series.Last()
+	return s.Series.Last(0)
 }
 
 func (s *SeriesBase) Length() int {

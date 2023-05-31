@@ -72,7 +72,7 @@ func Test_TR_and_RMA(t *testing.T) {
 				stream.EmitKLineClosed(k)
 			}
 
-			got := rma.Last()
+			got := rma.Last(0)
 			diff := math.Trunc((got-tt.want)*100) / 100
 			if diff != 0 {
 				t.Errorf("RMA(TR()) = %v, want %v", got, tt.want)

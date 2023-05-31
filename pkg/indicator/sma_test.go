@@ -58,10 +58,10 @@ func Test_SMA(t *testing.T) {
 				sma.PushK(k)
 			}
 
-			assert.InDelta(t, tt.want, sma.Last(), Delta)
+			assert.InDelta(t, tt.want, sma.Last(0), Delta)
 			assert.InDelta(t, tt.next, sma.Index(1), Delta)
 			sma.Update(tt.update)
-			assert.InDelta(t, tt.updateResult, sma.Last(), Delta)
+			assert.InDelta(t, tt.updateResult, sma.Last(0), Delta)
 			assert.Equal(t, tt.all, sma.Length())
 		})
 	}

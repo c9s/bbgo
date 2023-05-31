@@ -21,7 +21,7 @@ func (s *StopEMA) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExec
 }
 
 func (s *StopEMA) Allowed(closePrice fixedpoint.Value) bool {
-	ema := fixedpoint.NewFromFloat(s.stopEWMA.Last())
+	ema := fixedpoint.NewFromFloat(s.stopEWMA.Last(0))
 	if ema.IsZero() {
 		logrus.Infof("stopEMA protection: value is zero, skip")
 		return false

@@ -51,7 +51,7 @@ func Test_HULL(t *testing.T) {
 				hull.PushK(k)
 			}
 
-			last := hull.Last()
+			last := hull.Last(0)
 			assert.InDelta(t, tt.want, last, Delta)
 			assert.InDelta(t, tt.next, hull.Index(1), Delta)
 			assert.Equal(t, tt.all, hull.Length())
