@@ -19,8 +19,8 @@ type PMR struct {
 	types.IntervalWindow
 	types.SeriesBase
 
-	Values floats.Slice
-	SMA    *indicator.SMA
+	Values  floats.Slice
+	SMA     *indicator.SMA
 	EndTime time.Time
 
 	updateCallbacks []func(value float64)
@@ -40,20 +40,12 @@ func (inc *PMR) Update(price float64) {
 	}
 }
 
-func (inc *PMR) Last(int) float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *PMR) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *PMR) Index(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1-i]
+	return inc.Last(i)
 }
 
 func (inc *PMR) Length() int {

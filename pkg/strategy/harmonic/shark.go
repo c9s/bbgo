@@ -51,20 +51,12 @@ func (inc *SHARK) Update(high, low, price float64) {
 
 }
 
-func (inc *SHARK) Last(int) float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *SHARK) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *SHARK) Index(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1-i]
+	return inc.Last(i)
 }
 
 func (inc *SHARK) Length() int {
@@ -107,7 +99,7 @@ func (inc SHARK) SharkLong(highs, lows floats.Slice, p float64, lookback int) fl
 						if lows.Index(b-1) > lows.Index(b) && lows.Index(b) < lows.Index(b+1) {
 							B := lows.Index(b)
 							if hB > B && B > lB {
-								//log.Infof("got point B:%f", B)
+								// log.Infof("got point B:%f", B)
 								AB := math.Abs(A - B)
 								hC := B + 1.618*AB
 								lC := B + 1.13*AB
@@ -115,24 +107,24 @@ func (inc SHARK) SharkLong(highs, lows floats.Slice, p float64, lookback int) fl
 									if highs.Index(c-1) < highs.Index(c) && highs.Index(c) > highs.Index(c+1) {
 										C := highs.Index(c)
 										if hC > C && C > lC {
-											//log.Infof("got point C:%f", C)
+											// log.Infof("got point C:%f", C)
 											XC := math.Abs(X - C)
 											hD := C - 0.886*XC
 											lD := C - 1.13*XC
-											//for d := 1; d < c; d++ {
-											//if lows.Index(d-1) > lows.Index(d) && lows.Index(d) < lows.Index(d+1) {
-											D := p //lows.Index(d)
+											// for d := 1; d < c; d++ {
+											// if lows.Index(d-1) > lows.Index(d) && lows.Index(d) < lows.Index(d+1) {
+											D := p // lows.Index(d)
 											if hD > D && D > lD {
 												BC := math.Abs(B - C)
 												hD2 := C - 1.618*BC
 												lD2 := C - 2.24*BC
 												if hD2 > D && D > lD2 {
-													//log.Infof("got point D:%f", D)
+													// log.Infof("got point D:%f", D)
 													score++
 												}
 											}
-											//}
-											//}
+											// }
+											// }
 										}
 									}
 								}
@@ -161,7 +153,7 @@ func (inc SHARK) SharkShort(highs, lows floats.Slice, p float64, lookback int) f
 						if highs.Index(b-1) > highs.Index(b) && highs.Index(b) < highs.Index(b+1) {
 							B := highs.Index(b)
 							if hB > B && B > lB {
-								//log.Infof("got point B:%f", B)
+								// log.Infof("got point B:%f", B)
 								AB := math.Abs(A - B)
 								lC := B - 1.618*AB
 								hC := B - 1.13*AB
@@ -169,24 +161,24 @@ func (inc SHARK) SharkShort(highs, lows floats.Slice, p float64, lookback int) f
 									if lows.Index(c-1) < lows.Index(c) && lows.Index(c) > lows.Index(c+1) {
 										C := lows.Index(c)
 										if hC > C && C > lC {
-											//log.Infof("got point C:%f", C)
+											// log.Infof("got point C:%f", C)
 											XC := math.Abs(X - C)
 											lD := C + 0.886*XC
 											hD := C + 1.13*XC
-											//for d := 1; d < c; d++ {
-											//if lows.Index(d-1) > lows.Index(d) && lows.Index(d) < lows.Index(d+1) {
-											D := p //lows.Index(d)
+											// for d := 1; d < c; d++ {
+											// if lows.Index(d-1) > lows.Index(d) && lows.Index(d) < lows.Index(d+1) {
+											D := p // lows.Index(d)
 											if hD > D && D > lD {
 												BC := math.Abs(B - C)
 												lD2 := C + 1.618*BC
 												hD2 := C + 2.24*BC
 												if hD2 > D && D > lD2 {
-													//log.Infof("got point D:%f", D)
+													// log.Infof("got point D:%f", D)
 													score++
 												}
 											}
-											//}
-											//}
+											// }
+											// }
 										}
 									}
 								}

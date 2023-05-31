@@ -53,20 +53,12 @@ func (inc *NRR) Update(openPrice, closePrice float64) {
 	inc.ReturnValues.Push(irr)
 }
 
-func (inc *NRR) Last(int) float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *NRR) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *NRR) Index(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1-i]
+	return inc.Last(i)
 }
 
 func (inc *NRR) Length() int {

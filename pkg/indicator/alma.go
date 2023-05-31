@@ -66,17 +66,11 @@ func (inc *ALMA) Update(value float64) {
 }
 
 func (inc *ALMA) Last(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-	return inc.Values[len(inc.Values)-i-1]
+	return inc.Values.Last(i)
 }
 
 func (inc *ALMA) Index(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-	return inc.Values[len(inc.Values)-i-1]
+	return inc.Last(i)
 }
 
 func (inc *ALMA) Length() int {

@@ -21,6 +21,7 @@ func (inc *Queue) Last(i int) float64 {
 	if i < 0 || len(inc.arr)-i-1 < 0 {
 		return 0
 	}
+
 	return inc.arr[len(inc.arr)-1-i]
 }
 

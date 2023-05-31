@@ -12,7 +12,7 @@ func (f *FilterResult) Last(j int) float64 {
 		return 0
 	}
 	if len(f.c) > j {
-		return f.a.Index(f.c[j])
+		return f.a.Last(f.c[j])
 	}
 	l := f.a.Length()
 	k := len(f.c)
@@ -21,7 +21,7 @@ func (f *FilterResult) Last(j int) float64 {
 		i = f.c[k-1] + 1
 	}
 	for ; i < l; i++ {
-		tmp := f.a.Index(i)
+		tmp := f.a.Last(i)
 		if f.b(i, tmp) {
 			f.c = append(f.c, i)
 			if j == k {

@@ -48,19 +48,16 @@ func (inc *EMV) Update(high, low, vol float64) {
 	inc.Values.Update(result)
 }
 
-func (inc *EMV) Index(i int) float64 {
-	if inc.Values == nil {
-		return 0
-	}
-	return inc.Values.Index(i)
-}
-
 func (inc *EMV) Last(i int) float64 {
 	if inc.Values == nil {
 		return 0
 	}
 
 	return inc.Values.Last(i)
+}
+
+func (inc *EMV) Index(i int) float64 {
+	return inc.Last(i)
 }
 
 func (inc *EMV) Length() int {

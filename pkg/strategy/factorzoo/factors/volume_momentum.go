@@ -30,23 +30,14 @@ type VMOM struct {
 }
 
 func (inc *VMOM) Index(i int) float64 {
-	if inc.Values == nil {
-		return 0
-	}
+	return inc.Last(i)
+}
+
+func (inc *VMOM) Last(i int) float64 {
 	return inc.Values.Last(i)
 }
 
-func (inc *VMOM) Last(int) float64 {
-	if inc.Values.Length() == 0 {
-		return 0
-	}
-	return inc.Values.Last(0)
-}
-
 func (inc *VMOM) Length() int {
-	if inc.Values == nil {
-		return 0
-	}
 	return inc.Values.Length()
 }
 

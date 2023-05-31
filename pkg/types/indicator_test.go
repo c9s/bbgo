@@ -24,7 +24,7 @@ func TestQueue(t *testing.T) {
 func TestFloat(t *testing.T) {
 	var a Series = Sub(3., 2.)
 	assert.Equal(t, a.Last(0), 1.)
-	assert.Equal(t, a.Index(100), 1.)
+	assert.Equal(t, a.Last(100), 1.)
 }
 
 func TestNextCross(t *testing.T) {
@@ -67,8 +67,8 @@ func TestCorr(t *testing.T) {
 	corr := Correlation(&a, &b, 4, Pearson)
 	assert.InDelta(t, corr, -0.8510644, 0.001)
 	out := Rank(&a, 4)
-	assert.Equal(t, out.Index(0), 2.5)
-	assert.Equal(t, out.Index(1), 4.0)
+	assert.Equal(t, out.Last(0), 2.5)
+	assert.Equal(t, out.Last(1), 4.0)
 	corr = Correlation(&a, &b, 4, Spearman)
 	assert.InDelta(t, corr, -0.94868, 0.001)
 }
@@ -119,7 +119,7 @@ func TestSoftmax(t *testing.T) {
 	out := Softmax(&a, a.Length())
 	r := floats.Slice{0.8360188027814407, 0.11314284146556013, 0.05083835575299916}
 	for i := 0; i < out.Length(); i++ {
-		assert.InDelta(t, r.Index(i), out.Index(i), 0.001)
+		assert.InDelta(t, r.Last(i), out.Last(i), 0.001)
 	}
 }
 
@@ -128,7 +128,7 @@ func TestSigmoid(t *testing.T) {
 	out := Sigmoid(&a)
 	r := floats.Slice{0.9525741268224334, 0.7310585786300049, 0.8909031788043871}
 	for i := 0; i < out.Length(); i++ {
-		assert.InDelta(t, r.Index(i), out.Index(i), 0.001, "i=%d", i)
+		assert.InDelta(t, r.Last(i), out.Last(i), 0.001, "i=%d", i)
 	}
 }
 
@@ -143,7 +143,6 @@ func TestAdd(t *testing.T) {
 	var b NumberSeries = 2.0
 	out := Add(&a, &b)
 	assert.Equal(t, out.Last(0), 5.0)
-	assert.Equal(t, out.Index(0), 5.0)
 	assert.Equal(t, out.Length(), math.MaxInt32)
 }
 
@@ -153,7 +152,7 @@ func TestDiv(t *testing.T) {
 	out := Div(&a, &b)
 	assert.Equal(t, 1.0, out.Last(0))
 	assert.Equal(t, 3, out.Length())
-	assert.Equal(t, 0.5, out.Index(1))
+	assert.Equal(t, 0.5, out.Last(1))
 }
 
 func TestMul(t *testing.T) {
@@ -162,7 +161,7 @@ func TestMul(t *testing.T) {
 	out := Mul(&a, &b)
 	assert.Equal(t, out.Last(0), 4.0)
 	assert.Equal(t, out.Length(), 3)
-	assert.Equal(t, out.Index(1), 2.0)
+	assert.Equal(t, out.Last(1), 2.0)
 }
 
 func TestArray(t *testing.T) {
