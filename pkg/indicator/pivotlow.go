@@ -64,13 +64,13 @@ func (inc *PivotLow) PushK(k types.KLine) {
 }
 
 func calculatePivotHigh(highs floats.Slice, left, right int) (float64, bool) {
-	return floats.CalculatePivot(highs, left, right, func(a, pivot float64) bool {
+	return floats.FindPivot(highs, left, right, func(a, pivot float64) bool {
 		return a < pivot
 	})
 }
 
 func calculatePivotLow(lows floats.Slice, left, right int) (float64, bool) {
-	return floats.CalculatePivot(lows, left, right, func(a, pivot float64) bool {
+	return floats.FindPivot(lows, left, right, func(a, pivot float64) bool {
 		return a > pivot
 	})
 }

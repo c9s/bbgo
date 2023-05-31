@@ -9,7 +9,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func TestSubtract(t *testing.T) {
+func Test_v2_Subtract(t *testing.T) {
 	stream := &types.StandardStream{}
 	kLines := KLines(stream)
 	closePrices := ClosePrices(kLines)
@@ -25,6 +25,6 @@ func TestSubtract(t *testing.T) {
 	t.Logf("slowEMA: %+v", slowEMA.slice)
 
 	assert.Equal(t, len(subtract.a), len(subtract.b))
-	assert.Equal(t, len(subtract.a), len(subtract.c))
-	assert.InDelta(t, subtract.c[0], subtract.a[0]-subtract.b[0], 0.0001)
+	assert.Equal(t, len(subtract.a), len(subtract.slice))
+	assert.InDelta(t, subtract.slice[0], subtract.a[0]-subtract.b[0], 0.0001)
 }

@@ -73,7 +73,10 @@ func (s Slice) Add(b Slice) (c Slice) {
 }
 
 func (s Slice) Sum() (sum float64) {
-	return floats.Sum(s)
+	for _, v := range s {
+		sum += v
+	}
+	return sum
 }
 
 func (s Slice) Mean() (mean float64) {
@@ -95,6 +98,18 @@ func (s Slice) Tail(size int) Slice {
 	win := make(Slice, size)
 	copy(win, s[length-size:])
 	return win
+}
+
+func (s Slice) Average() float64 {
+	if len(s) == 0 {
+		return 0.0
+	}
+
+	total := 0.0
+	for _, value := range s {
+		total += value
+	}
+	return total / float64(len(s))
 }
 
 func (s Slice) Diff() (values Slice) {
@@ -171,19 +186,49 @@ func (s Slice) Addr() *Slice {
 func (s Slice) Last() float64 {
 	length := len(s)
 	if length > 0 {
-		return (s)[length-1]
+		return s[length-1]
 	}
 	return 0.0
 }
 
+// Index fetches the element from the end of the slice
+// WARNING: it does not start from 0!!!
 func (s Slice) Index(i int) float64 {
 	length := len(s)
-	if length-i <= 0 || i < 0 {
+	if i < 0 || length-1-i < 0 {
 		return 0.0
 	}
-	return (s)[length-i-1]
+	return s[length-1-i]
 }
 
 func (s Slice) Length() int {
 	return len(s)
+}
+
+func (s Slice) LSM() float64 {
+	return LSM(s)
+}
+
+// LSM is the least squares method for linear regression
+func LSM(values Slice) float64 {
+	var sumX, sumY, sumXSqr, sumXY = .0, .0, .0, .0
+
+	end := len(values) - 1
+	for i := end; i >= 0; i-- {
+		val := values[i]
+		per := float64(end - i + 1)
+		sumX += per
+		sumY += val
+		sumXSqr += per * per
+		sumXY += val * per
+	}
+
+	length := float64(len(values))
+	slope := (length*sumXY - sumX*sumY) / (length*sumXSqr - sumX*sumX)
+
+	average := sumY / length
+	tail := average - slope*sumX/length + slope
+	head := tail + slope*(length-1)
+	slope2 := (tail - head) / (length - 1)
+	return slope2
 }
