@@ -12,6 +12,7 @@ import (
 // The Klinger Oscillator is calculated by taking the difference between a 34-period and 55-period moving average.
 // Usually the indicator is using together with a 9-period or 13-period of moving average as the signal line.
 // This indicator is often used to identify potential turning points in the market, as well as to confirm the strength of a trend.
+//
 //go:generate callbackgen -type KlingerOscillator
 type KlingerOscillator struct {
 	types.SeriesBase
@@ -30,17 +31,11 @@ func (inc *KlingerOscillator) Length() int {
 	return inc.Fast.Length()
 }
 
-func (inc *KlingerOscillator) Last() float64 {
+func (inc *KlingerOscillator) Last(i int) float64 {
 	if inc.Fast == nil || inc.Slow == nil {
 		return 0
 	}
-	return inc.Fast.Last() - inc.Slow.Last()
-}
-func (inc *KlingerOscillator) Index(i int) float64 {
-	if inc.Fast == nil || inc.Slow == nil {
-		return 0
-	}
-	return inc.Fast.Index(i) - inc.Slow.Index(i)
+	return inc.Fast.Last(i) - inc.Slow.Last(i)
 }
 
 func (inc *KlingerOscillator) Update(high, low, cloze, volume float64) {

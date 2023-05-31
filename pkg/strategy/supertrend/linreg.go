@@ -19,11 +19,11 @@ type LinReg struct {
 }
 
 // Last slope of linear regression baseline
-func (lr *LinReg) Last() float64 {
+func (lr *LinReg) Last(int) float64 {
 	if lr.Values.Length() == 0 {
 		return 0.0
 	}
-	return lr.Values.Last()
+	return lr.Values.Last(0)
 }
 
 // Index returns the slope of specified index
@@ -68,7 +68,7 @@ func (lr *LinReg) Update(kline types.KLine) {
 	startPrice := endPrice + slope*(length-1)
 	lr.Values.Push((endPrice - startPrice) / (length - 1))
 
-	log.Debugf("linear regression baseline slope: %f", lr.Last())
+	log.Debugf("linear regression baseline slope: %f", lr.Last(0))
 }
 
 func (lr *LinReg) BindK(target indicator.KLineClosedEmitter, symbol string, interval types.Interval) {
@@ -96,9 +96,9 @@ func (lr *LinReg) GetSignal() types.Direction {
 	var lrSignal types.Direction = types.DirectionNone
 
 	switch {
-	case lr.Last() > 0:
+	case lr.Last(0) > 0:
 		lrSignal = types.DirectionUp
-	case lr.Last() < 0:
+	case lr.Last(0) < 0:
 		lrSignal = types.DirectionDown
 	}
 

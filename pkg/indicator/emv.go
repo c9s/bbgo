@@ -55,11 +55,12 @@ func (inc *EMV) Index(i int) float64 {
 	return inc.Values.Index(i)
 }
 
-func (inc *EMV) Last() float64 {
+func (inc *EMV) Last(i int) float64 {
 	if inc.Values == nil {
 		return 0
 	}
-	return inc.Values.Last()
+
+	return inc.Values.Last(i)
 }
 
 func (inc *EMV) Length() int {

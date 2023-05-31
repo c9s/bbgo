@@ -21,7 +21,7 @@ type S0 struct {
 	UpdateCallbacks []func(val float64)
 }
 
-func (inc *S0) Last() float64 {
+func (inc *S0) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
@@ -84,7 +84,7 @@ func calculateS0(klines []types.KLine, valClose KLineValueMapper) (float64, erro
 	}
 
 	sma := floats.Slice.Sum(closes[len(closes)-window:len(closes)-1]) / float64(window)
-	alpha := sma / closes.Last()
+	alpha := sma / closes.Last(0)
 
 	return alpha, nil
 }

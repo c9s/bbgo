@@ -21,7 +21,7 @@ type A34 struct {
 	UpdateCallbacks []func(val float64)
 }
 
-func (inc *A34) Last() float64 {
+func (inc *A34) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
@@ -83,7 +83,7 @@ func calculateA34(klines []types.KLine, valClose KLineValueMapper) (float64, err
 		closes.Push(valClose(k))
 	}
 
-	c := closes.Last()
+	c := closes.Last(0)
 
 	sumC := 0.
 	for i := 1; i <= 12; i++ {

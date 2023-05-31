@@ -183,12 +183,12 @@ func (s Slice) Addr() *Slice {
 }
 
 // Last, Index, Length implements the types.Series interface
-func (s Slice) Last() float64 {
+func (s Slice) Last(i int) float64 {
 	length := len(s)
-	if length > 0 {
-		return s[length-1]
+	if i < 0 || length-1-i < 0 {
+		return 0.0
 	}
-	return 0.0
+	return s[length-1-i]
 }
 
 // Index fetches the element from the end of the slice

@@ -29,12 +29,12 @@ func (s *TrendEMA) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExe
 		}
 
 		s.last = s.ewma.Values[s.ewma.Length()-2]
-		s.current = s.ewma.Last()
+		s.current = s.ewma.Last(0)
 	})
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(symbol, s.Interval, func(kline types.KLine) {
 		s.last = s.current
-		s.current = s.ewma.Last()
+		s.current = s.ewma.Last(0)
 	}))
 }
 

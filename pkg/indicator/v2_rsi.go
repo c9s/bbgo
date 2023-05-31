@@ -32,8 +32,8 @@ func (s *RSIStream) calculate(_ float64) float64 {
 	var sourceLen = s.source.Length()
 	var limit = min(s.window, sourceLen)
 	for i := 0; i < limit; i++ {
-		value := s.source.Index(i)
-		prev := s.source.Index(i + 1)
+		value := s.source.Last(i)
+		prev := s.source.Last(i + 1)
 		change := value - prev
 		if change >= 0 {
 			gainSum += change

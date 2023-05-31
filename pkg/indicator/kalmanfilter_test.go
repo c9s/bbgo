@@ -6065,7 +6065,7 @@ func Test_KalmanFilter(t *testing.T) {
 			for _, k := range klines {
 				filter.PushK(k)
 			}
-			got := filter.Last()
+			got := filter.Last(0)
 			got = math.Trunc(got*100.0) / 100.0
 			if got != tt.want {
 				t.Errorf("KalmanFilter.Last() = %v, want %v", got, tt.want)
@@ -6160,10 +6160,10 @@ func Test_KalmanFilterEstimationAccurate(t *testing.T) {
 			for _, k := range klines {
 				// square error between last estimated state and current actual state
 				if ewma.Length() > 0 {
-					filterDiff2Sum += klineSquareError(filter.Last(), k)
-					ewmaDiff2Sum += klineSquareError(ewma.Last(), k)
-					filterCloseDiff2Sum += closeSquareError(filter.Last(), k)
-					ewmaCloseDiff2Sum += closeSquareError(ewma.Last(), k)
+					filterDiff2Sum += klineSquareError(filter.Last(0), k)
+					ewmaDiff2Sum += klineSquareError(ewma.Last(0), k)
+					filterCloseDiff2Sum += closeSquareError(filter.Last(0), k)
+					ewmaCloseDiff2Sum += closeSquareError(ewma.Last(0), k)
 					numEstimations++
 				}
 

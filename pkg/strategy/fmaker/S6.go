@@ -21,7 +21,7 @@ type S6 struct {
 	UpdateCallbacks []func(val float64)
 }
 
-func (inc *S6) Last() float64 {
+func (inc *S6) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
@@ -90,10 +90,10 @@ func calculateS6(klines []types.KLine, valHigh KLineValueMapper, valLow KLineVal
 
 	}
 
-	H := highs.Last()
-	L := lows.Last()
-	C := closes.Last()
-	V := volumes.Last()
+	H := highs.Last(0)
+	L := lows.Last(0)
+	C := closes.Last(0)
+	V := volumes.Last(0)
 	alpha := (H + L + C) / 3 * V
 
 	return alpha, nil

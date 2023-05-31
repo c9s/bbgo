@@ -1,9 +1,10 @@
 package indicator
 
 import (
+	"math"
+
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
-	"math"
 )
 
 // Refer: https://jamesgoulding.com/Research_II/Ehlers/Ehlers%20(Optimal%20Tracking%20Filters).doc
@@ -39,16 +40,13 @@ func (inc *GHFilter) update(value, uncertainty float64) {
 	lambda := inc.a / inc.b
 	lambda2 := lambda * lambda
 	alpha := (-lambda2 + math.Sqrt(lambda2*lambda2+16*lambda2)) / 8
-	filtered := alpha*value + (1-alpha)*inc.Values.Last()
+	filtered := alpha*value + (1-alpha)*inc.Values.Last(0)
 	inc.Values.Push(filtered)
 	inc.lastMeasurement = value
 }
 
 func (inc *GHFilter) Index(i int) float64 {
-	if inc.Values == nil {
-		return 0.0
-	}
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *GHFilter) Length() int {
@@ -58,11 +56,11 @@ func (inc *GHFilter) Length() int {
 	return inc.Values.Length()
 }
 
-func (inc *GHFilter) Last() float64 {
+func (inc *GHFilter) Last(i int) float64 {
 	if inc.Values == nil {
 		return 0.0
 	}
-	return inc.Values.Last()
+	return inc.Values.Last(i)
 }
 
 // interfaces implementation check

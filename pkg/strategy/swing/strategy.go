@@ -15,7 +15,7 @@ const ID = "swing"
 
 // Float64Indicator is the indicators (SMA and EWMA) that we want to use are returning float64 data.
 type Float64Indicator interface {
-	Last() float64
+	Last(int) float64
 }
 
 func init() {
@@ -104,7 +104,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		movingAveragePrice := inc.Last()
+		movingAveragePrice := inc.Last(0)
 
 		// skip it if it's near zero
 		if movingAveragePrice < 0.0001 {

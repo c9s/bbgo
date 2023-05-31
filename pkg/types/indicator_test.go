@@ -15,7 +15,7 @@ import (
 
 func TestQueue(t *testing.T) {
 	zeroq := NewQueue(0)
-	assert.Equal(t, zeroq.Last(), 0.)
+	assert.Equal(t, zeroq.Last(0), 0.)
 	assert.Equal(t, zeroq.Index(0), 0.)
 	zeroq.Update(1.)
 	assert.Equal(t, zeroq.Length(), 0)
@@ -23,7 +23,7 @@ func TestQueue(t *testing.T) {
 
 func TestFloat(t *testing.T) {
 	var a Series = Sub(3., 2.)
-	assert.Equal(t, a.Last(), 1.)
+	assert.Equal(t, a.Last(0), 1.)
 	assert.Equal(t, a.Index(100), 1.)
 }
 
@@ -47,7 +47,7 @@ func TestFloat64Slice(t *testing.T) {
 	var c Series = Sub(&a, &b)
 	a = append(a, 4.0)
 	b = append(b, 3.0)
-	assert.Equal(t, c.Last(), 1.)
+	assert.Equal(t, c.Last(0), 1.)
 }
 
 /*
@@ -128,7 +128,7 @@ func TestSigmoid(t *testing.T) {
 	out := Sigmoid(&a)
 	r := floats.Slice{0.9525741268224334, 0.7310585786300049, 0.8909031788043871}
 	for i := 0; i < out.Length(); i++ {
-		assert.InDelta(t, r.Index(i), out.Index(i), 0.001)
+		assert.InDelta(t, r.Index(i), out.Index(i), 0.001, "i=%d", i)
 	}
 }
 
@@ -142,7 +142,7 @@ func TestAdd(t *testing.T) {
 	var a NumberSeries = 3.0
 	var b NumberSeries = 2.0
 	out := Add(&a, &b)
-	assert.Equal(t, out.Last(), 5.0)
+	assert.Equal(t, out.Last(0), 5.0)
 	assert.Equal(t, out.Index(0), 5.0)
 	assert.Equal(t, out.Length(), math.MaxInt32)
 }
@@ -151,16 +151,16 @@ func TestDiv(t *testing.T) {
 	a := floats.Slice{3.0, 1.0, 2.0}
 	b := NumberSeries(2.0)
 	out := Div(&a, &b)
-	assert.Equal(t, out.Last(), 1.0)
-	assert.Equal(t, out.Length(), 3)
-	assert.Equal(t, out.Index(1), 0.5)
+	assert.Equal(t, 1.0, out.Last(0))
+	assert.Equal(t, 3, out.Length())
+	assert.Equal(t, 0.5, out.Index(1))
 }
 
 func TestMul(t *testing.T) {
 	a := floats.Slice{3.0, 1.0, 2.0}
 	b := NumberSeries(2.0)
 	out := Mul(&a, &b)
-	assert.Equal(t, out.Last(), 4.0)
+	assert.Equal(t, out.Last(0), 4.0)
 	assert.Equal(t, out.Length(), 3)
 	assert.Equal(t, out.Index(1), 2.0)
 }
@@ -183,11 +183,11 @@ func TestSwitchInterface(t *testing.T) {
 	var d float32 = 4.0
 	var df float64 = 4.0
 	var e float64 = 5.0
-	assert.Equal(t, switchIface(a).Last(), af)
-	assert.Equal(t, switchIface(b).Last(), bf)
-	assert.Equal(t, switchIface(c).Last(), cf)
-	assert.Equal(t, switchIface(d).Last(), df)
-	assert.Equal(t, switchIface(e).Last(), e)
+	assert.Equal(t, switchIface(a).Last(0), af)
+	assert.Equal(t, switchIface(b).Last(0), bf)
+	assert.Equal(t, switchIface(c).Last(0), cf)
+	assert.Equal(t, switchIface(d).Last(0), df)
+	assert.Equal(t, switchIface(e).Last(0), e)
 }
 
 // from https://en.wikipedia.org/wiki/Logistic_regression
@@ -223,8 +223,8 @@ func TestClone(t *testing.T) {
 	a.Update(3.)
 	b := Clone(a)
 	b.Update(4.)
-	assert.Equal(t, a.Last(), 3.)
-	assert.Equal(t, b.Last(), 4.)
+	assert.Equal(t, a.Last(0), 3.)
+	assert.Equal(t, b.Last(0), 4.)
 }
 
 func TestPlot(t *testing.T) {
@@ -244,6 +244,6 @@ func TestFilter(t *testing.T) {
 		return val > 0
 	}, 4)
 	assert.Equal(t, b.Length(), 4)
-	assert.Equal(t, b.Last(), 1000.)
+	assert.Equal(t, b.Last(0), 1000.)
 	assert.Equal(t, b.Sum(3), 1200.)
 }
