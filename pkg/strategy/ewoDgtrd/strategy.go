@@ -180,11 +180,11 @@ type VWEMA struct {
 	V  types.UpdatableSeries
 }
 
-func (inc *VWEMA) Last(int) float64 {
-	return inc.PV.Last(0) / inc.V.Last(0)
+func (inc *VWEMA) Index(i int) float64 {
+	return inc.Last(i)
 }
 
-func (inc *VWEMA) Index(i int) float64 {
+func (inc *VWEMA) Last(i int) float64 {
 	if i >= inc.PV.Length() {
 		return 0
 	}

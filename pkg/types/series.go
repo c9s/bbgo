@@ -103,7 +103,7 @@ func Sum(a Series, limit ...int) (sum float64) {
 		l = limit[0]
 	}
 	for i := 0; i < l; i++ {
-		sum += a.Index(i)
+		sum += a.Last(i)
 	}
 	return sum
 }

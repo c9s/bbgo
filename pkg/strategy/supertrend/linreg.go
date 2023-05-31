@@ -19,20 +19,13 @@ type LinReg struct {
 }
 
 // Last slope of linear regression baseline
-func (lr *LinReg) Last(int) float64 {
-	if lr.Values.Length() == 0 {
-		return 0.0
-	}
-	return lr.Values.Last(0)
+func (lr *LinReg) Last(i int) float64 {
+	return lr.Values.Last(i)
 }
 
 // Index returns the slope of specified index
 func (lr *LinReg) Index(i int) float64 {
-	if i >= lr.Values.Length() {
-		return 0.0
-	}
-
-	return lr.Values.Index(i)
+	return lr.Last(i)
 }
 
 // Length of the slope values

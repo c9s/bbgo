@@ -34,11 +34,8 @@ type PSAR struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *PSAR) Last(int) float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-	return inc.Values.Last(0)
+func (inc *PSAR) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *PSAR) Length() int {

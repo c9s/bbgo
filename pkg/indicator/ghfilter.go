@@ -45,22 +45,16 @@ func (inc *GHFilter) update(value, uncertainty float64) {
 	inc.lastMeasurement = value
 }
 
-func (inc *GHFilter) Index(i int) float64 {
-	return inc.Last(i)
-}
-
 func (inc *GHFilter) Length() int {
-	if inc.Values == nil {
-		return 0
-	}
 	return inc.Values.Length()
 }
 
 func (inc *GHFilter) Last(i int) float64 {
-	if inc.Values == nil {
-		return 0.0
-	}
 	return inc.Values.Last(i)
+}
+
+func (inc *GHFilter) Index(i int) float64 {
+	return inc.Last(i)
 }
 
 // interfaces implementation check

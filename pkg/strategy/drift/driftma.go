@@ -24,8 +24,8 @@ func (s *DriftMA) Update(value, weight float64) {
 	s.ma2.Update(s.drift.Last(0))
 }
 
-func (s *DriftMA) Last(int) float64 {
-	return s.ma2.Last(0)
+func (s *DriftMA) Last(i int) float64 {
+	return s.ma2.Last(i)
 }
 
 func (s *DriftMA) Index(i int) float64 {
