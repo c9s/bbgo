@@ -56,20 +56,12 @@ func (inc *VWAP) Update(price, volume float64) {
 	inc.Values.Push(vwap)
 }
 
-func (inc *VWAP) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-	return inc.Values[len(inc.Values)-1]
+func (inc *VWAP) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *VWAP) Index(i int) float64 {
-	length := len(inc.Values)
-	if length == 0 || length-i-1 < 0 {
-		return 0
-	}
-
-	return inc.Values[length-i-1]
+	return inc.Last(i)
 }
 
 func (inc *VWAP) Length() int {
@@ -91,7 +83,7 @@ func (inc *VWAP) CalculateAndUpdate(allKLines []types.KLine) {
 		inc.PushK(k)
 	}
 
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 	inc.EndTime = allKLines[len(allKLines)-1].EndTime.Time()
 }
 
@@ -112,5 +104,5 @@ func calculateVWAP(klines []types.KLine, priceF KLineValueMapper, window int) fl
 	for _, k := range klines {
 		vwap.Update(priceF(k), k.Volume.Float64())
 	}
-	return vwap.Last()
+	return vwap.Last(0)
 }

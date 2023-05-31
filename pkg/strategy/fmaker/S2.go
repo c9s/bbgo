@@ -19,7 +19,7 @@ type S2 struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *S2) Last() float64 {
+func (inc *S2) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}

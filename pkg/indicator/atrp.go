@@ -21,7 +21,7 @@ import (
 //
 // Calculation:
 //
-//     ATRP = (Average True Range / Close) * 100
+//	ATRP = (Average True Range / Close) * 100
 //
 //go:generate callbackgen -type ATRP
 type ATRP struct {
@@ -69,15 +69,15 @@ func (inc *ATRP) Update(high, low, cloze float64) {
 
 	// apply rolling moving average
 	inc.RMA.Update(trueRange)
-	atr := inc.RMA.Last()
+	atr := inc.RMA.Last(0)
 	inc.PercentageVolatility.Push(atr / cloze)
 }
 
-func (inc *ATRP) Last() float64 {
+func (inc *ATRP) Last(i int) float64 {
 	if inc.RMA == nil {
 		return 0
 	}
-	return inc.RMA.Last()
+	return inc.RMA.Last(i)
 }
 
 func (inc *ATRP) Index(i int) float64 {
@@ -109,7 +109,7 @@ func (inc *ATRP) CalculateAndUpdate(kLines []types.KLine) {
 		inc.PushK(k)
 	}
 
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
 }
 

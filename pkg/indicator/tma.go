@@ -6,6 +6,7 @@ import (
 
 // Refer: Triangular Moving Average
 // Refer URL: https://ja.wikipedia.org/wiki/移動平均
+//
 //go:generate callbackgen -type TMA
 type TMA struct {
 	types.SeriesBase
@@ -24,21 +25,15 @@ func (inc *TMA) Update(value float64) {
 	}
 
 	inc.s1.Update(value)
-	inc.s2.Update(inc.s1.Last())
+	inc.s2.Update(inc.s1.Last(0))
 }
 
-func (inc *TMA) Last() float64 {
-	if inc.s2 == nil {
-		return 0
-	}
-	return inc.s2.Last()
+func (inc *TMA) Last(i int) float64 {
+	return inc.s2.Last(i)
 }
 
 func (inc *TMA) Index(i int) float64 {
-	if inc.s2 == nil {
-		return 0
-	}
-	return inc.s2.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *TMA) Length() int {
@@ -58,12 +53,12 @@ func (inc *TMA) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.s1 == nil {
 		for _, k := range allKLines {
 			inc.PushK(k)
-			inc.EmitUpdate(inc.Last())
+			inc.EmitUpdate(inc.Last(0))
 		}
 	} else {
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
 }
 

@@ -78,9 +78,9 @@ func Test_DMI(t *testing.T) {
 				ADXSmoothing:   14,
 			}
 			dmi.CalculateAndUpdate(tt.klines)
-			assert.InDelta(t, dmi.GetDIPlus().Last(), tt.want.dip, Delta)
-			assert.InDelta(t, dmi.GetDIMinus().Last(), tt.want.dim, Delta)
-			assert.InDelta(t, dmi.GetADX().Last(), tt.want.adx, Delta)
+			assert.InDelta(t, dmi.GetDIPlus().Last(0), tt.want.dip, Delta)
+			assert.InDelta(t, dmi.GetDIMinus().Last(0), tt.want.dim, Delta)
+			assert.InDelta(t, dmi.GetADX().Last(0), tt.want.adx, Delta)
 		})
 	}
 

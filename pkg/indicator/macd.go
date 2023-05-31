@@ -59,14 +59,14 @@ func (inc *MACDLegacy) Update(x float64) {
 	inc.slowEWMA.Update(x)
 
 	// update MACD value, it's also the signal line
-	fast := inc.fastEWMA.Last()
-	slow := inc.slowEWMA.Last()
+	fast := inc.fastEWMA.Last(0)
+	slow := inc.slowEWMA.Last(0)
 	macd := fast - slow
 	inc.Values.Push(macd)
 
 	// update signal line
 	inc.signalLine.Update(macd)
-	signal := inc.signalLine.Last()
+	signal := inc.signalLine.Last(0)
 
 	// update histogram
 	histogram := macd - signal
@@ -75,7 +75,7 @@ func (inc *MACDLegacy) Update(x float64) {
 	inc.EmitUpdate(macd, signal, histogram)
 }
 
-func (inc *MACDLegacy) Last() float64 {
+func (inc *MACDLegacy) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
@@ -106,21 +106,12 @@ type MACDValues struct {
 	*MACDLegacy
 }
 
-func (inc *MACDValues) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *MACDValues) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *MACDValues) Index(i int) float64 {
-	length := len(inc.Values)
-	if length == 0 || length-1-i < 0 {
-		return 0.0
-	}
-
-	return inc.Values[length-1+i]
+	return inc.Values.Last(i)
 }
 
 func (inc *MACDValues) Length() int {

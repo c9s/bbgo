@@ -597,7 +597,7 @@ type KLineSeries struct {
 	kv    KValueType
 }
 
-func (k *KLineSeries) Last() float64 {
+func (k *KLineSeries) Last(int) float64 {
 	length := len(*k.lines)
 	switch k.kv {
 	case kOpUnknown:

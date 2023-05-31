@@ -33,5 +33,5 @@ func (inc *Low) PushK(k types.KLine) {
 
 	inc.Update(k.Low.Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }

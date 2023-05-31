@@ -72,7 +72,7 @@ func (s *ResistanceShort) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	s.resistancePivot = session.StandardIndicatorSet(s.Symbol).PivotLow(s.IntervalWindow)
 
 	// use the last kline from the history before we get the next closed kline
-	s.updateResistanceOrders(fixedpoint.NewFromFloat(s.resistancePivot.Last()))
+	s.updateResistanceOrders(fixedpoint.NewFromFloat(s.resistancePivot.Last(0)))
 
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		// StrategyController

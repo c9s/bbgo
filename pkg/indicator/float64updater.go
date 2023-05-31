@@ -23,16 +23,12 @@ func NewFloat64Series(v ...float64) Float64Series {
 	return s
 }
 
-func (f *Float64Series) Last() float64 {
-	return f.slice.Last()
+func (f *Float64Series) Last(i int) float64 {
+	return f.slice.Last(i)
 }
 
 func (f *Float64Series) Index(i int) float64 {
-	length := len(f.slice)
-	if length == 0 || length-i-1 < 0 {
-		return 0
-	}
-	return f.slice[length-i-1]
+	return f.slice.Last(i)
 }
 
 func (f *Float64Series) Length() int {

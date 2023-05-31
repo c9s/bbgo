@@ -302,8 +302,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	var pips = s.Pips
 
 	if s.EnableBollBandMargin {
-		lastDownBand := fixedpoint.NewFromFloat(s.boll.DownBand.Last())
-		lastUpBand := fixedpoint.NewFromFloat(s.boll.UpBand.Last())
+		lastDownBand := fixedpoint.NewFromFloat(s.boll.DownBand.Last(0))
+		lastUpBand := fixedpoint.NewFromFloat(s.boll.UpBand.Last(0))
 
 		if lastUpBand.IsZero() || lastDownBand.IsZero() {
 			log.Warnf("bollinger band value is zero, skipping")

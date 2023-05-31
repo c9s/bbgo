@@ -30,12 +30,12 @@ func (inc *RR) Update(price float64) {
 		inc.prices = types.NewQueue(inc.Window)
 	}
 	inc.prices.Update(price)
-	irr := inc.prices.Last()/inc.prices.Index(1) - 1
+	irr := inc.prices.Last(0)/inc.prices.Index(1) - 1
 	inc.Values.Push(irr)
 
 }
 
-func (inc *RR) Last() float64 {
+func (inc *RR) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0
 	}
@@ -60,11 +60,11 @@ func (inc *RR) CalculateAndUpdate(allKLines []types.KLine) {
 		for _, k := range allKLines {
 			inc.PushK(k)
 		}
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	} else {
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
 }
 
@@ -91,14 +91,14 @@ func (inc *RR) PushK(k types.KLine) {
 
 	inc.Update(indicator.KLineClosePriceMapper(k))
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func (inc *RR) LoadK(allKLines []types.KLine) {
 	for _, k := range allKLines {
 		inc.PushK(k)
 	}
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 //func calculateReturn(klines []types.KLine, window int, val KLineValueMapper) (float64, error) {

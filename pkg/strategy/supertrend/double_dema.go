@@ -21,9 +21,9 @@ type DoubleDema struct {
 func (dd *DoubleDema) getDemaSignal(openPrice float64, closePrice float64) types.Direction {
 	var demaSignal types.Direction = types.DirectionNone
 
-	if closePrice > dd.fastDEMA.Last() && closePrice > dd.slowDEMA.Last() && !(openPrice > dd.fastDEMA.Last() && openPrice > dd.slowDEMA.Last()) {
+	if closePrice > dd.fastDEMA.Last(0) && closePrice > dd.slowDEMA.Last(0) && !(openPrice > dd.fastDEMA.Last(0) && openPrice > dd.slowDEMA.Last(0)) {
 		demaSignal = types.DirectionUp
-	} else if closePrice < dd.fastDEMA.Last() && closePrice < dd.slowDEMA.Last() && !(openPrice < dd.fastDEMA.Last() && openPrice < dd.slowDEMA.Last()) {
+	} else if closePrice < dd.fastDEMA.Last(0) && closePrice < dd.slowDEMA.Last(0) && !(openPrice < dd.fastDEMA.Last(0) && openPrice < dd.slowDEMA.Last(0)) {
 		demaSignal = types.DirectionDown
 	}
 

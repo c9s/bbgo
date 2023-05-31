@@ -30,7 +30,7 @@ func (s *EWMAStream) calculateAndPush(v float64) {
 }
 
 func (s *EWMAStream) calculate(v float64) float64 {
-	last := s.slice.Last()
+	last := s.slice.Last(0)
 	m := s.multiplier
 	return (1.0-m)*last + m*v
 }

@@ -61,8 +61,8 @@ func TestBOLL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			boll := BOLL{IntervalWindow: types.IntervalWindow{Window: tt.window}, K: tt.k}
 			boll.CalculateAndUpdate(tt.kLines)
-			assert.InDelta(t, tt.up, boll.UpBand.Last(), Delta)
-			assert.InDelta(t, tt.down, boll.DownBand.Last(), Delta)
+			assert.InDelta(t, tt.up, boll.UpBand.Last(0), Delta)
+			assert.InDelta(t, tt.down, boll.DownBand.Last(0), Delta)
 		})
 	}
 
