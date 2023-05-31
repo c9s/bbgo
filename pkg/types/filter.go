@@ -7,11 +7,7 @@ type FilterResult struct {
 	c      []int
 }
 
-func (f *FilterResult) Last() float64 {
-	return f.Index(0)
-}
-
-func (f *FilterResult) Index(j int) float64 {
+func (f *FilterResult) Last(j int) float64 {
 	if j >= f.length {
 		return 0
 	}
@@ -35,6 +31,10 @@ func (f *FilterResult) Index(j int) float64 {
 		}
 	}
 	return 0
+}
+
+func (f *FilterResult) Index(j int) float64 {
+	return f.Last(j)
 }
 
 func (f *FilterResult) Length() int {

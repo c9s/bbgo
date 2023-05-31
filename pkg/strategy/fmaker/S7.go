@@ -21,7 +21,7 @@ type S7 struct {
 	UpdateCallbacks []func(val float64)
 }
 
-func (inc *S7) Last() float64 {
+func (inc *S7) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
@@ -86,8 +86,8 @@ func calculateS7(klines []types.KLine, valOpen KLineValueMapper, valClose KLineV
 
 	}
 
-	O := opens.Last()
-	C := closes.Last()
+	O := opens.Last(0)
+	C := closes.Last(0)
 	alpha := -(1 - O/C)
 
 	return alpha, nil

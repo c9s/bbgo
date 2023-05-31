@@ -27,11 +27,11 @@ func NewHeikinAshi(size int) *HeikinAshi {
 
 func (s *HeikinAshi) Print() string {
 	return fmt.Sprintf("Heikin c: %.3f, o: %.3f, h: %.3f, l: %.3f, v: %.3f",
-		s.Close.Last(),
-		s.Open.Last(),
-		s.High.Last(),
-		s.Low.Last(),
-		s.Volume.Last())
+		s.Close.Last(0),
+		s.Open.Last(0),
+		s.High.Last(0),
+		s.Low.Last(0),
+		s.Volume.Last(0))
 }
 
 func (inc *HeikinAshi) Update(kline types.KLine) {
@@ -40,7 +40,7 @@ func (inc *HeikinAshi) Update(kline types.KLine) {
 	high := kline.High.Float64()
 	low := kline.Low.Float64()
 	newClose := (open + high + low + cloze) / 4.
-	newOpen := (inc.Open.Last() + inc.Close.Last()) / 2.
+	newOpen := (inc.Open.Last(0) + inc.Close.Last(0)) / 2.
 	inc.Close.Update(newClose)
 	inc.Open.Update(newOpen)
 	inc.High.Update(math.Max(math.Max(high, newOpen), newClose))

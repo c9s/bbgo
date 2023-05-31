@@ -47,7 +47,7 @@ func (inc *PVD) Update(price float64, volume float64) {
 	}
 }
 
-func (inc *PVD) Last() float64 {
+func (inc *PVD) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0
 	}
@@ -72,11 +72,11 @@ func (inc *PVD) CalculateAndUpdate(allKLines []types.KLine) {
 		for _, k := range allKLines {
 			inc.PushK(k)
 		}
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	} else {
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
 }
 
@@ -99,7 +99,7 @@ func (inc *PVD) PushK(k types.KLine) {
 
 	inc.Update(indicator.KLineClosePriceMapper(k), indicator.KLineVolumeMapper(k))
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func CalculateKLinesPVD(allKLines []types.KLine, window int) float64 {

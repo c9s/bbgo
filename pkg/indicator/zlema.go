@@ -27,17 +27,14 @@ type ZLEMA struct {
 }
 
 func (inc *ZLEMA) Index(i int) float64 {
-	if inc.zlema == nil {
-		return 0
-	}
-	return inc.zlema.Index(i)
+	return inc.Last(i)
 }
 
-func (inc *ZLEMA) Last() float64 {
+func (inc *ZLEMA) Last(i int) float64 {
 	if inc.zlema == nil {
 		return 0
 	}
-	return inc.zlema.Last()
+	return inc.zlema.Last(i)
 }
 
 func (inc *ZLEMA) Length() int {
@@ -74,12 +71,12 @@ func (inc *ZLEMA) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.zlema == nil {
 		for _, k := range allKLines {
 			inc.PushK(k)
-			inc.EmitUpdate(inc.Last())
+			inc.EmitUpdate(inc.Last(0))
 		}
 	} else {
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
 }
 

@@ -25,7 +25,7 @@ type R struct {
 	UpdateCallbacks []func(val float64)
 }
 
-func (inc *R) Last() float64 {
+func (inc *R) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}

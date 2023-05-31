@@ -33,25 +33,17 @@ func (inc *WWMA) Update(value float64) {
 		inc.Values = inc.Values[MaxNumOfWWMATruncateSize-1:]
 	}
 
-	last := inc.Last()
+	last := inc.Last(0)
 	wma := last + (value-last)/float64(inc.Window)
 	inc.Values.Push(wma)
 }
 
-func (inc *WWMA) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *WWMA) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *WWMA) Index(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1-i]
+	return inc.Last(i)
 }
 
 func (inc *WWMA) Length() int {
@@ -76,7 +68,7 @@ func (inc *WWMA) CalculateAndUpdate(allKLines []types.KLine) {
 		if doable {
 			inc.PushK(k)
 			inc.LastOpenTime = k.StartTime.Time()
-			inc.EmitUpdate(inc.Last())
+			inc.EmitUpdate(inc.Last(0))
 		}
 	}
 }

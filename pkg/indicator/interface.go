@@ -25,7 +25,7 @@ type KLinePusher interface {
 // Simple is the simple indicator that only returns one float64 value
 type Simple interface {
 	KLinePusher
-	Last() float64
+	Last(int) float64
 	OnUpdate(f func(value float64))
 }
 

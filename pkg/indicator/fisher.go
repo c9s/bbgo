@@ -16,6 +16,7 @@ import (
 // The Fisher Transform is calculated by taking the natural logarithm of the ratio of the security's current price to its moving average,
 // and then double-smoothing the result. This resulting line is called the Fisher Transform line, and can be plotted on the price chart
 // along with the security's price.
+//
 //go:generate callbackgen -type FisherTransform
 type FisherTransform struct {
 	types.SeriesBase
@@ -60,18 +61,15 @@ func (inc *FisherTransform) Update(value float64) {
 	}
 }
 
-func (inc *FisherTransform) Last() float64 {
+func (inc *FisherTransform) Last(i int) float64 {
 	if inc.Values == nil {
 		return 0.0
 	}
-	return inc.Values.Last()
+	return inc.Values.Last(i)
 }
 
 func (inc *FisherTransform) Index(i int) float64 {
-	if inc.Values == nil {
-		return 0.0
-	}
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *FisherTransform) Length() int {

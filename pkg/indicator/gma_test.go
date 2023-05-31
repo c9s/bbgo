@@ -51,10 +51,10 @@ func Test_GMA(t *testing.T) {
 			for _, k := range tt.kLines {
 				gma.PushK(k)
 			}
-			assert.InDelta(t, tt.want, gma.Last(), Delta)
+			assert.InDelta(t, tt.want, gma.Last(0), Delta)
 			assert.InDelta(t, tt.next, gma.Index(1), Delta)
 			gma.Update(tt.update)
-			assert.InDelta(t, tt.updateResult, gma.Last(), Delta)
+			assert.InDelta(t, tt.updateResult, gma.Last(0), Delta)
 			assert.Equal(t, tt.all, gma.Length())
 		})
 	}

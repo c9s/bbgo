@@ -278,9 +278,9 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 	baseBalance, hasBaseBalance := balances[s.Market.BaseCurrency]
 	quoteBalance, hasQuoteBalance := balances[s.Market.QuoteCurrency]
 
-	downBand := s.defaultBoll.DownBand.Last()
-	upBand := s.defaultBoll.UpBand.Last()
-	sma := s.defaultBoll.SMA.Last()
+	downBand := s.defaultBoll.DownBand.Last(0)
+	upBand := s.defaultBoll.UpBand.Last(0)
+	sma := s.defaultBoll.SMA.Last(0)
 	log.Infof("%s bollinger band: up %f sma %f down %f", s.Symbol, upBand, sma, downBand)
 
 	bandPercentage := calculateBandPercentage(upBand, downBand, sma, midPrice.Float64())
@@ -351,7 +351,7 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 	// WHEN: price breaks the upper band (price > window 2) == strongUpTrend
 	// THEN: we apply strongUpTrend skew
 	if s.TradeInBand {
-		if !inBetween(midPrice.Float64(), s.neutralBoll.DownBand.Last(), s.neutralBoll.UpBand.Last()) {
+		if !inBetween(midPrice.Float64(), s.neutralBoll.DownBand.Last(0), s.neutralBoll.UpBand.Last(0)) {
 			log.Infof("tradeInBand is set, skip placing orders when the price is outside of the band")
 			return
 		}
@@ -410,7 +410,7 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		canSell = false
 	}
 
-	if s.BuyBelowNeutralSMA && midPrice.Float64() > s.neutralBoll.SMA.Last() {
+	if s.BuyBelowNeutralSMA && midPrice.Float64() > s.neutralBoll.SMA.Last(0) {
 		canBuy = false
 	}
 

@@ -72,9 +72,9 @@ func (inc *DMI) Update(high, low, cloze float64) {
 	if inc.atr.Length() < inc.Window {
 		return
 	}
-	k := 100. / inc.atr.Last()
-	dmp := inc.DMP.Last()
-	dmn := inc.DMN.Last()
+	k := 100. / inc.atr.Last(0)
+	dmp := inc.DMP.Last(0)
+	dmn := inc.DMN.Last(0)
 	inc.DIPlus.Update(k * dmp)
 	inc.DIMinus.Update(k * dmn)
 	dx := 100. * math.Abs(dmp-dmn) / (dmp + dmn)
@@ -108,11 +108,11 @@ func (inc *DMI) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.ADX == nil {
 		for _, k := range allKLines {
 			inc.PushK(k)
-			inc.EmitUpdate(inc.DIPlus.Last(), inc.DIMinus.Last(), inc.ADX.Last())
+			inc.EmitUpdate(inc.DIPlus.Last(0), inc.DIMinus.Last(0), inc.ADX.Last(0))
 		}
 	} else {
 		inc.PushK(last)
-		inc.EmitUpdate(inc.DIPlus.Last(), inc.DIMinus.Last(), inc.ADX.Last())
+		inc.EmitUpdate(inc.DIPlus.Last(0), inc.DIMinus.Last(0), inc.ADX.Last(0))
 	}
 }
 

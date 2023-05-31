@@ -12,186 +12,17 @@ import (
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 )
 
-// Super basic Series type that simply holds the float64 data
-// with size limit (the only difference compare to float64slice)
-type Queue struct {
-	SeriesBase
-	arr  []float64
-	size int
-}
-
-func NewQueue(size int) *Queue {
-	out := &Queue{
-		arr:  make([]float64, 0, size),
-		size: size,
-	}
-	out.SeriesBase.Series = out
-	return out
-}
-
-func (inc *Queue) Last() float64 {
-	if len(inc.arr) == 0 {
-		return 0
-	}
-	return inc.arr[len(inc.arr)-1]
-}
-
-func (inc *Queue) Index(i int) float64 {
-	if len(inc.arr)-i-1 < 0 {
-		return 0
-	}
-	return inc.arr[len(inc.arr)-i-1]
-}
-
-func (inc *Queue) Length() int {
-	return len(inc.arr)
-}
-
-func (inc *Queue) Clone() *Queue {
-	out := &Queue{
-		arr:  inc.arr[:],
-		size: inc.size,
-	}
-	out.SeriesBase.Series = out
-	return out
-}
-
-func (inc *Queue) Update(v float64) {
-	inc.arr = append(inc.arr, v)
-	if len(inc.arr) > inc.size {
-		inc.arr = inc.arr[len(inc.arr)-inc.size:]
-	}
-}
-
-var _ UpdatableSeriesExtend = &Queue{}
-
 // Float64Indicator is the indicators (SMA and EWMA) that we want to use are returning float64 data.
 type Float64Indicator interface {
-	Last() float64
-}
-
-// The interface maps to pinescript basic type `series`
-// Access the internal historical data from the latest to the oldest
-// Index(0) always maps to Last()
-type Series interface {
-	Last() float64
-	Index(int) float64
-	Length() int
-}
-
-type SeriesExtend interface {
-	Series
-	Sum(limit ...int) float64
-	Mean(limit ...int) float64
-	Abs() SeriesExtend
-	Predict(lookback int, offset ...int) float64
-	NextCross(b Series, lookback int) (int, float64, bool)
-	CrossOver(b Series) BoolSeries
-	CrossUnder(b Series) BoolSeries
-	Highest(lookback int) float64
-	Lowest(lookback int) float64
-	Add(b interface{}) SeriesExtend
-	Minus(b interface{}) SeriesExtend
-	Div(b interface{}) SeriesExtend
-	Mul(b interface{}) SeriesExtend
-	Dot(b interface{}, limit ...int) float64
-	Array(limit ...int) (result []float64)
-	Reverse(limit ...int) (result floats.Slice)
-	Change(offset ...int) SeriesExtend
-	PercentageChange(offset ...int) SeriesExtend
-	Stdev(params ...int) float64
-	Rolling(window int) *RollingResult
-	Shift(offset int) SeriesExtend
-	Skew(length int) float64
-	Variance(length int) float64
-	Covariance(b Series, length int) float64
-	Correlation(b Series, length int, method ...CorrFunc) float64
-	AutoCorrelation(length int, lag ...int) float64
-	Rank(length int) SeriesExtend
-	Sigmoid() SeriesExtend
-	Softmax(window int) SeriesExtend
-	Entropy(window int) float64
-	CrossEntropy(b Series, window int) float64
-	Filter(b func(i int, value float64) bool, length int) SeriesExtend
-}
-
-func NewSeries(a Series) SeriesExtend {
-	return &SeriesBase{
-		Series: a,
-	}
-}
-
-type UpdatableSeries interface {
-	Series
-	Update(float64)
-}
-
-type UpdatableSeriesExtend interface {
-	SeriesExtend
-	Update(float64)
-}
-
-func Clone(u UpdatableSeriesExtend) UpdatableSeriesExtend {
-	method, ok := reflect.TypeOf(u).MethodByName("Clone")
-	if ok {
-		out := method.Func.Call([]reflect.Value{reflect.ValueOf(u)})
-		return out[0].Interface().(UpdatableSeriesExtend)
-	}
-	panic("method Clone not exist")
-}
-
-func TestUpdate(u UpdatableSeriesExtend, input float64) UpdatableSeriesExtend {
-	method, ok := reflect.TypeOf(u).MethodByName("TestUpdate")
-	if ok {
-		out := method.Func.Call([]reflect.Value{reflect.ValueOf(u), reflect.ValueOf(input)})
-		return out[0].Interface().(UpdatableSeriesExtend)
-	}
-	panic("method TestUpdate not exist")
-}
-
-// The interface maps to pinescript basic type `series` for bool type
-// Access the internal historical data from the latest to the oldest
-// Index(0) always maps to Last()
-type BoolSeries interface {
-	Last() bool
-	Index(int) bool
-	Length() int
-}
-
-// Calculate sum of the series
-// if limit is given, will only sum first limit numbers (a.Index[0..limit])
-// otherwise will sum all elements
-func Sum(a Series, limit ...int) (sum float64) {
-	l := a.Length()
-	if len(limit) > 0 && limit[0] < l {
-		l = limit[0]
-	}
-	for i := 0; i < l; i++ {
-		sum += a.Index(i)
-	}
-	return sum
-}
-
-// Calculate the average value of the series
-// if limit is given, will only calculate the average of first limit numbers (a.Index[0..limit])
-// otherwise will operate on all elements
-func Mean(a Series, limit ...int) (mean float64) {
-	l := a.Length()
-	if l == 0 {
-		return 0
-	}
-	if len(limit) > 0 && limit[0] < l {
-		l = limit[0]
-	}
-	return Sum(a, l) / float64(l)
+	Last(i int) float64
 }
 
 type AbsResult struct {
 	a Series
 }
 
-func (a *AbsResult) Last() float64 {
-	return math.Abs(a.a.Last())
+func (a *AbsResult) Last(i int) float64 {
+	return math.Abs(a.a.Last(i))
 }
 
 func (a *AbsResult) Index(i int) float64 {
@@ -282,9 +113,9 @@ func (c *CrossResult) Last() bool {
 		return false
 	}
 	if c.isOver {
-		return c.a.Last()-c.b.Last() > 0 && c.a.Index(1)-c.b.Index(1) < 0
+		return c.a.Last(0)-c.b.Last(0) > 0 && c.a.Index(1)-c.b.Index(1) < 0
 	} else {
-		return c.a.Last()-c.b.Last() < 0 && c.a.Index(1)-c.b.Index(1) > 0
+		return c.a.Last(0)-c.b.Last(0) < 0 && c.a.Index(1)-c.b.Index(1) > 0
 	}
 }
 
@@ -328,7 +159,7 @@ func Highest(a Series, lookback int) float64 {
 	if lookback > a.Length() {
 		lookback = a.Length()
 	}
-	highest := a.Last()
+	highest := a.Last(0)
 	for i := 1; i < lookback; i++ {
 		current := a.Index(i)
 		if highest < current {
@@ -342,7 +173,7 @@ func Lowest(a Series, lookback int) float64 {
 	if lookback > a.Length() {
 		lookback = a.Length()
 	}
-	lowest := a.Last()
+	lowest := a.Last(0)
 	for i := 1; i < lookback; i++ {
 		current := a.Index(i)
 		if lowest > current {
@@ -354,7 +185,7 @@ func Lowest(a Series, lookback int) float64 {
 
 type NumberSeries float64
 
-func (a NumberSeries) Last() float64 {
+func (a NumberSeries) Last(_ int) float64 {
 	return float64(a)
 }
 
@@ -384,12 +215,12 @@ func Add(a interface{}, b interface{}) SeriesExtend {
 	return NewSeries(&AddSeriesResult{aa, bb})
 }
 
-func (a *AddSeriesResult) Last() float64 {
-	return a.a.Last() + a.b.Last()
+func (a *AddSeriesResult) Last(i int) float64 {
+	return a.a.Last(i) + a.b.Last(i)
 }
 
 func (a *AddSeriesResult) Index(i int) float64 {
-	return a.a.Index(i) + a.b.Index(i)
+	return a.Last(i)
 }
 
 func (a *AddSeriesResult) Length() int {
@@ -415,12 +246,12 @@ func Sub(a interface{}, b interface{}) SeriesExtend {
 	return NewSeries(&MinusSeriesResult{aa, bb})
 }
 
-func (a *MinusSeriesResult) Last() float64 {
-	return a.a.Last() - a.b.Last()
+func (a *MinusSeriesResult) Last(i int) float64 {
+	return a.a.Index(i) - a.b.Index(i)
 }
 
 func (a *MinusSeriesResult) Index(i int) float64 {
-	return a.a.Index(i) - a.b.Index(i)
+	return a.Last(i)
 }
 
 func (a *MinusSeriesResult) Length() int {
@@ -471,12 +302,12 @@ type DivSeriesResult struct {
 	b Series
 }
 
-func (a *DivSeriesResult) Last() float64 {
-	return a.a.Last() / a.b.Last()
+func (a *DivSeriesResult) Last(i int) float64 {
+	return a.a.Index(i) / a.b.Index(i)
 }
 
 func (a *DivSeriesResult) Index(i int) float64 {
-	return a.a.Index(i) / a.b.Index(i)
+	return a.Last(i)
 }
 
 func (a *DivSeriesResult) Length() int {
@@ -502,12 +333,12 @@ type MulSeriesResult struct {
 	b Series
 }
 
-func (a *MulSeriesResult) Last() float64 {
-	return a.a.Last() * a.b.Last()
+func (a *MulSeriesResult) Last(i int) float64 {
+	return a.a.Index(i) * a.b.Index(i)
 }
 
 func (a *MulSeriesResult) Index(i int) float64 {
-	return a.a.Index(i) * a.b.Index(i)
+	return a.Last(i)
 }
 
 func (a *MulSeriesResult) Length() int {
@@ -654,18 +485,15 @@ type ChangeResult struct {
 	offset int
 }
 
-func (c *ChangeResult) Last() float64 {
-	if c.offset >= c.a.Length() {
-		return 0
-	}
-	return c.a.Last() - c.a.Index(c.offset)
-}
-
-func (c *ChangeResult) Index(i int) float64 {
+func (c *ChangeResult) Last(i int) float64 {
 	if i+c.offset >= c.a.Length() {
 		return 0
 	}
 	return c.a.Index(i) - c.a.Index(i+c.offset)
+}
+
+func (c *ChangeResult) Index(i int) float64 {
+	return c.Last(i)
 }
 
 func (c *ChangeResult) Length() int {
@@ -692,18 +520,15 @@ type PercentageChangeResult struct {
 	offset int
 }
 
-func (c *PercentageChangeResult) Last() float64 {
-	if c.offset >= c.a.Length() {
-		return 0
-	}
-	return c.a.Last()/c.a.Index(c.offset) - 1
-}
-
-func (c *PercentageChangeResult) Index(i int) float64 {
+func (c *PercentageChangeResult) Last(i int) float64 {
 	if i+c.offset >= c.a.Length() {
 		return 0
 	}
 	return c.a.Index(i)/c.a.Index(i+c.offset) - 1
+}
+
+func (c *PercentageChangeResult) Index(i int) float64 {
+	return c.Last(i)
 }
 
 func (c *PercentageChangeResult) Length() int {
@@ -902,23 +727,19 @@ type ShiftResult struct {
 	offset int
 }
 
-func (inc *ShiftResult) Last() float64 {
-	if inc.offset < 0 {
-		return 0
-	}
-	if inc.offset > inc.a.Length() {
-		return 0
-	}
-	return inc.a.Index(inc.offset)
-}
-func (inc *ShiftResult) Index(i int) float64 {
+func (inc *ShiftResult) Last(i int) float64 {
 	if inc.offset+i < 0 {
 		return 0
 	}
 	if inc.offset+i > inc.a.Length() {
 		return 0
 	}
+
 	return inc.a.Index(inc.offset + i)
+}
+
+func (inc *ShiftResult) Index(i int) float64 {
+	return inc.Last(i)
 }
 
 func (inc *ShiftResult) Length() int {
@@ -940,14 +761,16 @@ type SliceView struct {
 	length int
 }
 
-func (s *SliceView) Last() float64 {
-	return s.a.Index(s.start)
-}
-func (s *SliceView) Index(i int) float64 {
+func (s *SliceView) Last(i int) float64 {
 	if i >= s.length {
 		return 0
 	}
-	return s.a.Index(i + s.start)
+
+	return s.a.Last(i + s.start)
+}
+
+func (s *SliceView) Index(i int) float64 {
+	return s.Last(i)
 }
 
 func (s *SliceView) Length() int {
@@ -978,30 +801,6 @@ func (r *RollingResult) Length() int {
 
 func Rolling(a Series, window int) *RollingResult {
 	return &RollingResult{a, window}
-}
-
-type SigmoidResult struct {
-	a Series
-}
-
-func (s *SigmoidResult) Last() float64 {
-	return 1. / (1. + math.Exp(-s.a.Last()))
-}
-
-func (s *SigmoidResult) Index(i int) float64 {
-	return 1. / (1. + math.Exp(-s.a.Index(i)))
-}
-
-func (s *SigmoidResult) Length() int {
-	return s.a.Length()
-}
-
-// Sigmoid returns the input values in range of -1 to 1
-// along the sigmoid or s-shaped curve.
-// Commonly used in machine learning while training neural networks
-// as an activation function.
-func Sigmoid(a Series) SeriesExtend {
-	return NewSeries(&SigmoidResult{a})
 }
 
 // SoftMax returns the input value in the range of 0 to 1

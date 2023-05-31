@@ -10,6 +10,7 @@ import (
 // Refer: https://tradingview.com/script/aDymGrFx-Drift-Study-Inspired-by-Monte-Carlo-Simulations-with-BM-KL/
 // Brownian Motion's drift factor
 // could be used in Monte Carlo Simulations
+//
 //go:generate callbackgen -type WeightedDrift
 type WeightedDrift struct {
 	types.SeriesBase
@@ -54,7 +55,7 @@ func (inc *WeightedDrift) Update(value float64, weight float64) {
 	}
 	if inc.chng.Length() >= inc.Window {
 		stdev := types.Stdev(inc.chng, inc.Window)
-		drift := inc.MA.Last() - stdev*stdev*0.5
+		drift := inc.MA.Last(0) - stdev*stdev*0.5
 		inc.Values.Push(drift)
 	}
 }
@@ -77,7 +78,7 @@ func (inc *WeightedDrift) ZeroPoint() float64 {
 	} else {
 		return N2
 	}*/
-	return inc.LastValue * math.Exp(window*(0.5*stdev*stdev)+chng-inc.MA.Last()*window)
+	return inc.LastValue * math.Exp(window*(0.5*stdev*stdev)+chng-inc.MA.Last(0)*window)
 }
 
 func (inc *WeightedDrift) Clone() (out *WeightedDrift) {
@@ -100,17 +101,11 @@ func (inc *WeightedDrift) TestUpdate(value float64, weight float64) *WeightedDri
 }
 
 func (inc *WeightedDrift) Index(i int) float64 {
-	if inc.Values == nil {
-		return 0
-	}
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
-func (inc *WeightedDrift) Last() float64 {
-	if inc.Values.Length() == 0 {
-		return 0
-	}
-	return inc.Values.Last()
+func (inc *WeightedDrift) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *WeightedDrift) Length() int {
@@ -130,12 +125,12 @@ func (inc *WeightedDrift) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.chng == nil {
 		for _, k := range allKLines {
 			inc.PushK(k)
-			inc.EmitUpdate(inc.Last())
+			inc.EmitUpdate(inc.Last(0))
 		}
 	} else {
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
 }
 

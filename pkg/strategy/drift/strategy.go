@@ -261,8 +261,8 @@ func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
 		high := kline.High.Float64()
 		low := kline.Low.Float64()
 		s.ma.Update(source)
-		s.stdevHigh.Update(high - s.ma.Last())
-		s.stdevLow.Update(s.ma.Last() - low)
+		s.stdevHigh.Update(high - s.ma.Last(0))
+		s.stdevLow.Update(s.ma.Last(0) - low)
 		s.drift.Update(source, kline.Volume.Abs().Float64())
 		s.trendLine.Update(source)
 		s.atr.PushK(kline)
@@ -485,7 +485,7 @@ func (s *Strategy) klineHandlerMin(ctx context.Context, kline types.KLine, count
 		return
 	}
 	// for doing the trailing stoploss during backtesting
-	atr := s.atr.Last()
+	atr := s.atr.Last(0)
 	price := s.getLastPrice()
 	pricef := price.Float64()
 
@@ -538,7 +538,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 
 	s.drift.Update(sourcef, kline.Volume.Abs().Float64())
 	s.atr.PushK(kline)
-	atr := s.atr.Last()
+	atr := s.atr.Last(0)
 
 	price := kline.Close // s.getLastPrice()
 	pricef := price.Float64()
@@ -563,7 +563,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 		return
 	}
 
-	log.Infof("highdiff: %3.2f open: %8v, close: %8v, high: %8v, low: %8v, time: %v %v", s.stdevHigh.Last(), kline.Open, kline.Close, kline.High, kline.Low, kline.StartTime, kline.EndTime)
+	log.Infof("highdiff: %3.2f open: %8v, close: %8v, high: %8v, low: %8v, time: %v %v", s.stdevHigh.Last(0), kline.Open, kline.Close, kline.High, kline.Low, kline.StartTime, kline.EndTime)
 
 	s.positionLock.Lock()
 	if s.lowestPrice > 0 && lowf < s.lowestPrice {
@@ -596,7 +596,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 	shortCondition := drift[1] >= 0 && drift[0] <= 0 || (drift[1] >= drift[0] && drift[1] <= 0) || ddrift[1] >= 0 && ddrift[0] <= 0 || (ddrift[1] >= ddrift[0] && ddrift[1] <= 0)
 	longCondition := drift[1] <= 0 && drift[0] >= 0 || (drift[1] <= drift[0] && drift[1] >= 0) || ddrift[1] <= 0 && ddrift[0] >= 0 || (ddrift[1] <= ddrift[0] && ddrift[1] >= 0)
 	if shortCondition && longCondition {
-		if s.priceLines.Index(1) > s.priceLines.Last() {
+		if s.priceLines.Index(1) > s.priceLines.Last(0) {
 			longCondition = false
 		} else {
 			shortCondition = false
@@ -625,7 +625,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 	}
 
 	if longCondition {
-		source = source.Sub(fixedpoint.NewFromFloat(s.stdevLow.Last() * s.HighLowVarianceMultiplier))
+		source = source.Sub(fixedpoint.NewFromFloat(s.stdevLow.Last(0) * s.HighLowVarianceMultiplier))
 		if source.Compare(price) > 0 {
 			source = price
 		}
@@ -654,7 +654,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 			return
 		}
 
-		log.Infof("source in long %v %v %f", source, price, s.stdevLow.Last())
+		log.Infof("source in long %v %v %f", source, price, s.stdevLow.Last(0))
 
 		o, err := s.SubmitOrder(ctx, *submitOrder)
 		if err != nil {
@@ -675,12 +675,12 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine, counter 
 		return
 	}
 	if shortCondition {
-		source = source.Add(fixedpoint.NewFromFloat(s.stdevHigh.Last() * s.HighLowVarianceMultiplier))
+		source = source.Add(fixedpoint.NewFromFloat(s.stdevHigh.Last(0) * s.HighLowVarianceMultiplier))
 		if source.Compare(price) < 0 {
 			source = price
 		}
 
-		log.Infof("source in short: %v %v %f", source, price, s.stdevLow.Last())
+		log.Infof("source in short: %v %v %f", source, price, s.stdevLow.Last(0))
 
 		opt := s.OpenPositionOptions
 		opt.Short = true

@@ -142,7 +142,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 	// update pivot low data
 	session.MarketDataStream.OnStart(func() {
 		if s.updatePivotHigh() {
-			bbgo.Notify("%s new pivot high: %f", s.Symbol, s.pivotHigh.Last())
+			bbgo.Notify("%s new pivot high: %f", s.Symbol, s.pivotHigh.Last(0))
 		}
 
 		s.pilotQuantityCalculation()
@@ -155,7 +155,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 				return
 			}
 
-			bbgo.Notify("%s new pivot high: %f", s.Symbol, s.pivotHigh.Last())
+			bbgo.Notify("%s new pivot high: %f", s.Symbol, s.pivotHigh.Last(0))
 		}
 	}))
 
@@ -237,7 +237,7 @@ func (s *FailedBreakHigh) Bind(session *bbgo.ExchangeSession, orderExecutor *bbg
 		}
 
 		if s.vwma != nil {
-			vma := fixedpoint.NewFromFloat(s.vwma.Last())
+			vma := fixedpoint.NewFromFloat(s.vwma.Last(0))
 			if kline.Volume.Compare(vma) < 0 {
 				bbgo.Notify("%s %s kline volume %f is less than VMA %f, skip failed break high short", kline.Symbol, kline.Interval, kline.Volume.Float64(), vma.Float64())
 				return
@@ -378,7 +378,7 @@ func (s *FailedBreakHigh) detectMacdDivergence() {
 }
 
 func (s *FailedBreakHigh) updatePivotHigh() bool {
-	high := fixedpoint.NewFromFloat(s.pivotHigh.Last())
+	high := fixedpoint.NewFromFloat(s.pivotHigh.Last(0))
 	if high.IsZero() {
 		return false
 	}
@@ -390,7 +390,7 @@ func (s *FailedBreakHigh) updatePivotHigh() bool {
 		s.pivotHighPrices = append(s.pivotHighPrices, high)
 	}
 
-	fastHigh := fixedpoint.NewFromFloat(s.fastPivotHigh.Last())
+	fastHigh := fixedpoint.NewFromFloat(s.fastPivotHigh.Last(0))
 	if !fastHigh.IsZero() {
 		if fastHigh.Compare(s.lastHigh) > 0 {
 			// invalidate the last low

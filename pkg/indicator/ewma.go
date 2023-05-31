@@ -50,24 +50,20 @@ func (inc *EWMA) Update(value float64) {
 		inc.Values = inc.Values[MaxNumOfEWMATruncateSize-1:]
 	}
 
-	ema := (1-multiplier)*inc.Last() + multiplier*value
+	ema := (1-multiplier)*inc.Last(0) + multiplier*value
 	inc.Values.Push(ema)
 }
 
-func (inc *EWMA) Last() float64 {
+func (inc *EWMA) Last(i int) float64 {
 	if len(inc.Values) == 0 {
 		return 0
 	}
 
-	return inc.Values[len(inc.Values)-1]
+	return inc.Values.Last(i)
 }
 
 func (inc *EWMA) Index(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1-i]
+	return inc.Last(i)
 }
 
 func (inc *EWMA) Length() int {
@@ -81,7 +77,7 @@ func (inc *EWMA) PushK(k types.KLine) {
 
 	inc.Update(k.Close.Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func CalculateKLinesEMA(allKLines []types.KLine, priceF KLineValueMapper, window int) float64 {

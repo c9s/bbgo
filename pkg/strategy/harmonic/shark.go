@@ -51,7 +51,7 @@ func (inc *SHARK) Update(high, low, price float64) {
 
 }
 
-func (inc *SHARK) Last() float64 {
+func (inc *SHARK) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0
 	}
@@ -82,14 +82,14 @@ func (inc *SHARK) PushK(k types.KLine) {
 
 	inc.Update(indicator.KLineHighPriceMapper(k), indicator.KLineLowPriceMapper(k), indicator.KLineClosePriceMapper(k))
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func (inc *SHARK) LoadK(allKLines []types.KLine) {
 	for _, k := range allKLines {
 		inc.PushK(k)
 	}
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func (inc SHARK) SharkLong(highs, lows floats.Slice, p float64, lookback int) float64 {

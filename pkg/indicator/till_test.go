@@ -57,7 +57,7 @@ func Test_TILL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			till := TILL{IntervalWindow: types.IntervalWindow{Window: 16}}
 			till.CalculateAndUpdate(tt.kLines)
-			last := till.Last()
+			last := till.Last(0)
 			assert.InDelta(t, tt.want, last, Delta)
 			assert.InDelta(t, tt.next, till.Index(1), Delta)
 			assert.Equal(t, tt.all, till.Length())

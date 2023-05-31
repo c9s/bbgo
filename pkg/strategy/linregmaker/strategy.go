@@ -257,12 +257,12 @@ func (s *Strategy) isAllowOppositePosition() bool {
 		return false
 	}
 
-	if (s.mainTrendCurrent == types.DirectionUp && s.FastLinReg.Last() < 0 && s.SlowLinReg.Last() < 0) ||
-		(s.mainTrendCurrent == types.DirectionDown && s.FastLinReg.Last() > 0 && s.SlowLinReg.Last() > 0) {
-		log.Infof("%s allow opposite position is enabled: MainTrend %v, FastLinReg: %f, SlowLinReg: %f", s.Symbol, s.mainTrendCurrent, s.FastLinReg.Last(), s.SlowLinReg.Last())
+	if (s.mainTrendCurrent == types.DirectionUp && s.FastLinReg.Last(0) < 0 && s.SlowLinReg.Last(0) < 0) ||
+		(s.mainTrendCurrent == types.DirectionDown && s.FastLinReg.Last(0) > 0 && s.SlowLinReg.Last(0) > 0) {
+		log.Infof("%s allow opposite position is enabled: MainTrend %v, FastLinReg: %f, SlowLinReg: %f", s.Symbol, s.mainTrendCurrent, s.FastLinReg.Last(0), s.SlowLinReg.Last(0))
 		return true
 	}
-	log.Infof("%s allow opposite position is disabled: MainTrend %v, FastLinReg: %f, SlowLinReg: %f", s.Symbol, s.mainTrendCurrent, s.FastLinReg.Last(), s.SlowLinReg.Last())
+	log.Infof("%s allow opposite position is disabled: MainTrend %v, FastLinReg: %f, SlowLinReg: %f", s.Symbol, s.mainTrendCurrent, s.FastLinReg.Last(0), s.SlowLinReg.Last(0))
 
 	return false
 }
@@ -390,10 +390,10 @@ func (s *Strategy) getOrderQuantities(askPrice fixedpoint.Value, bidPrice fixedp
 	}
 
 	// Faster position decrease
-	if s.mainTrendCurrent == types.DirectionUp && s.SlowLinReg.Last() < 0 {
+	if s.mainTrendCurrent == types.DirectionUp && s.SlowLinReg.Last(0) < 0 {
 		sellQuantity = sellQuantity.Mul(s.FasterDecreaseRatio)
 		log.Infof("faster %s position decrease: sell qty %v", s.Symbol, sellQuantity)
-	} else if s.mainTrendCurrent == types.DirectionDown && s.SlowLinReg.Last() > 0 {
+	} else if s.mainTrendCurrent == types.DirectionDown && s.SlowLinReg.Last(0) > 0 {
 		buyQuantity = buyQuantity.Mul(s.FasterDecreaseRatio)
 		log.Infof("faster %s position decrease: buy qty %v", s.Symbol, buyQuantity)
 	}
@@ -475,12 +475,12 @@ func (s *Strategy) getCanBuySell(buyQuantity, bidPrice, sellQuantity, askPrice, 
 	// Check TradeInBand
 	if s.TradeInBand {
 		// Price too high
-		if bidPrice.Float64() > s.neutralBoll.UpBand.Last() {
+		if bidPrice.Float64() > s.neutralBoll.UpBand.Last(0) {
 			canBuy = false
 			log.Infof("tradeInBand is set, skip buy due to the price is higher than the neutralBB")
 		}
 		// Price too low in uptrend
-		if askPrice.Float64() < s.neutralBoll.DownBand.Last() {
+		if askPrice.Float64() < s.neutralBoll.DownBand.Last(0) {
 			canSell = false
 			log.Infof("tradeInBand is set, skip sell due to the price is lower than the neutralBB")
 		}
@@ -700,7 +700,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				closePrice = price
 			}
 		}
-		priceReverseEMA := fixedpoint.NewFromFloat(s.ReverseEMA.Last())
+		priceReverseEMA := fixedpoint.NewFromFloat(s.ReverseEMA.Last(0))
 
 		// Main trend by ReverseEMA
 		if closePrice.Compare(priceReverseEMA) > 0 {
@@ -715,7 +715,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// closePrice is the close price of current kline
 		closePrice := kline.GetClose()
 		// priceReverseEMA is the current ReverseEMA price
-		priceReverseEMA := fixedpoint.NewFromFloat(s.ReverseEMA.Last())
+		priceReverseEMA := fixedpoint.NewFromFloat(s.ReverseEMA.Last(0))
 
 		// Main trend by ReverseEMA
 		s.mainTrendPrevious = s.mainTrendCurrent

@@ -135,7 +135,7 @@ func (s *Strategy) generateGridBuyOrders(session *bbgo.ExchangeSession) ([]types
 	ema99 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
 	ema25 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 25})
 	ema7 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 7})
-	if ema7.Last() > ema25.Last()*1.001 && ema25.Last() > ema99.Last()*1.0005 {
+	if ema7.Last(0) > ema25.Last(0)*1.001 && ema25.Last(0) > ema99.Last(0)*1.0005 {
 		log.Infof("all ema lines trend up, skip buy")
 		return nil, nil
 	}
@@ -202,7 +202,7 @@ func (s *Strategy) generateGridSellOrders(session *bbgo.ExchangeSession) ([]type
 	ema99 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 99})
 	ema25 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 25})
 	ema7 := s.StandardIndicatorSet.EWMA(types.IntervalWindow{Interval: s.Interval, Window: 7})
-	if ema7.Last() < ema25.Last()*(1-0.004) && ema25.Last() < ema99.Last()*(1-0.0005) {
+	if ema7.Last(0) < ema25.Last(0)*(1-0.004) && ema25.Last(0) < ema99.Last(0)*(1-0.0005) {
 		log.Infof("all ema lines trend down, skip sell")
 		return nil, nil
 	}
