@@ -28,9 +28,41 @@ func (f *Float64Series) Last(i int) float64 {
 }
 
 func (f *Float64Series) Index(i int) float64 {
-	return f.slice.Last(i)
+	return f.Last(i)
 }
 
 func (f *Float64Series) Length() int {
 	return len(f.slice)
+}
+
+func (f *Float64Series) PushAndEmit(x float64) {
+	f.slice.Push(x)
+	f.EmitUpdate(x)
+}
+
+// Bind binds the source event to the target (Float64Calculator)
+// A Float64Calculator should be able to calculate the float64 result from a single float64 argument input
+func (f *Float64Series) Bind(source Float64Source, target Float64Calculator) {
+	var c func(x float64)
+
+	// optimize the truncation check
+	trc, canTruncate := target.(Float64Truncator)
+	if canTruncate {
+		c = func(x float64) {
+			y := target.Calculate(x)
+			target.PushAndEmit(y)
+			trc.Truncate()
+		}
+	} else {
+		c = func(x float64) {
+			y := target.Calculate(x)
+			target.PushAndEmit(y)
+		}
+	}
+
+	if sub, ok := source.(Float64Subscription); ok {
+		sub.AddSubscriber(c)
+	} else {
+		source.OnUpdate(c)
+	}
 }
