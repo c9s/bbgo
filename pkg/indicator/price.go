@@ -23,10 +23,14 @@ func Price(source KLineSubscription, mapper KLineValueMapper) *PriceStream {
 
 	source.AddSubscriber(func(k types.KLine) {
 		v := s.mapper(k)
-		s.slice.Push(v)
-		s.EmitUpdate(v)
+		s.PushAndEmit(v)
 	})
 	return s
+}
+
+func (s *PriceStream) PushAndEmit(v float64) {
+	s.slice.Push(v)
+	s.EmitUpdate(v)
 }
 
 func ClosePrices(source KLineSubscription) *PriceStream {
