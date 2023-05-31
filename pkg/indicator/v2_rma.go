@@ -19,23 +19,11 @@ func RMA2(source Float64Source, window int, adjust bool) *RMAStream {
 		Adjust:        adjust,
 	}
 
-	if sub, ok := source.(Float64Subscription); ok {
-		sub.AddSubscriber(s.calculateAndPush)
-	} else {
-		source.OnUpdate(s.calculateAndPush)
-	}
-
+	s.Bind(source, s)
 	return s
 }
 
-func (s *RMAStream) calculateAndPush(v float64) {
-	v2 := s.calculate(v)
-	s.slice.Push(v2)
-	s.EmitUpdate(v2)
-	s.truncate()
-}
-
-func (s *RMAStream) calculate(x float64) float64 {
+func (s *RMAStream) Calculate(x float64) float64 {
 	lambda := 1 / float64(s.window)
 	tmp := 0.0
 	if s.counter == 0 {
@@ -62,7 +50,7 @@ func (s *RMAStream) calculate(x float64) float64 {
 	return tmp
 }
 
-func (s *RMAStream) truncate() {
+func (s *RMAStream) Truncate() {
 	if len(s.slice) > MaxNumOfRMA {
 		s.slice = s.slice[MaxNumOfRMATruncateSize-1:]
 	}
