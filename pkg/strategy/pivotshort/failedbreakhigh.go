@@ -341,7 +341,7 @@ func (s *FailedBreakHigh) detectMacdDivergence() {
 	var histogramPivots floats.Slice
 	for i := pivotWindow; i > 0 && i < len(histogramValues); i++ {
 		// find positive histogram and the top
-		pivot, ok := floats.CalculatePivot(histogramValues[0:i], pivotWindow, pivotWindow, func(a, pivot float64) bool {
+		pivot, ok := floats.FindPivot(histogramValues[0:i], pivotWindow, pivotWindow, func(a, pivot float64) bool {
 			return pivot > 0 && pivot > a
 		})
 		if ok {
