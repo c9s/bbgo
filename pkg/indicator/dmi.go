@@ -115,15 +115,3 @@ func (inc *DMI) CalculateAndUpdate(allKLines []types.KLine) {
 		inc.EmitUpdate(inc.DIPlus.Last(0), inc.DIMinus.Last(0), inc.ADX.Last(0))
 	}
 }
-
-func (inc *DMI) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *DMI) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}
