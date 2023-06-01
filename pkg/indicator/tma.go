@@ -48,28 +48,3 @@ var _ types.SeriesExtend = &TMA{}
 func (inc *TMA) PushK(k types.KLine) {
 	inc.Update(k.Close.Float64())
 }
-
-func (inc *TMA) CalculateAndUpdate(allKLines []types.KLine) {
-	if inc.s1 == nil {
-		for _, k := range allKLines {
-			inc.PushK(k)
-			inc.EmitUpdate(inc.Last(0))
-		}
-	} else {
-		k := allKLines[len(allKLines)-1]
-		inc.PushK(k)
-		inc.EmitUpdate(inc.Last(0))
-	}
-}
-
-func (inc *TMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *TMA) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}
