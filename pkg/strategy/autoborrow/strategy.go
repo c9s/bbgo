@@ -359,7 +359,7 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 		return
 	}
 
-	delta := fixedpoint.MustNewFromString(event.Delta)
+	delta := event.Delta
 
 	// ignore outflow
 	if delta.Sign() < 0 {
