@@ -350,6 +350,8 @@ func (s *Strategy) handleBalanceUpdate(balances types.BalanceMap) {
 }
 
 func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateEvent) {
+	bbgo.Notify(event)
+
 	if s.MinMarginLevel.IsZero() {
 		return
 	}
