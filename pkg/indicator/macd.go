@@ -75,12 +75,8 @@ func (inc *MACDLegacy) Update(x float64) {
 	inc.EmitUpdate(macd, signal, histogram)
 }
 
-func (inc *MACDLegacy) Last(int) float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *MACDLegacy) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *MACDLegacy) Length() int {
@@ -111,7 +107,7 @@ func (inc *MACDValues) Last(i int) float64 {
 }
 
 func (inc *MACDValues) Index(i int) float64 {
-	return inc.Values.Last(i)
+	return inc.Last(i)
 }
 
 func (inc *MACDValues) Length() int {
