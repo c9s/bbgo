@@ -358,6 +358,7 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 
 	account := s.ExchangeSession.GetAccount()
 	if account.MarginLevel.Compare(s.MinMarginLevel) > 0 {
+		bbgo.Notify("account margin level %f is greater than minimal margin level %f, skip", account.MarginLevel.Float64(), s.MinMarginLevel.Float64())
 		return
 	}
 
