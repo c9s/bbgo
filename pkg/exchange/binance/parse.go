@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/adshao/go-binance/v2/futures"
+	"github.com/slack-go/slack"
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/valyala/fastjson"
@@ -21,43 +22,42 @@ type EventBase struct {
 }
 
 /*
-
 executionReport
 
-{
-  "e": "executionReport",        // Event type
-  "E": 1499405658658,            // Event time
-  "s": "ETHBTC",                 // Symbol
-  "c": "mUvoqJxFIILMdfAW5iGSOW", // Client order ID
-  "S": "BUY",                    // Side
-  "o": "LIMIT",                  // Order type
-  "f": "GTC",                    // Time in force
-  "q": "1.00000000",             // Order quantity
-  "p": "0.10264410",             // Order price
-  "P": "0.00000000",             // Stop price
-  "F": "0.00000000",             // Iceberg quantity
-  "g": -1,                       // OrderListId
-  "C": null,                     // Original client order ID; This is the ID of the order being canceled
-  "x": "NEW",                    // Current execution type
-  "X": "NEW",                    // Current order status
-  "r": "NONE",                   // Order reject reason; will be an error code.
-  "i": 4293153,                  // Order ID
-  "l": "0.00000000",             // Last executed quantity
-  "z": "0.00000000",             // Cumulative filled quantity
-  "L": "0.00000000",             // Last executed price
-  "n": "0",                      // Commission amount
-  "N": null,                     // Commission asset
-  "T": 1499405658657,            // Transaction time
-  "t": -1,                       // Trade ID
-  "I": 8641984,                  // Ignore
-  "w": true,                     // Is the order on the book?
-  "m": false,                    // Is this trade the maker side?
-  "M": false,                    // Ignore
-  "O": 1499405658657,            // Order creation time
-  "Z": "0.00000000",             // Cumulative quote asset transacted quantity
-  "Y": "0.00000000",             // Last quote asset transacted quantity (i.e. lastPrice * lastQty)
-  "Q": "0.00000000"              // Quote Order Quantity
-}
+	{
+	  "e": "executionReport",        // Event type
+	  "E": 1499405658658,            // Event time
+	  "s": "ETHBTC",                 // Symbol
+	  "c": "mUvoqJxFIILMdfAW5iGSOW", // Client order ID
+	  "S": "BUY",                    // Side
+	  "o": "LIMIT",                  // Order type
+	  "f": "GTC",                    // Time in force
+	  "q": "1.00000000",             // Order quantity
+	  "p": "0.10264410",             // Order price
+	  "P": "0.00000000",             // Stop price
+	  "F": "0.00000000",             // Iceberg quantity
+	  "g": -1,                       // OrderListId
+	  "C": null,                     // Original client order ID; This is the ID of the order being canceled
+	  "x": "NEW",                    // Current execution type
+	  "X": "NEW",                    // Current order status
+	  "r": "NONE",                   // Order reject reason; will be an error code.
+	  "i": 4293153,                  // Order ID
+	  "l": "0.00000000",             // Last executed quantity
+	  "z": "0.00000000",             // Cumulative filled quantity
+	  "L": "0.00000000",             // Last executed price
+	  "n": "0",                      // Commission amount
+	  "N": null,                     // Commission asset
+	  "T": 1499405658657,            // Transaction time
+	  "t": -1,                       // Trade ID
+	  "I": 8641984,                  // Ignore
+	  "w": true,                     // Is the order on the book?
+	  "m": false,                    // Is this trade the maker side?
+	  "M": false,                    // Ignore
+	  "O": 1499405658657,            // Order creation time
+	  "Z": "0.00000000",             // Cumulative quote asset transacted quantity
+	  "Y": "0.00000000",             // Last quote asset transacted quantity (i.e. lastPrice * lastQty)
+	  "Q": "0.00000000"              // Quote Order Quantity
+	}
 */
 type ExecutionReportEvent struct {
 	EventBase
@@ -165,71 +165,100 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 }
 
 /*
-balanceUpdate
+event: balanceUpdate
 
-{
-  "e": "balanceUpdate",         //KLineEvent Type
-  "E": 1573200697110,           //KLineEvent Time
-  "a": "BTC",                   //Asset
-  "d": "100.00000000",          //Balance Delta
-  "T": 1573200697068            //Clear Time
-}
+Balance Update occurs during the following:
+
+Deposits or withdrawals from the account
+Transfer of funds between accounts (e.g. Spot to Margin)
+
+	{
+	  "e": "balanceUpdate",         //KLineEvent Type
+	  "E": 1573200697110,           //KLineEvent Time
+	  "a": "BTC",                   //Asset
+	  "d": "100.00000000",          //Balance Delta
+	  "T": 1573200697068            //Clear Time
+	}
+
+This event is only for Spot
 */
 type BalanceUpdateEvent struct {
 	EventBase
 
-	Asset     string `json:"a"`
-	Delta     string `json:"d"`
-	ClearTime int64  `json:"T"`
+	Asset     string                     `json:"a"`
+	Delta     fixedpoint.Value           `json:"d"`
+	ClearTime types.MillisecondTimestamp `json:"T"`
+}
+
+func (e *BalanceUpdateEvent) SlackAttachment() slack.Attachment {
+	return slack.Attachment{
+		Title: "Binance Balance Update Event",
+		Color: "warning",
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Asset",
+				Value: e.Asset,
+				Short: true,
+			},
+			{
+				Title: "Delta",
+				Value: e.Delta.String(),
+				Short: true,
+			},
+			{
+				Title: "Time",
+				Value: e.ClearTime.String(),
+				Short: true,
+			},
+		},
+	}
 }
 
 /*
-
 outboundAccountInfo
 
-{
-  "e": "outboundAccountInfo",   // KLineEvent type
-  "E": 1499405658849,           // KLineEvent time
-  "m": 0,                       // Maker commission rate (bips)
-  "t": 0,                       // Taker commission rate (bips)
-  "b": 0,                       // Buyer commission rate (bips)
-  "s": 0,                       // Seller commission rate (bips)
-  "T": true,                    // Can trade?
-  "W": true,                    // Can withdraw?
-  "D": true,                    // Can deposit?
-  "u": 1499405658848,           // Time of last account update
-  "B": [                        // AccountBalances array
-    {
-      "a": "LTC",               // Asset
-      "f": "17366.18538083",    // Free amount
-      "l": "0.00000000"         // Locked amount
-    },
-    {
-      "a": "BTC",
-      "f": "10537.85314051",
-      "l": "2.19464093"
-    },
-    {
-      "a": "ETH",
-      "f": "17902.35190619",
-      "l": "0.00000000"
-    },
-    {
-      "a": "BNC",
-      "f": "1114503.29769312",
-      "l": "0.00000000"
-    },
-    {
-      "a": "NEO",
-      "f": "0.00000000",
-      "l": "0.00000000"
-    }
-  ],
-  "P": [                       // Account Permissions
-        "SPOT"
-  ]
-}
-
+	{
+	  "e": "outboundAccountInfo",   // KLineEvent type
+	  "E": 1499405658849,           // KLineEvent time
+	  "m": 0,                       // Maker commission rate (bips)
+	  "t": 0,                       // Taker commission rate (bips)
+	  "b": 0,                       // Buyer commission rate (bips)
+	  "s": 0,                       // Seller commission rate (bips)
+	  "T": true,                    // Can trade?
+	  "W": true,                    // Can withdraw?
+	  "D": true,                    // Can deposit?
+	  "u": 1499405658848,           // Time of last account update
+	  "B": [                        // AccountBalances array
+	    {
+	      "a": "LTC",               // Asset
+	      "f": "17366.18538083",    // Free amount
+	      "l": "0.00000000"         // Locked amount
+	    },
+	    {
+	      "a": "BTC",
+	      "f": "10537.85314051",
+	      "l": "2.19464093"
+	    },
+	    {
+	      "a": "ETH",
+	      "f": "17902.35190619",
+	      "l": "0.00000000"
+	    },
+	    {
+	      "a": "BNC",
+	      "f": "1114503.29769312",
+	      "l": "0.00000000"
+	    },
+	    {
+	      "a": "NEO",
+	      "f": "0.00000000",
+	      "l": "0.00000000"
+	    }
+	  ],
+	  "P": [                       // Account Permissions
+	        "SPOT"
+	  ]
+	}
 */
 type Balance struct {
 	Asset  string           `json:"a"`
