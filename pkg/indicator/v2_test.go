@@ -11,7 +11,7 @@ import (
 
 func Test_v2_Subtract(t *testing.T) {
 	stream := &types.StandardStream{}
-	kLines := KLines(stream)
+	kLines := KLines(stream, "", "")
 	closePrices := ClosePrices(kLines)
 	fastEMA := EWMA2(closePrices, 10)
 	slowEMA := EWMA2(closePrices, 25)

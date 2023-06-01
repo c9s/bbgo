@@ -64,7 +64,7 @@ func Test_TR_and_RMA(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			stream := &types.StandardStream{}
 
-			kLines := KLines(stream)
+			kLines := KLines(stream, "", "")
 			atr := TR2(kLines)
 			rma := RMA2(atr, tt.window, true)
 
