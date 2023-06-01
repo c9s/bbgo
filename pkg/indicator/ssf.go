@@ -80,9 +80,6 @@ func (inc *SSF) Index(i int) float64 {
 }
 
 func (inc *SSF) Length() int {
-	if inc.Values == nil {
-		return 0
-	}
 	return inc.Values.Length()
 }
 
@@ -103,15 +100,4 @@ func (inc *SSF) CalculateAndUpdate(allKLines []types.KLine) {
 		inc.PushK(k)
 		inc.EmitUpdate(inc.Last(0))
 	}
-}
-
-func (inc *SSF) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *SSF) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
