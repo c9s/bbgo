@@ -64,15 +64,3 @@ func (inc *AD) CalculateAndUpdate(kLines []types.KLine) {
 	inc.EmitUpdate(inc.Last(0))
 	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
 }
-
-func (inc *AD) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *AD) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}

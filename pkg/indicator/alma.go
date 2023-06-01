@@ -90,14 +90,3 @@ func (inc *ALMA) CalculateAndUpdate(allKLines []types.KLine) {
 	inc.Update(allKLines[len(allKLines)-1].Close.Float64())
 	inc.EmitUpdate(inc.Last(0))
 }
-
-func (inc *ALMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *ALMA) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}

@@ -98,15 +98,3 @@ func (inc *CCI) CalculateAndUpdate(allKLines []types.KLine) {
 		inc.EmitUpdate(inc.Last(0))
 	}
 }
-
-func (inc *CCI) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *CCI) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}
