@@ -40,6 +40,14 @@ func (f *Float64Series) PushAndEmit(x float64) {
 	f.EmitUpdate(x)
 }
 
+func (f *Float64Series) Subscribe(source Float64Source, c func(x float64)) {
+	if sub, ok := source.(Float64Subscription); ok {
+		sub.AddSubscriber(c)
+	} else {
+		source.OnUpdate(c)
+	}
+}
+
 // Bind binds the source event to the target (Float64Calculator)
 // A Float64Calculator should be able to calculate the float64 result from a single float64 argument input
 func (f *Float64Series) Bind(source Float64Source, target Float64Calculator) {
@@ -60,9 +68,5 @@ func (f *Float64Series) Bind(source Float64Source, target Float64Calculator) {
 		}
 	}
 
-	if sub, ok := source.(Float64Subscription); ok {
-		sub.AddSubscriber(c)
-	} else {
-		source.OnUpdate(c)
-	}
+	f.Subscribe(source, c)
 }
