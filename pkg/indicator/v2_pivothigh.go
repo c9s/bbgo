@@ -4,14 +4,14 @@ import (
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 )
 
-type PivotLowStream struct {
+type PivotHighStream struct {
 	Float64Series
 	rawValues           floats.Slice
 	window, rightWindow int
 }
 
-func PivotLow2(source Float64Source, window, rightWindow int) *PivotLowStream {
-	s := &PivotLowStream{
+func PivotHigh2(source Float64Source, window, rightWindow int) *PivotHighStream {
+	s := &PivotHighStream{
 		Float64Series: NewFloat64Series(),
 		window:        window,
 		rightWindow:   rightWindow,
@@ -19,7 +19,7 @@ func PivotLow2(source Float64Source, window, rightWindow int) *PivotLowStream {
 
 	s.Subscribe(source, func(x float64) {
 		s.rawValues.Push(x)
-		if low, ok := calculatePivotLow(s.rawValues, s.window, s.rightWindow); ok {
+		if low, ok := calculatePivotHigh(s.rawValues, s.window, s.rightWindow); ok {
 			s.PushAndEmit(low)
 		}
 	})
