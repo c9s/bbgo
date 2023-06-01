@@ -247,14 +247,30 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 
 			if !marginAsset.MaxTotalBorrow.IsZero() {
 				// check if we over borrow
-				newBorrow := toBorrow.Add(b.Borrowed)
-				if newBorrow.Compare(marginAsset.MaxTotalBorrow) > 0 {
-					toBorrow = toBorrow.Sub(newBorrow.Sub(marginAsset.MaxTotalBorrow))
+				newTotalBorrow := toBorrow.Add(b.Borrowed)
+				if newTotalBorrow.Compare(marginAsset.MaxTotalBorrow) > 0 {
+					toBorrow = toBorrow.Sub(newTotalBorrow.Sub(marginAsset.MaxTotalBorrow))
 					if toBorrow.Sign() < 0 {
 						log.Warnf("margin asset %s is over borrowed, skip", marginAsset.Asset)
 						continue
 					}
 				}
+			}
+
+			maxBorrowable, err2 := s.marginBorrowRepay.QueryMarginAssetMaxBorrowable(ctx, marginAsset.Asset)
+			if err2 != nil {
+				log.WithError(err).Errorf("max borrowable query error")
+				continue
+			}
+
+			if toBorrow.Compare(maxBorrowable) > 0 {
+				bbgo.Notify("Trying to borrow %f %s, which is greater than the max borrowable amount %f, will adjust borrow amount to %f",
+					toBorrow.Float64(),
+					marginAsset.Asset,
+					maxBorrowable.Float64(),
+					maxBorrowable.Float64())
+
+				toBorrow = fixedpoint.Min(maxBorrowable, toBorrow)
 			}
 
 			if toBorrow.IsZero() {
