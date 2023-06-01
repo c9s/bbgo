@@ -192,7 +192,7 @@ func (s Slice) Last(i int) float64 {
 }
 
 func (s Slice) Truncate(size int) Slice {
-	if len(s) < size {
+	if size < 0 || len(s) <= size {
 		return s
 	}
 
