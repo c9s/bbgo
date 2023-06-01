@@ -12,17 +12,14 @@ type SeriesBase struct {
 }
 
 func (s *SeriesBase) Index(i int) float64 {
+	return s.Last(i)
+}
+
+func (s *SeriesBase) Last(i int) float64 {
 	if s.Series == nil {
 		return 0
 	}
 	return s.Series.Last(i)
-}
-
-func (s *SeriesBase) Last(int) float64 {
-	if s.Series == nil {
-		return 0
-	}
-	return s.Series.Last(0)
 }
 
 func (s *SeriesBase) Length() int {

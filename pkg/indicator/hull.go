@@ -44,14 +44,11 @@ func (inc *HULL) Last(i int) float64 {
 	if inc.result == nil {
 		return 0
 	}
-	return inc.result.Index(i)
+	return inc.result.Last(i)
 }
 
 func (inc *HULL) Index(i int) float64 {
-	if inc.result == nil {
-		return 0
-	}
-	return inc.result.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *HULL) Length() int {

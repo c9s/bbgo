@@ -597,26 +597,11 @@ type KLineSeries struct {
 	kv    KValueType
 }
 
-func (k *KLineSeries) Last(int) float64 {
-	length := len(*k.lines)
-	switch k.kv {
-	case kOpUnknown:
-		panic("kline series operator unknown")
-	case kOpenValue:
-		return (*k.lines)[length-1].GetOpen().Float64()
-	case kCloseValue:
-		return (*k.lines)[length-1].GetClose().Float64()
-	case kLowValue:
-		return (*k.lines)[length-1].GetLow().Float64()
-	case kHighValue:
-		return (*k.lines)[length-1].GetHigh().Float64()
-	case kVolumeValue:
-		return (*k.lines)[length-1].Volume.Float64()
-	}
-	return 0
+func (k *KLineSeries) Index(i int) float64 {
+	return k.Last(i)
 }
 
-func (k *KLineSeries) Index(i int) float64 {
+func (k *KLineSeries) Last(i int) float64 {
 	length := len(*k.lines)
 	if length == 0 || length-i-1 < 0 {
 		return 0

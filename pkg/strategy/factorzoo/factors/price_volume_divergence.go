@@ -23,8 +23,8 @@ type PVD struct {
 	types.IntervalWindow
 	types.SeriesBase
 
-	Values floats.Slice
-	Prices *types.Queue
+	Values  floats.Slice
+	Prices  *types.Queue
 	Volumes *types.Queue
 	EndTime time.Time
 
@@ -47,20 +47,12 @@ func (inc *PVD) Update(price float64, volume float64) {
 	}
 }
 
-func (inc *PVD) Last(int) float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *PVD) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *PVD) Index(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1-i]
+	return inc.Last(i)
 }
 
 func (inc *PVD) Length() int {

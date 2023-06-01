@@ -26,7 +26,7 @@ func (a *AbsResult) Last(i int) float64 {
 }
 
 func (a *AbsResult) Index(i int) float64 {
-	return math.Abs(a.a.Index(i))
+	return a.Last(i)
 }
 
 func (a *AbsResult) Length() int {
@@ -49,7 +49,7 @@ func LinearRegression(a Series, lookback int) (alpha float64, beta float64) {
 	var weights []float64
 	for i := 0; i < lookback; i++ {
 		x[i] = float64(i)
-		y[i] = a.Index(i)
+		y[i] = a.Last(i)
 	}
 	alpha, beta = stat.LinearRegression(x, y, weights, false)
 	return
@@ -83,8 +83,8 @@ func NextCross(a Series, b Series, lookback int) (int, float64, bool) {
 	var weights []float64
 	for i := 0; i < lookback; i++ {
 		x[i] = float64(i)
-		y1[i] = a.Index(i)
-		y2[i] = b.Index(i)
+		y1[i] = a.Last(i)
+		y2[i] = b.Last(i)
 	}
 	alpha1, beta1 := stat.LinearRegression(x, y1, weights, false)
 	alpha2, beta2 := stat.LinearRegression(x, y2, weights, false)
@@ -113,9 +113,9 @@ func (c *CrossResult) Last() bool {
 		return false
 	}
 	if c.isOver {
-		return c.a.Last(0)-c.b.Last(0) > 0 && c.a.Index(1)-c.b.Index(1) < 0
+		return c.a.Last(0)-c.b.Last(0) > 0 && c.a.Last(1)-c.b.Last(1) < 0
 	} else {
-		return c.a.Last(0)-c.b.Last(0) < 0 && c.a.Index(1)-c.b.Index(1) > 0
+		return c.a.Last(0)-c.b.Last(0) < 0 && c.a.Last(1)-c.b.Last(1) > 0
 	}
 }
 
@@ -124,9 +124,9 @@ func (c *CrossResult) Index(i int) bool {
 		return false
 	}
 	if c.isOver {
-		return c.a.Index(i)-c.b.Index(i) > 0 && c.a.Index(i+1)-c.b.Index(i+1) < 0
+		return c.a.Last(i)-c.b.Last(i) > 0 && c.a.Last(i+1)-c.b.Last(i+1) < 0
 	} else {
-		return c.a.Index(i)-c.b.Index(i) < 0 && c.a.Index(i+1)-c.b.Index(i+1) > 0
+		return c.a.Last(i)-c.b.Last(i) < 0 && c.a.Last(i+1)-c.b.Last(i+1) > 0
 	}
 }
 
@@ -161,7 +161,7 @@ func Highest(a Series, lookback int) float64 {
 	}
 	highest := a.Last(0)
 	for i := 1; i < lookback; i++ {
-		current := a.Index(i)
+		current := a.Last(i)
 		if highest < current {
 			highest = current
 		}
@@ -175,7 +175,7 @@ func Lowest(a Series, lookback int) float64 {
 	}
 	lowest := a.Last(0)
 	for i := 1; i < lookback; i++ {
-		current := a.Index(i)
+		current := a.Last(i)
 		if lowest > current {
 			lowest = current
 		}
@@ -247,7 +247,7 @@ func Sub(a interface{}, b interface{}) SeriesExtend {
 }
 
 func (a *MinusSeriesResult) Last(i int) float64 {
-	return a.a.Index(i) - a.b.Index(i)
+	return a.a.Last(i) - a.b.Last(i)
 }
 
 func (a *MinusSeriesResult) Index(i int) float64 {
@@ -303,7 +303,7 @@ type DivSeriesResult struct {
 }
 
 func (a *DivSeriesResult) Last(i int) float64 {
-	return a.a.Index(i) / a.b.Index(i)
+	return a.a.Last(i) / a.b.Last(i)
 }
 
 func (a *DivSeriesResult) Index(i int) float64 {
@@ -334,7 +334,7 @@ type MulSeriesResult struct {
 }
 
 func (a *MulSeriesResult) Last(i int) float64 {
-	return a.a.Index(i) * a.b.Index(i)
+	return a.a.Last(i) * a.b.Last(i)
 }
 
 func (a *MulSeriesResult) Index(i int) float64 {
@@ -427,19 +427,19 @@ func Dot(a interface{}, b interface{}, limit ...int) float64 {
 	} else if isaf && !isbf {
 		sum := 0.
 		for i := 0; i < l; i++ {
-			sum += aaf * bbs.Index(i)
+			sum += aaf * bbs.Last(i)
 		}
 		return sum
 	} else if !isaf && isbf {
 		sum := 0.
 		for i := 0; i < l; i++ {
-			sum += aas.Index(i) * bbf
+			sum += aas.Last(i) * bbf
 		}
 		return sum
 	} else {
 		sum := 0.
 		for i := 0; i < l; i++ {
-			sum += aas.Index(i) * bbs.Index(i)
+			sum += aas.Last(i) * bbs.Index(i)
 		}
 		return sum
 	}
@@ -458,7 +458,7 @@ func Array(a Series, limit ...int) (result []float64) {
 	}
 	result = make([]float64, l)
 	for i := 0; i < l; i++ {
-		result[i] = a.Index(i)
+		result[i] = a.Last(i)
 	}
 	return
 }
@@ -475,7 +475,7 @@ func Reverse(a Series, limit ...int) (result floats.Slice) {
 	}
 	result = make([]float64, l)
 	for i := 0; i < l; i++ {
-		result[l-i-1] = a.Index(i)
+		result[l-i-1] = a.Last(i)
 	}
 	return
 }
@@ -489,7 +489,7 @@ func (c *ChangeResult) Last(i int) float64 {
 	if i+c.offset >= c.a.Length() {
 		return 0
 	}
-	return c.a.Index(i) - c.a.Index(i+c.offset)
+	return c.a.Last(i) - c.a.Last(i+c.offset)
 }
 
 func (c *ChangeResult) Index(i int) float64 {
@@ -524,7 +524,7 @@ func (c *PercentageChangeResult) Last(i int) float64 {
 	if i+c.offset >= c.a.Length() {
 		return 0
 	}
-	return c.a.Index(i)/c.a.Index(i+c.offset) - 1
+	return c.a.Last(i)/c.a.Last(i+c.offset) - 1
 }
 
 func (c *PercentageChangeResult) Index(i int) float64 {
@@ -565,7 +565,7 @@ func Stdev(a Series, params ...int) float64 {
 	avg := Mean(a, length)
 	s := .0
 	for i := 0; i < length; i++ {
-		diff := a.Index(i) - avg
+		diff := a.Last(i) - avg
 		s += diff * diff
 	}
 	if length-ddof == 0 {
@@ -588,7 +588,7 @@ func Kendall(a, b Series, length int) float64 {
 	concordant, discordant := 0, 0
 	for i := 0; i < length; i++ {
 		for j := i + 1; j < length; j++ {
-			value := (aRanks.Index(i) - aRanks.Index(j)) * (bRanks.Index(i) - bRanks.Index(j))
+			value := (aRanks.Last(i) - aRanks.Last(j)) * (bRanks.Last(i) - bRanks.Last(j))
 			if value > 0 {
 				concordant++
 			} else {
@@ -606,10 +606,10 @@ func Rank(a Series, length int) SeriesExtend {
 	rank := make([]float64, length)
 	mapper := make([]float64, length+1)
 	for i := length - 1; i >= 0; i-- {
-		ii := a.Index(i)
+		ii := a.Last(i)
 		counter := 0.
 		for j := 0; j < length; j++ {
-			if a.Index(j) <= ii {
+			if a.Last(j) <= ii {
 				counter += 1.
 			}
 		}
@@ -633,8 +633,8 @@ func Pearson(a, b Series, length int) float64 {
 	x := make([]float64, length)
 	y := make([]float64, length)
 	for i := 0; i < length; i++ {
-		x[i] = a.Index(i)
-		y[i] = b.Index(i)
+		x[i] = a.Last(i)
+		y[i] = b.Last(i)
 	}
 	return stat.Correlation(x, y, nil)
 }
@@ -690,7 +690,7 @@ func Covariance(a Series, b Series, length int) float64 {
 	meanb := Mean(b, length)
 	sum := 0.0
 	for i := 0; i < length; i++ {
-		sum += (a.Index(i) - meana) * (b.Index(i) - meanb)
+		sum += (a.Last(i) - meana) * (b.Last(i) - meanb)
 	}
 	sum /= float64(length)
 	return sum
@@ -711,7 +711,7 @@ func Skew(a Series, length int) float64 {
 	sum2 := 0.0
 	sum3 := 0.0
 	for i := 0; i < length; i++ {
-		diff := a.Index(i) - mean
+		diff := a.Last(i) - mean
 		sum2 += diff * diff
 		sum3 += diff * diff * diff
 	}
@@ -735,7 +735,7 @@ func (inc *ShiftResult) Last(i int) float64 {
 		return 0
 	}
 
-	return inc.a.Index(inc.offset + i)
+	return inc.a.Last(inc.offset + i)
 }
 
 func (inc *ShiftResult) Index(i int) float64 {
@@ -811,11 +811,11 @@ func Softmax(a Series, window int) SeriesExtend {
 	s := 0.0
 	max := Highest(a, window)
 	for i := 0; i < window; i++ {
-		s += math.Exp(a.Index(i) - max)
+		s += math.Exp(a.Last(i) - max)
 	}
 	out := NewQueue(window)
 	for i := window - 1; i >= 0; i-- {
-		out.Update(math.Exp(a.Index(i)-max) / s)
+		out.Update(math.Exp(a.Last(i)-max) / s)
 	}
 	return out
 }
@@ -825,7 +825,7 @@ func Softmax(a Series, window int) SeriesExtend {
 // - sum(v * ln(v))
 func Entropy(a Series, window int) (e float64) {
 	for i := 0; i < window; i++ {
-		v := a.Index(i)
+		v := a.Last(i)
 		if v != 0 {
 			e -= v * math.Log(v)
 		}
@@ -836,9 +836,9 @@ func Entropy(a Series, window int) (e float64) {
 // CrossEntropy computes the cross-entropy between the two distributions
 func CrossEntropy(a, b Series, window int) (e float64) {
 	for i := 0; i < window; i++ {
-		v := a.Index(i)
+		v := a.Last(i)
 		if v != 0 {
-			e -= v * math.Log(b.Index(i))
+			e -= v * math.Log(b.Last(i))
 		}
 	}
 	return e
@@ -893,7 +893,7 @@ func LogisticRegression(x []Series, y Series, lookback, iterations int, learning
 	xx := make([][]float64, lookback)
 	for i := 0; i < lookback; i++ {
 		for j := 0; j < features; j++ {
-			xx[i] = append(xx[i], x[j].Index(lookback-i-1))
+			xx[i] = append(xx[i], x[j].Last(lookback-i-1))
 		}
 	}
 	yy := Reverse(y, lookback)
@@ -1002,7 +1002,7 @@ func (canvas *Canvas) Plot(tag string, a Series, endTime Time, length int, inter
 	if a.Length() == 0 {
 		return
 	}
-	oldest := a.Index(a.Length() - 1)
+	oldest := a.Last(a.Length() - 1)
 	interval := canvas.Interval
 	if len(intervals) > 0 {
 		interval = intervals[0]
@@ -1026,7 +1026,7 @@ func (canvas *Canvas) PlotRaw(tag string, a Series, length int) {
 	if a.Length() == 0 {
 		return
 	}
-	oldest := a.Index(a.Length() - 1)
+	oldest := a.Last(a.Length() - 1)
 	canvas.Series = append(canvas.Series, chart.ContinuousSeries{
 		Name:    tag,
 		XValues: x,

@@ -17,7 +17,7 @@ func Omega(returns Series, returnThresholds ...float64) float64 {
 	win := 0.0
 	loss := 0.0
 	for i := 0; i < length; i++ {
-		out := threshold - returns.Index(i)
+		out := threshold - returns.Last(i)
 		if out > 0 {
 			win += out
 		} else {

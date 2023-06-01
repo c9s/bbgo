@@ -31,23 +31,14 @@ type MOM struct {
 }
 
 func (inc *MOM) Index(i int) float64 {
-	if inc.Values == nil {
-		return 0
-	}
+	return inc.Last(i)
+}
+
+func (inc *MOM) Last(i int) float64 {
 	return inc.Values.Last(i)
 }
 
-func (inc *MOM) Last(int) float64 {
-	if inc.Values.Length() == 0 {
-		return 0
-	}
-	return inc.Values.Last(0)
-}
-
 func (inc *MOM) Length() int {
-	if inc.Values == nil {
-		return 0
-	}
 	return inc.Values.Length()
 }
 

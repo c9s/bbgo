@@ -24,12 +24,8 @@ func (inc *PivotLow) Length() int {
 	return inc.Values.Length()
 }
 
-func (inc *PivotLow) Last(int) float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-
-	return inc.Values.Last(0)
+func (inc *PivotLow) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *PivotLow) Update(value float64) {
