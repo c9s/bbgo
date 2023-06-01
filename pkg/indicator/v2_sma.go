@@ -25,5 +25,5 @@ func (s *SMAStream) Calculate(v float64) float64 {
 }
 
 func (s *SMAStream) Truncate() {
-	s.slice.Truncate(MaxNumOfSMA)
+	s.slice = s.slice.Truncate(MaxNumOfSMA)
 }
