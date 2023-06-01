@@ -15,6 +15,14 @@ func TestSub(t *testing.T) {
 	assert.Equal(t, 5, c.Length())
 }
 
+func TestTruncate(t *testing.T) {
+	a := New(1, 2, 3, 4, 5)
+	for i := 5; i > 0; i-- {
+		a = a.Truncate(i)
+		assert.Equal(t, i, a.Length())
+	}
+}
+
 func TestAdd(t *testing.T) {
 	a := New(1, 2, 3, 4, 5)
 	b := New(1, 2, 3, 4, 5)

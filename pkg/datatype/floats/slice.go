@@ -191,14 +191,18 @@ func (s Slice) Last(i int) float64 {
 	return s[length-1-i]
 }
 
+func (s Slice) Truncate(size int) Slice {
+	if len(s) < size {
+		return s
+	}
+
+	return s[len(s)-size:]
+}
+
 // Index fetches the element from the end of the slice
 // WARNING: it does not start from 0!!!
 func (s Slice) Index(i int) float64 {
-	length := len(s)
-	if i < 0 || length-1-i < 0 {
-		return 0.0
-	}
-	return s[length-1-i]
+	return s.Last(i)
 }
 
 func (s Slice) Length() int {
