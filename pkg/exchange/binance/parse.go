@@ -165,7 +165,12 @@ func (e *ExecutionReportEvent) Trade() (*types.Trade, error) {
 }
 
 /*
-balanceUpdate
+event: balanceUpdate
+
+Balance Update occurs during the following:
+
+Deposits or withdrawals from the account
+Transfer of funds between accounts (e.g. Spot to Margin)
 
 	{
 	  "e": "balanceUpdate",         //KLineEvent Type
@@ -174,6 +179,8 @@ balanceUpdate
 	  "d": "100.00000000",          //Balance Delta
 	  "T": 1573200697068            //Clear Time
 	}
+
+This event is only for Spot
 */
 type BalanceUpdateEvent struct {
 	EventBase
