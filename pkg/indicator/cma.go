@@ -14,13 +14,14 @@ type CA struct {
 	Interval        types.Interval
 	Values          floats.Slice
 	length          float64
-	UpdateCallbacks []func(value float64)
+	updateCallbacks []func(value float64)
 }
 
 func (inc *CA) Update(x float64) {
 	if len(inc.Values) == 0 {
 		inc.SeriesBase.Series = inc
 	}
+
 	newVal := (inc.Values.Last(0)*inc.length + x) / (inc.length + 1.)
 	inc.length += 1
 	inc.Values.Push(newVal)
@@ -53,16 +54,4 @@ func (inc *CA) CalculateAndUpdate(allKLines []types.KLine) {
 		inc.PushK(k)
 		inc.EmitUpdate(inc.Last(0))
 	}
-}
-
-func (inc *CA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *CA) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
