@@ -54,32 +54,3 @@ func (inc *StdDev) PushK(k types.KLine) {
 	inc.Update(k.Close.Float64())
 	inc.EndTime = k.EndTime.Time()
 }
-
-func (inc *StdDev) CalculateAndUpdate(allKLines []types.KLine) {
-	var last = allKLines[len(allKLines)-1]
-
-	if inc.rawValues == nil {
-		for _, k := range allKLines {
-			if inc.EndTime != zeroTime && k.EndTime.Before(inc.EndTime) {
-				continue
-			}
-			inc.PushK(k)
-		}
-	} else {
-		inc.PushK(last)
-	}
-
-	inc.EmitUpdate(inc.Values.Last(0))
-}
-
-func (inc *StdDev) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *StdDev) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
-}
