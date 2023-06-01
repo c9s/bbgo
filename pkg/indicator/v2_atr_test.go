@@ -64,7 +64,7 @@ func Test_ATR2(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			stream := &types.StandardStream{}
 
-			kLines := KLines(stream)
+			kLines := KLines(stream, "", "")
 			atr := ATR2(kLines, tt.window)
 
 			for _, k := range tt.kLines {

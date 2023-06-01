@@ -1,7 +1,6 @@
 package indicator
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
@@ -81,22 +80,4 @@ func (inc *SMA) LoadK(allKLines []types.KLine) {
 	for _, k := range allKLines {
 		inc.PushK(k)
 	}
-}
-
-func calculateSMA(kLines []types.KLine, window int, priceF KLineValueMapper) (float64, error) {
-	length := len(kLines)
-	if length == 0 || length < window {
-		return 0.0, fmt.Errorf("insufficient elements for calculating SMA with window = %d", window)
-	}
-	if length != window {
-		return 0.0, fmt.Errorf("too much klines passed in, requires only %d klines", window)
-	}
-
-	sum := 0.0
-	for _, k := range kLines {
-		sum += priceF(k)
-	}
-
-	avg := sum / float64(window)
-	return avg, nil
 }

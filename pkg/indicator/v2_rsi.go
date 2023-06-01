@@ -17,17 +17,11 @@ func RSI2(source Float64Source, window int) *RSIStream {
 		Float64Series: NewFloat64Series(),
 		window:        window,
 	}
-
-	if sub, ok := source.(Float64Subscription); ok {
-		sub.AddSubscriber(s.calculateAndPush)
-	} else {
-		source.OnUpdate(s.calculateAndPush)
-	}
-
+	s.Bind(source, s)
 	return s
 }
 
-func (s *RSIStream) calculate(_ float64) float64 {
+func (s *RSIStream) Calculate(_ float64) float64 {
 	var gainSum, lossSum float64
 	var sourceLen = s.source.Length()
 	var limit = min(s.window, sourceLen)
@@ -47,10 +41,4 @@ func (s *RSIStream) calculate(_ float64) float64 {
 	rs := avgGain / avgLoss
 	rsi := 100.0 - (100.0 / (1.0 + rs))
 	return rsi
-}
-
-func (s *RSIStream) calculateAndPush(x float64) {
-	rsi := s.calculate(x)
-	s.slice.Push(rsi)
-	s.EmitUpdate(rsi)
 }
