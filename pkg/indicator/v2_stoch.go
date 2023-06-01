@@ -52,8 +52,9 @@ func Stoch2(source KLineSubscription, window, dPeriod int) *StochStream {
 			k = 100.0 * (kLine.Close.Float64() - lowest) / (highest - lowest)
 		}
 
-		d = s.K.Tail(s.dPeriod).Mean()
 		s.K.Push(k)
+	
+		d = s.K.Tail(s.dPeriod).Mean()
 		s.D.Push(d)
 		s.EmitUpdate(k, d)
 	})
