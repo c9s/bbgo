@@ -55,10 +55,6 @@ func (inc *EWMA) Update(value float64) {
 }
 
 func (inc *EWMA) Last(i int) float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-
 	return inc.Values.Last(i)
 }
 

@@ -35,20 +35,12 @@ func (inc *RR) Update(price float64) {
 
 }
 
-func (inc *RR) Last(int) float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *RR) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *RR) Index(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1-i]
+	return inc.Last(i)
 }
 
 func (inc *RR) Length() int {
@@ -101,7 +93,7 @@ func (inc *RR) LoadK(allKLines []types.KLine) {
 	inc.EmitUpdate(inc.Last(0))
 }
 
-//func calculateReturn(klines []types.KLine, window int, val KLineValueMapper) (float64, error) {
+// func calculateReturn(klines []types.KLine, window int, val KLineValueMapper) (float64, error) {
 //	length := len(klines)
 //	if length == 0 || length < window {
 //		return 0.0, fmt.Errorf("insufficient elements for calculating VOL with window = %d", window)
@@ -110,4 +102,4 @@ func (inc *RR) LoadK(allKLines []types.KLine) {
 //	rate := val(klines[length-1])/val(klines[length-2]) - 1
 //
 //	return rate, nil
-//}
+// }

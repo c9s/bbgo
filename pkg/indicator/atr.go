@@ -89,10 +89,7 @@ func (inc *ATR) Last(i int) float64 {
 }
 
 func (inc *ATR) Index(i int) float64 {
-	if inc.RMA == nil {
-		return 0
-	}
-	return inc.RMA.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *ATR) Length() int {
