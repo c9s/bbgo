@@ -165,8 +165,9 @@ type Strategy struct {
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
 
-	SkipSpreadCheck             bool `json:"skipSpreadCheck"`
-	RecoverGridByScanningTrades bool `json:"recoverGridByScanningTrades"`
+	SkipSpreadCheck                    bool `json:"skipSpreadCheck"`
+	RecoverGridByScanningTrades        bool `json:"recoverGridByScanningTrades"`
+	RecoverFailedOrdersWhenGridOpening bool `json:"recoverFailedOrdersWhenGridOpening"`
 
 	EnableProfitFixer bool        `json:"enableProfitFixer"`
 	FixProfitSince    *types.Time `json:"fixProfitSince"`
@@ -176,6 +177,9 @@ type Strategy struct {
 
 	GridProfitStats *GridProfitStats `persistence:"grid_profit_stats"`
 	Position        *types.Position  `persistence:"position"`
+
+	// this is used to check all generated orders are placed
+	GridOrderStates *GridOrderStates `persistence:"grid_order_states"`
 
 	// ExchangeSession is an injection field
 	ExchangeSession *bbgo.ExchangeSession
@@ -1131,6 +1135,10 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		return err
 	}
 
+	// use grid order states to check the orders are placed when opening grid
+	s.GridOrderStates = newGridOrderStates()
+	s.GridOrderStates.AddSubmitOrders(submitOrders...)
+
 	s.debugGridOrders(submitOrders, lastPrice)
 
 	writeCtx := s.getWriteContext(ctx)
@@ -1140,6 +1148,8 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		s.EmitGridError(err2)
 		return err2
 	}
+
+	s.GridOrderStates.AddCreatedOrders(createdOrders...)
 
 	// try to always emit grid ready
 	defer s.EmitGridReady()
@@ -1293,6 +1303,26 @@ func (s *Strategy) debugOrders(desc string, orders []types.Order) {
 	s.logger.Infof(sb.String())
 }
 
+func (s *Strategy) debugSubmitOrders(desc string, orders []types.SubmitOrder) {
+	if !s.Debug {
+		return
+	}
+
+	var sb strings.Builder
+
+	if desc == "" {
+		desc = "ORDERS"
+	}
+
+	sb.WriteString(desc + " [\n")
+	for i, order := range orders {
+		sb.WriteString(fmt.Sprintf("  - %d) %s\n", i, order.String()))
+	}
+	sb.WriteString("]")
+
+	s.logger.Infof(sb.String())
+}
+
 func (s *Strategy) debugGridProfitStats(trigger string) {
 	if !s.Debug {
 		return
@@ -1300,7 +1330,6 @@ func (s *Strategy) debugGridProfitStats(trigger string) {
 
 	stats := *s.GridProfitStats
 	// ProfitEntries may have too many profits, make it nil to readable
-	stats.ProfitEntries = nil
 	b, err := json.Marshal(stats)
 	if err != nil {
 		s.logger.WithError(err).Errorf("[%s] failed to debug grid profit stats", trigger)
@@ -2007,6 +2036,15 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSession) {
 	s.debugGridProfitStats("startProcess")
+	if s.RecoverFailedOrdersWhenGridOpening {
+		s.logger.Info("recover failed orders when grid opening")
+		if err := s.recoverFailedOrdersWhenGridOpening(ctx); err != nil {
+			s.logger.WithError(err).Error("failed to start process, recover failed orders when grid opening error")
+			s.EmitGridError(errors.Wrapf(err, "failed to start process, recover failed orders when grid opening error"))
+			return
+		}
+	}
+
 	if s.RecoverOrdersWhenStart {
 		// do recover only when triggerPrice is not set and not in the back-test mode
 		s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
@@ -2023,6 +2061,44 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 		s.EmitGridError(errors.Wrapf(err, "failed to start process, setup grid orders error"))
 		return
 	}
+}
+
+func (s *Strategy) recoverFailedOrdersWhenGridOpening(ctx context.Context) error {
+	if s.GridOrderStates == nil {
+		return nil
+	}
+
+	failedOrders, err := s.GridOrderStates.GetFailedOrdersWhenGridOpening(ctx, s.orderQueryService)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get failed orders")
+	}
+
+	var submitOrders []types.SubmitOrder
+	for _, failedOrder := range failedOrders {
+		submitOrders = append(submitOrders, types.SubmitOrder{
+			Symbol:        s.Symbol,
+			Type:          types.OrderTypeLimit,
+			Side:          failedOrder.Side,
+			Price:         failedOrder.Price,
+			Quantity:      failedOrder.Quantity,
+			Market:        s.Market,
+			TimeInForce:   types.TimeInForceGTC,
+			Tag:           orderTag,
+			GroupID:       s.OrderGroupID,
+			ClientOrderID: failedOrder.ClientOrderID,
+		})
+	}
+
+	s.debugSubmitOrders("RECOVER FAILED ORDERS WHEN GRID OPENING", submitOrders)
+
+	writeCtx := s.getWriteContext(ctx)
+	createdOrders, err := s.orderExecutor.SubmitOrders(writeCtx, submitOrders...)
+	if err != nil {
+		return errors.Wrapf(err, "failed to submit orders")
+	}
+
+	s.GridOrderStates.AddCreatedOrders(createdOrders...)
+	return nil
 }
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
