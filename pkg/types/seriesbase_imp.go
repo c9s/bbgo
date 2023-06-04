@@ -85,11 +85,11 @@ func (s *SeriesBase) Dot(b interface{}, limit ...int) float64 {
 	return Dot(s, b, limit...)
 }
 
-func (s *SeriesBase) Array(limit ...int) (result []float64) {
+func (s *SeriesBase) Array(limit ...int) []float64 {
 	return Array(s, limit...)
 }
 
-func (s *SeriesBase) Reverse(limit ...int) (result floats.Slice) {
+func (s *SeriesBase) Reverse(limit ...int) floats.Slice {
 	return Reverse(s, limit...)
 }
 
