@@ -268,7 +268,7 @@ func (e *GeneralOrderExecutor) reduceQuantityAndSubmitOrder(ctx context.Context,
 
 		submitOrder.Quantity = q
 		if e.position.Market.IsDustQuantity(submitOrder.Quantity, price) {
-			return nil, types.NewZeroAssetError(fmt.Errorf("dust quantity"))
+			return nil, types.NewZeroAssetError(fmt.Errorf("dust quantity, quantity = %f, price = %f", submitOrder.Quantity.Float64(), price.Float64()))
 		}
 
 		createdOrder, err2 := e.SubmitOrders(ctx, submitOrder)
@@ -334,10 +334,15 @@ func (e *GeneralOrderExecutor) NewOrderFromOpenPosition(ctx context.Context, opt
 				return nil, err
 			}
 
+			if price.IsZero() {
+				return nil, errors.New("unable to calculate quantity: zero price given")
+			}
+
 			quantity = quoteQuantity.Div(price)
 		}
+
 		if e.position.Market.IsDustQuantity(quantity, price) {
-			log.Warnf("dust quantity: %v", quantity)
+			log.Errorf("can not submit order: dust quantity, quantity = %f, price = %f", quantity.Float64(), price.Float64())
 			return nil, nil
 		}
 
@@ -389,9 +394,11 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 	if err != nil {
 		return nil, err
 	}
+
 	if submitOrder == nil {
 		return nil, nil
 	}
+
 	price := options.Price
 
 	side := "long"
@@ -399,7 +406,7 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		side = "short"
 	}
 
-	Notify("Opening %s %s position with quantity %v at price %v", e.position.Symbol, side, submitOrder.Quantity, price)
+	Notify("Opening %s %s position with quantity %f at price %f", e.position.Symbol, side, submitOrder.Quantity.Float64(), price.Float64())
 
 	createdOrder, err := e.SubmitOrders(ctx, *submitOrder)
 	if err == nil {
