@@ -627,6 +627,16 @@ func (k *KLineSeries) Length() int {
 
 var _ Series = &KLineSeries{}
 
+func TradeWith(symbol string, f func(trade Trade)) func(trade Trade) {
+	return func(trade Trade) {
+		if symbol != "" && trade.Symbol != symbol {
+			return
+		}
+
+		f(trade)
+	}
+}
+
 func KLineWith(symbol string, interval Interval, callback KLineCallback) KLineCallback {
 	return func(k KLine) {
 		if k.Symbol != symbol || (k.Interval != "" && k.Interval != interval) {
