@@ -183,7 +183,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 			if quoteBalance.Available.Compare(quoteQuantity) < 0 {
-				bbgo.Notify("Can not place scheduled %s order: quote balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, quoteBalance.Available, quoteQuantity)
 				log.Errorf("can not place scheduled %s order: quote balance %s is not enough: %v < %v", s.Symbol, s.Market.QuoteCurrency, quoteBalance.Available, quoteQuantity)
 				return
 			}
@@ -218,6 +217,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if s.UseLimitOrder {
 			submitOrder.Type = types.OrderTypeLimit
 			submitOrder.Price = closePrice
+		}
+
+		if err := s.orderExecutor.GracefulCancel(ctx); err != nil {
+			log.WithError(err).Errorf("cancel order error")
 		}
 
 		bbgo.Notify("Submitting scheduled %s order with quantity %s at price %s", s.Symbol, quantity.String(), closePrice.String())
