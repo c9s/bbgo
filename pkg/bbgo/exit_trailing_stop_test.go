@@ -41,7 +41,7 @@ func TestTrailingStop_ShortPosition(t *testing.T) {
 		Type:             types.OrderTypeMarket,
 		Market:           market,
 		Quantity:         fixedpoint.NewFromFloat(1.0),
-		Tag:              "trailingStop",
+		Tag:              "trailingStop:activation=1%,callback=1%",
 		MarginSideEffect: types.SideEffectTypeAutoRepay,
 	})
 
@@ -119,7 +119,7 @@ func TestTrailingStop_LongPosition(t *testing.T) {
 		Type:             types.OrderTypeMarket,
 		Market:           market,
 		Quantity:         fixedpoint.NewFromFloat(1.0),
-		Tag:              "trailingStop",
+		Tag:              "trailingStop:activation=1%,callback=1%",
 		MarginSideEffect: types.SideEffectTypeAutoRepay,
 	})
 
