@@ -38,6 +38,7 @@ type Strategy struct {
 
 	bbgo.QuantityOrAmount
 
+	MinBaseBalance fixedpoint.Value `json:"minBaseBalance"`
 	MaxBaseBalance fixedpoint.Value `json:"maxBaseBalance"`
 
 	BelowMovingAverage *bbgo.MovingAverageSettings `json:"belowMovingAverage,omitempty"`
@@ -163,23 +164,35 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// calculate quote quantity for balance checking
 		quoteQuantity := quantity.Mul(closePrice)
 
+		quoteBalance, ok := session.GetAccount().Balance(s.Market.QuoteCurrency)
+		if !ok {
+			log.Errorf("can not place scheduled %s order, quote balance %s is empty", s.Symbol, s.Market.QuoteCurrency)
+			return
+		}
+
+		baseBalance, ok := session.GetAccount().Balance(s.Market.BaseCurrency)
+		if !ok {
+			log.Errorf("can not place scheduled %s order, base balance %s is empty", s.Symbol, s.Market.BaseCurrency)
+			return
+		}
+
+		totalBase := baseBalance.Total()
+
 		// execute orders
 		switch side {
 		case types.SideTypeBuy:
+
 			if !s.MaxBaseBalance.IsZero() {
-				if baseBalance, ok := session.GetAccount().Balance(s.Market.BaseCurrency); ok {
-					total := baseBalance.Total()
-					if total.Add(quantity).Compare(s.MaxBaseBalance) >= 0 {
-						quantity = s.MaxBaseBalance.Sub(total)
-						quoteQuantity = quantity.Mul(closePrice)
-					}
+				if totalBase.Add(quantity).Compare(s.MaxBaseBalance) >= 0 {
+					quantity = s.MaxBaseBalance.Sub(totalBase)
+					quoteQuantity = quantity.Mul(closePrice)
 				}
 			}
 
-			quoteBalance, ok := session.GetAccount().Balance(s.Market.QuoteCurrency)
-			if !ok {
-				log.Errorf("can not place scheduled %s order, quote balance %s is empty", s.Symbol, s.Market.QuoteCurrency)
-				return
+			// if min base balance is defined
+			if !s.MinBaseBalance.IsZero() && s.MinBaseBalance.Compare(totalBase) > 0 {
+				quantity = fixedpoint.Max(quantity, s.MinBaseBalance.Sub(totalBase))
+				quantity = fixedpoint.Max(quantity, s.Market.MinQuantity)
 			}
 
 			if quoteBalance.Available.Compare(quoteQuantity) < 0 {
@@ -188,13 +201,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 		case types.SideTypeSell:
-			baseBalance, ok := session.GetAccount().Balance(s.Market.BaseCurrency)
-			if !ok {
-				log.Errorf("can not place scheduled %s order, base balance %s is empty", s.Symbol, s.Market.BaseCurrency)
-				return
+			quantity = fixedpoint.Min(quantity, baseBalance.Available)
+
+			// skip sell if we hit the minBaseBalance line
+			if !s.MinBaseBalance.IsZero() {
+				if totalBase.Sub(quantity).Compare(s.MinBaseBalance) < 0 {
+					return
+				}
 			}
 
-			quantity = fixedpoint.Min(quantity, baseBalance.Available)
 			quoteQuantity = quantity.Mul(closePrice)
 		}
 
