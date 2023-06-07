@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 	"fmt"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -82,14 +83,14 @@ func (s *HigherHighLowerLowStop) updateActivated(position *types.Position, close
 			r := fixedpoint.One.Add(s.ActivationRatio)
 			if closePrice.Compare(position.AverageCost.Mul(r)) >= 0 {
 				s.activated = true
-				Notify("[hhllStop] Stop of %s activated for long position, activation ratio %s:", s.Symbol, s.ActivationRatio.Percentage())
+				Notify("[hhllStop] %s stop is activated for long position, activation ratio %s:", s.Symbol, s.ActivationRatio.Percentage())
 			}
 		} else if position.IsShort() {
 			r := fixedpoint.One.Sub(s.ActivationRatio)
 			// for short position, if the close price is less than the activation price then this is a profit position.
 			if closePrice.Compare(position.AverageCost.Mul(r)) <= 0 {
 				s.activated = true
-				Notify("[hhllStop] Stop of %s activated for short position, activation ratio %s:", s.Symbol, s.ActivationRatio.Percentage())
+				Notify("[hhllStop] %s stop is activated for short position, activation ratio %s:", s.Symbol, s.ActivationRatio.Percentage())
 			}
 		}
 	}
@@ -99,15 +100,18 @@ func (s *HigherHighLowerLowStop) updateHighLowNumber(kline types.KLine) {
 	s.klines.Truncate(s.Window - 1)
 
 	if s.klines.Len() >= s.Window-1 {
-		if s.klines.GetHigh().Compare(kline.GetHigh()) < 0 {
+		high := kline.GetHigh()
+		low := kline.GetLow()
+		if s.klines.GetHigh().Compare(high) < 0 {
 			s.highLows = append(s.highLows, types.DirectionUp)
-			log.Debugf("[hhllStop] new higher high for %s", s.Symbol)
-		} else if s.klines.GetLow().Compare(kline.GetLow()) > 0 {
+			Notify("[hhllStop] detected %s new higher high %f", s.Symbol, high.Float64())
+		} else if s.klines.GetLow().Compare(low) > 0 {
 			s.highLows = append(s.highLows, types.DirectionDown)
-			log.Debugf("[hhllStop] new lower low for %s", s.Symbol)
+			Notify("[hhllStop] detected %s new lower low %f", s.Symbol, low.Float64())
 		} else {
 			s.highLows = append(s.highLows, types.DirectionNone)
 		}
+
 		// Truncate highLows
 		if len(s.highLows) > s.HighLowWindow {
 			end := len(s.highLows)
@@ -118,6 +122,7 @@ func (s *HigherHighLowerLowStop) updateHighLowNumber(kline types.KLine) {
 			kn := s.highLows[start:]
 			s.highLows = kn
 		}
+
 	} else {
 		s.highLows = append(s.highLows, types.DirectionNone)
 	}
@@ -183,13 +188,17 @@ func (s *HigherHighLowerLowStop) Bind(session *ExchangeSession, orderExecutor *G
 
 		// Close position & reset
 		if s.shouldStop(position) {
+			defer func() {
+				s.activated = false
+			}()
+
 			err := s.orderExecutor.ClosePosition(context.Background(), fixedpoint.One, "hhllStop")
 			if err != nil {
 				Notify("[hhllStop] Stop of %s triggered but failed to close %s position:", s.Symbol, err)
-			} else {
-				s.activated = false
-				Notify("[hhllStop] Stop of %s triggered and position closed", s.Symbol)
+				return
 			}
+
+			Notify("[hhllStop] Stop of %s triggered and position closed", s.Symbol)
 		}
 	}))
 
