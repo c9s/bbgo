@@ -6,6 +6,8 @@ import (
 
 type KLineSubscription interface {
 	AddSubscriber(f func(k types.KLine))
+	Length() int
+	Last(i int) *types.KLine
 }
 
 type PriceStream struct {

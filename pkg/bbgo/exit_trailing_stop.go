@@ -59,15 +59,11 @@ func (s *TrailingStop2) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 	}))
 
 	if !IsBackTesting && enableMarketTradeStop {
-		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
-			if trade.Symbol != position.Symbol {
-				return
-			}
-
+		session.MarketDataStream.OnMarketTrade(types.TradeWith(position.Symbol, func(trade types.Trade) {
 			if err := s.checkStopPrice(trade.Price, position); err != nil {
 				log.WithError(err).Errorf("error")
 			}
-		})
+		}))
 	}
 }
 
@@ -78,8 +74,10 @@ func (s *TrailingStop2) getRatio(price fixedpoint.Value, position *types.Positio
 		// for short position, it's:
 		//  (avg_cost - price) / avg_cost
 		return position.AverageCost.Sub(price).Div(position.AverageCost), nil
+
 	case types.SideTypeSell:
 		return price.Sub(position.AverageCost).Div(position.AverageCost), nil
+
 	default:
 		if position.IsLong() {
 			return price.Sub(position.AverageCost).Div(position.AverageCost), nil
@@ -174,12 +172,15 @@ func (s *TrailingStop2) triggerStop(price fixedpoint.Value) error {
 		s.activated = false
 		s.latestHigh = fixedpoint.Zero
 	}()
-	Notify("[TrailingStop] %s %s stop loss triggered. price: %f callback rate: %f", s.Symbol, s, price.Float64(), s.CallbackRate.Float64())
+
+	Notify("[TrailingStop] %s %s tailingStop is triggered. price: %f callbackRate: %s", s.Symbol, s.ActivationRatio.Percentage(), price.Float64(), s.CallbackRate.Percentage())
 	ctx := context.Background()
 	p := fixedpoint.One
 	if !s.ClosePosition.IsZero() {
 		p = s.ClosePosition
 	}
 
-	return s.orderExecutor.ClosePosition(ctx, p, "trailingStop")
+	tagName := fmt.Sprintf("trailingStop:activation=%s,callback=%s", s.ActivationRatio.Percentage(), s.CallbackRate.Percentage())
+
+	return s.orderExecutor.ClosePosition(ctx, p, tagName)
 }

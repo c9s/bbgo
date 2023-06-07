@@ -5,8 +5,8 @@ type MACDStream struct {
 
 	shortWindow, longWindow, signalWindow int
 
-	fastEWMA, slowEWMA, signal *EWMAStream
-	histogram                  *SubtractStream
+	FastEWMA, SlowEWMA, Signal *EWMAStream
+	Histogram                  *SubtractStream
 }
 
 func MACD2(source Float64Source, shortWindow, longWindow, signalWindow int) *MACDStream {
@@ -21,9 +21,9 @@ func MACD2(source Float64Source, shortWindow, longWindow, signalWindow int) *MAC
 		shortWindow:    shortWindow,
 		longWindow:     longWindow,
 		signalWindow:   signalWindow,
-		fastEWMA:       fastEWMA,
-		slowEWMA:       slowEWMA,
-		signal:         signal,
-		histogram:      histogram,
+		FastEWMA:       fastEWMA,
+		SlowEWMA:       slowEWMA,
+		Signal:         signal,
+		Histogram:      histogram,
 	}
 }
