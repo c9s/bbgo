@@ -34,6 +34,8 @@ type Strategy struct {
 	// Side is the order side type, which can be buy or sell
 	Side types.SideType `json:"side,omitempty"`
 
+	UseLimitOrder bool `json:"useLimitOrder"`
+
 	bbgo.QuantityOrAmount
 
 	MaxBaseBalance fixedpoint.Value `json:"maxBaseBalance"`
@@ -197,19 +199,29 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			quoteQuantity = quantity.Mul(closePrice)
 		}
 
+		// truncate quantity by its step size
+		quantity = s.Market.TruncateQuantity(quantity)
+
 		if s.Market.IsDustQuantity(quantity, closePrice) {
-			log.Warnf("%s: quantity %f is too small", s.Symbol, quantity.Float64())
+			log.Warnf("%s: quantity %f is too small, skip order", s.Symbol, quantity.Float64())
 			return
 		}
 
-		bbgo.Notify("Submitting scheduled %s order with quantity %s at price %s", s.Symbol, quantity.String(), closePrice.String())
-		_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		submitOrder := types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     side,
 			Type:     types.OrderTypeMarket,
 			Quantity: quantity,
 			Market:   s.Market,
-		})
+		}
+
+		if s.UseLimitOrder {
+			submitOrder.Type = types.OrderTypeLimit
+			submitOrder.Price = closePrice
+		}
+
+		bbgo.Notify("Submitting scheduled %s order with quantity %s at price %s", s.Symbol, quantity.String(), closePrice.String())
+		_, err := s.orderExecutor.SubmitOrders(ctx, submitOrder)
 		if err != nil {
 			bbgo.Notify("Can not place scheduled %s order: submit error %s", s.Symbol, err.Error())
 			log.WithError(err).Errorf("can not place scheduled %s order error", s.Symbol)
