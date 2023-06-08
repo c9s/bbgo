@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -40,7 +41,13 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("%s", ID)
+	var cs []string
+
+	for cur := range s.ExpectedBalances {
+		cs = append(cs, cur)
+	}
+
+	return ID + strings.Join(s.PreferredSessions, "-") + strings.Join(cs, "-")
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
