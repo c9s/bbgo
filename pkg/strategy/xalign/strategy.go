@@ -210,7 +210,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	go func() {
 		s.align(ctx, sessions)
 
-		ticker := time.NewTicker(time.Minute)
+		ticker := time.NewTicker(s.Interval.Duration())
 		defer ticker.Stop()
 
 		for {
