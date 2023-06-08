@@ -1,0 +1,44 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+  switches:
+    trade: true
+    orderUpdate: true
+    submitOrder: true
+
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: max
+
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+persistence:
+  json:
+    directory: var/data
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+crossExchangeStrategies:
+
+- xalign:
+    interval: 1m
+    sessions:
+    - max
+    - binance
+
+    ## quoteCurrencies config specifies which quote currency should be used for BUY order or SELL order.
+    ## when specifying [USDC,TWD] for "BUY", then it will consider BTCUSDT first then BTCTWD second.
+    quoteCurrencies:
+      buy: [USDC, TWD]
+      sell: [USDT]
+    expectedBalances:
+      BTC: 0.0440
+
