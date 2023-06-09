@@ -11,8 +11,8 @@ type Float64Series struct {
 	slice floats.Slice
 }
 
-func NewFloat64Series(v ...float64) Float64Series {
-	s := Float64Series{}
+func NewFloat64Series(v ...float64) *Float64Series {
+	s := &Float64Series{}
 	s.slice = v
 	s.SeriesBase.Series = s.slice
 	return s

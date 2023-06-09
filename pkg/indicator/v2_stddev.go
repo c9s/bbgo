@@ -3,7 +3,7 @@ package indicator
 import "github.com/c9s/bbgo/pkg/types"
 
 type StdDevStream struct {
-	Float64Series
+	*Float64Series
 
 	rawValues *types.Queue
 

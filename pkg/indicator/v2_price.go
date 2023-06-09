@@ -11,22 +11,23 @@ type KLineSubscription interface {
 }
 
 type PriceStream struct {
-	Float64Series
+	*Float64Series
 
 	mapper KLineValueMapper
 }
 
 func Price(source KLineSubscription, mapper KLineValueMapper) *PriceStream {
 	s := &PriceStream{
-		mapper: mapper,
+		Float64Series: NewFloat64Series(),
+		mapper:        mapper,
 	}
 
-	s.SeriesBase.Series = s.slice
-
-	source.AddSubscriber(func(k types.KLine) {
-		v := s.mapper(k)
-		s.PushAndEmit(v)
-	})
+	if source != nil {
+		source.AddSubscriber(func(k types.KLine) {
+			v := s.mapper(k)
+			s.PushAndEmit(v)
+		})
+	}
 	return s
 }
 
