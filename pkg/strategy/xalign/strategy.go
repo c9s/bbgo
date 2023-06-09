@@ -139,6 +139,7 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 				}
 
 				requiredQuoteAmount := q.Mul(price)
+				requiredQuoteAmount = requiredQuoteAmount.Round(market.PricePrecision, fixedpoint.Up)
 				if requiredQuoteAmount.Compare(quoteBalance.Available) < 0 {
 					log.Warnf("required quote amount %f < quote balance %v", requiredQuoteAmount.Float64(), quoteBalance)
 					continue
