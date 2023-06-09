@@ -1,6 +1,6 @@
 package indicator
 
-type BollStream struct {
+type BOLLStream struct {
 	// the band series
 	*Float64Series
 
@@ -20,12 +20,12 @@ type BollStream struct {
 //
 //	-> calculate SMA
 //	-> calculate stdDev -> calculate bandWidth -> get latest SMA -> upBand, downBand
-func BOLL2(source Float64Source, window int, k float64) *BollStream {
+func BOLL2(source Float64Source, window int, k float64) *BOLLStream {
 	// bind these indicators before our main calculator
 	sma := SMA2(source, window)
 	stdDev := StdDev2(source, window)
 
-	s := &BollStream{
+	s := &BOLLStream{
 		Float64Series: NewFloat64Series(),
 		UpBand:        NewFloat64Series(),
 		DownBand:      NewFloat64Series(),
@@ -45,7 +45,7 @@ func BOLL2(source Float64Source, window int, k float64) *BollStream {
 	return s
 }
 
-func (s *BollStream) Calculate(v float64) float64 {
+func (s *BOLLStream) Calculate(v float64) float64 {
 	stdDev := s.StdDev.Last(0)
 	band := stdDev * s.k
 	return band
