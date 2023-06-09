@@ -32,6 +32,7 @@ type Strategy struct {
 	PreferredQuoteCurrencies *QuoteCurrencyPreference    `json:"quoteCurrencies"`
 	ExpectedBalances         map[string]fixedpoint.Value `json:"expectedBalances"`
 	UseTakerOrder            bool                        `json:"useTakerOrder"`
+	DryRun                   bool                        `json:"dryRun"`
 
 	orderBook map[string]*bbgo.ActiveOrderBook
 }
@@ -92,7 +93,7 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 	for _, sessionName := range s.PreferredSessions {
 		session := sessions[sessionName]
 
-		var taker bool = s.UseTakerOrder
+		var taker = s.UseTakerOrder
 		var side types.SideType
 		var quoteCurrencies []string
 		if changeQuantity.Sign() > 0 {
@@ -137,7 +138,8 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 					price = ticker.Buy
 				}
 
-				requiredQuoteAmount := q.Div(price)
+				requiredQuoteAmount := q.Mul(price)
+				requiredQuoteAmount = requiredQuoteAmount.Round(market.PricePrecision, fixedpoint.Up)
 				if requiredQuoteAmount.Compare(quoteBalance.Available) < 0 {
 					log.Warnf("required quote amount %f < quote balance %v", requiredQuoteAmount.Float64(), quoteBalance)
 					continue
@@ -250,8 +252,11 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 		selectedSession, submitOrder := s.selectSessionForCurrency(ctx, sessions, currency, q)
 		if selectedSession != nil && submitOrder != nil {
-
 			log.Infof("placing order on %s: %#v", selectedSession.Name, submitOrder)
+
+			if s.DryRun {
+				return
+			}
 
 			createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
 			if err != nil {
