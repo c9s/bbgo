@@ -67,7 +67,7 @@ func Test_RSI2(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// RSI2()
-			prices := &PriceStream{}
+			prices := ClosePrices(nil)
 			rsi := RSI2(prices, tt.window)
 
 			t.Logf("data length: %d", len(tt.values))

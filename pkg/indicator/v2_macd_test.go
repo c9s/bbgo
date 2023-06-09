@@ -41,7 +41,7 @@ func Test_MACD2(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			prices := &PriceStream{}
+			prices := ClosePrices(nil)
 			macd := MACD2(prices, 12, 26, 9)
 			for _, k := range tt.kLines {
 				prices.EmitUpdate(k.Close.Float64())

@@ -1,7 +1,7 @@
 package indicator
 
 type EWMAStream struct {
-	Float64Series
+	*Float64Series
 
 	window     int
 	multiplier float64
