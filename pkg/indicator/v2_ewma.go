@@ -19,6 +19,10 @@ func EWMA2(source Float64Source, window int) *EWMAStream {
 
 func (s *EWMAStream) Calculate(v float64) float64 {
 	last := s.slice.Last(0)
+	if last == 0.0 {
+		return v
+	}
+
 	m := s.multiplier
 	return (1.0-m)*last + m*v
 }
