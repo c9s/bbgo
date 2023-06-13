@@ -215,11 +215,10 @@ func TestMarket_TruncateQuantity(t *testing.T) {
 }
 
 func TestMarket_AdjustQuantityByMinNotional(t *testing.T) {
-
 	market := Market{
 		Symbol:          "ETHUSDT",
 		StepSize:        fixedpoint.NewFromFloat(0.0001),
-		MinQuantity:     fixedpoint.NewFromFloat(0.0001),
+		MinQuantity:     fixedpoint.NewFromFloat(0.00045),
 		MinNotional:     fixedpoint.NewFromFloat(10.0),
 		VolumePrecision: 8,
 		PricePrecision:  2,
@@ -228,16 +227,17 @@ func TestMarket_AdjustQuantityByMinNotional(t *testing.T) {
 	// Quantity:0.00573961 Price:1750.99
 	testCases := []struct {
 		input  string
+		price  fixedpoint.Value
 		expect string
 	}{
-		{"0.00573961", "0.0058"},
+		{"0.00573961", number(1750.99), "0.0058"},
+		{"0.0019", number(1757.38), "0.0057"},
 	}
 
-	price := fixedpoint.NewFromFloat(1750.99)
 	for _, testCase := range testCases {
 		q := fixedpoint.MustNewFromString(testCase.input)
-		q2 := market.AdjustQuantityByMinNotional(q, price)
+		q2 := market.AdjustQuantityByMinNotional(q, testCase.price)
 		assert.Equalf(t, testCase.expect, q2.String(), "input: %s stepSize: %s", testCase.input, market.StepSize.String())
-		assert.False(t, market.IsDustQuantity(q2, price))
+		assert.False(t, market.IsDustQuantity(q2, testCase.price))
 	}
 }
