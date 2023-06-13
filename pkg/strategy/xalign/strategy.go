@@ -37,6 +37,8 @@ type Strategy struct {
 
 	sessions   map[string]*bbgo.ExchangeSession
 	orderBooks map[string]*bbgo.ActiveOrderBook
+
+	orderStore *bbgo.OrderStore
 }
 
 func (s *Strategy) ID() string {
@@ -222,11 +224,15 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	s.sessions = make(map[string]*bbgo.ExchangeSession)
 	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
 
+	s.orderStore = bbgo.NewOrderStore("")
+
 	for _, sessionName := range s.PreferredSessions {
 		session, ok := sessions[sessionName]
 		if !ok {
 			return fmt.Errorf("incorrect preferred session name: %s is not defined", sessionName)
 		}
+
+		s.orderStore.BindStream(session.UserDataStream)
 
 		orderBook := bbgo.NewActiveOrderBook("")
 		orderBook.BindStream(session.UserDataStream)
