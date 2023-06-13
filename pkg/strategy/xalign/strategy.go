@@ -155,6 +155,11 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 					continue
 				}
 
+				if market.IsDustQuantity(q, price) {
+					log.Infof("%s ignore dust quantity: %f", currency, q.Float64())
+					return nil, nil
+				}
+
 				q = market.AdjustQuantityByMinNotional(q, price)
 
 				return session, &types.SubmitOrder{
