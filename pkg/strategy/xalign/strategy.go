@@ -118,6 +118,8 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 				continue
 			}
 
+			spread := ticker.Sell.Sub(ticker.Buy)
+
 			// changeQuantity > 0 = buy
 			// changeQuantity < 0 = sell
 			q := changeQuantity.Abs()
@@ -135,8 +137,8 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 				price := ticker.Sell
 				if taker {
 					price = ticker.Sell
-				} else if ticker.Buy.Add(market.TickSize).Compare(ticker.Sell) < 0 {
-					price = ticker.Buy.Add(market.TickSize)
+				} else if spread.Compare(market.TickSize) > 0 {
+					price = ticker.Sell.Sub(market.TickSize)
 				} else {
 					price = ticker.Buy
 				}
@@ -174,14 +176,14 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 				price := ticker.Buy
 				if taker {
 					price = ticker.Buy
-				} else if ticker.Sell.Add(market.TickSize.Neg()).Compare(ticker.Buy) < 0 {
-					price = ticker.Sell.Add(market.TickSize.Neg())
+				} else if spread.Compare(market.TickSize) > 0 {
+					price = ticker.Buy.Add(market.TickSize)
 				} else {
 					price = ticker.Sell
 				}
 
 				if market.IsDustQuantity(q, price) {
-					log.Infof("%s dust quantity: %f", currency, q.Float64())
+					log.Infof("%s ignore dust quantity: %f", currency, q.Float64())
 					return nil, nil
 				}
 
