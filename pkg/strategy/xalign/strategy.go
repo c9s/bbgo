@@ -289,7 +289,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 		if selectedSession != nil && submitOrder != nil {
 			log.Infof("placing order on %s: %+v", selectedSession.Name, submitOrder)
 
-			bbgo.Notify("Aligning position", submitOrder)
+			bbgo.Notify("Aligning position on exchange session %s, delta: %f", selectedSession.Name, q.Float64(), submitOrder)
 
 			if s.DryRun {
 				return
