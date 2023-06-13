@@ -236,9 +236,9 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 		orderBook := bbgo.NewActiveOrderBook("")
 		orderBook.BindStream(session.UserDataStream)
+		s.orderBooks[sessionName] = orderBook
 
 		s.sessions[sessionName] = session
-		s.orderBooks[sessionName] = orderBook
 	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
@@ -313,6 +313,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 				} else {
 					log.Errorf("orderbook %s not found", selectedSession.Name)
 				}
+				s.orderBooks[selectedSession.Name].Add(*createdOrder)
 			}
 		}
 	}
