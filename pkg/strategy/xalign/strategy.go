@@ -34,7 +34,7 @@ type Strategy struct {
 	UseTakerOrder            bool                        `json:"useTakerOrder"`
 	DryRun                   bool                        `json:"dryRun"`
 
-	orderBook map[string]*bbgo.ActiveOrderBook
+	orderBooks map[string]*bbgo.ActiveOrderBook
 }
 
 func (s *Strategy) ID() string {
@@ -203,7 +203,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	instanceID := s.InstanceID()
 	_ = instanceID
 
-	s.orderBook = make(map[string]*bbgo.ActiveOrderBook)
+	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
 
 	for _, sessionName := range s.PreferredSessions {
 		session, ok := sessions[sessionName]
@@ -213,7 +213,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 		orderBook := bbgo.NewActiveOrderBook("")
 		orderBook.BindStream(session.UserDataStream)
-		s.orderBook[sessionName] = orderBook
+		s.orderBooks[sessionName] = orderBook
 	}
 
 	go func() {
@@ -242,8 +242,15 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 	_ = sessionBalances
 
 	for sessionName, session := range sessions {
-		if err := s.orderBook[sessionName].GracefulCancel(ctx, session.Exchange); err != nil {
-			log.WithError(err).Errorf("can not cancel order")
+		ob, ok := s.orderBooks[sessionName]
+		if !ok {
+			log.Errorf("orderbook on session %s not found", sessionName)
+			return
+		}
+		if ok {
+			if err := ob.GracefulCancel(ctx, session.Exchange); err != nil {
+				log.WithError(err).Errorf("can not cancel order")
+			}
 		}
 	}
 
@@ -265,7 +272,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 			}
 
 			if createdOrder != nil {
-				s.orderBook[selectedSession.Name].Add(*createdOrder)
+				s.orderBooks[selectedSession.Name].Add(*createdOrder)
 			}
 		}
 	}
