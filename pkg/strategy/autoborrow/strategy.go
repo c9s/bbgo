@@ -380,6 +380,11 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 	minMarginLevel := s.MinMarginLevel
 	curMarginLevel := account.MarginLevel
 
+	// margin repay/borrow also trigger this update event
+	if curMarginLevel.Compare(minMarginLevel) > 0 {
+		return
+	}
+
 	if b, ok := account.Balance(event.Asset); ok {
 		if b.Available.IsZero() {
 			return
