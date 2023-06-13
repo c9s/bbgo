@@ -34,6 +34,7 @@ type Strategy struct {
 	UseTakerOrder            bool                        `json:"useTakerOrder"`
 	DryRun                   bool                        `json:"dryRun"`
 
+	sessions   map[string]*bbgo.ExchangeSession
 	orderBooks map[string]*bbgo.ActiveOrderBook
 }
 
@@ -203,6 +204,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	instanceID := s.InstanceID()
 	_ = instanceID
 
+	s.sessions = make(map[string]*bbgo.ExchangeSession)
 	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
 
 	for _, sessionName := range s.PreferredSessions {
@@ -213,11 +215,13 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 		orderBook := bbgo.NewActiveOrderBook("")
 		orderBook.BindStream(session.UserDataStream)
+
+		s.sessions[sessionName] = session
 		s.orderBooks[sessionName] = orderBook
 	}
 
 	go func() {
-		s.align(ctx, sessions)
+		s.align(ctx, s.sessions)
 
 		ticker := time.NewTicker(s.Interval.Duration())
 		defer ticker.Stop()
@@ -229,7 +233,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				return
 
 			case <-ticker.C:
-				s.align(ctx, sessions)
+				s.align(ctx, s.sessions)
 			}
 		}
 	}()
