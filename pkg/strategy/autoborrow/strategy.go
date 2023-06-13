@@ -381,11 +381,16 @@ func (s *Strategy) handleBinanceBalanceUpdateEvent(event *binance.BalanceUpdateE
 	curMarginLevel := account.MarginLevel
 
 	if b, ok := account.Balance(event.Asset); ok {
-		if b.Available.IsZero() || b.Borrowed.IsZero() {
+		if b.Available.IsZero() {
 			return
 		}
 
-		toRepay := fixedpoint.Min(b.Borrowed, b.Available)
+		debt := b.Debt()
+		if debt.IsZero() {
+			return
+		}
+
+		toRepay := fixedpoint.Min(debt, b.Available)
 		if toRepay.IsZero() {
 			return
 		}
