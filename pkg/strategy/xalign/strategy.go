@@ -277,7 +277,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 		selectedSession, submitOrder := s.selectSessionForCurrency(ctx, sessions, currency, q)
 		if selectedSession != nil && submitOrder != nil {
-			log.Infof("placing order on %s: %#v", selectedSession.Name, submitOrder)
+			log.Infof("placing order on %s: %+v", selectedSession.Name, submitOrder)
 
 			bbgo.Notify("Aligning position", submitOrder)
 
