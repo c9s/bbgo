@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -233,6 +234,15 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		s.sessions[sessionName] = session
 		s.orderBooks[sessionName] = orderBook
 	}
+
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+		for n, session := range s.sessions {
+			if ob, ok := s.orderBooks[n]; ok {
+				_ = ob.GracefulCancel(ctx, session.Exchange)
+			}
+		}
+	})
 
 	go func() {
 		s.align(ctx, s.sessions)
