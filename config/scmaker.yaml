@@ -1,0 +1,50 @@
+sessions:
+  binance:
+    exchange: max
+    envVarPrefix: max
+
+
+exchangeStrategies:
+- on: max
+  scmaker:
+    symbol: USDCUSDT
+
+    ## adjustmentUpdateInterval is the interval for adjusting position
+    adjustmentUpdateInterval: 1m
+
+    ## liquidityUpdateInterval is the interval for updating liquidity orders
+    liquidityUpdateInterval: 1h
+
+    midPriceEMA:
+      interval: 1h
+      window: 99
+
+    ## priceRangeBollinger is used for the liquidity price range
+    priceRangeBollinger:
+      interval: 1h
+      window: 10
+      k: 1.0
+
+    numOfLiquidityLayers: 10
+
+    liquidityLayerTick: 0.01
+
+    strengthInterval: 1m
+
+    liquidityScale:
+      exp:
+        domain: [0, 10]
+        range: [100, 500]
+
+backtest:
+  sessions:
+    - max
+  startTime: "2023-05-01"
+  endTime: "2023-06-01"
+  symbols:
+  - USDCUSDT
+  account:
+    max:
+      balances:
+        USDC: 5000
+        USDT: 5000
