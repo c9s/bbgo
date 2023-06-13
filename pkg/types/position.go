@@ -170,7 +170,12 @@ func (p *Position) NewMarketCloseOrder(percentage fixedpoint.Value) *SubmitOrder
 	}
 }
 
-func (p *Position) IsDust(price fixedpoint.Value) bool {
+func (p *Position) IsDust(a ...fixedpoint.Value) bool {
+	price := p.AverageCost
+	if len(a) > 0 {
+		price = a[0]
+	}
+
 	base := p.Base.Abs()
 	return p.Market.IsDustQuantity(base, price)
 }
