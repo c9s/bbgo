@@ -124,6 +124,11 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 			// changeQuantity < 0 = sell
 			q := changeQuantity.Abs()
 
+			if q.Compare(market.MinQuantity) < 0 {
+				log.Infof("skip dust quantity: %f", q.Float64())
+				continue
+			}
+
 			log.Infof("%s changeQuantity: %f ticker: %+v market: %+v", symbol, changeQuantity.Float64(), ticker, market)
 
 			switch side {
