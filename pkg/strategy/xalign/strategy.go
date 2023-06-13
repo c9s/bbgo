@@ -122,6 +122,8 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 			// changeQuantity < 0 = sell
 			q := changeQuantity.Abs()
 
+			log.Infof("%s changeQuantity: %f ticker: %+v market: %+v", symbol, changeQuantity.Float64(), ticker, market)
+
 			switch side {
 
 			case types.SideTypeBuy:
