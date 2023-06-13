@@ -272,7 +272,11 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 			}
 
 			if createdOrder != nil {
-				s.orderBooks[selectedSession.Name].Add(*createdOrder)
+				if ob, ok := s.orderBooks[selectedSession.Name]; ok {
+					ob.Add(*createdOrder)
+				} else {
+					log.Errorf("orderbook %s not found", selectedSession.Name)
+				}
 			}
 		}
 	}
