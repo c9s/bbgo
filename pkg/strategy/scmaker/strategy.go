@@ -280,19 +280,24 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	// calculate and collect prices
 	for i := 0; i <= s.NumOfLiquidityLayers; i++ {
 		fi := fixedpoint.NewFromInt(int64(i))
-		if i == 0 {
-			bidPrices = append(bidPrices, ticker.Buy)
-			askPrices = append(askPrices, ticker.Sell)
-		} else if i == s.NumOfLiquidityLayers {
+
+		bidPrice := ticker.Buy
+		askPrice := ticker.Sell
+
+		if i == s.NumOfLiquidityLayers {
 			bwf := fixedpoint.NewFromFloat(bandWidth)
-			bidPrices = append(bidPrices, midPrice.Add(-bwf))
-			askPrices = append(askPrices, midPrice.Add(bwf))
-		} else {
-			bidPrice := midPrice.Sub(tickSize.Mul(fi))
-			askPrice := midPrice.Add(tickSize.Mul(fi))
-			bidPrices = append(bidPrices, bidPrice)
-			askPrices = append(askPrices, askPrice)
+			bidPrice = midPrice.Add(-bwf)
+			askPrice = midPrice.Add(bwf)
+		} else if i > 0 {
+			bidPrice = midPrice.Sub(tickSize.Mul(fi))
+			askPrice = midPrice.Add(tickSize.Mul(fi))
 		}
+
+		bidPrice = s.Market.TruncatePrice(bidPrice)
+		askPrice = s.Market.TruncatePrice(askPrice)
+
+		bidPrices = append(bidPrices, bidPrice)
+		askPrices = append(askPrices, askPrice)
 	}
 
 	availableBase := baseBal.Available
