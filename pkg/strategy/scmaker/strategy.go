@@ -42,9 +42,9 @@ type Strategy struct {
 
 	AdjustmentUpdateInterval types.Interval `json:"adjustmentUpdateInterval"`
 
-	MidPriceEMA        *types.IntervalWindow `json:"midPriceEMA"`
-	LiquiditySlideRule *bbgo.SlideRule       `json:"liquidityScale"`
-	LiquidityLayerTick fixedpoint.Value      `json:"liquidityLayerTick"`
+	MidPriceEMA            *types.IntervalWindow `json:"midPriceEMA"`
+	LiquiditySlideRule     *bbgo.SlideRule       `json:"liquidityScale"`
+	LiquidityLayerTickSize fixedpoint.Value      `json:"liquidityLayerTickSize"`
 
 	MinProfit fixedpoint.Value `json:"minProfit"`
 
@@ -195,7 +195,7 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 	tickSize := s.Market.TickSize
 
 	if s.Position.IsShort() {
-		price := profitProtectedPrice(types.SideTypeBuy, s.Position.AverageCost, ticker.Sell.Add(-tickSize), s.session.MakerFeeRate, s.MinProfit)
+		price := profitProtectedPrice(types.SideTypeBuy, s.Position.AverageCost, ticker.Sell.Add(tickSize.Neg()), s.session.MakerFeeRate, s.MinProfit)
 		quoteQuantity := fixedpoint.Min(price.Mul(posSize), quoteBal.Available)
 		bidQuantity := quoteQuantity.Div(price)
 
@@ -259,7 +259,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	quoteBal, _ := s.session.Account.Balance(s.Market.QuoteCurrency)
 
 	spread := ticker.Sell.Sub(ticker.Buy)
-	tickSize := fixedpoint.Max(s.LiquidityLayerTick, s.Market.TickSize)
+	tickSize := fixedpoint.Max(s.LiquidityLayerTickSize, s.Market.TickSize)
 
 	midPriceEMA := s.ewma.Last(0)
 	midPrice := fixedpoint.NewFromFloat(midPriceEMA)
@@ -286,7 +286,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 
 		if i == s.NumOfLiquidityLayers {
 			bwf := fixedpoint.NewFromFloat(bandWidth)
-			bidPrice = midPrice.Add(-bwf)
+			bidPrice = midPrice.Add(bwf.Neg())
 			askPrice = midPrice.Add(bwf)
 		} else if i > 0 {
 			bidPrice = midPrice.Sub(tickSize.Mul(fi))
