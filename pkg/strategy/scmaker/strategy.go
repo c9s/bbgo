@@ -45,6 +45,8 @@ type Strategy struct {
 	MidPriceEMA        *types.IntervalWindow `json:"midPriceEMA"`
 	LiquiditySlideRule *bbgo.SlideRule       `json:"liquidityScale"`
 
+	MinProfit fixedpoint.Value `json:"minProfit"`
+
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
@@ -98,6 +100,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Position.Strategy = ID
 	s.Position.StrategyInstanceID = instanceID
 
+	// if anyone of the fee rate is defined, this assumes that both are defined.
+	// so that zero maker fee could be applied
 	if s.session.MakerFeeRate.Sign() > 0 || s.session.TakerFeeRate.Sign() > 0 {
 		s.Position.SetExchangeFeeRate(s.session.ExchangeName, types.ExchangeFee{
 			MakerFeeRate: s.session.MakerFeeRate,
@@ -132,13 +136,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.initializePriceRangeBollinger(session)
 	s.initializeIntensityIndicator(session)
 
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.AdjustmentUpdateInterval, func(k types.KLine) {
-		s.placeAdjustmentOrders(ctx)
-	}))
+	session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
+		if k.Interval == s.AdjustmentUpdateInterval {
+			s.placeAdjustmentOrders(ctx)
+		}
 
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.LiquidityUpdateInterval, func(k types.KLine) {
-		s.placeLiquidityOrders(ctx)
-	}))
+		if k.Interval == s.LiquidityUpdateInterval {
+			s.placeLiquidityOrders(ctx)
+		}
+	})
 
 	return nil
 }
@@ -160,9 +166,67 @@ func (s *Strategy) initializePriceRangeBollinger(session *bbgo.ExchangeSession) 
 }
 
 func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
+	_ = s.adjustmentOrderBook.GracefulCancel(ctx, s.session.Exchange)
+
 	if s.Position.IsDust() {
 		return
 	}
+
+	ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)
+	if logErr(err, "unable to query ticker") {
+		return
+	}
+
+	baseBal, _ := s.session.Account.Balance(s.Market.BaseCurrency)
+	quoteBal, _ := s.session.Account.Balance(s.Market.QuoteCurrency)
+
+	var adjOrders []types.SubmitOrder
+
+	var posSize = s.Position.Base.Abs()
+
+	if s.Position.IsShort() {
+		price := profitProtectedPrice(types.SideTypeBuy, s.Position.AverageCost, ticker.Sell.Add(-s.Market.TickSize), s.session.MakerFeeRate, s.MinProfit)
+		quoteQuantity := fixedpoint.Min(price.Mul(posSize), quoteBal.Available)
+		bidQuantity := quoteQuantity.Div(price)
+
+		if s.Market.IsDustQuantity(bidQuantity, price) {
+			return
+		}
+
+		adjOrders = append(adjOrders, types.SubmitOrder{
+			Symbol:      s.Symbol,
+			Type:        types.OrderTypeLimitMaker,
+			Side:        types.SideTypeBuy,
+			Price:       price,
+			Quantity:    bidQuantity,
+			Market:      s.Market,
+			TimeInForce: types.TimeInForceGTC,
+		})
+	} else if s.Position.IsLong() {
+		price := profitProtectedPrice(types.SideTypeSell, s.Position.AverageCost, ticker.Buy.Add(s.Market.TickSize), s.session.MakerFeeRate, s.MinProfit)
+		askQuantity := fixedpoint.Min(posSize, baseBal.Available)
+
+		if s.Market.IsDustQuantity(askQuantity, price) {
+			return
+		}
+
+		adjOrders = append(adjOrders, types.SubmitOrder{
+			Symbol:      s.Symbol,
+			Type:        types.OrderTypeLimitMaker,
+			Side:        types.SideTypeSell,
+			Price:       price,
+			Quantity:    askQuantity,
+			Market:      s.Market,
+			TimeInForce: types.TimeInForceGTC,
+		})
+	}
+
+	createdOrders, err := s.orderExecutor.SubmitOrders(ctx, adjOrders...)
+	if logErr(err, "unable to place liquidity orders") {
+		return
+	}
+
+	s.adjustmentOrderBook.Add(createdOrders...)
 }
 
 func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
@@ -177,7 +241,6 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	quoteBal, _ := s.session.Account.Balance(s.Market.QuoteCurrency)
 
 	spread := ticker.Sell.Sub(ticker.Buy)
-	_ = spread
 
 	midPriceEMA := s.ewma.Last(0)
 	midPrice := fixedpoint.NewFromFloat(midPriceEMA)
@@ -187,9 +250,8 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	makerQuota.BaseAsset.Add(baseBal.Available)
 
 	bandWidth := s.boll.Last(0)
-	_ = bandWidth
 
-	log.Infof("mid price ema: %f boll band width: %f", midPriceEMA, bandWidth)
+	log.Infof("spread: %f mid price ema: %f boll band width: %f", spread.Float64(), midPriceEMA, bandWidth)
 
 	n := s.liquidityScale.Sum(1.0)
 
@@ -214,8 +276,31 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		}
 	}
 
-	askX := baseBal.Available.Float64() / n
-	bidX := quoteBal.Available.Float64() / (n * (fixedpoint.Sum(bidPrices).Float64()))
+	availableBase := baseBal.Available
+	availableQuote := quoteBal.Available
+
+	/*
+		log.Infof("available balances: %f %s, %f %s",
+			availableBase.Float64(), s.Market.BaseCurrency,
+			availableQuote.Float64(), s.Market.QuoteCurrency)
+	*/
+
+	log.Infof("balances before liq orders: %s, %s",
+		baseBal.String(),
+		quoteBal.String())
+
+	if !s.Position.IsDust() {
+		if s.Position.IsLong() {
+			availableBase = availableBase.Sub(s.Position.Base)
+			availableBase = s.Market.RoundDownQuantityByPrecision(availableBase)
+		} else if s.Position.IsShort() {
+			posSizeInQuote := s.Position.Base.Mul(ticker.Sell)
+			availableQuote = availableQuote.Sub(posSizeInQuote)
+		}
+	}
+
+	askX := availableBase.Float64() / n
+	bidX := availableQuote.Float64() / (n * (fixedpoint.Sum(bidPrices).Float64()))
 
 	askX = math.Trunc(askX*1e8) / 1e8
 	bidX = math.Trunc(bidX*1e8) / 1e8
@@ -227,7 +312,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		bidPrice := bidPrices[i]
 		askPrice := askPrices[i]
 
-		log.Infof("layer #%d %f/%f = %f/%f", i, askPrice.Float64(), bidPrice.Float64(), askQuantity.Float64(), bidQuantity.Float64())
+		log.Infof("liqudity layer #%d %f/%f = %f/%f", i, askPrice.Float64(), bidPrice.Float64(), askQuantity.Float64(), bidQuantity.Float64())
 
 		placeBuy := true
 		placeSell := true
@@ -245,11 +330,11 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 
 		quoteQuantity := bidQuantity.Mul(bidPrice)
 
-		if !makerQuota.QuoteAsset.Lock(quoteQuantity) {
+		if s.Market.IsDustQuantity(bidQuantity, bidPrice) || !makerQuota.QuoteAsset.Lock(quoteQuantity) {
 			placeBuy = false
 		}
 
-		if !makerQuota.BaseAsset.Lock(askQuantity) {
+		if s.Market.IsDustQuantity(askQuantity, askPrice) || !makerQuota.BaseAsset.Lock(askQuantity) {
 			placeSell = false
 		}
 
@@ -278,58 +363,30 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		}
 	}
 
-	_, err = s.orderExecutor.SubmitOrders(ctx, liqOrders...)
-	logErr(err, "unable to place liquidity orders")
+	makerQuota.Commit()
+
+	createdOrders, err := s.orderExecutor.SubmitOrders(ctx, liqOrders...)
+	if logErr(err, "unable to place liquidity orders") {
+		return
+	}
+
+	s.liquidityOrderBook.Add(createdOrders...)
 }
 
-func (s *Strategy) generateOrders(symbol string, side types.SideType, price, priceTick, baseQuantity fixedpoint.Value, numOrders int) (orders []types.SubmitOrder) {
-	var expBase = fixedpoint.Zero
-
+func profitProtectedPrice(side types.SideType, averageCost, price, feeRate, minProfit fixedpoint.Value) fixedpoint.Value {
 	switch side {
-	case types.SideTypeBuy:
-		if priceTick.Sign() > 0 {
-			priceTick = priceTick.Neg()
-		}
-
 	case types.SideTypeSell:
-		if priceTick.Sign() < 0 {
-			priceTick = priceTick.Neg()
-		}
+		minProfitPrice := averageCost.Add(
+			averageCost.Mul(feeRate.Add(minProfit)))
+		return fixedpoint.Max(minProfitPrice, price)
+
+	case types.SideTypeBuy:
+		minProfitPrice := averageCost.Sub(
+			averageCost.Mul(feeRate.Add(minProfit)))
+		return fixedpoint.Min(minProfitPrice, price)
+
 	}
-
-	decdigits := priceTick.Abs().NumIntDigits()
-	step := priceTick.Abs().MulExp(-decdigits + 1)
-
-	for i := 0; i < numOrders; i++ {
-		quantityExp := fixedpoint.NewFromFloat(math.Exp(expBase.Float64()))
-		volume := baseQuantity.Mul(quantityExp)
-		amount := volume.Mul(price)
-		// skip order less than 10usd
-		if amount.Compare(ten) < 0 {
-			log.Warnf("amount too small (< 10usd). price=%s volume=%s amount=%s",
-				price.String(), volume.String(), amount.String())
-			continue
-		}
-
-		orders = append(orders, types.SubmitOrder{
-			Symbol:   symbol,
-			Side:     side,
-			Type:     types.OrderTypeLimit,
-			Price:    price,
-			Quantity: volume,
-		})
-
-		log.Infof("%s order: %s @ %s", side, volume.String(), price.String())
-
-		if len(orders) >= numOrders {
-			break
-		}
-
-		price = price.Add(priceTick)
-		expBase = expBase.Add(step)
-	}
-
-	return orders
+	return price
 }
 
 func logErr(err error, msgAndArgs ...interface{}) bool {

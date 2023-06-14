@@ -2,7 +2,8 @@ sessions:
   binance:
     exchange: max
     envVarPrefix: max
-
+    makerFeeRate: 0%
+    takerFeeRate: 0.025%
 
 exchangeStrategies:
 - on: max
@@ -31,6 +32,8 @@ exchangeStrategies:
 
     strengthInterval: 1m
 
+    minProfit: 0%
+
     liquidityScale:
       exp:
         domain: [0, 10]
@@ -39,12 +42,14 @@ exchangeStrategies:
 backtest:
   sessions:
     - max
-  startTime: "2023-05-01"
+  startTime: "2023-05-20"
   endTime: "2023-06-01"
   symbols:
   - USDCUSDT
   account:
     max:
+      makerFeeRate: 0.0%
+      takerFeeRate: 0.025%
       balances:
         USDC: 5000
         USDT: 5000
