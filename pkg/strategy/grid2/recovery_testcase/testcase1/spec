@@ -1,0 +1,12 @@
+{
+    "symbol":"BTCUSDT",
+    "quoteCurrency": "USDT",
+    "baseCurrency": "BTC",
+    "mode":"arithmetic",
+    "lowerPrice":"20000.0",
+    "upperPrice":"30000.0",
+    "gridNumber":3,
+    "quoteInvestment":"45000.0",
+    "tickSize":0.1,
+    "stepSize":0.00000001
+}

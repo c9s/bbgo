@@ -59,8 +59,19 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 	}
 
 	s.logger.Infof("start recovering")
-	if err := s.recoverWithOpenOrdersByScanningTrades(ctx, historyService, openOrders); err != nil {
+	filledOrders, err := s.getFilledOrdersByScanningTrades(ctx, historyService, s.orderQueryService, openOrders)
+	if err != nil {
 		return errors.Wrap(err, "grid recover error")
+	}
+	s.debugOrders("emit filled orders", filledOrders)
+
+	// add open orders into avtive maker orders
+	s.addOrdersToActiveOrderBook(openOrders)
+
+	// emit the filled orders
+	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
+	for _, filledOrder := range filledOrders {
+		activeOrderBook.EmitFilled(filledOrder)
 	}
 
 	// emit ready after recover
@@ -96,11 +107,7 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 	return nil
 }
 
-func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrdersOnGrid []types.Order) error {
-	if s.orderQueryService == nil {
-		return fmt.Errorf("orderQueryService is nil, it can't get orders by trade")
-	}
-
+func (s *Strategy) getFilledOrdersByScanningTrades(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, openOrdersOnGrid []types.Order) ([]types.Order, error) {
 	// set grid
 	grid := s.newGrid()
 	s.setGrid(grid)
@@ -110,210 +117,243 @@ func (s *Strategy) recoverWithOpenOrdersByScanningTrades(ctx context.Context, hi
 	s.debugLog("open orders nums: %d, expected nums: %d", numGridOpenOrders, expectedNumOfOrders)
 	if expectedNumOfOrders == numGridOpenOrders {
 		// no need to recover, only need to add open orders back to active order book
-		s.addOrdersToActiveOrderBook(openOrdersOnGrid)
-		return nil
+		return nil, nil
 	} else if expectedNumOfOrders < numGridOpenOrders {
-		return fmt.Errorf("amount of grid's open orders should not > amount of expected grid's orders")
+		return nil, fmt.Errorf("amount of grid's open orders should not > amount of expected grid's orders")
 	}
 
-	// 1. build pin-order map
-	pinOrdersOpen, err := s.buildPinOrderMap(grid.Pins, openOrdersOnGrid)
+	// 1. build twin-order map
+	twinOrdersOpen, err := s.buildTwinOrderMap(grid.Pins, openOrdersOnGrid)
 	if err != nil {
-		return errors.Wrapf(err, "failed to build pin order map with open orders")
+		return nil, errors.Wrapf(err, "failed to build pin order map with open orders")
 	}
 
-	// 2. build the filled pin-order map by querying trades
-	pinOrdersFilled, err := s.buildFilledPinOrderMapFromTrades(ctx, historyService, pinOrdersOpen)
+	// 2. build the filled twin-order map by querying trades
+	expectedFilledNum := int(expectedNumOfOrders - numGridOpenOrders)
+	twinOrdersFilled, err := s.buildFilledTwinOrderMapFromTrades(ctx, queryTradesService, queryOrderService, twinOrdersOpen, expectedFilledNum)
 	if err != nil {
-		return errors.Wrapf(err, "failed to build filled pin order map")
+		return nil, errors.Wrapf(err, "failed to build filled pin order map")
 	}
 
-	// 3. get the filled orders from pin-order map
-	filledOrders := pinOrdersFilled.AscendingOrders()
-	numFilledOrders := len(filledOrders)
-	if numFilledOrders == int(expectedNumOfOrders-numGridOpenOrders) {
-		// nums of filled order is the same as Size - 1 - num(open orders)
-		s.logger.Infof("nums of filled order is the same as Size - 1 - len(open orders) : %d = %d - 1 - %d", numFilledOrders, s.grid.Size, numGridOpenOrders)
-	} else if numFilledOrders == int(expectedNumOfOrders-numGridOpenOrders+1) {
-		filledOrders = filledOrders[1:]
-	} else {
-		return fmt.Errorf("not reasonable num of filled orders")
-	}
+	// 3. get the filled orders from twin-order map
+	filledOrders := twinOrdersFilled.AscendingOrders()
 
 	// 4. verify the grid
-	if err := s.verifyFilledGrid(s.grid.Pins, pinOrdersOpen, filledOrders); err != nil {
-		return errors.Wrapf(err, "verify grid with error")
+	if err := s.verifyFilledTwinGrid(s.grid.Pins, twinOrdersOpen, filledOrders); err != nil {
+		return nil, errors.Wrapf(err, "verify grid with error")
 	}
 
-	// 5. add open orders to active order book.
-	s.addOrdersToActiveOrderBook(openOrdersOnGrid)
-
-	// 6. emit the filled orders
-	s.debugOrders("emit filled orders", filledOrders)
-	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
-	for _, filledOrder := range filledOrders {
-		activeOrderBook.EmitFilled(filledOrder)
-	}
-
-	return nil
+	return filledOrders, nil
 }
 
-func (s *Strategy) verifyFilledGrid(pins []Pin, pinOrders PinOrderMap, filledOrders []types.Order) error {
+func (s *Strategy) verifyFilledTwinGrid(pins []Pin, twinOrders TwinOrderMap, filledOrders []types.Order) error {
 	s.debugLog("verifying filled grid - pins: %+v", pins)
-	s.debugLog("verifying filled grid - open pin orders:\n%s", pinOrders.String())
 	s.debugOrders("verifying filled grid - filled orders", filledOrders)
+	s.debugLog("verifying filled grid - open twin orders:\n%s", twinOrders.String())
 
-	if err := addOrdersIntoPinOrderMap(pinOrders, filledOrders); err != nil {
-		return errors.Wrapf(err, "verifying filled grid error when add orders into pin order map")
+	if err := s.addOrdersIntoTwinOrderMap(twinOrders, filledOrders); err != nil {
+		return errors.Wrapf(err, "verifying filled grid error when add orders into twin order map")
 	}
 
-	s.debugLog("verifying filled grid - filled pin orders:\n%+v", pinOrders.String())
+	s.debugLog("verifying filled grid - filled twin orders:\n%+v", twinOrders.String())
 
-	expectedSide := types.SideTypeBuy
-	for _, pin := range pins {
-		order, exist := pinOrders[fixedpoint.Value(pin)]
+	for i, pin := range pins {
+		// we use twinOrderMap to make sure there are no duplicated order at one grid, and we use the sell price as key so we skip the pins[0] which is only for buy price
+		if i == 0 {
+			continue
+		}
+
+		twin, exist := twinOrders[fixedpoint.Value(pin)]
 		if !exist {
 			return fmt.Errorf("there is no order at price (%+v)", pin)
 		}
 
-		// if there is order with OrderID = 0, means we hit the empty pin
-		// there must be only one empty pin in the grid
-		// all orders below this pin need to be bid orders, above this pin need to be ask orders
-		if order.OrderID == 0 {
-			if expectedSide == types.SideTypeBuy {
-				expectedSide = types.SideTypeSell
-				continue
-			}
-
-			return fmt.Errorf("found more than one empty pins")
+		if !twin.Exist() {
+			return fmt.Errorf("all the price need a twin")
 		}
 
-		if order.Side != expectedSide {
-			return fmt.Errorf("the side of order (%s) is wrong, expected: %s", order.Side, expectedSide)
+		if !twin.IsValid() {
+			return fmt.Errorf("all the twins need to be valid")
 		}
-	}
-
-	if expectedSide != types.SideTypeSell {
-		return fmt.Errorf("there is no empty pin in the grid")
 	}
 
 	return nil
 }
 
-// buildPinOrderMap build the pin-order map with grid and open orders.
+// buildTwinOrderMap build the pin-order map with grid and open orders.
 // The keys of this map contains all required pins of this grid.
 // If the Order of the pin is empty types.Order (OrderID == 0), it means there is no open orders at this pin.
-func (s *Strategy) buildPinOrderMap(pins []Pin, openOrders []types.Order) (PinOrderMap, error) {
-	pinOrderMap := make(PinOrderMap)
+func (s *Strategy) buildTwinOrderMap(pins []Pin, openOrders []types.Order) (TwinOrderMap, error) {
+	twinOrderMap := make(TwinOrderMap)
 
-	for _, pin := range pins {
-		pinOrderMap[fixedpoint.Value(pin)] = types.Order{}
+	for i, pin := range pins {
+		// twin order map only use sell price as key, so skip 0
+		if i == 0 {
+			continue
+		}
+
+		twinOrderMap[fixedpoint.Value(pin)] = TwinOrder{}
 	}
 
 	for _, openOrder := range openOrders {
-		pin := openOrder.Price
-		v, exist := pinOrderMap[pin]
+		twinKey, err := findTwinOrderMapKey(s.grid, openOrder)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to build twin order map")
+		}
+
+		twinOrder, exist := twinOrderMap[twinKey]
 		if !exist {
-			return nil, fmt.Errorf("the price of the order (id: %d) is not in pins", openOrder.OrderID)
+			return nil, fmt.Errorf("the price of the openOrder (id: %d) is not in pins", openOrder.OrderID)
 		}
 
-		if v.OrderID != 0 {
-			return nil, fmt.Errorf("there are duplicated open orders at the same pin")
+		if twinOrder.Exist() {
+			return nil, fmt.Errorf("there are multiple order in a twin")
 		}
 
-		pinOrderMap[pin] = openOrder
+		twinOrder.SetOrder(openOrder)
+		twinOrderMap[twinKey] = twinOrder
 	}
 
-	return pinOrderMap, nil
+	return twinOrderMap, nil
 }
 
-// buildFilledPinOrderMapFromTrades will query the trades from last 24 hour and use them to build a pin order map
+// buildFilledTwinOrderMapFromTrades will query the trades from last 24 hour and use them to build a pin order map
 // It will skip the orders on pins at which open orders are already
-func (s *Strategy) buildFilledPinOrderMapFromTrades(ctx context.Context, historyService types.ExchangeTradeHistoryService, pinOrdersOpen PinOrderMap) (PinOrderMap, error) {
-	pinOrdersFilled := make(PinOrderMap)
+func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, twinOrdersOpen TwinOrderMap, expectedFillNum int) (TwinOrderMap, error) {
+	twinOrdersFilled := make(TwinOrderMap)
 
 	// existedOrders is used to avoid re-query the same orders
-	existedOrders := pinOrdersOpen.SyncOrderMap()
+	existedOrders := twinOrdersOpen.SyncOrderMap()
 
-	var limit int64 = 1000
 	// get the filled orders when bbgo is down in order from trades
-	// [NOTE] only retrieve from last 24 hours !!!
-	var fromTradeID uint64 = 0
+	until := time.Now()
+	// the first query only query the last 1 hour, because mostly shutdown and recovery happens within 1 hour
+	since := until.Add(-1 * time.Hour)
+	// hard limit for recover
+	recoverSinceLimit := time.Date(2023, time.March, 10, 0, 0, 0, 0, time.UTC)
+
+	if s.RecoverGridWithin != 0 && until.Add(-1*s.RecoverGridWithin).After(recoverSinceLimit) {
+		recoverSinceLimit = until.Add(-1 * s.RecoverGridWithin)
+	}
+
 	for {
-		trades, err := historyService.QueryTrades(ctx, s.Symbol, &types.TradeQueryOptions{
+		if err := s.queryTradesToUpdateTwinOrdersMap(ctx, queryTradesService, queryOrderService, twinOrdersOpen, twinOrdersFilled, existedOrders, since, until); err != nil {
+			return nil, errors.Wrapf(err, "failed to query trades to update twin orders map")
+		}
+
+		until = since
+		since = until.Add(-6 * time.Hour)
+
+		if len(twinOrdersFilled) >= expectedFillNum {
+			s.logger.Infof("stop querying trades because twin orders filled (%d) >= expected filled nums (%d)", len(twinOrdersFilled), expectedFillNum)
+			break
+		}
+
+		if s.GridProfitStats != nil && s.GridProfitStats.Since != nil && until.Before(*s.GridProfitStats.Since) {
+			s.logger.Infof("stop querying trades because the time range is out of the strategy's since (%s)", *s.GridProfitStats.Since)
+			break
+		}
+
+		if until.Before(recoverSinceLimit) {
+			s.logger.Infof("stop querying trades because the time range is out of the limit (%s)", recoverSinceLimit)
+			break
+		}
+	}
+
+	return twinOrdersFilled, nil
+}
+
+func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, twinOrdersOpen, twinOrdersFilled TwinOrderMap, existedOrders *types.SyncOrderMap, since, until time.Time) error {
+	var fromTradeID uint64 = 0
+	var limit int64 = 1000
+	for {
+		trades, err := queryTradesService.QueryTrades(ctx, s.Symbol, &types.TradeQueryOptions{
+			StartTime:   &since,
+			EndTime:     &until,
 			LastTradeID: fromTradeID,
 			Limit:       limit,
 		})
 
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to query trades to recover the grid with open orders")
+			return errors.Wrapf(err, "failed to query trades to recover the grid with open orders")
 		}
 
-		s.debugLog("QueryTrades return %d trades", len(trades))
+		s.debugLog("QueryTrades from %s <-> %s (from: %d) return %d trades", since, until, fromTradeID, len(trades))
 
 		for _, trade := range trades {
+			if trade.Time.After(until) {
+				return nil
+			}
+
 			s.debugLog(trade.String())
+
 			if existedOrders.Exists(trade.OrderID) {
 				// already queries, skip
 				continue
 			}
-
-			order, err := s.orderQueryService.QueryOrder(ctx, types.OrderQuery{
+			order, err := queryOrderService.QueryOrder(ctx, types.OrderQuery{
 				OrderID: strconv.FormatUint(trade.OrderID, 10),
 			})
 
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to query order by trade")
+				return errors.Wrapf(err, "failed to query order by trade")
 			}
 
-			s.debugLog("%s (group_id: %d)", order.String(), order.GroupID)
-
+			s.debugLog(order.String())
 			// avoid query this order again
 			existedOrders.Add(*order)
-
 			// add 1 to avoid duplicate
 			fromTradeID = trade.ID + 1
 
-			// checked the trade's order is filled order
-			pin := order.Price
-			v, exist := pinOrdersOpen[pin]
+			twinOrderKey, err := findTwinOrderMapKey(s.grid, *order)
+			if err != nil {
+				return errors.Wrapf(err, "failed to find grid order map's key when recover")
+			}
+
+			twinOrderOpen, exist := twinOrdersOpen[twinOrderKey]
 			if !exist {
-				return nil, fmt.Errorf("the price of the order with the same GroupID is not in pins")
+				return fmt.Errorf("the price of the order with the same GroupID is not in pins")
 			}
 
-			// skip open orders on grid
-			if v.OrderID != 0 {
+			if twinOrderOpen.Exist() {
 				continue
 			}
 
-			// check the order's creation time
-			if pinOrder, exist := pinOrdersFilled[pin]; exist && pinOrder.CreationTime.Time().After(order.CreationTime.Time()) {
-				// do not replace the pin order if the order's creation time is not after pin order's creation time
-				// this situation should not happen actually, because the trades is already sorted.
-				s.logger.Infof("pinOrder's creation time (%s) should not be after order's creation time (%s)", pinOrder.CreationTime, order.CreationTime)
-				continue
+			if twinOrder, exist := twinOrdersFilled[twinOrderKey]; exist {
+				to := twinOrder.GetOrder()
+				if to.UpdateTime.Time().After(order.UpdateTime.Time()) {
+					s.logger.Infof("twinOrder's update time (%s) should not be after order's update time (%s)", to.UpdateTime, order.UpdateTime)
+					continue
+				}
 			}
-			pinOrdersFilled[pin] = *order
+
+			twinOrder := TwinOrder{}
+			twinOrder.SetOrder(*order)
+			twinOrdersFilled[twinOrderKey] = twinOrder
 		}
 
 		// stop condition
 		if int64(len(trades)) < limit {
-			break
+			return nil
 		}
 	}
-
-	return pinOrdersFilled, nil
 }
 
-func addOrdersIntoPinOrderMap(pinOrders PinOrderMap, orders []types.Order) error {
+func (s *Strategy) addOrdersIntoTwinOrderMap(twinOrders TwinOrderMap, orders []types.Order) error {
 	for _, order := range orders {
-		price := order.Price
-		if o, exist := pinOrders[price]; !exist {
-			return fmt.Errorf("the price (%+v) is not in pins", price)
-		} else if o.OrderID != 0 {
-			return fmt.Errorf("there is already an order at this price (%+v)", price)
+		k, err := findTwinOrderMapKey(s.grid, order)
+		if err != nil {
+			return errors.Wrap(err, "failed to add orders into twin order map")
+		}
+
+		if v, exist := twinOrders[k]; !exist {
+			return fmt.Errorf("the price (%+v) is not in pins", k)
+		} else if v.Exist() {
+			return fmt.Errorf("there is already a twin order at this price (%+v)", k)
 		} else {
-			pinOrders[price] = order
+			twin := TwinOrder{}
+			twin.SetOrder(order)
+			twinOrders[k] = twin
 		}
 	}
 
