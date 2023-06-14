@@ -32,7 +32,7 @@ exchangeStrategies:
 
     strengthInterval: 1m
 
-    minProfit: 0%
+    minProfit: 0.004%
 
     liquidityScale:
       exp:
