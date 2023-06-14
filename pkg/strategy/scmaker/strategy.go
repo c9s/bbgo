@@ -44,6 +44,7 @@ type Strategy struct {
 
 	MidPriceEMA        *types.IntervalWindow `json:"midPriceEMA"`
 	LiquiditySlideRule *bbgo.SlideRule       `json:"liquidityScale"`
+	LiquidityLayerTick fixedpoint.Value      `json:"liquidityLayerTick"`
 
 	MinProfit fixedpoint.Value `json:"minProfit"`
 
@@ -89,7 +90,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.book.BindStream(session.UserDataStream)
 
 	s.liquidityOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
+	s.liquidityOrderBook.BindStream(session.UserDataStream)
+
 	s.adjustmentOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
+	s.adjustmentOrderBook.BindStream(session.UserDataStream)
 
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
@@ -177,15 +181,21 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 		return
 	}
 
+	if _, err := s.session.UpdateAccount(ctx); err != nil {
+		logErr(err, "unable to update account")
+		return
+	}
+
 	baseBal, _ := s.session.Account.Balance(s.Market.BaseCurrency)
 	quoteBal, _ := s.session.Account.Balance(s.Market.QuoteCurrency)
 
 	var adjOrders []types.SubmitOrder
 
-	var posSize = s.Position.Base.Abs()
+	posSize := s.Position.Base.Abs()
+	tickSize := s.Market.TickSize
 
 	if s.Position.IsShort() {
-		price := profitProtectedPrice(types.SideTypeBuy, s.Position.AverageCost, ticker.Sell.Add(-s.Market.TickSize), s.session.MakerFeeRate, s.MinProfit)
+		price := profitProtectedPrice(types.SideTypeBuy, s.Position.AverageCost, ticker.Sell.Add(-tickSize), s.session.MakerFeeRate, s.MinProfit)
 		quoteQuantity := fixedpoint.Min(price.Mul(posSize), quoteBal.Available)
 		bidQuantity := quoteQuantity.Div(price)
 
@@ -203,7 +213,7 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 			TimeInForce: types.TimeInForceGTC,
 		})
 	} else if s.Position.IsLong() {
-		price := profitProtectedPrice(types.SideTypeSell, s.Position.AverageCost, ticker.Buy.Add(s.Market.TickSize), s.session.MakerFeeRate, s.MinProfit)
+		price := profitProtectedPrice(types.SideTypeSell, s.Position.AverageCost, ticker.Buy.Add(tickSize), s.session.MakerFeeRate, s.MinProfit)
 		askQuantity := fixedpoint.Min(posSize, baseBal.Available)
 
 		if s.Market.IsDustQuantity(askQuantity, price) {
@@ -230,10 +240,18 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 }
 
 func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
-	_ = s.liquidityOrderBook.GracefulCancel(ctx, s.session.Exchange)
+	err := s.liquidityOrderBook.GracefulCancel(ctx, s.session.Exchange)
+	if logErr(err, "unable to cancel orders") {
+		return
+	}
 
 	ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)
 	if logErr(err, "unable to query ticker") {
+		return
+	}
+
+	if _, err := s.session.UpdateAccount(ctx); err != nil {
+		logErr(err, "unable to update account")
 		return
 	}
 
@@ -241,6 +259,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	quoteBal, _ := s.session.Account.Balance(s.Market.QuoteCurrency)
 
 	spread := ticker.Sell.Sub(ticker.Buy)
+	tickSize := fixedpoint.Max(s.LiquidityLayerTick, s.Market.TickSize)
 
 	midPriceEMA := s.ewma.Last(0)
 	midPrice := fixedpoint.NewFromFloat(midPriceEMA)
@@ -269,8 +288,8 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 			bidPrices = append(bidPrices, midPrice.Add(-bwf))
 			askPrices = append(askPrices, midPrice.Add(bwf))
 		} else {
-			bidPrice := midPrice.Sub(s.Market.TickSize.Mul(fi))
-			askPrice := midPrice.Add(s.Market.TickSize.Mul(fi))
+			bidPrice := midPrice.Sub(tickSize.Mul(fi))
+			askPrice := midPrice.Add(tickSize.Mul(fi))
 			bidPrices = append(bidPrices, bidPrice)
 			askPrices = append(askPrices, askPrice)
 		}

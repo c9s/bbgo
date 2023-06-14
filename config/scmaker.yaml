@@ -28,7 +28,7 @@ exchangeStrategies:
 
     numOfLiquidityLayers: 10
 
-    liquidityLayerTick: 0.01
+    liquidityLayerTick: 0.001
 
     strengthInterval: 1m
 
