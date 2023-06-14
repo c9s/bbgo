@@ -303,12 +303,6 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	availableBase := baseBal.Available
 	availableQuote := quoteBal.Available
 
-	/*
-		log.Infof("available balances: %f %s, %f %s",
-			availableBase.Float64(), s.Market.BaseCurrency,
-			availableQuote.Float64(), s.Market.QuoteCurrency)
-	*/
-
 	log.Infof("balances before liq orders: %s, %s",
 		baseBal.String(),
 		quoteBal.String())
