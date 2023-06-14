@@ -34,7 +34,7 @@ exchangeStrategies:
     liquidityScale:
       exp:
         domain: [0, 10]
-        range: [100, 500]
+        range: [1, 4]
 
 backtest:
   sessions:

@@ -27,7 +27,7 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-// scmaker is a stable coin market maker
+// Strategy scmaker is a stable coin market maker
 type Strategy struct {
 	Environment *bbgo.Environment
 	Market      types.Market
@@ -191,18 +191,43 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 
 	log.Infof("mid price ema: %f boll band width: %f", midPriceEMA, bandWidth)
 
-	var liqOrders []types.SubmitOrder
+	n := s.liquidityScale.Sum(1.0)
+
+	var bidPrices []fixedpoint.Value
+	var askPrices []fixedpoint.Value
+
+	// calculate and collect prices
 	for i := 0; i <= s.NumOfLiquidityLayers; i++ {
 		fi := fixedpoint.NewFromInt(int64(i))
-		quantity := fixedpoint.NewFromFloat(s.liquidityScale.Call(float64(i)))
-		bidPrice := midPrice.Sub(s.Market.TickSize.Mul(fi))
-		askPrice := midPrice.Add(s.Market.TickSize.Mul(fi))
 		if i == 0 {
-			bidPrice = ticker.Buy
-			askPrice = ticker.Sell
+			bidPrices = append(bidPrices, ticker.Buy)
+			askPrices = append(askPrices, ticker.Sell)
+		} else if i == s.NumOfLiquidityLayers {
+			bwf := fixedpoint.NewFromFloat(bandWidth)
+			bidPrices = append(bidPrices, midPrice.Add(-bwf))
+			askPrices = append(askPrices, midPrice.Add(bwf))
+		} else {
+			bidPrice := midPrice.Sub(s.Market.TickSize.Mul(fi))
+			askPrice := midPrice.Add(s.Market.TickSize.Mul(fi))
+			bidPrices = append(bidPrices, bidPrice)
+			askPrices = append(askPrices, askPrice)
 		}
+	}
 
-		log.Infof("layer #%d %f/%f = %f", i, askPrice.Float64(), bidPrice.Float64(), quantity.Float64())
+	askX := baseBal.Available.Float64() / n
+	bidX := quoteBal.Available.Float64() / (n * (fixedpoint.Sum(bidPrices).Float64()))
+
+	askX = math.Trunc(askX*1e8) / 1e8
+	bidX = math.Trunc(bidX*1e8) / 1e8
+
+	var liqOrders []types.SubmitOrder
+	for i := 0; i <= s.NumOfLiquidityLayers; i++ {
+		bidQuantity := fixedpoint.NewFromFloat(s.liquidityScale.Call(float64(i)) * bidX)
+		askQuantity := fixedpoint.NewFromFloat(s.liquidityScale.Call(float64(i)) * askX)
+		bidPrice := bidPrices[i]
+		askPrice := askPrices[i]
+
+		log.Infof("layer #%d %f/%f = %f/%f", i, askPrice.Float64(), bidPrice.Float64(), askQuantity.Float64(), bidQuantity.Float64())
 
 		placeBuy := true
 		placeSell := true
@@ -218,13 +243,13 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 			}
 		}
 
-		quoteQuantity := quantity.Mul(bidPrice)
+		quoteQuantity := bidQuantity.Mul(bidPrice)
 
 		if !makerQuota.QuoteAsset.Lock(quoteQuantity) {
 			placeBuy = false
 		}
 
-		if !makerQuota.BaseAsset.Lock(quantity) {
+		if !makerQuota.BaseAsset.Lock(askQuantity) {
 			placeSell = false
 		}
 
@@ -233,7 +258,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 				Symbol:      s.Symbol,
 				Side:        types.SideTypeBuy,
 				Type:        types.OrderTypeLimitMaker,
-				Quantity:    quantity,
+				Quantity:    bidQuantity,
 				Price:       bidPrice,
 				Market:      s.Market,
 				TimeInForce: types.TimeInForceGTC,
@@ -245,7 +270,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 				Symbol:      s.Symbol,
 				Side:        types.SideTypeSell,
 				Type:        types.OrderTypeLimitMaker,
-				Quantity:    quantity,
+				Quantity:    askQuantity,
 				Price:       askPrice,
 				Market:      s.Market,
 				TimeInForce: types.TimeInForceGTC,
