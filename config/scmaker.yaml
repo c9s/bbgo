@@ -23,7 +23,7 @@ exchangeStrategies:
     ## priceRangeBollinger is used for the liquidity price range
     priceRangeBollinger:
       interval: 1h
-      window: 10
+      window: 99
       k: 1.0
 
     numOfLiquidityLayers: 10
