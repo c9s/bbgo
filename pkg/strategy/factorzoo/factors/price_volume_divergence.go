@@ -23,8 +23,8 @@ type PVD struct {
 	types.IntervalWindow
 	types.SeriesBase
 
-	Values floats.Slice
-	Prices *types.Queue
+	Values  floats.Slice
+	Prices  *types.Queue
 	Volumes *types.Queue
 	EndTime time.Time
 
@@ -47,20 +47,12 @@ func (inc *PVD) Update(price float64, volume float64) {
 	}
 }
 
-func (inc *PVD) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *PVD) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *PVD) Index(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1-i]
+	return inc.Last(i)
 }
 
 func (inc *PVD) Length() int {
@@ -72,11 +64,11 @@ func (inc *PVD) CalculateAndUpdate(allKLines []types.KLine) {
 		for _, k := range allKLines {
 			inc.PushK(k)
 		}
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	} else {
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
 }
 
@@ -99,7 +91,7 @@ func (inc *PVD) PushK(k types.KLine) {
 
 	inc.Update(indicator.KLineClosePriceMapper(k), indicator.KLineVolumeMapper(k))
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func CalculateKLinesPVD(allKLines []types.KLine, window int) float64 {

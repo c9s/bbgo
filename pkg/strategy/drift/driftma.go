@@ -17,19 +17,19 @@ func (s *DriftMA) Update(value, weight float64) {
 	if s.ma1.Length() == 0 {
 		return
 	}
-	s.drift.Update(s.ma1.Last(), weight)
+	s.drift.Update(s.ma1.Last(0), weight)
 	if s.drift.Length() == 0 {
 		return
 	}
-	s.ma2.Update(s.drift.Last())
+	s.ma2.Update(s.drift.Last(0))
 }
 
-func (s *DriftMA) Last() float64 {
-	return s.ma2.Last()
+func (s *DriftMA) Last(i int) float64 {
+	return s.ma2.Last(i)
 }
 
 func (s *DriftMA) Index(i int) float64 {
-	return s.ma2.Index(i)
+	return s.ma2.Last(i)
 }
 
 func (s *DriftMA) Length() int {

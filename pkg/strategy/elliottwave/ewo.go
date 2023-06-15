@@ -8,11 +8,11 @@ type ElliottWave struct {
 }
 
 func (s *ElliottWave) Index(i int) float64 {
-	return s.maQuick.Index(i)/s.maSlow.Index(i) - 1.0
+	return s.Last(i)
 }
 
-func (s *ElliottWave) Last() float64 {
-	return s.maQuick.Last()/s.maSlow.Last() - 1.0
+func (s *ElliottWave) Last(i int) float64 {
+	return s.maQuick.Index(i)/s.maSlow.Index(i) - 1.0
 }
 
 func (s *ElliottWave) Length() int {

@@ -75,7 +75,7 @@ func (s *Strategy) updateBidOrders(orderExecutor bbgo.OrderExecutor, session *bb
 		return
 	}
 
-	var startPrice = fixedpoint.NewFromFloat(s.ewma.Last()).Mul(s.Percentage)
+	var startPrice = fixedpoint.NewFromFloat(s.ewma.Last(0)).Mul(s.Percentage)
 
 	var submitOrders []types.SubmitOrder
 	for i := 0; i < s.GridNum; i++ {

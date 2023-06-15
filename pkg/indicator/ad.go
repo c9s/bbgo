@@ -35,23 +35,16 @@ func (inc *AD) Update(high, low, cloze, volume float64) {
 		moneyFlowVolume = ((2*cloze - high - low) / (high - low)) * volume
 	}
 
-	ad := inc.Last() + moneyFlowVolume
+	ad := inc.Last(0) + moneyFlowVolume
 	inc.Values.Push(ad)
 }
 
-func (inc *AD) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-	return inc.Values[len(inc.Values)-1]
+func (inc *AD) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *AD) Index(i int) float64 {
-	length := len(inc.Values)
-	if length == 0 || length-i-1 < 0 {
-		return 0
-	}
-	return inc.Values[length-i-1]
+	return inc.Last(i)
 }
 
 func (inc *AD) Length() int {
@@ -68,18 +61,6 @@ func (inc *AD) CalculateAndUpdate(kLines []types.KLine) {
 		inc.Update(k.High.Float64(), k.Low.Float64(), k.Close.Float64(), k.Volume.Float64())
 	}
 
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
-}
-
-func (inc *AD) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *AD) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }

@@ -1,19 +1,25 @@
 package types
 
-import "github.com/c9s/bbgo/pkg/datatype/floats"
+import (
+	"github.com/c9s/bbgo/pkg/datatype/floats"
+)
 
-func (s *SeriesBase) Index(i int) float64 {
-	if s.Series == nil {
-		return 0
-	}
-	return s.Series.Index(i)
+// SeriesBase is a wrapper of the Series interface
+// You can assign a data container that implements the Series interface
+// And this SeriesBase struct provides the implemented methods for manipulating your data
+type SeriesBase struct {
+	Series
 }
 
-func (s *SeriesBase) Last() float64 {
+func (s *SeriesBase) Index(i int) float64 {
+	return s.Last(i)
+}
+
+func (s *SeriesBase) Last(i int) float64 {
 	if s.Series == nil {
 		return 0
 	}
-	return s.Series.Last()
+	return s.Series.Last(i)
 }
 
 func (s *SeriesBase) Length() int {
@@ -64,7 +70,7 @@ func (s *SeriesBase) Add(b interface{}) SeriesExtend {
 }
 
 func (s *SeriesBase) Minus(b interface{}) SeriesExtend {
-	return Minus(s, b)
+	return Sub(s, b)
 }
 
 func (s *SeriesBase) Div(b interface{}) SeriesExtend {
@@ -79,11 +85,11 @@ func (s *SeriesBase) Dot(b interface{}, limit ...int) float64 {
 	return Dot(s, b, limit...)
 }
 
-func (s *SeriesBase) Array(limit ...int) (result []float64) {
+func (s *SeriesBase) Array(limit ...int) []float64 {
 	return Array(s, limit...)
 }
 
-func (s *SeriesBase) Reverse(limit ...int) (result floats.Slice) {
+func (s *SeriesBase) Reverse(limit ...int) floats.Slice {
 	return Reverse(s, limit...)
 }
 

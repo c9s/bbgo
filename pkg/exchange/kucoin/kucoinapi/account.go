@@ -17,14 +17,6 @@ func (s *AccountService) NewListSubAccountsRequest() *ListSubAccountsRequest {
 	return &ListSubAccountsRequest{client: s.client}
 }
 
-func (s *AccountService) NewListAccountsRequest() *ListAccountsRequest {
-	return &ListAccountsRequest{client: s.client}
-}
-
-func (s *AccountService) NewGetAccountRequest(accountID string) *GetAccountRequest {
-	return &GetAccountRequest{client: s.client, accountID: accountID}
-}
-
 type SubAccount struct {
 	UserID string `json:"userId"`
 	Name   string `json:"subName"`
@@ -44,15 +36,4 @@ type Account struct {
 	Balance   fixedpoint.Value `json:"balance"`
 	Available fixedpoint.Value `json:"available"`
 	Holds     fixedpoint.Value `json:"holds"`
-}
-
-//go:generate GetRequest -url "/api/v1/accounts" -type ListAccountsRequest -responseDataType []Account
-type ListAccountsRequest struct {
-	client requestgen.AuthenticatedAPIClient
-}
-
-//go:generate GetRequest -url "/api/v1/accounts/:accountID" -type GetAccountRequest -responseDataType .Account
-type GetAccountRequest struct {
-	client    requestgen.AuthenticatedAPIClient
-	accountID string `param:"accountID,slug"`
 }

@@ -9,7 +9,7 @@ func (s *Strategy) CheckStopLoss() bool {
 		}
 	}
 	if s.UseAtr {
-		atr := s.atr.Last()
+		atr := s.atr.Last(0)
 		if s.sellPrice > 0 && s.sellPrice+atr <= s.highestPrice ||
 			s.buyPrice > 0 && s.buyPrice-atr >= s.lowestPrice {
 			return true

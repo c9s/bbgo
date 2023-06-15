@@ -65,7 +65,7 @@ func Test_calculateATR(t *testing.T) {
 				atr.PushK(k)
 			}
 
-			got := atr.Last()
+			got := atr.Last(0)
 			diff := math.Trunc((got-tt.want)*100) / 100
 			if diff != 0 {
 				t.Errorf("calculateATR() = %v, want %v", got, tt.want)

@@ -40,24 +40,18 @@ func (inc *OBV) Update(price, volume float64) {
 	}
 
 	if volume < inc.PrePrice {
-		inc.Values.Push(inc.Last() - volume)
+		inc.Values.Push(inc.Last(0) - volume)
 	} else {
-		inc.Values.Push(inc.Last() + volume)
+		inc.Values.Push(inc.Last(0) + volume)
 	}
 }
 
-func (inc *OBV) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-	return inc.Values[len(inc.Values)-1]
+func (inc *OBV) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *OBV) Index(i int) float64 {
-	if len(inc.Values)-i <= 0 {
-		return 0.0
-	}
-	return inc.Values[len(inc.Values)-i-1]
+	return inc.Last(i)
 }
 
 var _ types.SeriesExtend = &OBV{}
@@ -75,7 +69,7 @@ func (inc *OBV) CalculateAndUpdate(kLines []types.KLine) {
 		inc.PushK(k)
 	}
 
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
 }
 

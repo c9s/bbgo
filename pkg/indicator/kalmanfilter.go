@@ -1,9 +1,10 @@
 package indicator
 
 import (
+	"math"
+
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
-	"math"
 )
 
 // Refer: https://www.kalmanfilter.net/kalman1d.html
@@ -25,7 +26,7 @@ type KalmanFilter struct {
 func (inc *KalmanFilter) Update(value float64) {
 	var measureMove = value
 	if inc.measurements != nil {
-		measureMove = value - inc.measurements.Last()
+		measureMove = value - inc.measurements.Last(0)
 	}
 	inc.update(value, math.Abs(measureMove))
 }
@@ -46,7 +47,7 @@ func (inc *KalmanFilter) update(value, amp float64) {
 	q := math.Sqrt(types.Mean(inc.amp2)) * float64(1+inc.AdditionalSmoothWindow)
 
 	// update
-	lastPredict := inc.Values.Last()
+	lastPredict := inc.Values.Last(0)
 	curState := value + (value - lastPredict)
 	estimated := lastPredict + inc.k*(curState-lastPredict)
 
@@ -57,24 +58,15 @@ func (inc *KalmanFilter) update(value, amp float64) {
 }
 
 func (inc *KalmanFilter) Index(i int) float64 {
-	if inc.Values == nil {
-		return 0.0
-	}
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *KalmanFilter) Length() int {
-	if inc.Values == nil {
-		return 0
-	}
 	return inc.Values.Length()
 }
 
-func (inc *KalmanFilter) Last() float64 {
-	if inc.Values == nil {
-		return 0.0
-	}
-	return inc.Values.Last()
+func (inc *KalmanFilter) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 // interfaces implementation check

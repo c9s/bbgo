@@ -27,20 +27,19 @@ type MACDConfig struct {
 	LongPeriod int `json:"long"`
 }
 
-//go:generate callbackgen -type MACD
-type MACD struct {
+//go:generate callbackgen -type MACDLegacy
+type MACDLegacy struct {
 	MACDConfig
 
 	Values                         floats.Slice `json:"-"`
 	fastEWMA, slowEWMA, signalLine *EWMA
 	Histogram                      floats.Slice `json:"-"`
 
-	EndTime time.Time
-
 	updateCallbacks []func(macd, signal, histogram float64)
+	EndTime         time.Time
 }
 
-func (inc *MACD) Update(x float64) {
+func (inc *MACDLegacy) Update(x float64) {
 	if len(inc.Values) == 0 {
 		// apply default values
 		inc.fastEWMA = &EWMA{IntervalWindow: types.IntervalWindow{Window: inc.ShortPeriod}}
@@ -60,14 +59,14 @@ func (inc *MACD) Update(x float64) {
 	inc.slowEWMA.Update(x)
 
 	// update MACD value, it's also the signal line
-	fast := inc.fastEWMA.Last()
-	slow := inc.slowEWMA.Last()
+	fast := inc.fastEWMA.Last(0)
+	slow := inc.slowEWMA.Last(0)
 	macd := fast - slow
 	inc.Values.Push(macd)
 
 	// update signal line
 	inc.signalLine.Update(macd)
-	signal := inc.signalLine.Last()
+	signal := inc.signalLine.Last(0)
 
 	// update histogram
 	histogram := macd - signal
@@ -76,52 +75,39 @@ func (inc *MACD) Update(x float64) {
 	inc.EmitUpdate(macd, signal, histogram)
 }
 
-func (inc *MACD) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *MACDLegacy) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
-func (inc *MACD) Length() int {
+func (inc *MACDLegacy) Length() int {
 	return len(inc.Values)
 }
 
-func (inc *MACD) PushK(k types.KLine) {
+func (inc *MACDLegacy) PushK(k types.KLine) {
 	inc.Update(k.Close.Float64())
 }
 
-func (inc *MACD) MACD() types.SeriesExtend {
-	out := &MACDValues{MACD: inc}
+func (inc *MACDLegacy) MACD() types.SeriesExtend {
+	out := &MACDValues{MACDLegacy: inc}
 	out.SeriesBase.Series = out
 	return out
 }
 
-func (inc *MACD) Singals() types.SeriesExtend {
+func (inc *MACDLegacy) Singals() types.SeriesExtend {
 	return inc.signalLine
 }
 
 type MACDValues struct {
 	types.SeriesBase
-	*MACD
+	*MACDLegacy
 }
 
-func (inc *MACDValues) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *MACDValues) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *MACDValues) Index(i int) float64 {
-	length := len(inc.Values)
-	if length == 0 || length-1-i < 0 {
-		return 0.0
-	}
-
-	return inc.Values[length-1+i]
+	return inc.Last(i)
 }
 
 func (inc *MACDValues) Length() int {

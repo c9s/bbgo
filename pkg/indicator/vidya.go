@@ -58,18 +58,18 @@ func (inc *VIDYA) Update(value float64) {
 	change := types.Change(&inc.input)
 	CMO := math.Abs(types.Sum(change, inc.Window) / types.Sum(types.Abs(change), inc.Window))
 	alpha := 2. / float64(inc.Window+1)
-	inc.Values.Push(value*alpha*CMO + inc.Values.Last()*(1.-alpha*CMO))
+	inc.Values.Push(value*alpha*CMO + inc.Values.Last(0)*(1.-alpha*CMO))
 	if inc.Values.Length() > MaxNumOfEWMA {
 		inc.Values = inc.Values[MaxNumOfEWMATruncateSize-1:]
 	}
 }
 
-func (inc *VIDYA) Last() float64 {
-	return inc.Values.Last()
+func (inc *VIDYA) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *VIDYA) Index(i int) float64 {
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *VIDYA) Length() int {
@@ -86,12 +86,12 @@ func (inc *VIDYA) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.input.Length() == 0 {
 		for _, k := range allKLines {
 			inc.PushK(k)
-			inc.EmitUpdate(inc.Last())
+			inc.EmitUpdate(inc.Last(0))
 		}
 	} else {
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
 }
 

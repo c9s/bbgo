@@ -199,19 +199,19 @@ func (s *Strategy) smartCancel(ctx context.Context, pricef float64) int {
 			if s.counter-s.orderPendingCounter[order.OrderID] >= s.PendingMinInterval {
 				toCancel = true
 			} else if order.Side == types.SideTypeBuy {
-				if order.Price.Float64()+s.atr.Last()*2 <= pricef {
+				if order.Price.Float64()+s.atr.Last(0)*2 <= pricef {
 					toCancel = true
 				}
 			} else if order.Side == types.SideTypeSell {
 				// 75% of the probability
-				if order.Price.Float64()-s.atr.Last()*2 >= pricef {
+				if order.Price.Float64()-s.atr.Last(0)*2 >= pricef {
 					toCancel = true
 				}
 			} else {
 				panic("not supported side for the order")
 			}
 			if toCancel {
-				err := s.GeneralOrderExecutor.FastCancel(ctx, order)
+				err := s.GeneralOrderExecutor.CancelOrders(ctx, order)
 				if err == nil {
 					delete(s.orderPendingCounter, order.OrderID)
 				} else {
@@ -425,7 +425,7 @@ func (s *Strategy) klineHandlerMin(ctx context.Context, kline types.KLine) {
 	stoploss := s.Stoploss.Float64()
 	price := s.getLastPrice()
 	pricef := price.Float64()
-	atr := s.atr.Last()
+	atr := s.atr.Last(0)
 
 	numPending := s.smartCancel(ctx, pricef)
 	if numPending > 0 {
@@ -476,7 +476,7 @@ func (s *Strategy) klineHandler(ctx context.Context, kline types.KLine) {
 
 	s.smartCancel(ctx, pricef)
 
-	atr := s.atr.Last()
+	atr := s.atr.Last(0)
 	ewo := types.Array(s.ewo, 4)
 	if len(ewo) < 4 {
 		return

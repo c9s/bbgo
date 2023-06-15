@@ -36,5 +36,5 @@ func Test_PSAR(t *testing.T) {
 	}
 	assert.Equal(t, psar.Length(), 29)
 	assert.Equal(t, psar.AF, 0.04)
-	assert.Equal(t, psar.Last(), 0.16)
+	assert.Equal(t, psar.Last(0), 0.16)
 }

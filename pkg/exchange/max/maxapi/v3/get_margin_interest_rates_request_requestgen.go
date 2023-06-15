@@ -109,7 +109,7 @@ func (g *GetMarginInterestRatesRequest) GetSlugsMap() (map[string]string, error)
 	return slugs, nil
 }
 
-func (g *GetMarginInterestRatesRequest) Do(ctx context.Context) (*MarginInterestRateMap, error) {
+func (g *GetMarginInterestRatesRequest) Do(ctx context.Context) (MarginInterestRateMap, error) {
 
 	// no body params
 	var params interface{}
@@ -131,5 +131,5 @@ func (g *GetMarginInterestRatesRequest) Do(ctx context.Context) (*MarginInterest
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
 	}
-	return &apiResponse, nil
+	return apiResponse, nil
 }

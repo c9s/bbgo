@@ -21,7 +21,7 @@ type S5 struct {
 	UpdateCallbacks []func(val float64)
 }
 
-func (inc *S5) Last() float64 {
+func (inc *S5) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
@@ -83,7 +83,7 @@ func calculateS5(klines []types.KLine, valVolume KLineValueMapper) (float64, err
 		volumes.Push(valVolume(k))
 	}
 
-	v := volumes.Last()
+	v := volumes.Last(0)
 
 	sumV := 0.
 	for i := 1; i <= 10; i++ {

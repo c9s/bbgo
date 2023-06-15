@@ -32,5 +32,5 @@ func Test_TSI(t *testing.T) {
 	}
 	assert.Equal(t, tsi.Length(), 29)
 	Delta := 1.5e-2
-	assert.InDelta(t, tsi.Last(), 22.89, Delta)
+	assert.InDelta(t, tsi.Last(0), 22.89, Delta)
 }

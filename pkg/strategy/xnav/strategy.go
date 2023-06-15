@@ -19,8 +19,6 @@ import (
 
 const ID = "xnav"
 
-const stateKey = "state-v1"
-
 var log = logrus.WithField("strategy", ID)
 
 func init() {
@@ -82,6 +80,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 	priceTime := time.Now()
 
 	// iterate the sessions and record them
+	quoteCurrency := "USDT"
 	for sessionName, session := range sessions {
 		// update the account balances and the margin information
 		if _, err := session.UpdateAccount(ctx); err != nil {
@@ -91,7 +90,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 		account := session.GetAccount()
 		balances := account.Balances()
-		if err := session.UpdatePrices(ctx, balances.Currencies(), "USDT"); err != nil {
+		if err := session.UpdatePrices(ctx, balances.Currencies(), quoteCurrency); err != nil {
 			log.WithError(err).Error("price update failed")
 			return
 		}

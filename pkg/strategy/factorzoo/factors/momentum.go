@@ -31,27 +31,18 @@ type MOM struct {
 }
 
 func (inc *MOM) Index(i int) float64 {
-	if inc.Values == nil {
-		return 0
-	}
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
-func (inc *MOM) Last() float64 {
-	if inc.Values.Length() == 0 {
-		return 0
-	}
-	return inc.Values.Last()
+func (inc *MOM) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *MOM) Length() int {
-	if inc.Values == nil {
-		return 0
-	}
 	return inc.Values.Length()
 }
 
-//var _ types.SeriesExtend = &MOM{}
+// var _ types.SeriesExtend = &MOM{}
 
 func (inc *MOM) Update(open, close float64) {
 	if inc.SeriesBase.Series == nil {
@@ -62,7 +53,7 @@ func (inc *MOM) Update(open, close float64) {
 	inc.opens.Update(open)
 	inc.closes.Update(close)
 	if inc.opens.Length() >= inc.Window && inc.closes.Length() >= inc.Window {
-		gap := inc.opens.Last()/inc.closes.Index(1) - 1
+		gap := inc.opens.Last(0)/inc.closes.Index(1) - 1
 		inc.Values.Push(gap)
 	}
 }
@@ -72,11 +63,11 @@ func (inc *MOM) CalculateAndUpdate(allKLines []types.KLine) {
 		for _, k := range allKLines {
 			inc.PushK(k)
 		}
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	} else {
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
 }
 
@@ -99,7 +90,7 @@ func (inc *MOM) PushK(k types.KLine) {
 
 	inc.Update(k.Open.Float64(), k.Close.Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func calculateMomentum(klines []types.KLine, window int, valA KLineValueMapper, valB KLineValueMapper) (float64, error) {

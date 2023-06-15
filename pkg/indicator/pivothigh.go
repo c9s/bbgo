@@ -24,12 +24,8 @@ func (inc *PivotHigh) Length() int {
 	return inc.Values.Length()
 }
 
-func (inc *PivotHigh) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-
-	return inc.Values.Last()
+func (inc *PivotHigh) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *PivotHigh) Update(value float64) {
@@ -60,5 +56,5 @@ func (inc *PivotHigh) PushK(k types.KLine) {
 
 	inc.Update(k.High.Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }

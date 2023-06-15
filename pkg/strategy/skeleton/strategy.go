@@ -98,7 +98,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// when a kline is closed, we will do something
 	callback := func(kline types.KLine) {
 		// get the latest ATR value from the indicator object that we just defined.
-		atrValue := atr.Last()
+		atrValue := atr.Last(0)
 		log.Infof("atr %f", atrValue)
 
 		// Update our counter and sync the changes to the persistence layer on time

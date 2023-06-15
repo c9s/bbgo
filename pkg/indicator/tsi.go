@@ -9,6 +9,7 @@ import (
 
 // Refer: True Strength Index
 // Refer URL: https://www.investopedia.com/terms/t/tsi.asp
+//
 //go:generate callbackgen -type TSI
 type TSI struct {
 	types.SeriesBase
@@ -66,10 +67,10 @@ func (inc *TSI) Update(value float64) {
 	apc := math.Abs(pc)
 	inc.Apcs.Update(apc)
 
-	inc.Pcds.Update(inc.Pcs.Last())
-	inc.Apcds.Update(inc.Apcs.Last())
+	inc.Pcds.Update(inc.Pcs.Last(0))
+	inc.Apcds.Update(inc.Apcs.Last(0))
 
-	tsi := (inc.Pcds.Last() / inc.Apcds.Last()) * 100.
+	tsi := (inc.Pcds.Last(0) / inc.Apcds.Last(0)) * 100.
 	inc.Values.Push(tsi)
 	if inc.Values.Length() > MaxNumOfEWMA {
 		inc.Values = inc.Values[MaxNumOfEWMATruncateSize-1:]
@@ -80,12 +81,12 @@ func (inc *TSI) Length() int {
 	return inc.Values.Length()
 }
 
-func (inc *TSI) Last() float64 {
-	return inc.Values.Last()
+func (inc *TSI) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *TSI) Index(i int) float64 {
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *TSI) PushK(k types.KLine) {

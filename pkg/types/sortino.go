@@ -6,9 +6,11 @@ import (
 
 // Sortino: Calcluates the sotino ratio of access returns
 //
-//           ROI_excess   E[ROI] - ROI_risk_free
+//	ROI_excess   E[ROI] - ROI_risk_free
+//
 // sortino = ---------- = -----------------------
-//              risk      sqrt(E[ROI_drawdown^2])
+//
+//	risk      sqrt(E[ROI_drawdown^2])
 //
 // @param returns (Series): Series of profit/loss percentage every specific interval
 // @param riskFreeReturns (float): risk-free return rate of year
@@ -29,7 +31,7 @@ func Sortino(returns Series, riskFreeReturns float64, periods int, annualize boo
 	}
 	var sum = 0.
 	for i := 0; i < num; i++ {
-		exRet := returns.Index(i) - avgRiskFreeReturns
+		exRet := returns.Last(i) - avgRiskFreeReturns
 		if exRet < 0 {
 			sum += exRet * exRet
 		}

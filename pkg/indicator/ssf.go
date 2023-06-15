@@ -50,9 +50,9 @@ func (inc *SSF) Update(value float64) {
 		}
 
 		result := inc.c1*value +
-			inc.c2*inc.Values.Index(0) +
-			inc.c3*inc.Values.Index(1) +
-			inc.c4*inc.Values.Index(2)
+			inc.c2*inc.Values.Last(0) +
+			inc.c3*inc.Values.Last(1) +
+			inc.c4*inc.Values.Last(2)
 		inc.Values.Push(result)
 	} else { // poles == 2
 		if inc.Values == nil {
@@ -65,31 +65,22 @@ func (inc *SSF) Update(value float64) {
 			inc.Values = floats.Slice{}
 		}
 		result := inc.c1*value +
-			inc.c2*inc.Values.Index(0) +
-			inc.c3*inc.Values.Index(1)
+			inc.c2*inc.Values.Last(0) +
+			inc.c3*inc.Values.Last(1)
 		inc.Values.Push(result)
 	}
 }
 
+func (inc *SSF) Last(i int) float64 {
+	return inc.Values.Last(i)
+}
+
 func (inc *SSF) Index(i int) float64 {
-	if inc.Values == nil {
-		return 0.0
-	}
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *SSF) Length() int {
-	if inc.Values == nil {
-		return 0
-	}
 	return inc.Values.Length()
-}
-
-func (inc *SSF) Last() float64 {
-	if inc.Values == nil {
-		return 0.0
-	}
-	return inc.Values.Last()
 }
 
 var _ types.SeriesExtend = &SSF{}
@@ -102,22 +93,11 @@ func (inc *SSF) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.Values != nil {
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 		return
 	}
 	for _, k := range allKLines {
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
-}
-
-func (inc *SSF) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *SSF) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }

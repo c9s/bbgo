@@ -329,9 +329,9 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 	// baseBalance, hasBaseBalance := balances[s.Market.BaseCurrency]
 	// quoteBalance, hasQuoteBalance := balances[s.Market.QuoteCurrency]
 
-	downBand := s.defaultBoll.DownBand.Last()
-	upBand := s.defaultBoll.UpBand.Last()
-	sma := s.defaultBoll.SMA.Last()
+	downBand := s.defaultBoll.DownBand.Last(0)
+	upBand := s.defaultBoll.UpBand.Last(0)
+	sma := s.defaultBoll.SMA.Last(0)
 	log.Infof("bollinger band: up %f sma %f down %f", upBand, sma, downBand)
 
 	bandPercentage := calculateBandPercentage(upBand, downBand, sma, midPrice.Float64())

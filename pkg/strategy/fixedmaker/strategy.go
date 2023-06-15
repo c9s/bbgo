@@ -213,7 +213,7 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 	log.Infof("mid price: %+v", midPrice)
 
 	if s.ATRMultiplier.Float64() > 0 {
-		atr := fixedpoint.NewFromFloat(s.atr.Last())
+		atr := fixedpoint.NewFromFloat(s.atr.Last(0))
 		log.Infof("atr: %s", atr.String())
 		s.HalfSpreadRatio = s.ATRMultiplier.Mul(atr).Div(midPrice)
 		log.Infof("half spread ratio: %s", s.HalfSpreadRatio.String())

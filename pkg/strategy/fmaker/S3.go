@@ -21,7 +21,7 @@ type S3 struct {
 	UpdateCallbacks []func(val float64)
 }
 
-func (inc *S3) Last() float64 {
+func (inc *S3) Last(int) float64 {
 	if len(inc.Values) == 0 {
 		return 0.0
 	}
