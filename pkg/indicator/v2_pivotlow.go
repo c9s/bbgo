@@ -5,7 +5,7 @@ import (
 )
 
 type PivotLowStream struct {
-	Float64Series
+	*Float64Series
 	rawValues           floats.Slice
 	window, rightWindow int
 }

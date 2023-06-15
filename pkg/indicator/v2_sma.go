@@ -3,7 +3,7 @@ package indicator
 import "github.com/c9s/bbgo/pkg/types"
 
 type SMAStream struct {
-	Float64Series
+	*Float64Series
 	window    int
 	rawValues *types.Queue
 }

@@ -2,7 +2,7 @@ package indicator
 
 type RMAStream struct {
 	// embedded structs
-	Float64Series
+	*Float64Series
 
 	// config fields
 	Adjust bool

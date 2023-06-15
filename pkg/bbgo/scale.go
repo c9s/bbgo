@@ -12,6 +12,7 @@ type Scale interface {
 	Formula() string
 	FormulaOf(x float64) string
 	Call(x float64) (y float64)
+	Sum(step float64) float64
 }
 
 func init() {
@@ -21,6 +22,7 @@ func init() {
 	_ = Scale(&QuadraticScale{})
 }
 
+// f(x) := ab^x
 // y := ab^x
 // shift xs[0] to 0 (x - h)
 // a = y1
@@ -54,6 +56,14 @@ func (s *ExponentialScale) Solve() error {
 	s.b = math.Pow(s.Range[1]/s.Range[0], 1/(s.Domain[1]-s.h))
 	s.s = s.Domain[1] - s.h
 	return nil
+}
+
+func (s *ExponentialScale) Sum(step float64) float64 {
+	sum := 0.0
+	for x := s.Domain[0]; x <= s.Domain[1]; x += step {
+		sum += s.Call(x)
+	}
+	return sum
 }
 
 func (s *ExponentialScale) String() string {
@@ -98,6 +108,14 @@ func (s *LogarithmicScale) Call(x float64) (y float64) {
 	// y = a * log(x - h) + s
 	y = s.a*math.Log(x-s.h) + s.s
 	return y
+}
+
+func (s *LogarithmicScale) Sum(step float64) float64 {
+	sum := 0.0
+	for x := s.Domain[0]; x <= s.Domain[1]; x += step {
+		sum += s.Call(x)
+	}
+	return sum
 }
 
 func (s *LogarithmicScale) String() string {
@@ -158,6 +176,14 @@ func (s *LinearScale) Call(x float64) (y float64) {
 	return y
 }
 
+func (s *LinearScale) Sum(step float64) float64 {
+	sum := 0.0
+	for x := s.Domain[0]; x <= s.Domain[1]; x += step {
+		sum += s.Call(x)
+	}
+	return sum
+}
+
 func (s *LinearScale) String() string {
 	return s.Formula()
 }
@@ -199,6 +225,14 @@ func (s *QuadraticScale) Call(x float64) (y float64) {
 	// y = a * log(x - h) + s
 	y = s.a*math.Pow(x, 2) + s.b*x + s.c
 	return y
+}
+
+func (s *QuadraticScale) Sum(step float64) float64 {
+	sum := 0.0
+	for x := s.Domain[0]; x <= s.Domain[1]; x += step {
+		sum += s.Call(x)
+	}
+	return sum
 }
 
 func (s *QuadraticScale) String() string {
@@ -266,18 +300,20 @@ func (rule *SlideRule) Scale() (Scale, error) {
 // LayerScale defines the scale DSL for maker layers, e.g.,
 //
 // quantityScale:
-//   byLayer:
-//     exp:
-//       domain: [1, 5]
-//       range: [0.01, 1.0]
+//
+//	byLayer:
+//	  exp:
+//	    domain: [1, 5]
+//	    range: [0.01, 1.0]
 //
 // and
 //
 // quantityScale:
-//   byLayer:
-//     linear:
-//       domain: [1, 3]
-//       range: [0.01, 1.0]
+//
+//	byLayer:
+//	  linear:
+//	    domain: [1, 3]
+//	    range: [0.01, 1.0]
 type LayerScale struct {
 	LayerRule *SlideRule `json:"byLayer"`
 }
@@ -303,18 +339,20 @@ func (s *LayerScale) Scale(layer int) (quantity float64, err error) {
 // PriceVolumeScale defines the scale DSL for strategy, e.g.,
 //
 // quantityScale:
-//   byPrice:
-//     exp:
-//       domain: [10_000, 50_000]
-//       range: [0.01, 1.0]
+//
+//	byPrice:
+//	  exp:
+//	    domain: [10_000, 50_000]
+//	    range: [0.01, 1.0]
 //
 // and
 //
 // quantityScale:
-//   byVolume:
-//     linear:
-//       domain: [10_000, 50_000]
-//       range: [0.01, 1.0]
+//
+//	byVolume:
+//	  linear:
+//	    domain: [10_000, 50_000]
+//	    range: [0.01, 1.0]
 type PriceVolumeScale struct {
 	ByPriceRule  *SlideRule `json:"byPrice"`
 	ByVolumeRule *SlideRule `json:"byVolume"`

@@ -6,7 +6,7 @@ import (
 
 // SubtractStream subscribes 2 upstream data, and then subtract these 2 values
 type SubtractStream struct {
-	Float64Series
+	*Float64Series
 
 	a, b floats.Slice
 	i    int

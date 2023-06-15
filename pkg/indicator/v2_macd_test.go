@@ -35,13 +35,13 @@ func Test_MACD2(t *testing.T) {
 		{
 			name:   "random_case",
 			kLines: buildKLines(input),
-			want:   0.7967670223776384,
+			want:   0.7740187187598249,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			prices := &PriceStream{}
+			prices := ClosePrices(nil)
 			macd := MACD2(prices, 12, 26, 9)
 			for _, k := range tt.kLines {
 				prices.EmitUpdate(k.Close.Float64())

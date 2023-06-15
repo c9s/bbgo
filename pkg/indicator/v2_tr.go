@@ -9,7 +9,7 @@ import (
 // This TRStream calculates the ATR first
 type TRStream struct {
 	// embedded struct
-	Float64Series
+	*Float64Series
 
 	// private states
 	previousClose float64
