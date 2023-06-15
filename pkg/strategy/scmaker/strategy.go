@@ -289,8 +289,17 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 			bidPrice = midPrice.Add(bwf.Neg())
 			askPrice = midPrice.Add(bwf)
 		} else if i > 0 {
-			bidPrice = midPrice.Sub(tickSize.Mul(fi))
-			askPrice = midPrice.Add(tickSize.Mul(fi))
+			sp := tickSize.Mul(fi)
+			bidPrice = midPrice.Sub(sp)
+			askPrice = midPrice.Add(sp)
+
+			if bidPrice.Compare(ticker.Buy) < 0 {
+				bidPrice = ticker.Buy.Sub(sp)
+			}
+
+			if askPrice.Compare(ticker.Sell) > 0 {
+				askPrice = ticker.Sell.Add(sp)
+			}
 		}
 
 		bidPrice = s.Market.TruncatePrice(bidPrice)
