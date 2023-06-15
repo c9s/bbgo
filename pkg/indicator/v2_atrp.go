@@ -1,11 +1,13 @@
 package indicator
 
 type ATRPStream struct {
-	Float64Series
+	*Float64Series
 }
 
 func ATRP2(source KLineSubscription, window int) *ATRPStream {
-	s := &ATRPStream{}
+	s := &ATRPStream{
+		Float64Series: NewFloat64Series(),
+	}
 	tr := TR2(source)
 	atr := RMA2(tr, window, true)
 	atr.OnUpdate(func(x float64) {

@@ -1,7 +1,7 @@
 package indicator
 
 type CMAStream struct {
-	Float64Series
+	*Float64Series
 }
 
 func CMA2(source Float64Source) *CMAStream {

@@ -13,7 +13,7 @@ const (
 
 // CrossStream subscribes 2 upstreams, and calculate the cross signal
 type CrossStream struct {
-	Float64Series
+	*Float64Series
 
 	a, b floats.Slice
 }

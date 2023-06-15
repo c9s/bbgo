@@ -2,7 +2,7 @@ package indicator
 
 type RSIStream struct {
 	// embedded structs
-	Float64Series
+	*Float64Series
 
 	// config fields
 	window int

@@ -3,7 +3,7 @@ package indicator
 import "github.com/c9s/bbgo/pkg/datatype/floats"
 
 type MultiplyStream struct {
-	Float64Series
+	*Float64Series
 	a, b floats.Slice
 }
 
