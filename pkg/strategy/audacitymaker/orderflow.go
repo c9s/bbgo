@@ -92,7 +92,7 @@ func (s *PerTrade) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			// min-max scaling
 			ofsMax := orderFlowSize.Tail(100).Max()
 			ofsMin := orderFlowSize.Tail(100).Min()
-			ofsMinMax := (orderFlowSize.Last() - ofsMin) / (ofsMax - ofsMin)
+			ofsMinMax := (orderFlowSize.Last(0) - ofsMin) / (ofsMax - ofsMin)
 			// preserves temporal dependency via polar encoded angles
 			orderFlowSizeMinMax.Push(ofsMinMax)
 		}
@@ -102,7 +102,7 @@ func (s *PerTrade) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			// min-max scaling
 			ofnMax := orderFlowNumber.Tail(100).Max()
 			ofnMin := orderFlowNumber.Tail(100).Min()
-			ofnMinMax := (orderFlowNumber.Last() - ofnMin) / (ofnMax - ofnMin)
+			ofnMinMax := (orderFlowNumber.Last(0) - ofnMin) / (ofnMax - ofnMin)
 			// preserves temporal dependency via polar encoded angles
 			orderFlowNumberMinMax.Push(ofnMinMax)
 		}
@@ -167,9 +167,9 @@ func (s *PerTrade) placeTrade(ctx context.Context, side types.SideType, quantity
 
 func outlier(fs floats.Slice, multiplier float64) int {
 	stddev := stat.StdDev(fs, nil)
-	if fs.Last() > fs.Mean()+multiplier*stddev {
+	if fs.Last(0) > fs.Mean()+multiplier*stddev {
 		return 1
-	} else if fs.Last() < fs.Mean()-multiplier*stddev {
+	} else if fs.Last(0) < fs.Mean()-multiplier*stddev {
 		return -1
 	}
 	return 0

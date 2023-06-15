@@ -145,7 +145,7 @@ func (r *AccumulatedProfitReport) DailyUpdate(tradeStats *types.TradeStats) {
 
 	// Accumulated profit MA
 	r.accumulatedProfitMA.Update(r.accumulatedProfit.Float64())
-	r.accumulatedProfitMAPerDay.Update(r.accumulatedProfitMA.Last())
+	r.accumulatedProfitMAPerDay.Update(r.accumulatedProfitMA.Last(0))
 
 	// Accumulated Fee
 	r.accumulatedFeePerDay.Update(r.accumulatedFee.Float64())
@@ -341,11 +341,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	states.Update(0)
 	s.session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 
-		log.Infof("shark score: %f, current price: %f", s.shark.Last(), kline.Close.Float64())
+		log.Infof("shark score: %f, current price: %f", s.shark.Last(0), kline.Close.Float64())
 
 		nextState := hmm(s.shark.Array(s.Window), states.Array(s.Window), s.Window)
 		states.Update(nextState)
-		log.Infof("Denoised signal via HMM: %f", states.Last())
+		log.Infof("Denoised signal via HMM: %f", states.Last(0))
 
 		if states.Length() < s.Window {
 			return

@@ -20,6 +20,7 @@ import (
 //
 // @param offset: Gaussian applied to the combo line. 1->ema, 0->sma
 // @param sigma: the standard deviation applied to the combo line. This makes the combo line sharper
+//
 //go:generate callbackgen -type ALMA
 type ALMA struct {
 	types.SeriesBase
@@ -64,18 +65,12 @@ func (inc *ALMA) Update(value float64) {
 	}
 }
 
-func (inc *ALMA) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-	return inc.Values[len(inc.Values)-1]
+func (inc *ALMA) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *ALMA) Index(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-	return inc.Values[len(inc.Values)-i-1]
+	return inc.Last(i)
 }
 
 func (inc *ALMA) Length() int {
@@ -88,21 +83,10 @@ func (inc *ALMA) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.input == nil {
 		for _, k := range allKLines {
 			inc.Update(k.Close.Float64())
-			inc.EmitUpdate(inc.Last())
+			inc.EmitUpdate(inc.Last(0))
 		}
 		return
 	}
 	inc.Update(allKLines[len(allKLines)-1].Close.Float64())
-	inc.EmitUpdate(inc.Last())
-}
-
-func (inc *ALMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {
-	if inc.Interval != interval {
-		return
-	}
-	inc.CalculateAndUpdate(window)
-}
-
-func (inc *ALMA) Bind(updater KLineWindowUpdater) {
-	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
+	inc.EmitUpdate(inc.Last(0))
 }

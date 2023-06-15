@@ -51,22 +51,19 @@ func (inc *DEMA) Update(value float64) {
 	}
 
 	inc.a1.Update(value)
-	inc.a2.Update(inc.a1.Last())
-	inc.Values.Push(2*inc.a1.Last() - inc.a2.Last())
+	inc.a2.Update(inc.a1.Last(0))
+	inc.Values.Push(2*inc.a1.Last(0) - inc.a2.Last(0))
 	if len(inc.Values) > MaxNumOfEWMA {
 		inc.Values = inc.Values[MaxNumOfEWMATruncateSize-1:]
 	}
 }
 
-func (inc *DEMA) Last() float64 {
-	return inc.Values.Last()
+func (inc *DEMA) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *DEMA) Index(i int) float64 {
-	if len(inc.Values)-i-1 >= 0 {
-		return inc.Values[len(inc.Values)-1-i]
-	}
-	return 0
+	return inc.Last(i)
 }
 
 func (inc *DEMA) Length() int {
@@ -83,13 +80,13 @@ func (inc *DEMA) CalculateAndUpdate(allKLines []types.KLine) {
 	if inc.a1 == nil {
 		for _, k := range allKLines {
 			inc.PushK(k)
-			inc.EmitUpdate(inc.Last())
+			inc.EmitUpdate(inc.Last(0))
 		}
 	} else {
 		// last k
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
 }
 

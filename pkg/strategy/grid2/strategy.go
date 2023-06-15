@@ -91,6 +91,9 @@ type Strategy struct {
 	// GridNum is the grid number, how many orders you want to post on the orderbook.
 	GridNum int64 `json:"gridNumber"`
 
+	// BaseGridNum is an optional field used for base investment sell orders
+	BaseGridNum int `json:"baseGridNumber,omitempty"`
+
 	AutoRange *types.SimpleDuration `json:"autoRange"`
 
 	UpperPrice fixedpoint.Value `json:"upperPrice"`
@@ -162,8 +165,12 @@ type Strategy struct {
 	// it makes sure that your grid configuration is profitable.
 	FeeRate fixedpoint.Value `json:"feeRate"`
 
-	SkipSpreadCheck             bool `json:"skipSpreadCheck"`
-	RecoverGridByScanningTrades bool `json:"recoverGridByScanningTrades"`
+	SkipSpreadCheck             bool          `json:"skipSpreadCheck"`
+	RecoverGridByScanningTrades bool          `json:"recoverGridByScanningTrades"`
+	RecoverGridWithin           time.Duration `json:"recoverGridWithin"`
+
+	EnableProfitFixer bool        `json:"enableProfitFixer"`
+	FixProfitSince    *types.Time `json:"fixProfitSince"`
 
 	// Debug enables the debug mode
 	Debug bool `json:"debug"`
@@ -196,6 +203,9 @@ type Strategy struct {
 
 	tradingCtx, writeCtx context.Context
 	cancelWrite          context.CancelFunc
+
+	// this ensures that bbgo.Sync to lock the object
+	sync.Mutex
 }
 
 func (s *Strategy) ID() string {
@@ -227,7 +237,7 @@ func (s *Strategy) Validate() error {
 		}
 	}
 
-	if !s.QuantityOrAmount.IsSet() && s.QuoteInvestment.IsZero() {
+	if !s.QuantityOrAmount.IsSet() && s.QuoteInvestment.IsZero() && s.BaseInvestment.IsZero() {
 		return fmt.Errorf("either quantity, amount or quoteInvestment must be set")
 	}
 
@@ -338,13 +348,32 @@ func (s *Strategy) calculateProfit(o types.Order, buyPrice, buyQuantity fixedpoi
 func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 	tq := aggregateTradesQuantity(trades)
 
-	if tq.Compare(o.Quantity) != 0 {
-		s.logger.Warnf("order trades missing. expected: %s got: %s",
-			o.Quantity.String(),
-			tq.String())
-		return false
+	// on MAX: if order.status == filled, it does not mean order.executedQuantity == order.quantity
+	// order.executedQuantity can be less than order.quantity
+	// so here we use executed quantity to check if the total trade quantity matches to order.executedQuantity
+	executedQuantity := o.ExecutedQuantity
+	if executedQuantity.IsZero() {
+		// fall back to the original quantity if the executed quantity is zero
+		executedQuantity = o.Quantity
 	}
 
+	// early return here if it matches
+	c := tq.Compare(executedQuantity)
+	if c == 0 {
+		return true
+	}
+
+	if c < 0 {
+		s.logger.Warnf("order trades missing. expected: %s got: %s",
+			executedQuantity.String(),
+			tq.String())
+		return false
+	} else if c > 0 {
+		s.logger.Errorf("aggregated trade quantity %s > order executed quantity %s, something is wrong, please check", tq.String(), executedQuantity.String())
+		return true
+	}
+
+	// shouldn't reach here
 	return true
 }
 
@@ -354,7 +383,7 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 	// try to get the received trades (websocket trades)
 	orderTrades := s.historicalTrades.GetOrderTrades(o)
 	if len(orderTrades) > 0 {
-		s.logger.Infof("found filled order trades: %+v", orderTrades)
+		s.logger.Infof("GRID: found filled order trades: %+v", orderTrades)
 	}
 
 	feeCurrency := s.Market.BaseCurrency
@@ -378,7 +407,7 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 			return fixedpoint.Zero, feeCurrency
 		}
 
-		s.logger.Warnf("missing order trades or missing trade fee, pulling order trades from API")
+		s.logger.Warnf("GRID: missing #%d order trades or missing trade fee, pulling order trades from API", o.OrderID)
 
 		// if orderQueryService is supported, use it to query the trades of the filled order
 		apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
@@ -386,11 +415,17 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 			OrderID: strconv.FormatUint(o.OrderID, 10),
 		})
 		if err != nil {
-			s.logger.WithError(err).Errorf("query order trades error")
+			s.logger.WithError(err).Errorf("query #%d order trades error", o.OrderID)
 		} else {
-			s.logger.Infof("fetched api trades: %+v", apiOrderTrades)
+			s.logger.Infof("GRID: fetched api #%d order trades: %+v", o.OrderID, apiOrderTrades)
 			orderTrades = apiOrderTrades
 		}
+	}
+
+	// still try to aggregate the trades quantity if we can:
+	fees := collectTradeFee(orderTrades)
+	if fee, ok := fees[feeCurrency]; ok {
+		return fee, feeCurrency
 	}
 
 	return fixedpoint.Zero, feeCurrency
@@ -402,8 +437,19 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	// check order fee
 	newSide := types.SideTypeSell
 	newPrice := o.Price
-	newQuantity := o.Quantity
+
+	executedQuantity := o.ExecutedQuantity
+	// A safeguard check, fallback to the original quantity
+	if executedQuantity.IsZero() {
+		executedQuantity = o.Quantity
+	}
+
+	newQuantity := executedQuantity
 	executedPrice := o.Price
+
+	if o.ExecutedQuantity.Compare(o.Quantity) != 0 {
+		s.logger.Warnf("order #%d is filled, but order executed quantity %s != order quantity %s, something is wrong", o.OrderID, o.ExecutedQuantity, o.Quantity)
+	}
 
 	/*
 		if o.AveragePrice.Sign() > 0 {
@@ -412,7 +458,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	*/
 
 	// will be used for calculating quantity
-	orderExecutedQuoteAmount := o.Quantity.Mul(executedPrice)
+	orderExecutedQuoteAmount := executedQuantity.Mul(executedPrice)
 
 	// collect trades for fee
 	// fee calculation is used to reduce the order quantity
@@ -719,35 +765,49 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 	// maxBaseQuantity = baseInvestment / numberOfSellOrders
 	// if maxBaseQuantity < minQuantity or maxBaseQuantity * priceLowest < minNotional
 	// then reduce the numberOfSellOrders
-	numberOfSellOrders := 0
-	for i := len(pins) - 1; i >= 0; i-- {
-		pin := pins[i]
-		price := fixedpoint.Value(pin)
-		sellPrice := price
-		if s.ProfitSpread.Sign() > 0 {
-			sellPrice = sellPrice.Add(s.ProfitSpread)
+	numberOfSellOrders := s.BaseGridNum
+
+	// if it's not configured, calculate the number of sell orders
+	if numberOfSellOrders == 0 {
+		for i := len(pins) - 1; i >= 0; i-- {
+			pin := pins[i]
+			price := fixedpoint.Value(pin)
+			sellPrice := price
+			if s.ProfitSpread.Sign() > 0 {
+				sellPrice = sellPrice.Add(s.ProfitSpread)
+			}
+
+			if sellPrice.Compare(lastPrice) < 0 {
+				break
+			}
+
+			numberOfSellOrders++
 		}
 
-		if sellPrice.Compare(lastPrice) < 0 {
-			break
+		// avoid placing a sell order above the last price
+		if numberOfSellOrders > 0 {
+			numberOfSellOrders--
 		}
-
-		numberOfSellOrders++
 	}
 
 	// if the maxBaseQuantity is less than minQuantity, then we need to reduce the number of the sell orders
 	// so that the quantity can be increased.
-	maxNumberOfSellOrders := numberOfSellOrders + 1
-	minBaseQuantity := fixedpoint.Max(s.Market.MinNotional.Div(lastPrice), s.Market.MinQuantity)
-	maxBaseQuantity := fixedpoint.Zero
-	for maxBaseQuantity.Compare(s.Market.MinQuantity) <= 0 || maxBaseQuantity.Compare(minBaseQuantity) <= 0 {
-		maxNumberOfSellOrders--
-		maxBaseQuantity = baseInvestment.Div(fixedpoint.NewFromInt(int64(maxNumberOfSellOrders)))
+	baseQuantity := s.Market.TruncateQuantity(
+		baseInvestment.Div(
+			fixedpoint.NewFromInt(
+				int64(numberOfSellOrders))))
+
+	minBaseQuantity := fixedpoint.Max(
+		s.Market.MinNotional.Div(s.UpperPrice),
+		s.Market.MinQuantity)
+
+	if baseQuantity.Compare(minBaseQuantity) <= 0 {
+		baseQuantity = s.Market.RoundUpQuantityByPrecision(minBaseQuantity)
+		numberOfSellOrders = int(math.Floor(baseInvestment.Div(baseQuantity).Float64()))
 	}
-	s.logger.Infof("grid base investment sell orders: %d", maxNumberOfSellOrders)
-	if maxNumberOfSellOrders > 0 {
-		s.logger.Infof("grid base investment quantity: %f (base investment) / %d (number of sell orders) = %f (base quantity per order)", baseInvestment.Float64(), maxNumberOfSellOrders, maxBaseQuantity.Float64())
-	}
+
+	s.logger.Infof("grid base investment sell orders: %d", numberOfSellOrders)
+	s.logger.Infof("grid base investment quantity: %f (base investment) / %d (number of sell orders) = %f (base quantity per order)", baseInvestment.Float64(), numberOfSellOrders, baseQuantity.Float64())
 
 	// calculate quantity with quote investment
 	totalQuotePrice := fixedpoint.Zero
@@ -756,7 +816,7 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 	// quoteInvestment = (p1 + p2 + p3) * q
 	// maxBuyQuantity = quoteInvestment / (p1 + p2 + p3)
 	si := -1
-	for i := len(pins) - 1 - maxNumberOfSellOrders; i >= 0; i-- {
+	for i := len(pins) - 1 - numberOfSellOrders; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
 
@@ -791,12 +851,16 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInv
 		}
 	}
 
-	quoteSideQuantity := quoteInvestment.Div(totalQuotePrice)
-	if maxNumberOfSellOrders > 0 {
-		return fixedpoint.Min(quoteSideQuantity, maxBaseQuantity), nil
+	if totalQuotePrice.Sign() > 0 && quoteInvestment.Sign() > 0 {
+		quoteSideQuantity := quoteInvestment.Div(totalQuotePrice)
+		if numberOfSellOrders > 0 {
+			return fixedpoint.Min(quoteSideQuantity, baseQuantity), nil
+		}
+
+		return quoteSideQuantity, nil
 	}
 
-	return quoteSideQuantity, nil
+	return baseQuantity, nil
 }
 
 func (s *Strategy) newTriggerPriceHandler(ctx context.Context, session *bbgo.ExchangeSession) types.KLineCallback {
@@ -1020,7 +1084,7 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		}
 	} else {
 		// calculate the quantity from the investment configuration
-		if !s.QuoteInvestment.IsZero() && !s.BaseInvestment.IsZero() {
+		if !s.BaseInvestment.IsZero() {
 			quantity, err2 := s.calculateBaseQuoteInvestmentQuantity(s.QuoteInvestment, s.BaseInvestment, lastPrice, s.grid.Pins)
 			if err2 != nil {
 				s.EmitGridError(err2)
@@ -1277,16 +1341,22 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 			quantity = s.QuantityOrAmount.Amount.Div(price)
 		}
 
-		// TODO: add fee if we don't have the platform token. BNB, OKB or MAX...
-		if price.Compare(lastPrice) >= 0 {
+		placeSell := price.Compare(lastPrice) >= 0
+
+		// override the relative price position for sell order if BaseGridNum is defined
+		if s.BaseGridNum > 0 {
+			placeSell = i >= len(pins)-1-s.BaseGridNum
+		}
+
+		if placeSell {
 			si = i
 
-			// do not place sell order when i == 0
+			// do not place sell order when i == 0 (the bottom of grid)
 			if i == 0 {
 				continue
 			}
 
-			if usedBase.Add(quantity).Compare(totalBase) < 0 {
+			if usedBase.Add(quantity).Compare(totalBase) <= 0 {
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:        s.Symbol,
 					Type:          types.OrderTypeLimit,
@@ -1780,8 +1850,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		interval := s.AutoRange.Interval()
 		pivotLow := indicatorSet.PivotLow(types.IntervalWindow{Interval: interval, Window: s.AutoRange.Num})
 		pivotHigh := indicatorSet.PivotHigh(types.IntervalWindow{Interval: interval, Window: s.AutoRange.Num})
-		s.UpperPrice = fixedpoint.NewFromFloat(pivotHigh.Last())
-		s.LowerPrice = fixedpoint.NewFromFloat(pivotLow.Last())
+		s.UpperPrice = fixedpoint.NewFromFloat(pivotHigh.Last(0))
+		s.LowerPrice = fixedpoint.NewFromFloat(pivotLow.Last(0))
 		s.logger.Infof("autoRange is enabled, using pivot high %f and pivot low %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
 
@@ -1846,7 +1916,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.orderExecutor = orderExecutor
 
 	s.OnGridProfit(func(stats *GridProfitStats, profit *GridProfit) {
-		bbgo.Notify(profit)
+		if profit != nil {
+			bbgo.Notify(profit)
+		}
 		bbgo.Notify(stats)
 	})
 

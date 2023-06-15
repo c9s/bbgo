@@ -57,33 +57,27 @@ func (inc *TILL) Update(value float64) {
 	}
 
 	inc.e1.Update(value)
-	inc.e2.Update(inc.e1.Last())
-	inc.e3.Update(inc.e2.Last())
-	inc.e4.Update(inc.e3.Last())
-	inc.e5.Update(inc.e4.Last())
-	inc.e6.Update(inc.e5.Last())
+	inc.e2.Update(inc.e1.Last(0))
+	inc.e3.Update(inc.e2.Last(0))
+	inc.e4.Update(inc.e3.Last(0))
+	inc.e5.Update(inc.e4.Last(0))
+	inc.e6.Update(inc.e5.Last(0))
 }
 
-func (inc *TILL) Last() float64 {
-	if inc.e1 == nil || inc.e1.Length() == 0 {
-		return 0
-	}
-	e3 := inc.e3.Last()
-	e4 := inc.e4.Last()
-	e5 := inc.e5.Last()
-	e6 := inc.e6.Last()
-	return inc.c1*e6 + inc.c2*e5 + inc.c3*e4 + inc.c4*e3
-}
-
-func (inc *TILL) Index(i int) float64 {
+func (inc *TILL) Last(i int) float64 {
 	if inc.e1 == nil || inc.e1.Length() <= i {
 		return 0
 	}
+
 	e3 := inc.e3.Index(i)
 	e4 := inc.e4.Index(i)
 	e5 := inc.e5.Index(i)
 	e6 := inc.e6.Index(i)
 	return inc.c1*e6 + inc.c2*e5 + inc.c3*e4 + inc.c4*e3
+}
+
+func (inc *TILL) Index(i int) float64 {
+	return inc.Last(i)
 }
 
 func (inc *TILL) Length() int {
@@ -101,7 +95,7 @@ func (inc *TILL) PushK(k types.KLine) {
 	}
 
 	inc.Update(k.Close.Float64())
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func (inc *TILL) LoadK(allKLines []types.KLine) {

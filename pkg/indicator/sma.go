@@ -1,7 +1,6 @@
 package indicator
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
@@ -22,19 +21,12 @@ type SMA struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *SMA) Last() float64 {
-	if inc.Values.Length() == 0 {
-		return 0.0
-	}
-	return inc.Values.Last()
+func (inc *SMA) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *SMA) Index(i int) float64 {
-	if i >= inc.Values.Length() {
-		return 0.0
-	}
-
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *SMA) Length() int {
@@ -81,29 +73,11 @@ func (inc *SMA) PushK(k types.KLine) {
 
 	inc.Update(k.Close.Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Values.Last())
+	inc.EmitUpdate(inc.Values.Last(0))
 }
 
 func (inc *SMA) LoadK(allKLines []types.KLine) {
 	for _, k := range allKLines {
 		inc.PushK(k)
 	}
-}
-
-func calculateSMA(kLines []types.KLine, window int, priceF KLineValueMapper) (float64, error) {
-	length := len(kLines)
-	if length == 0 || length < window {
-		return 0.0, fmt.Errorf("insufficient elements for calculating SMA with window = %d", window)
-	}
-	if length != window {
-		return 0.0, fmt.Errorf("too much klines passed in, requires only %d klines", window)
-	}
-
-	sum := 0.0
-	for _, k := range kLines {
-		sum += priceF(k)
-	}
-
-	avg := sum / float64(window)
-	return avg, nil
 }

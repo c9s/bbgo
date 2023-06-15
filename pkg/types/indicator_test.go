@@ -1,7 +1,8 @@
 package types
 
 import (
-	//"os"
+	// "os"
+	"math"
 	"testing"
 	"time"
 
@@ -12,10 +13,18 @@ import (
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 )
 
+func TestQueue(t *testing.T) {
+	zeroq := NewQueue(0)
+	assert.Equal(t, zeroq.Last(0), 0.)
+	assert.Equal(t, zeroq.Index(0), 0.)
+	zeroq.Update(1.)
+	assert.Equal(t, zeroq.Length(), 0)
+}
+
 func TestFloat(t *testing.T) {
-	var a Series = Minus(3., 2.)
-	assert.Equal(t, a.Last(), 1.)
-	assert.Equal(t, a.Index(100), 1.)
+	var a Series = Sub(3., 2.)
+	assert.Equal(t, a.Last(0), 1.)
+	assert.Equal(t, a.Last(100), 1.)
 }
 
 func TestNextCross(t *testing.T) {
@@ -35,10 +44,10 @@ func TestNextCross(t *testing.T) {
 func TestFloat64Slice(t *testing.T) {
 	var a = floats.Slice{1.0, 2.0, 3.0}
 	var b = floats.Slice{1.0, 2.0, 3.0}
-	var c Series = Minus(&a, &b)
+	var c Series = Sub(&a, &b)
 	a = append(a, 4.0)
 	b = append(b, 3.0)
-	assert.Equal(t, c.Last(), 1.)
+	assert.Equal(t, c.Last(0), 1.)
 }
 
 /*
@@ -58,8 +67,8 @@ func TestCorr(t *testing.T) {
 	corr := Correlation(&a, &b, 4, Pearson)
 	assert.InDelta(t, corr, -0.8510644, 0.001)
 	out := Rank(&a, 4)
-	assert.Equal(t, out.Index(0), 2.5)
-	assert.Equal(t, out.Index(1), 4.0)
+	assert.Equal(t, out.Last(0), 2.5)
+	assert.Equal(t, out.Last(1), 4.0)
 	corr = Correlation(&a, &b, 4, Spearman)
 	assert.InDelta(t, corr, -0.94868, 0.001)
 }
@@ -110,7 +119,7 @@ func TestSoftmax(t *testing.T) {
 	out := Softmax(&a, a.Length())
 	r := floats.Slice{0.8360188027814407, 0.11314284146556013, 0.05083835575299916}
 	for i := 0; i < out.Length(); i++ {
-		assert.InDelta(t, r.Index(i), out.Index(i), 0.001)
+		assert.InDelta(t, r.Last(i), out.Last(i), 0.001)
 	}
 }
 
@@ -119,8 +128,65 @@ func TestSigmoid(t *testing.T) {
 	out := Sigmoid(&a)
 	r := floats.Slice{0.9525741268224334, 0.7310585786300049, 0.8909031788043871}
 	for i := 0; i < out.Length(); i++ {
-		assert.InDelta(t, r.Index(i), out.Index(i), 0.001)
+		assert.InDelta(t, r.Last(i), out.Last(i), 0.001, "i=%d", i)
 	}
+}
+
+func TestHighLowest(t *testing.T) {
+	a := floats.Slice{3.0, 1.0, 2.1}
+	assert.Equal(t, 3.0, Highest(&a, 4))
+	assert.Equal(t, 1.0, Lowest(&a, 4))
+}
+
+func TestAdd(t *testing.T) {
+	var a NumberSeries = 3.0
+	var b NumberSeries = 2.0
+	out := Add(&a, &b)
+	assert.Equal(t, out.Last(0), 5.0)
+	assert.Equal(t, out.Length(), math.MaxInt32)
+}
+
+func TestDiv(t *testing.T) {
+	a := floats.Slice{3.0, 1.0, 2.0}
+	b := NumberSeries(2.0)
+	out := Div(&a, &b)
+	assert.Equal(t, 1.0, out.Last(0))
+	assert.Equal(t, 3, out.Length())
+	assert.Equal(t, 0.5, out.Last(1))
+}
+
+func TestMul(t *testing.T) {
+	a := floats.Slice{3.0, 1.0, 2.0}
+	b := NumberSeries(2.0)
+	out := Mul(&a, &b)
+	assert.Equal(t, out.Last(0), 4.0)
+	assert.Equal(t, out.Length(), 3)
+	assert.Equal(t, out.Last(1), 2.0)
+}
+
+func TestArray(t *testing.T) {
+	a := floats.Slice{3.0, 1.0, 2.0}
+	out := Array(&a, 1)
+	assert.Equal(t, len(out), 1)
+	out = Array(&a, 4)
+	assert.Equal(t, len(out), 3)
+}
+
+func TestSwitchInterface(t *testing.T) {
+	var a int = 1
+	var af float64 = 1.0
+	var b int32 = 2
+	var bf float64 = 2.0
+	var c int64 = 3
+	var cf float64 = 3.0
+	var d float32 = 4.0
+	var df float64 = 4.0
+	var e float64 = 5.0
+	assert.Equal(t, switchIface(a).Last(0), af)
+	assert.Equal(t, switchIface(b).Last(0), bf)
+	assert.Equal(t, switchIface(c).Last(0), cf)
+	assert.Equal(t, switchIface(d).Last(0), df)
+	assert.Equal(t, switchIface(e).Last(0), e)
 }
 
 // from https://en.wikipedia.org/wiki/Logistic_regression
@@ -156,8 +222,8 @@ func TestClone(t *testing.T) {
 	a.Update(3.)
 	b := Clone(a)
 	b.Update(4.)
-	assert.Equal(t, a.Last(), 3.)
-	assert.Equal(t, b.Last(), 4.)
+	assert.Equal(t, a.Last(0), 3.)
+	assert.Equal(t, b.Last(0), 4.)
 }
 
 func TestPlot(t *testing.T) {
@@ -166,9 +232,9 @@ func TestPlot(t *testing.T) {
 	ct.Plot("test", &a, Time(time.Now()), 4)
 	assert.Equal(t, ct.Interval, Interval5m)
 	assert.Equal(t, ct.Series[0].(chart.TimeSeries).Len(), 4)
-	//f, _ := os.Create("output.png")
-	//defer f.Close()
-	//ct.Render(chart.PNG, f)
+	// f, _ := os.Create("output.png")
+	// defer f.Close()
+	// ct.Render(chart.PNG, f)
 }
 
 func TestFilter(t *testing.T) {
@@ -177,6 +243,6 @@ func TestFilter(t *testing.T) {
 		return val > 0
 	}, 4)
 	assert.Equal(t, b.Length(), 4)
-	assert.Equal(t, b.Last(), 1000.)
+	assert.Equal(t, b.Last(0), 1000.)
 	assert.Equal(t, b.Sum(3), 1200.)
 }

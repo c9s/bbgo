@@ -10,10 +10,6 @@ import (
 //go:generate -command PostRequest requestgen -method POST
 //go:generate -command DeleteRequest requestgen -method DELETE
 
-func (s *MarginService) NewGetMarginADRatioRequest() *GetMarginADRatioRequest {
-	return &GetMarginADRatioRequest{client: s.Client}
-}
-
 type ADRatio struct {
 	AdRatio     fixedpoint.Value `json:"ad_ratio"`
 	AssetInUsdt fixedpoint.Value `json:"asset_in_usdt"`
@@ -23,4 +19,8 @@ type ADRatio struct {
 //go:generate GetRequest -url "/api/v3/wallet/m/ad_ratio" -type GetMarginADRatioRequest -responseType .ADRatio
 type GetMarginADRatioRequest struct {
 	client requestgen.AuthenticatedAPIClient
+}
+
+func (s *Client) NewGetMarginADRatioRequest() *GetMarginADRatioRequest {
+	return &GetMarginADRatioRequest{client: s.Client}
 }

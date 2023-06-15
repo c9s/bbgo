@@ -473,14 +473,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				s.currentStopLossPrice = kline.GetLow()
 			}
 			if s.TakeProfitAtrMultiplier > 0 {
-				s.currentTakeProfitPrice = closePrice.Add(fixedpoint.NewFromFloat(s.Supertrend.AverageTrueRange.Last() * s.TakeProfitAtrMultiplier))
+				s.currentTakeProfitPrice = closePrice.Add(fixedpoint.NewFromFloat(s.Supertrend.AverageTrueRange.Last(0) * s.TakeProfitAtrMultiplier))
 			}
 		} else if side == types.SideTypeSell {
 			if s.StopLossByTriggeringK {
 				s.currentStopLossPrice = kline.GetHigh()
 			}
 			if s.TakeProfitAtrMultiplier > 0 {
-				s.currentTakeProfitPrice = closePrice.Sub(fixedpoint.NewFromFloat(s.Supertrend.AverageTrueRange.Last() * s.TakeProfitAtrMultiplier))
+				s.currentTakeProfitPrice = closePrice.Sub(fixedpoint.NewFromFloat(s.Supertrend.AverageTrueRange.Last(0) * s.TakeProfitAtrMultiplier))
 			}
 		}
 

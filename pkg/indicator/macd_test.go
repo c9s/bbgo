@@ -40,12 +40,12 @@ func Test_calculateMACD(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			iw := types.IntervalWindow{Window: 9}
-			macd := MACD{MACDConfig: MACDConfig{IntervalWindow: iw, ShortPeriod: 12, LongPeriod: 26}}
+			macd := MACDLegacy{MACDConfig: MACDConfig{IntervalWindow: iw, ShortPeriod: 12, LongPeriod: 26}}
 			for _, k := range tt.kLines {
 				macd.PushK(k)
 			}
 
-			got := macd.Last()
+			got := macd.Last(0)
 			diff := math.Trunc((got-tt.want)*100) / 100
 			if diff != 0 {
 				t.Errorf("calculateMACD() = %v, want %v", got, tt.want)

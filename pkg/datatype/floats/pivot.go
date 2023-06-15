@@ -1,10 +1,10 @@
 package floats
 
 func (s Slice) Pivot(left, right int, f func(a, pivot float64) bool) (float64, bool) {
-	return CalculatePivot(s, left, right, f)
+	return FindPivot(s, left, right, f)
 }
 
-func CalculatePivot(values Slice, left, right int, f func(a, pivot float64) bool) (float64, bool) {
+func FindPivot(values Slice, left, right int, f func(a, pivot float64) bool) (float64, bool) {
 	length := len(values)
 
 	if right == 0 {

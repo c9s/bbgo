@@ -14,7 +14,7 @@ import (
 //	VWMA = SMA(pv, window) / SMA(volumes, window)
 //
 // Volume Weighted Moving Average
-//- https://www.motivewave.com/studies/volume_weighted_moving_average.htm
+// - https://www.motivewave.com/studies/volume_weighted_moving_average.htm
 //
 // The Volume Weighted Moving Average (VWMA) is a technical analysis indicator that is used to smooth price data and reduce the lag
 // associated with traditional moving averages. It is calculated by taking the weighted moving average of the input data, with the
@@ -36,19 +36,12 @@ type VWMA struct {
 	updateCallbacks []func(value float64)
 }
 
-func (inc *VWMA) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-	return inc.Values[len(inc.Values)-1]
+func (inc *VWMA) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *VWMA) Index(i int) float64 {
-	length := len(inc.Values)
-	if length == 0 || length-i-1 < 0 {
-		return 0
-	}
-	return inc.Values[length-i-1]
+	return inc.Last(i)
 }
 
 func (inc *VWMA) Length() int {
@@ -70,8 +63,8 @@ func (inc *VWMA) Update(price, volume float64) {
 	inc.PriceVolumeSMA.Update(price * volume)
 	inc.VolumeSMA.Update(volume)
 
-	pv := inc.PriceVolumeSMA.Last()
-	v := inc.VolumeSMA.Last()
+	pv := inc.PriceVolumeSMA.Last(0)
+	v := inc.VolumeSMA.Last(0)
 	vwma := pv / v
 	inc.Values.Push(vwma)
 }
@@ -104,7 +97,7 @@ func (inc *VWMA) CalculateAndUpdate(allKLines []types.KLine) {
 	}
 
 	inc.EndTime = last.EndTime.Time()
-	inc.EmitUpdate(inc.Values.Last())
+	inc.EmitUpdate(inc.Values.Last(0))
 }
 
 func (inc *VWMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {

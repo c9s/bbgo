@@ -10,7 +10,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-
 //go:generate callbackgen -type Pivot
 type Pivot struct {
 	types.IntervalWindow
@@ -105,12 +104,12 @@ func calculatePivot(klines []types.KLine, window int, valLow KLineValueMapper, v
 	}
 
 	pl := 0.
-	if lows.Min() == lows.Index(int(window/2.)-1) {
+	if lows.Min() == lows.Last(int(window/2.)-1) {
 		pl = lows.Min()
 	}
 
 	ph := 0.
-	if highs.Max() == highs.Index(int(window/2.)-1) {
+	if highs.Max() == highs.Last(int(window/2.)-1) {
 		ph = highs.Max()
 	}
 

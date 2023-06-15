@@ -74,8 +74,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		if kline.Close.Float64() > ema.Last() {
-			log.Warnf("kline close price %v is above EMA %s %f", kline.Close, ema.IntervalWindow, ema.Last())
+		if kline.Close.Float64() > ema.Last(0) {
+			log.Warnf("kline close price %v is above EMA %s %f", kline.Close, ema.IntervalWindow, ema.Last(0))
 			return
 		}
 

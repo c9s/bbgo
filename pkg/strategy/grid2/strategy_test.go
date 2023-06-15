@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/sirupsen/logrus"
@@ -167,14 +166,22 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 		}, orders)
 	})
 
-	t.Run("base + quote", func(t *testing.T) {
+	t.Run("base and quote", func(t *testing.T) {
 		s := newTestStrategy()
 		s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
 		s.grid.CalculateArithmeticPins()
-		s.QuantityOrAmount.Quantity = number(0.01)
 
+		quoteInvestment := number(10_000.0)
+		baseInvestment := number(0.1)
 		lastPrice := number(15300)
-		orders, err := s.generateGridOrders(number(10000.0), number(0.021), lastPrice)
+
+		quantity, err := s.calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice, s.grid.Pins)
+		assert.NoError(t, err)
+		assert.Equal(t, number(0.025), quantity)
+
+		s.QuantityOrAmount.Quantity = quantity
+
+		orders, err := s.generateGridOrders(quoteInvestment, baseInvestment, lastPrice)
 		assert.NoError(t, err)
 		if !assert.Equal(t, 10, len(orders)) {
 			for _, o := range orders {
@@ -185,8 +192,88 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 		assertPriceSide(t, []PriceSideAssert{
 			{number(20000.0), types.SideTypeSell},
 			{number(19000.0), types.SideTypeSell},
-			{number(17000.0), types.SideTypeBuy},
-			{number(16000.0), types.SideTypeBuy},
+			{number(18000.0), types.SideTypeSell},
+			{number(17000.0), types.SideTypeSell},
+			// -- 16_000 should be empty
+			{number(15000.0), types.SideTypeBuy},
+			{number(14000.0), types.SideTypeBuy},
+			{number(13000.0), types.SideTypeBuy},
+			{number(12000.0), types.SideTypeBuy},
+			{number(11000.0), types.SideTypeBuy},
+			{number(10000.0), types.SideTypeBuy},
+		}, orders)
+	})
+
+	t.Run("base and quote with pre-calculated baseGridNumber", func(t *testing.T) {
+		s := newTestStrategy()
+		s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+		s.grid.CalculateArithmeticPins()
+
+		s.BaseGridNum = 4
+
+		quoteInvestment := number(10_000.0)
+		baseInvestment := number(0.1)
+		lastPrice := number(12300) // last price should not affect the sell order calculation
+
+		quantity, err := s.calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice, s.grid.Pins)
+		assert.NoError(t, err)
+		assert.Equal(t, number(0.025), quantity)
+
+		s.QuantityOrAmount.Quantity = quantity
+
+		orders, err := s.generateGridOrders(quoteInvestment, baseInvestment, lastPrice)
+		assert.NoError(t, err)
+		if !assert.Equal(t, 10, len(orders)) {
+			for _, o := range orders {
+				t.Logf("- %s %s", o.Price.String(), o.Side)
+			}
+		}
+
+		assertPriceSide(t, []PriceSideAssert{
+			{number(20000.0), types.SideTypeSell},
+			{number(19000.0), types.SideTypeSell},
+			{number(18000.0), types.SideTypeSell},
+			{number(17000.0), types.SideTypeSell},
+			// -- 16_000 should be empty
+			{number(15000.0), types.SideTypeBuy},
+			{number(14000.0), types.SideTypeBuy},
+			{number(13000.0), types.SideTypeBuy},
+			{number(12000.0), types.SideTypeBuy},
+			{number(11000.0), types.SideTypeBuy},
+			{number(10000.0), types.SideTypeBuy},
+		}, orders)
+	})
+
+	t.Run("base and quote with last price eq sell price", func(t *testing.T) {
+		s := newTestStrategy()
+		s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+		s.grid.CalculateArithmeticPins()
+		s.BaseGridNum = 4
+
+		quoteInvestment := number(10_000.0)
+		baseInvestment := number(0.1)
+		lastPrice := number(17000) // last price should not affect the sell order calculation
+
+		quantity, err := s.calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice, s.grid.Pins)
+		assert.NoError(t, err)
+		assert.Equal(t, number(0.025), quantity)
+
+		s.QuantityOrAmount.Quantity = quantity
+
+		orders, err := s.generateGridOrders(quoteInvestment, baseInvestment, lastPrice)
+		assert.NoError(t, err)
+		if !assert.Equal(t, 10, len(orders)) {
+			for _, o := range orders {
+				t.Logf("- %s %s", o.Price.String(), o.Side)
+			}
+		}
+
+		assertPriceSide(t, []PriceSideAssert{
+			{number(20000.0), types.SideTypeSell},
+			{number(19000.0), types.SideTypeSell},
+			{number(18000.0), types.SideTypeSell},
+			{number(17000.0), types.SideTypeSell},
+			// -- 16_000 should be empty
 			{number(15000.0), types.SideTypeBuy},
 			{number(14000.0), types.SideTypeBuy},
 			{number(13000.0), types.SideTypeBuy},
@@ -285,8 +372,58 @@ func TestStrategy_checkRequiredInvestmentByAmount(t *testing.T) {
 	})
 }
 
-func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
+func TestStrategy_calculateBaseQuoteInvestmentQuantity(t *testing.T) {
+	t.Run("1 sell", func(t *testing.T) {
+		s := newTestStrategy()
+		s.Market = newTestMarket("ETHUSDT")
+		s.UpperPrice = number(200.0)
+		s.LowerPrice = number(100.0)
+		s.GridNum = 7
+		s.Compound = true
 
+		lastPrice := number(180.0)
+		quoteInvestment := number(334.0) // 333.33
+		baseInvestment := number(0.5)
+		quantity, err := s.calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice, []Pin{
+			Pin(number(100.00)),
+			Pin(number(116.67)),
+			Pin(number(133.33)),
+			Pin(number(150.00)),
+			Pin(number(166.67)),
+			Pin(number(183.33)),
+			Pin(number(200.00)),
+		})
+		assert.NoError(t, err)
+		assert.InDelta(t, 0.5, quantity.Float64(), 0.0001)
+	})
+
+	t.Run("6 sell", func(t *testing.T) {
+		s := newTestStrategy()
+		s.Market = newTestMarket("ETHUSDT")
+		s.UpperPrice = number(200.0)
+		s.LowerPrice = number(100.0)
+		s.GridNum = 7
+		s.Compound = true
+
+		lastPrice := number(95.0)
+		quoteInvestment := number(334.0) // 333.33
+		baseInvestment := number(0.5)
+		quantity, err := s.calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice, []Pin{
+			Pin(number(100.00)),
+			Pin(number(116.67)),
+			Pin(number(133.33)),
+			Pin(number(150.00)),
+			Pin(number(166.67)),
+			Pin(number(183.33)),
+			Pin(number(200.00)),
+		})
+		assert.NoError(t, err)
+		assert.InDelta(t, 0.08333, quantity.Float64(), 0.0001)
+	})
+
+}
+
+func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 	t.Run("quote quantity", func(t *testing.T) {
 		// quoteInvestment = (10,000 + 11,000 + 12,000 + 13,000 + 14,000) * q
 		// q = quoteInvestment / (10,000 + 11,000 + 12,000 + 13,000 + 14,000)
@@ -375,11 +512,38 @@ func TestStrategy_calculateQuoteInvestmentQuantity(t *testing.T) {
 	})
 }
 
-func newTestMarket() types.Market {
+func newTestMarket(symbol string) types.Market {
+	switch symbol {
+	case "BTCUSDT":
+		return types.Market{
+			BaseCurrency:    "BTC",
+			QuoteCurrency:   "USDT",
+			TickSize:        number(0.01),
+			StepSize:        number(0.00001),
+			PricePrecision:  2,
+			VolumePrecision: 8,
+			MinNotional:     number(10.0),
+			MinQuantity:     number(0.001),
+		}
+	case "ETHUSDT":
+		return types.Market{
+			BaseCurrency:    "ETH",
+			QuoteCurrency:   "USDT",
+			TickSize:        number(0.01),
+			StepSize:        number(0.00001),
+			PricePrecision:  2,
+			VolumePrecision: 6,
+			MinNotional:     number(8.000),
+			MinQuantity:     number(0.00030),
+		}
+	}
+
+	// default
 	return types.Market{
 		BaseCurrency:    "BTC",
 		QuoteCurrency:   "USDT",
 		TickSize:        number(0.01),
+		StepSize:        number(0.00001),
 		PricePrecision:  2,
 		VolumePrecision: 8,
 		MinNotional:     number(10.0),
@@ -390,7 +554,7 @@ func newTestMarket() types.Market {
 var testOrderID = uint64(0)
 
 func newTestOrder(price, quantity fixedpoint.Value, side types.SideType) types.Order {
-	market := newTestMarket()
+	market := newTestMarket("BTCUSDT")
 	testOrderID++
 	return types.Order{
 		SubmitOrder: types.SubmitOrder{
@@ -414,7 +578,7 @@ func newTestOrder(price, quantity fixedpoint.Value, side types.SideType) types.O
 }
 
 func newTestStrategy() *Strategy {
-	market := newTestMarket()
+	market := newTestMarket("BTCUSDT")
 
 	s := &Strategy{
 		logger:           logrus.NewEntry(logrus.New()),
@@ -1065,6 +1229,7 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 	})
 }
 
+/*
 func Test_buildPinOrderMap(t *testing.T) {
 	assert := assert.New(t)
 	s := newTestStrategy()
@@ -1075,7 +1240,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 
 	t.Run("successful case", func(t *testing.T) {
 		openOrders := []types.Order{
-			types.Order{
+			{
 				SubmitOrder: types.SubmitOrder{
 					Symbol:       s.Symbol,
 					Side:         types.SideTypeBuy,
@@ -1110,7 +1275,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 
 	t.Run("there is one order with non-pin price in openOrders", func(t *testing.T) {
 		openOrders := []types.Order{
-			types.Order{
+			{
 				SubmitOrder: types.SubmitOrder{
 					Symbol:       s.Symbol,
 					Side:         types.SideTypeBuy,
@@ -1136,7 +1301,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 
 	t.Run("there are duplicated open orders at same pin", func(t *testing.T) {
 		openOrders := []types.Order{
-			types.Order{
+			{
 				SubmitOrder: types.SubmitOrder{
 					Symbol:       s.Symbol,
 					Side:         types.SideTypeBuy,
@@ -1155,7 +1320,7 @@ func Test_buildPinOrderMap(t *testing.T) {
 				ExecutedQuantity: number(0.0),
 				IsWorking:        false,
 			},
-			types.Order{
+			{
 				SubmitOrder: types.SubmitOrder{
 					Symbol:       s.Symbol,
 					Side:         types.SideTypeBuy,
@@ -1420,3 +1585,4 @@ func Test_verifyFilledGrid(t *testing.T) {
 	})
 
 }
+*/

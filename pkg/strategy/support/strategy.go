@@ -477,19 +477,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 		}
 
-		if s.longTermEMA != nil && closePrice.Float64() < s.longTermEMA.Last() {
+		if s.longTermEMA != nil && closePrice.Float64() < s.longTermEMA.Last(0) {
 			bbgo.Notify("%s: closed price is below the long term moving average line %f, skipping this support",
 				s.Symbol,
-				s.longTermEMA.Last(),
+				s.longTermEMA.Last(0),
 				kline,
 			)
 			return
 		}
 
-		if s.triggerEMA != nil && closePrice.Float64() > s.triggerEMA.Last() {
+		if s.triggerEMA != nil && closePrice.Float64() > s.triggerEMA.Last(0) {
 			bbgo.Notify("%s: closed price is above the trigger moving average line %f, skipping this support",
 				s.Symbol,
-				s.triggerEMA.Last(),
+				s.triggerEMA.Last(0),
 				kline,
 			)
 			return
@@ -499,8 +499,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			bbgo.Notify("Found %s support: the close price %s is below trigger EMA %f and above long term EMA %f and volume %s > minimum volume %s",
 				s.Symbol,
 				closePrice.String(),
-				s.triggerEMA.Last(),
-				s.longTermEMA.Last(),
+				s.triggerEMA.Last(0),
+				s.longTermEMA.Last(0),
 				kline.Volume.String(),
 				s.MinVolume.String(),
 				kline)

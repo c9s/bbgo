@@ -30,23 +30,14 @@ type VMOM struct {
 }
 
 func (inc *VMOM) Index(i int) float64 {
-	if inc.Values == nil {
-		return 0
-	}
-	return inc.Values.Index(i)
+	return inc.Last(i)
 }
 
-func (inc *VMOM) Last() float64 {
-	if inc.Values.Length() == 0 {
-		return 0
-	}
-	return inc.Values.Last()
+func (inc *VMOM) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *VMOM) Length() int {
-	if inc.Values == nil {
-		return 0
-	}
 	return inc.Values.Length()
 }
 
@@ -59,7 +50,7 @@ func (inc *VMOM) Update(volume float64) {
 	}
 	inc.volumes.Update(volume)
 	if inc.volumes.Length() >= inc.Window {
-		v := inc.volumes.Last() / inc.volumes.Mean()
+		v := inc.volumes.Last(0) / inc.volumes.Mean()
 		inc.Values.Push(v)
 	}
 }
@@ -69,11 +60,11 @@ func (inc *VMOM) CalculateAndUpdate(allKLines []types.KLine) {
 		for _, k := range allKLines {
 			inc.PushK(k)
 		}
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	} else {
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
 }
 
@@ -96,7 +87,7 @@ func (inc *VMOM) PushK(k types.KLine) {
 
 	inc.Update(k.Volume.Float64())
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func calculateVolumeMomentum(klines []types.KLine, window int, valV KLineValueMapper, valP KLineValueMapper) (float64, error) {
@@ -110,7 +101,7 @@ func calculateVolumeMomentum(klines []types.KLine, window int, valV KLineValueMa
 		vma += valV(p)
 	}
 	vma /= float64(window)
-	momentum := valV(klines[length-1]) / vma //* (valP(klines[length-1-2]) / valP(klines[length-1]))
+	momentum := valV(klines[length-1]) / vma // * (valP(klines[length-1-2]) / valP(klines[length-1]))
 
 	return momentum, nil
 }

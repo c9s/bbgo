@@ -19,8 +19,8 @@ type PMR struct {
 	types.IntervalWindow
 	types.SeriesBase
 
-	Values floats.Slice
-	SMA    *indicator.SMA
+	Values  floats.Slice
+	SMA     *indicator.SMA
 	EndTime time.Time
 
 	updateCallbacks []func(value float64)
@@ -35,25 +35,17 @@ func (inc *PMR) Update(price float64) {
 	}
 	inc.SMA.Update(price)
 	if inc.SMA.Length() >= inc.Window {
-		reversion := inc.SMA.Last() / price
+		reversion := inc.SMA.Last(0) / price
 		inc.Values.Push(reversion)
 	}
 }
 
-func (inc *PMR) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1]
+func (inc *PMR) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *PMR) Index(i int) float64 {
-	if i >= len(inc.Values) {
-		return 0
-	}
-
-	return inc.Values[len(inc.Values)-1-i]
+	return inc.Last(i)
 }
 
 func (inc *PMR) Length() int {
@@ -65,11 +57,11 @@ func (inc *PMR) CalculateAndUpdate(allKLines []types.KLine) {
 		for _, k := range allKLines {
 			inc.PushK(k)
 		}
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	} else {
 		k := allKLines[len(allKLines)-1]
 		inc.PushK(k)
-		inc.EmitUpdate(inc.Last())
+		inc.EmitUpdate(inc.Last(0))
 	}
 }
 
@@ -92,7 +84,7 @@ func (inc *PMR) PushK(k types.KLine) {
 
 	inc.Update(indicator.KLineClosePriceMapper(k))
 	inc.EndTime = k.EndTime.Time()
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func CalculateKLinesPMR(allKLines []types.KLine, window int) float64 {

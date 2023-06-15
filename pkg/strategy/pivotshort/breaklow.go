@@ -104,7 +104,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	// update pivot low data
 	session.MarketDataStream.OnStart(func() {
 		if s.updatePivotLow() {
-			bbgo.Notify("%s new pivot low: %f", s.Symbol, s.pivotLow.Last())
+			bbgo.Notify("%s new pivot low: %f", s.Symbol, s.pivotLow.Last(0))
 		}
 
 		s.pilotQuantityCalculation()
@@ -117,7 +117,7 @@ func (s *BreakLow) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 				return
 			}
 
-			bbgo.Notify("%s new pivot low: %f", s.Symbol, s.pivotLow.Last())
+			bbgo.Notify("%s new pivot low: %f", s.Symbol, s.pivotLow.Last(0))
 		}
 	}))
 
@@ -260,7 +260,7 @@ func (s *BreakLow) pilotQuantityCalculation() {
 }
 
 func (s *BreakLow) updatePivotLow() bool {
-	low := fixedpoint.NewFromFloat(s.pivotLow.Last())
+	low := fixedpoint.NewFromFloat(s.pivotLow.Last(0))
 	if low.IsZero() {
 		return false
 	}
@@ -273,7 +273,7 @@ func (s *BreakLow) updatePivotLow() bool {
 		s.pivotLowPrices = append(s.pivotLowPrices, low)
 	}
 
-	fastLow := fixedpoint.NewFromFloat(s.fastPivotLow.Last())
+	fastLow := fixedpoint.NewFromFloat(s.fastPivotLow.Last(0))
 	if !fastLow.IsZero() {
 		if fastLow.Compare(s.lastLow) < 0 {
 			s.lastLowInvalidated = true

@@ -1,8 +1,9 @@
 package indicator
 
 import (
-	"github.com/sirupsen/logrus"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/types"
@@ -11,6 +12,7 @@ import (
 var logLinReg = logrus.WithField("indicator", "LinReg")
 
 // LinReg is Linear Regression baseline
+//
 //go:generate callbackgen -type LinReg
 type LinReg struct {
 	types.SeriesBase
@@ -28,11 +30,8 @@ type LinReg struct {
 }
 
 // Last slope of linear regression baseline
-func (lr *LinReg) Last() float64 {
-	if lr.Values.Length() == 0 {
-		return 0.0
-	}
-	return lr.Values.Last()
+func (lr *LinReg) Last(i int) float64 {
+	return lr.Values.Last(i)
 }
 
 // LastRatio of slope to price
@@ -40,16 +39,12 @@ func (lr *LinReg) LastRatio() float64 {
 	if lr.ValueRatios.Length() == 0 {
 		return 0.0
 	}
-	return lr.ValueRatios.Last()
+	return lr.ValueRatios.Last(0)
 }
 
 // Index returns the slope of specified index
 func (lr *LinReg) Index(i int) float64 {
-	if i >= lr.Values.Length() {
-		return 0.0
-	}
-
-	return lr.Values.Index(i)
+	return lr.Values.Last(i)
 }
 
 // IndexRatio returns the slope ratio
@@ -58,7 +53,7 @@ func (lr *LinReg) IndexRatio(i int) float64 {
 		return 0.0
 	}
 
-	return lr.ValueRatios.Index(i)
+	return lr.ValueRatios.Last(i)
 }
 
 // Length of the slope values
@@ -99,9 +94,9 @@ func (lr *LinReg) Update(kline types.KLine) {
 	endPrice := average - slope*sumX/length + slope
 	startPrice := endPrice + slope*(length-1)
 	lr.Values.Push((endPrice - startPrice) / (length - 1))
-	lr.ValueRatios.Push(lr.Values.Last() / kline.GetClose().Float64())
+	lr.ValueRatios.Push(lr.Values.Last(0) / kline.GetClose().Float64())
 
-	logLinReg.Debugf("linear regression baseline slope: %f", lr.Last())
+	logLinReg.Debugf("linear regression baseline slope: %f", lr.Last(0))
 }
 
 func (lr *LinReg) BindK(target KLineClosedEmitter, symbol string, interval types.Interval) {

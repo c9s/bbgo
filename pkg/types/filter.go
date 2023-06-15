@@ -7,16 +7,12 @@ type FilterResult struct {
 	c      []int
 }
 
-func (f *FilterResult) Last() float64 {
-	return f.Index(0)
-}
-
-func (f *FilterResult) Index(j int) float64 {
+func (f *FilterResult) Last(j int) float64 {
 	if j >= f.length {
 		return 0
 	}
 	if len(f.c) > j {
-		return f.a.Index(f.c[j])
+		return f.a.Last(f.c[j])
 	}
 	l := f.a.Length()
 	k := len(f.c)
@@ -25,7 +21,7 @@ func (f *FilterResult) Index(j int) float64 {
 		i = f.c[k-1] + 1
 	}
 	for ; i < l; i++ {
-		tmp := f.a.Index(i)
+		tmp := f.a.Last(i)
 		if f.b(i, tmp) {
 			f.c = append(f.c, i)
 			if j == k {
@@ -35,6 +31,10 @@ func (f *FilterResult) Index(j int) float64 {
 		}
 	}
 	return 0
+}
+
+func (f *FilterResult) Index(j int) float64 {
+	return f.Last(j)
 }
 
 func (f *FilterResult) Length() int {

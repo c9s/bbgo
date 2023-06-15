@@ -139,7 +139,7 @@ func NewCCISTOCH(i types.Interval, filterHigh, filterLow float64) *CCISTOCH {
 
 func (inc *CCISTOCH) Update(cloze float64) {
 	inc.cci.Update(cloze)
-	inc.stoch.Update(inc.cci.Last(), inc.cci.Last(), inc.cci.Last())
+	inc.stoch.Update(inc.cci.Last(0), inc.cci.Last(0), inc.cci.Last(0))
 	inc.ma.Update(inc.stoch.LastD())
 }
 
@@ -180,19 +180,19 @@ type VWEMA struct {
 	V  types.UpdatableSeries
 }
 
-func (inc *VWEMA) Last() float64 {
-	return inc.PV.Last() / inc.V.Last()
+func (inc *VWEMA) Index(i int) float64 {
+	return inc.Last(i)
 }
 
-func (inc *VWEMA) Index(i int) float64 {
+func (inc *VWEMA) Last(i int) float64 {
 	if i >= inc.PV.Length() {
 		return 0
 	}
-	vi := inc.V.Index(i)
+	vi := inc.V.Last(i)
 	if vi == 0 {
 		return 0
 	}
-	return inc.PV.Index(i) / vi
+	return inc.PV.Last(i) / vi
 }
 
 func (inc *VWEMA) Length() int {
@@ -262,11 +262,11 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 		if s.heikinAshi.Close.Length() == 0 {
 			for _, kline := range window {
 				s.heikinAshi.Update(kline)
-				s.ccis.Update(getSource(window).Last())
+				s.ccis.Update(getSource(window).Last(0))
 			}
 		} else {
 			s.heikinAshi.Update(window[len(window)-1])
-			s.ccis.Update(getSource(window).Last())
+			s.ccis.Update(getSource(window).Last(0))
 		}
 	})
 	if s.UseEma {
@@ -283,7 +283,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 					ema34.Update(cloze)
 				}
 			} else {
-				cloze := getSource(window).Last()
+				cloze := getSource(window).Last(0)
 				ema5.Update(cloze)
 				ema34.Update(cloze)
 			}
@@ -306,7 +306,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 					sma34.Update(cloze)
 				}
 			} else {
-				cloze := getSource(window).Last()
+				cloze := getSource(window).Last(0)
 				sma5.Update(cloze)
 				sma34.Update(cloze)
 			}
@@ -330,14 +330,14 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 			vols := getVol(window)
 			if evwma5.PV.Length() == 0 {
 				for i := clozes.Length() - 1; i >= 0; i-- {
-					price := clozes.Index(i)
-					vol := vols.Index(i)
+					price := clozes.Last(i)
+					vol := vols.Last(i)
 					evwma5.UpdateVal(price, vol)
 					evwma34.UpdateVal(price, vol)
 				}
 			} else {
-				price := clozes.Last()
-				vol := vols.Last()
+				price := clozes.Last(0)
+				vol := vols.Last(0)
 				evwma5.UpdateVal(price, vol)
 				evwma34.UpdateVal(price, vol)
 			}
@@ -363,7 +363,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 					sig.Update(ewoValue)
 				}
 			} else {
-				sig.Update(s.ewo.Last())
+				sig.Update(s.ewo.Last(0))
 			}
 		})
 		s.ewoSignal = sig
@@ -381,7 +381,7 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 					sig.Update(ewoValue)
 				}
 			} else {
-				sig.Update(s.ewo.Last())
+				sig.Update(s.ewo.Last(0))
 			}
 		})
 		s.ewoSignal = sig
@@ -398,13 +398,13 @@ func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
 				// lazy init
 				ewoVals := s.ewo.Reverse()
 				for i, ewoValue := range ewoVals {
-					vol := window.Volume().Index(i)
+					vol := window.Volume().Last(i)
 					sig.PV.Update(ewoValue * vol)
 					sig.V.Update(vol)
 				}
 			} else {
-				vol := window.Volume().Last()
-				sig.PV.Update(s.ewo.Last() * vol)
+				vol := window.Volume().Last(0)
+				sig.PV.Update(s.ewo.Last(0) * vol)
 				sig.V.Update(vol)
 			}
 		})
@@ -663,11 +663,13 @@ func (s *Strategy) GetLastPrice() fixedpoint.Value {
 // - TP by (lastprice < peak price - atr) || (lastprice > bottom price + atr)
 // - SL by s.StopLoss (Abs(price_diff / price) > s.StopLoss)
 // - entry condition on ewo(Elliott wave oscillator) Crosses ewoSignal(ma on ewo, signalWindow)
-//   * buy signal on (crossover on previous K bar and no crossunder on latest K bar)
-//   * sell signal on (crossunder on previous K bar and no crossunder on latest K bar)
+//   - buy signal on (crossover on previous K bar and no crossunder on latest K bar)
+//   - sell signal on (crossunder on previous K bar and no crossunder on latest K bar)
+//
 // - and filtered by the following rules:
-//   * buy: buy signal ON, kline Close > Open, Close > ma5, Close > ma34, CCI Stochastic Buy signal
-//   * sell: sell signal ON, kline Close < Open, Close < ma5, Close < ma34, CCI Stochastic Sell signal
+//   - buy: buy signal ON, kline Close > Open, Close > ma5, Close > ma34, CCI Stochastic Buy signal
+//   - sell: sell signal ON, kline Close < Open, Close < ma5, Close < ma34, CCI Stochastic Sell signal
+//
 // - or entry when ma34 +- atr * 3 gets touched
 // - entry price: latestPrice +- atr / 2 (short,long), close at market price
 // Cancel non-fully filled orders on new signal (either in same direction or not)
@@ -784,8 +786,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.SetupIndicators(store)
 
 	// local peak of ewo
-	shortSig := s.ewo.Last() < s.ewo.Index(1) && s.ewo.Index(1) > s.ewo.Index(2)
-	longSig := s.ewo.Last() > s.ewo.Index(1) && s.ewo.Index(1) < s.ewo.Index(2)
+	shortSig := s.ewo.Last(0) < s.ewo.Last(1) && s.ewo.Last(1) > s.ewo.Last(2)
+	longSig := s.ewo.Last(0) > s.ewo.Last(1) && s.ewo.Last(1) < s.ewo.Last(2)
 
 	sellOrderTPSL := func(price fixedpoint.Value) {
 		lastPrice := s.GetLastPrice()
@@ -798,8 +800,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		balances := session.GetAccount().Balances()
 		quoteBalance := balances[s.Market.QuoteCurrency].Available
-		atr := fixedpoint.NewFromFloat(s.atr.Last())
-		atrx2 := fixedpoint.NewFromFloat(s.atr.Last() * 2)
+		atr := fixedpoint.NewFromFloat(s.atr.Last(0))
+		atrx2 := fixedpoint.NewFromFloat(s.atr.Last(0) * 2)
 		buyall := false
 		if s.bottomPrice.IsZero() || s.bottomPrice.Compare(price) > 0 {
 			s.bottomPrice = price
@@ -809,7 +811,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		spBack := s.sellPrice
 		reason := -1
 		if quoteBalance.Div(lastPrice).Compare(s.Market.MinQuantity) >= 0 && quoteBalance.Compare(s.Market.MinNotional) >= 0 {
-			base := fixedpoint.NewFromFloat(s.ma34.Last())
+			base := fixedpoint.NewFromFloat(s.ma34.Last(0))
 			// TP
 			if lastPrice.Compare(s.sellPrice) < 0 && (longSig ||
 				(!atrx2.IsZero() && base.Sub(atrx2).Compare(lastPrice) >= 0)) {
@@ -903,8 +905,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 		balances := session.GetAccount().Balances()
 		baseBalance := balances[s.Market.BaseCurrency].Available
-		atr := fixedpoint.NewFromFloat(s.atr.Last())
-		atrx2 := fixedpoint.NewFromFloat(s.atr.Last() * 2)
+		atr := fixedpoint.NewFromFloat(s.atr.Last(0))
+		atrx2 := fixedpoint.NewFromFloat(s.atr.Last(0) * 2)
 		sellall := false
 		if s.peakPrice.IsZero() || s.peakPrice.Compare(price) < 0 {
 			s.peakPrice = price
@@ -915,7 +917,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		reason := -1
 		if baseBalance.Compare(s.Market.MinQuantity) >= 0 && baseBalance.Mul(lastPrice).Compare(s.Market.MinNotional) >= 0 {
 			// TP
-			base := fixedpoint.NewFromFloat(s.ma34.Last())
+			base := fixedpoint.NewFromFloat(s.ma34.Last(0))
 			if lastPrice.Compare(s.buyPrice) > 0 && (shortSig ||
 				(!atrx2.IsZero() && base.Add(atrx2).Compare(lastPrice) <= 0)) {
 				sellall = true
@@ -1089,10 +1091,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		balances := session.GetAccount().Balances()
 		baseBalance := balances[s.Market.BaseCurrency].Total()
 		quoteBalance := balances[s.Market.QuoteCurrency].Total()
-		atr := fixedpoint.NewFromFloat(s.atr.Last())
+		atr := fixedpoint.NewFromFloat(s.atr.Last(0))
 		if !s.Environment.IsBackTesting() {
 			log.Infof("Get last price: %v, ewo %f, ewoSig %f, ccis: %f, atr %v, kline: %v, balance[base]: %v balance[quote]: %v",
-				lastPrice, s.ewo.Last(), s.ewoSignal.Last(), s.ccis.ma.Last(), atr, kline, baseBalance, quoteBalance)
+				lastPrice, s.ewo.Last(0), s.ewoSignal.Last(0), s.ccis.ma.Last(0), atr, kline, baseBalance, quoteBalance)
 		}
 
 		if kline.Interval != s.Interval {
@@ -1104,21 +1106,21 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		priceChangeRate := (priceHighest - priceLowest) / priceHighest / 14
 		ewoHighest := types.Highest(s.ewoHistogram, 233)
 
-		s.ewoChangeRate = math.Abs(s.ewoHistogram.Last() / ewoHighest * priceChangeRate)
+		s.ewoChangeRate = math.Abs(s.ewoHistogram.Last(0) / ewoHighest * priceChangeRate)
 
 		longSignal := types.CrossOver(s.ewo, s.ewoSignal)
 		shortSignal := types.CrossUnder(s.ewo, s.ewoSignal)
 
-		base := s.ma34.Last()
-		sellLine := base + s.atr.Last()*3
-		buyLine := base - s.atr.Last()*3
+		base := s.ma34.Last(0)
+		sellLine := base + s.atr.Last(0)*3
+		buyLine := base - s.atr.Last(0)*3
 		clozes := getClose(window)
 		opens := getOpen(window)
 
 		// get trend flags
-		bull := clozes.Last() > opens.Last()
-		breakThrough := clozes.Last() > s.ma5.Last() && clozes.Last() > s.ma34.Last()
-		breakDown := clozes.Last() < s.ma5.Last() && clozes.Last() < s.ma34.Last()
+		bull := clozes.Last(0) > opens.Last(0)
+		breakThrough := clozes.Last(0) > s.ma5.Last(0) && clozes.Last(0) > s.ma34.Last(0)
+		breakDown := clozes.Last(0) < s.ma5.Last(0) && clozes.Last(0) < s.ma34.Last(0)
 
 		// kline breakthrough ma5, ma34 trend up, and cci Stochastic bull
 		IsBull := bull && breakThrough && s.ccis.BuySignal() && s.ewoChangeRate < s.EwoChangeFilterHigh && s.ewoChangeRate > s.EwoChangeFilterLow
@@ -1141,7 +1143,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 				// backup, since the s.sellPrice will be cleared when doing ClosePosition
 				sellPrice := s.sellPrice
-				log.Errorf("ewoChangeRate %v, emv %v", s.ewoChangeRate, s.emv.Last())
+				log.Errorf("ewoChangeRate %v, emv %v", s.ewoChangeRate, s.emv.Last(0))
 
 				// calculate report
 				if closeOrder, _ := s.PlaceBuyOrder(ctx, price); closeOrder != nil {
@@ -1175,7 +1177,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 				// backup, since the s.buyPrice will be cleared when doing ClosePosition
 				buyPrice := s.buyPrice
-				log.Errorf("ewoChangeRate: %v, emv %v", s.ewoChangeRate, s.emv.Last())
+				log.Errorf("ewoChangeRate: %v, emv %v", s.ewoChangeRate, s.emv.Last(0))
 
 				// calculate report
 				if closeOrder, _ := s.PlaceSellOrder(ctx, price); closeOrder != nil {

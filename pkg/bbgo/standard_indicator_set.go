@@ -29,7 +29,7 @@ type StandardIndicatorSet struct {
 	// interval -> window
 	iwbIndicators  map[types.IntervalWindowBandWidth]*indicator.BOLL
 	iwIndicators   map[indicatorKey]indicator.KLinePusher
-	macdIndicators map[indicator.MACDConfig]*indicator.MACD
+	macdIndicators map[indicator.MACDConfig]*indicator.MACDLegacy
 
 	stream types.Stream
 	store  *MarketDataStore
@@ -47,7 +47,7 @@ func NewStandardIndicatorSet(symbol string, stream types.Stream, store *MarketDa
 		stream:         stream,
 		iwIndicators:   make(map[indicatorKey]indicator.KLinePusher),
 		iwbIndicators:  make(map[types.IntervalWindowBandWidth]*indicator.BOLL),
-		macdIndicators: make(map[indicator.MACDConfig]*indicator.MACD),
+		macdIndicators: make(map[indicator.MACDConfig]*indicator.MACDLegacy),
 	}
 }
 
@@ -154,14 +154,14 @@ func (s *StandardIndicatorSet) BOLL(iw types.IntervalWindow, bandWidth float64) 
 	return inc
 }
 
-func (s *StandardIndicatorSet) MACD(iw types.IntervalWindow, shortPeriod, longPeriod int) *indicator.MACD {
+func (s *StandardIndicatorSet) MACD(iw types.IntervalWindow, shortPeriod, longPeriod int) *indicator.MACDLegacy {
 	config := indicator.MACDConfig{IntervalWindow: iw, ShortPeriod: shortPeriod, LongPeriod: longPeriod}
 
 	inc, ok := s.macdIndicators[config]
 	if ok {
 		return inc
 	}
-	inc = &indicator.MACD{MACDConfig: config}
+	inc = &indicator.MACDLegacy{MACDConfig: config}
 	s.macdIndicators[config] = inc
 	s.initAndBind(inc, config.IntervalWindow.Interval)
 	return inc

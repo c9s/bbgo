@@ -14,6 +14,7 @@ import (
 // the weighted moving average of the input data using a weighting factor of W, where W is the square root of the length of the moving average.
 // The result is then double-smoothed by taking the weighted moving average of this result using a weighting factor of W/2. This final average
 // forms the HMA line, which can be used to make predictions about future price movements.
+//
 //go:generate callbackgen -type HULL
 type HULL struct {
 	types.SeriesBase
@@ -36,21 +37,18 @@ func (inc *HULL) Update(value float64) {
 	}
 	inc.ma1.Update(value)
 	inc.ma2.Update(value)
-	inc.result.Update(2*inc.ma1.Last() - inc.ma2.Last())
+	inc.result.Update(2*inc.ma1.Last(0) - inc.ma2.Last(0))
 }
 
-func (inc *HULL) Last() float64 {
+func (inc *HULL) Last(i int) float64 {
 	if inc.result == nil {
 		return 0
 	}
-	return inc.result.Last()
+	return inc.result.Last(i)
 }
 
 func (inc *HULL) Index(i int) float64 {
-	if inc.result == nil {
-		return 0
-	}
-	return inc.result.Index(i)
+	return inc.Last(i)
 }
 
 func (inc *HULL) Length() int {
@@ -66,5 +64,5 @@ func (inc *HULL) PushK(k types.KLine) {
 	}
 
 	inc.Update(k.Close.Float64())
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }

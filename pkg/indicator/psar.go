@@ -34,11 +34,8 @@ type PSAR struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *PSAR) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0
-	}
-	return inc.Values.Last()
+func (inc *PSAR) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *PSAR) Length() int {
@@ -46,8 +43,8 @@ func (inc *PSAR) Length() int {
 }
 
 func (inc *PSAR) falling() bool {
-	up := inc.High.Last() - inc.High.Index(1)
-	dn := inc.Low.Index(1) - inc.Low.Last()
+	up := inc.High.Last(0) - inc.High.Index(1)
+	dn := inc.Low.Index(1) - inc.Low.Last(0)
 	return (dn > up) && (dn > 0)
 }
 
@@ -66,7 +63,7 @@ func (inc *PSAR) Update(high, low float64) {
 	inc.High.Update(high)
 	inc.Low.Update(low)
 	if !isFirst {
-		ppsar := inc.Values.Last()
+		ppsar := inc.Values.Last(0)
 		if inc.Falling { // falling formula
 			psar := ppsar - inc.AF*(ppsar-inc.EP)
 			h := inc.High.Shift(1).Highest(2)

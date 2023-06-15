@@ -114,7 +114,7 @@ func (ds *DynamicAmpSpread) update(kline types.KLine) {
 
 func (ds *DynamicAmpSpread) getAskSpread() (askSpread float64, err error) {
 	if ds.AskSpreadScale != nil && ds.dynamicAskSpread.Length() >= ds.Window {
-		askSpread, err = ds.AskSpreadScale.Scale(ds.dynamicAskSpread.Last())
+		askSpread, err = ds.AskSpreadScale.Scale(ds.dynamicAskSpread.Last(0))
 		if err != nil {
 			log.WithError(err).Errorf("can not calculate dynamicAskSpread")
 			return 0, err
@@ -128,7 +128,7 @@ func (ds *DynamicAmpSpread) getAskSpread() (askSpread float64, err error) {
 
 func (ds *DynamicAmpSpread) getBidSpread() (bidSpread float64, err error) {
 	if ds.BidSpreadScale != nil && ds.dynamicBidSpread.Length() >= ds.Window {
-		bidSpread, err = ds.BidSpreadScale.Scale(ds.dynamicBidSpread.Last())
+		bidSpread, err = ds.BidSpreadScale.Scale(ds.dynamicBidSpread.Last(0))
 		if err != nil {
 			log.WithError(err).Errorf("can not calculate dynamicBidSpread")
 			return 0, err
@@ -224,12 +224,12 @@ func (ds *DynamicSpreadBollWidthRatio) getWeightedBBWidthRatio(positiveSigmoid b
 	//   - To ask spread, the higher neutral band get greater ratio
 	//   - To bid spread, the lower neutral band get greater ratio
 
-	defaultMid := ds.defaultBoll.SMA.Last()
-	defaultUpper := ds.defaultBoll.UpBand.Last()
-	defaultLower := ds.defaultBoll.DownBand.Last()
+	defaultMid := ds.defaultBoll.SMA.Last(0)
+	defaultUpper := ds.defaultBoll.UpBand.Last(0)
+	defaultLower := ds.defaultBoll.DownBand.Last(0)
 	defaultWidth := defaultUpper - defaultLower
-	neutralUpper := ds.neutralBoll.UpBand.Last()
-	neutralLower := ds.neutralBoll.DownBand.Last()
+	neutralUpper := ds.neutralBoll.UpBand.Last(0)
+	neutralLower := ds.neutralBoll.DownBand.Last(0)
 	factor := defaultWidth / ds.Sensitivity
 	var weightedUpper, weightedLower, weightedDivUpper, weightedDivLower float64
 	if positiveSigmoid {

@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+
 	"gonum.org/v1/gonum/mat"
 )
 
@@ -21,7 +22,7 @@ func (pca *PCA) Fit(x []SeriesExtend, lookback int) error {
 	for i, xx := range x {
 		mean := xx.Mean(lookback)
 		for j := 0; j < lookback; j++ {
-			vec[i+j*i] = xx.Index(j) - mean
+			vec[i+j*i] = xx.Last(j) - mean
 		}
 	}
 	pca.svd = &mat.SVD{}
@@ -40,7 +41,7 @@ func (pca *PCA) Transform(x []SeriesExtend, lookback int, features int) (result 
 	vec := make([]float64, lookback*len(x))
 	for i, xx := range x {
 		for j := 0; j < lookback; j++ {
-			vec[i+j*i] = xx.Index(j)
+			vec[i+j*i] = xx.Last(j)
 		}
 	}
 	newX := mat.NewDense(lookback, len(x), vec)

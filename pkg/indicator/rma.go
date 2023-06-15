@@ -78,16 +78,12 @@ func (inc *RMA) Update(x float64) {
 	}
 }
 
-func (inc *RMA) Last() float64 {
-	return inc.Values.Last()
+func (inc *RMA) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *RMA) Index(i int) float64 {
-	length := len(inc.Values)
-	if length == 0 || length-i-1 < 0 {
-		return 0
-	}
-	return inc.Values[length-i-1]
+	return inc.Last(i)
 }
 
 func (inc *RMA) Length() int {
@@ -116,7 +112,7 @@ func (inc *RMA) CalculateAndUpdate(kLines []types.KLine) {
 		inc.PushK(last)
 	}
 
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 }
 
 func (inc *RMA) handleKLineWindowUpdate(interval types.Interval, window types.KLineWindow) {

@@ -26,18 +26,12 @@ type Volatility struct {
 	UpdateCallbacks []func(value float64)
 }
 
-func (inc *Volatility) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-	return inc.Values[len(inc.Values)-1]
+func (inc *Volatility) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *Volatility) Index(i int) float64 {
-	if len(inc.Values)-i <= 0 {
-		return 0.0
-	}
-	return inc.Values[len(inc.Values)-i-1]
+	return inc.Last(i)
 }
 
 func (inc *Volatility) Length() int {

@@ -65,19 +65,12 @@ func (inc *RSI) Update(price float64) {
 	inc.PreviousAvgLoss = avgLoss
 }
 
-func (inc *RSI) Last() float64 {
-	if len(inc.Values) == 0 {
-		return 0.0
-	}
-	return inc.Values[len(inc.Values)-1]
+func (inc *RSI) Last(i int) float64 {
+	return inc.Values.Last(i)
 }
 
 func (inc *RSI) Index(i int) float64 {
-	length := len(inc.Values)
-	if length <= 0 || length-i-1 < 0 {
-		return 0.0
-	}
-	return inc.Values[length-i-1]
+	return inc.Last(i)
 }
 
 func (inc *RSI) Length() int {
@@ -99,7 +92,7 @@ func (inc *RSI) CalculateAndUpdate(kLines []types.KLine) {
 		inc.PushK(k)
 	}
 
-	inc.EmitUpdate(inc.Last())
+	inc.EmitUpdate(inc.Last(0))
 	inc.EndTime = kLines[len(kLines)-1].EndTime.Time()
 }
 

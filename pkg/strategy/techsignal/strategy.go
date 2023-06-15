@@ -187,7 +187,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				})
 			}
 
-			var lastMA = ma.Last()
+			var lastMA = ma.Last(0)
 
 			// skip if the closed price is above the moving average
 			if closePrice.Float64() > lastMA {

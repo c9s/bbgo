@@ -10,7 +10,7 @@ import (
 	"github.com/c9s/requestgen"
 )
 
-func (s *OrderService) NewGetWalletTradesRequest(walletType WalletType) *GetWalletTradesRequest {
+func (s *Client) NewGetWalletTradesRequest(walletType WalletType) *GetWalletTradesRequest {
 	return &GetWalletTradesRequest{client: s.Client, walletType: walletType}
 }
 
