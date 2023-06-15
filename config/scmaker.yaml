@@ -8,7 +8,7 @@ sessions:
 exchangeStrategies:
 - on: max
   scmaker:
-    symbol: USDCUSDT
+    symbol: &symbol USDCUSDT
 
     ## adjustmentUpdateInterval is the interval for adjusting position
     adjustmentUpdateInterval: 1m
@@ -45,7 +45,7 @@ backtest:
   startTime: "2023-05-20"
   endTime: "2023-06-01"
   symbols:
-  - USDCUSDT
+  - *symbol
   account:
     max:
       makerFeeRate: 0.0%

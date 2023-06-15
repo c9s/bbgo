@@ -280,6 +280,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	// calculate and collect prices
 	for i := 0; i <= s.NumOfLiquidityLayers; i++ {
 		fi := fixedpoint.NewFromInt(int64(i))
+		sp := tickSize.Mul(fi)
 
 		bidPrice := ticker.Buy
 		askPrice := ticker.Sell
@@ -289,17 +290,16 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 			bidPrice = midPrice.Add(bwf.Neg())
 			askPrice = midPrice.Add(bwf)
 		} else if i > 0 {
-			sp := tickSize.Mul(fi)
 			bidPrice = midPrice.Sub(sp)
 			askPrice = midPrice.Add(sp)
+		}
 
-			if bidPrice.Compare(ticker.Buy) < 0 {
-				bidPrice = ticker.Buy.Sub(sp)
-			}
+		if i > 0 && bidPrice.Compare(ticker.Buy) < 0 {
+			bidPrice = ticker.Buy.Sub(sp)
+		}
 
-			if askPrice.Compare(ticker.Sell) > 0 {
-				askPrice = ticker.Sell.Add(sp)
-			}
+		if i > 0 && askPrice.Compare(ticker.Sell) > 0 {
+			askPrice = ticker.Sell.Add(sp)
 		}
 
 		bidPrice = s.Market.TruncatePrice(bidPrice)
