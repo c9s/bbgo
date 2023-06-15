@@ -122,7 +122,7 @@ func (r *AccumulatedProfitReport) DailyUpdate(tradeStats *types.TradeStats) {
 
 	// Accumulated profit MA
 	r.accumulatedProfitMA.Update(r.accumulatedProfit.Float64())
-	r.accumulatedProfitMAPerDay.Update(r.accumulatedProfitMA.Last())
+	r.accumulatedProfitMAPerDay.Update(r.accumulatedProfitMA.Last(0))
 
 	// Accumulated Fee
 	r.accumulatedFeePerDay.Update(r.accumulatedFee.Float64())
