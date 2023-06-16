@@ -34,17 +34,17 @@ func (p *ProfitTracker) Init(market types.Market) {
 }
 
 func (p *ProfitTracker) Bind(tradeCollector *bbgo.TradeCollector, session *bbgo.ExchangeSession) {
-	// TODO: Register kline close callback
 	tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
 		p.AddProfit(*profit)
 	})
 
 	tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-
+		p.AddTrade(trade)
 	})
 
+	// Rotate profitStats slice
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(p.market.Symbol, p.Interval, func(kline types.KLine) {
-
+		p.Rotate()
 	}))
 }
 
@@ -60,4 +60,8 @@ func (p *ProfitTracker) Rotate() {
 
 func (p *ProfitTracker) AddProfit(profit types.Profit) {
 	(*p.currentProfitStats).AddProfit(profit)
+}
+
+func (p *ProfitTracker) AddTrade(trade types.Trade) {
+	(*p.currentProfitStats).AddTrade(trade)
 }
