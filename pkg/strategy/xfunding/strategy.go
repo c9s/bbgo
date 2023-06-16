@@ -638,10 +638,25 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 	if futuresBase.Compare(fixedpoint.Zero) < 0 {
 		orderPrice := ticker.Buy
 		orderQuantity := futuresBase.Abs()
-		// orderQuantity = fixedpoint.Max(orderQuantity, s.minQuantity)
+		orderQuantity = fixedpoint.Max(orderQuantity, s.minQuantity)
 		orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
+
 		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
-			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
+			submitOrder := types.SubmitOrder{
+				Symbol: s.Symbol,
+				Side:   types.SideTypeBuy,
+				Type:   types.OrderTypeLimitMaker,
+				Price:  orderPrice,
+				Market: s.futuresMarket,
+
+				// quantity: Cannot be sent with closePosition=true(Close-All)
+				// reduceOnly: Cannot be sent with closePosition=true
+				ClosePosition: true,
+			}
+
+			if _, err := s.futuresOrderExecutor.SubmitOrders(ctx, submitOrder); err != nil {
+				log.WithError(err).Errorf("can not submit futures order with close position: %+v", submitOrder)
+			}
 			return
 		}
 
@@ -722,7 +737,8 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	}
 
 	// if - futures position < max futures position, increase it
-	if futuresBase.Neg().Compare(maxFuturesBasePosition) >= 0 {
+	// posDiff := futuresBase.Abs().Sub(maxFuturesBasePosition)
+	if futuresBase.Abs().Compare(maxFuturesBasePosition) >= 0 {
 		s.setPositionState(PositionReady)
 
 		bbgo.Notify("Position Ready")
@@ -746,12 +762,15 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	log.Infof("position diff quantity: %s", diffQuantity.String())
 
 	orderQuantity := diffQuantity
-	// orderQuantity := fixedpoint.Max(diffQuantity, s.minQuantity)
+	orderQuantity = fixedpoint.Max(diffQuantity, s.minQuantity)
 	orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
-	if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
-		log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
-		return
-	}
+
+	/*
+		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
+			log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
+			return
+		}
+	*/
 
 	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
