@@ -638,7 +638,7 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 	if futuresBase.Compare(fixedpoint.Zero) < 0 {
 		orderPrice := ticker.Buy
 		orderQuantity := futuresBase.Abs()
-		orderQuantity = fixedpoint.Max(orderQuantity, s.minQuantity)
+		// orderQuantity = fixedpoint.Max(orderQuantity, s.minQuantity)
 		orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
 		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
 			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
@@ -745,7 +745,8 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 
 	log.Infof("position diff quantity: %s", diffQuantity.String())
 
-	orderQuantity := fixedpoint.Max(diffQuantity, s.minQuantity)
+	orderQuantity := diffQuantity
+	// orderQuantity := fixedpoint.Max(diffQuantity, s.minQuantity)
 	orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
 	if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
 		log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
