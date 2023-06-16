@@ -857,7 +857,7 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 
 		// avoid increase the order size
 		if s.spotMarket.IsDustQuantity(orderQuantity, orderPrice) {
-			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.spotMarket)
+			log.Infof("skip spot order with dust quantity %s, market=%+v balance=%+v", orderQuantity.String(), s.spotMarket, b)
 			return
 		}
 
