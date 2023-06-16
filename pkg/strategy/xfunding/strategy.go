@@ -33,6 +33,7 @@ const ID = "xfunding"
 // NoOp -> Opening
 // Opening -> Ready -> Closing
 // Closing -> Closed -> Opening
+//
 //go:generate stringer -type=PositionState
 type PositionState int
 
@@ -949,6 +950,9 @@ func (s *Strategy) detectPremiumIndex(premiumIndex *types.PremiumIndex) bool {
 		log.Infof("funding rate %s is lower than the Low threshold %s, start closing position...",
 			fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
 
+		bbgo.Notify("%s funding rate %s is lower than the Low threshold %s, start closing position...",
+			s.Symbol, fundingRate.Percentage(), s.ShortFundingRate.Low.Percentage())
+
 		holdingPeriod := premiumIndex.Time.Sub(s.State.PositionStartTime)
 		if holdingPeriod < time.Duration(s.MinHoldingPeriod) {
 			log.Warnf("position holding period %s is less than %s, skip closing", holdingPeriod, s.MinHoldingPeriod.Duration())
@@ -986,6 +990,9 @@ func (s *Strategy) startClosingPosition() {
 	}
 
 	log.Infof("startClosingPosition")
+
+	bbgo.Notify("Start to close position", s.FuturesPosition, s.SpotPosition)
+
 	s.setPositionState(PositionClosing)
 
 	// reset the transfer stats
