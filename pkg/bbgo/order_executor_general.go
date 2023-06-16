@@ -167,6 +167,10 @@ func (e *GeneralOrderExecutor) BindProfitTracker(profitTracker *report.ProfitTra
 	e.session.Subscribe(types.KLineChannel, profitTracker.Market.Symbol, types.SubscribeOptions{Interval: profitTracker.Interval})
 
 	e.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
+		if profit == nil {
+			return
+		}
+
 		profitTracker.AddProfit(*profit)
 	})
 
