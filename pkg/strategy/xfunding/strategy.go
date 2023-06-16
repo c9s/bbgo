@@ -871,6 +871,8 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 			return
 		}
 
+		log.Infof("spot balance: %+v", b)
+
 		orderQuantity = fixedpoint.Min(b.Available, orderQuantity)
 
 		// avoid increase the order size
