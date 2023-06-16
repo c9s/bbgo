@@ -877,17 +877,18 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 			return
 		}
 
-		createdOrders, err := s.spotOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		submitOrder := types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeSell,
 			Type:     types.OrderTypeLimitMaker,
 			Quantity: orderQuantity,
 			Price:    orderPrice,
 			Market:   s.futuresMarket,
-		})
+		}
+		createdOrders, err := s.spotOrderExecutor.SubmitOrders(ctx, submitOrder)
 
 		if err != nil {
-			log.WithError(err).Errorf("can not submit spot order")
+			log.WithError(err).Errorf("can not submit spot order: %+v", submitOrder)
 			return
 		}
 
