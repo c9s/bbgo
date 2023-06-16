@@ -164,7 +164,20 @@ func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats) {
 }
 
 func (e *GeneralOrderExecutor) BindProfitTracker(profitTracker *report.ProfitTracker) {
-	profitTracker.Bind(e.tradeCollector, e.session)
+	e.session.Subscribe(types.KLineChannel, profitTracker.Market.Symbol, types.SubscribeOptions{Interval: profitTracker.Interval})
+
+	e.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
+		profitTracker.AddProfit(*profit)
+	})
+
+	e.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		profitTracker.AddTrade(trade)
+	})
+
+	// Rotate profitStats slice
+	e.session.MarketDataStream.OnKLineClosed(types.KLineWith(profitTracker.Market.Symbol, profitTracker.Interval, func(kline types.KLine) {
+		profitTracker.Rotate()
+	}))
 }
 
 func (e *GeneralOrderExecutor) Bind() {
