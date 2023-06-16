@@ -12,7 +12,7 @@ import (
 // AccumulatedProfitReport For accumulated profit report output
 type AccumulatedProfitReport struct {
 	// ProfitMAWindow Accumulated profit SMA window
-	ProfitMAWindow int `json:"ProfitMAWindow"`
+	ProfitMAWindow int `json:"profitMAWindow"`
 
 	// ShortTermProfitWindow The window to sum up the short-term profit
 	ShortTermProfitWindow int `json:"shortTermProfitWindow"`
@@ -84,7 +84,7 @@ func (r *AccumulatedProfitReport) AddTrade(trade types.Trade) {
 
 func (r *AccumulatedProfitReport) Rotate(ps *types.ProfitStats, ts *types.TradeStats) {
 	// Accumulated profit
-	r.accumulatedProfit.Add(ps.AccumulatedNetProfit)
+	r.accumulatedProfit = r.accumulatedProfit.Add(ps.AccumulatedNetProfit)
 	r.accumulatedProfitPerInterval.Update(r.accumulatedProfit.Float64())
 
 	// Profit of each interval
@@ -120,12 +120,12 @@ func (r *AccumulatedProfitReport) Output() {
 			"#",
 			"Symbol",
 			"Total Net Profit",
-			fmt.Sprintf("Total Net Profit %sMA%d", r.Interval, r.Window),
-			fmt.Sprintf("%s %d Net Profit", r.Interval, r.ShortTermProfitWindow),
+			fmt.Sprintf("Total Net Profit %sMA%d", r.Interval, r.ProfitMAWindow),
+			fmt.Sprintf("%s%d Net Profit", r.Interval, r.ShortTermProfitWindow),
 			"accumulatedFee",
 			"winRatio",
 			"profitFactor",
-			fmt.Sprintf("%s %d Trades", r.Interval, r.Window),
+			fmt.Sprintf("%s%d Trades", r.Interval, r.Window),
 		}
 		for i := 0; i < len(r.strategyParameters); i++ {
 			titles = append(titles, r.strategyParameters[i][0])
