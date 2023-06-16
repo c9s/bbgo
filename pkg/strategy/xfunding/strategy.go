@@ -1135,6 +1135,11 @@ func (s *Strategy) checkAndRestorePositionRisks(ctx context.Context) error {
 
 	log.Infof("fetched futures position risks: %+v", positionRisks)
 
+	if len(positionRisks) == 0 {
+		s.FuturesPosition.Reset()
+		return nil
+	}
+
 	for _, positionRisk := range positionRisks {
 		if positionRisk.Symbol != s.Symbol {
 			continue
