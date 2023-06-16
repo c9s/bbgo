@@ -866,10 +866,12 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 		orderPrice := ticker.Sell
 		orderQuantity := diffQuantity
 		b, ok := s.spotSession.Account.Balance(s.spotMarket.BaseCurrency)
-
-		if ok {
-			orderQuantity = fixedpoint.Min(b.Available, orderQuantity)
+		if !ok {
+			log.Warnf("%s balance not found, can not sync spot position", s.spotMarket.BaseCurrency)
+			return
 		}
+
+		orderQuantity = fixedpoint.Min(b.Available, orderQuantity)
 
 		// avoid increase the order size
 		if s.spotMarket.IsDustQuantity(orderQuantity, orderPrice) {
