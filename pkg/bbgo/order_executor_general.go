@@ -3,6 +3,7 @@ package bbgo
 import (
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/report"
 	"strings"
 	"time"
 
@@ -160,6 +161,10 @@ func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats) {
 			Notify(profitStats)
 		}
 	})
+}
+
+func (e *GeneralOrderExecutor) BindProfitTracker(profitTracker *report.ProfitTracker) {
+	profitTracker.Bind(e.tradeCollector, e.session)
 }
 
 func (e *GeneralOrderExecutor) Bind() {
