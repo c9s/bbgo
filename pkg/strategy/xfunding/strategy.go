@@ -887,7 +887,7 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 			Type:     types.OrderTypeLimitMaker,
 			Quantity: orderQuantity,
 			Price:    orderPrice,
-			Market:   s.futuresMarket,
+			Market:   s.spotMarket,
 		}
 		createdOrders, err := s.spotOrderExecutor.SubmitOrders(ctx, submitOrder)
 
