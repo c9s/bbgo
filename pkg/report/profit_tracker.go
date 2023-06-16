@@ -44,15 +44,16 @@ func (p *ProfitTracker) Init(market types.Market, ts *types.TradeStats) {
 
 // Rotate the tracker to make a new ProfitStats to record the profits
 func (p *ProfitTracker) Rotate() {
+	// Update report
+	if p.AccumulatedProfitReport != nil {
+		p.AccumulatedProfitReport.Rotate(*p.CurrentProfitStats, p.tradeStats)
+	}
+
 	*p.CurrentProfitStats = types.NewProfitStats(p.Market)
 	p.ProfitStatsSlice = append(p.ProfitStatsSlice, *p.CurrentProfitStats)
 	// Truncate
 	if len(p.ProfitStatsSlice) > p.Window {
 		p.ProfitStatsSlice = p.ProfitStatsSlice[len(p.ProfitStatsSlice)-p.Window:]
-	}
-
-	if p.AccumulatedProfitReport != nil {
-		p.AccumulatedProfitReport.Rotate(*p.CurrentProfitStats, p.tradeStats)
 	}
 }
 

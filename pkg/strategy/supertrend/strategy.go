@@ -39,6 +39,8 @@ type Strategy struct {
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
 
+	ProfitTracker *report.ProfitTracker `json:"profitTracker"`
+
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
 
@@ -101,8 +103,6 @@ type Strategy struct {
 
 	// StrategyController
 	bbgo.StrategyController
-
-	ProfitTracker *report.ProfitTracker `json:"profitTracker" persistence:"profit_tracker"`
 }
 
 func (s *Strategy) ID() string {
@@ -367,7 +367,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindEnvironment(s.Environment)
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.BindTradeStats(s.TradeStats)
-	s.orderExecutor.BindProfitTracker(s.ProfitTracker)
+	if s.ProfitTracker != nil {
+		s.orderExecutor.BindProfitTracker(s.ProfitTracker)
+	}
 	s.orderExecutor.Bind()
 
 	// AccountValueCalculator
