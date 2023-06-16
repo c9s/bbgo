@@ -635,6 +635,17 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 		return
 	}
 
+	spotBase := s.SpotPosition.GetBase()
+	if !s.spotMarket.IsDustQuantity(spotBase, s.SpotPosition.AverageCost) {
+		if balance, ok := s.futuresSession.Account.Balance(s.futuresMarket.BaseCurrency); ok && balance.Available.Sign() > 0 {
+			if err := backoff.RetryGeneral(ctx, func() error {
+				return s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, balance.Available)
+			}); err != nil {
+				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
+			}
+		}
+	}
+
 	if futuresBase.Compare(fixedpoint.Zero) < 0 {
 		orderPrice := ticker.Buy
 		orderQuantity := futuresBase.Abs()
