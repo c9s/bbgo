@@ -826,7 +826,7 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 		return
 	}
 
-	log.Infof("spot/futures positions: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
+	log.Infof("syncSpotPosition: spot/futures positions: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
 
 	if futuresBase.Sign() > 0 {
 		// unexpected error
@@ -834,7 +834,7 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 		return
 	}
 
-	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
+	_ = s.spotOrderExecutor.GracefulCancel(ctx)
 
 	ticker, err := s.spotSession.Exchange.QueryTicker(ctx, s.Symbol)
 	if err != nil {
