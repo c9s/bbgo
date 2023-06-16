@@ -405,8 +405,11 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 		switch s.getPositionState() {
 		case PositionClosing:
+			// de-leverage and get the collateral base quantity for transfer
+			quantity := trade.Quantity.Div(s.Leverage)
+
 			if err := backoff.RetryGeneral(ctx, func() error {
-				return s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade.Quantity)
+				return s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, quantity)
 			}); err != nil {
 				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
 				return

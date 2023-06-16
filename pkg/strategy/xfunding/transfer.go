@@ -41,14 +41,11 @@ func (s *Strategy) resetTransfer(ctx context.Context, ex FuturesTransfer, asset 
 	return nil
 }
 
-func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset string, tradeQuantity fixedpoint.Value) error {
+func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset string, quantity fixedpoint.Value) error {
 	// if transfer done
 	if s.State.TotalBaseTransfer.IsZero() {
 		return nil
 	}
-
-	// de-leverage and get the collateral base quantity for transfer
-	quantity := tradeQuantity.Div(s.Leverage)
 
 	balances, err := s.futuresSession.Exchange.QueryAccountBalances(ctx)
 	if err != nil {
@@ -63,6 +60,8 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset st
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return fmt.Errorf("%s balance not found", asset)
 	}
+
+	log.Infof("found futures balance: %+v", b)
 
 	// add the previous pending base transfer and the current trade quantity
 	amount := s.State.PendingBaseTransfer.Add(quantity)
