@@ -112,3 +112,11 @@ exchangeStrategies:
           # If true, looking for lower lows in long position and higher highs in short position. If false, looking for
           # higher highs in long position and lower lows in short position
           oppositeDirectionAsPosition: false
+
+    profitTracker:
+      Interval: 1d
+      Window: 30
+      accumulatedProfitReport:
+        profitMAWindow: 60
+        shortTermProfitWindow: 14
+        tsvReportPath: res.tsv
