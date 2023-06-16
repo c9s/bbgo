@@ -851,7 +851,9 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 
 		orderPrice := ticker.Sell
 		orderQuantity := diffQuantity
-		if b, ok := s.spotSession.Account.Balance(s.spotMarket.BaseCurrency); ok {
+		b, ok := s.spotSession.Account.Balance(s.spotMarket.BaseCurrency)
+
+		if ok {
 			orderQuantity = fixedpoint.Min(b.Available, orderQuantity)
 		}
 
