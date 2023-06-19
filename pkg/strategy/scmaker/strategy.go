@@ -179,20 +179,36 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
+func (s *Strategy) preloadKLines(inc *indicator.KLineStream, session *bbgo.ExchangeSession, symbol string, interval types.Interval) {
+	if store, ok := session.MarketDataStore(symbol); ok {
+		if kLinesData, ok := store.KLinesOfInterval(interval); ok {
+			for _, k := range *kLinesData {
+				inc.EmitUpdate(k)
+			}
+		}
+	}
+}
+
 func (s *Strategy) initializeMidPriceEMA(session *bbgo.ExchangeSession) {
 	kLines := indicator.KLines(session.MarketDataStream, s.Symbol, s.MidPriceEMA.Interval)
 	s.ewma = indicator.EWMA2(indicator.ClosePrices(kLines), s.MidPriceEMA.Window)
+
+	s.preloadKLines(kLines, session, s.Symbol, s.MidPriceEMA.Interval)
 }
 
 func (s *Strategy) initializeIntensityIndicator(session *bbgo.ExchangeSession) {
 	kLines := indicator.KLines(session.MarketDataStream, s.Symbol, s.StrengthInterval)
 	s.intensity = Intensity(kLines, 10)
+
+	s.preloadKLines(kLines, session, s.Symbol, s.StrengthInterval)
 }
 
 func (s *Strategy) initializePriceRangeBollinger(session *bbgo.ExchangeSession) {
 	kLines := indicator.KLines(session.MarketDataStream, s.Symbol, s.PriceRangeBollinger.Interval)
 	closePrices := indicator.ClosePrices(kLines)
 	s.boll = indicator.BOLL2(closePrices, s.PriceRangeBollinger.Window, s.PriceRangeBollinger.K)
+
+	s.preloadKLines(kLines, session, s.Symbol, s.PriceRangeBollinger.Interval)
 }
 
 func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
