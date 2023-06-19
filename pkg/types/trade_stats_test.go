@@ -8,8 +8,17 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
-func number(v float64) fixedpoint.Value {
-	return fixedpoint.NewFromFloat(v)
+func number(v interface{}) fixedpoint.Value {
+	switch tv := v.(type) {
+	case float64:
+		return fixedpoint.NewFromFloat(tv)
+
+	case string:
+		return fixedpoint.MustNewFromString(tv)
+
+	default:
+		panic("invalid number input")
+	}
 }
 
 func TestTradeStats_consecutiveCounterAndAmount(t *testing.T) {
