@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 
@@ -150,6 +151,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if k.Interval == s.LiquidityUpdateInterval {
 			s.placeLiquidityOrders(ctx)
 		}
+	})
+
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+
+		err := s.liquidityOrderBook.GracefulCancel(ctx, s.session.Exchange)
+		logErr(err, "unable to cancel liquidity orders")
+
+		err = s.adjustmentOrderBook.GracefulCancel(ctx, s.session.Exchange)
+		logErr(err, "unable to cancel adjustment orders")
 	})
 
 	return nil
