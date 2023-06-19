@@ -46,6 +46,8 @@ type Strategy struct {
 	LiquiditySlideRule     *bbgo.SlideRule       `json:"liquidityScale"`
 	LiquidityLayerTickSize fixedpoint.Value      `json:"liquidityLayerTickSize"`
 
+	MaxExposure fixedpoint.Value `json:"maxExposure"`
+
 	MinProfit fixedpoint.Value `json:"minProfit"`
 
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
@@ -264,10 +266,6 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	midPriceEMA := s.ewma.Last(0)
 	midPrice := fixedpoint.NewFromFloat(midPriceEMA)
 
-	makerQuota := &bbgo.QuotaTransaction{}
-	makerQuota.QuoteAsset.Add(quoteBal.Available)
-	makerQuota.BaseAsset.Add(baseBal.Available)
-
 	bandWidth := s.boll.Last(0)
 
 	log.Infof("spread: %f mid price ema: %f boll band width: %f", spread.Float64(), midPriceEMA, bandWidth)
@@ -294,11 +292,11 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 			askPrice = midPrice.Add(sp)
 		}
 
-		if i > 0 && bidPrice.Compare(ticker.Buy) < 0 {
+		if i > 0 && bidPrice.Compare(ticker.Buy) > 0 {
 			bidPrice = ticker.Buy.Sub(sp)
 		}
 
-		if i > 0 && askPrice.Compare(ticker.Sell) > 0 {
+		if i > 0 && askPrice.Compare(ticker.Sell) < 0 {
 			askPrice = ticker.Sell.Add(sp)
 		}
 
@@ -311,6 +309,20 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 
 	availableBase := baseBal.Available
 	availableQuote := quoteBal.Available
+
+	// check max exposure
+	if s.MaxExposure.Sign() > 0 {
+		availableQuote = fixedpoint.Min(availableQuote, s.MaxExposure)
+
+		baseQuoteValue := availableBase.Mul(ticker.Sell)
+		if baseQuoteValue.Compare(s.MaxExposure) > 0 {
+			availableBase = s.MaxExposure.Div(ticker.Sell)
+		}
+	}
+
+	makerQuota := &bbgo.QuotaTransaction{}
+	makerQuota.QuoteAsset.Add(availableQuote)
+	makerQuota.BaseAsset.Add(availableBase)
 
 	log.Infof("balances before liq orders: %s, %s",
 		baseBal.String(),
