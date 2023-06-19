@@ -18,6 +18,11 @@ const ID = "scmaker"
 
 var ten = fixedpoint.NewFromInt(10)
 
+type advancedOrderCancelApi interface {
+	CancelAllOrders(ctx context.Context) ([]types.Order, error)
+	CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error)
+}
+
 type BollingerConfig struct {
 	Interval types.Interval `json:"interval"`
 	Window   int            `json:"window"`
@@ -127,6 +132,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	if err := scale.Solve(); err != nil {
 		return err
+	}
+
+	if cancelApi, ok := session.Exchange.(advancedOrderCancelApi); ok {
+		_, _ = cancelApi.CancelOrdersBySymbol(ctx, s.Symbol)
 	}
 
 	s.liquidityScale = scale
