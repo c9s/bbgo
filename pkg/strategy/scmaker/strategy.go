@@ -152,6 +152,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.initializePriceRangeBollinger(session)
 	s.initializeIntensityIndicator(session)
 
+	session.UserDataStream.OnStart(func() {
+		s.placeLiquidityOrders(ctx)
+	})
+
 	session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
 		if k.Interval == s.AdjustmentUpdateInterval {
 			s.placeAdjustmentOrders(ctx)
