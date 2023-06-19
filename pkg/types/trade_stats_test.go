@@ -13,6 +13,11 @@ func number(v interface{}) fixedpoint.Value {
 	case float64:
 		return fixedpoint.NewFromFloat(tv)
 
+	case int64:
+		return fixedpoint.NewFromInt(tv)
+	case int:
+		return fixedpoint.NewFromInt(int64(tv))
+
 	case string:
 		return fixedpoint.MustNewFromString(tv)
 
