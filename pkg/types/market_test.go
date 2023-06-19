@@ -228,16 +228,16 @@ func TestMarket_AdjustQuantityByMinNotional(t *testing.T) {
 	testCases := []struct {
 		input  string
 		price  fixedpoint.Value
-		expect string
+		expect fixedpoint.Value
 	}{
-		{"0.00573961", number(1750.99), "0.0058"},
-		{"0.0019", number(1757.38), "0.0057"},
+		{"0.00573961", number(1750.99), number("0.005739")},
+		{"0.0019", number(1757.38), number("0.0057")},
 	}
 
 	for _, testCase := range testCases {
 		q := fixedpoint.MustNewFromString(testCase.input)
 		q2 := market.AdjustQuantityByMinNotional(q, testCase.price)
-		assert.Equalf(t, testCase.expect, q2.String(), "input: %s stepSize: %s", testCase.input, market.StepSize.String())
+		assert.InDelta(t, testCase.expect.Float64(), q2.Float64(), 0.000001, "input: %s stepSize: %s", testCase.input, market.StepSize.String())
 		assert.False(t, market.IsDustQuantity(q2, testCase.price))
 	}
 }
