@@ -36,7 +36,7 @@ Common labels
 {{- define "bbgo.labels" -}}
 helm.sh/chart: {{ include "bbgo.chart" . }}
 {{ include "bbgo.selectorLabels" . }}
-{{- if .Values.addtionalLabels }}
+{{- if .Values.additionalLabels }}
 {{ toYaml .Values.additionalLabels }}
 {{- end }}
 {{- if .Chart.AppVersion }}
