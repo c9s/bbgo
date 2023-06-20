@@ -210,7 +210,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	s.tradingSession.UserDataStream.OnTradeUpdate(s.handleTradeUpdate)
 
 	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
-	s.groupID = util.FNV32(instanceID)
+	s.groupID = util.FNV32(instanceID) % math.MaxInt32
 	log.Infof("using group id %d from fnv32(%s)", s.groupID, instanceID)
 
 	go func() {
