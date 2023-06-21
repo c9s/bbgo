@@ -52,11 +52,14 @@ func (s *TrailingStop2) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 	s.latestHigh = fixedpoint.Zero
 
 	position := orderExecutor.Position()
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
+	f := func(kline types.KLine) {
 		if err := s.checkStopPrice(kline.Close, position); err != nil {
 			log.WithError(err).Errorf("error")
 		}
-	}))
+	}
+
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, f))
+	session.MarketDataStream.OnKLine(types.KLineWith(s.Symbol, s.Interval, f))
 
 	if !IsBackTesting && enableMarketTradeStop {
 		session.MarketDataStream.OnMarketTrade(types.TradeWith(position.Symbol, func(trade types.Trade) {
