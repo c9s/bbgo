@@ -22,6 +22,7 @@ spec:
     {{- end }}
       labels:
         {{- include "bbgo.selectorLabels" . | nindent 8 }}
+        {{- include "bbgo.labels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
