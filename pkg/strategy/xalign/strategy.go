@@ -40,7 +40,7 @@ type Strategy struct {
 	ExpectedBalances         map[string]fixedpoint.Value `json:"expectedBalances"`
 	UseTakerOrder            bool                        `json:"useTakerOrder"`
 	DryRun                   bool                        `json:"dryRun"`
-	BalanceToleranceRange    float64                     `json:"balanceToleranceRange"`
+	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
 	Duration                 types.Duration              `json:"for"`
 
 	faultBalanceRecords map[string][]TimeBalance
@@ -74,7 +74,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Defaults() error {
-	s.BalanceToleranceRange = 0.01
+	s.BalanceToleranceRange = fixedpoint.NewFromFloat(0.01)
 	return nil
 }
 
@@ -292,7 +292,8 @@ func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
 	for currency, expectedBalance := range s.ExpectedBalances {
 		q := s.calculateRefillQuantity(totalBalances, currency, expectedBalance)
 		rf := q.Div(expectedBalance).Abs().Float64()
-		if rf > s.BalanceToleranceRange {
+		tr := s.BalanceToleranceRange.Float64()
+		if rf > tr {
 			balance := totalBalances[currency]
 			s.faultBalanceRecords[currency] = append(s.faultBalanceRecords[currency], TimeBalance{
 				Time:    now,
