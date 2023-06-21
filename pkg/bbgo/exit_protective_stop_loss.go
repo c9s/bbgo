@@ -9,8 +9,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const enableMarketTradeStop = true
-
 // ProtectiveStopLoss provides a way to protect your profit but also keep a room for the price volatility
 // Set ActivationRatio to 1% means if the price is away from your average cost by 1%, we will activate the protective stop loss
 // and the StopLossRatio is the minimal profit ratio you want to keep for your position.

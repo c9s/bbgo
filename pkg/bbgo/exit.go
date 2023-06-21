@@ -8,7 +8,16 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/dynamic"
+	"github.com/c9s/bbgo/pkg/util"
 )
+
+var enableMarketTradeStop = true
+
+func init() {
+	if v, defined := util.GetEnvVarBool("ENABLE_MARKET_TRADE_STOP"); defined {
+		enableMarketTradeStop = v
+	}
+}
 
 type ExitMethodSet []ExitMethod
 
