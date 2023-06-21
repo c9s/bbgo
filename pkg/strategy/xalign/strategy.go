@@ -21,6 +21,12 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+type TimeBalance struct {
+	types.Balance
+
+	Time time.Time
+}
+
 type QuoteCurrencyPreference struct {
 	Buy  []string `json:"buy"`
 	Sell []string `json:"sell"`
@@ -34,6 +40,10 @@ type Strategy struct {
 	ExpectedBalances         map[string]fixedpoint.Value `json:"expectedBalances"`
 	UseTakerOrder            bool                        `json:"useTakerOrder"`
 	DryRun                   bool                        `json:"dryRun"`
+	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
+	Duration                 types.Duration              `json:"for"`
+
+	faultBalanceRecords map[string][]TimeBalance
 
 	sessions   map[string]*bbgo.ExchangeSession
 	orderBooks map[string]*bbgo.ActiveOrderBook
@@ -61,6 +71,11 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
+}
+
+func (s *Strategy) Defaults() error {
+	s.BalanceToleranceRange = fixedpoint.NewFromFloat(0.01)
+	return nil
 }
 
 func (s *Strategy) Validate() error {
@@ -221,6 +236,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	instanceID := s.InstanceID()
 	_ = instanceID
 
+	s.faultBalanceRecords = make(map[string][]TimeBalance)
 	s.sessions = make(map[string]*bbgo.ExchangeSession)
 	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
 
@@ -271,9 +287,26 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	return nil
 }
 
+func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
+	now := time.Now()
+	for currency, expectedBalance := range s.ExpectedBalances {
+		q := s.calculateRefillQuantity(totalBalances, currency, expectedBalance)
+		rf := q.Div(expectedBalance).Abs().Float64()
+		tr := s.BalanceToleranceRange.Float64()
+		if rf > tr {
+			balance := totalBalances[currency]
+			s.faultBalanceRecords[currency] = append(s.faultBalanceRecords[currency], TimeBalance{
+				Time:    now,
+				Balance: balance,
+			})
+		} else {
+			// reset counter
+			s.faultBalanceRecords[currency] = nil
+		}
+	}
+}
+
 func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
-	totalBalances, sessionBalances := s.aggregateBalances(ctx, sessions)
-	_ = sessionBalances
 
 	for sessionName, session := range sessions {
 		ob, ok := s.orderBooks[sessionName]
@@ -288,8 +321,23 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 		}
 	}
 
+	totalBalances, sessionBalances := s.aggregateBalances(ctx, sessions)
+	_ = sessionBalances
+
+	s.recordBalance(totalBalances)
+
 	for currency, expectedBalance := range s.ExpectedBalances {
 		q := s.calculateRefillQuantity(totalBalances, currency, expectedBalance)
+
+		if s.Duration > 0 {
+			log.Infof("checking fault balance records...")
+			if faultBalance, ok := s.faultBalanceRecords[currency]; ok && len(faultBalance) > 0 {
+				if time.Since(faultBalance[0].Time) < s.Duration.Duration() {
+					log.Infof("%s fault record since: %s < persistence period %s", currency, faultBalance[0].Time, s.Duration.Duration())
+					continue
+				}
+			}
+		}
 
 		selectedSession, submitOrder := s.selectSessionForCurrency(ctx, sessions, currency, q)
 		if selectedSession != nil && submitOrder != nil {
