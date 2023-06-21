@@ -35,7 +35,7 @@ crossExchangeStrategies:
     - binance
 
     ## quoteCurrencies config specifies which quote currency should be used for BUY order or SELL order.
-    ## when specifying [USDC,TWD] for "BUY", then it will consider BTCUSDT first then BTCTWD second.
+    ## when specifying [USDC,TWD] for "BUY", then it will consider BTCUSDC first then BTCTWD second.
     quoteCurrencies:
       buy: [USDC, TWD]
       sell: [USDT]
