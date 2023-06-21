@@ -26,9 +26,12 @@ func (s *RoiStopLoss) Bind(session *ExchangeSession, orderExecutor *GeneralOrder
 	s.orderExecutor = orderExecutor
 
 	position := orderExecutor.Position()
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
+	f := func(kline types.KLine) {
 		s.checkStopPrice(kline.Close, position)
-	}))
+	}
+
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, f))
+	session.MarketDataStream.OnKLine(types.KLineWith(s.Symbol, types.Interval1m, f))
 
 	if !IsBackTesting && enableMarketTradeStop {
 		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {

@@ -124,14 +124,17 @@ func (s *ProtectiveStopLoss) Bind(session *ExchangeSession, orderExecutor *Gener
 	})
 
 	position := orderExecutor.Position()
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
+
+	f := func(kline types.KLine) {
 		isPositionOpened := !position.IsClosed() && !position.IsDust(kline.Close)
 		if isPositionOpened {
 			s.handleChange(context.Background(), position, kline.Close, s.orderExecutor)
 		} else {
 			s.stopLossPrice = fixedpoint.Zero
 		}
-	}))
+	}
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, f))
+	session.MarketDataStream.OnKLine(types.KLineWith(s.Symbol, types.Interval1m, f))
 
 	if !IsBackTesting && enableMarketTradeStop {
 		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
