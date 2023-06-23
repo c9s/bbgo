@@ -10,7 +10,6 @@ var (
 	metricsGridNumOfOrdersWithCorrectPrice        *prometheus.GaugeVec
 	metricsGridNumOfMissingOrders                 *prometheus.GaugeVec
 	metricsGridNumOfMissingOrdersWithCorrectPrice *prometheus.GaugeVec
-	metricsGridOrderPrices                        *prometheus.GaugeVec
 	metricsGridProfit                             *prometheus.GaugeVec
 
 	metricsGridUpperPrice      *prometheus.GaugeVec
@@ -102,19 +101,6 @@ func initMetrics(extendedLabels []string) {
 		}, extendedLabels...),
 	)
 
-	metricsGridOrderPrices = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "bbgo_grid2_order_prices",
-			Help: "order prices",
-		},
-		append([]string{
-			"exchange", // exchange name
-			"symbol",   // symbol of the market
-			"ith",
-			"side",
-		}, extendedLabels...),
-	)
-
 	metricsGridProfit = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "bbgo_grid2_profit",
@@ -202,7 +188,6 @@ func registerMetrics() {
 		metricsGridNumOfMissingOrders,
 		metricsGridNumOfMissingOrdersWithCorrectPrice,
 		metricsGridProfit,
-		metricsGridOrderPrices,
 		metricsGridLowerPrice,
 		metricsGridUpperPrice,
 		metricsGridQuoteInvestment,

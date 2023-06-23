@@ -16,7 +16,6 @@ import (
 func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.ExchangeSession) error {
 	defer func() {
 		s.updateGridNumOfOrdersMetricsWithLock()
-		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 	}()
 
 	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
