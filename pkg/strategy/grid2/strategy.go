@@ -894,7 +894,6 @@ func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.Exch
 		bbgo.Sync(ctx, s)
 
 		s.updateGridNumOfOrdersMetricsWithLock()
-		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 	}
 }
 
@@ -1170,7 +1169,6 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	s.logger.Infof("ALL GRID ORDERS SUBMITTED")
 
 	s.updateGridNumOfOrdersMetrics(grid)
-	s.updateOpenOrderPricesMetrics(createdOrders)
 	return nil
 }
 
@@ -1217,41 +1215,6 @@ func (s *Strategy) updateGridNumOfOrdersMetrics(grid *Grid) {
 		metricsGridNumOfOrdersWithCorrectPrice.With(baseLabels).Set(float64(numOfOrdersWithCorrectPrice))
 		metricsGridNumOfMissingOrdersWithCorrectPrice.With(baseLabels).Set(float64(numOfMissingOrdersWithCorrectPrice))
 	}
-}
-
-func (s *Strategy) updateOpenOrderPricesMetrics(orders []types.Order) {
-	orders = sortOrdersByPriceAscending(orders)
-	num := len(orders)
-	s.deleteOpenOrderPricesMetrics()
-	for idx, order := range orders {
-		labels := s.newPrometheusLabels()
-		labels["side"] = order.Side.String()
-		labels["ith"] = strconv.Itoa(num - idx)
-		metricsGridOrderPrices.With(labels).Set(order.Price.Float64())
-	}
-}
-
-func (s *Strategy) deleteOpenOrderPricesMetrics() {
-	for i := 1; i <= int(s.GridNum); i++ {
-		ithStr := strconv.Itoa(i)
-		labels := s.newPrometheusLabels()
-		labels["side"] = "BUY"
-		labels["ith"] = ithStr
-		metricsGridOrderPrices.Delete(labels)
-		labels = s.newPrometheusLabels()
-		labels["side"] = "SELL"
-		labels["ith"] = ithStr
-		metricsGridOrderPrices.Delete(labels)
-	}
-}
-
-func sortOrdersByPriceAscending(orders []types.Order) []types.Order {
-	sort.Slice(orders, func(i, j int) bool {
-		a := orders[i]
-		b := orders[j]
-		return a.Price.Compare(b.Price) < 0
-	})
-	return orders
 }
 
 func (s *Strategy) debugGridOrders(submitOrders []types.SubmitOrder, lastPrice fixedpoint.Value) {
@@ -1538,7 +1501,6 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 		s.setGrid(grid)
 		s.EmitGridReady()
 		s.updateGridNumOfOrdersMetricsWithLock()
-		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 		return nil
 	} else {
 		s.logger.Infof("GRID RECOVER: found missing prices: %v", missingPrices)
@@ -1585,7 +1547,6 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 		s.setGrid(grid)
 		s.EmitGridReady()
 		s.updateGridNumOfOrdersMetricsWithLock()
-		s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 		return nil
 	}
 
@@ -1612,7 +1573,6 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	s.setGrid(grid)
 	s.EmitGridReady()
 	s.updateGridNumOfOrdersMetricsWithLock()
-	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 
 	for i := range filledOrders {
 		// avoid using the iterator
@@ -1629,7 +1589,6 @@ func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService
 	debugGrid(s.logger, grid, s.orderExecutor.ActiveMakerOrders())
 
 	s.updateGridNumOfOrdersMetricsWithLock()
-	s.updateOpenOrderPricesMetrics(s.orderExecutor.ActiveMakerOrders().Orders())
 	return nil
 }
 
