@@ -51,7 +51,7 @@ var RootCmd = &cobra.Command{
 			env = "development"
 		}
 
-		logFormatter, err := cmd.PersistentFlags().GetString("log-formatter")
+		logFormatter, err := cmd.Flags().GetString("log-formatter")
 		if err != nil {
 			return err
 		}
