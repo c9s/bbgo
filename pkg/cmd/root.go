@@ -51,6 +51,30 @@ var RootCmd = &cobra.Command{
 			env = "development"
 		}
 
+		logFormatter, err := cmd.PersistentFlags().GetString("log-formatter")
+		if err != nil {
+			return err
+		}
+
+		if len(logFormatter) == 0 {
+			switch env {
+			case "production", "prod", "stag", "staging":
+				// always use json formatter for production and staging
+				log.SetFormatter(&log.JSONFormatter{})
+			default:
+				log.SetFormatter(&prefixed.TextFormatter{})
+			}
+		} else {
+			switch logFormatter {
+			case "prefixed":
+				log.SetFormatter(&prefixed.TextFormatter{})
+			case "text":
+				log.SetFormatter(&log.TextFormatter{})
+			case "json":
+				log.SetFormatter(&log.JSONFormatter{})
+			}
+		}
+
 		if token := viper.GetString("rollbar-token"); token != "" {
 			log.Infof("found rollbar token %q, setting up rollbar hook...", util.MaskKey(token))
 
@@ -165,6 +189,8 @@ func init() {
 
 	RootCmd.PersistentFlags().String("config", "bbgo.yaml", "config file")
 
+	RootCmd.PersistentFlags().String("log-formatter", "", "configure log formatter")
+
 	RootCmd.PersistentFlags().String("rollbar-token", "", "rollbar token")
 
 	// A flag can be 'persistent' meaning that this flag will be available to
@@ -211,10 +237,6 @@ func init() {
 		return
 	}
 
-	log.SetFormatter(&prefixed.TextFormatter{})
-}
-
-func Execute() {
 	environment := os.Getenv("BBGO_ENV")
 	logDir := "log"
 	switch environment {
@@ -231,8 +253,8 @@ func Execute() {
 		if err != nil {
 			log.Panic(err)
 		}
-		logger := log.StandardLogger()
-		logger.AddHook(
+
+		log.AddHook(
 			lfshook.NewHook(
 				lfshook.WriterMap{
 					log.DebugLevel: writer,
@@ -240,12 +262,13 @@ func Execute() {
 					log.WarnLevel:  writer,
 					log.ErrorLevel: writer,
 					log.FatalLevel: writer,
-				},
-				&log.JSONFormatter{},
-			),
+				}, &log.JSONFormatter{}),
 		)
-	}
 
+	}
+}
+
+func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		log.WithError(err).Fatalf("cannot execute command")
 	}
