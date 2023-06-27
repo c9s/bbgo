@@ -183,9 +183,6 @@ func init() {
 	RootCmd.PersistentFlags().String("max-api-key", "", "max api key")
 	RootCmd.PersistentFlags().String("max-api-secret", "", "max api secret")
 
-	RootCmd.PersistentFlags().String("ftx-api-key", "", "ftx api key")
-	RootCmd.PersistentFlags().String("ftx-api-secret", "", "ftx api secret")
-	RootCmd.PersistentFlags().String("ftx-subaccount", "", "subaccount name. Specify it if the credential is for subaccount.")
 	RootCmd.PersistentFlags().String("cpu-profile", "", "cpu profile")
 
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
