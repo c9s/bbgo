@@ -39,6 +39,8 @@ serviceAccount:
 
 additionalLabels: {}
 
+deploymentAnnotations: {}
+
 podAnnotations: {}
 
 podSecurityContext: {}
