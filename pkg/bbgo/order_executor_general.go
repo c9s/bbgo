@@ -500,7 +500,7 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 		return err
 	}
 
-	if queryOrderService, ok := e.session.Exchange.(types.ExchangeOrderQueryService); ok {
+	if queryOrderService, ok := e.session.Exchange.(types.ExchangeOrderQueryService); ok && !IsBackTesting {
 		switch submitOrder.Type {
 		case types.OrderTypeMarket:
 			_ = backoff.RetryGeneral(ctx, func() error {
