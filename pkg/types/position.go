@@ -58,6 +58,9 @@ type Position struct {
 
 	AccumulatedProfit fixedpoint.Value `json:"accumulatedProfit,omitempty" db:"accumulated_profit"`
 
+	// closing is a flag for marking this position is closing
+	closing bool
+
 	sync.Mutex
 
 	// Modify position callbacks
@@ -426,6 +429,25 @@ func (p *Position) BindStream(stream Stream) {
 			p.AddTrade(trade)
 		}
 	})
+}
+
+func (p *Position) SetClosing(c bool) bool {
+	p.Lock()
+	defer p.Unlock()
+
+	if p.closing && c {
+		return false
+	}
+
+	p.closing = c
+	return true
+}
+
+func (p *Position) IsClosing() (c bool) {
+	p.Lock()
+	c = p.closing
+	p.Unlock()
+	return c
 }
 
 func (p *Position) AddTrades(trades []Trade) (fixedpoint.Value, fixedpoint.Value, bool) {
