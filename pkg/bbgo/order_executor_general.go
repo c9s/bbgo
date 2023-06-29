@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -11,10 +10,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
 
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/c9s/bbgo/pkg/util/backoff"
 )
 
 var ErrExceededSubmitOrderRetryLimit = errors.New("exceeded submit order retry limit")
@@ -507,22 +506,10 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	if queryOrderService, ok := e.session.Exchange.(types.ExchangeOrderQueryService); ok && !IsBackTesting {
 		switch submitOrder.Type {
 		case types.OrderTypeMarket:
-			_ = backoff.RetryGeneral(ctx, func() error {
-				order, err2 := queryOrderService.QueryOrder(ctx, types.OrderQuery{
-					Symbol:  e.symbol,
-					OrderID: strconv.FormatUint(createdOrders[0].OrderID, 10),
-				})
-
-				if err2 != nil {
-					return err2
-				}
-
-				if order.Status != types.OrderStatusFilled {
-					return errors.New("order is not filled yet")
-				}
-
-				return nil
-			})
+			_, err2 := retry.QueryOrderUntilSuccessful(ctx, queryOrderService, createdOrders[0].Symbol, createdOrders[0].OrderID)
+			if err2 != nil {
+				log.WithError(err2).Errorf("unable to query order")
+			}
 		}
 	}
 
