@@ -107,6 +107,9 @@ type ExchangeSession struct {
 	// standard indicators of each market
 	standardIndicatorSets map[string]*StandardIndicatorSet
 
+	// indicators is the v2 api indicators
+	indicators map[string]*IndicatorSet
+
 	orderStores map[string]*OrderStore
 
 	usedSymbols        map[string]struct{}
@@ -136,6 +139,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		positions:             make(map[string]*types.Position),
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
+		indicators:            make(map[string]*IndicatorSet),
 		orderStores:           make(map[string]*OrderStore),
 		usedSymbols:           make(map[string]struct{}),
 		initializedSymbols:    make(map[string]struct{}),
@@ -482,6 +486,20 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 
 	session.initializedSymbols[symbol] = struct{}{}
 	return nil
+}
+
+// Indicators returns the IndicatorSet struct that maintains the kLines stream cache and price stream cache
+// It also provides helper methods
+func (session *ExchangeSession) Indicators(symbol string) *IndicatorSet {
+	set, ok := session.indicators[symbol]
+	if ok {
+		return set
+	}
+
+	store, _ := session.MarketDataStore(symbol)
+	set = NewIndicatorSet(symbol, session.MarketDataStream, store)
+	session.indicators[symbol] = set
+	return set
 }
 
 func (session *ExchangeSession) StandardIndicatorSet(symbol string) *StandardIndicatorSet {
