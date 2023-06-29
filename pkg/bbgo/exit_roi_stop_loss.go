@@ -26,9 +26,12 @@ func (s *RoiStopLoss) Bind(session *ExchangeSession, orderExecutor *GeneralOrder
 	s.orderExecutor = orderExecutor
 
 	position := orderExecutor.Position()
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
+	f := func(kline types.KLine) {
 		s.checkStopPrice(kline.Close, position)
-	}))
+	}
+
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, f))
+	session.MarketDataStream.OnKLine(types.KLineWith(s.Symbol, types.Interval1m, f))
 
 	if !IsBackTesting && enableMarketTradeStop {
 		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
@@ -50,7 +53,7 @@ func (s *RoiStopLoss) checkStopPrice(closePrice fixedpoint.Value, position *type
 	// logrus.Debugf("ROIStopLoss: price=%f roi=%s stop=%s", closePrice.Float64(), roi.Percentage(), s.Percentage.Neg().Percentage())
 	if roi.Compare(s.Percentage.Neg()) < 0 {
 		// stop loss
-		Notify("[RoiStopLoss] %s stop loss triggered by ROI %s/%s, price: %f", position.Symbol, roi.Percentage(), s.Percentage.Neg().Percentage(), closePrice.Float64())
+		Notify("[RoiStopLoss] %s stop loss triggered by ROI %s/%s, currentPrice = %f", position.Symbol, roi.Percentage(), s.Percentage.Neg().Percentage(), closePrice.Float64())
 		if s.CancelActiveOrders {
 			_ = s.orderExecutor.GracefulCancel(context.Background())
 		}

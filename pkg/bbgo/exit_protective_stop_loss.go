@@ -9,8 +9,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const enableMarketTradeStop = false
-
 // ProtectiveStopLoss provides a way to protect your profit but also keep a room for the price volatility
 // Set ActivationRatio to 1% means if the price is away from your average cost by 1%, we will activate the protective stop loss
 // and the StopLossRatio is the minimal profit ratio you want to keep for your position.
@@ -124,14 +122,17 @@ func (s *ProtectiveStopLoss) Bind(session *ExchangeSession, orderExecutor *Gener
 	})
 
 	position := orderExecutor.Position()
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
+
+	f := func(kline types.KLine) {
 		isPositionOpened := !position.IsClosed() && !position.IsDust(kline.Close)
 		if isPositionOpened {
 			s.handleChange(context.Background(), position, kline.Close, s.orderExecutor)
 		} else {
 			s.stopLossPrice = fixedpoint.Zero
 		}
-	}))
+	}
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, f))
+	session.MarketDataStream.OnKLine(types.KLineWith(s.Symbol, types.Interval1m, f))
 
 	if !IsBackTesting && enableMarketTradeStop {
 		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
@@ -170,8 +171,12 @@ func (s *ProtectiveStopLoss) handleChange(ctx context.Context, position *types.P
 				s.stopLossPrice = position.AverageCost.Mul(one.Add(s.StopLossRatio))
 			}
 
-			Notify("[ProtectiveStopLoss] %s protection stop loss activated, current price = %f, average cost = %f, stop loss price = %f",
-				position.Symbol, closePrice.Float64(), position.AverageCost.Float64(), s.stopLossPrice.Float64())
+			Notify("[ProtectiveStopLoss] %s protection (%s) stop loss activated, SL = %f, currentPrice = %f, averageCost = %f",
+				position.Symbol,
+				s.StopLossRatio.Percentage(),
+				s.stopLossPrice.Float64(),
+				closePrice.Float64(),
+				position.AverageCost.Float64())
 
 			if s.PlaceStopOrder {
 				if err := s.placeStopOrder(ctx, position, orderExecutor); err != nil {
@@ -195,7 +200,11 @@ func (s *ProtectiveStopLoss) checkStopPrice(closePrice fixedpoint.Value, positio
 	}
 
 	if s.shouldStop(closePrice, position) {
-		Notify("[ProtectiveStopLoss] protection stop order is triggered at price %f", closePrice.Float64(), position)
+		Notify("[ProtectiveStopLoss] %s protection stop (%s) is triggered at price %f",
+			s.Symbol,
+			s.StopLossRatio.Percentage(),
+			closePrice.Float64(),
+			position)
 		if err := s.orderExecutor.ClosePosition(context.Background(), one, "protectiveStopLoss"); err != nil {
 			log.WithError(err).Errorf("failed to close position")
 		}

@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
 
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -42,7 +42,6 @@ type GeneralOrderExecutor struct {
 
 	maxRetries    uint
 	disableNotify bool
-	closing       int64
 }
 
 func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strategyInstanceID string, position *types.Position) *GeneralOrderExecutor {
@@ -390,6 +389,10 @@ func (e *GeneralOrderExecutor) NewOrderFromOpenPosition(ctx context.Context, opt
 // @return types.OrderSlice: Created orders with information from exchange.
 // @return error: Error message.
 func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) (types.OrderSlice, error) {
+	if e.position.IsClosing() {
+		return nil, errors.Wrap(ErrPositionAlreadyClosing, "unable to open position")
+	}
+
 	submitOrder, err := e.NewOrderFromOpenPosition(ctx, &options)
 	if err != nil {
 		return nil, err
@@ -442,22 +445,21 @@ func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context, orders ...typ
 	return nil
 }
 
+var ErrPositionAlreadyClosing = errors.New("position is already in closing process")
+
 // ClosePosition closes the current position by a percentage.
 // percentage 0.1 means close 10% position
 // tag is the order tag you want to attach, you may pass multiple tags, the tags will be combined into one tag string by commas.
 func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fixedpoint.Value, tags ...string) error {
+	if !e.position.SetClosing(true) {
+		return ErrPositionAlreadyClosing
+	}
+	defer e.position.SetClosing(false)
+
 	submitOrder := e.position.NewMarketCloseOrder(percentage)
 	if submitOrder == nil {
 		return nil
 	}
-
-	if e.closing > 0 {
-		log.Errorf("position is already closing")
-		return nil
-	}
-
-	atomic.AddInt64(&e.closing, 1)
-	defer atomic.StoreInt64(&e.closing, 0)
 
 	if e.session.Futures { // Futures: Use base qty in e.position
 		submitOrder.Quantity = e.position.GetBase().Abs()
@@ -496,8 +498,22 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 
 	Notify("Closing %s position %s with tags: %s", e.symbol, percentage.Percentage(), tagStr)
 
-	_, err := e.SubmitOrders(ctx, *submitOrder)
-	return err
+	createdOrders, err := e.SubmitOrders(ctx, *submitOrder)
+	if err != nil {
+		return err
+	}
+
+	if queryOrderService, ok := e.session.Exchange.(types.ExchangeOrderQueryService); ok && !IsBackTesting {
+		switch submitOrder.Type {
+		case types.OrderTypeMarket:
+			_, err2 := retry.QueryOrderUntilSuccessful(ctx, queryOrderService, createdOrders[0].Symbol, createdOrders[0].OrderID)
+			if err2 != nil {
+				log.WithError(err2).Errorf("unable to query order")
+			}
+		}
+	}
+
+	return nil
 }
 
 func (e *GeneralOrderExecutor) TradeCollector() *TradeCollector {
