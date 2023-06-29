@@ -390,6 +390,10 @@ func (e *GeneralOrderExecutor) NewOrderFromOpenPosition(ctx context.Context, opt
 // @return types.OrderSlice: Created orders with information from exchange.
 // @return error: Error message.
 func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPositionOptions) (types.OrderSlice, error) {
+	if e.position.IsClosing() {
+		return nil, errors.Wrap(ErrPositionAlreadyClosing, "unable to open position")
+	}
+
 	submitOrder, err := e.NewOrderFromOpenPosition(ctx, &options)
 	if err != nil {
 		return nil, err
@@ -442,7 +446,7 @@ func (e *GeneralOrderExecutor) GracefulCancel(ctx context.Context, orders ...typ
 	return nil
 }
 
-var ErrPositionAlreadyClosing = errors.New("position is already in closing process, can't close it again")
+var ErrPositionAlreadyClosing = errors.New("position is already in closing process")
 
 // ClosePosition closes the current position by a percentage.
 // percentage 0.1 means close 10% position
