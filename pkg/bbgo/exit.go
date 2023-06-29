@@ -14,8 +14,8 @@ import (
 var enableMarketTradeStop = true
 
 func init() {
-	if v, defined := util.GetEnvVarBool("ENABLE_MARKET_TRADE_STOP"); defined {
-		enableMarketTradeStop = v
+	if v, defined := util.GetEnvVarBool("DISABLE_MARKET_TRADE_STOP"); defined && v {
+		enableMarketTradeStop = false
 	}
 }
 
