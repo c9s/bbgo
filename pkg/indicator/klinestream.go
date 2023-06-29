@@ -36,6 +36,12 @@ func (s *KLineStream) AddSubscriber(f func(k types.KLine)) {
 	}
 }
 
+func (s *KLineStream) AddBackLog(kLines []types.KLine) {
+	for _, k := range kLines {
+		s.kLines = append(s.kLines, k)
+	}
+}
+
 // KLines creates a KLine stream that pushes the klines to the subscribers
 func KLines(source types.Stream, symbol string, interval types.Interval) *KLineStream {
 	s := &KLineStream{}
