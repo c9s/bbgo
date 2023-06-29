@@ -313,3 +313,15 @@ func TestPosition(t *testing.T) {
 		})
 	}
 }
+
+func TestPosition_SetClosing(t *testing.T) {
+	p := NewPosition("BTCUSDT", "BTC", "USDT")
+	ret := p.SetClosing(true)
+	assert.True(t, ret)
+
+	ret = p.SetClosing(true)
+	assert.False(t, ret)
+
+	ret = p.SetClosing(false)
+	assert.True(t, ret)
+}

@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,6 +18,7 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -974,7 +974,7 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 		for {
 			s.logger.Infof("checking %s open orders...", s.Symbol)
 
-			openOrders, err := queryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
+			openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
 			if err != nil {
 				s.logger.WithError(err).Errorf("CancelOrdersByGroupID api call error")
 				werr = multierr.Append(werr, err)
@@ -987,7 +987,7 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 			s.logger.Infof("found %d open orders left, using cancel all orders api", len(openOrders))
 
 			s.logger.Infof("using cancal all orders api for canceling grid orders...")
-			if err := cancelAllOrdersUntilSuccessful(ctx, service); err != nil {
+			if err := retry.CancelAllOrdersUntilSuccessful(ctx, service); err != nil {
 				s.logger.WithError(err).Errorf("CancelAllOrders api call error")
 				werr = multierr.Append(werr, err)
 			}
@@ -1393,12 +1393,12 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 
 func (s *Strategy) clearOpenOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
 	// clear open orders when start
-	openOrders, err := queryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
+	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
 	if err != nil {
 		return err
 	}
 
-	return cancelOrdersUntilSuccessful(ctx, session.Exchange, openOrders...)
+	return retry.CancelOrdersUntilSuccessful(ctx, session.Exchange, openOrders...)
 }
 
 func (s *Strategy) getLastTradePrice(ctx context.Context, session *bbgo.ExchangeSession) (fixedpoint.Value, error) {
@@ -1996,7 +1996,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 }
 
 func (s *Strategy) recoverByScanningOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
-	openOrders, err := queryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
+	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
 	if err != nil {
 		return err
 	}
@@ -2047,7 +2047,7 @@ func (s *Strategy) openOrdersMismatches(ctx context.Context, session *bbgo.Excha
 }
 
 func (s *Strategy) cancelDuplicatedPriceOpenOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
-	openOrders, err := queryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
+	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
 	if err != nil {
 		return err
 	}
@@ -2104,41 +2104,4 @@ func (s *Strategy) newClientOrderID() string {
 		return uuid.New().String()
 	}
 	return ""
-}
-
-func generalBackoff(ctx context.Context, op backoff.Operation) (err error) {
-	err = backoff.Retry(op, backoff.WithContext(
-		backoff.WithMaxRetries(
-			backoff.NewExponentialBackOff(),
-			101),
-		ctx))
-	return err
-}
-
-func cancelAllOrdersUntilSuccessful(ctx context.Context, service advancedOrderCancelApi) error {
-	var op = func() (err2 error) {
-		_, err2 = service.CancelAllOrders(ctx)
-		return err2
-	}
-
-	return generalBackoff(ctx, op)
-}
-
-func cancelOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
-	var op = func() (err2 error) {
-		err2 = ex.CancelOrders(ctx, orders...)
-		return err2
-	}
-
-	return generalBackoff(ctx, op)
-}
-
-func queryOpenOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, symbol string) (openOrders []types.Order, err error) {
-	var op = func() (err2 error) {
-		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
-		return err2
-	}
-
-	err = generalBackoff(ctx, op)
-	return openOrders, err
 }
