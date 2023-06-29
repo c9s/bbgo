@@ -11,16 +11,16 @@ const (
 	UnknownTrend PriceTrend = "unknown"
 )
 
-func detectPriceTrend(inc *indicator.BOLL, price float64) PriceTrend {
+func detectPriceTrend(inc *indicator.BOLLStream, price float64) PriceTrend {
 	if inBetween(price, inc.DownBand.Last(0), inc.UpBand.Last(0)) {
 		return NeutralTrend
 	}
 
-	if price < inc.LastDownBand() {
+	if price < inc.DownBand.Last(0) {
 		return DownTrend
 	}
 
-	if price > inc.LastUpBand() {
+	if price > inc.UpBand.Last(0) {
 		return UpTrend
 	}
 
