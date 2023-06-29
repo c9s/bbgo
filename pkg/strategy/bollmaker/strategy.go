@@ -158,10 +158,10 @@ type Strategy struct {
 	groupID uint32
 
 	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
-	defaultBoll *indicator.BOLL
+	defaultBoll *indicator.BOLLStream
 
 	// neutralBoll is the neutral price section
-	neutralBoll *indicator.BOLL
+	neutralBoll *indicator.BOLLStream
 
 	// StrategyController
 	bbgo.StrategyController
@@ -465,8 +465,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
 
-	s.neutralBoll = s.StandardIndicatorSet.BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
-	s.defaultBoll = s.StandardIndicatorSet.BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
+	s.neutralBoll = session.Indicators(s.Symbol).BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
+	s.defaultBoll = session.Indicators(s.Symbol).BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
 
 	// Setup dynamic spread
 	if s.DynamicSpread.IsEnabled() {
