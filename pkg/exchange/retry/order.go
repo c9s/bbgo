@@ -17,7 +17,7 @@ type advancedOrderCancelService interface {
 	CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([]types.Order, error)
 }
 
-func QueryOrderUntilSuccessful(ctx context.Context, queryOrderService types.ExchangeOrderQueryService, symbol string, orderId uint64) (o *types.Order, err error) {
+func QueryOrderUntilFilled(ctx context.Context, queryOrderService types.ExchangeOrderQueryService, symbol string, orderId uint64) (o *types.Order, err error) {
 	err = backoff.RetryGeneral(ctx, func() (err2 error) {
 		o, err2 = queryOrderService.QueryOrder(ctx, types.OrderQuery{
 			Symbol:  symbol,
