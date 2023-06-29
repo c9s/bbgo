@@ -18,7 +18,7 @@ type IndicatorSet struct {
 	closePrices map[types.Interval]*indicator.PriceStream
 }
 
-func NewIndicatorLoader(symbol string, stream types.Stream, store *MarketDataStore) *IndicatorSet {
+func NewIndicatorSet(symbol string, stream types.Stream, store *MarketDataStore) *IndicatorSet {
 	return &IndicatorSet{
 		Symbol: symbol,
 		store:  store,
