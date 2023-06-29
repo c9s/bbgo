@@ -1179,7 +1179,11 @@ func (s *Strategy) updateFilledOrderMetrics(order types.Order) {
 }
 
 func (s *Strategy) updateGridNumOfOrdersMetricsWithLock() {
-	s.updateGridNumOfOrdersMetrics(s.getGrid())
+	if s.mu.TryLock() {
+		grid := s.grid
+		s.mu.Unlock()
+		s.updateGridNumOfOrdersMetrics(grid)
+	}
 }
 
 func (s *Strategy) updateGridNumOfOrdersMetrics(grid *Grid) {
