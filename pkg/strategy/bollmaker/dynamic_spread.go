@@ -1,8 +1,9 @@
 package bollmaker
 
 import (
-	"github.com/pkg/errors"
 	"math"
+
+	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/indicator"
@@ -27,7 +28,7 @@ type DynamicSpreadSettings struct {
 }
 
 // Initialize dynamic spreads and preload SMAs
-func (ds *DynamicSpreadSettings) Initialize(symbol string, session *bbgo.ExchangeSession, neutralBoll, defaultBoll *indicator.BOLL) {
+func (ds *DynamicSpreadSettings) Initialize(symbol string, session *bbgo.ExchangeSession, neutralBoll, defaultBoll *indicator.BOLLStream) {
 	switch {
 	case ds.AmpSpreadSettings != nil:
 		ds.AmpSpreadSettings.initialize(symbol, session)
@@ -163,11 +164,10 @@ type DynamicSpreadBollWidthRatioSettings struct {
 	// A positive number. The greater factor, the sharper weighting function. Default set to 1.0 .
 	Sensitivity float64 `json:"sensitivity"`
 
-	neutralBoll *indicator.BOLL
-	defaultBoll *indicator.BOLL
+	defaultBoll, neutralBoll *indicator.BOLLStream
 }
 
-func (ds *DynamicSpreadBollWidthRatioSettings) initialize(neutralBoll, defaultBoll *indicator.BOLL) {
+func (ds *DynamicSpreadBollWidthRatioSettings) initialize(neutralBoll, defaultBoll *indicator.BOLLStream) {
 	ds.neutralBoll = neutralBoll
 	ds.defaultBoll = defaultBoll
 	if ds.Sensitivity <= 0. {
