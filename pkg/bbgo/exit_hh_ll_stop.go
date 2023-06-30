@@ -61,38 +61,80 @@ func (s *HigherHighLowerLowStop) Subscribe(session *ExchangeSession) {
 // updateActivated checks the position cost against the close price, activation ratio, and deactivation ratio to
 // determine whether this stop should be activated
 func (s *HigherHighLowerLowStop) updateActivated(position *types.Position, closePrice fixedpoint.Value) {
+	// deactivate when no position
 	if position.IsClosed() || position.IsDust(closePrice) {
+
 		s.activated = false
-	} else if s.activated {
+		return
+
+	}
+
+	// activation/deactivation price
+	var priceDeactive fixedpoint.Value
+	var priceActive fixedpoint.Value
+	if position.IsLong() {
+		priceDeactive = position.AverageCost.Mul(fixedpoint.One.Add(s.DeactivationRatio))
+		priceActive = position.AverageCost.Mul(fixedpoint.One.Add(s.ActivationRatio))
+	} else {
+		priceDeactive = position.AverageCost.Mul(fixedpoint.One.Sub(s.DeactivationRatio))
+		priceActive = position.AverageCost.Mul(fixedpoint.One.Sub(s.ActivationRatio))
+	}
+
+	if s.activated {
+
 		if position.IsLong() {
-			r := fixedpoint.One.Add(s.DeactivationRatio)
-			if closePrice.Compare(position.AverageCost.Mul(r)) >= 0 {
+
+			if closePrice.Compare(priceDeactive) >= 0 {
+
 				s.activated = false
-				Notify("[hhllStop] Stop of %s deactivated for long position, deactivation ratio %s:", s.Symbol, s.DeactivationRatio.Percentage())
+				Notify("[hhllStop] Stop of %s deactivated for long position, deactivation ratio %s", s.Symbol, s.DeactivationRatio.Percentage())
+
+			} else if closePrice.Compare(priceActive) < 0 {
+
+				s.activated = false
+				Notify("[hhllStop] Stop of %s deactivated for long position, activation ratio %s", s.Symbol, s.ActivationRatio.Percentage())
+
 			}
+
 		} else if position.IsShort() {
-			r := fixedpoint.One.Sub(s.DeactivationRatio)
+
 			// for short position, if the close price is less than the activation price then this is a profit position.
-			if closePrice.Compare(position.AverageCost.Mul(r)) <= 0 {
+			if closePrice.Compare(priceDeactive) <= 0 {
+
 				s.activated = false
-				Notify("[hhllStop] Stop of %s deactivated for short position, deactivation ratio %s:", s.Symbol, s.DeactivationRatio.Percentage())
+				Notify("[hhllStop] Stop of %s deactivated for short position, deactivation ratio %s", s.Symbol, s.DeactivationRatio.Percentage())
+
+			} else if closePrice.Compare(priceActive) > 0 {
+
+				s.activated = false
+				Notify("[hhllStop] Stop of %s deactivated for short position, activation ratio %s", s.Symbol, s.ActivationRatio.Percentage())
+
 			}
+
 		}
 	} else {
+
 		if position.IsLong() {
-			r := fixedpoint.One.Add(s.ActivationRatio)
-			if closePrice.Compare(position.AverageCost.Mul(r)) >= 0 {
+
+			if closePrice.Compare(priceActive) >= 0 && closePrice.Compare(priceDeactive) < 0 {
+
 				s.activated = true
-				Notify("[hhllStop] %s stop is activated for long position, activation ratio %s:", s.Symbol, s.ActivationRatio.Percentage())
+				Notify("[hhllStop] %s stop is activated for long position, activation ratio %s, deactivation ratio %s", s.Symbol, s.ActivationRatio.Percentage(), s.DeactivationRatio.Percentage())
+
 			}
+
 		} else if position.IsShort() {
-			r := fixedpoint.One.Sub(s.ActivationRatio)
+
 			// for short position, if the close price is less than the activation price then this is a profit position.
-			if closePrice.Compare(position.AverageCost.Mul(r)) <= 0 {
+			if closePrice.Compare(priceActive) <= 0 && closePrice.Compare(priceDeactive) > 0 {
+
 				s.activated = true
-				Notify("[hhllStop] %s stop is activated for short position, activation ratio %s:", s.Symbol, s.ActivationRatio.Percentage())
+				Notify("[hhllStop] %s stop is activated for short position, activation ratio %s, deactivation ratio %s", s.Symbol, s.ActivationRatio.Percentage(), s.DeactivationRatio.Percentage())
+
 			}
+
 		}
+
 	}
 }
 
