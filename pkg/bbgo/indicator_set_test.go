@@ -37,7 +37,7 @@ func TestIndicatorSet_closeCache(t *testing.T) {
 	assert.Equal(t, close1m, close1m2)
 }
 
-func TestIndicatorSet_rsi(t *testing.T) {
+func TestIndicatorSet_RSI(t *testing.T) {
 	indicatorSet := newTestIndicatorSet()
 
 	rsi1m := indicatorSet.RSI(types.IntervalWindow{Interval: types.Interval1m, Window: 7})
@@ -45,4 +45,14 @@ func TestIndicatorSet_rsi(t *testing.T) {
 
 	rsiLast := rsi1m.Last(0)
 	assert.InDelta(t, 80, rsiLast, 0.0000001)
+}
+
+func TestIndicatorSet_EWMA(t *testing.T) {
+	indicatorSet := newTestIndicatorSet()
+
+	ema1m := indicatorSet.EWMA(types.IntervalWindow{Interval: types.Interval1m, Window: 7})
+	assert.NotNil(t, ema1m)
+
+	emaLast := ema1m.Last(0)
+	assert.InDelta(t, 19424.224853515625, emaLast, 0.0000001)
 }
