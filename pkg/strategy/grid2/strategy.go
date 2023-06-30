@@ -1183,6 +1183,8 @@ func (s *Strategy) updateGridNumOfOrdersMetricsWithLock() {
 		grid := s.grid
 		s.mu.Unlock()
 		s.updateGridNumOfOrdersMetrics(grid)
+	} else {
+		s.logger.Warnf("updateGridNumOfOrdersMetricsWithLock: failed to acquire the lock to update metrics")
 	}
 }
 
