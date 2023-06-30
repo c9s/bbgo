@@ -126,12 +126,12 @@ func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
 }
 
 func (m *SyncOrderMap) processPendingRemoval() {
+	m.Lock()
+	defer m.Unlock()
+
 	if len(m.pendingRemoval) == 0 {
 		return
 	}
-
-	m.Lock()
-	defer m.Unlock()
 
 	expireTime := time.Now().Add(-5 * time.Minute)
 	removing := make(map[uint64]struct{})
