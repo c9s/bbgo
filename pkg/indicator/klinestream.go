@@ -36,7 +36,7 @@ func (s *KLineStream) AddSubscriber(f func(k types.KLine)) {
 	}
 }
 
-func (s *KLineStream) AddBackLog(kLines []types.KLine) {
+func (s *KLineStream) BackFill(kLines []types.KLine) {
 	s.kLines = append(s.kLines, kLines...)
 }
 

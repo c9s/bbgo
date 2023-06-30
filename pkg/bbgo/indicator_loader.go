@@ -38,7 +38,7 @@ func (i *IndicatorSet) KLines(interval types.Interval) *indicator.KLineStream {
 
 	kLines := indicator.KLines(i.stream, i.Symbol, interval)
 	if kLinesWindow, ok := i.store.KLinesOfInterval(interval); ok {
-		kLines.AddBackLog(*kLinesWindow)
+		kLines.BackFill(*kLinesWindow)
 	} else {
 		logrus.Warnf("market data store %s kline history not found, unable to backfill the kline stream data", interval)
 	}
