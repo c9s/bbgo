@@ -1179,7 +1179,13 @@ func (s *Strategy) updateFilledOrderMetrics(order types.Order) {
 }
 
 func (s *Strategy) updateGridNumOfOrdersMetricsWithLock() {
-	s.updateGridNumOfOrdersMetrics(s.getGrid())
+	if s.mu.TryLock() {
+		grid := s.grid
+		s.mu.Unlock()
+		s.updateGridNumOfOrdersMetrics(grid)
+	} else {
+		s.logger.Warnf("updateGridNumOfOrdersMetricsWithLock: failed to acquire the lock to update metrics")
+	}
 }
 
 func (s *Strategy) updateGridNumOfOrdersMetrics(grid *Grid) {

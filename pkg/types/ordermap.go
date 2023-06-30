@@ -125,26 +125,34 @@ func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
 	return exists
 }
 
-func (m *SyncOrderMap) Add(o Order) {
+func (m *SyncOrderMap) processPendingRemoval() {
 	m.Lock()
 	defer m.Unlock()
 
-	m.orders.Add(o)
+	if len(m.pendingRemoval) == 0 {
+		return
+	}
 
-	if len(m.pendingRemoval) > 0 {
-		expireTime := time.Now().Add(-5 * time.Minute)
-		removing := make(map[uint64]struct{})
-		for orderID, creationTime := range m.pendingRemoval {
-			if m.orders.Exists(orderID) || creationTime.Before(expireTime) {
-				m.orders.Remove(orderID)
-				removing[orderID] = struct{}{}
-			}
-		}
-
-		for orderID := range removing {
-			delete(m.pendingRemoval, orderID)
+	expireTime := time.Now().Add(-5 * time.Minute)
+	removing := make(map[uint64]struct{})
+	for orderID, creationTime := range m.pendingRemoval {
+		if m.orders.Exists(orderID) || creationTime.Before(expireTime) {
+			m.orders.Remove(orderID)
+			removing[orderID] = struct{}{}
 		}
 	}
+
+	for orderID := range removing {
+		delete(m.pendingRemoval, orderID)
+	}
+}
+
+func (m *SyncOrderMap) Add(o Order) {
+	m.Lock()
+	m.orders.Add(o)
+	m.Unlock()
+
+	m.processPendingRemoval()
 }
 
 func (m *SyncOrderMap) Update(o Order) {

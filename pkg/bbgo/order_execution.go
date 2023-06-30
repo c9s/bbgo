@@ -71,6 +71,7 @@ func (e *ExchangeOrderExecutionRouter) CancelOrdersTo(ctx context.Context, sessi
 }
 
 // ExchangeOrderExecutor is an order executor wrapper for single exchange instance.
+//
 //go:generate callbackgen -type ExchangeOrderExecutor
 type ExchangeOrderExecutor struct {
 	// MinQuoteBalance fixedpoint.Value `json:"minQuoteBalance,omitempty" yaml:"minQuoteBalance,omitempty"`
@@ -340,6 +341,8 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 		createdOrders, errIdx, err2 = BatchPlaceOrder(ctx, exchange, orderCallback, submitOrders...)
 		if err2 != nil {
 			werr = multierr.Append(werr, err2)
+		} else {
+			return createdOrders, nil, nil
 		}
 	}
 
