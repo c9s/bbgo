@@ -28,11 +28,20 @@ func (s *KLineStream) Last(i int) *types.KLine {
 func (s *KLineStream) AddSubscriber(f func(k types.KLine)) {
 	s.OnUpdate(f)
 
-	if len(s.kLines) > 0 {
-		// push historical klines to the subscriber
-		for _, k := range s.kLines {
-			f(k)
-		}
+	if len(s.kLines) == 0 {
+		return
+	}
+
+	// push historical klines to the subscriber
+	for _, k := range s.kLines {
+		f(k)
+	}
+}
+
+func (s *KLineStream) BackFill(kLines []types.KLine) {
+	for _, k := range kLines {
+		s.kLines = append(s.kLines, k)
+		s.EmitUpdate(k)
 	}
 }
 
