@@ -161,6 +161,7 @@ func (s *StandardIndicatorSet) MACD(iw types.IntervalWindow, shortPeriod, longPe
 	if ok {
 		return inc
 	}
+
 	inc = &indicator.MACDLegacy{MACDConfig: config}
 	s.macdIndicators[config] = inc
 	s.initAndBind(inc, config.IntervalWindow.Interval)

@@ -22,13 +22,29 @@ func Price(source KLineSubscription, mapper KLineValueMapper) *PriceStream {
 		mapper:        mapper,
 	}
 
-	if source != nil {
-		source.AddSubscriber(func(k types.KLine) {
-			v := s.mapper(k)
-			s.PushAndEmit(v)
-		})
+	if source == nil {
+		return s
 	}
+
+	source.AddSubscriber(func(k types.KLine) {
+		v := s.mapper(k)
+		s.PushAndEmit(v)
+	})
 	return s
+}
+
+// AddSubscriber adds the subscriber function and push historical data to the subscriber
+func (s *PriceStream) AddSubscriber(f func(v float64)) {
+	s.OnUpdate(f)
+
+	if len(s.slice) == 0 {
+		return
+	}
+
+	// push historical value to the subscriber
+	for _, v := range s.slice {
+		f(v)
+	}
 }
 
 func (s *PriceStream) PushAndEmit(v float64) {
@@ -50,4 +66,8 @@ func HighPrices(source KLineSubscription) *PriceStream {
 
 func OpenPrices(source KLineSubscription) *PriceStream {
 	return Price(source, KLineOpenPriceMapper)
+}
+
+func Volumes(source KLineSubscription) *PriceStream {
+	return Price(source, KLineVolumeMapper)
 }
