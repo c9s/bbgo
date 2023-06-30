@@ -341,7 +341,7 @@ func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx [
 		createdOrders, errIdx, err2 = BatchPlaceOrder(ctx, exchange, orderCallback, submitOrders...)
 		if err2 != nil {
 			werr = multierr.Append(werr, err2)
-		} else if err2 == nil {
+		} else {
 			return createdOrders, nil, nil
 		}
 	}
