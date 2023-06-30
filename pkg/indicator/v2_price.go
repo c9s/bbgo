@@ -51,3 +51,7 @@ func HighPrices(source KLineSubscription) *PriceStream {
 func OpenPrices(source KLineSubscription) *PriceStream {
 	return Price(source, KLineOpenPriceMapper)
 }
+
+func Volumes(source KLineSubscription) *PriceStream {
+	return Price(source, KLineVolumeMapper)
+}

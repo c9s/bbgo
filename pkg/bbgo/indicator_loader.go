@@ -69,6 +69,10 @@ func (i *IndicatorSet) CLOSE(interval types.Interval) *indicator.PriceStream {
 	return closePrices
 }
 
+func (i *IndicatorSet) VOLUME(interval types.Interval) *indicator.PriceStream {
+	return indicator.Volumes(i.KLines(interval))
+}
+
 func (i *IndicatorSet) RSI(iw types.IntervalWindow) *indicator.RSIStream {
 	return indicator.RSI2(i.CLOSE(iw.Interval), iw.Window)
 }
