@@ -64,8 +64,11 @@ func (s *HigherHighLowerLowStop) updateActivated(position *types.Position, close
 	if position.IsClosed() || position.IsDust(closePrice) {
 
 		s.activated = false
+		return
 
-	} else if s.activated {
+	}
+
+	if s.activated {
 
 		if position.IsLong() {
 
