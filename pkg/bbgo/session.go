@@ -503,6 +503,8 @@ func (session *ExchangeSession) Indicators(symbol string) *IndicatorSet {
 }
 
 func (session *ExchangeSession) StandardIndicatorSet(symbol string) *StandardIndicatorSet {
+	log.Warnf("StandardIndicatorSet() is deprecated in v1.49.0 and which will be removed in the next version, please use Indicators() instead")
+
 	set, ok := session.standardIndicatorSets[symbol]
 	if ok {
 		return set
