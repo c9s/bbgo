@@ -808,6 +808,7 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	session.marketDataStores = make(map[string]*MarketDataStore)
 	session.positions = make(map[string]*types.Position)
 	session.standardIndicatorSets = make(map[string]*StandardIndicatorSet)
+	session.indicators = make(map[string]*IndicatorSet)
 	session.orderStores = make(map[string]*OrderStore)
 	session.OrderExecutor = &ExchangeOrderExecutor{
 		// copy the notification system so that we can route
