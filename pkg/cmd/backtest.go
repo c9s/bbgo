@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"syscall"
 	"time"
@@ -697,19 +696,12 @@ func confirmation(s string) bool {
 	}
 }
 
-func getExchangeIntervals(ex types.Exchange) map[types.Interval]int {
+func getExchangeIntervals(ex types.Exchange) types.IntervalMap {
 	exCustom, ok := ex.(types.CustomIntervalProvider)
 	if ok {
 		return exCustom.SupportedInterval()
 	}
 	return types.SupportedIntervals
-}
-
-func sortIntervals(intervals []types.Interval) types.IntervalSlice {
-	sort.Slice(intervals, func(i, j int) bool {
-		return intervals[i].Duration() < intervals[j].Duration()
-	})
-	return intervals
 }
 
 func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, syncFrom, syncTo time.Time) error {
@@ -722,11 +714,7 @@ func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service
 			}
 
 			// sort intervals
-			var intervals types.IntervalSlice
-			for interval := range supportIntervals {
-				intervals = append(intervals, interval)
-			}
-
+			var intervals = supportIntervals.Slice()
 			intervals.Sort()
 
 			for _, interval := range intervals {
