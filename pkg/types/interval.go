@@ -142,7 +142,17 @@ func ParseInterval(input Interval) int {
 	return t
 }
 
-var SupportedIntervals = map[Interval]int{
+type IntervalMap map[Interval]int
+
+func (m IntervalMap) Slice() (slice IntervalSlice) {
+	for interval := range m {
+		slice = append(slice, interval)
+	}
+
+	return slice
+}
+
+var SupportedIntervals = IntervalMap{
 	Interval1s:  1,
 	Interval1m:  1 * 60,
 	Interval3m:  3 * 60,
