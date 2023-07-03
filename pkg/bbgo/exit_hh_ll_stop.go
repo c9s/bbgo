@@ -146,10 +146,10 @@ func (s *HigherHighLowerLowStop) updateHighLowNumber(kline types.KLine) {
 		low := kline.GetLow()
 		if s.klines.GetHigh().Compare(high) < 0 {
 			s.highLows = append(s.highLows, types.DirectionUp)
-			Notify("[hhllStop] detected %s new higher high %f", s.Symbol, high.Float64())
+			log.Debugf("[hhllStop] detected %s new higher high %f", s.Symbol, high.Float64())
 		} else if s.klines.GetLow().Compare(low) > 0 {
 			s.highLows = append(s.highLows, types.DirectionDown)
-			Notify("[hhllStop] detected %s new lower low %f", s.Symbol, low.Float64())
+			log.Debugf("[hhllStop] detected %s new lower low %f", s.Symbol, low.Float64())
 		} else {
 			s.highLows = append(s.highLows, types.DirectionNone)
 		}
