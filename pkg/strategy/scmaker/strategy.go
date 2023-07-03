@@ -51,6 +51,7 @@ type Strategy struct {
 	MidPriceEMA            *types.IntervalWindow `json:"midPriceEMA"`
 	LiquiditySlideRule     *bbgo.SlideRule       `json:"liquidityScale"`
 	LiquidityLayerTickSize fixedpoint.Value      `json:"liquidityLayerTickSize"`
+	LiquiditySkew          fixedpoint.Value      `json:"liquiditySkew"`
 
 	MaxExposure fixedpoint.Value `json:"maxExposure"`
 
@@ -292,6 +293,15 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		return
 	}
 
+	if ticker.Buy.IsZero() && ticker.Sell.IsZero() {
+		ticker.Sell = ticker.Last.Add(s.Market.TickSize)
+		ticker.Buy = ticker.Last.Sub(s.Market.TickSize)
+	} else if ticker.Buy.IsZero() {
+		ticker.Buy = ticker.Sell.Sub(s.Market.TickSize)
+	} else if ticker.Sell.IsZero() {
+		ticker.Sell = ticker.Buy.Add(s.Market.TickSize)
+	}
+
 	if _, err := s.session.UpdateAccount(ctx); err != nil {
 		logErr(err, "unable to update account")
 		return
@@ -310,7 +320,19 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 
 	log.Infof("spread: %f mid price ema: %f boll band width: %f", spread.Float64(), midPriceEMA, bandWidth)
 
-	n := s.liquidityScale.Sum(1.0)
+	sum := s.liquidityScale.Sum(1.0)
+	askSum := sum
+	bidSum := sum
+
+	log.Infof("liquidity sum: %f / %f", askSum, bidSum)
+
+	skew := s.LiquiditySkew.Float64()
+	useSkew := !s.LiquiditySkew.IsZero()
+	if useSkew {
+		askSum = sum / skew
+		bidSum = sum * skew
+		log.Infof("adjusted liqudity skew: %f / %f", askSum, bidSum)
+	}
 
 	var bidPrices []fixedpoint.Value
 	var askPrices []fixedpoint.Value
@@ -319,17 +341,19 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	for i := 0; i <= s.NumOfLiquidityLayers; i++ {
 		fi := fixedpoint.NewFromInt(int64(i))
 		sp := tickSize.Mul(fi)
+		spreadBidPrice := midPrice.Sub(sp)
+		spreadAskPrice := midPrice.Add(sp)
 
 		bidPrice := ticker.Buy
 		askPrice := ticker.Sell
 
 		if i == s.NumOfLiquidityLayers {
 			bwf := fixedpoint.NewFromFloat(bandWidth)
-			bidPrice = midPrice.Add(bwf.Neg())
-			askPrice = midPrice.Add(bwf)
+			bidPrice = fixedpoint.Min(midPrice.Add(bwf.Neg()), spreadBidPrice)
+			askPrice = fixedpoint.Max(midPrice.Add(bwf), spreadAskPrice)
 		} else if i > 0 {
-			bidPrice = midPrice.Sub(sp)
-			askPrice = midPrice.Add(sp)
+			bidPrice = spreadBidPrice
+			askPrice = spreadAskPrice
 		}
 
 		if i > 0 && bidPrice.Compare(ticker.Buy) > 0 {
@@ -378,8 +402,8 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		}
 	}
 
-	askX := availableBase.Float64() / n
-	bidX := availableQuote.Float64() / (n * (fixedpoint.Sum(bidPrices).Float64()))
+	askX := availableBase.Float64() / askSum
+	bidX := availableQuote.Float64() / (bidSum * (fixedpoint.Sum(bidPrices).Float64()))
 
 	askX = math.Trunc(askX*1e8) / 1e8
 	bidX = math.Trunc(bidX*1e8) / 1e8
@@ -450,6 +474,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	}
 
 	s.liquidityOrderBook.Add(createdOrders...)
+	log.Infof("%d liq orders are placed successfully", len(liqOrders))
 }
 
 func profitProtectedPrice(side types.SideType, averageCost, price, feeRate, minProfit fixedpoint.Value) fixedpoint.Value {
