@@ -1,5 +1,5 @@
 sessions:
-  binance:
+  max:
     exchange: max
     envVarPrefix: max
     makerFeeRate: 0%
@@ -15,6 +15,15 @@ exchangeStrategies:
 
     ## liquidityUpdateInterval is the interval for updating liquidity orders
     liquidityUpdateInterval: 1h
+    liquiditySkew: 1.5
+    numOfLiquidityLayers: 10
+    liquidityLayerTickSize: 0.0001
+    liquidityScale:
+      exp:
+        domain: [0, 9]
+        range: [1, 4]
+
+    maxExposure: 10_000
 
     midPriceEMA:
       interval: 1h
@@ -26,18 +35,11 @@ exchangeStrategies:
       window: 10
       k: 1.0
 
-    numOfLiquidityLayers: 10
-
-    liquidityLayerTickSize: 0.0001
 
     strengthInterval: 1m
 
     minProfit: 0.01%
 
-    liquidityScale:
-      exp:
-        domain: [0, 9]
-        range: [1, 4]
 
 backtest:
   sessions:
