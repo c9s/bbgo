@@ -1,10 +1,11 @@
 package riskcontrol
 
 import (
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	log "github.com/sirupsen/logrus"
 )
 
 //go:generate callbackgen -type PositionRiskControl
@@ -20,23 +21,25 @@ func NewPositionRiskControl(hardLimit, quantity fixedpoint.Value, tradeCollector
 		hardLimit: hardLimit,
 		quantity:  quantity,
 	}
-	// register position update handler: check if position is over hardlimit
+
+	// register position update handler: check if position is over the hard limit
 	tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		if fixedpoint.Compare(position.Base, hardLimit) > 0 {
-			log.Infof("Position %v is over hardlimit %v, releasing:\n", position.Base, hardLimit)
+			log.Infof("position %f is over hardlimit %f, releasing position...", position.Base.Float64(), hardLimit.Float64())
 			p.EmitReleasePosition(position.Base.Sub(hardLimit), types.SideTypeSell)
 		} else if fixedpoint.Compare(position.Base, hardLimit.Neg()) < 0 {
-			log.Infof("Position %v is over hardlimit %v, releasing:\n", position.Base, hardLimit)
+			log.Infof("position %f is over hardlimit %f, releasing position...", position.Base.Float64(), hardLimit.Float64())
 			p.EmitReleasePosition(position.Base.Neg().Sub(hardLimit), types.SideTypeBuy)
 		}
 	})
+
 	return p
 }
 
 // ModifiedQuantity returns quantity controlled by position risks
 // For buy orders, mod quantity = min(hardlimit - position, quanity), limiting by positive position
 // For sell orders, mod quantity = min(hardlimit - (-position), quanity), limiting by negative position
-func (p *PositionRiskControl) ModifiedQuantity(position fixedpoint.Value) (buyQuanity, sellQuantity fixedpoint.Value) {
+func (p *PositionRiskControl) ModifiedQuantity(position fixedpoint.Value) (buyQuantity, sellQuantity fixedpoint.Value) {
 	return fixedpoint.Min(p.hardLimit.Sub(position), p.quantity),
 		fixedpoint.Min(p.hardLimit.Add(position), p.quantity)
 }
