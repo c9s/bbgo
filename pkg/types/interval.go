@@ -94,7 +94,6 @@ func (s IntervalSlice) StringSlice() (slice []string) {
 	return slice
 }
 
-var Interval1ms = Interval("1ms")
 var Interval1s = Interval("1s")
 var Interval1m = Interval("1m")
 var Interval3m = Interval("3m")
