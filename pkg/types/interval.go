@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -79,6 +80,12 @@ func (i Interval) String() string {
 }
 
 type IntervalSlice []Interval
+
+func (s IntervalSlice) Sort() {
+	sort.Slice(s, func(i, j int) bool {
+		return s[i].Duration() < s[j].Duration()
+	})
+}
 
 func (s IntervalSlice) StringSlice() (slice []string) {
 	for _, interval := range s {

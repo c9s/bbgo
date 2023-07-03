@@ -697,29 +697,37 @@ func confirmation(s string) bool {
 	}
 }
 
+func getExchangeIntervals(ex types.Exchange) map[types.Interval]int {
+	exCustom, ok := ex.(types.CustomIntervalProvider)
+	if ok {
+		return exCustom.SupportedInterval()
+	}
+	return types.SupportedIntervals
+}
+
+func sortIntervals(intervals []types.Interval) types.IntervalSlice {
+	sort.Slice(intervals, func(i, j int) bool {
+		return intervals[i].Duration() < intervals[j].Duration()
+	})
+	return intervals
+}
+
 func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, syncFrom, syncTo time.Time) error {
 	for _, symbol := range userConfig.Backtest.Symbols {
 		for _, sourceExchange := range sourceExchanges {
-			exCustom, ok := sourceExchange.(types.CustomIntervalProvider)
+			var supportIntervals = getExchangeIntervals(sourceExchange)
 
-			var supportIntervals map[types.Interval]int
-			if ok {
-				supportIntervals = exCustom.SupportedInterval()
-			} else {
-				supportIntervals = types.SupportedIntervals
-			}
 			if !userConfig.Backtest.SyncSecKLines {
 				delete(supportIntervals, types.Interval1s)
 			}
 
 			// sort intervals
-			var intervals []types.Interval
+			var intervals types.IntervalSlice
 			for interval := range supportIntervals {
 				intervals = append(intervals, interval)
 			}
-			sort.Slice(intervals, func(i, j int) bool {
-				return intervals[i].Duration() < intervals[j].Duration()
-			})
+
+			intervals.Sort()
 
 			for _, interval := range intervals {
 				if err := backtestService.Sync(ctx, sourceExchange, symbol, interval, syncFrom, syncTo); err != nil {
