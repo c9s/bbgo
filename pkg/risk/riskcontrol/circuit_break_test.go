@@ -19,8 +19,8 @@ func Test_IsHalted(t *testing.T) {
 	)
 
 	window := types.IntervalWindow{Window: 30, Interval: types.Interval1m}
-	priceEWMA := &indicator.EWMA{IntervalWindow: window}
-	priceEWMA.Update(price)
+	priceEWMA := indicator.EWMA2(nil, window.Window)
+	priceEWMA.PushAndEmit(price)
 
 	cases := []struct {
 		name        string

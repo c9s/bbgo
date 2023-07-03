@@ -11,6 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/risk/riskcontrol"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -57,6 +58,12 @@ type Strategy struct {
 
 	MinProfit fixedpoint.Value `json:"minProfit"`
 
+	// risk related parameters
+	PositionHardLimit         fixedpoint.Value     `json:"positionHardLimit"`
+	MaxPositionQuantity       fixedpoint.Value     `json:"maxPositionQuantity"`
+	CircuitBreakLossThreshold fixedpoint.Value     `json:"circuitBreakLossThreshold"`
+	CircuitBreakEMA           types.IntervalWindow `json:"circuitBreakEMA"`
+
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
@@ -71,6 +78,9 @@ type Strategy struct {
 	ewma      *indicator.EWMAStream
 	boll      *indicator.BOLLStream
 	intensity *IntensityStream
+
+	positionRiskControl     *riskcontrol.PositionRiskControl
+	circuitBreakRiskControl *riskcontrol.CircuitBreakRiskControl
 }
 
 func (s *Strategy) ID() string {
@@ -126,6 +136,44 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ProfitStats = types.NewProfitStats(s.Market)
 	}
 
+	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.orderExecutor.BindEnvironment(s.Environment)
+	s.orderExecutor.BindProfitStats(s.ProfitStats)
+	s.orderExecutor.Bind()
+	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		bbgo.Sync(ctx, s)
+	})
+
+	if !s.PositionHardLimit.IsZero() && !s.MaxPositionQuantity.IsZero() {
+		log.Infof("positionHardLimit and maxPositionQuantity are configured, setting up PositionRiskControl...")
+		s.positionRiskControl = riskcontrol.NewPositionRiskControl(s.PositionHardLimit, s.MaxPositionQuantity, s.orderExecutor.TradeCollector())
+		s.positionRiskControl.OnReleasePosition(func(quantity fixedpoint.Value, side types.SideType) {
+			createdOrders, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Market:   s.Market,
+				Side:     side,
+				Type:     types.OrderTypeMarket,
+				Quantity: quantity,
+			})
+
+			if err != nil {
+				log.WithError(err).Errorf("failed to submit orders")
+				return
+			}
+
+			log.Infof("created position release orders: %+v", createdOrders)
+		})
+	}
+
+	if !s.CircuitBreakLossThreshold.IsZero() {
+		log.Infof("circuitBreakLossThreshold is configured, setting up CircuitBreakRiskControl...")
+		s.circuitBreakRiskControl = riskcontrol.NewCircuitBreakRiskControl(
+			s.Position,
+			session.Indicators(s.Symbol).EWMA(s.CircuitBreakEMA),
+			s.CircuitBreakLossThreshold,
+			s.ProfitStats)
+	}
+
 	scale, err := s.LiquiditySlideRule.Scale()
 	if err != nil {
 		return err
@@ -140,14 +188,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	s.liquidityScale = scale
-
-	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
-	s.orderExecutor.BindEnvironment(s.Environment)
-	s.orderExecutor.BindProfitStats(s.ProfitStats)
-	s.orderExecutor.Bind()
-	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(ctx, s)
-	})
 
 	s.initializeMidPriceEMA(session)
 	s.initializePriceRangeBollinger(session)
@@ -283,6 +323,11 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 }
 
 func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
+	if s.circuitBreakRiskControl != nil && s.circuitBreakRiskControl.IsHalted() {
+		log.Warn("circuitBreakRiskControl: trading halted")
+		return
+	}
+
 	err := s.liquidityOrderBook.GracefulCancel(ctx, s.session.Exchange)
 	if logErr(err, "unable to cancel orders") {
 		return

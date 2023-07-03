@@ -23,7 +23,25 @@ exchangeStrategies:
         domain: [0, 9]
         range: [1, 4]
 
+
+    ## maxExposure controls how much balance should be used for placing the maker orders
     maxExposure: 10_000
+
+    ## circuitBreakEMA is used for calculating the price for circuitBreak
+    circuitBreakEMA:
+      interval: 1m
+      window: 14
+
+    ## circuitBreakLossThreshold is the maximum loss threshold for realized+unrealized PnL
+    circuitBreakLossThreshold: -10.0
+
+    ## positionHardLimit is the maximum position limit
+    positionHardLimit: 500.0
+
+    ## maxPositionQuantity is the maximum quantity per order that could be controlled in positionHardLimit,
+    ## this parameter is used with positionHardLimit togerther
+    maxPositionQuantity: 10.0
+
 
     midPriceEMA:
       interval: 1h
