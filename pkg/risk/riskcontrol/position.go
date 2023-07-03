@@ -37,8 +37,8 @@ func NewPositionRiskControl(hardLimit, quantity fixedpoint.Value, tradeCollector
 }
 
 // ModifiedQuantity returns quantity controlled by position risks
-// For buy orders, mod quantity = min(hardlimit - position, quanity), limiting by positive position
-// For sell orders, mod quantity = min(hardlimit - (-position), quanity), limiting by negative position
+// For buy orders, mod quantity = min(hardLimit - position, quantity), limiting by positive position
+// For sell orders, mod quantity = min(hardLimit - (-position), quantity), limiting by negative position
 func (p *PositionRiskControl) ModifiedQuantity(position fixedpoint.Value) (buyQuantity, sellQuantity fixedpoint.Value) {
 	return fixedpoint.Min(p.hardLimit.Sub(position), p.quantity),
 		fixedpoint.Min(p.hardLimit.Add(position), p.quantity)
