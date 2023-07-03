@@ -67,5 +67,7 @@ func (f *Float64Series) Bind(source Float64Source, target Float64Calculator) {
 		}
 	}
 
-	f.Subscribe(source, c)
+	if source != nil {
+		f.Subscribe(source, c)
+	}
 }

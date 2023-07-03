@@ -10,22 +10,26 @@ Two types of risk controls for strategies is created:
 ### 2. Position-Limit Risk Control
 
 Initialization:
-```
-    s.positionRiskControl = riskcontrol.NewPositionRiskControl(s.HardLimit, s.Quantity, s.orderExecutor.TradeCollector())
-    s.positionRiskControl.OnReleasePosition(func(quantity fixedpoint.Value, side types.SideType) {
-        createdOrders, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-            Symbol:   s.Symbol,
-            Market:   s.Market,
-            Side:     side,
-            Type:     types.OrderTypeMarket,
-            Quantity: quantity,
-        })
-        if err != nil {
-            log.WithError(err).Errorf("failed to submit orders")
-            return
-        }
-        log.Infof("created orders: %+v", createdOrders)
+
+```go
+s.positionRiskControl = riskcontrol.NewPositionRiskControl(s.PositionHardLimit, s.MaxPositionQuantity, s.orderExecutor.TradeCollector())
+
+s.positionRiskControl.OnReleasePosition(func(quantity fixedpoint.Value, side types.SideType) {
+    createdOrders, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+        Symbol:   s.Symbol,
+        Market:   s.Market,
+        Side:     side,
+        Type:     types.OrderTypeMarket,
+        Quantity: quantity,
     })
+
+    if err != nil {
+        log.WithError(err).Errorf("failed to submit orders")
+        return
+    }
+
+    log.Infof("created position release orders: %+v", createdOrders)
+})
 ```
 
 Strategy should provide OnReleasePosition callback, which will be called when position (positive or negative) is over hard limit.
@@ -41,27 +45,27 @@ It calculates buy and sell quantity shrinking by hard limit and position.
 ### 3. Circuit-Break Risk Control
 
 Initialization
+
+```go
+s.circuitBreakRiskControl = riskcontrol.NewCircuitBreakRiskControl(
+    s.Position,
+    session.Indicators(s.Symbol).EWMA(s.CircuitBreakEMA),
+    s.CircuitBreakLossThreshold,
+    s.ProfitStats)
 ```
-    s.circuitBreakRiskControl = riskcontrol.NewCircuitBreakRiskControl(
-        s.Position,
-        session.StandardIndicatorSet(s.Symbol).EWMA(
-            types.IntervalWindow{
-                Window:   EWMAWindow,
-                Interval: types.Interval1m,
-            }),
-        s.CircuitBreakCondition,
-        s.ProfitStats)
-```
+
 Should pass in position and profit states. Also need an price EWMA to calculate unrealized profit.
 
 
 Validate parameters:
+
 ```
-    if s.CircuitBreakCondition.Float64() > 0 {
-        return fmt.Errorf("circuitBreakCondition should be non-positive")
-    }
-    return nil
+if s.CircuitBreakLossThreshold.Float64() > 0 {
+    return fmt.Errorf("circuitBreakLossThreshold should be non-positive")
+}
+return nil
 ```
+
 Circuit break condition should be non-greater than zero.
 
 Check for circuit break before submitting orders:
