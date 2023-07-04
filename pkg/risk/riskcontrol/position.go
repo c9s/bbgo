@@ -1,6 +1,8 @@
 package riskcontrol
 
 import (
+	"context"
+
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -10,36 +12,71 @@ import (
 
 //go:generate callbackgen -type PositionRiskControl
 type PositionRiskControl struct {
+	orderExecutor *bbgo.GeneralOrderExecutor
+
+	// hardLimit is the maximum base position you can hold
 	hardLimit fixedpoint.Value
-	quantity  fixedpoint.Value
+
+	// sliceQuantity is the maximum quantity of the order you want to place.
+	// only used in the ModifiedQuantity method
+	sliceQuantity fixedpoint.Value
 
 	releasePositionCallbacks []func(quantity fixedpoint.Value, side types.SideType)
 }
 
-func NewPositionRiskControl(hardLimit, quantity fixedpoint.Value, tradeCollector *bbgo.TradeCollector) *PositionRiskControl {
-	p := &PositionRiskControl{
-		hardLimit: hardLimit,
-		quantity:  quantity,
+func NewPositionRiskControl(hardLimit, quantity fixedpoint.Value, orderExecutor *bbgo.GeneralOrderExecutor) *PositionRiskControl {
+	control := &PositionRiskControl{
+		orderExecutor: orderExecutor,
+		hardLimit:     hardLimit,
+		sliceQuantity: quantity,
 	}
 
+	control.OnReleasePosition(func(quantity fixedpoint.Value, side types.SideType) {
+		pos := orderExecutor.Position()
+		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
+			Symbol:   pos.Symbol,
+			Market:   pos.Market,
+			Side:     side,
+			Type:     types.OrderTypeMarket,
+			Quantity: quantity,
+		})
+
+		if err != nil {
+			log.WithError(err).Errorf("failed to submit orders")
+			return
+		}
+
+		log.Infof("created position release orders: %+v", createdOrders)
+	})
+
 	// register position update handler: check if position is over the hard limit
-	tradeCollector.OnPositionUpdate(func(position *types.Position) {
+	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		if fixedpoint.Compare(position.Base, hardLimit) > 0 {
 			log.Infof("position %f is over hardlimit %f, releasing position...", position.Base.Float64(), hardLimit.Float64())
-			p.EmitReleasePosition(position.Base.Sub(hardLimit), types.SideTypeSell)
+			control.EmitReleasePosition(position.Base.Sub(hardLimit), types.SideTypeSell)
 		} else if fixedpoint.Compare(position.Base, hardLimit.Neg()) < 0 {
 			log.Infof("position %f is over hardlimit %f, releasing position...", position.Base.Float64(), hardLimit.Float64())
-			p.EmitReleasePosition(position.Base.Neg().Sub(hardLimit), types.SideTypeBuy)
+			control.EmitReleasePosition(position.Base.Neg().Sub(hardLimit), types.SideTypeBuy)
 		}
 	})
 
-	return p
+	return control
 }
 
-// ModifiedQuantity returns quantity controlled by position risks
-// For buy orders, mod quantity = min(hardLimit - position, quantity), limiting by positive position
-// For sell orders, mod quantity = min(hardLimit - (-position), quantity), limiting by negative position
+// ModifiedQuantity returns sliceQuantity controlled by position risks
+// For buy orders, modify sliceQuantity = min(hardLimit - position, sliceQuantity), limiting by positive position
+// For sell orders, modify sliceQuantity = min(hardLimit - (-position), sliceQuantity), limiting by negative position
+//
+// Pass the current base position to this method, and it returns the maximum sliceQuantity for placing the orders.
+// This works for both Long/Short position
 func (p *PositionRiskControl) ModifiedQuantity(position fixedpoint.Value) (buyQuantity, sellQuantity fixedpoint.Value) {
-	return fixedpoint.Min(p.hardLimit.Sub(position), p.quantity),
-		fixedpoint.Min(p.hardLimit.Add(position), p.quantity)
+	if p.sliceQuantity.IsZero() {
+		buyQuantity = p.hardLimit.Sub(position)
+		sellQuantity = p.hardLimit.Add(position)
+		return buyQuantity, sellQuantity
+	}
+
+	buyQuantity = fixedpoint.Min(p.hardLimit.Sub(position), p.sliceQuantity)
+	sellQuantity = fixedpoint.Min(p.hardLimit.Add(position), p.sliceQuantity)
+	return buyQuantity, sellQuantity
 }
