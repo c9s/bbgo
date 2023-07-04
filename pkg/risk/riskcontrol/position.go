@@ -10,6 +10,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+// PositionRiskControl controls the position with the given hard limit
+// TODO: add a decorator for the order executor and move the order submission logics into the decorator
+//
 //go:generate callbackgen -type PositionRiskControl
 type PositionRiskControl struct {
 	orderExecutor *bbgo.GeneralOrderExecutor
