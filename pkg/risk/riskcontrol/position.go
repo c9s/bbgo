@@ -24,7 +24,7 @@ type PositionRiskControl struct {
 	releasePositionCallbacks []func(quantity fixedpoint.Value, side types.SideType)
 }
 
-func NewPositionRiskControl(hardLimit, quantity fixedpoint.Value, orderExecutor *bbgo.GeneralOrderExecutor) *PositionRiskControl {
+func NewPositionRiskControl(orderExecutor *bbgo.GeneralOrderExecutor, hardLimit, quantity fixedpoint.Value) *PositionRiskControl {
 	control := &PositionRiskControl{
 		orderExecutor: orderExecutor,
 		hardLimit:     hardLimit,
