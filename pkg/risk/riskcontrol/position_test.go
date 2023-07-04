@@ -21,7 +21,7 @@ func Test_ModifiedQuantity(t *testing.T) {
 		},
 	}
 	orderExecutor := bbgo.NewGeneralOrderExecutor(nil, "BTCUSDT", "strategy", "strategy-1", pos)
-	riskControl := NewPositionRiskControl(fixedpoint.NewFromInt(10), fixedpoint.NewFromInt(2), orderExecutor)
+	riskControl := NewPositionRiskControl(orderExecutor, fixedpoint.NewFromInt(10), fixedpoint.NewFromInt(2))
 
 	cases := []struct {
 		name         string
@@ -92,7 +92,7 @@ func TestReleasePositionCallbacks(t *testing.T) {
 			}
 
 			orderExecutor := bbgo.NewGeneralOrderExecutor(nil, "BTCUSDT", "strategy", "strategy-1", pos)
-			riskControl := NewPositionRiskControl(fixedpoint.NewFromInt(10), fixedpoint.NewFromInt(2), orderExecutor)
+			riskControl := NewPositionRiskControl(orderExecutor, fixedpoint.NewFromInt(10), fixedpoint.NewFromInt(2))
 			riskControl.OnReleasePosition(func(quantity fixedpoint.Value, side types.SideType) {
 				if side == types.SideTypeBuy {
 					pos.Base = pos.Base.Add(quantity)
