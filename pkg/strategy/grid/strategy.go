@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
@@ -89,7 +90,7 @@ type Strategy struct {
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 
 	// orderStore is used to store all the created orders, so that we can filter the trades.
-	orderStore *bbgo.OrderStore
+	orderStore *core.OrderStore
 
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.ActiveOrderBook
@@ -562,7 +563,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	bbgo.Notify("grid %s position", s.Symbol, s.State.Position)
 
-	s.orderStore = bbgo.NewOrderStore(s.Symbol)
+	s.orderStore = core.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.

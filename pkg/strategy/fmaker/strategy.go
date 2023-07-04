@@ -10,6 +10,7 @@ import (
 	"gonum.org/v1/gonum/floats"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	floats2 "github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -47,7 +48,7 @@ type Strategy struct {
 	activeMakerOrders *bbgo.ActiveOrderBook
 	// closePositionOrders *bbgo.LocalActiveOrderBook
 
-	orderStore     *bbgo.OrderStore
+	orderStore     *core.OrderStore
 	tradeCollector *bbgo.TradeCollector
 
 	session *bbgo.ExchangeSession
@@ -158,7 +159,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// s.closePositionOrders = bbgo.NewLocalActiveOrderBook(s.Symbol)
 	// s.closePositionOrders.BindStream(session.UserDataStream)
 
-	s.orderStore = bbgo.NewOrderStore(s.Symbol)
+	s.orderStore = core.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
 
 	if s.Position == nil {

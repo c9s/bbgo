@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/util"
 
@@ -314,7 +315,7 @@ var BacktestCmd = &cobra.Command{
 			for usedSymbol := range exSource.Session.Positions() {
 				market, _ := exSource.Session.Market(usedSymbol)
 				position := types.NewPositionFromMarket(market)
-				orderStore := bbgo.NewOrderStore(usedSymbol)
+				orderStore := core.NewOrderStore(usedSymbol)
 				orderStore.AddOrderUpdate = true
 				tradeCollector := bbgo.NewTradeCollector(usedSymbol, position, orderStore)
 

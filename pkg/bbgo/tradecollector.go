@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
@@ -17,10 +18,10 @@ type TradeCollector struct {
 	Symbol   string
 	orderSig sigchan.Chan
 
-	tradeStore *TradeStore
+	tradeStore *core.TradeStore
 	tradeC     chan types.Trade
 	position   *types.Position
-	orderStore *OrderStore
+	orderStore *core.OrderStore
 	doneTrades map[types.TradeKey]struct{}
 
 	mu sync.Mutex
@@ -33,13 +34,13 @@ type TradeCollector struct {
 	profitCallbacks         []func(trade types.Trade, profit *types.Profit)
 }
 
-func NewTradeCollector(symbol string, position *types.Position, orderStore *OrderStore) *TradeCollector {
+func NewTradeCollector(symbol string, position *types.Position, orderStore *core.OrderStore) *TradeCollector {
 	return &TradeCollector{
 		Symbol:   symbol,
 		orderSig: sigchan.New(1),
 
 		tradeC:     make(chan types.Trade, 100),
-		tradeStore: NewTradeStore(),
+		tradeStore: core.NewTradeStore(),
 		doneTrades: make(map[types.TradeKey]struct{}),
 		position:   position,
 		orderStore: orderStore,
@@ -47,7 +48,7 @@ func NewTradeCollector(symbol string, position *types.Position, orderStore *Orde
 }
 
 // OrderStore returns the order store used by the trade collector
-func (c *TradeCollector) OrderStore() *OrderStore {
+func (c *TradeCollector) OrderStore() *core.OrderStore {
 	return c.orderStore
 }
 
@@ -56,7 +57,7 @@ func (c *TradeCollector) Position() *types.Position {
 	return c.position
 }
 
-func (c *TradeCollector) TradeStore() *TradeStore {
+func (c *TradeCollector) TradeStore() *core.TradeStore {
 	return c.tradeStore
 }
 
