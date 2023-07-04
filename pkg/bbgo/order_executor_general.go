@@ -62,7 +62,7 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 		tradeCollector:     NewTradeCollector(symbol, position, orderStore),
 	}
 
-	if session.Margin {
+	if session != nil && session.Margin {
 		executor.startMarginAssetUpdater(context.Background())
 	}
 
