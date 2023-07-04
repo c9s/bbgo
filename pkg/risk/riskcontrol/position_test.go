@@ -3,9 +3,11 @@ package riskcontrol
 import (
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/bbgo/mocks"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -58,7 +60,7 @@ func TestReleasePositionCallbacks(t *testing.T) {
 		resultPosition fixedpoint.Value
 	}{
 		{
-			name:           "PostivePositionWithinLimit",
+			name:           "PositivePositionWithinLimit",
 			position:       fixedpoint.NewFromInt(8),
 			resultPosition: fixedpoint.NewFromInt(8),
 		},
@@ -68,7 +70,7 @@ func TestReleasePositionCallbacks(t *testing.T) {
 			resultPosition: fixedpoint.NewFromInt(-8),
 		},
 		{
-			name:           "PostivePositionOverLimit",
+			name:           "PositivePositionOverLimit",
 			position:       fixedpoint.NewFromInt(11),
 			resultPosition: fixedpoint.NewFromInt(10),
 		},
@@ -91,7 +93,14 @@ func TestReleasePositionCallbacks(t *testing.T) {
 				},
 			}
 
-			orderExecutor := bbgo.NewGeneralOrderExecutor(nil, "BTCUSDT", "strategy", "strategy-1", pos)
+			tradeCollector := &bbgo.TradeCollector{}
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			orderExecutor := mocks.NewMockOrderExecutorExtended(mockCtrl)
+			orderExecutor.EXPECT().TradeCollector().Return(tradeCollector).AnyTimes()
+			orderExecutor.EXPECT().Position().Return(pos).AnyTimes()
+			orderExecutor.EXPECT().SubmitOrders(gomock.Any(), gomock.Any()).AnyTimes()
+
 			riskControl := NewPositionRiskControl(orderExecutor, fixedpoint.NewFromInt(10), fixedpoint.NewFromInt(2))
 			riskControl.OnReleasePosition(func(quantity fixedpoint.Value, side types.SideType) {
 				if side == types.SideTypeBuy {

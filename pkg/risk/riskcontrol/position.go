@@ -15,7 +15,7 @@ import (
 //
 //go:generate callbackgen -type PositionRiskControl
 type PositionRiskControl struct {
-	orderExecutor *bbgo.GeneralOrderExecutor
+	orderExecutor bbgo.OrderExecutorExtended
 
 	// hardLimit is the maximum base position you can hold
 	hardLimit fixedpoint.Value
@@ -27,7 +27,7 @@ type PositionRiskControl struct {
 	releasePositionCallbacks []func(quantity fixedpoint.Value, side types.SideType)
 }
 
-func NewPositionRiskControl(orderExecutor *bbgo.GeneralOrderExecutor, hardLimit, quantity fixedpoint.Value) *PositionRiskControl {
+func NewPositionRiskControl(orderExecutor bbgo.OrderExecutorExtended, hardLimit, quantity fixedpoint.Value) *PositionRiskControl {
 	control := &PositionRiskControl{
 		orderExecutor: orderExecutor,
 		hardLimit:     hardLimit,
