@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	gridmocks "github.com/c9s/bbgo/pkg/strategy/grid2/mocks"
 	"github.com/c9s/bbgo/pkg/types"
@@ -588,7 +588,7 @@ func newTestStrategy() *Strategy {
 		UpperPrice:       number(20_000),
 		LowerPrice:       number(10_000),
 		GridNum:          11,
-		historicalTrades: bbgo.NewTradeStore(),
+		historicalTrades: core.NewTradeStore(),
 
 		filledOrderIDMap: types.NewSyncOrderMap(),
 

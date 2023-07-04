@@ -1,4 +1,4 @@
-package bbgo
+package core
 
 import (
 	"testing"

@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
@@ -71,7 +72,7 @@ type Strategy struct {
 
 	profitOrders *bbgo.ActiveOrderBook
 
-	orders *bbgo.OrderStore
+	orders *core.OrderStore
 
 	// boll is the BOLLINGER indicator we used for predicting the price.
 	boll *indicator.BOLL
@@ -330,7 +331,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		Window:   21,
 	}, 2.0)
 
-	s.orders = bbgo.NewOrderStore(s.Symbol)
+	s.orders = core.NewOrderStore(s.Symbol)
 	s.orders.BindStream(session.UserDataStream)
 
 	// we don't persist orders so that we can not clear the previous orders for now. just need time to support this.
