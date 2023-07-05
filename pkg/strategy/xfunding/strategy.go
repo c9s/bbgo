@@ -347,6 +347,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	bbgo.Notify("Spot Position", s.SpotPosition)
 	bbgo.Notify("Futures Position", s.FuturesPosition)
 	bbgo.Notify("Neutral Position", s.NeutralPosition)
+	bbgo.Notify("State", s.State.PositionState)
 
 	// sync funding fee txns
 	if !s.ProfitStats.LastFundingFeeTime.IsZero() {
@@ -355,6 +356,20 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	// TEST CODE:
 	// s.syncFundingFeeRecords(ctx, time.Now().Add(-3*24*time.Hour))
+
+	switch s.State.PositionState {
+	case PositionOpening:
+		// transfer all base assets from the spot account into the spot account
+		if err := s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, fixedpoint.Zero); err != nil {
+			log.WithError(err).Errorf("futures asset transfer in error")
+		}
+
+	case PositionClosing, PositionClosed:
+		// transfer all base assets from the futures account back to the spot account
+		if err := s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, fixedpoint.Zero); err != nil {
+			log.WithError(err).Errorf("futures asset transfer out error")
+		}
+	}
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
 	s.spotOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {

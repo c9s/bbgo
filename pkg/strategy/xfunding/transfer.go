@@ -64,7 +64,10 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset st
 	log.Infof("found futures balance: %+v", b)
 
 	// add the previous pending base transfer and the current trade quantity
-	amount := s.State.PendingBaseTransfer.Add(quantity)
+	amount := b.MaxWithdrawAmount
+	if !quantity.IsZero() {
+		amount = s.State.PendingBaseTransfer.Add(quantity)
+	}
 
 	// try to transfer more if we enough balance
 	amount = fixedpoint.Min(amount, b.MaxWithdrawAmount)
