@@ -113,17 +113,19 @@ func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, asset str
 	}
 
 	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
-	if b.Available.Compare(quantity) < 0 {
+	if !quantity.IsZero() && b.Available.Compare(quantity) < 0 {
 		log.Infof("adding to pending base transfer: %s %s", quantity, asset)
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return nil
 	}
 
-	amount := s.State.PendingBaseTransfer.Add(quantity)
+	amount := b.Available
+	if !quantity.IsZero() {
+		amount = s.State.PendingBaseTransfer.Add(quantity)
+	}
 
 	pos := s.SpotPosition.GetBase().Abs()
 	rest := pos.Sub(s.State.TotalBaseTransfer)
-
 	if rest.Sign() < 0 {
 		return nil
 	}
