@@ -15,12 +15,14 @@ type OrderStore struct {
 	RemoveCancelled bool
 	RemoveFilled    bool
 	AddOrderUpdate  bool
+	C               chan types.Order
 }
 
 func NewOrderStore(symbol string) *OrderStore {
 	return &OrderStore{
 		Symbol: symbol,
 		orders: make(map[uint64]types.Order),
+		C:      make(chan types.Order),
 	}
 }
 
@@ -129,6 +131,7 @@ func (s *OrderStore) BindStream(stream types.Stream) {
 }
 
 func (s *OrderStore) HandleOrderUpdate(order types.Order) {
+
 	switch order.Status {
 
 	case types.OrderStatusNew, types.OrderStatusPartiallyFilled, types.OrderStatusFilled:
@@ -151,5 +154,10 @@ func (s *OrderStore) HandleOrderUpdate(order types.Order) {
 
 	case types.OrderStatusRejected:
 		s.Remove(order)
+	}
+
+	select {
+	case s.C <- order:
+	default:
 	}
 }
