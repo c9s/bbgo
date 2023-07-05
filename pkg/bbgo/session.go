@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/cache"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
@@ -110,7 +111,7 @@ type ExchangeSession struct {
 	// indicators is the v2 api indicators
 	indicators map[string]*IndicatorSet
 
-	orderStores map[string]*OrderStore
+	orderStores map[string]*core.OrderStore
 
 	usedSymbols        map[string]struct{}
 	initializedSymbols map[string]struct{}
@@ -140,7 +141,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
 		indicators:            make(map[string]*IndicatorSet),
-		orderStores:           make(map[string]*OrderStore),
+		orderStores:           make(map[string]*core.OrderStore),
 		usedSymbols:           make(map[string]struct{}),
 		initializedSymbols:    make(map[string]struct{}),
 		logger:                log.WithField("session", name),
@@ -398,7 +399,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	position.BindStream(session.UserDataStream)
 	session.positions[symbol] = position
 
-	orderStore := NewOrderStore(symbol)
+	orderStore := core.NewOrderStore(symbol)
 	orderStore.AddOrderUpdate = true
 
 	orderStore.BindStream(session.UserDataStream)
@@ -615,12 +616,12 @@ func (session *ExchangeSession) Markets() map[string]types.Market {
 	return session.markets
 }
 
-func (session *ExchangeSession) OrderStore(symbol string) (store *OrderStore, ok bool) {
+func (session *ExchangeSession) OrderStore(symbol string) (store *core.OrderStore, ok bool) {
 	store, ok = session.orderStores[symbol]
 	return store, ok
 }
 
-func (session *ExchangeSession) OrderStores() map[string]*OrderStore {
+func (session *ExchangeSession) OrderStores() map[string]*core.OrderStore {
 	return session.orderStores
 }
 
@@ -809,7 +810,7 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	session.positions = make(map[string]*types.Position)
 	session.standardIndicatorSets = make(map[string]*StandardIndicatorSet)
 	session.indicators = make(map[string]*IndicatorSet)
-	session.orderStores = make(map[string]*OrderStore)
+	session.orderStores = make(map[string]*core.OrderStore)
 	session.OrderExecutor = &ExchangeOrderExecutor{
 		// copy the notification system so that we can route
 		Session: session,

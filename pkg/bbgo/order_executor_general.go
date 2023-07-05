@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
 
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -33,7 +34,7 @@ type GeneralOrderExecutor struct {
 	strategyInstanceID string
 	position           *types.Position
 	activeMakerOrders  *ActiveOrderBook
-	orderStore         *OrderStore
+	orderStore         *core.OrderStore
 	tradeCollector     *TradeCollector
 
 	logger log.FieldLogger
@@ -49,7 +50,7 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 	position.Strategy = strategy
 	position.StrategyInstanceID = strategyInstanceID
 
-	orderStore := NewOrderStore(symbol)
+	orderStore := core.NewOrderStore(symbol)
 
 	executor := &GeneralOrderExecutor{
 		session:            session,
@@ -62,7 +63,7 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 		tradeCollector:     NewTradeCollector(symbol, position, orderStore),
 	}
 
-	if session.Margin {
+	if session != nil && session.Margin {
 		executor.startMarginAssetUpdater(context.Background())
 	}
 
@@ -121,7 +122,7 @@ func (e *GeneralOrderExecutor) marginAssetMaxBorrowableUpdater(ctx context.Conte
 	}
 }
 
-func (e *GeneralOrderExecutor) OrderStore() *OrderStore {
+func (e *GeneralOrderExecutor) OrderStore() *core.OrderStore {
 	return e.orderStore
 }
 

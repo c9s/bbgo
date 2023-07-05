@@ -28,6 +28,14 @@ type OrderExecutor interface {
 	CancelOrders(ctx context.Context, orders ...types.Order) error
 }
 
+//go:generate mockgen -destination=mocks/mock_order_executor_extended.go -package=mocks . OrderExecutorExtended
+type OrderExecutorExtended interface {
+	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
+	CancelOrders(ctx context.Context, orders ...types.Order) error
+	TradeCollector() *TradeCollector
+	Position() *types.Position
+}
+
 type OrderExecutionRouter interface {
 	// SubmitOrdersTo submit order to a specific exchange Session
 	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)

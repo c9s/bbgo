@@ -18,6 +18,7 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -186,7 +187,7 @@ type Strategy struct {
 	orderQueryService types.ExchangeOrderQueryService
 
 	orderExecutor    OrderExecutor
-	historicalTrades *bbgo.TradeStore
+	historicalTrades *core.TradeStore
 
 	logger *logrus.Entry
 
@@ -1858,7 +1859,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		}
 	}
 
-	s.historicalTrades = bbgo.NewTradeStore()
+	s.historicalTrades = core.NewTradeStore()
 	s.historicalTrades.EnablePrune = true
 	s.historicalTrades.BindStream(session.UserDataStream)
 

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/util"
 
 	"github.com/pkg/errors"
@@ -65,7 +66,7 @@ type Strategy struct {
 
 	activeAdjustmentOrders *bbgo.ActiveOrderBook
 	activeWallOrders       *bbgo.ActiveOrderBook
-	orderStore             *bbgo.OrderStore
+	orderStore             *core.OrderStore
 	tradeCollector         *bbgo.TradeCollector
 
 	groupID uint32
@@ -273,7 +274,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.activeAdjustmentOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeAdjustmentOrders.BindStream(session.UserDataStream)
 
-	s.orderStore = bbgo.NewOrderStore(s.Symbol)
+	s.orderStore = core.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
 
 	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)

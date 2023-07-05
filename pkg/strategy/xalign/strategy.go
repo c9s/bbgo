@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -50,7 +51,7 @@ type Strategy struct {
 	sessions   map[string]*bbgo.ExchangeSession
 	orderBooks map[string]*bbgo.ActiveOrderBook
 
-	orderStore *bbgo.OrderStore
+	orderStore *core.OrderStore
 }
 
 func (s *Strategy) ID() string {
@@ -242,7 +243,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	s.sessions = make(map[string]*bbgo.ExchangeSession)
 	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
 
-	s.orderStore = bbgo.NewOrderStore("")
+	s.orderStore = core.NewOrderStore("")
 
 	for _, sessionName := range s.PreferredSessions {
 		session, ok := sessions[sessionName]

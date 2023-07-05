@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -16,6 +17,7 @@ import (
 const CancelOrderWaitTime = 20 * time.Millisecond
 
 // ActiveOrderBook manages the local active order books.
+//
 //go:generate callbackgen -type ActiveOrderBook
 type ActiveOrderBook struct {
 	Symbol string
@@ -209,7 +211,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 				continue
 			}
 
-			openOrderStore := NewOrderStore(symbol)
+			openOrderStore := core.NewOrderStore(symbol)
 			openOrderStore.Add(openOrders...)
 			for _, o := range orders {
 				// if it's not on the order book (open orders), we should remove it from our local side

@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -37,7 +38,7 @@ type TwapExecution struct {
 	activePosition fixedpoint.Value
 
 	activeMakerOrders *ActiveOrderBook
-	orderStore        *OrderStore
+	orderStore        *core.OrderStore
 	position          *types.Position
 
 	executionCtx    context.Context
@@ -406,7 +407,7 @@ func (e *TwapExecution) Run(parentCtx context.Context) error {
 		QuoteCurrency: e.market.QuoteCurrency,
 	}
 
-	e.orderStore = NewOrderStore(e.Symbol)
+	e.orderStore = core.NewOrderStore(e.Symbol)
 	e.orderStore.BindStream(e.userDataStream)
 	e.activeMakerOrders = NewActiveOrderBook(e.Symbol)
 	e.activeMakerOrders.OnFilled(e.handleFilledOrder)
