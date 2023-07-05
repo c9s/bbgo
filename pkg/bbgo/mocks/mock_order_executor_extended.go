@@ -5,12 +5,13 @@
 package mocks
 
 import (
-	context "context"
-	reflect "reflect"
+	"context"
+	"reflect"
 
-	bbgo "github.com/c9s/bbgo/pkg/bbgo"
-	types "github.com/c9s/bbgo/pkg/types"
-	gomock "github.com/golang/mock/gomock"
+	"github.com/golang/mock/gomock"
+
+	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // MockOrderExecutorExtended is a mock of OrderExecutorExtended interface.
@@ -90,10 +91,10 @@ func (mr *MockOrderExecutorExtendedMockRecorder) SubmitOrders(arg0 interface{}, 
 }
 
 // TradeCollector mocks base method.
-func (m *MockOrderExecutorExtended) TradeCollector() *bbgo.TradeCollector {
+func (m *MockOrderExecutorExtended) TradeCollector() *core.TradeCollector {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TradeCollector")
-	ret0, _ := ret[0].(*bbgo.TradeCollector)
+	ret0, _ := ret[0].(*core.TradeCollector)
 	return ret0
 }
 

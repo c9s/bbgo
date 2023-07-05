@@ -8,6 +8,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/bbgo/mocks"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -93,7 +94,7 @@ func TestReleasePositionCallbacks(t *testing.T) {
 				},
 			}
 
-			tradeCollector := &bbgo.TradeCollector{}
+			tradeCollector := &core.TradeCollector{}
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			orderExecutor := mocks.NewMockOrderExecutorExtended(mockCtrl)
