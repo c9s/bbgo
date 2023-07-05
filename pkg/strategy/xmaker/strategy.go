@@ -105,7 +105,7 @@ type Strategy struct {
 	hedgeErrorRateReservation *rate.Reservation
 
 	orderStore     *core.OrderStore
-	tradeCollector *bbgo.TradeCollector
+	tradeCollector *core.TradeCollector
 
 	askPriceHeartBeat, bidPriceHeartBeat types.PriceHeartBeat
 
@@ -737,7 +737,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	s.orderStore.BindStream(s.sourceSession.UserDataStream)
 	s.orderStore.BindStream(s.makerSession.UserDataStream)
 
-	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
+	s.tradeCollector = core.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
 
 	if s.NotifyTrade {
 		s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {

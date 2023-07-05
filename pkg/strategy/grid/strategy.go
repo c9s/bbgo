@@ -95,7 +95,7 @@ type Strategy struct {
 	// activeOrders is the locally maintained active order book of the maker orders.
 	activeOrders *bbgo.ActiveOrderBook
 
-	tradeCollector *bbgo.TradeCollector
+	tradeCollector *core.TradeCollector
 
 	// groupID is the group ID used for the strategy instance for canceling orders
 	groupID uint32
@@ -571,7 +571,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.activeOrders.OnFilled(s.handleFilledOrder)
 	s.activeOrders.BindStream(session.UserDataStream)
 
-	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.State.Position, s.orderStore)
+	s.tradeCollector = core.NewTradeCollector(s.Symbol, s.State.Position, s.orderStore)
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		bbgo.Notify(trade)

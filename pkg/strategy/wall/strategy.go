@@ -67,7 +67,7 @@ type Strategy struct {
 	activeAdjustmentOrders *bbgo.ActiveOrderBook
 	activeWallOrders       *bbgo.ActiveOrderBook
 	orderStore             *core.OrderStore
-	tradeCollector         *bbgo.TradeCollector
+	tradeCollector         *core.TradeCollector
 
 	groupID uint32
 
@@ -277,7 +277,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderStore = core.NewOrderStore(s.Symbol)
 	s.orderStore.BindStream(session.UserDataStream)
 
-	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
+	s.tradeCollector = core.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		bbgo.Notify(trade)

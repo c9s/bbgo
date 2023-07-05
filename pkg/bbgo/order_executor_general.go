@@ -35,7 +35,7 @@ type GeneralOrderExecutor struct {
 	position           *types.Position
 	activeMakerOrders  *ActiveOrderBook
 	orderStore         *core.OrderStore
-	tradeCollector     *TradeCollector
+	tradeCollector     *core.TradeCollector
 
 	logger log.FieldLogger
 
@@ -60,7 +60,7 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 		position:           position,
 		activeMakerOrders:  NewActiveOrderBook(symbol),
 		orderStore:         orderStore,
-		tradeCollector:     NewTradeCollector(symbol, position, orderStore),
+		tradeCollector:     core.NewTradeCollector(symbol, position, orderStore),
 	}
 
 	if session != nil && session.Margin {
@@ -517,7 +517,7 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	return nil
 }
 
-func (e *GeneralOrderExecutor) TradeCollector() *TradeCollector {
+func (e *GeneralOrderExecutor) TradeCollector() *core.TradeCollector {
 	return e.tradeCollector
 }
 

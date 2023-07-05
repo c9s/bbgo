@@ -49,7 +49,7 @@ type Strategy struct {
 	// closePositionOrders *bbgo.LocalActiveOrderBook
 
 	orderStore     *core.OrderStore
-	tradeCollector *bbgo.TradeCollector
+	tradeCollector *core.TradeCollector
 
 	session *bbgo.ExchangeSession
 
@@ -174,7 +174,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Position.Strategy = ID
 	s.Position.StrategyInstanceID = instanceID
 
-	s.tradeCollector = bbgo.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
+	s.tradeCollector = core.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		// StrategyController
 		if s.Status != types.StrategyStatusRunning {
