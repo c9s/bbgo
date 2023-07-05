@@ -66,6 +66,7 @@ func (m Market) TruncateQuantity(quantity fixedpoint.Value) fixedpoint.Value {
 
 	qf := math.Trunc(quantity.Float64() * pow10)
 	qf = qf / pow10
+
 	qs := strconv.FormatFloat(qf, 'f', prec, 64)
 	return fixedpoint.MustNewFromString(qs)
 }

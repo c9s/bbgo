@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
 
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -32,7 +33,7 @@ type OrderExecutor interface {
 type OrderExecutorExtended interface {
 	SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
 	CancelOrders(ctx context.Context, orders ...types.Order) error
-	TradeCollector() *TradeCollector
+	TradeCollector() *core.TradeCollector
 	Position() *types.Position
 }
 

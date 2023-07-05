@@ -1,13 +1,12 @@
-package bbgo
+package core
 
 import (
 	"context"
 	"sync"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
@@ -18,10 +17,10 @@ type TradeCollector struct {
 	Symbol   string
 	orderSig sigchan.Chan
 
-	tradeStore *core.TradeStore
+	tradeStore *TradeStore
 	tradeC     chan types.Trade
 	position   *types.Position
-	orderStore *core.OrderStore
+	orderStore *OrderStore
 	doneTrades map[types.TradeKey]struct{}
 
 	mu sync.Mutex
@@ -34,13 +33,13 @@ type TradeCollector struct {
 	profitCallbacks         []func(trade types.Trade, profit *types.Profit)
 }
 
-func NewTradeCollector(symbol string, position *types.Position, orderStore *core.OrderStore) *TradeCollector {
+func NewTradeCollector(symbol string, position *types.Position, orderStore *OrderStore) *TradeCollector {
 	return &TradeCollector{
 		Symbol:   symbol,
 		orderSig: sigchan.New(1),
 
 		tradeC:     make(chan types.Trade, 100),
-		tradeStore: core.NewTradeStore(),
+		tradeStore: NewTradeStore(),
 		doneTrades: make(map[types.TradeKey]struct{}),
 		position:   position,
 		orderStore: orderStore,
@@ -48,7 +47,7 @@ func NewTradeCollector(symbol string, position *types.Position, orderStore *core
 }
 
 // OrderStore returns the order store used by the trade collector
-func (c *TradeCollector) OrderStore() *core.OrderStore {
+func (c *TradeCollector) OrderStore() *OrderStore {
 	return c.orderStore
 }
 
@@ -57,7 +56,7 @@ func (c *TradeCollector) Position() *types.Position {
 	return c.position
 }
 
-func (c *TradeCollector) TradeStore() *core.TradeStore {
+func (c *TradeCollector) TradeStore() *TradeStore {
 	return c.tradeStore
 }
 
@@ -99,9 +98,9 @@ func (c *TradeCollector) Recover(ctx context.Context, ex types.ExchangeTradeHist
 	}
 
 	for _, td := range trades {
-		log.Debugf("processing trade: %s", td.String())
+		logrus.Debugf("processing trade: %s", td.String())
 		if c.ProcessTrade(td) {
-			log.Infof("recovered trade: %s", td.String())
+			logrus.Infof("recovered trade: %s", td.String())
 			c.EmitRecover(td)
 		}
 	}
