@@ -10,6 +10,8 @@ sessions:
     envVarPrefix: binance
 
 exchangeStrategies:
+
+## triangular arbitrage strategy
 - on: binance
   tri:
     minSpreadRatio: 1.0011
