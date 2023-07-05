@@ -308,7 +308,7 @@ var BacktestCmd = &cobra.Command{
 		var reportDir = outputDirectory
 		var sessionTradeStats = make(map[string]map[string]*types.TradeStats)
 
-		var tradeCollectorList []*bbgo.TradeCollector
+		var tradeCollectorList []*core.TradeCollector
 		for _, exSource := range exchangeSources {
 			sessionName := exSource.Session.Name
 			tradeStatsMap := make(map[string]*types.TradeStats)
@@ -317,7 +317,7 @@ var BacktestCmd = &cobra.Command{
 				position := types.NewPositionFromMarket(market)
 				orderStore := core.NewOrderStore(usedSymbol)
 				orderStore.AddOrderUpdate = true
-				tradeCollector := bbgo.NewTradeCollector(usedSymbol, position, orderStore)
+				tradeCollector := core.NewTradeCollector(usedSymbol, position, orderStore)
 
 				tradeStats := types.NewTradeStats(usedSymbol)
 				tradeStats.SetIntervalProfitCollector(types.NewIntervalProfitCollector(types.Interval1d, startTime))

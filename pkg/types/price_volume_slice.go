@@ -12,6 +12,10 @@ type PriceVolume struct {
 	Price, Volume fixedpoint.Value
 }
 
+func (p PriceVolume) Equals(b PriceVolume) bool {
+	return p.Price.Eq(b.Price) && p.Volume.Eq(b.Volume)
+}
+
 func (p PriceVolume) String() string {
 	return fmt.Sprintf("PriceVolume{ price: %s, volume: %s }", p.Price.String(), p.Volume.String())
 }
@@ -139,8 +143,7 @@ func (slice *PriceVolumeSlice) UnmarshalJSON(b []byte) error {
 
 // ParsePriceVolumeSliceJSON tries to parse a 2 dimensional string array into a PriceVolumeSlice
 //
-//  [["9000", "10"], ["9900", "10"], ... ]
-//
+//	[["9000", "10"], ["9900", "10"], ... ]
 func ParsePriceVolumeSliceJSON(b []byte) (slice PriceVolumeSlice, err error) {
 	var as [][]fixedpoint.Value
 

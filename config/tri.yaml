@@ -1,0 +1,35 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+exchangeStrategies:
+
+## triangular arbitrage strategy
+- on: binance
+  tri:
+    minSpreadRatio: 1.0011
+    separateStream: true
+    # resetPosition: true
+    limits:
+      BTC: 0.001
+      ETH: 0.01
+      USDT: 20.0
+    symbols:
+    - BNBUSDT
+    - BNBBTC
+    - BNBETH
+    - BTCUSDT
+    - ETHUSDT
+    - ETHBTC
+    paths:
+    - [ BTCUSDT, ETHBTC, ETHUSDT ]
+    - [ BNBBTC, BNBUSDT, BTCUSDT ]
+    - [ BNBETH, BNBUSDT, ETHUSDT ]
+

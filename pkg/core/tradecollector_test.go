@@ -1,11 +1,10 @@
-package bbgo
+package core
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -13,7 +12,7 @@ import (
 func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
 	symbol := "BTCUSDT"
 	position := types.NewPosition(symbol, "BTC", "USDT")
-	orderStore := core.NewOrderStore(symbol)
+	orderStore := NewOrderStore(symbol)
 	collector := NewTradeCollector(symbol, position, orderStore)
 	assert.NotNil(t, collector)
 
