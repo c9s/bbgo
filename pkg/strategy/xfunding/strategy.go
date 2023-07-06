@@ -309,6 +309,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			FundingFeeCurrency: s.futuresMarket.QuoteCurrency,
 			TotalFundingFee:    fixedpoint.Zero,
 			FundingFeeRecords:  nil,
+			LastFundingFeeTime: time.Time{},
 		}
 	}
 
