@@ -347,6 +347,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	bbgo.Notify("Spot Position", s.SpotPosition)
 	bbgo.Notify("Futures Position", s.FuturesPosition)
 	bbgo.Notify("Neutral Position", s.NeutralPosition)
+	bbgo.Notify("State", s.State.PositionState)
 
 	// sync funding fee txns
 	if !s.ProfitStats.LastFundingFeeTime.IsZero() {
@@ -355,6 +356,20 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	// TEST CODE:
 	// s.syncFundingFeeRecords(ctx, time.Now().Add(-3*24*time.Hour))
+
+	switch s.State.PositionState {
+	case PositionOpening:
+		// transfer all base assets from the spot account into the spot account
+		if err := s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, fixedpoint.Zero); err != nil {
+			log.WithError(err).Errorf("futures asset transfer in error")
+		}
+
+	case PositionClosing, PositionClosed:
+		// transfer all base assets from the futures account back to the spot account
+		if err := s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, fixedpoint.Zero); err != nil {
+			log.WithError(err).Errorf("futures asset transfer out error")
+		}
+	}
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
 	s.spotOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
@@ -405,8 +420,11 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 		switch s.getPositionState() {
 		case PositionClosing:
+			// de-leverage and get the collateral base quantity for transfer
+			quantity := trade.Quantity.Div(s.Leverage)
+
 			if err := backoff.RetryGeneral(ctx, func() error {
-				return s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade.Quantity)
+				return s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, quantity)
 			}); err != nil {
 				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
 				return
@@ -635,13 +653,39 @@ func (s *Strategy) reduceFuturesPosition(ctx context.Context) {
 		return
 	}
 
+	spotBase := s.SpotPosition.GetBase()
+	if !s.spotMarket.IsDustQuantity(spotBase, s.SpotPosition.AverageCost) {
+		if balance, ok := s.futuresSession.Account.Balance(s.futuresMarket.BaseCurrency); ok && balance.Available.Sign() > 0 {
+			if err := backoff.RetryGeneral(ctx, func() error {
+				return s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, balance.Available)
+			}); err != nil {
+				log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
+			}
+		}
+	}
+
 	if futuresBase.Compare(fixedpoint.Zero) < 0 {
 		orderPrice := ticker.Buy
 		orderQuantity := futuresBase.Abs()
 		orderQuantity = fixedpoint.Max(orderQuantity, s.minQuantity)
 		orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
+
 		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
-			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
+			submitOrder := types.SubmitOrder{
+				Symbol: s.Symbol,
+				Side:   types.SideTypeBuy,
+				Type:   types.OrderTypeLimitMaker,
+				Price:  orderPrice,
+				Market: s.futuresMarket,
+
+				// quantity: Cannot be sent with closePosition=true(Close-All)
+				// reduceOnly: Cannot be sent with closePosition=true
+				ClosePosition: true,
+			}
+
+			if _, err := s.futuresOrderExecutor.SubmitOrders(ctx, submitOrder); err != nil {
+				log.WithError(err).Errorf("can not submit futures order with close position: %+v", submitOrder)
+			}
 			return
 		}
 
@@ -685,7 +729,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		return
 	}
 
-	log.Infof("position comparision: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
+	log.Infof("syncFuturesPosition: position comparision: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
 
 	if futuresBase.Sign() > 0 {
 		// unexpected error
@@ -722,7 +766,8 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	}
 
 	// if - futures position < max futures position, increase it
-	if futuresBase.Neg().Compare(maxFuturesBasePosition) >= 0 {
+	// posDiff := futuresBase.Abs().Sub(maxFuturesBasePosition)
+	if futuresBase.Abs().Compare(maxFuturesBasePosition) >= 0 {
 		s.setPositionState(PositionReady)
 
 		bbgo.Notify("Position Ready")
@@ -745,12 +790,16 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 
 	log.Infof("position diff quantity: %s", diffQuantity.String())
 
-	orderQuantity := fixedpoint.Max(diffQuantity, s.minQuantity)
+	orderQuantity := diffQuantity
+	orderQuantity = fixedpoint.Max(diffQuantity, s.minQuantity)
 	orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
-	if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
-		log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
-		return
-	}
+
+	/*
+		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
+			log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
+			return
+		}
+	*/
 
 	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -792,7 +841,7 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 		return
 	}
 
-	log.Infof("spot/futures positions: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
+	log.Infof("syncSpotPosition: spot/futures positions: %s (spot) <=> %s (futures)", spotBase.String(), futuresBase.String())
 
 	if futuresBase.Sign() > 0 {
 		// unexpected error
@@ -800,7 +849,7 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 		return
 	}
 
-	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
+	_ = s.spotOrderExecutor.GracefulCancel(ctx)
 
 	ticker, err := s.spotSession.Exchange.QueryTicker(ctx, s.Symbol)
 	if err != nil {
@@ -831,27 +880,34 @@ func (s *Strategy) syncSpotPosition(ctx context.Context) {
 
 		orderPrice := ticker.Sell
 		orderQuantity := diffQuantity
-		if b, ok := s.spotSession.Account.Balance(s.spotMarket.BaseCurrency); ok {
-			orderQuantity = fixedpoint.Min(b.Available, orderQuantity)
-		}
-
-		// avoid increase the order size
-		if s.spotMarket.IsDustQuantity(orderQuantity, orderPrice) {
-			log.Infof("skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.spotMarket)
+		b, ok := s.spotSession.Account.Balance(s.spotMarket.BaseCurrency)
+		if !ok {
+			log.Warnf("%s balance not found, can not sync spot position", s.spotMarket.BaseCurrency)
 			return
 		}
 
-		createdOrders, err := s.spotOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+		log.Infof("spot balance: %+v", b)
+
+		orderQuantity = fixedpoint.Min(b.Available, orderQuantity)
+
+		// avoid increase the order size
+		if s.spotMarket.IsDustQuantity(orderQuantity, orderPrice) {
+			log.Infof("skip spot order with dust quantity %s, market=%+v balance=%+v", orderQuantity.String(), s.spotMarket, b)
+			return
+		}
+
+		submitOrder := types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeSell,
 			Type:     types.OrderTypeLimitMaker,
 			Quantity: orderQuantity,
 			Price:    orderPrice,
-			Market:   s.futuresMarket,
-		})
+			Market:   s.spotMarket,
+		}
+		createdOrders, err := s.spotOrderExecutor.SubmitOrders(ctx, submitOrder)
 
 		if err != nil {
-			log.WithError(err).Errorf("can not submit spot order")
+			log.WithError(err).Errorf("can not submit spot order: %+v", submitOrder)
 			return
 		}
 
@@ -1090,6 +1146,13 @@ func (s *Strategy) checkAndRestorePositionRisks(ctx context.Context) error {
 	positionRisks, err := req.Do(ctx)
 	if err != nil {
 		return err
+	}
+
+	log.Infof("fetched futures position risks: %+v", positionRisks)
+
+	if len(positionRisks) == 0 {
+		s.FuturesPosition.Reset()
+		return nil
 	}
 
 	for _, positionRisk := range positionRisks {
