@@ -41,31 +41,33 @@ func (s *Strategy) resetTransfer(ctx context.Context, ex FuturesTransfer, asset 
 	return nil
 }
 
-func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset string, tradeQuantity fixedpoint.Value) error {
+func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset string, quantity fixedpoint.Value) error {
 	// if transfer done
 	if s.State.TotalBaseTransfer.IsZero() {
 		return nil
 	}
 
-	// de-leverage and get the collateral base quantity for transfer
-	quantity := tradeQuantity.Div(s.Leverage)
-
 	balances, err := s.futuresSession.Exchange.QueryAccountBalances(ctx)
 	if err != nil {
-		log.Infof("adding to pending base transfer: %s %s + %s", quantity.String(), asset, s.State.PendingBaseTransfer.String())
+		log.Infof("balance query error, adding to pending base transfer: %s %s + %s", quantity.String(), asset, s.State.PendingBaseTransfer.String())
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return err
 	}
 
 	b, ok := balances[asset]
 	if !ok {
-		log.Infof("adding to pending base transfer: %s %s + %s", quantity.String(), asset, s.State.PendingBaseTransfer.String())
+		log.Infof("balance not found, adding to pending base transfer: %s %s + %s", quantity.String(), asset, s.State.PendingBaseTransfer.String())
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return fmt.Errorf("%s balance not found", asset)
 	}
 
+	log.Infof("found futures balance: %+v", b)
+
 	// add the previous pending base transfer and the current trade quantity
-	amount := s.State.PendingBaseTransfer.Add(quantity)
+	amount := b.MaxWithdrawAmount
+	if !quantity.IsZero() {
+		amount = s.State.PendingBaseTransfer.Add(quantity)
+	}
 
 	// try to transfer more if we enough balance
 	amount = fixedpoint.Min(amount, b.MaxWithdrawAmount)
@@ -75,7 +77,7 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset st
 
 	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
 	if amount.IsZero() {
-		log.Infof("adding to pending base transfer: %s %s + %s ", quantity.String(), asset, s.State.PendingBaseTransfer.String())
+		log.Infof("zero amount, adding to pending base transfer: %s %s + %s ", quantity.String(), asset, s.State.PendingBaseTransfer.String())
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return nil
 	}
@@ -111,17 +113,19 @@ func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, asset str
 	}
 
 	// TODO: according to the fee, we might not be able to get enough balance greater than the trade quantity, we can adjust the quantity here
-	if b.Available.Compare(quantity) < 0 {
+	if !quantity.IsZero() && b.Available.Compare(quantity) < 0 {
 		log.Infof("adding to pending base transfer: %s %s", quantity, asset)
 		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
 		return nil
 	}
 
-	amount := s.State.PendingBaseTransfer.Add(quantity)
+	amount := b.Available
+	if !quantity.IsZero() {
+		amount = s.State.PendingBaseTransfer.Add(quantity)
+	}
 
 	pos := s.SpotPosition.GetBase().Abs()
 	rest := pos.Sub(s.State.TotalBaseTransfer)
-
 	if rest.Sign() < 0 {
 		return nil
 	}
