@@ -64,3 +64,5 @@ coverage_dum.txt
 
 *_local.yaml
 /.chglog/
+
+/.credentials
