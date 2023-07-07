@@ -309,6 +309,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 			FundingFeeCurrency: s.futuresMarket.QuoteCurrency,
 			TotalFundingFee:    fixedpoint.Zero,
 			FundingFeeRecords:  nil,
+			LastFundingFeeTime: time.Time{},
 		}
 	}
 
@@ -350,9 +351,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	bbgo.Notify("State", s.State.PositionState)
 
 	// sync funding fee txns
-	if !s.ProfitStats.LastFundingFeeTime.IsZero() {
-		s.syncFundingFeeRecords(ctx, s.ProfitStats.LastFundingFeeTime)
-	}
+	s.syncFundingFeeRecords(ctx, s.ProfitStats.LastFundingFeeTime)
 
 	// TEST CODE:
 	// s.syncFundingFeeRecords(ctx, time.Now().Add(-3*24*time.Hour))
@@ -554,6 +553,10 @@ func (s *Strategy) handleAccountUpdate(ctx context.Context, e *binance.AccountUp
 
 func (s *Strategy) syncFundingFeeRecords(ctx context.Context, since time.Time) {
 	now := time.Now()
+
+	if since.IsZero() {
+		since = now.AddDate(0, -3, 0)
+	}
 
 	log.Infof("syncing funding fee records from the income history query: %s <=> %s", since, now)
 
