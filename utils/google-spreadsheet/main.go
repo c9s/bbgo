@@ -13,7 +13,9 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	googleservice "github.com/c9s/bbgo/pkg/service/google"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // Retrieve a token, saves the token, then returns the generated client.
@@ -100,20 +102,24 @@ func main() {
 
 	googleservice.DebugBatchUpdateSpreadsheetResponse(batchUpdateResp)
 
-	appendCellsResp, err := googleservice.AppendRow(srv, spreadsheetId, 0, []interface{}{
-		"Date",
-		"Net Profit",
-		"Profit",
-		"Gross Profit",
-		"Gross Loss",
-		"Total Profit",
-		"Total Loss",
+	stats := types.NewProfitStats(types.Market{
+		Symbol:        "BTCUSDT",
+		BaseCurrency:  "BTC",
+		QuoteCurrency: "USDT",
 	})
+	stats.TodayNetProfit = fixedpoint.NewFromFloat(100.0)
+	stats.TodayPnL = fixedpoint.NewFromFloat(100.0)
+	stats.TodayGrossLoss = fixedpoint.NewFromFloat(-100.0)
+
+	_, err = googleservice.WriteStructHeader(srv, spreadsheetId, 0, "json", stats)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	logrus.Infof("appendCellsResp: %+v", appendCellsResp)
+	_, err = googleservice.WriteStructValues(srv, spreadsheetId, 0, "json", stats)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	readRange := "Sheet1!A2:E"
 	resp, err := googleservice.ReadSheetValuesRange(srv, spreadsheetId, readRange)

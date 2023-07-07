@@ -2,9 +2,13 @@ package google
 
 import (
 	"fmt"
+	"reflect"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/sheets/v4"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 func ReadSheetValuesRange(srv *sheets.Service, spreadsheetId, readRange string) (*sheets.ValueRange, error) {
@@ -43,6 +47,12 @@ func ValuesToCellData(values []interface{}) (cells []*sheets.CellData) {
 			cells = append(cells, &sheets.CellData{
 				UserEnteredValue: &sheets.ExtendedValue{NumberValue: &typedValue},
 			})
+		case int:
+			v := float64(typedValue)
+			cells = append(cells, &sheets.CellData{UserEnteredValue: &sheets.ExtendedValue{NumberValue: &v}})
+		case int64:
+			v := float64(typedValue)
+			cells = append(cells, &sheets.CellData{UserEnteredValue: &sheets.ExtendedValue{NumberValue: &v}})
 		case bool:
 			cells = append(cells, &sheets.CellData{
 				UserEnteredValue: &sheets.ExtendedValue{BoolValue: &typedValue},
@@ -55,6 +65,62 @@ func ValuesToCellData(values []interface{}) (cells []*sheets.CellData) {
 
 func GetSpreadSheetURL(spreadsheetId string) string {
 	return fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/edit#gid=0", spreadsheetId)
+}
+
+func WriteStructHeader(srv *sheets.Service, spreadsheetId string, sheetId int64, structTag string, st interface{}) (*sheets.BatchUpdateSpreadsheetResponse, error) {
+	typeOfSt := reflect.TypeOf(st)
+	typeOfSt = typeOfSt.Elem()
+
+	var headerTexts []interface{}
+	for i := 0; i < typeOfSt.NumField(); i++ {
+		tag := typeOfSt.Field(i).Tag
+		tagValue := tag.Get(structTag)
+		if len(tagValue) == 0 {
+			continue
+		}
+
+		headerTexts = append(headerTexts, tagValue)
+	}
+
+	return AppendRow(srv, spreadsheetId, sheetId, headerTexts)
+}
+
+func WriteStructValues(srv *sheets.Service, spreadsheetId string, sheetId int64, structTag string, st interface{}) (*sheets.BatchUpdateSpreadsheetResponse, error) {
+	typeOfSt := reflect.TypeOf(st)
+	typeOfSt = typeOfSt.Elem()
+
+	valueOfSt := reflect.ValueOf(st)
+	valueOfSt = valueOfSt.Elem()
+
+	var texts []interface{}
+	for i := 0; i < typeOfSt.NumField(); i++ {
+		tag := typeOfSt.Field(i).Tag
+		tagValue := tag.Get(structTag)
+		if len(tagValue) == 0 {
+			continue
+		}
+
+		valueInf := valueOfSt.Field(i).Interface()
+
+		switch typedValue := valueInf.(type) {
+		case string:
+			texts = append(texts, typedValue)
+		case float64:
+			texts = append(texts, typedValue)
+		case int64:
+			texts = append(texts, typedValue)
+		case *float64:
+			texts = append(texts, typedValue)
+		case fixedpoint.Value:
+			texts = append(texts, typedValue.String())
+		case *fixedpoint.Value:
+			texts = append(texts, typedValue.String())
+		case time.Time:
+			texts = append(texts, typedValue.Format(time.RFC3339))
+		}
+	}
+
+	return AppendRow(srv, spreadsheetId, sheetId, texts)
 }
 
 func AppendRow(srv *sheets.Service, spreadsheetId string, sheetId int64, values []interface{}) (*sheets.BatchUpdateSpreadsheetResponse, error) {
