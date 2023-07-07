@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
+
+	googleservice "github.com/c9s/bbgo/pkg/service/google"
 )
 
 // Retrieve a token, saves the token, then returns the generated client.
@@ -20,10 +22,13 @@ func getClient(config *oauth2.Config) *http.Client {
 	// created automatically when the authorization flow completes for the first
 	// time.
 	tokFile := "token.json"
+	if p, ok := os.LookupEnv("GOOGLE_AUTH_TOKEN_FILE"); ok {
+		tokFile = p
+	}
+
 	tok, err := tokenFromFile(tokFile)
 	if err != nil {
 		tok = getTokenFromWeb(config)
-		saveToken(tokFile, tok)
 	}
 	return config.Client(context.Background(), tok)
 }
@@ -58,53 +63,66 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
 	return tok, err
 }
 
-// Saves a token to a file path.
-func saveToken(path string, token *oauth2.Token) {
-	fmt.Printf("Saving credential file to: %s\n", path)
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		log.Fatalf("Unable to cache oauth token: %v", err)
-	}
-	defer f.Close()
-	json.NewEncoder(f).Encode(token)
-}
-
 func main() {
 	ctx := context.Background()
-	b, err := os.ReadFile("credentials.json")
+
+	tokenFile := os.Getenv("GOOGLE_AUTH_TOKEN_FILE")
+
+	srv, err := sheets.NewService(ctx,
+		option.WithCredentialsFile(tokenFile),
+	)
+
 	if err != nil {
-		log.Fatalf("Unable to read client secret file: %v", err)
+		log.Fatalf("Unable to new google sheets service client: %v", err)
 	}
 
-	// If modifying these scopes, delete your previously saved token.json.
-	config, err := google.ConfigFromJSON(b, "https://www.googleapis.com/auth/spreadsheets.readonly")
-	if err != nil {
-		log.Fatalf("Unable to parse client secret file to config: %v", err)
-	}
-	client := getClient(config)
-
-	srv, err := sheets.NewService(ctx, option.WithHTTPClient(client))
-	if err != nil {
-		log.Fatalf("Unable to retrieve Sheets client: %v", err)
-	}
-
-	spreadsheetUrl := os.Getenv("GOOGLE_SPREADSHEET_URL")
 	spreadsheetId := os.Getenv("GOOGLE_SPREADSHEET_ID")
-	readRange := os.Getenv("GOOGLE_SPREADSHEET_READ_RANGE")
+	spreadsheetUrl := googleservice.GetSpreadSheetURL(spreadsheetId)
 
-	fmt.Println("Reading ", spreadsheetUrl)
+	logrus.Infoln(spreadsheetUrl)
 
-	// Prints the names and majors of students in a sample spreadsheet:
-	// https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
-	// spreadsheetId := "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
-	// readRange := "Class Data!A2:E"
-	resp, err := srv.Spreadsheets.Values.Get(spreadsheetId, readRange).Do()
+	spreadsheet, err := srv.Spreadsheets.Get(spreadsheetId).Do()
+	if err != nil {
+		log.Fatalf("unable to get spreadsheet data: %v", err)
+	}
+
+	logrus.Infof("spreadsheet: %+v", spreadsheet)
+
+	for i, sheet := range spreadsheet.Sheets {
+		logrus.Infof("#%d sheetId: %d", i, sheet.Properties.SheetId)
+		logrus.Infof("#%d sheetTitle: %s", i, sheet.Properties.Title)
+	}
+
+	batchUpdateResp, err := googleservice.AddNewSheet(srv, spreadsheetId, fmt.Sprintf("Test Auto Add Sheet #%d", len(spreadsheet.Sheets)+1))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	googleservice.DebugBatchUpdateSpreadsheetResponse(batchUpdateResp)
+
+	appendCellsResp, err := googleservice.AppendRow(srv, spreadsheetId, 0, []interface{}{
+		"Date",
+		"Net Profit",
+		"Profit",
+		"Gross Profit",
+		"Gross Loss",
+		"Total Profit",
+		"Total Loss",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	logrus.Infof("appendCellsResp: %+v", appendCellsResp)
+
+	readRange := "Sheet1!A2:E"
+	resp, err := googleservice.ReadSheetValuesRange(srv, spreadsheetId, readRange)
 	if err != nil {
 		log.Fatalf("Unable to retrieve data from sheet: %v", err)
 	}
 
 	if len(resp.Values) == 0 {
-		fmt.Println("No data found.")
+		fmt.Println("No data found")
 	} else {
 		fmt.Println("Name, Major:")
 		for _, row := range resp.Values {
