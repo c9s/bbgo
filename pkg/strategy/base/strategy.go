@@ -7,8 +7,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// LongShortStrategy provides the core functionality that is required by a long/short strategy.
-type LongShortStrategy struct {
+// Strategy provides the core functionality that is required by a long/short strategy.
+type Strategy struct {
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
@@ -20,7 +20,7 @@ type LongShortStrategy struct {
 	OrderExecutor *bbgo.GeneralOrderExecutor
 }
 
-func (s *LongShortStrategy) Setup(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string) {
+func (s *Strategy) Setup(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string) {
 	s.parent = ctx
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
