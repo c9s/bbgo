@@ -26,6 +26,7 @@ import (
 	"github.com/c9s/bbgo/pkg/notifier/slacknotifier"
 	"github.com/c9s/bbgo/pkg/notifier/telegramnotifier"
 	"github.com/c9s/bbgo/pkg/service"
+	googleservice "github.com/c9s/bbgo/pkg/service/google"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -78,6 +79,7 @@ const (
 
 // Environment presents the real exchange data layer
 type Environment struct {
+	// built-in service
 	DatabaseService   *service.DatabaseService
 	OrderService      *service.OrderService
 	TradeService      *service.TradeService
@@ -91,6 +93,9 @@ type Environment struct {
 	WithdrawService   *service.WithdrawService
 	DepositService    *service.DepositService
 	PersistentService *service.PersistenceServiceFacade
+
+	// external services
+	GoogleSpreadSheetService *googleservice.SpreadSheetService
 
 	// startTime is the time of start point (which is used in the backtest)
 	startTime time.Time
@@ -214,6 +219,14 @@ func (environ *Environment) AddExchangeSession(name string, session *ExchangeSes
 func (environ *Environment) AddExchange(name string, exchange types.Exchange) (session *ExchangeSession) {
 	session = NewExchangeSession(name, exchange)
 	return environ.AddExchangeSession(name, session)
+}
+
+func (environ *Environment) ConfigureService(ctx context.Context, srvConfig *ServiceConfig) error {
+	if srvConfig.GoogleSpreadSheetService != nil {
+		environ.GoogleSpreadSheetService = googleservice.NewSpreadSheetService(ctx, srvConfig.GoogleSpreadSheetService.JsonTokenFile, srvConfig.GoogleSpreadSheetService.SpreadSheetID)
+	}
+
+	return nil
 }
 
 func (environ *Environment) ConfigureExchangeSessions(userConfig *Config) error {

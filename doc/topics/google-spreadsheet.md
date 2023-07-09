@@ -23,6 +23,18 @@ And
 
 <https://developers.google.com/workspace/guides/create-credentials>
 
+Download the JSON token file and store it in a safe place.
 
+### Setting up service account permissions
+
+Go to Google Workspace and Add "Manage Domain Wide Delegation", add you client and with the following scopes:
+
+```
+https://www.googleapis.com/auth/drive
+https://www.googleapis.com/auth/drive.file
+https://www.googleapis.com/auth/drive.readonly
+https://www.googleapis.com/auth/spreadsheets
+https://www.googleapis.com/auth/spreadsheets.readonly
+```
 
 
