@@ -108,16 +108,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
-func (s *Strategy) preloadKLines(inc *indicator.KLineStream, session *bbgo.ExchangeSession, symbol string, interval types.Interval) {
-	if store, ok := session.MarketDataStore(symbol); ok {
-		if kLinesData, ok := store.KLinesOfInterval(interval); ok {
-			for _, k := range *kLinesData {
-				inc.EmitUpdate(k)
-			}
-		}
-	}
-}
-
 func logErr(err error, msgAndArgs ...interface{}) bool {
 	if err == nil {
 		return false
