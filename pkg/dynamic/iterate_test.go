@@ -8,6 +8,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type TestEmbedded struct {
+	Foo int `persistence:"foo"`
+	Bar int `persistence:"bar"`
+}
+
+type TestA struct {
+	*TestEmbedded
+	Outer int `persistence:"outer"`
+}
+
 func TestIterateFields(t *testing.T) {
 
 	t.Run("basic", func(t *testing.T) {
@@ -99,5 +109,23 @@ func TestIterateFieldsByTag(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 2, cnt)
 		assert.Equal(t, []string{"a", "b"}, collectedTags)
+	})
+
+	t.Run("embedded", func(t *testing.T) {
+		a := &TestA{
+			TestEmbedded: &TestEmbedded{Foo: 1, Bar: 2},
+			Outer:        3,
+		}
+
+		collectedTags := []string{}
+		cnt := 0
+		err := IterateFieldsByTag(a, "persistence", func(tag string, ft reflect.StructField, fv reflect.Value) error {
+			cnt++
+			collectedTags = append(collectedTags, tag)
+			return nil
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, 3, cnt)
+		assert.Equal(t, []string{"foo", "bar", "outer"}, collectedTags)
 	})
 }
