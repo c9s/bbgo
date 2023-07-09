@@ -20,7 +20,7 @@ type Strategy struct {
 	OrderExecutor *bbgo.GeneralOrderExecutor
 }
 
-func (s *Strategy) Setup(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string) {
+func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string) {
 	s.parent = ctx
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
@@ -53,6 +53,6 @@ func (s *Strategy) Setup(ctx context.Context, environ *bbgo.Environment, session
 	s.OrderExecutor.BindProfitStats(s.ProfitStats)
 	s.OrderExecutor.Bind()
 	s.OrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(ctx, s)
+		// bbgo.Sync(ctx, s)
 	})
 }
