@@ -38,3 +38,11 @@ https://www.googleapis.com/auth/spreadsheets.readonly
 ```
 
 
+### Add settings to your bbgo.yaml
+
+```shell
+services:
+  googleSpreadSheet:
+    jsonTokenFile: ".credentials/google-cloud/service-account-json-token.json"
+    spreadSheetId: "YOUR_SPREADSHEET_ID"
+```
