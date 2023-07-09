@@ -1,0 +1,53 @@
+persistence:
+  json:
+    directory: var/data
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+exchangeStrategies:
+- on: binance
+  rsicross:
+    symbol: BTCUSDT
+    interval: 5m
+    fastWindow: 7
+    slowWindow: 12
+
+    quantity: 0.1
+
+    ### RISK CONTROLS
+    ## circuitBreakEMA is used for calculating the price for circuitBreak
+    # circuitBreakEMA:
+    #  interval: 1m
+    #  window: 14
+
+    ## circuitBreakLossThreshold is the maximum loss threshold for realized+unrealized PnL
+    # circuitBreakLossThreshold: -10.0
+
+    ## positionHardLimit is the maximum position limit
+    # positionHardLimit: 500.0
+
+    ## maxPositionQuantity is the maximum quantity per order that could be controlled in positionHardLimit,
+    ## this parameter is used with positionHardLimit togerther
+    # maxPositionQuantity: 10.0
+
+backtest:
+  startTime: "2022-01-01"
+  endTime: "2022-02-01"
+  symbols:
+  - BTCUSDT
+  sessions: [binance]
+  # syncSecKLines: true
+  accounts:
+    binance:
+      makerFeeRate: 0.0%
+      takerFeeRate: 0.075%
+      balances:
+        BTC: 0.0
+        USDT: 10000.0
