@@ -39,7 +39,7 @@ type Strategy struct {
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
 
-	ProfitTracker *report.ProfitTracker `json:"profitTracker"`
+	ProfitStatsTracker *report.ProfitStatsTracker `json:"profitStatsTracker"`
 
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
@@ -132,8 +132,8 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	s.ExitMethods.SetAndSubscribe(session, s)
 
 	// Profit tracker
-	if s.ProfitTracker != nil {
-		s.ProfitTracker.Subscribe(session)
+	if s.ProfitStatsTracker != nil {
+		s.ProfitStatsTracker.Subscribe(session)
 	}
 }
 
@@ -356,25 +356,25 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.Bind()
 
 	// Setup profit tracker
-	if s.ProfitTracker != nil {
-		if s.ProfitTracker.CurrentProfitStats == nil {
-			s.ProfitTracker.InitOld(s.Market, &s.ProfitStats, s.TradeStats)
+	if s.ProfitStatsTracker != nil {
+		if s.ProfitStatsTracker.CurrentProfitStats == nil {
+			s.ProfitStatsTracker.InitOld(s.Market, &s.ProfitStats, s.TradeStats)
 		}
 
 		// Add strategy parameters to report
-		if s.ProfitTracker.AccumulatedProfitReport != nil {
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("window", fmt.Sprintf("%d", s.Window))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("multiplier", fmt.Sprintf("%f", s.SupertrendMultiplier))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("fastDEMA", fmt.Sprintf("%d", s.FastDEMAWindow))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("slowDEMA", fmt.Sprintf("%d", s.SlowDEMAWindow))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("takeProfitAtrMultiplier", fmt.Sprintf("%f", s.TakeProfitAtrMultiplier))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopLossByTriggeringK", fmt.Sprintf("%t", s.StopLossByTriggeringK))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedSupertrend", fmt.Sprintf("%t", s.StopByReversedSupertrend))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedDema", fmt.Sprintf("%t", s.StopByReversedDema))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedLinGre", fmt.Sprintf("%t", s.StopByReversedLinGre))
+		if s.ProfitStatsTracker.AccumulatedProfitReport != nil {
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("window", fmt.Sprintf("%d", s.Window))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("multiplier", fmt.Sprintf("%f", s.SupertrendMultiplier))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("fastDEMA", fmt.Sprintf("%d", s.FastDEMAWindow))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("slowDEMA", fmt.Sprintf("%d", s.SlowDEMAWindow))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("takeProfitAtrMultiplier", fmt.Sprintf("%f", s.TakeProfitAtrMultiplier))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopLossByTriggeringK", fmt.Sprintf("%t", s.StopLossByTriggeringK))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedSupertrend", fmt.Sprintf("%t", s.StopByReversedSupertrend))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedDema", fmt.Sprintf("%t", s.StopByReversedDema))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedLinGre", fmt.Sprintf("%t", s.StopByReversedLinGre))
 		}
 
-		s.ProfitTracker.Bind(s.session, s.orderExecutor.TradeCollector())
+		s.ProfitStatsTracker.Bind(s.session, s.orderExecutor.TradeCollector())
 	}
 
 	// AccountValueCalculator
@@ -528,9 +528,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		defer wg.Done()
 
 		// Output profit report
-		if s.ProfitTracker != nil {
-			if s.ProfitTracker.AccumulatedProfitReport != nil {
-				s.ProfitTracker.AccumulatedProfitReport.Output()
+		if s.ProfitStatsTracker != nil {
+			if s.ProfitStatsTracker.AccumulatedProfitReport != nil {
+				s.ProfitStatsTracker.AccumulatedProfitReport.Output()
 			}
 		}
 

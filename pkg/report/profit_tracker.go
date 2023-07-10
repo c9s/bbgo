@@ -6,7 +6,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type ProfitTracker struct {
+type ProfitStatsTracker struct {
 	types.IntervalWindow
 
 	// Accumulated profit report
@@ -20,12 +20,12 @@ type ProfitTracker struct {
 	tradeStats *types.TradeStats
 }
 
-func (p *ProfitTracker) Subscribe(session *bbgo.ExchangeSession) {
+func (p *ProfitStatsTracker) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, p.Market.Symbol, types.SubscribeOptions{Interval: p.Interval})
 }
 
 // InitOld is for backward capability. ps is the ProfitStats of the strategy, Market is the strategy Market
-func (p *ProfitTracker) InitOld(market types.Market, ps **types.ProfitStats, ts *types.TradeStats) {
+func (p *ProfitStatsTracker) InitOld(market types.Market, ps **types.ProfitStats, ts *types.TradeStats) {
 	p.Market = market
 
 	if *ps == nil {
@@ -43,12 +43,12 @@ func (p *ProfitTracker) InitOld(market types.Market, ps **types.ProfitStats, ts 
 }
 
 // Init initialize the tracker with the given Market
-func (p *ProfitTracker) Init(market types.Market, ts *types.TradeStats) {
+func (p *ProfitStatsTracker) Init(market types.Market, ts *types.TradeStats) {
 	ps := types.NewProfitStats(p.Market)
 	p.InitOld(market, &ps, ts)
 }
 
-func (p *ProfitTracker) Bind(session *bbgo.ExchangeSession, tradeCollector *bbgo.TradeCollector) {
+func (p *ProfitStatsTracker) Bind(session *bbgo.ExchangeSession, tradeCollector *bbgo.TradeCollector) {
 	tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
 		if profit == nil {
 			return
@@ -68,7 +68,7 @@ func (p *ProfitTracker) Bind(session *bbgo.ExchangeSession, tradeCollector *bbgo
 }
 
 // Rotate the tracker to make a new ProfitStats to record the profits
-func (p *ProfitTracker) Rotate() {
+func (p *ProfitStatsTracker) Rotate() {
 	// Update report
 	if p.AccumulatedProfitReport != nil {
 		p.AccumulatedProfitReport.Rotate(*p.CurrentProfitStats, p.tradeStats)
@@ -82,11 +82,11 @@ func (p *ProfitTracker) Rotate() {
 	}
 }
 
-func (p *ProfitTracker) AddProfit(profit types.Profit) {
+func (p *ProfitStatsTracker) AddProfit(profit types.Profit) {
 	(*p.CurrentProfitStats).AddProfit(profit)
 }
 
-func (p *ProfitTracker) AddTrade(trade types.Trade) {
+func (p *ProfitStatsTracker) AddTrade(trade types.Trade) {
 	(*p.CurrentProfitStats).AddTrade(trade)
 
 	if p.AccumulatedProfitReport != nil {
