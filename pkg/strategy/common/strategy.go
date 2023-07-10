@@ -11,6 +11,16 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type RiskController struct {
+	PositionHardLimit         fixedpoint.Value     `json:"positionHardLimit"`
+	MaxPositionQuantity       fixedpoint.Value     `json:"maxPositionQuantity"`
+	CircuitBreakLossThreshold fixedpoint.Value     `json:"circuitBreakLossThreshold"`
+	CircuitBreakEMA           types.IntervalWindow `json:"circuitBreakEMA"`
+
+	positionRiskControl     *riskcontrol.PositionRiskControl
+	circuitBreakRiskControl *riskcontrol.CircuitBreakRiskControl
+}
+
 // Strategy provides the core functionality that is required by a long/short strategy.
 type Strategy struct {
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
@@ -23,13 +33,7 @@ type Strategy struct {
 	Session       *bbgo.ExchangeSession
 	OrderExecutor *bbgo.GeneralOrderExecutor
 
-	PositionHardLimit         fixedpoint.Value     `json:"positionHardLimit"`
-	MaxPositionQuantity       fixedpoint.Value     `json:"maxPositionQuantity"`
-	CircuitBreakLossThreshold fixedpoint.Value     `json:"circuitBreakLossThreshold"`
-	CircuitBreakEMA           types.IntervalWindow `json:"circuitBreakEMA"`
-
-	positionRiskControl     *riskcontrol.PositionRiskControl
-	circuitBreakRiskControl *riskcontrol.CircuitBreakRiskControl
+	RiskController
 }
 
 func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string) {
