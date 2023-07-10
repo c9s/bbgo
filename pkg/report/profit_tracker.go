@@ -20,6 +20,10 @@ type ProfitTracker struct {
 	tradeStats *types.TradeStats
 }
 
+func (p *ProfitTracker) Subscribe(session *bbgo.ExchangeSession) {
+	session.Subscribe(types.KLineChannel, p.Market.Symbol, types.SubscribeOptions{Interval: p.Interval})
+}
+
 // InitOld is for backward capability. ps is the ProfitStats of the strategy, Market is the strategy Market
 func (p *ProfitTracker) InitOld(market types.Market, ps **types.ProfitStats, ts *types.TradeStats) {
 	p.Market = market
@@ -45,8 +49,6 @@ func (p *ProfitTracker) Init(market types.Market, ts *types.TradeStats) {
 }
 
 func (p *ProfitTracker) Bind(session *bbgo.ExchangeSession, tradeCollector *bbgo.TradeCollector) {
-	session.Subscribe(types.KLineChannel, p.Market.Symbol, types.SubscribeOptions{Interval: p.Interval})
-
 	tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
 		if profit == nil {
 			return
