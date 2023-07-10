@@ -165,8 +165,8 @@ type ProfitStats struct {
 	TodayGrossLoss   fixedpoint.Value `json:"todayGrossLoss,omitempty"`
 	TodaySince       int64            `json:"todaySince,omitempty"`
 
-	startTime time.Time
-	endTime   time.Time
+	//StartTime time.Time
+	//EndTime   time.Time
 }
 
 func NewProfitStats(market Market) *ProfitStats {
@@ -185,8 +185,8 @@ func NewProfitStats(market Market) *ProfitStats {
 		TodayGrossProfit:       fixedpoint.Zero,
 		TodayGrossLoss:         fixedpoint.Zero,
 		TodaySince:             0,
-		startTime:              time.Now().UTC(),
-		endTime:                time.Now().UTC(),
+		//StartTime:              time.Now().UTC(),
+		//EndTime:                time.Now().UTC(),
 	}
 }
 
@@ -229,7 +229,7 @@ func (s *ProfitStats) AddProfit(profit Profit) {
 		s.TodayGrossLoss = s.TodayGrossLoss.Add(profit.Profit)
 	}
 
-	s.endTime = profit.TradedAt.UTC()
+	//s.EndTime = profit.TradedAt.UTC()
 }
 
 func (s *ProfitStats) AddTrade(trade Trade) {
