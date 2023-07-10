@@ -24,6 +24,12 @@ func BootstrapEnvironmentLightweight(ctx context.Context, environ *Environment, 
 		}
 	}
 
+	if userConfig.Service != nil {
+		if err := environ.ConfigureService(ctx, userConfig.Service); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -43,6 +49,12 @@ func BootstrapEnvironment(ctx context.Context, environ *Environment, userConfig 
 	if userConfig.Persistence != nil {
 		if err := ConfigurePersistence(ctx, environ, userConfig.Persistence); err != nil {
 			return errors.Wrap(err, "persistence configure error")
+		}
+	}
+
+	if userConfig.Service != nil {
+		if err := environ.ConfigureService(ctx, userConfig.Service); err != nil {
+			return err
 		}
 	}
 
