@@ -6,7 +6,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/util"
 
 	"github.com/pkg/errors"
@@ -158,10 +158,10 @@ type Strategy struct {
 	groupID uint32
 
 	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
-	defaultBoll *indicator.BOLLStream
+	defaultBoll *indicatorv2.BOLLStream
 
 	// neutralBoll is the neutral price section
-	neutralBoll *indicator.BOLLStream
+	neutralBoll *indicatorv2.BOLLStream
 
 	// StrategyController
 	bbgo.StrategyController

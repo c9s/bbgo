@@ -89,13 +89,13 @@ func (inc *PVD) PushK(k types.KLine) {
 		return
 	}
 
-	inc.Update(indicator.KLineClosePriceMapper(k), indicator.KLineVolumeMapper(k))
+	inc.Update(types.KLineClosePriceMapper(k), types.KLineVolumeMapper(k))
 	inc.EndTime = k.EndTime.Time()
 	inc.EmitUpdate(inc.Last(0))
 }
 
 func CalculateKLinesPVD(allKLines []types.KLine, window int) float64 {
-	return pvd(indicator.MapKLinePrice(allKLines, indicator.KLineClosePriceMapper), indicator.MapKLinePrice(allKLines, indicator.KLineVolumeMapper), window)
+	return pvd(types.MapKLinePrice(allKLines, types.KLineClosePriceMapper), types.MapKLinePrice(allKLines, types.KLineVolumeMapper), window)
 }
 
 func pvd(prices []float64, volumes []float64, window int) float64 {

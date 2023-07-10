@@ -58,7 +58,7 @@ func (inc *Volatility) CalculateAndUpdate(allKLines []types.KLine) {
 
 	var recentT = allKLines[end-(inc.Window-1) : end+1]
 
-	volatility, err := calculateVOLATILITY(recentT, inc.Window, KLineClosePriceMapper)
+	volatility, err := calculateVOLATILITY(recentT, inc.Window, types.KLineClosePriceMapper)
 	if err != nil {
 		log.WithError(err).Error("can not calculate volatility")
 		return
@@ -86,7 +86,7 @@ func (inc *Volatility) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculateVOLATILITY(klines []types.KLine, window int, priceF KLineValueMapper) (float64, error) {
+func calculateVOLATILITY(klines []types.KLine, window int, priceF types.KLineValueMapper) (float64, error) {
 	length := len(klines)
 	if length == 0 || length < window {
 		return 0.0, fmt.Errorf("insufficient elements for calculating VOL with window = %d", window)

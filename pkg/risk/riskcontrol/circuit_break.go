@@ -4,14 +4,14 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type CircuitBreakRiskControl struct {
 	// Since price could be fluctuated large,
 	// use an EWMA to smooth it in running time
-	price         *indicator.EWMAStream
+	price         *indicatorv2.EWMAStream
 	position      *types.Position
 	profitStats   *types.ProfitStats
 	lossThreshold fixedpoint.Value
@@ -19,7 +19,7 @@ type CircuitBreakRiskControl struct {
 
 func NewCircuitBreakRiskControl(
 	position *types.Position,
-	price *indicator.EWMAStream,
+	price *indicatorv2.EWMAStream,
 	lossThreshold fixedpoint.Value,
 	profitStats *types.ProfitStats) *CircuitBreakRiskControl {
 
