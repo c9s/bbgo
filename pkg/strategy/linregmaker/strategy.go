@@ -3,8 +3,9 @@ package linregmaker
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/risk/dynamicrisk"
 	"sync"
+
+	"github.com/c9s/bbgo/pkg/risk/dynamicrisk"
 
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/util"
@@ -221,20 +222,20 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		})
 	}
 
-	// Setup Exits
+	// Initialize Exits
 	s.ExitMethods.SetAndSubscribe(session, s)
 
-	// Setup dynamic spread
+	// Initialize dynamic spread
 	if s.DynamicSpread.IsEnabled() {
 		s.DynamicSpread.Initialize(s.Symbol, session)
 	}
 
-	// Setup dynamic exposure
+	// Initialize dynamic exposure
 	if s.DynamicExposure.IsEnabled() {
 		s.DynamicExposure.Initialize(s.Symbol, session)
 	}
 
-	// Setup dynamic quantities
+	// Initialize dynamic quantities
 	if len(s.DynamicQuantityIncrease) > 0 {
 		s.DynamicQuantityIncrease.Initialize(s.Symbol, session)
 	}
