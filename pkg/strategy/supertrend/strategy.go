@@ -133,7 +133,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 
 	// Profit tracker
 	if s.ProfitStatsTracker != nil {
-		s.ProfitStatsTracker.Subscribe(session)
+		s.ProfitStatsTracker.Subscribe(session, s.Symbol)
 	}
 }
 
