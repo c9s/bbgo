@@ -114,8 +114,8 @@ exchangeStrategies:
           oppositeDirectionAsPosition: false
 
     profitTracker:
-      Interval: 1d
-      Window: 30
+      interval: 1d
+      window: 30
       accumulatedProfitReport:
         profitMAWindow: 60
         shortTermProfitWindow: 14
