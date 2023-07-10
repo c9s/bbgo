@@ -327,25 +327,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.TradeStats = types.NewTradeStats(s.Symbol)
 	}
 
-	if s.ProfitTracker != nil {
-		if s.ProfitTracker.CurrentProfitStats == nil {
-			s.ProfitTracker.InitOld(s.Market, &s.ProfitStats, s.TradeStats)
-		}
-
-		// Add strategy parameters to report
-		if s.ProfitTracker.AccumulatedProfitReport != nil {
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("window", fmt.Sprintf("%d", s.Window))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("multiplier", fmt.Sprintf("%f", s.SupertrendMultiplier))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("fastDEMA", fmt.Sprintf("%d", s.FastDEMAWindow))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("slowDEMA", fmt.Sprintf("%d", s.SlowDEMAWindow))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("takeProfitAtrMultiplier", fmt.Sprintf("%f", s.TakeProfitAtrMultiplier))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopLossByTriggeringK", fmt.Sprintf("%t", s.StopLossByTriggeringK))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedSupertrend", fmt.Sprintf("%t", s.StopByReversedSupertrend))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedDema", fmt.Sprintf("%t", s.StopByReversedDema))
-			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedLinGre", fmt.Sprintf("%t", s.StopByReversedLinGre))
-		}
-	}
-
 	// Interval profit report
 	if bbgo.IsBackTesting {
 		startTime := s.Environment.StartTime()
@@ -367,10 +348,29 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindEnvironment(s.Environment)
 	s.orderExecutor.BindProfitStats(s.ProfitStats)
 	s.orderExecutor.BindTradeStats(s.TradeStats)
-	if s.ProfitTracker != nil {
-		s.orderExecutor.BindProfitTracker(s.ProfitTracker)
-	}
 	s.orderExecutor.Bind()
+
+	// Setup profit tracker
+	if s.ProfitTracker != nil {
+		if s.ProfitTracker.CurrentProfitStats == nil {
+			s.ProfitTracker.InitOld(s.Market, &s.ProfitStats, s.TradeStats)
+		}
+
+		// Add strategy parameters to report
+		if s.ProfitTracker.AccumulatedProfitReport != nil {
+			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("window", fmt.Sprintf("%d", s.Window))
+			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("multiplier", fmt.Sprintf("%f", s.SupertrendMultiplier))
+			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("fastDEMA", fmt.Sprintf("%d", s.FastDEMAWindow))
+			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("slowDEMA", fmt.Sprintf("%d", s.SlowDEMAWindow))
+			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("takeProfitAtrMultiplier", fmt.Sprintf("%f", s.TakeProfitAtrMultiplier))
+			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopLossByTriggeringK", fmt.Sprintf("%t", s.StopLossByTriggeringK))
+			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedSupertrend", fmt.Sprintf("%t", s.StopByReversedSupertrend))
+			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedDema", fmt.Sprintf("%t", s.StopByReversedDema))
+			s.ProfitTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedLinGre", fmt.Sprintf("%t", s.StopByReversedLinGre))
+		}
+
+		s.ProfitTracker.Bind(s.session, s.orderExecutor.TradeCollector())
+	}
 
 	// AccountValueCalculator
 	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
