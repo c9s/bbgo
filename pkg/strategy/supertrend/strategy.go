@@ -130,6 +130,11 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LinearRegression.Interval})
 
 	s.ExitMethods.SetAndSubscribe(session, s)
+
+	// Profit tracker
+	if s.ProfitTracker != nil {
+		s.ProfitTracker.Subscribe(session)
+	}
 }
 
 // Position control
