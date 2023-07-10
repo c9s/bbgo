@@ -1,6 +1,8 @@
 package report
 
 import (
+	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -40,6 +42,27 @@ func (p *ProfitTracker) InitOld(market types.Market, ps **types.ProfitStats, ts 
 func (p *ProfitTracker) Init(market types.Market, ts *types.TradeStats) {
 	ps := types.NewProfitStats(p.Market)
 	p.InitOld(market, &ps, ts)
+}
+
+func (p *ProfitTracker) Bind(session *bbgo.ExchangeSession, tradeCollector *bbgo.TradeCollector) {
+	session.Subscribe(types.KLineChannel, p.Market.Symbol, types.SubscribeOptions{Interval: p.Interval})
+
+	tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
+		if profit == nil {
+			return
+		}
+
+		p.AddProfit(*profit)
+	})
+
+	tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		p.AddTrade(trade)
+	})
+
+	// Rotate profitStats slice
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(p.Market.Symbol, p.Interval, func(kline types.KLine) {
+		p.Rotate()
+	}))
 }
 
 // Rotate the tracker to make a new ProfitStats to record the profits
