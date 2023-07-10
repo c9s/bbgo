@@ -113,7 +113,7 @@ exchangeStrategies:
           # higher highs in long position and lower lows in short position
           oppositeDirectionAsPosition: false
 
-    profitTracker:
+    profitStatsTracker:
       interval: 1d
       window: 30
       accumulatedProfitReport:
