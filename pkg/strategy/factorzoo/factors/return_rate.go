@@ -81,7 +81,7 @@ func (inc *RR) PushK(k types.KLine) {
 		return
 	}
 
-	inc.Update(indicator.KLineClosePriceMapper(k))
+	inc.Update(types.KLineClosePriceMapper(k))
 	inc.EndTime = k.EndTime.Time()
 	inc.EmitUpdate(inc.Last(0))
 }

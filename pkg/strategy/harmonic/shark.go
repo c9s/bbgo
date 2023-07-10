@@ -72,7 +72,7 @@ func (inc *SHARK) PushK(k types.KLine) {
 		return
 	}
 
-	inc.Update(indicator.KLineHighPriceMapper(k), indicator.KLineLowPriceMapper(k), indicator.KLineClosePriceMapper(k))
+	inc.Update(types.KLineHighPriceMapper(k), types.KLineLowPriceMapper(k), types.KLineClosePriceMapper(k))
 	inc.EndTime = k.EndTime.Time()
 	inc.EmitUpdate(inc.Last(0))
 }

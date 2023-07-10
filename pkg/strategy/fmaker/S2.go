@@ -40,7 +40,7 @@ func (inc *S2) CalculateAndUpdate(klines []types.KLine) {
 
 	var recentT = klines[end-(inc.Window-1) : end+1]
 
-	correlation, err := calculateS2(recentT, inc.Window, indicator.KLineOpenPriceMapper, indicator.KLineVolumeMapper)
+	correlation, err := calculateS2(recentT, inc.Window, types.KLineOpenPriceMapper, types.KLineVolumeMapper)
 	if err != nil {
 		log.WithError(err).Error("can not calculate correlation")
 		return

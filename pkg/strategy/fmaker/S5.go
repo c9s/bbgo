@@ -42,7 +42,7 @@ func (inc *S5) CalculateAndUpdate(klines []types.KLine) {
 
 	var recentT = klines[end-(inc.Window-1) : end+1]
 
-	val, err := calculateS5(recentT, indicator.KLineVolumeMapper)
+	val, err := calculateS5(recentT, types.KLineVolumeMapper)
 	if err != nil {
 		log.WithError(err).Error("can not calculate pivots")
 		return

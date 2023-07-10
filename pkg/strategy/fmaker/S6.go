@@ -42,7 +42,7 @@ func (inc *S6) CalculateAndUpdate(klines []types.KLine) {
 
 	var recentT = klines[end-(inc.Window-1) : end+1]
 
-	val, err := calculateS6(recentT, indicator.KLineHighPriceMapper, indicator.KLineLowPriceMapper, indicator.KLineClosePriceMapper, indicator.KLineVolumeMapper)
+	val, err := calculateS6(recentT, types.KLineHighPriceMapper, types.KLineLowPriceMapper, types.KLineClosePriceMapper, types.KLineVolumeMapper)
 	if err != nil {
 		log.WithError(err).Error("can not calculate")
 		return

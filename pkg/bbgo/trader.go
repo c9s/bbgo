@@ -222,7 +222,6 @@ func (trader *Trader) injectFieldsAndSubscribe(ctx context.Context) error {
 	// load and run Session strategies
 	for sessionName, strategies := range trader.exchangeStrategies {
 		var session = trader.environment.sessions[sessionName]
-		var orderExecutor = trader.getSessionOrderExecutor(sessionName)
 		for _, strategy := range strategies {
 			rs := reflect.ValueOf(strategy)
 
@@ -235,10 +234,6 @@ func (trader *Trader) injectFieldsAndSubscribe(ctx context.Context) error {
 
 			if err := trader.injectCommonServices(ctx, strategy); err != nil {
 				return err
-			}
-
-			if err := dynamic.InjectField(rs, "OrderExecutor", orderExecutor, false); err != nil {
-				return errors.Wrapf(err, "failed to inject OrderExecutor on %T", strategy)
 			}
 
 			if defaulter, ok := strategy.(StrategyDefaulter); ok {
@@ -441,7 +436,7 @@ func (trader *Trader) injectCommonServices(ctx context.Context, s interface{}) e
 				return fmt.Errorf("field Persistence is not a struct element, %s given", field)
 			}
 
-			if err := dynamic.InjectField(elem, "Facade", ps, true); err != nil {
+			if err := dynamic.InjectField(elem.Interface(), "Facade", ps, true); err != nil {
 				return err
 			}
 

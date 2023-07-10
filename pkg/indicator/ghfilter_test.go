@@ -6070,7 +6070,7 @@ func Test_GHFilter(t *testing.T) {
 func Test_GHFilterEstimationAccurate(t *testing.T) {
 	type args struct {
 		allKLines []types.KLine
-		priceF    KLineValueMapper
+		priceF    types.KLineValueMapper
 		window    int
 	}
 	var klines []types.KLine
