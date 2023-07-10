@@ -9,7 +9,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -52,10 +52,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	fastRsi := session.Indicators(s.Symbol).RSI(types.IntervalWindow{Interval: s.Interval, Window: s.FastWindow})
 	slowRsi := session.Indicators(s.Symbol).RSI(types.IntervalWindow{Interval: s.Interval, Window: s.SlowWindow})
-	rsiCross := indicator.Cross(fastRsi, slowRsi)
+	rsiCross := indicatorv2.Cross(fastRsi, slowRsi)
 	rsiCross.OnUpdate(func(v float64) {
-		switch indicator.CrossType(v) {
-		case indicator.CrossOver:
+		switch indicatorv2.CrossType(v) {
+		case indicatorv2.CrossOver:
 			opts := s.OpenPositionOptions
 			opts.Long = true
 
@@ -69,7 +69,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				logErr(err, "unable to open position")
 			}
 
-		case indicator.CrossUnder:
+		case indicatorv2.CrossUnder:
 			if err := s.OrderExecutor.ClosePosition(ctx, fixedpoint.One); err != nil {
 				logErr(err, "failed to close position")
 			}

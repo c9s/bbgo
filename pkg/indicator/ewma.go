@@ -76,9 +76,9 @@ func (inc *EWMA) PushK(k types.KLine) {
 	inc.EmitUpdate(inc.Last(0))
 }
 
-func CalculateKLinesEMA(allKLines []types.KLine, priceF KLineValueMapper, window int) float64 {
+func CalculateKLinesEMA(allKLines []types.KLine, priceF types.KLineValueMapper, window int) float64 {
 	var multiplier = 2.0 / (float64(window) + 1)
-	return ewma(MapKLinePrice(allKLines, priceF), multiplier)
+	return ewma(types.MapKLinePrice(allKLines, priceF), multiplier)
 }
 
 // see https://www.investopedia.com/ask/answers/122314/what-exponential-moving-average-ema-formula-and-how-ema-calculated.asp

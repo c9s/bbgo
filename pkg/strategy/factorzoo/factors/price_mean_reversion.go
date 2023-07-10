@@ -82,13 +82,13 @@ func (inc *PMR) PushK(k types.KLine) {
 		return
 	}
 
-	inc.Update(indicator.KLineClosePriceMapper(k))
+	inc.Update(types.KLineClosePriceMapper(k))
 	inc.EndTime = k.EndTime.Time()
 	inc.EmitUpdate(inc.Last(0))
 }
 
 func CalculateKLinesPMR(allKLines []types.KLine, window int) float64 {
-	return pmr(indicator.MapKLinePrice(allKLines, indicator.KLineClosePriceMapper), window)
+	return pmr(types.MapKLinePrice(allKLines, types.KLineClosePriceMapper), window)
 }
 
 func pmr(prices []float64, window int) float64 {
