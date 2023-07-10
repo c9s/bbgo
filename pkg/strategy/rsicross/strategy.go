@@ -10,7 +10,6 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
-	"github.com/c9s/bbgo/pkg/risk/riskcontrol"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -33,15 +32,6 @@ type Strategy struct {
 	FastWindow int            `json:"fastWindow"`
 
 	bbgo.OpenPositionOptions
-
-	// risk related parameters
-	PositionHardLimit         fixedpoint.Value     `json:"positionHardLimit"`
-	MaxPositionQuantity       fixedpoint.Value     `json:"maxPositionQuantity"`
-	CircuitBreakLossThreshold fixedpoint.Value     `json:"circuitBreakLossThreshold"`
-	CircuitBreakEMA           types.IntervalWindow `json:"circuitBreakEMA"`
-
-	positionRiskControl     *riskcontrol.PositionRiskControl
-	circuitBreakRiskControl *riskcontrol.CircuitBreakRiskControl
 }
 
 func (s *Strategy) ID() string {
@@ -59,20 +49,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.Strategy = &common.Strategy{}
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
-
-	if !s.PositionHardLimit.IsZero() && !s.MaxPositionQuantity.IsZero() {
-		log.Infof("positionHardLimit and maxPositionQuantity are configured, setting up PositionRiskControl...")
-		s.positionRiskControl = riskcontrol.NewPositionRiskControl(s.OrderExecutor, s.PositionHardLimit, s.MaxPositionQuantity)
-	}
-
-	if !s.CircuitBreakLossThreshold.IsZero() {
-		log.Infof("circuitBreakLossThreshold is configured, setting up CircuitBreakRiskControl...")
-		s.circuitBreakRiskControl = riskcontrol.NewCircuitBreakRiskControl(
-			s.Position,
-			session.Indicators(s.Symbol).EWMA(s.CircuitBreakEMA),
-			s.CircuitBreakLossThreshold,
-			s.ProfitStats)
-	}
 
 	fastRsi := session.Indicators(s.Symbol).RSI(types.IntervalWindow{Interval: s.Interval, Window: s.FastWindow})
 	slowRsi := session.Indicators(s.Symbol).RSI(types.IntervalWindow{Interval: s.Interval, Window: s.SlowWindow})
