@@ -1,6 +1,8 @@
 package bollmaker
 
-import "github.com/c9s/bbgo/pkg/indicator"
+import (
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
+)
 
 type PriceTrend string
 
@@ -11,7 +13,7 @@ const (
 	UnknownTrend PriceTrend = "unknown"
 )
 
-func detectPriceTrend(inc *indicator.BOLLStream, price float64) PriceTrend {
+func detectPriceTrend(inc *indicatorv2.BOLLStream, price float64) PriceTrend {
 	if inBetween(price, inc.DownBand.Last(0), inc.UpBand.Last(0)) {
 		return NeutralTrend
 	}

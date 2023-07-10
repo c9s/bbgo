@@ -10,7 +10,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	. "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/risk/riskcontrol"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
@@ -73,8 +73,8 @@ type Strategy struct {
 	liquidityScale bbgo.Scale
 
 	// indicators
-	ewma      *indicator.EWMAStream
-	boll      *indicator.BOLLStream
+	ewma      *EWMAStream
+	boll      *BOLLStream
 	intensity *IntensityStream
 
 	positionRiskControl     *riskcontrol.PositionRiskControl
@@ -172,7 +172,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
-func (s *Strategy) preloadKLines(inc *indicator.KLineStream, session *bbgo.ExchangeSession, symbol string, interval types.Interval) {
+func (s *Strategy) preloadKLines(inc *KLineStream, session *bbgo.ExchangeSession, symbol string, interval types.Interval) {
 	if store, ok := session.MarketDataStore(symbol); ok {
 		if kLinesData, ok := store.KLinesOfInterval(interval); ok {
 			for _, k := range *kLinesData {
@@ -183,23 +183,23 @@ func (s *Strategy) preloadKLines(inc *indicator.KLineStream, session *bbgo.Excha
 }
 
 func (s *Strategy) initializeMidPriceEMA(session *bbgo.ExchangeSession) {
-	kLines := indicator.KLines(session.MarketDataStream, s.Symbol, s.MidPriceEMA.Interval)
-	s.ewma = indicator.EWMA2(indicator.ClosePrices(kLines), s.MidPriceEMA.Window)
+	kLines := KLines(session.MarketDataStream, s.Symbol, s.MidPriceEMA.Interval)
+	s.ewma = EWMA2(ClosePrices(kLines), s.MidPriceEMA.Window)
 
 	s.preloadKLines(kLines, session, s.Symbol, s.MidPriceEMA.Interval)
 }
 
 func (s *Strategy) initializeIntensityIndicator(session *bbgo.ExchangeSession) {
-	kLines := indicator.KLines(session.MarketDataStream, s.Symbol, s.StrengthInterval)
+	kLines := KLines(session.MarketDataStream, s.Symbol, s.StrengthInterval)
 	s.intensity = Intensity(kLines, 10)
 
 	s.preloadKLines(kLines, session, s.Symbol, s.StrengthInterval)
 }
 
 func (s *Strategy) initializePriceRangeBollinger(session *bbgo.ExchangeSession) {
-	kLines := indicator.KLines(session.MarketDataStream, s.Symbol, s.PriceRangeBollinger.Interval)
-	closePrices := indicator.ClosePrices(kLines)
-	s.boll = indicator.BOLL2(closePrices, s.PriceRangeBollinger.Window, s.PriceRangeBollinger.K)
+	kLines := KLines(session.MarketDataStream, s.Symbol, s.PriceRangeBollinger.Interval)
+	closePrices := ClosePrices(kLines)
+	s.boll = BOLL(closePrices, s.PriceRangeBollinger.Window, s.PriceRangeBollinger.K)
 
 	s.preloadKLines(kLines, session, s.Symbol, s.PriceRangeBollinger.Interval)
 }

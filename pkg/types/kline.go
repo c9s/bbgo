@@ -645,3 +645,41 @@ func KLineWith(symbol string, interval Interval, callback KLineCallback) KLineCa
 		callback(k)
 	}
 }
+
+type KLineValueMapper func(k KLine) float64
+
+func KLineOpenPriceMapper(k KLine) float64 {
+	return k.Open.Float64()
+}
+
+func KLineClosePriceMapper(k KLine) float64 {
+	return k.Close.Float64()
+}
+
+func KLineTypicalPriceMapper(k KLine) float64 {
+	return (k.High.Float64() + k.Low.Float64() + k.Close.Float64()) / 3.
+}
+
+func KLinePriceVolumeMapper(k KLine) float64 {
+	return k.Close.Mul(k.Volume).Float64()
+}
+
+func KLineVolumeMapper(k KLine) float64 {
+	return k.Volume.Float64()
+}
+
+func MapKLinePrice(kLines []KLine, f KLineValueMapper) (prices []float64) {
+	for _, k := range kLines {
+		prices = append(prices, f(k))
+	}
+
+	return prices
+}
+
+func KLineLowPriceMapper(k KLine) float64 {
+	return k.Low.Float64()
+}
+
+func KLineHighPriceMapper(k KLine) float64 {
+	return k.High.Float64()
+}

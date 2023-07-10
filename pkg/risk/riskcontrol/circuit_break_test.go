@@ -6,12 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 func Test_IsHalted(t *testing.T) {
-
 	var (
 		price          = 30000.00
 		realizedPnL    = fixedpoint.NewFromFloat(-100.0)
@@ -19,7 +18,7 @@ func Test_IsHalted(t *testing.T) {
 	)
 
 	window := types.IntervalWindow{Window: 30, Interval: types.Interval1m}
-	priceEWMA := indicator.EWMA2(nil, window.Window)
+	priceEWMA := indicatorv2.EWMA2(nil, window.Window)
 	priceEWMA.PushAndEmit(price)
 
 	cases := []struct {

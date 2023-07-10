@@ -63,7 +63,7 @@ func Test_calculateVWAP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			priceF := KLineTypicalPriceMapper
+			priceF := types.KLineTypicalPriceMapper
 			got := calculateVWAP(tt.kLines, priceF, tt.window)
 			diff := math.Trunc((got-tt.want)*100) / 100
 			if diff != 0 {
