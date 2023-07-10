@@ -20,8 +20,8 @@ type ProfitStatsTracker struct {
 	tradeStats *types.TradeStats
 }
 
-func (p *ProfitStatsTracker) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, p.Market.Symbol, types.SubscribeOptions{Interval: p.Interval})
+func (p *ProfitStatsTracker) Subscribe(session *bbgo.ExchangeSession, symbol string) {
+	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: p.Interval})
 }
 
 // InitOld is for backward capability. ps is the ProfitStats of the strategy, Market is the strategy Market
