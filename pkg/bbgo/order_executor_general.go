@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/report"
 	"strings"
 	"time"
 
@@ -161,27 +160,6 @@ func (e *GeneralOrderExecutor) BindProfitStats(profitStats *types.ProfitStats) {
 			Notify(profitStats)
 		}
 	})
-}
-
-func (e *GeneralOrderExecutor) BindProfitTracker(profitTracker *report.ProfitTracker) {
-	e.session.Subscribe(types.KLineChannel, profitTracker.Market.Symbol, types.SubscribeOptions{Interval: profitTracker.Interval})
-
-	e.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
-		if profit == nil {
-			return
-		}
-
-		profitTracker.AddProfit(*profit)
-	})
-
-	e.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		profitTracker.AddTrade(trade)
-	})
-
-	// Rotate profitStats slice
-	e.session.MarketDataStream.OnKLineClosed(types.KLineWith(profitTracker.Market.Symbol, profitTracker.Interval, func(kline types.KLine) {
-		profitTracker.Rotate()
-	}))
 }
 
 func (e *GeneralOrderExecutor) Bind() {
