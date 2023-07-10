@@ -1,24 +1,54 @@
 package google
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+var log = logrus.WithField("service", "google")
+
+type SpreadSheetService struct {
+	SpreadsheetID string
+	TokenFile     string
+
+	service *sheets.Service
+}
+
+func NewSpreadSheetService(ctx context.Context, tokenFile string, spreadsheetID string) *SpreadSheetService {
+	if len(tokenFile) == 0 {
+		log.Panicf("google.SpreadSheetService: jsonTokenFile is not set")
+	}
+
+	srv, err := sheets.NewService(ctx,
+		option.WithCredentialsFile(tokenFile),
+	)
+
+	if err != nil {
+		log.Panicf("google.SpreadSheetService: unable to initialize spreadsheet service: %v", err)
+	}
+
+	return &SpreadSheetService{
+		SpreadsheetID: spreadsheetID,
+		service:       srv,
+	}
+}
+
 func ReadSheetValuesRange(srv *sheets.Service, spreadsheetId, readRange string) (*sheets.ValueRange, error) {
-	logrus.Infof("ReadSheetValuesRange: %s", readRange)
+	log.Infof("ReadSheetValuesRange: %s", readRange)
 	resp, err := srv.Spreadsheets.Values.Get(spreadsheetId, readRange).Do()
 	return resp, err
 }
 
 func AddNewSheet(srv *sheets.Service, spreadsheetId string, title string) (*sheets.BatchUpdateSpreadsheetResponse, error) {
-	logrus.Infof("AddNewSheet: %s", title)
+	log.Infof("AddNewSheet: %s", title)
 	return srv.Spreadsheets.BatchUpdate(spreadsheetId, &sheets.BatchUpdateSpreadsheetRequest{
 		IncludeSpreadsheetInResponse: false,
 		Requests: []*sheets.Request{
@@ -127,7 +157,7 @@ func AppendRow(srv *sheets.Service, spreadsheetId string, sheetId int64, values 
 	row := &sheets.RowData{}
 	row.Values = ValuesToCellData(values)
 
-	logrus.Infof("AppendRow: %+v", row.Values)
+	log.Infof("AppendRow: %+v", row.Values)
 	return srv.Spreadsheets.BatchUpdate(spreadsheetId, &sheets.BatchUpdateSpreadsheetRequest{
 		Requests: []*sheets.Request{
 			{
@@ -142,7 +172,7 @@ func AppendRow(srv *sheets.Service, spreadsheetId string, sheetId int64, values 
 }
 
 func DebugBatchUpdateSpreadsheetResponse(resp *sheets.BatchUpdateSpreadsheetResponse) {
-	logrus.Infof("BatchUpdateSpreadsheetResponse.SpreadsheetId: %+v", resp.SpreadsheetId)
-	logrus.Infof("BatchUpdateSpreadsheetResponse.UpdatedSpreadsheet: %+v", resp.UpdatedSpreadsheet)
-	logrus.Infof("BatchUpdateSpreadsheetResponse.Replies: %+v", resp.Replies)
+	log.Infof("BatchUpdateSpreadsheetResponse.SpreadsheetId: %+v", resp.SpreadsheetId)
+	log.Infof("BatchUpdateSpreadsheetResponse.UpdatedSpreadsheet: %+v", resp.UpdatedSpreadsheet)
+	log.Infof("BatchUpdateSpreadsheetResponse.Replies: %+v", resp.Replies)
 }

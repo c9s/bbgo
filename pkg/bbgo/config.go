@@ -21,7 +21,9 @@ import (
 
 // DefaultFeeRate set the fee rate for most cases
 // BINANCE uses 0.1% for both maker and taker
-//  for BNB holders, it's 0.075% for both maker and taker
+//
+//	for BNB holders, it's 0.075% for both maker and taker
+//
 // MAX uses 0.050% for maker and 0.15% for taker
 var DefaultFeeRate = fixedpoint.NewFromFloat(0.075 * 0.01)
 
@@ -312,6 +314,15 @@ type SyncConfig struct {
 	} `json:"userDataStream,omitempty" yaml:"userDataStream,omitempty"`
 }
 
+type GoogleSpreadSheetServiceConfig struct {
+	JsonTokenFile string `json:"jsonTokenFile" yaml:"jsonTokenFile"`
+	SpreadSheetID string `json:"spreadSheetId" yaml:"spreadSheetId"`
+}
+
+type ServiceConfig struct {
+	GoogleSpreadSheetService *GoogleSpreadSheetServiceConfig `json:"googleSpreadSheet" yaml:"googleSpreadSheet"`
+}
+
 type Config struct {
 	Build *BuildConfig `json:"build,omitempty" yaml:"build,omitempty"`
 
@@ -326,6 +337,8 @@ type Config struct {
 	Notifications *NotificationConfig `json:"notifications,omitempty" yaml:"notifications,omitempty"`
 
 	Persistence *PersistenceConfig `json:"persistence,omitempty" yaml:"persistence,omitempty"`
+
+	Service *ServiceConfig `json:"services,omitempty" yaml:"services,omitempty"`
 
 	Sessions map[string]*ExchangeSession `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 

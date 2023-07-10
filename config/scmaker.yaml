@@ -5,6 +5,11 @@ sessions:
     makerFeeRate: 0%
     takerFeeRate: 0.025%
 
+#services:
+#  googleSpreadSheet:
+#    jsonTokenFile: ".credentials/google-cloud/service-account-json-token.json"
+#    spreadSheetId: "YOUR_SPREADSHEET_ID"
+
 exchangeStrategies:
 - on: max
   scmaker:
