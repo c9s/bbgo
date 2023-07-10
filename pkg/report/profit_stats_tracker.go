@@ -2,6 +2,7 @@ package report
 
 import (
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -48,7 +49,7 @@ func (p *ProfitStatsTracker) Init(market types.Market, ts *types.TradeStats) {
 	p.InitOld(market, &ps, ts)
 }
 
-func (p *ProfitStatsTracker) Bind(session *bbgo.ExchangeSession, tradeCollector *bbgo.TradeCollector) {
+func (p *ProfitStatsTracker) Bind(session *bbgo.ExchangeSession, tradeCollector *core.TradeCollector) {
 	tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
 		if profit == nil {
 			return
