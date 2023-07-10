@@ -1027,7 +1027,7 @@ func buildKLines(prices []fixedpoint.Value) (klines []types.KLine) {
 func Test_calculateEWMA(t *testing.T) {
 	type args struct {
 		allKLines []types.KLine
-		priceF    KLineValueMapper
+		priceF    types.KLineValueMapper
 		window    int
 	}
 	var input []fixedpoint.Value
@@ -1043,7 +1043,7 @@ func Test_calculateEWMA(t *testing.T) {
 			name: "ETHUSDT EMA 7",
 			args: args{
 				allKLines: buildKLines(input),
-				priceF:    KLineClosePriceMapper,
+				priceF:    types.KLineClosePriceMapper,
 				window:    7,
 			},
 			want: 571.72, // with open price, binance desktop returns 571.45, trading view returns 570.8957, for close price, binance mobile returns 571.72
@@ -1052,7 +1052,7 @@ func Test_calculateEWMA(t *testing.T) {
 			name: "ETHUSDT EMA 25",
 			args: args{
 				allKLines: buildKLines(input),
-				priceF:    KLineClosePriceMapper,
+				priceF:    types.KLineClosePriceMapper,
 				window:    25,
 			},
 			want: 571.30,
@@ -1061,7 +1061,7 @@ func Test_calculateEWMA(t *testing.T) {
 			name: "ETHUSDT EMA 99",
 			args: args{
 				allKLines: buildKLines(input),
-				priceF:    KLineClosePriceMapper,
+				priceF:    types.KLineClosePriceMapper,
 				window:    99,
 			},
 			want: 577.62, // binance mobile uses 577.58

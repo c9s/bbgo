@@ -417,6 +417,8 @@ func (e *GeneralOrderExecutor) OpenPosition(ctx context.Context, options OpenPos
 		return createdOrder, nil
 	}
 
+	log.WithError(err).Errorf("unable to submit order: %v", err)
+	log.Infof("reduce quantity and retry order")
 	return e.reduceQuantityAndSubmitOrder(ctx, price, *submitOrder)
 }
 

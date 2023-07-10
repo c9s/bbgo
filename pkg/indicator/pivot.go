@@ -52,7 +52,7 @@ func (inc *Pivot) CalculateAndUpdate(klines []types.KLine) {
 
 	recentT := klines[end-(inc.Window-1) : end+1]
 
-	l, h, err := calculatePivot(recentT, inc.Window, KLineLowPriceMapper, KLineHighPriceMapper)
+	l, h, err := calculatePivot(recentT, inc.Window, types.KLineLowPriceMapper, types.KLineHighPriceMapper)
 	if err != nil {
 		log.WithError(err).Error("can not calculate pivots")
 		return
@@ -90,7 +90,7 @@ func (inc *Pivot) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculatePivot(klines []types.KLine, window int, valLow KLineValueMapper, valHigh KLineValueMapper) (float64, float64, error) {
+func calculatePivot(klines []types.KLine, window int, valLow types.KLineValueMapper, valHigh types.KLineValueMapper) (float64, float64, error) {
 	length := len(klines)
 	if length == 0 || length < window {
 		return 0., 0., fmt.Errorf("insufficient elements for calculating with window = %d", window)
@@ -114,12 +114,4 @@ func calculatePivot(klines []types.KLine, window int, valLow KLineValueMapper, v
 	}
 
 	return pl, ph, nil
-}
-
-func KLineLowPriceMapper(k types.KLine) float64 {
-	return k.Low.Float64()
-}
-
-func KLineHighPriceMapper(k types.KLine) float64 {
-	return k.High.Float64()
 }

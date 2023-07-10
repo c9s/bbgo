@@ -42,7 +42,7 @@ func (inc *A34) CalculateAndUpdate(klines []types.KLine) {
 
 	var recentT = klines[end-(inc.Window-1) : end+1]
 
-	val, err := calculateA34(recentT, indicator.KLineClosePriceMapper)
+	val, err := calculateA34(recentT, types.KLineClosePriceMapper)
 	if err != nil {
 		log.WithError(err).Error("can not calculate pivots")
 		return

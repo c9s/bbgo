@@ -71,7 +71,7 @@ func (inc *VWAP) Length() int {
 var _ types.SeriesExtend = &VWAP{}
 
 func (inc *VWAP) PushK(k types.KLine) {
-	inc.Update(KLineTypicalPriceMapper(k), k.Volume.Float64())
+	inc.Update(types.KLineTypicalPriceMapper(k), k.Volume.Float64())
 }
 
 func (inc *VWAP) CalculateAndUpdate(allKLines []types.KLine) {
@@ -99,7 +99,7 @@ func (inc *VWAP) Bind(updater KLineWindowUpdater) {
 	updater.OnKLineWindowUpdate(inc.handleKLineWindowUpdate)
 }
 
-func calculateVWAP(klines []types.KLine, priceF KLineValueMapper, window int) float64 {
+func calculateVWAP(klines []types.KLine, priceF types.KLineValueMapper, window int) float64 {
 	vwap := VWAP{IntervalWindow: types.IntervalWindow{Window: window}}
 	for _, k := range klines {
 		vwap.Update(priceF(k), k.Volume.Float64())
