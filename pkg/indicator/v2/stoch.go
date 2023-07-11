@@ -47,8 +47,8 @@ func Stoch(source KLineSubscription, window, dPeriod int) *StochStream {
 		lowest := s.lowPrices.Slice.Tail(s.window).Min()
 		highest := s.highPrices.Slice.Tail(s.window).Max()
 
-		var k float64 = 50.0
-		var d float64 = 0.0
+		var k = 50.0
+		var d = 0.0
 
 		if highest != lowest {
 			k = 100.0 * (kLine.Close.Float64() - lowest) / (highest - lowest)
