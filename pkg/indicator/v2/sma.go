@@ -12,7 +12,7 @@ type SMAStream struct {
 	rawValues *types.Queue
 }
 
-func SMA2(source types.Float64Source, window int) *SMAStream {
+func SMA(source types.Float64Source, window int) *SMAStream {
 	s := &SMAStream{
 		Float64Series: types.NewFloat64Series(),
 		window:        window,
