@@ -108,48 +108,67 @@ func (r *AccumulatedProfitReport) Rotate(ps *types.ProfitStats, ts *types.TradeS
 	r.profitFactorPerInterval.Update(ts.ProfitFactor.Float64())
 }
 
+// CsvHeader returns a header slice
+func (r *AccumulatedProfitReport) CsvHeader() []string {
+	titles := []string{
+		"#",
+		"Symbol",
+		"Total Net Profit",
+		fmt.Sprintf("Total Net Profit %sMA%d", r.Interval, r.ProfitMAWindow),
+		fmt.Sprintf("%s%d Net Profit", r.Interval, r.ShortTermProfitWindow),
+		"accumulatedFee",
+		"winRatio",
+		"profitFactor",
+		fmt.Sprintf("%s%d Trades", r.Interval, r.Window),
+	}
+
+	for i := 0; i < len(r.strategyParameters); i++ {
+		titles = append(titles, r.strategyParameters[i][0])
+	}
+
+	return titles
+}
+
+// CsvRecords returns a data slice
+func (r *AccumulatedProfitReport) CsvRecords() [][]string {
+	var data [][]string
+
+	for i := 0; i <= r.Window-1; i++ {
+		values := []string{
+			strconv.Itoa(i + 1),
+			r.symbol,
+			strconv.FormatFloat(r.accumulatedProfitPerInterval.Last(i), 'f', 4, 64),
+			strconv.FormatFloat(r.profitMAPerInterval.Last(i), 'f', 4, 64),
+			strconv.FormatFloat(r.accumulatedProfitPerInterval.Last(i)-r.accumulatedProfitPerInterval.Last(i+r.ShortTermProfitWindow), 'f', 4, 64),
+			strconv.FormatFloat(r.accumulatedFeePerInterval.Last(i), 'f', 4, 64),
+			strconv.FormatFloat(r.winRatioPerInterval.Last(i), 'f', 4, 64),
+			strconv.FormatFloat(r.profitFactorPerInterval.Last(i), 'f', 4, 64),
+			strconv.FormatFloat(r.accumulatedTradesPerInterval.Last(i), 'f', 4, 64),
+		}
+		for j := 0; j < len(r.strategyParameters); j++ {
+			values = append(values, r.strategyParameters[j][1])
+		}
+
+		data = append(data, values)
+	}
+
+	return data
+}
+
 // Output Accumulated profit report to a TSV file
 func (r *AccumulatedProfitReport) Output() {
 	if r.TsvReportPath != "" {
+		// Open specified file for appending
 		tsvwiter, err := tsv.AppendWriterFile(r.TsvReportPath)
 		if err != nil {
 			panic(err)
 		}
 		defer tsvwiter.Close()
-		// Output title row
-		titles := []string{
-			"#",
-			"Symbol",
-			"Total Net Profit",
-			fmt.Sprintf("Total Net Profit %sMA%d", r.Interval, r.ProfitMAWindow),
-			fmt.Sprintf("%s%d Net Profit", r.Interval, r.ShortTermProfitWindow),
-			"accumulatedFee",
-			"winRatio",
-			"profitFactor",
-			fmt.Sprintf("%s%d Trades", r.Interval, r.Window),
-		}
-		for i := 0; i < len(r.strategyParameters); i++ {
-			titles = append(titles, r.strategyParameters[i][0])
-		}
-		_ = tsvwiter.Write(titles)
 
-		// Output data row
-		for i := 0; i <= r.Window-1; i++ {
-			values := []string{
-				strconv.Itoa(i + 1),
-				r.symbol,
-				strconv.FormatFloat(r.accumulatedProfitPerInterval.Last(i), 'f', 4, 64),
-				strconv.FormatFloat(r.profitMAPerInterval.Last(i), 'f', 4, 64),
-				strconv.FormatFloat(r.accumulatedProfitPerInterval.Last(i)-r.accumulatedProfitPerInterval.Last(i+r.ShortTermProfitWindow), 'f', 4, 64),
-				strconv.FormatFloat(r.accumulatedFeePerInterval.Last(i), 'f', 4, 64),
-				strconv.FormatFloat(r.winRatioPerInterval.Last(i), 'f', 4, 64),
-				strconv.FormatFloat(r.profitFactorPerInterval.Last(i), 'f', 4, 64),
-				strconv.FormatFloat(r.accumulatedTradesPerInterval.Last(i), 'f', 4, 64),
-			}
-			for j := 0; j < len(r.strategyParameters); j++ {
-				values = append(values, r.strategyParameters[j][1])
-			}
-			_ = tsvwiter.Write(values)
-		}
+		// Column Title
+		_ = tsvwiter.Write(r.CsvHeader())
+
+		// Output data rows
+		_ = tsvwiter.WriteAll(r.CsvRecords())
 	}
 }
