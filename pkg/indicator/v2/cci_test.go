@@ -1,12 +1,10 @@
-package indicator
+package indicatorv2
 
 import (
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 /*
@@ -25,14 +23,17 @@ func Test_CCI(t *testing.T) {
 		panic(err)
 	}
 	t.Run("random_case", func(t *testing.T) {
-		cci := CCI{IntervalWindow: types.IntervalWindow{Window: 16}}
+		price := Price(nil, nil)
+		cci := CCI(price, 16)
 		for _, value := range input {
-			cci.Update(value)
+			price.PushAndEmit(value)
 		}
+
+		t.Logf("cci: %+v", cci.Slice)
 
 		last := cci.Last(0)
 		assert.InDelta(t, 93.250481, last, delta)
 		assert.InDelta(t, 81.813449, cci.Index(1), delta)
-		assert.Equal(t, 50-16+1, cci.Length())
+		assert.Equal(t, 50, cci.Length(), "length")
 	})
 }
