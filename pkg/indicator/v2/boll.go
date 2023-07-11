@@ -26,7 +26,7 @@ type BOLLStream struct {
 //	-> calculate stdDev -> calculate bandWidth -> get latest SMA -> upBand, downBand
 func BOLL(source types.Float64Source, window int, k float64) *BOLLStream {
 	// bind these indicators before our main calculator
-	sma := SMA2(source, window)
+	sma := SMA(source, window)
 	stdDev := StdDev(source, window)
 
 	s := &BOLLStream{
