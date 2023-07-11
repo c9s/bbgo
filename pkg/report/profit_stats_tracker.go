@@ -25,8 +25,8 @@ func (p *ProfitStatsTracker) Subscribe(session *bbgo.ExchangeSession, symbol str
 	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: p.Interval})
 }
 
-// InitOld is for backward capability. ps is the ProfitStats of the strategy, Market is the strategy Market
-func (p *ProfitStatsTracker) InitOld(market types.Market, ps **types.ProfitStats, ts *types.TradeStats) {
+// InitLegacy is for backward capability. ps is the ProfitStats of the strategy, Market is the strategy Market
+func (p *ProfitStatsTracker) InitLegacy(market types.Market, ps **types.ProfitStats, ts *types.TradeStats) {
 	p.Market = market
 
 	if *ps == nil {
@@ -46,7 +46,7 @@ func (p *ProfitStatsTracker) InitOld(market types.Market, ps **types.ProfitStats
 // Init initialize the tracker with the given Market
 func (p *ProfitStatsTracker) Init(market types.Market, ts *types.TradeStats) {
 	ps := types.NewProfitStats(p.Market)
-	p.InitOld(market, &ps, ts)
+	p.InitLegacy(market, &ps, ts)
 }
 
 func (p *ProfitStatsTracker) Bind(session *bbgo.ExchangeSession, tradeCollector *core.TradeCollector) {
