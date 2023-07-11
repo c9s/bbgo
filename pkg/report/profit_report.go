@@ -7,6 +7,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
+	"strconv"
 )
 
 // AccumulatedProfitReport For accumulated profit report output
@@ -135,15 +136,15 @@ func (r *AccumulatedProfitReport) Output() {
 		// Output data row
 		for i := 0; i <= r.Window-1; i++ {
 			values := []string{
-				fmt.Sprintf("%d", i+1),
+				strconv.Itoa(i + 1),
 				r.symbol,
-				fmt.Sprintf("%f", r.accumulatedProfitPerInterval.Last(i)),
-				fmt.Sprintf("%f", r.profitMAPerInterval.Last(i)),
-				fmt.Sprintf("%f", r.accumulatedProfitPerInterval.Last(i)-r.accumulatedProfitPerInterval.Last(i+r.ShortTermProfitWindow)),
-				fmt.Sprintf("%f", r.accumulatedFeePerInterval.Last(i)),
-				fmt.Sprintf("%f", r.winRatioPerInterval.Last(i)),
-				fmt.Sprintf("%f", r.profitFactorPerInterval.Last(i)),
-				fmt.Sprintf("%f", r.accumulatedTradesPerInterval.Last(i)),
+				strconv.FormatFloat(r.accumulatedProfitPerInterval.Last(i), 'f', 4, 64),
+				strconv.FormatFloat(r.profitMAPerInterval.Last(i), 'f', 4, 64),
+				strconv.FormatFloat(r.accumulatedProfitPerInterval.Last(i)-r.accumulatedProfitPerInterval.Last(i+r.ShortTermProfitWindow), 'f', 4, 64),
+				strconv.FormatFloat(r.accumulatedFeePerInterval.Last(i), 'f', 4, 64),
+				strconv.FormatFloat(r.winRatioPerInterval.Last(i), 'f', 4, 64),
+				strconv.FormatFloat(r.profitFactorPerInterval.Last(i), 'f', 4, 64),
+				strconv.FormatFloat(r.accumulatedTradesPerInterval.Last(i), 'f', 4, 64),
 			}
 			for j := 0; j < len(r.strategyParameters); j++ {
 				values = append(values, r.strategyParameters[j][1])
