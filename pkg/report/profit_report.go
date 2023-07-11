@@ -5,7 +5,7 @@ import (
 	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 	"strconv"
 )
@@ -27,10 +27,10 @@ type AccumulatedProfitReport struct {
 
 	// Accumulated profit
 	accumulatedProfit            fixedpoint.Value
-	accumulatedProfitPerInterval floats.Slice
+	accumulatedProfitPerInterval *types.Float64Series
 
 	// Accumulated profit MA
-	profitMA            *indicator.SMA
+	profitMA            *indicatorv2.SMAStream
 	profitMAPerInterval floats.Slice
 
 	// Profit of each interval
@@ -71,7 +71,8 @@ func (r *AccumulatedProfitReport) Initialize(symbol string, interval types.Inter
 		r.ShortTermProfitWindow = 7
 	}
 
-	r.profitMA = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: r.Interval, Window: r.ProfitMAWindow}}
+	r.accumulatedProfitPerInterval = types.NewFloat64Series()
+	r.profitMA = indicatorv2.SMA2(r.accumulatedProfitPerInterval, r.ProfitMAWindow)
 }
 
 func (r *AccumulatedProfitReport) AddStrategyParameter(title string, value string) {
@@ -86,13 +87,12 @@ func (r *AccumulatedProfitReport) AddTrade(trade types.Trade) {
 func (r *AccumulatedProfitReport) Rotate(ps *types.ProfitStats, ts *types.TradeStats) {
 	// Accumulated profit
 	r.accumulatedProfit = r.accumulatedProfit.Add(ps.AccumulatedNetProfit)
-	r.accumulatedProfitPerInterval.Update(r.accumulatedProfit.Float64())
+	r.accumulatedProfitPerInterval.PushAndEmit(r.accumulatedProfit.Float64())
 
 	// Profit of each interval
 	r.ProfitPerInterval.Update(ps.AccumulatedNetProfit.Float64())
 
 	// Profit MA
-	r.profitMA.Update(r.accumulatedProfit.Float64())
 	r.profitMAPerInterval.Update(r.profitMA.Last(0))
 
 	// Accumulated Fee
