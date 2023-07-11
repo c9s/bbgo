@@ -3,24 +3,20 @@
 package tri
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/cache"
-	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var markets = make(types.MarketMap)
 
 func init() {
-	var err error
-	markets, err = cache.LoadExchangeMarketsWithCache(context.Background(), &binance.Exchange{})
-	if err != nil {
+	if err := util.ReadJsonFile("../../../testdata/binance-markets.json", &markets); err != nil {
 		panic(err)
 	}
 }
