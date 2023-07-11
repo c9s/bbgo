@@ -62,5 +62,21 @@
     "minPrice": 0.01,
     "maxPrice": 100000,
     "tickSize": 0.01
+  },
+  "ETHBTC": {
+  "symbol": "ETHBTC",
+  "localSymbol": "ETHBTC",
+  "pricePrecision": 8,
+  "volumePrecision": 8,
+  "quoteCurrency": "BTC",
+  "baseCurrency": "ETH",
+  "minNotional": 0.0001,
+  "minAmount": 0.0001,
+  "minQuantity": 0.0001,
+  "maxQuantity": 100000,
+  "stepSize": 0.0001,
+  "minPrice": 1e-05,
+  "maxPrice": 922327,
+  "tickSize": 1e-05
   }
 }
