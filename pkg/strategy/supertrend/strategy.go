@@ -358,7 +358,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// Setup profit tracker
 	if s.ProfitStatsTracker != nil {
 		if s.ProfitStatsTracker.CurrentProfitStats == nil {
-			s.ProfitStatsTracker.InitOld(s.Market, &s.ProfitStats, s.TradeStats)
+			s.ProfitStatsTracker.InitLegacy(s.Market, &s.ProfitStats, s.TradeStats)
 		}
 
 		// Add strategy parameters to report
