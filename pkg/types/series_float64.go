@@ -29,6 +29,10 @@ func (f *Float64Series) Length() int {
 	return len(f.Slice)
 }
 
+func (f *Float64Series) Push(x float64) {
+	f.Slice.Push(x)
+}
+
 func (f *Float64Series) PushAndEmit(x float64) {
 	f.Slice.Push(x)
 	f.EmitUpdate(x)

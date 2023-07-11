@@ -10,13 +10,14 @@ import (
 	"github.com/c9s/bbgo/pkg/style"
 )
 
+var Two = fixedpoint.NewFromInt(2)
+var Three = fixedpoint.NewFromInt(3)
+
 type Direction int
 
 const DirectionUp = 1
 const DirectionNone = 0
 const DirectionDown = -1
-
-var Two = fixedpoint.NewFromInt(2)
 
 type KLineOrWindow interface {
 	GetInterval() string
@@ -666,6 +667,10 @@ func KLinePriceVolumeMapper(k KLine) float64 {
 
 func KLineVolumeMapper(k KLine) float64 {
 	return k.Volume.Float64()
+}
+
+func KLineHLC3Mapper(k KLine) float64 {
+	return k.High.Add(k.Low).Add(k.Close).Div(Three).Float64()
 }
 
 func MapKLinePrice(kLines []KLine, f KLineValueMapper) (prices []float64) {
