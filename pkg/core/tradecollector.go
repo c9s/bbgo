@@ -123,32 +123,42 @@ func (c *TradeCollector) Process() bool {
 		key := trade.Key()
 
 		c.mu.Lock()
-		defer c.mu.Unlock()
 
 		// if it's already done, remove the trade from the trade store
 		if _, done := c.doneTrades[key]; done {
+			c.mu.Unlock()
 			return true
 		}
 
-		if c.orderStore.Exists(trade.OrderID) {
-			if c.position != nil {
+		if c.position != nil {
+			if c.orderStore.Exists(trade.OrderID) {
+				var p types.Profit
 				profit, netProfit, madeProfit := c.position.AddTrade(trade)
 				if madeProfit {
-					p := c.position.NewProfit(trade, profit, netProfit)
-					c.EmitTrade(trade, profit, netProfit)
-					c.EmitProfit(trade, &p)
-				} else {
-					c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
-					c.EmitProfit(trade, nil)
+					p = c.position.NewProfit(trade, profit, netProfit)
 				}
+
+				c.doneTrades[key] = struct{}{}
+				c.mu.Unlock()
+
+				c.EmitTrade(trade, profit, netProfit)
+				if !p.Profit.IsZero() {
+					c.EmitProfit(trade, &p)
+				}
+
 				positionChanged = true
-			} else {
-				c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
+				return true
 			}
 
-			c.doneTrades[key] = struct{}{}
-			return true
+		} else {
+			if c.orderStore.Exists(trade.OrderID) {
+				c.doneTrades[key] = struct{}{}
+				c.mu.Unlock()
+				c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
+				return true
+			}
 		}
+
 		return false
 	})
 
