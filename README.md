@@ -128,6 +128,7 @@ the implementation.
 - OKEx Spot Exchange
 - Kucoin Spot Exchange
 - MAX Spot Exchange (located in Taiwan)
+- Bitget (In Progress)
 
 ## Documentation and General Topics
 
