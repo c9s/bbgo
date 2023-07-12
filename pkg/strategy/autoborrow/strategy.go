@@ -225,6 +225,12 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 
 		s.tryToRepayAnyDebt(ctx)
 
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Second * 5):
+		}
+
 		// update account info after the repay
 		account, err = s.ExchangeSession.UpdateAccount(ctx)
 		if err != nil {
