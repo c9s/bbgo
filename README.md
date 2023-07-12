@@ -90,6 +90,38 @@ the implementation.
 
 ![bbgo backtest report](assets/screenshots/backtest-report.jpg)
 
+## Built-in Strategies
+
+| strategy    | description                                                                                                                             | type       | backtest support |
+|-------------|-----------------------------------------------------------------------------------------------------------------------------------------|------------|------------------|
+| grid        | the first generation grid strategy, it provides more flexibility, but you need to prepare inventories                                   | maker      |                  |
+| grid2       | the second generation grid strategy, it can convert your quote asset into a grid, supports base+quote mode                              | maker      |                  |
+| bollgrid    | strategy implements a basic grid strategy with the built-in bollinger indicator                                                         | maker      |                  | 
+| xmaker      | cross exchange market making strategy, it hedges your inventory risk on the other side                                                  | maker      | no               |
+| xnav        | this strategy helps you record the current net asset value                                                                              |            |                  |
+| xalign      | this strategy aligns your balance position automatically                                                                                |            |                  |
+| xfunding    | a funding rate fee strategy                                                                                                             |            |                  |
+| autoborrow  | this strategy uses margin to borrow assets, to help you keep the minimal balance                                                        | tool       | no               |
+| pivotshort  | this strategy finds the pivot low and entry the trade when the price breaks the previous low                                            | long/short |                  |
+| schedule    | this strategy buy/sell with a fixed quantity periodically, you can use this as a single DCA, or to refill the fee asset like BNB.       | tool       |
+| irr         | this strategy opens the position based on the predicated return rate                                                                    | long/short |                  |
+| bollmaker   | this strategy holds a long-term long/short position, places maker orders on both side, uses bollinger band to control the position size | maker      |                  |
+| wall        | this strategy creates wall (large amount order) on the order book                                                                       |            |                  |
+| scmaker     | this market making strategy is desgiend for stable coin markets, like USDC/USDT                                                         |            |                  |
+| drift       |                                                                                                                                         | long/short |                  |
+| rsicross    | this strategy opens a long position when the fast rsi cross over the slow rsi, this is a demo strategy for using the v2 indicator       | long/short |                  |
+| marketcap   | this strategy implements a strategy that rebalances the portfolio based on the market capitalization                                    | rebalance  | no               |
+| supertrend  | this strategy uses DEMA and Supertrend indicator to open the long/short position                                                        | long/short |                  |
+| trendtrader | this strategy opens long/short position based on the trendline breakout                                                                 |            |                  |
+| elliottwave |                                                                                                                                         |            |                  |
+| ewoDgtrd    |                                                                                                                                         |            |                  |
+| fixedmaker  |                                                                                                                                         |            |                  |
+| factoryzoo  |                                                                                                                                         |            |                  |
+| fmaker      |                                                                                                                                         |            |                  |
+| linregmaker | a linear regression based market maker                                                                                                  |            |                  |
+
+
+
 ## Supported Exchanges
 
 - Binance Spot Exchange (and binance.us)
@@ -234,7 +266,8 @@ bbgo pnl --exchange binance --asset BTC --since "2019-01-01"
 
 ### Synchronize System Time With Binance
 
-BBGO provides the script for UNIX systems/subsystems to synchronize date with Binance. `jq` and `bc` are required to be installed in previous.
+BBGO provides the script for UNIX systems/subsystems to synchronize date with Binance. `jq` and `bc` are required to be
+installed in previous.
 To install the dependencies in Ubuntu, try the following commands:
 
 ```bash
@@ -346,8 +379,6 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
 
 - `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert). See
   [document](./doc/strategy/pricealert.md).
-- `xpuremaker` strategy demonstrates how to maintain the orderbook and submit maker
-  orders [xpuremaker](pkg/strategy/xpuremaker)
 - `buyandhold` strategy demonstrates how to subscribe kline events and submit market
   order [buyandhold](pkg/strategy/pricedrop)
 - `bollgrid` strategy implements a basic grid strategy with the built-in bollinger
@@ -360,8 +391,8 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
 - `support` strategy uses K-lines with high volume as support [support](pkg/strategy/support). See
   [document](./doc/strategy/support.md).
 - `flashcrash` strategy implements a strategy that catches the flashcrash [flashcrash](pkg/strategy/flashcrash)
-- `marketcap` strategy implements a strategy that rebalances the portfolio based on the
-  market capitalization [marketcap](pkg/strategy/marketcap). See [document](./doc/strategy/marketcap.md).
+- `marketcap` strategy implements a strategy that rebalances the portfolio based on the market
+  capitalization [marketcap](pkg/strategy/marketcap). See [document](./doc/strategy/marketcap.md).
 - `pivotshort` - shorting focused strategy.
 - `irr` - return rate strategy.
 - `drift` - drift strategy.
