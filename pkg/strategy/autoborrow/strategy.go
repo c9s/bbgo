@@ -3,6 +3,7 @@ package autoborrow
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -56,6 +57,8 @@ type Strategy struct {
 	MaxMarginLevel       fixedpoint.Value `json:"maxMarginLevel"`
 	AutoRepayWhenDeposit bool             `json:"autoRepayWhenDeposit"`
 
+	MarginLevelAlertSlackMentions []string `json:"marginLevelAlertSlackMentions"`
+
 	Assets []MarginAsset `json:"assets"`
 
 	ExchangeSession *bbgo.ExchangeSession
@@ -94,6 +97,10 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 		}
 
 		toRepay := fixedpoint.Min(b.Available, b.Debt())
+		if toRepay.IsZero() {
+			continue
+		}
+
 		bbgo.Notify(&MarginAction{
 			Exchange:       s.ExchangeSession.ExchangeName,
 			Action:         "Repay",
@@ -107,6 +114,8 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 		if err := s.marginBorrowRepay.RepayMarginAsset(context.Background(), b.Currency, toRepay); err != nil {
 			log.WithError(err).Errorf("margin repay error")
 		}
+
+		return
 	}
 }
 
@@ -204,16 +213,24 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	)
 
 	// if margin ratio is too low, do not borrow
-	if curMarginLevel.Compare(minMarginLevel) < 0 {
-		log.Infof("current margin level %f < min margin level %f, skip autoborrow", curMarginLevel.Float64(), minMarginLevel.Float64())
-		bbgo.Notify("Warning!!! %s Current Margin Level %f < Minimal Margin Level %f",
+	for maxTries := 5; account.MarginLevel.Compare(minMarginLevel) < 0 && maxTries > 0; maxTries-- {
+		log.Infof("current margin level %f < min margin level %f, skip autoborrow", account.MarginLevel.Float64(), minMarginLevel.Float64())
+
+		bbgo.Notify("Warning!!! %s Current Margin Level %f < Minimal Margin Level %f "+strings.Join(s.MarginLevelAlertSlackMentions, " "),
 			s.ExchangeSession.Name,
-			curMarginLevel.Float64(),
+			account.MarginLevel.Float64(),
 			minMarginLevel.Float64(),
 			account.Balances().Debts(),
 		)
+
 		s.tryToRepayAnyDebt(ctx)
-		return
+
+		// update account info after the repay
+		account, err = s.ExchangeSession.UpdateAccount(ctx)
+		if err != nil {
+			log.WithError(err).Errorf("can not update account")
+			return
+		}
 	}
 
 	balances := account.Balances()
@@ -282,7 +299,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 				Action:         "Borrow",
 				Asset:          marginAsset.Asset,
 				Amount:         toBorrow,
-				MarginLevel:    curMarginLevel,
+				MarginLevel:    account.MarginLevel,
 				MinMarginLevel: minMarginLevel,
 			})
 			log.Infof("sending borrow request %f %s", toBorrow.Float64(), marginAsset.Asset)
