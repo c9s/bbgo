@@ -203,8 +203,9 @@ func (e *GeneralOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ..
 	orderCreateCallback := func(createdOrder types.Order) {
 		e.orderStore.Add(createdOrder)
 		e.activeMakerOrders.Add(createdOrder)
-		e.tradeCollector.Process()
 	}
+
+	defer e.tradeCollector.Process()
 
 	if e.maxRetries == 0 {
 		createdOrders, _, err := BatchPlaceOrder(ctx, e.session.Exchange, orderCreateCallback, formattedOrders...)

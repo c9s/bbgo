@@ -385,9 +385,11 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 
 	session.Trades[symbol] = &types.TradeSlice{Trades: trades}
 	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-		if trade.Symbol == symbol {
-			session.Trades[symbol].Append(trade)
+		if trade.Symbol != symbol {
+			return
 		}
+
+		session.Trades[symbol].Append(trade)
 	})
 
 	position := &types.Position{

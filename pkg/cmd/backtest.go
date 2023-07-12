@@ -529,7 +529,8 @@ var BacktestCmd = &cobra.Command{
 				profitFactor := tradeState.ProfitFactor
 				winningRatio := tradeState.WinningRatio
 				intervalProfits := tradeState.IntervalProfits[types.Interval1d]
-				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Trades, intervalProfits, profitFactor, winningRatio)
+
+				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Copy(), intervalProfits, profitFactor, winningRatio)
 				if err != nil {
 					return err
 				}
