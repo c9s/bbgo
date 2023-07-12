@@ -36,14 +36,16 @@ func NewPositionRiskControl(orderExecutor bbgo.OrderExecutorExtended, hardLimit,
 
 	control.OnReleasePosition(func(quantity fixedpoint.Value, side types.SideType) {
 		pos := orderExecutor.Position()
-		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), types.SubmitOrder{
+		submitOrder := types.SubmitOrder{
 			Symbol:   pos.Symbol,
 			Market:   pos.Market,
 			Side:     side,
 			Type:     types.OrderTypeMarket,
 			Quantity: quantity,
-		})
+		}
 
+		log.Infof("submitting order: %+v", submitOrder)
+		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), submitOrder)
 		if err != nil {
 			log.WithError(err).Errorf("failed to submit orders")
 			return
