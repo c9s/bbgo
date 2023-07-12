@@ -36,6 +36,15 @@ type Strategy struct {
 	RiskController
 }
 
+func NewStrategy(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string) *Strategy {
+	s := &Strategy{
+		Environ: environ,
+		Session: session,
+	}
+	s.Initialize(ctx, environ, session, market, strategyID, instanceID)
+	return s
+}
+
 func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string) {
 	s.parent = ctx
 	s.ctx, s.cancel = context.WithCancel(ctx)

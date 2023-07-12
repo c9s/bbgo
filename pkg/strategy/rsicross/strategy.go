@@ -49,8 +49,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.Strategy = &common.Strategy{}
-	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
+	s.Strategy = common.NewStrategy(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
 	fastRsi := session.Indicators(s.Symbol).RSI(types.IntervalWindow{Interval: s.Interval, Window: s.FastWindow})
 	slowRsi := session.Indicators(s.Symbol).RSI(types.IntervalWindow{Interval: s.Interval, Window: s.SlowWindow})
