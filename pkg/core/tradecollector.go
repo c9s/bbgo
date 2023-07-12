@@ -117,6 +117,7 @@ func (c *TradeCollector) setDone(key types.TradeKey) {
 // if we have the order in the order store, then the trade will be considered for the position.
 // profit will also be calculated.
 func (c *TradeCollector) Process() bool {
+	logrus.Debugf("TradeCollector.Process()")
 	positionChanged := false
 
 	c.tradeStore.Filter(func(trade types.Trade) bool {
