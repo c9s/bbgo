@@ -94,6 +94,19 @@ func (s *SpreadSheetService) LookupSheet(title string) (*sheets.Sheet, error) {
 	return nil, nil
 }
 
+func (s *SpreadSheetService) LookupOrNewSheet(title string) (*sheets.Sheet, error) {
+	sheet, err := s.LookupSheet(title)
+	if err != nil {
+		return nil, err
+	}
+
+	if sheet != nil {
+		return sheet, nil
+	}
+
+	return s.NewSheet(title)
+}
+
 func ReadSheetValuesRange(srv *sheets.Service, spreadsheetId, readRange string) (*sheets.ValueRange, error) {
 	log.Infof("ReadSheetValuesRange: %s", readRange)
 	resp, err := srv.Spreadsheets.Values.Get(spreadsheetId, readRange).Do()
