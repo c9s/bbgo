@@ -36,6 +36,12 @@ type Strategy struct {
 	RiskController
 }
 
+// TODO: use this to replace the parameters
+type StrategyInstance interface {
+	ID() string
+	InstanceID() string
+}
+
 func NewStrategy(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string) *Strategy {
 	s := &Strategy{
 		Environ: environ,
@@ -80,6 +86,10 @@ func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, se
 	s.OrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		// bbgo.Sync(ctx, s)
 	})
+
+	if environ.GoogleSpreadSheetService != nil {
+		// allocate a google spread sheet for this strategy
+	}
 
 	if !s.PositionHardLimit.IsZero() && !s.MaxPositionQuantity.IsZero() {
 		log.Infof("positionHardLimit and maxPositionQuantity are configured, setting up PositionRiskControl...")

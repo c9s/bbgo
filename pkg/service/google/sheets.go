@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -19,7 +20,8 @@ type SpreadSheetService struct {
 	SpreadsheetID string
 	TokenFile     string
 
-	service *sheets.Service
+	service     *sheets.Service
+	spreadsheet *sheets.Spreadsheet
 }
 
 func NewSpreadSheetService(ctx context.Context, tokenFile string, spreadsheetID string) *SpreadSheetService {
@@ -39,6 +41,57 @@ func NewSpreadSheetService(ctx context.Context, tokenFile string, spreadsheetID 
 		SpreadsheetID: spreadsheetID,
 		service:       srv,
 	}
+}
+
+func (s *SpreadSheetService) Load() error {
+	spreadsheet, err := s.service.Spreadsheets.Get(s.SpreadsheetID).Do()
+	if err != nil {
+		return err
+	}
+
+	s.spreadsheet = spreadsheet
+	return nil
+}
+
+func (s *SpreadSheetService) Get(forceReload bool) (*sheets.Spreadsheet, error) {
+	if s.spreadsheet == nil || forceReload {
+		if err := s.Load(); err != nil {
+			return nil, err
+		}
+	}
+
+	return s.spreadsheet, nil
+}
+
+func (s *SpreadSheetService) NewSheet(title string) (*sheets.Sheet, error) {
+	resp, err := AddNewSheet(s.service, s.SpreadsheetID, title)
+	if err != nil {
+		return nil, err
+	}
+
+	DebugBatchUpdateSpreadsheetResponse(resp)
+
+	_, err = s.Get(true)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.LookupSheet(title)
+}
+
+func (s *SpreadSheetService) LookupSheet(title string) (*sheets.Sheet, error) {
+	spreadsheet, err := s.Get(false)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, sheet := range spreadsheet.Sheets {
+		if strings.EqualFold(title, sheet.Properties.Title) {
+			return sheet, nil
+		}
+	}
+
+	return nil, nil
 }
 
 func ReadSheetValuesRange(srv *sheets.Service, spreadsheetId, readRange string) (*sheets.ValueRange, error) {
