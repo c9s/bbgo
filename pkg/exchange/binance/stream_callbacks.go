@@ -54,6 +54,16 @@ func (s *Stream) EmitAggTradeEvent(e *AggTradeEvent) {
 	}
 }
 
+func (s *Stream) OnForceOrderEvent(cb func(e *ForceOrderEvent)) {
+	s.forceOrderEventCallbacks = append(s.forceOrderEventCallbacks, cb)
+}
+
+func (s *Stream) EmitForceOrderEvent(e *ForceOrderEvent) {
+	for _, cb := range s.forceOrderEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnBalanceUpdateEvent(cb func(event *BalanceUpdateEvent)) {
 	s.balanceUpdateEventCallbacks = append(s.balanceUpdateEventCallbacks, cb)
 }
@@ -194,6 +204,8 @@ type StreamEventHub interface {
 	OnMarketTradeEvent(cb func(e *MarketTradeEvent))
 
 	OnAggTradeEvent(cb func(e *AggTradeEvent))
+
+	OnForceOrderEvent(cb func(e *ForceOrderEvent))
 
 	OnBalanceUpdateEvent(cb func(event *BalanceUpdateEvent))
 
