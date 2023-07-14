@@ -7,18 +7,26 @@ exchangeStrategies:
 
     # minMarginRatio for triggering auto borrow
     # we trigger auto borrow only when the margin ratio is above the number
-    minMarginLevel: 1.5
+    minMarginLevel: 3.0
 
     # maxMarginRatio for stop auto-repay
     # if the margin ratio is high enough, we don't have the urge to repay
-    maxMarginLevel: 10.0
+    maxMarginLevel: 20.0
+
+    marginLevelAlertInterval: 5m
+    marginLevelAlertMinMargin: 2.0
+    marginLevelAlertSlackMentions:
+    - '<@USER_ID>'
+    - '<!subteam^TEAM_ID>'
 
     assets:
     - asset: ETH
       low: 3.0
       maxQuantityPerBorrow: 1.0
       maxTotalBorrow: 10.0
+
     - asset: USDT
       low: 1000.0
       maxQuantityPerBorrow: 100.0
       maxTotalBorrow: 10.0
+      
