@@ -21,10 +21,6 @@ type notifyTask struct {
 	Opts    []slack.MsgOption
 }
 
-type slackAttachmentCreator interface {
-	SlackAttachment() slack.Attachment
-}
-
 type Notifier struct {
 	client  *slack.Client
 	channel string
@@ -59,6 +55,7 @@ func (n *Notifier) worker() {
 
 		case task := <-n.taskC:
 			limiter.Wait(ctx)
+
 			_, _, err := n.client.PostMessageContext(ctx, task.Channel, task.Opts...)
 			if err != nil {
 				log.WithError(err).
@@ -86,7 +83,7 @@ func filterSlackAttachments(args []interface{}) (slackAttachments []slack.Attach
 
 			slackAttachments = append(slackAttachments, a)
 
-		case slackAttachmentCreator:
+		case types.SlackAttachmentCreator:
 			if firstAttachmentOffset == -1 {
 				firstAttachmentOffset = idx
 			}
@@ -132,7 +129,7 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 	case slack.Attachment:
 		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{a}, slackAttachments...)...))
 
-	case slackAttachmentCreator:
+	case types.SlackAttachmentCreator:
 		// convert object to slack attachment (if supported)
 		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{a.SlackAttachment()}, slackAttachments...)...))
 
