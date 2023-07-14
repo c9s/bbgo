@@ -23,24 +23,60 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-/**
-- on: binance
-  autoborrow:
+/*
+  - on: binance
+    autoborrow:
     interval: 30m
     repayWhenDeposit: true
 
     # minMarginLevel for triggering auto borrow
     minMarginLevel: 1.5
     assets:
-    - asset: ETH
-      low: 3.0
-      maxQuantityPerBorrow: 1.0
-      maxTotalBorrow: 10.0
-    - asset: USDT
-      low: 1000.0
-      maxQuantityPerBorrow: 100.0
-      maxTotalBorrow: 10.0
+
+  - asset: ETH
+    low: 3.0
+    maxQuantityPerBorrow: 1.0
+    maxTotalBorrow: 10.0
+
+  - asset: USDT
+    low: 1000.0
+    maxQuantityPerBorrow: 100.0
+    maxTotalBorrow: 10.0
 */
+type MarginAlert struct {
+	CurrentMarginLevel fixedpoint.Value
+	MinimalMarginLevel fixedpoint.Value
+	SlackMentions      []string
+	SessionName        string
+}
+
+func (m *MarginAlert) SlackAttachment() slack.Attachment {
+	return slack.Attachment{
+		Color: "red",
+		Title: fmt.Sprintf("Margin Level Alert: %s session - current margin level %f < required margin level %f",
+			m.SessionName, m.CurrentMarginLevel.Float64(), m.MinimalMarginLevel.Float64()),
+		Text: strings.Join(m.SlackMentions, " "),
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Session",
+				Value: m.SessionName,
+				Short: true,
+			},
+			{
+				Title: "Current Margin Level",
+				Value: m.CurrentMarginLevel.String(),
+				Short: true,
+			},
+			{
+				Title: "Minimal Margin Level",
+				Value: m.MinimalMarginLevel.String(),
+				Short: true,
+			},
+		},
+		// Footer:     "",
+		// FooterIcon: "",
+	}
+}
 
 type MarginAsset struct {
 	Asset                string           `json:"asset"`
@@ -57,7 +93,9 @@ type Strategy struct {
 	MaxMarginLevel       fixedpoint.Value `json:"maxMarginLevel"`
 	AutoRepayWhenDeposit bool             `json:"autoRepayWhenDeposit"`
 
-	MarginLevelAlertSlackMentions []string `json:"marginLevelAlertSlackMentions"`
+	MarginLevelAlertInterval      types.Duration   `json:"marginLevelAlertInterval"`
+	MarginLevelAlertMinMargin     fixedpoint.Value `json:"marginLevelAlertMinMargin"`
+	MarginLevelAlertSlackMentions []string         `json:"marginLevelAlertSlackMentions"`
 
 	Assets []MarginAsset `json:"assets"`
 
@@ -510,6 +548,39 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 	}
 
+	if !s.MarginLevelAlertMinMargin.IsZero() {
+		alertInterval := time.Minute * 5
+		if s.MarginLevelAlertInterval > 0 {
+			alertInterval = s.MarginLevelAlertInterval.Duration()
+		}
+
+		go s.marginAlertWorker(ctx, alertInterval)
+	}
+
 	go s.run(ctx, s.Interval.Duration())
 	return nil
+}
+
+func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(alertInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				account := s.ExchangeSession.GetAccount()
+				if account.MarginLevel.Compare(s.MarginLevelAlertMinMargin) <= 0 {
+					bbgo.Notify(&MarginAlert{
+						CurrentMarginLevel: account.MarginLevel,
+						MinimalMarginLevel: s.MarginLevelAlertMinMargin,
+						SlackMentions:      s.MarginLevelAlertSlackMentions,
+						SessionName:        s.ExchangeSession.Name,
+					})
+					bbgo.Notify(account.Balances().Debts())
+				}
+			}
+		}
+	}()
 }

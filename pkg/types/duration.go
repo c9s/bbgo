@@ -89,6 +89,7 @@ func ParseSimpleDuration(s string) (*SimpleDuration, error) {
 	return nil, errors.Wrapf(ErrNotSimpleDuration, "input %q is not a simple duration", s)
 }
 
+// Duration
 type Duration time.Duration
 
 func (d *Duration) Duration() time.Duration {
