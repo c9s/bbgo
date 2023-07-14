@@ -340,6 +340,8 @@ func convertSubscription(s types.Subscription) string {
 		return fmt.Sprintf("%s@trade", strings.ToLower(s.Symbol))
 	case types.AggTradeChannel:
 		return fmt.Sprintf("%s@aggTrade", strings.ToLower(s.Symbol))
+	case types.ForceOrderChannel:
+		return fmt.Sprintf("%s@forceOrder", strings.ToLower(s.Symbol))
 	}
 
 	return fmt.Sprintf("%s@%s", strings.ToLower(s.Symbol), s.Channel)

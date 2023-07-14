@@ -8,6 +8,7 @@ const (
 	BookTickerChannel  = Channel("bookTicker")
 	MarketTradeChannel = Channel("trade")
 	AggTradeChannel    = Channel("aggTrade")
+	ForceOrderChannel  = Channel("forceOrder")
 
 	// channels for futures
 	MarkPriceChannel = Channel("markPrice")

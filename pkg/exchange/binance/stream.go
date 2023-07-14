@@ -48,6 +48,7 @@ type Stream struct {
 
 	marketTradeEventCallbacks []func(e *MarketTradeEvent)
 	aggTradeEventCallbacks    []func(e *AggTradeEvent)
+	forceOrderEventCallbacks  []func(e *ForceOrderEvent)
 
 	balanceUpdateEventCallbacks           []func(event *BalanceUpdateEvent)
 	outboundAccountInfoEventCallbacks     []func(event *OutboundAccountInfoEvent)
@@ -126,6 +127,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnContinuousKLineEvent(stream.handleContinuousKLineEvent)
 	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
 	stream.OnAggTradeEvent(stream.handleAggTradeEvent)
+	stream.OnForceOrderEvent(stream.handleForceOrderEvent)
 
 	// Futures User Data Stream
 	// ===================================
@@ -231,6 +233,10 @@ func (s *Stream) handleMarketTradeEvent(e *MarketTradeEvent) {
 
 func (s *Stream) handleAggTradeEvent(e *AggTradeEvent) {
 	s.EmitAggTrade(e.Trade())
+}
+
+func (s *Stream) handleForceOrderEvent(e *ForceOrderEvent) {
+	s.EmitForceOrder(e.LiquidationInfo())
 }
 
 func (s *Stream) handleKLineEvent(e *KLineEvent) {
