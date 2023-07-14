@@ -254,7 +254,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 	for maxTries := 5; account.MarginLevel.Compare(minMarginLevel) < 0 && maxTries > 0; maxTries-- {
 		log.Infof("current margin level %f < min margin level %f, skip autoborrow", account.MarginLevel.Float64(), minMarginLevel.Float64())
 
-		bbgo.Notify("Warning!!! %s Current Margin Level %f < Minimal Margin Level %f "+strings.Join(s.MarginLevelAlertSlackMentions, " "),
+		bbgo.Notify("Warning!!! %s Current Margin Level %f < Minimal Margin Level %f",
 			s.ExchangeSession.Name,
 			account.MarginLevel.Float64(),
 			minMarginLevel.Float64(),

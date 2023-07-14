@@ -29,4 +29,4 @@ exchangeStrategies:
       low: 1000.0
       maxQuantityPerBorrow: 100.0
       maxTotalBorrow: 10.0
-      
+
