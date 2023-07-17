@@ -67,4 +67,14 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("assets: %+v", assets)
 	})
+
+	t.Run("GetAccountTransfersRequest", func(t *testing.T) {
+		req := client.NewGetAccountTransfersRequest()
+		req.CoinId(1)
+		req.FromType(AccountExchange)
+		transfers, err := req.Do(ctx)
+
+		assert.NoError(t, err)
+		t.Logf("transfers: %+v", transfers)
+	})
 }

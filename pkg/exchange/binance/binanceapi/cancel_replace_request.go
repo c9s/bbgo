@@ -2,8 +2,9 @@ package binanceapi
 
 import (
 	"github.com/adshao/go-binance/v2"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type CancelReplaceSpotOrderData struct {
