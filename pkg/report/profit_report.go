@@ -72,7 +72,7 @@ func (r *AccumulatedProfitReport) Initialize(symbol string, interval types.Inter
 	}
 
 	r.accumulatedProfitPerInterval = types.NewFloat64Series()
-	r.profitMA = indicatorv2.SMA2(r.accumulatedProfitPerInterval, r.ProfitMAWindow)
+	r.profitMA = indicatorv2.SMA(r.accumulatedProfitPerInterval, r.ProfitMAWindow)
 }
 
 func (r *AccumulatedProfitReport) AddStrategyParameter(title string, value string) {
