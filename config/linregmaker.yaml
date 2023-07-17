@@ -175,3 +175,12 @@ exchangeStrategies:
       # roiStopLoss is the stop loss percentage of the position ROI (currently the price change)
       - roiStopLoss:
           percentage: 30%
+
+    profitStatsTracker:
+      interval: 1d
+      window: 30
+      accumulatedProfitReport:
+        profitMAWindow: 60
+        shortTermProfitWindow: 14
+        tsvReportPath: res.tsv
+    trackParameters: false
