@@ -120,3 +120,4 @@ exchangeStrategies:
         profitMAWindow: 60
         shortTermProfitWindow: 14
         tsvReportPath: res.tsv
+    trackParameters: false

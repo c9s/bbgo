@@ -39,7 +39,9 @@ type Strategy struct {
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
 
+	// ProfitStatsTracker tracks profit related status and generates report
 	ProfitStatsTracker *report.ProfitStatsTracker `json:"profitStatsTracker"`
+	TrackParameters    bool                       `json:"trackParameters"`
 
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
@@ -362,7 +364,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		// Add strategy parameters to report
-		if s.ProfitStatsTracker.AccumulatedProfitReport != nil {
+		if s.TrackParameters && s.ProfitStatsTracker.AccumulatedProfitReport != nil {
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("window", fmt.Sprintf("%d", s.Window))
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("multiplier", fmt.Sprintf("%f", s.SupertrendMultiplier))
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("fastDEMA", fmt.Sprintf("%d", s.FastDEMAWindow))
