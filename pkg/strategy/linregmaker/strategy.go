@@ -3,6 +3,8 @@ package linregmaker
 import (
 	"context"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/report"
+	"os"
 	"sync"
 
 	"github.com/c9s/bbgo/pkg/risk/dynamicrisk"
@@ -135,6 +137,10 @@ type Strategy struct {
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
 
+	// ProfitStatsTracker tracks profit related status and generates report
+	ProfitStatsTracker *report.ProfitStatsTracker `json:"profitStatsTracker"`
+	TrackParameters    bool                       `json:"trackParameters"`
+
 	Environment          *bbgo.Environment
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 	Market               types.Market
@@ -241,6 +247,11 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 	if len(s.DynamicQuantityDecrease) > 0 {
 		s.DynamicQuantityDecrease.Initialize(s.Symbol, session)
+	}
+
+	// Profit tracker
+	if s.ProfitStatsTracker != nil {
+		s.ProfitStatsTracker.Subscribe(session, s.Symbol)
 	}
 }
 
@@ -664,6 +675,27 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 	s.ExitMethods.Bind(session, s.orderExecutor)
 
+	// Setup profit tracker
+	if s.ProfitStatsTracker != nil {
+		if s.ProfitStatsTracker.CurrentProfitStats == nil {
+			s.ProfitStatsTracker.InitLegacy(s.Market, &s.ProfitStats, s.TradeStats)
+		}
+
+		// Add strategy parameters to report
+		if s.TrackParameters && s.ProfitStatsTracker.AccumulatedProfitReport != nil {
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("ReverseEMAWindow", fmt.Sprintf("%d", s.ReverseEMA.Window))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("FastLinRegInterval", fmt.Sprintf("%s", s.FastLinReg.Interval))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("SlowLinRegWindow", fmt.Sprintf("%d", s.SlowLinReg.Window))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("SlowLinRegInterval", fmt.Sprintf("%s", s.SlowLinReg.Interval))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("FasterDecreaseRatio", fmt.Sprintf("%f", s.FasterDecreaseRatio))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("NeutralBollingerWindow", fmt.Sprintf("%d", s.NeutralBollinger.Window))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("NeutralBollingerBandWidth", fmt.Sprintf("%f", s.NeutralBollinger.BandWidth))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("Spread", fmt.Sprintf("%f", s.Spread))
+		}
+
+		s.ProfitStatsTracker.Bind(s.session, s.orderExecutor.TradeCollector())
+	}
+
 	// Indicators initialized by StandardIndicatorSet must be initialized in Run()
 	// Initialize ReverseEMA
 	s.ReverseEMA = s.StandardIndicatorSet.EWMA(s.ReverseEMA.IntervalWindow)
@@ -812,7 +844,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
+		// Output profit report
+		if s.ProfitStatsTracker != nil {
+			if s.ProfitStatsTracker.AccumulatedProfitReport != nil {
+				s.ProfitStatsTracker.AccumulatedProfitReport.Output()
+			}
+		}
+
 		_ = s.orderExecutor.GracefulCancel(ctx)
+		_, _ = fmt.Fprintln(os.Stderr, s.TradeStats.String())
 	})
 
 	return nil
