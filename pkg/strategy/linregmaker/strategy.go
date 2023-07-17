@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/c9s/bbgo/pkg/report"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/c9s/bbgo/pkg/risk/dynamicrisk"
@@ -683,14 +684,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// Add strategy parameters to report
 		if s.TrackParameters && s.ProfitStatsTracker.AccumulatedProfitReport != nil {
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("ReverseEMAWindow", fmt.Sprintf("%d", s.ReverseEMA.Window))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("FastLinRegInterval", fmt.Sprintf("%s", s.FastLinReg.Interval))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("SlowLinRegWindow", fmt.Sprintf("%d", s.SlowLinReg.Window))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("SlowLinRegInterval", fmt.Sprintf("%s", s.SlowLinReg.Interval))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("FasterDecreaseRatio", fmt.Sprintf("%f", s.FasterDecreaseRatio))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("NeutralBollingerWindow", fmt.Sprintf("%d", s.NeutralBollinger.Window))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("NeutralBollingerBandWidth", fmt.Sprintf("%f", s.NeutralBollinger.BandWidth))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("Spread", fmt.Sprintf("%f", s.Spread))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("ReverseEMAWindow", strconv.Itoa(s.ReverseEMA.Window))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("FastLinRegInterval", s.FastLinReg.Interval.String())
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("SlowLinRegWindow", strconv.Itoa(s.SlowLinReg.Window))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("SlowLinRegInterval", s.SlowLinReg.Interval.String())
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("FasterDecreaseRatio", s.FasterDecreaseRatio.String())
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("NeutralBollingerWindow", strconv.Itoa(s.NeutralBollinger.Window))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("NeutralBollingerBandWidth", strconv.FormatFloat(s.NeutralBollinger.BandWidth, 'f', 4, 64))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("Spread", s.Spread.Percentage())
 		}
 
 		s.ProfitStatsTracker.Bind(s.session, s.orderExecutor.TradeCollector())
