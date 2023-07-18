@@ -52,7 +52,12 @@ func calculateArithmeticPins(lower, upper, spread, tickSize fixedpoint.Value) []
 	}
 
 	// this makes sure there is no error at the upper price
-	pins = append(pins, Pin(upper))
+	pp := math.Round(upper.Float64()*pow10*10.0) / 10.0
+	pp = math.Trunc(pp) / pow10
+
+	pps := strconv.FormatFloat(pp, 'f', prec, 64)
+	upperPrice := fixedpoint.MustNewFromString(pps)
+	pins = append(pins, Pin(upperPrice))
 
 	return pins
 }
