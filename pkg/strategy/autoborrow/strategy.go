@@ -186,7 +186,8 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 			marginAsset.MinDebtRatio = fixedpoint.One
 		}
 
-		if b.Total().Compare(marginAsset.Low) <= 0 {
+		if total.Compare(marginAsset.Low) <= 0 {
+			log.Infof("%s total %f is less than margin asset low %f, skip repay", marginAsset.Asset, total.Float64(), marginAsset.Low.Float64())
 			continue
 		}
 
