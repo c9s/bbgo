@@ -187,15 +187,15 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 		}
 
 		if total.Compare(marginAsset.Low) <= 0 {
-			log.Infof("%s total %f is less than margin asset low %f, skip repay", marginAsset.Asset, total.Float64(), marginAsset.Low.Float64())
+			log.Infof("%s total %f is less than margin asset low %f, skip early repay", marginAsset.Asset, total.Float64(), marginAsset.Low.Float64())
 			continue
 		}
 
 		log.Infof("checking debtRatio: session = %s asset = %s, debt = %f, total = %f, debtRatio = %f", s.ExchangeSession.Name, marginAsset.Asset, debt.Float64(), total.Float64(), debtRatio.Float64())
 
 		// if debt is greater than total, skip repay
-		if b.Debt().Compare(b.Total()) > 0 {
-			log.Infof("%s debt %f is greater than total %f", marginAsset.Asset, b.Debt().Float64(), b.Total().Float64())
+		if debt.Compare(total) > 0 {
+			log.Infof("%s debt %f is greater than total %f, skip early repay", marginAsset.Asset, debt.Float64(), total.Float64())
 			continue
 		}
 
