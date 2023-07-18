@@ -194,14 +194,14 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 
 		// if debt is greater than total, skip repay
 		if b.Debt().Compare(b.Total()) > 0 {
-			log.Infof("%s debt %f is less than total %f", marginAsset.Asset, b.Debt().Float64(), b.Total().Float64())
+			log.Infof("%s debt %f is greater than total %f", marginAsset.Asset, b.Debt().Float64(), b.Total().Float64())
 			continue
 		}
 
 		// the current debt ratio is less than the minimal ratio,
 		// we need to repay and reduce the debt
 		if debtRatio.Compare(marginAsset.MinDebtRatio) > 0 {
-			log.Infof("%s debt ratio %f is less than min debt ratio %f, skip", marginAsset.Asset, debtRatio.Float64(), marginAsset.MinDebtRatio.Float64())
+			log.Infof("%s debt ratio %f is greater than min debt ratio %f, skip", marginAsset.Asset, debtRatio.Float64(), marginAsset.MinDebtRatio.Float64())
 			continue
 		}
 
