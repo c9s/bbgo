@@ -180,7 +180,9 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 		}
 
 		// debt / total
-		debtRatio := b.Debt().Div(b.Total())
+		debt := b.Debt()
+		total := b.Total()
+		debtRatio := debt.Div(total)
 		if marginAsset.MinDebtRatio.IsZero() {
 			marginAsset.MinDebtRatio = fixedpoint.One
 		}
@@ -189,7 +191,7 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 			continue
 		}
 
-		log.Infof("checking debtRatio: session = %s asset = %s, debtRatio = %f", s.ExchangeSession.Name, marginAsset.Asset, debtRatio.Float64())
+		log.Infof("checking debtRatio: session = %s asset = %s, debt = %f, total = %f, debtRatio = %f", s.ExchangeSession.Name, marginAsset.Asset, debt.Float64(), total.Float64(), debtRatio.Float64())
 
 		// if debt is greater than total, skip repay
 		if b.Debt().Compare(b.Total()) > 0 {
