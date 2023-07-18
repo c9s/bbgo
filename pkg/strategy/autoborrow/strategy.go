@@ -165,7 +165,6 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 	}
 
 	minMarginLevel := s.MinMarginLevel
-	curMarginLevel := account.MarginLevel
 
 	balances := account.Balances()
 	if len(balances) == 0 {
@@ -219,12 +218,18 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 			Action:         fmt.Sprintf("Repay for Debt Ratio %f", debtRatio.Float64()),
 			Asset:          b.Currency,
 			Amount:         toRepay,
-			MarginLevel:    curMarginLevel,
+			MarginLevel:    account.MarginLevel,
 			MinMarginLevel: minMarginLevel,
 		})
 
 		if err := s.marginBorrowRepay.RepayMarginAsset(context.Background(), b.Currency, toRepay); err != nil {
 			log.WithError(err).Errorf("margin repay error")
+		}
+
+		if accountUpdate, err2 := s.ExchangeSession.UpdateAccount(ctx); err2 != nil {
+			log.WithError(err).Errorf("unable to update account")
+		} else {
+			account = accountUpdate
 		}
 	}
 }
