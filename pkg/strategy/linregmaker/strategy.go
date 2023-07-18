@@ -689,10 +689,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("FastLinRegInterval", s.FastLinReg.Interval.String())
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("SlowLinRegWindow", strconv.Itoa(s.SlowLinReg.Window))
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("SlowLinRegInterval", s.SlowLinReg.Interval.String())
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("FasterDecreaseRatio", s.FasterDecreaseRatio.String())
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("FasterDecreaseRatio", strconv.FormatFloat(s.FasterDecreaseRatio.Float64(), 'f', 4, 64))
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("NeutralBollingerWindow", strconv.Itoa(s.NeutralBollinger.Window))
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("NeutralBollingerBandWidth", strconv.FormatFloat(s.NeutralBollinger.BandWidth, 'f', 4, 64))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("Spread", s.Spread.Percentage())
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("Spread", strconv.FormatFloat(s.Spread.Float64(), 'f', 4, 64))
 		}
 
 		s.ProfitStatsTracker.Bind(s.session, s.orderExecutor.TradeCollector())
