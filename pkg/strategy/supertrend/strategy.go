@@ -39,6 +39,10 @@ type Strategy struct {
 	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
 	TradeStats  *types.TradeStats  `persistence:"trade_stats"`
 
+	// ProfitStatsTracker tracks profit related status and generates report
+	ProfitStatsTracker *report.ProfitStatsTracker `json:"profitStatsTracker"`
+	TrackParameters    bool                       `json:"trackParameters"`
+
 	// Symbol is the market symbol you want to trade
 	Symbol string `json:"symbol"`
 
@@ -101,9 +105,6 @@ type Strategy struct {
 
 	// StrategyController
 	bbgo.StrategyController
-
-	// Accumulated profit report
-	AccumulatedProfitReport *report.AccumulatedProfitReport `json:"accumulatedProfitReport"`
 }
 
 func (s *Strategy) ID() string {
@@ -131,6 +132,11 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LinearRegression.Interval})
 
 	s.ExitMethods.SetAndSubscribe(session, s)
+
+	// Profit tracker
+	if s.ProfitStatsTracker != nil {
+		s.ProfitStatsTracker.Subscribe(session, s.Symbol)
+	}
 }
 
 // Position control
@@ -351,27 +357,30 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindTradeStats(s.TradeStats)
 	s.orderExecutor.Bind()
 
-	// AccountValueCalculator
-	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
-
-	// Accumulated profit report
-	if bbgo.IsBackTesting {
-		if s.AccumulatedProfitReport == nil {
-			s.AccumulatedProfitReport = &report.AccumulatedProfitReport{}
+	// Setup profit tracker
+	if s.ProfitStatsTracker != nil {
+		if s.ProfitStatsTracker.CurrentProfitStats == nil {
+			s.ProfitStatsTracker.InitLegacy(s.Market, &s.ProfitStats, s.TradeStats)
 		}
-		s.AccumulatedProfitReport.Initialize(s.Symbol, session, s.orderExecutor, s.TradeStats)
 
 		// Add strategy parameters to report
-		s.AccumulatedProfitReport.AddExtraValue([2]string{"window", fmt.Sprintf("%d", s.Window)})
-		s.AccumulatedProfitReport.AddExtraValue([2]string{"multiplier", fmt.Sprintf("%f", s.SupertrendMultiplier)})
-		s.AccumulatedProfitReport.AddExtraValue([2]string{"fastDEMA", fmt.Sprintf("%d", s.FastDEMAWindow)})
-		s.AccumulatedProfitReport.AddExtraValue([2]string{"slowDEMA", fmt.Sprintf("%d", s.SlowDEMAWindow)})
-		s.AccumulatedProfitReport.AddExtraValue([2]string{"takeProfitAtrMultiplier", fmt.Sprintf("%f", s.TakeProfitAtrMultiplier)})
-		s.AccumulatedProfitReport.AddExtraValue([2]string{"stopLossByTriggeringK", fmt.Sprintf("%t", s.StopLossByTriggeringK)})
-		s.AccumulatedProfitReport.AddExtraValue([2]string{"stopByReversedSupertrend", fmt.Sprintf("%t", s.StopByReversedSupertrend)})
-		s.AccumulatedProfitReport.AddExtraValue([2]string{"stopByReversedDema", fmt.Sprintf("%t", s.StopByReversedDema)})
-		s.AccumulatedProfitReport.AddExtraValue([2]string{"stopByReversedLinGre", fmt.Sprintf("%t", s.StopByReversedLinGre)})
+		if s.TrackParameters && s.ProfitStatsTracker.AccumulatedProfitReport != nil {
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("window", fmt.Sprintf("%d", s.Window))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("multiplier", fmt.Sprintf("%f", s.SupertrendMultiplier))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("fastDEMA", fmt.Sprintf("%d", s.FastDEMAWindow))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("slowDEMA", fmt.Sprintf("%d", s.SlowDEMAWindow))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("takeProfitAtrMultiplier", fmt.Sprintf("%f", s.TakeProfitAtrMultiplier))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopLossByTriggeringK", fmt.Sprintf("%t", s.StopLossByTriggeringK))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedSupertrend", fmt.Sprintf("%t", s.StopByReversedSupertrend))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedDema", fmt.Sprintf("%t", s.StopByReversedDema))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedLinGre", fmt.Sprintf("%t", s.StopByReversedLinGre))
+		}
+
+		s.ProfitStatsTracker.Bind(s.session, s.orderExecutor.TradeCollector())
 	}
+
+	// AccountValueCalculator
+	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
 
 	// For drawing
 	profitSlice := floats.Slice{1., 1.}
@@ -520,10 +529,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		if bbgo.IsBackTesting {
-			// Output accumulated profit report
-			defer s.AccumulatedProfitReport.Output(s.Symbol)
+		// Output profit report
+		if s.ProfitStatsTracker != nil {
+			if s.ProfitStatsTracker.AccumulatedProfitReport != nil {
+				s.ProfitStatsTracker.AccumulatedProfitReport.Output()
+			}
+		}
 
+		if bbgo.IsBackTesting {
 			// Draw graph
 			if s.DrawGraph {
 				if err := s.Draw(&profitSlice, &cumProfitSlice); err != nil {
