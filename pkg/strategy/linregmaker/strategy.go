@@ -685,6 +685,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Add strategy parameters to report
 		if s.TrackParameters && s.ProfitStatsTracker.AccumulatedProfitReport != nil {
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("ReverseEMAWindow", strconv.Itoa(s.ReverseEMA.Window))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("FastLinRegWindow", strconv.Itoa(s.FastLinReg.Window))
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("FastLinRegInterval", s.FastLinReg.Interval.String())
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("SlowLinRegWindow", strconv.Itoa(s.SlowLinReg.Window))
 			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("SlowLinRegInterval", s.SlowLinReg.Interval.String())
