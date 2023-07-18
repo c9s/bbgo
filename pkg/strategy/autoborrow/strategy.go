@@ -215,7 +215,7 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 
 		bbgo.Notify(&MarginAction{
 			Exchange:       s.ExchangeSession.ExchangeName,
-			Action:         fmt.Sprintf("Repay for Debt Ratio %f", debtRatio.Float64()),
+			Action:         fmt.Sprintf("Repay for Debt Ratio %f < Min Debt Ratio %f", debtRatio.Float64(), marginAsset.MinDebtRatio.Float64()),
 			Asset:          b.Currency,
 			Amount:         toRepay,
 			MarginLevel:    account.MarginLevel,
