@@ -107,12 +107,6 @@ func (c *TradeCollector) Recover(ctx context.Context, ex types.ExchangeTradeHist
 	return nil
 }
 
-func (c *TradeCollector) setDone(key types.TradeKey) {
-	c.mu.Lock()
-	c.doneTrades[key] = struct{}{}
-	c.mu.Unlock()
-}
-
 // Process filters the received trades and see if there are orders matching the trades
 // if we have the order in the order store, then the trade will be considered for the position.
 // profit will also be calculated.
@@ -120,48 +114,47 @@ func (c *TradeCollector) Process() bool {
 	logrus.Debugf("TradeCollector.Process()")
 	positionChanged := false
 
+	var trades []types.Trade
+
+	// if it's already done, remove the trade from the trade store
+	c.mu.Lock()
 	c.tradeStore.Filter(func(trade types.Trade) bool {
 		key := trade.Key()
 
-		c.mu.Lock()
-
-		// if it's already done, remove the trade from the trade store
+		// remove done trades
 		if _, done := c.doneTrades[key]; done {
-			c.mu.Unlock()
 			return true
 		}
 
-		if c.position != nil {
-			if c.orderStore.Exists(trade.OrderID) {
-				var p types.Profit
-				profit, netProfit, madeProfit := c.position.AddTrade(trade)
-				if madeProfit {
-					p = c.position.NewProfit(trade, profit, netProfit)
-				}
-
-				c.doneTrades[key] = struct{}{}
-				c.mu.Unlock()
-
-				c.EmitTrade(trade, profit, netProfit)
-				if !p.Profit.IsZero() {
-					c.EmitProfit(trade, &p)
-				}
-
-				positionChanged = true
-				return true
-			}
-
-		} else {
-			if c.orderStore.Exists(trade.OrderID) {
-				c.doneTrades[key] = struct{}{}
-				c.mu.Unlock()
-				c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
-				return true
-			}
+		// if it's the trade we're looking for, add it to the list and mark it as done
+		if c.orderStore.Exists(trade.OrderID) {
+			trades = append(trades, trade)
+			c.doneTrades[key] = struct{}{}
+			return true
 		}
 
 		return false
 	})
+	c.mu.Unlock()
+
+	for _, trade := range trades {
+		var p types.Profit
+		if c.position != nil {
+			profit, netProfit, madeProfit := c.position.AddTrade(trade)
+			if madeProfit {
+				p = c.position.NewProfit(trade, profit, netProfit)
+			}
+			positionChanged = true
+
+			c.EmitTrade(trade, profit, netProfit)
+		} else {
+			c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
+		}
+
+		if !p.Profit.IsZero() {
+			c.EmitProfit(trade, &p)
+		}
+	}
 
 	if positionChanged && c.position != nil {
 		c.EmitPositionUpdate(c.position)
