@@ -16,8 +16,10 @@ exchangeStrategies:
   rsicross:
     symbol: BTCUSDT
     interval: 5m
-    fastWindow: 3
-    slowWindow: 12
+    fastWindow: 6
+    slowWindow: 18
+    openBelow: 30.0
+    closeAbove: 60.0
 
     quantity: 0.1
 
