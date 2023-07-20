@@ -75,7 +75,7 @@ func TestIterateFieldsByTag(t *testing.T) {
 
 		collectedTags := []string{}
 		cnt := 0
-		err := IterateFieldsByTag(&a, "persistence", func(tag string, ft reflect.StructField, fv reflect.Value) error {
+		err := IterateFieldsByTag(&a, "persistence", true, func(tag string, ft reflect.StructField, fv reflect.Value) error {
 			cnt++
 			collectedTags = append(collectedTags, tag)
 			return nil
@@ -101,7 +101,7 @@ func TestIterateFieldsByTag(t *testing.T) {
 
 		collectedTags := []string{}
 		cnt := 0
-		err := IterateFieldsByTag(&a, "persistence", func(tag string, ft reflect.StructField, fv reflect.Value) error {
+		err := IterateFieldsByTag(&a, "persistence", true, func(tag string, ft reflect.StructField, fv reflect.Value) error {
 			cnt++
 			collectedTags = append(collectedTags, tag)
 			return nil
@@ -119,7 +119,7 @@ func TestIterateFieldsByTag(t *testing.T) {
 
 		collectedTags := []string{}
 		cnt := 0
-		err := IterateFieldsByTag(a, "persistence", func(tag string, ft reflect.StructField, fv reflect.Value) error {
+		err := IterateFieldsByTag(a, "persistence", true, func(tag string, ft reflect.StructField, fv reflect.Value) error {
 			cnt++
 			collectedTags = append(collectedTags, tag)
 			return nil

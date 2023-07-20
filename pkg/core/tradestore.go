@@ -60,6 +60,7 @@ func (s *TradeStore) Clear() {
 
 type TradeFilter func(trade types.Trade) bool
 
+// Filter filters the trades by a given TradeFilter function
 func (s *TradeStore) Filter(filter TradeFilter) {
 	s.Lock()
 	var trades = make(map[uint64]types.Trade)
@@ -72,6 +73,7 @@ func (s *TradeStore) Filter(filter TradeFilter) {
 	s.Unlock()
 }
 
+// GetOrderTrades finds the trades match order id matches to the given order
 func (s *TradeStore) GetOrderTrades(o types.Order) (trades []types.Trade) {
 	s.Lock()
 	for _, t := range s.trades {
