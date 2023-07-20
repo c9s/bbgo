@@ -88,7 +88,8 @@ func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, se
 	})
 
 	if environ.GoogleSpreadSheetService != nil {
-		// allocate a google spread sheet for this strategy
+		// allocate a Google spread sheet for this strategy
+		s.configureSpreadSheet()
 	}
 
 	if !s.PositionHardLimit.IsZero() && !s.MaxPositionQuantity.IsZero() {
@@ -104,4 +105,31 @@ func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, se
 			s.CircuitBreakLossThreshold,
 			s.ProfitStats)
 	}
+}
+
+func (s *Strategy) configureSpreadSheet() error {
+	sheetSrv := s.Environ.GoogleSpreadSheetService
+	// allocate a Google spread sheet for this strategy
+	spreadsheet, err := sheetSrv.Get(true)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("spreadsheet loaded: %+v", spreadsheet)
+
+	profitStatsTitle := "profitStats-" + s.Position.StrategyInstanceID
+	sheet, err := sheetSrv.LookupOrNewSheet(profitStatsTitle)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("sheet loaded: %+v", sheet)
+
+	column, err := sheetSrv.GetFirstColumn(sheet)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("column: %+v", column)
+	return nil
 }
