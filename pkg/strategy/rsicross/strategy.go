@@ -26,10 +26,12 @@ type Strategy struct {
 	Environment *bbgo.Environment
 	Market      types.Market
 
-	Symbol     string         `json:"symbol"`
-	Interval   types.Interval `json:"interval"`
-	SlowWindow int            `json:"slowWindow"`
-	FastWindow int            `json:"fastWindow"`
+	Symbol     string           `json:"symbol"`
+	Interval   types.Interval   `json:"interval"`
+	SlowWindow int              `json:"slowWindow"`
+	FastWindow int              `json:"fastWindow"`
+	OpenBelow  fixedpoint.Value `json:"openBelow"`
+	CloseAbove fixedpoint.Value `json:"closeAbove"`
 
 	bbgo.OpenPositionOptions
 }
@@ -56,6 +58,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	rsiCross.OnUpdate(func(v float64) {
 		switch indicatorv2.CrossType(v) {
 		case indicatorv2.CrossOver:
+			if s.OpenBelow.Sign() > 0 && fastRsi.Last(0) > s.OpenBelow.Float64() {
+				return
+			}
+
 			opts := s.OpenPositionOptions
 			opts.Long = true
 
@@ -70,6 +76,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			}
 
 		case indicatorv2.CrossUnder:
+			if s.CloseAbove.Sign() > 0 && fastRsi.Last(0) < s.CloseAbove.Float64() {
+				return
+			}
+
 			if err := s.OrderExecutor.ClosePosition(ctx, fixedpoint.One); err != nil {
 				logErr(err, "failed to close position")
 			}
