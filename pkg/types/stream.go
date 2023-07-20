@@ -214,13 +214,13 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 					return
 
 				case net.Error:
-					log.WithError(err).Error("websocket read network error")
+					log.WithError(err).Warn("websocket read network error")
 					_ = conn.Close()
 					s.Reconnect()
 					return
 
 				default:
-					log.WithError(err).Error("unexpected websocket error")
+					log.WithError(err).Warn("unexpected websocket error")
 					_ = conn.Close()
 					s.Reconnect()
 					return
