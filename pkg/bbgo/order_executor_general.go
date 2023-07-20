@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/backoff"
 )
 
 var ErrExceededSubmitOrderRetryLimit = errors.New("exceeded submit order retry limit")
@@ -429,15 +430,10 @@ func (e *GeneralOrderExecutor) GracefulCancelActiveOrderBook(ctx context.Context
 		return nil
 	}
 
-	if err := activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
-		// Retry once
-		if err = activeOrders.GracefulCancel(ctx, e.session.Exchange); err != nil {
-			return errors.Wrap(err, "graceful cancel error")
-		}
-	}
+	defer e.tradeCollector.Process()
 
-	e.tradeCollector.Process()
-	return nil
+	op := func() error { return activeOrders.GracefulCancel(ctx, e.session.Exchange) }
+	return backoff.RetryGeneral(ctx, op)
 }
 
 // GracefulCancel cancels all active maker orders if orders are not given, otherwise cancel all the given orders

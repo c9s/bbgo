@@ -43,7 +43,7 @@ func Sync(ctx context.Context, obj interface{}) {
 }
 
 func loadPersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
-	return dynamic.IterateFieldsByTag(obj, "persistence", func(tag string, field reflect.StructField, value reflect.Value) error {
+	return dynamic.IterateFieldsByTag(obj, "persistence", true, func(tag string, field reflect.StructField, value reflect.Value) error {
 		log.Debugf("[loadPersistenceFields] loading value into field %v, tag = %s, original value = %v", field, tag, value)
 
 		newValueInf := dynamic.NewTypeValueInterface(value.Type())
@@ -71,7 +71,7 @@ func loadPersistenceFields(obj interface{}, id string, persistence service.Persi
 }
 
 func storePersistenceFields(obj interface{}, id string, persistence service.PersistenceService) error {
-	return dynamic.IterateFieldsByTag(obj, "persistence", func(tag string, ft reflect.StructField, fv reflect.Value) error {
+	return dynamic.IterateFieldsByTag(obj, "persistence", true, func(tag string, ft reflect.StructField, fv reflect.Value) error {
 		log.Debugf("[storePersistenceFields] storing value from field %v, tag = %s, original value = %v", ft, tag, fv)
 
 		inf := fv.Interface()
