@@ -79,6 +79,7 @@ func (s *SpreadSheetService) NewSheet(title string) (*sheets.Sheet, error) {
 	return s.LookupSheet(title)
 }
 
+// LookupSheet looks up if there is a sheet matches the given title
 func (s *SpreadSheetService) LookupSheet(title string) (*sheets.Sheet, error) {
 	spreadsheet, err := s.Get(false)
 	if err != nil {
@@ -94,6 +95,8 @@ func (s *SpreadSheetService) LookupSheet(title string) (*sheets.Sheet, error) {
 	return nil, nil
 }
 
+// LookupSheet looks up if there is a sheet matches the given title
+// And if there is no such a sheet, a sheet with that given title will be created.
 func (s *SpreadSheetService) LookupOrNewSheet(title string) (*sheets.Sheet, error) {
 	sheet, err := s.LookupSheet(title)
 	if err != nil {
@@ -105,6 +108,17 @@ func (s *SpreadSheetService) LookupOrNewSheet(title string) (*sheets.Sheet, erro
 	}
 
 	return s.NewSheet(title)
+}
+
+func (s *SpreadSheetService) GetFirstColumn(sheet *sheets.Sheet) ([][]interface{}, error) {
+	title := sheet.Properties.Title
+	readRange := title + "!A1:A"
+	resp, err := ReadSheetValuesRange(s.service, s.SpreadsheetID, readRange)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Values, nil
 }
 
 func ReadSheetValuesRange(srv *sheets.Service, spreadsheetId, readRange string) (*sheets.ValueRange, error) {
