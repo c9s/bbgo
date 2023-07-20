@@ -89,6 +89,7 @@ func main() {
 	}
 
 	logrus.Infof("spreadsheet: %+v", spreadsheet)
+	logrus.Infof("spreadsheet sheet[0]: %+v", spreadsheet.Sheets[0])
 
 	for i, sheet := range spreadsheet.Sheets {
 		logrus.Infof("#%d sheetId: %d", i, sheet.Properties.SheetId)
