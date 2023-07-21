@@ -78,6 +78,10 @@ metrics:
   enabled: false
   port: 9090
 
+logFormatter:
+  enabled: false
+  format: json
+
 grpc:
   enabled: false
   port: 50051
