@@ -128,7 +128,8 @@ the implementation.
 - OKEx Spot Exchange
 - Kucoin Spot Exchange
 - MAX Spot Exchange (located in Taiwan)
-- Bitget (In Progress)
+- Bitget Exchange (In Progress)
+- Bybit Exchange (In Progress)
 
 ## Documentation and General Topics
 
@@ -219,6 +220,10 @@ KUCOIN_API_KEY=
 KUCOIN_API_SECRET=
 KUCOIN_API_PASSPHRASE=
 KUCOIN_API_KEY_VERSION=2
+
+# for Bybit exchange, if you have one
+BYBIT_API_KEY=
+BYBIT_API_SECRET=
 ```
 
 Prepare your dotenv file `.env.local` and BBGO yaml config file `bbgo.yaml`.
