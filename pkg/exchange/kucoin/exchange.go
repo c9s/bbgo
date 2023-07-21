@@ -23,7 +23,7 @@ var queryOrderLimiter = rate.NewLimiter(rate.Every(6*time.Second), 1)
 
 var ErrMissingSequence = errors.New("sequence is missing")
 
-// OKB is the platform currency of OKEx, pre-allocate static string here
+// KCS is the platform currency of Kucoin, pre-allocate static string here
 const KCS = "KCS"
 
 var log = logrus.WithFields(logrus.Fields{
@@ -38,7 +38,6 @@ type Exchange struct {
 func New(key, secret, passphrase string) *Exchange {
 	client := kucoinapi.NewClient()
 
-	// for public access mode
 	if len(key) > 0 && len(secret) > 0 && len(passphrase) > 0 {
 		client.Auth(key, secret, passphrase)
 	}
