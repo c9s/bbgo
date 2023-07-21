@@ -54,6 +54,10 @@ spec:
           {{- if .Values.webserver.enabled }}
           - "--enable-webserver"
           {{- end }}
+          {{- if .Values.logFormatter.enabled }}
+          - "--log-formatter"
+          - {{ .Values.logFormatter.format | quote }}
+          {{- end }}
           {{- if .Values.grpc.enabled }}
           - "--enable-grpc"
           - "--grpc-bind"
