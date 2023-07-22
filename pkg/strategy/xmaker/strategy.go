@@ -595,6 +595,8 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 		tradeScanInterval = 30 * time.Minute
 	}
 
+	tradeScanOverlapBufferPeriod := 5 * time.Minute
+
 	tradeScanTicker := time.NewTicker(tradeScanInterval)
 	defer tradeScanTicker.Stop()
 
@@ -607,7 +609,7 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 			log.Infof("scanning trades from %s ago...", tradeScanInterval)
 
 			if s.RecoverTrade {
-				startTime := time.Now().Add(-tradeScanInterval)
+				startTime := time.Now().Add(-tradeScanInterval).Add(-tradeScanOverlapBufferPeriod)
 
 				if err := s.tradeCollector.Recover(ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
 					log.WithError(err).Errorf("query trades error")
