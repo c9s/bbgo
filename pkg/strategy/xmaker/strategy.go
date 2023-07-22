@@ -811,7 +811,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 		bbgo.Notify(position)
 	})
 	s.tradeCollector.OnRecover(func(trade types.Trade) {
-		bbgo.Notify("Recover trade", trade)
+		bbgo.Notify("Recovered trade", trade)
 	})
 	s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
