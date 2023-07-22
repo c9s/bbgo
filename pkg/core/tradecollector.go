@@ -99,13 +99,17 @@ func (c *TradeCollector) Recover(ctx context.Context, ex types.ExchangeTradeHist
 		return err
 	}
 
+	cnt := 0
 	for _, td := range trades {
 		logrus.Debugf("checking trade: %s", td.String())
 		if c.processTrade(td) {
 			logrus.Infof("recovered trade: %s", td.String())
+			cnt++
 			c.EmitRecover(td)
 		}
 	}
+
+	logrus.Infof("%d %s trades were recovered", cnt, symbol)
 	return nil
 }
 
