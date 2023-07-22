@@ -76,6 +76,11 @@ type Strategy struct {
 
 	NotifyTrade bool `json:"notifyTrade"`
 
+	// RecoverTrade tries to find the missing trades via the REStful API
+	RecoverTrade bool `json:"recoverTrade"`
+
+	RecoverTradeScanPeriod types.Duration `json:"recoverTradeScanPeriod"`
+
 	NumLayers int `json:"numLayers"`
 
 	// Pips is the pips of the layer prices
@@ -584,6 +589,38 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	s.orderStore.Add(returnOrders...)
 }
 
+func (s *Strategy) tradeRecover(ctx context.Context) {
+	tradeScanInterval := s.RecoverTradeScanPeriod.Duration()
+	if tradeScanInterval == 0 {
+		tradeScanInterval = 30 * time.Minute
+	}
+
+	tradeScanTicker := time.NewTicker(tradeScanInterval)
+	defer tradeScanTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-tradeScanTicker.C:
+			log.Infof("scanning trades from %s ago...", tradeScanInterval)
+
+			if s.RecoverTrade {
+				startTime := time.Now().Add(-tradeScanInterval)
+
+				if err := s.tradeCollector.Recover(ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
+					log.WithError(err).Errorf("query trades error")
+				}
+
+				if err := s.tradeCollector.Recover(ctx, s.makerSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
+					log.WithError(err).Errorf("query trades error")
+				}
+			}
+		}
+	}
+}
+
 func (s *Strategy) Validate() error {
 	if s.Quantity.IsZero() || s.QuantityScale == nil {
 		return errors.New("quantity or quantityScale can not be empty")
@@ -779,6 +816,10 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 	s.stopC = make(chan struct{})
 
+	if s.RecoverTrade {
+		go s.tradeRecover(ctx)
+	}
+
 	go func() {
 		posTicker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
 		defer posTicker.Stop()
@@ -788,10 +829,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 		reportTicker := time.NewTicker(time.Hour)
 		defer reportTicker.Stop()
-
-		tradeScanInterval := 20 * time.Minute
-		tradeScanTicker := time.NewTicker(tradeScanInterval)
-		defer tradeScanTicker.Stop()
 
 		defer func() {
 			if err := s.activeMakerOrders.GracefulCancel(context.Background(), s.makerSession.Exchange); err != nil {
@@ -815,13 +852,6 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 
 			case <-reportTicker.C:
 				bbgo.Notify(s.ProfitStats)
-
-			case <-tradeScanTicker.C:
-				log.Infof("scanning trades from %s ago...", tradeScanInterval)
-				startTime := time.Now().Add(-tradeScanInterval)
-				if err := s.tradeCollector.Recover(ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
-					log.WithError(err).Errorf("query trades error")
-				}
 
 			case <-posTicker.C:
 				// For positive position and positive covered position:
