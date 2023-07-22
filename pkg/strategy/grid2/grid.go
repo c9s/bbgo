@@ -55,10 +55,9 @@ func removeDuplicatedPins(pins []Pin) []Pin {
 
 		if _, exists := buckets[p.String()]; exists {
 			continue
-		} else {
-			out = append(out, pin)
 		}
 
+		out = append(out, pin)
 		buckets[p.String()] = struct{}{}
 	}
 
