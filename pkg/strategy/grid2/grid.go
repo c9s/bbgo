@@ -35,28 +35,49 @@ type Grid struct {
 
 type Pin fixedpoint.Value
 
+// filterPrice filters price with the given precision
+func filterPrice(p fixedpoint.Value, prec int) fixedpoint.Value {
+	var pow10 = math.Pow10(prec)
+	pp := math.Round(p.Float64()*pow10*10.0) / 10.0
+	pp = math.Trunc(pp) / pow10
+
+	pps := strconv.FormatFloat(pp, 'f', prec, 64)
+	price := fixedpoint.MustNewFromString(pps)
+	return price
+}
+
+func removeDuplicatedPins(pins []Pin) []Pin {
+	var buckets = map[string]struct{}{}
+	var out []Pin
+
+	for _, pin := range pins {
+		p := fixedpoint.Value(pin)
+
+		if _, exists := buckets[p.String()]; exists {
+			continue
+		} else {
+			out = append(out, pin)
+		}
+
+		buckets[p.String()] = struct{}{}
+	}
+
+	return out
+}
+
 func calculateArithmeticPins(lower, upper, spread, tickSize fixedpoint.Value) []Pin {
 	var pins []Pin
 
 	// tickSize number is like 0.01, 0.1, 0.001
 	var ts = tickSize.Float64()
 	var prec = int(math.Round(math.Log10(ts) * -1.0))
-	var pow10 = math.Pow10(prec)
 	for p := lower; p.Compare(upper.Sub(spread)) <= 0; p = p.Add(spread) {
-		pp := math.Round(p.Float64()*pow10*10.0) / 10.0
-		pp = math.Trunc(pp) / pow10
-
-		pps := strconv.FormatFloat(pp, 'f', prec, 64)
-		price := fixedpoint.MustNewFromString(pps)
+		price := filterPrice(p, prec)
 		pins = append(pins, Pin(price))
 	}
 
 	// this makes sure there is no error at the upper price
-	pp := math.Round(upper.Float64()*pow10*10.0) / 10.0
-	pp = math.Trunc(pp) / pow10
-
-	pps := strconv.FormatFloat(pp, 'f', prec, 64)
-	upperPrice := fixedpoint.MustNewFromString(pps)
+	upperPrice := filterPrice(upper, prec)
 	pins = append(pins, Pin(upperPrice))
 
 	return pins
@@ -94,7 +115,7 @@ func (g *Grid) CalculateGeometricPins() {
 		return nil
 	}
 
-	g.addPins(g.calculator())
+	g.addPins(removeDuplicatedPins(g.calculator()))
 }
 
 func (g *Grid) CalculateArithmeticPins() {
