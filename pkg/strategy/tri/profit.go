@@ -1,8 +1,6 @@
 package tri
 
 import (
-	"fmt"
-
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -16,7 +14,7 @@ type Profit struct {
 }
 
 func (p *Profit) PlainText() string {
-	var title = fmt.Sprintf("Arbitrage Profit ")
+	var title = "Arbitrage Profit "
 	title += style.PnLEmojiSimple(p.Profit) + " "
 	title += style.PnLSignString(p.Profit) + " " + p.Asset
 
@@ -28,7 +26,7 @@ func (p *Profit) PlainText() string {
 
 func (p *Profit) SlackAttachment() slack.Attachment {
 	var color = style.PnLColor(p.Profit)
-	var title = fmt.Sprintf("Triangular PnL ")
+	var title = "Triangular PnL "
 	title += style.PnLEmojiSimple(p.Profit) + " "
 	title += style.PnLSignString(p.Profit) + " " + p.Asset
 
