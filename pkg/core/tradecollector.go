@@ -101,16 +101,26 @@ func (c *TradeCollector) Recover(ctx context.Context, ex types.ExchangeTradeHist
 
 	cnt := 0
 	for _, td := range trades {
-		logrus.Debugf("checking trade: %s", td.String())
-		if c.processTrade(td) {
-			logrus.Infof("recovered trade: %s", td.String())
+		if c.RecoverTrade(td) {
 			cnt++
-			c.EmitRecover(td)
 		}
 	}
 
 	logrus.Infof("%d %s trades were recovered", cnt, symbol)
 	return nil
+}
+
+func (c *TradeCollector) RecoverTrade(td types.Trade) bool {
+	logrus.Debugf("checking trade: %s", td.String())
+	if c.processTrade(td) {
+		logrus.Infof("recovered trade: %s", td.String())
+		c.EmitRecover(td)
+		return true
+	}
+
+	// add to the trade store, and then we can recover it when an order is matched
+	c.tradeStore.Add(td)
+	return false
 }
 
 // Process filters the received trades and see if there are orders matching the trades
