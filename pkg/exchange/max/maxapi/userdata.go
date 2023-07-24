@@ -94,15 +94,15 @@ func parserOrderSnapshotEvent(v *fastjson.Value) *OrderSnapshotEvent {
 }
 
 type TradeUpdate struct {
-	ID     uint64 `json:"i"`
-	Side   string `json:"sd"`
-	Price  string `json:"p"`
-	Volume string `json:"v"`
-	Market string `json:"M"`
+	ID     uint64           `json:"i"`
+	Side   string           `json:"sd"`
+	Price  fixedpoint.Value `json:"p"`
+	Volume fixedpoint.Value `json:"v"`
+	Market string           `json:"M"`
 
-	Fee           string `json:"f"`
-	FeeCurrency   string `json:"fc"`
-	FeeDiscounted bool   `json:"fd"`
+	Fee           fixedpoint.Value `json:"f"`
+	FeeCurrency   string           `json:"fc"`
+	FeeDiscounted bool             `json:"fd"`
 
 	Timestamp  int64 `json:"T"`
 	UpdateTime int64 `json:"TU"`
@@ -110,22 +110,6 @@ type TradeUpdate struct {
 	OrderID uint64 `json:"oi"`
 
 	Maker bool `json:"m"`
-}
-
-func parseTradeUpdate(v *fastjson.Value) TradeUpdate {
-	return TradeUpdate{
-		ID:          v.GetUint64("i"),
-		Side:        string(v.GetStringBytes("sd")),
-		Price:       string(v.GetStringBytes("p")),
-		Volume:      string(v.GetStringBytes("v")),
-		Market:      string(v.GetStringBytes("M")),
-		Fee:         string(v.GetStringBytes("f")),
-		FeeCurrency: string(v.GetStringBytes("fc")),
-		Timestamp:   v.GetInt64("T"),
-		UpdateTime:  v.GetInt64("TU"),
-		OrderID:     v.GetUint64("oi"),
-		Maker:       v.GetBool("m"),
-	}
 }
 
 type TradeUpdateEvent struct {
