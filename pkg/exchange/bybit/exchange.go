@@ -1,6 +1,8 @@
 package bybit
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
@@ -42,4 +44,18 @@ func (e *Exchange) Name() types.ExchangeName {
 // fees using the native token.
 func (e *Exchange) PlatformFeeCurrency() string {
 	return ""
+}
+
+func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
+	instruments, err := e.client.NewGetInstrumentsInfoRequest().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	marketMap := types.MarketMap{}
+	for _, s := range instruments.List {
+		marketMap.Add(toGlobalMarket(s))
+	}
+
+	return marketMap, nil
 }
