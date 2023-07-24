@@ -94,74 +94,46 @@ func parserOrderSnapshotEvent(v *fastjson.Value) *OrderSnapshotEvent {
 }
 
 type TradeUpdate struct {
-	ID     uint64 `json:"i"`
-	Side   string `json:"sd"`
-	Price  string `json:"p"`
-	Volume string `json:"v"`
-	Market string `json:"M"`
+	ID     uint64           `json:"i"`
+	Side   string           `json:"sd"`
+	Price  fixedpoint.Value `json:"p"`
+	Volume fixedpoint.Value `json:"v"`
+	Market string           `json:"M"`
 
-	Fee         string `json:"f"`
-	FeeCurrency string `json:"fc"`
-	Timestamp   int64  `json:"T"`
-	UpdateTime  int64  `json:"TU"`
+	Fee           fixedpoint.Value `json:"f"`
+	FeeCurrency   string           `json:"fc"`
+	FeeDiscounted bool             `json:"fd"`
+
+	Timestamp  int64 `json:"T"`
+	UpdateTime int64 `json:"TU"`
 
 	OrderID uint64 `json:"oi"`
 
 	Maker bool `json:"m"`
 }
 
-func parseTradeUpdate(v *fastjson.Value) TradeUpdate {
-	return TradeUpdate{
-		ID:          v.GetUint64("i"),
-		Side:        string(v.GetStringBytes("sd")),
-		Price:       string(v.GetStringBytes("p")),
-		Volume:      string(v.GetStringBytes("v")),
-		Market:      string(v.GetStringBytes("M")),
-		Fee:         string(v.GetStringBytes("f")),
-		FeeCurrency: string(v.GetStringBytes("fc")),
-		Timestamp:   v.GetInt64("T"),
-		UpdateTime:  v.GetInt64("TU"),
-		OrderID:     v.GetUint64("oi"),
-		Maker:       v.GetBool("m"),
-	}
-}
-
 type TradeUpdateEvent struct {
 	BaseEvent
-
 	Trades []TradeUpdate `json:"t"`
 }
-
-func parseTradeUpdateEvent(v *fastjson.Value) *TradeUpdateEvent {
-	var e TradeUpdateEvent
-	e.Event = string(v.GetStringBytes("e"))
-	e.Timestamp = v.GetInt64("T")
-
-	for _, tv := range v.GetArray("t") {
-		e.Trades = append(e.Trades, parseTradeUpdate(tv))
-	}
-
-	return &e
-}
-
-type TradeSnapshot []TradeUpdate
 
 type TradeSnapshotEvent struct {
 	BaseEvent
-
 	Trades []TradeUpdate `json:"t"`
 }
 
-func parseTradeSnapshotEvent(v *fastjson.Value) *TradeSnapshotEvent {
+func parseTradeUpdateEvent(v *fastjson.Value) (*TradeUpdateEvent, error) {
+	jsonBytes := v.String()
+	var e TradeUpdateEvent
+	err := json.Unmarshal([]byte(jsonBytes), &e)
+	return &e, err
+}
+
+func parseTradeSnapshotEvent(v *fastjson.Value) (*TradeSnapshotEvent, error) {
+	jsonBytes := v.String()
 	var e TradeSnapshotEvent
-	e.Event = string(v.GetStringBytes("e"))
-	e.Timestamp = v.GetInt64("T")
-
-	for _, tv := range v.GetArray("t") {
-		e.Trades = append(e.Trades, parseTradeUpdate(tv))
-	}
-
-	return &e
+	err := json.Unmarshal([]byte(jsonBytes), &e)
+	return &e, err
 }
 
 type BalanceMessage struct {
@@ -252,10 +224,10 @@ func ParseUserEvent(v *fastjson.Value) (interface{}, error) {
 		return parseOrderUpdateEvent(v), nil
 
 	case "trade_snapshot", "mwallet_trade_snapshot":
-		return parseTradeSnapshotEvent(v), nil
+		return parseTradeSnapshotEvent(v)
 
 	case "trade_update", "mwallet_trade_update":
-		return parseTradeUpdateEvent(v), nil
+		return parseTradeUpdateEvent(v)
 
 	case "ad_ratio_snapshot", "ad_ratio_update":
 		return parseADRatioEvent(v)
