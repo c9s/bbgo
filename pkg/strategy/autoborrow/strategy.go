@@ -158,6 +158,8 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 }
 
 func (s *Strategy) reBalanceDebt(ctx context.Context) {
+	log.Infof("rebalancing debt...")
+
 	account, err := s.ExchangeSession.UpdateAccount(ctx)
 	if err != nil {
 		log.WithError(err).Errorf("can not update account")
@@ -171,6 +173,8 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 		log.Warn("balance is empty, skip autoborrow")
 		return
 	}
+
+	log.Infof("balances: %#v", balances)
 
 	for _, marginAsset := range s.Assets {
 		b, ok := balances[marginAsset.Asset]
