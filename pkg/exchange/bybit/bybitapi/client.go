@@ -157,9 +157,10 @@ sample:
 */
 
 type APIResponse struct {
-	RetCode    uint                       `json:"retCode"`
-	RetMsg     string                     `json:"retMsg"`
-	Result     json.RawMessage            `json:"result"`
-	RetExtInfo json.RawMessage            `json:"retExtInfo"`
-	Time       types.MillisecondTimestamp `json:"time"`
+	RetCode    uint            `json:"retCode"`
+	RetMsg     string          `json:"retMsg"`
+	Result     json.RawMessage `json:"result"`
+	RetExtInfo json.RawMessage `json:"retExtInfo"`
+	// Time is current timestamp (ms)
+	Time types.MillisecondTimestamp `json:"time"`
 }

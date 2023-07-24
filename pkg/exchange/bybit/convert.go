@@ -2,34 +2,13 @@ package bybit
 
 import (
 	"math"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 func toGlobalMarket(m bybitapi.Instrument) types.Market {
-	// sample:
-	//Symbol: BTCUSDT
-	//BaseCoin: BTC
-	//QuoteCoin: USDT
-	//Innovation: 0
-	//Status: Trading
-	//MarginTrading: both
-	//
-	//LotSizeFilter:
-	//{
-	//    BasePrecision: 0.000001
-	//    QuotePrecision: 0.00000001
-	//    MinOrderQty: 0.000048
-	//    MaxOrderQty: 71.73956243
-	//    MinOrderAmt: 1
-	//    MaxOrderAmt: 2000000
-	//}
-	//
-	//PriceFilter:
-	//{
-	//    TickSize: 0.01
-	//}
 	return types.Market{
 		Symbol:          m.Symbol,
 		LocalSymbol:     m.Symbol,
@@ -49,5 +28,18 @@ func toGlobalMarket(m bybitapi.Instrument) types.Market {
 		MinPrice: m.LotSizeFilter.MinOrderAmt,
 		MaxPrice: m.LotSizeFilter.MaxOrderAmt,
 		TickSize: m.PriceFilter.TickSize,
+	}
+}
+
+func toGlobalTicker(stats bybitapi.Ticker, time time.Time) types.Ticker {
+	return types.Ticker{
+		Volume: stats.Volume24H,
+		Last:   stats.LastPrice,
+		Open:   stats.PrevPrice24H, // Market price 24 hours ago
+		High:   stats.HighPrice24H,
+		Low:    stats.LowPrice24H,
+		Buy:    stats.Bid1Price,
+		Sell:   stats.Ask1Price,
+		Time:   time,
 	}
 }
