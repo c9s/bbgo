@@ -16,7 +16,7 @@ func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
 	collector := NewTradeCollector(symbol, position, orderStore)
 	assert.NotNil(t, collector)
 
-	matched := collector.ProcessTrade(types.Trade{
+	matched := collector.RecoverTrade(types.Trade{
 		ID:            1,
 		OrderID:       399,
 		Exchange:      types.ExchangeBinance,
@@ -28,7 +28,7 @@ func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
 		IsBuyer:       true,
 	})
 	assert.False(t, matched, "should be added to the trade store")
-	assert.Equal(t, 1, len(collector.tradeStore.Trades()), "should have one trade in the trade store")
+	assert.Equal(t, 1, len(collector.tradeStore.Trades()), "should have 1 trade in the trade store")
 
 	orderStore.Add(types.Order{
 		SubmitOrder: types.SubmitOrder{
