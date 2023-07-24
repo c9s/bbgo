@@ -126,7 +126,9 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 
 	balances := account.Balances()
 	for _, b := range balances {
-		if b.Borrowed.Sign() <= 0 {
+		debt := b.Debt()
+
+		if debt.Sign() <= 0 {
 			continue
 		}
 
@@ -134,7 +136,7 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 			continue
 		}
 
-		toRepay := fixedpoint.Min(b.Available, b.Debt())
+		toRepay := fixedpoint.Min(b.Available, debt)
 		if toRepay.IsZero() {
 			continue
 		}
