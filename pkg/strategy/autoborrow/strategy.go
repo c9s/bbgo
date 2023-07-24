@@ -216,11 +216,13 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 		log.Infof("checking repayable balance: %+v", b)
 
 		toRepay := debt
-		if !b.Available.IsZero() {
-			toRepay = fixedpoint.Min(toRepay, b.Available)
-		} else {
-			log.Errorf("available balance is 0: %#v", b)
+
+		if b.Available.IsZero() {
+			log.Errorf("%s available balance is 0, can not repay, balance = %+v", marginAsset.Asset, b)
+			continue
 		}
+
+		toRepay = fixedpoint.Min(toRepay, b.Available)
 
 		if !marginAsset.Low.IsZero() {
 			toRepay = toRepay.Sub(marginAsset.Low)
@@ -234,6 +236,8 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 				b.Borrowed.Float64())
 			continue
 		}
+
+		log.Infof("%s repay %f", marginAsset.Asset, toRepay.Float64())
 
 		bbgo.Notify(&MarginAction{
 			Exchange:       s.ExchangeSession.ExchangeName,
