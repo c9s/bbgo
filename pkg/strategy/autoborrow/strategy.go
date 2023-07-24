@@ -225,7 +225,10 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 		toRepay = fixedpoint.Min(toRepay, b.Available)
 
 		if !marginAsset.Low.IsZero() {
-			toRepay = toRepay.Sub(marginAsset.Low)
+			extra := b.Available.Sub(marginAsset.Low)
+			if extra.Sign() > 0 {
+				toRepay = fixedpoint.Min(extra, toRepay)
+			}
 		}
 
 		if toRepay.Sign() <= 0 {
