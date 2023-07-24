@@ -561,7 +561,7 @@ func (x Value) Compare(y Value) int {
 }
 
 func Min(a, b Value) Value {
-	if a < b {
+	if a.Compare(b) < 0 {
 		return a
 	}
 
@@ -569,7 +569,7 @@ func Min(a, b Value) Value {
 }
 
 func Max(a, b Value) Value {
-	if a > b {
+	if a.Compare(b) > 0 {
 		return a
 	}
 
