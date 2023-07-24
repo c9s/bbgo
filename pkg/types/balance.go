@@ -114,6 +114,18 @@ func (m BalanceSnapshot) CsvRecords() [][]string {
 
 type BalanceMap map[string]Balance
 
+func (m BalanceMap) NotZero() BalanceMap {
+	bm := make(BalanceMap)
+	for c, b := range m {
+		if b.Total().IsZero() && b.Debt().IsZero() && b.Net().IsZero() {
+			continue
+		}
+
+		bm[c] = b
+	}
+	return bm
+}
+
 func (m BalanceMap) Debts() BalanceMap {
 	bm := make(BalanceMap)
 	for c, b := range m {
