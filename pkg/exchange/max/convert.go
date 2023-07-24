@@ -288,36 +288,19 @@ func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
 	// trade time
 	mts := time.Unix(0, t.Timestamp*int64(time.Millisecond))
 
-	price, err := fixedpoint.NewFromString(t.Price)
-	if err != nil {
-		return nil, err
-	}
-
-	quantity, err := fixedpoint.NewFromString(t.Volume)
-	if err != nil {
-		return nil, err
-	}
-
-	quoteQuantity := price.Mul(quantity)
-
-	fee, err := fixedpoint.NewFromString(t.Fee)
-	if err != nil {
-		return nil, err
-	}
-
 	return &types.Trade{
 		ID:            t.ID,
 		OrderID:       t.OrderID,
 		Symbol:        toGlobalSymbol(t.Market),
 		Exchange:      types.ExchangeMax,
-		Price:         price,
-		Quantity:      quantity,
+		Price:         t.Price,
+		Quantity:      t.Volume,
 		Side:          side,
 		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       t.Maker,
-		Fee:           fee,
+		Fee:           t.Fee,
 		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
-		QuoteQuantity: quoteQuantity,
+		QuoteQuantity: t.Price.Mul(t.Volume),
 		Time:          types.Time(mts),
 	}, nil
 }
