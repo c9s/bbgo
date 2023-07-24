@@ -89,6 +89,8 @@ func (c *TradeCollector) Emit() {
 }
 
 func (c *TradeCollector) Recover(ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, from time.Time) error {
+	logrus.Debugf("recovering %s trades...", symbol)
+
 	trades, err := ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		StartTime: &from,
 	})
@@ -97,14 +99,28 @@ func (c *TradeCollector) Recover(ctx context.Context, ex types.ExchangeTradeHist
 		return err
 	}
 
+	cnt := 0
 	for _, td := range trades {
-		logrus.Debugf("processing trade: %s", td.String())
-		if c.ProcessTrade(td) {
-			logrus.Infof("recovered trade: %s", td.String())
-			c.EmitRecover(td)
+		if c.RecoverTrade(td) {
+			cnt++
 		}
 	}
+
+	logrus.Infof("%d %s trades were recovered", cnt, symbol)
 	return nil
+}
+
+func (c *TradeCollector) RecoverTrade(td types.Trade) bool {
+	logrus.Debugf("checking trade: %s", td.String())
+	if c.processTrade(td) {
+		logrus.Infof("recovered trade: %s", td.String())
+		c.EmitRecover(td)
+		return true
+	}
+
+	// add to the trade store, and then we can recover it when an order is matched
+	c.tradeStore.Add(td)
+	return false
 }
 
 // Process filters the received trades and see if there are orders matching the trades
@@ -178,45 +194,33 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 		return false
 	}
 
-	if c.orderStore.Exists(trade.OrderID) {
-		if c.position != nil {
-			profit, netProfit, madeProfit := c.position.AddTrade(trade)
-			if madeProfit {
-				p := c.position.NewProfit(trade, profit, netProfit)
-				c.EmitTrade(trade, profit, netProfit)
-				c.EmitProfit(trade, &p)
-			} else {
-				c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
-				c.EmitProfit(trade, nil)
-			}
-			c.EmitPositionUpdate(c.position)
+	if !c.orderStore.Exists(trade.OrderID) {
+		return false
+	}
+
+	if c.position != nil {
+		profit, netProfit, madeProfit := c.position.AddTrade(trade)
+		if madeProfit {
+			p := c.position.NewProfit(trade, profit, netProfit)
+			c.EmitTrade(trade, profit, netProfit)
+			c.EmitProfit(trade, &p)
 		} else {
 			c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
+			c.EmitProfit(trade, nil)
 		}
-
-		c.doneTrades[key] = struct{}{}
-		return true
+		c.EmitPositionUpdate(c.position)
+	} else {
+		c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
 	}
-	return false
+
+	c.doneTrades[key] = struct{}{}
+	return true
 }
 
 // return true when the given trade is added
 // return false when the given trade is not added
 func (c *TradeCollector) ProcessTrade(trade types.Trade) bool {
-	key := trade.Key()
-	// if it's already done, remove the trade from the trade store
-	c.mu.Lock()
-	if _, done := c.doneTrades[key]; done {
-		return false
-	}
-	c.mu.Unlock()
-
-	if c.processTrade(trade) {
-		return true
-	}
-
-	c.tradeStore.Add(trade)
-	return false
+	return c.processTrade(trade)
 }
 
 // Run is a goroutine executed in the background
