@@ -31,8 +31,8 @@ func (w *WithdrawalRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
 
 	query := url.Values{}
-	for k, v := range params {
-		query.Add(k, fmt.Sprintf("%v", v))
+	for _k, _v := range params {
+		query.Add(_k, fmt.Sprintf("%v", _v))
 	}
 
 	return query, nil
@@ -41,17 +41,17 @@ func (w *WithdrawalRequest) GetQueryParameters() (url.Values, error) {
 // GetParameters builds and checks the parameters and return the result in a map object
 func (w *WithdrawalRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
-	// check addressUUID field -> json key address_uuid
+	// check addressUUID field -> json key withdraw_address_uuid
 	addressUUID := w.addressUUID
 
 	// TEMPLATE check-required
 	if len(addressUUID) == 0 {
-		return nil, fmt.Errorf("address_uuid is required, empty string given")
+		return nil, fmt.Errorf("withdraw_address_uuid is required, empty string given")
 	}
 	// END TEMPLATE check-required
 
 	// assign parameter of addressUUID
-	params["address_uuid"] = addressUUID
+	params["withdraw_address_uuid"] = addressUUID
 	// check currency field -> json key currency
 	currency := w.currency
 
@@ -81,13 +81,13 @@ func (w *WithdrawalRequest) GetParametersQuery() (url.Values, error) {
 		return query, err
 	}
 
-	for k, v := range params {
-		if w.isVarSlice(v) {
-			w.iterateSlice(v, func(it interface{}) {
-				query.Add(k+"[]", fmt.Sprintf("%v", it))
+	for _k, _v := range params {
+		if w.isVarSlice(_v) {
+			w.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
 			})
 		} else {
-			query.Add(k, fmt.Sprintf("%v", v))
+			query.Add(_k, fmt.Sprintf("%v", _v))
 		}
 	}
 
@@ -112,24 +112,24 @@ func (w *WithdrawalRequest) GetSlugParameters() (map[string]interface{}, error) 
 }
 
 func (w *WithdrawalRequest) applySlugsToUrl(url string, slugs map[string]string) string {
-	for k, v := range slugs {
-		needleRE := regexp.MustCompile(":" + k + "\\b")
-		url = needleRE.ReplaceAllString(url, v)
+	for _k, _v := range slugs {
+		needleRE := regexp.MustCompile(":" + _k + "\\b")
+		url = needleRE.ReplaceAllString(url, _v)
 	}
 
 	return url
 }
 
-func (w *WithdrawalRequest) iterateSlice(slice interface{}, f func(it interface{})) {
+func (w *WithdrawalRequest) iterateSlice(slice interface{}, _f func(it interface{})) {
 	sliceValue := reflect.ValueOf(slice)
-	for i := 0; i < sliceValue.Len(); i++ {
-		it := sliceValue.Index(i).Interface()
-		f(it)
+	for _i := 0; _i < sliceValue.Len(); _i++ {
+		it := sliceValue.Index(_i).Interface()
+		_f(it)
 	}
 }
 
-func (w *WithdrawalRequest) isVarSlice(v interface{}) bool {
-	rt := reflect.TypeOf(v)
+func (w *WithdrawalRequest) isVarSlice(_v interface{}) bool {
+	rt := reflect.TypeOf(_v)
 	switch rt.Kind() {
 	case reflect.Slice:
 		return true
@@ -144,8 +144,8 @@ func (w *WithdrawalRequest) GetSlugsMap() (map[string]string, error) {
 		return slugs, nil
 	}
 
-	for k, v := range params {
-		slugs[k] = fmt.Sprintf("%v", v)
+	for _k, _v := range params {
+		slugs[_k] = fmt.Sprintf("%v", _v)
 	}
 
 	return slugs, nil
