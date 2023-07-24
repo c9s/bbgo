@@ -7,6 +7,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/exchange/bitget"
+	"github.com/c9s/bbgo/pkg/exchange/bybit"
 	"github.com/c9s/bbgo/pkg/exchange/kucoin"
 	"github.com/c9s/bbgo/pkg/exchange/max"
 	"github.com/c9s/bbgo/pkg/exchange/okex"
@@ -43,6 +44,9 @@ func New(n types.ExchangeName, key, secret, passphrase string) (types.ExchangeMi
 
 	case types.ExchangeBitget:
 		return bitget.New(key, secret, passphrase), nil
+
+	case types.ExchangeBybit:
+		return bybit.New(key, secret)
 
 	default:
 		return nil, fmt.Errorf("unsupported exchange: %v", n)
