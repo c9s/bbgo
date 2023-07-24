@@ -84,7 +84,7 @@ type MarginAsset struct {
 	MaxTotalBorrow       fixedpoint.Value `json:"maxTotalBorrow"`
 	MaxQuantityPerBorrow fixedpoint.Value `json:"maxQuantityPerBorrow"`
 	MinQuantityPerBorrow fixedpoint.Value `json:"minQuantityPerBorrow"`
-	MinDebtRatio         fixedpoint.Value `json:"debtRatio"`
+	DebtRatio            fixedpoint.Value `json:"debtRatio"`
 }
 
 type Strategy struct {
@@ -181,9 +181,11 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 		// debt / total
 		debt := b.Debt()
 		total := b.Total()
+
 		debtRatio := debt.Div(total)
-		if marginAsset.MinDebtRatio.IsZero() {
-			marginAsset.MinDebtRatio = fixedpoint.One
+
+		if marginAsset.DebtRatio.IsZero() {
+			marginAsset.DebtRatio = fixedpoint.One
 		}
 
 		if total.Compare(marginAsset.Low) <= 0 {
@@ -199,24 +201,29 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 			continue
 		}
 
-		// the current debt ratio is less than the minimal ratio,
-		// we need to repay and reduce the debt
-		if debtRatio.Compare(marginAsset.MinDebtRatio) > 0 {
-			log.Infof("%s debt ratio %f is greater than min debt ratio %f, skip", marginAsset.Asset, debtRatio.Float64(), marginAsset.MinDebtRatio.Float64())
+		// if debtRatio is lesser, means that we have more spot, we should try to repay as much as we can
+		if debtRatio.Compare(marginAsset.DebtRatio) > 0 {
+			log.Infof("%s debt ratio %f is greater than min debt ratio %f, skip", marginAsset.Asset, debtRatio.Float64(), marginAsset.DebtRatio.Float64())
 			continue
 		}
+
+		log.Infof("checking repayable balance: %+v", b)
 
 		toRepay := fixedpoint.Min(b.Borrowed, b.Available)
 		toRepay = toRepay.Sub(marginAsset.Low)
 
 		if toRepay.Sign() <= 0 {
-			log.Warnf("%s repay amount = 0, can not repay", marginAsset.Asset)
+			log.Warnf("%s repay = %f, available = %f, borrowed = %f, can not repay",
+				marginAsset.Asset,
+				toRepay.Float64(),
+				b.Available.Float64(),
+				b.Borrowed.Float64())
 			continue
 		}
 
 		bbgo.Notify(&MarginAction{
 			Exchange:       s.ExchangeSession.ExchangeName,
-			Action:         fmt.Sprintf("Repay for Debt Ratio %f < Min Debt Ratio %f", debtRatio.Float64(), marginAsset.MinDebtRatio.Float64()),
+			Action:         fmt.Sprintf("Repay for Debt Ratio %f < Minimal Debt Ratio %f", debtRatio.Float64(), marginAsset.DebtRatio.Float64()),
 			Asset:          b.Currency,
 			Amount:         toRepay,
 			MarginLevel:    account.MarginLevel,
