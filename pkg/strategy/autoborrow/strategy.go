@@ -213,9 +213,9 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 
 		log.Infof("checking repayable balance: %+v", b)
 
-		toRepay := b.Borrowed
+		toRepay := debt
 		if !b.Available.IsZero() {
-			toRepay = fixedpoint.Min(b.Borrowed, b.Available)
+			toRepay = fixedpoint.Min(toRepay, b.Available)
 		} else {
 			log.Errorf("available balance is 0: %#v", b)
 		}
