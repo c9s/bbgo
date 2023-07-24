@@ -170,13 +170,13 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 
 	minMarginLevel := s.MinMarginLevel
 
-	balances := account.Balances()
+	balances := account.Balances().NotZero()
 	if len(balances) == 0 {
-		log.Warn("balance is empty, skip autoborrow")
+		log.Warn("balance is empty, skip repay")
 		return
 	}
 
-	log.Infof("balances: %#v", balances)
+	log.Infof("non-zero balances: %+v", balances)
 
 	for _, marginAsset := range s.Assets {
 		b, ok := balances[marginAsset.Asset]
