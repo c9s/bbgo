@@ -36,7 +36,7 @@ import (
 type WithdrawalRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	addressUUID string  `param:"address_uuid,required"`
+	addressUUID string  `param:"withdraw_address_uuid,required"`
 	currency    string  `param:"currency,required"`
 	amount      float64 `param:"amount"`
 }
