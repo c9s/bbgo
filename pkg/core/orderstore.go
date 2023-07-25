@@ -11,11 +11,19 @@ type OrderStore struct {
 	mu     sync.Mutex
 	orders map[uint64]types.Order
 
-	Symbol          string
+	Symbol string
+
+	// RemoveCancelled removes the canceled order when receiving a cancel order update event
+	// It also removes the order even if it's partially filled
+	// by default, only 0 filled canceled order will be removed.
 	RemoveCancelled bool
-	RemoveFilled    bool
-	AddOrderUpdate  bool
-	C               chan types.Order
+
+	// RemoveFilled removes the fully filled order when receiving a filled order update event
+	RemoveFilled bool
+
+	// AddOrderUpdate adds the order into the store when receiving an order update when the order does not exist in the current store.
+	AddOrderUpdate bool
+	C              chan types.Order
 }
 
 func NewOrderStore(symbol string) *OrderStore {
