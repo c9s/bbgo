@@ -764,8 +764,9 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		}
 	*/
 
-	if err := orderLimiter.Wait(ctx); err != nil {
+	if err = orderLimiter.Wait(ctx); err != nil {
 		log.WithError(err).Errorf("order rate limiter wait error")
+		return nil, err
 	}
 
 	log.Infof("querying closed orders %s from %s <=> %s ...", symbol, since, until)
@@ -822,8 +823,9 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err error) {
-	if err := orderLimiter.Wait(ctx); err != nil {
+	if err = orderLimiter.Wait(ctx); err != nil {
 		log.WithError(err).Errorf("order rate limiter wait error")
+		return err
 	}
 
 	if e.IsFutures {
@@ -1086,8 +1088,9 @@ func (e *Exchange) submitSpotOrder(ctx context.Context, order types.SubmitOrder)
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
-	if err := orderLimiter.Wait(ctx); err != nil {
+	if err = orderLimiter.Wait(ctx); err != nil {
 		log.WithError(err).Errorf("order rate limiter wait error")
+		return nil, err
 	}
 
 	if e.IsMargin {
