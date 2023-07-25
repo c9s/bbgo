@@ -73,6 +73,7 @@ func (r *TelegramReply) Send(message string) {
 	for _, split := range splits {
 		if err := sendLimiter.Wait(ctx); err != nil {
 			log.WithError(err).Errorf("telegram send limit exceeded")
+			return
 		}
 		checkSendErr(r.bot.Send(r.session.Chat, split))
 	}
@@ -175,6 +176,7 @@ func (tm *Telegram) Start(ctx context.Context) {
 				for i, split := range splits {
 					if err := sendLimiter.Wait(ctx); err != nil {
 						log.WithError(err).Errorf("telegram send limit exceeded")
+						return
 					}
 					if i == len(splits)-1 {
 						// only set menu on the last message
