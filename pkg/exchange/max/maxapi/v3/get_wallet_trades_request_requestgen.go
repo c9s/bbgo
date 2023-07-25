@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"

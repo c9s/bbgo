@@ -5,6 +5,13 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type Liquidity string
+
+const (
+	LiquidityMaker = "maker"
+	LiquidityTaker = "taker"
+)
+
 type Trade struct {
 	ID                      uint64                     `json:"id" db:"exchange_id"`
 	WalletType              WalletType                 `json:"wallet_type,omitempty"`
@@ -18,7 +25,8 @@ type Trade struct {
 	OrderID                 uint64                     `json:"order_id"`
 	Fee                     fixedpoint.Value           `json:"fee"` // float number as string
 	FeeCurrency             string                     `json:"fee_currency"`
-	Liquidity               string                     `json:"liquidity"`
+	FeeDiscounted           bool                       `json:"fee_discounted"`
+	Liquidity               Liquidity                  `json:"liquidity"`
 	SelfTradeBidFee         fixedpoint.Value           `json:"self_trade_bid_fee"`
 	SelfTradeBidFeeCurrency string                     `json:"self_trade_bid_fee_currency"`
 	SelfTradeBidOrderID     uint64                     `json:"self_trade_bid_order_id"`
