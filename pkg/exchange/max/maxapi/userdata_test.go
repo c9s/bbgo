@@ -39,7 +39,7 @@ func Test_parseTradeSnapshotEvent(t *testing.T) {
 	assert.Equal(t, 1, len(evt.Trades))
 	assert.Equal(t, "bid", evt.Trades[0].Side)
 	assert.Equal(t, "ethtwd", evt.Trades[0].Market)
-	assert.Equal(t, int64(1521726960357), evt.Trades[0].Timestamp)
+	assert.Equal(t, int64(1521726960357), evt.Trades[0].Timestamp.Time().UnixMilli())
 	assert.Equal(t, "3.2", evt.Trades[0].Fee.String())
 	assert.Equal(t, "twd", evt.Trades[0].FeeCurrency)
 }
