@@ -45,4 +45,16 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("instrumentsInfo: %+v", instrumentsInfo)
 	})
+
+	t.Run("GetTicker", func(t *testing.T) {
+		req := client.NewGetTickersRequest()
+		apiResp, err := req.Symbol("BTCUSDT").Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("apiResp: %+v", apiResp)
+
+		req = client.NewGetTickersRequest()
+		tickers, err := req.Symbol("BTCUSDT").DoWithResponseTime(ctx)
+		assert.NoError(t, err)
+		t.Logf("tickers: %+v", tickers)
+	})
 }
