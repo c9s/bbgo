@@ -105,7 +105,7 @@ type TradeUpdate struct {
 	FeeDiscounted bool             `json:"fd"`
 
 	Timestamp  types.MillisecondTimestamp `json:"T"`
-	UpdateTime int64                      `json:"TU"`
+	UpdateTime types.MillisecondTimestamp `json:"TU"`
 
 	OrderID uint64 `json:"oi"`
 
