@@ -1,6 +1,8 @@
 package bybit
 
 import (
+	"fmt"
+	"hash/fnv"
 	"math"
 	"time"
 
@@ -42,4 +44,129 @@ func toGlobalTicker(stats bybitapi.Ticker, time time.Time) types.Ticker {
 		Sell:   stats.Ask1Price,
 		Time:   time,
 	}
+}
+
+func toGlobalOrder(order bybitapi.OpenOrder) (*types.Order, error) {
+	side, err := toGlobalSideType(order.Side)
+	if err != nil {
+		return nil, err
+	}
+	orderType, err := toGlobalOrderType(order.OrderType)
+	if err != nil {
+		return nil, err
+	}
+	timeInForce, err := toGlobalTimeInForce(order.TimeInForce)
+	if err != nil {
+		return nil, err
+	}
+	status, err := toGlobalOrderStatus(order.OrderStatus)
+	if err != nil {
+		return nil, err
+	}
+	working, err := isWorking(order.OrderStatus)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: order.OrderLinkId,
+			Symbol:        order.Symbol,
+			Side:          side,
+			Type:          orderType,
+			Quantity:      order.Qty,
+			Price:         order.Price,
+			TimeInForce:   timeInForce,
+		},
+		Exchange:         types.ExchangeBybit,
+		OrderID:          hashStringID(order.OrderId),
+		UUID:             order.OrderId,
+		Status:           status,
+		ExecutedQuantity: order.CumExecQty,
+		IsWorking:        working,
+		CreationTime:     types.Time(order.CreatedTime.Time()),
+		UpdateTime:       types.Time(order.UpdatedTime.Time()),
+	}, nil
+}
+
+func toGlobalSideType(side bybitapi.Side) (types.SideType, error) {
+	switch side {
+	case bybitapi.SideBuy:
+		return types.SideTypeBuy, nil
+
+	case bybitapi.SideSell:
+		return types.SideTypeSell, nil
+
+	default:
+		return types.SideType(side), fmt.Errorf("unexpected side: %s", side)
+	}
+}
+
+func toGlobalOrderType(s bybitapi.OrderType) (types.OrderType, error) {
+	switch s {
+	case bybitapi.OrderTypeMarket:
+		return types.OrderTypeMarket, nil
+
+	case bybitapi.OrderTypeLimit:
+		return types.OrderTypeLimit, nil
+
+	default:
+		return types.OrderType(s), fmt.Errorf("unexpected order type: %s", s)
+	}
+}
+
+func toGlobalTimeInForce(force bybitapi.TimeInForce) (types.TimeInForce, error) {
+	switch force {
+	case bybitapi.TimeInForceGTC:
+		return types.TimeInForceGTC, nil
+
+	case bybitapi.TimeInForceIOC:
+		return types.TimeInForceIOC, nil
+
+	case bybitapi.TimeInForceFOK:
+		return types.TimeInForceFOK, nil
+
+	default:
+		return types.TimeInForce(force), fmt.Errorf("unexpected timeInForce type: %s", force)
+	}
+}
+
+func toGlobalOrderStatus(status bybitapi.OrderStatus) (types.OrderStatus, error) {
+	switch status {
+	case bybitapi.OrderStatusCreated,
+		bybitapi.OrderStatusNew,
+		bybitapi.OrderStatusActive:
+		return types.OrderStatusNew, nil
+
+	case bybitapi.OrderStatusFilled:
+		return types.OrderStatusFilled, nil
+
+	case bybitapi.OrderStatusPartiallyFilled:
+		return types.OrderStatusPartiallyFilled, nil
+
+	case bybitapi.OrderStatusCancelled,
+		bybitapi.OrderStatusPartiallyFilledCanceled,
+		bybitapi.OrderStatusDeactivated:
+		return types.OrderStatusCanceled, nil
+
+	case bybitapi.OrderStatusRejected:
+		return types.OrderStatusRejected, nil
+
+	default:
+		// following not supported
+		// bybitapi.OrderStatusUntriggered
+		// bybitapi.OrderStatusTriggered
+		return types.OrderStatus(status), fmt.Errorf("unexpected order status: %s", status)
+	}
+}
+
+func hashStringID(s string) uint64 {
+	h := fnv.New64a()
+	h.Write([]byte(s))
+	return h.Sum64()
+}
+
+func isWorking(status bybitapi.OrderStatus) (bool, error) {
+	s, err := toGlobalOrderStatus(status)
+	return s == types.OrderStatusNew || s == types.OrderStatusPartiallyFilled, err
 }

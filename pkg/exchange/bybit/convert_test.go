@@ -130,3 +130,229 @@ func TestToGlobalTicker(t *testing.T) {
 
 	assert.Equal(t, toGlobalTicker(ticker, timeNow), exp)
 }
+
+func TestToGlobalOrder(t *testing.T) {
+	// sample: partialFilled
+	//{
+	//  "OrderId": 1472539279335923200,
+	//  "OrderLinkId": 1690276361150,
+	//  "BlockTradeId": null,
+	//  "Symbol": "DOTUSDT",
+	//  "Price": 7.278,
+	//  "Qty": 0.8,
+	//  "Side": "Sell",
+	//  "IsLeverage": 0,
+	//  "PositionIdx": 0,
+	//  "OrderStatus": "PartiallyFilled",
+	//  "CancelType": "UNKNOWN",
+	//  "RejectReason": null,
+	//  "AvgPrice": 7.278,
+	//  "LeavesQty": 0,
+	//  "LeavesValue": 0,
+	//  "CumExecQty": 0.5,
+	//  "CumExecValue": 0,
+	//  "CumExecFee": 0,
+	//  "TimeInForce": "GTC",
+	//  "OrderType": "Limit",
+	//  "StopOrderType": null,
+	//  "OrderIv": null,
+	//  "TriggerPrice": 0,
+	//  "TakeProfit": 0,
+	//  "StopLoss": 0,
+	//  "TpTriggerBy": null,
+	//  "SlTriggerBy": null,
+	//  "TriggerDirection": 0,
+	//  "TriggerBy": null,
+	//  "LastPriceOnCreated": null,
+	//  "ReduceOnly": false,
+	//  "CloseOnTrigger": false,
+	//  "SmpType": "None",
+	//  "SmpGroup": 0,
+	//  "SmpOrderId": null,
+	//  "TpslMode": null,
+	//  "TpLimitPrice": null,
+	//  "SlLimitPrice": null,
+	//  "PlaceType": null,
+	//  "CreatedTime": "2023-07-25 17:12:41.325 +0800 CST",
+	//  "UpdatedTime": "2023-07-25 17:12:57.868 +0800 CST"
+	//}
+	timeNow := time.Now()
+	openOrder := bybitapi.OpenOrder{
+		OrderId:            "1472539279335923200",
+		OrderLinkId:        "1690276361150",
+		BlockTradeId:       "",
+		Symbol:             "DOTUSDT",
+		Price:              fixedpoint.NewFromFloat(7.278),
+		Qty:                fixedpoint.NewFromFloat(0.8),
+		Side:               bybitapi.SideSell,
+		IsLeverage:         "0",
+		PositionIdx:        0,
+		OrderStatus:        bybitapi.OrderStatusPartiallyFilled,
+		CancelType:         "UNKNOWN",
+		RejectReason:       "",
+		AvgPrice:           fixedpoint.NewFromFloat(7.728),
+		LeavesQty:          fixedpoint.NewFromFloat(0),
+		LeavesValue:        fixedpoint.NewFromFloat(0),
+		CumExecQty:         fixedpoint.NewFromFloat(0.5),
+		CumExecValue:       fixedpoint.NewFromFloat(0),
+		CumExecFee:         fixedpoint.NewFromFloat(0),
+		TimeInForce:        "GTC",
+		OrderType:          bybitapi.OrderTypeLimit,
+		StopOrderType:      "",
+		OrderIv:            "",
+		TriggerPrice:       fixedpoint.NewFromFloat(0),
+		TakeProfit:         fixedpoint.NewFromFloat(0),
+		StopLoss:           fixedpoint.NewFromFloat(0),
+		TpTriggerBy:        "",
+		SlTriggerBy:        "",
+		TriggerDirection:   0,
+		TriggerBy:          "",
+		LastPriceOnCreated: "",
+		ReduceOnly:         false,
+		CloseOnTrigger:     false,
+		SmpType:            "None",
+		SmpGroup:           0,
+		SmpOrderId:         "",
+		TpslMode:           "",
+		TpLimitPrice:       "",
+		SlLimitPrice:       "",
+		PlaceType:          "",
+		CreatedTime:        types.MillisecondTimestamp(timeNow),
+		UpdatedTime:        types.MillisecondTimestamp(timeNow),
+	}
+	side, err := toGlobalSideType(openOrder.Side)
+	assert.NoError(t, err)
+	orderType, err := toGlobalOrderType(openOrder.OrderType)
+	assert.NoError(t, err)
+	tif, err := toGlobalTimeInForce(openOrder.TimeInForce)
+	assert.NoError(t, err)
+	status, err := toGlobalOrderStatus(openOrder.OrderStatus)
+	assert.NoError(t, err)
+	working, err := isWorking(openOrder.OrderStatus)
+	assert.NoError(t, err)
+
+	exp := types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: openOrder.OrderLinkId,
+			Symbol:        openOrder.Symbol,
+			Side:          side,
+			Type:          orderType,
+			Quantity:      openOrder.Qty,
+			Price:         openOrder.Price,
+			TimeInForce:   tif,
+		},
+		Exchange:         types.ExchangeBybit,
+		OrderID:          hashStringID(openOrder.OrderId),
+		UUID:             openOrder.OrderId,
+		Status:           status,
+		ExecutedQuantity: openOrder.CumExecQty,
+		IsWorking:        working,
+		CreationTime:     types.Time(timeNow),
+		UpdateTime:       types.Time(timeNow),
+		IsFutures:        false,
+		IsMargin:         false,
+		IsIsolated:       false,
+	}
+	res, err := toGlobalOrder(openOrder)
+	assert.NoError(t, err)
+	assert.Equal(t, res, &exp)
+}
+
+func TestToGlobalSideType(t *testing.T) {
+	res, err := toGlobalSideType(bybitapi.SideBuy)
+	assert.NoError(t, err)
+	assert.Equal(t, types.SideTypeBuy, res)
+
+	res, err = toGlobalSideType(bybitapi.SideSell)
+	assert.NoError(t, err)
+	assert.Equal(t, types.SideTypeSell, res)
+
+	res, err = toGlobalSideType("GG")
+	assert.Error(t, err)
+}
+
+func TestToGlobalOrderType(t *testing.T) {
+	res, err := toGlobalOrderType(bybitapi.OrderTypeMarket)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderTypeMarket, res)
+
+	res, err = toGlobalOrderType(bybitapi.OrderTypeLimit)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderTypeLimit, res)
+
+	res, err = toGlobalOrderType("GG")
+	assert.Error(t, err)
+}
+
+func TestToGlobalTimeInForce(t *testing.T) {
+	res, err := toGlobalTimeInForce(bybitapi.TimeInForceGTC)
+	assert.NoError(t, err)
+	assert.Equal(t, types.TimeInForceGTC, res)
+
+	res, err = toGlobalTimeInForce(bybitapi.TimeInForceIOC)
+	assert.NoError(t, err)
+	assert.Equal(t, types.TimeInForceIOC, res)
+
+	res, err = toGlobalTimeInForce(bybitapi.TimeInForceFOK)
+	assert.NoError(t, err)
+	assert.Equal(t, types.TimeInForceFOK, res)
+
+	res, err = toGlobalTimeInForce("GG")
+	assert.Error(t, err)
+}
+
+func TestToGlobalOrderStatus(t *testing.T) {
+	t.Run("New", func(t *testing.T) {
+		res, err := toGlobalOrderStatus(bybitapi.OrderStatusNew)
+		assert.NoError(t, err)
+		assert.Equal(t, types.OrderStatusNew, res)
+
+		res, err = toGlobalOrderStatus(bybitapi.OrderStatusActive)
+		assert.NoError(t, err)
+		assert.Equal(t, types.OrderStatusNew, res)
+	})
+
+	t.Run("Filled", func(t *testing.T) {
+		res, err := toGlobalOrderStatus(bybitapi.OrderStatusFilled)
+		assert.NoError(t, err)
+		assert.Equal(t, types.OrderStatusFilled, res)
+	})
+
+	t.Run("PartiallyFilled", func(t *testing.T) {
+		res, err := toGlobalOrderStatus(bybitapi.OrderStatusPartiallyFilled)
+		assert.NoError(t, err)
+		assert.Equal(t, types.OrderStatusPartiallyFilled, res)
+	})
+
+	t.Run("OrderStatusCanceled", func(t *testing.T) {
+		res, err := toGlobalOrderStatus(bybitapi.OrderStatusCancelled)
+		assert.NoError(t, err)
+		assert.Equal(t, types.OrderStatusCanceled, res)
+
+		res, err = toGlobalOrderStatus(bybitapi.OrderStatusPartiallyFilledCanceled)
+		assert.NoError(t, err)
+		assert.Equal(t, types.OrderStatusCanceled, res)
+
+		res, err = toGlobalOrderStatus(bybitapi.OrderStatusDeactivated)
+		assert.NoError(t, err)
+		assert.Equal(t, types.OrderStatusCanceled, res)
+	})
+
+	t.Run("OrderStatusRejected", func(t *testing.T) {
+		res, err := toGlobalOrderStatus(bybitapi.OrderStatusRejected)
+		assert.NoError(t, err)
+		assert.Equal(t, types.OrderStatusRejected, res)
+	})
+}
+
+func TestIsWorking(t *testing.T) {
+	for _, s := range bybitapi.AllOrderStatuses {
+		res, err := isWorking(s)
+		assert.NoError(t, err)
+		if res {
+			gos, err := toGlobalOrderStatus(s)
+			assert.NoError(t, err)
+			assert.True(t, gos == types.OrderStatusNew || gos == types.OrderStatusPartiallyFilled)
+		}
+	}
+}
