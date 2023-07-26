@@ -25,13 +25,38 @@ const RestBaseURL = "https://api.bybit.com"
 // defaultRequestWindowMilliseconds specify how long an HTTP request is valid. It is also used to prevent replay attacks.
 var defaultRequestWindowMilliseconds = fmt.Sprintf("%d", time.Millisecond*5000)
 
+//go:generate mockery --name Client --with-expecter
+type Client interface {
+	GetInstrumentsInfoRequester
+}
+
+type ApiClient struct {
+	GetInstrumentsInfoRequester
+}
+
+// FIXME: Maybe rename to baseClient, and ApiClient can be RestClient
 type RestClient struct {
 	requestgen.BaseAPIClient
 
 	key, secret string
 }
 
-func NewClient() (*RestClient, error) {
+func NewApiClient(key, secret string) (*ApiClient, error) {
+	c, err := NewClient(key, secret)
+	if err != nil {
+		return nil, err
+	}
+	if len(key) > 0 && len(secret) > 0 {
+		c.Auth(key, secret)
+	}
+
+	return &ApiClient{
+		GetInstrumentsInfoRequester: NewGetInstrumentsInfoRequest(c),
+		// if you add New interface, please new struct here
+	}, nil
+}
+
+func NewClient(key, secret string) (*RestClient, error) {
 	u, err := url.Parse(RestBaseURL)
 	if err != nil {
 		return nil, err

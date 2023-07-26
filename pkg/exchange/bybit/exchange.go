@@ -2,7 +2,6 @@ package bybit
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -25,17 +24,14 @@ var log = logrus.WithFields(logrus.Fields{
 
 type Exchange struct {
 	key, secret string
-	client      *bybitapi.RestClient
+	client      bybitapi.Client
 }
 
 func New(key, secret string) (*Exchange, error) {
-	client, err := bybitapi.NewClient()
+	client, err := bybitapi.NewApiClient(key, secret)
 	if err != nil {
+		log.Warnf("failed to new api client, err: %v", err)
 		return nil, err
-	}
-
-	if len(key) > 0 && len(secret) > 0 {
-		client.Auth(key, secret)
 	}
 
 	return &Exchange{
@@ -62,7 +58,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		return nil, err
 	}
 
-	instruments, err := e.client.NewGetInstrumentsInfoRequest().Do(ctx)
+	instruments, err := e.client.GetInstruInfoDo(ctx)
 	if err != nil {
 		log.Warnf("failed to query instruments, err: %v", err)
 		return nil, err
@@ -77,54 +73,56 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	if err := sharedRateLimiter.Wait(ctx); err != nil {
-		log.WithError(err).Errorf("ticker rate limiter wait error")
-		return nil, err
-	}
-
-	s, err := e.client.NewGetTickersRequest().Symbol(symbol).DoWithResponseTime(ctx)
-	if err != nil {
-		log.Warnf("failed to get tickers, symbol: %s, err: %v", symbol, err)
-		return nil, err
-	}
-
-	if len(s.List) != 1 {
-		log.Warnf("unexpected ticker length, exp: 1, got: %d", len(s.List))
-		return nil, fmt.Errorf("unexpected ticker lenght, exp:1, got:%d", len(s.List))
-	}
-
-	ticker := toGlobalTicker(s.List[0], s.ClosedTime.Time())
-	return &ticker, nil
+	//if err := sharedRateLimiter.Wait(ctx); err != nil {
+	//	log.WithError(err).Errorf("ticker rate limiter wait error")
+	//	return nil, err
+	//}
+	//
+	//s, err := e.client.NewGetTickersRequest.Symbol(symbol).DoWithResponseTime(ctx)
+	//if err != nil {
+	//	log.Warnf("failed to get tickers, symbol: %s, err: %v", symbol, err)
+	//	return nil, err
+	//}
+	//
+	//if len(s.List) != 1 {
+	//	log.Warnf("unexpected ticker length, exp: 1, got: %d", len(s.List))
+	//	return nil, fmt.Errorf("unexpected ticker lenght, exp:1, got:%d", len(s.List))
+	//}
+	//
+	//ticker := toGlobalTicker(s.List[0], s.ClosedTime.Time())
+	//return &ticker, nil
+	return nil, nil
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[string]types.Ticker, error) {
-	tickers := map[string]types.Ticker{}
-	if len(symbols) > 0 {
-		for _, s := range symbols {
-			t, err := e.QueryTicker(ctx, s)
-			if err != nil {
-				return nil, err
-			}
-
-			tickers[s] = *t
-		}
-
-		return tickers, nil
-	}
-
-	if err := sharedRateLimiter.Wait(ctx); err != nil {
-		log.WithError(err).Errorf("ticker rate limiter wait error")
-		return nil, err
-	}
-	allTickers, err := e.client.NewGetTickersRequest().DoWithResponseTime(ctx)
-	if err != nil {
-		log.Warnf("failed to get tickers, err: %v", err)
-		return nil, err
-	}
-
-	for _, s := range allTickers.List {
-		tickers[s.Symbol] = toGlobalTicker(s, allTickers.ClosedTime.Time())
-	}
-
-	return tickers, nil
+	//tickers := map[string]types.Ticker{}
+	//if len(symbols) > 0 {
+	//	for _, s := range symbols {
+	//		t, err := e.QueryTicker(ctx, s)
+	//		if err != nil {
+	//			return nil, err
+	//		}
+	//
+	//		tickers[s] = *t
+	//	}
+	//
+	//	return tickers, nil
+	//}
+	//
+	//if err := sharedRateLimiter.Wait(ctx); err != nil {
+	//	log.WithError(err).Errorf("ticker rate limiter wait error")
+	//	return nil, err
+	//}
+	//allTickers, err := e.client.NewGetTickersRequest().DoWithResponseTime(ctx)
+	//if err != nil {
+	//	log.Warnf("failed to get tickers, err: %v", err)
+	//	return nil, err
+	//}
+	//
+	//for _, s := range allTickers.List {
+	//	tickers[s.Symbol] = toGlobalTicker(s, allTickers.ClosedTime.Time())
+	//}
+	//
+	//return tickers, nil
+	return nil, nil
 }

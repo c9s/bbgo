@@ -35,7 +35,7 @@ type Instrument struct {
 	} `json:"priceFilter"`
 }
 
-//go:generate GetRequest -url "/v5/market/instruments-info" -type GetInstrumentsInfoRequest -responseDataType .InstrumentsInfo
+//go:generate GetRequest -url "/v5/market/instruments-info" -type GetInstrumentsInfoRequest -responseDataType .InstrumentsInfo -prefix GetInstruInfo -interfaceName GetInstrumentsInfoRequester
 type GetInstrumentsInfoRequest struct {
 	client requestgen.APIClient
 
@@ -48,7 +48,7 @@ type GetInstrumentsInfoRequest struct {
 	cursor *string `param:"cursor,query"`
 }
 
-func (c *RestClient) NewGetInstrumentsInfoRequest() *GetInstrumentsInfoRequest {
+func NewGetInstrumentsInfoRequest(c *RestClient) *GetInstrumentsInfoRequest {
 	return &GetInstrumentsInfoRequest{
 		client:   c,
 		category: CategorySpot,
