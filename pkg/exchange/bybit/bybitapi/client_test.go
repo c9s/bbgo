@@ -57,4 +57,24 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("tickers: %+v", tickers)
 	})
+
+	t.Run("GetOpenOrderRequest", func(t *testing.T) {
+		cursor := ""
+		for {
+			req := client.NewGetOpenOrderRequest().Limit(1)
+			if len(cursor) != 0 {
+				req = req.Cursor(cursor)
+			}
+			openOrders, err := req.Do(ctx)
+			assert.NoError(t, err)
+
+			for _, o := range openOrders.List {
+				t.Logf("openOrders: %+v", o)
+			}
+			if len(openOrders.NextPageCursor) == 0 {
+				break
+			}
+			cursor = openOrders.NextPageCursor
+		}
+	})
 }
