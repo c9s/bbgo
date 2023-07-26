@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
@@ -66,14 +67,12 @@ func (e *Exchange) PlatformFeeCurrency() string {
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	if err := sharedRateLimiter.Wait(ctx); err != nil {
-		log.WithError(err).Errorf("markets rate limiter wait error")
-		return nil, err
+		return nil, fmt.Errorf("markets rate limiter wait error: %v", err)
 	}
 
 	instruments, err := e.client.NewGetInstrumentsInfoRequest().Do(ctx)
 	if err != nil {
-		log.Warnf("failed to query instruments, err: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to get instruments, err: %v", err)
 	}
 
 	marketMap := types.MarketMap{}
@@ -86,18 +85,15 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
 	if err := sharedRateLimiter.Wait(ctx); err != nil {
-		log.WithError(err).Errorf("ticker rate limiter wait error")
-		return nil, err
+		return nil, fmt.Errorf("ticker order rate limiter wait error: %v", err)
 	}
 
 	s, err := e.client.NewGetTickersRequest().Symbol(symbol).DoWithResponseTime(ctx)
 	if err != nil {
-		log.Warnf("failed to get tickers, symbol: %s, err: %v", symbol, err)
 		return nil, err
 	}
 
 	if len(s.List) != 1 {
-		log.Warnf("unexpected ticker length, exp: 1, got: %d", len(s.List))
 		return nil, fmt.Errorf("unexpected ticker lenght, exp:1, got:%d", len(s.List))
 	}
 
@@ -121,12 +117,10 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	}
 
 	if err := sharedRateLimiter.Wait(ctx); err != nil {
-		log.WithError(err).Errorf("ticker rate limiter wait error")
-		return nil, err
+		return nil, fmt.Errorf("tickers rate limiter wait error: %v", err)
 	}
 	allTickers, err := e.client.NewGetTickersRequest().DoWithResponseTime(ctx)
 	if err != nil {
-		log.Warnf("failed to get tickers, err: %v", err)
 		return nil, err
 	}
 
@@ -147,20 +141,17 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		}
 
 		if err = tradeRateLimiter.Wait(ctx); err != nil {
-			log.WithError(err).Errorf("trade rate limiter wait error")
-			return nil, err
+			return nil, fmt.Errorf("place order rate limiter wait error: %v", err)
 		}
 		res, err := req.Do(ctx)
 		if err != nil {
-			log.Warnf("failed to get open order, cursor: %s, err: %v", cursor, err)
-			return nil, err
+			return nil, fmt.Errorf("failed to query open orders, err: %v", err)
 		}
 
 		for _, order := range res.List {
 			order, err := toGlobalOrder(order)
 			if err != nil {
-				log.Warnf("failed to convert order, err: %v", err)
-				return nil, err
+				return nil, fmt.Errorf("failed to convert order, err: %v", err)
 			}
 
 			orders = append(orders, *order)
@@ -223,13 +214,11 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	req.OrderLinkId(order.ClientOrderID)
 
 	if err := orderRateLimiter.Wait(ctx); err != nil {
-		log.WithError(err).Errorf("place order rate limiter wait error")
-		return nil, err
+		return nil, fmt.Errorf("place order rate limiter wait error: %v", err)
 	}
 	res, err := req.Do(ctx)
 	if err != nil {
-		log.Warnf("failed to place order, order: %#v, err: %v", order, err)
-		return nil, err
+		return nil, fmt.Errorf("failed to place order, order: %#v, err: %v", order, err)
 	}
 
 	if len(res.OrderId) == 0 || res.OrderLinkId != order.ClientOrderID {
@@ -246,4 +235,45 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	}
 
 	return toGlobalOrder(ordersResp.List[0])
+}
+
+func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (errs error) {
+	if len(orders) == 0 {
+		return nil
+	}
+
+	for _, order := range orders {
+		req := e.client.NewCancelOrderRequest()
+
+		switch {
+		case len(order.ClientOrderID) != 0:
+			req.OrderLinkId(order.ClientOrderID)
+		case len(order.UUID) != 0 && order.OrderID != 0:
+			req.OrderId(order.UUID)
+		default:
+			errs = multierr.Append(
+				errs,
+				fmt.Errorf("the order uuid and client order id are empty, order: %#v", order),
+			)
+			continue
+		}
+
+		req.Symbol(order.Market.Symbol)
+
+		if err := orderRateLimiter.Wait(ctx); err != nil {
+			errs = multierr.Append(errs, fmt.Errorf("cancel order rate limiter wait, order id: %s, error: %v", order.ClientOrderID, err))
+			continue
+		}
+		res, err := req.Do(ctx)
+		if err != nil {
+			errs = multierr.Append(errs, fmt.Errorf("failed to cancel order id: %s, err: %v", order.ClientOrderID, err))
+			continue
+		}
+		if res.OrderId != order.UUID || res.OrderLinkId != order.ClientOrderID {
+			errs = multierr.Append(errs, fmt.Errorf("unexpected order id, resp: %#v, order: %#v", res, order))
+			continue
+		}
+	}
+
+	return errs
 }
