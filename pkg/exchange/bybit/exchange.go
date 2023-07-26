@@ -17,11 +17,14 @@ import (
 //
 // The default order limiter apply 2 requests per second and a 2 initial bucket
 // this includes QueryMarkets, QueryTicker
-var sharedRateLimiter = rate.NewLimiter(rate.Every(time.Second/2), 2)
+var (
+	sharedRateLimiter = rate.NewLimiter(rate.Every(time.Second/2), 2)
+	tradeRateLimiter  = rate.NewLimiter(rate.Every(time.Second/5), 5)
 
-var log = logrus.WithFields(logrus.Fields{
-	"exchange": "bybit",
-})
+	log = logrus.WithFields(logrus.Fields{
+		"exchange": "bybit",
+	})
+)
 
 type Exchange struct {
 	key, secret string
@@ -127,4 +130,42 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	}
 
 	return tickers, nil
+}
+
+func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
+	cursor := ""
+	for {
+		req := e.client.NewGetOpenOrderRequest().Symbol(symbol)
+		if len(cursor) != 0 {
+			// the default limit is 20.
+			req = req.Cursor(cursor)
+		}
+
+		if err = tradeRateLimiter.Wait(ctx); err != nil {
+			log.WithError(err).Errorf("trade rate limiter wait error")
+			return nil, err
+		}
+		res, err := req.Do(ctx)
+		if err != nil {
+			log.Warnf("failed to get open order, cursor: %s, err: %v", cursor, err)
+			return nil, err
+		}
+
+		for _, order := range res.List {
+			order, err := toGlobalOrder(order)
+			if err != nil {
+				log.Warnf("failed to convert order, err: %v", err)
+				return nil, err
+			}
+
+			orders = append(orders, *order)
+		}
+
+		if len(res.NextPageCursor) == 0 {
+			break
+		}
+		cursor = res.NextPageCursor
+	}
+
+	return orders, nil
 }

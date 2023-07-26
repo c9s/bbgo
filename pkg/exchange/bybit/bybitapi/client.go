@@ -5,7 +5,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -23,7 +23,7 @@ const defaultHTTPTimeout = time.Second * 15
 const RestBaseURL = "https://api.bybit.com"
 
 // defaultRequestWindowMilliseconds specify how long an HTTP request is valid. It is also used to prevent replay attacks.
-var defaultRequestWindowMilliseconds = fmt.Sprintf("%d", time.Millisecond*5000)
+var defaultRequestWindowMilliseconds = fmt.Sprintf("%d", 5*time.Second.Milliseconds())
 
 type RestClient struct {
 	requestgen.BaseAPIClient
@@ -124,7 +124,7 @@ func sign(payload string, secret string) string {
 		return ""
 	}
 
-	return base64.StdEncoding.EncodeToString(sig.Sum(nil))
+	return hex.EncodeToString(sig.Sum(nil))
 }
 
 func castPayload(payload interface{}) ([]byte, error) {
