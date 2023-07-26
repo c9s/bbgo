@@ -1,6 +1,7 @@
 package bybit
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -355,4 +356,32 @@ func TestIsWorking(t *testing.T) {
 			assert.True(t, gos == types.OrderStatusNew || gos == types.OrderStatusPartiallyFilled)
 		}
 	}
+}
+
+func Test_toLocalOrderType(t *testing.T) {
+	orderType, err := toLocalOrderType(types.OrderTypeLimit)
+	assert.NoError(t, err)
+	assert.Equal(t, bybitapi.OrderTypeLimit, orderType)
+
+	orderType, err = toLocalOrderType(types.OrderTypeMarket)
+	assert.NoError(t, err)
+	assert.Equal(t, bybitapi.OrderTypeMarket, orderType)
+
+	orderType, err = toLocalOrderType("wrong type")
+	assert.Error(t, fmt.Errorf("order type %s not supported", "wrong side"), err)
+	assert.Equal(t, bybitapi.OrderType(""), orderType)
+}
+
+func Test_toLocalSide(t *testing.T) {
+	side, err := toLocalSide(types.SideTypeSell)
+	assert.NoError(t, err)
+	assert.Equal(t, bybitapi.SideSell, side)
+
+	side, err = toLocalSide(types.SideTypeBuy)
+	assert.NoError(t, err)
+	assert.Equal(t, bybitapi.SideBuy, side)
+
+	side, err = toLocalSide("wrong side")
+	assert.Error(t, fmt.Errorf("side type %s not supported", "wrong side"), err)
+	assert.Equal(t, bybitapi.Side(""), side)
 }

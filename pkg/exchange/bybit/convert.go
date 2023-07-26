@@ -170,3 +170,29 @@ func isWorking(status bybitapi.OrderStatus) (bool, error) {
 	s, err := toGlobalOrderStatus(status)
 	return s == types.OrderStatusNew || s == types.OrderStatusPartiallyFilled, err
 }
+
+func toLocalOrderType(orderType types.OrderType) (bybitapi.OrderType, error) {
+	switch orderType {
+	case types.OrderTypeLimit:
+		return bybitapi.OrderTypeLimit, nil
+
+	case types.OrderTypeMarket:
+		return bybitapi.OrderTypeMarket, nil
+
+	default:
+		return "", fmt.Errorf("order type %s not supported", orderType)
+	}
+}
+
+func toLocalSide(side types.SideType) (bybitapi.Side, error) {
+	switch side {
+	case types.SideTypeSell:
+		return bybitapi.SideSell, nil
+
+	case types.SideTypeBuy:
+		return bybitapi.SideBuy, nil
+
+	default:
+		return "", fmt.Errorf("side type %s not supported", side)
+	}
+}
