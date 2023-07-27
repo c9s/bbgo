@@ -12,8 +12,8 @@ type PlaceOrderResponse struct {
 	OrderLinkId string `json:"orderLinkId"`
 }
 
-//go:generate PostRequest -url "/v5/order/create" -type PostPlaceOrderRequest -responseDataType .PlaceOrderResponse
-type PostPlaceOrderRequest struct {
+//go:generate PostRequest -url "/v5/order/create" -type PlaceOrderRequest -responseDataType .PlaceOrderResponse
+type PlaceOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	category    Category    `param:"category" validValues:"spot"`
@@ -49,8 +49,8 @@ type PostPlaceOrderRequest struct {
 	slOrderType    *string `param:"slOrderType"`
 }
 
-func (c *RestClient) NewPlaceOrderRequest() *PostPlaceOrderRequest {
-	return &PostPlaceOrderRequest{
+func (c *RestClient) NewPlaceOrderRequest() *PlaceOrderRequest {
+	return &PlaceOrderRequest{
 		client:   c,
 		category: CategorySpot,
 	}
