@@ -92,6 +92,9 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("apiResp: %+v", apiResp)
 
+		_, err = strconv.ParseUint(apiResp.OrderId, 10, 64)
+		assert.NoError(t, err)
+
 		ordersResp, err := client.NewGetOpenOrderRequest().OrderLinkId(apiResp.OrderLinkId).Do(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, len(ordersResp.List), 1)

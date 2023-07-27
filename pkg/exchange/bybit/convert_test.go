@@ -3,6 +3,7 @@ package bybit
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"testing"
 	"time"
 
@@ -231,6 +232,8 @@ func TestToGlobalOrder(t *testing.T) {
 	assert.NoError(t, err)
 	working, err := isWorking(openOrder.OrderStatus)
 	assert.NoError(t, err)
+	orderIdNum, err := strconv.ParseUint(openOrder.OrderId, 10, 64)
+	assert.NoError(t, err)
 
 	exp := types.Order{
 		SubmitOrder: types.SubmitOrder{
@@ -243,7 +246,7 @@ func TestToGlobalOrder(t *testing.T) {
 			TimeInForce:   tif,
 		},
 		Exchange:         types.ExchangeBybit,
-		OrderID:          hashStringID(openOrder.OrderId),
+		OrderID:          orderIdNum,
 		UUID:             openOrder.OrderId,
 		Status:           status,
 		ExecutedQuantity: openOrder.CumExecQty,

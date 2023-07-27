@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
@@ -67,6 +68,13 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 	if err != nil {
 		return nil, err
 	}
+	// linear and inverse : 42f4f364-82e1-49d3-ad1d-cd8cf9aa308d (UUID format)
+	// spot : 1468264727470772736 (only numbers)
+	// Now we only use spot trading.
+	orderIdNum, err := strconv.ParseUint(order.OrderId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected order id: %s, err: %v", order.OrderId, err)
+	}
 
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
@@ -79,7 +87,7 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 			TimeInForce:   timeInForce,
 		},
 		Exchange:         types.ExchangeBybit,
-		OrderID:          hashStringID(order.OrderId),
+		OrderID:          orderIdNum,
 		UUID:             order.OrderId,
 		Status:           status,
 		ExecutedQuantity: order.CumExecQty,
