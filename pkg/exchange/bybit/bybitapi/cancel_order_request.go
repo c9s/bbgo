@@ -12,8 +12,8 @@ type CancelOrderResponse struct {
 	OrderLinkId string `json:"orderLinkId"`
 }
 
-//go:generate PostRequest -url "/v5/order/cancel" -type PostCancelOrderRequest -responseDataType .CancelOrderResponse
-type PostCancelOrderRequest struct {
+//go:generate PostRequest -url "/v5/order/cancel" -type CancelOrderRequest -responseDataType .CancelOrderResponse
+type CancelOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	category Category `param:"category" validValues:"spot"`
@@ -27,8 +27,8 @@ type PostCancelOrderRequest struct {
 	orderFilter *string `param:"timeInForce" validValues:"Order"`
 }
 
-func (c *RestClient) NewCancelOrderRequest() *PostCancelOrderRequest {
-	return &PostCancelOrderRequest{
+func (c *RestClient) NewCancelOrderRequest() *CancelOrderRequest {
+	return &CancelOrderRequest{
 		client:   c,
 		category: CategorySpot,
 	}
