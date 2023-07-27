@@ -116,6 +116,12 @@ const (
 	OrderStatusRejected OrderStatus = "REJECTED"
 )
 
+func (o OrderStatus) Closed() bool {
+	return o == OrderStatusFilled ||
+		o == OrderStatusCanceled ||
+		o == OrderStatusRejected
+}
+
 type SubmitOrder struct {
 	ClientOrderID string `json:"clientOrderID,omitempty" db:"client_order_id"`
 

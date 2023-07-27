@@ -3,6 +3,7 @@ package bybit
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -14,7 +15,8 @@ import (
 )
 
 const (
-	maxOrderIdLen = 36
+	maxOrderIdLen         = 36
+	defaultQueryClosedLen = 50
 )
 
 // https://bybit-exchange.github.io/docs/zh-TW/v5/rate-limit
@@ -26,6 +28,7 @@ var (
 	sharedRateLimiter = rate.NewLimiter(rate.Every(time.Second/2), 2)
 	tradeRateLimiter  = rate.NewLimiter(rate.Every(time.Second/5), 5)
 	orderRateLimiter  = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	closedRateLimiter = rate.NewLimiter(rate.Every(time.Second), 1)
 
 	log = logrus.WithFields(logrus.Fields{
 		"exchange": "bybit",
@@ -67,7 +70,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	if err := sharedRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("markets rate limiter wait error: %v", err)
+		return nil, fmt.Errorf("markets rate limiter wait error: %w", err)
 	}
 
 	instruments, err := e.client.NewGetInstrumentsInfoRequest().Do(ctx)
@@ -85,12 +88,12 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
 	if err := sharedRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("ticker order rate limiter wait error: %v", err)
+		return nil, fmt.Errorf("ticker order rate limiter wait error: %w", err)
 	}
 
 	s, err := e.client.NewGetTickersRequest().Symbol(symbol).DoWithResponseTime(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to call ticker, symbol: %s, err: %w", symbol, err)
 	}
 
 	if len(s.List) != 1 {
@@ -117,11 +120,11 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	}
 
 	if err := sharedRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("tickers rate limiter wait error: %v", err)
+		return nil, fmt.Errorf("tickers rate limiter wait error: %w", err)
 	}
 	allTickers, err := e.client.NewGetTickersRequest().DoWithResponseTime(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to call ticker, err: %w", err)
 	}
 
 	for _, s := range allTickers.List {
@@ -141,11 +144,11 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		}
 
 		if err = tradeRateLimiter.Wait(ctx); err != nil {
-			return nil, fmt.Errorf("place order rate limiter wait error: %v", err)
+			return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
 		}
 		res, err := req.Do(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to query open orders, err: %v", err)
+			return nil, fmt.Errorf("failed to query open orders, err: %w", err)
 		}
 
 		for _, order := range res.List {
@@ -214,11 +217,11 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	req.OrderLinkId(order.ClientOrderID)
 
 	if err := orderRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("place order rate limiter wait error: %v", err)
+		return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
 	}
 	res, err := req.Do(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to place order, order: %#v, err: %v", order, err)
+		return nil, fmt.Errorf("failed to place order, order: %#v, err: %w", order, err)
 	}
 
 	if len(res.OrderId) == 0 || res.OrderLinkId != order.ClientOrderID {
@@ -227,7 +230,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 
 	ordersResp, err := e.client.NewGetOpenOrderRequest().OrderLinkId(res.OrderLinkId).Do(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query order by client order id: %s", res.OrderLinkId)
+		return nil, fmt.Errorf("failed to query order by client order id: %s, err: %w", res.OrderLinkId, err)
 	}
 
 	if len(ordersResp.List) != 1 {
@@ -261,12 +264,12 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 		req.Symbol(order.Market.Symbol)
 
 		if err := orderRateLimiter.Wait(ctx); err != nil {
-			errs = multierr.Append(errs, fmt.Errorf("cancel order rate limiter wait, order id: %s, error: %v", order.ClientOrderID, err))
+			errs = multierr.Append(errs, fmt.Errorf("cancel order rate limiter wait, order id: %s, error: %w", order.ClientOrderID, err))
 			continue
 		}
 		res, err := req.Do(ctx)
 		if err != nil {
-			errs = multierr.Append(errs, fmt.Errorf("failed to cancel order id: %s, err: %v", order.ClientOrderID, err))
+			errs = multierr.Append(errs, fmt.Errorf("failed to cancel order id: %s, err: %w", order.ClientOrderID, err))
 			continue
 		}
 		if res.OrderId != order.UUID || res.OrderLinkId != order.ClientOrderID {
@@ -276,4 +279,39 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	}
 
 	return errs
+}
+
+func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, util time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+	if !since.IsZero() || !util.IsZero() {
+		log.Warn("!!!BYBIT EXCHANGE API NOTICE!!! the since/until conditions will not be effected on SPOT account, bybit exchange does not support time-range-based query currently")
+	}
+
+	if err := closedRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
+	}
+	res, err := e.client.NewGetOrderHistoriesRequest().
+		Symbol(symbol).
+		Cursor(strconv.FormatUint(lastOrderID, 10)).
+		Limit(defaultQueryClosedLen).
+		Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
+	}
+
+	for _, order := range res.List {
+		o, err2 := toGlobalOrder(order)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+			continue
+		}
+
+		if o.Status.Closed() {
+			orders = append(orders, *o)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return types.SortOrdersAscending(orders), nil
 }
