@@ -178,7 +178,7 @@ func TestToGlobalOrder(t *testing.T) {
 	//  "UpdatedTime": "2023-07-25 17:12:57.868 +0800 CST"
 	//}
 	timeNow := time.Now()
-	openOrder := bybitapi.OpenOrder{
+	openOrder := bybitapi.Order{
 		OrderId:            "1472539279335923200",
 		OrderLinkId:        "1690276361150",
 		BlockTradeId:       "",

@@ -46,7 +46,7 @@ func toGlobalTicker(stats bybitapi.Ticker, time time.Time) types.Ticker {
 	}
 }
 
-func toGlobalOrder(order bybitapi.OpenOrder) (*types.Order, error) {
+func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 	side, err := toGlobalSideType(order.Side)
 	if err != nil {
 		return nil, err
