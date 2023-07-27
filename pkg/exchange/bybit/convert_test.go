@@ -1,7 +1,10 @@
 package bybit
 
 import (
+	"context"
 	"fmt"
+	"github.com/pkg/errors"
+	"go.uber.org/multierr"
 	"math"
 	"strconv"
 	"testing"
@@ -13,6 +16,18 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+func TestU(t *testing.T) {
+	e := returnErr()
+
+	t.Log(errors.Is(e, context.DeadlineExceeded))
+
+}
+
+func returnErr() error {
+	var err error
+	return multierr.Append(multierr.Append(err, fmt.Errorf("got err: %w", context.DeadlineExceeded)), fmt.Errorf("GG"))
+}
 
 func TestToGlobalMarket(t *testing.T) {
 	// sample:
