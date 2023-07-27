@@ -13,23 +13,24 @@ const (
 )
 
 type Trade struct {
-	ID                      uint64                     `json:"id" db:"exchange_id"`
-	WalletType              WalletType                 `json:"wallet_type,omitempty"`
-	Price                   fixedpoint.Value           `json:"price"`
-	Volume                  fixedpoint.Value           `json:"volume"`
-	Funds                   fixedpoint.Value           `json:"funds"`
-	Market                  string                     `json:"market"`
-	MarketName              string                     `json:"market_name"`
-	CreatedAt               types.MillisecondTimestamp `json:"created_at"`
-	Side                    string                     `json:"side"`
-	OrderID                 uint64                     `json:"order_id"`
-	Fee                     fixedpoint.Value           `json:"fee"` // float number as string
-	FeeCurrency             string                     `json:"fee_currency"`
-	FeeDiscounted           bool                       `json:"fee_discounted"`
-	Liquidity               Liquidity                  `json:"liquidity"`
-	SelfTradeBidFee         fixedpoint.Value           `json:"self_trade_bid_fee"`
-	SelfTradeBidFeeCurrency string                     `json:"self_trade_bid_fee_currency"`
-	SelfTradeBidOrderID     uint64                     `json:"self_trade_bid_order_id"`
+	ID                        uint64                     `json:"id" db:"exchange_id"`
+	WalletType                WalletType                 `json:"wallet_type,omitempty"`
+	Price                     fixedpoint.Value           `json:"price"`
+	Volume                    fixedpoint.Value           `json:"volume"`
+	Funds                     fixedpoint.Value           `json:"funds"`
+	Market                    string                     `json:"market"`
+	MarketName                string                     `json:"market_name"`
+	CreatedAt                 types.MillisecondTimestamp `json:"created_at"`
+	Side                      string                     `json:"side"`
+	OrderID                   uint64                     `json:"order_id"`
+	Fee                       fixedpoint.Value           `json:"fee"` // float number as string
+	FeeCurrency               string                     `json:"fee_currency"`
+	FeeDiscounted             bool                       `json:"fee_discounted"`
+	Liquidity                 Liquidity                  `json:"liquidity"`
+	SelfTradeBidFee           fixedpoint.Value           `json:"self_trade_bid_fee"`
+	SelfTradeBidFeeCurrency   string                     `json:"self_trade_bid_fee_currency"`
+	SelfTradeBidFeeDiscounted bool                       `json:"self_trade_bid_fee_discounted"`
+	SelfTradeBidOrderID       uint64                     `json:"self_trade_bid_order_id"`
 }
 
 func (t Trade) IsBuyer() bool {
