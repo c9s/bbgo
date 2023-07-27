@@ -79,7 +79,7 @@ func TestClient(t *testing.T) {
 		}
 	})
 
-	t.Run("PostPlaceOrderRequest", func(t *testing.T) {
+	t.Run("PlaceOrderRequest", func(t *testing.T) {
 		req := client.NewPlaceOrderRequest().
 			Symbol("DOTUSDT").
 			Side(SideBuy).
@@ -98,7 +98,7 @@ func TestClient(t *testing.T) {
 		t.Logf("apiResp: %+v", ordersResp.List[0])
 	})
 
-	t.Run("PostCancelOrderRequest", func(t *testing.T) {
+	t.Run("CancelOrderRequest", func(t *testing.T) {
 		req := client.NewPlaceOrderRequest().
 			Symbol("DOTUSDT").
 			Side(SideBuy).
