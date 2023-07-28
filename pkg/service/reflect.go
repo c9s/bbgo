@@ -40,7 +40,7 @@ func placeholdersOf(record interface{}) []string {
 	for i := 0; i < rt.NumField(); i++ {
 		fieldType := rt.Field(i)
 		if tag, ok := fieldType.Tag.Lookup("db"); ok {
-			if tag == "gid" {
+			if tag == "gid" || tag == "-" || tag == "" {
 				continue
 			}
 
@@ -65,7 +65,7 @@ func fieldsNamesOf(record interface{}) []string {
 	for i := 0; i < rt.NumField(); i++ {
 		fieldType := rt.Field(i)
 		if tag, ok := fieldType.Tag.Lookup("db"); ok {
-			if tag == "gid" {
+			if tag == "gid" || tag == "-" || tag == "" {
 				continue
 			}
 
