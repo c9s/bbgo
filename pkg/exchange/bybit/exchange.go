@@ -11,12 +11,15 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
+	v3 "github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi/v3"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 const (
-	maxOrderIdLen         = 36
-	defaultQueryClosedLen = 50
+	maxOrderIdLen     = 36
+	defaultQueryLimit = 50
+
+	halfYearDuration = 6 * 30 * 24 * time.Hour
 )
 
 // https://bybit-exchange.github.io/docs/zh-TW/v5/rate-limit
@@ -25,10 +28,10 @@ const (
 // The default order limiter apply 2 requests per second and a 2 initial bucket
 // this includes QueryMarkets, QueryTicker
 var (
-	sharedRateLimiter = rate.NewLimiter(rate.Every(time.Second/2), 2)
-	tradeRateLimiter  = rate.NewLimiter(rate.Every(time.Second/5), 5)
-	orderRateLimiter  = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	closedRateLimiter = rate.NewLimiter(rate.Every(time.Second), 1)
+	sharedRateLimiter       = rate.NewLimiter(rate.Every(time.Second/2), 2)
+	tradeRateLimiter        = rate.NewLimiter(rate.Every(time.Second/5), 5)
+	orderRateLimiter        = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	closedOrderQueryLimiter = rate.NewLimiter(rate.Every(time.Second), 1)
 
 	log = logrus.WithFields(logrus.Fields{
 		"exchange": "bybit",
@@ -38,6 +41,7 @@ var (
 type Exchange struct {
 	key, secret string
 	client      *bybitapi.RestClient
+	v3client    *v3.Client
 }
 
 func New(key, secret string) (*Exchange, error) {
@@ -286,13 +290,13 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		log.Warn("!!!BYBIT EXCHANGE API NOTICE!!! the since/until conditions will not be effected on SPOT account, bybit exchange does not support time-range-based query currently")
 	}
 
-	if err := closedRateLimiter.Wait(ctx); err != nil {
+	if err := closedOrderQueryLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
 	}
 	res, err := e.client.NewGetOrderHistoriesRequest().
 		Symbol(symbol).
 		Cursor(strconv.FormatUint(lastOrderID, 10)).
-		Limit(defaultQueryClosedLen).
+		Limit(defaultQueryLimit).
 		Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
@@ -314,4 +318,72 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	}
 
 	return types.SortOrdersAscending(orders), nil
+}
+
+/*
+QueryTrades queries trades by time range or trade id range.
+If options.StartTime is not specified, you can only query for records in the last 7 days.
+If you want to query for records older than 7 days, options.StartTime is required.
+It supports to query records up to 180 days.
+
+If the orderId is null, fromTradeId is passed, and toTradeId is null, then the result is sorted by
+ticketId in ascend. Otherwise, the result is sorted by ticketId in descend.
+
+** Here includes MakerRebate. If needed, let's discuss how to modify it to return in trade. **
+** StartTime and EndTime are inclusive. **
+** StartTime and EndTime cannot exceed 180 days. **
+*/
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+	if options.StartTime != nil && options.EndTime != nil && options.EndTime.Sub(*options.StartTime) > halfYearDuration {
+		return nil, fmt.Errorf("StartTime and EndTime cannot exceed 180 days, startTime: %v, endTime: %v, diff: %v",
+			options.StartTime.String(),
+			options.EndTime.String(),
+			options.EndTime.Sub(*options.StartTime)/24)
+	}
+
+	// using v3 client, since the v5 API does not support feeCurrency.
+	req := e.v3client.NewGetTradesRequest()
+	req.Symbol(symbol)
+
+	if options.StartTime != nil || options.EndTime != nil {
+		if options.StartTime != nil {
+			req.StartTime(options.StartTime.UTC())
+		}
+		if options.EndTime != nil {
+			req.EndTime(options.EndTime.UTC())
+		}
+	} else {
+		req.FromTradeId(strconv.FormatUint(options.LastTradeID, 10))
+	}
+
+	limit := uint64(options.Limit)
+	if limit > defaultQueryLimit || limit <= 0 {
+		log.Debugf("limtit is exceeded or zero, update to %d, got: %d", defaultQueryLimit, options.Limit)
+		limit = defaultQueryLimit
+	}
+	req.Limit(limit)
+
+	if err := tradeRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("trade rate limiter wait error: %w", err)
+	}
+	response, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query trades, err: %w", err)
+	}
+
+	var errs error
+	for _, trade := range response.List {
+		res, err := v3ToGlobalTrade(trade)
+		if err != nil {
+			errs = multierr.Append(errs, err)
+			continue
+		}
+		trades = append(trades, *res)
+	}
+
+	if errs != nil {
+		return nil, errs
+	}
+
+	return trades, nil
 }
