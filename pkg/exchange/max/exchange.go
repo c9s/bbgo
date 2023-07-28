@@ -305,8 +305,10 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol st
 		orders = append(orders, *order)
 	}
 
-	orders = types.SortOrdersAscending(orders)
-	return orders, nil
+	if err != nil {
+		return nil, err
+	}
+	return types.SortOrdersAscending(orders), nil
 }
 
 func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
