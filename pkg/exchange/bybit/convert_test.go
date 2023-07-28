@@ -1,8 +1,12 @@
 package bybit
 
 import (
+	"context"
 	"fmt"
+	"github.com/pkg/errors"
+	"go.uber.org/multierr"
 	"math"
+	"strconv"
 	"testing"
 	"time"
 
@@ -12,6 +16,18 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+func TestU(t *testing.T) {
+	e := returnErr()
+
+	t.Log(errors.Is(e, context.DeadlineExceeded))
+
+}
+
+func returnErr() error {
+	var err error
+	return multierr.Append(multierr.Append(err, fmt.Errorf("got err: %w", context.DeadlineExceeded)), fmt.Errorf("GG"))
+}
 
 func TestToGlobalMarket(t *testing.T) {
 	// sample:
@@ -178,7 +194,7 @@ func TestToGlobalOrder(t *testing.T) {
 	//  "UpdatedTime": "2023-07-25 17:12:57.868 +0800 CST"
 	//}
 	timeNow := time.Now()
-	openOrder := bybitapi.OpenOrder{
+	openOrder := bybitapi.Order{
 		OrderId:            "1472539279335923200",
 		OrderLinkId:        "1690276361150",
 		BlockTradeId:       "",
@@ -231,6 +247,8 @@ func TestToGlobalOrder(t *testing.T) {
 	assert.NoError(t, err)
 	working, err := isWorking(openOrder.OrderStatus)
 	assert.NoError(t, err)
+	orderIdNum, err := strconv.ParseUint(openOrder.OrderId, 10, 64)
+	assert.NoError(t, err)
 
 	exp := types.Order{
 		SubmitOrder: types.SubmitOrder{
@@ -243,7 +261,7 @@ func TestToGlobalOrder(t *testing.T) {
 			TimeInForce:   tif,
 		},
 		Exchange:         types.ExchangeBybit,
-		OrderID:          hashStringID(openOrder.OrderId),
+		OrderID:          orderIdNum,
 		UUID:             openOrder.OrderId,
 		Status:           status,
 		ExecutedQuantity: openOrder.CumExecQty,

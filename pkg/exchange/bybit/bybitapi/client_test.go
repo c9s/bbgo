@@ -92,6 +92,9 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("apiResp: %+v", apiResp)
 
+		_, err = strconv.ParseUint(apiResp.OrderId, 10, 64)
+		assert.NoError(t, err)
+
 		ordersResp, err := client.NewGetOpenOrderRequest().OrderLinkId(apiResp.OrderLinkId).Do(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, len(ordersResp.List), 1)
@@ -128,5 +131,28 @@ func TestClient(t *testing.T) {
 		assert.Equal(t, len(ordersResp.List), 1)
 		assert.Equal(t, ordersResp.List[0].OrderStatus, OrderStatusCancelled)
 		t.Logf("apiResp: %+v", ordersResp.List[0])
+	})
+
+	t.Run("GetOrderHistoriesRequest", func(t *testing.T) {
+		req := client.NewPlaceOrderRequest().
+			Symbol("DOTUSDT").
+			Side(SideBuy).
+			OrderType(OrderTypeLimit).
+			Qty("1").
+			Price("4.6").
+			OrderLinkId(uuid.NewString()).
+			TimeInForce(TimeInForceGTC)
+		apiResp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("apiResp: %+v", apiResp)
+
+		ordersResp, err := client.NewGetOpenOrderRequest().OrderLinkId(apiResp.OrderLinkId).Do(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, len(ordersResp.List), 1)
+		t.Logf("apiResp: %+v", ordersResp.List[0])
+
+		orderResp, err := client.NewGetOrderHistoriesRequest().Symbol("DOTUSDT").Cursor("0").Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("apiResp: %#v", orderResp)
 	})
 }

@@ -9,13 +9,13 @@ import (
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Result
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Result
 
-type OpenOrdersResponse struct {
-	List           []OpenOrder `json:"list"`
-	NextPageCursor string      `json:"nextPageCursor"`
-	Category       string      `json:"category"`
+type OrdersResponse struct {
+	List           []Order `json:"list"`
+	NextPageCursor string  `json:"nextPageCursor"`
+	Category       string  `json:"category"`
 }
 
-type OpenOrder struct {
+type Order struct {
 	OrderId            string                     `json:"orderId"`
 	OrderLinkId        string                     `json:"orderLinkId"`
 	BlockTradeId       string                     `json:"blockTradeId"`
@@ -59,7 +59,7 @@ type OpenOrder struct {
 	UpdatedTime        types.MillisecondTimestamp `json:"updatedTime"`
 }
 
-//go:generate GetRequest -url "/v5/order/realtime" -type GetOpenOrdersRequest -responseDataType .OpenOrdersResponse
+//go:generate GetRequest -url "/v5/order/realtime" -type GetOpenOrdersRequest -responseDataType .OrdersResponse
 type GetOpenOrdersRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
@@ -75,6 +75,8 @@ type GetOpenOrdersRequest struct {
 	cursor      *string   `param:"cursor,query"`
 }
 
+// NewGetOpenOrderRequest queries unfilled or partially filled orders in real-time. To query older order records,
+// please use the order history interface.
 func (c *RestClient) NewGetOpenOrderRequest() *GetOpenOrdersRequest {
 	return &GetOpenOrdersRequest{
 		client:   c,
