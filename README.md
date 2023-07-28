@@ -98,27 +98,27 @@ the implementation.
 | grid2       | the second generation grid strategy, it can convert your quote asset into a grid, supports base+quote mode                              | maker      |                  |
 | bollgrid    | strategy implements a basic grid strategy with the built-in bollinger indicator                                                         | maker      |                  | 
 | xmaker      | cross exchange market making strategy, it hedges your inventory risk on the other side                                                  | maker      | no               |
-| xnav        | this strategy helps you record the current net asset value                                                                              |            |                  |
-| xalign      | this strategy aligns your balance position automatically                                                                                |            |                  |
-| xfunding    | a funding rate fee strategy                                                                                                             |            |                  |
+| xnav        | this strategy helps you record the current net asset value                                                                              | tool       |                  |
+| xalign      | this strategy aligns your balance position automatically                                                                                | tool       |                  |
+| xfunding    | a funding rate fee strategy                                                                                                             | funding    |                  |
 | autoborrow  | this strategy uses margin to borrow assets, to help you keep the minimal balance                                                        | tool       | no               |
 | pivotshort  | this strategy finds the pivot low and entry the trade when the price breaks the previous low                                            | long/short |                  |
 | schedule    | this strategy buy/sell with a fixed quantity periodically, you can use this as a single DCA, or to refill the fee asset like BNB.       | tool       |
 | irr         | this strategy opens the position based on the predicated return rate                                                                    | long/short |                  |
 | bollmaker   | this strategy holds a long-term long/short position, places maker orders on both side, uses bollinger band to control the position size | maker      |                  |
-| wall        | this strategy creates wall (large amount order) on the order book                                                                       |            |                  |
-| scmaker     | this market making strategy is desgiend for stable coin markets, like USDC/USDT                                                         |            |                  |
+| wall        | this strategy creates wall (large amount order) on the order book                                                                       | maker      |                  |
+| scmaker     | this market making strategy is desgiend for stable coin markets, like USDC/USDT                                                         | maker      |                  |
 | drift       |                                                                                                                                         | long/short |                  |
 | rsicross    | this strategy opens a long position when the fast rsi cross over the slow rsi, this is a demo strategy for using the v2 indicator       | long/short |                  |
 | marketcap   | this strategy implements a strategy that rebalances the portfolio based on the market capitalization                                    | rebalance  | no               |
 | supertrend  | this strategy uses DEMA and Supertrend indicator to open the long/short position                                                        | long/short |                  |
-| trendtrader | this strategy opens long/short position based on the trendline breakout                                                                 |            |                  |
-| elliottwave |                                                                                                                                         |            |                  |
-| ewoDgtrd    |                                                                                                                                         |            |                  |
-| fixedmaker  |                                                                                                                                         |            |                  |
-| factoryzoo  |                                                                                                                                         |            |                  |
-| fmaker      |                                                                                                                                         |            |                  |
-| linregmaker | a linear regression based market maker                                                                                                  |            |                  |
+| trendtrader | this strategy opens long/short position based on the trendline breakout                                                                 | long/short |                  |
+| elliottwave |                                                                                                                                         | long/short |                  |
+| ewoDgtrd    |                                                                                                                                         | long/short |                  |
+| fixedmaker  |                                                                                                                                         | maker      |                  |
+| factoryzoo  |                                                                                                                                         | long/short |                  |
+| fmaker      |                                                                                                                                         | maker      |                  |
+| linregmaker | a linear regression based market maker                                                                                                  | maker      |                  |
 
 
 
