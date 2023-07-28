@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
+	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi/v3"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -73,7 +74,7 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 	// Now we only use spot trading.
 	orderIdNum, err := strconv.ParseUint(order.OrderId, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("unexpected order id: %s, err: %v", order.OrderId, err)
+		return nil, fmt.Errorf("unexpected order id: %s, err: %w", order.OrderId, err)
 	}
 
 	return &types.Order{
@@ -203,4 +204,64 @@ func toLocalSide(side types.SideType) (bybitapi.Side, error) {
 	default:
 		return "", fmt.Errorf("side type %s not supported", side)
 	}
+}
+
+func toV3Buyer(isBuyer v3.Side) (types.SideType, error) {
+	switch isBuyer {
+	case v3.SideBuy:
+		return types.SideTypeBuy, nil
+	case v3.SideSell:
+		return types.SideTypeSell, nil
+	default:
+		return "", fmt.Errorf("unexpected side type: %s", isBuyer)
+	}
+}
+func toV3Maker(isMaker v3.OrderType) (bool, error) {
+	switch isMaker {
+	case v3.OrderTypeMaker:
+		return true, nil
+	case v3.OrderTypeTaker:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected order type: %s", isMaker)
+	}
+}
+
+func v3ToGlobalTrade(trade v3.Trade) (*types.Trade, error) {
+	side, err := toV3Buyer(trade.IsBuyer)
+	if err != nil {
+		return nil, err
+	}
+	isMaker, err := toV3Maker(trade.IsMaker)
+	if err != nil {
+		return nil, err
+	}
+
+	orderIdNum, err := strconv.ParseUint(trade.OrderId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected order id: %s, err: %w", trade.OrderId, err)
+	}
+	tradeIdNum, err := strconv.ParseUint(trade.TradeId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected trade id: %s, err: %w", trade.TradeId, err)
+	}
+
+	return &types.Trade{
+		ID:            tradeIdNum,
+		OrderID:       orderIdNum,
+		Exchange:      types.ExchangeBybit,
+		Price:         trade.OrderPrice,
+		Quantity:      trade.OrderQty,
+		QuoteQuantity: trade.OrderPrice.Mul(trade.OrderQty),
+		Symbol:        trade.Symbol,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       isMaker,
+		Time:          types.Time(trade.ExecutionTime),
+		Fee:           trade.ExecFee,
+		FeeCurrency:   trade.FeeTokenId,
+		IsMargin:      false,
+		IsFutures:     false,
+		IsIsolated:    false,
+	}, nil
 }

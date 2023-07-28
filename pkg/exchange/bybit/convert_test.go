@@ -3,16 +3,17 @@ package bybit
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	"go.uber.org/multierr"
 	"math"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
+	v3 "github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi/v3"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -402,4 +403,75 @@ func Test_toLocalSide(t *testing.T) {
 	side, err = toLocalSide("wrong side")
 	assert.Error(t, fmt.Errorf("side type %s not supported", "wrong side"), err)
 	assert.Equal(t, bybitapi.Side(""), side)
+}
+
+func Test_toGlobalTrade(t *testing.T) {
+	/* sample: trade
+	{
+		"Symbol":"BTCUSDT",
+		"Id":"1474200510090276864",
+		"OrderId":"1474200270671015936",
+		"TradeId":"2100000000031181772",
+		"OrderPrice":"27628",
+		"OrderQty":"0.007959",
+		"ExecFee":"0.21989125",
+		"FeeTokenId":"USDT",
+		"CreatTime":"2023-07-28 00:13:15.457 +0800 CST",
+		"IsBuyer":"1",
+		"IsMaker":"0",
+		"MatchOrderId":"5760912963729109504",
+		"MakerRebate":"0",
+		"ExecutionTime":"2023-07-28 00:13:15.463 +0800 CST",
+		"BlockTradeId": "",
+	}
+	*/
+	timeNow := time.Now()
+	trade := v3.Trade{
+		Symbol:        "DOTUSDT",
+		Id:            "1474200510090276864",
+		OrderId:       "1474200270671015936",
+		TradeId:       "2100000000031181772",
+		OrderPrice:    fixedpoint.NewFromFloat(27628),
+		OrderQty:      fixedpoint.NewFromFloat(0.007959),
+		ExecFee:       fixedpoint.NewFromFloat(0.21989125),
+		FeeTokenId:    "USDT",
+		CreatTime:     types.MillisecondTimestamp(timeNow),
+		IsBuyer:       "0",
+		IsMaker:       "0",
+		MatchOrderId:  "5760912963729109504",
+		MakerRebate:   fixedpoint.NewFromFloat(0),
+		ExecutionTime: types.MillisecondTimestamp(timeNow),
+		BlockTradeId:  "",
+	}
+
+	s, err := toV3Buyer(trade.IsBuyer)
+	assert.NoError(t, err)
+	m, err := toV3Maker(trade.IsMaker)
+	assert.NoError(t, err)
+	orderIdNum, err := strconv.ParseUint(trade.OrderId, 10, 64)
+	assert.NoError(t, err)
+	tradeId, err := strconv.ParseUint(trade.TradeId, 10, 64)
+	assert.NoError(t, err)
+
+	exp := types.Trade{
+		ID:            tradeId,
+		OrderID:       orderIdNum,
+		Exchange:      types.ExchangeBybit,
+		Price:         trade.OrderPrice,
+		Quantity:      trade.OrderQty,
+		QuoteQuantity: trade.OrderPrice.Mul(trade.OrderQty),
+		Symbol:        trade.Symbol,
+		Side:          s,
+		IsBuyer:       s == types.SideTypeBuy,
+		IsMaker:       m,
+		Time:          types.Time(timeNow),
+		Fee:           trade.ExecFee,
+		FeeCurrency:   trade.FeeTokenId,
+		IsMargin:      false,
+		IsFutures:     false,
+		IsIsolated:    false,
+	}
+	res, err := v3ToGlobalTrade(trade)
+	assert.NoError(t, err)
+	assert.Equal(t, res, &exp)
 }
