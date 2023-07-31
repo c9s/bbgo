@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -39,7 +38,7 @@ func (g *GetWalletTradesRequest) Limit(limit uint64) *GetWalletTradesRequest {
 	return g
 }
 
-func (g *GetWalletTradesRequest) WalletType(walletType max.WalletType) *GetWalletTradesRequest {
+func (g *GetWalletTradesRequest) WalletType(walletType WalletType) *GetWalletTradesRequest {
 	g.walletType = walletType
 	return g
 }
