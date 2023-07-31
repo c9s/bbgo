@@ -73,6 +73,10 @@ func (i *IndicatorSet) VOLUME(interval types.Interval) *indicatorv2.PriceStream 
 	return indicatorv2.Volumes(i.KLines(interval))
 }
 
+func (i *IndicatorSet) VWAP(iw types.IntervalWindow) *indicatorv2.VWAPStream {
+	return indicatorv2.VWAP(i.CLOSE(iw.Interval), i.VOLUME(iw.Interval), iw.Window)
+}
+
 func (i *IndicatorSet) RSI(iw types.IntervalWindow) *indicatorv2.RSIStream {
 	return indicatorv2.RSI2(i.CLOSE(iw.Interval), iw.Window)
 }
