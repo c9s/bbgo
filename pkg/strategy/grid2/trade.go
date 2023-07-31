@@ -9,6 +9,10 @@ import (
 func collectTradeFee(trades []types.Trade) map[string]fixedpoint.Value {
 	fees := make(map[string]fixedpoint.Value)
 	for _, t := range trades {
+		if t.FeeDiscounted {
+			continue
+		}
+
 		if fee, ok := fees[t.FeeCurrency]; ok {
 			fees[t.FeeCurrency] = fee.Add(t.Fee)
 		} else {

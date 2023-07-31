@@ -256,6 +256,10 @@ func ParseLooseFormatTime(s string) (LooseFormatTime, error) {
 		t = time.Now().AddDate(0, -1, 0)
 		return LooseFormatTime(t), nil
 
+	case "last 30 days":
+		t = time.Now().AddDate(0, 0, -30)
+		return LooseFormatTime(t), nil
+
 	case "last year":
 		t = time.Now().AddDate(-1, 0, 0)
 		return LooseFormatTime(t), nil
@@ -357,4 +361,3 @@ func BeginningOfTheDay(t time.Time) time.Time {
 func Over24Hours(since time.Time) bool {
 	return time.Since(since) >= 24*time.Hour
 }
-
