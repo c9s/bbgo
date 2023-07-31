@@ -67,6 +67,12 @@ type Trade struct {
 	Fee         fixedpoint.Value `json:"fee" db:"fee"`
 	FeeCurrency string           `json:"feeCurrency" db:"fee_currency"`
 
+	// FeeDiscounted is an optional field which indicates whether the trade is using the platform fee token for discount.
+	// When FeeDiscounted = true, means the fee is deducted outside the trade
+	// By default, it's set to false.
+	// This is only used by the MAX exchange
+	FeeDiscounted bool `json:"feeDiscounted" db:"-"`
+
 	IsMargin   bool `json:"isMargin" db:"is_margin"`
 	IsFutures  bool `json:"isFutures" db:"is_futures"`
 	IsIsolated bool `json:"isIsolated" db:"is_isolated"`

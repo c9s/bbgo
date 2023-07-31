@@ -211,6 +211,7 @@ func toGlobalTradeV3(t v3.Trade) ([]types.Trade, error) {
 		IsMaker:       t.IsMaker(),
 		Fee:           t.Fee,
 		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
+		FeeDiscounted: t.FeeDiscounted,
 		QuoteQuantity: t.Funds,
 		Time:          types.Time(t.CreatedAt),
 		IsMargin:      isMargin,
@@ -227,6 +228,7 @@ func toGlobalTradeV3(t v3.Trade) ([]types.Trade, error) {
 		bidTrade.OrderID = t.SelfTradeBidOrderID
 		bidTrade.Fee = t.SelfTradeBidFee
 		bidTrade.FeeCurrency = toGlobalCurrency(t.SelfTradeBidFeeCurrency)
+		bidTrade.FeeDiscounted = t.SelfTradeBidFeeDiscounted
 		bidTrade.IsBuyer = !trade.IsBuyer
 		bidTrade.IsMaker = !trade.IsMaker
 		trades = append(trades, bidTrade)
@@ -285,9 +287,6 @@ func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
 	// skip trade ID that is the same. however this should not happen
 	var side = toGlobalSideType(t.Side)
 
-	// trade time
-	mts := time.Unix(0, t.Timestamp*int64(time.Millisecond))
-
 	return &types.Trade{
 		ID:            t.ID,
 		OrderID:       t.OrderID,
@@ -300,8 +299,9 @@ func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
 		IsMaker:       t.Maker,
 		Fee:           t.Fee,
 		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
+		FeeDiscounted: t.FeeDiscounted,
 		QuoteQuantity: t.Price.Mul(t.Volume),
-		Time:          types.Time(mts),
+		Time:          types.Time(t.Timestamp.Time()),
 	}, nil
 }
 
