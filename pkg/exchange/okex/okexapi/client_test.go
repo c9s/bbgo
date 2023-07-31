@@ -31,8 +31,8 @@ func TestClient_GetInstrumentsRequest(t *testing.T) {
 	client := NewClient()
 	ctx := context.Background()
 
-	ser := PublicDataService{client: client}
-	req := ser.NewGetInstrumentsRequest()
+	srv := &PublicDataService{client: client}
+	req := srv.NewGetInstrumentsRequest()
 
 	instruments, err := req.
 		InstrumentType(InstrumentTypeSpot).
@@ -45,8 +45,8 @@ func TestClient_GetInstrumentsRequest(t *testing.T) {
 func TestClient_GetFundingRateRequest(t *testing.T) {
 	client := NewClient()
 	ctx := context.Background()
-	ser := PublicDataService{client: client}
-	req := ser.NewGetFundingRate()
+	srv := &PublicDataService{client: client}
+	req := srv.NewGetFundingRate()
 
 	instrument, err := req.
 		InstrumentID("BTC-USDT-SWAP").
@@ -59,8 +59,8 @@ func TestClient_GetFundingRateRequest(t *testing.T) {
 func TestClient_PlaceOrderRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	ser := TradeService{client: client}
-	req := ser.NewPlaceOrderRequest()
+	srv := &TradeService{client: client}
+	req := srv.NewPlaceOrderRequest()
 
 	order, err := req.
 		InstrumentID("XTZ-BTC").
