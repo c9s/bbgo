@@ -44,7 +44,7 @@ func NewPositionRiskControl(orderExecutor bbgo.OrderExecutorExtended, hardLimit,
 			Quantity: quantity,
 		}
 
-		log.Infof("submitting order: %+v", submitOrder)
+		log.Infof("RiskControl: position limit exceeded, submitting order to reduce position: %+v", submitOrder)
 		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), submitOrder)
 		if err != nil {
 			log.WithError(err).Errorf("failed to submit orders")

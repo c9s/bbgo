@@ -127,7 +127,6 @@ func (c *TradeCollector) RecoverTrade(td types.Trade) bool {
 // if we have the order in the order store, then the trade will be considered for the position.
 // profit will also be calculated.
 func (c *TradeCollector) Process() bool {
-	logrus.Debugf("TradeCollector.Process()")
 	positionChanged := false
 
 	var trades []types.Trade
@@ -184,19 +183,23 @@ func (c *TradeCollector) Process() bool {
 // return true when the given trade is added
 // return false when the given trade is not added
 func (c *TradeCollector) processTrade(trade types.Trade) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	key := trade.Key()
+
+	c.mu.Lock()
 
 	// if it's already done, remove the trade from the trade store
 	if _, done := c.doneTrades[key]; done {
+		c.mu.Unlock()
 		return false
 	}
 
 	if !c.orderStore.Exists(trade.OrderID) {
+		c.mu.Unlock()
 		return false
 	}
+
+	c.doneTrades[key] = struct{}{}
+	c.mu.Unlock()
 
 	if c.position != nil {
 		profit, netProfit, madeProfit := c.position.AddTrade(trade)
@@ -213,7 +216,6 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 		c.EmitTrade(trade, fixedpoint.Zero, fixedpoint.Zero)
 	}
 
-	c.doneTrades[key] = struct{}{}
 	return true
 }
 
