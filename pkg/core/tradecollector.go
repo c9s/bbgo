@@ -77,7 +77,7 @@ func (c *TradeCollector) BindStreamForBackground(stream types.Stream) {
 
 func (c *TradeCollector) BindStream(stream types.Stream) {
 	stream.OnTradeUpdate(func(trade types.Trade) {
-		c.ProcessTrade(trade)
+		c.processTrade(trade)
 	})
 }
 
@@ -194,6 +194,9 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 	}
 
 	if !c.orderStore.Exists(trade.OrderID) {
+		// not done yet
+		// add this trade to the trade store for the later processing
+		c.tradeStore.Add(trade)
 		c.mu.Unlock()
 		return false
 	}
@@ -241,7 +244,7 @@ func (c *TradeCollector) Run(ctx context.Context) {
 			c.Process()
 
 		case trade := <-c.tradeC:
-			c.ProcessTrade(trade)
+			c.processTrade(trade)
 		}
 	}
 }
