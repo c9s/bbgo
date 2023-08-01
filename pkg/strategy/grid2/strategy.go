@@ -485,7 +485,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		// use the profit to buy more inventory in the grid
 		if s.Compound || s.EarnBase {
 			// if it's not using the platform fee currency, reduce the quote quantity for the buy order
-			if feeCurrency == s.Market.QuoteCurrency {
+			if feeCurrency == s.Market.QuoteCurrency && fee.Sign() > 0 {
 				orderExecutedQuoteAmount = orderExecutedQuoteAmount.Sub(fee)
 			}
 
@@ -518,7 +518,7 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 			}
 		}
 
-		if feeCurrency == s.Market.BaseCurrency {
+		if feeCurrency == s.Market.BaseCurrency && fee.Sign() > 0 {
 			newQuantity = newQuantity.Sub(fee)
 		}
 
