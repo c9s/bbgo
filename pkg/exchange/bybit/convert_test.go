@@ -1,34 +1,18 @@
 package bybit
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/multierr"
-
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	v3 "github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi/v3"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/stretchr/testify/assert"
 )
-
-func TestU(t *testing.T) {
-	e := returnErr()
-
-	t.Log(errors.Is(e, context.DeadlineExceeded))
-
-}
-
-func returnErr() error {
-	var err error
-	return multierr.Append(multierr.Append(err, fmt.Errorf("got err: %w", context.DeadlineExceeded)), fmt.Errorf("GG"))
-}
 
 func TestToGlobalMarket(t *testing.T) {
 	// sample:
