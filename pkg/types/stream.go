@@ -274,6 +274,7 @@ func (s *StandardStream) ping(ctx context.Context, conn *websocket.Conn, cancel 
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
 				log.WithError(err).Error("ping error", err)
 				s.Reconnect()
+				return
 			}
 		}
 	}
@@ -306,6 +307,7 @@ func (s *StandardStream) Connect(ctx context.Context) error {
 	}
 
 	// start one re-connector goroutine with the base context
+	// reconnector goroutine does not exit when the connection is closed
 	go s.reconnector(ctx)
 
 	s.EmitStart()
