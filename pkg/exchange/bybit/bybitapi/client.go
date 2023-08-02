@@ -19,8 +19,13 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const defaultHTTPTimeout = time.Second * 15
-const RestBaseURL = "https://api.bybit.com"
+const (
+	defaultHTTPTimeout = time.Second * 15
+
+	RestBaseURL         = "https://api.bybit.com"
+	WsSpotPublicSpotUrl = "wss://stream.bybit.com/v5/public/spot"
+	WsSpotPrivateUrl    = "wss://stream.bybit.com/v5/private"
+)
 
 // defaultRequestWindowMilliseconds specify how long an HTTP request is valid. It is also used to prevent replay attacks.
 var defaultRequestWindowMilliseconds = fmt.Sprintf("%d", 5*time.Second.Milliseconds())

@@ -387,3 +387,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	return trades, nil
 }
+
+func (e *Exchange) NewStream() types.Stream {
+	return NewStream()
+}
