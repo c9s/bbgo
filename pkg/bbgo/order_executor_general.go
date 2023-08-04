@@ -41,6 +41,15 @@ func (e *BaseOrderExecutor) ActiveMakerOrders() *ActiveOrderBook {
 	return e.activeMakerOrders
 }
 
+// GracefulCancel cancels all active maker orders if orders are not given, otherwise cancel all the given orders
+func (e *BaseOrderExecutor) GracefulCancel(ctx context.Context, orders ...types.Order) error {
+	if err := e.activeMakerOrders.GracefulCancel(ctx, e.session.Exchange, orders...); err != nil {
+		return errors.Wrap(err, "graceful cancel error")
+	}
+
+	return nil
+}
+
 // GeneralOrderExecutor implements the general order executor for strategy
 type GeneralOrderExecutor struct {
 	BaseOrderExecutor

@@ -202,6 +202,15 @@ func (s *Strategy) getSourceMarket() (types.Market, bool) {
 
 // convert triggers a convert order
 func (s *Strategy) convert(ctx context.Context) error {
+	s.collectPendingQuantity()
+
+	if err := s.orderExecutor.GracefulCancel(ctx); err != nil {
+		log.WithError(err).Warn("unable to cancel orders")
+	}
+
+	// sleep one second for exchange to unlock the balance
+	time.Sleep(time.Second)
+
 	account := s.session.GetAccount()
 	fromAsset, ok := account.Balance(s.From)
 	if !ok {
@@ -238,6 +247,8 @@ func (s *Strategy) convert(ctx context.Context) error {
 }
 
 func (s *Strategy) collectPendingQuantity() {
+	log.Infof("collecting pending quantity...")
+
 	s.pendingQuantityLock.Lock()
 	defer s.pendingQuantityLock.Unlock()
 
@@ -246,13 +257,22 @@ func (s *Strategy) collectPendingQuantity() {
 		if m, ok := s.markets[o.Symbol]; ok {
 			switch o.Side {
 			case types.SideTypeBuy:
+				if m.QuoteCurrency == s.From {
+					continue
+				}
+
 				qq := o.Quantity.Sub(o.ExecutedQuantity).Mul(o.Price)
 				if q2, ok := s.pendingQuantity[m.QuoteCurrency]; ok {
 					s.pendingQuantity[m.QuoteCurrency] = q2.Add(qq)
 				} else {
 					s.pendingQuantity[m.QuoteCurrency] = qq
 				}
+
 			case types.SideTypeSell:
+				if m.BaseCurrency == s.From {
+					continue
+				}
+
 				q := o.Quantity.Sub(o.ExecutedQuantity)
 				if q2, ok := s.pendingQuantity[m.BaseCurrency]; ok {
 					s.pendingQuantity[m.BaseCurrency] = q2.Add(q)
@@ -262,17 +282,16 @@ func (s *Strategy) collectPendingQuantity() {
 			}
 		}
 	}
+
+	log.Infof("collected pending quantity: %+v", s.pendingQuantity)
 }
 
 func (s *Strategy) convertBalance(ctx context.Context, fromAsset string, available fixedpoint.Value, market types.Market, ticker *types.Ticker) error {
-	s.collectPendingQuantity()
-
-	if err := s.orderExecutor.CancelOrders(ctx); err != nil {
-		log.WithError(err).Warn("unable to cancel orders")
-	}
 
 	s.pendingQuantityLock.Lock()
 	if pendingQ, ok := s.pendingQuantity[fromAsset]; ok {
+
+		log.Infof("adding pending quantity %s to the current quantity %s", pendingQ, available)
 		available = available.Add(pendingQ)
 
 		delete(s.pendingQuantity, fromAsset)
