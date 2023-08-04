@@ -1,0 +1,26 @@
+---
+exchangeStrategies:
+- on: binance
+  convert:
+    ## the initial asset you want to convert to
+    from: BNB
+
+    ## the final asset you want to convert to
+    to: BTC
+
+    ## interval is the period of trigger
+    interval: 1m
+
+    ## minBalance is the minimal balance line you want to keep
+    ## in this example, it means 1 BNB
+    minBalance: 1.0
+
+    ## maxQuantity is the max quantity per order for converting asset
+    ## in this example, it means 2 BNB
+    maxQuantity: 2.0
+
+    ## useTakerOrder uses the taker price for the order, so the order will be a taker
+    ## which will be filled immediately
+    useTakerOrder: true
+
+

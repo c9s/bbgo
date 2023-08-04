@@ -27,15 +27,37 @@ var quantityReduceDelta = fixedpoint.NewFromFloat(0.005)
 // This is for the maximum retries
 const submitOrderRetryLimit = 5
 
+type BaseOrderExecutor struct {
+	session           *ExchangeSession
+	activeMakerOrders *ActiveOrderBook
+	orderStore        *core.OrderStore
+}
+
+func (e *BaseOrderExecutor) OrderStore() *core.OrderStore {
+	return e.orderStore
+}
+
+func (e *BaseOrderExecutor) ActiveMakerOrders() *ActiveOrderBook {
+	return e.activeMakerOrders
+}
+
+// GracefulCancel cancels all active maker orders if orders are not given, otherwise cancel all the given orders
+func (e *BaseOrderExecutor) GracefulCancel(ctx context.Context, orders ...types.Order) error {
+	if err := e.activeMakerOrders.GracefulCancel(ctx, e.session.Exchange, orders...); err != nil {
+		return errors.Wrap(err, "graceful cancel error")
+	}
+
+	return nil
+}
+
 // GeneralOrderExecutor implements the general order executor for strategy
 type GeneralOrderExecutor struct {
-	session            *ExchangeSession
+	BaseOrderExecutor
+
 	symbol             string
 	strategy           string
 	strategyInstanceID string
 	position           *types.Position
-	activeMakerOrders  *ActiveOrderBook
-	orderStore         *core.OrderStore
 	tradeCollector     *core.TradeCollector
 
 	logger log.FieldLogger
@@ -54,13 +76,16 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 	orderStore := core.NewOrderStore(symbol)
 
 	executor := &GeneralOrderExecutor{
-		session:            session,
+		BaseOrderExecutor: BaseOrderExecutor{
+			session:           session,
+			activeMakerOrders: NewActiveOrderBook(symbol),
+			orderStore:        orderStore,
+		},
+
 		symbol:             symbol,
 		strategy:           strategy,
 		strategyInstanceID: strategyInstanceID,
 		position:           position,
-		activeMakerOrders:  NewActiveOrderBook(symbol),
-		orderStore:         orderStore,
 		tradeCollector:     core.NewTradeCollector(symbol, position, orderStore),
 	}
 
@@ -121,14 +146,6 @@ func (e *GeneralOrderExecutor) marginAssetMaxBorrowableUpdater(ctx context.Conte
 			e.updateMarginAssetMaxBorrowable(ctx, marginService, market)
 		}
 	}
-}
-
-func (e *GeneralOrderExecutor) OrderStore() *core.OrderStore {
-	return e.orderStore
-}
-
-func (e *GeneralOrderExecutor) ActiveMakerOrders() *ActiveOrderBook {
-	return e.activeMakerOrders
 }
 
 func (e *GeneralOrderExecutor) BindEnvironment(environ *Environment) {
