@@ -98,15 +98,15 @@ the implementation.
 | grid2       | the second generation grid strategy, it can convert your quote asset into a grid, supports base+quote mode                              | maker      |                  |
 | bollgrid    | strategy implements a basic grid strategy with the built-in bollinger indicator                                                         | maker      |                  | 
 | xmaker      | cross exchange market making strategy, it hedges your inventory risk on the other side                                                  | maker      | no               |
-| xnav        | this strategy helps you record the current net asset value                                                                              | tool       |                  |
-| xalign      | this strategy aligns your balance position automatically                                                                                | tool       |                  |
-| xfunding    | a funding rate fee strategy                                                                                                             | funding    |                  |
+| xnav        | this strategy helps you record the current net asset value                                                                              | tool       | no               |
+| xalign      | this strategy aligns your balance position automatically                                                                                | tool       | no               |
+| xfunding    | a funding rate fee strategy                                                                                                             | funding    | no               |
 | autoborrow  | this strategy uses margin to borrow assets, to help you keep the minimal balance                                                        | tool       | no               |
 | pivotshort  | this strategy finds the pivot low and entry the trade when the price breaks the previous low                                            | long/short |                  |
 | schedule    | this strategy buy/sell with a fixed quantity periodically, you can use this as a single DCA, or to refill the fee asset like BNB.       | tool       |
 | irr         | this strategy opens the position based on the predicated return rate                                                                    | long/short |                  |
 | bollmaker   | this strategy holds a long-term long/short position, places maker orders on both side, uses bollinger band to control the position size | maker      |                  |
-| wall        | this strategy creates wall (large amount order) on the order book                                                                       | maker      |                  |
+| wall        | this strategy creates wall (large amount order) on the order book                                                                       | maker      | no               |
 | scmaker     | this market making strategy is desgiend for stable coin markets, like USDC/USDT                                                         | maker      |                  |
 | drift       |                                                                                                                                         | long/short |                  |
 | rsicross    | this strategy opens a long position when the fast rsi cross over the slow rsi, this is a demo strategy for using the v2 indicator       | long/short |                  |
@@ -119,6 +119,8 @@ the implementation.
 | factoryzoo  |                                                                                                                                         | long/short |                  |
 | fmaker      |                                                                                                                                         | maker      |                  |
 | linregmaker | a linear regression based market maker                                                                                                  | maker      |                  |
+| convert     | convert strategy is a tool that helps you convert specific asset to a target asset                                                      | tool       | no               |
+
 
 
 
