@@ -18,3 +18,11 @@ func CollectTradeFee(trades []types.Trade) map[string]fixedpoint.Value {
 
 	return fees
 }
+
+func AggregateTradesQuantity(trades []types.Trade) fixedpoint.Value {
+	tq := fixedpoint.Zero
+	for _, t := range trades {
+		tq = tq.Add(t.Quantity)
+	}
+	return tq
+}
