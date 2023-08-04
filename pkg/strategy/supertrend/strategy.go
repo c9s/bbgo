@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -365,15 +366,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// Add strategy parameters to report
 		if s.TrackParameters && s.ProfitStatsTracker.AccumulatedProfitReport != nil {
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("window", fmt.Sprintf("%d", s.Window))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("multiplier", fmt.Sprintf("%f", s.SupertrendMultiplier))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("fastDEMA", fmt.Sprintf("%d", s.FastDEMAWindow))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("slowDEMA", fmt.Sprintf("%d", s.SlowDEMAWindow))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("takeProfitAtrMultiplier", fmt.Sprintf("%f", s.TakeProfitAtrMultiplier))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopLossByTriggeringK", fmt.Sprintf("%t", s.StopLossByTriggeringK))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedSupertrend", fmt.Sprintf("%t", s.StopByReversedSupertrend))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedDema", fmt.Sprintf("%t", s.StopByReversedDema))
-			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedLinGre", fmt.Sprintf("%t", s.StopByReversedLinGre))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("window", strconv.Itoa(s.Window))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("multiplier", strconv.FormatFloat(s.SupertrendMultiplier, 'f', 2, 64))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("fastDEMA", strconv.Itoa(s.FastDEMAWindow))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("slowDEMA", strconv.Itoa(s.SlowDEMAWindow))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("linReg", strconv.Itoa(s.LinearRegression.Window))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("takeProfitAtrMultiplier", strconv.FormatFloat(s.TakeProfitAtrMultiplier, 'f', 2, 64))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopLossByTriggeringK", strconv.FormatBool(s.StopLossByTriggeringK))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedSupertrend", strconv.FormatBool(s.StopByReversedSupertrend))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedDema", strconv.FormatBool(s.StopByReversedDema))
+			s.ProfitStatsTracker.AccumulatedProfitReport.AddStrategyParameter("stopByReversedLinGre", strconv.FormatBool(s.StopByReversedLinGre))
 		}
 
 		s.ProfitStatsTracker.Bind(s.session, s.orderExecutor.TradeCollector())
