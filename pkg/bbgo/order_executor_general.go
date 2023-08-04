@@ -33,6 +33,14 @@ type BaseOrderExecutor struct {
 	orderStore        *core.OrderStore
 }
 
+func (e *BaseOrderExecutor) OrderStore() *core.OrderStore {
+	return e.orderStore
+}
+
+func (e *BaseOrderExecutor) ActiveMakerOrders() *ActiveOrderBook {
+	return e.activeMakerOrders
+}
+
 // GeneralOrderExecutor implements the general order executor for strategy
 type GeneralOrderExecutor struct {
 	BaseOrderExecutor
@@ -129,14 +137,6 @@ func (e *GeneralOrderExecutor) marginAssetMaxBorrowableUpdater(ctx context.Conte
 			e.updateMarginAssetMaxBorrowable(ctx, marginService, market)
 		}
 	}
-}
-
-func (e *GeneralOrderExecutor) OrderStore() *core.OrderStore {
-	return e.orderStore
-}
-
-func (e *GeneralOrderExecutor) ActiveMakerOrders() *ActiveOrderBook {
-	return e.activeMakerOrders
 }
 
 func (e *GeneralOrderExecutor) BindEnvironment(environ *Environment) {
