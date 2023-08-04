@@ -122,12 +122,13 @@ func (b *ActiveOrderBook) waitAllClear(ctx context.Context, waitTime, timeout ti
 // It calls the exchange cancel order api and then remove the orders from the active orderbook directly.
 func (b *ActiveOrderBook) FastCancel(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
 	// if no orders are given, set to cancelAll
+	hasSymbol := b.Symbol != ""
 	if len(orders) == 0 {
 		orders = b.Orders()
 	} else {
 		// simple check on given input
 		for _, o := range orders {
-			if b.Symbol != "" && o.Symbol != b.Symbol {
+			if hasSymbol && o.Symbol != b.Symbol {
 				return errors.New("[ActiveOrderBook] cancel " + b.Symbol + " orderbook with different order symbol: " + o.Symbol)
 			}
 		}
@@ -157,8 +158,9 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 		orders = b.Orders()
 	} else {
 		// simple check on given input
+		hasSymbol := b.Symbol != ""
 		for _, o := range orders {
-			if b.Symbol != "" && o.Symbol != b.Symbol {
+			if hasSymbol && o.Symbol != b.Symbol {
 				return errors.New("[ActiveOrderBook] cancel " + b.Symbol + " orderbook with different symbol: " + o.Symbol)
 			}
 		}
@@ -222,6 +224,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 				}
 			}
 		}
+
 		orders = leftOrders
 	}
 
@@ -231,6 +234,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 
 func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
 	hasSymbol := len(b.Symbol) > 0
+
 	if hasSymbol && order.Symbol != b.Symbol {
 		return
 	}
@@ -297,6 +301,7 @@ func (b *ActiveOrderBook) Update(orders ...types.Order) {
 
 func (b *ActiveOrderBook) Add(orders ...types.Order) {
 	hasSymbol := len(b.Symbol) > 0
+
 	for _, order := range orders {
 		if hasSymbol && b.Symbol != order.Symbol {
 			continue
