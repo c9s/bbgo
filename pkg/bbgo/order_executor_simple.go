@@ -45,6 +45,14 @@ func (e *SimpleOrderExecutor) SubmitOrders(ctx context.Context, submitOrders ...
 
 // CancelOrders cancels the given order objects directly
 func (e *SimpleOrderExecutor) CancelOrders(ctx context.Context, orders ...types.Order) error {
+	if len(orders) == 0 {
+		orders = e.activeMakerOrders.Orders()
+	}
+
+	if len(orders) == 0 {
+		return nil
+	}
+
 	err := e.session.Exchange.CancelOrders(ctx, orders...)
 	if err != nil { // Retry once
 		err2 := e.session.Exchange.CancelOrders(ctx, orders...)
