@@ -27,15 +27,20 @@ var quantityReduceDelta = fixedpoint.NewFromFloat(0.005)
 // This is for the maximum retries
 const submitOrderRetryLimit = 5
 
+type BaseOrderExecutor struct {
+	session           *ExchangeSession
+	activeMakerOrders *ActiveOrderBook
+	orderStore        *core.OrderStore
+}
+
 // GeneralOrderExecutor implements the general order executor for strategy
 type GeneralOrderExecutor struct {
-	session            *ExchangeSession
+	BaseOrderExecutor
+
 	symbol             string
 	strategy           string
 	strategyInstanceID string
 	position           *types.Position
-	activeMakerOrders  *ActiveOrderBook
-	orderStore         *core.OrderStore
 	tradeCollector     *core.TradeCollector
 
 	logger log.FieldLogger
@@ -54,13 +59,16 @@ func NewGeneralOrderExecutor(session *ExchangeSession, symbol, strategy, strateg
 	orderStore := core.NewOrderStore(symbol)
 
 	executor := &GeneralOrderExecutor{
-		session:            session,
+		BaseOrderExecutor: BaseOrderExecutor{
+			session:           session,
+			activeMakerOrders: NewActiveOrderBook(symbol),
+			orderStore:        orderStore,
+		},
+
 		symbol:             symbol,
 		strategy:           strategy,
 		strategyInstanceID: strategyInstanceID,
 		position:           position,
-		activeMakerOrders:  NewActiveOrderBook(symbol),
-		orderStore:         orderStore,
 		tradeCollector:     core.NewTradeCollector(symbol, position, orderStore),
 	}
 
