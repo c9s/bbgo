@@ -72,6 +72,7 @@ func (m Market) TruncateQuantity(quantity fixedpoint.Value) fixedpoint.Value {
 }
 
 // TruncateQuoteQuantity uses the tick size to truncate floating number, in order to avoid the rounding issue
+// this is usually used for calculating the order size from the quote quantity.
 func (m Market) TruncateQuoteQuantity(quantity fixedpoint.Value) fixedpoint.Value {
 	var ts = m.TickSize.Float64()
 	var prec = int(math.Round(math.Log10(ts) * -1.0))
@@ -82,6 +83,51 @@ func (m Market) TruncateQuoteQuantity(quantity fixedpoint.Value) fixedpoint.Valu
 
 	qs := strconv.FormatFloat(qf, 'f', prec, 64)
 	return fixedpoint.MustNewFromString(qs)
+}
+
+// GreaterThanMinimalOrderQuantity ensures that your given balance could fit the minimal order quantity
+// when side = sell, then available = base balance
+// when side = buy, then available = quote balance
+// The balance will be truncated first in order to calculate the minimal notional and minimal quantity
+// The adjusted (truncated) order quantity will be returned
+func (m Market) GreaterThanMinimalOrderQuantity(side SideType, price, available fixedpoint.Value) (fixedpoint.Value, bool) {
+	switch side {
+	case SideTypeSell:
+		available = m.TruncateQuantity(available)
+
+		if available.Compare(m.MinQuantity) < 0 {
+			return fixedpoint.Zero, false
+		}
+
+		quoteAmount := price.Mul(available)
+		if quoteAmount.Compare(m.MinNotional) < 0 {
+			return fixedpoint.Zero, false
+		}
+
+		return available, true
+
+	case SideTypeBuy:
+		available = m.TruncateQuoteQuantity(available)
+
+		if available.Compare(m.MinNotional) < 0 {
+			return fixedpoint.Zero, false
+		}
+
+		quantity := available.Div(price)
+		quantity = m.TruncateQuantity(quantity)
+		if quantity.Compare(m.MinQuantity) < 0 {
+			return fixedpoint.Zero, false
+		}
+
+		notional := quantity.Mul(price)
+		if notional.Compare(m.MinNotional) < 0 {
+			return fixedpoint.Zero, false
+		}
+
+		return quantity, true
+	}
+
+	return available, true
 }
 
 // RoundDownQuantityByPrecision uses the volume precision to round down the quantity
