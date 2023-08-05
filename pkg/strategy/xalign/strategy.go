@@ -145,8 +145,9 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 			// changeQuantity < 0 = sell
 			q := changeQuantity.Abs()
 
+			// a fast filtering
 			if q.Compare(market.MinQuantity) < 0 {
-				log.Infof("skip dust quantity: %f", q.Float64())
+				log.Debugf("skip dust quantity: %f", q.Float64())
 				continue
 			}
 
@@ -155,11 +156,6 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 			switch side {
 
 			case types.SideTypeBuy:
-				quoteBalance, ok := session.Account.Balance(quoteCurrency)
-				if !ok {
-					continue
-				}
-
 				price := ticker.Sell
 				if taker {
 					price = ticker.Sell
@@ -169,6 +165,11 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 					price = ticker.Buy
 				}
 
+				quoteBalance, ok := session.Account.Balance(quoteCurrency)
+				if !ok {
+					continue
+				}
+
 				requiredQuoteAmount := q.Mul(price)
 				requiredQuoteAmount = requiredQuoteAmount.Round(market.PricePrecision, fixedpoint.Up)
 				if requiredQuoteAmount.Compare(quoteBalance.Available) > 0 {
@@ -176,24 +177,28 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 					continue
 				}
 
-				if market.IsDustQuantity(q, price) {
-					log.Infof("%s ignore dust quantity: %f", currency, q.Float64())
-					return nil, nil
-				}
-
-				q = market.AdjustQuantityByMinNotional(q, price)
-
-				return session, &types.SubmitOrder{
-					Symbol:      symbol,
-					Side:        side,
-					Type:        types.OrderTypeLimit,
-					Quantity:    q,
-					Price:       price,
-					Market:      market,
-					TimeInForce: "GTC",
+				if quantity, ok := market.GreaterThanMinimalOrderQuantity(side, price, requiredQuoteAmount); ok {
+					return session, &types.SubmitOrder{
+						Symbol:      symbol,
+						Side:        side,
+						Type:        types.OrderTypeLimit,
+						Quantity:    quantity,
+						Price:       price,
+						Market:      market,
+						TimeInForce: types.TimeInForceGTC,
+					}
 				}
 
 			case types.SideTypeSell:
+				price := ticker.Buy
+				if taker {
+					price = ticker.Buy
+				} else if spread.Compare(market.TickSize) > 0 {
+					price = ticker.Buy.Add(market.TickSize)
+				} else {
+					price = ticker.Sell
+				}
+
 				baseBalance, ok := session.Account.Balance(currency)
 				if !ok {
 					continue
@@ -204,28 +209,16 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 					continue
 				}
 
-				price := ticker.Buy
-				if taker {
-					price = ticker.Buy
-				} else if spread.Compare(market.TickSize) > 0 {
-					price = ticker.Buy.Add(market.TickSize)
-				} else {
-					price = ticker.Sell
-				}
-
-				if market.IsDustQuantity(q, price) {
-					log.Infof("%s ignore dust quantity: %f", currency, q.Float64())
-					return nil, nil
-				}
-
-				return session, &types.SubmitOrder{
-					Symbol:      symbol,
-					Side:        side,
-					Type:        types.OrderTypeLimit,
-					Quantity:    q,
-					Price:       price,
-					Market:      market,
-					TimeInForce: "GTC",
+				if quantity, ok := market.GreaterThanMinimalOrderQuantity(side, price, q); ok {
+					return session, &types.SubmitOrder{
+						Symbol:      symbol,
+						Side:        side,
+						Type:        types.OrderTypeLimit,
+						Quantity:    quantity,
+						Price:       price,
+						Market:      market,
+						TimeInForce: types.TimeInForceGTC,
+					}
 				}
 			}
 
