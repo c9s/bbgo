@@ -595,8 +595,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 }
 
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
-	var emptyTime = time.Time{}
-	if since == emptyTime {
+	if since.IsZero() {
 		since, err = getLaunchDate()
 		if err != nil {
 			return nil, err
