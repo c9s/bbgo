@@ -372,16 +372,22 @@ func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) e
 	return nil
 }
 
-func (e *Exchange) TransferMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
-	if e.IsMargin {
-		if e.IsIsolatedMargin {
-			return e.transferIsolatedMarginAccountAsset(ctx, asset, amount, io)
-		} else {
-			return e.transferCrossMarginAccountAsset(ctx, asset, amount, io)
-		}
+// TransferMarginAccountAsset transfers the asset into/out from the margin account
+//
+// types.TransferIn => Spot to Margin
+// types.TransferOut => Margin to Spot
+//
+// to call this method, you must set the IsMargin = true
+func (e *Exchange) TransferMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+	if !e.IsMargin {
+		return errors.New("you can not operate margin transfer on a non-margin session")
 	}
 
-	return errors.New("isolated margin transfer is not supported")
+	if e.IsIsolatedMargin {
+		return e.transferIsolatedMarginAccountAsset(ctx, asset, amount, io)
+	}
+
+	return e.transferCrossMarginAccountAsset(ctx, asset, amount, io)
 }
 
 func (e *Exchange) transferIsolatedMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
