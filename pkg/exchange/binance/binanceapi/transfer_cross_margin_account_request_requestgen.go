@@ -16,6 +16,11 @@ func (t *TransferCrossMarginAccountRequest) Asset(asset string) *TransferCrossMa
 	return t
 }
 
+func (t *TransferCrossMarginAccountRequest) TransferType(transferType int) *TransferCrossMarginAccountRequest {
+	t.transferType = transferType
+	return t
+}
+
 func (t *TransferCrossMarginAccountRequest) Amount(amount string) *TransferCrossMarginAccountRequest {
 	t.amount = amount
 	return t
@@ -41,6 +46,11 @@ func (t *TransferCrossMarginAccountRequest) GetParameters() (map[string]interfac
 
 	// assign parameter of asset
 	params["asset"] = asset
+	// check transferType field -> json key type
+	transferType := t.transferType
+
+	// assign parameter of transferType
+	params["type"] = transferType
 	// check amount field -> json key amount
 	amount := t.amount
 
