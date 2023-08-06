@@ -625,13 +625,16 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 		// 0(0:pending,6: credited but cannot withdraw, 1:success)
 		// set the default status
 		status := types.DepositStatus(fmt.Sprintf("code: %d", d.Status))
+
+		// https://www.binance.com/en/support/faq/115003736451
 		switch d.Status {
-		case 0:
+		case binanceapi.DepositStatusPending:
 			status = types.DepositPending
-		case 6:
-			// https://www.binance.com/en/support/faq/115003736451
+
+		case binanceapi.DepositStatusCredited:
 			status = types.DepositCredited
-		case 1:
+
+		case binanceapi.DepositStatusSuccess:
 			status = types.DepositSuccess
 		}
 
