@@ -372,6 +372,14 @@ func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) e
 	return nil
 }
 
+func (e *Exchange) TransferMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+	if e.IsMargin && !e.IsIsolatedMargin {
+		return e.transferCrossMarginAccountAsset(ctx, asset, amount, io)
+	}
+
+	return errors.New("isolated margin transfer is not supported")
+}
+
 // transferCrossMarginAccountAsset transfer asset to the cross margin account or to the main account
 func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
 	req := e.client.NewMarginTransferService()
