@@ -373,34 +373,53 @@ func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) e
 }
 
 func (e *Exchange) TransferMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
-	if e.IsMargin && !e.IsIsolatedMargin {
-		return e.transferCrossMarginAccountAsset(ctx, asset, amount, io)
+	if e.IsMargin {
+		if e.IsIsolatedMargin {
+			return e.transferIsolatedMarginAccountAsset(ctx, asset, amount, io)
+		} else {
+			return e.transferCrossMarginAccountAsset(ctx, asset, amount, io)
+		}
 	}
 
 	return errors.New("isolated margin transfer is not supported")
 }
 
+func (e *Exchange) transferIsolatedMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+	req := e.client2.NewTransferIsolatedMarginAccountRequest()
+	req.Symbol(e.IsolatedMarginSymbol)
+
+	switch io {
+	case types.TransferIn:
+		req.TransFrom(binanceapi.AccountTypeSpot)
+		req.TransTo(binanceapi.AccountTypeIsolatedMargin)
+
+	case types.TransferOut:
+		req.TransFrom(binanceapi.AccountTypeIsolatedMargin)
+		req.TransTo(binanceapi.AccountTypeSpot)
+	}
+
+	req.Asset(asset)
+	req.Amount(amount.String())
+	resp, err := req.Do(ctx)
+	return logResponse(resp, err, req)
+}
+
 // transferCrossMarginAccountAsset transfer asset to the cross margin account or to the main account
 func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
-	req := e.client.NewMarginTransferService()
+	req := e.client2.NewTransferCrossMarginAccountRequest()
 	req.Asset(asset)
 	req.Amount(amount.String())
 
 	if io == types.TransferIn {
-		req.Type(binance.MarginTransferTypeToMargin)
+		req.TransferType(int(binance.MarginTransferTypeToMargin))
 	} else if io == types.TransferOut {
-		req.Type(binance.MarginTransferTypeToMain)
+		req.TransferType(int(binance.MarginTransferTypeToMain))
 	} else {
 		return fmt.Errorf("unexpected transfer direction: %d given", io)
 	}
 
 	resp, err := req.Do(ctx)
-	if err != nil {
-		return err
-	}
-
-	log.Debugf("cross margin transfer %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
-	return err
+	return logResponse(resp, err, req)
 }
 
 func (e *Exchange) QueryCrossMarginAccount(ctx context.Context) (*types.Account, error) {
@@ -1449,4 +1468,14 @@ func calculateMarginTolerance(marginLevel fixedpoint.Value) fixedpoint.Value {
 	// so when marginLevel equals 1.1, the formula becomes 1.0 - 1.0, or zero.
 	// = 1.0 - (1.1 / marginLevel)
 	return fixedpoint.One.Sub(fixedpoint.NewFromFloat(1.1).Div(marginLevel))
+}
+
+func logResponse(resp interface{}, err error, req interface{}) error {
+	if err != nil {
+		log.WithError(err).Errorf("%T: error %+v", req, resp)
+		return err
+	}
+
+	log.Infof("%T: response: %+v", req, resp)
+	return nil
 }
