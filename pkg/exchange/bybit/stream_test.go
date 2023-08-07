@@ -36,6 +36,35 @@ func TestStream(t *testing.T) {
 		c := make(chan struct{})
 		<-c
 	})
+
+	t.Run("book test", func(t *testing.T) {
+		s.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
+			Depth: types.DepthLevel50,
+		})
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnBookSnapshot(func(book types.SliceOrderBook) {
+			t.Log("got snapshot", book)
+		})
+		s.OnBookUpdate(func(book types.SliceOrderBook) {
+			t.Log("got update", book)
+		})
+		c := make(chan struct{})
+		<-c
+	})
+
+	t.Run("wallet test", func(t *testing.T) {
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnBalanceSnapshot(func(balances types.BalanceMap) {
+			t.Log("got snapshot", balances)
+		})
+		c := make(chan struct{})
+		<-c
+	})
 }
 
 func TestStream_parseWebSocketEvent(t *testing.T) {
