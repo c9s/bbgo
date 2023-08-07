@@ -28,11 +28,12 @@ type WsOpType string
 const (
 	WsOpTypePing      WsOpType = "ping"
 	WsOpTypePong      WsOpType = "pong"
+	WsOpTypeAuth      WsOpType = "auth"
 	WsOpTypeSubscribe WsOpType = "subscribe"
 )
 
 type WebsocketOp struct {
-	Op   string   `json:"op"`
+	Op   WsOpType `json:"op"`
 	Args []string `json:"args"`
 }
 
@@ -57,6 +58,11 @@ func (w *WebSocketOpEvent) IsValid() error {
 		return nil
 	case WsOpTypePong:
 		// private event
+		return nil
+	case WsOpTypeAuth:
+		if w.Success != nil && !*w.Success {
+			return fmt.Errorf("unexpected response of auth: %#v", w)
+		}
 		return nil
 	case WsOpTypeSubscribe:
 		if w.Success != nil && !*w.Success {
@@ -88,12 +94,6 @@ type WebSocketTopicEvent struct {
 	Ts   types.MillisecondTimestamp `json:"ts"`
 	Data json.RawMessage            `json:"data"`
 }
-
-// PriceVolumeSlice represents a slice of price and value.
-//
-// index 0 is Bid/Ask price.
-// index 1 is Bid/Ask size. The *delta data* has size=0, which means that all quotations for this price have been filled or cancelled
-type PriceVolumeSlice [2]fixedpoint.Value
 
 type BookEvent struct {
 	// Symbol name

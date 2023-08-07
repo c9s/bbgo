@@ -1,14 +1,42 @@
 package bybit
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/testutil"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+func getTestClientOrSkip(t *testing.T) *Stream {
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "BYBIT")
+	if !ok {
+		t.Skip("BYBIT_* env vars are not configured")
+		return nil
+	}
+
+	return NewStream(key, secret)
+}
+
+func TestStream(t *testing.T) {
+	s := getTestClientOrSkip(t)
+
+	t.Run("Auth test", func(t *testing.T) {
+		s.Connect(context.Background())
+		c := make(chan struct{})
+		<-c
+	})
+}
 
 func TestStream_parseWebSocketEvent(t *testing.T) {
 	s := Stream{}

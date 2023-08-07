@@ -57,8 +57,9 @@ func New(key, secret string) (*Exchange, error) {
 	return &Exchange{
 		key: key,
 		// pragma: allowlist nextline secret
-		secret: secret,
-		client: client,
+		secret:   secret,
+		client:   client,
+		v3client: v3.NewClient(client),
 	}, nil
 }
 
@@ -389,5 +390,5 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream()
+	return NewStream(e.key, e.secret)
 }

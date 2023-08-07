@@ -107,7 +107,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	// 2. Use the HMAC_SHA256 or RSA_SHA256 algorithm to sign the string in step 1, and convert it to a hex
 	// string (HMAC_SHA256) / base64 (RSA_SHA256) to obtain the sign parameter.
 	// 3. Append the sign parameter to request header, and send the HTTP request.
-	signature := sign(signKey, c.secret)
+	signature := Sign(signKey, c.secret)
 
 	req, err := http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
 	if err != nil {
@@ -122,7 +122,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	return req, nil
 }
 
-func sign(payload string, secret string) string {
+func Sign(payload string, secret string) string {
 	var sig = hmac.New(sha256.New, []byte(secret))
 	_, err := sig.Write([]byte(payload))
 	if err != nil {
