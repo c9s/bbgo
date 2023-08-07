@@ -13,3 +13,13 @@ func (s *Stream) EmitBookEvent(e BookEvent) {
 		cb(e)
 	}
 }
+
+func (s *Stream) OnWalletEvent(cb func(e []*WalletEvent)) {
+	s.walletEventCallbacks = append(s.walletEventCallbacks, cb)
+}
+
+func (s *Stream) EmitWalletEvent(e []*WalletEvent) {
+	for _, cb := range s.walletEventCallbacks {
+		cb(e)
+	}
+}
