@@ -440,6 +440,7 @@ const (
 	DepthLevel1      Depth = "1"
 	DepthLevel5      Depth = "5"
 	DepthLevel20     Depth = "20"
+	DepthLevel50     Depth = "50"
 )
 
 type Speed string
