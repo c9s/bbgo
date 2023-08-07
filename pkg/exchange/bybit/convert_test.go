@@ -371,7 +371,7 @@ func Test_toLocalOrderType(t *testing.T) {
 	assert.Equal(t, bybitapi.OrderTypeMarket, orderType)
 
 	orderType, err = toLocalOrderType("wrong type")
-	assert.Error(t, fmt.Errorf("order type %s not supported", "wrong side"), err)
+	assert.Equal(t, fmt.Errorf("order type wrong type not supported"), err)
 	assert.Equal(t, bybitapi.OrderType(""), orderType)
 }
 
@@ -385,7 +385,7 @@ func Test_toLocalSide(t *testing.T) {
 	assert.Equal(t, bybitapi.SideBuy, side)
 
 	side, err = toLocalSide("wrong side")
-	assert.Error(t, fmt.Errorf("side type %s not supported", "wrong side"), err)
+	assert.Equal(t, fmt.Errorf("side type %s not supported", "wrong side"), err)
 	assert.Equal(t, bybitapi.Side(""), side)
 }
 

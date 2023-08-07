@@ -17,15 +17,14 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		raw, err := s.parseWebSocketEvent([]byte(msg))
 		assert.NoError(t, err)
 
-		expSucceeds := true
 		expRetMsg := string(WsOpTypePong)
 		e, ok := raw.(*WebSocketOpEvent)
 		assert.True(t, ok)
 		assert.Equal(t, &WebSocketOpEvent{
-			Success: &expSucceeds,
-			RetMsg:  &expRetMsg,
+			Success: true,
+			RetMsg:  expRetMsg,
 			ConnId:  "a806f6c4-3608-4b6d-a225-9f5da975bc44",
-			ReqId:   nil,
+			ReqId:   "",
 			Op:      WsOpTypePing,
 			Args:    nil,
 		}, e)
@@ -39,16 +38,15 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		raw, err := s.parseWebSocketEvent([]byte(msg))
 		assert.NoError(t, err)
 
-		expSucceeds := true
 		expRetMsg := string(WsOpTypePong)
 		expReqId := "b26704da-f5af-44c2-bdf7-935d6739e1a0"
 		e, ok := raw.(*WebSocketOpEvent)
 		assert.True(t, ok)
 		assert.Equal(t, &WebSocketOpEvent{
-			Success: &expSucceeds,
-			RetMsg:  &expRetMsg,
+			Success: true,
+			RetMsg:  expRetMsg,
 			ConnId:  "a806f6c4-3608-4b6d-a225-9f5da975bc44",
-			ReqId:   &expReqId,
+			ReqId:   expReqId,
 			Op:      WsOpTypePing,
 			Args:    nil,
 		}, e)
@@ -65,10 +63,10 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		e, ok := raw.(*WebSocketOpEvent)
 		assert.True(t, ok)
 		assert.Equal(t, &WebSocketOpEvent{
-			Success: nil,
-			RetMsg:  nil,
+			Success: false,
+			RetMsg:  "",
 			ConnId:  "civn4p1dcjmtvb69ome0-yrt1",
-			ReqId:   nil,
+			ReqId:   "",
 			Op:      WsOpTypePong,
 			Args:    []string{"1690884539181"},
 		}, e)
@@ -86,10 +84,10 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		e, ok := raw.(*WebSocketOpEvent)
 		assert.True(t, ok)
 		assert.Equal(t, &WebSocketOpEvent{
-			Success: nil,
-			RetMsg:  nil,
+			Success: false,
+			RetMsg:  "",
 			ConnId:  "civn4p1dcjmtvb69ome0-yrt1",
-			ReqId:   &expReqId,
+			ReqId:   expReqId,
 			Op:      WsOpTypePong,
 			Args:    []string{"1690884539181"},
 		}, e)
@@ -100,14 +98,13 @@ func Test_parseWebSocketEvent(t *testing.T) {
 
 func Test_WebSocketEventIsValid(t *testing.T) {
 	t.Run("[public] valid op ping", func(t *testing.T) {
-		expSucceeds := true
 		expRetMsg := string(WsOpTypePong)
 		expReqId := "b26704da-f5af-44c2-bdf7-935d6739e1a0"
 
 		w := &WebSocketOpEvent{
-			Success: &expSucceeds,
-			RetMsg:  &expRetMsg,
-			ReqId:   &expReqId,
+			Success: true,
+			RetMsg:  expRetMsg,
+			ReqId:   expReqId,
 			ConnId:  "test-conndid",
 			Op:      WsOpTypePing,
 			Args:    nil,
@@ -117,9 +114,9 @@ func Test_WebSocketEventIsValid(t *testing.T) {
 
 	t.Run("[private] valid op ping", func(t *testing.T) {
 		w := &WebSocketOpEvent{
-			Success: nil,
-			RetMsg:  nil,
-			ReqId:   nil,
+			Success: false,
+			RetMsg:  "",
+			ReqId:   "",
 			ConnId:  "test-conndid",
 			Op:      WsOpTypePong,
 			Args:    nil,
@@ -128,77 +125,60 @@ func Test_WebSocketEventIsValid(t *testing.T) {
 	})
 
 	t.Run("[public] un-Success", func(t *testing.T) {
-		expSucceeds := false
 		expRetMsg := string(WsOpTypePong)
 		expReqId := "b26704da-f5af-44c2-bdf7-935d6739e1a0"
 
 		w := &WebSocketOpEvent{
-			Success: &expSucceeds,
-			RetMsg:  &expRetMsg,
-			ReqId:   &expReqId,
+			Success: false,
+			RetMsg:  expRetMsg,
+			ReqId:   expReqId,
 			ConnId:  "test-conndid",
 			Op:      WsOpTypePing,
 			Args:    nil,
 		}
-		assert.Error(t, fmt.Errorf("unexpeted response of pong: %+v", w), w.IsValid())
-	})
-
-	t.Run("[public] missing Success field", func(t *testing.T) {
-		expRetMsg := string(WsOpTypePong)
-		expReqId := "b26704da-f5af-44c2-bdf7-935d6739e1a0"
-
-		w := &WebSocketOpEvent{
-			RetMsg: &expRetMsg,
-			ReqId:  &expReqId,
-			ConnId: "test-conndid",
-			Op:     WsOpTypePing,
-			Args:   nil,
-		}
-		assert.Error(t, fmt.Errorf("unexpeted response of pong: %+v", w), w.IsValid())
+		assert.Equal(t, fmt.Errorf("unexpected response result: %+v", w), w.IsValid())
 	})
 
 	t.Run("[public] invalid ret msg", func(t *testing.T) {
-		expSucceeds := false
 		expRetMsg := "PINGPONGPINGPONG"
 		expReqId := "b26704da-f5af-44c2-bdf7-935d6739e1a0"
 
 		w := &WebSocketOpEvent{
-			Success: &expSucceeds,
-			RetMsg:  &expRetMsg,
-			ReqId:   &expReqId,
+			Success: false,
+			RetMsg:  expRetMsg,
+			ReqId:   expReqId,
 			ConnId:  "test-conndid",
 			Op:      WsOpTypePing,
 			Args:    nil,
 		}
-		assert.Error(t, fmt.Errorf("unexpeted response of pong: %+v", w), w.IsValid())
+		assert.Equal(t, fmt.Errorf("unexpected response result: %+v", w), w.IsValid())
 	})
 
 	t.Run("[public] missing RetMsg field", func(t *testing.T) {
 		expReqId := "b26704da-f5af-44c2-bdf7-935d6739e1a0"
 
 		w := &WebSocketOpEvent{
-			ReqId:  &expReqId,
+			ReqId:  expReqId,
 			ConnId: "test-conndid",
 			Op:     WsOpTypePing,
 			Args:   nil,
 		}
-		assert.Error(t, fmt.Errorf("unexpeted response of pong: %+v", w), w.IsValid())
+		assert.Equal(t, fmt.Errorf("unexpected response result: %+v", w), w.IsValid())
 	})
 
 	t.Run("unexpected op type", func(t *testing.T) {
 		w := &WebSocketOpEvent{
 			Op: WsOpType("unexpected"),
 		}
-		assert.Error(t, fmt.Errorf("unexpected op type: %+v", w), w.IsValid())
+		assert.Equal(t, fmt.Errorf("unexpected op type: %+v", w), w.IsValid())
 	})
 
 	t.Run("[subscribe] valid", func(t *testing.T) {
-		expSucceeds := true
-		expRetMsg := ""
+		expRetMsg := "subscribe"
 		w := &WebSocketOpEvent{
-			Success: &expSucceeds,
-			RetMsg:  &expRetMsg,
-			ReqId:   nil,
+			Success: true,
+			RetMsg:  expRetMsg,
+			ReqId:   "",
 			ConnId:  "test-conndid",
 			Op:      WsOpTypeSubscribe,
 			Args:    nil,
@@ -207,17 +187,41 @@ func Test_WebSocketEventIsValid(t *testing.T) {
 	})
 
 	t.Run("[subscribe] un-succeeds", func(t *testing.T) {
-		expSucceeds := false
 		expRetMsg := ""
 		w := &WebSocketOpEvent{
-			Success: &expSucceeds,
-			RetMsg:  &expRetMsg,
-			ReqId:   nil,
+			Success: false,
+			RetMsg:  expRetMsg,
+			ReqId:   "",
 			ConnId:  "test-conndid",
 			Op:      WsOpTypeSubscribe,
 			Args:    nil,
 		}
-		assert.Error(t, fmt.Errorf("unexpected subscribe result: %+v", w), w.IsValid())
+		assert.Equal(t, fmt.Errorf("unexpected response result: %+v", w), w.IsValid())
+	})
+
+	t.Run("[auth] valid", func(t *testing.T) {
+		w := &WebSocketOpEvent{
+			Success: true,
+			RetMsg:  "",
+			ReqId:   "",
+			ConnId:  "test-conndid",
+			Op:      WsOpTypeAuth,
+			Args:    nil,
+		}
+		assert.NoError(t, w.IsValid())
+	})
+
+	t.Run("[subscribe] un-succeeds", func(t *testing.T) {
+		expRetMsg := "invalid signature"
+		w := &WebSocketOpEvent{
+			Success: false,
+			RetMsg:  expRetMsg,
+			ReqId:   "",
+			ConnId:  "test-conndid",
+			Op:      WsOpTypeAuth,
+			Args:    nil,
+		}
+		assert.Equal(t, fmt.Errorf("unexpected response result: %+v", w), w.IsValid())
 	})
 }
 
