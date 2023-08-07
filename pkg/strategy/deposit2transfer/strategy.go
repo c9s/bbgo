@@ -4,19 +4,31 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+type marginTransferService interface {
+	TransferMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error
+}
 
 const ID = "deposit2transfer"
 
 var log = logrus.WithField("strategy", ID)
 
 var errNotBinanceExchange = errors.New("not binance exchange, currently only support binance exchange")
+
+var errMarginTransferNotSupport = errors.New("exchange session does not support margin transfer")
+
+var errDepositHistoryNotSupport = errors.New("exchange session does not support deposit history query")
 
 func init() {
 	// Register the pointer of the strategy struct,
@@ -28,14 +40,20 @@ func init() {
 type Strategy struct {
 	Environment *bbgo.Environment
 
+	Asset string `json:"asset"`
+
 	Interval types.Interval `json:"interval"`
 
-	SpotSession    string `json:"spotSession"`
-	FuturesSession string `json:"futuresSession"`
+	binanceSpot *binance.Exchange
 
-	spotSession, futuresSession *bbgo.ExchangeSession
+	marginTransferService marginTransferService
 
-	binanceFutures, binanceSpot *binance.Exchange
+	depositHistoryService types.ExchangeTransferService
+
+	lastDeposit *types.Deposit
+
+	watchingDeposits map[string]types.Deposit
+	mu               sync.Mutex
 }
 
 func (s *Strategy) ID() string {
@@ -53,14 +71,6 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Validate() error {
-	if len(s.SpotSession) == 0 {
-		return errors.New("spotSession name is required")
-	}
-
-	if len(s.FuturesSession) == 0 {
-		return errors.New("futuresSession name is required")
-	}
-
 	return nil
 }
 
@@ -69,70 +79,90 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	s.watchingDeposits = make(map[string]types.Deposit)
+
 	var ok bool
-	s.binanceFutures, ok = session.Exchange.(*binance.Exchange)
-	if !ok {
-		return errNotBinanceExchange
-	}
 
 	s.binanceSpot, ok = session.Exchange.(*binance.Exchange)
 	if !ok {
 		return errNotBinanceExchange
 	}
 
-	// instanceID := s.InstanceID()
-	/*
-		if err := s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, fixedpoint.Zero); err != nil {
-			log.WithError(err).Errorf("futures asset transfer in error")
-		}
+	s.marginTransferService, ok = session.Exchange.(marginTransferService)
+	if !ok {
+		return errMarginTransferNotSupport
+	}
 
-		if err := s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, fixedpoint.Zero); err != nil {
-			log.WithError(err).Errorf("futures asset transfer out error")
-		}
-
-		if err := backoff.RetryGeneral(ctx, func() error {
-			return s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, trade.Quantity)
-		}); err != nil {
-			log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
-			return err
-		}
-
-		if err := backoff.RetryGeneral(ctx, func() error {
-			return s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, quantity)
-		}); err != nil {
-			log.WithError(err).Errorf("spot-to-futures transfer in retry failed")
-			return err
-		}
-	*/
-
-	if binanceStream, ok := s.futuresSession.UserDataStream.(*binance.Stream); ok {
-		binanceStream.OnAccountUpdateEvent(func(e *binance.AccountUpdateEvent) {
-			s.handleAccountUpdate(ctx, e)
-		})
+	s.depositHistoryService, ok = session.Exchange.(types.ExchangeTransferService)
+	if !ok {
+		return errDepositHistoryNotSupport
 	}
 
 	return nil
 }
 
-func (s *Strategy) handleAccountUpdate(ctx context.Context, e *binance.AccountUpdateEvent) {
-	switch e.AccountUpdate.EventReasonType {
-	case binance.AccountUpdateEventReasonDeposit:
-	case binance.AccountUpdateEventReasonWithdraw:
-	case binance.AccountUpdateEventReasonFundingFee:
-		//  EventBase:{
-		// 		Event:ACCOUNT_UPDATE
-		// 		Time:1679760000932
-		// 	}
-		// 	Transaction:1679760000927
-		// 	AccountUpdate:{
-		// 			EventReasonType:FUNDING_FEE
-		// 			Balances:[{
-		// 					Asset:USDT
-		// 					WalletBalance:56.64251742
-		// 					CrossWalletBalance:56.64251742
-		// 					BalanceChange:-0.00037648
-		// 			}]
-		// 		}
-		// 	}
+func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			succeededDeposits, err := s.scanDepositHistory(ctx)
+			if err != nil {
+				log.WithError(err).Errorf("unable to scan deposit history")
+				continue
+			}
+
+			for _, d := range succeededDeposits {
+				log.Infof("succeeded deposit: %+v", d)
+			}
+		}
 	}
+}
+
+func (s *Strategy) scanDepositHistory(ctx context.Context) ([]types.Deposit, error) {
+	now := time.Now()
+	since := now.Add(-time.Hour)
+	deposits, err := s.depositHistoryService.QueryDepositHistory(ctx, s.Asset, since, now)
+	if err != nil {
+		return nil, err
+	}
+
+	// sort the recent deposit records in descending order
+	sort.Slice(deposits, func(i, j int) bool {
+		return deposits[i].Time.Time().Before(deposits[j].Time.Time())
+	})
+
+	s.mu.Lock()
+	defer s.mu.Lock()
+
+	for _, deposit := range deposits {
+		if _, ok := s.watchingDeposits[deposit.TransactionID]; ok {
+			// if the deposit record is in the watch list, update it
+			s.watchingDeposits[deposit.TransactionID] = deposit
+		} else {
+			switch deposit.Status {
+			case types.DepositSuccess:
+				// ignore all deposits that are already success
+				continue
+
+			case types.DepositCredited, types.DepositPending:
+				s.watchingDeposits[deposit.TransactionID] = deposit
+			}
+		}
+	}
+
+	var succeededDeposits []types.Deposit
+	for _, deposit := range deposits {
+		if deposit.Status == types.DepositSuccess {
+			succeededDeposits = append(succeededDeposits, deposit)
+			delete(s.watchingDeposits, deposit.TransactionID)
+		}
+	}
+
+	return succeededDeposits, nil
 }
