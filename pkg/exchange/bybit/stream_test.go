@@ -55,9 +55,9 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 		expSucceeds := true
 		expRetMsg := "subscribe"
 		assert.Equal(t, WebSocketOpEvent{
-			Success: &expSucceeds,
-			RetMsg:  &expRetMsg,
-			ReqId:   nil,
+			Success: expSucceeds,
+			RetMsg:  expRetMsg,
+			ReqId:   "",
 			ConnId:  "a403c8e5-e2b6-4edd-a8f0-1a64fa7227a5",
 			Op:      WsOpTypeSubscribe,
 			Args:    nil,
@@ -122,9 +122,7 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 			}`
 
 		res, err := s.parseWebSocketEvent([]byte(input))
-		assert.Error(t, fmt.Errorf("failed to unmarshal data into BookEvent: %+v, : %w", `{
-					"GG": "test",
-			   }`, err), err)
+		assert.Error(t, err)
 		assert.Equal(t, nil, res)
 	})
 }
@@ -177,7 +175,7 @@ func Test_convertSubscription(t *testing.T) {
 			Symbol:  "BTCUSDT",
 			Channel: "unsupported",
 		})
-		assert.Error(t, fmt.Errorf("unsupported stream channel: %s", "unsupported"), err)
+		assert.Equal(t, fmt.Errorf("unsupported stream channel: %s", "unsupported"), err)
 		assert.Equal(t, "", res)
 	})
 }
