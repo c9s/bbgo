@@ -1051,3 +1051,13 @@ func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 	_, ok := SupportedIntervals[interval]
 	return ok
 }
+
+func logResponse(resp interface{}, err error, req interface{}) error {
+	if err != nil {
+		log.WithError(err).Errorf("%T: error %+v", req, resp)
+		return err
+	}
+
+	log.Infof("%T: response: %+v", req, resp)
+	return nil
+}

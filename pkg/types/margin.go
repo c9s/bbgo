@@ -119,8 +119,8 @@ type MarginSettings struct {
 	IsolatedMarginSymbol string
 }
 
-func (e MarginSettings) GetMarginSettings() MarginSettings {
-	return e
+func (e *MarginSettings) GetMarginSettings() MarginSettings {
+	return *e
 }
 
 func (e *MarginSettings) UseMargin() {

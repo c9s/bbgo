@@ -372,27 +372,56 @@ func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) e
 	return nil
 }
 
+// TransferMarginAccountAsset transfers the asset into/out from the margin account
+//
+// types.TransferIn => Spot to Margin
+// types.TransferOut => Margin to Spot
+//
+// to call this method, you must set the IsMargin = true
+func (e *Exchange) TransferMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+	if e.IsIsolatedMargin {
+		return e.transferIsolatedMarginAccountAsset(ctx, asset, amount, io)
+	}
+
+	return e.transferCrossMarginAccountAsset(ctx, asset, amount, io)
+}
+
+func (e *Exchange) transferIsolatedMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+	req := e.client2.NewTransferIsolatedMarginAccountRequest()
+	req.Symbol(e.IsolatedMarginSymbol)
+
+	switch io {
+	case types.TransferIn:
+		req.TransFrom(binanceapi.AccountTypeSpot)
+		req.TransTo(binanceapi.AccountTypeIsolatedMargin)
+
+	case types.TransferOut:
+		req.TransFrom(binanceapi.AccountTypeIsolatedMargin)
+		req.TransTo(binanceapi.AccountTypeSpot)
+	}
+
+	req.Asset(asset)
+	req.Amount(amount.String())
+	resp, err := req.Do(ctx)
+	return logResponse(resp, err, req)
+}
+
 // transferCrossMarginAccountAsset transfer asset to the cross margin account or to the main account
 func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
-	req := e.client.NewMarginTransferService()
+	req := e.client2.NewTransferCrossMarginAccountRequest()
 	req.Asset(asset)
 	req.Amount(amount.String())
 
 	if io == types.TransferIn {
-		req.Type(binance.MarginTransferTypeToMargin)
+		req.TransferType(int(binance.MarginTransferTypeToMargin))
 	} else if io == types.TransferOut {
-		req.Type(binance.MarginTransferTypeToMain)
+		req.TransferType(int(binance.MarginTransferTypeToMain))
 	} else {
 		return fmt.Errorf("unexpected transfer direction: %d given", io)
 	}
 
 	resp, err := req.Do(ctx)
-	if err != nil {
-		return err
-	}
-
-	log.Debugf("cross margin transfer %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
-	return err
+	return logResponse(resp, err, req)
 }
 
 func (e *Exchange) QueryCrossMarginAccount(ctx context.Context) (*types.Account, error) {
@@ -562,8 +591,7 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 }
 
 func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
-	var emptyTime = time.Time{}
-	if since == emptyTime {
+	if since.IsZero() {
 		since, err = getLaunchDate()
 		if err != nil {
 			return nil, err
@@ -593,13 +621,16 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 		// 0(0:pending,6: credited but cannot withdraw, 1:success)
 		// set the default status
 		status := types.DepositStatus(fmt.Sprintf("code: %d", d.Status))
+
+		// https://www.binance.com/en/support/faq/115003736451
 		switch d.Status {
-		case 0:
+		case binanceapi.DepositStatusPending:
 			status = types.DepositPending
-		case 6:
-			// https://www.binance.com/en/support/faq/115003736451
+
+		case binanceapi.DepositStatusCredited:
 			status = types.DepositCredited
-		case 1:
+
+		case binanceapi.DepositStatusSuccess:
 			status = types.DepositSuccess
 		}
 
@@ -612,6 +643,8 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			AddressTag:    d.AddressTag,
 			TransactionID: d.TxId,
 			Status:        status,
+			UnlockConfirm: d.UnlockConfirm,
+			Confirmation:  d.ConfirmTimes,
 		})
 	}
 
@@ -1441,4 +1474,14 @@ func calculateMarginTolerance(marginLevel fixedpoint.Value) fixedpoint.Value {
 	// so when marginLevel equals 1.1, the formula becomes 1.0 - 1.0, or zero.
 	// = 1.0 - (1.1 / marginLevel)
 	return fixedpoint.One.Sub(fixedpoint.NewFromFloat(1.1).Div(marginLevel))
+}
+
+func logResponse(resp interface{}, err error, req interface{}) error {
+	if err != nil {
+		log.WithError(err).Errorf("%T: error %+v", req, resp)
+		return err
+	}
+
+	log.Infof("%T: response: %+v", req, resp)
+	return nil
 }
