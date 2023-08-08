@@ -162,7 +162,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		s.collectPendingQuantity(ctx)
-	
+
 		_ = s.orderExecutor.GracefulCancel(ctx)
 	})
 
@@ -327,27 +327,16 @@ func (s *Strategy) convertBalance(ctx context.Context, fromAsset string, availab
 	switch fromAsset {
 
 	case market.BaseCurrency:
-		log.Infof("converting %s %s to %s...", available, fromAsset, market.QuoteCurrency)
-
-		available = market.TruncateQuantity(available)
-
-		// from = Base -> action = sell
-		if available.Compare(market.MinQuantity) < 0 {
-			log.Debugf("asset %s %s is less than minQuantity %s, skip convert", available, fromAsset, market.MinQuantity)
-			return nil
-		}
-
 		price := ticker.Sell
 		if s.UseTakerOrder {
 			price = ticker.Buy
 		}
 
-		quoteAmount := price.Mul(available)
-		if quoteAmount.Compare(market.MinNotional) < 0 {
-			log.Debugf("asset %s %s (%s %s) is less than minNotional %s, skip convert",
-				available, fromAsset,
-				quoteAmount, market.QuoteCurrency,
-				market.MinNotional)
+		log.Infof("converting %s %s to %s...", available, fromAsset, market.QuoteCurrency)
+
+		quantity, ok := market.GreaterThanMinimalOrderQuantity(types.SideTypeSell, price, available)
+		if !ok {
+			log.Debugf("asset %s %s is less than MoQ, skip convert", available, fromAsset)
 			return nil
 		}
 
@@ -355,7 +344,7 @@ func (s *Strategy) convertBalance(ctx context.Context, fromAsset string, availab
 			Symbol:      market.Symbol,
 			Side:        types.SideTypeSell,
 			Type:        types.OrderTypeLimit,
-			Quantity:    available,
+			Quantity:    quantity,
 			Price:       price,
 			Market:      market,
 			TimeInForce: types.TimeInForceGTC,
@@ -365,36 +354,16 @@ func (s *Strategy) convertBalance(ctx context.Context, fromAsset string, availab
 		}
 
 	case market.QuoteCurrency:
-		log.Infof("converting %s %s to %s...", available, fromAsset, market.BaseCurrency)
-
-		available = market.TruncateQuoteQuantity(available)
-
-		// from = Quote -> action = buy
-		if available.Compare(market.MinNotional) < 0 {
-			log.Debugf("asset %s %s is less than minNotional %s, skip convert", available, fromAsset, market.MinNotional)
-			return nil
-		}
-
 		price := ticker.Buy
 		if s.UseTakerOrder {
 			price = ticker.Sell
 		}
 
-		quantity := available.Div(price)
-		quantity = market.TruncateQuantity(quantity)
-		if quantity.Compare(market.MinQuantity) < 0 {
-			log.Debugf("asset %s %s is less than minQuantity %s, skip convert",
-				quantity, fromAsset,
-				market.MinQuantity)
-			return nil
-		}
+		log.Infof("converting %s %s to %s...", available, fromAsset, market.BaseCurrency)
 
-		notional := quantity.Mul(price)
-		if notional.Compare(market.MinNotional) < 0 {
-			log.Debugf("asset %s %s (%s %s) is less than minNotional %s, skip convert",
-				quantity, fromAsset,
-				notional, market.QuoteCurrency,
-				market.MinNotional)
+		quantity, ok := market.GreaterThanMinimalOrderQuantity(types.SideTypeBuy, price, available)
+		if !ok {
+			log.Debugf("asset %s %s is less than MoQ, skip convert", available, fromAsset)
 			return nil
 		}
 
