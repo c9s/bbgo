@@ -14,21 +14,21 @@ func (s *Stream) EmitBookEvent(e BookEvent) {
 	}
 }
 
-func (s *Stream) OnWalletEvent(cb func(e []*WalletEvent)) {
+func (s *Stream) OnWalletEvent(cb func(e []WalletEvent)) {
 	s.walletEventCallbacks = append(s.walletEventCallbacks, cb)
 }
 
-func (s *Stream) EmitWalletEvent(e []*WalletEvent) {
+func (s *Stream) EmitWalletEvent(e []WalletEvent) {
 	for _, cb := range s.walletEventCallbacks {
 		cb(e)
 	}
 }
 
-func (s *Stream) OnOrderEvent(cb func(e []*OrderEvent)) {
+func (s *Stream) OnOrderEvent(cb func(e []OrderEvent)) {
 	s.orderEventCallbacks = append(s.orderEventCallbacks, cb)
 }
 
-func (s *Stream) EmitOrderEvent(e []*OrderEvent) {
+func (s *Stream) EmitOrderEvent(e []OrderEvent) {
 	for _, cb := range s.orderEventCallbacks {
 		cb(e)
 	}
