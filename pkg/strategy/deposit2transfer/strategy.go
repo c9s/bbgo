@@ -87,6 +87,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return errDepositHistoryNotSupport
 	}
 
+	go s.tickWatcher(ctx, s.Interval.Duration())
+
 	return nil
 }
 
@@ -94,42 +96,52 @@ func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	s.checkDeposits(ctx)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 
 		case <-ticker.C:
-			for _, asset := range s.Assets {
-				account := s.session.Account
+			s.checkDeposits(ctx)
+		}
+	}
+}
 
-				succeededDeposits, err := s.scanDepositHistory(ctx, asset, 4*time.Hour)
-				if err != nil {
-					log.WithError(err).Errorf("unable to scan deposit history")
-					continue
-				}
+func (s *Strategy) checkDeposits(ctx context.Context) {
+	for _, asset := range s.Assets {
+		log.Infof("checking %s deposits...", asset)
 
-				for _, d := range succeededDeposits {
-					log.Infof("found succeeded deposit: %+v", d)
+		account := s.session.Account
+		succeededDeposits, err := s.scanDepositHistory(ctx, asset, 4*time.Hour)
+		if err != nil {
+			log.WithError(err).Errorf("unable to scan deposit history")
+			return
+		}
 
-					bal, ok := account.Balance(d.Asset)
-					if !ok {
-						log.Errorf("unexpected error: %s balance not found", d.Asset)
-						continue
-					}
+		if len(succeededDeposits) == 0 {
+			log.Infof("no %s deposit found", asset)
+		}
 
-					log.Infof("%s balance: %+v", d.Asset, bal)
+		for _, d := range succeededDeposits {
+			log.Infof("found succeeded deposit: %+v", d)
 
-					amount := fixedpoint.Min(bal.Available, d.Amount)
+			bal, ok := account.Balance(d.Asset)
+			if !ok {
+				log.Errorf("unexpected error: %s balance not found", d.Asset)
+				return
+			}
 
-					bbgo.Notify("Found succeeded deposit %s %s, transferring %s %s into the margin account",
-						d.Amount.String(), d.Asset,
-						amount.String(), d.Asset)
+			log.Infof("%s balance: %+v", d.Asset, bal)
 
-					if err2 := s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, amount, types.TransferIn); err2 != nil {
-						log.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
-					}
-				}
+			amount := fixedpoint.Min(bal.Available, d.Amount)
+
+			bbgo.Notify("Found succeeded deposit %s %s, transferring %s %s into the margin account",
+				d.Amount.String(), d.Asset,
+				amount.String(), d.Asset)
+
+			if err2 := s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, amount, types.TransferIn); err2 != nil {
+				log.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
 			}
 		}
 	}
