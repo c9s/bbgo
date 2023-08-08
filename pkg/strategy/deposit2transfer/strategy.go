@@ -75,18 +75,13 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("%s", ID)
+	return fmt.Sprintf("%s-%s", ID, s.Assets)
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.watchingDeposits = make(map[string]types.Deposit)
 
 	var ok bool
-
-	s.binanceSpot, ok = session.Exchange.(*binance.Exchange)
-	if !ok {
-		return errNotBinanceExchange
-	}
 
 	s.marginTransferService, ok = session.Exchange.(marginTransferService)
 	if !ok {
