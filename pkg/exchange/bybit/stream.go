@@ -33,7 +33,8 @@ type Stream struct {
 	types.StandardStream
 
 	bookEventCallbacks   []func(e BookEvent)
-	walletEventCallbacks []func(e []*WalletEvent)
+	walletEventCallbacks []func(e []WalletEvent)
+	orderEventCallbacks  []func(e []OrderEvent)
 }
 
 func NewStream(key, secret string) *Stream {
@@ -52,6 +53,7 @@ func NewStream(key, secret string) *Stream {
 	stream.OnConnect(stream.handlerConnect)
 	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnWalletEvent(stream.handleWalletEvent)
+	stream.OnOrderEvent(stream.handleOrderEvent)
 	return stream
 }
 
@@ -75,8 +77,11 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	case *BookEvent:
 		s.EmitBookEvent(*e)
 
-	case []*WalletEvent:
+	case []WalletEvent:
 		s.EmitWalletEvent(e)
+
+	case []OrderEvent:
+		s.EmitOrderEvent(e)
 	}
 }
 
@@ -105,8 +110,13 @@ func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 			return &book, nil
 
 		case TopicTypeWallet:
-			var wallets []*WalletEvent
+			var wallets []WalletEvent
 			return wallets, json.Unmarshal(e.WebSocketTopicEvent.Data, &wallets)
+
+		case TopicTypeOrder:
+			var orders []OrderEvent
+			return orders, json.Unmarshal(e.WebSocketTopicEvent.Data, &orders)
+
 		}
 	}
 
@@ -194,6 +204,7 @@ func (s *Stream) handlerConnect() {
 			Op: WsOpTypeSubscribe,
 			Args: []string{
 				string(TopicTypeWallet),
+				string(TopicTypeOrder),
 			},
 		}); err != nil {
 			log.WithError(err).Error("failed to send subscription request")
@@ -228,7 +239,7 @@ func (s *Stream) handleBookEvent(e BookEvent) {
 	}
 }
 
-func (s *Stream) handleWalletEvent(events []*WalletEvent) {
+func (s *Stream) handleWalletEvent(events []WalletEvent) {
 	bm := types.BalanceMap{}
 	for _, event := range events {
 		if event.AccountType != AccountTypeSpot {
@@ -245,4 +256,19 @@ func (s *Stream) handleWalletEvent(events []*WalletEvent) {
 	}
 
 	s.StandardStream.EmitBalanceSnapshot(bm)
+}
+
+func (s *Stream) handleOrderEvent(events []OrderEvent) {
+	for _, event := range events {
+		if event.Category != bybitapi.CategorySpot {
+			return
+		}
+
+		gOrder, err := toGlobalOrder(event.Order)
+		if err != nil {
+			log.WithError(err).Error("failed to convert to global order")
+			continue
+		}
+		s.StandardStream.EmitOrderUpdate(*gOrder)
+	}
 }

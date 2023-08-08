@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -80,6 +81,7 @@ type TopicType string
 const (
 	TopicTypeOrderBook TopicType = "orderbook"
 	TopicTypeWallet    TopicType = "wallet"
+	TopicTypeOrder     TopicType = "order"
 )
 
 type DataType string
@@ -200,4 +202,10 @@ type WalletEvent struct {
 		// - This is a unique field for UNIFIED account
 		MarginCollateral bool `json:"marginCollateral"`
 	} `json:"coin"`
+}
+
+type OrderEvent struct {
+	bybitapi.Order
+
+	Category bybitapi.Category `json:"category"`
 }

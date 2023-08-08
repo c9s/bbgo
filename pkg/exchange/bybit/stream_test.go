@@ -65,6 +65,17 @@ func TestStream(t *testing.T) {
 		c := make(chan struct{})
 		<-c
 	})
+
+	t.Run("order test", func(t *testing.T) {
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnOrderUpdate(func(order types.Order) {
+			t.Log("got update", order)
+		})
+		c := make(chan struct{})
+		<-c
+	})
 }
 
 func TestStream_parseWebSocketEvent(t *testing.T) {
