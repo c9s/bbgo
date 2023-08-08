@@ -34,6 +34,12 @@ type Deposit struct {
 	AddressTag    string           `json:"addressTag"`
 	TransactionID string           `json:"transactionID" db:"txn_id"`
 	Status        DepositStatus    `json:"status"`
+
+	// Required confirm for unlock balance
+	UnlockConfirm int `json:"unlockConfirm"`
+
+	// Confirmation format = "current/required", for example: "7/16"
+	Confirmation string `json:"confirmation"`
 }
 
 func (d Deposit) EffectiveTime() time.Time {
