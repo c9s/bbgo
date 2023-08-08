@@ -40,7 +40,7 @@ func init() {
 type Strategy struct {
 	Environment *bbgo.Environment
 
-	Asset string `json:"asset"`
+	Assets []string `json:"assets"`
 
 	Interval types.Interval `json:"interval"`
 
@@ -111,23 +111,32 @@ func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
 			return
 
 		case <-ticker.C:
-			succeededDeposits, err := s.scanDepositHistory(ctx)
-			if err != nil {
-				log.WithError(err).Errorf("unable to scan deposit history")
-				continue
-			}
+			for _, asset := range s.Assets {
+				succeededDeposits, err := s.scanDepositHistory(ctx, asset, 4*time.Hour)
+				if err != nil {
+					log.WithError(err).Errorf("unable to scan deposit history")
+					continue
+				}
 
-			for _, d := range succeededDeposits {
-				log.Infof("succeeded deposit: %+v", d)
+				for _, d := range succeededDeposits {
+					log.Infof("found succeeded deposit: %+v", d)
+
+					bbgo.Notify("Found succeeded deposit %s %s, transferring asset into the margin account", d.Amount.String(), d.Asset)
+					if err2 := s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, d.Amount, types.TransferIn); err2 != nil {
+						log.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
+					}
+				}
 			}
 		}
 	}
 }
 
-func (s *Strategy) scanDepositHistory(ctx context.Context) ([]types.Deposit, error) {
+func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duration time.Duration) ([]types.Deposit, error) {
+	log.Infof("scanning %s deposit history...", asset)
+
 	now := time.Now()
-	since := now.Add(-time.Hour)
-	deposits, err := s.depositHistoryService.QueryDepositHistory(ctx, s.Asset, since, now)
+	since := now.Add(-duration)
+	deposits, err := s.depositHistoryService.QueryDepositHistory(ctx, asset, since, now)
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +150,10 @@ func (s *Strategy) scanDepositHistory(ctx context.Context) ([]types.Deposit, err
 	defer s.mu.Lock()
 
 	for _, deposit := range deposits {
+		if deposit.Asset != asset {
+			continue
+		}
+
 		if _, ok := s.watchingDeposits[deposit.TransactionID]; ok {
 			// if the deposit record is in the watch list, update it
 			s.watchingDeposits[deposit.TransactionID] = deposit
@@ -159,6 +172,11 @@ func (s *Strategy) scanDepositHistory(ctx context.Context) ([]types.Deposit, err
 	var succeededDeposits []types.Deposit
 	for _, deposit := range deposits {
 		if deposit.Status == types.DepositSuccess {
+			current, required := deposit.GetCurrentConfirmation()
+			if required > 0 && deposit.UnlockConfirm > 0 && current < deposit.UnlockConfirm {
+				continue
+			}
+
 			succeededDeposits = append(succeededDeposits, deposit)
 			delete(s.watchingDeposits, deposit.TransactionID)
 		}
