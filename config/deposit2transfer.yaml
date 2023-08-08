@@ -9,4 +9,4 @@ exchangeStrategies:
 
     ## assets are the assets you want to transfer into the margin account
     assets:
-    - BTC
+    - USDT
