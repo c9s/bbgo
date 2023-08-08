@@ -11,7 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (s *Client) NewMarginTransferRequest() *MarginTransferRequest {
+func (s *MarginService) NewMarginTransferRequest() *MarginTransferRequest {
 	return &MarginTransferRequest{client: s.Client}
 }
 
@@ -35,7 +35,7 @@ type MarginTransferResponse struct {
 type MarginTransferRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	currency string `param:"currency,required"`
-	amount   string `param:"amount"`
-	side     string `param:"side"`
+	currency string             `param:"currency,required"`
+	amount   string             `param:"amount"`
+	side     MarginTransferSide `param:"side"`
 }

@@ -21,7 +21,7 @@ func (m *MarginTransferRequest) Amount(amount string) *MarginTransferRequest {
 	return m
 }
 
-func (m *MarginTransferRequest) Side(side string) *MarginTransferRequest {
+func (m *MarginTransferRequest) Side(side MarginTransferSide) *MarginTransferRequest {
 	m.side = side
 	return m
 }
@@ -59,6 +59,17 @@ func (m *MarginTransferRequest) GetParameters() (map[string]interface{}, error) 
 	params["amount"] = amount
 	// check side field -> json key side
 	side := m.side
+
+	// TEMPLATE check-valid-values
+	switch side {
+	case MarginTransferSideIn, MarginTransferSideOut:
+		params["side"] = side
+
+	default:
+		return nil, fmt.Errorf("side value %v is invalid", side)
+
+	}
+	// END TEMPLATE check-valid-values
 
 	// assign parameter of side
 	params["side"] = side
