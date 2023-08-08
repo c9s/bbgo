@@ -106,14 +106,31 @@ func (c *RestClient) NewGetAccountsRequest() *GetAccountsRequest {
 	return &GetAccountsRequest{client: c}
 }
 
+type DepositState string
+
+const (
+	DepositStateSubmitting DepositState = "submitting"
+	DepositStateCancelled  DepositState = "cancelled"
+	DepositStateSubmitted  DepositState = "submitted"
+	DepositStatePending    DepositState = "pending"
+	DepositStateSuspect    DepositState = "suspect"
+	DepositStateRejected   DepositState = "rejected"
+	DepositStateSuspended  DepositState = "suspended"
+	DepositStateAccepted   DepositState = "accepted"
+	DepositStateChecking   DepositState = "checking"
+)
+
 type Deposit struct {
-	Currency        string                     `json:"currency"`
+	Currency        string                     `json:"currency"`         // "eth"
 	CurrencyVersion string                     `json:"currency_version"` // "eth"
+	NetworkProtocol string                     `json:"network_protocol"` // "ethereum-erc20"
 	Amount          fixedpoint.Value           `json:"amount"`
 	Fee             fixedpoint.Value           `json:"fee"`
 	TxID            string                     `json:"txid"`
-	State           string                     `json:"state"`
+	State           DepositState               `json:"state"`
+	Status          string                     `json:"status"`
 	Confirmations   int64                      `json:"confirmations"`
+	Address         string                     `json:"to_address"` // 0x5c7d23d516f120d322fc7b116386b7e491739138
 	CreatedAt       types.MillisecondTimestamp `json:"created_at"`
 	UpdatedAt       types.MillisecondTimestamp `json:"updated_at"`
 }
@@ -134,6 +151,14 @@ func (c *RestClient) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {
 		client: c,
 	}
 }
+
+// submitted -> accepted -> processing -> sent -> confirmed
+type WithdrawState string
+
+const (
+	WithdrawStateSubmitting WithdrawState = "submitting"
+	WithdrawStateConfirmed  WithdrawState = "confirmed"
+)
 
 type Withdraw struct {
 	UUID            string           `json:"uuid"`

@@ -262,24 +262,24 @@ func toGlobalTradeV2(t max.Trade) (*types.Trade, error) {
 	}, nil
 }
 
-func toGlobalDepositStatus(a string) types.DepositStatus {
+func toGlobalDepositStatus(a max.DepositState) types.DepositStatus {
 	switch a {
-	case "submitting", "submitted", "checking":
+
+	case max.DepositStateSubmitting, max.DepositStateSubmitted, max.DepositStatePending, max.DepositStateChecking:
 		return types.DepositPending
 
-	case "accepted":
-		return types.DepositSuccess
-
-	case "rejected":
+	case max.DepositStateRejected:
 		return types.DepositRejected
 
-	case "canceled":
+	case max.DepositStateCancelled:
 		return types.DepositCancelled
 
-	case "suspect", "refunded":
-
+	case max.DepositStateAccepted:
+		return types.DepositSuccess
 	}
 
+	// other states goes to this
+	// max.DepositStateSuspect, max.DepositStateSuspended
 	return types.DepositStatus(a)
 }
 
