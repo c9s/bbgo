@@ -47,11 +47,9 @@ type Strategy struct {
 	binanceSpot *binance.Exchange
 
 	marginTransferService marginTransferService
-
 	depositHistoryService types.ExchangeTransferService
 
-	lastDeposit *types.Deposit
-
+	session          *bbgo.ExchangeSession
 	watchingDeposits map[string]types.Deposit
 	mu               sync.Mutex
 }
@@ -79,6 +77,7 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	s.session = session
 	s.watchingDeposits = make(map[string]types.Deposit)
 
 	var ok bool
@@ -107,6 +106,8 @@ func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
 
 		case <-ticker.C:
 			for _, asset := range s.Assets {
+				account := s.session.Account
+
 				succeededDeposits, err := s.scanDepositHistory(ctx, asset, 4*time.Hour)
 				if err != nil {
 					log.WithError(err).Errorf("unable to scan deposit history")
@@ -116,8 +117,21 @@ func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
 				for _, d := range succeededDeposits {
 					log.Infof("found succeeded deposit: %+v", d)
 
-					bbgo.Notify("Found succeeded deposit %s %s, transferring asset into the margin account", d.Amount.String(), d.Asset)
-					if err2 := s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, d.Amount, types.TransferIn); err2 != nil {
+					bal, ok := account.Balance(d.Asset)
+					if !ok {
+						log.Errorf("unexpected error: %s balance not found", d.Asset)
+						continue
+					}
+
+					log.Infof("%s balance: %+v", d.Asset, bal)
+
+					amount := fixedpoint.Min(bal.Available, d.Amount)
+
+					bbgo.Notify("Found succeeded deposit %s %s, transferring %s %s into the margin account",
+						d.Amount.String(), d.Asset,
+						amount.String(), d.Asset)
+
+					if err2 := s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, amount, types.TransferIn); err2 != nil {
 						log.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
 					}
 				}
@@ -145,6 +159,8 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	defer s.mu.Lock()
 
 	for _, deposit := range deposits {
+		log.Infof("scanning deposit: %+v", deposit)
+
 		if deposit.Asset != asset {
 			continue
 		}
@@ -156,9 +172,11 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 			switch deposit.Status {
 			case types.DepositSuccess:
 				// ignore all deposits that are already success
+				log.Infof("ignored succeess deposit: %s", deposit.TransactionID)
 				continue
 
 			case types.DepositCredited, types.DepositPending:
+				log.Infof("adding pending deposit: %s", deposit.TransactionID)
 				s.watchingDeposits[deposit.TransactionID] = deposit
 			}
 		}
@@ -167,8 +185,11 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	var succeededDeposits []types.Deposit
 	for _, deposit := range deposits {
 		if deposit.Status == types.DepositSuccess {
+			log.Infof("found pending -> success deposit: %+v", deposit)
+
 			current, required := deposit.GetCurrentConfirmation()
 			if required > 0 && deposit.UnlockConfirm > 0 && current < deposit.UnlockConfirm {
+				log.Infof("deposit %s unlock confirm %d is not reached, current: %d, required: %d, skip this round", deposit.TransactionID, deposit.UnlockConfirm, current, required)
 				continue
 			}
 
