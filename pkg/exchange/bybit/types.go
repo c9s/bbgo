@@ -28,18 +28,19 @@ type WsOpType string
 const (
 	WsOpTypePing      WsOpType = "ping"
 	WsOpTypePong      WsOpType = "pong"
+	WsOpTypeAuth      WsOpType = "auth"
 	WsOpTypeSubscribe WsOpType = "subscribe"
 )
 
 type WebsocketOp struct {
-	Op   string   `json:"op"`
+	Op   WsOpType `json:"op"`
 	Args []string `json:"args"`
 }
 
 type WebSocketOpEvent struct {
-	Success *bool   `json:"success,omitempty"`
-	RetMsg  *string `json:"ret_msg,omitempty"`
-	ReqId   *string `json:"req_id,omitempty"`
+	Success bool   `json:"success"`
+	RetMsg  string `json:"ret_msg"`
+	ReqId   string `json:"req_id,omitempty"`
 
 	ConnId string   `json:"conn_id"`
 	Op     WsOpType `json:"op"`
@@ -50,17 +51,21 @@ func (w *WebSocketOpEvent) IsValid() error {
 	switch w.Op {
 	case WsOpTypePing:
 		// public event
-		if (w.Success != nil && !*w.Success) ||
-			(w.RetMsg != nil && WsOpType(*w.RetMsg) != WsOpTypePong) {
-			return fmt.Errorf("unexpeted response of pong: %+v", w)
+		if !w.Success || WsOpType(w.RetMsg) != WsOpTypePong {
+			return fmt.Errorf("unexpected response result: %+v", w)
 		}
 		return nil
 	case WsOpTypePong:
-		// private event
+		// private event, no success and ret_msg fields in response
+		return nil
+	case WsOpTypeAuth:
+		if !w.Success || w.RetMsg != "" {
+			return fmt.Errorf("unexpected response result: %+v", w)
+		}
 		return nil
 	case WsOpTypeSubscribe:
-		if w.Success != nil && !*w.Success {
-			return fmt.Errorf("unexpected subscribe result: %+v", w)
+		if !w.Success || WsOpType(w.RetMsg) != WsOpTypeSubscribe {
+			return fmt.Errorf("unexpected response result: %+v", w)
 		}
 		return nil
 	default:
@@ -88,12 +93,6 @@ type WebSocketTopicEvent struct {
 	Ts   types.MillisecondTimestamp `json:"ts"`
 	Data json.RawMessage            `json:"data"`
 }
-
-// PriceVolumeSlice represents a slice of price and value.
-//
-// index 0 is Bid/Ask price.
-// index 1 is Bid/Ask size. The *delta data* has size=0, which means that all quotations for this price have been filled or cancelled
-type PriceVolumeSlice [2]fixedpoint.Value
 
 type BookEvent struct {
 	// Symbol name

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -21,16 +22,25 @@ const (
 	spotArgsLimit = 10
 )
 
+var (
+	// wsAuthRequest specifies the duration for which a websocket request's authentication is valid.
+	wsAuthRequest = 10 * time.Second
+)
+
 //go:generate callbackgen -type Stream
 type Stream struct {
+	key, secret string
 	types.StandardStream
 
 	bookEventCallbacks []func(e BookEvent)
 }
 
-func NewStream() *Stream {
+func NewStream(key, secret string) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
+		// pragma: allowlist nextline secret
+		key:    key,
+		secret: secret,
 	}
 
 	stream.SetEndpointCreator(stream.createEndpoint)
@@ -150,10 +160,23 @@ func (s *Stream) handlerConnect() {
 		}
 		log.Infof("subscribing channels: %+v", topics)
 		if err := s.Conn.WriteJSON(WebsocketOp{
-			Op:   "subscribe",
+			Op:   WsOpTypeSubscribe,
 			Args: topics,
 		}); err != nil {
 			log.WithError(err).Error("failed to send subscription request")
+		}
+	} else {
+		expires := strconv.FormatInt(time.Now().Add(wsAuthRequest).In(time.UTC).UnixMilli(), 10)
+
+		if err := s.Conn.WriteJSON(WebsocketOp{
+			Op: WsOpTypeAuth,
+			Args: []string{
+				s.key,
+				expires,
+				bybitapi.Sign(fmt.Sprintf("GET/realtime%s", expires), s.secret),
+			},
+		}); err != nil {
+			log.WithError(err).Error("failed to auth request")
 		}
 	}
 }

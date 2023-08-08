@@ -11,3 +11,7 @@ type APIResponse = bybitapi.APIResponse
 type Client struct {
 	Client requestgen.AuthenticatedAPIClient
 }
+
+func NewClient(client *bybitapi.RestClient) *Client {
+	return &Client{Client: client}
+}
