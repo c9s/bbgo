@@ -32,7 +32,8 @@ type Stream struct {
 	key, secret string
 	types.StandardStream
 
-	bookEventCallbacks []func(e BookEvent)
+	bookEventCallbacks   []func(e BookEvent)
+	walletEventCallbacks []func(e []*WalletEvent)
 }
 
 func NewStream(key, secret string) *Stream {
@@ -50,6 +51,7 @@ func NewStream(key, secret string) *Stream {
 
 	stream.OnConnect(stream.handlerConnect)
 	stream.OnBookEvent(stream.handleBookEvent)
+	stream.OnWalletEvent(stream.handleWalletEvent)
 	return stream
 }
 
@@ -72,6 +74,9 @@ func (s *Stream) dispatchEvent(event interface{}) {
 
 	case *BookEvent:
 		s.EmitBookEvent(*e)
+
+	case []*WalletEvent:
+		s.EmitWalletEvent(e)
 	}
 }
 
@@ -98,6 +103,10 @@ func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 
 			book.Type = e.WebSocketTopicEvent.Type
 			return &book, nil
+
+		case TopicTypeWallet:
+			var wallets []*WalletEvent
+			return wallets, json.Unmarshal(e.WebSocketTopicEvent.Data, &wallets)
 		}
 	}
 
@@ -164,6 +173,7 @@ func (s *Stream) handlerConnect() {
 			Args: topics,
 		}); err != nil {
 			log.WithError(err).Error("failed to send subscription request")
+			return
 		}
 	} else {
 		expires := strconv.FormatInt(time.Now().Add(wsAuthRequest).In(time.UTC).UnixMilli(), 10)
@@ -177,6 +187,17 @@ func (s *Stream) handlerConnect() {
 			},
 		}); err != nil {
 			log.WithError(err).Error("failed to auth request")
+			return
+		}
+
+		if err := s.Conn.WriteJSON(WebsocketOp{
+			Op: WsOpTypeSubscribe,
+			Args: []string{
+				string(TopicTypeWallet),
+			},
+		}); err != nil {
+			log.WithError(err).Error("failed to send subscription request")
+			return
 		}
 	}
 }
@@ -205,4 +226,23 @@ func (s *Stream) handleBookEvent(e BookEvent) {
 	case e.Type == DataTypeDelta:
 		s.EmitBookUpdate(orderBook)
 	}
+}
+
+func (s *Stream) handleWalletEvent(events []*WalletEvent) {
+	bm := types.BalanceMap{}
+	for _, event := range events {
+		if event.AccountType != AccountTypeSpot {
+			return
+		}
+
+		for _, obj := range event.Coins {
+			bm[obj.Coin] = types.Balance{
+				Currency:  obj.Coin,
+				Available: obj.Free,
+				Locked:    obj.Locked,
+			}
+		}
+	}
+
+	s.StandardStream.EmitBalanceSnapshot(bm)
 }

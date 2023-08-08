@@ -173,11 +173,23 @@ func Test_WebSocketEventIsValid(t *testing.T) {
 		assert.Equal(t, fmt.Errorf("unexpected op type: %+v", w), w.IsValid())
 	})
 
-	t.Run("[subscribe] valid", func(t *testing.T) {
+	t.Run("[subscribe] valid with public channel", func(t *testing.T) {
 		expRetMsg := "subscribe"
 		w := &WebSocketOpEvent{
 			Success: true,
 			RetMsg:  expRetMsg,
+			ReqId:   "",
+			ConnId:  "test-conndid",
+			Op:      WsOpTypeSubscribe,
+			Args:    nil,
+		}
+		assert.NoError(t, w.IsValid())
+	})
+
+	t.Run("[subscribe] valid with private channel", func(t *testing.T) {
+		w := &WebSocketOpEvent{
+			Success: true,
+			RetMsg:  "",
 			ReqId:   "",
 			ConnId:  "test-conndid",
 			Op:      WsOpTypeSubscribe,
