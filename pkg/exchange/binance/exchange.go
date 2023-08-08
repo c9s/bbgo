@@ -647,6 +647,8 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			AddressTag:    d.AddressTag,
 			TransactionID: d.TxId,
 			Status:        status,
+			UnlockConfirm: d.UnlockConfirm,
+			Confirmation:  d.ConfirmTimes,
 		})
 	}
 
