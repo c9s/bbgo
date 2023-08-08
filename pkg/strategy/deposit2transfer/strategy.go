@@ -195,7 +195,7 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	}
 
 	var succeededDeposits []types.Deposit
-	for _, deposit := range deposits {
+	for _, deposit := range s.watchingDeposits {
 		if deposit.Status == types.DepositSuccess {
 			log.Infof("found pending -> success deposit: %+v", deposit)
 
