@@ -39,7 +39,7 @@ type Strategy struct {
 
 	Assets []string `json:"assets"`
 
-	Interval types.Interval `json:"interval"`
+	Interval types.Duration `json:"interval"`
 
 	marginTransferService marginTransferService
 	depositHistoryService types.ExchangeTransferService
@@ -56,8 +56,8 @@ func (s *Strategy) ID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
 
 func (s *Strategy) Defaults() error {
-	if s.Interval == "" {
-		s.Interval = types.Interval1m
+	if s.Interval == 0 {
+		s.Interval = types.Duration(5 * time.Minute)
 	}
 
 	return nil
@@ -87,7 +87,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		return errDepositHistoryNotSupport
 	}
 
-	go s.tickWatcher(ctx, s.Interval.Duration())
+	session.UserDataStream.OnStart(func() {
+		go s.tickWatcher(ctx, s.Interval.Duration())
+	})
 
 	return nil
 }
@@ -97,6 +99,7 @@ func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
 	defer ticker.Stop()
 
 	s.checkDeposits(ctx)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -121,6 +124,7 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 
 		if len(succeededDeposits) == 0 {
 			log.Infof("no %s deposit found", asset)
+			continue
 		}
 
 		for _, d := range succeededDeposits {
@@ -163,10 +167,10 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	})
 
 	s.mu.Lock()
-	defer s.mu.Lock()
+	defer s.mu.Unlock()
 
 	for _, deposit := range deposits {
-		log.Infof("scanning deposit: %+v", deposit)
+		log.Infof("checking deposit: %+v", deposit)
 
 		if deposit.Asset != asset {
 			continue
@@ -177,9 +181,10 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 			s.watchingDeposits[deposit.TransactionID] = deposit
 		} else {
 			switch deposit.Status {
+
 			case types.DepositSuccess:
 				// ignore all deposits that are already success
-				log.Infof("ignored succeess deposit: %s", deposit.TransactionID)
+				log.Infof("ignored succeess deposit: %s %+v", deposit.TransactionID, deposit)
 				continue
 
 			case types.DepositCredited, types.DepositPending:
