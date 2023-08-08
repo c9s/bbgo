@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -23,8 +22,6 @@ type marginTransferService interface {
 const ID = "deposit2transfer"
 
 var log = logrus.WithField("strategy", ID)
-
-var errNotBinanceExchange = errors.New("not binance exchange, currently only support binance exchange")
 
 var errMarginTransferNotSupport = errors.New("exchange session does not support margin transfer")
 
@@ -43,8 +40,6 @@ type Strategy struct {
 	Assets []string `json:"assets"`
 
 	Interval types.Interval `json:"interval"`
-
-	binanceSpot *binance.Exchange
 
 	marginTransferService marginTransferService
 	depositHistoryService types.ExchangeTransferService
