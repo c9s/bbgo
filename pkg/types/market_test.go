@@ -13,6 +13,31 @@ import (
 
 var s func(string) fixedpoint.Value = fixedpoint.MustNewFromString
 
+func TestMarket_GreaterThanMinimalOrderQuantity(t *testing.T) {
+	market := Market{
+		Symbol:          "BTCUSDT",
+		LocalSymbol:     "BTCUSDT",
+		PricePrecision:  8,
+		VolumePrecision: 8,
+		QuoteCurrency:   "USDT",
+		BaseCurrency:    "BTC",
+		MinNotional:     number(10.0),
+		MinAmount:       number(10.0),
+		MinQuantity:     number(0.0001),
+		StepSize:        number(0.00001),
+		TickSize:        number(0.01),
+	}
+
+	_, ok := market.GreaterThanMinimalOrderQuantity(SideTypeSell, number(20000.0), number(0.00051))
+	assert.True(t, ok)
+
+	_, ok = market.GreaterThanMinimalOrderQuantity(SideTypeBuy, number(20000.0), number(10.0))
+	assert.True(t, ok)
+
+	_, ok = market.GreaterThanMinimalOrderQuantity(SideTypeBuy, number(20000.0), number(0.99999))
+	assert.False(t, ok)
+}
+
 func TestFormatQuantity(t *testing.T) {
 	quantity := formatQuantity(
 		s("0.12511"),
