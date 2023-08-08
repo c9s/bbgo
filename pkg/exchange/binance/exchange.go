@@ -379,10 +379,6 @@ func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) e
 //
 // to call this method, you must set the IsMargin = true
 func (e *Exchange) TransferMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
-	if !e.IsMargin {
-		return errors.New("you can not operate margin transfer on a non-margin session")
-	}
-
 	if e.IsIsolatedMargin {
 		return e.transferIsolatedMarginAccountAsset(ctx, asset, amount, io)
 	}
