@@ -1,14 +1,42 @@
 package bybit
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/testutil"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+func getTestClientOrSkip(t *testing.T) *Stream {
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
+	key, secret, ok := testutil.IntegrationTestConfigured(t, "BYBIT")
+	if !ok {
+		t.Skip("BYBIT_* env vars are not configured")
+		return nil
+	}
+
+	return NewStream(key, secret)
+}
+
+func TestStream(t *testing.T) {
+	s := getTestClientOrSkip(t)
+
+	t.Run("Auth test", func(t *testing.T) {
+		s.Connect(context.Background())
+		c := make(chan struct{})
+		<-c
+	})
+}
 
 func TestStream_parseWebSocketEvent(t *testing.T) {
 	s := Stream{}
@@ -27,9 +55,9 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 		expSucceeds := true
 		expRetMsg := "subscribe"
 		assert.Equal(t, WebSocketOpEvent{
-			Success: &expSucceeds,
-			RetMsg:  &expRetMsg,
-			ReqId:   nil,
+			Success: expSucceeds,
+			RetMsg:  expRetMsg,
+			ReqId:   "",
 			ConnId:  "a403c8e5-e2b6-4edd-a8f0-1a64fa7227a5",
 			Op:      WsOpTypeSubscribe,
 			Args:    nil,
@@ -94,9 +122,7 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 			}`
 
 		res, err := s.parseWebSocketEvent([]byte(input))
-		assert.Error(t, fmt.Errorf("failed to unmarshal data into BookEvent: %+v, : %w", `{
-					"GG": "test",
-			   }`, err), err)
+		assert.Error(t, err)
 		assert.Equal(t, nil, res)
 	})
 }
@@ -149,7 +175,7 @@ func Test_convertSubscription(t *testing.T) {
 			Symbol:  "BTCUSDT",
 			Channel: "unsupported",
 		})
-		assert.Error(t, fmt.Errorf("unsupported stream channel: %s", "unsupported"), err)
+		assert.Equal(t, fmt.Errorf("unsupported stream channel: %s", "unsupported"), err)
 		assert.Equal(t, "", res)
 	})
 }
