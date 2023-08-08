@@ -1,0 +1,12 @@
+---
+## deposit2transfer scans the deposit history and then transfer the deposited assets into your margin account
+## currently only cross-margin is supported.
+exchangeStrategies:
+- on: binance
+  deposit2transfer:
+    ## interval is the deposit history scanning interval
+    interval: 1m
+
+    ## assets are the assets you want to transfer into the margin account
+    assets:
+    - USDT
