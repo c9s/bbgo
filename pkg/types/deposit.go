@@ -2,6 +2,8 @@ package types
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -40,6 +42,21 @@ type Deposit struct {
 
 	// Confirmation format = "current/required", for example: "7/16"
 	Confirmation string `json:"confirmation"`
+}
+
+func (d Deposit) GetCurrentConfirmation() (current int, required int) {
+	if len(d.Confirmation) == 0 {
+		return 0, 0
+	}
+
+	strs := strings.Split(d.Confirmation, "/")
+	if len(strs) < 2 {
+		return 0, 0
+	}
+
+	current, _ = strconv.Atoi(strs[0])
+	required, _ = strconv.Atoi(strs[1])
+	return current, required
 }
 
 func (d Deposit) EffectiveTime() time.Time {
