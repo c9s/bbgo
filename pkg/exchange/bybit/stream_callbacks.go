@@ -23,3 +23,13 @@ func (s *Stream) EmitWalletEvent(e []*WalletEvent) {
 		cb(e)
 	}
 }
+
+func (s *Stream) OnOrderEvent(cb func(e []*OrderEvent)) {
+	s.orderEventCallbacks = append(s.orderEventCallbacks, cb)
+}
+
+func (s *Stream) EmitOrderEvent(e []*OrderEvent) {
+	for _, cb := range s.orderEventCallbacks {
+		cb(e)
+	}
+}
