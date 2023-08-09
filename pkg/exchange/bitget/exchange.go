@@ -63,9 +63,9 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 	markets := types.MarketMap{}
 	for _, s := range symbols {
-		symbol := toGlobalSymbol(s.Symbol)
+		symbol := toGlobalSymbol(s.SymbolName)
 		markets[symbol] = types.Market{
-			Symbol:          symbol,
+			Symbol:          s.SymbolName,
 			LocalSymbol:     s.Symbol,
 			PricePrecision:  s.PriceScale,
 			VolumePrecision: s.QuantityScale,
@@ -86,8 +86,23 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	// TODO implement me
-	panic("implement me")
+	req := e.client.NewGetTickerRequest()
+	req.Symbol(symbol)
+	ticker, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Ticker{
+		Time:   ticker.Ts.Time(),
+		Volume: ticker.BaseVol,
+		Last:   ticker.Close,
+		Open:   ticker.OpenUtc0,
+		High:   ticker.High24H,
+		Low:    ticker.Low24H,
+		Buy:    ticker.BuyOne,
+		Sell:   ticker.SellOne,
+	}, nil
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
