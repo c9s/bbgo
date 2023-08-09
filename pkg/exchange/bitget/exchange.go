@@ -116,8 +116,21 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	// TODO implement me
-	panic("implement me")
+	req := e.client.NewGetAccountAssetsRequest()
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	bals := types.BalanceMap{}
+	for _, asset := range resp {
+		b := toGlobalBalance(asset)
+		bals[asset.CoinName] = b
+	}
+
+	account := types.NewAccount()
+	account.UpdateBalances(bals)
+	return account, nil
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
