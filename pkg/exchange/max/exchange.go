@@ -781,10 +781,11 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 				Time:          types.Time(d.CreatedAt),
 				Amount:        d.Amount,
 				Asset:         toGlobalCurrency(d.Currency),
-				Address:       "", // not supported
-				AddressTag:    "", // not supported
+				Address:       d.Address, // not supported
+				AddressTag:    "",        // not supported
 				TransactionID: d.TxID,
 				Status:        toGlobalDepositStatus(d.State),
+				Confirmation:  "",
 			})
 		}
 
