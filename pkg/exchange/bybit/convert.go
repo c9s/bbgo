@@ -265,3 +265,21 @@ func v3ToGlobalTrade(trade v3.Trade) (*types.Trade, error) {
 		IsIsolated:    false,
 	}, nil
 }
+
+func toGlobalBalanceMap(events []bybitapi.WalletBalances) types.BalanceMap {
+	bm := types.BalanceMap{}
+	for _, event := range events {
+		if event.AccountType != bybitapi.AccountTypeSpot {
+			continue
+		}
+
+		for _, obj := range event.Coins {
+			bm[obj.Coin] = types.Balance{
+				Currency:  obj.Coin,
+				Available: obj.Free,
+				Locked:    obj.Locked,
+			}
+		}
+	}
+	return bm
+}
