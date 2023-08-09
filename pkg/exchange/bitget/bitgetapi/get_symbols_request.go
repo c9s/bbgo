@@ -18,8 +18,8 @@ type Symbol struct {
 	MaxTradeAmount      fixedpoint.Value `json:"maxTradeAmount"`
 	TakerFeeRate        fixedpoint.Value `json:"takerFeeRate"`
 	MakerFeeRate        fixedpoint.Value `json:"makerFeeRate"`
-	PriceScale          fixedpoint.Value `json:"priceScale"`
-	QuantityScale       fixedpoint.Value `json:"quantityScale"`
+	PriceScale          int              `json:"priceScale"`
+	QuantityScale       int              `json:"quantityScale"`
 	MinTradeUSDT        fixedpoint.Value `json:"minTradeUSDT"`
 	Status              string           `json:"status"`
 	BuyLimitPriceRatio  fixedpoint.Value `json:"buyLimitPriceRatio"`
