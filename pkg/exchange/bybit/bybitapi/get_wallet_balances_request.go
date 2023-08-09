@@ -1,8 +1,17 @@
 package bybitapi
 
 import (
+	"github.com/c9s/requestgen"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
+
+//go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Result
+//go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Result
+
+type WalletBalancesResponse struct {
+	List []WalletBalances `json:"list"`
+}
 
 type WalletBalances struct {
 	AccountType            AccountType      `json:"accountType"`
@@ -59,4 +68,25 @@ type WalletBalances struct {
 		// - This is a unique field for UNIFIED account
 		MarginCollateral bool `json:"marginCollateral"`
 	} `json:"coin"`
+}
+
+//go:generate GetRequest -url "/v5/account/wallet-balance" -type GetWalletBalancesRequest -responseDataType .WalletBalancesResponse
+type GetWalletBalancesRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	// Account type
+	// - Unified account: UNIFIED (trade spot/linear/options), CONTRACT(trade inverse)
+	// - Normal account: CONTRACT, SPOT
+	accountType AccountType `param:"accountType,query" validValues:"SPOT"`
+	// Coin name
+	// - If not passed, it returns non-zero asset info
+	// - You can pass multiple coins to query, separated by comma. USDT,USDC
+	coin *string `param:"coin,query"`
+}
+
+func (c *RestClient) NewGetWalletBalancesRequest() *GetWalletBalancesRequest {
+	return &GetWalletBalancesRequest{
+		client:      c,
+		accountType: AccountTypeSpot,
+	}
 }
