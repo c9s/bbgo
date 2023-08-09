@@ -33,7 +33,7 @@ type Stream struct {
 	types.StandardStream
 
 	bookEventCallbacks   []func(e BookEvent)
-	walletEventCallbacks []func(e []WalletEvent)
+	walletEventCallbacks []func(e []bybitapi.WalletBalances)
 	orderEventCallbacks  []func(e []OrderEvent)
 }
 
@@ -77,7 +77,7 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	case *BookEvent:
 		s.EmitBookEvent(*e)
 
-	case []WalletEvent:
+	case []bybitapi.WalletBalances:
 		s.EmitWalletEvent(e)
 
 	case []OrderEvent:
@@ -110,7 +110,7 @@ func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 			return &book, nil
 
 		case TopicTypeWallet:
-			var wallets []WalletEvent
+			var wallets []bybitapi.WalletBalances
 			return wallets, json.Unmarshal(e.WebSocketTopicEvent.Data, &wallets)
 
 		case TopicTypeOrder:
@@ -239,23 +239,8 @@ func (s *Stream) handleBookEvent(e BookEvent) {
 	}
 }
 
-func (s *Stream) handleWalletEvent(events []WalletEvent) {
-	bm := types.BalanceMap{}
-	for _, event := range events {
-		if event.AccountType != AccountTypeSpot {
-			return
-		}
-
-		for _, obj := range event.Coins {
-			bm[obj.Coin] = types.Balance{
-				Currency:  obj.Coin,
-				Available: obj.Free,
-				Locked:    obj.Locked,
-			}
-		}
-	}
-
-	s.StandardStream.EmitBalanceSnapshot(bm)
+func (s *Stream) handleWalletEvent(events []bybitapi.WalletBalances) {
+	s.StandardStream.EmitBalanceSnapshot(toGlobalBalanceMap(events))
 }
 
 func (s *Stream) handleOrderEvent(events []OrderEvent) {
