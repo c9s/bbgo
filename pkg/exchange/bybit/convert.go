@@ -283,3 +283,48 @@ func toGlobalBalanceMap(events []bybitapi.WalletBalances) types.BalanceMap {
 	}
 	return bm
 }
+
+func toLocalInterval(interval types.Interval) (string, error) {
+	if _, found := bybitapi.SupportedIntervals[interval]; !found {
+		return "", fmt.Errorf("interval not supported: %s", interval)
+	}
+
+	switch interval {
+
+	case types.Interval1d:
+		return string(bybitapi.IntervalSignDay), nil
+
+	case types.Interval1w:
+		return string(bybitapi.IntervalSignWeek), nil
+
+	case types.Interval1mo:
+		return string(bybitapi.IntervalSignMonth), nil
+
+	default:
+		return fmt.Sprintf("%d", interval.Minutes()), nil
+
+	}
+}
+
+func toGlobalKLines(symbol string, interval types.Interval, klines []bybitapi.KLine) []types.KLine {
+	gKLines := make([]types.KLine, len(klines))
+	for i, kline := range klines {
+		endTime := types.Time(kline.StartTime.Time().Add(interval.Duration()))
+		gKLines[i] = types.KLine{
+			Exchange:    types.ExchangeBybit,
+			Symbol:      symbol,
+			StartTime:   types.Time(kline.StartTime),
+			EndTime:     endTime,
+			Interval:    interval,
+			Open:        kline.Open,
+			Close:       kline.Close,
+			High:        kline.High,
+			Low:         kline.Low,
+			Volume:      kline.Volume,
+			QuoteVolume: kline.TurnOver,
+			// Bybit doesn't support close flag in REST API
+			Closed: false,
+		}
+	}
+	return gKLines
+}
