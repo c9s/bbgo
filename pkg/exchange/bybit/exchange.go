@@ -12,6 +12,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	v3 "github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi/v3"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -36,6 +37,8 @@ var (
 	log = logrus.WithFields(logrus.Fields{
 		"exchange": "bybit",
 	})
+
+	_ types.ExchangeAccountService = &Exchange{}
 )
 
 type Exchange struct {
@@ -387,6 +390,23 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	return trades, nil
+}
+
+func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+	balanceMap, err := e.QueryAccountBalances(ctx)
+	if err != nil {
+		return nil, err
+	}
+	acct := &types.Account{
+		AccountType: types.AccountTypeSpot,
+		// MakerFeeRate bybit doesn't support global maker fee rate.
+		MakerFeeRate: fixedpoint.Zero,
+		// TakerFeeRate bybit doesn't support global taker fee rate.
+		TakerFeeRate: fixedpoint.Zero,
+	}
+	acct.UpdateBalances(balanceMap)
+
+	return acct, nil
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {

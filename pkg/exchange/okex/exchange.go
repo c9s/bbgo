@@ -142,7 +142,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	}
 
 	var account = types.Account{
-		AccountType: "SPOT",
+		AccountType: types.AccountTypeSpot,
 	}
 
 	var balanceMap = toGlobalBalance(accountBalance)
