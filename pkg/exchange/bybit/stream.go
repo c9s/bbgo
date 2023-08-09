@@ -34,6 +34,7 @@ type Stream struct {
 
 	bookEventCallbacks   []func(e BookEvent)
 	walletEventCallbacks []func(e []bybitapi.WalletBalances)
+	kLineEventCallbacks  []func(e KLineEvent)
 	orderEventCallbacks  []func(e []OrderEvent)
 }
 
@@ -52,6 +53,7 @@ func NewStream(key, secret string) *Stream {
 
 	stream.OnConnect(stream.handlerConnect)
 	stream.OnBookEvent(stream.handleBookEvent)
+	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnWalletEvent(stream.handleWalletEvent)
 	stream.OnOrderEvent(stream.handleOrderEvent)
 	return stream
@@ -80,6 +82,9 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	case []bybitapi.WalletBalances:
 		s.EmitWalletEvent(e)
 
+	case *KLineEvent:
+		s.EmitKLineEvent(*e)
+
 	case []OrderEvent:
 		s.EmitOrderEvent(e)
 	}
@@ -99,6 +104,7 @@ func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 
 	case e.IsTopic():
 		switch getTopicType(e.Topic) {
+
 		case TopicTypeOrderBook:
 			var book BookEvent
 			err = json.Unmarshal(e.WebSocketTopicEvent.Data, &book)
@@ -108,6 +114,20 @@ func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 
 			book.Type = e.WebSocketTopicEvent.Type
 			return &book, nil
+
+		case TopicTypeKLine:
+			var kLines []KLine
+			err = json.Unmarshal(e.WebSocketTopicEvent.Data, &kLines)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal data into KLine: %+v, : %w", string(e.WebSocketTopicEvent.Data), err)
+			}
+
+			symbol, err := getSymbolFromTopic(e.Topic)
+			if err != nil {
+				return nil, err
+			}
+
+			return &KLineEvent{KLines: kLines, Symbol: symbol, Type: e.WebSocketTopicEvent.Type}, nil
 
 		case TopicTypeWallet:
 			var wallets []bybitapi.WalletBalances
@@ -165,7 +185,7 @@ func (s *Stream) handlerConnect() {
 		var topics []string
 
 		for _, subscription := range s.Subscriptions {
-			topic, err := convertSubscription(subscription)
+			topic, err := s.convertSubscription(subscription)
 			if err != nil {
 				log.WithError(err).Errorf("subscription convert error")
 				continue
@@ -213,17 +233,27 @@ func (s *Stream) handlerConnect() {
 	}
 }
 
-func convertSubscription(s types.Subscription) (string, error) {
-	switch s.Channel {
+func (s *Stream) convertSubscription(sub types.Subscription) (string, error) {
+	switch sub.Channel {
+
 	case types.BookChannel:
 		depth := types.DepthLevel1
-		if len(s.Options.Depth) > 0 && s.Options.Depth == types.DepthLevel50 {
+		if len(sub.Options.Depth) > 0 && sub.Options.Depth == types.DepthLevel50 {
 			depth = types.DepthLevel50
 		}
-		return genTopic(TopicTypeOrderBook, depth, s.Symbol), nil
+		return genTopic(TopicTypeOrderBook, depth, sub.Symbol), nil
+
+	case types.KLineChannel:
+		interval, err := toLocalInterval(sub.Options.Interval)
+		if err != nil {
+			return "", err
+		}
+
+		return genTopic(TopicTypeKLine, interval, sub.Symbol), nil
+
 	}
 
-	return "", fmt.Errorf("unsupported stream channel: %s", s.Channel)
+	return "", fmt.Errorf("unsupported stream channel: %s", sub.Channel)
 }
 
 func (s *Stream) handleBookEvent(e BookEvent) {
@@ -255,5 +285,25 @@ func (s *Stream) handleOrderEvent(events []OrderEvent) {
 			continue
 		}
 		s.StandardStream.EmitOrderUpdate(*gOrder)
+	}
+}
+
+func (s *Stream) handleKLineEvent(klineEvent KLineEvent) {
+	if klineEvent.Type != DataTypeSnapshot {
+		return
+	}
+
+	for _, event := range klineEvent.KLines {
+		kline, err := event.toGlobalKLine(klineEvent.Symbol)
+		if err != nil {
+			log.WithError(err).Error("failed to convert to global k line")
+			continue
+		}
+
+		if kline.Closed {
+			s.EmitKLineClosed(kline)
+		} else {
+			s.EmitKLine(kline)
+		}
 	}
 }

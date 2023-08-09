@@ -82,6 +82,7 @@ const (
 	TopicTypeOrderBook TopicType = "orderbook"
 	TopicTypeWallet    TopicType = "wallet"
 	TopicTypeOrder     TopicType = "order"
+	TopicTypeKLine     TopicType = "kline"
 )
 
 type DataType string
@@ -143,8 +144,69 @@ func getTopicType(topic string) TopicType {
 	return TopicType(slice[0])
 }
 
+func getSymbolFromTopic(topic string) (string, error) {
+	slice := strings.Split(topic, topicSeparator)
+	if len(slice) != 3 {
+		return "", fmt.Errorf("unexpected topic: %s", topic)
+	}
+	return slice[2], nil
+}
+
 type OrderEvent struct {
 	bybitapi.Order
 
 	Category bybitapi.Category `json:"category"`
+}
+
+type KLineEvent struct {
+	KLines []KLine
+
+	// internal use
+	// Type can be one of snapshot or delta. Copied from WebSocketTopicEvent.Type
+	Type DataType
+	// Symbol. Copied from WebSocketTopicEvent.Topic
+	Symbol string
+}
+
+type KLine struct {
+	// The start timestamp (ms)
+	StartTime types.MillisecondTimestamp `json:"start"`
+	// The end timestamp (ms)
+	EndTime types.MillisecondTimestamp `json:"end"`
+	// Kline interval
+	Interval   string           `json:"interval"`
+	OpenPrice  fixedpoint.Value `json:"open"`
+	ClosePrice fixedpoint.Value `json:"close"`
+	HighPrice  fixedpoint.Value `json:"high"`
+	LowPrice   fixedpoint.Value `json:"low"`
+	// Trade volume
+	Volume fixedpoint.Value `json:"volume"`
+	// Turnover.  Unit of figure: quantity of quota coin
+	Turnover fixedpoint.Value `json:"turnover"`
+	// Weather the tick is ended or not
+	Confirm bool `json:"confirm"`
+	// The timestamp (ms) of the last matched order in the candle
+	Timestamp types.MillisecondTimestamp `json:"timestamp"`
+}
+
+func (k *KLine) toGlobalKLine(symbol string) (types.KLine, error) {
+	interval, found := bybitapi.ToGlobalInterval[k.Interval]
+	if !found {
+		return types.KLine{}, fmt.Errorf("unexpected k line interval: %+v", k)
+	}
+
+	return types.KLine{
+		Exchange:    types.ExchangeBybit,
+		Symbol:      symbol,
+		StartTime:   types.Time(k.StartTime.Time()),
+		EndTime:     types.Time(k.EndTime.Time()),
+		Interval:    interval,
+		Open:        k.OpenPrice,
+		Close:       k.ClosePrice,
+		High:        k.HighPrice,
+		Low:         k.LowPrice,
+		Volume:      k.Volume,
+		QuoteVolume: k.Turnover,
+		Closed:      k.Confirm,
+	}, nil
 }

@@ -26,6 +26,16 @@ func (s *Stream) EmitWalletEvent(e []bybitapi.WalletBalances) {
 	}
 }
 
+func (s *Stream) OnKLineEvent(cb func(e KLineEvent)) {
+	s.kLineEventCallbacks = append(s.kLineEventCallbacks, cb)
+}
+
+func (s *Stream) EmitKLineEvent(e KLineEvent) {
+	for _, cb := range s.kLineEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnOrderEvent(cb func(e []OrderEvent)) {
 	s.orderEventCallbacks = append(s.orderEventCallbacks, cb)
 }
