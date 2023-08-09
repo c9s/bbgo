@@ -47,6 +47,8 @@ type Strategy struct {
 	session          *bbgo.ExchangeSession
 	watchingDeposits map[string]types.Deposit
 	mu               sync.Mutex
+
+	lastAssetDepositTimes map[string]time.Time
 }
 
 func (s *Strategy) ID() string {
@@ -74,6 +76,7 @@ func (s *Strategy) InstanceID() string {
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
 	s.watchingDeposits = make(map[string]types.Deposit)
+	s.lastAssetDepositTimes = make(map[string]time.Time)
 
 	var ok bool
 
@@ -161,7 +164,7 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 		return nil, err
 	}
 
-	// sort the recent deposit records in descending order
+	// sort the recent deposit records in ascending order
 	sort.Slice(deposits, func(i, j int) bool {
 		return deposits[i].Time.Time().Before(deposits[j].Time.Time())
 	})
@@ -183,14 +186,30 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 			switch deposit.Status {
 
 			case types.DepositSuccess:
-				// ignore all deposits that are already success
-				log.Infof("ignored succeess deposit: %s %+v", deposit.TransactionID, deposit)
-				continue
+				if depositTime, ok := s.lastAssetDepositTimes[asset]; ok {
+					// if it's newer than the latest deposit time, then we just add it the monitoring list
+					if deposit.Time.After(depositTime) {
+						log.Infof("adding new success deposit: %s", deposit.TransactionID)
+						s.watchingDeposits[deposit.TransactionID] = deposit
+					}
+				} else {
+					// ignore all initial deposit history that are already success
+					log.Infof("ignored succeess deposit: %s %+v", deposit.TransactionID, deposit)
+				}
 
 			case types.DepositCredited, types.DepositPending:
 				log.Infof("adding pending deposit: %s", deposit.TransactionID)
 				s.watchingDeposits[deposit.TransactionID] = deposit
 			}
+		}
+	}
+
+	if len(deposits) > 0 {
+		lastDeposit := deposits[len(deposits)-1]
+		if lastTime, ok := s.lastAssetDepositTimes[asset]; ok {
+			s.lastAssetDepositTimes[asset] = later(lastDeposit.Time.Time(), lastTime)
+		} else {
+			s.lastAssetDepositTimes[asset] = lastDeposit.Time.Time()
 		}
 	}
 
@@ -211,4 +230,12 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	}
 
 	return succeededDeposits, nil
+}
+
+func later(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+
+	return b
 }
