@@ -2,7 +2,9 @@
 
 package bybit
 
-import ()
+import (
+	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
+)
 
 func (s *Stream) OnBookEvent(cb func(e BookEvent)) {
 	s.bookEventCallbacks = append(s.bookEventCallbacks, cb)
@@ -14,11 +16,11 @@ func (s *Stream) EmitBookEvent(e BookEvent) {
 	}
 }
 
-func (s *Stream) OnWalletEvent(cb func(e []WalletEvent)) {
+func (s *Stream) OnWalletEvent(cb func(e []bybitapi.WalletBalances)) {
 	s.walletEventCallbacks = append(s.walletEventCallbacks, cb)
 }
 
-func (s *Stream) EmitWalletEvent(e []WalletEvent) {
+func (s *Stream) EmitWalletEvent(e []bybitapi.WalletBalances) {
 	for _, cb := range s.walletEventCallbacks {
 		cb(e)
 	}

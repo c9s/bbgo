@@ -87,3 +87,7 @@ const (
 	TimeInForceIOC TimeInForce = "IOC"
 	TimeInForceFOK TimeInForce = "FOK"
 )
+
+type AccountType string
+
+const AccountTypeSpot AccountType = "SPOT"
