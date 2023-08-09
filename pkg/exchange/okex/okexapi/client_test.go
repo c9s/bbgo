@@ -74,3 +74,34 @@ func TestClient_PlaceOrderRequest(t *testing.T) {
 	assert.NotEmpty(t, order)
 	t.Logf("order: %+v", order) // Right now account has no money
 }
+
+func TestClient_GetPendingOrderRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	srv := &TradeService{client: client}
+	req := srv.NewGetPendingOrderRequest()
+	odr_type := []string{string(OrderTypeLimit), string(OrderTypeIOC)}
+
+	pending_order, err := req.
+		InstrumentID("XTZ-BTC").
+		OrderTypes(odr_type).
+		Do(ctx)
+	assert.NoError(t, err)
+	assert.Empty(t, pending_order)
+	t.Logf("order: %+v", pending_order)
+}
+
+func TestClient_GetOrderDetailsRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	srv := &TradeService{client: client}
+	req := srv.NewGetOrderDetailsRequest()
+
+	orderDetail, err := req.
+		InstrumentID("BTC-USDT").
+		OrderID("xxx-test-order-id").
+		Do(ctx)
+	assert.Error(t, err) // Right now account has no orders
+	assert.Empty(t, orderDetail)
+	t.Logf("err: %+v", err)
+}

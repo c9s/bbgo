@@ -18,6 +18,7 @@ func toGlobalSymbol(symbol string) string {
 }
 
 // //go:generate sh -c "echo \"package okex\nvar spotSymbolMap = map[string]string{\n\" $(curl -s -L 'https://okex.com/api/v5/public/instruments?instType=SPOT' | jq -r '.data[] | \"\\(.instId | sub(\"-\" ; \"\") | tojson ): \\( .instId | tojson),\n\"') \"\n}\" > symbols.go"
+//
 //go:generate go run gensymbols.go
 func toLocalSymbol(symbol string) string {
 	if s, ok := spotSymbolMap[symbol]; ok {
@@ -223,20 +224,20 @@ func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) 
 	return orders, nil
 }
 
-func toGlobalOrderStatus(state okexapi.OrderState) (types.OrderStatus, error) {
+func toGlobalOrderStatus(state okexapi.OrderState) types.OrderStatus {
 	switch state {
 	case okexapi.OrderStateCanceled:
-		return types.OrderStatusCanceled, nil
+		return types.OrderStatusCanceled
 	case okexapi.OrderStateLive:
-		return types.OrderStatusNew, nil
+		return types.OrderStatusNew
 	case okexapi.OrderStatePartiallyFilled:
-		return types.OrderStatusPartiallyFilled, nil
+		return types.OrderStatusPartiallyFilled
 	case okexapi.OrderStateFilled:
-		return types.OrderStatusFilled, nil
+		return types.OrderStatusFilled
 
 	}
 
-	return "", fmt.Errorf("unknown or unsupported okex order state: %s", state)
+	return types.OrderStatus(state)
 }
 
 func toLocalOrderType(orderType types.OrderType) (okexapi.OrderType, error) {
@@ -255,20 +256,22 @@ func toLocalOrderType(orderType types.OrderType) (okexapi.OrderType, error) {
 	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
 }
 
-func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
+func toGlobalOrderType(orderType okexapi.OrderType) types.OrderType {
 	switch orderType {
 	case okexapi.OrderTypeMarket:
-		return types.OrderTypeMarket, nil
+		return types.OrderTypeMarket
 	case okexapi.OrderTypeLimit:
-		return types.OrderTypeLimit, nil
+		return types.OrderTypeLimit
 	case okexapi.OrderTypePostOnly:
-		return types.OrderTypeLimitMaker, nil
-
+		return types.OrderTypeLimitMaker
 	case okexapi.OrderTypeFOK:
+		return types.OrderTypeFillOrKill
 	case okexapi.OrderTypeIOC:
-
+		return types.OrderTypeIOC
+	default:
+		log.Errorf("unsupported order type: %v", orderType)
+		return ""
 	}
-	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
 }
 
 func toLocalInterval(src string) string {
