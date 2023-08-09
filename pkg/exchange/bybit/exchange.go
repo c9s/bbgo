@@ -25,10 +25,10 @@ const (
 // https://bybit-exchange.github.io/docs/zh-TW/v5/rate-limit
 // sharedRateLimiter indicates that the API belongs to the public API.
 //
-// The default order limiter apply 2 requests per second and a 2 initial bucket
-// this includes QueryMarkets, QueryTicker
+// The default order limiter apply 3 requests per second and a 2 initial bucket
+// this includes QueryMarkets, QueryTicker, QueryAccountBalances
 var (
-	sharedRateLimiter       = rate.NewLimiter(rate.Every(time.Second/2), 2)
+	sharedRateLimiter       = rate.NewLimiter(rate.Every(time.Second/3), 2)
 	tradeRateLimiter        = rate.NewLimiter(rate.Every(time.Second/5), 5)
 	orderRateLimiter        = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 	closedOrderQueryLimiter = rate.NewLimiter(rate.Every(time.Second), 1)
@@ -389,6 +389,19 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	return trades, nil
 }
 
+func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
+	if err := sharedRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query account balances rate limiter wait error: %w", err)
+	}
+
+	req := e.client.NewGetWalletBalancesRequest()
+	accounts, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalBalanceMap(accounts.List), nil
+}
 func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.key, e.secret)
 }
