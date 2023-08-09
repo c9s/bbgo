@@ -155,4 +155,11 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("apiResp: %#v", orderResp)
 	})
+
+	t.Run("GetWalletBalancesRequest", func(t *testing.T) {
+		req := client.NewGetWalletBalancesRequest().Coin("BTC")
+		apiResp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("apiResp: %+v", apiResp)
+	})
 }
