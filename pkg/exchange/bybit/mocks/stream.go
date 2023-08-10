@@ -36,19 +36,19 @@ func (m *MockMarketInfoProvider) EXPECT() *MockMarketInfoProviderMockRecorder {
 	return m.recorder
 }
 
-// GetFeeRates mocks base method.
-func (m *MockMarketInfoProvider) GetFeeRates(arg0 context.Context) (bybitapi.FeeRates, error) {
+// GetAllFeeRates mocks base method.
+func (m *MockMarketInfoProvider) GetAllFeeRates(arg0 context.Context) (bybitapi.FeeRates, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFeeRates", arg0)
+	ret := m.ctrl.Call(m, "GetAllFeeRates", arg0)
 	ret0, _ := ret[0].(bybitapi.FeeRates)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetFeeRates indicates an expected call of GetFeeRates.
-func (mr *MockMarketInfoProviderMockRecorder) GetFeeRates(arg0 interface{}) *gomock.Call {
+// GetAllFeeRates indicates an expected call of GetAllFeeRates.
+func (mr *MockMarketInfoProviderMockRecorder) GetAllFeeRates(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFeeRates", reflect.TypeOf((*MockMarketInfoProvider)(nil).GetFeeRates), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllFeeRates", reflect.TypeOf((*MockMarketInfoProvider)(nil).GetAllFeeRates), arg0)
 }
 
 // QueryMarkets mocks base method.

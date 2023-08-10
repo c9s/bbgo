@@ -29,7 +29,7 @@ var (
 
 //go:generate mockgen -destination=mocks/stream.go -package=mocks . MarketInfoProvider
 type MarketInfoProvider interface {
-	GetFeeRates(ctx context.Context) (bybitapi.FeeRates, error)
+	GetAllFeeRates(ctx context.Context) (bybitapi.FeeRates, error)
 	QueryMarkets(ctx context.Context) (types.MarketMap, error)
 }
 
@@ -46,6 +46,7 @@ type Stream struct {
 	walletEventCallbacks []func(e []bybitapi.WalletBalances)
 	kLineEventCallbacks  []func(e KLineEvent)
 	orderEventCallbacks  []func(e []OrderEvent)
+	tradeEventCallbacks  []func(e []TradeEvent)
 }
 
 func NewStream(key, secret string, marketProvider MarketInfoProvider) *Stream {
@@ -68,6 +69,7 @@ func NewStream(key, secret string, marketProvider MarketInfoProvider) *Stream {
 	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnWalletEvent(stream.handleWalletEvent)
 	stream.OnOrderEvent(stream.handleOrderEvent)
+	stream.OnTradeEvent(stream.handleTradeEvent)
 	return stream
 }
 
@@ -99,6 +101,10 @@ func (s *Stream) dispatchEvent(event interface{}) {
 
 	case []OrderEvent:
 		s.EmitOrderEvent(e)
+
+	case []TradeEvent:
+		s.EmitTradeEvent(e)
+
 	}
 }
 
@@ -148,6 +154,10 @@ func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 		case TopicTypeOrder:
 			var orders []OrderEvent
 			return orders, json.Unmarshal(e.WebSocketTopicEvent.Data, &orders)
+
+		case TopicTypeTrade:
+			var trades []TradeEvent
+			return trades, json.Unmarshal(e.WebSocketTopicEvent.Data, &trades)
 
 		}
 	}
@@ -237,6 +247,7 @@ func (s *Stream) handlerConnect() {
 			Args: []string{
 				string(TopicTypeWallet),
 				string(TopicTypeOrder),
+				string(TopicTypeTrade),
 			},
 		}); err != nil {
 			log.WithError(err).Error("failed to send subscription request")
@@ -320,6 +331,23 @@ func (s *Stream) handleKLineEvent(klineEvent KLineEvent) {
 	}
 }
 
+func (s *Stream) handleTradeEvent(events []TradeEvent) {
+	for _, event := range events {
+		feeRate, found := s.symbolFeeDetails[event.Symbol]
+		if !found {
+			log.Warnf("unexpected symbol found, fee rate not supported, symbol: %s", event.Symbol)
+			continue
+		}
+
+		gTrade, err := event.toGlobalTrade(*feeRate)
+		if err != nil {
+			log.WithError(err).Errorf("unable to convert: %+v", event)
+			continue
+		}
+		s.StandardStream.EmitTradeUpdate(*gTrade)
+	}
+}
+
 type symbolFeeDetail struct {
 	bybitapi.FeeRate
 
@@ -330,7 +358,7 @@ type symbolFeeDetail struct {
 // getAllFeeRates retrieves all fee rates from the Bybit API and then fetches markets to ensure the base coin and quote coin
 // are correct.
 func (e *Stream) getAllFeeRates(ctx context.Context) error {
-	feeRates, err := e.marketProvider.GetFeeRates(ctx)
+	feeRates, err := e.marketProvider.GetAllFeeRates(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to call get fee rates: %w", err)
 	}
