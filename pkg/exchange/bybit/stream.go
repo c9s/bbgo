@@ -27,10 +27,20 @@ var (
 	wsAuthRequest = 10 * time.Second
 )
 
+//go:generate mockgen -destination=mocks/stream.go -package=mocks . MarketInfoProvider
+type MarketInfoProvider interface {
+	GetFeeRates(ctx context.Context) (bybitapi.FeeRates, error)
+	QueryMarkets(ctx context.Context) (types.MarketMap, error)
+}
+
 //go:generate callbackgen -type Stream
 type Stream struct {
-	key, secret string
 	types.StandardStream
+
+	key, secret    string
+	marketProvider MarketInfoProvider
+	// TODO: update the fee rate at 7:00 am UTC; rotation required.
+	symbolFeeDetails map[string]*symbolFeeDetail
 
 	bookEventCallbacks   []func(e BookEvent)
 	walletEventCallbacks []func(e []bybitapi.WalletBalances)
@@ -38,20 +48,22 @@ type Stream struct {
 	orderEventCallbacks  []func(e []OrderEvent)
 }
 
-func NewStream(key, secret string) *Stream {
+func NewStream(key, secret string, marketProvider MarketInfoProvider) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
 		// pragma: allowlist nextline secret
-		key:    key,
-		secret: secret,
+		key:            key,
+		secret:         secret,
+		marketProvider: marketProvider,
 	}
 
 	stream.SetEndpointCreator(stream.createEndpoint)
 	stream.SetParser(stream.parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetHeartBeat(stream.ping)
-
+	stream.SetBeforeConnect(stream.getAllFeeRates)
 	stream.OnConnect(stream.handlerConnect)
+
 	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnWalletEvent(stream.handleWalletEvent)
@@ -306,4 +318,54 @@ func (s *Stream) handleKLineEvent(klineEvent KLineEvent) {
 			s.EmitKLine(kline)
 		}
 	}
+}
+
+type symbolFeeDetail struct {
+	bybitapi.FeeRate
+
+	BaseCoin  string
+	QuoteCoin string
+}
+
+// getAllFeeRates retrieves all fee rates from the Bybit API and then fetches markets to ensure the base coin and quote coin
+// are correct.
+func (e *Stream) getAllFeeRates(ctx context.Context) error {
+	feeRates, err := e.marketProvider.GetFeeRates(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to call get fee rates: %w", err)
+	}
+
+	symbolMap := map[string]*symbolFeeDetail{}
+	for _, f := range feeRates.List {
+		if _, found := symbolMap[f.Symbol]; !found {
+			symbolMap[f.Symbol] = &symbolFeeDetail{FeeRate: f}
+		}
+	}
+
+	mkts, err := e.marketProvider.QueryMarkets(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get markets: %w", err)
+	}
+
+	// update base coin, quote coin into symbolFeeDetail
+	for _, mkt := range mkts {
+		feeRate, found := symbolMap[mkt.Symbol]
+		if !found {
+			continue
+		}
+
+		feeRate.BaseCoin = mkt.BaseCurrency
+		feeRate.QuoteCoin = mkt.QuoteCurrency
+	}
+
+	// remove trading pairs that are not present in spot market.
+	for k, v := range symbolMap {
+		if len(v.BaseCoin) == 0 || len(v.QuoteCoin) == 0 {
+			log.Debugf("related market not found: %s, skipping the associated trade", k)
+			delete(symbolMap, k)
+		}
+	}
+
+	e.symbolFeeDetails = symbolMap
+	return nil
 }

@@ -490,7 +490,7 @@ func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 	return ok
 }
 
-func (e *Exchange) GetFeeRates(ctx context.Context) (bybitapi.FeeRates, error) {
+func (e *Exchange) GetAllFeeRates(ctx context.Context) (bybitapi.FeeRates, error) {
 	if err := sharedRateLimiter.Wait(ctx); err != nil {
 		return bybitapi.FeeRates{}, fmt.Errorf("query fee rate limiter wait error: %w", err)
 	}
@@ -503,5 +503,5 @@ func (e *Exchange) GetFeeRates(ctx context.Context) (bybitapi.FeeRates, error) {
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e.key, e.secret)
+	return NewStream(e.key, e.secret, e)
 }
