@@ -99,6 +99,17 @@ func TestStream(t *testing.T) {
 		c := make(chan struct{})
 		<-c
 	})
+
+	t.Run("trade test", func(t *testing.T) {
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnTradeUpdate(func(trade types.Trade) {
+			t.Log("got update", trade)
+		})
+		c := make(chan struct{})
+		<-c
+	})
 }
 
 func TestStream_parseWebSocketEvent(t *testing.T) {
@@ -364,7 +375,7 @@ func TestStream_getFeeRate(t *testing.T) {
 			},
 		}
 
-		mockMarketProvider.EXPECT().GetFeeRates(ctx).Return(feeRates, nil).Times(1)
+		mockMarketProvider.EXPECT().GetAllFeeRates(ctx).Return(feeRates, nil).Times(1)
 		mockMarketProvider.EXPECT().QueryMarkets(ctx).Return(mkts, nil).Times(1)
 
 		expFeeRates := map[string]*symbolFeeDetail{
@@ -379,7 +390,7 @@ func TestStream_getFeeRate(t *testing.T) {
 				QuoteCoin: "USDT",
 			},
 		}
-		err := s.getFeeRate(ctx)
+		err := s.getAllFeeRates(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, expFeeRates, s.symbolFeeDetails)
 	})
@@ -411,10 +422,10 @@ func TestStream_getFeeRate(t *testing.T) {
 			},
 		}
 
-		mockMarketProvider.EXPECT().GetFeeRates(ctx).Return(feeRates, nil).Times(1)
+		mockMarketProvider.EXPECT().GetAllFeeRates(ctx).Return(feeRates, nil).Times(1)
 		mockMarketProvider.EXPECT().QueryMarkets(ctx).Return(nil, unknownErr).Times(1)
 
-		err := s.getFeeRate(ctx)
+		err := s.getAllFeeRates(ctx)
 		assert.Equal(t, fmt.Errorf("failed to get markets: %w", unknownErr), err)
 		assert.Equal(t, map[string]*symbolFeeDetail(nil), s.symbolFeeDetails)
 	})
@@ -427,9 +438,9 @@ func TestStream_getFeeRate(t *testing.T) {
 
 		ctx := context.Background()
 
-		mockMarketProvider.EXPECT().GetFeeRates(ctx).Return(bybitapi.FeeRates{}, unknownErr).Times(1)
+		mockMarketProvider.EXPECT().GetAllFeeRates(ctx).Return(bybitapi.FeeRates{}, unknownErr).Times(1)
 
-		err := s.getFeeRate(ctx)
+		err := s.getAllFeeRates(ctx)
 		assert.Equal(t, fmt.Errorf("failed to call get fee rates: %w", unknownErr), err)
 		assert.Equal(t, map[string]*symbolFeeDetail(nil), s.symbolFeeDetails)
 	})
