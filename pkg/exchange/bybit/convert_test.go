@@ -459,3 +459,88 @@ func Test_toGlobalTrade(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, res, &exp)
 }
+
+func Test_toGlobalKLines(t *testing.T) {
+	symbol := "BTCUSDT"
+	interval := types.Interval15m
+
+	resp := bybitapi.KLinesResponse{
+		Symbol: symbol,
+		List: []bybitapi.KLine{
+			/*
+				[
+					{
+						"StartTime": "2023-08-08 17:30:00 +0800 CST",
+						"OpenPrice": 29045.3,
+						"HighPrice": 29228.56,
+						"LowPrice": 29045.3,
+						"ClosePrice": 29228.56,
+						"Volume": 9.265593,
+						"TurnOver": 270447.43520753
+					},
+					{
+						"StartTime": "2023-08-08 17:15:00 +0800 CST",
+						"OpenPrice": 29167.33,
+						"HighPrice": 29229.08,
+						"LowPrice": 29000,
+						"ClosePrice": 29045.3,
+						"Volume": 9.295508,
+						"TurnOver": 270816.87513775
+					}
+				]
+			*/
+			{
+				StartTime: types.NewMillisecondTimestampFromInt(1691486100000),
+				Open:      fixedpoint.NewFromFloat(29045.3),
+				High:      fixedpoint.NewFromFloat(29228.56),
+				Low:       fixedpoint.NewFromFloat(29045.3),
+				Close:     fixedpoint.NewFromFloat(29228.56),
+				Volume:    fixedpoint.NewFromFloat(9.265593),
+				TurnOver:  fixedpoint.NewFromFloat(270447.43520753),
+			},
+			{
+				StartTime: types.NewMillisecondTimestampFromInt(1691487000000),
+				Open:      fixedpoint.NewFromFloat(29167.33),
+				High:      fixedpoint.NewFromFloat(29229.08),
+				Low:       fixedpoint.NewFromFloat(29000),
+				Close:     fixedpoint.NewFromFloat(29045.3),
+				Volume:    fixedpoint.NewFromFloat(9.295508),
+				TurnOver:  fixedpoint.NewFromFloat(270816.87513775),
+			},
+		},
+		Category: bybitapi.CategorySpot,
+	}
+
+	expKlines := []types.KLine{
+		{
+			Exchange:    types.ExchangeBybit,
+			Symbol:      resp.Symbol,
+			StartTime:   types.Time(resp.List[0].StartTime.Time()),
+			EndTime:     types.Time(resp.List[0].StartTime.Time().Add(interval.Duration())),
+			Interval:    interval,
+			Open:        fixedpoint.NewFromFloat(29045.3),
+			Close:       fixedpoint.NewFromFloat(29228.56),
+			High:        fixedpoint.NewFromFloat(29228.56),
+			Low:         fixedpoint.NewFromFloat(29045.3),
+			Volume:      fixedpoint.NewFromFloat(9.265593),
+			QuoteVolume: fixedpoint.NewFromFloat(270447.43520753),
+			Closed:      false,
+		},
+		{
+			Exchange:    types.ExchangeBybit,
+			Symbol:      resp.Symbol,
+			StartTime:   types.Time(resp.List[1].StartTime.Time()),
+			EndTime:     types.Time(resp.List[1].StartTime.Time().Add(interval.Duration())),
+			Interval:    interval,
+			Open:        fixedpoint.NewFromFloat(29167.33),
+			Close:       fixedpoint.NewFromFloat(29045.3),
+			High:        fixedpoint.NewFromFloat(29229.08),
+			Low:         fixedpoint.NewFromFloat(29000),
+			Volume:      fixedpoint.NewFromFloat(9.295508),
+			QuoteVolume: fixedpoint.NewFromFloat(270816.87513775),
+			Closed:      false,
+		},
+	}
+
+	assert.Equal(t, toGlobalKLines(symbol, interval, resp.List), expKlines)
+}

@@ -2,6 +2,7 @@ package bybit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -72,6 +73,23 @@ func TestStream(t *testing.T) {
 
 		s.OnOrderUpdate(func(order types.Order) {
 			t.Log("got update", order)
+		})
+		c := make(chan struct{})
+		<-c
+	})
+
+	t.Run("kline test", func(t *testing.T) {
+		s.Subscribe(types.KLineChannel, "BTCUSDT", types.SubscribeOptions{
+			Interval: types.Interval30m,
+			Depth:    "",
+			Speed:    "",
+		})
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnKLine(func(kline types.KLine) {
+			t.Log(kline)
 		})
 		c := make(chan struct{})
 		<-c
@@ -151,6 +169,80 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 		}, *book)
 	})
 
+	t.Run("TopicTypeKLine with snapshot", func(t *testing.T) {
+		input := `{
+    "topic": "kline.5.BTCUSDT",
+    "data": [
+        {
+            "start": 1672324800000,
+            "end": 1672325099999,
+            "interval": "5",
+            "open": "16649.5",
+            "close": "16677",
+            "high": "16677",
+            "low": "16608",
+            "volume": "2.081",
+            "turnover": "34666.4005",
+            "confirm": false,
+            "timestamp": 1672324988882
+        }
+    ],
+    "ts": 1672324988882,
+    "type": "snapshot"
+}`
+
+		res, err := s.parseWebSocketEvent([]byte(input))
+		assert.NoError(t, err)
+		book, ok := res.(*KLineEvent)
+		assert.True(t, ok)
+		assert.Equal(t, KLineEvent{
+			Symbol: "BTCUSDT",
+			Type:   DataTypeSnapshot,
+			KLines: []KLine{
+				{
+					StartTime:  types.NewMillisecondTimestampFromInt(1672324800000),
+					EndTime:    types.NewMillisecondTimestampFromInt(1672325099999),
+					Interval:   "5",
+					OpenPrice:  fixedpoint.NewFromFloat(16649.5),
+					ClosePrice: fixedpoint.NewFromFloat(16677),
+					HighPrice:  fixedpoint.NewFromFloat(16677),
+					LowPrice:   fixedpoint.NewFromFloat(16608),
+					Volume:     fixedpoint.NewFromFloat(2.081),
+					Turnover:   fixedpoint.NewFromFloat(34666.4005),
+					Confirm:    false,
+					Timestamp:  types.NewMillisecondTimestampFromInt(1672324988882),
+				},
+			},
+		}, *book)
+	})
+
+	t.Run("TopicTypeKLine with invalid topic", func(t *testing.T) {
+		input := `{
+    "topic": "kline.5",
+    "data": [
+        {
+            "start": 1672324800000,
+            "end": 1672325099999,
+            "interval": "5",
+            "open": "16649.5",
+            "close": "16677",
+            "high": "16677",
+            "low": "16608",
+            "volume": "2.081",
+            "turnover": "34666.4005",
+            "confirm": false,
+            "timestamp": 1672324988882
+        }
+    ],
+    "ts": 1672324988882,
+    "type": "snapshot"
+}`
+
+		res, err := s.parseWebSocketEvent([]byte(input))
+		assert.Equal(t, errors.New("unexpected topic: kline.5"), err)
+		assert.Nil(t, res)
+	})
+
 	t.Run("Parse fails", func(t *testing.T) {
 		input := `{
 			   "topic":"orderbook.50.BTCUSDT",
@@ -168,8 +260,9 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 }
 
 func Test_convertSubscription(t *testing.T) {
+	s := Stream{}
 	t.Run("BookChannel.DepthLevel1", func(t *testing.T) {
-		res, err := convertSubscription(types.Subscription{
+		res, err := s.convertSubscription(types.Subscription{
 			Symbol:  "BTCUSDT",
 			Channel: types.BookChannel,
 			Options: types.SubscribeOptions{
@@ -180,7 +273,7 @@ func Test_convertSubscription(t *testing.T) {
 		assert.Equal(t, genTopic(TopicTypeOrderBook, types.DepthLevel1, "BTCUSDT"), res)
 	})
 	t.Run("BookChannel. with default depth", func(t *testing.T) {
-		res, err := convertSubscription(types.Subscription{
+		res, err := s.convertSubscription(types.Subscription{
 			Symbol:  "BTCUSDT",
 			Channel: types.BookChannel,
 		})
@@ -188,7 +281,7 @@ func Test_convertSubscription(t *testing.T) {
 		assert.Equal(t, genTopic(TopicTypeOrderBook, types.DepthLevel1, "BTCUSDT"), res)
 	})
 	t.Run("BookChannel.DepthLevel50", func(t *testing.T) {
-		res, err := convertSubscription(types.Subscription{
+		res, err := s.convertSubscription(types.Subscription{
 			Symbol:  "BTCUSDT",
 			Channel: types.BookChannel,
 			Options: types.SubscribeOptions{
@@ -199,7 +292,7 @@ func Test_convertSubscription(t *testing.T) {
 		assert.Equal(t, genTopic(TopicTypeOrderBook, types.DepthLevel50, "BTCUSDT"), res)
 	})
 	t.Run("BookChannel. not support depth, use default level 1", func(t *testing.T) {
-		res, err := convertSubscription(types.Subscription{
+		res, err := s.convertSubscription(types.Subscription{
 			Symbol:  "BTCUSDT",
 			Channel: types.BookChannel,
 			Options: types.SubscribeOptions{
@@ -211,7 +304,7 @@ func Test_convertSubscription(t *testing.T) {
 	})
 
 	t.Run("unsupported channel", func(t *testing.T) {
-		res, err := convertSubscription(types.Subscription{
+		res, err := s.convertSubscription(types.Subscription{
 			Symbol:  "BTCUSDT",
 			Channel: "unsupported",
 		})

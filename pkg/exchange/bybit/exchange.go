@@ -19,6 +19,7 @@ import (
 const (
 	maxOrderIdLen     = 36
 	defaultQueryLimit = 50
+	defaultKLineLimit = 1000
 
 	halfYearDuration = 6 * 30 * 24 * time.Hour
 )
@@ -38,7 +39,12 @@ var (
 		"exchange": "bybit",
 	})
 
-	_ types.ExchangeAccountService = &Exchange{}
+	_ types.ExchangeAccountService    = &Exchange{}
+	_ types.ExchangeMarketDataService = &Exchange{}
+	_ types.CustomIntervalProvider    = &Exchange{}
+	_ types.ExchangeMinimal           = &Exchange{}
+	_ types.ExchangeTradeService      = &Exchange{}
+	_ types.Exchange                  = &Exchange{}
 )
 
 type Exchange struct {
@@ -422,6 +428,68 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 
 	return toGlobalBalanceMap(accounts.List), nil
 }
+
+/*
+QueryKLines queries for historical klines (also known as candles/candlesticks). Charts are returned in groups based
+on the requested interval.
+
+A k-line's start time is inclusive, but end time is not(startTime + interval - 1 millisecond).
+e.q. 15m interval k line can be represented as 00:00:00.000 ~ 00:14:59.999
+*/
+func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+	req := e.client.NewGetKLinesRequest().Symbol(symbol)
+	intervalStr, err := toLocalInterval(interval)
+	if err != nil {
+		return nil, err
+	}
+	req.Interval(intervalStr)
+
+	limit := uint64(options.Limit)
+	if limit > defaultKLineLimit || limit <= 0 {
+		log.Debugf("limtit is exceeded or zero, update to %d, got: %d", defaultKLineLimit, options.Limit)
+		limit = defaultKLineLimit
+	}
+	req.Limit(limit)
+
+	if options.StartTime != nil {
+		req.StartTime(*options.StartTime)
+	}
+
+	if options.EndTime != nil {
+		req.EndTime(*options.EndTime)
+	}
+
+	if err := sharedRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query klines rate limiter wait error: %w", err)
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call k line, err: %w", err)
+	}
+
+	if resp.Category != bybitapi.CategorySpot {
+		return nil, fmt.Errorf("unexpected category: %s", resp.Category)
+	}
+
+	if resp.Symbol != symbol {
+		return nil, fmt.Errorf("unexpected symbol: %s, exp: %s", resp.Category, symbol)
+	}
+
+	kLines := toGlobalKLines(symbol, interval, resp.List)
+	return types.SortKLinesAscending(kLines), nil
+
+}
+
+func (e *Exchange) SupportedInterval() map[types.Interval]int {
+	return bybitapi.SupportedIntervals
+}
+
+func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
+	_, ok := bybitapi.SupportedIntervals[interval]
+	return ok
+}
+
 func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.key, e.secret)
 }
