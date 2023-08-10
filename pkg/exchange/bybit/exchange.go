@@ -27,10 +27,10 @@ const (
 // https://bybit-exchange.github.io/docs/zh-TW/v5/rate-limit
 // sharedRateLimiter indicates that the API belongs to the public API.
 //
-// The default order limiter apply 3 requests per second and a 2 initial bucket
-// this includes QueryMarkets, QueryTicker, QueryAccountBalances
+// The default order limiter apply 5 requests per second and a 5 initial bucket
+// this includes QueryMarkets, QueryTicker, QueryAccountBalances, GetFeeRates
 var (
-	sharedRateLimiter       = rate.NewLimiter(rate.Every(time.Second/3), 2)
+	sharedRateLimiter       = rate.NewLimiter(rate.Every(time.Second/5), 5)
 	tradeRateLimiter        = rate.NewLimiter(rate.Every(time.Second/5), 5)
 	orderRateLimiter        = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 	closedOrderQueryLimiter = rate.NewLimiter(rate.Every(time.Second), 1)
@@ -488,6 +488,18 @@ func (e *Exchange) SupportedInterval() map[types.Interval]int {
 func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 	_, ok := bybitapi.SupportedIntervals[interval]
 	return ok
+}
+
+func (e *Exchange) GetFeeRates(ctx context.Context) (bybitapi.FeeRates, error) {
+	if err := sharedRateLimiter.Wait(ctx); err != nil {
+		return bybitapi.FeeRates{}, fmt.Errorf("query fee rate limiter wait error: %w", err)
+	}
+	feeRates, err := e.client.NewGetFeeRatesRequest().Do(ctx)
+	if err != nil {
+		return bybitapi.FeeRates{}, fmt.Errorf("failed to get fee rates, err: %w", err)
+	}
+
+	return *feeRates, nil
 }
 
 func (e *Exchange) NewStream() types.Stream {
