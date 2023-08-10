@@ -173,4 +173,11 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("apiResp: %+v", apiResp.List)
 	})
+
+	t.Run("GetFeeRatesRequest", func(t *testing.T) {
+		req := client.NewGetFeeRatesRequest()
+		apiResp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("apiResp: %+v", apiResp)
+	})
 }
