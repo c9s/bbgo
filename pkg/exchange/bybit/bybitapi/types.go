@@ -1,5 +1,41 @@
 package bybitapi
 
+import "github.com/c9s/bbgo/pkg/types"
+
+var (
+	SupportedIntervals = map[types.Interval]int{
+		types.Interval1m:  1 * 60,
+		types.Interval3m:  3 * 60,
+		types.Interval5m:  5 * 60,
+		types.Interval15m: 15 * 60,
+		types.Interval30m: 30 * 60,
+		types.Interval1h:  60 * 60,
+		types.Interval2h:  60 * 60 * 2,
+		types.Interval4h:  60 * 60 * 4,
+		types.Interval6h:  60 * 60 * 6,
+		types.Interval12h: 60 * 60 * 12,
+		types.Interval1d:  60 * 60 * 24,
+		types.Interval1w:  60 * 60 * 24 * 7,
+		types.Interval1mo: 60 * 60 * 24 * 30,
+	}
+
+	ToGlobalInterval = map[string]types.Interval{
+		"1":   types.Interval1m,
+		"3":   types.Interval3m,
+		"5":   types.Interval5m,
+		"15":  types.Interval15m,
+		"30":  types.Interval30m,
+		"60":  types.Interval1h,
+		"120": types.Interval2h,
+		"240": types.Interval4h,
+		"360": types.Interval6h,
+		"720": types.Interval12h,
+		"D":   types.Interval1d,
+		"W":   types.Interval1w,
+		"M":   types.Interval1mo,
+	}
+)
+
 type Category string
 
 const (

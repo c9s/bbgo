@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -161,5 +162,15 @@ func TestClient(t *testing.T) {
 		apiResp, err := req.Do(ctx)
 		assert.NoError(t, err)
 		t.Logf("apiResp: %+v", apiResp)
+	})
+
+	t.Run("GetKLinesRequest", func(t *testing.T) {
+		startTime := time.Date(2023, 8, 8, 9, 28, 0, 0, time.UTC)
+		endTime := time.Date(2023, 8, 8, 9, 45, 0, 0, time.UTC)
+		req := client.NewGetKLinesRequest().
+			Symbol("BTCUSDT").Interval("15").StartTime(startTime).EndTime(endTime)
+		apiResp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("apiResp: %+v", apiResp.List)
 	})
 }

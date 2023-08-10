@@ -386,3 +386,74 @@ func Test_getTopicName(t *testing.T) {
 	exp := TopicTypeOrderBook
 	assert.Equal(t, exp, getTopicType("orderbook.50.BTCUSDT"))
 }
+
+func Test_getSymbolFromTopic(t *testing.T) {
+	t.Run("succeeds", func(t *testing.T) {
+		exp := "BTCUSDT"
+		res, err := getSymbolFromTopic("kline.1.BTCUSDT")
+		assert.NoError(t, err)
+		assert.Equal(t, exp, res)
+	})
+
+	t.Run("unexpected topic", func(t *testing.T) {
+		res, err := getSymbolFromTopic("kline.1")
+		assert.Empty(t, res)
+		assert.Equal(t, err, fmt.Errorf("unexpected topic: kline.1"))
+	})
+}
+
+func TestKLine_toGlobalKLine(t *testing.T) {
+	t.Run("succeeds", func(t *testing.T) {
+		k := KLine{
+			StartTime:  types.NewMillisecondTimestampFromInt(1691486100000),
+			EndTime:    types.NewMillisecondTimestampFromInt(1691487000000),
+			Interval:   "1",
+			OpenPrice:  fixedpoint.NewFromFloat(29045.3),
+			ClosePrice: fixedpoint.NewFromFloat(29228.56),
+			HighPrice:  fixedpoint.NewFromFloat(29228.56),
+			LowPrice:   fixedpoint.NewFromFloat(29045.3),
+			Volume:     fixedpoint.NewFromFloat(9.265593),
+			Turnover:   fixedpoint.NewFromFloat(270447.43520753),
+			Confirm:    false,
+			Timestamp:  types.NewMillisecondTimestampFromInt(1691486100000),
+		}
+
+		gKline, err := k.toGlobalKLine("BTCUSDT")
+		assert.NoError(t, err)
+
+		assert.Equal(t, types.KLine{
+			Exchange:    types.ExchangeBybit,
+			Symbol:      "BTCUSDT",
+			StartTime:   types.Time(k.StartTime.Time()),
+			EndTime:     types.Time(k.EndTime.Time()),
+			Interval:    types.Interval1m,
+			Open:        fixedpoint.NewFromFloat(29045.3),
+			Close:       fixedpoint.NewFromFloat(29228.56),
+			High:        fixedpoint.NewFromFloat(29228.56),
+			Low:         fixedpoint.NewFromFloat(29045.3),
+			Volume:      fixedpoint.NewFromFloat(9.265593),
+			QuoteVolume: fixedpoint.NewFromFloat(270447.43520753),
+			Closed:      false,
+		}, gKline)
+	})
+
+	t.Run("interval not supported", func(t *testing.T) {
+		k := KLine{
+			StartTime:  types.NewMillisecondTimestampFromInt(1691486100000),
+			EndTime:    types.NewMillisecondTimestampFromInt(1691487000000),
+			Interval:   "112",
+			OpenPrice:  fixedpoint.NewFromFloat(29045.3),
+			ClosePrice: fixedpoint.NewFromFloat(29228.56),
+			HighPrice:  fixedpoint.NewFromFloat(29228.56),
+			LowPrice:   fixedpoint.NewFromFloat(29045.3),
+			Volume:     fixedpoint.NewFromFloat(9.265593),
+			Turnover:   fixedpoint.NewFromFloat(270447.43520753),
+			Confirm:    false,
+			Timestamp:  types.NewMillisecondTimestampFromInt(1691486100000),
+		}
+
+		gKline, err := k.toGlobalKLine("BTCUSDT")
+		assert.Equal(t, fmt.Errorf("unexpected k line interval: %+v", &k), err)
+		assert.Equal(t, gKline, types.KLine{})
+	})
+}
