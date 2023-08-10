@@ -44,6 +44,8 @@ type Dispatcher func(e interface{})
 // HeartBeat keeps connection alive by sending the heartbeat packet.
 type HeartBeat func(ctxConn context.Context, conn *websocket.Conn, cancelConn context.CancelFunc)
 
+type BeforeConnect func(ctx context.Context) error
+
 //go:generate callbackgen -type StandardStream -interface
 type StandardStream struct {
 	parser     Parser
@@ -111,6 +113,8 @@ type StandardStream struct {
 	FuturesPositionSnapshotCallbacks []func(futuresPositions FuturesPositionMap)
 
 	heartBeat HeartBeat
+
+	beforeConnect BeforeConnect
 }
 
 type StandardStreamEmitter interface {
@@ -306,6 +310,11 @@ func (s *StandardStream) Reconnect() {
 
 // Connect starts the stream and create the websocket connection
 func (s *StandardStream) Connect(ctx context.Context) error {
+	if s.beforeConnect != nil {
+		if err := s.beforeConnect(ctx); err != nil {
+			return err
+		}
+	}
 	err := s.DialAndConnect(ctx)
 	if err != nil {
 		return err
@@ -430,6 +439,11 @@ func (s *StandardStream) Close() error {
 // SetHeartBeat sets the custom heart beat implementation if needed
 func (s *StandardStream) SetHeartBeat(fn HeartBeat) {
 	s.heartBeat = fn
+}
+
+// SetBeforeConnect sets the custom hook function before connect
+func (s *StandardStream) SetBeforeConnect(fn BeforeConnect) {
+	s.beforeConnect = fn
 }
 
 type Depth string
