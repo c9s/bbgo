@@ -3,6 +3,7 @@ package bybit
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
@@ -83,6 +84,7 @@ const (
 	TopicTypeWallet    TopicType = "wallet"
 	TopicTypeOrder     TopicType = "order"
 	TopicTypeKLine     TopicType = "kline"
+	TopicTypeTrade     TopicType = "execution"
 )
 
 type DataType string
@@ -209,4 +211,147 @@ func (k *KLine) toGlobalKLine(symbol string) (types.KLine, error) {
 		QuoteVolume: k.Turnover,
 		Closed:      k.Confirm,
 	}, nil
+}
+
+type TradeEvent struct {
+	// linear and inverse order id format: 42f4f364-82e1-49d3-ad1d-cd8cf9aa308d (UUID format)
+	// spot: 1468264727470772736 (only numbers)
+	// we only use spot trading.
+	OrderId     string            `json:"orderId"`
+	OrderLinkId string            `json:"orderLinkId"`
+	Category    bybitapi.Category `json:"category"`
+	Symbol      string            `json:"symbol"`
+	ExecId      string            `json:"execId"`
+	ExecPrice   fixedpoint.Value  `json:"execPrice"`
+	ExecQty     fixedpoint.Value  `json:"execQty"`
+
+	// Is maker order. true: maker, false: taker
+	IsMaker bool `json:"isMaker"`
+	// Paradigm block trade ID
+	BlockTradeId string `json:"blockTradeId"`
+	// Order type. Market,Limit
+	OrderType bybitapi.OrderType `json:"orderType"`
+	// 	Side. Buy,Sell
+	Side bybitapi.Side `json:"side"`
+	// 	Executed timestamp（ms）
+	ExecTime types.MillisecondTimestamp `json:"execTime"`
+	// 	Closed position size
+	ClosedSize fixedpoint.Value `json:"closedSize"`
+
+	/* The following parameters do not support SPOT trading. */
+	// Executed trading fee. You can get spot fee currency instruction here. Normal spot is not supported
+	ExecFee fixedpoint.Value `json:"execFee"`
+	// Executed type. Normal spot is not supported
+	ExecType string `json:"execType"`
+	// Executed order value. Normal spot is not supported
+	ExecValue fixedpoint.Value `json:"execValue"`
+	// Trading fee rate. Normal spot is not supported
+	FeeRate fixedpoint.Value `json:"feeRate"`
+	// The remaining qty not executed. Normal spot is not supported
+	LeavesQty fixedpoint.Value `json:"leavesQty"`
+	// Order price. Normal spot is not supported
+	OrderPrice fixedpoint.Value `json:"orderPrice"`
+	// Order qty. Normal spot is not supported
+	OrderQty fixedpoint.Value `json:"orderQty"`
+	// Stop order type. If the order is not stop order, any type is not returned. Normal spot is not supported
+	StopOrderType string `json:"stopOrderType"`
+	// Whether to borrow. Unified spot only. 0: false, 1: true. . Normal spot is not supported, always 0
+	IsLeverage string `json:"isLeverage"`
+	// Implied volatility of mark price. Valid for option
+	MarkIv string `json:"markIv"`
+	// The mark price of the symbol when executing. Valid for option
+	MarkPrice fixedpoint.Value `json:"markPrice"`
+	// The index price of the symbol when executing. Valid for option
+	IndexPrice fixedpoint.Value `json:"indexPrice"`
+	// The underlying price of the symbol when executing. Valid for option
+	UnderlyingPrice fixedpoint.Value `json:"underlyingPrice"`
+	// Implied volatility. Valid for option
+	TradeIv string `json:"tradeIv"`
+}
+
+func (t *TradeEvent) toGlobalTrade(symbolFee symbolFeeDetail) (*types.Trade, error) {
+	if t.Category != bybitapi.CategorySpot {
+		return nil, fmt.Errorf("unexected category: %s", t.Category)
+	}
+
+	side, err := toGlobalSideType(t.Side)
+	if err != nil {
+		return nil, err
+	}
+
+	orderIdNum, err := strconv.ParseUint(t.OrderId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected order id: %s, err: %w", t.OrderId, err)
+	}
+
+	execIdNum, err := strconv.ParseUint(t.ExecId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected exec id: %s, err: %w", t.ExecId, err)
+	}
+
+	trade := &types.Trade{
+		ID:            execIdNum,
+		OrderID:       orderIdNum,
+		Exchange:      types.ExchangeBybit,
+		Price:         t.ExecPrice,
+		Quantity:      t.ExecQty,
+		QuoteQuantity: t.ExecPrice.Mul(t.ExecQty),
+		Symbol:        t.Symbol,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       t.IsMaker,
+		Time:          types.Time(t.ExecTime),
+		Fee:           fixedpoint.Zero,
+		FeeCurrency:   "",
+	}
+	trade.FeeCurrency, trade.Fee = calculateFee(*t, symbolFee)
+	return trade, nil
+}
+
+// CalculateFee given isMaker to get the fee currency and fee.
+// https://bybit-exchange.github.io/docs/v5/enum#spot-fee-currency-instruction
+//
+// with the example of BTCUSDT:
+//
+// Is makerFeeRate positive?
+//
+//   - TRUE
+//     Side = Buy -> base currency (BTC)
+//     Side = Sell -> quote currency (USDT)
+//
+//   - FALSE
+//     IsMakerOrder = TRUE
+//     -> Side = Buy -> quote currency (USDT)
+//     -> Side = Sell -> base currency (BTC)
+//
+//     IsMakerOrder = FALSE
+//     -> Side = Buy -> base currency (BTC)
+//     -> Side = Sell -> quote currency (USDT)
+func calculateFee(t TradeEvent, feeDetail symbolFeeDetail) (string, fixedpoint.Value) {
+	if feeDetail.MakerFeeRate.Sign() > 0 || !t.IsMaker {
+		if t.Side == bybitapi.SideBuy {
+			return feeDetail.BaseCoin, baseCoinAsFee(t, feeDetail)
+		}
+		return feeDetail.QuoteCoin, quoteCoinAsFee(t, feeDetail)
+	}
+
+	if t.Side == bybitapi.SideBuy {
+		return feeDetail.QuoteCoin, quoteCoinAsFee(t, feeDetail)
+	}
+	return feeDetail.BaseCoin, baseCoinAsFee(t, feeDetail)
+}
+
+func baseCoinAsFee(t TradeEvent, feeDetail symbolFeeDetail) fixedpoint.Value {
+	if t.IsMaker {
+		return feeDetail.MakerFeeRate.Mul(t.ExecQty)
+	}
+	return feeDetail.TakerFeeRate.Mul(t.ExecQty)
+}
+
+func quoteCoinAsFee(t TradeEvent, feeDetail symbolFeeDetail) fixedpoint.Value {
+	baseFee := t.ExecPrice.Mul(t.ExecQty)
+	if t.IsMaker {
+		return feeDetail.MakerFeeRate.Mul(baseFee)
+	}
+	return feeDetail.TakerFeeRate.Mul(baseFee)
 }
