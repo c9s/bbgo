@@ -351,37 +351,18 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	req.InstrumentID(q.Symbol).
 		OrderID(q.OrderID).
 		ClientOrderID(q.ClientOrderID)
-	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
-	if err != nil {
-		return nil, err
-	}
 
 	var order *okexapi.OrderDetails
-	order, err = req.Do(ctx)
+	order, err := req.Do(ctx)
 
 	if err != nil {
 		return nil, err
 	}
 
-	timeInForce := types.TimeInForceFOK
-	if order.OrderType == okexapi.OrderTypeIOC {
-		timeInForce = types.TimeInForceIOC
+	isMargin := false
+	if order.InstrumentType == string(okexapi.InstrumentTypeMARGIN) {
+		isMargin = true
 	}
-	return &types.Order{
-		SubmitOrder: types.SubmitOrder{
-			ClientOrderID: order.ClientOrderID,
-			Symbol:        order.InstrumentID,
-			Side:          types.SideType(order.Side),
-			Type:          toGlobalOrderType(order.OrderType),
-			Quantity:      order.Quantity,
-			Price:         order.Price,
-			TimeInForce:   types.TimeInForce(timeInForce),
-		},
-		Exchange:         types.ExchangeOKEx,
-		OrderID:          uint64(orderID),
-		Status:           toGlobalOrderStatus(order.State),
-		ExecutedQuantity: order.FilledQuantity,
-		CreationTime:     types.Time(order.CreationTime),
-		UpdateTime:       types.Time(order.UpdateTime),
-	}, nil
+
+	return toGlobalOrder(order, isMargin)
 }

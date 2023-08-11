@@ -2,6 +2,7 @@ package okex
 
 import (
 	"fmt"
+	"hash/fnv"
 	"regexp"
 	"strconv"
 	"strings"
@@ -172,10 +173,7 @@ func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) 
 
 		side := types.SideType(strings.ToUpper(string(orderDetail.Side)))
 
-		orderType, err := toGlobalOrderType(orderDetail.OrderType)
-		if err != nil {
-			return orders, err
-		}
+		orderType := toGlobalOrderType(orderDetail.OrderType)
 
 		timeInForce := types.TimeInForceGTC
 		switch orderDetail.OrderType {
@@ -186,10 +184,7 @@ func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) 
 
 		}
 
-		orderStatus, err := toGlobalOrderStatus(orderDetail.State)
-		if err != nil {
-			return orders, err
-		}
+		orderStatus := toGlobalOrderStatus(orderDetail.State)
 
 		isWorking := false
 		switch orderStatus {
@@ -258,16 +253,21 @@ func toLocalOrderType(orderType types.OrderType) (okexapi.OrderType, error) {
 
 func toGlobalOrderType(orderType okexapi.OrderType) types.OrderType {
 	switch orderType {
-	case okexapi.OrderTypeMarket:
+	case okexapi.OrderTypeMarket, okexapi.OrderTypeMarketMakerProtection:
 		return types.OrderTypeMarket
+
 	case okexapi.OrderTypeLimit:
 		return types.OrderTypeLimit
+
 	case okexapi.OrderTypePostOnly:
 		return types.OrderTypeLimitMaker
-	case okexapi.OrderTypeFOK:
-		return types.OrderTypeFillOrKill
-	case okexapi.OrderTypeIOC:
-		return types.OrderTypeIOC
+
+	case okexapi.OrderTypeIOC, okexapi.OrderTypeFOK:
+		return types.OrderTypeMarket
+
+	case okexapi.OrderTypeMarektMakerProtectionPostOnly:
+		return types.OrderTypeLimitMaker
+
 	default:
 		log.Errorf("unsupported order type: %v", orderType)
 		return ""
@@ -279,4 +279,35 @@ func toLocalInterval(src string) string {
 	return re.ReplaceAllStringFunc(src, func(w string) string {
 		return strings.ToUpper(w)
 	})
+}
+
+func hashStringID(s string) uint64 {
+	h := fnv.New64a()
+	h.Write([]byte(s))
+	return h.Sum64()
+}
+
+func toGlobalOrder(okexOrder *okexapi.OrderDetails, isMargin bool) (*types.Order, error) {
+	timeInForce := types.TimeInForceFOK
+	if okexOrder.OrderType == okexapi.OrderTypeIOC {
+		timeInForce = types.TimeInForceIOC
+	}
+	return &types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: okexOrder.ClientOrderID,
+			Symbol:        okexOrder.InstrumentID,
+			Side:          types.SideType(okexOrder.Side),
+			Type:          toGlobalOrderType(okexOrder.OrderType),
+			Quantity:      okexOrder.Quantity,
+			Price:         okexOrder.Price,
+			TimeInForce:   types.TimeInForce(timeInForce),
+		},
+		Exchange:         types.ExchangeOKEx,
+		OrderID:          hashStringID(okexOrder.OrderID),
+		Status:           toGlobalOrderStatus(okexOrder.State),
+		ExecutedQuantity: okexOrder.FilledQuantity,
+		CreationTime:     types.Time(okexOrder.CreationTime),
+		UpdateTime:       types.Time(okexOrder.UpdateTime),
+		IsMargin:         isMargin,
+	}, nil
 }
