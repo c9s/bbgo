@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -115,10 +116,11 @@ func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
 }
 
 func (s *Strategy) checkDeposits(ctx context.Context) {
+	accountLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
+
 	for _, asset := range s.Assets {
 		log.Infof("checking %s deposits...", asset)
 
-		account := s.session.Account
 		succeededDeposits, err := s.scanDepositHistory(ctx, asset, 4*time.Hour)
 		if err != nil {
 			log.WithError(err).Errorf("unable to scan deposit history")
@@ -132,6 +134,17 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 
 		for _, d := range succeededDeposits {
 			log.Infof("found succeeded deposit: %+v", d)
+
+			if err2 := accountLimiter.Wait(ctx); err2 != nil {
+				log.WithError(err2).Errorf("rate limiter error")
+				return
+			}
+
+			account, err2 := s.session.UpdateAccount(ctx)
+			if err2 != nil {
+				log.WithError(err2).Errorf("unable to update account")
+				continue
+			}
 
 			bal, ok := account.Balance(d.Asset)
 			if !ok {
