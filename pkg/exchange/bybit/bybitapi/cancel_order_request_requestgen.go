@@ -77,12 +77,12 @@ func (p *CancelOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// assign parameter of orderLinkId
 	params["orderLinkId"] = orderLinkId
-	// check orderId field -> json key orderLinkId
+	// check orderId field -> json key orderId
 	if p.orderId != nil {
 		orderId := *p.orderId
 
 		// assign parameter of orderId
-		params["orderLinkId"] = orderId
+		params["orderId"] = orderId
 	} else {
 	}
 	// check orderFilter field -> json key timeInForce
