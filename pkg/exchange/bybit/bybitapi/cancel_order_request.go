@@ -21,7 +21,7 @@ type CancelOrderRequest struct {
 	// User customised order ID. Either orderId or orderLinkId is required
 	orderLinkId string `param:"orderLinkId"`
 
-	orderId *string `param:"orderLinkId"`
+	orderId *string `param:"orderId"`
 	// orderFilter default type is Order
 	// tpsl order type are not currently supported
 	orderFilter *string `param:"timeInForce" validValues:"Order"`
