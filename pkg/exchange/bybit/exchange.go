@@ -262,11 +262,17 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	for _, order := range orders {
 		req := e.client.NewCancelOrderRequest()
 
+		reqId := ""
 		switch {
+		// use the OrderID first, then the ClientOrderID
+		case order.OrderID > 0:
+			req.OrderId(order.UUID)
+			reqId = order.UUID
+
 		case len(order.ClientOrderID) != 0:
 			req.OrderLinkId(order.ClientOrderID)
-		case len(order.UUID) != 0 && order.OrderID != 0:
-			req.OrderId(order.UUID)
+			reqId = order.ClientOrderID
+
 		default:
 			errs = multierr.Append(
 				errs,
@@ -286,8 +292,10 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			errs = multierr.Append(errs, fmt.Errorf("failed to cancel order id: %s, err: %w", order.ClientOrderID, err))
 			continue
 		}
-		if res.OrderId != order.UUID || res.OrderLinkId != order.ClientOrderID {
-			errs = multierr.Append(errs, fmt.Errorf("unexpected order id, resp: %#v, order: %#v", res, order))
+
+		// sanity check
+		if res.OrderId != reqId && res.OrderLinkId != reqId {
+			errs = multierr.Append(errs, fmt.Errorf("order id mismatch, exp: %s, respOrderId: %s, respOrderLinkId: %s", reqId, res.OrderId, res.OrderLinkId))
 			continue
 		}
 	}
