@@ -2,6 +2,7 @@ package bybit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -181,6 +182,39 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	}
 
 	return orders, nil
+}
+
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	if len(q.OrderID) == 0 && len(q.ClientOrderID) == 0 {
+		return nil, errors.New("one of OrderID/ClientOrderID is required parameter")
+	}
+
+	if len(q.OrderID) != 0 && len(q.ClientOrderID) != 0 {
+		return nil, errors.New("only accept one parameter of OrderID/ClientOrderID")
+	}
+
+	req := e.client.NewGetOrderHistoriesRequest()
+	if len(q.Symbol) != 0 {
+		req.Symbol(q.Symbol)
+	}
+
+	if len(q.OrderID) != 0 {
+		req.OrderId(q.OrderID)
+	}
+
+	if len(q.ClientOrderID) != 0 {
+		req.OrderLinkId(q.ClientOrderID)
+	}
+
+	res, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query order, queryConfig: %+v, err: %w", q, err)
+	}
+	if len(res.List) != 1 {
+		return nil, fmt.Errorf("unexpected order length, queryConfig: %+v", q)
+	}
+
+	return toGlobalOrder(res.List[0])
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {

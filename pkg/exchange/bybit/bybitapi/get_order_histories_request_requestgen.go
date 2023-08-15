@@ -28,6 +28,11 @@ func (g *GetOrderHistoriesRequest) OrderId(orderId string) *GetOrderHistoriesReq
 	return g
 }
 
+func (g *GetOrderHistoriesRequest) OrderLinkId(orderLinkId string) *GetOrderHistoriesRequest {
+	g.orderLinkId = &orderLinkId
+	return g
+}
+
 func (g *GetOrderHistoriesRequest) OrderFilter(orderFilter string) *GetOrderHistoriesRequest {
 	g.orderFilter = &orderFilter
 	return g
@@ -91,6 +96,14 @@ func (g *GetOrderHistoriesRequest) GetQueryParameters() (url.Values, error) {
 
 		// assign parameter of orderId
 		params["orderId"] = orderId
+	} else {
+	}
+	// check orderLinkId field -> json key orderLinkId
+	if g.orderLinkId != nil {
+		orderLinkId := *g.orderLinkId
+
+		// assign parameter of orderLinkId
+		params["orderLinkId"] = orderLinkId
 	} else {
 	}
 	// check orderFilter field -> json key orderFilter

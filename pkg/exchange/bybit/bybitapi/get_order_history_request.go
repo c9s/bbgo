@@ -9,14 +9,15 @@ import (
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Result
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Result
 
-//go:generate GetRequest -url "/v5/order/history" -type GetOrderHistoriesRequest -responseDataType .OpenOrdersResponse
+//go:generate GetRequest -url "/v5/order/history" -type GetOrderHistoriesRequest -responseDataType .OrdersResponse
 type GetOrderHistoriesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	category Category `param:"category,query" validValues:"spot"`
 
-	symbol  *string `param:"symbol,query"`
-	orderId *string `param:"orderId,query"`
+	symbol      *string `param:"symbol,query"`
+	orderId     *string `param:"orderId,query"`
+	orderLinkId *string `param:"orderLinkId,query"`
 	// orderFilter supports 3 types of Order:
 	// 1. active order, 2. StopOrder: conditional order, 3. tpslOrder: spot TP/SL order
 	// Normal spot: return Order active order by default
