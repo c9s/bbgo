@@ -77,8 +77,8 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			MaxQuantity:     s.MaxTradeAmount,
 			StepSize:        fixedpoint.NewFromFloat(math.Pow10(-s.QuantityScale)),
 			TickSize:        fixedpoint.NewFromFloat(math.Pow10(-s.PriceScale)),
-			MinPrice:        0,
-			MaxPrice:        0,
+			MinPrice:        fixedpoint.Zero,
+			MaxPrice:        fixedpoint.Zero,
 		}
 	}
 
