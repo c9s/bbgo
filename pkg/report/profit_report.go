@@ -25,6 +25,9 @@ type AccumulatedProfitReport struct {
 
 	types.IntervalWindow
 
+	// ProfitMAWindow Accumulated profit SMA window
+	AccumulateTradeWindow int `json:"accumulateTradeWindow"`
+
 	// Accumulated profit
 	accumulatedProfit            fixedpoint.Value
 	accumulatedProfitPerInterval *types.Float64Series
@@ -119,7 +122,7 @@ func (r *AccumulatedProfitReport) CsvHeader() []string {
 		"accumulatedFee",
 		"winRatio",
 		"profitFactor",
-		fmt.Sprintf("%s%d Trades", r.Interval, r.Window),
+		fmt.Sprintf("%s%d Trades", r.Interval, r.AccumulateTradeWindow),
 	}
 
 	for i := 0; i < len(r.strategyParameters); i++ {
@@ -143,7 +146,7 @@ func (r *AccumulatedProfitReport) CsvRecords() [][]string {
 			strconv.FormatFloat(r.accumulatedFeePerInterval.Last(i), 'f', 4, 64),
 			strconv.FormatFloat(r.winRatioPerInterval.Last(i), 'f', 4, 64),
 			strconv.FormatFloat(r.profitFactorPerInterval.Last(i), 'f', 4, 64),
-			strconv.FormatFloat(r.accumulatedTradesPerInterval.Last(i), 'f', 4, 64),
+			strconv.FormatFloat(r.accumulatedTradesPerInterval.Last(i)-r.accumulatedTradesPerInterval.Last(i+r.AccumulateTradeWindow), 'f', 4, 64),
 		}
 		for j := 0; j < len(r.strategyParameters); j++ {
 			values = append(values, r.strategyParameters[j][1])
