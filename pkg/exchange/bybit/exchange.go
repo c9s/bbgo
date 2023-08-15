@@ -228,7 +228,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	if len(order.ClientOrderID) > maxOrderIdLen {
 		return nil, fmt.Errorf("unexpected length of order id, got: %d", len(order.ClientOrderID))
 	}
-	req.OrderLinkId(order.ClientOrderID)
+	if len(order.ClientOrderID) > 0 {
+		req.OrderLinkId(order.ClientOrderID)
+	}
 
 	if err := orderRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
@@ -238,11 +240,11 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		return nil, fmt.Errorf("failed to place order, order: %#v, err: %w", order, err)
 	}
 
-	if len(res.OrderId) == 0 || res.OrderLinkId != order.ClientOrderID {
+	if len(res.OrderId) == 0 || (len(order.ClientOrderID) != 0 && res.OrderLinkId != order.ClientOrderID) {
 		return nil, fmt.Errorf("unexpected order id, resp: %#v, order: %#v", res, order)
 	}
 
-	ordersResp, err := e.client.NewGetOpenOrderRequest().OrderLinkId(res.OrderLinkId).Do(ctx)
+	ordersResp, err := e.client.NewGetOpenOrderRequest().OrderId(res.OrderId).Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query order by client order id: %s, err: %w", res.OrderLinkId, err)
 	}
