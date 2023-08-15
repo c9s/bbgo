@@ -119,5 +119,6 @@ exchangeStrategies:
       accumulatedProfitReport:
         profitMAWindow: 60
         shortTermProfitWindow: 14
+        accumulateTradeWindow: 30
         tsvReportPath: res.tsv
     trackParameters: false
