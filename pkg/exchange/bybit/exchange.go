@@ -302,7 +302,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	if len(order.ClientOrderID) > maxOrderIdLen {
 		return nil, fmt.Errorf("unexpected length of order id, got: %d", len(order.ClientOrderID))
 	}
-	req.OrderLinkId(order.ClientOrderID)
+	if len(order.ClientOrderID) > 0 {
+		req.OrderLinkId(order.ClientOrderID)
+	}
 
 	if err := orderRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
@@ -312,11 +314,11 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		return nil, fmt.Errorf("failed to place order, order: %#v, err: %w", order, err)
 	}
 
-	if len(res.OrderId) == 0 || res.OrderLinkId != order.ClientOrderID {
+	if len(res.OrderId) == 0 || (len(order.ClientOrderID) != 0 && res.OrderLinkId != order.ClientOrderID) {
 		return nil, fmt.Errorf("unexpected order id, resp: %#v, order: %#v", res, order)
 	}
 
-	ordersResp, err := e.client.NewGetOpenOrderRequest().OrderLinkId(res.OrderLinkId).Do(ctx)
+	ordersResp, err := e.client.NewGetOpenOrderRequest().OrderId(res.OrderId).Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query order by client order id: %s, err: %w", res.OrderLinkId, err)
 	}
@@ -336,11 +338,17 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	for _, order := range orders {
 		req := e.client.NewCancelOrderRequest()
 
+		reqId := ""
 		switch {
+		// use the OrderID first, then the ClientOrderID
+		case order.OrderID > 0:
+			req.OrderId(order.UUID)
+			reqId = order.UUID
+
 		case len(order.ClientOrderID) != 0:
 			req.OrderLinkId(order.ClientOrderID)
-		case len(order.UUID) != 0 && order.OrderID != 0:
-			req.OrderId(order.UUID)
+			reqId = order.ClientOrderID
+
 		default:
 			errs = multierr.Append(
 				errs,
@@ -360,8 +368,10 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			errs = multierr.Append(errs, fmt.Errorf("failed to cancel order id: %s, err: %w", order.ClientOrderID, err))
 			continue
 		}
-		if res.OrderId != order.UUID || res.OrderLinkId != order.ClientOrderID {
-			errs = multierr.Append(errs, fmt.Errorf("unexpected order id, resp: %#v, order: %#v", res, order))
+
+		// sanity check
+		if res.OrderId != reqId && res.OrderLinkId != reqId {
+			errs = multierr.Append(errs, fmt.Errorf("order id mismatch, exp: %s, respOrderId: %s, respOrderLinkId: %s", reqId, res.OrderId, res.OrderLinkId))
 			continue
 		}
 	}
