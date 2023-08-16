@@ -2,6 +2,7 @@ package bybit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -45,6 +46,7 @@ var (
 	_ types.ExchangeMinimal           = &Exchange{}
 	_ types.ExchangeTradeService      = &Exchange{}
 	_ types.Exchange                  = &Exchange{}
+	_ types.ExchangeOrderQueryService = &Exchange{}
 )
 
 type Exchange struct {
@@ -181,6 +183,78 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	}
 
 	return orders, nil
+}
+
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	if len(q.OrderID) == 0 && len(q.ClientOrderID) == 0 {
+		return nil, errors.New("one of OrderID/ClientOrderID is required parameter")
+	}
+
+	if len(q.OrderID) != 0 && len(q.ClientOrderID) != 0 {
+		return nil, errors.New("only accept one parameter of OrderID/ClientOrderID")
+	}
+
+	req := e.client.NewGetOrderHistoriesRequest()
+	if len(q.Symbol) != 0 {
+		req.Symbol(q.Symbol)
+	}
+
+	if len(q.OrderID) != 0 {
+		req.OrderId(q.OrderID)
+	}
+
+	if len(q.ClientOrderID) != 0 {
+		req.OrderLinkId(q.ClientOrderID)
+	}
+
+	res, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query order, queryConfig: %+v, err: %w", q, err)
+	}
+	if len(res.List) != 1 {
+		return nil, fmt.Errorf("unexpected order length, queryConfig: %+v", q)
+	}
+
+	return toGlobalOrder(res.List[0])
+}
+
+func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (trades []types.Trade, err error) {
+	if len(q.ClientOrderID) != 0 {
+		log.Warn("!!!BYBIT EXCHANGE API NOTICE!!! Bybit does not support searching for trades using OrderClientId.")
+	}
+
+	if len(q.OrderID) == 0 {
+		return nil, errors.New("orderID is required parameter")
+	}
+	req := e.v3client.NewGetTradesRequest().OrderId(q.OrderID)
+
+	if len(q.Symbol) != 0 {
+		req.Symbol(q.Symbol)
+	}
+
+	if err := tradeRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("trade rate limiter wait error: %w", err)
+	}
+	response, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query order trades, err: %w", err)
+	}
+
+	var errs error
+	for _, trade := range response.List {
+		res, err := v3ToGlobalTrade(trade)
+		if err != nil {
+			errs = multierr.Append(errs, err)
+			continue
+		}
+		trades = append(trades, *res)
+	}
+
+	if errs != nil {
+		return nil, errs
+	}
+
+	return trades, nil
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
