@@ -20,6 +20,10 @@ type marginTransferService interface {
 	TransferMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error
 }
 
+type spotAccountQueryService interface {
+	QuerySpotAccount(ctx context.Context) (*types.Account, error)
+}
+
 const ID = "deposit2transfer"
 
 var log = logrus.WithField("strategy", ID)
@@ -140,21 +144,22 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 				return
 			}
 
-			account, err2 := s.session.UpdateAccount(ctx)
-			if err2 != nil {
-				log.WithError(err2).Errorf("unable to update account")
-				continue
+			// we can't use the account from margin
+			amount := d.Amount
+			if service, ok := s.session.Exchange.(spotAccountQueryService); ok {
+				account, err2 := service.QuerySpotAccount(ctx)
+				if err2 != nil {
+					log.WithError(err2).Errorf("unable to update account")
+					continue
+				}
+
+				if bal, ok := account.Balance(d.Asset); ok {
+					log.Infof("%s balance: %+v", d.Asset, bal)
+					amount = fixedpoint.Min(bal.Available, amount)
+				} else {
+					log.Errorf("unexpected error: %s balance not found", d.Asset)
+				}
 			}
-
-			bal, ok := account.Balance(d.Asset)
-			if !ok {
-				log.Errorf("unexpected error: %s balance not found", d.Asset)
-				return
-			}
-
-			log.Infof("%s balance: %+v", d.Asset, bal)
-
-			amount := fixedpoint.Min(bal.Available, d.Amount)
 
 			bbgo.Notify("Found succeeded deposit %s %s, transferring %s %s into the margin account",
 				d.Amount.String(), d.Asset,
