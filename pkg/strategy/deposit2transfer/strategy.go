@@ -154,7 +154,7 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 				}
 
 				if bal, ok := account.Balance(d.Asset); ok {
-					log.Infof("%s balance: %+v", d.Asset, bal)
+					log.Infof("spot account balance %s: %+v", d.Asset, bal)
 					amount = fixedpoint.Min(bal.Available, amount)
 				} else {
 					log.Errorf("unexpected error: %s balance not found", d.Asset)
