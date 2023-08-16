@@ -562,6 +562,35 @@ func (e *Exchange) getLaunchDate() (time.Time, error) {
 	return time.Date(2018, time.June, 21, 0, 0, 0, 0, loc), nil
 }
 
+func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error) {
+	if err := e.accountQueryLimiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+
+	vipLevel, err := e.client.NewGetVipLevelRequest().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// MAX returns the fee rate in the following format:
+	//  "maker_fee": 0.0005 -> 0.05%
+	//  "taker_fee": 0.0015 -> 0.15%
+	a := &types.Account{
+		AccountType:  types.AccountTypeSpot,
+		MarginLevel:  fixedpoint.Zero,
+		MakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.MakerFee), // 0.15% = 0.0015
+		TakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.TakerFee), // 0.15% = 0.0015
+	}
+
+	balances, err := e.queryBalances(ctx, maxapi.WalletTypeSpot)
+	if err != nil {
+		return nil, err
+	}
+	a.UpdateBalances(balances)
+
+	return nil, nil
+}
+
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	if err := e.accountQueryLimiter.Wait(ctx); err != nil {
 		return nil, err
@@ -577,10 +606,15 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	//  "taker_fee": 0.0015 -> 0.15%
 
 	a := &types.Account{
-		AccountType:  types.AccountTypeSpot,
 		MarginLevel:  fixedpoint.Zero,
 		MakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.MakerFee), // 0.15% = 0.0015
 		TakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.TakerFee), // 0.15% = 0.0015
+	}
+
+	if e.MarginSettings.IsMargin {
+		a.AccountType = types.AccountTypeMargin
+	} else {
+		a.AccountType = types.AccountTypeSpot
 	}
 
 	balances, err := e.QueryAccountBalances(ctx)
@@ -590,8 +624,6 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	a.UpdateBalances(balances)
 
 	if e.MarginSettings.IsMargin {
-		a.AccountType = types.AccountTypeMargin
-
 		req := e.v3client.NewGetMarginADRatioRequest()
 		adRatio, err := req.Do(ctx)
 		if err != nil {
@@ -606,16 +638,21 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	if err := e.accountQueryLimiter.Wait(ctx); err != nil {
-		return nil, err
-	}
-
 	walletType := maxapi.WalletTypeSpot
 	if e.MarginSettings.IsMargin {
 		walletType = maxapi.WalletTypeMargin
 	}
 
+	return e.queryBalances(ctx, walletType)
+}
+
+func (e *Exchange) queryBalances(ctx context.Context, walletType maxapi.WalletType) (types.BalanceMap, error) {
+	if err := e.accountQueryLimiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+
 	req := e.v3client.NewGetWalletAccountsRequest(walletType)
+
 	accounts, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
