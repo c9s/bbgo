@@ -254,18 +254,6 @@ func (b *ActiveOrderBook) Print() {
 	}
 }
 
-// update updates the order stores in the internal order storage
-func (b *ActiveOrderBook) update(orders ...types.Order) {
-	hasSymbol := len(b.Symbol) > 0
-	for _, order := range orders {
-		if hasSymbol && b.Symbol != order.Symbol {
-			continue
-		}
-
-		b.orders.Update(order)
-	}
-}
-
 // Update updates the order by the order status and emit the related events.
 // When order is filled, the order will be removed from the internal order storage.
 // When order is New or PartiallyFilled, the internal order will be updated according to the latest order update.
@@ -283,6 +271,15 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 		return
 	}
 
+	// if order update time is too old, skip it
+	if previousOrder, ok := b.orders.Get(order.OrderID); ok {
+		previousUpdateTime := previousOrder.UpdateTime.Time()
+		if !previousUpdateTime.IsZero() && order.UpdateTime.Before(previousUpdateTime) {
+			b.mu.Unlock()
+			return
+		}
+	}
+
 	switch order.Status {
 	case types.OrderStatusFilled:
 		// make sure we have the order and we remove it
@@ -295,11 +292,11 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 		b.C.Emit()
 
 	case types.OrderStatusPartiallyFilled:
-		b.update(order)
+		b.orders.Update(order)
 		b.mu.Unlock()
 
 	case types.OrderStatusNew:
-		b.update(order)
+		b.orders.Update(order)
 		b.mu.Unlock()
 
 		b.C.Emit()

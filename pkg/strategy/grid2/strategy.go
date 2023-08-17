@@ -2127,9 +2127,7 @@ func (s *Strategy) handleConnect(ctx context.Context, session *bbgo.ExchangeSess
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
 	activeOrders := activeOrderBook.Orders()
 	for _, o := range activeOrders {
-
 		var updatedOrder *types.Order
-
 		err := retry.GeneralBackoff(ctx, func() error {
 			var err error
 			updatedOrder, err = s.orderQueryService.QueryOrder(ctx, types.OrderQuery{
