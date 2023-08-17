@@ -149,7 +149,7 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 			if service, ok := s.session.Exchange.(spotAccountQueryService); ok {
 				account, err2 := service.QuerySpotAccount(ctx)
 				if err2 != nil {
-					log.WithError(err2).Errorf("unable to update account")
+					log.WithError(err2).Errorf("unable to query spot account")
 					continue
 				}
 
