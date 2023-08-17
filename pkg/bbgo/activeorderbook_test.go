@@ -22,7 +22,7 @@ func TestActiveOrderBook_pendingOrders(t *testing.T) {
 
 	// if we received filled order first
 	// should be added to pending orders
-	ob.orderUpdateHandler(types.Order{
+	ob.Update(types.Order{
 		OrderID: 99,
 		SubmitOrder: types.SubmitOrder{
 			Symbol:       "BTCUSDT",
@@ -63,5 +63,4 @@ func TestActiveOrderBook_pendingOrders(t *testing.T) {
 	})
 
 	assert.True(t, filled, "filled event should be fired")
-
 }
