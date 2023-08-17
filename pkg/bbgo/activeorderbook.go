@@ -233,17 +233,6 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 }
 
 func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
-	hasSymbol := len(b.Symbol) > 0
-
-	if hasSymbol && order.Symbol != b.Symbol {
-		return
-	}
-
-	if !b.orders.Exists(order.OrderID) {
-		b.pendingOrderUpdates.Add(order)
-		return
-	}
-
 	b.Update(order)
 }
 
@@ -279,6 +268,17 @@ func (b *ActiveOrderBook) update(orders ...types.Order) {
 // When order is New or PartiallyFilled, the internal order will be updated according to the latest order update.
 // When the order is cancelled, it will be removed from the internal order storage.
 func (b *ActiveOrderBook) Update(order types.Order) {
+	hasSymbol := len(b.Symbol) > 0
+
+	if hasSymbol && order.Symbol != b.Symbol {
+		return
+	}
+
+	if !b.orders.Exists(order.OrderID) {
+		b.pendingOrderUpdates.Add(order)
+		return
+	}
+
 	switch order.Status {
 	case types.OrderStatusFilled:
 		// make sure we have the order and we remove it
