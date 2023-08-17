@@ -587,8 +587,7 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 		return nil, err
 	}
 	a.UpdateBalances(balances)
-
-	return nil, nil
+	return a, nil
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
