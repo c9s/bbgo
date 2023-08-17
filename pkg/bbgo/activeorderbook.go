@@ -244,33 +244,7 @@ func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
 		return
 	}
 
-	switch order.Status {
-	case types.OrderStatusFilled:
-		// make sure we have the order and we remove it
-		if b.Remove(order) {
-			b.EmitFilled(order)
-		}
-		b.C.Emit()
-
-	case types.OrderStatusPartiallyFilled:
-		b.Update(order)
-
-	case types.OrderStatusNew:
-		b.Update(order)
-		b.C.Emit()
-
-	case types.OrderStatusCanceled, types.OrderStatusRejected:
-		if order.Status == types.OrderStatusCanceled {
-			b.EmitCanceled(order)
-		}
-
-		log.Debugf("[ActiveOrderBook] order is %s, removing order %s", order.Status, order)
-		b.Remove(order)
-		b.C.Emit()
-
-	default:
-		log.Warnf("unhandled order status: %s", order.Status)
-	}
+	b.Update(order)
 }
 
 func (b *ActiveOrderBook) Print() {
@@ -288,7 +262,8 @@ func (b *ActiveOrderBook) Print() {
 	}
 }
 
-func (b *ActiveOrderBook) Update(orders ...types.Order) {
+// update updates the order stores in the internal order storage
+func (b *ActiveOrderBook) update(orders ...types.Order) {
 	hasSymbol := len(b.Symbol) > 0
 	for _, order := range orders {
 		if hasSymbol && b.Symbol != order.Symbol {
@@ -297,6 +272,42 @@ func (b *ActiveOrderBook) Update(orders ...types.Order) {
 
 		b.orders.Update(order)
 	}
+}
+
+// Update updates the order by the order status and emit the related events.
+// When order is filled, the order will be removed from the internal order storage.
+// When order is New or PartiallyFilled, the internal order will be updated according to the latest order update.
+// When the order is cancelled, it will be removed from the internal order storage.
+func (b *ActiveOrderBook) Update(order types.Order) {
+	switch order.Status {
+	case types.OrderStatusFilled:
+		// make sure we have the order and we remove it
+		if b.Remove(order) {
+			b.EmitFilled(order)
+		}
+		b.C.Emit()
+
+	case types.OrderStatusPartiallyFilled:
+		b.update(order)
+
+	case types.OrderStatusNew:
+		b.update(order)
+		b.C.Emit()
+
+	case types.OrderStatusCanceled, types.OrderStatusRejected:
+		// TODO: note that orders transit to "canceled" may have partially filled
+		if order.Status == types.OrderStatusCanceled {
+			b.EmitCanceled(order)
+		}
+
+		log.Debugf("[ActiveOrderBook] order is %s, removing order %s", order.Status, order)
+		b.Remove(order)
+		b.C.Emit()
+
+	default:
+		log.Warnf("[ActiveOrderBook] unhandled order status: %s", order.Status)
+	}
+
 }
 
 func (b *ActiveOrderBook) Add(orders ...types.Order) {
