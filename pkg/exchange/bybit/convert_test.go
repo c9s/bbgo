@@ -133,7 +133,7 @@ func TestToGlobalTicker(t *testing.T) {
 	assert.Equal(t, toGlobalTicker(ticker, timeNow), exp)
 }
 
-func Test_processQuantity(t *testing.T) {
+func Test_processMarketBuyQuantity(t *testing.T) {
 	t.Run("websocket event", func(t *testing.T) {
 		t.Run("Market/Buy/OrderStatusPartiallyFilled", func(t *testing.T) {
 			o := bybitapi.Order{
@@ -144,7 +144,7 @@ func Test_processQuantity(t *testing.T) {
 				CumExecQty:   fixedpoint.NewFromFloat(2),
 				OrderStatus:  bybitapi.OrderStatusPartiallyFilled,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.Qty.Div(o.CumExecValue.Div(o.CumExecQty)), res)
 		})
@@ -158,7 +158,7 @@ func Test_processQuantity(t *testing.T) {
 				CumExecQty:   fixedpoint.NewFromFloat(2),
 				OrderStatus:  bybitapi.OrderStatusPartiallyFilled,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.Qty.Div(o.CumExecValue.Div(o.CumExecQty)), res)
 		})
@@ -172,7 +172,7 @@ func Test_processQuantity(t *testing.T) {
 				CumExecQty:   fixedpoint.NewFromFloat(2),
 				OrderStatus:  bybitapi.OrderStatusFilled,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.CumExecQty, res)
 		})
@@ -186,7 +186,7 @@ func Test_processQuantity(t *testing.T) {
 				CumExecQty:   fixedpoint.NewFromFloat(2),
 				OrderStatus:  bybitapi.OrderStatusCreated,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, fixedpoint.Zero, res)
 		})
@@ -200,7 +200,7 @@ func Test_processQuantity(t *testing.T) {
 				CumExecQty:   fixedpoint.NewFromFloat(2),
 				OrderStatus:  bybitapi.OrderStatusNew,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, fixedpoint.Zero, res)
 		})
@@ -214,9 +214,23 @@ func Test_processQuantity(t *testing.T) {
 				CumExecQty:   fixedpoint.NewFromFloat(2),
 				OrderStatus:  bybitapi.OrderStatusRejected,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, fixedpoint.Zero, res)
+		})
+
+		t.Run("Market/Buy/OrderStatusCanceled", func(t *testing.T) {
+			o := bybitapi.Order{
+				Qty:          fixedpoint.NewFromFloat(5),
+				OrderType:    bybitapi.OrderTypeMarket,
+				Side:         bybitapi.SideBuy,
+				CumExecValue: fixedpoint.NewFromFloat(200),
+				CumExecQty:   fixedpoint.NewFromFloat(2),
+				OrderStatus:  bybitapi.OrderStatusCancelled,
+			}
+			res, err := processMarketBuyQuantity(o)
+			assert.NoError(t, err)
+			assert.Equal(t, o.Qty, res)
 		})
 
 		t.Run("Market/Buy/Unexpected status", func(t *testing.T) {
@@ -228,9 +242,24 @@ func Test_processQuantity(t *testing.T) {
 				CumExecQty:   fixedpoint.NewFromFloat(2),
 				OrderStatus:  bybitapi.OrderStatus("unexpected"),
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.Error(t, err)
 			assert.Equal(t, fmt.Errorf("unexpected order status: %s", o.OrderStatus), err)
+			assert.Equal(t, fixedpoint.Zero, res)
+		})
+
+		t.Run("Market/Buy/CumExecQty zero", func(t *testing.T) {
+			o := bybitapi.Order{
+				Qty:          fixedpoint.NewFromFloat(5),
+				OrderType:    bybitapi.OrderTypeMarket,
+				Side:         bybitapi.SideBuy,
+				CumExecValue: fixedpoint.NewFromFloat(200),
+				CumExecQty:   fixedpoint.Zero,
+				OrderStatus:  bybitapi.OrderStatusPartiallyFilled,
+			}
+			res, err := processMarketBuyQuantity(o)
+			assert.Error(t, err)
+			assert.Equal(t, fmt.Errorf("CumExecQty shouldn't be zero"), err)
 			assert.Equal(t, fixedpoint.Zero, res)
 		})
 
@@ -240,7 +269,7 @@ func Test_processQuantity(t *testing.T) {
 				OrderType: bybitapi.OrderTypeMarket,
 				Side:      bybitapi.SideSell,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.Qty, res)
 		})
@@ -251,7 +280,7 @@ func Test_processQuantity(t *testing.T) {
 				OrderType: bybitapi.OrderTypeLimit,
 				Side:      bybitapi.SideBuy,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.Qty, res)
 		})
@@ -262,7 +291,7 @@ func Test_processQuantity(t *testing.T) {
 				OrderType: bybitapi.OrderTypeLimit,
 				Side:      bybitapi.SideSell,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.Qty, res)
 		})
@@ -277,7 +306,7 @@ func Test_processQuantity(t *testing.T) {
 				AvgPrice:    fixedpoint.NewFromFloat(25000),
 				OrderStatus: bybitapi.OrderStatusPartiallyFilled,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.Qty.Div(o.AvgPrice), res)
 		})
@@ -291,7 +320,7 @@ func Test_processQuantity(t *testing.T) {
 				OrderStatus: bybitapi.OrderStatusPartiallyFilledCanceled,
 				CumExecQty:  fixedpoint.NewFromFloat(0.002),
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.CumExecQty, res)
 		})
@@ -305,7 +334,7 @@ func Test_processQuantity(t *testing.T) {
 				OrderStatus: bybitapi.OrderStatusFilled,
 				CumExecQty:  fixedpoint.NewFromFloat(0.002),
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.CumExecQty, res)
 		})
@@ -319,7 +348,7 @@ func Test_processQuantity(t *testing.T) {
 				OrderStatus: bybitapi.OrderStatusCreated,
 				CumExecQty:  fixedpoint.NewFromFloat(0.002),
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, fixedpoint.Zero, res)
 		})
@@ -333,7 +362,7 @@ func Test_processQuantity(t *testing.T) {
 				OrderStatus: bybitapi.OrderStatusNew,
 				CumExecQty:  fixedpoint.NewFromFloat(0.002),
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, fixedpoint.Zero, res)
 		})
@@ -347,8 +376,37 @@ func Test_processQuantity(t *testing.T) {
 				OrderStatus: bybitapi.OrderStatusRejected,
 				CumExecQty:  fixedpoint.NewFromFloat(0.002),
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
+			assert.Equal(t, fixedpoint.Zero, res)
+		})
+
+		t.Run("Market/Buy/OrderStatusCanceled", func(t *testing.T) {
+			o := bybitapi.Order{
+				Qty:         fixedpoint.NewFromFloat(200),
+				OrderType:   bybitapi.OrderTypeMarket,
+				Side:        bybitapi.SideBuy,
+				AvgPrice:    fixedpoint.NewFromFloat(25000),
+				OrderStatus: bybitapi.OrderStatusCancelled,
+				CumExecQty:  fixedpoint.NewFromFloat(0.002),
+			}
+			res, err := processMarketBuyQuantity(o)
+			assert.NoError(t, err)
+			assert.Equal(t, o.Qty, res)
+		})
+
+		t.Run("Market/Buy/AvgPrice zero", func(t *testing.T) {
+			o := bybitapi.Order{
+				Qty:         fixedpoint.NewFromFloat(200),
+				OrderType:   bybitapi.OrderTypeMarket,
+				Side:        bybitapi.SideBuy,
+				AvgPrice:    fixedpoint.Zero,
+				OrderStatus: bybitapi.OrderStatusPartiallyFilled,
+				CumExecQty:  fixedpoint.NewFromFloat(0.002),
+			}
+			res, err := processMarketBuyQuantity(o)
+			assert.Error(t, err)
+			assert.Equal(t, fmt.Errorf("AvgPrice shouldn't be zero"), err)
 			assert.Equal(t, fixedpoint.Zero, res)
 		})
 
@@ -358,7 +416,7 @@ func Test_processQuantity(t *testing.T) {
 				OrderType: bybitapi.OrderTypeMarket,
 				Side:      bybitapi.SideSell,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.Qty, res)
 		})
@@ -369,7 +427,7 @@ func Test_processQuantity(t *testing.T) {
 				OrderType: bybitapi.OrderTypeLimit,
 				Side:      bybitapi.SideBuy,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.Qty, res)
 		})
@@ -380,7 +438,7 @@ func Test_processQuantity(t *testing.T) {
 				OrderType: bybitapi.OrderTypeLimit,
 				Side:      bybitapi.SideSell,
 			}
-			res, err := processQuantity(o)
+			res, err := processMarketBuyQuantity(o)
 			assert.NoError(t, err)
 			assert.Equal(t, o.Qty, res)
 		})

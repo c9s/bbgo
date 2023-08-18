@@ -77,7 +77,7 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 		return nil, fmt.Errorf("unexpected order id: %s, err: %w", order.OrderId, err)
 	}
 
-	qty, err := processQuantity(order)
+	qty, err := processMarketBuyQuantity(order)
 	if err != nil {
 		return nil, err
 	}
@@ -189,13 +189,13 @@ func processOtherOrderStatus(status bybitapi.OrderStatus) (types.OrderStatus, er
 	}
 }
 
-// processQuantity converts the quantity unit from quote coin to base coin if the order is a **MARKET BUY**.
+// processMarketBuyQuantity converts the quantity unit from quote coin to base coin if the order is a **MARKET BUY**.
 //
 // If the status is OrderStatusPartiallyFilled, it returns the estimated quantity based on the base coin.
 //
 // If the order status is OrderStatusPartiallyFilledCanceled, it indicates that the order is not fully filled,
 // and the system has automatically canceled it. In this scenario, CumExecQty is considered equal to Qty.
-func processQuantity(o bybitapi.Order) (fixedpoint.Value, error) {
+func processMarketBuyQuantity(o bybitapi.Order) (fixedpoint.Value, error) {
 	if o.Side != bybitapi.SideBuy || o.OrderType != bybitapi.OrderTypeMarket {
 		return o.Qty, nil
 	}
@@ -206,8 +206,16 @@ func processQuantity(o bybitapi.Order) (fixedpoint.Value, error) {
 		// if CumExecValue is zero, it indicates the caller is from the RESTFUL API.
 		// we can use AvgPrice to estimate quantity.
 		if o.CumExecValue.IsZero() {
+			if o.AvgPrice.IsZero() {
+				return fixedpoint.Zero, fmt.Errorf("AvgPrice shouldn't be zero")
+			}
+
 			qty = o.Qty.Div(o.AvgPrice)
 		} else {
+			if o.CumExecQty.IsZero() {
+				return fixedpoint.Zero, fmt.Errorf("CumExecQty shouldn't be zero")
+			}
+
 			// from web socket event
 			qty = o.Qty.Div(o.CumExecValue.Div(o.CumExecQty))
 		}
@@ -221,6 +229,9 @@ func processQuantity(o bybitapi.Order) (fixedpoint.Value, error) {
 		bybitapi.OrderStatusNew,
 		bybitapi.OrderStatusRejected:
 		qty = fixedpoint.Zero
+
+	case bybitapi.OrderStatusCancelled:
+		qty = o.Qty
 
 	default:
 		return fixedpoint.Zero, fmt.Errorf("unexpected order status: %s", o.OrderStatus)
