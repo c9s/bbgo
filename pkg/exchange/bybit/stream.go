@@ -204,6 +204,11 @@ func (s *Stream) ping(ctx context.Context, conn *websocket.Conn, cancelFunc cont
 
 func (s *Stream) handlerConnect() {
 	if s.PublicOnly {
+		if len(s.Subscriptions) == 0 {
+			log.Debug("no subscriptions")
+			return
+		}
+
 		var topics []string
 
 		for _, subscription := range s.Subscriptions {

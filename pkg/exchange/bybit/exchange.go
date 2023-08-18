@@ -263,7 +263,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	}
 
 	req := e.client.NewPlaceOrderRequest()
-	req.Symbol(order.Symbol)
+	req.Symbol(order.Market.Symbol)
 
 	// set order type
 	orderType, err := toLocalOrderType(order.Type)
@@ -280,7 +280,16 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	req.Side(side)
 
 	// set quantity
-	req.Qty(order.Market.FormatQuantity(order.Quantity))
+	orderQty := order.Quantity
+	// if the order is market buy, the quantity is quote coin, instead of base coin. so we need to convert it.
+	if order.Type == types.OrderTypeMarket && order.Side == types.SideTypeBuy {
+		ticker, err := e.QueryTicker(ctx, order.Market.Symbol)
+		if err != nil {
+			return nil, err
+		}
+		orderQty = order.Quantity.Mul(ticker.Buy)
+	}
+	req.Qty(order.Market.FormatQuantity(orderQty))
 
 	// set price
 	switch order.Type {
