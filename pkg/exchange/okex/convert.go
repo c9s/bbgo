@@ -165,14 +165,10 @@ func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) 
 func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) {
 	var orders []types.Order
 	for _, orderDetail := range orderDetails {
-		isMargin := false
-		if orderDetail.InstrumentType == string(okexapi.InstrumentTypeMARGIN) {
-			isMargin = true
-		}
 
-		o, err := toGlobalOrder(&orderDetail, isMargin)
+		o, err := toGlobalOrder(&orderDetail)
 		if err != nil {
-			log.WithError(err).Error("order convert error")
+			return nil, err
 		} else {
 			orders = append(orders, *o)
 		}
@@ -218,10 +214,10 @@ func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
 	case okexapi.OrderTypeMarket:
 		return types.OrderTypeMarket, nil
 
-	case okexapi.OrderTypeLimit, okexapi.OrderTypeMarketMakerProtection:
+	case okexapi.OrderTypeLimit, okexapi.OrderTypeFOK, okexapi.OrderTypeIOC, okexapi.OrderTypeMarketMakerProtection:
 		return types.OrderTypeLimit, nil
 
-	case okexapi.OrderTypePostOnly, okexapi.OrderTypeIOC, okexapi.OrderTypeFOK, okexapi.OrderTypeMarektMakerProtectionPostOnly:
+	case okexapi.OrderTypePostOnly, okexapi.OrderTypeMarketMakerProtectionPostOnly:
 		return types.OrderTypeLimitMaker, nil
 
 	}
@@ -236,18 +232,28 @@ func toLocalInterval(src string) string {
 	})
 }
 
-func toGlobalOrder(okexOrder *okexapi.OrderDetails, isMargin bool) (*types.Order, error) {
+func toGlobalSide(side okexapi.SideType) (s types.SideType) {
+	switch string(side) {
+	case "sell":
+		s = types.SideTypeSell
+	case "buy":
+		s = types.SideTypeBuy
+	}
+	return s
+}
+
+func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 
 	orderID, err := strconv.ParseInt(okexOrder.OrderID, 10, 64)
 	if err != nil {
-		return &types.Order{}, err
+		return nil, err
 	}
 
-	side := types.SideType(strings.ToUpper(string(okexOrder.Side)))
+	side := toGlobalSide(okexOrder.Side)
 
 	orderType, err := toGlobalOrderType(okexOrder.OrderType)
 	if err != nil {
-		return &types.Order{}, err
+		return nil, err
 	}
 
 	timeInForce := types.TimeInForceGTC
@@ -260,7 +266,7 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails, isMargin bool) (*types.Order
 
 	orderStatus, err := toGlobalOrderStatus(okexOrder.State)
 	if err != nil {
-		return &types.Order{}, err
+		return nil, err
 	}
 
 	isWorking := false
@@ -268,6 +274,11 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails, isMargin bool) (*types.Order
 	case types.OrderStatusNew, types.OrderStatusPartiallyFilled:
 		isWorking = true
 
+	}
+
+	isMargin := false
+	if okexOrder.InstrumentType == string(okexapi.InstrumentTypeMARGIN) {
+		isMargin = true
 	}
 
 	return &types.Order{
