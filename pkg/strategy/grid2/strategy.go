@@ -1951,6 +1951,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		}
 	})
 
+	session.UserDataStream.OnConnect(func() {
+		s.handleConnect(ctx, session)
+	})
+
 	// if TriggerPrice is zero, that means we need to open the grid when start up
 	if s.TriggerPrice.IsZero() {
 		// must call the openGrid method inside the OnStart callback because
@@ -2111,4 +2115,33 @@ func (s *Strategy) newClientOrderID() string {
 		return uuid.New().String()
 	}
 	return ""
+}
+
+func (s *Strategy) handleConnect(ctx context.Context, session *bbgo.ExchangeSession) {
+	grid := s.getGrid()
+	if grid == nil {
+		return
+	}
+
+	// TODO: move this logics into the active maker orders component, like activeOrders.Sync(ctx)
+	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
+	activeOrders := activeOrderBook.Orders()
+	for _, o := range activeOrders {
+		var updatedOrder *types.Order
+		err := retry.GeneralBackoff(ctx, func() error {
+			var err error
+			updatedOrder, err = s.orderQueryService.QueryOrder(ctx, types.OrderQuery{
+				Symbol:  o.Symbol,
+				OrderID: strconv.FormatUint(o.OrderID, 10),
+			})
+			return err
+		})
+
+		if err != nil {
+			s.logger.WithError(err).Errorf("unable to query order")
+			return
+		}
+
+		activeOrderBook.Update(*updatedOrder)
+	}
 }
