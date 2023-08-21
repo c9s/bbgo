@@ -39,7 +39,7 @@ const (
 	OrderTypeFOK                           OrderType = "fok"
 	OrderTypeIOC                           OrderType = "ioc"
 	OrderTypeMarketMakerProtection         OrderType = "mmp"
-	OrderTypeMarektMakerProtectionPostOnly OrderType = "mmp_and_post_only"
+	OrderTypeMarketMakerProtectionPostOnly OrderType = "mmp_and_post_only"
 )
 
 type InstrumentType string

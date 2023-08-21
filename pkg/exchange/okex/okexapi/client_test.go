@@ -18,7 +18,7 @@ func getTestClientOrSkip(t *testing.T) *RestClient {
 
 	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
 	if !ok {
-		t.SkipNow()
+		t.Skip("Please configure all credentials about OKEX")
 		return nil
 	}
 
