@@ -2,13 +2,13 @@ package bybit
 
 import (
 	"fmt"
-	"hash/fnv"
 	"math"
 	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi/v3"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -53,22 +53,22 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	orderType, err := toGlobalOrderType(order.OrderType)
 	if err != nil {
 		return nil, err
 	}
+
 	timeInForce, err := toGlobalTimeInForce(order.TimeInForce)
 	if err != nil {
 		return nil, err
 	}
-	status, err := toGlobalOrderStatus(order.OrderStatus)
+
+	status, err := toGlobalOrderStatus(order.OrderStatus, order.Side, order.OrderType)
 	if err != nil {
 		return nil, err
 	}
-	working, err := isWorking(order.OrderStatus)
-	if err != nil {
-		return nil, err
-	}
+
 	// linear and inverse : 42f4f364-82e1-49d3-ad1d-cd8cf9aa308d (UUID format)
 	// spot : 1468264727470772736 (only numbers)
 	// Now we only use spot trading.
@@ -77,13 +77,18 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 		return nil, fmt.Errorf("unexpected order id: %s, err: %w", order.OrderId, err)
 	}
 
+	qty, err := processMarketBuyQuantity(order)
+	if err != nil {
+		return nil, err
+	}
+
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: order.OrderLinkId,
 			Symbol:        order.Symbol,
 			Side:          side,
 			Type:          orderType,
-			Quantity:      order.Qty,
+			Quantity:      qty,
 			Price:         order.Price,
 			TimeInForce:   timeInForce,
 		},
@@ -92,7 +97,7 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 		UUID:             order.OrderId,
 		Status:           status,
 		ExecutedQuantity: order.CumExecQty,
-		IsWorking:        working,
+		IsWorking:        status == types.OrderStatusNew || status == types.OrderStatusPartiallyFilled,
 		CreationTime:     types.Time(order.CreatedTime.Time()),
 		UpdateTime:       types.Time(order.UpdatedTime.Time()),
 	}, nil
@@ -140,7 +145,23 @@ func toGlobalTimeInForce(force bybitapi.TimeInForce) (types.TimeInForce, error) 
 	}
 }
 
-func toGlobalOrderStatus(status bybitapi.OrderStatus) (types.OrderStatus, error) {
+func toGlobalOrderStatus(status bybitapi.OrderStatus, side bybitapi.Side, orderType bybitapi.OrderType) (types.OrderStatus, error) {
+	switch status {
+
+	case bybitapi.OrderStatusPartiallyFilledCanceled:
+		// market buy order	-> PartiallyFilled -> PartiallyFilledCanceled
+		if orderType == bybitapi.OrderTypeMarket && side == bybitapi.SideBuy {
+			return types.OrderStatusFilled, nil
+		}
+		// limit buy/sell order -> PartiallyFilled -> PartiallyFilledCanceled(Canceled)
+		return types.OrderStatusCanceled, nil
+
+	default:
+		return processOtherOrderStatus(status)
+	}
+}
+
+func processOtherOrderStatus(status bybitapi.OrderStatus) (types.OrderStatus, error) {
 	switch status {
 	case bybitapi.OrderStatusCreated,
 		bybitapi.OrderStatusNew,
@@ -154,7 +175,6 @@ func toGlobalOrderStatus(status bybitapi.OrderStatus) (types.OrderStatus, error)
 		return types.OrderStatusPartiallyFilled, nil
 
 	case bybitapi.OrderStatusCancelled,
-		bybitapi.OrderStatusPartiallyFilledCanceled,
 		bybitapi.OrderStatusDeactivated:
 		return types.OrderStatusCanceled, nil
 
@@ -169,15 +189,55 @@ func toGlobalOrderStatus(status bybitapi.OrderStatus) (types.OrderStatus, error)
 	}
 }
 
-func hashStringID(s string) uint64 {
-	h := fnv.New64a()
-	h.Write([]byte(s))
-	return h.Sum64()
-}
+// processMarketBuyQuantity converts the quantity unit from quote coin to base coin if the order is a **MARKET BUY**.
+//
+// If the status is OrderStatusPartiallyFilled, it returns the estimated quantity based on the base coin.
+//
+// If the order status is OrderStatusPartiallyFilledCanceled, it indicates that the order is not fully filled,
+// and the system has automatically canceled it. In this scenario, CumExecQty is considered equal to Qty.
+func processMarketBuyQuantity(o bybitapi.Order) (fixedpoint.Value, error) {
+	if o.Side != bybitapi.SideBuy || o.OrderType != bybitapi.OrderTypeMarket {
+		return o.Qty, nil
+	}
 
-func isWorking(status bybitapi.OrderStatus) (bool, error) {
-	s, err := toGlobalOrderStatus(status)
-	return s == types.OrderStatusNew || s == types.OrderStatusPartiallyFilled, err
+	var qty fixedpoint.Value
+	switch o.OrderStatus {
+	case bybitapi.OrderStatusPartiallyFilled:
+		// if CumExecValue is zero, it indicates the caller is from the RESTFUL API.
+		// we can use AvgPrice to estimate quantity.
+		if o.CumExecValue.IsZero() {
+			if o.AvgPrice.IsZero() {
+				return fixedpoint.Zero, fmt.Errorf("AvgPrice shouldn't be zero")
+			}
+
+			qty = o.Qty.Div(o.AvgPrice)
+		} else {
+			if o.CumExecQty.IsZero() {
+				return fixedpoint.Zero, fmt.Errorf("CumExecQty shouldn't be zero")
+			}
+
+			// from web socket event
+			qty = o.Qty.Div(o.CumExecValue.Div(o.CumExecQty))
+		}
+
+	case bybitapi.OrderStatusPartiallyFilledCanceled,
+		// Considering extreme scenarios, there's a possibility that 'OrderStatusFilled' could occur.
+		bybitapi.OrderStatusFilled:
+		qty = o.CumExecQty
+
+	case bybitapi.OrderStatusCreated,
+		bybitapi.OrderStatusNew,
+		bybitapi.OrderStatusRejected:
+		qty = fixedpoint.Zero
+
+	case bybitapi.OrderStatusCancelled:
+		qty = o.Qty
+
+	default:
+		return fixedpoint.Zero, fmt.Errorf("unexpected order status: %s", o.OrderStatus)
+	}
+
+	return qty, nil
 }
 
 func toLocalOrderType(orderType types.OrderType) (bybitapi.OrderType, error) {

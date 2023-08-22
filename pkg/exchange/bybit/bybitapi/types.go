@@ -68,9 +68,10 @@ const (
 	// OrderStatusCreated order has been accepted by the system but not yet put through the matching engine
 	OrderStatusCreated OrderStatus = "Created"
 	// OrderStatusNew is order has been placed successfully.
-	OrderStatusNew                     OrderStatus = "New"
-	OrderStatusRejected                OrderStatus = "Rejected"
-	OrderStatusPartiallyFilled         OrderStatus = "PartiallyFilled"
+	OrderStatusNew             OrderStatus = "New"
+	OrderStatusRejected        OrderStatus = "Rejected"
+	OrderStatusPartiallyFilled OrderStatus = "PartiallyFilled"
+	// OrderStatusPartiallyFilledCanceled means that the order has been partially filled but not all then cancel.
 	OrderStatusPartiallyFilledCanceled OrderStatus = "PartiallyFilledCanceled"
 	OrderStatusFilled                  OrderStatus = "Filled"
 	OrderStatusCancelled               OrderStatus = "Cancelled"
