@@ -26,7 +26,7 @@ var log = logrus.WithFields(logrus.Fields{
 	"exchange": ID,
 })
 
-var ErrSymbolRequired = errors.New("Symbol is required parameter")
+var ErrSymbolRequired = errors.New("symbol is a required parameter")
 
 type Exchange struct {
 	key, secret, passphrase string

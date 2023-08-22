@@ -168,10 +168,9 @@ func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) 
 
 		o, err := toGlobalOrder(&orderDetail)
 		if err != nil {
-			return nil, err
-		} else {
-			orders = append(orders, *o)
+			log.WithError(err).Error("order convert error")
 		}
+		orders = append(orders, *o)
 	}
 
 	return orders, nil
@@ -210,6 +209,8 @@ func toLocalOrderType(orderType types.OrderType) (okexapi.OrderType, error) {
 }
 
 func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
+	// Okex IOC and FOK only implement limit order
+	// reference: https://www.okx.com/cn/help-center/360025135731
 	switch orderType {
 	case okexapi.OrderTypeMarket:
 		return types.OrderTypeMarket, nil
