@@ -33,13 +33,11 @@ const (
 type OrderType string
 
 const (
-	OrderTypeMarket                        OrderType = "market"
-	OrderTypeLimit                         OrderType = "limit"
-	OrderTypePostOnly                      OrderType = "post_only"
-	OrderTypeFOK                           OrderType = "fok"
-	OrderTypeIOC                           OrderType = "ioc"
-	OrderTypeMarketMakerProtection         OrderType = "mmp"
-	OrderTypeMarketMakerProtectionPostOnly OrderType = "mmp_and_post_only"
+	OrderTypeMarket   OrderType = "market"
+	OrderTypeLimit    OrderType = "limit"
+	OrderTypePostOnly OrderType = "post_only"
+	OrderTypeFOK      OrderType = "fok"
+	OrderTypeIOC      OrderType = "ioc"
 )
 
 type InstrumentType string

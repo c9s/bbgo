@@ -214,10 +214,10 @@ func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
 	case okexapi.OrderTypeMarket:
 		return types.OrderTypeMarket, nil
 
-	case okexapi.OrderTypeLimit, okexapi.OrderTypeFOK, okexapi.OrderTypeIOC, okexapi.OrderTypeMarketMakerProtection:
+	case okexapi.OrderTypeLimit, okexapi.OrderTypeFOK, okexapi.OrderTypeIOC:
 		return types.OrderTypeLimit, nil
 
-	case okexapi.OrderTypePostOnly, okexapi.OrderTypeMarketMakerProtectionPostOnly:
+	case okexapi.OrderTypePostOnly:
 		return types.OrderTypeLimitMaker, nil
 
 	}
