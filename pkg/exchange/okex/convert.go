@@ -171,6 +171,7 @@ func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) 
 		o, err2 := toGlobalOrder(&orderDetail)
 		if err2 != nil {
 			err = multierr.Append(err, err2)
+			continue
 		}
 		orders = append(orders, *o)
 	}
