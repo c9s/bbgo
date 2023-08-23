@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -164,16 +165,17 @@ func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) 
 
 func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) {
 	var orders []types.Order
+	var err error
 	for _, orderDetail := range orderDetails {
 
-		o, err := toGlobalOrder(&orderDetail)
-		if err != nil {
-			log.WithError(err).Error("order convert error")
+		o, err2 := toGlobalOrder(&orderDetail)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
 		}
 		orders = append(orders, *o)
 	}
 
-	return orders, nil
+	return orders, err
 }
 
 func toGlobalOrderStatus(state okexapi.OrderState) (types.OrderStatus, error) {
@@ -209,8 +211,7 @@ func toLocalOrderType(orderType types.OrderType) (okexapi.OrderType, error) {
 }
 
 func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
-	// Okex IOC and FOK only implement limit order
-	// reference: https://www.okx.com/cn/help-center/360025135731
+	// IOC, FOK are only allowed with limit order type, so we assume the order type is always limit order for FOK, IOC orders
 	switch orderType {
 	case okexapi.OrderTypeMarket:
 		return types.OrderTypeMarket, nil
