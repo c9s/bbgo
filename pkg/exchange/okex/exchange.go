@@ -26,6 +26,8 @@ var log = logrus.WithFields(logrus.Fields{
 	"exchange": ID,
 })
 
+var ErrSymbolRequired = errors.New("symbol is a required parameter")
+
 type Exchange struct {
 	key, secret, passphrase string
 
@@ -273,7 +275,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 	var reqs []*okexapi.CancelOrderRequest
 	for _, order := range orders {
 		if len(order.Symbol) == 0 {
-			return errors.New("symbol is required for canceling an okex order")
+			return ErrSymbolRequired
 		}
 
 		req := e.client.TradeService.NewCancelOrderRequest()
@@ -338,4 +340,26 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 	return klines, nil
 
+}
+
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	if len(q.Symbol) == 0 {
+		return nil, ErrSymbolRequired
+	}
+	if len(q.OrderID) == 0 && len(q.ClientOrderID) == 0 {
+		return nil, errors.New("okex.QueryOrder: OrderId or ClientOrderId is required parameter")
+	}
+	req := e.client.TradeService.NewGetOrderDetailsRequest()
+	req.InstrumentID(q.Symbol).
+		OrderID(q.OrderID).
+		ClientOrderID(q.ClientOrderID)
+
+	var order *okexapi.OrderDetails
+	order, err := req.Do(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return toGlobalOrder(order)
 }

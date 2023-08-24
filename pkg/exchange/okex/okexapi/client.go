@@ -47,6 +47,7 @@ const (
 	InstrumentTypeSwap    InstrumentType = "SWAP"
 	InstrumentTypeFutures InstrumentType = "FUTURES"
 	InstrumentTypeOption  InstrumentType = "OPTION"
+	InstrumentTypeMARGIN  InstrumentType = "MARGIN"
 )
 
 type OrderState string

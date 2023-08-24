@@ -363,7 +363,7 @@ func (r *GetOrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) 
 	}
 
 	if len(orderResponse.Data) == 0 {
-		return nil, errors.New("order create error")
+		return nil, errors.New("get order details error")
 	}
 
 	return &orderResponse.Data[0], nil
