@@ -22,17 +22,19 @@ func getTestClientOrSkip(t *testing.T) *RestClient {
 		return nil
 	}
 
-	client := NewClient()
+	client, err := NewClient()
+	assert.NoError(t, err)
 	client.Auth(key, secret, passphrase)
 	return client
 }
 
 func TestClient_GetInstrumentsRequest(t *testing.T) {
-	client := NewClient()
+	client, err := NewClient()
+	assert.NoError(t, err)
 	ctx := context.Background()
 
-	srv := &PublicDataService{client: client}
-	req := srv.NewGetInstrumentsRequest()
+	// srv := &PublicDataService{client: client}
+	req := client.NewGetInstrumentsRequest()
 
 	instruments, err := req.
 		InstrumentType(InstrumentTypeSpot).
@@ -43,10 +45,11 @@ func TestClient_GetInstrumentsRequest(t *testing.T) {
 }
 
 func TestClient_GetFundingRateRequest(t *testing.T) {
-	client := NewClient()
+	client, err := NewClient()
+	assert.NoError(t, err)
 	ctx := context.Background()
-	srv := &PublicDataService{client: client}
-	req := srv.NewGetFundingRate()
+	// srv := &PublicDataService{client: client}
+	req := client.NewGetFundingRate()
 
 	instrument, err := req.
 		InstrumentID("BTC-USDT-SWAP").
@@ -59,8 +62,7 @@ func TestClient_GetFundingRateRequest(t *testing.T) {
 func TestClient_PlaceOrderRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	srv := &TradeService{client: client}
-	req := srv.NewPlaceOrderRequest()
+	req := client.NewPlaceOrderRequest()
 
 	order, err := req.
 		InstrumentID("BTC-USDT").
@@ -78,8 +80,8 @@ func TestClient_PlaceOrderRequest(t *testing.T) {
 func TestClient_GetPendingOrderRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	srv := &TradeService{client: client}
-	req := srv.NewGetPendingOrderRequest()
+	// srv := &TradeService{client: client}
+	req := client.NewGetPendingOrderRequest()
 	odr_type := []string{string(OrderTypeLimit), string(OrderTypeIOC)}
 
 	pending_order, err := req.
@@ -94,8 +96,8 @@ func TestClient_GetPendingOrderRequest(t *testing.T) {
 func TestClient_GetOrderDetailsRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	srv := &TradeService{client: client}
-	req := srv.NewGetOrderDetailsRequest()
+	// srv := &TradeService{client: client}
+	req := client.NewGetOrderDetailsRequest()
 
 	orderDetail, err := req.
 		InstrumentID("BTC-USDT").
@@ -104,4 +106,69 @@ func TestClient_GetOrderDetailsRequest(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, orderDetail)
 	t.Logf("order detail: %+v", orderDetail)
+}
+
+func TestClient_GetTransactionDetailsRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	// srv := &TradeService{client: client}
+	req := client.NewGetTransactionDetailsRequest()
+
+	transactionDetail, err := req.
+		InstrumentType(InstrumentTypeSpot).
+		Do(ctx)
+
+	assert.NoError(t, err)
+	assert.Empty(t, transactionDetail) // No transaction in 3 days
+	t.Logf("transaction detail: %+v", transactionDetail)
+}
+
+func TestClient_GetAccountBalanceRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	account, err := client.AccountBalances(ctx)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, account)
+	t.Logf("account detail: %+v", account)
+}
+
+func TestClient_GetAssetBalancesRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	asset, err := client.AssetBalances(ctx)
+
+	assert.NoError(t, err)
+	assert.Empty(t, asset)
+	t.Logf("asset detail: %+v", asset)
+}
+
+func TestClient_GetAssetCurrenciesRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	asset, err := client.AssetCurrencies(ctx)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, asset)
+	t.Logf("asset detail: %+v", asset)
+}
+
+func TestClient_GetMarketTickerRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	ticker, err := client.MarketTicker(ctx, "BTC-USDT")
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, ticker)
+	t.Logf("ticker detail: %+v", ticker)
+}
+
+func TestClient_GetMarketTickersRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	ticker, err := client.MarketTickers(ctx, "SPOT")
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, ticker)
+	t.Logf("ticker detail: %+v", ticker)
 }

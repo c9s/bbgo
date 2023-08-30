@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_QueryOrder(t *testing.T) {
+func Test_QueryOrderTrades(t *testing.T) {
 	key := os.Getenv("OKEX_API_KEY")
 	secret := os.Getenv("OKEX_API_SECRET")
 	passphrase := os.Getenv("OKEX_API_PASSPHRASE")
@@ -26,12 +26,11 @@ func Test_QueryOrder(t *testing.T) {
 	assert.NoError(t, err)
 
 	queryOrder := types.OrderQuery{
-		Symbol:  "BTC-USDT",
 		OrderID: "609869603774656544",
 	}
-	orderDetail, err := e.QueryOrder(context.Background(), queryOrder)
+	transactionDetail, err := e.QueryOrderTrades(context.Background(), queryOrder)
 	if assert.NoError(t, err) {
-		assert.NotEmpty(t, orderDetail)
+		assert.Empty(t, transactionDetail) // No transaction in 3 days
 	}
-	t.Logf("order detail: %+v", orderDetail)
+	t.Logf("transaction detail: %+v", transactionDetail)
 }

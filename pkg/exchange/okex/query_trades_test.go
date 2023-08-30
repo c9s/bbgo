@@ -4,12 +4,13 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_QueryOrder(t *testing.T) {
+func Test_QueryTrades(t *testing.T) {
 	key := os.Getenv("OKEX_API_KEY")
 	secret := os.Getenv("OKEX_API_SECRET")
 	passphrase := os.Getenv("OKEX_API_PASSPHRASE")
@@ -26,12 +27,20 @@ func Test_QueryOrder(t *testing.T) {
 	assert.NoError(t, err)
 
 	queryOrder := types.OrderQuery{
-		Symbol:  "BTC-USDT",
-		OrderID: "609869603774656544",
+		Symbol: "BTC-USDT",
 	}
-	orderDetail, err := e.QueryOrder(context.Background(), queryOrder)
+
+	since := time.Now().AddDate(0, -3, 0)
+	until := time.Now()
+
+	queryOption := types.TradeQueryOptions{
+		StartTime: &since,
+		EndTime:   &until,
+		Limit:     100,
+	}
+	transactionDetail, err := e.QueryTrades(context.Background(), queryOrder.Symbol, &queryOption)
 	if assert.NoError(t, err) {
-		assert.NotEmpty(t, orderDetail)
+		assert.NotEmpty(t, transactionDetail)
 	}
-	t.Logf("order detail: %+v", orderDetail)
+	t.Logf("transaction detail: %+v", transactionDetail)
 }

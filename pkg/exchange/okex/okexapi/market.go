@@ -82,12 +82,12 @@ func (r *CandlesticksRequest) Do(ctx context.Context) ([]Candle, error) {
 		params.Add("limit", strconv.Itoa(*r.limit))
 	}
 
-	req, err := r.client.newRequest("GET", "/api/v5/market/candles", params, nil)
+	req, err := r.client.NewRequest(ctx, "GET", "/api/v5/market/candles", params, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := r.client.sendRequest(req)
+	resp, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -177,12 +177,12 @@ func (r *MarketTickersRequest) Do(ctx context.Context) ([]MarketTicker, error) {
 	var params = url.Values{}
 	params.Add("instType", string(r.instType))
 
-	req, err := r.client.newRequest("GET", "/api/v5/market/tickers", params, nil)
+	req, err := r.client.NewRequest(ctx, "GET", "/api/v5/market/tickers", params, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -216,12 +216,12 @@ func (r *MarketTickerRequest) Do(ctx context.Context) (*MarketTicker, error) {
 	var params = url.Values{}
 	params.Add("instId", r.instId)
 
-	req, err := r.client.newRequest("GET", "/api/v5/market/ticker", params, nil)
+	req, err := r.client.NewRequest(ctx, "GET", "/api/v5/market/ticker", params, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -242,27 +242,27 @@ func (r *MarketTickerRequest) Do(ctx context.Context) (*MarketTicker, error) {
 	return &tickerResponse.Data[0], nil
 }
 
-type MarketDataService struct {
-	client *RestClient
-}
+// type MarketDataService struct {
+// 	client *RestClient
+// }
 
-func (c *MarketDataService) NewMarketTickerRequest(instId string) *MarketTickerRequest {
+func (c *RestClient) NewMarketTickerRequest(instId string) *MarketTickerRequest {
 	return &MarketTickerRequest{
-		client: c.client,
+		client: c,
 		instId: instId,
 	}
 }
 
-func (c *MarketDataService) NewMarketTickersRequest(instType string) *MarketTickersRequest {
+func (c *RestClient) NewMarketTickersRequest(instType string) *MarketTickersRequest {
 	return &MarketTickersRequest{
-		client:   c.client,
+		client:   c,
 		instType: instType,
 	}
 }
 
-func (c *MarketDataService) NewCandlesticksRequest(instId string) *CandlesticksRequest {
+func (c *RestClient) NewCandlesticksRequest(instId string) *CandlesticksRequest {
 	return &CandlesticksRequest{
-		client: c.client,
+		client: c,
 		instId: instId,
 	}
 }

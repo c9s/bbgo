@@ -2,12 +2,14 @@ package okex
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
@@ -16,11 +18,17 @@ import (
 )
 
 var marketDataLimiter = rate.NewLimiter(rate.Every(time.Second/10), 1)
+var tradeRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
 
 const ID = "okex"
 
 // PlatformToken is the platform currency of OKEx, pre-allocate static string here
 const PlatformToken = "OKB"
+
+// Constant For query limit
+const (
+	defaultQueryLimit = 100
+)
 
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": ID,
@@ -34,8 +42,11 @@ type Exchange struct {
 	client *okexapi.RestClient
 }
 
-func New(key, secret, passphrase string) *Exchange {
-	client := okexapi.NewClient()
+func New(key, secret, passphrase string) (*Exchange, error) {
+	client, err := okexapi.NewClient()
+	if err != nil {
+		return nil, err
+	}
 
 	if len(key) > 0 && len(secret) > 0 {
 		client.Auth(key, secret, passphrase)
@@ -46,7 +57,7 @@ func New(key, secret, passphrase string) *Exchange {
 		secret:     secret,
 		passphrase: passphrase,
 		client:     client,
-	}
+	}, nil
 }
 
 func (e *Exchange) Name() types.ExchangeName {
@@ -54,7 +65,7 @@ func (e *Exchange) Name() types.ExchangeName {
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-	instruments, err := e.client.PublicDataService.NewGetInstrumentsRequest().
+	instruments, err := e.client.NewGetInstrumentsRequest().
 		InstrumentType(okexapi.InstrumentTypeSpot).
 		Do(ctx)
 
@@ -98,7 +109,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
 	symbol = toLocalSymbol(symbol)
 
-	marketTicker, err := e.client.MarketTicker(symbol)
+	marketTicker, err := e.client.MarketTicker(ctx, symbol)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +118,7 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[string]types.Ticker, error) {
-	marketTickers, err := e.client.MarketTickers(okexapi.InstrumentTypeSpot)
+	marketTickers, err := e.client.MarketTickers(ctx, okexapi.InstrumentTypeSpot)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +149,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	accountBalance, err := e.client.AccountBalances()
+	accountBalance, err := e.client.AccountBalances(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +164,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	accountBalances, err := e.client.AccountBalances()
+	accountBalances, err := e.client.AccountBalances(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +174,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
-	orderReq := e.client.TradeService.NewPlaceOrderRequest()
+	orderReq := e.client.NewPlaceOrderRequest()
 
 	orderType, err := toLocalOrderType(order.Type)
 	if err != nil {
@@ -257,7 +268,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	instrumentID := toLocalSymbol(symbol)
-	req := e.client.TradeService.NewGetPendingOrderRequest().InstrumentType(okexapi.InstrumentTypeSpot).InstrumentID(instrumentID)
+	req := e.client.NewGetPendingOrderRequest().InstrumentType(okexapi.InstrumentTypeSpot).InstrumentID(instrumentID)
 	orderDetails, err := req.Do(ctx)
 	if err != nil {
 		return orders, err
@@ -278,7 +289,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 			return ErrSymbolRequired
 		}
 
-		req := e.client.TradeService.NewCancelOrderRequest()
+		req := e.client.NewCancelOrderRequest()
 		req.InstrumentID(toLocalSymbol(order.Symbol))
 		req.OrderID(strconv.FormatUint(order.OrderID, 10))
 		if len(order.ClientOrderID) > 0 {
@@ -287,7 +298,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		reqs = append(reqs, req)
 	}
 
-	batchReq := e.client.TradeService.NewBatchCancelOrderRequest()
+	batchReq := e.client.NewBatchCancelOrderRequest()
 	batchReq.Add(reqs...)
 	_, err := batchReq.Do(ctx)
 	return err
@@ -304,7 +315,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 	intervalParam := toLocalInterval(interval.String())
 
-	req := e.client.MarketDataService.NewCandlesticksRequest(toLocalSymbol(symbol))
+	req := e.client.NewCandlesticksRequest(toLocalSymbol(symbol))
 	req.Bar(intervalParam)
 
 	if options.StartTime != nil {
@@ -349,7 +360,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	if len(q.OrderID) == 0 && len(q.ClientOrderID) == 0 {
 		return nil, errors.New("okex.QueryOrder: OrderId or ClientOrderId is required parameter")
 	}
-	req := e.client.TradeService.NewGetOrderDetailsRequest()
+	req := e.client.NewGetOrderDetailsRequest()
 	req.InstrumentID(q.Symbol).
 		OrderID(q.OrderID).
 		ClientOrderID(q.ClientOrderID)
@@ -362,4 +373,130 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	}
 
 	return toGlobalOrder(order)
+}
+
+func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
+	if len(q.ClientOrderID) != 0 {
+		log.Warn("!!!OKEX EXCHANGE API NOTICE!!! Okex does not support searching for trades using OrderClientId.")
+	}
+
+	if len(q.OrderID) == 0 {
+		return nil, errors.New("orderID is required parameter")
+	}
+	req := e.client.NewGetTransactionDetailsRequest().OrderID(q.OrderID)
+
+	if len(q.Symbol) != 0 {
+		req.InstrumentID(q.Symbol)
+	}
+
+	if err := tradeRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("trade rate limiter wait error: %w", err)
+	}
+	response, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query order trades, err: %w", err)
+	}
+
+	var trades []types.Trade
+	var errs error
+	for _, trade := range response {
+		res, err := toGlobalTrade(&trade)
+		if err != nil {
+			errs = multierr.Append(errs, err)
+			continue
+		}
+		trades = append(trades, *res)
+	}
+
+	if errs != nil {
+		return nil, errs
+	}
+
+	return trades, nil
+}
+
+/*
+Query Closed trades can query closed trades in last 3 months, there are no time interval limitations, as long as until >= since.
+LastTradeID is used as cursor, only return trades earlier than that trade.
+If you want to query trades by time range, please just pass since and until.
+If you want to query by cursor, please pass LatestTradeID.
+Though it still get correct response even we pass all parameters with right time interval and wrong trade id, like 0.
+*/
+func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error) {
+	if symbol == "" {
+		return nil, ErrSymbolRequired
+	}
+
+	if err := tradeRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
+	}
+
+	var lastOrder string = strconv.FormatUint(lastOrderID, 10)
+
+	res, err := e.client.NewGetOrderHistoriesRequest().
+		SetInstrumentID(symbol).
+		StartTime(since).
+		EndTime(until).
+		Limit(defaultQueryLimit).
+		After(lastOrder).
+		Do(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
+	}
+
+	var orders []types.Order
+
+	for _, order := range res {
+		o, err2 := toGlobalOrder(&order)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+			continue
+		}
+
+		if o.Status.Closed() {
+			orders = append(orders, *o)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return types.SortOrdersAscending(orders), nil
+}
+
+/*
+Query trades can query trades in last 3 months, there are no time interval limitations, as long as end_time >= start_time.
+LastTradeID is used as cursor, only return trades earlier than that trade.
+If you want to query trades by time range, please just pass start_time and end_time.
+If you want to query by cursor, please pass LatestTradeID.
+Though it still get correct response even we pass all parameters with right time interval and wrong trade id, like 0.
+*/
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
+	if symbol == "" {
+		return nil, ErrSymbolRequired
+	}
+
+	if err := tradeRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query trades rate limiter wait error: %w", err)
+	}
+
+	var lastOrder string = strconv.FormatUint(options.LastTradeID, 10)
+	res, err := e.client.NewGetOrderHistoriesRequest().
+		SetInstrumentID(symbol).
+		StartTime(*options.StartTime).
+		EndTime(*options.EndTime).
+		Limit(uint64(options.Limit)).
+		After(lastOrder).
+		Do(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
+	}
+
+	trades, err := toGlobalTrades(res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to trans order detail to trades error: %w", err)
+	}
+	return trades, nil
 }

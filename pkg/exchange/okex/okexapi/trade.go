@@ -2,6 +2,7 @@ package okexapi
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -10,9 +11,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-type TradeService struct {
-	client *RestClient
-}
+// type TradeService struct {
+// 	client *RestClient
+// }
 
 type OrderResponse struct {
 	OrderID       string `json:"ordId"`
@@ -22,45 +23,45 @@ type OrderResponse struct {
 	Message       string `json:"sMsg"`
 }
 
-func (c *TradeService) NewPlaceOrderRequest() *PlaceOrderRequest {
+func (c *RestClient) NewPlaceOrderRequest() *PlaceOrderRequest {
 	return &PlaceOrderRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
+func (c *RestClient) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
 	return &BatchPlaceOrderRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewCancelOrderRequest() *CancelOrderRequest {
+func (c *RestClient) NewCancelOrderRequest() *CancelOrderRequest {
 	return &CancelOrderRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewBatchCancelOrderRequest() *BatchCancelOrderRequest {
+func (c *RestClient) NewBatchCancelOrderRequest() *BatchCancelOrderRequest {
 	return &BatchCancelOrderRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewGetOrderDetailsRequest() *GetOrderDetailsRequest {
+func (c *RestClient) NewGetOrderDetailsRequest() *GetOrderDetailsRequest {
 	return &GetOrderDetailsRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewGetPendingOrderRequest() *GetPendingOrderRequest {
+func (c *RestClient) NewGetPendingOrderRequest() *GetPendingOrderRequest {
 	return &GetPendingOrderRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewGetTransactionDetailsRequest() *GetTransactionDetailsRequest {
+func (c *RestClient) NewGetTransactionDetailsRequest() *GetTransactionDetailsRequest {
 	return &GetTransactionDetailsRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
@@ -99,12 +100,12 @@ func (r *PlaceOrderRequest) Parameters() map[string]interface{} {
 
 func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
 	payload := r.Parameters()
-	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/order", nil, payload)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/order", nil, payload)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -149,12 +150,12 @@ func (r *CancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, error) {
 		return nil, errors.New("either orderID or clientOrderID is required for canceling order")
 	}
 
-	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/cancel-order", nil, payload)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/cancel-order", nil, payload)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -190,12 +191,12 @@ func (r *BatchCancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, erro
 		parameterList = append(parameterList, params)
 	}
 
-	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/cancel-batch-orders", nil, parameterList)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/cancel-batch-orders", nil, parameterList)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -231,12 +232,12 @@ func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error
 		parameterList = append(parameterList, params)
 	}
 
-	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/batch-orders", nil, parameterList)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/batch-orders", nil, parameterList)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -343,12 +344,12 @@ func (r *GetOrderDetailsRequest) QueryParameters() url.Values {
 
 func (r *GetOrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) {
 	params := r.QueryParameters()
-	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/order", params, nil)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v5/trade/order", params, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -430,12 +431,13 @@ func (r *GetPendingOrderRequest) Parameters() map[string]interface{} {
 
 func (r *GetPendingOrderRequest) Do(ctx context.Context) ([]OrderDetails, error) {
 	payload := r.Parameters()
-	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/orders-pending", nil, payload)
+	fmt.Println(payload)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v5/trade/orders-pending", nil, payload)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -477,32 +479,46 @@ func (r *GetTransactionDetailsRequest) OrderID(orderID string) *GetTransactionDe
 	return r
 }
 
-func (r *GetTransactionDetailsRequest) Parameters() map[string]interface{} {
+func (r *GetTransactionDetailsRequest) Parameters() (url.Values, error) {
 	var payload = map[string]interface{}{}
 
 	if r.instType != nil {
-		payload["instType"] = r.instType
+		instType := *r.instType
+		payload["instType"] = instType
 	}
 
 	if r.instId != nil {
-		payload["instId"] = r.instId
+		instId := *r.instId
+		payload["instId"] = instId
 	}
 
 	if r.ordId != nil {
-		payload["ordId"] = r.ordId
+		ordId := *r.ordId
+		payload["ordId"] = ordId
 	}
 
-	return payload
+	query := url.Values{}
+	for _k, _v := range payload {
+		query.Add(_k, fmt.Sprintf("%v", _v))
+	}
+
+	return query, nil
 }
 
 func (r *GetTransactionDetailsRequest) Do(ctx context.Context) ([]OrderDetails, error) {
-	payload := r.Parameters()
-	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/fills", nil, payload)
+
+	// no body params
+	var params interface{}
+	query, err := r.Parameters()
+	if err != nil {
+		return nil, err
+	}
+	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v5/trade/fills", query, params)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -517,4 +533,64 @@ func (r *GetTransactionDetailsRequest) Do(ctx context.Context) ([]OrderDetails, 
 	}
 
 	return orderResponse.Data, nil
+}
+
+type TradeDetails struct {
+	InstrumentType string `json:"instType"`
+	InstrumentID   string `json:"instId"`
+	TradeID        string `json:"tradeId"`
+	// Tag            string           `json:"tag"`
+	// Price          fixedpoint.Value `json:"px"`
+	// Quantity       fixedpoint.Value `json:"sz"`
+
+	OrderID       string `json:"ordId"`
+	ClientOrderID string `json:"clOrdId"`
+	BillID        string `json:"billId"`
+	Tag           string `json:"tag"`
+	// OrderType     OrderType `json:"ordType"`
+	// Side          SideType  `json:"side"`
+
+	// // Accumulated fill quantity
+	// FilledQuantity fixedpoint.Value `json:"accFillSz"`
+
+	// FeeCurrency string           `json:"feeCcy"`
+	// Fee         fixedpoint.Value `json:"fee"`
+
+	// // trade related fields
+	// LastTradeID           string                     `json:"tradeId,omitempty"`
+	LastFilledPrice    fixedpoint.Value `json:"fillPx"`
+	LastFilledQuantity fixedpoint.Value `json:"fillSz"`
+	IndexPrice         fixedpoint.Value `json:"fillIdxPx"`
+	LastFilledProfit   fixedpoint.Value `json:"fillPnl"`
+	Side               SideType         `json:"side"`
+	PositionSide       string           `json:"posSide"`
+	// LastFilledTime        types.MillisecondTimestamp `json:"fillTime"`
+	// LastFilledFee         fixedpoint.Value           `json:"fillFee"`
+	// LastFilledFeeCurrency string                     `json:"fillFeeCcy"`
+
+	// ExecutionType = liquidity (M = maker or T = taker)
+	ExecutionType string           `json:"execType"`
+	FeeCurrency   string           `json:"feeCcy"`
+	Fee           fixedpoint.Value `json:"fee"`
+
+	// Average filled price. If none is filled, it will return 0.
+	AveragePrice fixedpoint.Value `json:"avgPx"`
+
+	// Currency = Margin currency
+	// Only applicable to cross MARGIN orders in Single-currency margin.
+	Currency string `json:"ccy"`
+
+	// Leverage = from 0.01 to 125.
+	// Only applicable to MARGIN/FUTURES/SWAP
+	Leverage fixedpoint.Value `json:"lever"`
+
+	RebateCurrency string           `json:"rebateCcy"`
+	Rebate         fixedpoint.Value `json:"rebate"`
+
+	PnL fixedpoint.Value `json:"pnl"`
+
+	UpdateTime   types.MillisecondTimestamp `json:"uTime"`
+	CreationTime types.MillisecondTimestamp `json:"cTime"`
+
+	State OrderState `json:"state"`
 }

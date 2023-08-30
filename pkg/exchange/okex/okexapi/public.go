@@ -9,19 +9,19 @@ import (
 	"github.com/pkg/errors"
 )
 
-type PublicDataService struct {
-	client *RestClient
-}
+// type PublicDataService struct {
+// 	client *RestClient
+// }
 
-func (s *PublicDataService) NewGetInstrumentsRequest() *GetInstrumentsRequest {
+func (c *RestClient) NewGetInstrumentsRequest() *GetInstrumentsRequest {
 	return &GetInstrumentsRequest{
-		client: s.client,
+		client: c,
 	}
 }
 
-func (s *PublicDataService) NewGetFundingRate() *GetFundingRateRequest {
+func (c *RestClient) NewGetFundingRate() *GetFundingRateRequest {
 	return &GetFundingRateRequest{
-		client: s.client,
+		client: c,
 	}
 }
 
@@ -49,12 +49,12 @@ func (r *GetFundingRateRequest) Do(ctx context.Context) (*FundingRate, error) {
 	var params = url.Values{}
 	params.Add("instId", string(r.instId))
 
-	req, err := r.client.newRequest("GET", "/api/v5/public/funding-rate", params, nil)
+	req, err := r.client.NewRequest(ctx, "GET", "/api/v5/public/funding-rate", params, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -123,12 +123,12 @@ func (r *GetInstrumentsRequest) Do(ctx context.Context) ([]Instrument, error) {
 		params.Add("instId", *r.instId)
 	}
 
-	req, err := r.client.newRequest("GET", "/api/v5/public/instruments", params, nil)
+	req, err := r.client.NewRequest(ctx, "GET", "/api/v5/public/instruments", params, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
