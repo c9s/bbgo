@@ -9,10 +9,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// type PublicDataService struct {
-// 	client *RestClient
-// }
-
 func (c *RestClient) NewGetInstrumentsRequest() *GetInstrumentsRequest {
 	return &GetInstrumentsRequest{
 		client: c,

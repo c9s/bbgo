@@ -242,10 +242,6 @@ func (r *MarketTickerRequest) Do(ctx context.Context) (*MarketTicker, error) {
 	return &tickerResponse.Data[0], nil
 }
 
-// type MarketDataService struct {
-// 	client *RestClient
-// }
-
 func (c *RestClient) NewMarketTickerRequest(instId string) *MarketTickerRequest {
 	return &MarketTickerRequest{
 		client: c,

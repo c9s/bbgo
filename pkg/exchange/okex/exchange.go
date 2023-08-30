@@ -17,8 +17,14 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var marketDataLimiter = rate.NewLimiter(rate.Every(time.Second/10), 1)
-var tradeRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
+// Okex rate limit list in each api document
+// The default order limiter apply 30 requests per second and a 5 initial bucket
+// this includes QueryOrder, QueryOrderTrades, SubmitOrder, QueryOpenOrders, CancelOrders
+var (
+	marketDataLimiter = rate.NewLimiter(rate.Every(time.Second/10), 1)
+	tradeRateLimiter  = rate.NewLimiter(rate.Every(time.Second/10), 5)
+	orderRateLimiter  = rate.NewLimiter(rate.Every(time.Second/30), 5)
+)
 
 const ID = "okex"
 
@@ -389,8 +395,8 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 		req.InstrumentID(q.Symbol)
 	}
 
-	if err := tradeRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("trade rate limiter wait error: %w", err)
+	if err := orderRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("order rate limiter wait error: %w", err)
 	}
 	response, err := req.Do(ctx)
 	if err != nil {

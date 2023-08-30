@@ -33,7 +33,6 @@ func TestClient_GetInstrumentsRequest(t *testing.T) {
 	assert.NoError(t, err)
 	ctx := context.Background()
 
-	// srv := &PublicDataService{client: client}
 	req := client.NewGetInstrumentsRequest()
 
 	instruments, err := req.
@@ -48,7 +47,6 @@ func TestClient_GetFundingRateRequest(t *testing.T) {
 	client, err := NewClient()
 	assert.NoError(t, err)
 	ctx := context.Background()
-	// srv := &PublicDataService{client: client}
 	req := client.NewGetFundingRate()
 
 	instrument, err := req.
@@ -80,7 +78,6 @@ func TestClient_PlaceOrderRequest(t *testing.T) {
 func TestClient_GetPendingOrderRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	// srv := &TradeService{client: client}
 	req := client.NewGetPendingOrderRequest()
 	odr_type := []string{string(OrderTypeLimit), string(OrderTypeIOC)}
 
@@ -96,7 +93,6 @@ func TestClient_GetPendingOrderRequest(t *testing.T) {
 func TestClient_GetOrderDetailsRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	// srv := &TradeService{client: client}
 	req := client.NewGetOrderDetailsRequest()
 
 	orderDetail, err := req.
@@ -111,7 +107,6 @@ func TestClient_GetOrderDetailsRequest(t *testing.T) {
 func TestClient_GetTransactionDetailsRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	// srv := &TradeService{client: client}
 	req := client.NewGetTransactionDetailsRequest()
 
 	transactionDetail, err := req.
