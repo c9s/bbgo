@@ -166,7 +166,7 @@ func toGlobalTrade(orderDetail *okexapi.OrderDetails) (*types.Trade, error) {
 		isFuture = true
 	}
 
-	var pnl = sql.NullFloat64{Float64: float64(orderDetail.PnL), Valid: true}
+	var pnl = sql.NullFloat64{Float64: orderDetail.PnL.Float64(), Valid: true}
 
 	return &types.Trade{
 		ID:            uint64(tradeID),
