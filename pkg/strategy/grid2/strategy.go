@@ -583,7 +583,9 @@ func (s *Strategy) handleOrderFilled(o types.Order) {
 	s.processFilledOrder(o)
 }
 
-func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
+func (s *Strategy) checkRequiredInvestmentByQuantity(
+	baseBalance, quoteBalance, quantity, lastPrice fixedpoint.Value, pins []Pin,
+) (requiredBase, requiredQuote fixedpoint.Value, err error) {
 	// check more investment budget details
 	requiredBase = fixedpoint.Zero
 	requiredQuote = fixedpoint.Zero
@@ -641,7 +643,9 @@ func (s *Strategy) checkRequiredInvestmentByQuantity(baseBalance, quoteBalance, 
 	return requiredBase, requiredQuote, nil
 }
 
-func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, amount, lastPrice fixedpoint.Value, pins []Pin) (requiredBase, requiredQuote fixedpoint.Value, err error) {
+func (s *Strategy) checkRequiredInvestmentByAmount(
+	baseBalance, quoteBalance, amount, lastPrice fixedpoint.Value, pins []Pin,
+) (requiredBase, requiredQuote fixedpoint.Value, err error) {
 
 	// check more investment budget details
 	requiredBase = fixedpoint.Zero
@@ -702,7 +706,9 @@ func (s *Strategy) checkRequiredInvestmentByAmount(baseBalance, quoteBalance, am
 	return requiredBase, requiredQuote, nil
 }
 
-func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice fixedpoint.Value, pins []Pin) (fixedpoint.Value, error) {
+func (s *Strategy) calculateQuoteInvestmentQuantity(
+	quoteInvestment, lastPrice fixedpoint.Value, pins []Pin,
+) (fixedpoint.Value, error) {
 	// quoteInvestment = (p1 * q) + (p2 * q) + (p3 * q) + ....
 	// =>
 	// quoteInvestment = (p1 + p2 + p3) * q
@@ -758,7 +764,9 @@ func (s *Strategy) calculateQuoteInvestmentQuantity(quoteInvestment, lastPrice f
 	return q, nil
 }
 
-func (s *Strategy) calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice fixedpoint.Value, pins []Pin) (fixedpoint.Value, error) {
+func (s *Strategy) calculateBaseQuoteInvestmentQuantity(
+	quoteInvestment, baseInvestment, lastPrice fixedpoint.Value, pins []Pin,
+) (fixedpoint.Value, error) {
 	s.logger.Infof("calculating quantity by base/quote investment: %f / %f", baseInvestment.Float64(), quoteInvestment.Float64())
 	// q_p1 = q_p2 = q_p3 = q_p4
 	// baseInvestment = q_p1 + q_p2 + q_p3 + q_p4 + ....
@@ -1463,7 +1471,9 @@ func (s *Strategy) checkMinimalQuoteInvestment(grid *Grid) error {
 	return nil
 }
 
-func (s *Strategy) recoverGridWithOpenOrders(ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order) error {
+func (s *Strategy) recoverGridWithOpenOrders(
+	ctx context.Context, historyService types.ExchangeTradeHistoryService, openOrders []types.Order,
+) error {
 	grid := s.newGrid()
 
 	s.logger.Infof("GRID RECOVER: %s", grid.String())
@@ -1622,7 +1632,10 @@ func (s *Strategy) getGrid() *Grid {
 
 // replayOrderHistory queries the closed order history from the API and rebuild the orderbook from the order history.
 // startTime, endTime is the time range of the order history.
-func (s *Strategy) replayOrderHistory(ctx context.Context, grid *Grid, orderBook *bbgo.ActiveOrderBook, historyService types.ExchangeTradeHistoryService, startTime, endTime time.Time, lastOrderID uint64) error {
+func (s *Strategy) replayOrderHistory(
+	ctx context.Context, grid *Grid, orderBook *bbgo.ActiveOrderBook, historyService types.ExchangeTradeHistoryService,
+	startTime, endTime time.Time, lastOrderID uint64,
+) error {
 	// a simple guard, in reality, this startTime is not possible to exceed the endTime
 	// because the queries closed orders might still in the range.
 	orderIdChanged := true
@@ -1952,7 +1965,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	session.UserDataStream.OnConnect(func() {
-		s.handleConnect(ctx, session)
+		if !bbgo.IsBackTesting {
+			go time.AfterFunc(time.Minute, func() {
+				s.recoverActiveOrders(ctx, session)
+			})
+		}
 	})
 
 	// if TriggerPrice is zero, that means we need to open the grid when start up
@@ -2117,11 +2134,15 @@ func (s *Strategy) newClientOrderID() string {
 	return ""
 }
 
-func (s *Strategy) handleConnect(ctx context.Context, session *bbgo.ExchangeSession) {
+func (s *Strategy) recoverActiveOrders(ctx context.Context, session *bbgo.ExchangeSession) {
 	grid := s.getGrid()
 	if grid == nil {
 		return
 	}
+
+	// this lock avoids recovering the active orders while the openGrid is executing
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	// TODO: move this logics into the active maker orders component, like activeOrders.Sync(ctx)
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
