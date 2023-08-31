@@ -240,9 +240,14 @@ func (s *ProfitStats) AddTrade(trade Trade) {
 	s.AccumulatedVolume = s.AccumulatedVolume.Add(trade.Quantity)
 }
 
+// IsOver checks if the since time is over given duration
+func (s *ProfitStats) IsOver(d time.Duration) bool {
+	return time.Since(time.Unix(s.TodaySince, 0)) >= d
+}
+
 // IsOver24Hours checks if the since time is over 24 hours
 func (s *ProfitStats) IsOver24Hours() bool {
-	return time.Since(time.Unix(s.TodaySince, 0)) >= 24*time.Hour
+	return s.IsOver(24 * time.Hour)
 }
 
 func (s *ProfitStats) ResetToday(t time.Time) {
