@@ -2135,6 +2135,8 @@ func (s *Strategy) newClientOrderID() string {
 }
 
 func (s *Strategy) recoverActiveOrders(ctx context.Context, session *bbgo.ExchangeSession) {
+	s.logger.Infof("recovering active orders after websocket connect")
+
 	grid := s.getGrid()
 	if grid == nil {
 		return
@@ -2147,7 +2149,14 @@ func (s *Strategy) recoverActiveOrders(ctx context.Context, session *bbgo.Exchan
 	// TODO: move this logics into the active maker orders component, like activeOrders.Sync(ctx)
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
 	activeOrders := activeOrderBook.Orders()
+	if len(activeOrders) == 0 {
+		return
+	}
+
+	s.logger.Infof("found %d active orders to update...", len(activeOrders))
 	for _, o := range activeOrders {
+		s.logger.Infof("updating %d order...", o.OrderID)
+
 		var updatedOrder *types.Order
 		err := retry.GeneralBackoff(ctx, func() error {
 			var err error
