@@ -2,6 +2,7 @@ package riskcontrol
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -68,11 +69,13 @@ func Test_IsHalted(t *testing.T) {
 				},
 				priceEWMA,
 				breakCondition,
-				&types.ProfitStats{
-					TodayPnL: realizedPnL,
-				},
+				&types.ProfitStats{},
+				24*time.Hour,
 			)
-			assert.Equal(t, tc.isHalted, riskControl.IsHalted())
+			now := time.Now()
+			riskControl.profitStats.ResetToday(now)
+			riskControl.profitStats.TodayPnL = realizedPnL
+			assert.Equal(t, tc.isHalted, riskControl.IsHalted(now.Add(time.Hour)))
 		})
 	}
 }
