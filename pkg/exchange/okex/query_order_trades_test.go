@@ -30,7 +30,7 @@ func Test_QueryOrderTrades(t *testing.T) {
 	}
 	transactionDetail, err := e.QueryOrderTrades(context.Background(), queryOrder)
 	if assert.NoError(t, err) {
-		assert.Empty(t, transactionDetail) // No transaction in 3 days
+		assert.NotEmpty(t, transactionDetail)
 	}
 	t.Logf("transaction detail: %+v", transactionDetail)
 }

@@ -20,8 +20,9 @@ import (
 // Okex rate limit list in each api document
 // The default order limiter apply 30 requests per second and a 5 initial bucket
 // this includes QueryOrder, QueryOrderTrades, SubmitOrder, QueryOpenOrders, CancelOrders
+// Market data limiter means public api, this includes QueryMarkets, QueryTicker, QueryTickers, QueryKLines
 var (
-	marketDataLimiter = rate.NewLimiter(rate.Every(time.Second/10), 1)
+	marketDataLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
 	tradeRateLimiter  = rate.NewLimiter(rate.Every(time.Second/10), 5)
 	orderRateLimiter  = rate.NewLimiter(rate.Every(time.Second/30), 5)
 )
@@ -381,18 +382,19 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	return toGlobalOrder(order)
 }
 
+// Query order trades can query trades in last 3 months.
 func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
 	if len(q.ClientOrderID) != 0 {
 		log.Warn("!!!OKEX EXCHANGE API NOTICE!!! Okex does not support searching for trades using OrderClientId.")
 	}
 
-	if len(q.OrderID) == 0 {
-		return nil, errors.New("orderID is required parameter")
-	}
-	req := e.client.NewGetTransactionDetailsRequest().OrderID(q.OrderID)
-
+	var req *okexapi.GetTransactionHistoriesRequest
 	if len(q.Symbol) != 0 {
-		req.InstrumentID(q.Symbol)
+		req = e.client.NewGetTransactionHistoriesRequest().SetInstrumentID(q.Symbol)
+	}
+
+	if len(q.OrderID) != 0 {
+		req = e.client.NewGetTransactionHistoriesRequest().SetOrderID(q.OrderID)
 	}
 
 	if err := orderRateLimiter.Wait(ctx); err != nil {
