@@ -460,6 +460,8 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 
 	// will be used for calculating quantity
 	orderExecutedQuoteAmount := executedQuantity.Mul(executedPrice)
+	// round down order executed quote amount to avoid insufficient balance
+	orderExecutedQuoteAmount = orderExecutedQuoteAmount.Round(s.Market.PricePrecision, fixedpoint.Down)
 
 	// collect trades for fee
 	// fee calculation is used to reduce the order quantity
