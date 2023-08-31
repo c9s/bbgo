@@ -1966,7 +1966,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	session.UserDataStream.OnConnect(func() {
 		if !bbgo.IsBackTesting {
-			go time.AfterFunc(time.Minute, func() {
+			// callback may block the stream execution, so we spawn the recover function to the background
+			// add (5 seconds + random <10 seconds jitter) delay
+			go time.AfterFunc(util.MillisecondsJitter(5*time.Second, 1000*10), func() {
 				s.recoverActiveOrders(ctx, session)
 			})
 		}
