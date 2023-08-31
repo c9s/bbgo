@@ -1964,16 +1964,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		}
 	})
 
-	session.UserDataStream.OnConnect(func() {
-		if !bbgo.IsBackTesting {
-			// callback may block the stream execution, so we spawn the recover function to the background
-			// add (5 seconds + random <10 seconds jitter) delay
-			go time.AfterFunc(util.MillisecondsJitter(5*time.Second, 1000*10), func() {
-				s.recoverActiveOrders(ctx, session)
-			})
-		}
-	})
-
 	// if TriggerPrice is zero, that means we need to open the grid when start up
 	if s.TriggerPrice.IsZero() {
 		// must call the openGrid method inside the OnStart callback because
@@ -1985,12 +1975,24 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			s.logger.Infof("user data stream started, initializing grid...")
 
 			if !bbgo.IsBackTesting {
-				go s.startProcess(ctx, session)
+				go time.AfterFunc(3*time.Second, func() {
+					s.startProcess(ctx, session)
+				})
 			} else {
 				s.startProcess(ctx, session)
 			}
 		})
 	}
+
+	session.UserDataStream.OnConnect(func() {
+		if !bbgo.IsBackTesting {
+			// callback may block the stream execution, so we spawn the recover function to the background
+			// add (5 seconds + random <10 seconds jitter) delay
+			go time.AfterFunc(util.MillisecondsJitter(5*time.Second, 1000*10), func() {
+				s.recoverActiveOrders(ctx, session)
+			})
+		}
+	})
 
 	return nil
 }
