@@ -524,7 +524,7 @@ func TestTradeEvent_toGlobalTrade(t *testing.T) {
 			OrderId:         fmt.Sprintf("%d", expTrade.OrderID),
 			OrderLinkId:     "1691419101980",
 			Category:        "spot",
-			Symbol:          fmt.Sprintf("%s", expTrade.Symbol),
+			Symbol:          expTrade.Symbol,
 			ExecId:          fmt.Sprintf("%d", expTrade.ID),
 			ExecPrice:       expTrade.Price,
 			ExecQty:         expTrade.Quantity,
