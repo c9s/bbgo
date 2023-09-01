@@ -81,25 +81,25 @@ type KLineEvent struct {
 }
 
 /*
-{
-  "c": "kline",
-  "M": "btcusdt",
-  "e": "update",
-  "T": 1602999650179,
-  "k": {
-    "ST": 1602999900000,
-    "ET": 1602999900000,
-    "M": "btcusdt",
-    "R": "5m",
-    "O": "11417.21",
-    "H": "11417.21",
-    "L": "11417.21",
-    "C": "11417.21",
-    "v": "0",
-    "ti": 0,
-    "x": false
-  }
-}
+	{
+	  "c": "kline",
+	  "M": "btcusdt",
+	  "e": "update",
+	  "T": 1602999650179,
+	  "k": {
+	    "ST": 1602999900000,
+	    "ET": 1602999900000,
+	    "M": "btcusdt",
+	    "R": "5m",
+	    "O": "11417.21",
+	    "H": "11417.21",
+	    "L": "11417.21",
+	    "C": "11417.21",
+	    "v": "0",
+	    "ti": 0,
+	    "x": false
+	  }
+	}
 */
 type KLinePayload struct {
 	StartTime   int64  `json:"ST"`
@@ -175,6 +175,7 @@ func (e *BookEvent) Time() time.Time {
 
 func (e *BookEvent) OrderBook() (snapshot types.SliceOrderBook, err error) {
 	snapshot.Symbol = strings.ToUpper(e.Market)
+	snapshot.Time = e.Time()
 
 	for _, bid := range e.Bids {
 		pv, err := bid.PriceVolumePair()

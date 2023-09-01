@@ -188,6 +188,7 @@ func (s *Stream) handleBookEvent(e max.BookEvent) {
 	}
 
 	newBook.Symbol = toGlobalSymbol(e.Market)
+	newBook.Time = e.Time()
 
 	switch e.Event {
 	case "snapshot":
