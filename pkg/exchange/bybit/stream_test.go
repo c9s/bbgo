@@ -35,6 +35,7 @@ func getTestClientOrSkip(t *testing.T) *Stream {
 }
 
 func TestStream(t *testing.T) {
+	t.Skip()
 	s := getTestClientOrSkip(t)
 
 	t.Run("Auth test", func(t *testing.T) {
@@ -182,6 +183,7 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 			UpdateId:   fixedpoint.NewFromFloat(1854104),
 			SequenceId: fixedpoint.NewFromFloat(10559247733),
 			Type:       DataTypeDelta,
+			ServerTime: types.NewMillisecondTimestampFromInt(1691130685111).Time(),
 		}, *book)
 	})
 

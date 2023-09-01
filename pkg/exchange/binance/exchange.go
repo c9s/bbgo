@@ -1346,6 +1346,8 @@ func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot type
 
 func convertDepth(snapshot types.SliceOrderBook, symbol string, finalUpdateID int64, response *binance.DepthResponse) (types.SliceOrderBook, int64, error) {
 	snapshot.Symbol = symbol
+	// empty time since the API does not provide time information.
+	snapshot.Time = time.Time{}
 	finalUpdateID = response.LastUpdateID
 	for _, entry := range response.Bids {
 		// entry.Price, Quantity: entry.Quantity
