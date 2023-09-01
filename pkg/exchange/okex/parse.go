@@ -65,17 +65,21 @@ type BookEvent struct {
 }
 
 func (data *BookEvent) BookTicker() types.BookTicker {
-
-	var askBookData BookEntry = data.Asks[0]
-	var bidBookData BookEntry = data.Bids[0]
-
-	return types.BookTicker{
-		Symbol:   data.Symbol,
-		Buy:      bidBookData.Price,
-		BuySize:  bidBookData.Price,
-		Sell:     askBookData.Price,
-		SellSize: askBookData.Volume,
+	ticker := types.BookTicker{
+		Symbol: data.Symbol,
 	}
+
+	if len(data.Bids) > 0 {
+		ticker.Buy = data.Bids[0].Price
+		ticker.BuySize = data.Bids[0].Volume
+	}
+
+	if len(data.Asks) > 0 {
+		ticker.Sell = data.Asks[0].Price
+		ticker.SellSize = data.Asks[0].Volume
+	}
+
+	return ticker
 }
 
 func (data *BookEvent) Book() types.SliceOrderBook {
