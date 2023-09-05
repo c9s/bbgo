@@ -300,7 +300,7 @@ func convertWebSocketTrade(t max.TradeUpdate) (*types.Trade, error) {
 		Fee:           t.Fee,
 		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
 		FeeDiscounted: t.FeeDiscounted,
-		QuoteQuantity: t.Price.Mul(t.Volume),
+		QuoteQuantity: t.Funds,
 		Time:          types.Time(t.Timestamp.Time()),
 	}, nil
 }

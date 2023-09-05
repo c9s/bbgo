@@ -378,9 +378,9 @@ func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 	return true
 }
 
-// aggregateOrderFee collects the base fee quantity from the given order
+// aggregateOrderQuoteAmountAndBaseFee collects the base fee quantity from the given order
 // it falls back to query the trades via the RESTful API when the websocket trades are not all received.
-func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
+func (s *Strategy) aggregateOrderQuoteAmountAndFee(o types.Order) (fixedpoint.Value, fixedpoint.Value, string) {
 	// try to get the received trades (websocket trades)
 	orderTrades := s.historicalTrades.GetOrderTrades(o)
 	if len(orderTrades) > 0 {
@@ -396,16 +396,17 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 		// if one of the trades is missing, we need to query the trades from the RESTful API
 		if s.verifyOrderTrades(o, orderTrades) {
 			// if trades are verified
+			quoteAmount := aggregateTradesQuoteQuantity(orderTrades)
 			fees := collectTradeFee(orderTrades)
 			if fee, ok := fees[feeCurrency]; ok {
-				return fee, feeCurrency
+				return quoteAmount, fee, feeCurrency
 			}
-			return fixedpoint.Zero, feeCurrency
+			return quoteAmount, fixedpoint.Zero, feeCurrency
 		}
 
 		// if we don't support orderQueryService, then we should just skip
 		if s.orderQueryService == nil {
-			return fixedpoint.Zero, feeCurrency
+			return fixedpoint.Zero, fixedpoint.Zero, feeCurrency
 		}
 
 		s.logger.Warnf("GRID: missing #%d order trades or missing trade fee, pulling order trades from API", o.OrderID)
@@ -423,13 +424,14 @@ func (s *Strategy) aggregateOrderFee(o types.Order) (fixedpoint.Value, string) {
 		}
 	}
 
+	quoteAmount := aggregateTradesQuoteQuantity(orderTrades)
 	// still try to aggregate the trades quantity if we can:
 	fees := collectTradeFee(orderTrades)
 	if fee, ok := fees[feeCurrency]; ok {
-		return fee, feeCurrency
+		return quoteAmount, fee, feeCurrency
 	}
 
-	return fixedpoint.Zero, feeCurrency
+	return quoteAmount, fixedpoint.Zero, feeCurrency
 }
 
 func (s *Strategy) processFilledOrder(o types.Order) {
@@ -446,7 +448,6 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 	}
 
 	newQuantity := executedQuantity
-	executedPrice := o.Price
 
 	if o.ExecutedQuantity.Compare(o.Quantity) != 0 {
 		s.logger.Warnf("order #%d is filled, but order executed quantity %s != order quantity %s, something is wrong", o.OrderID, o.ExecutedQuantity, o.Quantity)
@@ -458,16 +459,11 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 		}
 	*/
 
-	// will be used for calculating quantity
-	orderExecutedQuoteAmount := executedQuantity.Mul(executedPrice)
-	// round down order executed quote amount to avoid insufficient balance
-	orderExecutedQuoteAmount = orderExecutedQuoteAmount.Round(s.Market.PricePrecision, fixedpoint.Down)
-
 	// collect trades for fee
 	// fee calculation is used to reduce the order quantity
 	// because when 1.0 BTC buy order is filled without FEE token, then we will actually get 1.0 * (1 - feeRate) BTC
 	// if we don't reduce the sell quantity, than we might fail to place the sell order
-	fee, feeCurrency := s.aggregateOrderFee(o)
+	orderExecutedQuoteAmount, fee, feeCurrency := s.aggregateOrderQuoteAmountAndFee(o)
 	s.logger.Infof("GRID ORDER #%d %s FEE: %s %s",
 		o.OrderID, o.Side,
 		fee.String(), feeCurrency)
