@@ -484,7 +484,7 @@ func (s *Strategy) executePath(ctx context.Context, session *bbgo.ExchangeSessio
 }
 
 func notifyUsdPnL(profit fixedpoint.Value) {
-	var title = fmt.Sprintf("Triangular Sum PnL ~= ")
+	var title = "Triangular Sum PnL ~= "
 	title += style.PnLEmojiSimple(profit) + " "
 	title += style.PnLSignString(profit) + " USD"
 	bbgo.Notify(title)

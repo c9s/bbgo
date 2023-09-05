@@ -80,6 +80,7 @@ type WebSocketOrderBookL2Event struct {
 		Asks types.PriceVolumeSlice `json:"asks"`
 		Bids types.PriceVolumeSlice `json:"bids"`
 	} `json:"changes"`
+	Time types.MillisecondTimestamp `json:"time"`
 }
 
 type WebSocketCandleEvent struct {

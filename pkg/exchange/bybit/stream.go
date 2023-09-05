@@ -131,6 +131,7 @@ func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 			}
 
 			book.Type = e.WebSocketTopicEvent.Type
+			book.ServerTime = e.WebSocketTopicEvent.Ts.Time()
 			return &book, nil
 
 		case TopicTypeKLine:

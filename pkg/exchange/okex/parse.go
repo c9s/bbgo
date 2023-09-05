@@ -85,6 +85,7 @@ func (data *BookEvent) BookTicker() types.BookTicker {
 func (data *BookEvent) Book() types.SliceOrderBook {
 	book := types.SliceOrderBook{
 		Symbol: data.Symbol,
+		Time:   types.NewMillisecondTimestampFromInt(data.MillisecondTimestamp).Time(),
 	}
 
 	for _, bid := range data.Bids {
