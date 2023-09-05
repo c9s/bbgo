@@ -427,7 +427,6 @@ func (r *GetPendingOrderRequest) Parameters() map[string]interface{} {
 
 func (r *GetPendingOrderRequest) Do(ctx context.Context) ([]OrderDetails, error) {
 	payload := r.Parameters()
-	fmt.Println(payload)
 	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v5/trade/orders-pending", nil, payload)
 	if err != nil {
 		return nil, err
