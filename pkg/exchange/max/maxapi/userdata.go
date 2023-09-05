@@ -98,6 +98,7 @@ type TradeUpdate struct {
 	Side   string           `json:"sd"`
 	Price  fixedpoint.Value `json:"p"`
 	Volume fixedpoint.Value `json:"v"`
+	Funds  fixedpoint.Value `json:"fn"`
 	Market string           `json:"M"`
 
 	Fee           fixedpoint.Value `json:"f"`
