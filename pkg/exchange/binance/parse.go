@@ -461,6 +461,7 @@ func (e *DepthEvent) String() (o string) {
 
 func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
 	book.Symbol = e.Symbol
+	book.Time = types.NewMillisecondTimestampFromInt(e.EventBase.Time).Time()
 
 	// already in descending order
 	book.Bids = e.Bids

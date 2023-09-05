@@ -438,6 +438,7 @@ func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (types.SliceOr
 
 	return types.SliceOrderBook{
 		Symbol: toGlobalSymbol(symbol),
+		Time:   orderBook.Time.Time(),
 		Bids:   orderBook.Bids,
 		Asks:   orderBook.Asks,
 	}, sequence, nil
