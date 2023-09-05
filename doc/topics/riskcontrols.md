@@ -51,7 +51,8 @@ s.circuitBreakRiskControl = riskcontrol.NewCircuitBreakRiskControl(
     s.Position,
     session.Indicators(s.Symbol).EWMA(s.CircuitBreakEMA),
     s.CircuitBreakLossThreshold,
-    s.ProfitStats)
+    s.ProfitStats,
+    24*time.Hour)
 ```
 
 Should pass in position and profit states. Also need an price EWMA to calculate unrealized profit.
@@ -71,7 +72,7 @@ Circuit break condition should be non-greater than zero.
 Check for circuit break before submitting orders:
 ```
     // Circuit break when accumulated losses are over break condition
-    if s.circuitBreakRiskControl.IsHalted() {
+    if s.circuitBreakRiskControl.IsHalted(kline.EndTime) {
         return
     }
 
