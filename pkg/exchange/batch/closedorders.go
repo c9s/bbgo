@@ -29,6 +29,7 @@ func (q *ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startT
 			}
 			return strconv.FormatUint(order.OrderID, 10)
 		},
+		JumpIfEmpty: 30 * 24 * time.Hour,
 	}
 
 	c = make(chan types.Order, 100)
