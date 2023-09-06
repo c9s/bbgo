@@ -22,17 +22,17 @@ func getTestClientOrSkip(t *testing.T) *RestClient {
 		return nil
 	}
 
-	client := NewClient()
+	client, err := NewClient()
+	assert.NoError(t, err)
 	client.Auth(key, secret, passphrase)
 	return client
 }
 
 func TestClient_GetInstrumentsRequest(t *testing.T) {
-	client := NewClient()
+	client, err := NewClient()
+	assert.NoError(t, err)
 	ctx := context.Background()
-
-	srv := &PublicDataService{client: client}
-	req := srv.NewGetInstrumentsRequest()
+	req := client.NewGetInstrumentsRequest()
 
 	instruments, err := req.
 		InstrumentType(InstrumentTypeSpot).
@@ -43,10 +43,10 @@ func TestClient_GetInstrumentsRequest(t *testing.T) {
 }
 
 func TestClient_GetFundingRateRequest(t *testing.T) {
-	client := NewClient()
+	client, err := NewClient()
+	assert.NoError(t, err)
 	ctx := context.Background()
-	srv := &PublicDataService{client: client}
-	req := srv.NewGetFundingRate()
+	req := client.NewGetFundingRate()
 
 	instrument, err := req.
 		InstrumentID("BTC-USDT-SWAP").
@@ -59,8 +59,7 @@ func TestClient_GetFundingRateRequest(t *testing.T) {
 func TestClient_PlaceOrderRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	srv := &TradeService{client: client}
-	req := srv.NewPlaceOrderRequest()
+	req := client.NewPlaceOrderRequest()
 
 	order, err := req.
 		InstrumentID("BTC-USDT").
@@ -78,8 +77,7 @@ func TestClient_PlaceOrderRequest(t *testing.T) {
 func TestClient_GetPendingOrderRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	srv := &TradeService{client: client}
-	req := srv.NewGetPendingOrderRequest()
+	req := client.NewGetPendingOrderRequest()
 	odr_type := []string{string(OrderTypeLimit), string(OrderTypeIOC)}
 
 	pending_order, err := req.
@@ -94,8 +92,7 @@ func TestClient_GetPendingOrderRequest(t *testing.T) {
 func TestClient_GetOrderDetailsRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	srv := &TradeService{client: client}
-	req := srv.NewGetOrderDetailsRequest()
+	req := client.NewGetOrderDetailsRequest()
 
 	orderDetail, err := req.
 		InstrumentID("BTC-USDT").
