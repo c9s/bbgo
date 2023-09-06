@@ -22,15 +22,13 @@ func getTestClientOrSkip(t *testing.T) *RestClient {
 		return nil
 	}
 
-	client, err := NewClient()
-	assert.NoError(t, err)
+	client := NewClient()
 	client.Auth(key, secret, passphrase)
 	return client
 }
 
 func TestClient_GetInstrumentsRequest(t *testing.T) {
-	client, err := NewClient()
-	assert.NoError(t, err)
+	client := NewClient()
 	ctx := context.Background()
 	req := client.NewGetInstrumentsRequest()
 
@@ -43,8 +41,7 @@ func TestClient_GetInstrumentsRequest(t *testing.T) {
 }
 
 func TestClient_GetFundingRateRequest(t *testing.T) {
-	client, err := NewClient()
-	assert.NoError(t, err)
+	client := NewClient()
 	ctx := context.Background()
 	req := client.NewGetFundingRate()
 

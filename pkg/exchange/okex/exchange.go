@@ -35,10 +35,7 @@ type Exchange struct {
 }
 
 func New(key, secret, passphrase string) (*Exchange, error) {
-	client, err := okexapi.NewClient()
-	if err != nil {
-		return nil, err
-	}
+	client := okexapi.NewClient()
 
 	if len(key) > 0 && len(secret) > 0 {
 		client.Auth(key, secret, passphrase)

@@ -66,21 +66,26 @@ type RestClient struct {
 	Key, Secret, Passphrase string
 }
 
-func NewClient() (*RestClient, error) {
-	u, err := url.Parse(RestBaseURL)
-	if err != nil {
-		return nil, err
-	}
+var parsedBaseURL *url.URL
 
+func init() {
+	url, err := url.Parse(RestBaseURL)
+	if err != nil {
+		panic(err)
+	}
+	parsedBaseURL = url
+}
+
+func NewClient() *RestClient {
 	client := &RestClient{
 		BaseAPIClient: requestgen.BaseAPIClient{
-			BaseURL: u,
+			BaseURL: parsedBaseURL,
 			HttpClient: &http.Client{
 				Timeout: defaultHTTPTimeout,
 			},
 		},
 	}
-	return client, nil
+	return client
 }
 
 func (c *RestClient) Auth(key, secret, passphrase string) {
