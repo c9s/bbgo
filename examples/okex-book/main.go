@@ -44,10 +44,8 @@ var rootCmd = &cobra.Command{
 			return errors.New("empty key, secret or passphrase")
 		}
 
-		client, err := okexapi.NewClient()
-		if err != nil {
-			return errors.New("init client error: please check url")
-		}
+		client := okexapi.NewClient()
+
 		client.Auth(key, secret, passphrase)
 
 		instruments, err := client.NewGetInstrumentsRequest().
