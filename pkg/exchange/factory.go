@@ -37,7 +37,7 @@ func New(n types.ExchangeName, key, secret, passphrase string) (types.ExchangeMi
 		return max.New(key, secret), nil
 
 	case types.ExchangeOKEx:
-		return okex.New(key, secret, passphrase), nil
+		return okex.New(key, secret, passphrase)
 
 	case types.ExchangeKucoin:
 		return kucoin.New(key, secret, passphrase), nil

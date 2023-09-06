@@ -22,7 +22,8 @@ func Test_QueryOrder(t *testing.T) {
 		return
 	}
 
-	e := New(key, secret, passphrase)
+	e, err := New(key, secret, passphrase)
+	assert.NoError(t, err)
 
 	queryOrder := types.OrderQuery{
 		Symbol:  "BTC-USDT",
