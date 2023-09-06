@@ -73,6 +73,52 @@ func NewStream(key, secret string, marketProvider MarketInfoProvider) *Stream {
 	return stream
 }
 
+func (s *Stream) syncSubscriptions(opType WsOpType) error {
+	if opType != WsOpTypeUnsubscribe && opType != WsOpTypeSubscribe {
+		return fmt.Errorf("unexpected subscription type: %v", opType)
+	}
+
+	logger := log.WithField("opType", opType)
+	lens := len(s.Subscriptions)
+	for begin := 0; begin < lens; begin += spotArgsLimit {
+		end := begin + spotArgsLimit
+		if end > lens {
+			end = lens
+		}
+
+		topics := []string{}
+		for _, subscription := range s.Subscriptions[begin:end] {
+			topic, err := s.convertSubscription(subscription)
+			if err != nil {
+				logger.WithError(err).Errorf("convert error, subscription: %+v", subscription)
+				return err
+			}
+
+			topics = append(topics, topic)
+		}
+
+		logger.Infof("%s channels: %+v", opType, topics)
+		if err := s.Conn.WriteJSON(WebsocketOp{
+			Op:   opType,
+			Args: topics,
+		}); err != nil {
+			logger.WithError(err).Error("failed to send request")
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Stream) Unsubscribe() {
+	// errors are handled in the syncSubscriptions, so they are skipped here.
+	_ = s.syncSubscriptions(WsOpTypeUnsubscribe)
+	s.Resubscribe(func(old []types.Subscription) (new []types.Subscription, err error) {
+		// clear the subscriptions
+		return []types.Subscription{}, nil
+	})
+}
+
 func (s *Stream) createEndpoint(_ context.Context) (string, error) {
 	var url string
 	if s.PublicOnly {
@@ -204,34 +250,8 @@ func (s *Stream) ping(ctx context.Context, conn *websocket.Conn, cancelFunc cont
 
 func (s *Stream) handlerConnect() {
 	if s.PublicOnly {
-		if len(s.Subscriptions) == 0 {
-			log.Debug("no subscriptions")
-			return
-		}
-
-		var topics []string
-
-		for _, subscription := range s.Subscriptions {
-			topic, err := s.convertSubscription(subscription)
-			if err != nil {
-				log.WithError(err).Errorf("subscription convert error")
-				continue
-			}
-
-			topics = append(topics, topic)
-		}
-		if len(topics) > spotArgsLimit {
-			log.Debugf("topics exceeds limit: %d, drop of: %v", spotArgsLimit, topics[spotArgsLimit:])
-			topics = topics[:spotArgsLimit]
-		}
-		log.Infof("subscribing channels: %+v", topics)
-		if err := s.Conn.WriteJSON(WebsocketOp{
-			Op:   WsOpTypeSubscribe,
-			Args: topics,
-		}); err != nil {
-			log.WithError(err).Error("failed to send subscription request")
-			return
-		}
+		// errors are handled in the syncSubscriptions, so they are skipped here.
+		_ = s.syncSubscriptions(WsOpTypeSubscribe)
 	} else {
 		expires := strconv.FormatInt(time.Now().Add(wsAuthRequest).In(time.UTC).UnixMilli(), 10)
 
