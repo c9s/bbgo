@@ -34,7 +34,7 @@ type Exchange struct {
 	client *okexapi.RestClient
 }
 
-func New(key, secret, passphrase string) (*Exchange, error) {
+func New(key, secret, passphrase string) *Exchange {
 	client := okexapi.NewClient()
 
 	if len(key) > 0 && len(secret) > 0 {
@@ -46,7 +46,7 @@ func New(key, secret, passphrase string) (*Exchange, error) {
 		secret:     secret,
 		passphrase: passphrase,
 		client:     client,
-	}, nil
+	}
 }
 
 func (e *Exchange) Name() types.ExchangeName {
