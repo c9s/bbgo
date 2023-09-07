@@ -73,6 +73,7 @@ func (s *Stream) handleOrderBookL2Event(e *WebSocketOrderBookL2Event) {
 	if ok {
 		f.AddUpdate(types.SliceOrderBook{
 			Symbol: toGlobalSymbol(e.Symbol),
+			Time:   e.Time.Time(),
 			Bids:   e.Changes.Bids,
 			Asks:   e.Changes.Asks,
 		}, e.SequenceStart, e.SequenceEnd)
