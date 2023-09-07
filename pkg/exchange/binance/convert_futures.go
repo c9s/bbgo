@@ -2,6 +2,7 @@ package binance
 
 import (
 	"fmt"
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"time"
 
 	"github.com/adshao/go-binance/v2/futures"
@@ -11,7 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func toGlobalFuturesAccountInfo(account *futures.Account) *types.FuturesAccountInfo {
+func toGlobalFuturesAccountInfo(account *binanceapi.FuturesAccount) *types.FuturesAccountInfo {
 	return &types.FuturesAccountInfo{
 		Assets:                      toGlobalFuturesUserAssets(account.Assets),
 		Positions:                   toGlobalFuturesPositions(account.Positions),
@@ -37,7 +38,7 @@ func toGlobalFuturesBalance(balances []*futures.Balance) types.BalanceMap {
 	return retBalances
 }
 
-func toGlobalFuturesPositions(futuresPositions []*futures.AccountPosition) types.FuturesPositionMap {
+func toGlobalFuturesPositions(futuresPositions []*binanceapi.FuturesAccountPosition) types.FuturesPositionMap {
 	retFuturesPositions := make(types.FuturesPositionMap)
 	for _, futuresPosition := range futuresPositions {
 		retFuturesPositions[futuresPosition.Symbol] = types.FuturesPosition{ // TODO: types.FuturesPosition
@@ -58,7 +59,7 @@ func toGlobalFuturesPositions(futuresPositions []*futures.AccountPosition) types
 	return retFuturesPositions
 }
 
-func toGlobalFuturesUserAssets(assets []*futures.AccountAsset) (retAssets types.FuturesAssetMap) {
+func toGlobalFuturesUserAssets(assets []*binanceapi.FuturesAccountAsset) (retAssets types.FuturesAssetMap) {
 	retFuturesAssets := make(types.FuturesAssetMap)
 	for _, futuresAsset := range assets {
 		retFuturesAssets[futuresAsset.Asset] = types.FuturesUserAsset{

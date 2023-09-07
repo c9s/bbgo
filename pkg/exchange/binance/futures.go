@@ -63,7 +63,9 @@ func (e *Exchange) TransferFuturesAccountAsset(ctx context.Context, asset string
 // Balance.Available = Wallet Balance(in Binance UI) - Used Margin
 // Balance.Locked = Used Margin
 func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, error) {
-	account, err := e.futuresClient.NewGetAccountService().Do(ctx)
+	//account, err := e.futuresClient.NewGetAccountService().Do(ctx)
+	req_account := e.futuresClient2.NewFuturesGetAccountRequest()
+	account, err := req_account.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
