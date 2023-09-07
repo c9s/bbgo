@@ -2,6 +2,7 @@ package okexapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -82,29 +83,29 @@ func (r *CandlesticksRequest) Do(ctx context.Context) ([]Candle, error) {
 		params.Add("limit", strconv.Itoa(*r.limit))
 	}
 
-	req, err := r.client.newRequest("GET", "/api/v5/market/candles", params, nil)
+	req, err := r.client.NewRequest(ctx, "GET", "/api/v5/market/candles", params, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
 	type candleEntry [7]string
-	var candlesResponse struct {
-		Code    string        `json:"code"`
-		Message string        `json:"msg"`
-		Data    []candleEntry `json:"data"`
-	}
 
-	if err := resp.DecodeJSON(&candlesResponse); err != nil {
+	var apiResponse APIResponse
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
+	}
+	var data []candleEntry
+	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
 		return nil, err
 	}
 
 	var candles []Candle
-	for _, entry := range candlesResponse.Data {
+	for _, entry := range data {
 		timestamp, err := strconv.ParseInt(entry[0], 10, 64)
 		if err != nil {
 			return candles, err
@@ -177,27 +178,26 @@ func (r *MarketTickersRequest) Do(ctx context.Context) ([]MarketTicker, error) {
 	var params = url.Values{}
 	params.Add("instType", string(r.instType))
 
-	req, err := r.client.newRequest("GET", "/api/v5/market/tickers", params, nil)
+	req, err := r.client.NewRequest(ctx, "GET", "/api/v5/market/tickers", params, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var tickerResponse struct {
-		Code    string         `json:"code"`
-		Message string         `json:"msg"`
-		Data    []MarketTicker `json:"data"`
+	var apiResponse APIResponse
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
 	}
-
-	if err := response.DecodeJSON(&tickerResponse); err != nil {
+	var data []MarketTicker
+	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
 		return nil, err
 	}
 
-	return tickerResponse.Data, nil
+	return data, nil
 }
 
 type MarketTickerRequest struct {
@@ -216,53 +216,49 @@ func (r *MarketTickerRequest) Do(ctx context.Context) (*MarketTicker, error) {
 	var params = url.Values{}
 	params.Add("instId", r.instId)
 
-	req, err := r.client.newRequest("GET", "/api/v5/market/ticker", params, nil)
+	req, err := r.client.NewRequest(ctx, "GET", "/api/v5/market/ticker", params, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var tickerResponse struct {
-		Code    string         `json:"code"`
-		Message string         `json:"msg"`
-		Data    []MarketTicker `json:"data"`
+	var apiResponse APIResponse
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
 	}
-	if err := response.DecodeJSON(&tickerResponse); err != nil {
+	var data []MarketTicker
+	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
 		return nil, err
 	}
 
-	if len(tickerResponse.Data) == 0 {
+	if len(data) == 0 {
 		return nil, fmt.Errorf("ticker of %s not found", r.instId)
 	}
 
-	return &tickerResponse.Data[0], nil
+	return &data[0], nil
 }
 
-type MarketDataService struct {
-	client *RestClient
-}
-
-func (c *MarketDataService) NewMarketTickerRequest(instId string) *MarketTickerRequest {
+func (c *RestClient) NewMarketTickerRequest(instId string) *MarketTickerRequest {
 	return &MarketTickerRequest{
-		client: c.client,
+		client: c,
 		instId: instId,
 	}
 }
 
-func (c *MarketDataService) NewMarketTickersRequest(instType string) *MarketTickersRequest {
+func (c *RestClient) NewMarketTickersRequest(instType string) *MarketTickersRequest {
 	return &MarketTickersRequest{
-		client:   c.client,
+		client:   c,
 		instType: instType,
 	}
 }
 
-func (c *MarketDataService) NewCandlesticksRequest(instId string) *CandlesticksRequest {
+func (c *RestClient) NewCandlesticksRequest(instId string) *CandlesticksRequest {
 	return &CandlesticksRequest{
-		client: c.client,
+		client: c,
 		instId: instId,
 	}
 }

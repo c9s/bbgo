@@ -45,9 +45,10 @@ var rootCmd = &cobra.Command{
 		}
 
 		client := okexapi.NewClient()
+
 		client.Auth(key, secret, passphrase)
 
-		instruments, err := client.PublicDataService.NewGetInstrumentsRequest().
+		instruments, err := client.NewGetInstrumentsRequest().
 			InstrumentType("SPOT").Do(ctx)
 		if err != nil {
 			return err
@@ -55,14 +56,14 @@ var rootCmd = &cobra.Command{
 
 		log.Infof("instruments: %+v", instruments)
 
-		fundingRate, err := client.PublicDataService.NewGetFundingRate().InstrumentID("BTC-USDT-SWAP").Do(ctx)
+		fundingRate, err := client.NewGetFundingRate().InstrumentID("BTC-USDT-SWAP").Do(ctx)
 		if err != nil {
 			return err
 		}
 		log.Infof("funding rate: %+v", fundingRate)
 
 		log.Infof("ACCOUNT BALANCES:")
-		account, err := client.AccountBalances()
+		account, err := client.AccountBalances(ctx)
 		if err != nil {
 			return err
 		}
@@ -70,7 +71,7 @@ var rootCmd = &cobra.Command{
 		log.Infof("%+v", account)
 
 		log.Infof("ASSET BALANCES:")
-		assetBalances, err := client.AssetBalances()
+		assetBalances, err := client.AssetBalances(ctx)
 		if err != nil {
 			return err
 		}
@@ -80,7 +81,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		log.Infof("ASSET CURRENCIES:")
-		currencies, err := client.AssetCurrencies()
+		currencies, err := client.AssetCurrencies(ctx)
 		if err != nil {
 			return err
 		}
@@ -90,7 +91,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		log.Infof("MARKET TICKERS:")
-		tickers, err := client.MarketTickers(okexapi.InstrumentTypeSpot)
+		tickers, err := client.MarketTickers(ctx, okexapi.InstrumentTypeSpot)
 		if err != nil {
 			return err
 		}
@@ -99,7 +100,7 @@ var rootCmd = &cobra.Command{
 			log.Infof("%T%+v", ticker, ticker)
 		}
 
-		ticker, err := client.MarketTicker("ETH-USDT")
+		ticker, err := client.MarketTicker(ctx, "ETH-USDT")
 		if err != nil {
 			return err
 		}
@@ -107,7 +108,7 @@ var rootCmd = &cobra.Command{
 		log.Infof("%T%+v", ticker, ticker)
 
 		log.Infof("PLACING ORDER:")
-		placeResponse, err := client.TradeService.NewPlaceOrderRequest().
+		placeResponse, err := client.NewPlaceOrderRequest().
 			InstrumentID("LTC-USDT").
 			OrderType(okexapi.OrderTypeLimit).
 			Side(okexapi.SideTypeBuy).
@@ -122,7 +123,7 @@ var rootCmd = &cobra.Command{
 		time.Sleep(time.Second)
 
 		log.Infof("getting order detail...")
-		orderDetail, err := client.TradeService.NewGetOrderDetailsRequest().
+		orderDetail, err := client.NewGetOrderDetailsRequest().
 			InstrumentID("LTC-USDT").
 			OrderID(placeResponse.OrderID).
 			Do(ctx)
@@ -132,7 +133,7 @@ var rootCmd = &cobra.Command{
 
 		log.Infof("order detail: %+v", orderDetail)
 
-		cancelResponse, err := client.TradeService.NewCancelOrderRequest().
+		cancelResponse, err := client.NewCancelOrderRequest().
 			InstrumentID("LTC-USDT").
 			OrderID(placeResponse.OrderID).
 			Do(ctx)
@@ -144,15 +145,15 @@ var rootCmd = &cobra.Command{
 		time.Sleep(time.Second)
 
 		log.Infof("BATCH PLACE ORDER:")
-		batchPlaceReq := client.TradeService.NewBatchPlaceOrderRequest()
-		batchPlaceReq.Add(client.TradeService.NewPlaceOrderRequest().
+		batchPlaceReq := client.NewBatchPlaceOrderRequest()
+		batchPlaceReq.Add(client.NewPlaceOrderRequest().
 			InstrumentID("LTC-USDT").
 			OrderType(okexapi.OrderTypeLimit).
 			Side(okexapi.SideTypeBuy).
 			Price("50.0").
 			Quantity("0.5"))
 
-		batchPlaceReq.Add(client.TradeService.NewPlaceOrderRequest().
+		batchPlaceReq.Add(client.NewPlaceOrderRequest().
 			InstrumentID("LTC-USDT").
 			OrderType(okexapi.OrderTypeLimit).
 			Side(okexapi.SideTypeBuy).
@@ -168,7 +169,7 @@ var rootCmd = &cobra.Command{
 		time.Sleep(time.Second)
 
 		log.Infof("getting pending orders...")
-		pendingOrders, err := client.TradeService.NewGetPendingOrderRequest().Do(ctx)
+		pendingOrders, err := client.NewGetPendingOrderRequest().Do(ctx)
 		if err != nil {
 			return err
 		}
@@ -176,9 +177,9 @@ var rootCmd = &cobra.Command{
 			log.Infof("pending order: %+v", pendingOrder)
 		}
 
-		cancelReq := client.TradeService.NewBatchCancelOrderRequest()
+		cancelReq := client.NewBatchCancelOrderRequest()
 		for _, resp := range batchPlaceResponse {
-			cancelReq.Add(client.TradeService.NewCancelOrderRequest().
+			cancelReq.Add(client.NewCancelOrderRequest().
 				InstrumentID("LTC-USDT").
 				OrderID(resp.OrderID))
 		}
