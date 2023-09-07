@@ -2,6 +2,7 @@ package okexapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"strings"
 
@@ -9,10 +10,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 )
-
-type TradeService struct {
-	client *RestClient
-}
 
 type OrderResponse struct {
 	OrderID       string `json:"ordId"`
@@ -22,45 +19,45 @@ type OrderResponse struct {
 	Message       string `json:"sMsg"`
 }
 
-func (c *TradeService) NewPlaceOrderRequest() *PlaceOrderRequest {
+func (c *RestClient) NewPlaceOrderRequest() *PlaceOrderRequest {
 	return &PlaceOrderRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
+func (c *RestClient) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
 	return &BatchPlaceOrderRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewCancelOrderRequest() *CancelOrderRequest {
+func (c *RestClient) NewCancelOrderRequest() *CancelOrderRequest {
 	return &CancelOrderRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewBatchCancelOrderRequest() *BatchCancelOrderRequest {
+func (c *RestClient) NewBatchCancelOrderRequest() *BatchCancelOrderRequest {
 	return &BatchCancelOrderRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewGetOrderDetailsRequest() *GetOrderDetailsRequest {
+func (c *RestClient) NewGetOrderDetailsRequest() *GetOrderDetailsRequest {
 	return &GetOrderDetailsRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewGetPendingOrderRequest() *GetPendingOrderRequest {
+func (c *RestClient) NewGetPendingOrderRequest() *GetPendingOrderRequest {
 	return &GetPendingOrderRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
-func (c *TradeService) NewGetTransactionDetailsRequest() *GetTransactionDetailsRequest {
+func (c *RestClient) NewGetTransactionDetailsRequest() *GetTransactionDetailsRequest {
 	return &GetTransactionDetailsRequest{
-		client: c.client,
+		client: c,
 	}
 }
 
@@ -99,30 +96,30 @@ func (r *PlaceOrderRequest) Parameters() map[string]interface{} {
 
 func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
 	payload := r.Parameters()
-	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/order", nil, payload)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/order", nil, payload)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var orderResponse struct {
-		Code    string          `json:"code"`
-		Message string          `json:"msg"`
-		Data    []OrderResponse `json:"data"`
+	var apiResponse APIResponse
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
 	}
-	if err := response.DecodeJSON(&orderResponse); err != nil {
+	var data []OrderResponse
+	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
 		return nil, err
 	}
 
-	if len(orderResponse.Data) == 0 {
+	if len(data) == 0 {
 		return nil, errors.New("order create error")
 	}
 
-	return &orderResponse.Data[0], nil
+	return &data[0], nil
 }
 
 //go:generate requestgen -type CancelOrderRequest
@@ -149,26 +146,26 @@ func (r *CancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, error) {
 		return nil, errors.New("either orderID or clientOrderID is required for canceling order")
 	}
 
-	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/cancel-order", nil, payload)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/cancel-order", nil, payload)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var orderResponse struct {
-		Code    string          `json:"code"`
-		Message string          `json:"msg"`
-		Data    []OrderResponse `json:"data"`
+	var apiResponse APIResponse
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
 	}
-	if err := response.DecodeJSON(&orderResponse); err != nil {
+	var data []OrderResponse
+	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
 		return nil, err
 	}
 
-	return orderResponse.Data, nil
+	return data, nil
 }
 
 type BatchCancelOrderRequest struct {
@@ -190,26 +187,26 @@ func (r *BatchCancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, erro
 		parameterList = append(parameterList, params)
 	}
 
-	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/cancel-batch-orders", nil, parameterList)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/cancel-batch-orders", nil, parameterList)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var orderResponse struct {
-		Code    string          `json:"code"`
-		Message string          `json:"msg"`
-		Data    []OrderResponse `json:"data"`
+	var apiResponse APIResponse
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
 	}
-	if err := response.DecodeJSON(&orderResponse); err != nil {
+	var data []OrderResponse
+	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
 		return nil, err
 	}
 
-	return orderResponse.Data, nil
+	return data, nil
 }
 
 type BatchPlaceOrderRequest struct {
@@ -231,26 +228,26 @@ func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error
 		parameterList = append(parameterList, params)
 	}
 
-	req, err := r.client.newAuthenticatedRequest("POST", "/api/v5/trade/batch-orders", nil, parameterList)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/batch-orders", nil, parameterList)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var orderResponse struct {
-		Code    string          `json:"code"`
-		Message string          `json:"msg"`
-		Data    []OrderResponse `json:"data"`
+	var apiResponse APIResponse
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
 	}
-	if err := response.DecodeJSON(&orderResponse); err != nil {
+	var data []OrderResponse
+	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
 		return nil, err
 	}
 
-	return orderResponse.Data, nil
+	return data, nil
 }
 
 type OrderDetails struct {
@@ -343,30 +340,30 @@ func (r *GetOrderDetailsRequest) QueryParameters() url.Values {
 
 func (r *GetOrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) {
 	params := r.QueryParameters()
-	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/order", params, nil)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v5/trade/order", params, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var orderResponse struct {
-		Code    string         `json:"code"`
-		Message string         `json:"msg"`
-		Data    []OrderDetails `json:"data"`
+	var apiResponse APIResponse
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
 	}
-	if err := response.DecodeJSON(&orderResponse); err != nil {
+	var data []OrderDetails
+	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
 		return nil, err
 	}
 
-	if len(orderResponse.Data) == 0 {
+	if len(data) == 0 {
 		return nil, errors.New("get order details error")
 	}
 
-	return &orderResponse.Data[0], nil
+	return &data[0], nil
 }
 
 type GetPendingOrderRequest struct {
@@ -430,26 +427,26 @@ func (r *GetPendingOrderRequest) Parameters() map[string]interface{} {
 
 func (r *GetPendingOrderRequest) Do(ctx context.Context) ([]OrderDetails, error) {
 	payload := r.Parameters()
-	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/orders-pending", nil, payload)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v5/trade/orders-pending", nil, payload)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var orderResponse struct {
-		Code    string         `json:"code"`
-		Message string         `json:"msg"`
-		Data    []OrderDetails `json:"data"`
+	var apiResponse APIResponse
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
 	}
-	if err := response.DecodeJSON(&orderResponse); err != nil {
+	var data []OrderDetails
+	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
 		return nil, err
 	}
 
-	return orderResponse.Data, nil
+	return data, nil
 }
 
 type GetTransactionDetailsRequest struct {
@@ -497,24 +494,24 @@ func (r *GetTransactionDetailsRequest) Parameters() map[string]interface{} {
 
 func (r *GetTransactionDetailsRequest) Do(ctx context.Context) ([]OrderDetails, error) {
 	payload := r.Parameters()
-	req, err := r.client.newAuthenticatedRequest("GET", "/api/v5/trade/fills", nil, payload)
+	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v5/trade/fills", nil, payload)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := r.client.sendRequest(req)
+	response, err := r.client.SendRequest(req)
 	if err != nil {
 		return nil, err
 	}
 
-	var orderResponse struct {
-		Code    string         `json:"code"`
-		Message string         `json:"msg"`
-		Data    []OrderDetails `json:"data"`
+	var apiResponse APIResponse
+	if err := response.DecodeJSON(&apiResponse); err != nil {
+		return nil, err
 	}
-	if err := response.DecodeJSON(&orderResponse); err != nil {
+	var data []OrderDetails
+	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
 		return nil, err
 	}
 
-	return orderResponse.Data, nil
+	return data, nil
 }
