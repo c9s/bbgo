@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -83,6 +84,7 @@ func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, se
 			s.Position,
 			session.Indicators(market.Symbol).EWMA(s.CircuitBreakEMA),
 			s.CircuitBreakLossThreshold,
-			s.ProfitStats)
+			s.ProfitStats,
+			24*time.Hour)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -117,14 +118,18 @@ type BookEvent struct {
 	SequenceId fixedpoint.Value `json:"seq"`
 
 	// internal use
-	// Type can be one of snapshot or delta. Copied from WebSocketTopicEvent.Type
+	// Copied from WebSocketTopicEvent.Type, WebSocketTopicEvent.Ts
+	// Type can be one of snapshot or delta.
 	Type DataType
+	// ServerTime using the websocket timestamp as server time. Since the event not provide server time information.
+	ServerTime time.Time
 }
 
 func (e *BookEvent) OrderBook() (snapshot types.SliceOrderBook) {
 	snapshot.Symbol = e.Symbol
 	snapshot.Bids = e.Bids
 	snapshot.Asks = e.Asks
+	snapshot.Time = e.ServerTime
 	return snapshot
 }
 

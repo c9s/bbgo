@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -123,7 +124,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.Position,
 			session.Indicators(s.Symbol).EWMA(s.CircuitBreakEMA),
 			s.CircuitBreakLossThreshold,
-			s.ProfitStats)
+			s.ProfitStats,
+			24*time.Hour)
 	}
 
 	scale, err := s.LiquiditySlideRule.Scale()
@@ -275,18 +277,18 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 }
 
 func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
-	if s.circuitBreakRiskControl != nil && s.circuitBreakRiskControl.IsHalted() {
+	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
+	if logErr(err, "unable to query ticker") {
+		return
+	}
+
+	if s.circuitBreakRiskControl != nil && s.circuitBreakRiskControl.IsHalted(ticker.Time) {
 		log.Warn("circuitBreakRiskControl: trading halted")
 		return
 	}
 
-	err := s.liquidityOrderBook.GracefulCancel(ctx, s.Session.Exchange)
+	err = s.liquidityOrderBook.GracefulCancel(ctx, s.Session.Exchange)
 	if logErr(err, "unable to cancel orders") {
-		return
-	}
-
-	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
-	if logErr(err, "unable to query ticker") {
 		return
 	}
 

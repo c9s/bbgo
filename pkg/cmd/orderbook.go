@@ -71,9 +71,10 @@ var orderbookCmd = &cobra.Command{
 			}
 
 			if bid, ask, ok := orderBook.BestBidAndAsk(); ok {
-				log.Infof("ASK | %f x %f / %f x %f | BID",
+				log.Infof("ASK | %f x %f / %f x %f | BID | %s",
 					ask.Volume.Float64(), ask.Price.Float64(),
-					bid.Price.Float64(), bid.Volume.Float64())
+					bid.Price.Float64(), bid.Volume.Float64(),
+					book.Time.String())
 			}
 		})
 
@@ -84,9 +85,10 @@ var orderbookCmd = &cobra.Command{
 			orderBook.Update(book)
 
 			if bid, ask, ok := orderBook.BestBidAndAsk(); ok {
-				log.Infof("ASK | %f x %f / %f x %f | BID",
+				log.Infof("ASK | %f x %f / %f x %f | BID | %s",
 					ask.Volume.Float64(), ask.Price.Float64(),
-					bid.Price.Float64(), bid.Volume.Float64())
+					bid.Price.Float64(), bid.Volume.Float64(),
+					book.Time.String())
 			}
 		})
 
