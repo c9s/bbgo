@@ -64,8 +64,8 @@ func (e *Exchange) TransferFuturesAccountAsset(ctx context.Context, asset string
 // Balance.Locked = Used Margin
 func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, error) {
 	//account, err := e.futuresClient.NewGetAccountService().Do(ctx)
-	req_account := e.futuresClient2.NewFuturesGetAccountRequest()
-	account, err := req_account.Do(ctx)
+	reqAccount := e.futuresClient2.NewFuturesGetAccountRequest()
+	account, err := reqAccount.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
