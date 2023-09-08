@@ -27,12 +27,24 @@ var defaultDialer = &websocket.Dialer{
 type Stream interface {
 	StandardStreamEventHub
 
+	// Subscribe subscribes the specific channel, but not connect to the server.
 	Subscribe(channel Channel, symbol string, options SubscribeOptions)
 	GetSubscriptions() []Subscription
+	// Resubscribe used to update or renew existing subscriptions. It will reconnect to the server.
+	Resubscribe(func(oldSubs []Subscription) (newSubs []Subscription, err error)) error
+	// SetPublicOnly connects to public or private
 	SetPublicOnly()
 	GetPublicOnly() bool
+
+	// Connect connects to websocket server
 	Connect(ctx context.Context) error
+	Reconnect()
 	Close() error
+}
+
+type Unsubscriber interface {
+	// Unsubscribe unsubscribes the all subscriptions.
+	Unsubscribe()
 }
 
 type EndpointCreator func(ctx context.Context) (string, error)
@@ -75,6 +87,10 @@ type StandardStream struct {
 	CloseC chan struct{}
 
 	Subscriptions []Subscription
+
+	// subLock is used for locking Subscriptions fields.
+	// When changing these field values, be sure to call subLock
+	subLock sync.Mutex
 
 	startCallbacks []func()
 
@@ -290,10 +306,34 @@ func (s *StandardStream) ping(ctx context.Context, conn *websocket.Conn, cancel 
 }
 
 func (s *StandardStream) GetSubscriptions() []Subscription {
+	s.subLock.Lock()
+	defer s.subLock.Unlock()
+
 	return s.Subscriptions
 }
 
+// Resubscribe synchronizes the new subscriptions based on the provided function.
+// The fn function takes the old subscriptions as input and returns the new subscriptions that will replace the old ones
+// in the struct then Reconnect.
+// This method is thread-safe.
+func (s *StandardStream) Resubscribe(fn func(old []Subscription) (new []Subscription, err error)) error {
+	s.subLock.Lock()
+	defer s.subLock.Unlock()
+
+	var err error
+	subs, err := fn(s.Subscriptions)
+	if err != nil {
+		return err
+	}
+	s.Subscriptions = subs
+	s.Reconnect()
+	return nil
+}
+
 func (s *StandardStream) Subscribe(channel Channel, symbol string, options SubscribeOptions) {
+	s.subLock.Lock()
+	defer s.subLock.Unlock()
+
 	s.Subscriptions = append(s.Subscriptions, Subscription{
 		Channel: channel,
 		Symbol:  symbol,
