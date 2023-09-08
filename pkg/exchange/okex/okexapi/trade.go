@@ -251,7 +251,7 @@ func (r *BatchPlaceOrderRequest) Do(ctx context.Context) ([]OrderResponse, error
 }
 
 type OrderDetails struct {
-	InstrumentType string           `json:"instType"`
+	InstrumentType InstrumentType   `json:"instType"`
 	InstrumentID   string           `json:"instId"`
 	Tag            string           `json:"tag"`
 	Price          fixedpoint.Value `json:"px"`
@@ -275,6 +275,7 @@ type OrderDetails struct {
 	LastFilledTime        types.MillisecondTimestamp `json:"fillTime"`
 	LastFilledFee         fixedpoint.Value           `json:"fillFee"`
 	LastFilledFeeCurrency string                     `json:"fillFeeCcy"`
+	LastFilledPnl         fixedpoint.Value           `json:"fillPnl"`
 
 	// ExecutionType = liquidity (M = maker or T = taker)
 	ExecutionType string `json:"execType"`
