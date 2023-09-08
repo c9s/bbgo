@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -38,6 +39,20 @@ func TestStream(t *testing.T) {
 	t.Skip()
 	s := getTestClientOrSkip(t)
 
+	symbols := []string{
+		"BTCUSDT",
+		"ETHUSDT",
+		"DOTUSDT",
+		"ADAUSDT",
+		"AAVEUSDT",
+		"APTUSDT",
+		"ATOMUSDT",
+		"AXSUSDT",
+		"BNBUSDT",
+		"SOLUSDT",
+		"DOGEUSDT",
+	}
+
 	t.Run("Auth test", func(t *testing.T) {
 		s.Connect(context.Background())
 		c := make(chan struct{})
@@ -58,6 +73,41 @@ func TestStream(t *testing.T) {
 		s.OnBookUpdate(func(book types.SliceOrderBook) {
 			t.Log("got update", book)
 		})
+		c := make(chan struct{})
+		<-c
+	})
+
+	t.Run("book test on unsubscribe and reconnect", func(t *testing.T) {
+		for _, symbol := range symbols {
+			s.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{
+				Depth: types.DepthLevel50,
+			})
+		}
+
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnBookSnapshot(func(book types.SliceOrderBook) {
+			t.Log("got snapshot", book)
+		})
+		s.OnBookUpdate(func(book types.SliceOrderBook) {
+			t.Log("got update", book)
+		})
+
+		<-time.After(2 * time.Second)
+
+		s.Unsubscribe()
+		for _, symbol := range symbols {
+			s.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{
+				Depth: types.DepthLevel50,
+			})
+		}
+
+		<-time.After(2 * time.Second)
+
+		s.Reconnect()
+
 		c := make(chan struct{})
 		<-c
 	})

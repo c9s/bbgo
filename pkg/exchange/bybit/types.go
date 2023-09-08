@@ -29,10 +29,11 @@ func (w *WsEvent) IsTopic() bool {
 type WsOpType string
 
 const (
-	WsOpTypePing      WsOpType = "ping"
-	WsOpTypePong      WsOpType = "pong"
-	WsOpTypeAuth      WsOpType = "auth"
-	WsOpTypeSubscribe WsOpType = "subscribe"
+	WsOpTypePing        WsOpType = "ping"
+	WsOpTypePong        WsOpType = "pong"
+	WsOpTypeAuth        WsOpType = "auth"
+	WsOpTypeSubscribe   WsOpType = "subscribe"
+	WsOpTypeUnsubscribe WsOpType = "unsubscribe"
 )
 
 type WebsocketOp struct {
@@ -73,6 +74,15 @@ func (w *WebSocketOpEvent) IsValid() error {
 			return fmt.Errorf("unexpected response result: %+v", w)
 		}
 		return nil
+
+	case WsOpTypeUnsubscribe:
+		// in the public channel, you can get RetMsg = 'subscribe', but in the private channel, you cannot.
+		// so, we only verify that success is true.
+		if !w.Success {
+			return fmt.Errorf("unexpected response result: %+v", w)
+		}
+		return nil
+
 	default:
 		return fmt.Errorf("unexpected op type: %+v", w)
 	}
