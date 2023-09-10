@@ -42,11 +42,12 @@ type Stream struct {
 	// TODO: update the fee rate at 7:00 am UTC; rotation required.
 	symbolFeeDetails map[string]*symbolFeeDetail
 
-	bookEventCallbacks   []func(e BookEvent)
-	walletEventCallbacks []func(e []bybitapi.WalletBalances)
-	kLineEventCallbacks  []func(e KLineEvent)
-	orderEventCallbacks  []func(e []OrderEvent)
-	tradeEventCallbacks  []func(e []TradeEvent)
+	bookEventCallbacks        []func(e BookEvent)
+	marketTradeEventCallbacks []func(e []MarketTradeEvent)
+	walletEventCallbacks      []func(e []bybitapi.WalletBalances)
+	kLineEventCallbacks       []func(e KLineEvent)
+	orderEventCallbacks       []func(e []OrderEvent)
+	tradeEventCallbacks       []func(e []TradeEvent)
 }
 
 func NewStream(key, secret string, marketProvider MarketInfoProvider) *Stream {
@@ -66,6 +67,7 @@ func NewStream(key, secret string, marketProvider MarketInfoProvider) *Stream {
 	stream.OnConnect(stream.handlerConnect)
 
 	stream.OnBookEvent(stream.handleBookEvent)
+	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
 	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnWalletEvent(stream.handleWalletEvent)
 	stream.OnOrderEvent(stream.handleOrderEvent)
@@ -139,6 +141,9 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	case *BookEvent:
 		s.EmitBookEvent(*e)
 
+	case []MarketTradeEvent:
+		s.EmitMarketTradeEvent(e)
+
 	case []bybitapi.WalletBalances:
 		s.EmitWalletEvent(e)
 
@@ -173,18 +178,28 @@ func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 			var book BookEvent
 			err = json.Unmarshal(e.WebSocketTopicEvent.Data, &book)
 			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal data into BookEvent: %+v, : %w", string(e.WebSocketTopicEvent.Data), err)
+				return nil, fmt.Errorf("failed to unmarshal data into BookEvent: %+v, err: %w", string(e.WebSocketTopicEvent.Data), err)
 			}
 
 			book.Type = e.WebSocketTopicEvent.Type
 			book.ServerTime = e.WebSocketTopicEvent.Ts.Time()
 			return &book, nil
 
+		case TopicTypeMarketTrade:
+			// snapshot only
+			var trade []MarketTradeEvent
+			err = json.Unmarshal(e.WebSocketTopicEvent.Data, &trade)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal data into MarketTradeEvent: %+v, err: %w", string(e.WebSocketTopicEvent.Data), err)
+			}
+
+			return trade, nil
+
 		case TopicTypeKLine:
 			var kLines []KLine
 			err = json.Unmarshal(e.WebSocketTopicEvent.Data, &kLines)
 			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal data into KLine: %+v, : %w", string(e.WebSocketTopicEvent.Data), err)
+				return nil, fmt.Errorf("failed to unmarshal data into KLine: %+v, err: %w", string(e.WebSocketTopicEvent.Data), err)
 			}
 
 			symbol, err := getSymbolFromTopic(e.Topic)
@@ -292,6 +307,9 @@ func (s *Stream) convertSubscription(sub types.Subscription) (string, error) {
 		}
 		return genTopic(TopicTypeOrderBook, depth, sub.Symbol), nil
 
+	case types.MarketTradeChannel:
+		return genTopic(TopicTypeMarketTrade, sub.Symbol), nil
+
 	case types.KLineChannel:
 		interval, err := toLocalInterval(sub.Options.Interval)
 		if err != nil {
@@ -315,6 +333,18 @@ func (s *Stream) handleBookEvent(e BookEvent) {
 
 	case e.Type == DataTypeDelta:
 		s.EmitBookUpdate(orderBook)
+	}
+}
+
+func (s *Stream) handleMarketTradeEvent(events []MarketTradeEvent) {
+	for _, event := range events {
+		trade, err := event.toGlobalTrade()
+		if err != nil {
+			log.WithError(err).Error("failed to convert to market trade")
+			continue
+		}
+
+		s.StandardStream.EmitMarketTrade(trade)
 	}
 }
 

@@ -112,6 +112,19 @@ func TestStream(t *testing.T) {
 		<-c
 	})
 
+	t.Run("market trade test", func(t *testing.T) {
+		s.Subscribe(types.MarketTradeChannel, "BTCUSDT", types.SubscribeOptions{})
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnMarketTrade(func(trade types.Trade) {
+			t.Log("got update", trade)
+		})
+		c := make(chan struct{})
+		<-c
+	})
+
 	t.Run("wallet test", func(t *testing.T) {
 		err := s.Connect(context.Background())
 		assert.NoError(t, err)
@@ -235,6 +248,42 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 			Type:       DataTypeDelta,
 			ServerTime: types.NewMillisecondTimestampFromInt(1691130685111).Time(),
 		}, *book)
+	})
+
+	t.Run("TopicTypeMarketTrade with snapshot", func(t *testing.T) {
+		input := `{
+   "topic":"publicTrade.BTCUSDT",
+   "ts":1694348711526,
+   "type":"snapshot",
+   "data":[
+      {
+         "i":"2290000000068683805",
+         "T":1694348711524,
+         "p":"25816.27",
+         "v":"0.000083",
+         "S":"Sell",
+         "s":"BTCUSDT",
+         "BT":false
+      }
+   ]
+}`
+
+		res, err := s.parseWebSocketEvent([]byte(input))
+		assert.NoError(t, err)
+		book, ok := res.([]MarketTradeEvent)
+		assert.True(t, ok)
+		assert.Equal(t, []MarketTradeEvent{
+			{
+				Timestamp:  types.NewMillisecondTimestampFromInt(1694348711524),
+				Symbol:     "BTCUSDT",
+				Side:       bybitapi.SideSell,
+				Quantity:   fixedpoint.NewFromFloat(0.000083),
+				Price:      fixedpoint.NewFromFloat(25816.27),
+				Direction:  "",
+				TradeId:    "2290000000068683805",
+				BlockTrade: false,
+			},
+		}, book)
 	})
 
 	t.Run("TopicTypeKLine with snapshot", func(t *testing.T) {
@@ -378,6 +427,16 @@ func Test_convertSubscription(t *testing.T) {
 		})
 		assert.Equal(t, fmt.Errorf("unsupported stream channel: %s", "unsupported"), err)
 		assert.Equal(t, "", res)
+	})
+
+	t.Run("MarketTradeChannel", func(t *testing.T) {
+		res, err := s.convertSubscription(types.Subscription{
+			Symbol:  "BTCUSDT",
+			Channel: types.MarketTradeChannel,
+			Options: types.SubscribeOptions{},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, genTopic(TopicTypeMarketTrade, "BTCUSDT"), res)
 	})
 }
 
