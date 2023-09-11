@@ -91,11 +91,12 @@ func (w *WebSocketOpEvent) IsValid() error {
 type TopicType string
 
 const (
-	TopicTypeOrderBook TopicType = "orderbook"
-	TopicTypeWallet    TopicType = "wallet"
-	TopicTypeOrder     TopicType = "order"
-	TopicTypeKLine     TopicType = "kline"
-	TopicTypeTrade     TopicType = "execution"
+	TopicTypeOrderBook   TopicType = "orderbook"
+	TopicTypeMarketTrade TopicType = "publicTrade"
+	TopicTypeWallet      TopicType = "wallet"
+	TopicTypeOrder       TopicType = "order"
+	TopicTypeKLine       TopicType = "kline"
+	TopicTypeTrade       TopicType = "execution"
 )
 
 type DataType string
@@ -141,6 +142,52 @@ func (e *BookEvent) OrderBook() (snapshot types.SliceOrderBook) {
 	snapshot.Asks = e.Asks
 	snapshot.Time = e.ServerTime
 	return snapshot
+}
+
+type MarketTradeEvent struct {
+	// Timestamp is the timestamp (ms) that the order is filled
+	Timestamp types.MillisecondTimestamp `json:"T"`
+	Symbol    string                     `json:"s"`
+	// Side of taker. Buy,Sell
+	Side bybitapi.Side `json:"S"`
+	// Quantity is the trade size
+	Quantity fixedpoint.Value `json:"v"`
+	// Price is the trade price
+	Price fixedpoint.Value `json:"p"`
+	// L is the direction of price change. Unique field for future
+	Direction string `json:"L"`
+	// trade ID
+	TradeId string `json:"i"`
+	// Whether it is a block trade order or not
+	BlockTrade bool `json:"BT"`
+}
+
+func (m *MarketTradeEvent) toGlobalTrade() (types.Trade, error) {
+	tradeId, err := strconv.ParseUint(m.TradeId, 10, 64)
+	if err != nil {
+		return types.Trade{}, fmt.Errorf("unexpected trade id: %s, err: %w", m.TradeId, err)
+	}
+
+	side, err := toGlobalSideType(m.Side)
+	if err != nil {
+		return types.Trade{}, err
+	}
+
+	return types.Trade{
+		ID:            tradeId,
+		OrderID:       0, // not supported
+		Exchange:      types.ExchangeBybit,
+		Price:         m.Price,
+		Quantity:      m.Quantity,
+		QuoteQuantity: m.Price.Mul(m.Quantity),
+		Symbol:        m.Symbol,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       false, // not supported
+		Time:          types.Time(m.Timestamp.Time()),
+		Fee:           fixedpoint.Zero, // not supported
+		FeeCurrency:   "",              // not supported
+	}, nil
 }
 
 const topicSeparator = "."
