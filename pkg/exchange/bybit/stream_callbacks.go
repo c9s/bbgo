@@ -16,6 +16,16 @@ func (s *Stream) EmitBookEvent(e BookEvent) {
 	}
 }
 
+func (s *Stream) OnMarketTradeEvent(cb func(e []MarketTradeEvent)) {
+	s.marketTradeEventCallbacks = append(s.marketTradeEventCallbacks, cb)
+}
+
+func (s *Stream) EmitMarketTradeEvent(e []MarketTradeEvent) {
+	for _, cb := range s.marketTradeEventCallbacks {
+		cb(e)
+	}
+}
+
 func (s *Stream) OnWalletEvent(cb func(e []bybitapi.WalletBalances)) {
 	s.walletEventCallbacks = append(s.walletEventCallbacks, cb)
 }
