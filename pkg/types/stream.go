@@ -98,6 +98,8 @@ type StandardStream struct {
 
 	disconnectCallbacks []func()
 
+	authCallbacks []func()
+
 	// private trade update callbacks
 	tradeUpdateCallbacks []func(trade Trade)
 
@@ -138,6 +140,7 @@ type StandardStreamEmitter interface {
 	EmitStart()
 	EmitConnect()
 	EmitDisconnect()
+	EmitAuth()
 	EmitTradeUpdate(Trade)
 	EmitOrderUpdate(Order)
 	EmitBalanceSnapshot(BalanceMap)

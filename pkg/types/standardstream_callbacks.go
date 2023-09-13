@@ -34,6 +34,16 @@ func (s *StandardStream) EmitDisconnect() {
 	}
 }
 
+func (s *StandardStream) OnAuth(cb func()) {
+	s.authCallbacks = append(s.authCallbacks, cb)
+}
+
+func (s *StandardStream) EmitAuth() {
+	for _, cb := range s.authCallbacks {
+		cb()
+	}
+}
+
 func (s *StandardStream) OnTradeUpdate(cb func(trade Trade)) {
 	s.tradeUpdateCallbacks = append(s.tradeUpdateCallbacks, cb)
 }
@@ -170,6 +180,8 @@ type StandardStreamEventHub interface {
 	OnConnect(cb func())
 
 	OnDisconnect(cb func())
+
+	OnAuth(cb func())
 
 	OnTradeUpdate(cb func(trade Trade))
 
