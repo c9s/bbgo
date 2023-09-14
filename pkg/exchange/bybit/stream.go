@@ -137,6 +137,9 @@ func (s *Stream) dispatchEvent(event interface{}) {
 		if err := e.IsValid(); err != nil {
 			log.Errorf("invalid event: %v", err)
 		}
+		if e.IsAuthenticated() {
+			s.EmitAuth()
+		}
 
 	case *BookEvent:
 		s.EmitBookEvent(*e)

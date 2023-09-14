@@ -150,6 +150,9 @@ func (s *Stream) handleDisconnect() {
 
 func (s *Stream) handleConnect() {
 	if !s.PublicOnly {
+		// Emit Auth before establishing the connection to prevent the caller from missing the Update data after
+		// creating the order.
+		s.EmitAuth()
 		return
 	}
 
