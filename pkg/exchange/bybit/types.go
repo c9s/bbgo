@@ -88,6 +88,10 @@ func (w *WebSocketOpEvent) IsValid() error {
 	}
 }
 
+func (w *WebSocketOpEvent) IsAuthenticated() bool {
+	return w.Op == WsOpTypeAuth && w.Success
+}
+
 type TopicType string
 
 const (
