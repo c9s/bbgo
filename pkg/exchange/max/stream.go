@@ -53,6 +53,7 @@ func NewStream(key, secret string) *Stream {
 	stream.OnConnect(stream.handleConnect)
 	stream.OnAuthEvent(func(e max.AuthEvent) {
 		log.Infof("max websocket connection authenticated: %+v", e)
+		stream.EmitAuth()
 	})
 	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnOrderSnapshotEvent(stream.handleOrderSnapshotEvent)

@@ -118,6 +118,7 @@ func (s *Stream) handleEvent(event WebSocketEvent) {
 	switch event.Event {
 	case "login":
 		if event.Code == "0" {
+			s.EmitAuth()
 			var subs = []WebsocketSubscription{
 				{Channel: "account"},
 				{Channel: "orders", InstrumentType: string(okexapi.InstrumentTypeSpot)},

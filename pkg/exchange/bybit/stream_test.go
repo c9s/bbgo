@@ -126,6 +126,9 @@ func TestStream(t *testing.T) {
 	})
 
 	t.Run("wallet test", func(t *testing.T) {
+		s.OnAuth(func() {
+			t.Log("authenticated")
+		})
 		err := s.Connect(context.Background())
 		assert.NoError(t, err)
 
