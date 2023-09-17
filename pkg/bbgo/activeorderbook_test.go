@@ -59,7 +59,7 @@ func TestActiveOrderBook_pendingOrders(t *testing.T) {
 		},
 		Status:       types.OrderStatusNew,
 		CreationTime: types.Time(now),
-		UpdateTime:   types.Time(now.Add(-time.Second)),
+		UpdateTime:   types.Time(now),
 	})
 
 	assert.True(t, filled, "filled event should be fired")

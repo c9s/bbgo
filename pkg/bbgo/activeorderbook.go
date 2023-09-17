@@ -334,13 +334,50 @@ func (b *ActiveOrderBook) Add(orders ...types.Order) {
 	}
 }
 
+func isNewerUpdate(a, b types.Order) bool {
+	// compare state first
+	switch a.Status {
+
+	case types.OrderStatusCanceled, types.OrderStatusRejected: // canceled is a final state
+		switch b.Status {
+		case types.OrderStatusNew, types.OrderStatusPartiallyFilled:
+			return true
+		}
+
+	case types.OrderStatusPartiallyFilled:
+		switch b.Status {
+		case types.OrderStatusNew:
+			return true
+		}
+
+	case types.OrderStatusFilled:
+		switch b.Status {
+		case types.OrderStatusFilled, types.OrderStatusPartiallyFilled, types.OrderStatusNew:
+			return true
+		}
+	}
+
+	au := time.Time(a.UpdateTime)
+	bu := time.Time(b.UpdateTime)
+
+	if !au.IsZero() && !bu.IsZero() && au.After(bu) {
+		return true
+	}
+
+	if !au.IsZero() && bu.IsZero() {
+		return true
+	}
+
+	return false
+}
+
 // add the order to the active order book and check the pending order
 func (b *ActiveOrderBook) add(order types.Order) {
 	if pendingOrder, ok := b.pendingOrderUpdates.Get(order.OrderID); ok {
 		// if the pending order update time is newer than the adding order
 		// we should use the pending order rather than the adding order.
 		// if pending order is older, than we should add the new one, and drop the pending order
-		if pendingOrder.UpdateTime.Time().After(order.UpdateTime.Time()) {
+		if isNewerUpdate(pendingOrder, order) {
 			order = pendingOrder
 		}
 
