@@ -268,7 +268,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 
 	b.mu.Lock()
 	if !b.orders.Exists(order.OrderID) {
-		log.Infof("[ActiveOrderBook] order #%d does not exist, adding it to pending order update", order.OrderID)
+		log.Infof("[ActiveOrderBook] order #%d %s does not exist, adding it to pending order update", order.OrderID, order.Status)
 		b.pendingOrderUpdates.Add(order)
 		b.mu.Unlock()
 		return
@@ -278,7 +278,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 	if previousOrder, ok := b.orders.Get(order.OrderID); ok {
 		previousUpdateTime := previousOrder.UpdateTime.Time()
 		if !previousUpdateTime.IsZero() && order.UpdateTime.Before(previousUpdateTime) {
-			log.Infof("[ActiveOrderBook] order #%d updateTime is out of date, skip it", order.OrderID)
+			log.Infof("[ActiveOrderBook] order #%d updateTime %s is out of date, skip it", order.OrderID, order.UpdateTime)
 			b.mu.Unlock()
 			return
 		}

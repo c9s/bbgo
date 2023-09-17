@@ -67,7 +67,9 @@ func toGlobalRewards(maxRewards []max.Reward) ([]types.Reward, error) {
 	return rewards, nil
 }
 
-func toGlobalOrderStatus(orderState max.OrderState, executedVolume, remainingVolume fixedpoint.Value) types.OrderStatus {
+func toGlobalOrderStatus(
+	orderState max.OrderState, executedVolume, remainingVolume fixedpoint.Value,
+) types.OrderStatus {
 	switch orderState {
 
 	case max.OrderStateCancel:
@@ -328,6 +330,6 @@ func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 		Status:           toGlobalOrderStatus(u.State, u.ExecutedVolume, u.RemainingVolume),
 		ExecutedQuantity: u.ExecutedVolume,
 		CreationTime:     types.Time(time.Unix(0, u.CreatedAtMs*int64(time.Millisecond))),
-		UpdateTime:       types.Time(time.Unix(0, u.CreatedAtMs*int64(time.Millisecond))),
+		UpdateTime:       types.Time(time.Unix(0, u.UpdateTime*int64(time.Millisecond))),
 	}, nil
 }
