@@ -291,6 +291,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 		b.mu.Unlock()
 
 		if removed {
+			log.Infof("[ActiveOrderBook] order #%d is filled: %s", order.OrderID, order.String())
 			b.EmitFilled(order)
 		}
 		b.C.Emit()
