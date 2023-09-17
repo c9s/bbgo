@@ -320,9 +320,8 @@ func (o Order) String() string {
 		orderID = strconv.FormatUint(o.OrderID, 10)
 	}
 
-	desc := fmt.Sprintf("ORDER %s | %s | %s | %s | %s %-4s | %s/%s @ %s",
+	desc := fmt.Sprintf("ORDER %s | %s | %s | %s %-4s | %s/%s @ %s",
 		o.Exchange.String(),
-		o.CreationTime.Time().Local().Format(time.StampMilli),
 		orderID,
 		o.Symbol,
 		o.Type,
@@ -335,7 +334,15 @@ func (o Order) String() string {
 		desc += " Stop @ " + o.StopPrice.String()
 	}
 
-	return desc + " | " + string(o.Status)
+	desc += " | " + string(o.Status) + " | "
+
+	if time.Time(o.UpdateTime).IsZero() {
+		desc += "0/" + time.Time(o.CreationTime).UTC().Format(time.StampMilli)
+	} else {
+		desc += time.Time(o.UpdateTime).UTC().Format(time.StampMilli) + "/" + time.Time(o.CreationTime).UTC().Format(time.StampMilli)
+	}
+
+	return desc
 }
 
 // PlainText is used for telegram-styled messages
