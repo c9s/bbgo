@@ -59,7 +59,9 @@ func (b *ActiveOrderBook) BindStream(stream types.Stream) {
 	stream.OnOrderUpdate(b.orderUpdateHandler)
 }
 
-func (b *ActiveOrderBook) waitClear(ctx context.Context, order types.Order, waitTime, timeout time.Duration) (bool, error) {
+func (b *ActiveOrderBook) waitClear(
+	ctx context.Context, order types.Order, waitTime, timeout time.Duration,
+) (bool, error) {
 	if !b.orders.Exists(order.OrderID) {
 		return true, nil
 	}
@@ -266,6 +268,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 
 	b.mu.Lock()
 	if !b.orders.Exists(order.OrderID) {
+		log.Infof("[ActiveOrderBook] order #%d %s does not exist, adding it to pending order update", order.OrderID, order.Status)
 		b.pendingOrderUpdates.Add(order)
 		b.mu.Unlock()
 		return
@@ -275,6 +278,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 	if previousOrder, ok := b.orders.Get(order.OrderID); ok {
 		previousUpdateTime := previousOrder.UpdateTime.Time()
 		if !previousUpdateTime.IsZero() && order.UpdateTime.Before(previousUpdateTime) {
+			log.Infof("[ActiveOrderBook] order #%d updateTime %s is out of date, skip it", order.OrderID, order.UpdateTime)
 			b.mu.Unlock()
 			return
 		}
@@ -287,6 +291,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 		b.mu.Unlock()
 
 		if removed {
+			log.Infof("[ActiveOrderBook] order #%d is filled: %s", order.OrderID, order.String())
 			b.EmitFilled(order)
 		}
 		b.C.Emit()
@@ -330,13 +335,50 @@ func (b *ActiveOrderBook) Add(orders ...types.Order) {
 	}
 }
 
+func isNewerUpdate(a, b types.Order) bool {
+	// compare state first
+	switch a.Status {
+
+	case types.OrderStatusCanceled, types.OrderStatusRejected: // canceled is a final state
+		switch b.Status {
+		case types.OrderStatusNew, types.OrderStatusPartiallyFilled:
+			return true
+		}
+
+	case types.OrderStatusPartiallyFilled:
+		switch b.Status {
+		case types.OrderStatusNew:
+			return true
+		}
+
+	case types.OrderStatusFilled:
+		switch b.Status {
+		case types.OrderStatusFilled, types.OrderStatusPartiallyFilled, types.OrderStatusNew:
+			return true
+		}
+	}
+
+	au := time.Time(a.UpdateTime)
+	bu := time.Time(b.UpdateTime)
+
+	if !au.IsZero() && !bu.IsZero() && au.After(bu) {
+		return true
+	}
+
+	if !au.IsZero() && bu.IsZero() {
+		return true
+	}
+
+	return false
+}
+
 // add the order to the active order book and check the pending order
 func (b *ActiveOrderBook) add(order types.Order) {
 	if pendingOrder, ok := b.pendingOrderUpdates.Get(order.OrderID); ok {
 		// if the pending order update time is newer than the adding order
 		// we should use the pending order rather than the adding order.
 		// if pending order is older, than we should add the new one, and drop the pending order
-		if pendingOrder.UpdateTime.Time().After(order.UpdateTime.Time()) {
+		if isNewerUpdate(pendingOrder, order) {
 			order = pendingOrder
 		}
 
