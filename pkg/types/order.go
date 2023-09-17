@@ -336,10 +336,12 @@ func (o Order) String() string {
 
 	desc += " | " + string(o.Status) + " | "
 
+	desc += time.Time(o.CreationTime).UTC().Format(time.StampMilli)
+
 	if time.Time(o.UpdateTime).IsZero() {
-		desc += "0/" + time.Time(o.CreationTime).UTC().Format(time.StampMilli)
+		desc += " -> 0"
 	} else {
-		desc += time.Time(o.UpdateTime).UTC().Format(time.StampMilli) + "/" + time.Time(o.CreationTime).UTC().Format(time.StampMilli)
+		desc += " -> " + time.Time(o.UpdateTime).UTC().Format(time.StampMilli)
 	}
 
 	return desc
