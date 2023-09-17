@@ -59,7 +59,9 @@ func (b *ActiveOrderBook) BindStream(stream types.Stream) {
 	stream.OnOrderUpdate(b.orderUpdateHandler)
 }
 
-func (b *ActiveOrderBook) waitClear(ctx context.Context, order types.Order, waitTime, timeout time.Duration) (bool, error) {
+func (b *ActiveOrderBook) waitClear(
+	ctx context.Context, order types.Order, waitTime, timeout time.Duration,
+) (bool, error) {
 	if !b.orders.Exists(order.OrderID) {
 		return true, nil
 	}
@@ -266,6 +268,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 
 	b.mu.Lock()
 	if !b.orders.Exists(order.OrderID) {
+		log.Infof("[ActiveOrderBook] order #%d does not exist, adding it to pending order update", order.OrderID)
 		b.pendingOrderUpdates.Add(order)
 		b.mu.Unlock()
 		return
@@ -275,6 +278,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 	if previousOrder, ok := b.orders.Get(order.OrderID); ok {
 		previousUpdateTime := previousOrder.UpdateTime.Time()
 		if !previousUpdateTime.IsZero() && order.UpdateTime.Before(previousUpdateTime) {
+			log.Infof("[ActiveOrderBook] order #%d updateTime is out of date, skip it", order.OrderID)
 			b.mu.Unlock()
 			return
 		}
