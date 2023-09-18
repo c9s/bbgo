@@ -25,7 +25,7 @@ func Test_QueryOrder(t *testing.T) {
 	e := New(key, secret, passphrase)
 
 	queryOrder := types.OrderQuery{
-		Symbol:  "BTC-USDT",
+		Symbol:  "BTCUSDT",
 		OrderID: "609869603774656544",
 	}
 	orderDetail, err := e.QueryOrder(context.Background(), queryOrder)
