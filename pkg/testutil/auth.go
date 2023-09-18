@@ -3,6 +3,7 @@ package testutil
 import (
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -26,6 +27,7 @@ func IntegrationTestConfigured(t *testing.T, prefix string) (key, secret string,
 
 func IntegrationTestWithPassphraseConfigured(t *testing.T, prefix string) (key, secret, passphrase string, ok bool) {
 	var hasKey, hasSecret, hasPassphrase bool
+	prefix = strings.ToUpper(prefix)
 	key, hasKey = os.LookupEnv(prefix + "_API_KEY")
 	secret, hasSecret = os.LookupEnv(prefix + "_API_SECRET")
 	passphrase, hasPassphrase = os.LookupEnv(prefix + "_API_PASSPHRASE")

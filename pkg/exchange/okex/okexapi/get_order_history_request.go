@@ -6,21 +6,21 @@ import (
 	"github.com/c9s/requestgen"
 )
 
-//go:generate GetRequest -url "/api/v5/trade/fills-history" -type GetTransactionHistoriesRequest -responseDataType .APIResponse
-type GetTransactionHistoriesRequest struct {
+//go:generate GetRequest -url "/api/v5/trade/orders-history-archive" -type GetOrderHistoryRequest -responseDataType .APIResponse
+type GetOrderHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	instrumentType InstrumentType `param:"instType,query"`
 	instrumentID   *string        `param:"instId,query"`
 	orderType      *OrderType     `param:"ordType,query"`
-	orderID        string         `param:"ordId,query"`
-	// Underlying and InstrumentFamily Applicable to FUTURES/SWAP/OPTION
+	// underlying and instrumentFamil Applicable to FUTURES/SWAP/OPTION
 	underlying       *string `param:"uly,query"`
 	instrumentFamily *string `param:"instFamily,query"`
 
-	after     *string    `param:"after,query"`
-	before    *string    `param:"before,query"`
-	startTime *time.Time `param:"begin,query,milliseconds"`
+	state     *OrderState `param:"state,query"`
+	after     *string     `param:"after,query"`
+	before    *string     `param:"before,query"`
+	startTime *time.Time  `param:"begin,query,milliseconds"`
 
 	// endTime for each request, startTime and endTime can be any interval, but should be in last 3 months
 	endTime *time.Time `param:"end,query,milliseconds"`
@@ -32,8 +32,8 @@ type GetTransactionHistoriesRequest struct {
 type OrderList []OrderDetails
 
 // NewGetOrderHistoriesRequest is descending order by createdTime
-func (c *RestClient) NewGetTransactionHistoriesRequest() *GetTransactionHistoriesRequest {
-	return &GetTransactionHistoriesRequest{
+func (c *RestClient) NewGetOrderHistoryRequest() *GetOrderHistoryRequest {
+	return &GetOrderHistoryRequest{
 		client:         c,
 		instrumentType: InstrumentTypeSpot,
 	}
