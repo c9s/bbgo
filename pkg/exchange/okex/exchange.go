@@ -2,12 +2,14 @@ package okex
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
@@ -15,7 +17,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var marketDataLimiter = rate.NewLimiter(rate.Every(time.Second/10), 1)
+// Okex rate limit list in each api document
+// The default order limiter apply 30 requests per second and a 5 initial bucket
+// this includes QueryOrder, QueryOrderTrades, SubmitOrder, QueryOpenOrders, CancelOrders
+// Market data limiter means public api, this includes QueryMarkets, QueryTicker, QueryTickers, QueryKLines
+var (
+	marketDataLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 5)
+	tradeRateLimiter  = rate.NewLimiter(rate.Every(100*time.Millisecond), 5)
+	orderRateLimiter  = rate.NewLimiter(rate.Every(300*time.Millisecond), 5)
+)
 
 const ID = "okex"
 
@@ -362,4 +372,45 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	}
 
 	return toGlobalOrder(order)
+}
+
+// Query order trades can query trades in last 3 months.
+func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
+	if len(q.ClientOrderID) != 0 {
+		log.Warn("!!!OKEX EXCHANGE API NOTICE!!! Okex does not support searching for trades using OrderClientId.")
+	}
+
+	req := e.client.NewGetTransactionHistoriesRequest()
+	if len(q.Symbol) != 0 {
+		req.InstrumentID(q.Symbol)
+	}
+
+	if len(q.OrderID) != 0 {
+		req.OrderID(q.OrderID)
+	}
+
+	if err := orderRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("order rate limiter wait error: %w", err)
+	}
+	response, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query order trades, err: %w", err)
+	}
+
+	var trades []types.Trade
+	var errs error
+	for _, trade := range response {
+		res, err := toGlobalTrade(&trade)
+		if err != nil {
+			errs = multierr.Append(errs, err)
+			continue
+		}
+		trades = append(trades, *res)
+	}
+
+	if errs != nil {
+		return nil, errs
+	}
+
+	return trades, nil
 }

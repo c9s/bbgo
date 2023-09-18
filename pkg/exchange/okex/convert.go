@@ -128,36 +128,14 @@ func segmentOrderDetails(orderDetails []okexapi.OrderDetails) (trades, orders []
 
 func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) {
 	var trades []types.Trade
+	var err error
 	for _, orderDetail := range orderDetails {
-		tradeID, err := strconv.ParseInt(orderDetail.LastTradeID, 10, 64)
-		if err != nil {
-			return trades, errors.Wrapf(err, "error parsing tradeId value: %s", orderDetail.LastTradeID)
+		trade, err2 := toGlobalTrade(&orderDetail)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+			continue
 		}
-
-		orderID, err := strconv.ParseInt(orderDetail.OrderID, 10, 64)
-		if err != nil {
-			return trades, errors.Wrapf(err, "error parsing ordId value: %s", orderDetail.OrderID)
-		}
-
-		side := types.SideType(strings.ToUpper(string(orderDetail.Side)))
-
-		trades = append(trades, types.Trade{
-			ID:            uint64(tradeID),
-			OrderID:       uint64(orderID),
-			Exchange:      types.ExchangeOKEx,
-			Price:         orderDetail.LastFilledPrice,
-			Quantity:      orderDetail.LastFilledQuantity,
-			QuoteQuantity: orderDetail.LastFilledPrice.Mul(orderDetail.LastFilledQuantity),
-			Symbol:        toGlobalSymbol(orderDetail.InstrumentID),
-			Side:          side,
-			IsBuyer:       side == types.SideTypeBuy,
-			IsMaker:       orderDetail.ExecutionType == "M",
-			Time:          types.Time(orderDetail.LastFilledTime),
-			Fee:           orderDetail.LastFilledFee,
-			FeeCurrency:   orderDetail.LastFilledFeeCurrency,
-			IsMargin:      false,
-			IsIsolated:    false,
-		})
+		trades = append(trades, *trade)
 	}
 
 	return trades, nil
@@ -280,7 +258,7 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 	}
 
 	isMargin := false
-	if okexOrder.InstrumentType == string(okexapi.InstrumentTypeMARGIN) {
+	if okexOrder.InstrumentType == okexapi.InstrumentTypeMARGIN {
 		isMargin = true
 	}
 
@@ -304,5 +282,48 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 		UpdateTime:       types.Time(okexOrder.UpdateTime),
 		IsMargin:         isMargin,
 		IsIsolated:       false,
+	}, nil
+}
+
+func toGlobalTrade(orderDetail *okexapi.OrderDetails) (*types.Trade, error) {
+	tradeID, err := strconv.ParseInt(orderDetail.LastTradeID, 10, 64)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing tradeId value: %s", orderDetail.LastTradeID)
+	}
+
+	orderID, err := strconv.ParseInt(orderDetail.OrderID, 10, 64)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing ordId value: %s", orderDetail.OrderID)
+	}
+
+	side := toGlobalSide(orderDetail.Side)
+
+	isMargin := false
+	if orderDetail.InstrumentType == okexapi.InstrumentTypeMARGIN {
+		isMargin = true
+	}
+
+	isFuture := false
+	if orderDetail.InstrumentType == okexapi.InstrumentTypeFutures {
+		isFuture = true
+	}
+
+	return &types.Trade{
+		ID:            uint64(tradeID),
+		OrderID:       uint64(orderID),
+		Exchange:      types.ExchangeOKEx,
+		Price:         orderDetail.LastFilledPrice,
+		Quantity:      orderDetail.LastFilledQuantity,
+		QuoteQuantity: orderDetail.LastFilledPrice.Mul(orderDetail.LastFilledQuantity),
+		Symbol:        toGlobalSymbol(orderDetail.InstrumentID),
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       orderDetail.ExecutionType == "M",
+		Time:          types.Time(orderDetail.LastFilledTime),
+		Fee:           orderDetail.LastFilledFee,
+		FeeCurrency:   orderDetail.LastFilledFeeCurrency,
+		IsMargin:      isMargin,
+		IsFutures:     isFuture,
+		IsIsolated:    false,
 	}, nil
 }
