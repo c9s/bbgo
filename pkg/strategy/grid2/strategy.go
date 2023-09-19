@@ -2159,14 +2159,9 @@ func (s *Strategy) recoverActiveOrders(ctx context.Context, session *bbgo.Exchan
 	for _, o := range activeOrders {
 		s.logger.Infof("updating %d order...", o.OrderID)
 
-		var updatedOrder *types.Order
-		err := retry.GeneralBackoff(ctx, func() error {
-			var err error
-			updatedOrder, err = s.orderQueryService.QueryOrder(ctx, types.OrderQuery{
-				Symbol:  o.Symbol,
-				OrderID: strconv.FormatUint(o.OrderID, 10),
-			})
-			return err
+		updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, s.orderQueryService, types.OrderQuery{
+			Symbol:  o.Symbol,
+			OrderID: strconv.FormatUint(o.OrderID, 10),
 		})
 
 		if err != nil {
