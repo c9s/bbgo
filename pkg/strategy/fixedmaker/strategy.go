@@ -35,7 +35,6 @@ type Strategy struct {
 	Quantity        fixedpoint.Value `json:"quantity"`
 	HalfSpreadRatio fixedpoint.Value `json:"halfSpreadRatio"`
 	OrderType       types.OrderType  `json:"orderType"`
-	DryRun          bool             `json:"dryRun"`
 
 	// SkewFactor is used to calculate the skew of bid/ask price
 	SkewFactor   fixedpoint.Value `json:"skewFactor"`
@@ -45,8 +44,15 @@ type Strategy struct {
 	ATRMultiplier fixedpoint.Value `json:"atrMultiplier"`
 	ATRWindow     int              `json:"atrWindow"`
 
+	// bollinger band is used to check if the price is too high or too low
+	BOLLWindow    int     `json:"bollWindow"`
+	BOLLBandWidth float64 `json:"bollBandWidth"`
+
+	DryRun bool `json:"dryRun"`
+
 	activeOrderBook *bbgo.ActiveOrderBook
 	atr             *indicatorv2.ATRStream
+	boll            *indicatorv2.BOLLStream
 }
 
 func (s *Strategy) Defaults() error {
@@ -58,6 +64,16 @@ func (s *Strategy) Defaults() error {
 	if s.ATRWindow == 0 {
 		log.Infof("atr window is not set, using default value 14")
 		s.ATRWindow = 14
+	}
+
+	if s.BOLLWindow == 0 {
+		log.Infof("boll window is not set, using default value 20")
+		s.BOLLWindow = 20
+	}
+
+	if s.BOLLBandWidth == 0 {
+		log.Infof("boll band width is not set, using default value 2.0")
+		s.BOLLBandWidth = 2.0
 	}
 	return nil
 }
@@ -93,6 +109,14 @@ func (s *Strategy) Validate() error {
 	if s.ATRWindow < 0 {
 		return fmt.Errorf("atrWindow should be non-negative")
 	}
+
+	if s.BOLLWindow < 0 {
+		return fmt.Errorf("bollWindow should be non-negative")
+	}
+
+	if s.BOLLBandWidth < 0 {
+		return fmt.Errorf("bollBandWidth should be non-negative")
+	}
 	return nil
 }
 
@@ -108,6 +132,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.activeOrderBook.BindStream(session.UserDataStream)
 
 	s.atr = session.Indicators(s.Symbol).ATR(s.Interval, s.ATRWindow)
+	s.boll = session.Indicators(s.Symbol).BOLL(types.IntervalWindow{Interval: s.Interval, Window: s.BOLLWindow}, s.BOLLBandWidth)
 
 	session.UserDataStream.OnStart(func() {
 		// you can place orders here when bbgo is started, this will be called only once.
@@ -214,30 +239,49 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 	log.Infof("ask price: %s", askPrice.String())
 
 	// check balance and generate orders
-	amount := s.Quantity.Mul(bidPrice)
-	if quoteBalance.Available.Compare(amount) > 0 {
-		orders = append(orders, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeBuy,
-			Type:     s.OrderType,
-			Price:    bidPrice,
-			Quantity: s.Quantity,
-		})
-	} else {
-		log.Infof("not enough quote balance to buy, available: %s, amount: %s", quoteBalance.Available, amount)
-	}
-
-	if baseBalance.Available.Compare(s.Quantity) > 0 {
-		orders = append(orders, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeSell,
-			Type:     s.OrderType,
-			Price:    askPrice,
-			Quantity: s.Quantity,
-		})
-	} else {
-		log.Infof("not enough base balance to sell, available: %s, quantity: %s", baseBalance.Available, s.Quantity)
-	}
+	orders = s.appendBuyOrder(orders, bidPrice, quoteBalance)
+	orders = s.appendSellOrder(orders, askPrice, baseBalance)
 
 	return orders, nil
+}
+
+func (s *Strategy) appendBuyOrder(orders []types.SubmitOrder, bidPrice fixedpoint.Value, quoteBalance types.Balance) []types.SubmitOrder {
+	amount := s.Quantity.Mul(bidPrice)
+	if quoteBalance.Available.Compare(amount) < 0 {
+		log.Infof("not enough quote balance to buy, available: %s, amount: %s", quoteBalance.Available, amount)
+		return orders
+	}
+
+	if bidPrice.Float64() > s.boll.UpBand.Last(0) {
+		log.Infof("bid price %s is higher than boll up band %f, skip buying", bidPrice.String(), s.boll.UpBand.Last(0))
+		return orders
+	}
+
+	return append(orders, types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeBuy,
+		Type:     s.OrderType,
+		Price:    bidPrice,
+		Quantity: s.Quantity,
+	})
+}
+
+func (s *Strategy) appendSellOrder(orders []types.SubmitOrder, askPrice fixedpoint.Value, baseBalance types.Balance) []types.SubmitOrder {
+	if baseBalance.Available.Compare(s.Quantity) < 0 {
+		log.Infof("not enough base balance to sell, available: %s, quantity: %s", baseBalance.Available, s.Quantity)
+		return orders
+	}
+
+	if askPrice.Float64() < s.boll.DownBand.Last(0) {
+		log.Infof("ask price %s is lower than boll down band %f, skip selling", askPrice.String(), s.boll.DownBand.Last(0))
+		return orders
+	}
+
+	return append(orders, types.SubmitOrder{
+		Symbol:   s.Symbol,
+		Side:     types.SideTypeSell,
+		Type:     s.OrderType,
+		Price:    askPrice,
+		Quantity: s.Quantity,
+	})
 }
