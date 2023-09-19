@@ -80,6 +80,11 @@ type StandardStream struct {
 
 	PublicOnly bool
 
+	// sg is used to wait until the previous routines are closed.
+	// only handle routines used internally, avoid including external callback func to prevent issues if they have
+	// bugs and cannot terminate. e.q. heartBeat
+	sg SyncGroup
+
 	// ReconnectC is a signal channel for reconnecting
 	ReconnectC chan struct{}
 
@@ -160,6 +165,7 @@ func NewStandardStream() StandardStream {
 	return StandardStream{
 		ReconnectC: make(chan struct{}, 1),
 		CloseC:     make(chan struct{}),
+		sg:         NewSyncGroup(),
 	}
 }
 
@@ -188,9 +194,10 @@ func (s *StandardStream) SetConn(ctx context.Context, conn *websocket.Conn) (con
 	connCtx, connCancel := context.WithCancel(ctx)
 	s.ConnLock.Lock()
 
-	// ensure the previous context is cancelled
+	// ensure the previous context is cancelled and all routines are closed.
 	if s.ConnCancel != nil {
 		s.ConnCancel()
+		s.sg.WaitAndClear()
 	}
 
 	// create a new context for this connection
@@ -405,9 +412,16 @@ func (s *StandardStream) DialAndConnect(ctx context.Context) error {
 	connCtx, connCancel := s.SetConn(ctx, conn)
 	s.EmitConnect()
 
-	go s.Read(connCtx, conn, connCancel)
-	go s.ping(connCtx, conn, connCancel, pingInterval)
+	s.sg.Add(func() {
+		s.Read(connCtx, conn, connCancel)
+	})
+	s.sg.Add(func() {
+		s.ping(connCtx, conn, connCancel, pingInterval)
+	})
+	s.sg.Run()
+
 	if s.heartBeat != nil {
+		// not included in wg, as it is an external callback func.
 		go s.heartBeat(connCtx, conn, connCancel)
 	}
 	return nil
