@@ -651,7 +651,7 @@ func TestStrategy_calculateProfit(t *testing.T) {
 	})
 }
 
-func TestStrategy_aggregateOrderBaseFee(t *testing.T) {
+func TestStrategy_aggregateOrderQuoteAmountAndFee(t *testing.T) {
 	s := newTestStrategy()
 
 	mockCtrl := gomock.NewController(t)
@@ -666,32 +666,34 @@ func TestStrategy_aggregateOrderBaseFee(t *testing.T) {
 		OrderID: "3",
 	}).Return([]types.Trade{
 		{
-			ID:          1,
-			OrderID:     3,
-			Exchange:    "binance",
-			Price:       number(20000.0),
-			Quantity:    number(0.2),
-			Symbol:      "BTCUSDT",
-			Side:        types.SideTypeBuy,
-			IsBuyer:     true,
-			FeeCurrency: "BTC",
-			Fee:         number(0.2 * 0.01),
+			ID:            1,
+			OrderID:       3,
+			Exchange:      "binance",
+			Price:         number(20000.0),
+			Quantity:      number(0.2),
+			QuoteQuantity: number(4000),
+			Symbol:        "BTCUSDT",
+			Side:          types.SideTypeBuy,
+			IsBuyer:       true,
+			FeeCurrency:   "BTC",
+			Fee:           number(0.2 * 0.01),
 		},
 		{
-			ID:          1,
-			OrderID:     3,
-			Exchange:    "binance",
-			Price:       number(20000.0),
-			Quantity:    number(0.8),
-			Symbol:      "BTCUSDT",
-			Side:        types.SideTypeBuy,
-			IsBuyer:     true,
-			FeeCurrency: "BTC",
-			Fee:         number(0.8 * 0.01),
+			ID:            1,
+			OrderID:       3,
+			Exchange:      "binance",
+			Price:         number(20000.0),
+			Quantity:      number(0.8),
+			QuoteQuantity: number(16000),
+			Symbol:        "BTCUSDT",
+			Side:          types.SideTypeBuy,
+			IsBuyer:       true,
+			FeeCurrency:   "BTC",
+			Fee:           number(0.8 * 0.01),
 		},
 	}, nil)
 
-	baseFee, _ := s.aggregateOrderFee(types.Order{
+	quoteAmount, fee, _ := s.aggregateOrderQuoteAmountAndFee(types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:       "BTCUSDT",
 			Side:         types.SideTypeBuy,
@@ -710,7 +712,8 @@ func TestStrategy_aggregateOrderBaseFee(t *testing.T) {
 		ExecutedQuantity: number(1.0),
 		IsWorking:        false,
 	})
-	assert.Equal(t, "0.01", baseFee.String())
+	assert.Equal(t, "0.01", fee.String())
+	assert.Equal(t, "20000", quoteAmount.String())
 }
 
 func TestStrategy_findDuplicatedPriceOpenOrders(t *testing.T) {
@@ -1116,7 +1119,7 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 	})
 }
 
-func TestStrategy_aggregateOrderBaseFeeRetry(t *testing.T) {
+func TestStrategy_aggregateOrderQuoteAmountAndFeeRetry(t *testing.T) {
 	s := newTestStrategy()
 
 	mockCtrl := gomock.NewController(t)
@@ -1161,7 +1164,7 @@ func TestStrategy_aggregateOrderBaseFeeRetry(t *testing.T) {
 		},
 	}, nil)
 
-	baseFee, _ := s.aggregateOrderFee(types.Order{
+	quoteAmount, fee, _ := s.aggregateOrderQuoteAmountAndFee(types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:       "BTCUSDT",
 			Side:         types.SideTypeBuy,
@@ -1180,7 +1183,8 @@ func TestStrategy_aggregateOrderBaseFeeRetry(t *testing.T) {
 		ExecutedQuantity: number(1.0),
 		IsWorking:        false,
 	})
-	assert.Equal(t, "0.01", baseFee.String())
+	assert.Equal(t, "0.01", fee.String())
+	assert.Equal(t, "20000", quoteAmount.String())
 }
 
 func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
