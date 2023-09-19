@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -290,12 +291,13 @@ func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTr
 				// already queries, skip
 				continue
 			}
-			order, err := queryOrderService.QueryOrder(ctx, types.OrderQuery{
+			order, err := retry.QueryOrderUntilSuccessful(ctx, queryOrderService, types.OrderQuery{
+				Symbol:  trade.Symbol,
 				OrderID: strconv.FormatUint(trade.OrderID, 10),
 			})
 
 			if err != nil {
-				return errors.Wrapf(err, "failed to query order by trade")
+				return errors.Wrapf(err, "failed to query order by trade (trade id: %d, order id: %d)", trade.ID, trade.OrderID)
 			}
 
 			s.debugLog(order.String())
