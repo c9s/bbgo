@@ -57,6 +57,16 @@ func QueryOpenOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, symb
 	return openOrders, err
 }
 
+func QueryOrderUntilSuccessful(ctx context.Context, query types.ExchangeOrderQueryService, opts types.OrderQuery) (order *types.Order, err error) {
+	var op = func() (err2 error) {
+		order, err2 = query.QueryOrder(ctx, opts)
+		return err2
+	}
+
+	err = GeneralBackoff(ctx, op)
+	return order, err
+}
+
 func CancelAllOrdersUntilSuccessful(ctx context.Context, service advancedOrderCancelService) error {
 	var op = func() (err2 error) {
 		_, err2 = service.CancelAllOrders(ctx)
