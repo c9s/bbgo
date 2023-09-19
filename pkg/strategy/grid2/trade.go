@@ -29,3 +29,17 @@ func aggregateTradesQuantity(trades []types.Trade) fixedpoint.Value {
 	}
 	return tq
 }
+
+// aggregateTradesQuoteQuantity aggregates the quote quantity from the given trade slice
+func aggregateTradesQuoteQuantity(trades []types.Trade) fixedpoint.Value {
+	quoteQuantity := fixedpoint.Zero
+	for _, t := range trades {
+		if t.QuoteQuantity.IsZero() {
+			quoteQuantity = quoteQuantity.Add(t.Price.Mul(t.Quantity))
+		} else {
+			quoteQuantity = quoteQuantity.Add(t.QuoteQuantity)
+		}
+	}
+
+	return quoteQuantity
+}
