@@ -100,6 +100,8 @@ type StandardStream struct {
 
 	authCallbacks []func()
 
+	rawMessageCallbacks []func(raw []byte)
+
 	// private trade update callbacks
 	tradeUpdateCallbacks []func(trade Trade)
 
@@ -259,6 +261,8 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 			if mt != websocket.TextMessage {
 				continue
 			}
+
+			s.EmitRawMessage(message)
 
 			if debugRawMessage {
 				log.Info(string(message))
