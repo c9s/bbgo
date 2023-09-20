@@ -15,41 +15,42 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func parseWebSocketEvent(str []byte) (interface{}, error) {
-	v, err := fastjson.ParseBytes(str)
+func parseWebSocketEvent(in []byte) (interface{}, error) {
+	var e WsEvent
+
+	err := json.Unmarshal(in, &e)
 	if err != nil {
 		return nil, err
 	}
 
-	if v.Exists("event") {
-		return parseEvent(v)
-	}
-
-	if v.Exists("data") {
-		return parseData(v)
+	switch {
+	case e.IsOp():
+		parseEvent(&e)
+	case e.IsTopicEvent():
+		parseData(&e)
 	}
 
 	return nil, nil
 }
 
-type WebSocketEvent struct {
-	Event   string      `json:"event"`
-	Code    string      `json:"code,omitempty"`
-	Message string      `json:"msg,omitempty"`
-	Arg     interface{} `json:"arg,omitempty"`
-}
+// type WebSocketEvent struct {
+// 	Event   string      `json:"event"`
+// 	Code    string      `json:"code,omitempty"`
+// 	Message string      `json:"msg,omitempty"`
+// 	Arg     interface{} `json:"arg,omitempty"`
+// }
 
-func parseEvent(v *fastjson.Value) (*WebSocketEvent, error) {
+func parseEvent(v *WsEvent) (*WebSocketEvent, error) {
 	// event could be "subscribe", "unsubscribe" or "error"
-	event := string(v.GetStringBytes("event"))
-	code := string(v.GetStringBytes("code"))
-	message := string(v.GetStringBytes("msg"))
-	arg := v.GetObject("arg")
+	// event := string(v.GetStringBytes("event"))
+	// code := string(v.GetStringBytes("code"))
+	// message := string(v.GetStringBytes("msg"))
+	// arg := v.GetObject("arg")
 	return &WebSocketEvent{
-		Event:   event,
-		Code:    code,
-		Message: message,
-		Arg:     arg,
+		Event:   v.WebSocketEvent.Event,
+		Code:    v.WebSocketEvent.Code,
+		Message: v.WebSocketEvent.Message,
+		Arg:     v.WebSocketEvent.Arg,
 	}, nil
 }
 
@@ -327,30 +328,32 @@ func parseOrder(v *fastjson.Value) ([]okexapi.OrderDetails, error) {
 	return orderDetails, nil
 }
 
-func parseData(v *fastjson.Value) (interface{}, error) {
+func parseData(v *WsEvent) (interface{}, error) {
 
-	channel := string(v.GetStringBytes("arg", "channel"))
+	// channel := string(v.GetStringBytes("arg", "channel"))
 
-	switch channel {
-	case "books5":
-		data, err := parseBookData(v)
-		data.channel = channel
-		return data, err
-	case "books":
-		data, err := parseBookData(v)
-		data.channel = channel
-		return data, err
-	case "account":
-		return parseAccount(v)
-	case "orders":
-		return parseOrder(v)
-	default:
-		if strings.HasPrefix(channel, "candle") {
-			data, err := parseCandle(channel, v)
-			return data, err
-		}
+	//channel := v.WebSocketTopicEvent.Arg[0].Channel
 
-	}
+	// switch channel {
+	// case "books5":
+	// 	data, err := parseBookData(v)
+	// 	data.channel = channel
+	// 	return data, err
+	// case "books":
+	// 	data, err := parseBookData(v)
+	// 	data.channel = channel
+	// 	return data, err
+	// case "account":
+	// 	return parseAccount(v)
+	// case "orders":
+	// 	return parseOrder(v)
+	// default:
+	// 	if strings.HasPrefix(channel, "candle") {
+	// 		data, err := parseCandle(channel, v)
+	// 		return data, err
+	// 	}
+
+	// }
 
 	return nil, nil
 }

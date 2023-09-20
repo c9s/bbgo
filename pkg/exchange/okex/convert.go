@@ -55,11 +55,11 @@ func toGlobalBalance(account *okexapi.Account) types.BalanceMap {
 	return balanceMap
 }
 
-type WebsocketSubscription struct {
-	Channel        string `json:"channel"`
-	InstrumentID   string `json:"instId,omitempty"`
-	InstrumentType string `json:"instType,omitempty"`
-}
+// type WebsocketSubscription struct {
+// 	Channel        string `json:"channel"`
+// 	InstrumentID   string `json:"instId,omitempty"`
+// 	InstrumentType string `json:"instType,omitempty"`
+// }
 
 var CandleChannels = []string{
 	"candle1Y",

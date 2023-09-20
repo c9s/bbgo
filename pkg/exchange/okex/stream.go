@@ -2,6 +2,8 @@ package okex
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -9,23 +11,11 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type WebsocketOp struct {
-	Op   string      `json:"op"`
-	Args interface{} `json:"args"`
-}
-
-type WebsocketLogin struct {
-	Key        string `json:"apiKey"`
-	Passphrase string `json:"passphrase"`
-	Timestamp  string `json:"timestamp"`
-	Sign       string `json:"sign"`
-}
-
 //go:generate callbackgen -type Stream -interface
 type Stream struct {
 	types.StandardStream
 
-	client *okexapi.RestClient
+	key, secret, passphrase string
 
 	// public callbacks
 	candleEventCallbacks       []func(candle Candle)
@@ -42,9 +32,11 @@ type CandleKey struct {
 	Channel      string
 }
 
-func NewStream(client *okexapi.RestClient) *Stream {
+func NewStream(key, secret, passphrase string) *Stream {
 	stream := &Stream{
-		client:         client,
+		key:            key,
+		secret:         secret,
+		passphrase:     passphrase,
 		StandardStream: types.NewStandardStream(),
 		lastCandle:     make(map[CandleKey]Candle),
 	}
@@ -78,7 +70,7 @@ func (s *Stream) handleConnect() {
 			return
 		}
 
-		log.Infof("subscribing channels: %+v", subs)
+		log.Infof("subscribing channels: %v", subs)
 		err := s.Conn.WriteJSON(WebsocketOp{
 			Op:   "subscribe",
 			Args: subs,
@@ -93,13 +85,13 @@ func (s *Stream) handleConnect() {
 		// sign=CryptoJS.enc.Base64.Stringify(CryptoJS.HmacSHA256(timestamp +'GET'+'/users/self/verify', secretKey))
 		msTimestamp := strconv.FormatFloat(float64(time.Now().UnixNano())/float64(time.Second), 'f', -1, 64)
 		payload := msTimestamp + "GET" + "/users/self/verify"
-		sign := okexapi.Sign(payload, s.client.Secret)
+		sign := okexapi.Sign(payload, s.secret)
 		op := WebsocketOp{
 			Op: "login",
-			Args: []WebsocketLogin{
+			Args: []WebsocketSubscription{
 				{
-					Key:        s.client.Key,
-					Passphrase: s.client.Passphrase,
+					Key:        s.key,
+					Passphrase: s.passphrase,
 					Timestamp:  msTimestamp,
 					Sign:       sign,
 				},
@@ -107,6 +99,8 @@ func (s *Stream) handleConnect() {
 		}
 
 		log.Infof("sending okex login request")
+		res2B, _ := json.Marshal(op)
+		fmt.Println(string(res2B))
 		err := s.Conn.WriteJSON(op)
 		if err != nil {
 			log.WithError(err).Errorf("can not send login message")
