@@ -44,6 +44,16 @@ func (s *StandardStream) EmitAuth() {
 	}
 }
 
+func (s *StandardStream) OnRawMessage(cb func(raw []byte)) {
+	s.rawMessageCallbacks = append(s.rawMessageCallbacks, cb)
+}
+
+func (s *StandardStream) EmitRawMessage(raw []byte) {
+	for _, cb := range s.rawMessageCallbacks {
+		cb(raw)
+	}
+}
+
 func (s *StandardStream) OnTradeUpdate(cb func(trade Trade)) {
 	s.tradeUpdateCallbacks = append(s.tradeUpdateCallbacks, cb)
 }
@@ -182,6 +192,8 @@ type StandardStreamEventHub interface {
 	OnDisconnect(cb func())
 
 	OnAuth(cb func())
+
+	OnRawMessage(cb func(raw []byte))
 
 	OnTradeUpdate(cb func(trade Trade))
 
