@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -111,13 +112,12 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	session.UserDataStream.OnStart(func() {
 		// you can place orders here when bbgo is started, this will be called only once.
-		s.replenish(ctx)
 	})
 
 	s.activeOrderBook.OnFilled(func(order types.Order) {
 		if s.activeOrderBook.NumOfOrders() == 0 {
 			log.Infof("no active orders, replenish")
-			s.replenish(ctx)
+			s.replenish(ctx, order.UpdateTime.Time())
 		}
 	})
 
@@ -125,7 +125,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		log.Infof("%+v", kline)
 
 		s.cancelOrders(ctx)
-		s.replenish(ctx)
+		s.replenish(ctx, kline.EndTime.Time())
 	})
 
 	// the shutdown handler, you can cancel all orders
@@ -143,7 +143,12 @@ func (s *Strategy) cancelOrders(ctx context.Context) {
 	}
 }
 
-func (s *Strategy) replenish(ctx context.Context) {
+func (s *Strategy) replenish(ctx context.Context, t time.Time) {
+	if s.IsHalted(t) {
+		log.Infof("circuit break halted, not replenishing")
+		return
+	}
+
 	submitOrders, err := s.generateSubmitOrders(ctx)
 	if err != nil {
 		log.WithError(err).Error("failed to generate submit orders")
