@@ -19,7 +19,6 @@ type CircuitBreakRiskControl struct {
 	lossThreshold  fixedpoint.Value
 	haltedDuration time.Duration
 
-	isHalted bool
 	haltedAt time.Time
 }
 
@@ -59,10 +58,10 @@ func (c *CircuitBreakRiskControl) IsHalted(t time.Time) bool {
 		c.profitStats.TodayPnL.Float64(),
 		unrealized.Float64())
 
-	c.isHalted = unrealized.Add(c.profitStats.TodayPnL).Compare(c.lossThreshold) <= 0
-	if c.isHalted {
+	isHalted := unrealized.Add(c.profitStats.TodayPnL).Compare(c.lossThreshold) <= 0
+	if isHalted {
 		c.haltedAt = t
 	}
 
-	return c.isHalted
+	return isHalted
 }
