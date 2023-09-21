@@ -9,7 +9,8 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -23,6 +24,8 @@ func init() {
 
 // Fixed spread market making strategy
 type Strategy struct {
+	*common.Strategy
+
 	Environment          *bbgo.Environment
 	StandardIndicatorSet *bbgo.StandardIndicatorSet
 	Market               types.Market
@@ -42,22 +45,18 @@ type Strategy struct {
 	ATRMultiplier fixedpoint.Value `json:"atrMultiplier"`
 	ATRWindow     int              `json:"atrWindow"`
 
-	// persistence fields
-	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
-	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
-
-	session         *bbgo.ExchangeSession
-	orderExecutor   *bbgo.GeneralOrderExecutor
 	activeOrderBook *bbgo.ActiveOrderBook
-	atr             *indicator.ATR
+	atr             *indicatorv2.ATRStream
 }
 
 func (s *Strategy) Defaults() error {
 	if s.OrderType == "" {
+		log.Infof("order type is not set, using limit maker order type")
 		s.OrderType = types.OrderTypeLimitMaker
 	}
 
 	if s.ATRWindow == 0 {
+		log.Infof("atr window is not set, using default value 14")
 		s.ATRWindow = 14
 	}
 	return nil
@@ -102,36 +101,13 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.session = session
+	s.Strategy = &common.Strategy{}
+	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
 	s.activeOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeOrderBook.BindStream(session.UserDataStream)
 
-	instanceID := s.InstanceID()
-
-	if s.Position == nil {
-		s.Position = types.NewPositionFromMarket(s.Market)
-	}
-
-	// Always update the position fields
-	s.Position.Strategy = ID
-	s.Position.StrategyInstanceID = instanceID
-
-	if s.ProfitStats == nil {
-		s.ProfitStats = types.NewProfitStats(s.Market)
-	}
-
-	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
-	s.orderExecutor.BindEnvironment(s.Environment)
-
-	s.orderExecutor.BindProfitStats(s.ProfitStats)
-
-	s.orderExecutor.Bind()
-	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(ctx, s)
-	})
-
-	s.atr = s.StandardIndicatorSet.ATR(types.IntervalWindow{Interval: s.Interval, Window: s.ATRWindow})
+	s.atr = session.Indicators(s.Symbol).ATR(s.Interval, s.ATRWindow)
 
 	session.UserDataStream.OnStart(func() {
 		// you can place orders here when bbgo is started, this will be called only once.
@@ -155,14 +131,14 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	// the shutdown handler, you can cancel all orders
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-		_ = s.orderExecutor.GracefulCancel(ctx)
+		_ = s.OrderExecutor.GracefulCancel(ctx)
 	})
 
 	return nil
 }
 
 func (s *Strategy) cancelOrders(ctx context.Context) {
-	if err := s.session.Exchange.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
+	if err := s.Session.Exchange.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
 		log.WithError(err).Errorf("failed to cancel orders")
 	}
 }
@@ -180,7 +156,7 @@ func (s *Strategy) replenish(ctx context.Context) {
 		return
 	}
 
-	createdOrders, err := s.orderExecutor.SubmitOrders(ctx, submitOrders...)
+	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
 		log.WithError(err).Error("failed to submit orders")
 		return
@@ -193,19 +169,19 @@ func (s *Strategy) replenish(ctx context.Context) {
 func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrder, error) {
 	orders := []types.SubmitOrder{}
 
-	baseBalance, ok := s.session.GetAccount().Balance(s.Market.BaseCurrency)
+	baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
 	if !ok {
 		return nil, fmt.Errorf("base currency %s balance not found", s.Market.BaseCurrency)
 	}
 	log.Infof("base balance: %+v", baseBalance)
 
-	quoteBalance, ok := s.session.GetAccount().Balance(s.Market.QuoteCurrency)
+	quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
 	if !ok {
 		return nil, fmt.Errorf("quote currency %s balance not found", s.Market.QuoteCurrency)
 	}
 	log.Infof("quote balance: %+v", quoteBalance)
 
-	ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)
+	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
 	if err != nil {
 		return nil, err
 	}
