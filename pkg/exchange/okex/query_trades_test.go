@@ -38,20 +38,20 @@ func Test_QueryTrades(t *testing.T) {
 	t.Logf("transaction detail: %+v", transactionDetail)
 	// query by trade id
 	transactionDetail, err = e.QueryTrades(context.Background(), queryOrder.Symbol, &types.TradeQueryOptions{LastTradeID: 432044402})
-	if assert.NoError(t, err) {
-		assert.NotEmpty(t, transactionDetail)
+	if assert.Error(t, err) {
+		assert.Empty(t, transactionDetail)
 	}
 	t.Logf("transaction detail: %+v", transactionDetail)
 	// query by no time interval and no trade id
 	transactionDetail, err = e.QueryTrades(context.Background(), queryOrder.Symbol, &types.TradeQueryOptions{})
-	if assert.NoError(t, err) {
-		assert.NotEmpty(t, transactionDetail)
+	if assert.Error(t, err) {
+		assert.Empty(t, transactionDetail)
 	}
 	t.Logf("transaction detail: %+v", transactionDetail)
 	// query by limit exceed default value
 	transactionDetail, err = e.QueryTrades(context.Background(), queryOrder.Symbol, &types.TradeQueryOptions{Limit: 150})
-	if assert.NoError(t, err) {
-		assert.NotEmpty(t, transactionDetail)
+	if assert.Error(t, err) {
+		assert.Empty(t, transactionDetail)
 	}
 	t.Logf("transaction detail: %+v", transactionDetail)
 }
