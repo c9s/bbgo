@@ -23,7 +23,6 @@ import (
 // Market data limiter means public api, this includes QueryMarkets, QueryTicker, QueryTickers, QueryKLines
 var (
 	marketDataLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 5)
-	tradeRateLimiter  = rate.NewLimiter(rate.Every(300*time.Millisecond), 5)
 	orderRateLimiter  = rate.NewLimiter(rate.Every(300*time.Millisecond), 5)
 )
 
@@ -434,7 +433,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		return nil, ErrSymbolRequired
 	}
 
-	if err := tradeRateLimiter.Wait(ctx); err != nil {
+	if err := orderRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
 	}
 
@@ -478,14 +477,16 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 /*
 QueryTrades can query trades in last 3 months, there are no time interval limitations, as long as end_time >= start_time.
 OKEX do not provide api to query by tradeID, So use /api/v5/trade/orders-history-archive as its official site do.
-Please Use LastTradeID as cursor, only return trades later than that trade, that trade is not included.
 If you want to query trades by time range, please just pass start_time and end_time.
-If you want to query by cursor, please pass LastTradeID.
 Because it gets the correct response even when you pass all parameters with the right time interval and invalid LastTradeID, like 0.
 */
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
 	if symbol == "" {
 		return nil, ErrSymbolRequired
+	}
+
+	if options.LastTradeID > 0 {
+		log.Warn("!!!OKEX EXCHANGE API NOTICE!!! Okex does not support searching for trades using TradeId.")
 	}
 
 	req := e.client.NewGetOrderHistoryRequest().InstrumentID(toLocalSymbol(symbol))
@@ -497,14 +498,15 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		req.Limit(limit)
 	}
 
-	if err := tradeRateLimiter.Wait(ctx); err != nil {
+	if err := orderRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("query trades rate limiter wait error: %w", err)
 	}
 
 	var err error
 	var response []okexapi.OrderDetails
-	// query by time interval
-	if options.StartTime != nil || options.EndTime != nil {
+	if options.StartTime == nil && options.EndTime == nil {
+		return nil, fmt.Errorf("StartTime and EndTime are require parameter!")
+	} else { // query by time interval
 		if options.StartTime != nil {
 			req.StartTime(*options.StartTime)
 		}
@@ -512,29 +514,10 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			req.EndTime(*options.EndTime)
 		}
 
-		response, err = req.Do(ctx)
+		response, err = req.
+			Do(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to call get order histories error: %w", err)
-		}
-	} else if options.StartTime == nil && options.EndTime == nil && options.LastTradeID == 0 { // query by no any parameters
-		response, err = req.Do(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to call get order histories error: %w", err)
-		}
-	} else { // query by trade id
-		lastTradeID := strconv.FormatUint(options.LastTradeID, 10)
-		res, err := req.Do(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to call get order histories error: %w", err)
-		}
-		for _, trade := range res {
-			if trade.LastTradeID == lastTradeID {
-				response, err = req.Before(trade.OrderID).Do(ctx)
-				if err != nil {
-					return nil, fmt.Errorf("failed to call get order histories error: %w", err)
-				}
-				break
-			}
 		}
 	}
 
