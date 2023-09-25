@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -204,6 +205,8 @@ type Strategy struct {
 
 	tradingCtx, writeCtx context.Context
 	cancelWrite          context.CancelFunc
+
+	recovered int32
 
 	// this ensures that bbgo.Sync to lock the object
 	sync.Mutex
@@ -1982,11 +1985,16 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		})
 	}
 
-	session.UserDataStream.OnConnect(func() {
+	session.UserDataStream.OnAuth(func() {
 		if !bbgo.IsBackTesting {
 			// callback may block the stream execution, so we spawn the recover function to the background
 			// add (5 seconds + random <10 seconds jitter) delay
 			go time.AfterFunc(util.MillisecondsJitter(5*time.Second, 1000*10), func() {
+				recovered := atomic.LoadInt32(&s.recovered)
+				if recovered == 0 {
+					return
+				}
+
 				s.recoverActiveOrders(ctx, session)
 			})
 		}
@@ -2016,6 +2024,10 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 }
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
+	defer func() {
+		atomic.AddInt32(&s.recovered, 1)
+	}()
+
 	if s.RecoverGridByScanningTrades {
 		s.debugLog("recovering grid by scanning trades")
 		return s.recoverByScanningTrades(ctx, session)
@@ -2156,8 +2168,8 @@ func (s *Strategy) recoverActiveOrders(ctx context.Context, session *bbgo.Exchan
 	}
 
 	s.logger.Infof("found %d active orders to update...", len(activeOrders))
-	for _, o := range activeOrders {
-		s.logger.Infof("updating %d order...", o.OrderID)
+	for i, o := range activeOrders {
+		s.logger.Infof("updating %d/%d order #%d...", i+1, len(activeOrders), o.OrderID)
 
 		updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, s.orderQueryService, types.OrderQuery{
 			Symbol:  o.Symbol,
@@ -2169,6 +2181,7 @@ func (s *Strategy) recoverActiveOrders(ctx context.Context, session *bbgo.Exchan
 			return
 		}
 
+		s.logger.Infof("triggering updated order #%d: %s", o.OrderID, o.String())
 		activeOrderBook.Update(*updatedOrder)
 	}
 }
