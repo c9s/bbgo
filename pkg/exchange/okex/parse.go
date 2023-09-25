@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/valyala/fastjson"
-
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -25,12 +23,41 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 
 	switch {
 	case e.IsOp():
-		parseEvent(&e)
-	case e.IsTopicEvent():
-		parseData(&e)
+		return e.WebSocketOpEvent, nil
+	case e.IsPushDataEvent():
+		// need unmarshal again because arg in both WebSocketOpEvent and WebSocketPushDataEvent
+		var pushDataEvent WebSocketPushDataEvent
+
+		err := json.Unmarshal(in, &pushDataEvent)
+		if err != nil {
+			return nil, err
+		}
+
+		channel := pushDataEvent.Arg.Channel
+
+		switch channel {
+
+		case string(WsChannelTypeBooks5):
+			data, err := parseBookData(&pushDataEvent)
+			return data, err
+		case string(WsChannelTypeBooks):
+			data, err := parseBookData(&pushDataEvent)
+			return data, err
+		case string(WsChannelTypeAccount):
+			data, err := parseAccount(&pushDataEvent)
+			return data, err
+		case string(WsChannelTypeOrders):
+			data, err := parseOrder(&pushDataEvent)
+			return data, err
+		default:
+			if strings.HasPrefix(channel, "candle") {
+				data, err := parseCandle(channel, &pushDataEvent)
+				return data, err
+			}
+		}
 	}
 
-	return nil, nil
+	return nil, fmt.Errorf("unhandled websocket event: %+v", string(in))
 }
 
 // type WebSocketEvent struct {
@@ -40,28 +67,28 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 // 	Arg     interface{} `json:"arg,omitempty"`
 // }
 
-func parseEvent(v *WsEvent) (*WebSocketEvent, error) {
-	// event could be "subscribe", "unsubscribe" or "error"
-	// event := string(v.GetStringBytes("event"))
-	// code := string(v.GetStringBytes("code"))
-	// message := string(v.GetStringBytes("msg"))
-	// arg := v.GetObject("arg")
-	return &WebSocketEvent{
-		Event:   v.WebSocketEvent.Event,
-		Code:    v.WebSocketEvent.Code,
-		Message: v.WebSocketEvent.Message,
-		Arg:     v.WebSocketEvent.Arg,
-	}, nil
-}
+// func parseEvent(v *WsEvent) (*WebSocketOpEvent, error) {
+// 	// event could be "subscribe", "unsubscribe" or "error"
+// 	// event := string(v.GetStringBytes("event"))
+// 	// code := string(v.GetStringBytes("code"))
+// 	// message := string(v.GetStringBytes("msg"))
+// 	// arg := v.GetObject("arg")
+// 	return &WebSocketOpEvent{
+// 		Event:   v.WebSocketOpEvent.Event,
+// 		Code:    v.WebSocketOpEvent.Code,
+// 		Message: v.WebSocketOpEvent.Message,
+// 		Arg:     v.WebSocketOpEvent.Arg,
+// 	}, nil
+// }
 
 type BookEvent struct {
 	InstrumentID         string
 	Symbol               string
 	Action               string
-	Bids                 []BookEntry
-	Asks                 []BookEntry
-	MillisecondTimestamp int64
-	Checksum             int
+	Bids                 [][]fixedpoint.Value       `json:"bids"`
+	Asks                 [][]fixedpoint.Value       `json:"asks"`
+	MillisecondTimestamp types.MillisecondTimestamp `json:"ts"`
+	Checksum             int                        `json:"checksum"`
 	channel              string
 }
 
@@ -71,13 +98,13 @@ func (data *BookEvent) BookTicker() types.BookTicker {
 	}
 
 	if len(data.Bids) > 0 {
-		ticker.Buy = data.Bids[0].Price
-		ticker.BuySize = data.Bids[0].Volume
+		ticker.Buy = data.Bids[0][0]
+		ticker.BuySize = data.Bids[0][1]
 	}
 
 	if len(data.Asks) > 0 {
-		ticker.Sell = data.Asks[0].Price
-		ticker.SellSize = data.Asks[0].Volume
+		ticker.Sell = data.Asks[0][0]
+		ticker.SellSize = data.Asks[0][1]
 	}
 
 	return ticker
@@ -86,101 +113,41 @@ func (data *BookEvent) BookTicker() types.BookTicker {
 func (data *BookEvent) Book() types.SliceOrderBook {
 	book := types.SliceOrderBook{
 		Symbol: data.Symbol,
-		Time:   types.NewMillisecondTimestampFromInt(data.MillisecondTimestamp).Time(),
+		Time:   data.MillisecondTimestamp.Time(),
 	}
 
-	for _, bid := range data.Bids {
-		book.Bids = append(book.Bids, types.PriceVolume{Price: bid.Price, Volume: bid.Volume})
+	for i := range data.Bids {
+		book.Bids = append(book.Bids, types.PriceVolume{Price: data.Bids[i][0], Volume: data.Bids[i][1]})
 	}
 
-	for _, ask := range data.Asks {
-		book.Asks = append(book.Asks, types.PriceVolume{Price: ask.Price, Volume: ask.Volume})
+	for j := range data.Asks {
+		book.Asks = append(book.Asks, types.PriceVolume{Price: data.Asks[j][0], Volume: data.Asks[j][1]})
 	}
 
 	return book
 }
 
-type BookEntry struct {
-	Price         fixedpoint.Value
-	Volume        fixedpoint.Value
-	NumLiquidated int
-	NumOrders     int
-}
-
-func parseBookEntry(v *fastjson.Value) (*BookEntry, error) {
-	arr, err := v.Array()
-	if err != nil {
+// Order book channel
+func parseBookData(v *WebSocketPushDataEvent) (*BookEvent, error) {
+	instrumentId := v.Arg.InstrumentID
+	data := v.Data
+	var bookEvent []BookEvent
+	if err := json.Unmarshal(data, &bookEvent); err != nil {
 		return nil, err
 	}
 
-	if len(arr) < 4 {
-		return nil, fmt.Errorf("unexpected book entry size: %d", len(arr))
-	}
+	action := v.Action
 
-	price := fixedpoint.Must(fixedpoint.NewFromString(string(arr[0].GetStringBytes())))
-	volume := fixedpoint.Must(fixedpoint.NewFromString(string(arr[1].GetStringBytes())))
-	numLiquidated, err := strconv.Atoi(string(arr[2].GetStringBytes()))
-	if err != nil {
-		return nil, err
-	}
-
-	numOrders, err := strconv.Atoi(string(arr[3].GetStringBytes()))
-	if err != nil {
-		return nil, err
-	}
-
-	return &BookEntry{
-		Price:         price,
-		Volume:        volume,
-		NumLiquidated: numLiquidated,
-		NumOrders:     numOrders,
-	}, nil
-}
-
-func parseBookData(v *fastjson.Value) (*BookEvent, error) {
-	instrumentId := string(v.GetStringBytes("arg", "instId"))
-	data := v.GetArray("data")
-	if len(data) == 0 {
-		return nil, errors.New("empty data payload")
-	}
-
-	// "snapshot" or "update"
-	action := string(v.GetStringBytes("action"))
-
-	millisecondTimestamp, err := strconv.ParseInt(string(data[0].GetStringBytes("ts")), 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	checksum := data[0].GetInt("checksum")
-
-	var asks []BookEntry
-	var bids []BookEntry
-
-	for _, v := range data[0].GetArray("asks") {
-		entry, err := parseBookEntry(v)
-		if err != nil {
-			return nil, err
-		}
-		asks = append(asks, *entry)
-	}
-
-	for _, v := range data[0].GetArray("bids") {
-		entry, err := parseBookEntry(v)
-		if err != nil {
-			return nil, err
-		}
-		bids = append(bids, *entry)
-	}
+	checksum := bookEvent[0].Checksum
 
 	return &BookEvent{
 		InstrumentID:         instrumentId,
 		Symbol:               toGlobalSymbol(instrumentId),
-		Action:               action,
-		Bids:                 bids,
-		Asks:                 asks,
+		Action:               *action,
+		Bids:                 bookEvent[0].Bids,
+		Asks:                 bookEvent[0].Asks,
 		Checksum:             checksum,
-		MillisecondTimestamp: millisecondTimestamp,
+		MillisecondTimestamp: bookEvent[0].MillisecondTimestamp,
 	}, nil
 }
 
@@ -226,65 +193,63 @@ func (c *Candle) KLine() types.KLine {
 	}
 }
 
-func parseCandle(channel string, v *fastjson.Value) (*Candle, error) {
-	instrumentID := string(v.GetStringBytes("arg", "instId"))
-	data, err := v.Get("data").Array()
-	if err != nil {
+// Candlesticks channel
+func parseCandle(channel string, v *WebSocketPushDataEvent) (*Candle, error) {
+	instrumentID := v.Arg.InstrumentID
+
+	data := v.Data
+	var dataPoints [][]string
+	if err := json.Unmarshal(data, &dataPoints); err != nil {
 		return nil, err
 	}
 
-	if len(data) == 0 {
+	if len(dataPoints) == 0 {
 		return nil, errors.New("candle data is empty")
 	}
 
-	arr, err := data[0].Array()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(arr) < 7 {
-		return nil, fmt.Errorf("unexpected candle data length: %d", len(arr))
+	if len(dataPoints[0]) < 7 { // okex actually return 9 points
+		return nil, fmt.Errorf("unexpected candle data length: %d", len(dataPoints[0]))
 	}
 
 	interval := strings.ToLower(strings.TrimPrefix(channel, "candle"))
 
-	timestamp, err := strconv.ParseInt(string(arr[0].GetStringBytes()), 10, 64)
+	timestamp, err := strconv.ParseInt(string(dataPoints[0][0]), 10, 64)
 	if err != nil {
 		return nil, err
 	}
 
-	open, err := fixedpoint.NewFromString(string(arr[1].GetStringBytes()))
+	open, err := fixedpoint.NewFromString(string(dataPoints[0][1]))
 	if err != nil {
 		return nil, err
 	}
 
-	high, err := fixedpoint.NewFromString(string(arr[2].GetStringBytes()))
+	high, err := fixedpoint.NewFromString(string(dataPoints[0][2]))
 	if err != nil {
 		return nil, err
 	}
 
-	low, err := fixedpoint.NewFromString(string(arr[3].GetStringBytes()))
+	low, err := fixedpoint.NewFromString(string(dataPoints[0][3]))
 	if err != nil {
 		return nil, err
 	}
 
-	cls, err := fixedpoint.NewFromString(string(arr[4].GetStringBytes()))
+	cls, err := fixedpoint.NewFromString(string(dataPoints[0][4]))
 	if err != nil {
 		return nil, err
 	}
 
-	vol, err := fixedpoint.NewFromString(string(arr[5].GetStringBytes()))
+	vol, err := fixedpoint.NewFromString(string(dataPoints[0][5]))
 	if err != nil {
 		return nil, err
 	}
 
-	volCurrency, err := fixedpoint.NewFromString(string(arr[6].GetStringBytes()))
+	volCurrency, err := fixedpoint.NewFromString(string(dataPoints[0][6]))
 	if err != nil {
 		return nil, err
 	}
 
 	candleTime := time.Unix(0, timestamp*int64(time.Millisecond))
-	return &Candle{
+	candle := &Candle{
 		Channel:              channel,
 		InstrumentID:         instrumentID,
 		Symbol:               toGlobalSymbol(instrumentID),
@@ -297,63 +262,31 @@ func parseCandle(channel string, v *fastjson.Value) (*Candle, error) {
 		VolumeInCurrency:     volCurrency,
 		MillisecondTimestamp: timestamp,
 		StartTime:            candleTime,
-	}, nil
+	}
+	return candle, nil
 }
 
-func parseAccount(v *fastjson.Value) (*okexapi.Account, error) {
-	data := v.Get("data").MarshalTo(nil)
+func parseAccount(v *WebSocketPushDataEvent) (*okexapi.Account, error) {
+	data := v.Data
 
-	var accounts []okexapi.Account
-	err := json.Unmarshal(data, &accounts)
-	if err != nil {
+	var account []okexapi.Account
+	if err := json.Unmarshal(data, &account); err != nil {
 		return nil, err
 	}
 
-	if len(accounts) == 0 {
-		return nil, errors.New("empty account data")
+	if len(account) == 0 {
+		return nil, fmt.Errorf("empty account")
 	}
-
-	return &accounts[0], nil
+	return &account[0], nil
 }
 
-func parseOrder(v *fastjson.Value) ([]okexapi.OrderDetails, error) {
-	data := v.Get("data").MarshalTo(nil)
+func parseOrder(v *WebSocketPushDataEvent) ([]okexapi.OrderDetails, error) {
+	data := v.Data
 
 	var orderDetails []okexapi.OrderDetails
-	err := json.Unmarshal(data, &orderDetails)
-	if err != nil {
+	if err := json.Unmarshal(data, &orderDetails); err != nil {
 		return nil, err
 	}
 
 	return orderDetails, nil
-}
-
-func parseData(v *WsEvent) (interface{}, error) {
-
-	// channel := string(v.GetStringBytes("arg", "channel"))
-
-	//channel := v.WebSocketTopicEvent.Arg[0].Channel
-
-	// switch channel {
-	// case "books5":
-	// 	data, err := parseBookData(v)
-	// 	data.channel = channel
-	// 	return data, err
-	// case "books":
-	// 	data, err := parseBookData(v)
-	// 	data.channel = channel
-	// 	return data, err
-	// case "account":
-	// 	return parseAccount(v)
-	// case "orders":
-	// 	return parseOrder(v)
-	// default:
-	// 	if strings.HasPrefix(channel, "candle") {
-	// 		data, err := parseCandle(channel, v)
-	// 		return data, err
-	// 	}
-
-	// }
-
-	return nil, nil
 }

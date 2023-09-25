@@ -24,6 +24,10 @@ const RestBaseURL = "https://www.okex.com/"
 const PublicWebSocketURL = "wss://ws.okex.com:8443/ws/v5/public"
 const PrivateWebSocketURL = "wss://ws.okex.com:8443/ws/v5/private"
 
+// Candlesticks and Block trading related websocket switch to below link
+// https://www.okx.com/hk/help/changes-to-v5-api-websocket-subscription-parameter-and-url
+const PublicCandlesticksWebSocketURL = "wss://ws.okx.com:8443/ws/v5/business"
+
 type SideType string
 
 const (
@@ -172,9 +176,9 @@ type BalanceDetail struct {
 }
 
 type Account struct {
-	TotalEquityInUSD fixedpoint.Value `json:"totalEq"`
-	UpdateTime       string           `json:"uTime"`
-	Details          []BalanceDetail  `json:"details"`
+	TotalEquityInUSD fixedpoint.Value           `json:"totalEq"`
+	UpdateTime       types.MillisecondTimestamp `json:"uTime"`
+	Details          []BalanceDetail            `json:"details"`
 }
 
 func (c *RestClient) AccountBalances(ctx context.Context) (*Account, error) {

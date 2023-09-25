@@ -10,7 +10,7 @@ type WebsocketLogin struct {
 	Sign       string `json:"sign"`
 }
 
-// channel args
+// op args
 type WebsocketSubscription struct {
 	Channel          string           `json:"channel"`
 	InstrumentID     string           `json:"instId,omitempty"`
@@ -20,8 +20,9 @@ type WebsocketSubscription struct {
 	TdMode           string           `json:"tdMode,omitempty"`
 	OrderType        string           `json:"ordType,omitempty"`
 	Quantity         fixedpoint.Value `json:"sz,omitempty"`
-	Key              string           `json:"apiKey,omitempty"`
-	Passphrase       string           `json:"passphrase,omitempty"`
-	Timestamp        string           `json:"timestamp,omitempty"`
-	Sign             string           `json:"sign,omitempty"`
+	// below for op login
+	Key        string `json:"apiKey,omitempty"`
+	Passphrase string `json:"passphrase,omitempty"`
+	Timestamp  string `json:"timestamp,omitempty"`
+	Sign       string `json:"sign,omitempty"`
 }

@@ -2,9 +2,8 @@ package okex
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
@@ -20,7 +19,7 @@ type Stream struct {
 	// public callbacks
 	candleEventCallbacks       []func(candle Candle)
 	bookEventCallbacks         []func(book BookEvent)
-	eventCallbacks             []func(event WebSocketEvent)
+	eventCallbacks             []func(event WebSocketOpEvent)
 	accountEventCallbacks      []func(account okexapi.Account)
 	orderDetailsEventCallbacks []func(orderDetails []okexapi.OrderDetails)
 
@@ -70,11 +69,12 @@ func (s *Stream) handleConnect() {
 			return
 		}
 
-		log.Infof("subscribing channels: %v", subs)
-		err := s.Conn.WriteJSON(WebsocketOp{
-			Op:   "subscribe",
+		log.Infof("subscribing channels: %+v", subs)
+		var websocketOp = WebsocketOp{
+			Op:   WsOpTypeSubscribe,
 			Args: subs,
-		})
+		}
+		err := s.Conn.WriteJSON(websocketOp)
 
 		if err != nil {
 			log.WithError(err).Error("subscribe error")
@@ -87,7 +87,7 @@ func (s *Stream) handleConnect() {
 		payload := msTimestamp + "GET" + "/users/self/verify"
 		sign := okexapi.Sign(payload, s.secret)
 		op := WebsocketOp{
-			Op: "login",
+			Op: WsOpTypeLogin,
 			Args: []WebsocketSubscription{
 				{
 					Key:        s.key,
@@ -99,8 +99,6 @@ func (s *Stream) handleConnect() {
 		}
 
 		log.Infof("sending okex login request")
-		res2B, _ := json.Marshal(op)
-		fmt.Println(string(res2B))
 		err := s.Conn.WriteJSON(op)
 		if err != nil {
 			log.WithError(err).Errorf("can not send login message")
@@ -108,19 +106,19 @@ func (s *Stream) handleConnect() {
 	}
 }
 
-func (s *Stream) handleEvent(event WebSocketEvent) {
+func (s *Stream) handleEvent(event WebSocketOpEvent) {
 	switch event.Event {
 	case "login":
 		if event.Code == "0" {
 			s.EmitAuth()
 			var subs = []WebsocketSubscription{
-				{Channel: "account"},
-				{Channel: "orders", InstrumentType: string(okexapi.InstrumentTypeSpot)},
+				{Channel: string(WsChannelTypeAccount)},
+				{Channel: string(WsChannelTypeOrders), InstrumentType: string(okexapi.InstrumentTypeSpot)},
 			}
 
 			log.Infof("subscribing private channels: %+v", subs)
-			err := s.Conn.WriteJSON(WebsocketOp{
-				Op:   "subscribe",
+			err := s.Conn.WriteJSON(WebSocketOpEvent{
+				Op:   WsOpTypeSubscribe,
 				Args: subs,
 			})
 
@@ -186,6 +184,19 @@ func (s *Stream) handleCandleEvent(candle Candle) {
 
 func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 	var url string
+	for _, subscription := range s.Subscriptions {
+		sub, err := convertSubscription(subscription)
+		if err != nil {
+			log.WithError(err).Errorf("subscription convert error")
+			continue
+		}
+
+		if strings.HasPrefix(strings.ToLower(sub.Channel), "candle") {
+			url = okexapi.PublicCandlesticksWebSocketURL
+			log.Warnf("OKEX: Candlesticks channel detected, this channel need its own endpoint, can't mix with other channel")
+			return url, nil
+		}
+	}
 	if s.PublicOnly {
 		url = okexapi.PublicWebSocketURL
 	} else {
@@ -196,7 +207,7 @@ func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch et := e.(type) {
-	case *WebSocketEvent:
+	case *WebSocketOpEvent:
 		s.EmitEvent(*et)
 
 	case *BookEvent:
