@@ -92,8 +92,9 @@ type NotificationConfig struct {
 }
 
 type LoggingConfig struct {
-	Trade bool `json:"trade,omitempty"`
-	Order bool `json:"order,omitempty"`
+	Trade  bool                   `json:"trade,omitempty"`
+	Order  bool                   `json:"order,omitempty"`
+	Fields map[string]interface{} `json:"fields,omitempty"`
 }
 
 type Session struct {

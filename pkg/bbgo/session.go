@@ -116,7 +116,7 @@ type ExchangeSession struct {
 	usedSymbols        map[string]struct{}
 	initializedSymbols map[string]struct{}
 
-	logger *log.Entry
+	logger log.FieldLogger
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
@@ -182,10 +182,14 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		return ErrSessionAlreadyInitialized
 	}
 
-	var log = log.WithField("session", session.Name)
+	var logger = environ.Logger()
+	logger = logger.WithField("session", session.Name)
+
+	// override the default logger
+	session.logger = logger
 
 	// load markets first
-	log.Infof("querying market info from %s...", session.Name)
+	logger.Infof("querying market info from %s...", session.Name)
 
 	var disableMarketsCache = false
 	var markets types.MarketMap
@@ -233,7 +237,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	// query and initialize the balances
 	if !session.PublicOnly {
-		log.Infof("querying account balances...")
+		logger.Infof("querying account balances...")
 
 		account, err := session.Exchange.QueryAccount(ctx)
 		if err != nil {
@@ -244,8 +248,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		session.Account = account
 		session.accountMutex.Unlock()
 
-		log.Infof("account %s balances:", session.Name)
-		account.Balances().Print()
+		logger.Infof("account %s balances:\n%s", session.Name, account.Balances().String())
 
 		// forward trade updates and order updates to the order executor
 		session.UserDataStream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
@@ -275,29 +278,29 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	if environ.loggingConfig != nil {
 		if environ.loggingConfig.Trade {
 			session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-				log.Info(trade.String())
+				logger.Info(trade.String())
 			})
 		}
 
 		if environ.loggingConfig.Order {
 			session.UserDataStream.OnOrderUpdate(func(order types.Order) {
-				log.Info(order.String())
+				logger.Info(order.String())
 			})
 		}
 	} else {
 		// if logging config is nil, then apply default logging setup
 		// add trade logger
 		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-			log.Info(trade.String())
+			logger.Info(trade.String())
 		})
 	}
 
 	if viper.GetBool("debug-kline") {
 		session.MarketDataStream.OnKLine(func(kline types.KLine) {
-			log.WithField("marketData", "kline").Infof("kline: %+v", kline)
+			logger.WithField("marketData", "kline").Infof("kline: %+v", kline)
 		})
 		session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-			log.WithField("marketData", "kline").Infof("kline closed: %+v", kline)
+			logger.WithField("marketData", "kline").Infof("kline closed: %+v", kline)
 		})
 	}
 
@@ -558,7 +561,9 @@ func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataSto
 }
 
 // KLine updates will be received in the order listend in intervals array
-func (session *ExchangeSession) SerialMarketDataStore(ctx context.Context, symbol string, intervals []types.Interval, useAggTrade ...bool) (store *SerialMarketDataStore, ok bool) {
+func (session *ExchangeSession) SerialMarketDataStore(
+	ctx context.Context, symbol string, intervals []types.Interval, useAggTrade ...bool,
+) (store *SerialMarketDataStore, ok bool) {
 	st, ok := session.MarketDataStore(symbol)
 	if !ok {
 		return nil, false
@@ -628,7 +633,9 @@ func (session *ExchangeSession) OrderStores() map[string]*core.OrderStore {
 }
 
 // Subscribe save the subscription info, later it will be assigned to the stream
-func (session *ExchangeSession) Subscribe(channel types.Channel, symbol string, options types.SubscribeOptions) *ExchangeSession {
+func (session *ExchangeSession) Subscribe(
+	channel types.Channel, symbol string, options types.SubscribeOptions,
+) *ExchangeSession {
 	if channel == types.KLineChannel && len(options.Interval) == 0 {
 		panic("subscription interval for kline can not be empty")
 	}
