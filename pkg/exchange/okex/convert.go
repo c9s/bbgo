@@ -93,7 +93,7 @@ func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
 
 	case types.BookChannel:
 		return WebsocketSubscription{
-			Channel:      "books",
+			Channel:      string(WsChannelTypeBooks),
 			InstrumentID: toLocalSymbol(s.Symbol),
 		}, nil
 	case types.BookTickerChannel:

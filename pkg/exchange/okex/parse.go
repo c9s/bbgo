@@ -60,27 +60,6 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 	return nil, fmt.Errorf("unhandled websocket event: %+v", string(in))
 }
 
-// type WebSocketEvent struct {
-// 	Event   string      `json:"event"`
-// 	Code    string      `json:"code,omitempty"`
-// 	Message string      `json:"msg,omitempty"`
-// 	Arg     interface{} `json:"arg,omitempty"`
-// }
-
-// func parseEvent(v *WsEvent) (*WebSocketOpEvent, error) {
-// 	// event could be "subscribe", "unsubscribe" or "error"
-// 	// event := string(v.GetStringBytes("event"))
-// 	// code := string(v.GetStringBytes("code"))
-// 	// message := string(v.GetStringBytes("msg"))
-// 	// arg := v.GetObject("arg")
-// 	return &WebSocketOpEvent{
-// 		Event:   v.WebSocketOpEvent.Event,
-// 		Code:    v.WebSocketOpEvent.Code,
-// 		Message: v.WebSocketOpEvent.Message,
-// 		Arg:     v.WebSocketOpEvent.Arg,
-// 	}, nil
-// }
-
 type BookEvent struct {
 	InstrumentID         string
 	Symbol               string
@@ -136,14 +115,17 @@ func parseBookData(v *WebSocketPushDataEvent) (*BookEvent, error) {
 		return nil, err
 	}
 
-	action := v.Action
+	var action string
+	if v.Arg.Channel != string(WsChannelTypeBooks5) {
+		action = *v.Action
+	}
 
 	checksum := bookEvent[0].Checksum
 
 	return &BookEvent{
 		InstrumentID:         instrumentId,
 		Symbol:               toGlobalSymbol(instrumentId),
-		Action:               *action,
+		Action:               action,
 		Bids:                 bookEvent[0].Bids,
 		Asks:                 bookEvent[0].Asks,
 		Checksum:             checksum,

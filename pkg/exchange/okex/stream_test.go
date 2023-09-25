@@ -70,6 +70,20 @@ func TestStream(t *testing.T) {
 		<-c
 	})
 
+	t.Run("book ticker test", func(t *testing.T) {
+		s.Subscribe(types.BookTickerChannel, "BTCUSDT", types.SubscribeOptions{})
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnBookTickerUpdate(func(bookTicker types.BookTicker) {
+			fmt.Println()
+			fmt.Printf("bookticker detail: %+v", bookTicker)
+		})
+		c := make(chan struct{})
+		<-c
+	})
+
 	t.Run("kline test", func(t *testing.T) {
 		s.Subscribe(types.KLineChannel, "LTCUSDT", types.SubscribeOptions{
 			Interval: types.Interval30m,

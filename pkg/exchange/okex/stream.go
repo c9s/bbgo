@@ -108,7 +108,7 @@ func (s *Stream) handleConnect() {
 
 func (s *Stream) handleEvent(event WebSocketOpEvent) {
 	switch event.Event {
-	case "login":
+	case WsOpTypeLogin:
 		if event.Code == "0" {
 			s.EmitAuth()
 			var subs = []WebsocketSubscription{
@@ -212,7 +212,7 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *BookEvent:
 		// there's "books" for 400 depth and books5 for 5 depth
-		if et.channel != "books5" {
+		if et.channel != string(WsChannelTypeBooks5) {
 			s.EmitBookEvent(*et)
 		}
 		s.EmitBookTickerUpdate(et.BookTicker())
