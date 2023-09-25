@@ -126,6 +126,14 @@ func NewEnvironment() *Environment {
 	}
 }
 
+func (environ *Environment) Logger() log.FieldLogger {
+	if environ.loggingConfig != nil && len(environ.loggingConfig.Fields) > 0 {
+		return log.WithFields(environ.loggingConfig.Fields)
+	}
+
+	return log.StandardLogger()
+}
+
 func (environ *Environment) Session(name string) (*ExchangeSession, bool) {
 	s, ok := environ.sessions[name]
 	return s, ok
@@ -857,7 +865,9 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 	interact.AddMessenger(messenger)
 }
 
-func (environ *Environment) setupTelegram(userConfig *Config, telegramBotToken string, persistence service.PersistenceService) error {
+func (environ *Environment) setupTelegram(
+	userConfig *Config, telegramBotToken string, persistence service.PersistenceService,
+) error {
 	tt := strings.Split(telegramBotToken, ":")
 	telegramID := tt[0]
 
