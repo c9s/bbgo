@@ -236,12 +236,12 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 			mt, message, err := conn.ReadMessage()
 			if err != nil {
 				// if it's a network timeout error, we should re-connect
-				switch err := err.(type) {
+				switch err2 := err.(type) {
 
 				// if it's a websocket related error
 				case *websocket.CloseError:
-					if err.Code != websocket.CloseNormalClosure {
-						log.WithError(err).Errorf("websocket error abnormal close: %+v", err)
+					if err2.Code != websocket.CloseNormalClosure {
+						log.WithError(err2).Warnf("websocket error abnormal close: %+v", err2)
 					}
 
 					_ = conn.Close()
@@ -251,13 +251,13 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 					return
 
 				case net.Error:
-					log.WithError(err).Warn("websocket read network error")
+					log.WithError(err2).Warn("websocket read network error")
 					_ = conn.Close()
 					s.Reconnect()
 					return
 
 				default:
-					log.WithError(err).Warn("unexpected websocket error")
+					log.WithError(err2).Warn("unexpected websocket error")
 					_ = conn.Close()
 					s.Reconnect()
 					return
@@ -291,7 +291,9 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 	}
 }
 
-func (s *StandardStream) ping(ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc, interval time.Duration) {
+func (s *StandardStream) ping(
+	ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc, interval time.Duration,
+) {
 	defer func() {
 		cancel()
 		log.Debug("[websocket] ping worker stopped")
