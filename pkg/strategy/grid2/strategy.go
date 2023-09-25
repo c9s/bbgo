@@ -2168,8 +2168,8 @@ func (s *Strategy) recoverActiveOrders(ctx context.Context, session *bbgo.Exchan
 	}
 
 	s.logger.Infof("found %d active orders to update...", len(activeOrders))
-	for _, o := range activeOrders {
-		s.logger.Infof("updating %d order...", o.OrderID)
+	for i, o := range activeOrders {
+		s.logger.Infof("updating %d/%d order #%d...", i+1, len(activeOrders), o.OrderID)
 
 		updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, s.orderQueryService, types.OrderQuery{
 			Symbol:  o.Symbol,
@@ -2181,6 +2181,7 @@ func (s *Strategy) recoverActiveOrders(ctx context.Context, session *bbgo.Exchan
 			return
 		}
 
+		s.logger.Infof("triggering updated order #%d: %s", o.OrderID, o.String())
 		activeOrderBook.Update(*updatedOrder)
 	}
 }
