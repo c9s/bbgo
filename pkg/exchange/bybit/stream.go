@@ -385,7 +385,7 @@ func (s *Stream) handleMarketTradeEvent(events []MarketTradeEvent) {
 }
 
 func (s *Stream) handleWalletEvent(events []bybitapi.WalletBalances) {
-	s.StandardStream.EmitBalanceSnapshot(toGlobalBalanceMap(events))
+	s.StandardStream.EmitBalanceUpdate(toGlobalBalanceMap(events))
 }
 
 func (s *Stream) handleOrderEvent(events []OrderEvent) {

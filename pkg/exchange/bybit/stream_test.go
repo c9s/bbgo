@@ -135,8 +135,8 @@ func TestStream(t *testing.T) {
 		err := s.Connect(context.Background())
 		assert.NoError(t, err)
 
-		s.OnBalanceSnapshot(func(balances types.BalanceMap) {
-			t.Log("got snapshot", balances)
+		s.OnBalanceUpdate(func(balances types.BalanceMap) {
+			t.Log("got update", balances)
 		})
 		c := make(chan struct{})
 		<-c
