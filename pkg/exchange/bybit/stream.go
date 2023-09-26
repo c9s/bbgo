@@ -11,6 +11,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 const (
@@ -27,18 +28,29 @@ var (
 	wsAuthRequest = 10 * time.Second
 )
 
-//go:generate mockgen -destination=mocks/stream.go -package=mocks . MarketInfoProvider
+// MarketInfoProvider calculates trade fees since trading fees are not supported by streaming.
 type MarketInfoProvider interface {
 	GetAllFeeRates(ctx context.Context) (bybitapi.FeeRates, error)
 	QueryMarkets(ctx context.Context) (types.MarketMap, error)
+}
+
+// AccountBalanceProvider provides a function to query all balances at streaming connected and emit balance snapshot.
+type AccountBalanceProvider interface {
+	QueryAccountBalances(ctx context.Context) (types.BalanceMap, error)
+}
+
+//go:generate mockgen -destination=mocks/stream.go -package=mocks . StreamDataProvider
+type StreamDataProvider interface {
+	MarketInfoProvider
+	AccountBalanceProvider
 }
 
 //go:generate callbackgen -type Stream
 type Stream struct {
 	types.StandardStream
 
-	key, secret    string
-	marketProvider MarketInfoProvider
+	key, secret        string
+	streamDataProvider StreamDataProvider
 	// TODO: update the fee rate at 7:00 am UTC; rotation required.
 	symbolFeeDetails map[string]*symbolFeeDetail
 
@@ -50,13 +62,13 @@ type Stream struct {
 	tradeEventCallbacks       []func(e []TradeEvent)
 }
 
-func NewStream(key, secret string, marketProvider MarketInfoProvider) *Stream {
+func NewStream(key, secret string, userDataProvider StreamDataProvider) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
 		// pragma: allowlist nextline secret
-		key:            key,
-		secret:         secret,
-		marketProvider: marketProvider,
+		key:                key,
+		secret:             secret,
+		streamDataProvider: userDataProvider,
 	}
 
 	stream.SetEndpointCreator(stream.createEndpoint)
@@ -65,6 +77,7 @@ func NewStream(key, secret string, marketProvider MarketInfoProvider) *Stream {
 	stream.SetHeartBeat(stream.ping)
 	stream.SetBeforeConnect(stream.getAllFeeRates)
 	stream.OnConnect(stream.handlerConnect)
+	stream.OnAuth(stream.handleAuthEvent)
 
 	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
@@ -326,6 +339,26 @@ func (s *Stream) convertSubscription(sub types.Subscription) (string, error) {
 	return "", fmt.Errorf("unsupported stream channel: %s", sub.Channel)
 }
 
+func (s *Stream) handleAuthEvent() {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	var balnacesMap types.BalanceMap
+	var err error
+	err = util.Retry(ctx, 10, 300*time.Millisecond, func() error {
+		balnacesMap, err = s.streamDataProvider.QueryAccountBalances(ctx)
+		return err
+	}, func(err error) {
+		log.WithError(err).Error("failed to call query account balances")
+	})
+	if err != nil {
+		log.WithError(err).Error("no more attempts to retrieve balances")
+		return
+	}
+
+	s.EmitBalanceSnapshot(balnacesMap)
+}
+
 func (s *Stream) handleBookEvent(e BookEvent) {
 	orderBook := e.OrderBook()
 	switch {
@@ -417,7 +450,7 @@ type symbolFeeDetail struct {
 // getAllFeeRates retrieves all fee rates from the Bybit API and then fetches markets to ensure the base coin and quote coin
 // are correct.
 func (e *Stream) getAllFeeRates(ctx context.Context) error {
-	feeRates, err := e.marketProvider.GetAllFeeRates(ctx)
+	feeRates, err := e.streamDataProvider.GetAllFeeRates(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to call get fee rates: %w", err)
 	}
@@ -429,7 +462,7 @@ func (e *Stream) getAllFeeRates(ctx context.Context) error {
 		}
 	}
 
-	mkts, err := e.marketProvider.QueryMarkets(ctx)
+	mkts, err := e.streamDataProvider.QueryMarkets(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get markets: %w", err)
 	}
