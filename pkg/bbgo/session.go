@@ -282,7 +282,13 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 			})
 		}
 
-		if environ.loggingConfig.Order {
+		if environ.loggingConfig.FilledOrderOnly {
+			session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+				if order.Status == types.OrderStatusFilled {
+					logger.Info(order.String())
+				}
+			})
+		} else if environ.loggingConfig.Order {
 			session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 				logger.Info(order.String())
 			})
