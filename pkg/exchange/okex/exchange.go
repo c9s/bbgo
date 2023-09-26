@@ -312,7 +312,10 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		return nil, err
 	}
 
-	intervalParam := toLocalInterval(interval.String())
+	intervalParam, err := toLocalInterval(interval)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get interval: %w", err)
+	}
 
 	req := e.client.NewCandlesticksRequest(toLocalSymbol(symbol))
 	req.Bar(intervalParam)
@@ -413,4 +416,26 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 	}
 
 	return trades, nil
+}
+
+func (e *Exchange) SupportedInterval() map[types.Interval]int {
+	return okexapi.SupportedIntervals
+}
+
+func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
+	_, ok := okexapi.SupportedIntervals[interval]
+	return ok
+}
+
+func (e *Exchange) GetAllFeeRates(ctx context.Context) (okexapi.FeeRateList, error) {
+	if err := orderRateLimiter.Wait(ctx); err != nil {
+		return okexapi.FeeRateList{}, fmt.Errorf("query fee rate limiter wait error: %w", err)
+	}
+	feeRates, err := e.client.NewGetFeeRatesRequest().
+		Do(ctx)
+	if err != nil {
+		return okexapi.FeeRateList{}, fmt.Errorf("failed to get fee rates, err: %w", err)
+	}
+
+	return feeRates, nil
 }
