@@ -192,6 +192,8 @@ func (p *Position) GetBase() (base fixedpoint.Value) {
 	return base
 }
 
+// GetQuantity calls GetBase() and then convert the number into a positive number
+// that could be treated as a quantity.
 func (p *Position) GetQuantity() fixedpoint.Value {
 	base := p.GetBase()
 	return base.Abs()

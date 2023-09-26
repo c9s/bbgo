@@ -2,6 +2,7 @@ package strategy
 
 // import built-in strategies
 import (
+	_ "github.com/c9s/bbgo/pkg/strategy/atrpin"
 	_ "github.com/c9s/bbgo/pkg/strategy/audacitymaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/autoborrow"
 	_ "github.com/c9s/bbgo/pkg/strategy/bollgrid"
