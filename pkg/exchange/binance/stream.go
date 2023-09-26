@@ -86,9 +86,13 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnDepthEvent(func(e *DepthEvent) {
 		f, ok := stream.depthBuffers[e.Symbol]
 		if ok {
-			err := f.AddUpdate(types.SliceOrderBook{
+			t, err := e.EventBase.Time.Int64()
+			if err != nil {
+				log.WithError(err).Errorf("Time parsing failed: %v", e.EventBase.Time)
+			}
+			err = f.AddUpdate(types.SliceOrderBook{
 				Symbol: e.Symbol,
-				Time:   types.NewMillisecondTimestampFromInt(e.EventBase.Time).Time(),
+				Time:   types.NewMillisecondTimestampFromInt(t).Time(),
 				Bids:   e.Bids,
 				Asks:   e.Asks,
 			}, e.FirstUpdateID, e.FinalUpdateID)
