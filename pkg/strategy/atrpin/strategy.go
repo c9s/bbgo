@@ -28,7 +28,7 @@ type Strategy struct {
 	Symbol string `json:"symbol"`
 
 	Interval   types.Interval `json:"interval"`
-	Window     int            `json:"slowWindow"`
+	Window     int            `json:"window"`
 	Multiplier float64        `json:"multiplier"`
 
 	bbgo.QuantityOrAmount
@@ -45,6 +45,7 @@ func (s *Strategy) InstanceID() string {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
 }
 
 func (s *Strategy) Defaults() error {
@@ -64,12 +65,23 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
 	atr := session.Indicators(s.Symbol).ATR(s.Interval, s.Window)
-	session.UserDataStream.OnKLine(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
 		if err := s.Strategy.OrderExecutor.GracefulCancel(ctx); err != nil {
 			log.WithError(err).Error("unable to cancel open orders...")
 		}
 
+		account, err := session.UpdateAccount(ctx)
+		if err != nil {
+			log.WithError(err).Error("unable to update account")
+			return
+		}
+
+		baseBalance, _ := account.Balance(s.Market.BaseCurrency)
+		quoteBalance, _ := account.Balance(s.Market.QuoteCurrency)
+
 		lastAtr := atr.Last(0)
+		log.Infof("atr: %f", lastAtr)
 
 		// protection
 		if lastAtr <= k.High.Sub(k.Low).Float64() {
@@ -78,13 +90,20 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		priceRange := fixedpoint.NewFromFloat(lastAtr * s.Multiplier)
 
+		// if the atr is too small, apply the price range protection with 10%
+		// priceRange protection 10%
+		priceRange = fixedpoint.Max(priceRange, k.Close.Mul(fixedpoint.NewFromFloat(0.1)))
+		log.Infof("priceRange: %f", priceRange.Float64())
+
 		ticker, err := session.Exchange.QueryTicker(ctx, s.Symbol)
 		if err != nil {
 			log.WithError(err).Error("unable to query ticker")
 			return
 		}
 
-		bidPrice := ticker.Buy.Sub(priceRange)
+		log.Info(ticker.String())
+
+		bidPrice := fixedpoint.Max(ticker.Buy.Sub(priceRange), s.Market.TickSize)
 		askPrice := ticker.Sell.Add(priceRange)
 
 		bidQuantity := s.QuantityOrAmount.CalculateQuantity(bidPrice)
@@ -94,41 +113,72 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		position := s.Strategy.OrderExecutor.Position()
 		if !position.IsDust() {
+			log.Infof("position: %+v", position)
+
 			side := types.SideTypeSell
 			takerPrice := fixedpoint.Zero
 
 			if position.IsShort() {
 				side = types.SideTypeBuy
-				takerPrice = askPrice
+				takerPrice = ticker.Sell
 			} else if position.IsLong() {
 				side = types.SideTypeSell
-				takerPrice = bidPrice
+				takerPrice = ticker.Buy
 			}
 
 			orderForms = append(orderForms, types.SubmitOrder{
-				Symbol:   s.Symbol,
-				Side:     side,
-				Price:    takerPrice,
-				Quantity: position.GetQuantity(),
-				Market:   s.Market,
+				Symbol:      s.Symbol,
+				Type:        types.OrderTypeLimit,
+				Side:        side,
+				Price:       takerPrice,
+				Quantity:    position.GetQuantity(),
+				Market:      s.Market,
+				TimeInForce: types.TimeInForceGTC,
+				Tag:         "takeProfit",
+			})
+
+			log.Infof("SUBMIT TAKER ORDER: %+v", orderForms)
+
+			if _, err := s.Strategy.OrderExecutor.SubmitOrders(ctx, orderForms...); err != nil {
+				log.WithError(err).Error("unable to submit orders")
+			}
+
+			return
+		}
+
+		askQuantity = s.Market.AdjustQuantityByMinNotional(askQuantity, askPrice)
+		if !s.Market.IsDustQuantity(askQuantity, askPrice) && askQuantity.Compare(baseBalance.Available) < 0 {
+			orderForms = append(orderForms, types.SubmitOrder{
+				Symbol:      s.Symbol,
+				Side:        types.SideTypeSell,
+				Type:        types.OrderTypeLimitMaker,
+				Quantity:    askQuantity,
+				Price:       askPrice,
+				Market:      s.Market,
+				TimeInForce: types.TimeInForceGTC,
+				Tag:         "pinOrder",
 			})
 		}
 
-		orderForms = append(orderForms, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeSell,
-			Price:    askPrice,
-			Quantity: askQuantity,
-			Market:   s.Market,
-		})
+		bidQuantity = s.Market.AdjustQuantityByMinNotional(bidQuantity, bidPrice)
+		if !s.Market.IsDustQuantity(bidQuantity, bidPrice) && bidQuantity.Mul(bidPrice).Compare(quoteBalance.Available) < 0 {
+			orderForms = append(orderForms, types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Side:     types.SideTypeBuy,
+				Type:     types.OrderTypeLimitMaker,
+				Price:    bidPrice,
+				Quantity: bidQuantity,
+				Market:   s.Market,
+				Tag:      "pinOrder",
+			})
+		}
 
-		orderForms = append(orderForms, types.SubmitOrder{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeBuy,
-			Price:    bidPrice,
-			Quantity: bidQuantity,
-			Market:   s.Market,
-		})
+		if len(orderForms) == 0 {
+			log.Infof("no order to place")
+			return
+		}
+
+		log.Infof("bid/ask: %f/%f", bidPrice.Float64(), askPrice.Float64())
 
 		if _, err := s.Strategy.OrderExecutor.SubmitOrders(ctx, orderForms...); err != nil {
 			log.WithError(err).Error("unable to submit orders")
@@ -137,6 +187,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
+
+		if err := s.Strategy.OrderExecutor.GracefulCancel(ctx); err != nil {
+			log.WithError(err).Error("unable to cancel open orders...")
+		}
 	})
 
 	return nil
