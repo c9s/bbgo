@@ -20,6 +20,8 @@ type RMAStream struct {
 }
 
 func RMA2(source types.Float64Source, window int, adjust bool) *RMAStream {
+	checkWindow(window)
+
 	s := &RMAStream{
 		Float64Series: types.NewFloat64Series(),
 		window:        window,
@@ -53,12 +55,17 @@ func (s *RMAStream) Calculate(x float64) float64 {
 
 	s.Slice.Push(tmp)
 	s.previous = tmp
-
 	return tmp
 }
 
 func (s *RMAStream) Truncate() {
 	if len(s.Slice) > MaxNumOfRMA {
 		s.Slice = s.Slice[MaxNumOfRMATruncateSize-1:]
+	}
+}
+
+func checkWindow(window int) {
+	if window == 0 {
+		panic("window can not be zero")
 	}
 }
