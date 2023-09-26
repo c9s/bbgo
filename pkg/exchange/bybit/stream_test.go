@@ -54,6 +54,9 @@ func TestStream(t *testing.T) {
 	}
 
 	t.Run("Auth test", func(t *testing.T) {
+		s.OnBalanceSnapshot(func(balances types.BalanceMap) {
+			t.Log("got balance snapshot", balances)
+		})
 		s.Connect(context.Background())
 		c := make(chan struct{})
 		<-c
@@ -132,8 +135,8 @@ func TestStream(t *testing.T) {
 		err := s.Connect(context.Background())
 		assert.NoError(t, err)
 
-		s.OnBalanceSnapshot(func(balances types.BalanceMap) {
-			t.Log("got snapshot", balances)
+		s.OnBalanceUpdate(func(balances types.BalanceMap) {
+			t.Log("got update", balances)
 		})
 		c := make(chan struct{})
 		<-c
@@ -450,9 +453,9 @@ func TestStream_getFeeRate(t *testing.T) {
 	unknownErr := errors.New("unknown err")
 
 	t.Run("succeeds", func(t *testing.T) {
-		mockMarketProvider := mocks.NewMockMarketInfoProvider(mockCtrl)
+		mockMarketProvider := mocks.NewMockStreamDataProvider(mockCtrl)
 		s := &Stream{
-			marketProvider: mockMarketProvider,
+			streamDataProvider: mockMarketProvider,
 		}
 
 		ctx := context.Background()
@@ -510,9 +513,9 @@ func TestStream_getFeeRate(t *testing.T) {
 	})
 
 	t.Run("failed to query markets", func(t *testing.T) {
-		mockMarketProvider := mocks.NewMockMarketInfoProvider(mockCtrl)
+		mockMarketProvider := mocks.NewMockStreamDataProvider(mockCtrl)
 		s := &Stream{
-			marketProvider: mockMarketProvider,
+			streamDataProvider: mockMarketProvider,
 		}
 
 		ctx := context.Background()
@@ -545,9 +548,9 @@ func TestStream_getFeeRate(t *testing.T) {
 	})
 
 	t.Run("failed to get fee rates", func(t *testing.T) {
-		mockMarketProvider := mocks.NewMockMarketInfoProvider(mockCtrl)
+		mockMarketProvider := mocks.NewMockStreamDataProvider(mockCtrl)
 		s := &Stream{
-			marketProvider: mockMarketProvider,
+			streamDataProvider: mockMarketProvider,
 		}
 
 		ctx := context.Background()
