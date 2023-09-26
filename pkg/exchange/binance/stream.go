@@ -384,6 +384,9 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case *ListenKeyExpired:
 		s.EmitListenKeyExpired(e)
 
+	case *ForceOrderEvent:
+		s.EmitForceOrderEvent(e)
+
 	case *MarginCallEvent:
 
 	}
