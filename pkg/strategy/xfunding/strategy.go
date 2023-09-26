@@ -527,15 +527,19 @@ func (s *Strategy) handleAccountUpdate(ctx context.Context, e *binance.AccountUp
 			if b.Asset != s.ProfitStats.FundingFeeCurrency {
 				continue
 			}
-
-			txnTime := time.UnixMilli(e.Time)
+			t, err := e.EventBase.Time.Int64()
+			if err != nil {
+				log.WithError(err).Error("unable to parse event timestamp")
+				continue
+			}
+			txnTime := time.UnixMilli(t)
 			fee := FundingFee{
 				Asset:  b.Asset,
 				Amount: b.BalanceChange,
 				Txn:    e.Transaction,
 				Time:   txnTime,
 			}
-			err := s.ProfitStats.AddFundingFee(fee)
+			err = s.ProfitStats.AddFundingFee(fee)
 			if err != nil {
 				log.WithError(err).Error("unable to add funding fee to profitStats")
 				continue

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/adshao/go-binance/v2/futures"
@@ -17,8 +18,8 @@ import (
 )
 
 type EventBase struct {
-	Event string `json:"e"` // event name
-	Time  int64  `json:"E"` // event time
+	Event string      `json:"e"` // event name
+	Time  json.Number `json:"E"` // event time
 }
 
 /*
@@ -461,7 +462,11 @@ func (e *DepthEvent) String() (o string) {
 
 func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
 	book.Symbol = e.Symbol
-	book.Time = types.NewMillisecondTimestampFromInt(e.EventBase.Time).Time()
+	t, err := e.EventBase.Time.Int64()
+	if err != nil {
+		return book, err
+	}
+	book.Time = types.NewMillisecondTimestampFromInt(t).Time()
 
 	// already in descending order
 	book.Bids = e.Bids
@@ -500,7 +505,7 @@ func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
 	var depth = &DepthEvent{
 		EventBase: EventBase{
 			Event: string(val.GetStringBytes("e")),
-			Time:  val.GetInt64("E"),
+			Time:  json.Number(strconv.FormatInt(val.GetInt64("E"), 10)),
 		},
 		Symbol:        string(val.GetStringBytes("s")),
 		FirstUpdateID: val.GetInt64("U"),
