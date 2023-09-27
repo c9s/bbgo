@@ -429,27 +429,31 @@ If options.StartTime is not specified, you can only query for records in the las
 If you want to query for records older than 7 days, options.StartTime is required.
 It supports to query records up to 180 days.
 
-If the orderId is null, fromTradeId is passed, and toTradeId is null, then the result is sorted by
-ticketId in ascend. Otherwise, the result is sorted by ticketId in descend.
-
 ** Here includes MakerRebate. If needed, let's discuss how to modify it to return in trade. **
 ** StartTime and EndTime are inclusive. **
 ** StartTime and EndTime cannot exceed 180 days. **
+** StartTime, EndTime, FromTradeId can be used together. **
+** If the `FromTradeId` is passed, and `ToTradeId` is null, then the result is sorted by tradeId in `ascend`.
+Otherwise, the result is sorted by tradeId in `descend`. **
 */
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	// using v3 client, since the v5 API does not support feeCurrency.
 	req := e.v3client.NewGetTradesRequest()
 	req.Symbol(symbol)
 
-	if options.StartTime != nil || options.EndTime != nil {
-		if options.StartTime != nil {
-			req.StartTime(options.StartTime.UTC())
-		}
-		if options.EndTime != nil {
-			req.EndTime(options.EndTime.UTC())
-		}
-	} else {
-		req.FromTradeId(strconv.FormatUint(options.LastTradeID, 10))
+	// If `lastTradeId` is given and greater than 0, the query will use it as a condition and the retrieved result will be
+	// in `ascending` order. We can use `lastTradeId` to retrieve all the data. So we hack it to '1' if `lastTradeID` is '0'.
+	// If 0 is given, it will not be used as a condition and the result will be in `descending` order. The FromTradeId
+	// option cannot be used to retrieve more data.
+	req.FromTradeId(strconv.FormatUint(options.LastTradeID, 10))
+	if options.LastTradeID == 0 {
+		req.FromTradeId("1")
+	}
+	if options.StartTime != nil {
+		req.StartTime(options.StartTime.UTC())
+	}
+	if options.EndTime != nil {
+		req.EndTime(options.EndTime.UTC())
 	}
 
 	limit := uint64(options.Limit)
