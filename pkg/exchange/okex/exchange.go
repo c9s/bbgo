@@ -426,16 +426,3 @@ func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 	_, ok := okexapi.SupportedIntervals[interval]
 	return ok
 }
-
-func (e *Exchange) GetAllFeeRates(ctx context.Context) (okexapi.FeeRateList, error) {
-	if err := orderRateLimiter.Wait(ctx); err != nil {
-		return okexapi.FeeRateList{}, fmt.Errorf("query fee rate limiter wait error: %w", err)
-	}
-	feeRates, err := e.client.NewGetFeeRatesRequest().
-		Do(ctx)
-	if err != nil {
-		return okexapi.FeeRateList{}, fmt.Errorf("failed to get fee rates, err: %w", err)
-	}
-
-	return feeRates, nil
-}

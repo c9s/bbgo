@@ -23,8 +23,40 @@ func Test_QueryKlines(t *testing.T) {
 	}
 
 	now := time.Now()
-	// test supported interval
+	// test supported interval - minute
 	klineDetail, err := e.QueryKLines(context.Background(), queryOrder.Symbol, types.Interval("1m"), types.KLineQueryOptions{
+		Limit:   50,
+		EndTime: &now})
+	if assert.NoError(t, err) {
+		assert.NotEmpty(t, klineDetail)
+	}
+	t.Logf("kline detail: %+v", klineDetail)
+	// test supported interval - hour
+	klineDetail, err = e.QueryKLines(context.Background(), queryOrder.Symbol, types.Interval("1h"), types.KLineQueryOptions{
+		Limit:   50,
+		EndTime: &now})
+	if assert.NoError(t, err) {
+		assert.NotEmpty(t, klineDetail)
+	}
+	t.Logf("kline detail: %+v", klineDetail)
+	// test supported interval - day
+	klineDetail, err = e.QueryKLines(context.Background(), queryOrder.Symbol, types.Interval("1d"), types.KLineQueryOptions{
+		Limit:   50,
+		EndTime: &now})
+	if assert.NoError(t, err) {
+		assert.NotEmpty(t, klineDetail)
+	}
+	t.Logf("kline detail: %+v", klineDetail)
+	// test supported interval - week
+	klineDetail, err = e.QueryKLines(context.Background(), queryOrder.Symbol, types.Interval("1w"), types.KLineQueryOptions{
+		Limit:   50,
+		EndTime: &now})
+	if assert.NoError(t, err) {
+		assert.NotEmpty(t, klineDetail)
+	}
+	t.Logf("kline detail: %+v", klineDetail)
+	// test supported interval - month
+	klineDetail, err = e.QueryKLines(context.Background(), queryOrder.Symbol, types.Interval("1mo"), types.KLineQueryOptions{
 		Limit:   50,
 		EndTime: &now})
 	if assert.NoError(t, err) {
