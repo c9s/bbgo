@@ -1,6 +1,6 @@
 sessions:
   max:
-    exchange: max
+    exchange: &exchange max
     envVarPrefix: max
 
 persistence:
@@ -12,13 +12,14 @@ persistence:
     db: 0
 
 exchangeStrategies:
-- on: max
+- on: *exchange
   atrpin:
     symbol: BTCUSDT
     interval: 5m
     window: 14
     multiplier: 100.0
-    amount: 1000
+    minPriceRange: 20%
+    amount: 100
 
 backtest:
   startTime: "2018-10-01"
@@ -26,7 +27,7 @@ backtest:
   symbols:
   - BTCUSDT
   sessions:
-  - max
+  - *exchange
   # syncSecKLines: true
   accounts:
     max:

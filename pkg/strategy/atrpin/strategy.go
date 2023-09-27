@@ -27,9 +27,10 @@ type Strategy struct {
 
 	Symbol string `json:"symbol"`
 
-	Interval   types.Interval `json:"interval"`
-	Window     int            `json:"window"`
-	Multiplier float64        `json:"multiplier"`
+	Interval      types.Interval   `json:"interval"`
+	Window        int              `json:"window"`
+	Multiplier    float64          `json:"multiplier"`
+	MinPriceRange fixedpoint.Value `json:"minPriceRange"`
 
 	bbgo.QuantityOrAmount
 	// bbgo.OpenPositionOptions
@@ -92,7 +93,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		// if the atr is too small, apply the price range protection with 10%
 		// priceRange protection 10%
-		priceRange = fixedpoint.Max(priceRange, k.Close.Mul(fixedpoint.NewFromFloat(0.1)))
+		priceRange = fixedpoint.Max(priceRange, k.Close.Mul(s.MinPriceRange))
 		log.Infof("priceRange: %f", priceRange.Float64())
 
 		ticker, err := session.Exchange.QueryTicker(ctx, s.Symbol)
