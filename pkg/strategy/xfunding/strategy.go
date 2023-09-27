@@ -527,8 +527,7 @@ func (s *Strategy) handleAccountUpdate(ctx context.Context, e *binance.AccountUp
 			if b.Asset != s.ProfitStats.FundingFeeCurrency {
 				continue
 			}
-
-			txnTime := time.UnixMilli(e.Time)
+			txnTime := e.EventBase.Time.Time()
 			fee := FundingFee{
 				Asset:  b.Asset,
 				Amount: b.BalanceChange,

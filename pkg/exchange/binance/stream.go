@@ -88,7 +88,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 		if ok {
 			err := f.AddUpdate(types.SliceOrderBook{
 				Symbol: e.Symbol,
-				Time:   types.NewMillisecondTimestampFromInt(e.EventBase.Time).Time(),
+				Time:   e.EventBase.Time.Time(),
 				Bids:   e.Bids,
 				Asks:   e.Asks,
 			}, e.FirstUpdateID, e.FinalUpdateID)
