@@ -397,7 +397,7 @@ func TestParseOrderFuturesUpdate(t *testing.T) {
 	assert.Equal(t, "SELL", orderTradeEvent.OrderTrade.Side)
 	assert.Equal(t, "x-NSUYEBKMe60cf610-f5c7-49a4-9c1", orderTradeEvent.OrderTrade.ClientOrderID)
 	assert.Equal(t, "MARKET", orderTradeEvent.OrderTrade.OrderType)
-	assert.Equal(t, int64(1639933384763), orderTradeEvent.Time)
+	assert.Equal(t, types.NewMillisecondTimestampFromInt(1639933384763), orderTradeEvent.Time)
 	assert.Equal(t, types.MillisecondTimestamp(time.UnixMilli(1639933384755)), orderTradeEvent.OrderTrade.OrderTradeTime)
 	assert.Equal(t, fixedpoint.MustNewFromString("0.001"), orderTradeEvent.OrderTrade.OriginalQuantity)
 	assert.Equal(t, fixedpoint.MustNewFromString("0.001"), orderTradeEvent.OrderTrade.OrderLastFilledQuantity)
