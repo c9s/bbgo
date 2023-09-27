@@ -17,8 +17,8 @@ import (
 )
 
 type EventBase struct {
-	Event string `json:"e"` // event name
-	Time  int64  `json:"E"` // event time
+	Event string                     `json:"e"` // event name
+	Time  types.MillisecondTimestamp `json:"E"` // event time
 }
 
 /*
@@ -461,7 +461,7 @@ func (e *DepthEvent) String() (o string) {
 
 func (e *DepthEvent) OrderBook() (book types.SliceOrderBook, err error) {
 	book.Symbol = e.Symbol
-	book.Time = types.NewMillisecondTimestampFromInt(e.EventBase.Time).Time()
+	book.Time = e.EventBase.Time.Time()
 
 	// already in descending order
 	book.Bids = e.Bids
@@ -500,7 +500,7 @@ func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
 	var depth = &DepthEvent{
 		EventBase: EventBase{
 			Event: string(val.GetStringBytes("e")),
-			Time:  val.GetInt64("E"),
+			Time:  types.NewMillisecondTimestampFromInt(val.GetInt64("E")),
 		},
 		Symbol:        string(val.GetStringBytes("s")),
 		FirstUpdateID: val.GetInt64("U"),
