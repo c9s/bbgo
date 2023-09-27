@@ -37,22 +37,16 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 
 		switch channel {
 
-		case string(WsChannelTypeBooks5):
-			data, err := parseBookData(&pushDataEvent)
-			return data, err
-		case string(WsChannelTypeBooks):
-			data, err := parseBookData(&pushDataEvent)
-			return data, err
 		case string(WsChannelTypeAccount):
-			data, err := parseAccount(&pushDataEvent)
-			return data, err
+			return parseAccount(&pushDataEvent)
 		case string(WsChannelTypeOrders):
-			data, err := parseOrder(&pushDataEvent)
-			return data, err
+			return parseOrder(&pushDataEvent)
 		default:
 			if strings.HasPrefix(channel, "candle") {
-				data, err := parseCandle(channel, &pushDataEvent)
-				return data, err
+				return parseCandle(channel, &pushDataEvent)
+			}
+			if strings.HasPrefix(channel, "books") {
+				return parseBookData(&pushDataEvent)
 			}
 		}
 	}
@@ -64,8 +58,8 @@ type BookEvent struct {
 	InstrumentID         string
 	Symbol               string
 	Action               string
-	Bids                 [][]fixedpoint.Value       `json:"bids"`
-	Asks                 [][]fixedpoint.Value       `json:"asks"`
+	Bids                 json.RawMessage            `json:"bids"`
+	Asks                 json.RawMessage            `json:"asks"`
 	MillisecondTimestamp types.MillisecondTimestamp `json:"ts"`
 	Checksum             int                        `json:"checksum"`
 	channel              string
@@ -76,14 +70,34 @@ func (data *BookEvent) BookTicker() types.BookTicker {
 		Symbol: data.Symbol,
 	}
 
+	priceVolumeSlice, err := types.ParsePriceVolumeSliceJSON(data.Bids)
+	if err != nil {
+		return types.BookTicker{}
+	}
+
+	priceVolume, ok := priceVolumeSlice.First()
+	if !ok {
+		return types.BookTicker{}
+	}
+
 	if len(data.Bids) > 0 {
-		ticker.Buy = data.Bids[0][0]
-		ticker.BuySize = data.Bids[0][1]
+		ticker.Buy = priceVolume.Price
+		ticker.BuySize = priceVolume.Volume
+	}
+
+	priceVolumeSlice, err = types.ParsePriceVolumeSliceJSON(data.Asks)
+	if err != nil {
+		return types.BookTicker{}
+	}
+
+	priceVolume, ok = priceVolumeSlice.First()
+	if !ok {
+		return types.BookTicker{}
 	}
 
 	if len(data.Asks) > 0 {
-		ticker.Sell = data.Asks[0][0]
-		ticker.SellSize = data.Asks[0][1]
+		ticker.Sell = priceVolume.Price
+		ticker.SellSize = priceVolume.Volume
 	}
 
 	return ticker
@@ -95,12 +109,22 @@ func (data *BookEvent) Book() types.SliceOrderBook {
 		Time:   data.MillisecondTimestamp.Time(),
 	}
 
-	for i := range data.Bids {
-		book.Bids = append(book.Bids, types.PriceVolume{Price: data.Bids[i][0], Volume: data.Bids[i][1]})
+	priceVolumeSlice, err := types.ParsePriceVolumeSliceJSON(data.Bids)
+	if err != nil {
+		return types.SliceOrderBook{}
+	}
+	for i := range priceVolumeSlice {
+		priceVolume := priceVolumeSlice[i]
+		book.Bids = append(book.Bids, priceVolume)
 	}
 
-	for j := range data.Asks {
-		book.Asks = append(book.Asks, types.PriceVolume{Price: data.Asks[j][0], Volume: data.Asks[j][1]})
+	priceVolumeSlice, err = types.ParsePriceVolumeSliceJSON(data.Asks)
+	if err != nil {
+		return types.SliceOrderBook{}
+	}
+	for i := range priceVolumeSlice {
+		priceVolume := priceVolumeSlice[i]
+		book.Asks = append(book.Asks, priceVolume)
 	}
 
 	return book
@@ -115,6 +139,8 @@ func parseBookData(v *WebSocketPushDataEvent) (*BookEvent, error) {
 		return nil, err
 	}
 
+	// action: value are 'snapshot' or 'update', only applicable to : channel books
+	// channel books5 don't have this field
 	var action string
 	if v.Arg.Channel != string(WsChannelTypeBooks5) {
 		action = *v.Action

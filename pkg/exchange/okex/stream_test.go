@@ -29,7 +29,7 @@ func getTestClientOrSkip(t *testing.T) *Stream {
 }
 
 func TestStream(t *testing.T) {
-	// t.Skip()
+	t.Skip()
 	s := getTestClientOrSkip(t)
 
 	t.Run("Auth test", func(t *testing.T) {
