@@ -1,0 +1,40 @@
+sessions:
+  max:
+    exchange: &exchange max
+    envVarPrefix: max
+
+persistence:
+  json:
+    directory: var/data
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+exchangeStrategies:
+- on: *exchange
+  atrpin:
+    symbol: BTCUSDT
+    interval: 5m
+    window: 14
+    multiplier: 100.0
+    minPriceRange: 20%
+    amount: 100
+
+backtest:
+  startTime: "2018-10-01"
+  endTime: "2018-11-01"
+  symbols:
+  - BTCUSDT
+  sessions:
+  - *exchange
+  # syncSecKLines: true
+  accounts:
+    max:
+      makerFeeRate: 0.0%
+      takerFeeRate: 0.075%
+      balances:
+        BTC: 1.0
+        USDT: 10_000.0
+
+

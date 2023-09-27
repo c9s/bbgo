@@ -38,10 +38,12 @@ func (s *TRStream) calculateAndPush(high, low, cls float64) {
 	if trueRange < hc {
 		trueRange = hc
 	}
+
 	if trueRange < lc {
 		trueRange = lc
 	}
 
 	s.previousClose = cls
-	s.EmitUpdate(trueRange)
+
+	s.PushAndEmit(trueRange)
 }

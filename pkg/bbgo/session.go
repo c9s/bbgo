@@ -282,7 +282,13 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 			})
 		}
 
-		if environ.loggingConfig.Order {
+		if environ.loggingConfig.FilledOrderOnly {
+			session.UserDataStream.OnOrderUpdate(func(order types.Order) {
+				if order.Status == types.OrderStatusFilled {
+					logger.Info(order.String())
+				}
+			})
+		} else if environ.loggingConfig.Order {
 			session.UserDataStream.OnOrderUpdate(func(order types.Order) {
 				logger.Info(order.String())
 			})
@@ -550,14 +556,14 @@ func (session *ExchangeSession) Positions() map[string]*types.Position {
 // MarketDataStore returns the market data store of a symbol
 func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
-	// FIXME: the returned MarketDataStore when !ok will be empty
-	if !ok {
-		s = NewMarketDataStore(symbol)
-		s.BindStream(session.MarketDataStream)
-		session.marketDataStores[symbol] = s
+	if ok {
 		return s, true
 	}
-	return s, ok
+
+	s = NewMarketDataStore(symbol)
+	s.BindStream(session.MarketDataStream)
+	session.marketDataStores[symbol] = s
+	return s, true
 }
 
 // KLine updates will be received in the order listend in intervals array
