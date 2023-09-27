@@ -437,13 +437,6 @@ ticketId in ascend. Otherwise, the result is sorted by ticketId in descend.
 ** StartTime and EndTime cannot exceed 180 days. **
 */
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
-	if options.StartTime != nil && options.EndTime != nil && options.EndTime.Sub(*options.StartTime) > halfYearDuration {
-		return nil, fmt.Errorf("StartTime and EndTime cannot exceed 180 days, startTime: %v, endTime: %v, diff: %v",
-			options.StartTime.String(),
-			options.EndTime.String(),
-			options.EndTime.Sub(*options.StartTime)/24)
-	}
-
 	// using v3 client, since the v5 API does not support feeCurrency.
 	req := e.v3client.NewGetTradesRequest()
 	req.Symbol(symbol)
