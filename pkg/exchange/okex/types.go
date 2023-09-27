@@ -1,4 +1,4 @@
-package okexapi
+package okex
 
 import "github.com/c9s/bbgo/pkg/types"
 

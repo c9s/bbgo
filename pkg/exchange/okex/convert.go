@@ -2,6 +2,7 @@ package okex
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -206,18 +207,22 @@ func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
 }
 
 func toLocalInterval(interval types.Interval) (string, error) {
-	if _, ok := okexapi.SupportedIntervals[interval]; !ok {
-		return "", fmt.Errorf("interval not supported: %s", interval)
+	if _, ok := SupportedIntervals[interval]; !ok {
+		return "", fmt.Errorf("interval %s is not supported", interval)
 	}
 
 	switch i := interval.String(); {
-	case strings.HasSuffix(i, "h"), strings.HasSuffix(i, "d"), strings.HasSuffix(i, "w"):
-		return strings.ToUpper(i), nil
+	case strings.HasSuffix(i, "m"):
+		return i, nil
 	case strings.HasSuffix(i, "mo"):
 		return "1M", nil
 	default:
-		return interval.String(), nil
+		hdwRegex := regexp.MustCompile("h$|d$|w$")
+		if hdwRegex.Match([]byte(i)) {
+			return strings.ToUpper(i), nil
+		}
 	}
+	return "", fmt.Errorf("interval %s is not supported", interval)
 }
 
 func toGlobalSide(side okexapi.SideType) (s types.SideType) {

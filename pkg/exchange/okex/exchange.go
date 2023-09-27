@@ -419,10 +419,10 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 }
 
 func (e *Exchange) SupportedInterval() map[types.Interval]int {
-	return okexapi.SupportedIntervals
+	return SupportedIntervals
 }
 
 func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
-	_, ok := okexapi.SupportedIntervals[interval]
+	_, ok := SupportedIntervals[interval]
 	return ok
 }
