@@ -514,10 +514,21 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			req.EndTime(*options.EndTime)
 		}
 
-		response, err = req.
-			Do(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to call get order histories error: %w", err)
+		var res []okexapi.OrderDetails
+		var lastOrderID = "0"
+		for { // pagenation should use "after" (earlier than)
+			res, err = req.
+				After(lastOrderID).
+				Do(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to call get order histories error: %w", err)
+			}
+			response = append(response, res...)
+			if len(res) == defaultQueryLimit {
+				lastOrderID = res[defaultQueryLimit-1].OrderID
+			} else {
+				break
+			}
 		}
 	}
 
