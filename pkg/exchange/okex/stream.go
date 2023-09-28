@@ -2,6 +2,7 @@ package okex
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -112,8 +113,8 @@ func (s *Stream) handleEvent(event WebSocketOpEvent) {
 		if event.Code == "0" {
 			s.EmitAuth()
 			var subs = []WebsocketSubscription{
-				{Channel: string(WsChannelTypeAccount)},
-				{Channel: string(WsChannelTypeOrders), InstrumentType: string(okexapi.InstrumentTypeSpot)},
+				{Channel: WsChannelTypeAccount},
+				{Channel: WsChannelTypeOrders, InstrumentType: string(okexapi.InstrumentTypeSpot)},
 			}
 
 			log.Infof("subscribing private channels: %+v", subs)
@@ -191,10 +192,8 @@ func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 			continue
 		}
 
-		if strings.HasPrefix(strings.ToLower(sub.Channel), "candle") {
-			url = okexapi.PublicCandlesticksWebSocketURL
-			log.Warnf("OKEX: Candlesticks channel detected, this channel need its own endpoint, can't mix with other channel")
-			return url, nil
+		if strings.HasPrefix(strings.ToLower(string(sub.Channel)), "candle") {
+			return "", fmt.Errorf("OKEX: Candlesticks channel detected, this channel need its own endpoint %s, can't mix with other channel.", okexapi.PublicCandlesticksWebSocketURL)
 		}
 	}
 	if s.PublicOnly {

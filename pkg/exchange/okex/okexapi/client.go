@@ -21,8 +21,8 @@ import (
 
 const defaultHTTPTimeout = time.Second * 15
 const RestBaseURL = "https://www.okex.com/"
-const PublicWebSocketURL = "wss://ws.okex.com:8443/ws/v5/public"
-const PrivateWebSocketURL = "wss://ws.okex.com:8443/ws/v5/private"
+const PublicWebSocketURL = "wss://ws.okx.com:8443/ws/v5/public"
+const PrivateWebSocketURL = "wss://ws.okx.com:8443/ws/v5/private"
 
 // Candlesticks and Block trading related websocket switch to below link
 // https://www.okx.com/hk/help/changes-to-v5-api-websocket-subscription-parameter-and-url

@@ -3,6 +3,7 @@ package okex
 import (
 	"encoding/json"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -97,13 +98,56 @@ const (
 	WsChannelTypeBooks5       WebSocketChannelType = "books5"
 	WsChannelTypeBooks50L2Tbt WebSocketChannelType = "books50-l2-tbt"
 	WsChannelTypeBooksL2Tbt   WebSocketChannelType = "books-l2-tbt"
+	WsChannelTypeCandle3M     WebSocketChannelType = "candle3M"
+	WsChannelTypeCandle1M     WebSocketChannelType = "candle1M"
+	WsChannelTypeCandle1W     WebSocketChannelType = "candle1W"
+	WsChannelTypeCandle1D     WebSocketChannelType = "candle1D"
+	WsChannelTypeCandle2D     WebSocketChannelType = "candle2D"
+	WsChannelTypeCandle3D     WebSocketChannelType = "candle3D"
+	WsChannelTypeCandle5D     WebSocketChannelType = "candle5D"
+	WsChannelTypeCandle12H    WebSocketChannelType = "candle12H"
+	WsChannelTypeCandle6H     WebSocketChannelType = "candle6H"
+	WsChannelTypeCandle4H     WebSocketChannelType = "candle4H"
+	WsChannelTypeCandle2H     WebSocketChannelType = "candle2H"
+	WsChannelTypeCandle1H     WebSocketChannelType = "candle1H"
+	WsChannelTypeCandle30m    WebSocketChannelType = "candle30m"
+	WsChannelTypeCandle15m    WebSocketChannelType = "candle15m"
+	WsChannelTypeCandle5m     WebSocketChannelType = "candle5m"
+	WsChannelTypeCandle3m     WebSocketChannelType = "candle3m"
+	WsChannelTypeCandle1m     WebSocketChannelType = "candle1m"
+	WsChannelTypeCandle1s     WebSocketChannelType = "candle1s"
 )
 
 func (w *WebsocketSubscription) NeedAuthenticated() bool {
-	return w.Channel != string(WsChannelTypeTickers) && w.Channel != string(WsChannelTypeTrades) &&
-		w.Channel != string(WsChannelTypeTradesAll) && w.Channel != string(WsChannelTypeOptionTrades)
+	return w.Channel != WsChannelTypeTickers && w.Channel != WsChannelTypeTrades &&
+		w.Channel != WsChannelTypeTradesAll && w.Channel != WsChannelTypeOptionTrades
 }
 
 func (w *WebSocketOpEvent) IsAuthenticated() bool {
 	return w.Op == WsOpTypeLogin && w.Code == "0"
+}
+
+// login args
+type WebsocketLogin struct {
+	Key        string `json:"apiKey"`
+	Passphrase string `json:"passphrase"`
+	Timestamp  string `json:"timestamp"`
+	Sign       string `json:"sign"`
+}
+
+// op args
+type WebsocketSubscription struct {
+	Channel          WebSocketChannelType `json:"channel"`
+	InstrumentID     string               `json:"instId,omitempty"`
+	InstrumentType   string               `json:"instType,omitempty"`
+	InstrumentFamily string               `json:"instFamily,omitempty"`
+	Side             string               `json:"side,omitempty"`
+	TdMode           string               `json:"tdMode,omitempty"`
+	OrderType        string               `json:"ordType,omitempty"`
+	Quantity         fixedpoint.Value     `json:"sz,omitempty"`
+	// below for op login
+	Key        string `json:"apiKey,omitempty"`
+	Passphrase string `json:"passphrase,omitempty"`
+	Timestamp  string `json:"timestamp,omitempty"`
+	Sign       string `json:"sign,omitempty"`
 }

@@ -37,15 +37,15 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 
 		switch channel {
 
-		case string(WsChannelTypeAccount):
+		case WsChannelTypeAccount:
 			return parseAccount(&pushDataEvent)
-		case string(WsChannelTypeOrders):
+		case WsChannelTypeOrders:
 			return parseOrder(&pushDataEvent)
 		default:
-			if strings.HasPrefix(channel, "candle") {
-				return parseCandle(channel, &pushDataEvent)
+			if strings.HasPrefix(string(channel), "candle") {
+				return parseCandle(string(channel), &pushDataEvent)
 			}
-			if strings.HasPrefix(channel, "books") {
+			if strings.HasPrefix(string(channel), "books") {
 				return parseBookData(&pushDataEvent)
 			}
 		}
@@ -142,7 +142,7 @@ func parseBookData(v *WebSocketPushDataEvent) (*BookEvent, error) {
 	// action: value are 'snapshot' or 'update', only applicable to : channel books
 	// channel books5 don't have this field
 	var action string
-	if v.Arg.Channel != string(WsChannelTypeBooks5) {
+	if v.Arg.Channel != WsChannelTypeBooks5 {
 		action = *v.Action
 	}
 

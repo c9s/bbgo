@@ -53,7 +53,9 @@ func TestStream(t *testing.T) {
 	})
 
 	t.Run("book test", func(t *testing.T) {
-		s.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{})
+		s.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
+			Depth: types.DepthLevel400,
+		})
 		s.SetPublicOnly()
 		err := s.Connect(context.Background())
 		assert.NoError(t, err)
@@ -92,7 +94,8 @@ func TestStream(t *testing.T) {
 		})
 		s.SetPublicOnly()
 		err := s.Connect(context.Background())
-		assert.NoError(t, err)
+		assert.Error(t, err)
+		fmt.Printf("get error message: %s", err)
 
 		s.OnKLine(func(kline types.KLine) {
 			fmt.Println()
