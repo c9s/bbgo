@@ -90,5 +90,8 @@ func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, se
 }
 
 func (s *Strategy) IsHalted(t time.Time) bool {
+	if s.circuitBreakRiskControl == nil {
+		return false
+	}
 	return s.circuitBreakRiskControl.IsHalted(t)
 }
