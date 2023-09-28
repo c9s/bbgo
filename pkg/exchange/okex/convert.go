@@ -217,7 +217,7 @@ func toLocalInterval(interval types.Interval) (string, error) {
 	case strings.HasSuffix(i, "mo"):
 		return "1M", nil
 	default:
-		hdwRegex := regexp.MustCompile("h$|d$|w$")
+		hdwRegex := regexp.MustCompile("\\d+[hdw]$")
 		if hdwRegex.Match([]byte(i)) {
 			return strings.ToUpper(i), nil
 		}
