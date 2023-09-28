@@ -155,8 +155,8 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 	log.Infof("mid price: %+v", midPrice)
 
 	// calculate bid and ask price
-	// ask price = mid price * (1 + r))
-	// bid price = mid price * (1 - r))
+	// sell price = mid price * (1 + r))
+	// buy price = mid price * (1 - r))
 	sellPrice := midPrice.Mul(fixedpoint.One.Add(s.HalfSpread)).Round(s.Market.PricePrecision, fixedpoint.Up)
 	buyPrice := midPrice.Mul(fixedpoint.One.Sub(s.HalfSpread)).Round(s.Market.PricePrecision, fixedpoint.Down)
 	log.Infof("sell price: %s, buy price: %s", sellPrice.String(), buyPrice.String())
