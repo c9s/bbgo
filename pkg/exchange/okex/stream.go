@@ -15,6 +15,7 @@ import (
 type Stream struct {
 	types.StandardStream
 
+	client                  *okexapi.RestClient
 	key, secret, passphrase string
 
 	// public callbacks
@@ -32,11 +33,11 @@ type CandleKey struct {
 	Channel      string
 }
 
-func NewStream(key, secret, passphrase string) *Stream {
+func NewStream(client *okexapi.RestClient) *Stream {
 	stream := &Stream{
-		key:            key,
-		secret:         secret,
-		passphrase:     passphrase,
+		key:            client.Key,
+		secret:         client.Secret,
+		passphrase:     client.Passphrase,
 		StandardStream: types.NewStandardStream(),
 		lastCandle:     make(map[CandleKey]Candle),
 	}

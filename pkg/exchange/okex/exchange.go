@@ -304,7 +304,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e.key, e.secret, e.passphrase)
+	return NewStream(e.client)
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {

@@ -51,15 +51,15 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unhandled websocket event: %+v", string(in))
+	return nil, fmt.Errorf("unhandled websocket event: %s", string(in))
 }
 
 type BookEvent struct {
 	InstrumentID         string
 	Symbol               string
 	Action               string
-	Bids                 json.RawMessage            `json:"bids"`
-	Asks                 json.RawMessage            `json:"asks"`
+	Bids                 types.PriceVolumeSlice     `json:"bids"`
+	Asks                 types.PriceVolumeSlice     `json:"asks"`
 	MillisecondTimestamp types.MillisecondTimestamp `json:"ts"`
 	Checksum             int                        `json:"checksum"`
 	channel              string
@@ -70,12 +70,7 @@ func (data *BookEvent) BookTicker() types.BookTicker {
 		Symbol: data.Symbol,
 	}
 
-	priceVolumeSlice, err := types.ParsePriceVolumeSliceJSON(data.Bids)
-	if err != nil {
-		return types.BookTicker{}
-	}
-
-	priceVolume, ok := priceVolumeSlice.First()
+	priceVolume, ok := data.Bids.First()
 	if !ok {
 		return types.BookTicker{}
 	}
@@ -85,12 +80,7 @@ func (data *BookEvent) BookTicker() types.BookTicker {
 		ticker.BuySize = priceVolume.Volume
 	}
 
-	priceVolumeSlice, err = types.ParsePriceVolumeSliceJSON(data.Asks)
-	if err != nil {
-		return types.BookTicker{}
-	}
-
-	priceVolume, ok = priceVolumeSlice.First()
+	priceVolume, ok = data.Asks.First()
 	if !ok {
 		return types.BookTicker{}
 	}
@@ -109,21 +99,13 @@ func (data *BookEvent) Book() types.SliceOrderBook {
 		Time:   data.MillisecondTimestamp.Time(),
 	}
 
-	priceVolumeSlice, err := types.ParsePriceVolumeSliceJSON(data.Bids)
-	if err != nil {
-		return types.SliceOrderBook{}
-	}
-	for i := range priceVolumeSlice {
-		priceVolume := priceVolumeSlice[i]
+	for i := range data.Bids {
+		priceVolume := data.Bids[i]
 		book.Bids = append(book.Bids, priceVolume)
 	}
 
-	priceVolumeSlice, err = types.ParsePriceVolumeSliceJSON(data.Asks)
-	if err != nil {
-		return types.SliceOrderBook{}
-	}
-	for i := range priceVolumeSlice {
-		priceVolume := priceVolumeSlice[i]
+	for i := range data.Asks {
+		priceVolume := data.Asks[i]
 		book.Asks = append(book.Asks, priceVolume)
 	}
 

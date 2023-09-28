@@ -24,8 +24,9 @@ func getTestClientOrSkip(t *testing.T) *Stream {
 		t.Skip("Please configure all credentials about OKEX")
 		return nil
 	}
+	e := New(key, secret, passphrase)
 
-	return NewStream(key, secret, passphrase)
+	return NewStream(e.client)
 }
 
 func TestStream(t *testing.T) {
