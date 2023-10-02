@@ -206,11 +206,23 @@ func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
 	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
 }
 
-func toLocalInterval(src string) string {
-	var re = regexp.MustCompile(`\d+[hdw]`)
-	return re.ReplaceAllStringFunc(src, func(w string) string {
-		return strings.ToUpper(w)
-	})
+func toLocalInterval(interval types.Interval) (string, error) {
+	if _, ok := SupportedIntervals[interval]; !ok {
+		return "", fmt.Errorf("interval %s is not supported", interval)
+	}
+
+	switch i := interval.String(); {
+	case strings.HasSuffix(i, "m"):
+		return i, nil
+	case strings.HasSuffix(i, "mo"):
+		return "1M", nil
+	default:
+		hdwRegex := regexp.MustCompile("\\d+[hdw]$")
+		if hdwRegex.Match([]byte(i)) {
+			return strings.ToUpper(i), nil
+		}
+	}
+	return "", fmt.Errorf("interval %s is not supported", interval)
 }
 
 func toGlobalSide(side okexapi.SideType) (s types.SideType) {
