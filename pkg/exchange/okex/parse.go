@@ -15,23 +15,50 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func parseWebSocketEvent(str []byte) (interface{}, error) {
-	v, err := fastjson.ParseBytes(str)
+func parseWebSocketEvent(in []byte) (interface{}, error) {
+	var e WsEvent
+
+	err := json.Unmarshal(in, &e)
 	if err != nil {
 		return nil, err
 	}
+	switch {
+	case e.IsOp():
+		return e.WebSocketOpEvent, nil
+	case e.IsPushDataEvent():
+		// need unmarshal again because arg in both WebSocketOpEvent and WebSocketPushDataEvent
+		var pushDataEvent WebSocketPushDataEvent
+		err := json.Unmarshal(in, &pushDataEvent)
+		if err != nil {
+			return nil, err
+		}
+		channel := pushDataEvent.Arg.Channel
 
-	if v.Exists("event") {
-		return parseEvent(v)
+		// keep old style first, just demo account channel, account channel use new writing style.
+		v, err := fastjson.ParseBytes(in)
+		if err != nil {
+			return nil, err
+		}
+
+		switch channel {
+
+		case WsChannelTypeAccount:
+			return parseAccount(&pushDataEvent)
+		case WsChannelTypeOrders:
+			return parseData(v)
+		default:
+			if strings.HasPrefix(string(channel), "candle") {
+				return parseData(v)
+			}
+			if strings.HasPrefix(string(channel), "books") {
+				return parseData(v)
+			}
+		}
 	}
-
-	if v.Exists("data") {
-		return parseData(v)
-	}
-
-	return nil, nil
+	return nil, fmt.Errorf("unhandled websocket event: %s", string(in))
 }
 
+// Will be replace with WebSocketOpEvent in the future
 type WebSocketEvent struct {
 	Event   string      `json:"event"`
 	Code    string      `json:"code,omitempty"`
@@ -61,7 +88,7 @@ type BookEvent struct {
 	Asks                 []BookEntry
 	MillisecondTimestamp int64
 	Checksum             int
-	channel              string
+	channel              WebSocketChannelType
 }
 
 func (data *BookEvent) BookTicker() types.BookTicker {
@@ -299,12 +326,11 @@ func parseCandle(channel string, v *fastjson.Value) (*Candle, error) {
 	}, nil
 }
 
-func parseAccount(v *fastjson.Value) (*okexapi.Account, error) {
-	data := v.Get("data").MarshalTo(nil)
+func parseAccount(v *WebSocketPushDataEvent) (*okexapi.Account, error) {
+	data := v.Data
 
 	var accounts []okexapi.Account
-	err := json.Unmarshal(data, &accounts)
-	if err != nil {
+	if err := json.Unmarshal(data, &accounts); err != nil {
 		return nil, err
 	}
 
@@ -334,14 +360,12 @@ func parseData(v *fastjson.Value) (interface{}, error) {
 	switch channel {
 	case "books5":
 		data, err := parseBookData(v)
-		data.channel = channel
+		data.channel = WebSocketChannelType(channel)
 		return data, err
 	case "books":
 		data, err := parseBookData(v)
-		data.channel = channel
+		data.channel = WebSocketChannelType(channel)
 		return data, err
-	case "account":
-		return parseAccount(v)
 	case "orders":
 		return parseOrder(v)
 	default:

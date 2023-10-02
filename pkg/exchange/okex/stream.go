@@ -9,18 +9,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type WebsocketOp struct {
-	Op   string      `json:"op"`
-	Args interface{} `json:"args"`
-}
-
-type WebsocketLogin struct {
-	Key        string `json:"apiKey"`
-	Passphrase string `json:"passphrase"`
-	Timestamp  string `json:"timestamp"`
-	Sign       string `json:"sign"`
-}
-
 //go:generate callbackgen -type Stream -interface
 type Stream struct {
 	types.StandardStream
@@ -80,7 +68,7 @@ func (s *Stream) handleConnect() {
 
 		log.Infof("subscribing channels: %+v", subs)
 		err := s.Conn.WriteJSON(WebsocketOp{
-			Op:   "subscribe",
+			Op:   WsOpTypeSubscribe,
 			Args: subs,
 		})
 
@@ -95,8 +83,8 @@ func (s *Stream) handleConnect() {
 		payload := msTimestamp + "GET" + "/users/self/verify"
 		sign := okexapi.Sign(payload, s.client.Secret)
 		op := WebsocketOp{
-			Op: "login",
-			Args: []WebsocketLogin{
+			Op: WsOpTypeLogin,
+			Args: []WebsocketSubscription{
 				{
 					Key:        s.client.Key,
 					Passphrase: s.client.Passphrase,
@@ -116,17 +104,17 @@ func (s *Stream) handleConnect() {
 
 func (s *Stream) handleEvent(event WebSocketEvent) {
 	switch event.Event {
-	case "login":
+	case string(WsOpTypeLogin):
 		if event.Code == "0" {
 			s.EmitAuth()
 			var subs = []WebsocketSubscription{
-				{Channel: "account"},
-				{Channel: "orders", InstrumentType: string(okexapi.InstrumentTypeSpot)},
+				{Channel: WsChannelTypeAccount},
+				{Channel: WsChannelTypeOrders, InstrumentType: okexapi.InstrumentTypeSpot},
 			}
 
 			log.Infof("subscribing private channels: %+v", subs)
 			err := s.Conn.WriteJSON(WebsocketOp{
-				Op:   "subscribe",
+				Op:   WsOpTypeSubscribe,
 				Args: subs,
 			})
 
@@ -207,7 +195,7 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *BookEvent:
 		// there's "books" for 400 depth and books5 for 5 depth
-		if et.channel != "books5" {
+		if et.channel != WsChannelTypeBooks5 {
 			s.EmitBookEvent(*et)
 		}
 		s.EmitBookTickerUpdate(et.BookTicker())

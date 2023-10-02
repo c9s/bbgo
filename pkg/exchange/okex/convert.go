@@ -55,12 +55,6 @@ func toGlobalBalance(account *okexapi.Account) types.BalanceMap {
 	return balanceMap
 }
 
-type WebsocketSubscription struct {
-	Channel        string `json:"channel"`
-	InstrumentID   string `json:"instId,omitempty"`
-	InstrumentType string `json:"instType,omitempty"`
-}
-
 var CandleChannels = []string{
 	"candle1Y",
 	"candle6M", "candle3M", "candle1M",
@@ -70,19 +64,19 @@ var CandleChannels = []string{
 	"candle30m", "candle15m", "candle5m", "candle3m", "candle1m",
 }
 
-func convertIntervalToCandle(interval types.Interval) string {
+func convertIntervalToCandle(interval types.Interval) WebSocketChannelType {
 	s := interval.String()
 	switch s {
 
 	case "1h", "2h", "4h", "6h", "12h", "1d", "3d":
-		return "candle" + strings.ToUpper(s)
+		return WebSocketChannelType("candle" + strings.ToUpper(s))
 
 	case "1m", "5m", "15m", "30m":
-		return "candle" + s
+		return WebSocketChannelType("candle" + s)
 
 	}
 
-	return "candle" + s
+	return WebSocketChannelType("candle" + s)
 }
 
 func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
