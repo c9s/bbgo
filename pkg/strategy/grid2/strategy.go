@@ -171,9 +171,6 @@ type Strategy struct {
 	RecoverGridByScanningTrades bool          `json:"recoverGridByScanningTrades"`
 	RecoverGridWithin           time.Duration `json:"recoverGridWithin"`
 
-	// activeOrderRecover periodically check the open orders is the same as active orderbook and recover it
-	activeOrderRecover *ActiveOrderRecover
-
 	EnableProfitFixer bool        `json:"enableProfitFixer"`
 	FixProfitSince    *types.Time `json:"fixProfitSince"`
 
@@ -1989,10 +1986,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		})
 	}
 
-	s.activeOrderRecover = NewActiveOrderRecover(s, 40*time.Minute)
 	session.UserDataStream.OnAuth(func() {
 		if !bbgo.IsBackTesting {
-			go s.activeOrderRecover.Run(ctx)
+			go s.recoverActiveOrdersWithOpenOrdersPeriodically(ctx)
 			/*
 				// callback may block the stream execution, so we spawn the recover function to the background
 				// add (5 seconds + random <10 seconds jitter) delay
