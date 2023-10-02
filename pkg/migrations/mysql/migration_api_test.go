@@ -14,7 +14,7 @@ func TestGetMigrationsMap(t *testing.T) {
 
 func TestMergeMigrationsMap(t *testing.T) {
 	MergeMigrationsMap(map[int64]*rockhopper.Migration{
-		2: {},
-		3: {},
+		2: &rockhopper.Migration{},
+		3: &rockhopper.Migration{},
 	})
 }
