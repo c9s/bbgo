@@ -14,6 +14,8 @@ type GetTransactionHistoryRequest struct {
 	instrumentID   *string        `param:"instId,query"`
 	orderType      *OrderType     `param:"ordType,query"`
 	orderID        string         `param:"ordId,query"`
+	billID         string         `param:"billId"`
+
 	// Underlying and InstrumentFamily Applicable to FUTURES/SWAP/OPTION
 	underlying       *string `param:"uly,query"`
 	instrumentFamily *string `param:"instFamily,query"`

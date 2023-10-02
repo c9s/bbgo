@@ -68,6 +68,11 @@ func (g *GetTransactionHistoryRequest) Limit(limit uint64) *GetTransactionHistor
 	return g
 }
 
+func (g *GetTransactionHistoryRequest) BillID(billID string) *GetTransactionHistoryRequest {
+	g.billID = billID
+	return g
+}
+
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (g *GetTransactionHistoryRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
@@ -189,6 +194,11 @@ func (g *GetTransactionHistoryRequest) GetQueryParameters() (url.Values, error) 
 // GetParameters builds and checks the parameters and return the result in a map object
 func (g *GetTransactionHistoryRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
+	// check billID field -> json key billId
+	billID := g.billID
+
+	// assign parameter of billID
+	params["billId"] = billID
 
 	return params, nil
 }
@@ -274,7 +284,7 @@ func (g *GetTransactionHistoryRequest) GetSlugsMap() (map[string]string, error) 
 
 func (g *GetTransactionHistoryRequest) Do(ctx context.Context) (OrderList, error) {
 
-	// no body params
+	// empty params for GET operation
 	var params interface{}
 	query, err := g.GetQueryParameters()
 	if err != nil {
