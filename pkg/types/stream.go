@@ -42,6 +42,10 @@ type Stream interface {
 	Close() error
 }
 
+type PrivateChannelSetter interface {
+	SetPrivateChannels(channels []string)
+}
+
 type Unsubscriber interface {
 	// Unsubscribe unsubscribes the all subscriptions.
 	Unsubscribe()
