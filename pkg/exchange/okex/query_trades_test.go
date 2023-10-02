@@ -54,4 +54,11 @@ func Test_QueryTrades(t *testing.T) {
 		assert.Empty(t, transactionDetail)
 	}
 	t.Logf("transaction detail: %+v", transactionDetail)
+	// pagenation test
+	transactionDetail, err = e.QueryTrades(context.Background(), queryOrder.Symbol, &types.TradeQueryOptions{EndTime: &until, Limit: 1})
+	if assert.NoError(t, err) {
+		assert.NotEmpty(t, transactionDetail)
+		assert.Less(t, 1, len(transactionDetail))
+	}
+	t.Logf("transaction detail: %+v", transactionDetail)
 }

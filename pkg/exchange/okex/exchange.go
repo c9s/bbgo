@@ -493,6 +493,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	limit := uint64(options.Limit)
 	if limit > defaultQueryLimit || limit <= 0 {
+		limit = defaultQueryLimit
 		log.Debugf("limit is exceeded default limit %d or zero, got: %d, Do not pass limit", defaultQueryLimit, options.Limit)
 	} else {
 		req.Limit(limit)
@@ -514,18 +515,17 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			req.EndTime(*options.EndTime)
 		}
 
-		var res []okexapi.OrderDetails
 		var lastOrderID = "0"
 		for { // pagenation should use "after" (earlier than)
-			res, err = req.
+			res, err := req.
 				After(lastOrderID).
 				Do(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to call get order histories error: %w", err)
 			}
 			response = append(response, res...)
-			if len(res) == defaultQueryLimit {
-				lastOrderID = res[defaultQueryLimit-1].OrderID
+			if len(res) == int(limit) {
+				lastOrderID = res[limit-1].OrderID
 			} else {
 				break
 			}
