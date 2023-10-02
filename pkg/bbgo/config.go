@@ -94,6 +94,7 @@ type NotificationConfig struct {
 type LoggingConfig struct {
 	Trade           bool                   `json:"trade,omitempty"`
 	Order           bool                   `json:"order,omitempty"`
+	Balance         bool                   `json:"balance,omitempty"`
 	FilledOrderOnly bool                   `json:"filledOrder,omitempty"`
 	Fields          map[string]interface{} `json:"fields,omitempty"`
 }

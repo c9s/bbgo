@@ -287,6 +287,15 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	}
 
 	if environ.loggingConfig != nil {
+		if environ.loggingConfig.Balance {
+			session.UserDataStream.OnBalanceSnapshot(func(balances types.BalanceMap) {
+				logger.Info(balances.String())
+			})
+			session.UserDataStream.OnBalanceUpdate(func(balances types.BalanceMap) {
+				logger.Info(balances.String())
+			})
+		}
+
 		if environ.loggingConfig.Trade {
 			session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 				logger.Info(trade.String())
