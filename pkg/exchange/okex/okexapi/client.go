@@ -172,9 +172,9 @@ type BalanceDetail struct {
 }
 
 type Account struct {
-	TotalEquityInUSD fixedpoint.Value `json:"totalEq"`
-	UpdateTime       string           `json:"uTime"`
-	Details          []BalanceDetail  `json:"details"`
+	TotalEquityInUSD fixedpoint.Value           `json:"totalEq"`
+	UpdateTime       types.MillisecondTimestamp `json:"uTime"`
+	Details          []BalanceDetail            `json:"details"`
 }
 
 func (c *RestClient) AccountBalances(ctx context.Context) (*Account, error) {

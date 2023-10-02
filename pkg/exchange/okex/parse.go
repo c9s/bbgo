@@ -15,7 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func parseWebSocketEvent(in []byte) (interface{}, error) {
+func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 	var e WsEvent
 
 	err := json.Unmarshal(in, &e)
@@ -24,7 +24,13 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 	}
 	switch {
 	case e.IsOp():
-		return e.WebSocketOpEvent, nil
+		// need unmarshal again because arg in both WebSocketOpEvent and WebSocketPushDataEvent
+		var opEvent WebSocketOpEvent
+		err := json.Unmarshal(in, &opEvent)
+		if err != nil {
+			return nil, err
+		}
+		return &opEvent, nil
 	case e.IsPushDataEvent():
 		// need unmarshal again because arg in both WebSocketOpEvent and WebSocketPushDataEvent
 		var pushDataEvent WebSocketPushDataEvent

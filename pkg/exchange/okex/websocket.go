@@ -55,10 +55,10 @@ type WebSocketOpEvent struct {
 	Op   WsOpType                `json:"op"`
 	Args []WebsocketSubscription `json:"args,omitempty"`
 	// Below is Websocket Response field
-	Event   WsOpType                `json:"event,omitempty"`
-	Code    string                  `json:"code,omitempty"`
-	Message string                  `json:"msg,omitempty"`
-	Arg     []WebsocketSubscription `json:"arg,omitempty"`
+	Event   WsOpType              `json:"event,omitempty"`
+	Code    string                `json:"code,omitempty"`
+	Message string                `json:"msg,omitempty"`
+	Arg     WebsocketSubscription `json:"arg,omitempty"`
 }
 
 // Websocket Response event for private channel
@@ -141,6 +141,7 @@ type WebsocketSubscription struct {
 	TdMode           string                 `json:"tdMode,omitempty"`
 	OrderType        string                 `json:"ordType,omitempty"`
 	Quantity         fixedpoint.Value       `json:"sz,omitempty"`
+	Currency         string                 `json:"ccy,omitempty"`
 	// below for op login
 	Key        string `json:"apiKey,omitempty"`
 	Passphrase string `json:"passphrase,omitempty"`

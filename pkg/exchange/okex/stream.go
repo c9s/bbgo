@@ -37,7 +37,7 @@ func NewStream(client *okexapi.RestClient) *Stream {
 		lastCandle:     make(map[CandleKey]Candle),
 	}
 
-	stream.SetParser(parseWebSocketEvent)
+	stream.SetParser(stream.parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.createEndpoint)
 
