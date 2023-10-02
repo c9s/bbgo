@@ -489,7 +489,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		log.Warn("!!!OKEX EXCHANGE API NOTICE!!! Okex does not support searching for trades using TradeId.")
 	}
 
-	req := e.client.NewGetOrderHistoryRequest().InstrumentID(toLocalSymbol(symbol))
+	req := e.client.NewGetTransactionHistoryRequest().InstrumentID(toLocalSymbol(symbol))
 
 	limit := uint64(options.Limit)
 	if limit > defaultQueryLimit || limit <= 0 {
@@ -515,17 +515,17 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			req.EndTime(*options.EndTime)
 		}
 
-		var lastOrderID = "0"
-		for { // pagenation should use "after" (earlier than)
+		var billID = "" // billId should be emtpy, can't be 0
+		for {           // pagenation should use "after" (earlier than)
 			res, err := req.
-				After(lastOrderID).
+				After(billID).
 				Do(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to call get order histories error: %w", err)
 			}
 			response = append(response, res...)
 			if len(res) == int(limit) {
-				lastOrderID = res[limit-1].OrderID
+				billID = res[limit-1].BillID
 			} else {
 				break
 			}
