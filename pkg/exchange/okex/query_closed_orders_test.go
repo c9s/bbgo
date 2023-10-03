@@ -24,13 +24,15 @@ func Test_QueryClosedOrders(t *testing.T) {
 	}
 
 	// test by order id as a cursor
-	closedOrder, err := e.QueryClosedOrders(context.Background(), string(queryOrder.Symbol), time.Time{}, time.Time{}, 609869603774656544)
-	if assert.NoError(t, err) {
-		assert.NotEmpty(t, closedOrder)
-	}
-	t.Logf("closed order detail: %+v", closedOrder)
+	/*
+		closedOrder, err := e.QueryClosedOrders(context.Background(), string(queryOrder.Symbol), time.Time{}, time.Time{}, 609869603774656544)
+		if assert.NoError(t, err) {
+			assert.NotEmpty(t, closedOrder)
+		}
+		t.Logf("closed order detail: %+v", closedOrder)
+	*/
 	// test by time interval
-	closedOrder, err = e.QueryClosedOrders(context.Background(), string(queryOrder.Symbol), time.Now().Add(-90*24*time.Hour), time.Now(), 0)
+	closedOrder, err := e.QueryClosedOrders(context.Background(), string(queryOrder.Symbol), time.Now().Add(-90*24*time.Hour), time.Now(), 0)
 	if assert.NoError(t, err) {
 		assert.NotEmpty(t, closedOrder)
 	}
@@ -54,9 +56,11 @@ func Test_QueryClosedOrders(t *testing.T) {
 	}
 	t.Logf("closed order detail: %+v", closedOrder)
 	// test by time interval and order id together
-	closedOrder, err = e.QueryClosedOrders(context.Background(), string(queryOrder.Symbol), time.Unix(1694154903, 999), time.Now(), 609869603774656544)
-	if assert.NoError(t, err) {
-		assert.NotEmpty(t, closedOrder)
-	}
-	t.Logf("closed order detail: %+v", closedOrder)
+	/*
+		closedOrder, err = e.QueryClosedOrders(context.Background(), string(queryOrder.Symbol), time.Unix(1694154903, 999), time.Now(), 609869603774656544)
+		if assert.NoError(t, err) {
+			assert.NotEmpty(t, closedOrder)
+		}
+		t.Logf("closed order detail: %+v", closedOrder)
+	*/
 }

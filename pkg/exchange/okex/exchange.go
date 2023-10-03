@@ -479,6 +479,9 @@ QueryTrades can query trades in last 3 months, there are no time interval limita
 OKEX do not provide api to query by tradeID, So use /api/v5/trade/orders-history-archive as its official site do.
 If you want to query trades by time range, please just pass start_time and end_time.
 Because it gets the correct response even when you pass all parameters with the right time interval and invalid LastTradeID, like 0.
+No matter how you pass parameter, QueryTrades return descending order.
+If you query time period 3 months earlier with start time and end time, will return [] empty slice
+But If you query time period 3 months earlier JUST with start time, will return like start with 3 months ago.
 */
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
 	if symbol == "" {
@@ -528,7 +531,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			if len(res) != int(limit) {
 				break
 			}
-			billID = res[limit-1].BillID
+			billID = strconv.Itoa(int(res[limit-1].BillID))
 		}
 	}
 

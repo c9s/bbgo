@@ -276,7 +276,7 @@ type OrderDetails struct {
 	LastFilledFee         fixedpoint.Value           `json:"fillFee"`
 	LastFilledFeeCurrency string                     `json:"fillFeeCcy"`
 	LastFilledPnl         fixedpoint.Value           `json:"fillPnl"`
-	BillID                string                     `json:"billId"`
+	BillID                types.StrInt64             `json:"billId"`
 
 	// ExecutionType = liquidity (M = maker or T = taker)
 	ExecutionType string `json:"execType"`
