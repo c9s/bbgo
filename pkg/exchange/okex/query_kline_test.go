@@ -30,8 +30,15 @@ func Test_QueryKlines(t *testing.T) {
 	if assert.NoError(t, err) {
 		assert.NotEmpty(t, klineDetail)
 	}
-	// test supported interval - hour
+	// test supported interval - hour - 1 hour
 	klineDetail, err = e.QueryKLines(context.Background(), queryOrder.Symbol, types.Interval1h, types.KLineQueryOptions{
+		Limit:   50,
+		EndTime: &now})
+	if assert.NoError(t, err) {
+		assert.NotEmpty(t, klineDetail)
+	}
+	// test supported interval - hour - 6 hour to test UTC time
+	klineDetail, err = e.QueryKLines(context.Background(), queryOrder.Symbol, types.Interval6h, types.KLineQueryOptions{
 		Limit:   50,
 		EndTime: &now})
 	if assert.NoError(t, err) {

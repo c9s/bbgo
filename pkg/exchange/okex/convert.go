@@ -215,11 +215,24 @@ func toLocalInterval(interval types.Interval) (string, error) {
 	case strings.HasSuffix(i, "m"):
 		return i, nil
 	case strings.HasSuffix(i, "mo"):
-		return "1M", nil
+		return "1Mutc", nil
 	default:
-		hdwRegex := regexp.MustCompile("\\d+[hdw]$")
+		hdwRegex := regexp.MustCompile("\\d+[dw]$")
 		if hdwRegex.Match([]byte(i)) {
-			return strings.ToUpper(i), nil
+			return strings.ToUpper(i) + "utc", nil
+		}
+		hdwRegex = regexp.MustCompile("(\\d+)[h]$")
+		if fs := hdwRegex.FindStringSubmatch(i); len(fs) > 0 {
+			digits, err := strconv.ParseInt(string(fs[1]), 10, 64)
+			if err != nil {
+				return "", fmt.Errorf("interval %s is not supported", interval)
+			}
+			if digits >= 6 {
+				return strings.ToUpper(i) + "utc", nil
+			} else {
+				return strings.ToUpper(i), nil
+			}
+
 		}
 	}
 	return "", fmt.Errorf("interval %s is not supported", interval)
