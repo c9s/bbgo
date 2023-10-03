@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -30,27 +31,37 @@ func getTestClientOrSkip(t *testing.T) *Stream {
 }
 
 func TestStream(t *testing.T) {
-	t.Skip()
+
 	s := getTestClientOrSkip(t)
 
+	ctx, cancelTimeout := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelTimeout()
+
+	deadline := time.Now().Add(5 * time.Second)
+
 	t.Run("Auth test", func(t *testing.T) {
-		s.Connect(context.Background())
-		c := make(chan struct{})
-		<-c
+		s.Connect(ctx)
+		assert.False(t, s.PublicOnly)
 	})
 
 	t.Run("account test", func(t *testing.T) {
 		s.OnAuth(func() {
 			fmt.Println("authenticated")
 		})
-		err := s.Connect(context.Background())
+		err := s.Connect(ctx)
 		assert.NoError(t, err)
+		var accountVerify okexapi.Account
 
 		s.OnAccountEvent(func(account okexapi.Account) {
-			fmt.Println("account detail", account)
+			accountVerify = account
 		})
-		c := make(chan struct{})
-		<-c
+
+		for {
+			if len(accountVerify.Details) != 0 || time.Now().After(deadline) {
+				assert.NotEmpty(t, accountVerify.Details)
+				break
+			}
+		}
 	})
 
 	t.Run("book test", func(t *testing.T) {
@@ -58,33 +69,52 @@ func TestStream(t *testing.T) {
 			Depth: types.DepthLevel400,
 		})
 		s.SetPublicOnly()
-		err := s.Connect(context.Background())
+		err := s.Connect(ctx)
 		assert.NoError(t, err)
+		var sliceOrderBook types.SliceOrderBook
+		var updateSliceOrderBook types.SliceOrderBook
 
 		s.OnBookSnapshot(func(book types.SliceOrderBook) {
-			fmt.Println()
-			fmt.Printf("book detail: %+v", book)
+			sliceOrderBook = book
 		})
 		s.OnBookUpdate(func(book types.SliceOrderBook) {
-			fmt.Println()
-			fmt.Printf("book update detail: %+v", book)
+			updateSliceOrderBook = book
 		})
-		c := make(chan struct{})
-		<-c
+		for {
+			if len(sliceOrderBook.Asks) != 0 || time.Now().After(deadline) {
+				assert.NotEmpty(t, sliceOrderBook.Asks)
+				assert.NotEmpty(t, sliceOrderBook.Bids)
+				break
+			}
+		}
+		for {
+			if len(updateSliceOrderBook.Asks) != 0 || time.Now().After(deadline) {
+				assert.NotEmpty(t, updateSliceOrderBook.Asks)
+				assert.NotEmpty(t, updateSliceOrderBook.Bids)
+				break
+			}
+		}
+
 	})
 
 	t.Run("book ticker test", func(t *testing.T) {
 		s.Subscribe(types.BookTickerChannel, "BTCUSDT", types.SubscribeOptions{})
 		s.SetPublicOnly()
-		err := s.Connect(context.Background())
+		err := s.Connect(ctx)
 		assert.NoError(t, err)
+		var bookticker types.BookTicker
 
 		s.OnBookTickerUpdate(func(bookTicker types.BookTicker) {
-			fmt.Println()
-			fmt.Printf("bookticker detail: %+v", bookTicker)
+			bookticker = bookTicker
 		})
-		c := make(chan struct{})
-		<-c
+		for {
+			if bookticker.Symbol != "" || time.Now().After(deadline) {
+				assert.True(t, bookticker.Symbol != "")
+				assert.NotEmpty(t, bookticker.Buy)
+				break
+			}
+		}
+
 	})
 
 	t.Run("kline test", func(t *testing.T) {
@@ -94,28 +124,29 @@ func TestStream(t *testing.T) {
 			Speed:    "",
 		})
 		s.SetPublicOnly()
-		err := s.Connect(context.Background())
+		err := s.Connect(ctx)
 		assert.Error(t, err)
 		fmt.Printf("get error message: %s", err)
-
-		s.OnKLine(func(kline types.KLine) {
-			fmt.Println()
-			fmt.Printf("kline (candle) detail: %+v", kline)
-		})
-		c := make(chan struct{})
-		<-c
 	})
 
+	// Only order Updated would trigger order channel
 	t.Run("order test", func(t *testing.T) {
-		err := s.Connect(context.Background())
+		err := s.Connect(ctx)
 		assert.NoError(t, err)
+		var o types.Order
 
 		s.OnOrderUpdate(func(order types.Order) {
-			fmt.Println()
-			fmt.Printf("order update detail: %+v", order)
+			o = order
 		})
-		c := make(chan struct{})
-		<-c
+
+		for {
+			if o.Exchange != "" || time.Now().After(deadline) {
+				assert.True(t, o.Exchange == "")
+				assert.True(t, o.OrderID == 0)
+				break
+			}
+		}
+
 	})
 
 }
