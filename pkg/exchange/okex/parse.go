@@ -361,22 +361,22 @@ func parseOrder(v *fastjson.Value) ([]okexapi.OrderDetails, error) {
 
 func parseData(v *fastjson.Value) (interface{}, error) {
 
-	channel := string(v.GetStringBytes("arg", "channel"))
+	channel := WebSocketChannelType(v.GetStringBytes("arg", "channel"))
 
 	switch channel {
-	case "books5":
+	case WsChannelTypeBooks5:
 		data, err := parseBookData(v)
-		data.channel = WebSocketChannelType(channel)
+		data.channel = WsChannelTypeBooks5
 		return data, err
-	case "books":
+	case WsChannelTypeBooks:
 		data, err := parseBookData(v)
-		data.channel = WebSocketChannelType(channel)
+		data.channel = WsChannelTypeBooks
 		return data, err
-	case "orders":
+	case WsChannelTypeOrders:
 		return parseOrder(v)
 	default:
-		if strings.HasPrefix(channel, "candle") {
-			data, err := parseCandle(channel, v)
+		if strings.HasPrefix(string(channel), "candle") {
+			data, err := parseCandle(string(channel), v)
 			return data, err
 		}
 

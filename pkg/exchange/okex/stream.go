@@ -18,7 +18,7 @@ type Stream struct {
 	// public callbacks
 	candleEventCallbacks       []func(candle Candle)
 	bookEventCallbacks         []func(book BookEvent)
-	eventCallbacks             []func(event WebSocketEvent)
+	eventCallbacks             []func(event WebSocketOpEvent)
 	accountEventCallbacks      []func(account okexapi.Account)
 	orderDetailsEventCallbacks []func(orderDetails []okexapi.OrderDetails)
 
@@ -102,10 +102,10 @@ func (s *Stream) handleConnect() {
 	}
 }
 
-func (s *Stream) handleEvent(event WebSocketEvent) {
+func (s *Stream) handleEvent(event WebSocketOpEvent) {
 	switch event.Event {
-	case string(WsOpTypeLogin):
-		if event.Code == "0" {
+	case WsOpTypeLogin:
+		if event.Code == OKEX_SUCCESS_CODE {
 			s.EmitAuth()
 			var subs = []WebsocketSubscription{
 				{Channel: WsChannelTypeAccount},
@@ -190,7 +190,7 @@ func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch et := e.(type) {
-	case *WebSocketEvent:
+	case *WebSocketOpEvent:
 		s.EmitEvent(*et)
 
 	case *BookEvent:
