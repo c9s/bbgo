@@ -494,7 +494,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	limit := uint64(options.Limit)
 	if limit > defaultQueryLimit || limit <= 0 {
 		limit = defaultQueryLimit
-		log.Debugf("limit is exceeded default limit %d or zero, got: %d, Do not pass limit", defaultQueryLimit, options.Limit)
+		req.Limit(defaultQueryLimit)
+		log.Debugf("limit is exceeded default limit %d or zero, got: %d, use default limit", defaultQueryLimit, options.Limit)
 	} else {
 		req.Limit(limit)
 	}
@@ -506,7 +507,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	var err error
 	var response []okexapi.OrderDetails
 	if options.StartTime == nil && options.EndTime == nil {
-		return nil, fmt.Errorf("StartTime and EndTime are require parameter!")
+		return nil, fmt.Errorf("StartTime and EndTime are required parameter!")
 	} else { // query by time interval
 		if options.StartTime != nil {
 			req.StartTime(*options.StartTime)
@@ -524,11 +525,10 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 				return nil, fmt.Errorf("failed to call get order histories error: %w", err)
 			}
 			response = append(response, res...)
-			if len(res) == int(limit) {
-				billID = res[limit-1].BillID
-			} else {
+			if len(res) != int(limit) {
 				break
 			}
+			billID = res[limit-1].BillID
 		}
 	}
 
