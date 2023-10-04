@@ -8,7 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const OKEX_SUCCESS_CODE = "0"
+const WsOpStatusCode = "0"
 
 type WsEvent struct {
 	// "op" and "PushData" are exclusive.
@@ -122,7 +122,7 @@ const (
 )
 
 func (w *WebSocketOpEvent) IsAuthenticated() bool {
-	return w.Op == WsOpTypeLogin && w.Code == OKEX_SUCCESS_CODE
+	return w.Op == WsOpTypeLogin && w.Code == WsOpStatusCode
 }
 
 // login args

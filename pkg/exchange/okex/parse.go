@@ -333,10 +333,9 @@ func parseCandle(channel string, v *fastjson.Value) (*Candle, error) {
 }
 
 func parseAccount(v *WebSocketPushDataEvent) (*okexapi.Account, error) {
-	data := v.Data
 
 	var accounts []okexapi.Account
-	if err := json.Unmarshal(data, &accounts); err != nil {
+	if err := json.Unmarshal(v.Data, &accounts); err != nil {
 		return nil, err
 	}
 
@@ -366,11 +365,11 @@ func parseData(v *fastjson.Value) (interface{}, error) {
 	switch channel {
 	case WsChannelTypeBooks5:
 		data, err := parseBookData(v)
-		data.channel = WsChannelTypeBooks5
+		channel = WsChannelTypeBooks5
 		return data, err
 	case WsChannelTypeBooks:
 		data, err := parseBookData(v)
-		data.channel = WsChannelTypeBooks
+		channel = WsChannelTypeBooks
 		return data, err
 	case WsChannelTypeOrders:
 		return parseOrder(v)

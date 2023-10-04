@@ -105,7 +105,7 @@ func (s *Stream) handleConnect() {
 func (s *Stream) handleEvent(event WebSocketOpEvent) {
 	switch event.Event {
 	case WsOpTypeLogin:
-		if event.Code == OKEX_SUCCESS_CODE {
+		if event.Code == WsOpStatusCode {
 			s.EmitAuth()
 			var subs = []WebsocketSubscription{
 				{Channel: WsChannelTypeAccount},
