@@ -44,7 +44,7 @@ const (
 
 var httpTransportMaxIdleConnsPerHost = http.DefaultMaxIdleConnsPerHost
 var httpTransportMaxIdleConns = 100
-var httpTransportIdleConnTimeout = 90 * time.Second
+var httpTransportIdleConnTimeout = 85 * time.Second
 var disableUserAgentHeader = false
 
 func init() {
@@ -87,7 +87,7 @@ var nonceOnce sync.Once
 var httpTransport = &http.Transport{
 	Proxy: http.ProxyFromEnvironment,
 	DialContext: (&net.Dialer{
-		Timeout:   10 * time.Second,
+		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
 	}).DialContext,
 
@@ -204,12 +204,16 @@ func (c *RestClient) getNonce() int64 {
 	return (seconds+offset)*1000 - 1 + int64(math.Mod(float64(rc), 1000.0))
 }
 
-func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, m string, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(
+	ctx context.Context, m string, refURL string, params url.Values, payload interface{},
+) (*http.Request, error) {
 	return c.newAuthenticatedRequest(ctx, m, refURL, params, payload, nil)
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) newAuthenticatedRequest(ctx context.Context, m string, refURL string, params url.Values, data interface{}, rel *url.URL) (*http.Request, error) {
+func (c *RestClient) newAuthenticatedRequest(
+	ctx context.Context, m string, refURL string, params url.Values, data interface{}, rel *url.URL,
+) (*http.Request, error) {
 	if len(c.APIKey) == 0 {
 		return nil, errors.New("empty api key")
 	}
