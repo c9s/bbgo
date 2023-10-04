@@ -18,27 +18,15 @@ import (
 func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 	var e WsEvent
 
-	err := json.Unmarshal(in, &e)
+	isOp, err := e.IsOp(in)
 	if err != nil {
 		return nil, err
 	}
 	switch {
-	case e.IsOp():
-		// need unmarshal again because arg in both WebSocketOpEvent and WebSocketPushDataEvent
-		var opEvent WebSocketOpEvent
-		err := json.Unmarshal(in, &opEvent)
-		if err != nil {
-			return nil, err
-		}
-		return &opEvent, nil
-	case e.IsPushDataEvent():
-		// need unmarshal again because arg in both WebSocketOpEvent and WebSocketPushDataEvent
-		var pushDataEvent WebSocketPushDataEvent
-		err := json.Unmarshal(in, &pushDataEvent)
-		if err != nil {
-			return nil, err
-		}
-		channel := pushDataEvent.Arg.Channel
+	case isOp:
+		return e.WebSocketOpEvent, nil
+	case !isOp:
+		channel := e.WebSocketPushDataEvent.Arg.Channel
 
 		// keep old style first, just demo account channel, account channel use new writing style.
 		v, err := fastjson.ParseBytes(in)
@@ -49,7 +37,7 @@ func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 		switch channel {
 
 		case WsChannelTypeAccount:
-			return parseAccount(&pushDataEvent)
+			return parseAccount(e.WebSocketPushDataEvent)
 		case WsChannelTypeOrders:
 			return parseData(v)
 		default:

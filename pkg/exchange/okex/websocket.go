@@ -6,6 +6,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
 )
 
 const WsOpStatusCode = "0"
@@ -16,12 +17,32 @@ type WsEvent struct {
 	*WebSocketPushDataEvent
 }
 
-func (w *WsEvent) IsOp() bool {
-	return w.WebSocketOpEvent != nil && w.WebSocketPushDataEvent == nil
+func (w *WsEvent) IsOp(in []byte) (bool, error) {
+	err := w.parseWsEvent(in)
+	if err != nil {
+		return false, errors.New("can not parse WsEvent")
+	}
+	return w.WebSocketOpEvent != nil && w.WebSocketPushDataEvent == nil, nil
 }
 
-func (w *WsEvent) IsPushDataEvent() bool {
-	return w.WebSocketOpEvent == nil && w.WebSocketPushDataEvent != nil
+func (w *WsEvent) parseWsEvent(in []byte) error {
+	var op WebSocketOpEvent
+	err := json.Unmarshal(in, &op)
+	if err != nil {
+		return err
+	}
+	var pushData WebSocketPushDataEvent
+	err = json.Unmarshal(in, &pushData)
+	if err != nil {
+		return err
+	}
+	if op.Event != "" && len(pushData.Data) == 0 {
+		w.WebSocketOpEvent = &op
+	}
+	if op.Event == "" && len(pushData.Data) != 0 {
+		w.WebSocketPushDataEvent = &pushData
+	}
+	return nil
 }
 
 type WsOpType string
