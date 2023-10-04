@@ -2,20 +2,9 @@
 exchangeStrategies:
   - on: max
     fixedmaker:
-      interval: 5m
       symbol: BTCUSDT
-      halfSpreadRatio: 0.05%
+      interval: 5m
+      halfSpread: 0.05%
       quantity: 0.005
-      dryRun: false
-
-  - on: max
-    rebalance:
-      interval: 1h
-      quoteCurrency: USDT
-      targetWeights:
-        BTC: 50%
-        USDT: 50%
-      threshold: 2%
-      maxAmount: 200 # max amount to buy or sell per order
-      orderType: LIMIT_MAKER # LIMIT, LIMIT_MAKER or MARKET
-      dryRun: false
+      orderType: LIMIT_MAKER
+      dryRun: true

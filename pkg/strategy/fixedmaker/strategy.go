@@ -10,7 +10,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -27,38 +26,23 @@ func init() {
 type Strategy struct {
 	*common.Strategy
 
-	Environment          *bbgo.Environment
-	StandardIndicatorSet *bbgo.StandardIndicatorSet
-	Market               types.Market
+	Environment *bbgo.Environment
+	Market      types.Market
 
-	Interval        types.Interval   `json:"interval"`
-	Symbol          string           `json:"symbol"`
-	Quantity        fixedpoint.Value `json:"quantity"`
-	HalfSpreadRatio fixedpoint.Value `json:"halfSpreadRatio"`
-	OrderType       types.OrderType  `json:"orderType"`
-	DryRun          bool             `json:"dryRun"`
-
-	// SkewFactor is used to calculate the skew of bid/ask price
-	SkewFactor   fixedpoint.Value `json:"skewFactor"`
-	TargetWeight fixedpoint.Value `json:"targetWeight"`
-
-	// replace halfSpreadRatio by ATR
-	ATRMultiplier fixedpoint.Value `json:"atrMultiplier"`
-	ATRWindow     int              `json:"atrWindow"`
+	Symbol     string           `json:"symbol"`
+	Interval   types.Interval   `json:"interval"`
+	Quantity   fixedpoint.Value `json:"quantity"`
+	HalfSpread fixedpoint.Value `json:"halfSpread"`
+	OrderType  types.OrderType  `json:"orderType"`
+	DryRun     bool             `json:"dryRun"`
 
 	activeOrderBook *bbgo.ActiveOrderBook
-	atr             *indicatorv2.ATRStream
 }
 
 func (s *Strategy) Defaults() error {
 	if s.OrderType == "" {
 		log.Infof("order type is not set, using limit maker order type")
 		s.OrderType = types.OrderTypeLimitMaker
-	}
-
-	if s.ATRWindow == 0 {
-		log.Infof("atr window is not set, using default value 14")
-		s.ATRWindow = 14
 	}
 	return nil
 }
@@ -79,20 +63,8 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("quantity should be positive")
 	}
 
-	if s.HalfSpreadRatio.Float64() <= 0 {
+	if s.HalfSpread.Float64() <= 0 {
 		return fmt.Errorf("halfSpreadRatio should be positive")
-	}
-
-	if s.SkewFactor.Float64() < 0 {
-		return fmt.Errorf("skewFactor should be non-negative")
-	}
-
-	if s.ATRMultiplier.Float64() < 0 {
-		return fmt.Errorf("atrMultiplier should be non-negative")
-	}
-
-	if s.ATRWindow < 0 {
-		return fmt.Errorf("atrWindow should be non-negative")
 	}
 	return nil
 }
@@ -108,12 +80,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.activeOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeOrderBook.BindStream(session.UserDataStream)
 
-	s.atr = session.Indicators(s.Symbol).ATR(s.Interval, s.ATRWindow)
-
-	session.UserDataStream.OnStart(func() {
-		// you can place orders here when bbgo is started, this will be called only once.
-	})
-
 	s.activeOrderBook.OnFilled(func(order types.Order) {
 		if s.activeOrderBook.NumOfOrders() == 0 {
 			log.Infof("no active orders, replenish")
@@ -122,9 +88,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
-		log.Infof("%+v", kline)
-
-		s.cancelOrders(ctx)
+		log.Infof("%s", kline.String())
 		s.replenish(ctx, kline.EndTime.Time())
 	})
 
@@ -133,17 +97,14 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		defer wg.Done()
 		_ = s.OrderExecutor.GracefulCancel(ctx)
 	})
-
 	return nil
 }
 
-func (s *Strategy) cancelOrders(ctx context.Context) {
+func (s *Strategy) replenish(ctx context.Context, t time.Time) {
 	if err := s.Session.Exchange.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
 		log.WithError(err).Errorf("failed to cancel orders")
 	}
-}
 
-func (s *Strategy) replenish(ctx context.Context, t time.Time) {
 	if s.IsHalted(t) {
 		log.Infof("circuit break halted, not replenishing")
 		return
@@ -193,39 +154,21 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 	midPrice := ticker.Buy.Add(ticker.Sell).Div(fixedpoint.NewFromFloat(2.0))
 	log.Infof("mid price: %+v", midPrice)
 
-	if s.ATRMultiplier.Float64() > 0 {
-		atr := fixedpoint.NewFromFloat(s.atr.Last(0))
-		log.Infof("atr: %s", atr.String())
-		s.HalfSpreadRatio = s.ATRMultiplier.Mul(atr).Div(midPrice)
-		log.Infof("half spread ratio: %s", s.HalfSpreadRatio.String())
-	}
-
-	// calcualte skew by the difference between base weight and target weight
-	baseValue := baseBalance.Total().Mul(midPrice)
-	baseWeight := baseValue.Div(baseValue.Add(quoteBalance.Total()))
-	skew := s.SkewFactor.Mul(s.HalfSpreadRatio).Mul(baseWeight.Sub(s.TargetWeight))
-
-	// let the skew be in the range of [-r, r]
-	skew = skew.Clamp(s.HalfSpreadRatio.Neg(), s.HalfSpreadRatio)
-
 	// calculate bid and ask price
-	// bid price = mid price * (1 - r - skew))
-	bidSpreadRatio := fixedpoint.Max(s.HalfSpreadRatio.Add(skew), fixedpoint.Zero)
-	bidPrice := midPrice.Mul(fixedpoint.One.Sub(bidSpreadRatio))
-	log.Infof("bid price: %s", bidPrice.String())
-	// ask price = mid price * (1 + r - skew))
-	askSrasedRatio := fixedpoint.Max(s.HalfSpreadRatio.Sub(skew), fixedpoint.Zero)
-	askPrice := midPrice.Mul(fixedpoint.One.Add(askSrasedRatio))
-	log.Infof("ask price: %s", askPrice.String())
+	// sell price = mid price * (1 + r))
+	// buy price = mid price * (1 - r))
+	sellPrice := midPrice.Mul(fixedpoint.One.Add(s.HalfSpread)).Round(s.Market.PricePrecision, fixedpoint.Up)
+	buyPrice := midPrice.Mul(fixedpoint.One.Sub(s.HalfSpread)).Round(s.Market.PricePrecision, fixedpoint.Down)
+	log.Infof("sell price: %s, buy price: %s", sellPrice.String(), buyPrice.String())
 
 	// check balance and generate orders
-	amount := s.Quantity.Mul(bidPrice)
+	amount := s.Quantity.Mul(buyPrice)
 	if quoteBalance.Available.Compare(amount) > 0 {
 		orders = append(orders, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeBuy,
 			Type:     s.OrderType,
-			Price:    bidPrice,
+			Price:    buyPrice,
 			Quantity: s.Quantity,
 		})
 	} else {
@@ -237,7 +180,7 @@ func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrde
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeSell,
 			Type:     s.OrderType,
-			Price:    askPrice,
+			Price:    sellPrice,
 			Quantity: s.Quantity,
 		})
 	} else {
