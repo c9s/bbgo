@@ -21,20 +21,20 @@ var (
 		types.Interval1mo: 60 * 60 * 24 * 30,
 	}
 
-	ToGlobalInterval = map[string]types.Interval{
-		"1m":     types.Interval1m,
-		"3m":     types.Interval3m,
-		"5m":     types.Interval5m,
-		"15m":    types.Interval15m,
-		"30m":    types.Interval30m,
-		"1H":     types.Interval1h,
-		"2H":     types.Interval2h,
-		"4H":     types.Interval4h,
-		"6Hutc":  types.Interval6h,
-		"12Hutc": types.Interval12h,
-		"1Dutc":  types.Interval1d,
-		"3Dutc":  types.Interval3d,
-		"1Wutc":  types.Interval1w,
-		"1Mutc":  types.Interval1mo,
+	ToLocalInterval = map[types.Interval]string{
+		types.Interval1m:  "1m",
+		types.Interval3m:  "3m",
+		types.Interval5m:  "5m",
+		types.Interval15m: "15m",
+		types.Interval30m: "30m",
+		types.Interval1h:  "1H",
+		types.Interval2h:  "2H",
+		types.Interval4h:  "4H",
+		types.Interval6h:  "6Hutc",
+		types.Interval12h: "12Hutc",
+		types.Interval1d:  "1Dutc",
+		types.Interval3d:  "3Dutc",
+		types.Interval1w:  "1Wutc",
+		types.Interval1mo: "1Mutc",
 	}
 )

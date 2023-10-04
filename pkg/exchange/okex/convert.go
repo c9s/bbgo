@@ -2,7 +2,6 @@ package okex
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -211,30 +210,10 @@ func toLocalInterval(interval types.Interval) (string, error) {
 		return "", fmt.Errorf("interval %s is not supported", interval)
 	}
 
-	switch in := interval.String(); {
-	case strings.HasSuffix(in, "m"):
+	if in, ok := ToLocalInterval[interval]; ok {
 		return in, nil
-	case strings.HasSuffix(in, "mo"):
-		return "1Mutc", nil
-	default:
-		hdwRegex := regexp.MustCompile(`\d+[dw]$`)
-		if hdwRegex.Match([]byte(in)) {
-			return strings.ToUpper(in) + "utc", nil
-		}
-		hdwRegex = regexp.MustCompile(`(\d+)[h]$`)
-		if fs := hdwRegex.FindStringSubmatch(in); len(fs) > 0 {
-			digits, err := strconv.ParseInt(string(fs[1]), 10, 64)
-			if err != nil {
-				return "", fmt.Errorf("interval %s is not supported", interval)
-			}
-			if digits >= 6 {
-				return strings.ToUpper(in) + "utc", nil
-			} else {
-				return strings.ToUpper(in), nil
-			}
-
-		}
 	}
+
 	return "", fmt.Errorf("interval %s is not supported", interval)
 }
 
