@@ -210,11 +210,12 @@ func toLocalInterval(interval types.Interval) (string, error) {
 		return "", fmt.Errorf("interval %s is not supported", interval)
 	}
 
-	if in, ok := ToLocalInterval[interval]; ok {
-		return in, nil
+	in, ok := ToLocalInterval[interval]
+	if !ok {
+		return "", fmt.Errorf("interval %s is not supported, got local interval %s", interval, in)
 	}
 
-	return "", fmt.Errorf("interval %s is not supported", interval)
+	return in, nil
 }
 
 func toGlobalSide(side okexapi.SideType) (s types.SideType) {
