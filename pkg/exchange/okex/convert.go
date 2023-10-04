@@ -286,10 +286,8 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 }
 
 func toGlobalTrade(orderDetail *okexapi.OrderDetails) (*types.Trade, error) {
-	tradeID, err := strconv.ParseInt(orderDetail.LastTradeID, 10, 64)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing tradeId value: %s", orderDetail.LastTradeID)
-	}
+	// Should use tradeId, but okex use billId to perform pagination, so use billID as tradeID instead.
+	billID := orderDetail.BillID
 
 	orderID, err := strconv.ParseInt(orderDetail.OrderID, 10, 64)
 	if err != nil {
@@ -309,7 +307,7 @@ func toGlobalTrade(orderDetail *okexapi.OrderDetails) (*types.Trade, error) {
 	}
 
 	return &types.Trade{
-		ID:            uint64(tradeID),
+		ID:            uint64(billID),
 		OrderID:       uint64(orderID),
 		Exchange:      types.ExchangeOKEx,
 		Price:         orderDetail.LastFilledPrice,
