@@ -18,31 +18,30 @@ type WsEvent struct {
 }
 
 func (w *WsEvent) IsOp(in []byte) (bool, error) {
-	err := w.parseWsEvent(in)
+	w, err := w.parseWsEvent(in)
 	if err != nil {
 		return false, errors.New("can not parse WsEvent")
 	}
 	return w.WebSocketOpEvent != nil && w.WebSocketPushDataEvent == nil, nil
 }
 
-func (w *WsEvent) parseWsEvent(in []byte) error {
+func (w *WsEvent) parseWsEvent(in []byte) (*WsEvent, error) {
 	var op WebSocketOpEvent
 	err := json.Unmarshal(in, &op)
 	if err != nil {
-		return err
+		// Do nothing, will return parse error later.
 	}
 	var pushData WebSocketPushDataEvent
 	err = json.Unmarshal(in, &pushData)
-	if err != nil {
-		return err
-	}
 	if op.Event != "" && len(pushData.Data) == 0 {
 		w.WebSocketOpEvent = &op
+		return w, nil
 	}
 	if op.Event == "" && len(pushData.Data) != 0 {
 		w.WebSocketPushDataEvent = &pushData
+		return w, nil
 	}
-	return nil
+	return w, errors.New("can not parse WsEvent")
 }
 
 type WsOpType string
