@@ -316,7 +316,10 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		return nil, err
 	}
 
-	intervalParam := toLocalInterval(interval.String())
+	intervalParam, err := toLocalInterval(interval)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get interval: %w", err)
+	}
 
 	req := e.client.NewCandlesticksRequest(toLocalSymbol(symbol))
 	req.Bar(intervalParam)
@@ -540,4 +543,13 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		return nil, fmt.Errorf("failed to trans order detail to trades error: %w", err)
 	}
 	return trades, nil
+}
+
+func (e *Exchange) SupportedInterval() map[types.Interval]int {
+	return SupportedIntervals
+}
+
+func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
+	_, ok := SupportedIntervals[interval]
+	return ok
 }
