@@ -1,0 +1,24 @@
+---
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: max
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+crossExchangeStrategies:
+  - xfixedmaker:
+      tradingExchange: max
+      symbol: BTCUSDT
+      interval: 5m
+      halfSpread: 0.05%
+      quantity: 0.005
+      orderType: LIMIT_MAKER
+      dryRun: true
+
+      referenceExchange: binance
+      referencePriceEMA:
+        interval: 1m
+        window: 14
+      orderPriceLossThreshold: -10

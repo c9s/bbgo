@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -71,6 +70,10 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
+
+	if !s.CircuitBreakLossThreshold.IsZero() {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.CircuitBreakEMA.Interval})
+	}
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -81,15 +84,29 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.activeOrderBook.BindStream(session.UserDataStream)
 
 	s.activeOrderBook.OnFilled(func(order types.Order) {
+		if s.IsHalted(order.UpdateTime.Time()) {
+			log.Infof("circuit break halted")
+			return
+		}
+
 		if s.activeOrderBook.NumOfOrders() == 0 {
-			log.Infof("no active orders, replenish")
-			s.replenish(ctx, order.UpdateTime.Time())
+			log.Infof("no active orders, placing orders...")
+			s.placeOrders(ctx)
 		}
 	})
 
 	session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 		log.Infof("%s", kline.String())
-		s.replenish(ctx, kline.EndTime.Time())
+
+		if s.IsHalted(kline.EndTime.Time()) {
+			log.Infof("circuit break halted")
+			return
+		}
+
+		if kline.Interval == s.Interval {
+			s.cancelOrders(ctx)
+			s.placeOrders(ctx)
+		}
 	})
 
 	// the shutdown handler, you can cancel all orders
@@ -97,32 +114,30 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		defer wg.Done()
 		_ = s.OrderExecutor.GracefulCancel(ctx)
 	})
+
 	return nil
 }
 
-func (s *Strategy) replenish(ctx context.Context, t time.Time) {
+func (s *Strategy) cancelOrders(ctx context.Context) {
 	if err := s.Session.Exchange.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
 		log.WithError(err).Errorf("failed to cancel orders")
 	}
+}
 
-	if s.IsHalted(t) {
-		log.Infof("circuit break halted, not replenishing")
-		return
-	}
-
-	submitOrders, err := s.generateSubmitOrders(ctx)
+func (s *Strategy) placeOrders(ctx context.Context) {
+	orders, err := s.generateOrders(ctx)
 	if err != nil {
-		log.WithError(err).Error("failed to generate submit orders")
+		log.WithError(err).Error("failed to generate orders")
 		return
 	}
-	log.Infof("submit orders: %+v", submitOrders)
+	log.Infof("orders: %+v", orders)
 
 	if s.DryRun {
 		log.Infof("dry run, not submitting orders")
 		return
 	}
 
-	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, submitOrders...)
+	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orders...)
 	if err != nil {
 		log.WithError(err).Error("failed to submit orders")
 		return
@@ -132,7 +147,7 @@ func (s *Strategy) replenish(ctx context.Context, t time.Time) {
 	s.activeOrderBook.Add(createdOrders...)
 }
 
-func (s *Strategy) generateSubmitOrders(ctx context.Context) ([]types.SubmitOrder, error) {
+func (s *Strategy) generateOrders(ctx context.Context) ([]types.SubmitOrder, error) {
 	orders := []types.SubmitOrder{}
 
 	baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
