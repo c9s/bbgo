@@ -534,17 +534,17 @@ func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
 }
 
 type ForceOrderEventInner struct {
-	Symbol                string           `json:"s"`
-	TradeTime             int64            `json:"T"`
-	Side                  string           `json:"S"`
-	OrderType             string           `json:"o"`
-	TimeInForce           string           `json:"f"`
-	Quantity              fixedpoint.Value `json:"q"`
-	Price                 fixedpoint.Value `json:"p"`
-	AveragePrice          fixedpoint.Value `json:"ap"`
-	OrderStatus           string           `json:"X"`
-	LastFilledQuantity    fixedpoint.Value `json:"l"`
-	LastFilledAccQuantity fixedpoint.Value `json:"z"`
+	Symbol                string                     `json:"s"`
+	TradeTime             types.MillisecondTimestamp `json:"T"`
+	Side                  string                     `json:"S"`
+	OrderType             string                     `json:"o"`
+	TimeInForce           string                     `json:"f"`
+	Quantity              fixedpoint.Value           `json:"q"`
+	Price                 fixedpoint.Value           `json:"p"`
+	AveragePrice          fixedpoint.Value           `json:"ap"`
+	OrderStatus           string                     `json:"X"`
+	LastFilledQuantity    fixedpoint.Value           `json:"l"`
+	LastFilledAccQuantity fixedpoint.Value           `json:"z"`
 }
 
 type ForceOrderEvent struct {
@@ -554,7 +554,6 @@ type ForceOrderEvent struct {
 
 func (e *ForceOrderEvent) LiquidationInfo() types.LiquidationInfo {
 	o := e.Order
-	tt := time.Unix(0, o.TradeTime*int64(time.Millisecond))
 	return types.LiquidationInfo{
 		Symbol:       o.Symbol,
 		Side:         types.SideType(o.Side),
@@ -564,7 +563,7 @@ func (e *ForceOrderEvent) LiquidationInfo() types.LiquidationInfo {
 		Price:        o.Price,
 		AveragePrice: o.AveragePrice,
 		OrderStatus:  types.OrderStatus(o.OrderStatus),
-		TradeTime:    types.Time(tt),
+		TradeTime:    types.Time(o.TradeTime),
 	}
 }
 
