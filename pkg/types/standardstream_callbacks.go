@@ -164,6 +164,16 @@ func (s *StandardStream) EmitAggTrade(trade Trade) {
 	}
 }
 
+func (s *StandardStream) OnForceOrder(cb func(info LiquidationInfo)) {
+	s.forceOrderCallbacks = append(s.forceOrderCallbacks, cb)
+}
+
+func (s *StandardStream) EmitForceOrder(info LiquidationInfo) {
+	for _, cb := range s.forceOrderCallbacks {
+		cb(info)
+	}
+}
+
 func (s *StandardStream) OnFuturesPositionUpdate(cb func(futuresPositions FuturesPositionMap)) {
 	s.FuturesPositionUpdateCallbacks = append(s.FuturesPositionUpdateCallbacks, cb)
 }
@@ -216,6 +226,8 @@ type StandardStreamEventHub interface {
 	OnMarketTrade(cb func(trade Trade))
 
 	OnAggTrade(cb func(trade Trade))
+
+	OnForceOrder(cb func(info LiquidationInfo))
 
 	OnFuturesPositionUpdate(cb func(futuresPositions FuturesPositionMap))
 

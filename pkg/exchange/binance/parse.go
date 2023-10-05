@@ -362,7 +362,10 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		var event AggTradeEvent
 		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
-
+	case "forceOrder":
+		var event ForceOrderEvent
+		err = json.Unmarshal([]byte(message), &event)
+		return &event, err
 	}
 
 	// futures stream
@@ -529,6 +532,62 @@ func parseDepthEvent(val *fastjson.Value) (*DepthEvent, error) {
 
 	return depth, err
 }
+
+type ForceOrderEventInner struct {
+	Symbol                string                     `json:"s"`
+	TradeTime             types.MillisecondTimestamp `json:"T"`
+	Side                  string                     `json:"S"`
+	OrderType             string                     `json:"o"`
+	TimeInForce           string                     `json:"f"`
+	Quantity              fixedpoint.Value           `json:"q"`
+	Price                 fixedpoint.Value           `json:"p"`
+	AveragePrice          fixedpoint.Value           `json:"ap"`
+	OrderStatus           string                     `json:"X"`
+	LastFilledQuantity    fixedpoint.Value           `json:"l"`
+	LastFilledAccQuantity fixedpoint.Value           `json:"z"`
+}
+
+type ForceOrderEvent struct {
+	EventBase
+	Order ForceOrderEventInner `json:"o"`
+}
+
+func (e *ForceOrderEvent) LiquidationInfo() types.LiquidationInfo {
+	o := e.Order
+	return types.LiquidationInfo{
+		Symbol:       o.Symbol,
+		Side:         types.SideType(o.Side),
+		OrderType:    types.OrderType(o.OrderType),
+		TimeInForce:  types.TimeInForce(o.TimeInForce),
+		Quantity:     o.Quantity,
+		Price:        o.Price,
+		AveragePrice: o.AveragePrice,
+		OrderStatus:  types.OrderStatus(o.OrderStatus),
+		TradeTime:    types.Time(o.TradeTime),
+	}
+}
+
+/*
+ForceOrderEvent
+
+{
+   "E" : 1689303434028,
+   "e" : "forceOrder",
+   "o" : {
+      "S" : "BUY", // Side
+      "T" : 1689303434025, // Order Trade Time
+      "X" : "FILLED", // Order Status
+      "ap" : "2011.09", // Average Price
+      "f" : "IOC", // TimeInForce
+      "l" : "0.003", // Last filled Quantity
+      "o" : "LIMIT", // Order Type
+      "p" : "2021.37", // Price
+      "q" : "0.003", // Original Quantity
+      "s" : "ETHUSDT", // Symbol
+      "z" : "0.003" // Order Filed Accumulated Quantity
+   }
+}
+*/
 
 type MarketTradeEvent struct {
 	EventBase
