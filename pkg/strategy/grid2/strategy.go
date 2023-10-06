@@ -206,7 +206,8 @@ type Strategy struct {
 	tradingCtx, writeCtx context.Context
 	cancelWrite          context.CancelFunc
 
-	recovered int32
+	recovered             int32
+	activeOrdersRecoverCh chan struct{}
 
 	// this ensures that bbgo.Sync to lock the object
 	sync.Mutex
@@ -1977,8 +1978,12 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			s.logger.Infof("user data stream started, initializing grid...")
 
 			if !bbgo.IsBackTesting {
-				go time.AfterFunc(3*time.Second, func() {
-					s.startProcess(ctx, session)
+				time.AfterFunc(3*time.Second, func() {
+					if err := s.startProcess(ctx, session); err != nil {
+						return
+					}
+
+					s.recoverActiveOrdersWithOpenOrdersPeriodically(ctx)
 				})
 			} else {
 				s.startProcess(ctx, session)
@@ -1987,27 +1992,20 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	session.UserDataStream.OnAuth(func() {
-		if !bbgo.IsBackTesting {
-			go s.recoverActiveOrdersWithOpenOrdersPeriodically(ctx)
-			/*
-				// callback may block the stream execution, so we spawn the recover function to the background
-				// add (5 seconds + random <10 seconds jitter) delay
-				go time.AfterFunc(util.MillisecondsJitter(5*time.Second, 1000*10), func() {
-					recovered := atomic.LoadInt32(&s.recovered)
-					if recovered == 0 {
-						return
-					}
-
-					s.recoverActiveOrders(ctx, session)
-				})
-			*/
-		}
+		time.AfterFunc(util.MillisecondsJitter(5*time.Second, 1000*10), func() {
+			select {
+			case s.activeOrdersRecoverCh <- struct{}{}:
+				s.logger.Info("trigger active orders recover when on auth")
+			default:
+				s.logger.Warn("failed to trigger active orders recover when on auth")
+			}
+		})
 	})
 
 	return nil
 }
 
-func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSession) {
+func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSession) error {
 	s.debugGridProfitStats("startProcess")
 	if s.RecoverOrdersWhenStart {
 		// do recover only when triggerPrice is not set and not in the back-test mode
@@ -2016,15 +2014,17 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 			// if recover fail, return and do not open grid
 			s.logger.WithError(err).Error("failed to start process, recover error")
 			s.EmitGridError(errors.Wrapf(err, "failed to start process, recover error"))
-			return
+			return err
 		}
 	}
 
 	// avoid using goroutine here for back-test
 	if err := s.openGrid(ctx, session); err != nil {
 		s.EmitGridError(errors.Wrapf(err, "failed to start process, setup grid orders error"))
-		return
+		return err
 	}
+
+	return nil
 }
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
