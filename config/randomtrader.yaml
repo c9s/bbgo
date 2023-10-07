@@ -3,7 +3,10 @@ exchangeStrategies:
   - on: max
     randomtrader:
       symbol: USDCUSDT
-      cronExpression: "@every 8h" # https://pkg.go.dev/github.com/robfig/cron#hdr-Predefined_schedules
+      # https://pkg.go.dev/github.com/robfig/cron#hdr-Predefined_schedules
+      cronExpression: "@every 1m"
       quantity: 8
+      # adjust quantity by minimal notional and minimal quantity
+      adjustQuantity: true
       onStart: true
       dryRun: true
