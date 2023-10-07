@@ -32,8 +32,11 @@ type Strategy struct {
 	Symbol         string           `json:"symbol"`
 	CronExpression string           `json:"cronExpression"`
 	Quantity       fixedpoint.Value `json:"quantity"`
+	AdjustQuantity bool             `json:"adjustQuantity"`
 	OnStart        bool             `json:"onStart"`
 	DryRun         bool             `json:"dryRun"`
+
+	cron *cron.Cron
 }
 
 func (s *Strategy) Defaults() error {
@@ -67,7 +70,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	session.UserDataStream.OnStart(func() {
 		if s.OnStart {
-			s.trade(ctx)
+			s.placeOrder()
 		}
 	})
 
@@ -77,39 +80,78 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		_ = s.OrderExecutor.GracefulCancel(ctx)
 	})
 
-	cron := cron.New()
-	cron.AddFunc(s.CronExpression, func() {
-		s.trade(ctx)
-	})
-	cron.Start()
+	s.cron = cron.New()
+	s.cron.AddFunc(s.CronExpression, s.placeOrder)
+	s.cron.Start()
 
 	return nil
 }
 
-func (s *Strategy) trade(ctx context.Context) {
-	orderForm := []types.SubmitOrder{
-		{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeBuy,
-			Type:     types.OrderTypeMarket,
-			Quantity: s.Quantity,
-		}, {
+func (s *Strategy) placeOrder() {
+	ctx := context.Background()
+
+	baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
+	if !ok {
+		log.Errorf("base balance not found")
+		return
+	}
+	quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
+	if !ok {
+		log.Errorf("quote balance not found")
+		return
+	}
+
+	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
+	if err != nil {
+		log.WithError(err).Error("query ticker error")
+		return
+	}
+
+	sellQuantity := s.Quantity
+	buyQuantity := s.Quantity
+	if s.AdjustQuantity {
+		sellQuantity = s.Market.AdjustQuantityByMinNotional(s.Quantity, ticker.Sell)
+		buyQuantity = fixedpoint.Max(s.Quantity, s.Market.MinQuantity)
+	}
+
+	orderForm := []types.SubmitOrder{}
+	if baseBalance.Available.Compare(sellQuantity) > 0 {
+		orderForm = append(orderForm, types.SubmitOrder{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeSell,
 			Type:     types.OrderTypeMarket,
-			Quantity: s.Quantity,
-		},
+			Quantity: sellQuantity,
+		})
+	} else {
+		log.Infof("base balance: %s is not enough", baseBalance.Available.String())
 	}
 
-	submitOrder := orderForm[rand.Intn(2)]
-	log.Infof("submit order: %s", submitOrder.String())
+	if quoteBalance.Available.Div(ticker.Buy).Compare(buyQuantity) > 0 {
+		orderForm = append(orderForm, types.SubmitOrder{
+			Symbol:   s.Symbol,
+			Side:     types.SideTypeBuy,
+			Type:     types.OrderTypeMarket,
+			Quantity: buyQuantity,
+		})
+	} else {
+		log.Infof("quote balance: %s is not enough", quoteBalance.Available.String())
+	}
+
+	var order types.SubmitOrder
+	if len(orderForm) == 0 {
+		log.Infof("both base and quote balance are not enough, skip submit order")
+		return
+	} else {
+		order = orderForm[rand.Intn(len(orderForm))]
+	}
+	log.Infof("submit order: %s", order.String())
 
 	if s.DryRun {
 		log.Infof("dry run, skip submit order")
 		return
 	}
 
-	_, err := s.OrderExecutor.SubmitOrders(ctx, submitOrder)
+	_, err = s.OrderExecutor.SubmitOrders(ctx, order)
 	if err != nil {
 		log.WithError(err).Error("submit order error")
 		return
