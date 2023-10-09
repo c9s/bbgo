@@ -74,8 +74,9 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 
 	// update active orders not in open orders
 	for _, activeOrder := range activeOrders {
-		if _, exist := openOrdersMap[activeOrder.OrderID]; !exist {
-
+		if _, exist := openOrdersMap[activeOrder.OrderID]; exist {
+			delete(openOrdersMap, activeOrder.OrderID)
+		} else {
 			s.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
 
 			updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, s.orderQueryService, types.OrderQuery{
@@ -89,8 +90,6 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 			}
 
 			activeOrderBook.Update(*updatedOrder)
-		} else {
-			delete(openOrdersMap, activeOrder.OrderID)
 		}
 	}
 
