@@ -1983,7 +1983,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 						return
 					}
 
-					s.recoverActiveOrdersWithOpenOrdersPeriodically(ctx)
+					s.recoverActiveOrdersPeriodically(ctx)
 				})
 			} else {
 				s.startProcess(ctx, session)
