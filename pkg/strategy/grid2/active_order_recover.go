@@ -42,13 +42,13 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 }
 
 func (s *Strategy) syncActiveOrders(ctx context.Context) error {
+	s.logger.Infof("[ActiveOrderRecover] syncActiveOrders")
+
 	recovered := atomic.LoadInt32(&s.recovered)
 	if recovered == 0 {
 		s.logger.Infof("[ActiveOrderRecover] skip recovering active orders because recover not ready")
 		return nil
 	}
-
-	s.logger.Infof("[ActiveOrderRecover] recovering active orders with open orders")
 
 	if s.getGrid() == nil {
 		return nil
