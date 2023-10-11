@@ -61,6 +61,8 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 		return err
 	}
 
+	metricsNumOfOpenOrders.With(s.newPrometheusLabels()).Set(float64(len(openOrders)))
+
 	// open orders query time + 1 min means this open orders may be changed !
 	openOrdersExpiredTime := time.Now().Add(1 * time.Minute)
 
