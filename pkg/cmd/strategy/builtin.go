@@ -29,7 +29,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/pivotshort"
 	_ "github.com/c9s/bbgo/pkg/strategy/pricealert"
 	_ "github.com/c9s/bbgo/pkg/strategy/pricedrop"
-	_ "github.com/c9s/bbgo/pkg/strategy/randomtrader"
+	_ "github.com/c9s/bbgo/pkg/strategy/random"
 	_ "github.com/c9s/bbgo/pkg/strategy/rebalance"
 	_ "github.com/c9s/bbgo/pkg/strategy/rsicross"
 	_ "github.com/c9s/bbgo/pkg/strategy/rsmaker"
