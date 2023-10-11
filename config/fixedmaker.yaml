@@ -1,10 +1,27 @@
 ---
+backtest:
+  startTime: "2023-01-01"
+  endTime: "2023-05-31"
+  symbols:
+    - USDCUSDT
+  sessions:
+    - max
+  accounts:
+    max:
+      balances:
+        USDC: 500.0
+        USDT: 500.0
+
 exchangeStrategies:
   - on: max
     fixedmaker:
-      symbol: BTCUSDT
+      symbol: USDCUSDT
       interval: 5m
       halfSpread: 0.05%
-      quantity: 0.005
+      quantity: 15
       orderType: LIMIT_MAKER
-      dryRun: true
+      dryRun: false
+
+      positionHardLimit: 1500
+      maxPositionQuantity: 1500
+      circuitBreakLossThreshold: -0.15
