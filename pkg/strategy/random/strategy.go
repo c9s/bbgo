@@ -1,4 +1,4 @@
-package randomtrader
+package random
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const ID = "randomtrader"
+const ID = "random"
 
 var log = logrus.WithField("strategy", ID)
 
