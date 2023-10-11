@@ -76,6 +76,7 @@ func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, se
 	if !s.PositionHardLimit.IsZero() && !s.MaxPositionQuantity.IsZero() {
 		log.Infof("positionHardLimit and maxPositionQuantity are configured, setting up PositionRiskControl...")
 		s.positionRiskControl = riskcontrol.NewPositionRiskControl(s.OrderExecutor, s.PositionHardLimit, s.MaxPositionQuantity)
+		s.positionRiskControl.Initialize(ctx, session)
 	}
 
 	if !s.CircuitBreakLossThreshold.IsZero() {
