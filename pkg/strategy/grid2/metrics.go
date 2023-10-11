@@ -18,6 +18,8 @@ var (
 	metricsGridBaseInvestment  *prometheus.GaugeVec
 
 	metricsGridFilledOrderPrice *prometheus.GaugeVec
+
+	metricsNumOfOpenOrders *prometheus.GaugeVec
 )
 
 func labelKeys(labels prometheus.Labels) []string {
@@ -167,6 +169,18 @@ func initMetrics(extendedLabels []string) {
 			"side",
 		}, extendedLabels...),
 	)
+
+	metricsNumOfOpenOrders = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_grid2_num_of_open_orders",
+			Help: "number of open orders",
+		},
+		append([]string{
+			"exchange", // exchange name
+			"symbol",   // symbol of the market
+		}, extendedLabels...),
+	)
+
 }
 
 var metricsRegistered = false
@@ -193,6 +207,7 @@ func registerMetrics() {
 		metricsGridQuoteInvestment,
 		metricsGridBaseInvestment,
 		metricsGridFilledOrderPrice,
+		metricsNumOfOpenOrders,
 	)
 	metricsRegistered = true
 }
