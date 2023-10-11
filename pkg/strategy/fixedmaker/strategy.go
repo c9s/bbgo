@@ -64,7 +64,7 @@ func (s *Strategy) Validate() error {
 	}
 
 	if s.HalfSpread.Float64() <= 0 {
-		return fmt.Errorf("halfSpreadRatio should be positive")
+		return fmt.Errorf("halfSpread should be positive")
 	}
 	return nil
 }
