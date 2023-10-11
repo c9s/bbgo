@@ -24,6 +24,11 @@ type PositionRiskControl struct {
 	// only used in the ModifiedQuantity method
 	sliceQuantity fixedpoint.Value
 
+	// activeOrderBook is used to store orders created by the risk control.
+	// This allows us to cancel them before submitting the position release
+	// orders, preventing duplicate orders.
+	activeOrderBook *bbgo.ActiveOrderBook
+
 	releasePositionCallbacks []func(quantity fixedpoint.Value, side types.SideType)
 }
 
@@ -33,26 +38,6 @@ func NewPositionRiskControl(orderExecutor bbgo.OrderExecutorExtended, hardLimit,
 		hardLimit:     hardLimit,
 		sliceQuantity: quantity,
 	}
-
-	control.OnReleasePosition(func(quantity fixedpoint.Value, side types.SideType) {
-		pos := orderExecutor.Position()
-		submitOrder := types.SubmitOrder{
-			Symbol:   pos.Symbol,
-			Market:   pos.Market,
-			Side:     side,
-			Type:     types.OrderTypeMarket,
-			Quantity: quantity,
-		}
-
-		log.Infof("RiskControl: position limit exceeded, submitting order to reduce position: %+v", submitOrder)
-		createdOrders, err := orderExecutor.SubmitOrders(context.Background(), submitOrder)
-		if err != nil {
-			log.WithError(err).Errorf("failed to submit orders")
-			return
-		}
-
-		log.Infof("created position release orders: %+v", createdOrders)
-	})
 
 	// register position update handler: check if position is over the hard limit
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
@@ -66,6 +51,37 @@ func NewPositionRiskControl(orderExecutor bbgo.OrderExecutorExtended, hardLimit,
 	})
 
 	return control
+}
+
+func (p *PositionRiskControl) Initialize(ctx context.Context, session *bbgo.ExchangeSession) {
+	p.activeOrderBook = bbgo.NewActiveOrderBook("")
+	p.activeOrderBook.BindStream(session.UserDataStream)
+
+	p.OnReleasePosition(func(quantity fixedpoint.Value, side types.SideType) {
+		if err := p.activeOrderBook.GracefulCancel(ctx, session.Exchange); err != nil {
+			log.WithError(err).Errorf("failed to cancel orders")
+		}
+
+		pos := p.orderExecutor.Position()
+		submitOrder := types.SubmitOrder{
+			Symbol:   pos.Symbol,
+			Market:   pos.Market,
+			Side:     side,
+			Type:     types.OrderTypeMarket,
+			Quantity: quantity,
+		}
+
+		log.Infof("RiskControl: position limit exceeded, submitting order to reduce position: %+v", submitOrder)
+		createdOrders, err := p.orderExecutor.SubmitOrders(ctx, submitOrder)
+		if err != nil {
+			log.WithError(err).Errorf("failed to submit orders")
+			return
+		}
+
+		log.Infof("created position release orders: %+v", createdOrders)
+
+		p.activeOrderBook.Add(createdOrders...)
+	})
 }
 
 // ModifiedQuantity returns sliceQuantity controlled by position risks
