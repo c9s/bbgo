@@ -1888,6 +1888,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		bbgo.Sync(ctx, s)
 	})
 	orderExecutor.ActiveMakerOrders().OnFilled(s.newOrderUpdateHandler(ctx, session))
+	orderExecutor.SetMaxRetries(5)
 
 	if s.logger != nil {
 		orderExecutor.SetLogger(s.logger)
