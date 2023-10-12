@@ -7,18 +7,40 @@ sessions:
     exchange: binance
     envVarPrefix: binance
 
+backtest:
+  startTime: "2023-01-01"
+  endTime: "2023-01-02"
+  symbols:
+    - BTCUSDT
+  sessions:
+    - max
+    - binance
+  accounts:
+    max:
+      balances:
+        BTC: 0.5
+        USDT: 15000.0
+
 crossExchangeStrategies:
   - xfixedmaker:
       tradingExchange: max
       symbol: BTCUSDT
       interval: 5m
-      halfSpread: 0.05%
+      halfSpread: 0.01%
       quantity: 0.005
       orderType: LIMIT_MAKER
-      dryRun: true
+      dryRun: false
 
       referenceExchange: binance
       referencePriceEMA:
         interval: 1m
         window: 14
       orderPriceLossThreshold: -10
+
+      positionHardLimit: 200
+      maxPositionQuantity: 0.005
+
+      circuitBreakLossThreshold: -10
+      circuitBreakEMA:
+        interval: 1m
+        window: 14
