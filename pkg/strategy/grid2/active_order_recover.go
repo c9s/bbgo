@@ -45,6 +45,8 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 	s.logger.Infof("[ActiveOrderRecover] syncActiveOrders")
 
+	notAddNonExistingOpenOrdersAfter := time.Now().Add(-5 * time.Minute)
+
 	recovered := atomic.LoadInt32(&s.recovered)
 	if recovered == 0 {
 		s.logger.Infof("[ActiveOrderRecover] skip recovering active orders because recover not ready")
@@ -63,9 +65,6 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 
 	metricsNumOfOpenOrders.With(s.newPrometheusLabels()).Set(float64(len(openOrders)))
 
-	// open orders query time + 1 min means this open orders may be changed !
-	openOrdersExpiredTime := time.Now().Add(1 * time.Minute)
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -78,18 +77,9 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 	}
 
 	// update active orders not in open orders
-	var openOrdersExpired bool = false
 	for _, activeOrder := range activeOrders {
 		if _, exist := openOrdersMap[activeOrder.OrderID]; exist {
-			if openOrdersExpired || time.Now().After(openOrdersExpiredTime) {
-				openOrdersExpired = true
-				s.logger.Infof("active order #%d is in the open orders but the update_at is over 1 min, updating...", activeOrder.OrderID)
-				if err := s.syncActiveOrder(ctx, activeOrderBook, activeOrder.OrderID); err != nil {
-					s.logger.WithError(err).Errorf("[ActiveOrderRecover] unable to query order #%d", activeOrder.OrderID)
-					continue
-				}
-			}
-
+			// no need to sync active order already in active orderbook, because we only need to know if it filled or not.
 			delete(openOrdersMap, activeOrder.OrderID)
 		} else {
 			s.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
@@ -103,6 +93,11 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 
 	// update open orders not in active orders
 	for _, openOrder := range openOrdersMap {
+		// we don't add open orders into active orderbook if updated in 5 min
+		if openOrder.UpdateTime.After(notAddNonExistingOpenOrdersAfter) {
+			continue
+		}
+
 		activeOrderBook.Update(openOrder)
 	}
 
