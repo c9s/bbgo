@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -206,7 +205,6 @@ type Strategy struct {
 	tradingCtx, writeCtx context.Context
 	cancelWrite          context.CancelFunc
 
-	recovered             int32
 	activeOrdersRecoverCh chan struct{}
 
 	// this ensures that bbgo.Sync to lock the object
@@ -2028,10 +2026,6 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 }
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
-	defer func() {
-		atomic.AddInt32(&s.recovered, 1)
-	}()
-
 	if s.RecoverGridByScanningTrades {
 		s.debugLog("recovering grid by scanning trades")
 		return s.recoverByScanningTrades(ctx, session)
