@@ -10,7 +10,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -29,13 +28,12 @@ type Strategy struct {
 	Environment *bbgo.Environment
 	Market      types.Market
 
-	Symbol         string           `json:"symbol"`
-	CronExpression string           `json:"cronExpression"`
-	Quantity       fixedpoint.Value `json:"quantity"`
-	AdjustQuantity bool             `json:"adjustQuantity"`
-	OnStart        bool             `json:"onStart"`
-	DryRun         bool             `json:"dryRun"`
+	Symbol         string `json:"symbol"`
+	CronExpression string `json:"cronExpression"`
+	OnStart        bool   `json:"onStart"`
+	DryRun         bool   `json:"dryRun"`
 
+	bbgo.QuantityOrAmount
 	cron *cron.Cron
 }
 
@@ -58,6 +56,10 @@ func (s *Strategy) InstanceID() string {
 func (s *Strategy) Validate() error {
 	if s.CronExpression == "" {
 		return fmt.Errorf("cronExpression is required")
+	}
+
+	if err := s.QuantityOrAmount.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -107,12 +109,10 @@ func (s *Strategy) placeOrder() {
 		return
 	}
 
-	sellQuantity := s.Quantity
-	buyQuantity := s.Quantity
-	if s.AdjustQuantity {
-		sellQuantity = s.Market.AdjustQuantityByMinNotional(s.Quantity, ticker.Sell)
-		buyQuantity = fixedpoint.Max(s.Quantity, s.Market.MinQuantity)
-	}
+	sellQuantity := s.CalculateQuantity(ticker.Sell)
+	buyQuantity := s.CalculateQuantity(ticker.Buy)
+	sellQuantity = s.Market.AdjustQuantityByMinNotional(sellQuantity, ticker.Sell)
+	buyQuantity = s.Market.AdjustQuantityByMinNotional(buyQuantity, ticker.Buy)
 
 	orderForm := []types.SubmitOrder{}
 	if baseBalance.Available.Compare(sellQuantity) > 0 {
