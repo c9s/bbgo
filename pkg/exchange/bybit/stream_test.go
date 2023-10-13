@@ -395,6 +395,28 @@ func Test_convertSubscription(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, genTopic(TopicTypeOrderBook, types.DepthLevel1, "BTCUSDT"), res)
 	})
+	t.Run("BookChannel.DepthLevel50", func(t *testing.T) {
+		res, err := s.convertSubscription(types.Subscription{
+			Symbol:  "BTCUSDT",
+			Channel: types.BookChannel,
+			Options: types.SubscribeOptions{
+				Depth: types.DepthLevel50,
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, genTopic(TopicTypeOrderBook, types.DepthLevel50, "BTCUSDT"), res)
+	})
+	t.Run("BookChannel.DepthLevel200", func(t *testing.T) {
+		res, err := s.convertSubscription(types.Subscription{
+			Symbol:  "BTCUSDT",
+			Channel: types.BookChannel,
+			Options: types.SubscribeOptions{
+				Depth: types.DepthLevel200,
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, genTopic(TopicTypeOrderBook, types.DepthLevel200, "BTCUSDT"), res)
+	})
 	t.Run("BookChannel. with default depth", func(t *testing.T) {
 		res, err := s.convertSubscription(types.Subscription{
 			Symbol:  "BTCUSDT",

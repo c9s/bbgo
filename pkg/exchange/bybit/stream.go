@@ -318,8 +318,12 @@ func (s *Stream) convertSubscription(sub types.Subscription) (string, error) {
 
 	case types.BookChannel:
 		depth := types.DepthLevel1
-		if len(sub.Options.Depth) > 0 && sub.Options.Depth == types.DepthLevel50 {
-			depth = types.DepthLevel50
+
+		switch sub.Options.Depth {
+		case types.DepthLevel50:
+			depth = sub.Options.Depth
+		case types.DepthLevel200:
+			depth = sub.Options.Depth
 		}
 		return genTopic(TopicTypeOrderBook, depth, sub.Symbol), nil
 
