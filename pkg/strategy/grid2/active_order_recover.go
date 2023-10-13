@@ -3,14 +3,25 @@ package grid2
 import (
 	"context"
 	"strconv"
-	"sync/atomic"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 )
+
+type SyncActiveOrdersOpts struct {
+	logger            *logrus.Entry
+	metricsLabels     prometheus.Labels
+	activeOrderBook   *bbgo.ActiveOrderBook
+	orderQueryService types.ExchangeOrderQueryService
+	exchange          types.Exchange
+}
 
 func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 	// every time we activeOrdersRecoverCh receive signal, do active orders recover
@@ -22,6 +33,14 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	opts := SyncActiveOrdersOpts{
+		logger:            s.logger,
+		metricsLabels:     s.newPrometheusLabels(),
+		activeOrderBook:   s.orderExecutor.ActiveMakerOrders(),
+		orderQueryService: s.orderQueryService,
+		exchange:          s.session.Exchange,
+	}
+
 	for {
 		select {
 
@@ -29,12 +48,12 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 			return
 
 		case <-ticker.C:
-			if err := s.syncActiveOrders(ctx); err != nil {
+			if err := syncActiveOrders(ctx, opts); err != nil {
 				log.WithError(err).Errorf("unable to sync active orders")
 			}
 
 		case <-s.activeOrdersRecoverCh:
-			if err := s.syncActiveOrders(ctx); err != nil {
+			if err := syncActiveOrders(ctx, opts); err != nil {
 				log.WithError(err).Errorf("unable to sync active orders")
 			}
 
@@ -42,50 +61,38 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 	}
 }
 
-func (s *Strategy) syncActiveOrders(ctx context.Context) error {
-	s.logger.Infof("[ActiveOrderRecover] syncActiveOrders")
+func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
+	opts.logger.Infof("[ActiveOrderRecover] syncActiveOrders")
 
 	notAddNonExistingOpenOrdersAfter := time.Now().Add(-5 * time.Minute)
 
-	recovered := atomic.LoadInt32(&s.recovered)
-	if recovered == 0 {
-		s.logger.Infof("[ActiveOrderRecover] skip recovering active orders because recover not ready")
-		return nil
-	}
-
-	if s.getGrid() == nil {
-		return nil
-	}
-
-	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, s.session.Exchange, s.Symbol)
+	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, opts.exchange, opts.activeOrderBook.Symbol)
 	if err != nil {
-		s.logger.WithError(err).Error("[ActiveOrderRecover] failed to query open orders, skip this time")
-		return err
+		opts.logger.WithError(err).Error("[ActiveOrderRecover] failed to query open orders, skip this time")
+		return errors.Wrapf(err, "[ActiveOrderRecover] failed to query open orders, skip this time")
 	}
 
-	metricsNumOfOpenOrders.With(s.newPrometheusLabels()).Set(float64(len(openOrders)))
+	metricsNumOfOpenOrders.With(opts.metricsLabels).Set(float64(len(openOrders)))
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
-	activeOrders := activeOrderBook.Orders()
+	activeOrders := opts.activeOrderBook.Orders()
 
 	openOrdersMap := make(map[uint64]types.Order)
 	for _, openOrder := range openOrders {
 		openOrdersMap[openOrder.OrderID] = openOrder
 	}
 
+	var errs error
 	// update active orders not in open orders
 	for _, activeOrder := range activeOrders {
 		if _, exist := openOrdersMap[activeOrder.OrderID]; exist {
 			// no need to sync active order already in active orderbook, because we only need to know if it filled or not.
 			delete(openOrdersMap, activeOrder.OrderID)
 		} else {
-			s.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
+			opts.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
 
-			if err := s.syncActiveOrder(ctx, activeOrderBook, activeOrder.OrderID); err != nil {
-				s.logger.WithError(err).Errorf("[ActiveOrderRecover] unable to query order #%d", activeOrder.OrderID)
+			if err := syncActiveOrder(ctx, opts.activeOrderBook, opts.orderQueryService, activeOrder.OrderID); err != nil {
+				opts.logger.WithError(err).Errorf("[ActiveOrderRecover] unable to query order #%d", activeOrder.OrderID)
+				errs = multierr.Append(errs, err)
 				continue
 			}
 		}
@@ -98,15 +105,16 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 			continue
 		}
 
-		activeOrderBook.Update(openOrder)
+		opts.activeOrderBook.Add(openOrder)
+		// opts.activeOrderBook.Update(openOrder)
 	}
 
-	return nil
+	return errs
 }
 
-func (s *Strategy) syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderID uint64) error {
-	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, s.orderQueryService, types.OrderQuery{
-		Symbol:  s.Symbol,
+func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService, orderID uint64) error {
+	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
+		Symbol:  activeOrderBook.Symbol,
 		OrderID: strconv.FormatUint(orderID, 10),
 	})
 
