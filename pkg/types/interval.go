@@ -179,7 +179,7 @@ type IntervalWindow struct {
 	Window int `json:"window"`
 
 	// RightWindow is used by the pivot indicator
-	RightWindow int `json:"rightWindow"`
+	RightWindow *int `json:"rightWindow"`
 }
 
 type IntervalWindowBandWidth struct {
