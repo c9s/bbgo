@@ -39,7 +39,11 @@ func (inc *PivotLow) Update(value float64) {
 		return
 	}
 
-	low, ok := calculatePivotLow(inc.Lows, inc.Window, inc.RightWindow)
+	if inc.RightWindow == nil {
+		inc.RightWindow = &inc.Window
+	}
+
+	low, ok := calculatePivotLow(inc.Lows, inc.Window, *inc.RightWindow)
 	if !ok {
 		return
 	}

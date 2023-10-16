@@ -11,7 +11,12 @@ type PivotHighStream struct {
 	window, rightWindow int
 }
 
-func PivotHigh2(source types.Float64Source, window, rightWindow int) *PivotHighStream {
+func PivotHigh(source types.Float64Source, window int, args ...int) *PivotHighStream {
+	rightWindow := window
+	if len(args) > 0 {
+		rightWindow = args[0]
+	}
+
 	s := &PivotHighStream{
 		Float64Series: types.NewFloat64Series(),
 		window:        window,
