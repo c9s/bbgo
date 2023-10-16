@@ -7,10 +7,6 @@ func (s Slice) Pivot(left, right int, f func(a, pivot float64) bool) (float64, b
 func FindPivot(values Slice, left, right int, f func(a, pivot float64) bool) (float64, bool) {
 	length := len(values)
 
-	if right == 0 {
-		right = left
-	}
-
 	if length == 0 || length < left+right+1 {
 		return 0.0, false
 	}

@@ -36,8 +36,8 @@ func Test_calculatePivotLow(t *testing.T) {
 		assert.Equal(t, 0.0, low)
 	})
 
-	t.Run("right window 0", func(t *testing.T) {
-		low, ok := calculatePivotLow([]float64{15.0, 13.0, 12.0, 10.0, 14.0, 15.0}, 2, 0)
+	t.Run("right window same", func(t *testing.T) {
+		low, ok := calculatePivotLow([]float64{15.0, 13.0, 12.0, 10.0, 14.0, 15.0}, 2, 2)
 		assert.True(t, ok)
 		assert.Equal(t, 10.0, low)
 	})
