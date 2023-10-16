@@ -1967,14 +1967,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	// if TriggerPrice is zero, that means we need to open the grid when start up
 	if s.TriggerPrice.IsZero() {
-		// must call the openGrid method inside the OnStart callback because
-		// it needs to receive the trades from the user data stream
-		//
-		// should try to avoid blocking the user data stream
-		// callbacks are blocking operation
-		session.UserDataStream.OnStart(func() {
-			s.logger.Infof("user data stream started, initializing grid...")
-
+		session.UserDataStream.OnAuth(func() {
+			s.logger.Infof("user data stream authenticated, start the process")
 			if !bbgo.IsBackTesting {
 				time.AfterFunc(3*time.Second, func() {
 					if err := s.startProcess(ctx, session); err != nil {
@@ -1988,17 +1982,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			}
 		})
 	}
-
-	session.UserDataStream.OnAuth(func() {
-		time.AfterFunc(util.MillisecondsJitter(5*time.Second, 1000*10), func() {
-			select {
-			case s.activeOrdersRecoverCh <- struct{}{}:
-				s.logger.Info("trigger active orders recover when on auth")
-			default:
-				s.logger.Warn("failed to trigger active orders recover when on auth")
-			}
-		})
-	})
 
 	return nil
 }

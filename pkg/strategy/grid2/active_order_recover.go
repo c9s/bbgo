@@ -23,9 +23,29 @@ type SyncActiveOrdersOpts struct {
 	exchange          types.Exchange
 }
 
+func (s *Strategy) initializeRecoverCh() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	alreadyInitialize := false
+
+	if s.activeOrdersRecoverCh == nil {
+		s.logger.Info("initialize recover channel")
+		s.activeOrdersRecoverCh = make(chan struct{}, 1)
+	} else {
+		s.logger.Info("already initialize recover channel, trigger active orders recover")
+		alreadyInitialize = true
+		s.activeOrdersRecoverCh <- struct{}{}
+	}
+
+	return alreadyInitialize
+}
+
 func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 	// every time we activeOrdersRecoverCh receive signal, do active orders recover
-	s.activeOrdersRecoverCh = make(chan struct{}, 1)
+	if alreadyInitialize := s.initializeRecoverCh(); alreadyInitialize {
+		return
+	}
 
 	// make ticker's interval random in 25 min ~ 35 min
 	interval := util.MillisecondsJitter(25*time.Minute, 10*60*1000)
