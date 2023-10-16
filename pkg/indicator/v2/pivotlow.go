@@ -11,7 +11,12 @@ type PivotLowStream struct {
 	window, rightWindow int
 }
 
-func PivotLow(source types.Float64Source, window, rightWindow int) *PivotLowStream {
+func PivotLow(source types.Float64Source, window int, args ...int) *PivotLowStream {
+	rightWindow := window
+	if len(args) > 0 {
+		rightWindow = args[0]
+	}
+
 	s := &PivotLowStream{
 		Float64Series: types.NewFloat64Series(),
 		window:        window,
