@@ -92,7 +92,9 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 		return errors.Wrapf(err, "[ActiveOrderRecover] failed to query open orders, skip this time")
 	}
 
-	metricsNumOfOpenOrders.With(opts.metricsLabels).Set(float64(len(openOrders)))
+	if metricsNumOfOpenOrders != nil {
+		metricsNumOfOpenOrders.With(opts.metricsLabels).Set(float64(len(openOrders)))
+	}
 
 	activeOrders := opts.activeOrderBook.Orders()
 
