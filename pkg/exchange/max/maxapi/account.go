@@ -25,9 +25,7 @@ type Account struct {
 	Locked   fixedpoint.Value `json:"locked"`
 
 	// v3 fields for M wallet
-	Debt      fixedpoint.Value `json:"debt"`
 	Principal fixedpoint.Value `json:"principal"`
-	Borrowed  fixedpoint.Value `json:"borrowed"`
 	Interest  fixedpoint.Value `json:"interest"`
 
 	// v2 fields
