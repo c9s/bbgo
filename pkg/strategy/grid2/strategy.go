@@ -2,7 +2,6 @@ package grid2
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
@@ -205,7 +204,7 @@ type Strategy struct {
 	tradingCtx, writeCtx context.Context
 	cancelWrite          context.CancelFunc
 
-	activeOrdersRecoverCh chan struct{}
+	activeOrdersRecoverC chan struct{}
 
 	// this ensures that bbgo.Sync to lock the object
 	sync.Mutex
@@ -899,7 +898,6 @@ func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.Exch
 		s.handleOrderFilled(o)
 
 		// sync the profits to redis
-		s.debugGridProfitStats("OrderUpdate")
 		bbgo.Sync(ctx, s)
 
 		s.updateGridNumOfOrdersMetricsWithLock()
@@ -1018,7 +1016,6 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 
 	defer s.EmitGridClosed()
 
-	s.debugGridProfitStats("CloseGrid")
 	bbgo.Sync(ctx, s)
 
 	// now we can cancel the open orders
@@ -1171,7 +1168,6 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	if len(orderIds) > 0 {
 		s.GridProfitStats.InitialOrderID = orderIds[0]
-		s.debugGridProfitStats("openGrid")
 		bbgo.Sync(ctx, s)
 	}
 
@@ -1270,23 +1266,6 @@ func (s *Strategy) debugOrders(desc string, orders []types.Order) {
 	sb.WriteString("]")
 
 	s.logger.Infof(sb.String())
-}
-
-func (s *Strategy) debugGridProfitStats(trigger string) {
-	if !s.Debug {
-		return
-	}
-
-	stats := *s.GridProfitStats
-	// ProfitEntries may have too many profits, make it nil to readable
-	stats.ProfitEntries = nil
-	b, err := json.Marshal(stats)
-	if err != nil {
-		s.logger.WithError(err).Errorf("[%s] failed to debug grid profit stats", trigger)
-		return
-	}
-
-	s.logger.Infof("trigger %s => grid profit stats : %s", trigger, string(b))
 }
 
 func (s *Strategy) debugLog(format string, args ...interface{}) {
@@ -1883,7 +1862,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.GridProfitStats.AddTrade(trade)
 	})
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		s.debugGridProfitStats("OnPositionUpdate")
 		bbgo.Sync(ctx, s)
 	})
 	orderExecutor.ActiveMakerOrders().OnFilled(s.newOrderUpdateHandler(ctx, session))
@@ -1987,7 +1965,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 }
 
 func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSession) error {
-	s.debugGridProfitStats("startProcess")
 	if s.RecoverOrdersWhenStart {
 		// do recover only when triggerPrice is not set and not in the back-test mode
 		s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
