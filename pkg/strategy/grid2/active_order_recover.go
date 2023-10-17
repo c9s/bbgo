@@ -110,6 +110,9 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 		} else {
 			opts.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
 
+			// sleep 100ms to avoid DDOS
+			time.Sleep(100 * time.Millisecond)
+
 			if err := syncActiveOrder(ctx, opts.activeOrderBook, opts.orderQueryService, activeOrder.OrderID); err != nil {
 				opts.logger.WithError(err).Errorf("[ActiveOrderRecover] unable to query order #%d", activeOrder.OrderID)
 				errs = multierr.Append(errs, err)
