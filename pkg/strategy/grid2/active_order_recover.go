@@ -27,23 +27,29 @@ func (s *Strategy) initializeRecoverCh() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	alreadyInitialize := false
+	isInitialize := false
 
-	if s.activeOrdersRecoverCh == nil {
-		s.logger.Info("initialize recover channel")
-		s.activeOrdersRecoverCh = make(chan struct{}, 1)
+	if s.activeOrdersRecoverC == nil {
+		s.logger.Info("initializing recover channel")
+		s.activeOrdersRecoverC = make(chan struct{}, 1)
 	} else {
-		s.logger.Info("already initialize recover channel, trigger active orders recover")
-		alreadyInitialize = true
-		s.activeOrdersRecoverCh <- struct{}{}
+		s.logger.Info("recover channel is already initialized, trigger active orders recover")
+		isInitialize = true
+
+		select {
+		case s.activeOrdersRecoverC <- struct{}{}:
+			s.logger.Info("trigger active orders recover")
+		default:
+			s.logger.Info("activeOrdersRecoverC is full")
+		}
 	}
 
-	return alreadyInitialize
+	return isInitialize
 }
 
 func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
-	// every time we activeOrdersRecoverCh receive signal, do active orders recover
-	if alreadyInitialize := s.initializeRecoverCh(); alreadyInitialize {
+	// every time we activeOrdersRecoverC receive signal, do active orders recover
+	if isInitialize := s.initializeRecoverCh(); isInitialize {
 		return
 	}
 
@@ -72,7 +78,7 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 				log.WithError(err).Errorf("unable to sync active orders")
 			}
 
-		case <-s.activeOrdersRecoverCh:
+		case <-s.activeOrdersRecoverC:
 			if err := syncActiveOrders(ctx, opts); err != nil {
 				log.WithError(err).Errorf("unable to sync active orders")
 			}
