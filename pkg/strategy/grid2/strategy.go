@@ -2,14 +2,12 @@ package grid2
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -206,7 +204,7 @@ type Strategy struct {
 	tradingCtx, writeCtx context.Context
 	cancelWrite          context.CancelFunc
 
-	recovered int32
+	activeOrdersRecoverC chan struct{}
 
 	// this ensures that bbgo.Sync to lock the object
 	sync.Mutex
@@ -900,7 +898,6 @@ func (s *Strategy) newOrderUpdateHandler(ctx context.Context, session *bbgo.Exch
 		s.handleOrderFilled(o)
 
 		// sync the profits to redis
-		s.debugGridProfitStats("OrderUpdate")
 		bbgo.Sync(ctx, s)
 
 		s.updateGridNumOfOrdersMetricsWithLock()
@@ -1019,7 +1016,6 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 
 	defer s.EmitGridClosed()
 
-	s.debugGridProfitStats("CloseGrid")
 	bbgo.Sync(ctx, s)
 
 	// now we can cancel the open orders
@@ -1172,7 +1168,6 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 
 	if len(orderIds) > 0 {
 		s.GridProfitStats.InitialOrderID = orderIds[0]
-		s.debugGridProfitStats("openGrid")
 		bbgo.Sync(ctx, s)
 	}
 
@@ -1271,23 +1266,6 @@ func (s *Strategy) debugOrders(desc string, orders []types.Order) {
 	sb.WriteString("]")
 
 	s.logger.Infof(sb.String())
-}
-
-func (s *Strategy) debugGridProfitStats(trigger string) {
-	if !s.Debug {
-		return
-	}
-
-	stats := *s.GridProfitStats
-	// ProfitEntries may have too many profits, make it nil to readable
-	stats.ProfitEntries = nil
-	b, err := json.Marshal(stats)
-	if err != nil {
-		s.logger.WithError(err).Errorf("[%s] failed to debug grid profit stats", trigger)
-		return
-	}
-
-	s.logger.Infof("trigger %s => grid profit stats : %s", trigger, string(b))
 }
 
 func (s *Strategy) debugLog(format string, args ...interface{}) {
@@ -1884,7 +1862,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.GridProfitStats.AddTrade(trade)
 	})
 	orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		s.debugGridProfitStats("OnPositionUpdate")
 		bbgo.Sync(ctx, s)
 	})
 	orderExecutor.ActiveMakerOrders().OnFilled(s.newOrderUpdateHandler(ctx, session))
@@ -1968,17 +1945,15 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	// if TriggerPrice is zero, that means we need to open the grid when start up
 	if s.TriggerPrice.IsZero() {
-		// must call the openGrid method inside the OnStart callback because
-		// it needs to receive the trades from the user data stream
-		//
-		// should try to avoid blocking the user data stream
-		// callbacks are blocking operation
-		session.UserDataStream.OnStart(func() {
-			s.logger.Infof("user data stream started, initializing grid...")
-
+		session.UserDataStream.OnAuth(func() {
+			s.logger.Infof("user data stream authenticated, start the process")
 			if !bbgo.IsBackTesting {
-				go time.AfterFunc(3*time.Second, func() {
-					s.startProcess(ctx, session)
+				time.AfterFunc(3*time.Second, func() {
+					if err := s.startProcess(ctx, session); err != nil {
+						return
+					}
+
+					s.recoverActiveOrdersPeriodically(ctx)
 				})
 			} else {
 				s.startProcess(ctx, session)
@@ -1986,26 +1961,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		})
 	}
 
-	session.UserDataStream.OnAuth(func() {
-		if !bbgo.IsBackTesting {
-			// callback may block the stream execution, so we spawn the recover function to the background
-			// add (5 seconds + random <10 seconds jitter) delay
-			go time.AfterFunc(util.MillisecondsJitter(5*time.Second, 1000*10), func() {
-				recovered := atomic.LoadInt32(&s.recovered)
-				if recovered == 0 {
-					return
-				}
-
-				s.recoverActiveOrders(ctx, session)
-			})
-		}
-	})
-
 	return nil
 }
 
-func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSession) {
-	s.debugGridProfitStats("startProcess")
+func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSession) error {
 	if s.RecoverOrdersWhenStart {
 		// do recover only when triggerPrice is not set and not in the back-test mode
 		s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
@@ -2013,22 +1972,20 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 			// if recover fail, return and do not open grid
 			s.logger.WithError(err).Error("failed to start process, recover error")
 			s.EmitGridError(errors.Wrapf(err, "failed to start process, recover error"))
-			return
+			return err
 		}
 	}
 
 	// avoid using goroutine here for back-test
 	if err := s.openGrid(ctx, session); err != nil {
 		s.EmitGridError(errors.Wrapf(err, "failed to start process, setup grid orders error"))
-		return
+		return err
 	}
+
+	return nil
 }
 
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
-	defer func() {
-		atomic.AddInt32(&s.recovered, 1)
-	}()
-
 	if s.RecoverGridByScanningTrades {
 		s.debugLog("recovering grid by scanning trades")
 		return s.recoverByScanningTrades(ctx, session)
