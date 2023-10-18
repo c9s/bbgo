@@ -664,8 +664,8 @@ func (e *Exchange) queryBalances(ctx context.Context, walletType maxapi.WalletTy
 			Currency:  cur,
 			Available: b.Balance,
 			Locked:    b.Locked,
-			NetAsset:  b.Balance.Add(b.Locked).Sub(b.Debt),
-			Borrowed:  b.Borrowed,
+			NetAsset:  b.Balance.Add(b.Locked).Sub(b.Principal).Sub(b.Interest),
+			Borrowed:  b.Principal,
 			Interest:  b.Interest,
 		}
 	}
