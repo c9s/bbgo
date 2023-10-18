@@ -168,7 +168,9 @@ func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 	trader.riskControls = riskControls
 }
 
-func (trader *Trader) RunSingleExchangeStrategy(ctx context.Context, strategy SingleExchangeStrategy, session *ExchangeSession, orderExecutor OrderExecutor) error {
+func (trader *Trader) RunSingleExchangeStrategy(
+	ctx context.Context, strategy SingleExchangeStrategy, session *ExchangeSession, orderExecutor OrderExecutor,
+) error {
 	if v, ok := strategy.(StrategyValidator); ok {
 		if err := v.Validate(); err != nil {
 			return fmt.Errorf("failed to validate the config: %w", err)
@@ -254,7 +256,7 @@ func (trader *Trader) injectFieldsAndSubscribe(ctx context.Context) error {
 				log.Errorf("strategy %s does not implement ExchangeSessionSubscriber", strategy.ID())
 			}
 
-			if symbol, ok := dynamic.LookupSymbolField(rs); ok {
+			if symbol, ok := dynamic.LookupSymbolField(rs); ok && symbol != "" {
 				log.Infof("found symbol %s based strategy from %s", symbol, rs.Type())
 
 				if err := session.initSymbol(ctx, trader.environment, symbol); err != nil {
