@@ -13,3 +13,13 @@ func (s *Stream) EmitBookEvent(o BookEvent) {
 		cb(o)
 	}
 }
+
+func (s *Stream) OnMarketTradeEvent(cb func(o MarketTradeEvent)) {
+	s.marketTradeEventCallbacks = append(s.marketTradeEventCallbacks, cb)
+}
+
+func (s *Stream) EmitMarketTradeEvent(o MarketTradeEvent) {
+	for _, cb := range s.marketTradeEventCallbacks {
+		cb(o)
+	}
+}

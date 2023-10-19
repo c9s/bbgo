@@ -13,7 +13,8 @@ import (
 type Stream struct {
 	types.StandardStream
 
-	bookEventCallbacks []func(o BookEvent)
+	bookEventCallbacks        []func(o BookEvent)
+	marketTradeEventCallbacks []func(o MarketTradeEvent)
 }
 
 func NewStream() *Stream {
@@ -27,6 +28,7 @@ func NewStream() *Stream {
 	stream.OnConnect(stream.handlerConnect)
 
 	stream.OnBookEvent(stream.handleBookEvent)
+	stream.OnMarketTradeEvent(stream.handleMaretTradeEvent)
 	return stream
 }
 
@@ -87,6 +89,9 @@ func (s *Stream) dispatchEvent(event interface{}) {
 
 	case *BookEvent:
 		s.EmitBookEvent(*e)
+
+	case *MarketTradeEvent:
+		s.EmitMarketTradeEvent(*e)
 	}
 }
 
@@ -101,7 +106,7 @@ func (s *Stream) handlerConnect() {
 
 func (s *Stream) handleBookEvent(o BookEvent) {
 	for _, book := range o.ToGlobalOrderBooks() {
-		switch o.Type {
+		switch o.actionType {
 		case ActionTypeSnapshot:
 			s.EmitBookSnapshot(book)
 
@@ -131,6 +136,10 @@ func convertSubscription(sub types.Subscription) (WsArg, error) {
 			arg.Channel = ChannelOrderBook
 		}
 		return arg, nil
+
+	case types.MarketTradeChannel:
+		arg.Channel = ChannelTrade
+		return arg, nil
 	}
 
 	return arg, fmt.Errorf("unsupported stream channel: %s", sub.Channel)
@@ -156,10 +165,37 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 			return nil, fmt.Errorf("failed to unmarshal data into BookEvent, Arg: %+v Data: %s, err: %w", event.Arg, string(event.Data), err)
 		}
 
-		book.Type = event.Action
-		book.InstId = event.Arg.InstId
+		book.actionType = event.Action
+		book.instId = event.Arg.InstId
 		return &book, nil
+
+	case ChannelTrade:
+		var trade MarketTradeEvent
+		err = json.Unmarshal(event.Data, &trade.Events)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal data into MarketTradeEvent, Arg: %+v Data: %s, err: %w", event.Arg, string(event.Data), err)
+		}
+
+		trade.actionType = event.Action
+		trade.instId = event.Arg.InstId
+		return &trade, nil
 	}
 
 	return nil, fmt.Errorf("unhandled websocket event: %+v", string(in))
+}
+
+func (s *Stream) handleMaretTradeEvent(m MarketTradeEvent) {
+	if m.actionType == ActionTypeSnapshot {
+		// we don't support snapshot event
+		return
+	}
+	for _, trade := range m.Events {
+		globalTrade, err := trade.ToGlobal(m.instId)
+		if err != nil {
+			log.WithError(err).Error("failed to convert to market trade")
+			return
+		}
+
+		s.EmitMarketTrade(globalTrade)
+	}
 }
