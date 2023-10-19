@@ -82,6 +82,11 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 	// iterate the sessions and record them
 	quoteCurrency := "USDT"
 	for sessionName, session := range sessions {
+		if session.PublicOnly {
+			log.Infof("session %s is public only, skip", sessionName)
+			continue
+		}
+
 		// update the account balances and the margin information
 		if _, err := session.UpdateAccount(ctx); err != nil {
 			log.WithError(err).Errorf("can not update account")
