@@ -92,6 +92,20 @@ func TestStream(t *testing.T) {
 		c := make(chan struct{})
 		<-c
 	})
+
+	t.Run("trade test", func(t *testing.T) {
+		s.Subscribe(types.MarketTradeChannel, "BTCUSDT", types.SubscribeOptions{})
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnMarketTrade(func(trade types.Trade) {
+			t.Log("got update", trade)
+		})
+		c := make(chan struct{})
+		<-c
+	})
+
 }
 
 func TestStream_parseWebSocketEvent(t *testing.T) {
@@ -247,8 +261,8 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 						Checksum: 0,
 					},
 				},
-				Type:   actionType,
-				InstId: "BTCUSDT",
+				actionType: actionType,
+				instId:     "BTCUSDT",
 			}, *book)
 		}
 
@@ -261,6 +275,181 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 			snapshotInput := fmt.Sprintf(input, ActionTypeUpdate)
 			eventFn(snapshotInput, ActionTypeUpdate)
 		})
+	})
+}
+
+func Test_parseWebSocketEvent_MarketTrade(t *testing.T) {
+	t.Run("MarketTrade event", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"trade",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  [
+				 "1697697791663",
+				 "28303.43",
+				 "0.0452",
+				 "sell"
+			  ],
+			  [
+				 "1697697794663",
+				 "28345.67",
+				 "0.1234",
+				 "sell"
+			  ]
+		   ],
+		   "ts":1697697791670
+		}`
+
+		eventFn := func(in string, actionType ActionType) {
+			res, err := parseWebSocketEvent([]byte(in))
+			assert.NoError(t, err)
+			book, ok := res.(*MarketTradeEvent)
+			assert.True(t, ok)
+			assert.Equal(t, MarketTradeEvent{
+				Events: MarketTradeSlice{
+					{
+						Ts:    types.NewMillisecondTimestampFromInt(1697697791663),
+						Price: fixedpoint.NewFromFloat(28303.43),
+						Size:  fixedpoint.NewFromFloat(0.0452),
+						Side:  "sell",
+					},
+
+					{
+						Ts:    types.NewMillisecondTimestampFromInt(1697697794663),
+						Price: fixedpoint.NewFromFloat(28345.67),
+						Size:  fixedpoint.NewFromFloat(0.1234),
+						Side:  "sell",
+					},
+				},
+				actionType: actionType,
+				instId:     "BTCUSDT",
+			}, *book)
+		}
+
+		t.Run("snapshot type", func(t *testing.T) {
+			snapshotInput := fmt.Sprintf(input, ActionTypeSnapshot)
+			eventFn(snapshotInput, ActionTypeSnapshot)
+		})
+
+		t.Run("update type", func(t *testing.T) {
+			snapshotInput := fmt.Sprintf(input, ActionTypeUpdate)
+			eventFn(snapshotInput, ActionTypeUpdate)
+		})
+	})
+
+	t.Run("Unexpected length of market trade", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"trade",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  [
+				 "1697697791663",
+				 "28303.43",
+				 "28303.43",
+				 "0.0452",
+				 "sell"
+			  ]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "unexpected trades length")
+	})
+
+	t.Run("Unexpected timestamp", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"trade",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  [
+				 "TIMESTAMP",
+				 "28303.43",
+				 "0.0452",
+				 "sell"
+			  ]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "timestamp")
+	})
+
+	t.Run("Unexpected price", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"trade",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  [
+				 "1697697791663",
+				 "1p",
+				 "0.0452",
+				 "sell"
+			  ]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "price")
+	})
+
+	t.Run("Unexpected size", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"trade",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  [
+				 "1697697791663",
+				 "28303.43",
+				 "2v",
+				 "sell"
+			  ]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "size")
+	})
+
+	t.Run("Unexpected side", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"trade",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  [
+				 "1697697791663",
+				 "28303.43",
+				 "0.0452",
+				 12345
+			  ]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "side")
 	})
 }
 
@@ -307,6 +496,19 @@ func Test_convertSubscription(t *testing.T) {
 		assert.Equal(t, WsArg{
 			InstType: instSp,
 			Channel:  ChannelOrderBook,
+			InstId:   "BTCUSDT",
+		}, res)
+	})
+	t.Run("TradeChannel", func(t *testing.T) {
+		res, err := convertSubscription(types.Subscription{
+			Symbol:  "BTCUSDT",
+			Channel: types.MarketTradeChannel,
+			Options: types.SubscribeOptions{},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, WsArg{
+			InstType: instSp,
+			Channel:  ChannelTrade,
 			InstId:   "BTCUSDT",
 		}, res)
 	})
