@@ -111,3 +111,128 @@ func (m TwinOrderMap) String() string {
 	sb.WriteString("================== END OF PIN ORDER MAP ==================\n")
 	return sb.String()
 }
+
+type TwinOrderBook struct {
+	// sort in asc order
+	pins []fixedpoint.Value
+
+	// pin index, use to find the next or last pin in desc order
+	pinIdx map[fixedpoint.Value]int
+
+	// orderbook
+	m map[fixedpoint.Value]*TwinOrder
+
+	size int
+}
+
+func NewTwinOrderBook(pins []Pin) *TwinOrderBook {
+	var v []fixedpoint.Value
+	for _, pin := range pins {
+		v = append(v, fixedpoint.Value(pin))
+	}
+
+	// sort it in asc order
+	sort.Slice(v, func(i, j int) bool {
+		return v[j].Compare(v[i]) > 0
+	})
+
+	pinIdx := make(map[fixedpoint.Value]int)
+	m := make(map[fixedpoint.Value]*TwinOrder)
+	for i, pin := range v {
+		m[pin] = &TwinOrder{}
+		pinIdx[pin] = i
+	}
+
+	ob := TwinOrderBook{
+		pins:   v,
+		pinIdx: pinIdx,
+		m:      m,
+		size:   0,
+	}
+
+	return &ob
+}
+
+func (book *TwinOrderBook) String() string {
+	var sb strings.Builder
+
+	sb.WriteString("================== TWIN ORDERBOOK ==================\n")
+	for _, pin := range book.pins {
+		twin := book.m[fixedpoint.Value(pin)]
+		twinOrder := twin.GetOrder()
+		sb.WriteString(fmt.Sprintf("-> %8s) %s\n", pin, twinOrder.String()))
+	}
+	sb.WriteString("================== END OF TWINORDERBOOK ==================\n")
+	return sb.String()
+}
+
+func (book *TwinOrderBook) GetTwinOrderPin(order types.Order) (fixedpoint.Value, error) {
+	idx, exist := book.pinIdx[order.Price]
+	if !exist {
+		return fixedpoint.Zero, fmt.Errorf("the order's (%d) price (%s) is not in pins", order.OrderID, order.Price)
+	}
+
+	if order.Side == types.SideTypeBuy {
+		idx++
+		if idx >= len(book.pins) {
+			return fixedpoint.Zero, fmt.Errorf("this order's twin order price is not in pins, %+v", order)
+		}
+	} else if order.Side == types.SideTypeSell {
+		if idx == 0 {
+			return fixedpoint.Zero, fmt.Errorf("this order's twin order price is at zero index, %+v", order)
+		}
+		// do nothing
+	} else {
+		// should not happen
+		return fixedpoint.Zero, fmt.Errorf("the order's (%d) side (%s) is not supported", order.OrderID, order.Side)
+	}
+
+	return book.pins[idx], nil
+}
+
+func (book *TwinOrderBook) AddOrder(order types.Order) error {
+	pin, err := book.GetTwinOrderPin(order)
+	if err != nil {
+		return err
+	}
+
+	twinOrder, exist := book.m[pin]
+	if !exist {
+		// should not happen
+		return fmt.Errorf("no any empty twin order at pins, should not happen, check it")
+	}
+
+	if !twinOrder.Exist() {
+		book.size++
+	}
+	twinOrder.SetOrder(order)
+
+	return nil
+}
+
+func (book *TwinOrderBook) GetTwinOrder(pin fixedpoint.Value) *TwinOrder {
+	return book.m[pin]
+}
+
+func (book *TwinOrderBook) AddTwinOrder(pin fixedpoint.Value, order *TwinOrder) {
+	book.m[pin] = order
+}
+
+func (book *TwinOrderBook) Size() int {
+	return book.size
+}
+
+func (book *TwinOrderBook) EmptyTwinOrderSize() int {
+	return len(book.pins) - 1 - book.size
+}
+
+func (book *TwinOrderBook) SyncOrderMap() *types.SyncOrderMap {
+	orderMap := types.NewSyncOrderMap()
+	for _, twin := range book.m {
+		if twin.Exist() {
+			orderMap.Add(twin.GetOrder())
+		}
+	}
+
+	return orderMap
+}
