@@ -308,6 +308,8 @@ var BacktestCmd = &cobra.Command{
 		var reportDir = outputDirectory
 		var sessionTradeStats = make(map[string]map[string]*types.TradeStats)
 
+		// for each exchange session, iterate the positions and
+		// allocate trade collector to calculate the tradeStats
 		var tradeCollectorList []*core.TradeCollector
 		for _, exSource := range exchangeSources {
 			sessionName := exSource.Session.Name
@@ -335,6 +337,7 @@ var BacktestCmd = &cobra.Command{
 			}
 			sessionTradeStats[sessionName] = tradeStatsMap
 		}
+
 		kLineHandlers = append(kLineHandlers, func(k types.KLine, _ *backtest.ExchangeDataSource) {
 			if k.Interval == types.Interval1d && k.Closed {
 				for _, collector := range tradeCollectorList {
