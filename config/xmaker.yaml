@@ -17,6 +17,12 @@ persistence:
     port: 6379
     db: 0
 
+logging:
+  trade: true
+  order: true
+  fields:
+    env: staging
+
 sessions:
   max:
     exchange: max
