@@ -2,8 +2,10 @@ package bitget
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -23,6 +25,7 @@ const (
 	ChannelOrderBook5 ChannelType = "books5"
 	// ChannelOrderBook15 top 15 order book of "books" that begins from bid1/ask1
 	ChannelOrderBook15 ChannelType = "books15"
+	ChannelTrade       ChannelType = "trade"
 )
 
 type WsArg struct {
@@ -119,15 +122,15 @@ type BookEvent struct {
 	}
 
 	// internal use
-	Type   ActionType
-	InstId string
+	actionType ActionType
+	instId     string
 }
 
 func (e *BookEvent) ToGlobalOrderBooks() []types.SliceOrderBook {
 	books := make([]types.SliceOrderBook, len(e.Events))
 	for i, event := range e.Events {
 		books[i] = types.SliceOrderBook{
-			Symbol: e.InstId,
+			Symbol: e.instId,
 			Bids:   event.Bids,
 			Asks:   event.Asks,
 			Time:   event.Ts.Time(),
@@ -135,4 +138,125 @@ func (e *BookEvent) ToGlobalOrderBooks() []types.SliceOrderBook {
 	}
 
 	return books
+}
+
+type SideType string
+
+const (
+	SideBuy  SideType = "buy"
+	SideSell SideType = "sell"
+)
+
+func (s SideType) ToGlobal() (types.SideType, error) {
+	switch s {
+	case SideBuy:
+		return types.SideTypeBuy, nil
+	case SideSell:
+		return types.SideTypeSell, nil
+	default:
+		return "", fmt.Errorf("unexpceted side type: %s", s)
+	}
+}
+
+type MarketTrade struct {
+	Ts    types.MillisecondTimestamp
+	Price fixedpoint.Value
+	Size  fixedpoint.Value
+	Side  SideType
+}
+
+type MarketTradeSlice []MarketTrade
+
+func (m *MarketTradeSlice) UnmarshalJSON(b []byte) error {
+	if m == nil {
+		return errors.New("nil pointer of market trade slice")
+	}
+	s, err := parseMarketTradeSliceJSON(b)
+	if err != nil {
+		return err
+	}
+
+	*m = s
+	return nil
+}
+
+// ParseMarketTradeSliceJSON tries to parse a 2 dimensional string array into a MarketTradeSlice
+//
+// [
+//
+//	[
+//	   "1697694819663",
+//	   "28312.97",
+//	   "0.1653",
+//	   "sell"
+//	],
+//	[
+//	   "1697694818663",
+//	   "28313",
+//	   "0.1598",
+//	   "buy"
+//	]
+//
+// ]
+func parseMarketTradeSliceJSON(in []byte) (slice MarketTradeSlice, err error) {
+	var rawTrades [][]json.RawMessage
+
+	err = json.Unmarshal(in, &rawTrades)
+	if err != nil {
+		return slice, err
+	}
+
+	for _, raw := range rawTrades {
+		if len(raw) != 4 {
+			return nil, fmt.Errorf("unexpected trades length: %d, data: %q", len(raw), raw)
+		}
+		var trade MarketTrade
+		if err = json.Unmarshal(raw[0], &trade.Ts); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal into timestamp: %q", raw[0])
+		}
+		if err = json.Unmarshal(raw[1], &trade.Price); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal into price: %q", raw[1])
+		}
+		if err = json.Unmarshal(raw[2], &trade.Size); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal into size: %q", raw[2])
+		}
+		if err = json.Unmarshal(raw[3], &trade.Side); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal into side: %q", raw[3])
+		}
+
+		slice = append(slice, trade)
+	}
+
+	return slice, nil
+}
+
+func (m MarketTrade) ToGlobal(symbol string) (types.Trade, error) {
+	side, err := m.Side.ToGlobal()
+	if err != nil {
+		return types.Trade{}, err
+	}
+
+	return types.Trade{
+		ID:            0, // not supported
+		OrderID:       0, // not supported
+		Exchange:      types.ExchangeBitget,
+		Price:         m.Price,
+		Quantity:      m.Size,
+		QuoteQuantity: m.Price.Mul(m.Size),
+		Symbol:        symbol,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       false, // not supported
+		Time:          types.Time(m.Ts.Time()),
+		Fee:           fixedpoint.Zero, // not supported
+		FeeCurrency:   "",              // not supported
+	}, nil
+}
+
+type MarketTradeEvent struct {
+	Events MarketTradeSlice
+
+	// internal use
+	actionType ActionType
+	instId     string
 }
