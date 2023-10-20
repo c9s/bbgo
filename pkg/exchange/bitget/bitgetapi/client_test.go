@@ -38,6 +38,13 @@ func TestClient(t *testing.T) {
 		t.Logf("tickers: %+v", tickers)
 	})
 
+	t.Run("GetSymbolsRequest", func(t *testing.T) {
+		req := client.NewGetSymbolsRequest()
+		symbols, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("symbols: %+v", symbols)
+	})
+
 	t.Run("GetTickerRequest", func(t *testing.T) {
 		req := client.NewGetTickerRequest()
 		req.Symbol("BTCUSDT_SPBL")
