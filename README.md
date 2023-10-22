@@ -488,7 +488,7 @@ See also:
 
 ## Command Usages
 
-### Submitting Orders to a specific exchagne session
+### Submitting Orders to a specific exchange session
 
 ```shell
 bbgo submit-order --session=okex --symbol=OKBUSDT --side=buy --price=10.0 --quantity=1
