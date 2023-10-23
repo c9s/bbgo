@@ -18,7 +18,7 @@ func TestTwinOrderBook(t *testing.T) {
 		Pin(fixedpoint.NewFromInt(2)),
 	}
 
-	book := NewTwinOrderBook(pins)
+	book := newTwinOrderBook(pins)
 	assert.Equal(0, book.Size())
 	assert.Equal(4, book.EmptyTwinOrderSize())
 	for _, pin := range pins {
