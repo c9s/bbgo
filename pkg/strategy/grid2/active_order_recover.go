@@ -23,21 +23,21 @@ type SyncActiveOrdersOpts struct {
 	exchange          types.Exchange
 }
 
-func (s *Strategy) initializeRecoverCh() bool {
+func (s *Strategy) initializeRecoverC() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	isInitialize := false
 
-	if s.activeOrdersRecoverC == nil {
+	if s.recoverC == nil {
 		s.logger.Info("initializing recover channel")
-		s.activeOrdersRecoverC = make(chan struct{}, 1)
+		s.recoverC = make(chan struct{}, 1)
 	} else {
 		s.logger.Info("recover channel is already initialized, trigger active orders recover")
 		isInitialize = true
 
 		select {
-		case s.activeOrdersRecoverC <- struct{}{}:
+		case s.recoverC <- struct{}{}:
 			s.logger.Info("trigger active orders recover")
 		default:
 			s.logger.Info("activeOrdersRecoverC is full")
@@ -49,7 +49,7 @@ func (s *Strategy) initializeRecoverCh() bool {
 
 func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 	// every time we activeOrdersRecoverC receive signal, do active orders recover
-	if isInitialize := s.initializeRecoverCh(); isInitialize {
+	if isInitialize := s.initializeRecoverC(); isInitialize {
 		return
 	}
 
@@ -78,7 +78,7 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 				log.WithError(err).Errorf("unable to sync active orders")
 			}
 
-		case <-s.activeOrdersRecoverC:
+		case <-s.recoverC:
 			if err := syncActiveOrders(ctx, opts); err != nil {
 				log.WithError(err).Errorf("unable to sync active orders")
 			}
