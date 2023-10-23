@@ -174,3 +174,77 @@ func TestSyncActiveOrders(t *testing.T) {
 		assert.Equal(types.OrderStatusNew, activeOrders[0].Status)
 	})
 }
+
+func TestSyncActiveOrder(t *testing.T) {
+	assert := assert.New(t)
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	symbol := "ETHUSDT"
+
+	t.Run("sync filled order in active orderbook, active orderbook should remove this order", func(t *testing.T) {
+		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
+
+		order := types.Order{
+			OrderID: 1,
+			Status:  types.OrderStatusNew,
+			SubmitOrder: types.SubmitOrder{
+				Symbol: symbol,
+			},
+		}
+		activeOrderbook.Add(order)
+
+		updatedOrder := order
+		updatedOrder.Status = types.OrderStatusFilled
+
+		mockOrderQueryService.EXPECT().QueryOrder(ctx, types.OrderQuery{
+			Symbol:  symbol,
+			OrderID: strconv.FormatUint(order.OrderID, 10),
+		}).Return(&updatedOrder, nil)
+
+		if !assert.NoError(syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID)) {
+			return
+		}
+
+		// verify active orderbook
+		activeOrders := activeOrderbook.Orders()
+		assert.Equal(0, len(activeOrders))
+	})
+
+	t.Run("sync partial-filled order in active orderbook, active orderbook should still keep this order", func(t *testing.T) {
+		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
+
+		order := types.Order{
+			OrderID: 1,
+			Status:  types.OrderStatusNew,
+			SubmitOrder: types.SubmitOrder{
+				Symbol: symbol,
+			},
+		}
+		activeOrderbook.Add(order)
+
+		updatedOrder := order
+		updatedOrder.Status = types.OrderStatusPartiallyFilled
+
+		mockOrderQueryService.EXPECT().QueryOrder(ctx, types.OrderQuery{
+			Symbol:  symbol,
+			OrderID: strconv.FormatUint(order.OrderID, 10),
+		}).Return(&updatedOrder, nil)
+
+		if !assert.NoError(syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID)) {
+			return
+		}
+
+		// verify active orderbook
+		activeOrders := activeOrderbook.Orders()
+		assert.Equal(1, len(activeOrders))
+		assert.Equal(order.OrderID, activeOrders[0].OrderID)
+		assert.Equal(updatedOrder.Status, activeOrders[0].Status)
+	})
+}
