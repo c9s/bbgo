@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -112,7 +113,20 @@ func (m TwinOrderMap) String() string {
 	return sb.String()
 }
 
+// TwinOrderBook is to verify grid
+// For grid trading, there are twin orders between a grid
+// e.g. 100, 200, 300, 400, 500
+//      BUY 100 and SELL 200 are a twin.
+//      BUY 200 and SELL 300 are a twin.
+// Because they can't be placed on orderbook at the same time.
+// We use sell price to be the twin orderbook's key
+// New the twin orderbook with pins, and it will sort the pins in asc order.
+// There must be a non nil TwinOrder on the every pin (except the first one).
+// But the TwinOrder.Exist() may be false. It means there is no twin order on this grid
 type TwinOrderBook struct {
+	// used to protect orderbook update
+	mu sync.Mutex
+
 	// sort in asc order
 	pins []fixedpoint.Value
 
@@ -122,6 +136,7 @@ type TwinOrderBook struct {
 	// orderbook
 	m map[fixedpoint.Value]*TwinOrder
 
+	// size is the amount on twin orderbook
 	size int
 }
 
@@ -171,6 +186,17 @@ func (b *TwinOrderBook) GetTwinOrderPin(order types.Order) (fixedpoint.Value, er
 	}
 
 	if order.Side == types.SideTypeBuy {
+		// we use sell price as twin orderbook's key, so if the order's side is buy.
+		// we need to find its next price on grid.
+		// e.g.
+		// BUY 100 <- twin -> SELL 200
+		// BUY 200 <- twin -> SELL 300
+		// BUY 300 <- twin -> SELL 400
+		// BUY 400 <- twin -> SELL 500
+		// if the order is BUY 100, we need to find its twin order's price to be the twin orderbook's key
+		// so we plus 1 here and use sorted pins to find the next price (200)
+		// there must no BUY 500 in the grid, so we need to make sure the idx should always not over the len(pins)
+		// also, there must no SELL 100 in the grid, so we need to make sure the idx should always not be 0
 		idx++
 		if idx >= len(b.pins) {
 			return fixedpoint.Zero, fmt.Errorf("this order's twin order price is not in pins, %+v", order)
@@ -189,19 +215,29 @@ func (b *TwinOrderBook) GetTwinOrderPin(order types.Order) (fixedpoint.Value, er
 }
 
 func (b *TwinOrderBook) AddOrder(order types.Order) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	pin, err := b.GetTwinOrderPin(order)
 	if err != nil {
 		return err
 	}
 
+	// At all the pins, we already create the empty TwinOrder{}
+	// As a result,if the exist is false, it means the pin is not in the twin orderbook.
+	// That's invalid pin, or we have something wrong when new TwinOrderBook
 	twinOrder, exist := b.m[pin]
 	if !exist {
 		// should not happen
 		return fmt.Errorf("no any empty twin order at pins, should not happen, check it")
 	}
 
+	// Exist == false means there is no twin order on this pin
 	if !twinOrder.Exist() {
 		b.size++
+	}
+	if b.size >= len(b.pins) {
+		return fmt.Errorf("the maximum size of twin orderbook is len(pins) - 1, need to check it")
 	}
 	twinOrder.SetOrder(order)
 
@@ -213,14 +249,20 @@ func (b *TwinOrderBook) GetTwinOrder(pin fixedpoint.Value) *TwinOrder {
 }
 
 func (b *TwinOrderBook) AddTwinOrder(pin fixedpoint.Value, order *TwinOrder) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	b.m[pin] = order
 }
 
+// Size is the valid twin order on grid.
 func (b *TwinOrderBook) Size() int {
 	return b.size
 }
 
+// EmptyTwinOrderSize is the amount of grid there is no twin order on it.
 func (b *TwinOrderBook) EmptyTwinOrderSize() int {
+	// for grid, there is only pins - 1 order on the grid, so we need to minus 1.
 	return len(b.pins) - 1 - b.size
 }
 
