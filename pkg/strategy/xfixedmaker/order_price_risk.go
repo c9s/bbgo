@@ -2,16 +2,16 @@ package xfixedmaker
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/indicator/v2/trend"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type OrderPriceRiskControl struct {
-	referencePrice *indicatorv2.EWMAStream
+	referencePrice *trend.EWMAStream
 	lossThreshold  fixedpoint.Value
 }
 
-func NewOrderPriceRiskControl(referencePrice *indicatorv2.EWMAStream, threshold fixedpoint.Value) *OrderPriceRiskControl {
+func NewOrderPriceRiskControl(referencePrice *trend.EWMAStream, threshold fixedpoint.Value) *OrderPriceRiskControl {
 	return &OrderPriceRiskControl{
 		referencePrice: referencePrice,
 		lossThreshold:  threshold,

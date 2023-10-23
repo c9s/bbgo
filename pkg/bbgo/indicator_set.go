@@ -3,7 +3,9 @@ package bbgo
 import (
 	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/indicator/v2"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/indicator/v2/momentum"
+	"github.com/c9s/bbgo/pkg/indicator/v2/trend"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -73,16 +75,16 @@ func (i *IndicatorSet) VOLUME(interval types.Interval) *indicatorv2.PriceStream 
 	return indicatorv2.Volumes(i.KLines(interval))
 }
 
-func (i *IndicatorSet) RSI(iw types.IntervalWindow) *indicatorv2.RSIStream {
-	return indicatorv2.RSI2(i.CLOSE(iw.Interval), iw.Window)
+func (i *IndicatorSet) RSI(iw types.IntervalWindow) *momentum.RSIStream {
+	return momentum.RSI2(i.CLOSE(iw.Interval), iw.Window)
 }
 
-func (i *IndicatorSet) EMA(iw types.IntervalWindow) *indicatorv2.EWMAStream {
+func (i *IndicatorSet) EMA(iw types.IntervalWindow) *trend.EWMAStream {
 	return i.EWMA(iw)
 }
 
-func (i *IndicatorSet) EWMA(iw types.IntervalWindow) *indicatorv2.EWMAStream {
-	return indicatorv2.EWMA2(i.CLOSE(iw.Interval), iw.Window)
+func (i *IndicatorSet) EWMA(iw types.IntervalWindow) *trend.EWMAStream {
+	return trend.EWMA2(i.CLOSE(iw.Interval), iw.Window)
 }
 
 func (i *IndicatorSet) STOCH(iw types.IntervalWindow, dPeriod int) *indicatorv2.StochStream {
@@ -93,14 +95,14 @@ func (i *IndicatorSet) BOLL(iw types.IntervalWindow, k float64) *indicatorv2.BOL
 	return indicatorv2.BOLL(i.CLOSE(iw.Interval), iw.Window, k)
 }
 
-func (i *IndicatorSet) MACD(interval types.Interval, shortWindow, longWindow, signalWindow int) *indicatorv2.MACDStream {
-	return indicatorv2.MACD2(i.CLOSE(interval), shortWindow, longWindow, signalWindow)
+func (i *IndicatorSet) MACD(interval types.Interval, shortWindow, longWindow, signalWindow int) *trend.MACDStream {
+	return trend.MACD2(i.CLOSE(interval), shortWindow, longWindow, signalWindow)
 }
 
-func (i *IndicatorSet) ATR(interval types.Interval, window int) *indicatorv2.ATRStream {
-	return indicatorv2.ATR2(i.KLines(interval), window)
+func (i *IndicatorSet) ATR(interval types.Interval, window int) *trend.ATRStream {
+	return trend.ATR2(i.KLines(interval), window)
 }
 
-func (i *IndicatorSet) ATRP(interval types.Interval, window int) *indicatorv2.ATRPStream {
-	return indicatorv2.ATRP2(i.KLines(interval), window)
+func (i *IndicatorSet) ATRP(interval types.Interval, window int) *trend.ATRPStream {
+	return trend.ATRP2(i.KLines(interval), window)
 }

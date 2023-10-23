@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/indicator/v2/trend"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -15,7 +15,7 @@ func Test_OrderPriceRiskControl_IsSafe(t *testing.T) {
 	lossThreshold := fixedpoint.NewFromFloat(-100)
 
 	window := types.IntervalWindow{Window: 30, Interval: types.Interval1m}
-	refPriceEWMA := indicatorv2.EWMA2(nil, window.Window)
+	refPriceEWMA := trend.EWMA2(nil, window.Window)
 	refPriceEWMA.PushAndEmit(refPrice)
 
 	cases := []struct {

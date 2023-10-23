@@ -3,13 +3,14 @@ package scmaker
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/indicator/v2/trend"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type IntensityStream struct {
 	*types.Float64Series
 
-	Buy, Sell *indicatorv2.RMAStream
+	Buy, Sell *trend.RMAStream
 	window    int
 }
 
@@ -18,8 +19,8 @@ func Intensity(source indicatorv2.KLineSubscription, window int) *IntensityStrea
 		Float64Series: types.NewFloat64Series(),
 		window:        window,
 
-		Buy:  indicatorv2.RMA2(types.NewFloat64Series(), window, false),
-		Sell: indicatorv2.RMA2(types.NewFloat64Series(), window, false),
+		Buy:  trend.RMA2(types.NewFloat64Series(), window, false),
+		Sell: trend.RMA2(types.NewFloat64Series(), window, false),
 	}
 
 	threshold := fixedpoint.NewFromFloat(100.0)

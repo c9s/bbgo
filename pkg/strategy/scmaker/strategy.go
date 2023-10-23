@@ -12,6 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	. "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/indicator/v2/trend"
 	"github.com/c9s/bbgo/pkg/risk/riskcontrol"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
@@ -74,7 +75,7 @@ type Strategy struct {
 	liquidityScale bbgo.Scale
 
 	// indicators
-	ewma      *EWMAStream
+	ewma      *trend.EWMAStream
 	boll      *BOLLStream
 	intensity *IntensityStream
 
@@ -186,7 +187,7 @@ func (s *Strategy) preloadKLines(inc *KLineStream, session *bbgo.ExchangeSession
 
 func (s *Strategy) initializeMidPriceEMA(session *bbgo.ExchangeSession) {
 	kLines := KLines(session.MarketDataStream, s.Symbol, s.MidPriceEMA.Interval)
-	s.ewma = EWMA2(ClosePrices(kLines), s.MidPriceEMA.Window)
+	s.ewma = trend.EWMA2(ClosePrices(kLines), s.MidPriceEMA.Window)
 
 	s.preloadKLines(kLines, session, s.Symbol, s.MidPriceEMA.Interval)
 }
