@@ -2,7 +2,6 @@ package grid2
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -141,19 +140,4 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 	}
 
 	return errs
-}
-
-func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService, orderID uint64) error {
-	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
-		Symbol:  activeOrderBook.Symbol,
-		OrderID: strconv.FormatUint(orderID, 10),
-	})
-
-	if err != nil {
-		return err
-	}
-
-	activeOrderBook.Update(*updatedOrder)
-
-	return nil
 }
