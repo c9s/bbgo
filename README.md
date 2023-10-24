@@ -107,7 +107,7 @@ the implementation.
 | irr         | this strategy opens the position based on the predicated return rate                                                                    | long/short |                  |
 | bollmaker   | this strategy holds a long-term long/short position, places maker orders on both side, uses bollinger band to control the position size | maker      |                  |
 | wall        | this strategy creates wall (large amount order) on the order book                                                                       | maker      | no               |
-| scmaker     | this market making strategy is desgiend for stable coin markets, like USDC/USDT                                                         | maker      |                  |
+| scmaker     | this market making strategy is designed for stable coin markets, like USDC/USDT                                                         | maker      |                  |
 | drift       |                                                                                                                                         | long/short |                  |
 | rsicross    | this strategy opens a long position when the fast rsi cross over the slow rsi, this is a demo strategy for using the v2 indicator       | long/short |                  |
 | marketcap   | this strategy implements a strategy that rebalances the portfolio based on the market capitalization                                    | rebalance  | no               |
