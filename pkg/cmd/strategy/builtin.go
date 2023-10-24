@@ -5,6 +5,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/atrpin"
 	_ "github.com/c9s/bbgo/pkg/strategy/audacitymaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/autoborrow"
+	_ "github.com/c9s/bbgo/pkg/strategy/balancecheck"
 	_ "github.com/c9s/bbgo/pkg/strategy/bollgrid"
 	_ "github.com/c9s/bbgo/pkg/strategy/bollmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/convert"

@@ -1,0 +1,9 @@
+---
+exchangeStrategies:
+  - on: max
+    balancecheck:
+      exceptedBalances:
+        BTC: 1.0
+        USDT: 1000
+      balanceCheckTorlerance: 20%
+      cronExpression: "@every 1s"
