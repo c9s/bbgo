@@ -204,7 +204,7 @@ type Strategy struct {
 	tradingCtx, writeCtx context.Context
 	cancelWrite          context.CancelFunc
 
-	activeOrdersRecoverC chan struct{}
+	recoverC chan struct{}
 
 	// this ensures that bbgo.Sync to lock the object
 	sync.Mutex
@@ -1953,7 +1953,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 						return
 					}
 
-					s.recoverActiveOrdersPeriodically(ctx)
+					s.recoverPeriodically(ctx)
 				})
 			} else {
 				s.startProcess(ctx, session)
@@ -1968,7 +1968,7 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 	if s.RecoverOrdersWhenStart {
 		// do recover only when triggerPrice is not set and not in the back-test mode
 		s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
-		if err := s.recoverGrid(ctx, session); err != nil {
+		if err := s.recover(ctx); err != nil {
 			// if recover fail, return and do not open grid
 			s.logger.WithError(err).Error("failed to start process, recover error")
 			s.EmitGridError(errors.Wrapf(err, "failed to start process, recover error"))
@@ -1985,6 +1985,7 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 	return nil
 }
 
+/*
 func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSession) error {
 	if s.RecoverGridByScanningTrades {
 		s.debugLog("recovering grid by scanning trades")
@@ -1994,6 +1995,7 @@ func (s *Strategy) recoverGrid(ctx context.Context, session *bbgo.ExchangeSessio
 	s.debugLog("recovering grid by scanning orders")
 	return s.recoverByScanningOrders(ctx, session)
 }
+*/
 
 func (s *Strategy) recoverByScanningOrders(ctx context.Context, session *bbgo.ExchangeSession) error {
 	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)

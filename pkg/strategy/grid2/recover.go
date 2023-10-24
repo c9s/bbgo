@@ -6,41 +6,121 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
+	"github.com/pkg/errors"
 )
 
-func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.ExchangeSession) error {
-	defer func() {
-		s.updateGridNumOfOrdersMetricsWithLock()
-	}()
+/*
+  	Background knowledge
+  	1. active orderbook add orders only when receive new order event or call Add/Update method manually
+  	2. active orderbook remove orders only when receive filled/cancelled event or call Remove/Update method manually
 
-	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
+  	As a result
+  	1. at the same twin-order-price, there is order in open orders but not in active orderbook
+  		- not receive new order event
+		  	=> add order into active orderbook
+  	2. at the same twin-order-price, there is order in active orderbook but not in open orders
+  		- not receive filled event
+			=> query the filled order and call Update method
+  	3. at the same twin-order-price, there is no order in open orders and no order in active orderbook
+		- failed to create the order
+			=> query the last order from trades to emit filled, and it will submit again
+		- not receive new order event and the order filled before we find it.
+			=> query the untracked order (also is the last order) from trades to emit filled and it will submit the reversed order
+  	4. at the same twin-order-price, there are different orders in open orders and active orderbook
+	  	- should not happen !!!
+		  	=> log error
+	5. at the same twin-order-price, there is the same order in open orders and active orderbook
+		- normal case
+			=> no need to do anything
+
+	After killing pod, active orderbook must be empty. we can think it is the same as not receive new event.
+
+	Process
+	1. build twin orderbook with pins and open orders.
+	2. build twin orderbook with pins and active orders.
+	3. compare above twin orderbooks to add open orders into active orderbook and update active orders.
+	4. run grid recover to make sure all the twin price has its order.
+*/
+
+func (s *Strategy) initializeRecoverC() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	isInitialize := false
+
+	if s.recoverC == nil {
+		s.logger.Info("initializing recover channel")
+		s.recoverC = make(chan struct{}, 1)
+	} else {
+		s.logger.Info("recover channel is already initialized, trigger active orders recover")
+		isInitialize = true
+
+		select {
+		case s.recoverC <- struct{}{}:
+			s.logger.Info("trigger active orders recover")
+		default:
+			s.logger.Info("activeOrdersRecoverC is full")
+		}
+	}
+
+	return isInitialize
+}
+
+func (s *Strategy) recoverPeriodically(ctx context.Context) {
+	// every time we activeOrdersRecoverC receive signal, do active orders recover
+	if isInitialize := s.initializeRecoverC(); isInitialize {
+		return
+	}
+
+	// make ticker's interval random in 25 min ~ 35 min
+	interval := util.MillisecondsJitter(25*time.Minute, 10*60*1000)
+	s.logger.Infof("[Recover] interval: %s", interval)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			if err := s.recover(ctx); err != nil {
+				s.logger.WithError(err).Error("failed to recover")
+			}
+
+		case <-s.recoverC:
+			if err := s.recover(ctx); err != nil {
+				s.logger.WithError(err).Error("failed to recover")
+			}
+		}
+	}
+}
+
+func (s *Strategy) recover(ctx context.Context) error {
+	historyService, implemented := s.session.Exchange.(types.ExchangeTradeHistoryService)
 	// if the exchange doesn't support ExchangeTradeHistoryService, do not run recover
 	if !implemented {
 		s.logger.Warn("ExchangeTradeHistoryService is not implemented, can not recover grid")
 		return nil
 	}
 
-	openOrders, err := session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
+	activeOrders := activeOrderBook.Orders()
+
+	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, s.session.Exchange, s.Symbol)
 	if err != nil {
-		return errors.Wrapf(err, "unable to query open orders when recovering")
+		return err
 	}
 
-	s.logger.Infof("found %d open orders left on the %s order book", len(openOrders), s.Symbol)
-
-	if s.GridProfitStats.InitialOrderID != 0 {
-		s.logger.Info("InitialOrderID is already there, need to recover")
-	} else if len(openOrders) != 0 {
-		s.logger.Info("even though InitialOrderID is 0, there are open orders so need to recover")
-	} else {
-		s.logger.Info("InitialOrderID is 0 and there is no open orders, query trades to check it")
-		// initial order id may be new strategy or lost data in redis, so we need to check trades + open orders
-		// if there are open orders or trades, we need to recover
+	// check if it's new strategy or need to recover
+	if len(activeOrders) == 0 && len(openOrders) == 0 && s.GridProfitStats.InitialOrderID == 0 {
+		// even though there is no open orders and initial orderID is 0
+		// we still need to query trades to make sure if we need to recover or not
 		trades, err := historyService.QueryTrades(ctx, s.Symbol, &types.TradeQueryOptions{
 			// from 1, because some API will ignore 0 last trade id
 			LastTradeID: 1,
@@ -53,181 +133,153 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 		}
 
 		if len(trades) == 0 {
-			s.logger.Info("0 trades found, it's a new strategy so no need to recover")
+			s.logger.Info("no open order, no active order, no trade, it's a new strategy so no need to recover")
 			return nil
 		}
 	}
 
-	s.logger.Infof("start recovering")
-	filledOrders, err := s.getFilledOrdersByScanningTrades(ctx, historyService, s.orderQueryService, openOrders)
-	if err != nil {
-		return errors.Wrap(err, "grid recover error")
-	}
-	s.debugOrders("emit filled orders", filledOrders)
+	s.logger.Info("start recovering")
 
-	// add open orders into avtive maker orders
-	s.addOrdersToActiveOrderBook(openOrders)
-
-	// emit the filled orders
-	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
-	for _, filledOrder := range filledOrders {
-		activeOrderBook.EmitFilled(filledOrder)
+	if s.getGrid() == nil {
+		s.setGrid(s.newGrid())
 	}
 
-	// emit ready after recover
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	pins := s.getGrid().Pins
+
+	activeOrdersInTwinOrderBook, err := s.buildTwinOrderBook(pins, activeOrders)
+	openOrdersInTwinOrderBook, err := s.buildTwinOrderBook(pins, openOrders)
+
+	s.logger.Infof("active orders' twin orderbook\n%s", activeOrdersInTwinOrderBook.String())
+	s.logger.Infof("open orders in twin orderbook\n%s", openOrdersInTwinOrderBook.String())
+
+	// remove index 0, because twin orderbook's price is from the second one
+	pins = pins[1:]
+	var noTwinOrderPins []fixedpoint.Value
+
+	for _, pin := range pins {
+		v := fixedpoint.Value(pin)
+		activeOrder := activeOrdersInTwinOrderBook.GetTwinOrder(v)
+		openOrder := openOrdersInTwinOrderBook.GetTwinOrder(v)
+		if activeOrder == nil || openOrder == nil {
+			return fmt.Errorf("there is no any twin order at this pin, can not recover")
+		}
+
+		var activeOrderID uint64 = 0
+		if activeOrder.Exist() {
+			activeOrderID = activeOrder.GetOrder().OrderID
+		}
+
+		var openOrderID uint64 = 0
+		if openOrder.Exist() {
+			openOrderID = openOrder.GetOrder().OrderID
+		}
+
+		// case 3
+		if activeOrderID == 0 && openOrderID == 0 {
+			noTwinOrderPins = append(noTwinOrderPins, v)
+			continue
+		}
+
+		// case 1
+		if activeOrderID == 0 {
+			activeOrderBook.Add(openOrder.GetOrder())
+			// also add open orders into active order's twin orderbook, we will use this active orderbook to recover empty price grid
+			activeOrdersInTwinOrderBook.AddTwinOrder(v, openOrder)
+			continue
+		}
+
+		// case 2
+		if openOrderID == 0 {
+			syncActiveOrder(ctx, activeOrderBook, s.orderQueryService, activeOrder.GetOrder().OrderID)
+			continue
+		}
+
+		// case 4
+		if activeOrderID != openOrderID {
+			return fmt.Errorf("there are two different orders in the same pin, can not recover")
+		}
+
+		// case 5
+		// do nothing
+	}
+
+	s.logger.Infof("twin orderbook after adding open orders\n%s", activeOrdersInTwinOrderBook.String())
+
+	if err := s.recoverEmptyGrid(ctx, activeOrdersInTwinOrderBook, historyService, s.orderQueryService); err != nil {
+		s.logger.WithError(err).Error("failed to recover empty grid")
+		return err
+	}
+
+	s.logger.Infof("twin orderbook after recovering\n%s", activeOrdersInTwinOrderBook.String())
+
+	if activeOrdersInTwinOrderBook.EmptyTwinOrderSize() > 0 {
+		return fmt.Errorf("there is still empty grid in twin orderbook")
+	}
+
+	for _, pin := range noTwinOrderPins {
+		twinOrder := activeOrdersInTwinOrderBook.GetTwinOrder(pin)
+		if twinOrder == nil {
+			return fmt.Errorf("should not get nil twin order after recovering empty grid, check it")
+		}
+
+		if !twinOrder.Exist() {
+			return fmt.Errorf("should not get empty twin order after recovering empty grid, check it")
+		}
+
+		activeOrderBook.EmitFilled(twinOrder.GetOrder())
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
 	s.EmitGridReady()
 
-	// debug and send metrics
-	// wait for the reverse order to be placed
 	time.Sleep(2 * time.Second)
 	debugGrid(s.logger, s.grid, s.orderExecutor.ActiveMakerOrders())
 
-	defer bbgo.Sync(ctx, s)
-
-	if s.EnableProfitFixer {
-		until := time.Now()
-		since := until.Add(-7 * 24 * time.Hour)
-		if s.FixProfitSince != nil {
-			since = s.FixProfitSince.Time()
-		}
-
-		fixer := newProfitFixer(s.grid, s.Symbol, historyService)
-		fixer.SetLogger(s.logger)
-
-		// set initial order ID = 0 instead of s.GridProfitStats.InitialOrderID because the order ID could be incorrect
-		if err := fixer.Fix(ctx, since, until, 0, s.GridProfitStats); err != nil {
-			return err
-		}
-
-		s.logger.Infof("fixed profitStats: %#v", s.GridProfitStats)
-
-		s.EmitGridProfit(s.GridProfitStats, nil)
-	}
+	bbgo.Sync(ctx, s)
 
 	return nil
 }
 
-func (s *Strategy) getFilledOrdersByScanningTrades(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, openOrdersOnGrid []types.Order) ([]types.Order, error) {
-	// set grid
-	grid := s.newGrid()
-	s.setGrid(grid)
+func (s *Strategy) buildTwinOrderBook(pins []Pin, orders []types.Order) (*TwinOrderBook, error) {
+	book := NewTwinOrderBook(pins)
 
-	expectedNumOfOrders := s.GridNum - 1
-	numGridOpenOrders := int64(len(openOrdersOnGrid))
-	s.debugLog("open orders nums: %d, expected nums: %d", numGridOpenOrders, expectedNumOfOrders)
-	if expectedNumOfOrders == numGridOpenOrders {
-		// no need to recover, only need to add open orders back to active order book
-		return nil, nil
-	} else if expectedNumOfOrders < numGridOpenOrders {
-		return nil, fmt.Errorf("amount of grid's open orders should not > amount of expected grid's orders")
+	for _, order := range orders {
+		if err := book.AddOrder(order); err != nil {
+			return nil, err
+		}
 	}
 
-	// 1. build twin-order map
-	twinOrdersOpen, err := s.buildTwinOrderMap(grid.Pins, openOrdersOnGrid)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to build pin order map with open orders")
-	}
-
-	// 2. build the filled twin-order map by querying trades
-	expectedFilledNum := int(expectedNumOfOrders - numGridOpenOrders)
-	twinOrdersFilled, err := s.buildFilledTwinOrderMapFromTrades(ctx, queryTradesService, queryOrderService, twinOrdersOpen, expectedFilledNum)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to build filled pin order map")
-	}
-
-	// 3. get the filled orders from twin-order map
-	filledOrders := twinOrdersFilled.AscendingOrders()
-
-	// 4. verify the grid
-	if err := s.verifyFilledTwinGrid(s.grid.Pins, twinOrdersOpen, filledOrders); err != nil {
-		return nil, errors.Wrapf(err, "verify grid with error")
-	}
-
-	return filledOrders, nil
+	return book, nil
 }
 
-func (s *Strategy) verifyFilledTwinGrid(pins []Pin, twinOrders TwinOrderMap, filledOrders []types.Order) error {
-	s.debugLog("verifying filled grid - pins: %+v", pins)
-	s.debugOrders("verifying filled grid - filled orders", filledOrders)
-	s.debugLog("verifying filled grid - open twin orders:\n%s", twinOrders.String())
+func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService, orderID uint64) error {
+	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
+		Symbol:  activeOrderBook.Symbol,
+		OrderID: strconv.FormatUint(orderID, 10),
+	})
 
-	if err := s.addOrdersIntoTwinOrderMap(twinOrders, filledOrders); err != nil {
-		return errors.Wrapf(err, "verifying filled grid error when add orders into twin order map")
+	if err != nil {
+		return err
 	}
 
-	s.debugLog("verifying filled grid - filled twin orders:\n%+v", twinOrders.String())
-
-	for i, pin := range pins {
-		// we use twinOrderMap to make sure there are no duplicated order at one grid, and we use the sell price as key so we skip the pins[0] which is only for buy price
-		if i == 0 {
-			continue
-		}
-
-		twin, exist := twinOrders[fixedpoint.Value(pin)]
-		if !exist {
-			return fmt.Errorf("there is no order at price (%+v)", pin)
-		}
-
-		if !twin.Exist() {
-			return fmt.Errorf("all the price need a twin")
-		}
-
-		if !twin.IsValid() {
-			return fmt.Errorf("all the twins need to be valid")
-		}
-	}
+	activeOrderBook.Update(*updatedOrder)
 
 	return nil
 }
 
-// buildTwinOrderMap build the pin-order map with grid and open orders.
-// The keys of this map contains all required pins of this grid.
-// If the Order of the pin is empty types.Order (OrderID == 0), it means there is no open orders at this pin.
-func (s *Strategy) buildTwinOrderMap(pins []Pin, openOrders []types.Order) (TwinOrderMap, error) {
-	twinOrderMap := make(TwinOrderMap)
-
-	for i, pin := range pins {
-		// twin order map only use sell price as key, so skip 0
-		if i == 0 {
-			continue
-		}
-
-		twinOrderMap[fixedpoint.Value(pin)] = TwinOrder{}
+func (s *Strategy) recoverEmptyGrid(ctx context.Context, twinOrderBook *TwinOrderBook, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService) error {
+	if twinOrderBook.EmptyTwinOrderSize() == 0 {
+		s.logger.Info("no empty grid")
+		return nil
 	}
 
-	for _, openOrder := range openOrders {
-		twinKey, err := findTwinOrderMapKey(s.grid, openOrder)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to build twin order map")
-		}
+	existedOrders := twinOrderBook.SyncOrderMap()
 
-		twinOrder, exist := twinOrderMap[twinKey]
-		if !exist {
-			return nil, fmt.Errorf("the price of the openOrder (id: %d) is not in pins", openOrder.OrderID)
-		}
-
-		if twinOrder.Exist() {
-			return nil, fmt.Errorf("there are multiple order in a twin")
-		}
-
-		twinOrder.SetOrder(openOrder)
-		twinOrderMap[twinKey] = twinOrder
-	}
-
-	return twinOrderMap, nil
-}
-
-// buildFilledTwinOrderMapFromTrades will query the trades from last 24 hour and use them to build a pin order map
-// It will skip the orders on pins at which open orders are already
-func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, twinOrdersOpen TwinOrderMap, expectedFillNum int) (TwinOrderMap, error) {
-	twinOrdersFilled := make(TwinOrderMap)
-
-	// existedOrders is used to avoid re-query the same orders
-	existedOrders := twinOrdersOpen.SyncOrderMap()
-
-	// get the filled orders when bbgo is down in order from trades
 	until := time.Now()
-	// the first query only query the last 1 hour, because mostly shutdown and recovery happens within 1 hour
 	since := until.Add(-1 * time.Hour)
 	// hard limit for recover
 	recoverSinceLimit := time.Date(2023, time.March, 10, 0, 0, 0, 0, time.UTC)
@@ -237,15 +289,15 @@ func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryT
 	}
 
 	for {
-		if err := s.queryTradesToUpdateTwinOrdersMap(ctx, queryTradesService, queryOrderService, twinOrdersOpen, twinOrdersFilled, existedOrders, since, until); err != nil {
-			return nil, errors.Wrapf(err, "failed to query trades to update twin orders map")
+		if err := s.queryTradesToUpdateTwinOrderBook(ctx, twinOrderBook, queryTradesService, queryOrderService, existedOrders, since, until); err != nil {
+			return errors.Wrapf(err, "failed to query trades to update twin orderbook")
 		}
 
 		until = since
 		since = until.Add(-6 * time.Hour)
 
-		if len(twinOrdersFilled) >= expectedFillNum {
-			s.logger.Infof("stop querying trades because twin orders filled (%d) >= expected filled nums (%d)", len(twinOrdersFilled), expectedFillNum)
+		if twinOrderBook.EmptyTwinOrderSize() == 0 {
+			s.logger.Infof("stop querying trades because there is no empty twin order on twin orderbook")
 			break
 		}
 
@@ -260,10 +312,10 @@ func (s *Strategy) buildFilledTwinOrderMapFromTrades(ctx context.Context, queryT
 		}
 	}
 
-	return twinOrdersFilled, nil
+	return nil
 }
 
-func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, twinOrdersOpen, twinOrdersFilled TwinOrderMap, existedOrders *types.SyncOrderMap, since, until time.Time) error {
+func (s *Strategy) queryTradesToUpdateTwinOrderBook(ctx context.Context, twinOrderBook *TwinOrderBook, queryTradesService types.ExchangeTradeHistoryService, queryOrderService types.ExchangeOrderQueryService, existedOrders *types.SyncOrderMap, since, until time.Time) error {
 	var fromTradeID uint64 = 0
 	var limit int64 = 1000
 	for {
@@ -275,9 +327,8 @@ func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTr
 		})
 
 		if err != nil {
-			return errors.Wrapf(err, "failed to query trades to recover the grid with open orders")
+			return errors.Wrapf(err, "failed to query trades to recover the grid")
 		}
-
 		s.debugLog("QueryTrades from %s <-> %s (from: %d) return %d trades", since, until, fromTradeID, len(trades))
 
 		for _, trade := range trades {
@@ -306,31 +357,9 @@ func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTr
 			// add 1 to avoid duplicate
 			fromTradeID = trade.ID + 1
 
-			twinOrderKey, err := findTwinOrderMapKey(s.grid, *order)
-			if err != nil {
-				return errors.Wrapf(err, "failed to find grid order map's key when recover")
+			if err := twinOrderBook.AddOrder(*order); err != nil {
+				return errors.Wrapf(err, "failed to add queried order into twin orderbook")
 			}
-
-			twinOrderOpen, exist := twinOrdersOpen[twinOrderKey]
-			if !exist {
-				return fmt.Errorf("the price of the order with the same GroupID is not in pins")
-			}
-
-			if twinOrderOpen.Exist() {
-				continue
-			}
-
-			if twinOrder, exist := twinOrdersFilled[twinOrderKey]; exist {
-				to := twinOrder.GetOrder()
-				if to.UpdateTime.Time().After(order.UpdateTime.Time()) {
-					s.logger.Infof("twinOrder's update time (%s) should not be after order's update time (%s)", to.UpdateTime, order.UpdateTime)
-					continue
-				}
-			}
-
-			twinOrder := TwinOrder{}
-			twinOrder.SetOrder(*order)
-			twinOrdersFilled[twinOrderKey] = twinOrder
 		}
 
 		// stop condition
@@ -338,25 +367,4 @@ func (s *Strategy) queryTradesToUpdateTwinOrdersMap(ctx context.Context, queryTr
 			return nil
 		}
 	}
-}
-
-func (s *Strategy) addOrdersIntoTwinOrderMap(twinOrders TwinOrderMap, orders []types.Order) error {
-	for _, order := range orders {
-		k, err := findTwinOrderMapKey(s.grid, order)
-		if err != nil {
-			return errors.Wrap(err, "failed to add orders into twin order map")
-		}
-
-		if v, exist := twinOrders[k]; !exist {
-			return fmt.Errorf("the price (%+v) is not in pins", k)
-		} else if v.Exist() {
-			return fmt.Errorf("there is already a twin order at this price (%+v)", k)
-		} else {
-			twin := TwinOrder{}
-			twin.SetOrder(order)
-			twinOrders[k] = twin
-		}
-	}
-
-	return nil
 }
