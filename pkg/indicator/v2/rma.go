@@ -48,11 +48,6 @@ func (s *RMAStream) Calculate(x float64) float64 {
 	}
 	s.counter++
 
-	if s.counter < s.window {
-		// we can use x, but we need to use 0. to make the same behavior as the result from python pandas_ta
-		s.Slice.Push(0)
-	}
-
 	s.Slice.Push(tmp)
 	s.previous = tmp
 	return tmp
