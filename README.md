@@ -30,14 +30,14 @@ You can use BBGO's trading unit and back-test unit to implement your own strateg
 
 ### Trading Unit Developers 🧑‍💻
 
-You can use BBGO's underlying common exchange API, currently it supports 4+ major exchanges, so you don't have to repeat
+You can use BBGO's underlying common exchange API, currently, it supports 4+ major exchanges, so you don't have to repeat
 the implementation.
 
 ## Features
 
 - Exchange abstraction interface.
-- Stream integration (user data websocket, market data websocket).
-- Real-time orderBook integration through websocket.
+- Stream integration (user data web socket, market data web socket).
+- Real-time orderBook integration through a web socket.
 - TWAP order execution support. See [TWAP Order Execution](./doc/topics/twap.md)
 - PnL calculation.
 - Slack/Telegram notification.
@@ -177,7 +177,7 @@ bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/download.
 
 Or refer to the [Release Page](https://github.com/c9s/bbgo/releases) and download manually.
 
-Since v2, we've added new float point implementation from dnum to support decimals with higher precision. To download &
+Since v2, we've added a new float point implementation from dnum to support decimals with higher precision. To download &
 setup, please refer to [Dnum Installation](doc/topics/dnum-binary.md)
 
 ### One-click Linode StackScript
@@ -319,7 +319,7 @@ You can only use one database driver MySQL or SQLite to store your trading data.
 
 #### Configure MySQL Database
 
-To use MySQL database for data syncing, first you need to install your mysql server:
+To use MySQL database for data syncing, first, you need to install your mysql server:
 
 ```sh
 # For Ubuntu Linux
@@ -427,7 +427,7 @@ See [Developing Strategy](./doc/topics/developing-strategy.md)
 
 ## Write your own private strategy
 
-Create your go package, and initialize the repository with `go mod` and add bbgo as a dependency:
+Create your go package, initialize the repository with `go mod`, and add bbgo as a dependency:
 
 ```sh
 go mod init
@@ -550,7 +550,7 @@ following types could be injected automatically:
 2. Allocate and initialize exchange sessions.
 3. Add exchange sessions to the environment (the data layer).
 4. Use the given environment to initialize the trader object (the logic layer).
-5. The trader initializes the environment and start the exchange connections.
+5. The trader initializes the environment and starts the exchange connections.
 6. Call strategy.Run() method sequentially.
 
 ## Exchange API Examples
@@ -567,7 +567,7 @@ maxRest := maxapi.NewRestClient(maxapi.ProductionAPIURL)
 maxRest.Auth(key, secret)
 ```
 
-Creating user data stream to get the orderbook (depth):
+Creating user data stream to get the order book (depth):
 
 ```go
 stream := max.NewStream(key, secret)
@@ -591,7 +591,7 @@ streambook.BindStream(stream)
 
 1. Click the "Fork" button from the GitHub repository.
 2. Clone your forked repository into `$GOPATH/github.com/c9s/bbgo`.
-3. Change directory into `$GOPATH/github.com/c9s/bbgo`.
+3. Change the directory into `$GOPATH/github.com/c9s/bbgo`.
 4. Create a branch and start your development.
 5. Test your changes.
 6. Push your changes to your fork.
@@ -616,13 +616,13 @@ make embed && go run -tags web ./cmd/bbgo-lorca
 ### What's Position?
 
 - Base Currency & Quote Currency <https://www.ig.com/au/glossary-trading-terms/base-currency-definition>
-- How to calculate average cost? <https://www.janushenderson.com/en-us/investor/planning/calculate-average-cost/>
+- How to calculate the average cost? <https://www.janushenderson.com/en-us/investor/planning/calculate-average-cost/>
 
 ### Looking For A New Strategy?
 
-You can write an article about BBGO in any topic, in 750-1500 words for exchange, and I can implement the strategy for
-you (depends on the complexity and efforts). If you're interested in, DM me in telegram <https://t.me/c123456789s> or
-twitter <https://twitter.com/c9s>, we can discuss.
+You can write an article about BBGO on any topic, in 750-1500 words for exchange, and I can implement the strategy for
+you (depending on the complexity and efforts). If you're interested in, DM me in telegram <https://t.me/c123456789s> or
+twitter <https://twitter.com/c9s>, and we can discuss.
 
 ### Adding New Crypto Exchange support?
 
