@@ -26,15 +26,15 @@ const (
 )
 
 // https://bybit-exchange.github.io/docs/zh-TW/v5/rate-limit
-// sharedRateLimiter indicates that the API belongs to the public API.
-//
-// The default order limiter apply 5 requests per second and a 5 initial bucket
-// this includes QueryMarkets, QueryTicker, QueryAccountBalances, GetFeeRates
+// GET/POST method (shared): 120 requests per second for 5 consecutive seconds
 var (
-	sharedRateLimiter       = rate.NewLimiter(rate.Every(time.Second/5), 5)
-	tradeRateLimiter        = rate.NewLimiter(rate.Every(time.Second/5), 5)
-	orderRateLimiter        = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	closedOrderQueryLimiter = rate.NewLimiter(rate.Every(time.Second), 1)
+	// sharedRateLimiter indicates that the API belongs to the public API.
+	// The default order limiter apply 5 requests per second and a 5 initial bucket
+	// this includes QueryMarkets, QueryTicker, QueryAccountBalances, GetFeeRates
+	sharedRateLimiter          = rate.NewLimiter(rate.Every(time.Second/5), 5)
+	queryOrderTradeRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
+	orderRateLimiter           = rate.NewLimiter(rate.Every(time.Second/10), 10)
+	closedOrderQueryLimiter    = rate.NewLimiter(rate.Every(time.Second), 1)
 
 	log = logrus.WithFields(logrus.Fields{
 		"exchange": "bybit",
@@ -159,7 +159,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 			req = req.Cursor(cursor)
 		}
 
-		if err = tradeRateLimiter.Wait(ctx); err != nil {
+		if err = queryOrderTradeRateLimiter.Wait(ctx); err != nil {
 			return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
 		}
 		res, err := req.Do(ctx)
@@ -232,7 +232,7 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (tr
 		req.Symbol(q.Symbol)
 	}
 
-	if err := tradeRateLimiter.Wait(ctx); err != nil {
+	if err := queryOrderTradeRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("trade rate limiter wait error: %w", err)
 	}
 	response, err := req.Do(ctx)
@@ -463,7 +463,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 	req.Limit(limit)
 
-	if err := tradeRateLimiter.Wait(ctx); err != nil {
+	if err := queryOrderTradeRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("trade rate limiter wait error: %w", err)
 	}
 	response, err := req.Do(ctx)
