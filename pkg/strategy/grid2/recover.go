@@ -150,33 +150,36 @@ func (s *Strategy) recover(ctx context.Context) error {
 
 	s.logger.Infof("twin orderbook after adding open orders\n%s", activeOrdersInTwinOrderBook.String())
 
-	if err := s.recoverEmptyGridOnTwinOrderBook(ctx, activeOrdersInTwinOrderBook, historyService, s.orderQueryService); err != nil {
-		s.logger.WithError(err).Error("failed to recover empty grid")
-		return err
-	}
-
-	s.logger.Infof("twin orderbook after recovering\n%s", activeOrdersInTwinOrderBook.String())
-
-	if activeOrdersInTwinOrderBook.EmptyTwinOrderSize() > 0 {
-		return fmt.Errorf("there is still empty grid in twin orderbook")
-	}
-
-	for _, pin := range noTwinOrderPins {
-		twinOrder := activeOrdersInTwinOrderBook.GetTwinOrder(pin)
-		if twinOrder == nil {
-			return fmt.Errorf("should not get nil twin order after recovering empty grid, check it")
+	if len(noTwinOrderPins) != 0 {
+		if err := s.recoverEmptyGridOnTwinOrderBook(ctx, activeOrdersInTwinOrderBook, historyService, s.orderQueryService); err != nil {
+			s.logger.WithError(err).Error("failed to recover empty grid")
+			return err
 		}
 
-		if !twinOrder.Exist() {
-			return fmt.Errorf("should not get empty twin order after recovering empty grid, check it")
+		s.logger.Infof("twin orderbook after recovering no twin order on grid\n%s", activeOrdersInTwinOrderBook.String())
+
+		if activeOrdersInTwinOrderBook.EmptyTwinOrderSize() > 0 {
+			return fmt.Errorf("there is still empty grid in twin orderbook")
 		}
 
-		activeOrderBook.EmitFilled(twinOrder.GetOrder())
+		for _, pin := range noTwinOrderPins {
+			twinOrder := activeOrdersInTwinOrderBook.GetTwinOrder(pin)
+			if twinOrder == nil {
+				return fmt.Errorf("should not get nil twin order after recovering empty grid, check it")
+			}
 
-		time.Sleep(100 * time.Millisecond)
+			if !twinOrder.Exist() {
+				return fmt.Errorf("should not get empty twin order after recovering empty grid, check it")
+			}
+
+			activeOrderBook.EmitFilled(twinOrder.GetOrder())
+
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 
-	s.EmitGridReady()
+	// TODO: do not emit ready here, emit ready only once when opening grid or recovering grid after worker stopped
+	// s.EmitGridReady()
 
 	time.Sleep(2 * time.Second)
 	debugGrid(s.logger, s.grid, s.orderExecutor.ActiveMakerOrders())
