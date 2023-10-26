@@ -154,7 +154,10 @@ func newTwinOrderBook(pins []Pin) *TwinOrderBook {
 	pinIdx := make(map[fixedpoint.Value]int)
 	m := make(map[fixedpoint.Value]*TwinOrder)
 	for i, pin := range v {
-		m[pin] = &TwinOrder{}
+		// we use sell price for twin orderbook's price, so we skip the first pin as price
+		if i > 0 {
+			m[pin] = &TwinOrder{}
+		}
 		pinIdx[pin] = i
 	}
 
