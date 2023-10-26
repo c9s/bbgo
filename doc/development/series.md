@@ -25,7 +25,7 @@ type BoolSeries interface {
 }
 ```
 
-Series were used almost everywhere in indicators to return the calculated numeric results, but the use of BoolSeries is quite limited. At this moment, we only use BoolSeries to check if some condition is fullfilled at some timepoint. For example, in `CrossOver` and `CrossUnder` functions if `Last()` returns true, then there might be a cross event happend on the curves at the moment.
+Series were used almost everywhere in indicators to return the calculated numeric results, but the use of BoolSeries is quite limited. At this moment, we only use BoolSeries to check if some condition is fulfilled at some timepoint. For example, in `CrossOver` and `CrossUnder` functions if `Last()` returns true, then there might be a cross event happened on the curves at the moment.
 
 #### Expected Implementation
 
@@ -44,7 +44,7 @@ and if any of the method in the interface not been implemented, this would gener
 
 #### Extended Series
 
-Instead of simple Series interface, we have `types.SeriesExtend` interface that enriches the functionality of `types.Series`. An indicator struct could simply be extended to `types.SeriesExtend` type by embedding anonymous struct `types.SeriesBase`, and instanced by `types.NewSeries()` function. The `types.SeriesExtend` interface binds commonly used functions, such as `Add`, `Reverse`, `Shfit`, `Covariance` and `Entropy`, to the original `types.Series` object. Please check [pkg/types/seriesbase_imp.go](../../pkg/types/seriesbase_imp.go) for the extendable functions.
+Instead of simple Series interface, we have `types.SeriesExtend` interface that enriches the functionality of `types.Series`. An indicator struct could simply be extended to `types.SeriesExtend` type by embedding anonymous struct `types.SeriesBase`, and instanced by `types.NewSeries()` function. The `types.SeriesExtend` interface binds commonly used functions, such as `Add`, `Reverse`, `Shift`, `Covariance` and `Entropy`, to the original `types.Series` object. Please check [pkg/types/seriesbase_imp.go](../../pkg/types/seriesbase_imp.go) for the extendable functions.
 
 Example:
 
