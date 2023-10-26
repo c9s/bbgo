@@ -69,3 +69,6 @@ func Volumes(source KLineSubscription) *PriceStream {
 func HLC3(source KLineSubscription) *PriceStream {
 	return Price(source, types.KLineHLC3Mapper)
 }
+func HL2(source KLineSubscription) *PriceStream {
+	return Price(source, types.KLineHL2Mapper)
+}

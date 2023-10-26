@@ -60,3 +60,7 @@ func MeetingLines(source v2.KLineSubscription) *MeetingLinesStream {
 
 	return s
 }
+
+func (s *MeetingLinesStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
+}

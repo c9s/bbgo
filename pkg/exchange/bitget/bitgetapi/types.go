@@ -14,6 +14,7 @@ const (
 	OrderTypeMarket OrderType = "market"
 )
 
+// OrderSide represents the side of an order: Buy (long) or Sell (short).
 type OrderSide string
 
 const (

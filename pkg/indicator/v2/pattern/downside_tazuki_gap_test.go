@@ -15,7 +15,7 @@ func TestTazukiGap(t *testing.T) {
 	}
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
-	ind := Doji(kLines, 0.01)
+	ind := TazukiGap(kLines)
 
 	for _, candle := range ts {
 		stream.EmitKLineClosed(candle)

@@ -9,9 +9,9 @@ import (
 
 func TestSeparatingLines(t *testing.T) {
 	ts := []types.KLine{
-		{Open: 200, Low: 160, High: 210, Close: 170},
-		{Open: 150, Low: 140, High: 190, Close: 180},
-		{Open: 152, Low: 120, High: 152, Close: 130},
+		{Open: n(200), Low: n(160), High: n(210), Close: n(170)},
+		{Open: n(150), Low: n(140), High: n(190), Close: n(180)},
+		{Open: n(152), Low: n(120), High: n(152), Close: n(130)},
 	}
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
@@ -27,9 +27,9 @@ func TestSeparatingLines(t *testing.T) {
 	}
 
 	ts = []types.KLine{
-		{Open: 50, Low: 40, High: 80, Close: 70},
-		{Open: 100, Low: 70, High: 110, Close: 80},
-		{Open: 102, Low: 102, High: 130, Close: 120},
+		{Open: n(50), Low: n(40), High: n(80), Close: n(70)},
+		{Open: n(100), Low: n(70), High: n(110), Close: n(80)},
+		{Open: n(102), Low: n(102), High: n(130), Close: n(120)},
 	}
 	ind = SeparatingLines(kLines, 0.01)
 

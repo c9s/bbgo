@@ -10,9 +10,10 @@ import (
 func TestThreeWhiteSoldiers(t *testing.T) {
 	ts := []types.KLine{
 		{Open: n(21.12), Low: n(20.85), High: n(21.83), Close: n(21.65)},
-		{Open: n(21.48), Low: n(21.36), High: n(21.36), Close: n(22.20)},
-		{Open: n(21.80), Low: n(21.66), High: n(21.66), Close: n(22.65)},
+		{Open: n(21.48), Low: n(21.36), High: n(22.40), Close: n(22.20)},
+		{Open: n(21.80), Low: n(21.66), High: n(22.80), Close: n(22.65)},
 	}
+
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
 	ind := ThreeWhiteSoldiers(kLines)

@@ -46,3 +46,7 @@ func DarkCloud(source v2.KLineSubscription) *DarkCloudStream {
 
 	return s
 }
+
+func (s *DarkCloudStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
+}

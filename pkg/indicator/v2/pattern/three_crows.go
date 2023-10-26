@@ -37,11 +37,13 @@ func ThreeCrows(source v2.KLineSubscription) *ThreeCrowsStream {
 			three        = source.Last(2)
 			two          = source.Last(1)
 			one          = source.Last(0)
-			isDownTrend  = three.Low > two.Low && two.Low > three.Low
+			isDownTrend  = three.Low > two.Low && two.Low > one.Low
 			isAllBearish = three.Open > three.Close &&
 				two.Open > two.Close && one.Open > one.Close
 			opensWithinPreviousBody = three.Open > two.Open &&
-				two.Open > three.Close && one.Open > two.Open
+				two.Open > three.Close &&
+				two.Open > one.Open &&
+				one.Open > two.Close
 		)
 
 		if isDownTrend && isAllBearish && opensWithinPreviousBody {
@@ -53,4 +55,8 @@ func ThreeCrows(source v2.KLineSubscription) *ThreeCrowsStream {
 	})
 
 	return s
+}
+
+func (s *ThreeCrowsStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
 }

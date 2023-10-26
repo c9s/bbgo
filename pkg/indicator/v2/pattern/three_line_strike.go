@@ -71,3 +71,7 @@ func ThreeLineStrike(source v2.KLineSubscription) *ThreeLineStrikeStream {
 
 	return s
 }
+
+func (s *ThreeLineStrikeStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
+}

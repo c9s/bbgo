@@ -10,8 +10,8 @@ import (
 func TestBelthold(t *testing.T) {
 
 	ts := []types.KLine{
-		{Open: 60, Low: 55, High: 75, Close: 70},
-		{Open: 100, Low: 75, High: 100, Close: 80},
+		{Open: n(60), Low: n(55), High: n(75), Close: n(70)},
+		{Open: n(100), Low: n(75), High: n(100), Close: n(80)},
 	}
 
 	stream := &types.StandardStream{}
@@ -28,8 +28,8 @@ func TestBelthold(t *testing.T) {
 	}
 
 	ts = []types.KLine{
-		{Open: 120, Low: 100, High: 125, Close: 105},
-		{Open: 70, Low: 70, High: 95, Close: 90},
+		{Open: n(120), Low: n(100), High: n(125), Close: n(105)},
+		{Open: n(70), Low: n(70), High: n(95), Close: n(90)},
 	}
 
 	ind = Belthold(kLines)

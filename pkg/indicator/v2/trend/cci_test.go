@@ -1,10 +1,12 @@
-package indicatorv2
+package trend
 
 import (
 	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	v2 "github.com/c9s/bbgo/pkg/indicator/v2"
 )
 
 /*
@@ -23,7 +25,7 @@ func Test_CCI(t *testing.T) {
 		panic(err)
 	}
 	t.Run("random_case", func(t *testing.T) {
-		price := Price(nil, nil)
+		price := v2.Price(nil, nil)
 		cci := CCI(price, 16)
 		for _, value := range input {
 			price.PushAndEmit(value)

@@ -1,4 +1,4 @@
-package indicatorv2
+package momentum
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	v2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -57,7 +58,7 @@ func TestSTOCH2_update(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stream := &types.StandardStream{}
-			kLines := KLines(stream, "", "")
+			kLines := v2.KLines(stream, "", "")
 			kd := Stoch(kLines, tt.window, DPeriod)
 
 			for _, k := range tt.kLines {

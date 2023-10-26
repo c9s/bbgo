@@ -29,6 +29,22 @@ func (f *Float64Series) Length() int {
 	return len(f.Slice)
 }
 
+// CrossOver returns true if the latest series values cross above x
+func (f *Float64Series) CrossOver(curr, x float64) bool {
+	if f.Last(1) < x && curr > x {
+		return true
+	}
+	return false
+}
+
+// CrossDown returns true if the latest series values cross below x
+func (f *Float64Series) CrossUnder(x float64) bool {
+	if f.Last(1) > x && f.Last(0) < x {
+		return true
+	}
+	return false
+}
+
 func (f *Float64Series) Push(x float64) {
 	f.Slice.Push(x)
 }

@@ -1,7 +1,8 @@
-package indicatorv2
+package momentum
 
 import (
 	"github.com/c9s/bbgo/pkg/datatype/floats"
+	v2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -26,15 +27,15 @@ type StochStream struct {
 	window  int
 	dPeriod int
 
-	highPrices, lowPrices *PriceStream
+	highPrices, lowPrices *v2.PriceStream
 
 	updateCallbacks []func(k, d float64)
 }
 
 // Stochastic Oscillator
-func Stoch(source KLineSubscription, window, dPeriod int) *StochStream {
-	highPrices := HighPrices(source)
-	lowPrices := LowPrices(source)
+func Stoch(source v2.KLineSubscription, window, dPeriod int) *StochStream {
+	highPrices := v2.HighPrices(source)
+	lowPrices := v2.LowPrices(source)
 
 	s := &StochStream{
 		window:     window,

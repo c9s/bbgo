@@ -13,9 +13,10 @@ func TestDojiStar(t *testing.T) {
 		{Open: n(22.20), Low: n(21.87), High: n(22.40), Close: n(22.22)},
 		{Open: n(21.60), Low: n(19.30), High: n(22.05), Close: n(19.45)},
 	}
+
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
-	ind := DojiStar(kLines, 0.01)
+	ind := DojiStar(kLines, Bearish, 0.05)
 
 	for _, candle := range ts {
 		stream.EmitKLineClosed(candle)
@@ -31,7 +32,9 @@ func TestDojiStar(t *testing.T) {
 		{Open: n(20.30), Low: n(20.10), High: n(20.45), Close: n(20.30)},
 		{Open: n(20.70), Low: n(20.40), High: n(21.82), Close: n(21.58)},
 	}
-	ind = DojiStar(kLines, 0.01)
+	stream = &types.StandardStream{}
+	kLines = v2.KLines(stream, "", "")
+	ind = DojiStar(kLines, Bullish, 0.01)
 
 	for _, candle := range ts {
 		stream.EmitKLineClosed(candle)

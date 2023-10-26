@@ -30,7 +30,7 @@ func PiercingLine(source v2.KLineSubscription) *PiercingLineStream {
 			two             = source.Last(1)
 			one             = source.Last(0)
 			firstMidpoint   = (two.Open + two.Close) / 2
-			isDowntrend     = one.Close < two.Low
+			isDowntrend     = one.Low < two.Low
 			isFirstBearish  = two.Close < two.Open
 			isSecondBullish = one.Close > one.Open
 			isPiercingLine  = two.Low > one.Open &&
@@ -45,4 +45,8 @@ func PiercingLine(source v2.KLineSubscription) *PiercingLineStream {
 	})
 
 	return s
+}
+
+func (s *PiercingLineStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
 }

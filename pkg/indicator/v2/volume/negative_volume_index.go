@@ -7,7 +7,7 @@ import (
 )
 
 // Starting value for NVI.
-const NVI_STARTING_VALUE = 1000
+var NVI_STARTING_VALUE = fixedpoint.NewFromInt(1000)
 
 // Negative Volume Index (NVI)
 type NVIStream struct {
@@ -29,16 +29,18 @@ func NegativeVolumeIndex(source v2.KLineSubscription) *NVIStream {
 	source.AddSubscriber(func(v types.KLine) {
 		var nvi = fixedpoint.Zero
 
-		if s.Slice.Length() == 0 {
+		if s.Length() == 0 {
 			nvi = NVI_STARTING_VALUE
 		} else {
-			closing := source.Last(0).Close
-			prevClose := source.Last(1).Close
-			lastNVI := fixedpoint.NewFromFloat(s.Slice.Last(0))
-			if source.Last(1).Volume < source.Last(0).Volume {
-				nvi = lastNVI
+			var (
+				prev    = source.Last(1)
+				prevNVI = fixedpoint.NewFromFloat(s.Slice.Last(0))
+			)
+			if v.Volume > prev.Volume {
+				nvi = prevNVI
 			} else {
-				nvi += ((closing - prevClose) / prevClose) * lastNVI
+				inner := v.Close.Sub(prev.Close).Div(prev.Close)
+				nvi = prevNVI.Add(inner.Mul(prevNVI))
 			}
 		}
 
@@ -46,4 +48,8 @@ func NegativeVolumeIndex(source v2.KLineSubscription) *NVIStream {
 	})
 
 	return s
+}
+
+func (s *NVIStream) Truncate() {
+	s.Slice = s.Slice.Truncate(5000)
 }

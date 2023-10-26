@@ -54,3 +54,7 @@ func Harami(source v2.KLineSubscription) *HaramiStream {
 
 	return s
 }
+
+func (s *HaramiStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
+}

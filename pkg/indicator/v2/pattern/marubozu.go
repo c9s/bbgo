@@ -45,3 +45,7 @@ func Marubozu(source v2.KLineSubscription, maxDiff float64) *MarubozuStream {
 
 	return s
 }
+
+func (s *MarubozuStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
+}

@@ -57,3 +57,7 @@ func Belthold(source v2.KLineSubscription) *BeltholdStream {
 
 	return s
 }
+
+func (s *BeltholdStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
+}

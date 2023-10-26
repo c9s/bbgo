@@ -12,6 +12,7 @@ func TestPiercingLine(t *testing.T) {
 		{Open: n(42.70), Low: n(41.45), High: n(42.82), Close: n(41.60)},
 		{Open: n(41.33), Low: n(41.15), High: n(42.50), Close: n(42.34)},
 	}
+
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
 	ind := PiercingLine(kLines)
@@ -19,9 +20,9 @@ func TestPiercingLine(t *testing.T) {
 	for _, candle := range ts {
 		stream.EmitKLineClosed(candle)
 	}
-	expectedBear := -1.0
+	expectedBull := 1.0
 
-	if ind.Last(0) != expectedBear {
-		t.Errorf("TestPiercingLine Bear unexpected result: got %v want %v", ind.Last(0), expectedBear)
+	if ind.Last(0) != expectedBull {
+		t.Errorf("TestPiercingLine Bull unexpected result: got %v want %v", ind.Last(0), expectedBull)
 	}
 }

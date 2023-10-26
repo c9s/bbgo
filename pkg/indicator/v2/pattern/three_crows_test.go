@@ -3,8 +3,6 @@ package pattern
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
 	v2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -24,7 +22,6 @@ func TestThreeCrows(t *testing.T) {
 	}
 	expectedBear := -1.0
 
-	spew.Dump(ind)
 	if ind.Last(0) != expectedBear {
 		t.Errorf("TestThreeCrows Bear unexpected result: got %v want %v", ind.Last(0), expectedBear)
 	}

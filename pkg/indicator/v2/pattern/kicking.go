@@ -68,3 +68,7 @@ func Kicking(source v2.KLineSubscription, maxDiff float64) *KickingStream {
 
 	return s
 }
+
+func (s *KickingStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
+}

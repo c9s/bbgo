@@ -14,7 +14,7 @@ type TazukiGapStream struct {
 func TazukiGap(source v2.KLineSubscription) *TazukiGapStream {
 	s := &TazukiGapStream{
 		Float64Series: types.NewFloat64Series(),
-		window:        2,
+		window:        3,
 	}
 
 	source.AddSubscriber(func(kLine types.KLine) {
@@ -49,4 +49,8 @@ func TazukiGap(source v2.KLineSubscription) *TazukiGapStream {
 	})
 
 	return s
+}
+
+func (s *TazukiGapStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
 }

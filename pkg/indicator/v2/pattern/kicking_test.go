@@ -9,8 +9,8 @@ import (
 
 func TestKicking(t *testing.T) {
 	ts := []types.KLine{
-		{Open: 100, Low: 100, High: 120, Close: 120},
-		{Open: 90, Low: 70, High: 90, Close: 70},
+		{Open: n(100), Low: n(100), High: n(120), Close: n(120)},
+		{Open: n(90), Low: n(70), High: n(90), Close: n(70)},
 	}
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
@@ -26,8 +26,8 @@ func TestKicking(t *testing.T) {
 	}
 
 	ts = []types.KLine{
-		{Open: 90, Low: 70, High: 90, Close: 70},
-		{Open: 100, Low: 100, High: 120, Close: 120},
+		{Open: n(90), Low: n(70), High: n(90), Close: n(70)},
+		{Open: n(100), Low: n(100), High: n(120), Close: n(120)},
 	}
 	ind = Kicking(kLines, 0.01)
 

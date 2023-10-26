@@ -9,9 +9,9 @@ import (
 
 func TestMeetingLines(t *testing.T) {
 	ts := []types.KLine{
-		{Open: 85, Low: 85, High: 100, Close: 95},
-		{Open: 95, Low: 90, High: 120, Close: 115},
-		{Open: 130, Low: 105, High: 140, Close: 110},
+		{Open: n(85), Low: n(85), High: n(100), Close: n(95)},
+		{Open: n(95), Low: n(90), High: n(120), Close: n(115)},
+		{Open: n(130), Low: n(105), High: n(140), Close: n(110)},
 	}
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
@@ -27,9 +27,9 @@ func TestMeetingLines(t *testing.T) {
 	}
 
 	ts = []types.KLine{
-		{Open: 200, Low: 180, High: 210, Close: 190},
-		{Open: 180, Low: 140, High: 195, Close: 150},
-		{Open: 110, Low: 105, High: 160, Close: 155},
+		{Open: n(200), Low: n(180), High: n(210), Close: n(190)},
+		{Open: n(180), Low: n(140), High: n(195), Close: n(150)},
+		{Open: n(110), Low: n(105), High: n(160), Close: n(155)},
 	}
 	ind = MeetingLines(kLines)
 

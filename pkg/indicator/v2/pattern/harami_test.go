@@ -9,8 +9,8 @@ import (
 
 func TestHarami(t *testing.T) {
 	ts := []types.KLine{
-		{Open: 100, Low: 95, High: 125, Close: 120},
-		{Open: 110, Low: 100, High: 115, Close: 105},
+		{Open: n(100), Low: n(95), High: n(125), Close: n(120)},
+		{Open: n(110), Low: n(100), High: n(115), Close: n(105)},
 	}
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
@@ -26,8 +26,8 @@ func TestHarami(t *testing.T) {
 	}
 
 	ts = []types.KLine{
-		{Open: 120, Low: 95, High: 125, Close: 100},
-		{Open: 105, Low: 100, High: 115, Close: 110},
+		{Open: n(120), Low: n(95), High: n(125), Close: n(100)},
+		{Open: n(105), Low: n(100), High: n(115), Close: n(110)},
 	}
 	ind = Harami(kLines)
 

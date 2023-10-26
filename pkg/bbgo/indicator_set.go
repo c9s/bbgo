@@ -6,6 +6,7 @@ import (
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/indicator/v2/momentum"
 	"github.com/c9s/bbgo/pkg/indicator/v2/trend"
+	"github.com/c9s/bbgo/pkg/indicator/v2/volatility"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -91,18 +92,18 @@ func (i *IndicatorSet) STOCH(iw types.IntervalWindow, dPeriod int) *indicatorv2.
 	return indicatorv2.Stoch(i.KLines(iw.Interval), iw.Window, dPeriod)
 }
 
-func (i *IndicatorSet) BOLL(iw types.IntervalWindow, k float64) *indicatorv2.BOLLStream {
-	return indicatorv2.BOLL(i.CLOSE(iw.Interval), iw.Window, k)
+func (i *IndicatorSet) BOLL(iw types.IntervalWindow, k float64) *volatility.BOLLStream {
+	return volatility.BOLL(i.CLOSE(iw.Interval), iw.Window, k)
 }
 
 func (i *IndicatorSet) MACD(interval types.Interval, shortWindow, longWindow, signalWindow int) *trend.MACDStream {
 	return trend.MACD2(i.CLOSE(interval), shortWindow, longWindow, signalWindow)
 }
 
-func (i *IndicatorSet) ATR(interval types.Interval, window int) *trend.ATRStream {
-	return trend.ATR2(i.KLines(interval), window)
+func (i *IndicatorSet) ATR(interval types.Interval, window int) *volatility.ATRStream {
+	return volatility.ATR2(i.KLines(interval), window)
 }
 
-func (i *IndicatorSet) ATRP(interval types.Interval, window int) *trend.ATRPStream {
-	return trend.ATRP2(i.KLines(interval), window)
+func (i *IndicatorSet) ATRP(interval types.Interval, window int) *volatility.ATRPStream {
+	return volatility.ATRP2(i.KLines(interval), window)
 }

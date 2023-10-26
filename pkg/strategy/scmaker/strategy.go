@@ -13,6 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	. "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/indicator/v2/trend"
+	"github.com/c9s/bbgo/pkg/indicator/v2/volatility"
 	"github.com/c9s/bbgo/pkg/risk/riskcontrol"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
@@ -76,7 +77,7 @@ type Strategy struct {
 
 	// indicators
 	ewma      *trend.EWMAStream
-	boll      *BOLLStream
+	boll      *volatility.BOLLStream
 	intensity *IntensityStream
 
 	positionRiskControl     *riskcontrol.PositionRiskControl
@@ -202,7 +203,7 @@ func (s *Strategy) initializeIntensityIndicator(session *bbgo.ExchangeSession) {
 func (s *Strategy) initializePriceRangeBollinger(session *bbgo.ExchangeSession) {
 	kLines := KLines(session.MarketDataStream, s.Symbol, s.PriceRangeBollinger.Interval)
 	closePrices := ClosePrices(kLines)
-	s.boll = BOLL(closePrices, s.PriceRangeBollinger.Window, s.PriceRangeBollinger.K)
+	s.boll = volatility.BOLL(closePrices, s.PriceRangeBollinger.Window, s.PriceRangeBollinger.K)
 
 	s.preloadKLines(kLines, session, s.Symbol, s.PriceRangeBollinger.Interval)
 }

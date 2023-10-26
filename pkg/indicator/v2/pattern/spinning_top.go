@@ -10,29 +10,35 @@ type SpinningTopStream struct {
 	*types.Float64Series
 }
 
-func SpinningTop(source v2.KLineSubscription) *SpinningTopStream {
+func SpinningTop(source v2.KLineSubscription, direction Direction) *SpinningTopStream {
 	s := &SpinningTopStream{
 		Float64Series: types.NewFloat64Series(),
 	}
 
 	source.AddSubscriber(func(kLine types.KLine) {
 		var (
-			output            = Neutral
-			one               = source.Last(0)
-			bodyLength        = fixedpoint.Abs(one.Close - one.Open)
-			upperShadowLength = fixedpoint.Abs(one.High - one.Close)
-			lowerShadowLength = fixedpoint.Abs(one.Open - one.Low)
-			isSpinningTop     = bodyLength < upperShadowLength &&
-				bodyLength < lowerShadowLength
+			output     = Neutral
+			one        = source.Last(0)
+			bodyLength = fixedpoint.Abs(one.Close - one.Open)
 		)
+		if direction == Bullish {
+			var (
+				upperShadowLength = fixedpoint.Abs(one.High - one.Close)
+				lowerShadowLength = fixedpoint.Abs(one.Open - one.Low)
+				isSpinningTop     = bodyLength < upperShadowLength &&
+					bodyLength < lowerShadowLength
+			)
 
-		if isSpinningTop {
-			output = Bull
+			if isSpinningTop {
+				output = Bull
+			}
 		} else {
-			upperShadowLength = fixedpoint.Abs(one.High - one.Open)
-			lowerShadowLength = fixedpoint.Abs(one.High - one.Low)
-			var isBearishSpinningTop = bodyLength < upperShadowLength &&
-				bodyLength < lowerShadowLength
+			var (
+				upperShadowLength    = fixedpoint.Abs(one.High - one.Open)
+				lowerShadowLength    = fixedpoint.Abs(one.High - one.Low)
+				isBearishSpinningTop = bodyLength < upperShadowLength &&
+					bodyLength < lowerShadowLength
+			)
 			if isBearishSpinningTop {
 				output = Bear
 			}
@@ -43,4 +49,8 @@ func SpinningTop(source v2.KLineSubscription) *SpinningTopStream {
 	})
 
 	return s
+}
+
+func (s *SpinningTopStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
 }

@@ -14,7 +14,7 @@ func TestHaramiCross(t *testing.T) {
 	}
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
-	ind := HaramiCross(kLines, 0.01)
+	ind := HaramiCross(kLines, Bearish, 0.01)
 
 	for _, candle := range ts {
 		stream.EmitKLineClosed(candle)
@@ -29,7 +29,8 @@ func TestHaramiCross(t *testing.T) {
 		{Open: n(25.13), Low: n(21.7), High: n(25.80), Close: n(22.14)},
 		{Open: n(23.45), Low: n(23.07), High: n(24.59), Close: n(23.45)},
 	}
-	ind = HaramiCross(kLines, 0.01)
+
+	ind = HaramiCross(kLines, Bullish, 0.01)
 
 	for _, candle := range ts {
 		stream.EmitKLineClosed(candle)

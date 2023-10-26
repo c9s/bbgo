@@ -55,3 +55,7 @@ func Engulfing(source v2.KLineSubscription) *EngulfingStream {
 
 	return s
 }
+
+func (s *EngulfingStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
+}

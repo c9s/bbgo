@@ -19,6 +19,7 @@ func AbondonedBaby(source v2.KLineSubscription) *AbondonedBabyStream {
 	}
 
 	source.AddSubscriber(func(kLine types.KLine) {
+
 		var (
 			i      = source.Length()
 			output = Neutral
@@ -53,9 +54,13 @@ func AbondonedBaby(source v2.KLineSubscription) *AbondonedBabyStream {
 			}
 		}
 
-		s.PushAndEmit(output)
+		s.Float64Series.PushAndEmit(output)
 
 	})
 
 	return s
+}
+
+func (s *AbondonedBabyStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
 }

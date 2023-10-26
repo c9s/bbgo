@@ -9,9 +9,9 @@ import (
 
 func TestAbandonedBaby(t *testing.T) {
 	ts := []types.KLine{
-		{Open: 90, Low: 85, High: 105, Close: 100},
-		{Open: 125, Low: 120, High: 135, Close: 130},
-		{Open: 110, Low: 92, High: 115, Close: 95},
+		{Open: n(90), Low: n(85), High: n(105), Close: n(100)},
+		{Open: n(125), Low: n(120), High: n(135), Close: n(130)},
+		{Open: n(110), Low: n(92), High: n(115), Close: n(95)},
 	}
 
 	stream := &types.StandardStream{}
@@ -24,6 +24,6 @@ func TestAbandonedBaby(t *testing.T) {
 	expectedBear := -1.0
 
 	if ind.Last(0) != expectedBear {
-		t.Errorf("TestAbandonedBaby Bear unexpected result: got %v want %v", ind, expectedBear)
+		t.Errorf("TestAbandonedBaby Bear unexpected result: got %v want %v", ind.Last(0), expectedBear)
 	}
 }

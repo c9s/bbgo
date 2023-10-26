@@ -9,7 +9,7 @@ import (
 
 func TestMarubozu(t *testing.T) {
 	ts := []types.KLine{
-		{Open: 200, Low: 100, High: 200, Close: 100},
+		{Open: n(200), Low: n(100), High: n(200), Close: n(100)},
 	}
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
@@ -25,7 +25,7 @@ func TestMarubozu(t *testing.T) {
 	}
 
 	ts = []types.KLine{
-		{Open: 100, Low: 100, High: 200, Close: 200},
+		{Open: n(100), Low: n(100), High: n(200), Close: n(200)},
 	}
 	ind = Marubozu(kLines, 0.01)
 

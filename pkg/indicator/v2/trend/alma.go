@@ -4,9 +4,8 @@
 package trend
 
 import (
-	"github.com/thecolngroup/gou/dec"
+	"math"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	v2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -23,9 +22,9 @@ type ALMAStream struct {
 	// embedded struct
 	*types.Float64Series
 
-	sample *types.Float64Series
-	offset fixedpoint.Value
-	sigma  fixedpoint.Value
+	sample []float64
+	offset float64
+	sigma  float64
 	window int
 }
 
@@ -33,16 +32,19 @@ type ALMAStream struct {
 // Ported from https://www.tradingview.com/pine-script-reference/#fun_alma
 // NewALMA creates a new ALMA indicator with default parameters.
 func ALMA(source types.Float64Source, window int) *ALMAStream {
-	return ALMAWithSigma(window, DefaultALMAOffset, DefaultALMASigma)
+	return ALMAWithSigma(source, window, DefaultALMAOffset, DefaultALMASigma)
 }
 
 // NewALMAWithSigma creates a new ALMA indicator with the given offset and sigma.
-func ALMAWithSigma(window int, offset, sigma float64) *ALMAStream {
-	return &ALMAStream{
-		window: window,
-		offset: fixedpoint.NewFromFloat(offset),
-		sigma:  fixedpoint.NewFromFloat(sigma),
+func ALMAWithSigma(source types.Float64Source, window int, offset, sigma float64) *ALMAStream {
+	s := &ALMAStream{
+		Float64Series: types.NewFloat64Series(),
+		window:        window,
+		offset:        offset,
+		sigma:         sigma,
 	}
+	s.Bind(source, s)
+	return s
 }
 
 func (s *ALMAStream) Calculate(v float64) float64 {
@@ -53,22 +55,23 @@ func (s *ALMAStream) Calculate(v float64) float64 {
 		return v
 	}
 	var (
-		length    = fixedpoint.NewFromInt(int64(s.window))
-		two       = fixedpoint.Two
-		norm, sum fixedpoint.Value
-		offset    = s.offset.Mul(length.Sub(fixedpoint.One))
-		m         = offset.Floor()
-		sig       = length.Div(s.sigma)
+		length    = float64(s.window)
+		norm, sum float64
+		offset    = s.offset * (length - 1)
+		m         = math.Floor(offset)
+		sig       = length / s.sigma
 	)
-	for i := 0; i < s.sample.Length(); i++ {
-		index := fixedpoint.NewFromInt(int64(i))
-		pow := index.Sub(m).Pow(two).Div(sig.Pow(two).Mul(two))
-		weight := fixedpoint.Exp(dec.New(-1).Mul(pow))
-		norm = norm.Add(weight)
-		sum = fixedpoint.NewFromFloat(s.sample.Last(i))
-		sum = sum.Mul(weight).Add(sum)
+	for i := 0; i < len(s.sample); i++ {
+		pow := math.Pow(float64(i)-m, 2) / (math.Pow(sig, 2) * 2)
+		weight := math.Exp(-1 * pow)
+		norm += weight
+		sum += s.sample[i] * weight
 	}
-	ma := sum.Div(norm)
+	ma := sum / norm
 
-	return ma.Float64()
+	return ma
+}
+
+func (s *ALMAStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }

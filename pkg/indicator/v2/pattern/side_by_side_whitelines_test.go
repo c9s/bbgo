@@ -9,10 +9,10 @@ import (
 
 func TestSideBySideWhiteLines(t *testing.T) {
 	ts := []types.KLine{
-		{Open: 130, Low: 110, High: 140, Close: 120},
-		{Open: 110, Low: 85, High: 115, Close: 90},
-		{Open: 50, Low: 45, High: 75, Close: 70},
-		{Open: 50, Low: 42, High: 77, Close: 68},
+		{Open: n(130), Low: n(110), High: n(140), Close: n(120)},
+		{Open: n(110), Low: n(85), High: n(115), Close: n(90)},
+		{Open: n(50), Low: n(45), High: n(75), Close: n(70)},
+		{Open: n(50), Low: n(42), High: n(77), Close: n(68)},
 	}
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
@@ -28,10 +28,10 @@ func TestSideBySideWhiteLines(t *testing.T) {
 	}
 
 	ts = []types.KLine{
-		{Open: 70, Low: 60, High: 90, Close: 80},
-		{Open: 100, Low: 90, High: 130, Close: 120},
-		{Open: 150, Low: 140, High: 210, Close: 185},
-		{Open: 150, Low: 135, High: 200, Close: 190},
+		{Open: n(70), Low: n(60), High: n(90), Close: n(80)},
+		{Open: n(100), Low: n(90), High: n(130), Close: n(120)},
+		{Open: n(150), Low: n(140), High: n(210), Close: n(185)},
+		{Open: n(150), Low: n(135), High: n(200), Close: n(190)},
 	}
 	ind = SideBySideWhiteLines(kLines, 0.01)
 

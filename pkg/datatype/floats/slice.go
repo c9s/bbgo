@@ -36,6 +36,18 @@ func (s Slice) Max() float64 {
 	return floats.Max(s)
 }
 
+func (s Slice) MaxIndex() int {
+	maxIdx := 0
+	maxVal := s[0]
+	for i, val := range s {
+		if val > maxVal {
+			maxVal = val
+			maxIdx = i
+		}
+	}
+	return maxIdx
+}
+
 func (s Slice) Min() float64 {
 	return floats.Min(s)
 }

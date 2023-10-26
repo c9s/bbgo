@@ -13,7 +13,7 @@ func TestSpinningTop(t *testing.T) {
 	}
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
-	ind := SpinningTop(kLines)
+	ind := SpinningTop(kLines, Bearish)
 
 	for _, candle := range ts {
 		stream.EmitKLineClosed(candle)
@@ -27,7 +27,7 @@ func TestSpinningTop(t *testing.T) {
 	ts = []types.KLine{
 		{Open: n(20.62), Low: n(20.34), High: n(20.75), Close: n(20.50)},
 	}
-	ind = SpinningTop(kLines)
+	ind = SpinningTop(kLines, Bullish)
 
 	for _, candle := range ts {
 		stream.EmitKLineClosed(candle)

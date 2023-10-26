@@ -1,4 +1,4 @@
-package indicatorv2
+package trend
 
 import (
 	"math"

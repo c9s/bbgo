@@ -40,12 +40,18 @@ func ThreeWhiteSoldiers(source v2.KLineSubscription) *ThreeWhiteSoldiersStream {
 				two.High > one.Open &&
 				one.Open < two.Close
 		)
+
 		if isUpTrend && isAllBullish && doesOpenWithinPreviousBody {
 			output = Bull
 		}
+
 		s.PushAndEmit(output)
 
 	})
 
 	return s
+}
+
+func (s *ThreeWhiteSoldiersStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
 }

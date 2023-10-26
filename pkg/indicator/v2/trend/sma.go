@@ -4,7 +4,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const MaxNumOfSMA = 5_000
+const MaxNumOfMA = 5_000
 
 type SMAStream struct {
 	*types.Float64Series
@@ -29,5 +29,5 @@ func (s *SMAStream) Calculate(v float64) float64 {
 }
 
 func (s *SMAStream) Truncate() {
-	s.Slice = s.Slice.Truncate(MaxNumOfSMA)
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }

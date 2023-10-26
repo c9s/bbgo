@@ -9,8 +9,8 @@ import (
 
 func TestEngulfing(t *testing.T) {
 	ts := []types.KLine{
-		{Open: 80, Low: 75, High: 95, Close: 90},
-		{Open: 100, Low: 65, High: 105, Close: 70},
+		{Open: n(80), Low: n(75), High: n(95), Close: n(90)},
+		{Open: n(100), Low: n(65), High: n(105), Close: n(70)},
 	}
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
@@ -26,8 +26,8 @@ func TestEngulfing(t *testing.T) {
 	}
 
 	ts = []types.KLine{
-		{Open: 90, Low: 75, High: 95, Close: 80},
-		{Open: 70, Low: 65, High: 105, Close: 100},
+		{Open: n(90), Low: n(75), High: n(95), Close: n(80)},
+		{Open: n(70), Low: n(65), High: n(105), Close: n(100)},
 	}
 	ind = Engulfing(kLines)
 

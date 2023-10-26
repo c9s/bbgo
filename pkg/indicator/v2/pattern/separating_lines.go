@@ -65,3 +65,7 @@ func SeparatingLines(source v2.KLineSubscription, maxDiff float64) *SeparatingLi
 
 	return s
 }
+
+func (s *SeparatingLinesStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
+}

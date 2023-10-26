@@ -37,9 +37,9 @@ func DojiLongLegged(source v2.KLineSubscription) *DojiLongLeggedStream {
 		if four.Close > four.Open {
 			if three.Close > three.Open {
 				if two.Close > two.Open {
-					if fixedpoint.Abs((one.Close-one.Open)/one.Open) < threshold {
-						if fixedpoint.Abs((one.High-one.Open)/one.Open) > limit {
-							if fixedpoint.Abs((one.Close-one.Low)/one.Low) > limit {
+					if fixedpoint.Abs(one.Close.Sub(one.Open).Div(one.Open)) < threshold {
+						if fixedpoint.Abs(one.High.Sub(one.Open).Div(one.Open)) > limit {
+							if fixedpoint.Abs(one.Close.Sub(one.Low).Div(one.Low)) > limit {
 								output = Bear
 							}
 						}
@@ -52,9 +52,9 @@ func DojiLongLegged(source v2.KLineSubscription) *DojiLongLeggedStream {
 		if four.Close < four.Open {
 			if three.Close < three.Open {
 				if two.Close < two.Open {
-					if fixedpoint.Abs((one.Open-one.Close)/one.Close) < threshold {
-						if fixedpoint.Abs((one.Low-one.Close)/one.Close) > limit {
-							if fixedpoint.Abs((one.Open-one.High)/one.High) > limit {
+					if fixedpoint.Abs(one.Open.Sub(one.Close).Div(one.Close)) < threshold {
+						if fixedpoint.Abs(one.Low.Sub(one.Close).Div(one.Close)) > limit {
+							if fixedpoint.Abs(one.Open.Sub(one.High).Div(one.High)) > limit {
 								output = Bull
 							}
 						}
@@ -68,4 +68,8 @@ func DojiLongLegged(source v2.KLineSubscription) *DojiLongLeggedStream {
 	})
 
 	return s
+}
+
+func (s *DojiLongLeggedStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
 }

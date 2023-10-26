@@ -9,10 +9,10 @@ import (
 
 func TestDojiLongLegged(t *testing.T) {
 	ts := []types.KLine{
-		{Open: 85, Low: 80, High: 95, Close: 90},
-		{Open: 95, Low: 90, High: 105, Close: 100},
-		{Open: 105, Low: 100, High: 115, Close: 110},
-		{Open: 170, Low: 120, High: 210, Close: 160},
+		{Open: n(85), Low: n(80), High: n(95), Close: n(90)},
+		{Open: n(95), Low: n(90), High: n(105), Close: n(100)},
+		{Open: n(105), Low: n(100), High: n(115), Close: n(110)},
+		{Open: n(170), Low: n(120), High: n(210), Close: n(160)},
 	}
 
 	stream := &types.StandardStream{}
@@ -29,10 +29,10 @@ func TestDojiLongLegged(t *testing.T) {
 	}
 
 	ts = []types.KLine{
-		{Open: 90, Low: 80, High: 95, Close: 85},
-		{Open: 100, Low: 90, High: 105, Close: 95},
-		{Open: 110, Low: 100, High: 115, Close: 105},
-		{Open: 160, Low: 120, High: 210, Close: 170},
+		{Open: n(90), Low: n(80), High: n(95), Close: n(85)},
+		{Open: n(100), Low: n(90), High: n(105), Close: n(95)},
+		{Open: n(110), Low: n(100), High: n(115), Close: n(105)},
+		{Open: n(160), Low: n(120), High: n(210), Close: n(170)},
 	}
 	ind = DojiLongLegged(kLines)
 

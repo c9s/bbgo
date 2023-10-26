@@ -23,7 +23,7 @@ func TestALMA(t *testing.T) {
 			name:       "Valid sample",
 			giveV:      []float64{10, 89, 20, 43, 44, 33, 19},
 			giveLength: 3,
-			want:       32.680479063242394,
+			want:       32.68047906324239,
 		},
 		{
 			name:       "0 length window",

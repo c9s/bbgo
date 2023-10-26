@@ -78,3 +78,7 @@ func SideBySideWhiteLines(source v2.KLineSubscription, maxDiff float64) *SideByS
 
 	return s
 }
+
+func (s *SideBySideWhiteLinesStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
+}

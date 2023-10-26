@@ -9,11 +9,11 @@ import (
 
 func TestBreakAway(t *testing.T) {
 	ts := []types.KLine{
-		{Open: 70, Low: 60, High: 85, Close: 80},
-		{Open: 115, Low: 110, High: 125, Close: 120},
-		{Open: 120, Low: 115, High: 130, Close: 125},
-		{Open: 125, Low: 120, High: 135, Close: 130},
-		{Open: 125, Low: 95, High: 130, Close: 100},
+		{Open: n(70), Low: n(60), High: n(85), Close: n(80)},
+		{Open: n(115), Low: n(110), High: n(125), Close: n(120)},
+		{Open: n(120), Low: n(115), High: n(130), Close: n(125)},
+		{Open: n(125), Low: n(120), High: n(135), Close: n(130)},
+		{Open: n(125), Low: n(95), High: n(130), Close: n(100)},
 	}
 
 	stream := &types.StandardStream{}
@@ -30,11 +30,11 @@ func TestBreakAway(t *testing.T) {
 	}
 
 	ts = []types.KLine{
-		{Open: 130, Low: 115, High: 135, Close: 120},
-		{Open: 100, Low: 85, High: 105, Close: 90},
-		{Open: 95, Low: 80, High: 100, Close: 85},
-		{Open: 90, Low: 75, High: 95, Close: 80},
-		{Open: 85, Low: 80, High: 115, Close: 110},
+		{Open: n(130), Low: n(115), High: n(135), Close: n(120)},
+		{Open: n(100), Low: n(85), High: n(105), Close: n(90)},
+		{Open: n(95), Low: n(80), High: n(100), Close: n(85)},
+		{Open: n(90), Low: n(75), High: n(95), Close: n(80)},
+		{Open: n(85), Low: n(80), High: n(115), Close: n(110)},
 	}
 	ind = BreakAway(kLines)
 

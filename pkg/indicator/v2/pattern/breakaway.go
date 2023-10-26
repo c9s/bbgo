@@ -60,3 +60,7 @@ func BreakAway(source v2.KLineSubscription) *BreakAwayStream {
 
 	return s
 }
+
+func (s *BreakAwayStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
+}

@@ -26,16 +26,23 @@ func AccumulationDistribution(source v2.KLineSubscription) *AccumulationDistribu
 		var (
 			i      = s.Slice.Length()
 			output = fixedpoint.NewFromInt(0)
+			cl     = v.Close.Sub(v.Low)
+			hc     = v.High.Sub(v.Close)
+			hl     = v.High.Sub(v.Low)
 		)
 
 		if i > 0 {
 			output = fixedpoint.NewFromFloat(s.Slice.Last(0))
 		}
 
-		output += v.Volume * ((v.Close - v.Low) - (v.High-v.Close)/(v.High-v.Low))
+		output = output.Add(v.Volume.Mul(cl.Sub(hc).Div(hl)))
 
 		s.PushAndEmit(output.Float64())
 	})
 
 	return s
+}
+
+func (s *AccumulationDistributionStream) Truncate() {
+	s.Slice = s.Slice.Truncate(5000)
 }

@@ -8,38 +8,33 @@ import (
 
 type DojiGraveStoneStream struct {
 	*types.Float64Series
-
-	window int
 }
 
-func DojiGraveStone(source v2.KLineSubscription) *DojiGraveStoneStream {
+func DojiGraveStone(source v2.KLineSubscription, maxDiff float64) *DojiGraveStoneStream {
 	s := &DojiGraveStoneStream{
 		Float64Series: types.NewFloat64Series(),
-		window:        2,
 	}
 
 	source.AddSubscriber(func(kLine types.KLine) {
 		var (
-			i      = source.Length()
-			output = Neutral
-		)
-		if i < s.window {
-			s.PushAndEmit(output)
-			return
-		}
-		var (
-			one            = source.Last(0)
-			openEqualClose = fixedpoint.ApproxEqual(one.Open, one.Close, 0.001)
-			highEqualsOpen = fixedpoint.ApproxEqual(one.Open, one.High, 0.001)
-			lowEqualsClose = fixedpoint.ApproxEqual(one.Close, one.Low, 0.001)
+			output         = Neutral
+			one            = kLine
+			openEqualClose = fixedpoint.ApproxEqual(one.Open, one.Close, maxDiff)
+			highEqualsOpen = fixedpoint.ApproxEqual(one.Open, one.High, maxDiff)
+			lowEqualsClose = fixedpoint.ApproxEqual(one.Close, one.Low, maxDiff)
 		)
 
 		if openEqualClose && lowEqualsClose && !highEqualsOpen {
 			output = Bear
 		}
+
 		s.PushAndEmit(output)
 
 	})
 
 	return s
+}
+
+func (s *DojiGraveStoneStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfPattern)
 }

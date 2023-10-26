@@ -9,10 +9,10 @@ import (
 
 func TestThreeLineStrike(t *testing.T) {
 	ts := []types.KLine{
-		{Open: 98, Low: 77, High: 100, Close: 80},
-		{Open: 90, Low: 68, High: 95, Close: 73},
-		{Open: 82, Low: 65, High: 86, Close: 67},
-		{Open: 62, Low: 59, High: 103, Close: 101},
+		{Open: n(98), Low: n(77), High: n(100), Close: n(80)},
+		{Open: n(90), Low: n(68), High: n(95), Close: n(73)},
+		{Open: n(82), Low: n(65), High: n(86), Close: n(67)},
+		{Open: n(62), Low: n(59), High: n(103), Close: n(101)},
 	}
 	stream := &types.StandardStream{}
 	kLines := v2.KLines(stream, "", "")
@@ -28,10 +28,10 @@ func TestThreeLineStrike(t *testing.T) {
 	}
 
 	ts = []types.KLine{
-		{Open: 70, Low: 60, High: 100, Close: 90},
-		{Open: 80, Low: 75, High: 110, Close: 105},
-		{Open: 95, Low: 93, High: 120, Close: 115},
-		{Open: 125, Low: 50, High: 130, Close: 55},
+		{Open: n(70), Low: n(60), High: n(100), Close: n(90)},
+		{Open: n(80), Low: n(75), High: n(110), Close: n(105)},
+		{Open: n(95), Low: n(93), High: n(120), Close: n(115)},
+		{Open: n(125), Low: n(50), High: n(130), Close: n(55)},
 	}
 	ind = ThreeLineStrike(kLines)
 

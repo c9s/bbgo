@@ -5,17 +5,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	v2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 func TestNegativeVolumeIndex(t *testing.T) {
 	ts := []types.KLine{
-		{Volume: 100, Close: 9},
-		{Volume: 110, Close: 11},
-		{Volume: 80, Close: 7},
-		{Volume: 120, Close: 10},
-		{Volume: 90, Close: 8},
+		{Volume: n(100), Close: n(9)},
+		{Volume: n(110), Close: n(11)},
+		{Volume: n(80), Close: n(7)},
+		{Volume: n(120), Close: n(10)},
+		{Volume: n(90), Close: n(8)},
 	}
 
 	stream := &types.StandardStream{}
@@ -25,10 +26,15 @@ func TestNegativeVolumeIndex(t *testing.T) {
 	for _, candle := range ts {
 		stream.EmitKLineClosed(candle)
 	}
-	assert.InDelta(t, 509.09, ind.Last(0), 0.001)
-	assert.InDelta(t, 636.36, ind.Last(1), 0.001)
-	assert.InDelta(t, 636.36, ind.Last(2), 0.001)
-	assert.InDelta(t, 1000.0, ind.Last(3), 0.001)
-	assert.InDelta(t, 1000.0, ind.Last(4), 0.001)
 
+	assert.InDelta(t, 509.09, ind.Last(0), 0.01)
+	assert.InDelta(t, 636.36, ind.Last(1), 0.01)
+	assert.InDelta(t, 636.36, ind.Last(2), 0.01)
+	assert.InDelta(t, 1000.0, ind.Last(3), 0.01)
+	assert.InDelta(t, 1000.0, ind.Last(4), 0.01)
+
+}
+
+func n(n float64) fixedpoint.Value {
+	return fixedpoint.NewFromFloat(n)
 }

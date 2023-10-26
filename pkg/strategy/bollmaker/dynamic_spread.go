@@ -7,7 +7,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/indicator"
-	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/indicator/v2/volatility"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -29,7 +29,7 @@ type DynamicSpreadSettings struct {
 }
 
 // Initialize dynamic spreads and preload SMAs
-func (ds *DynamicSpreadSettings) Initialize(symbol string, session *bbgo.ExchangeSession, neutralBoll, defaultBoll *indicatorv2.BOLLStream) {
+func (ds *DynamicSpreadSettings) Initialize(symbol string, session *bbgo.ExchangeSession, neutralBoll, defaultBoll *volatility.BOLLStream) {
 	switch {
 	case ds.AmpSpreadSettings != nil:
 		ds.AmpSpreadSettings.initialize(symbol, session)
@@ -165,10 +165,10 @@ type DynamicSpreadBollWidthRatioSettings struct {
 	// A positive number. The greater factor, the sharper weighting function. Default set to 1.0 .
 	Sensitivity float64 `json:"sensitivity"`
 
-	defaultBoll, neutralBoll *indicatorv2.BOLLStream
+	defaultBoll, neutralBoll *volatility.BOLLStream
 }
 
-func (ds *DynamicSpreadBollWidthRatioSettings) initialize(neutralBoll, defaultBoll *indicatorv2.BOLLStream) {
+func (ds *DynamicSpreadBollWidthRatioSettings) initialize(neutralBoll, defaultBoll *volatility.BOLLStream) {
 	ds.neutralBoll = neutralBoll
 	ds.defaultBoll = defaultBoll
 	if ds.Sensitivity <= 0. {
