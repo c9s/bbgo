@@ -88,8 +88,8 @@ func (i *IndicatorSet) EWMA(iw types.IntervalWindow) *trend.EWMAStream {
 	return trend.EWMA2(i.CLOSE(iw.Interval), iw.Window)
 }
 
-func (i *IndicatorSet) STOCH(iw types.IntervalWindow, dPeriod int) *indicatorv2.StochStream {
-	return indicatorv2.Stoch(i.KLines(iw.Interval), iw.Window, dPeriod)
+func (i *IndicatorSet) STOCH(iw types.IntervalWindow, dPeriod int) *momentum.StochStream {
+	return momentum.Stoch(i.KLines(iw.Interval), iw.Window, dPeriod)
 }
 
 func (i *IndicatorSet) BOLL(iw types.IntervalWindow, k float64) *volatility.BOLLStream {

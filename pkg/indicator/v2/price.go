@@ -1,6 +1,8 @@
 package indicatorv2
 
 import (
+	"math"
+
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -69,6 +71,24 @@ func Volumes(source KLineSubscription) *PriceStream {
 func HLC3(source KLineSubscription) *PriceStream {
 	return Price(source, types.KLineHLC3Mapper)
 }
+
 func HL2(source KLineSubscription) *PriceStream {
 	return Price(source, types.KLineHL2Mapper)
+}
+
+func LogClose(source KLineSubscription) *PriceStream {
+	s := &PriceStream{
+		Float64Series: types.NewFloat64Series(),
+	}
+
+	if source == nil {
+		return s
+	}
+
+	source.AddSubscriber(func(k types.KLine) {
+		if source.Length() > 0 {
+			s.PushAndEmit(math.Log(k.Close.Div(source.Last(0).Close).Float64()))
+		}
+	})
+	return s
 }
