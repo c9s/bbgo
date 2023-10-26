@@ -23,6 +23,11 @@ func TestTwinOrderBook(t *testing.T) {
 	assert.Equal(4, book.EmptyTwinOrderSize())
 	for _, pin := range pins {
 		twinOrder := book.GetTwinOrder(fixedpoint.Value(pin))
+		if fixedpoint.NewFromInt(1) == fixedpoint.Value(pin) {
+			assert.Nil(twinOrder)
+			continue
+		}
+
 		if !assert.NotNil(twinOrder) {
 			continue
 		}
