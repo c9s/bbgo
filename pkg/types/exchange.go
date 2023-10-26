@@ -122,6 +122,11 @@ type ExchangeTradeHistoryService interface {
 	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
 }
 
+type ExchangeTimeRangeProvider interface {
+	GetMaxTradeHistoryTimeRange() time.Duration
+	GetMaxOrderHistoryTimeRange() time.Duration
+}
+
 type ExchangeMarketDataService interface {
 	NewStream() Stream
 

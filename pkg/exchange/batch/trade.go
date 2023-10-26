@@ -17,10 +17,16 @@ type TradeBatchQuery struct {
 	types.ExchangeTradeHistoryService
 }
 
-func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *types.TradeQueryOptions, opts ...Option) (c chan types.Trade, errC chan error) {
+func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *types.TradeQueryOptions) (c chan types.Trade, errC chan error) {
 	if options.EndTime == nil {
 		now := time.Now()
 		options.EndTime = &now
+	}
+
+	jump := 3 * 24 * time.Hour
+	timeRangeProvider, ok := e.ExchangeTradeHistoryService.(types.ExchangeTimeRangeProvider)
+	if ok {
+		jump = timeRangeProvider.GetMaxTradeHistoryTimeRange()
 	}
 
 	startTime := *options.StartTime
@@ -42,11 +48,7 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 			}
 			return trade.Key().String()
 		},
-		JumpIfEmpty: 24 * time.Hour,
-	}
-
-	for _, opt := range opts {
-		opt(query)
+		JumpIfEmpty: jump,
 	}
 
 	c = make(chan types.Trade, 100)
