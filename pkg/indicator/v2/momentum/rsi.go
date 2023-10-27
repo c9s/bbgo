@@ -17,8 +17,8 @@ type RSIStream struct {
 
 func RSI2(source types.Float64Source, window int) *RSIStream {
 	s := &RSIStream{
-		source:        source,
 		Float64Series: types.NewFloat64Series(),
+		source:        source,
 		window:        window,
 	}
 	s.Bind(source, s)

@@ -673,8 +673,16 @@ func KLineHLC3Mapper(k KLine) float64 {
 	return k.High.Add(k.Low).Add(k.Close).Div(Three).Float64()
 }
 
+func KLineHLC3xVMapper(k KLine) float64 {
+	return k.High.Add(k.Low).Add(k.Close).Div(Three).Mul(k.Volume).Float64()
+}
+
 func KLineHL2Mapper(k KLine) float64 {
 	return k.High.Add(k.Low).Div(Two).Float64()
+}
+
+func KLineCxVMapper(k KLine) float64 {
+	return k.Close.Mul(k.Volume).Float64()
 }
 
 func MapKLinePrice(kLines []KLine, f KLineValueMapper) (prices []float64) {

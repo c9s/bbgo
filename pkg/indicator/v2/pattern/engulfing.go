@@ -11,6 +11,7 @@ type EngulfingStream struct {
 	window int
 }
 
+// Bullish engulfing patterns are more likely to signal reversals when they are preceded by four or more black candlesticks.
 func Engulfing(source v2.KLineSubscription) *EngulfingStream {
 	s := &EngulfingStream{
 		Float64Series: types.NewFloat64Series(),

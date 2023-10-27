@@ -53,3 +53,7 @@ func (s *DEMAStream) Calculate(v float64) float64 {
 
 	return dema
 }
+
+func (s *DEMAStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
+}

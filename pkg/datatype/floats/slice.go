@@ -99,6 +99,17 @@ func (s Slice) Mean() (mean float64) {
 	return s.Sum() / float64(length)
 }
 
+/* Calculates the variance across the dataset of float64s */
+func (s Slice) Variance() float64 {
+	var variance = .0
+
+	for _, diff := range s {
+		variance += math.Pow(diff-s.Mean(), 2)
+	}
+
+	return variance / float64(len(s))
+}
+
 func (s Slice) Tail(size int) Slice {
 	length := len(s)
 	if length <= size {

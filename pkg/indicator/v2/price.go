@@ -72,8 +72,16 @@ func HLC3(source KLineSubscription) *PriceStream {
 	return Price(source, types.KLineHLC3Mapper)
 }
 
+func HLC3MulVolume(source KLineSubscription) *PriceStream {
+	return Price(source, types.KLineHLC3xVMapper)
+}
+
 func HL2(source KLineSubscription) *PriceStream {
 	return Price(source, types.KLineHL2Mapper)
+}
+
+func CloseMulVolume(source KLineSubscription) *PriceStream {
+	return Price(source, types.KLineCxVMapper)
 }
 
 func LogClose(source KLineSubscription) *PriceStream {
