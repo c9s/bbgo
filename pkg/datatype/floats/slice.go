@@ -2,7 +2,6 @@ package floats
 
 import (
 	"math"
-	"sort"
 
 	"gonum.org/v1/gonum/floats"
 )
@@ -51,12 +50,6 @@ func (s Slice) MaxIndex() int {
 
 func (s Slice) Min() float64 {
 	return floats.Min(s)
-}
-
-func (s Slice) Sort() (b Slice) {
-	b = s
-	sort.Float64s(b)
-	return b
 }
 
 func (s Slice) Sub(b Slice) (c Slice) {

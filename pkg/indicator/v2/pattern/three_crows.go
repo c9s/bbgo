@@ -5,18 +5,18 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// https://www.candlescanner.com/candlestick-patterns/two-crows/
-// The Two Crows is a three-line bearish reversal candlestick pattern.
-// The pattern requires confirmation, that is, the following candles should break
-// a trendline or the nearest support area which may be formed by the first candle’s line.
-// If the pattern is not confirmed it may act only as a temporary pause within an uptrend.
-// Although the pattern name suggest that two lines form it, in fact, it contains three lines
 type ThreeCrowsStream struct {
 	*types.Float64Series
 
 	window int
 }
 
+// https://www.candlescanner.com/candlestick-patterns/two-crows/
+// The Two Crows is a three-line bearish reversal candlestick pattern.
+// The pattern requires confirmation, that is, the following candles should break
+// a trendline or the nearest support area which may be formed by the first candle’s line.
+// If the pattern is not confirmed it may act only as a temporary pause within an uptrend.
+// Although the pattern name suggest that two lines form it, in fact, it contains three lines
 func ThreeCrows(source v2.KLineSubscription) *ThreeCrowsStream {
 	s := &ThreeCrowsStream{
 		Float64Series: types.NewFloat64Series(),

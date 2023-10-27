@@ -12,6 +12,11 @@ type MorningOrEveningStarStream struct {
 	window int
 }
 
+// An evening star is a candlestick pattern that's used by technical analysts to predict future price reversals
+// to the downside.
+// The evening star pattern is rare but it's considered by traders to be a reliable technical indicator.
+// The evening star is the opposite of the morning star.
+// The candlestick pattern is bearish whereas the morning star pattern is bullish.
 func MorningOrEveningStar(source v2.KLineSubscription, direction Direction) *MorningOrEveningStarStream {
 	s := &MorningOrEveningStarStream{
 		Float64Series: types.NewFloat64Series(),

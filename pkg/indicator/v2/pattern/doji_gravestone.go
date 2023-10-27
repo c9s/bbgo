@@ -10,6 +10,10 @@ type DojiGraveStoneStream struct {
 	*types.Float64Series
 }
 
+// A gravestone doji candle is a pattern that technical stock traders use as a signal that a stock price
+// may soon undergo a bearish reversal. This pattern forms when the open, low, and closing prices of an asset
+// are close to each other and have a long upper shadow. The shadow in a candlestick chart is the thin part
+// showing the price action for the day as it differs from high to low prices.
 func DojiGraveStone(source v2.KLineSubscription, maxDiff float64) *DojiGraveStoneStream {
 	s := &DojiGraveStoneStream{
 		Float64Series: types.NewFloat64Series(),

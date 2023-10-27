@@ -10,8 +10,6 @@ import (
 // The DefaultChaikinOscillator function calculates Chaikin
 // Oscillator with the most frequently used fast and short
 // periods, 3 and 10.
-//
-// Returns co, ad.
 func NewChaikinOscillatorDefault(source v2.KLineSubscription) *ChaikinOscillatorStream {
 	return ChaikinOscillator(source, 3, 10)
 }

@@ -11,6 +11,10 @@ type HaramiStream struct {
 	window int
 }
 
+// The bullish harami indicator is charted as a long candlestick followed by a smaller body,
+// referred to as a doji, that is completely contained within the vertical range of the previous body.
+// To some, a line drawn around this pattern resembles a pregnant woman. The word harami comes from an
+// old Japanese word meaning pregnant.
 func Harami(source v2.KLineSubscription) *HaramiStream {
 	s := &HaramiStream{
 		Float64Series: types.NewFloat64Series(),

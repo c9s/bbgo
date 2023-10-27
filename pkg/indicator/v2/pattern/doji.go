@@ -10,7 +10,10 @@ type DojiStream struct {
 	*types.Float64Series
 }
 
-// maxDiff is the maximum deviation between a and b to consider them approximately equal
+// Is a doji bullish or bearish?
+// A doji formation generally can be interpreted as a sign of indecision, meaning neither bulls nor bears
+// can successfully take over. Of its variations, the dragonfly doji is seen as a bullish reversal pattern
+// that occurs at the bottom of downtrends. The gravestone doji is read as a bearish reversal at the peak of uptrends.
 func Doji(source v2.KLineSubscription, maxDiff float64) *DojiStream {
 	s := &DojiStream{
 		Float64Series: types.NewFloat64Series(),

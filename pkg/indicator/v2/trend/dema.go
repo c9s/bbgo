@@ -30,14 +30,26 @@ type DEMAStream struct {
 }
 
 func DEMA(source types.Float64Source, window int) *DEMAStream {
-	ema1 := EWMA2(source, window)
-	ema2 := EWMA2(source, window)
-	return &DEMAStream{ema1: ema1, ema2: ema2}
+	var (
+		ema1 = EWMA2(source, window)
+		ema2 = EWMA2(ema1, window)
+	)
+
+	s := &DEMAStream{
+		Float64Series: types.NewFloat64Series(),
+		ema1:          ema1,
+		ema2:          ema2,
+	}
+	s.Bind(source, s)
+	return s
 }
 
 func (s *DEMAStream) Calculate(v float64) float64 {
-	e1 := s.ema1.Last(0)
-	e2 := s.ema2.Last(0)
-	dema := e1*2 - e2
+	var (
+		e1   = s.ema1.Last(0)
+		e2   = s.ema2.Last(0)
+		dema = e1*2 - e2
+	)
+
 	return dema
 }
