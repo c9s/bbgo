@@ -61,3 +61,7 @@ func KDJ(source v2.KLineSubscription, window, kWindow, dWindow int) *KDJStream {
 func KDJDefault(source v2.KLineSubscription) *KDJStream {
 	return KDJ(source, 9, 3, 3)
 }
+
+func (s *KDJStream) Truncate() {
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
+}

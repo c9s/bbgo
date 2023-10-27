@@ -18,7 +18,7 @@ type VWAPStream struct {
 // VWAP = Sum(Closing * Volume) / Sum(Volume)
 func VWAP(source v2.KLineSubscription, window int) *VWAPStream {
 	var (
-		hlc3v  = v2.CloseMulVolume(source)
+		pv     = v2.CloseMulVolume(source)
 		volume = v2.Volumes(source)
 		s      = &VWAPStream{
 			Float64Series: types.NewFloat64Series(),
@@ -26,9 +26,17 @@ func VWAP(source v2.KLineSubscription, window int) *VWAPStream {
 		}
 	)
 	source.AddSubscriber(func(v types.KLine) {
-		// var vwap = hlc3v.Sum(window) / volume.Sum(s.window) // todo behaviour not the same?!
-		var vwap = floats.Sum(hlc3v.Slice.Tail(s.window)) / floats.Sum(volume.Slice.Tail(s.window))
+		// var vwap = pv.Sum(window) / volume.Sum(s.window) // todo behaviour not the same?!
+		var vwap = floats.Sum(pv.Slice.Tail(s.window)) / floats.Sum(volume.Slice.Tail(s.window))
 		s.PushAndEmit(vwap)
 	})
 	return s
+}
+
+func VwapDefault(source v2.KLineSubscription) *VWAPStream {
+	return VWAP(source, 14)
+}
+
+func (s *VWAPStream) Truncate() {
+	s.Slice = s.Slice.Truncate(5000)
 }
