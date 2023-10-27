@@ -39,8 +39,8 @@ func toGlobalMarket(m kucoinapi.Symbol) types.Market {
 	return types.Market{
 		Symbol:          symbol,
 		LocalSymbol:     m.Symbol,
-		PricePrecision:  int(math.Log10(m.PriceIncrement.Float64())), // convert 0.0001 to 4
-		VolumePrecision: int(math.Log10(m.BaseIncrement.Float64())),
+		PricePrecision:  -int(math.Log10(m.PriceIncrement.Float64())), // convert 0.0001 to 4
+		VolumePrecision: -int(math.Log10(m.BaseIncrement.Float64())),
 		QuoteCurrency:   m.QuoteCurrency,
 		BaseCurrency:    m.BaseCurrency,
 		MinNotional:     m.QuoteMinSize,
