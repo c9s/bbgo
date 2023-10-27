@@ -16,8 +16,8 @@ func toGlobalMarket(m bybitapi.Instrument) types.Market {
 	return types.Market{
 		Symbol:          m.Symbol,
 		LocalSymbol:     m.Symbol,
-		PricePrecision:  int(math.Log10(m.LotSizeFilter.QuotePrecision.Float64())),
-		VolumePrecision: int(math.Log10(m.LotSizeFilter.BasePrecision.Float64())),
+		PricePrecision:  -int(math.Log10(m.LotSizeFilter.QuotePrecision.Float64())),
+		VolumePrecision: -int(math.Log10(m.LotSizeFilter.BasePrecision.Float64())),
 		QuoteCurrency:   m.QuoteCoin,
 		BaseCurrency:    m.BaseCoin,
 		MinNotional:     m.LotSizeFilter.MinOrderAmt,
