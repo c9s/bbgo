@@ -27,7 +27,6 @@ persistence:
     db: 0
 
 crossExchangeStrategies:
-
 - xalign:
     interval: 1m
     sessions:
@@ -41,4 +40,10 @@ crossExchangeStrategies:
       sell: [USDT]
     expectedBalances:
       BTC: 0.0440
-
+    useTakerOrder: false
+    dryRun: true
+    balanceToleranceRange: 10%
+    maxAmounts:
+      USDT: 100
+      USDC: 100
+      TWD: 3000
