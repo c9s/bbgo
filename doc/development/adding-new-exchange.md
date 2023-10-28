@@ -58,7 +58,7 @@ Stream
     - [ ] Public trade message parser (optional)
     - [ ] Ticker message parser (optional)
 - [ ] ping/pong handling. (you can reuse the existing types.StandardStream)
-- [ ] heart-beat hanlding or keep-alive handling. (already included in types.StandardStream)
+- [ ] heart-beat handling or keep-alive handling. (already included in types.StandardStream)
 - [ ] handling reconnect. (already included in types.StandardStream)
 
 Database
