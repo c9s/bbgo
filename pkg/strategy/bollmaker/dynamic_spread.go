@@ -29,7 +29,7 @@ type DynamicSpreadSettings struct {
 }
 
 // Initialize dynamic spreads and preload SMAs
-func (ds *DynamicSpreadSettings) Initialize(symbol string, session *bbgo.ExchangeSession, neutralBoll, defaultBoll *volatility.BOLLStream) {
+func (ds *DynamicSpreadSettings) Initialize(symbol string, session *bbgo.ExchangeSession, neutralBoll, defaultBoll *volatility.BollingerStream) {
 	switch {
 	case ds.AmpSpreadSettings != nil:
 		ds.AmpSpreadSettings.initialize(symbol, session)
@@ -165,10 +165,10 @@ type DynamicSpreadBollWidthRatioSettings struct {
 	// A positive number. The greater factor, the sharper weighting function. Default set to 1.0 .
 	Sensitivity float64 `json:"sensitivity"`
 
-	defaultBoll, neutralBoll *volatility.BOLLStream
+	defaultBoll, neutralBoll *volatility.BollingerStream
 }
 
-func (ds *DynamicSpreadBollWidthRatioSettings) initialize(neutralBoll, defaultBoll *volatility.BOLLStream) {
+func (ds *DynamicSpreadBollWidthRatioSettings) initialize(neutralBoll, defaultBoll *volatility.BollingerStream) {
 	ds.neutralBoll = neutralBoll
 	ds.defaultBoll = defaultBoll
 	if ds.Sensitivity <= 0. {

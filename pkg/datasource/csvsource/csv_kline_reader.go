@@ -8,35 +8,35 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var _ KlineReader = (*CSVKlineReader)(nil)
+var _ KLineReader = (*CSVKLineReader)(nil)
 
-// CSVKlineReader is a KlineReader that reads from a CSV file.
-type CSVKlineReader struct {
+// CSVKLineReader is a KLineReader that reads from a CSV file.
+type CSVKLineReader struct {
 	csv     *csv.Reader
-	decoder CSVKlineDecoder
+	decoder CSVKLineDecoder
 }
 
-// MakeCSVKlineReader is a factory method type that creates a new CSVKlineReader.
-type MakeCSVKlineReader func(csv *csv.Reader) *CSVKlineReader
+// MakeCSVKLineReader is a factory method type that creates a new CSVKLineReader.
+type MakeCSVKLineReader func(csv *csv.Reader) *CSVKLineReader
 
-// NewCSVKlineReader creates a new CSVKlineReader with the default Binance decoder.
-func NewCSVKlineReader(csv *csv.Reader) *CSVKlineReader {
-	return &CSVKlineReader{
+// NewCSVKLineReader creates a new CSVKLineReader with the default Binance decoder.
+func NewCSVKLineReader(csv *csv.Reader) *CSVKLineReader {
+	return &CSVKLineReader{
 		csv:     csv,
-		decoder: BinanceCSVKlineDecoder,
+		decoder: BinanceCSVKLineDecoder,
 	}
 }
 
-// NewCSVKlineReaderWithDecoder creates a new CSVKlineReader with the given decoder.
-func NewCSVKlineReaderWithDecoder(csv *csv.Reader, decoder CSVKlineDecoder) *CSVKlineReader {
-	return &CSVKlineReader{
+// NewCSVKLineReaderWithDecoder creates a new CSVKLineReader with the given decoder.
+func NewCSVKLineReaderWithDecoder(csv *csv.Reader, decoder CSVKLineDecoder) *CSVKLineReader {
+	return &CSVKLineReader{
 		csv:     csv,
 		decoder: decoder,
 	}
 }
 
-// Read reads the next Kline from the underlying CSV data.
-func (r *CSVKlineReader) Read(interval time.Duration) (types.KLine, error) {
+// Read reads the next KLine from the underlying CSV data.
+func (r *CSVKLineReader) Read(interval time.Duration) (types.KLine, error) {
 	var k types.KLine
 
 	rec, err := r.csv.Read()
@@ -47,8 +47,8 @@ func (r *CSVKlineReader) Read(interval time.Duration) (types.KLine, error) {
 	return r.decoder(rec, interval)
 }
 
-// ReadAll reads all the Klines from the underlying CSV data.
-func (r *CSVKlineReader) ReadAll(interval time.Duration) ([]types.KLine, error) {
+// ReadAll reads all the KLines from the underlying CSV data.
+func (r *CSVKLineReader) ReadAll(interval time.Duration) ([]types.KLine, error) {
 	var ks []types.KLine
 	for {
 		k, err := r.Read(interval)

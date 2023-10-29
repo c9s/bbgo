@@ -28,7 +28,7 @@ type BybitCsvTick struct {
 	ForeignNotional fixedpoint.Value `json:"foreignNotional"`
 }
 
-func ConvertTicksToKlines(symbol string, interval time.Duration) error {
+func ConvertTicksToKLines(symbol string, interval time.Duration) error {
 	err := filepath.Walk(
 		fmt.Sprintf("pkg/datasource/csv/testdata/bybit/%s/", symbol),
 		func(path string, info os.FileInfo, err error) error {
@@ -93,11 +93,11 @@ func ConvertTicksToKlines(symbol string, interval time.Duration) error {
 		return err
 	}
 
-	return WriteKlines(fmt.Sprintf("pkg/datasource/csv/testdata/%s_%s.csv", symbol, interval.String()), klines)
+	return WriteKLines(fmt.Sprintf("pkg/datasource/csv/testdata/%s_%s.csv", symbol, interval.String()), klines)
 }
 
-// WriteKlines write csv to path.
-func WriteKlines(path string, prices []types.KLine) (err error) {
+// WriteKLines write csv to path.
+func WriteKLines(path string, prices []types.KLine) (err error) {
 	file, err := os.Create(path)
 	if err != nil {
 		return errors.Wrap(err, "failed to open file")

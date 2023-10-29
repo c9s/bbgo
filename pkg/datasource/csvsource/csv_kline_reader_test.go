@@ -12,7 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var assertKlineEq = func(t *testing.T, exp, act types.KLine) {
+var assertKLineEq = func(t *testing.T, exp, act types.KLine) {
 	assert.Equal(t, exp.StartTime, act.StartTime)
 	assert.True(t, exp.Open == act.Open)
 	assert.True(t, exp.High == act.High)
@@ -21,7 +21,7 @@ var assertKlineEq = func(t *testing.T, exp, act types.KLine) {
 	assert.Equal(t, exp.Volume, act.Volume)
 }
 
-func TestCSVKlineReader_ReadWithBinanceDecoder(t *testing.T) {
+func TestCSVKLineReader_ReadWithBinanceDecoder(t *testing.T) {
 	tests := []struct {
 		name string
 		give string
@@ -80,26 +80,26 @@ func TestCSVKlineReader_ReadWithBinanceDecoder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reader := NewBinanceCSVKlineReader(csv.NewReader(strings.NewReader(tt.give)))
+			reader := NewBinanceCSVKLineReader(csv.NewReader(strings.NewReader(tt.give)))
 			kline, err := reader.Read(time.Hour)
 			assert.Equal(t, tt.err, err)
-			assertKlineEq(t, tt.want, kline)
+			assertKLineEq(t, tt.want, kline)
 		})
 	}
 }
 
-func TestCSVKlineReader_ReadAllWithDefaultDecoder(t *testing.T) {
+func TestCSVKLineReader_ReadAllWithDefaultDecoder(t *testing.T) {
 	records := []string{
 		"1609459200000,28923.63000000,29031.34000000,28690.17000000,28995.13000000,2311.81144500",
 		"1609459300000,28928.63000000,30031.34000000,22690.17000000,28495.13000000,3000.00",
 	}
-	reader := NewCSVKlineReader(csv.NewReader(strings.NewReader(strings.Join(records, "\n"))))
+	reader := NewCSVKLineReader(csv.NewReader(strings.NewReader(strings.Join(records, "\n"))))
 	klines, err := reader.ReadAll(time.Hour)
 	assert.NoError(t, err)
 	assert.Len(t, klines, 2)
 }
 
-func TestCSVKlineReader_ReadWithMetaTraderDecoder(t *testing.T) {
+func TestCSVKLineReader_ReadWithMetaTraderDecoder(t *testing.T) {
 
 	tests := []struct {
 		name string
@@ -146,10 +146,10 @@ func TestCSVKlineReader_ReadWithMetaTraderDecoder(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reader := NewMetaTraderCSVKlineReader(csv.NewReader(strings.NewReader(tt.give)))
+			reader := NewMetaTraderCSVKLineReader(csv.NewReader(strings.NewReader(tt.give)))
 			kline, err := reader.Read(time.Hour)
 			assert.Equal(t, tt.err, err)
-			assertKlineEq(t, tt.want, kline)
+			assertKLineEq(t, tt.want, kline)
 		})
 	}
 }

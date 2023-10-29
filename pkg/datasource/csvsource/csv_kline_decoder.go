@@ -28,19 +28,19 @@ var (
 	ErrInvalidVolumeFormat = errors.New("volume must be in valid float format")
 )
 
-// CSVKlineDecoder is an extension point for CSVKlineReader to support custom file formats.
-type CSVKlineDecoder func(record []string, interval time.Duration) (types.KLine, error)
+// CSVKLineDecoder is an extension point for CSVKLineReader to support custom file formats.
+type CSVKLineDecoder func(record []string, interval time.Duration) (types.KLine, error)
 
-// NewBinanceCSVKlineReader creates a new CSVKlineReader for Binance CSV files.
-func NewBinanceCSVKlineReader(csv *csv.Reader) *CSVKlineReader {
-	return &CSVKlineReader{
+// NewBinanceCSVKLineReader creates a new CSVKLineReader for Binance CSV files.
+func NewBinanceCSVKLineReader(csv *csv.Reader) *CSVKLineReader {
+	return &CSVKLineReader{
 		csv:     csv,
-		decoder: BinanceCSVKlineDecoder,
+		decoder: BinanceCSVKLineDecoder,
 	}
 }
 
-// BinanceCSVKlineDecoder decodes a CSV record from Binance or Bybit into a Kline.
-func BinanceCSVKlineDecoder(record []string, interval time.Duration) (types.KLine, error) {
+// BinanceCSVKLineDecoder decodes a CSV record from Binance or Bybit into a KLine.
+func BinanceCSVKLineDecoder(record []string, interval time.Duration) (types.KLine, error) {
 	var (
 		k, empty types.KLine
 		err      error
@@ -55,6 +55,8 @@ func BinanceCSVKlineDecoder(record []string, interval time.Duration) (types.KLin
 		return empty, ErrInvalidTimeFormat
 	}
 	k.StartTime = types.NewTimeFromUnix(time.UnixMilli(msec).Unix(), 0)
+	k.EndTime = types.NewTimeFromUnix(k.StartTime.Time().Add(interval).Unix(), 0)
+
 	open, err := strconv.ParseFloat(record[1], 64)
 	if err != nil {
 		return empty, ErrInvalidPriceFormat
@@ -90,17 +92,17 @@ func BinanceCSVKlineDecoder(record []string, interval time.Duration) (types.KLin
 	return k, nil
 }
 
-// NewMetaTraderCSVKlineReader creates a new CSVKlineReader for MetaTrader CSV files.
-func NewMetaTraderCSVKlineReader(csv *csv.Reader) *CSVKlineReader {
+// NewMetaTraderCSVKLineReader creates a new CSVKLineReader for MetaTrader CSV files.
+func NewMetaTraderCSVKLineReader(csv *csv.Reader) *CSVKLineReader {
 	csv.Comma = ';'
-	return &CSVKlineReader{
+	return &CSVKLineReader{
 		csv:     csv,
-		decoder: MetaTraderCSVKlineDecoder,
+		decoder: MetaTraderCSVKLineDecoder,
 	}
 }
 
-// MetaTraderCSVKlineDecoder decodes a CSV record from MetaTrader into a Kline.
-func MetaTraderCSVKlineDecoder(record []string, interval time.Duration) (types.KLine, error) {
+// MetaTraderCSVKLineDecoder decodes a CSV record from MetaTrader into a KLine.
+func MetaTraderCSVKLineDecoder(record []string, interval time.Duration) (types.KLine, error) {
 	var (
 		k, empty types.KLine
 		err      error

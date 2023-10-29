@@ -92,8 +92,8 @@ func (i *IndicatorSet) STOCH(iw types.IntervalWindow, dPeriod int) *momentum.Sto
 	return momentum.Stoch(i.KLines(iw.Interval), iw.Window, dPeriod)
 }
 
-func (i *IndicatorSet) BOLL(iw types.IntervalWindow, k float64) *volatility.BOLLStream {
-	return volatility.BOLL(i.CLOSE(iw.Interval), iw.Window, k)
+func (i *IndicatorSet) BOLL(iw types.IntervalWindow, k float64) *volatility.BollingerStream {
+	return volatility.BollingerBand(i.CLOSE(iw.Interval), iw.Window, k)
 }
 
 func (i *IndicatorSet) MACD(interval types.Interval, shortWindow, longWindow, signalWindow int) *trend.MACDStream {

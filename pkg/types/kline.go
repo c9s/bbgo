@@ -685,6 +685,10 @@ func KLineCxVMapper(k KLine) float64 {
 	return k.Close.Mul(k.Volume).Float64()
 }
 
+func KLineCOMapper(k KLine) float64 {
+	return k.Close.Sub(k.Open).Float64()
+}
+
 func MapKLinePrice(kLines []KLine, f KLineValueMapper) (prices []float64) {
 	for _, k := range kLines {
 		prices = append(prices, f(k))

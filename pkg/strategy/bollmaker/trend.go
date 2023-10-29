@@ -11,7 +11,7 @@ const (
 	UnknownTrend PriceTrend = "unknown"
 )
 
-func detectPriceTrend(inc *volatility.BOLLStream, price float64) PriceTrend {
+func detectPriceTrend(inc *volatility.BollingerStream, price float64) PriceTrend {
 	if inBetween(price, inc.DownBand.Last(0), inc.UpBand.Last(0)) {
 		return NeutralTrend
 	}

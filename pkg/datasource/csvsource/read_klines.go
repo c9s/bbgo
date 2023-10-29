@@ -10,21 +10,21 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// KlineReader is an interface for reading candlesticks.
-type KlineReader interface {
+// KLineReader is an interface for reading candlesticks.
+type KLineReader interface {
 	Read(interval time.Duration) (types.KLine, error)
 	ReadAll(interval time.Duration) ([]types.KLine, error)
 }
 
-// ReadKlinesFromCSV reads all the .csv files in a given directory or a single file into a slice of Klines.
-// Wraps a default CSVKlineReader with Binance decoder for convenience.
+// ReadKLinesFromCSV reads all the .csv files in a given directory or a single file into a slice of KLines.
+// Wraps a default CSVKLineReader with Binance decoder for convenience.
 // For finer grained memory management use the base kline reader.
-func ReadKlinesFromCSV(path string, interval time.Duration) ([]types.KLine, error) {
-	return ReadKlinesFromCSVWithDecoder(path, interval, MakeCSVKlineReader(NewBinanceCSVKlineReader))
+func ReadKLinesFromCSV(path string, interval time.Duration) ([]types.KLine, error) {
+	return ReadKLinesFromCSVWithDecoder(path, interval, MakeCSVKLineReader(NewBinanceCSVKLineReader))
 }
 
-// ReadKlinesFromCSVWithDecoder permits using a custom CSVKlineReader.
-func ReadKlinesFromCSVWithDecoder(path string, interval time.Duration, maker MakeCSVKlineReader) ([]types.KLine, error) {
+// ReadKLinesFromCSVWithDecoder permits using a custom CSVKLineReader.
+func ReadKLinesFromCSVWithDecoder(path string, interval time.Duration, maker MakeCSVKLineReader) ([]types.KLine, error) {
 	var prices []types.KLine
 
 	err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {

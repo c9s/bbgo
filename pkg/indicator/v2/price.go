@@ -84,7 +84,11 @@ func CloseMulVolume(source KLineSubscription) *PriceStream {
 	return Price(source, types.KLineCxVMapper)
 }
 
-func LogClose(source KLineSubscription) *PriceStream {
+func CloseSubOpen(source KLineSubscription) *PriceStream {
+	return Price(source, types.KLineCOMapper)
+}
+
+func DiffClose(source KLineSubscription) *PriceStream {
 	s := &PriceStream{
 		Float64Series: types.NewFloat64Series(),
 	}

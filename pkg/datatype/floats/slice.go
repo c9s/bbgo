@@ -36,7 +36,7 @@ func (s Slice) Max() float64 {
 	return floats.Max(s)
 }
 
-func (s Slice) MaxIndex() int {
+func (s Slice) IndexOfMaxValue() int {
 	maxIdx := 0
 	maxVal := s[0]
 	for i, val := range s {

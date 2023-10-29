@@ -1,7 +1,7 @@
 package momentum
 
 import (
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -29,7 +29,7 @@ func RSI2(source types.Float64Source, window int) *RSIStream {
 func (s *RSIStream) Calculate(_ float64) float64 {
 	var gainSum, lossSum float64
 	var sourceLen = s.source.Length()
-	var limit = indicator.Min(s.window, sourceLen)
+	var limit = indicatorv2.Min(s.window, sourceLen)
 	for i := 0; i < limit; i++ {
 		value := s.source.Last(i)
 		prev := s.source.Last(i + 1)
