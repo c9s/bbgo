@@ -46,6 +46,21 @@ func (f *Float64Series) Subscribe(source Float64Source, c func(x float64)) {
 	}
 }
 
+// AddSubscriber adds the subscriber function and push historical data to the subscriber
+func (f *Float64Series) AddSubscriber(fn func(v float64)) {
+	f.OnUpdate(fn)
+
+	if f.Length() == 0 {
+		return
+	}
+
+	// push historical values to the subscriber
+	for _, vv := range f.Slice {
+		fn(vv)
+	}
+}
+
+
 // Bind binds the source event to the target (Float64Calculator)
 // A Float64Calculator should be able to calculate the float64 result from a single float64 argument input
 func (f *Float64Series) Bind(source Float64Source, target Float64Calculator) {

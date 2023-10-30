@@ -2,81 +2,19 @@ package grid2
 
 import (
 	"context"
-	"encoding/csv"
-	"encoding/json"
-	"fmt"
-	"io"
-	"io/ioutil"
-	"os"
-	"sort"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/mocks"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-type TestData struct {
-	Market       types.Market  `json:"market" yaml:"market"`
-	Strategy     Strategy      `json:"strategy" yaml:"strategy"`
-	OpenOrders   []types.Order `json:"openOrders" yaml:"openOrders"`
-	ClosedOrders []types.Order `json:"closedOrders" yaml:"closedOrders"`
-	Trades       []types.Trade `json:"trades" yaml:"trades"`
-}
-
-type TestDataService struct {
-	Orders map[string]types.Order
-	Trades []types.Trade
-}
-
-func (t *TestDataService) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
-	var i int = 0
-	if options.LastTradeID != 0 {
-		for idx, trade := range t.Trades {
-			if trade.ID < options.LastTradeID {
-				continue
-			}
-
-			i = idx
-			break
-		}
-	}
-
-	var trades []types.Trade
-	l := len(t.Trades)
-	for ; i < l && len(trades) < int(options.Limit); i++ {
-		trades = append(trades, t.Trades[i])
-	}
-
-	return trades, nil
-}
-
-func (t *TestDataService) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
-	if len(q.OrderID) == 0 {
-		return nil, fmt.Errorf("order id should not be empty")
-	}
-
-	order, exist := t.Orders[q.OrderID]
-	if !exist {
-		return nil, fmt.Errorf("order not found")
-	}
-
-	return &order, nil
-}
-
-// dummy method for interface
-func (t *TestDataService) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	return nil, nil
-}
-
-// dummy method for interface
-func (t *TestDataService) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
-	return nil, nil
-}
-
-func NewStrategy(t *TestData) *Strategy {
+func newStrategy(t *TestData) *Strategy {
 	s := t.Strategy
 	s.Debug = true
 	s.Initialize()
@@ -86,210 +24,214 @@ func NewStrategy(t *TestData) *Strategy {
 	return &s
 }
 
-func NewTestDataService(t *TestData) *TestDataService {
-	var orders map[string]types.Order = make(map[string]types.Order)
-	for _, order := range t.OpenOrders {
-		orders[strconv.FormatUint(order.OrderID, 10)] = order
-	}
-
-	for _, order := range t.ClosedOrders {
-		orders[strconv.FormatUint(order.OrderID, 10)] = order
-	}
-
-	trades := t.Trades
-	sort.Slice(t.Trades, func(i, j int) bool {
-		return trades[i].ID < trades[j].ID
-	})
-
-	return &TestDataService{
-		Orders: orders,
-		Trades: trades,
-	}
-}
-
-func readSpec(fileName string) (*TestData, error) {
-	content, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return nil, err
-	}
-
-	market := types.Market{}
-	if err := json.Unmarshal(content, &market); err != nil {
-		return nil, err
-	}
-
-	strategy := Strategy{}
-	if err := json.Unmarshal(content, &strategy); err != nil {
-		return nil, err
-	}
-
-	data := TestData{
-		Market:   market,
-		Strategy: strategy,
-	}
-	return &data, nil
-}
-
-func readOrdersFromCSV(fileName string) ([]types.Order, error) {
-	csvFile, err := os.Open(fileName)
-	if err != nil {
-		return nil, err
-	}
-	defer csvFile.Close()
-	csvReader := csv.NewReader(csvFile)
-
-	keys, err := csvReader.Read()
-	if err != nil {
-		return nil, err
-	}
-
-	var orders []types.Order
-	for {
-		row, err := csvReader.Read()
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			return nil, err
-		}
-
-		if len(row) != len(keys) {
-			return nil, fmt.Errorf("length of row should be equal to length of keys")
-		}
-
-		var m map[string]interface{} = make(map[string]interface{})
-		for i, key := range keys {
-			if key == "orderID" {
-				x, err := strconv.ParseUint(row[i], 10, 64)
-				if err != nil {
-					return nil, err
-				}
-				m[key] = x
-			} else {
-				m[key] = row[i]
-			}
-		}
-
-		b, err := json.Marshal(m)
-		if err != nil {
-			return nil, err
-		}
-
-		order := types.Order{}
-		if err = json.Unmarshal(b, &order); err != nil {
-			return nil, err
-		}
-
-		orders = append(orders, order)
-	}
-
-	return orders, nil
-}
-
-func readTradesFromCSV(fileName string) ([]types.Trade, error) {
-	csvFile, err := os.Open(fileName)
-	if err != nil {
-		return nil, err
-	}
-	defer csvFile.Close()
-	csvReader := csv.NewReader(csvFile)
-
-	keys, err := csvReader.Read()
-	if err != nil {
-		return nil, err
-	}
-
-	var trades []types.Trade
-	for {
-		row, err := csvReader.Read()
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			return nil, err
-		}
-
-		if len(row) != len(keys) {
-			return nil, fmt.Errorf("length of row should be equal to length of keys")
-		}
-
-		var m map[string]interface{} = make(map[string]interface{})
-		for i, key := range keys {
-			switch key {
-			case "id", "orderID":
-				x, err := strconv.ParseUint(row[i], 10, 64)
-				if err != nil {
-					return nil, err
-				}
-				m[key] = x
-			default:
-				m[key] = row[i]
-			}
-		}
-
-		b, err := json.Marshal(m)
-		if err != nil {
-			return nil, err
-		}
-
-		trade := types.Trade{}
-		if err = json.Unmarshal(b, &trade); err != nil {
-			return nil, err
-		}
-
-		trades = append(trades, trade)
-	}
-
-	return trades, nil
-}
-
-func readTestDataFrom(fileDir string) (*TestData, error) {
-	data, err := readSpec(fmt.Sprintf("%s/spec", fileDir))
-	if err != nil {
-		return nil, err
-	}
-
-	openOrders, err := readOrdersFromCSV(fmt.Sprintf("%s/open_orders.csv", fileDir))
-	if err != nil {
-		return nil, err
-	}
-
-	closedOrders, err := readOrdersFromCSV(fmt.Sprintf("%s/closed_orders.csv", fileDir))
-	if err != nil {
-		return nil, err
-	}
-
-	trades, err := readTradesFromCSV(fmt.Sprintf("%s/trades.csv", fileDir))
-	if err != nil {
-		return nil, err
-	}
-
-	data.OpenOrders = openOrders
-	data.ClosedOrders = closedOrders
-	data.Trades = trades
-	return data, nil
-}
-
-func TestRecoverByScanningTrades(t *testing.T) {
+func TestBuildTwinOrderBook(t *testing.T) {
 	assert := assert.New(t)
 
-	t.Run("test case 1", func(t *testing.T) {
-		fileDir := "recovery_testcase/testcase1/"
-
-		data, err := readTestDataFrom(fileDir)
+	pins := []Pin{
+		Pin(fixedpoint.NewFromInt(200)),
+		Pin(fixedpoint.NewFromInt(300)),
+		Pin(fixedpoint.NewFromInt(500)),
+		Pin(fixedpoint.NewFromInt(400)),
+		Pin(fixedpoint.NewFromInt(100)),
+	}
+	t.Run("build twin orderbook with no order", func(t *testing.T) {
+		b, err := buildTwinOrderBook(pins, nil)
 		if !assert.NoError(err) {
 			return
 		}
 
-		testService := NewTestDataService(data)
-		strategy := NewStrategy(data)
-		filledOrders, err := strategy.getFilledOrdersByScanningTrades(context.Background(), testService, testService, data.OpenOrders)
+		assert.Equal(0, b.Size())
+		assert.Nil(b.GetTwinOrder(fixedpoint.NewFromInt(100)))
+		assert.False(b.GetTwinOrder(fixedpoint.NewFromInt(200)).Exist())
+		assert.False(b.GetTwinOrder(fixedpoint.NewFromInt(300)).Exist())
+		assert.False(b.GetTwinOrder(fixedpoint.NewFromInt(400)).Exist())
+		assert.False(b.GetTwinOrder(fixedpoint.NewFromInt(500)).Exist())
+	})
+
+	t.Run("build twin orderbook with some valid orders", func(t *testing.T) {
+		orders := []types.Order{
+			{
+				OrderID: 1,
+				SubmitOrder: types.SubmitOrder{
+					Side:  types.SideTypeBuy,
+					Price: fixedpoint.NewFromInt(100),
+				},
+			},
+			{
+				OrderID: 5,
+				SubmitOrder: types.SubmitOrder{
+					Side:  types.SideTypeSell,
+					Price: fixedpoint.NewFromInt(500),
+				},
+			},
+		}
+		b, err := buildTwinOrderBook(pins, orders)
 		if !assert.NoError(err) {
 			return
 		}
 
-		assert.Len(filledOrders, 0)
+		assert.Equal(2, b.Size())
+		assert.Equal(2, b.EmptyTwinOrderSize())
+		assert.Nil(b.GetTwinOrder(fixedpoint.NewFromInt(100)))
+		assert.True(b.GetTwinOrder(fixedpoint.NewFromInt(200)).Exist())
+		assert.False(b.GetTwinOrder(fixedpoint.NewFromInt(300)).Exist())
+		assert.False(b.GetTwinOrder(fixedpoint.NewFromInt(400)).Exist())
+		assert.True(b.GetTwinOrder(fixedpoint.NewFromInt(500)).Exist())
+	})
+
+	t.Run("build twin orderbook with invalid orders", func(t *testing.T) {})
+}
+
+func TestSyncActiveOrder(t *testing.T) {
+	assert := assert.New(t)
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	symbol := "ETHUSDT"
+
+	t.Run("sync filled order in active orderbook, active orderbook should remove this order", func(t *testing.T) {
+		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
+
+		order := types.Order{
+			OrderID: 1,
+			Status:  types.OrderStatusNew,
+			SubmitOrder: types.SubmitOrder{
+				Symbol: symbol,
+			},
+		}
+		activeOrderbook.Add(order)
+
+		updatedOrder := order
+		updatedOrder.Status = types.OrderStatusFilled
+
+		mockOrderQueryService.EXPECT().QueryOrder(ctx, types.OrderQuery{
+			Symbol:  symbol,
+			OrderID: strconv.FormatUint(order.OrderID, 10),
+		}).Return(&updatedOrder, nil)
+
+		if !assert.NoError(syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID)) {
+			return
+		}
+
+		// verify active orderbook
+		activeOrders := activeOrderbook.Orders()
+		assert.Equal(0, len(activeOrders))
+	})
+
+	t.Run("sync partial-filled order in active orderbook, active orderbook should still keep this order", func(t *testing.T) {
+		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
+
+		order := types.Order{
+			OrderID: 1,
+			Status:  types.OrderStatusNew,
+			SubmitOrder: types.SubmitOrder{
+				Symbol: symbol,
+			},
+		}
+		activeOrderbook.Add(order)
+
+		updatedOrder := order
+		updatedOrder.Status = types.OrderStatusPartiallyFilled
+
+		mockOrderQueryService.EXPECT().QueryOrder(ctx, types.OrderQuery{
+			Symbol:  symbol,
+			OrderID: strconv.FormatUint(order.OrderID, 10),
+		}).Return(&updatedOrder, nil)
+
+		if !assert.NoError(syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID)) {
+			return
+		}
+
+		// verify active orderbook
+		activeOrders := activeOrderbook.Orders()
+		assert.Equal(1, len(activeOrders))
+		assert.Equal(order.OrderID, activeOrders[0].OrderID)
+		assert.Equal(updatedOrder.Status, activeOrders[0].Status)
+	})
+}
+
+func TestQueryTradesToUpdateTwinOrderBook(t *testing.T) {
+	assert := assert.New(t)
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	symbol := "ETHUSDT"
+	pins := []Pin{
+		Pin(fixedpoint.NewFromInt(100)),
+		Pin(fixedpoint.NewFromInt(200)),
+		Pin(fixedpoint.NewFromInt(300)),
+		Pin(fixedpoint.NewFromInt(400)),
+		Pin(fixedpoint.NewFromInt(500)),
+	}
+
+	t.Run("query trades and update twin orderbook successfully in one page", func(t *testing.T) {
+		book := newTwinOrderBook(pins)
+		mockTradeHistoryService := mocks.NewMockExchangeTradeHistoryService(mockCtrl)
+		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
+
+		trades := []types.Trade{
+			{
+				ID:      1,
+				OrderID: 1,
+				Symbol:  symbol,
+				Time:    types.Time(time.Now().Add(-2 * time.Hour)),
+			},
+			{
+				ID:      2,
+				OrderID: 2,
+				Symbol:  symbol,
+				Time:    types.Time(time.Now().Add(-1 * time.Hour)),
+			},
+		}
+		orders := []types.Order{
+			{
+				OrderID: 1,
+				Status:  types.OrderStatusNew,
+				SubmitOrder: types.SubmitOrder{
+					Symbol: symbol,
+					Side:   types.SideTypeBuy,
+					Price:  fixedpoint.NewFromInt(100),
+				},
+			},
+			{
+				OrderID: 2,
+				Status:  types.OrderStatusFilled,
+				SubmitOrder: types.SubmitOrder{
+					Symbol: symbol,
+					Side:   types.SideTypeSell,
+					Price:  fixedpoint.NewFromInt(500),
+				},
+			},
+		}
+		mockTradeHistoryService.EXPECT().QueryTrades(gomock.Any(), gomock.Any(), gomock.Any()).Return(trades, nil).Times(1)
+		mockOrderQueryService.EXPECT().QueryOrder(gomock.Any(), types.OrderQuery{
+			Symbol:  symbol,
+			OrderID: "1",
+		}).Return(&orders[0], nil)
+		mockOrderQueryService.EXPECT().QueryOrder(gomock.Any(), types.OrderQuery{
+			Symbol:  symbol,
+			OrderID: "2",
+		}).Return(&orders[1], nil)
+
+		assert.Equal(0, book.Size())
+		if !assert.NoError(queryTradesToUpdateTwinOrderBook(ctx, symbol, book, mockTradeHistoryService, mockOrderQueryService, book.SyncOrderMap(), time.Now().Add(-24*time.Hour), time.Now(), nil)) {
+			return
+		}
+
+		assert.Equal(2, book.Size())
+		assert.True(book.GetTwinOrder(fixedpoint.NewFromInt(200)).Exist())
+		assert.Equal(orders[0].OrderID, book.GetTwinOrder(fixedpoint.NewFromInt(200)).GetOrder().OrderID)
+		assert.True(book.GetTwinOrder(fixedpoint.NewFromInt(500)).Exist())
+		assert.Equal(orders[1].OrderID, book.GetTwinOrder(fixedpoint.NewFromInt(500)).GetOrder().OrderID)
 	})
 }

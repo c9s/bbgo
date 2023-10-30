@@ -67,11 +67,6 @@ func (inc *RMA) Update(x float64) {
 	}
 	inc.counter++
 
-	if inc.counter < inc.Window {
-		inc.Values.Push(0)
-		return
-	}
-
 	inc.Values.Push(inc.tmp)
 	if len(inc.Values) > MaxNumOfRMA {
 		inc.Values = inc.Values[MaxNumOfRMATruncateSize-1:]
