@@ -54,7 +54,7 @@ func (s *Strategy) recover(ctx context.Context) error {
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
 	activeOrders := activeOrderBook.Orders()
 
-	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, s.session.Exchange, s.Symbol)
+	openOrders, err := retry.QueryOpenOrdersUntilSuccessfulLite(ctx, s.session.Exchange, s.Symbol)
 	if err != nil {
 		return err
 	}
