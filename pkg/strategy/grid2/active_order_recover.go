@@ -89,8 +89,8 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 	opts.logger.Infof("[ActiveOrderRecover] syncActiveOrders")
 
-	// do not sync orders which is updated in 3 min, because we may receive from websocket and handle it twice
-	doNotSyncAfter := time.Now().Add(-3 * time.Minute)
+	// only sync orders which is updated over 3 min, because we may receive from websocket and handle it twice
+	syncBefore := time.Now().Add(-3 * time.Minute)
 
 	openOrders, err := retry.QueryOpenOrdersUntilSuccessfulLite(ctx, opts.exchange, opts.activeOrderBook.Symbol)
 	if err != nil {
@@ -117,7 +117,7 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 			delete(openOrdersMap, activeOrder.OrderID)
 		} else {
 			opts.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
-			if activeOrder.UpdateTime.After(doNotSyncAfter) {
+			if activeOrder.UpdateTime.After(syncBefore) {
 				opts.logger.Infof("active order #%d is updated in 3 min, skip updating...", activeOrder.OrderID)
 				continue
 			}
@@ -137,7 +137,7 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 	for _, openOrder := range openOrdersMap {
 		opts.logger.Infof("found open order #%d is not in active orderbook, updating...", openOrder.OrderID)
 		// we don't add open orders into active orderbook if updated in 3 min, because we may receive message from websocket and add it twice.
-		if openOrder.UpdateTime.After(doNotSyncAfter) {
+		if openOrder.UpdateTime.After(syncBefore) {
 			opts.logger.Infof("open order #%d is updated in 3 min, skip updating...", openOrder.OrderID)
 			continue
 		}

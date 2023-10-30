@@ -5,10 +5,9 @@ import (
 	"errors"
 	"strconv"
 
-	backoff2 "github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v4"
 
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util/backoff"
 )
 
 type advancedOrderCancelService interface {
@@ -18,7 +17,7 @@ type advancedOrderCancelService interface {
 }
 
 func QueryOrderUntilFilled(ctx context.Context, queryOrderService types.ExchangeOrderQueryService, symbol string, orderId uint64) (o *types.Order, err error) {
-	err = backoff.RetryGeneral(ctx, func() (err2 error) {
+	var op = func() (err2 error) {
 		o, err2 = queryOrderService.QueryOrder(ctx, types.OrderQuery{
 			Symbol:  symbol,
 			OrderID: strconv.FormatUint(orderId, 10),
@@ -33,24 +32,25 @@ func QueryOrderUntilFilled(ctx context.Context, queryOrderService types.Exchange
 		}
 
 		return err2
-	})
+	}
 
+	err = GeneralBackoff(ctx, op)
 	return o, err
 }
 
-func GeneralBackoff(ctx context.Context, op backoff2.Operation) (err error) {
-	err = backoff2.Retry(op, backoff2.WithContext(
-		backoff2.WithMaxRetries(
-			backoff2.NewExponentialBackOff(),
+func GeneralBackoff(ctx context.Context, op backoff.Operation) (err error) {
+	err = backoff.Retry(op, backoff.WithContext(
+		backoff.WithMaxRetries(
+			backoff.NewExponentialBackOff(),
 			101),
 		ctx))
 	return err
 }
 
-func GeneralBackoffLite(ctx context.Context, op backoff2.Operation) (err error) {
-	err = backoff2.Retry(op, backoff2.WithContext(
-		backoff2.WithMaxRetries(
-			backoff2.NewExponentialBackOff(),
+func GeneralLiteBackoff(ctx context.Context, op backoff.Operation) (err error) {
+	err = backoff.Retry(op, backoff.WithContext(
+		backoff.WithMaxRetries(
+			backoff.NewExponentialBackOff(),
 			5),
 		ctx))
 	return err
@@ -72,7 +72,7 @@ func QueryOpenOrdersUntilSuccessfulLite(ctx context.Context, ex types.Exchange, 
 		return err2
 	}
 
-	err = GeneralBackoffLite(ctx, op)
+	err = GeneralLiteBackoff(ctx, op)
 	return openOrders, err
 }
 
