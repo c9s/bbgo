@@ -89,9 +89,10 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 	opts.logger.Infof("[ActiveOrderRecover] syncActiveOrders")
 
-	notAddNonExistingOpenOrdersAfter := time.Now().Add(-5 * time.Minute)
+	// do not sync orders which is updated in 3 min, because we may receive from websocket and handle it twice
+	doNotSyncAfter := time.Now().Add(-3 * time.Minute)
 
-	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, opts.exchange, opts.activeOrderBook.Symbol)
+	openOrders, err := retry.QueryOpenOrdersUntilSuccessfulLite(ctx, opts.exchange, opts.activeOrderBook.Symbol)
 	if err != nil {
 		opts.logger.WithError(err).Error("[ActiveOrderRecover] failed to query open orders, skip this time")
 		return errors.Wrapf(err, "[ActiveOrderRecover] failed to query open orders, skip this time")
@@ -116,6 +117,10 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 			delete(openOrdersMap, activeOrder.OrderID)
 		} else {
 			opts.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
+			if activeOrder.UpdateTime.After(doNotSyncAfter) {
+				opts.logger.Infof("active order #%d is updated in 3 min, skip updating...", activeOrder.OrderID)
+				continue
+			}
 
 			// sleep 100ms to avoid DDOS
 			time.Sleep(100 * time.Millisecond)
@@ -130,8 +135,10 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 
 	// update open orders not in active orders
 	for _, openOrder := range openOrdersMap {
-		// we don't add open orders into active orderbook if updated in 5 min
-		if openOrder.UpdateTime.After(notAddNonExistingOpenOrdersAfter) {
+		opts.logger.Infof("found open order #%d is not in active orderbook, updating...", openOrder.OrderID)
+		// we don't add open orders into active orderbook if updated in 3 min, because we may receive message from websocket and add it twice.
+		if openOrder.UpdateTime.After(doNotSyncAfter) {
+			opts.logger.Infof("open order #%d is updated in 3 min, skip updating...", openOrder.OrderID)
 			continue
 		}
 

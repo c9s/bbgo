@@ -47,6 +47,15 @@ func GeneralBackoff(ctx context.Context, op backoff2.Operation) (err error) {
 	return err
 }
 
+func GeneralBackoffLite(ctx context.Context, op backoff2.Operation) (err error) {
+	err = backoff2.Retry(op, backoff2.WithContext(
+		backoff2.WithMaxRetries(
+			backoff2.NewExponentialBackOff(),
+			5),
+		ctx))
+	return err
+}
+
 func QueryOpenOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, symbol string) (openOrders []types.Order, err error) {
 	var op = func() (err2 error) {
 		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
@@ -54,6 +63,16 @@ func QueryOpenOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, symb
 	}
 
 	err = GeneralBackoff(ctx, op)
+	return openOrders, err
+}
+
+func QueryOpenOrdersUntilSuccessfulLite(ctx context.Context, ex types.Exchange, symbol string) (openOrders []types.Order, err error) {
+	var op = func() (err2 error) {
+		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
+		return err2
+	}
+
+	err = GeneralBackoffLite(ctx, op)
 	return openOrders, err
 }
 
