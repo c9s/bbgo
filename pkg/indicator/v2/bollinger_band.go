@@ -1,7 +1,6 @@
 package indicatorv2
 
 import (
-	"github.com/c9s/bbgo/pkg/indicator/v2/trend"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -13,7 +12,7 @@ type BollingerStream struct {
 
 	k float64
 
-	SMA    *trend.SMAStream
+	SMA    *SMAStream
 	StdDev *StdDevStream
 }
 
@@ -26,7 +25,7 @@ type BollingerStream struct {
 //	-> calculate stdDev -> calculate bandWidth -> get latest SMA -> upBand, downBand
 func BollingerBand(source types.Float64Source, window int, k float64) *BollingerStream {
 	// bind these indicators before our main calculator
-	sma := trend.SMA(source, window)
+	sma := SMA(source, window)
 	stdDev := StdDev(source, window)
 
 	s := &BollingerStream{

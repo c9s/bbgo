@@ -28,24 +28,22 @@ type BybitCsvTick struct {
 	ForeignNotional fixedpoint.Value `json:"foreignNotional"`
 }
 
-func ConvertTicksToKLines(symbol string, interval time.Duration) error {
+func ConvertTicksToKLines(path, symbol string, interval KLineInterval) ([]types.KLine, error) {
 	err := filepath.Walk(
-		fmt.Sprintf("pkg/datasource/csv/testdata/bybit/%s/", symbol),
+		path,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				fmt.Println(err)
-				return err
+				return fmt.Errorf("walk %s: %w", path, err)
 			}
-			fmt.Printf("dir: %v: name: %s\n", info.IsDir(), path)
 			if !info.IsDir() {
 				file, err := os.Open(path)
 				if err != nil {
-					return err
+					return fmt.Errorf("open %s: %w", path, err)
 				}
 				reader := csv.NewReader(file)
 				data, err := reader.ReadAll()
 				if err != nil {
-					return err
+					return fmt.Errorf("read %s: %w", path, err)
 				}
 				for idx, row := range data {
 					// skip header
@@ -55,25 +53,26 @@ func ConvertTicksToKLines(symbol string, interval time.Duration) error {
 					if idx == 1 {
 						continue
 					}
-					timestamp, err := strconv.ParseInt(strings.Split(row[0], ".")[0], 10, 64)
+					startTime := strings.Split(row[0], ".")[0]
+					timestamp, err := strconv.ParseInt(startTime, 10, 64)
 					if err != nil {
-						return err
+						return fmt.Errorf("parse time %s: %w", startTime, err)
 					}
 					size, err := strconv.ParseFloat(row[3], 64)
 					if err != nil {
-						return err
+						return fmt.Errorf("parse size %s: %w", row[3], err)
 					}
 					price, err := strconv.ParseFloat(row[4], 64)
 					if err != nil {
-						return err
+						return fmt.Errorf("parse price %s: %w", row[4], err)
 					}
-					homeNotional, err := strconv.ParseFloat(row[5], 64)
+					homeNotional, err := strconv.ParseFloat(row[8], 64)
 					if err != nil {
-						return err
+						return fmt.Errorf("parse home notional %s: %w", row[8], err)
 					}
 					foreignNotional, err := strconv.ParseFloat(row[9], 64)
 					if err != nil {
-						return err
+						return fmt.Errorf("parse foreign notional %s: %w", row[9], err)
 					}
 					ConvertBybitCsvTickToCandles(BybitCsvTick{
 						Timestamp:       int64(timestamp),
@@ -90,45 +89,14 @@ func ConvertTicksToKLines(symbol string, interval time.Duration) error {
 			return nil
 		})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return WriteKLines(fmt.Sprintf("pkg/datasource/csv/testdata/%s_%s.csv", symbol, interval.String()), klines)
+	return klines, nil
 }
 
-// WriteKLines write csv to path.
-func WriteKLines(path string, prices []types.KLine) (err error) {
-	file, err := os.Create(path)
-	if err != nil {
-		return errors.Wrap(err, "failed to open file")
-	}
-	defer func() {
-		err = file.Close()
-		if err != nil {
-			panic("failed to close file")
-		}
-	}()
-	w := csv.NewWriter(file)
-	defer w.Flush()
-	// Using Write
-	for _, record := range prices {
-		row := []string{strconv.Itoa(int(record.StartTime.UnixMilli())), dtos(record.Open), dtos(record.High), dtos(record.Low), dtos(record.Close), dtos(record.Volume)}
-		if err := w.Write(row); err != nil {
-			return errors.Wrap(err, "writing record to file")
-		}
-	}
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func dtos(n fixedpoint.Value) string {
-	return fmt.Sprintf("%f", n.Float64())
-}
-
-func ConvertBybitCsvTickToCandles(tick BybitCsvTick, interval time.Duration) {
+// Conver ticks to KLine with interval
+func ConvertBybitCsvTickToCandles(tick BybitCsvTick, interval KLineInterval) {
 	var (
 		currentCandle = types.KLine{}
 		high          = fixedpoint.Zero
@@ -178,10 +146,39 @@ func ConvertBybitCsvTickToCandles(tick BybitCsvTick, interval time.Duration) {
 	}
 }
 
-func detCandleStart(ts time.Time, interval time.Duration) (isOpen, isClose bool, t time.Time) {
+// WriteKLines writes csv to path.
+func WriteKLines(path string, prices []types.KLine) (err error) {
+	file, err := os.Create(path)
+	if err != nil {
+		return errors.Wrap(err, "failed to open file")
+	}
+	defer func() {
+		err = file.Close()
+		if err != nil {
+			panic("failed to close file")
+		}
+	}()
+	w := csv.NewWriter(file)
+	defer w.Flush()
+	// Using Write
+	for _, record := range prices {
+		row := []string{strconv.Itoa(int(record.StartTime.UnixMilli())), record.Open.String(), record.High.String(), record.Low.String(), record.Close.String(), record.Volume.String()}
+		if err := w.Write(row); err != nil {
+			return errors.Wrap(err, "writing record to file")
+		}
+	}
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func detCandleStart(ts time.Time, kInterval KLineInterval) (isOpen, isClose bool, t time.Time) {
+	interval := convertInterval(kInterval)
 	if len(klines) == 0 {
 		start := time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour()+1, 0, 0, 0, ts.Location())
-		if t.Minute() < int(interval.Minutes()) { // supported intervals 5 10 15 30
+		if t.Minute() < int(interval.Minutes()) { // todo make enum of supported intervals 5 10 15 30 and extend to other intervals
 			start = time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour(), int(interval.Minutes()), 0, 0, ts.Location())
 		}
 		return true, false, start
@@ -194,4 +191,26 @@ func detCandleStart(ts time.Time, interval time.Duration) (isOpen, isClose bool,
 	}
 
 	return false, false, t
+}
+
+func convertInterval(kInterval KLineInterval) time.Duration {
+	var interval = time.Minute
+	switch kInterval {
+	case M1:
+	case M5:
+		interval = time.Minute * 5
+	case M15:
+		interval = time.Minute * 15
+	case M30:
+		interval = time.Minute * 30
+	case H1:
+		interval = time.Hour
+	case H2:
+		interval = time.Hour * 2
+	case H4:
+		interval = time.Hour * 4
+	case D1:
+		interval = time.Hour * 24
+	}
+	return interval
 }

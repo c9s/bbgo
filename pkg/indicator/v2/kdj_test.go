@@ -3,7 +3,6 @@ package indicatorv2
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -32,7 +31,6 @@ func TestKdj(t *testing.T) {
 	for _, candle := range ts {
 		stream.EmitKLineClosed(candle)
 	}
-	spew.Dump(ind)
 	for i, v := range expectedJ {
 		assert.InDelta(t, v, ind.Slice[i], 0.01, "Expected KDJ.slice[%d] to be %v, but got %v", i, v, ind.Slice[i])
 	}
