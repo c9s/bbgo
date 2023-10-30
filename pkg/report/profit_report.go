@@ -7,7 +7,7 @@ import (
 	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator/v2/trend"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -34,7 +34,7 @@ type AccumulatedProfitReport struct {
 	accumulatedProfitPerInterval *types.Float64Series
 
 	// Accumulated profit MA
-	profitMA            *trend.SMAStream
+	profitMA            *indicatorv2.SMAStream
 	profitMAPerInterval floats.Slice
 
 	// Profit of each interval
@@ -76,7 +76,7 @@ func (r *AccumulatedProfitReport) Initialize(symbol string, interval types.Inter
 	}
 
 	r.accumulatedProfitPerInterval = types.NewFloat64Series()
-	r.profitMA = trend.SMA(r.accumulatedProfitPerInterval, r.ProfitMAWindow)
+	r.profitMA = indicatorv2.SMA(r.accumulatedProfitPerInterval, r.ProfitMAWindow)
 }
 
 func (r *AccumulatedProfitReport) AddStrategyParameter(title string, value string) {

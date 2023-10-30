@@ -11,7 +11,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator/v2/volatility"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -157,10 +157,10 @@ type Strategy struct {
 	groupID uint32
 
 	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
-	defaultBoll *volatility.BollingerStream
+	defaultBoll *indicatorv2.BollingerStream
 
 	// neutralBoll is the neutral price section
-	neutralBoll *volatility.BollingerStream
+	neutralBoll *indicatorv2.BollingerStream
 
 	// StrategyController
 	bbgo.StrategyController

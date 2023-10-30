@@ -17,7 +17,7 @@ import (
 // moves (sharp price movements that are allowed under certain exchange rules). The ATR is typically smoothed using a moving average to make it
 // more responsive to changes in the underlying price data. The ATRP is a useful indicator for traders because it provides a way to compare the
 // volatility of different securities, regardless of their individual prices. It can also be used to identify potential entry and exit points
-// for trades based on changes in the security's volatility.
+// for trades based on changes in the security's indicatorv2.
 //
 // Calculation:
 //

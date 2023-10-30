@@ -1,6 +1,6 @@
 package bollmaker
 
-import "github.com/c9s/bbgo/pkg/indicator/v2/volatility"
+import indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 
 type PriceTrend string
 
@@ -11,7 +11,7 @@ const (
 	UnknownTrend PriceTrend = "unknown"
 )
 
-func detectPriceTrend(inc *volatility.BollingerStream, price float64) PriceTrend {
+func detectPriceTrend(inc *indicatorv2.BollingerStream, price float64) PriceTrend {
 	if inBetween(price, inc.DownBand.Last(0), inc.UpBand.Last(0)) {
 		return NeutralTrend
 	}

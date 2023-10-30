@@ -1,8 +1,8 @@
 package indicatorv2
 
 import (
-	"github.com/c9s/bbgo/pkg/indicator/v2/bst"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/bst"
 )
 
 type MaxValueStream struct {
