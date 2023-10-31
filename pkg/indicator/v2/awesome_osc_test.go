@@ -52,3 +52,11 @@ func buildKLinesFromHL(high, low []float64) (klines []types.KLine) {
 
 	return klines
 }
+
+func buildKLinesFromC(closing []float64) (klines []types.KLine) {
+	for i := range closing {
+		klines = append(klines, types.KLine{Close: n(closing[i])})
+	}
+
+	return klines
+}

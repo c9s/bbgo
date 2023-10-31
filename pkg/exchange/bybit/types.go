@@ -331,7 +331,7 @@ type TradeEvent struct {
 	IndexPrice fixedpoint.Value `json:"indexPrice"`
 	// The underlying price of the symbol when executing. Valid for option
 	UnderlyingPrice fixedpoint.Value `json:"underlyingPrice"`
-	// Implied indicatorv2. Valid for option
+	// Implied volatility. Valid for option
 	TradeIv string `json:"tradeIv"`
 }
 

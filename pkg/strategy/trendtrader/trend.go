@@ -1,4 +1,4 @@
-package indicatorv2trader
+package trendtrader
 
 import (
 	"context"

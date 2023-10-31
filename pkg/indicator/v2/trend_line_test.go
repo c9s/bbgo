@@ -49,34 +49,4 @@ func TestTrendIndicator(t *testing.T) {
 
 		}
 	})
-
-	// t.Run("respects the window", func(t *testing.T) {
-	// 	indicator := NewTrendLine(4)
-	// 	indicator.Update(dec.Slice(-100, 1000, 0, 1, 2, 3)...)
-	// 	source := types.NewFloat64Series()
-	// 	sma := SMA(source, 9)
-
-	// 	data := []float64{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	// 	for _, d := range data {
-	// 		source.PushAndEmit(d)
-	// 	}
-
-	// 	assert.InDelta(t, 5, sma.Last(0), 0.001)
-	// 	assert.EqualValues(t, 1, indicator.Value().Float64())
-	// })
-
-	// t.Run("does not allow an index out of bounds on the low end", func(t *testing.T) {
-	// 	indicator := NewTrendLine(2)
-	// 	indicator.Update(dec.Slice(0, 0, 1)...)
-	// 	source := types.NewFloat64Series()
-	// 	sma := SMA(source, 9)
-
-	// 	data := []float64{1, 2, 3, 4, 5, 6, 7, 8, 9}
-	// 	for _, d := range data {
-	// 		source.PushAndEmit(d)
-	// 	}
-
-	// 	assert.InDelta(t, 5, sma.Last(0), 0.001)
-	// 	assert.EqualValues(t, 1, indicator.Value().Float64())
-	// })
 }

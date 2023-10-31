@@ -90,29 +90,14 @@ func TestBollingerBand(t *testing.T) {
 	for _, line := range expectedLines {
 		tokens := strings.Split(line, "\t")
 		if len(tokens) == 5 {
-			// 	f1, _ := strconv.ParseFloat(tokens[0], 64)
-			// 	SMAs = append(SMAs, f1)
-			// 	f2, _ := strconv.ParseFloat(tokens[1], 64)
-			// 	STDEVs = append(STDEVs, f2)
 			f3, _ := strconv.ParseFloat(tokens[2], 64)
 			BBUPs = append(BBUPs, f3)
 			f4, _ := strconv.ParseFloat(tokens[3], 64)
 			BBLOs = append(BBLOs, f4)
-			// f5, _ := strconv.ParseFloat(tokens[4], 64)
-			// BBWs = append(BBWs, f5)
 		}
 	}
-	// assert.Equal(t, len(SMAs), 23)
-
 	window := 20
 	sigma := 2.0
-	// ts := dec.Slice(src...)
-	// isma := trend.NewSimpleMovingAverage(window)
-	// isma.Update(ts...)
-	// smaHistory := isma.Series()
-	// iwstd := NewWindowedStandardDeviation(window)
-	// iwstd.Update(ts...)
-	// wstdHistory := iwstd.Series()
 
 	source := types.NewFloat64Series()
 	ind := BollingerBand(source, window, sigma)
@@ -122,14 +107,7 @@ func TestBollingerBand(t *testing.T) {
 	}
 	for i := window - 1; i < len(ts); i++ {
 		j := i - (window - 1)
-		// decimalAlmostEquals(t, smaHistory[i], SMAs[j], 0.01)
-		// decimalAlmostEquals(t, wstdHistory[i], STDEVs[j], 0.01)
-		decimalAlmostEquals(t, ind.UpBand.Slice[i], BBUPs[j], 0.01)
-		decimalAlmostEquals(t, ind.DownBand.Slice[i], BBLOs[j], 0.01)
-		// decimalAlmostEquals(t, bbUPHistory[i].Sub(bbLOHistory[i]), BBWs[j], 0.01)
+		assert.InEpsilon(t, ind.UpBand.Slice[i], BBUPs[j], 0.01)
+		assert.InEpsilon(t, ind.DownBand.Slice[i], BBLOs[j], 0.01)
 	}
-}
-
-func decimalAlmostEquals(t *testing.T, actual float64, expected, epsilon float64) {
-	assert.InEpsilon(t, expected, actual, epsilon)
 }
