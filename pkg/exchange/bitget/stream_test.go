@@ -106,6 +106,22 @@ func TestStream(t *testing.T) {
 		<-c
 	})
 
+	t.Run("kline test", func(t *testing.T) {
+		s.Subscribe(types.KLineChannel, "BTCUSDT", types.SubscribeOptions{Interval: types.Interval1w})
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnKLine(func(kline types.KLine) {
+			t.Log("got update", kline)
+		})
+		s.OnKLineClosed(func(kline types.KLine) {
+			t.Log("got closed update", kline)
+		})
+		c := make(chan struct{})
+		<-c
+	})
+
 }
 
 func TestStream_parseWebSocketEvent(t *testing.T) {
@@ -453,6 +469,174 @@ func Test_parseWebSocketEvent_MarketTrade(t *testing.T) {
 	})
 }
 
+func Test_parseWebSocketEvent_KLine(t *testing.T) {
+	t.Run("KLine event", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"candle5m",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+				["1698744600000","34361.49","34458.98","34355.53","34416.41","99.6631"]
+		   ],
+		   "ts":1697697791670
+		}`
+
+		eventFn := func(in string, actionType ActionType) {
+			res, err := parseWebSocketEvent([]byte(in))
+			assert.NoError(t, err)
+			kline, ok := res.(*KLineEvent)
+			assert.True(t, ok)
+			assert.Equal(t, KLineEvent{
+				channel: "candle5m",
+				Events: KLineSlice{
+					{
+						StartTime:    types.NewMillisecondTimestampFromInt(1698744600000),
+						OpenPrice:    fixedpoint.NewFromFloat(34361.49),
+						HighestPrice: fixedpoint.NewFromFloat(34458.98),
+						LowestPrice:  fixedpoint.NewFromFloat(34355.53),
+						ClosePrice:   fixedpoint.NewFromFloat(34416.41),
+						Volume:       fixedpoint.NewFromFloat(99.6631),
+					},
+				},
+				actionType: actionType,
+				instId:     "BTCUSDT",
+			}, *kline)
+		}
+
+		t.Run("snapshot type", func(t *testing.T) {
+			snapshotInput := fmt.Sprintf(input, ActionTypeSnapshot)
+			eventFn(snapshotInput, ActionTypeSnapshot)
+		})
+
+		t.Run("update type", func(t *testing.T) {
+			snapshotInput := fmt.Sprintf(input, ActionTypeUpdate)
+			eventFn(snapshotInput, ActionTypeUpdate)
+		})
+	})
+
+	t.Run("Unexpected length of kline", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"candle5m",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  ["1698744600000","34361.45","34458.98","34355.53","34416.41","99.6631", "123456"]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "unexpected kline length")
+	})
+
+	t.Run("Unexpected timestamp", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"candle5m",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  ["timestamp","34361.49","34458.98","34355.53","34416.41","99.6631"]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "timestamp")
+	})
+
+	t.Run("Unexpected open price", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"candle5m",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+				["1698744600000","1p","34458.98","34355.53","34416.41","99.6631"]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "open price")
+	})
+
+	t.Run("Unexpected highest price", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"candle5m",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  ["1698744600000","34361.45","3p","34355.53","34416.41","99.6631"]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "highest price")
+	})
+
+	t.Run("Unexpected lowest price", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"candle5m",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  ["1698744600000","34361.45","34458.98","1p","34416.41","99.6631"]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "lowest price")
+	})
+
+	t.Run("Unexpected close price", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"candle5m",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  ["1698744600000","34361.45","34458.98","34355.53","1c","99.6631"]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "close price")
+	})
+
+	t.Run("Unexpected volume", func(t *testing.T) {
+		input := `{
+		   "action":"%s",
+		   "arg":{
+			  "instType":"sp",
+			  "channel":"candle5m",
+			  "instId":"BTCUSDT"
+		   },
+		   "data":[
+			  ["1698744600000","34361.45","34458.98","34355.53","34416.41", "1v"]
+		   ],
+		   "ts":1697697791670
+		}`
+		_, err := parseWebSocketEvent([]byte(input))
+		assert.ErrorContains(t, err, "volume")
+	})
+}
+
 func Test_convertSubscription(t *testing.T) {
 	t.Run("BookChannel.ChannelOrderBook5", func(t *testing.T) {
 		res, err := convertSubscription(types.Subscription{
@@ -511,5 +695,22 @@ func Test_convertSubscription(t *testing.T) {
 			Channel:  ChannelTrade,
 			InstId:   "BTCUSDT",
 		}, res)
+	})
+	t.Run("CandleChannel", func(t *testing.T) {
+		for gInterval, localInterval := range toLocalInterval {
+			res, err := convertSubscription(types.Subscription{
+				Symbol:  "BTCUSDT",
+				Channel: types.KLineChannel,
+				Options: types.SubscribeOptions{
+					Interval: gInterval,
+				},
+			})
+			assert.NoError(t, err)
+			assert.Equal(t, WsArg{
+				InstType: instSp,
+				Channel:  ChannelType(localInterval),
+				InstId:   "BTCUSDT",
+			}, res)
+		}
 	})
 }
