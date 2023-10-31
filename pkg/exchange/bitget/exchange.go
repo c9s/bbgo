@@ -2,12 +2,13 @@ package bitget
 
 import (
 	"context"
-	"math"
+	"fmt"
+	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -18,6 +19,11 @@ const PlatformToken = "BGB"
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": ID,
 })
+
+var (
+	// queryMarketRateLimiter has its own rate limit. https://bitgetlimited.github.io/apidoc/en/spot/#get-symbols
+	queryMarketRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
+)
 
 type Exchange struct {
 	key, secret, passphrase string
@@ -54,7 +60,10 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-	// TODO implement me
+	if err := queryMarketRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("markets rate limiter wait error: %w", err)
+	}
+
 	req := e.client.NewGetSymbolsRequest()
 	symbols, err := req.Do(ctx)
 	if err != nil {
@@ -64,22 +73,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	markets := types.MarketMap{}
 	for _, s := range symbols {
 		symbol := toGlobalSymbol(s.SymbolName)
-		markets[symbol] = types.Market{
-			Symbol:          s.SymbolName,
-			LocalSymbol:     s.Symbol,
-			PricePrecision:  s.PriceScale,
-			VolumePrecision: s.QuantityScale,
-			QuoteCurrency:   s.QuoteCoin,
-			BaseCurrency:    s.BaseCoin,
-			MinNotional:     s.MinTradeUSDT,
-			MinAmount:       s.MinTradeUSDT,
-			MinQuantity:     s.MinTradeAmount,
-			MaxQuantity:     s.MaxTradeAmount,
-			StepSize:        fixedpoint.NewFromFloat(math.Pow10(-s.QuantityScale)),
-			TickSize:        fixedpoint.NewFromFloat(math.Pow10(-s.PriceScale)),
-			MinPrice:        fixedpoint.Zero,
-			MaxPrice:        fixedpoint.Zero,
-		}
+		markets[symbol] = toGlobalMarket(s)
 	}
 
 	return markets, nil
