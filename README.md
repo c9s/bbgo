@@ -73,7 +73,7 @@ the implementation.
     - [Tillson T3 Moving Average](./pkg/indicator/till.go)
     - [Triangular Moving Average](./pkg/indicator/tma.go)
     - [Variable Index Dynamic Average](./pkg/indicator/vidya.go)
-    - [Volatility Indicator](./pkg/indicator/indicatorv2.go)
+    - [Volatility Indicator](./pkg/indicator/volatility.go)
     - [Volume Weighted Average Price](./pkg/indicator/vwap.go)
     - [Zero Lag Exponential Moving Average](./pkg/indicator/zlema.go)
     - And more...

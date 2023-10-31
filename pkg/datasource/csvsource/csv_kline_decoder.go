@@ -118,6 +118,7 @@ func MetaTraderCSVKLineDecoder(record []string, interval time.Duration) (types.K
 		return empty, ErrInvalidTimeFormat
 	}
 	k.StartTime = types.NewTimeFromUnix(t.Unix(), 0)
+	k.EndTime = types.NewTimeFromUnix(t.Add(interval).Unix(), 0)
 
 	open, err := strconv.ParseFloat(record[2], 64)
 	if err != nil {

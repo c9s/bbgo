@@ -32,7 +32,7 @@ func TestCSVKLineReader_ReadWithBinanceDecoder(t *testing.T) {
 			name: "Read DOHLCV",
 			give: "1609459200000,28923.63000000,29031.34000000,28690.17000000,28995.13000000,2311.81144500",
 			want: types.KLine{
-				StartTime: types.NewTimeFromUnix(1609459200000, 0),
+				StartTime: types.NewTimeFromUnix(1609459200, 0),
 				Open:      fixedpoint.NewFromFloat(28923.63),
 				High:      fixedpoint.NewFromFloat(29031.34),
 				Low:       fixedpoint.NewFromFloat(28690.17),
@@ -44,7 +44,7 @@ func TestCSVKLineReader_ReadWithBinanceDecoder(t *testing.T) {
 			name: "Read DOHLC",
 			give: "1609459200000,28923.63000000,29031.34000000,28690.17000000,28995.13000000",
 			want: types.KLine{
-				StartTime: types.NewTimeFromUnix(1609459200000, 0),
+				StartTime: types.NewTimeFromUnix(1609459200, 0),
 				Open:      fixedpoint.NewFromFloat(28923.63),
 				High:      fixedpoint.NewFromFloat(29031.34),
 				Low:       fixedpoint.NewFromFloat(28690.17),
