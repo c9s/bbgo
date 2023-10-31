@@ -56,39 +56,11 @@ func BinanceCSVKLineDecoder(record []string, interval time.Duration) (types.KLin
 	}
 	k.StartTime = types.NewTimeFromUnix(time.UnixMilli(msec).Unix(), 0)
 	k.EndTime = types.NewTimeFromUnix(k.StartTime.Time().Add(interval).Unix(), 0)
-
-	open, err := strconv.ParseFloat(record[1], 64)
-	if err != nil {
-		return empty, ErrInvalidPriceFormat
-	}
-	k.Open = fixedpoint.NewFromFloat(open)
-
-	high, err := strconv.ParseFloat(record[2], 64)
-	if err != nil {
-		return empty, ErrInvalidPriceFormat
-	}
-	k.High = fixedpoint.NewFromFloat(high)
-
-	low, err := strconv.ParseFloat(record[3], 64)
-	if err != nil {
-		return empty, ErrInvalidPriceFormat
-	}
-	k.Low = fixedpoint.NewFromFloat(low)
-
-	close, err := strconv.ParseFloat(record[4], 64)
-	if err != nil {
-		return empty, ErrInvalidPriceFormat
-	}
-	k.Close = fixedpoint.NewFromFloat(close)
-
-	if len(record) > 5 {
-		vol, err := strconv.ParseFloat(record[5], 64)
-		if err != nil {
-			return empty, ErrInvalidVolumeFormat
-		}
-		k.Volume = fixedpoint.NewFromFloat(vol)
-	}
-
+	k.Open = fixedpoint.MustNewFromString(record[1])
+	k.High = fixedpoint.MustNewFromString(record[2])
+	k.Low = fixedpoint.MustNewFromString(record[3])
+	k.Close = fixedpoint.MustNewFromString(record[4])
+	k.Volume = fixedpoint.MustNewFromString(record[5])
 	return k, nil
 }
 
@@ -119,38 +91,11 @@ func MetaTraderCSVKLineDecoder(record []string, interval time.Duration) (types.K
 	}
 	k.StartTime = types.NewTimeFromUnix(t.Unix(), 0)
 	k.EndTime = types.NewTimeFromUnix(t.Add(interval).Unix(), 0)
-
-	open, err := strconv.ParseFloat(record[2], 64)
-	if err != nil {
-		return empty, ErrInvalidPriceFormat
-	}
-	k.Open = fixedpoint.NewFromFloat(open)
-
-	high, err := strconv.ParseFloat(record[3], 64)
-	if err != nil {
-		return empty, ErrInvalidPriceFormat
-	}
-	k.High = fixedpoint.NewFromFloat(high)
-
-	low, err := strconv.ParseFloat(record[4], 64)
-	if err != nil {
-		return empty, ErrInvalidPriceFormat
-	}
-	k.Low = fixedpoint.NewFromFloat(low)
-
-	close, err := strconv.ParseFloat(record[5], 64)
-	if err != nil {
-		return empty, ErrInvalidPriceFormat
-	}
-	k.Close = fixedpoint.NewFromFloat(close)
-
-	if len(record) > 5 {
-		vol, err := strconv.ParseFloat(record[6], 64)
-		if err != nil {
-			return empty, ErrInvalidVolumeFormat
-		}
-		k.Volume = fixedpoint.NewFromFloat(vol)
-	}
+	k.Open = fixedpoint.MustNewFromString(record[2])
+	k.High = fixedpoint.MustNewFromString(record[3])
+	k.Low = fixedpoint.MustNewFromString(record[4])
+	k.Close = fixedpoint.MustNewFromString(record[5])
+	k.Volume = fixedpoint.MustNewFromString(record[6])
 
 	return k, nil
 }

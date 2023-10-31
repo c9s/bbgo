@@ -3,6 +3,8 @@ package csvsource
 import (
 	"encoding/csv"
 	"io"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 var _ TickReader = (*CSVTickReader)(nil)
@@ -33,7 +35,7 @@ func NewCSVTickReaderWithDecoder(csv *csv.Reader, decoder CSVTickDecoder) *CSVTi
 }
 
 // ReadAll reads all the KLines from the underlying CSV data.
-func (r *CSVTickReader) ReadAll(interval KLineInterval) error {
+func (r *CSVTickReader) ReadAll(interval types.Interval) error {
 	var i int
 	for {
 		tick, err := r.Read(i)

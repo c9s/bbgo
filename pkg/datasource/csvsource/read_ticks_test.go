@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 func TestReadTicksFromCSV(t *testing.T) {
@@ -12,7 +14,7 @@ func TestReadTicksFromCSV(t *testing.T) {
 	expectedEndTime := expectedStartTime.Add(time.Minute)
 	// 11771900,6.06300000,7.70000000,14959258,14959262,1698537604628,False,True
 
-	klines, err := ReadTicksFromCSV("./testdata/FXSUSDT-ticks-2023-10-29.csv", M1)
+	klines, err := ReadTicksFromCSV("./testdata/FXSUSDT-ticks-2023-10-29.csv", types.Interval1m)
 	assert.NoError(t, err)
 	assert.Len(t, klines, 1)
 	assert.Equal(t, expectedStartTime.Unix(), klines[0].StartTime.Unix(), "StartTime")

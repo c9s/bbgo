@@ -10,7 +10,7 @@ import (
 var klines []types.KLine
 
 // Convert ticks to KLine with interval
-func ConvertCsvTickToKLines(tick *CsvTick, interval KLineInterval) {
+func ConvertCsvTickToKLines(tick *CsvTick, interval types.Interval) {
 	var (
 		currentCandle = types.KLine{}
 		high          = fixedpoint.Zero
@@ -22,7 +22,7 @@ func ConvertCsvTickToKLines(tick *CsvTick, interval KLineInterval) {
 	if isOpen {
 		klines = append(klines, types.KLine{
 			StartTime: types.NewTimeFromUnix(t.Unix(), 0),
-			EndTime:   types.NewTimeFromUnix(t.Add(convertInterval(interval)).Unix(), 0),
+			EndTime:   types.NewTimeFromUnix(t.Add(interval.Duration()).Unix(), 0),
 			Open:      tick.Price,
 			High:      tick.Price,
 			Low:       tick.Price,
@@ -57,9 +57,9 @@ func ConvertCsvTickToKLines(tick *CsvTick, interval KLineInterval) {
 	}
 }
 
-func detCandleStart(ts time.Time, kInterval KLineInterval) (isOpen bool, t time.Time) {
+func detCandleStart(ts time.Time, interval types.Interval) (isOpen bool, t time.Time) {
 	if len(klines) == 0 {
-		return true, convertTimestamp(ts, kInterval)
+		return true, interval.Convert(ts)
 	}
 	var (
 		current = klines[len(klines)-1]

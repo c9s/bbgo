@@ -13,13 +13,14 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
-func Download(saveToPath, symbol string, exchange SupportedExchange, start time.Time) error {
+func Download(saveToPath, symbol string, exchange types.ExchangeName, start time.Time) error {
 	for {
 		var (
 			fileName = fmt.Sprintf("%s%s.csv", symbol, start.Format("2006-01-02"))
-			url      string
 		)
 
 		if fileExists(filepath.Join(saveToPath, fileName)) {
@@ -27,18 +28,7 @@ func Download(saveToPath, symbol string, exchange SupportedExchange, start time.
 			continue
 		}
 
-		switch exchange {
-		case Bybit:
-			url = fmt.Sprintf("https://public.bybit.com/trading/%s/%s.gz",
-				symbol,
-				fileName)
-
-		case Binance:
-			url = fmt.Sprintf("https://data.binance.vision/data/spot/daily/aggTrades/%s/%s-aggTrades-%s.zip",
-				symbol,
-				symbol,
-				start.Format("2006-01-02"))
-		}
+		var url = buildURL(exchange, symbol, fileName, start)
 
 		log.Info("fetching ", url)
 
@@ -59,7 +49,23 @@ func Download(saveToPath, symbol string, exchange SupportedExchange, start time.
 	return nil
 }
 
-func readCSVFromUrl(exchange SupportedExchange, url string) (csvContent []byte, err error) {
+func buildURL(exchange types.ExchangeName, symbol string, fileName string, start time.Time) (url string) {
+	switch exchange {
+	case types.ExchangeBybit:
+		url = fmt.Sprintf("https://public.bybit.com/trading/%s/%s.gz",
+			symbol,
+			fileName)
+
+	case types.ExchangeBinance:
+		url = fmt.Sprintf("https://data.binance.vision/data/spot/daily/aggTrades/%s/%s-aggTrades-%s.zip",
+			symbol,
+			symbol,
+			start.Format("2006-01-02"))
+	}
+	return url
+}
+
+func readCSVFromUrl(exchange types.ExchangeName, url string) (csvContent []byte, err error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("get %s: %w", url, err)
@@ -72,13 +78,13 @@ func readCSVFromUrl(exchange SupportedExchange, url string) (csvContent []byte, 
 	}
 
 	switch exchange {
-	case Bybit:
+	case types.ExchangeBybit:
 		csvContent, err = gUnzipData(body)
 		if err != nil {
 			return nil, fmt.Errorf("gunzip data %s: %w", url, err)
 		}
 
-	case Binance:
+	case types.ExchangeBinance:
 		csvContent, err = unzipData(body)
 		if err != nil {
 			return nil, fmt.Errorf("unzip data %s: %w", url, err)

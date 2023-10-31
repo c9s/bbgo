@@ -28,19 +28,14 @@ func BinanceCSVTickDecoder(row []string, intex int) (*CsvTick, error) {
 	if err != nil {
 		return nil, ErrInvalidTimeFormat
 	}
-	size, err := strconv.ParseFloat(row[2], 64)
-	if err != nil {
-		return nil, ErrInvalidVolumeFormat
-	}
-	price, err := strconv.ParseFloat(row[1], 64)
-	if err != nil {
-		return nil, ErrInvalidPriceFormat
-	}
+	size := fixedpoint.MustNewFromString(row[2])
+	price := fixedpoint.MustNewFromString(row[1])
+	hn := price.Mul(size)
 	return &CsvTick{
 		Timestamp:    timestamp / 1000,
-		Size:         fixedpoint.NewFromFloat(size),
-		Price:        fixedpoint.NewFromFloat(price),
-		HomeNotional: fixedpoint.NewFromFloat(price * size),
+		Size:         size,
+		Price:        price,
+		HomeNotional: hn,
 	}, nil
 }
 
@@ -65,31 +60,14 @@ func BybitCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 	if err != nil {
 		return nil, ErrInvalidTimeFormat
 	}
-	size, err := strconv.ParseFloat(row[3], 64)
-	if err != nil {
-		return nil, ErrInvalidVolumeFormat
-	}
-	price, err := strconv.ParseFloat(row[4], 64)
-	if err != nil {
-		return nil, ErrInvalidPriceFormat
-	}
-	homeNotional, err := strconv.ParseFloat(row[8], 64)
-	if err != nil {
-		return nil, ErrInvalidVolumeFormat
-	}
-	foreignNotional, err := strconv.ParseFloat(row[9], 64)
-	if err != nil {
-		return nil, ErrInvalidVolumeFormat
-	}
-
 	return &CsvTick{
 		Timestamp:       timestamp,
 		Symbol:          row[1],
 		Side:            row[2],
-		Size:            fixedpoint.NewFromFloat(size),
-		Price:           fixedpoint.NewFromFloat(price),
+		Size:            fixedpoint.MustNewFromString(row[3]),
+		Price:           fixedpoint.MustNewFromString(row[4]),
 		TickDirection:   row[5],
-		HomeNotional:    fixedpoint.NewFromFloat(homeNotional),
-		ForeignNotional: fixedpoint.NewFromFloat(foreignNotional),
+		HomeNotional:    fixedpoint.MustNewFromString(row[8]),
+		ForeignNotional: fixedpoint.MustNewFromString(row[9]),
 	}, nil
 }
