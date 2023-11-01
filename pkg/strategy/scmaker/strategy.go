@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	. "github.com/c9s/bbgo/pkg/indicator/v2"
-	"github.com/c9s/bbgo/pkg/risk/riskcontrol"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -60,12 +58,6 @@ type Strategy struct {
 
 	MinProfit fixedpoint.Value `json:"minProfit"`
 
-	// risk related parameters
-	PositionHardLimit         fixedpoint.Value     `json:"positionHardLimit"`
-	MaxPositionQuantity       fixedpoint.Value     `json:"maxPositionQuantity"`
-	CircuitBreakLossThreshold fixedpoint.Value     `json:"circuitBreakLossThreshold"`
-	CircuitBreakEMA           types.IntervalWindow `json:"circuitBreakEMA"`
-
 	liquidityOrderBook, adjustmentOrderBook *bbgo.ActiveOrderBook
 	book                                    *types.StreamOrderBook
 
@@ -75,9 +67,6 @@ type Strategy struct {
 	ewma      *EWMAStream
 	boll      *BOLLStream
 	intensity *IntensityStream
-
-	positionRiskControl     *riskcontrol.PositionRiskControl
-	circuitBreakRiskControl *riskcontrol.CircuitBreakRiskControl
 }
 
 func (s *Strategy) ID() string {
@@ -110,21 +99,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	s.adjustmentOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
 	s.adjustmentOrderBook.BindStream(session.UserDataStream)
-
-	if !s.PositionHardLimit.IsZero() && !s.MaxPositionQuantity.IsZero() {
-		log.Infof("positionHardLimit and maxPositionQuantity are configured, setting up PositionRiskControl...")
-		s.positionRiskControl = riskcontrol.NewPositionRiskControl(s.OrderExecutor, s.PositionHardLimit, s.MaxPositionQuantity)
-	}
-
-	if !s.CircuitBreakLossThreshold.IsZero() {
-		log.Infof("circuitBreakLossThreshold is configured, setting up CircuitBreakRiskControl...")
-		s.circuitBreakRiskControl = riskcontrol.NewCircuitBreakRiskControl(
-			s.Position,
-			session.Indicators(s.Symbol).EWMA(s.CircuitBreakEMA),
-			s.CircuitBreakLossThreshold,
-			s.ProfitStats,
-			24*time.Hour)
-	}
 
 	scale, err := s.LiquiditySlideRule.Scale()
 	if err != nil {
@@ -282,7 +256,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		return
 	}
 
-	if s.circuitBreakRiskControl != nil && s.circuitBreakRiskControl.IsHalted(ticker.Time) {
+	if s.IsHalted(ticker.Time) {
 		log.Warn("circuitBreakRiskControl: trading halted")
 		return
 	}
