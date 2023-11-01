@@ -540,7 +540,6 @@ var BacktestCmd = &cobra.Command{
 
 		for _, session := range environ.Sessions() {
 			for symbol, trades := range session.Trades {
-
 				if len(trades.Trades) == 0 {
 					log.Warnf("session has no %s trades", symbol)
 					continue
