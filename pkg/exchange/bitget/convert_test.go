@@ -10,7 +10,37 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func TestToGlobalMarket(t *testing.T) {
+func Test_toGlobalBalance(t *testing.T) {
+	// sample:
+	// {
+	//        "coinId":"10012",
+	//        "coinName":"usdt",
+	//        "available":"0",
+	//        "frozen":"0",
+	//        "lock":"0",
+	//        "uTime":"1622697148"
+	//    }
+	asset := bitgetapi.AccountAsset{
+		CoinId:    2,
+		CoinName:  "USDT",
+		Available: fixedpoint.NewFromFloat(1.2),
+		Frozen:    fixedpoint.NewFromFloat(0.5),
+		Lock:      fixedpoint.NewFromFloat(0.5),
+		UTime:     types.NewMillisecondTimestampFromInt(1622697148),
+	}
+
+	assert.Equal(t, types.Balance{
+		Currency:          "USDT",
+		Available:         fixedpoint.NewFromFloat(1.2),
+		Locked:            fixedpoint.NewFromFloat(1), // frozen + lock
+		Borrowed:          fixedpoint.Zero,
+		Interest:          fixedpoint.Zero,
+		NetAsset:          fixedpoint.Zero,
+		MaxWithdrawAmount: fixedpoint.Zero,
+	}, toGlobalBalance(asset))
+}
+
+func Test_toGlobalMarket(t *testing.T) {
 	// sample:
 	//{
 	//            "symbol":"BTCUSDT_SPBL",
