@@ -23,6 +23,10 @@ var log = logrus.WithFields(logrus.Fields{
 var (
 	// queryMarketRateLimiter has its own rate limit. https://bitgetlimited.github.io/apidoc/en/spot/#get-symbols
 	queryMarketRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
+	// queryAccountRateLimiter has its own rate limit. https://bitgetlimited.github.io/apidoc/en/spot/#get-account-assets
+	queryAccountRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
+	// queryTickerRateLimiter has its own rate limit. https://bitgetlimited.github.io/apidoc/en/spot/#get-single-ticker
+	queryTickerRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
 )
 
 type Exchange struct {
@@ -80,11 +84,15 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
+	if err := queryTickerRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("ticker rate limiter wait error: %w", err)
+	}
+
 	req := e.client.NewGetTickerRequest()
 	req.Symbol(symbol)
 	ticker, err := req.Do(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query ticker: %w", err)
 	}
 
 	return &types.Ticker{
@@ -110,16 +118,9 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	req := e.client.NewGetAccountAssetsRequest()
-	resp, err := req.Do(ctx)
+	bals, err := e.QueryAccountBalances(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	bals := types.BalanceMap{}
-	for _, asset := range resp {
-		b := toGlobalBalance(asset)
-		bals[asset.CoinName] = b
 	}
 
 	account := types.NewAccount()
@@ -128,8 +129,23 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	// TODO implement me
-	panic("implement me")
+	if err := queryAccountRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
+	}
+
+	req := e.client.NewGetAccountAssetsRequest()
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query account assets: %w", err)
+	}
+
+	bals := types.BalanceMap{}
+	for _, asset := range resp {
+		b := toGlobalBalance(asset)
+		bals[asset.CoinName] = b
+	}
+
+	return bals, nil
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
