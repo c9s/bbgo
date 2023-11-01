@@ -19,8 +19,6 @@ import (
 
 const ID = "scmaker"
 
-var ten = fixedpoint.NewFromInt(10)
-
 type advancedOrderCancelApi interface {
 	CancelAllOrders(ctx context.Context) ([]types.Order, error)
 	CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error)
@@ -100,12 +98,12 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.Strategy = &common.Strategy{}
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
 	s.book = types.NewStreamBook(s.Symbol)
-	s.book.BindStream(session.UserDataStream)
+	s.book.BindStream(session.MarketDataStream)
 
 	s.liquidityOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
 	s.liquidityOrderBook.BindStream(session.UserDataStream)
@@ -174,7 +172,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
-func (s *Strategy) preloadKLines(inc *KLineStream, session *bbgo.ExchangeSession, symbol string, interval types.Interval) {
+func (s *Strategy) preloadKLines(
+	inc *KLineStream, session *bbgo.ExchangeSession, symbol string, interval types.Interval,
+) {
 	if store, ok := session.MarketDataStore(symbol); ok {
 		if kLinesData, ok := store.KLinesOfInterval(interval); ok {
 			for _, k := range *kLinesData {
@@ -476,7 +476,9 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	log.Infof("%d liq orders are placed successfully", len(liqOrders))
 }
 
-func profitProtectedPrice(side types.SideType, averageCost, price, feeRate, minProfit fixedpoint.Value) fixedpoint.Value {
+func profitProtectedPrice(
+	side types.SideType, averageCost, price, feeRate, minProfit fixedpoint.Value,
+) fixedpoint.Value {
 	switch side {
 	case types.SideTypeSell:
 		minProfitPrice := averageCost.Add(
