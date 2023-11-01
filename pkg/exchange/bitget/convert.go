@@ -46,3 +46,16 @@ func toGlobalMarket(s bitgetapi.Symbol) types.Market {
 		MaxPrice:        fixedpoint.Zero,
 	}
 }
+
+func toGlobalTicker(ticker bitgetapi.Ticker) types.Ticker {
+	return types.Ticker{
+		Time:   ticker.Ts.Time(),
+		Volume: ticker.BaseVol,
+		Last:   ticker.Close,
+		Open:   ticker.OpenUtc0,
+		High:   ticker.High24H,
+		Low:    ticker.Low24H,
+		Buy:    ticker.BuyOne,
+		Sell:   ticker.SellOne,
+	}
+}

@@ -27,6 +27,8 @@ var (
 	queryAccountRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
 	// queryTickerRateLimiter has its own rate limit. https://bitgetlimited.github.io/apidoc/en/spot/#get-single-ticker
 	queryTickerRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
+	// queryTickersRateLimiter has its own rate limit. https://bitgetlimited.github.io/apidoc/en/spot/#get-all-tickers
+	queryTickersRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
 )
 
 type Exchange struct {
@@ -90,26 +92,44 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 
 	req := e.client.NewGetTickerRequest()
 	req.Symbol(symbol)
-	ticker, err := req.Do(ctx)
+	resp, err := req.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query ticker: %w", err)
 	}
 
-	return &types.Ticker{
-		Time:   ticker.Ts.Time(),
-		Volume: ticker.BaseVol,
-		Last:   ticker.Close,
-		Open:   ticker.OpenUtc0,
-		High:   ticker.High24H,
-		Low:    ticker.Low24H,
-		Buy:    ticker.BuyOne,
-		Sell:   ticker.SellOne,
-	}, nil
+	ticker := toGlobalTicker(*resp)
+	return &ticker, nil
 }
 
-func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
-	// TODO implement me
-	panic("implement me")
+func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[string]types.Ticker, error) {
+	tickers := map[string]types.Ticker{}
+	if len(symbols) > 0 {
+		for _, s := range symbols {
+			t, err := e.QueryTicker(ctx, s)
+			if err != nil {
+				return nil, err
+			}
+
+			tickers[s] = *t
+		}
+
+		return tickers, nil
+	}
+
+	if err := queryTickersRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("tickers rate limiter wait error: %w", err)
+	}
+
+	resp, err := e.client.NewGetAllTickersRequest().Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tickers: %w", err)
+	}
+
+	for _, s := range resp {
+		tickers[s.Symbol] = toGlobalTicker(s)
+	}
+
+	return tickers, nil
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
