@@ -8,45 +8,16 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
 	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
-type IntervalProfitCollector struct {
-	Interval  Interval      `json:"interval"`
-	Profits   *floats.Slice `json:"profits"`
-	Timestamp *floats.Slice `json:"timestamp"`
-	tmpTime   time.Time     `json:"tmpTime"`
-}
-
-func NewIntervalProfitCollector(i Interval, startTime time.Time) *IntervalProfitCollector {
-	return &IntervalProfitCollector{Interval: i, tmpTime: startTime, Profits: &floats.Slice{1.}, Timestamp: &floats.Slice{float64(startTime.Unix())}}
-}
-
-// Update the collector by every traded profit
-func (s *IntervalProfitCollector) Update(profit *Profit) {
-	if s.tmpTime.IsZero() {
-		panic("No valid start time. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
-	} else {
-		duration := s.Interval.Duration()
-		if profit.TradedAt.Before(s.tmpTime.Add(duration)) {
-			(*s.Profits)[len(*s.Profits)-1] *= 1. + profit.NetProfitMargin.Float64()
-		} else {
-			for {
-				s.Profits.Update(1.)
-				s.tmpTime = s.tmpTime.Add(duration)
-				s.Timestamp.Update(float64(s.tmpTime.Unix()))
-				if profit.TradedAt.Before(s.tmpTime.Add(duration)) {
-					(*s.Profits)[len(*s.Profits)-1] *= 1. + profit.NetProfitMargin.Float64()
-					break
-				}
-			}
-		}
-	}
-}
+const (
+	ErrStartTimeNotValid = "No valid start time. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?"
+	ErrProfitArrEmpty    = "profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?"
+)
 
 type ProfitReport struct {
 	StartTime time.Time `json:"startTime"`
@@ -60,6 +31,55 @@ func (s ProfitReport) String() string {
 		log.Fatal(err)
 	}
 	return string(b)
+}
+
+type IntervalProfitCollector struct {
+	Interval     Interval        `json:"interval"`
+	Profits      floats.Slice    `json:"profits"`
+	TimeInMarket []time.Duration `json:"timeInMarket"`
+	Timestamp    floats.Slice    `json:"timestamp"`
+	tmpTime      time.Time       `json:"tmpTime"`
+}
+
+func NewIntervalProfitCollector(i Interval, startTime time.Time) *IntervalProfitCollector {
+	return &IntervalProfitCollector{Interval: i, tmpTime: startTime, Profits: floats.Slice{1.}, Timestamp: floats.Slice{float64(startTime.Unix())}}
+}
+
+// Update the collector by every traded profit
+func (s *IntervalProfitCollector) Update(profit *Profit) {
+	if s.tmpTime.IsZero() {
+		panic(ErrStartTimeNotValid)
+	} else {
+		s.TimeInMarket = append(s.TimeInMarket, profit.TradedAt.Sub(profit.PositionOpenedAt))
+		duration := s.Interval.Duration()
+		if profit.TradedAt.Before(s.tmpTime.Add(duration)) {
+			(s.Profits)[len(s.Profits)-1] *= 1. + profit.NetProfitMargin.Float64()
+		} else {
+			for {
+				s.Profits.Update(1.)
+				s.tmpTime = s.tmpTime.Add(duration)
+				s.Timestamp.Update(float64(s.tmpTime.Unix()))
+				if profit.TradedAt.Before(s.tmpTime.Add(duration)) {
+					(s.Profits)[len(s.Profits)-1] *= 1. + profit.NetProfitMargin.Float64()
+					break
+				}
+			}
+		}
+	}
+}
+
+// Determine average and total time spend in market
+func (s *IntervalProfitCollector) GetTimeInMarket() (avgHoldSec, totalTimeInMarketSec int64) {
+	if s.Profits == nil {
+		return 0, 0
+	}
+	l := len(s.TimeInMarket)
+	for i := 0; i < l; i++ {
+		d := s.TimeInMarket[i]
+		totalTimeInMarketSec += int64(d / time.Millisecond)
+	}
+	avgHoldSec = totalTimeInMarketSec / int64(l)
+	return
 }
 
 // Get all none-profitable intervals
@@ -93,9 +113,9 @@ func (s *IntervalProfitCollector) GetProfitableIntervals() (result []ProfitRepor
 // Get number of profitable traded intervals
 func (s *IntervalProfitCollector) GetNumOfProfitableIntervals() (profit int) {
 	if s.Profits == nil {
-		panic("profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrProfitArrEmpty)
 	}
-	for _, v := range *s.Profits {
+	for _, v := range s.Profits {
 		if v > 1. {
 			profit += 1
 		}
@@ -107,9 +127,9 @@ func (s *IntervalProfitCollector) GetNumOfProfitableIntervals() (profit int) {
 // (no trade within the interval or pnl = 0 will be also included here)
 func (s *IntervalProfitCollector) GetNumOfNonProfitableIntervals() (nonprofit int) {
 	if s.Profits == nil {
-		panic("profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrProfitArrEmpty)
 	}
-	for _, v := range *s.Profits {
+	for _, v := range s.Profits {
 		if v <= 1. {
 			nonprofit += 1
 		}
@@ -121,10 +141,11 @@ func (s *IntervalProfitCollector) GetNumOfNonProfitableIntervals() (nonprofit in
 // no smart sharpe ON for the calculated result
 func (s *IntervalProfitCollector) GetSharpe() float64 {
 	if s.tmpTime.IsZero() {
-		panic("No valid start time. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrStartTimeNotValid)
 	}
 	if s.Profits == nil {
-		panic("profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrStartTimeNotValid)
+
 	}
 	return Sharpe(Sub(s.Profits, 1.), s.Profits.Length(), true, false)
 }
@@ -133,10 +154,10 @@ func (s *IntervalProfitCollector) GetSharpe() float64 {
 // No risk-free return rate and smart sortino OFF for the calculated result.
 func (s *IntervalProfitCollector) GetSortino() float64 {
 	if s.tmpTime.IsZero() {
-		panic("No valid start time. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrStartTimeNotValid)
 	}
 	if s.Profits == nil {
-		panic("profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrProfitArrEmpty)
 	}
 	return Sortino(Sub(s.Profits, 1.), 0., s.Profits.Length(), true, false)
 }
