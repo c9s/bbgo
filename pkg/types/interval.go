@@ -64,6 +64,61 @@ func (i Interval) Duration() time.Duration {
 	return time.Duration(i.Milliseconds()) * time.Millisecond
 }
 
+// Truncate determines the candle open time from a given timestamp
+// eg interval 1 hour and tick at timestamp 00:58:45 will return timestamp shifted to 00:00:00
+func (i Interval) Truncate(ts time.Time) (start time.Time) {
+	switch i {
+	case Interval1s:
+		return ts.Truncate(time.Second)
+	case Interval1m:
+		return ts.Truncate(time.Minute)
+	case Interval3m:
+		return shiftMinute(ts, 3)
+	case Interval5m:
+		return shiftMinute(ts, 5)
+	case Interval15m:
+		return shiftMinute(ts, 15)
+	case Interval30m:
+		return shiftMinute(ts, 30)
+	case Interval1h:
+		return ts.Truncate(time.Hour)
+	case Interval2h:
+		return shiftHour(ts, 2)
+	case Interval4h:
+		return shiftHour(ts, 4)
+	case Interval6h:
+		return shiftHour(ts, 6)
+	case Interval12h:
+		return shiftHour(ts, 12)
+	case Interval1d:
+		return ts.Truncate(time.Hour * 24)
+	case Interval3d:
+		return shiftDay(ts, 3)
+	case Interval1w:
+		return shiftDay(ts, 7)
+	case Interval2w:
+		return shiftDay(ts, 14)
+	case Interval1mo:
+		return time.Date(ts.Year(), ts.Month(), 0, 0, 0, 0, 0, time.UTC)
+	}
+	return start
+}
+
+func shiftDay(ts time.Time, shift int) time.Time {
+	day := ts.Day() - (ts.Day() % shift)
+	return time.Date(ts.Year(), ts.Month(), day, 0, 0, 0, 0, ts.Location())
+}
+
+func shiftHour(ts time.Time, shift int) time.Time {
+	hour := ts.Hour() - (ts.Hour() % shift)
+	return time.Date(ts.Year(), ts.Month(), ts.Day(), hour, 0, 0, 0, ts.Location())
+}
+
+func shiftMinute(ts time.Time, shift int) time.Time {
+	minute := ts.Minute() - (ts.Minute() % shift)
+	return time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour(), minute, 0, 0, ts.Location())
+}
+
 func (i *Interval) UnmarshalJSON(b []byte) (err error) {
 	var a string
 	err = json.Unmarshal(b, &a)

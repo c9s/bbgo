@@ -68,49 +68,21 @@ func ReadSummaryReport(filename string) (*SummaryReport, error) {
 // SessionSymbolReport is the report per exchange session
 // trades are merged, collected and re-calculated
 type SessionSymbolReport struct {
-	Exchange                 types.ExchangeName        `json:"exchange"`
-	Symbol                   string                    `json:"symbol,omitempty"`
-	Intervals                []types.Interval          `json:"intervals,omitempty"`
-	Subscriptions            []types.Subscription      `json:"subscriptions"`
-	Market                   types.Market              `json:"market"`
-	LastPrice                fixedpoint.Value          `json:"lastPrice,omitempty"`
-	StartPrice               fixedpoint.Value          `json:"startPrice,omitempty"`
-	PnL                      *pnl.AverageCostPnLReport `json:"pnl,omitempty"`
-	InitialBalances          types.BalanceMap          `json:"initialBalances,omitempty"`
-	FinalBalances            types.BalanceMap          `json:"finalBalances,omitempty"`
-	Manifests                Manifests                 `json:"manifests,omitempty"`
-	TradeCount               fixedpoint.Value          `json:"tradeCount,omitempty"`
-	RoundTurnCount           fixedpoint.Value          `json:"roundTurnCount,omitempty"`
-	TotalNetProfit           fixedpoint.Value          `json:"totalNetProfit,omitempty"`
-	AvgNetProfit             fixedpoint.Value          `json:"avgNetProfit,omitempty"`
-	GrossProfit              fixedpoint.Value          `json:"grossProfit,omitempty"`
-	GrossLoss                fixedpoint.Value          `json:"grossLoss,omitempty"`
-	PRR                      fixedpoint.Value          `json:"prr,omitempty"`
-	PercentProfitable        fixedpoint.Value          `json:"percentProfitable,omitempty"`
-	MaxDrawdown              fixedpoint.Value          `json:"maxDrawdown,omitempty"`
-	AverageDrawdown          fixedpoint.Value          `json:"avgDrawdown,omitempty"`
-	MaxProfit                fixedpoint.Value          `json:"maxProfit,omitempty"`
-	MaxLoss                  fixedpoint.Value          `json:"maxLoss,omitempty"`
-	AvgProfit                fixedpoint.Value          `json:"avgProfit,omitempty"`
-	AvgLoss                  fixedpoint.Value          `json:"avgLoss,omitempty"`
-	TotalTimeInMarketSec     int64                     `json:"totalTimeInMarketSec,omitempty"`
-	AvgHoldSec               int64                     `json:"avgHoldSec,omitempty"`
-	WinningCount             int                       `json:"winningCount,omitempty"`
-	LosingCount              int                       `json:"losingCount,omitempty"`
-	MaxLossStreak            int                       `json:"maxLossStreak,omitempty"`
-	Sharpe                   fixedpoint.Value          `json:"sharpeRatio"`
-	AnnualHistoricVolatility fixedpoint.Value          `json:"annualHistoricVolatility,omitempty"`
-	CAGR                     fixedpoint.Value          `json:"cagr,omitempty"`
-	Calmar                   fixedpoint.Value          `json:"calmar,omitempty"`
-	Sterling                 fixedpoint.Value          `json:"sterling,omitempty"`
-	Burke                    fixedpoint.Value          `json:"burke,omitempty"`
-	Kelly                    fixedpoint.Value          `json:"kelly,omitempty"`
-	OptimalF                 fixedpoint.Value          `json:"optimalF,omitempty"`
-	StatN                    fixedpoint.Value          `json:"statN,omitempty"`
-	StdErr                   fixedpoint.Value          `json:"statNStdErr,omitempty"`
-	Sortino                  fixedpoint.Value          `json:"sortinoRatio"`
-	ProfitFactor             fixedpoint.Value          `json:"profitFactor"`
-	WinningRatio             fixedpoint.Value          `json:"winningRatio"`
+	Exchange        types.ExchangeName        `json:"exchange"`
+	Symbol          string                    `json:"symbol,omitempty"`
+	Intervals       []types.Interval          `json:"intervals,omitempty"`
+	Subscriptions   []types.Subscription      `json:"subscriptions"`
+	Market          types.Market              `json:"market"`
+	LastPrice       fixedpoint.Value          `json:"lastPrice,omitempty"`
+	StartPrice      fixedpoint.Value          `json:"startPrice,omitempty"`
+	PnL             *pnl.AverageCostPnLReport `json:"pnl,omitempty"`
+	InitialBalances types.BalanceMap          `json:"initialBalances,omitempty"`
+	FinalBalances   types.BalanceMap          `json:"finalBalances,omitempty"`
+	Manifests       Manifests                 `json:"manifests,omitempty"`
+	Sharpe          fixedpoint.Value          `json:"sharpeRatio"`
+	Sortino         fixedpoint.Value          `json:"sortinoRatio"`
+	ProfitFactor    fixedpoint.Value          `json:"profitFactor"`
+	WinningRatio    fixedpoint.Value          `json:"winningRatio"`
 }
 
 func (r *SessionSymbolReport) InitialEquityValue() fixedpoint.Value {
