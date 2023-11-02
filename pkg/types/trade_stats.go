@@ -219,24 +219,6 @@ type TradeStats struct {
 	consecutiveSide    int
 	consecutiveCounter int
 	consecutiveAmount  fixedpoint.Value
-
-	// CAGR is the Compound Annual Growth Rate of the equity curve.
-	CAGR float64
-
-	// MaxDrawdown is the maximum percentage drawdown of the equity curve
-	MaxDrawdown float64
-
-	// MDDRecovery is the recovery time of the maximum drawdown of the equity curve.
-	MDDRecovery time.Duration
-
-	// HistVolAnn is the historic volatility of the equity curve as annualized std dev.
-	HistVolAnn float64
-
-	// Sharpe is the Sharpe ratio of the equity curve.
-	Sharpe float64
-
-	// Calmar is the Calmar ratio of the equity curve.
-	Calmar float64
 }
 
 func NewTradeStats(symbol string) *TradeStats {
