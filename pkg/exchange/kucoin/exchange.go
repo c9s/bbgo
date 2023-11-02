@@ -165,7 +165,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	}
 
 	req := e.client.MarketDataService.NewGetKLinesRequest()
-	req.Symbol(toLocalSymbol(symbol))
+	req.Symbol(ToLocalSymbol(symbol))
 	req.Interval(toLocalInterval(interval))
 	if options.StartTime != nil {
 		req.StartAt(*options.StartTime)
@@ -208,7 +208,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
 	req := e.client.TradeService.NewPlaceOrderRequest()
-	req.Symbol(toLocalSymbol(order.Symbol))
+	req.Symbol(ToLocalSymbol(order.Symbol))
 	req.Side(toLocalSide(order.Side))
 
 	if order.ClientOrderID != "" {
@@ -298,7 +298,7 @@ You will not be able to query for cancelled orders that have happened more than 
 */
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	req := e.client.TradeService.NewListOrdersRequest()
-	req.Symbol(toLocalSymbol(symbol))
+	req.Symbol(ToLocalSymbol(symbol))
 	req.Status("active")
 	orderList, err := req.Do(ctx)
 	if err != nil {
@@ -316,7 +316,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
 	req := e.client.TradeService.NewListOrdersRequest()
-	req.Symbol(toLocalSymbol(symbol))
+	req.Symbol(ToLocalSymbol(symbol))
 	req.Status("done")
 	req.StartAt(since)
 
@@ -350,7 +350,7 @@ var launchDate = time.Date(2017, 9, 0, 0, 0, 0, 0, time.UTC)
 
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	req := e.client.TradeService.NewGetFillsRequest()
-	req.Symbol(toLocalSymbol(symbol))
+	req.Symbol(ToLocalSymbol(symbol))
 
 	// we always sync trades in the ascending order, and kucoin does not support last trade ID query
 	// hence we need to set the start time here
@@ -422,7 +422,7 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (types.SliceOrderBook, int64, error) {
-	orderBook, err := e.client.MarketDataService.GetOrderBook(toLocalSymbol(symbol), 100)
+	orderBook, err := e.client.MarketDataService.GetOrderBook(ToLocalSymbol(symbol), 100)
 	if err != nil {
 		return types.SliceOrderBook{}, 0, err
 	}

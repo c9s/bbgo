@@ -1,9 +1,13 @@
 ## Back-testing
 
-*Before you start back-testing, you need to setup [MySQL](../../README.md#configure-mysql-database) or [SQLite3
+Currently bbgo supports two ways to run backtests:
+
+  1: Through csv data source (supported right now are binance, bybit and OkEx)
+
+  2: Alternatively run backtests through [MySQL](../../README.md#configure-mysql-database) or [SQLite3
 ](../../README.md#configure-sqlite3-database). Using MySQL is highly recommended.*
 
-First, you need to add the back-testing config to your `bbgo.yaml`:
+Let's start by adding the back-testing section to your config eg: `bbgo.yaml`:
 
 ```yaml
 backtest:
@@ -41,8 +45,11 @@ Note on date formats, the following date formats are supported:
 * RFC822, which looks like `02 Jan 06 15:04 MST`
 * You can also use `2021-11-26T15:04:56`
 
-And then, you can sync remote exchange k-lines (candle bars) data for back-testing:
-
+And then, you can sync remote exchange k-lines (candle bars) data for back-testing through csv data source:
+```sh
+bbgo backtest -v --csv --verify --config config/grid.yaml
+```
+or use the sql data source like so:
 ```sh
 bbgo backtest -v --sync --config config/grid.yaml
 ```
@@ -66,6 +73,11 @@ Run back-test:
 
 ```sh
 bbgo backtest --base-asset-baseline --config config/grid.yaml
+```
+or through csv data source
+
+```sh
+bbgo backtest -v --csv --base-asset-baseline --config config/grid.yaml --output data/backtest
 ```
 
 If you're developing a strategy, you might want to start with a command like this:
