@@ -33,7 +33,6 @@ func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
 	qty := fixedpoint.MustNewFromString(row[2])
 	baseQty := fixedpoint.MustNewFromString(row[2])
 	price := fixedpoint.MustNewFromString(row[1])
-	// isBuyerMaker=false trade will qualify as BUY.
 	id, err := strconv.ParseUint(row[0], 10, 64)
 	if err != nil {
 		return nil, err
@@ -42,6 +41,7 @@ func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
 	if err != nil {
 		return nil, err
 	}
+	// isBuyerMaker=false trade will qualify as BUY.
 	side := types.SideTypeBuy
 	if isBuyerMaker {
 		side = types.SideTypeSell
