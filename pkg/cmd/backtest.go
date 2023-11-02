@@ -531,7 +531,7 @@ var BacktestCmd = &cobra.Command{
 				winningRatio := tradeState.WinningRatio
 				intervalProfits := tradeState.IntervalProfits[types.Interval1d]
 
-				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Copy(), tradeStats)
+				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Copy(), intervalProfits, profitFactor, winningRatio)
 				if err != nil {
 					return err
 				}
@@ -596,13 +596,14 @@ var BacktestCmd = &cobra.Command{
 	},
 }
 
-func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, symbol string, trades []types.Trade, intervalProfit *types.IntervalProfitCollector,
-	profitFactor, winningRatio fixedpoint.Value) (
+func createSymbolReport(
+	userConfig *bbgo.Config, session *bbgo.ExchangeSession, symbol string, trades []types.Trade,
+	intervalProfit *types.IntervalProfitCollector,
+	profitFactor, winningRatio fixedpoint.Value,
+) (
 	*backtest.SessionSymbolReport,
 	error,
 ) {
-	intervalProfit := tradeStats.IntervalProfits[types.Interval1d]
-
 	backtestExchange, ok := session.Exchange.(*backtest.Exchange)
 	if !ok {
 		return nil, fmt.Errorf("unexpected error, exchange instance is not a backtest exchange")
@@ -612,11 +613,6 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 	if !ok {
 		return nil, fmt.Errorf("market not found: %s, %s", symbol, session.Exchange.Name())
 	}
-	tStart, tEnd := trades[0].Time, trades[len(trades)-1].Time
-
-	periodStart := tStart.Time()
-	periodEnd := tEnd.Time()
-	period := periodEnd.Sub(periodStart)
 
 	startPrice, ok := session.StartPrice(symbol)
 	if !ok {
@@ -633,80 +629,28 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 		Market:             market,
 	}
 
+	sharpeRatio := fixedpoint.NewFromFloat(intervalProfit.GetSharpe())
+	sortinoRatio := fixedpoint.NewFromFloat(intervalProfit.GetSortino())
+
 	report := calculator.Calculate(symbol, trades, lastPrice)
 	accountConfig := userConfig.Backtest.GetAccount(session.Exchange.Name().String())
 	initBalances := accountConfig.Balances.BalanceMap()
 	finalBalances := session.GetAccount().Balances()
-	maxProfit := n(intervalProfit.Profits.Max())
-	maxLoss := n(intervalProfit.Profits.Min())
-	drawdown := types.Drawdown(intervalProfit.Profits)
-	maxDrawdown := drawdown.Max()
-	avgDrawdown := drawdown.Average()
-	roundTurnCount := n(float64(tradeStats.NumOfProfitTrade + tradeStats.NumOfLossTrade))
-	roundTurnLength := n(float64(intervalProfit.Profits.Length()))
-	winningCount := n(float64(tradeStats.NumOfProfitTrade))
-	loosingCount := n(float64(tradeStats.NumOfLossTrade))
-	avgProfit := tradeStats.GrossProfit.Div(n(types.NNZ(float64(tradeStats.NumOfProfitTrade), 1)))
-	avgLoss := tradeStats.GrossLoss.Div(n(types.NNZ(float64(tradeStats.NumOfLossTrade), 1)))
-
-	winningPct := winningCount.Div(roundTurnCount)
-	// losingPct := fixedpoint.One.Sub(winningPct)
-
-	sharpeRatio := n(intervalProfit.GetSharpe())
-	sortinoRatio := n(intervalProfit.GetSortino())
-	annVolHis := n(types.AnnualHistoricVolatility(intervalProfit.Profits))
-	totalTimeInMarketSec, avgHoldSec := intervalProfit.GetTimeInMarket()
-	statn, stdErr := types.StatN(intervalProfit.Profits)
 	symbolReport := backtest.SessionSymbolReport{
-		Exchange:                 session.Exchange.Name(),
-		Symbol:                   symbol,
-		Market:                   market,
-		LastPrice:                lastPrice,
-		StartPrice:               startPrice,
-		InitialBalances:          initBalances,
-		FinalBalances:            finalBalances,
-		TradeCount:               fixedpoint.NewFromInt(int64(len(trades))),
-		GrossLoss:                tradeStats.GrossLoss,
-		GrossProfit:              tradeStats.GrossProfit,
-		WinningCount:             tradeStats.NumOfProfitTrade,
-		LosingCount:              tradeStats.NumOfLossTrade,
-		RoundTurnCount:           roundTurnCount,
-		WinningRatio:             tradeStats.WinningRatio,
-		PercentProfitable:        winningPct,
-		ProfitFactor:             tradeStats.ProfitFactor,
-		MaxDrawdown:              n(maxDrawdown),
-		AverageDrawdown:          n(avgDrawdown),
-		MaxProfit:                maxProfit,
-		MaxLoss:                  maxLoss,
-		MaxLossStreak:            tradeStats.MaximumConsecutiveLosses,
-		TotalTimeInMarketSec:     totalTimeInMarketSec,
-		AvgHoldSec:               avgHoldSec,
-		AvgProfit:                avgProfit,
-		AvgLoss:                  avgLoss,
-		AvgNetProfit:             tradeStats.TotalNetProfit.Div(roundTurnLength),
-		TotalNetProfit:           tradeStats.TotalNetProfit,
-		AnnualHistoricVolatility: annVolHis,
-		PnL:                      report,
-		PRR:                      types.PRR(tradeStats.GrossProfit, tradeStats.GrossLoss, winningCount, loosingCount),
-		Kelly:                    types.KellyCriterion(tradeStats.ProfitFactor, winningPct),
-		OptimalF:                 types.OptimalF(intervalProfit.Profits),
-		StatN:                    statn,
-		StdErr:                   stdErr,
-		Sharpe:                   sharpeRatio,
-		Sortino:                  sortinoRatio,
+		Exchange:        session.Exchange.Name(),
+		Symbol:          symbol,
+		Market:          market,
+		LastPrice:       lastPrice,
+		StartPrice:      startPrice,
+		PnL:             report,
+		InitialBalances: initBalances,
+		FinalBalances:   finalBalances,
+		// Manifests:       manifests,
+		Sharpe:       sharpeRatio,
+		Sortino:      sortinoRatio,
+		ProfitFactor: profitFactor,
+		WinningRatio: winningRatio,
 	}
-
-	cagr := types.NN(
-		types.CAGR(
-			symbolReport.InitialEquityValue().Float64(),
-			symbolReport.FinalEquityValue().Float64(),
-			int(period.Hours())/24,
-		), 0)
-
-	symbolReport.CAGR = n(cagr)
-	symbolReport.Calmar = n(types.CalmarRatio(cagr, maxDrawdown))
-	symbolReport.Sterling = n(types.SterlingRatio(cagr, avgDrawdown))
-	symbolReport.Burke = n(types.BurkeRatio(cagr, drawdown.AverageSquared()))
 
 	for _, s := range session.Subscriptions {
 		symbolReport.Subscriptions = append(symbolReport.Subscriptions, s)
@@ -730,7 +674,10 @@ func n(v float64) fixedpoint.Value {
 	return fixedpoint.NewFromFloat(v)
 }
 
-func verify(userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, startTime, endTime time.Time) error {
+func verify(
+	userConfig *bbgo.Config, backtestService *service.BacktestService,
+	sourceExchanges map[types.ExchangeName]types.Exchange, startTime, endTime time.Time,
+) error {
 	for _, sourceExchange := range sourceExchanges {
 		err := backtestService.Verify(sourceExchange, userConfig.Backtest.Symbols, startTime, endTime)
 		if err != nil {
