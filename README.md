@@ -30,14 +30,14 @@ You can use BBGO's trading unit and back-test unit to implement your own strateg
 
 ### Trading Unit Developers 🧑‍💻
 
-You can use BBGO's underlying common exchange API, currently it supports 4+ major exchanges, so you don't have to repeat
+You can use BBGO's underlying common exchange API, currently, it supports 4+ major exchanges, so you don't have to repeat
 the implementation.
 
 ## Features
 
 - Exchange abstraction interface.
-- Stream integration (user data websocket, market data websocket).
-- Real-time orderBook integration through websocket.
+- Stream integration (user data web socket, market data web socket).
+- Real-time orderBook integration through a web socket.
 - TWAP order execution support. See [TWAP Order Execution](./doc/topics/twap.md)
 - PnL calculation.
 - Slack/Telegram notification.
@@ -101,25 +101,25 @@ the implementation.
 | xnav        | this strategy helps you record the current net asset value                                                                              | tool       | no               |
 | xalign      | this strategy aligns your balance position automatically                                                                                | tool       | no               |
 | xfunding    | a funding rate fee strategy                                                                                                             | funding    | no               |
-| autoborrow  | this strategy uses margin to borrow assets, to help you keep the minimal balance                                                        | tool       | no               |
-| pivotshort  | this strategy finds the pivot low and entry the trade when the price breaks the previous low                                            | long/short |                  |
+| autoborrow  | this strategy uses margin to borrow assets, to help you keep a minimal balance                                                        | tool       | no               |
+| pivotshort  | this strategy finds the pivot low and enters the trade when the price breaks the previous low                                            | long/short |                  |
 | schedule    | this strategy buy/sell with a fixed quantity periodically, you can use this as a single DCA, or to refill the fee asset like BNB.       | tool       |
 | irr         | this strategy opens the position based on the predicated return rate                                                                    | long/short |                  |
-| bollmaker   | this strategy holds a long-term long/short position, places maker orders on both side, uses bollinger band to control the position size | maker      |                  |
-| wall        | this strategy creates wall (large amount order) on the order book                                                                       | maker      | no               |
-| scmaker     | this market making strategy is desgiend for stable coin markets, like USDC/USDT                                                         | maker      |                  |
+| bollmaker   | this strategy holds a long-term long/short position, places maker orders on both sides, and uses a bollinger band to control the position size | maker      |                  |
+| wall        | this strategy creates a wall (large amount of order) on the order book                                                                       | maker      | no               |
+| scmaker     | this market making strategy is designed for stable coin markets, like USDC/USDT                                                         | maker      |                  |
 | drift       |                                                                                                                                         | long/short |                  |
-| rsicross    | this strategy opens a long position when the fast rsi cross over the slow rsi, this is a demo strategy for using the v2 indicator       | long/short |                  |
+| rsicross    | this strategy opens a long position when the fast rsi crosses over the slow rsi, this is a demo strategy for using the v2 indicator       | long/short |                  |
 | marketcap   | this strategy implements a strategy that rebalances the portfolio based on the market capitalization                                    | rebalance  | no               |
 | supertrend  | this strategy uses DEMA and Supertrend indicator to open the long/short position                                                        | long/short |                  |
-| trendtrader | this strategy opens long/short position based on the trendline breakout                                                                 | long/short |                  |
+| trendtrader | this strategy opens a long/short position based on the trendline breakout                                                                 | long/short |                  |
 | elliottwave |                                                                                                                                         | long/short |                  |
 | ewoDgtrd    |                                                                                                                                         | long/short |                  |
 | fixedmaker  |                                                                                                                                         | maker      |                  |
 | factoryzoo  |                                                                                                                                         | long/short |                  |
 | fmaker      |                                                                                                                                         | maker      |                  |
 | linregmaker | a linear regression based market maker                                                                                                  | maker      |                  |
-| convert     | convert strategy is a tool that helps you convert specific asset to a target asset                                                      | tool       | no               |
+| convert     | convert strategy is a tool that helps you convert a specific asset to a target asset                                                      | tool       | no               |
 
 
 
@@ -177,7 +177,7 @@ bash <(curl -s https://raw.githubusercontent.com/c9s/bbgo/main/scripts/download.
 
 Or refer to the [Release Page](https://github.com/c9s/bbgo/releases) and download manually.
 
-Since v2, we've added new float point implementation from dnum to support decimals with higher precision. To download &
+Since v2, we've added a new float point implementation from dnum to support decimals with higher precision. To download &
 setup, please refer to [Dnum Installation](doc/topics/dnum-binary.md)
 
 ### One-click Linode StackScript
@@ -250,7 +250,7 @@ To start bbgo with the frontend dashboard:
 bbgo run --enable-webserver
 ```
 
-If you want to switch to other dotenv file, you can add an `--dotenv` option or `--config`:
+If you want to switch to another dotenv file, you can add an `--dotenv` option or `--config`:
 
 ```sh
 bbgo sync --dotenv .env.dev --config config/grid.yaml --session binance
@@ -292,7 +292,7 @@ You could also add the script to crontab so that the system time could get synch
 
 ### Testnet (Paper Trading)
 
-Currently only supports binance testnet. To run bbgo in testnet, apply new API keys
+Currently only supports Binance testnet. To run bbgo in testnet, apply new API keys
 from [Binance Test Network](https://testnet.binance.vision), and set the following env before you start bbgo:
 
 ```bash
@@ -319,7 +319,7 @@ You can only use one database driver MySQL or SQLite to store your trading data.
 
 #### Configure MySQL Database
 
-To use MySQL database for data syncing, first you need to install your mysql server:
+To use MySQL database for data syncing, first, you need to install your MySQL server:
 
 ```sh
 # For Ubuntu Linux
@@ -406,7 +406,7 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
 - `drift` - drift strategy.
 - `grid2` - the second-generation grid strategy.
 
-To run these built-in strategies, just modify the config file to make the configuration suitable for you, for example if
+To run these built-in strategies, just modify the config file to make the configuration suitable for you, for example, if
 you want to run
 `buyandhold` strategy:
 
@@ -427,7 +427,7 @@ See [Developing Strategy](./doc/topics/developing-strategy.md)
 
 ## Write your own private strategy
 
-Create your go package, and initialize the repository with `go mod` and add bbgo as a dependency:
+Create your go package, initialize the repository with `go mod`, and add bbgo as a dependency:
 
 ```sh
 go mod init
@@ -488,7 +488,7 @@ See also:
 
 ## Command Usages
 
-### Submitting Orders to a specific exchagne session
+### Submitting Orders to a specific exchange session
 
 ```shell
 bbgo submit-order --session=okex --symbol=OKBUSDT --side=buy --price=10.0 --quantity=1
@@ -524,7 +524,7 @@ bbgo userdatastream --session binance
 
 In order to minimize the strategy code, bbgo supports dynamic dependency injection.
 
-Before executing your strategy, bbgo injects the components into your strategy object if it found the embedded field
+Before executing your strategy, bbgo injects the components into your strategy object if it finds the embedded field
 that is using bbgo component. for example:
 
 ```go
@@ -550,7 +550,7 @@ following types could be injected automatically:
 2. Allocate and initialize exchange sessions.
 3. Add exchange sessions to the environment (the data layer).
 4. Use the given environment to initialize the trader object (the logic layer).
-5. The trader initializes the environment and start the exchange connections.
+5. The trader initializes the environment and starts the exchange connections.
 6. Call strategy.Run() method sequentially.
 
 ## Exchange API Examples
@@ -567,7 +567,7 @@ maxRest := maxapi.NewRestClient(maxapi.ProductionAPIURL)
 maxRest.Auth(key, secret)
 ```
 
-Creating user data stream to get the orderbook (depth):
+Creating user data stream to get the order book (depth):
 
 ```go
 stream := max.NewStream(key, secret)
@@ -591,7 +591,7 @@ streambook.BindStream(stream)
 
 1. Click the "Fork" button from the GitHub repository.
 2. Clone your forked repository into `$GOPATH/github.com/c9s/bbgo`.
-3. Change directory into `$GOPATH/github.com/c9s/bbgo`.
+3. Change the directory to `$GOPATH/github.com/c9s/bbgo`.
 4. Create a branch and start your development.
 5. Test your changes.
 6. Push your changes to your fork.
@@ -616,13 +616,13 @@ make embed && go run -tags web ./cmd/bbgo-lorca
 ### What's Position?
 
 - Base Currency & Quote Currency <https://www.ig.com/au/glossary-trading-terms/base-currency-definition>
-- How to calculate average cost? <https://www.janushenderson.com/en-us/investor/planning/calculate-average-cost/>
+- How to calculate the average cost? <https://www.janushenderson.com/en-us/investor/planning/calculate-average-cost/>
 
 ### Looking For A New Strategy?
 
-You can write an article about BBGO in any topic, in 750-1500 words for exchange, and I can implement the strategy for
-you (depends on the complexity and efforts). If you're interested in, DM me in telegram <https://t.me/c123456789s> or
-twitter <https://twitter.com/c9s>, we can discuss.
+You can write an article about BBGO on any topic, in 750-1500 words for exchange, and I can implement the strategy for
+you (depending on the complexity and effort). If you're interested in, DM me in telegram <https://t.me/c123456789s> or
+twitter <https://twitter.com/c9s>, and we can discuss.
 
 ### Adding New Crypto Exchange support?
 

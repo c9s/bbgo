@@ -45,6 +45,7 @@ type Strategy struct {
 	DryRun                   bool                        `json:"dryRun"`
 	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
 	Duration                 types.Duration              `json:"for"`
+	MaxAmounts               map[string]fixedpoint.Value `json:"maxAmounts"`
 
 	faultBalanceRecords map[string][]TimeBalance
 
@@ -156,7 +157,7 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 			switch side {
 
 			case types.SideTypeBuy:
-				price := ticker.Sell
+				var price fixedpoint.Value
 				if taker {
 					price = ticker.Sell
 				} else if spread.Compare(market.TickSize) > 0 {
@@ -177,6 +178,12 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 					continue
 				}
 
+				maxAmount, ok := s.MaxAmounts[market.QuoteCurrency]
+				if ok {
+					requiredQuoteAmount = bbgo.AdjustQuantityByMaxAmount(requiredQuoteAmount, price, maxAmount)
+					log.Infof("adjusted quantity %f %s by max amount %f %s", requiredQuoteAmount.Float64(), market.BaseCurrency, maxAmount.Float64(), market.QuoteCurrency)
+				}
+
 				if quantity, ok := market.GreaterThanMinimalOrderQuantity(side, price, requiredQuoteAmount); ok {
 					return session, &types.SubmitOrder{
 						Symbol:      symbol,
@@ -190,7 +197,7 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 				}
 
 			case types.SideTypeSell:
-				price := ticker.Buy
+				var price fixedpoint.Value
 				if taker {
 					price = ticker.Buy
 				} else if spread.Compare(market.TickSize) > 0 {
@@ -207,6 +214,12 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 				if q.Compare(baseBalance.Available) > 0 {
 					log.Warnf("required base amount %f < available base balance %v, skip", q.Float64(), baseBalance)
 					continue
+				}
+
+				maxAmount, ok := s.MaxAmounts[market.QuoteCurrency]
+				if ok {
+					q = bbgo.AdjustQuantityByMaxAmount(q, price, maxAmount)
+					log.Infof("adjusted quantity %f %s by max amount %f %s", q.Float64(), market.BaseCurrency, maxAmount.Float64(), market.QuoteCurrency)
 				}
 
 				if quantity, ok := market.GreaterThanMinimalOrderQuantity(side, price, q); ok {

@@ -10,6 +10,14 @@ sessions:
     exchange: max
     envVarPrefix: MAX
 
+
+logging:
+  trade: true
+  order: true
+  # fields:
+  #   env: prod
+
+
 exchangeStrategies:
 
 - on: max
@@ -33,6 +41,6 @@ exchangeStrategies:
       byLayer:
         linear:
           domain: [ 1, 3 ]
-          range: [ 10.0, 30.0 ]
+          range: [ 10000.0, 30000.0 ]
 
 

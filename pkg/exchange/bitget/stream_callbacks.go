@@ -23,3 +23,13 @@ func (s *Stream) EmitMarketTradeEvent(o MarketTradeEvent) {
 		cb(o)
 	}
 }
+
+func (s *Stream) OnKLineEvent(cb func(o KLineEvent)) {
+	s.KLineEventCallbacks = append(s.KLineEventCallbacks, cb)
+}
+
+func (s *Stream) EmitKLineEvent(o KLineEvent) {
+	for _, cb := range s.KLineEventCallbacks {
+		cb(o)
+	}
+}
