@@ -42,3 +42,15 @@ func TestOptimalF(t *testing.T) {
 	f := OptimalF(roundturns)
 	assert.EqualValues(t, 0.45, f)
 }
+
+func TestDrawdown(t *testing.T) {
+	roundturns := floats.Slice{100, 50, 100}
+	expected := []float64{.0, .5, .0}
+	drawdown := Drawdown(roundturns)
+	assert.EqualValues(t, 0.5, drawdown.Max())
+	assert.EqualValues(t, 0.16666666666666666, drawdown.Average())
+	assert.EqualValues(t, 0.08333333333333333, drawdown.AverageSquared())
+	for i, v := range expected {
+		assert.EqualValues(t, v, drawdown[i])
+	}
+}
