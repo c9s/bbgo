@@ -526,8 +526,15 @@ var BacktestCmd = &cobra.Command{
 
 		for _, session := range environ.Sessions() {
 			for symbol, trades := range session.Trades {
-				tradeStats := sessionTradeStats[session.Name][symbol]
+				if len(trades.Trades) == 0 {
+					log.Warnf("session has no %s trades", symbol)
+					continue
+				}
 
+				tradeState := sessionTradeStats[session.Name][symbol]
+				profitFactor := tradeState.ProfitFactor
+				winningRatio := tradeState.WinningRatio
+				intervalProfits := tradeState.IntervalProfits[types.Interval1d]
 				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Copy(), tradeStats)
 				if err != nil {
 					return err
@@ -726,7 +733,10 @@ func n(v float64) fixedpoint.Value {
 	return fixedpoint.NewFromFloat(v)
 }
 
-func verify(userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, startTime, endTime time.Time) error {
+func verify(
+	userConfig *bbgo.Config, backtestService *service.BacktestService,
+	sourceExchanges map[types.ExchangeName]types.Exchange, startTime, endTime time.Time,
+) error {
 	for _, sourceExchange := range sourceExchanges {
 		err := backtestService.Verify(sourceExchange, userConfig.Backtest.Symbols, startTime, endTime)
 		if err != nil {
@@ -766,7 +776,10 @@ func getExchangeIntervals(ex types.Exchange) types.IntervalMap {
 	return types.SupportedIntervals
 }
 
-func sync(ctx context.Context, userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, syncFrom, syncTo time.Time) error {
+func sync(
+	ctx context.Context, userConfig *bbgo.Config, backtestService *service.BacktestService,
+	sourceExchanges map[types.ExchangeName]types.Exchange, syncFrom, syncTo time.Time,
+) error {
 	for _, symbol := range userConfig.Backtest.Symbols {
 		for _, sourceExchange := range sourceExchanges {
 			var supportIntervals = getExchangeIntervals(sourceExchange)

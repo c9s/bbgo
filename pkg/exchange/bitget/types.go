@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -259,4 +260,135 @@ type MarketTradeEvent struct {
 	// internal use
 	actionType ActionType
 	instId     string
+}
+
+var (
+	toLocalInterval = map[types.Interval]string{
+		types.Interval1m:  "candle1m",
+		types.Interval5m:  "candle5m",
+		types.Interval15m: "candle15m",
+		types.Interval30m: "candle30m",
+		types.Interval1h:  "candle1H",
+		types.Interval4h:  "candle4H",
+		types.Interval12h: "candle12H",
+		types.Interval1d:  "candle1D",
+		types.Interval1w:  "candle1W",
+	}
+
+	toGlobalInterval = map[string]types.Interval{
+		"candle1m":  types.Interval1m,
+		"candle5m":  types.Interval5m,
+		"candle15m": types.Interval15m,
+		"candle30m": types.Interval30m,
+		"candle1H":  types.Interval1h,
+		"candle4H":  types.Interval4h,
+		"candle12H": types.Interval12h,
+		"candle1D":  types.Interval1d,
+		"candle1W":  types.Interval1w,
+	}
+)
+
+type KLine struct {
+	StartTime    types.MillisecondTimestamp
+	OpenPrice    fixedpoint.Value
+	HighestPrice fixedpoint.Value
+	LowestPrice  fixedpoint.Value
+	ClosePrice   fixedpoint.Value
+	Volume       fixedpoint.Value
+}
+
+func (k KLine) ToGlobal(interval types.Interval, symbol string) types.KLine {
+	startTime := k.StartTime.Time()
+
+	return types.KLine{
+		Exchange:                 types.ExchangeBitget,
+		Symbol:                   symbol,
+		StartTime:                types.Time(startTime),
+		EndTime:                  types.Time(startTime.Add(interval.Duration() - time.Millisecond)),
+		Interval:                 interval,
+		Open:                     k.OpenPrice,
+		Close:                    k.ClosePrice,
+		High:                     k.HighestPrice,
+		Low:                      k.LowestPrice,
+		Volume:                   k.Volume,
+		QuoteVolume:              fixedpoint.Zero, // not supported
+		TakerBuyBaseAssetVolume:  fixedpoint.Zero, // not supported
+		TakerBuyQuoteAssetVolume: fixedpoint.Zero, // not supported
+		LastTradeID:              0,               // not supported
+		NumberOfTrades:           0,               // not supported
+		Closed:                   false,
+	}
+}
+
+type KLineSlice []KLine
+
+func (m *KLineSlice) UnmarshalJSON(b []byte) error {
+	if m == nil {
+		return errors.New("nil pointer of kline slice")
+	}
+	s, err := parseKLineSliceJSON(b)
+	if err != nil {
+		return err
+	}
+
+	*m = s
+	return nil
+}
+
+// parseKLineSliceJSON tries to parse a 2 dimensional string array into a KLineSlice
+//
+//	[
+//
+//	    ["1597026383085", "8533.02", "8553.74", "8527.17", "8548.26", "45247"]
+//	]
+func parseKLineSliceJSON(in []byte) (slice KLineSlice, err error) {
+	var rawKLines [][]json.RawMessage
+
+	err = json.Unmarshal(in, &rawKLines)
+	if err != nil {
+		return slice, err
+	}
+
+	for _, raw := range rawKLines {
+		if len(raw) != 6 {
+			return nil, fmt.Errorf("unexpected kline length: %d, data: %q", len(raw), raw)
+		}
+		var kline KLine
+		if err = json.Unmarshal(raw[0], &kline.StartTime); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal into timestamp: %q", raw[0])
+		}
+		if err = json.Unmarshal(raw[1], &kline.OpenPrice); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal into open price: %q", raw[1])
+		}
+		if err = json.Unmarshal(raw[2], &kline.HighestPrice); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal into highest price: %q", raw[2])
+		}
+		if err = json.Unmarshal(raw[3], &kline.LowestPrice); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal into lowest price: %q", raw[3])
+		}
+		if err = json.Unmarshal(raw[4], &kline.ClosePrice); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal into close price: %q", raw[4])
+		}
+		if err = json.Unmarshal(raw[5], &kline.Volume); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal into volume: %q", raw[5])
+		}
+
+		slice = append(slice, kline)
+	}
+
+	return slice, nil
+}
+
+type KLineEvent struct {
+	Events KLineSlice
+
+	// internal use
+	actionType ActionType
+	channel    ChannelType
+	instId     string
+}
+
+func (k KLineEvent) CacheKey() string {
+	// e.q: candle5m.BTCUSDT
+	return fmt.Sprintf("%s.%s", k.channel, k.instId)
 }

@@ -23,7 +23,12 @@ type QueryTradesOptions struct {
 	Sessions []string
 	Symbol   string
 	LastGID  int64
-	Since    *time.Time
+
+	// inclusive
+	Since *time.Time
+
+	// exclusive
+	Until *time.Time
 
 	// ASC or DESC
 	Ordering string
@@ -272,11 +277,19 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 	sel := sq.Select("*").
 		From("trades")
 
+	if options.LastGID != 0 {
+		sel = sel.Where(sq.Gt{"gid": options.LastGID})
+	}
 	if options.Since != nil {
 		sel = sel.Where(sq.GtOrEq{"traded_at": options.Since})
 	}
+	if options.Until != nil {
+		sel = sel.Where(sq.Lt{"traded_at": options.Until})
+	}
 
-	sel = sel.Where(sq.Eq{"symbol": options.Symbol})
+	if options.Symbol != "" {
+		sel = sel.Where(sq.Eq{"symbol": options.Symbol})
+	}
 
 	if options.Exchange != "" {
 		sel = sel.Where(sq.Eq{"exchange": options.Exchange})
@@ -412,4 +425,3 @@ func SelectLastTrades(ex types.ExchangeName, symbol string, isMargin, isFutures,
 		OrderBy("traded_at DESC").
 		Limit(limit)
 }
-
