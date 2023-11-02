@@ -1,7 +1,6 @@
 package csvsource
 
 import (
-	"encoding/csv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -11,14 +10,12 @@ import (
 type ICSVTickConverter interface {
 	LatestKLine() (k *types.KLine)
 	GetKLineResult() []types.KLine
-	CsvTickToKLine(tick *CsvTick, interval types.Interval)
+	CsvTickToKLine(tick *CsvTick, interval types.Interval) (closesKLine bool)
 }
 
 // CSVTickConverter takes a tick and internally converts it to a KLine slice
 type CSVTickConverter struct {
-	csv     *csv.Reader
-	decoder CSVTickDecoder
-	klines  []types.KLine
+	klines []types.KLine
 }
 
 func NewCSVTickConverter() ICSVTickConverter {
@@ -41,7 +38,7 @@ func (c *CSVTickConverter) GetKLineResult() []types.KLine {
 }
 
 // Convert ticks to KLine with interval
-func (c *CSVTickConverter) CsvTickToKLine(tick *CsvTick, interval types.Interval) {
+func (c *CSVTickConverter) CsvTickToKLine(tick *CsvTick, interval types.Interval) (closesKLine bool) {
 	var (
 		currentCandle = types.KLine{}
 		high          = fixedpoint.Zero
@@ -50,15 +47,25 @@ func (c *CSVTickConverter) CsvTickToKLine(tick *CsvTick, interval types.Interval
 	isOpen, t := c.detCandleStart(tick.Timestamp.Time(), interval)
 
 	if isOpen {
+		k := c.LatestKLine()
 		c.klines = append(c.klines, types.KLine{
-			StartTime: types.NewTimeFromUnix(t.Unix(), 0),
-			EndTime:   types.NewTimeFromUnix(t.Add(interval.Duration()).Unix(), 0),
-			Open:      tick.Price,
-			High:      tick.Price,
-			Low:       tick.Price,
-			Close:     tick.Price,
-			Volume:    tick.HomeNotional,
+			Exchange:    tick.Exchange,
+			Symbol:      tick.Symbol,
+			Interval:    interval,
+			StartTime:   types.NewTimeFromUnix(t.Unix(), 0),
+			EndTime:     types.NewTimeFromUnix(t.Add(interval.Duration()).Unix(), 0),
+			Open:        tick.Price,
+			High:        tick.Price,
+			Low:         tick.Price,
+			Close:       tick.Price,
+			Volume:      tick.HomeNotional,
+			QuoteVolume: tick.ForeignNotional,
+			Closed:      false,
 		})
+		if k != nil {
+			k.Closed = true // k is pointer
+			closesKLine = true
+		}
 		return
 	}
 
@@ -77,14 +84,21 @@ func (c *CSVTickConverter) CsvTickToKLine(tick *CsvTick, interval types.Interval
 	}
 
 	c.klines[len(c.klines)-1] = types.KLine{
-		StartTime: currentCandle.StartTime,
-		EndTime:   currentCandle.EndTime,
-		Open:      currentCandle.Open,
-		High:      high,
-		Low:       low,
-		Close:     tick.Price,
-		Volume:    currentCandle.Volume.Add(tick.HomeNotional),
+		StartTime:   currentCandle.StartTime,
+		EndTime:     currentCandle.EndTime,
+		Exchange:    tick.Exchange,
+		Symbol:      tick.Symbol,
+		Interval:    interval,
+		Open:        currentCandle.Open,
+		High:        high,
+		Low:         low,
+		Close:       tick.Price,
+		Volume:      currentCandle.Volume.Add(tick.HomeNotional),
+		QuoteVolume: currentCandle.QuoteVolume.Add(tick.ForeignNotional),
+		Closed:      false,
 	}
+
+	return
 }
 
 func (c *CSVTickConverter) detCandleStart(ts time.Time, interval types.Interval) (isOpen bool, t time.Time) {

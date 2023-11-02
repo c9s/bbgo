@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -22,6 +23,7 @@ type Stream struct {
 
 type CsvStreamConfig struct {
 	Interval     types.Interval
+	RateLimit    time.Duration    `json:"csvPath"`
 	CsvPath      string           `json:"csvPath"`
 	Symbol       string           `json:"symbol"`
 	BaseCoin     string           `json:"baseCoin"`
@@ -45,8 +47,11 @@ func NewStream(cfg *CsvStreamConfig) *Stream {
 	return stream
 }
 
-func (s *Stream) simulateEvents() error {
+func (s *Stream) Simulate() error {
 	var i int
+	converter := NewCSVTickConverter()
+
+	// iterate equity series at csv path and stream
 	err := filepath.WalkDir(s.config.CsvPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -63,7 +68,6 @@ func (s *Stream) simulateEvents() error {
 		}
 		//nolint:errcheck // Read ops only so safe to ignore err return
 		defer file.Close()
-		converter := NewCSVTickConverter()
 		reader := NewBybitCSVTickReader(csv.NewReader(file))
 		tick, err := reader.Read(i)
 		if err != nil {
@@ -76,14 +80,17 @@ func (s *Stream) simulateEvents() error {
 		}
 		s.StandardStream.EmitMarketTrade(*trade)
 
-		converter.CsvTickToKLine(tick, s.config.Interval)
 		kline := converter.LatestKLine()
-		if kline.Closed {
+		closesKline := converter.CsvTickToKLine(tick, s.config.Interval)
+		if closesKline {
 			s.StandardStream.EmitKLineClosed(*kline)
 		} else {
+			kline = converter.LatestKLine()
 			s.StandardStream.EmitKLine(*kline)
 		}
-
+		// allow for execution time of indicators and strategy
+		time.Sleep(s.config.RateLimit) // Max execution time for tradingview strategy
+		// to optimize exec time consider callback channel once a strategy has finished running another tick is emitted
 		return nil
 	})
 	if err != nil {
