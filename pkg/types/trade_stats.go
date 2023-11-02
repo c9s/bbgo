@@ -19,42 +19,6 @@ const (
 	ErrProfitArrEmpty    = "profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?"
 )
 
-type IntervalProfitCollector struct {
-	Interval     Interval        `json:"interval"`
-	Profits      *floats.Slice   `json:"profits"`
-	TimeInMarket []time.Duration `json:"timeInMarket"`
-	Timestamp    *floats.Slice   `json:"timestamp"`
-	tmpTime      time.Time       `json:"tmpTime"`
-}
-
-func NewIntervalProfitCollector(i Interval, startTime time.Time) *IntervalProfitCollector {
-	return &IntervalProfitCollector{Interval: i, tmpTime: startTime, Profits: &floats.Slice{1.}, Timestamp: &floats.Slice{float64(startTime.Unix())}}
-}
-
-// Update the collector by every traded profit
-func (s *IntervalProfitCollector) Update(profit *Profit) {
-	s.TimeInMarket = append(s.TimeInMarket, profit.TradedAt.Sub(profit.PositionOpenedAt))
-
-	if s.tmpTime.IsZero() {
-		panic(ErrStartTimeNotValid)
-	} else {
-		duration := s.Interval.Duration()
-		if profit.TradedAt.Before(s.tmpTime.Add(duration)) {
-			(*s.Profits)[len(*s.Profits)-1] *= 1. + profit.NetProfitMargin.Float64()
-		} else {
-			for {
-				s.Profits.Update(1.)
-				s.tmpTime = s.tmpTime.Add(duration)
-				s.Timestamp.Update(float64(s.tmpTime.Unix()))
-				if profit.TradedAt.Before(s.tmpTime.Add(duration)) {
-					(*s.Profits)[len(*s.Profits)-1] *= 1. + profit.NetProfitMargin.Float64()
-					break
-				}
-			}
-		}
-	}
-}
-
 type ProfitReport struct {
 	StartTime time.Time `json:"startTime"`
 	Profit    float64   `json:"profit"`
@@ -67,6 +31,41 @@ func (s ProfitReport) String() string {
 		log.Fatal(err)
 	}
 	return string(b)
+}
+
+type IntervalProfitCollector struct {
+	Interval     Interval        `json:"interval"`
+	Profits      floats.Slice    `json:"profits"`
+	TimeInMarket []time.Duration `json:"timeInMarket"`
+	Timestamp    floats.Slice    `json:"timestamp"`
+	tmpTime      time.Time       `json:"tmpTime"`
+}
+
+func NewIntervalProfitCollector(i Interval, startTime time.Time) *IntervalProfitCollector {
+	return &IntervalProfitCollector{Interval: i, tmpTime: startTime, Profits: floats.Slice{1.}, Timestamp: floats.Slice{float64(startTime.Unix())}}
+}
+
+// Update the collector by every traded profit
+func (s *IntervalProfitCollector) Update(profit *Profit) {
+	if s.tmpTime.IsZero() {
+		panic(ErrStartTimeNotValid)
+	} else {
+		s.TimeInMarket = append(s.TimeInMarket, profit.TradedAt.Sub(profit.PositionOpenedAt))
+		duration := s.Interval.Duration()
+		if profit.TradedAt.Before(s.tmpTime.Add(duration)) {
+			(s.Profits)[len(s.Profits)-1] *= 1. + profit.NetProfitMargin.Float64()
+		} else {
+			for {
+				s.Profits.Update(1.)
+				s.tmpTime = s.tmpTime.Add(duration)
+				s.Timestamp.Update(float64(s.tmpTime.Unix()))
+				if profit.TradedAt.Before(s.tmpTime.Add(duration)) {
+					(s.Profits)[len(s.Profits)-1] *= 1. + profit.NetProfitMargin.Float64()
+					break
+				}
+			}
+		}
+	}
 }
 
 // Determine average and total time spend in market
@@ -116,7 +115,7 @@ func (s *IntervalProfitCollector) GetNumOfProfitableIntervals() (profit int) {
 	if s.Profits == nil {
 		panic(ErrProfitArrEmpty)
 	}
-	for _, v := range *s.Profits {
+	for _, v := range s.Profits {
 		if v > 1. {
 			profit += 1
 		}
@@ -130,7 +129,7 @@ func (s *IntervalProfitCollector) GetNumOfNonProfitableIntervals() (nonprofit in
 	if s.Profits == nil {
 		panic(ErrProfitArrEmpty)
 	}
-	for _, v := range *s.Profits {
+	for _, v := range s.Profits {
 		if v <= 1. {
 			nonprofit += 1
 		}

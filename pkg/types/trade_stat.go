@@ -31,9 +31,30 @@ func CAGR(initial, final float64, days int) float64 {
 	return math.Pow(x, y) - 1
 }
 
-// CalmarRatio relates the capaital growth rate to the maximum drawdown.
+// measures of risk-adjusted return based on drawdown risk
+
+// calmar ratio - discounts expected excess return of a portfolio by the
+// worst expected maximum draw down for that portfolio
+// CR = E(re)/MD1 = (E(r) - rf) / MD1
 func CalmarRatio(cagr, maxDrawdown float64) float64 {
 	return cagr / maxDrawdown
+}
+
+// Sterling ratio
+// discounts the expected excess return of a portfolio by the average of the N worst
+// expected maximum drawdowns for that portfolio
+// CR = E(re) / (1/N)(sum MDi)
+func SterlingRatio(cagr, avgDrawdown float64) float64 {
+	return cagr / avgDrawdown
+}
+
+// Burke Ratio
+// similar to sterling, but less sensitive to outliers
+// discounts the expected excess return of a portfolio by the square root of the average
+// of the N worst expected maximum drawdowns for that portfolio
+// BR = E(re) / ((1/N)(sum MD^2))^0.5            ---> smoothing, can take roots, logs etc
+func BurkeRatio(cagr, avgDrawdownSquared float64) float64 {
+	return cagr / math.Sqrt(avgDrawdownSquared)
 }
 
 // KellyCriterion the famous method for trade sizing.
@@ -104,4 +125,27 @@ func NNZ(x, y float64) float64 {
 		return y
 	}
 	return x
+}
+
+// Compute the drawdown function associated to a portfolio equity curve,
+// also called the portfolio underwater equity curve.
+// Portfolio Optimization with Drawdown Constraints, Chekhlov et al., 2000
+// http://papers.ssrn.com/sol3/papers.cfm?abstract_id=223323
+func Drawdown(equityCurve floats.Slice) floats.Slice {
+	// Initialize highWaterMark
+	highWaterMark := math.Inf(-1)
+
+	// Create ddVector with the same length as equityCurve
+	ddVector := make([]float64, len(equityCurve))
+
+	// Loop over all the values to compute the drawdown vector
+	for i := 0; i < len(equityCurve); i++ {
+		if equityCurve[i] > highWaterMark {
+			highWaterMark = equityCurve[i]
+		}
+
+		ddVector[i] = (highWaterMark - equityCurve[i]) / highWaterMark
+	}
+
+	return ddVector
 }

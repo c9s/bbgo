@@ -87,6 +87,8 @@ type SessionSymbolReport struct {
 	GrossLoss                fixedpoint.Value          `json:"grossLoss,omitempty"`
 	PRR                      fixedpoint.Value          `json:"prr,omitempty"`
 	PercentProfitable        fixedpoint.Value          `json:"percentProfitable,omitempty"`
+	MaxDrawdown              fixedpoint.Value          `json:"maxDrawdown,omitempty"`
+	AverageDrawdown          fixedpoint.Value          `json:"avgDrawdown,omitempty"`
 	MaxProfit                fixedpoint.Value          `json:"maxProfit,omitempty"`
 	MaxLoss                  fixedpoint.Value          `json:"maxLoss,omitempty"`
 	AvgProfit                fixedpoint.Value          `json:"avgProfit,omitempty"`
@@ -100,10 +102,12 @@ type SessionSymbolReport struct {
 	AnnualHistoricVolatility fixedpoint.Value          `json:"annualHistoricVolatility,omitempty"`
 	CAGR                     fixedpoint.Value          `json:"cagr,omitempty"`
 	Calmar                   fixedpoint.Value          `json:"calmar,omitempty"`
+	Sterling                 fixedpoint.Value          `json:"sterling,omitempty"`
+	Burke                    fixedpoint.Value          `json:"burke,omitempty"`
 	Kelly                    fixedpoint.Value          `json:"kelly,omitempty"`
 	OptimalF                 fixedpoint.Value          `json:"optimalF,omitempty"`
 	StatN                    fixedpoint.Value          `json:"statN,omitempty"`
-	StatNStdErr              fixedpoint.Value          `json:"statNStdErr,omitempty"`
+	StdErr                   fixedpoint.Value          `json:"statNStdErr,omitempty"`
 	Sortino                  fixedpoint.Value          `json:"sortinoRatio"`
 	ProfitFactor             fixedpoint.Value          `json:"profitFactor"`
 	WinningRatio             fixedpoint.Value          `json:"winningRatio"`
