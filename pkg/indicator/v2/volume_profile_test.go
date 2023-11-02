@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/datasource/csvsource"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 

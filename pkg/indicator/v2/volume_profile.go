@@ -8,7 +8,6 @@ import (
 	"gonum.org/v1/gonum/stat"
 
 	bbgofloats "github.com/c9s/bbgo/pkg/datatype/floats"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 

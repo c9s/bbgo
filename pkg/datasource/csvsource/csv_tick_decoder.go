@@ -2,10 +2,9 @@ package csvsource
 
 import (
 	"encoding/csv"
-	"strconv"
-	"strings"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // CSVTickDecoder is an extension point for CSVTickReader to support custom file formats.
@@ -20,19 +19,15 @@ func NewBinanceCSVTickReader(csv *csv.Reader) *CSVTickReader {
 }
 
 // BinanceCSVKLineDecoder decodes a CSV record from Binance into a CsvTick.
-func BinanceCSVTickDecoder(row []string, intex int) (*CsvTick, error) {
+func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
 	if len(row) < 7 {
 		return nil, ErrNotEnoughColumns
-	}
-	timestamp, err := strconv.ParseInt(row[5], 10, 64)
-	if err != nil {
-		return nil, ErrInvalidTimeFormat
 	}
 	size := fixedpoint.MustNewFromString(row[2])
 	price := fixedpoint.MustNewFromString(row[1])
 	hn := price.Mul(size)
 	return &CsvTick{
-		Timestamp:    timestamp / 1000,
+		Timestamp:    types.MustParseMillisecondTimestamp(row[5]),
 		Size:         size,
 		Price:        price,
 		HomeNotional: hn,
@@ -55,18 +50,17 @@ func BybitCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 	if index == 0 {
 		return nil, nil
 	}
-	startTime := strings.Split(row[0], ".")[0]
-	timestamp, err := strconv.ParseInt(startTime, 10, 64)
+	side, err := types.StrToSideType(row[2])
 	if err != nil {
-		return nil, ErrInvalidTimeFormat
+		return nil, ErrInvalidOrderSideFormat
 	}
 	return &CsvTick{
-		Timestamp:       timestamp,
+		Timestamp:       types.MustParseMillisecondTimestamp(row[0]),
 		Symbol:          row[1],
-		Side:            row[2],
+		Side:            side,
+		TickDirection:   row[5],
 		Size:            fixedpoint.MustNewFromString(row[3]),
 		Price:           fixedpoint.MustNewFromString(row[4]),
-		TickDirection:   row[5],
 		HomeNotional:    fixedpoint.MustNewFromString(row[8]),
 		ForeignNotional: fixedpoint.MustNewFromString(row[9]),
 	}, nil
