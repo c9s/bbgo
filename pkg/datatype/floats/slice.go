@@ -112,18 +112,6 @@ func (s Slice) Average() float64 {
 	return total / float64(len(s))
 }
 
-func (s Slice) AverageSquared() float64 {
-	if len(s) == 0 {
-		return 0.0
-	}
-
-	total := 0.0
-	for _, value := range s {
-		total += math.Pow(value, 2)
-	}
-	return total / float64(len(s))
-}
-
 func (s Slice) Diff() (values Slice) {
 	for i, v := range s {
 		if i == 0 {
