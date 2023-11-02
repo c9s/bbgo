@@ -8,18 +8,23 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
 	"gopkg.in/yaml.v3"
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+const (
+	ErrStartTimeNotValid = "No valid start time. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?"
+	ErrProfitArrEmpty    = "profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?"
+)
+
 type IntervalProfitCollector struct {
-	Interval  Interval      `json:"interval"`
-	Profits   *floats.Slice `json:"profits"`
-	Timestamp *floats.Slice `json:"timestamp"`
-	tmpTime   time.Time     `json:"tmpTime"`
+	Interval     Interval        `json:"interval"`
+	Profits      *floats.Slice   `json:"profits"`
+	TimeInMarket []time.Duration `json:"timeInMarket"`
+	Timestamp    *floats.Slice   `json:"timestamp"`
+	tmpTime      time.Time       `json:"tmpTime"`
 }
 
 func NewIntervalProfitCollector(i Interval, startTime time.Time) *IntervalProfitCollector {
@@ -28,8 +33,10 @@ func NewIntervalProfitCollector(i Interval, startTime time.Time) *IntervalProfit
 
 // Update the collector by every traded profit
 func (s *IntervalProfitCollector) Update(profit *Profit) {
+	s.TimeInMarket = append(s.TimeInMarket, profit.TradedAt.Sub(profit.PositionOpenedAt))
+
 	if s.tmpTime.IsZero() {
-		panic("No valid start time. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrStartTimeNotValid)
 	} else {
 		duration := s.Interval.Duration()
 		if profit.TradedAt.Before(s.tmpTime.Add(duration)) {
@@ -60,6 +67,20 @@ func (s ProfitReport) String() string {
 		log.Fatal(err)
 	}
 	return string(b)
+}
+
+// Determine average and total time spend in market
+func (s *IntervalProfitCollector) GetTimeInMarket() (avgHoldSec, totalTimeInMarketSec int64) {
+	if s.Profits == nil {
+		return 0, 0
+	}
+	l := len(s.TimeInMarket)
+	for i := 0; i < l; i++ {
+		d := s.TimeInMarket[i]
+		totalTimeInMarketSec += int64(d / time.Millisecond)
+	}
+	avgHoldSec = totalTimeInMarketSec / int64(l)
+	return
 }
 
 // Get all none-profitable intervals
@@ -93,7 +114,7 @@ func (s *IntervalProfitCollector) GetProfitableIntervals() (result []ProfitRepor
 // Get number of profitable traded intervals
 func (s *IntervalProfitCollector) GetNumOfProfitableIntervals() (profit int) {
 	if s.Profits == nil {
-		panic("profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrProfitArrEmpty)
 	}
 	for _, v := range *s.Profits {
 		if v > 1. {
@@ -107,7 +128,7 @@ func (s *IntervalProfitCollector) GetNumOfProfitableIntervals() (profit int) {
 // (no trade within the interval or pnl = 0 will be also included here)
 func (s *IntervalProfitCollector) GetNumOfNonProfitableIntervals() (nonprofit int) {
 	if s.Profits == nil {
-		panic("profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrProfitArrEmpty)
 	}
 	for _, v := range *s.Profits {
 		if v <= 1. {
@@ -121,10 +142,11 @@ func (s *IntervalProfitCollector) GetNumOfNonProfitableIntervals() (nonprofit in
 // no smart sharpe ON for the calculated result
 func (s *IntervalProfitCollector) GetSharpe() float64 {
 	if s.tmpTime.IsZero() {
-		panic("No valid start time. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrStartTimeNotValid)
 	}
 	if s.Profits == nil {
-		panic("profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrStartTimeNotValid)
+
 	}
 	return Sharpe(Sub(s.Profits, 1.), s.Profits.Length(), true, false)
 }
@@ -133,10 +155,10 @@ func (s *IntervalProfitCollector) GetSharpe() float64 {
 // No risk-free return rate and smart sortino OFF for the calculated result.
 func (s *IntervalProfitCollector) GetSortino() float64 {
 	if s.tmpTime.IsZero() {
-		panic("No valid start time. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrStartTimeNotValid)
 	}
 	if s.Profits == nil {
-		panic("profits array empty. Did you create IntervalProfitCollector instance using NewIntervalProfitCollector?")
+		panic(ErrProfitArrEmpty)
 	}
 	return Sortino(Sub(s.Profits, 1.), 0., s.Profits.Length(), true, false)
 }
@@ -197,6 +219,24 @@ type TradeStats struct {
 	consecutiveSide    int
 	consecutiveCounter int
 	consecutiveAmount  fixedpoint.Value
+
+	// CAGR is the Compound Annual Growth Rate of the equity curve.
+	CAGR float64
+
+	// MaxDrawdown is the maximum percentage drawdown of the equity curve
+	MaxDrawdown float64
+
+	// MDDRecovery is the recovery time of the maximum drawdown of the equity curve.
+	MDDRecovery time.Duration
+
+	// HistVolAnn is the historic volatility of the equity curve as annualized std dev.
+	HistVolAnn float64
+
+	// Sharpe is the Sharpe ratio of the equity curve.
+	Sharpe float64
+
+	// Calmar is the Calmar ratio of the equity curve.
+	Calmar float64
 }
 
 func NewTradeStats(symbol string) *TradeStats {
