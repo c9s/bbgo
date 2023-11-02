@@ -69,6 +69,7 @@ func (s *Stream) simulateEvents() error {
 		if err != nil {
 			return err
 		}
+		tick.Symbol = s.config.Symbol // not every csv provides symbol information
 		trade, err := tick.toGlobalTrade()
 		if err != nil {
 			return err
