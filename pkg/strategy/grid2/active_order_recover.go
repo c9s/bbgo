@@ -2,7 +2,6 @@ package grid2
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -23,21 +22,21 @@ type SyncActiveOrdersOpts struct {
 	exchange          types.Exchange
 }
 
-func (s *Strategy) initializeRecoverCh() bool {
+func (s *Strategy) initializeRecoverC() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	isInitialize := false
 
-	if s.activeOrdersRecoverC == nil {
+	if s.recoverC == nil {
 		s.logger.Info("initializing recover channel")
-		s.activeOrdersRecoverC = make(chan struct{}, 1)
+		s.recoverC = make(chan struct{}, 1)
 	} else {
 		s.logger.Info("recover channel is already initialized, trigger active orders recover")
 		isInitialize = true
 
 		select {
-		case s.activeOrdersRecoverC <- struct{}{}:
+		case s.recoverC <- struct{}{}:
 			s.logger.Info("trigger active orders recover")
 		default:
 			s.logger.Info("activeOrdersRecoverC is full")
@@ -49,7 +48,7 @@ func (s *Strategy) initializeRecoverCh() bool {
 
 func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 	// every time we activeOrdersRecoverC receive signal, do active orders recover
-	if isInitialize := s.initializeRecoverCh(); isInitialize {
+	if isInitialize := s.initializeRecoverC(); isInitialize {
 		return
 	}
 
@@ -78,7 +77,7 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 				log.WithError(err).Errorf("unable to sync active orders")
 			}
 
-		case <-s.activeOrdersRecoverC:
+		case <-s.recoverC:
 			if err := syncActiveOrders(ctx, opts); err != nil {
 				log.WithError(err).Errorf("unable to sync active orders")
 			}
@@ -90,9 +89,10 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 	opts.logger.Infof("[ActiveOrderRecover] syncActiveOrders")
 
-	notAddNonExistingOpenOrdersAfter := time.Now().Add(-5 * time.Minute)
+	// only sync orders which is updated over 3 min, because we may receive from websocket and handle it twice
+	syncBefore := time.Now().Add(-3 * time.Minute)
 
-	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, opts.exchange, opts.activeOrderBook.Symbol)
+	openOrders, err := retry.QueryOpenOrdersUntilSuccessfulLite(ctx, opts.exchange, opts.activeOrderBook.Symbol)
 	if err != nil {
 		opts.logger.WithError(err).Error("[ActiveOrderRecover] failed to query open orders, skip this time")
 		return errors.Wrapf(err, "[ActiveOrderRecover] failed to query open orders, skip this time")
@@ -117,6 +117,10 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 			delete(openOrdersMap, activeOrder.OrderID)
 		} else {
 			opts.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
+			if activeOrder.UpdateTime.After(syncBefore) {
+				opts.logger.Infof("active order #%d is updated in 3 min, skip updating...", activeOrder.OrderID)
+				continue
+			}
 
 			// sleep 100ms to avoid DDOS
 			time.Sleep(100 * time.Millisecond)
@@ -131,8 +135,10 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 
 	// update open orders not in active orders
 	for _, openOrder := range openOrdersMap {
-		// we don't add open orders into active orderbook if updated in 5 min
-		if openOrder.UpdateTime.After(notAddNonExistingOpenOrdersAfter) {
+		opts.logger.Infof("found open order #%d is not in active orderbook, updating...", openOrder.OrderID)
+		// we don't add open orders into active orderbook if updated in 3 min, because we may receive message from websocket and add it twice.
+		if openOrder.UpdateTime.After(syncBefore) {
+			opts.logger.Infof("open order #%d is updated in 3 min, skip updating...", openOrder.OrderID)
 			continue
 		}
 
@@ -141,19 +147,4 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 	}
 
 	return errs
-}
-
-func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService, orderID uint64) error {
-	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
-		Symbol:  activeOrderBook.Symbol,
-		OrderID: strconv.FormatUint(orderID, 10),
-	})
-
-	if err != nil {
-		return err
-	}
-
-	activeOrderBook.Update(*updatedOrder)
-
-	return nil
 }

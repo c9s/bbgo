@@ -2,7 +2,6 @@ package bybit
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"testing"
 	"time"
@@ -67,8 +66,8 @@ func TestToGlobalMarket(t *testing.T) {
 	exp := types.Market{
 		Symbol:          inst.Symbol,
 		LocalSymbol:     inst.Symbol,
-		PricePrecision:  int(math.Log10(inst.LotSizeFilter.QuotePrecision.Float64())),
-		VolumePrecision: int(math.Log10(inst.LotSizeFilter.BasePrecision.Float64())),
+		PricePrecision:  8,
+		VolumePrecision: 6,
 		QuoteCurrency:   inst.QuoteCoin,
 		BaseCurrency:    inst.BaseCoin,
 		MinNotional:     inst.LotSizeFilter.MinOrderAmt,

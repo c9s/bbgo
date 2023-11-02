@@ -204,7 +204,7 @@ type Strategy struct {
 	tradingCtx, writeCtx context.Context
 	cancelWrite          context.CancelFunc
 
-	activeOrdersRecoverC chan struct{}
+	recoverC chan struct{}
 
 	// this ensures that bbgo.Sync to lock the object
 	sync.Mutex

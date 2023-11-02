@@ -15,10 +15,6 @@ import (
 )
 
 const (
-	// Bybit: To avoid network or program issues, we recommend that you send the ping heartbeat packet every 20 seconds
-	// to maintain the WebSocket connection.
-	pingInterval = 20 * time.Second
-
 	// spotArgsLimit can input up to 10 args for each subscription request sent to one connection.
 	spotArgsLimit = 10
 )
@@ -244,40 +240,18 @@ func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 }
 
 // ping implements the Bybit text message of WebSocket PingPong.
-func (s *Stream) ping(ctx context.Context, conn *websocket.Conn, cancelFunc context.CancelFunc) {
-	defer func() {
-		log.Debug("[bybit] ping worker stopped")
-		cancelFunc()
-	}()
-
-	var pingTicker = time.NewTicker(pingInterval)
-	defer pingTicker.Stop()
-
-	for {
-		select {
-
-		case <-ctx.Done():
-			return
-
-		case <-s.CloseC:
-			return
-
-		case <-pingTicker.C:
-			// it's just for maintaining the liveliness of the connection, so comment out ReqId.
-			err := conn.WriteJSON(struct {
-				//ReqId string `json:"req_id"`
-				Op WsOpType `json:"op"`
-			}{
-				//ReqId: uuid.NewString(),
-				Op: WsOpTypePing,
-			})
-			if err != nil {
-				log.WithError(err).Error("ping error", err)
-				s.Reconnect()
-				return
-			}
-		}
+func (s *Stream) ping(conn *websocket.Conn) error {
+	err := conn.WriteJSON(struct {
+		Op WsOpType `json:"op"`
+	}{
+		Op: WsOpTypePing,
+	})
+	if err != nil {
+		log.WithError(err).Error("ping error")
+		return err
 	}
+
+	return nil
 }
 
 func (s *Stream) handlerConnect() {

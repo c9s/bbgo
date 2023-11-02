@@ -57,8 +57,8 @@ type Parser func(message []byte) (interface{}, error)
 
 type Dispatcher func(e interface{})
 
-// HeartBeat keeps connection alive by sending the heartbeat packet.
-type HeartBeat func(ctxConn context.Context, conn *websocket.Conn, cancelConn context.CancelFunc)
+// HeartBeat keeps connection alive by sending the ping packet.
+type HeartBeat func(conn *websocket.Conn) error
 
 type BeforeConnect func(ctx context.Context) error
 
@@ -86,7 +86,7 @@ type StandardStream struct {
 
 	// sg is used to wait until the previous routines are closed.
 	// only handle routines used internally, avoid including external callback func to prevent issues if they have
-	// bugs and cannot terminate. e.q. heartBeat
+	// bugs and cannot terminate.
 	sg SyncGroup
 
 	// ReconnectC is a signal channel for reconnecting
@@ -319,6 +319,14 @@ func (s *StandardStream) ping(
 			return
 
 		case <-pingTicker.C:
+			if s.heartBeat != nil {
+				if err := s.heartBeat(conn); err != nil {
+					// log errors at the concrete class so that we can identify which exchange encountered an error
+					s.Reconnect()
+					return
+				}
+			}
+
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
 				log.WithError(err).Error("ping error", err)
 				s.Reconnect()
@@ -432,11 +440,6 @@ func (s *StandardStream) DialAndConnect(ctx context.Context) error {
 		s.ping(connCtx, conn, connCancel, pingInterval)
 	})
 	s.sg.Run()
-
-	if s.heartBeat != nil {
-		// not included in wg, as it is an external callback func.
-		go s.heartBeat(connCtx, conn, connCancel)
-	}
 	return nil
 }
 
