@@ -15,13 +15,13 @@ const (
 	DailyToAnnualFactor = 252 // todo does this apply to crypto at all?
 )
 
-// HistVolAnn is the annualized historic volatility of daily returns.
+// AnnualHistoricVolatility is the historic volatility of the equity curve as annualized std dev.
 func AnnualHistoricVolatility(data Series) float64 {
 	var sd = Stdev(data, data.Length(), 1)
 	return sd * math.Sqrt(DailyToAnnualFactor)
 }
 
-// CAGR Compound Annual Growth Rate
+// CAGR is the Compound Annual Growth Rate of the equity curve.
 func CAGR(initial, final float64, days int) float64 {
 	var (
 		growthRate = (final - initial) / initial
