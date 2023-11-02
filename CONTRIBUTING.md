@@ -31,19 +31,19 @@ Install pre-commit to check your changes before you commit:
 
 See <https://pre-commit.com/> for more details.
 
-For new large features, such as integrating binance futures contracts, please propose a discussion first before you start working on it.
+For new large features, such as integrating Binance futures contracts, please propose a discussion first before you start working on it.
 
 For new small features, you could open a pull request directly.
 
 For each contributor, you have chance to receive the BBG token through the polygon network.
 
-Each issue has its BBG label, by completing the issue with a pull request, you can get correspond amount of BBG.
+Each issue has its BBG label, by completing the issue with a pull request, you can get corresponding amount of BBG.
 
 ## Support
 
 ### By contributing pull requests
 
-Any pull request is welcome, documentation, format fixing, testing, features.
+Any pull request is welcome, documentation, format fixing, testing, and features.
 
 ### By registering account with referral ID
 
@@ -52,7 +52,7 @@ You may register your exchange account with my referral ID to support this proje
 - For MAX Exchange: <https://max.maicoin.com/signup?r=c7982718> (default commission rate to your account)
 - For Binance Exchange: <https://www.binancezh.com/en/register?ref=VGDGLT80> (5% commission back to your account)
 
-### By small amount cryptos
+### By small amount of cryptos
 
 - BTC address `3J6XQJNWT56amqz9Hz2BEVQ7W4aNmb5kiU`
 - USDT ERC20 address `0xeBcf7887A5b767DEb2e0C77E46A22c6Adc64E427`

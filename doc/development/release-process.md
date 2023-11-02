@@ -40,7 +40,7 @@ Run the following command to create the release:
 make version VERSION=v1.20.2
 ```
 
-The above command wilL:
+The above command will:
 
 - Update and compile the migration scripts into go files.
 - Bump the version name in the go code.

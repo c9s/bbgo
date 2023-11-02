@@ -1,12 +1,20 @@
 package bitget
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/websocket"
+	"strings"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
 	"github.com/c9s/bbgo/pkg/types"
+)
+
+var (
+	pingBytes = []byte("ping")
+	pongBytes = []byte("pong")
 )
 
 //go:generate callbackgen -type Stream
@@ -15,20 +23,26 @@ type Stream struct {
 
 	bookEventCallbacks        []func(o BookEvent)
 	marketTradeEventCallbacks []func(o MarketTradeEvent)
+	KLineEventCallbacks       []func(o KLineEvent)
+
+	lastCandle map[string]types.KLine
 }
 
 func NewStream() *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
+		lastCandle:     map[string]types.KLine{},
 	}
 
 	stream.SetEndpointCreator(stream.createEndpoint)
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
+	stream.SetHeartBeat(stream.ping)
 	stream.OnConnect(stream.handlerConnect)
 
 	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnMarketTradeEvent(stream.handleMaretTradeEvent)
+	stream.OnKLineEvent(stream.handleKLineEvent)
 	return stream
 }
 
@@ -92,6 +106,15 @@ func (s *Stream) dispatchEvent(event interface{}) {
 
 	case *MarketTradeEvent:
 		s.EmitMarketTradeEvent(*e)
+
+	case *KLineEvent:
+		s.EmitKLineEvent(*e)
+
+	case []byte:
+		// We only handle the 'pong' case. Others are unexpected.
+		if !bytes.Equal(e, pongBytes) {
+			log.Errorf("invalid event: %q", e)
+		}
 	}
 }
 
@@ -114,6 +137,16 @@ func (s *Stream) handleBookEvent(o BookEvent) {
 			s.EmitBookUpdate(book)
 		}
 	}
+}
+
+// ping implements the bitget text message of WebSocket PingPong.
+func (s *Stream) ping(conn *websocket.Conn) error {
+	err := conn.WriteMessage(websocket.TextMessage, pingBytes)
+	if err != nil {
+		log.WithError(err).Error("ping error", err)
+		return nil
+	}
+	return nil
 }
 
 func convertSubscription(sub types.Subscription) (WsArg, error) {
@@ -140,12 +173,33 @@ func convertSubscription(sub types.Subscription) (WsArg, error) {
 	case types.MarketTradeChannel:
 		arg.Channel = ChannelTrade
 		return arg, nil
+
+	case types.KLineChannel:
+		interval, found := toLocalInterval[sub.Options.Interval]
+		if !found {
+			return WsArg{}, fmt.Errorf("interval %s not supported on KLine subscription", sub.Options.Interval)
+		}
+
+		arg.Channel = ChannelType(interval)
+		return arg, nil
 	}
 
 	return arg, fmt.Errorf("unsupported stream channel: %s", sub.Channel)
 }
 
 func parseWebSocketEvent(in []byte) (interface{}, error) {
+	switch {
+	case bytes.Equal(in, pongBytes):
+		// Return the original raw data may seem redundant because we can validate the string and return nil,
+		// but we cannot return nil to a lower level handler. This can cause confusion in the next handler, such as
+		// the dispatch handler. Therefore, I return the original raw data.
+		return in, nil
+	default:
+		return parseEvent(in)
+	}
+}
+
+func parseEvent(in []byte) (interface{}, error) {
 	var event WsEvent
 
 	err := json.Unmarshal(in, &event)
@@ -157,7 +211,8 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 		return &event, nil
 	}
 
-	switch event.Arg.Channel {
+	ch := event.Arg.Channel
+	switch ch {
 	case ChannelOrderBook, ChannelOrderBook5, ChannelOrderBook15:
 		var book BookEvent
 		err = json.Unmarshal(event.Data, &book.Events)
@@ -179,9 +234,26 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 		trade.actionType = event.Action
 		trade.instId = event.Arg.InstId
 		return &trade, nil
-	}
 
-	return nil, fmt.Errorf("unhandled websocket event: %+v", string(in))
+	default:
+
+		// handle the `KLine` case here to avoid complicating the code structure.
+		if strings.HasPrefix(string(ch), "candle") {
+			var kline KLineEvent
+			err = json.Unmarshal(event.Data, &kline.Events)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal data into KLineEvent, Arg: %+v Data: %s, err: %w", event.Arg, string(event.Data), err)
+			}
+
+			kline.actionType = event.Action
+			kline.channel = ch
+			kline.instId = event.Arg.InstId
+			return &kline, nil
+		}
+		// return an error for any other case
+
+		return nil, fmt.Errorf("unhandled websocket event: %+v", string(in))
+	}
 }
 
 func (s *Stream) handleMaretTradeEvent(m MarketTradeEvent) {
@@ -197,5 +269,30 @@ func (s *Stream) handleMaretTradeEvent(m MarketTradeEvent) {
 		}
 
 		s.EmitMarketTrade(globalTrade)
+	}
+}
+
+func (s *Stream) handleKLineEvent(k KLineEvent) {
+	if k.actionType == ActionTypeSnapshot {
+		// we don't support snapshot event
+		return
+	}
+
+	interval, found := toGlobalInterval[string(k.channel)]
+	if !found {
+		log.Errorf("unexpected interval %s on KLine subscription", k.channel)
+		return
+	}
+
+	for _, kline := range k.Events {
+		last, ok := s.lastCandle[k.CacheKey()]
+		if ok && kline.StartTime.Time().After(last.StartTime.Time()) {
+			last.Closed = true
+			s.EmitKLineClosed(last)
+		}
+
+		kLine := kline.ToGlobal(interval, k.instId)
+		s.EmitKLine(kLine)
+		s.lastCandle[k.CacheKey()] = kLine
 	}
 }

@@ -382,6 +382,14 @@ func (e *Exchange) SubscribeMarketData(
 	}
 
 	log.Infof("querying klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
+	if len(symbols) == 0 {
+		log.Warnf("empty symbols, will not query kline data from the database")
+
+		c := make(chan types.KLine)
+		close(c)
+		return c, nil
+	}
+
 	klineC, errC := e.srv.QueryKLinesCh(startTime, endTime, e, symbols, intervals)
 	go func() {
 		if err := <-errC; err != nil {
