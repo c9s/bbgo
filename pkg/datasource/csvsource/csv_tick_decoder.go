@@ -52,9 +52,12 @@ func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
 		Side:            side,
 		Size:            qty,
 		Price:           price,
+		IsBuyerMaker:    isBuyerMaker,
 		HomeNotional:    price.Mul(qty),
 		ForeignNotional: price.Mul(baseQty),
 		Timestamp:       types.MustParseMillisecondTimestamp(row[5]),
+		// Symbol: must be overwritten - info not in csv,
+		// TickDirection: would need to keep last tick in memory to compare tick direction,
 	}, nil
 }
 

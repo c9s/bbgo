@@ -15,6 +15,7 @@ import (
 type Stream struct {
 	types.StandardStream
 	config                    *CsvStreamConfig
+	converter                 ICSVTickConverter
 	marketTradeEventCallbacks []func(e []CsvTick)
 	kLineEventCallbacks       []func(e []types.KLine)
 	orderEventCallbacks       []func(e []types.Order)
@@ -22,19 +23,22 @@ type Stream struct {
 }
 
 type CsvStreamConfig struct {
-	Interval     types.Interval
-	RateLimit    time.Duration    `json:"csvPath"`
-	CsvPath      string           `json:"csvPath"`
-	Symbol       string           `json:"symbol"`
-	BaseCoin     string           `json:"baseCoin"`
-	QuoteCoin    string           `json:"quoteCoin"`
-	TakerFeeRate fixedpoint.Value `json:"takerFeeRate"`
-	MakerFeeRate fixedpoint.Value `json:"makerFeeRate"`
+	Interval     types.Interval     `json:"interval"`
+	RateLimit    time.Duration      `json:"rateLimit"`
+	StrategyID   string             `json:"strategyID"`
+	CsvPath      string             `json:"csvPath"`
+	Exchange     types.ExchangeName `json:"exchange"`
+	Symbol       string             `json:"symbol"`
+	BaseCoin     string             `json:"baseCoin"`
+	QuoteCoin    string             `json:"quoteCoin"`
+	TakerFeeRate fixedpoint.Value   `json:"takerFeeRate"`
+	MakerFeeRate fixedpoint.Value   `json:"makerFeeRate"`
 }
 
 func NewStream(cfg *CsvStreamConfig) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
+		converter:      NewCSVTickConverter(),
 		config:         cfg,
 	}
 
@@ -49,8 +53,6 @@ func NewStream(cfg *CsvStreamConfig) *Stream {
 
 func (s *Stream) Simulate() error {
 	var i int
-	converter := NewCSVTickConverter()
-
 	// iterate equity series at csv path and stream
 	err := filepath.WalkDir(s.config.CsvPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -74,23 +76,31 @@ func (s *Stream) Simulate() error {
 			return err
 		}
 		tick.Symbol = s.config.Symbol // not every csv provides symbol information
+
 		trade, err := tick.toGlobalTrade()
 		if err != nil {
 			return err
 		}
+		trade.Fee = s.config.TakerFeeRate
+		trade.FeeCurrency = s.config.QuoteCoin
+		if tick.IsBuyerMaker { // if supported by exchange csv format
+			trade.Fee = s.config.MakerFeeRate
+		}
 		s.StandardStream.EmitMarketTrade(*trade)
 
-		kline := converter.LatestKLine()
-		closesKline := converter.CsvTickToKLine(tick, s.config.Interval)
+		kline := s.converter.LatestKLine()
+		closesKline := s.converter.CsvTickToKLine(tick, s.config.Interval)
 		if closesKline {
 			s.StandardStream.EmitKLineClosed(*kline)
 		} else {
-			kline = converter.LatestKLine()
+			kline = s.converter.LatestKLine() // overwrite with newer KLine
 			s.StandardStream.EmitKLine(*kline)
 		}
+
 		// allow for execution time of indicators and strategy
-		time.Sleep(s.config.RateLimit) // Max execution time for tradingview strategy
+		time.Sleep(s.config.RateLimit) // Max execution time for tradingview strategy is 250ms
 		// to optimize exec time consider callback channel once a strategy has finished running another tick is emitted
+
 		return nil
 	})
 	if err != nil {
