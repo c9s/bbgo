@@ -12,7 +12,7 @@ import (
 // TickReader is an interface for reading candlesticks.
 type TickReader interface {
 	Read(i int) (*CsvTick, error)
-	ReadAll(interval types.Interval) error
+	ReadAll(interval types.Interval) (k []types.KLine, err error)
 }
 
 // ReadTicksFromCSV reads all the .csv files in a given directory or a single file into a slice of Ticks.
@@ -23,8 +23,8 @@ func ReadTicksFromCSV(path string, interval types.Interval) ([]types.KLine, erro
 }
 
 // ReadTicksFromCSVWithDecoder permits using a custom CSVTickReader.
-func ReadTicksFromCSVWithDecoder(path string, interval types.Interval, maker MakeCSVTickReader) ([]types.KLine, error) {
-	err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
+func ReadTicksFromCSVWithDecoder(path string, interval types.Interval, maker MakeCSVTickReader) (klines []types.KLine, err error) {
+	err = filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -41,7 +41,7 @@ func ReadTicksFromCSVWithDecoder(path string, interval types.Interval, maker Mak
 		//nolint:errcheck // Read ops only so safe to ignore err return
 		defer file.Close()
 		reader := maker(csv.NewReader(file))
-		err = reader.ReadAll(interval)
+		klines, err = reader.ReadAll(interval)
 		if err != nil {
 			return err
 		}

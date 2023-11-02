@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 var assertTickEq = func(t *testing.T, exp, act *CsvTick) {
@@ -28,7 +29,7 @@ func TestCSVTickReader_ReadWithBinanceDecoder(t *testing.T) {
 			name: "Read Tick",
 			give: "11782578,6.00000000,1.00000000,14974844,14974844,1698623884463,True,True",
 			want: &CsvTick{
-				Timestamp:    1698623884,
+				Timestamp:    types.NewMillisecondTimestampFromInt(1698623884463),
 				Size:         fixedpoint.NewFromFloat(1),
 				Price:        fixedpoint.NewFromFloat(6),
 				HomeNotional: fixedpoint.NewFromFloat(6),

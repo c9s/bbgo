@@ -2,15 +2,16 @@ package csvsource
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 type CsvTick struct {
-	Timestamp       int64            `json:"timestamp"`
-	Symbol          string           `json:"symbol"`
-	Side            string           `json:"side"`
-	TickDirection   string           `json:"tickDirection"`
-	Size            fixedpoint.Value `json:"size"`
-	Price           fixedpoint.Value `json:"price"`
-	HomeNotional    fixedpoint.Value `json:"homeNotional"`
-	ForeignNotional fixedpoint.Value `json:"foreignNotional"`
+	Symbol          string                     `json:"symbol"`
+	TickDirection   string                     `json:"tickDirection"`
+	Side            types.SideType             `json:"side"`
+	Size            fixedpoint.Value           `json:"size"`
+	Price           fixedpoint.Value           `json:"price"`
+	HomeNotional    fixedpoint.Value           `json:"homeNotional"`
+	ForeignNotional fixedpoint.Value           `json:"foreignNotional"`
+	Timestamp       types.MillisecondTimestamp `json:"timestamp"`
 }

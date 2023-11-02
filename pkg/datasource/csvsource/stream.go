@@ -74,7 +74,7 @@ func (s *Stream) simulateEvents() error {
 		}
 		s.StandardStream.EmitMarketTrade(trade)
 
-		ConvertCsvTickToKLines(tick, s.config.Interval)
+		reader.CsvTickToKLines(tick, s.config.Interval)
 		kline := klines[len(klines)-1]
 		if kline.Closed {
 			s.StandardStream.EmitKLineClosed(kline)

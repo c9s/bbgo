@@ -21,6 +21,9 @@ var (
 	// ErrInvalidTimeFormat is returned when the CSV price record does not have a valid time unix milli format.
 	ErrInvalidTimeFormat = errors.New("cannot parse time string")
 
+	// ErrInvalidOrderSideFormat is returned when the CSV side record does not have a valid buy or sell string.
+	ErrInvalidOrderSideFormat = errors.New("cannot parse order side string")
+
 	// ErrInvalidPriceFormat is returned when the CSV price record does not prices in expected format.
 	ErrInvalidPriceFormat = errors.New("OHLC prices must be in valid decimal format")
 
