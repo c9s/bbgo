@@ -63,6 +63,7 @@ func (s *Stream) simulateEvents() error {
 		}
 		//nolint:errcheck // Read ops only so safe to ignore err return
 		defer file.Close()
+		converter := NewCSVTickConverter()
 		reader := NewBybitCSVTickReader(csv.NewReader(file))
 		tick, err := reader.Read(i)
 		if err != nil {
@@ -72,14 +73,14 @@ func (s *Stream) simulateEvents() error {
 		if err != nil {
 			return err
 		}
-		s.StandardStream.EmitMarketTrade(trade)
+		s.StandardStream.EmitMarketTrade(*trade)
 
-		reader.CsvTickToKLines(tick, s.config.Interval)
-		kline := klines[len(klines)-1]
+		converter.CsvTickToKLine(tick, s.config.Interval)
+		kline := converter.LatestKLine()
 		if kline.Closed {
-			s.StandardStream.EmitKLineClosed(kline)
+			s.StandardStream.EmitKLineClosed(*kline)
 		} else {
-			s.StandardStream.EmitKLine(kline)
+			s.StandardStream.EmitKLine(*kline)
 		}
 
 		return nil
