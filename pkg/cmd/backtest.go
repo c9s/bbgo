@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -635,7 +634,10 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 	initBalances := accountConfig.Balances.BalanceMap()
 	finalBalances := session.GetAccount().Balances()
 	maxProfit := n(intervalProfit.Profits.Max())
-	maxLoss := n(math.Abs(intervalProfit.Profits.Min()))
+	maxLoss := n(intervalProfit.Profits.Min())
+	drawdown := types.Drawdown(intervalProfit.Profits)
+	maxDrawdown := drawdown.Max()
+	avgDrawdown := drawdown.Average()
 	roundTurnCount := n(float64(tradeStats.NumOfProfitTrade + tradeStats.NumOfLossTrade))
 	roundTurnLength := n(float64(intervalProfit.Profits.Length()))
 	winningCount := n(float64(tradeStats.NumOfProfitTrade))
@@ -650,7 +652,7 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 	sortinoRatio := n(intervalProfit.GetSortino())
 	annVolHis := n(types.AnnualHistoricVolatility(intervalProfit.Profits))
 	totalTimeInMarketSec, avgHoldSec := intervalProfit.GetTimeInMarket()
-	statn, stdErr := types.StatN(*intervalProfit.Profits)
+	statn, stdErr := types.StatN(intervalProfit.Profits)
 	symbolReport := backtest.SessionSymbolReport{
 		Exchange:                 session.Exchange.Name(),
 		Symbol:                   symbol,
@@ -668,6 +670,8 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 		WinningRatio:             tradeStats.WinningRatio,
 		PercentProfitable:        winningPct,
 		ProfitFactor:             tradeStats.ProfitFactor,
+		MaxDrawdown:              n(maxDrawdown),
+		AverageDrawdown:          n(avgDrawdown),
 		MaxProfit:                maxProfit,
 		MaxLoss:                  maxLoss,
 		MaxLossStreak:            tradeStats.MaximumConsecutiveLosses,
@@ -681,9 +685,9 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 		PnL:                      report,
 		PRR:                      types.PRR(tradeStats.GrossProfit, tradeStats.GrossLoss, winningCount, loosingCount),
 		Kelly:                    types.KellyCriterion(tradeStats.ProfitFactor, winningPct),
-		OptimalF:                 types.OptimalF(*intervalProfit.Profits),
+		OptimalF:                 types.OptimalF(intervalProfit.Profits),
 		StatN:                    statn,
-		StatNStdErr:              stdErr,
+		StdErr:                   stdErr,
 		Sharpe:                   sharpeRatio,
 		Sortino:                  sortinoRatio,
 	}
@@ -696,7 +700,9 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 		), 0)
 
 	symbolReport.CAGR = n(cagr)
-	symbolReport.Calmar = n(types.CalmarRatio(cagr, tradeStats.MaxDrawdown))
+	symbolReport.Calmar = n(types.CalmarRatio(cagr, maxDrawdown))
+	symbolReport.Sterling = n(types.SterlingRatio(cagr, avgDrawdown))
+	symbolReport.Burke = n(types.BurkeRatio(cagr, drawdown.AverageSquared()))
 
 	for _, s := range session.Subscriptions {
 		symbolReport.Subscriptions = append(symbolReport.Subscriptions, s)
@@ -719,6 +725,7 @@ func createSymbolReport(userConfig *bbgo.Config, session *bbgo.ExchangeSession, 
 func n(v float64) fixedpoint.Value {
 	return fixedpoint.NewFromFloat(v)
 }
+
 func verify(userConfig *bbgo.Config, backtestService *service.BacktestService, sourceExchanges map[types.ExchangeName]types.Exchange, startTime, endTime time.Time) error {
 	for _, sourceExchange := range sourceExchanges {
 		err := backtestService.Verify(sourceExchange, userConfig.Backtest.Symbols, startTime, endTime)
