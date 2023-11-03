@@ -204,6 +204,65 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 		}, orders)
 	})
 
+	t.Run("base and quote #2", func(t *testing.T) {
+		gridNum := int64(22)
+		upperPrice := number(35500.000000)
+		lowerPrice := number(34450.000000)
+		quoteInvestment := number(18.47)
+		baseInvestment := number(0.010700)
+		lastPrice := number(34522.930000)
+		baseGridNum := int(20)
+
+		s := newTestStrategy()
+		s.GridNum = gridNum
+		s.BaseGridNum = baseGridNum
+		s.LowerPrice = lowerPrice
+		s.UpperPrice = upperPrice
+		s.grid = NewGrid(lowerPrice, upperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+		s.grid.CalculateArithmeticPins()
+		assert.Equal(t, 22, len(s.grid.Pins))
+
+		quantity, err := s.calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice, s.grid.Pins)
+		assert.NoError(t, err)
+		assert.Equal(t, "0.000535", quantity.String())
+
+		s.QuantityOrAmount.Quantity = quantity
+
+		orders, err := s.generateGridOrders(quoteInvestment, baseInvestment, lastPrice)
+		assert.NoError(t, err)
+		if !assert.Equal(t, 21, len(orders)) {
+			for _, o := range orders {
+				t.Logf("- %s %s", o.Price.String(), o.Side)
+			}
+		}
+
+		assertPriceSide(t, []PriceSideAssert{
+			{number(35500.0), types.SideTypeSell},
+			{number(35450.0), types.SideTypeSell},
+			{number(35400.0), types.SideTypeSell},
+			{number(35350.0), types.SideTypeSell},
+			{number(35300.0), types.SideTypeSell},
+			{number(35250.0), types.SideTypeSell},
+			{number(35200.0), types.SideTypeSell},
+			{number(35150.0), types.SideTypeSell},
+			{number(35100.0), types.SideTypeSell},
+			{number(35050.0), types.SideTypeSell},
+			{number(35000.0), types.SideTypeSell},
+			{number(34950.0), types.SideTypeSell},
+			{number(34900.0), types.SideTypeSell},
+			{number(34850.0), types.SideTypeSell},
+			{number(34800.0), types.SideTypeSell},
+			{number(34750.0), types.SideTypeSell},
+			{number(34700.0), types.SideTypeSell},
+			{number(34650.0), types.SideTypeSell},
+			{number(34600.0), types.SideTypeSell},
+			{number(34550.0), types.SideTypeSell},
+			// -- fake trade price at 34549.9
+			// -- 34500 should be empty
+			{number(34450.0), types.SideTypeBuy},
+		}, orders)
+	})
+
 	t.Run("base and quote with pre-calculated baseGridNumber", func(t *testing.T) {
 		s := newTestStrategy()
 		s.grid = NewGrid(s.LowerPrice, s.UpperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
@@ -519,11 +578,11 @@ func newTestMarket(symbol string) types.Market {
 			BaseCurrency:    "BTC",
 			QuoteCurrency:   "USDT",
 			TickSize:        number(0.01),
-			StepSize:        number(0.00001),
+			StepSize:        number(0.000001),
 			PricePrecision:  2,
 			VolumePrecision: 8,
-			MinNotional:     number(10.0),
-			MinQuantity:     number(0.001),
+			MinNotional:     number(8.0),
+			MinQuantity:     number(0.0003),
 		}
 	case "ETHUSDT":
 		return types.Market{
@@ -534,7 +593,7 @@ func newTestMarket(symbol string) types.Market {
 			PricePrecision:  2,
 			VolumePrecision: 6,
 			MinNotional:     number(8.000),
-			MinQuantity:     number(0.00030),
+			MinQuantity:     number(0.0046),
 		}
 	}
 
@@ -577,12 +636,17 @@ func newTestOrder(price, quantity fixedpoint.Value, side types.SideType) types.O
 	}
 }
 
-func newTestStrategy() *Strategy {
-	market := newTestMarket("BTCUSDT")
+func newTestStrategy(va ...string) *Strategy {
+	symbol := "BTCUSDT"
 
+	if len(va) > 0 {
+		symbol = va[0]
+	}
+
+	market := newTestMarket(symbol)
 	s := &Strategy{
 		logger:           logrus.NewEntry(logrus.New()),
-		Symbol:           "BTCUSDT",
+		Symbol:           symbol,
 		Market:           market,
 		GridProfitStats:  newGridProfitStats(market),
 		UpperPrice:       number(20_000),
@@ -790,7 +854,9 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 		}
 
 		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
-		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(
+			ctx context.Context, order types.SubmitOrder,
+		) (types.OrderSlice, error) {
 			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder, order), "%+v is not equal to %+v", order, expectedSubmitOrder)
 			return []types.Order{
 				{SubmitOrder: expectedSubmitOrder},
@@ -858,7 +924,9 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 		}
 
 		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
-		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(
+			ctx context.Context, order types.SubmitOrder,
+		) (types.OrderSlice, error) {
 			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder, order), "%+v is not equal to %+v", order, expectedSubmitOrder)
 			return []types.Order{
 				{SubmitOrder: expectedSubmitOrder},
@@ -946,7 +1014,9 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Market:      s.Market,
 			Tag:         orderTag,
 		}
-		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(
+			ctx context.Context, order types.SubmitOrder,
+		) (types.OrderSlice, error) {
 			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder, order), "%+v is not equal to %+v", order, expectedSubmitOrder)
 			return []types.Order{
 				{SubmitOrder: expectedSubmitOrder},
@@ -963,7 +1033,9 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Market:      s.Market,
 			Tag:         orderTag,
 		}
-		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(
+			ctx context.Context, order types.SubmitOrder,
+		) (types.OrderSlice, error) {
 			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder2, order), "%+v is not equal to %+v", order, expectedSubmitOrder2)
 			return []types.Order{
 				{SubmitOrder: expectedSubmitOrder2},
@@ -1060,7 +1132,9 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 		}
 
 		orderExecutor := gridmocks.NewMockOrderExecutor(mockCtrl)
-		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(
+			ctx context.Context, order types.SubmitOrder,
+		) (types.OrderSlice, error) {
 			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder, order), "%+v is not equal to %+v", order, expectedSubmitOrder)
 			return []types.Order{
 				{SubmitOrder: expectedSubmitOrder},
@@ -1078,7 +1152,9 @@ func TestStrategy_handleOrderFilled(t *testing.T) {
 			Tag:         orderTag,
 		}
 
-		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, order types.SubmitOrder) (types.OrderSlice, error) {
+		orderExecutor.EXPECT().SubmitOrders(ctx, gomock.Any()).DoAndReturn(func(
+			ctx context.Context, order types.SubmitOrder,
+		) (types.OrderSlice, error) {
 			assert.True(t, equalOrdersIgnoreClientOrderID(expectedSubmitOrder2, order), "%+v is not equal to %+v", order, expectedSubmitOrder2)
 			return []types.Order{
 				{SubmitOrder: expectedSubmitOrder2},
@@ -1190,14 +1266,14 @@ func TestStrategy_aggregateOrderQuoteAmountAndFeeRetry(t *testing.T) {
 func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 
 	t.Run("7 grids", func(t *testing.T) {
-		s := newTestStrategy()
+		s := newTestStrategy("ETHUSDT")
 		s.UpperPrice = number(1660)
 		s.LowerPrice = number(1630)
 		s.QuoteInvestment = number(61)
 		s.GridNum = 7
 		grid := s.newGrid()
 		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, grid)
-		assert.InDelta(t, 60.46, minQuoteInvestment.Float64(), 0.01)
+		assert.InDelta(t, 48.36, minQuoteInvestment.Float64(), 0.01)
 
 		err := s.checkMinimalQuoteInvestment(grid)
 		assert.NoError(t, err)
@@ -1207,12 +1283,11 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 		s := newTestStrategy()
 		// 10_000 * 0.001 = 10USDT
 		// 20_000 * 0.001 = 20USDT
-		// hence we should have at least: 20USDT * 10 grids
 		s.QuoteInvestment = number(10_000)
 		s.GridNum = 10
 		grid := s.newGrid()
 		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, grid)
-		assert.InDelta(t, 129.9999, minQuoteInvestment.Float64(), 0.01)
+		assert.InDelta(t, 103.999, minQuoteInvestment.Float64(), 0.01)
 
 		err := s.checkMinimalQuoteInvestment(grid)
 		assert.NoError(t, err)
@@ -1225,11 +1300,11 @@ func TestStrategy_checkMinimalQuoteInvestment(t *testing.T) {
 
 		grid := s.newGrid()
 		minQuoteInvestment := calculateMinimalQuoteInvestment(s.Market, grid)
-		assert.InDelta(t, 14979.995499, minQuoteInvestment.Float64(), 0.001)
+		assert.InDelta(t, 11983.996400, minQuoteInvestment.Float64(), 0.001)
 
 		err := s.checkMinimalQuoteInvestment(grid)
 		assert.Error(t, err)
-		assert.EqualError(t, err, "need at least 14979.995500 USDT for quote investment, 10000.000000 USDT given")
+		assert.EqualError(t, err, "need at least 11983.996400 USDT for quote investment, 10000.000000 USDT given")
 	})
 }
 
