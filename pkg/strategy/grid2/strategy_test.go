@@ -204,7 +204,7 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 		}, orders)
 	})
 
-	t.Run("base and quote #2", func(t *testing.T) {
+	t.Run("base and quote with predefined base grid num", func(t *testing.T) {
 		gridNum := int64(22)
 		upperPrice := number(35500.000000)
 		lowerPrice := number(34450.000000)
@@ -258,6 +258,64 @@ func TestStrategy_generateGridOrders(t *testing.T) {
 			{number(34600.0), types.SideTypeSell},
 			{number(34550.0), types.SideTypeSell},
 			// -- fake trade price at 34549.9
+			// -- 34500 should be empty
+			{number(34450.0), types.SideTypeBuy},
+		}, orders)
+	})
+
+	t.Run("base and quote", func(t *testing.T) {
+		gridNum := int64(22)
+		upperPrice := number(35500.000000)
+		lowerPrice := number(34450.000000)
+		quoteInvestment := number(20.0)
+		baseInvestment := number(0.010700)
+		lastPrice := number(34522.930000)
+		baseGridNum := int(0)
+
+		s := newTestStrategy()
+		s.GridNum = gridNum
+		s.BaseGridNum = baseGridNum
+		s.LowerPrice = lowerPrice
+		s.UpperPrice = upperPrice
+		s.grid = NewGrid(lowerPrice, upperPrice, fixedpoint.NewFromInt(s.GridNum), s.Market.TickSize)
+		s.grid.CalculateArithmeticPins()
+		assert.Equal(t, 22, len(s.grid.Pins))
+
+		quantity, err := s.calculateBaseQuoteInvestmentQuantity(quoteInvestment, baseInvestment, lastPrice, s.grid.Pins)
+		assert.NoError(t, err)
+		assert.Equal(t, "0.00029006", quantity.String())
+
+		s.QuantityOrAmount.Quantity = quantity
+
+		orders, err := s.generateGridOrders(quoteInvestment, baseInvestment, lastPrice)
+		assert.NoError(t, err)
+		if !assert.Equal(t, 21, len(orders)) {
+			for _, o := range orders {
+				t.Logf("- %s %s", o.Price.String(), o.Side)
+			}
+		}
+
+		assertPriceSide(t, []PriceSideAssert{
+			{number(35500.0), types.SideTypeSell},
+			{number(35450.0), types.SideTypeSell},
+			{number(35400.0), types.SideTypeSell},
+			{number(35350.0), types.SideTypeSell},
+			{number(35300.0), types.SideTypeSell},
+			{number(35250.0), types.SideTypeSell},
+			{number(35200.0), types.SideTypeSell},
+			{number(35150.0), types.SideTypeSell},
+			{number(35100.0), types.SideTypeSell},
+			{number(35050.0), types.SideTypeSell},
+			{number(35000.0), types.SideTypeSell},
+			{number(34950.0), types.SideTypeSell},
+			{number(34900.0), types.SideTypeSell},
+			{number(34850.0), types.SideTypeSell},
+			{number(34800.0), types.SideTypeSell},
+			{number(34750.0), types.SideTypeSell},
+			{number(34700.0), types.SideTypeSell},
+			{number(34650.0), types.SideTypeSell},
+			{number(34600.0), types.SideTypeSell},
+			{number(34550.0), types.SideTypeSell},
 			// -- 34500 should be empty
 			{number(34450.0), types.SideTypeBuy},
 		}, orders)
