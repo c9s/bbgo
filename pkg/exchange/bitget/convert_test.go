@@ -1,11 +1,13 @@
 package bitget
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
+	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -142,4 +144,131 @@ func Test_toGlobalTicker(t *testing.T) {
 		Buy:    fixedpoint.NewFromFloat(24013.94),
 		Sell:   fixedpoint.NewFromFloat(24014.06),
 	}, toGlobalTicker(ticker))
+}
+
+func Test_toGlobalSideType(t *testing.T) {
+	side, err := toGlobalSideType(v2.SideTypeBuy)
+	assert.NoError(t, err)
+	assert.Equal(t, types.SideTypeBuy, side)
+
+	side, err = toGlobalSideType(v2.SideTypeSell)
+	assert.NoError(t, err)
+	assert.Equal(t, types.SideTypeSell, side)
+
+	_, err = toGlobalSideType("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_toGlobalOrderType(t *testing.T) {
+	orderType, err := toGlobalOrderType(v2.OrderTypeMarket)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderTypeMarket, orderType)
+
+	orderType, err = toGlobalOrderType(v2.OrderTypeLimit)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderTypeLimit, orderType)
+
+	_, err = toGlobalOrderType("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_toGlobalOrderStatus(t *testing.T) {
+	status, err := toGlobalOrderStatus(v2.OrderStatusInit)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusNew, status)
+
+	status, err = toGlobalOrderStatus(v2.OrderStatusNew)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusNew, status)
+
+	status, err = toGlobalOrderStatus(v2.OrderStatusLive)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusNew, status)
+
+	status, err = toGlobalOrderStatus(v2.OrderStatusFilled)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusFilled, status)
+
+	status, err = toGlobalOrderStatus(v2.OrderStatusPartialFilled)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusPartiallyFilled, status)
+
+	status, err = toGlobalOrderStatus(v2.OrderStatusCancelled)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusCanceled, status)
+
+	_, err = toGlobalOrderStatus("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_unfilledOrderToGlobalOrder(t *testing.T) {
+	var (
+		assert        = assert.New(t)
+		orderId       = 1105087175647989764
+		unfilledOrder = v2.UnfilledOrder{
+			Symbol:           "BTCUSDT",
+			OrderId:          types.StrInt64(orderId),
+			ClientOrderId:    "74b86af3-6098-479c-acac-bfb074c067f3",
+			PriceAvg:         fixedpoint.NewFromFloat(1.2),
+			Size:             fixedpoint.NewFromFloat(5),
+			OrderType:        v2.OrderTypeLimit,
+			Side:             v2.SideTypeBuy,
+			Status:           v2.OrderStatusLive,
+			BasePrice:        fixedpoint.NewFromFloat(0),
+			BaseVolume:       fixedpoint.NewFromFloat(0),
+			QuoteVolume:      fixedpoint.NewFromFloat(0),
+			EnterPointSource: "API",
+			OrderSource:      "normal",
+			CTime:            types.NewMillisecondTimestampFromInt(1660704288118),
+			UTime:            types.NewMillisecondTimestampFromInt(1660704288118),
+		}
+	)
+
+	t.Run("succeeds", func(t *testing.T) {
+		order, err := unfilledOrderToGlobalOrder(unfilledOrder)
+		assert.NoError(err)
+		assert.Equal(&types.Order{
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: "74b86af3-6098-479c-acac-bfb074c067f3",
+				Symbol:        "BTCUSDT",
+				Side:          types.SideTypeBuy,
+				Type:          types.OrderTypeLimit,
+				Quantity:      fixedpoint.NewFromFloat(5),
+				Price:         fixedpoint.NewFromFloat(1.2),
+				TimeInForce:   types.TimeInForceGTC,
+			},
+			Exchange:         types.ExchangeBitget,
+			OrderID:          uint64(orderId),
+			UUID:             strconv.FormatInt(int64(orderId), 10),
+			Status:           types.OrderStatusNew,
+			ExecutedQuantity: fixedpoint.NewFromFloat(0),
+			IsWorking:        true,
+			CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+			UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+		}, order)
+	})
+
+	t.Run("failed to convert side", func(t *testing.T) {
+		newOrder := unfilledOrder
+		newOrder.Side = "xxx"
+
+		_, err := unfilledOrderToGlobalOrder(newOrder)
+		assert.ErrorContains(err, "xxx")
+	})
+
+	t.Run("failed to convert oder type", func(t *testing.T) {
+		newOrder := unfilledOrder
+		newOrder.OrderType = "xxx"
+
+		_, err := unfilledOrderToGlobalOrder(newOrder)
+		assert.ErrorContains(err, "xxx")
+	})
+
+	t.Run("failed to convert oder status", func(t *testing.T) {
+		newOrder := unfilledOrder
+		newOrder.Status = "xxx"
+
+		_, err := unfilledOrderToGlobalOrder(newOrder)
+		assert.ErrorContains(err, "xxx")
+	})
 }
