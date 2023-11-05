@@ -27,17 +27,26 @@ func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
 	if len(row) < 7 {
 		return nil, ErrNotEnoughColumns
 	}
-	// example csv row
-	// id, price, qty, base_qty, time, is_buyer_maker,
+	// example csv row for some reason some properties are duplicated in their csv
+	// id, price, qty, base_qty, base_qty, time, is_buyer_maker, is_buyer_maker,
 	// 11782578,6.00000000,1.00000000,14974844,14974844,1698623884463,True
-	qty := fixedpoint.MustNewFromString(row[2])
-	baseQty := fixedpoint.MustNewFromString(row[2])
-	price := fixedpoint.MustNewFromString(row[1])
 	id, err := strconv.ParseUint(row[0], 10, 64)
 	if err != nil {
-		return nil, err
+		return nil, ErrInvalidIDFormat
 	}
-	isBuyerMaker, err := strconv.ParseBool(row[5])
+	price, err := fixedpoint.NewFromString(row[1])
+	if err != nil {
+		return nil, ErrInvalidPriceFormat
+	}
+	qty, err := fixedpoint.NewFromString(row[2])
+	if err != nil {
+		return nil, ErrInvalidVolumeFormat
+	}
+	baseQty, err := fixedpoint.NewFromString(row[3])
+	if err != nil {
+		return nil, ErrInvalidVolumeFormat
+	}
+	isBuyerMaker, err := strconv.ParseBool(row[6])
 	if err != nil {
 		return nil, err
 	}
@@ -45,6 +54,10 @@ func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
 	side := types.SideTypeBuy
 	if isBuyerMaker {
 		side = types.SideTypeSell
+	}
+	ts, err := types.ParseMillisecondTimestamp(row[5])
+	if err != nil {
+		return nil, ErrInvalidTimeFormat
 	}
 	return &CsvTick{
 		TradeID:         id,
@@ -55,7 +68,7 @@ func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
 		IsBuyerMaker:    isBuyerMaker,
 		HomeNotional:    price.Mul(qty),
 		ForeignNotional: price.Mul(baseQty),
-		Timestamp:       types.MustParseMillisecondTimestamp(row[5]),
+		Timestamp:       ts,
 		// Symbol: must be overwritten - info not in csv,
 		// TickDirection: would need to keep last tick in memory to compare tick direction,
 	}, nil
@@ -88,17 +101,37 @@ func BybitCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 	if err != nil {
 		return nil, ErrInvalidIDFormat
 	}
+	size, err := fixedpoint.NewFromString(row[3])
+	if err != nil {
+		return nil, ErrInvalidVolumeFormat
+	}
+	price, err := fixedpoint.NewFromString(row[4])
+	if err != nil {
+		return nil, ErrInvalidPriceFormat
+	}
+	hn, err := fixedpoint.NewFromString(row[8])
+	if err != nil {
+		return nil, ErrInvalidVolumeFormat
+	}
+	fn, err := fixedpoint.NewFromString(row[9])
+	if err != nil {
+		return nil, ErrInvalidVolumeFormat
+	}
+	ts, err := types.ParseMillisecondTimestamp(row[0])
+	if err != nil {
+		return nil, ErrInvalidTimeFormat
+	}
 	return &CsvTick{
 		TradeID:         id,
 		Symbol:          row[1],
 		Exchange:        types.ExchangeBybit,
 		Side:            side,
-		Size:            fixedpoint.MustNewFromString(row[3]),
-		Price:           fixedpoint.MustNewFromString(row[4]),
-		HomeNotional:    fixedpoint.MustNewFromString(row[8]),
-		ForeignNotional: fixedpoint.MustNewFromString(row[9]),
+		Size:            size,
+		Price:           price,
+		HomeNotional:    hn,
+		ForeignNotional: fn,
 		TickDirection:   row[5], // todo does this seem promising to define for other exchanges too?
-		Timestamp:       types.MustParseMillisecondTimestamp(row[0]),
+		Timestamp:       ts,
 	}, nil
 }
 
