@@ -19,7 +19,10 @@ var (
 	ErrNotEnoughColumns = errors.New("not enough columns")
 
 	// ErrInvalidTimeFormat is returned when the CSV price record does not have a valid time unix milli format.
-	ErrInvalidIDFormat = errors.New("cannot trade id string")
+	ErrInvalidIDFormat = errors.New("cannot parse trade id string")
+
+	// ErrInvalidBoolFormat is returned when the CSV isBuyerMaker record does not have a valid bool representation.
+	ErrInvalidBoolFormat = errors.New("cannot parse bool to string")
 
 	// ErrInvalidTimeFormat is returned when the CSV price record does not have a valid time unix milli format.
 	ErrInvalidTimeFormat = errors.New("cannot parse time string")
@@ -28,10 +31,10 @@ var (
 	ErrInvalidOrderSideFormat = errors.New("cannot parse order side string")
 
 	// ErrInvalidPriceFormat is returned when the CSV price record does not prices in expected format.
-	ErrInvalidPriceFormat = errors.New("OHLC prices must be in valid decimal format")
+	ErrInvalidPriceFormat = errors.New("OHLC prices must be valid number format")
 
 	// ErrInvalidVolumeFormat is returned when the CSV price record does not have a valid volume format.
-	ErrInvalidVolumeFormat = errors.New("volume must be in valid float format")
+	ErrInvalidVolumeFormat = errors.New("volume must be valid number format")
 )
 
 // CSVKLineDecoder is an extension point for CSVKLineReader to support custom file formats.
@@ -60,13 +63,33 @@ func BinanceCSVKLineDecoder(record []string, interval time.Duration) (types.KLin
 	if err != nil {
 		return empty, ErrInvalidTimeFormat
 	}
+	open, err := fixedpoint.NewFromString(record[1])
+	if err != nil {
+		return empty, ErrInvalidPriceFormat
+	}
+	high, err := fixedpoint.NewFromString(record[2])
+	if err != nil {
+		return empty, ErrInvalidPriceFormat
+	}
+	low, err := fixedpoint.NewFromString(record[3])
+	if err != nil {
+		return empty, ErrInvalidPriceFormat
+	}
+	closing, err := fixedpoint.NewFromString(record[4])
+	if err != nil {
+		return empty, ErrInvalidPriceFormat
+	}
+	volume, err := fixedpoint.NewFromString(record[5])
+	if err != nil {
+		return empty, ErrInvalidVolumeFormat
+	}
 	k.StartTime = types.NewTimeFromUnix(time.UnixMilli(msec).Unix(), 0)
 	k.EndTime = types.NewTimeFromUnix(k.StartTime.Time().Add(interval).Unix(), 0)
-	k.Open = fixedpoint.MustNewFromString(record[1])
-	k.High = fixedpoint.MustNewFromString(record[2])
-	k.Low = fixedpoint.MustNewFromString(record[3])
-	k.Close = fixedpoint.MustNewFromString(record[4])
-	k.Volume = fixedpoint.MustNewFromString(record[5])
+	k.Open = open
+	k.High = high
+	k.Low = low
+	k.Close = closing
+	k.Volume = volume
 	return k, nil
 }
 
@@ -95,13 +118,34 @@ func MetaTraderCSVKLineDecoder(record []string, interval time.Duration) (types.K
 	if err != nil {
 		return empty, ErrInvalidTimeFormat
 	}
+	open, err := fixedpoint.NewFromString(record[2])
+	if err != nil {
+		return empty, ErrInvalidPriceFormat
+	}
+	high, err := fixedpoint.NewFromString(record[3])
+	if err != nil {
+		return empty, ErrInvalidPriceFormat
+	}
+	low, err := fixedpoint.NewFromString(record[4])
+	if err != nil {
+		return empty, ErrInvalidPriceFormat
+	}
+	closing, err := fixedpoint.NewFromString(record[5])
+	if err != nil {
+		return empty, ErrInvalidPriceFormat
+	}
+	volume, err := fixedpoint.NewFromString(record[6])
+	if err != nil {
+		return empty, ErrInvalidVolumeFormat
+	}
+
 	k.StartTime = types.NewTimeFromUnix(t.Unix(), 0)
 	k.EndTime = types.NewTimeFromUnix(t.Add(interval).Unix(), 0)
-	k.Open = fixedpoint.MustNewFromString(record[2])
-	k.High = fixedpoint.MustNewFromString(record[3])
-	k.Low = fixedpoint.MustNewFromString(record[4])
-	k.Close = fixedpoint.MustNewFromString(record[5])
-	k.Volume = fixedpoint.MustNewFromString(record[6])
+	k.Open = open
+	k.High = high
+	k.Low = low
+	k.Close = closing
+	k.Volume = volume
 
 	return k, nil
 }
