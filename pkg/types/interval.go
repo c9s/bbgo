@@ -99,21 +99,24 @@ func (i Interval) Truncate(ts time.Time) (start time.Time) {
 	case Interval2w:
 		return shiftDay(ts, 14)
 	case Interval1mo:
-		return time.Date(ts.Year(), ts.Month(), 0, 0, 0, 0, 0, ts.UTC().Location())
+		return time.Date(ts.Year(), ts.Month(), 0, 0, 0, 0, 0, time.UTC)
 	}
 	return start
 }
 
-func shiftDay(ts time.Time, shift time.Duration) time.Time {
-	return ts.Truncate(time.Hour * 24).Add(shift * time.Hour)
+func shiftDay(ts time.Time, shift int) time.Time {
+	day := ts.Day() - (ts.Day() % shift)
+	return time.Date(ts.Year(), ts.Month(), day, 0, 0, 0, 0, ts.Location())
 }
 
-func shiftHour(ts time.Time, shift time.Duration) time.Time {
-	return ts.Truncate(time.Hour).Add(shift * time.Hour)
+func shiftHour(ts time.Time, shift int) time.Time {
+	hour := ts.Hour() - (ts.Hour() % shift)
+	return time.Date(ts.Year(), ts.Month(), ts.Day(), hour, 0, 0, 0, ts.Location())
 }
 
-func shiftMinute(ts time.Time, shift time.Duration) time.Time {
-	return ts.Truncate(time.Minute).Add(shift * time.Minute)
+func shiftMinute(ts time.Time, shift int) time.Time {
+	minute := ts.Minute() - (ts.Minute() % shift)
+	return time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour(), minute, 0, 0, ts.Location())
 }
 
 func (i *Interval) UnmarshalJSON(b []byte) (err error) {
