@@ -64,14 +64,14 @@ func (i Interval) Duration() time.Duration {
 	return time.Duration(i.Milliseconds()) * time.Millisecond
 }
 
-// Convert determines the candle open time from a given timestamp
-// eg interval 1 hour and tick at timestamp 00:58 will return timestamp shifted to 00:00
-func (i Interval) Convert(ts time.Time) time.Time {
-	var start = time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour(), ts.Second(), 0, 0, ts.Location())
+// Truncate determines the candle open time from a given timestamp
+// eg interval 1 hour and tick at timestamp 00:58:45 will return timestamp shifted to 00:00:00
+func (i Interval) Truncate(ts time.Time) (start time.Time) {
 	switch i {
-	case Interval1s: // default start as defined above
+	case Interval1s:
+		return ts.Truncate(time.Second)
 	case Interval1m:
-		return time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour(), ts.Minute(), 0, 0, ts.Location())
+		return ts.Truncate(time.Minute)
 	case Interval3m:
 		return shiftMinute(ts, 3)
 	case Interval5m:
@@ -81,7 +81,7 @@ func (i Interval) Convert(ts time.Time) time.Time {
 	case Interval30m:
 		return shiftMinute(ts, 30)
 	case Interval1h:
-		return time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour(), 0, 0, 0, ts.Location())
+		return ts.Truncate(time.Hour)
 	case Interval2h:
 		return shiftHour(ts, 2)
 	case Interval4h:
@@ -91,7 +91,7 @@ func (i Interval) Convert(ts time.Time) time.Time {
 	case Interval12h:
 		return shiftHour(ts, 12)
 	case Interval1d:
-		return time.Date(ts.Year(), ts.Month(), ts.Day(), 0, 0, 0, 0, ts.Location())
+		return ts.Truncate(time.Hour * 24)
 	case Interval3d:
 		return shiftDay(ts, 3)
 	case Interval1w:
@@ -99,24 +99,24 @@ func (i Interval) Convert(ts time.Time) time.Time {
 	case Interval2w:
 		return shiftDay(ts, 14)
 	case Interval1mo:
-		return time.Date(ts.Year(), ts.Month(), 0, 0, 0, 0, 0, ts.Location())
+		return time.Date(ts.Year(), ts.Month(), 0, 0, 0, 0, 0, ts.UTC().Location())
 	}
 	return start
 }
 
 func shiftDay(ts time.Time, shift int) time.Time {
-	day := ts.Day() - (ts.Day() % shift)
-	return time.Date(ts.Year(), ts.Month(), day, 0, 0, 0, 0, ts.Location())
+	day := time.Duration(ts.Day()-(ts.Day()%shift)) * time.Hour * 24
+	return ts.Truncate(day)
 }
 
 func shiftHour(ts time.Time, shift int) time.Time {
-	hour := ts.Hour() - (ts.Hour() % shift)
-	return time.Date(ts.Year(), ts.Month(), ts.Day(), hour, 0, 0, 0, ts.Location())
+	hour := time.Duration(ts.Hour()-(ts.Hour()%shift)) * time.Hour
+	return ts.Truncate(hour)
 }
 
 func shiftMinute(ts time.Time, shift int) time.Time {
-	minute := ts.Minute() - (ts.Minute() % shift)
-	return time.Date(ts.Year(), ts.Month(), ts.Day(), ts.Hour(), minute, 0, 0, ts.Location())
+	minute := time.Duration(ts.Minute()-(ts.Minute()%shift)) * time.Minute
+	return ts.Truncate(minute)
 }
 
 func (i *Interval) UnmarshalJSON(b []byte) (err error) {

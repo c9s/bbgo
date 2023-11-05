@@ -19,6 +19,9 @@ var (
 	ErrNotEnoughColumns = errors.New("not enough columns")
 
 	// ErrInvalidTimeFormat is returned when the CSV price record does not have a valid time unix milli format.
+	ErrInvalidIDFormat = errors.New("cannot trade id string")
+
+	// ErrInvalidTimeFormat is returned when the CSV price record does not have a valid time unix milli format.
 	ErrInvalidTimeFormat = errors.New("cannot parse time string")
 
 	// ErrInvalidOrderSideFormat is returned when the CSV side record does not have a valid buy or sell string.

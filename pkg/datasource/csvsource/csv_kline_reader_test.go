@@ -14,11 +14,11 @@ import (
 
 var assertKLineEq = func(t *testing.T, exp, act types.KLine) {
 	assert.Equal(t, exp.StartTime, act.StartTime)
-	assert.True(t, exp.Open == act.Open)
-	assert.True(t, exp.High == act.High)
-	assert.True(t, exp.Low == act.Low)
-	assert.True(t, exp.Close == act.Close)
-	assert.Equal(t, exp.Volume, act.Volume)
+	assert.Equal(t, exp.Open.Compare(act.Open), 0)
+	assert.Equal(t, exp.High.Compare(act.High), 0)
+	assert.Equal(t, exp.Low.Compare(act.Low), 0)
+	assert.Equal(t, exp.Close.Compare(act.Close), 0)
+	assert.Equal(t, exp.Volume.Compare(act.Volume), 0)
 }
 
 func TestCSVKLineReader_ReadWithBinanceDecoder(t *testing.T) {

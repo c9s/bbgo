@@ -11,9 +11,8 @@ var _ TickReader = (*CSVTickReader)(nil)
 
 // CSVTickReader is a CSVTickReader that reads from a CSV file.
 type CSVTickReader struct {
-	csv       *csv.Reader
-	decoder   CSVTickDecoder
-	converter *CSVTickConverter
+	csv     *csv.Reader
+	decoder CSVTickDecoder
 }
 
 // MakeCSVTickReader is a factory method type that creates a new CSVTickReader.
