@@ -86,7 +86,7 @@ func BybitCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 	}
 	id, err := uuidStringToUInt(row[6])
 	if err != nil {
-		return nil, ErrInvalidOrderSideFormat
+		return nil, ErrInvalidIDFormat
 	}
 	return &CsvTick{
 		TradeID:         id,
@@ -109,7 +109,7 @@ func uuidStringToUInt(uuidStr string) (uint64, error) {
 	// Parse the hexadecimal string into a big integer
 	uuidBigInt, success := new(big.Int).SetString(uuidStr, 16)
 	if !success {
-		return 0, fmt.Errorf("Failed to parse UUID as a big integer")
+		return 0, fmt.Errorf("parse UUID as a big integer")
 	}
 
 	return uuidBigInt.Uint64(), nil

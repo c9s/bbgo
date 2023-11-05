@@ -68,26 +68,26 @@ func buildURL(exchange types.ExchangeName, symbol string, fileName string, start
 func readCSVFromUrl(exchange types.ExchangeName, url string) (csvContent []byte, err error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("get %s: %w", url, err)
+		return nil, fmt.Errorf("http get error, url %s: %w", url, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read body %s: %w", url, err)
+		return nil, fmt.Errorf("unable to read response: %w", err)
 	}
 
 	switch exchange {
 	case types.ExchangeBybit:
-		csvContent, err = gUnzipData(body)
+		csvContent, err = gunzip(body)
 		if err != nil {
-			return nil, fmt.Errorf("gunzip data %s: %w", url, err)
+			return nil, fmt.Errorf("gunzip data %s: %w", exchange, err)
 		}
 
 	case types.ExchangeBinance:
-		csvContent, err = unzipData(body)
+		csvContent, err = unzip(body)
 		if err != nil {
-			return nil, fmt.Errorf("unzip data %s: %w", url, err)
+			return nil, fmt.Errorf("unzip data %s: %w", exchange, err)
 		}
 	}
 
@@ -111,7 +111,7 @@ func write(content []byte, saveToPath, fileName string) error {
 	return nil
 }
 
-func unzipData(data []byte) (resData []byte, err error) {
+func unzip(data []byte) (resData []byte, err error) {
 	zipReader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		log.Error(err)
@@ -142,7 +142,7 @@ func readZipFile(zf *zip.File) ([]byte, error) {
 	return io.ReadAll(f)
 }
 
-func gUnzipData(data []byte) (resData []byte, err error) {
+func gunzip(data []byte) (resData []byte, err error) {
 	b := bytes.NewBuffer(data)
 
 	var r io.Reader

@@ -103,12 +103,10 @@ func (c *CSVTickConverter) CsvTickToKLine(tick *CsvTick, interval types.Interval
 
 func (c *CSVTickConverter) detCandleStart(ts time.Time, interval types.Interval) (isOpen bool, t time.Time) {
 	if len(c.klines) == 0 {
-		return true, interval.Convert(ts)
+		return true, interval.Truncate(ts)
 	}
-	var (
-		current = c.klines[len(c.klines)-1]
-		end     = current.EndTime.Time()
-	)
+
+	var end = c.LatestKLine().EndTime.Time()
 	if ts.After(end) {
 		return true, end
 	}

@@ -12,10 +12,10 @@ import (
 )
 
 var assertTickEq = func(t *testing.T, exp, act *CsvTick) {
-	assert.Equal(t, exp.Timestamp, act.Timestamp)
-	assert.True(t, exp.Price == act.Price)
-	assert.True(t, exp.Size == act.Size)
-	assert.True(t, exp.HomeNotional == act.HomeNotional)
+	assert.Equal(t, exp.Timestamp.Time(), act.Timestamp.Time())
+	assert.Equal(t, exp.Price.Compare(act.Price), 0)
+	assert.Equal(t, exp.Size.Compare(act.Size), 0)
+	assert.Equal(t, exp.HomeNotional.Compare(act.HomeNotional), 0)
 }
 
 func TestCSVTickReader_ReadWithBinanceDecoder(t *testing.T) {

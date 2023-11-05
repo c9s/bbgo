@@ -5,13 +5,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type EquityType int
-
-const (
-	Spot        EquityType = 0
-	Derivatives EquityType = 1
-)
-
 type CsvTick struct {
 	Exchange        types.ExchangeName `json:"exchange"`
 	TradeID         uint64             `json:"tradeID"`
