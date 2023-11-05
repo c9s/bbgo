@@ -19,7 +19,7 @@ type CsvTick struct {
 	Timestamp       types.MillisecondTimestamp `json:"timestamp"`
 }
 
-func (c *CsvTick) toGlobalTrade() (*types.Trade, error) {
+func (c *CsvTick) ToGlobalTrade() (*types.Trade, error) {
 	return &types.Trade{
 		ID: c.TradeID,
 		// OrderID:    // not implemented

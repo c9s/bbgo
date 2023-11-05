@@ -104,19 +104,16 @@ func (i Interval) Truncate(ts time.Time) (start time.Time) {
 	return start
 }
 
-func shiftDay(ts time.Time, shift int) time.Time {
-	day := time.Duration(ts.Day()-(ts.Day()%shift)) * time.Hour * 24
-	return ts.Truncate(day)
+func shiftDay(ts time.Time, shift time.Duration) time.Time {
+	return ts.Truncate(time.Hour * 24).Add(shift * time.Hour)
 }
 
-func shiftHour(ts time.Time, shift int) time.Time {
-	hour := time.Duration(ts.Hour()-(ts.Hour()%shift)) * time.Hour
-	return ts.Truncate(hour)
+func shiftHour(ts time.Time, shift time.Duration) time.Time {
+	return ts.Truncate(time.Hour).Add(shift * time.Hour)
 }
 
-func shiftMinute(ts time.Time, shift int) time.Time {
-	minute := time.Duration(ts.Minute()-(ts.Minute()%shift)) * time.Minute
-	return ts.Truncate(minute)
+func shiftMinute(ts time.Time, shift time.Duration) time.Time {
+	return ts.Truncate(time.Minute).Add(shift * time.Minute)
 }
 
 func (i *Interval) UnmarshalJSON(b []byte) (err error) {
