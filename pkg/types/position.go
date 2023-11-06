@@ -65,6 +65,17 @@ type Position struct {
 
 	// Modify position callbacks
 	modifyCallbacks []func(baseQty fixedpoint.Value, quoteQty fixedpoint.Value, price fixedpoint.Value)
+
+	// ttl is the ttl to keep in persistence
+	ttl time.Duration
+}
+
+func (s *Position) SetTTL(ttl time.Duration) {
+	s.ttl = ttl
+}
+
+func (s *Position) Expiration() time.Duration {
+	return s.ttl
 }
 
 func (p *Position) CsvHeader() []string {
