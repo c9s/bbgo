@@ -531,10 +531,7 @@ var BacktestCmd = &cobra.Command{
 					continue
 				}
 
-				tradeState := sessionTradeStats[session.Name][symbol]
-				profitFactor := tradeState.ProfitFactor
-				winningRatio := tradeState.WinningRatio
-				intervalProfits := tradeState.IntervalProfits[types.Interval1d]
+				tradeStats := sessionTradeStats[session.Name][symbol]
 				symbolReport, err := createSymbolReport(userConfig, session, symbol, trades.Copy(), tradeStats)
 				if err != nil {
 					return err
@@ -546,8 +543,8 @@ var BacktestCmd = &cobra.Command{
 				summaryReport.TotalUnrealizedProfit = symbolReport.PnL.UnrealizedProfit
 				summaryReport.InitialEquityValue = summaryReport.InitialEquityValue.Add(symbolReport.InitialEquityValue())
 				summaryReport.FinalEquityValue = summaryReport.FinalEquityValue.Add(symbolReport.FinalEquityValue())
-				summaryReport.TotalGrossProfit.Add(symbolReport.PnL.GrossProfit)
-				summaryReport.TotalGrossLoss.Add(symbolReport.PnL.GrossLoss)
+				summaryReport.TotalGrossProfit = summaryReport.TotalGrossProfit.Add(symbolReport.PnL.GrossProfit)
+				summaryReport.TotalGrossLoss = summaryReport.TotalGrossLoss.Add(symbolReport.PnL.GrossLoss)
 
 				// write report to a file
 				if generatingReport {
