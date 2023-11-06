@@ -100,7 +100,7 @@ func TestBollingerBand(t *testing.T) {
 	sigma := 2.0
 
 	source := types.NewFloat64Series()
-	ind := BollingerBand(source, window, sigma)
+	ind := BOLL(source, window, sigma)
 
 	for _, d := range ts {
 		source.PushAndEmit(d)

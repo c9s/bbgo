@@ -75,7 +75,7 @@ type Strategy struct {
 
 	// indicators
 	ewma      *indicatorv2.EWMAStream
-	boll      *indicatorv2.BollingerStream
+	boll      *indicatorv2.BOLLStream
 	intensity *IntensityStream
 
 	positionRiskControl     *riskcontrol.PositionRiskControl
@@ -201,7 +201,7 @@ func (s *Strategy) initializeIntensityIndicator(session *bbgo.ExchangeSession) {
 func (s *Strategy) initializePriceRangeBollinger(session *bbgo.ExchangeSession) {
 	kLines := indicatorv2.KLines(session.MarketDataStream, s.Symbol, s.PriceRangeBollinger.Interval)
 	closePrices := indicatorv2.ClosePrices(kLines)
-	s.boll = indicatorv2.BollingerBand(closePrices, s.PriceRangeBollinger.Window, s.PriceRangeBollinger.K)
+	s.boll = indicatorv2.BOLL(closePrices, s.PriceRangeBollinger.Window, s.PriceRangeBollinger.K)
 
 	s.preloadKLines(kLines, session, s.Symbol, s.PriceRangeBollinger.Interval)
 }

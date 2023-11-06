@@ -4,7 +4,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type BollingerStream struct {
+type BOLLStream struct {
 	// the band series
 	*types.Float64Series
 
@@ -16,19 +16,19 @@ type BollingerStream struct {
 	StdDev *StdDevStream
 }
 
-// BOOL2 is bollinger indicator
+// BOLL2 is bollinger indicator
 // the data flow:
 //
 // priceSource ->
 //
 //	-> calculate SMA
 //	-> calculate stdDev -> calculate bandWidth -> get latest SMA -> upBand, downBand
-func BollingerBand(source types.Float64Source, window int, k float64) *BollingerStream {
+func BOLL(source types.Float64Source, window int, k float64) *BOLLStream {
 	// bind these indicators before our main calculator
 	sma := SMA(source, window)
 	stdDev := StdDev(source, window)
 
-	s := &BollingerStream{
+	s := &BOLLStream{
 		Float64Series: types.NewFloat64Series(),
 		UpBand:        types.NewFloat64Series(),
 		DownBand:      types.NewFloat64Series(),
@@ -47,13 +47,13 @@ func BollingerBand(source types.Float64Source, window int, k float64) *Bollinger
 	return s
 }
 
-func (s *BollingerStream) Calculate(v float64) float64 {
+func (s *BOLLStream) Calculate(v float64) float64 {
 	stdDev := s.StdDev.Last(0)
 	band := stdDev * s.k
 	return band
 }
 
-func (s *BollingerStream) Truncate() {
+func (s *BOLLStream) Truncate() {
 	s.UpBand.Slice = s.UpBand.Slice.Truncate(5000)
 	s.DownBand.Slice = s.DownBand.Slice.Truncate(5000)
 }

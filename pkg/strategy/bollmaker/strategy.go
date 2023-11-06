@@ -157,10 +157,10 @@ type Strategy struct {
 	groupID uint32
 
 	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
-	defaultBoll *indicatorv2.BollingerStream
+	defaultBoll *indicatorv2.BOLLStream
 
 	// neutralBoll is the neutral price section
-	neutralBoll *indicatorv2.BollingerStream
+	neutralBoll *indicatorv2.BOLLStream
 
 	// StrategyController
 	bbgo.StrategyController

@@ -89,8 +89,8 @@ func (i *IndicatorSet) STOCH(iw types.IntervalWindow, dPeriod int) *indicatorv2.
 	return indicatorv2.Stoch(i.KLines(iw.Interval), iw.Window, dPeriod)
 }
 
-func (i *IndicatorSet) BOLL(iw types.IntervalWindow, k float64) *indicatorv2.BollingerStream {
-	return indicatorv2.BollingerBand(i.CLOSE(iw.Interval), iw.Window, k)
+func (i *IndicatorSet) BOLL(iw types.IntervalWindow, k float64) *indicatorv2.BOLLStream {
+	return indicatorv2.BOLL(i.CLOSE(iw.Interval), iw.Window, k)
 }
 
 func (i *IndicatorSet) MACD(interval types.Interval, shortWindow, longWindow, signalWindow int) *indicatorv2.MACDStream {
