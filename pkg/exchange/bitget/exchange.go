@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
@@ -19,7 +20,9 @@ const (
 
 	PlatformToken = "BGB"
 
-	queryOpenOrdersLimit = 100
+	queryLimit       = 100
+	maxOrderIdLen    = 36
+	queryMaxDuration = 90 * 24 * time.Hour
 )
 
 var log = logrus.WithFields(logrus.Fields{
@@ -37,6 +40,8 @@ var (
 	queryTickersRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
 	// queryOpenOrdersRateLimiter has its own rate limit. https://www.bitget.com/zh-CN/api-doc/spot/trade/Get-Unfilled-Orders
 	queryOpenOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
+	// closedQueryOrdersRateLimiter has its own rate limit. https://www.bitget.com/api-doc/spot/trade/Get-History-Orders
+	closedQueryOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/15), 5)
 )
 
 type Exchange struct {
@@ -192,7 +197,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 		req := e.v2Client.NewGetUnfilledOrdersRequest().
 			Symbol(symbol).
-			Limit(strconv.FormatInt(queryOpenOrdersLimit, 10))
+			Limit(strconv.FormatInt(queryLimit, 10))
 		if nextCursor != 0 {
 			req.IdLessThan(strconv.FormatInt(int64(nextCursor), 10))
 		}
@@ -213,17 +218,68 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 		orderLen := len(openOrders)
 		// a defensive programming to ensure the length of order response is expected.
-		if orderLen > queryOpenOrdersLimit {
+		if orderLen > queryLimit {
 			return nil, fmt.Errorf("unexpected open orders length %d", orderLen)
 		}
 
-		if orderLen < queryOpenOrdersLimit {
+		if orderLen < queryLimit {
 			break
 		}
 		nextCursor = openOrders[orderLen-1].OrderId
 	}
 
 	return orders, nil
+}
+
+// QueryClosedOrders queries closed order by time range(`CTime`) and id. The order of the response is in descending order.
+// If you need to retrieve all data, please utilize the function pkg/exchange/batch.ClosedOrderBatchQuery.
+//
+// ** Since is inclusive, Until is exclusive. If you use a time range to query, you must provide both a start time and an end time. **
+// ** Since and Until cannot exceed 90 days. **
+// ** Since from the last 90 days can be queried. **
+func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+	if since.Sub(time.Now()) > queryMaxDuration {
+		return nil, fmt.Errorf("start time from the last 90 days can be queried, got: %s", since)
+	}
+	if until.Before(since) {
+		return nil, fmt.Errorf("end time %s before start %s", until, since)
+	}
+	if until.Sub(since) > queryMaxDuration {
+		return nil, fmt.Errorf("the start time %s and end time %s cannot exceed 90 days", since, until)
+	}
+	if lastOrderID != 0 {
+		log.Warn("!!!BITGET EXCHANGE API NOTICE!!! The order of response is in descending order, so the last order id not supported.")
+	}
+
+	if err := closedQueryOrdersRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
+	}
+	res, err := e.v2Client.NewGetHistoryOrdersRequest().
+		Symbol(symbol).
+		Limit(strconv.Itoa(queryLimit)).
+		StartTime(since.UnixMilli()).
+		EndTime(until.UnixMilli()).
+		Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
+	}
+
+	for _, order := range res {
+		o, err2 := toGlobalOrder(order)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+			continue
+		}
+
+		if o.Status.Closed() {
+			orders = append(orders, *o)
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return types.SortOrdersAscending(orders), nil
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {

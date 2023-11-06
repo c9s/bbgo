@@ -2,11 +2,10 @@ package bitgetapi
 
 import (
 	"context"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"strconv"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
 	"github.com/c9s/bbgo/pkg/testutil"
@@ -25,7 +24,6 @@ func getTestClientOrSkip(t *testing.T) *Client {
 
 	client := bitgetapi.NewClient()
 	client.Auth(key, secret, os.Getenv("BITGET_API_PASSPHRASE"))
-
 	return NewClient(client)
 }
 
@@ -38,5 +36,13 @@ func TestClient(t *testing.T) {
 		resp, err := req.Do(ctx)
 		assert.NoError(t, err)
 		t.Logf("resp: %+v", resp)
+	})
+
+	t.Run("GetHistoryOrdersRequest", func(t *testing.T) {
+		// market buy
+		req, err := client.NewGetHistoryOrdersRequest().Symbol("APEUSDT").Do(ctx)
+		assert.NoError(t, err)
+
+		t.Logf("place order resp: %+v", req)
 	})
 }
