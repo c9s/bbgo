@@ -23,5 +23,6 @@ func ApproxEqual(a, b Value, maxDiff float64) bool {
 	smallMultiple := a.Mul(NewFromFloat(maxDiff))
 
 	// Compare the absolute difference to the small multiple
-	return diff <= smallMultiple
+	cmp := diff.Compare(smallMultiple)
+	return cmp == -1 || cmp == 0
 }

@@ -33,39 +33,39 @@ func ThreeLineStrike(source KLineSubscription) *ThreeLineStrikeStream {
 			one   = source.Last(0)
 		)
 		// BEAR
-		if three.Close < four.Close {
-			if two.Close < three.Close {
-				if four.Close < three.Open && three.Open < four.Open {
-					if three.Close < two.Open && two.Open < three.Open {
-						if one.Open < two.Close {
-							if one.Close > four.Open {
+		if three.Close.Float64() < four.Close.Float64() {
+			if two.Close.Float64() < three.Close.Float64() {
+				if four.Close.Float64() < three.Open.Float64() &&
+					three.Open.Float64() < four.Open.Float64() {
+					if three.Close.Float64() < two.Open.Float64() &&
+						two.Open.Float64() < three.Open.Float64() {
+						if one.Open.Float64() < two.Close.Float64() {
+							if one.Close.Float64() > four.Open.Float64() {
 								output = Bear
 							}
 						}
 					}
 				}
-
 			}
 		}
-
 		// BULL
-		if three.Close > four.Close {
-			if two.Close > three.Close {
-				if four.Close > three.Open && three.Open > four.Open {
-					if three.Close > two.Open && two.Open > three.Open {
-						if one.Open > two.Close {
-							if one.Close < four.Open {
+		if three.Close.Float64() > four.Close.Float64() {
+			if two.Close.Float64() > three.Close.Float64() {
+				if four.Close.Float64() > three.Open.Float64() &&
+					three.Open.Float64() > four.Open.Float64() {
+					if three.Close.Float64() > two.Open.Float64() &&
+						two.Open.Float64() > three.Open.Float64() {
+						if one.Open.Float64() > two.Close.Float64() {
+							if one.Close.Float64() < four.Open.Float64() {
 								output = Bull
 							}
 						}
 					}
 				}
-
 			}
 		}
 
 		s.PushAndEmit(output)
-
 	})
 
 	return s

@@ -35,18 +35,18 @@ func Harami(source KLineSubscription) *HaramiStream {
 		)
 
 		// BEAR
-		if two.Open < two.Close {
-			if one.Open > one.Close {
-				if one.Open < two.Close && one.Close > two.Open {
+		if two.Open.Float64() < two.Close.Float64() {
+			if one.Open.Float64() > one.Close.Float64() {
+				if one.Open.Float64() < two.Close.Float64() && one.Close.Float64() > two.Open.Float64() {
 					output = Bear
 				}
 			}
 		}
 
 		// BULL
-		if two.Open > two.Close {
-			if one.Open < one.Close {
-				if one.Open > two.Close && one.Close < two.Open {
+		if two.Open.Float64() > two.Close.Float64() {
+			if one.Open.Float64() < one.Close.Float64() {
+				if one.Open.Float64() > two.Close.Float64() && one.Close.Float64() < two.Open.Float64() {
 					output = Bull
 				}
 			}

@@ -2,7 +2,6 @@ package indicatorv2
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -36,34 +35,34 @@ func MorningOrEveningStar(source KLineSubscription, direction Direction) *Mornin
 			three         = source.Last(2)
 			two           = source.Last(1)
 			one           = source.Last(0)
-			firstMidpoint = three.Open.Add(three.Close).Div(fixedpoint.Two)
+			firstMidpoint = three.Open.Add(three.Close).Div(fixedpoint.Two).Float64()
 		)
 		if direction == Bullish {
 			var (
-				isFirstBearish = three.Close < three.Open
-				hasSmallBody   = three.Low > two.Low &&
-					three.Low > two.High
-				isThirdBullish = one.Open < one.Close
-				gapExists      = two.High < three.Low &&
-					two.Low < three.Low &&
-					one.Open > two.High &&
-					two.Close < one.Open
-				doesCloseAboveFirstMidpoint = one.Close > firstMidpoint
+				isFirstBearish = three.Close.Float64() < three.Open.Float64()
+				hasSmallBody   = three.Low.Float64() > two.Low.Float64() &&
+					three.Low.Float64() > two.High.Float64()
+				isThirdBullish = one.Open.Float64() < one.Close.Float64()
+				gapExists      = two.High.Float64() < three.Low.Float64() &&
+					two.Low.Float64() < three.Low.Float64() &&
+					one.Open.Float64() > two.High.Float64() &&
+					two.Close.Float64() < one.Open.Float64()
+				doesCloseAboveFirstMidpoint = one.Close.Float64() > firstMidpoint
 			)
 			if isFirstBearish && hasSmallBody && gapExists && isThirdBullish && doesCloseAboveFirstMidpoint {
 				output = Bull // morning star
 			}
 		} else {
 			var (
-				isFirstBullish = three.Close > three.Open
-				hasSmallBody   = three.High < two.Low &&
-					three.High < two.High
-				isThirdBearish = one.Open > one.Close
-				gapExists      = two.High > three.High &&
-					two.Low > three.High &&
-					one.Open < two.Low &&
-					two.Close > one.Open
-				doesCloseBelowFirstMidpoint = one.Close < firstMidpoint
+				isFirstBullish = three.Close.Float64() > three.Open.Float64()
+				hasSmallBody   = three.High.Float64() < two.Low.Float64() &&
+					three.High.Float64() < two.High.Float64()
+				isThirdBearish = one.Open.Float64() > one.Close.Float64()
+				gapExists      = two.High.Float64() > three.High.Float64() &&
+					two.Low.Float64() > three.High.Float64() &&
+					one.Open.Float64() < two.Low.Float64() &&
+					two.Close.Float64() > one.Open.Float64()
+				doesCloseBelowFirstMidpoint = one.Close.Float64() < firstMidpoint
 			)
 			if isFirstBullish && hasSmallBody && gapExists && isThirdBearish && doesCloseBelowFirstMidpoint {
 				output = Bear // evening star

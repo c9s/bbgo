@@ -42,7 +42,7 @@ func DonchianChannel(source KLineSubscription, window int) *DonchianChannelStrea
 }
 
 func (s *DonchianChannelStream) Truncate() {
-	s.UpBand.Slice = s.UpBand.Slice.Truncate(5000)
-	s.DownBand.Slice = s.DownBand.Slice.Truncate(5000)
-	s.MiddleBand.Slice = s.MiddleBand.Slice.Truncate(5000)
+	s.UpBand.Slice = s.UpBand.Slice.Truncate(MaxNumOfMA)
+	s.DownBand.Slice = s.DownBand.Slice.Truncate(MaxNumOfMA)
+	s.MiddleBand.Slice = s.MiddleBand.Slice.Truncate(MaxNumOfMA)
 }

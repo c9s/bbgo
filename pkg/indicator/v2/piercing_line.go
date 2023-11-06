@@ -1,6 +1,7 @@
 package indicatorv2
 
 import (
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -28,12 +29,12 @@ func PiercingLine(source KLineSubscription) *PiercingLineStream {
 		var (
 			two             = source.Last(1)
 			one             = source.Last(0)
-			firstMidpoint   = (two.Open + two.Close) / 2
-			isDowntrend     = one.Low < two.Low
-			isFirstBearish  = two.Close < two.Open
-			isSecondBullish = one.Close > one.Open
-			isPiercingLine  = two.Low > one.Open &&
-				one.Close > firstMidpoint
+			firstMidpoint   = two.Open.Add(two.Close).Div(fixedpoint.Two).Float64()
+			isDowntrend     = one.Low.Float64() < two.Low.Float64()
+			isFirstBearish  = two.Close.Float64() < two.Open.Float64()
+			isSecondBullish = one.Close.Float64() > one.Open.Float64()
+			isPiercingLine  = two.Low.Float64() > one.Open.Float64() &&
+				one.Close.Float64() > firstMidpoint
 		)
 		if isDowntrend && isFirstBearish && isSecondBullish && isPiercingLine {
 			output = Bull

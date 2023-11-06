@@ -50,5 +50,5 @@ func WilliamsR(source KLineSubscription, window int) *WilliamsRStream {
 }
 
 func (s *WilliamsRStream) Truncate() {
-	s.Slice = s.Slice.Truncate(5000)
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }

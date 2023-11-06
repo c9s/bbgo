@@ -2,7 +2,6 @@ package indicatorv2
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -45,21 +44,21 @@ func HaramiCross(source KLineSubscription, direction Direction, maxDiff float64)
 		)
 		if direction == Bullish {
 			var (
-				isBullishHaramiCrossPattern = two.Open > one.Open &&
-					two.Close < one.Open &&
-					two.Close < one.Close &&
-					two.Open > one.Low &&
-					two.High > one.High
+				isBullishHaramiCrossPattern = two.Open.Float64() > one.Open.Float64() &&
+					two.Close.Float64() < one.Open.Float64() &&
+					two.Close.Float64() < one.Close.Float64() &&
+					two.Open.Float64() > one.Low.Float64() &&
+					two.High.Float64() > one.High.Float64()
 			)
 			if isBullishHaramiCrossPattern && isLastDoji {
 				output = Bull
 			}
 		} else {
-			var isBearishHaramiCrossPattern = two.Open < one.Open &&
-				two.Close > one.Open &&
-				two.Close > one.Close &&
-				two.Open < one.Low &&
-				two.High > one.High
+			var isBearishHaramiCrossPattern = two.Open.Float64() < one.Open.Float64() &&
+				two.Close.Float64() > one.Open.Float64() &&
+				two.Close.Float64() > one.Close.Float64() &&
+				two.Open.Float64() < one.Low.Float64() &&
+				two.High.Float64() > one.High.Float64()
 			if isBearishHaramiCrossPattern && isLastDoji {
 				output = Bear
 			}

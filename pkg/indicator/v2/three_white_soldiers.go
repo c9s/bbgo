@@ -29,15 +29,15 @@ func ThreeWhiteSoldiers(source KLineSubscription) *ThreeWhiteSoldiersStream {
 			three     = source.Last(2)
 			two       = source.Last(1)
 			one       = source.Last(0)
-			isUpTrend = two.High > three.High &&
-				one.High > two.High
-			isAllBullish = three.Open < three.Close &&
-				two.Open < two.Close &&
-				one.Open < one.Close
-			doesOpenWithinPreviousBody = three.Close > two.Open &&
-				two.Open < three.High &&
-				two.High > one.Open &&
-				one.Open < two.Close
+			isUpTrend = two.High.Float64() > three.High.Float64() &&
+				one.High.Float64() > two.High.Float64()
+			isAllBullish = three.Open.Float64() < three.Close.Float64() &&
+				two.Open.Float64() < two.Close.Float64() &&
+				one.Open.Float64() < one.Close.Float64()
+			doesOpenWithinPreviousBody = three.Close.Float64() > two.Open.Float64() &&
+				two.Open.Float64() < three.High.Float64() &&
+				two.High.Float64() > one.Open.Float64() &&
+				one.Open.Float64() < two.Close.Float64()
 		)
 
 		if isUpTrend && isAllBullish && doesOpenWithinPreviousBody {

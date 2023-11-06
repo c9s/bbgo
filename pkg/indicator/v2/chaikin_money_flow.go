@@ -4,7 +4,6 @@ import (
 	"gonum.org/v1/gonum/floats"
 
 	bbfloat "github.com/c9s/bbgo/pkg/datatype/floats"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -50,7 +49,7 @@ func ChaikinMoneyFlow(source KLineSubscription, window int) *ChaikinMoneyFlowStr
 }
 
 func (s *ChaikinMoneyFlowStream) Truncate() {
-	s.Slice = s.Slice.Truncate(5000)
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }
 
 func ChaikinMoneyFlowDefault(source KLineSubscription) *ChaikinMoneyFlowStream {

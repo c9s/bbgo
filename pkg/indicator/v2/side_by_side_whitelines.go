@@ -2,7 +2,6 @@ package indicatorv2
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -35,13 +34,13 @@ func SideBySideWhiteLines(source KLineSubscription, maxDiff float64) *SideBySide
 		)
 
 		// BEAR
-		if four.Open > four.Close {
-			if three.Open > three.Close {
-				if three.Low > two.High {
-					if two.Open < two.Close {
-						if one.Open < one.Close {
-							if fixedpoint.Abs((two.Open-one.Open)/one.Open) < threshold {
-								if fixedpoint.Abs((two.Close-one.Close)/one.Close) < threshold {
+		if four.Open.Float64() > four.Close.Float64() {
+			if three.Open.Float64() > three.Close.Float64() {
+				if three.Low.Float64() > two.High.Float64() {
+					if two.Open.Float64() < two.Close.Float64() {
+						if one.Open.Float64() < one.Close.Float64() {
+							if fixedpoint.Abs(two.Open.Sub(one.Open).Div(one.Open)).Float64() < threshold {
+								if fixedpoint.Abs(two.Close.Sub(one.Close).Div(one.Close)).Float64() < threshold {
 									if fixedpoint.ApproxEqual(two.Open, one.Open, maxDiff) {
 										output = Bear
 									}
@@ -54,13 +53,13 @@ func SideBySideWhiteLines(source KLineSubscription, maxDiff float64) *SideBySide
 		}
 
 		// BULL
-		if four.Open < four.Close {
-			if three.Open < three.Close {
-				if three.Low < two.High {
-					if two.Open < two.Close {
-						if one.Open < one.Close {
-							if fixedpoint.Abs((two.Open-one.Open)/one.Open) < threshold {
-								if fixedpoint.Abs((two.Close-one.Close)/one.Close) < threshold {
+		if four.Open.Float64() < four.Close.Float64() {
+			if three.Open.Float64() < three.Close.Float64() {
+				if three.Low.Float64() < two.High.Float64() {
+					if two.Open.Float64() < two.Close.Float64() {
+						if one.Open.Float64() < one.Close.Float64() {
+							if fixedpoint.Abs(two.Open.Sub(one.Open).Div(one.Open)).Float64() < threshold {
+								if fixedpoint.Abs(two.Close.Sub(one.Close).Div(one.Close)).Float64() < threshold {
 									if fixedpoint.ApproxEqual(two.Open, one.Open, maxDiff) {
 										output = Bull
 									}

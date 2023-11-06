@@ -32,18 +32,18 @@ func Engulfing(source KLineSubscription) *EngulfingStream {
 		)
 
 		// BEAR
-		if two.Open < two.Close {
-			if one.Open > two.Close {
-				if one.Close < two.Open {
+		if two.Open.Float64() < two.Close.Float64() {
+			if one.Open.Float64() > two.Close.Float64() {
+				if one.Close.Float64() < two.Open.Float64() {
 					output = Bear
 				}
 			}
 		}
 
 		// BULL
-		if two.Open > two.Close {
-			if one.Open < two.Close {
-				if one.Close > two.Open {
+		if two.Open.Float64() > two.Close.Float64() {
+			if one.Open.Float64() < two.Close.Float64() {
+				if one.Close.Float64() > two.Open.Float64() {
 					output = Bull
 				}
 			}

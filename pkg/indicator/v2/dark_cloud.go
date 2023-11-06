@@ -34,11 +34,11 @@ func DarkCloud(source KLineSubscription) *DarkCloudStream {
 		var (
 			two             = source.Last(1)
 			one             = source.Last(0)
-			twoMidpoint     = (two.Close + two.Open) / 2
-			isFirstBullish  = two.Close > two.Open
-			isSecondBearish = one.Close < one.Open
-			isDarkCloud     = one.Open > two.High &&
-				one.Close < twoMidpoint && one.Close > two.Open
+			twoMidpoint     = (two.Close.Float64() + two.Open.Float64()) / 2
+			isFirstBullish  = two.Close.Float64() > two.Open.Float64()
+			isSecondBearish = one.Close.Float64() < one.Open.Float64()
+			isDarkCloud     = one.Open.Float64() > two.High.Float64() &&
+				one.Close.Float64() < twoMidpoint && one.Close.Float64() > two.Open.Float64()
 		)
 
 		if isFirstBullish && isSecondBearish && isDarkCloud {

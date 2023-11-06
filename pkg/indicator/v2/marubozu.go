@@ -24,7 +24,7 @@ func Marubozu(source KLineSubscription, maxDiff float64) *MarubozuStream {
 			one    = source.Last(0)
 		)
 		// BEAR
-		if one.Open > one.Close {
+		if one.Open.Float64() > one.Close.Float64() {
 			if fixedpoint.ApproxEqual(one.High, one.Open, maxDiff) &&
 				fixedpoint.ApproxEqual(one.Low, one.Close, maxDiff) {
 				output = Bear
@@ -32,7 +32,7 @@ func Marubozu(source KLineSubscription, maxDiff float64) *MarubozuStream {
 		}
 
 		// BULL
-		if one.Open < one.Close {
+		if one.Open.Float64() < one.Close.Float64() {
 			if fixedpoint.ApproxEqual(one.Low, one.Open, maxDiff) &&
 				fixedpoint.ApproxEqual(one.High, one.Close, maxDiff) {
 				output = Bull

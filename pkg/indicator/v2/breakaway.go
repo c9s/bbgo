@@ -33,20 +33,26 @@ func BreakAway(source KLineSubscription) *BreakAwayStream {
 			one   = source.Last(0)
 		)
 
-		if five.Open < five.Close {
-			if four.Open < four.Close && five.Close < four.Open {
-				if four.Close < three.Close && three.Close < two.Close {
-					if one.Open > one.Close && one.Close > five.Close {
+		if five.Open.Float64() < five.Close.Float64() {
+			if four.Open.Float64() < four.Close.Float64() &&
+				five.Close.Float64() < four.Open.Float64() {
+				if four.Close.Float64() < three.Close.Float64() &&
+					three.Close.Float64() < two.Close.Float64() {
+					if one.Open.Float64() > one.Close.Float64() &&
+						one.Close.Float64() > five.Close.Float64() {
 						output = Bear
 					}
 				}
 			}
 		}
 
-		if five.Open > five.Close {
-			if four.Open > four.Close && five.Close > four.Open {
-				if four.Close > three.Close && three.Close > two.Close {
-					if one.Open < one.Close && one.Close < five.Close {
+		if five.Open.Float64() > five.Close.Float64() {
+			if four.Open.Float64() > four.Close.Float64() &&
+				five.Close.Float64() > four.Open.Float64() {
+				if four.Close.Float64() > three.Close.Float64() &&
+					three.Close.Float64() > two.Close.Float64() {
+					if one.Open.Float64() < one.Close.Float64() &&
+						one.Close.Float64() < five.Close.Float64() {
 						output = Bull
 					}
 				}

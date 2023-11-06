@@ -2,7 +2,6 @@ package indicatorv2
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -51,5 +50,5 @@ func NegativeVolumeIndex(source KLineSubscription) *NVIStream {
 }
 
 func (s *NVIStream) Truncate() {
-	s.Slice = s.Slice.Truncate(5000)
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }

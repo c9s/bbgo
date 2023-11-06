@@ -2,7 +2,6 @@ package indicatorv2
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -34,10 +33,10 @@ func MeetingLines(source KLineSubscription) *MeetingLinesStream {
 		)
 
 		// BEAR
-		if three.Open < three.Close {
-			if two.Open < two.Close {
-				if one.Open > one.Close {
-					if fixedpoint.Abs((two.Close-one.Close)/one.Close) < threshold {
+		if three.Open.Float64() < three.Close.Float64() {
+			if two.Open.Float64() < two.Close.Float64() {
+				if one.Open.Float64() > one.Close.Float64() {
+					if fixedpoint.Abs(two.Close.Sub(one.Close).Div(one.Close)).Float64() < threshold {
 						output = Bear
 					}
 				}
@@ -45,10 +44,10 @@ func MeetingLines(source KLineSubscription) *MeetingLinesStream {
 		}
 
 		// BULL
-		if three.Open > three.Close {
-			if two.Open > two.Close {
-				if one.Open < one.Close {
-					if fixedpoint.Abs((two.Close-one.Close)/one.Close) < threshold {
+		if three.Open.Float64() > three.Close.Float64() {
+			if two.Open.Float64() > two.Close.Float64() {
+				if one.Open.Float64() < one.Close.Float64() {
+					if fixedpoint.Abs(two.Close.Sub(one.Close).Div(one.Close)).Float64() < threshold {
 						output = Bull
 					}
 				}

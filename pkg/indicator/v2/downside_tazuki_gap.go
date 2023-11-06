@@ -29,14 +29,14 @@ func TazukiGap(source KLineSubscription) *TazukiGapStream {
 			three            = source.Last(2)
 			two              = source.Last(1)
 			one              = source.Last(0)
-			isFirstBearish   = three.Close < three.Open
-			isSecondBearish  = two.Close < two.Open
-			isThirdBullish   = one.Close > one.Open
-			isFirstGapExists = two.High < three.Low
-			isTazukiGap      = two.Open > one.Open &&
-				two.Close < one.Open &&
-				one.Close > two.Open &&
-				one.Close < three.Close
+			isFirstBearish   = three.Close.Float64() < three.Open.Float64()
+			isSecondBearish  = two.Close.Float64() < two.Open.Float64()
+			isThirdBullish   = one.Close.Float64() > one.Open.Float64()
+			isFirstGapExists = two.High.Float64() < three.Low.Float64()
+			isTazukiGap      = two.Open.Float64() > one.Open.Float64() &&
+				two.Close.Float64() < one.Open.Float64() &&
+				one.Close.Float64() > two.Open.Float64() &&
+				one.Close.Float64() < three.Close.Float64()
 		)
 
 		if isFirstBearish && isSecondBearish && isThirdBullish && isFirstGapExists && isTazukiGap {

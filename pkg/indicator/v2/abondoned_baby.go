@@ -2,7 +2,6 @@ package indicatorv2
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -32,22 +31,25 @@ func AbondonedBaby(source KLineSubscription) *AbondonedBabyStream {
 			one   = source.Last(2)
 			two   = source.Last(1)
 			three = source.Last(0)
+			abs   = fixedpoint.Abs((two.Close.Sub(two.Open).Div(two.Open))).Float64()
 		)
 
-		if one.Open < one.Close {
-			if one.High < two.Low {
-				if fixedpoint.Abs((two.Close-two.Open)/(two.Open)) < threshold {
-					if three.Open < two.Low && three.Close < three.Open {
+		if one.Open.Float64() < one.Close.Float64() {
+			if one.High.Float64() < two.Low.Float64() {
+				if abs < threshold {
+					if three.Open.Float64() < two.Low.Float64() &&
+						three.Close.Float64() < three.Open.Float64() {
 						output = -1.0
 					}
 				}
 			}
 		}
 
-		if one.Open > one.Close {
-			if one.Low > two.High {
-				if fixedpoint.Abs((two.Close-two.Open)/two.Open) <= threshold {
-					if three.Open > two.High && three.Close > three.Open {
+		if one.Open.Float64() > one.Close.Float64() {
+			if one.Low.Float64() > two.High.Float64() {
+				if abs <= threshold {
+					if three.Open.Float64() > two.High.Float64() &&
+						three.Close.Float64() > three.Open.Float64() {
 						output = 1.0
 					}
 				}

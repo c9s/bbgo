@@ -42,5 +42,5 @@ func (s *UlcerIndexStream) Calculate(_ float64) float64 {
 }
 
 func (s *UlcerIndexStream) Truncate() {
-	s.Slice = s.Slice.Truncate(5000)
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }

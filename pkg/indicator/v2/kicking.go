@@ -33,9 +33,9 @@ func Kicking(source KLineSubscription, maxDiff float64) *KickingStream {
 		)
 
 		// BEAR
-		if two.Open < two.Close {
-			if one.Open > one.Close {
-				if two.Open > one.Open {
+		if two.Open.Float64() < two.Close.Float64() {
+			if one.Open.Float64() > one.Close.Float64() {
+				if two.Open.Float64() > one.Open.Float64() {
 					if fixedpoint.ApproxEqual(two.Open, two.Low, maxDiff) &&
 						fixedpoint.ApproxEqual(two.Close, two.High, maxDiff) {
 						if fixedpoint.ApproxEqual(one.Open, one.High, maxDiff) &&
@@ -48,9 +48,9 @@ func Kicking(source KLineSubscription, maxDiff float64) *KickingStream {
 		}
 
 		// BULL
-		if two.Open > two.Close {
-			if one.Open < one.Close {
-				if two.Open < one.Open {
+		if two.Open.Float64() > two.Close.Float64() {
+			if one.Open.Float64() < one.Close.Float64() {
+				if two.Open.Float64() < one.Open.Float64() {
 					if fixedpoint.ApproxEqual(two.Open, two.High, maxDiff) &&
 						fixedpoint.ApproxEqual(two.Close, two.Low, maxDiff) {
 						if fixedpoint.ApproxEqual(one.Open, one.Low, maxDiff) &&

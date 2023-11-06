@@ -2,7 +2,6 @@ package indicatorv2
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -39,12 +38,12 @@ func DojiLongLegged(source KLineSubscription) *DojiLongLeggedStream {
 			one   = source.Last(0)
 		)
 		// BEAR
-		if four.Close > four.Open {
-			if three.Close > three.Open {
-				if two.Close > two.Open {
-					if fixedpoint.Abs(one.Close.Sub(one.Open).Div(one.Open)) < threshold {
-						if fixedpoint.Abs(one.High.Sub(one.Open).Div(one.Open)) > limit {
-							if fixedpoint.Abs(one.Close.Sub(one.Low).Div(one.Low)) > limit {
+		if four.Close.Float64() > four.Open.Float64() {
+			if three.Close.Float64() > three.Open.Float64() {
+				if two.Close.Float64() > two.Open.Float64() {
+					if fixedpoint.Abs(one.Close.Sub(one.Open).Div(one.Open)).Float64() < threshold {
+						if fixedpoint.Abs(one.High.Sub(one.Open).Div(one.Open)).Float64() > limit {
+							if fixedpoint.Abs(one.Close.Sub(one.Low).Div(one.Low)).Float64() > limit {
 								output = Bear
 							}
 						}
@@ -54,12 +53,12 @@ func DojiLongLegged(source KLineSubscription) *DojiLongLeggedStream {
 		}
 
 		// BULL
-		if four.Close < four.Open {
-			if three.Close < three.Open {
-				if two.Close < two.Open {
-					if fixedpoint.Abs(one.Open.Sub(one.Close).Div(one.Close)) < threshold {
-						if fixedpoint.Abs(one.Low.Sub(one.Close).Div(one.Close)) > limit {
-							if fixedpoint.Abs(one.Open.Sub(one.High).Div(one.High)) > limit {
+		if four.Close.Float64() < four.Open.Float64() {
+			if three.Close.Float64() < three.Open.Float64() {
+				if two.Close.Float64() < two.Open.Float64() {
+					if fixedpoint.Abs(one.Open.Sub(one.Close).Div(one.Close)).Float64() < threshold {
+						if fixedpoint.Abs(one.Low.Sub(one.Close).Div(one.Close)).Float64() > limit {
+							if fixedpoint.Abs(one.Open.Sub(one.High).Div(one.High)).Float64() > limit {
 								output = Bull
 							}
 						}

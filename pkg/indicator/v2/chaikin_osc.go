@@ -32,5 +32,5 @@ func ChaikinOscillator(source KLineSubscription, slow, fast int) *ChaikinOscilla
 }
 
 func (s *ChaikinOscillatorStream) Truncate() {
-	s.Slice = s.Slice.Truncate(5000)
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }

@@ -33,16 +33,18 @@ func ThreeCrows(source KLineSubscription) *ThreeCrowsStream {
 		}
 
 		var (
-			three        = source.Last(2)
-			two          = source.Last(1)
-			one          = source.Last(0)
-			isDownTrend  = three.Low > two.Low && two.Low > one.Low
-			isAllBearish = three.Open > three.Close &&
-				two.Open > two.Close && one.Open > one.Close
-			opensWithinPreviousBody = three.Open > two.Open &&
-				two.Open > three.Close &&
-				two.Open > one.Open &&
-				one.Open > two.Close
+			three       = source.Last(2)
+			two         = source.Last(1)
+			one         = source.Last(0)
+			isDownTrend = three.Low.Float64() > two.Low.Float64() &&
+				two.Low.Float64() > one.Low.Float64()
+			isAllBearish = three.Open.Float64() > three.Close.Float64() &&
+				two.Open.Float64() > two.Close.Float64() &&
+				one.Open.Float64() > one.Close.Float64()
+			opensWithinPreviousBody = three.Open.Float64() > two.Open.Float64() &&
+				two.Open.Float64() > three.Close.Float64() &&
+				two.Open.Float64() > one.Open.Float64() &&
+				one.Open.Float64() > two.Close.Float64()
 		)
 
 		if isDownTrend && isAllBearish && opensWithinPreviousBody {

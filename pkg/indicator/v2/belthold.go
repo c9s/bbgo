@@ -30,20 +30,20 @@ func Belthold(source KLineSubscription) *BeltholdStream {
 			one = source.Last(0)
 		)
 
-		if two.Close > two.Open {
-			if two.High < one.Open {
-				if one.Open == one.High {
-					if one.Close < one.Open {
+		if two.Close.Float64() > two.Open.Float64() {
+			if two.High.Float64() < one.Open.Float64() {
+				if one.Open.Float64() == one.High.Float64() {
+					if one.Close.Float64() < one.Open.Float64() {
 						output = Bear
 					}
 				}
 			}
 		}
 
-		if two.Close < two.Open {
-			if two.Low > one.Open {
-				if one.Open == one.Low {
-					if one.Close > one.Open {
+		if two.Close.Float64() < two.Open.Float64() {
+			if two.Low.Float64() > one.Open.Float64() {
+				if one.Open.Float64() == one.Low.Float64() {
+					if one.Close.Float64() > one.Open.Float64() {
 						output = Bull
 					}
 				}

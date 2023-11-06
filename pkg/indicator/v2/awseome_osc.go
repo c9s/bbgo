@@ -57,7 +57,7 @@ func (s *AwesomeOscillatorStream) Calculate(v float64) float64 {
 }
 
 func (s *AwesomeOscillatorStream) Truncate() {
-	s.Slice = s.Slice.Truncate(5000)
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }
 
 // todo move this

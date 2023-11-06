@@ -22,9 +22,9 @@ func OBV(source KLineSubscription) *OBVStream {
 			prev := source.Last(1)
 			obv = s.Slice.Last(0)
 
-			if v.Close > prev.Close {
+			if v.Close.Float64() > prev.Close.Float64() {
 				obv += v.Volume.Float64()
-			} else if v.Close < prev.Close {
+			} else if v.Close.Float64() < prev.Close.Float64() {
 				obv -= v.Volume.Float64()
 			}
 		}
@@ -36,5 +36,5 @@ func OBV(source KLineSubscription) *OBVStream {
 }
 
 func (s *OBVStream) Truncate() {
-	s.Slice = s.Slice.Truncate(5000)
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }

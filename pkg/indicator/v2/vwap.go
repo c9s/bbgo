@@ -37,5 +37,5 @@ func VwapDefault(source KLineSubscription) *VWAPStream {
 }
 
 func (s *VWAPStream) Truncate() {
-	s.Slice = s.Slice.Truncate(5000)
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }

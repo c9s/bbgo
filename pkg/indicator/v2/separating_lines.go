@@ -2,7 +2,6 @@ package indicatorv2
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -34,10 +33,10 @@ func SeparatingLines(source KLineSubscription, maxDiff float64) *SeparatingLines
 			one   = source.Last(0)
 		)
 		// BEAR
-		if three.Open > three.Close {
-			if two.Open < two.Close {
-				if one.Open > one.Close {
-					if fixedpoint.Abs((two.Open-one.Open)/one.Open) < threshold {
+		if three.Open.Float64() > three.Close.Float64() {
+			if two.Open.Float64() < two.Close.Float64() {
+				if one.Open.Float64() > one.Close.Float64() {
+					if fixedpoint.Abs(two.Open.Sub(one.Open).Div(one.Open)).Float64() < threshold {
 						if fixedpoint.ApproxEqual(one.Open, one.High, maxDiff) {
 							output = Bear
 						}
@@ -47,10 +46,10 @@ func SeparatingLines(source KLineSubscription, maxDiff float64) *SeparatingLines
 		}
 
 		// BULL
-		if three.Open < three.Close {
-			if two.Open > two.Close {
-				if one.Open < one.Close {
-					if fixedpoint.Abs((two.Open-one.Open)/one.Open) < threshold {
+		if three.Open.Float64() < three.Close.Float64() {
+			if two.Open.Float64() > two.Close.Float64() {
+				if one.Open.Float64() < one.Close.Float64() {
+					if fixedpoint.Abs(two.Open.Sub(one.Open).Div(one.Open)).Float64() < threshold {
 						if fixedpoint.ApproxEqual(one.Open, one.Low, maxDiff) {
 							output = Bull
 						}

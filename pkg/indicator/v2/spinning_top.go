@@ -2,7 +2,6 @@ package indicatorv2
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -28,10 +27,10 @@ func SpinningTop(source KLineSubscription, direction Direction) *SpinningTopStre
 		)
 		if direction == Bullish {
 			var (
-				upperShadowLength = fixedpoint.Abs(one.High - one.Close)
-				lowerShadowLength = fixedpoint.Abs(one.Open - one.Low)
-				isSpinningTop     = bodyLength < upperShadowLength &&
-					bodyLength < lowerShadowLength
+				upperShadowLength = fixedpoint.Abs(one.High - one.Close).Float64()
+				lowerShadowLength = fixedpoint.Abs(one.Open - one.Low).Float64()
+				isSpinningTop     = bodyLength.Float64() < upperShadowLength &&
+					bodyLength.Float64() < lowerShadowLength
 			)
 
 			if isSpinningTop {
@@ -39,10 +38,10 @@ func SpinningTop(source KLineSubscription, direction Direction) *SpinningTopStre
 			}
 		} else {
 			var (
-				upperShadowLength    = fixedpoint.Abs(one.High - one.Open)
-				lowerShadowLength    = fixedpoint.Abs(one.High - one.Low)
-				isBearishSpinningTop = bodyLength < upperShadowLength &&
-					bodyLength < lowerShadowLength
+				upperShadowLength    = fixedpoint.Abs(one.High - one.Open).Float64()
+				lowerShadowLength    = fixedpoint.Abs(one.High - one.Low).Float64()
+				isBearishSpinningTop = bodyLength.Float64() < upperShadowLength &&
+					bodyLength.Float64() < lowerShadowLength
 			)
 			if isBearishSpinningTop {
 				output = Bear

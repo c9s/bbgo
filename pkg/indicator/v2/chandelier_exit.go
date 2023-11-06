@@ -57,5 +57,5 @@ func ChandelierExitDefault(source KLineSubscription, os OrderSide) *ChandelierEx
 }
 
 func (s *ChandelierExitStream) Truncate() {
-	s.Slice = s.Slice.Truncate(5000)
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }
