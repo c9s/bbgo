@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -12,6 +13,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
 )
+
+var syncWindow = -3 * time.Minute
 
 /*
   	Background knowledge
@@ -91,6 +94,8 @@ func (s *Strategy) recover(ctx context.Context) error {
 
 	pins := s.getGrid().Pins
 
+	syncBefore := time.Now().Add(syncWindow)
+
 	activeOrdersInTwinOrderBook, err := buildTwinOrderBook(pins, activeOrders)
 	openOrdersInTwinOrderBook, err := buildTwinOrderBook(pins, openOrders)
 
@@ -135,7 +140,14 @@ func (s *Strategy) recover(ctx context.Context) error {
 
 		// case 2
 		if openOrderID == 0 {
-			syncActiveOrder(ctx, activeOrderBook, s.orderQueryService, activeOrder.GetOrder().OrderID)
+			order := activeOrder.GetOrder()
+			if err := syncActiveOrder(ctx, activeOrderBook, s.orderQueryService, order.OrderID, syncBefore); err != nil {
+				if strings.Contains(err.Error(), "skip syncing active order") {
+					s.logger.Infof("[Recover] skip handle active order #%d, because the updated_at is in 3 min", order.OrderID)
+				} else {
+					s.logger.WithError(err).Errorf("[Recover] unable to query order #%d", order.OrderID)
+				}
+			}
 			continue
 		}
 
@@ -250,7 +262,7 @@ func buildTwinOrderBook(pins []Pin, orders []types.Order) (*TwinOrderBook, error
 	return book, nil
 }
 
-func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService, orderID uint64) error {
+func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService, orderID uint64, syncBefore time.Time) error {
 	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
 		Symbol:  activeOrderBook.Symbol,
 		OrderID: strconv.FormatUint(orderID, 10),
@@ -258,6 +270,10 @@ func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook,
 
 	if err != nil {
 		return err
+	}
+
+	if updatedOrder.UpdateTime.After(syncBefore) {
+		return fmt.Errorf("skip syncing active order, because its updated_at is after %s", syncBefore)
 	}
 
 	activeOrderBook.Update(*updatedOrder)
