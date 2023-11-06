@@ -114,7 +114,7 @@ func TestSyncActiveOrder(t *testing.T) {
 			OrderID: strconv.FormatUint(order.OrderID, 10),
 		}).Return(&updatedOrder, nil)
 
-		if !assert.NoError(syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID)) {
+		if !assert.NoError(syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID, time.Now())) {
 			return
 		}
 
@@ -144,7 +144,7 @@ func TestSyncActiveOrder(t *testing.T) {
 			OrderID: strconv.FormatUint(order.OrderID, 10),
 		}).Return(&updatedOrder, nil)
 
-		if !assert.NoError(syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID)) {
+		if !assert.NoError(syncActiveOrder(ctx, activeOrderbook, mockOrderQueryService, order.OrderID, time.Now())) {
 			return
 		}
 
