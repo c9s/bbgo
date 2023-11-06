@@ -177,6 +177,7 @@ type Strategy struct {
 
 	GridProfitStats *GridProfitStats `persistence:"grid_profit_stats"`
 	Position        *types.Position  `persistence:"position"`
+	PersistenceTTL  types.Duration   `json:"persistenceTTL"`
 
 	// ExchangeSession is an injection field
 	ExchangeSession *bbgo.ExchangeSession
@@ -1835,13 +1836,17 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.ProfitSpread = s.Market.TruncatePrice(s.ProfitSpread)
 	}
 
+	s.logger.Infof("ttl: %s", s.PersistenceTTL.Duration())
+
 	if s.GridProfitStats == nil {
 		s.GridProfitStats = newGridProfitStats(s.Market)
 	}
+	s.GridProfitStats.SetTTL(s.PersistenceTTL.Duration())
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
+	s.Position.SetTTL(s.PersistenceTTL.Duration())
 
 	// initialize and register prometheus metrics
 	if s.PrometheusLabels != nil {
