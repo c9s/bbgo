@@ -47,8 +47,7 @@ type Stream struct {
 
 	key, secret        string
 	streamDataProvider StreamDataProvider
-	// TODO: update the fee rate at 7:00 am UTC; rotation required.
-	symbolFeeDetails map[string]*symbolFeeDetail
+	feeRateProvider    *feeRatePoller
 
 	bookEventCallbacks        []func(e BookEvent)
 	marketTradeEventCallbacks []func(e []MarketTradeEvent)
@@ -65,13 +64,17 @@ func NewStream(key, secret string, userDataProvider StreamDataProvider) *Stream 
 		key:                key,
 		secret:             secret,
 		streamDataProvider: userDataProvider,
+		feeRateProvider:    newFeeRatePoller(userDataProvider),
 	}
 
 	stream.SetEndpointCreator(stream.createEndpoint)
 	stream.SetParser(stream.parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetHeartBeat(stream.ping)
-	stream.SetBeforeConnect(stream.getAllFeeRates)
+	stream.SetBeforeConnect(func(ctx context.Context) error {
+		go stream.feeRateProvider.Start(ctx)
+		return nil
+	})
 	stream.OnConnect(stream.handlerConnect)
 	stream.OnAuth(stream.handleAuthEvent)
 
@@ -403,67 +406,17 @@ func (s *Stream) handleKLineEvent(klineEvent KLineEvent) {
 
 func (s *Stream) handleTradeEvent(events []TradeEvent) {
 	for _, event := range events {
-		feeRate, found := s.symbolFeeDetails[event.Symbol]
-		if !found {
-			log.Warnf("unexpected symbol found, fee rate not supported, symbol: %s", event.Symbol)
+		feeRate, err := s.feeRateProvider.Get(event.Symbol)
+		if err != nil {
+			log.Warnf("failed to get fee rate by symbol: %s", event.Symbol)
 			continue
 		}
 
-		gTrade, err := event.toGlobalTrade(*feeRate)
+		gTrade, err := event.toGlobalTrade(feeRate)
 		if err != nil {
 			log.WithError(err).Errorf("unable to convert: %+v", event)
 			continue
 		}
 		s.StandardStream.EmitTradeUpdate(*gTrade)
 	}
-}
-
-type symbolFeeDetail struct {
-	bybitapi.FeeRate
-
-	BaseCoin  string
-	QuoteCoin string
-}
-
-// getAllFeeRates retrieves all fee rates from the Bybit API and then fetches markets to ensure the base coin and quote coin
-// are correct.
-func (e *Stream) getAllFeeRates(ctx context.Context) error {
-	feeRates, err := e.streamDataProvider.GetAllFeeRates(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to call get fee rates: %w", err)
-	}
-
-	symbolMap := map[string]*symbolFeeDetail{}
-	for _, f := range feeRates.List {
-		if _, found := symbolMap[f.Symbol]; !found {
-			symbolMap[f.Symbol] = &symbolFeeDetail{FeeRate: f}
-		}
-	}
-
-	mkts, err := e.streamDataProvider.QueryMarkets(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get markets: %w", err)
-	}
-
-	// update base coin, quote coin into symbolFeeDetail
-	for _, mkt := range mkts {
-		feeRate, found := symbolMap[mkt.Symbol]
-		if !found {
-			continue
-		}
-
-		feeRate.BaseCoin = mkt.BaseCurrency
-		feeRate.QuoteCoin = mkt.QuoteCurrency
-	}
-
-	// remove trading pairs that are not present in spot market.
-	for k, v := range symbolMap {
-		if len(v.BaseCoin) == 0 || len(v.QuoteCoin) == 0 {
-			log.Debugf("related market not found: %s, skipping the associated trade", k)
-			delete(symbolMap, k)
-		}
-	}
-
-	e.symbolFeeDetails = symbolMap
-	return nil
 }
