@@ -46,14 +46,13 @@ func (p *feeRatePoller) Start(ctx context.Context) {
 }
 
 func (p *feeRatePoller) startLoop(ctx context.Context) {
+	err := p.poll(ctx)
+	if err != nil {
+		log.WithError(err).Warn("failed to initialize the fee rate, the ticker is scheduled to update it subsequently")
+	}
+
 	ticker := time.NewTicker(feeRatePollingPeriod)
 	defer ticker.Stop()
-
-	// Make sure the first poll should succeed by retrying with a shorter period.
-	_ = util.Retry(ctx, util.InfiniteRetry, 30*time.Second,
-		func() error { return p.poll(ctx) },
-		func(e error) { log.WithError(e).Warn("failed to update fee rate") })
-
 	for {
 		select {
 		case <-ctx.Done():
