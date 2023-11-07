@@ -30,7 +30,7 @@ func (s *Strategy) initializeRecoverC() bool {
 
 	if s.recoverC == nil {
 		s.logger.Info("initializing recover channel")
-		s.recoverC = make(chan struct{}, 10)
+		s.recoverC = make(chan struct{}, 1)
 	} else {
 		s.logger.Info("recover channel is already initialized, trigger active orders recover")
 		isInitialize = true
