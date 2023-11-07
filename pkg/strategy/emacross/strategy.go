@@ -47,8 +47,7 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval5m})
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -59,8 +58,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.lastKLine = k
 	}))
 
-	fastEMA := session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: types.Interval5m, Window: 7})
-	slowEMA := session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: types.Interval5m, Window: 14})
+	fastEMA := session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.FastWindow})
+	slowEMA := session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.SlowWindow})
+
 	cross := indicatorv2.Cross(fastEMA, slowEMA)
 	cross.OnUpdate(func(v float64) {
 		switch indicatorv2.CrossType(v) {
@@ -79,14 +79,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			opts.Tags = []string{"emaCrossOver"}
 
 			_, err := s.Strategy.OrderExecutor.OpenPosition(ctx, opts)
-			if err != nil {
-				log.WithError(err).Errorf("unable to submit buy order")
-			}
+			logErr(err, "unable to open position")
 		case indicatorv2.CrossUnder:
 			err := s.Strategy.OrderExecutor.ClosePosition(ctx, fixedpoint.One)
-			if err != nil {
-				log.WithError(err).Errorf("unable to submit sell order")
-			}
+			logErr(err, "unable to submit close position order")
 		}
 	})
 
