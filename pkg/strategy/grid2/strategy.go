@@ -1836,7 +1836,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.ProfitSpread = s.Market.TruncatePrice(s.ProfitSpread)
 	}
 
-	s.logger.Infof("ttl: %s", s.PersistenceTTL.Duration())
+	s.logger.Infof("persistence ttl: %s", s.PersistenceTTL.Duration())
 
 	if s.GridProfitStats == nil {
 		s.GridProfitStats = newGridProfitStats(s.Market)

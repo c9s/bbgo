@@ -71,6 +71,9 @@ type Position struct {
 }
 
 func (s *Position) SetTTL(ttl time.Duration) {
+	if ttl.Nanoseconds() <= 0 {
+		return
+	}
 	s.ttl = ttl
 }
 
