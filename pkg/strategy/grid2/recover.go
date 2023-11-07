@@ -98,8 +98,8 @@ func (s *Strategy) recover(ctx context.Context) error {
 	activeOrdersInTwinOrderBook, err := buildTwinOrderBook(pins, activeOrders)
 	openOrdersInTwinOrderBook, err := buildTwinOrderBook(pins, openOrders)
 
-	s.logger.Infof("active orders' twin orderbook\n%s", activeOrdersInTwinOrderBook.String())
-	s.logger.Infof("open orders in twin orderbook\n%s", openOrdersInTwinOrderBook.String())
+	s.logger.Infof("[Recover] active orders' twin orderbook\n%s", activeOrdersInTwinOrderBook.String())
+	s.logger.Infof("[Recover] open orders in twin orderbook\n%s", openOrdersInTwinOrderBook.String())
 
 	// remove index 0, because twin orderbook's price is from the second one
 	pins = pins[1:]
@@ -131,7 +131,9 @@ func (s *Strategy) recover(ctx context.Context) error {
 
 		// case 1
 		if activeOrderID == 0 {
-			activeOrderBook.Add(openOrder.GetOrder())
+			order := openOrder.GetOrder()
+			s.logger.Infof("[Recover] found open order #%d is not in the active orderbook, adding...", order.OrderID)
+			activeOrderBook.Add(order)
 			// also add open orders into active order's twin orderbook, we will use this active orderbook to recover empty price grid
 			activeOrdersInTwinOrderBook.AddTwinOrder(v, openOrder)
 			continue
@@ -140,11 +142,17 @@ func (s *Strategy) recover(ctx context.Context) error {
 		// case 2
 		if openOrderID == 0 {
 			order := activeOrder.GetOrder()
-			if isActiveOrderBookUpdated, err := syncActiveOrder(ctx, activeOrderBook, s.orderQueryService, order.OrderID, syncBefore); err != nil {
+			s.logger.Infof("[Recover] found active order #%d is not in the open orders, updating...", order.OrderID)
+			isActiveOrderBookUpdated, err := syncActiveOrder(ctx, activeOrderBook, s.orderQueryService, order.OrderID, syncBefore)
+			if err != nil {
 				s.logger.WithError(err).Errorf("[Recover] unable to query order #%d", order.OrderID)
-			} else if !isActiveOrderBookUpdated {
+				continue
+			}
+
+			if !isActiveOrderBookUpdated {
 				s.logger.Infof("[Recover] active order #%d is updated in 3 min, skip updating...", order.OrderID)
 			}
+
 			continue
 		}
 
