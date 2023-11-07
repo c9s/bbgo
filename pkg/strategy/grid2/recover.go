@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -141,12 +140,10 @@ func (s *Strategy) recover(ctx context.Context) error {
 		// case 2
 		if openOrderID == 0 {
 			order := activeOrder.GetOrder()
-			if err := syncActiveOrder(ctx, activeOrderBook, s.orderQueryService, order.OrderID, syncBefore); err != nil {
-				if strings.Contains(err.Error(), "skip syncing active order") {
-					s.logger.Infof("[Recover] skip handle active order #%d, because the updated_at is in 3 min", order.OrderID)
-				} else {
-					s.logger.WithError(err).Errorf("[Recover] unable to query order #%d", order.OrderID)
-				}
+			if isActiveOrderBookUpdated, err := syncActiveOrder(ctx, activeOrderBook, s.orderQueryService, order.OrderID, syncBefore); err != nil {
+				s.logger.WithError(err).Errorf("[Recover] unable to query order #%d", order.OrderID)
+			} else if !isActiveOrderBookUpdated {
+				s.logger.Infof("[Recover] active order #%d is updated in 3 min, skip updating...", order.OrderID)
 			}
 			continue
 		}
@@ -262,23 +259,24 @@ func buildTwinOrderBook(pins []Pin, orders []types.Order) (*TwinOrderBook, error
 	return book, nil
 }
 
-func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService, orderID uint64, syncBefore time.Time) error {
+func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService, orderID uint64, syncBefore time.Time) (bool, error) {
 	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
 		Symbol:  activeOrderBook.Symbol,
 		OrderID: strconv.FormatUint(orderID, 10),
 	})
 
+	isActiveOrderBookUpdated := false
+
 	if err != nil {
-		return err
+		return isActiveOrderBookUpdated, err
 	}
 
-	if updatedOrder.UpdateTime.After(syncBefore) {
-		return fmt.Errorf("skip syncing active order, because its updated_at is after %s", syncBefore)
+	isActiveOrderBookUpdated = updatedOrder.UpdateTime.Before(syncBefore)
+	if isActiveOrderBookUpdated {
+		activeOrderBook.Update(*updatedOrder)
 	}
 
-	activeOrderBook.Update(*updatedOrder)
-
-	return nil
+	return isActiveOrderBookUpdated, nil
 }
 
 func queryTradesToUpdateTwinOrderBook(
