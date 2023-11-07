@@ -22,30 +22,6 @@ type SyncActiveOrdersOpts struct {
 	exchange          types.Exchange
 }
 
-func (s *Strategy) initializeRecoverC() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	isInitialize := false
-
-	if s.recoverC == nil {
-		s.logger.Info("initializing recover channel")
-		s.recoverC = make(chan struct{}, 1)
-	} else {
-		s.logger.Info("recover channel is already initialized, trigger active orders recover")
-		isInitialize = true
-
-		select {
-		case s.recoverC <- struct{}{}:
-			s.logger.Info("trigger active orders recover")
-		default:
-			s.logger.Info("activeOrdersRecoverC is full")
-		}
-	}
-
-	return isInitialize
-}
-
 func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 	// every time we activeOrdersRecoverC receive signal, do active orders recover
 	if isInitialize := s.initializeRecoverC(); isInitialize {

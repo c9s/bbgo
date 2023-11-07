@@ -1971,7 +1971,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 						return
 					}
 
-					s.recoverActiveOrdersPeriodically(ctx)
+					s.recoverPeriodically(ctx)
 				})
 			} else {
 				s.startProcess(ctx, session)
@@ -1986,12 +1986,14 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 	if s.RecoverOrdersWhenStart {
 		// do recover only when triggerPrice is not set and not in the back-test mode
 		s.logger.Infof("recoverWhenStart is set, trying to recover grid orders...")
-		if err := s.recoverGrid(ctx, session); err != nil {
+		if err := s.recover(ctx); err != nil {
 			// if recover fail, return and do not open grid
 			s.logger.WithError(err).Error("failed to start process, recover error")
 			s.EmitGridError(errors.Wrapf(err, "failed to start process, recover error"))
 			return err
 		}
+
+		s.EmitGridReady()
 	}
 
 	// avoid using goroutine here for back-test
