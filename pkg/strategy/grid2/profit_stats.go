@@ -44,6 +44,9 @@ func newGridProfitStats(market types.Market) *GridProfitStats {
 }
 
 func (s *GridProfitStats) SetTTL(ttl time.Duration) {
+	if ttl.Nanoseconds() <= 0 {
+		return
+	}
 	s.ttl = ttl
 }
 
