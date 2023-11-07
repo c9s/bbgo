@@ -116,12 +116,16 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 			// no need to sync active order already in active orderbook, because we only need to know if it filled or not.
 			delete(openOrdersMap, activeOrder.OrderID)
 		} else {
-			opts.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
+			opts.logger.Infof("[ActiveOrderRecover] found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
 
-			if isActiveOrderBookUpdated, err := syncActiveOrder(ctx, opts.activeOrderBook, opts.orderQueryService, activeOrder.OrderID, syncBefore); err != nil {
+			isActiveOrderBookUpdated, err := syncActiveOrder(ctx, opts.activeOrderBook, opts.orderQueryService, activeOrder.OrderID, syncBefore)
+			if err != nil {
 				opts.logger.WithError(err).Errorf("[ActiveOrderRecover] unable to query order #%d", activeOrder.OrderID)
 				errs = multierr.Append(errs, err)
-			} else if !isActiveOrderBookUpdated {
+				continue
+			}
+
+			if !isActiveOrderBookUpdated {
 				opts.logger.Infof("[ActiveOrderRecover] active order #%d is updated in 3 min, skip updating...", activeOrder.OrderID)
 			}
 		}
