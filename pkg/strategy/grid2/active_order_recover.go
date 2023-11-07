@@ -30,7 +30,7 @@ func (s *Strategy) initializeRecoverC() bool {
 
 	if s.recoverC == nil {
 		s.logger.Info("initializing recover channel")
-		s.recoverC = make(chan struct{}, 1)
+		s.recoverC = make(chan struct{}, 10)
 	} else {
 		s.logger.Info("recover channel is already initialized, trigger active orders recover")
 		isInitialize = true
@@ -66,22 +66,26 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 		exchange:          s.session.Exchange,
 	}
 
+	var lastRecoverTime time.Time
+
 	for {
 		select {
-
 		case <-ctx.Done():
 			return
 
 		case <-ticker.C:
-			if err := syncActiveOrders(ctx, opts); err != nil {
-				log.WithError(err).Errorf("unable to sync active orders")
-			}
-
+			s.recoverC <- struct{}{}
+			bbgo.Sync(ctx, s)
 		case <-s.recoverC:
-			if err := syncActiveOrders(ctx, opts); err != nil {
-				log.WithError(err).Errorf("unable to sync active orders")
+			if !time.Now().After(lastRecoverTime.Add(10 * time.Minute)) {
+				continue
 			}
 
+			if err := syncActiveOrders(ctx, opts); err != nil {
+				log.WithError(err).Errorf("unable to sync active orders")
+			} else {
+				lastRecoverTime = time.Now()
+			}
 		}
 	}
 }
