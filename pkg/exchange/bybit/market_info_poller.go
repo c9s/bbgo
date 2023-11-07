@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 const (
@@ -46,14 +45,13 @@ func (p *feeRatePoller) Start(ctx context.Context) {
 }
 
 func (p *feeRatePoller) startLoop(ctx context.Context) {
+	err := p.poll(ctx)
+	if err != nil {
+		log.WithError(err).Warn("failed to initialize the fee rate, the ticker is scheduled to update it subsequently")
+	}
+
 	ticker := time.NewTicker(feeRatePollingPeriod)
 	defer ticker.Stop()
-
-	// Make sure the first poll should succeed by retrying with a shorter period.
-	_ = util.Retry(ctx, util.InfiniteRetry, 30*time.Second,
-		func() error { return p.poll(ctx) },
-		func(e error) { log.WithError(e).Warn("failed to update fee rate") })
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -83,15 +81,12 @@ func (p *feeRatePoller) poll(ctx context.Context) error {
 	return nil
 }
 
-func (p *feeRatePoller) Get(symbol string) (symbolFeeDetail, error) {
+func (p *feeRatePoller) Get(symbol string) (symbolFeeDetail, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	fee, ok := p.symbolFeeDetail[symbol]
-	if !ok {
-		return symbolFeeDetail{}, fmt.Errorf("%s fee rate not found", symbol)
-	}
-	return fee, nil
+	fee, found := p.symbolFeeDetail[symbol]
+	return fee, found
 }
 
 func (e *feeRatePoller) getAllFeeRates(ctx context.Context) (map[string]symbolFeeDetail, error) {

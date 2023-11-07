@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -22,6 +23,11 @@ const (
 var (
 	// wsAuthRequest specifies the duration for which a websocket request's authentication is valid.
 	wsAuthRequest = 10 * time.Second
+	// The default taker/maker fees can help us in estimating trading fees in the SPOT market, because trade fees are not
+	// provided for traditional accounts on Bybit.
+	// https://www.bybit.com/en-US/help-center/article/Trading-Fee-Structure
+	defaultTakerFee = fixedpoint.NewFromFloat(0.001)
+	defaultMakerFee = fixedpoint.NewFromFloat(0.001)
 )
 
 // MarketInfoProvider calculates trade fees since trading fees are not supported by streaming.
@@ -48,6 +54,7 @@ type Stream struct {
 	key, secret        string
 	streamDataProvider StreamDataProvider
 	feeRateProvider    *feeRatePoller
+	marketsInfo        types.MarketMap
 
 	bookEventCallbacks        []func(e BookEvent)
 	marketTradeEventCallbacks []func(e []MarketTradeEvent)
@@ -71,8 +78,14 @@ func NewStream(key, secret string, userDataProvider StreamDataProvider) *Stream 
 	stream.SetParser(stream.parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetHeartBeat(stream.ping)
-	stream.SetBeforeConnect(func(ctx context.Context) error {
+	stream.SetBeforeConnect(func(ctx context.Context) (err error) {
 		go stream.feeRateProvider.Start(ctx)
+
+		stream.marketsInfo, err = stream.streamDataProvider.QueryMarkets(ctx)
+		if err != nil {
+			log.WithError(err).Error("failed to query market info before to connect stream")
+			return err
+		}
 		return nil
 	})
 	stream.OnConnect(stream.handlerConnect)
@@ -406,10 +419,31 @@ func (s *Stream) handleKLineEvent(klineEvent KLineEvent) {
 
 func (s *Stream) handleTradeEvent(events []TradeEvent) {
 	for _, event := range events {
-		feeRate, err := s.feeRateProvider.Get(event.Symbol)
-		if err != nil {
-			log.Warnf("failed to get fee rate by symbol: %s", event.Symbol)
-			continue
+		feeRate, found := s.feeRateProvider.Get(event.Symbol)
+		if !found {
+			feeRate = symbolFeeDetail{
+				FeeRate: bybitapi.FeeRate{
+					Symbol:       event.Symbol,
+					TakerFeeRate: defaultTakerFee,
+					MakerFeeRate: defaultMakerFee,
+				},
+				BaseCoin:  "",
+				QuoteCoin: "",
+			}
+
+			if market, ok := s.marketsInfo[event.Symbol]; ok {
+				feeRate.BaseCoin = market.BaseCurrency
+				feeRate.QuoteCoin = market.QuoteCurrency
+			}
+
+			// The error log level was utilized due to a detected discrepancy in the fee calculations.
+			log.Errorf("failed to get %s fee rate, use default taker fee %f, maker fee %f, base coin: %s, quote coin: %s",
+				event.Symbol,
+				feeRate.TakerFeeRate.Float64(),
+				feeRate.MakerFeeRate.Float64(),
+				feeRate.BaseCoin,
+				feeRate.QuoteCoin,
+			)
 		}
 
 		gTrade, err := event.toGlobalTrade(feeRate)

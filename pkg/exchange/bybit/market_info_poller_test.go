@@ -137,7 +137,7 @@ func Test_feeRatePoller_Get(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	mockMarketProvider := mocks.NewMockStreamDataProvider(mockCtrl)
-	t.Run("succeeds", func(t *testing.T) {
+	t.Run("found", func(t *testing.T) {
 		symbol := "BTCUSDT"
 		expFeeDetail := symbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
@@ -156,18 +156,18 @@ func Test_feeRatePoller_Get(t *testing.T) {
 			},
 		}
 
-		res, err := s.Get(symbol)
-		assert.NoError(t, err)
+		res, found := s.Get(symbol)
+		assert.True(t, found)
 		assert.Equal(t, expFeeDetail, res)
 	})
-	t.Run("succeeds", func(t *testing.T) {
+	t.Run("not found", func(t *testing.T) {
 		symbol := "BTCUSDT"
 		s := &feeRatePoller{
 			client:          mockMarketProvider,
 			symbolFeeDetail: map[string]symbolFeeDetail{},
 		}
 
-		_, err := s.Get(symbol)
-		assert.ErrorContains(t, err, symbol)
+		_, found := s.Get(symbol)
+		assert.False(t, found)
 	})
 }
