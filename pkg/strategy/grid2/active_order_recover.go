@@ -2,7 +2,6 @@ package grid2
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -118,22 +117,12 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 			delete(openOrdersMap, activeOrder.OrderID)
 		} else {
 			opts.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
-			if activeOrder.UpdateTime.After(syncBefore) {
-				opts.logger.Infof("active order #%d is updated in 3 min, skip updating...", activeOrder.OrderID)
-				continue
-			}
 
-			// sleep 100ms to avoid DDOS
-			time.Sleep(100 * time.Millisecond)
-
-			if err := syncActiveOrder(ctx, opts.activeOrderBook, opts.orderQueryService, activeOrder.OrderID, syncBefore); err != nil {
-				if strings.Contains(err.Error(), "skip syncing active order") {
-					opts.logger.Infof("[ActiveOrderRecover] skip syncing active order #%d, because the updated_at is in 3 min", activeOrder.OrderID)
-				} else {
-					opts.logger.WithError(err).Errorf("[ActiveOrderRecover] unable to query order #%d", activeOrder.OrderID)
-					errs = multierr.Append(errs, err)
-				}
-				continue
+			if isActiveOrderBookUpdated, err := syncActiveOrder(ctx, opts.activeOrderBook, opts.orderQueryService, activeOrder.OrderID, syncBefore); err != nil {
+				opts.logger.WithError(err).Errorf("[ActiveOrderRecover] unable to query order #%d", activeOrder.OrderID)
+				errs = multierr.Append(errs, err)
+			} else if !isActiveOrderBookUpdated {
+				opts.logger.Infof("[ActiveOrderRecover] active order #%d is updated in 3 min, skip updating...", activeOrder.OrderID)
 			}
 		}
 	}
