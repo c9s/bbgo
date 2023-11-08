@@ -211,10 +211,16 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 			orders = append(orders, *order)
 		}
 
-		if len(openOrders) != queryOpenOrdersLimit {
+		orderLen := len(openOrders)
+		// a defensive programming to ensure the length of order response is expected.
+		if orderLen > queryOpenOrdersLimit {
+			return nil, fmt.Errorf("unexpected open orders length %d", orderLen)
+		}
+
+		if orderLen < queryOpenOrdersLimit {
 			break
 		}
-		nextCursor = openOrders[len(openOrders)-1].OrderId
+		nextCursor = openOrders[orderLen-1].OrderId
 	}
 
 	return orders, nil
