@@ -143,6 +143,12 @@ func (g *GetTickersRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetTickersRequest) GetPath() string {
+	return "/v5/market/tickers"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetTickersRequest) Do(ctx context.Context) (*APIResponse, error) {
 
 	// no body params
@@ -152,7 +158,9 @@ func (g *GetTickersRequest) Do(ctx context.Context) (*APIResponse, error) {
 		return nil, err
 	}
 
-	apiURL := "/v5/market/tickers"
+	var apiURL string
+
+	apiURL = g.GetPath()
 
 	req, err := g.client.NewRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
@@ -167,6 +175,16 @@ func (g *GetTickersRequest) Do(ctx context.Context) (*APIResponse, error) {
 	var apiResponse APIResponse
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+	validator, ok := interface{}(apiResponse).(responseValidator)
+	if ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return &apiResponse, nil
 }

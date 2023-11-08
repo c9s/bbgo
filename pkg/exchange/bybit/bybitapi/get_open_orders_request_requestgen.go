@@ -258,6 +258,12 @@ func (g *GetOpenOrdersRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetOpenOrdersRequest) GetPath() string {
+	return "/v5/order/realtime"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetOpenOrdersRequest) Do(ctx context.Context) (*OrdersResponse, error) {
 
 	// no body params
@@ -267,7 +273,9 @@ func (g *GetOpenOrdersRequest) Do(ctx context.Context) (*OrdersResponse, error) 
 		return nil, err
 	}
 
-	apiURL := "/v5/order/realtime"
+	var apiURL string
+
+	apiURL = g.GetPath()
 
 	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
@@ -282,6 +290,16 @@ func (g *GetOpenOrdersRequest) Do(ctx context.Context) (*OrdersResponse, error) 
 	var apiResponse APIResponse
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+	validator, ok := interface{}(apiResponse).(responseValidator)
+	if ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	var data OrdersResponse
 	if err := json.Unmarshal(apiResponse.Result, &data); err != nil {
