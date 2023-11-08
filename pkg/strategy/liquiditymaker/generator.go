@@ -24,6 +24,7 @@ import (
 //
 // totalLiquidityAmount = priceAsk1 * scale(1) * f + priceAsk2 * scale(2) * f + priceAsk3 * scale(3) * f + ....
 // totalLiquidityAmount = f * (priceAsk1 * scale(1)  + priceAsk2 * scale(2)  + priceAsk3 * scale(3) + ....)
+// f = totalLiquidityAmount / (priceAsk1 * scale(1)  + priceAsk2 * scale(2)  + priceAsk3 * scale(3) + ....)
 //
 // when side == buy
 //

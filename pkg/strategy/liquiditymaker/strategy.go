@@ -299,6 +299,8 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		s.NumOfLiquidityLayers,
 		s.liquidityScale)
 
+	askOrders = filterAskOrders(askOrders, baseBal.Available)
+
 	orderForms := append(bidOrders, askOrders...)
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
@@ -329,6 +331,20 @@ func profitProtectedPrice(
 
 	}
 	return price
+}
+
+func filterAskOrders(askOrders []types.SubmitOrder, available fixedpoint.Value) (out []types.SubmitOrder) {
+	usedBase := fixedpoint.Zero
+	for _, askOrder := range askOrders {
+		if usedBase.Add(askOrder.Quantity).Compare(available) > 0 {
+			return out
+		}
+
+		usedBase = usedBase.Add(askOrder.Quantity)
+		out = append(out, askOrder)
+	}
+
+	return out
 }
 
 func logErr(err error, msgAndArgs ...interface{}) bool {
