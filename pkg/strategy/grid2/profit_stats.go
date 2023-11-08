@@ -24,6 +24,9 @@ type GridProfitStats struct {
 	Market           types.Market                `json:"market,omitempty"`
 	Since            *time.Time                  `json:"since,omitempty"`
 	InitialOrderID   uint64                      `json:"initialOrderID"`
+
+	// ttl is the ttl to keep in persistence
+	ttl time.Duration
 }
 
 func newGridProfitStats(market types.Market) *GridProfitStats {
@@ -38,6 +41,17 @@ func newGridProfitStats(market types.Market) *GridProfitStats {
 		Volume:           fixedpoint.Zero,
 		Market:           market,
 	}
+}
+
+func (s *GridProfitStats) SetTTL(ttl time.Duration) {
+	if ttl.Nanoseconds() <= 0 {
+		return
+	}
+	s.ttl = ttl
+}
+
+func (s *GridProfitStats) Expiration() time.Duration {
+	return s.ttl
 }
 
 func (s *GridProfitStats) AddTrade(trade types.Trade) {
