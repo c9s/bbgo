@@ -75,7 +75,6 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 
 		case <-ticker.C:
 			s.recoverC <- struct{}{}
-			bbgo.Sync(ctx, s)
 		case <-s.recoverC:
 			if !time.Now().After(lastRecoverTime.Add(10 * time.Minute)) {
 				continue
