@@ -66,22 +66,25 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 		exchange:          s.session.Exchange,
 	}
 
+	var lastRecoverTime time.Time
+
 	for {
 		select {
-
 		case <-ctx.Done():
 			return
 
 		case <-ticker.C:
-			if err := syncActiveOrders(ctx, opts); err != nil {
-				log.WithError(err).Errorf("unable to sync active orders")
-			}
-
+			s.recoverC <- struct{}{}
 		case <-s.recoverC:
-			if err := syncActiveOrders(ctx, opts); err != nil {
-				log.WithError(err).Errorf("unable to sync active orders")
+			if !time.Now().After(lastRecoverTime.Add(10 * time.Minute)) {
+				continue
 			}
 
+			if err := syncActiveOrders(ctx, opts); err != nil {
+				log.WithError(err).Errorf("unable to sync active orders")
+			} else {
+				lastRecoverTime = time.Now()
+			}
 		}
 	}
 }
