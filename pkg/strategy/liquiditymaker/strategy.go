@@ -50,6 +50,9 @@ type Strategy struct {
 	LiquiditySkew          fixedpoint.Value `json:"liquiditySkew"`
 	LiquidityPriceRange    fixedpoint.Value `json:"liquidityPriceRange"`
 
+	AskLiquidityAmount fixedpoint.Value `json:"askLiquidityAmount"`
+	BidLiquidityAmount fixedpoint.Value `json:"bidLiquidityAmount"`
+
 	Spread   fixedpoint.Value `json:"spread"`
 	MaxPrice fixedpoint.Value `json:"maxPrice"`
 	MinPrice fixedpoint.Value `json:"minPrice"`
