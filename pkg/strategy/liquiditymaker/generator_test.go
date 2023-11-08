@@ -42,7 +42,7 @@ func TestLiquidityOrderGenerator(t *testing.T) {
 	assert.InDelta(t, 1.0, scale.Call(1.0), 0.00001)
 	assert.InDelta(t, 4.0, scale.Call(30.0), 0.00001)
 
-	totalAmount := Number(200_000.0)
+	totalAmount := Number(20_000.0)
 
 	t.Run("ask orders", func(t *testing.T) {
 		orders := g.Generate(types.SideTypeSell, totalAmount, Number(2.0), Number(2.04), 30, scale)
@@ -55,26 +55,26 @@ func TestLiquidityOrderGenerator(t *testing.T) {
 		assert.InDelta(t, totalAmount.Float64(), totalQuoteQuantity.Float64(), 1.0)
 
 		AssertOrdersPriceSideQuantity(t, []PriceSideQuantityAssert{
-			{Side: types.SideTypeSell, Price: Number("2.0000"), Quantity: Number("1513.40")},
-			{Side: types.SideTypeSell, Price: Number("2.0013"), Quantity: Number("1587.50")},
-			{Side: types.SideTypeSell, Price: Number("2.0027"), Quantity: Number("1665.23")},
-			{Side: types.SideTypeSell, Price: Number("2.0041"), Quantity: Number("1746.77")},
-			{Side: types.SideTypeSell, Price: Number("2.0055"), Quantity: Number("1832.30")},
-			{Side: types.SideTypeSell, Price: Number("2.0068"), Quantity: Number("1922.02")},
-			{Side: types.SideTypeSell, Price: Number("2.0082"), Quantity: Number("2016.13")},
-			{Side: types.SideTypeSell, Price: Number("2.0096"), Quantity: Number("2114.85")},
-			{Side: types.SideTypeSell, Price: Number("2.0110"), Quantity: Number("2218.40")},
-			{Side: types.SideTypeSell, Price: Number("2.0124"), Quantity: Number("2327.02")},
-			{Side: types.SideTypeSell, Price: Number("2.0137"), Quantity: Number("2440.96")},
-			{Side: types.SideTypeSell, Price: Number("2.0151"), Quantity: Number("2560.48")},
-			{Side: types.SideTypeSell, Price: Number("2.0165"), Quantity: Number("2685.86")},
-			{Side: types.SideTypeSell, Price: Number("2.0179"), Quantity: Number("2817.37")},
-			{Side: types.SideTypeSell, Price: Number("2.0193"), Quantity: Number("2955.32")},
+			{Side: types.SideTypeSell, Price: Number("2.0000"), Quantity: Number("151.34")},
+			{Side: types.SideTypeSell, Price: Number("2.0013"), Quantity: Number("158.75")},
+			{Side: types.SideTypeSell, Price: Number("2.0027"), Quantity: Number("166.52")},
+			{Side: types.SideTypeSell, Price: Number("2.0041"), Quantity: Number("174.67")},
+			{Side: types.SideTypeSell, Price: Number("2.0055"), Quantity: Number("183.23")},
+			{Side: types.SideTypeSell, Price: Number("2.0068"), Quantity: Number("192.20")},
+			{Side: types.SideTypeSell, Price: Number("2.0082"), Quantity: Number("201.61")},
+			{Side: types.SideTypeSell, Price: Number("2.0096"), Quantity: Number("211.48")},
+			{Side: types.SideTypeSell, Price: Number("2.0110"), Quantity: Number("221.84")},
+			{Side: types.SideTypeSell, Price: Number("2.0124"), Quantity: Number("232.70")},
+			{Side: types.SideTypeSell, Price: Number("2.0137"), Quantity: Number("244.09")},
+			{Side: types.SideTypeSell, Price: Number("2.0151"), Quantity: Number("256.04")},
+			{Side: types.SideTypeSell, Price: Number("2.0165"), Quantity: Number("268.58")},
+			{Side: types.SideTypeSell, Price: Number("2.0179"), Quantity: Number("281.73")},
+			{Side: types.SideTypeSell, Price: Number("2.0193"), Quantity: Number("295.53")},
 		}, orders[0:15])
 
 		AssertOrdersPriceSideQuantity(t, []PriceSideQuantityAssert{
-			{Side: types.SideTypeSell, Price: Number("2.0386"), Quantity: Number("5771.04")},
-			{Side: types.SideTypeSell, Price: Number("2.0399"), Quantity: Number("6053.62")},
+			{Side: types.SideTypeSell, Price: Number("2.0386"), Quantity: Number("577.10")},
+			{Side: types.SideTypeSell, Price: Number("2.0399"), Quantity: Number("605.36")},
 		}, orders[28:30])
 	})
 
@@ -89,26 +89,26 @@ func TestLiquidityOrderGenerator(t *testing.T) {
 		assert.InDelta(t, totalAmount.Float64(), totalQuoteQuantity.Float64(), 1.0)
 
 		AssertOrdersPriceSideQuantity(t, []PriceSideQuantityAssert{
-			{Side: types.SideTypeBuy, Price: Number("2.0000"), Quantity: Number("1551.37")},
-			{Side: types.SideTypeBuy, Price: Number("1.9986"), Quantity: Number("1627.33")},
-			{Side: types.SideTypeBuy, Price: Number("1.9972"), Quantity: Number("1707.01")},
-			{Side: types.SideTypeBuy, Price: Number("1.9958"), Quantity: Number("1790.59")},
-			{Side: types.SideTypeBuy, Price: Number("1.9944"), Quantity: Number("1878.27")},
-			{Side: types.SideTypeBuy, Price: Number("1.9931"), Quantity: Number("1970.24")},
-			{Side: types.SideTypeBuy, Price: Number("1.9917"), Quantity: Number("2066.71")},
-			{Side: types.SideTypeBuy, Price: Number("1.9903"), Quantity: Number("2167.91")},
-			{Side: types.SideTypeBuy, Price: Number("1.9889"), Quantity: Number("2274.06")},
-			{Side: types.SideTypeBuy, Price: Number("1.9875"), Quantity: Number("2385.40")},
-			{Side: types.SideTypeBuy, Price: Number("1.9862"), Quantity: Number("2502.20")},
-			{Side: types.SideTypeBuy, Price: Number("1.9848"), Quantity: Number("2624.72")},
-			{Side: types.SideTypeBuy, Price: Number("1.9834"), Quantity: Number("2753.24")},
-			{Side: types.SideTypeBuy, Price: Number("1.9820"), Quantity: Number("2888.05")},
-			{Side: types.SideTypeBuy, Price: Number("1.9806"), Quantity: Number("3029.46")},
+			{Side: types.SideTypeBuy, Price: Number("2.0000"), Quantity: Number("155.13")},
+			{Side: types.SideTypeBuy, Price: Number("1.9986"), Quantity: Number("162.73")},
+			{Side: types.SideTypeBuy, Price: Number("1.9972"), Quantity: Number("170.70")},
+			{Side: types.SideTypeBuy, Price: Number("1.9958"), Quantity: Number("179.05")},
+			{Side: types.SideTypeBuy, Price: Number("1.9944"), Quantity: Number("187.82")},
+			{Side: types.SideTypeBuy, Price: Number("1.9931"), Quantity: Number("197.02")},
+			{Side: types.SideTypeBuy, Price: Number("1.9917"), Quantity: Number("206.67")},
+			{Side: types.SideTypeBuy, Price: Number("1.9903"), Quantity: Number("216.79")},
+			{Side: types.SideTypeBuy, Price: Number("1.9889"), Quantity: Number("227.40")},
+			{Side: types.SideTypeBuy, Price: Number("1.9875"), Quantity: Number("238.54")},
+			{Side: types.SideTypeBuy, Price: Number("1.9862"), Quantity: Number("250.22")},
+			{Side: types.SideTypeBuy, Price: Number("1.9848"), Quantity: Number("262.47")},
+			{Side: types.SideTypeBuy, Price: Number("1.9834"), Quantity: Number("275.32")},
+			{Side: types.SideTypeBuy, Price: Number("1.9820"), Quantity: Number("288.80")},
+			{Side: types.SideTypeBuy, Price: Number("1.9806"), Quantity: Number("302.94")},
 		}, orders[0:15])
 
 		AssertOrdersPriceSideQuantity(t, []PriceSideQuantityAssert{
-			{Side: types.SideTypeBuy, Price: Number("1.9613"), Quantity: Number("5915.83")},
-			{Side: types.SideTypeBuy, Price: Number("1.9600"), Quantity: Number("6205.49")},
+			{Side: types.SideTypeBuy, Price: Number("1.9613"), Quantity: Number("591.58")},
+			{Side: types.SideTypeBuy, Price: Number("1.9600"), Quantity: Number("620.54")},
 		}, orders[28:30])
 	})
 }
