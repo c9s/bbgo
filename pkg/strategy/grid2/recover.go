@@ -13,6 +13,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var syncWindow = -3 * time.Minute
+
 /*
   	Background knowledge
   	1. active orderbook add orders only when receive new order event or call Add/Update method manually
@@ -91,11 +93,13 @@ func (s *Strategy) recover(ctx context.Context) error {
 
 	pins := s.getGrid().Pins
 
+	syncBefore := time.Now().Add(syncWindow)
+
 	activeOrdersInTwinOrderBook, err := buildTwinOrderBook(pins, activeOrders)
 	openOrdersInTwinOrderBook, err := buildTwinOrderBook(pins, openOrders)
 
-	s.logger.Infof("active orders' twin orderbook\n%s", activeOrdersInTwinOrderBook.String())
-	s.logger.Infof("open orders in twin orderbook\n%s", openOrdersInTwinOrderBook.String())
+	s.logger.Infof("[Recover] active orders' twin orderbook\n%s", activeOrdersInTwinOrderBook.String())
+	s.logger.Infof("[Recover] open orders in twin orderbook\n%s", openOrdersInTwinOrderBook.String())
 
 	// remove index 0, because twin orderbook's price is from the second one
 	pins = pins[1:]
@@ -127,7 +131,9 @@ func (s *Strategy) recover(ctx context.Context) error {
 
 		// case 1
 		if activeOrderID == 0 {
-			activeOrderBook.Add(openOrder.GetOrder())
+			order := openOrder.GetOrder()
+			s.logger.Infof("[Recover] found open order #%d is not in the active orderbook, adding...", order.OrderID)
+			activeOrderBook.Add(order)
 			// also add open orders into active order's twin orderbook, we will use this active orderbook to recover empty price grid
 			activeOrdersInTwinOrderBook.AddTwinOrder(v, openOrder)
 			continue
@@ -135,7 +141,18 @@ func (s *Strategy) recover(ctx context.Context) error {
 
 		// case 2
 		if openOrderID == 0 {
-			syncActiveOrder(ctx, activeOrderBook, s.orderQueryService, activeOrder.GetOrder().OrderID)
+			order := activeOrder.GetOrder()
+			s.logger.Infof("[Recover] found active order #%d is not in the open orders, updating...", order.OrderID)
+			isActiveOrderBookUpdated, err := syncActiveOrder(ctx, activeOrderBook, s.orderQueryService, order.OrderID, syncBefore)
+			if err != nil {
+				s.logger.WithError(err).Errorf("[Recover] unable to query order #%d", order.OrderID)
+				continue
+			}
+
+			if !isActiveOrderBookUpdated {
+				s.logger.Infof("[Recover] active order #%d is updated in 3 min, skip updating...", order.OrderID)
+			}
+
 			continue
 		}
 
@@ -250,19 +267,24 @@ func buildTwinOrderBook(pins []Pin, orders []types.Order) (*TwinOrderBook, error
 	return book, nil
 }
 
-func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService, orderID uint64) error {
+func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService, orderID uint64, syncBefore time.Time) (bool, error) {
 	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
 		Symbol:  activeOrderBook.Symbol,
 		OrderID: strconv.FormatUint(orderID, 10),
 	})
 
+	isActiveOrderBookUpdated := false
+
 	if err != nil {
-		return err
+		return isActiveOrderBookUpdated, err
 	}
 
-	activeOrderBook.Update(*updatedOrder)
+	isActiveOrderBookUpdated = updatedOrder.UpdateTime.Before(syncBefore)
+	if isActiveOrderBookUpdated {
+		activeOrderBook.Update(*updatedOrder)
+	}
 
-	return nil
+	return isActiveOrderBookUpdated, nil
 }
 
 func queryTradesToUpdateTwinOrderBook(
