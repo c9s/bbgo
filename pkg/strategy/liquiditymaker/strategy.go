@@ -3,7 +3,6 @@ package liquiditymaker
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -44,18 +43,16 @@ type Strategy struct {
 
 	AdjustmentUpdateInterval types.Interval `json:"adjustmentUpdateInterval"`
 
-	NumOfLiquidityLayers   int              `json:"numOfLiquidityLayers"`
-	LiquiditySlideRule     *bbgo.SlideRule  `json:"liquidityScale"`
-	LiquidityLayerTickSize fixedpoint.Value `json:"liquidityLayerTickSize"`
-	LiquiditySkew          fixedpoint.Value `json:"liquiditySkew"`
-	LiquidityPriceRange    fixedpoint.Value `json:"liquidityPriceRange"`
+	NumOfLiquidityLayers int              `json:"numOfLiquidityLayers"`
+	LiquiditySlideRule   *bbgo.SlideRule  `json:"liquidityScale"`
+	LiquidityPriceRange  fixedpoint.Value `json:"liquidityPriceRange"`
+	AskLiquidityAmount   fixedpoint.Value `json:"askLiquidityAmount"`
+	BidLiquidityAmount   fixedpoint.Value `json:"bidLiquidityAmount"`
 
-	AskLiquidityAmount fixedpoint.Value `json:"askLiquidityAmount"`
-	BidLiquidityAmount fixedpoint.Value `json:"bidLiquidityAmount"`
-
-	Spread   fixedpoint.Value `json:"spread"`
-	MaxPrice fixedpoint.Value `json:"maxPrice"`
-	MinPrice fixedpoint.Value `json:"minPrice"`
+	UseLastTradePrice bool             `json:"useLastTradePrice"`
+	Spread            fixedpoint.Value `json:"spread"`
+	MaxPrice          fixedpoint.Value `json:"maxPrice"`
+	MinPrice          fixedpoint.Value `json:"minPrice"`
 
 	MaxExposure fixedpoint.Value `json:"maxExposure"`
 
@@ -65,6 +62,8 @@ type Strategy struct {
 	book                                    *types.StreamOrderBook
 
 	liquidityScale bbgo.Scale
+
+	orderGenerator *LiquidityOrderGenerator
 }
 
 func (s *Strategy) ID() string {
@@ -84,6 +83,11 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.Strategy = &common.Strategy{}
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
+
+	s.orderGenerator = &LiquidityOrderGenerator{
+		Symbol: s.Symbol,
+		Market: s.Market,
+	}
 
 	s.book = types.NewStreamBook(s.Symbol)
 	s.book.BindStream(session.MarketDataStream)
@@ -209,6 +213,11 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 }
 
 func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
+	err := s.liquidityOrderBook.GracefulCancel(ctx, s.Session.Exchange)
+	if logErr(err, "unable to cancel orders") {
+		return
+	}
+
 	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
 	if logErr(err, "unable to query ticker") {
 		return
@@ -219,10 +228,13 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		return
 	}
 
-	err = s.liquidityOrderBook.GracefulCancel(ctx, s.Session.Exchange)
-	if logErr(err, "unable to cancel orders") {
+	if _, err := s.Session.UpdateAccount(ctx); err != nil {
+		logErr(err, "unable to update account")
 		return
 	}
+
+	baseBal, _ := s.Session.Account.Balance(s.Market.BaseCurrency)
+	quoteBal, _ := s.Session.Account.Balance(s.Market.QuoteCurrency)
 
 	if ticker.Buy.IsZero() && ticker.Sell.IsZero() {
 		ticker.Sell = ticker.Last.Add(s.Market.TickSize)
@@ -233,77 +245,31 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		ticker.Sell = ticker.Buy.Add(s.Market.TickSize)
 	}
 
-	if _, err := s.Session.UpdateAccount(ctx); err != nil {
-		logErr(err, "unable to update account")
-		return
-	}
-
-	baseBal, _ := s.Session.Account.Balance(s.Market.BaseCurrency)
-	quoteBal, _ := s.Session.Account.Balance(s.Market.QuoteCurrency)
+	log.Infof("ticker: %+v", ticker)
 
 	lastTradedPrice := ticker.Last
 	midPrice := ticker.Sell.Add(ticker.Buy).Div(fixedpoint.Two)
 	currentSpread := ticker.Sell.Sub(ticker.Buy)
-	tickSize := fixedpoint.Max(s.LiquidityLayerTickSize, s.Market.TickSize)
 	sideSpread := s.Spread.Div(fixedpoint.Two)
 
-	log.Infof("current: spread: %f lastTradedPrice: %f midPrice: %f", currentSpread.Float64(), lastTradedPrice.Float64(), midPrice.Float64())
+	if s.UseLastTradePrice {
+		midPrice = lastTradedPrice
+	}
+
+	log.Infof("current spread: %f lastTradedPrice: %f midPrice: %f", currentSpread.Float64(), lastTradedPrice.Float64(), midPrice.Float64())
 
 	ask1Price := midPrice.Mul(fixedpoint.One.Add(sideSpread))
 	bid1Price := midPrice.Mul(fixedpoint.One.Sub(sideSpread))
 
 	askLastPrice := midPrice.Mul(fixedpoint.One.Add(s.LiquidityPriceRange))
 	bidLastPrice := midPrice.Mul(fixedpoint.One.Sub(s.LiquidityPriceRange))
-	log.Infof("wanted side spread: %f askRange: %f ~ %f bidRange: %f ~ %f", sideSpread.Float64(),
+	log.Infof("wanted side spread: %f askRange: %f ~ %f bidRange: %f ~ %f",
+		sideSpread.Float64(),
 		ask1Price.Float64(), askLastPrice.Float64(),
 		bid1Price.Float64(), bidLastPrice.Float64())
 
-	askLayerSpread := askLastPrice.Sub(ask1Price).Div(fixedpoint.NewFromInt(int64(s.NumOfLiquidityLayers)))
-	bidLayerSpread := bid1Price.Sub(bidLastPrice).Div(fixedpoint.NewFromInt(int64(s.NumOfLiquidityLayers)))
-
-	if askLayerSpread.Compare(tickSize) < 0 {
-		askLayerSpread = tickSize
-	}
-
-	if bidLayerSpread.Compare(tickSize) < 0 {
-		bidLayerSpread = tickSize
-	}
-
-	sum := s.liquidityScale.Sum(1.0)
-	askSum := sum
-	bidSum := sum
-	log.Infof("liquidity sum: %f / %f", askSum, bidSum)
-
-	skew := s.LiquiditySkew.Float64()
-	useSkew := !s.LiquiditySkew.IsZero()
-	if useSkew {
-		askSum = sum / skew
-		bidSum = sum * skew
-		log.Infof("adjusted liqudity skew: %f / %f", askSum, bidSum)
-	}
-
-	var bidPrices []fixedpoint.Value
-	var askPrices []fixedpoint.Value
-
-	// calculate and collect prices
-	for i := 0; i <= s.NumOfLiquidityLayers; i++ {
-		fi := fixedpoint.NewFromInt(int64(i))
-		bidPrice := bid1Price.Sub(bidLayerSpread.Mul(fi))
-		askPrice := ask1Price.Add(askLayerSpread.Mul(fi))
-
-		bidPrice = s.Market.TruncatePrice(bidPrice)
-		askPrice = s.Market.TruncatePrice(askPrice)
-
-		bidPrices = append(bidPrices, bidPrice)
-		askPrices = append(askPrices, askPrice)
-	}
-
 	availableBase := baseBal.Available
 	availableQuote := quoteBal.Available
-
-	makerQuota := &bbgo.QuotaTransaction{}
-	makerQuota.QuoteAsset.Add(availableQuote)
-	makerQuota.BaseAsset.Add(availableBase)
 
 	log.Infof("balances before liq orders: %s, %s",
 		baseBal.String(),
@@ -319,79 +285,32 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		}
 	}
 
-	askX := availableBase.Float64() / askSum
-	bidX := availableQuote.Float64() / (bidSum * (fixedpoint.Sum(bidPrices).Float64()))
+	bidOrders := s.orderGenerator.Generate(types.SideTypeBuy,
+		fixedpoint.Min(s.BidLiquidityAmount, quoteBal.Available),
+		bid1Price,
+		bidLastPrice,
+		s.NumOfLiquidityLayers,
+		s.liquidityScale)
 
-	askX = math.Trunc(askX*1e8) / 1e8
-	bidX = math.Trunc(bidX*1e8) / 1e8
+	askOrders := s.orderGenerator.Generate(types.SideTypeSell,
+		s.AskLiquidityAmount,
+		ask1Price,
+		askLastPrice,
+		s.NumOfLiquidityLayers,
+		s.liquidityScale)
 
-	var liqOrders []types.SubmitOrder
-	for i := 0; i <= s.NumOfLiquidityLayers; i++ {
-		bidQuantity := fixedpoint.NewFromFloat(s.liquidityScale.Call(float64(i)) * bidX)
-		askQuantity := fixedpoint.NewFromFloat(s.liquidityScale.Call(float64(i)) * askX)
-		bidPrice := bidPrices[i]
-		askPrice := askPrices[i]
+	orderForms := append(bidOrders, askOrders...)
 
-		log.Infof("liqudity layer #%d %f/%f = %f/%f", i, askPrice.Float64(), bidPrice.Float64(), askQuantity.Float64(), bidQuantity.Float64())
-
-		placeBuy := true
-		placeSell := true
-		averageCost := s.Position.AverageCost
-		// when long position, do not place sell orders below the average cost
-		if !s.Position.IsDust() {
-			if s.Position.IsLong() && askPrice.Compare(averageCost) < 0 {
-				placeSell = false
-			}
-
-			if s.Position.IsShort() && bidPrice.Compare(averageCost) > 0 {
-				placeBuy = false
-			}
-		}
-
-		quoteQuantity := bidQuantity.Mul(bidPrice)
-
-		if s.Market.IsDustQuantity(bidQuantity, bidPrice) || !makerQuota.QuoteAsset.Lock(quoteQuantity) {
-			placeBuy = false
-		}
-
-		if s.Market.IsDustQuantity(askQuantity, askPrice) || !makerQuota.BaseAsset.Lock(askQuantity) {
-			placeSell = false
-		}
-
-		if placeBuy {
-			liqOrders = append(liqOrders, types.SubmitOrder{
-				Symbol:      s.Symbol,
-				Side:        types.SideTypeBuy,
-				Type:        types.OrderTypeLimitMaker,
-				Quantity:    bidQuantity,
-				Price:       bidPrice,
-				Market:      s.Market,
-				TimeInForce: types.TimeInForceGTC,
-			})
-		}
-
-		if placeSell {
-			liqOrders = append(liqOrders, types.SubmitOrder{
-				Symbol:      s.Symbol,
-				Side:        types.SideTypeSell,
-				Type:        types.OrderTypeLimitMaker,
-				Quantity:    askQuantity,
-				Price:       askPrice,
-				Market:      s.Market,
-				TimeInForce: types.TimeInForceGTC,
-			})
-		}
-	}
-
-	makerQuota.Commit()
-
-	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, liqOrders...)
+	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
 	if logErr(err, "unable to place liquidity orders") {
 		return
 	}
 
 	s.liquidityOrderBook.Add(createdOrders...)
-	log.Infof("%d liq orders are placed successfully", len(liqOrders))
+	log.Infof("%d liq orders are placed successfully", len(orderForms))
+	for _, o := range createdOrders {
+		log.Infof("liq order: %+v", o)
+	}
 }
 
 func profitProtectedPrice(
