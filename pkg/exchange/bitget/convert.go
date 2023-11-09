@@ -1,6 +1,7 @@
 package bitget
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -157,4 +158,88 @@ func unfilledOrderToGlobalOrder(order v2.UnfilledOrder) (*types.Order, error) {
 		CreationTime:     types.Time(order.CTime.Time()),
 		UpdateTime:       types.Time(order.UTime.Time()),
 	}, nil
+}
+
+func toGlobalOrder(order v2.OrderDetail) (*types.Order, error) {
+	side, err := toGlobalSideType(order.Side)
+	if err != nil {
+		return nil, err
+	}
+
+	orderType, err := toGlobalOrderType(order.OrderType)
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := toGlobalOrderStatus(order.Status)
+	if err != nil {
+		return nil, err
+	}
+
+	qty := order.Size
+	price := order.Price
+
+	if orderType == types.OrderTypeMarket {
+		price = order.PriceAvg
+		if side == types.SideTypeBuy {
+			qty, err = processMarketBuyQuantity(order.BaseVolume, order.QuoteVolume, order.PriceAvg, order.Size, order.Status)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return &types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: order.ClientOrderId,
+			Symbol:        order.Symbol,
+			Side:          side,
+			Type:          orderType,
+			Quantity:      qty,
+			Price:         price,
+			// Bitget does not include the "time-in-force" field in its API response for spot trading, so we set GTC.
+			TimeInForce: types.TimeInForceGTC,
+		},
+		Exchange:         types.ExchangeBitget,
+		OrderID:          uint64(order.OrderId),
+		UUID:             strconv.FormatInt(int64(order.OrderId), 10),
+		Status:           status,
+		ExecutedQuantity: order.BaseVolume,
+		IsWorking:        order.Status.IsWorking(),
+		CreationTime:     types.Time(order.CTime.Time()),
+		UpdateTime:       types.Time(order.UTime.Time()),
+	}, nil
+}
+
+// processMarketBuyQuantity returns the estimated base quantity or real. The order size will be 'quote quantity' when side is buy and
+// type is market, so we need to convert that. This is because the unit of types.Order.Quantity is base coin.
+//
+// If the order status is PartialFilled, return estimated base coin quantity.
+// If the order status is Filled, return the filled base quantity instead of the buy quantity, because a market order on the buy side
+// cannot execute all.
+// Otherwise, return zero.
+func processMarketBuyQuantity(filledQty, filledPrice, priceAvg, buyQty fixedpoint.Value, orderStatus v2.OrderStatus) (fixedpoint.Value, error) {
+	switch orderStatus {
+	case v2.OrderStatusInit, v2.OrderStatusNew, v2.OrderStatusLive, v2.OrderStatusCancelled:
+		return fixedpoint.Zero, nil
+
+	case v2.OrderStatusPartialFilled:
+		// sanity check for avoid divide 0
+		if priceAvg.IsZero() {
+			return fixedpoint.Zero, errors.New("priceAvg for a partialFilled should not be zero")
+		}
+		// calculate the remaining quote coin quantity.
+		remainPrice := buyQty.Sub(filledPrice)
+		// calculate the remaining base coin quantity.
+		remainBaseCoinQty := remainPrice.Div(priceAvg)
+		// Estimated quantity that may be purchased.
+		return filledQty.Add(remainBaseCoinQty), nil
+
+	case v2.OrderStatusFilled:
+		// Market buy orders may not purchase the entire quantity, hence the use of filledQty here.
+		return filledQty, nil
+
+	default:
+		return fixedpoint.Zero, fmt.Errorf("failed to execute market buy quantity due to unexpected order status %s ", orderStatus)
+	}
 }
