@@ -187,6 +187,12 @@ func (p *CancelOrderRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (p *CancelOrderRequest) GetPath() string {
+	return "/v5/order/cancel"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (p *CancelOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, error) {
 
 	params, err := p.GetParameters()
@@ -195,7 +201,9 @@ func (p *CancelOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, erro
 	}
 	query := url.Values{}
 
-	apiURL := "/v5/order/cancel"
+	var apiURL string
+
+	apiURL = p.GetPath()
 
 	req, err := p.client.NewAuthenticatedRequest(ctx, "POST", apiURL, query, params)
 	if err != nil {
@@ -210,6 +218,16 @@ func (p *CancelOrderRequest) Do(ctx context.Context) (*CancelOrderResponse, erro
 	var apiResponse APIResponse
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+	validator, ok := interface{}(apiResponse).(responseValidator)
+	if ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	var data CancelOrderResponse
 	if err := json.Unmarshal(apiResponse.Result, &data); err != nil {

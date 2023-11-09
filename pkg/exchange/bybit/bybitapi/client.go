@@ -162,10 +162,25 @@ sample:
 */
 
 type APIResponse struct {
-	RetCode    uint            `json:"retCode"`
-	RetMsg     string          `json:"retMsg"`
-	Result     json.RawMessage `json:"result"`
+	// Success/Error code
+	RetCode uint `json:"retCode"`
+	// Success/Error msg. OK, success, SUCCESS indicate a successful response
+	RetMsg string `json:"retMsg"`
+	// Business data result
+	Result json.RawMessage `json:"result"`
+	// Extend info. Most of the time, it is {}
 	RetExtInfo json.RawMessage `json:"retExtInfo"`
 	// Time is current timestamp (ms)
 	Time types.MillisecondTimestamp `json:"time"`
+}
+
+func (a APIResponse) Validate() error {
+	if a.RetCode != 0 {
+		return a.Error()
+	}
+	return nil
+}
+
+func (a APIResponse) Error() error {
+	return fmt.Errorf("retCode: %d, retMsg: %s, retExtInfo: %q, time: %s", a.RetCode, a.RetMsg, a.RetExtInfo, a.Time)
 }
