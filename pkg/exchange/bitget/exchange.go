@@ -3,18 +3,24 @@ package bitget
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
+	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const ID = "bitget"
+const (
+	ID = "bitget"
 
-const PlatformToken = "BGB"
+	PlatformToken = "BGB"
+
+	queryOpenOrdersLimit = 100
+)
 
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": ID,
@@ -29,12 +35,15 @@ var (
 	queryTickerRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
 	// queryTickersRateLimiter has its own rate limit. https://bitgetlimited.github.io/apidoc/en/spot/#get-all-tickers
 	queryTickersRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
+	// queryOpenOrdersRateLimiter has its own rate limit. https://www.bitget.com/zh-CN/api-doc/spot/trade/Get-Unfilled-Orders
+	queryOpenOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
 )
 
 type Exchange struct {
 	key, secret, passphrase string
 
-	client *bitgetapi.RestClient
+	client   *bitgetapi.RestClient
+	v2Client *v2.Client
 }
 
 func New(key, secret, passphrase string) *Exchange {
@@ -49,6 +58,7 @@ func New(key, secret, passphrase string) *Exchange {
 		secret:     secret,
 		passphrase: passphrase,
 		client:     client,
+		v2Client:   v2.NewClient(client),
 	}
 }
 
@@ -174,8 +184,46 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	// TODO implement me
-	panic("implement me")
+	var nextCursor types.StrInt64
+	for {
+		if err := queryOpenOrdersRateLimiter.Wait(ctx); err != nil {
+			return nil, fmt.Errorf("open order rate limiter wait error: %w", err)
+		}
+
+		req := e.v2Client.NewGetUnfilledOrdersRequest().
+			Symbol(symbol).
+			Limit(strconv.FormatInt(queryOpenOrdersLimit, 10))
+		if nextCursor != 0 {
+			req.IdLessThan(strconv.FormatInt(int64(nextCursor), 10))
+		}
+
+		openOrders, err := req.Do(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query open orders: %w", err)
+		}
+
+		for _, o := range openOrders {
+			order, err := unfilledOrderToGlobalOrder(o)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert order, err: %v", err)
+			}
+
+			orders = append(orders, *order)
+		}
+
+		orderLen := len(openOrders)
+		// a defensive programming to ensure the length of order response is expected.
+		if orderLen > queryOpenOrdersLimit {
+			return nil, fmt.Errorf("unexpected open orders length %d", orderLen)
+		}
+
+		if orderLen < queryOpenOrdersLimit {
+			break
+		}
+		nextCursor = openOrders[orderLen-1].OrderId
+	}
+
+	return orders, nil
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
