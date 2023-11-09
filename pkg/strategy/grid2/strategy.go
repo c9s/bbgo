@@ -1365,7 +1365,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 
 				// because the precision issue, we need to round up quote quantity and add it into used quote
 				// e.g. quote we calculate : 8888.85, but it may lock 8888.9 due to their precision.
-				roundUpQuoteQuantity := quoteQuantity.Round(s.Market.VolumePrecision, fixedpoint.Up)
+				roundUpQuoteQuantity := quoteQuantity.Round(s.Market.PricePrecision, fixedpoint.Up)
 				usedQuote = usedQuote.Add(roundUpQuoteQuantity)
 			}
 		} else {
@@ -1384,7 +1384,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 
 			// because the precision issue, we need to round up quote quantity and add it into used quote
 			// e.g. quote we calculate : 8888.85, but it may lock 8888.9 due to their precision.
-			roundUpQuoteQuantity := quoteQuantity.Round(s.Market.VolumePrecision, fixedpoint.Up)
+			roundUpQuoteQuantity := quoteQuantity.Round(s.Market.PricePrecision, fixedpoint.Up)
 			if usedQuote.Add(roundUpQuoteQuantity).Compare(totalQuote) > 0 {
 				if i > 0 {
 					s.logger.Errorf("used quote %f > total quote %f, this should not happen", usedQuote.Add(quoteQuantity).Float64(), totalQuote.Float64())
