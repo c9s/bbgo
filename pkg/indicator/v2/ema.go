@@ -9,11 +9,14 @@ type EWMAStream struct {
 	multiplier float64
 }
 
-func EWMA2(source types.Float64Source, window int) *EWMAStream {
+func EWMA2(source types.Float64Source, window int, multiplier ...float64) *EWMAStream {
 	s := &EWMAStream{
 		Float64Series: types.NewFloat64Series(),
 		window:        window,
 		multiplier:    2.0 / float64(1+window),
+	}
+	if len(multiplier) == 1 {
+		s.multiplier = multiplier[0]
 	}
 	s.Bind(source, s)
 	return s

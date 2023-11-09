@@ -51,9 +51,7 @@ func (s *RMAStream) Calculate(x float64) float64 {
 }
 
 func (s *RMAStream) Truncate() {
-	if len(s.Slice) > MaxNumOfRMA {
-		s.Slice = s.Slice[MaxNumOfRMATruncateSize-1:]
-	}
+	s.Slice = s.Slice.Truncate(MaxNumOfMA)
 }
 
 func checkWindow(window int) {

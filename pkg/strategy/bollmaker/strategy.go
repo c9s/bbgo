@@ -6,15 +6,14 @@ import (
 	"math"
 	"sync"
 
-	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
-	"github.com/c9s/bbgo/pkg/util"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 // TODO:

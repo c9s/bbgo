@@ -10,14 +10,13 @@ type BOLLStream struct {
 
 	UpBand, DownBand *types.Float64Series
 
-	window int
-	k      float64
+	k float64
 
 	SMA    *SMAStream
 	StdDev *StdDevStream
 }
 
-// BOOL2 is bollinger indicator
+// BOLL2 is bollinger indicator
 // the data flow:
 //
 // priceSource ->
@@ -33,7 +32,6 @@ func BOLL(source types.Float64Source, window int, k float64) *BOLLStream {
 		Float64Series: types.NewFloat64Series(),
 		UpBand:        types.NewFloat64Series(),
 		DownBand:      types.NewFloat64Series(),
-		window:        window,
 		k:             k,
 		SMA:           sma,
 		StdDev:        stdDev,
@@ -53,4 +51,9 @@ func (s *BOLLStream) Calculate(v float64) float64 {
 	stdDev := s.StdDev.Last(0)
 	band := stdDev * s.k
 	return band
+}
+
+func (s *BOLLStream) Truncate() {
+	s.UpBand.Slice = s.UpBand.Slice.Truncate(5000)
+	s.DownBand.Slice = s.DownBand.Slice.Truncate(5000)
 }

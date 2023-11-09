@@ -17,8 +17,8 @@ type RSIStream struct {
 
 func RSI2(source types.Float64Source, window int) *RSIStream {
 	s := &RSIStream{
-		source:        source,
 		Float64Series: types.NewFloat64Series(),
+		source:        source,
 		window:        window,
 	}
 	s.Bind(source, s)
@@ -28,7 +28,7 @@ func RSI2(source types.Float64Source, window int) *RSIStream {
 func (s *RSIStream) Calculate(_ float64) float64 {
 	var gainSum, lossSum float64
 	var sourceLen = s.source.Length()
-	var limit = min(s.window, sourceLen)
+	var limit = Min(s.window, sourceLen)
 	for i := 0; i < limit; i++ {
 		value := s.source.Last(i)
 		prev := s.source.Last(i + 1)
@@ -45,18 +45,4 @@ func (s *RSIStream) Calculate(_ float64) float64 {
 	rs := avgGain / avgLoss
 	rsi := 100.0 - (100.0 / (1.0 + rs))
 	return rsi
-}
-
-func max(x, y int) int {
-	if x > y {
-		return x
-	}
-	return y
-}
-
-func min(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
 }

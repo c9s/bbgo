@@ -1,6 +1,8 @@
 package indicatorv2
 
-import "github.com/c9s/bbgo/pkg/types"
+import (
+	"github.com/c9s/bbgo/pkg/types"
+)
 
 type ATRPStream struct {
 	*types.Float64Series

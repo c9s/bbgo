@@ -1,6 +1,6 @@
 package indicator
 
-func max(x, y int) int {
+func Max(x, y int) int {
 	if x > y {
 		return x
 	}

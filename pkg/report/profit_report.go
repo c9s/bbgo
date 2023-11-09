@@ -2,12 +2,13 @@ package report
 
 import (
 	"fmt"
+	"strconv"
+
 	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
-	"strconv"
 )
 
 // AccumulatedProfitReport For accumulated profit report output

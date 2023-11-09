@@ -3,7 +3,7 @@ package bbgo
 import (
 	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/indicator/v2"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 

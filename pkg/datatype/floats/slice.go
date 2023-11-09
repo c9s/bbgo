@@ -36,6 +36,18 @@ func (s Slice) Max() float64 {
 	return floats.Max(s)
 }
 
+func (s Slice) IndexOfMaxValue() int {
+	maxIdx := 0
+	maxVal := s[0]
+	for i, val := range s {
+		if val > maxVal {
+			maxVal = val
+			maxIdx = i
+		}
+	}
+	return maxIdx
+}
+
 func (s Slice) Min() float64 {
 	return floats.Min(s)
 }
@@ -85,6 +97,17 @@ func (s Slice) Mean() (mean float64) {
 		panic("zero length slice")
 	}
 	return s.Sum() / float64(length)
+}
+
+/* Calculates the variance across the dataset of float64s */
+func (s Slice) Variance() float64 {
+	var variance = .0
+
+	for _, diff := range s {
+		variance += math.Pow(diff-s.Mean(), 2)
+	}
+
+	return variance / float64(len(s))
 }
 
 func (s Slice) Tail(size int) Slice {
