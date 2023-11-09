@@ -47,6 +47,8 @@ var (
 	submitOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
 	// queryTradeRateLimiter has its own rate limit. https://www.bitget.com/zh-CN/api-doc/spot/trade/Get-Fills
 	queryTradeRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
+	// cancelOrderRateLimiter has its own rate limit. https://www.bitget.com/api-doc/spot/trade/Cancel-Order
+	cancelOrderRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
 )
 
 type Exchange struct {
@@ -392,9 +394,53 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	return types.SortOrdersAscending(orders), nil
 }
 
-func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
-	// TODO implement me
-	panic("implement me")
+func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (errs error) {
+	if len(orders) == 0 {
+		return nil
+	}
+
+	for _, order := range orders {
+		req := e.client.NewCancelOrderRequest()
+
+		reqId := ""
+		switch {
+		// use the OrderID first, then the ClientOrderID
+		case order.OrderID > 0:
+			req.OrderId(strconv.FormatUint(order.OrderID, 10))
+			reqId = strconv.FormatUint(order.OrderID, 10)
+
+		case len(order.ClientOrderID) != 0:
+			req.ClientOrderId(order.ClientOrderID)
+			reqId = order.ClientOrderID
+
+		default:
+			errs = multierr.Append(
+				errs,
+				fmt.Errorf("the order uuid and client order id are empty, order: %#v", order),
+			)
+			continue
+		}
+
+		req.Symbol(order.Market.Symbol)
+
+		if err := cancelOrderRateLimiter.Wait(ctx); err != nil {
+			errs = multierr.Append(errs, fmt.Errorf("cancel order rate limiter wait, order id: %s, error: %w", order.ClientOrderID, err))
+			continue
+		}
+		res, err := req.Do(ctx)
+		if err != nil {
+			errs = multierr.Append(errs, fmt.Errorf("failed to cancel order id: %s, err: %w", order.ClientOrderID, err))
+			continue
+		}
+
+		// sanity check
+		if res.OrderId != reqId && res.ClientOrderId != reqId {
+			errs = multierr.Append(errs, fmt.Errorf("order id mismatch, exp: %s, respOrderId: %s, respClientOrderId: %s", reqId, res.OrderId, res.ClientOrderId))
+			continue
+		}
+	}
+
+	return errs
 }
 
 // QueryTrades queries fill trades. The trade of the response is in descending order. The time-based query are typically
