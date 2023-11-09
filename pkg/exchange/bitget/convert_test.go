@@ -491,3 +491,91 @@ func Test_toLocalSide(t *testing.T) {
 	_, err = toLocalOrderType("xxx")
 	assert.ErrorContains(t, err, "xxx")
 }
+
+func Test_isMaker(t *testing.T) {
+	isM, err := isMaker(v2.TradeTaker)
+	assert.NoError(t, err)
+	assert.False(t, isM)
+
+	isM, err = isMaker(v2.TradeMaker)
+	assert.NoError(t, err)
+	assert.True(t, isM)
+
+	_, err = isMaker("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_isFeeDiscount(t *testing.T) {
+	isDiscount, err := isFeeDiscount(v2.DiscountNo)
+	assert.NoError(t, err)
+	assert.False(t, isDiscount)
+
+	isDiscount, err = isFeeDiscount(v2.DiscountYes)
+	assert.NoError(t, err)
+	assert.True(t, isDiscount)
+
+	_, err = isFeeDiscount("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_toGlobalTrade(t *testing.T) {
+	// {
+	//   "userId":"8672173294",
+	//   "symbol":"APEUSDT",
+	//   "orderId":"1104337778433757184",
+	//   "tradeId":"1104337778504044545",
+	//   "orderType":"limit",
+	//   "side":"sell",
+	//   "priceAvg":"1.4001",
+	//   "size":"5",
+	//   "amount":"7.0005",
+	//   "feeDetail":{
+	//      "deduction":"no",
+	//      "feeCoin":"USDT",
+	//      "totalDeductionFee":"",
+	//      "totalFee":"-0.0070005"
+	//   },
+	//   "tradeScope":"taker",
+	//   "cTime":"1699020564676",
+	//   "uTime":"1699020564687"
+	//}
+	trade := v2.Trade{
+		UserId:    types.StrInt64(8672173294),
+		Symbol:    "APEUSDT",
+		OrderId:   types.StrInt64(1104337778433757184),
+		TradeId:   types.StrInt64(1104337778504044545),
+		OrderType: v2.OrderTypeLimit,
+		Side:      v2.SideTypeSell,
+		PriceAvg:  fixedpoint.NewFromFloat(1.4001),
+		Size:      fixedpoint.NewFromFloat(5),
+		Amount:    fixedpoint.NewFromFloat(7.0005),
+		FeeDetail: v2.TradeFee{
+			Deduction:         "no",
+			FeeCoin:           "USDT",
+			TotalDeductionFee: fixedpoint.Zero,
+			TotalFee:          fixedpoint.NewFromFloat(-0.0070005),
+		},
+		TradeScope: v2.TradeTaker,
+		CTime:      types.NewMillisecondTimestampFromInt(1699020564676),
+		UTime:      types.NewMillisecondTimestampFromInt(1699020564687),
+	}
+
+	res, err := toGlobalTrade(trade)
+	assert.NoError(t, err)
+	assert.Equal(t, &types.Trade{
+		ID:            uint64(1104337778504044545),
+		OrderID:       uint64(1104337778433757184),
+		Exchange:      types.ExchangeBitget,
+		Price:         fixedpoint.NewFromFloat(1.4001),
+		Quantity:      fixedpoint.NewFromFloat(5),
+		QuoteQuantity: fixedpoint.NewFromFloat(7.0005),
+		Symbol:        "APEUSDT",
+		Side:          types.SideTypeSell,
+		IsBuyer:       false,
+		IsMaker:       false,
+		Time:          types.Time(types.NewMillisecondTimestampFromInt(1699020564676)),
+		Fee:           fixedpoint.NewFromFloat(0.0070005),
+		FeeCurrency:   "USDT",
+		FeeDiscounted: false,
+	}, res)
+}
