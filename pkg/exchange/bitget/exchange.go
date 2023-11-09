@@ -2,6 +2,7 @@ package bitget
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -44,6 +45,8 @@ var (
 	closedQueryOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/15), 5)
 	// submitOrdersRateLimiter has its own rate limit. https://www.bitget.com/zh-CN/api-doc/spot/trade/Place-Order
 	submitOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
+	// queryTradeRateLimiter has its own rate limit. https://www.bitget.com/zh-CN/api-doc/spot/trade/Get-Fills
+	queryTradeRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
 )
 
 type Exchange struct {
@@ -392,4 +395,70 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	// TODO implement me
 	panic("implement me")
+}
+
+// QueryTrades queries fill trades. The trade of the response is in descending order. The time-based query are typically
+// using (`CTime`) as the search criteria.
+// If you need to retrieve all data, please utilize the function pkg/exchange/batch.TradeBatchQuery.
+//
+// ** StartTime is inclusive, EndTime is exclusive. If you use the EndTime, the StartTime is required. **
+// ** StartTime and EndTime cannot exceed 90 days. **
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+	if options.LastTradeID != 0 {
+		log.Warn("!!!BITGET EXCHANGE API NOTICE!!! The trade of response is in descending order, so the last trade id not supported.")
+	}
+
+	req := e.v2Client.NewGetTradeFillsRequest()
+	req.Symbol(symbol)
+
+	if options.StartTime != nil {
+		if time.Since(*options.StartTime) > queryMaxDuration {
+			return nil, fmt.Errorf("start time from the last 90 days can be queried, got: %s", options.StartTime)
+		}
+		req.StartTime(options.StartTime.UnixMilli())
+	}
+
+	if options.EndTime != nil {
+		if options.StartTime == nil {
+			return nil, errors.New("start time is required for query trades if you take end time")
+		}
+		if options.EndTime.Before(*options.StartTime) {
+			return nil, fmt.Errorf("end time %s before start %s", *options.EndTime, *options.StartTime)
+		}
+		if options.EndTime.Sub(*options.StartTime) > queryMaxDuration {
+			return nil, fmt.Errorf("start time %s and end time %s cannot greater than 90 days", options.StartTime, options.EndTime)
+		}
+		req.EndTime(options.EndTime.UnixMilli())
+	}
+
+	limit := options.Limit
+	if limit > queryLimit || limit <= 0 {
+		log.Debugf("limtit is exceeded or zero, update to %d, got: %d", queryLimit, options.Limit)
+		limit = queryLimit
+	}
+	req.Limit(strconv.FormatInt(limit, 10))
+
+	if err := queryTradeRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("trade rate limiter wait error: %w", err)
+	}
+	response, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query trades, err: %w", err)
+	}
+
+	var errs error
+	for _, trade := range response {
+		res, err := toGlobalTrade(trade)
+		if err != nil {
+			errs = multierr.Append(errs, err)
+			continue
+		}
+		trades = append(trades, *res)
+	}
+
+	if errs != nil {
+		return nil, errs
+	}
+
+	return trades, nil
 }

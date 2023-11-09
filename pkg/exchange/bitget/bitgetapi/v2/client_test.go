@@ -58,4 +58,11 @@ func TestClient(t *testing.T) {
 
 		t.Logf("place order resp: %+v", req)
 	})
+
+	t.Run("GetTradeFillsRequest", func(t *testing.T) {
+		req, err := client.NewGetTradeFillsRequest().Symbol("APEUSDT").Do(ctx)
+		assert.NoError(t, err)
+
+		t.Logf("get trade fills resp: %+v", req)
+	})
 }
