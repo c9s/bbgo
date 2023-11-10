@@ -205,6 +205,12 @@ func (g *GetTradesRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetTradesRequest) GetPath() string {
+	return "/spot/v3/private/my-trades"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetTradesRequest) Do(ctx context.Context) (*TradesResponse, error) {
 
 	// no body params
@@ -214,7 +220,9 @@ func (g *GetTradesRequest) Do(ctx context.Context) (*TradesResponse, error) {
 		return nil, err
 	}
 
-	apiURL := "/spot/v3/private/my-trades"
+	var apiURL string
+
+	apiURL = g.GetPath()
 
 	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
@@ -229,6 +237,16 @@ func (g *GetTradesRequest) Do(ctx context.Context) (*TradesResponse, error) {
 	var apiResponse bybitapi.APIResponse
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+	validator, ok := interface{}(apiResponse).(responseValidator)
+	if ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	var data TradesResponse
 	if err := json.Unmarshal(apiResponse.Result, &data); err != nil {

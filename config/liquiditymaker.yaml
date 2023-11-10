@@ -1,0 +1,54 @@
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: max
+    makerFeeRate: 0%
+    takerFeeRate: 0.025%
+
+#services:
+#  googleSpreadSheet:
+#    jsonTokenFile: ".credentials/google-cloud/service-account-json-token.json"
+#    spreadSheetId: "YOUR_SPREADSHEET_ID"
+
+exchangeStrategies:
+- on: max
+  liquiditymaker:
+    symbol: &symbol USDTTWD
+
+    ## adjustmentUpdateInterval is the interval for adjusting position
+    adjustmentUpdateInterval: 1m
+
+    ## liquidityUpdateInterval is the interval for updating liquidity orders
+    liquidityUpdateInterval: 1h
+
+    numOfLiquidityLayers: 30
+    askLiquidityAmount: 20_000.0
+    bidLiquidityAmount: 20_000.0
+    liquidityPriceRange: 2%
+    useLastTradePrice: true
+    spread: 1.1%
+
+    liquidityScale:
+      exp:
+        domain: [1, 30]
+        range: [1, 4]
+
+    ## maxExposure controls how much balance should be used for placing the maker orders
+    maxExposure: 200_000
+    minProfit: 0.01%
+
+
+backtest:
+  sessions:
+    - max
+  startTime: "2023-05-20"
+  endTime: "2023-06-01"
+  symbols:
+  - *symbol
+  account:
+    max:
+      makerFeeRate: 0.0%
+      takerFeeRate: 0.025%
+      balances:
+        USDT: 5000
+        TWD: 150_000

@@ -262,6 +262,12 @@ func (g *GetOrderHistoriesRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetOrderHistoriesRequest) GetPath() string {
+	return "/v5/order/history"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetOrderHistoriesRequest) Do(ctx context.Context) (*OrdersResponse, error) {
 
 	// no body params
@@ -271,7 +277,9 @@ func (g *GetOrderHistoriesRequest) Do(ctx context.Context) (*OrdersResponse, err
 		return nil, err
 	}
 
-	apiURL := "/v5/order/history"
+	var apiURL string
+
+	apiURL = g.GetPath()
 
 	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
@@ -286,6 +294,16 @@ func (g *GetOrderHistoriesRequest) Do(ctx context.Context) (*OrdersResponse, err
 	var apiResponse APIResponse
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+	validator, ok := interface{}(apiResponse).(responseValidator)
+	if ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	var data OrdersResponse
 	if err := json.Unmarshal(apiResponse.Result, &data); err != nil {
