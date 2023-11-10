@@ -83,8 +83,7 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	// TODO implement me
-	panic("implement me")
+	return NewStream(e.key, e.secret, e.passphrase)
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
