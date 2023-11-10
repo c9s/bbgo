@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -22,6 +23,11 @@ const (
 var (
 	// wsAuthRequest specifies the duration for which a websocket request's authentication is valid.
 	wsAuthRequest = 10 * time.Second
+	// The default taker/maker fees can help us in estimating trading fees in the SPOT market, because trade fees are not
+	// provided for traditional accounts on Bybit.
+	// https://www.bybit.com/en-US/help-center/article/Trading-Fee-Structure
+	defaultTakerFee = fixedpoint.NewFromFloat(0.001)
+	defaultMakerFee = fixedpoint.NewFromFloat(0.001)
 )
 
 // MarketInfoProvider calculates trade fees since trading fees are not supported by streaming.
@@ -47,8 +53,8 @@ type Stream struct {
 
 	key, secret        string
 	streamDataProvider StreamDataProvider
-	// TODO: update the fee rate at 7:00 am UTC; rotation required.
-	symbolFeeDetails map[string]*symbolFeeDetail
+	feeRateProvider    *feeRatePoller
+	marketsInfo        types.MarketMap
 
 	bookEventCallbacks        []func(e BookEvent)
 	marketTradeEventCallbacks []func(e []MarketTradeEvent)
@@ -65,13 +71,23 @@ func NewStream(key, secret string, userDataProvider StreamDataProvider) *Stream 
 		key:                key,
 		secret:             secret,
 		streamDataProvider: userDataProvider,
+		feeRateProvider:    newFeeRatePoller(userDataProvider),
 	}
 
 	stream.SetEndpointCreator(stream.createEndpoint)
 	stream.SetParser(stream.parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetHeartBeat(stream.ping)
-	stream.SetBeforeConnect(stream.getAllFeeRates)
+	stream.SetBeforeConnect(func(ctx context.Context) (err error) {
+		go stream.feeRateProvider.Start(ctx)
+
+		stream.marketsInfo, err = stream.streamDataProvider.QueryMarkets(ctx)
+		if err != nil {
+			log.WithError(err).Error("failed to query market info before to connect stream")
+			return err
+		}
+		return nil
+	})
 	stream.OnConnect(stream.handlerConnect)
 	stream.OnAuth(stream.handleAuthEvent)
 
@@ -403,67 +419,38 @@ func (s *Stream) handleKLineEvent(klineEvent KLineEvent) {
 
 func (s *Stream) handleTradeEvent(events []TradeEvent) {
 	for _, event := range events {
-		feeRate, found := s.symbolFeeDetails[event.Symbol]
+		feeRate, found := s.feeRateProvider.Get(event.Symbol)
 		if !found {
-			log.Warnf("unexpected symbol found, fee rate not supported, symbol: %s", event.Symbol)
-			continue
+			feeRate = symbolFeeDetail{
+				FeeRate: bybitapi.FeeRate{
+					Symbol:       event.Symbol,
+					TakerFeeRate: defaultTakerFee,
+					MakerFeeRate: defaultMakerFee,
+				},
+				BaseCoin:  "",
+				QuoteCoin: "",
+			}
+
+			if market, ok := s.marketsInfo[event.Symbol]; ok {
+				feeRate.BaseCoin = market.BaseCurrency
+				feeRate.QuoteCoin = market.QuoteCurrency
+			}
+
+			// The error log level was utilized due to a detected discrepancy in the fee calculations.
+			log.Errorf("failed to get %s fee rate, use default taker fee %f, maker fee %f, base coin: %s, quote coin: %s",
+				event.Symbol,
+				feeRate.TakerFeeRate.Float64(),
+				feeRate.MakerFeeRate.Float64(),
+				feeRate.BaseCoin,
+				feeRate.QuoteCoin,
+			)
 		}
 
-		gTrade, err := event.toGlobalTrade(*feeRate)
+		gTrade, err := event.toGlobalTrade(feeRate)
 		if err != nil {
 			log.WithError(err).Errorf("unable to convert: %+v", event)
 			continue
 		}
 		s.StandardStream.EmitTradeUpdate(*gTrade)
 	}
-}
-
-type symbolFeeDetail struct {
-	bybitapi.FeeRate
-
-	BaseCoin  string
-	QuoteCoin string
-}
-
-// getAllFeeRates retrieves all fee rates from the Bybit API and then fetches markets to ensure the base coin and quote coin
-// are correct.
-func (e *Stream) getAllFeeRates(ctx context.Context) error {
-	feeRates, err := e.streamDataProvider.GetAllFeeRates(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to call get fee rates: %w", err)
-	}
-
-	symbolMap := map[string]*symbolFeeDetail{}
-	for _, f := range feeRates.List {
-		if _, found := symbolMap[f.Symbol]; !found {
-			symbolMap[f.Symbol] = &symbolFeeDetail{FeeRate: f}
-		}
-	}
-
-	mkts, err := e.streamDataProvider.QueryMarkets(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get markets: %w", err)
-	}
-
-	// update base coin, quote coin into symbolFeeDetail
-	for _, mkt := range mkts {
-		feeRate, found := symbolMap[mkt.Symbol]
-		if !found {
-			continue
-		}
-
-		feeRate.BaseCoin = mkt.BaseCurrency
-		feeRate.QuoteCoin = mkt.QuoteCurrency
-	}
-
-	// remove trading pairs that are not present in spot market.
-	for k, v := range symbolMap {
-		if len(v.BaseCoin) == 0 || len(v.QuoteCoin) == 0 {
-			log.Debugf("related market not found: %s, skipping the associated trade", k)
-			delete(symbolMap, k)
-		}
-	}
-
-	e.symbolFeeDetails = symbolMap
-	return nil
 }

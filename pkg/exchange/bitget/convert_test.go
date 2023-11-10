@@ -1,11 +1,13 @@
 package bitget
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
+	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -142,4 +144,438 @@ func Test_toGlobalTicker(t *testing.T) {
 		Buy:    fixedpoint.NewFromFloat(24013.94),
 		Sell:   fixedpoint.NewFromFloat(24014.06),
 	}, toGlobalTicker(ticker))
+}
+
+func Test_toGlobalSideType(t *testing.T) {
+	side, err := toGlobalSideType(v2.SideTypeBuy)
+	assert.NoError(t, err)
+	assert.Equal(t, types.SideTypeBuy, side)
+
+	side, err = toGlobalSideType(v2.SideTypeSell)
+	assert.NoError(t, err)
+	assert.Equal(t, types.SideTypeSell, side)
+
+	_, err = toGlobalSideType("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_toGlobalOrderType(t *testing.T) {
+	orderType, err := toGlobalOrderType(v2.OrderTypeMarket)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderTypeMarket, orderType)
+
+	orderType, err = toGlobalOrderType(v2.OrderTypeLimit)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderTypeLimit, orderType)
+
+	_, err = toGlobalOrderType("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_toGlobalOrderStatus(t *testing.T) {
+	status, err := toGlobalOrderStatus(v2.OrderStatusInit)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusNew, status)
+
+	status, err = toGlobalOrderStatus(v2.OrderStatusNew)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusNew, status)
+
+	status, err = toGlobalOrderStatus(v2.OrderStatusLive)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusNew, status)
+
+	status, err = toGlobalOrderStatus(v2.OrderStatusFilled)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusFilled, status)
+
+	status, err = toGlobalOrderStatus(v2.OrderStatusPartialFilled)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusPartiallyFilled, status)
+
+	status, err = toGlobalOrderStatus(v2.OrderStatusCancelled)
+	assert.NoError(t, err)
+	assert.Equal(t, types.OrderStatusCanceled, status)
+
+	_, err = toGlobalOrderStatus("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_unfilledOrderToGlobalOrder(t *testing.T) {
+	var (
+		assert        = assert.New(t)
+		orderId       = 1105087175647989764
+		unfilledOrder = v2.UnfilledOrder{
+			Symbol:           "BTCUSDT",
+			OrderId:          types.StrInt64(orderId),
+			ClientOrderId:    "74b86af3-6098-479c-acac-bfb074c067f3",
+			PriceAvg:         fixedpoint.NewFromFloat(1.2),
+			Size:             fixedpoint.NewFromFloat(5),
+			OrderType:        v2.OrderTypeLimit,
+			Side:             v2.SideTypeBuy,
+			Status:           v2.OrderStatusLive,
+			BasePrice:        fixedpoint.NewFromFloat(0),
+			BaseVolume:       fixedpoint.NewFromFloat(0),
+			QuoteVolume:      fixedpoint.NewFromFloat(0),
+			EnterPointSource: "API",
+			OrderSource:      "normal",
+			CTime:            types.NewMillisecondTimestampFromInt(1660704288118),
+			UTime:            types.NewMillisecondTimestampFromInt(1660704288118),
+		}
+	)
+
+	t.Run("succeeds", func(t *testing.T) {
+		order, err := unfilledOrderToGlobalOrder(unfilledOrder)
+		assert.NoError(err)
+		assert.Equal(&types.Order{
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: "74b86af3-6098-479c-acac-bfb074c067f3",
+				Symbol:        "BTCUSDT",
+				Side:          types.SideTypeBuy,
+				Type:          types.OrderTypeLimit,
+				Quantity:      fixedpoint.NewFromFloat(5),
+				Price:         fixedpoint.NewFromFloat(1.2),
+				TimeInForce:   types.TimeInForceGTC,
+			},
+			Exchange:         types.ExchangeBitget,
+			OrderID:          uint64(orderId),
+			UUID:             strconv.FormatInt(int64(orderId), 10),
+			Status:           types.OrderStatusNew,
+			ExecutedQuantity: fixedpoint.NewFromFloat(0),
+			IsWorking:        true,
+			CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+			UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+		}, order)
+	})
+
+	t.Run("failed to convert side", func(t *testing.T) {
+		newOrder := unfilledOrder
+		newOrder.Side = "xxx"
+
+		_, err := unfilledOrderToGlobalOrder(newOrder)
+		assert.ErrorContains(err, "xxx")
+	})
+
+	t.Run("failed to convert oder type", func(t *testing.T) {
+		newOrder := unfilledOrder
+		newOrder.OrderType = "xxx"
+
+		_, err := unfilledOrderToGlobalOrder(newOrder)
+		assert.ErrorContains(err, "xxx")
+	})
+
+	t.Run("failed to convert oder status", func(t *testing.T) {
+		newOrder := unfilledOrder
+		newOrder.Status = "xxx"
+
+		_, err := unfilledOrderToGlobalOrder(newOrder)
+		assert.ErrorContains(err, "xxx")
+	})
+}
+
+func Test_toGlobalOrder(t *testing.T) {
+	var (
+		assert        = assert.New(t)
+		orderId       = 1105087175647989764
+		unfilledOrder = v2.OrderDetail{
+			UserId:           123456,
+			Symbol:           "BTCUSDT",
+			OrderId:          types.StrInt64(orderId),
+			ClientOrderId:    "74b86af3-6098-479c-acac-bfb074c067f3",
+			Price:            fixedpoint.NewFromFloat(1.2),
+			Size:             fixedpoint.NewFromFloat(5),
+			OrderType:        v2.OrderTypeLimit,
+			Side:             v2.SideTypeBuy,
+			Status:           v2.OrderStatusFilled,
+			PriceAvg:         fixedpoint.NewFromFloat(1.4),
+			BaseVolume:       fixedpoint.NewFromFloat(5),
+			QuoteVolume:      fixedpoint.NewFromFloat(7.0005),
+			EnterPointSource: "API",
+			FeeDetailRaw:     `{\"newFees\":{\"c\":0,\"d\":0,\"deduction\":false,\"r\":-0.0070005,\"t\":-0.0070005,\"totalDeductionFee\":0},\"USDT\":{\"deduction\":false,\"feeCoinCode\":\"USDT\",\"totalDeductionFee\":0,\"totalFee\":-0.007000500000}}`,
+			OrderSource:      "normal",
+			CTime:            types.NewMillisecondTimestampFromInt(1660704288118),
+			UTime:            types.NewMillisecondTimestampFromInt(1660704288118),
+		}
+
+		expOrder = &types.Order{
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: "74b86af3-6098-479c-acac-bfb074c067f3",
+				Symbol:        "BTCUSDT",
+				Side:          types.SideTypeBuy,
+				Type:          types.OrderTypeLimit,
+				Quantity:      fixedpoint.NewFromFloat(5),
+				Price:         fixedpoint.NewFromFloat(1.2),
+				TimeInForce:   types.TimeInForceGTC,
+			},
+			Exchange:         types.ExchangeBitget,
+			OrderID:          uint64(orderId),
+			UUID:             strconv.FormatInt(int64(orderId), 10),
+			Status:           types.OrderStatusFilled,
+			ExecutedQuantity: fixedpoint.NewFromFloat(5),
+			IsWorking:        false,
+			CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+			UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+		}
+	)
+
+	t.Run("succeeds with limit buy", func(t *testing.T) {
+		order, err := toGlobalOrder(unfilledOrder)
+		assert.NoError(err)
+		assert.Equal(expOrder, order)
+	})
+
+	t.Run("succeeds with limit sell", func(t *testing.T) {
+		newUnfilledOrder := unfilledOrder
+		newUnfilledOrder.Side = v2.SideTypeSell
+
+		newExpOrder := *expOrder
+		newExpOrder.Side = types.SideTypeSell
+
+		order, err := toGlobalOrder(newUnfilledOrder)
+		assert.NoError(err)
+		assert.Equal(&newExpOrder, order)
+	})
+
+	t.Run("succeeds with market sell", func(t *testing.T) {
+		newUnfilledOrder := unfilledOrder
+		newUnfilledOrder.Side = v2.SideTypeSell
+		newUnfilledOrder.OrderType = v2.OrderTypeMarket
+
+		newExpOrder := *expOrder
+		newExpOrder.Side = types.SideTypeSell
+		newExpOrder.Type = types.OrderTypeMarket
+		newExpOrder.Price = newUnfilledOrder.PriceAvg
+
+		order, err := toGlobalOrder(newUnfilledOrder)
+		assert.NoError(err)
+		assert.Equal(&newExpOrder, order)
+	})
+
+	t.Run("succeeds with market buy", func(t *testing.T) {
+		newUnfilledOrder := unfilledOrder
+		newUnfilledOrder.Side = v2.SideTypeBuy
+		newUnfilledOrder.OrderType = v2.OrderTypeMarket
+
+		newExpOrder := *expOrder
+		newExpOrder.Side = types.SideTypeBuy
+		newExpOrder.Type = types.OrderTypeMarket
+		newExpOrder.Price = newUnfilledOrder.PriceAvg
+		newExpOrder.Quantity = newUnfilledOrder.BaseVolume
+
+		order, err := toGlobalOrder(newUnfilledOrder)
+		assert.NoError(err)
+		assert.Equal(&newExpOrder, order)
+	})
+
+	t.Run("succeeds with limit buy", func(t *testing.T) {
+		order, err := toGlobalOrder(unfilledOrder)
+		assert.NoError(err)
+		assert.Equal(&types.Order{
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: "74b86af3-6098-479c-acac-bfb074c067f3",
+				Symbol:        "BTCUSDT",
+				Side:          types.SideTypeBuy,
+				Type:          types.OrderTypeLimit,
+				Quantity:      fixedpoint.NewFromFloat(5),
+				Price:         fixedpoint.NewFromFloat(1.2),
+				TimeInForce:   types.TimeInForceGTC,
+			},
+			Exchange:         types.ExchangeBitget,
+			OrderID:          uint64(orderId),
+			UUID:             strconv.FormatInt(int64(orderId), 10),
+			Status:           types.OrderStatusFilled,
+			ExecutedQuantity: fixedpoint.NewFromFloat(5),
+			IsWorking:        false,
+			CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+			UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+		}, order)
+	})
+
+	t.Run("failed to convert side", func(t *testing.T) {
+		newOrder := unfilledOrder
+		newOrder.Side = "xxx"
+
+		_, err := toGlobalOrder(newOrder)
+		assert.ErrorContains(err, "xxx")
+	})
+
+	t.Run("failed to convert oder type", func(t *testing.T) {
+		newOrder := unfilledOrder
+		newOrder.OrderType = "xxx"
+
+		_, err := toGlobalOrder(newOrder)
+		assert.ErrorContains(err, "xxx")
+	})
+
+	t.Run("failed to convert oder status", func(t *testing.T) {
+		newOrder := unfilledOrder
+		newOrder.Status = "xxx"
+
+		_, err := toGlobalOrder(newOrder)
+		assert.ErrorContains(err, "xxx")
+	})
+}
+
+func Test_processMarketBuyQuantity(t *testing.T) {
+	var (
+		assert            = assert.New(t)
+		filledBaseCoinQty = fixedpoint.NewFromFloat(3.5648)
+		filledPrice       = fixedpoint.NewFromFloat(4.99998848)
+		priceAvg          = fixedpoint.NewFromFloat(1.4026)
+		buyQty            = fixedpoint.NewFromFloat(5)
+	)
+
+	t.Run("zero quantity on Init/New/Live/Cancelled", func(t *testing.T) {
+		qty, err := processMarketBuyQuantity(filledBaseCoinQty, filledPrice, priceAvg, buyQty, v2.OrderStatusInit)
+		assert.NoError(err)
+		assert.Equal(fixedpoint.Zero, qty)
+
+		qty, err = processMarketBuyQuantity(filledBaseCoinQty, filledPrice, priceAvg, buyQty, v2.OrderStatusNew)
+		assert.NoError(err)
+		assert.Equal(fixedpoint.Zero, qty)
+
+		qty, err = processMarketBuyQuantity(filledBaseCoinQty, filledPrice, priceAvg, buyQty, v2.OrderStatusLive)
+		assert.NoError(err)
+		assert.Equal(fixedpoint.Zero, qty)
+
+		qty, err = processMarketBuyQuantity(filledBaseCoinQty, filledPrice, priceAvg, buyQty, v2.OrderStatusCancelled)
+		assert.NoError(err)
+		assert.Equal(fixedpoint.Zero, qty)
+	})
+
+	t.Run("5 on PartialFilled", func(t *testing.T) {
+		priceAvg := fixedpoint.NewFromFloat(2)
+		buyQty := fixedpoint.NewFromFloat(10)
+		filledPrice := fixedpoint.NewFromFloat(4)
+		filledBaseCoinQty := fixedpoint.NewFromFloat(2)
+
+		qty, err := processMarketBuyQuantity(filledBaseCoinQty, filledPrice, priceAvg, buyQty, v2.OrderStatusPartialFilled)
+		assert.NoError(err)
+		assert.Equal(fixedpoint.NewFromFloat(5), qty)
+	})
+
+	t.Run("3.5648 on Filled", func(t *testing.T) {
+		qty, err := processMarketBuyQuantity(filledBaseCoinQty, filledPrice, priceAvg, buyQty, v2.OrderStatusFilled)
+		assert.NoError(err)
+		assert.Equal(fixedpoint.NewFromFloat(3.5648), qty)
+	})
+
+	t.Run("unexpected order status", func(t *testing.T) {
+		_, err := processMarketBuyQuantity(filledBaseCoinQty, filledPrice, priceAvg, buyQty, "xxx")
+		assert.ErrorContains(err, "xxx")
+	})
+}
+
+func Test_toLocalOrderType(t *testing.T) {
+	orderType, err := toLocalOrderType(types.OrderTypeLimit)
+	assert.NoError(t, err)
+	assert.Equal(t, v2.OrderTypeLimit, orderType)
+
+	orderType, err = toLocalOrderType(types.OrderTypeMarket)
+	assert.NoError(t, err)
+	assert.Equal(t, v2.OrderTypeMarket, orderType)
+
+	_, err = toLocalOrderType("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_toLocalSide(t *testing.T) {
+	orderType, err := toLocalSide(types.SideTypeSell)
+	assert.NoError(t, err)
+	assert.Equal(t, v2.SideTypeSell, orderType)
+
+	orderType, err = toLocalSide(types.SideTypeBuy)
+	assert.NoError(t, err)
+	assert.Equal(t, v2.SideTypeBuy, orderType)
+
+	_, err = toLocalOrderType("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_isMaker(t *testing.T) {
+	isM, err := isMaker(v2.TradeTaker)
+	assert.NoError(t, err)
+	assert.False(t, isM)
+
+	isM, err = isMaker(v2.TradeMaker)
+	assert.NoError(t, err)
+	assert.True(t, isM)
+
+	_, err = isMaker("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_isFeeDiscount(t *testing.T) {
+	isDiscount, err := isFeeDiscount(v2.DiscountNo)
+	assert.NoError(t, err)
+	assert.False(t, isDiscount)
+
+	isDiscount, err = isFeeDiscount(v2.DiscountYes)
+	assert.NoError(t, err)
+	assert.True(t, isDiscount)
+
+	_, err = isFeeDiscount("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_toGlobalTrade(t *testing.T) {
+	// {
+	//   "userId":"8672173294",
+	//   "symbol":"APEUSDT",
+	//   "orderId":"1104337778433757184",
+	//   "tradeId":"1104337778504044545",
+	//   "orderType":"limit",
+	//   "side":"sell",
+	//   "priceAvg":"1.4001",
+	//   "size":"5",
+	//   "amount":"7.0005",
+	//   "feeDetail":{
+	//      "deduction":"no",
+	//      "feeCoin":"USDT",
+	//      "totalDeductionFee":"",
+	//      "totalFee":"-0.0070005"
+	//   },
+	//   "tradeScope":"taker",
+	//   "cTime":"1699020564676",
+	//   "uTime":"1699020564687"
+	//}
+	trade := v2.Trade{
+		UserId:    types.StrInt64(8672173294),
+		Symbol:    "APEUSDT",
+		OrderId:   types.StrInt64(1104337778433757184),
+		TradeId:   types.StrInt64(1104337778504044545),
+		OrderType: v2.OrderTypeLimit,
+		Side:      v2.SideTypeSell,
+		PriceAvg:  fixedpoint.NewFromFloat(1.4001),
+		Size:      fixedpoint.NewFromFloat(5),
+		Amount:    fixedpoint.NewFromFloat(7.0005),
+		FeeDetail: v2.TradeFee{
+			Deduction:         "no",
+			FeeCoin:           "USDT",
+			TotalDeductionFee: fixedpoint.Zero,
+			TotalFee:          fixedpoint.NewFromFloat(-0.0070005),
+		},
+		TradeScope: v2.TradeTaker,
+		CTime:      types.NewMillisecondTimestampFromInt(1699020564676),
+		UTime:      types.NewMillisecondTimestampFromInt(1699020564687),
+	}
+
+	res, err := toGlobalTrade(trade)
+	assert.NoError(t, err)
+	assert.Equal(t, &types.Trade{
+		ID:            uint64(1104337778504044545),
+		OrderID:       uint64(1104337778433757184),
+		Exchange:      types.ExchangeBitget,
+		Price:         fixedpoint.NewFromFloat(1.4001),
+		Quantity:      fixedpoint.NewFromFloat(5),
+		QuoteQuantity: fixedpoint.NewFromFloat(7.0005),
+		Symbol:        "APEUSDT",
+		Side:          types.SideTypeSell,
+		IsBuyer:       false,
+		IsMaker:       false,
+		Time:          types.Time(types.NewMillisecondTimestampFromInt(1699020564676)),
+		Fee:           fixedpoint.NewFromFloat(0.0070005),
+		FeeCurrency:   "USDT",
+		FeeDiscounted: false,
+	}, res)
 }

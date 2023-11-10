@@ -66,22 +66,25 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 		exchange:          s.session.Exchange,
 	}
 
+	var lastRecoverTime time.Time
+
 	for {
 		select {
-
 		case <-ctx.Done():
 			return
 
 		case <-ticker.C:
-			if err := syncActiveOrders(ctx, opts); err != nil {
-				log.WithError(err).Errorf("unable to sync active orders")
-			}
-
+			s.recoverC <- struct{}{}
 		case <-s.recoverC:
-			if err := syncActiveOrders(ctx, opts); err != nil {
-				log.WithError(err).Errorf("unable to sync active orders")
+			if !time.Now().After(lastRecoverTime.Add(10 * time.Minute)) {
+				continue
 			}
 
+			if err := syncActiveOrders(ctx, opts); err != nil {
+				log.WithError(err).Errorf("unable to sync active orders")
+			} else {
+				lastRecoverTime = time.Now()
+			}
 		}
 	}
 }
@@ -116,19 +119,17 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 			// no need to sync active order already in active orderbook, because we only need to know if it filled or not.
 			delete(openOrdersMap, activeOrder.OrderID)
 		} else {
-			opts.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
-			if activeOrder.UpdateTime.After(syncBefore) {
-				opts.logger.Infof("active order #%d is updated in 3 min, skip updating...", activeOrder.OrderID)
-				continue
-			}
+			opts.logger.Infof("[ActiveOrderRecover] found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
 
-			// sleep 100ms to avoid DDOS
-			time.Sleep(100 * time.Millisecond)
-
-			if err := syncActiveOrder(ctx, opts.activeOrderBook, opts.orderQueryService, activeOrder.OrderID); err != nil {
+			isActiveOrderBookUpdated, err := syncActiveOrder(ctx, opts.activeOrderBook, opts.orderQueryService, activeOrder.OrderID, syncBefore)
+			if err != nil {
 				opts.logger.WithError(err).Errorf("[ActiveOrderRecover] unable to query order #%d", activeOrder.OrderID)
 				errs = multierr.Append(errs, err)
 				continue
+			}
+
+			if !isActiveOrderBookUpdated {
+				opts.logger.Infof("[ActiveOrderRecover] active order #%d is updated in 3 min, skip updating...", activeOrder.OrderID)
 			}
 		}
 	}
