@@ -13,12 +13,14 @@ import (
 type InstType string
 
 const (
-	instSp InstType = "sp"
+	instSp   InstType = "sp"
+	instSpV2 InstType = "SPOT"
 )
 
 type ChannelType string
 
 const (
+	ChannelAccount ChannelType = "account"
 	// ChannelOrderBook snapshot and update might return less than 200 bids/asks as per symbol's orderbook various from
 	// each other; The number of bids/asks is not a fixed value and may vary in the future
 	ChannelOrderBook ChannelType = "books"
@@ -34,6 +36,7 @@ type WsArg struct {
 	Channel  ChannelType `json:"channel"`
 	// InstId Instrument ID. e.q. BTCUSDT, ETHUSDT
 	InstId string `json:"instId"`
+	Coin   string `json:"coin"`
 
 	ApiKey     string `json:"apiKey"`
 	Passphrase string `json:"passphrase"`
@@ -93,6 +96,10 @@ func (w *WsEvent) IsValid() error {
 	default:
 		return fmt.Errorf("unexpected event type: %+v", w)
 	}
+}
+
+func (w *WsEvent) IsAuthenticated() bool {
+	return w.Event == WsEventLogin && w.Code == 0
 }
 
 type ActionType string
@@ -397,4 +404,24 @@ type KLineEvent struct {
 func (k KLineEvent) CacheKey() string {
 	// e.q: candle5m.BTCUSDT
 	return fmt.Sprintf("%s.%s", k.channel, k.instId)
+}
+
+type Balance struct {
+	Coin      string           `json:"coin"`
+	Available fixedpoint.Value `json:"available"`
+	// Amount of frozen assets Usually frozen when the order is placed
+	Frozen fixedpoint.Value `json:"frozen"`
+	// Amount of locked assets Locked assests required to become a fiat merchants, etc.
+	Locked fixedpoint.Value `json:"locked"`
+	// Restricted availability For spot copy trading
+	LimitAvailable fixedpoint.Value           `json:"limitAvailable"`
+	UTime          types.MillisecondTimestamp `json:"uTime"`
+}
+
+type AccountEvent struct {
+	Balances []Balance
+
+	// internal use
+	actionType ActionType
+	instId     string
 }
