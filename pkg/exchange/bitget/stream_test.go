@@ -128,6 +128,13 @@ func TestStream(t *testing.T) {
 		err := s.Connect(context.Background())
 		assert.NoError(t, err)
 
+		s.OnBalanceSnapshot(func(balances types.BalanceMap) {
+			t.Log("get balances", balances)
+		})
+		s.OnBalanceUpdate(func(balances types.BalanceMap) {
+			t.Log("get update", balances)
+		})
+
 		c := make(chan struct{})
 		<-c
 	})
