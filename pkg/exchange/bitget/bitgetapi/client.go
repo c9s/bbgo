@@ -51,7 +51,9 @@ func (c *RestClient) Auth(key, secret, passphrase string) {
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(
+	ctx context.Context, method, refURL string, params url.Values, payload interface{},
+) (*http.Request, error) {
 	if len(c.key) == 0 {
 		return nil, errors.New("empty api key")
 	}
@@ -107,6 +109,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	req.Header.Add("ACCESS-SIGN", signature)
 	req.Header.Add("ACCESS-TIMESTAMP", timestamp)
 	req.Header.Add("ACCESS-PASSPHRASE", c.passphrase)
+	req.Header.Add("X-CHANNEL-API-CODE", "7575765263")
 	return req, nil
 }
 
