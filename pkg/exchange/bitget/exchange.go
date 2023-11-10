@@ -42,6 +42,8 @@ var (
 	queryOpenOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
 	// closedQueryOrdersRateLimiter has its own rate limit. https://www.bitget.com/api-doc/spot/trade/Get-History-Orders
 	closedQueryOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/15), 5)
+	// submitOrdersRateLimiter has its own rate limit. https://www.bitget.com/zh-CN/api-doc/spot/trade/Place-Order
+	submitOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
 )
 
 type Exchange struct {
@@ -183,9 +185,114 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return bals, nil
 }
 
+// SubmitOrder submits an order.
+//
+// Remark:
+// 1. We support only GTC for time-in-force, because the response from queryOrder does not include time-in-force information.
+// 2. For market buy orders, the size unit is quote currency, whereas the unit for order.Quantity is in base currency.
+// Therefore, we need to calculate the equivalent quote currency amount based on the ticker data.
+//
+// Note that there is a bug in Bitget where you can place a market order with the 'post_only' option successfully,
+// which should not be possible. The issue has been reported.
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
-	// TODO implement me
-	panic("implement me")
+	if len(order.Market.Symbol) == 0 {
+		return nil, fmt.Errorf("order.Market.Symbol is required: %+v", order)
+	}
+
+	req := e.v2Client.NewPlaceOrderRequest()
+	req.Symbol(order.Market.Symbol)
+
+	// set order type
+	orderType, err := toLocalOrderType(order.Type)
+	if err != nil {
+		return nil, err
+	}
+	req.OrderType(orderType)
+
+	// set side
+	side, err := toLocalSide(order.Side)
+	if err != nil {
+		return nil, err
+	}
+	req.Side(side)
+
+	// set quantity
+	qty := order.Quantity
+	// if the order is market buy, the quantity is quote coin, instead of base coin. so we need to convert it.
+	if order.Type == types.OrderTypeMarket && order.Side == types.SideTypeBuy {
+		ticker, err := e.QueryTicker(ctx, order.Market.Symbol)
+		if err != nil {
+			return nil, err
+		}
+		qty = order.Quantity.Mul(ticker.Buy)
+	}
+	req.Size(order.Market.FormatQuantity(qty))
+
+	// we support only GTC/PostOnly, this is because:
+	// 1. We support only SPOT trading.
+	// 2. The query oepn/closed order does not including the `force` in SPOT.
+	// If we support FOK/IOC, but you can't query them, that would be unreasonable.
+	// The other case to consider is 'PostOnly', which is a trade-off because we want to support 'xmaker'.
+	if order.TimeInForce != types.TimeInForceGTC {
+		return nil, fmt.Errorf("time-in-force %s not supported", order.TimeInForce)
+	}
+	req.Force(v2.OrderForceGTC)
+	// set price
+	if order.Type == types.OrderTypeLimit || order.Type == types.OrderTypeLimitMaker {
+		req.Price(order.Market.FormatPrice(order.Price))
+
+		if order.Type == types.OrderTypeLimitMaker {
+			req.Force(v2.OrderForcePostOnly)
+		}
+	}
+
+	// set client order id
+	if len(order.ClientOrderID) > maxOrderIdLen {
+		return nil, fmt.Errorf("unexpected length of order id, got: %d", len(order.ClientOrderID))
+	}
+	if len(order.ClientOrderID) > 0 {
+		req.ClientOrderId(order.ClientOrderID)
+	}
+
+	if err := submitOrdersRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
+	}
+	res, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to place order, order: %#v, err: %w", order, err)
+	}
+
+	if len(res.OrderId) == 0 || (len(order.ClientOrderID) != 0 && res.ClientOrderId != order.ClientOrderID) {
+		return nil, fmt.Errorf("unexpected order id, resp: %#v, order: %#v", res, order)
+	}
+
+	orderId := res.OrderId
+	ordersResp, err := e.v2Client.NewGetUnfilledOrdersRequest().OrderId(orderId).Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query open order by order id: %s, err: %w", orderId, err)
+	}
+
+	switch len(ordersResp) {
+	case 0:
+		// The market order will be executed immediately, so we cannot retrieve it through the NewGetUnfilledOrdersRequest API.
+		// Try to get the order from the NewGetHistoryOrdersRequest API.
+		ordersResp, err := e.v2Client.NewGetHistoryOrdersRequest().OrderId(orderId).Do(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query history order by order id: %s, err: %w", orderId, err)
+		}
+
+		if len(ordersResp) != 1 {
+			return nil, fmt.Errorf("unexpected order length, order id: %s", orderId)
+		}
+
+		return toGlobalOrder(ordersResp[0])
+
+	case 1:
+		return unfilledOrderToGlobalOrder(ordersResp[0])
+
+	default:
+		return nil, fmt.Errorf("unexpected order length, order id: %s", orderId)
+	}
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
@@ -238,7 +345,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 // ** Since and Until cannot exceed 90 days. **
 // ** Since from the last 90 days can be queried. **
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	if since.Sub(time.Now()) > queryMaxDuration {
+	if time.Since(since) > queryMaxDuration {
 		return nil, fmt.Errorf("start time from the last 90 days can be queried, got: %s", since)
 	}
 	if until.Before(since) {

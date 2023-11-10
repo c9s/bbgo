@@ -243,3 +243,29 @@ func processMarketBuyQuantity(filledQty, filledPrice, priceAvg, buyQty fixedpoin
 		return fixedpoint.Zero, fmt.Errorf("failed to execute market buy quantity due to unexpected order status %s ", orderStatus)
 	}
 }
+
+func toLocalOrderType(orderType types.OrderType) (v2.OrderType, error) {
+	switch orderType {
+	case types.OrderTypeLimit:
+		return v2.OrderTypeLimit, nil
+
+	case types.OrderTypeMarket:
+		return v2.OrderTypeMarket, nil
+
+	default:
+		return "", fmt.Errorf("order type %s not supported", orderType)
+	}
+}
+
+func toLocalSide(side types.SideType) (v2.SideType, error) {
+	switch side {
+	case types.SideTypeSell:
+		return v2.SideTypeSell, nil
+
+	case types.SideTypeBuy:
+		return v2.SideTypeBuy, nil
+
+	default:
+		return "", fmt.Errorf("side type %s not supported", side)
+	}
+}
