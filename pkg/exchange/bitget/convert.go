@@ -109,6 +109,66 @@ func toGlobalOrderStatus(status v2.OrderStatus) (types.OrderStatus, error) {
 	}
 }
 
+func isMaker(s v2.TradeScope) (bool, error) {
+	switch s {
+	case v2.TradeMaker:
+		return true, nil
+
+	case v2.TradeTaker:
+		return false, nil
+
+	default:
+		return false, fmt.Errorf("unexpected trade scope: %s", s)
+	}
+}
+
+func isFeeDiscount(s v2.DiscountStatus) (bool, error) {
+	switch s {
+	case v2.DiscountYes:
+		return true, nil
+
+	case v2.DiscountNo:
+		return false, nil
+
+	default:
+		return false, fmt.Errorf("unexpected discount status: %s", s)
+	}
+}
+
+func toGlobalTrade(trade v2.Trade) (*types.Trade, error) {
+	side, err := toGlobalSideType(trade.Side)
+	if err != nil {
+		return nil, err
+	}
+
+	isMaker, err := isMaker(trade.TradeScope)
+	if err != nil {
+		return nil, err
+	}
+
+	isDiscount, err := isFeeDiscount(trade.FeeDetail.Deduction)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Trade{
+		ID:            uint64(trade.TradeId),
+		OrderID:       uint64(trade.OrderId),
+		Exchange:      types.ExchangeBitget,
+		Price:         trade.PriceAvg,
+		Quantity:      trade.Size,
+		QuoteQuantity: trade.Amount,
+		Symbol:        trade.Symbol,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       isMaker,
+		Time:          types.Time(trade.CTime),
+		Fee:           trade.FeeDetail.TotalFee.Abs(),
+		FeeCurrency:   trade.FeeDetail.FeeCoin,
+		FeeDiscounted: isDiscount,
+	}, nil
+}
+
 // unfilledOrderToGlobalOrder convert the local order to global.
 //
 // Note that the quantity unit, according official document: Base coin when orderType=limit; Quote coin when orderType=market
