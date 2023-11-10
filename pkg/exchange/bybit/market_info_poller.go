@@ -49,6 +49,7 @@ func (p *feeRatePoller) startLoop(ctx context.Context) {
 	if err != nil {
 		log.WithError(err).Warn("failed to initialize the fee rate, the ticker is scheduled to update it subsequently")
 	}
+	log.Infof("[edwin] get fee from initializer: %v", p.symbolFeeDetail)
 
 	ticker := time.NewTicker(feeRatePollingPeriod)
 	defer ticker.Stop()
@@ -64,6 +65,7 @@ func (p *feeRatePoller) startLoop(ctx context.Context) {
 			if err := p.poll(ctx); err != nil {
 				log.WithError(err).Warn("failed to update fee rate")
 			}
+			log.Infof("[edwin] get fee from poller %v", p.symbolFeeDetail)
 		}
 	}
 }
