@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/datasource/csvsource"
@@ -30,11 +29,9 @@ func TestVolumeProfile(t *testing.T) {
 	for _, candle := range candles {
 		stream.EmitKLineClosed(candle)
 	}
-	spew.Dump(ind)
-
-	assert.InDelta(t, 35359.26666666667, ind.VP.Low, 0.01, "VP.LOW")
-	assert.InDelta(t, 35569.12777777779, ind.VP.VAL, 0.01, "VP.VAL")
-	assert.InDelta(t, 35988.850000000006, ind.VP.POC, 0.01, "VP.POC")
-	assert.InDelta(t, 36408.572222222225, ind.VP.VAH, 0.01, "VP.VAH")
-	assert.InDelta(t, 36617.433333333334, ind.VP.High, 0.01, "VP.HIGH")
+	assert.InDelta(t, 36512.7, ind.VP.Low, 0.01, "VP.LOW")
+	assert.InDelta(t, 36512.7, ind.VP.VAL, 0.01, "VP.VAL")
+	assert.InDelta(t, 36518.574, ind.VP.POC, 0.01, "VP.POC")
+	assert.InDelta(t, 36530.322, ind.VP.VAH, 0.01, "VP.VAH")
+	assert.InDelta(t, 36617.433, ind.VP.High, 0.01, "VP.HIGH")
 }

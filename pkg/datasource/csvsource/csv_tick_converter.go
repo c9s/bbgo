@@ -71,13 +71,13 @@ func (c *CSVTickConverter) CsvTickToKLine(tick *CsvTick, interval types.Interval
 
 	currentCandle = c.klines[len(c.klines)-1]
 
-	if tick.Price.Float64() > currentCandle.High.Float64() {
+	if tick.Price.Compare(currentCandle.High) > 0 {
 		high = tick.Price
 	} else {
 		high = currentCandle.High
 	}
 
-	if tick.Price.Float64() < currentCandle.Low.Float64() {
+	if tick.Price.Compare(currentCandle.Low) < 0 {
 		low = tick.Price
 	} else {
 		low = currentCandle.Low

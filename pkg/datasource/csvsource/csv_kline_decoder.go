@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -79,17 +81,26 @@ func BinanceCSVKLineDecoder(record []string, interval time.Duration) (types.KLin
 	if err != nil {
 		return empty, ErrInvalidPriceFormat
 	}
-	volume, err := fixedpoint.NewFromString(record[5])
-	if err != nil {
-		return empty, ErrInvalidVolumeFormat
-	}
+
 	k.StartTime = types.NewTimeFromUnix(time.UnixMilli(msec).Unix(), 0)
 	k.EndTime = types.NewTimeFromUnix(k.StartTime.Time().Add(interval).Unix(), 0)
 	k.Open = open
 	k.High = high
 	k.Low = low
 	k.Close = closing
-	k.Volume = volume
+	k.Volume = fixedpoint.Zero
+
+	if len(record) == 6 {
+		spew.Dump(record)
+		volume, err := fixedpoint.NewFromString(record[5])
+		if err != nil {
+			return empty, ErrInvalidVolumeFormat
+		}
+
+		k.Volume = volume
+		spew.Dump(k)
+	}
+
 	return k, nil
 }
 
