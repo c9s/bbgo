@@ -11,13 +11,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var assertTickEq = func(t *testing.T, exp, act *CsvTick) {
-	assert.Equal(t, exp.Timestamp.Time(), act.Timestamp.Time())
-	assert.Equal(t, exp.Price.Compare(act.Price), 0)
-	assert.Equal(t, exp.Size.Compare(act.Size), 0)
-	assert.Equal(t, exp.HomeNotional.Compare(act.HomeNotional), 0)
-}
-
 func TestCSVTickReader_ReadWithBinanceDecoder(t *testing.T) {
 	tests := []struct {
 		name string
@@ -65,11 +58,18 @@ func TestCSVTickReader_ReadWithBinanceDecoder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reader := NewBinanceCSVTickReader(csv.NewReader(strings.NewReader(tt.give)))
-			kline, err := reader.Read(0)
+			tick, err := reader.Read(0)
 			if err == nil {
-				assertTickEq(t, tt.want, kline)
+				assertTickEqual(t, tt.want, tick)
 			}
 			assert.Equal(t, tt.err, err)
 		})
 	}
+}
+
+func assertTickEqual(t *testing.T, exp, act *CsvTick) {
+	assert.Equal(t, exp.Timestamp.Time(), act.Timestamp.Time())
+	assert.Equal(t, 0, exp.Price.Compare(act.Price))
+	assert.Equal(t, 0, exp.Size.Compare(act.Size))
+	assert.Equal(t, 0, exp.HomeNotional.Compare(act.HomeNotional))
 }

@@ -6,19 +6,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var assertKLineEq = func(t *testing.T, exp, act types.KLine) {
-	assert.Equal(t, exp.StartTime, act.StartTime)
-	assert.Equal(t, exp.Open.Compare(act.Open), 0)
-	assert.Equal(t, exp.High.Compare(act.High), 0)
-	assert.Equal(t, exp.Low.Compare(act.Low), 0)
-	assert.Equal(t, exp.Close.Compare(act.Close), 0)
-	assert.Equal(t, exp.Volume.Compare(act.Volume), 0)
+func assertKLineEq(t *testing.T, exp, act types.KLine, name string) {
+	assert.Equal(t, exp.StartTime, act.StartTime, name)
+	assert.Equal(t, 0, exp.Open.Compare(act.Open), name)
+	assert.Equal(t, 0, exp.High.Compare(act.High), name)
+	assert.Equal(t, 0, exp.Low.Compare(act.Low), name)
+	assert.Equal(t, 0, exp.Close.Compare(act.Close), name)
+	assert.Equal(t, 0, exp.Volume.Compare(act.Volume), name)
 }
 
 func TestCSVKLineReader_ReadWithBinanceDecoder(t *testing.T) {
@@ -37,7 +38,8 @@ func TestCSVKLineReader_ReadWithBinanceDecoder(t *testing.T) {
 				High:      fixedpoint.NewFromFloat(29031.34),
 				Low:       fixedpoint.NewFromFloat(28690.17),
 				Close:     fixedpoint.NewFromFloat(28995.13),
-				Volume:    fixedpoint.NewFromFloat(2311.81144500)},
+				// todo mustNewFromString and NewFromFloat have different values
+				Volume: fixedpoint.MustNewFromString("2311.81144500")},
 			err: nil,
 		},
 		{
@@ -83,7 +85,11 @@ func TestCSVKLineReader_ReadWithBinanceDecoder(t *testing.T) {
 			reader := NewBinanceCSVKLineReader(csv.NewReader(strings.NewReader(tt.give)))
 			kline, err := reader.Read(time.Hour)
 			assert.Equal(t, tt.err, err)
-			assertKLineEq(t, tt.want, kline)
+			if err == nil {
+				spew.Dump(tt.want)
+				spew.Dump(kline)
+				assertKLineEq(t, tt.want, kline, tt.name)
+			}
 		})
 	}
 }
@@ -149,7 +155,7 @@ func TestCSVKLineReader_ReadWithMetaTraderDecoder(t *testing.T) {
 			reader := NewMetaTraderCSVKLineReader(csv.NewReader(strings.NewReader(tt.give)))
 			kline, err := reader.Read(time.Hour)
 			assert.Equal(t, tt.err, err)
-			assertKLineEq(t, tt.want, kline)
+			assertKLineEq(t, tt.want, kline, tt.name)
 		})
 	}
 }
