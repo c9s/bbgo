@@ -34,6 +34,11 @@ type WsArg struct {
 	Channel  ChannelType `json:"channel"`
 	// InstId Instrument ID. e.q. BTCUSDT, ETHUSDT
 	InstId string `json:"instId"`
+
+	ApiKey     string `json:"apiKey"`
+	Passphrase string `json:"passphrase"`
+	Timestamp  string `json:"timestamp"`
+	Sign       string `json:"sign"`
 }
 
 type WsEventType string
@@ -41,6 +46,7 @@ type WsEventType string
 const (
 	WsEventSubscribe   WsEventType = "subscribe"
 	WsEventUnsubscribe WsEventType = "unsubscribe"
+	WsEventLogin       WsEventType = "login"
 	WsEventError       WsEventType = "error"
 )
 
@@ -76,7 +82,7 @@ func (w *WsEvent) IsValid() error {
 	case WsEventError:
 		return fmt.Errorf("websocket request error, op: %s, code: %d, msg: %s", w.Op, w.Code, w.Msg)
 
-	case WsEventSubscribe, WsEventUnsubscribe:
+	case WsEventSubscribe, WsEventUnsubscribe, WsEventLogin:
 		// Actually, this code is unnecessary because the events are either `Subscribe` or `Unsubscribe`, But to avoid bugs
 		// in the exchange, we still check.
 		if w.Code != 0 || len(w.Msg) != 0 {

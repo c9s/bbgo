@@ -76,7 +76,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	}
 
 	// See https://bitgetlimited.github.io/apidoc/en/spot/#signature
-	// sign(
+	// Sign(
 	//    timestamp +
 	// 	  method.toUpperCase() +
 	// 	  requestPath + "?" + queryString +
@@ -94,7 +94,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	}
 
 	signKey := timestamp + strings.ToUpper(method) + path + string(body)
-	signature := sign(signKey, c.secret)
+	signature := Sign(signKey, c.secret)
 
 	req, err := http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
 	if err != nil {
@@ -110,7 +110,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	return req, nil
 }
 
-func sign(payload string, secret string) string {
+func Sign(payload string, secret string) string {
 	var sig = hmac.New(sha256.New, []byte(secret))
 	_, err := sig.Write([]byte(payload))
 	if err != nil {

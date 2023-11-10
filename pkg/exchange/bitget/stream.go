@@ -5,10 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/gorilla/websocket"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
+	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -21,6 +25,7 @@ var (
 type Stream struct {
 	types.StandardStream
 
+	key, secret, passphrase   string
 	bookEventCallbacks        []func(o BookEvent)
 	marketTradeEventCallbacks []func(o MarketTradeEvent)
 	KLineEventCallbacks       []func(o KLineEvent)
@@ -28,10 +33,13 @@ type Stream struct {
 	lastCandle map[string]types.KLine
 }
 
-func NewStream() *Stream {
+func NewStream(key, secret, passphrase string) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
 		lastCandle:     map[string]types.KLine{},
+		key:            key,
+		secret:         secret,
+		passphrase:     passphrase,
 	}
 
 	stream.SetEndpointCreator(stream.createEndpoint)
@@ -89,7 +97,7 @@ func (s *Stream) createEndpoint(_ context.Context) (string, error) {
 	if s.PublicOnly {
 		url = bitgetapi.PublicWebSocketURL
 	} else {
-		url = bitgetapi.PrivateWebSocketURL
+		url = v2.PrivateWebSocketURL
 	}
 	return url, nil
 }
@@ -123,7 +131,22 @@ func (s *Stream) handlerConnect() {
 		// errors are handled in the syncSubscriptions, so they are skipped here.
 		_ = s.syncSubscriptions(WsEventSubscribe)
 	} else {
-		log.Error("*** PRIVATE API NOT IMPLEMENTED ***")
+		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+
+		if err := s.Conn.WriteJSON(WsOp{
+			Op: WsEventLogin,
+			Args: []WsArg{
+				{
+					ApiKey:     s.key,
+					Passphrase: s.passphrase,
+					Timestamp:  timestamp,
+					Sign:       bitgetapi.Sign(fmt.Sprintf("%sGET/user/verify", timestamp), s.secret),
+				},
+			},
+		}); err != nil {
+			log.WithError(err).Error("failed to auth request")
+			return
+		}
 	}
 }
 
