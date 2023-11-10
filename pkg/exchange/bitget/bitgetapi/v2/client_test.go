@@ -65,4 +65,17 @@ func TestClient(t *testing.T) {
 
 		t.Logf("get trade fills resp: %+v", req)
 	})
+
+	t.Run("CancelOrderRequest", func(t *testing.T) {
+		req, err := client.NewPlaceOrderRequest().Symbol("APEUSDT").OrderType(OrderTypeLimit).
+			Side(SideTypeSell).
+			Price("2").
+			Size("5").
+			Force(OrderForceGTC).
+			Do(context.Background())
+		assert.NoError(t, err)
+
+		resp, err := client.NewCancelOrderRequest().Symbol("APEUSDT").OrderId(req.OrderId).Do(ctx)
+		t.Logf("cancel order resp: %+v", resp)
+	})
 }
