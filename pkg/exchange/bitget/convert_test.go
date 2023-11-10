@@ -465,3 +465,29 @@ func Test_processMarketBuyQuantity(t *testing.T) {
 		assert.ErrorContains(err, "xxx")
 	})
 }
+
+func Test_toLocalOrderType(t *testing.T) {
+	orderType, err := toLocalOrderType(types.OrderTypeLimit)
+	assert.NoError(t, err)
+	assert.Equal(t, v2.OrderTypeLimit, orderType)
+
+	orderType, err = toLocalOrderType(types.OrderTypeMarket)
+	assert.NoError(t, err)
+	assert.Equal(t, v2.OrderTypeMarket, orderType)
+
+	_, err = toLocalOrderType("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func Test_toLocalSide(t *testing.T) {
+	orderType, err := toLocalSide(types.SideTypeSell)
+	assert.NoError(t, err)
+	assert.Equal(t, v2.SideTypeSell, orderType)
+
+	orderType, err = toLocalSide(types.SideTypeBuy)
+	assert.NoError(t, err)
+	assert.Equal(t, v2.SideTypeBuy, orderType)
+
+	_, err = toLocalOrderType("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
