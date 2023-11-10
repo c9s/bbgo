@@ -526,11 +526,6 @@ var BacktestCmd = &cobra.Command{
 
 		for _, session := range environ.Sessions() {
 			for symbol, trades := range session.Trades {
-				if len(trades.Trades) == 0 {
-					log.Warnf("session has no %s trades", symbol)
-					continue
-				}
-
 				tradeState := sessionTradeStats[session.Name][symbol]
 				profitFactor := tradeState.ProfitFactor
 				winningRatio := tradeState.WinningRatio
@@ -673,6 +668,10 @@ func createSymbolReport(
 	}
 
 	return &symbolReport, nil
+}
+
+func n(v float64) fixedpoint.Value {
+	return fixedpoint.NewFromFloat(v)
 }
 
 func verify(
