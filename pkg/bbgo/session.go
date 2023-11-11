@@ -472,49 +472,53 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 			}
 
 			if sub.Symbol == symbol {
-				klineSubscriptions[types.Interval(sub.Options.Interval)] = struct{}{}
+				klineSubscriptions[sub.Options.Interval] = struct{}{}
 			}
 		}
 	}
 
-	// always subscribe the 1m kline so we can make sure the connection persists.
-	klineSubscriptions[minInterval] = struct{}{}
-
-	for interval := range klineSubscriptions {
-		// avoid querying the last unclosed kline
-		endTime := environ.startTime
-		var i int64
-		for i = 0; i < KLinePreloadLimit; i += 1000 {
-			var duration time.Duration = time.Duration(-i * int64(interval.Duration()))
-			e := endTime.Add(duration)
-
-			kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
-				EndTime: &e,
-				Limit:   1000, // indicators need at least 100
-			})
-			if err != nil {
-				return err
-			}
-
-			if len(kLines) == 0 {
-				log.Warnf("no kline data for %s %s (end time <= %s)", symbol, interval, e)
-				continue
-			}
-
-			// update last prices by the given kline
-			lastKLine := kLines[len(kLines)-1]
-			if interval == minInterval {
-				session.lastPrices[symbol] = lastKLine.Close
-			}
-
-			for _, k := range kLines {
-				// let market data store trigger the update, so that the indicator could be updated too.
-				marketDataStore.AddKLine(k)
-			}
-		}
+	if !(environ.environmentConfig != nil && environ.environmentConfig.DisableDefaultKLineSubscription) {
+		// subscribe the 1m kline by default so we can make sure the connection persists.
+		klineSubscriptions[minInterval] = struct{}{}
 	}
 
-	log.Infof("%s last price: %v", symbol, session.lastPrices[symbol])
+	if !(environ.environmentConfig != nil && environ.environmentConfig.DisableHistoryKLinePreload) {
+		for interval := range klineSubscriptions {
+			// avoid querying the last unclosed kline
+			endTime := environ.startTime
+			var i int64
+			for i = 0; i < KLinePreloadLimit; i += 1000 {
+				var duration time.Duration = time.Duration(-i * int64(interval.Duration()))
+				e := endTime.Add(duration)
+
+				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
+					EndTime: &e,
+					Limit:   1000, // indicators need at least 100
+				})
+				if err != nil {
+					return err
+				}
+
+				if len(kLines) == 0 {
+					log.Warnf("no kline data for %s %s (end time <= %s)", symbol, interval, e)
+					continue
+				}
+
+				// update last prices by the given kline
+				lastKLine := kLines[len(kLines)-1]
+				if interval == minInterval {
+					session.lastPrices[symbol] = lastKLine.Close
+				}
+
+				for _, k := range kLines {
+					// let market data store trigger the update, so that the indicator could be updated too.
+					marketDataStore.AddKLine(k)
+				}
+			}
+		}
+
+		log.Infof("%s last price: %v", symbol, session.lastPrices[symbol])
+	}
 
 	session.initializedSymbols[symbol] = struct{}{}
 	return nil
