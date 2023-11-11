@@ -82,10 +82,6 @@ github.com/bytedance/sonic v1.9.1 h1:6iJ6NqdoxCDr6mbY8h18oSO+cShGSMRGCEo7F2h0x8s
 github.com/bytedance/sonic v1.9.1/go.mod h1:i736AoUSYt75HyZLoJW9ERYxcy6eaN6h4BZXU064P/U=
 github.com/c-bata/goptuna v0.8.1 h1:25+n1MLv0yvCsD56xv4nqIus3oLHL9GuPAZDLIqmX1U=
 github.com/c-bata/goptuna v0.8.1/go.mod h1:knmS8+Iyq5PPy1YUeIEq0pMFR4Y6x7z/CySc9HlZTCY=
-github.com/c9s/requestgen v1.3.4 h1:kK2rIO3OAt9JoY5gT0OSkSpq0dy/+JeuI22FwSKpUrY=
-github.com/c9s/requestgen v1.3.4/go.mod h1:wp4saiPdh0zLF5AkopGCqPQfy9Q5xvRh+TQBOA1l1r4=
-github.com/c9s/requestgen v1.3.5 h1:iGYAP0rWQW3JOo+Z3S0SoenSt581IQ9mupJxRFCrCJs=
-github.com/c9s/requestgen v1.3.5/go.mod h1:QwkZudcv84kJ8g9+E0RDTj+13btFXbTvv2aI+zbuLbc=
 github.com/c9s/requestgen v1.3.6 h1:ul7dZ2uwGYjNBjreooRfSY10WTXvQmQSjZsHebz6QfE=
 github.com/c9s/requestgen v1.3.6/go.mod h1:QwkZudcv84kJ8g9+E0RDTj+13btFXbTvv2aI+zbuLbc=
 github.com/c9s/rockhopper v1.2.2-0.20220617053729-ffdc87df194b h1:wT8c03PHLv7+nZUIGqxAzRvIfYHNxMCNVWwvdGkOXTs=
