@@ -7,12 +7,18 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 )
 
 const (
 	// To maintain aligned fee rates, it's important to update fees frequently.
 	feeRatePollingPeriod = time.Minute
+)
+
+var (
+	pollFeeRateRateLimiter = rate.NewLimiter(rate.Every(10*time.Minute), 1)
 )
 
 type symbolFeeDetail struct {
@@ -77,6 +83,10 @@ func (p *feeRatePoller) poll(ctx context.Context) error {
 	p.mu.Lock()
 	p.symbolFeeDetail = symbolFeeRate
 	p.mu.Unlock()
+
+	if pollFeeRateRateLimiter.Allow() {
+		log.Infof("updated fee rate: %+v", p.symbolFeeDetail)
+	}
 
 	return nil
 }
