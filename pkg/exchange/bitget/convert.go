@@ -346,6 +346,8 @@ func toGlobalBalanceMap(balances []Balance) types.BalanceMap {
 func toGlobalKLines(symbol string, interval types.Interval, kLines v2.KLineResponse) []types.KLine {
 	gKLines := make([]types.KLine, len(kLines))
 	for i, kline := range kLines {
+		// follow the binance rule, to avoid endTime overlapping with the next startTime. So we subtract -1 time.Millisecond
+		// on endTime.
 		endTime := types.Time(kline.Ts.Time().Add(interval.Duration() - time.Millisecond))
 		gKLines[i] = types.KLine{
 			Exchange:    types.ExchangeBitget,
