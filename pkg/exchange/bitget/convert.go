@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
 	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
@@ -340,4 +341,27 @@ func toGlobalBalanceMap(balances []Balance) types.BalanceMap {
 		}
 	}
 	return bm
+}
+
+func toGlobalKLines(symbol string, interval types.Interval, kLines v2.KLineResponse) []types.KLine {
+	gKLines := make([]types.KLine, len(kLines))
+	for i, kline := range kLines {
+		endTime := types.Time(kline.Ts.Time().Add(interval.Duration() - time.Millisecond))
+		gKLines[i] = types.KLine{
+			Exchange:    types.ExchangeBitget,
+			Symbol:      symbol,
+			StartTime:   types.Time(kline.Ts),
+			EndTime:     endTime,
+			Interval:    interval,
+			Open:        kline.Open,
+			Close:       kline.Close,
+			High:        kline.High,
+			Low:         kline.Low,
+			Volume:      kline.Volume,
+			QuoteVolume: kline.QuoteVolume,
+			// Bitget doesn't support close flag in REST API
+			Closed: false,
+		}
+	}
+	return gKLines
 }

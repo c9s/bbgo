@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -77,5 +78,13 @@ func TestClient(t *testing.T) {
 
 		resp, err := client.NewCancelOrderRequest().Symbol("APEUSDT").OrderId(req.OrderId).Do(ctx)
 		t.Logf("cancel order resp: %+v", resp)
+	})
+
+	t.Run("GetKLineRequest", func(t *testing.T) {
+		startTime := time.Date(2023, 8, 12, 0, 0, 0, 0, time.UTC)
+		endTime := time.Date(2023, 10, 14, 0, 0, 0, 0, time.UTC)
+		resp, err := client.NewGetKLineRequest().Symbol("APEUSDT").Granularity("30min").StartTime(startTime).EndTime(endTime).Limit("1000").Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("resp: %+v", resp)
 	})
 }
