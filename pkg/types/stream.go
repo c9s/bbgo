@@ -62,6 +62,8 @@ type HeartBeat func(conn *websocket.Conn) error
 
 type BeforeConnect func(ctx context.Context) error
 
+type WebsocketPongEvent struct{}
+
 //go:generate callbackgen -type StandardStream -interface
 type StandardStream struct {
 	parser     Parser
@@ -226,6 +228,9 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 	// flag format: debug-{component}-{message type}
 	debugRawMessage := viper.GetBool("debug-websocket-raw-message")
 
+	hasParser := s.parser != nil
+	hasDispatcher := s.dispatcher != nil
+
 	for {
 		select {
 
@@ -276,22 +281,30 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 				continue
 			}
 
-			s.EmitRawMessage(message)
-
 			if debugRawMessage {
 				log.Info(string(message))
 			}
 
-			var e interface{}
-			if s.parser != nil {
-				e, err = s.parser(message)
-				if err != nil {
-					log.WithError(err).Errorf("websocket event parse error, message: %s", message)
-					continue
-				}
+			if !hasParser {
+				s.EmitRawMessage(message)
+				continue
 			}
 
-			if s.dispatcher != nil {
+			var e interface{}
+			e, err = s.parser(message)
+			if err != nil {
+				log.WithError(err).Errorf("websocket event parse error, message: %s", message)
+				// emit raw message even if occurs error, because we want anything can be detected
+				s.EmitRawMessage(message)
+				continue
+			}
+
+			// skip pong event to avoid the message like spam
+			if _, ok := e.(*WebsocketPongEvent); !ok {
+				s.EmitRawMessage(message)
+			}
+
+			if hasDispatcher {
 				s.dispatcher(e)
 			}
 		}

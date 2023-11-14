@@ -20,19 +20,9 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		raw, err := s.parseWebSocketEvent([]byte(msg))
 		assert.NoError(t, err)
 
-		expRetMsg := string(WsOpTypePong)
-		e, ok := raw.(*WebSocketOpEvent)
+		e, ok := raw.(*types.WebsocketPongEvent)
 		assert.True(t, ok)
-		assert.Equal(t, &WebSocketOpEvent{
-			Success: true,
-			RetMsg:  expRetMsg,
-			ConnId:  "a806f6c4-3608-4b6d-a225-9f5da975bc44",
-			ReqId:   "",
-			Op:      WsOpTypePing,
-			Args:    nil,
-		}, e)
-
-		assert.NoError(t, e.IsValid())
+		assert.Equal(t, &types.WebsocketPongEvent{}, e)
 	})
 
 	t.Run("[public] PingEvent with req id", func(t *testing.T) {
@@ -41,20 +31,9 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		raw, err := s.parseWebSocketEvent([]byte(msg))
 		assert.NoError(t, err)
 
-		expRetMsg := string(WsOpTypePong)
-		expReqId := "b26704da-f5af-44c2-bdf7-935d6739e1a0"
-		e, ok := raw.(*WebSocketOpEvent)
+		e, ok := raw.(*types.WebsocketPongEvent)
 		assert.True(t, ok)
-		assert.Equal(t, &WebSocketOpEvent{
-			Success: true,
-			RetMsg:  expRetMsg,
-			ConnId:  "a806f6c4-3608-4b6d-a225-9f5da975bc44",
-			ReqId:   expReqId,
-			Op:      WsOpTypePing,
-			Args:    nil,
-		}, e)
-
-		assert.NoError(t, e.IsValid())
+		assert.Equal(t, &types.WebsocketPongEvent{}, e)
 	})
 
 	t.Run("[private] PingEvent without req id", func(t *testing.T) {
@@ -63,18 +42,9 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		raw, err := s.parseWebSocketEvent([]byte(msg))
 		assert.NoError(t, err)
 
-		e, ok := raw.(*WebSocketOpEvent)
+		e, ok := raw.(*types.WebsocketPongEvent)
 		assert.True(t, ok)
-		assert.Equal(t, &WebSocketOpEvent{
-			Success: false,
-			RetMsg:  "",
-			ConnId:  "civn4p1dcjmtvb69ome0-yrt1",
-			ReqId:   "",
-			Op:      WsOpTypePong,
-			Args:    []string{"1690884539181"},
-		}, e)
-
-		assert.NoError(t, e.IsValid())
+		assert.Equal(t, &types.WebsocketPongEvent{}, e)
 	})
 
 	t.Run("[private] PingEvent with req id", func(t *testing.T) {
@@ -83,19 +53,9 @@ func Test_parseWebSocketEvent(t *testing.T) {
 		raw, err := s.parseWebSocketEvent([]byte(msg))
 		assert.NoError(t, err)
 
-		expReqId := "78d36b57-a142-47b7-9143-5843df77d44d"
-		e, ok := raw.(*WebSocketOpEvent)
+		e, ok := raw.(*types.WebsocketPongEvent)
 		assert.True(t, ok)
-		assert.Equal(t, &WebSocketOpEvent{
-			Success: false,
-			RetMsg:  "",
-			ConnId:  "civn4p1dcjmtvb69ome0-yrt1",
-			ReqId:   expReqId,
-			Op:      WsOpTypePong,
-			Args:    []string{"1690884539181"},
-		}, e)
-
-		assert.NoError(t, e.IsValid())
+		assert.Equal(t, &types.WebsocketPongEvent{}, e)
 	})
 }
 

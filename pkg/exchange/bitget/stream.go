@@ -129,11 +129,6 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	case *AccountEvent:
 		s.EmitAccountEvent(*e)
 
-	case []byte:
-		// We only handle the 'pong' case. Others are unexpected.
-		if !bytes.Equal(e, pongBytes) {
-			log.Errorf("invalid event: %q", e)
-		}
 	}
 }
 
@@ -240,10 +235,9 @@ func convertSubscription(sub types.Subscription) (WsArg, error) {
 func parseWebSocketEvent(in []byte) (interface{}, error) {
 	switch {
 	case bytes.Equal(in, pongBytes):
-		// Return the original raw data may seem redundant because we can validate the string and return nil,
-		// but we cannot return nil to a lower level handler. This can cause confusion in the next handler, such as
-		// the dispatch handler. Therefore, I return the original raw data.
-		return in, nil
+		// return global pong event to avoid emit raw message
+		return types.WebsocketPongEvent{}, nil
+
 	default:
 		return parseEvent(in)
 	}
