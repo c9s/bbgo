@@ -24,6 +24,7 @@ var log = logrus.WithField("exchange", "max")
 
 func init() {
 	_ = types.ExchangeTradeHistoryService(&Exchange{})
+
 }
 
 type Exchange struct {
@@ -290,13 +291,14 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3client.NewGetWalletOrderHistoryRequest(walletType).Market(market)
 	if lastOrderID == 0 {
 		lastOrderID = 1
 	}
 
-	req.FromID(lastOrderID)
-	req.Limit(1000)
+	req := e.v3client.NewGetWalletOrderHistoryRequest(walletType).
+		Market(market).
+		FromID(lastOrderID).
+		Limit(1000)
 
 	maxOrders, err := req.Do(ctx)
 	if err != nil {
