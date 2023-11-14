@@ -5,10 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/gorilla/websocket"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
+	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -21,17 +25,23 @@ var (
 type Stream struct {
 	types.StandardStream
 
+	key, secret, passphrase   string
 	bookEventCallbacks        []func(o BookEvent)
 	marketTradeEventCallbacks []func(o MarketTradeEvent)
 	KLineEventCallbacks       []func(o KLineEvent)
 
+	accountEventCallbacks []func(e AccountEvent)
+
 	lastCandle map[string]types.KLine
 }
 
-func NewStream() *Stream {
+func NewStream(key, secret, passphrase string) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
 		lastCandle:     map[string]types.KLine{},
+		key:            key,
+		secret:         secret,
+		passphrase:     passphrase,
 	}
 
 	stream.SetEndpointCreator(stream.createEndpoint)
@@ -43,6 +53,9 @@ func NewStream() *Stream {
 	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnMarketTradeEvent(stream.handleMaretTradeEvent)
 	stream.OnKLineEvent(stream.handleKLineEvent)
+
+	stream.OnAuth(stream.handleAuth)
+	stream.OnAccountEvent(stream.handleAccountEvent)
 	return stream
 }
 
@@ -89,7 +102,7 @@ func (s *Stream) createEndpoint(_ context.Context) (string, error) {
 	if s.PublicOnly {
 		url = bitgetapi.PublicWebSocketURL
 	} else {
-		url = bitgetapi.PrivateWebSocketURL
+		url = v2.PrivateWebSocketURL
 	}
 	return url, nil
 }
@@ -99,6 +112,9 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	case *WsEvent:
 		if err := e.IsValid(); err != nil {
 			log.Errorf("invalid event: %v", err)
+		}
+		if e.IsAuthenticated() {
+			s.EmitAuth()
 		}
 
 	case *BookEvent:
@@ -110,6 +126,9 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	case *KLineEvent:
 		s.EmitKLineEvent(*e)
 
+	case *AccountEvent:
+		s.EmitAccountEvent(*e)
+
 	case []byte:
 		// We only handle the 'pong' case. Others are unexpected.
 		if !bytes.Equal(e, pongBytes) {
@@ -118,12 +137,43 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	}
 }
 
+func (s *Stream) handleAuth() {
+	if err := s.Conn.WriteJSON(WsOp{
+		Op: WsEventSubscribe,
+		Args: []WsArg{
+			{
+				InstType: instSpV2,
+				Channel:  ChannelAccount,
+				Coin:     "default", // default all
+			},
+		},
+	}); err != nil {
+		log.WithError(err).Error("failed to send subscription request")
+		return
+	}
+}
+
 func (s *Stream) handlerConnect() {
 	if s.PublicOnly {
 		// errors are handled in the syncSubscriptions, so they are skipped here.
 		_ = s.syncSubscriptions(WsEventSubscribe)
 	} else {
-		log.Error("*** PRIVATE API NOT IMPLEMENTED ***")
+		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+
+		if err := s.Conn.WriteJSON(WsOp{
+			Op: WsEventLogin,
+			Args: []WsArg{
+				{
+					ApiKey:     s.key,
+					Passphrase: s.passphrase,
+					Timestamp:  timestamp,
+					Sign:       bitgetapi.Sign(fmt.Sprintf("%sGET/user/verify", timestamp), s.secret),
+				},
+			},
+		}); err != nil {
+			log.WithError(err).Error("failed to auth request")
+			return
+		}
 	}
 }
 
@@ -213,6 +263,17 @@ func parseEvent(in []byte) (interface{}, error) {
 
 	ch := event.Arg.Channel
 	switch ch {
+	case ChannelAccount:
+		var acct AccountEvent
+		err = json.Unmarshal(event.Data, &acct.Balances)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal data into AccountEvent, Arg: %+v Data: %s, err: %w", event.Arg, string(event.Data), err)
+		}
+
+		acct.actionType = event.Action
+		acct.instId = event.Arg.InstId
+		return &acct, nil
+
 	case ChannelOrderBook, ChannelOrderBook5, ChannelOrderBook15:
 		var book BookEvent
 		err = json.Unmarshal(event.Data, &book.Events)
@@ -295,4 +356,17 @@ func (s *Stream) handleKLineEvent(k KLineEvent) {
 		s.EmitKLine(kLine)
 		s.lastCandle[k.CacheKey()] = kLine
 	}
+}
+
+func (s *Stream) handleAccountEvent(m AccountEvent) {
+	balanceMap := toGlobalBalanceMap(m.Balances)
+	if len(balanceMap) == 0 {
+		return
+	}
+
+	if m.actionType == ActionTypeUpdate {
+		s.StandardStream.EmitBalanceUpdate(balanceMap)
+		return
+	}
+	s.StandardStream.EmitBalanceSnapshot(balanceMap)
 }

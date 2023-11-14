@@ -329,3 +329,15 @@ func toLocalSide(side types.SideType) (v2.SideType, error) {
 		return "", fmt.Errorf("side type %s not supported", side)
 	}
 }
+
+func toGlobalBalanceMap(balances []Balance) types.BalanceMap {
+	bm := types.BalanceMap{}
+	for _, obj := range balances {
+		bm[obj.Coin] = types.Balance{
+			Currency:  obj.Coin,
+			Available: obj.Available,
+			Locked:    obj.Frozen.Add(obj.Locked),
+		}
+	}
+	return bm
+}
