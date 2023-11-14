@@ -579,3 +579,22 @@ func Test_toGlobalTrade(t *testing.T) {
 		FeeDiscounted: false,
 	}, res)
 }
+
+func Test_toGlobalBalanceMap(t *testing.T) {
+	assert.Equal(t, types.BalanceMap{
+		"BTC": {
+			Currency:  "BTC",
+			Available: fixedpoint.NewFromFloat(0.5),
+			Locked:    fixedpoint.NewFromFloat(0.6 + 0.7),
+		},
+	}, toGlobalBalanceMap([]Balance{
+		{
+			Coin:           "BTC",
+			Available:      fixedpoint.NewFromFloat(0.5),
+			Frozen:         fixedpoint.NewFromFloat(0.6),
+			Locked:         fixedpoint.NewFromFloat(0.7),
+			LimitAvailable: fixedpoint.Zero,
+			UTime:          types.NewMillisecondTimestampFromInt(1699020564676),
+		},
+	}))
+}

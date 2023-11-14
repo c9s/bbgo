@@ -33,3 +33,13 @@ func (s *Stream) EmitKLineEvent(o KLineEvent) {
 		cb(o)
 	}
 }
+
+func (s *Stream) OnAccountEvent(cb func(e AccountEvent)) {
+	s.accountEventCallbacks = append(s.accountEventCallbacks, cb)
+}
+
+func (s *Stream) EmitAccountEvent(e AccountEvent) {
+	for _, cb := range s.accountEventCallbacks {
+		cb(e)
+	}
+}

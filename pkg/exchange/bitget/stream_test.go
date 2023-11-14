@@ -19,7 +19,9 @@ func getTestClientOrSkip(t *testing.T) *Stream {
 		t.Skip("skip test for CI")
 	}
 
-	return NewStream()
+	return NewStream(os.Getenv("BITGET_API_KEY"),
+		os.Getenv("BITGET_API_SECRET"),
+		os.Getenv("BITGET_API_PASSPHRASE"))
 }
 
 func TestStream(t *testing.T) {
@@ -118,6 +120,21 @@ func TestStream(t *testing.T) {
 		s.OnKLineClosed(func(kline types.KLine) {
 			t.Log("got closed update", kline)
 		})
+		c := make(chan struct{})
+		<-c
+	})
+
+	t.Run("private test", func(t *testing.T) {
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnBalanceSnapshot(func(balances types.BalanceMap) {
+			t.Log("get balances", balances)
+		})
+		s.OnBalanceUpdate(func(balances types.BalanceMap) {
+			t.Log("get update", balances)
+		})
+
 		c := make(chan struct{})
 		<-c
 	})
