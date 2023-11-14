@@ -94,7 +94,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		return nil, fmt.Errorf("markets rate limiter wait error: %w", err)
 	}
 
-	req := e.client.NewGetSymbolsRequest()
+	req := e.v2Client.NewGetSymbolsRequest()
 	symbols, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -102,8 +102,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 	markets := types.MarketMap{}
 	for _, s := range symbols {
-		symbol := toGlobalSymbol(s.SymbolName)
-		markets[symbol] = toGlobalMarket(s)
+		markets[s.Symbol] = toGlobalMarket(s)
 	}
 
 	return markets, nil

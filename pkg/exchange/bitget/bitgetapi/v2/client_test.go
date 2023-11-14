@@ -87,4 +87,10 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("resp: %+v", resp)
 	})
+
+	t.Run("GetSymbolsRequest", func(t *testing.T) {
+		resp, err := client.NewGetSymbolsRequest().Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("resp: %+v", resp)
+	})
 }
