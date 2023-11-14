@@ -47,16 +47,16 @@ func toGlobalMarket(s v2.Symbol) types.Market {
 	}
 }
 
-func toGlobalTicker(ticker bitgetapi.Ticker) types.Ticker {
+func toGlobalTicker(ticker v2.Ticker) types.Ticker {
 	return types.Ticker{
 		Time:   ticker.Ts.Time(),
-		Volume: ticker.BaseVol,
-		Last:   ticker.Close,
-		Open:   ticker.OpenUtc0,
+		Volume: ticker.BaseVolume,
+		Last:   ticker.LastPr,
+		Open:   ticker.Open,
 		High:   ticker.High24H,
 		Low:    ticker.Low24H,
-		Buy:    ticker.BuyOne,
-		Sell:   ticker.SellOne,
+		Buy:    ticker.BidPr,
+		Sell:   ticker.AskPr,
 	}
 }
 

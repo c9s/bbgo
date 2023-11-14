@@ -93,4 +93,10 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("resp: %+v", resp)
 	})
+
+	t.Run("GetTickersRequest", func(t *testing.T) {
+		resp, err := client.NewGetTickersRequest().Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("resp: %+v", resp)
+	})
 }
