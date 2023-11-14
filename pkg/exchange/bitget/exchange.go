@@ -58,7 +58,7 @@ type Exchange struct {
 	key, secret, passphrase string
 
 	client   *bitgetapi.RestClient
-	v2Client *v2.Client
+	v2client *v2.Client
 }
 
 func New(key, secret, passphrase string) *Exchange {
@@ -73,7 +73,7 @@ func New(key, secret, passphrase string) *Exchange {
 		secret:     secret,
 		passphrase: passphrase,
 		client:     client,
-		v2Client:   v2.NewClient(client),
+		v2client:   v2.NewClient(client),
 	}
 }
 
@@ -94,7 +94,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		return nil, fmt.Errorf("markets rate limiter wait error: %w", err)
 	}
 
-	req := e.v2Client.NewGetSymbolsRequest()
+	req := e.v2client.NewGetSymbolsRequest()
 	symbols, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -113,14 +113,17 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 		return nil, fmt.Errorf("ticker rate limiter wait error: %w", err)
 	}
 
-	req := e.client.NewGetTickerRequest()
+	req := e.v2client.NewGetTickersRequest()
 	req.Symbol(symbol)
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query ticker: %w", err)
 	}
+	if len(resp) != 1 {
+		return nil, fmt.Errorf("unexpected length of query single symbol: %+v", resp)
+	}
 
-	ticker := toGlobalTicker(*resp)
+	ticker := toGlobalTicker(resp[1])
 	return &ticker, nil
 }
 
@@ -143,7 +146,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 		return nil, fmt.Errorf("tickers rate limiter wait error: %w", err)
 	}
 
-	resp, err := e.client.NewGetAllTickersRequest().Do(ctx)
+	resp, err := e.v2client.NewGetTickersRequest().Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tickers: %w", err)
 	}
@@ -164,7 +167,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 // The end time has different limits. 1m, 5m can query for one month,15m can query for 52 days,30m can query for 62 days,
 // 1H can query for 83 days,4H can query for 240 days,6H can query for 360 days.
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	req := e.v2Client.NewGetKLineRequest().Symbol(symbol)
+	req := e.v2client.NewGetKLineRequest().Symbol(symbol)
 	intervalStr, found := toLocalGranularity[interval]
 	if !found {
 		return nil, fmt.Errorf("%s not supported, supported granlarity: %+v", intervalStr, toLocalGranularity)
@@ -252,7 +255,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		return nil, fmt.Errorf("order.Market.Symbol is required: %+v", order)
 	}
 
-	req := e.v2Client.NewPlaceOrderRequest()
+	req := e.v2client.NewPlaceOrderRequest()
 	req.Symbol(order.Market.Symbol)
 
 	// set order type
@@ -320,7 +323,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	}
 
 	orderId := res.OrderId
-	ordersResp, err := e.v2Client.NewGetUnfilledOrdersRequest().OrderId(orderId).Do(ctx)
+	ordersResp, err := e.v2client.NewGetUnfilledOrdersRequest().OrderId(orderId).Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query open order by order id: %s, err: %w", orderId, err)
 	}
@@ -329,7 +332,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	case 0:
 		// The market order will be executed immediately, so we cannot retrieve it through the NewGetUnfilledOrdersRequest API.
 		// Try to get the order from the NewGetHistoryOrdersRequest API.
-		ordersResp, err := e.v2Client.NewGetHistoryOrdersRequest().OrderId(orderId).Do(ctx)
+		ordersResp, err := e.v2client.NewGetHistoryOrdersRequest().OrderId(orderId).Do(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query history order by order id: %s, err: %w", orderId, err)
 		}
@@ -355,7 +358,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 			return nil, fmt.Errorf("open order rate limiter wait error: %w", err)
 		}
 
-		req := e.v2Client.NewGetUnfilledOrdersRequest().
+		req := e.v2client.NewGetUnfilledOrdersRequest().
 			Symbol(symbol).
 			Limit(strconv.FormatInt(queryLimit, 10))
 		if nextCursor != 0 {
@@ -414,7 +417,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	if err := closedQueryOrdersRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
 	}
-	res, err := e.v2Client.NewGetHistoryOrdersRequest().
+	res, err := e.v2client.NewGetHistoryOrdersRequest().
 		Symbol(symbol).
 		Limit(strconv.Itoa(queryLimit)).
 		StartTime(since.UnixMilli()).
@@ -502,7 +505,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		log.Warn("!!!BITGET EXCHANGE API NOTICE!!! The trade of response is in descending order, so the last trade id not supported.")
 	}
 
-	req := e.v2Client.NewGetTradeFillsRequest()
+	req := e.v2client.NewGetTradeFillsRequest()
 	req.Symbol(symbol)
 
 	if options.StartTime != nil {
