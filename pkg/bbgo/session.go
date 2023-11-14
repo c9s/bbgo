@@ -58,6 +58,10 @@ type ExchangeSession struct {
 	// This option is exchange specific
 	PrivateChannels []string `json:"privateChannels,omitempty" yaml:"privateChannels,omitempty"`
 
+	// PrivateChannelSymbols is used for filtering the private user data channel, .e.g, order symbol subscription.
+	// This option is exchange specific
+	PrivateChannelSymbols []string `json:"privateChannelSymbols,omitempty" yaml:"privateChannelSymbols,omitempty"`
+
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
 	IsolatedMargin       bool   `json:"isolatedMargin,omitempty" yaml:"isolatedMargin,omitempty"`
 	IsolatedMarginSymbol string `json:"isolatedMarginSymbol,omitempty" yaml:"isolatedMarginSymbol,omitempty"`
@@ -246,6 +250,11 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		if len(session.PrivateChannels) > 0 {
 			if setter, ok := session.UserDataStream.(types.PrivateChannelSetter); ok {
 				setter.SetPrivateChannels(session.PrivateChannels)
+			}
+		}
+		if len(session.PrivateChannelSymbols) > 0 {
+			if setter, ok := session.UserDataStream.(types.PrivateChannelSymbolSetter); ok {
+				setter.SetPrivateChannelSymbols(session.PrivateChannelSymbols)
 			}
 		}
 

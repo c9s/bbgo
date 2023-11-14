@@ -46,6 +46,10 @@ type PrivateChannelSetter interface {
 	SetPrivateChannels(channels []string)
 }
 
+type PrivateChannelSymbolSetter interface {
+	SetPrivateChannelSymbols(symbols []string)
+}
+
 type Unsubscriber interface {
 	// Unsubscribe unsubscribes the all subscriptions.
 	Unsubscribe()
