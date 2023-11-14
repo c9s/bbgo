@@ -113,14 +113,17 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 		return nil, fmt.Errorf("ticker rate limiter wait error: %w", err)
 	}
 
-	req := e.client.NewGetTickerRequest()
+	req := e.v2Client.NewGetTickersRequest()
 	req.Symbol(symbol)
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query ticker: %w", err)
 	}
+	if len(resp) != 1 {
+		return nil, fmt.Errorf("unexpected length of query single symbol: %+v", resp)
+	}
 
-	ticker := toGlobalTicker(*resp)
+	ticker := toGlobalTicker(resp[1])
 	return &ticker, nil
 }
 
@@ -143,7 +146,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 		return nil, fmt.Errorf("tickers rate limiter wait error: %w", err)
 	}
 
-	resp, err := e.client.NewGetAllTickersRequest().Do(ctx)
+	resp, err := e.v2Client.NewGetTickersRequest().Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tickers: %w", err)
 	}

@@ -100,39 +100,41 @@ func Test_toGlobalMarket(t *testing.T) {
 
 func Test_toGlobalTicker(t *testing.T) {
 	// sample:
-	// {
-	//        "symbol": "BTCUSDT",
-	//        "high24h": "24175.65",
-	//        "low24h": "23677.75",
-	//        "close": "24014.11",
-	//        "quoteVol": "177689342.3025",
-	//        "baseVol": "7421.5009",
-	//        "usdtVol": "177689342.302407",
-	//        "ts": "1660704288118",
-	//        "buyOne": "24013.94",
-	//        "sellOne": "24014.06",
-	//        "bidSz": "0.0663",
-	//        "askSz": "0.0119",
-	//        "openUtc0": "23856.72",
-	//        "changeUtc":"0.00301",
-	//        "change":"0.00069"
-	//    }
-	ticker := bitgetapi.Ticker{
-		Symbol:    "BTCUSDT",
-		High24H:   fixedpoint.NewFromFloat(24175.65),
-		Low24H:    fixedpoint.NewFromFloat(23677.75),
-		Close:     fixedpoint.NewFromFloat(24014.11),
-		QuoteVol:  fixedpoint.NewFromFloat(177689342.3025),
-		BaseVol:   fixedpoint.NewFromFloat(7421.5009),
-		UsdtVol:   fixedpoint.NewFromFloat(177689342.302407),
-		Ts:        types.NewMillisecondTimestampFromInt(1660704288118),
-		BuyOne:    fixedpoint.NewFromFloat(24013.94),
-		SellOne:   fixedpoint.NewFromFloat(24014.06),
-		BidSz:     fixedpoint.NewFromFloat(0.0663),
-		AskSz:     fixedpoint.NewFromFloat(0.0119),
-		OpenUtc0:  fixedpoint.NewFromFloat(23856.72),
-		ChangeUtc: fixedpoint.NewFromFloat(0.00301),
-		Change:    fixedpoint.NewFromFloat(0.00069),
+	//{
+	//   "open":"36465.96",
+	//   "symbol":"BTCUSDT",
+	//   "high24h":"37040.25",
+	//   "low24h":"36202.65",
+	//   "lastPr":"36684.42",
+	//   "quoteVolume":"311893591.2805",
+	//   "baseVolume":"8507.3684",
+	//   "usdtVolume":"311893591.280427",
+	//   "ts":"1699947106122",
+	//   "bidPr":"36684.49",
+	//   "askPr":"36684.51",
+	//   "bidSz":"0.3812",
+	//   "askSz":"0.0133",
+	//   "openUtc":"36465.96",
+	//   "changeUtc24h":"0.00599",
+	//   "change24h":"-0.00426"
+	//}
+	ticker := v2.Ticker{
+		Symbol:       "BTCUSDT",
+		High24H:      fixedpoint.NewFromFloat(24175.65),
+		Low24H:       fixedpoint.NewFromFloat(23677.75),
+		LastPr:       fixedpoint.NewFromFloat(24014.11),
+		QuoteVolume:  fixedpoint.NewFromFloat(177689342.3025),
+		BaseVolume:   fixedpoint.NewFromFloat(7421.5009),
+		UsdtVolume:   fixedpoint.NewFromFloat(177689342.302407),
+		Ts:           types.NewMillisecondTimestampFromInt(1660704288118),
+		BidPr:        fixedpoint.NewFromFloat(24013.94),
+		AskPr:        fixedpoint.NewFromFloat(24014.06),
+		BidSz:        fixedpoint.NewFromFloat(0.0663),
+		AskSz:        fixedpoint.NewFromFloat(0.0119),
+		OpenUtc:      fixedpoint.NewFromFloat(23856.72),
+		ChangeUtc24H: fixedpoint.NewFromFloat(0.00301),
+		Change24H:    fixedpoint.NewFromFloat(0.00069),
+		Open:         fixedpoint.NewFromFloat(23856.72),
 	}
 
 	assert.Equal(t, types.Ticker{
