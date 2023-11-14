@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
@@ -13,10 +12,6 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-func toGlobalSymbol(s string) string {
-	return strings.ToUpper(s)
-}
 
 func toGlobalBalance(asset bitgetapi.AccountAsset) types.Balance {
 	return types.Balance{
@@ -30,23 +25,23 @@ func toGlobalBalance(asset bitgetapi.AccountAsset) types.Balance {
 	}
 }
 
-func toGlobalMarket(s bitgetapi.Symbol) types.Market {
-	if s.Status != bitgetapi.SymbolOnline {
+func toGlobalMarket(s v2.Symbol) types.Market {
+	if s.Status != v2.SymbolOnline {
 		log.Warnf("The symbol %s is not online", s.Symbol)
 	}
 	return types.Market{
-		Symbol:          s.SymbolName,
+		Symbol:          s.Symbol,
 		LocalSymbol:     s.Symbol,
-		PricePrecision:  s.PriceScale.Int(),
-		VolumePrecision: s.QuantityScale.Int(),
+		PricePrecision:  s.PricePrecision.Int(),
+		VolumePrecision: s.QuantityPrecision.Int(),
 		QuoteCurrency:   s.QuoteCoin,
 		BaseCurrency:    s.BaseCoin,
 		MinNotional:     s.MinTradeUSDT,
 		MinAmount:       s.MinTradeUSDT,
 		MinQuantity:     s.MinTradeAmount,
 		MaxQuantity:     s.MaxTradeAmount,
-		StepSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(s.QuantityScale.Int())),
-		TickSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(s.PriceScale.Int())),
+		StepSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(s.QuantityPrecision.Int())),
+		TickSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(s.PricePrecision.Int())),
 		MinPrice:        fixedpoint.Zero,
 		MaxPrice:        fixedpoint.Zero,
 	}

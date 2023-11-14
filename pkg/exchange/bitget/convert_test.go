@@ -46,53 +46,53 @@ func Test_toGlobalBalance(t *testing.T) {
 func Test_toGlobalMarket(t *testing.T) {
 	// sample:
 	//{
-	//            "symbol":"BTCUSDT_SPBL",
-	//            "symbolName":"BTCUSDT",
-	//            "baseCoin":"BTC",
-	//            "quoteCoin":"USDT",
-	//            "minTradeAmount":"0.0001",
-	//            "maxTradeAmount":"10000",
-	//            "takerFeeRate":"0.001",
-	//            "makerFeeRate":"0.001",
-	//            "priceScale":"4",
-	//            "quantityScale":"8",
-	//            "minTradeUSDT":"5",
-	//            "status":"online",
-	//            "buyLimitPriceRatio": "0.05",
-	//            "sellLimitPriceRatio": "0.05"
-	//        }
-	inst := bitgetapi.Symbol{
-		Symbol:              "BTCUSDT_SPBL",
-		SymbolName:          "BTCUSDT",
+	//   "symbol":"BTCUSDT",
+	//   "baseCoin":"BTC",
+	//   "quoteCoin":"USDT",
+	//   "minTradeAmount":"0",
+	//   "maxTradeAmount":"10000000000",
+	//   "takerFeeRate":"0.002",
+	//   "makerFeeRate":"0.002",
+	//   "pricePrecision":"2",
+	//   "quantityPrecision":"4",
+	//   "quotePrecision":"6",
+	//   "status":"online",
+	//   "minTradeUSDT":"5",
+	//   "buyLimitPriceRatio":"0.05",
+	//   "sellLimitPriceRatio":"0.05"
+	//}
+	inst := v2.Symbol{
+		Symbol:              "BTCUSDT",
 		BaseCoin:            "BTC",
 		QuoteCoin:           "USDT",
-		MinTradeAmount:      fixedpoint.NewFromFloat(0.0001),
-		MaxTradeAmount:      fixedpoint.NewFromFloat(10000),
-		TakerFeeRate:        fixedpoint.NewFromFloat(0.001),
-		MakerFeeRate:        fixedpoint.NewFromFloat(0.001),
-		PriceScale:          fixedpoint.NewFromFloat(4),
-		QuantityScale:       fixedpoint.NewFromFloat(8),
+		MinTradeAmount:      fixedpoint.NewFromFloat(0),
+		MaxTradeAmount:      fixedpoint.NewFromFloat(10000000000),
+		TakerFeeRate:        fixedpoint.NewFromFloat(0.002),
+		MakerFeeRate:        fixedpoint.NewFromFloat(0.002),
+		PricePrecision:      fixedpoint.NewFromFloat(2),
+		QuantityPrecision:   fixedpoint.NewFromFloat(4),
+		QuotePrecision:      fixedpoint.NewFromFloat(6),
 		MinTradeUSDT:        fixedpoint.NewFromFloat(5),
-		Status:              bitgetapi.SymbolOnline,
+		Status:              v2.SymbolOnline,
 		BuyLimitPriceRatio:  fixedpoint.NewFromFloat(0.05),
 		SellLimitPriceRatio: fixedpoint.NewFromFloat(0.05),
 	}
 
 	exp := types.Market{
-		Symbol:          inst.SymbolName,
+		Symbol:          inst.Symbol,
 		LocalSymbol:     inst.Symbol,
-		PricePrecision:  4,
-		VolumePrecision: 8,
+		PricePrecision:  2,
+		VolumePrecision: 4,
 		QuoteCurrency:   inst.QuoteCoin,
 		BaseCurrency:    inst.BaseCoin,
 		MinNotional:     inst.MinTradeUSDT,
 		MinAmount:       inst.MinTradeUSDT,
 		MinQuantity:     inst.MinTradeAmount,
 		MaxQuantity:     inst.MaxTradeAmount,
-		StepSize:        fixedpoint.NewFromFloat(0.00000001),
+		StepSize:        fixedpoint.NewFromFloat(0.0001),
 		MinPrice:        fixedpoint.Zero,
 		MaxPrice:        fixedpoint.Zero,
-		TickSize:        fixedpoint.NewFromFloat(0.0001),
+		TickSize:        fixedpoint.NewFromFloat(0.01),
 	}
 
 	assert.Equal(t, toGlobalMarket(inst), exp)
