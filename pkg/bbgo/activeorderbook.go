@@ -268,7 +268,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 
 	b.mu.Lock()
 	if !b.orders.Exists(order.OrderID) {
-		log.Infof("[ActiveOrderBook] order #%d %s does not exist, adding it to pending order update", order.OrderID, order.Status)
+		log.Debugf("[ActiveOrderBook] order #%d %s does not exist, adding it to pending order update", order.OrderID, order.Status)
 		b.pendingOrderUpdates.Add(order)
 		b.mu.Unlock()
 		return
