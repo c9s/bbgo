@@ -21,9 +21,10 @@ const (
 
 	PlatformToken = "BGB"
 
-	queryLimit       = 100
-	maxOrderIdLen    = 36
-	queryMaxDuration = 90 * 24 * time.Hour
+	queryLimit        = 100
+	defaultKLineLimit = 100
+	maxOrderIdLen     = 36
+	queryMaxDuration  = 90 * 24 * time.Hour
 )
 
 var log = logrus.WithFields(logrus.Fields{
@@ -49,6 +50,8 @@ var (
 	queryTradeRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
 	// cancelOrderRateLimiter has its own rate limit. https://www.bitget.com/api-doc/spot/trade/Cancel-Order
 	cancelOrderRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
+	// kLineRateLimiter has its own rate limit. https://www.bitget.com/api-doc/spot/market/Get-Candle-Data
+	kLineOrderRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
 )
 
 type Exchange struct {
@@ -153,9 +156,56 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	return tickers, nil
 }
 
+// QueryKLines queries the k line data by interval and time range...etc.
+//
+// If you provide only the start time, the system will return the latest data.
+// If you provide both the start and end times, the system will return data within the specified range.
+// If you provide only the end time, the system will return data that occurred before the end time.
+//
+// The end time has different limits. 1m, 5m can query for one month,15m can query for 52 days,30m can query for 62 days,
+// 1H can query for 83 days,4H can query for 240 days,6H can query for 360 days.
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	// TODO implement me
-	panic("implement me")
+	req := e.v2Client.NewGetKLineRequest().Symbol(symbol)
+	intervalStr, found := toLocalGranularity[interval]
+	if !found {
+		return nil, fmt.Errorf("%s not supported, supported granlarity: %+v", intervalStr, toLocalGranularity)
+	}
+	req.Granularity(intervalStr)
+
+	limit := uint64(options.Limit)
+	if limit > defaultKLineLimit || limit <= 0 {
+		log.Debugf("limtit is exceeded or zero, update to %d, got: %d", defaultKLineLimit, options.Limit)
+		limit = defaultKLineLimit
+	}
+	req.Limit(strconv.FormatUint(limit, 10))
+
+	if options.StartTime != nil {
+		req.StartTime(*options.StartTime)
+	}
+
+	if options.EndTime != nil {
+		if options.StartTime != nil && options.EndTime.Before(*options.StartTime) {
+			return nil, fmt.Errorf("end time %s before start time %s", *options.EndTime, *options.StartTime)
+		}
+
+		ok, duration := hasMaxDuration(interval)
+		if ok && time.Since(*options.EndTime) > duration {
+			return nil, fmt.Errorf("end time %s are greater than max duration %s", *options.EndTime, duration)
+		}
+		req.EndTime(*options.EndTime)
+	}
+
+	if err := kLineOrderRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query klines rate limiter wait error: %w", err)
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call k line, err: %w", err)
+	}
+
+	kLines := toGlobalKLines(symbol, interval, resp)
+	return types.SortKLinesAscending(kLines), nil
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {

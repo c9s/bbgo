@@ -299,7 +299,42 @@ var (
 		"candle1D":  types.Interval1d,
 		"candle1W":  types.Interval1w,
 	}
+
+	// we align utc time zone
+	toLocalGranularity = map[types.Interval]string{
+		types.Interval1m:  "1min",
+		types.Interval5m:  "5min",
+		types.Interval15m: "15min",
+		types.Interval30m: "30min",
+		types.Interval1h:  "1h",
+		types.Interval4h:  "4h",
+		types.Interval6h:  "6Hutc",
+		types.Interval12h: "12Hutc",
+		types.Interval1d:  "1Dutc",
+		types.Interval3d:  "3Dutc",
+		types.Interval1w:  "1Wutc",
+		types.Interval1mo: "1Mutc",
+	}
 )
+
+func hasMaxDuration(interval types.Interval) (bool, time.Duration) {
+	switch interval {
+	case types.Interval1m, types.Interval5m:
+		return true, 30 * 24 * time.Hour
+	case types.Interval15m:
+		return true, 52 * 24 * time.Hour
+	case types.Interval30m:
+		return true, 62 * 24 * time.Hour
+	case types.Interval1h:
+		return true, 83 * 24 * time.Hour
+	case types.Interval4h:
+		return true, 240 * 24 * time.Hour
+	case types.Interval6h:
+		return true, 360 * 24 * time.Hour
+	default:
+		return false, 0 * time.Duration(0)
+	}
+}
 
 type KLine struct {
 	StartTime    types.MillisecondTimestamp
