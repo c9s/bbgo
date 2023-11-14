@@ -25,12 +25,15 @@ var (
 type Stream struct {
 	types.StandardStream
 
+	privateChannelSymbols []string
+
 	key, secret, passphrase   string
 	bookEventCallbacks        []func(o BookEvent)
 	marketTradeEventCallbacks []func(o MarketTradeEvent)
 	KLineEventCallbacks       []func(o KLineEvent)
 
-	accountEventCallbacks []func(e AccountEvent)
+	accountEventCallbacks    []func(e AccountEvent)
+	orderTradeEventCallbacks []func(e OrderTradeEvent)
 
 	lastCandle map[string]types.KLine
 }
@@ -56,6 +59,7 @@ func NewStream(key, secret, passphrase string) *Stream {
 
 	stream.OnAuth(stream.handleAuth)
 	stream.OnAccountEvent(stream.handleAccountEvent)
+	stream.OnOrderTradeEvent(stream.handleOrderTradeEvent)
 	return stream
 }
 
@@ -129,23 +133,50 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	case *AccountEvent:
 		s.EmitAccountEvent(*e)
 
+	case *OrderTradeEvent:
+		s.EmitOrderTradeEvent(*e)
+
+	case []byte:
+		// We only handle the 'pong' case. Others are unexpected.
+		if !bytes.Equal(e, pongBytes) {
+			log.Errorf("invalid event: %q", e)
+		}
 	}
 }
 
+// handleAuth subscribe private stream channels. Because Bitget doesn't allow authentication and subscription to be used
+// consecutively, we subscribe after authentication confirmation.
 func (s *Stream) handleAuth() {
-	if err := s.Conn.WriteJSON(WsOp{
+	op := WsOp{
 		Op: WsEventSubscribe,
 		Args: []WsArg{
 			{
 				InstType: instSpV2,
 				Channel:  ChannelAccount,
-				Coin:     "default", // default all
+				Coin:     "default", // all coins
 			},
 		},
-	}); err != nil {
+	}
+	if len(s.privateChannelSymbols) > 0 {
+		for _, symbol := range s.privateChannelSymbols {
+			op.Args = append(op.Args, WsArg{
+				InstType: instSpV2,
+				Channel:  ChannelOrders,
+				InstId:   symbol,
+			})
+		}
+	} else {
+		log.Warnf("you have not subscribed to any order channels")
+	}
+
+	if err := s.Conn.WriteJSON(op); err != nil {
 		log.WithError(err).Error("failed to send subscription request")
 		return
 	}
+}
+
+func (s *Stream) SetPrivateChannelSymbols(symbols []string) {
+	s.privateChannelSymbols = symbols
 }
 
 func (s *Stream) handlerConnect() {
@@ -279,6 +310,17 @@ func parseEvent(in []byte) (interface{}, error) {
 		book.instId = event.Arg.InstId
 		return &book, nil
 
+	case ChannelOrders:
+		var order OrderTradeEvent
+		err = json.Unmarshal(event.Data, &order.Orders)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal data into OrderTradeEvent, Arg: %+v Data: %s, err: %w", event.Arg, string(event.Data), err)
+		}
+
+		order.actionType = event.Action
+		order.instId = event.Arg.InstId
+		return &order, nil
+
 	case ChannelTrade:
 		var trade MarketTradeEvent
 		err = json.Unmarshal(event.Data, &trade.Events)
@@ -363,4 +405,32 @@ func (s *Stream) handleAccountEvent(m AccountEvent) {
 		return
 	}
 	s.StandardStream.EmitBalanceSnapshot(balanceMap)
+}
+
+func (s *Stream) handleOrderTradeEvent(m OrderTradeEvent) {
+	if len(m.Orders) == 0 {
+		return
+	}
+
+	for _, order := range m.Orders {
+		globalOrder, err := order.toGlobalOrder()
+		if err != nil {
+			log.Errorf("failed to convert order to global: %s", err)
+			continue
+		}
+		// The bitget support only snapshot on orders channel, so we use snapshot as update to emit data.
+		if m.actionType != ActionTypeSnapshot {
+			continue
+		}
+		s.StandardStream.EmitOrderUpdate(globalOrder)
+
+		if globalOrder.Status == types.OrderStatusPartiallyFilled {
+			trade, err := order.toGlobalTrade()
+			if err != nil {
+				log.Errorf("failed to convert trade to global: %s", err)
+				continue
+			}
+			s.StandardStream.EmitTradeUpdate(trade)
+		}
+	}
 }
