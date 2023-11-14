@@ -159,9 +159,6 @@ func (s *Stream) createEndpoint(_ context.Context) (string, error) {
 func (s *Stream) dispatchEvent(event interface{}) {
 	switch e := event.(type) {
 	case *WebSocketOpEvent:
-		if err := e.IsValid(); err != nil {
-			log.Errorf("invalid event: %v", err)
-		}
 		if e.IsAuthenticated() {
 			s.EmitAuth()
 		}
@@ -197,6 +194,15 @@ func (s *Stream) parseWebSocketEvent(in []byte) (interface{}, error) {
 
 	switch {
 	case e.IsOp():
+		if err = e.IsValid(); err != nil {
+			log.Errorf("invalid event: %+v, err: %s", e, err)
+			return nil, err
+		}
+
+		// return global pong event to avoid emit raw message
+		if ok, pongEvent := e.toGlobalPongEventIfValid(); ok {
+			return pongEvent, nil
+		}
 		return e.WebSocketOpEvent, nil
 
 	case e.IsTopic():
