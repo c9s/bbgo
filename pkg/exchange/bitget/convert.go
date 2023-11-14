@@ -362,3 +362,120 @@ func toGlobalKLines(symbol string, interval types.Interval, kLines v2.KLineRespo
 	}
 	return gKLines
 }
+
+func toGlobalTimeInForce(force v2.OrderForce) (types.TimeInForce, error) {
+	switch force {
+	case v2.OrderForceFOK:
+		return types.TimeInForceFOK, nil
+
+	case v2.OrderForceGTC, v2.OrderForcePostOnly:
+		return types.TimeInForceGTC, nil
+
+	case v2.OrderForceIOC:
+		return types.TimeInForceIOC, nil
+
+	default:
+		return "", fmt.Errorf("unexpected time-in-force: %s", force)
+	}
+}
+
+func (o *Order) processMarketBuyQuantity() (fixedpoint.Value, error) {
+	switch o.Status {
+	case v2.OrderStatusLive, v2.OrderStatusNew, v2.OrderStatusInit, v2.OrderStatusCancelled:
+		return fixedpoint.Zero, nil
+
+	case v2.OrderStatusPartialFilled:
+		if o.FillPrice.IsZero() {
+			return fixedpoint.Zero, fmt.Errorf("fillPrice for a partialFilled should not be zero")
+		}
+		return o.Size.Div(o.FillPrice), nil
+
+	case v2.OrderStatusFilled:
+		return o.AccBaseVolume, nil
+
+	default:
+		return fixedpoint.Zero, fmt.Errorf("unexpected status: %s", o.Status)
+	}
+}
+
+func (o *Order) toGlobalOrder() (types.Order, error) {
+	side, err := toGlobalSideType(o.Side)
+	if err != nil {
+		return types.Order{}, err
+	}
+
+	orderType, err := toGlobalOrderType(o.OrderType)
+	if err != nil {
+		return types.Order{}, err
+	}
+
+	timeInForce, err := toGlobalTimeInForce(o.Force)
+	if err != nil {
+		return types.Order{}, err
+	}
+
+	status, err := toGlobalOrderStatus(o.Status)
+	if err != nil {
+		return types.Order{}, err
+	}
+
+	qty := o.Size
+	if orderType == types.OrderTypeMarket && side == types.SideTypeBuy {
+		qty, err = o.processMarketBuyQuantity()
+		if err != nil {
+			return types.Order{}, err
+		}
+	}
+
+	return types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: o.ClientOrderId,
+			Symbol:        o.InstId,
+			Side:          side,
+			Type:          orderType,
+			Quantity:      qty,
+			Price:         o.PriceAvg,
+			TimeInForce:   timeInForce,
+		},
+		Exchange:         types.ExchangeBitget,
+		OrderID:          uint64(o.OrderId),
+		UUID:             strconv.FormatInt(int64(o.OrderId), 10),
+		Status:           status,
+		ExecutedQuantity: o.AccBaseVolume,
+		IsWorking:        o.Status.IsWorking(),
+		CreationTime:     types.Time(o.CTime.Time()),
+		UpdateTime:       types.Time(o.UTime.Time()),
+	}, nil
+}
+
+func (o *Order) toGlobalTrade() (types.Trade, error) {
+	if o.Status != v2.OrderStatusPartialFilled {
+		return types.Trade{}, fmt.Errorf("failed to convert to global trade, unexpected status: %s", o.Status)
+	}
+
+	side, err := toGlobalSideType(o.Side)
+	if err != nil {
+		return types.Trade{}, err
+	}
+
+	isMaker, err := o.isMaker()
+	if err != nil {
+		return types.Trade{}, err
+	}
+
+	return types.Trade{
+		ID:            uint64(o.TradeId),
+		OrderID:       uint64(o.OrderId),
+		Exchange:      types.ExchangeBitget,
+		Price:         o.FillPrice,
+		Quantity:      o.BaseVolume,
+		QuoteQuantity: o.FillPrice.Mul(o.BaseVolume),
+		Symbol:        o.InstId,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       isMaker,
+		Time:          types.Time(o.FillTime),
+		Fee:           o.FillFee.Abs(),
+		FeeCurrency:   o.FillFeeCoin,
+	}, nil
+}

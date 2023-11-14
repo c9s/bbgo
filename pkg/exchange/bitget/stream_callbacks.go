@@ -43,3 +43,13 @@ func (s *Stream) EmitAccountEvent(e AccountEvent) {
 		cb(e)
 	}
 }
+
+func (s *Stream) OnOrderTradeEvent(cb func(e OrderTradeEvent)) {
+	s.orderTradeEventCallbacks = append(s.orderTradeEventCallbacks, cb)
+}
+
+func (s *Stream) EmitOrderTradeEvent(e OrderTradeEvent) {
+	for _, cb := range s.orderTradeEventCallbacks {
+		cb(e)
+	}
+}

@@ -686,3 +686,452 @@ func Test_toGlobalKLines(t *testing.T) {
 
 	assert.Equal(t, toGlobalKLines(symbol, interval, resp), expKlines)
 }
+
+func Test_toGlobalTimeInForce(t *testing.T) {
+	force, err := toGlobalTimeInForce(v2.OrderForceFOK)
+	assert.NoError(t, err)
+	assert.Equal(t, types.TimeInForceFOK, force)
+
+	force, err = toGlobalTimeInForce(v2.OrderForceGTC)
+	assert.NoError(t, err)
+	assert.Equal(t, types.TimeInForceGTC, force)
+
+	force, err = toGlobalTimeInForce(v2.OrderForcePostOnly)
+	assert.NoError(t, err)
+	assert.Equal(t, types.TimeInForceGTC, force)
+
+	force, err = toGlobalTimeInForce(v2.OrderForceIOC)
+	assert.NoError(t, err)
+	assert.Equal(t, types.TimeInForceIOC, force)
+
+	_, err = toGlobalTimeInForce("xxx")
+	assert.ErrorContains(t, err, "xxx")
+}
+
+func TestOrder_processMarketBuyQuantity(t *testing.T) {
+	t.Run("zero qty", func(t *testing.T) {
+		o := Order{}
+		for _, s := range []v2.OrderStatus{v2.OrderStatusLive, v2.OrderStatusNew, v2.OrderStatusInit, v2.OrderStatusCancelled} {
+			o.Status = s
+			qty, err := o.processMarketBuyQuantity()
+			assert.NoError(t, err)
+			assert.Equal(t, fixedpoint.Zero, qty)
+		}
+	})
+
+	t.Run("calculate qty", func(t *testing.T) {
+		o := Order{
+			Size: fixedpoint.NewFromFloat(2),
+			Trade: Trade{
+				FillPrice: fixedpoint.NewFromFloat(1),
+			},
+			Status: v2.OrderStatusPartialFilled,
+		}
+		qty, err := o.processMarketBuyQuantity()
+		assert.NoError(t, err)
+		assert.Equal(t, fixedpoint.NewFromFloat(2), qty)
+	})
+
+	t.Run("return accumulated balance", func(t *testing.T) {
+		o := Order{
+			AccBaseVolume: fixedpoint.NewFromFloat(5),
+			Status:        v2.OrderStatusFilled,
+		}
+		qty, err := o.processMarketBuyQuantity()
+		assert.NoError(t, err)
+		assert.Equal(t, fixedpoint.NewFromFloat(5), qty)
+	})
+
+	t.Run("unexpected status", func(t *testing.T) {
+		o := Order{
+			Status: "xxx",
+		}
+		_, err := o.processMarketBuyQuantity()
+		assert.ErrorContains(t, err, "xxx")
+	})
+}
+
+func TestOrder_toGlobalOrder(t *testing.T) {
+	o := Order{
+		Trade: Trade{
+			FillPrice:   fixedpoint.NewFromFloat(0.49016),
+			TradeId:     types.StrInt64(1107950490073112582),
+			BaseVolume:  fixedpoint.NewFromFloat(33.6558),
+			FillTime:    types.NewMillisecondTimestampFromInt(1699881902235),
+			FillFee:     fixedpoint.NewFromFloat(-0.0336558),
+			FillFeeCoin: "BGB",
+			TradeScope:  "T",
+		},
+		InstId:           "BGBUSDT",
+		OrderId:          types.StrInt64(1107950489998626816),
+		ClientOrderId:    "cc73aab9-1e44-4022-8458-60d8c6a08753",
+		Size:             fixedpoint.NewFromFloat(39.0),
+		Notional:         fixedpoint.NewFromFloat(39.0),
+		OrderType:        v2.OrderTypeMarket,
+		Force:            v2.OrderForceGTC,
+		Side:             v2.SideTypeBuy,
+		AccBaseVolume:    fixedpoint.NewFromFloat(33.6558),
+		PriceAvg:         fixedpoint.NewFromFloat(0.49016),
+		Status:           v2.OrderStatusPartialFilled,
+		CTime:            types.NewMillisecondTimestampFromInt(1699881902217),
+		UTime:            types.NewMillisecondTimestampFromInt(1699881902248),
+		FeeDetail:        nil,
+		EnterPointSource: "API",
+	}
+
+	// market buy example:
+	//      {
+	//         "instId":"BGBUSDT",
+	//         "orderId":"1107950489998626816",
+	//         "clientOid":"cc73aab9-1e44-4022-8458-60d8c6a08753",
+	//         "size":"39.0000",
+	//         "notional":"39.000000",
+	//         "orderType":"market",
+	//         "force":"gtc",
+	//         "side":"buy",
+	//         "fillPrice":"0.49016",
+	//         "tradeId":"1107950490073112582",
+	//         "baseVolume":"33.6558",
+	//         "fillTime":"1699881902235",
+	//         "fillFee":"-0.0336558",
+	//         "fillFeeCoin":"BGB",
+	//         "tradeScope":"T",
+	//         "accBaseVolume":"33.6558",
+	//         "priceAvg":"0.49016",
+	//         "status":"partially_filled",
+	//         "cTime":"1699881902217",
+	//         "uTime":"1699881902248",
+	//         "feeDetail":[
+	//            {
+	//               "feeCoin":"BGB",
+	//               "fee":"-0.0336558"
+	//            }
+	//         ],
+	//         "enterPointSource":"API"
+	//      }
+	t.Run("market buy", func(t *testing.T) {
+		newO := o
+		res, err := newO.toGlobalOrder()
+		assert.NoError(t, err)
+		assert.Equal(t, types.Order{
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: "cc73aab9-1e44-4022-8458-60d8c6a08753",
+				Symbol:        "BGBUSDT",
+				Side:          types.SideTypeBuy,
+				Type:          types.OrderTypeMarket,
+				Quantity:      newO.Size.Div(newO.FillPrice),
+				Price:         newO.PriceAvg,
+				TimeInForce:   types.TimeInForceGTC,
+			},
+			Exchange:         types.ExchangeBitget,
+			OrderID:          uint64(newO.OrderId),
+			UUID:             strconv.FormatInt(int64(newO.OrderId), 10),
+			Status:           types.OrderStatusPartiallyFilled,
+			ExecutedQuantity: newO.AccBaseVolume,
+			IsWorking:        newO.Status.IsWorking(),
+			CreationTime:     types.Time(newO.CTime),
+			UpdateTime:       types.Time(newO.UTime),
+		}, res)
+	})
+
+	// market sell example:
+	//      {
+	//         "instId":"BGBUSDT",
+	//         "orderId":"1107940456212631553",
+	//         "clientOid":"088bb971-858e-48e2-b503-85c3274edd89",
+	//         "size":"285.0000",
+	//         "orderType":"market",
+	//         "force":"gtc",
+	//         "side":"sell",
+	//         "fillPrice":"0.48706",
+	//         "tradeId":"1107940456278728706",
+	//         "baseVolume":"22.5840",
+	//         "fillTime":"1699879509992",
+	//         "fillFee":"-0.01099976304",
+	//         "fillFeeCoin":"USDT",
+	//         "tradeScope":"T",
+	//         "accBaseVolume":"45.1675",
+	//         "priceAvg":"0.48706",
+	//         "status":"partially_filled",
+	//         "cTime":"1699879509976",
+	//         "uTime":"1699879510007",
+	//         "feeDetail":[
+	//            {
+	//               "feeCoin":"USDT",
+	//               "fee":"-0.02199928255"
+	//            }
+	//         ],
+	//         "enterPointSource":"API"
+	//      }
+	t.Run("market sell", func(t *testing.T) {
+		newO := o
+		newO.OrderType = v2.OrderTypeMarket
+		newO.Side = v2.SideTypeSell
+
+		res, err := newO.toGlobalOrder()
+		assert.NoError(t, err)
+		assert.Equal(t, types.Order{
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: "cc73aab9-1e44-4022-8458-60d8c6a08753",
+				Symbol:        "BGBUSDT",
+				Side:          types.SideTypeSell,
+				Type:          types.OrderTypeMarket,
+				Quantity:      newO.Size,
+				Price:         newO.PriceAvg,
+				TimeInForce:   types.TimeInForceGTC,
+			},
+			Exchange:         types.ExchangeBitget,
+			OrderID:          uint64(newO.OrderId),
+			UUID:             strconv.FormatInt(int64(newO.OrderId), 10),
+			Status:           types.OrderStatusPartiallyFilled,
+			ExecutedQuantity: newO.AccBaseVolume,
+			IsWorking:        newO.Status.IsWorking(),
+			CreationTime:     types.Time(newO.CTime),
+			UpdateTime:       types.Time(newO.UTime),
+		}, res)
+	})
+
+	// limit buy example:
+	//      {
+	//         "instId":"BGBUSDT",
+	//         "orderId":"1107955329902481408",
+	//         "clientOid":"c578164a-bf34-44ba-8bb7-a1538f33b1b8",
+	//         "price":"0.49998",
+	//         "size":"24.9990",
+	//         "notional":"24.999000",
+	//         "orderType":"limit",
+	//         "force":"gtc",
+	//         "side":"buy",
+	//         "fillPrice":"0.49998",
+	//         "tradeId":"1107955401758285828",
+	//         "baseVolume":"15.9404",
+	//         "fillTime":"1699883073272",
+	//         "fillFee":"-0.0159404",
+	//         "fillFeeCoin":"BGB",
+	//         "tradeScope":"M",
+	//         "accBaseVolume":"15.9404",
+	//         "priceAvg":"0.49998",
+	//         "status":"partially_filled",
+	//         "cTime":"1699883056140",
+	//         "uTime":"1699883073285",
+	//         "feeDetail":[
+	//            {
+	//               "feeCoin":"BGB",
+	//               "fee":"-0.0159404"
+	//            }
+	//         ],
+	//         "enterPointSource":"API"
+	//      }
+	t.Run("limit buy", func(t *testing.T) {
+		newO := o
+		newO.OrderType = v2.OrderTypeLimit
+
+		res, err := newO.toGlobalOrder()
+		assert.NoError(t, err)
+		assert.Equal(t, types.Order{
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: "cc73aab9-1e44-4022-8458-60d8c6a08753",
+				Symbol:        "BGBUSDT",
+				Side:          types.SideTypeBuy,
+				Type:          types.OrderTypeLimit,
+				Quantity:      newO.Size,
+				Price:         newO.PriceAvg,
+				TimeInForce:   types.TimeInForceGTC,
+			},
+			Exchange:         types.ExchangeBitget,
+			OrderID:          uint64(newO.OrderId),
+			UUID:             strconv.FormatInt(int64(newO.OrderId), 10),
+			Status:           types.OrderStatusPartiallyFilled,
+			ExecutedQuantity: newO.AccBaseVolume,
+			IsWorking:        newO.Status.IsWorking(),
+			CreationTime:     types.Time(newO.CTime),
+			UpdateTime:       types.Time(newO.UTime),
+		}, res)
+	})
+
+	// limit sell example:
+	//      {
+	//         "instId":"BGBUSDT",
+	//         "orderId":"1107936497259417600",
+	//         "clientOid":"02d4592e-091c-4b5a-aef3-6a7cf57b5e82",
+	//         "price":"0.48710",
+	//         "size":"280.0000",
+	//         "orderType":"limit",
+	//         "force":"gtc",
+	//         "side":"sell",
+	//         "fillPrice":"0.48710",
+	//         "tradeId":"1107937053540556809",
+	//         "baseVolume":"41.0593",
+	//         "fillTime":"1699878698716",
+	//         "fillFee":"-0.01999998503",
+	//         "fillFeeCoin":"USDT",
+	//         "tradeScope":"M",
+	//         "accBaseVolume":"146.3209",
+	//         "priceAvg":"0.48710",
+	//         "status":"partially_filled",
+	//         "cTime":"1699878566088",
+	//         "uTime":"1699878698746",
+	//         "feeDetail":[
+	//            {
+	//               "feeCoin":"USDT",
+	//               "fee":"-0.07127291039"
+	//            }
+	//         ],
+	//         "enterPointSource":"API"
+	//      }
+	t.Run("limit sell", func(t *testing.T) {
+		newO := o
+		newO.OrderType = v2.OrderTypeLimit
+		newO.Side = v2.SideTypeSell
+
+		res, err := newO.toGlobalOrder()
+		assert.NoError(t, err)
+		assert.Equal(t, types.Order{
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: "cc73aab9-1e44-4022-8458-60d8c6a08753",
+				Symbol:        "BGBUSDT",
+				Side:          types.SideTypeSell,
+				Type:          types.OrderTypeLimit,
+				Quantity:      newO.Size,
+				Price:         newO.PriceAvg,
+				TimeInForce:   types.TimeInForceGTC,
+			},
+			Exchange:         types.ExchangeBitget,
+			OrderID:          uint64(newO.OrderId),
+			UUID:             strconv.FormatInt(int64(newO.OrderId), 10),
+			Status:           types.OrderStatusPartiallyFilled,
+			ExecutedQuantity: newO.AccBaseVolume,
+			IsWorking:        newO.Status.IsWorking(),
+			CreationTime:     types.Time(newO.CTime),
+			UpdateTime:       types.Time(newO.UTime),
+		}, res)
+	})
+
+	t.Run("unexpected status", func(t *testing.T) {
+		newO := o
+		newO.Status = "xxx"
+		_, err := newO.toGlobalOrder()
+		assert.ErrorContains(t, err, "xxx")
+	})
+
+	t.Run("unexpected time-in-force", func(t *testing.T) {
+		newO := o
+		newO.Force = "xxx"
+		_, err := newO.toGlobalOrder()
+		assert.ErrorContains(t, err, "xxx")
+	})
+
+	t.Run("unexpected order type", func(t *testing.T) {
+		newO := o
+		newO.OrderType = "xxx"
+		_, err := newO.toGlobalOrder()
+		assert.ErrorContains(t, err, "xxx")
+	})
+
+	t.Run("unexpected side", func(t *testing.T) {
+		newO := o
+		newO.Side = "xxx"
+		_, err := newO.toGlobalOrder()
+		assert.ErrorContains(t, err, "xxx")
+	})
+}
+
+func TestOrder_toGlobalTrade(t *testing.T) {
+	// market buy example:
+	//      {
+	//         "instId":"BGBUSDT",
+	//         "orderId":"1107950489998626816",
+	//         "clientOid":"cc73aab9-1e44-4022-8458-60d8c6a08753",
+	//         "size":"39.0000",
+	//         "notional":"39.000000",
+	//         "orderType":"market",
+	//         "force":"gtc",
+	//         "side":"buy",
+	//         "fillPrice":"0.49016",
+	//         "tradeId":"1107950490073112582",
+	//         "baseVolume":"33.6558",
+	//         "fillTime":"1699881902235",
+	//         "fillFee":"-0.0336558",
+	//         "fillFeeCoin":"BGB",
+	//         "tradeScope":"T",
+	//         "accBaseVolume":"33.6558",
+	//         "priceAvg":"0.49016",
+	//         "status":"partially_filled",
+	//         "cTime":"1699881902217",
+	//         "uTime":"1699881902248",
+	//         "feeDetail":[
+	//            {
+	//               "feeCoin":"BGB",
+	//               "fee":"-0.0336558"
+	//            }
+	//         ],
+	//         "enterPointSource":"API"
+	//      }
+	o := Order{
+		Trade: Trade{
+			FillPrice:   fixedpoint.NewFromFloat(0.49016),
+			TradeId:     types.StrInt64(1107950490073112582),
+			BaseVolume:  fixedpoint.NewFromFloat(33.6558),
+			FillTime:    types.NewMillisecondTimestampFromInt(1699881902235),
+			FillFee:     fixedpoint.NewFromFloat(-0.0336558),
+			FillFeeCoin: "BGB",
+			TradeScope:  "T",
+		},
+		InstId:           "BGBUSDT",
+		OrderId:          types.StrInt64(1107950489998626816),
+		ClientOrderId:    "cc73aab9-1e44-4022-8458-60d8c6a08753",
+		Size:             fixedpoint.NewFromFloat(39.0),
+		Notional:         fixedpoint.NewFromFloat(39.0),
+		OrderType:        v2.OrderTypeMarket,
+		Force:            v2.OrderForceGTC,
+		Side:             v2.SideTypeBuy,
+		AccBaseVolume:    fixedpoint.NewFromFloat(33.6558),
+		PriceAvg:         fixedpoint.NewFromFloat(0.49016),
+		Status:           v2.OrderStatusPartialFilled,
+		CTime:            types.NewMillisecondTimestampFromInt(1699881902217),
+		UTime:            types.NewMillisecondTimestampFromInt(1699881902248),
+		FeeDetail:        nil,
+		EnterPointSource: "API",
+	}
+
+	t.Run("succeeds", func(t *testing.T) {
+		res, err := o.toGlobalTrade()
+		assert.NoError(t, err)
+		assert.Equal(t, types.Trade{
+			ID:            uint64(o.TradeId),
+			OrderID:       uint64(o.OrderId),
+			Exchange:      types.ExchangeBitget,
+			Price:         o.FillPrice,
+			Quantity:      o.BaseVolume,
+			QuoteQuantity: o.FillPrice.Mul(o.BaseVolume),
+			Symbol:        "BGBUSDT",
+			Side:          types.SideTypeBuy,
+			IsBuyer:       true,
+			IsMaker:       false,
+			Time:          types.Time(o.FillTime),
+			Fee:           o.FillFee.Abs(),
+			FeeCurrency:   "BGB",
+		}, res)
+	})
+
+	t.Run("unexpected trade scope", func(t *testing.T) {
+		newO := o
+		newO.TradeScope = "xxx"
+		_, err := newO.toGlobalTrade()
+		assert.ErrorContains(t, err, "xxx")
+	})
+
+	t.Run("unexpected side type", func(t *testing.T) {
+		newO := o
+		newO.Side = "xxx"
+		_, err := newO.toGlobalTrade()
+		assert.ErrorContains(t, err, "xxx")
+	})
+
+	t.Run("unexpected side type", func(t *testing.T) {
+		newO := o
+		newO.Status = "xxx"
+		_, err := newO.toGlobalTrade()
+		assert.ErrorContains(t, err, "xxx")
+	})
+}
