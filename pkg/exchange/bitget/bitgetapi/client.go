@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -163,4 +164,18 @@ type APIResponse struct {
 	Code    string          `json:"code"`
 	Message string          `json:"msg"`
 	Data    json.RawMessage `json:"data"`
+}
+
+func (a APIResponse) Validate() error {
+	// v1, v2 use the same success code.
+	// https://www.bitget.com/api-doc/spot/error-code/restapi
+	// https://bitgetlimited.github.io/apidoc/en/mix/#restapi-error-codes
+	if a.Code != "00000" {
+		return a.Error()
+	}
+	return nil
+}
+
+func (a APIResponse) Error() error {
+	return fmt.Errorf("code: %s, msg: %s, data: %q", a.Code, a.Message, a.Data)
 }
