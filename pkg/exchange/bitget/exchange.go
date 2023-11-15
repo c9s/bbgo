@@ -397,18 +397,22 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 // QueryClosedOrders queries closed order by time range(`CreatedTime`) and id. The order of the response is in descending order.
 // If you need to retrieve all data, please utilize the function pkg/exchange/batch.ClosedOrderBatchQuery.
 //
+// REMARK: If your start time is 90 days earlier, we will update it to now - 90 days.
 // ** Since is inclusive, Until is exclusive. If you use a time range to query, you must provide both a start time and an end time. **
 // ** Since and Until cannot exceed 90 days. **
-// ** Since from the last 90 days can be queried. **
+// ** Since from the last 90 days can be queried **
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
-	if time.Since(since) > queryMaxDuration {
-		return nil, fmt.Errorf("start time from the last 90 days can be queried, got: %s", since)
+	newSince := since
+
+	if time.Since(newSince) > queryMaxDuration {
+		newSince = time.Now().Add(-queryMaxDuration)
+		log.Warnf("!!!BITGET EXCHANGE API NOTICE!!! The closed order API cannot query data beyond 90 days from the current date, update %s -> %s", since, newSince)
 	}
-	if until.Before(since) {
-		return nil, fmt.Errorf("end time %s before start %s", until, since)
+	if until.Before(newSince) {
+		return nil, fmt.Errorf("end time %s before start %s", until, newSince)
 	}
-	if until.Sub(since) > queryMaxDuration {
-		return nil, fmt.Errorf("the start time %s and end time %s cannot exceed 90 days", since, until)
+	if until.Sub(newSince) > queryMaxDuration {
+		return nil, fmt.Errorf("the start time %s and end time %s cannot exceed 90 days", newSince, until)
 	}
 	if lastOrderID != 0 {
 		log.Warn("!!!BITGET EXCHANGE API NOTICE!!! The order of response is in descending order, so the last order id not supported.")
@@ -420,7 +424,7 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	res, err := e.v2client.NewGetHistoryOrdersRequest().
 		Symbol(symbol).
 		Limit(strconv.Itoa(queryLimit)).
-		StartTime(since).
+		StartTime(newSince).
 		EndTime(until).
 		Do(ctx)
 	if err != nil {
@@ -451,7 +455,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	}
 
 	for _, order := range orders {
-		req := e.client.NewCancelOrderRequest()
+		req := e.v2client.NewCancelOrderRequest()
 
 		reqId := ""
 		switch {
@@ -472,7 +476,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			continue
 		}
 
-		req.Symbol(order.Market.Symbol)
+		req.Symbol(order.Symbol)
 
 		if err := cancelOrderRateLimiter.Wait(ctx); err != nil {
 			errs = multierr.Append(errs, fmt.Errorf("cancel order rate limiter wait, order id: %s, error: %w", order.ClientOrderID, err))
@@ -485,8 +489,8 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 		}
 
 		// sanity check
-		if res.OrderId != reqId && res.ClientOrderId != reqId {
-			errs = multierr.Append(errs, fmt.Errorf("order id mismatch, exp: %s, respOrderId: %s, respClientOrderId: %s", reqId, res.OrderId, res.ClientOrderId))
+		if res.OrderId.String() != reqId && res.ClientOrderId != reqId {
+			errs = multierr.Append(errs, fmt.Errorf("order id mismatch, exp: %s, respOrderId: %d, respClientOrderId: %s", reqId, res.OrderId, res.ClientOrderId))
 			continue
 		}
 	}
@@ -498,6 +502,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 // using (`CreatedTime`) as the search criteria.
 // If you need to retrieve all data, please utilize the function pkg/exchange/batch.TradeBatchQuery.
 //
+// REMARK: If your start time is 90 days earlier, we will update it to now - 90 days.
 // ** StartTime is inclusive, EndTime is exclusive. If you use the EndTime, the StartTime is required. **
 // ** StartTime and EndTime cannot exceed 90 days. **
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
@@ -508,22 +513,25 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	req := e.v2client.NewGetTradeFillsRequest()
 	req.Symbol(symbol)
 
+	var newStartTime time.Time
 	if options.StartTime != nil {
-		if time.Since(*options.StartTime) > queryMaxDuration {
-			return nil, fmt.Errorf("start time from the last 90 days can be queried, got: %s", options.StartTime)
+		newStartTime = *options.StartTime
+		if time.Since(newStartTime) > queryMaxDuration {
+			newStartTime = time.Now().Add(-queryMaxDuration)
+			log.Warnf("!!!BITGET EXCHANGE API NOTICE!!! The trade API cannot query data beyond 90 days from the current date, update %s -> %s", *options.StartTime, newStartTime)
 		}
-		req.StartTime(*options.StartTime)
+		req.StartTime(newStartTime)
 	}
 
 	if options.EndTime != nil {
-		if options.StartTime == nil {
+		if newStartTime.IsZero() {
 			return nil, errors.New("start time is required for query trades if you take end time")
 		}
-		if options.EndTime.Before(*options.StartTime) {
-			return nil, fmt.Errorf("end time %s before start %s", *options.EndTime, *options.StartTime)
+		if options.EndTime.Before(newStartTime) {
+			return nil, fmt.Errorf("end time %s before start %s", *options.EndTime, newStartTime)
 		}
-		if options.EndTime.Sub(*options.StartTime) > queryMaxDuration {
-			return nil, fmt.Errorf("start time %s and end time %s cannot greater than 90 days", options.StartTime, options.EndTime)
+		if options.EndTime.Sub(newStartTime) > queryMaxDuration {
+			return nil, fmt.Errorf("start time %s and end time %s cannot greater than 90 days", newStartTime, options.EndTime)
 		}
 		req.EndTime(*options.EndTime)
 	}
