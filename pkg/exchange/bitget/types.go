@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -29,6 +30,7 @@ const (
 	// ChannelOrderBook15 top 15 order book of "books" that begins from bid1/ask1
 	ChannelOrderBook15 ChannelType = "books15"
 	ChannelTrade       ChannelType = "trade"
+	ChannelOrders      ChannelType = "orders"
 )
 
 type WsArg struct {
@@ -450,11 +452,71 @@ type Balance struct {
 	Locked fixedpoint.Value `json:"locked"`
 	// Restricted availability For spot copy trading
 	LimitAvailable fixedpoint.Value           `json:"limitAvailable"`
-	UTime          types.MillisecondTimestamp `json:"uTime"`
+	UpdatedTime    types.MillisecondTimestamp `json:"uTime"`
 }
 
 type AccountEvent struct {
 	Balances []Balance
+
+	// internal use
+	actionType ActionType
+	instId     string
+}
+
+type Trade struct {
+	// Latest filled price
+	FillPrice fixedpoint.Value `json:"fillPrice"`
+	TradeId   types.StrInt64   `json:"tradeId"`
+	// Number of latest filled orders
+	BaseVolume fixedpoint.Value           `json:"baseVolume"`
+	FillTime   types.MillisecondTimestamp `json:"fillTime"`
+	// Transaction fee of the latest transaction, negative value
+	FillFee fixedpoint.Value `json:"fillFee"`
+	// Currency of transaction fee of the latest transaction
+	FillFeeCoin string `json:"fillFeeCoin"`
+	// Direction of liquidity of the latest transaction
+	TradeScope string `json:"tradeScope"`
+}
+
+type Order struct {
+	Trade
+
+	InstId string `json:"instId"`
+	// OrderId are always numeric. It's confirmed with official customer service. https://t.me/bitgetOpenapi/24172
+	OrderId       types.StrInt64 `json:"orderId"`
+	ClientOrderId string         `json:"clientOid"`
+	// Size is base coin when orderType=limit; quote coin when orderType=market
+	Size fixedpoint.Value `json:"size"`
+	// Buy amount, returned when buying at market price
+	Notional      fixedpoint.Value           `json:"notional"`
+	OrderType     v2.OrderType               `json:"orderType"`
+	Force         v2.OrderForce              `json:"force"`
+	Side          v2.SideType                `json:"side"`
+	AccBaseVolume fixedpoint.Value           `json:"accBaseVolume"`
+	PriceAvg      fixedpoint.Value           `json:"priceAvg"`
+	Status        v2.OrderStatus             `json:"status"`
+	CreatedTime   types.MillisecondTimestamp `json:"cTime"`
+	UpdatedTime   types.MillisecondTimestamp `json:"uTime"`
+	FeeDetail     []struct {
+		FeeCoin string `json:"feeCoin"`
+		Fee     string `json:"fee"`
+	} `json:"feeDetail"`
+	EnterPointSource string `json:"enterPointSource"`
+}
+
+func (o *Order) isMaker() (bool, error) {
+	switch o.TradeScope {
+	case "T":
+		return false, nil
+	case "M":
+		return true, nil
+	default:
+		return false, fmt.Errorf("unexpected trade scope: %s", o.TradeScope)
+	}
+}
+
+type OrderTradeEvent struct {
+	Orders []Order
 
 	// internal use
 	actionType ActionType

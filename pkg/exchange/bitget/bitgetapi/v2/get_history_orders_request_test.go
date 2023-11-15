@@ -53,8 +53,8 @@ func TestOrderDetail_UnmarshalJSON(t *testing.T) {
 			EnterPointSource: "API",
 			FeeDetailRaw:     "",
 			OrderSource:      "normal",
-			CTime:            types.NewMillisecondTimestampFromInt(1699021576683),
-			UTime:            types.NewMillisecondTimestampFromInt(1699021649099),
+			CreatedTime:      types.NewMillisecondTimestampFromInt(1699021576683),
+			UpdatedTime:      types.NewMillisecondTimestampFromInt(1699021649099),
 			FeeDetail:        FeeDetail{},
 		}, od)
 	})
@@ -98,8 +98,8 @@ func TestOrderDetail_UnmarshalJSON(t *testing.T) {
 			EnterPointSource: "API",
 			FeeDetailRaw:     `{"newFees":{"c":0,"d":0,"deduction":false,"r":-0.0070005,"t":-0.0070005,"totalDeductionFee":0},"USDT":{"deduction":false,"feeCoinCode":"USDT","totalDeductionFee":0,"totalFee":-0.007000500000}}`,
 			OrderSource:      "normal",
-			CTime:            types.NewMillisecondTimestampFromInt(1699020564659),
-			UTime:            types.NewMillisecondTimestampFromInt(1699020564688),
+			CreatedTime:      types.NewMillisecondTimestampFromInt(1699020564659),
+			UpdatedTime:      types.NewMillisecondTimestampFromInt(1699020564688),
 			FeeDetail: FeeDetail{
 				NewFees: struct {
 					DeductedByCoupon     fixedpoint.Value `json:"c"`

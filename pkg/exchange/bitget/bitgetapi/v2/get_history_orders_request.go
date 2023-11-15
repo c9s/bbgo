@@ -51,8 +51,8 @@ type OrderDetail struct {
 	// The value is json string, so we unmarshal it after unmarshal OrderDetail
 	FeeDetailRaw string                     `json:"feeDetail"`
 	OrderSource  string                     `json:"orderSource"`
-	CTime        types.MillisecondTimestamp `json:"cTime"`
-	UTime        types.MillisecondTimestamp `json:"uTime"`
+	CreatedTime  types.MillisecondTimestamp `json:"cTime"`
+	UpdatedTime  types.MillisecondTimestamp `json:"uTime"`
 
 	FeeDetail FeeDetail
 }

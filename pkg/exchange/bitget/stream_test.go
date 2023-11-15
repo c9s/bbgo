@@ -134,6 +134,12 @@ func TestStream(t *testing.T) {
 		s.OnBalanceUpdate(func(balances types.BalanceMap) {
 			t.Log("get update", balances)
 		})
+		s.OnOrderUpdate(func(order types.Order) {
+			t.Log("order update", order)
+		})
+		s.OnTradeUpdate(func(trade types.Trade) {
+			t.Log("trade update", trade)
+		})
 
 		c := make(chan struct{})
 		<-c

@@ -394,7 +394,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	return orders, nil
 }
 
-// QueryClosedOrders queries closed order by time range(`CTime`) and id. The order of the response is in descending order.
+// QueryClosedOrders queries closed order by time range(`CreatedTime`) and id. The order of the response is in descending order.
 // If you need to retrieve all data, please utilize the function pkg/exchange/batch.ClosedOrderBatchQuery.
 //
 // ** Since is inclusive, Until is exclusive. If you use a time range to query, you must provide both a start time and an end time. **
@@ -495,7 +495,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 }
 
 // QueryTrades queries fill trades. The trade of the response is in descending order. The time-based query are typically
-// using (`CTime`) as the search criteria.
+// using (`CreatedTime`) as the search criteria.
 // If you need to retrieve all data, please utilize the function pkg/exchange/batch.TradeBatchQuery.
 //
 // ** StartTime is inclusive, EndTime is exclusive. If you use the EndTime, the StartTime is required. **
