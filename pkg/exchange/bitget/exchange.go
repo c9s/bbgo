@@ -420,8 +420,8 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 	res, err := e.v2client.NewGetHistoryOrdersRequest().
 		Symbol(symbol).
 		Limit(strconv.Itoa(queryLimit)).
-		StartTime(since.UnixMilli()).
-		EndTime(until.UnixMilli()).
+		StartTime(since).
+		EndTime(until).
 		Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
@@ -512,7 +512,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		if time.Since(*options.StartTime) > queryMaxDuration {
 			return nil, fmt.Errorf("start time from the last 90 days can be queried, got: %s", options.StartTime)
 		}
-		req.StartTime(options.StartTime.UnixMilli())
+		req.StartTime(*options.StartTime)
 	}
 
 	if options.EndTime != nil {
@@ -525,7 +525,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		if options.EndTime.Sub(*options.StartTime) > queryMaxDuration {
 			return nil, fmt.Errorf("start time %s and end time %s cannot greater than 90 days", options.StartTime, options.EndTime)
 		}
-		req.EndTime(options.EndTime.UnixMilli())
+		req.EndTime(*options.EndTime)
 	}
 
 	limit := options.Limit
