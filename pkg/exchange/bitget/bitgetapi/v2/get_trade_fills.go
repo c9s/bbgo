@@ -36,19 +36,19 @@ type TradeFee struct {
 }
 
 type Trade struct {
-	UserId     types.StrInt64             `json:"userId"`
-	Symbol     string                     `json:"symbol"`
-	OrderId    types.StrInt64             `json:"orderId"`
-	TradeId    types.StrInt64             `json:"tradeId"`
-	OrderType  OrderType                  `json:"orderType"`
-	Side       SideType                   `json:"side"`
-	PriceAvg   fixedpoint.Value           `json:"priceAvg"`
-	Size       fixedpoint.Value           `json:"size"`
-	Amount     fixedpoint.Value           `json:"amount"`
-	FeeDetail  TradeFee                   `json:"feeDetail"`
-	TradeScope TradeScope                 `json:"tradeScope"`
-	CTime      types.MillisecondTimestamp `json:"cTime"`
-	UTime      types.MillisecondTimestamp `json:"uTime"`
+	UserId      types.StrInt64             `json:"userId"`
+	Symbol      string                     `json:"symbol"`
+	OrderId     types.StrInt64             `json:"orderId"`
+	TradeId     types.StrInt64             `json:"tradeId"`
+	OrderType   OrderType                  `json:"orderType"`
+	Side        SideType                   `json:"side"`
+	PriceAvg    fixedpoint.Value           `json:"priceAvg"`
+	Size        fixedpoint.Value           `json:"size"`
+	Amount      fixedpoint.Value           `json:"amount"`
+	FeeDetail   TradeFee                   `json:"feeDetail"`
+	TradeScope  TradeScope                 `json:"tradeScope"`
+	CreatedTime types.MillisecondTimestamp `json:"cTime"`
+	UpdatedTime types.MillisecondTimestamp `json:"uTime"`
 }
 
 //go:generate GetRequest -url "/api/v2/spot/trade/fills" -type GetTradeFillsRequest -responseDataType []Trade
