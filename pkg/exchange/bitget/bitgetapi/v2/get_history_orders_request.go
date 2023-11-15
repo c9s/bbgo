@@ -6,6 +6,7 @@ package bitgetapi
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -91,10 +92,10 @@ type GetHistoryOrdersRequest struct {
 	// Limit number default 100 max 100
 	limit *string `param:"limit,query"`
 	// idLessThan requests the content on the page before this ID (older data), the value input should be the orderId of the corresponding interface.
-	idLessThan *string `param:"idLessThan,query"`
-	startTime  *int64  `param:"startTime,query"`
-	endTime    *int64  `param:"endTime,query"`
-	orderId    *string `param:"orderId,query"`
+	idLessThan *string    `param:"idLessThan,query"`
+	startTime  *time.Time `param:"startTime,milliseconds,query"`
+	endTime    *time.Time `param:"endTime,milliseconds,query"`
+	orderId    *string    `param:"orderId,query"`
 }
 
 func (c *Client) NewGetHistoryOrdersRequest() *GetHistoryOrdersRequest {

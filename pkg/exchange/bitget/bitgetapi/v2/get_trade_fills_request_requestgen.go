@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"strconv"
+	"time"
 )
 
 func (s *GetTradeFillsRequest) Symbol(symbol string) *GetTradeFillsRequest {
@@ -27,12 +29,12 @@ func (s *GetTradeFillsRequest) IdLessThan(idLessThan string) *GetTradeFillsReque
 	return s
 }
 
-func (s *GetTradeFillsRequest) StartTime(startTime int64) *GetTradeFillsRequest {
+func (s *GetTradeFillsRequest) StartTime(startTime time.Time) *GetTradeFillsRequest {
 	s.startTime = &startTime
 	return s
 }
 
-func (s *GetTradeFillsRequest) EndTime(endTime int64) *GetTradeFillsRequest {
+func (s *GetTradeFillsRequest) EndTime(endTime time.Time) *GetTradeFillsRequest {
 	s.endTime = &endTime
 	return s
 }
@@ -71,7 +73,8 @@ func (s *GetTradeFillsRequest) GetQueryParameters() (url.Values, error) {
 		startTime := *s.startTime
 
 		// assign parameter of startTime
-		params["startTime"] = startTime
+		// convert time.Time to milliseconds time stamp
+		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
 	} else {
 	}
 	// check endTime field -> json key endTime
@@ -79,7 +82,8 @@ func (s *GetTradeFillsRequest) GetQueryParameters() (url.Values, error) {
 		endTime := *s.endTime
 
 		// assign parameter of endTime
-		params["endTime"] = endTime
+		// convert time.Time to milliseconds time stamp
+		params["endTime"] = strconv.FormatInt(endTime.UnixNano()/int64(time.Millisecond), 10)
 	} else {
 	}
 	// check orderId field -> json key orderId
@@ -185,6 +189,12 @@ func (s *GetTradeFillsRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (s *GetTradeFillsRequest) GetPath() string {
+	return "/api/v2/spot/trade/fills"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (s *GetTradeFillsRequest) Do(ctx context.Context) ([]Trade, error) {
 
 	// no body params
@@ -194,7 +204,9 @@ func (s *GetTradeFillsRequest) Do(ctx context.Context) ([]Trade, error) {
 		return nil, err
 	}
 
-	apiURL := "/api/v2/spot/trade/fills"
+	var apiURL string
+
+	apiURL = s.GetPath()
 
 	req, err := s.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
@@ -211,6 +223,15 @@ func (s *GetTradeFillsRequest) Do(ctx context.Context) ([]Trade, error) {
 		return nil, err
 	}
 
+	type responseValidator interface {
+		Validate() error
+	}
+	validator, ok := interface{}(apiResponse).(responseValidator)
+	if ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
+	}
 	var data []Trade
 	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
 		return nil, err

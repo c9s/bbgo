@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"strconv"
+	"time"
 )
 
 func (g *GetHistoryOrdersRequest) Symbol(symbol string) *GetHistoryOrdersRequest {
@@ -27,12 +29,12 @@ func (g *GetHistoryOrdersRequest) IdLessThan(idLessThan string) *GetHistoryOrder
 	return g
 }
 
-func (g *GetHistoryOrdersRequest) StartTime(startTime int64) *GetHistoryOrdersRequest {
+func (g *GetHistoryOrdersRequest) StartTime(startTime time.Time) *GetHistoryOrdersRequest {
 	g.startTime = &startTime
 	return g
 }
 
-func (g *GetHistoryOrdersRequest) EndTime(endTime int64) *GetHistoryOrdersRequest {
+func (g *GetHistoryOrdersRequest) EndTime(endTime time.Time) *GetHistoryOrdersRequest {
 	g.endTime = &endTime
 	return g
 }
@@ -74,7 +76,8 @@ func (g *GetHistoryOrdersRequest) GetQueryParameters() (url.Values, error) {
 		startTime := *g.startTime
 
 		// assign parameter of startTime
-		params["startTime"] = startTime
+		// convert time.Time to milliseconds time stamp
+		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
 	} else {
 	}
 	// check endTime field -> json key endTime
@@ -82,7 +85,8 @@ func (g *GetHistoryOrdersRequest) GetQueryParameters() (url.Values, error) {
 		endTime := *g.endTime
 
 		// assign parameter of endTime
-		params["endTime"] = endTime
+		// convert time.Time to milliseconds time stamp
+		params["endTime"] = strconv.FormatInt(endTime.UnixNano()/int64(time.Millisecond), 10)
 	} else {
 	}
 	// check orderId field -> json key orderId
