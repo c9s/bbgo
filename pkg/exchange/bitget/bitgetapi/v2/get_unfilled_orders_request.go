@@ -27,8 +27,8 @@ type UnfilledOrder struct {
 	QuoteVolume      fixedpoint.Value           `json:"quoteVolume"`
 	EnterPointSource string                     `json:"enterPointSource"`
 	OrderSource      string                     `json:"orderSource"`
-	CTime            types.MillisecondTimestamp `json:"cTime"`
-	UTime            types.MillisecondTimestamp `json:"uTime"`
+	CreatedTime      types.MillisecondTimestamp `json:"cTime"`
+	UpdatedTime      types.MillisecondTimestamp `json:"uTime"`
 }
 
 //go:generate GetRequest -url "/api/v2/spot/trade/unfilled-orders" -type GetUnfilledOrdersRequest -responseDataType []UnfilledOrder

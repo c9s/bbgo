@@ -452,7 +452,7 @@ type Balance struct {
 	Locked fixedpoint.Value `json:"locked"`
 	// Restricted availability For spot copy trading
 	LimitAvailable fixedpoint.Value           `json:"limitAvailable"`
-	UTime          types.MillisecondTimestamp `json:"uTime"`
+	UpdatedTime    types.MillisecondTimestamp `json:"uTime"`
 }
 
 type AccountEvent struct {
@@ -495,8 +495,8 @@ type Order struct {
 	AccBaseVolume fixedpoint.Value           `json:"accBaseVolume"`
 	PriceAvg      fixedpoint.Value           `json:"priceAvg"`
 	Status        v2.OrderStatus             `json:"status"`
-	CTime         types.MillisecondTimestamp `json:"cTime"`
-	UTime         types.MillisecondTimestamp `json:"uTime"`
+	CreatedTime   types.MillisecondTimestamp `json:"cTime"`
+	UpdatedTime   types.MillisecondTimestamp `json:"uTime"`
 	FeeDetail     []struct {
 		FeeCoin string `json:"feeCoin"`
 		Fee     string `json:"fee"`

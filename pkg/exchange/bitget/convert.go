@@ -158,7 +158,7 @@ func toGlobalTrade(trade v2.Trade) (*types.Trade, error) {
 		Side:          side,
 		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       isMaker,
-		Time:          types.Time(trade.CTime),
+		Time:          types.Time(trade.CreatedTime),
 		Fee:           trade.FeeDetail.TotalFee.Abs(),
 		FeeCurrency:   trade.FeeDetail.FeeCoin,
 		FeeDiscounted: isDiscount,
@@ -211,8 +211,8 @@ func unfilledOrderToGlobalOrder(order v2.UnfilledOrder) (*types.Order, error) {
 		Status:           status,
 		ExecutedQuantity: order.BaseVolume,
 		IsWorking:        order.Status.IsWorking(),
-		CreationTime:     types.Time(order.CTime.Time()),
-		UpdateTime:       types.Time(order.UTime.Time()),
+		CreationTime:     types.Time(order.CreatedTime.Time()),
+		UpdateTime:       types.Time(order.UpdatedTime.Time()),
 	}, nil
 }
 
@@ -262,8 +262,8 @@ func toGlobalOrder(order v2.OrderDetail) (*types.Order, error) {
 		Status:           status,
 		ExecutedQuantity: order.BaseVolume,
 		IsWorking:        order.Status.IsWorking(),
-		CreationTime:     types.Time(order.CTime.Time()),
-		UpdateTime:       types.Time(order.UTime.Time()),
+		CreationTime:     types.Time(order.CreatedTime.Time()),
+		UpdateTime:       types.Time(order.UpdatedTime.Time()),
 	}, nil
 }
 
@@ -443,8 +443,8 @@ func (o *Order) toGlobalOrder() (types.Order, error) {
 		Status:           status,
 		ExecutedQuantity: o.AccBaseVolume,
 		IsWorking:        o.Status.IsWorking(),
-		CreationTime:     types.Time(o.CTime.Time()),
-		UpdateTime:       types.Time(o.UTime.Time()),
+		CreationTime:     types.Time(o.CreatedTime.Time()),
+		UpdateTime:       types.Time(o.UpdatedTime.Time()),
 	}, nil
 }
 

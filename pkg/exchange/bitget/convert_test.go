@@ -222,8 +222,8 @@ func Test_unfilledOrderToGlobalOrder(t *testing.T) {
 			QuoteVolume:      fixedpoint.NewFromFloat(0),
 			EnterPointSource: "API",
 			OrderSource:      "normal",
-			CTime:            types.NewMillisecondTimestampFromInt(1660704288118),
-			UTime:            types.NewMillisecondTimestampFromInt(1660704288118),
+			CreatedTime:      types.NewMillisecondTimestampFromInt(1660704288118),
+			UpdatedTime:      types.NewMillisecondTimestampFromInt(1660704288118),
 		}
 	)
 
@@ -296,8 +296,8 @@ func Test_toGlobalOrder(t *testing.T) {
 			EnterPointSource: "API",
 			FeeDetailRaw:     `{\"newFees\":{\"c\":0,\"d\":0,\"deduction\":false,\"r\":-0.0070005,\"t\":-0.0070005,\"totalDeductionFee\":0},\"USDT\":{\"deduction\":false,\"feeCoinCode\":\"USDT\",\"totalDeductionFee\":0,\"totalFee\":-0.007000500000}}`,
 			OrderSource:      "normal",
-			CTime:            types.NewMillisecondTimestampFromInt(1660704288118),
-			UTime:            types.NewMillisecondTimestampFromInt(1660704288118),
+			CreatedTime:      types.NewMillisecondTimestampFromInt(1660704288118),
+			UpdatedTime:      types.NewMillisecondTimestampFromInt(1660704288118),
 		}
 
 		expOrder = &types.Order{
@@ -558,9 +558,9 @@ func Test_toGlobalTrade(t *testing.T) {
 			TotalDeductionFee: fixedpoint.Zero,
 			TotalFee:          fixedpoint.NewFromFloat(-0.0070005),
 		},
-		TradeScope: v2.TradeTaker,
-		CTime:      types.NewMillisecondTimestampFromInt(1699020564676),
-		UTime:      types.NewMillisecondTimestampFromInt(1699020564687),
+		TradeScope:  v2.TradeTaker,
+		CreatedTime: types.NewMillisecondTimestampFromInt(1699020564676),
+		UpdatedTime: types.NewMillisecondTimestampFromInt(1699020564687),
 	}
 
 	res, err := toGlobalTrade(trade)
@@ -597,7 +597,7 @@ func Test_toGlobalBalanceMap(t *testing.T) {
 			Frozen:         fixedpoint.NewFromFloat(0.6),
 			Locked:         fixedpoint.NewFromFloat(0.7),
 			LimitAvailable: fixedpoint.Zero,
-			UTime:          types.NewMillisecondTimestampFromInt(1699020564676),
+			UpdatedTime:    types.NewMillisecondTimestampFromInt(1699020564676),
 		},
 	}))
 }
@@ -773,8 +773,8 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 		AccBaseVolume:    fixedpoint.NewFromFloat(33.6558),
 		PriceAvg:         fixedpoint.NewFromFloat(0.49016),
 		Status:           v2.OrderStatusPartialFilled,
-		CTime:            types.NewMillisecondTimestampFromInt(1699881902217),
-		UTime:            types.NewMillisecondTimestampFromInt(1699881902248),
+		CreatedTime:      types.NewMillisecondTimestampFromInt(1699881902217),
+		UpdatedTime:      types.NewMillisecondTimestampFromInt(1699881902248),
 		FeeDetail:        nil,
 		EnterPointSource: "API",
 	}
@@ -829,8 +829,8 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 			Status:           types.OrderStatusPartiallyFilled,
 			ExecutedQuantity: newO.AccBaseVolume,
 			IsWorking:        newO.Status.IsWorking(),
-			CreationTime:     types.Time(newO.CTime),
-			UpdateTime:       types.Time(newO.UTime),
+			CreationTime:     types.Time(newO.CreatedTime),
+			UpdateTime:       types.Time(newO.UpdatedTime),
 		}, res)
 	})
 
@@ -886,8 +886,8 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 			Status:           types.OrderStatusPartiallyFilled,
 			ExecutedQuantity: newO.AccBaseVolume,
 			IsWorking:        newO.Status.IsWorking(),
-			CreationTime:     types.Time(newO.CTime),
-			UpdateTime:       types.Time(newO.UTime),
+			CreationTime:     types.Time(newO.CreatedTime),
+			UpdateTime:       types.Time(newO.UpdatedTime),
 		}, res)
 	})
 
@@ -944,8 +944,8 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 			Status:           types.OrderStatusPartiallyFilled,
 			ExecutedQuantity: newO.AccBaseVolume,
 			IsWorking:        newO.Status.IsWorking(),
-			CreationTime:     types.Time(newO.CTime),
-			UpdateTime:       types.Time(newO.UTime),
+			CreationTime:     types.Time(newO.CreatedTime),
+			UpdateTime:       types.Time(newO.UpdatedTime),
 		}, res)
 	})
 
@@ -1002,8 +1002,8 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 			Status:           types.OrderStatusPartiallyFilled,
 			ExecutedQuantity: newO.AccBaseVolume,
 			IsWorking:        newO.Status.IsWorking(),
-			CreationTime:     types.Time(newO.CTime),
-			UpdateTime:       types.Time(newO.UTime),
+			CreationTime:     types.Time(newO.CreatedTime),
+			UpdateTime:       types.Time(newO.UpdatedTime),
 		}, res)
 	})
 
@@ -1088,8 +1088,8 @@ func TestOrder_toGlobalTrade(t *testing.T) {
 		AccBaseVolume:    fixedpoint.NewFromFloat(33.6558),
 		PriceAvg:         fixedpoint.NewFromFloat(0.49016),
 		Status:           v2.OrderStatusPartialFilled,
-		CTime:            types.NewMillisecondTimestampFromInt(1699881902217),
-		UTime:            types.NewMillisecondTimestampFromInt(1699881902248),
+		CreatedTime:      types.NewMillisecondTimestampFromInt(1699881902217),
+		UpdatedTime:      types.NewMillisecondTimestampFromInt(1699881902248),
 		FeeDetail:        nil,
 		EnterPointSource: "API",
 	}
