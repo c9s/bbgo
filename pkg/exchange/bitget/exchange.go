@@ -289,7 +289,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	// 2. The query oepn/closed order does not including the `force` in SPOT.
 	// If we support FOK/IOC, but you can't query them, that would be unreasonable.
 	// The other case to consider is 'PostOnly', which is a trade-off because we want to support 'xmaker'.
-	if order.TimeInForce != types.TimeInForceGTC {
+	if order.TimeInForce != types.TimeInForceGTC && len(order.TimeInForce) != 0 {
 		return nil, fmt.Errorf("time-in-force %s not supported", order.TimeInForce)
 	}
 	req.Force(v2.OrderForceGTC)
