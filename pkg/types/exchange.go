@@ -26,13 +26,13 @@ func (n *ExchangeName) UnmarshalJSON(data []byte) error {
 	}
 
 	switch s {
-	case "max", "binance", "okex", "kucoin":
+	case "binance", "bitget", "bybit", "max", "okex", "kucoin":
 		*n = ExchangeName(s)
 		return nil
 
 	}
 
-	return fmt.Errorf("unknown or unsupported exchange name: %s, valid names are: max, binance, okex, kucoin", s)
+	return fmt.Errorf("unknown or unsupported exchange name: %s, valid names are: binance, bitget, bybit, max, okex, kucoin", s)
 }
 
 func (n ExchangeName) String() string {
