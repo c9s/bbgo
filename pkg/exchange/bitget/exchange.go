@@ -123,7 +123,7 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 		return nil, fmt.Errorf("unexpected length of query single symbol: %+v", resp)
 	}
 
-	ticker := toGlobalTicker(resp[1])
+	ticker := toGlobalTicker(resp[0])
 	return &ticker, nil
 }
 
