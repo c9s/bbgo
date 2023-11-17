@@ -329,6 +329,8 @@ type ServiceConfig struct {
 type EnvironmentConfig struct {
 	DisableDefaultKLineSubscription bool `json:"disableDefaultKLineSubscription"`
 	DisableHistoryKLinePreload      bool `json:"disableHistoryKLinePreload"`
+	DisableSessionTradeBuffer       bool `json:"disableSessionTradeBuffer"`
+	MaxSessionTradeBufferSize       int  `json:"maxSessionTradeBufferSize"`
 }
 
 type Config struct {
