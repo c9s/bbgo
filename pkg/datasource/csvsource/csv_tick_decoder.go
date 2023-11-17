@@ -2,13 +2,12 @@ package csvsource
 
 import (
 	"encoding/csv"
-	"fmt"
-	"math/big"
 	"strconv"
-	"strings"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // CSVTickDecoder is an extension point for CSVTickReader to support custom file formats.
@@ -24,7 +23,7 @@ func NewBinanceCSVTickReader(csv *csv.Reader) *CSVTickReader {
 
 // BinanceCSVKLineDecoder decodes a CSV record from Binance into a CsvTick.
 func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
-	if len(row) < 7 {
+	if len(row) < 5 {
 		return nil, ErrNotEnoughColumns
 	}
 	// example csv row for some reason some properties are duplicated in their csv
@@ -55,7 +54,7 @@ func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
 	if isBuyerMaker {
 		side = types.SideTypeSell
 	}
-	ts, err := types.ParseMillisecondTimestamp(row[5])
+	n, err := strconv.ParseInt(row[5], 10, 64)
 	if err != nil {
 		return nil, ErrInvalidTimeFormat
 	}
@@ -68,7 +67,7 @@ func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
 		IsBuyerMaker:    isBuyerMaker,
 		HomeNotional:    price.Mul(qty),
 		ForeignNotional: price.Mul(baseQty),
-		Timestamp:       ts,
+		Timestamp:       types.NewMillisecondTimestampFromInt(n),
 		// Symbol: must be overwritten - info not in csv,
 		// TickDirection: would need to keep last tick in memory to compare tick direction,
 	}, nil
@@ -97,10 +96,6 @@ func BybitCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 	if err != nil {
 		return nil, ErrInvalidOrderSideFormat
 	}
-	id, err := uuidStringToUInt(row[6])
-	if err != nil {
-		return nil, ErrInvalidIDFormat
-	}
 	size, err := fixedpoint.NewFromString(row[3])
 	if err != nil {
 		return nil, ErrInvalidVolumeFormat
@@ -117,12 +112,13 @@ func BybitCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 	if err != nil {
 		return nil, ErrInvalidVolumeFormat
 	}
-	ts, err := types.ParseMillisecondTimestamp(row[0])
+	n, err := strconv.ParseFloat(row[0], 64) // startTime eg 1696982287.4922
 	if err != nil {
 		return nil, ErrInvalidTimeFormat
 	}
+	ts := time.Unix(int64(n), 0)
 	return &CsvTick{
-		TradeID:         id,
+		TradeID:         uint64(index),
 		Symbol:          row[1],
 		Exchange:        types.ExchangeBybit,
 		Side:            side,
@@ -131,19 +127,64 @@ func BybitCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 		HomeNotional:    hn,
 		ForeignNotional: fn,
 		TickDirection:   row[5], // todo does this seem promising to define for other exchanges too?
-		Timestamp:       ts,
+		Timestamp:       types.NewMillisecondTimestampFromInt(ts.UnixMilli()),
 	}, nil
 }
 
-func uuidStringToUInt(uuidStr string) (uint64, error) {
-	// Remove hyphens from the UUID string
-	uuidStr = strings.Replace(uuidStr, "-", "", -1)
-
-	// Parse the hexadecimal string into a big integer
-	uuidBigInt, success := new(big.Int).SetString(uuidStr, 16)
-	if !success {
-		return 0, fmt.Errorf("parse UUID as a big integer")
+// NewOKExCSVTickReader creates a new CSVTickReader for OKEx CSV files.
+func NewOKExCSVTickReader(csv *csv.Reader) *CSVTickReader {
+	return &CSVTickReader{
+		csv:     csv,
+		decoder: OKExCSVTickDecoder,
 	}
+}
 
-	return uuidBigInt.Uint64(), nil
+// OKExCSVKLineDecoder decodes a CSV record from OKEx into a CsvTick.
+func OKExCSVTickDecoder(row []string, index int) (*CsvTick, error) {
+	if len(row) < 5 {
+		return nil, ErrNotEnoughColumns
+	}
+	if index == 0 {
+		return nil, nil
+	}
+	// example csv row for OKeX
+	// trade_id, side,	size,	price,	created_time
+	// 134642,	sell,	6.2638	6.507	1.69975E+12
+	id, err := strconv.ParseInt(row[0], 10, 64)
+	if err != nil {
+		return nil, ErrInvalidIDFormat
+	}
+	price, err := fixedpoint.NewFromString(row[3])
+	if err != nil {
+		return nil, ErrInvalidPriceFormat
+	}
+	qty, err := fixedpoint.NewFromString(row[2])
+	if err != nil {
+		return nil, ErrInvalidVolumeFormat
+	}
+	side := types.SideTypeBuy
+	isBuyerMaker := false
+	if row[1] == "sell" {
+		side = types.SideTypeSell
+		isBuyerMaker = true
+	}
+	n, err := strconv.ParseInt(row[4], 10, 64)
+	if err != nil {
+		spew.Dump(row)
+		spew.Dump(err)
+		return nil, ErrInvalidTimeFormat
+	}
+	return &CsvTick{
+		TradeID:      uint64(id),
+		Exchange:     types.ExchangeOKEx,
+		Side:         side,
+		Size:         qty,
+		Price:        price,
+		IsBuyerMaker: isBuyerMaker,
+		HomeNotional: price.Mul(qty),
+		Timestamp:    types.NewMillisecondTimestampFromInt(n),
+		// ForeignNotional: // info not in csv
+		// Symbol: must be overwritten - info not in csv
+		// TickDirection: would need to keep last tick in memory to compare tick direction,
+	}, nil
 }

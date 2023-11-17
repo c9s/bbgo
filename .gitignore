@@ -49,6 +49,7 @@ testoutput
 
 *.swp
 /pkg/backtest/assets.go
+/data/backtest
 
 coverage.txt
 coverage_dum.txt

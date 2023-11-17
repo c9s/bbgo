@@ -18,11 +18,24 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type BackTestable interface {
+	Verify(sourceExchange types.Exchange, symbols []string, startTime time.Time, endTime time.Time) error
+	Sync(ctx context.Context, ex types.Exchange, symbol string, intervals []types.Interval, since, until time.Time) error
+	QueryKLine(ex types.ExchangeName, symbol string, interval types.Interval, orderBy string, limit int) (*types.KLine, error)
+	QueryKLinesForward(exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time, limit int) ([]types.KLine, error)
+	QueryKLinesBackward(exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time, limit int) ([]types.KLine, error)
+	QueryKLinesCh(since, until time.Time, exchange types.Exchange, symbols []string, intervals []types.Interval) (chan types.KLine, chan error)
+}
+
 type BacktestService struct {
 	DB *sqlx.DB
 }
 
-func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
+func NewBacktestService(db *sqlx.DB) *BacktestService {
+	return &BacktestService{DB: db}
+}
+
+func (s *BacktestService) syncKLineByInterval(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
 	log.Infof("synchronizing %s klines with interval %s: %s <=> %s", exchange.Name(), interval, startTime, endTime)
 
 	// TODO: use isFutures here
@@ -95,7 +108,7 @@ func (s *BacktestService) Verify(sourceExchange types.Exchange, symbols []string
 		for interval := range types.SupportedIntervals {
 			log.Infof("verifying %s %s backtesting data: %s to %s...", symbol, interval, startTime, endTime)
 
-			timeRanges, err := s.FindMissingTimeRanges(context.Background(), sourceExchange, symbol, interval,
+			timeRanges, err := s.findMissingTimeRanges(context.Background(), sourceExchange, symbol, interval,
 				startTime, endTime)
 			if err != nil {
 				return err
@@ -123,11 +136,11 @@ func (s *BacktestService) Verify(sourceExchange types.Exchange, symbols []string
 	return nil
 }
 
-func (s *BacktestService) SyncFresh(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
+func (s *BacktestService) syncFresh(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
 	log.Infof("starting fresh sync %s %s %s: %s <=> %s", exchange.Name(), symbol, interval, startTime, endTime)
 	startTime = startTime.Truncate(time.Minute).Add(-2 * time.Second)
 	endTime = endTime.Truncate(time.Minute).Add(2 * time.Second)
-	return s.SyncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime)
+	return s.syncKLineByInterval(ctx, exchange, symbol, interval, startTime, endTime)
 }
 
 // QueryKLine queries the klines from the database
@@ -350,18 +363,28 @@ func (t *TimeRange) String() string {
 	return t.Start.String() + " ~ " + t.End.String()
 }
 
-func (s *BacktestService) Sync(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) error {
-	t1, t2, err := s.QueryExistingDataRange(ctx, ex, symbol, interval, since, until)
-	if err != nil && err != sql.ErrNoRows {
-		return err
+func (s *BacktestService) Sync(ctx context.Context, ex types.Exchange, symbol string, intervals []types.Interval, since, until time.Time) error {
+	for _, interval := range intervals {
+		t1, t2, err := s.queryExistingDataRange(ctx, ex, symbol, interval, since, until)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+
+		if err == sql.ErrNoRows || t1 == nil || t2 == nil {
+			// fallback to fresh sync
+			err := s.syncFresh(ctx, ex, symbol, interval, since, until)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := s.syncPartial(ctx, ex, symbol, interval, since, until)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
-	if err == sql.ErrNoRows || t1 == nil || t2 == nil {
-		// fallback to fresh sync
-		return s.SyncFresh(ctx, ex, symbol, interval, since, until)
-	}
-
-	return s.SyncPartial(ctx, ex, symbol, interval, since, until)
+	return nil
 }
 
 // SyncPartial
@@ -369,20 +392,20 @@ func (s *BacktestService) Sync(ctx context.Context, ex types.Exchange, symbol st
 // scan if there is a missing part
 // create a time range slice []TimeRange
 // iterate the []TimeRange slice to sync data.
-func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) error {
+func (s *BacktestService) syncPartial(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) error {
 	log.Infof("starting partial sync %s %s %s: %s <=> %s", ex.Name(), symbol, interval, since, until)
 
-	t1, t2, err := s.QueryExistingDataRange(ctx, ex, symbol, interval, since, until)
+	t1, t2, err := s.queryExistingDataRange(ctx, ex, symbol, interval, since, until)
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 
 	if err == sql.ErrNoRows || t1 == nil || t2 == nil {
 		// fallback to fresh sync
-		return s.SyncFresh(ctx, ex, symbol, interval, since, until)
+		return s.syncFresh(ctx, ex, symbol, interval, since, until)
 	}
 
-	timeRanges, err := s.FindMissingTimeRanges(ctx, ex, symbol, interval, t1.Time(), t2.Time())
+	timeRanges, err := s.findMissingTimeRanges(ctx, ex, symbol, interval, t1.Time(), t2.Time())
 	if err != nil {
 		return err
 	}
@@ -409,7 +432,7 @@ func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, sy
 	}
 
 	for _, timeRange := range timeRanges {
-		err = s.SyncKLineByInterval(ctx, ex, symbol, interval, timeRange.Start.Add(time.Second), timeRange.End.Add(-time.Second))
+		err = s.syncKLineByInterval(ctx, ex, symbol, interval, timeRange.Start.Add(time.Second), timeRange.End.Add(-time.Second))
 		if err != nil {
 			return err
 		}
@@ -420,7 +443,7 @@ func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, sy
 
 // FindMissingTimeRanges returns the missing time ranges, the start/end time represents the existing data time points.
 // So when sending kline query to the exchange API, we need to add one second to the start time and minus one second to the end time.
-func (s *BacktestService) FindMissingTimeRanges(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) ([]TimeRange, error) {
+func (s *BacktestService) findMissingTimeRanges(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) ([]TimeRange, error) {
 	query := SelectKLineTimePoints(ex.Name(), symbol, interval, since, until)
 	sql, args, err := query.ToSql()
 	if err != nil {
@@ -463,7 +486,7 @@ func (s *BacktestService) FindMissingTimeRanges(ctx context.Context, ex types.Ex
 	return timeRanges, nil
 }
 
-func (s *BacktestService) QueryExistingDataRange(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, tArgs ...time.Time) (start, end *types.Time, err error) {
+func (s *BacktestService) queryExistingDataRange(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, tArgs ...time.Time) (start, end *types.Time, err error) {
 	sel := SelectKLineTimeRange(ex.Name(), symbol, interval, tArgs...)
 	sql, args, err := sel.ToSql()
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
+	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -23,9 +23,9 @@ func TestCSVTickReader_ReadWithBinanceDecoder(t *testing.T) {
 			give: "11782578,6.00000000,1.00000000,14974844,14974844,1698623884463,True,True",
 			want: &CsvTick{
 				Timestamp:    types.NewMillisecondTimestampFromInt(1698623884463),
-				Size:         fixedpoint.NewFromFloat(1),
-				Price:        fixedpoint.NewFromFloat(6),
-				HomeNotional: fixedpoint.NewFromFloat(6),
+				Size:         Number(1),
+				Price:        Number(6),
+				HomeNotional: Number(6),
 			},
 			err: nil,
 		},

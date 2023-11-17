@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -34,11 +35,12 @@ func TestCSVKLineReader_ReadWithBinanceDecoder(t *testing.T) {
 			give: "1609459200000,28923.63000000,29031.34000000,28690.17000000,28995.13000000,2311.81144500",
 			want: types.KLine{
 				StartTime: types.NewTimeFromUnix(1609459200, 0),
-				Open:      fixedpoint.NewFromFloat(28923.63),
-				High:      fixedpoint.NewFromFloat(29031.34),
-				Low:       fixedpoint.NewFromFloat(28690.17),
-				Close:     fixedpoint.NewFromFloat(28995.13),
-				// todo mustNewFromString and NewFromFloat have different values
+				Open:      Number(28923.63),
+				High:      Number(29031.34),
+				Low:       Number(28690.17),
+				Close:     Number(28995.13),
+				// todo this should never happen >>
+				// mustNewFromString and NewFromFloat have different values after parse
 				Volume: fixedpoint.MustNewFromString("2311.81144500")},
 			err: nil,
 		},
@@ -47,11 +49,11 @@ func TestCSVKLineReader_ReadWithBinanceDecoder(t *testing.T) {
 			give: "1609459200000,28923.63000000,29031.34000000,28690.17000000,28995.13000000",
 			want: types.KLine{
 				StartTime: types.NewTimeFromUnix(1609459200, 0),
-				Open:      fixedpoint.NewFromFloat(28923.63),
-				High:      fixedpoint.NewFromFloat(29031.34),
-				Low:       fixedpoint.NewFromFloat(28690.17),
-				Close:     fixedpoint.NewFromFloat(28995.13),
-				Volume:    fixedpoint.NewFromFloat(0)},
+				Open:      Number(28923.63),
+				High:      Number(29031.34),
+				Low:       Number(28690.17),
+				Close:     Number(28995.13),
+				Volume:    Number(0)},
 			err: nil,
 		},
 		{
@@ -118,11 +120,11 @@ func TestCSVKLineReader_ReadWithMetaTraderDecoder(t *testing.T) {
 			give: "11/12/2008;16:00;779.527679;780.964756;777.527679;779.964756;5",
 			want: types.KLine{
 				StartTime: types.NewTimeFromUnix(time.Date(2008, 12, 11, 16, 0, 0, 0, time.UTC).Unix(), 0),
-				Open:      fixedpoint.NewFromFloat(779.527679),
-				High:      fixedpoint.NewFromFloat(780.964756),
-				Low:       fixedpoint.NewFromFloat(777.527679),
-				Close:     fixedpoint.NewFromFloat(779.964756),
-				Volume:    fixedpoint.NewFromFloat(5)},
+				Open:      Number(779.527679),
+				High:      Number(780.964756),
+				Low:       Number(777.527679),
+				Close:     Number(779.964756),
+				Volume:    Number(5)},
 			err: nil,
 		},
 		{
