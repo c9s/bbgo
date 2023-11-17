@@ -8,6 +8,7 @@ import (
 )
 
 type ICSVTickConverter interface {
+	GetTicks() []*CsvTick
 	LatestKLine() (k *types.KLine)
 	GetKLineResult() []types.KLine
 	CsvTickToKLine(tick *CsvTick, interval types.Interval) (closesKLine bool)
@@ -15,13 +16,19 @@ type ICSVTickConverter interface {
 
 // CSVTickConverter takes a tick and internally converts it to a KLine slice
 type CSVTickConverter struct {
+	ticks  []*CsvTick
 	klines []types.KLine
 }
 
 func NewCSVTickConverter() ICSVTickConverter {
 	return &CSVTickConverter{
+		ticks:  []*CsvTick{},
 		klines: []types.KLine{},
 	}
+}
+
+func (c *CSVTickConverter) GetTicks() []*CsvTick {
+	return c.ticks
 }
 
 // GetKLineResult returns the converted ticks as kLine of interval

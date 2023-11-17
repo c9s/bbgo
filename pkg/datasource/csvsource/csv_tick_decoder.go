@@ -24,7 +24,7 @@ func NewBinanceCSVTickReader(csv *csv.Reader) *CSVTickReader {
 
 // BinanceCSVKLineDecoder decodes a CSV record from Binance into a CsvTick.
 func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
-	if len(row) < 7 {
+	if len(row) < 5 {
 		return nil, ErrNotEnoughColumns
 	}
 	// example csv row for some reason some properties are duplicated in their csv
@@ -97,10 +97,10 @@ func BybitCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 	if err != nil {
 		return nil, ErrInvalidOrderSideFormat
 	}
-	id, err := uuidStringToUInt(row[6])
-	if err != nil {
-		return nil, ErrInvalidIDFormat
-	}
+	// id, err := uuidStringToUInt(row[6])
+	// if err != nil {
+	// 	return nil, ErrInvalidIDFormat
+	// }
 	size, err := fixedpoint.NewFromString(row[3])
 	if err != nil {
 		return nil, ErrInvalidVolumeFormat
@@ -122,7 +122,7 @@ func BybitCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 		return nil, ErrInvalidTimeFormat
 	}
 	return &CsvTick{
-		TradeID:         id,
+		TradeID:         uint64(index),
 		Symbol:          row[1],
 		Exchange:        types.ExchangeBybit,
 		Side:            side,
@@ -146,4 +146,57 @@ func uuidStringToUInt(uuidStr string) (uint64, error) {
 	}
 
 	return uuidBigInt.Uint64(), nil
+}
+
+// NewOKExCSVTickReader creates a new CSVTickReader for OKEx CSV files.
+func NewOKExCSVTickReader(csv *csv.Reader) *CSVTickReader {
+	return &CSVTickReader{
+		csv:     csv,
+		decoder: OKExCSVTickDecoder,
+	}
+}
+
+// OKExCSVKLineDecoder decodes a CSV record from OKEx into a CsvTick.
+func OKExCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
+	if len(row) < 5 {
+		return nil, ErrNotEnoughColumns
+	}
+	// example csv row for OKX
+	// trade_id, side,	size,	price,	created_time
+	// 134642,	sell,	6.2638	6.507	1.69975E+12
+	id, err := strconv.ParseUint(row[0], 10, 64)
+	if err != nil {
+		return nil, ErrInvalidIDFormat
+	}
+	price, err := fixedpoint.NewFromString(row[3])
+	if err != nil {
+		return nil, ErrInvalidPriceFormat
+	}
+	qty, err := fixedpoint.NewFromString(row[2])
+	if err != nil {
+		return nil, ErrInvalidVolumeFormat
+	}
+	side := types.SideTypeBuy
+	isBuyerMaker := false
+	if row[1] == "sell" {
+		side = types.SideTypeSell
+		isBuyerMaker = true
+	}
+	ts, err := types.ParseMillisecondTimestamp(row[4])
+	if err != nil {
+		return nil, ErrInvalidTimeFormat
+	}
+	return &CsvTick{
+		TradeID:      id,
+		Exchange:     types.ExchangeOKEx,
+		Side:         side,
+		Size:         qty,
+		Price:        price,
+		IsBuyerMaker: isBuyerMaker,
+		HomeNotional: price.Mul(qty),
+		Timestamp:    ts,
+		// ForeignNotional: // info not in csv
+		// Symbol: must be overwritten - info not in csv
+		// TickDirection: would need to keep last tick in memory to compare tick direction,
+	}, nil
 }

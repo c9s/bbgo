@@ -57,6 +57,7 @@ func BinanceCSVKLineDecoder(record []string, interval time.Duration) (types.KLin
 		err      error
 	)
 
+	spew.Dump(record)
 	if len(record) < 5 {
 		return k, ErrNotEnoughColumns
 	}

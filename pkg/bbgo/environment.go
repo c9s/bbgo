@@ -40,9 +40,9 @@ func init() {
 // IsBackTesting is a global variable that indicates the current environment is back-test or not.
 var IsBackTesting = false
 
-var BackTestService *service.BacktestService
+var BackTestService service.IBacktestService
 
-func SetBackTesting(s *service.BacktestService) {
+func SetBackTesting(s service.IBacktestService) {
 	BackTestService = s
 	IsBackTesting = s != nil
 }
@@ -85,7 +85,7 @@ type Environment struct {
 	TradeService      *service.TradeService
 	ProfitService     *service.ProfitService
 	PositionService   *service.PositionService
-	BacktestService   *service.BacktestService
+	BacktestService   service.IBacktestService
 	RewardService     *service.RewardService
 	MarginService     *service.MarginService
 	SyncService       *service.SyncService

@@ -10,25 +10,31 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/kucoin"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func Download(saveToPath, symbol string, exchange types.ExchangeName, start time.Time) error {
+func Download(saveToPath, symbol string, exchange types.ExchangeName, since, until time.Time) (err error) {
 	for {
 		var (
-			fileName = fmt.Sprintf("%s%s.csv", symbol, start.Format("2006-01-02"))
+			fileName = fmt.Sprintf("%s%s.csv", symbol, since.Format("2006-01-02"))
 		)
 
 		if fileExists(filepath.Join(saveToPath, fileName)) {
-			start = start.AddDate(0, 0, 1)
+			since = since.AddDate(0, 0, 1)
 			continue
 		}
 
-		var url = buildURL(exchange, symbol, fileName, start)
+		var url, err = buildURL(exchange, symbol, fileName, since)
+		if err != nil {
+			log.Error(err)
+			break
+		}
 
 		log.Info("fetching ", url)
 
@@ -43,13 +49,17 @@ func Download(saveToPath, symbol string, exchange types.ExchangeName, start time
 			log.Error(err)
 			break
 		}
-		start = start.AddDate(0, 0, 1)
+
+		since = since.AddDate(0, 0, 1)
+		if until.After(since) {
+			break
+		}
 	}
 
-	return nil
+	return err
 }
 
-func buildURL(exchange types.ExchangeName, symbol string, fileName string, start time.Time) (url string) {
+func buildURL(exchange types.ExchangeName, symbol string, fileName string, start time.Time) (url string, err error) {
 	switch exchange {
 	case types.ExchangeBybit:
 		url = fmt.Sprintf("https://public.bybit.com/trading/%s/%s.gz",
@@ -61,8 +71,25 @@ func buildURL(exchange types.ExchangeName, symbol string, fileName string, start
 			symbol,
 			symbol,
 			start.Format("2006-01-02"))
+	case types.ExchangeOKEx:
+		// todo temporary find a better solution
+		coins := strings.Split(kucoin.ToLocalSymbol(symbol), "-")
+		if len(coins) == 0 {
+			err = fmt.Errorf("%s not supported yet for OKEx.. care to fix it? PR's welcome", symbol)
+			return
+		}
+		baseCoin := coins[0]
+		quoteCoin := coins[1]
+		url = fmt.Sprintf("https://static.okx.com/cdn/okex/traderecords/aggtrades/daily/%s/%s-%s-aggtrades-%s.zip",
+			start.Format("20060102"),
+			baseCoin,
+			quoteCoin,
+			start.Format("2006-01-02"))
+	default:
+		err = fmt.Errorf("%s not supported yet as csv data source.. care to fix it? PR's welcome", exchange.String())
 	}
-	return url
+
+	return url, err
 }
 
 func readCSVFromUrl(exchange types.ExchangeName, url string) (csvContent []byte, err error) {
@@ -85,6 +112,12 @@ func readCSVFromUrl(exchange types.ExchangeName, url string) (csvContent []byte,
 		}
 
 	case types.ExchangeBinance:
+		csvContent, err = unzip(body)
+		if err != nil {
+			return nil, fmt.Errorf("unzip data %s: %w", exchange, err)
+		}
+
+	case types.ExchangeOKEx:
 		csvContent, err = unzip(body)
 		if err != nil {
 			return nil, fmt.Errorf("unzip data %s: %w", exchange, err)
