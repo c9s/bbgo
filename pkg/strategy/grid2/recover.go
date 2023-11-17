@@ -6,11 +6,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
+	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/pkg/errors"
 )
 
 var syncWindow = -3 * time.Minute
@@ -267,24 +269,34 @@ func buildTwinOrderBook(pins []Pin, orders []types.Order) (*TwinOrderBook, error
 	return book, nil
 }
 
-func syncActiveOrder(ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService, orderID uint64, syncBefore time.Time) (bool, error) {
+func syncActiveOrder(
+	ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService,
+	orderID uint64, syncBefore time.Time,
+) (isOrderUpdated bool, err error) {
+	isMax := isMaxExchange(orderQueryService)
+
 	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
 		Symbol:  activeOrderBook.Symbol,
 		OrderID: strconv.FormatUint(orderID, 10),
 	})
 
-	isActiveOrderBookUpdated := false
-
 	if err != nil {
-		return isActiveOrderBookUpdated, err
+		return isOrderUpdated, err
 	}
 
-	isActiveOrderBookUpdated = updatedOrder.UpdateTime.Before(syncBefore)
-	if isActiveOrderBookUpdated {
+	// maxapi.OrderStateFinalizing does not mean the fee is calculated
+	// we should only consider order state done for MAX
+	if isMax && updatedOrder.OriginalStatus != string(maxapi.OrderStateDone) {
+		return isOrderUpdated, nil
+	}
+
+	// should only trigger order update when the updated time is old enough
+	isOrderUpdated = updatedOrder.UpdateTime.Before(syncBefore)
+	if isOrderUpdated {
 		activeOrderBook.Update(*updatedOrder)
 	}
 
-	return isActiveOrderBookUpdated, nil
+	return isOrderUpdated, nil
 }
 
 func queryTradesToUpdateTwinOrderBook(

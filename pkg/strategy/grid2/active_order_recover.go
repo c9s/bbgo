@@ -4,14 +4,16 @@ import (
 	"context"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/exchange/retry"
-	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/max"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
+	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type SyncActiveOrdersOpts struct {
@@ -89,6 +91,11 @@ func (s *Strategy) recoverActiveOrdersPeriodically(ctx context.Context) {
 	}
 }
 
+func isMaxExchange(ex interface{}) bool {
+	_, yes := ex.(*max.Exchange)
+	return yes
+}
+
 func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 	opts.logger.Infof("[ActiveOrderRecover] syncActiveOrders")
 
@@ -115,6 +122,7 @@ func syncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 	var errs error
 	// update active orders not in open orders
 	for _, activeOrder := range activeOrders {
+
 		if _, exist := openOrdersMap[activeOrder.OrderID]; exist {
 			// no need to sync active order already in active orderbook, because we only need to know if it filled or not.
 			delete(openOrdersMap, activeOrder.OrderID)
