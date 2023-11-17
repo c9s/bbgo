@@ -115,8 +115,11 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 			}
 
 			if !sentAny {
-				log.Debugf("batch querying %T: %d/%d records are not sent", q.Type, listLen, listLen)
-				return
+				// there are 2 reasons that records can not send
+				// 1) duplicated record
+				// 2) out-of-range record
+				log.Debugf("batch querying %T: %d/%d records are not sent, continue to the next batch", q.Type, listLen, listLen)
+				continue
 			}
 		}
 	}()
