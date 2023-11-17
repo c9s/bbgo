@@ -34,15 +34,16 @@ func TestClient(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("GetUnfilledOrdersRequest", func(t *testing.T) {
-		req := client.NewGetUnfilledOrdersRequest().StartTime(1)
+		startTime := time.Now().Add(-30 * 24 * time.Hour)
+		req := client.NewGetUnfilledOrdersRequest().StartTime(startTime)
 		resp, err := req.Do(ctx)
 		assert.NoError(t, err)
 		t.Logf("resp: %+v", resp)
 	})
 
 	t.Run("GetHistoryOrdersRequest", func(t *testing.T) {
-		// market buy
-		req, err := client.NewGetHistoryOrdersRequest().Symbol("APEUSDT").Do(ctx)
+		startTime := time.Now().Add(-30 * 24 * time.Hour)
+		req, err := client.NewGetHistoryOrdersRequest().Symbol("APEUSDT").StartTime(startTime).Do(ctx)
 		assert.NoError(t, err)
 
 		t.Logf("place order resp: %+v", req)
@@ -61,7 +62,8 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("GetTradeFillsRequest", func(t *testing.T) {
-		req, err := client.NewGetTradeFillsRequest().Symbol("APEUSDT").Do(ctx)
+		startTime := time.Now().Add(-30 * 24 * time.Hour)
+		req, err := client.NewGetTradeFillsRequest().Symbol("APEUSDT").StartTime(startTime).Do(ctx)
 		assert.NoError(t, err)
 
 		t.Logf("get trade fills resp: %+v", req)

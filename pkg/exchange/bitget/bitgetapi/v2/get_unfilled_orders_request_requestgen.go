@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"strconv"
+	"time"
 )
 
 func (g *GetUnfilledOrdersRequest) Symbol(symbol string) *GetUnfilledOrdersRequest {
@@ -27,12 +29,12 @@ func (g *GetUnfilledOrdersRequest) IdLessThan(idLessThan string) *GetUnfilledOrd
 	return g
 }
 
-func (g *GetUnfilledOrdersRequest) StartTime(startTime int64) *GetUnfilledOrdersRequest {
+func (g *GetUnfilledOrdersRequest) StartTime(startTime time.Time) *GetUnfilledOrdersRequest {
 	g.startTime = &startTime
 	return g
 }
 
-func (g *GetUnfilledOrdersRequest) EndTime(endTime int64) *GetUnfilledOrdersRequest {
+func (g *GetUnfilledOrdersRequest) EndTime(endTime time.Time) *GetUnfilledOrdersRequest {
 	g.endTime = &endTime
 	return g
 }
@@ -74,7 +76,8 @@ func (g *GetUnfilledOrdersRequest) GetQueryParameters() (url.Values, error) {
 		startTime := *g.startTime
 
 		// assign parameter of startTime
-		params["startTime"] = startTime
+		// convert time.Time to milliseconds time stamp
+		params["startTime"] = strconv.FormatInt(startTime.UnixNano()/int64(time.Millisecond), 10)
 	} else {
 	}
 	// check endTime field -> json key endTime
@@ -82,7 +85,8 @@ func (g *GetUnfilledOrdersRequest) GetQueryParameters() (url.Values, error) {
 		endTime := *g.endTime
 
 		// assign parameter of endTime
-		params["endTime"] = endTime
+		// convert time.Time to milliseconds time stamp
+		params["endTime"] = strconv.FormatInt(endTime.UnixNano()/int64(time.Millisecond), 10)
 	} else {
 	}
 	// check orderId field -> json key orderId
@@ -188,6 +192,12 @@ func (g *GetUnfilledOrdersRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetUnfilledOrdersRequest) GetPath() string {
+	return "/api/v2/spot/trade/unfilled-orders"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetUnfilledOrdersRequest) Do(ctx context.Context) ([]UnfilledOrder, error) {
 
 	// no body params
@@ -197,7 +207,9 @@ func (g *GetUnfilledOrdersRequest) Do(ctx context.Context) ([]UnfilledOrder, err
 		return nil, err
 	}
 
-	apiURL := "/api/v2/spot/trade/unfilled-orders"
+	var apiURL string
+
+	apiURL = g.GetPath()
 
 	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
@@ -212,6 +224,16 @@ func (g *GetUnfilledOrdersRequest) Do(ctx context.Context) ([]UnfilledOrder, err
 	var apiResponse bitgetapi.APIResponse
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+	validator, ok := interface{}(apiResponse).(responseValidator)
+	if ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	var data []UnfilledOrder
 	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
