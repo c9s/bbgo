@@ -188,6 +188,7 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 		IsWorking:        maxOrder.State == max.OrderStateWait,
 		OrderID:          maxOrder.ID,
 		Status:           toGlobalOrderStatus(maxOrder.State, executedVolume, remainingVolume),
+		OriginalStatus:   string(maxOrder.State),
 		ExecutedQuantity: executedVolume,
 		CreationTime:     types.Time(maxOrder.CreatedAt.Time()),
 		UpdateTime:       types.Time(maxOrder.UpdatedAt.Time()),
