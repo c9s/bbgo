@@ -396,14 +396,27 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		return fmt.Errorf("market %s is not defined", symbol)
 	}
 
-	session.Trades[symbol] = &types.TradeSlice{Trades: nil}
-	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-		if trade.Symbol != symbol {
-			return
-		}
+	disableSessionTradeBuffer := environ.environmentConfig != nil && environ.environmentConfig.DisableSessionTradeBuffer
+	maxSessionTradeBufferSize := 0
+	if environ.environmentConfig != nil && environ.environmentConfig.MaxSessionTradeBufferSize > 0 {
+		maxSessionTradeBufferSize = environ.environmentConfig.MaxSessionTradeBufferSize
+	}
 
-		session.Trades[symbol].Append(trade)
-	})
+	session.Trades[symbol] = &types.TradeSlice{Trades: nil}
+
+	if !disableSessionTradeBuffer {
+		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+			if trade.Symbol != symbol {
+				return
+			}
+
+			session.Trades[symbol].Append(trade)
+
+			if maxSessionTradeBufferSize > 0 {
+				session.Trades[symbol].Truncate(maxSessionTradeBufferSize)
+			}
+		})
+	}
 
 	// session wide position
 	position := &types.Position{
@@ -416,7 +429,6 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 
 	orderStore := core.NewOrderStore(symbol)
 	orderStore.AddOrderUpdate = true
-
 	orderStore.BindStream(session.UserDataStream)
 	session.orderStores[symbol] = orderStore
 
