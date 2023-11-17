@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,7 +19,6 @@ import (
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -398,50 +396,39 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		return fmt.Errorf("market %s is not defined", symbol)
 	}
 
-	var err error
-	var trades []types.Trade
-	if environ.SyncService != nil && environ.BacktestService == nil {
-		tradingFeeCurrency := session.Exchange.PlatformFeeCurrency()
-		if strings.HasPrefix(symbol, tradingFeeCurrency) {
-			trades, err = environ.TradeService.QueryForTradingFeeCurrency(session.Exchange.Name(), symbol, tradingFeeCurrency)
-		} else {
-			trades, err = environ.TradeService.Query(service.QueryTradesOptions{
-				Exchange: session.Exchange.Name(),
-				Symbol:   symbol,
-				Ordering: "DESC",
-				Limit:    100,
-			})
-		}
-
-		if err != nil {
-			return err
-		}
-
-		trades = types.SortTradesAscending(trades)
-		log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
+	disableSessionTradeBuffer := environ.environmentConfig != nil && environ.environmentConfig.DisableSessionTradeBuffer
+	maxSessionTradeBufferSize := 0
+	if environ.environmentConfig != nil && environ.environmentConfig.MaxSessionTradeBufferSize > 0 {
+		maxSessionTradeBufferSize = environ.environmentConfig.MaxSessionTradeBufferSize
 	}
 
-	session.Trades[symbol] = &types.TradeSlice{Trades: trades}
-	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-		if trade.Symbol != symbol {
-			return
-		}
+	session.Trades[symbol] = &types.TradeSlice{Trades: nil}
 
-		session.Trades[symbol].Append(trade)
-	})
+	if !disableSessionTradeBuffer {
+		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+			if trade.Symbol != symbol {
+				return
+			}
 
+			session.Trades[symbol].Append(trade)
+
+			if maxSessionTradeBufferSize > 0 {
+				session.Trades[symbol].Truncate(maxSessionTradeBufferSize)
+			}
+		})
+	}
+
+	// session wide position
 	position := &types.Position{
 		Symbol:        symbol,
 		BaseCurrency:  market.BaseCurrency,
 		QuoteCurrency: market.QuoteCurrency,
 	}
-	position.AddTrades(trades)
 	position.BindStream(session.UserDataStream)
 	session.positions[symbol] = position
 
 	orderStore := core.NewOrderStore(symbol)
 	orderStore.AddOrderUpdate = true
-
 	orderStore.BindStream(session.UserDataStream)
 	session.orderStores[symbol] = orderStore
 
