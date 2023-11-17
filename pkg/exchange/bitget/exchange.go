@@ -21,10 +21,10 @@ const (
 
 	PlatformToken = "BGB"
 
-	queryLimit        = 100
-	defaultKLineLimit = 100
-	maxOrderIdLen     = 36
-	queryMaxDuration  = 90 * 24 * time.Hour
+	queryLimit                   = 100
+	defaultKLineLimit            = 100
+	maxOrderIdLen                = 36
+	maxHistoricalDataQueryPeriod = 90 * 24 * time.Hour
 )
 
 var log = logrus.WithFields(logrus.Fields{
@@ -286,10 +286,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 
 	// we support only GTC/PostOnly, this is because:
 	// 1. We support only SPOT trading.
-	// 2. The query oepn/closed order does not including the `force` in SPOT.
+	// 2. The query open/closed order does not include the `force` in SPOT.
 	// If we support FOK/IOC, but you can't query them, that would be unreasonable.
 	// The other case to consider is 'PostOnly', which is a trade-off because we want to support 'xmaker'.
-	if order.TimeInForce != types.TimeInForceGTC && len(order.TimeInForce) != 0 {
+	if len(order.TimeInForce) != 0 && order.TimeInForce != types.TimeInForceGTC {
 		return nil, fmt.Errorf("time-in-force %s not supported", order.TimeInForce)
 	}
 	req.Force(v2.OrderForceGTC)
@@ -403,15 +403,17 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 // ** Since from the last 90 days can be queried **
 func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
 	newSince := since
+	now := time.Now()
 
-	if time.Since(newSince) > queryMaxDuration {
-		newSince = time.Now().Add(-queryMaxDuration)
+	if time.Since(newSince) > maxHistoricalDataQueryPeriod {
+		newSince = now.Add(-maxHistoricalDataQueryPeriod)
 		log.Warnf("!!!BITGET EXCHANGE API NOTICE!!! The closed order API cannot query data beyond 90 days from the current date, update %s -> %s", since, newSince)
 	}
 	if until.Before(newSince) {
-		return nil, fmt.Errorf("end time %s before start %s", until, newSince)
+		log.Warnf("!!!BITGET EXCHANGE API NOTICE!!! The 'until' comes before 'since', update until to now(%s -> %s).", until, now)
+		until = now
 	}
-	if until.Sub(newSince) > queryMaxDuration {
+	if until.Sub(newSince) > maxHistoricalDataQueryPeriod {
 		return nil, fmt.Errorf("the start time %s and end time %s cannot exceed 90 days", newSince, until)
 	}
 	if lastOrderID != 0 {
@@ -516,8 +518,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	var newStartTime time.Time
 	if options.StartTime != nil {
 		newStartTime = *options.StartTime
-		if time.Since(newStartTime) > queryMaxDuration {
-			newStartTime = time.Now().Add(-queryMaxDuration)
+		if time.Since(newStartTime) > maxHistoricalDataQueryPeriod {
+			newStartTime = time.Now().Add(-maxHistoricalDataQueryPeriod)
 			log.Warnf("!!!BITGET EXCHANGE API NOTICE!!! The trade API cannot query data beyond 90 days from the current date, update %s -> %s", *options.StartTime, newStartTime)
 		}
 		req.StartTime(newStartTime)
@@ -530,7 +532,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		if options.EndTime.Before(newStartTime) {
 			return nil, fmt.Errorf("end time %s before start %s", *options.EndTime, newStartTime)
 		}
-		if options.EndTime.Sub(newStartTime) > queryMaxDuration {
+		if options.EndTime.Sub(newStartTime) > maxHistoricalDataQueryPeriod {
 			return nil, fmt.Errorf("start time %s and end time %s cannot greater than 90 days", newStartTime, options.EndTime)
 		}
 		req.EndTime(*options.EndTime)
