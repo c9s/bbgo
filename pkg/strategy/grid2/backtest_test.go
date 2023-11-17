@@ -66,7 +66,7 @@ func RunBacktest(t *testing.T, strategy bbgo.SingleExchangeStrategy) {
 		return
 	}
 
-	backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
+	backtestService := service.NewBacktestService(environ.DatabaseService.DB)
 	defer func() {
 		err := environ.DatabaseService.DB.Close()
 		assert.NoError(t, err)

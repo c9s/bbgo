@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -56,12 +54,10 @@ func BinanceCSVKLineDecoder(record []string, interval time.Duration) (types.KLin
 		k, empty types.KLine
 		err      error
 	)
-
 	if len(record) < 5 {
 		return k, ErrNotEnoughColumns
 	}
-
-	msec, err := strconv.ParseInt(record[0], 10, 64)
+	ts, err := strconv.ParseFloat(record[0], 64) // check for e numbers "1.70027E+12"
 	if err != nil {
 		return empty, ErrInvalidTimeFormat
 	}
@@ -82,24 +78,18 @@ func BinanceCSVKLineDecoder(record []string, interval time.Duration) (types.KLin
 		return empty, ErrInvalidPriceFormat
 	}
 
-	k.StartTime = types.NewTimeFromUnix(time.UnixMilli(msec).Unix(), 0)
+	volume, err := fixedpoint.NewFromString(record[5])
+	if err != nil {
+		return empty, ErrInvalidVolumeFormat
+	}
+
+	k.StartTime = types.NewTimeFromUnix(int64(ts), 0)
 	k.EndTime = types.NewTimeFromUnix(k.StartTime.Time().Add(interval).Unix(), 0)
 	k.Open = open
 	k.High = high
 	k.Low = low
 	k.Close = closing
-	k.Volume = fixedpoint.Zero
-
-	if len(record) == 6 {
-		spew.Dump(record)
-		volume, err := fixedpoint.NewFromString(record[5])
-		if err != nil {
-			return empty, ErrInvalidVolumeFormat
-		}
-
-		k.Volume = volume
-		spew.Dump(k)
-	}
+	k.Volume = volume
 
 	return k, nil
 }

@@ -25,7 +25,7 @@ func ReadKLinesFromCSV(path string, interval time.Duration) ([]types.KLine, erro
 
 // ReadKLinesFromCSVWithDecoder permits using a custom CSVKLineReader.
 func ReadKLinesFromCSVWithDecoder(path string, interval time.Duration, maker MakeCSVKLineReader) ([]types.KLine, error) {
-	var prices []types.KLine
+	var klines []types.KLine
 
 	err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -44,16 +44,16 @@ func ReadKLinesFromCSVWithDecoder(path string, interval time.Duration, maker Mak
 		//nolint:errcheck // Read ops only so safe to ignore err return
 		defer file.Close()
 		reader := maker(csv.NewReader(file))
-		klines, err := reader.ReadAll(interval)
+		newKlines, err := reader.ReadAll(interval)
 		if err != nil {
 			return err
 		}
-		prices = append(prices, klines...)
+		klines = append(klines, newKlines...)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return prices, nil
+	return klines, nil
 }
