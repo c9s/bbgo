@@ -45,9 +45,9 @@ func (s *BacktestServiceCSV) Sync(ctx context.Context, exchange types.Exchange, 
 	endTime = endTime.Truncate(time.Minute).Add(2 * time.Second)
 
 	log.Infof("synchronizing %s klines with interval %s: %s <=> %s", exchange.Name(), interval, startTime, endTime)
-
+	syncDir := fmt.Sprintf("%s/%s/%s", s.path, exchange.Name().String(), symbol)
 	kLines, err := csvsource.ReadTicksFromCSVWithDecoder(
-		s.path,
+		syncDir,
 		symbol,
 		interval,
 		csvsource.MakeCSVTickReader(csvsource.NewBinanceCSVTickReader), // todo remove hardcode

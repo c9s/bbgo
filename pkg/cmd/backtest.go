@@ -683,10 +683,6 @@ func createSymbolReport(
 	return &symbolReport, nil
 }
 
-func n(v float64) fixedpoint.Value {
-	return fixedpoint.NewFromFloat(v)
-}
-
 func verify(
 	userConfig *bbgo.Config, backtestService service.IBacktestService,
 	sourceExchanges map[types.ExchangeName]types.Exchange, startTime, endTime time.Time,

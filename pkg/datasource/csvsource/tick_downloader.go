@@ -19,13 +19,14 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func Download(saveToPath, symbol string, exchange types.ExchangeName, since, until time.Time) (err error) {
+func Download(path, symbol string, exchange types.ExchangeName, since, until time.Time) (err error) {
 	for {
 		var (
+			subDir   = fmt.Sprintf("%s/%s/%s", path, exchange.String(), symbol)
 			fileName = fmt.Sprintf("%s%s.csv", symbol, since.Format("2006-01-02"))
 		)
 
-		if fileExists(filepath.Join(saveToPath, fileName)) {
+		if fileExists(filepath.Join(subDir, fileName)) {
 			since = since.AddDate(0, 0, 1)
 			continue
 		}
@@ -44,7 +45,7 @@ func Download(saveToPath, symbol string, exchange types.ExchangeName, since, unt
 			break
 		}
 
-		err = write(csvContent, saveToPath, fileName)
+		err = write(csvContent, subDir, fileName)
 		if err != nil {
 			log.Error(err)
 			break
