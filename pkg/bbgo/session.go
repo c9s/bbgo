@@ -15,6 +15,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/cache"
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
@@ -267,12 +268,13 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 			session.accountMutex.Unlock()
 		} else {
 			logger.Infof("querying account balances...")
-			account, err := session.Exchange.QueryAccount(ctx)
+			account, err := retry.QueryAccountUntilSuccessful(ctx, session.Exchange)
 			if err != nil {
 				return err
 			}
 
 			session.setAccount(account)
+			session.metricsBalancesUpdater(account.Balances())
 			logger.Infof("account %s balances:\n%s", session.Name, account.Balances().String())
 		}
 
@@ -296,7 +298,6 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 		// if metrics mode is enabled, we bind the callbacks to update metrics
 		if viper.GetBool("metrics") {
-			session.metricsBalancesUpdater(account.Balances())
 			session.bindUserDataStreamMetrics(session.UserDataStream)
 		}
 	}
