@@ -135,7 +135,8 @@ var PnLCmd = &cobra.Command{
 
 				// we need the backtest klines for the daily prices
 				backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
-				if err := backtestService.Sync(ctx, exchange, symbol, types.Interval1d, since, until); err != nil {
+				intervals := []types.Interval{types.Interval1d}
+				if err := backtestService.Sync(ctx, exchange, symbol, intervals, since, until); err != nil {
 					return err
 				}
 			}

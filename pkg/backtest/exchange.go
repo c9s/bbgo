@@ -55,7 +55,7 @@ var ErrEmptyOrderType = errors.New("order type can not be empty string")
 type Exchange struct {
 	sourceName     types.ExchangeName
 	publicExchange types.Exchange
-	srv            service.IBacktestService
+	srv            service.BackTestable
 	currentTime    time.Time
 
 	account *types.Account
@@ -78,7 +78,7 @@ type Exchange struct {
 }
 
 func NewExchange(
-	sourceName types.ExchangeName, sourceExchange types.Exchange, srv service.IBacktestService, config *bbgo.Backtest,
+	sourceName types.ExchangeName, sourceExchange types.Exchange, srv service.BackTestable, config *bbgo.Backtest,
 ) (*Exchange, error) {
 	ex := sourceExchange
 

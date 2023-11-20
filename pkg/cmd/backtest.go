@@ -23,6 +23,7 @@ import (
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/data/tsv"
+	"github.com/c9s/bbgo/pkg/datasource/csvsource"
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
@@ -162,7 +163,7 @@ var BacktestCmd = &cobra.Command{
 
 		environ := bbgo.NewEnvironment()
 
-		backtestService := service.NewBacktestServiceCSV(outputDirectory)
+		backtestService := service.NewBacktestServiceCSV(outputDirectory, csvsource.SPOT, csvsource.AGGTRADES) // todo make configurable
 		if modeCsv {
 			if err := bbgo.BootstrapEnvironmentLightweight(ctx, environ, userConfig); err != nil {
 				return err
@@ -684,7 +685,7 @@ func createSymbolReport(
 }
 
 func verify(
-	userConfig *bbgo.Config, backtestService service.IBacktestService,
+	userConfig *bbgo.Config, backtestService service.BackTestable,
 	sourceExchanges map[types.ExchangeName]types.Exchange, startTime, endTime time.Time,
 ) error {
 	for _, sourceExchange := range sourceExchanges {
@@ -727,7 +728,7 @@ func getExchangeIntervals(ex types.Exchange) types.IntervalMap {
 }
 
 func sync(
-	ctx context.Context, userConfig *bbgo.Config, backtestService service.IBacktestService,
+	ctx context.Context, userConfig *bbgo.Config, backtestService service.BackTestable,
 	sourceExchanges map[types.ExchangeName]types.Exchange, syncFrom, syncTo time.Time,
 ) error {
 	for _, symbol := range userConfig.Backtest.Symbols {
@@ -742,10 +743,8 @@ func sync(
 			var intervals = supportIntervals.Slice()
 			intervals.Sort()
 
-			for _, interval := range intervals {
-				if err := backtestService.Sync(ctx, sourceExchange, symbol, interval, syncFrom, syncTo); err != nil {
-					return err
-				}
+			if err := backtestService.Sync(ctx, sourceExchange, symbol, intervals, syncFrom, syncTo); err != nil {
+				return err
 			}
 		}
 	}

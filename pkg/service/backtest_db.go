@@ -18,9 +18,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type IBacktestService interface {
+type BackTestable interface {
 	Verify(sourceExchange types.Exchange, symbols []string, startTime time.Time, endTime time.Time) error
-	Sync(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) error
+	Sync(ctx context.Context, ex types.Exchange, symbol string, intervals []types.Interval, since, until time.Time) error
 	QueryKLine(ex types.ExchangeName, symbol string, interval types.Interval, orderBy string, limit int) (*types.KLine, error)
 	QueryKLinesForward(exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time, limit int) ([]types.KLine, error)
 	QueryKLinesBackward(exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time, limit int) ([]types.KLine, error)
@@ -31,7 +31,7 @@ type BacktestService struct {
 	DB *sqlx.DB
 }
 
-func NewBacktestService(db *sqlx.DB) IBacktestService {
+func NewBacktestService(db *sqlx.DB) *BacktestService {
 	return &BacktestService{DB: db}
 }
 
@@ -363,18 +363,28 @@ func (t *TimeRange) String() string {
 	return t.Start.String() + " ~ " + t.End.String()
 }
 
-func (s *BacktestService) Sync(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) error {
-	t1, t2, err := s.queryExistingDataRange(ctx, ex, symbol, interval, since, until)
-	if err != nil && err != sql.ErrNoRows {
-		return err
+func (s *BacktestService) Sync(ctx context.Context, ex types.Exchange, symbol string, intervals []types.Interval, since, until time.Time) error {
+	for _, interval := range intervals {
+		t1, t2, err := s.queryExistingDataRange(ctx, ex, symbol, interval, since, until)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+
+		if err == sql.ErrNoRows || t1 == nil || t2 == nil {
+			// fallback to fresh sync
+			err := s.syncFresh(ctx, ex, symbol, interval, since, until)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := s.syncPartial(ctx, ex, symbol, interval, since, until)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
-	if err == sql.ErrNoRows || t1 == nil || t2 == nil {
-		// fallback to fresh sync
-		return s.syncFresh(ctx, ex, symbol, interval, since, until)
-	}
-
-	return s.syncPartial(ctx, ex, symbol, interval, since, until)
+	return nil
 }
 
 // SyncPartial

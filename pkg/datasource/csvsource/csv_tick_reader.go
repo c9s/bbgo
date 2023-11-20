@@ -42,7 +42,7 @@ func (r *CSVTickReader) ReadAll() (ticks []*CsvTick, err error) {
 			break
 		}
 		if err != nil {
-			return ticks, err
+			return nil, err
 		}
 		i++ // used as jump logic inside decoder to skip csv headers in case
 		if tick == nil {

@@ -2,7 +2,6 @@ package csvsource
 
 import (
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -11,68 +10,93 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func Test_Download_Binance_Default(t *testing.T) {
-	if _, ok := os.LookupEnv("TEST_CSV_DOWNLOADER"); !ok {
-		t.Skip()
-	}
-	var (
-		symbol = "FXSUSDT"
-		path   = "testdata/binance/" + symbol
-		since  = time.Now().Round(0)
-		until  = since.Add(-24 * time.Hour)
-	)
-
-	err := Download(path, symbol, types.ExchangeBybit, since, until)
-	assert.NoError(t, err)
-	klines, err := ReadTicksFromCSV(path, symbol, types.Interval1h)
-	assert.NoError(t, err)
-	assert.Equal(t, 24, len(klines))
-	err = WriteKLines(fmt.Sprintf("%s/%s_%s.csv", path, symbol, types.Interval1h), klines)
-	assert.NoError(t, err)
-	err = os.RemoveAll("testdata/binance/")
-	assert.NoError(t, err)
+type DownloadTester struct {
+	Exchange    types.ExchangeName
+	Reader      MakeCSVTickReader
+	Market      MarketType
+	Granularity DataType
+	Symbol      string
+	Path        string
 }
 
-func Test_Download_Bybit(t *testing.T) {
-	if _, ok := os.LookupEnv("TEST_CSV_DOWNLOADER"); !ok {
-		t.Skip()
+var (
+	expectedCandles = []int{1440, 48, 24}
+	intervals       = []types.Interval{types.Interval1m, types.Interval30m, types.Interval1h}
+	until           = time.Now().Round(0)
+	since           = until.Add(-24 * time.Hour)
+)
+
+func Test_CSV_Download(t *testing.T) {
+	// if _, ok := os.LookupEnv("TEST_CSV_DOWNLOADER"); !ok {
+	// 	t.Skip()
+	// }
+	var tests = []DownloadTester{
+		{
+			Exchange:    types.ExchangeBinance,
+			Reader:      NewBinanceCSVTickReader,
+			Market:      SPOT,
+			Granularity: AGGTRADES,
+			Symbol:      "FXSUSDT",
+			Path:        "testdata/binance/FXSUSDT",
+		},
+		{
+			Exchange:    types.ExchangeBybit,
+			Reader:      NewBybitCSVTickReader,
+			Market:      FUTURES,
+			Granularity: AGGTRADES,
+			Symbol:      "FXSUSDT",
+			Path:        "testdata/bybit/FXSUSDT",
+		},
+		{
+			Exchange:    types.ExchangeOKEx,
+			Reader:      NewOKExCSVTickReader,
+			Market:      SPOT,
+			Granularity: AGGTRADES,
+			Symbol:      "BTCUSDT",
+			Path:        "testdata/okex/BTCUSDT",
+		},
 	}
-	var (
-		symbol = "FXSUSDT"
-		path   = "testdata/bybit/" + symbol
-		since  = time.Now().Round(0)
-		until  = since.Add(-24 * time.Hour)
-	)
 
-	err := Download(path, symbol, types.ExchangeBybit, since, until)
-	assert.NoError(t, err)
-	klines, err := ReadTicksFromCSVWithDecoder(path, symbol, types.Interval1h, MakeCSVTickReader(NewBybitCSVTickReader))
-	assert.NoError(t, err)
-	assert.Equal(t, 24, len(klines))
-	err = WriteKLines(fmt.Sprintf("%s/%s_%s.csv", path, symbol, types.Interval1h), klines)
-	assert.NoError(t, err)
-	err = os.RemoveAll("testdata/bybit/")
-	assert.NoError(t, err)
-}
+	for _, tt := range tests {
+		err := Download(
+			tt.Path,
+			tt.Symbol,
+			tt.Exchange,
+			tt.Market,
+			tt.Granularity,
+			since,
+			until,
+		)
+		assert.NoError(t, err)
 
-func Test_Download_OkEx(t *testing.T) {
-	if _, ok := os.LookupEnv("TEST_CSV_DOWNLOADER"); !ok {
-		t.Skip()
+		klineMap, err := ReadTicksFromCSVWithDecoder(
+			tt.Path,
+			tt.Symbol,
+			intervals,
+			MakeCSVTickReader(tt.Reader),
+		)
+		assert.NoError(t, err)
+
+		for i, interval := range intervals {
+			klines := klineMap[interval]
+
+			assert.Equal(
+				t,
+				expectedCandles[i],
+				len(klines),
+				fmt.Sprintf("%s: %s/%s should have %d kLines",
+					tt.Exchange.String(),
+					tt.Symbol,
+					interval.String(),
+					expectedCandles[i],
+				),
+			)
+
+			err = WriteKLines(tt.Path, tt.Symbol, klines)
+			assert.NoError(t, err)
+		}
+
+		// err = os.RemoveAll(tt.Path)
+		// assert.NoError(t, err)
 	}
-	var (
-		symbol = "FXSUSDT"
-		path   = "testdata/okex/" + symbol
-		since  = time.Now().Round(0)
-		until  = since.Add(-24 * time.Hour)
-	)
-
-	err := Download(path, symbol, types.ExchangeOKEx, since, until)
-	assert.NoError(t, err)
-	klines, err := ReadTicksFromCSVWithDecoder(path, symbol, types.Interval1h, MakeCSVTickReader(NewOKExCSVTickReader))
-	assert.NoError(t, err)
-	assert.Equal(t, 24, len(klines))
-	err = WriteKLines(fmt.Sprintf("%s/%s_%s.csv", path, symbol, types.Interval1h), klines)
-	assert.NoError(t, err)
-	err = os.RemoveAll("testdata/okex/")
-	assert.NoError(t, err)
 }

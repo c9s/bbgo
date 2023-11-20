@@ -38,7 +38,8 @@ func TestCSVKLineReader_ReadWithBinanceDecoder(t *testing.T) {
 				High:      fixedpoint.NewFromFloat(29031.34),
 				Low:       fixedpoint.NewFromFloat(28690.17),
 				Close:     fixedpoint.NewFromFloat(28995.13),
-				// todo mustNewFromString and NewFromFloat have different values
+				// todo this should never happen >>
+				// mustNewFromString and NewFromFloat have different values after parse
 				Volume: fixedpoint.MustNewFromString("2311.81144500")},
 			err: nil,
 		},

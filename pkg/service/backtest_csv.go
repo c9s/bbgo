@@ -14,11 +14,17 @@ import (
 )
 
 type BacktestServiceCSV struct {
-	kLines map[types.Interval][]types.KLine
-	path   string
+	kLines      map[types.Interval][]types.KLine
+	path        string
+	marketType  csvsource.MarketType
+	granularity csvsource.DataType
 }
 
-func NewBacktestServiceCSV(path string) IBacktestService {
+func NewBacktestServiceCSV(
+	path string,
+	marketType csvsource.MarketType,
+	dataType csvsource.DataType,
+) BackTestable {
 	return &BacktestServiceCSV{
 		kLines: make(map[types.Interval][]types.KLine),
 		path:   path,
@@ -30,7 +36,15 @@ func (s *BacktestServiceCSV) Verify(sourceExchange types.Exchange, symbols []str
 	_, _, isIsolated, isolatedSymbol := exchange2.GetSessionAttributes(sourceExchange)
 	// override symbol if isolatedSymbol is not empty
 	if isIsolated && len(isolatedSymbol) > 0 {
-		err := csvsource.Download(s.path, isolatedSymbol, sourceExchange.Name(), startTime, endTime)
+		err := csvsource.Download(
+			s.path,
+			isolatedSymbol,
+			sourceExchange.Name(),
+			s.marketType,
+			s.granularity,
+			startTime,
+			endTime,
+		)
 		if err != nil {
 			return errors.Errorf("downloading csv data: %v", err)
 		}
@@ -39,24 +53,36 @@ func (s *BacktestServiceCSV) Verify(sourceExchange types.Exchange, symbols []str
 	return nil
 }
 
-func (s *BacktestServiceCSV) Sync(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
-	log.Infof("starting fresh sync %s %s %s: %s <=> %s", exchange.Name(), symbol, interval, startTime, endTime)
-	startTime = startTime.Truncate(time.Minute).Add(-2 * time.Second)
-	endTime = endTime.Truncate(time.Minute).Add(2 * time.Second)
+func (s *BacktestServiceCSV) Sync(ctx context.Context, exchange types.Exchange, symbol string, intervals []types.Interval, startTime, endTime time.Time) error {
 
-	log.Infof("synchronizing %s klines with interval %s: %s <=> %s", exchange.Name(), interval, startTime, endTime)
-	syncDir := fmt.Sprintf("%s/%s/%s", s.path, exchange.Name().String(), symbol)
-	kLines, err := csvsource.ReadTicksFromCSVWithDecoder(
-		syncDir,
+	log.Infof("starting fresh csv sync %s %s: %s <=> %s", exchange.Name(), symbol, startTime, endTime)
+
+	path := fmt.Sprintf("%s/%s/%s", s.path, exchange.Name().String(), symbol)
+
+	var reader csvsource.MakeCSVTickReader
+
+	switch exchange.Name() {
+	case types.ExchangeBinance:
+		reader = csvsource.NewBinanceCSVTickReader
+	case types.ExchangeBybit:
+		reader = csvsource.NewBybitCSVTickReader
+	case types.ExchangeOKEx:
+		reader = csvsource.NewOKExCSVTickReader
+	default:
+		return fmt.Errorf("%s not supported yet.. care to fix it? PR's welcome ;)", exchange.Name().String())
+	}
+
+	kLineMap, err := csvsource.ReadTicksFromCSVWithDecoder(
+		path,
 		symbol,
-		interval,
-		csvsource.MakeCSVTickReader(csvsource.NewBinanceCSVTickReader), // todo remove hardcode
+		intervals,
+		csvsource.MakeCSVTickReader(reader),
 	)
 	if err != nil {
 		return errors.Errorf("reading csv data: %v", err)
 	}
 
-	s.kLines[interval] = kLines
+	s.kLines = kLineMap
 
 	return nil
 }
