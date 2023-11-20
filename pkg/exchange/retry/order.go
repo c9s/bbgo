@@ -16,7 +16,9 @@ type advancedOrderCancelService interface {
 	CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([]types.Order, error)
 }
 
-func QueryOrderUntilFilled(ctx context.Context, queryOrderService types.ExchangeOrderQueryService, symbol string, orderId uint64) (o *types.Order, err error) {
+func QueryOrderUntilFilled(
+	ctx context.Context, queryOrderService types.ExchangeOrderQueryService, symbol string, orderId uint64,
+) (o *types.Order, err error) {
 	var op = func() (err2 error) {
 		o, err2 = queryOrderService.QueryOrder(ctx, types.OrderQuery{
 			Symbol:  symbol,
@@ -56,7 +58,9 @@ func GeneralLiteBackoff(ctx context.Context, op backoff.Operation) (err error) {
 	return err
 }
 
-func QueryOpenOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, symbol string) (openOrders []types.Order, err error) {
+func QueryOpenOrdersUntilSuccessful(
+	ctx context.Context, ex types.Exchange, symbol string,
+) (openOrders []types.Order, err error) {
 	var op = func() (err2 error) {
 		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
 		return err2
@@ -66,7 +70,9 @@ func QueryOpenOrdersUntilSuccessful(ctx context.Context, ex types.Exchange, symb
 	return openOrders, err
 }
 
-func QueryOpenOrdersUntilSuccessfulLite(ctx context.Context, ex types.Exchange, symbol string) (openOrders []types.Order, err error) {
+func QueryOpenOrdersUntilSuccessfulLite(
+	ctx context.Context, ex types.Exchange, symbol string,
+) (openOrders []types.Order, err error) {
 	var op = func() (err2 error) {
 		openOrders, err2 = ex.QueryOpenOrders(ctx, symbol)
 		return err2
@@ -76,7 +82,21 @@ func QueryOpenOrdersUntilSuccessfulLite(ctx context.Context, ex types.Exchange, 
 	return openOrders, err
 }
 
-func QueryOrderUntilSuccessful(ctx context.Context, query types.ExchangeOrderQueryService, opts types.OrderQuery) (order *types.Order, err error) {
+func QueryAccountUntilSuccessful(
+	ctx context.Context, ex types.ExchangeAccountService,
+) (account *types.Account, err error) {
+	var op = func() (err2 error) {
+		account, err2 = ex.QueryAccount(ctx)
+		return err2
+	}
+
+	err = GeneralBackoff(ctx, op)
+	return account, err
+}
+
+func QueryOrderUntilSuccessful(
+	ctx context.Context, query types.ExchangeOrderQueryService, opts types.OrderQuery,
+) (order *types.Order, err error) {
 	var op = func() (err2 error) {
 		order, err2 = query.QueryOrder(ctx, opts)
 		return err2
