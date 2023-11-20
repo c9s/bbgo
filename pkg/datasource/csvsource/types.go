@@ -5,8 +5,14 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type CsvConfig struct {
+	Market      MarketType `json:"market"`
+	Granularity DataType   `json:"granularity"`
+}
+
 type CsvTick struct {
 	Exchange        types.ExchangeName `json:"exchange"`
+	Market          MarketType         `json:"market"`
 	TradeID         uint64             `json:"tradeID"`
 	Symbol          string             `json:"symbol"`
 	TickDirection   string             `json:"tickDirection"`
@@ -20,6 +26,10 @@ type CsvTick struct {
 }
 
 func (c *CsvTick) ToGlobalTrade() (*types.Trade, error) {
+	var isFutures bool
+	if c.Market == FUTURES {
+		isFutures = true
+	}
 	return &types.Trade{
 		ID: c.TradeID,
 		// OrderID:    // not implemented
@@ -34,8 +44,8 @@ func (c *CsvTick) ToGlobalTrade() (*types.Trade, error) {
 		Time:          types.Time(c.Timestamp),
 		// Fee:           trade.ExecFee, // info is overwritten by stream?
 		// FeeCurrency:   trade.FeeTokenId,
+		IsFutures:  isFutures,
 		IsMargin:   false,
-		IsFutures:  false, // todo make equity type configurable
 		IsIsolated: false,
 	}, nil
 }

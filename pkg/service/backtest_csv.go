@@ -16,18 +16,20 @@ import (
 type BacktestServiceCSV struct {
 	kLines      map[types.Interval][]types.KLine
 	path        string
-	marketType  csvsource.MarketType
+	market      csvsource.MarketType
 	granularity csvsource.DataType
 }
 
 func NewBacktestServiceCSV(
 	path string,
-	marketType csvsource.MarketType,
-	dataType csvsource.DataType,
+	market csvsource.MarketType,
+	granularity csvsource.DataType,
 ) BackTestable {
 	return &BacktestServiceCSV{
-		kLines: make(map[types.Interval][]types.KLine),
-		path:   path,
+		kLines:      make(map[types.Interval][]types.KLine),
+		path:        path,
+		market:      market,
+		granularity: granularity,
 	}
 }
 
@@ -40,7 +42,7 @@ func (s *BacktestServiceCSV) Verify(sourceExchange types.Exchange, symbols []str
 			s.path,
 			isolatedSymbol,
 			sourceExchange.Name(),
-			s.marketType,
+			s.market,
 			s.granularity,
 			startTime,
 			endTime,

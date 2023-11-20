@@ -11,7 +11,6 @@ type ICSVTickConverter interface {
 	CsvTickToKLine(tick *CsvTick) (closesKLine bool)
 	GetTicks() []*CsvTick
 	LatestKLine(interval types.Interval) (k *types.KLine)
-	GetKLineResult(interval types.Interval) []types.KLine
 	GetKLineResults() map[types.Interval][]types.KLine
 }
 
@@ -44,14 +43,6 @@ func (c *CSVTickConverter) LatestKLine(interval types.Interval) (k *types.KLine)
 		return nil
 	}
 	return &c.klines[interval][len(c.klines[interval])-1]
-}
-
-// GetKLineResult returns the converted ticks as kLine of interval
-func (c *CSVTickConverter) GetKLineResult(interval types.Interval) []types.KLine {
-	if _, ok := c.klines[interval]; !ok || len(c.klines[interval]) == 0 {
-		return nil
-	}
-	return c.klines[interval]
 }
 
 // GetKLineResults returns the converted ticks as kLine of all constructed intervals

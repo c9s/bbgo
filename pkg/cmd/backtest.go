@@ -23,7 +23,6 @@ import (
 	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/data/tsv"
-	"github.com/c9s/bbgo/pkg/datasource/csvsource"
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
@@ -163,7 +162,14 @@ var BacktestCmd = &cobra.Command{
 
 		environ := bbgo.NewEnvironment()
 
-		backtestService := service.NewBacktestServiceCSV(outputDirectory, csvsource.SPOT, csvsource.AGGTRADES) // todo make configurable
+		if userConfig.Backtest.CsvSource == nil {
+			return fmt.Errorf("user config backtest section needs csvsource config")
+		}
+		backtestService := service.NewBacktestServiceCSV(
+			outputDirectory,
+			userConfig.Backtest.CsvSource.Market,
+			userConfig.Backtest.CsvSource.Granularity,
+		)
 		if modeCsv {
 			if err := bbgo.BootstrapEnvironmentLightweight(ctx, environ, userConfig); err != nil {
 				return err
@@ -540,6 +546,11 @@ var BacktestCmd = &cobra.Command{
 
 		for _, session := range environ.Sessions() {
 			for symbol, trades := range session.Trades {
+				if len(trades.Trades) == 0 {
+					log.Warnf("session has no %s trades", symbol)
+					continue
+				}
+
 				tradeState := sessionTradeStats[session.Name][symbol]
 				profitFactor := tradeState.ProfitFactor
 				winningRatio := tradeState.WinningRatio

@@ -2,6 +2,7 @@ package csvsource
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -27,9 +28,9 @@ var (
 )
 
 func Test_CSV_Download(t *testing.T) {
-	// if _, ok := os.LookupEnv("TEST_CSV_DOWNLOADER"); !ok {
-	// 	t.Skip()
-	// }
+	if _, ok := os.LookupEnv("TEST_CSV_DOWNLOADER"); !ok {
+		t.Skip()
+	}
 	var tests = []DownloadTester{
 		{
 			Exchange:    types.ExchangeBinance,
@@ -96,7 +97,7 @@ func Test_CSV_Download(t *testing.T) {
 			assert.NoError(t, err)
 		}
 
-		// err = os.RemoveAll(tt.Path)
-		// assert.NoError(t, err)
+		err = os.RemoveAll(tt.Path)
+		assert.NoError(t, err)
 	}
 }

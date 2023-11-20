@@ -62,7 +62,7 @@ func ReadTicksFromCSVWithDecoder(
 		}
 		//nolint:errcheck // Read ops only so safe to ignore err return
 		defer file.Close()
-		reader := maker(csv.NewReader(file)) // todo this is wrong need to pass instantiated converter
+		reader := maker(csv.NewReader(file))
 		newTicks, err := reader.ReadAll()
 		if err != nil {
 			return err
@@ -74,7 +74,7 @@ func ReadTicksFromCSVWithDecoder(
 	if err != nil {
 		return nil, err
 	}
-	// sort ticks by timestamp (okex sorts csv by price ascending)
+	// sort ticks by timestamp (okex sorts csv by price ascending ;(
 	sort.Slice(ticks, func(i, j int) bool {
 		return ticks[i].Timestamp.Time().Before(ticks[j].Timestamp.Time())
 	})

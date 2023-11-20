@@ -105,7 +105,7 @@ func buildURL(
 	exchange types.ExchangeName,
 	symbol string,
 	market MarketType,
-	detail DataType,
+	granularity DataType,
 	fileName string,
 	start time.Time,
 ) (url string, err error) {
@@ -123,7 +123,7 @@ func buildURL(
 			marketType = "futures/um"
 		}
 		dataType := "aggTrades"
-		if detail == TRADES {
+		if granularity == TRADES {
 			dataType = "trades"
 		}
 		url = fmt.Sprintf("https://data.binance.vision/data/%s/daily/%s/%s/%s-%s-%s.zip",
@@ -148,7 +148,7 @@ func buildURL(
 			marketType = "-SWAP"
 		}
 		dataType := "aggtrades"
-		if detail == TRADES {
+		if granularity == TRADES {
 			dataType = "trades"
 		}
 		url = fmt.Sprintf("https://static.okx.com/cdn/okex/traderecords/%s/daily/%s/%s-%s%s-%s-%s.zip",
