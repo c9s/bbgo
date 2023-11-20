@@ -368,7 +368,7 @@ func toLocalInterval(interval types.Interval) (string, error) {
 func toGlobalKLines(symbol string, interval types.Interval, klines []bybitapi.KLine) []types.KLine {
 	gKLines := make([]types.KLine, len(klines))
 	for i, kline := range klines {
-		endTime := types.Time(kline.StartTime.Time().Add(interval.Duration()))
+		endTime := types.Time(kline.StartTime.Time().Add(interval.Duration() - time.Millisecond))
 		gKLines[i] = types.KLine{
 			Exchange:    types.ExchangeBybit,
 			Symbol:      symbol,

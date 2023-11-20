@@ -54,7 +54,9 @@ type KLine struct {
 	Symbol string `json:"symbol" db:"symbol"`
 
 	StartTime Time `json:"startTime" db:"start_time"`
-	EndTime   Time `json:"endTime" db:"end_time"`
+	// EndTime follows the binance rule, to avoid endTime overlapping with the next startTime. So if your end time (2023-01-01 01:00:00)
+	// are overlapping with next start time interval (2023-01-01 01:00:00), you should subtract -1 time.millisecond on EndTime.
+	EndTime Time `json:"endTime" db:"end_time"`
 
 	Interval Interval `json:"interval" db:"interval"`
 

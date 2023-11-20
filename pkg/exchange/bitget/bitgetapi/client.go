@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -51,7 +52,9 @@ func (c *RestClient) Auth(key, secret, passphrase string) {
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(
+	ctx context.Context, method, refURL string, params url.Values, payload interface{},
+) (*http.Request, error) {
 	if len(c.key) == 0 {
 		return nil, errors.New("empty api key")
 	}
@@ -76,7 +79,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	}
 
 	// See https://bitgetlimited.github.io/apidoc/en/spot/#signature
-	// sign(
+	// Sign(
 	//    timestamp +
 	// 	  method.toUpperCase() +
 	// 	  requestPath + "?" + queryString +
@@ -94,7 +97,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	}
 
 	signKey := timestamp + strings.ToUpper(method) + path + string(body)
-	signature := sign(signKey, c.secret)
+	signature := Sign(signKey, c.secret)
 
 	req, err := http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
 	if err != nil {
@@ -107,10 +110,11 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	req.Header.Add("ACCESS-SIGN", signature)
 	req.Header.Add("ACCESS-TIMESTAMP", timestamp)
 	req.Header.Add("ACCESS-PASSPHRASE", c.passphrase)
+	req.Header.Add("X-CHANNEL-API-CODE", "7575765263")
 	return req, nil
 }
 
-func sign(payload string, secret string) string {
+func Sign(payload string, secret string) string {
 	var sig = hmac.New(sha256.New, []byte(secret))
 	_, err := sig.Write([]byte(payload))
 	if err != nil {
@@ -160,4 +164,18 @@ type APIResponse struct {
 	Code    string          `json:"code"`
 	Message string          `json:"msg"`
 	Data    json.RawMessage `json:"data"`
+}
+
+func (a APIResponse) Validate() error {
+	// v1, v2 use the same success code.
+	// https://www.bitget.com/api-doc/spot/error-code/restapi
+	// https://bitgetlimited.github.io/apidoc/en/mix/#restapi-error-codes
+	if a.Code != "00000" {
+		return a.Error()
+	}
+	return nil
+}
+
+func (a APIResponse) Error() error {
+	return fmt.Errorf("code: %s, msg: %s, data: %q", a.Code, a.Message, a.Data)
 }

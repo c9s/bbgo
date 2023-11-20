@@ -25,30 +25,37 @@ type SyncService struct {
 }
 
 // SyncSessionSymbols syncs the trades from the given exchange session
-func (s *SyncService) SyncSessionSymbols(ctx context.Context, exchange types.Exchange, startTime time.Time, symbols ...string) error {
+func (s *SyncService) SyncSessionSymbols(
+	ctx context.Context, exchange types.Exchange, startTime time.Time, symbols ...string,
+) error {
 	markets, err := cache.LoadExchangeMarketsWithCache(ctx, exchange)
 	if err != nil {
 		return err
 	}
 
 	for _, symbol := range symbols {
-		if _, ok := markets[symbol]; ok {
-			log.Infof("syncing %s %s trades...", exchange.Name(), symbol)
-			if err := s.TradeService.Sync(ctx, exchange, symbol, startTime); err != nil {
-				return err
-			}
+		// skip symbols do not exist in the market info
+		if _, ok := markets[symbol]; !ok {
+			continue
+		}
 
-			log.Infof("syncing %s %s orders...", exchange.Name(), symbol)
-			if err := s.OrderService.Sync(ctx, exchange, symbol, startTime); err != nil {
-				return err
-			}
+		log.Infof("syncing %s %s trades from %s...", exchange.Name(), symbol, startTime)
+		if err := s.TradeService.Sync(ctx, exchange, symbol, startTime); err != nil {
+			return err
+		}
+
+		log.Infof("syncing %s %s orders from %s...", exchange.Name(), symbol, startTime)
+		if err := s.OrderService.Sync(ctx, exchange, symbol, startTime); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-func (s *SyncService) SyncMarginHistory(ctx context.Context, exchange types.Exchange, startTime time.Time, assets ...string) error {
+func (s *SyncService) SyncMarginHistory(
+	ctx context.Context, exchange types.Exchange, startTime time.Time, assets ...string,
+) error {
 	if _, implemented := exchange.(types.MarginHistoryService); !implemented {
 		log.Debugf("exchange %T does not support types.MarginHistoryService", exchange)
 		return nil

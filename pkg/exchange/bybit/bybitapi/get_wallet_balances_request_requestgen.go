@@ -143,6 +143,12 @@ func (g *GetWalletBalancesRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetWalletBalancesRequest) GetPath() string {
+	return "/v5/account/wallet-balance"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetWalletBalancesRequest) Do(ctx context.Context) (*WalletBalancesResponse, error) {
 
 	// no body params
@@ -152,7 +158,9 @@ func (g *GetWalletBalancesRequest) Do(ctx context.Context) (*WalletBalancesRespo
 		return nil, err
 	}
 
-	apiURL := "/v5/account/wallet-balance"
+	var apiURL string
+
+	apiURL = g.GetPath()
 
 	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
@@ -167,6 +175,16 @@ func (g *GetWalletBalancesRequest) Do(ctx context.Context) (*WalletBalancesRespo
 	var apiResponse APIResponse
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+	validator, ok := interface{}(apiResponse).(responseValidator)
+	if ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	var data WalletBalancesResponse
 	if err := json.Unmarshal(apiResponse.Result, &data); err != nil {

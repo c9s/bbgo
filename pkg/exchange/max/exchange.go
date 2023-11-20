@@ -22,6 +22,11 @@ import (
 
 var log = logrus.WithField("exchange", "max")
 
+func init() {
+	_ = types.ExchangeTradeHistoryService(&Exchange{})
+
+}
+
 type Exchange struct {
 	types.MarginSettings
 
@@ -266,12 +271,16 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 }
 
 // lastOrderID is not supported on MAX
-func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error) {
+func (e *Exchange) QueryClosedOrders(
+	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
+) ([]types.Order, error) {
 	log.Warn("!!!MAX EXCHANGE API NOTICE!!! the since/until conditions will not be effected on closed orders query, max exchange does not support time-range-based query")
 	return e.queryClosedOrdersByLastOrderID(ctx, symbol, lastOrderID)
 }
 
-func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol string, lastOrderID uint64) (orders []types.Order, err error) {
+func (e *Exchange) queryClosedOrdersByLastOrderID(
+	ctx context.Context, symbol string, lastOrderID uint64,
+) (orders []types.Order, err error) {
 	if err := e.closedOrderQueryLimiter.Wait(ctx); err != nil {
 		return orders, err
 	}
@@ -282,13 +291,14 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(ctx context.Context, symbol st
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3client.NewGetWalletOrderHistoryRequest(walletType).Market(market)
 	if lastOrderID == 0 {
 		lastOrderID = 1
 	}
 
-	req.FromID(lastOrderID)
-	req.Limit(1000)
+	req := e.v3client.NewGetWalletOrderHistoryRequest(walletType).
+		Market(market).
+		FromID(lastOrderID).
+		Limit(1000)
 
 	maxOrders, err := req.Do(ctx)
 	if err != nil {
@@ -429,7 +439,9 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	return err2
 }
 
-func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
+func (e *Exchange) Withdraw(
+	ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions,
+) error {
 	asset = toLocalCurrency(asset)
 
 	addresses, err := e.client.WithdrawalService.NewGetWithdrawalAddressesRequest().
@@ -673,7 +685,9 @@ func (e *Exchange) queryBalances(ctx context.Context, walletType maxapi.WalletTy
 	return balances, nil
 }
 
-func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []types.Withdraw, err error) {
+func (e *Exchange) QueryWithdrawHistory(
+	ctx context.Context, asset string, since, until time.Time,
+) (allWithdraws []types.Withdraw, err error) {
 	startTime := since
 	limit := 1000
 	txIDs := map[string]struct{}{}
@@ -769,7 +783,9 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 	return allWithdraws, nil
 }
 
-func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
+func (e *Exchange) QueryDepositHistory(
+	ctx context.Context, asset string, since, until time.Time,
+) (allDeposits []types.Deposit, err error) {
 	startTime := since
 	limit := 1000
 	txIDs := map[string]struct{}{}
@@ -846,7 +862,9 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 // For this QueryTrades spec (to be compatible with batch.TradeBatchQuery)
 // give LastTradeID       -> ignore start_time (but still can filter the end_time)
 // without any parameters -> return trades within 24 hours
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) QueryTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (trades []types.Trade, err error) {
 	if err := e.queryTradeLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
@@ -964,7 +982,9 @@ func (e *Exchange) QueryRewards(ctx context.Context, startTime time.Time) ([]typ
 // https://max-api.maicoin.com/api/v2/k?market=btctwd&limit=10&period=1&timestamp=1620202440
 // The above query will return a kline that starts with 1620202440 (unix timestamp) without endTime.
 // We need to calculate the endTime by ourself.
-func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryKLines(
+	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
+) ([]types.KLine, error) {
 	if err := e.marketDataLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
@@ -1041,7 +1061,9 @@ func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount f
 	return nil
 }
 
-func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error) {
+func (e *Exchange) QueryMarginAssetMaxBorrowable(
+	ctx context.Context, asset string,
+) (amount fixedpoint.Value, err error) {
 	req := e.v3client.NewGetMarginBorrowingLimitsRequest()
 	resp, err := req.Do(ctx)
 	if err != nil {
