@@ -329,8 +329,13 @@ type ServiceConfig struct {
 type EnvironmentConfig struct {
 	DisableDefaultKLineSubscription bool `json:"disableDefaultKLineSubscription"`
 	DisableHistoryKLinePreload      bool `json:"disableHistoryKLinePreload"`
-	DisableSessionTradeBuffer       bool `json:"disableSessionTradeBuffer"`
-	MaxSessionTradeBufferSize       int  `json:"maxSessionTradeBufferSize"`
+
+	// DisableStartUpBalanceQuery disables the balance query in the startup process
+	// which initializes the session.Account with the QueryAccount method.
+	DisableStartupBalanceQuery bool `json:"disableStartupBalanceQuery"`
+
+	DisableSessionTradeBuffer bool `json:"disableSessionTradeBuffer"`
+	MaxSessionTradeBufferSize int  `json:"maxSessionTradeBufferSize"`
 }
 
 type Config struct {

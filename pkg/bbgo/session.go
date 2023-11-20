@@ -15,6 +15,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/cache"
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
@@ -177,10 +178,14 @@ func (session *ExchangeSession) UpdateAccount(ctx context.Context) (*types.Accou
 		return nil, err
 	}
 
-	session.accountMutex.Lock()
-	session.Account = account
-	session.accountMutex.Unlock()
+	session.setAccount(account)
 	return account, nil
+}
+
+func (session *ExchangeSession) setAccount(a *types.Account) {
+	session.accountMutex.Lock()
+	session.Account = a
+	session.accountMutex.Unlock()
 }
 
 // Init initializes the basic data structure and market information by its exchange.
@@ -256,17 +261,22 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 			}
 		}
 
-		logger.Infof("querying account balances...")
-		account, err := session.Exchange.QueryAccount(ctx)
-		if err != nil {
-			return err
+		disableStartupBalanceQuery := environ.environmentConfig != nil && environ.environmentConfig.DisableStartupBalanceQuery
+		if disableStartupBalanceQuery {
+			session.accountMutex.Lock()
+			session.Account = types.NewAccount()
+			session.accountMutex.Unlock()
+		} else {
+			logger.Infof("querying account balances...")
+			account, err := retry.QueryAccountUntilSuccessful(ctx, session.Exchange)
+			if err != nil {
+				return err
+			}
+
+			session.setAccount(account)
+			session.metricsBalancesUpdater(account.Balances())
+			logger.Infof("account %s balances:\n%s", session.Name, account.Balances().String())
 		}
-
-		session.accountMutex.Lock()
-		session.Account = account
-		session.accountMutex.Unlock()
-
-		logger.Infof("account %s balances:\n%s", session.Name, account.Balances().String())
 
 		// forward trade updates and order updates to the order executor
 		session.UserDataStream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
@@ -288,7 +298,6 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 		// if metrics mode is enabled, we bind the callbacks to update metrics
 		if viper.GetBool("metrics") {
-			session.metricsBalancesUpdater(account.Balances())
 			session.bindUserDataStreamMetrics(session.UserDataStream)
 		}
 	}
