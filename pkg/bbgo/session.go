@@ -177,10 +177,14 @@ func (session *ExchangeSession) UpdateAccount(ctx context.Context) (*types.Accou
 		return nil, err
 	}
 
-	session.accountMutex.Lock()
-	session.Account = account
-	session.accountMutex.Unlock()
+	session.setAccount(account)
 	return account, nil
+}
+
+func (session *ExchangeSession) setAccount(a *types.Account) {
+	session.accountMutex.Lock()
+	session.Account = a
+	session.accountMutex.Unlock()
 }
 
 // Init initializes the basic data structure and market information by its exchange.
@@ -268,12 +272,9 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 				return err
 			}
 
-			session.accountMutex.Lock()
-			session.Account = account
-			session.accountMutex.Unlock()
+			session.setAccount(account)
+			logger.Infof("account %s balances:\n%s", session.Name, account.Balances().String())
 		}
-
-		logger.Infof("account %s balances:\n%s", session.Name, account.Balances().String())
 
 		// forward trade updates and order updates to the order executor
 		session.UserDataStream.OnTradeUpdate(session.OrderExecutor.EmitTradeUpdate)
