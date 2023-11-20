@@ -41,3 +41,10 @@ func (s *StrInt64) UnmarshalJSON(body []byte) error {
 
 	return nil
 }
+
+func (s *StrInt64) String() string {
+	if s == nil {
+		return ""
+	}
+	return strconv.FormatInt(int64(*s), 10)
+}

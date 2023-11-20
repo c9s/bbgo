@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -13,12 +14,14 @@ import (
 type InstType string
 
 const (
-	instSp InstType = "sp"
+	instSp   InstType = "sp"
+	instSpV2 InstType = "SPOT"
 )
 
 type ChannelType string
 
 const (
+	ChannelAccount ChannelType = "account"
 	// ChannelOrderBook snapshot and update might return less than 200 bids/asks as per symbol's orderbook various from
 	// each other; The number of bids/asks is not a fixed value and may vary in the future
 	ChannelOrderBook ChannelType = "books"
@@ -27,6 +30,7 @@ const (
 	// ChannelOrderBook15 top 15 order book of "books" that begins from bid1/ask1
 	ChannelOrderBook15 ChannelType = "books15"
 	ChannelTrade       ChannelType = "trade"
+	ChannelOrders      ChannelType = "orders"
 )
 
 type WsArg struct {
@@ -34,6 +38,12 @@ type WsArg struct {
 	Channel  ChannelType `json:"channel"`
 	// InstId Instrument ID. e.q. BTCUSDT, ETHUSDT
 	InstId string `json:"instId"`
+	Coin   string `json:"coin"`
+
+	ApiKey     string `json:"apiKey"`
+	Passphrase string `json:"passphrase"`
+	Timestamp  string `json:"timestamp"`
+	Sign       string `json:"sign"`
 }
 
 type WsEventType string
@@ -41,6 +51,7 @@ type WsEventType string
 const (
 	WsEventSubscribe   WsEventType = "subscribe"
 	WsEventUnsubscribe WsEventType = "unsubscribe"
+	WsEventLogin       WsEventType = "login"
 	WsEventError       WsEventType = "error"
 )
 
@@ -76,7 +87,7 @@ func (w *WsEvent) IsValid() error {
 	case WsEventError:
 		return fmt.Errorf("websocket request error, op: %s, code: %d, msg: %s", w.Op, w.Code, w.Msg)
 
-	case WsEventSubscribe, WsEventUnsubscribe:
+	case WsEventSubscribe, WsEventUnsubscribe, WsEventLogin:
 		// Actually, this code is unnecessary because the events are either `Subscribe` or `Unsubscribe`, But to avoid bugs
 		// in the exchange, we still check.
 		if w.Code != 0 || len(w.Msg) != 0 {
@@ -87,6 +98,10 @@ func (w *WsEvent) IsValid() error {
 	default:
 		return fmt.Errorf("unexpected event type: %+v", w)
 	}
+}
+
+func (w *WsEvent) IsAuthenticated() bool {
+	return w.Event == WsEventLogin && w.Code == 0
 }
 
 type ActionType string
@@ -286,7 +301,42 @@ var (
 		"candle1D":  types.Interval1d,
 		"candle1W":  types.Interval1w,
 	}
+
+	// we align utc time zone
+	toLocalGranularity = map[types.Interval]string{
+		types.Interval1m:  "1min",
+		types.Interval5m:  "5min",
+		types.Interval15m: "15min",
+		types.Interval30m: "30min",
+		types.Interval1h:  "1h",
+		types.Interval4h:  "4h",
+		types.Interval6h:  "6Hutc",
+		types.Interval12h: "12Hutc",
+		types.Interval1d:  "1Dutc",
+		types.Interval3d:  "3Dutc",
+		types.Interval1w:  "1Wutc",
+		types.Interval1mo: "1Mutc",
+	}
 )
+
+func hasMaxDuration(interval types.Interval) (bool, time.Duration) {
+	switch interval {
+	case types.Interval1m, types.Interval5m:
+		return true, 30 * 24 * time.Hour
+	case types.Interval15m:
+		return true, 52 * 24 * time.Hour
+	case types.Interval30m:
+		return true, 62 * 24 * time.Hour
+	case types.Interval1h:
+		return true, 83 * 24 * time.Hour
+	case types.Interval4h:
+		return true, 240 * 24 * time.Hour
+	case types.Interval6h:
+		return true, 360 * 24 * time.Hour
+	default:
+		return false, 0 * time.Duration(0)
+	}
+}
 
 type KLine struct {
 	StartTime    types.MillisecondTimestamp
@@ -391,4 +441,84 @@ type KLineEvent struct {
 func (k KLineEvent) CacheKey() string {
 	// e.q: candle5m.BTCUSDT
 	return fmt.Sprintf("%s.%s", k.channel, k.instId)
+}
+
+type Balance struct {
+	Coin      string           `json:"coin"`
+	Available fixedpoint.Value `json:"available"`
+	// Amount of frozen assets Usually frozen when the order is placed
+	Frozen fixedpoint.Value `json:"frozen"`
+	// Amount of locked assets Locked assests required to become a fiat merchants, etc.
+	Locked fixedpoint.Value `json:"locked"`
+	// Restricted availability For spot copy trading
+	LimitAvailable fixedpoint.Value           `json:"limitAvailable"`
+	UpdatedTime    types.MillisecondTimestamp `json:"uTime"`
+}
+
+type AccountEvent struct {
+	Balances []Balance
+
+	// internal use
+	actionType ActionType
+	instId     string
+}
+
+type Trade struct {
+	// Latest filled price
+	FillPrice fixedpoint.Value `json:"fillPrice"`
+	TradeId   types.StrInt64   `json:"tradeId"`
+	// Number of latest filled orders
+	BaseVolume fixedpoint.Value           `json:"baseVolume"`
+	FillTime   types.MillisecondTimestamp `json:"fillTime"`
+	// Transaction fee of the latest transaction, negative value
+	FillFee fixedpoint.Value `json:"fillFee"`
+	// Currency of transaction fee of the latest transaction
+	FillFeeCoin string `json:"fillFeeCoin"`
+	// Direction of liquidity of the latest transaction
+	TradeScope string `json:"tradeScope"`
+}
+
+type Order struct {
+	Trade
+
+	InstId string `json:"instId"`
+	// OrderId are always numeric. It's confirmed with official customer service. https://t.me/bitgetOpenapi/24172
+	OrderId       types.StrInt64 `json:"orderId"`
+	ClientOrderId string         `json:"clientOid"`
+	// Size is base coin when orderType=limit; quote coin when orderType=market
+	Size fixedpoint.Value `json:"size"`
+	// Buy amount, returned when buying at market price
+	Notional      fixedpoint.Value           `json:"notional"`
+	OrderType     v2.OrderType               `json:"orderType"`
+	Force         v2.OrderForce              `json:"force"`
+	Side          v2.SideType                `json:"side"`
+	AccBaseVolume fixedpoint.Value           `json:"accBaseVolume"`
+	PriceAvg      fixedpoint.Value           `json:"priceAvg"`
+	Status        v2.OrderStatus             `json:"status"`
+	CreatedTime   types.MillisecondTimestamp `json:"cTime"`
+	UpdatedTime   types.MillisecondTimestamp `json:"uTime"`
+	FeeDetail     []struct {
+		FeeCoin string `json:"feeCoin"`
+		Fee     string `json:"fee"`
+	} `json:"feeDetail"`
+	EnterPointSource string `json:"enterPointSource"`
+}
+
+func (o *Order) isMaker() (bool, error) {
+	switch o.TradeScope {
+	case "T":
+		return false, nil
+	case "M":
+		return true, nil
+	default:
+		return false, fmt.Errorf("unexpected trade scope: %s", o.TradeScope)
+	}
+}
+
+type OrderTradeEvent struct {
+	Orders []Order
+
+	// internal use
+	actionType ActionType
+	instId     string
 }

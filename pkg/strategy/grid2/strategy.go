@@ -177,6 +177,7 @@ type Strategy struct {
 
 	GridProfitStats *GridProfitStats `persistence:"grid_profit_stats"`
 	Position        *types.Position  `persistence:"position"`
+	PersistenceTTL  types.Duration   `json:"persistenceTTL"`
 
 	// ExchangeSession is an injection field
 	ExchangeSession *bbgo.ExchangeSession
@@ -796,6 +797,8 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(
 		if numberOfSellOrders > 0 {
 			numberOfSellOrders--
 		}
+
+		s.logger.Infof("calculated number of sell orders: %d", numberOfSellOrders)
 	}
 
 	// if the maxBaseQuantity is less than minQuantity, then we need to reduce the number of the sell orders
@@ -810,8 +813,12 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(
 		s.Market.MinQuantity)
 
 	if baseQuantity.Compare(minBaseQuantity) <= 0 {
+		s.logger.Infof("base quantity %s is less than min base quantity: %s, adjusting...", baseQuantity.String(), minBaseQuantity.String())
+
 		baseQuantity = s.Market.RoundUpQuantityByPrecision(minBaseQuantity)
 		numberOfSellOrders = int(math.Floor(baseInvestment.Div(baseQuantity).Float64()))
+
+		s.logger.Infof("adjusted base quantity to %s", baseQuantity.String())
 	}
 
 	s.logger.Infof("grid base investment sell orders: %d", numberOfSellOrders)
@@ -824,7 +831,8 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(
 	// quoteInvestment = (p1 + p2 + p3) * q
 	// maxBuyQuantity = quoteInvestment / (p1 + p2 + p3)
 	si := -1
-	for i := len(pins) - 1 - numberOfSellOrders; i >= 0; i-- {
+	end := len(pins) - 1
+	for i := end - numberOfSellOrders - 1; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
 
@@ -844,6 +852,7 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(
 				// requiredQuote = requiredQuote.Add(quantity.Mul(nextLowerPrice))
 				totalQuotePrice = totalQuotePrice.Add(nextLowerPrice)
 			}
+
 		} else {
 			// for orders that buy
 			if s.ProfitSpread.IsZero() && i+1 == si {
@@ -851,7 +860,7 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(
 			}
 
 			// should never place a buy order at the upper price
-			if i == len(pins)-1 {
+			if i == end {
 				continue
 			}
 
@@ -859,8 +868,11 @@ func (s *Strategy) calculateBaseQuoteInvestmentQuantity(
 		}
 	}
 
+	s.logger.Infof("total quote price: %f", totalQuotePrice.Float64())
 	if totalQuotePrice.Sign() > 0 && quoteInvestment.Sign() > 0 {
 		quoteSideQuantity := quoteInvestment.Div(totalQuotePrice)
+
+		s.logger.Infof("quote side quantity: %f = %f / %f", quoteSideQuantity.Float64(), quoteInvestment.Float64(), totalQuotePrice.Float64())
 		if numberOfSellOrders > 0 {
 			return fixedpoint.Min(quoteSideQuantity, baseQuantity), nil
 		}
@@ -1056,6 +1068,11 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 		err2 := errors.Wrap(err, "unable to get the last trade price")
 		s.EmitGridError(err2)
 		return err2
+	}
+
+	if s.BaseGridNum > 0 {
+		sell1 := fixedpoint.Value(s.grid.Pins[len(s.grid.Pins)-1-s.BaseGridNum])
+		lastPrice = sell1.Sub(s.Market.TickSize)
 	}
 
 	// check if base and quote are enough
@@ -1432,6 +1449,8 @@ func calculateMinimalQuoteInvestment(market types.Market, grid *Grid) fixedpoint
 	for i := len(pins) - 2; i >= 0; i-- {
 		pin := pins[i]
 		price := fixedpoint.Value(pin)
+
+		// TODO: should we round the quote here before adding?
 		totalQuote = totalQuote.Add(price.Mul(minQuantity))
 	}
 
@@ -1817,13 +1836,17 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.ProfitSpread = s.Market.TruncatePrice(s.ProfitSpread)
 	}
 
+	s.logger.Infof("persistence ttl: %s", s.PersistenceTTL.Duration())
+
 	if s.GridProfitStats == nil {
 		s.GridProfitStats = newGridProfitStats(s.Market)
 	}
+	s.GridProfitStats.SetTTL(s.PersistenceTTL.Duration())
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
+	s.Position.SetTTL(s.PersistenceTTL.Duration())
 
 	// initialize and register prometheus metrics
 	if s.PrometheusLabels != nil {

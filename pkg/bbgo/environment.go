@@ -108,13 +108,13 @@ type Environment struct {
 	syncStatus      SyncStatus
 	syncConfig      *SyncConfig
 
-	loggingConfig *LoggingConfig
+	loggingConfig     *LoggingConfig
+	environmentConfig *EnvironmentConfig
 
 	sessions map[string]*ExchangeSession
 }
 
 func NewEnvironment() *Environment {
-
 	now := time.Now()
 	return &Environment{
 		// default trade scan time

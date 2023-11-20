@@ -88,6 +88,13 @@ func (w *WebSocketOpEvent) IsValid() error {
 	}
 }
 
+func (w *WebSocketOpEvent) toGlobalPongEventIfValid() (bool, *types.WebsocketPongEvent) {
+	if w.Op == WsOpTypePing || w.Op == WsOpTypePong {
+		return true, &types.WebsocketPongEvent{}
+	}
+	return false, nil
+}
+
 func (w *WebSocketOpEvent) IsAuthenticated() bool {
 	return w.Op == WsOpTypeAuth && w.Success
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,7 +19,6 @@ import (
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -57,6 +55,10 @@ type ExchangeSession struct {
 	// PrivateChannels is used for filtering the private user data channel, .e.g, orders, trades, balances.. etc
 	// This option is exchange specific
 	PrivateChannels []string `json:"privateChannels,omitempty" yaml:"privateChannels,omitempty"`
+
+	// PrivateChannelSymbols is used for filtering the private user data channel, .e.g, order symbol subscription.
+	// This option is exchange specific
+	PrivateChannelSymbols []string `json:"privateChannelSymbols,omitempty" yaml:"privateChannelSymbols,omitempty"`
 
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
 	IsolatedMargin       bool   `json:"isolatedMargin,omitempty" yaml:"isolatedMargin,omitempty"`
@@ -248,6 +250,11 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 				setter.SetPrivateChannels(session.PrivateChannels)
 			}
 		}
+		if len(session.PrivateChannelSymbols) > 0 {
+			if setter, ok := session.UserDataStream.(types.PrivateChannelSymbolSetter); ok {
+				setter.SetPrivateChannelSymbols(session.PrivateChannelSymbols)
+			}
+		}
 
 		logger.Infof("querying account balances...")
 		account, err := session.Exchange.QueryAccount(ctx)
@@ -389,50 +396,39 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		return fmt.Errorf("market %s is not defined", symbol)
 	}
 
-	var err error
-	var trades []types.Trade
-	if environ.SyncService != nil && environ.BacktestService == nil {
-		tradingFeeCurrency := session.Exchange.PlatformFeeCurrency()
-		if strings.HasPrefix(symbol, tradingFeeCurrency) {
-			trades, err = environ.TradeService.QueryForTradingFeeCurrency(session.Exchange.Name(), symbol, tradingFeeCurrency)
-		} else {
-			trades, err = environ.TradeService.Query(service.QueryTradesOptions{
-				Exchange: session.Exchange.Name(),
-				Symbol:   symbol,
-				Ordering: "DESC",
-				Limit:    100,
-			})
-		}
-
-		if err != nil {
-			return err
-		}
-
-		trades = types.SortTradesAscending(trades)
-		log.Infof("symbol %s: %d trades loaded", symbol, len(trades))
+	disableSessionTradeBuffer := environ.environmentConfig != nil && environ.environmentConfig.DisableSessionTradeBuffer
+	maxSessionTradeBufferSize := 0
+	if environ.environmentConfig != nil && environ.environmentConfig.MaxSessionTradeBufferSize > 0 {
+		maxSessionTradeBufferSize = environ.environmentConfig.MaxSessionTradeBufferSize
 	}
 
-	session.Trades[symbol] = &types.TradeSlice{Trades: trades}
-	session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
-		if trade.Symbol != symbol {
-			return
-		}
+	session.Trades[symbol] = &types.TradeSlice{Trades: nil}
 
-		session.Trades[symbol].Append(trade)
-	})
+	if !disableSessionTradeBuffer {
+		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+			if trade.Symbol != symbol {
+				return
+			}
 
+			session.Trades[symbol].Append(trade)
+
+			if maxSessionTradeBufferSize > 0 {
+				session.Trades[symbol].Truncate(maxSessionTradeBufferSize)
+			}
+		})
+	}
+
+	// session wide position
 	position := &types.Position{
 		Symbol:        symbol,
 		BaseCurrency:  market.BaseCurrency,
 		QuoteCurrency: market.QuoteCurrency,
 	}
-	position.AddTrades(trades)
 	position.BindStream(session.UserDataStream)
 	session.positions[symbol] = position
 
 	orderStore := core.NewOrderStore(symbol)
 	orderStore.AddOrderUpdate = true
-
 	orderStore.BindStream(session.UserDataStream)
 	session.orderStores[symbol] = orderStore
 
@@ -472,49 +468,53 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 			}
 
 			if sub.Symbol == symbol {
-				klineSubscriptions[types.Interval(sub.Options.Interval)] = struct{}{}
+				klineSubscriptions[sub.Options.Interval] = struct{}{}
 			}
 		}
 	}
 
-	// always subscribe the 1m kline so we can make sure the connection persists.
-	klineSubscriptions[minInterval] = struct{}{}
-
-	for interval := range klineSubscriptions {
-		// avoid querying the last unclosed kline
-		endTime := environ.startTime
-		var i int64
-		for i = 0; i < KLinePreloadLimit; i += 1000 {
-			var duration time.Duration = time.Duration(-i * int64(interval.Duration()))
-			e := endTime.Add(duration)
-
-			kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
-				EndTime: &e,
-				Limit:   1000, // indicators need at least 100
-			})
-			if err != nil {
-				return err
-			}
-
-			if len(kLines) == 0 {
-				log.Warnf("no kline data for %s %s (end time <= %s)", symbol, interval, e)
-				continue
-			}
-
-			// update last prices by the given kline
-			lastKLine := kLines[len(kLines)-1]
-			if interval == minInterval {
-				session.lastPrices[symbol] = lastKLine.Close
-			}
-
-			for _, k := range kLines {
-				// let market data store trigger the update, so that the indicator could be updated too.
-				marketDataStore.AddKLine(k)
-			}
-		}
+	if !(environ.environmentConfig != nil && environ.environmentConfig.DisableDefaultKLineSubscription) {
+		// subscribe the 1m kline by default so we can make sure the connection persists.
+		klineSubscriptions[minInterval] = struct{}{}
 	}
 
-	log.Infof("%s last price: %v", symbol, session.lastPrices[symbol])
+	if !(environ.environmentConfig != nil && environ.environmentConfig.DisableHistoryKLinePreload) {
+		for interval := range klineSubscriptions {
+			// avoid querying the last unclosed kline
+			endTime := environ.startTime
+			var i int64
+			for i = 0; i < KLinePreloadLimit; i += 1000 {
+				var duration time.Duration = time.Duration(-i * int64(interval.Duration()))
+				e := endTime.Add(duration)
+
+				kLines, err := session.Exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
+					EndTime: &e,
+					Limit:   1000, // indicators need at least 100
+				})
+				if err != nil {
+					return err
+				}
+
+				if len(kLines) == 0 {
+					log.Warnf("no kline data for %s %s (end time <= %s)", symbol, interval, e)
+					continue
+				}
+
+				// update last prices by the given kline
+				lastKLine := kLines[len(kLines)-1]
+				if interval == minInterval {
+					session.lastPrices[symbol] = lastKLine.Close
+				}
+
+				for _, k := range kLines {
+					// let market data store trigger the update, so that the indicator could be updated too.
+					marketDataStore.AddKLine(k)
+				}
+			}
+		}
+
+		log.Infof("%s last price: %v", symbol, session.lastPrices[symbol])
+	}
 
 	session.initializedSymbols[symbol] = struct{}{}
 	return nil

@@ -496,6 +496,12 @@ func (p *PlaceOrderRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (p *PlaceOrderRequest) GetPath() string {
+	return "/v5/order/create"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (p *PlaceOrderRequest) Do(ctx context.Context) (*PlaceOrderResponse, error) {
 
 	params, err := p.GetParameters()
@@ -504,7 +510,9 @@ func (p *PlaceOrderRequest) Do(ctx context.Context) (*PlaceOrderResponse, error)
 	}
 	query := url.Values{}
 
-	apiURL := "/v5/order/create"
+	var apiURL string
+
+	apiURL = p.GetPath()
 
 	req, err := p.client.NewAuthenticatedRequest(ctx, "POST", apiURL, query, params)
 	if err != nil {
@@ -519,6 +527,16 @@ func (p *PlaceOrderRequest) Do(ctx context.Context) (*PlaceOrderResponse, error)
 	var apiResponse APIResponse
 	if err := response.DecodeJSON(&apiResponse); err != nil {
 		return nil, err
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+	validator, ok := interface{}(apiResponse).(responseValidator)
+	if ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	var data PlaceOrderResponse
 	if err := json.Unmarshal(apiResponse.Result, &data); err != nil {

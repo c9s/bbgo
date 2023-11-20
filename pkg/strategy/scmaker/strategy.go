@@ -5,21 +5,17 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	. "github.com/c9s/bbgo/pkg/indicator/v2"
-	"github.com/c9s/bbgo/pkg/risk/riskcontrol"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 const ID = "scmaker"
-
-var ten = fixedpoint.NewFromInt(10)
 
 type advancedOrderCancelApi interface {
 	CancelAllOrders(ctx context.Context) ([]types.Order, error)
@@ -62,12 +58,6 @@ type Strategy struct {
 
 	MinProfit fixedpoint.Value `json:"minProfit"`
 
-	// risk related parameters
-	PositionHardLimit         fixedpoint.Value     `json:"positionHardLimit"`
-	MaxPositionQuantity       fixedpoint.Value     `json:"maxPositionQuantity"`
-	CircuitBreakLossThreshold fixedpoint.Value     `json:"circuitBreakLossThreshold"`
-	CircuitBreakEMA           types.IntervalWindow `json:"circuitBreakEMA"`
-
 	liquidityOrderBook, adjustmentOrderBook *bbgo.ActiveOrderBook
 	book                                    *types.StreamOrderBook
 
@@ -77,9 +67,6 @@ type Strategy struct {
 	ewma      *EWMAStream
 	boll      *BOLLStream
 	intensity *IntensityStream
-
-	positionRiskControl     *riskcontrol.PositionRiskControl
-	circuitBreakRiskControl *riskcontrol.CircuitBreakRiskControl
 }
 
 func (s *Strategy) ID() string {
@@ -100,33 +87,18 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	}
 }
 
-func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.Strategy = &common.Strategy{}
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
 	s.book = types.NewStreamBook(s.Symbol)
-	s.book.BindStream(session.UserDataStream)
+	s.book.BindStream(session.MarketDataStream)
 
 	s.liquidityOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
 	s.liquidityOrderBook.BindStream(session.UserDataStream)
 
 	s.adjustmentOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
 	s.adjustmentOrderBook.BindStream(session.UserDataStream)
-
-	if !s.PositionHardLimit.IsZero() && !s.MaxPositionQuantity.IsZero() {
-		log.Infof("positionHardLimit and maxPositionQuantity are configured, setting up PositionRiskControl...")
-		s.positionRiskControl = riskcontrol.NewPositionRiskControl(s.OrderExecutor, s.PositionHardLimit, s.MaxPositionQuantity)
-	}
-
-	if !s.CircuitBreakLossThreshold.IsZero() {
-		log.Infof("circuitBreakLossThreshold is configured, setting up CircuitBreakRiskControl...")
-		s.circuitBreakRiskControl = riskcontrol.NewCircuitBreakRiskControl(
-			s.Position,
-			session.Indicators(s.Symbol).EWMA(s.CircuitBreakEMA),
-			s.CircuitBreakLossThreshold,
-			s.ProfitStats,
-			24*time.Hour)
-	}
 
 	scale, err := s.LiquiditySlideRule.Scale()
 	if err != nil {
@@ -174,7 +146,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
-func (s *Strategy) preloadKLines(inc *KLineStream, session *bbgo.ExchangeSession, symbol string, interval types.Interval) {
+func (s *Strategy) preloadKLines(
+	inc *KLineStream, session *bbgo.ExchangeSession, symbol string, interval types.Interval,
+) {
 	if store, ok := session.MarketDataStore(symbol); ok {
 		if kLinesData, ok := store.KLinesOfInterval(interval); ok {
 			for _, k := range *kLinesData {
@@ -282,7 +256,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		return
 	}
 
-	if s.circuitBreakRiskControl != nil && s.circuitBreakRiskControl.IsHalted(ticker.Time) {
+	if s.IsHalted(ticker.Time) {
 		log.Warn("circuitBreakRiskControl: trading halted")
 		return
 	}
@@ -476,7 +450,9 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	log.Infof("%d liq orders are placed successfully", len(liqOrders))
 }
 
-func profitProtectedPrice(side types.SideType, averageCost, price, feeRate, minProfit fixedpoint.Value) fixedpoint.Value {
+func profitProtectedPrice(
+	side types.SideType, averageCost, price, feeRate, minProfit fixedpoint.Value,
+) fixedpoint.Value {
 	switch side {
 	case types.SideTypeSell:
 		minProfitPrice := averageCost.Add(
