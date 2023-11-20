@@ -103,8 +103,26 @@ type IsolatedMarginAccountInfo struct {
 
 func NewAccount() *Account {
 	return &Account{
-		balances: make(BalanceMap),
+		AccountType:        "spot",
+		FuturesInfo:        nil,
+		MarginInfo:         nil,
+		IsolatedMarginInfo: nil,
+		MarginLevel:        fixedpoint.Zero,
+		MarginTolerance:    fixedpoint.Zero,
+		BorrowEnabled:      false,
+		TransferEnabled:    false,
+		MarginRatio:        fixedpoint.Zero,
+		LiquidationPrice:   fixedpoint.Zero,
+		LiquidationRate:    fixedpoint.Zero,
+		MakerFeeRate:       fixedpoint.Zero,
+		TakerFeeRate:       fixedpoint.Zero,
+		TotalAccountValue:  fixedpoint.Zero,
+		CanDeposit:         false,
+		CanTrade:           false,
+		CanWithdraw:        false,
+		balances:           make(BalanceMap),
 	}
+
 }
 
 // Balances lock the balances and returned the copied balances

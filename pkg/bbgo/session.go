@@ -256,15 +256,22 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 			}
 		}
 
-		logger.Infof("querying account balances...")
-		account, err := session.Exchange.QueryAccount(ctx)
-		if err != nil {
-			return err
-		}
+		disableStartupBalanceQuery := environ.environmentConfig != nil && environ.environmentConfig.DisableStartupBalanceQuery
+		if disableStartupBalanceQuery {
+			session.accountMutex.Lock()
+			session.Account = types.NewAccount()
+			session.accountMutex.Unlock()
+		} else {
+			logger.Infof("querying account balances...")
+			account, err := session.Exchange.QueryAccount(ctx)
+			if err != nil {
+				return err
+			}
 
-		session.accountMutex.Lock()
-		session.Account = account
-		session.accountMutex.Unlock()
+			session.accountMutex.Lock()
+			session.Account = account
+			session.accountMutex.Unlock()
+		}
 
 		logger.Infof("account %s balances:\n%s", session.Name, account.Balances().String())
 
