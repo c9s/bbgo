@@ -339,7 +339,7 @@ func (e *Exchange) queryClosedOrdersByTime(ctx context.Context, symbol string, s
 
 	for _, maxOrder := range maxOrders {
 		if maxOrder.CreatedAt.Time().Before(since) {
-			break
+			continue
 		}
 		order, err2 := toGlobalOrder(maxOrder)
 		if err2 != nil {

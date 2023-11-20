@@ -24,7 +24,7 @@ func (g *GetWalletClosedOrdersRequest) Timestamp(timestamp time.Time) *GetWallet
 	return g
 }
 
-func (g *GetWalletClosedOrdersRequest) OrderBy(orderBy string) *GetWalletClosedOrdersRequest {
+func (g *GetWalletClosedOrdersRequest) OrderBy(orderBy max.OrderByType) *GetWalletClosedOrdersRequest {
 	g.orderBy = &orderBy
 	return g
 }
@@ -77,17 +77,6 @@ func (g *GetWalletClosedOrdersRequest) GetParameters() (map[string]interface{}, 
 	// check orderBy field -> json key order_by
 	if g.orderBy != nil {
 		orderBy := *g.orderBy
-
-		// TEMPLATE check-valid-values
-		switch orderBy {
-		case "asc", "desc":
-			params["order_by"] = orderBy
-
-		default:
-			return nil, fmt.Errorf("order_by value %v is invalid", orderBy)
-
-		}
-		// END TEMPLATE check-valid-values
 
 		// assign parameter of orderBy
 		params["order_by"] = orderBy

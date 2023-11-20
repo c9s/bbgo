@@ -8,6 +8,7 @@ import (
 
 // create type alias
 type WalletType = maxapi.WalletType
+type OrderByType = maxapi.OrderByType
 type OrderType = maxapi.OrderType
 
 type Order = maxapi.Order

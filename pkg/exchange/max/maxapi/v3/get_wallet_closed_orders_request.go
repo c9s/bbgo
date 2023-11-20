@@ -20,8 +20,8 @@ type GetWalletClosedOrdersRequest struct {
 
 	walletType WalletType `param:"walletType,slug,required"`
 
-	market    string     `param:"market,required"`
-	timestamp *time.Time `param:"timestamp,milliseconds,omitempty"`
-	orderBy   *string    `param:"order_by,omitempty" validValues:"asc,desc,asc_updated_at,desc_updated_at"`
-	limit     *uint      `param:"limit,omitempty"`
+	market    string       `param:"market,required"`
+	timestamp *time.Time   `param:"timestamp,milliseconds,omitempty"`
+	orderBy   *OrderByType `param:"order_by,omitempty"`
+	limit     *uint        `param:"limit,omitempty"`
 }
