@@ -11,9 +11,9 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 const (
@@ -351,11 +351,9 @@ func (s *Stream) handleAuthEvent() {
 
 	var balnacesMap types.BalanceMap
 	var err error
-	err = util.Retry(ctx, 10, 300*time.Millisecond, func() error {
+	err = retry.GeneralBackoff(ctx, func() error {
 		balnacesMap, err = s.streamDataProvider.QueryAccountBalances(ctx)
 		return err
-	}, func(err error) {
-		log.WithError(err).Error("failed to call query account balances")
 	})
 	if err != nil {
 		log.WithError(err).Error("no more attempts to retrieve balances")
