@@ -1387,13 +1387,11 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 			roundUpQuoteQuantity := quoteQuantity.Round(s.Market.PricePrecision, fixedpoint.Up)
 			if usedQuote.Add(roundUpQuoteQuantity).Compare(totalQuote) > 0 {
 				if i > 0 {
-					s.logger.Errorf("used quote %f > total quote %f, this should not happen", usedQuote.Add(quoteQuantity).Float64(), totalQuote.Float64())
 					return nil, fmt.Errorf("used quote %f > total quote %f, this should not happen", usedQuote.Add(quoteQuantity).Float64(), totalQuote.Float64())
 				} else {
 					restQuote := totalQuote.Sub(usedQuote)
 					quantity = restQuote.Div(price).Round(s.Market.VolumePrecision, fixedpoint.Down)
 					if s.Market.MinQuantity.Compare(quantity) > 0 {
-						s.logger.Errorf("the round down quantity (%s) is less than min quantity (%s), we cannot place this order", quantity, s.Market.MinQuantity)
 						return nil, fmt.Errorf("the round down quantity (%s) is less than min quantity (%s), we cannot place this order", quantity, s.Market.MinQuantity)
 					}
 				}
