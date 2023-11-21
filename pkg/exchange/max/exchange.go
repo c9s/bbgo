@@ -253,18 +253,36 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	maxOrders, err := e.v3client.NewGetWalletOpenOrdersRequest(walletType).Market(market).Do(ctx)
-	if err != nil {
-		return orders, err
-	}
-
-	for _, maxOrder := range maxOrders {
-		order, err := toGlobalOrder(maxOrder)
+	// timestamp can't be negative, so we need to use time which epochtime is > 0
+	var since time.Time = time.Date(2018, time.January, 1, 0, 0, 0, 0, time.Local)
+	var limit uint = 1000
+	for {
+		req := e.v3client.NewGetWalletOpenOrdersRequest(walletType).Market(market).Timestamp(since).OrderBy(maxapi.OrderByAsc).Limit(limit)
+		maxOrders, err := req.Do(ctx)
 		if err != nil {
-			return orders, err
+			return nil, err
 		}
 
-		orders = append(orders, *order)
+		for _, maxOrder := range maxOrders {
+			createdAt := maxOrder.CreatedAt.Time()
+			if createdAt.After(since) {
+				since = createdAt
+			}
+
+			order, err := toGlobalOrder(maxOrder)
+			if err != nil {
+				return orders, err
+			}
+
+			orders = append(orders, *order)
+		}
+
+		if len(maxOrders) < int(limit) {
+			break
+		}
+
+		// open orders api will get the open orders which created_at >= since, so we need to add 1 ms to avoid duplicated
+		since = since.Add(1 * time.Millisecond)
 	}
 
 	return orders, err
