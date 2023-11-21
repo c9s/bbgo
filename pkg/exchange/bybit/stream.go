@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -28,6 +29,11 @@ var (
 	// https://www.bybit.com/en-US/help-center/article/Trading-Fee-Structure
 	defaultTakerFee = fixedpoint.NewFromFloat(0.001)
 	defaultMakerFee = fixedpoint.NewFromFloat(0.001)
+
+	marketTradeLogLimiter = rate.NewLimiter(rate.Every(time.Minute), 1)
+	tradeLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
+	orderLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
+	kLineLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
 )
 
 // MarketInfoProvider calculates trade fees since trading fees are not supported by streaming.
@@ -376,7 +382,9 @@ func (s *Stream) handleMarketTradeEvent(events []MarketTradeEvent) {
 	for _, event := range events {
 		trade, err := event.toGlobalTrade()
 		if err != nil {
-			log.WithError(err).Error("failed to convert to market trade")
+			if marketTradeLogLimiter.Allow() {
+				log.WithError(err).Error("failed to convert to market trade")
+			}
 			continue
 		}
 
@@ -396,7 +404,9 @@ func (s *Stream) handleOrderEvent(events []OrderEvent) {
 
 		gOrder, err := toGlobalOrder(event.Order)
 		if err != nil {
-			log.WithError(err).Error("failed to convert to global order")
+			if orderLogLimiter.Allow() {
+				log.WithError(err).Error("failed to convert to global order")
+			}
 			continue
 		}
 		s.StandardStream.EmitOrderUpdate(*gOrder)
@@ -411,7 +421,9 @@ func (s *Stream) handleKLineEvent(klineEvent KLineEvent) {
 	for _, event := range klineEvent.KLines {
 		kline, err := event.toGlobalKLine(klineEvent.Symbol)
 		if err != nil {
-			log.WithError(err).Error("failed to convert to global k line")
+			if kLineLogLimiter.Allow() {
+				log.WithError(err).Error("failed to convert to global k line")
+			}
 			continue
 		}
 
@@ -442,19 +454,23 @@ func (s *Stream) handleTradeEvent(events []TradeEvent) {
 				feeRate.QuoteCoin = market.QuoteCurrency
 			}
 
-			// The error log level was utilized due to a detected discrepancy in the fee calculations.
-			log.Errorf("failed to get %s fee rate, use default taker fee %f, maker fee %f, base coin: %s, quote coin: %s",
-				event.Symbol,
-				feeRate.TakerFeeRate.Float64(),
-				feeRate.MakerFeeRate.Float64(),
-				feeRate.BaseCoin,
-				feeRate.QuoteCoin,
-			)
+			if tradeLogLimiter.Allow() {
+				// The error log level was utilized due to a detected discrepancy in the fee calculations.
+				log.Errorf("failed to get %s fee rate, use default taker fee %f, maker fee %f, base coin: %s, quote coin: %s",
+					event.Symbol,
+					feeRate.TakerFeeRate.Float64(),
+					feeRate.MakerFeeRate.Float64(),
+					feeRate.BaseCoin,
+					feeRate.QuoteCoin,
+				)
+			}
 		}
 
 		gTrade, err := event.toGlobalTrade(feeRate)
 		if err != nil {
-			log.WithError(err).Errorf("unable to convert: %+v", event)
+			if tradeLogLimiter.Allow() {
+				log.WithError(err).Errorf("unable to convert: %+v", event)
+			}
 			continue
 		}
 		s.StandardStream.EmitTradeUpdate(*gTrade)

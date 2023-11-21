@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
 	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
@@ -19,6 +20,11 @@ import (
 var (
 	pingBytes = []byte("ping")
 	pongBytes = []byte("pong")
+
+	marketTradeLogLimiter = rate.NewLimiter(rate.Every(time.Minute), 1)
+	tradeLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
+	orderLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
+	kLineLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
 )
 
 //go:generate callbackgen -type Stream
@@ -361,7 +367,9 @@ func (s *Stream) handleMaretTradeEvent(m MarketTradeEvent) {
 	for _, trade := range m.Events {
 		globalTrade, err := trade.ToGlobal(m.instId)
 		if err != nil {
-			log.WithError(err).Error("failed to convert to market trade")
+			if marketTradeLogLimiter.Allow() {
+				log.WithError(err).Error("failed to convert to market trade")
+			}
 			return
 		}
 
@@ -377,7 +385,9 @@ func (s *Stream) handleKLineEvent(k KLineEvent) {
 
 	interval, found := toGlobalInterval[string(k.channel)]
 	if !found {
-		log.Errorf("unexpected interval %s on KLine subscription", k.channel)
+		if kLineLogLimiter.Allow() {
+			log.Errorf("unexpected interval %s on KLine subscription", k.channel)
+		}
 		return
 	}
 
@@ -415,7 +425,9 @@ func (s *Stream) handleOrderTradeEvent(m OrderTradeEvent) {
 	for _, order := range m.Orders {
 		globalOrder, err := order.toGlobalOrder()
 		if err != nil {
-			log.Errorf("failed to convert order to global: %s", err)
+			if orderLogLimiter.Allow() {
+				log.Errorf("failed to convert order to global: %s", err)
+			}
 			continue
 		}
 		// The bitget support only snapshot on orders channel, so we use snapshot as update to emit data.
@@ -427,7 +439,9 @@ func (s *Stream) handleOrderTradeEvent(m OrderTradeEvent) {
 		if globalOrder.Status == types.OrderStatusPartiallyFilled {
 			trade, err := order.toGlobalTrade()
 			if err != nil {
-				log.Errorf("failed to convert trade to global: %s", err)
+				if tradeLogLimiter.Allow() {
+					log.Errorf("failed to convert trade to global: %s", err)
+				}
 				continue
 			}
 			s.StandardStream.EmitTradeUpdate(trade)
