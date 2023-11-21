@@ -326,11 +326,11 @@ func (e *Exchange) queryClosedOrdersByTime(ctx context.Context, symbol string, s
 		walletType = maxapi.WalletTypeMargin
 	}
 
-	req := e.v3client.NewGetWalletClosedOrdersRequest(walletType).Market(market).Limit(1000)
-
-	if !until.IsZero() {
-		req.Timestamp(until)
-	}
+	req := e.v3client.NewGetWalletClosedOrdersRequest(walletType).
+		Market(market).
+		Timestamp(since).
+		Limit(1000).
+		OrderBy(maxapi.OrderByAsc)
 
 	maxOrders, err := req.Do(ctx)
 	if err != nil {
@@ -338,7 +338,7 @@ func (e *Exchange) queryClosedOrdersByTime(ctx context.Context, symbol string, s
 	}
 
 	for _, maxOrder := range maxOrders {
-		if maxOrder.CreatedAt.Time().Before(since) {
+		if maxOrder.CreatedAt.Time().After(until) {
 			continue
 		}
 		order, err2 := toGlobalOrder(maxOrder)
@@ -353,7 +353,7 @@ func (e *Exchange) queryClosedOrdersByTime(ctx context.Context, symbol string, s
 	if err != nil {
 		return nil, err
 	}
-	return types.SortOrdersAscending(orders), nil
+	return orders, nil
 }
 
 func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
