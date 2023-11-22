@@ -85,6 +85,12 @@ func NewStream(key, secret string, userDataProvider StreamDataProvider) *Stream 
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetHeartBeat(stream.ping)
 	stream.SetBeforeConnect(func(ctx context.Context) (err error) {
+		if stream.PublicOnly {
+			// we don't need the fee rate in the public stream.
+			return
+		}
+
+		// get account fee rate
 		go stream.feeRateProvider.Start(ctx)
 
 		stream.marketsInfo, err = stream.streamDataProvider.QueryMarkets(ctx)
