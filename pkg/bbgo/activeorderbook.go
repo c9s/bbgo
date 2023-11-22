@@ -349,6 +349,12 @@ func isNewerUpdate(a, b types.Order) bool {
 		switch b.Status {
 		case types.OrderStatusNew:
 			return true
+		case types.OrderStatusPartiallyFilled:
+			// unknown for equal
+			if a.ExecutedQuantity.Compare(b.ExecutedQuantity) > 0 {
+				return true
+			}
+
 		}
 
 	case types.OrderStatusFilled:
