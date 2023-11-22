@@ -276,8 +276,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 
 	// if order update time is too old, skip it
 	if previousOrder, ok := b.orders.Get(order.OrderID); ok {
-		previousUpdateTime := previousOrder.UpdateTime.Time()
-		if !previousUpdateTime.IsZero() && order.UpdateTime.Before(previousUpdateTime) {
+		if isNewerOrderUpdate(previousOrder, order) {
 			log.Infof("[ActiveOrderBook] order #%d updateTime %s is out of date, skip it", order.OrderID, order.UpdateTime)
 			b.mu.Unlock()
 			return
