@@ -364,6 +364,10 @@ func isNewerUpdate(a, b types.Order) bool {
 		}
 	}
 
+	return isNewerUpdateTime(a, b)
+}
+
+func isNewerUpdateTime(a, b types.Order) bool {
 	au := time.Time(a.UpdateTime)
 	bu := time.Time(b.UpdateTime)
 

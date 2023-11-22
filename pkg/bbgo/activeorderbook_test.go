@@ -77,3 +77,14 @@ func Test_isNewerUpdate(t *testing.T) {
 	ret := isNewerUpdate(a, b)
 	assert.True(t, ret)
 }
+
+func Test_isNewerUpdateTime(t *testing.T) {
+	a := types.Order{
+		UpdateTime: types.NewTimeFromUnix(200, 0),
+	}
+	b := types.Order{
+		UpdateTime: types.NewTimeFromUnix(100, 0),
+	}
+	ret := isNewerUpdateTime(a, b)
+	assert.True(t, ret)
+}
