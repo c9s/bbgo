@@ -335,7 +335,7 @@ func (b *ActiveOrderBook) Add(orders ...types.Order) {
 	}
 }
 
-func isNewerUpdate(a, b types.Order) bool {
+func isNewerOrderUpdate(a, b types.Order) bool {
 	// compare state first
 	switch a.Status {
 
@@ -364,10 +364,10 @@ func isNewerUpdate(a, b types.Order) bool {
 		}
 	}
 
-	return isNewerUpdateTime(a, b)
+	return isNewerOrderUpdateTime(a, b)
 }
 
-func isNewerUpdateTime(a, b types.Order) bool {
+func isNewerOrderUpdateTime(a, b types.Order) bool {
 	au := time.Time(a.UpdateTime)
 	bu := time.Time(b.UpdateTime)
 
@@ -388,7 +388,7 @@ func (b *ActiveOrderBook) add(order types.Order) {
 		// if the pending order update time is newer than the adding order
 		// we should use the pending order rather than the adding order.
 		// if pending order is older, than we should add the new one, and drop the pending order
-		if isNewerUpdate(pendingOrder, order) {
+		if isNewerOrderUpdate(pendingOrder, order) {
 			order = pendingOrder
 		}
 

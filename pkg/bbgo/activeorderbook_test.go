@@ -74,7 +74,7 @@ func Test_isNewerUpdate(t *testing.T) {
 		Status:           types.OrderStatusPartiallyFilled,
 		ExecutedQuantity: number(0.1),
 	}
-	ret := isNewerUpdate(a, b)
+	ret := isNewerOrderUpdate(a, b)
 	assert.True(t, ret)
 }
 
@@ -85,6 +85,6 @@ func Test_isNewerUpdateTime(t *testing.T) {
 	b := types.Order{
 		UpdateTime: types.NewTimeFromUnix(100, 0),
 	}
-	ret := isNewerUpdateTime(a, b)
+	ret := isNewerOrderUpdateTime(a, b)
 	assert.True(t, ret)
 }
