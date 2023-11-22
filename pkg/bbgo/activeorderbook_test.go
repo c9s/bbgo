@@ -64,3 +64,16 @@ func TestActiveOrderBook_pendingOrders(t *testing.T) {
 
 	assert.True(t, filled, "filled event should be fired")
 }
+
+func Test_isNewerUpdate(t *testing.T) {
+	a := types.Order{
+		Status:           types.OrderStatusPartiallyFilled,
+		ExecutedQuantity: number(0.2),
+	}
+	b := types.Order{
+		Status:           types.OrderStatusPartiallyFilled,
+		ExecutedQuantity: number(0.1),
+	}
+	ret := isNewerUpdate(a, b)
+	assert.True(t, ret)
+}
