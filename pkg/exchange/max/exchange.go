@@ -275,6 +275,10 @@ func (e *Exchange) QueryClosedOrders(
 	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
 ) ([]types.Order, error) {
 	log.Warn("!!!MAX EXCHANGE API NOTICE!!! the since/until conditions will not be effected on closed orders query, max exchange does not support time-range-based query")
+	if !since.IsZero() || !until.IsZero() {
+		return e.queryClosedOrdersByTime(ctx, symbol, since, until)
+	}
+
 	return e.queryClosedOrdersByLastOrderID(ctx, symbol, lastOrderID)
 }
 
@@ -319,6 +323,47 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(
 		return nil, err
 	}
 	return types.SortOrdersAscending(orders), nil
+}
+
+func (e *Exchange) queryClosedOrdersByTime(ctx context.Context, symbol string, since, until time.Time) (orders []types.Order, err error) {
+	if err := e.closedOrderQueryLimiter.Wait(ctx); err != nil {
+		return orders, err
+	}
+
+	market := toLocalSymbol(symbol)
+	walletType := maxapi.WalletTypeSpot
+	if e.MarginSettings.IsMargin {
+		walletType = maxapi.WalletTypeMargin
+	}
+
+	req := e.v3client.NewGetWalletClosedOrdersRequest(walletType).
+		Market(market).
+		Timestamp(since).
+		Limit(1000).
+		OrderBy(maxapi.OrderByAsc)
+
+	maxOrders, err := req.Do(ctx)
+	if err != nil {
+		return orders, err
+	}
+
+	for _, maxOrder := range maxOrders {
+		if maxOrder.CreatedAt.Time().After(until) {
+			continue
+		}
+		order, err2 := toGlobalOrder(maxOrder)
+		if err2 != nil {
+			err = multierr.Append(err, err2)
+			continue
+		}
+
+		orders = append(orders, *order)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return orders, nil
 }
 
 func (e *Exchange) CancelAllOrders(ctx context.Context) ([]types.Order, error) {
