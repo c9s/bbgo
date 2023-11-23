@@ -1362,7 +1362,11 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 					ClientOrderID: s.newClientOrderID(),
 				})
 				quoteQuantity := quantity.Mul(nextPrice)
-				usedQuote = usedQuote.Add(quoteQuantity)
+
+				// because the precision issue, we need to round up quote quantity and add it into used quote
+				// e.g. quote we calculate : 8888.85, but it may lock 8888.9 due to their precision.
+				roundUpQuoteQuantity := quoteQuantity.Round(s.Market.PricePrecision, fixedpoint.Up)
+				usedQuote = usedQuote.Add(roundUpQuoteQuantity)
 			}
 		} else {
 			// if price spread is not enabled, and we have already placed a sell order index on the top of this price,
@@ -1378,9 +1382,19 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 
 			quoteQuantity := quantity.Mul(price)
 
-			if usedQuote.Add(quoteQuantity).Compare(totalQuote) > 0 {
-				s.logger.Warnf("used quote %f > total quote %f, this should not happen", usedQuote.Add(quoteQuantity).Float64(), totalQuote.Float64())
-				continue
+			// because the precision issue, we need to round up quote quantity and add it into used quote
+			// e.g. quote we calculate : 8888.85, but it may lock 8888.9 due to their precision.
+			roundUpQuoteQuantity := quoteQuantity.Round(s.Market.PricePrecision, fixedpoint.Up)
+			if usedQuote.Add(roundUpQuoteQuantity).Compare(totalQuote) > 0 {
+				if i > 0 {
+					return nil, fmt.Errorf("used quote %f > total quote %f, this should not happen", usedQuote.Add(quoteQuantity).Float64(), totalQuote.Float64())
+				} else {
+					restQuote := totalQuote.Sub(usedQuote)
+					quantity = restQuote.Div(price).Round(s.Market.VolumePrecision, fixedpoint.Down)
+					if s.Market.MinQuantity.Compare(quantity) > 0 {
+						return nil, fmt.Errorf("the round down quantity (%s) is less than min quantity (%s), we cannot place this order", quantity, s.Market.MinQuantity)
+					}
+				}
 			}
 
 			submitOrders = append(submitOrders, types.SubmitOrder{
@@ -1395,7 +1409,7 @@ func (s *Strategy) generateGridOrders(totalQuote, totalBase, lastPrice fixedpoin
 				GroupID:       s.OrderGroupID,
 				ClientOrderID: s.newClientOrderID(),
 			})
-			usedQuote = usedQuote.Add(quoteQuantity)
+			usedQuote = usedQuote.Add(roundUpQuoteQuantity)
 		}
 	}
 
