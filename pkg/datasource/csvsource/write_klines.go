@@ -18,8 +18,8 @@ func WriteKLines(path, symbol string, klines []types.KLine) (err error) {
 	from := klines[0].StartTime.Time()
 	end := klines[len(klines)-1].EndTime.Time()
 	to := ""
-	if from.AddDate(0, 0, 1).After(end) {
-		to = "-" + end.Format("2006-01-02")
+	if from.Day() != end.Day() {
+		to = ":" + end.Format("2006-01-02")
 	}
 
 	path = fmt.Sprintf("%s/klines/%s",
@@ -27,7 +27,7 @@ func WriteKLines(path, symbol string, klines []types.KLine) (err error) {
 		klines[0].Interval.String(),
 	)
 
-	fileName := fmt.Sprintf("%s/%s-%s%s.csv",
+	fileName := fmt.Sprintf("%s/%s_%s%s.csv",
 		path,
 		symbol,
 		from.Format("2006-01-02"),

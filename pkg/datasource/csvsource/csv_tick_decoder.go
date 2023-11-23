@@ -7,6 +7,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // CSVTickDecoder is an extension point for CSVTickReader to support custom file formats.
@@ -53,11 +54,10 @@ func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
 	if isBuyerMaker {
 		side = types.SideTypeSell
 	}
-	n, err := strconv.ParseFloat(row[5], 64)
+	n, err := strconv.ParseInt(row[5], 10, 64)
 	if err != nil {
 		return nil, ErrInvalidTimeFormat
 	}
-	ts := time.Unix(int64(n), 0)
 	return &CsvTick{
 		TradeID:         id,
 		Exchange:        types.ExchangeBinance,
@@ -67,7 +67,7 @@ func BinanceCSVTickDecoder(row []string, _ int) (*CsvTick, error) {
 		IsBuyerMaker:    isBuyerMaker,
 		HomeNotional:    price.Mul(qty),
 		ForeignNotional: price.Mul(baseQty),
-		Timestamp:       types.NewMillisecondTimestampFromInt(ts.UnixMilli()),
+		Timestamp:       types.NewMillisecondTimestampFromInt(n),
 		// Symbol: must be overwritten - info not in csv,
 		// TickDirection: would need to keep last tick in memory to compare tick direction,
 	}, nil
@@ -168,11 +168,12 @@ func OKExCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 		side = types.SideTypeSell
 		isBuyerMaker = true
 	}
-	n, err := strconv.ParseFloat(row[4], 64) // startTime
+	n, err := strconv.ParseInt(row[4], 10, 64)
 	if err != nil {
+		spew.Dump(row)
+		spew.Dump(err)
 		return nil, ErrInvalidTimeFormat
 	}
-	ts := time.Unix(int64(n), 0)
 	return &CsvTick{
 		TradeID:      uint64(id),
 		Exchange:     types.ExchangeOKEx,
@@ -181,7 +182,7 @@ func OKExCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 		Price:        price,
 		IsBuyerMaker: isBuyerMaker,
 		HomeNotional: price.Mul(qty),
-		Timestamp:    types.NewMillisecondTimestampFromInt(ts.UnixMilli()),
+		Timestamp:    types.NewMillisecondTimestampFromInt(n),
 		// ForeignNotional: // info not in csv
 		// Symbol: must be overwritten - info not in csv
 		// TickDirection: would need to keep last tick in memory to compare tick direction,

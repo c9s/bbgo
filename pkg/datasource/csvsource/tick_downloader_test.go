@@ -3,6 +3,7 @@ package csvsource
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -21,10 +22,10 @@ type DownloadTester struct {
 }
 
 var (
-	expectedCandles = []int{1440, 48, 24}
-	intervals       = []types.Interval{types.Interval1m, types.Interval30m, types.Interval1h}
-	until           = time.Now().Round(0)
-	since           = until.Add(-24 * time.Hour)
+	expectedCandles = []int{864, 144, 72}
+	intervals       = []types.Interval{types.Interval5m, types.Interval30m, types.Interval1h}
+	since           = time.Date(2023, 11, 17, 0, 0, 0, 0, time.UTC)
+	until           = time.Date(2023, 11, 19, 0, 0, 0, 0, time.UTC)
 )
 
 func Test_CSV_Download(t *testing.T) {
@@ -53,8 +54,8 @@ func Test_CSV_Download(t *testing.T) {
 			Reader:      NewOKExCSVTickReader,
 			Market:      SPOT,
 			Granularity: AGGTRADES,
-			Symbol:      "BTCUSDT",
-			Path:        "testdata/okex/BTCUSDT",
+			Symbol:      "FXSUSDT",
+			Path:        "testdata/okex/FXSUSDT",
 		},
 	}
 
@@ -71,7 +72,7 @@ func Test_CSV_Download(t *testing.T) {
 		assert.NoError(t, err)
 
 		klineMap, err := ReadTicksFromCSVWithDecoder(
-			tt.Path,
+			filepath.Join(tt.Path, string(tt.Granularity)),
 			tt.Symbol,
 			intervals,
 			MakeCSVTickReader(tt.Reader),

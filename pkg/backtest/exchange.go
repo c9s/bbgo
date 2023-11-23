@@ -376,7 +376,6 @@ func (e *Exchange) SubscribeMarketData(
 	for symbol := range loadedSymbols {
 		symbols = append(symbols, symbol)
 	}
-	symbols = append(symbols, "FXSUSDT")
 
 	var intervals []types.Interval
 	for interval := range loadedIntervals {

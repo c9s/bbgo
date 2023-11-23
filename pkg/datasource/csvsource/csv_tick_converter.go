@@ -3,7 +3,6 @@ package csvsource
 import (
 	"time"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -56,11 +55,8 @@ func (c *CSVTickConverter) GetKLineResults() map[types.Interval][]types.KLine {
 // Convert ticks to KLine with interval
 func (c *CSVTickConverter) CsvTickToKLine(tick *CsvTick) (closesKLine bool) {
 	for _, interval := range c.intervals {
-		var (
-			currentCandle = types.KLine{}
-			high          = fixedpoint.Zero
-			low           = fixedpoint.Zero
-		)
+		var currentCandle *types.KLine
+
 		isOpen, t := c.detCandleStart(tick.Timestamp.Time(), interval)
 		if isOpen {
 			latestKline := c.LatestKLine(interval)
@@ -87,47 +83,33 @@ func (c *CSVTickConverter) CsvTickToKLine(tick *CsvTick) (closesKLine bool) {
 			return
 		}
 
-		currentCandle = c.klines[interval][len(c.klines[interval])-1]
+		currentCandle = c.LatestKLine(interval)
 
 		if tick.Price.Compare(currentCandle.High) > 0 {
-			high = tick.Price
-		} else {
-			high = currentCandle.High
+			currentCandle.High = tick.Price
 		}
 
 		if tick.Price.Compare(currentCandle.Low) < 0 {
-			low = tick.Price
-		} else {
-			low = currentCandle.Low
+			currentCandle.Low = tick.Price
 		}
-
-		c.klines[interval][len(c.klines[interval])-1] = types.KLine{
-			StartTime:   currentCandle.StartTime,
-			EndTime:     currentCandle.EndTime,
-			Exchange:    tick.Exchange,
-			Symbol:      tick.Symbol,
-			Interval:    interval,
-			Open:        currentCandle.Open,
-			High:        high,
-			Low:         low,
-			Close:       tick.Price,
-			Volume:      currentCandle.Volume.Add(tick.HomeNotional),
-			QuoteVolume: currentCandle.QuoteVolume.Add(tick.ForeignNotional),
-			Closed:      false,
-		}
+		currentCandle.Close = tick.Price
+		currentCandle.Volume = currentCandle.Volume.Add(tick.HomeNotional)
+		currentCandle.QuoteVolume = currentCandle.QuoteVolume.Add(tick.ForeignNotional)
 	}
 
 	return
 }
 
 func (c *CSVTickConverter) detCandleStart(ts time.Time, interval types.Interval) (isOpen bool, t time.Time) {
-	if len(c.klines) == 0 {
+	var last = c.LatestKLine(interval)
+	if last == nil {
 		return true, interval.Truncate(ts)
 	}
-
-	var end = c.LatestKLine(interval).EndTime.Time()
-	if ts.After(end) {
-		return true, end
+	if last != nil {
+		var end = last.EndTime.Time()
+		if ts.After(end) {
+			return true, end
+		}
 	}
 
 	return false, t
