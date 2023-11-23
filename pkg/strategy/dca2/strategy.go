@@ -3,10 +3,15 @@ package dca2
 import (
 	"context"
 	"fmt"
+	"math"
+	"sync"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,17 +26,20 @@ func init() {
 }
 
 type Strategy struct {
+	*common.Strategy
+
 	Environment *bbgo.Environment
 	Market      types.Market
 
 	Symbol string `json:"symbol"`
 
 	// setting
+	Short            bool             `json:"short"`
 	Budget           fixedpoint.Value `json:"budget"`
-	OrderNum         int64            `json:"orderNum"`
-	Margin           fixedpoint.Value `json:"margin"`
-	TakeProfitSpread fixedpoint.Value `json:"takeProfitSpread"`
-	RoundInterval    types.Duration   `json:"roundInterval"`
+	MaxOrderNum      int64            `json:"maxOrderNum"`
+	PriceDeviation   fixedpoint.Value `json:"priceDeviation"`
+	TakeProfitRatio  fixedpoint.Value `json:"takeProfitRatio"`
+	CoolDownInterval types.Duration   `json:"coolDownInterval"`
 
 	// OrderGroupID is the group ID used for the strategy instance for canceling orders
 	OrderGroupID uint32 `json:"orderGroupID"`
@@ -40,14 +48,12 @@ type Strategy struct {
 	logger    *logrus.Entry
 	LogFields logrus.Fields `json:"logFields"`
 
-	// persistence fields: position and profit
-	Position    *types.Position    `persistence:"position"`
-	ProfitStats *types.ProfitStats `persistence:"profit_stats"`
-
 	// private field
-	session       *bbgo.ExchangeSession
-	orderExecutor *bbgo.GeneralOrderExecutor
-	book          *types.StreamOrderBook
+	mu                   sync.Mutex
+	makerSide            types.SideType
+	takeProfitSide       types.SideType
+	takeProfitPrice      fixedpoint.Value
+	startTimeOfNextRound time.Time
 }
 
 func (s *Strategy) ID() string {
@@ -55,15 +61,15 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if s.OrderNum < 1 {
+	if s.MaxOrderNum < 1 {
 		return fmt.Errorf("maxOrderNum can not be < 1")
 	}
 
-	if s.TakeProfitSpread.Compare(fixedpoint.Zero) <= 0 {
+	if s.TakeProfitRatio.Sign() <= 0 {
 		return fmt.Errorf("takeProfitSpread can not be <= 0")
 	}
 
-	if s.Margin.Compare(fixedpoint.Zero) <= 0 {
+	if s.PriceDeviation.Sign() <= 0 {
 		return fmt.Errorf("margin can not be <= 0")
 	}
 
@@ -91,95 +97,52 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{Depth: types.DepthLevel1})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	if s.Position == nil {
-		s.Position = types.NewPositionFromMarket(s.Market)
-	}
-
-	if s.ProfitStats == nil {
-		s.ProfitStats = types.NewProfitStats(s.Market)
-	}
-
+	s.Strategy = &common.Strategy{}
+	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 	instanceID := s.InstanceID()
-	s.session = session
-	s.orderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
-	s.orderExecutor.BindEnvironment(s.Environment)
-	s.orderExecutor.BindProfitStats(s.ProfitStats)
-	s.orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		bbgo.Sync(ctx, s)
-	})
-	s.orderExecutor.Bind()
-	s.book = types.NewStreamBook(s.Symbol)
-	s.book.BindStream(s.session.MarketDataStream)
 
-	balances := session.GetAccount().Balances()
+	if s.Short {
+		s.makerSide = types.SideTypeSell
+		s.takeProfitSide = types.SideTypeBuy
+	} else {
+		s.makerSide = types.SideTypeBuy
+		s.takeProfitSide = types.SideTypeSell
+	}
+
+	if s.OrderGroupID == 0 {
+		s.OrderGroupID = util.FNV32(instanceID) % math.MaxInt32
+	}
+
+	// order executor
+	s.OrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		s.logger.Infof("position: %s", s.Position.String())
+		bbgo.Sync(ctx, s)
+
+		// update take profit price here
+	})
+
+	session.MarketDataStream.OnKLine(func(kline types.KLine) {
+		// check price here
+	})
+
+	session.UserDataStream.OnAuth(func() {
+		s.logger.Info("user data stream authenticated, start the process")
+		// decide state here
+	})
+
+	balances, err := session.Exchange.QueryAccountBalances(ctx)
+	if err != nil {
+		return err
+	}
+
 	balance := balances[s.Market.QuoteCurrency]
 	if balance.Available.Compare(s.Budget) < 0 {
 		return fmt.Errorf("the available balance of %s is %s which is less than budget setting %s, please check it", s.Market.QuoteCurrency, balance.Available, s.Budget)
 	}
 
-	session.MarketDataStream.OnBookUpdate(func(book types.SliceOrderBook) {
-		bid, ok := book.BestBid()
-		if !ok {
-			return
-		}
-
-		takeProfitPrice := s.Market.TruncatePrice(s.Position.AverageCost.Mul(fixedpoint.One.Add(s.TakeProfitSpread)))
-		if bid.Price.Compare(takeProfitPrice) >= 0 {
-		}
-	})
-
 	return nil
-}
-
-func (s *Strategy) generateMakerOrder(budget, askPrice, margin fixedpoint.Value, orderNum int64) ([]types.SubmitOrder, error) {
-	marginPrice := askPrice.Mul(margin)
-	price := askPrice
-	var prices []fixedpoint.Value
-	var total fixedpoint.Value
-	for i := 0; i < int(orderNum); i++ {
-		price = price.Sub(marginPrice)
-		truncatePrice := s.Market.TruncatePrice(price)
-		prices = append(prices, truncatePrice)
-		total = total.Add(truncatePrice)
-	}
-
-	quantity := budget.Div(total)
-	quantity = s.Market.TruncateQuantity(quantity)
-
-	var submitOrders []types.SubmitOrder
-
-	for _, price := range prices {
-		submitOrders = append(submitOrders, types.SubmitOrder{
-			Symbol:      s.Symbol,
-			Market:      s.Market,
-			Type:        types.OrderTypeLimit,
-			Price:       price,
-			Side:        types.SideTypeBuy,
-			TimeInForce: types.TimeInForceGTC,
-			Quantity:    quantity,
-			Tag:         orderTag,
-			GroupID:     s.OrderGroupID,
-		})
-	}
-
-	return submitOrders, nil
-}
-
-func (s *Strategy) generateTakeProfitOrder(position *types.Position, takeProfitSpread fixedpoint.Value) types.SubmitOrder {
-	takeProfitPrice := s.Market.TruncatePrice(position.AverageCost.Mul(fixedpoint.One.Add(takeProfitSpread)))
-	return types.SubmitOrder{
-		Symbol:      s.Symbol,
-		Market:      s.Market,
-		Type:        types.OrderTypeLimit,
-		Price:       takeProfitPrice,
-		Side:        types.SideTypeSell,
-		TimeInForce: types.TimeInForceGTC,
-		Quantity:    position.GetBase().Abs(),
-		Tag:         orderTag,
-		GroupID:     s.OrderGroupID,
-	}
 }

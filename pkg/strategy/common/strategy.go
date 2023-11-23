@@ -69,9 +69,11 @@ func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, se
 	s.OrderExecutor.BindEnvironment(environ)
 	s.OrderExecutor.BindProfitStats(s.ProfitStats)
 	s.OrderExecutor.Bind()
-	s.OrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		// bbgo.Sync(ctx, s)
-	})
+	/*
+		s.OrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+			bbgo.Sync(ctx, s)
+		})
+	*/
 
 	if !s.PositionHardLimit.IsZero() && !s.MaxPositionQuantity.IsZero() {
 		log.Infof("positionHardLimit and maxPositionQuantity are configured, setting up PositionRiskControl...")
