@@ -9,6 +9,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type cancelOrdersByGroupIDApi interface {
+	CancelOrdersByGroupID(ctx context.Context, groupID int64) ([]types.Order, error)
+}
+
 func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 	s.logger.Infof("[DCA] start placing open position orders")
 	price, err := getBestPriceUntilSuccess(ctx, s.Session.Exchange, s.Symbol, s.Short)
@@ -110,4 +114,25 @@ func calculateNotionalAndNum(market types.Market, short bool, budget fixedpoint.
 	}
 
 	return fixedpoint.Zero, 0
+}
+
+func (s *Strategy) cancelOpenPositionOrders(ctx context.Context) error {
+	s.logger.Info("[DCA] cancel open position orders")
+	e, ok := s.Session.Exchange.(cancelOrdersByGroupIDApi)
+	if ok {
+		cancelledOrders, err := e.CancelOrdersByGroupID(ctx, int64(s.OrderGroupID))
+		if err != nil {
+			return err
+		}
+
+		for _, cancelledOrder := range cancelledOrders {
+			s.logger.Info("CANCEL ", cancelledOrder.String())
+		}
+	} else {
+		if err := s.OrderExecutor.ActiveMakerOrders().GracefulCancel(ctx, s.Session.Exchange); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
