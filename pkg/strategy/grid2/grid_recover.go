@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -18,6 +19,8 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 	defer func() {
 		s.updateGridNumOfOrdersMetricsWithLock()
 	}()
+	isMax := isMaxExchange(session.Exchange)
+	s.logger.Infof("isMax: %t", isMax)
 
 	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)
 	// if the exchange doesn't support ExchangeTradeHistoryService, do not run recover
@@ -71,6 +74,10 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 	// emit the filled orders
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
 	for _, filledOrder := range filledOrders {
+		if isMax && filledOrder.OriginalStatus != string(maxapi.OrderStateDone) {
+			activeOrderBook.Add(filledOrder)
+			continue
+		}
 		activeOrderBook.EmitFilled(filledOrder)
 	}
 
