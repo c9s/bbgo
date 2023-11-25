@@ -22,9 +22,9 @@ import (
 const (
 	defaultHTTPTimeout = time.Second * 15
 
-	RestBaseURL         = "https://api.bybit.com"
-	WsSpotPublicSpotUrl = "wss://stream.bybit.com/v5/public/spot"
-	WsSpotPrivateUrl    = "wss://stream.bybit.com/v5/private"
+	RestBaseURL         = "https://api-testnet.bybit.com"
+	WsSpotPublicSpotUrl = "wss://stream-testnet.bybit.com/v5/public/spot"
+	WsSpotPrivateUrl    = "wss://stream-testnet.bybit.com/v5/private"
 )
 
 // defaultRequestWindowMilliseconds specify how long an HTTP request is valid. It is also used to prevent replay attacks.
