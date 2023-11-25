@@ -75,7 +75,12 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		if token := viper.GetString("rollbar-token"); token != "" {
+		token := viper.GetString("rollbar-token")
+		if token == "" {
+			token = os.Getenv("ROLLBAR_TOKEN")
+		}
+
+		if token != "" {
 			log.Infof("found rollbar token %q, setting up rollbar hook...", util.MaskKey(token))
 
 			log.AddHook(rollrus.NewHook(
