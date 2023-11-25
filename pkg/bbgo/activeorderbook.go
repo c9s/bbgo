@@ -276,7 +276,10 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 
 	// if order update time is too old, skip it
 	if previousOrder, ok := b.orders.Get(order.OrderID); ok {
-		if isNewerOrderUpdate(previousOrder, order) {
+		// the arguments ordering is important here
+		// if we can't detect which is newer, isNewerOrderUpdate returns false
+		// if you pass two same objects to isNewerOrderUpdate, it returns false
+		if !isNewerOrderUpdate(order, previousOrder) {
 			log.Infof("[ActiveOrderBook] order #%d updateTime %s is out of date, skip it", order.OrderID, order.UpdateTime)
 			b.mu.Unlock()
 			return
@@ -387,7 +390,9 @@ func (b *ActiveOrderBook) add(order types.Order) {
 		// if the pending order update time is newer than the adding order
 		// we should use the pending order rather than the adding order.
 		// if pending order is older, than we should add the new one, and drop the pending order
+		log.Infof("found pending order update")
 		if isNewerOrderUpdate(pendingOrder, order) {
+			log.Infof("pending order update is newer")
 			order = pendingOrder
 		}
 
