@@ -33,13 +33,11 @@ func newTestStrategy(va ...string) *Strategy {
 
 	market := newTestMarket()
 	s := &Strategy{
-		logger:           logrus.NewEntry(logrus.New()),
-		Symbol:           symbol,
-		Market:           market,
-		Short:            false,
-		TakeProfitRatio:  Number("10%"),
-		openPositionSide: types.SideTypeBuy,
-		takeProfitSide:   types.SideTypeSell,
+		logger:          logrus.NewEntry(logrus.New()),
+		Symbol:          symbol,
+		Market:          market,
+		Short:           false,
+		TakeProfitRatio: Number("10%"),
 	}
 	return s
 }
