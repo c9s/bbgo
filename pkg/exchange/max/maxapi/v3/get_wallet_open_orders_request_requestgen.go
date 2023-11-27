@@ -72,7 +72,6 @@ func (g *GetWalletOpenOrdersRequest) GetParameters() (map[string]interface{}, er
 		// assign parameter of timestamp
 		// convert time.Time to milliseconds time stamp
 		params["timestamp"] = strconv.FormatInt(timestamp.UnixNano()/int64(time.Millisecond), 10)
-		fmt.Println(params["timestamp"], timestamp)
 	} else {
 	}
 	// check orderBy field -> json key order_by
