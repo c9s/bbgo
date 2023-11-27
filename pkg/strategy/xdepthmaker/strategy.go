@@ -62,9 +62,6 @@ type Strategy struct {
 	// Quantity is used for fixed quantity of the first layer
 	Quantity fixedpoint.Value `json:"quantity"`
 
-	// QuantityMultiplier is the factor that multiplies the quantity of the previous layer
-	QuantityMultiplier fixedpoint.Value `json:"quantityMultiplier"`
-
 	// QuantityScale helps user to define the quantity by layer scale
 	QuantityScale *bbgo.LayerScale `json:"quantityScale,omitempty"`
 
@@ -86,8 +83,8 @@ type Strategy struct {
 	Pips fixedpoint.Value `json:"pips"`
 
 	// --------------------------------
-	// private field
-
+	// private fields
+	// --------------------------------
 	makerSession, sourceSession *bbgo.ExchangeSession
 
 	makerMarket, sourceMarket types.Market
@@ -144,10 +141,6 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 func (s *Strategy) Validate() error {
 	if s.Quantity.IsZero() || s.QuantityScale == nil {
 		return errors.New("quantity or quantityScale can not be empty")
-	}
-
-	if !s.QuantityMultiplier.IsZero() && s.QuantityMultiplier.Sign() < 0 {
-		return errors.New("quantityMultiplier can not be a negative number")
 	}
 
 	if len(s.Symbol) == 0 {
@@ -735,10 +728,6 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				makerQuota.Rollback()
 				hedgeQuota.Rollback()
 			}
-
-			if s.QuantityMultiplier.Sign() > 0 {
-				bidQuantity = bidQuantity.Mul(s.QuantityMultiplier)
-			}
 		}
 
 		// for maker ask orders
@@ -789,9 +778,6 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				hedgeQuota.Rollback()
 			}
 
-			if s.QuantityMultiplier.Sign() > 0 {
-				askQuantity = askQuantity.Mul(s.QuantityMultiplier)
-			}
 		}
 	}
 
