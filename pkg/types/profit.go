@@ -155,9 +155,14 @@ type PeriodProfitStats struct {
 	GrossProfit   fixedpoint.Value `json:"grossProfit,omitempty"`
 	GrossLoss     fixedpoint.Value `json:"grossLoss,omitempty"`
 	Volume        fixedpoint.Value `json:"volume,omitempty"`
-	LastTradeTime time.Time        `json:"lastTradeTime,omitempty"`
-	StartTime     time.Time        `json:"startTime,omitempty"`
-	EndTime       time.Time        `json:"endTime,omitempty"`
+	VolumeInQuote fixedpoint.Value `json:"volumeInQuote,omitempty"`
+	MakerVolume   fixedpoint.Value `json:"makerVolume,omitempty"`
+	TakerVolume   fixedpoint.Value `json:"takerVolume,omitempty"`
+
+	// time fields
+	LastTradeTime time.Time `json:"lastTradeTime,omitempty"`
+	StartTime     time.Time `json:"startTime,omitempty"`
+	EndTime       time.Time `json:"endTime,omitempty"`
 }
 
 type ProfitStats struct {
