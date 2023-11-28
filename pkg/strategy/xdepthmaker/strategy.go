@@ -250,6 +250,14 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Validate() error {
+	if s.MakerExchange == "" {
+		return errors.New("maker exchange is not configured")
+	}
+
+	if s.HedgeExchange == "" {
+		return errors.New("maker exchange is not configured")
+	}
+
 	if s.Quantity.IsZero() || s.QuantityScale == nil {
 		return errors.New("quantity or quantityScale can not be empty")
 	}
