@@ -46,8 +46,10 @@ type CrossExchangeMarketMakingStrategy struct {
 	makerSession, hedgeSession *bbgo.ExchangeSession
 	makerMarket, hedgeMarket   types.Market
 
-	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
-	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
+	// persistence fields
+	Position        *types.Position    `json:"position,omitempty" persistence:"position"`
+	ProfitStats     *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
+	CoveredPosition fixedpoint.Value   `json:"coveredPosition,omitempty" persistence:"covered_position"`
 
 	MakerOrderExecutor, HedgeOrderExecutor *bbgo.GeneralOrderExecutor
 
@@ -133,6 +135,28 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	s.orderStore.BindStream(hedgeSession.UserDataStream)
 	s.orderStore.BindStream(makerSession.UserDataStream)
 	s.tradeCollector = core.NewTradeCollector(symbol, s.Position, s.orderStore)
+
+	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+		c := trade.PositionChange()
+		if trade.Exchange == s.hedgeSession.ExchangeName {
+			s.CoveredPosition.AtomicAdd(c)
+		}
+
+		s.ProfitStats.AddTrade(trade)
+
+		if profit.Compare(fixedpoint.Zero) == 0 {
+			s.Environ.RecordPosition(s.Position, trade, nil)
+		} else {
+			log.Infof("%s generated profit: %v", symbol, profit)
+
+			p := s.Position.NewProfit(trade, profit, netProfit)
+			bbgo.Notify(&p)
+			s.ProfitStats.AddProfit(p)
+
+			s.Environ.RecordPosition(s.Position, trade, &p)
+		}
+	})
+
 	return nil
 }
 
@@ -188,10 +212,6 @@ type Strategy struct {
 	// --------------------------------
 	// private fields
 	// --------------------------------
-	state *State
-
-	// persistence fields
-	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty" persistence:"covered_position"`
 
 	// pricingBook is the order book (depth) from the hedging session
 	pricingBook *types.StreamOrderBook
@@ -281,8 +301,6 @@ func (s *Strategy) Initialize() error {
 func (s *Strategy) CrossRun(
 	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
-	instanceID := s.InstanceID()
-
 	makerSession, hedgeSession, err := selectSessions2(sessions, s.MakerExchange, s.HedgeExchange)
 	if err != nil {
 		return err
@@ -293,41 +311,12 @@ func (s *Strategy) CrossRun(
 		return err
 	}
 
-	if s.CoveredPosition.IsZero() {
-		if s.state != nil && !s.CoveredPosition.IsZero() {
-			s.CoveredPosition = s.state.CoveredPosition
-		}
-	}
-
 	s.pricingBook = types.NewStreamBook(s.Symbol)
 	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
 
 	if s.NotifyTrade {
 		s.tradeCollector.OnTrade(notifyTrade)
 	}
-
-	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		c := trade.PositionChange()
-		if trade.Exchange == s.hedgeSession.ExchangeName {
-			s.CoveredPosition = s.CoveredPosition.Add(c)
-		}
-
-		s.ProfitStats.AddTrade(trade)
-
-		if profit.Compare(fixedpoint.Zero) == 0 {
-			s.Environment.RecordPosition(s.Position, trade, nil)
-		} else {
-			log.Infof("%s generated profit: %v", s.Symbol, profit)
-
-			p := s.Position.NewProfit(trade, profit, netProfit)
-			p.Strategy = ID
-			p.StrategyInstanceID = instanceID
-			bbgo.Notify(&p)
-			s.ProfitStats.AddProfit(p)
-
-			s.Environment.RecordPosition(s.Position, trade, &p)
-		}
-	})
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		bbgo.Notify(position)
@@ -353,12 +342,6 @@ func (s *Strategy) CrossRun(
 
 		reportTicker := time.NewTicker(time.Hour)
 		defer reportTicker.Stop()
-
-		defer func() {
-			if err := s.MakerOrderExecutor.GracefulCancel(context.Background()); err != nil {
-				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
-			}
-		}()
 
 		for {
 			select {
@@ -420,7 +403,11 @@ func (s *Strategy) CrossRun(
 		defer cancelShutdown()
 
 		if err := s.MakerOrderExecutor.GracefulCancel(shutdownCtx); err != nil {
-			log.WithError(err).Errorf("graceful cancel error")
+			log.WithError(err).Errorf("graceful cancel %s order error", s.Symbol)
+		}
+
+		if err := s.HedgeOrderExecutor.GracefulCancel(shutdownCtx); err != nil {
+			log.WithError(err).Errorf("graceful cancel %s order error", s.Symbol)
 		}
 
 		bbgo.Notify("%s: %s position", ID, s.Symbol, s.Position)
