@@ -194,7 +194,9 @@ type Strategy struct {
 	// persistence fields
 	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty" persistence:"covered_position"`
 
-	book              *types.StreamOrderBook
+	// pricingBook is the order book (depth) from the hedging session
+	pricingBook *types.StreamOrderBook
+
 	activeMakerOrders *bbgo.ActiveOrderBook
 
 	hedgeErrorLimiter         *rate.Limiter
@@ -216,19 +218,13 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
-	sourceSession, ok := sessions[s.HedgeExchange]
-	if !ok {
-		panic(fmt.Errorf("source session %s is not defined", s.HedgeExchange))
+	makerSession, hedgeSession, err := selectSessions2(sessions, s.MakerExchange, s.HedgeExchange)
+	if err != nil {
+		panic(err)
 	}
 
-	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
-	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
-
-	makerSession, ok := sessions[s.MakerExchange]
-	if !ok {
-		panic(fmt.Errorf("maker session %s is not defined", s.MakerExchange))
-	}
-
+	hedgeSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
+	hedgeSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
@@ -320,8 +316,8 @@ func (s *Strategy) CrossRun(
 		})
 	}
 
-	s.book = types.NewStreamBook(s.Symbol)
-	s.book.BindStream(s.hedgeSession.MarketDataStream)
+	s.pricingBook = types.NewStreamBook(s.Symbol)
+	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
 
 	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
@@ -471,7 +467,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	lastPrice := s.lastPrice
-	sourceBook := s.book.CopyDepth(1)
+	sourceBook := s.pricingBook.CopyDepth(1)
 	switch side {
 
 	case types.SideTypeBuy:
@@ -608,7 +604,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	bestBid, bestAsk, hasPrice := s.book.BestBidAndAsk()
+	bestBid, bestAsk, hasPrice := s.pricingBook.BestBidAndAsk()
 	if !hasPrice {
 		return
 	}
@@ -616,7 +612,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	// use mid-price for the last price
 	s.lastPrice = bestBid.Price.Add(bestAsk.Price).Div(Two)
 
-	bookLastUpdateTime := s.book.LastUpdateTime()
+	bookLastUpdateTime := s.pricingBook.LastUpdateTime()
 
 	if _, err := s.bidPriceHeartBeat.Update(bestBid, priceUpdateTimeout); err != nil {
 		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
@@ -632,7 +628,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	sourceBook := s.book.CopyDepth(10)
+	sourceBook := s.pricingBook.CopyDepth(10)
 	if valid, err := sourceBook.IsValid(); !valid {
 		log.WithError(err).Errorf("%s invalid copied order book, skip quoting: %v", s.Symbol, err)
 		return
