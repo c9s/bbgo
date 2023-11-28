@@ -132,8 +132,7 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	s.orderStore = core.NewOrderStore(s.Position.Symbol)
 	s.orderStore.BindStream(hedgeSession.UserDataStream)
 	s.orderStore.BindStream(makerSession.UserDataStream)
-	s.tradeCollector = core.NewTradeCollector(s.Position.Symbol, s.Position, s.orderStore)
-
+	s.tradeCollector = core.NewTradeCollector(symbol, s.Position, s.orderStore)
 	return nil
 }
 
@@ -196,8 +195,6 @@ type Strategy struct {
 
 	// pricingBook is the order book (depth) from the hedging session
 	pricingBook *types.StreamOrderBook
-
-	activeMakerOrders *bbgo.ActiveOrderBook
 
 	hedgeErrorLimiter         *rate.Limiter
 	hedgeErrorRateReservation *rate.Reservation
@@ -305,9 +302,6 @@ func (s *Strategy) CrossRun(
 	s.pricingBook = types.NewStreamBook(s.Symbol)
 	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
 
-	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
-	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
-
 	if s.NotifyTrade {
 		s.tradeCollector.OnTrade(notifyTrade)
 	}
@@ -361,7 +355,7 @@ func (s *Strategy) CrossRun(
 		defer reportTicker.Stop()
 
 		defer func() {
-			if err := s.activeMakerOrders.GracefulCancel(context.Background(), s.makerSession.Exchange); err != nil {
+			if err := s.MakerOrderExecutor.GracefulCancel(context.Background()); err != nil {
 				log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
 			}
 		}()
@@ -425,7 +419,7 @@ func (s *Strategy) CrossRun(
 		shutdownCtx, cancelShutdown := context.WithTimeout(context.TODO(), time.Minute)
 		defer cancelShutdown()
 
-		if err := s.activeMakerOrders.GracefulCancel(shutdownCtx, s.makerSession.Exchange); err != nil {
+		if err := s.MakerOrderExecutor.GracefulCancel(shutdownCtx); err != nil {
 			log.WithError(err).Errorf("graceful cancel error")
 		}
 
@@ -575,13 +569,13 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 }
 
 func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter) {
-	if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
+	if err := s.MakerOrderExecutor.GracefulCancel(ctx); err != nil {
 		log.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
-		s.activeMakerOrders.Print()
+		s.MakerOrderExecutor.ActiveMakerOrders().Print()
 		return
 	}
 
-	if s.activeMakerOrders.NumOfOrders() > 0 {
+	if s.MakerOrderExecutor.ActiveMakerOrders().NumOfOrders() > 0 {
 		return
 	}
 
@@ -818,14 +812,11 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	makerOrders, err := orderExecutionRouter.SubmitOrdersTo(ctx, s.MakerExchange, submitOrders...)
+	_, err := s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
 		log.WithError(err).Errorf("order error: %s", err.Error())
 		return
 	}
-
-	s.activeMakerOrders.Add(makerOrders...)
-	s.orderStore.Add(makerOrders...)
 }
 
 func selectSessions2(
