@@ -302,30 +302,11 @@ func (s *Strategy) CrossRun(
 		}
 	}
 
-	if s.makerSession.MakerFeeRate.Sign() > 0 || s.makerSession.TakerFeeRate.Sign() > 0 {
-		s.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), types.ExchangeFee{
-			MakerFeeRate: s.makerSession.MakerFeeRate,
-			TakerFeeRate: s.makerSession.TakerFeeRate,
-		})
-	}
-
-	if s.hedgeSession.MakerFeeRate.Sign() > 0 || s.hedgeSession.TakerFeeRate.Sign() > 0 {
-		s.Position.SetExchangeFeeRate(types.ExchangeName(s.HedgeExchange), types.ExchangeFee{
-			MakerFeeRate: s.hedgeSession.MakerFeeRate,
-			TakerFeeRate: s.hedgeSession.TakerFeeRate,
-		})
-	}
-
 	s.pricingBook = types.NewStreamBook(s.Symbol)
 	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
 
 	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
-
-	s.orderStore = core.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(s.hedgeSession.UserDataStream)
-	s.orderStore.BindStream(s.makerSession.UserDataStream)
-	s.tradeCollector = core.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
 
 	if s.NotifyTrade {
 		s.tradeCollector.OnTrade(notifyTrade)
