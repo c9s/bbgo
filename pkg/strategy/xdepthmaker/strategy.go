@@ -33,13 +33,119 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+func notifyTrade(trade types.Trade, _, _ fixedpoint.Value) {
+	bbgo.Notify(trade)
+}
+
+type CrossExchangeMarketMakingStrategy struct {
+	ctx, parent context.Context
+	cancel      context.CancelFunc
+
+	Environ *bbgo.Environment
+
+	makerSession, hedgeSession *bbgo.ExchangeSession
+	makerMarket, hedgeMarket   types.Market
+
+	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
+	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
+
+	MakerOrderExecutor, HedgeOrderExecutor *bbgo.GeneralOrderExecutor
+
+	// orderStore is a shared order store between the maker session and the hedge session
+	orderStore *core.OrderStore
+
+	// tradeCollector is a shared trade collector between the maker session and the hedge session
+	tradeCollector *core.TradeCollector
+}
+
+func (s *CrossExchangeMarketMakingStrategy) Initialize(
+	ctx context.Context, environ *bbgo.Environment,
+	makerSession, hedgeSession *bbgo.ExchangeSession,
+	symbol, strategyID, instanceID string,
+) error {
+	s.parent = ctx
+	s.ctx, s.cancel = context.WithCancel(ctx)
+
+	s.Environ = environ
+
+	s.makerSession = makerSession
+	s.hedgeSession = hedgeSession
+
+	var ok bool
+	s.hedgeMarket, ok = s.hedgeSession.Market(symbol)
+	if !ok {
+		return fmt.Errorf("source session market %s is not defined", symbol)
+	}
+
+	s.makerMarket, ok = s.makerSession.Market(symbol)
+	if !ok {
+		return fmt.Errorf("maker session market %s is not defined", symbol)
+	}
+
+	if s.ProfitStats == nil {
+		s.ProfitStats = types.NewProfitStats(s.makerMarket)
+	}
+
+	if s.Position == nil {
+		s.Position = types.NewPositionFromMarket(s.makerMarket)
+	}
+
+	// Always update the position fields
+	s.Position.Strategy = strategyID
+	s.Position.StrategyInstanceID = instanceID
+
+	// if anyone of the fee rate is defined, this assumes that both are defined.
+	// so that zero maker fee could be applied
+	for _, ses := range []*bbgo.ExchangeSession{makerSession, hedgeSession} {
+		if ses.MakerFeeRate.Sign() > 0 || ses.TakerFeeRate.Sign() > 0 {
+			s.Position.SetExchangeFeeRate(ses.ExchangeName, types.ExchangeFee{
+				MakerFeeRate: ses.MakerFeeRate,
+				TakerFeeRate: ses.TakerFeeRate,
+			})
+		}
+	}
+
+	s.MakerOrderExecutor = bbgo.NewGeneralOrderExecutor(
+		makerSession,
+		s.makerMarket.Symbol,
+		strategyID, instanceID,
+		s.Position)
+	s.MakerOrderExecutor.BindEnvironment(environ)
+	s.MakerOrderExecutor.BindProfitStats(s.ProfitStats)
+	s.MakerOrderExecutor.Bind()
+	s.MakerOrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		// bbgo.Sync(ctx, s)
+	})
+
+	s.HedgeOrderExecutor = bbgo.NewGeneralOrderExecutor(
+		hedgeSession,
+		s.hedgeMarket.Symbol,
+		strategyID, instanceID,
+		s.Position)
+	s.HedgeOrderExecutor.BindEnvironment(environ)
+	s.HedgeOrderExecutor.BindProfitStats(s.ProfitStats)
+	s.HedgeOrderExecutor.Bind()
+	s.HedgeOrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
+		// bbgo.Sync(ctx, s)
+	})
+
+	s.orderStore = core.NewOrderStore(s.Position.Symbol)
+	s.orderStore.BindStream(hedgeSession.UserDataStream)
+	s.orderStore.BindStream(makerSession.UserDataStream)
+	s.tradeCollector = core.NewTradeCollector(s.Position.Symbol, s.Position, s.orderStore)
+
+	return nil
+}
+
 type Strategy struct {
+	*CrossExchangeMarketMakingStrategy
+
 	Environment *bbgo.Environment
 
 	Symbol string `json:"symbol"`
 
-	// SourceExchange session name
-	SourceExchange string `json:"sourceExchange"`
+	// HedgeExchange session name
+	HedgeExchange string `json:"hedgeExchange"`
 
 	// MakerExchange session name
 	MakerExchange string `json:"makerExchange"`
@@ -53,8 +159,6 @@ type Strategy struct {
 	AskMargin     fixedpoint.Value `json:"askMargin"`
 	UseDepthPrice bool             `json:"useDepthPrice"`
 	DepthQuantity fixedpoint.Value `json:"depthQuantity"`
-
-	EnableBollBandMargin bool `json:"enableBollBandMargin"`
 
 	StopHedgeQuoteBalance fixedpoint.Value `json:"stopHedgeQuoteBalance"`
 	StopHedgeBaseBalance  fixedpoint.Value `json:"stopHedgeBaseBalance"`
@@ -85,15 +189,9 @@ type Strategy struct {
 	// --------------------------------
 	// private fields
 	// --------------------------------
-	makerSession, sourceSession *bbgo.ExchangeSession
-
-	makerMarket, sourceMarket types.Market
-
 	state *State
 
 	// persistence fields
-	Position        *types.Position  `json:"position,omitempty" persistence:"position"`
-	ProfitStats     *ProfitStats     `json:"profitStats,omitempty" persistence:"profit_stats"`
 	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty" persistence:"covered_position"`
 
 	book              *types.StreamOrderBook
@@ -102,13 +200,9 @@ type Strategy struct {
 	hedgeErrorLimiter         *rate.Limiter
 	hedgeErrorRateReservation *rate.Reservation
 
-	orderStore     *core.OrderStore
-	tradeCollector *core.TradeCollector
-
 	askPriceHeartBeat, bidPriceHeartBeat types.PriceHeartBeat
 
 	lastPrice fixedpoint.Value
-	groupID   uint32
 
 	stopC chan struct{}
 }
@@ -122,9 +216,9 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
-	sourceSession, ok := sessions[s.SourceExchange]
+	sourceSession, ok := sessions[s.HedgeExchange]
 	if !ok {
-		panic(fmt.Errorf("source session %s is not defined", s.SourceExchange))
+		panic(fmt.Errorf("source session %s is not defined", s.HedgeExchange))
 	}
 
 	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
@@ -194,50 +288,16 @@ func (s *Strategy) Initialize() error {
 func (s *Strategy) CrossRun(
 	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
-	// configure sessions
-	sourceSession, ok := sessions[s.SourceExchange]
-	if !ok {
-		return fmt.Errorf("source exchange session %s is not defined", s.SourceExchange)
-	}
-
-	s.sourceSession = sourceSession
-
-	makerSession, ok := sessions[s.MakerExchange]
-	if !ok {
-		return fmt.Errorf("maker exchange session %s is not defined", s.MakerExchange)
-	}
-
-	s.makerSession = makerSession
-
-	s.sourceMarket, ok = s.sourceSession.Market(s.Symbol)
-	if !ok {
-		return fmt.Errorf("source session market %s is not defined", s.Symbol)
-	}
-
-	s.makerMarket, ok = s.makerSession.Market(s.Symbol)
-	if !ok {
-		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
-	}
-
-	// restore state
 	instanceID := s.InstanceID()
-	s.groupID = util.FNV32(instanceID)
-	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
-	if s.Position == nil {
-		s.Position = types.NewPositionFromMarket(s.makerMarket)
-
-		// force update for legacy code
-		s.Position.Market = s.makerMarket
+	makerSession, hedgeSession, err := selectSessions2(sessions, s.MakerExchange, s.HedgeExchange)
+	if err != nil {
+		return err
 	}
 
-	bbgo.Notify("xdepthmaker: %s position is restored", s.Symbol, s.Position)
-
-	if s.ProfitStats == nil {
-		s.ProfitStats = &ProfitStats{
-			ProfitStats:   types.NewProfitStats(s.makerMarket),
-			MakerExchange: s.makerSession.ExchangeName,
-		}
+	s.CrossExchangeMarketMakingStrategy = &CrossExchangeMarketMakingStrategy{}
+	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx, s.Environment, makerSession, hedgeSession, s.Symbol, ID, s.InstanceID()); err != nil {
+		return err
 	}
 
 	if s.CoveredPosition.IsZero() {
@@ -253,34 +313,31 @@ func (s *Strategy) CrossRun(
 		})
 	}
 
-	if s.sourceSession.MakerFeeRate.Sign() > 0 || s.sourceSession.TakerFeeRate.Sign() > 0 {
-		s.Position.SetExchangeFeeRate(types.ExchangeName(s.SourceExchange), types.ExchangeFee{
-			MakerFeeRate: s.sourceSession.MakerFeeRate,
-			TakerFeeRate: s.sourceSession.TakerFeeRate,
+	if s.hedgeSession.MakerFeeRate.Sign() > 0 || s.hedgeSession.TakerFeeRate.Sign() > 0 {
+		s.Position.SetExchangeFeeRate(types.ExchangeName(s.HedgeExchange), types.ExchangeFee{
+			MakerFeeRate: s.hedgeSession.MakerFeeRate,
+			TakerFeeRate: s.hedgeSession.TakerFeeRate,
 		})
 	}
 
 	s.book = types.NewStreamBook(s.Symbol)
-	s.book.BindStream(s.sourceSession.MarketDataStream)
+	s.book.BindStream(s.hedgeSession.MarketDataStream)
 
 	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
 
 	s.orderStore = core.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(s.sourceSession.UserDataStream)
+	s.orderStore.BindStream(s.hedgeSession.UserDataStream)
 	s.orderStore.BindStream(s.makerSession.UserDataStream)
-
 	s.tradeCollector = core.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
 
 	if s.NotifyTrade {
-		s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-			bbgo.Notify(trade)
-		})
+		s.tradeCollector.OnTrade(notifyTrade)
 	}
 
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		c := trade.PositionChange()
-		if trade.Exchange == s.sourceSession.ExchangeName {
+		if trade.Exchange == s.hedgeSession.ExchangeName {
 			s.CoveredPosition = s.CoveredPosition.Add(c)
 		}
 
@@ -307,7 +364,7 @@ func (s *Strategy) CrossRun(
 	s.tradeCollector.OnRecover(func(trade types.Trade) {
 		bbgo.Notify("Recovered trade", trade)
 	})
-	s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
+	s.tradeCollector.BindStream(s.hedgeSession.UserDataStream)
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
 
 	s.stopC = make(chan struct{})
@@ -366,7 +423,7 @@ func (s *Strategy) CrossRun(
 
 				uncoverPosition := position.Sub(s.CoveredPosition)
 				absPos := uncoverPosition.Abs()
-				if !s.DisableHedge && absPos.Compare(s.sourceMarket.MinQuantity) > 0 {
+				if !s.DisableHedge && absPos.Compare(s.hedgeMarket.MinQuantity) > 0 {
 					log.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
 						s.Symbol,
 						position,
@@ -429,28 +486,28 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	notional := quantity.Mul(lastPrice)
-	if notional.Compare(s.sourceMarket.MinNotional) <= 0 {
+	if notional.Compare(s.hedgeMarket.MinNotional) <= 0 {
 		log.Warnf("%s %v less than min notional, skipping hedge", s.Symbol, notional)
 		return
 	}
 
 	// adjust quantity according to the balances
-	account := s.sourceSession.GetAccount()
+	account := s.hedgeSession.GetAccount()
 	switch side {
 
 	case types.SideTypeBuy:
 		// check quote quantity
-		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
+		if quote, ok := account.Balance(s.hedgeMarket.QuoteCurrency); ok {
 			if quote.Available.Compare(notional) < 0 {
 				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
 				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, lastPrice.Mul(lastPriceModifier), quote.Available)
-				quantity = s.sourceMarket.TruncateQuantity(quantity)
+				quantity = s.hedgeMarket.TruncateQuantity(quantity)
 			}
 		}
 
 	case types.SideTypeSell:
 		// check quote quantity
-		if base, ok := account.Balance(s.sourceMarket.BaseCurrency); ok {
+		if base, ok := account.Balance(s.hedgeMarket.BaseCurrency); ok {
 			if base.Available.Compare(quantity) < 0 {
 				quantity = base.Available
 			}
@@ -458,15 +515,15 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	// truncate quantity for the supported precision
-	quantity = s.sourceMarket.TruncateQuantity(quantity)
+	quantity = s.hedgeMarket.TruncateQuantity(quantity)
 
-	if notional.Compare(s.sourceMarket.MinNotional.Mul(minGap)) <= 0 {
-		log.Warnf("the adjusted amount %v is less than minimal notional %v, skipping hedge", notional, s.sourceMarket.MinNotional)
+	if notional.Compare(s.hedgeMarket.MinNotional.Mul(minGap)) <= 0 {
+		log.Warnf("the adjusted amount %v is less than minimal notional %v, skipping hedge", notional, s.hedgeMarket.MinNotional)
 		return
 	}
 
-	if quantity.Compare(s.sourceMarket.MinQuantity.Mul(minGap)) <= 0 {
-		log.Warnf("the adjusted quantity %v is less than minimal quantity %v, skipping hedge", quantity, s.sourceMarket.MinQuantity)
+	if quantity.Compare(s.hedgeMarket.MinQuantity.Mul(minGap)) <= 0 {
+		log.Warnf("the adjusted quantity %v is less than minimal quantity %v, skipping hedge", quantity, s.hedgeMarket.MinQuantity)
 		return
 	}
 
@@ -481,9 +538,9 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	log.Infof("submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
 	bbgo.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
-	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
+	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.hedgeSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-		Market:   s.sourceMarket,
+		Market:   s.hedgeMarket,
 		Symbol:   s.Symbol,
 		Type:     types.OrderTypeMarket,
 		Side:     side,
@@ -528,7 +585,7 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 			if s.RecoverTrade {
 				startTime := time.Now().Add(-tradeScanInterval).Add(-tradeScanOverlapBufferPeriod)
 
-				if err := s.tradeCollector.Recover(ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
+				if err := s.tradeCollector.Recover(ctx, s.hedgeSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
 					log.WithError(err).Errorf("query trades error")
 				}
 
@@ -605,20 +662,20 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		}
 	}
 
-	hedgeBalances := s.sourceSession.GetAccount().Balances()
+	hedgeBalances := s.hedgeSession.GetAccount().Balances()
 	hedgeQuota := &bbgo.QuotaTransaction{}
-	if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
+	if b, ok := hedgeBalances[s.hedgeMarket.BaseCurrency]; ok {
 		// to make bid orders, we need enough base asset in the foreign exchange,
 		// if the base asset balance is not enough for selling
 		if s.StopHedgeBaseBalance.Sign() > 0 {
-			minAvailable := s.StopHedgeBaseBalance.Add(s.sourceMarket.MinQuantity)
+			minAvailable := s.StopHedgeBaseBalance.Add(s.hedgeMarket.MinQuantity)
 			if b.Available.Compare(minAvailable) > 0 {
 				hedgeQuota.BaseAsset.Add(b.Available.Sub(minAvailable))
 			} else {
 				log.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
 				disableMakerBid = true
 			}
-		} else if b.Available.Compare(s.sourceMarket.MinQuantity) > 0 {
+		} else if b.Available.Compare(s.hedgeMarket.MinQuantity) > 0 {
 			hedgeQuota.BaseAsset.Add(b.Available)
 		} else {
 			log.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
@@ -626,18 +683,18 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		}
 	}
 
-	if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
+	if b, ok := hedgeBalances[s.hedgeMarket.QuoteCurrency]; ok {
 		// to make ask orders, we need enough quote asset in the foreign exchange,
 		// if the quote asset balance is not enough for buying
 		if s.StopHedgeQuoteBalance.Sign() > 0 {
-			minAvailable := s.StopHedgeQuoteBalance.Add(s.sourceMarket.MinNotional)
+			minAvailable := s.StopHedgeQuoteBalance.Add(s.hedgeMarket.MinNotional)
 			if b.Available.Compare(minAvailable) > 0 {
 				hedgeQuota.QuoteAsset.Add(b.Available.Sub(minAvailable))
 			} else {
 				log.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
 				disableMakerAsk = true
 			}
-		} else if b.Available.Compare(s.sourceMarket.MinNotional) > 0 {
+		} else if b.Available.Compare(s.hedgeMarket.MinNotional) > 0 {
 			hedgeQuota.QuoteAsset.Add(b.Available)
 		} else {
 			log.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
@@ -719,7 +776,6 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					Price:       bidPrice,
 					Quantity:    bidQuantity,
 					TimeInForce: types.TimeInForceGTC,
-					GroupID:     s.groupID,
 				})
 
 				makerQuota.Commit()
@@ -769,7 +825,6 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					Price:       askPrice,
 					Quantity:    askQuantity,
 					TimeInForce: types.TimeInForceGTC,
-					GroupID:     s.groupID,
 				})
 				makerQuota.Commit()
 				hedgeQuota.Commit()
@@ -794,4 +849,18 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 	s.activeMakerOrders.Add(makerOrders...)
 	s.orderStore.Add(makerOrders...)
+}
+
+func selectSessions2(
+	sessions map[string]*bbgo.ExchangeSession, n1, n2 string,
+) (s1, s2 *bbgo.ExchangeSession, err error) {
+	for _, n := range []string{n1, n2} {
+		if _, ok := sessions[n]; !ok {
+			return nil, nil, fmt.Errorf("session %s is not defined", n)
+		}
+	}
+
+	s1 = sessions[n1]
+	s2 = sessions[n2]
+	return s1, s2, nil
 }
