@@ -134,8 +134,8 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	s.orderStore = core.NewOrderStore(s.Position.Symbol)
 	s.orderStore.BindStream(hedgeSession.UserDataStream)
 	s.orderStore.BindStream(makerSession.UserDataStream)
-	s.tradeCollector = core.NewTradeCollector(symbol, s.Position, s.orderStore)
 
+	s.tradeCollector = core.NewTradeCollector(symbol, s.Position, s.orderStore)
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		c := trade.PositionChange()
 		if trade.Exchange == s.hedgeSession.ExchangeName {
@@ -156,6 +156,8 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 			s.Environ.RecordPosition(s.Position, trade, &p)
 		}
 	})
+	s.tradeCollector.BindStream(s.hedgeSession.UserDataStream)
+	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
 
 	return nil
 }
@@ -194,8 +196,6 @@ type Strategy struct {
 
 	// MaxExposurePosition defines the unhedged quantity of stop
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
-
-	DisableHedge bool `json:"disableHedge"`
 
 	NotifyTrade bool `json:"notifyTrade"`
 
@@ -240,7 +240,11 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		panic(err)
 	}
 
-	hedgeSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
+	hedgeSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
+		Depth: types.DepthLevelMedium,
+		Speed: types.SpeedHigh,
+	})
+
 	hedgeSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
@@ -324,8 +328,6 @@ func (s *Strategy) CrossRun(
 	s.tradeCollector.OnRecover(func(trade types.Trade) {
 		bbgo.Notify("Recovered trade", trade)
 	})
-	s.tradeCollector.BindStream(s.hedgeSession.UserDataStream)
-	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
 
 	s.stopC = make(chan struct{})
 
@@ -337,12 +339,6 @@ func (s *Strategy) CrossRun(
 		posTicker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
 		defer posTicker.Stop()
 
-		quoteTicker := time.NewTicker(util.MillisecondsJitter(s.UpdateInterval.Duration(), 200))
-		defer quoteTicker.Stop()
-
-		reportTicker := time.NewTicker(time.Hour)
-		defer reportTicker.Stop()
-
 		for {
 			select {
 
@@ -353,12 +349,6 @@ func (s *Strategy) CrossRun(
 			case <-ctx.Done():
 				log.Warnf("%s maker goroutine stopped, due to the cancelled context", s.Symbol)
 				return
-
-			case <-quoteTicker.C:
-				s.updateQuote(ctx, orderExecutionRouter)
-
-			case <-reportTicker.C:
-				bbgo.Notify(s.ProfitStats)
 
 			case <-posTicker.C:
 				// For positive position and positive covered position:
@@ -377,7 +367,7 @@ func (s *Strategy) CrossRun(
 
 				uncoverPosition := position.Sub(s.CoveredPosition)
 				absPos := uncoverPosition.Abs()
-				if !s.DisableHedge && absPos.Compare(s.hedgeMarket.MinQuantity) > 0 {
+				if absPos.Compare(s.hedgeMarket.MinQuantity) > 0 {
 					log.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
 						s.Symbol,
 						position,
@@ -795,7 +785,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	}
 
 	if len(submitOrders) == 0 {
-		log.Warnf("no orders generated")
+		log.Warnf("no orders are generated")
 		return
 	}
 
