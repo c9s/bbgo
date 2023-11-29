@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/sigchan"
 )
 
 type OrderBook interface {
@@ -114,13 +113,26 @@ func (b *MutexOrderBook) Update(update SliceOrderBook) {
 	b.Unlock()
 }
 
-//go:generate callbackgen -type StreamOrderBook
+type BookSignalType string
+
+const (
+	BookSignalSnapshot BookSignalType = "snapshot"
+	BookSignalUpdate   BookSignalType = "update"
+)
+
+type BookSignal struct {
+	Type BookSignalType
+	Book SliceOrderBook
+}
+
 // StreamOrderBook receives streaming data from websocket connection and
 // update the order book with mutex lock, so you can safely access it.
+//
+//go:generate callbackgen -type StreamOrderBook
 type StreamOrderBook struct {
 	*MutexOrderBook
 
-	C sigchan.Chan
+	C chan BookSignal
 
 	updateCallbacks   []func(update SliceOrderBook)
 	snapshotCallbacks []func(snapshot SliceOrderBook)
@@ -129,7 +141,7 @@ type StreamOrderBook struct {
 func NewStreamBook(symbol string) *StreamOrderBook {
 	return &StreamOrderBook{
 		MutexOrderBook: NewMutexOrderBook(symbol),
-		C:              sigchan.New(60),
+		C:              make(chan BookSignal, 1),
 	}
 }
 
@@ -141,7 +153,9 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 
 		sb.Load(book)
 		sb.EmitSnapshot(book)
-		sb.C.Emit()
+
+		// when it's snapshot, it's very important to push the snapshot signal to the caller
+		sb.C <- BookSignal{Type: BookSignalSnapshot, Book: book}
 	})
 
 	stream.OnBookUpdate(func(book SliceOrderBook) {
@@ -151,6 +165,10 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 
 		sb.Update(book)
 		sb.EmitUpdate(book)
-		sb.C.Emit()
+
+		select {
+		case sb.C <- BookSignal{Type: BookSignalUpdate, Book: book}:
+		default:
+		}
 	})
 }
