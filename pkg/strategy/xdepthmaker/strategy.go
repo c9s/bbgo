@@ -311,7 +311,8 @@ func (s *Strategy) Initialize() error {
 }
 
 func (s *Strategy) CrossRun(
-	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
+	ctx context.Context, _ bbgo.OrderExecutionRouter,
+	sessions map[string]*bbgo.ExchangeSession,
 ) error {
 	makerSession, hedgeSession, err := selectSessions2(sessions, s.MakerExchange, s.HedgeExchange)
 	if err != nil {
@@ -333,14 +334,15 @@ func (s *Strategy) CrossRun(
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
 		bbgo.Notify(position)
 	})
-	s.tradeCollector.OnRecover(func(trade types.Trade) {
-		bbgo.Notify("Recovered trade", trade)
-	})
 
 	s.stopC = make(chan struct{})
 
 	if s.RecoverTrade {
-		go s.tradeRecover(ctx)
+		s.tradeCollector.OnRecover(func(trade types.Trade) {
+			bbgo.Notify("Recovered trade", trade)
+		})
+
+		go s.runTradeRecover(ctx)
 	}
 
 	go func() {
@@ -357,6 +359,18 @@ func (s *Strategy) CrossRun(
 			case <-ctx.Done():
 				log.Warnf("%s maker goroutine stopped, due to the cancelled context", s.Symbol)
 				return
+
+			case sig, ok := <-s.pricingBook.C:
+				// when any book change event happened
+				if !ok {
+					return
+				}
+
+				switch sig.Type {
+				case types.BookSignalSnapshot:
+				case types.BookSignalUpdate:
+
+				}
 
 			case <-posTicker.C:
 				// For positive position and positive covered position:
@@ -494,8 +508,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	log.Infof("submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
 	bbgo.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
-	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.hedgeSession}
-	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+
+	createdOrders, err := s.HedgeOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Market:   s.hedgeMarket,
 		Symbol:   s.Symbol,
 		Type:     types.OrderTypeMarket,
@@ -509,17 +523,17 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		return
 	}
 
-	// if it's selling, than we should add positive position
+	s.orderStore.Add(createdOrders...)
+
+	// if it's selling, then we should add positive position
 	if side == types.SideTypeSell {
 		s.CoveredPosition = s.CoveredPosition.Add(quantity)
 	} else {
 		s.CoveredPosition = s.CoveredPosition.Add(quantity.Neg())
 	}
-
-	s.orderStore.Add(returnOrders...)
 }
 
-func (s *Strategy) tradeRecover(ctx context.Context) {
+func (s *Strategy) runTradeRecover(ctx context.Context) {
 	tradeScanInterval := s.RecoverTradeScanPeriod.Duration()
 	if tradeScanInterval == 0 {
 		tradeScanInterval = 30 * time.Minute
@@ -560,7 +574,9 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	if s.MakerOrderExecutor.ActiveMakerOrders().NumOfOrders() > 0 {
+	numOfMakerOrders := s.MakerOrderExecutor.ActiveMakerOrders().NumOfOrders()
+	if numOfMakerOrders > 0 {
+		log.Warnf("maker orders are not all canceled")
 		return
 	}
 
@@ -797,11 +813,13 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	_, err := s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
+	createdOrders, err := s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
 		log.WithError(err).Errorf("order error: %s", err.Error())
 		return
 	}
+
+	s.orderStore.Add(createdOrders...)
 }
 
 func selectSessions2(
