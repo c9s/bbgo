@@ -138,6 +138,14 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	s.tradeCollector = core.NewTradeCollector(symbol, s.Position, s.orderStore)
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		c := trade.PositionChange()
+
+		// sync covered position
+		// sell trade -> negative delta ->
+		// 	  1) long position -> reduce long position
+		//    2) short position -> increase short position
+		// buy trade -> positive delta ->
+		// 	  1) short position -> reduce short position
+		// 	  2) short position -> increase short position
 		if trade.Exchange == s.hedgeSession.ExchangeName {
 			s.CoveredPosition.AtomicAdd(c)
 		}
@@ -525,11 +533,12 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	s.orderStore.Add(createdOrders...)
 
-	// if it's selling, then we should add positive position
-	if side == types.SideTypeSell {
-		s.CoveredPosition = s.CoveredPosition.Add(quantity)
-	} else {
-		s.CoveredPosition = s.CoveredPosition.Add(quantity.Neg())
+	// if the hedge is on sell side, then we should add positive position
+	switch side {
+	case types.SideTypeSell:
+		s.CoveredPosition.AtomicAdd(quantity)
+	case types.SideTypeBuy:
+		s.CoveredPosition.AtomicAdd(quantity.Neg())
 	}
 }
 
