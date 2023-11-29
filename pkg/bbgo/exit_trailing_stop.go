@@ -93,7 +93,7 @@ func (s *TrailingStop2) getRatio(price fixedpoint.Value, position *types.Positio
 }
 
 func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.Position) error {
-	if position.IsClosed() || position.IsDust(price) {
+	if position.IsClosed() || position.IsDust(price) || position.IsClosing() {
 		return nil
 	}
 

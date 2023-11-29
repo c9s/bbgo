@@ -45,7 +45,7 @@ func (s *RoiStopLoss) Bind(session *ExchangeSession, orderExecutor *GeneralOrder
 }
 
 func (s *RoiStopLoss) checkStopPrice(closePrice fixedpoint.Value, position *types.Position) {
-	if position.IsClosed() || position.IsDust(closePrice) {
+	if position.IsClosed() || position.IsDust(closePrice) || position.IsClosing() {
 		return
 	}
 
