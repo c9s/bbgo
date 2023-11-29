@@ -15,7 +15,6 @@ import (
 // To query the historical quote volume, use the following query:
 //
 // > SELECT start_time, `interval`, quote_volume, open, close FROM binance_klines WHERE symbol = 'ETHUSDT' AND `interval` = '5m' ORDER BY quote_volume DESC LIMIT 20;
-//
 type CumulatedVolumeTakeProfit struct {
 	Symbol string `json:"symbol"`
 
@@ -39,7 +38,7 @@ func (s *CumulatedVolumeTakeProfit) Bind(session *ExchangeSession, orderExecutor
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		closePrice := kline.Close
 		openPrice := kline.Open
-		if position.IsClosed() || position.IsDust(closePrice) {
+		if position.IsClosed() || position.IsDust(closePrice) || position.IsClosing() {
 			return
 		}
 
