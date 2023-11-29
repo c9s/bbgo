@@ -1,6 +1,7 @@
 package bbgo
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 
@@ -316,6 +317,18 @@ func (rule *SlideRule) Scale() (Scale, error) {
 //	    range: [0.01, 1.0]
 type LayerScale struct {
 	LayerRule *SlideRule `json:"byLayer"`
+}
+
+func (s *LayerScale) UnmarshalJSON(data []byte) error {
+	type T LayerScale
+	var p T
+	err := json.Unmarshal(data, &p)
+	if err != nil {
+		return err
+	}
+
+	*s = LayerScale(p)
+	return nil
 }
 
 func (s *LayerScale) Scale(layer int) (quantity float64, err error) {
