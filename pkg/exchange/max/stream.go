@@ -96,6 +96,9 @@ func (s *Stream) handleConnect() {
 				case types.DepthLevelMedium:
 					depth = 20
 
+				case types.DepthLevel1:
+					depth = 1
+
 				case types.DepthLevel5:
 					depth = 5
 
