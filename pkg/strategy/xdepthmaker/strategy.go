@@ -202,6 +202,9 @@ type Strategy struct {
 	// QuantityScale helps user to define the quantity by layer scale
 	QuantityScale *bbgo.LayerScale `json:"quantityScale,omitempty"`
 
+	// DepthScale helps user to define the depth by layer scale
+	DepthScale *bbgo.LayerScale `json:"depthScale,omitempty"`
+
 	// MaxExposurePosition defines the unhedged quantity of stop
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
@@ -266,8 +269,8 @@ func (s *Strategy) Validate() error {
 		return errors.New("maker exchange is not configured")
 	}
 
-	if s.Quantity.IsZero() || s.QuantityScale == nil {
-		return errors.New("quantity or quantityScale can not be empty")
+	if s.DepthScale == nil {
+		return errors.New("depthScale can not be empty")
 	}
 
 	if len(s.Symbol) == 0 {
@@ -576,7 +579,106 @@ func (s *Strategy) runTradeRecover(ctx context.Context) {
 	}
 }
 
-func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter) {
+func (s *Strategy) generateMakerOrders(pricingBook *types.StreamOrderBook) ([]types.SubmitOrder, error) {
+	bestBid, bestAsk, hasPrice := pricingBook.BestBidAndAsk()
+	if !hasPrice {
+		return nil, nil
+	}
+
+	bestBidPrice := bestBid.Price
+	bestAskPrice := bestAsk.Price
+	log.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
+
+	lastMidPrice := bestBidPrice.Add(bestAskPrice).Div(Two)
+	_ = lastMidPrice
+
+	var submitOrders []types.SubmitOrder
+	var accumulatedBidQuantity = fixedpoint.Zero
+	var accumulatedAskQuantity = fixedpoint.Zero
+	var accumulatedBidQuoteQuantity = fixedpoint.Zero
+
+	dupPricingBook := pricingBook.CopyDepth(0)
+
+	for _, side := range []types.SideType{types.SideTypeBuy, types.SideTypeSell} {
+		for i := 1; i <= s.NumLayers; i++ {
+			requiredDepthFloat, err := s.DepthScale.Scale(i)
+			if err != nil {
+				return nil, errors.Wrapf(err, "depthScale scale error")
+			}
+
+			// requiredDepth is the required depth in quote currency
+			requiredDepth := fixedpoint.NewFromFloat(requiredDepthFloat)
+
+			sideBook := dupPricingBook.SideBook(side)
+			index := sideBook.IndexByQuoteVolumeDepth(requiredDepth)
+
+			pvs := types.PriceVolumeSlice{}
+			if index == -1 {
+				pvs = sideBook[:]
+			} else {
+				pvs = sideBook[0 : index+1]
+			}
+
+			log.Infof("required depth: %f, pvs: %+v", requiredDepth.Float64(), pvs)
+
+			depthPrice, err := averageDepthPrice(pvs)
+			if err != nil {
+				log.WithError(err).Errorf("error aggregating depth price")
+				continue
+			}
+
+			switch side {
+			case types.SideTypeBuy:
+				if s.BidMargin.Sign() > 0 {
+					depthPrice = depthPrice.Mul(fixedpoint.One.Sub(s.BidMargin))
+				}
+
+				depthPrice = depthPrice.Round(s.makerMarket.PricePrecision+1, fixedpoint.Down)
+
+			case types.SideTypeSell:
+				if s.AskMargin.Sign() > 0 {
+					depthPrice = depthPrice.Mul(fixedpoint.One.Add(s.AskMargin))
+				}
+
+				depthPrice = depthPrice.Round(s.makerMarket.PricePrecision+1, fixedpoint.Up)
+			}
+
+			depthPrice = s.makerMarket.TruncatePrice(depthPrice)
+
+			quantity := requiredDepth.Div(depthPrice)
+			quantity = s.makerMarket.TruncateQuantity(quantity)
+			log.Infof("side: %s required depth: %f price: %f quantity: %f", side, requiredDepth.Float64(), depthPrice.Float64(), quantity.Float64())
+
+			switch side {
+			case types.SideTypeBuy:
+				quantity = quantity.Sub(accumulatedBidQuantity)
+
+				accumulatedBidQuantity = accumulatedBidQuantity.Add(quantity)
+				quoteQuantity := fixedpoint.Mul(quantity, depthPrice)
+				quoteQuantity = quoteQuantity.Round(s.makerMarket.PricePrecision, fixedpoint.Up)
+				accumulatedBidQuoteQuantity = accumulatedBidQuoteQuantity.Add(quoteQuantity)
+
+			case types.SideTypeSell:
+				quantity = quantity.Sub(accumulatedAskQuantity)
+				accumulatedAskQuantity = accumulatedAskQuantity.Add(quantity)
+
+			}
+
+			submitOrders = append(submitOrders, types.SubmitOrder{
+				Symbol:   s.Symbol,
+				Type:     types.OrderTypeLimitMaker,
+				Market:   s.makerMarket,
+				Side:     side,
+				Price:    depthPrice,
+				Quantity: quantity,
+			})
+		}
+	}
+
+	return submitOrders, nil
+}
+
+func (s *Strategy) updateQuote(ctx context.Context) {
 	if err := s.MakerOrderExecutor.GracefulCancel(ctx); err != nil {
 		log.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
 		s.MakerOrderExecutor.ActiveMakerOrders().Print()
@@ -843,4 +945,23 @@ func selectSessions2(
 	s1 = sessions[n1]
 	s2 = sessions[n2]
 	return s1, s2, nil
+}
+
+func averageDepthPrice(pvs types.PriceVolumeSlice) (price fixedpoint.Value, err error) {
+	if len(pvs) == 0 {
+		return fixedpoint.Zero, fmt.Errorf("empty pv slice")
+	}
+
+	totalQuoteAmount := fixedpoint.Zero
+	totalQuantity := fixedpoint.Zero
+
+	for i := 0; i < len(pvs); i++ {
+		pv := pvs[i]
+		quoteAmount := fixedpoint.Mul(pv.Volume, pv.Price)
+		totalQuoteAmount = totalQuoteAmount.Add(quoteAmount)
+		totalQuantity = totalQuantity.Add(pv.Volume)
+	}
+
+	price = totalQuoteAmount.Div(totalQuantity)
+	return price, nil
 }
