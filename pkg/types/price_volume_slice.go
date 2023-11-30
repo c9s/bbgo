@@ -38,7 +38,7 @@ func (slice PriceVolumeSlice) Trim() (pvs PriceVolumeSlice) {
 }
 
 func (slice PriceVolumeSlice) CopyDepth(depth int) PriceVolumeSlice {
-	if depth > len(slice) {
+	if depth == 0 || depth > len(slice) {
 		return slice.Copy()
 	}
 
@@ -67,8 +67,23 @@ func (slice PriceVolumeSlice) First() (PriceVolume, bool) {
 	return PriceVolume{}, false
 }
 
+func (slice PriceVolumeSlice) IndexByQuoteVolumeDepth(requiredQuoteVolume fixedpoint.Value) int {
+	var totalQuoteVolume = fixedpoint.Zero
+	for x, pv := range slice {
+		// this should use float64 multiply
+		quoteVolume := fixedpoint.Mul(pv.Volume, pv.Price)
+		totalQuoteVolume = totalQuoteVolume.Add(quoteVolume)
+		if totalQuoteVolume.Compare(requiredQuoteVolume) >= 0 {
+			return x
+		}
+	}
+
+	// depth not enough
+	return -1
+}
+
 func (slice PriceVolumeSlice) IndexByVolumeDepth(requiredVolume fixedpoint.Value) int {
-	var tv fixedpoint.Value = fixedpoint.Zero
+	var tv = fixedpoint.Zero
 	for x, el := range slice {
 		tv = tv.Add(el.Volume)
 		if tv.Compare(requiredVolume) >= 0 {
@@ -76,7 +91,7 @@ func (slice PriceVolumeSlice) IndexByVolumeDepth(requiredVolume fixedpoint.Value
 		}
 	}
 
-	// not deep enough
+	// depth not enough
 	return -1
 }
 

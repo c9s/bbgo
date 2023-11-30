@@ -32,7 +32,7 @@ type PriceSideQuantityAssert struct {
 func AssertOrdersPriceSideQuantity(
 	t *testing.T, asserts []PriceSideQuantityAssert, orders []types.SubmitOrder,
 ) {
-	assert.Equalf(t, len(orders), len(asserts), "expecting %d orders", len(asserts))
+	assert.Equalf(t, len(asserts), len(orders), "expecting %d orders", len(asserts))
 
 	var assertPrices, orderPrices fixedpoint.Slice
 	var assertPricesFloat, orderPricesFloat []float64

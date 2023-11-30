@@ -1,0 +1,67 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
+  switches:
+    trade: true
+    orderUpdate: false
+    submitOrder: false
+
+persistence:
+  json:
+    directory: var/data
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+logging:
+  trade: true
+  order: true
+  fields:
+    env: staging
+
+sessions:
+  max:
+    exchange: max
+    envVarPrefix: max
+
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+crossExchangeStrategies:
+
+- xdepthmaker:
+    symbol: "BTCUSDT"
+    makerExchange: max
+    hedgeExchange: binance
+
+    # disableHedge disables the hedge orders on the source exchange
+    # disableHedge: true
+
+    hedgeInterval: 10s
+    notifyTrade: true
+
+    margin: 0.004
+    askMargin: 0.4%
+    bidMargin: 0.4%
+
+    depthScale:
+      byLayer:
+        linear:
+          domain: [1, 30]
+          range: [50, 20_000]
+
+    # numLayers means how many order we want to place on each side. 3 means we want 3 bid orders and 3 ask orders
+    numLayers: 30
+
+    # pips is the fraction numbers between each order. for BTC, 1 pip is 0.1,
+    # 0.1 pip is 0.01, here we use 10, so we will get 18000.00, 18001.00 and
+    # 18002.00
+    pips: 10
+    persistence:
+      type: redis
+
