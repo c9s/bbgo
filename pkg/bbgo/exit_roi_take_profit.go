@@ -29,7 +29,7 @@ func (s *RoiTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 	position := orderExecutor.Position()
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
 		closePrice := kline.Close
-		if position.IsClosed() || position.IsDust(closePrice) {
+		if position.IsClosed() || position.IsDust(closePrice) || position.IsClosing() {
 			return
 		}
 
