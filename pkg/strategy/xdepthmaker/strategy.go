@@ -363,6 +363,9 @@ func (s *Strategy) CrossRun(
 		posTicker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
 		defer posTicker.Stop()
 
+		fullReplenishTicker := time.NewTicker(util.MillisecondsJitter(15*time.Minute, 200))
+		defer fullReplenishTicker.Stop()
+
 		for {
 			select {
 
@@ -373,6 +376,9 @@ func (s *Strategy) CrossRun(
 			case <-ctx.Done():
 				log.Warnf("%s maker goroutine stopped, due to the cancelled context", s.Symbol)
 				return
+
+			case <-fullReplenishTicker.C:
+				s.updateQuote(ctx, 0)
 
 			case sig, ok := <-s.pricingBook.C:
 				// when any book change event happened
