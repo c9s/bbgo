@@ -18,6 +18,10 @@ func NewPriceHeartBeat(timeout time.Duration) *PriceHeartBeat {
 	}
 }
 
+func (b *PriceHeartBeat) Last() PriceVolume {
+	return b.last
+}
+
 // Update updates the price volume object and the last update time
 // It returns (bool, error), when the price is successfully updated, it returns true.
 // If the price is not updated (same price) and the last time exceeded the timeout,
