@@ -230,7 +230,7 @@ type Strategy struct {
 	hedgeErrorLimiter         *rate.Limiter
 	hedgeErrorRateReservation *rate.Reservation
 
-	askPriceHeartBeat, bidPriceHeartBeat types.PriceHeartBeat
+	askPriceHeartBeat, bidPriceHeartBeat *types.PriceHeartBeat
 
 	lastPrice fixedpoint.Value
 
@@ -318,6 +318,8 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Initialize() error {
+	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
+	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
 	return nil
 }
 
@@ -701,14 +703,14 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	bookLastUpdateTime := s.pricingBook.LastUpdateTime()
 
-	if _, err := s.bidPriceHeartBeat.Update(bestBid, priceUpdateTimeout); err != nil {
+	if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
 		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
 		return
 	}
 
-	if _, err := s.askPriceHeartBeat.Update(bestAsk, priceUpdateTimeout); err != nil {
+	if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
 		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
