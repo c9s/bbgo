@@ -59,7 +59,7 @@ func TestStrategy_generateMakerOrders(t *testing.T) {
 		Time: time.Now(),
 	})
 
-	orders, err := s.generateMakerOrders(pricingBook)
+	orders, err := s.generateMakerOrders(pricingBook, 0)
 	assert.NoError(t, err)
 	AssertOrdersPriceSideQuantity(t, []PriceSideQuantityAssert{
 		{Side: types.SideTypeBuy, Price: Number("25000"), Quantity: Number("0.04")},        // =~ $1000.00

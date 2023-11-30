@@ -243,3 +243,16 @@ func (m *SyncOrderMap) Orders() (slice OrderSlice) {
 }
 
 type OrderSlice []Order
+
+func (s OrderSlice) SeparateBySide() (buyOrders, sellOrders []Order) {
+	for _, o := range s {
+		switch o.Side {
+		case SideTypeBuy:
+			buyOrders = append(buyOrders, o)
+		case SideTypeSell:
+			sellOrders = append(sellOrders, o)
+		}
+	}
+
+	return buyOrders, sellOrders
+}

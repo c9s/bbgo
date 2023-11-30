@@ -82,6 +82,26 @@ func (slice PriceVolumeSlice) IndexByQuoteVolumeDepth(requiredQuoteVolume fixedp
 	return -1
 }
 
+func (slice PriceVolumeSlice) SumDepth() fixedpoint.Value {
+	var total = fixedpoint.Zero
+	for _, pv := range slice {
+		total = total.Add(pv.Volume)
+	}
+
+	return total
+}
+
+func (slice PriceVolumeSlice) SumDepthInQuote() fixedpoint.Value {
+	var total = fixedpoint.Zero
+
+	for _, pv := range slice {
+		quoteVolume := fixedpoint.Mul(pv.Price, pv.Volume)
+		total = total.Add(quoteVolume)
+	}
+
+	return total
+}
+
 func (slice PriceVolumeSlice) IndexByVolumeDepth(requiredVolume fixedpoint.Value) int {
 	var tv = fixedpoint.Zero
 	for x, el := range slice {

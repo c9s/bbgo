@@ -2,6 +2,7 @@ package xdepthmaker
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"sync"
 	"time"
@@ -381,8 +382,10 @@ func (s *Strategy) CrossRun(
 
 				switch sig.Type {
 				case types.BookSignalSnapshot:
-				case types.BookSignalUpdate:
+					s.updateQuote(ctx, 0)
 
+				case types.BookSignalUpdate:
+					s.updateQuote(ctx, 5)
 				}
 
 			case <-posTicker.C:
@@ -581,7 +584,7 @@ func (s *Strategy) runTradeRecover(ctx context.Context) {
 	}
 }
 
-func (s *Strategy) generateMakerOrders(pricingBook *types.StreamOrderBook) ([]types.SubmitOrder, error) {
+func (s *Strategy) generateMakerOrders(pricingBook *types.StreamOrderBook, maxLayer int) ([]types.SubmitOrder, error) {
 	bestBid, bestAsk, hasPrice := pricingBook.BestBidAndAsk()
 	if !hasPrice {
 		return nil, nil
@@ -600,8 +603,12 @@ func (s *Strategy) generateMakerOrders(pricingBook *types.StreamOrderBook) ([]ty
 
 	dupPricingBook := pricingBook.CopyDepth(0)
 
+	if maxLayer == 0 || maxLayer > s.NumLayers {
+		maxLayer = s.NumLayers
+	}
+
 	for _, side := range []types.SideType{types.SideTypeBuy, types.SideTypeSell} {
-		for i := 1; i <= s.NumLayers; i++ {
+		for i := 1; i <= maxLayer; i++ {
 			requiredDepthFloat, err := s.DepthScale.Scale(i)
 			if err != nil {
 				return nil, errors.Wrapf(err, "depthScale scale error")
@@ -679,11 +686,31 @@ func (s *Strategy) generateMakerOrders(pricingBook *types.StreamOrderBook) ([]ty
 	return submitOrders, nil
 }
 
-func (s *Strategy) updateQuote(ctx context.Context) {
-	if err := s.MakerOrderExecutor.GracefulCancel(ctx); err != nil {
-		log.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
-		s.MakerOrderExecutor.ActiveMakerOrders().Print()
-		return
+func (s *Strategy) partiallyCancelOrders(ctx context.Context, maxLayer int) error {
+	buyOrders, sellOrders := s.MakerOrderExecutor.ActiveMakerOrders().Orders().SeparateBySide()
+	buyOrders = types.SortOrdersByPrice(buyOrders, true)
+	sellOrders = types.SortOrdersByPrice(sellOrders, false)
+
+	buyOrdersToCancel := buyOrders[0:min(maxLayer, len(buyOrders))]
+	sellOrdersToCancel := sellOrders[0:min(maxLayer, len(sellOrders))]
+
+	err1 := s.MakerOrderExecutor.GracefulCancel(ctx, buyOrdersToCancel...)
+	err2 := s.MakerOrderExecutor.GracefulCancel(ctx, sellOrdersToCancel...)
+	return stderrors.Join(err1, err2)
+}
+
+func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
+	if maxLayer == 0 {
+		if err := s.MakerOrderExecutor.GracefulCancel(ctx); err != nil {
+			log.WithError(err).Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
+			s.MakerOrderExecutor.ActiveMakerOrders().Print()
+			return
+		}
+	} else {
+		if err := s.partiallyCancelOrders(ctx, maxLayer); err != nil {
+			log.WithError(err).Warnf("%s partial order cancel failed", s.Symbol)
+			return
+		}
 	}
 
 	numOfMakerOrders := s.MakerOrderExecutor.ActiveMakerOrders().NumOfOrders()
@@ -719,7 +746,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		return
 	}
 
-	submitOrders, err := s.generateMakerOrders(s.pricingBook)
+	submitOrders, err := s.generateMakerOrders(s.pricingBook, maxLayer)
 	if err != nil {
 		log.WithError(err).Errorf("generate order error")
 		return
@@ -770,4 +797,12 @@ func averageDepthPrice(pvs types.PriceVolumeSlice) (price fixedpoint.Value, err 
 
 	price = totalQuoteAmount.Div(totalQuantity)
 	return price, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
 }
