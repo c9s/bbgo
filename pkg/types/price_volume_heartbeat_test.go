@@ -2,6 +2,7 @@ package types
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -9,7 +10,8 @@ import (
 )
 
 func TestPriceHeartBeat_Update(t *testing.T) {
-	hb := PriceHeartBeat{}
+	hb := NewPriceHeartBeat(time.Minute)
+
 	updated, err := hb.Update(PriceVolume{Price: fixedpoint.NewFromFloat(22.0), Volume: fixedpoint.NewFromFloat(100.0)})
 	assert.NoError(t, err)
 	assert.True(t, updated)
