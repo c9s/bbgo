@@ -62,7 +62,7 @@ func (s *HigherHighLowerLowStop) Subscribe(session *ExchangeSession) {
 // determine whether this stop should be activated
 func (s *HigherHighLowerLowStop) updateActivated(position *types.Position, closePrice fixedpoint.Value) {
 	// deactivate when no position
-	if position.IsClosed() || position.IsDust(closePrice) {
+	if position.IsClosed() || position.IsDust(closePrice) || position.IsClosing() {
 
 		s.activated = false
 		return

@@ -93,7 +93,7 @@ func (s *TrailingStop2) getRatio(price fixedpoint.Value, position *types.Positio
 }
 
 func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.Position) error {
-	if position.IsClosed() || position.IsDust(price) {
+	if position.IsClosed() || position.IsDust(price) || position.IsClosing() {
 		return nil
 	}
 
@@ -101,7 +101,7 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 		// check if we have the minimal profit
 		roi := position.ROI(price)
 		if roi.Compare(s.MinProfit) >= 0 {
-			Notify("[trailingStop] activated: %s ROI %s > minimal profit ratio %f", s.Symbol, roi.Percentage(), s.MinProfit.Float64())
+			Notify("[trailingStop] activated: %s ROI %s > minimal profit ratio %s", s.Symbol, roi.Percentage(), s.MinProfit.Percentage())
 			s.activated = true
 		}
 	} else if !s.ActivationRatio.IsZero() {
