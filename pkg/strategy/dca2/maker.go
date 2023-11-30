@@ -9,9 +9,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (s *Strategy) openMakerOrders(ctx context.Context) error {
-	s.logger.Infof("[DCA] open maker orders")
-	price, err := s.retryGetBestPrice(ctx, s.Short)
+func (s *Strategy) placeMakerOrders(ctx context.Context) error {
+	s.logger.Infof("[DCA] start placing maker orders")
+	price, err := s.getBestPriceUntilSuccess(ctx, s.Short)
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func (s *Strategy) openMakerOrders(ctx context.Context) error {
 	return nil
 }
 
-func (s *Strategy) retryGetBestPrice(ctx context.Context, short bool) (fixedpoint.Value, error) {
+func (s *Strategy) getBestPriceUntilSuccess(ctx context.Context, short bool) (fixedpoint.Value, error) {
 	var err error
 	var ticker *types.Ticker
 	for try := 1; try <= 100; try++ {
@@ -56,6 +56,7 @@ func (s *Strategy) generateMakerOrder(short bool, budget, price, margin fixedpoi
 		marginPrice = marginPrice.Neg()
 	}
 
+	// TODO: not implement short part yet
 	var prices []fixedpoint.Value
 	var total fixedpoint.Value
 	for i := 0; i < int(orderNum); i++ {
