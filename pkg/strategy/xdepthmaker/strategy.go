@@ -184,15 +184,16 @@ type Strategy struct {
 	// MakerExchange session name
 	MakerExchange string `json:"makerExchange"`
 
-	UpdateInterval      types.Duration `json:"updateInterval"`
-	HedgeInterval       types.Duration `json:"hedgeInterval"`
+	UpdateInterval types.Duration `json:"updateInterval"`
+	HedgeInterval  types.Duration `json:"hedgeInterval"`
+
+	FullReplenishInterval types.Duration `json:"fullReplenishInterval"`
+
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
 
-	Margin        fixedpoint.Value `json:"margin"`
-	BidMargin     fixedpoint.Value `json:"bidMargin"`
-	AskMargin     fixedpoint.Value `json:"askMargin"`
-	UseDepthPrice bool             `json:"useDepthPrice"`
-	DepthQuantity fixedpoint.Value `json:"depthQuantity"`
+	Margin    fixedpoint.Value `json:"margin"`
+	BidMargin fixedpoint.Value `json:"bidMargin"`
+	AskMargin fixedpoint.Value `json:"askMargin"`
 
 	StopHedgeQuoteBalance fixedpoint.Value `json:"stopHedgeQuoteBalance"`
 	StopHedgeBaseBalance  fixedpoint.Value `json:"stopHedgeBaseBalance"`
@@ -286,6 +287,10 @@ func (s *Strategy) Defaults() error {
 		s.UpdateInterval = types.Duration(time.Second)
 	}
 
+	if s.FullReplenishInterval == 0 {
+		s.FullReplenishInterval = types.Duration(15 * time.Minute)
+	}
+
 	if s.HedgeInterval == 0 {
 		s.HedgeInterval = types.Duration(3 * time.Second)
 	}
@@ -363,7 +368,7 @@ func (s *Strategy) CrossRun(
 		posTicker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
 		defer posTicker.Stop()
 
-		fullReplenishTicker := time.NewTicker(util.MillisecondsJitter(15*time.Minute, 200))
+		fullReplenishTicker := time.NewTicker(util.MillisecondsJitter(s.FullReplenishInterval.Duration(), 200))
 		defer fullReplenishTicker.Stop()
 
 		for {
