@@ -589,7 +589,6 @@ func (s *Strategy) generateMakerOrders(pricingBook *types.StreamOrderBook) ([]ty
 
 	bestBidPrice := bestBid.Price
 	bestAskPrice := bestAsk.Price
-	log.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
 
 	lastMidPrice := bestBidPrice.Add(bestAskPrice).Div(Two)
 	_ = lastMidPrice
@@ -698,8 +697,11 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		return
 	}
 
-	// use mid-price for the last price
-	s.lastPrice = bestBid.Price.Add(bestAsk.Price).Div(Two)
+	bestBidPrice := bestBid.Price
+	bestAskPrice := bestAsk.Price
+	log.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
+
+	s.lastPrice = bestBidPrice.Add(bestAskPrice).Div(Two)
 
 	bookLastUpdateTime := s.pricingBook.LastUpdateTime()
 
@@ -717,208 +719,10 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		return
 	}
 
-	sourceBook := s.pricingBook.CopyDepth(10)
-	if valid, err := sourceBook.IsValid(); !valid {
-		log.WithError(err).Errorf("%s invalid copied order book, skip quoting: %v", s.Symbol, err)
+	submitOrders, err := s.generateMakerOrders(s.pricingBook)
+	if err != nil {
+		log.WithError(err).Errorf("generate order error")
 		return
-	}
-
-	var disableMakerBid = false
-	var disableMakerAsk = false
-
-	// check maker's balance quota
-	// we load the balances from the account while we're generating the orders,
-	// the balance may have a chance to be deducted by other strategies or manual orders submitted by the user
-	makerBalances := s.makerSession.GetAccount().Balances()
-	makerQuota := &bbgo.QuotaTransaction{}
-	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
-		if b.Available.Compare(s.makerMarket.MinQuantity) > 0 {
-			makerQuota.BaseAsset.Add(b.Available)
-		} else {
-			disableMakerAsk = true
-		}
-	}
-
-	if b, ok := makerBalances[s.makerMarket.QuoteCurrency]; ok {
-		if b.Available.Compare(s.makerMarket.MinNotional) > 0 {
-			makerQuota.QuoteAsset.Add(b.Available)
-		} else {
-			disableMakerBid = true
-		}
-	}
-
-	hedgeBalances := s.hedgeSession.GetAccount().Balances()
-	hedgeQuota := &bbgo.QuotaTransaction{}
-	if b, ok := hedgeBalances[s.hedgeMarket.BaseCurrency]; ok {
-		// to make bid orders, we need enough base asset in the foreign exchange,
-		// if the base asset balance is not enough for selling
-		if s.StopHedgeBaseBalance.Sign() > 0 {
-			minAvailable := s.StopHedgeBaseBalance.Add(s.hedgeMarket.MinQuantity)
-			if b.Available.Compare(minAvailable) > 0 {
-				hedgeQuota.BaseAsset.Add(b.Available.Sub(minAvailable))
-			} else {
-				log.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
-				disableMakerBid = true
-			}
-		} else if b.Available.Compare(s.hedgeMarket.MinQuantity) > 0 {
-			hedgeQuota.BaseAsset.Add(b.Available)
-		} else {
-			log.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
-			disableMakerBid = true
-		}
-	}
-
-	if b, ok := hedgeBalances[s.hedgeMarket.QuoteCurrency]; ok {
-		// to make ask orders, we need enough quote asset in the foreign exchange,
-		// if the quote asset balance is not enough for buying
-		if s.StopHedgeQuoteBalance.Sign() > 0 {
-			minAvailable := s.StopHedgeQuoteBalance.Add(s.hedgeMarket.MinNotional)
-			if b.Available.Compare(minAvailable) > 0 {
-				hedgeQuota.QuoteAsset.Add(b.Available.Sub(minAvailable))
-			} else {
-				log.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
-				disableMakerAsk = true
-			}
-		} else if b.Available.Compare(s.hedgeMarket.MinNotional) > 0 {
-			hedgeQuota.QuoteAsset.Add(b.Available)
-		} else {
-			log.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
-			disableMakerAsk = true
-		}
-	}
-
-	// if max exposure position is configured, we should not:
-	// 1. place bid orders when we already bought too much
-	// 2. place ask orders when we already sold too much
-	if s.MaxExposurePosition.Sign() > 0 {
-		pos := s.Position.GetBase()
-
-		if pos.Compare(s.MaxExposurePosition.Neg()) > 0 {
-			// stop sell if we over-sell
-			disableMakerAsk = true
-		} else if pos.Compare(s.MaxExposurePosition) > 0 {
-			// stop buy if we over buy
-			disableMakerBid = true
-		}
-	}
-
-	if disableMakerAsk && disableMakerBid {
-		log.Warnf("%s bid/ask maker is disabled due to insufficient balances", s.Symbol)
-		return
-	}
-
-	bestBidPrice := bestBid.Price
-	bestAskPrice := bestAsk.Price
-	log.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
-
-	var submitOrders []types.SubmitOrder
-	var accumulativeBidQuantity, accumulativeAskQuantity fixedpoint.Value
-	var bidQuantity = s.Quantity
-	var askQuantity = s.Quantity
-	var bidMargin = s.BidMargin
-	var askMargin = s.AskMargin
-	var pips = s.Pips
-
-	bidPrice := bestBidPrice
-	askPrice := bestAskPrice
-	for i := 0; i < s.NumLayers; i++ {
-		// for maker bid orders
-		if !disableMakerBid {
-			if s.QuantityScale != nil {
-				qf, err := s.QuantityScale.Scale(i + 1)
-				if err != nil {
-					log.WithError(err).Errorf("quantityScale error")
-					return
-				}
-
-				log.Infof("%s scaling bid #%d quantity to %f", s.Symbol, i+1, qf)
-
-				// override the default bid quantity
-				bidQuantity = fixedpoint.NewFromFloat(qf)
-			}
-
-			accumulativeBidQuantity = accumulativeBidQuantity.Add(bidQuantity)
-			if s.UseDepthPrice {
-				if s.DepthQuantity.Sign() > 0 {
-					bidPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), s.DepthQuantity)
-				} else {
-					bidPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeBuy), accumulativeBidQuantity)
-				}
-			}
-
-			bidPrice = bidPrice.Mul(fixedpoint.One.Sub(bidMargin))
-			if i > 0 && pips.Sign() > 0 {
-				bidPrice = bidPrice.Sub(pips.Mul(fixedpoint.NewFromInt(int64(i)).
-					Mul(s.makerMarket.TickSize)))
-			}
-
-			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
-				// if we bought, then we need to sell the base from the hedge session
-				submitOrders = append(submitOrders, types.SubmitOrder{
-					Symbol:      s.Symbol,
-					Type:        types.OrderTypeLimit,
-					Side:        types.SideTypeBuy,
-					Price:       bidPrice,
-					Quantity:    bidQuantity,
-					TimeInForce: types.TimeInForceGTC,
-				})
-
-				makerQuota.Commit()
-				hedgeQuota.Commit()
-			} else {
-				makerQuota.Rollback()
-				hedgeQuota.Rollback()
-			}
-		}
-
-		// for maker ask orders
-		if !disableMakerAsk {
-			if s.QuantityScale != nil {
-				qf, err := s.QuantityScale.Scale(i + 1)
-				if err != nil {
-					log.WithError(err).Errorf("quantityScale error")
-					return
-				}
-
-				log.Infof("%s scaling ask #%d quantity to %f", s.Symbol, i+1, qf)
-
-				// override the default bid quantity
-				askQuantity = fixedpoint.NewFromFloat(qf)
-			}
-			accumulativeAskQuantity = accumulativeAskQuantity.Add(askQuantity)
-
-			if s.UseDepthPrice {
-				if s.DepthQuantity.Sign() > 0 {
-					askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), s.DepthQuantity)
-				} else {
-					askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
-				}
-			}
-
-			askPrice = askPrice.Mul(fixedpoint.One.Add(askMargin))
-			if i > 0 && pips.Sign() > 0 {
-				askPrice = askPrice.Add(pips.Mul(fixedpoint.NewFromInt(int64(i)).Mul(s.makerMarket.TickSize)))
-			}
-
-			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
-				// if we bought, then we need to sell the base from the hedge session
-				submitOrders = append(submitOrders, types.SubmitOrder{
-					Symbol:      s.Symbol,
-					Market:      s.makerMarket,
-					Type:        types.OrderTypeLimit,
-					Side:        types.SideTypeSell,
-					Price:       askPrice,
-					Quantity:    askQuantity,
-					TimeInForce: types.TimeInForceGTC,
-				})
-				makerQuota.Commit()
-				hedgeQuota.Commit()
-			} else {
-				makerQuota.Rollback()
-				hedgeQuota.Rollback()
-			}
-
-		}
 	}
 
 	if len(submitOrders) == 0 {
