@@ -3,6 +3,7 @@ package retry
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 
 	"github.com/cenkalti/backoff/v4"
@@ -14,6 +15,34 @@ type advancedOrderCancelService interface {
 	CancelAllOrders(ctx context.Context) ([]types.Order, error)
 	CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error)
 	CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([]types.Order, error)
+}
+
+func QueryOrderUntilCanceled(
+	ctx context.Context, queryOrderService types.ExchangeOrderQueryService, symbol string, orderId uint64,
+) (o *types.Order, err error) {
+	var op = func() (err2 error) {
+		o, err2 = queryOrderService.QueryOrder(ctx, types.OrderQuery{
+			Symbol:  symbol,
+			OrderID: strconv.FormatUint(orderId, 10),
+		})
+
+		if err2 != nil {
+			return err2
+		}
+
+		if o == nil {
+			return fmt.Errorf("order #%d response is nil", orderId)
+		}
+
+		if o.Status == types.OrderStatusCanceled || o.Status == types.OrderStatusFilled {
+			return nil
+		}
+
+		return fmt.Errorf("order #%d is not canceled yet: %s", o.OrderID, o.Status)
+	}
+
+	err = GeneralBackoff(ctx, op)
+	return o, err
 }
 
 func QueryOrderUntilFilled(
