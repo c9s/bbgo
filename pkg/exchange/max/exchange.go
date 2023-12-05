@@ -246,7 +246,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	return toGlobalOrder(*maxOrder)
 }
 
-func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
+func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.Order, error) {
 	market := toLocalSymbol(symbol)
 	walletType := maxapi.WalletTypeSpot
 	if e.MarginSettings.IsMargin {
@@ -254,7 +254,15 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 	}
 
 	// timestamp can't be negative, so we need to use time which epochtime is > 0
-	var since time.Time = time.Date(2018, time.January, 1, 0, 0, 0, 0, time.Local)
+	since, err := e.getLaunchDate()
+	if err != nil {
+		return nil, err
+	}
+
+	// use types.OrderMap because the timestamp params is inclusive. We will get the duplicated order if we use the last order as new since.
+	// If we use since = since + 1ms, we may miss some orders with the same created_at.
+	// As a result, we use OrderMap to avoid duplicated or missing order.
+	var orderMap types.OrderMap = make(types.OrderMap)
 	var limit uint = 1000
 	for {
 		req := e.v3client.NewGetWalletOpenOrdersRequest(walletType).Market(market).Timestamp(since).OrderBy(maxapi.OrderByAsc).Limit(limit)
@@ -263,6 +271,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 			return nil, err
 		}
 
+		noDuplicatedCnt := 0
 		for _, maxOrder := range maxOrders {
 			createdAt := maxOrder.CreatedAt.Time()
 			if createdAt.After(since) {
@@ -271,21 +280,25 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 			order, err := toGlobalOrder(maxOrder)
 			if err != nil {
-				return orders, err
+				return nil, err
 			}
 
-			orders = append(orders, *order)
+			if _, exist := orderMap[order.OrderID]; !exist {
+				orderMap[order.OrderID] = *order
+				noDuplicatedCnt++
+			}
 		}
 
 		if len(maxOrders) < int(limit) {
 			break
 		}
 
-		// open orders api will get the open orders which created_at >= since, so we need to add 1 ms to avoid duplicated
-		since = since.Add(1 * time.Millisecond)
+		if noDuplicatedCnt == 0 {
+			break
+		}
 	}
 
-	return orders, err
+	return orderMap.Orders(), err
 }
 
 func (e *Exchange) QueryClosedOrders(
