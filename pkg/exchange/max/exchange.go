@@ -346,8 +346,11 @@ func (e *Exchange) queryClosedOrdersByTime(ctx context.Context, symbol string, s
 		return orders, err
 	}
 
-	// there is since limit for closed orders API
-	sinceLimit := time.Date(2018, time.January, 1, 0, 0, 0, 0, time.Local)
+	// there is since limit for closed orders API. If the since is before launch date, it will respond error
+	sinceLimit, err := e.getLaunchDate()
+	if err != nil {
+		return orders, err
+	}
 	if since.Before(sinceLimit) {
 		since = sinceLimit
 	}
