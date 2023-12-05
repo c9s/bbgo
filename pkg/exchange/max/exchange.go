@@ -274,7 +274,7 @@ func (e *Exchange) QueryClosedOrders(
 	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
 ) ([]types.Order, error) {
 	if !since.IsZero() || !until.IsZero() {
-		return e.queryClosedOrdersByTime(ctx, symbol, since, until, maxapi.OrderByAsc, 1000)
+		return e.queryClosedOrdersByTime(ctx, symbol, since, until, maxapi.OrderByAsc)
 	}
 
 	return e.queryClosedOrdersByLastOrderID(ctx, symbol, lastOrderID)
@@ -283,13 +283,13 @@ func (e *Exchange) QueryClosedOrders(
 func (e *Exchange) QueryClosedOrdersDesc(
 	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
 ) ([]types.Order, error) {
-	closedOrders, err := e.queryClosedOrdersByTime(ctx, symbol, since, until, maxapi.OrderByDesc, 1000)
+	closedOrders, err := e.queryClosedOrdersByTime(ctx, symbol, since, until, maxapi.OrderByDesc)
 	if lastOrderID == 0 {
 		return closedOrders, err
 	}
 
 	var filterClosedOrders []types.Order
-	for _, closedOrder := range filterClosedOrders {
+	for _, closedOrder := range closedOrders {
 		if closedOrder.OrderID > lastOrderID {
 			filterClosedOrders = append(filterClosedOrders, closedOrder)
 		}
@@ -341,7 +341,7 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(
 	return types.SortOrdersAscending(orders), nil
 }
 
-func (e *Exchange) queryClosedOrdersByTime(ctx context.Context, symbol string, since, until time.Time, orderByType maxapi.OrderByType, limit uint) (orders []types.Order, err error) {
+func (e *Exchange) queryClosedOrdersByTime(ctx context.Context, symbol string, since, until time.Time, orderByType maxapi.OrderByType) (orders []types.Order, err error) {
 	if err := e.closedOrderQueryLimiter.Wait(ctx); err != nil {
 		return orders, err
 	}
@@ -367,7 +367,7 @@ func (e *Exchange) queryClosedOrdersByTime(ctx context.Context, symbol string, s
 
 	req := e.v3client.NewGetWalletClosedOrdersRequest(walletType).
 		Market(market).
-		Limit(limit).
+		Limit(1000).
 		OrderBy(orderByType)
 
 	switch orderByType {
