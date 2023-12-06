@@ -215,6 +215,10 @@ func TestDot(t *testing.T) {
 	assert.InDelta(t, out2, 3., 0.001)
 	out3 := Dot(3., &a, 2)
 	assert.InDelta(t, out2, out3, 0.001)
+	out4 := Dot(&a, 3, 2)
+	assert.InDelta(t, out2, 3., 0.001)
+	out5 := Dot(3, &a, 2)
+	assert.InDelta(t, out4, out5, 0.001)
 }
 
 func TestClone(t *testing.T) {
