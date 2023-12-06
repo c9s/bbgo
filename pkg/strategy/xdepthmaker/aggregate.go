@@ -27,6 +27,6 @@ func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Valu
 		totalAmount = totalAmount.Add(pv.Volume.Mul(pv.Price))
 	}
 
-	price = totalAmount.Div(requiredQuantity)
+	price = totalAmount.Div(requiredQuantity.Sub(q))
 	return price
 }
