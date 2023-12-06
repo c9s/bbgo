@@ -3,15 +3,15 @@ package dca2
 import (
 	"context"
 	"fmt"
-	"time"
 
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 func (s *Strategy) placeDCAOrders(ctx context.Context) error {
 	s.logger.Infof("[DCA] start placing maker orders")
-	price, err := s.getBestPriceUntilSuccess(ctx, s.Short)
+	price, err := getBestPriceUntilSuccess(ctx, s.Session.Exchange, s.Symbol, s.Short)
 	if err != nil {
 		return err
 	}
@@ -31,23 +31,17 @@ func (s *Strategy) placeDCAOrders(ctx context.Context) error {
 	return nil
 }
 
-func (s *Strategy) getBestPriceUntilSuccess(ctx context.Context, short bool) (fixedpoint.Value, error) {
-	var err error
-	var ticker *types.Ticker
-	for try := 1; try <= 100; try++ {
-		ticker, err = s.Session.Exchange.QueryTicker(ctx, s.Symbol)
-		if err == nil && ticker != nil {
-			s.logger.Infof("ticker: %s", ticker.String())
-			if short {
-				return ticker.Buy, nil
-			}
-			return ticker.Sell, nil
-		}
-
-		time.Sleep(1 * time.Second)
+func getBestPriceUntilSuccess(ctx context.Context, ex types.Exchange, symbol string, short bool) (fixedpoint.Value, error) {
+	ticker, err := retry.QueryTickerUntilSuccessful(ctx, ex, symbol)
+	if err != nil {
+		return fixedpoint.Zero, err
 	}
 
-	return fixedpoint.Zero, err
+	if short {
+		return ticker.Buy, nil
+	} else {
+		return ticker.Sell, nil
+	}
 }
 
 func (s *Strategy) generateDCAOrders(short bool, budget, price, priceDeviation fixedpoint.Value, maxOrderNum int64) ([]types.SubmitOrder, error) {
