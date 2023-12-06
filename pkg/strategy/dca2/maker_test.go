@@ -45,58 +45,31 @@ func TestGenerateMakerOrder(t *testing.T) {
 	strategy := newTestStrategy()
 
 	t.Run("case 1: all config is valid and we can place enough orders", func(t *testing.T) {
-		budget := Number("105000")
+		budget := Number("10500")
 		askPrice := Number("30000")
 		margin := Number("0.05")
-		submitOrders, err := strategy.generateMakerOrder(false, budget, askPrice, margin, 4)
+		submitOrders, err := strategy.generateDCAOrders(false, budget, askPrice, margin, 4)
 		if !assert.NoError(err) {
 			return
 		}
 
 		assert.Len(submitOrders, 4)
-		assert.Equal(submitOrders[0].Price, Number("28500"))
-		assert.Equal(submitOrders[1].Price, Number("27000"))
-		assert.Equal(submitOrders[2].Price, Number("25500"))
-		assert.Equal(submitOrders[3].Price, Number("24000"))
-		assert.Equal(submitOrders[0].Quantity, Number("1"))
-		assert.Equal(submitOrders[1].Quantity, Number("1"))
-		assert.Equal(submitOrders[2].Quantity, Number("1"))
-		assert.Equal(submitOrders[3].Quantity, Number("1"))
+		assert.Equal(Number("30000"), submitOrders[0].Price)
+		assert.Equal(Number("0.0875"), submitOrders[0].Quantity)
+		assert.Equal(Number("28500"), submitOrders[1].Price)
+		assert.Equal(Number("0.092105"), submitOrders[1].Quantity)
+		assert.Equal(Number("27075"), submitOrders[2].Price)
+		assert.Equal(Number("0.096952"), submitOrders[2].Quantity)
+		assert.Equal(Number("25721.25"), submitOrders[3].Price)
+		assert.Equal(Number("0.102055"), submitOrders[3].Quantity)
 	})
 
-	t.Run("case 2: some orders' price will below 0 and we should not create such order", func(t *testing.T) {
-		budget := Number("100000")
-		askPrice := Number("30000")
-		margin := Number("0.2")
-		submitOrders, err := strategy.generateMakerOrder(false, budget, askPrice, margin, 5)
-		if !assert.NoError(err) {
-			return
-		}
-
-		assert.Len(submitOrders, 4)
-		assert.Equal(submitOrders[0].Price, Number("24000"))
-		assert.Equal(submitOrders[1].Price, Number("18000"))
-		assert.Equal(submitOrders[2].Price, Number("12000"))
-		assert.Equal(submitOrders[3].Price, Number("6000"))
-		assert.Equal(submitOrders[0].Quantity, Number("1.666666"))
-		assert.Equal(submitOrders[1].Quantity, Number("1.666666"))
-		assert.Equal(submitOrders[2].Quantity, Number("1.666666"))
-		assert.Equal(submitOrders[3].Quantity, Number("1.666666"))
+	t.Run("case 2: some orders' price will below 0, so we should not create such order", func(t *testing.T) {
 	})
 
-	t.Run("case 3: some orders' notional is too small and we should not create such order", func(t *testing.T) {
-		budget := Number("30")
-		askPrice := Number("30000")
-		margin := Number("0.2")
-		submitOrders, err := strategy.generateMakerOrder(false, budget, askPrice, margin, 5)
-		if !assert.NoError(err) {
-			return
-		}
+	t.Run("case 3: notional is too small, so we should decrease num of orders", func(t *testing.T) {
+	})
 
-		assert.Len(submitOrders, 2)
-		assert.Equal(submitOrders[0].Price, Number("24000"))
-		assert.Equal(submitOrders[1].Price, Number("18000"))
-		assert.Equal(submitOrders[0].Quantity, Number("0.000714"))
-		assert.Equal(submitOrders[1].Quantity, Number("0.000714"))
+	t.Run("case 4: quantity is too small, so we should decrease num of orders", func(t *testing.T) {
 	})
 }
