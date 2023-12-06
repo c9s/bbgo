@@ -271,7 +271,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.
 			return nil, err
 		}
 
-		noDuplicatedCnt := 0
+		numUniqueOrders := 0
 		for _, maxOrder := range maxOrders {
 			createdAt := maxOrder.CreatedAt.Time()
 			if createdAt.After(since) {
@@ -285,7 +285,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.
 
 			if _, exist := orderMap[order.OrderID]; !exist {
 				orderMap[order.OrderID] = *order
-				noDuplicatedCnt++
+				numUniqueOrders++
 			}
 		}
 
@@ -293,7 +293,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.
 			break
 		}
 
-		if noDuplicatedCnt == 0 {
+		if numUniqueOrders == 0 {
 			break
 		}
 	}
