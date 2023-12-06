@@ -8,6 +8,14 @@ import (
 // OrderMap is used for storing orders by their order id
 type OrderMap map[uint64]Order
 
+func NewOrderMap(os ...Order) OrderMap {
+	m := OrderMap{}
+	if len(os) > 0 {
+		m.Add(os...)
+	}
+	return m
+}
+
 func (m OrderMap) Backup() (orderForms []SubmitOrder) {
 	for _, order := range m {
 		orderForms = append(orderForms, order.Backup())
@@ -17,8 +25,10 @@ func (m OrderMap) Backup() (orderForms []SubmitOrder) {
 }
 
 // Add the order the the map
-func (m OrderMap) Add(o Order) {
-	m[o.OrderID] = o
+func (m OrderMap) Add(os ...Order) {
+	for _, o := range os {
+		m[o.OrderID] = o
+	}
 }
 
 // Update only updates the order when the order ID exists in the map
