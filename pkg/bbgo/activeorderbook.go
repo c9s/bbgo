@@ -178,7 +178,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 	waitTime := CancelOrderWaitTime
 
 	startTime := time.Now()
-	// ensure every order is cancelled
+	// ensure every order is canceled
 	for {
 		// Some orders in the variable are not created on the server side yet,
 		// If we cancel these orders directly, we will get an unsent order error
@@ -203,14 +203,18 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 		// verify the current open orders via the RESTful API
 		log.Warnf("[ActiveOrderBook] using REStful API to verify active orders...")
 
-		var symbols = map[string]struct{}{}
+		var symbolOrdersMap = map[string]types.OrderSlice{}
 		for _, order := range orders {
-			symbols[order.Symbol] = struct{}{}
-
+			symbolOrdersMap[order.Symbol] = append(symbolOrdersMap[order.Symbol], order)
 		}
-		var leftOrders []types.Order
 
-		for symbol := range symbols {
+		var leftOrders []types.Order
+		for symbol := range symbolOrdersMap {
+			symbolOrders, ok := symbolOrdersMap[symbol]
+			if !ok {
+				continue
+			}
+
 			openOrders, err := ex.QueryOpenOrders(ctx, symbol)
 			if err != nil {
 				log.WithError(err).Errorf("can not query %s open orders", symbol)
@@ -218,7 +222,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 			}
 
 			orderMap := types.NewOrderMap(openOrders...)
-			for _, o := range orders {
+			for _, o := range symbolOrders {
 				// if it's not on the order book (open orders), we should remove it from our local side
 				if !orderMap.Exists(o.OrderID) {
 					b.Remove(o)
@@ -228,6 +232,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 			}
 		}
 
+		// update order slice for the next try
 		orders = leftOrders
 	}
 
