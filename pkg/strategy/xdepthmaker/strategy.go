@@ -255,7 +255,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 	hedgeSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
 		Depth: types.DepthLevelMedium,
-		Speed: types.SpeedHigh,
+		Speed: types.SpeedLow,
 	})
 
 	hedgeSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
@@ -370,6 +370,8 @@ func (s *Strategy) CrossRun(
 
 		fullReplenishTicker := time.NewTicker(util.MillisecondsJitter(s.FullReplenishInterval.Duration(), 200))
 		defer fullReplenishTicker.Stop()
+
+		s.updateQuote(ctx, 0)
 
 		for {
 			select {
