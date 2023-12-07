@@ -451,10 +451,12 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 		sessions = environ.SelectSessions(selectedSessions...)
 	}
 
-	since := time.Now().AddDate(0, -6, 0)
+	since := defaultSyncSinceTime()
 	if userConfig.Sync.Since != nil {
 		since = userConfig.Sync.Since.Time()
 	}
+
+	environ.SetSyncStartTime(since)
 
 	syncSymbolMap, restSymbols := categorizeSyncSymbol(userConfig.Sync.Symbols)
 	for _, session := range sessions {
@@ -463,7 +465,7 @@ func (environ *Environment) syncWithUserConfig(ctx context.Context, userConfig *
 			syncSymbols = append(syncSymbols, ss...)
 		}
 
-		if err := environ.syncSession(ctx, session, syncSymbols...); err != nil {
+		if err := environ.syncSession(ctx, session, since, syncSymbols...); err != nil {
 			return err
 		}
 
@@ -520,8 +522,9 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	}
 
 	// the default sync logics
+	since := defaultSyncSinceTime()
 	for _, session := range environ.sessions {
-		if err := environ.syncSession(ctx, session); err != nil {
+		if err := environ.syncSession(ctx, session, since); err != nil {
 			return err
 		}
 	}
@@ -616,10 +619,13 @@ func (environ *Environment) SyncSession(ctx context.Context, session *ExchangeSe
 	environ.setSyncing(Syncing)
 	defer environ.setSyncing(SyncDone)
 
-	return environ.syncSession(ctx, session, defaultSymbols...)
+	since := defaultSyncSinceTime()
+	return environ.syncSession(ctx, session, since, defaultSymbols...)
 }
 
-func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSession, defaultSymbols ...string) error {
+func (environ *Environment) syncSession(
+	ctx context.Context, session *ExchangeSession, syncStartTime time.Time, defaultSymbols ...string,
+) error {
 	symbols, err := session.getSessionSymbols(defaultSymbols...)
 	if err != nil {
 		return err
@@ -627,7 +633,7 @@ func (environ *Environment) syncSession(ctx context.Context, session *ExchangeSe
 
 	log.Infof("syncing symbols %v from session %s", symbols, session.Name)
 
-	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, environ.syncStartTime, symbols...)
+	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, syncStartTime, symbols...)
 }
 
 func (environ *Environment) ConfigureNotificationSystem(ctx context.Context, userConfig *Config) error {
@@ -1013,4 +1019,8 @@ func (session *ExchangeSession) getSessionSymbols(defaultSymbols ...string) ([]s
 	}
 
 	return session.FindPossibleSymbols()
+}
+
+func defaultSyncSinceTime() time.Time {
+	return time.Now().AddDate(0, -6, 0)
 }
