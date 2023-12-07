@@ -9,14 +9,14 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (s *Strategy) placeDCAOrders(ctx context.Context) error {
-	s.logger.Infof("[DCA] start placing maker orders")
+func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
+	s.logger.Infof("[DCA] start placing open position orders")
 	price, err := getBestPriceUntilSuccess(ctx, s.Session.Exchange, s.Symbol, s.Short)
 	if err != nil {
 		return err
 	}
 
-	orders, err := s.generateDCAOrders(s.Short, s.Budget, price, s.PriceDeviation, s.MaxOrderNum)
+	orders, err := s.generateOpenPositionOrders(s.Short, s.Budget, price, s.PriceDeviation, s.MaxOrderNum)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func getBestPriceUntilSuccess(ctx context.Context, ex types.Exchange, symbol str
 	}
 }
 
-func (s *Strategy) generateDCAOrders(short bool, budget, price, priceDeviation fixedpoint.Value, maxOrderNum int64) ([]types.SubmitOrder, error) {
+func (s *Strategy) generateOpenPositionOrders(short bool, budget, price, priceDeviation fixedpoint.Value, maxOrderNum int64) ([]types.SubmitOrder, error) {
 	// TODO: not implement short part yet
 	factor := fixedpoint.One.Sub(priceDeviation)
 	if short {
@@ -65,7 +65,7 @@ func (s *Strategy) generateDCAOrders(short bool, budget, price, priceDeviation f
 		prices = append(prices, price)
 	}
 
-	notional, orderNum := calculateDCAMakerOrderNotionalAndNum(s.Market, short, budget, prices)
+	notional, orderNum := calculateNotionalAndNum(s.Market, short, budget, prices)
 	if orderNum == 0 {
 		return nil, fmt.Errorf("failed to calculate DCA maker order notional and num, price: %s, budget: %s", price, budget)
 	}
@@ -89,9 +89,9 @@ func (s *Strategy) generateDCAOrders(short bool, budget, price, priceDeviation f
 	return submitOrders, nil
 }
 
-// calculateDCAMakerNotionalAndNum will calculate the notional and num of DCA orders
+// calculateNotionalAndNum calculates the notional and num of open position orders
 // DCA2 is notional-based, every order has the same notional
-func calculateDCAMakerOrderNotionalAndNum(market types.Market, short bool, budget fixedpoint.Value, prices []fixedpoint.Value) (fixedpoint.Value, int) {
+func calculateNotionalAndNum(market types.Market, short bool, budget fixedpoint.Value, prices []fixedpoint.Value) (fixedpoint.Value, int) {
 	for num := len(prices); num > 0; num-- {
 		notional := budget.Div(fixedpoint.NewFromInt(int64(num)))
 		if notional.Compare(market.MinNotional) < 0 {

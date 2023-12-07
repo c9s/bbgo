@@ -48,7 +48,7 @@ func TestGenerateMakerOrder(t *testing.T) {
 		budget := Number("10500")
 		askPrice := Number("30000")
 		margin := Number("0.05")
-		submitOrders, err := strategy.generateDCAOrders(false, budget, askPrice, margin, 4)
+		submitOrders, err := strategy.generateOpenPositionOrders(false, budget, askPrice, margin, 4)
 		if !assert.NoError(err) {
 			return
 		}
