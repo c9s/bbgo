@@ -45,7 +45,6 @@ func getBestPriceUntilSuccess(ctx context.Context, ex types.Exchange, symbol str
 }
 
 func (s *Strategy) generateOpenPositionOrders(short bool, budget, price, priceDeviation fixedpoint.Value, maxOrderNum int64) ([]types.SubmitOrder, error) {
-	// TODO: not implement short part yet
 	factor := fixedpoint.One.Sub(priceDeviation)
 	if short {
 		factor = fixedpoint.One.Add(priceDeviation)
@@ -67,7 +66,7 @@ func (s *Strategy) generateOpenPositionOrders(short bool, budget, price, priceDe
 
 	notional, orderNum := calculateNotionalAndNum(s.Market, short, budget, prices)
 	if orderNum == 0 {
-		return nil, fmt.Errorf("failed to calculate DCA maker order notional and num, price: %s, budget: %s", price, budget)
+		return nil, fmt.Errorf("failed to calculate notional and num of open position orders, price: %s, budget: %s", price, budget)
 	}
 
 	var submitOrders []types.SubmitOrder

@@ -39,7 +39,7 @@ func newTestStrategy(va ...string) *Strategy {
 	return s
 }
 
-func TestGenerateMakerOrder(t *testing.T) {
+func TestGenerateOpenPositionOrders(t *testing.T) {
 	assert := assert.New(t)
 
 	strategy := newTestStrategy()
