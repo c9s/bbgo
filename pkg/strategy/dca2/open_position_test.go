@@ -12,6 +12,7 @@ import (
 
 func newTestMarket() types.Market {
 	return types.Market{
+		Symbol:          "BTCUSDT",
 		BaseCurrency:    "BTC",
 		QuoteCurrency:   "USDT",
 		TickSize:        Number(0.01),
@@ -32,13 +33,13 @@ func newTestStrategy(va ...string) *Strategy {
 
 	market := newTestMarket()
 	s := &Strategy{
-		logger:          logrus.NewEntry(logrus.New()),
-		Symbol:          symbol,
-		Market:          market,
-		Short:           false,
-		TakeProfitRatio: Number("10%"),
-		makerSide:       types.SideTypeBuy,
-		takeProfitSide:  types.SideTypeSell,
+		logger:           logrus.NewEntry(logrus.New()),
+		Symbol:           symbol,
+		Market:           market,
+		Short:            false,
+		TakeProfitRatio:  Number("10%"),
+		openPositionSide: types.SideTypeBuy,
+		takeProfitSide:   types.SideTypeSell,
 	}
 	return s
 }
@@ -52,7 +53,7 @@ func TestGenerateOpenPositionOrders(t *testing.T) {
 		budget := Number("10500")
 		askPrice := Number("30000")
 		margin := Number("0.05")
-		submitOrders, err := strategy.generateOpenPositionOrders(false, budget, askPrice, margin, 4)
+		submitOrders, err := generateOpenPositionOrders(strategy.Market, false, budget, askPrice, margin, 4, strategy.OrderGroupID)
 		if !assert.NoError(err) {
 			return
 		}

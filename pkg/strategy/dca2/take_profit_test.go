@@ -24,7 +24,7 @@ func TestGenerateTakeProfitOrder(t *testing.T) {
 		FeeCurrency:   strategy.Market.BaseCurrency,
 	})
 
-	o := strategy.generateTakeProfitOrder(false, position)
+	o := generateTakeProfitOrder(strategy.Market, false, strategy.TakeProfitRatio, position, strategy.OrderGroupID)
 	assert.Equal(Number("31397.09"), o.Price)
 	assert.Equal(Number("0.9985"), o.Quantity)
 	assert.Equal(types.SideTypeSell, o.Side)
@@ -38,7 +38,7 @@ func TestGenerateTakeProfitOrder(t *testing.T) {
 		Fee:           Number("0.00075"),
 		FeeCurrency:   strategy.Market.BaseCurrency,
 	})
-	o = strategy.generateTakeProfitOrder(false, position)
+	o = generateTakeProfitOrder(strategy.Market, false, strategy.TakeProfitRatio, position, strategy.OrderGroupID)
 	assert.Equal(Number("30846.26"), o.Price)
 	assert.Equal(Number("1.49775"), o.Quantity)
 	assert.Equal(types.SideTypeSell, o.Side)
