@@ -75,7 +75,7 @@ func (s *Stream) syncSubscriptions(opType WsEventType) error {
 	}
 
 	logger := log.WithField("opType", opType)
-	args := []WsArg{}
+	var args []WsArg
 	for _, subscription := range s.Subscriptions {
 		arg, err := convertSubscription(subscription)
 		if err != nil {
@@ -244,9 +244,11 @@ func convertSubscription(sub types.Subscription) (WsArg, error) {
 		arg.Channel = ChannelOrderBook5
 
 		switch sub.Options.Depth {
-		case types.DepthLevel15:
+		case types.DepthLevel5:
+			arg.Channel = ChannelOrderBook5
+		case types.DepthLevel15, types.DepthLevelMedium:
 			arg.Channel = ChannelOrderBook15
-		case types.DepthLevel200:
+		case types.DepthLevel200, types.DepthLevelFull:
 			log.Warn("*** The subscription events for the order book may return fewer than 200 bids/asks at a depth of 200. ***")
 			arg.Channel = ChannelOrderBook
 		}
