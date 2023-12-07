@@ -20,7 +20,7 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 		return err
 	}
 
-	orders, err := s.generateOpenPositionOrders(s.Short, s.Budget, price, s.PriceDeviation, s.MaxOrderNum)
+	orders, err := generateOpenPositionOrders(s.Market, s.Short, s.Budget, price, s.PriceDeviation, s.MaxOrderNum, s.OrderGroupID)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func getBestPriceUntilSuccess(ctx context.Context, ex types.Exchange, symbol str
 	}
 }
 
-func (s *Strategy) generateOpenPositionOrders(short bool, budget, price, priceDeviation fixedpoint.Value, maxOrderNum int64) ([]types.SubmitOrder, error) {
+func generateOpenPositionOrders(market types.Market, short bool, budget, price, priceDeviation fixedpoint.Value, maxOrderNum int64, orderGroupID uint32) ([]types.SubmitOrder, error) {
 	factor := fixedpoint.One.Sub(priceDeviation)
 	if short {
 		factor = fixedpoint.One.Add(priceDeviation)
@@ -60,32 +60,37 @@ func (s *Strategy) generateOpenPositionOrders(short bool, budget, price, priceDe
 		if i > 0 {
 			price = price.Mul(factor)
 		}
-		price = s.Market.TruncatePrice(price)
-		if price.Compare(s.Market.MinPrice) < 0 {
+		price = market.TruncatePrice(price)
+		if price.Compare(market.MinPrice) < 0 {
 			break
 		}
 
 		prices = append(prices, price)
 	}
 
-	notional, orderNum := calculateNotionalAndNum(s.Market, short, budget, prices)
+	notional, orderNum := calculateNotionalAndNum(market, short, budget, prices)
 	if orderNum == 0 {
 		return nil, fmt.Errorf("failed to calculate notional and num of open position orders, price: %s, budget: %s", price, budget)
 	}
 
+	side := types.SideTypeBuy
+	if short {
+		side = types.SideTypeSell
+	}
+
 	var submitOrders []types.SubmitOrder
 	for i := 0; i < orderNum; i++ {
-		quantity := s.Market.TruncateQuantity(notional.Div(prices[i]))
+		quantity := market.TruncateQuantity(notional.Div(prices[i]))
 		submitOrders = append(submitOrders, types.SubmitOrder{
-			Symbol:      s.Symbol,
-			Market:      s.Market,
+			Symbol:      market.Symbol,
+			Market:      market,
 			Type:        types.OrderTypeLimit,
 			Price:       prices[i],
-			Side:        s.makerSide,
+			Side:        side,
 			TimeInForce: types.TimeInForceGTC,
 			Quantity:    quantity,
 			Tag:         orderTag,
-			GroupID:     s.OrderGroupID,
+			GroupID:     orderGroupID,
 		})
 	}
 
