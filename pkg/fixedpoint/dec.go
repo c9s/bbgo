@@ -1197,7 +1197,7 @@ func align(x, y *Value) bool {
 	}
 	yshift = e
 	// check(0 <= yshift && yshift <= 20)
-	//y.coef = (y.coef + halfpow10[yshift]) / pow10[yshift]
+	// y.coef = (y.coef + halfpow10[yshift]) / pow10[yshift]
 	y.coef = (y.coef) / pow10[yshift]
 	// check(int(y.exp)+yshift == int(x.exp))
 	return true
