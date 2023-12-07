@@ -1,3 +1,5 @@
+//go:build !dnum
+
 package xdepthmaker
 
 import (
