@@ -274,7 +274,9 @@ func toGlobalOrder(order v2.OrderDetail) (*types.Order, error) {
 // If the order status is Filled, return the filled base quantity instead of the buy quantity, because a market order on the buy side
 // cannot execute all.
 // Otherwise, return zero.
-func processMarketBuyQuantity(filledQty, filledPrice, priceAvg, buyQty fixedpoint.Value, orderStatus v2.OrderStatus) (fixedpoint.Value, error) {
+func processMarketBuyQuantity(
+	filledQty, filledPrice, priceAvg, buyQty fixedpoint.Value, orderStatus v2.OrderStatus,
+) (fixedpoint.Value, error) {
 	switch orderStatus {
 	case v2.OrderStatusInit, v2.OrderStatusNew, v2.OrderStatusLive, v2.OrderStatusCancelled:
 		return fixedpoint.Zero, nil
@@ -302,7 +304,7 @@ func processMarketBuyQuantity(filledQty, filledPrice, priceAvg, buyQty fixedpoin
 
 func toLocalOrderType(orderType types.OrderType) (v2.OrderType, error) {
 	switch orderType {
-	case types.OrderTypeLimit:
+	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		return v2.OrderTypeLimit, nil
 
 	case types.OrderTypeMarket:
