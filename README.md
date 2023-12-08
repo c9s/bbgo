@@ -139,15 +139,19 @@ the implementation.
 
 ## Requirements
 
-Get your exchange API key and secret after you register the accounts (you can choose one or more exchanges):
+* Go SDK 1.20
 
-- MAX: <https://max.maicoin.com/signup?r=c7982718>
-- Binance: <https://accounts.binance.com/en/register?ref=38192708>
-- OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
-- Kucoin: <https://www.kucoin.com/ucenter/signup?rcode=r3KX2D4>
+* Linux / MacOS / Windows (WSL)
 
-This project is maintained and supported by a small group of team. If you would like to support this project, please
-register on the exchanges using the provided links with referral codes above.
+* Get your exchange API key and secret after you register the accounts (you can choose one or more exchanges):
+
+  - MAX: <https://max.maicoin.com/signup?r=c7982718>
+  - Binance: <https://accounts.binance.com/en/register?ref=38192708>
+  - OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
+  - Kucoin: <https://www.kucoin.com/ucenter/signup?rcode=r3KX2D4>
+
+  This project is maintained and supported by a small group of team. If you would like to support this project, please
+  register on the exchanges using the provided links with referral codes above.
 
 ## Installation
 
