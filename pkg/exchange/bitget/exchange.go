@@ -166,7 +166,9 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 //
 // The end time has different limits. 1m, 5m can query for one month,15m can query for 52 days,30m can query for 62 days,
 // 1H can query for 83 days,4H can query for 240 days,6H can query for 360 days.
-func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryKLines(
+	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
+) ([]types.KLine, error) {
 	req := e.v2client.NewGetKLineRequest().Symbol(symbol)
 	intervalStr, found := toLocalGranularity[interval]
 	if !found {
@@ -263,6 +265,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	if err != nil {
 		return nil, err
 	}
+
 	req.OrderType(orderType)
 
 	// set side
@@ -270,6 +273,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	if err != nil {
 		return nil, err
 	}
+
 	req.Side(side)
 
 	// set quantity
@@ -282,30 +286,38 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		}
 		qty = order.Quantity.Mul(ticker.Buy)
 	}
+
 	req.Size(order.Market.FormatQuantity(qty))
 
-	// we support only GTC/PostOnly, this is because:
-	// 1. We support only SPOT trading.
+	// set TimeInForce
+	// we only support GTC/PostOnly, because:
+	// 1. we only support SPOT trading.
 	// 2. The query open/closed order does not include the `force` in SPOT.
 	// If we support FOK/IOC, but you can't query them, that would be unreasonable.
 	// The other case to consider is 'PostOnly', which is a trade-off because we want to support 'xmaker'.
 	if len(order.TimeInForce) != 0 && order.TimeInForce != types.TimeInForceGTC {
 		return nil, fmt.Errorf("time-in-force %s not supported", order.TimeInForce)
 	}
-	req.Force(v2.OrderForceGTC)
+
+	switch order.Type {
+	case types.OrderTypeLimitMaker:
+		req.Force(v2.OrderForcePostOnly)
+	default:
+		req.Force(v2.OrderForceGTC)
+	}
+
 	// set price
-	if order.Type == types.OrderTypeLimit || order.Type == types.OrderTypeLimitMaker {
+	switch order.Type {
+	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		req.Price(order.Market.FormatPrice(order.Price))
 
-		if order.Type == types.OrderTypeLimitMaker {
-			req.Force(v2.OrderForcePostOnly)
-		}
 	}
 
 	// set client order id
 	if len(order.ClientOrderID) > maxOrderIdLen {
 		return nil, fmt.Errorf("unexpected length of order id, got: %d", len(order.ClientOrderID))
 	}
+
 	if len(order.ClientOrderID) > 0 {
 		req.ClientOrderId(order.ClientOrderID)
 	}
@@ -401,7 +413,9 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 // ** Since is inclusive, Until is exclusive. If you use a time range to query, you must provide both a start time and an end time. **
 // ** Since and Until cannot exceed 90 days. **
 // ** Since from the last 90 days can be queried **
-func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+func (e *Exchange) QueryClosedOrders(
+	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
+) (orders []types.Order, err error) {
 	newSince := since
 	now := time.Now()
 
@@ -507,7 +521,9 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 // REMARK: If your start time is 90 days earlier, we will update it to now - 90 days.
 // ** StartTime is inclusive, EndTime is exclusive. If you use the EndTime, the StartTime is required. **
 // ** StartTime and EndTime cannot exceed 90 days. **
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) QueryTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (trades []types.Trade, err error) {
 	if options.LastTradeID != 0 {
 		log.Warn("!!!BITGET EXCHANGE API NOTICE!!! The trade of response is in descending order, so the last trade id not supported.")
 	}
