@@ -68,8 +68,12 @@ type GeneralOrderExecutor struct {
 	disableNotify bool
 }
 
+// NewGeneralOrderExecutor allocates a GeneralOrderExecutor
+// which has its own order store, trade collector
 func NewGeneralOrderExecutor(
-	session *ExchangeSession, symbol, strategy, strategyInstanceID string, position *types.Position,
+	session *ExchangeSession,
+	symbol, strategy, strategyInstanceID string,
+	position *types.Position,
 ) *GeneralOrderExecutor {
 	// Always update the position fields
 	position.Strategy = strategy

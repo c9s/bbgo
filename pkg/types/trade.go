@@ -120,6 +120,9 @@ func (trade Trade) CsvRecords() [][]string {
 	}
 }
 
+// PositionChange returns the position delta of this trade
+// BUY trade -> positive quantity
+// SELL trade -> negative quantity
 func (trade Trade) PositionChange() fixedpoint.Value {
 	q := trade.Quantity
 	switch trade.Side {

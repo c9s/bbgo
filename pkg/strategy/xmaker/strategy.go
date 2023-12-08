@@ -112,7 +112,7 @@ type Strategy struct {
 	orderStore     *core.OrderStore
 	tradeCollector *core.TradeCollector
 
-	askPriceHeartBeat, bidPriceHeartBeat types.PriceHeartBeat
+	askPriceHeartBeat, bidPriceHeartBeat *types.PriceHeartBeat
 
 	lastPrice fixedpoint.Value
 	groupID   uint32
@@ -170,6 +170,12 @@ func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Valu
 	return price
 }
 
+func (s *Strategy) Initialize() error {
+	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
+	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
+	return nil
+}
+
 func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter) {
 	if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 		log.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
@@ -191,14 +197,14 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 	bookLastUpdateTime := s.book.LastUpdateTime()
 
-	if _, err := s.bidPriceHeartBeat.Update(bestBid, priceUpdateTimeout); err != nil {
+	if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
 		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
 		return
 	}
 
-	if _, err := s.askPriceHeartBeat.Update(bestAsk, priceUpdateTimeout); err != nil {
+	if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
 		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
@@ -639,7 +645,9 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
-func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+func (s *Strategy) CrossRun(
+	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
+) error {
 	if s.BollBandInterval == "" {
 		s.BollBandInterval = types.Interval1m
 	}
