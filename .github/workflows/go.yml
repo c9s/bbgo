@@ -16,9 +16,9 @@ jobs:
     strategy:
       matrix:
         redis-version:
-        - 6.2
+        - "6.2"
         go-version:
-        - 1.18
+        - "1.20"
     env:
       MYSQL_DATABASE: bbgo
       MYSQL_USER: "root"

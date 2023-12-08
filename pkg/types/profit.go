@@ -147,6 +147,24 @@ func (p *Profit) PlainText() string {
 	)
 }
 
+// PeriodProfitStats defined the profit stats for a period
+// TODO: replace AccumulatedPnL and TodayPnL fields from the ProfitStats struct
+type PeriodProfitStats struct {
+	PnL           fixedpoint.Value `json:"pnl,omitempty"`
+	NetProfit     fixedpoint.Value `json:"netProfit,omitempty"`
+	GrossProfit   fixedpoint.Value `json:"grossProfit,omitempty"`
+	GrossLoss     fixedpoint.Value `json:"grossLoss,omitempty"`
+	Volume        fixedpoint.Value `json:"volume,omitempty"`
+	VolumeInQuote fixedpoint.Value `json:"volumeInQuote,omitempty"`
+	MakerVolume   fixedpoint.Value `json:"makerVolume,omitempty"`
+	TakerVolume   fixedpoint.Value `json:"takerVolume,omitempty"`
+
+	// time fields
+	LastTradeTime time.Time `json:"lastTradeTime,omitempty"`
+	StartTime     time.Time `json:"startTime,omitempty"`
+	EndTime       time.Time `json:"endTime,omitempty"`
+}
+
 type ProfitStats struct {
 	Symbol        string `json:"symbol"`
 	QuoteCurrency string `json:"quoteCurrency"`
@@ -164,9 +182,6 @@ type ProfitStats struct {
 	TodayGrossProfit fixedpoint.Value `json:"todayGrossProfit,omitempty"`
 	TodayGrossLoss   fixedpoint.Value `json:"todayGrossLoss,omitempty"`
 	TodaySince       int64            `json:"todaySince,omitempty"`
-
-	//StartTime time.Time
-	//EndTime   time.Time
 }
 
 func NewProfitStats(market Market) *ProfitStats {
@@ -185,8 +200,8 @@ func NewProfitStats(market Market) *ProfitStats {
 		TodayGrossProfit:       fixedpoint.Zero,
 		TodayGrossLoss:         fixedpoint.Zero,
 		TodaySince:             0,
-		//StartTime:              time.Now().UTC(),
-		//EndTime:                time.Now().UTC(),
+		// StartTime:              time.Now().UTC(),
+		// EndTime:                time.Now().UTC(),
 	}
 }
 
@@ -229,7 +244,7 @@ func (s *ProfitStats) AddProfit(profit Profit) {
 		s.TodayGrossLoss = s.TodayGrossLoss.Add(profit.Profit)
 	}
 
-	//s.EndTime = profit.TradedAt.UTC()
+	// s.EndTime = profit.TradedAt.UTC()
 }
 
 func (s *ProfitStats) AddTrade(trade Trade) {
