@@ -327,29 +327,29 @@ func Dot(a interface{}, b interface{}, limit ...int) float64 {
 		aas = tp
 		isaf = false
 	default:
-		panic("input should be either Series or float64")
+		panic("input should be either *Series or numbers")
 	}
 	switch tp := b.(type) {
 	case float64:
 		bbf = tp
 		isbf = true
 	case int32:
-		aaf = float64(tp)
-		isaf = true
+		bbf = float64(tp)
+		isbf = true
 	case int64:
-		aaf = float64(tp)
-		isaf = true
+		bbf = float64(tp)
+		isbf = true
 	case float32:
-		aaf = float64(tp)
-		isaf = true
+		bbf = float64(tp)
+		isbf = true
 	case int:
-		aaf = float64(tp)
-		isaf = true
+		bbf = float64(tp)
+		isbf = true
 	case Series:
 		bbs = tp
 		isbf = false
 	default:
-		panic("input should be either Series or float64")
+		panic("input should be either *Series or numbers")
 
 	}
 	l := 1
