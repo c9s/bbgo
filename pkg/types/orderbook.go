@@ -26,8 +26,9 @@ type OrderBook interface {
 type MutexOrderBook struct {
 	sync.Mutex
 
-	Symbol    string
-	OrderBook OrderBook
+	Symbol string
+
+	orderBook OrderBook
 }
 
 func NewMutexOrderBook(symbol string) *MutexOrderBook {
@@ -39,20 +40,27 @@ func NewMutexOrderBook(symbol string) *MutexOrderBook {
 
 	return &MutexOrderBook{
 		Symbol:    symbol,
-		OrderBook: book,
+		orderBook: book,
 	}
 }
 
 func (b *MutexOrderBook) IsValid() (ok bool, err error) {
 	b.Lock()
-	ok, err = b.OrderBook.IsValid()
+	ok, err = b.orderBook.IsValid()
 	b.Unlock()
 	return ok, err
 }
 
+func (b *MutexOrderBook) SideBook(sideType SideType) PriceVolumeSlice {
+	b.Lock()
+	sideBook := b.orderBook.SideBook(sideType)
+	b.Unlock()
+	return sideBook
+}
+
 func (b *MutexOrderBook) LastUpdateTime() time.Time {
 	b.Lock()
-	t := b.OrderBook.LastUpdateTime()
+	t := b.orderBook.LastUpdateTime()
 	b.Unlock()
 	return t
 }
@@ -60,8 +68,8 @@ func (b *MutexOrderBook) LastUpdateTime() time.Time {
 func (b *MutexOrderBook) BestBidAndAsk() (bid, ask PriceVolume, ok bool) {
 	var ok1, ok2 bool
 	b.Lock()
-	bid, ok1 = b.OrderBook.BestBid()
-	ask, ok2 = b.OrderBook.BestAsk()
+	bid, ok1 = b.orderBook.BestBid()
+	ask, ok2 = b.orderBook.BestAsk()
 	b.Unlock()
 	ok = ok1 && ok2
 	return bid, ask, ok
@@ -69,48 +77,49 @@ func (b *MutexOrderBook) BestBidAndAsk() (bid, ask PriceVolume, ok bool) {
 
 func (b *MutexOrderBook) BestBid() (pv PriceVolume, ok bool) {
 	b.Lock()
-	pv, ok = b.OrderBook.BestBid()
+	pv, ok = b.orderBook.BestBid()
 	b.Unlock()
 	return pv, ok
 }
 
 func (b *MutexOrderBook) BestAsk() (pv PriceVolume, ok bool) {
 	b.Lock()
-	pv, ok = b.OrderBook.BestAsk()
+	pv, ok = b.orderBook.BestAsk()
 	b.Unlock()
 	return pv, ok
 }
 
 func (b *MutexOrderBook) Load(book SliceOrderBook) {
 	b.Lock()
-	b.OrderBook.Load(book)
+	b.orderBook.Load(book)
 	b.Unlock()
 }
 
 func (b *MutexOrderBook) Reset() {
 	b.Lock()
-	b.OrderBook.Reset()
+	b.orderBook.Reset()
 	b.Unlock()
 }
 
 func (b *MutexOrderBook) CopyDepth(depth int) OrderBook {
 	b.Lock()
-	book := b.OrderBook.CopyDepth(depth)
-	b.Unlock()
-	return book
+	defer b.Unlock()
+
+	return b.orderBook.CopyDepth(depth)
 }
 
 func (b *MutexOrderBook) Copy() OrderBook {
 	b.Lock()
-	book := b.OrderBook.Copy()
-	b.Unlock()
-	return book
+	defer b.Unlock()
+
+	return b.orderBook.Copy()
 }
 
 func (b *MutexOrderBook) Update(update SliceOrderBook) {
 	b.Lock()
-	b.OrderBook.Update(update)
-	b.Unlock()
+	defer b.Unlock()
+
+	b.orderBook.Update(update)
 }
 
 type BookSignalType string

@@ -45,7 +45,7 @@ func TestStrategy_generateMakerOrders(t *testing.T) {
 	}
 
 	pricingBook := types.NewStreamBook("BTCUSDT")
-	pricingBook.OrderBook.Load(types.SliceOrderBook{
+	pricingBook.Load(types.SliceOrderBook{
 		Symbol: "BTCUSDT",
 		Bids: types.PriceVolumeSlice{
 			{Price: Number("25000.00"), Volume: Number("0.1")},

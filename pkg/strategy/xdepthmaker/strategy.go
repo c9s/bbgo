@@ -25,7 +25,7 @@ var defaultMargin = fixedpoint.NewFromFloat(0.003)
 
 var Two = fixedpoint.NewFromInt(2)
 
-const priceUpdateTimeout = 30 * time.Second
+const priceUpdateTimeout = 5 * time.Minute
 
 const ID = "xdepthmaker"
 
@@ -644,7 +644,16 @@ func (s *Strategy) generateMakerOrders(
 	var accumulatedAskQuantity = fixedpoint.Zero
 	var accumulatedBidQuoteQuantity = fixedpoint.Zero
 
-	dupPricingBook := pricingBook.CopyDepth(0)
+	// copy the pricing book because during the generation the book data could change
+	dupPricingBook := pricingBook.Copy()
+
+	log.Infof("dupPricingBook: \n\tbids: %+v \n\tasks: %+v",
+		dupPricingBook.SideBook(types.SideTypeBuy),
+		dupPricingBook.SideBook(types.SideTypeSell))
+
+	log.Infof("pricingBook: \n\tbids: %+v \n\tasks: %+v",
+		pricingBook.SideBook(types.SideTypeBuy),
+		pricingBook.SideBook(types.SideTypeSell))
 
 	if maxLayer == 0 || maxLayer > s.NumLayers {
 		maxLayer = s.NumLayers
@@ -831,14 +840,12 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 		log.WithError(err).Warnf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
-		return
 	}
 
 	if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
 		log.WithError(err).Warnf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
-		return
 	}
 
 	balances, err := s.MakerOrderExecutor.Session().Exchange.QueryAccountBalances(ctx)

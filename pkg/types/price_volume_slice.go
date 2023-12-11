@@ -17,7 +17,7 @@ func (p PriceVolume) Equals(b PriceVolume) bool {
 }
 
 func (p PriceVolume) String() string {
-	return fmt.Sprintf("PriceVolume{ price: %s, volume: %s }", p.Price.String(), p.Volume.String())
+	return fmt.Sprintf("PriceVolume{ Price: %s, Volume: %s }", p.Price.String(), p.Volume.String())
 }
 
 type PriceVolumeSlice []PriceVolume
