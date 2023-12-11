@@ -399,6 +399,7 @@ func (s *Strategy) CrossRun(
 
 		s.updateQuote(ctx, 0)
 
+		lastOrderReplenishTime := time.Now()
 		for {
 			select {
 
@@ -412,11 +413,16 @@ func (s *Strategy) CrossRun(
 
 			case <-fullReplenishTicker.C:
 				s.updateQuote(ctx, 0)
+				lastOrderReplenishTime = time.Now()
 
 			case sig, ok := <-s.pricingBook.C:
 				// when any book change event happened
 				if !ok {
 					return
+				}
+
+				if time.Since(lastOrderReplenishTime) < time.Minute {
+					continue
 				}
 
 				switch sig.Type {
@@ -426,6 +432,8 @@ func (s *Strategy) CrossRun(
 				case types.BookSignalUpdate:
 					s.updateQuote(ctx, 5)
 				}
+
+				lastOrderReplenishTime = time.Now()
 
 			case <-posTicker.C:
 				// For positive position and positive covered position:
