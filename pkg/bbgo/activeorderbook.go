@@ -395,7 +395,7 @@ func (b *ActiveOrderBook) add(order types.Order) {
 		// if the pending order is older, then we should add the new one, and drop the pending order
 		log.Debugf("found pending order update: %+v", pendingOrder)
 		if isNewerOrderUpdate(pendingOrder, order) {
-			log.Infof("pending order update is newer: %+v", pendingOrder)
+			log.Debugf("pending order update is newer: %+v", pendingOrder)
 			order = pendingOrder
 		}
 
