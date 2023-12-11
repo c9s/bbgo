@@ -421,7 +421,7 @@ func (s *Strategy) CrossRun(
 					return
 				}
 
-				if time.Since(lastOrderReplenishTime) < time.Minute {
+				if time.Since(lastOrderReplenishTime) < 10*time.Second {
 					continue
 				}
 
@@ -828,14 +828,14 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 	bookLastUpdateTime := s.pricingBook.LastUpdateTime()
 
 	if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
-		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
+		log.WithError(err).Warnf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
 		return
 	}
 
 	if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
-		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
+		log.WithError(err).Warnf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
 		return
