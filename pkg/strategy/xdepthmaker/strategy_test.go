@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -61,7 +62,7 @@ func TestStrategy_generateMakerOrders(t *testing.T) {
 		Time: time.Now(),
 	})
 
-	orders, err := s.generateMakerOrders(pricingBook, 0)
+	orders, err := s.generateMakerOrders(pricingBook, 0, fixedpoint.PosInf, fixedpoint.PosInf)
 	assert.NoError(t, err)
 	AssertOrdersPriceSideQuantity(t, []PriceSideQuantityAssert{
 		{Side: types.SideTypeBuy, Price: Number("25000"), Quantity: Number("0.04")},        // =~ $1000.00

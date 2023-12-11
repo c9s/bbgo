@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -237,7 +238,7 @@ type Strategy struct {
 
 	lastPrice fixedpoint.Value
 
-	stopC chan struct{}
+	stopC, authedC chan struct{}
 }
 
 func (s *Strategy) ID() string {
@@ -365,12 +366,46 @@ func (s *Strategy) CrossRun(
 		go s.runTradeRecover(ctx)
 	}
 
+	s.authedC = make(chan struct{}, 2)
+	s.makerSession.UserDataStream.OnAuth(func() {
+		select {
+		case s.authedC <- struct{}{}:
+		default:
+		}
+	})
+	s.hedgeSession.UserDataStream.OnAuth(func() {
+		select {
+		case s.authedC <- struct{}{}:
+		default:
+		}
+	})
+
 	go func() {
+		log.Infof("waiting for user data stream to get authenticated")
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.authedC:
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.authedC:
+		}
+
+		log.Infof("user data stream authenticated, start placing orders...")
+
 		posTicker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
 		defer posTicker.Stop()
 
 		fullReplenishTicker := time.NewTicker(util.MillisecondsJitter(s.FullReplenishInterval.Duration(), 200))
 		defer fullReplenishTicker.Stop()
+
+		// clean up the previous open orders
+		if err := s.cleanUpOpenOrders(ctx); err != nil {
+			log.WithError(err).Errorf("error cleaning up open orders")
+		}
 
 		s.updateQuote(ctx, 0)
 
@@ -598,17 +633,13 @@ func (s *Strategy) runTradeRecover(ctx context.Context) {
 	}
 }
 
-func (s *Strategy) generateMakerOrders(pricingBook *types.StreamOrderBook, maxLayer int) ([]types.SubmitOrder, error) {
-	bestBid, bestAsk, hasPrice := pricingBook.BestBidAndAsk()
+func (s *Strategy) generateMakerOrders(
+	pricingBook *types.StreamOrderBook, maxLayer int, availableBase fixedpoint.Value, availableQuote fixedpoint.Value,
+) ([]types.SubmitOrder, error) {
+	_, _, hasPrice := pricingBook.BestBidAndAsk()
 	if !hasPrice {
 		return nil, nil
 	}
-
-	bestBidPrice := bestBid.Price
-	bestAskPrice := bestAsk.Price
-
-	lastMidPrice := bestBidPrice.Add(bestAskPrice).Div(Two)
-	_ = lastMidPrice
 
 	var submitOrders []types.SubmitOrder
 	var accumulatedBidQuantity = fixedpoint.Zero
@@ -621,8 +652,33 @@ func (s *Strategy) generateMakerOrders(pricingBook *types.StreamOrderBook, maxLa
 		maxLayer = s.NumLayers
 	}
 
+	var availableBalances = map[types.SideType]fixedpoint.Value{
+		types.SideTypeBuy:  availableQuote,
+		types.SideTypeSell: availableBase,
+	}
+
 	for _, side := range []types.SideType{types.SideTypeBuy, types.SideTypeSell} {
+		sideBook := dupPricingBook.SideBook(side)
+		if sideBook.Len() == 0 {
+			log.Warnf("orderbook %s side is empty", side)
+			continue
+		}
+
+		availableSideBalance, ok := availableBalances[side]
+		if !ok {
+			log.Warnf("no available balance for side %s side", side)
+			continue
+		}
+
+	layerLoop:
 		for i := 1; i <= maxLayer; i++ {
+			// simple break, we need to check the market minNotional and minQuantity later
+			if !availableSideBalance.Eq(fixedpoint.PosInf) {
+				if availableSideBalance.IsZero() || availableSideBalance.Sign() < 0 {
+					break layerLoop
+				}
+			}
+
 			requiredDepthFloat, err := s.DepthScale.Scale(i)
 			if err != nil {
 				return nil, errors.Wrapf(err, "depthScale scale error")
@@ -631,7 +687,6 @@ func (s *Strategy) generateMakerOrders(pricingBook *types.StreamOrderBook, maxLa
 			// requiredDepth is the required depth in quote currency
 			requiredDepth := fixedpoint.NewFromFloat(requiredDepthFloat)
 
-			sideBook := dupPricingBook.SideBook(side)
 			index := sideBook.IndexByQuoteVolumeDepth(requiredDepth)
 
 			pvs := types.PriceVolumeSlice{}
@@ -641,7 +696,11 @@ func (s *Strategy) generateMakerOrders(pricingBook *types.StreamOrderBook, maxLa
 				pvs = sideBook[0 : index+1]
 			}
 
-			log.Infof("required depth: %f, pvs: %+v", requiredDepth.Float64(), pvs)
+			if len(pvs) == 0 {
+				continue
+			}
+
+			log.Infof("side: %s required depth: %f, pvs: %+v", side, requiredDepth.Float64(), pvs)
 
 			depthPrice, err := averageDepthPrice(pvs)
 			if err != nil {
@@ -678,12 +737,36 @@ func (s *Strategy) generateMakerOrders(pricingBook *types.StreamOrderBook, maxLa
 				accumulatedBidQuantity = accumulatedBidQuantity.Add(quantity)
 				quoteQuantity := fixedpoint.Mul(quantity, depthPrice)
 				quoteQuantity = quoteQuantity.Round(s.makerMarket.PricePrecision, fixedpoint.Up)
+
+				if !availableSideBalance.Eq(fixedpoint.PosInf) && availableSideBalance.Compare(quoteQuantity) <= 0 {
+					quoteQuantity = availableSideBalance
+					quantity = quoteQuantity.Div(depthPrice).Round(s.makerMarket.PricePrecision, fixedpoint.Down)
+				}
+
+				if quantity.Compare(s.makerMarket.MinQuantity) <= 0 || quoteQuantity.Compare(s.makerMarket.MinNotional) <= 0 {
+					break layerLoop
+				}
+
+				availableSideBalance = availableSideBalance.Sub(quoteQuantity)
+
 				accumulatedBidQuoteQuantity = accumulatedBidQuoteQuantity.Add(quoteQuantity)
 
 			case types.SideTypeSell:
 				quantity = quantity.Sub(accumulatedAskQuantity)
-				accumulatedAskQuantity = accumulatedAskQuantity.Add(quantity)
+				quoteQuantity := quantity.Mul(depthPrice)
 
+				// balance check
+				if !availableSideBalance.Eq(fixedpoint.PosInf) && availableSideBalance.Compare(quantity) <= 0 {
+					break layerLoop
+				}
+
+				if quantity.Compare(s.makerMarket.MinQuantity) <= 0 || quoteQuantity.Compare(s.makerMarket.MinNotional) <= 0 {
+					break layerLoop
+				}
+
+				availableSideBalance = availableSideBalance.Sub(quantity)
+
+				accumulatedAskQuantity = accumulatedAskQuantity.Add(quantity)
 			}
 
 			submitOrders = append(submitOrders, types.SubmitOrder{
@@ -760,7 +843,27 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 		return
 	}
 
-	submitOrders, err := s.generateMakerOrders(s.pricingBook, maxLayer)
+	balances, err := s.MakerOrderExecutor.Session().Exchange.QueryAccountBalances(ctx)
+	if err != nil {
+		log.WithError(err).Errorf("balance query error")
+		return
+	}
+
+	log.Infof("balances: %+v", balances.NotZero())
+
+	quoteBalance, ok := balances[s.makerMarket.QuoteCurrency]
+	if !ok {
+		return
+	}
+
+	baseBalance, ok := balances[s.makerMarket.BaseCurrency]
+	if !ok {
+		return
+	}
+
+	log.Infof("quote balance: %s, base balance: %s", quoteBalance, baseBalance)
+
+	submitOrders, err := s.generateMakerOrders(s.pricingBook, maxLayer, baseBalance.Available, quoteBalance.Available)
 	if err != nil {
 		log.WithError(err).Errorf("generate order error")
 		return
@@ -778,6 +881,19 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 	}
 
 	s.orderStore.Add(createdOrders...)
+}
+
+func (s *Strategy) cleanUpOpenOrders(ctx context.Context) error {
+	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, s.makerSession.Exchange, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	if err := s.makerSession.Exchange.CancelOrders(ctx, openOrders...); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func selectSessions2(
