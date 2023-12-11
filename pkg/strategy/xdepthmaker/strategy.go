@@ -367,18 +367,8 @@ func (s *Strategy) CrossRun(
 	}
 
 	s.authedC = make(chan struct{}, 2)
-	s.makerSession.UserDataStream.OnAuth(func() {
-		select {
-		case s.authedC <- struct{}{}:
-		default:
-		}
-	})
-	s.hedgeSession.UserDataStream.OnAuth(func() {
-		select {
-		case s.authedC <- struct{}{}:
-		default:
-		}
-	})
+	bindAuthSignal(ctx, s.makerSession.UserDataStream, s.authedC)
+	bindAuthSignal(ctx, s.hedgeSession.UserDataStream, s.authedC)
 
 	go func() {
 		log.Infof("waiting for user data stream to get authenticated")
@@ -935,4 +925,15 @@ func min(a, b int) int {
 	}
 
 	return b
+}
+
+func bindAuthSignal(ctx context.Context, stream types.Stream, c chan<- struct{}) {
+	stream.OnAuth(func() {
+		select {
+		case <-ctx.Done():
+			return
+		case c <- struct{}{}:
+		default:
+		}
+	})
 }
