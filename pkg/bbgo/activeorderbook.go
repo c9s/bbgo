@@ -392,10 +392,10 @@ func (b *ActiveOrderBook) add(order types.Order) {
 	if pendingOrder, ok := b.pendingOrderUpdates.Get(order.OrderID); ok {
 		// if the pending order update time is newer than the adding order
 		// we should use the pending order rather than the adding order.
-		// if pending order is older, than we should add the new one, and drop the pending order
-		log.Infof("found pending order update")
+		// if the pending order is older, then we should add the new one, and drop the pending order
+		log.Debugf("found pending order update: %+v", pendingOrder)
 		if isNewerOrderUpdate(pendingOrder, order) {
-			log.Infof("pending order update is newer")
+			log.Infof("pending order update is newer: %+v", pendingOrder)
 			order = pendingOrder
 		}
 
