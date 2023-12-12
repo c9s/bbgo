@@ -68,7 +68,9 @@ var debugf func(msg string, args ...interface{})
 
 func init() {
 	if v, ok := util.GetEnvVarBool("DEBUG_BITGET"); ok && v {
-		debugf = log.Infof
+		debugf = func(msg string, args ...interface{}) {
+			log.Infof("[BITGET] "+msg, args...)
+		}
 	} else {
 		debugf = func(msg string, args ...interface{}) {}
 	}
