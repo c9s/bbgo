@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
 	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 const (
@@ -34,25 +35,44 @@ var log = logrus.WithFields(logrus.Fields{
 var (
 	// queryMarketRateLimiter has its own rate limit. https://bitgetlimited.github.io/apidoc/en/spot/#get-symbols
 	queryMarketRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
+
 	// queryAccountRateLimiter has its own rate limit. https://bitgetlimited.github.io/apidoc/en/spot/#get-account-assets
 	queryAccountRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
+
 	// queryTickerRateLimiter has its own rate limit. https://bitgetlimited.github.io/apidoc/en/spot/#get-single-ticker
 	queryTickerRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
+
 	// queryTickersRateLimiter has its own rate limit. https://bitgetlimited.github.io/apidoc/en/spot/#get-all-tickers
 	queryTickersRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
+
 	// queryOpenOrdersRateLimiter has its own rate limit. https://www.bitget.com/zh-CN/api-doc/spot/trade/Get-Unfilled-Orders
 	queryOpenOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
+
 	// closedQueryOrdersRateLimiter has its own rate limit. https://www.bitget.com/api-doc/spot/trade/Get-History-Orders
 	closedQueryOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/15), 5)
-	// submitOrdersRateLimiter has its own rate limit. https://www.bitget.com/zh-CN/api-doc/spot/trade/Place-Order
-	submitOrdersRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
+
+	// submitOrderRateLimiter has its own rate limit. https://www.bitget.com/zh-CN/api-doc/spot/trade/Place-Order
+	submitOrderRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
+
 	// queryTradeRateLimiter has its own rate limit. https://www.bitget.com/zh-CN/api-doc/spot/trade/Get-Fills
 	queryTradeRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
+
 	// cancelOrderRateLimiter has its own rate limit. https://www.bitget.com/api-doc/spot/trade/Cancel-Order
 	cancelOrderRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
+
 	// kLineRateLimiter has its own rate limit. https://www.bitget.com/api-doc/spot/market/Get-Candle-Data
-	kLineOrderRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
+	kLineRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
 )
+
+var debugf func(msg string, args ...interface{})
+
+func init() {
+	if v, ok := util.GetEnvVarBool("DEBUG_BITGET"); ok && v {
+		debugf = log.Infof
+	} else {
+		debugf = func(msg string, args ...interface{}) {}
+	}
+}
 
 type Exchange struct {
 	key, secret, passphrase string
@@ -199,7 +219,7 @@ func (e *Exchange) QueryKLines(
 		req.EndTime(*options.EndTime)
 	}
 
-	if err := kLineOrderRateLimiter.Wait(ctx); err != nil {
+	if err := kLineRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("query klines rate limiter wait error: %w", err)
 	}
 
@@ -322,26 +342,34 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		req.ClientOrderId(order.ClientOrderID)
 	}
 
-	if err := submitOrdersRateLimiter.Wait(ctx); err != nil {
+	if err := submitOrderRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
 	}
+
 	res, err := req.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to place order, order: %#v, err: %w", order, err)
 	}
+
+	debugf("order created: %+v", res)
 
 	if len(res.OrderId) == 0 || (len(order.ClientOrderID) != 0 && res.ClientOrderId != order.ClientOrderID) {
 		return nil, fmt.Errorf("unexpected order id, resp: %#v, order: %#v", res, order)
 	}
 
 	orderId := res.OrderId
+
+	debugf("fetching unfilled order info for order #%s", orderId)
 	ordersResp, err := e.v2client.NewGetUnfilledOrdersRequest().OrderId(orderId).Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query open order by order id: %s, err: %w", orderId, err)
 	}
 
-	switch len(ordersResp) {
-	case 0:
+	debugf("unfilled order response: %+v", ordersResp)
+
+	if len(ordersResp) == 1 {
+		return unfilledOrderToGlobalOrder(ordersResp[0])
+	} else if len(ordersResp) == 0 {
 		// The market order will be executed immediately, so we cannot retrieve it through the NewGetUnfilledOrdersRequest API.
 		// Try to get the order from the NewGetHistoryOrdersRequest API.
 		ordersResp, err := e.v2client.NewGetHistoryOrdersRequest().OrderId(orderId).Do(ctx)
@@ -354,13 +382,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		}
 
 		return toGlobalOrder(ordersResp[0])
-
-	case 1:
-		return unfilledOrderToGlobalOrder(ordersResp[0])
-
-	default:
-		return nil, fmt.Errorf("unexpected order length, order id: %s", orderId)
 	}
+
+	return nil, fmt.Errorf("unexpected order length, order id: %s", orderId)
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
