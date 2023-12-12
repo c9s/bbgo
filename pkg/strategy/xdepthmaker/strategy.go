@@ -647,13 +647,9 @@ func (s *Strategy) generateMakerOrders(
 	// copy the pricing book because during the generation the book data could change
 	dupPricingBook := pricingBook.Copy()
 
-	log.Infof("dupPricingBook: \n\tbids: %+v \n\tasks: %+v",
+	log.Infof("pricingBook: \n\tbids: %+v \n\tasks: %+v",
 		dupPricingBook.SideBook(types.SideTypeBuy),
 		dupPricingBook.SideBook(types.SideTypeSell))
-
-	log.Infof("pricingBook: \n\tbids: %+v \n\tasks: %+v",
-		pricingBook.SideBook(types.SideTypeBuy),
-		pricingBook.SideBook(types.SideTypeSell))
 
 	if maxLayer == 0 || maxLayer > s.NumLayers {
 		maxLayer = s.NumLayers
