@@ -924,6 +924,7 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 	//      }
 	t.Run("limit buy", func(t *testing.T) {
 		newO := o
+		newO.Price = fixedpoint.NewFromFloat(0.49998)
 		newO.OrderType = v2.OrderTypeLimit
 
 		res, err := newO.toGlobalOrder()
@@ -935,7 +936,7 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 				Side:          types.SideTypeBuy,
 				Type:          types.OrderTypeLimit,
 				Quantity:      newO.Size,
-				Price:         newO.PriceAvg,
+				Price:         newO.Price,
 				TimeInForce:   types.TimeInForceGTC,
 			},
 			Exchange:         types.ExchangeBitget,
@@ -983,6 +984,7 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 		newO := o
 		newO.OrderType = v2.OrderTypeLimit
 		newO.Side = v2.SideTypeSell
+		newO.Price = fixedpoint.NewFromFloat(0.48710)
 
 		res, err := newO.toGlobalOrder()
 		assert.NoError(t, err)
@@ -993,7 +995,7 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 				Side:          types.SideTypeSell,
 				Type:          types.OrderTypeLimit,
 				Quantity:      newO.Size,
-				Price:         newO.PriceAvg,
+				Price:         newO.Price,
 				TimeInForce:   types.TimeInForceGTC,
 			},
 			Exchange:         types.ExchangeBitget,
