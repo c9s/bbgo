@@ -10,7 +10,7 @@ import (
 )
 
 const TradeExpiryTime = 3 * time.Hour
-const PruneTriggerNumOfTrades = 10_000
+const MaximumTradeStoreSize = 1_000
 
 type TradeStore struct {
 	// any created trades for tracking trades
@@ -142,6 +142,10 @@ func (s *TradeStore) isCoolTrade(trade types.Trade) bool {
 	return !s.lastTradeTime.IsZero() && time.Time(trade.Time).Sub(s.lastTradeTime) > time.Hour
 }
 
+func (s *TradeStore) exceededMaximumTradeStoreSize() bool {
+	return len(s.trades) > MaximumTradeStoreSize
+}
+
 func (s *TradeStore) BindStream(stream types.Stream) {
 	stream.OnTradeUpdate(func(trade types.Trade) {
 		s.Add(trade)
@@ -149,7 +153,7 @@ func (s *TradeStore) BindStream(stream types.Stream) {
 
 	if s.EnablePrune {
 		stream.OnTradeUpdate(func(trade types.Trade) {
-			if s.isCoolTrade(trade) {
+			if s.isCoolTrade(trade) || s.exceededMaximumTradeStoreSize() {
 				s.Prune(time.Time(trade.Time))
 			}
 		})
