@@ -38,13 +38,17 @@ type GetUnfilledOrdersRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	symbol *string `param:"symbol,query"`
-	// Limit number default 100 max 100
+
+	// limit number default 100 max 100
 	limit *string `param:"limit,query"`
+
 	// idLessThan requests the content on the page before this ID (older data), the value input should be the orderId of the corresponding interface.
-	idLessThan *string    `param:"idLessThan,query"`
-	startTime  *time.Time `param:"startTime,milliseconds,query"`
-	endTime    *time.Time `param:"endTime,milliseconds,query"`
-	orderId    *string    `param:"orderId,query"`
+	idLessThan *string `param:"idLessThan,query"`
+
+	startTime *time.Time `param:"startTime,milliseconds,query"`
+	endTime   *time.Time `param:"endTime,milliseconds,query"`
+
+	orderId *string `param:"orderId,query"`
 }
 
 func (c *Client) NewGetUnfilledOrdersRequest() *GetUnfilledOrdersRequest {

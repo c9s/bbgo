@@ -191,7 +191,7 @@ func unfilledOrderToGlobalOrder(order v2.UnfilledOrder) (*types.Order, error) {
 	// The market order will be executed immediately, so this check is used to handle corner cases.
 	if orderType == types.OrderTypeMarket {
 		qty = order.BaseVolume
-		log.Warnf("!!!  The price(%f) and quantity(%f) are not verified for market orders, because we only receive limit orders in the test environment !!!", price.Float64(), qty.Float64())
+		log.Warnf("!!! The price(%f) and quantity(%f) are not verified for market orders, because we only receive limit orders in the test environment !!!", price.Float64(), qty.Float64())
 	}
 
 	return &types.Order{
@@ -202,6 +202,7 @@ func unfilledOrderToGlobalOrder(order v2.UnfilledOrder) (*types.Order, error) {
 			Type:          orderType,
 			Quantity:      qty,
 			Price:         price,
+
 			// Bitget does not include the "time-in-force" field in its API response for spot trading, so we set GTC.
 			TimeInForce: types.TimeInForceGTC,
 		},
