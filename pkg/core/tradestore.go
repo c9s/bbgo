@@ -10,6 +10,7 @@ import (
 )
 
 const TradeExpiryTime = 3 * time.Hour
+const CoolTradePeriod = 1 * time.Hour
 const MaximumTradeStoreSize = 1_000
 
 type TradeStore struct {
@@ -139,7 +140,7 @@ func (s *TradeStore) Prune(curTime time.Time) {
 
 func (s *TradeStore) isCoolTrade(trade types.Trade) bool {
 	// if the duration between the current trade and the last trade is over 1 hour, we call it "cool trade"
-	return !s.lastTradeTime.IsZero() && time.Time(trade.Time).Sub(s.lastTradeTime) > time.Hour
+	return !s.lastTradeTime.IsZero() && time.Time(trade.Time).Sub(s.lastTradeTime) > CoolTradePeriod
 }
 
 func (s *TradeStore) exceededMaximumTradeStoreSize() bool {
