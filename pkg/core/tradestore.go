@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -112,14 +114,16 @@ func (s *TradeStore) touchLastTradeTime(trade types.Trade) {
 	}
 }
 
-// pruneExpiredTrades prunes trades that are older than the expiry time
-// see TradeExpiryTime
-func (s *TradeStore) pruneExpiredTrades(curTime time.Time) {
+// Prune prunes trades that are older than the expiry time
+// see TradeExpiryTime (24 hours)
+func (s *TradeStore) Prune(curTime time.Time) {
 	s.Lock()
 	defer s.Unlock()
 
 	var trades = make(map[uint64]types.Trade)
 	var cutOffTime = curTime.Add(-TradeExpiryTime)
+
+	log.Infof("pruning expired trades, cutoff time = %s", cutOffTime.String())
 	for _, trade := range s.trades {
 		if trade.Time.Before(cutOffTime) {
 			continue
@@ -129,15 +133,13 @@ func (s *TradeStore) pruneExpiredTrades(curTime time.Time) {
 	}
 
 	s.trades = trades
-}
 
-func (s *TradeStore) Prune(curTime time.Time) {
-	s.pruneExpiredTrades(curTime)
+	log.Infof("trade pruning done, size: %d", len(trades))
 }
 
 func (s *TradeStore) isCoolTrade(trade types.Trade) bool {
-	// if the time of last trade is over 1 hour, we call it's cool trade
-	return s.lastTradeTime != (time.Time{}) && time.Time(trade.Time).Sub(s.lastTradeTime) > time.Hour
+	// if the duration between the current trade and the last trade is over 1 hour, we call it "cool trade"
+	return !s.lastTradeTime.IsZero() && time.Time(trade.Time).Sub(s.lastTradeTime) > time.Hour
 }
 
 func (s *TradeStore) BindStream(stream types.Stream) {
