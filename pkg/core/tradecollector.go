@@ -34,12 +34,15 @@ type TradeCollector struct {
 }
 
 func NewTradeCollector(symbol string, position *types.Position, orderStore *OrderStore) *TradeCollector {
+	tradeStore := NewTradeStore()
+	tradeStore.EnablePrune = true
+
 	return &TradeCollector{
 		Symbol:   symbol,
 		orderSig: sigchan.New(1),
 
 		tradeC:     make(chan types.Trade, 100),
-		tradeStore: NewTradeStore(),
+		tradeStore: tradeStore,
 		doneTrades: make(map[types.TradeKey]struct{}),
 		position:   position,
 		orderStore: orderStore,
@@ -88,7 +91,9 @@ func (c *TradeCollector) Emit() {
 	c.orderSig.Emit()
 }
 
-func (c *TradeCollector) Recover(ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, from time.Time) error {
+func (c *TradeCollector) Recover(
+	ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, from time.Time,
+) error {
 	logrus.Debugf("recovering %s trades...", symbol)
 
 	trades, err := ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
