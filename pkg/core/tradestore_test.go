@@ -30,7 +30,7 @@ func TestTradeStore_Prune(t *testing.T) {
 	store := NewTradeStore()
 	store.Add(
 		types.Trade{ID: 1, Time: types.Time(now.Add(-25 * time.Hour))},
-		types.Trade{ID: 2, Time: types.Time(now.Add(-23 * time.Hour))},
+		types.Trade{ID: 2, Time: types.Time(now.Add(-2 * time.Hour))},
 		types.Trade{ID: 3, Time: types.Time(now.Add(-2 * time.Minute))},
 		types.Trade{ID: 4, Time: types.Time(now.Add(-1 * time.Minute))},
 	)
