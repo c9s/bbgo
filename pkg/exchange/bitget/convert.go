@@ -430,6 +430,11 @@ func (o *Order) toGlobalOrder() (types.Order, error) {
 		}
 	}
 
+	price := o.Price
+	if orderType == types.OrderTypeMarket {
+		price = o.PriceAvg
+	}
+
 	return types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: o.ClientOrderId,
@@ -437,7 +442,7 @@ func (o *Order) toGlobalOrder() (types.Order, error) {
 			Side:          side,
 			Type:          orderType,
 			Quantity:      qty,
-			Price:         o.PriceAvg,
+			Price:         price,
 			TimeInForce:   timeInForce,
 		},
 		Exchange:         types.ExchangeBitget,
