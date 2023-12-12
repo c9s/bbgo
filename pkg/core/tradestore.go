@@ -9,7 +9,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const TradeExpiryTime = 24 * time.Hour
+const TradeExpiryTime = 3 * time.Hour
 const PruneTriggerNumOfTrades = 10_000
 
 type TradeStore struct {
@@ -115,7 +115,7 @@ func (s *TradeStore) touchLastTradeTime(trade types.Trade) {
 }
 
 // Prune prunes trades that are older than the expiry time
-// see TradeExpiryTime (24 hours)
+// see TradeExpiryTime (3 hours)
 func (s *TradeStore) Prune(curTime time.Time) {
 	s.Lock()
 	defer s.Unlock()
