@@ -125,6 +125,7 @@ func TestStream(t *testing.T) {
 	})
 
 	t.Run("private test", func(t *testing.T) {
+		s.SetPrivateChannelSymbols([]string{"BTCUSDT"})
 		err := s.Connect(context.Background())
 		assert.NoError(t, err)
 

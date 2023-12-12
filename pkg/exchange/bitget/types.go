@@ -488,16 +488,18 @@ type Order struct {
 	// Size is base coin when orderType=limit; quote coin when orderType=market
 	Size fixedpoint.Value `json:"size"`
 	// Buy amount, returned when buying at market price
-	Notional      fixedpoint.Value           `json:"notional"`
-	OrderType     v2.OrderType               `json:"orderType"`
-	Force         v2.OrderForce              `json:"force"`
-	Side          v2.SideType                `json:"side"`
-	AccBaseVolume fixedpoint.Value           `json:"accBaseVolume"`
-	PriceAvg      fixedpoint.Value           `json:"priceAvg"`
-	Status        v2.OrderStatus             `json:"status"`
-	CreatedTime   types.MillisecondTimestamp `json:"cTime"`
-	UpdatedTime   types.MillisecondTimestamp `json:"uTime"`
-	FeeDetail     []struct {
+	Notional      fixedpoint.Value `json:"notional"`
+	OrderType     v2.OrderType     `json:"orderType"`
+	Force         v2.OrderForce    `json:"force"`
+	Side          v2.SideType      `json:"side"`
+	AccBaseVolume fixedpoint.Value `json:"accBaseVolume"`
+	PriceAvg      fixedpoint.Value `json:"priceAvg"`
+	// The Price field is only applicable to limit orders.
+	Price       fixedpoint.Value           `json:"price"`
+	Status      v2.OrderStatus             `json:"status"`
+	CreatedTime types.MillisecondTimestamp `json:"cTime"`
+	UpdatedTime types.MillisecondTimestamp `json:"uTime"`
+	FeeDetail   []struct {
 		FeeCoin string `json:"feeCoin"`
 		Fee     string `json:"fee"`
 	} `json:"feeDetail"`
