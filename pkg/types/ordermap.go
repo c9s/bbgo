@@ -254,6 +254,15 @@ func (m *SyncOrderMap) Orders() (slice OrderSlice) {
 
 type OrderSlice []Order
 
+func (s *OrderSlice) Add(o Order) {
+	*s = append(*s, o)
+}
+
+// Map builds up an OrderMap by the order id
+func (s OrderSlice) Map() OrderMap {
+	return NewOrderMap(s...)
+}
+
 func (s OrderSlice) SeparateBySide() (buyOrders, sellOrders []Order) {
 	for _, o := range s {
 		switch o.Side {
