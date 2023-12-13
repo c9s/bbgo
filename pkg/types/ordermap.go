@@ -3,6 +3,8 @@ package types
 import (
 	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // OrderMap is used for storing orders by their order id
@@ -274,4 +276,10 @@ func (s OrderSlice) SeparateBySide() (buyOrders, sellOrders []Order) {
 	}
 
 	return buyOrders, sellOrders
+}
+
+func (s OrderSlice) Print() {
+	for _, o := range s {
+		logrus.Infof("%s", o)
+	}
 }

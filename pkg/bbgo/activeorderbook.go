@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 	"encoding/json"
-	"sort"
 	"sync"
 	"time"
 
@@ -163,10 +162,14 @@ func (b *ActiveOrderBook) FastCancel(ctx context.Context, ex types.Exchange, ord
 }
 
 // GracefulCancel cancels the active orders gracefully
-func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
+func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange, specifiedOrders ...types.Order) error {
+	cancelAll := false
+	orders := specifiedOrders
+
 	// if no orders are given, set to cancelAll
-	if len(orders) == 0 {
+	if len(specifiedOrders) == 0 {
 		orders = b.Orders()
+		cancelAll = true
 	} else {
 		// simple check on given input
 		hasSymbol := b.Symbol != ""
@@ -176,6 +179,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 			}
 		}
 	}
+
 	// optimize order cancel for back-testing
 	if IsBackTesting {
 		return ex.CancelOrders(context.Background(), orders...)
@@ -200,16 +204,24 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 
 		log.Debugf("[ActiveOrderBook] waiting %s for %s orders to be cancelled...", waitTime, b.Symbol)
 
-		clear, err := b.waitAllClear(ctx, waitTime, orderCancelTimeout)
-		if clear || err != nil {
-			break
+		if cancelAll {
+			clear, err := b.waitAllClear(ctx, waitTime, orderCancelTimeout)
+			if clear || err != nil {
+				break
+			}
+
+			log.Warnf("[ActiveOrderBook] %d %s orders are not cancelled yet:", b.NumOfOrders(), b.Symbol)
+			b.Print()
+
+		} else {
+			existingOrders := b.filterExistingOrders(orders)
+			if len(existingOrders) == 0 {
+				break
+			}
 		}
 
-		log.Warnf("[ActiveOrderBook] %d %s orders are not cancelled yet:", b.NumOfOrders(), b.Symbol)
-		b.Print()
-
 		// verify the current open orders via the RESTful API
-		log.Warnf("[ActiveOrderBook] using REStful API to verify active orders...")
+		log.Warnf("[ActiveOrderBook] using open orders API to verify the active orders...")
 
 		var symbolOrdersMap = categorizeOrderBySymbol(orders)
 
@@ -252,17 +264,8 @@ func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
 
 func (b *ActiveOrderBook) Print() {
 	orders := b.orders.Orders()
-
-	// sort orders by price
-	sort.Slice(orders, func(i, j int) bool {
-		o1 := orders[i]
-		o2 := orders[j]
-		return o1.Price.Compare(o2.Price) > 0
-	})
-
-	for _, o := range orders {
-		log.Infof("%s", o)
-	}
+	orders = types.SortOrdersByPrice(orders, true)
+	orders.Print()
 }
 
 // Update updates the order by the order status and emit the related events.
@@ -446,6 +449,16 @@ func (b *ActiveOrderBook) Orders() types.OrderSlice {
 
 func (b *ActiveOrderBook) Lookup(f func(o types.Order) bool) *types.Order {
 	return b.orders.Lookup(f)
+}
+
+func (b *ActiveOrderBook) filterExistingOrders(orders []types.Order) (existingOrders types.OrderSlice) {
+	for _, o := range orders {
+		if b.Exists(o) {
+			existingOrders.Add(o)
+		}
+	}
+
+	return existingOrders
 }
 
 func categorizeOrderBySymbol(orders types.OrderSlice) map[string]types.OrderSlice {
