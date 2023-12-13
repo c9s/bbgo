@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"go.uber.org/multierr"
 	"golang.org/x/time/rate"
 
@@ -69,19 +68,8 @@ type LogFunction func(msg string, args ...interface{})
 
 var debugf LogFunction
 
-func isPrefixFormatterConfigured() bool {
-	_, isPrefixFormatter := logrus.StandardLogger().Formatter.(*prefixed.TextFormatter)
-	return isPrefixFormatter
-}
-
 func getDebugFunction() LogFunction {
 	if v, ok := util.GetEnvVarBool("DEBUG_BITGET"); ok && v {
-		if isPrefixFormatterConfigured() {
-			return func(msg string, args ...interface{}) {
-				log.Infof("[BITGET] "+msg, args...)
-			}
-		}
-
 		return log.Infof
 	}
 
