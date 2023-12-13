@@ -17,7 +17,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/util"
@@ -46,10 +45,7 @@ var RootCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		env := os.Getenv("BBGO_ENV")
-		if env == "" {
-			env = "development"
-		}
+		env := bbgo.GetCurrentEnv()
 
 		logFormatter, err := cmd.Flags().GetString("log-formatter")
 		if err != nil {
@@ -57,22 +53,11 @@ var RootCmd = &cobra.Command{
 		}
 
 		if len(logFormatter) == 0 {
-			switch env {
-			case "production", "prod", "stag", "staging":
-				// always use json formatter for production and staging
-				log.SetFormatter(&log.JSONFormatter{})
-			default:
-				log.SetFormatter(&prefixed.TextFormatter{})
-			}
+			formatter := bbgo.NewLogFormatterWithEnv(env)
+			log.SetFormatter(formatter)
 		} else {
-			switch logFormatter {
-			case "prefixed":
-				log.SetFormatter(&prefixed.TextFormatter{})
-			case "text":
-				log.SetFormatter(&log.TextFormatter{})
-			case "json":
-				log.SetFormatter(&log.JSONFormatter{})
-			}
+			formatter := bbgo.NewLogFormatter(bbgo.LogFormatterType(logFormatter))
+			log.SetFormatter(formatter)
 		}
 
 		if token := viper.GetString("rollbar-token"); token != "" {

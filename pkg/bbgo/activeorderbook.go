@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 	"encoding/json"
-	"sort"
 	"sync"
 	"time"
 
@@ -14,7 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const CancelOrderWaitTime = 20 * time.Millisecond
+const DefaultCancelOrderWaitTime = 20 * time.Millisecond
 
 // ActiveOrderBook manages the local active order books.
 //
@@ -34,6 +33,8 @@ type ActiveOrderBook struct {
 	C sigchan.Chan
 
 	mu sync.Mutex
+
+	cancelOrderWaitTime time.Duration
 }
 
 func NewActiveOrderBook(symbol string) *ActiveOrderBook {
@@ -42,7 +43,12 @@ func NewActiveOrderBook(symbol string) *ActiveOrderBook {
 		orders:              types.NewSyncOrderMap(),
 		pendingOrderUpdates: types.NewSyncOrderMap(),
 		C:                   sigchan.New(1),
+		cancelOrderWaitTime: DefaultCancelOrderWaitTime,
 	}
+}
+
+func (b *ActiveOrderBook) SetCancelOrderWaitTime(duration time.Duration) {
+	b.cancelOrderWaitTime = duration
 }
 
 func (b *ActiveOrderBook) MarshalJSON() ([]byte, error) {
@@ -156,10 +162,14 @@ func (b *ActiveOrderBook) FastCancel(ctx context.Context, ex types.Exchange, ord
 }
 
 // GracefulCancel cancels the active orders gracefully
-func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange, orders ...types.Order) error {
+func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange, specifiedOrders ...types.Order) error {
+	cancelAll := false
+	orders := specifiedOrders
+
 	// if no orders are given, set to cancelAll
-	if len(orders) == 0 {
+	if len(specifiedOrders) == 0 {
 		orders = b.Orders()
+		cancelAll = true
 	} else {
 		// simple check on given input
 		hasSymbol := b.Symbol != ""
@@ -169,13 +179,15 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 			}
 		}
 	}
+
 	// optimize order cancel for back-testing
 	if IsBackTesting {
 		return ex.CancelOrders(context.Background(), orders...)
 	}
 
 	log.Debugf("[ActiveOrderBook] gracefully cancelling %s orders...", b.Symbol)
-	waitTime := CancelOrderWaitTime
+	waitTime := b.cancelOrderWaitTime
+	orderCancelTimeout := 5 * time.Second
 
 	startTime := time.Now()
 	// ensure every order is canceled
@@ -192,23 +204,28 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 
 		log.Debugf("[ActiveOrderBook] waiting %s for %s orders to be cancelled...", waitTime, b.Symbol)
 
-		clear, err := b.waitAllClear(ctx, waitTime, 5*time.Second)
-		if clear || err != nil {
-			break
-		}
+		if cancelAll {
+			clear, err := b.waitAllClear(ctx, waitTime, orderCancelTimeout)
+			if clear || err != nil {
+				break
+			}
 
-		log.Warnf("[ActiveOrderBook] %d %s orders are not cancelled yet:", b.NumOfOrders(), b.Symbol)
-		b.Print()
+			log.Warnf("[ActiveOrderBook] %d %s orders are not cancelled yet:", b.NumOfOrders(), b.Symbol)
+			b.Print()
+
+		} else {
+			existingOrders := b.filterExistingOrders(orders)
+			if len(existingOrders) == 0 {
+				break
+			}
+		}
 
 		// verify the current open orders via the RESTful API
-		log.Warnf("[ActiveOrderBook] using REStful API to verify active orders...")
+		log.Warnf("[ActiveOrderBook] using open orders API to verify the active orders...")
 
-		var symbolOrdersMap = map[string]types.OrderSlice{}
-		for _, order := range orders {
-			symbolOrdersMap[order.Symbol] = append(symbolOrdersMap[order.Symbol], order)
-		}
+		var symbolOrdersMap = categorizeOrderBySymbol(orders)
 
-		var leftOrders []types.Order
+		var leftOrders types.OrderSlice
 		for symbol := range symbolOrdersMap {
 			symbolOrders, ok := symbolOrdersMap[symbol]
 			if !ok {
@@ -221,13 +238,14 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 				continue
 			}
 
-			orderMap := types.NewOrderMap(openOrders...)
+			openOrderMap := types.NewOrderMap(openOrders...)
 			for _, o := range symbolOrders {
-				// if it's not on the order book (open orders), we should remove it from our local side
-				if !orderMap.Exists(o.OrderID) {
+				// if it's not on the order book (open orders),
+				// we should remove it from our local side
+				if !openOrderMap.Exists(o.OrderID) {
 					b.Remove(o)
 				} else {
-					leftOrders = append(leftOrders, o)
+					leftOrders.Add(o)
 				}
 			}
 		}
@@ -246,17 +264,8 @@ func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
 
 func (b *ActiveOrderBook) Print() {
 	orders := b.orders.Orders()
-
-	// sort orders by price
-	sort.Slice(orders, func(i, j int) bool {
-		o1 := orders[i]
-		o2 := orders[j]
-		return o1.Price.Compare(o2.Price) > 0
-	})
-
-	for _, o := range orders {
-		log.Infof("%s", o)
-	}
+	orders = types.SortOrdersByPrice(orders, true)
+	orders.Print()
 }
 
 // Update updates the order by the order status and emit the related events.
@@ -440,4 +449,24 @@ func (b *ActiveOrderBook) Orders() types.OrderSlice {
 
 func (b *ActiveOrderBook) Lookup(f func(o types.Order) bool) *types.Order {
 	return b.orders.Lookup(f)
+}
+
+func (b *ActiveOrderBook) filterExistingOrders(orders []types.Order) (existingOrders types.OrderSlice) {
+	for _, o := range orders {
+		if b.Exists(o) {
+			existingOrders.Add(o)
+		}
+	}
+
+	return existingOrders
+}
+
+func categorizeOrderBySymbol(orders types.OrderSlice) map[string]types.OrderSlice {
+	orderMap := map[string]types.OrderSlice{}
+
+	for _, order := range orders {
+		orderMap[order.Symbol] = append(orderMap[order.Symbol], order)
+	}
+
+	return orderMap
 }
