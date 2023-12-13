@@ -64,14 +64,20 @@ var (
 	kLineRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
 )
 
-var debugf func(msg string, args ...interface{})
+type LogFunction func(msg string, args ...interface{})
+
+var debugf LogFunction
+
+func getDebugFunction() LogFunction {
+	if v, ok := util.GetEnvVarBool("DEBUG_BITGET"); ok && v {
+		return log.Infof
+	}
+
+	return func(msg string, args ...interface{}) {}
+}
 
 func init() {
-	if v, ok := util.GetEnvVarBool("DEBUG_BITGET"); ok && v {
-		debugf = log.Infof
-	} else {
-		debugf = func(msg string, args ...interface{}) {}
-	}
+	debugf = getDebugFunction()
 }
 
 type Exchange struct {
