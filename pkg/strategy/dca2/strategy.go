@@ -50,7 +50,7 @@ type Strategy struct {
 
 	// private field
 	mu                   sync.Mutex
-	makerSide            types.SideType
+	openPositionSide     types.SideType
 	takeProfitSide       types.SideType
 	takeProfitPrice      fixedpoint.Value
 	startTimeOfNextRound time.Time
@@ -106,10 +106,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	instanceID := s.InstanceID()
 
 	if s.Short {
-		s.makerSide = types.SideTypeSell
+		s.openPositionSide = types.SideTypeSell
 		s.takeProfitSide = types.SideTypeBuy
 	} else {
-		s.makerSide = types.SideTypeBuy
+		s.openPositionSide = types.SideTypeBuy
 		s.takeProfitSide = types.SideTypeSell
 	}
 
