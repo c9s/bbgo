@@ -23,7 +23,7 @@ func init() {
 
 // Fixed spread market making strategy
 type Strategy struct {
-	*common.Strategy
+	common.Strategy
 
 	Environment *bbgo.Environment
 
@@ -109,7 +109,6 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 	s.market = market
 
-	s.Strategy = &common.Strategy{}
 	s.Strategy.Initialize(ctx, s.Environment, tradingSession, s.market, ID, s.InstanceID())
 
 	s.orderPriceRiskControl = NewOrderPriceRiskControl(
