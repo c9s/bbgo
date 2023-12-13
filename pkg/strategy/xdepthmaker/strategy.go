@@ -474,14 +474,11 @@ func (s *Strategy) CrossRun(
 		// wait for the quoter to stop
 		time.Sleep(s.UpdateInterval.Duration())
 
-		shutdownCtx, cancelShutdown := context.WithTimeout(context.TODO(), time.Minute)
-		defer cancelShutdown()
-
-		if err := s.MakerOrderExecutor.GracefulCancel(shutdownCtx); err != nil {
+		if err := s.MakerOrderExecutor.GracefulCancel(ctx); err != nil {
 			log.WithError(err).Errorf("graceful cancel %s order error", s.Symbol)
 		}
 
-		if err := s.HedgeOrderExecutor.GracefulCancel(shutdownCtx); err != nil {
+		if err := s.HedgeOrderExecutor.GracefulCancel(ctx); err != nil {
 			log.WithError(err).Errorf("graceful cancel %s order error", s.Symbol)
 		}
 
@@ -889,6 +886,13 @@ func (s *Strategy) cleanUpOpenOrders(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	if len(openOrders) == 0 {
+		return nil
+	}
+
+	log.Infof("found existing open orders:")
+	types.OrderSlice(openOrders).Print()
 
 	if err := s.makerSession.Exchange.CancelOrders(ctx, openOrders...); err != nil {
 		return err
