@@ -34,7 +34,7 @@ func init() {
 
 // Strategy scmaker is a stable coin market maker
 type Strategy struct {
-	*common.Strategy
+	common.Strategy
 
 	Environment *bbgo.Environment
 	Market      types.Market
@@ -88,7 +88,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.Strategy = &common.Strategy{}
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
 	s.book = types.NewStreamBook(s.Symbol)
