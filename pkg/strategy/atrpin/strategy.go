@@ -20,7 +20,7 @@ func init() {
 }
 
 type Strategy struct {
-	*common.Strategy
+	common.Strategy
 
 	Environment *bbgo.Environment
 	Market      types.Market
@@ -62,7 +62,6 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.Strategy = &common.Strategy{}
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
 	atr := session.Indicators(s.Symbol).ATR(s.Interval, s.Window)

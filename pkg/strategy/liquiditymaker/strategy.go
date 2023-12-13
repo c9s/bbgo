@@ -32,7 +32,7 @@ func init() {
 // - place enough total liquidity amount on the order book, for example, 20k USDT value liquidity on both sell and buy
 // - ensure the spread by placing the orders from the mid price (or the last trade price)
 type Strategy struct {
-	*common.Strategy
+	common.Strategy
 
 	Environment *bbgo.Environment
 	Market      types.Market
@@ -81,7 +81,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.Strategy = &common.Strategy{}
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
 	s.orderGenerator = &LiquidityOrderGenerator{
