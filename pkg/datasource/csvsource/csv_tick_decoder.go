@@ -158,21 +158,25 @@ func OKExCSVTickDecoder(row []string, index int) (*CsvTick, error) {
 	if err != nil {
 		return nil, ErrInvalidPriceFormat
 	}
+
 	qty, err := fixedpoint.NewFromString(row[2])
 	if err != nil {
 		return nil, ErrInvalidVolumeFormat
 	}
+
 	side := types.SideTypeBuy
 	isBuyerMaker := false
 	if row[1] == "sell" {
 		side = types.SideTypeSell
 		isBuyerMaker = true
 	}
+
 	n, err := strconv.ParseFloat(row[4], 64) // startTime
 	if err != nil {
 		return nil, ErrInvalidTimeFormat
 	}
-	ts := time.Unix(int64(n), 0)
+
+	ts := time.UnixMilli(int64(n))
 	return &CsvTick{
 		TradeID:      uint64(id),
 		Exchange:     types.ExchangeOKEx,
