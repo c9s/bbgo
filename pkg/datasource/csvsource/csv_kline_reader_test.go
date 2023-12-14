@@ -15,7 +15,7 @@ import (
 )
 
 func assertKLineEq(t *testing.T, exp, act types.KLine, name string) {
-	assert.Equal(t, exp.StartTime, act.StartTime, name)
+	assert.True(t, exp.StartTime.Equal(act.StartTime.Time()), name)
 	assert.Equal(t, 0, exp.Open.Compare(act.Open), name)
 	assert.Equal(t, 0, exp.High.Compare(act.High), name)
 	assert.Equal(t, 0, exp.Low.Compare(act.Low), name)
