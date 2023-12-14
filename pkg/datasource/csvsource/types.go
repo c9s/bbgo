@@ -6,13 +6,13 @@ import (
 )
 
 type CsvConfig struct {
-	Market      MarketType `json:"market"`
-	Granularity DataType   `json:"granularity"`
+	Market      types.MarketType     `json:"market"`
+	Granularity types.MarketDataType `json:"granularity"`
 }
 
 type CsvTick struct {
 	Exchange        types.ExchangeName `json:"exchange"`
-	Market          MarketType         `json:"market"`
+	Market          types.MarketType   `json:"market"`
 	TradeID         uint64             `json:"tradeID"`
 	Symbol          string             `json:"symbol"`
 	TickDirection   string             `json:"tickDirection"`
@@ -27,7 +27,7 @@ type CsvTick struct {
 
 func (c *CsvTick) ToGlobalTrade() (*types.Trade, error) {
 	var isFutures bool
-	if c.Market == FUTURES {
+	if c.Market == types.MarketTypeFutures {
 		isFutures = true
 	}
 	return &types.Trade{
