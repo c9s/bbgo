@@ -5,11 +5,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type CsvConfig struct {
-	Market      types.MarketType     `json:"market"`
-	Granularity types.MarketDataType `json:"granularity"`
-}
-
 type CsvTick struct {
 	Exchange        types.ExchangeName `json:"exchange"`
 	Market          types.MarketType   `json:"market"`
