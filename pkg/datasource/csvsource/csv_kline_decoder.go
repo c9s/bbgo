@@ -54,37 +54,46 @@ func BinanceCSVKLineDecoder(record []string, interval time.Duration) (types.KLin
 		k, empty types.KLine
 		err      error
 	)
+
 	if len(record) < 5 {
 		return k, ErrNotEnoughColumns
 	}
+
 	ts, err := strconv.ParseFloat(record[0], 64) // check for e numbers "1.70027E+12"
 	if err != nil {
 		return empty, ErrInvalidTimeFormat
 	}
+
 	open, err := fixedpoint.NewFromString(record[1])
 	if err != nil {
 		return empty, ErrInvalidPriceFormat
 	}
+
 	high, err := fixedpoint.NewFromString(record[2])
 	if err != nil {
 		return empty, ErrInvalidPriceFormat
 	}
+
 	low, err := fixedpoint.NewFromString(record[3])
 	if err != nil {
 		return empty, ErrInvalidPriceFormat
 	}
+
 	closing, err := fixedpoint.NewFromString(record[4])
 	if err != nil {
 		return empty, ErrInvalidPriceFormat
 	}
 
-	volume, err := fixedpoint.NewFromString(record[5])
-	if err != nil {
-		return empty, ErrInvalidVolumeFormat
+	volume := fixedpoint.Zero
+	if len(record) == 6 {
+		volume, err = fixedpoint.NewFromString(record[5])
+		if err != nil {
+			return empty, ErrInvalidVolumeFormat
+		}
 	}
 
-	k.StartTime = types.NewTimeFromUnix(int64(ts), 0)
-	k.EndTime = types.NewTimeFromUnix(k.StartTime.Time().Add(interval).Unix(), 0)
+	k.StartTime = types.Time(time.UnixMilli(int64(ts)))
+	k.EndTime = types.Time(k.StartTime.Time().Add(interval))
 	k.Open = open
 	k.High = high
 	k.Low = low
