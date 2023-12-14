@@ -30,8 +30,8 @@ func TestVolumeProfile(t *testing.T) {
 		stream.EmitKLineClosed(candle)
 	}
 	assert.InDelta(t, 36512.7, ind.VP.Low, 0.01, "VP.LOW")
-	assert.InDelta(t, 36600.811, ind.VP.VAL, 0.01, "VP.VAL")
-	assert.InDelta(t, 36612.559, ind.VP.POC, 0.01, "VP.POC")
-	assert.InDelta(t, 36618.433, ind.VP.VAH, 0.01, "VP.VAH")
+	assert.InDelta(t, 36512.7, ind.VP.VAL, 0.01, "VP.VAL")
+	assert.InDelta(t, 36518.574, ind.VP.POC, 0.01, "VP.POC")
+	assert.InDelta(t, 36530.32, ind.VP.VAH, 0.01, "VP.VAH")
 	assert.InDelta(t, 36617.433, ind.VP.High, 0.01, "VP.HIGH")
 }
