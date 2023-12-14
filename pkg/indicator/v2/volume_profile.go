@@ -16,11 +16,11 @@ const DefaultValueAreaPercentage = 0.68
 
 type VolumeProfileStream struct {
 	*types.Float64Series
-	VP     VolumeProfile
+	VP     VolumeProfileDetails
 	window int
 }
 
-// VolumeProfile is a histogram of market price and volume.
+// VolumeProfileDetails is a histogram of market price and volume.
 // Intent is to show the price points with most volume during a period.
 // The profile gives key features such as:
 //
@@ -31,7 +31,7 @@ type VolumeProfileStream struct {
 // Value area low (VAL)
 //
 // Session High/Low
-type VolumeProfile struct {
+type VolumeProfileDetails struct {
 
 	// Bins is the histogram bins.
 	Bins []float64
@@ -65,7 +65,7 @@ type VolumeLevel struct {
 	Volume float64
 }
 
-func NewVolumeProfile(source KLineSubscription, window int) *VolumeProfileStream {
+func VolumeProfile(source KLineSubscription, window int) *VolumeProfileStream {
 	prices := HLC3(source)
 	volumes := Volumes(source)
 
