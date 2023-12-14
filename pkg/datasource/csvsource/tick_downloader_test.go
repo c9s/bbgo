@@ -14,8 +14,8 @@ import (
 type DownloadTester struct {
 	Exchange    types.ExchangeName
 	Reader      MakeCSVTickReader
-	Market      MarketType
-	Granularity DataType
+	Market      types.MarketType
+	Granularity types.MarketDataType
 	Symbol      string
 	Path        string
 }
@@ -35,24 +35,24 @@ func Test_CSV_Download(t *testing.T) {
 		{
 			Exchange:    types.ExchangeBinance,
 			Reader:      NewBinanceCSVTickReader,
-			Market:      SPOT,
-			Granularity: AGGTRADES,
+			Market:      types.MarketTypeSpot,
+			Granularity: types.MarketDataTypeAggTrades,
 			Symbol:      "FXSUSDT",
 			Path:        "testdata/binance/FXSUSDT",
 		},
 		{
 			Exchange:    types.ExchangeBybit,
 			Reader:      NewBybitCSVTickReader,
-			Market:      FUTURES,
-			Granularity: AGGTRADES,
+			Market:      types.MarketTypeFutures,
+			Granularity: types.MarketDataTypeAggTrades,
 			Symbol:      "FXSUSDT",
 			Path:        "testdata/bybit/FXSUSDT",
 		},
 		{
 			Exchange:    types.ExchangeOKEx,
 			Reader:      NewOKExCSVTickReader,
-			Market:      SPOT,
-			Granularity: AGGTRADES,
+			Market:      types.MarketTypeSpot,
+			Granularity: types.MarketDataTypeAggTrades,
 			Symbol:      "BTCUSDT",
 			Path:        "testdata/okex/BTCUSDT",
 		},

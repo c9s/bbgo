@@ -16,14 +16,14 @@ import (
 type BacktestServiceCSV struct {
 	kLines      map[types.Interval][]types.KLine
 	path        string
-	market      csvsource.MarketType
-	granularity csvsource.DataType
+	market      types.MarketType
+	granularity types.MarketDataType
 }
 
 func NewBacktestServiceCSV(
 	path string,
-	market csvsource.MarketType,
-	granularity csvsource.DataType,
+	market types.MarketType,
+	granularity types.MarketDataType,
 ) BackTestable {
 	return &BacktestServiceCSV{
 		kLines:      make(map[types.Interval][]types.KLine),
@@ -33,7 +33,9 @@ func NewBacktestServiceCSV(
 	}
 }
 
-func (s *BacktestServiceCSV) Verify(sourceExchange types.Exchange, symbols []string, startTime time.Time, endTime time.Time) error {
+func (s *BacktestServiceCSV) Verify(
+	sourceExchange types.Exchange, symbols []string, startTime time.Time, endTime time.Time,
+) error {
 	// TODO: use isFutures here
 	_, _, isIsolated, isolatedSymbol := exchange2.GetSessionAttributes(sourceExchange)
 	// override symbol if isolatedSymbol is not empty
@@ -55,7 +57,10 @@ func (s *BacktestServiceCSV) Verify(sourceExchange types.Exchange, symbols []str
 	return nil
 }
 
-func (s *BacktestServiceCSV) Sync(ctx context.Context, exchange types.Exchange, symbol string, intervals []types.Interval, startTime, endTime time.Time) error {
+func (s *BacktestServiceCSV) Sync(
+	ctx context.Context, exchange types.Exchange, symbol string, intervals []types.Interval,
+	startTime, endTime time.Time,
+) error {
 
 	log.Infof("starting fresh csv sync %s %s: %s <=> %s", exchange.Name(), symbol, startTime, endTime)
 
@@ -90,7 +95,9 @@ func (s *BacktestServiceCSV) Sync(ctx context.Context, exchange types.Exchange, 
 }
 
 // QueryKLine queries the klines from the database
-func (s *BacktestServiceCSV) QueryKLine(ex types.ExchangeName, symbol string, interval types.Interval, orderBy string, limit int) (*types.KLine, error) {
+func (s *BacktestServiceCSV) QueryKLine(
+	ex types.ExchangeName, symbol string, interval types.Interval, orderBy string, limit int,
+) (*types.KLine, error) {
 	log.Infof("querying last kline exchange = %s AND symbol = %s AND interval = %s", ex, symbol, interval)
 	if _, ok := s.kLines[interval]; !ok || len(s.kLines[interval]) == 0 {
 		return nil, errors.New("interval not initialized")
@@ -99,7 +106,9 @@ func (s *BacktestServiceCSV) QueryKLine(ex types.ExchangeName, symbol string, in
 }
 
 // QueryKLinesForward is used for querying klines to back-testing
-func (s *BacktestServiceCSV) QueryKLinesForward(exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time, limit int) ([]types.KLine, error) {
+func (s *BacktestServiceCSV) QueryKLinesForward(
+	exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time, limit int,
+) ([]types.KLine, error) {
 	// Sample implementation (modify as needed):
 	var result []types.KLine
 
@@ -122,7 +131,9 @@ func (s *BacktestServiceCSV) QueryKLinesForward(exchange types.ExchangeName, sym
 	return result, nil
 }
 
-func (s *BacktestServiceCSV) QueryKLinesBackward(exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time, limit int) ([]types.KLine, error) {
+func (s *BacktestServiceCSV) QueryKLinesBackward(
+	exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time, limit int,
+) ([]types.KLine, error) {
 	var result []types.KLine
 
 	// Access klines data based on interval
@@ -146,7 +157,9 @@ func (s *BacktestServiceCSV) QueryKLinesBackward(exchange types.ExchangeName, sy
 	return result, nil
 }
 
-func (s *BacktestServiceCSV) QueryKLinesCh(since, until time.Time, exchange types.Exchange, symbols []string, intervals []types.Interval) (chan types.KLine, chan error) {
+func (s *BacktestServiceCSV) QueryKLinesCh(
+	since, until time.Time, exchange types.Exchange, symbols []string, intervals []types.Interval,
+) (chan types.KLine, chan error) {
 	if len(symbols) == 0 {
 		return returnError(errors.Errorf("symbols is empty when querying kline, please check your strategy setting. "))
 	}
