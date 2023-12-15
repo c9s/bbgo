@@ -21,6 +21,8 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/util"
 
+	_ "time/tzdata"
+
 	_ "github.com/go-sql-driver/mysql"
 )
 
