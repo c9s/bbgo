@@ -14,7 +14,6 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
 	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 const (
@@ -63,22 +62,6 @@ var (
 	// kLineRateLimiter has its own rate limit. https://www.bitget.com/api-doc/spot/market/Get-Candle-Data
 	kLineRateLimiter = rate.NewLimiter(rate.Every(time.Second/10), 5)
 )
-
-type LogFunction func(msg string, args ...interface{})
-
-var debugf LogFunction
-
-func getDebugFunction() LogFunction {
-	if v, ok := util.GetEnvVarBool("DEBUG_BITGET"); ok && v {
-		return log.Infof
-	}
-
-	return func(msg string, args ...interface{}) {}
-}
-
-func init() {
-	debugf = getDebugFunction()
-}
 
 type Exchange struct {
 	key, secret, passphrase string
