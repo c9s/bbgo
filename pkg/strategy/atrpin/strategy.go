@@ -20,7 +20,7 @@ func init() {
 }
 
 type Strategy struct {
-	common.Strategy
+	*common.Strategy
 
 	Environment *bbgo.Environment
 	Market      types.Market
@@ -34,6 +34,11 @@ type Strategy struct {
 
 	bbgo.QuantityOrAmount
 	// bbgo.OpenPositionOptions
+}
+
+func (s *Strategy) Initialize() error {
+	s.Strategy = &common.Strategy{}
+	return nil
 }
 
 func (s *Strategy) ID() string {

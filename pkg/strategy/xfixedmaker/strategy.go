@@ -23,7 +23,7 @@ func init() {
 
 // Fixed spread market making strategy
 type Strategy struct {
-	common.Strategy
+	*common.Strategy
 
 	Environment *bbgo.Environment
 
@@ -51,7 +51,9 @@ func (s *Strategy) Defaults() error {
 	}
 	return nil
 }
+
 func (s *Strategy) Initialize() error {
+	s.Strategy = &common.Strategy{}
 	return nil
 }
 
