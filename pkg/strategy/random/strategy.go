@@ -23,7 +23,7 @@ func init() {
 }
 
 type Strategy struct {
-	common.Strategy
+	*common.Strategy
 
 	Environment *bbgo.Environment
 	Market      types.Market
@@ -42,6 +42,7 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Initialize() error {
+	s.Strategy = &common.Strategy{}
 	return nil
 }
 
