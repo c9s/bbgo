@@ -462,6 +462,7 @@ func (s *Strategy) CrossRun(
 			log.WithError(err).Errorf("graceful cancel %s order error", s.Symbol)
 		}
 
+		bbgo.Sync(ctx, s)
 		bbgo.Notify("%s: %s position", ID, s.Symbol, s.Position)
 	})
 
