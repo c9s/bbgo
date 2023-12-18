@@ -136,12 +136,6 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 
 	// global trade collector
 	s.tradeCollector = core.NewTradeCollector(symbol, s.Position, s.orderStore)
-	s.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		bbgo.Notify(trade)
-	})
-	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		bbgo.Notify(position)
-	})
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		c := trade.PositionChange()
 
@@ -155,20 +149,6 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 		if trade.Exchange == s.hedgeSession.ExchangeName {
 			// TODO: make this atomic
 			s.CoveredPosition = s.CoveredPosition.Add(c)
-		}
-
-		s.ProfitStats.AddTrade(trade)
-
-		if profit.Compare(fixedpoint.Zero) == 0 {
-			s.Environ.RecordPosition(s.Position, trade, nil)
-		} else {
-			log.Infof("%s generated profit: %v", symbol, profit)
-
-			p := s.Position.NewProfit(trade, profit, netProfit)
-			bbgo.Notify(&p)
-			s.ProfitStats.AddProfit(p)
-
-			s.Environ.RecordPosition(s.Position, trade, &p)
 		}
 	})
 	s.tradeCollector.BindStream(s.hedgeSession.UserDataStream)
