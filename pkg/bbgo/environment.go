@@ -1020,7 +1020,7 @@ func (session *ExchangeSession) getSessionSymbols(defaultSymbols ...string) ([]s
 		return defaultSymbols, nil
 	}
 
-	return session.FindPossibleSymbols()
+	return session.FindPossibleAssetSymbols()
 }
 
 func defaultSyncSinceTime() time.Time {
