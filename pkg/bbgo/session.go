@@ -654,7 +654,7 @@ func (session *ExchangeSession) Market(symbol string) (market types.Market, ok b
 	return market, ok
 }
 
-func (session *ExchangeSession) Markets() map[string]types.Market {
+func (session *ExchangeSession) Markets() types.MarketMap {
 	return session.markets
 }
 
@@ -703,10 +703,30 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context, currencies []s
 	// 	return nil
 	// }
 
+	markets := session.Markets()
+
 	var symbols []string
 	for _, c := range currencies {
-		symbols = append(symbols, c+fiat) // BTC/USDT
-		symbols = append(symbols, fiat+c) // USDT/TWD
+		var tries []string
+		// expand USD stable coin currencies
+		if types.IsUSDFiatCurrency(fiat) {
+			for _, usdFiat := range types.USDFiatCurrencies {
+				tries = append(tries, c+usdFiat, usdFiat+c)
+			}
+		} else {
+			tries = []string{c + fiat, fiat + c}
+		}
+
+		for _, try := range tries {
+			if markets.Has(try) {
+				symbols = append(symbols, try)
+				break
+			}
+		}
+	}
+
+	if len(symbols) == 0 {
+		return nil
 	}
 
 	tickers, err := session.Exchange.QueryTickers(ctx, symbols...)
@@ -717,7 +737,17 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context, currencies []s
 	var lastTime time.Time
 	for k, v := range tickers {
 		// for {Crypto}/USDT markets
-		session.lastPrices[k] = v.Last
+		// map things like BTCUSDT = {price}
+		if market, ok := markets[k]; ok {
+			if types.IsFiatCurrency(market.BaseCurrency) {
+				session.lastPrices[k] = v.Last.Div(fixedpoint.One)
+			} else {
+				session.lastPrices[k] = v.Last
+			}
+		} else {
+			session.lastPrices[k] = v.Last
+		}
+
 		if v.Time.After(lastTime) {
 			lastTime = v.Time
 		}

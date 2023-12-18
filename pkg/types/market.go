@@ -90,7 +90,9 @@ func (m Market) TruncateQuoteQuantity(quantity fixedpoint.Value) fixedpoint.Valu
 // when side = buy, then available = quote balance
 // The balance will be truncated first in order to calculate the minimal notional and minimal quantity
 // The adjusted (truncated) order quantity will be returned
-func (m Market) GreaterThanMinimalOrderQuantity(side SideType, price, available fixedpoint.Value) (fixedpoint.Value, bool) {
+func (m Market) GreaterThanMinimalOrderQuantity(
+	side SideType, price, available fixedpoint.Value,
+) (fixedpoint.Value, bool) {
 	switch side {
 	case SideTypeSell:
 		available = m.TruncateQuantity(available)
@@ -235,4 +237,9 @@ type MarketMap map[string]Market
 
 func (m MarketMap) Add(market Market) {
 	m[market.Symbol] = market
+}
+
+func (m MarketMap) Has(symbol string) bool {
+	_, ok := m[symbol]
+	return ok
 }
