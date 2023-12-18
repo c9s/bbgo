@@ -565,7 +565,7 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 		return
 	}
 
-	// set profit info to position
+	// guard: set profit info to position if the strategy info is empty
 	if profit != nil {
 		if position.Strategy == "" && profit.Strategy != "" {
 			position.Strategy = profit.Strategy
@@ -576,10 +576,12 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 		}
 	}
 
+	log.Infof("recordPosition: position = %s, trade = %+v, profit = %+v", position.Base.String(), trade, profit)
 	if profit != nil {
 		if err := environ.PositionService.Insert(position, trade, profit.Profit); err != nil {
 			log.WithError(err).Errorf("can not insert position record")
 		}
+
 		if err := environ.ProfitService.Insert(*profit); err != nil {
 			log.WithError(err).Errorf("can not insert profit record: %+v", profit)
 		}
