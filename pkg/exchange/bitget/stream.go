@@ -432,13 +432,19 @@ func (s *Stream) handleOrderTradeEvent(m OrderTradeEvent) {
 			}
 			continue
 		}
+
 		// The bitget support only snapshot on orders channel, so we use snapshot as update to emit data.
 		if m.actionType != ActionTypeSnapshot {
 			continue
 		}
 		s.StandardStream.EmitOrderUpdate(globalOrder)
 
-		if globalOrder.Status == types.OrderStatusPartiallyFilled {
+		if order.TradeId == 0 {
+			continue
+		}
+
+		switch globalOrder.Status {
+		case types.OrderStatusPartiallyFilled, types.OrderStatusFilled:
 			trade, err := order.toGlobalTrade()
 			if err != nil {
 				if tradeLogLimiter.Allow() {
@@ -446,6 +452,7 @@ func (s *Stream) handleOrderTradeEvent(m OrderTradeEvent) {
 				}
 				continue
 			}
+
 			s.StandardStream.EmitTradeUpdate(trade)
 		}
 	}
