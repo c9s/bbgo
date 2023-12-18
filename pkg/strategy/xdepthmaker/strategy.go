@@ -249,6 +249,16 @@ func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
 
+func (s *Strategy) Initialize() error {
+	if s.CrossExchangeMarketMakingStrategy == nil {
+		s.CrossExchangeMarketMakingStrategy = &CrossExchangeMarketMakingStrategy{}
+	}
+
+	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
+	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
+	return nil
+}
+
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	makerSession, hedgeSession, err := selectSessions2(sessions, s.MakerExchange, s.HedgeExchange)
 	if err != nil {
@@ -325,12 +335,6 @@ func (s *Strategy) Defaults() error {
 	return nil
 }
 
-func (s *Strategy) Initialize() error {
-	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
-	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
-	return nil
-}
-
 func (s *Strategy) CrossRun(
 	ctx context.Context, _ bbgo.OrderExecutionRouter,
 	sessions map[string]*bbgo.ExchangeSession,
@@ -340,7 +344,6 @@ func (s *Strategy) CrossRun(
 		return err
 	}
 
-	s.CrossExchangeMarketMakingStrategy = &CrossExchangeMarketMakingStrategy{}
 	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx, s.Environment, makerSession, hedgeSession, s.Symbol, ID, s.InstanceID()); err != nil {
 		return err
 	}
