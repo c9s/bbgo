@@ -16,8 +16,8 @@ import (
 )
 
 // Strategy method calls:
-// -> Defaults()   (optional method)
 // -> Initialize()   (optional method)
+// -> Defaults()     (optional method)
 // -> Validate()     (optional method)
 // -> Run()          (optional method)
 // -> Shutdown(shutdownCtx context.Context, wg *sync.WaitGroup)
@@ -244,12 +244,6 @@ func (trader *Trader) injectFieldsAndSubscribe(ctx context.Context) error {
 				}
 			}
 
-			if initializer, ok := strategy.(StrategyInitializer); ok {
-				if err := initializer.Initialize(); err != nil {
-					panic(err)
-				}
-			}
-
 			if subscriber, ok := strategy.(ExchangeSessionSubscriber); ok {
 				subscriber.Subscribe(session)
 			} else {
@@ -362,17 +356,26 @@ func (trader *Trader) Run(ctx context.Context) error {
 	return trader.environment.Connect(ctx)
 }
 
+func (trader *Trader) Initialize(ctx context.Context) error {
+	log.Infof("initializing strategies...")
+	return trader.IterateStrategies(func(strategy StrategyID) error {
+		if initializer, ok := strategy.(StrategyInitializer); ok {
+			return initializer.Initialize()
+		}
+
+		return nil
+	})
+}
+
 func (trader *Trader) LoadState(ctx context.Context) error {
 	if trader.environment.BacktestService != nil {
 		return nil
 	}
 
 	isolation := GetIsolationFromContext(ctx)
-
 	ps := isolation.persistenceServiceFacade.Get()
 
 	log.Infof("loading strategies states...")
-
 	return trader.IterateStrategies(func(strategy StrategyID) error {
 		id := dynamic.CallID(strategy)
 		return loadPersistenceFields(strategy, id, ps)
