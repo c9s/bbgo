@@ -163,6 +163,10 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 		return err
 	}
 
+	if err := trader.Initialize(tradingCtx); err != nil {
+		return err
+	}
+
 	if err := trader.LoadState(tradingCtx); err != nil {
 		return err
 	}
