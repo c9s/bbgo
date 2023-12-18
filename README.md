@@ -30,7 +30,7 @@ You can use BBGO's trading unit and back-test unit to implement your own strateg
 
 ### Trading Unit Developers 🧑‍💻
 
-You can use BBGO's underlying common exchange API, currently, it supports 4+ major exchanges, so you don't have to repeat
+You can use BBGO's underlying common exchange API; currently, it supports 4+ major exchanges, so you don't have to repeat
 the implementation.
 
 ## Features
@@ -150,8 +150,8 @@ the implementation.
   - OKEx: <https://www.okex.com/join/2412712?src=from:ios-share>
   - Kucoin: <https://www.kucoin.com/ucenter/signup?rcode=r3KX2D4>
 
-  This project is maintained and supported by a small group of team. If you would like to support this project, please
-  register on the exchanges using the provided links with referral codes above.
+  This project is maintained and supported by a small group of people. If you would like to support this project, please
+  Register on the exchanges using the provided links with the referral codes above.
 
 ## Installation
 
