@@ -35,10 +35,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-func notifyTrade(trade types.Trade, _, _ fixedpoint.Value) {
-	bbgo.Notify(trade)
-}
-
 type CrossExchangeMarketMakingStrategy struct {
 	ctx, parent context.Context
 	cancel      context.CancelFunc
@@ -133,10 +129,12 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 		// bbgo.Sync(ctx, s)
 	})
 
+	// global order store
 	s.orderStore = core.NewOrderStore(s.Position.Symbol)
 	s.orderStore.BindStream(hedgeSession.UserDataStream)
 	s.orderStore.BindStream(makerSession.UserDataStream)
 
+	// global trade collector
 	s.tradeCollector = core.NewTradeCollector(symbol, s.Position, s.orderStore)
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		c := trade.PositionChange()
@@ -152,24 +150,9 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 			// TODO: make this atomic
 			s.CoveredPosition = s.CoveredPosition.Add(c)
 		}
-
-		s.ProfitStats.AddTrade(trade)
-
-		if profit.Compare(fixedpoint.Zero) == 0 {
-			s.Environ.RecordPosition(s.Position, trade, nil)
-		} else {
-			log.Infof("%s generated profit: %v", symbol, profit)
-
-			p := s.Position.NewProfit(trade, profit, netProfit)
-			bbgo.Notify(&p)
-			s.ProfitStats.AddProfit(p)
-
-			s.Environ.RecordPosition(s.Position, trade, &p)
-		}
 	})
 	s.tradeCollector.BindStream(s.hedgeSession.UserDataStream)
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
-
 	return nil
 }
 
@@ -344,20 +327,14 @@ func (s *Strategy) CrossRun(
 		return err
 	}
 
+	log.Infof("makerSession: %s hedgeSession: %s", makerSession.Name, hedgeSession.Name)
+
 	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx, s.Environment, makerSession, hedgeSession, s.Symbol, ID, s.InstanceID()); err != nil {
 		return err
 	}
 
 	s.pricingBook = types.NewStreamBook(s.Symbol)
 	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
-
-	if s.NotifyTrade {
-		s.tradeCollector.OnTrade(notifyTrade)
-	}
-
-	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		bbgo.Notify(position)
-	})
 
 	s.stopC = make(chan struct{})
 
@@ -485,6 +462,7 @@ func (s *Strategy) CrossRun(
 			log.WithError(err).Errorf("graceful cancel %s order error", s.Symbol)
 		}
 
+		bbgo.Sync(ctx, s)
 		bbgo.Notify("%s: %s position", ID, s.Symbol, s.Position)
 	})
 
