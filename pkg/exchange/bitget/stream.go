@@ -424,7 +424,11 @@ func (s *Stream) handleOrderTradeEvent(m OrderTradeEvent) {
 		return
 	}
 
+	debugf("received OrderTradeEvent: %+v", m)
+
 	for _, order := range m.Orders {
+		debugf("received Order: %+v", order)
+
 		globalOrder, err := order.toGlobalOrder()
 		if err != nil {
 			if orderLogLimiter.Allow() {
@@ -437,11 +441,14 @@ func (s *Stream) handleOrderTradeEvent(m OrderTradeEvent) {
 		if m.actionType != ActionTypeSnapshot {
 			continue
 		}
+
 		s.StandardStream.EmitOrderUpdate(globalOrder)
 
 		if order.TradeId == 0 {
 			continue
 		}
+
+		debugf("received Trade: %+v", order.Trade)
 
 		switch globalOrder.Status {
 		case types.OrderStatusPartiallyFilled, types.OrderStatusFilled:
