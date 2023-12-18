@@ -101,4 +101,10 @@ func TestClient(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("resp: %+v", resp)
 	})
+
+	t.Run("GetAccountAssetsRequest", func(t *testing.T) {
+		resp, err := client.NewGetAccountAssetsRequest().AssetType(AssetTypeHoldOnly).Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("resp: %+v", resp)
+	})
 }
