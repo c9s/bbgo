@@ -35,10 +35,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-func notifyTrade(trade types.Trade, _, _ fixedpoint.Value) {
-	bbgo.Notify(trade)
-}
-
 type CrossExchangeMarketMakingStrategy struct {
 	ctx, parent context.Context
 	cancel      context.CancelFunc
@@ -133,11 +129,19 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 		// bbgo.Sync(ctx, s)
 	})
 
+	// global order store
 	s.orderStore = core.NewOrderStore(s.Position.Symbol)
 	s.orderStore.BindStream(hedgeSession.UserDataStream)
 	s.orderStore.BindStream(makerSession.UserDataStream)
 
+	// global trade collector
 	s.tradeCollector = core.NewTradeCollector(symbol, s.Position, s.orderStore)
+	s.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		bbgo.Notify(trade)
+	})
+	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
+		bbgo.Notify(position)
+	})
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		c := trade.PositionChange()
 
@@ -169,7 +173,6 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	})
 	s.tradeCollector.BindStream(s.hedgeSession.UserDataStream)
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
-
 	return nil
 }
 
@@ -344,20 +347,14 @@ func (s *Strategy) CrossRun(
 		return err
 	}
 
+	log.Infof("makerSession: %s hedgeSession: %s", makerSession.Name, hedgeSession.Name)
+
 	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx, s.Environment, makerSession, hedgeSession, s.Symbol, ID, s.InstanceID()); err != nil {
 		return err
 	}
 
 	s.pricingBook = types.NewStreamBook(s.Symbol)
 	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
-
-	if s.NotifyTrade {
-		s.tradeCollector.OnTrade(notifyTrade)
-	}
-
-	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		bbgo.Notify(position)
-	})
 
 	s.stopC = make(chan struct{})
 
