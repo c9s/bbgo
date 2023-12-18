@@ -34,7 +34,7 @@ func init() {
 
 // Strategy scmaker is a stable coin market maker
 type Strategy struct {
-	common.Strategy
+	*common.Strategy
 
 	Environment *bbgo.Environment
 	Market      types.Market
@@ -67,6 +67,11 @@ type Strategy struct {
 	ewma      *EWMAStream
 	boll      *BOLLStream
 	intensity *IntensityStream
+}
+
+func (s *Strategy) Initialize() error {
+	s.Strategy = &common.Strategy{}
+	return nil
 }
 
 func (s *Strategy) ID() string {

@@ -32,7 +32,7 @@ func init() {
 // - place enough total liquidity amount on the order book, for example, 20k USDT value liquidity on both sell and buy
 // - ensure the spread by placing the orders from the mid price (or the last trade price)
 type Strategy struct {
-	common.Strategy
+	*common.Strategy
 
 	Environment *bbgo.Environment
 	Market      types.Market
@@ -64,6 +64,11 @@ type Strategy struct {
 	liquidityScale bbgo.Scale
 
 	orderGenerator *LiquidityOrderGenerator
+}
+
+func (s *Strategy) Initialize() error {
+	s.Strategy = &common.Strategy{}
+	return nil
 }
 
 func (s *Strategy) ID() string {
