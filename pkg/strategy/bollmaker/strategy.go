@@ -58,6 +58,12 @@ type Strategy struct {
 
 	bbgo.QuantityOrAmount
 
+	// BidQuantity is used for placing buy order, this will override the default quantity
+	BidQuantity fixedpoint.Value `json:"bidQuantity"`
+
+	// AskQuantity is used for placing sell order, this will override the default quantity
+	AskQuantity fixedpoint.Value `json:"askQuantity"`
+
 	// TrendEMA is used for detecting the trend by a given EMA
 	// you can define interval and window
 	TrendEMA *bbgo.TrendEMA `json:"trendEMA"`
@@ -251,8 +257,15 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		s.Position,
 	)
 
-	sellQuantity := s.QuantityOrAmount.CalculateQuantity(askPrice)
-	buyQuantity := s.QuantityOrAmount.CalculateQuantity(bidPrice)
+	sellQuantity := s.AskQuantity
+	if sellQuantity.IsZero() {
+		sellQuantity = s.QuantityOrAmount.CalculateQuantity(askPrice)
+	}
+
+	buyQuantity := s.BidQuantity
+	if buyQuantity.IsZero() {
+		buyQuantity = s.QuantityOrAmount.CalculateQuantity(bidPrice)
+	}
 
 	sellOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
