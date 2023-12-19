@@ -201,7 +201,7 @@ exchangeStrategies:
     buyBelowNeutralSMA: true
 
     emaCross:
-      enabled: true
+      enabled: false
       interval: 1h
       fastWindow: 3
       slowWindow: 12
