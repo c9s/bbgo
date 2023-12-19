@@ -47,7 +47,10 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Initialize() error {
-	s.Strategy = &common.Strategy{}
+	if s.Strategy == nil {
+		s.Strategy = &common.Strategy{}
+	}
+
 	return nil
 }
 
