@@ -46,9 +46,13 @@ type BollingerSetting struct {
 }
 
 type EMACrossSetting struct {
+	Enabled    bool           `json:"enabled"`
 	Interval   types.Interval `json:"interval"`
 	FastWindow int            `json:"fastWindow"`
 	SlowWindow int            `json:"slowWindow"`
+
+	fastEMA, slowEMA *indicatorv2.EWMAStream
+	cross            *indicatorv2.CrossStream
 }
 
 type Strategy struct {
@@ -174,6 +178,8 @@ type Strategy struct {
 	// neutralBoll is the neutral price section
 	neutralBoll *indicatorv2.BOLLStream
 
+	shouldBuy bool
+
 	// StrategyController
 	bbgo.StrategyController
 }
@@ -280,6 +286,7 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		Price:    askPrice,
 		Market:   s.Market,
 	}
+
 	buyOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeBuy,
@@ -438,14 +445,20 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		}
 	}
 
+	if !s.shouldBuy {
+		log.Infof("shouldBuy is turned off, skip placing buy order")
+		canBuy = false
+	}
+
 	if canSell {
 		submitOrders = append(submitOrders, sellOrder)
 	}
+
 	if canBuy {
 		submitOrders = append(submitOrders, buyOrder)
 	}
 
-	// condition for lower the average cost
+	// condition for lowering the average cost
 	/*
 		if midPrice < s.Position.AverageCost.MulFloat64(1.0-s.MinProfitSpread.Float64()) && canBuy {
 			submitOrders = append(submitOrders, buyOrder)
@@ -481,8 +494,25 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	// StrategyController
 	s.Status = types.StrategyStatusRunning
 
+	s.shouldBuy = true
 	s.neutralBoll = session.Indicators(s.Symbol).BOLL(s.NeutralBollinger.IntervalWindow, s.NeutralBollinger.BandWidth)
 	s.defaultBoll = session.Indicators(s.Symbol).BOLL(s.DefaultBollinger.IntervalWindow, s.DefaultBollinger.BandWidth)
+
+	if s.EMACrossSetting != nil && s.EMACrossSetting.Enabled {
+		s.EMACrossSetting.fastEMA = session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.EMACrossSetting.FastWindow})
+		s.EMACrossSetting.slowEMA = session.Indicators(s.Symbol).EWMA(types.IntervalWindow{Interval: s.Interval, Window: s.EMACrossSetting.SlowWindow})
+		s.EMACrossSetting.cross = indicatorv2.Cross(s.EMACrossSetting.fastEMA, s.EMACrossSetting.slowEMA)
+		s.EMACrossSetting.cross.OnUpdate(func(v float64) {
+			switch indicatorv2.CrossType(v) {
+			case indicatorv2.CrossOver:
+				s.shouldBuy = true
+			case indicatorv2.CrossUnder:
+				s.shouldBuy = false
+				// TODO: can partially close position when necessary
+				// s.orderExecutor.ClosePosition(ctx)
+			}
+		})
+	}
 
 	// Setup dynamic spread
 	if s.DynamicSpread.IsEnabled() {
@@ -565,7 +595,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	session.UserDataStream.OnStart(func() {
-		if s.UseTickerPrice {
+		if !bbgo.IsBackTesting && s.UseTickerPrice {
 			ticker, err := s.session.Exchange.QueryTicker(ctx, s.Symbol)
 			if err != nil {
 				return
