@@ -6,11 +6,10 @@ import (
 	"math"
 	"sync"
 
-	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
-	"github.com/c9s/bbgo/pkg/util"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -44,6 +43,12 @@ type State struct {
 type BollingerSetting struct {
 	types.IntervalWindow
 	BandWidth float64 `json:"bandWidth"`
+}
+
+type EMACrossSetting struct {
+	Interval   types.Interval `json:"interval"`
+	FastWindow int            `json:"fastWindow"`
+	SlowWindow int            `json:"slowWindow"`
 }
 
 type Strategy struct {
@@ -121,6 +126,9 @@ type Strategy struct {
 	// BuyBelowNeutralSMA if true, the market maker will only place buy order when the current price is below the neutral band SMA.
 	BuyBelowNeutralSMA bool `json:"buyBelowNeutralSMA"`
 
+	// EMACrossSetting is used for defining ema cross signal to turn on/off buy
+	EMACrossSetting *EMACrossSetting `json:"emaCross"`
+
 	// NeutralBollinger is the smaller range of the bollinger band
 	// If price is in this band, it usually means the price is oscillating.
 	// If price goes out of this band, we tend to not place sell orders or buy orders
@@ -150,18 +158,15 @@ type Strategy struct {
 	ShadowProtection      bool             `json:"shadowProtection"`
 	ShadowProtectionRatio fixedpoint.Value `json:"shadowProtectionRatio"`
 
-	session *bbgo.ExchangeSession
-	book    *types.StreamOrderBook
-
 	ExitMethods bbgo.ExitMethodSet `json:"exits"`
 
 	// persistence fields
 	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 
+	session       *bbgo.ExchangeSession
+	book          *types.StreamOrderBook
 	orderExecutor *bbgo.GeneralOrderExecutor
-
-	groupID uint32
 
 	// defaultBoll is the BOLLINGER indicator we used for predicting the price.
 	defaultBoll *indicatorv2.BOLLStream
@@ -274,7 +279,6 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		Quantity: sellQuantity,
 		Price:    askPrice,
 		Market:   s.Market,
-		GroupID:  s.groupID,
 	}
 	buyOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -283,7 +287,6 @@ func (s *Strategy) placeOrders(ctx context.Context, midPrice fixedpoint.Value, k
 		Quantity: buyQuantity,
 		Price:    bidPrice,
 		Market:   s.Market,
-		GroupID:  s.groupID,
 	}
 
 	var submitOrders []types.SubmitOrder
@@ -511,7 +514,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	// calculate group id for orders
 	instanceID := s.InstanceID()
-	s.groupID = util.FNV32(instanceID)
 
 	// If position is nil, we need to allocate a new position for calculation
 	if s.Position == nil {
