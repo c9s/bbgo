@@ -137,7 +137,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 func (s *Strategy) rebalance(ctx context.Context) {
 	// cancel active orders before rebalance
-	if err := s.Session.Exchange.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
+	if err := s.activeOrderBook.GracefulCancel(ctx, s.Session.Exchange); err != nil {
 		log.WithError(err).Errorf("failed to cancel orders")
 	}
 
