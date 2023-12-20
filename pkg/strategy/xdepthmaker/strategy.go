@@ -123,7 +123,7 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 		// bbgo.Sync(ctx, s)
 	})
 
-	coveredFunc := func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+	s.HedgeOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		c := trade.PositionChange()
 
 		// sync covered position
@@ -133,15 +133,12 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 		// buy trade -> positive delta ->
 		// 	  1) short position -> reduce short position
 		// 	  2) short position -> increase short position
-		if trade.Exchange == s.hedgeSession.ExchangeName {
-			// TODO: make this atomic
-			s.mu.Lock()
-			s.CoveredPosition = s.CoveredPosition.Add(c)
-			s.mu.Unlock()
-		}
-	}
-	s.MakerOrderExecutor.TradeCollector().OnTrade(coveredFunc)
-	s.HedgeOrderExecutor.TradeCollector().OnTrade(coveredFunc)
+
+		// TODO: make this atomic
+		s.mu.Lock()
+		s.CoveredPosition = s.CoveredPosition.Add(c)
+		s.mu.Unlock()
+	})
 	return nil
 }
 
