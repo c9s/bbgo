@@ -113,6 +113,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	s.activeOrderBook = bbgo.NewActiveOrderBook("")
 	s.activeOrderBook.BindStream(session.UserDataStream)
+	s.activeOrderBook.OnFilled(func(order types.Order) {
+		s.rebalance(ctx)
+	})
 
 	session.UserDataStream.OnStart(func() {
 		if s.OnStart {
