@@ -12,6 +12,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/deposit2transfer"
 	_ "github.com/c9s/bbgo/pkg/strategy/drift"
 	_ "github.com/c9s/bbgo/pkg/strategy/elliottwave"
+	_ "github.com/c9s/bbgo/pkg/strategy/emacross"
 	_ "github.com/c9s/bbgo/pkg/strategy/emastop"
 	_ "github.com/c9s/bbgo/pkg/strategy/etf"
 	_ "github.com/c9s/bbgo/pkg/strategy/ewoDgtrd"
