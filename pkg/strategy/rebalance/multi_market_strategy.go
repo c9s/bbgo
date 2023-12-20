@@ -11,8 +11,8 @@ type MultiMarketStrategy struct {
 	Environ *bbgo.Environment
 	Session *bbgo.ExchangeSession
 
-	PositionMap      PositionMap    `persistence:"positionMap"`
-	ProfitStatsMap   ProfitStatsMap `persistence:"profitStatsMap"`
+	PositionMap      PositionMap    `persistence:"position_map"`
+	ProfitStatsMap   ProfitStatsMap `persistence:"profit_stats_map"`
 	OrderExecutorMap GeneralOrderExecutorMap
 
 	parent, ctx context.Context
