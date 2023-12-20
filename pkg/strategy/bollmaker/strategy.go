@@ -213,6 +213,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.TrendEMA.Interval})
 	}
 
+	if s.EMACrossSetting != nil && s.EMACrossSetting.Enabled {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.EMACrossSetting.Interval})
+	}
+
 	s.ExitMethods.SetAndSubscribe(session, s)
 }
 
