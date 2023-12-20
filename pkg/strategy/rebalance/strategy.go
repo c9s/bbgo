@@ -54,6 +54,10 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Initialize() error {
+	if s.MultiMarketStrategy == nil {
+		s.MultiMarketStrategy = &MultiMarketStrategy{}
+	}
+
 	for currency := range s.TargetWeights {
 		if currency == s.QuoteCurrency {
 			continue
@@ -105,7 +109,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.markets[symbol] = market
 	}
 
-	s.MultiMarketStrategy = &MultiMarketStrategy{}
 	s.MultiMarketStrategy.Initialize(ctx, s.Environment, session, s.markets, ID)
 
 	s.activeOrderBook = bbgo.NewActiveOrderBook("")
