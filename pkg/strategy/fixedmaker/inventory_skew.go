@@ -1,6 +1,8 @@
 package fixedmaker
 
 import (
+	"fmt"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -19,6 +21,17 @@ type InventorySkewBidAskRatios struct {
 type InventorySkew struct {
 	InventoryRangeMultiplier fixedpoint.Value `json:"inventoryRangeMultiplier"`
 	TargetBaseRatio          fixedpoint.Value `json:"targetBaseRatio"`
+}
+
+func (s *InventorySkew) Validate() error {
+	if s.InventoryRangeMultiplier.Float64() < 0 {
+		return fmt.Errorf("inventoryRangeMultiplier should be positive")
+	}
+
+	if s.TargetBaseRatio.Float64() < 0 {
+		return fmt.Errorf("targetBaseRatio should be positive")
+	}
+	return nil
 }
 
 func (s *InventorySkew) CalculateBidAskRatios(quantity fixedpoint.Value, price fixedpoint.Value, baseBalance fixedpoint.Value, quoteBalance fixedpoint.Value) *InventorySkewBidAskRatios {
