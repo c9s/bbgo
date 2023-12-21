@@ -25,11 +25,24 @@ type BacktestService struct {
 func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
 	log.Infof("synchronizing %s klines with interval %s: %s <=> %s", exchange.Name(), interval, startTime, endTime)
 
-	// TODO: use isFutures here
-	_, _, isIsolated, isolatedSymbol := exchange2.GetSessionAttributes(exchange)
+	_, isFutures, isIsolated, isolatedSymbol := exchange2.GetSessionAttributes(exchange)
+
 	// override symbol if isolatedSymbol is not empty
 	if isIsolated && len(isolatedSymbol) > 0 {
 		symbol = isolatedSymbol
+	}
+
+	if isFutures {
+		futuresExchange, ok := exchange.(types.FuturesExchange)
+		if !ok {
+			return fmt.Errorf("exchange %s does not support futures", exchange.Name())
+		}
+
+		if isIsolated {
+			futuresExchange.UseIsolatedFutures(symbol)
+		} else {
+			futuresExchange.UseFutures()
+		}
 	}
 
 	if s.DB.DriverName() == "sqlite3" {
