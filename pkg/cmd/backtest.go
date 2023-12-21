@@ -192,6 +192,16 @@ var BacktestCmd = &cobra.Command{
 				return err
 			}
 			sourceExchanges[exName] = publicExchange
+
+			// Set exchange to use futures
+			if userConfig.Sessions[exName.String()].Futures {
+				futuresExchange, ok := publicExchange.(types.FuturesExchange)
+				if !ok {
+					return fmt.Errorf("exchange %s does not support futures", publicExchange.Name())
+				}
+
+				futuresExchange.UseFutures()
+			}
 		}
 
 		var syncFromTime time.Time

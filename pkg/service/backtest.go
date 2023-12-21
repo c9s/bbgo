@@ -19,8 +19,7 @@ import (
 )
 
 type BacktestService struct {
-	DB      *sqlx.DB
-	Futures bool
+	DB *sqlx.DB
 }
 
 func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time) error {
@@ -31,18 +30,7 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 		symbol = isolatedSymbol
 	}
 
-	s.Futures = isFutures
-	if s.Futures {
-		futuresExchange, ok := exchange.(types.FuturesExchange)
-		if !ok {
-			return fmt.Errorf("exchange %s does not support futures", exchange.Name())
-		}
-
-		if isIsolated {
-			futuresExchange.UseIsolatedFutures(symbol)
-		} else {
-			futuresExchange.UseFutures()
-		}
+	if isFutures {
 		log.Infof("synchronizing %s futures klines with interval %s: %s <=> %s", exchange.Name(), interval, startTime, endTime)
 	} else {
 		log.Infof("synchronizing %s klines with interval %s: %s <=> %s", exchange.Name(), interval, startTime, endTime)
@@ -57,7 +45,7 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 	tasks := []SyncTask{
 		{
 			Type:   types.KLine{},
-			Select: s.SelectLastKLines(exchange.Name(), symbol, interval, startTime, endTime, 100),
+			Select: s.SelectLastKLines(exchange, symbol, interval, startTime, endTime, 100),
 			Time: func(obj interface{}) time.Time {
 				return obj.(types.KLine).StartTime.Time()
 			},
@@ -86,11 +74,11 @@ func (s *BacktestService) SyncKLineByInterval(ctx context.Context, exchange type
 			BatchInsertBuffer: 1000,
 			BatchInsert: func(obj interface{}) error {
 				kLines := obj.([]types.KLine)
-				return s.BatchInsert(kLines)
+				return s.BatchInsert(kLines, exchange)
 			},
 			Insert: func(obj interface{}) error {
 				kline := obj.(types.KLine)
-				return s.Insert(kline)
+				return s.Insert(kline, exchange)
 			},
 			LogInsert: log.GetLevel() == log.DebugLevel,
 		},
@@ -147,10 +135,10 @@ func (s *BacktestService) SyncFresh(ctx context.Context, exchange types.Exchange
 }
 
 // QueryKLine queries the klines from the database
-func (s *BacktestService) QueryKLine(ex types.ExchangeName, symbol string, interval types.Interval, orderBy string, limit int) (*types.KLine, error) {
+func (s *BacktestService) QueryKLine(ex types.Exchange, symbol string, interval types.Interval, orderBy string, limit int) (*types.KLine, error) {
 	log.Infof("querying last kline exchange = %s AND symbol = %s AND interval = %s", ex, symbol, interval)
 
-	tableName := s.targetKlineTable(ex)
+	tableName := targetKlineTable(ex)
 	// make the SQL syntax IDE friendly, so that it can analyze it.
 	sql := fmt.Sprintf("SELECT * FROM `%s` WHERE  `symbol` = :symbol AND `interval` = :interval ORDER BY end_time "+orderBy+" LIMIT "+strconv.Itoa(limit), tableName)
 
@@ -178,8 +166,8 @@ func (s *BacktestService) QueryKLine(ex types.ExchangeName, symbol string, inter
 }
 
 // QueryKLinesForward is used for querying klines to back-testing
-func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol string, interval types.Interval, startTime time.Time, limit int) ([]types.KLine, error) {
-	tableName := s.targetKlineTable(exchange)
+func (s *BacktestService) QueryKLinesForward(exchange types.Exchange, symbol string, interval types.Interval, startTime time.Time, limit int) ([]types.KLine, error) {
+	tableName := targetKlineTable(exchange)
 	sql := "SELECT * FROM `binance_klines` WHERE `end_time` >= :start_time AND `symbol` = :symbol AND `interval` = :interval and exchange = :exchange ORDER BY end_time ASC LIMIT :limit"
 	sql = strings.ReplaceAll(sql, "binance_klines", tableName)
 
@@ -188,7 +176,7 @@ func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol
 		"limit":      limit,
 		"symbol":     symbol,
 		"interval":   interval,
-		"exchange":   exchange.String(),
+		"exchange":   exchange.Name().String(),
 	})
 	if err != nil {
 		return nil, err
@@ -197,8 +185,8 @@ func (s *BacktestService) QueryKLinesForward(exchange types.ExchangeName, symbol
 	return s.scanRows(rows)
 }
 
-func (s *BacktestService) QueryKLinesBackward(exchange types.ExchangeName, symbol string, interval types.Interval, endTime time.Time, limit int) ([]types.KLine, error) {
-	tableName := s.targetKlineTable(exchange)
+func (s *BacktestService) QueryKLinesBackward(exchange types.Exchange, symbol string, interval types.Interval, endTime time.Time, limit int) ([]types.KLine, error) {
+	tableName := targetKlineTable(exchange)
 
 	sql := "SELECT * FROM `binance_klines` WHERE `end_time` <= :end_time  and exchange = :exchange  AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time DESC LIMIT :limit"
 	sql = strings.ReplaceAll(sql, "binance_klines", tableName)
@@ -209,7 +197,7 @@ func (s *BacktestService) QueryKLinesBackward(exchange types.ExchangeName, symbo
 		"end_time": endTime,
 		"symbol":   symbol,
 		"interval": interval,
-		"exchange": exchange.String(),
+		"exchange": exchange.Name().String(),
 	})
 	if err != nil {
 		return nil, err
@@ -223,7 +211,7 @@ func (s *BacktestService) QueryKLinesCh(since, until time.Time, exchange types.E
 		return returnError(errors.Errorf("symbols is empty when querying kline, plesae check your strategy setting. "))
 	}
 
-	tableName := s.targetKlineTable(exchange.Name())
+	tableName := targetKlineTable(exchange)
 	var query string
 
 	// need to sort by start_time desc in order to let matching engine process 1m first
@@ -316,9 +304,11 @@ func (s *BacktestService) scanRows(rows *sqlx.Rows) (klines []types.KLine, err e
 	return klines, rows.Err()
 }
 
-func (s *BacktestService) targetKlineTable(exchangeName types.ExchangeName) string {
-	tableName := strings.ToLower(exchangeName.String())
-	if s.Futures {
+func targetKlineTable(exchange types.Exchange) string {
+	_, isFutures, _, _ := exchange2.GetSessionAttributes(exchange)
+
+	tableName := strings.ToLower(exchange.Name().String())
+	if isFutures {
 		return tableName + "_futures_klines"
 	} else {
 		return tableName + "_klines"
@@ -327,12 +317,12 @@ func (s *BacktestService) targetKlineTable(exchangeName types.ExchangeName) stri
 
 var errExchangeFieldIsUnset = errors.New("kline.Exchange field should not be empty")
 
-func (s *BacktestService) Insert(kline types.KLine) error {
+func (s *BacktestService) Insert(kline types.KLine, ex types.Exchange) error {
 	if len(kline.Exchange) == 0 {
 		return errExchangeFieldIsUnset
 	}
 
-	tableName := s.targetKlineTable(kline.Exchange)
+	tableName := targetKlineTable(ex)
 
 	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
 		"VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume)", tableName)
@@ -342,12 +332,12 @@ func (s *BacktestService) Insert(kline types.KLine) error {
 }
 
 // BatchInsert Note: all kline should be same exchange, or it will cause issue.
-func (s *BacktestService) BatchInsert(kline []types.KLine) error {
+func (s *BacktestService) BatchInsert(kline []types.KLine, ex types.Exchange) error {
 	if len(kline) == 0 {
 		return nil
 	}
 
-	tableName := s.targetKlineTable(kline[0].Exchange)
+	tableName := targetKlineTable(ex)
 
 	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
 		" VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume); ", tableName)
@@ -442,7 +432,7 @@ func (s *BacktestService) SyncPartial(ctx context.Context, ex types.Exchange, sy
 // FindMissingTimeRanges returns the missing time ranges, the start/end time represents the existing data time points.
 // So when sending kline query to the exchange API, we need to add one second to the start time and minus one second to the end time.
 func (s *BacktestService) FindMissingTimeRanges(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, since, until time.Time) ([]TimeRange, error) {
-	query := s.SelectKLineTimePoints(ex.Name(), symbol, interval, since, until)
+	query := s.SelectKLineTimePoints(ex, symbol, interval, since, until)
 	sql, args, err := query.ToSql()
 	if err != nil {
 		return nil, err
@@ -485,7 +475,7 @@ func (s *BacktestService) FindMissingTimeRanges(ctx context.Context, ex types.Ex
 }
 
 func (s *BacktestService) QueryExistingDataRange(ctx context.Context, ex types.Exchange, symbol string, interval types.Interval, tArgs ...time.Time) (start, end *types.Time, err error) {
-	sel := s.SelectKLineTimeRange(ex.Name(), symbol, interval, tArgs...)
+	sel := s.SelectKLineTimeRange(ex, symbol, interval, tArgs...)
 	sql, args, err := sel.ToSql()
 	if err != nil {
 		return nil, nil, err
@@ -510,7 +500,7 @@ func (s *BacktestService) QueryExistingDataRange(ctx context.Context, ex types.E
 	return &t1, &t2, nil
 }
 
-func (s *BacktestService) SelectKLineTimePoints(ex types.ExchangeName, symbol string, interval types.Interval, args ...time.Time) sq.SelectBuilder {
+func (s *BacktestService) SelectKLineTimePoints(ex types.Exchange, symbol string, interval types.Interval, args ...time.Time) sq.SelectBuilder {
 	conditions := sq.And{
 		sq.Eq{"symbol": symbol},
 		sq.Eq{"`interval`": interval.String()},
@@ -522,7 +512,7 @@ func (s *BacktestService) SelectKLineTimePoints(ex types.ExchangeName, symbol st
 		conditions = append(conditions, sq.Expr("`start_time` BETWEEN ? AND ?", since, until))
 	}
 
-	tableName := s.targetKlineTable(ex)
+	tableName := targetKlineTable(ex)
 
 	return sq.Select("start_time").
 		From(tableName).
@@ -531,7 +521,7 @@ func (s *BacktestService) SelectKLineTimePoints(ex types.ExchangeName, symbol st
 }
 
 // SelectKLineTimeRange returns the existing klines time range (since < kline.start_time < until)
-func (s *BacktestService) SelectKLineTimeRange(ex types.ExchangeName, symbol string, interval types.Interval, args ...time.Time) sq.SelectBuilder {
+func (s *BacktestService) SelectKLineTimeRange(ex types.Exchange, symbol string, interval types.Interval, args ...time.Time) sq.SelectBuilder {
 	conditions := sq.And{
 		sq.Eq{"symbol": symbol},
 		sq.Eq{"`interval`": interval.String()},
@@ -546,7 +536,7 @@ func (s *BacktestService) SelectKLineTimeRange(ex types.ExchangeName, symbol str
 		conditions = append(conditions, sq.Expr("`start_time` BETWEEN ? AND ?", since, until))
 	}
 
-	tableName := s.targetKlineTable(ex)
+	tableName := targetKlineTable(ex)
 
 	return sq.Select("MIN(start_time) AS t1, MAX(start_time) AS t2").
 		From(tableName).
@@ -554,8 +544,8 @@ func (s *BacktestService) SelectKLineTimeRange(ex types.ExchangeName, symbol str
 }
 
 // TODO: add is_futures column since the klines data is different
-func (s *BacktestService) SelectLastKLines(ex types.ExchangeName, symbol string, interval types.Interval, startTime, endTime time.Time, limit uint64) sq.SelectBuilder {
-	tableName := s.targetKlineTable(ex)
+func (s *BacktestService) SelectLastKLines(ex types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time, limit uint64) sq.SelectBuilder {
+	tableName := targetKlineTable(ex)
 	return sq.Select("*").
 		From(tableName).
 		Where(sq.And{
