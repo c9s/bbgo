@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	AddMigration(upAddBybitKlines, downAddBybitKlines)
+	AddMigration(upAddFuturesKlines, downAddFuturesKlines)
 
 }
 
