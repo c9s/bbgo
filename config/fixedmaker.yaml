@@ -16,12 +16,19 @@ exchangeStrategies:
   - on: max
     fixedmaker:
       symbol: USDCUSDT
-      interval: 5m
+      interval: 1m
       halfSpread: 0.05%
       quantity: 15
       orderType: LIMIT_MAKER
-      dryRun: false
+      dryRun: true
 
       positionHardLimit: 1500
       maxPositionQuantity: 1500
       circuitBreakLossThreshold: -0.15
+      circuitBreakEMA:
+        interval: 1m
+        window: 14
+
+      inventorySkew:
+        inventoryRangeMultiplier: 1.0
+        targetBaseRatio: 0.5
