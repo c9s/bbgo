@@ -12,8 +12,8 @@ var (
 )
 
 type InventorySkewBidAskRatios struct {
-	bidRatio fixedpoint.Value
-	askRatio fixedpoint.Value
+	BidRatio fixedpoint.Value
+	AskRatio fixedpoint.Value
 }
 
 // https://hummingbot.org/strategy-configs/inventory-skew/
@@ -46,8 +46,8 @@ func (s *InventorySkew) CalculateBidAskRatios(quantity fixedpoint.Value, price f
 	askAdjustment := interp(baseValue, leftLimit, rightLimit, zero, two).Clamp(zero, two)
 
 	return &InventorySkewBidAskRatios{
-		bidRatio: bidAdjustment,
-		askRatio: askAdjustment,
+		BidRatio: bidAdjustment,
+		AskRatio: askAdjustment,
 	}
 }
 
