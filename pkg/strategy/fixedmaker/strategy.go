@@ -195,9 +195,9 @@ func (s *Strategy) generateOrders(ctx context.Context) ([]types.SubmitOrder, err
 			baseBalance.Total(),
 			quoteBalance.Total(),
 		)
-		log.Infof("bid ratio: %s, ask ratio: %s", ratios.bidRatio.String(), ratios.askRatio.String())
-		buyQuantity = s.Quantity.Mul(ratios.bidRatio)
-		sellQuantity = s.Quantity.Mul(ratios.askRatio)
+		log.Infof("bid ratio: %s, ask ratio: %s", ratios.BidRatio.String(), ratios.AskRatio.String())
+		buyQuantity = s.Quantity.Mul(ratios.BidRatio)
+		sellQuantity = s.Quantity.Mul(ratios.AskRatio)
 		log.Infof("buy quantity: %s, sell quantity: %s", buyQuantity.String(), sellQuantity.String())
 	}
 
