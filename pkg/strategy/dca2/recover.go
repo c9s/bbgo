@@ -39,14 +39,14 @@ func (s *Strategy) recover(ctx context.Context) error {
 		return err
 	}
 
-	currentRound, err := getCurrentRoundOrders(s.Short, openOrders, closedOrders, s.OrderGroupID)
+	currentRound, err := getCurrentRoundOrders(openOrders, closedOrders, s.OrderGroupID)
 	if err != nil {
 		return err
 	}
 	debugRoundOrders(s.logger, "current", currentRound)
 
 	// recover state
-	state, err := recoverState(ctx, s.Symbol, s.Short, int(s.MaxOrderNum), openOrders, currentRound, s.OrderExecutor.ActiveMakerOrders(), s.OrderExecutor.OrderStore(), s.OrderGroupID)
+	state, err := recoverState(ctx, s.Symbol, int(s.MaxOrderNum), openOrders, currentRound, s.OrderExecutor.ActiveMakerOrders(), s.OrderExecutor.OrderStore(), s.OrderGroupID)
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func (s *Strategy) recover(ctx context.Context) error {
 }
 
 // recover state
-func recoverState(ctx context.Context, symbol string, short bool, maxOrderNum int, openOrders []types.Order, currentRound Round, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore, groupID uint32) (State, error) {
+func recoverState(ctx context.Context, symbol string, maxOrderNum int, openOrders []types.Order, currentRound Round, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore, groupID uint32) (State, error) {
 	if len(currentRound.OpenPositionOrders) == 0 {
 		// new strategy
 		return WaitToOpenPosition, nil
@@ -225,14 +225,9 @@ type Round struct {
 	TakeProfitOrder    types.Order
 }
 
-func getCurrentRoundOrders(short bool, openOrders, closedOrders []types.Order, groupID uint32) (Round, error) {
+func getCurrentRoundOrders(openOrders, closedOrders []types.Order, groupID uint32) (Round, error) {
 	openPositionSide := types.SideTypeBuy
 	takeProfitSide := types.SideTypeSell
-
-	if short {
-		openPositionSide = types.SideTypeSell
-		takeProfitSide = types.SideTypeBuy
-	}
 
 	var allOrders []types.Order
 	allOrders = append(allOrders, openOrders...)
