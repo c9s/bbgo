@@ -178,12 +178,11 @@ func (s *Strategy) runOpenPositionOrdersCancelled(ctx context.Context, next Stat
 }
 
 func (s *Strategy) runTakeProfitReady(_ context.Context, next State) {
+	// wait 3 seconds to avoid position not update
+	time.Sleep(3 * time.Second)
+
 	s.logger.Info("[State] TakeProfitReady - start reseting position and calculate budget for next round")
-	if s.Short {
-		s.Budget = s.Budget.Add(s.Position.Base)
-	} else {
-		s.Budget = s.Budget.Add(s.Position.Quote)
-	}
+	s.Budget = s.Budget.Add(s.Position.Quote)
 
 	// reset position
 	s.Position.Reset()

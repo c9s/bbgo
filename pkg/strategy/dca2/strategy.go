@@ -34,7 +34,6 @@ type Strategy struct {
 	Symbol string `json:"symbol"`
 
 	// setting
-	Short            bool             `json:"short"`
 	Budget           fixedpoint.Value `json:"budget"`
 	MaxOrderNum      int64            `json:"maxOrderNum"`
 	PriceDeviation   fixedpoint.Value `json:"priceDeviation"`
@@ -122,10 +121,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.logger.Infof("[DCA] FILLED ORDER: %s", o.String())
 		openPositionSide := types.SideTypeBuy
 		takeProfitSide := types.SideTypeSell
-		if s.Short {
-			openPositionSide = types.SideTypeSell
-			takeProfitSide = types.SideTypeBuy
-		}
 
 		switch o.Side {
 		case openPositionSide:
@@ -145,7 +140,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		compRes := kline.Close.Compare(s.takeProfitPrice)
 		// price doesn't hit the take profit price
-		if (s.Short && compRes > 0) || (!s.Short && compRes < 0) {
+		if compRes < 0 {
 			return
 		}
 
@@ -193,9 +188,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 func (s *Strategy) updateTakeProfitPrice() {
 	takeProfitRatio := s.TakeProfitRatio
-	if s.Short {
-		takeProfitRatio = takeProfitRatio.Neg()
-	}
 	s.takeProfitPrice = s.Market.TruncatePrice(s.Position.AverageCost.Mul(fixedpoint.One.Add(takeProfitRatio)))
 	s.logger.Infof("[DCA] cost: %s, ratio: %s, price: %s", s.Position.AverageCost, takeProfitRatio, s.takeProfitPrice)
 }

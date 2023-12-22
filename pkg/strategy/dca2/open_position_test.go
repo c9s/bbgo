@@ -36,7 +36,6 @@ func newTestStrategy(va ...string) *Strategy {
 		logger:          logrus.NewEntry(logrus.New()),
 		Symbol:          symbol,
 		Market:          market,
-		Short:           false,
 		TakeProfitRatio: Number("10%"),
 	}
 	return s
@@ -51,7 +50,7 @@ func TestGenerateOpenPositionOrders(t *testing.T) {
 		budget := Number("10500")
 		askPrice := Number("30000")
 		margin := Number("0.05")
-		submitOrders, err := generateOpenPositionOrders(strategy.Market, false, budget, askPrice, margin, 4, strategy.OrderGroupID)
+		submitOrders, err := generateOpenPositionOrders(strategy.Market, budget, askPrice, margin, 4, strategy.OrderGroupID)
 		if !assert.NoError(err) {
 			return
 		}
