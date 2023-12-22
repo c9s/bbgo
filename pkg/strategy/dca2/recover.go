@@ -240,11 +240,9 @@ func getCurrentRoundOrders(short bool, openOrders, closedOrders []types.Order, g
 	lastSide := takeProfitSide
 	for _, order := range allOrders {
 		// group id filter is used for debug when local running
-		/*
-			if order.GroupID != groupID {
-				continue
-			}
-		*/
+		if order.GroupID != groupID {
+			continue
+		}
 
 		if order.Side == takeProfitSide && lastSide == openPositionSide {
 			break

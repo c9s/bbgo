@@ -109,8 +109,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.OrderGroupID = util.FNV32(instanceID) % math.MaxInt32
 	}
 
-	s.updateTakeProfitPrice()
-
 	// order executor
 	s.OrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		s.logger.Infof("[DCA] POSITION UPDATE: %s", s.Position.String())
@@ -131,26 +129,16 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		switch o.Side {
 		case openPositionSide:
-			s.nextStateC <- OpenPositionOrderFilled
+			s.emitNextState(OpenPositionOrderFilled)
 		case takeProfitSide:
-			s.nextStateC <- WaitToOpenPosition
+			s.emitNextState(WaitToOpenPosition)
 		default:
 			s.logger.Infof("[DCA] unsupported side (%s) of order: %s", o.Side, o)
 		}
 	})
 
 	session.MarketDataStream.OnKLine(func(kline types.KLine) {
-		s.logger.Infof("[DCA] %s", s.Strategy.Position.String())
-		s.logger.Infof("[DCA] tkae-profit price: %s", s.takeProfitPrice)
 		// check price here
-		// because we subscribe 1m kline, it will close every 1 min
-		// we use it as ticker to maker WaitToOpenPosition -> OpenPositionReady
-		select {
-		case s.nextStateC <- None:
-		default:
-			s.logger.Info("[DCA] nextStateC is full or not initialized")
-		}
-
 		if s.state != OpenPositionOrderFilled {
 			return
 		}
@@ -161,7 +149,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			return
 		}
 
-		s.nextStateC <- OpenPositionOrdersCancelling
+		s.emitNextState(OpenPositionOrdersCancelling)
 	})
 
 	session.UserDataStream.OnAuth(func() {
@@ -178,6 +166,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 				s.logger.Infof("[DCA] recovered position %s", s.Position.String())
 				s.logger.Infof("[DCA] recovered budget %s", s.Budget)
 				s.logger.Infof("[DCA] recovered startTimeOfNextRound %s", s.startTimeOfNextRound)
+
+				s.updateTakeProfitPrice()
 
 				// store persistence
 				bbgo.Sync(ctx, s)
