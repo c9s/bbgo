@@ -34,11 +34,21 @@ func upAddFuturesKlines(ctx context.Context, tx rockhopper.SQLExecutor) (err err
 		return err
 	}
 
+	_, err = tx.ExecContext(ctx, "CREATE INDEX `bybit_futures_klines_end_time_symbol_interval` ON `bybit_futures_klines` (`end_time`, `symbol`, `interval`);\nCREATE INDEX `okex_futures_klines_end_time_symbol_interval` ON `okex_futures_klines` (`end_time`, `symbol`, `interval`);\nCREATE INDEX `binance_futures_klines_end_time_symbol_interval` ON `binance_futures_klines` (`end_time`, `symbol`, `interval`);\nCREATE INDEX `max_futures_klines_end_time_symbol_interval` ON `max_futures_klines` (`end_time`, `symbol`, `interval`);")
+	if err != nil {
+		return err
+	}
+
 	return err
 }
 
 func downAddFuturesKlines(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is rolled back.
+
+	_, err = tx.ExecContext(ctx, "DROP INDEX IF EXISTS `bybit_futures_klines_end_time_symbol_interval`;\nDROP INDEX IF EXISTS `okex_futures_klines_end_time_symbol_interval`;\nDROP INDEX IF EXISTS `binance_futures_klines_end_time_symbol_interval`;\nDROP INDEX IF EXISTS `max_futures_klines_end_time_symbol_interval`;\n")
+	if err != nil {
+		return err
+	}
 
 	_, err = tx.ExecContext(ctx, "DROP TABLE IF EXISTS `bybit_futures_klines`;")
 	if err != nil {
