@@ -1,0 +1,22 @@
+---
+exchangeStrategies:
+  - on: max
+    # automaticaly buy coins when the balance is lower than the threshold
+    autobuy:
+      symbol: MAXTWD
+      schedule: "@every 1s"
+      threshold: 200
+      # price type: buy, sell, last or mid
+      priceType: buy
+
+      # order quantity or amount
+      # quantity: 100
+      amount: 800
+
+      # skip if the price is higher than the upper band
+      bollinger:
+        interval: 1m
+        window: 21
+        bandWidth: 2.0
+
+      dryRun: true
