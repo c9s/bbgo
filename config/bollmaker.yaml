@@ -17,7 +17,7 @@ backtest:
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
   startTime: "2022-05-01"
-  endTime: "2022-08-14"
+  endTime: "2023-11-01"
   sessions:
   - binance
   symbols:
@@ -199,6 +199,15 @@ exchangeStrategies:
 
     # buyBelowNeutralSMA: when this set, it will only place buy order when the current price is below the SMA line.
     buyBelowNeutralSMA: true
+
+    # emaCross is used for turning buy on/off
+    # when short term EMA cross fast term EMA, turn on buy,
+    # otherwise, turn off buy
+    emaCross:
+      enabled: false
+      interval: 1h
+      fastWindow: 3
+      slowWindow: 12
 
     exits:
 
