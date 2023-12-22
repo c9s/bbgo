@@ -30,6 +30,7 @@ package backtest
 import (
 	"context"
 	"fmt"
+	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"strconv"
 	"sync"
 	"time"
@@ -381,7 +382,13 @@ func (e *Exchange) SubscribeMarketData(
 		intervals = append(intervals, interval)
 	}
 
-	log.Infof("querying klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
+	_, isFutures, _, _ := exchange2.GetSessionAttributes(e.publicExchange)
+	if isFutures {
+		log.Infof("querying futures klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
+	} else {
+		log.Infof("querying klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
+	}
+
 	if len(symbols) == 0 {
 		log.Warnf("empty symbols, will not query kline data from the database")
 
@@ -390,7 +397,7 @@ func (e *Exchange) SubscribeMarketData(
 		return c, nil
 	}
 
-	klineC, errC := e.srv.QueryKLinesCh(startTime, endTime, e, symbols, intervals)
+	klineC, errC := e.srv.QueryKLinesCh(startTime, endTime, e.publicExchange, symbols, intervals)
 	go func() {
 		if err := <-errC; err != nil {
 			log.WithError(err).Error("backtest data feed error")
