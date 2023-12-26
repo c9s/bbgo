@@ -264,7 +264,9 @@ func (s *Strategy) Initialize() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+	if !s.TriggerPrice.IsZero() || !s.StopLossPrice.IsZero() || !s.TakeProfitPrice.IsZero() {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+	}
 
 	if s.AutoRange != nil {
 		interval := s.AutoRange.Interval()
