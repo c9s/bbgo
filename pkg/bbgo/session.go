@@ -405,6 +405,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		return fmt.Errorf("market %s is not defined", symbol)
 	}
 
+	disableMarketDataStore := environ.environmentConfig != nil && environ.environmentConfig.DisableMarketDataStore
 	disableSessionTradeBuffer := environ.environmentConfig != nil && environ.environmentConfig.DisableSessionTradeBuffer
 	maxSessionTradeBufferSize := 0
 	if environ.environmentConfig != nil && environ.environmentConfig.MaxSessionTradeBufferSize > 0 {
@@ -441,13 +442,13 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	orderStore.BindStream(session.UserDataStream)
 	session.orderStores[symbol] = orderStore
 
-	if _, ok := session.marketDataStores[symbol]; !ok {
-		marketDataStore := NewMarketDataStore(symbol)
-		marketDataStore.BindStream(session.MarketDataStream)
-		session.marketDataStores[symbol] = marketDataStore
+	marketDataStore := NewMarketDataStore(symbol)
+	if !disableMarketDataStore {
+		if _, ok := session.marketDataStores[symbol]; !ok {
+			marketDataStore.BindStream(session.MarketDataStream)
+		}
 	}
-
-	marketDataStore := session.marketDataStores[symbol]
+	session.marketDataStores[symbol] = marketDataStore
 
 	if _, ok := session.standardIndicatorSets[symbol]; !ok {
 		standardIndicatorSet := NewStandardIndicatorSet(symbol, session.MarketDataStream, marketDataStore)

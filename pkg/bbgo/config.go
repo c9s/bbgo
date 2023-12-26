@@ -335,7 +335,10 @@ type EnvironmentConfig struct {
 	DisableStartupBalanceQuery bool `json:"disableStartupBalanceQuery"`
 
 	DisableSessionTradeBuffer bool `json:"disableSessionTradeBuffer"`
-	MaxSessionTradeBufferSize int  `json:"maxSessionTradeBufferSize"`
+
+	DisableMarketDataStore bool `json:"disableMarketDataStore"`
+
+	MaxSessionTradeBufferSize int `json:"maxSessionTradeBufferSize"`
 }
 
 type Config struct {
