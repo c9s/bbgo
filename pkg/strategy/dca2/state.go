@@ -156,7 +156,7 @@ func (s *Strategy) runOpenPositionOrderFilled(_ context.Context, next State) {
 
 func (s *Strategy) runOpenPositionOrdersCancelling(ctx context.Context, next State) {
 	s.logger.Info("[State] OpenPositionOrdersCancelling - start cancelling open-position orders")
-	if err := s.cancelOpenPositionOrders(ctx); err != nil {
+	if err := s.cancelAllOrders(ctx); err != nil {
 		s.logger.WithError(err).Error("failed to cancel maker orders")
 		return
 	}
