@@ -3,7 +3,6 @@ package dca2
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strconv"
 	"time"
 
@@ -13,15 +12,19 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type queryAPI interface {
-	QueryOpenOrders(ctx context.Context, symbol string) ([]types.Order, error)
+type descendingClosedOrderQueryService interface {
 	QueryClosedOrdersDesc(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error)
-	QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error)
+}
+
+type RecoverApiQueryService interface {
+	types.ExchangeOrderQueryService
+	types.ExchangeTradeService
+	descendingClosedOrderQueryService
 }
 
 func (s *Strategy) recover(ctx context.Context) error {
 	s.logger.Info("[DCA] recover")
-	queryService, ok := s.Session.Exchange.(queryAPI)
+	queryService, ok := s.Session.Exchange.(RecoverApiQueryService)
 	if !ok {
 		return fmt.Errorf("[DCA] exchange %s doesn't support queryAPI interface", s.Session.ExchangeName)
 	}
@@ -70,9 +73,19 @@ func (s *Strategy) recover(ctx context.Context) error {
 
 // recover state
 func recoverState(ctx context.Context, symbol string, short bool, maxOrderNum int, openOrders []types.Order, currentRound Round, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore, groupID uint32) (State, error) {
+	if len(currentRound.OpenPositionOrders) == 0 {
+		// new strategy
+		return WaitToOpenPosition, nil
+	}
+
 	numOpenOrders := len(openOrders)
 	// dca stop at take profit order stage
 	if currentRound.TakeProfitOrder.OrderID != 0 {
+		if numOpenOrders == 0 {
+			// current round's take-profit order filled, wait to open next round
+			return WaitToOpenPosition, nil
+		}
+
 		// check the open orders is take profit order or not
 		if numOpenOrders == 1 {
 			if openOrders[0].OrderID == currentRound.TakeProfitOrder.OrderID {
@@ -84,24 +97,17 @@ func recoverState(ctx context.Context, symbol string, short bool, maxOrderNum in
 			}
 		}
 
-		if numOpenOrders == 0 {
-			// current round's take-profit order filled, wait to open next round
-			return WaitToOpenPosition, nil
-		}
-
 		return None, fmt.Errorf("stop at taking profit stage, but the number of open orders is > 1")
-	}
-
-	if len(currentRound.OpenPositionOrders) == 0 {
-		// new strategy
-		return WaitToOpenPosition, nil
 	}
 
 	numOpenPositionOrders := len(currentRound.OpenPositionOrders)
 	if numOpenPositionOrders > maxOrderNum {
 		return None, fmt.Errorf("the number of open-position orders is > max order number")
 	} else if numOpenPositionOrders < maxOrderNum {
-		// failed to place some orders at open position stage
+		// The number of open-position orders should be the same as maxOrderNum
+		// If not, it may be the following possible cause
+		// 1. This strategy at position opening, so it may not place all orders we want successfully
+		// 2. There are some errors when placing open-position orders. e.g. cannot lock fund.....
 		return None, fmt.Errorf("the number of open-position orders is < max order number")
 	}
 
@@ -146,7 +152,7 @@ func recoverState(ctx context.Context, symbol string, short bool, maxOrderNum in
 	return None, fmt.Errorf("unexpected order status combination")
 }
 
-func recoverPosition(ctx context.Context, position *types.Position, queryService queryAPI, currentRound Round) error {
+func recoverPosition(ctx context.Context, position *types.Position, queryService RecoverApiQueryService, currentRound Round) error {
 	if position == nil {
 		return nil
 	}
@@ -232,9 +238,7 @@ func getCurrentRoundOrders(short bool, openOrders, closedOrders []types.Order, g
 	allOrders = append(allOrders, openOrders...)
 	allOrders = append(allOrders, closedOrders...)
 
-	sort.Slice(allOrders, func(i, j int) bool {
-		return allOrders[i].CreationTime.After(allOrders[j].CreationTime.Time())
-	})
+	types.SortOrdersDescending(allOrders)
 
 	var currentRound Round
 	lastSide := takeProfitSide
