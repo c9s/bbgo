@@ -12,6 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 )
 
@@ -43,9 +44,18 @@ type Strategy struct {
 	// OrderGroupID is the group ID used for the strategy instance for canceling orders
 	OrderGroupID uint32 `json:"orderGroupID"`
 
+	// RecoverWhenStart option is used for recovering dca states
+	RecoverWhenStart bool `json:"recoverWhenStart"`
+
+	// KeepOrdersWhenShutdown option is used for keeping the grid orders when shutting down bbgo
+	KeepOrdersWhenShutdown bool `json:"keepOrdersWhenShutdown"`
+
 	// log
 	logger    *logrus.Entry
 	LogFields logrus.Fields `json:"logFields"`
+
+	// PrometheusLabels will be used as the base prometheus labels
+	PrometheusLabels prometheus.Labels `json:"prometheusLabels"`
 
 	// private field
 	mu                   sync.Mutex
@@ -53,6 +63,13 @@ type Strategy struct {
 	startTimeOfNextRound time.Time
 	nextStateC           chan State
 	state                State
+
+	// callbacks
+	readyCallbacks    []func()
+	positionCallbacks []func(*types.Position)
+	profitCallbacks   []func(*types.ProfitStats)
+	closedCallbacks   []func()
+	errorCallbacks    []func(error)
 }
 
 func (s *Strategy) ID() string {
@@ -151,16 +168,20 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.logger.Info("[DCA] user data stream authenticated")
 		time.AfterFunc(3*time.Second, func() {
 			if isInitialize := s.initializeNextStateC(); !isInitialize {
-				// recover
-				if err := s.recover(ctx); err != nil {
-					s.logger.WithError(err).Error("[DCA] something wrong when state recovering")
-					return
-				}
+				if s.RecoverWhenStart {
+					// recover
+					if err := s.recover(ctx); err != nil {
+						s.logger.WithError(err).Error("[DCA] something wrong when state recovering")
+						return
+					}
 
-				s.logger.Infof("[DCA] recovered state: %d", s.state)
-				s.logger.Infof("[DCA] recovered position %s", s.Position.String())
-				s.logger.Infof("[DCA] recovered budget %s", s.Budget)
-				s.logger.Infof("[DCA] recovered startTimeOfNextRound %s", s.startTimeOfNextRound)
+					s.logger.Infof("[DCA] recovered state: %d", s.state)
+					s.logger.Infof("[DCA] recovered position %s", s.Position.String())
+					s.logger.Infof("[DCA] recovered budget %s", s.Budget)
+					s.logger.Infof("[DCA] recovered startTimeOfNextRound %s", s.startTimeOfNextRound)
+				} else {
+					s.state = WaitToOpenPosition
+				}
 
 				s.updateTakeProfitPrice()
 
@@ -169,6 +190,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 				// start running state machine
 				s.runState(ctx)
+
+				s.EmitReady()
 			}
 		})
 	})
@@ -183,6 +206,19 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		return fmt.Errorf("the available balance of %s is %s which is less than budget setting %s, please check it", s.Market.QuoteCurrency, balance.Available, s.Budget)
 	}
 
+	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
+		defer wg.Done()
+
+		if s.KeepOrdersWhenShutdown {
+			s.logger.Infof("keepOrdersWhenShutdown is set, will keep the orders on the exchange")
+			return
+		}
+
+		if err := s.Close(ctx); err != nil {
+			s.logger.WithError(err).Errorf("dca2 graceful order cancel error")
+		}
+	})
+
 	return nil
 }
 
@@ -190,4 +226,20 @@ func (s *Strategy) updateTakeProfitPrice() {
 	takeProfitRatio := s.TakeProfitRatio
 	s.takeProfitPrice = s.Market.TruncatePrice(s.Position.AverageCost.Mul(fixedpoint.One.Add(takeProfitRatio)))
 	s.logger.Infof("[DCA] cost: %s, ratio: %s, price: %s", s.Position.AverageCost, takeProfitRatio, s.takeProfitPrice)
+}
+
+func (s *Strategy) Close(ctx context.Context) error {
+	s.logger.Infof("[DCA] closing %s dca2", s.Symbol)
+
+	defer s.EmitClosed()
+
+	bbgo.Sync(ctx, s)
+
+	return s.cancelAllOrders(ctx)
+}
+
+func (s *Strategy) CleanUp(ctx context.Context) error {
+	_ = s.Initialize()
+	defer s.EmitClosed()
+	return s.cancelAllOrders(ctx)
 }
