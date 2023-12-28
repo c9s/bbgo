@@ -7,6 +7,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type PositionMap map[string]*types.Position
+type ProfitStatsMap map[string]*types.ProfitStats
+
 type MultiMarketStrategy struct {
 	Environ *bbgo.Environment
 	Session *bbgo.ExchangeSession
@@ -19,26 +22,47 @@ type MultiMarketStrategy struct {
 	cancel      context.CancelFunc
 }
 
-func (s *MultiMarketStrategy) Initialize(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, markets map[string]types.Market, strategyID string) {
+func (s *MultiMarketStrategy) Initialize(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, markets map[string]types.Market, strategyID string, instanceID string) {
 	s.parent = ctx
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
 	s.Environ = environ
 	s.Session = session
 
+	// initialize position map
 	if s.PositionMap == nil {
+		log.Infof("creating position map")
 		s.PositionMap = make(PositionMap)
 	}
-	s.PositionMap.CreatePositions(markets)
+	for symbol, market := range markets {
+		if _, ok := s.PositionMap[symbol]; ok {
+			continue
+		}
 
+		log.Infof("creating position for symbol %s", symbol)
+		position := types.NewPositionFromMarket(market)
+		position.Strategy = ID
+		position.StrategyInstanceID = instanceID
+		s.PositionMap[symbol] = position
+	}
+
+	// initialize profit stats map
 	if s.ProfitStatsMap == nil {
+		log.Infof("creating profit stats map")
 		s.ProfitStatsMap = make(ProfitStatsMap)
 	}
-	s.ProfitStatsMap.CreateProfitStats(markets)
+	for symbol, market := range markets {
+		if _, ok := s.ProfitStatsMap[symbol]; ok {
+			continue
+		}
 
-	s.OrderExecutorMap = NewGeneralOrderExecutorMap(session, s.PositionMap)
+		log.Infof("creating profit stats for symbol %s", symbol)
+		s.ProfitStatsMap[symbol] = types.NewProfitStats(market)
+	}
+
+	// initialize order executor map
+	s.OrderExecutorMap = NewGeneralOrderExecutorMap(session, strategyID, instanceID, s.PositionMap)
 	s.OrderExecutorMap.BindEnvironment(environ)
 	s.OrderExecutorMap.BindProfitStats(s.ProfitStatsMap)
-	s.OrderExecutorMap.Sync(ctx, s)
 	s.OrderExecutorMap.Bind()
 }
