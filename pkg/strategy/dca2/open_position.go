@@ -15,12 +15,12 @@ type cancelOrdersByGroupIDApi interface {
 
 func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 	s.logger.Infof("[DCA] start placing open position orders")
-	price, err := getBestPriceUntilSuccess(ctx, s.Session.Exchange, s.Symbol, s.Short)
+	price, err := getBestPriceUntilSuccess(ctx, s.Session.Exchange, s.Symbol)
 	if err != nil {
 		return err
 	}
 
-	orders, err := generateOpenPositionOrders(s.Market, s.Short, s.Budget, price, s.PriceDeviation, s.MaxOrderNum, s.OrderGroupID)
+	orders, err := generateOpenPositionOrders(s.Market, s.Budget, price, s.PriceDeviation, s.MaxOrderNum, s.OrderGroupID)
 	if err != nil {
 		return err
 	}
@@ -35,24 +35,17 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 	return nil
 }
 
-func getBestPriceUntilSuccess(ctx context.Context, ex types.Exchange, symbol string, short bool) (fixedpoint.Value, error) {
+func getBestPriceUntilSuccess(ctx context.Context, ex types.Exchange, symbol string) (fixedpoint.Value, error) {
 	ticker, err := retry.QueryTickerUntilSuccessful(ctx, ex, symbol)
 	if err != nil {
 		return fixedpoint.Zero, err
 	}
 
-	if short {
-		return ticker.Buy, nil
-	} else {
-		return ticker.Sell, nil
-	}
+	return ticker.Sell, nil
 }
 
-func generateOpenPositionOrders(market types.Market, short bool, budget, price, priceDeviation fixedpoint.Value, maxOrderNum int64, orderGroupID uint32) ([]types.SubmitOrder, error) {
+func generateOpenPositionOrders(market types.Market, budget, price, priceDeviation fixedpoint.Value, maxOrderNum int64, orderGroupID uint32) ([]types.SubmitOrder, error) {
 	factor := fixedpoint.One.Sub(priceDeviation)
-	if short {
-		factor = fixedpoint.One.Add(priceDeviation)
-	}
 
 	// calculate all valid prices
 	var prices []fixedpoint.Value
@@ -68,15 +61,12 @@ func generateOpenPositionOrders(market types.Market, short bool, budget, price, 
 		prices = append(prices, price)
 	}
 
-	notional, orderNum := calculateNotionalAndNum(market, short, budget, prices)
+	notional, orderNum := calculateNotionalAndNum(market, budget, prices)
 	if orderNum == 0 {
 		return nil, fmt.Errorf("failed to calculate notional and num of open position orders, price: %s, budget: %s", price, budget)
 	}
 
 	side := types.SideTypeBuy
-	if short {
-		side = types.SideTypeSell
-	}
 
 	var submitOrders []types.SubmitOrder
 	for i := 0; i < orderNum; i++ {
@@ -99,7 +89,7 @@ func generateOpenPositionOrders(market types.Market, short bool, budget, price, 
 
 // calculateNotionalAndNum calculates the notional and num of open position orders
 // DCA2 is notional-based, every order has the same notional
-func calculateNotionalAndNum(market types.Market, short bool, budget fixedpoint.Value, prices []fixedpoint.Value) (fixedpoint.Value, int) {
+func calculateNotionalAndNum(market types.Market, budget fixedpoint.Value, prices []fixedpoint.Value) (fixedpoint.Value, int) {
 	for num := len(prices); num > 0; num-- {
 		notional := budget.Div(fixedpoint.NewFromInt(int64(num)))
 		if notional.Compare(market.MinNotional) < 0 {
@@ -107,9 +97,6 @@ func calculateNotionalAndNum(market types.Market, short bool, budget fixedpoint.
 		}
 
 		maxPriceIdx := 0
-		if short {
-			maxPriceIdx = num - 1
-		}
 		quantity := market.TruncateQuantity(notional.Div(prices[maxPriceIdx]))
 		if quantity.Compare(market.MinQuantity) < 0 {
 			continue

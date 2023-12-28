@@ -39,7 +39,7 @@ func Test_GetCurrenctAndLastRoundOrders(t *testing.T) {
 			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-5*time.Second)),
 		}
 
-		currentRound, err := getCurrentRoundOrders(false, openOrders, closedOrders, 0)
+		currentRound, err := getCurrentRoundOrders(openOrders, closedOrders, 0)
 
 		assert.NoError(t, err)
 		assert.NotEqual(t, 0, currentRound.TakeProfitOrder.OrderID)
@@ -72,7 +72,7 @@ func Test_GetCurrenctAndLastRoundOrders(t *testing.T) {
 			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-17*time.Second)),
 		}
 
-		currentRound, err := getCurrentRoundOrders(false, openOrders, closedOrders, 0)
+		currentRound, err := getCurrentRoundOrders(openOrders, closedOrders, 0)
 
 		assert.NoError(t, err)
 		assert.NotEqual(t, 0, currentRound.TakeProfitOrder.OrderID)
@@ -101,7 +101,7 @@ func Test_RecoverState(t *testing.T) {
 		currentRound := Round{}
 		activeOrderBook := bbgo.NewActiveOrderBook(symbol)
 		orderStore := core.NewOrderStore(symbol)
-		state, err := recoverState(context.Background(), symbol, false, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
+		state, err := recoverState(context.Background(), symbol, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
 		assert.NoError(t, err)
 		assert.Equal(t, WaitToOpenPosition, state)
 	})
@@ -120,7 +120,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		orderStore := core.NewOrderStore(symbol)
 		activeOrderBook := bbgo.NewActiveOrderBook(symbol)
-		state, err := recoverState(context.Background(), symbol, false, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
+		state, err := recoverState(context.Background(), symbol, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionReady, state)
 	})
@@ -144,7 +144,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		orderStore := core.NewOrderStore(symbol)
 		activeOrderBook := bbgo.NewActiveOrderBook(symbol)
-		state, err := recoverState(context.Background(), symbol, false, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
+		state, err := recoverState(context.Background(), symbol, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionOrderFilled, state)
 	})
@@ -165,7 +165,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		orderStore := core.NewOrderStore(symbol)
 		activeOrderBook := bbgo.NewActiveOrderBook(symbol)
-		state, err := recoverState(context.Background(), symbol, false, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
+		state, err := recoverState(context.Background(), symbol, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionOrdersCancelling, state)
 	})
@@ -184,7 +184,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		orderStore := core.NewOrderStore(symbol)
 		activeOrderBook := bbgo.NewActiveOrderBook(symbol)
-		state, err := recoverState(context.Background(), symbol, false, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
+		state, err := recoverState(context.Background(), symbol, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionOrdersCancelled, state)
 	})
@@ -206,7 +206,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		orderStore := core.NewOrderStore(symbol)
 		activeOrderBook := bbgo.NewActiveOrderBook(symbol)
-		state, err := recoverState(context.Background(), symbol, false, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
+		state, err := recoverState(context.Background(), symbol, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
 		assert.NoError(t, err)
 		assert.Equal(t, TakeProfitReady, state)
 	})
@@ -226,7 +226,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		orderStore := core.NewOrderStore(symbol)
 		activeOrderBook := bbgo.NewActiveOrderBook(symbol)
-		state, err := recoverState(context.Background(), symbol, false, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
+		state, err := recoverState(context.Background(), symbol, 5, openOrders, currentRound, activeOrderBook, orderStore, 0)
 		assert.NoError(t, err)
 		assert.Equal(t, WaitToOpenPosition, state)
 	})
