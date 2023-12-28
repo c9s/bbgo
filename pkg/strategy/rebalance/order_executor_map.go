@@ -10,12 +10,12 @@ import (
 
 type GeneralOrderExecutorMap map[string]*bbgo.GeneralOrderExecutor
 
-func NewGeneralOrderExecutorMap(session *bbgo.ExchangeSession, positionMap PositionMap) GeneralOrderExecutorMap {
+func NewGeneralOrderExecutorMap(session *bbgo.ExchangeSession, strategyID string, instanceID string, positionMap PositionMap) GeneralOrderExecutorMap {
 	m := make(GeneralOrderExecutorMap)
 
 	for symbol, position := range positionMap {
 		log.Infof("creating order executor for symbol %s", symbol)
-		orderExecutor := bbgo.NewGeneralOrderExecutor(session, symbol, ID, instanceID(symbol), position)
+		orderExecutor := bbgo.NewGeneralOrderExecutor(session, symbol, strategyID, instanceID, position)
 		m[symbol] = orderExecutor
 	}
 
@@ -38,14 +38,6 @@ func (m GeneralOrderExecutorMap) BindProfitStats(profitStatsMap ProfitStatsMap) 
 func (m GeneralOrderExecutorMap) Bind() {
 	for _, orderExecutor := range m {
 		orderExecutor.Bind()
-	}
-}
-
-func (m GeneralOrderExecutorMap) Sync(ctx context.Context, obj interface{}) {
-	for _, orderExecutor := range m {
-		orderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-			bbgo.Sync(ctx, obj)
-		})
 	}
 }
 

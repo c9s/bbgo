@@ -22,10 +22,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-func instanceID(symbol string) string {
-	return fmt.Sprintf("%s:%s", ID, symbol)
-}
-
 type Strategy struct {
 	*MultiMarketStrategy
 
@@ -72,6 +68,10 @@ func (s *Strategy) ID() string {
 	return ID
 }
 
+func (s *Strategy) InstanceID() string {
+	return ID
+}
+
 func (s *Strategy) Validate() error {
 	if len(s.TargetWeights) == 0 {
 		return fmt.Errorf("targetWeights should not be empty")
@@ -109,7 +109,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.markets[symbol] = market
 	}
 
-	s.MultiMarketStrategy.Initialize(ctx, s.Environment, session, s.markets, ID)
+	s.MultiMarketStrategy.Initialize(ctx, s.Environment, session, s.markets, ID, s.InstanceID())
 
 	s.activeOrderBook = bbgo.NewActiveOrderBook("")
 	s.activeOrderBook.BindStream(session.UserDataStream)
