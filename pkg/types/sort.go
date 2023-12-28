@@ -20,6 +20,14 @@ func SortOrdersAscending(orders []Order) []Order {
 	return orders
 }
 
+// SortOrdersDescending sorts by creation time descending-ly
+func SortOrdersDescending(orders []Order) []Order {
+	sort.Slice(orders, func(i, j int) bool {
+		return orders[i].CreationTime.Time().After(orders[j].CreationTime.Time())
+	})
+	return orders
+}
+
 // SortOrdersByPrice sorts by creation time ascending-ly
 func SortOrdersByPrice(orders []Order, descending bool) []Order {
 	var f func(i, j int) bool
