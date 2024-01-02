@@ -30,7 +30,6 @@ package backtest
 import (
 	"context"
 	"fmt"
-	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"strconv"
 	"sync"
 	"time"
@@ -382,7 +381,14 @@ func (e *Exchange) SubscribeMarketData(
 		intervals = append(intervals, interval)
 	}
 
-	_, isFutures, _, _ := exchange2.GetSessionAttributes(e.publicExchange)
+	//_, isFutures, _, _ := exchange2.GetSessionAttributes(e.publicExchange)
+	var isFutures bool
+	if futuresExchange, ok := e.publicExchange.(types.FuturesExchange); ok {
+		isFutures = futuresExchange.GetFuturesSettings().IsFutures
+	} else {
+		isFutures = false
+	}
+
 	if isFutures {
 		log.Infof("querying futures klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
 	} else {
