@@ -26,11 +26,11 @@ func (s *Strategy) EmitPosition(position *types.Position) {
 	}
 }
 
-func (s *Strategy) OnProfit(cb func(*types.ProfitStats)) {
+func (s *Strategy) OnProfit(cb func(*ProfitStats)) {
 	s.profitCallbacks = append(s.profitCallbacks, cb)
 }
 
-func (s *Strategy) EmitProfit(profitStats *types.ProfitStats) {
+func (s *Strategy) EmitProfit(profitStats *ProfitStats) {
 	for _, cb := range s.profitCallbacks {
 		cb(profitStats)
 	}
