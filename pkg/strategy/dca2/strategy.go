@@ -9,7 +9,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,16 +27,19 @@ func init() {
 
 //go:generate callbackgen -type Strateg
 type Strategy struct {
-	*common.Strategy
+	Position    *types.Position `json:"position,omitempty" persistence:"position"`
+	ProfitStats *ProfitStats    `json:"profitStats,omitempty" persistence:"profit_stats"`
 
-	Environment *bbgo.Environment
-	Market      types.Market
+	Environment   *bbgo.Environment
+	Session       *bbgo.ExchangeSession
+	OrderExecutor *bbgo.GeneralOrderExecutor
+	Market        types.Market
 
 	Symbol string `json:"symbol"`
 
 	// setting
-	Budget           fixedpoint.Value `json:"budget"`
-	MaxOrderNum      int64            `json:"maxOrderNum"`
+	QuoteInvestment  fixedpoint.Value `json:"quoteInvestment"`
+	MaxOrderCount    int64            `json:"maxOrderCount"`
 	PriceDeviation   fixedpoint.Value `json:"priceDeviation"`
 	TakeProfitRatio  fixedpoint.Value `json:"takeProfitRatio"`
 	CoolDownInterval types.Duration   `json:"coolDownInterval"`
@@ -68,7 +70,7 @@ type Strategy struct {
 	// callbacks
 	readyCallbacks    []func()
 	positionCallbacks []func(*types.Position)
-	profitCallbacks   []func(*types.ProfitStats)
+	profitCallbacks   []func(*ProfitStats)
 	closedCallbacks   []func()
 	errorCallbacks    []func(error)
 }
@@ -78,8 +80,8 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if s.MaxOrderNum < 1 {
-		return fmt.Errorf("maxOrderNum can not be < 1")
+	if s.MaxOrderCount < 1 {
+		return fmt.Errorf("maxOrderCount can not be < 1")
 	}
 
 	if s.TakeProfitRatio.Sign() <= 0 {
@@ -106,7 +108,6 @@ func (s *Strategy) Defaults() error {
 
 func (s *Strategy) Initialize() error {
 	s.logger = log.WithFields(s.LogFields)
-	s.Strategy = &common.Strategy{}
 	return nil
 }
 
@@ -119,8 +120,29 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 	instanceID := s.InstanceID()
+	s.Session = session
+	if s.ProfitStats == nil {
+		s.ProfitStats = newProfitStats(s.Market, s.QuoteInvestment)
+	}
+
+	if s.Position == nil {
+		s.Position = types.NewPositionFromMarket(s.Market)
+	}
+
+	s.Position.Strategy = ID
+	s.Position.StrategyInstanceID = instanceID
+
+	if session.MakerFeeRate.Sign() > 0 || session.TakerFeeRate.Sign() > 0 {
+		s.Position.SetExchangeFeeRate(session.ExchangeName, types.ExchangeFee{
+			MakerFeeRate: session.MakerFeeRate,
+			TakerFeeRate: session.TakerFeeRate,
+		})
+	}
+
+	s.OrderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.OrderExecutor.BindEnvironment(s.Environment)
+	s.OrderExecutor.Bind()
 
 	if s.OrderGroupID == 0 {
 		s.OrderGroupID = util.FNV32(instanceID) % math.MaxInt32
@@ -133,6 +155,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		// update take profit price here
 		s.updateTakeProfitPrice()
+	})
+
+	s.OrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+		s.ProfitStats.AddTrade(trade)
 	})
 
 	s.OrderExecutor.ActiveMakerOrders().OnFilled(func(o types.Order) {
@@ -178,7 +204,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 					s.logger.Infof("[DCA] recovered state: %d", s.state)
 					s.logger.Infof("[DCA] recovered position %s", s.Position.String())
-					s.logger.Infof("[DCA] recovered budget %s", s.Budget)
+					s.logger.Infof("[DCA] recovered quote investment %s", s.QuoteInvestment)
 					s.logger.Infof("[DCA] recovered startTimeOfNextRound %s", s.startTimeOfNextRound)
 				} else {
 					s.state = WaitToOpenPosition
@@ -204,8 +230,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	balance := balances[s.Market.QuoteCurrency]
-	if balance.Available.Compare(s.Budget) < 0 {
-		return fmt.Errorf("the available balance of %s is %s which is less than budget setting %s, please check it", s.Market.QuoteCurrency, balance.Available, s.Budget)
+	if balance.Available.Compare(s.QuoteInvestment) < 0 {
+		return fmt.Errorf("the available balance of %s is %s which is less than quote investment setting %s, please check it", s.Market.QuoteCurrency, balance.Available, s.QuoteInvestment)
 	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {

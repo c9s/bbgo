@@ -20,7 +20,7 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 		return err
 	}
 
-	orders, err := generateOpenPositionOrders(s.Market, s.Budget, price, s.PriceDeviation, s.MaxOrderNum, s.OrderGroupID)
+	orders, err := generateOpenPositionOrders(s.Market, s.QuoteInvestment, price, s.PriceDeviation, s.MaxOrderCount, s.OrderGroupID)
 	if err != nil {
 		return err
 	}
@@ -44,12 +44,12 @@ func getBestPriceUntilSuccess(ctx context.Context, ex types.Exchange, symbol str
 	return ticker.Sell, nil
 }
 
-func generateOpenPositionOrders(market types.Market, budget, price, priceDeviation fixedpoint.Value, maxOrderNum int64, orderGroupID uint32) ([]types.SubmitOrder, error) {
+func generateOpenPositionOrders(market types.Market, quoteInvestment, price, priceDeviation fixedpoint.Value, maxOrderCount int64, orderGroupID uint32) ([]types.SubmitOrder, error) {
 	factor := fixedpoint.One.Sub(priceDeviation)
 
 	// calculate all valid prices
 	var prices []fixedpoint.Value
-	for i := 0; i < int(maxOrderNum); i++ {
+	for i := 0; i < int(maxOrderCount); i++ {
 		if i > 0 {
 			price = price.Mul(factor)
 		}
@@ -61,9 +61,9 @@ func generateOpenPositionOrders(market types.Market, budget, price, priceDeviati
 		prices = append(prices, price)
 	}
 
-	notional, orderNum := calculateNotionalAndNum(market, budget, prices)
+	notional, orderNum := calculateNotionalAndNum(market, quoteInvestment, prices)
 	if orderNum == 0 {
-		return nil, fmt.Errorf("failed to calculate notional and num of open position orders, price: %s, budget: %s", price, budget)
+		return nil, fmt.Errorf("failed to calculate notional and num of open position orders, price: %s, quote investment: %s", price, quoteInvestment)
 	}
 
 	side := types.SideTypeBuy
@@ -89,9 +89,9 @@ func generateOpenPositionOrders(market types.Market, budget, price, priceDeviati
 
 // calculateNotionalAndNum calculates the notional and num of open position orders
 // DCA2 is notional-based, every order has the same notional
-func calculateNotionalAndNum(market types.Market, budget fixedpoint.Value, prices []fixedpoint.Value) (fixedpoint.Value, int) {
+func calculateNotionalAndNum(market types.Market, quoteInvestment fixedpoint.Value, prices []fixedpoint.Value) (fixedpoint.Value, int) {
 	for num := len(prices); num > 0; num-- {
-		notional := budget.Div(fixedpoint.NewFromInt(int64(num)))
+		notional := quoteInvestment.Div(fixedpoint.NewFromInt(int64(num)))
 		if notional.Compare(market.MinNotional) < 0 {
 			continue
 		}

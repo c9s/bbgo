@@ -181,11 +181,15 @@ func (s *Strategy) runTakeProfitReady(_ context.Context, next State) {
 	// wait 3 seconds to avoid position not update
 	time.Sleep(3 * time.Second)
 
-	s.logger.Info("[State] TakeProfitReady - start reseting position and calculate budget for next round")
-	s.Budget = s.Budget.Add(s.Position.Quote)
+	s.logger.Info("[State] TakeProfitReady - start reseting position and calculate quote investment for next round")
+	s.QuoteInvestment = s.QuoteInvestment.Add(s.Position.Quote)
 
 	// reset position
 	s.Position.Reset()
+
+	// reset
+	s.EmitProfit(s.ProfitStats)
+	s.ProfitStats.FinishRound()
 
 	// set the start time of the next round
 	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())
