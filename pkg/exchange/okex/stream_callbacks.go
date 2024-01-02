@@ -6,12 +6,12 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 )
 
-func (s *Stream) OnCandleEvent(cb func(candle Candle)) {
-	s.candleEventCallbacks = append(s.candleEventCallbacks, cb)
+func (s *Stream) OnKLineEvent(cb func(candle KLineEvent)) {
+	s.kLineEventCallbacks = append(s.kLineEventCallbacks, cb)
 }
 
-func (s *Stream) EmitCandleEvent(candle Candle) {
-	for _, cb := range s.candleEventCallbacks {
+func (s *Stream) EmitKLineEvent(candle KLineEvent) {
+	for _, cb := range s.kLineEventCallbacks {
 		cb(candle)
 	}
 }
@@ -57,7 +57,7 @@ func (s *Stream) EmitOrderDetailsEvent(orderDetails []okexapi.OrderDetails) {
 }
 
 type StreamEventHub interface {
-	OnCandleEvent(cb func(candle Candle))
+	OnKLineEvent(cb func(candle KLineEvent))
 
 	OnBookEvent(cb func(book BookEvent))
 

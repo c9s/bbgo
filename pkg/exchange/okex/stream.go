@@ -28,32 +28,24 @@ type Stream struct {
 	client *okexapi.RestClient
 
 	// public callbacks
-	candleEventCallbacks       []func(candle Candle)
+	kLineEventCallbacks        []func(candle KLineEvent)
 	bookEventCallbacks         []func(book BookEvent)
 	eventCallbacks             []func(event WebSocketEvent)
 	accountEventCallbacks      []func(account okexapi.Account)
 	orderDetailsEventCallbacks []func(orderDetails []okexapi.OrderDetails)
-
-	lastCandle map[CandleKey]Candle
-}
-
-type CandleKey struct {
-	InstrumentID string
-	Channel      string
 }
 
 func NewStream(client *okexapi.RestClient) *Stream {
 	stream := &Stream{
 		client:         client,
 		StandardStream: types.NewStandardStream(),
-		lastCandle:     make(map[CandleKey]Candle),
 	}
 
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.createEndpoint)
 
-	stream.OnCandleEvent(stream.handleCandleEvent)
+	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnAccountEvent(stream.handleAccountEvent)
 	stream.OnOrderDetailsEvent(stream.handleOrderDetailsEvent)
@@ -167,27 +159,22 @@ func (s *Stream) handleAccountEvent(account okexapi.Account) {
 func (s *Stream) handleBookEvent(data BookEvent) {
 	book := data.Book()
 	switch data.Action {
-	case "snapshot":
+	case ActionTypeSnapshot:
 		s.EmitBookSnapshot(book)
-	case "update":
+	case ActionTypeUpdate:
 		s.EmitBookUpdate(book)
 	}
 }
 
-func (s *Stream) handleCandleEvent(candle Candle) {
-	key := CandleKey{Channel: candle.Channel, InstrumentID: candle.InstrumentID}
-	kline := candle.KLine()
-
-	// check if we need to close previous kline
-	lastCandle, ok := s.lastCandle[key]
-	if ok && candle.StartTime.After(lastCandle.StartTime) {
-		lastKline := lastCandle.KLine()
-		lastKline.Closed = true
-		s.EmitKLineClosed(lastKline)
+func (s *Stream) handleKLineEvent(k KLineEvent) {
+	for _, event := range k.Events {
+		kline := event.ToGlobal(types.Interval(k.Interval), k.Symbol)
+		if kline.Closed {
+			s.EmitKLineClosed(kline)
+		} else {
+			s.EmitKLine(kline)
+		}
 	}
-
-	s.EmitKLine(kline)
-	s.lastCandle[key] = candle
 }
 
 func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
@@ -207,12 +194,12 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *BookEvent:
 		// there's "books" for 400 depth and books5 for 5 depth
-		if et.channel != "books5" {
+		if et.channel != ChannelBook5 {
 			s.EmitBookEvent(*et)
 		}
 		s.EmitBookTickerUpdate(et.BookTicker())
-	case *Candle:
-		s.EmitCandleEvent(*et)
+	case *KLineEvent:
+		s.EmitKLineEvent(*et)
 
 	case *okexapi.Account:
 		s.EmitAccountEvent(*et)
