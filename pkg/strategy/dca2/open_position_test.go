@@ -47,10 +47,10 @@ func TestGenerateOpenPositionOrders(t *testing.T) {
 	strategy := newTestStrategy()
 
 	t.Run("case 1: all config is valid and we can place enough orders", func(t *testing.T) {
-		budget := Number("10500")
+		quoteInvestment := Number("10500")
 		askPrice := Number("30000")
 		margin := Number("0.05")
-		submitOrders, err := generateOpenPositionOrders(strategy.Market, budget, askPrice, margin, 4, strategy.OrderGroupID)
+		submitOrders, err := generateOpenPositionOrders(strategy.Market, quoteInvestment, askPrice, margin, 4, strategy.OrderGroupID)
 		if !assert.NoError(err) {
 			return
 		}
