@@ -26,6 +26,7 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+//go:generate callbackgen -type Strateg
 type Strategy struct {
 	*common.Strategy
 
@@ -188,10 +189,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 				// store persistence
 				bbgo.Sync(ctx, s)
 
+				// ready
+				s.EmitReady()
+
 				// start running state machine
 				s.runState(ctx)
-
-				s.EmitReady()
 			}
 		})
 	})
