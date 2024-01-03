@@ -143,10 +143,10 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 	req.Symbol(symbol)
 	resp, err := req.Do(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query ticker: %w", err)
+		return nil, fmt.Errorf("failed to query ticker, symbol: %s, err: %w", symbol, err)
 	}
 	if len(resp) != 1 {
-		return nil, fmt.Errorf("unexpected length of query single symbol: %+v", resp)
+		return nil, fmt.Errorf("unexpected length of query single symbol: %s, resp: %+v", symbol, resp)
 	}
 
 	ticker := toGlobalTicker(resp[0])
