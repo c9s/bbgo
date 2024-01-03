@@ -7,17 +7,16 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
 	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func toGlobalBalance(asset bitgetapi.AccountAsset) types.Balance {
+func toGlobalBalance(asset v2.AccountAsset) types.Balance {
 	return types.Balance{
-		Currency:          asset.CoinName,
+		Currency:          asset.Coin,
 		Available:         asset.Available,
-		Locked:            asset.Lock.Add(asset.Frozen),
+		Locked:            asset.Locked.Add(asset.Frozen),
 		Borrowed:          fixedpoint.Zero,
 		Interest:          fixedpoint.Zero,
 		NetAsset:          fixedpoint.Zero,

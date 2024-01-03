@@ -126,10 +126,10 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 	req.Symbol(symbol)
 	resp, err := req.Do(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query ticker: %w", err)
+		return nil, fmt.Errorf("failed to query ticker, symbol: %s, err: %w", symbol, err)
 	}
 	if len(resp) != 1 {
-		return nil, fmt.Errorf("unexpected length of query single symbol: %+v", resp)
+		return nil, fmt.Errorf("unexpected length of query single symbol: %s, resp: %+v", symbol, resp)
 	}
 
 	ticker := toGlobalTicker(resp[0])
@@ -237,7 +237,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
 	}
 
-	req := e.client.NewGetAccountAssetsRequest()
+	req := e.v2client.NewGetAccountAssetsRequest().AssetType(v2.AssetTypeHoldOnly)
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query account assets: %w", err)
@@ -246,7 +246,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	bals := types.BalanceMap{}
 	for _, asset := range resp {
 		b := toGlobalBalance(asset)
-		bals[asset.CoinName] = b
+		bals[asset.Coin] = b
 	}
 
 	return bals, nil
