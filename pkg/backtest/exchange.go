@@ -381,7 +381,6 @@ func (e *Exchange) SubscribeMarketData(
 		intervals = append(intervals, interval)
 	}
 
-	//_, isFutures, _, _ := exchange2.GetSessionAttributes(e.publicExchange)
 	var isFutures bool
 	if futuresExchange, ok := e.publicExchange.(types.FuturesExchange); ok {
 		isFutures = futuresExchange.GetFuturesSettings().IsFutures
