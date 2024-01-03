@@ -3,6 +3,8 @@ package dca2
 import (
 	"context"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
 type State int64
@@ -177,12 +179,13 @@ func (s *Strategy) runOpenPositionOrdersCancelled(ctx context.Context, next Stat
 	s.logger.Info("[State] OpenPositionOrdersCancelled -> TakeProfitReady")
 }
 
-func (s *Strategy) runTakeProfitReady(_ context.Context, next State) {
+func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 	// wait 3 seconds to avoid position not update
 	time.Sleep(3 * time.Second)
 
 	s.logger.Info("[State] TakeProfitReady - start reseting position and calculate quote investment for next round")
 	s.QuoteInvestment = s.QuoteInvestment.Add(s.Position.Quote)
+	s.ProfitStats.QuoteInvestment = s.QuoteInvestment
 
 	// reset position
 	s.Position.Reset()
@@ -190,6 +193,8 @@ func (s *Strategy) runTakeProfitReady(_ context.Context, next State) {
 	// reset
 	s.EmitProfit(s.ProfitStats)
 	s.ProfitStats.FinishRound()
+
+	bbgo.Sync(ctx, s)
 
 	// set the start time of the next round
 	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())
