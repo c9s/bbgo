@@ -235,13 +235,24 @@ func (s *Strategy) Close(ctx context.Context) error {
 
 	defer s.EmitClosed()
 
-	bbgo.Sync(ctx, s)
+	err := s.OrderExecutor.GracefulCancel(ctx, s.OrderExecutor.ActiveMakerOrders().Orders()...)
+	if err != nil {
+		s.logger.WithError(err).Errorf("[DCA] there are errors when cancelling orders at close")
+	}
 
-	return s.cancelAllOrders(ctx)
+	bbgo.Sync(ctx, s)
+	return err
 }
 
 func (s *Strategy) CleanUp(ctx context.Context) error {
 	_ = s.Initialize()
 	defer s.EmitClosed()
-	return s.cancelAllOrders(ctx)
+
+	err := s.OrderExecutor.GracefulCancel(ctx, s.OrderExecutor.ActiveMakerOrders().Orders()...)
+	if err != nil {
+		s.logger.WithError(err).Errorf("[DCA] there are errors when cancelling orders at clean up")
+	}
+
+	bbgo.Sync(ctx, s)
+	return err
 }

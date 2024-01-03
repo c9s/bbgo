@@ -107,24 +107,3 @@ func calculateNotionalAndNum(market types.Market, budget fixedpoint.Value, price
 
 	return fixedpoint.Zero, 0
 }
-
-func (s *Strategy) cancelAllOrders(ctx context.Context) error {
-	s.logger.Info("[DCA] cancel all orders")
-	e, ok := s.Session.Exchange.(cancelOrdersByGroupIDApi)
-	if ok {
-		cancelledOrders, err := e.CancelOrdersByGroupID(ctx, int64(s.OrderGroupID))
-		if err != nil {
-			return err
-		}
-
-		for _, cancelledOrder := range cancelledOrders {
-			s.logger.Info("CANCEL ", cancelledOrder.String())
-		}
-	} else {
-		if err := s.OrderExecutor.ActiveMakerOrders().GracefulCancel(ctx, s.Session.Exchange); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
