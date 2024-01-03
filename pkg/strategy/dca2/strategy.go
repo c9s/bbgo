@@ -235,7 +235,7 @@ func (s *Strategy) Close(ctx context.Context) error {
 
 	defer s.EmitClosed()
 
-	err := s.OrderExecutor.GracefulCancel(ctx, s.OrderExecutor.ActiveMakerOrders().Orders()...)
+	err := s.OrderExecutor.GracefulCancel(ctx)
 	if err != nil {
 		s.logger.WithError(err).Errorf("[DCA] there are errors when cancelling orders at close")
 	}
@@ -248,7 +248,7 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	_ = s.Initialize()
 	defer s.EmitClosed()
 
-	err := s.OrderExecutor.GracefulCancel(ctx, s.OrderExecutor.ActiveMakerOrders().Orders()...)
+	err := s.OrderExecutor.GracefulCancel(ctx)
 	if err != nil {
 		s.logger.WithError(err).Errorf("[DCA] there are errors when cancelling orders at clean up")
 	}
