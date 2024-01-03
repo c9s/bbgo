@@ -159,6 +159,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	s.OrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		s.ProfitStats.AddTrade(trade)
+		bbgo.Sync(ctx, s)
 	})
 
 	s.OrderExecutor.ActiveMakerOrders().OnFilled(func(o types.Order) {
@@ -206,6 +207,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 					s.logger.Infof("[DCA] recovered position %s", s.Position.String())
 					s.logger.Infof("[DCA] recovered quote investment %s", s.QuoteInvestment)
 					s.logger.Infof("[DCA] recovered startTimeOfNextRound %s", s.startTimeOfNextRound)
+
+					bbgo.Sync(ctx, s)
 				} else {
 					s.state = WaitToOpenPosition
 				}
