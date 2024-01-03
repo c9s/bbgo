@@ -256,11 +256,11 @@ func (e *Exchange) QueryKLines(
 	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
 ) ([]types.KLine, error) {
 	if options.EndTime != nil {
-		return e.srv.QueryKLinesBackward(e.sourceName, symbol, interval, *options.EndTime, 1000)
+		return e.srv.QueryKLinesBackward(e, symbol, interval, *options.EndTime, 1000)
 	}
 
 	if options.StartTime != nil {
-		return e.srv.QueryKLinesForward(e.sourceName, symbol, interval, *options.StartTime, 1000)
+		return e.srv.QueryKLinesForward(e, symbol, interval, *options.StartTime, 1000)
 	}
 
 	return nil, errors.New("endTime or startTime can not be nil")
@@ -381,7 +381,19 @@ func (e *Exchange) SubscribeMarketData(
 		intervals = append(intervals, interval)
 	}
 
-	log.Infof("querying klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
+	var isFutures bool
+	if futuresExchange, ok := e.publicExchange.(types.FuturesExchange); ok {
+		isFutures = futuresExchange.GetFuturesSettings().IsFutures
+	} else {
+		isFutures = false
+	}
+
+	if isFutures {
+		log.Infof("querying futures klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
+	} else {
+		log.Infof("querying klines from database with exchange: %v symbols: %v and intervals: %v for back-testing", e.Name(), symbols, intervals)
+	}
+
 	if len(symbols) == 0 {
 		log.Warnf("empty symbols, will not query kline data from the database")
 
@@ -390,7 +402,7 @@ func (e *Exchange) SubscribeMarketData(
 		return c, nil
 	}
 
-	klineC, errC := e.srv.QueryKLinesCh(startTime, endTime, e, symbols, intervals)
+	klineC, errC := e.srv.QueryKLinesCh(startTime, endTime, e.publicExchange, symbols, intervals)
 	go func() {
 		if err := <-errC; err != nil {
 			log.WithError(err).Error("backtest data feed error")
