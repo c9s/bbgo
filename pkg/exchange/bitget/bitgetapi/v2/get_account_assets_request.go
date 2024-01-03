@@ -31,7 +31,7 @@ type GetAccountAssetsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	coin      *string   `param:"symbol,query"`
-	assetType AssetType `param:"limit,query"`
+	assetType AssetType `param:"assetType,query"`
 }
 
 func (c *Client) NewGetAccountAssetsRequest() *GetAccountAssetsRequest {

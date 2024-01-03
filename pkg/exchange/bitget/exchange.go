@@ -254,7 +254,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
 	}
 
-	req := e.client.NewGetAccountAssetsRequest()
+	req := e.v2client.NewGetAccountAssetsRequest().AssetType(v2.AssetTypeHoldOnly)
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query account assets: %w", err)
@@ -263,7 +263,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	bals := types.BalanceMap{}
 	for _, asset := range resp {
 		b := toGlobalBalance(asset)
-		bals[asset.CoinName] = b
+		bals[asset.Coin] = b
 	}
 
 	return bals, nil

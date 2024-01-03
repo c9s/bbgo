@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
 	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -23,13 +22,13 @@ func Test_toGlobalBalance(t *testing.T) {
 	//        "lock":"0",
 	//        "uTime":"1622697148"
 	//    }
-	asset := bitgetapi.AccountAsset{
-		CoinId:    2,
-		CoinName:  "USDT",
-		Available: fixedpoint.NewFromFloat(1.2),
-		Frozen:    fixedpoint.NewFromFloat(0.5),
-		Lock:      fixedpoint.NewFromFloat(0.5),
-		UTime:     types.NewMillisecondTimestampFromInt(1622697148),
+	asset := v2.AccountAsset{
+		Coin:           "USDT",
+		Available:      fixedpoint.NewFromFloat(1.2),
+		Frozen:         fixedpoint.NewFromFloat(0.5),
+		Locked:         fixedpoint.NewFromFloat(0.5),
+		LimitAvailable: fixedpoint.Zero,
+		UpdatedTime:    types.NewMillisecondTimestampFromInt(1622697148),
 	}
 
 	assert.Equal(t, types.Balance{
