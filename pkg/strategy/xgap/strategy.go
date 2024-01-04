@@ -18,8 +18,6 @@ import (
 
 const ID = "xgap"
 
-const stateKey = "state-v1"
-
 var log = logrus.WithField("strategy", ID)
 
 var StepPercentageGap = fixedpoint.NewFromFloat(0.05)
@@ -76,6 +74,8 @@ type Strategy struct {
 	lastSourceKLine, lastTradingKLine types.KLine
 	sourceBook, tradingBook           *types.StreamOrderBook
 	groupID                           uint32
+
+	activeOrderBook *bbgo.ActiveOrderBook
 
 	stopC chan struct{}
 }
@@ -212,6 +212,9 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	instanceID := fmt.Sprintf("%s-%s", ID, s.Symbol)
 	s.groupID = util.FNV32(instanceID) % math.MaxInt32
 	log.Infof("using group id %d from fnv32(%s)", s.groupID, instanceID)
+
+	s.activeOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
+	s.activeOrderBook.BindStream(s.tradingSession.UserDataStream)
 
 	go func() {
 		ticker := time.NewTicker(
@@ -355,9 +358,11 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 					log.WithError(err).Error("order submit error")
 				}
 
+				s.activeOrderBook.Add(createdOrders...)
+
 				time.Sleep(time.Second)
 
-				if err := tradingSession.Exchange.CancelOrders(ctx, createdOrders...); err != nil {
+				if err := s.activeOrderBook.GracefulCancel(ctx, s.tradingSession.Exchange); err != nil {
 					log.WithError(err).Error("cancel order error")
 				}
 			}
