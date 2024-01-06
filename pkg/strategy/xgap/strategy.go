@@ -22,7 +22,7 @@ const ID = "xgap"
 var log = logrus.WithField("strategy", ID)
 
 var StepPercentageGap = fixedpoint.NewFromFloat(0.05)
-var NotionModifier = fixedpoint.NewFromFloat(1.01)
+
 var Two = fixedpoint.NewFromInt(2)
 
 func init() {
@@ -68,6 +68,7 @@ type Strategy struct {
 	TradingExchange string           `json:"tradingExchange"`
 	MinSpread       fixedpoint.Value `json:"minSpread"`
 	Quantity        fixedpoint.Value `json:"quantity"`
+	DryRun          bool             `json:"dryRun"`
 
 	DailyFeeBudgets map[string]fixedpoint.Value `json:"dailyFeeBudgets,omitempty"`
 	DailyMaxVolume  fixedpoint.Value            `json:"dailyMaxVolume,omitempty"`
@@ -320,10 +321,35 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 	log.Infof("mid price %s", midPrice.String())
 
 	var balances = s.tradingSession.GetAccount().Balances()
-	var quantity = s.tradingMarket.MinQuantity
+
+	baseBalance, ok := balances[s.tradingMarket.BaseCurrency]
+	if !ok {
+		log.Errorf("base balance %s not found", s.tradingMarket.BaseCurrency)
+		return
+	}
+	quoteBalance, ok := balances[s.tradingMarket.QuoteCurrency]
+	if !ok {
+		log.Errorf("quote balance %s not found", s.tradingMarket.QuoteCurrency)
+		return
+	}
+
+	minQuantity := s.tradingMarket.AdjustQuantityByMinNotional(s.tradingMarket.MinQuantity, price)
+
+	if baseBalance.Available.Compare(minQuantity) < 0 {
+		log.Infof("base balance: %s is not enough, skip", baseBalance.Available.String())
+		return
+	}
+
+	if quoteBalance.Available.Div(price).Compare(minQuantity) < 0 {
+		log.Infof("quote balance: %s is not enough, skip", quoteBalance.Available.String())
+		return
+	}
+
+	maxQuantity := fixedpoint.Min(baseBalance.Available, quoteBalance.Available.Div(price))
+	quantity := minQuantity
 
 	if s.Quantity.Sign() > 0 {
-		quantity = fixedpoint.Min(s.Quantity, s.tradingMarket.MinQuantity)
+		quantity = fixedpoint.Max(s.Quantity, quantity)
 	} else if s.SimulateVolume {
 		s.mu.Lock()
 		if s.lastTradingKLine.Volume.Sign() > 0 && s.lastSourceKLine.Volume.Sign() > 0 {
@@ -337,15 +363,6 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 			if volumeDiff.Sign() > 0 {
 				quantity = volumeDiff
 			}
-
-			if baseBalance, ok := balances[s.tradingMarket.BaseCurrency]; ok {
-				quantity = fixedpoint.Min(quantity, baseBalance.Available)
-			}
-
-			if quoteBalance, ok := balances[s.tradingMarket.QuoteCurrency]; ok {
-				maxQuantity := quoteBalance.Available.Div(price)
-				quantity = fixedpoint.Min(quantity, maxQuantity)
-			}
 		}
 		s.mu.Unlock()
 	} else {
@@ -354,33 +371,37 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		quantity = quantity.Mul(fixedpoint.NewFromFloat(jitter))
 	}
 
-	var quoteAmount = price.Mul(quantity)
-	if quoteAmount.Compare(s.tradingMarket.MinNotional) <= 0 {
-		quantity = fixedpoint.Max(
-			s.tradingMarket.MinQuantity,
-			s.tradingMarket.MinNotional.Mul(NotionModifier).Div(price))
+	quantity = fixedpoint.Min(quantity, maxQuantity)
+
+	orderForms := []types.SubmitOrder{
+		{
+			Symbol:   s.Symbol,
+			Side:     types.SideTypeBuy,
+			Type:     types.OrderTypeLimit,
+			Quantity: quantity,
+			Price:    price,
+			Market:   s.tradingMarket,
+		},
+		{
+			Symbol:   s.Symbol,
+			Side:     types.SideTypeSell,
+			Type:     types.OrderTypeLimit,
+			Quantity: quantity,
+			Price:    price,
+			Market:   s.tradingMarket,
+		},
+	}
+	log.Infof("order forms: %+v", orderForms)
+
+	if s.DryRun {
+		log.Infof("dry run, skip")
+		return
 	}
 
-	orderForms := []types.SubmitOrder{{
-		Symbol:   s.Symbol,
-		Side:     types.SideTypeBuy,
-		Type:     types.OrderTypeLimit,
-		Quantity: quantity,
-		Price:    price,
-		Market:   s.tradingMarket,
-	}, {
-		Symbol:   s.Symbol,
-		Side:     types.SideTypeSell,
-		Type:     types.OrderTypeLimit,
-		Quantity: quantity,
-		Price:    price,
-		Market:   s.tradingMarket,
-	}}
-	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
+	_, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
 	if err != nil {
 		log.WithError(err).Error("order submit error")
 	}
-	log.Infof("created orders: %+v", createdOrders)
 
 	time.Sleep(time.Second)
 }
