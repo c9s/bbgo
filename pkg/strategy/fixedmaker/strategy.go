@@ -35,6 +35,8 @@ type Strategy struct {
 	OrderType  types.OrderType  `json:"orderType"`
 	DryRun     bool             `json:"dryRun"`
 
+	InventorySkew InventorySkew `json:"inventorySkew"`
+
 	activeOrderBook *bbgo.ActiveOrderBook
 }
 
@@ -69,6 +71,10 @@ func (s *Strategy) Validate() error {
 
 	if s.HalfSpread.Float64() <= 0 {
 		return fmt.Errorf("halfSpread should be positive")
+	}
+
+	if err := s.InventorySkew.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -123,7 +129,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 }
 
 func (s *Strategy) cancelOrders(ctx context.Context) {
-	if err := s.Session.Exchange.CancelOrders(ctx, s.activeOrderBook.Orders()...); err != nil {
+	if err := s.activeOrderBook.GracefulCancel(ctx, s.Session.Exchange); err != nil {
 		log.WithError(err).Errorf("failed to cancel orders")
 	}
 }
@@ -180,6 +186,21 @@ func (s *Strategy) generateOrders(ctx context.Context) ([]types.SubmitOrder, err
 	buyPrice := midPrice.Mul(fixedpoint.One.Sub(s.HalfSpread)).Round(s.Market.PricePrecision, fixedpoint.Down)
 	log.Infof("sell price: %s, buy price: %s", sellPrice.String(), buyPrice.String())
 
+	buyQuantity := s.Quantity
+	sellQuantity := s.Quantity
+	if !s.InventorySkew.InventoryRangeMultiplier.IsZero() {
+		ratios := s.InventorySkew.CalculateBidAskRatios(
+			s.Quantity,
+			midPrice,
+			baseBalance.Total(),
+			quoteBalance.Total(),
+		)
+		log.Infof("bid ratio: %s, ask ratio: %s", ratios.BidRatio.String(), ratios.AskRatio.String())
+		buyQuantity = s.Quantity.Mul(ratios.BidRatio)
+		sellQuantity = s.Quantity.Mul(ratios.AskRatio)
+		log.Infof("buy quantity: %s, sell quantity: %s", buyQuantity.String(), sellQuantity.String())
+	}
+
 	// check balance and generate orders
 	amount := s.Quantity.Mul(buyPrice)
 	if quoteBalance.Available.Compare(amount) > 0 {
@@ -188,7 +209,7 @@ func (s *Strategy) generateOrders(ctx context.Context) ([]types.SubmitOrder, err
 			Side:     types.SideTypeBuy,
 			Type:     s.OrderType,
 			Price:    buyPrice,
-			Quantity: s.Quantity,
+			Quantity: buyQuantity,
 		})
 	} else {
 		log.Infof("not enough quote balance to buy, available: %s, amount: %s", quoteBalance.Available, amount)
@@ -200,7 +221,7 @@ func (s *Strategy) generateOrders(ctx context.Context) ([]types.SubmitOrder, err
 			Side:     types.SideTypeSell,
 			Type:     s.OrderType,
 			Price:    sellPrice,
-			Quantity: s.Quantity,
+			Quantity: sellQuantity,
 		})
 	} else {
 		log.Infof("not enough base balance to sell, available: %s, quantity: %s", baseBalance.Available, s.Quantity)
