@@ -1,39 +1,13 @@
 ---
-notifications:
-  slack:
-    defaultChannel: "bbgo"
-    errorChannel: "bbgo-error"
-  switches:
-    trade: true
-    orderUpdate: true
-    submitOrder: true
-
-backtest:
-  startTime: "2022-01-01"
-  endTime: "2022-10-01"
-  symbols:
-    - BTCUSDT
-    - ETHUSDT
-    - MAXUSDT
-  account:
-    max:
-      makerFeeRate: 0.075%
-      takerFeeRate: 0.075%
-      balances:
-        BTC: 0.0
-        ETH: 0.0
-        MAX: 0.0
-        USDT: 10000.0
-
 exchangeStrategies:
   - on: max
     rebalance:
-      cronExpression: "@every 1s"
-      quoteCurrency: USDT
+      schedule: "@every 1s"
+      quoteCurrency: TWD
       targetWeights:
-        BTC: 50%
-        ETH: 25%
-        USDT: 25%
+        BTC: 60%
+        ETH: 30%
+        TWD: 10%
       threshold: 1%
       maxAmount: 1_000 # max amount to buy or sell per order
       orderType: LIMIT_MAKER # LIMIT, LIMIT_MAKER or MARKET
