@@ -126,7 +126,7 @@ func (s *Strategy) isBudgetAllowed() bool {
 }
 
 func (s *Strategy) handleTradeUpdate(trade types.Trade) {
-	log.Infof("received trade %+v", trade)
+	log.Infof("received trade %s", trade.String())
 
 	if trade.Symbol != s.Symbol {
 		return
@@ -209,15 +209,11 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	// from here, set data binding
 	s.sourceSession.MarketDataStream.OnKLine(func(kline types.KLine) {
-		log.Infof("source exchange %s price: %s volume: %s",
-			s.Symbol, kline.Close.String(), kline.Volume.String())
 		s.mu.Lock()
 		s.lastSourceKLine = kline
 		s.mu.Unlock()
 	})
 	s.tradingSession.MarketDataStream.OnKLine(func(kline types.KLine) {
-		log.Infof("trading exchange %s price: %s volume: %s",
-			s.Symbol, kline.Close.String(), kline.Volume.String())
 		s.mu.Lock()
 		s.lastTradingKLine = kline
 		s.mu.Unlock()
@@ -296,8 +292,8 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 
 		// if the spread is less than 100 ticks (100 pips), skip
 		if spread.Compare(s.tradingMarket.TickSize.MulExp(2)) < 0 {
-			log.Warnf("spread too small, we can't place orders: spread=%v bid=%v ask=%v",
-				spread, bestBid.Price, bestAsk.Price)
+			log.Warnf("spread too small, we can't place orders: spread=%s bid=%s ask=%s",
+				spread.String(), bestBid.Price.String(), bestAsk.Price.String())
 			return
 		}
 
@@ -313,15 +309,15 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 
 	var spread = bestAsk.Price.Sub(bestBid.Price)
 	var spreadPercentage = spread.Div(bestAsk.Price)
-	log.Infof("spread=%v %s ask=%v bid=%v",
-		spread, spreadPercentage.Percentage(),
-		bestAsk.Price, bestBid.Price)
+	log.Infof("spread=%s %s ask=%s bid=%s",
+		spread.String(), spreadPercentage.Percentage(),
+		bestAsk.Price.String(), bestBid.Price.String())
 	// var spreadPercentage = spread.Float64() / bestBid.Price.Float64()
 
 	var midPrice = bestAsk.Price.Add(bestBid.Price).Div(Two)
 	var price = midPrice
 
-	log.Infof("mid price %v", midPrice)
+	log.Infof("mid price %s", midPrice.String())
 
 	var balances = s.tradingSession.GetAccount().Balances()
 	var quantity = s.tradingMarket.MinQuantity
@@ -331,6 +327,11 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 	} else if s.SimulateVolume {
 		s.mu.Lock()
 		if s.lastTradingKLine.Volume.Sign() > 0 && s.lastSourceKLine.Volume.Sign() > 0 {
+			log.Infof("trading exchange %s price: %s volume: %s",
+				s.Symbol, s.lastTradingKLine.Close.String(), s.lastTradingKLine.Volume.String())
+			log.Infof("source exchange %s price: %s volume: %s",
+				s.Symbol, s.lastSourceKLine.Close.String(), s.lastSourceKLine.Volume.String())
+
 			volumeDiff := s.lastSourceKLine.Volume.Sub(s.lastTradingKLine.Volume)
 			// change the current quantity only diff is positive
 			if volumeDiff.Sign() > 0 {
@@ -360,7 +361,7 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 			s.tradingMarket.MinNotional.Mul(NotionModifier).Div(price))
 	}
 
-	orderForm := []types.SubmitOrder{{
+	orderForms := []types.SubmitOrder{{
 		Symbol:   s.Symbol,
 		Side:     types.SideTypeBuy,
 		Type:     types.OrderTypeLimit,
@@ -375,7 +376,7 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		Price:    price,
 		Market:   s.tradingMarket,
 	}}
-	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForm...)
+	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
 	if err != nil {
 		log.WithError(err).Error("order submit error")
 	}
