@@ -28,10 +28,10 @@ type Strategy struct {
 	Environment *bbgo.Environment
 	Market      types.Market
 
-	Symbol         string `json:"symbol"`
-	CronExpression string `json:"cronExpression"`
-	OnStart        bool   `json:"onStart"`
-	DryRun         bool   `json:"dryRun"`
+	Symbol   string `json:"symbol"`
+	Schedule string `json:"schedule"`
+	OnStart  bool   `json:"onStart"`
+	DryRun   bool   `json:"dryRun"`
 
 	bbgo.QuantityOrAmount
 	cron *cron.Cron
@@ -55,8 +55,8 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Validate() error {
-	if s.CronExpression == "" {
-		return fmt.Errorf("cronExpression is required")
+	if s.Schedule == "" {
+		return fmt.Errorf("schedule is required")
 	}
 
 	if err := s.QuantityOrAmount.Validate(); err != nil {
@@ -83,7 +83,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	s.cron = cron.New()
-	s.cron.AddFunc(s.CronExpression, s.placeOrder)
+	s.cron.AddFunc(s.Schedule, s.placeOrder)
 	s.cron.Start()
 
 	return nil

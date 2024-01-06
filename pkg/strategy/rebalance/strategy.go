@@ -27,14 +27,14 @@ type Strategy struct {
 
 	Environment *bbgo.Environment
 
-	CronExpression string           `json:"cronExpression"`
-	QuoteCurrency  string           `json:"quoteCurrency"`
-	TargetWeights  types.ValueMap   `json:"targetWeights"`
-	Threshold      fixedpoint.Value `json:"threshold"`
-	MaxAmount      fixedpoint.Value `json:"maxAmount"` // max amount to buy or sell per order
-	OrderType      types.OrderType  `json:"orderType"`
-	DryRun         bool             `json:"dryRun"`
-	OnStart        bool             `json:"onStart"` // rebalance on start
+	Schedule      string           `json:"schedule"`
+	QuoteCurrency string           `json:"quoteCurrency"`
+	TargetWeights types.ValueMap   `json:"targetWeights"`
+	Threshold     fixedpoint.Value `json:"threshold"`
+	MaxAmount     fixedpoint.Value `json:"maxAmount"` // max amount to buy or sell per order
+	OrderType     types.OrderType  `json:"orderType"`
+	DryRun        bool             `json:"dryRun"`
+	OnStart       bool             `json:"onStart"` // rebalance on start
 
 	symbols         []string
 	markets         map[string]types.Market
@@ -130,7 +130,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	s.cron = cron.New()
-	s.cron.AddFunc(s.CronExpression, func() {
+	s.cron.AddFunc(s.Schedule, func() {
 		s.rebalance(ctx)
 	})
 	s.cron.Start()
