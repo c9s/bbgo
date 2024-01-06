@@ -6,6 +6,7 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
+    publicOnly: true
 
 backtest:
   startTime: "2023-01-01"
@@ -25,11 +26,11 @@ crossExchangeStrategies:
   - xfixedmaker:
       tradingExchange: max
       symbol: BTCUSDT
-      interval: 5m
+      interval: 1m
       halfSpread: 0.01%
       quantity: 0.005
       orderType: LIMIT_MAKER
-      dryRun: false
+      dryRun: true
 
       referenceExchange: binance
       referencePriceEMA:
@@ -44,3 +45,7 @@ crossExchangeStrategies:
       circuitBreakEMA:
         interval: 1m
         window: 14
+
+      inventorySkew:
+        inventoryRangeMultiplier: 1.0
+        targetBaseRatio: 0.5
