@@ -1,3 +1,6 @@
+* [English👈](./README.md)
+* [中文](./README.zh_TW.md)
+
 # BBGO
 
 A modern crypto trading bot framework written in Go.
@@ -645,7 +648,9 @@ See [Contributing](./CONTRIBUTING.md)
 
 ### Financial Contributors
 
-<object type="image/svg+xml" data="https://opencollective.com/bbgo/tiers/backer.svg?avatarHeight=36&width=600"></object>
+[[Become a backer](https://opencollective.com/bbgo#backer)]
+
+<a href="https://opencollective.com/bbgo#backers" target="_blank"><img src="https://opencollective.com/bbgo/tiers/backer.svg?width=890"></a>
 
 ## BBGO Tokenomics
 
