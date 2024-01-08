@@ -20,7 +20,7 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 		return err
 	}
 
-	orders, err := generateOpenPositionOrders(s.Market, s.QuoteInvestment, price, s.PriceDeviation, s.MaxOrderCount, s.OrderGroupID)
+	orders, err := generateOpenPositionOrders(s.Market, s.ProfitStats.QuoteInvestment, price, s.PriceDeviation, s.MaxOrderCount, s.OrderGroupID)
 	if err != nil {
 		return err
 	}

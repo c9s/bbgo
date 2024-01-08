@@ -123,11 +123,18 @@ func (s *Strategy) triggerNextState() {
 	}
 }
 
-func (s *Strategy) runWaitToOpenPositionState(_ context.Context, next State) {
+func (s *Strategy) runWaitToOpenPositionState(ctx context.Context, next State) {
 	s.logger.Info("[State] WaitToOpenPosition - check startTimeOfNextRound")
 	if time.Now().Before(s.startTimeOfNextRound) {
 		return
 	}
+
+	// reset position and open new round for profit stats before position opening
+	s.Position.Reset()
+	s.ProfitStats.NewRound()
+
+	// store into redis
+	bbgo.Sync(ctx, s)
 
 	s.state = PositionOpening
 	s.logger.Info("[State] WaitToOpenPosition -> PositionOpening")
@@ -184,17 +191,12 @@ func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 	time.Sleep(3 * time.Second)
 
 	s.logger.Info("[State] TakeProfitReady - start reseting position and calculate quote investment for next round")
-	s.QuoteInvestment = s.QuoteInvestment.Add(s.Position.Quote)
-	s.ProfitStats.QuoteInvestment = s.QuoteInvestment
 
-	// reset position
-	s.Position.Reset()
-
-	// reset
-	s.EmitProfit(s.ProfitStats)
-	s.ProfitStats.FinishRound()
-
+	// calculate profit stats
+	s.ProfitStats.CalculateProfitOfRound(ctx, s.Session.Exchange)
 	bbgo.Sync(ctx, s)
+
+	s.EmitProfit(s.ProfitStats)
 
 	// set the start time of the next round
 	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())
