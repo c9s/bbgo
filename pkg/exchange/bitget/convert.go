@@ -25,9 +25,10 @@ func toGlobalBalance(asset v2.AccountAsset) types.Balance {
 }
 
 func toGlobalMarket(s v2.Symbol) types.Market {
-	if s.Status != v2.SymbolOnline {
-		log.Warnf("The symbol %s is not online", s.Symbol)
+	if s.Status != v2.SymbolStatusOnline {
+		log.Warnf("The market symbol status %s is not online: %s", s.Symbol, s.Status)
 	}
+
 	return types.Market{
 		Symbol:          s.Symbol,
 		LocalSymbol:     s.Symbol,

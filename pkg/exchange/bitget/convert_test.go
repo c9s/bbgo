@@ -44,7 +44,7 @@ func Test_toGlobalBalance(t *testing.T) {
 
 func Test_toGlobalMarket(t *testing.T) {
 	// sample:
-	//{
+	// {
 	//   "symbol":"BTCUSDT",
 	//   "baseCoin":"BTC",
 	//   "quoteCoin":"USDT",
@@ -59,7 +59,7 @@ func Test_toGlobalMarket(t *testing.T) {
 	//   "minTradeUSDT":"5",
 	//   "buyLimitPriceRatio":"0.05",
 	//   "sellLimitPriceRatio":"0.05"
-	//}
+	// }
 	inst := v2.Symbol{
 		Symbol:              "BTCUSDT",
 		BaseCoin:            "BTC",
@@ -72,7 +72,7 @@ func Test_toGlobalMarket(t *testing.T) {
 		QuantityPrecision:   fixedpoint.NewFromFloat(4),
 		QuotePrecision:      fixedpoint.NewFromFloat(6),
 		MinTradeUSDT:        fixedpoint.NewFromFloat(5),
-		Status:              v2.SymbolOnline,
+		Status:              v2.SymbolStatusOnline,
 		BuyLimitPriceRatio:  fixedpoint.NewFromFloat(0.05),
 		SellLimitPriceRatio: fixedpoint.NewFromFloat(0.05),
 	}
@@ -99,7 +99,7 @@ func Test_toGlobalMarket(t *testing.T) {
 
 func Test_toGlobalTicker(t *testing.T) {
 	// sample:
-	//{
+	// {
 	//   "open":"36465.96",
 	//   "symbol":"BTCUSDT",
 	//   "high24h":"37040.25",
@@ -116,7 +116,7 @@ func Test_toGlobalTicker(t *testing.T) {
 	//   "openUtc":"36465.96",
 	//   "changeUtc24h":"0.00599",
 	//   "change24h":"-0.00426"
-	//}
+	// }
 	ticker := v2.Ticker{
 		Symbol:       "BTCUSDT",
 		High24H:      fixedpoint.NewFromFloat(24175.65),
@@ -540,7 +540,7 @@ func Test_toGlobalTrade(t *testing.T) {
 	//   "tradeScope":"taker",
 	//   "cTime":"1699020564676",
 	//   "uTime":"1699020564687"
-	//}
+	// }
 	trade := v2.Trade{
 		UserId:    types.StrInt64(8672173294),
 		Symbol:    "APEUSDT",
