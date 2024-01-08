@@ -55,9 +55,9 @@ func toGlobalBalance(account *okexapi.Account) types.BalanceMap {
 }
 
 type WebsocketSubscription struct {
-	Channel        string `json:"channel"`
-	InstrumentID   string `json:"instId,omitempty"`
-	InstrumentType string `json:"instType,omitempty"`
+	Channel        Channel `json:"channel"`
+	InstrumentID   string  `json:"instId,omitempty"`
+	InstrumentType string  `json:"instType,omitempty"`
 }
 
 var CandleChannels = []string{
@@ -92,18 +92,23 @@ func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
 	case types.KLineChannel:
 		// Channel names are:
 		return WebsocketSubscription{
-			Channel:      convertIntervalToCandle(s.Options.Interval),
+			Channel:      Channel(convertIntervalToCandle(s.Options.Interval)),
 			InstrumentID: toLocalSymbol(s.Symbol),
 		}, nil
 
 	case types.BookChannel:
 		return WebsocketSubscription{
-			Channel:      "books",
+			Channel:      ChannelBooks,
 			InstrumentID: toLocalSymbol(s.Symbol),
 		}, nil
 	case types.BookTickerChannel:
 		return WebsocketSubscription{
-			Channel:      "books5",
+			Channel:      ChannelBook5,
+			InstrumentID: toLocalSymbol(s.Symbol),
+		}, nil
+	case types.MarketTradeChannel:
+		return WebsocketSubscription{
+			Channel:      ChannelMarketTrades,
 			InstrumentID: toLocalSymbol(s.Symbol),
 		}, nil
 	}

@@ -2,11 +2,16 @@ package okex
 
 import (
 	"context"
+	"golang.org/x/time/rate"
 	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/types"
+)
+
+var (
+	tradeLogLimiter = rate.NewLimiter(rate.Every(time.Minute), 1)
 )
 
 type WebsocketOp struct {
@@ -33,6 +38,7 @@ type Stream struct {
 	eventCallbacks             []func(event WebSocketEvent)
 	accountEventCallbacks      []func(account okexapi.Account)
 	orderDetailsEventCallbacks []func(orderDetails []okexapi.OrderDetails)
+	marketTradeEventCallbacks  []func(tradeDetail []MarketTradeEvent)
 }
 
 func NewStream(client *okexapi.RestClient) *Stream {
@@ -48,6 +54,7 @@ func NewStream(client *okexapi.RestClient) *Stream {
 	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnAccountEvent(stream.handleAccountEvent)
+	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
 	stream.OnOrderDetailsEvent(stream.handleOrderDetailsEvent)
 	stream.OnEvent(stream.handleEvent)
 	stream.OnConnect(stream.handleConnect)
@@ -166,6 +173,20 @@ func (s *Stream) handleBookEvent(data BookEvent) {
 	}
 }
 
+func (s *Stream) handleMarketTradeEvent(data []MarketTradeEvent) {
+	for _, event := range data {
+		trade, err := event.toGlobalTrade()
+		if err != nil {
+			if tradeLogLimiter.Allow() {
+				log.WithError(err).Error("failed to convert to market trade")
+			}
+			continue
+		}
+
+		s.EmitMarketTrade(trade)
+	}
+}
+
 func (s *Stream) handleKLineEvent(k KLineEvent) {
 	for _, event := range k.Events {
 		kline := event.ToGlobal(types.Interval(k.Interval), k.Symbol)
@@ -206,6 +227,9 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case []okexapi.OrderDetails:
 		s.EmitOrderDetailsEvent(et)
+
+	case []MarketTradeEvent:
+		s.EmitMarketTradeEvent(et)
 
 	}
 }
