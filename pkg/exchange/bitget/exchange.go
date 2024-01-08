@@ -111,6 +111,11 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 	markets := types.MarketMap{}
 	for _, s := range symbols {
+		if s.Status == v2.SymbolStatusOffline {
+			// ignore offline symbols
+			continue
+		}
+
 		markets[s.Symbol] = toGlobalMarket(s)
 	}
 
