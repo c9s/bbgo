@@ -48,4 +48,21 @@ func TestStream(t *testing.T) {
 		c := make(chan struct{})
 		<-c
 	})
+	t.Run("kline test", func(t *testing.T) {
+		s.Subscribe(types.KLineChannel, "LTC-USD-200327", types.SubscribeOptions{
+			Interval: types.Interval1m,
+		})
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnKLine(func(kline types.KLine) {
+			t.Log("got update", kline)
+		})
+		s.OnKLineClosed(func(kline types.KLine) {
+			t.Log("got closed", kline)
+		})
+		c := make(chan struct{})
+		<-c
+	})
 }
