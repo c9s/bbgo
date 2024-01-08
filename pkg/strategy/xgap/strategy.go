@@ -336,12 +336,12 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 	minQuantity := s.tradingMarket.AdjustQuantityByMinNotional(s.tradingMarket.MinQuantity, price)
 
 	if baseBalance.Available.Compare(minQuantity) < 0 {
-		log.Infof("base balance: %s is not enough, skip", baseBalance.Available.String())
+		log.Infof("base balance: %s %s is not enough, skip", baseBalance.Available.String(), s.tradingMarket.BaseCurrency)
 		return
 	}
 
 	if quoteBalance.Available.Div(price).Compare(minQuantity) < 0 {
-		log.Infof("quote balance: %s is not enough, skip", quoteBalance.Available.String())
+		log.Infof("quote balance: %s %s is not enough, skip", quoteBalance.Available.String(), s.tradingMarket.QuoteCurrency)
 		return
 	}
 
