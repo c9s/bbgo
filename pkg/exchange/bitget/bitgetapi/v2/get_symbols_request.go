@@ -12,12 +12,14 @@ import (
 type SymbolStatus string
 
 const (
-	// SymbolOffline represent market is suspended, users cannot trade.
-	SymbolOffline SymbolStatus = "offline"
-	// SymbolGray represents market is online, but user trading is not available.
-	SymbolGray SymbolStatus = "gray"
-	// SymbolOnline trading begins, users can trade.
-	SymbolOnline SymbolStatus = "online"
+	// SymbolStatusOffline represent market is suspended, users cannot trade.
+	SymbolStatusOffline SymbolStatus = "offline"
+
+	// SymbolStatusGray represents market is online, but user trading is not available.
+	SymbolStatusGray SymbolStatus = "gray"
+
+	// SymbolStatusOnline trading begins, users can trade.
+	SymbolStatusOnline SymbolStatus = "online"
 )
 
 type Symbol struct {
