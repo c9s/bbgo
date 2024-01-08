@@ -48,6 +48,20 @@ func TestStream(t *testing.T) {
 		c := make(chan struct{})
 		<-c
 	})
+
+	t.Run("market trade test", func(t *testing.T) {
+		s.Subscribe(types.MarketTradeChannel, "BTCUSDT", types.SubscribeOptions{})
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnMarketTrade(func(trade types.Trade) {
+			t.Log("got trade upgrade", trade)
+		})
+		c := make(chan struct{})
+		<-c
+	})
+
 	t.Run("kline test", func(t *testing.T) {
 		s.Subscribe(types.KLineChannel, "LTC-USD-200327", types.SubscribeOptions{
 			Interval: types.Interval1m,
