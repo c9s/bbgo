@@ -1,6 +1,10 @@
 package dca2
 
 import (
+	"context"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -11,8 +15,7 @@ type ProfitStats struct {
 	Symbol string       `json:"symbol"`
 	Market types.Market `json:"market,omitempty"`
 
-	CreatedAt       time.Time        `json:"since,omitempty"`
-	UpdatedAt       time.Time        `json:"updatedAt,omitempty"`
+	FromOrderID     uint64           `json:"fromOrderID,omitempty"`
 	Round           int64            `json:"round,omitempty"`
 	QuoteInvestment fixedpoint.Value `json:"quoteInvestment,omitempty"`
 
@@ -29,8 +32,6 @@ func newProfitStats(market types.Market, quoteInvestment fixedpoint.Value) *Prof
 	return &ProfitStats{
 		Symbol:          market.Symbol,
 		Market:          market,
-		CreatedAt:       time.Now(),
-		UpdatedAt:       time.Now(),
 		Round:           0,
 		QuoteInvestment: quoteInvestment,
 		RoundFee:        make(map[string]fixedpoint.Value),
@@ -70,21 +71,82 @@ func (s *ProfitStats) AddTrade(trade types.Trade) {
 		s.TotalFee[trade.FeeCurrency] = trade.Fee
 	}
 
-	switch trade.Side {
-	case types.SideTypeSell:
-		s.RoundProfit = s.RoundProfit.Add(trade.QuoteQuantity)
-		s.TotalProfit = s.TotalProfit.Add(trade.QuoteQuantity)
-	case types.SideTypeBuy:
-		s.RoundProfit = s.RoundProfit.Sub(trade.QuoteQuantity)
-		s.TotalProfit = s.TotalProfit.Sub(trade.QuoteQuantity)
-	default:
+	quoteQuantity := trade.QuoteQuantity
+	if trade.Side == types.SideTypeBuy {
+		quoteQuantity = quoteQuantity.Neg()
 	}
 
-	s.UpdatedAt = trade.Time.Time()
+	s.RoundProfit = s.RoundProfit.Add(quoteQuantity)
+	s.TotalProfit = s.TotalProfit.Add(quoteQuantity)
+
+	if s.Market.QuoteCurrency == trade.FeeCurrency {
+		s.RoundProfit.Sub(trade.Fee)
+		s.TotalProfit.Sub(trade.Fee)
+	}
 }
 
-func (s *ProfitStats) FinishRound() {
+func (s *ProfitStats) NewRound() {
 	s.Round++
 	s.RoundProfit = fixedpoint.Zero
 	s.RoundFee = make(map[string]fixedpoint.Value)
+}
+
+func (s *ProfitStats) CalculateProfitOfRound(ctx context.Context, exchange types.Exchange) error {
+	historyService, ok := exchange.(types.ExchangeTradeHistoryService)
+	if !ok {
+		return fmt.Errorf("exchange %s doesn't support ExchangeTradeHistoryService", exchange.Name())
+	}
+
+	queryService, ok := exchange.(types.ExchangeOrderQueryService)
+	if !ok {
+		return fmt.Errorf("exchange %s doesn't support ExchangeOrderQueryService", exchange.Name())
+	}
+
+	// query the orders of this round
+	orders, err := historyService.QueryClosedOrders(ctx, s.Symbol, time.Time{}, time.Time{}, s.FromOrderID)
+	if err != nil {
+		return err
+	}
+
+	// query the trades of this round
+	for _, order := range orders {
+		if order.ExecutedQuantity.Sign() == 0 {
+			// skip no trade orders
+			continue
+		}
+
+		trades, err := queryService.QueryOrderTrades(ctx, types.OrderQuery{
+			Symbol:  order.Symbol,
+			OrderID: strconv.FormatUint(order.OrderID, 10),
+		})
+
+		if err != nil {
+			return err
+		}
+
+		for _, trade := range trades {
+			s.AddTrade(trade)
+		}
+	}
+
+	s.FromOrderID = s.FromOrderID + 1
+	s.QuoteInvestment = s.QuoteInvestment.Add(s.RoundProfit)
+
+	return nil
+}
+
+func (s *ProfitStats) String() string {
+	var sb strings.Builder
+	sb.WriteString("[------------------ Profit Stats ------------------]\n")
+	sb.WriteString(fmt.Sprintf("Round: %d\n", s.Round))
+	sb.WriteString(fmt.Sprintf("From Order ID: %d\n", s.FromOrderID))
+	sb.WriteString(fmt.Sprintf("Quote Investment: %s\n", s.QuoteInvestment))
+	sb.WriteString(fmt.Sprintf("Round Profit: %s\n", s.RoundProfit))
+	sb.WriteString(fmt.Sprintf("Total Profit: %s\n", s.TotalProfit))
+	for currency, fee := range s.RoundFee {
+		sb.WriteString(fmt.Sprintf("FEE (%s): %s\n", currency, fee))
+	}
+	sb.WriteString("[------------------ Profit Stats ------------------]\n")
+
+	return sb.String()
 }

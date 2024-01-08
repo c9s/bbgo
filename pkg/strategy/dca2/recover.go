@@ -35,7 +35,6 @@ func (s *Strategy) recover(ctx context.Context) error {
 	}
 
 	closedOrders, err := queryService.QueryClosedOrdersDesc(ctx, s.Symbol, time.Date(2024, time.January, 1, 0, 0, 0, 0, time.Local), time.Now(), 0)
-	// closedOrders, err := queryService.QueryClosedOrdersDesc(ctx, s.Symbol, time.Time{}, time.Now(), 0)
 	if err != nil {
 		return err
 	}
@@ -57,16 +56,13 @@ func (s *Strategy) recover(ctx context.Context) error {
 		return err
 	}
 
-	// recover quote investment
-	quoteInvestment := recoverQuoteInvestment(currentRound)
+	// recover profit stats
+	recoverProfitStats(ctx, s.ProfitStats, s.Session.Exchange)
 
 	// recover startTimeOfNextRound
 	startTimeOfNextRound := recoverStartTimeOfNextRound(ctx, currentRound, s.CoolDownInterval)
 
 	s.state = state
-	if !quoteInvestment.IsZero() {
-		s.QuoteInvestment = quoteInvestment
-	}
 	s.startTimeOfNextRound = startTimeOfNextRound
 
 	return nil
@@ -155,7 +151,7 @@ func recoverState(ctx context.Context, symbol string, maxOrderCount int, openOrd
 
 func recoverPosition(ctx context.Context, position *types.Position, queryService RecoverApiQueryService, currentRound Round) error {
 	if position == nil {
-		return nil
+		return fmt.Errorf("position is nil, please check it")
 	}
 
 	var positionOrders []types.Order
@@ -189,6 +185,16 @@ func recoverPosition(ctx context.Context, position *types.Position, queryService
 
 		position.AddTrades(trades)
 	}
+
+	return nil
+}
+
+func recoverProfitStats(ctx context.Context, profitStats *ProfitStats, exchange types.Exchange) error {
+	if profitStats == nil {
+		return fmt.Errorf("profit stats is nil, please check it")
+	}
+
+	profitStats.CalculateProfitOfRound(ctx, exchange)
 
 	return nil
 }

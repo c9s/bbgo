@@ -157,11 +157,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.updateTakeProfitPrice()
 	})
 
-	s.OrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		s.ProfitStats.AddTrade(trade)
-		bbgo.Sync(ctx, s)
-	})
-
 	s.OrderExecutor.ActiveMakerOrders().OnFilled(func(o types.Order) {
 		s.logger.Infof("[DCA] FILLED ORDER: %s", o.String())
 		openPositionSide := types.SideTypeBuy
@@ -203,12 +198,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 						return
 					}
 
-					s.logger.Infof("[DCA] recovered state: %d", s.state)
-					s.logger.Infof("[DCA] recovered position %s", s.Position.String())
-					s.logger.Infof("[DCA] recovered quote investment %s", s.QuoteInvestment)
-					s.logger.Infof("[DCA] recovered startTimeOfNextRound %s", s.startTimeOfNextRound)
-
-					bbgo.Sync(ctx, s)
+					s.logger.Infof("[DCA] state: %d", s.state)
+					s.logger.Infof("[DCA] position %s", s.Position.String())
+					s.logger.Infof("[DCA] profit stats %s", s.ProfitStats.String())
+					s.logger.Infof("[DCA] startTimeOfNextRound %s", s.startTimeOfNextRound)
 				} else {
 					s.state = WaitToOpenPosition
 				}
@@ -233,8 +226,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	balance := balances[s.Market.QuoteCurrency]
-	if balance.Available.Compare(s.QuoteInvestment) < 0 {
-		return fmt.Errorf("the available balance of %s is %s which is less than quote investment setting %s, please check it", s.Market.QuoteCurrency, balance.Available, s.QuoteInvestment)
+	if balance.Available.Compare(s.ProfitStats.QuoteInvestment) < 0 {
+		return fmt.Errorf("the available balance of %s is %s which is less than quote investment setting %s, please check it", s.Market.QuoteCurrency, balance.Available, s.ProfitStats.QuoteInvestment)
 	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
