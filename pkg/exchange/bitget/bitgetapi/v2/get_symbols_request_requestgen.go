@@ -137,15 +137,29 @@ func (g *GetSymbolsRequest) Do(ctx context.Context) ([]Symbol, error) {
 	}
 
 	var apiResponse bitgetapi.APIResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
 	}
 
 	type responseValidator interface {
 		Validate() error
 	}
-	validator, ok := interface{}(apiResponse).(responseValidator)
-	if ok {
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
 		if err := validator.Validate(); err != nil {
 			return nil, err
 		}
