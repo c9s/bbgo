@@ -3,7 +3,6 @@ package okex
 import (
 	"context"
 	"fmt"
-	"math"
 	"strconv"
 	"time"
 
@@ -24,6 +23,8 @@ import (
 var (
 	marketDataLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 5)
 	orderRateLimiter  = rate.NewLimiter(rate.Every(300*time.Millisecond), 5)
+
+	queryMarketLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 )
 
 const ID = "okex"
@@ -68,10 +69,11 @@ func (e *Exchange) Name() types.ExchangeName {
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-	instruments, err := e.client.NewGetInstrumentsRequest().
-		InstrumentType(okexapi.InstrumentTypeSpot).
-		Do(ctx)
+	if err := queryMarketLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("markets rate limiter wait error: %w", err)
+	}
 
+	instruments, err := e.client.NewGetInstrumentsInfoRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +89,8 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			BaseCurrency:  instrument.BaseCurrency,
 
 			// convert tick size OKEx to precision
-			PricePrecision:  int(-math.Log10(instrument.TickSize.Float64())),
-			VolumePrecision: int(-math.Log10(instrument.LotSize.Float64())),
+			PricePrecision:  instrument.TickSize.NumFractionalDigits(),
+			VolumePrecision: instrument.LotSize.NumFractionalDigits(),
 
 			// TickSize: OKEx's price tick, for BTC-USDT it's "0.1"
 			TickSize: instrument.TickSize,
