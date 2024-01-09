@@ -24,7 +24,9 @@ var (
 	marketDataLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 5)
 	orderRateLimiter  = rate.NewLimiter(rate.Every(300*time.Millisecond), 5)
 
-	queryMarketLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryMarketLimiter  = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryTickerLimiter  = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryTickersLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 )
 
 const ID = "okex"
@@ -112,18 +114,29 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	symbol = toLocalSymbol(symbol)
+	if err := queryTickerLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("ticker rate limiter wait error: %w", err)
+	}
 
-	marketTicker, err := e.client.MarketTicker(ctx, symbol)
+	symbol = toLocalSymbol(symbol)
+	marketTicker, err := e.client.NewGetTickerRequest().InstId(symbol).Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return toGlobalTicker(*marketTicker), nil
+	if len(marketTicker) != 1 {
+		return nil, fmt.Errorf("unexpected length of %s market ticker, got: %v", symbol, marketTicker)
+	}
+
+	return toGlobalTicker(marketTicker[0]), nil
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[string]types.Ticker, error) {
-	marketTickers, err := e.client.MarketTickers(ctx, okexapi.InstrumentTypeSpot)
+	if err := queryTickersLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("tickers rate limiter wait error: %w", err)
+	}
+
+	marketTickers, err := e.client.NewGetTickersRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
