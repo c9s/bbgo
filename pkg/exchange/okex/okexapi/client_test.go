@@ -30,11 +30,9 @@ func getTestClientOrSkip(t *testing.T) *RestClient {
 func TestClient_GetInstrumentsRequest(t *testing.T) {
 	client := NewClient()
 	ctx := context.Background()
-	req := client.NewGetInstrumentsRequest()
+	req := client.NewGetInstrumentsInfoRequest()
 
-	instruments, err := req.
-		InstrumentType(InstrumentTypeSpot).
-		Do(ctx)
+	instruments, err := req.Do(ctx)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, instruments)
 	t.Logf("instruments: %+v", instruments)
