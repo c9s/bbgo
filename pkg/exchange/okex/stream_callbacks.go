@@ -56,6 +56,16 @@ func (s *Stream) EmitOrderDetailsEvent(orderDetails []okexapi.OrderDetails) {
 	}
 }
 
+func (s *Stream) OnMarketTradeEvent(cb func(tradeDetail []MarketTradeEvent)) {
+	s.marketTradeEventCallbacks = append(s.marketTradeEventCallbacks, cb)
+}
+
+func (s *Stream) EmitMarketTradeEvent(tradeDetail []MarketTradeEvent) {
+	for _, cb := range s.marketTradeEventCallbacks {
+		cb(tradeDetail)
+	}
+}
+
 type StreamEventHub interface {
 	OnKLineEvent(cb func(candle KLineEvent))
 
@@ -66,4 +76,6 @@ type StreamEventHub interface {
 	OnAccountEvent(cb func(account okexapi.Account))
 
 	OnOrderDetailsEvent(cb func(orderDetails []okexapi.OrderDetails))
+
+	OnMarketTradeEvent(cb func(tradeDetail []MarketTradeEvent))
 }
