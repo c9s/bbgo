@@ -61,7 +61,7 @@ func generateOpenPositionOrders(market types.Market, quoteInvestment, price, pri
 		prices = append(prices, price)
 	}
 
-	notional, orderNum := calculateNotionalAndNum(market, quoteInvestment, prices)
+	notional, orderNum := calculateNotionalAndNumOrders(market, quoteInvestment, prices)
 	if orderNum == 0 {
 		return nil, fmt.Errorf("failed to calculate notional and num of open position orders, price: %s, quote investment: %s", price, quoteInvestment)
 	}
@@ -87,9 +87,9 @@ func generateOpenPositionOrders(market types.Market, quoteInvestment, price, pri
 	return submitOrders, nil
 }
 
-// calculateNotionalAndNum calculates the notional and num of open position orders
+// calculateNotionalAndNumOrders calculates the notional and num of open position orders
 // DCA2 is notional-based, every order has the same notional
-func calculateNotionalAndNum(market types.Market, quoteInvestment fixedpoint.Value, prices []fixedpoint.Value) (fixedpoint.Value, int) {
+func calculateNotionalAndNumOrders(market types.Market, quoteInvestment fixedpoint.Value, prices []fixedpoint.Value) (fixedpoint.Value, int) {
 	for num := len(prices); num > 0; num-- {
 		notional := quoteInvestment.Div(fixedpoint.NewFromInt(int64(num)))
 		if notional.Compare(market.MinNotional) < 0 {

@@ -193,7 +193,7 @@ func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 	s.logger.Info("[State] TakeProfitReady - start reseting position and calculate quote investment for next round")
 
 	// calculate profit stats
-	s.ProfitStats.CalculateProfitOfRound(ctx, s.Session.Exchange)
+	s.CalculateProfitOfCurrentRound(ctx)
 	bbgo.Sync(ctx, s)
 
 	s.EmitProfit(s.ProfitStats)
