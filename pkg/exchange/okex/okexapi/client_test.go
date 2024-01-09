@@ -60,6 +60,17 @@ func TestClient_GetMarketTicker(t *testing.T) {
 	t.Logf("tickers: %+v", tickers)
 }
 
+func TestClient_GetAcountInfo(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	req := client.NewGetAccountInfoRequest()
+
+	acct, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, acct)
+	t.Logf("acct: %+v", acct)
+}
+
 func TestClient_GetFundingRateRequest(t *testing.T) {
 	client := NewClient()
 	ctx := context.Background()

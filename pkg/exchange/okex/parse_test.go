@@ -95,7 +95,7 @@ func Test_parseWebSocketEvent_accountEvent(t *testing.T) {
 
 		exp := &okexapi.Account{
 			TotalEquityInUSD: fixedpoint.NewFromFloat(91884),
-			UpdateTime:       "1614846244194",
+			UpdateTime:       types.NewMillisecondTimestampFromInt(1614846244194),
 			Details: []okexapi.BalanceDetail{
 				{
 					Currency:                "BTC",
