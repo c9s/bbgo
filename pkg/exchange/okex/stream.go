@@ -205,6 +205,7 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case *WebSocketEvent:
 		if err := et.IsValid(); err != nil {
 			log.Errorf("invalid event: %v", err)
+			return
 		}
 		if et.IsAuthenticated() {
 			s.EmitAuth()
