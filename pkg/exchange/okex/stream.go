@@ -35,7 +35,6 @@ type Stream struct {
 	// public callbacks
 	kLineEventCallbacks        []func(candle KLineEvent)
 	bookEventCallbacks         []func(book BookEvent)
-	eventCallbacks             []func(event WebSocketEvent)
 	accountEventCallbacks      []func(account okexapi.Account)
 	orderDetailsEventCallbacks []func(orderDetails []okexapi.OrderDetails)
 	marketTradeEventCallbacks  []func(tradeDetail []MarketTradeEvent)
@@ -56,8 +55,8 @@ func NewStream(client *okexapi.RestClient) *Stream {
 	stream.OnAccountEvent(stream.handleAccountEvent)
 	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
 	stream.OnOrderDetailsEvent(stream.handleOrderDetailsEvent)
-	stream.OnEvent(stream.handleEvent)
 	stream.OnConnect(stream.handleConnect)
+	stream.OnAuth(stream.handleAuth)
 	return stream
 }
 
@@ -113,26 +112,19 @@ func (s *Stream) handleConnect() {
 	}
 }
 
-func (s *Stream) handleEvent(event WebSocketEvent) {
-	switch event.Event {
-	case "login":
-		if event.Code == "0" {
-			s.EmitAuth()
-			var subs = []WebsocketSubscription{
-				{Channel: "account"},
-				{Channel: "orders", InstrumentType: string(okexapi.InstrumentTypeSpot)},
-			}
+func (s *Stream) handleAuth() {
+	var subs = []WebsocketSubscription{
+		{Channel: ChannelAccount},
+		{Channel: "orders", InstrumentType: string(okexapi.InstrumentTypeSpot)},
+	}
 
-			log.Infof("subscribing private channels: %+v", subs)
-			err := s.Conn.WriteJSON(WebsocketOp{
-				Op:   "subscribe",
-				Args: subs,
-			})
-
-			if err != nil {
-				log.WithError(err).Error("private channel subscribe error")
-			}
-		}
+	log.Infof("subscribing private channels: %+v", subs)
+	err := s.Conn.WriteJSON(WebsocketOp{
+		Op:   "subscribe",
+		Args: subs,
+	})
+	if err != nil {
+		log.WithError(err).Error("private channel subscribe error")
 	}
 }
 
@@ -160,7 +152,7 @@ func (s *Stream) handleOrderDetailsEvent(orderDetails []okexapi.OrderDetails) {
 
 func (s *Stream) handleAccountEvent(account okexapi.Account) {
 	balances := toGlobalBalance(&account)
-	s.EmitBalanceSnapshot(balances)
+	s.EmitBalanceUpdate(balances)
 }
 
 func (s *Stream) handleBookEvent(data BookEvent) {
@@ -211,7 +203,12 @@ func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch et := e.(type) {
 	case *WebSocketEvent:
-		s.EmitEvent(*et)
+		if err := et.IsValid(); err != nil {
+			log.Errorf("invalid event: %v", err)
+		}
+		if et.IsAuthenticated() {
+			s.EmitAuth()
+		}
 
 	case *BookEvent:
 		// there's "books" for 400 depth and books5 for 5 depth

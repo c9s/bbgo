@@ -44,14 +44,12 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 		return nil, err
 	}
 	if event.Event != "" {
-		// TODO: remove fastjson
-		return event, nil
+		return &event, nil
 	}
 
 	switch event.Arg.Channel {
 	case ChannelAccount:
-		// TODO: remove fastjson
-		return parseAccount(v)
+		return parseAccount(event.Data)
 
 	case ChannelBooks, ChannelBook5:
 		var bookEvent BookEvent
@@ -100,16 +98,45 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 	return nil, nil
 }
 
+type WsEventType string
+
+const (
+	WsEventTypeLogin = "login"
+	WsEventTypeError = "error"
+)
+
 type WebSocketEvent struct {
-	Event   string `json:"event"`
-	Code    string `json:"code,omitempty"`
-	Message string `json:"msg,omitempty"`
+	Event   WsEventType `json:"event"`
+	Code    string      `json:"code,omitempty"`
+	Message string      `json:"msg,omitempty"`
 	Arg     struct {
 		Channel Channel `json:"channel"`
 		InstId  string  `json:"instId"`
 	} `json:"arg,omitempty"`
 	Data       json.RawMessage `json:"data"`
 	ActionType ActionType      `json:"action"`
+}
+
+func (w *WebSocketEvent) IsValid() error {
+	switch w.Event {
+	case WsEventTypeError:
+		return fmt.Errorf("websocket request error, code: %s, msg: %s", w.Code, w.Message)
+
+	case WsEventTypeLogin:
+		// Actually, this code is unnecessary because the events are either `Subscribe` or `Unsubscribe`, But to avoid bugs
+		// in the exchange, we still check.
+		if w.Code != "0" || len(w.Message) != 0 {
+			return fmt.Errorf("websocket request error, code: %s, msg: %s", w.Code, w.Message)
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("unexpected event type: %+v", w)
+	}
+}
+
+func (w *WebSocketEvent) IsAuthenticated() bool {
+	return w.Event == WsEventTypeLogin && w.Code == "0"
 }
 
 type BookEvent struct {
@@ -345,17 +372,15 @@ type KLineEvent struct {
 	Channel      Channel
 }
 
-func parseAccount(v *fastjson.Value) (*okexapi.Account, error) {
-	data := v.Get("data").MarshalTo(nil)
-
+func parseAccount(v []byte) (*okexapi.Account, error) {
 	var accounts []okexapi.Account
-	err := json.Unmarshal(data, &accounts)
+	err := json.Unmarshal(v, &accounts)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(accounts) == 0 {
-		return nil, errors.New("empty account data")
+		return &okexapi.Account{}, nil
 	}
 
 	return &accounts[0], nil
