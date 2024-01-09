@@ -13,11 +13,17 @@ exchangeStrategies:
     # if the margin ratio is high enough, we don't have the urge to repay
     maxMarginLevel: 20.0
 
-    marginLevelAlertInterval: 5m
-    marginLevelAlertMinMargin: 2.0
-    marginLevelAlertSlackMentions:
-    - '<@USER_ID>'
-    - '<!subteam^TEAM_ID>'
+    marginRepayAlert:
+      slackMentions:
+      - '<@USER_ID>'
+      - '<!subteam^TEAM_ID>'
+
+    marginLevelAlert:
+      interval: 5m
+      minMargin: 2.0
+      slackMentions:
+      - '<@USER_ID>'
+      - '<!subteam^TEAM_ID>'
 
     assets:
     - asset: ETH
