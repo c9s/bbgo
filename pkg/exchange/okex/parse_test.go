@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -574,4 +575,96 @@ func TestKLine_ToGlobal(t *testing.T) {
 		}, event.Events[0].ToGlobal(types.Interval(event.Interval), event.Symbol))
 	})
 
+}
+
+func Test_parseWebSocketEvent(t *testing.T) {
+	in := `
+{
+  "arg": {
+    "channel": "trades",
+    "instId": "BTC-USDT"
+  },
+  "data": [
+    {
+      "instId": "BTC-USDT",
+      "tradeId": "130639474",
+      "px": "42219.9",
+      "sz": "0.12060306",
+      "side": "buy",
+      "ts": "1630048897897",
+      "count": "3"
+    }
+  ]
+}
+`
+	exp := []MarketTradeEvent{{
+		InstId:    "BTC-USDT",
+		TradeId:   130639474,
+		Px:        fixedpoint.NewFromFloat(42219.9),
+		Sz:        fixedpoint.NewFromFloat(0.12060306),
+		Side:      okexapi.SideTypeBuy,
+		Timestamp: types.NewMillisecondTimestampFromInt(1630048897897),
+		Count:     3,
+	}}
+
+	res, err := parseWebSocketEvent([]byte(in))
+	assert.NoError(t, err)
+	event, ok := res.([]MarketTradeEvent)
+	assert.True(t, ok)
+	assert.Len(t, event, 1)
+	assert.Equal(t, exp, event)
+
+}
+
+func Test_toGlobalTrade(t *testing.T) {
+	//  {
+	//      "instId": "BTC-USDT",
+	//      "tradeId": "130639474",
+	//      "px": "42219.9",
+	//      "sz": "0.12060306",
+	//      "side": "buy",
+	//      "ts": "1630048897897",
+	//      "count": "3"
+	//    }
+	marketTrade := MarketTradeEvent{
+		InstId:    "BTC-USDT",
+		TradeId:   130639474,
+		Px:        fixedpoint.NewFromFloat(42219.9),
+		Sz:        fixedpoint.NewFromFloat(0.12060306),
+		Side:      okexapi.SideTypeBuy,
+		Timestamp: types.NewMillisecondTimestampFromInt(1630048897897),
+		Count:     3,
+	}
+	t.Run("succeeds", func(t *testing.T) {
+		trade, err := marketTrade.toGlobalTrade()
+		assert.NoError(t, err)
+		assert.Equal(t, types.Trade{
+			ID:            uint64(130639474),
+			OrderID:       uint64(0),
+			Exchange:      types.ExchangeOKEx,
+			Price:         fixedpoint.NewFromFloat(42219.9),
+			Quantity:      fixedpoint.NewFromFloat(0.12060306),
+			QuoteQuantity: marketTrade.Px.Mul(marketTrade.Sz),
+			Symbol:        "BTCUSDT",
+			Side:          types.SideTypeBuy,
+			IsBuyer:       true,
+			IsMaker:       false,
+			Time:          types.Time(types.NewMillisecondTimestampFromInt(1630048897897)),
+			Fee:           fixedpoint.Zero,
+			FeeCurrency:   "",
+			FeeDiscounted: false,
+		}, trade)
+	})
+	t.Run("unexpected side", func(t *testing.T) {
+		newTrade := marketTrade
+		newTrade.Side = "both"
+		_, err := newTrade.toGlobalTrade()
+		assert.ErrorContains(t, err, "both")
+	})
+	t.Run("unexpected symbol", func(t *testing.T) {
+		newTrade := marketTrade
+		newTrade.InstId = ""
+		_, err := newTrade.toGlobalTrade()
+		assert.ErrorContains(t, err, "unexpected inst id")
+	})
 }

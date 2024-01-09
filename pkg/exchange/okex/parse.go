@@ -21,6 +21,7 @@ const (
 	ChannelBook5        Channel = "book5"
 	ChannelCandlePrefix Channel = "candle"
 	ChannelAccount      Channel = "account"
+	ChannelMarketTrades Channel = "trades"
 	ChannelOrders       Channel = "orders"
 )
 
@@ -65,6 +66,14 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 		bookEvent.channel = event.Arg.Channel
 		bookEvent.Action = event.ActionType
 		return &bookEvent, nil
+
+	case ChannelMarketTrades:
+		var trade []MarketTradeEvent
+		err = json.Unmarshal(event.Data, &trade)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal data into MarketTradeEvent: %+v, err: %w", string(event.Data), err)
+		}
+		return trade, nil
 
 	case ChannelOrders:
 		// TODO: remove fastjson
@@ -362,4 +371,55 @@ func parseOrder(v *fastjson.Value) ([]okexapi.OrderDetails, error) {
 	}
 
 	return orderDetails, nil
+}
+
+func toGlobalSideType(side okexapi.SideType) (types.SideType, error) {
+	switch side {
+	case okexapi.SideTypeBuy:
+		return types.SideTypeBuy, nil
+
+	case okexapi.SideTypeSell:
+		return types.SideTypeSell, nil
+
+	default:
+		return types.SideType(side), fmt.Errorf("unexpected side: %s", side)
+	}
+}
+
+type MarketTradeEvent struct {
+	InstId    string                     `json:"instId"`
+	TradeId   types.StrInt64             `json:"tradeId"`
+	Px        fixedpoint.Value           `json:"px"`
+	Sz        fixedpoint.Value           `json:"sz"`
+	Side      okexapi.SideType           `json:"side"`
+	Timestamp types.MillisecondTimestamp `json:"ts"`
+	Count     types.StrInt64             `json:"count"`
+}
+
+func (m *MarketTradeEvent) toGlobalTrade() (types.Trade, error) {
+	symbol := toGlobalSymbol(m.InstId)
+	if symbol == "" {
+		return types.Trade{}, fmt.Errorf("unexpected inst id: %s", m.InstId)
+	}
+
+	side, err := toGlobalSideType(m.Side)
+	if err != nil {
+		return types.Trade{}, err
+	}
+
+	return types.Trade{
+		ID:            uint64(m.TradeId),
+		OrderID:       0, // not supported
+		Exchange:      types.ExchangeOKEx,
+		Price:         m.Px,
+		Quantity:      m.Sz,
+		QuoteQuantity: m.Px.Mul(m.Sz),
+		Symbol:        symbol,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       false, // not supported
+		Time:          types.Time(m.Timestamp.Time()),
+		Fee:           fixedpoint.Zero, // not supported
+		FeeCurrency:   "",              // not supported
+	}, nil
 }
