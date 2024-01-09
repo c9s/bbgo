@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
 )
@@ -156,52 +155,6 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	req.Header.Add("OK-ACCESS-TIMESTAMP", timestamp)
 	req.Header.Add("OK-ACCESS-PASSPHRASE", c.Passphrase)
 	return req, nil
-}
-
-type BalanceDetail struct {
-	Currency                string                     `json:"ccy"`
-	Available               fixedpoint.Value           `json:"availEq"`
-	CashBalance             fixedpoint.Value           `json:"cashBal"`
-	OrderFrozen             fixedpoint.Value           `json:"ordFrozen"`
-	Frozen                  fixedpoint.Value           `json:"frozenBal"`
-	Equity                  fixedpoint.Value           `json:"eq"`
-	EquityInUSD             fixedpoint.Value           `json:"eqUsd"`
-	UpdateTime              types.MillisecondTimestamp `json:"uTime"`
-	UnrealizedProfitAndLoss fixedpoint.Value           `json:"upl"`
-}
-
-type Account struct {
-	TotalEquityInUSD fixedpoint.Value `json:"totalEq"`
-	UpdateTime       string           `json:"uTime"`
-	Details          []BalanceDetail  `json:"details"`
-}
-
-func (c *RestClient) AccountBalances(ctx context.Context) (*Account, error) {
-	req, err := c.NewAuthenticatedRequest(ctx, "GET", "/api/v5/account/balance", nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := c.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var balanceResponse struct {
-		Code    string    `json:"code"`
-		Message string    `json:"msg"`
-		Data    []Account `json:"data"`
-	}
-
-	if err := response.DecodeJSON(&balanceResponse); err != nil {
-		return nil, err
-	}
-
-	if len(balanceResponse.Data) == 0 {
-		return nil, errors.New("empty account data")
-	}
-
-	return &balanceResponse.Data[0], nil
 }
 
 type AssetBalance struct {
