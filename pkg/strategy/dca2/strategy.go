@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
@@ -68,11 +69,9 @@ type Strategy struct {
 	state                State
 
 	// callbacks
-	readyCallbacks    []func()
+	types.CommonCallback
 	positionCallbacks []func(*types.Position)
 	profitCallbacks   []func(*ProfitStats)
-	closedCallbacks   []func()
-	errorCallbacks    []func(error)
 }
 
 func (s *Strategy) ID() string {
@@ -277,4 +276,48 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 
 	bbgo.Sync(ctx, s)
 	return err
+}
+
+func (s *Strategy) CalculateProfitOfCurrentRound(ctx context.Context) error {
+	historyService, ok := s.Session.Exchange.(types.ExchangeTradeHistoryService)
+	if !ok {
+		return fmt.Errorf("exchange %s doesn't support ExchangeTradeHistoryService", s.Session.Exchange.Name())
+	}
+
+	queryService, ok := s.Session.Exchange.(types.ExchangeOrderQueryService)
+	if !ok {
+		return fmt.Errorf("exchange %s doesn't support ExchangeOrderQueryService", s.Session.Exchange.Name())
+	}
+
+	// query the orders of this round
+	orders, err := historyService.QueryClosedOrders(ctx, s.Symbol, time.Time{}, time.Time{}, s.ProfitStats.FromOrderID)
+	if err != nil {
+		return err
+	}
+
+	// query the trades of this round
+	for _, order := range orders {
+		if order.ExecutedQuantity.Sign() == 0 {
+			// skip no trade orders
+			continue
+		}
+
+		trades, err := queryService.QueryOrderTrades(ctx, types.OrderQuery{
+			Symbol:  order.Symbol,
+			OrderID: strconv.FormatUint(order.OrderID, 10),
+		})
+
+		if err != nil {
+			return err
+		}
+
+		for _, trade := range trades {
+			s.ProfitStats.AddTrade(trade)
+		}
+	}
+
+	s.ProfitStats.FromOrderID = s.ProfitStats.FromOrderID + 1
+	s.ProfitStats.QuoteInvestment = s.ProfitStats.QuoteInvestment.Add(s.ProfitStats.CurrentRoundProfit)
+
+	return nil
 }

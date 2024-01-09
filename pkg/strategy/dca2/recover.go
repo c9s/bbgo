@@ -57,7 +57,7 @@ func (s *Strategy) recover(ctx context.Context) error {
 	}
 
 	// recover profit stats
-	recoverProfitStats(ctx, s.ProfitStats, s.Session.Exchange)
+	recoverProfitStats(ctx, s)
 
 	// recover startTimeOfNextRound
 	startTimeOfNextRound := recoverStartTimeOfNextRound(ctx, currentRound, s.CoolDownInterval)
@@ -189,12 +189,12 @@ func recoverPosition(ctx context.Context, position *types.Position, queryService
 	return nil
 }
 
-func recoverProfitStats(ctx context.Context, profitStats *ProfitStats, exchange types.Exchange) error {
-	if profitStats == nil {
+func recoverProfitStats(ctx context.Context, strategy *Strategy) error {
+	if strategy.ProfitStats == nil {
 		return fmt.Errorf("profit stats is nil, please check it")
 	}
 
-	profitStats.CalculateProfitOfRound(ctx, exchange)
+	strategy.CalculateProfitOfCurrentRound(ctx)
 
 	return nil
 }

@@ -6,16 +6,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (s *Strategy) OnReady(cb func()) {
-	s.readyCallbacks = append(s.readyCallbacks, cb)
-}
-
-func (s *Strategy) EmitReady() {
-	for _, cb := range s.readyCallbacks {
-		cb()
-	}
-}
-
 func (s *Strategy) OnPosition(cb func(*types.Position)) {
 	s.positionCallbacks = append(s.positionCallbacks, cb)
 }
@@ -33,25 +23,5 @@ func (s *Strategy) OnProfit(cb func(*ProfitStats)) {
 func (s *Strategy) EmitProfit(profitStats *ProfitStats) {
 	for _, cb := range s.profitCallbacks {
 		cb(profitStats)
-	}
-}
-
-func (s *Strategy) OnClosed(cb func()) {
-	s.closedCallbacks = append(s.closedCallbacks, cb)
-}
-
-func (s *Strategy) EmitClosed() {
-	for _, cb := range s.closedCallbacks {
-		cb()
-	}
-}
-
-func (s *Strategy) OnError(cb func(err error)) {
-	s.errorCallbacks = append(s.errorCallbacks, cb)
-}
-
-func (s *Strategy) EmitError(err error) {
-	for _, cb := range s.errorCallbacks {
-		cb(err)
 	}
 }
