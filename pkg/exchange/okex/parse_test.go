@@ -11,6 +11,126 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func Test_parseWebSocketEvent_accountEvent(t *testing.T) {
+	t.Run("succeeds", func(t *testing.T) {
+		in := `
+{
+  "arg": {
+    "channel": "account",
+    "uid": "77982378738415879"
+  },
+  "data": [
+    {
+      "uTime": "1614846244194",
+      "totalEq": "91884",
+      "adjEq": "91884.8502560037982063",
+      "isoEq": "0",
+      "ordFroz": "0",
+      "imr": "0",
+      "mmr": "0",
+      "borrowFroz": "",
+      "notionalUsd": "",
+      "mgnRatio": "100000",
+      "details": [{
+          "availBal": "",
+          "availEq": "1",
+          "ccy": "BTC",
+          "cashBal": "1",
+          "uTime": "1617279471503",
+          "disEq": "50559.01",
+          "eq": "1",
+          "eqUsd": "45078",
+          "fixedBal": "0",
+          "frozenBal": "0",
+          "interest": "0",
+          "isoEq": "0",
+          "liab": "0",
+          "maxLoan": "",
+          "mgnRatio": "",
+          "notionalLever": "0",
+          "ordFrozen": "0",
+          "upl": "0",
+          "uplLiab": "0",
+          "crossLiab": "0",
+          "isoLiab": "0",
+          "coinUsdPrice": "60000",
+          "stgyEq":"0",
+          "spotInUseAmt":"",
+          "isoUpl":"",
+          "borrowFroz": ""
+        },
+        {
+          "availBal": "",
+          "availEq": "41307",
+          "ccy": "USDT",
+          "cashBal": "41307",
+          "uTime": "1617279471503",
+          "disEq": "41325",
+          "eq": "41307",
+          "eqUsd": "45078",
+          "fixedBal": "0",
+          "frozenBal": "0",
+          "interest": "0",
+          "isoEq": "0",
+          "liab": "0",
+          "maxLoan": "",
+          "mgnRatio": "",
+          "notionalLever": "0",
+          "ordFrozen": "0",
+          "upl": "0",
+          "uplLiab": "0",
+          "crossLiab": "0",
+          "isoLiab": "0",
+          "coinUsdPrice": "1.00007",
+          "stgyEq":"0",
+          "spotInUseAmt":"",
+          "isoUpl":"",
+          "borrowFroz": ""
+        }
+      ]
+    }
+  ]
+}
+`
+
+		exp := &okexapi.Account{
+			TotalEquityInUSD: fixedpoint.NewFromFloat(91884),
+			UpdateTime:       "1614846244194",
+			Details: []okexapi.BalanceDetail{
+				{
+					Currency:                "BTC",
+					Available:               fixedpoint.NewFromFloat(1),
+					CashBalance:             fixedpoint.NewFromFloat(1),
+					OrderFrozen:             fixedpoint.Zero,
+					Frozen:                  fixedpoint.Zero,
+					Equity:                  fixedpoint.One,
+					EquityInUSD:             fixedpoint.NewFromFloat(45078),
+					UpdateTime:              types.NewMillisecondTimestampFromInt(1617279471503),
+					UnrealizedProfitAndLoss: fixedpoint.Zero,
+				},
+				{
+					Currency:                "USDT",
+					Available:               fixedpoint.NewFromFloat(41307),
+					CashBalance:             fixedpoint.NewFromFloat(41307),
+					OrderFrozen:             fixedpoint.Zero,
+					Frozen:                  fixedpoint.Zero,
+					Equity:                  fixedpoint.NewFromFloat(41307),
+					EquityInUSD:             fixedpoint.NewFromFloat(45078),
+					UpdateTime:              types.NewMillisecondTimestampFromInt(1617279471503),
+					UnrealizedProfitAndLoss: fixedpoint.Zero,
+				},
+			},
+		}
+
+		res, err := parseWebSocketEvent([]byte(in))
+		assert.NoError(t, err)
+		event, ok := res.(*okexapi.Account)
+		assert.True(t, ok)
+		assert.Equal(t, exp, event)
+	})
+
+}
+
 func TestParsePriceVolumeOrderSliceJSON(t *testing.T) {
 	t.Run("snapshot", func(t *testing.T) {
 		in := `
@@ -666,5 +786,67 @@ func Test_toGlobalTrade(t *testing.T) {
 		newTrade.InstId = ""
 		_, err := newTrade.toGlobalTrade()
 		assert.ErrorContains(t, err, "unexpected inst id")
+	})
+}
+
+func TestWebSocketEvent_IsValid(t *testing.T) {
+	t.Run("op login event", func(t *testing.T) {
+		input := `{
+  "event": "login",
+  "code": "0",
+  "msg": "",
+  "connId": "a4d3ae55"
+}`
+		res, err := parseWebSocketEvent([]byte(input))
+		assert.NoError(t, err)
+		opEvent, ok := res.(*WebSocketEvent)
+		assert.True(t, ok)
+		assert.Equal(t, WebSocketEvent{
+			Event:   WsEventTypeLogin,
+			Code:    "0",
+			Message: "",
+		}, *opEvent)
+
+		assert.NoError(t, opEvent.IsValid())
+	})
+
+	t.Run("op error event", func(t *testing.T) {
+		input := `{
+  "event": "error",
+  "code": "60009",
+  "msg": "Login failed.",
+  "connId": "a4d3ae55"
+}`
+		res, err := parseWebSocketEvent([]byte(input))
+		assert.NoError(t, err)
+		opEvent, ok := res.(*WebSocketEvent)
+		assert.True(t, ok)
+		assert.Equal(t, WebSocketEvent{
+			Event:   WsEventTypeError,
+			Code:    "60009",
+			Message: "Login failed.",
+		}, *opEvent)
+
+		assert.ErrorContains(t, opEvent.IsValid(), "request error")
+	})
+
+	t.Run("unexpected event", func(t *testing.T) {
+		input := `{
+  "event": "test gg",
+  "code": "60009",
+  "msg": "unexpected",
+  "connId": "a4d3ae55"
+}`
+		res, err := parseWebSocketEvent([]byte(input))
+		assert.NoError(t, err)
+		opEvent, ok := res.(*WebSocketEvent)
+		assert.True(t, ok)
+		assert.Equal(t, WebSocketEvent{
+			Event:   "test gg",
+			Code:    "60009",
+			Message: "unexpected",
+		}, *opEvent)
+
+		assert.ErrorContains(t, opEvent.IsValid(), "unexpected event type")
 	})
 }

@@ -26,16 +26,6 @@ func (s *Stream) EmitBookEvent(book BookEvent) {
 	}
 }
 
-func (s *Stream) OnEvent(cb func(event WebSocketEvent)) {
-	s.eventCallbacks = append(s.eventCallbacks, cb)
-}
-
-func (s *Stream) EmitEvent(event WebSocketEvent) {
-	for _, cb := range s.eventCallbacks {
-		cb(event)
-	}
-}
-
 func (s *Stream) OnAccountEvent(cb func(account okexapi.Account)) {
 	s.accountEventCallbacks = append(s.accountEventCallbacks, cb)
 }
@@ -70,8 +60,6 @@ type StreamEventHub interface {
 	OnKLineEvent(cb func(candle KLineEvent))
 
 	OnBookEvent(cb func(book BookEvent))
-
-	OnEvent(cb func(event WebSocketEvent))
 
 	OnAccountEvent(cb func(account okexapi.Account))
 
