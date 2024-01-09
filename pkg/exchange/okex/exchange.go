@@ -27,6 +27,7 @@ var (
 	queryMarketLimiter  = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 	queryTickerLimiter  = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 	queryTickersLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryAccountLimiter = rate.NewLimiter(rate.Every(200*time.Millisecond), 5)
 )
 
 const ID = "okex"
@@ -167,28 +168,31 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	accountBalance, err := e.client.AccountBalances(ctx)
+	bals, err := e.QueryAccountBalances(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var account = types.Account{
-		AccountType: types.AccountTypeSpot,
-	}
-
-	var balanceMap = toGlobalBalance(accountBalance)
-	account.UpdateBalances(balanceMap)
-	return &account, nil
+	account := types.NewAccount()
+	account.UpdateBalances(bals)
+	return account, nil
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	accountBalances, err := e.client.AccountBalances(ctx)
+	if err := queryAccountLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
+	}
+
+	accountBalances, err := e.client.NewGetAccountInfoRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	var balanceMap = toGlobalBalance(accountBalances)
-	return balanceMap, nil
+	if len(accountBalances) != 1 {
+		return nil, fmt.Errorf("unexpected length of balances: %v", accountBalances)
+	}
+
+	return toGlobalBalance(&accountBalances[0]), nil
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
