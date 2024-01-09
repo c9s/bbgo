@@ -122,6 +122,7 @@ func (s *Stream) dispatchEvent(event interface{}) {
 	case *WsEvent:
 		if err := e.IsValid(); err != nil {
 			log.Errorf("invalid event: %v", err)
+			return
 		}
 		if e.IsAuthenticated() {
 			s.EmitAuth()

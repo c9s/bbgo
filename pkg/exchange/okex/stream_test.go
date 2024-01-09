@@ -31,6 +31,20 @@ func TestStream(t *testing.T) {
 	t.Skip()
 	s := getTestClientOrSkip(t)
 
+	t.Run("account test", func(t *testing.T) {
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnBalanceUpdate(func(balances types.BalanceMap) {
+			t.Log("got snapshot", balances)
+		})
+		s.OnBookUpdate(func(book types.SliceOrderBook) {
+			t.Log("got update", book)
+		})
+		c := make(chan struct{})
+		<-c
+	})
+
 	t.Run("book test", func(t *testing.T) {
 		s.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
 			Depth: types.DepthLevel50,
