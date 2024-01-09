@@ -38,6 +38,28 @@ func TestClient_GetInstrumentsRequest(t *testing.T) {
 	t.Logf("instruments: %+v", instruments)
 }
 
+func TestClient_GetMarketTickers(t *testing.T) {
+	client := NewClient()
+	ctx := context.Background()
+	req := client.NewGetTickersRequest()
+
+	tickers, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tickers)
+	t.Logf("tickers: %+v", tickers)
+}
+
+func TestClient_GetMarketTicker(t *testing.T) {
+	client := NewClient()
+	ctx := context.Background()
+	req := client.NewGetTickerRequest().InstId("BTC-USDT")
+
+	tickers, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, tickers)
+	t.Logf("tickers: %+v", tickers)
+}
+
 func TestClient_GetFundingRateRequest(t *testing.T) {
 	client := NewClient()
 	ctx := context.Background()
