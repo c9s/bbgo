@@ -34,7 +34,7 @@ func (s *Strategy) recover(ctx context.Context) error {
 		return err
 	}
 
-	closedOrders, err := queryService.QueryClosedOrdersDesc(ctx, s.Symbol, time.Time{}, time.Now(), 0)
+	closedOrders, err := queryService.QueryClosedOrdersDesc(ctx, s.Symbol, time.Date(2024, time.January, 1, 0, 0, 0, 0, time.Local), time.Now(), 0)
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func (s *Strategy) recover(ctx context.Context) error {
 	debugRoundOrders(s.logger, "current", currentRound)
 
 	// recover state
-	state, err := recoverState(ctx, s.Symbol, int(s.MaxOrderNum), openOrders, currentRound, s.OrderExecutor.ActiveMakerOrders(), s.OrderExecutor.OrderStore(), s.OrderGroupID)
+	state, err := recoverState(ctx, s.Symbol, int(s.MaxOrderCount), openOrders, currentRound, s.OrderExecutor.ActiveMakerOrders(), s.OrderExecutor.OrderStore(), s.OrderGroupID)
 	if err != nil {
 		return err
 	}
@@ -56,23 +56,20 @@ func (s *Strategy) recover(ctx context.Context) error {
 		return err
 	}
 
-	// recover budget
-	budget := recoverBudget(currentRound)
+	// recover profit stats
+	recoverProfitStats(ctx, s)
 
 	// recover startTimeOfNextRound
 	startTimeOfNextRound := recoverStartTimeOfNextRound(ctx, currentRound, s.CoolDownInterval)
 
 	s.state = state
-	if !budget.IsZero() {
-		s.Budget = budget
-	}
 	s.startTimeOfNextRound = startTimeOfNextRound
 
 	return nil
 }
 
 // recover state
-func recoverState(ctx context.Context, symbol string, maxOrderNum int, openOrders []types.Order, currentRound Round, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore, groupID uint32) (State, error) {
+func recoverState(ctx context.Context, symbol string, maxOrderCount int, openOrders []types.Order, currentRound Round, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore, groupID uint32) (State, error) {
 	if len(currentRound.OpenPositionOrders) == 0 {
 		// new strategy
 		return WaitToOpenPosition, nil
@@ -101,10 +98,10 @@ func recoverState(ctx context.Context, symbol string, maxOrderNum int, openOrder
 	}
 
 	numOpenPositionOrders := len(currentRound.OpenPositionOrders)
-	if numOpenPositionOrders > maxOrderNum {
+	if numOpenPositionOrders > maxOrderCount {
 		return None, fmt.Errorf("the number of open-position orders is > max order number")
-	} else if numOpenPositionOrders < maxOrderNum {
-		// The number of open-position orders should be the same as maxOrderNum
+	} else if numOpenPositionOrders < maxOrderCount {
+		// The number of open-position orders should be the same as maxOrderCount
 		// If not, it may be the following possible cause
 		// 1. This strategy at position opening, so it may not place all orders we want successfully
 		// 2. There are some errors when placing open-position orders. e.g. cannot lock fund.....
@@ -154,7 +151,7 @@ func recoverState(ctx context.Context, symbol string, maxOrderNum int, openOrder
 
 func recoverPosition(ctx context.Context, position *types.Position, queryService RecoverApiQueryService, currentRound Round) error {
 	if position == nil {
-		return nil
+		return fmt.Errorf("position is nil, please check it")
 	}
 
 	var positionOrders []types.Order
@@ -192,7 +189,17 @@ func recoverPosition(ctx context.Context, position *types.Position, queryService
 	return nil
 }
 
-func recoverBudget(currentRound Round) fixedpoint.Value {
+func recoverProfitStats(ctx context.Context, strategy *Strategy) error {
+	if strategy.ProfitStats == nil {
+		return fmt.Errorf("profit stats is nil, please check it")
+	}
+
+	strategy.CalculateProfitOfCurrentRound(ctx)
+
+	return nil
+}
+
+func recoverQuoteInvestment(currentRound Round) fixedpoint.Value {
 	if len(currentRound.OpenPositionOrders) == 0 {
 		return fixedpoint.Zero
 	}
