@@ -2,6 +2,7 @@ package okex
 
 import (
 	"context"
+	"fmt"
 	"golang.org/x/time/rate"
 	"strconv"
 	"time"
@@ -15,7 +16,7 @@ var (
 )
 
 type WebsocketOp struct {
-	Op   string      `json:"op"`
+	Op   WsEventType `json:"op"`
 	Args interface{} `json:"args"`
 }
 
@@ -58,6 +59,44 @@ func NewStream(client *okexapi.RestClient) *Stream {
 	stream.OnConnect(stream.handleConnect)
 	stream.OnAuth(stream.handleAuth)
 	return stream
+}
+
+func (s *Stream) syncSubscriptions(opType WsEventType) error {
+	if opType != WsEventTypeUnsubscribe && opType != WsEventTypeSubscribe {
+		return fmt.Errorf("unexpected subscription type: %v", opType)
+	}
+
+	logger := log.WithField("opType", opType)
+	var topics []WebsocketSubscription
+	for _, subscription := range s.Subscriptions {
+		topic, err := convertSubscription(subscription)
+		if err != nil {
+			logger.WithError(err).Errorf("convert error, subscription: %+v", subscription)
+			return err
+		}
+
+		topics = append(topics, topic)
+	}
+
+	logger.Infof("%s channels: %+v", opType, topics)
+	if err := s.Conn.WriteJSON(WebsocketOp{
+		Op:   opType,
+		Args: topics,
+	}); err != nil {
+		logger.WithError(err).Error("failed to send request")
+		return err
+	}
+
+	return nil
+}
+
+func (s *Stream) Unsubscribe() {
+	// errors are handled in the syncSubscriptions, so they are skipped here.
+	_ = s.syncSubscriptions(WsEventTypeUnsubscribe)
+	s.Resubscribe(func(old []types.Subscription) (new []types.Subscription, err error) {
+		// clear the subscriptions
+		return []types.Subscription{}, nil
+	})
 }
 
 func (s *Stream) handleConnect() {

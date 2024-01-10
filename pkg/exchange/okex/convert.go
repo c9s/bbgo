@@ -97,6 +97,10 @@ func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
 		}, nil
 
 	case types.BookChannel:
+		if s.Options.Depth != types.DepthLevel400 {
+			return WebsocketSubscription{}, fmt.Errorf("%s depth not supported", s.Options.Depth)
+		}
+
 		return WebsocketSubscription{
 			Channel:      ChannelBooks,
 			InstrumentID: toLocalSymbol(s.Symbol),
