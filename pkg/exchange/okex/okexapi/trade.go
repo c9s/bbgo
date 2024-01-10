@@ -17,12 +17,6 @@ func (c *RestClient) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
 	}
 }
 
-func (c *RestClient) NewCancelOrderRequest() *CancelOrderRequest {
-	return &CancelOrderRequest{
-		client: c,
-	}
-}
-
 func (c *RestClient) NewBatchCancelOrderRequest() *BatchCancelOrderRequest {
 	return &BatchCancelOrderRequest{
 		client: c,
@@ -52,52 +46,6 @@ func (r *PlaceOrderRequest) Parameters() map[string]interface{} {
 	return params
 }
 
-//go:generate requestgen -type CancelOrderRequest
-type CancelOrderRequest struct {
-	client *RestClient
-
-	instrumentID  string  `param:"instId"`
-	orderID       *string `param:"ordId"`
-	clientOrderID *string `param:"clOrdId"`
-}
-
-func (r *CancelOrderRequest) Parameters() map[string]interface{} {
-	payload, _ := r.GetParameters()
-	return payload
-}
-
-func (r *CancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, error) {
-	payload, err := r.GetParameters()
-	if err != nil {
-		return nil, err
-	}
-
-	if r.clientOrderID == nil && r.orderID != nil {
-		return nil, errors.New("either orderID or clientOrderID is required for canceling order")
-	}
-
-	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/cancel-order", nil, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse APIResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-	var data []OrderResponse
-	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
-		return nil, err
-	}
-
-	return data, nil
-}
-
 type BatchCancelOrderRequest struct {
 	client *RestClient
 
@@ -113,7 +61,10 @@ func (r *BatchCancelOrderRequest) Do(ctx context.Context) ([]OrderResponse, erro
 	var parameterList []map[string]interface{}
 
 	for _, req := range r.reqs {
-		params := req.Parameters()
+		params, err := req.GetParameters()
+		if err != nil {
+			return nil, err
+		}
 		parameterList = append(parameterList, params)
 	}
 
