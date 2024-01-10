@@ -3,6 +3,8 @@ package dca2
 import (
 	"context"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
 type State int64
@@ -121,11 +123,18 @@ func (s *Strategy) triggerNextState() {
 	}
 }
 
-func (s *Strategy) runWaitToOpenPositionState(_ context.Context, next State) {
+func (s *Strategy) runWaitToOpenPositionState(ctx context.Context, next State) {
 	s.logger.Info("[State] WaitToOpenPosition - check startTimeOfNextRound")
 	if time.Now().Before(s.startTimeOfNextRound) {
 		return
 	}
+
+	// reset position and open new round for profit stats before position opening
+	s.Position.Reset()
+	s.ProfitStats.NewRound()
+
+	// store into redis
+	bbgo.Sync(ctx, s)
 
 	s.state = PositionOpening
 	s.logger.Info("[State] WaitToOpenPosition -> PositionOpening")
@@ -156,7 +165,7 @@ func (s *Strategy) runOpenPositionOrderFilled(_ context.Context, next State) {
 
 func (s *Strategy) runOpenPositionOrdersCancelling(ctx context.Context, next State) {
 	s.logger.Info("[State] OpenPositionOrdersCancelling - start cancelling open-position orders")
-	if err := s.cancelOpenPositionOrders(ctx); err != nil {
+	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
 		s.logger.WithError(err).Error("failed to cancel maker orders")
 		return
 	}
@@ -177,15 +186,17 @@ func (s *Strategy) runOpenPositionOrdersCancelled(ctx context.Context, next Stat
 	s.logger.Info("[State] OpenPositionOrdersCancelled -> TakeProfitReady")
 }
 
-func (s *Strategy) runTakeProfitReady(_ context.Context, next State) {
+func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 	// wait 3 seconds to avoid position not update
 	time.Sleep(3 * time.Second)
 
-	s.logger.Info("[State] TakeProfitReady - start reseting position and calculate budget for next round")
-	s.Budget = s.Budget.Add(s.Position.Quote)
+	s.logger.Info("[State] TakeProfitReady - start reseting position and calculate quote investment for next round")
 
-	// reset position
-	s.Position.Reset()
+	// calculate profit stats
+	s.CalculateProfitOfCurrentRound(ctx)
+	bbgo.Sync(ctx, s)
+
+	s.EmitProfit(s.ProfitStats)
 
 	// set the start time of the next round
 	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())

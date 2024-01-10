@@ -22,10 +22,10 @@ exchangeStrategies:
 - on: max
   dca2:
     symbol: ETHUSDT
-    short: false
-    budget: 200
-    maxOrderNum: 5
-    priceDeviation: 1%
-    takeProfitRatio: 0.2%
-    coolDownInterval: 3m
-    circuitBreakLossThreshold: -0.9
+    quoteInvestment: "200"
+    maxOrderCount: 5
+    priceDeviation: "0.01"
+    takeProfitRatio: "0.002"
+    coolDownInterval: 180
+    recoverWhenStart: true
+    keepOrdersWhenShutdown: true
