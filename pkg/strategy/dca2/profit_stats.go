@@ -3,26 +3,10 @@ package dca2
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-type PersistenceTTL struct {
-	ttl time.Duration
-}
-
-func (p *PersistenceTTL) SetTTL(ttl time.Duration) {
-	if ttl.Nanoseconds() <= 0 {
-		return
-	}
-	p.ttl = ttl
-}
-
-func (p *PersistenceTTL) Expiration() time.Duration {
-	return p.ttl
-}
 
 type ProfitStats struct {
 	Symbol string       `json:"symbol"`
@@ -37,7 +21,7 @@ type ProfitStats struct {
 	TotalProfit        fixedpoint.Value            `json:"totalProfit,omitempty"`
 	TotalFee           map[string]fixedpoint.Value `json:"totalFee,omitempty"`
 
-	PersistenceTTL
+	types.PersistenceTTL
 }
 
 func newProfitStats(market types.Market, quoteInvestment fixedpoint.Value) *ProfitStats {
