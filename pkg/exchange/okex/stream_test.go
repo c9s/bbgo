@@ -48,7 +48,7 @@ func TestStream(t *testing.T) {
 
 	t.Run("book test", func(t *testing.T) {
 		s.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
-			Depth: types.DepthLevel50,
+			Depth: types.DepthLevel400,
 		})
 		s.SetPublicOnly()
 		err := s.Connect(context.Background())
@@ -97,7 +97,7 @@ func TestStream(t *testing.T) {
 
 	t.Run("Subscribe/Unsubscribe test", func(t *testing.T) {
 		s.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
-			Depth: types.DepthLevel50,
+			Depth: types.DepthLevel400,
 		})
 		s.SetPublicOnly()
 		err := s.Connect(context.Background())
@@ -119,7 +119,7 @@ func TestStream(t *testing.T) {
 
 	t.Run("Resubscribe test", func(t *testing.T) {
 		s.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
-			Depth: types.DepthLevel50,
+			Depth: types.DepthLevel400,
 		})
 		s.SetPublicOnly()
 		err := s.Connect(context.Background())
