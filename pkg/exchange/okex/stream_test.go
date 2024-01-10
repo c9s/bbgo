@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -89,6 +90,52 @@ func TestStream(t *testing.T) {
 		})
 		s.OnKLineClosed(func(kline types.KLine) {
 			t.Log("got closed", kline)
+		})
+		c := make(chan struct{})
+		<-c
+	})
+
+	t.Run("Subscribe/Unsubscribe test", func(t *testing.T) {
+		s.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
+			Depth: types.DepthLevel50,
+		})
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnBookSnapshot(func(book types.SliceOrderBook) {
+			t.Log("got snapshot", book)
+		})
+		s.OnBookUpdate(func(book types.SliceOrderBook) {
+			t.Log("got update", book)
+		})
+
+		<-time.After(5 * time.Second)
+
+		s.Unsubscribe()
+		c := make(chan struct{})
+		<-c
+	})
+
+	t.Run("Resubscribe test", func(t *testing.T) {
+		s.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
+			Depth: types.DepthLevel50,
+		})
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnBookSnapshot(func(book types.SliceOrderBook) {
+			t.Log("got snapshot", book)
+		})
+		s.OnBookUpdate(func(book types.SliceOrderBook) {
+			t.Log("got update", book)
+		})
+
+		<-time.After(5 * time.Second)
+
+		s.Resubscribe(func(old []types.Subscription) (new []types.Subscription, err error) {
+			return old, nil
 		})
 		c := make(chan struct{})
 		<-c
