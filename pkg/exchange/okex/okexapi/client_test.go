@@ -2,10 +2,12 @@ package okexapi
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/testutil"
@@ -106,6 +108,66 @@ func TestClient_PlaceOrderRequest(t *testing.T) {
 	res, err := c.Do(ctx)
 	assert.NoError(t, err)
 	t.Log(res)
+}
+
+func TestClient_CancelOrderRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	req := client.NewPlaceOrderRequest()
+	clientId := fmt.Sprintf("%d", uuid.New().ID())
+
+	order, err := req.
+		InstrumentID("BTC-USDT").
+		TradeMode(TradeModeCash).
+		Side(SideTypeSell).
+		OrderType(OrderTypeLimit).
+		TargetCurrency(TargetCurrencyBase).
+		ClientOrderID(clientId).
+		Price("48000").
+		Size("0.001").
+		Do(ctx)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, order)
+	t.Logf("place order: %+v", order)
+
+	c := client.NewGetOrderDetailsRequest().ClientOrderID(clientId).InstrumentID("BTC-USDT")
+	res, err := c.Do(ctx)
+	assert.NoError(t, err)
+	t.Log(res)
+
+	cancelResp, err := client.NewCancelOrderRequest().ClientOrderID(clientId).InstrumentID("BTC-USDT").Do(ctx)
+	assert.NoError(t, err)
+	t.Log(cancelResp)
+}
+
+func TestClient_BatchCancelOrderRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	req := client.NewPlaceOrderRequest()
+	clientId := fmt.Sprintf("%d", uuid.New().ID())
+
+	order, err := req.
+		InstrumentID("BTC-USDT").
+		TradeMode(TradeModeCash).
+		Side(SideTypeSell).
+		OrderType(OrderTypeLimit).
+		TargetCurrency(TargetCurrencyBase).
+		ClientOrderID(clientId).
+		Price("48000").
+		Size("0.001").
+		Do(ctx)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, order)
+	t.Logf("place order: %+v", order)
+
+	c := client.NewGetOrderDetailsRequest().ClientOrderID(clientId).InstrumentID("BTC-USDT")
+	res, err := c.Do(ctx)
+	assert.NoError(t, err)
+	t.Log(res)
+
+	cancelResp, err := client.NewBatchCancelOrderRequest().Add(&CancelOrderRequest{instrumentID: "BTC-USDT", clientOrderID: &clientId}).Do(ctx)
+	assert.NoError(t, err)
+	t.Log(cancelResp)
 }
 
 func TestClient_GetPendingOrderRequest(t *testing.T) {
