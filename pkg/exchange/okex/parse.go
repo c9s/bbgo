@@ -101,8 +101,10 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 type WsEventType string
 
 const (
-	WsEventTypeLogin = "login"
-	WsEventTypeError = "error"
+	WsEventTypeLogin       = "login"
+	WsEventTypeError       = "error"
+	WsEventTypeSubscribe   = "subscribe"
+	WsEventTypeUnsubscribe = "unsubscribe"
 )
 
 type WebSocketEvent struct {
@@ -121,6 +123,9 @@ func (w *WebSocketEvent) IsValid() error {
 	switch w.Event {
 	case WsEventTypeError:
 		return fmt.Errorf("websocket request error, code: %s, msg: %s", w.Code, w.Message)
+
+	case WsEventTypeSubscribe, WsEventTypeUnsubscribe:
+		return nil
 
 	case WsEventTypeLogin:
 		// Actually, this code is unnecessary because the events are either `Subscribe` or `Unsubscribe`, But to avoid bugs
