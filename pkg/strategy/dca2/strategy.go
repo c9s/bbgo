@@ -10,6 +10,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -69,7 +70,7 @@ type Strategy struct {
 	state                State
 
 	// callbacks
-	types.CommonCallback
+	common.StatusCallbacks
 	positionCallbacks []func(*types.Position)
 	profitCallbacks   []func(*ProfitStats)
 }
@@ -297,10 +298,21 @@ func (s *Strategy) CalculateProfitOfCurrentRound(ctx context.Context) error {
 
 	// query the trades of this round
 	for _, order := range orders {
+		if order.OrderID > s.ProfitStats.FromOrderID {
+			s.ProfitStats.FromOrderID = order.OrderID
+		}
+
+		// skip not this strategy order
+		if order.GroupID != s.OrderGroupID {
+			continue
+		}
+
 		if order.ExecutedQuantity.Sign() == 0 {
 			// skip no trade orders
 			continue
 		}
+
+		s.logger.Infof("[DCA] calculate profit stats from order: %s", order.String())
 
 		trades, err := queryService.QueryOrderTrades(ctx, types.OrderQuery{
 			Symbol:  order.Symbol,
@@ -312,6 +324,7 @@ func (s *Strategy) CalculateProfitOfCurrentRound(ctx context.Context) error {
 		}
 
 		for _, trade := range trades {
+			s.logger.Infof("[DCA] calculate profit stats from trade: %s", trade.String())
 			s.ProfitStats.AddTrade(trade)
 		}
 	}

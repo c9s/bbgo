@@ -1,36 +1,37 @@
-package types
+package common
 
-type CommonCallback struct {
+//go:generate callbackgen -type StatusCallbacks
+type StatusCallbacks struct {
 	readyCallbacks  []func()
 	closedCallbacks []func()
 	errorCallbacks  []func(error)
 }
 
-func (c *CommonCallback) OnReady(cb func()) {
+func (c *StatusCallbacks) OnReady(cb func()) {
 	c.readyCallbacks = append(c.readyCallbacks, cb)
 }
 
-func (c *CommonCallback) EmitReady() {
+func (c *StatusCallbacks) EmitReady() {
 	for _, cb := range c.readyCallbacks {
 		cb()
 	}
 }
 
-func (c *CommonCallback) OnClosed(cb func()) {
+func (c *StatusCallbacks) OnClosed(cb func()) {
 	c.closedCallbacks = append(c.closedCallbacks, cb)
 }
 
-func (c *CommonCallback) EmitClosed() {
+func (c *StatusCallbacks) EmitClosed() {
 	for _, cb := range c.closedCallbacks {
 		cb()
 	}
 }
 
-func (c *CommonCallback) OnError(cb func(err error)) {
+func (c *StatusCallbacks) OnError(cb func(err error)) {
 	c.errorCallbacks = append(c.errorCallbacks, cb)
 }
 
-func (c *CommonCallback) EmitError(err error) {
+func (c *StatusCallbacks) EmitError(err error) {
 	for _, cb := range c.errorCallbacks {
 		cb(err)
 	}
