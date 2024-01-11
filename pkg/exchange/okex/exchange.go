@@ -24,11 +24,12 @@ var (
 	marketDataLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 5)
 	orderRateLimiter  = rate.NewLimiter(rate.Every(300*time.Millisecond), 5)
 
-	queryMarketLimiter  = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	queryTickerLimiter  = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	queryTickersLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	queryAccountLimiter = rate.NewLimiter(rate.Every(200*time.Millisecond), 5)
-	placeOrderLimiter   = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
+	queryMarketLimiter      = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryTickerLimiter      = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryTickersLimiter     = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryAccountLimiter     = rate.NewLimiter(rate.Every(200*time.Millisecond), 5)
+	placeOrderLimiter       = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
+	batchCancelOrderLimiter = rate.NewLimiter(rate.Every(5*time.Millisecond), 200)
 )
 
 const ID = "okex"
@@ -321,11 +322,18 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		req.InstrumentID(toLocalSymbol(order.Symbol))
 		req.OrderID(strconv.FormatUint(order.OrderID, 10))
 		if len(order.ClientOrderID) > 0 {
+			_, err := strconv.ParseInt(order.ClientOrderID, 10, 64)
+			if err != nil {
+				return fmt.Errorf("client order id should be numberic: %s, err: %w", order.ClientOrderID, err)
+			}
 			req.ClientOrderID(order.ClientOrderID)
 		}
 		reqs = append(reqs, req)
 	}
 
+	if err := batchCancelOrderLimiter.Wait(ctx); err != nil {
+		return fmt.Errorf("batch cancel order rate limiter wait error: %w", err)
+	}
 	batchReq := e.client.NewBatchCancelOrderRequest()
 	batchReq.Add(reqs...)
 	_, err := batchReq.Do(ctx)
