@@ -11,20 +11,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-type OrderResponse struct {
-	OrderID       string `json:"ordId"`
-	ClientOrderID string `json:"clOrdId"`
-	Tag           string `json:"tag"`
-	Code          string `json:"sCode"`
-	Message       string `json:"sMsg"`
-}
-
-func (c *RestClient) NewPlaceOrderRequest() *PlaceOrderRequest {
-	return &PlaceOrderRequest{
-		client: c,
-	}
-}
-
 func (c *RestClient) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
 	return &BatchPlaceOrderRequest{
 		client: c,
@@ -61,65 +47,9 @@ func (c *RestClient) NewGetTransactionDetailsRequest() *GetTransactionDetailsReq
 	}
 }
 
-//go:generate requestgen -type PlaceOrderRequest
-type PlaceOrderRequest struct {
-	client *RestClient
-
-	instrumentID string `param:"instId"`
-
-	// tdMode
-	// margin mode: "cross", "isolated"
-	// non-margin mode cash
-	tradeMode string `param:"tdMode" validValues:"cross,isolated,cash"`
-
-	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
-	clientOrderID *string `param:"clOrdId"`
-
-	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
-	tag *string `param:"tag"`
-
-	// "buy" or "sell"
-	side SideType `param:"side" validValues:"buy,sell"`
-
-	orderType OrderType `param:"ordType"`
-
-	quantity string `param:"sz"`
-
-	// price
-	price *string `param:"px"`
-}
-
 func (r *PlaceOrderRequest) Parameters() map[string]interface{} {
 	params, _ := r.GetParameters()
 	return params
-}
-
-func (r *PlaceOrderRequest) Do(ctx context.Context) (*OrderResponse, error) {
-	payload := r.Parameters()
-	req, err := r.client.NewAuthenticatedRequest(ctx, "POST", "/api/v5/trade/order", nil, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse APIResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-	var data []OrderResponse
-	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
-		return nil, err
-	}
-
-	if len(data) == 0 {
-		return nil, errors.New("order create error")
-	}
-
-	return &data[0], nil
 }
 
 //go:generate requestgen -type CancelOrderRequest
