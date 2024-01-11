@@ -30,15 +30,15 @@ var (
 	queryAccountLimiter     = rate.NewLimiter(rate.Every(200*time.Millisecond), 5)
 	placeOrderLimiter       = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
 	batchCancelOrderLimiter = rate.NewLimiter(rate.Every(5*time.Millisecond), 200)
+	queryOpenOrderLimiter   = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
 )
 
-const ID = "okex"
-
-// PlatformToken is the platform currency of OKEx, pre-allocate static string here
-const PlatformToken = "OKB"
-
 const (
-	// Constant For query limit
+	ID = "okex"
+
+	// PlatformToken is the platform currency of OKEx, pre-allocate static string here
+	PlatformToken = "OKB"
+
 	defaultQueryLimit = 100
 )
 
@@ -295,15 +295,46 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	*/
 }
 
+// QueryOpenOrders retrieves the pending orders. The data returned is ordered by createdTime, and we utilized the
+// `After` parameter to acquire all orders.
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	instrumentID := toLocalSymbol(symbol)
-	req := e.client.NewGetPendingOrderRequest().InstrumentType(okexapi.InstrumentTypeSpot).InstrumentID(instrumentID)
-	orderDetails, err := req.Do(ctx)
-	if err != nil {
-		return orders, err
+
+	nextCursor := int64(0)
+	for {
+		if err := queryOpenOrderLimiter.Wait(ctx); err != nil {
+			return nil, fmt.Errorf("query open orders rate limiter wait error: %w", err)
+		}
+
+		req := e.client.NewGetOpenOrdersRequest().
+			InstrumentID(instrumentID).
+			After(strconv.FormatInt(nextCursor, 10))
+		openOrders, err := req.Do(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query open orders: %w", err)
+		}
+
+		for _, o := range openOrders {
+			o, err := openOrderToGlobal(&o)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert order, err: %v", err)
+			}
+
+			orders = append(orders, *o)
+		}
+
+		orderLen := len(openOrders)
+		// a defensive programming to ensure the length of order response is expected.
+		if orderLen > defaultQueryLimit {
+			return nil, fmt.Errorf("unexpected open orders length %d", orderLen)
+		}
+
+		if orderLen < defaultQueryLimit {
+			break
+		}
+		nextCursor = int64(openOrders[orderLen-1].OrderId)
 	}
 
-	orders, err = toGlobalOrders(orderDetails)
 	return orders, err
 }
 

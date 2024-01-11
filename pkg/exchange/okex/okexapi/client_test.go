@@ -140,6 +140,26 @@ func TestClient_CancelOrderRequest(t *testing.T) {
 	t.Log(cancelResp)
 }
 
+func TestClient_OpenOrdersRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+
+	orders := []OpenOrder{}
+	beforeId := int64(0)
+	for {
+		c := client.NewGetOpenOrdersRequest().InstrumentID("BTC-USDT").Limit("1").After(fmt.Sprintf("%d", beforeId))
+		res, err := c.Do(ctx)
+		assert.NoError(t, err)
+		if len(res) != 1 {
+			break
+		}
+		orders = append(orders, res...)
+		beforeId = int64(res[0].OrderId)
+	}
+
+	t.Log(orders)
+}
+
 func TestClient_BatchCancelOrderRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
@@ -168,21 +188,6 @@ func TestClient_BatchCancelOrderRequest(t *testing.T) {
 	cancelResp, err := client.NewBatchCancelOrderRequest().Add(&CancelOrderRequest{instrumentID: "BTC-USDT", clientOrderID: &clientId}).Do(ctx)
 	assert.NoError(t, err)
 	t.Log(cancelResp)
-}
-
-func TestClient_GetPendingOrderRequest(t *testing.T) {
-	client := getTestClientOrSkip(t)
-	ctx := context.Background()
-	req := client.NewGetPendingOrderRequest()
-	odr_type := []string{string(OrderTypeLimit), string(OrderTypeIOC)}
-
-	pending_order, err := req.
-		InstrumentID("BTC-USDT").
-		OrderTypes(odr_type).
-		Do(ctx)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, pending_order)
-	t.Logf("pending order: %+v", pending_order)
 }
 
 func TestClient_GetOrderDetailsRequest(t *testing.T) {

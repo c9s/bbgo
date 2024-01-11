@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
-	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/pkg/errors"
 )
 
 func (c *RestClient) NewBatchPlaceOrderRequest() *BatchPlaceOrderRequest {
@@ -25,12 +25,6 @@ func (c *RestClient) NewBatchCancelOrderRequest() *BatchCancelOrderRequest {
 
 func (c *RestClient) NewGetOrderDetailsRequest() *GetOrderDetailsRequest {
 	return &GetOrderDetailsRequest{
-		client: c,
-	}
-}
-
-func (c *RestClient) NewGetPendingOrderRequest() *GetPendingOrderRequest {
-	return &GetPendingOrderRequest{
 		client: c,
 	}
 }
@@ -247,89 +241,6 @@ func (r *GetOrderDetailsRequest) Do(ctx context.Context) (*OrderDetails, error) 
 	}
 
 	return &data[0], nil
-}
-
-type GetPendingOrderRequest struct {
-	client *RestClient
-
-	instId *string
-
-	instType *InstrumentType
-
-	orderTypes []string
-
-	state *OrderState
-}
-
-func (r *GetPendingOrderRequest) InstrumentID(instId string) *GetPendingOrderRequest {
-	r.instId = &instId
-	return r
-}
-
-func (r *GetPendingOrderRequest) InstrumentType(instType InstrumentType) *GetPendingOrderRequest {
-	r.instType = &instType
-	return r
-}
-
-func (r *GetPendingOrderRequest) State(state OrderState) *GetPendingOrderRequest {
-	r.state = &state
-	return r
-}
-
-func (r *GetPendingOrderRequest) OrderTypes(orderTypes []string) *GetPendingOrderRequest {
-	r.orderTypes = orderTypes
-	return r
-}
-
-func (r *GetPendingOrderRequest) AddOrderTypes(orderTypes ...string) *GetPendingOrderRequest {
-	r.orderTypes = append(r.orderTypes, orderTypes...)
-	return r
-}
-
-func (r *GetPendingOrderRequest) Parameters() map[string]interface{} {
-	var payload = map[string]interface{}{}
-
-	if r.instId != nil {
-		payload["instId"] = r.instId
-	}
-
-	if r.instType != nil {
-		payload["instType"] = r.instType
-	}
-
-	if r.state != nil {
-		payload["state"] = r.state
-	}
-
-	if len(r.orderTypes) > 0 {
-		payload["ordType"] = strings.Join(r.orderTypes, ",")
-	}
-
-	return payload
-}
-
-func (r *GetPendingOrderRequest) Do(ctx context.Context) ([]OrderDetails, error) {
-	payload := r.Parameters()
-	req, err := r.client.NewAuthenticatedRequest(ctx, "GET", "/api/v5/trade/orders-pending", nil, payload)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := r.client.SendRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var apiResponse APIResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
-	}
-	var data []OrderDetails
-	if err := json.Unmarshal(apiResponse.Data, &data); err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
 
 type GetTransactionDetailsRequest struct {
