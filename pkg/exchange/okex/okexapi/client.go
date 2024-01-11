@@ -58,6 +58,10 @@ const (
 	OrderStateFilled          OrderState = "filled"
 )
 
+func (o OrderState) IsWorking() bool {
+	return o == OrderStateLive || o == OrderStatePartiallyFilled
+}
+
 type RestClient struct {
 	requestgen.BaseAPIClient
 
