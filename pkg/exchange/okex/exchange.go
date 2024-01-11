@@ -28,6 +28,7 @@ var (
 	queryTickerLimiter  = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 	queryTickersLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 	queryAccountLimiter = rate.NewLimiter(rate.Every(200*time.Millisecond), 5)
+	placeOrderLimiter   = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
 )
 
 const ID = "okex"
@@ -198,63 +199,68 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
 	orderReq := e.client.NewPlaceOrderRequest()
 
+	orderReq.InstrumentID(toLocalSymbol(order.Symbol))
+	orderReq.Side(toLocalSideType(order.Side))
+	orderReq.Size(order.Market.FormatQuantity(order.Quantity))
+
+	// set price field for limit orders
+	switch order.Type {
+	case types.OrderTypeStopLimit, types.OrderTypeLimit:
+		orderReq.Price(order.Market.FormatPrice(order.Price))
+	case types.OrderTypeMarket:
+		// Because our order.Quantity unit is base coin, so we indicate the target currency to Base.
+		if order.Side == types.SideTypeBuy {
+			orderReq.Size(order.Market.FormatQuantity(order.Quantity))
+			orderReq.TargetCurrency(okexapi.TargetCurrencyBase)
+		} else {
+			orderReq.Size(order.Market.FormatQuantity(order.Quantity))
+			orderReq.TargetCurrency(okexapi.TargetCurrencyQuote)
+		}
+	}
+
 	orderType, err := toLocalOrderType(order.Type)
 	if err != nil {
 		return nil, err
 	}
 
-	orderReq.InstrumentID(toLocalSymbol(order.Symbol))
-	orderReq.Side(toLocalSideType(order.Side))
-
-	if order.Market.Symbol != "" {
-		orderReq.Quantity(order.Market.FormatQuantity(order.Quantity))
-	} else {
-		// TODO report error
-		orderReq.Quantity(order.Quantity.FormatString(8))
-	}
-
-	// set price field for limit orders
-	switch order.Type {
-	case types.OrderTypeStopLimit, types.OrderTypeLimit:
-		if order.Market.Symbol != "" {
-			orderReq.Price(order.Market.FormatPrice(order.Price))
-		} else {
-			// TODO report error
-			orderReq.Price(order.Price.FormatString(8))
-		}
-	}
-
 	switch order.TimeInForce {
-	case "FOK":
+	case types.TimeInForceFOK:
 		orderReq.OrderType(okexapi.OrderTypeFOK)
-	case "IOC":
+	case types.TimeInForceIOC:
 		orderReq.OrderType(okexapi.OrderTypeIOC)
 	default:
 		orderReq.OrderType(orderType)
 	}
 
-	orderHead, err := orderReq.Do(ctx)
+	if err := placeOrderLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
+	}
+
+	_, err = strconv.ParseInt(order.ClientOrderID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("client order id should be numberic: %s, err: %w", order.ClientOrderID, err)
+	}
+	orderReq.ClientOrderID(order.ClientOrderID)
+
+	orders, err := orderReq.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	orderID, err := strconv.ParseInt(orderHead.OrderID, 10, 64)
-	if err != nil {
-		return nil, err
+	if len(orders) != 1 {
+		return nil, fmt.Errorf("unexpected length of order response: %v", orders)
 	}
 
-	return &types.Order{
-		SubmitOrder:      order,
-		Exchange:         types.ExchangeOKEx,
-		OrderID:          uint64(orderID),
-		Status:           types.OrderStatusNew,
-		ExecutedQuantity: fixedpoint.Zero,
-		IsWorking:        true,
-		CreationTime:     types.Time(time.Now()),
-		UpdateTime:       types.Time(time.Now()),
-		IsMargin:         false,
-		IsIsolated:       false,
-	}, nil
+	orderRes, err := e.QueryOrder(ctx, types.OrderQuery{
+		Symbol:        order.Symbol,
+		OrderID:       orders[0].OrderID,
+		ClientOrderID: orders[0].ClientOrderID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query order by id: %s, clientOrderId: %s, err: %w", orders[0].OrderID, orders[0].ClientOrderID, err)
+	}
+
+	return orderRes, nil
 
 	// TODO: move this to batch place orders interface
 	/*

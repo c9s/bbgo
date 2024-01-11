@@ -91,15 +91,21 @@ func TestClient_PlaceOrderRequest(t *testing.T) {
 
 	order, err := req.
 		InstrumentID("BTC-USDT").
-		TradeMode("cash").
-		Side(SideTypeBuy).
+		TradeMode(TradeModeCash).
+		Side(SideTypeSell).
 		OrderType(OrderTypeLimit).
-		Price("15000").
-		Quantity("0.0001").
+		TargetCurrency(TargetCurrencyBase).
+		Price("48000").
+		Size("0.001").
 		Do(ctx)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, order)
 	t.Logf("place order: %+v", order)
+
+	c := client.NewGetOrderDetailsRequest().OrderID(order[0].OrderID).InstrumentID("BTC-USDT")
+	res, err := c.Do(ctx)
+	assert.NoError(t, err)
+	t.Log(res)
 }
 
 func TestClient_GetPendingOrderRequest(t *testing.T) {
