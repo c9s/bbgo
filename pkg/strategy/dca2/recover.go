@@ -34,7 +34,7 @@ func (s *Strategy) recover(ctx context.Context) error {
 		return err
 	}
 
-	closedOrders, err := queryService.QueryClosedOrdersDesc(ctx, s.Symbol, time.Date(2024, time.January, 1, 0, 0, 0, 0, time.Local), time.Now(), 0)
+	closedOrders, err := queryService.QueryClosedOrdersDesc(ctx, s.Symbol, time.Date(2024, time.January, 12, 14, 0, 0, 0, time.Local), time.Now(), 0)
 	if err != nil {
 		return err
 	}
@@ -50,14 +50,17 @@ func (s *Strategy) recover(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	s.logger.Info("recover stats DONE")
 
 	// recover position
 	if err := recoverPosition(ctx, s.Position, queryService, currentRound); err != nil {
 		return err
 	}
+	s.logger.Info("recover position DONE")
 
 	// recover profit stats
 	recoverProfitStats(ctx, s)
+	s.logger.Info("recover profit stats DONE")
 
 	// recover startTimeOfNextRound
 	startTimeOfNextRound := recoverStartTimeOfNextRound(ctx, currentRound, s.CoolDownInterval)
@@ -194,7 +197,7 @@ func recoverProfitStats(ctx context.Context, strategy *Strategy) error {
 		return fmt.Errorf("profit stats is nil, please check it")
 	}
 
-	strategy.CalculateProfitOfCurrentRound(ctx)
+	strategy.CalculateAndEmitProfit(ctx)
 
 	return nil
 }

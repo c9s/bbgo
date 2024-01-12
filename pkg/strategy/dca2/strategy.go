@@ -279,7 +279,7 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	return err
 }
 
-func (s *Strategy) CalculateProfitOfCurrentRound(ctx context.Context) error {
+func (s *Strategy) CalculateAndEmitProfit(ctx context.Context) error {
 	historyService, ok := s.Session.Exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
 		return fmt.Errorf("exchange %s doesn't support ExchangeTradeHistoryService", s.Session.Exchange.Name())
@@ -290,47 +290,73 @@ func (s *Strategy) CalculateProfitOfCurrentRound(ctx context.Context) error {
 		return fmt.Errorf("exchange %s doesn't support ExchangeOrderQueryService", s.Session.Exchange.Name())
 	}
 
-	// query the orders of this round
+	// TODO: pagination for it
+	// query the orders
 	orders, err := historyService.QueryClosedOrders(ctx, s.Symbol, time.Time{}, time.Time{}, s.ProfitStats.FromOrderID)
 	if err != nil {
 		return err
 	}
 
-	// query the trades of this round
+	var rounds []Round
+	var round Round
 	for _, order := range orders {
-		if order.OrderID > s.ProfitStats.FromOrderID {
-			s.ProfitStats.FromOrderID = order.OrderID
-		}
-
 		// skip not this strategy order
 		if order.GroupID != s.OrderGroupID {
 			continue
 		}
 
-		if order.ExecutedQuantity.Sign() == 0 {
-			// skip no trade orders
-			continue
-		}
-
-		s.logger.Infof("[DCA] calculate profit stats from order: %s", order.String())
-
-		trades, err := queryService.QueryOrderTrades(ctx, types.OrderQuery{
-			Symbol:  order.Symbol,
-			OrderID: strconv.FormatUint(order.OrderID, 10),
-		})
-
-		if err != nil {
-			return err
-		}
-
-		for _, trade := range trades {
-			s.logger.Infof("[DCA] calculate profit stats from trade: %s", trade.String())
-			s.ProfitStats.AddTrade(trade)
+		switch order.Side {
+		case types.SideTypeBuy:
+			round.OpenPositionOrders = append(round.OpenPositionOrders, order)
+		case types.SideTypeSell:
+			if order.Status != types.OrderStatusFilled {
+				continue
+			}
+			round.TakeProfitOrder = order
+			rounds = append(rounds, round)
+			round = Round{}
+		default:
+			s.logger.Errorf("there is order with unsupported side")
 		}
 	}
 
-	s.ProfitStats.FromOrderID = s.ProfitStats.FromOrderID + 1
-	s.ProfitStats.QuoteInvestment = s.ProfitStats.QuoteInvestment.Add(s.ProfitStats.CurrentRoundProfit)
+	for _, round := range rounds {
+		var roundOrders []types.Order = round.OpenPositionOrders
+		roundOrders = append(roundOrders, round.TakeProfitOrder)
+		for _, order := range roundOrders {
+			s.logger.Infof("[DCA] calculate profit stats from order: %s", order.String())
+
+			// skip no trade orders
+			if order.ExecutedQuantity.Sign() == 0 {
+				continue
+			}
+
+			trades, err := queryService.QueryOrderTrades(ctx, types.OrderQuery{
+				Symbol:  order.Symbol,
+				OrderID: strconv.FormatUint(order.OrderID, 10),
+			})
+
+			if err != nil {
+				return err
+			}
+
+			for _, trade := range trades {
+				s.logger.Infof("[DCA] calculate profit stats from trade: %s", trade.String())
+				s.ProfitStats.AddTrade(trade)
+			}
+		}
+
+		s.ProfitStats.FromOrderID = round.TakeProfitOrder.OrderID + 1
+		s.ProfitStats.QuoteInvestment = s.ProfitStats.QuoteInvestment.Add(s.ProfitStats.CurrentRoundProfit)
+
+		// store into persistence
+		bbgo.Sync(ctx, s)
+
+		// emit profit
+		s.EmitProfit(s.ProfitStats)
+
+		s.ProfitStats.NewRound()
+	}
 
 	return nil
 }

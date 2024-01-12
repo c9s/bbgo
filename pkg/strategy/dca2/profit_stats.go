@@ -65,8 +65,8 @@ func (s *ProfitStats) AddTrade(trade types.Trade) {
 	s.TotalProfit = s.TotalProfit.Add(quoteQuantity)
 
 	if s.Market.QuoteCurrency == trade.FeeCurrency {
-		s.CurrentRoundProfit.Sub(trade.Fee)
-		s.TotalProfit.Sub(trade.Fee)
+		s.CurrentRoundProfit = s.CurrentRoundProfit.Sub(trade.Fee)
+		s.TotalProfit = s.TotalProfit.Sub(trade.Fee)
 	}
 }
 
