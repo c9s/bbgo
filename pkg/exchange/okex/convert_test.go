@@ -11,13 +11,13 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func Test_openOrderToGlobal(t *testing.T) {
+func Test_orderDetailToGlobal(t *testing.T) {
 	var (
 		assert = assert.New(t)
 
 		orderId = 665576973905014786
 		// {"accFillSz":"0","algoClOrdId":"","algoId":"","attachAlgoClOrdId":"","attachAlgoOrds":[],"avgPx":"","cTime":"1704957916401","cancelSource":"","cancelSourceReason":"","category":"normal","ccy":"","clOrdId":"","fee":"0","feeCcy":"USDT","fillPx":"","fillSz":"0","fillTime":"","instId":"BTC-USDT","instType":"SPOT","lever":"","ordId":"665576973905014786","ordType":"limit","pnl":"0","posSide":"net","px":"48174.5","pxType":"","pxUsd":"","pxVol":"","quickMgnType":"","rebate":"0","rebateCcy":"BTC","reduceOnly":"false","side":"sell","slOrdPx":"","slTriggerPx":"","slTriggerPxType":"","source":"","state":"live","stpId":"","stpMode":"","sz":"0.00001","tag":"","tdMode":"cash","tgtCcy":"","tpOrdPx":"","tpTriggerPx":"","tpTriggerPxType":"","tradeId":"","uTime":"1704957916401"}
-		openOrder = &okexapi.OpenOrder{
+		openOrder = &okexapi.OrderDetail{
 			AccumulatedFillSize: fixedpoint.NewFromFloat(0),
 			AvgPrice:            fixedpoint.NewFromFloat(0),
 			CreatedTime:         types.NewMillisecondTimestampFromInt(1704957916401),
@@ -62,7 +62,7 @@ func Test_openOrderToGlobal(t *testing.T) {
 	)
 
 	t.Run("succeeds", func(t *testing.T) {
-		order, err := openOrderToGlobal(openOrder)
+		order, err := orderDetailToGlobal(openOrder)
 		assert.NoError(err)
 		assert.Equal(expOrder, order)
 	})
@@ -70,14 +70,14 @@ func Test_openOrderToGlobal(t *testing.T) {
 	t.Run("unexpected order status", func(t *testing.T) {
 		newOrder := *openOrder
 		newOrder.State = "xxx"
-		_, err := openOrderToGlobal(&newOrder)
+		_, err := orderDetailToGlobal(&newOrder)
 		assert.ErrorContains(err, "xxx")
 	})
 
 	t.Run("unexpected order type", func(t *testing.T) {
 		newOrder := *openOrder
 		newOrder.OrderType = "xxx"
-		_, err := openOrderToGlobal(&newOrder)
+		_, err := orderDetailToGlobal(&newOrder)
 		assert.ErrorContains(err, "xxx")
 	})
 
