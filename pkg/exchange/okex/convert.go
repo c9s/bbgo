@@ -149,6 +149,49 @@ func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) 
 	return trades, nil
 }
 
+func openOrderToGlobal(order *okexapi.OpenOrder) (*types.Order, error) {
+	side := toGlobalSide(order.Side)
+
+	orderType, err := toGlobalOrderType(order.OrderType)
+	if err != nil {
+		return nil, err
+	}
+
+	timeInForce := types.TimeInForceGTC
+	switch order.OrderType {
+	case okexapi.OrderTypeFOK:
+		timeInForce = types.TimeInForceFOK
+	case okexapi.OrderTypeIOC:
+		timeInForce = types.TimeInForceIOC
+	}
+
+	orderStatus, err := toGlobalOrderStatus(order.State)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: order.ClientOrderId,
+			Symbol:        toGlobalSymbol(order.InstrumentID),
+			Side:          side,
+			Type:          orderType,
+			Price:         order.Price,
+			Quantity:      order.Size,
+			TimeInForce:   timeInForce,
+		},
+		Exchange:         types.ExchangeOKEx,
+		OrderID:          uint64(order.OrderId),
+		UUID:             strconv.FormatInt(int64(order.OrderId), 10),
+		Status:           orderStatus,
+		OriginalStatus:   string(order.State),
+		ExecutedQuantity: order.AccumulatedFillSize,
+		IsWorking:        order.State.IsWorking(),
+		CreationTime:     types.Time(order.CreatedTime),
+		UpdateTime:       types.Time(order.UpdatedTime),
+	}, nil
+}
+
 func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) {
 	var orders []types.Order
 	var err error

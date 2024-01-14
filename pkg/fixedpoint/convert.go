@@ -296,7 +296,7 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 		*v = Zero
 		return nil
 	}
-	if len(data) == 0 {
+	if len(data) == 0 || bytes.Equal(data, []byte{'"', '"'}) {
 		*v = Zero
 		return nil
 	}
