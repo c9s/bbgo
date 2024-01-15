@@ -31,6 +31,8 @@ type GetTransactionHistoryRequest struct {
 	limit *uint64 `param:"limit,query"`
 }
 
+type OrderList []OrderDetails
+
 // NewGetOrderHistoriesRequest is descending order by createdTime
 func (c *RestClient) NewGetTransactionHistoryRequest() *GetTransactionHistoryRequest {
 	return &GetTransactionHistoryRequest{
