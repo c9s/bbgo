@@ -149,7 +149,7 @@ func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) 
 	return trades, nil
 }
 
-func openOrderToGlobal(order *okexapi.OpenOrder) (*types.Order, error) {
+func orderDetailToGlobal(order *okexapi.OrderDetail) (*types.Order, error) {
 	side := toGlobalSide(order.Side)
 
 	orderType, err := toGlobalOrderType(order.OrderType)

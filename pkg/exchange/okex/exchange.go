@@ -24,13 +24,14 @@ var (
 	marketDataLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 5)
 	orderRateLimiter  = rate.NewLimiter(rate.Every(300*time.Millisecond), 5)
 
-	queryMarketLimiter      = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	queryTickerLimiter      = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	queryTickersLimiter     = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	queryAccountLimiter     = rate.NewLimiter(rate.Every(200*time.Millisecond), 5)
-	placeOrderLimiter       = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
-	batchCancelOrderLimiter = rate.NewLimiter(rate.Every(5*time.Millisecond), 200)
-	queryOpenOrderLimiter   = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
+	queryMarketLimiter          = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryTickerLimiter          = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryTickersLimiter         = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryAccountLimiter         = rate.NewLimiter(rate.Every(200*time.Millisecond), 5)
+	placeOrderLimiter           = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
+	batchCancelOrderLimiter     = rate.NewLimiter(rate.Every(5*time.Millisecond), 200)
+	queryOpenOrderLimiter       = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
+	queryClosedOrderRateLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 )
 
 const (
@@ -40,6 +41,8 @@ const (
 	PlatformToken = "OKB"
 
 	defaultQueryLimit = 100
+
+	maxHistoricalDataQueryPeriod = 90 * 24 * time.Hour
 )
 
 var log = logrus.WithFields(logrus.Fields{
@@ -315,7 +318,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		}
 
 		for _, o := range openOrders {
-			o, err := openOrderToGlobal(&o)
+			o, err := orderDetailToGlobal(&o.OrderDetail)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert order, err: %v", err)
 			}
@@ -488,27 +491,32 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 /*
 QueryClosedOrders can query closed orders in last 3 months, there are no time interval limitations, as long as until >= since.
 Please Use lastOrderID as cursor, only return orders later than that order, that order is not included.
-If you want to query orders by time range, please just pass since and until.
-If you want to query by cursor, please pass lastOrderID.
-Because it gets the correct response even when you pass all parameters with the right time interval and invalid lastOrderID, like 0.
-Time interval boundary unit is second.
-since is inclusive, ex. order created in 1694155903, get response if query since 1694155903, get empty if query since 1694155904
-until is not inclusive, ex. order created in 1694155903, get response if query until 1694155904, get empty if query until 1694155903
+If you want to query all orders within a large time range (e.g. total orders > 100), we recommend using batch.ClosedOrderBatchQuery.
+
+** since and until are inclusive, you can include the lastTradeId as well. **
 */
-func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error) {
+func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
 	if symbol == "" {
 		return nil, ErrSymbolRequired
 	}
 
-	if err := orderRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
+	newSince := since
+	now := time.Now()
+
+	if time.Since(newSince) > maxHistoricalDataQueryPeriod {
+		newSince = now.Add(-maxHistoricalDataQueryPeriod)
+		log.Warnf("!!!OKX EXCHANGE API NOTICE!!! The closed order API cannot query data beyond 90 days from the current date, update %s -> %s", since, newSince)
+	}
+	if until.Before(newSince) {
+		log.Warnf("!!!OKX EXCHANGE API NOTICE!!! The 'until' comes before 'since', update until to now(%s -> %s).", until, now)
+		until = now
+	}
+	if until.Sub(newSince) > maxHistoricalDataQueryPeriod {
+		return nil, fmt.Errorf("the start time %s and end time %s cannot exceed 90 days", newSince, until)
 	}
 
-	var lastOrder string
-	if lastOrderID <= 0 {
-		lastOrder = ""
-	} else {
-		lastOrder = strconv.FormatUint(lastOrderID, 10)
+	if err := queryClosedOrderRateLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
 	}
 
 	res, err := e.client.NewGetOrderHistoryRequest().
@@ -516,17 +524,15 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 		StartTime(since).
 		EndTime(until).
 		Limit(defaultQueryLimit).
-		Before(lastOrder).
+		Before(strconv.FormatUint(lastOrderID, 10)).
 		Do(ctx)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
 	}
 
-	var orders []types.Order
-
 	for _, order := range res {
-		o, err2 := toGlobalOrder(&order)
+		o, err2 := orderDetailToGlobal(&order)
 		if err2 != nil {
 			err = multierr.Append(err, err2)
 			continue
