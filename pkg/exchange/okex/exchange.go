@@ -22,7 +22,6 @@ import (
 // Market data limiter means public api, this includes QueryMarkets, QueryTicker, QueryTickers, QueryKLines
 var (
 	marketDataLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 5)
-	orderRateLimiter  = rate.NewLimiter(rate.Every(300*time.Millisecond), 5)
 
 	queryMarketLimiter          = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 	queryTickerLimiter          = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
@@ -32,6 +31,7 @@ var (
 	batchCancelOrderLimiter     = rate.NewLimiter(rate.Every(5*time.Millisecond), 200)
 	queryOpenOrderLimiter       = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
 	queryClosedOrderRateLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryTradeLimiter           = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 )
 
 const (
@@ -448,8 +448,8 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	return toGlobalOrder(order)
 }
 
-// Query order trades can query trades in last 3 months.
-func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
+// QueryOrderTrades quires order trades can query trades in last 3 months.
+func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (trades []types.Trade, err error) {
 	if len(q.ClientOrderID) != 0 {
 		log.Warn("!!!OKEX EXCHANGE API NOTICE!!! Okex does not support searching for trades using OrderClientId.")
 	}
@@ -463,28 +463,18 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 		req.OrderID(q.OrderID)
 	}
 
-	if err := orderRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("order rate limiter wait error: %w", err)
+	if err := queryTradeLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("order trade rate limiter wait error: %w", err)
 	}
 	response, err := req.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query order trades, err: %w", err)
 	}
 
-	var trades []types.Trade
-	var errs error
 	for _, trade := range response {
-		res, err := toGlobalTrade(&trade)
-		if err != nil {
-			errs = multierr.Append(errs, err)
-			continue
-		}
-		trades = append(trades, *res)
+		trades = append(trades, tradeToGlobal(trade))
 	}
 
-	if errs != nil {
-		return nil, errs
-	}
 	return trades, nil
 }
 
@@ -549,69 +539,63 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, 
 
 /*
 QueryTrades can query trades in last 3 months, there are no time interval limitations, as long as end_time >= start_time.
-OKEX do not provide api to query by tradeID, So use /api/v5/trade/orders-history-archive as its official site do.
-If you want to query trades by time range, please just pass start_time and end_time.
-Because it gets the correct response even when you pass all parameters with the right time interval and invalid LastTradeID, like 0.
-No matter how you pass parameter, QueryTrades return descending order.
-If you query time period 3 months earlier with start time and end time, will return [] empty slice
-But If you query time period 3 months earlier JUST with start time, will return like start with 3 months ago.
+okx does not provide an API to query by trade ID, so we use the bill ID to do it. The trades result is ordered by timestamp.
+
+REMARK: If your start time is 90 days earlier, we will update it to now - 90 days.
+** StartTime and EndTime are inclusive. **
+** StartTime and EndTime cannot exceed 90 days.  **
+** StartTime, EndTime, FromTradeId can be used together. **
+
+If you want to query all trades within a large time range (e.g. total orders > 100), we recommend using batch.TradeBatchQuery.
 */
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	if symbol == "" {
 		return nil, ErrSymbolRequired
 	}
 
-	if options.LastTradeID > 0 {
-		log.Warn("!!!OKEX EXCHANGE API NOTICE!!! Okex does not support searching for trades using TradeId.")
-	}
-
 	req := e.client.NewGetTransactionHistoryRequest().InstrumentID(toLocalSymbol(symbol))
 
-	limit := uint64(options.Limit)
+	limit := options.Limit
+	req.Limit(uint64(limit))
 	if limit > defaultQueryLimit || limit <= 0 {
-		limit = defaultQueryLimit
+		log.Infof("limit is exceeded default limit %d or zero, got: %d, use default limit", defaultQueryLimit, limit)
 		req.Limit(defaultQueryLimit)
-		log.Debugf("limit is exceeded default limit %d or zero, got: %d, use default limit", defaultQueryLimit, options.Limit)
-	} else {
-		req.Limit(limit)
 	}
 
-	if err := orderRateLimiter.Wait(ctx); err != nil {
+	var newStartTime time.Time
+	if options.StartTime != nil {
+		newStartTime = *options.StartTime
+		if time.Since(newStartTime) > maxHistoricalDataQueryPeriod {
+			newStartTime = time.Now().Add(-maxHistoricalDataQueryPeriod)
+			log.Warnf("!!!OKX EXCHANGE API NOTICE!!! The trade API cannot query data beyond 90 days from the current date, update %s -> %s", *options.StartTime, newStartTime)
+		}
+		req.StartTime(newStartTime.UTC())
+	}
+
+	if options.EndTime != nil {
+		if options.EndTime.Before(newStartTime) {
+			return nil, fmt.Errorf("end time %s before start %s", *options.EndTime, newStartTime)
+		}
+		if options.EndTime.Sub(newStartTime) > maxHistoricalDataQueryPeriod {
+			return nil, fmt.Errorf("start time %s and end time %s cannot greater than 90 days", newStartTime, options.EndTime)
+		}
+		req.EndTime(options.EndTime.UTC())
+	}
+	req.Before(strconv.FormatUint(options.LastTradeID, 10))
+
+	if err := queryTradeLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("query trades rate limiter wait error: %w", err)
 	}
 
-	var err error
-	var response []okexapi.OrderDetails
-	if options.StartTime == nil && options.EndTime == nil {
-		return nil, fmt.Errorf("StartTime and EndTime are required parameter!")
-	} else { // query by time interval
-		if options.StartTime != nil {
-			req.StartTime(*options.StartTime)
-		}
-		if options.EndTime != nil {
-			req.EndTime(*options.EndTime)
-		}
-
-		var billID = "" // billId should be emtpy, can't be 0
-		for {           // pagenation should use "after" (earlier than)
-			res, err := req.
-				After(billID).
-				Do(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to call get order histories error: %w", err)
-			}
-			response = append(response, res...)
-			if len(res) != int(limit) {
-				break
-			}
-			billID = strconv.Itoa(int(res[limit-1].BillID))
-		}
-	}
-
-	trades, err := toGlobalTrades(response)
+	response, err := req.Do(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to trans order detail to trades error: %w", err)
+		return nil, fmt.Errorf("failed to query trades, err: %w", err)
 	}
+
+	for _, trade := range response {
+		trades = append(trades, tradeToGlobal(trade))
+	}
+
 	return trades, nil
 }
 
