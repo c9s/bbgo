@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	tradeLogLimiter = rate.NewLimiter(rate.Every(time.Minute), 1)
+	marketTradeLogLimiter = rate.NewLimiter(rate.Every(time.Minute), 1)
+	tradeLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
 )
 
 type WebsocketOp struct {
@@ -34,11 +35,11 @@ type Stream struct {
 	client *okexapi.RestClient
 
 	// public callbacks
-	kLineEventCallbacks        []func(candle KLineEvent)
-	bookEventCallbacks         []func(book BookEvent)
-	accountEventCallbacks      []func(account okexapi.Account)
-	orderDetailsEventCallbacks []func(orderDetails []okexapi.OrderDetails)
-	marketTradeEventCallbacks  []func(tradeDetail []MarketTradeEvent)
+	kLineEventCallbacks       []func(candle KLineEvent)
+	bookEventCallbacks        []func(book BookEvent)
+	accountEventCallbacks     []func(account okexapi.Account)
+	orderTradesEventCallbacks []func(orderTrades []OrderTradeEvent)
+	marketTradeEventCallbacks []func(tradeDetail []MarketTradeEvent)
 }
 
 func NewStream(client *okexapi.RestClient) *Stream {
@@ -55,7 +56,7 @@ func NewStream(client *okexapi.RestClient) *Stream {
 	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnAccountEvent(stream.handleAccountEvent)
 	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
-	stream.OnOrderDetailsEvent(stream.handleOrderDetailsEvent)
+	stream.OnOrderTradesEvent(stream.handleOrderDetailsEvent)
 	stream.OnConnect(stream.handleConnect)
 	stream.OnAuth(stream.handleAuth)
 	return stream
@@ -167,24 +168,26 @@ func (s *Stream) handleAuth() {
 	}
 }
 
-func (s *Stream) handleOrderDetailsEvent(orderDetails []okexapi.OrderDetails) {
-	detailTrades, detailOrders := segmentOrderDetails(orderDetails)
-
-	trades, err := toGlobalTrades(detailTrades)
-	if err != nil {
-		log.WithError(err).Errorf("error converting order details into trades")
-	} else {
-		for _, trade := range trades {
-			s.EmitTradeUpdate(trade)
+func (s *Stream) handleOrderDetailsEvent(orderTrades []OrderTradeEvent) {
+	for _, evt := range orderTrades {
+		if evt.TradeId != "" {
+			trade, err := evt.toGlobalTrade()
+			if err != nil {
+				if tradeLogLimiter.Allow() {
+					log.WithError(err).Errorf("failed to convert global trade")
+				}
+			} else {
+				s.EmitTradeUpdate(trade)
+			}
 		}
-	}
 
-	orders, err := toGlobalOrders(detailOrders)
-	if err != nil {
-		log.WithError(err).Errorf("error converting order details into orders")
-	} else {
-		for _, order := range orders {
-			s.EmitOrderUpdate(order)
+		order, err := orderDetailToGlobal(&evt.OrderDetail)
+		if err != nil {
+			if tradeLogLimiter.Allow() {
+				log.WithError(err).Errorf("failed to convert global order")
+			}
+		} else {
+			s.EmitOrderUpdate(*order)
 		}
 	}
 }
@@ -208,7 +211,7 @@ func (s *Stream) handleMarketTradeEvent(data []MarketTradeEvent) {
 	for _, event := range data {
 		trade, err := event.toGlobalTrade()
 		if err != nil {
-			if tradeLogLimiter.Allow() {
+			if marketTradeLogLimiter.Allow() {
 				log.WithError(err).Error("failed to convert to market trade")
 			}
 			continue
@@ -262,8 +265,8 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case *okexapi.Account:
 		s.EmitAccountEvent(*et)
 
-	case []okexapi.OrderDetails:
-		s.EmitOrderDetailsEvent(et)
+	case []OrderTradeEvent:
+		s.EmitOrderTradesEvent(et)
 
 	case []MarketTradeEvent:
 		s.EmitMarketTradeEvent(et)

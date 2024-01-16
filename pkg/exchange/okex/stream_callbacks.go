@@ -36,13 +36,13 @@ func (s *Stream) EmitAccountEvent(account okexapi.Account) {
 	}
 }
 
-func (s *Stream) OnOrderDetailsEvent(cb func(orderDetails []okexapi.OrderDetails)) {
-	s.orderDetailsEventCallbacks = append(s.orderDetailsEventCallbacks, cb)
+func (s *Stream) OnOrderTradesEvent(cb func(orderTrades []OrderTradeEvent)) {
+	s.orderTradesEventCallbacks = append(s.orderTradesEventCallbacks, cb)
 }
 
-func (s *Stream) EmitOrderDetailsEvent(orderDetails []okexapi.OrderDetails) {
-	for _, cb := range s.orderDetailsEventCallbacks {
-		cb(orderDetails)
+func (s *Stream) EmitOrderTradesEvent(orderTrades []OrderTradeEvent) {
+	for _, cb := range s.orderTradesEventCallbacks {
+		cb(orderTrades)
 	}
 }
 
@@ -63,7 +63,7 @@ type StreamEventHub interface {
 
 	OnAccountEvent(cb func(account okexapi.Account))
 
-	OnOrderDetailsEvent(cb func(orderDetails []okexapi.OrderDetails))
+	OnOrderTradesEvent(cb func(orderTrades []OrderTradeEvent))
 
 	OnMarketTradeEvent(cb func(tradeDetail []MarketTradeEvent))
 }

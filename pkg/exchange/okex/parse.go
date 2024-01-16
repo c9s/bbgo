@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
-
-	"github.com/valyala/fastjson"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -22,7 +21,7 @@ const (
 	ChannelCandlePrefix Channel = "candle"
 	ChannelAccount      Channel = "account"
 	ChannelMarketTrades Channel = "trades"
-	ChannelOrders       Channel = "orders"
+	ChannelOrderTrades  Channel = "orders"
 )
 
 type ActionType string
@@ -33,13 +32,8 @@ const (
 )
 
 func parseWebSocketEvent(in []byte) (interface{}, error) {
-	v, err := fastjson.ParseBytes(in)
-	if err != nil {
-		return nil, err
-	}
-
 	var event WebSocketEvent
-	err = json.Unmarshal(in, &event)
+	err := json.Unmarshal(in, &event)
 	if err != nil {
 		return nil, err
 	}
@@ -73,9 +67,14 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 		}
 		return trade, nil
 
-	case ChannelOrders:
-		// TODO: remove fastjson
-		return parseOrder(v)
+	case ChannelOrderTrades:
+		var orderTrade []OrderTradeEvent
+		err := json.Unmarshal(event.Data, &orderTrade)
+		if err != nil {
+			return nil, err
+		}
+
+		return orderTrade, nil
 
 	default:
 		if strings.HasPrefix(string(event.Arg.Channel), string(ChannelCandlePrefix)) {
@@ -391,16 +390,67 @@ func parseAccount(v []byte) (*okexapi.Account, error) {
 	return &accounts[0], nil
 }
 
-func parseOrder(v *fastjson.Value) ([]okexapi.OrderDetails, error) {
-	data := v.Get("data").MarshalTo(nil)
+type OrderTradeEvent struct {
+	okexapi.OrderDetail
 
-	var orderDetails []okexapi.OrderDetails
-	err := json.Unmarshal(data, &orderDetails)
+	Code          types.StrInt64        `json:"code"`
+	Msg           string                `json:"msg"`
+	AmendResult   string                `json:"amendResult"`
+	ExecutionType okexapi.LiquidityType `json:"execType"`
+	// FillFee last filled fee amount or rebate amount:
+	// Negative number represents the user transaction fee charged by the platform;
+	// Positive number represents rebate
+	FillFee fixedpoint.Value `json:"fillFee"`
+	// FillFeeCurrency last filled fee currency or rebate currency.
+	// It is fee currency when fillFee is less than 0; It is rebate currency when fillFee>=0.
+	FillFeeCurrency string `json:"fillFeeCcy"`
+	// FillNotionalUsd Filled notional value in USD of order
+	FillNotionalUsd fixedpoint.Value `json:"fillNotionalUsd"`
+	FillPnl         fixedpoint.Value `json:"fillPnl"`
+	// NotionalUsd Estimated national value in USD of order
+	NotionalUsd fixedpoint.Value `json:"notionalUsd"`
+	// ReqId Client Request ID as assigned by the client for order amendment. "" will be returned if there is no order amendment.
+	ReqId     string           `json:"reqId"`
+	LastPrice fixedpoint.Value `json:"lastPx"`
+	// QuickMgnType Quick Margin type, Only applicable to Quick Margin Mode of isolated margin
+	// manual, auto_borrow, auto_repay
+	QuickMgnType string `json:"quickMgnType"`
+	// AmendSource Source of the order amendation.
+	AmendSource string `json:"amendSource"`
+	// CancelSource Source of the order cancellation.
+	CancelSource string `json:"cancelSource"`
+
+	// Only applicable to options; return "" for other instrument types
+	FillPriceVolume string `json:"fillPxVol"`
+	FillPriceUsd    string `json:"fillPxUsd"`
+	FillMarkVolume  string `json:"fillMarkVol"`
+	FillFwdPrice    string `json:"fillFwdPx"`
+	FillMarkPrice   string `json:"fillMarkPx"`
+}
+
+func (o *OrderTradeEvent) toGlobalTrade() (types.Trade, error) {
+	side := toGlobalSide(o.Side)
+	tradeId, err := strconv.ParseUint(o.TradeId, 10, 64)
 	if err != nil {
-		return nil, err
+		return types.Trade{}, fmt.Errorf("unexpected trade id [%s] format: %w", o.TradeId, err)
 	}
-
-	return orderDetails, nil
+	return types.Trade{
+		ID:            tradeId,
+		OrderID:       uint64(o.OrderId),
+		Exchange:      types.ExchangeOKEx,
+		Price:         o.FillPrice,
+		Quantity:      o.FillSize,
+		QuoteQuantity: o.FillPrice.Mul(o.FillSize),
+		Symbol:        toGlobalSymbol(o.InstrumentID),
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       o.ExecutionType == okexapi.LiquidityTypeMaker,
+		Time:          types.Time(o.FillTime.Time()),
+		// charged by the platform is positive in our design, so added the `Neg()`.
+		Fee:           o.FillFee.Neg(),
+		FeeCurrency:   o.FeeCurrency,
+		FeeDiscounted: false,
+	}, nil
 }
 
 func toGlobalSideType(side okexapi.SideType) (types.SideType, error) {
