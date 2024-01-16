@@ -149,6 +149,32 @@ func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) 
 	return trades, nil
 }
 
+func tradeToGlobal(trade okexapi.Trade) types.Trade {
+	// ** We use the bill id as the trade id, because okx uses billId to perform pagination. **
+	billID := trade.BillId
+
+	side := toGlobalSide(trade.Side)
+	return types.Trade{
+		ID:            uint64(billID),
+		OrderID:       uint64(trade.OrderId),
+		Exchange:      types.ExchangeOKEx,
+		Price:         trade.FillPrice,
+		Quantity:      trade.FillSize,
+		QuoteQuantity: trade.FillPrice.Mul(trade.FillSize),
+		Symbol:        toGlobalSymbol(trade.InstrumentId),
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       trade.ExecutionType == okexapi.LiquidityTypeMaker,
+		Time:          types.Time(trade.Timestamp),
+		// The fees obtained from the exchange are negative, hence they are forcibly converted to positive.
+		Fee:         trade.Fee.Abs(),
+		FeeCurrency: trade.FeeCurrency,
+		IsMargin:    false,
+		IsFutures:   false,
+		IsIsolated:  false,
+	}
+}
+
 func orderDetailToGlobal(order *okexapi.OrderDetail) (*types.Order, error) {
 	side := toGlobalSide(order.Side)
 

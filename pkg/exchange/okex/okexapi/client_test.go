@@ -211,6 +211,59 @@ func TestClient_OrderHistoryByTimeRange(t *testing.T) {
 	t.Log(res)
 }
 
+func TestClient_TransactionHistoryByOrderId(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+
+	c := client.NewGetTransactionHistoryRequest().OrderID("665951812901531754")
+	res, err := c.Do(ctx)
+	assert.NoError(t, err)
+	t.Log(res)
+}
+
+func TestClient_TransactionHistoryAll(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+
+	beforeId := int64(0)
+	for {
+		c := client.NewGetTransactionHistoryRequest().Before(strconv.FormatInt(beforeId, 10)).Limit(1)
+		res, err := c.Do(ctx)
+		assert.NoError(t, err)
+		t.Log(res)
+
+		if len(res) != 1 {
+			break
+		}
+		//orders = append(orders, res...)
+		beforeId = int64(res[0].BillId)
+		t.Log(res[0])
+	}
+}
+
+func TestClient_TransactionHistoryWithTime(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+
+	beforeId := int64(0)
+	for {
+		// [{"side":"sell","fillSz":"1","fillPx":"46446.4","fillPxVol":"","fillFwdPx":"","fee":"-46.4464","fillPnl":"0","ordId":"665951654130348158","feeRate":"-0.001","instType":"SPOT","fillPxUsd":"","instId":"BTC-USDT","clOrdId":"","posSide":"net","billId":"665951654138736652","fillMarkVol":"","tag":"","fillTime":"1705047247128","execType":"T","fillIdxPx":"","tradeId":"724072849","fillMarkPx":"","feeCcy":"USDT","ts":"1705047247130"}]
+		// [{"side":"sell","fillSz":"11.053006","fillPx":"54.17","fillPxVol":"","fillFwdPx":"","fee":"-0.59874133502","fillPnl":"0","ordId":"665951812901531754","feeRate":"-0.001","instType":"SPOT","fillPxUsd":"","instId":"OKB-USDT","clOrdId":"","posSide":"net","billId":"665951812905726068","fillMarkVol":"","tag":"","fillTime":"1705047284982","execType":"T","fillIdxPx":"","tradeId":"589438381","fillMarkPx":"","feeCcy":"USDT","ts":"1705047284983"}]
+		// [{"side":"sell","fillSz":"88.946994","fillPx":"54.16","fillPxVol":"","fillFwdPx":"","fee":"-4.81736919504","fillPnl":"0","ordId":"665951812901531754","feeRate":"-0.001","instType":"SPOT","fillPxUsd":"","instId":"OKB-USDT","clOrdId":"","posSide":"net","billId":"665951812905726084","fillMarkVol":"","tag":"","fillTime":"1705047284982","execType":"T","fillIdxPx":"","tradeId":"589438382","fillMarkPx":"","feeCcy":"USDT","ts":"1705047284983"}]
+		c := client.NewGetTransactionHistoryRequest().Limit(1).Before(fmt.Sprintf("%d", beforeId)).
+			StartTime(types.NewMillisecondTimestampFromInt(1705047247130).Time()).
+			EndTime(types.NewMillisecondTimestampFromInt(1705047284983).Time())
+		res, err := c.Do(ctx)
+		assert.NoError(t, err)
+		t.Log(res)
+
+		if len(res) != 1 {
+			break
+		}
+		beforeId = int64(res[0].BillId)
+	}
+}
+
 func TestClient_BatchCancelOrderRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
