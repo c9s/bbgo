@@ -175,6 +175,25 @@ func tradeToGlobal(trade okexapi.Trade) types.Trade {
 	}
 }
 
+func processMarketBuySize(o *okexapi.OrderDetail) (fixedpoint.Value, error) {
+	switch o.State {
+	case okexapi.OrderStateLive, okexapi.OrderStateCanceled:
+		return fixedpoint.Zero, nil
+
+	case okexapi.OrderStatePartiallyFilled:
+		if o.FillPrice.IsZero() {
+			return fixedpoint.Zero, fmt.Errorf("fillPrice for a partialFilled should not be zero")
+		}
+		return o.Size.Div(o.FillPrice), nil
+
+	case okexapi.OrderStateFilled:
+		return o.AccumulatedFillSize, nil
+
+	default:
+		return fixedpoint.Zero, fmt.Errorf("unexpected status: %s", o.State)
+	}
+}
+
 func orderDetailToGlobal(order *okexapi.OrderDetail) (*types.Order, error) {
 	side := toGlobalSide(order.Side)
 
@@ -196,6 +215,17 @@ func orderDetailToGlobal(order *okexapi.OrderDetail) (*types.Order, error) {
 		return nil, err
 	}
 
+	size := order.Size
+	if order.Side == okexapi.SideTypeBuy &&
+		order.OrderType == okexapi.OrderTypeMarket &&
+		order.TargetCurrency == okexapi.TargetCurrencyQuote {
+
+		size, err = processMarketBuySize(order)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: order.ClientOrderId,
@@ -203,7 +233,8 @@ func orderDetailToGlobal(order *okexapi.OrderDetail) (*types.Order, error) {
 			Side:          side,
 			Type:          orderType,
 			Price:         order.Price,
-			Quantity:      order.Size,
+			Quantity:      size,
+			AveragePrice:  order.AvgPrice,
 			TimeInForce:   timeInForce,
 		},
 		Exchange:         types.ExchangeOKEx,
