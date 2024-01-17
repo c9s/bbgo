@@ -850,3 +850,292 @@ func TestWebSocketEvent_IsValid(t *testing.T) {
 		assert.ErrorContains(t, opEvent.IsValid(), "unexpected event type")
 	})
 }
+
+func TestOrderTradeEvent(t *testing.T) {
+	//{"arg":{"channel":"orders","instType":"SPOT","uid":"530315546680502420"},"data":[{"accFillSz":"0","algoClOrdId":"","algoId":"","amendResult":"","amendSource":"","attachAlgoClOrdId":"","attachAlgoOrds":[],"avgPx":"0","cTime":"1705384184502","cancelSource":"","category":"normal","ccy":"","clOrdId":"","code":"0","execType":"","fee":"0","feeCcy":"OKB","fillFee":"0","fillFeeCcy":"","fillFwdPx":"","fillMarkPx":"","fillMarkVol":"","fillNotionalUsd":"","fillPnl":"0","fillPx":"","fillPxUsd":"","fillPxVol":"","fillSz":"0","fillTime":"","instId":"OKB-USDT","instType":"SPOT","lastPx":"54","lever":"0","msg":"","notionalUsd":"99.929","ordId":"667364871905857536","ordType":"market","pnl":"0","posSide":"","px":"","pxType":"","pxUsd":"","pxVol":"","quickMgnType":"","rebate":"0","rebateCcy":"USDT","reduceOnly":"false","reqId":"","side":"buy","slOrdPx":"","slTriggerPx":"","slTriggerPxType":"","source":"","state":"live","stpId":"","stpMode":"","sz":"100","tag":"","tdMode":"cash","tgtCcy":"quote_ccy","tpOrdPx":"","tpTriggerPx":"","tpTriggerPxType":"","tradeId":"","uTime":"1705384184502"}]}
+	//{"arg":{"channel":"orders","instType":"SPOT","uid":"530315546680502420"},"data":[{"accFillSz":"1.84","algoClOrdId":"","algoId":"","amendResult":"","amendSource":"","attachAlgoClOrdId":"","attachAlgoOrds":[],"avgPx":"54","cTime":"1705384184502","cancelSource":"","category":"normal","ccy":"","clOrdId":"","code":"0","execType":"T","fee":"-0.001844337","feeCcy":"OKB","fillFee":"-0.001844337","fillFeeCcy":"OKB","fillFwdPx":"","fillMarkPx":"","fillMarkVol":"","fillNotionalUsd":"99.9","fillPnl":"0","fillPx":"54","fillPxUsd":"","fillPxVol":"","fillSz":"1.844337","fillTime":"1705384184503","instId":"OKB-USDT","instType":"SPOT","lastPx":"54","lever":"0","msg":"","notionalUsd":"99.929","ordId":"667364871905857536","ordType":"market","pnl":"0","posSide":"","px":"","pxType":"","pxUsd":"","pxVol":"","quickMgnType":"","rebate":"0","rebateCcy":"USDT","reduceOnly":"false","reqId":"","side":"buy","slOrdPx":"","slTriggerPx":"","slTriggerPxType":"","source":"","state":"partially_filled","stpId":"","stpMode":"","sz":"100","tag":"","tdMode":"cash","tgtCcy":"quote_ccy","tpOrdPx":"","tpTriggerPx":"","tpTriggerPxType":"","tradeId":"590957341","uTime":"1705384184503"}]}
+	//{"arg":{"channel":"orders","instType":"SPOT","uid":"530315546680502420"},"data":[{"accFillSz":"1.84","algoClOrdId":"","algoId":"","amendResult":"","amendSource":"","attachAlgoClOrdId":"","attachAlgoOrds":[],"avgPx":"54","cTime":"1705384184502","cancelSource":"","category":"normal","ccy":"","clOrdId":"","code":"0","execType":"","fee":"-0.001844337","feeCcy":"OKB","fillFee":"0","fillFeeCcy":"","fillFwdPx":"","fillMarkPx":"","fillMarkVol":"","fillNotionalUsd":"99.9","fillPnl":"0","fillPx":"","fillPxUsd":"","fillPxVol":"","fillSz":"0","fillTime":"","instId":"OKB-USDT","instType":"SPOT","lastPx":"54","lever":"0","msg":"","notionalUsd":"99.929","ordId":"667364871905857536","ordType":"market","pnl":"0","posSide":"","px":"","pxType":"","pxUsd":"","pxVol":"","quickMgnType":"","rebate":"0","rebateCcy":"USDT","reduceOnly":"false","reqId":"","side":"buy","slOrdPx":"","slTriggerPx":"","slTriggerPxType":"","source":"","state":"filled","stpId":"","stpMode":"","sz":"100","tag":"","tdMode":"cash","tgtCcy":"quote_ccy","tpOrdPx":"","tpTriggerPx":"","tpTriggerPxType":"","tradeId":"","uTime":"1705384184504"}]}
+	t.Run("succeeds", func(t *testing.T) {
+		in := `
+{
+   "arg":{
+      "channel":"orders",
+      "instType":"SPOT",
+      "uid":"530315546680502420"
+   },
+   "data":[
+      {
+         "accFillSz":"1.84",
+         "algoClOrdId":"",
+         "algoId":"",
+         "amendResult":"",
+         "amendSource":"",
+         "attachAlgoClOrdId":"",
+         "attachAlgoOrds":[
+            
+         ],
+         "avgPx":"54",
+         "cTime":"1705384184502",
+         "cancelSource":"",
+         "category":"normal",
+         "ccy":"",
+         "clOrdId":"",
+         "code":"0",
+         "execType":"T",
+         "fee":"-0.001844337",
+         "feeCcy":"OKB",
+         "fillFee":"-0.001844337",
+         "fillFeeCcy":"OKB",
+         "fillFwdPx":"",
+         "fillMarkPx":"",
+         "fillMarkVol":"",
+         "fillNotionalUsd":"99.9",
+         "fillPnl":"0",
+         "fillPx":"54",
+         "fillPxUsd":"",
+         "fillPxVol":"",
+         "fillSz":"1.84",
+         "fillTime":"1705384184503",
+         "instId":"OKB-USDT",
+         "instType":"SPOT",
+         "lastPx":"54",
+         "lever":"0",
+         "msg":"",
+         "notionalUsd":"99.929",
+         "ordId":"667364871905857536",
+         "ordType":"market",
+         "pnl":"0",
+         "posSide":"",
+         "px":"",
+         "pxType":"",
+         "pxUsd":"",
+         "pxVol":"",
+         "quickMgnType":"",
+         "rebate":"0",
+         "rebateCcy":"USDT",
+         "reduceOnly":"false",
+         "reqId":"",
+         "side":"buy",
+         "slOrdPx":"",
+         "slTriggerPx":"",
+         "slTriggerPxType":"",
+         "source":"",
+         "state":"partially_filled",
+         "stpId":"",
+         "stpMode":"",
+         "sz":"100",
+         "tag":"",
+         "tdMode":"cash",
+         "tgtCcy":"quote_ccy",
+         "tpOrdPx":"",
+         "tpTriggerPx":"",
+         "tpTriggerPxType":"",
+         "tradeId":"590957341",
+         "uTime":"1705384184503"
+      }
+   ]
+}
+`
+
+		exp := []OrderTradeEvent{
+			{
+				OrderDetail: okexapi.OrderDetail{
+					AccumulatedFillSize: fixedpoint.NewFromFloat(1.84),
+					AvgPrice:            fixedpoint.NewFromFloat(54),
+					CreatedTime:         types.NewMillisecondTimestampFromInt(1705384184502),
+					Category:            "normal",
+					ClientOrderId:       "",
+					Fee:                 fixedpoint.NewFromFloat(-0.001844337),
+					FeeCurrency:         "OKB",
+					FillTime:            types.NewMillisecondTimestampFromInt(1705384184503),
+					InstrumentID:        "OKB-USDT",
+					InstrumentType:      okexapi.InstrumentTypeSpot,
+					OrderId:             types.StrInt64(667364871905857536),
+					OrderType:           okexapi.OrderTypeMarket,
+					Price:               fixedpoint.Zero,
+					Side:                okexapi.SideTypeBuy,
+					State:               okexapi.OrderStatePartiallyFilled,
+					Size:                fixedpoint.NewFromFloat(100),
+					TargetCurrency:      okexapi.TargetCurrencyQuote,
+					UpdatedTime:         types.NewMillisecondTimestampFromInt(1705384184503),
+					Currency:            "",
+					TradeId:             "590957341",
+					FillPrice:           fixedpoint.NewFromFloat(54),
+					FillSize:            fixedpoint.NewFromFloat(1.84),
+					Lever:               "0",
+					Pnl:                 fixedpoint.Zero,
+					PositionSide:        "",
+					PriceUsd:            fixedpoint.Zero,
+					PriceVol:            fixedpoint.Zero,
+					PriceType:           "",
+					Rebate:              fixedpoint.Zero,
+					RebateCcy:           "USDT",
+					AttachAlgoClOrdId:   "",
+					SlOrdPx:             fixedpoint.Zero,
+					SlTriggerPx:         fixedpoint.Zero,
+					SlTriggerPxType:     "",
+					AttachAlgoOrds:      []interface{}{},
+					Source:              "",
+					StpId:               "",
+					StpMode:             "",
+					Tag:                 "",
+					TradeMode:           okexapi.TradeModeCash,
+					TpOrdPx:             fixedpoint.Zero,
+					TpTriggerPx:         fixedpoint.Zero,
+					TpTriggerPxType:     "",
+					ReduceOnly:          "false",
+					AlgoClOrdId:         "",
+					AlgoId:              "",
+				},
+				Code:            types.StrInt64(0),
+				Msg:             "",
+				AmendResult:     "",
+				ExecutionType:   okexapi.LiquidityTypeTaker,
+				FillFee:         fixedpoint.NewFromFloat(-0.001844337),
+				FillFeeCurrency: "OKB",
+				FillNotionalUsd: fixedpoint.NewFromFloat(99.9),
+				FillPnl:         fixedpoint.Zero,
+				NotionalUsd:     fixedpoint.NewFromFloat(99.929),
+				ReqId:           "",
+				LastPrice:       fixedpoint.NewFromFloat(54),
+				QuickMgnType:    "",
+				AmendSource:     "",
+				CancelSource:    "",
+				FillPriceVolume: "",
+				FillPriceUsd:    "",
+				FillMarkVolume:  "",
+				FillFwdPrice:    "",
+				FillMarkPrice:   "",
+			},
+		}
+
+		res, err := parseWebSocketEvent([]byte(in))
+		assert.NoError(t, err)
+		event, ok := res.([]OrderTradeEvent)
+		assert.True(t, ok)
+		assert.Equal(t, exp, event)
+	})
+}
+
+func TestOrderTradeEvent_toGlobalTrade1(t *testing.T) {
+	var (
+		in = `
+{
+   "arg":{
+      "channel":"orders",
+      "instType":"SPOT",
+      "uid":"530315546680502420"
+   },
+   "data":[
+      {
+         "accFillSz":"1.84",
+         "algoClOrdId":"",
+         "algoId":"",
+         "amendResult":"",
+         "amendSource":"",
+         "attachAlgoClOrdId":"",
+         "attachAlgoOrds":[
+            
+         ],
+         "avgPx":"54",
+         "cTime":"1705384184502",
+         "cancelSource":"",
+         "category":"normal",
+         "ccy":"",
+         "clOrdId":"",
+         "code":"0",
+         "execType":"T",
+         "fee":"-0.001844337",
+         "feeCcy":"OKB",
+         "fillFee":"-0.001844337",
+         "fillFeeCcy":"OKB",
+         "fillFwdPx":"",
+         "fillMarkPx":"",
+         "fillMarkVol":"",
+         "fillNotionalUsd":"99.9",
+         "fillPnl":"0",
+         "fillPx":"54",
+         "fillPxUsd":"",
+         "fillPxVol":"",
+         "fillSz":"1.84",
+         "fillTime":"1705384184503",
+         "instId":"OKB-USDT",
+         "instType":"SPOT",
+         "lastPx":"54",
+         "lever":"0",
+         "msg":"",
+         "notionalUsd":"99.929",
+         "ordId":"667364871905857536",
+         "ordType":"market",
+         "pnl":"0",
+         "posSide":"",
+         "px":"",
+         "pxType":"",
+         "pxUsd":"",
+         "pxVol":"",
+         "quickMgnType":"",
+         "rebate":"0",
+         "rebateCcy":"USDT",
+         "reduceOnly":"false",
+         "reqId":"",
+         "side":"buy",
+         "slOrdPx":"",
+         "slTriggerPx":"",
+         "slTriggerPxType":"",
+         "source":"",
+         "state":"partially_filled",
+         "stpId":"",
+         "stpMode":"",
+         "sz":"100",
+         "tag":"",
+         "tdMode":"cash",
+         "tgtCcy":"quote_ccy",
+         "tpOrdPx":"",
+         "tpTriggerPx":"",
+         "tpTriggerPxType":"",
+         "tradeId":"590957341",
+         "uTime":"1705384184503"
+      }
+   ]
+}
+`
+		expTrade = types.Trade{
+			ID:            uint64(590957341),
+			OrderID:       uint64(667364871905857536),
+			Exchange:      types.ExchangeOKEx,
+			Price:         fixedpoint.NewFromFloat(54),
+			Quantity:      fixedpoint.NewFromFloat(1.84),
+			QuoteQuantity: fixedpoint.NewFromFloat(54).Mul(fixedpoint.NewFromFloat(1.84)),
+			Symbol:        "OKBUSDT",
+			Side:          types.SideTypeBuy,
+			IsBuyer:       true,
+			IsMaker:       false,
+			Time:          types.Time(types.NewMillisecondTimestampFromInt(1705384184503).Time()),
+			Fee:           fixedpoint.NewFromFloat(0.001844337),
+			FeeCurrency:   "OKB",
+		}
+	)
+
+	t.Run("succeeds", func(t *testing.T) {
+		res, err := parseWebSocketEvent([]byte(in))
+		assert.NoError(t, err)
+		event, ok := res.([]OrderTradeEvent)
+		assert.True(t, ok)
+
+		trade, err := event[0].toGlobalTrade()
+		assert.NoError(t, err)
+		assert.Equal(t, expTrade, trade)
+	})
+
+	t.Run("unexpected trade id", func(t *testing.T) {
+		res, err := parseWebSocketEvent([]byte(in))
+		assert.NoError(t, err)
+		event, ok := res.([]OrderTradeEvent)
+		assert.True(t, ok)
+
+		event[0].TradeId = "XXXX"
+		_, err = event[0].toGlobalTrade()
+		assert.ErrorContains(t, err, "trade id")
+	})
+
+}

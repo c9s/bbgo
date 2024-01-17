@@ -68,6 +68,26 @@ func Test_orderDetailToGlobal(t *testing.T) {
 		assert.Equal(expOrder, order)
 	})
 
+	t.Run("succeeds with market/buy/targetQuoteCurrency", func(t *testing.T) {
+		newOrder := *openOrder
+		newOrder.OrderType = okexapi.OrderTypeMarket
+		newOrder.Side = okexapi.SideTypeBuy
+		newOrder.TargetCurrency = okexapi.TargetCurrencyQuote
+		newOrder.FillPrice = fixedpoint.NewFromFloat(100)
+		newOrder.Size = fixedpoint.NewFromFloat(10000)
+		newOrder.State = okexapi.OrderStatePartiallyFilled
+
+		newExpOrder := *expOrder
+		newExpOrder.Side = types.SideTypeBuy
+		newExpOrder.Type = types.OrderTypeMarket
+		newExpOrder.Quantity = fixedpoint.NewFromFloat(100)
+		newExpOrder.Status = types.OrderStatusPartiallyFilled
+		newExpOrder.OriginalStatus = string(okexapi.OrderStatePartiallyFilled)
+		order, err := orderDetailToGlobal(&newOrder)
+		assert.NoError(err)
+		assert.Equal(&newExpOrder, order)
+	})
+
 	t.Run("unexpected order status", func(t *testing.T) {
 		newOrder := *openOrder
 		newOrder.State = "xxx"
@@ -170,5 +190,56 @@ func Test_tradeToGlobal(t *testing.T) {
 			Fee:           fixedpoint.NewFromFloat(46),
 			FeeCurrency:   "USDT",
 		})
+	})
+}
+
+func Test_processMarketBuyQuantity(t *testing.T) {
+	var (
+		assert = assert.New(t)
+	)
+
+	t.Run("zero", func(t *testing.T) {
+		size, err := processMarketBuySize(&okexapi.OrderDetail{State: okexapi.OrderStateLive})
+		assert.NoError(err)
+		assert.Equal(fixedpoint.Zero, size)
+
+		size, err = processMarketBuySize(&okexapi.OrderDetail{State: okexapi.OrderStateCanceled})
+		assert.NoError(err)
+		assert.Equal(fixedpoint.Zero, size)
+	})
+
+	t.Run("estimated size", func(t *testing.T) {
+		size, err := processMarketBuySize(&okexapi.OrderDetail{
+			FillPrice: fixedpoint.NewFromFloat(2),
+			Size:      fixedpoint.NewFromFloat(4),
+			State:     okexapi.OrderStatePartiallyFilled,
+		})
+		assert.NoError(err)
+		assert.Equal(fixedpoint.NewFromFloat(2), size)
+	})
+
+	t.Run("unexpected fill price", func(t *testing.T) {
+		_, err := processMarketBuySize(&okexapi.OrderDetail{
+			FillPrice: fixedpoint.Zero,
+			Size:      fixedpoint.NewFromFloat(4),
+			State:     okexapi.OrderStatePartiallyFilled,
+		})
+		assert.ErrorContains(err, "fillPrice")
+	})
+
+	t.Run("accumulatedFillsize", func(t *testing.T) {
+		size, err := processMarketBuySize(&okexapi.OrderDetail{
+			AccumulatedFillSize: fixedpoint.NewFromFloat(1000),
+			State:               okexapi.OrderStateFilled,
+		})
+		assert.NoError(err)
+		assert.Equal(fixedpoint.NewFromFloat(1000), size)
+	})
+
+	t.Run("unexpected status", func(t *testing.T) {
+		_, err := processMarketBuySize(&okexapi.OrderDetail{
+			State: "XXXXXXX",
+		})
+		assert.ErrorContains(err, "unexpected")
 	})
 }
