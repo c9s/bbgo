@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 )
 
 const ID = "dca2"
@@ -25,6 +27,12 @@ var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
+}
+
+type advancedOrderCancelApi interface {
+	CancelAllOrders(ctx context.Context) ([]types.Order, error)
+	CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error)
+	CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([]types.Order, error)
 }
 
 //go:generate callbackgen -type Strateg
@@ -54,6 +62,9 @@ type Strategy struct {
 
 	// KeepOrdersWhenShutdown option is used for keeping the grid orders when shutting down bbgo
 	KeepOrdersWhenShutdown bool `json:"keepOrdersWhenShutdown"`
+
+	// UseCancelAllOrdersApiWhenClose uses a different API to cancel all the orders on the market when closing a grid
+	UseCancelAllOrdersApiWhenClose bool `json:"useCancelAllOrdersApiWhenClose"`
 
 	// log
 	logger    *logrus.Entry
@@ -260,13 +271,42 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	_ = s.Initialize()
 	defer s.EmitClosed()
 
-	err := s.OrderExecutor.GracefulCancel(ctx)
-	if err != nil {
-		s.logger.WithError(err).Errorf("[DCA] there are errors when cancelling orders at clean up")
+	session := s.Session
+	if session == nil {
+		return fmt.Errorf("Session is nil, please check it")
 	}
 
-	bbgo.Sync(ctx, s)
-	return err
+	service, support := session.Exchange.(advancedOrderCancelApi)
+	if !support {
+		return fmt.Errorf("advancedOrderCancelApi interface is not implemented, fallback to default graceful cancel, exchange %T", session)
+	}
+
+	var werr error
+	for {
+		s.logger.Infof("checking %s open orders...", s.Symbol)
+
+		openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
+		if err != nil {
+			s.logger.WithError(err).Errorf("CancelOrdersByGroupID api call error")
+			werr = multierr.Append(werr, err)
+		}
+
+		if len(openOrders) == 0 {
+			break
+		}
+
+		s.logger.Infof("found %d open orders left, using cancel all orders api", len(openOrders))
+
+		s.logger.Infof("using cancal all orders api for canceling grid orders...")
+		if err := retry.CancelAllOrdersUntilSuccessful(ctx, service); err != nil {
+			s.logger.WithError(err).Errorf("CancelAllOrders api call error")
+			werr = multierr.Append(werr, err)
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	return werr
 }
 
 func (s *Strategy) CalculateAndEmitProfit(ctx context.Context) error {
