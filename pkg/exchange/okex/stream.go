@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -31,7 +32,8 @@ type WebsocketLogin struct {
 type Stream struct {
 	types.StandardStream
 
-	client *okexapi.RestClient
+	client          *okexapi.RestClient
+	balanceProvider types.ExchangeAccountService
 
 	// public callbacks
 	kLineEventCallbacks        []func(candle KLineEvent)
@@ -41,10 +43,11 @@ type Stream struct {
 	marketTradeEventCallbacks  []func(tradeDetail []MarketTradeEvent)
 }
 
-func NewStream(client *okexapi.RestClient) *Stream {
+func NewStream(client *okexapi.RestClient, balanceProvider types.ExchangeAccountService) *Stream {
 	stream := &Stream{
-		client:         client,
-		StandardStream: types.NewStandardStream(),
+		client:          client,
+		balanceProvider: balanceProvider,
+		StandardStream:  types.NewStandardStream(),
 	}
 
 	stream.SetParser(parseWebSocketEvent)
@@ -57,7 +60,7 @@ func NewStream(client *okexapi.RestClient) *Stream {
 	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
 	stream.OnOrderDetailsEvent(stream.handleOrderDetailsEvent)
 	stream.OnConnect(stream.handleConnect)
-	stream.OnAuth(stream.handleAuth)
+	stream.OnAuth(stream.subscribePrivateChannels(stream.emitBalanceSnapshot))
 	return stream
 }
 
@@ -151,20 +154,42 @@ func (s *Stream) handleConnect() {
 	}
 }
 
-func (s *Stream) handleAuth() {
-	var subs = []WebsocketSubscription{
-		{Channel: ChannelAccount},
-		{Channel: "orders", InstrumentType: string(okexapi.InstrumentTypeSpot)},
-	}
+func (s *Stream) subscribePrivateChannels(next func()) func() {
+	return func() {
+		var subs = []WebsocketSubscription{
+			{Channel: ChannelAccount},
+			{Channel: "orders", InstrumentType: string(okexapi.InstrumentTypeSpot)},
+		}
 
-	log.Infof("subscribing private channels: %+v", subs)
-	err := s.Conn.WriteJSON(WebsocketOp{
-		Op:   "subscribe",
-		Args: subs,
+		log.Infof("subscribing private channels: %+v", subs)
+		err := s.Conn.WriteJSON(WebsocketOp{
+			Op:   "subscribe",
+			Args: subs,
+		})
+		if err != nil {
+			log.WithError(err).Error("private channel subscribe error")
+			return
+		}
+		next()
+	}
+}
+
+func (s *Stream) emitBalanceSnapshot() {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	var balancesMap types.BalanceMap
+	var err error
+	err = retry.GeneralBackoff(ctx, func() error {
+		balancesMap, err = s.balanceProvider.QueryAccountBalances(ctx)
+		return err
 	})
 	if err != nil {
-		log.WithError(err).Error("private channel subscribe error")
+		log.WithError(err).Error("no more attempts to retrieve balances")
+		return
 	}
+
+	s.EmitBalanceSnapshot(balancesMap)
 }
 
 func (s *Stream) handleOrderDetailsEvent(orderDetails []okexapi.OrderDetails) {
