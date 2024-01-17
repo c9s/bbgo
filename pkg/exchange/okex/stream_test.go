@@ -143,4 +143,18 @@ func TestStream(t *testing.T) {
 		c := make(chan struct{})
 		<-c
 	})
+
+	t.Run("order trade test", func(t *testing.T) {
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnOrderUpdate(func(order types.Order) {
+			t.Log("order update", order)
+		})
+		s.OnTradeUpdate(func(trade types.Trade) {
+			t.Log("trade update", trade)
+		})
+		c := make(chan struct{})
+		<-c
+	})
 }

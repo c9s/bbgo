@@ -30,7 +30,7 @@ type OrderDetail struct {
 	Side           SideType                   `json:"side"`
 	State          OrderState                 `json:"state"`
 	Size           fixedpoint.Value           `json:"sz"`
-	TargetCurrency string                     `json:"tgtCcy"`
+	TargetCurrency TargetCurrency             `json:"tgtCcy"`
 	UpdatedTime    types.MillisecondTimestamp `json:"uTime"`
 
 	// Margin currency
@@ -69,7 +69,7 @@ type OrderDetail struct {
 	// Self trade prevention mode. Return "" if self trade prevention is not applicable
 	StpMode         string           `json:"stpMode"`
 	Tag             string           `json:"tag"`
-	TradeMode       string           `json:"tdMode"`
+	TradeMode       TradeMode        `json:"tdMode"`
 	TpOrdPx         fixedpoint.Value `json:"tpOrdPx"`
 	TpTriggerPx     fixedpoint.Value `json:"tpTriggerPx"`
 	TpTriggerPxType string           `json:"tpTriggerPxType"`
