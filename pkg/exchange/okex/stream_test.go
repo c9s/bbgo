@@ -25,7 +25,7 @@ func getTestClientOrSkip(t *testing.T) *Stream {
 	}
 
 	exchange := New(key, secret, passphrase)
-	return NewStream(exchange.client)
+	return NewStream(exchange.client, exchange)
 }
 
 func TestStream(t *testing.T) {
@@ -37,6 +37,9 @@ func TestStream(t *testing.T) {
 		assert.NoError(t, err)
 
 		s.OnBalanceUpdate(func(balances types.BalanceMap) {
+			t.Log("got snapshot", balances)
+		})
+		s.OnBalanceSnapshot(func(balances types.BalanceMap) {
 			t.Log("got snapshot", balances)
 		})
 		s.OnBookUpdate(func(book types.SliceOrderBook) {
