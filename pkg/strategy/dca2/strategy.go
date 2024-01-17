@@ -220,16 +220,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		})
 	})
 
-	balances, err := session.Exchange.QueryAccountBalances(ctx)
-	if err != nil {
-		return err
-	}
-
-	balance := balances[s.Market.QuoteCurrency]
-	if balance.Available.Compare(s.ProfitStats.QuoteInvestment) < 0 {
-		return fmt.Errorf("the available balance of %s is %s which is less than quote investment setting %s, please check it", s.Market.QuoteCurrency, balance.Available, s.ProfitStats.QuoteInvestment)
-	}
-
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
