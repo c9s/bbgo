@@ -102,7 +102,7 @@ func calculateNotionalAndNumOrders(market types.Market, quoteInvestment fixedpoi
 			continue
 		}
 
-		return notional, num
+		return market.TruncatePrice(notional), num
 	}
 
 	return fixedpoint.Zero, 0
