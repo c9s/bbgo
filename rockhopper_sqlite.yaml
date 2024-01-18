@@ -2,4 +2,6 @@
 driver: sqlite3
 dialect: sqlite3
 dsn: "bbgo.sqlite3"
+# package: bbgo
+package: main
 migrationsDir: migrations/sqlite3
