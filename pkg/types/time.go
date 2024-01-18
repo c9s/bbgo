@@ -136,6 +136,11 @@ func convertFloat64ToTime(vt string, f float64) (time.Time, error) {
 // Time type implements the driver value for sqlite
 type Time time.Time
 
+// layout defines the time layout without timezone
+// because sqlite3 and mysql does not output datetime with timezone.
+//
+// sqlite3 format (in UTC): 2022-06-01 11:38:45
+// mysql format in (in Local): 2022-06-02 20:28:10 or 2022-06-02 20:28:10.000
 var layout = "2006-01-02 15:04:05.999Z07:00"
 
 func (t *Time) UnmarshalJSON(data []byte) error {

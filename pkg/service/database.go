@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"github.com/c9s/rockhopper"
+	"github.com/c9s/rockhopper/v2"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 
@@ -70,18 +70,11 @@ func (s *DatabaseService) Upgrade(ctx context.Context) error {
 	}
 
 	// sqlx.DB is different from sql.DB
-	rh := rockhopper.New(s.Driver, dialect, s.DB.DB)
+	rh := rockhopper.New(s.Driver, dialect, s.DB.DB, rockhopper.TableName)
 
-	currentVersion, err := rh.CurrentVersion()
-	if err != nil {
-		return err
-	}
+	migrations = migrations.FilterPackage([]string{"main"}).SortAndConnect()
 
-	if err := rockhopper.Up(ctx, rh, migrations, currentVersion, 0); err != nil {
-		return err
-	}
-
-	return nil
+	return rockhopper.Align(ctx, rh, 20231123125402, migrations)
 }
 
 func ReformatMysqlDSN(dsn string) (string, error) {
