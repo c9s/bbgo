@@ -25,12 +25,12 @@ func GetMigrationsMap() map[int64]*rockhopper.Migration {
 	return registeredGoMigrations
 }
 
-// SortedMigrations builds up the migration objects, sort them by timestamp and return as a slice
+// SortedMigrations build up the migration objects, sort them by timestamp and return as a slice
 func SortedMigrations() rockhopper.MigrationSlice {
 	return Migrations()
 }
 
-// Migrations builds up the migration objects, sort them by timestamp and return as a slice
+// Migrations build up the migration objects, sort them by timestamp and return as a slice
 func Migrations() rockhopper.MigrationSlice {
 	var migrations = rockhopper.MigrationSlice{}
 	for _, migration := range registeredGoMigrations {
