@@ -70,8 +70,9 @@ type WebsocketPongEvent struct{}
 
 //go:generate callbackgen -type StandardStream -interface
 type StandardStream struct {
-	parser     Parser
-	dispatcher Dispatcher
+	parser       Parser
+	dispatcher   Dispatcher
+	pingInterval time.Duration
 
 	endpointCreator EndpointCreator
 
@@ -178,9 +179,10 @@ type StandardStreamEmitter interface {
 
 func NewStandardStream() StandardStream {
 	return StandardStream{
-		ReconnectC: make(chan struct{}, 1),
-		CloseC:     make(chan struct{}),
-		sg:         NewSyncGroup(),
+		ReconnectC:   make(chan struct{}, 1),
+		CloseC:       make(chan struct{}),
+		sg:           NewSyncGroup(),
+		pingInterval: pingInterval,
 	}
 }
 
@@ -315,15 +317,19 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 	}
 }
 
+func (s *StandardStream) SetPingInterval(interval time.Duration) {
+	s.pingInterval = interval
+}
+
 func (s *StandardStream) ping(
-	ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc, interval time.Duration,
+	ctx context.Context, conn *websocket.Conn, cancel context.CancelFunc,
 ) {
 	defer func() {
 		cancel()
 		log.Debug("[websocket] ping worker stopped")
 	}()
 
-	var pingTicker = time.NewTicker(interval)
+	var pingTicker = time.NewTicker(s.pingInterval)
 	defer pingTicker.Stop()
 
 	for {
@@ -454,7 +460,7 @@ func (s *StandardStream) DialAndConnect(ctx context.Context) error {
 		s.Read(connCtx, conn, connCancel)
 	})
 	s.sg.Add(func() {
-		s.ping(connCtx, conn, connCancel, pingInterval)
+		s.ping(connCtx, conn, connCancel)
 	})
 	s.sg.Run()
 	return nil

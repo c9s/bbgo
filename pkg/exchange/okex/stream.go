@@ -15,6 +15,9 @@ import (
 var (
 	marketTradeLogLimiter = rate.NewLimiter(rate.Every(time.Minute), 1)
 	tradeLogLimiter       = rate.NewLimiter(rate.Every(time.Minute), 1)
+	// pingInterval the connection will break automatically if the subscription is not established or data has not been
+	// pushed for more than 30 seconds. Therefore, we set it to 20 seconds.
+	pingInterval = 20 * time.Second
 )
 
 type WebsocketOp struct {
@@ -54,6 +57,7 @@ func NewStream(client *okexapi.RestClient, balanceProvider types.ExchangeAccount
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.createEndpoint)
+	stream.SetPingInterval(pingInterval)
 
 	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnBookEvent(stream.handleBookEvent)
