@@ -3,7 +3,8 @@ package mysql
 import (
 	"testing"
 
-	"github.com/c9s/rockhopper"
+	"github.com/c9s/rockhopper/v2"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,8 +14,8 @@ func TestGetMigrationsMap(t *testing.T) {
 }
 
 func TestMergeMigrationsMap(t *testing.T) {
-	MergeMigrationsMap(map[int64]*rockhopper.Migration{
-		2: &rockhopper.Migration{},
-		3: &rockhopper.Migration{},
+	MergeMigrationsMap(map[registryKey]*rockhopper.Migration{
+		registryKey{Version: 2}: &rockhopper.Migration{},
+		registryKey{Version: 2}: &rockhopper.Migration{},
 	})
 }

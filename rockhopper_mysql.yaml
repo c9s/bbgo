@@ -3,6 +3,7 @@
 ---
 driver: mysql
 dialect: mysql
+package: main
 
 # unix socket connection to mysql with password
 # dsn: "root:123123@unix(/opt/local/var/run/mysql57/mysqld.sock)/bbgo_dev?parseTime=true"
