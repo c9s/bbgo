@@ -86,6 +86,7 @@ func (s *Strategy) runState(ctx context.Context) {
 
 			if nextState != validNextState {
 				s.logger.Warnf("[DCA] %d is not valid next state of curreny state %d", nextState, s.state)
+				continue
 			}
 
 			// move to next state

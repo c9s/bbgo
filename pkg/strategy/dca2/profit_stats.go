@@ -21,6 +21,11 @@ type ProfitStats struct {
 	TotalProfit        fixedpoint.Value            `json:"totalProfit,omitempty"`
 	TotalFee           map[string]fixedpoint.Value `json:"totalFee,omitempty"`
 
+	// Running is used for testing by the same account
+	// Running is true -> this bot is still working, we need to use the values in persistence
+	// Running is false -> this bot is closed, we can reset all the values in persistence
+	Running bool `json:"running,omitempty"`
+
 	types.PersistenceTTL
 }
 
