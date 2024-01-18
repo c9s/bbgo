@@ -63,5 +63,8 @@ type PlaceOrderRequest struct {
 }
 
 func (c *RestClient) NewPlaceOrderRequest() *PlaceOrderRequest {
-	return &PlaceOrderRequest{client: c}
+	return &PlaceOrderRequest{
+		client:    c,
+		tradeMode: TradeModeCash,
+	}
 }
