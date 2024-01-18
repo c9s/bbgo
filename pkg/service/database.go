@@ -3,9 +3,10 @@ package service
 import (
 	"context"
 
-	"github.com/c9s/rockhopper/v2"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+
+	"github.com/c9s/rockhopper/v2"
 
 	mysqlMigrations "github.com/c9s/bbgo/pkg/migrations/mysql"
 	sqlite3Migrations "github.com/c9s/bbgo/pkg/migrations/sqlite3"
@@ -72,9 +73,27 @@ func (s *DatabaseService) Upgrade(ctx context.Context) error {
 	// sqlx.DB is different from sql.DB
 	rh := rockhopper.New(s.Driver, dialect, s.DB.DB, rockhopper.TableName)
 
-	migrations = migrations.FilterPackage([]string{"main"}).SortAndConnect()
+	if err := rh.Touch(ctx); err != nil {
+		return err
+	}
 
-	return rockhopper.Align(ctx, rh, 20231123125402, migrations)
+	migrations = migrations.FilterPackage([]string{"main"}).SortAndConnect()
+	if len(migrations) == 0 {
+		return nil
+	}
+
+	_, lastAppliedMigration, err := rh.FindLastAppliedMigration(ctx, migrations)
+	if err != nil {
+		return err
+	}
+
+	if lastAppliedMigration != nil {
+		return rockhopper.Up(ctx, rh, lastAppliedMigration.Next, 0)
+	}
+
+	// TODO: use align in the next major version
+	// return rockhopper.Align(ctx, rh, 20231123125402, migrations)
+	return rockhopper.Up(ctx, rh, migrations.Head(), 0)
 }
 
 func ReformatMysqlDSN(dsn string) (string, error) {
