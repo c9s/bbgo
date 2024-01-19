@@ -6,22 +6,27 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/c9s/rockhopper"
+	"github.com/c9s/rockhopper/v2"
 )
 
-var registeredGoMigrations map[int64]*rockhopper.Migration
+type registryKey struct {
+	Package string
+	Version int64
+}
 
-func MergeMigrationsMap(ms map[int64]*rockhopper.Migration) {
+var registeredGoMigrations = map[registryKey]*rockhopper.Migration{}
+
+func MergeMigrationsMap(ms map[registryKey]*rockhopper.Migration) {
 	for k, m := range ms {
 		if _, ok := registeredGoMigrations[k]; !ok {
 			registeredGoMigrations[k] = m
 		} else {
-			log.Printf("the migration key %d is duplicated: %+v", k, m)
+			log.Printf("the migration key %+v is duplicated: %+v", k, m)
 		}
 	}
 }
 
-func GetMigrationsMap() map[int64]*rockhopper.Migration {
+func GetMigrationsMap() map[registryKey]*rockhopper.Migration {
 	return registeredGoMigrations
 }
 
@@ -41,11 +46,14 @@ func Migrations() rockhopper.MigrationSlice {
 }
 
 // AddMigration adds a migration with its runtime caller information
-func AddMigration(up, down rockhopper.TransactionHandler) {
+func AddMigration(packageName string, up, down rockhopper.TransactionHandler) {
 	pc, filename, _, _ := runtime.Caller(1)
 
-	funcName := runtime.FuncForPC(pc).Name()
-	packageName := _parseFuncPackageName(funcName)
+	if packageName == "" {
+		funcName := runtime.FuncForPC(pc).Name()
+		packageName = _parseFuncPackageName(funcName)
+	}
+
 	AddNamedMigration(packageName, filename, up, down)
 }
 
@@ -64,10 +72,13 @@ func _parseFuncPackageName(funcName string) string {
 // AddNamedMigration adds a named migration to the registered go migration map
 func AddNamedMigration(packageName, filename string, up, down rockhopper.TransactionHandler) {
 	if registeredGoMigrations == nil {
-		registeredGoMigrations = make(map[int64]*rockhopper.Migration)
+		registeredGoMigrations = make(map[registryKey]*rockhopper.Migration)
 	}
 
-	v, _ := rockhopper.FileNumericComponent(filename)
+	v, err := rockhopper.FileNumericComponent(filename)
+	if err != nil {
+		panic(fmt.Errorf("unable to parse numeric component from filename %s: %v", filename, err))
+	}
 
 	migration := &rockhopper.Migration{
 		Package:    packageName,
@@ -80,8 +91,10 @@ func AddNamedMigration(packageName, filename string, up, down rockhopper.Transac
 		UseTx:   true,
 	}
 
-	if existing, ok := registeredGoMigrations[v]; ok {
-		panic(fmt.Sprintf("failed to add migration %q: version conflicts with %q", filename, existing.Source))
+	key := registryKey{Package: packageName, Version: v}
+	if existing, ok := registeredGoMigrations[key]; ok {
+		panic(fmt.Sprintf("failed to add migration %q: version conflicts with key %+v: %+v", filename, key, existing))
 	}
-	registeredGoMigrations[v] = migration
+
+	registeredGoMigrations[key] = migration
 }
