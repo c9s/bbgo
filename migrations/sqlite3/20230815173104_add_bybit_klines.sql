@@ -1,3 +1,4 @@
+-- !txn
 -- +up
 -- +begin
 CREATE TABLE `bybit_klines`

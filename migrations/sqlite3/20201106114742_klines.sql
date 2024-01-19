@@ -1,11 +1,12 @@
+-- !txn
 -- +up
 -- +begin
 CREATE TABLE `klines`
 (
     `gid`           INTEGER PRIMARY KEY AUTOINCREMENT,
     `exchange`      VARCHAR(10)    NOT NULL,
-    `start_time`    DATETIME(3)    NOT NULL,
-    `end_time`      DATETIME(3)    NOT NULL,
+    `start_time`    DATETIME(3) NOT NULL,
+    `end_time`      DATETIME(3) NOT NULL,
     `interval`      VARCHAR(3)     NOT NULL,
     `symbol`        VARCHAR(7)     NOT NULL,
     `open`          DECIMAL(16, 8) NOT NULL,
@@ -25,8 +26,8 @@ CREATE TABLE `okex_klines`
 (
     `gid`           INTEGER PRIMARY KEY AUTOINCREMENT,
     `exchange`      VARCHAR(10)    NOT NULL,
-    `start_time`    DATETIME(3)    NOT NULL,
-    `end_time`      DATETIME(3)    NOT NULL,
+    `start_time`    DATETIME(3) NOT NULL,
+    `end_time`      DATETIME(3) NOT NULL,
     `interval`      VARCHAR(3)     NOT NULL,
     `symbol`        VARCHAR(7)     NOT NULL,
     `open`          DECIMAL(16, 8) NOT NULL,
@@ -45,8 +46,8 @@ CREATE TABLE `binance_klines`
 (
     `gid`           INTEGER PRIMARY KEY AUTOINCREMENT,
     `exchange`      VARCHAR(10)    NOT NULL,
-    `start_time`    DATETIME(3)    NOT NULL,
-    `end_time`      DATETIME(3)    NOT NULL,
+    `start_time`    DATETIME(3) NOT NULL,
+    `end_time`      DATETIME(3) NOT NULL,
     `interval`      VARCHAR(3)     NOT NULL,
     `symbol`        VARCHAR(7)     NOT NULL,
     `open`          DECIMAL(16, 8) NOT NULL,
@@ -65,8 +66,8 @@ CREATE TABLE `max_klines`
 (
     `gid`           INTEGER PRIMARY KEY AUTOINCREMENT,
     `exchange`      VARCHAR(10)    NOT NULL,
-    `start_time`    DATETIME(3)    NOT NULL,
-    `end_time`      DATETIME(3)    NOT NULL,
+    `start_time`    DATETIME(3) NOT NULL,
+    `end_time`      DATETIME(3) NOT NULL,
     `interval`      VARCHAR(3)     NOT NULL,
     `symbol`        VARCHAR(7)     NOT NULL,
     `open`          DECIMAL(16, 8) NOT NULL,
