@@ -1,3 +1,4 @@
+-- !txn
 -- +up
 CREATE INDEX trades_symbol ON trades(symbol);
 CREATE INDEX trades_symbol_fee_currency ON trades(symbol, fee_currency, traded_at);
