@@ -133,11 +133,11 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 	s.Session = session
-	if s.ProfitStats == nil || !s.ProfitStats.Running {
+	if s.ProfitStats == nil {
 		s.ProfitStats = newProfitStats(s.Market, s.QuoteInvestment)
 	}
 
-	if s.Position == nil || !s.ProfitStats.Running {
+	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
 
@@ -161,7 +161,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	// order executor
 	s.OrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
-		s.logger.Infof("[DCA] POSITION CHANGE: %s", position.String())
 		s.logger.Infof("[DCA] POSITION UPDATE: %s", s.Position.String())
 		bbgo.Sync(ctx, s)
 
@@ -203,7 +202,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.logger.Info("[DCA] user data stream authenticated")
 		time.AfterFunc(3*time.Second, func() {
 			if isInitialize := s.initializeNextStateC(); !isInitialize {
-				if s.RecoverWhenStart && s.ProfitStats.Running {
+				if s.RecoverWhenStart {
 					// recover
 					if err := s.recover(ctx); err != nil {
 						s.logger.WithError(err).Error("[DCA] something wrong when state recovering")
@@ -263,8 +262,6 @@ func (s *Strategy) Close(ctx context.Context) error {
 	if err != nil {
 		s.logger.WithError(err).Errorf("[DCA] there are errors when cancelling orders at close")
 	}
-
-	s.ProfitStats.Running = false
 
 	bbgo.Sync(ctx, s)
 	return err

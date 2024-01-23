@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -32,18 +31,6 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 	}
 
 	s.debugOrders(createdOrders)
-
-	// Running is false means this is new bot (no matter it has trades or not) in persistence
-	if !s.ProfitStats.Running {
-		for _, createdOrder := range createdOrders {
-			if s.ProfitStats.FromOrderID == 0 || s.ProfitStats.FromOrderID > createdOrder.OrderID {
-				s.ProfitStats.FromOrderID = createdOrder.OrderID
-			}
-		}
-		s.ProfitStats.Running = true
-
-		bbgo.Sync(ctx, s)
-	}
 
 	return nil
 }
