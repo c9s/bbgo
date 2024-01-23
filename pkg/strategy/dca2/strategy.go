@@ -66,6 +66,9 @@ type Strategy struct {
 	// UseCancelAllOrdersApiWhenClose uses a different API to cancel all the orders on the market when closing a grid
 	UseCancelAllOrdersApiWhenClose bool `json:"useCancelAllOrdersApiWhenClose"`
 
+	// dev mode
+	DevMode DevMode `json:"devMode"`
+
 	// log
 	logger    *logrus.Entry
 	LogFields logrus.Fields `json:"logFields"`
@@ -141,6 +144,12 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
 
+	// if dev mode is on and it's not a new strategy
+	if s.DevMode.On && !s.DevMode.IsNewStrategy {
+		s.ProfitStats = newProfitStats(s.Market, s.QuoteInvestment)
+		s.Position = types.NewPositionFromMarket(s.Market)
+	}
+
 	s.Position.Strategy = ID
 	s.Position.StrategyInstanceID = instanceID
 
@@ -202,14 +211,18 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.logger.Info("[DCA] user data stream authenticated")
 		time.AfterFunc(3*time.Second, func() {
 			if isInitialize := s.initializeNextStateC(); !isInitialize {
-				if s.RecoverWhenStart {
+
+				// no need to recover when two situation
+				// 1. recoverWhenStart is false
+				// 2. dev mode is on and it's not new strategy
+				if !s.RecoverWhenStart || (s.DevMode.On && !s.DevMode.IsNewStrategy) {
+					s.state = WaitToOpenPosition
+				} else {
 					// recover
 					if err := s.recover(ctx); err != nil {
 						s.logger.WithError(err).Error("[DCA] something wrong when state recovering")
 						return
 					}
-				} else {
-					s.state = WaitToOpenPosition
 				}
 
 				s.logger.Infof("[DCA] state: %d", s.state)
