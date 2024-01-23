@@ -28,10 +28,10 @@ type GetOpenOrdersRequest struct {
 	// Pagination of data to return records newer than the requested ordId
 	before *string `param:"before,query"`
 	// Filter with a begin timestamp. Unix timestamp format in milliseconds, e.g. 1597026383085
-	begin *time.Time `param:"begin,query"`
+	begin *time.Time `param:"begin,query,timestamp"`
 
 	// Filter with an end timestamp. Unix timestamp format in milliseconds, e.g. 1597026383085
-	end   *time.Time `param:"end,query"`
+	end   *time.Time `param:"end,query,timestamp"`
 	limit *string    `param:"limit,query"`
 }
 
