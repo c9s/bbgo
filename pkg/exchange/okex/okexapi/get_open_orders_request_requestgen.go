@@ -12,13 +12,13 @@ import (
 	"time"
 )
 
-func (g *GetOpenOrdersRequest) InstrumentID(instrumentID string) *GetOpenOrdersRequest {
-	g.instrumentID = &instrumentID
+func (g *GetOpenOrdersRequest) InstrumentType(instrumentType InstrumentType) *GetOpenOrdersRequest {
+	g.instrumentType = instrumentType
 	return g
 }
 
-func (g *GetOpenOrdersRequest) InstrumentType(instrumentType InstrumentType) *GetOpenOrdersRequest {
-	g.instrumentType = instrumentType
+func (g *GetOpenOrdersRequest) InstrumentID(instrumentID string) *GetOpenOrdersRequest {
+	g.instrumentID = &instrumentID
 	return g
 }
 
@@ -65,14 +65,6 @@ func (g *GetOpenOrdersRequest) Limit(limit string) *GetOpenOrdersRequest {
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
-	// check instrumentID field -> json key instId
-	if g.instrumentID != nil {
-		instrumentID := *g.instrumentID
-
-		// assign parameter of instrumentID
-		params["instId"] = instrumentID
-	} else {
-	}
 	// check instrumentType field -> json key instType
 	instrumentType := g.instrumentType
 
@@ -89,6 +81,14 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 
 	// assign parameter of instrumentType
 	params["instType"] = instrumentType
+	// check instrumentID field -> json key instId
+	if g.instrumentID != nil {
+		instrumentID := *g.instrumentID
+
+		// assign parameter of instrumentID
+		params["instId"] = instrumentID
+	} else {
+	}
 	// check orderType field -> json key ordType
 	if g.orderType != nil {
 		orderType := *g.orderType
