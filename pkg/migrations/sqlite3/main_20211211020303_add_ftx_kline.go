@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_addFtxKline, down_main_addFtxKline)
-
 }
 
 func up_main_addFtxKline(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

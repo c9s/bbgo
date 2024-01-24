@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_addBybitKlines, down_main_addBybitKlines)
-
 }
 
 func up_main_addBybitKlines(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

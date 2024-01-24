@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_fixProfitSymbolLength, down_main_fixProfitSymbolLength)
-
 }
 
 func up_main_fixProfitSymbolLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

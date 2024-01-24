@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_addWithdrawsTable, down_main_addWithdrawsTable)
-
 }
 
 func up_main_addWithdrawsTable(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
