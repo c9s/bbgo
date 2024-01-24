@@ -10,7 +10,7 @@ require (
 	github.com/adshao/go-binance/v2 v2.4.2
 	github.com/c-bata/goptuna v0.8.1
 	github.com/c9s/requestgen v1.3.6
-	github.com/c9s/rockhopper/v2 v2.0.2
+	github.com/c9s/rockhopper/v2 v2.0.3-0.20240124055428-2473c6221858
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/cheggaaa/pb/v3 v3.0.8
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
