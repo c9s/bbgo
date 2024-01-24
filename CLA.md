@@ -4,8 +4,6 @@
 
 In order to clarify the intellectual property license granted with Contributions from any person or entity, BBGO must have a Contributor License Agreement ("CLA") on file that has been signed by each Contributor, indicating agreement to the license terms below. This CLA is for your protection as a Contributor as well as the protection of BBGO and its users; it does not change your rights to use your own Contributions for any other purpose.
 
-If you have not already done so, please complete and sign, then scan and email a pdf file of this CLA to [yoanlin93+cla@gmail.com](mailto:yoanlin93@gmail.com).
-
 Please read this document carefully before signing and keep a copy for your records.
 
 You accept and agree to the following terms and conditions for your present and future Contributions Submitted to BBGO. In return, BBGO shall not use your Contributions in a way that is contrary to the public benefit or inconsistent with its nonprofit status and bylaws in effect at the time of the Contribution. Except for the license granted herein to BBGO and recipients of software distributed by BBGO, You reserve all right, title, and interest in and to your Contributions.
