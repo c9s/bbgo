@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_marginLoans, down_main_marginLoans)
-
 }
 
 func up_main_marginLoans(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

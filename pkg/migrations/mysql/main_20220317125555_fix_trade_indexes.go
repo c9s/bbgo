@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_fixTradeIndexes, down_main_fixTradeIndexes)
-
 }
 
 func up_main_fixTradeIndexes(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

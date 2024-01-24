@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_addKucoinKlines, down_main_addKucoinKlines)
-
 }
 
 func up_main_addKucoinKlines(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_klines, down_main_klines)
-
 }
 
 func up_main_klines(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

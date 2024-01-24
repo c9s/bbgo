@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_fixFeeColumn, down_main_fixFeeColumn)
-
 }
 
 func up_main_fixFeeColumn(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
