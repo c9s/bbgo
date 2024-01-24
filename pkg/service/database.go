@@ -19,6 +19,8 @@ type DatabaseService struct {
 	Driver string
 	DSN    string
 	DB     *sqlx.DB
+
+	migrationPackages []string
 }
 
 func NewDatabaseService(driver, dsn string) *DatabaseService {
@@ -35,7 +37,6 @@ func NewDatabaseService(driver, dsn string) *DatabaseService {
 		Driver: driver,
 		DSN:    dsn,
 	}
-
 }
 
 func (s *DatabaseService) Connect() error {
@@ -48,6 +49,10 @@ func (s *DatabaseService) Insert(record interface{}) error {
 	sql := dbCache.InsertSqlOf(record)
 	_, err := s.DB.NamedExec(sql, record)
 	return err
+}
+
+func (s *DatabaseService) AddMigrationPackages(pkgNames ...string) {
+	s.migrationPackages = append(s.migrationPackages, pkgNames...)
 }
 
 func (s *DatabaseService) Close() error {
@@ -77,23 +82,12 @@ func (s *DatabaseService) Upgrade(ctx context.Context) error {
 		return err
 	}
 
-	migrations = migrations.FilterPackage([]string{"main"}).SortAndConnect()
 	if len(migrations) == 0 {
 		return nil
 	}
 
-	_, lastAppliedMigration, err := rh.FindLastAppliedMigration(ctx, migrations)
-	if err != nil {
-		return err
-	}
-
-	if lastAppliedMigration != nil {
-		return rockhopper.Up(ctx, rh, lastAppliedMigration.Next, 0)
-	}
-
-	// TODO: use align in the next major version
-	// return rockhopper.Align(ctx, rh, 20231123125402, migrations)
-	return rockhopper.Up(ctx, rh, migrations.Head(), 0)
+	pkgNames := append([]string{rockhopper.DefaultPackageName}, s.migrationPackages...)
+	return rockhopper.Upgrade(ctx, rh, migrations.FilterPackage(pkgNames))
 }
 
 func ReformatMysqlDSN(dsn string) (string, error) {

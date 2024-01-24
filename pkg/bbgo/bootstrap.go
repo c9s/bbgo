@@ -34,7 +34,7 @@ func BootstrapEnvironmentLightweight(ctx context.Context, environ *Environment, 
 }
 
 func BootstrapEnvironment(ctx context.Context, environ *Environment, userConfig *Config) error {
-	if err := environ.ConfigureDatabase(ctx); err != nil {
+	if err := environ.ConfigureDatabase(ctx, userConfig); err != nil {
 		return err
 	}
 
@@ -66,5 +66,5 @@ func BootstrapEnvironment(ctx context.Context, environ *Environment, userConfig 
 }
 
 func BootstrapBacktestEnvironment(ctx context.Context, environ *Environment) error {
-	return environ.ConfigureDatabase(ctx)
+	return environ.ConfigureDatabase(ctx, nil)
 }
