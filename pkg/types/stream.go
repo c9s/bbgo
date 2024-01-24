@@ -549,6 +549,7 @@ const (
 	DepthLevelMedium Depth = "MEDIUM"
 	DepthLevel1      Depth = "1"
 	DepthLevel5      Depth = "5"
+	DepthLevel10     Depth = "10"
 	DepthLevel15     Depth = "15"
 	DepthLevel20     Depth = "20"
 	DepthLevel50     Depth = "50"

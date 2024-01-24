@@ -318,9 +318,13 @@ func convertSubscription(s types.Subscription) string {
 		case types.DepthLevel5:
 			n += "5"
 
-		case types.DepthLevelMedium:
+		case types.DepthLevel10:
+			n += "10"
+
+		case types.DepthLevel20, types.DepthLevelMedium:
 			n += "20"
 
+			// default to full
 		case types.DepthLevelFull:
 		default:
 
