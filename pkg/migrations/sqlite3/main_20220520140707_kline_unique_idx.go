@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_klineUniqueIdx, down_main_klineUniqueIdx)
-
 }
 
 func up_main_klineUniqueIdx(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_fixUniqueIndex, down_main_fixUniqueIndex)
-
 }
 
 func up_main_fixUniqueIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

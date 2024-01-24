@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_increaseDecimalLength, down_main_increaseDecimalLength)
-
 }
 
 func up_main_increaseDecimalLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

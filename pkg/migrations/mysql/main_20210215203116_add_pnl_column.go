@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_addPnlColumn, down_main_addPnlColumn)
-
 }
 
 func up_main_addPnlColumn(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

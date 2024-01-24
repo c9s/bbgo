@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_addMarginInfoToNav, down_main_addMarginInfoToNav)
-
 }
 
 func up_main_addMarginInfoToNav(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

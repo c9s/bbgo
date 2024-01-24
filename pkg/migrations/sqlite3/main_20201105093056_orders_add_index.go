@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_ordersAddIndex, down_main_ordersAddIndex)
-
 }
 
 func up_main_ordersAddIndex(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
