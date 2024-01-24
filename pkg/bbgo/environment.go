@@ -188,8 +188,9 @@ func (environ *Environment) ConfigureDatabase(ctx context.Context, config *Confi
 		dbDriver = "mysql"
 	}
 
-	if dbDriver == "" {
-		return fmt.Errorf("either env DB_DRIVER or config.Driver is not set")
+	// database is optional
+	if dbDriver == "" || dbDSN == "" {
+		return nil
 	}
 
 	return environ.ConfigureDatabaseDriver(ctx, dbDriver, dbDSN, extraPkgNames...)
