@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 )
 
 const ID = "dca2"
@@ -25,6 +27,12 @@ var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
+}
+
+type advancedOrderCancelApi interface {
+	CancelAllOrders(ctx context.Context) ([]types.Order, error)
+	CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error)
+	CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([]types.Order, error)
 }
 
 //go:generate callbackgen -type Strateg
@@ -54,6 +62,9 @@ type Strategy struct {
 
 	// KeepOrdersWhenShutdown option is used for keeping the grid orders when shutting down bbgo
 	KeepOrdersWhenShutdown bool `json:"keepOrdersWhenShutdown"`
+
+	// UseCancelAllOrdersApiWhenClose uses a different API to cancel all the orders on the market when closing a grid
+	UseCancelAllOrdersApiWhenClose bool `json:"useCancelAllOrdersApiWhenClose"`
 
 	// log
 	logger    *logrus.Entry
@@ -197,14 +208,14 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 						s.logger.WithError(err).Error("[DCA] something wrong when state recovering")
 						return
 					}
-
-					s.logger.Infof("[DCA] state: %d", s.state)
-					s.logger.Infof("[DCA] position %s", s.Position.String())
-					s.logger.Infof("[DCA] profit stats %s", s.ProfitStats.String())
-					s.logger.Infof("[DCA] startTimeOfNextRound %s", s.startTimeOfNextRound)
 				} else {
 					s.state = WaitToOpenPosition
 				}
+
+				s.logger.Infof("[DCA] state: %d", s.state)
+				s.logger.Infof("[DCA] position %s", s.Position.String())
+				s.logger.Infof("[DCA] profit stats %s", s.ProfitStats.String())
+				s.logger.Infof("[DCA] startTimeOfNextRound %s", s.startTimeOfNextRound)
 
 				s.updateTakeProfitPrice()
 
@@ -219,16 +230,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			}
 		})
 	})
-
-	balances, err := session.Exchange.QueryAccountBalances(ctx)
-	if err != nil {
-		return err
-	}
-
-	balance := balances[s.Market.QuoteCurrency]
-	if balance.Available.Compare(s.ProfitStats.QuoteInvestment) < 0 {
-		return fmt.Errorf("the available balance of %s is %s which is less than quote investment setting %s, please check it", s.Market.QuoteCurrency, balance.Available, s.ProfitStats.QuoteInvestment)
-	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -270,16 +271,45 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	_ = s.Initialize()
 	defer s.EmitClosed()
 
-	err := s.OrderExecutor.GracefulCancel(ctx)
-	if err != nil {
-		s.logger.WithError(err).Errorf("[DCA] there are errors when cancelling orders at clean up")
+	session := s.Session
+	if session == nil {
+		return fmt.Errorf("Session is nil, please check it")
 	}
 
-	bbgo.Sync(ctx, s)
-	return err
+	service, support := session.Exchange.(advancedOrderCancelApi)
+	if !support {
+		return fmt.Errorf("advancedOrderCancelApi interface is not implemented, fallback to default graceful cancel, exchange %T", session)
+	}
+
+	var werr error
+	for {
+		s.logger.Infof("checking %s open orders...", s.Symbol)
+
+		openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
+		if err != nil {
+			s.logger.WithError(err).Errorf("CancelOrdersByGroupID api call error")
+			werr = multierr.Append(werr, err)
+		}
+
+		if len(openOrders) == 0 {
+			break
+		}
+
+		s.logger.Infof("found %d open orders left, using cancel all orders api", len(openOrders))
+
+		s.logger.Infof("using cancal all orders api for canceling grid orders...")
+		if err := retry.CancelAllOrdersUntilSuccessful(ctx, service); err != nil {
+			s.logger.WithError(err).Errorf("CancelAllOrders api call error")
+			werr = multierr.Append(werr, err)
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+
+	return werr
 }
 
-func (s *Strategy) CalculateProfitOfCurrentRound(ctx context.Context) error {
+func (s *Strategy) CalculateAndEmitProfit(ctx context.Context) error {
 	historyService, ok := s.Session.Exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
 		return fmt.Errorf("exchange %s doesn't support ExchangeTradeHistoryService", s.Session.Exchange.Name())
@@ -290,47 +320,73 @@ func (s *Strategy) CalculateProfitOfCurrentRound(ctx context.Context) error {
 		return fmt.Errorf("exchange %s doesn't support ExchangeOrderQueryService", s.Session.Exchange.Name())
 	}
 
-	// query the orders of this round
+	// TODO: pagination for it
+	// query the orders
 	orders, err := historyService.QueryClosedOrders(ctx, s.Symbol, time.Time{}, time.Time{}, s.ProfitStats.FromOrderID)
 	if err != nil {
 		return err
 	}
 
-	// query the trades of this round
+	var rounds []Round
+	var round Round
 	for _, order := range orders {
-		if order.OrderID > s.ProfitStats.FromOrderID {
-			s.ProfitStats.FromOrderID = order.OrderID
-		}
-
 		// skip not this strategy order
 		if order.GroupID != s.OrderGroupID {
 			continue
 		}
 
-		if order.ExecutedQuantity.Sign() == 0 {
-			// skip no trade orders
-			continue
-		}
-
-		s.logger.Infof("[DCA] calculate profit stats from order: %s", order.String())
-
-		trades, err := queryService.QueryOrderTrades(ctx, types.OrderQuery{
-			Symbol:  order.Symbol,
-			OrderID: strconv.FormatUint(order.OrderID, 10),
-		})
-
-		if err != nil {
-			return err
-		}
-
-		for _, trade := range trades {
-			s.logger.Infof("[DCA] calculate profit stats from trade: %s", trade.String())
-			s.ProfitStats.AddTrade(trade)
+		switch order.Side {
+		case types.SideTypeBuy:
+			round.OpenPositionOrders = append(round.OpenPositionOrders, order)
+		case types.SideTypeSell:
+			if order.Status != types.OrderStatusFilled {
+				continue
+			}
+			round.TakeProfitOrder = order
+			rounds = append(rounds, round)
+			round = Round{}
+		default:
+			s.logger.Errorf("there is order with unsupported side")
 		}
 	}
 
-	s.ProfitStats.FromOrderID = s.ProfitStats.FromOrderID + 1
-	s.ProfitStats.QuoteInvestment = s.ProfitStats.QuoteInvestment.Add(s.ProfitStats.CurrentRoundProfit)
+	for _, round := range rounds {
+		var roundOrders []types.Order = round.OpenPositionOrders
+		roundOrders = append(roundOrders, round.TakeProfitOrder)
+		for _, order := range roundOrders {
+			s.logger.Infof("[DCA] calculate profit stats from order: %s", order.String())
+
+			// skip no trade orders
+			if order.ExecutedQuantity.Sign() == 0 {
+				continue
+			}
+
+			trades, err := queryService.QueryOrderTrades(ctx, types.OrderQuery{
+				Symbol:  order.Symbol,
+				OrderID: strconv.FormatUint(order.OrderID, 10),
+			})
+
+			if err != nil {
+				return err
+			}
+
+			for _, trade := range trades {
+				s.logger.Infof("[DCA] calculate profit stats from trade: %s", trade.String())
+				s.ProfitStats.AddTrade(trade)
+			}
+		}
+
+		s.ProfitStats.FromOrderID = round.TakeProfitOrder.OrderID + 1
+		s.ProfitStats.QuoteInvestment = s.ProfitStats.QuoteInvestment.Add(s.ProfitStats.CurrentRoundProfit)
+
+		// store into persistence
+		bbgo.Sync(ctx, s)
+
+		// emit profit
+		s.EmitProfit(s.ProfitStats)
+
+		s.ProfitStats.NewRound()
+	}
 
 	return nil
 }

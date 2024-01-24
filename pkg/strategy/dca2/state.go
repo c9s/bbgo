@@ -72,6 +72,7 @@ func (s *Strategy) runState(ctx context.Context) {
 			s.logger.Info("[DCA] runState DONE")
 			return
 		case <-ticker.C:
+			s.logger.Infof("[DCA] triggerNextState current state: %d", s.state)
 			s.triggerNextState()
 		case nextState := <-s.nextStateC:
 			s.logger.Infof("[DCA] currenct state: %d, next state: %d", s.state, nextState)
@@ -85,6 +86,7 @@ func (s *Strategy) runState(ctx context.Context) {
 
 			if nextState != validNextState {
 				s.logger.Warnf("[DCA] %d is not valid next state of curreny state %d", nextState, s.state)
+				continue
 			}
 
 			// move to next state
@@ -118,7 +120,7 @@ func (s *Strategy) triggerNextState() {
 		// only trigger from order filled event
 	default:
 		if nextState, ok := stateTransition[s.state]; ok {
-			s.nextStateC <- nextState
+			s.emitNextState(nextState)
 		}
 	}
 }
@@ -128,13 +130,6 @@ func (s *Strategy) runWaitToOpenPositionState(ctx context.Context, next State) {
 	if time.Now().Before(s.startTimeOfNextRound) {
 		return
 	}
-
-	// reset position and open new round for profit stats before position opening
-	s.Position.Reset()
-	s.ProfitStats.NewRound()
-
-	// store into redis
-	bbgo.Sync(ctx, s)
 
 	s.state = PositionOpening
 	s.logger.Info("[State] WaitToOpenPosition -> PositionOpening")
@@ -160,7 +155,7 @@ func (s *Strategy) runOpenPositionOrderFilled(_ context.Context, next State) {
 	s.logger.Info("[State] OpenPositionOrderFilled -> OpenPositionOrdersCancelling")
 
 	// after open position cancelling, immediately trigger open position cancelled to cancel the other orders
-	s.nextStateC <- OpenPositionOrdersCancelled
+	s.emitNextState(OpenPositionOrdersCancelled)
 }
 
 func (s *Strategy) runOpenPositionOrdersCancelling(ctx context.Context, next State) {
@@ -173,7 +168,7 @@ func (s *Strategy) runOpenPositionOrdersCancelling(ctx context.Context, next Sta
 	s.logger.Info("[State] OpenPositionOrdersCancelling -> OpenPositionOrdersCancelled")
 
 	// after open position cancelled, immediately trigger take profit ready to open take-profit order
-	s.nextStateC <- TakeProfitReady
+	s.emitNextState(TakeProfitReady)
 }
 
 func (s *Strategy) runOpenPositionOrdersCancelled(ctx context.Context, next State) {
@@ -192,11 +187,16 @@ func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 
 	s.logger.Info("[State] TakeProfitReady - start reseting position and calculate quote investment for next round")
 
-	// calculate profit stats
-	s.CalculateProfitOfCurrentRound(ctx)
-	bbgo.Sync(ctx, s)
+	// reset position
 
-	s.EmitProfit(s.ProfitStats)
+	// calculate profit stats
+	s.CalculateAndEmitProfit(ctx)
+
+	// reset position and open new round for profit stats before position opening
+	s.Position.Reset()
+
+	// store into redis
+	bbgo.Sync(ctx, s)
 
 	// set the start time of the next round
 	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())
