@@ -1,0 +1,7 @@
+environment:
+  disableDefaultKLineSubscription: true
+  disableHistoryKLinePreload: true
+  disableStartupBalanceQuery: true
+  disableSessionTradeBuffer: true
+  disableMarketDataStore: true
+  maxSessionTradeBufferSize: true
