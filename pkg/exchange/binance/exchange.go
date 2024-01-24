@@ -30,6 +30,8 @@ import (
 
 const BNB = "BNB"
 
+const DefaultDepthLimit = 5000
+
 const BinanceUSBaseURL = "https://api.binance.us"
 const BinanceTestBaseURL = "https://testnet.binance.vision"
 const BinanceUSWebSocketURL = "wss://stream.binance.us:9443"
@@ -378,7 +380,9 @@ func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) e
 // types.TransferOut => Margin to Spot
 //
 // to call this method, you must set the IsMargin = true
-func (e *Exchange) TransferMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+func (e *Exchange) TransferMarginAccountAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
+) error {
 	if e.IsIsolatedMargin {
 		return e.transferIsolatedMarginAccountAsset(ctx, asset, amount, io)
 	}
@@ -386,7 +390,9 @@ func (e *Exchange) TransferMarginAccountAsset(ctx context.Context, asset string,
 	return e.transferCrossMarginAccountAsset(ctx, asset, amount, io)
 }
 
-func (e *Exchange) transferIsolatedMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+func (e *Exchange) transferIsolatedMarginAccountAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
+) error {
 	req := e.client2.NewTransferIsolatedMarginAccountRequest()
 	req.Symbol(e.IsolatedMarginSymbol)
 
@@ -407,7 +413,9 @@ func (e *Exchange) transferIsolatedMarginAccountAsset(ctx context.Context, asset
 }
 
 // transferCrossMarginAccountAsset transfer asset to the cross margin account or to the main account
-func (e *Exchange) transferCrossMarginAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+func (e *Exchange) transferCrossMarginAccountAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
+) error {
 	req := e.client2.NewTransferCrossMarginAccountRequest()
 	req.Asset(asset)
 	req.Amount(amount.String())
@@ -512,7 +520,9 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 	return a, nil
 }
 
-func (e *Exchange) Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions) error {
+func (e *Exchange) Withdraw(
+	ctx context.Context, asset string, amount fixedpoint.Value, address string, options *types.WithdrawalOptions,
+) error {
 	req := e.client2.NewWithdrawRequest()
 	req.Coin(asset)
 	req.Address(address)
@@ -787,7 +797,9 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	return toGlobalOrder(order, e.IsMargin)
 }
 
-func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+func (e *Exchange) QueryClosedOrders(
+	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
+) (orders []types.Order, err error) {
 	// we can only query orders within 24 hours
 	// if the until-since is more than 24 hours, we should reset the until to:
 	// new until = since + 24 hours - 1 millisecond
@@ -1147,7 +1159,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 //
 // the endTime of a binance kline, is the (startTime + interval time - 1 millisecond), e.g.,
 // millisecond unix timestamp: 1620172860000 and 1620172919999
-func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryKLines(
+	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
+) ([]types.KLine, error) {
 	if e.IsFutures {
 		return e.QueryFuturesKLines(ctx, symbol, interval, options)
 	}
@@ -1204,7 +1218,9 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	return kLines, nil
 }
 
-func (e *Exchange) queryMarginTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) queryMarginTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (trades []types.Trade, err error) {
 	var remoteTrades []*binance.TradeV3
 	req := e.client.NewListMarginTradesService().
 		IsIsolated(e.IsIsolatedMargin).
@@ -1336,7 +1352,7 @@ func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot type
 		return e.queryFuturesDepth(ctx, symbol)
 	}
 
-	response, err := e.client.NewDepthService().Symbol(symbol).Do(ctx)
+	response, err := e.client.NewDepthService().Symbol(symbol).Limit(DefaultDepthLimit).Do(ctx)
 	if err != nil {
 		return snapshot, finalUpdateID, err
 	}
@@ -1344,7 +1360,9 @@ func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot type
 	return convertDepth(snapshot, symbol, finalUpdateID, response)
 }
 
-func convertDepth(snapshot types.SliceOrderBook, symbol string, finalUpdateID int64, response *binance.DepthResponse) (types.SliceOrderBook, int64, error) {
+func convertDepth(
+	snapshot types.SliceOrderBook, symbol string, finalUpdateID int64, response *binance.DepthResponse,
+) (types.SliceOrderBook, int64, error) {
 	snapshot.Symbol = symbol
 	// empty time since the API does not provide time information.
 	snapshot.Time = time.Time{}
