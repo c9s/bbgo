@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_fixOrderStatusLength, down_main_fixOrderStatusLength)
-
 }
 
 func up_main_fixOrderStatusLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

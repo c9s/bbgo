@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_addProfitTable, down_main_addProfitTable)
-
 }
 
 func up_main_addProfitTable(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

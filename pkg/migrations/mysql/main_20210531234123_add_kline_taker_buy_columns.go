@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_addKlineTakerBuyColumns, down_main_addKlineTakerBuyColumns)
-
 }
 
 func up_main_addKlineTakerBuyColumns(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {

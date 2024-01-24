@@ -8,7 +8,6 @@ import (
 
 func init() {
 	AddMigration("main", up_main_updateFeeCurrencyLength, down_main_updateFeeCurrencyLength)
-
 }
 
 func up_main_updateFeeCurrencyLength(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
