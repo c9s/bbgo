@@ -91,7 +91,7 @@ func (s *Stream) handleConnect() {
 			if len(sub.Options.Depth) > 0 {
 				switch sub.Options.Depth {
 				case types.DepthLevelFull:
-					depth = 0
+					depth = 50
 
 				case types.DepthLevelMedium:
 					depth = 20
@@ -101,6 +101,9 @@ func (s *Stream) handleConnect() {
 
 				case types.DepthLevel5:
 					depth = 5
+
+				default:
+					depth = 20
 
 				}
 			}
