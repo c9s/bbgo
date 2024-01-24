@@ -326,6 +326,13 @@ type ServiceConfig struct {
 	GoogleSpreadSheetService *GoogleSpreadSheetServiceConfig `json:"googleSpreadSheet" yaml:"googleSpreadSheet"`
 }
 
+type DatabaseConfig struct {
+	Driver string `json:"driver"`
+	DSN    string `json:"dsn"`
+
+	ExtraMigrationPackages []string `json:"extraMigrationPackages"`
+}
+
 type EnvironmentConfig struct {
 	DisableDefaultKLineSubscription bool `json:"disableDefaultKLineSubscription"`
 	DisableHistoryKLinePreload      bool `json:"disableHistoryKLinePreload"`
@@ -357,6 +364,8 @@ type Config struct {
 	Persistence *PersistenceConfig `json:"persistence,omitempty" yaml:"persistence,omitempty"`
 
 	Service *ServiceConfig `json:"services,omitempty" yaml:"services,omitempty"`
+
+	DatabaseConfig *DatabaseConfig `json:"database,omitempty" yaml:"database,omitempty"`
 
 	Environment *EnvironmentConfig `json:"environment,omitempty" yaml:"environment,omitempty"`
 
