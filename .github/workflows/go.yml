@@ -78,7 +78,7 @@ jobs:
 
     - name: Test
       run: |
-        go test -race -coverprofile coverage.txt -covermode atomic ./pkg/...
+        go test -count 3 -race -coverprofile coverage.txt -covermode atomic ./pkg/...
         sed -i -e '/_requestgen.go/d' coverage.txt
 
     - name: TestDnum
