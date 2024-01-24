@@ -101,25 +101,25 @@ func (b *MutexOrderBook) Reset() {
 	b.Unlock()
 }
 
-func (b *MutexOrderBook) CopyDepth(depth int) OrderBook {
+func (b *MutexOrderBook) CopyDepth(depth int) (ob OrderBook) {
 	b.Lock()
-	defer b.Unlock()
-
-	return b.orderBook.CopyDepth(depth)
+	ob = b.orderBook.CopyDepth(depth)
+	b.Unlock()
+	return ob
 }
 
-func (b *MutexOrderBook) Copy() OrderBook {
+func (b *MutexOrderBook) Copy() (ob OrderBook) {
 	b.Lock()
-	defer b.Unlock()
+	ob = b.orderBook.Copy()
+	b.Unlock()
 
-	return b.orderBook.Copy()
+	return ob
 }
 
 func (b *MutexOrderBook) Update(update SliceOrderBook) {
 	b.Lock()
-	defer b.Unlock()
-
 	b.orderBook.Update(update)
+	b.Unlock()
 }
 
 type BookSignalType string
