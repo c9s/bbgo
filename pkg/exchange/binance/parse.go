@@ -414,7 +414,7 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unsupported message: %s", message)
+	return nil, fmt.Errorf("unsupported binance websocket message: %s", message)
 }
 
 // IsBookTicker document ref :https://binance-docs.github.io/apidocs/spot/en/#individual-symbol-book-ticker-streams
