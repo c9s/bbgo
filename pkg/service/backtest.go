@@ -232,7 +232,7 @@ func (s *BacktestService) QueryKLinesCh(
 	if len(queries) == 1 {
 		query = queries[0] + " ORDER BY end_time ASC, start_time DESC"
 	} else {
-		query = "(" + strings.Join(queries, ") UNION (") + ") ORDER BY end_time ASC, start_time DESC"
+		query = "SELECT * FROM (" + strings.Join(queries, " UNION ALL ") + ") a ORDER BY end_time ASC, start_time DESC"
 	}
 
 	sql, args, err := sqlx.Named(query, map[string]interface{}{
