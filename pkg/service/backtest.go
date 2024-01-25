@@ -230,7 +230,7 @@ func (s *BacktestService) QueryKLinesCh(
 
 	var query string
 	if len(queries) == 1 {
-		query = queries[0]
+		query = queries[0] + " ORDER BY end_time ASC, start_time DESC"
 	} else {
 		query = "(" + strings.Join(queries, ") UNION (") + ") ORDER BY end_time ASC, start_time DESC"
 	}
