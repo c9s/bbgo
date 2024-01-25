@@ -225,14 +225,14 @@ func (s *BacktestService) QueryKLinesCh(
 
 	var queries []string
 	for _, symbol := range symbols {
-		queries = append(queries, fmt.Sprintf("SELECT * FROM `%s` WHERE `end_time` BETWEEN :since AND :until AND `symbol` = %s AND `interval` IN (:intervals) ORDER BY end_time ASC, start_time DESC", s.targetKlineTable(exchange, symbol), symbol))
+		queries = append(queries, fmt.Sprintf("SELECT * FROM `%s` WHERE `end_time` BETWEEN :since AND :until AND `symbol` = %s AND `interval` IN (:intervals)", s.targetKlineTable(exchange, symbol), symbol))
 	}
 
 	var query string
 	if len(queries) == 1 {
 		query = queries[0]
 	} else {
-		query = "(" + strings.Join(queries, ") UNION (") + ")"
+		query = "(" + strings.Join(queries, ") UNION (") + ") ORDER BY end_time ASC, start_time DESC"
 	}
 
 	sql, args, err := sqlx.Named(query, map[string]interface{}{
