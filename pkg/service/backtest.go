@@ -144,7 +144,7 @@ func (s *BacktestService) QueryKLine(
 ) (*types.KLine, error) {
 	log.Infof("querying last kline exchange = %s AND symbol = %s AND interval = %s", ex, symbol, interval)
 
-	tableName := targetKlineTable(ex, symbol)
+	tableName := s.targetKlineTable(ex, symbol)
 	// make the SQL syntax IDE friendly, so that it can analyze it.
 	sql := fmt.Sprintf("SELECT * FROM `%s` WHERE  `symbol` = :symbol AND `interval` = :interval ORDER BY end_time "+orderBy+" LIMIT "+strconv.Itoa(limit), tableName)
 
@@ -175,7 +175,7 @@ func (s *BacktestService) QueryKLine(
 func (s *BacktestService) QueryKLinesForward(
 	exchange types.Exchange, symbol string, interval types.Interval, startTime time.Time, limit int,
 ) ([]types.KLine, error) {
-	tableName := targetKlineTable(exchange, symbol)
+	tableName := s.targetKlineTable(exchange, symbol)
 	sql := "SELECT * FROM `binance_klines` WHERE `end_time` >= :start_time AND `symbol` = :symbol AND `interval` = :interval and exchange = :exchange ORDER BY end_time ASC LIMIT :limit"
 	sql = strings.ReplaceAll(sql, "binance_klines", tableName)
 
@@ -196,7 +196,7 @@ func (s *BacktestService) QueryKLinesForward(
 func (s *BacktestService) QueryKLinesBackward(
 	exchange types.Exchange, symbol string, interval types.Interval, endTime time.Time, limit int,
 ) ([]types.KLine, error) {
-	tableName := targetKlineTable(exchange, symbol)
+	tableName := s.targetKlineTable(exchange, symbol)
 
 	sql := "SELECT * FROM `binance_klines` WHERE `end_time` <= :end_time  and exchange = :exchange  AND `symbol` = :symbol AND `interval` = :interval ORDER BY end_time DESC LIMIT :limit"
 	sql = strings.ReplaceAll(sql, "binance_klines", tableName)
@@ -225,7 +225,7 @@ func (s *BacktestService) QueryKLinesCh(
 
 	var queries []string
 	for _, symbol := range symbols {
-		queries = append(queries, fmt.Sprintf("SELECT * FROM `%s` WHERE `end_time` BETWEEN :since AND :until AND `symbol` = %s AND `interval` IN (:intervals) ORDER BY end_time ASC, start_time DESC", targetKlineTable(exchange, symbol), symbol))
+		queries = append(queries, fmt.Sprintf("SELECT * FROM `%s` WHERE `end_time` BETWEEN :since AND :until AND `symbol` = %s AND `interval` IN (:intervals) ORDER BY end_time ASC, start_time DESC", s.targetKlineTable(exchange, symbol), symbol))
 	}
 
 	var query string
@@ -313,15 +313,20 @@ func (s *BacktestService) scanRows(rows *sqlx.Rows) (klines []types.KLine, err e
 	return klines, rows.Err()
 }
 
-func targetKlineTable(exchange types.Exchange, symbol string) string {
+func (s *BacktestService) targetKlineTable(exchange types.Exchange, symbol string) string {
 	_, isFutures, _, _ := exchange2.GetSessionAttributes(exchange)
 
 	tableName := strings.ToLower(exchange.Name().String()) + strings.ToLower(symbol)
 	if isFutures {
-		return tableName + "_futures_klines"
+		tableName = tableName + "_futures_klines"
 	} else {
-		return tableName + "_spot_klines"
+		tableName = tableName + "_spot_klines"
 	}
+
+	// Create table on the fly
+	_, _ = s.DB.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` LIKE `klines`;", tableName))
+
+	return tableName
 }
 
 var errExchangeFieldIsUnset = errors.New("kline.Exchange field should not be empty")
@@ -331,7 +336,7 @@ func (s *BacktestService) Insert(kline types.KLine, ex types.Exchange) error {
 		return errExchangeFieldIsUnset
 	}
 
-	tableName := targetKlineTable(ex, kline.Symbol)
+	tableName := s.targetKlineTable(ex, kline.Symbol)
 
 	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
 		"VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume)", tableName)
@@ -346,7 +351,7 @@ func (s *BacktestService) BatchInsert(kline []types.KLine, ex types.Exchange) er
 		return nil
 	}
 
-	tableName := targetKlineTable(ex, kline[0].Symbol)
+	tableName := s.targetKlineTable(ex, kline[0].Symbol)
 
 	sql := fmt.Sprintf("INSERT INTO `%s` (`exchange`, `start_time`, `end_time`, `symbol`, `interval`, `open`, `high`, `low`, `close`, `closed`, `volume`, `quote_volume`, `taker_buy_base_volume`, `taker_buy_quote_volume`)"+
 		" VALUES (:exchange, :start_time, :end_time, :symbol, :interval, :open, :high, :low, :close, :closed, :volume, :quote_volume, :taker_buy_base_volume, :taker_buy_quote_volume); ", tableName)
@@ -531,7 +536,7 @@ func (s *BacktestService) SelectKLineTimePoints(
 		conditions = append(conditions, sq.Expr("`start_time` BETWEEN ? AND ?", since, until))
 	}
 
-	tableName := targetKlineTable(ex, symbol)
+	tableName := s.targetKlineTable(ex, symbol)
 
 	return sq.Select("start_time").
 		From(tableName).
@@ -557,7 +562,7 @@ func (s *BacktestService) SelectKLineTimeRange(
 		conditions = append(conditions, sq.Expr("`start_time` BETWEEN ? AND ?", since, until))
 	}
 
-	tableName := targetKlineTable(ex, symbol)
+	tableName := s.targetKlineTable(ex, symbol)
 
 	return sq.Select("MIN(start_time) AS t1, MAX(start_time) AS t2").
 		From(tableName).
@@ -568,7 +573,7 @@ func (s *BacktestService) SelectKLineTimeRange(
 func (s *BacktestService) SelectLastKLines(
 	ex types.Exchange, symbol string, interval types.Interval, startTime, endTime time.Time, limit uint64,
 ) sq.SelectBuilder {
-	tableName := targetKlineTable(ex, symbol)
+	tableName := s.targetKlineTable(ex, symbol)
 	return sq.Select("*").
 		From(tableName).
 		Where(sq.And{
