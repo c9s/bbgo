@@ -198,12 +198,12 @@ func (environ *Environment) ConfigureDatabase(ctx context.Context, config *Confi
 
 func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver string, dsn string, extraPkgNames ...string) error {
 	environ.DatabaseService = service.NewDatabaseService(driver, dsn)
+	environ.DatabaseService.AddMigrationPackages(extraPkgNames...)
+
 	err := environ.DatabaseService.Connect()
 	if err != nil {
 		return err
 	}
-
-	environ.DatabaseService.AddMigrationPackages(extraPkgNames...)
 
 	if err := environ.DatabaseService.Upgrade(ctx); err != nil {
 		return err
