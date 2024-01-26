@@ -773,11 +773,13 @@ func (s *Strategy) buildArbMarkets(session *bbgo.ExchangeSession, symbols []stri
 		}
 
 		m := &ArbMarket{
-			Symbol:        symbol,
-			market:        market,
-			BaseCurrency:  market.BaseCurrency,
-			QuoteCurrency: market.QuoteCurrency,
-			sigC:          sigC,
+			Symbol:                symbol,
+			market:                market,
+			BaseCurrency:          market.BaseCurrency,
+			QuoteCurrency:         market.QuoteCurrency,
+			sigC:                  sigC,
+			truncateBaseQuantity:  createBaseQuantityTruncator(market),
+			truncateQuoteQuantity: createPricePrecisionBasedQuoteQuantityTruncator(market),
 		}
 
 		if separateStream {
