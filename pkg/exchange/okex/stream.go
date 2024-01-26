@@ -35,6 +35,7 @@ type WebsocketLogin struct {
 //go:generate callbackgen -type Stream -interface
 type Stream struct {
 	types.StandardStream
+	kLineStream *KLineStream
 
 	client          *okexapi.RestClient
 	balanceProvider types.ExchangeAccountService
@@ -52,6 +53,7 @@ func NewStream(client *okexapi.RestClient, balanceProvider types.ExchangeAccount
 		client:          client,
 		balanceProvider: balanceProvider,
 		StandardStream:  types.NewStandardStream(),
+		kLineStream:     NewKLineStream(),
 	}
 
 	stream.SetParser(parseWebSocketEvent)
@@ -59,13 +61,13 @@ func NewStream(client *okexapi.RestClient, balanceProvider types.ExchangeAccount
 	stream.SetEndpointCreator(stream.createEndpoint)
 	stream.SetPingInterval(pingInterval)
 
-	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnAccountEvent(stream.handleAccountEvent)
 	stream.OnMarketTradeEvent(stream.handleMarketTradeEvent)
 	stream.OnOrderTradesEvent(stream.handleOrderDetailsEvent)
 	stream.OnConnect(stream.handleConnect)
 	stream.OnAuth(stream.subscribePrivateChannels(stream.emitBalanceSnapshot))
+
 	return stream
 }
 
@@ -250,17 +252,6 @@ func (s *Stream) handleMarketTradeEvent(data []MarketTradeEvent) {
 	}
 }
 
-func (s *Stream) handleKLineEvent(k KLineEvent) {
-	for _, event := range k.Events {
-		kline := kLineToGlobal(event, types.Interval(k.Interval), k.Symbol)
-		if kline.Closed {
-			s.EmitKLineClosed(kline)
-		} else {
-			s.EmitKLine(kline)
-		}
-	}
-}
-
 func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 	var url string
 	if s.PublicOnly {
@@ -288,8 +279,6 @@ func (s *Stream) dispatchEvent(e interface{}) {
 			s.EmitBookEvent(*et)
 		}
 		s.EmitBookTickerUpdate(et.BookTicker())
-	case *KLineEvent:
-		s.EmitKLineEvent(*et)
 
 	case *okexapi.Account:
 		s.EmitAccountEvent(*et)
