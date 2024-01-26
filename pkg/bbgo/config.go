@@ -327,10 +327,10 @@ type ServiceConfig struct {
 }
 
 type DatabaseConfig struct {
-	Driver string `json:"driver"`
-	DSN    string `json:"dsn"`
+	Driver string `json:"driver" yaml:"driver"`
+	DSN    string `json:"dsn" yaml:"dsn"`
 
-	ExtraMigrationPackages []string `json:"extraMigrationPackages"`
+	ExtraMigrationPackages []string `json:"extraMigrationPackages" yaml:"extraMigrationPackages"`
 }
 
 type EnvironmentConfig struct {
