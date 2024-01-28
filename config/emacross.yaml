@@ -26,7 +26,7 @@ backtest:
   endTime: "2022-03-01"
   symbols:
   - BTCUSDT
-  sessions: [max,binance]
+  sessions: [binance]
   # syncSecKLines: true
   accounts:
     binance:
