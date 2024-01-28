@@ -357,7 +357,6 @@ func (trader *Trader) Run(ctx context.Context) error {
 }
 
 func (trader *Trader) Initialize(ctx context.Context) error {
-	log.Infof("initializing strategies...")
 	return trader.IterateStrategies(func(strategy StrategyID) error {
 		if initializer, ok := strategy.(StrategyInitializer); ok {
 			return initializer.Initialize()

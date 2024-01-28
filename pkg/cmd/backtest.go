@@ -303,6 +303,10 @@ var BacktestCmd = &cobra.Command{
 			return err
 		}
 
+		if err := trader.Initialize(ctx); err != nil {
+			return err
+		}
+
 		if err := trader.Run(ctx); err != nil {
 			return err
 		}
