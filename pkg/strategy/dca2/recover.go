@@ -11,6 +11,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+var recoverSinceLimit = time.Date(2024, time.January, 29, 12, 0, 0, 0, time.Local)
+
 type descendingClosedOrderQueryService interface {
 	QueryClosedOrdersDesc(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error)
 }
@@ -33,7 +35,7 @@ func (s *Strategy) recover(ctx context.Context) error {
 		return err
 	}
 
-	closedOrders, err := queryService.QueryClosedOrdersDesc(ctx, s.Symbol, time.Date(2024, time.January, 23, 12, 0, 0, 0, time.Local), time.Now(), 0)
+	closedOrders, err := queryService.QueryClosedOrdersDesc(ctx, s.Symbol, recoverSinceLimit, time.Now(), 0)
 	if err != nil {
 		return err
 	}
