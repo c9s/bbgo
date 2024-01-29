@@ -252,7 +252,7 @@ func (s *Stream) handleMarketTradeEvent(data []MarketTradeEvent) {
 
 func (s *Stream) handleKLineEvent(k KLineEvent) {
 	for _, event := range k.Events {
-		kline := event.ToGlobal(types.Interval(k.Interval), k.Symbol)
+		kline := kLineToGlobal(event, types.Interval(k.Interval), k.Symbol)
 		if kline.Closed {
 			s.EmitKLineClosed(kline)
 		} else {

@@ -2,7 +2,6 @@ package okex
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -243,31 +242,7 @@ func ParsePriceVolumeOrderSliceJSON(b []byte) (slice PriceVolumeOrderSlice, err 
 	return slice, nil
 }
 
-type KLine struct {
-	StartTime    types.MillisecondTimestamp
-	OpenPrice    fixedpoint.Value
-	HighestPrice fixedpoint.Value
-	LowestPrice  fixedpoint.Value
-	ClosePrice   fixedpoint.Value
-	// Volume trading volume, with a unit of contract.cccccbcvefkeibbhtrebbfklrbetukhrgjgkiilufbde
-
-	// If it is a derivatives contract, the value is the number of contracts.
-	// If it is SPOT/MARGIN, the value is the quantity in base currency.
-	Volume fixedpoint.Value
-	// VolumeCcy trading volume, with a unit of currency.
-	// If it is a derivatives contract, the value is the number of base currency.
-	// If it is SPOT/MARGIN, the value is the quantity in quote currency.
-	VolumeCcy fixedpoint.Value
-	// VolumeCcyQuote Trading volume, the value is the quantity in quote currency
-	// e.g. The unit is USDT for BTC-USDT and BTC-USDT-SWAP;
-	// The unit is USD for BTC-USD-SWAP
-	VolumeCcyQuote fixedpoint.Value
-	// The state of candlesticks.
-	// 0 represents that it is uncompleted, 1 represents that it is completed.
-	Confirm fixedpoint.Value
-}
-
-func (k KLine) ToGlobal(interval types.Interval, symbol string) types.KLine {
+func kLineToGlobal(k okexapi.KLine, interval types.Interval, symbol string) types.KLine {
 	startTime := k.StartTime.Time()
 
 	return types.KLine{
@@ -281,94 +256,17 @@ func (k KLine) ToGlobal(interval types.Interval, symbol string) types.KLine {
 		High:                     k.HighestPrice,
 		Low:                      k.LowestPrice,
 		Volume:                   k.Volume,
-		QuoteVolume:              k.VolumeCcy,     // not supported
-		TakerBuyBaseAssetVolume:  fixedpoint.Zero, // not supported
-		TakerBuyQuoteAssetVolume: fixedpoint.Zero, // not supported
-		LastTradeID:              0,               // not supported
-		NumberOfTrades:           0,               // not supported
+		QuoteVolume:              k.VolumeInCurrency, // not supported
+		TakerBuyBaseAssetVolume:  fixedpoint.Zero,    // not supported
+		TakerBuyQuoteAssetVolume: fixedpoint.Zero,    // not supported
+		LastTradeID:              0,                  // not supported
+		NumberOfTrades:           0,                  // not supported
 		Closed:                   !k.Confirm.IsZero(),
 	}
 }
 
-type KLineSlice []KLine
-
-func (m *KLineSlice) UnmarshalJSON(b []byte) error {
-	if m == nil {
-		return errors.New("nil pointer of kline slice")
-	}
-	s, err := parseKLineSliceJSON(b)
-	if err != nil {
-		return err
-	}
-
-	*m = s
-	return nil
-}
-
-// parseKLineSliceJSON tries to parse a 2 dimensional string array into a KLineSlice
-//
-//		[
-//	   [
-//	     "1597026383085",
-//	     "8533.02",
-//	     "8553.74",
-//	     "8527.17",
-//	     "8548.26",
-//	     "45247",
-//	     "529.5858061",
-//	     "5529.5858061",
-//	     "0"
-//	   ]
-//	 ]
-func parseKLineSliceJSON(in []byte) (slice KLineSlice, err error) {
-	var rawKLines [][]json.RawMessage
-
-	err = json.Unmarshal(in, &rawKLines)
-	if err != nil {
-		return slice, err
-	}
-
-	for _, raw := range rawKLines {
-		if len(raw) != 9 {
-			return nil, fmt.Errorf("unexpected kline length: %d, data: %q", len(raw), raw)
-		}
-		var kline KLine
-		if err = json.Unmarshal(raw[0], &kline.StartTime); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal into timestamp: %q", raw[0])
-		}
-		if err = json.Unmarshal(raw[1], &kline.OpenPrice); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal into open price: %q", raw[1])
-		}
-		if err = json.Unmarshal(raw[2], &kline.HighestPrice); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal into highest price: %q", raw[2])
-		}
-		if err = json.Unmarshal(raw[3], &kline.LowestPrice); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal into lowest price: %q", raw[3])
-		}
-		if err = json.Unmarshal(raw[4], &kline.ClosePrice); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal into close price: %q", raw[4])
-		}
-		if err = json.Unmarshal(raw[5], &kline.Volume); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal into volume: %q", raw[5])
-		}
-		if err = json.Unmarshal(raw[6], &kline.VolumeCcy); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal into volume currency: %q", raw[6])
-		}
-		if err = json.Unmarshal(raw[7], &kline.VolumeCcyQuote); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal into trading currency quote: %q", raw[7])
-		}
-		if err = json.Unmarshal(raw[8], &kline.Confirm); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal into confirm: %q", raw[8])
-		}
-
-		slice = append(slice, kline)
-	}
-
-	return slice, nil
-}
-
 type KLineEvent struct {
-	Events KLineSlice
+	Events okexapi.KLineSlice
 
 	InstrumentID string
 	Symbol       string
