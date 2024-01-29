@@ -307,3 +307,12 @@ func TestClient_GetOrderDetailsRequest(t *testing.T) {
 	assert.NotEmpty(t, orderDetail)
 	t.Logf("order detail: %+v", orderDetail)
 }
+
+func TestClient_CandlesTicksRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	req := client.NewGetCandlesRequest().InstrumentID("BTC-USDT")
+	res, err := req.Do(ctx)
+	assert.NoError(t, err)
+	t.Log(res)
+}
