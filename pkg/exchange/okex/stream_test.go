@@ -67,6 +67,34 @@ func TestStream(t *testing.T) {
 		<-c
 	})
 
+	t.Run("book && kline test", func(t *testing.T) {
+		s.Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
+			Depth: types.DepthLevel400,
+		})
+		s.Subscribe(types.KLineChannel, "BTCUSDT", types.SubscribeOptions{
+			Interval: types.Interval1m,
+		})
+		s.SetPublicOnly()
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		s.OnBookSnapshot(func(book types.SliceOrderBook) {
+			t.Log("got snapshot", book)
+		})
+		s.OnBookUpdate(func(book types.SliceOrderBook) {
+			t.Log("got update", book)
+		})
+		s.OnKLine(func(kline types.KLine) {
+			t.Log("kline", kline)
+		})
+		s.OnKLineClosed(func(kline types.KLine) {
+			t.Log("kline closed", kline)
+		})
+
+		c := make(chan struct{})
+		<-c
+	})
+
 	t.Run("market trade test", func(t *testing.T) {
 		s.Subscribe(types.MarketTradeChannel, "BTCUSDT", types.SubscribeOptions{})
 		s.SetPublicOnly()
