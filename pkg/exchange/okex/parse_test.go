@@ -352,17 +352,17 @@ func Test_parseKLineSliceJSON(t *testing.T) {
 }
 `
 		exp := &KLineEvent{
-			Events: KLineSlice{
+			Events: okexapi.KLineSlice{
 				{
-					StartTime:      types.NewMillisecondTimestampFromInt(1597026383085),
-					OpenPrice:      fixedpoint.NewFromFloat(8533),
-					HighestPrice:   fixedpoint.NewFromFloat(8553.74),
-					LowestPrice:    fixedpoint.NewFromFloat(8527.17),
-					ClosePrice:     fixedpoint.NewFromFloat(8548.26),
-					Volume:         fixedpoint.NewFromFloat(45247),
-					VolumeCcy:      fixedpoint.NewFromFloat(529.5858061),
-					VolumeCcyQuote: fixedpoint.NewFromFloat(529.5858061),
-					Confirm:        fixedpoint.Zero,
+					StartTime:        types.NewMillisecondTimestampFromInt(1597026383085),
+					OpenPrice:        fixedpoint.NewFromFloat(8533),
+					HighestPrice:     fixedpoint.NewFromFloat(8553.74),
+					LowestPrice:      fixedpoint.NewFromFloat(8527.17),
+					ClosePrice:       fixedpoint.NewFromFloat(8548.26),
+					Volume:           fixedpoint.NewFromFloat(45247),
+					VolumeInCurrency: fixedpoint.NewFromFloat(529.5858061),
+					//VolumeInCurrencyQuote: fixedpoint.NewFromFloat(529.5858061),
+					Confirm: fixedpoint.Zero,
 				},
 			},
 			InstrumentID: "BTC-USDT",
@@ -651,17 +651,17 @@ func TestKLine_ToGlobal(t *testing.T) {
 }
 `
 		exp := &KLineEvent{
-			Events: KLineSlice{
+			Events: okexapi.KLineSlice{
 				{
-					StartTime:      types.NewMillisecondTimestampFromInt(1597026383085),
-					OpenPrice:      fixedpoint.NewFromFloat(8533),
-					HighestPrice:   fixedpoint.NewFromFloat(8553.74),
-					LowestPrice:    fixedpoint.NewFromFloat(8527.17),
-					ClosePrice:     fixedpoint.NewFromFloat(8548.26),
-					Volume:         fixedpoint.NewFromFloat(45247),
-					VolumeCcy:      fixedpoint.NewFromFloat(529.5858061),
-					VolumeCcyQuote: fixedpoint.NewFromFloat(529.5858061),
-					Confirm:        fixedpoint.Zero,
+					StartTime:        types.NewMillisecondTimestampFromInt(1597026383085),
+					OpenPrice:        fixedpoint.NewFromFloat(8533),
+					HighestPrice:     fixedpoint.NewFromFloat(8553.74),
+					LowestPrice:      fixedpoint.NewFromFloat(8527.17),
+					ClosePrice:       fixedpoint.NewFromFloat(8548.26),
+					Volume:           fixedpoint.NewFromFloat(45247),
+					VolumeInCurrency: fixedpoint.NewFromFloat(529.5858061),
+					//VolumeInCurrencyQuote: fixedpoint.NewFromFloat(529.5858061),
+					Confirm: fixedpoint.Zero,
 				},
 			},
 			InstrumentID: "BTC-USDT",
@@ -686,13 +686,13 @@ func TestKLine_ToGlobal(t *testing.T) {
 			High:                     exp.Events[0].HighestPrice,
 			Low:                      exp.Events[0].LowestPrice,
 			Volume:                   exp.Events[0].Volume,
-			QuoteVolume:              exp.Events[0].VolumeCcy,
+			QuoteVolume:              exp.Events[0].VolumeInCurrency,
 			TakerBuyBaseAssetVolume:  fixedpoint.Zero,
 			TakerBuyQuoteAssetVolume: fixedpoint.Zero,
 			LastTradeID:              0,
 			NumberOfTrades:           0,
 			Closed:                   false,
-		}, event.Events[0].ToGlobal(types.Interval(event.Interval), event.Symbol))
+		}, kLineToGlobal(event.Events[0], types.Interval(event.Interval), event.Symbol))
 	})
 
 }

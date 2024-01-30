@@ -32,6 +32,7 @@ var (
 	queryOpenOrderLimiter       = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
 	queryClosedOrderRateLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 	queryTradeLimiter           = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
+	queryKLineLimiter           = rate.NewLimiter(rate.Every(100*time.Millisecond), 20)
 )
 
 const (
@@ -379,24 +380,24 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	if err := marketDataLimiter.Wait(ctx); err != nil {
-		return nil, err
+	if err := queryKLineLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("query k line rate limiter wait error: %w", err)
 	}
 
 	intervalParam, err := toLocalInterval(interval)
 	if err != nil {
-		return nil, fmt.Errorf("fail to get interval: %w", err)
+		return nil, fmt.Errorf("failed to get interval: %w", err)
 	}
 
-	req := e.client.NewCandlesticksRequest(toLocalSymbol(symbol))
+	req := e.client.NewGetCandlesRequest().InstrumentID(toLocalSymbol(symbol))
 	req.Bar(intervalParam)
 
 	if options.StartTime != nil {
-		req.After(options.StartTime.Unix())
+		req.After(*options.StartTime)
 	}
 
 	if options.EndTime != nil {
-		req.Before(options.EndTime.Unix())
+		req.Before(*options.EndTime)
 	}
 
 	candles, err := req.Do(ctx)
@@ -406,20 +407,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 	var klines []types.KLine
 	for _, candle := range candles {
-		klines = append(klines, types.KLine{
-			Exchange:    types.ExchangeOKEx,
-			Symbol:      symbol,
-			Interval:    interval,
-			Open:        candle.Open,
-			High:        candle.High,
-			Low:         candle.Low,
-			Close:       candle.Close,
-			Closed:      true,
-			Volume:      candle.Volume,
-			QuoteVolume: candle.VolumeInCurrency,
-			StartTime:   types.Time(candle.Time),
-			EndTime:     types.Time(candle.Time.Add(interval.Duration() - time.Millisecond)),
-		})
+		klines = append(klines, kLineToGlobal(candle, interval, symbol))
 	}
 
 	return klines, nil
