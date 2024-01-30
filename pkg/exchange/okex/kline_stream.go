@@ -47,19 +47,15 @@ func (s *KLineStream) handleConnect() {
 
 		subs = append(subs, sub)
 	}
-	if len(subs) == 0 {
-		return
-	}
+	subscribe(s.Conn, subs)
+}
 
-	log.Infof("subscribing channels: %+v", subs)
-	err := s.Conn.WriteJSON(WebsocketOp{
-		Op:   "subscribe",
-		Args: subs,
-	})
-
-	if err != nil {
-		log.WithError(err).Error("subscribe error")
+func (s *KLineStream) Connect(ctx context.Context) error {
+	if len(s.StandardStream.Subscriptions) == 0 {
+		log.Info("no subscriptions in kline")
+		return nil
 	}
+	return s.StandardStream.Connect(ctx)
 }
 
 func (s *KLineStream) handleKLineEvent(k KLineEvent) {
@@ -84,4 +80,15 @@ func (s *KLineStream) dispatchEvent(e interface{}) {
 	case *KLineEvent:
 		s.EmitKLineEvent(*et)
 	}
+}
+
+func (s *KLineStream) Unsubscribe() {
+	// errors are handled in the syncSubscriptions, so they are skipped here.
+	if len(s.StandardStream.Subscriptions) != 0 {
+		_ = syncSubscriptions(s.StandardStream.Conn, s.StandardStream.Subscriptions, WsEventTypeUnsubscribe)
+	}
+	s.Resubscribe(func(old []types.Subscription) (new []types.Subscription, err error) {
+		// clear the subscriptions
+		return []types.Subscription{}, nil
+	})
 }
