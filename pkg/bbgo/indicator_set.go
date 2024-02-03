@@ -93,6 +93,10 @@ func (i *IndicatorSet) BOLL(iw types.IntervalWindow, k float64) *indicatorv2.BOL
 	return indicatorv2.BOLL(i.CLOSE(iw.Interval), iw.Window, k)
 }
 
+func (i *IndicatorSet) Keltner(iw types.IntervalWindow, atrLength int) *indicatorv2.KeltnerStream {
+	return indicatorv2.Keltner(i.KLines(iw.Interval), iw.Window, atrLength)
+}
+
 func (i *IndicatorSet) MACD(interval types.Interval, shortWindow, longWindow, signalWindow int) *indicatorv2.MACDStream {
 	return indicatorv2.MACD2(i.CLOSE(interval), shortWindow, longWindow, signalWindow)
 }
