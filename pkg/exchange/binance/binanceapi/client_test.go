@@ -176,3 +176,24 @@ func TestClient_NewTransferAssetRequest(t *testing.T) {
 	assert.NotEmpty(t, res)
 	t.Logf("result: %+v", res)
 }
+
+func TestClient_GetMarginBorrowRepayHistoryRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+
+	err := client.SetTimeOffsetFromServer(ctx)
+	assert.NoError(t, err)
+
+	req := client.NewGetMarginBorrowRepayHistoryRequest()
+	end := time.Now()
+	start := end.Add(-24 * time.Hour * 30)
+	req.StartTime(start)
+	req.EndTime(end)
+	req.Asset("BTC")
+	req.SetBorrowRepayType(BorrowRepayTypeBorrow)
+	res, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.NotEmpty(t, res)
+	t.Logf("result: %+v", res)
+}
