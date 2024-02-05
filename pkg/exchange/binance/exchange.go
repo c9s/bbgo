@@ -328,43 +328,37 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 	return resp.Amount, nil
 }
 
-func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
-	req := e.client.NewMarginRepayService()
+func (e *Exchange) borrowRepayAsset(ctx context.Context, asset string, amount fixedpoint.Value, marginType binanceapi.BorrowRepayType) error {
+	req := e.client2.NewPlaceMarginOrderRequest()
 	req.Asset(asset)
 	req.Amount(amount.String())
+	req.SetBorrowRepayType(marginType)
 	if e.IsIsolatedMargin {
+		req.IsIsolated(e.IsIsolatedMargin)
 		req.Symbol(e.IsolatedMarginSymbol)
 	}
 
-	log.Infof("repaying margin asset %s amount %f", asset, amount.Float64())
+	log.Infof("%s margin asset %s amount %f", marginType, asset, amount.Float64())
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return err
 	}
 
-	log.Debugf("margin repayed %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
+	log.Debugf("margin %s %f %s, transaction id = %d", marginType, amount.Float64(), asset, resp.TranId)
 	return err
+}
+
+func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	return e.borrowRepayAsset(ctx, asset, amount, binanceapi.BorrowRepayTypeRepay)
 }
 
 func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
-	req := e.client.NewMarginLoanService()
-	req.Asset(asset)
-	req.Amount(amount.String())
-	if e.IsIsolatedMargin {
-		req.Symbol(e.IsolatedMarginSymbol)
-	}
-
-	log.Infof("borrowing margin asset %s amount %f", asset, amount.Float64())
-	resp, err := req.Do(ctx)
-	if err != nil {
-		return err
-	}
-	log.Debugf("margin borrowed %f %s, transaction id = %d", amount.Float64(), asset, resp.TranID)
-	return err
+	return e.borrowRepayAsset(ctx, asset, amount, binanceapi.BorrowRepayTypeBorrow)
 }
 
 func (e *Exchange) QueryMarginBorrowHistory(ctx context.Context, asset string) error {
-	req := e.client.NewListMarginLoansService()
+	req := e.client2.NewGetMarginBorrowRepayHistoryRequest()
+	req.SetBorrowRepayType(binanceapi.BorrowRepayTypeBorrow)
 	req.Asset(asset)
 	history, err := req.Do(ctx)
 	if err != nil {
