@@ -440,7 +440,7 @@ func (tree *RBTree) CopyInorderReverse(limit int) *RBTree {
 	cnt := 0
 	newTree := NewRBTree()
 	tree.InorderReverse(func(n *RBNode) bool {
-		if cnt >= limit {
+		if limit > 0 && cnt >= limit {
 			return false
 		}
 
@@ -448,6 +448,7 @@ func (tree *RBTree) CopyInorderReverse(limit int) *RBTree {
 		cnt++
 		return true
 	})
+
 	return newTree
 }
 
