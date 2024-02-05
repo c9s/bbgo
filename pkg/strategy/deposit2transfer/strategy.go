@@ -123,7 +123,7 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 	accountLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
 
 	for _, asset := range s.Assets {
-		log.Infof("checking %s deposits...", asset)
+		log.Debugf("checking %s deposits...", asset)
 
 		succeededDeposits, err := s.scanDepositHistory(ctx, asset, 4*time.Hour)
 		if err != nil {
@@ -132,7 +132,7 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 		}
 
 		if len(succeededDeposits) == 0 {
-			log.Infof("no %s deposit found", asset)
+			log.Debugf("no %s deposit found", asset)
 			continue
 		}
 
@@ -173,7 +173,7 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 }
 
 func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duration time.Duration) ([]types.Deposit, error) {
-	log.Infof("scanning %s deposit history...", asset)
+	log.Debugf("scanning %s deposit history...", asset)
 
 	now := time.Now()
 	since := now.Add(-duration)
@@ -191,7 +191,7 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	defer s.mu.Unlock()
 
 	for _, deposit := range deposits {
-		log.Infof("checking deposit: %+v", deposit)
+		log.Debugf("checking deposit: %+v", deposit)
 
 		if deposit.Asset != asset {
 			continue
