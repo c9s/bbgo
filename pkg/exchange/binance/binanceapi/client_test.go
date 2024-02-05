@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -153,4 +154,25 @@ func TestClient_setTimeOffsetFromServer(t *testing.T) {
 	client := NewClient("")
 	err := client.SetTimeOffsetFromServer(context.Background())
 	assert.NoError(t, err)
+}
+
+func TestClient_NewTransferAssetRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+
+	err := client.SetTimeOffsetFromServer(ctx)
+	assert.NoError(t, err)
+
+	req := client.NewTransferAssetRequest()
+	req.Asset("BTC")
+	req.FromSymbol("BTCUSDT")
+	req.ToSymbol("BTCUSDT")
+	req.Amount("0.01")
+	req.Timestamp(time.Now())
+	req.TransferType(TransferAssetTypeIsolatedMarginToMain)
+	res, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.NotEmpty(t, res)
+	t.Logf("result: %+v", res)
 }
