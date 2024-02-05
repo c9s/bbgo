@@ -28,7 +28,7 @@ func newProfitStats(market types.Market, quoteInvestment fixedpoint.Value) *Prof
 	return &ProfitStats{
 		Symbol:          market.Symbol,
 		Market:          market,
-		Round:           0,
+		Round:           1,
 		QuoteInvestment: quoteInvestment,
 		CurrentRoundFee: make(map[string]fixedpoint.Value),
 		TotalFee:        make(map[string]fixedpoint.Value),
