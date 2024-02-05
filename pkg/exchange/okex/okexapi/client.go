@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -245,4 +246,15 @@ type APIResponse struct {
 	Code    string          `json:"code"`
 	Message string          `json:"msg"`
 	Data    json.RawMessage `json:"data"`
+}
+
+func (a APIResponse) Validate() error {
+	if a.Code != "0" {
+		return a.Error()
+	}
+	return nil
+}
+
+func (a APIResponse) Error() error {
+	return fmt.Errorf("retCode: %s, retMsg: %s", a.Code, a.Message)
 }
