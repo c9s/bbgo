@@ -8,14 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_GetMarginRepayHistoryRequest(t *testing.T) {
+func Test_GetMarginLoanHistoryRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
 
 	err := client.SetTimeOffsetFromServer(ctx)
 	assert.NoError(t, err)
 
-	req := client.NewGetMarginRepayHistoryRequest()
+	req := client.NewGetMarginBorrowRepayHistoryRequest()
 	req.Asset("USDT")
 	req.IsolatedSymbol("DOTUSDT")
 	req.StartTime(time.Date(2022, time.February, 1, 0, 0, 0, 0, time.UTC))
