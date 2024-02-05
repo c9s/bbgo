@@ -1,8 +1,6 @@
 package binanceapi
 
 import (
-	"time"
-
 	"github.com/c9s/requestgen"
 )
 
@@ -28,8 +26,6 @@ type TransferAssetRequest struct {
 	transferType TransferAssetType `param:"type"`
 
 	amount string `param:"amount"`
-
-	timestamp time.Time `param:"timestamp,milliseconds,query"`
 
 	fromSymbol *string `param:"fromSymbol"`
 	toSymbol   *string `param:"toSymbol"`
