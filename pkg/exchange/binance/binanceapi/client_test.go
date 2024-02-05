@@ -168,7 +168,6 @@ func TestClient_NewTransferAssetRequest(t *testing.T) {
 	req.FromSymbol("BTCUSDT")
 	req.ToSymbol("BTCUSDT")
 	req.Amount("0.01")
-	req.Timestamp(time.Now())
 	req.TransferType(TransferAssetTypeIsolatedMarginToMain)
 	res, err := req.Do(ctx)
 	assert.NoError(t, err)
