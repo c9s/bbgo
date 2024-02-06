@@ -244,3 +244,19 @@ func TestClient_NewPlaceMarginOrderRequest(t *testing.T) {
 	assert.NotEmpty(t, res)
 	t.Logf("result: %+v", res)
 }
+
+func TestClient_GetDepth(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+
+	err := client.SetTimeOffsetFromServer(ctx)
+	assert.NoError(t, err)
+
+	req := client.NewGetDepthRequest().Symbol("BTCUSDT").Limit(1000)
+	resp, err := req.Do(ctx)
+	if assert.NoError(t, err) {
+		assert.NotNil(t, resp)
+		assert.NotEmpty(t, resp)
+		t.Logf("response: %+v", resp)
+	}
+}
