@@ -39,9 +39,6 @@ type Strategy struct {
 
 func (s *Strategy) Initialize() error {
 	s.Strategy = &common.Strategy{}
-
-	log = log.WithField("symbol", s.Symbol)
-
 	return nil
 }
 
@@ -123,7 +120,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		position := s.Strategy.OrderExecutor.Position()
 		log.Infof("position: %+v", position)
 		if !position.IsDust() {
-			log.Infof("position is not dust")
+			log.Infof("%s position is not dust", s.Symbol)
 
 			side := types.SideTypeSell
 			takerPrice := fixedpoint.Zero
@@ -150,7 +147,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			log.Infof("SUBMIT TAKER ORDER: %+v", orderForms)
 
 			if _, err := s.Strategy.OrderExecutor.SubmitOrders(ctx, orderForms...); err != nil {
-				log.WithError(err).Error("unable to submit orders")
+				log.WithError(err).Errorf("unable to submit orders: %+v", orderForms)
 			}
 
 			return
@@ -184,14 +181,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		}
 
 		if len(orderForms) == 0 {
-			log.Infof("no order to place")
+			log.Infof("no %s order to place", s.Symbol)
 			return
 		}
 
-		log.Infof("bid/ask: %f/%f", bidPrice.Float64(), askPrice.Float64())
+		log.Infof("%s bid/ask: %f/%f", s.Symbol, bidPrice.Float64(), askPrice.Float64())
 
 		if _, err := s.Strategy.OrderExecutor.SubmitOrders(ctx, orderForms...); err != nil {
-			log.WithError(err).Error("unable to submit orders")
+			log.WithError(err).Errorf("unable to submit orders: %+v", orderForms)
 		}
 	}))
 
