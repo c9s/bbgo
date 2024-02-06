@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/sirupsen/logrus"
 )
 
 const ID = "atrpin"
+
+var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -38,6 +39,9 @@ type Strategy struct {
 
 func (s *Strategy) Initialize() error {
 	s.Strategy = &common.Strategy{}
+
+	log = log.WithField("symbol", s.Symbol)
+
 	return nil
 }
 
@@ -117,8 +121,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		var orderForms []types.SubmitOrder
 
 		position := s.Strategy.OrderExecutor.Position()
+		log.Infof("position: %+v", position)
 		if !position.IsDust() {
-			log.Infof("position: %+v", position)
+			log.Infof("position is not dust")
 
 			side := types.SideTypeSell
 			takerPrice := fixedpoint.Zero
