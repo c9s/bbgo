@@ -12,6 +12,7 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/valyala/fastjson"
 
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -26,6 +27,7 @@ const (
 	EventTypeExecutionReport         EventType = "executionReport"
 	EventTypeDepthUpdate             EventType = "depthUpdate"
 	EventTypeListenKeyExpired        EventType = "listenKeyExpired"
+	EventTypeTrade                   EventType = "trade"
 
 	// Our side defines the following event types since binance doesn't
 	// define the event name from the server messages.
@@ -333,15 +335,6 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 	}
 
 	switch eventType {
-	case EventTypeKLine:
-		var event KLineEvent
-		err := json.Unmarshal(message, &event)
-		return &event, err
-	case EventTypeBookTicker:
-		var event BookTickerEvent
-		err := json.Unmarshal([]byte(message), &event)
-		event.Event = eventType
-		return &event, err
 
 	case EventTypeOutboundAccountPosition:
 		var event OutboundAccountPositionEvent
@@ -366,13 +359,35 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 	case EventTypeDepthUpdate:
 		return parseDepthEvent(val)
 
-	case EventTypeListenKeyExpired:
-		var event ListenKeyExpired
+	case EventTypeTrade:
+		var event MarketTradeEvent
 		err = json.Unmarshal(message, &event)
 		return &event, err
 
-	case "trade":
-		var event MarketTradeEvent
+	case EventTypeBookTicker:
+		var event BookTickerEvent
+		err := json.Unmarshal(message, &event)
+		event.Event = eventType
+		return &event, err
+
+	case EventTypePartialDepth:
+		var depth binanceapi.Depth
+		err := json.Unmarshal(message, &depth)
+		return &PartialDepthEvent{
+			EventBase: EventBase{
+				Event: EventTypePartialDepth,
+				Time:  types.MillisecondTimestamp(time.Now()),
+			},
+			Depth: depth,
+		}, err
+
+	case EventTypeKLine:
+		var event KLineEvent
+		err := json.Unmarshal(message, &event)
+		return &event, err
+
+	case EventTypeListenKeyExpired:
+		var event ListenKeyExpired
 		err = json.Unmarshal(message, &event)
 		return &event, err
 
@@ -380,6 +395,7 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		var event AggTradeEvent
 		err = json.Unmarshal(message, &event)
 		return &event, err
+
 	case "forceOrder":
 		var event ForceOrderEvent
 		err = json.Unmarshal(message, &event)
@@ -1109,6 +1125,12 @@ type AccountConfigUpdateEvent struct {
 	MarginModeConfig struct {
 		MultiAssetsMode bool `json:"j"`
 	} `json:"ai"`
+}
+
+type PartialDepthEvent struct {
+	EventBase
+
+	binanceapi.Depth
 }
 
 type BookTickerEvent struct {
