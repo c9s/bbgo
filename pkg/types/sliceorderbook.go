@@ -136,7 +136,7 @@ func (b *SliceOrderBook) updateBids(pvs PriceVolumeSlice) {
 func (b *SliceOrderBook) update(book SliceOrderBook) {
 	b.updateBids(book.Bids)
 	b.updateAsks(book.Asks)
-	b.lastUpdateTime = time.Now()
+	b.lastUpdateTime = defaultTime(book.Time, time.Now)
 }
 
 func (b *SliceOrderBook) Reset() {
