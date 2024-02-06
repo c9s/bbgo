@@ -305,12 +305,6 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		return nil, err
 	}
 
-	// res, err := json.MarshalIndent(message, "", "  ")
-	// if err != nil {
-	//	log.Fatal(err)
-	// }
-	// str := strings.ReplaceAll(string(res), "\\", "")
-	// fmt.Println(str)
 	eventType := string(val.GetStringBytes("e"))
 	if eventType == "" && IsBookTicker(val) {
 		eventType = "bookTicker"
