@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
@@ -168,7 +169,6 @@ func TestClient_NewTransferAssetRequest(t *testing.T) {
 	req.FromSymbol("BTCUSDT")
 	req.ToSymbol("BTCUSDT")
 	req.Amount("0.01")
-	req.Timestamp(time.Now())
 	req.TransferType(TransferAssetTypeIsolatedMarginToMain)
 	res, err := req.Do(ctx)
 	assert.NoError(t, err)
@@ -192,6 +192,53 @@ func TestClient_GetMarginBorrowRepayHistoryRequest(t *testing.T) {
 	req.Asset("BTC")
 	req.SetBorrowRepayType(BorrowRepayTypeBorrow)
 	res, err := req.Do(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.NotEmpty(t, res)
+	t.Logf("result: %+v", res)
+}
+
+func TestClient_NewPlaceMarginOrderRequest(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+
+	err := client.SetTimeOffsetFromServer(ctx)
+	assert.NoError(t, err)
+
+	res, err := client.NewPlaceMarginOrderRequest().
+		Asset("USDT").
+		Amount(fixedpoint.NewFromFloat(5)).
+		IsIsolated(true).
+		Symbol("BNBUSDT").
+		SetBorrowRepayType(BorrowRepayTypeBorrow).
+		Do(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.NotEmpty(t, res)
+	t.Logf("result: %+v", res)
+
+	<-time.After(time.Second)
+	end := time.Now()
+	start := end.Add(-24 * time.Hour * 30)
+	histories, err := client.NewGetMarginBorrowRepayHistoryRequest().
+		StartTime(start).
+		EndTime(end).
+		Asset("BNB").
+		IsolatedSymbol("BNBUSDT").
+		SetBorrowRepayType(BorrowRepayTypeBorrow).
+		Do(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, histories)
+	assert.NotEmpty(t, histories)
+	t.Logf("result: %+v", histories)
+
+	res, err = client.NewPlaceMarginOrderRequest().
+		Asset("USDT").
+		Amount(fixedpoint.NewFromFloat(5)).
+		IsIsolated(true).
+		Symbol("BNBUSDT").
+		SetBorrowRepayType(BorrowRepayTypeRepay).
+		Do(ctx)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 	assert.NotEmpty(t, res)

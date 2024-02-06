@@ -9,14 +9,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
-	"strconv"
-	"time"
 )
-
-func (t *TransferAssetRequest) Timestamp(timestamp time.Time) *TransferAssetRequest {
-	t.timestamp = timestamp
-	return t
-}
 
 func (t *TransferAssetRequest) Asset(asset string) *TransferAssetRequest {
 	t.asset = asset
@@ -46,12 +39,6 @@ func (t *TransferAssetRequest) ToSymbol(toSymbol string) *TransferAssetRequest {
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (t *TransferAssetRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
-	// check timestamp field -> json key timestamp
-	timestamp := t.timestamp
-
-	// assign parameter of timestamp
-	// convert time.Time to milliseconds time stamp
-	params["timestamp"] = strconv.FormatInt(timestamp.UnixNano()/int64(time.Millisecond), 10)
 
 	query := url.Values{}
 	for _k, _v := range params {
@@ -201,10 +188,7 @@ func (t *TransferAssetRequest) Do(ctx context.Context) (*TransferResponse, error
 	if err != nil {
 		return nil, err
 	}
-	query, err := t.GetQueryParameters()
-	if err != nil {
-		return nil, err
-	}
+	query := url.Values{}
 
 	var apiURL string
 
