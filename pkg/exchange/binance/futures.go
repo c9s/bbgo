@@ -15,7 +15,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (e *Exchange) queryFuturesClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+func (e *Exchange) queryFuturesClosedOrders(
+	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
+) (orders []types.Order, err error) {
 	req := e.futuresClient.NewListOrdersService().Symbol(symbol)
 
 	if lastOrderID > 0 {
@@ -34,7 +36,9 @@ func (e *Exchange) queryFuturesClosedOrders(ctx context.Context, symbol string, 
 	return toGlobalFuturesOrders(binanceOrders, false)
 }
 
-func (e *Exchange) TransferFuturesAccountAsset(ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection) error {
+func (e *Exchange) TransferFuturesAccountAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
+) error {
 	req := e.client2.NewFuturesTransferRequest()
 	req.Asset(asset)
 	req.Amount(amount.String())
@@ -63,7 +67,7 @@ func (e *Exchange) TransferFuturesAccountAsset(ctx context.Context, asset string
 // Balance.Available = Wallet Balance(in Binance UI) - Used Margin
 // Balance.Locked = Used Margin
 func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, error) {
-	//account, err := e.futuresClient.NewGetAccountService().Do(ctx)
+	// account, err := e.futuresClient.NewGetAccountService().Do(ctx)
 	reqAccount := e.futuresClient2.NewFuturesGetAccountRequest()
 	account, err := reqAccount.Do(ctx)
 	if err != nil {
@@ -218,7 +222,9 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	return createdOrder, err
 }
 
-func (e *Exchange) QueryFuturesKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryFuturesKLines(
+	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
+) ([]types.KLine, error) {
 
 	var limit = 1000
 	if options.Limit > 0 {
@@ -272,7 +278,9 @@ func (e *Exchange) QueryFuturesKLines(ctx context.Context, symbol string, interv
 	return kLines, nil
 }
 
-func (e *Exchange) queryFuturesTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) queryFuturesTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (trades []types.Trade, err error) {
 
 	var remoteTrades []*futures.AccountTrade
 	req := e.futuresClient.NewListAccountTradeService().
@@ -376,7 +384,7 @@ func (e *Exchange) queryFuturesDepth(ctx context.Context, symbol string) (snapsh
 		Asks:         res.Asks,
 	}
 
-	return convertDepth(snapshot, symbol, finalUpdateID, response)
+	return convertDepthLegacy(snapshot, symbol, finalUpdateID, response)
 }
 
 func (e *Exchange) GetFuturesClient() *binanceapi.FuturesRestClient {
@@ -386,7 +394,9 @@ func (e *Exchange) GetFuturesClient() *binanceapi.FuturesRestClient {
 // QueryFuturesIncomeHistory queries the income history on the binance futures account
 // This is more binance futures specific API, the convert function is not designed yet.
 // TODO: consider other futures platforms and design the common data structure for this
-func (e *Exchange) QueryFuturesIncomeHistory(ctx context.Context, symbol string, incomeType binanceapi.FuturesIncomeType, startTime, endTime *time.Time) ([]binanceapi.FuturesIncome, error) {
+func (e *Exchange) QueryFuturesIncomeHistory(
+	ctx context.Context, symbol string, incomeType binanceapi.FuturesIncomeType, startTime, endTime *time.Time,
+) ([]binanceapi.FuturesIncome, error) {
 	req := e.futuresClient2.NewFuturesGetIncomeHistoryRequest()
 	req.Symbol(symbol)
 	req.IncomeType(incomeType)
