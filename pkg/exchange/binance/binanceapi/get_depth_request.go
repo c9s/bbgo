@@ -14,7 +14,7 @@ type Depth struct {
 
 //go:generate requestgen -method GET -url "/api/v3/depth" -type GetDepthRequest -responseType .Depth
 type GetDepthRequest struct {
-	client requestgen.AuthenticatedAPIClient
+	client requestgen.APIClient
 
 	symbol string `param:"symbol"`
 	limit  int    `param:"limit" defaultValue:"1000"`

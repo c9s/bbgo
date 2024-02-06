@@ -148,7 +148,7 @@ func (g *GetDepthRequest) Do(ctx context.Context) (*Depth, error) {
 
 	apiURL = g.GetPath()
 
-	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
+	req, err := g.client.NewRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}
