@@ -331,7 +331,7 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 func (e *Exchange) borrowRepayAsset(ctx context.Context, asset string, amount fixedpoint.Value, marginType binanceapi.BorrowRepayType) error {
 	req := e.client2.NewPlaceMarginOrderRequest()
 	req.Asset(asset)
-	req.Amount(amount.String())
+	req.Amount(amount)
 	req.SetBorrowRepayType(marginType)
 	if e.IsIsolatedMargin {
 		req.IsIsolated(e.IsIsolatedMargin)

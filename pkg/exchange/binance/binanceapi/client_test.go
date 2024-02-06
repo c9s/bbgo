@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
@@ -206,7 +207,7 @@ func TestClient_NewPlaceMarginOrderRequest(t *testing.T) {
 
 	res, err := client.NewPlaceMarginOrderRequest().
 		Asset("USDT").
-		Amount("5").
+		Amount(fixedpoint.NewFromFloat(5)).
 		IsIsolated(true).
 		Symbol("BNBUSDT").
 		SetBorrowRepayType(BorrowRepayTypeBorrow).
@@ -233,7 +234,7 @@ func TestClient_NewPlaceMarginOrderRequest(t *testing.T) {
 
 	res, err = client.NewPlaceMarginOrderRequest().
 		Asset("USDT").
-		Amount("5").
+		Amount(fixedpoint.NewFromFloat(5)).
 		IsIsolated(true).
 		Symbol("BNBUSDT").
 		SetBorrowRepayType(BorrowRepayTypeRepay).
