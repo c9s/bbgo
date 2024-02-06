@@ -327,9 +327,9 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 
 	eventType := string(val.GetStringBytes("e"))
 	if eventType == "" {
-		if IsBookTicker(val) {
+		if isBookTicker(val) {
 			eventType = EventTypeBookTicker
-		} else if IsPartialDepth(val) {
+		} else if isPartialDepth(val) {
 			eventType = EventTypePartialDepth
 		}
 	}
@@ -451,15 +451,15 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 	return nil, fmt.Errorf("unsupported binance websocket message: %s", message)
 }
 
-// IsBookTicker document ref :https://binance-docs.github.io/apidocs/spot/en/#individual-symbol-book-ticker-streams
+// isBookTicker document ref :https://binance-docs.github.io/apidocs/spot/en/#individual-symbol-book-ticker-streams
 // use key recognition because there's no identification in the content.
-func IsBookTicker(val *fastjson.Value) bool {
+func isBookTicker(val *fastjson.Value) bool {
 	return val.Exists("u") && val.Exists("s") &&
 		val.Exists("b") && val.Exists("B") &&
 		val.Exists("a") && val.Exists("A")
 }
 
-func IsPartialDepth(val *fastjson.Value) bool {
+func isPartialDepth(val *fastjson.Value) bool {
 	return val.Exists("lastUpdateId") &&
 		val.Exists("bids") && val.Exists("bids")
 }
@@ -1127,25 +1127,47 @@ type AccountConfigUpdateEvent struct {
 	} `json:"ai"`
 }
 
+/*
+	{
+	  "lastUpdateId": 160,  // Last update ID
+	  "bids": [             // Bids to be updated
+	    [
+	      "0.0024",         // Price level to be updated
+	      "10"              // Quantity
+	    ]
+	  ],
+	  "asks": [             // Asks to be updated
+	    [
+	      "0.0026",         // Price level to be updated
+	      "100"             // Quantity
+	    ]
+	  ]
+	}
+*/
 type PartialDepthEvent struct {
 	EventBase
 
 	binanceapi.Depth
 }
 
+/*
+	{
+	  "u":400900217,     // order book updateId
+	  "s":"BNBUSDT",     // symbol
+	  "b":"25.35190000", // best bid price
+	  "B":"31.21000000", // best bid qty
+	  "a":"25.36520000", // best ask price
+	  "A":"40.66000000"  // best ask qty
+	}
+*/
 type BookTickerEvent struct {
 	EventBase
+	UpdateID int64            `json:"u"`
 	Symbol   string           `json:"s"`
 	Buy      fixedpoint.Value `json:"b"`
 	BuySize  fixedpoint.Value `json:"B"`
 	Sell     fixedpoint.Value `json:"a"`
 	SellSize fixedpoint.Value `json:"A"`
-	// "u":400900217,     // order book updateId
-	// "s":"BNBUSDT",     // symbol
-	// "b":"25.35190000", // best bid price
-	// "B":"31.21000000", // best bid qty
-	// "a":"25.36520000", // best ask price
-	// "A":"40.66000000"  // best ask qty
 }
 
 func (k *BookTickerEvent) BookTicker() types.BookTicker {
