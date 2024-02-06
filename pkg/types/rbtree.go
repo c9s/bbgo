@@ -437,33 +437,24 @@ func (tree *RBTree) PostorderOf(current *RBNode, cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) CopyInorderReverse(limit int) *RBTree {
-	cnt := 0
 	newTree := NewRBTree()
-	tree.InorderReverse(func(n *RBNode) bool {
-		if cnt >= limit {
-			return false
-		}
+	if limit == 0 {
+		tree.InorderReverse(copyNodeFast(newTree))
+		return newTree
+	}
 
-		newTree.Insert(n.key, n.value)
-		cnt++
-		return true
-	})
+	tree.InorderReverse(copyNodeLimit(newTree, limit))
 	return newTree
 }
 
 func (tree *RBTree) CopyInorder(limit int) *RBTree {
-	cnt := 0
 	newTree := NewRBTree()
-	tree.Inorder(func(n *RBNode) bool {
-		if limit > 0 && cnt >= limit {
-			return false
-		}
+	if limit == 0 {
+		tree.Inorder(copyNodeFast(newTree))
+		return newTree
+	}
 
-		newTree.Insert(n.key, n.value)
-		cnt++
-		return true
-	})
-
+	tree.Inorder(copyNodeLimit(newTree, limit))
 	return newTree
 }
 
@@ -472,4 +463,24 @@ func (tree *RBTree) Print() {
 		fmt.Printf("%v -> %v\n", n.key, n.value)
 		return true
 	})
+}
+
+func copyNodeFast(newTree *RBTree) func(n *RBNode) bool {
+	return func(n *RBNode) bool {
+		newTree.Insert(n.key, n.value)
+		return true
+	}
+}
+
+func copyNodeLimit(newTree *RBTree, limit int) func(n *RBNode) bool {
+	cnt := 0
+	return func(n *RBNode) bool {
+		if limit > 0 && cnt >= limit {
+			return false
+		}
+
+		newTree.Insert(n.key, n.value)
+		cnt++
+		return true
+	}
 }
