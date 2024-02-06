@@ -1346,15 +1346,32 @@ func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot type
 		return e.queryFuturesDepth(ctx, symbol)
 	}
 
-	response, err := e.client.NewDepthService().Symbol(symbol).Limit(DefaultDepthLimit).Do(ctx)
+	response, err := e.client2.NewGetDepthRequest().Symbol(symbol).Limit(DefaultDepthLimit).Do(ctx)
 	if err != nil {
 		return snapshot, finalUpdateID, err
 	}
 
-	return convertDepth(snapshot, symbol, finalUpdateID, response)
+	return convertDepth(symbol, response)
 }
 
-func convertDepth(
+func convertDepth(symbol string, response *binanceapi.Depth) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	snapshot.Symbol = symbol
+	// empty time since the API does not provide time information.
+	snapshot.Time = time.Time{}
+
+	finalUpdateID = response.LastUpdateId
+	for _, entry := range response.Bids {
+		snapshot.Bids = append(snapshot.Bids, types.PriceVolume{Price: entry[0], Volume: entry[1]})
+	}
+
+	for _, entry := range response.Asks {
+		snapshot.Asks = append(snapshot.Asks, types.PriceVolume{Price: entry[0], Volume: entry[1]})
+	}
+
+	return snapshot, finalUpdateID, err
+}
+
+func convertDepthLegacy(
 	snapshot types.SliceOrderBook, symbol string, finalUpdateID int64, response *binance.DepthResponse,
 ) (types.SliceOrderBook, int64, error) {
 	snapshot.Symbol = symbol
