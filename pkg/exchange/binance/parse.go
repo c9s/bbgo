@@ -28,6 +28,8 @@ const (
 	EventTypeDepthUpdate             EventType = "depthUpdate"
 	EventTypeListenKeyExpired        EventType = "listenKeyExpired"
 	EventTypeTrade                   EventType = "trade"
+	EventTypeAggTrade                EventType = "aggTrade"
+	EventTypeForceOrder              EventType = "forceOrder"
 
 	// Our side defines the following event types since binance doesn't
 	// define the event name from the server messages.
@@ -391,12 +393,12 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		err = json.Unmarshal(message, &event)
 		return &event, err
 
-	case "aggTrade":
+	case EventTypeAggTrade:
 		var event AggTradeEvent
 		err = json.Unmarshal(message, &event)
 		return &event, err
 
-	case "forceOrder":
+	case EventTypeForceOrder:
 		var event ForceOrderEvent
 		err = json.Unmarshal(message, &event)
 		return &event, err
