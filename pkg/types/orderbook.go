@@ -122,16 +122,16 @@ func (b *MutexOrderBook) Update(update SliceOrderBook) {
 	b.Unlock()
 }
 
-type BookSignalType string
+type BookSignalType int
 
 const (
-	BookSignalSnapshot BookSignalType = "snapshot"
-	BookSignalUpdate   BookSignalType = "update"
+	BookSignalSnapshot BookSignalType = 1
+	BookSignalUpdate   BookSignalType = 2
 )
 
 type BookSignal struct {
 	Type BookSignalType
-	Book SliceOrderBook
+	Time time.Time
 }
 
 // StreamOrderBook receives streaming data from websocket connection and
@@ -141,7 +141,7 @@ type BookSignal struct {
 type StreamOrderBook struct {
 	*MutexOrderBook
 
-	C chan BookSignal
+	C chan *BookSignal
 
 	updateCallbacks   []func(update SliceOrderBook)
 	snapshotCallbacks []func(snapshot SliceOrderBook)
@@ -150,7 +150,7 @@ type StreamOrderBook struct {
 func NewStreamBook(symbol string) *StreamOrderBook {
 	return &StreamOrderBook{
 		MutexOrderBook: NewMutexOrderBook(symbol),
-		C:              make(chan BookSignal, 1),
+		C:              make(chan *BookSignal, 1),
 	}
 }
 
@@ -162,9 +162,7 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 
 		sb.Load(book)
 		sb.EmitSnapshot(book)
-
-		// when it's snapshot, it's very important to push the snapshot signal to the caller
-		sb.C <- BookSignal{Type: BookSignalSnapshot, Book: book}
+		sb.emitChange(BookSignalSnapshot, book.Time)
 	})
 
 	stream.OnBookUpdate(func(book SliceOrderBook) {
@@ -174,10 +172,21 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 
 		sb.Update(book)
 		sb.EmitUpdate(book)
-
-		select {
-		case sb.C <- BookSignal{Type: BookSignalUpdate, Book: book}:
-		default:
-		}
+		sb.emitChange(BookSignalUpdate, book.Time)
 	})
+}
+
+func (sb *StreamOrderBook) emitChange(signalType BookSignalType, bookTime time.Time) {
+	select {
+	case sb.C <- &BookSignal{Type: signalType, Time: defaultTime(bookTime, time.Now)}:
+	default:
+	}
+}
+
+func defaultTime(a time.Time, b func() time.Time) time.Time {
+	if a.IsZero() {
+		return b()
+	}
+
+	return a
 }
