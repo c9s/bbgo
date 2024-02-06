@@ -119,19 +119,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		position := s.Strategy.OrderExecutor.Position()
 		log.Infof("position: %+v", position)
-		if !position.IsDust() {
+
+		side := types.SideTypeBuy
+		takerPrice := ticker.Sell
+		if position.IsLong() {
+			side = types.SideTypeSell
+			takerPrice = ticker.Buy
+		}
+
+		if !position.IsDust(takerPrice) {
 			log.Infof("%s position is not dust", s.Symbol)
-
-			side := types.SideTypeSell
-			takerPrice := fixedpoint.Zero
-
-			if position.IsShort() {
-				side = types.SideTypeBuy
-				takerPrice = ticker.Sell
-			} else if position.IsLong() {
-				side = types.SideTypeSell
-				takerPrice = ticker.Buy
-			}
 
 			orderForms = append(orderForms, types.SubmitOrder{
 				Symbol:      s.Symbol,
