@@ -16,6 +16,24 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type EventType = string
+
+const (
+	EventTypeKLine                   EventType = "kline"
+	EventTypeOutboundAccountPosition EventType = "outboundAccountPosition"
+	EventTypeOutboundAccountInfo     EventType = "outboundAccountInfo"
+	EventTypeBalanceUpdate           EventType = "balanceUpdate"
+	EventTypeExecutionReport         EventType = "executionReport"
+	EventTypeDepthUpdate             EventType = "depthUpdate"
+	EventTypeListenKeyExpired        EventType = "listenKeyExpired"
+
+	// Our side defines the following event types since binance doesn't
+	// define the event name from the server messages.
+	//
+	EventTypeBookTicker   EventType = "bookTicker"
+	EventTypePartialDepth EventType = "partialDepth"
+)
+
 type EventBase struct {
 	Event string                     `json:"e"` // event name
 	Time  types.MillisecondTimestamp `json:"E"` // event time
@@ -306,65 +324,69 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 	}
 
 	eventType := string(val.GetStringBytes("e"))
-	if eventType == "" && IsBookTicker(val) {
-		eventType = "bookTicker"
+	if eventType == "" {
+		if IsBookTicker(val) {
+			eventType = EventTypeBookTicker
+		} else if IsPartialDepth(val) {
+			eventType = EventTypePartialDepth
+		}
 	}
 
 	switch eventType {
-	case "kline":
+	case EventTypeKLine:
 		var event KLineEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err := json.Unmarshal(message, &event)
 		return &event, err
-	case "bookTicker":
+	case EventTypeBookTicker:
 		var event BookTickerEvent
 		err := json.Unmarshal([]byte(message), &event)
 		event.Event = eventType
 		return &event, err
 
-	case "outboundAccountPosition":
+	case EventTypeOutboundAccountPosition:
 		var event OutboundAccountPositionEvent
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 
-	case "outboundAccountInfo":
+	case EventTypeOutboundAccountInfo:
 		var event OutboundAccountInfoEvent
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 
-	case "balanceUpdate":
+	case EventTypeBalanceUpdate:
 		var event BalanceUpdateEvent
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 
-	case "executionReport":
+	case EventTypeExecutionReport:
 		var event ExecutionReportEvent
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 
-	case "depthUpdate":
+	case EventTypeDepthUpdate:
 		return parseDepthEvent(val)
 
-	case "listenKeyExpired":
+	case EventTypeListenKeyExpired:
 		var event ListenKeyExpired
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 
 	case "trade":
 		var event MarketTradeEvent
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 
 	case "aggTrade":
 		var event AggTradeEvent
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 	case "forceOrder":
 		var event ForceOrderEvent
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 	}
 
-	// futures stream
+	// events for futures
 	switch eventType {
 
 	// futures market data stream
@@ -419,6 +441,11 @@ func IsBookTicker(val *fastjson.Value) bool {
 	return !val.Exists("e") && val.Exists("u") &&
 		val.Exists("s") && val.Exists("b") &&
 		val.Exists("B") && val.Exists("a") && val.Exists("A")
+}
+
+func IsPartialDepth(val *fastjson.Value) bool {
+	return val.Exists("lastUpdateId") &&
+		val.Exists("bids") && val.Exists("bids")
 }
 
 type DepthEntry struct {
