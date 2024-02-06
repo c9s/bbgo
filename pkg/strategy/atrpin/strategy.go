@@ -117,8 +117,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		var orderForms []types.SubmitOrder
 
 		position := s.Strategy.OrderExecutor.Position()
+		log.Infof("position: %+v", position)
 		if !position.IsDust() {
-			log.Infof("position: %+v", position)
+			log.Infof("position is not dust")
 
 			side := types.SideTypeSell
 			takerPrice := fixedpoint.Zero
