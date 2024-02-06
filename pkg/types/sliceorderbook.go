@@ -21,6 +21,11 @@ type SliceOrderBook struct {
 	// Time represents the server time. If empty, it indicates that the server does not provide this information.
 	Time time.Time
 
+	// LastUpdateId is the message id from the server
+	// this field is optional, not every exchange provides this information
+	// this is for binance right now.
+	LastUpdateId int64
+
 	lastUpdateTime time.Time
 
 	loadCallbacks   []func(book *SliceOrderBook)
@@ -136,7 +141,7 @@ func (b *SliceOrderBook) updateBids(pvs PriceVolumeSlice) {
 func (b *SliceOrderBook) update(book SliceOrderBook) {
 	b.updateBids(book.Bids)
 	b.updateAsks(book.Asks)
-	b.lastUpdateTime = time.Now()
+	b.lastUpdateTime = defaultTime(book.Time, time.Now)
 }
 
 func (b *SliceOrderBook) Reset() {

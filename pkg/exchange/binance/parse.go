@@ -12,8 +12,30 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/valyala/fastjson"
 
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+)
+
+type EventType = string
+
+const (
+	EventTypeKLine                   EventType = "kline"
+	EventTypeOutboundAccountPosition EventType = "outboundAccountPosition"
+	EventTypeOutboundAccountInfo     EventType = "outboundAccountInfo"
+	EventTypeBalanceUpdate           EventType = "balanceUpdate"
+	EventTypeExecutionReport         EventType = "executionReport"
+	EventTypeDepthUpdate             EventType = "depthUpdate"
+	EventTypeListenKeyExpired        EventType = "listenKeyExpired"
+	EventTypeTrade                   EventType = "trade"
+	EventTypeAggTrade                EventType = "aggTrade"
+	EventTypeForceOrder              EventType = "forceOrder"
+
+	// Our side defines the following event types since binance doesn't
+	// define the event name from the server messages.
+	//
+	EventTypeBookTicker   EventType = "bookTicker"
+	EventTypePartialDepth EventType = "partialDepth"
 )
 
 type EventBase struct {
@@ -305,72 +327,84 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		return nil, err
 	}
 
-	// res, err := json.MarshalIndent(message, "", "  ")
-	// if err != nil {
-	//	log.Fatal(err)
-	// }
-	// str := strings.ReplaceAll(string(res), "\\", "")
-	// fmt.Println(str)
 	eventType := string(val.GetStringBytes("e"))
-	if eventType == "" && IsBookTicker(val) {
-		eventType = "bookTicker"
+	if eventType == "" {
+		if isBookTicker(val) {
+			eventType = EventTypeBookTicker
+		} else if isPartialDepth(val) {
+			eventType = EventTypePartialDepth
+		}
 	}
 
 	switch eventType {
-	case "kline":
-		var event KLineEvent
-		err := json.Unmarshal([]byte(message), &event)
+
+	case EventTypeOutboundAccountPosition:
+		var event OutboundAccountPositionEvent
+		err = json.Unmarshal(message, &event)
 		return &event, err
-	case "bookTicker":
+
+	case EventTypeOutboundAccountInfo:
+		var event OutboundAccountInfoEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
+
+	case EventTypeBalanceUpdate:
+		var event BalanceUpdateEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
+
+	case EventTypeExecutionReport:
+		var event ExecutionReportEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
+
+	case EventTypeDepthUpdate:
+		return parseDepthEvent(val)
+
+	case EventTypeTrade:
+		var event MarketTradeEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
+
+	case EventTypeBookTicker:
 		var event BookTickerEvent
-		err := json.Unmarshal([]byte(message), &event)
+		err := json.Unmarshal(message, &event)
 		event.Event = eventType
 		return &event, err
 
-	case "outboundAccountPosition":
-		var event OutboundAccountPositionEvent
-		err = json.Unmarshal([]byte(message), &event)
+	case EventTypePartialDepth:
+		var depth binanceapi.Depth
+		err := json.Unmarshal(message, &depth)
+		return &PartialDepthEvent{
+			EventBase: EventBase{
+				Event: EventTypePartialDepth,
+				Time:  types.MillisecondTimestamp(time.Now()),
+			},
+			Depth: depth,
+		}, err
+
+	case EventTypeKLine:
+		var event KLineEvent
+		err := json.Unmarshal(message, &event)
 		return &event, err
 
-	case "outboundAccountInfo":
-		var event OutboundAccountInfoEvent
-		err = json.Unmarshal([]byte(message), &event)
-		return &event, err
-
-	case "balanceUpdate":
-		var event BalanceUpdateEvent
-		err = json.Unmarshal([]byte(message), &event)
-		return &event, err
-
-	case "executionReport":
-		var event ExecutionReportEvent
-		err = json.Unmarshal([]byte(message), &event)
-		return &event, err
-
-	case "depthUpdate":
-		return parseDepthEvent(val)
-
-	case "listenKeyExpired":
+	case EventTypeListenKeyExpired:
 		var event ListenKeyExpired
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 
-	case "trade":
-		var event MarketTradeEvent
-		err = json.Unmarshal([]byte(message), &event)
-		return &event, err
-
-	case "aggTrade":
+	case EventTypeAggTrade:
 		var event AggTradeEvent
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
-	case "forceOrder":
+
+	case EventTypeForceOrder:
 		var event ForceOrderEvent
-		err = json.Unmarshal([]byte(message), &event)
+		err = json.Unmarshal(message, &event)
 		return &event, err
 	}
 
-	// futures stream
+	// events for futures
 	switch eventType {
 
 	// futures market data stream
@@ -419,12 +453,17 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 	return nil, fmt.Errorf("unsupported binance websocket message: %s", message)
 }
 
-// IsBookTicker document ref :https://binance-docs.github.io/apidocs/spot/en/#individual-symbol-book-ticker-streams
-// use key recognition because there's no identify in the content.
-func IsBookTicker(val *fastjson.Value) bool {
-	return !val.Exists("e") && val.Exists("u") &&
-		val.Exists("s") && val.Exists("b") &&
-		val.Exists("B") && val.Exists("a") && val.Exists("A")
+// isBookTicker document ref :https://binance-docs.github.io/apidocs/spot/en/#individual-symbol-book-ticker-streams
+// use key recognition because there's no identification in the content.
+func isBookTicker(val *fastjson.Value) bool {
+	return val.Exists("u") && val.Exists("s") &&
+		val.Exists("b") && val.Exists("B") &&
+		val.Exists("a") && val.Exists("A")
+}
+
+func isPartialDepth(val *fastjson.Value) bool {
+	return val.Exists("lastUpdateId") &&
+		val.Exists("bids") && val.Exists("bids")
 }
 
 type DepthEntry struct {
@@ -1090,19 +1129,47 @@ type AccountConfigUpdateEvent struct {
 	} `json:"ai"`
 }
 
+/*
+	{
+	  "lastUpdateId": 160,  // Last update ID
+	  "bids": [             // Bids to be updated
+	    [
+	      "0.0024",         // Price level to be updated
+	      "10"              // Quantity
+	    ]
+	  ],
+	  "asks": [             // Asks to be updated
+	    [
+	      "0.0026",         // Price level to be updated
+	      "100"             // Quantity
+	    ]
+	  ]
+	}
+*/
+type PartialDepthEvent struct {
+	EventBase
+
+	binanceapi.Depth
+}
+
+/*
+	{
+	  "u":400900217,     // order book updateId
+	  "s":"BNBUSDT",     // symbol
+	  "b":"25.35190000", // best bid price
+	  "B":"31.21000000", // best bid qty
+	  "a":"25.36520000", // best ask price
+	  "A":"40.66000000"  // best ask qty
+	}
+*/
 type BookTickerEvent struct {
 	EventBase
+	UpdateID int64            `json:"u"`
 	Symbol   string           `json:"s"`
 	Buy      fixedpoint.Value `json:"b"`
 	BuySize  fixedpoint.Value `json:"B"`
 	Sell     fixedpoint.Value `json:"a"`
 	SellSize fixedpoint.Value `json:"A"`
-	// "u":400900217,     // order book updateId
-	// "s":"BNBUSDT",     // symbol
-	// "b":"25.35190000", // best bid price
-	// "B":"31.21000000", // best bid qty
-	// "a":"25.36520000", // best ask price
-	// "A":"40.66000000"  // best ask qty
 }
 
 func (k *BookTickerEvent) BookTicker() types.BookTicker {
