@@ -436,11 +436,11 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 }
 
 // IsBookTicker document ref :https://binance-docs.github.io/apidocs/spot/en/#individual-symbol-book-ticker-streams
-// use key recognition because there's no identify in the content.
+// use key recognition because there's no identification in the content.
 func IsBookTicker(val *fastjson.Value) bool {
-	return !val.Exists("e") && val.Exists("u") &&
-		val.Exists("s") && val.Exists("b") &&
-		val.Exists("B") && val.Exists("a") && val.Exists("A")
+	return val.Exists("u") && val.Exists("s") &&
+		val.Exists("b") && val.Exists("B") &&
+		val.Exists("a") && val.Exists("A")
 }
 
 func IsPartialDepth(val *fastjson.Value) bool {
