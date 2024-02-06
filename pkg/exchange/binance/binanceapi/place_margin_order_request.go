@@ -2,6 +2,8 @@ package binanceapi
 
 import (
 	"github.com/c9s/requestgen"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 //go:generate requestgen -method POST -url "/sapi/v1/margin/borrow-repay" -type PlaceMarginOrderRequest -responseType .TransferResponse
@@ -16,7 +18,7 @@ type PlaceMarginOrderRequest struct {
 	// Only for Isolated margin
 	symbol *string `param:"symbol"`
 
-	amount string `param:"amount"`
+	amount fixedpoint.Value `param:"amount"`
 
 	BorrowRepayType BorrowRepayType `param:"type"`
 }

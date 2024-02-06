@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -26,7 +27,7 @@ func (p *PlaceMarginOrderRequest) Symbol(symbol string) *PlaceMarginOrderRequest
 	return p
 }
 
-func (p *PlaceMarginOrderRequest) Amount(amount string) *PlaceMarginOrderRequest {
+func (p *PlaceMarginOrderRequest) Amount(amount fixedpoint.Value) *PlaceMarginOrderRequest {
 	p.amount = amount
 	return p
 }
