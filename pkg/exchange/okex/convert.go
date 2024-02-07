@@ -150,12 +150,9 @@ func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) 
 }
 
 func tradeToGlobal(trade okexapi.Trade) types.Trade {
-	// ** We use the bill id as the trade id, because okx uses billId to perform pagination. **
-	billID := trade.BillId
-
 	side := toGlobalSide(trade.Side)
 	return types.Trade{
-		ID:            uint64(billID),
+		ID:            uint64(trade.TradeId),
 		OrderID:       uint64(trade.OrderId),
 		Exchange:      types.ExchangeOKEx,
 		Price:         trade.FillPrice,
