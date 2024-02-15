@@ -535,6 +535,7 @@ REMARK: If your start time is 90 days earlier, we will update it to now - 90 day
 ** StartTime, EndTime, FromTradeId can be used together. **
 
 If you want to query all trades within a large time range (e.g. total orders > 100), we recommend using batch.TradeBatchQuery.
+We don't support the last trade id as a filter because okx supports bill ID only.
 */
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
 	if symbol == "" {
@@ -544,11 +545,11 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	req := e.client.NewGetTransactionHistoryRequest().InstrumentID(toLocalSymbol(symbol))
 
 	limit := options.Limit
-	req.Limit(uint64(limit))
 	if limit > defaultQueryLimit || limit <= 0 {
 		log.Infof("limit is exceeded default limit %d or zero, got: %d, use default limit", defaultQueryLimit, limit)
-		req.Limit(defaultQueryLimit)
+		limit = defaultQueryLimit
 	}
+	req.Limit(uint64(limit))
 
 	var newStartTime time.Time
 	if options.StartTime != nil {
@@ -569,19 +570,38 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		}
 		req.EndTime(options.EndTime.UTC())
 	}
-	req.Before(strconv.FormatUint(options.LastTradeID, 10))
 
-	if err := queryTradeLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("query trades rate limiter wait error: %w", err)
+	if options.LastTradeID != 0 {
+		// we don't support the last trade id as a filter because okx supports bill ID only.
+		// we don't have any more fields (types.Trade) to store it.
+		log.Infof("Last trade id not supported on QueryTrades")
 	}
 
-	response, err := req.Do(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query trades, err: %w", err)
-	}
+	for {
+		if err := queryTradeLimiter.Wait(ctx); err != nil {
+			return nil, fmt.Errorf("query trades rate limiter wait error: %w", err)
+		}
 
-	for _, trade := range response {
-		trades = append(trades, tradeToGlobal(trade))
+		response, err := req.Do(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query trades, err: %w", err)
+		}
+
+		for _, trade := range response {
+			trades = append(trades, tradeToGlobal(trade))
+		}
+
+		tradeLen := int64(len(response))
+		// a defensive programming to ensure the length of order response is expected.
+		if tradeLen > limit {
+			return nil, fmt.Errorf("unexpected trade length %d", tradeLen)
+		}
+
+		if tradeLen < limit {
+			break
+		}
+		// use Before filter to get all data.
+		req.Before(response[tradeLen-1].BillId.String())
 	}
 
 	return trades, nil

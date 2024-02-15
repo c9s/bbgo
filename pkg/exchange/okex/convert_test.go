@@ -115,7 +115,7 @@ func Test_tradeToGlobal(t *testing.T) {
 
 	t.Run("succeeds with sell/taker", func(t *testing.T) {
 		assert.Equal(tradeToGlobal(res), types.Trade{
-			ID:            uint64(665951654138736652),
+			ID:            uint64(724072849),
 			OrderID:       uint64(665951654130348158),
 			Exchange:      types.ExchangeOKEx,
 			Price:         fixedpoint.NewFromFloat(46446.4),
@@ -135,7 +135,7 @@ func Test_tradeToGlobal(t *testing.T) {
 		newRes := res
 		newRes.Side = okexapi.SideTypeBuy
 		assert.Equal(tradeToGlobal(newRes), types.Trade{
-			ID:            uint64(665951654138736652),
+			ID:            uint64(724072849),
 			OrderID:       uint64(665951654130348158),
 			Exchange:      types.ExchangeOKEx,
 			Price:         fixedpoint.NewFromFloat(46446.4),
@@ -155,7 +155,7 @@ func Test_tradeToGlobal(t *testing.T) {
 		newRes := res
 		newRes.ExecutionType = okexapi.LiquidityTypeMaker
 		assert.Equal(tradeToGlobal(newRes), types.Trade{
-			ID:            uint64(665951654138736652),
+			ID:            uint64(724072849),
 			OrderID:       uint64(665951654130348158),
 			Exchange:      types.ExchangeOKEx,
 			Price:         fixedpoint.NewFromFloat(46446.4),
@@ -176,7 +176,7 @@ func Test_tradeToGlobal(t *testing.T) {
 		newRes.Side = okexapi.SideTypeBuy
 		newRes.ExecutionType = okexapi.LiquidityTypeMaker
 		assert.Equal(tradeToGlobal(newRes), types.Trade{
-			ID:            uint64(665951654138736652),
+			ID:            uint64(724072849),
 			OrderID:       uint64(665951654130348158),
 			Exchange:      types.ExchangeOKEx,
 			Price:         fixedpoint.NewFromFloat(46446.4),
