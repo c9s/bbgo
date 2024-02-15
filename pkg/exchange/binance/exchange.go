@@ -387,17 +387,17 @@ func (e *Exchange) TransferMarginAccountAsset(
 func (e *Exchange) transferIsolatedMarginAccountAsset(
 	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
 ) error {
-	req := e.client2.NewTransferAssetRequest()
-	req.Asset(asset)
-	req.FromSymbol(e.IsolatedMarginSymbol)
-	req.ToSymbol(e.IsolatedMarginSymbol)
+	req := e.client2.NewTransferIsolatedMarginAccountRequest()
+	req.Symbol(e.IsolatedMarginSymbol)
 
 	switch io {
 	case types.TransferIn:
-		req.TransferType(binanceapi.TransferAssetTypeMainToIsolatedMargin)
+		req.TransFrom(binanceapi.AccountTypeSpot)
+		req.TransTo(binanceapi.AccountTypeIsolatedMargin)
 
 	case types.TransferOut:
-		req.TransferType(binanceapi.TransferAssetTypeIsolatedMarginToMain)
+		req.TransFrom(binanceapi.AccountTypeIsolatedMargin)
+		req.TransTo(binanceapi.AccountTypeSpot)
 	}
 
 	req.Asset(asset)
@@ -410,14 +410,14 @@ func (e *Exchange) transferIsolatedMarginAccountAsset(
 func (e *Exchange) transferCrossMarginAccountAsset(
 	ctx context.Context, asset string, amount fixedpoint.Value, io types.TransferDirection,
 ) error {
-	req := e.client2.NewTransferAssetRequest()
+	req := e.client2.NewTransferCrossMarginAccountRequest()
 	req.Asset(asset)
 	req.Amount(amount.String())
 
 	if io == types.TransferIn {
-		req.TransferType(binanceapi.TransferAssetTypeMainToMargin)
+		req.TransferType(int(binance.MarginTransferTypeToMargin))
 	} else if io == types.TransferOut {
-		req.TransferType(binanceapi.TransferAssetTypeMarginToMain)
+		req.TransferType(int(binance.MarginTransferTypeToMain))
 	} else {
 		return fmt.Errorf("unexpected transfer direction: %d given", io)
 	}

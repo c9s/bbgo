@@ -157,26 +157,6 @@ func TestClient_setTimeOffsetFromServer(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestClient_NewTransferAssetRequest(t *testing.T) {
-	client := getTestClientOrSkip(t)
-	ctx := context.Background()
-
-	err := client.SetTimeOffsetFromServer(ctx)
-	assert.NoError(t, err)
-
-	req := client.NewTransferAssetRequest()
-	req.Asset("BTC")
-	req.FromSymbol("BTCUSDT")
-	req.ToSymbol("BTCUSDT")
-	req.Amount("0.01")
-	req.TransferType(TransferAssetTypeIsolatedMarginToMain)
-	res, err := req.Do(ctx)
-	assert.NoError(t, err)
-	assert.NotNil(t, res)
-	assert.NotEmpty(t, res)
-	t.Logf("result: %+v", res)
-}
-
 func TestClient_GetMarginBorrowRepayHistoryRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
