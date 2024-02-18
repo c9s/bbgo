@@ -44,7 +44,7 @@ lastClosedPrice := closePrices.Last(0)
 secondClosedPrice := closePrices.Last(1)
 ```
 
-To create a EMA indicator instance, again, simply pass the closePrice indicator to the SMA stream constructor:
+To create an EMA indicator instance, again, simply pass the closePrice indicator to the SMA stream constructor:
 
 ```go
 ema := indicatorv2.EMA(closePrices, 17)
@@ -70,7 +70,33 @@ returns a float64 number as output.
 [input float64] -> [Calculate] -> [output float64]
 ```
 
-Since it is a float64 value indicator, we will use `*types.Float64Series` here to store our values:
+Since it will be a float64 value indicator, we will use `*types.Float64Series` here to store our values,
+`types.Float64Series` is a struct that contains a slice to store the float64 values, it is implemented as follows:
+
+```go
+type Float64Series struct {
+	SeriesBase
+	Float64Updater
+	Slice floats.Slice
+}
+```
+
+The `Slice` field is a []float64 slice,
+which provides some helper methods that helps you do some calculation on the float64 slice.
+
+And Float64Updater provides a way to let indicators subscribe to the updated value:
+
+```go
+u := Float64Updater{}
+u.OnUpdate(func(v float64) { ... })
+u.OnUpdate(func(v float64) { ... })
+
+// to emit the callbacks
+u.EmitUpdate(10.0)
+```
+
+Now you have a basic concept about the Float64Series, 
+we can now start to implement our first indicator structure:
 
 ```go
 package indicatorv2
@@ -84,6 +110,8 @@ type EWMAStream struct {
 	multiplier float64
 }
 ```
+
+Again, since it is a float64 value indicator, we use `*types.Float64Series` here to store our values.
 
 And then, add the constructor of the indicator stream:
 
