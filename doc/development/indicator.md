@@ -50,11 +50,31 @@ To create an EMA indicator instance, again, simply pass the closePrice indicator
 ema := indicatorv2.EMA(closePrices, 17)
 ```
 
-If you want to listen to the EMA value events, just add a callback on the indicator instance:
+If you want to listen to the EMA value events, add a callback on the indicator instance:
 
 ```go
 ema.OnUpdate(func(v float64) { .... })
 ```
+
+
+To combine these techniques together:
+
+```go
+
+// use dot import to use the constructors as helpers
+import . "github.com/c9s/bbgo/pkg/indicator/v2"
+
+func main() {
+    // you should get the correct stream instance from the *bbgo.ExchangeSession instance
+    stream := &types.Stream{}
+    
+    ema := EMA(
+        ClosePrices(
+            KLines(stream, types.Interval1m)), 14)
+    _ = ema
+}
+```
+
 
 ## Adding New Indicator
 
