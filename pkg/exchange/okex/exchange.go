@@ -214,7 +214,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 
 	// set price field for limit orders
 	switch order.Type {
-	case types.OrderTypeStopLimit, types.OrderTypeLimit:
+	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		orderReq.Price(order.Market.FormatPrice(order.Price))
 	case types.OrderTypeMarket:
 		// Because our order.Quantity unit is base coin, so we indicate the target currency to Base.
