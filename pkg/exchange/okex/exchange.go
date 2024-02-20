@@ -3,6 +3,7 @@ package okex
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -33,6 +34,9 @@ var (
 	queryClosedOrderRateLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 	queryTradeLimiter           = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 	queryKLineLimiter           = rate.NewLimiter(rate.Every(100*time.Millisecond), 20)
+
+	// clientOrderIdRegex combine of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
+	clientOrderIdRegex = regexp.MustCompile("^[a-zA-Z0-9]{0,32}$")
 )
 
 const (
@@ -241,11 +245,12 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
 	}
 
-	_, err = strconv.ParseInt(order.ClientOrderID, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("client order id should be numberic: %s, err: %w", order.ClientOrderID, err)
+	if len(order.ClientOrderID) > 0 {
+		if ok := clientOrderIdRegex.MatchString(order.ClientOrderID); !ok {
+			return nil, fmt.Errorf("client order id should be case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters: %s", order.ClientOrderID)
+		}
+		orderReq.ClientOrderID(order.ClientOrderID)
 	}
-	orderReq.ClientOrderID(order.ClientOrderID)
 
 	orders, err := orderReq.Do(ctx)
 	if err != nil {
@@ -357,9 +362,8 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		req.InstrumentID(toLocalSymbol(order.Symbol))
 		req.OrderID(strconv.FormatUint(order.OrderID, 10))
 		if len(order.ClientOrderID) > 0 {
-			_, err := strconv.ParseInt(order.ClientOrderID, 10, 64)
-			if err != nil {
-				return fmt.Errorf("client order id should be numberic: %s, err: %w", order.ClientOrderID, err)
+			if ok := clientOrderIdRegex.MatchString(order.ClientOrderID); !ok {
+				return fmt.Errorf("client order id should be case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters: %s", order.ClientOrderID)
 			}
 			req.ClientOrderID(order.ClientOrderID)
 		}
