@@ -17,26 +17,33 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// Okex rate limit list in each api document
-// The default order limiter apply 30 requests per second and a 5 initial bucket
-// this includes QueryOrder, QueryOrderTrades, SubmitOrder, QueryOpenOrders, CancelOrders
-// Market data limiter means public api, this includes QueryMarkets, QueryTicker, QueryTickers, QueryKLines
 var (
-	marketDataLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 5)
-
-	queryMarketLimiter          = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	queryTickerLimiter          = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	queryTickersLimiter         = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	queryAccountLimiter         = rate.NewLimiter(rate.Every(200*time.Millisecond), 5)
-	placeOrderLimiter           = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
-	batchCancelOrderLimiter     = rate.NewLimiter(rate.Every(5*time.Millisecond), 200)
-	queryOpenOrderLimiter       = rate.NewLimiter(rate.Every(30*time.Millisecond), 30)
-	queryClosedOrderRateLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	queryTradeLimiter           = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
-	queryKLineLimiter           = rate.NewLimiter(rate.Every(100*time.Millisecond), 20)
-
 	// clientOrderIdRegex combine of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
 	clientOrderIdRegex = regexp.MustCompile("^[a-zA-Z0-9]{0,32}$")
+
+	// Rate Limit: 20 requests per 2 seconds, Rate limit rule: IP + instrumentType.
+	// Currently, calls are not made very frequently, so only IP is considered.
+	queryMarketLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 1)
+	// Rate Limit: 20 requests per 2 seconds, Rate limit rule: IP
+	queryTickerLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 1)
+	// Rate Limit: 20 requests per 2 seconds, Rate limit rule: IP
+	queryTickersLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 1)
+	// Rate Limit: 10 requests per 2 seconds, Rate limit rule: UserID
+	queryAccountLimiter = rate.NewLimiter(rate.Every(200*time.Millisecond), 1)
+	// Rate Limit: 60 requests per 2 seconds, Rate limit rule (except Options): UserID + Instrument ID.
+	// TODO: support UserID + Instrument ID
+	placeOrderLimiter = rate.NewLimiter(rate.Every(33*time.Millisecond), 1)
+	// Rate Limit: 60 requests per 2 seconds, Rate limit rule (except Options): UserID + Instrument ID
+	// TODO: support UserID + Instrument ID
+	batchCancelOrderLimiter = rate.NewLimiter(rate.Every(33*time.Millisecond), 1)
+	// Rate Limit: 60 requests per 2 seconds, Rate limit rule: UserID
+	queryOpenOrderLimiter = rate.NewLimiter(rate.Every(33*time.Millisecond), 1)
+	// Rate Limit: 20 requests per 2 seconds, Rate limit rule: UserID
+	queryClosedOrderRateLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 1)
+	// Rate Limit: 10 requests per 2 seconds, Rate limit rule: UserID
+	queryTradeLimiter = rate.NewLimiter(rate.Every(200*time.Millisecond), 1)
+	// Rate Limit: 40 requests per 2 seconds, Rate limit rule: IP
+	queryKLineLimiter = rate.NewLimiter(rate.Every(50*time.Millisecond), 1)
 )
 
 const (
