@@ -256,5 +256,5 @@ func (a APIResponse) Validate() error {
 }
 
 func (a APIResponse) Error() error {
-	return fmt.Errorf("retCode: %s, retMsg: %s", a.Code, a.Message)
+	return fmt.Errorf("retCode: %s, retMsg: %s, data: %s", a.Code, a.Message, string(a.Data))
 }
