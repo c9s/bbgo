@@ -2,7 +2,6 @@ package retry
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -54,15 +53,17 @@ func QueryOrderUntilFilled(
 			OrderID: strconv.FormatUint(orderId, 10),
 		})
 
-		if err2 != nil || o == nil {
+		if err2 != nil {
 			return err2
 		}
 
-		if o.Status != types.OrderStatusFilled {
-			return errors.New("order is not filled yet")
+		// for final status return nil error to stop the retry
+		switch o.Status {
+		case types.OrderStatusFilled, types.OrderStatusCanceled:
+			return nil
 		}
 
-		return err2
+		return fmt.Errorf("order is not filled yet: status=%s E/Q=%s/%s", o.Status, o.ExecutedQuantity.String(), o.Quantity.String())
 	}
 
 	err = GeneralBackoff(ctx, op)
