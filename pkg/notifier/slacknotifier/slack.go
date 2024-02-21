@@ -83,6 +83,13 @@ func filterSlackAttachments(args []interface{}) (slackAttachments []slack.Attach
 
 			slackAttachments = append(slackAttachments, a)
 
+		case *slack.Attachment:
+			if firstAttachmentOffset == -1 {
+				firstAttachmentOffset = idx
+			}
+
+			slackAttachments = append(slackAttachments, *a)
+
 		case types.SlackAttachmentCreator:
 			if firstAttachmentOffset == -1 {
 				firstAttachmentOffset = idx
