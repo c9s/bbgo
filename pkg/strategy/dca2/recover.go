@@ -67,7 +67,7 @@ func (s *Strategy) recover(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	s.state = state
+	s.updateState(state)
 	s.logger.Info("recover stats DONE")
 
 	return nil
