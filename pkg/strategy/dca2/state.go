@@ -46,6 +46,13 @@ func (s *Strategy) initializeNextStateC() bool {
 	return isInitialize
 }
 
+func (s *Strategy) updateState(state State) {
+	s.state = state
+
+	s.logger.Infof("[state] update state to %d", state)
+	metricsState.With(baseLabels).Set(float64(s.state))
+}
+
 func (s *Strategy) emitNextState(nextState State) {
 	select {
 	case s.nextStateC <- nextState:
@@ -63,17 +70,22 @@ func (s *Strategy) emitNextState(nextState State) {
 // TakeProfitReady -> the takeProfit order filled ->
 func (s *Strategy) runState(ctx context.Context) {
 	s.logger.Info("[DCA] runState")
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	stateTriggerTicker := time.NewTicker(5 * time.Second)
+	defer stateTriggerTicker.Stop()
+
+	monitorTicker := time.NewTicker(10 * time.Minute)
+	defer monitorTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			s.logger.Info("[DCA] runState DONE")
 			return
-		case <-ticker.C:
-			s.logger.Infof("[DCA] triggerNextState current state: %d", s.state)
+		case <-stateTriggerTicker.C:
+			// s.logger.Infof("[DCA] triggerNextState current state: %d", s.state)
 			s.triggerNextState()
+		case <-monitorTicker.C:
+			s.updateNumOfOrdersMetrics(ctx)
 		case nextState := <-s.nextStateC:
 			s.logger.Infof("[DCA] currenct state: %d, next state: %d", s.state, nextState)
 
@@ -131,7 +143,7 @@ func (s *Strategy) runWaitToOpenPositionState(ctx context.Context, next State) {
 		return
 	}
 
-	s.state = PositionOpening
+	s.updateState(PositionOpening)
 	s.logger.Info("[State] WaitToOpenPosition -> PositionOpening")
 }
 
@@ -141,17 +153,17 @@ func (s *Strategy) runPositionOpening(ctx context.Context, next State) {
 		s.logger.WithError(err).Error("failed to place dca orders, please check it.")
 		return
 	}
-	s.state = OpenPositionReady
+	s.updateState(OpenPositionReady)
 	s.logger.Info("[State] PositionOpening -> OpenPositionReady")
 }
 
 func (s *Strategy) runOpenPositionReady(_ context.Context, next State) {
-	s.state = OpenPositionOrderFilled
+	s.updateState(OpenPositionOrderFilled)
 	s.logger.Info("[State] OpenPositionReady -> OpenPositionOrderFilled")
 }
 
 func (s *Strategy) runOpenPositionOrderFilled(_ context.Context, next State) {
-	s.state = OpenPositionOrdersCancelling
+	s.updateState(OpenPositionOrdersCancelling)
 	s.logger.Info("[State] OpenPositionOrderFilled -> OpenPositionOrdersCancelling")
 
 	// after open position cancelling, immediately trigger open position cancelled to cancel the other orders
@@ -164,7 +176,7 @@ func (s *Strategy) runOpenPositionOrdersCancelling(ctx context.Context, next Sta
 		s.logger.WithError(err).Error("failed to cancel maker orders")
 		return
 	}
-	s.state = OpenPositionOrdersCancelled
+	s.updateState(OpenPositionOrdersCancelled)
 	s.logger.Info("[State] OpenPositionOrdersCancelling -> OpenPositionOrdersCancelled")
 
 	// after open position cancelled, immediately trigger take profit ready to open take-profit order
@@ -177,7 +189,7 @@ func (s *Strategy) runOpenPositionOrdersCancelled(ctx context.Context, next Stat
 		s.logger.WithError(err).Error("failed to open take profit orders")
 		return
 	}
-	s.state = TakeProfitReady
+	s.updateState(TakeProfitReady)
 	s.logger.Info("[State] OpenPositionOrdersCancelled -> TakeProfitReady")
 }
 
@@ -200,6 +212,6 @@ func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 
 	// set the start time of the next round
 	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())
-	s.state = WaitToOpenPosition
+	s.updateState(WaitToOpenPosition)
 	s.logger.Info("[State] TakeProfitReady -> WaitToOpenPosition")
 }

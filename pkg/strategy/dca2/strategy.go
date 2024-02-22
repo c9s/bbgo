@@ -21,11 +21,15 @@ import (
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
 
-const ID = "dca2"
+const (
+	ID       = "dca2"
+	orderTag = "dca2"
+)
 
-const orderTag = "dca2"
-
-var log = logrus.WithField("strategy", ID)
+var (
+	log        = logrus.WithField("strategy", ID)
+	baseLabels prometheus.Labels
+)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -119,6 +123,7 @@ func (s *Strategy) Defaults() error {
 
 	s.LogFields["symbol"] = s.Symbol
 	s.LogFields["strategy"] = ID
+
 	return nil
 }
 
@@ -135,6 +140,23 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
 }
 
+func (s *Strategy) newPrometheusLabels() prometheus.Labels {
+	labels := prometheus.Labels{
+		"exchange": "default",
+		"symbol":   s.Symbol,
+	}
+
+	if s.Session != nil {
+		labels["exchange"] = s.Session.Name
+	}
+
+	if s.PrometheusLabels == nil {
+		return labels
+	}
+
+	return mergeLabels(s.PrometheusLabels, labels)
+}
+
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 	s.Session = session
@@ -145,6 +167,15 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
+
+	// prometheus
+	if s.PrometheusLabels != nil {
+		initMetrics(labelKeys(s.PrometheusLabels))
+	}
+	registerMetrics()
+
+	// prometheus labels
+	baseLabels = s.newPrometheusLabels()
 
 	// if dev mode is on and it's not a new strategy
 	if s.DevMode != nil && s.DevMode.Enabled && !s.DevMode.IsNewAccount {
@@ -192,6 +223,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		default:
 			s.logger.Infof("[DCA] unsupported side (%s) of order: %s", o.Side, o)
 		}
+
+		// update metrics when filled
+		s.updateNumOfOrdersMetrics(ctx)
 	})
 
 	session.MarketDataStream.OnKLine(func(kline types.KLine) {
@@ -218,7 +252,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 				// 1. recoverWhenStart is false
 				// 2. dev mode is on and it's not new strategy
 				if !s.RecoverWhenStart || (s.DevMode != nil && s.DevMode.Enabled && !s.DevMode.IsNewAccount) {
-					s.state = WaitToOpenPosition
+					s.updateState(WaitToOpenPosition)
 				} else {
 					// recover
 					if err := s.recover(ctx); err != nil {
@@ -400,9 +434,23 @@ func (s *Strategy) CalculateAndEmitProfit(ctx context.Context) error {
 
 		// emit profit
 		s.EmitProfit(s.ProfitStats)
+		updateProfitMetrics(s.ProfitStats.Round, s.ProfitStats.CurrentRoundProfit.Float64())
 
 		s.ProfitStats.NewRound()
 	}
 
 	return nil
+}
+
+func (s *Strategy) updateNumOfOrdersMetrics(ctx context.Context) {
+	// update open orders metrics
+	openOrders, err := s.Session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	if err != nil {
+		s.logger.WithError(err).Warn("failed to query open orders to update num of the orders metrics")
+	} else {
+		metricsNumOfOpenOrders.With(baseLabels).Set(float64(len(openOrders)))
+	}
+
+	// update active orders metrics
+	metricsNumOfActiveOrders.With(baseLabels).Set(float64(s.OrderExecutor.ActiveMakerOrders().NumOfOrders()))
 }
