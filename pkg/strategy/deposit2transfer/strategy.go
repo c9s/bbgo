@@ -53,6 +53,8 @@ type Strategy struct {
 	watchingDeposits map[string]types.Deposit
 	mu               sync.Mutex
 
+	logger logrus.FieldLogger
+
 	lastAssetDepositTimes map[string]time.Time
 }
 
@@ -65,6 +67,10 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
 func (s *Strategy) Defaults() error {
 	if s.Interval == 0 {
 		s.Interval = types.Duration(5 * time.Minute)
+	}
+
+	if s.logger == nil {
+		s.logger = log.Dup()
 	}
 
 	return nil
@@ -82,6 +88,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.session = session
 	s.watchingDeposits = make(map[string]types.Deposit)
 	s.lastAssetDepositTimes = make(map[string]time.Time)
+	s.logger = s.logger.WithField("exchange", session.ExchangeName)
 
 	var ok bool
 
@@ -123,24 +130,26 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 	accountLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
 
 	for _, asset := range s.Assets {
-		log.Debugf("checking %s deposits...", asset)
+		logger := s.logger.WithField("asset", asset)
+
+		logger.Debugf("checking %s deposits...", asset)
 
 		succeededDeposits, err := s.scanDepositHistory(ctx, asset, 4*time.Hour)
 		if err != nil {
-			log.WithError(err).Errorf("unable to scan deposit history")
+			logger.WithError(err).Errorf("unable to scan deposit history")
 			return
 		}
 
 		if len(succeededDeposits) == 0 {
-			log.Debugf("no %s deposit found", asset)
+			logger.Debugf("no %s deposit found", asset)
 			continue
 		}
 
 		for _, d := range succeededDeposits {
-			log.Infof("found succeeded deposit: %+v", d)
+			logger.Infof("found succeeded %s deposit: %+v", asset, d)
 
 			if err2 := accountLimiter.Wait(ctx); err2 != nil {
-				log.WithError(err2).Errorf("rate limiter error")
+				logger.WithError(err2).Errorf("rate limiter error")
 				return
 			}
 
@@ -149,15 +158,15 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 			if service, ok := s.session.Exchange.(spotAccountQueryService); ok {
 				account, err2 := service.QuerySpotAccount(ctx)
 				if err2 != nil {
-					log.WithError(err2).Errorf("unable to query spot account")
+					logger.WithError(err2).Errorf("unable to query spot account")
 					continue
 				}
 
 				if bal, ok := account.Balance(d.Asset); ok {
-					log.Infof("spot account balance %s: %+v", d.Asset, bal)
+					logger.Infof("spot account balance %s: %+v", d.Asset, bal)
 					amount = fixedpoint.Min(bal.Available, amount)
 				} else {
-					log.Errorf("unexpected error: %s balance not found", d.Asset)
+					logger.Errorf("unexpected error: %s balance not found", d.Asset)
 				}
 			}
 
@@ -166,14 +175,15 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 				amount.String(), d.Asset)
 
 			if err2 := s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, amount, types.TransferIn); err2 != nil {
-				log.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
+				logger.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
 			}
 		}
 	}
 }
 
 func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duration time.Duration) ([]types.Deposit, error) {
-	log.Debugf("scanning %s deposit history...", asset)
+	logger := s.logger.WithField("asset", asset)
+	logger.Debugf("scanning %s deposit history...", asset)
 
 	now := time.Now()
 	since := now.Add(-duration)
@@ -191,7 +201,7 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	defer s.mu.Unlock()
 
 	for _, deposit := range deposits {
-		log.Debugf("checking deposit: %+v", deposit)
+		logger.Debugf("checking deposit: %+v", deposit)
 
 		if deposit.Asset != asset {
 			continue
@@ -207,16 +217,16 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 				if depositTime, ok := s.lastAssetDepositTimes[asset]; ok {
 					// if it's newer than the latest deposit time, then we just add it the monitoring list
 					if deposit.Time.After(depositTime) {
-						log.Infof("adding new success deposit: %s", deposit.TransactionID)
+						logger.Infof("adding new success deposit: %s", deposit.TransactionID)
 						s.watchingDeposits[deposit.TransactionID] = deposit
 					}
 				} else {
 					// ignore all initial deposit history that are already success
-					log.Infof("ignored succeess deposit: %s %+v", deposit.TransactionID, deposit)
+					logger.Infof("ignored succeess deposit: %s %+v", deposit.TransactionID, deposit)
 				}
 
 			case types.DepositCredited, types.DepositPending:
-				log.Infof("adding pending deposit: %s", deposit.TransactionID)
+				logger.Infof("adding pending deposit: %s", deposit.TransactionID)
 				s.watchingDeposits[deposit.TransactionID] = deposit
 			}
 		}
@@ -234,11 +244,11 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	var succeededDeposits []types.Deposit
 	for _, deposit := range s.watchingDeposits {
 		if deposit.Status == types.DepositSuccess {
-			log.Infof("found pending -> success deposit: %+v", deposit)
+			logger.Infof("found pending -> success deposit: %+v", deposit)
 
 			current, required := deposit.GetCurrentConfirmation()
 			if required > 0 && deposit.UnlockConfirm > 0 && current < deposit.UnlockConfirm {
-				log.Infof("deposit %s unlock confirm %d is not reached, current: %d, required: %d, skip this round", deposit.TransactionID, deposit.UnlockConfirm, current, required)
+				logger.Infof("deposit %s unlock confirm %d is not reached, current: %d, required: %d, skip this round", deposit.TransactionID, deposit.UnlockConfirm, current, required)
 				continue
 			}
 
