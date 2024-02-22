@@ -2,6 +2,7 @@ package retry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -9,6 +10,8 @@ import (
 
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var ErrOrderIsNil = errors.New("order object is nil")
 
 type advancedOrderCancelService interface {
 	CancelAllOrders(ctx context.Context) ([]types.Order, error)
@@ -55,6 +58,10 @@ func QueryOrderUntilFilled(
 
 		if err2 != nil {
 			return err2
+		}
+
+		if o == nil {
+			return ErrOrderIsNil
 		}
 
 		// for final status return nil error to stop the retry
