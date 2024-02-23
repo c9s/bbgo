@@ -30,6 +30,7 @@ func toGlobalMarket(s v2.Symbol) types.Market {
 	}
 
 	return types.Market{
+		Exchange:        types.ExchangeBitget,
 		Symbol:          s.Symbol,
 		LocalSymbol:     s.Symbol,
 		PricePrecision:  s.PricePrecision.Int(),

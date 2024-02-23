@@ -78,6 +78,7 @@ func Test_toGlobalMarket(t *testing.T) {
 	}
 
 	exp := types.Market{
+		Exchange:        types.ExchangeBitget,
 		Symbol:          inst.Symbol,
 		LocalSymbol:     inst.Symbol,
 		PricePrecision:  2,

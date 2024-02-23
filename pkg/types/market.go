@@ -10,6 +10,8 @@ import (
 )
 
 type Market struct {
+	Exchange ExchangeName `json:"exchange,omitempty"`
+
 	Symbol string `json:"symbol"`
 
 	// LocalSymbol is used for exchange's API (exchange package internal)
