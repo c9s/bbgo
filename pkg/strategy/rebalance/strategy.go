@@ -33,6 +33,7 @@ type Strategy struct {
 	Threshold     fixedpoint.Value `json:"threshold"`
 	MaxAmount     fixedpoint.Value `json:"maxAmount"` // max amount to buy or sell per order
 	OrderType     types.OrderType  `json:"orderType"`
+	PriceType     types.PriceType  `json:"priceType"`
 	DryRun        bool             `json:"dryRun"`
 	OnStart       bool             `json:"onStart"` // rebalance on start
 
@@ -45,6 +46,10 @@ type Strategy struct {
 func (s *Strategy) Defaults() error {
 	if s.OrderType == "" {
 		s.OrderType = types.OrderTypeLimitMaker
+	}
+
+	if s.PriceType == "" {
+		s.PriceType = types.PriceTypeMaker
 	}
 	return nil
 }
@@ -243,12 +248,11 @@ func (s *Strategy) generateOrder(ctx context.Context) (*types.SubmitOrder, error
 			return nil, err
 		}
 
-		var price fixedpoint.Value
+		price := s.PriceType.Map(ticker, side)
+
 		if side == types.SideTypeBuy {
-			price = ticker.Buy
-			quantity = fixedpoint.Min(quantity, balances[s.QuoteCurrency].Available.Div(ticker.Sell))
+			quantity = fixedpoint.Min(quantity, balances[s.QuoteCurrency].Available.Div(price))
 		} else if side == types.SideTypeSell {
-			price = ticker.Sell
 			quantity = fixedpoint.Min(quantity, balances[market.BaseCurrency].Available)
 		}
 

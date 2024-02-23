@@ -18,8 +18,6 @@ const ID = "autobuy"
 
 var log = logrus.WithField("strategy", ID)
 
-var two = fixedpoint.NewFromInt(2)
-
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -33,7 +31,7 @@ type Strategy struct {
 	Symbol    string                  `json:"symbol"`
 	Schedule  string                  `json:"schedule"`
 	Threshold fixedpoint.Value        `json:"threshold"`
-	PriceType PriceType               `json:"priceType"`
+	PriceType types.PriceType         `json:"priceType"`
 	Bollinger *types.BollingerSetting `json:"bollinger"`
 	DryRun    bool                    `json:"dryRun"`
 
@@ -67,7 +65,7 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Defaults() error {
 	if s.PriceType == "" {
-		s.PriceType = PriceTypeBuy
+		s.PriceType = types.PriceTypeMaker
 	}
 	return nil
 }
@@ -122,19 +120,8 @@ func (s *Strategy) autobuy(ctx context.Context) {
 		return
 	}
 
-	var price fixedpoint.Value
-	switch s.PriceType {
-	case PriceTypeLast:
-		price = ticker.Last
-	case PriceTypeBuy:
-		price = ticker.Buy
-	case PriceTypeSell:
-		price = ticker.Sell
-	case PriceTypeMid:
-		price = ticker.Buy.Add(ticker.Sell).Div(two)
-	default:
-		price = ticker.Buy
-	}
+	side := types.SideTypeBuy
+	price := s.PriceType.Map(ticker, side)
 
 	if price.Float64() > s.boll.UpBand.Last(0) {
 		log.Infof("price %s is higher than upper band %f, skip", price.String(), s.boll.UpBand.Last(0))
@@ -150,7 +137,7 @@ func (s *Strategy) autobuy(ctx context.Context) {
 	quantity := s.CalculateQuantity(price)
 	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
-		Side:     types.SideTypeBuy,
+		Side:     side,
 		Type:     types.OrderTypeLimitMaker,
 		Quantity: quantity,
 		Price:    price,
