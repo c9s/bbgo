@@ -41,9 +41,9 @@ func UniversalCancelAllOrders(ctx context.Context, exchange types.Exchange, open
 		return errors.New("to cancel all orders, openOrders can not be empty")
 	}
 
+	var anyErr error
 	if service, ok := exchange.(CancelAllOrdersBySymbolService); ok {
 		var symbols = CollectOrderSymbols(openOrders)
-		var anyErr error
 		for _, symbol := range symbols {
 			_, err := service.CancelOrdersBySymbol(ctx, symbol)
 			if err != nil {
@@ -58,7 +58,6 @@ func UniversalCancelAllOrders(ctx context.Context, exchange types.Exchange, open
 
 	if service, ok := exchange.(CancelAllOrdersByGroupIDService); ok {
 		var groupIds = CollectOrderGroupIds(openOrders)
-		var anyErr error
 		for _, groupId := range groupIds {
 			if _, err := service.CancelOrdersByGroupID(ctx, groupId); err != nil {
 				anyErr = err
@@ -70,7 +69,11 @@ func UniversalCancelAllOrders(ctx context.Context, exchange types.Exchange, open
 		}
 	}
 
-	return fmt.Errorf("unable to cancel all orders: %+v", openOrders)
+	if anyErr != nil {
+		return anyErr
+	}
+
+	return fmt.Errorf("unable to cancel all orders, openOrders:%+v", openOrders)
 }
 
 func CollectOrderGroupIds(orders []types.Order) (groupIds []uint32) {
