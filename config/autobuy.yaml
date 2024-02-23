@@ -6,8 +6,8 @@ exchangeStrategies:
       symbol: MAXTWD
       schedule: "@every 1s"
       threshold: 200
-      # price type: buy, sell, last or mid
-      priceType: buy
+      # price type: LAST, BUY, SELL, MID, TAKER, MAKER
+      priceType: BUY
 
       # order quantity or amount
       # quantity: 100
