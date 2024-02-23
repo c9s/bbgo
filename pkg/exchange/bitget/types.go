@@ -485,8 +485,11 @@ type Order struct {
 	// OrderId are always numeric. It's confirmed with official customer service. https://t.me/bitgetOpenapi/24172
 	OrderId       types.StrInt64 `json:"orderId"`
 	ClientOrderId string         `json:"clientOid"`
-	// Size is base coin when orderType=limit; quote coin when orderType=market
-	Size fixedpoint.Value `json:"size"`
+	// NewSize represents the order quantity, following the specified rules:
+	// when orderType=limit, newSize represents the quantity of base coin,
+	// when orderType=marketandside=buy, newSize represents the quantity of quote coin,
+	// when orderType=marketandside=sell, newSize represents the quantity of base coin.
+	NewSize fixedpoint.Value `json:"newSize"`
 	// Buy amount, returned when buying at market price
 	Notional      fixedpoint.Value `json:"notional"`
 	OrderType     v2.OrderType     `json:"orderType"`
