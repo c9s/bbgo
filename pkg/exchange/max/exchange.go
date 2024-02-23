@@ -146,6 +146,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		symbol := toGlobalSymbol(m.ID)
 
 		market := types.Market{
+			Exchange:        types.ExchangeMax,
 			Symbol:          symbol,
 			LocalSymbol:     m.ID,
 			PricePrecision:  m.QuoteUnitPrecision,
@@ -372,7 +373,9 @@ func (e *Exchange) queryClosedOrdersByLastOrderID(
 	return types.SortOrdersAscending(orders), nil
 }
 
-func (e *Exchange) queryClosedOrdersByTime(ctx context.Context, symbol string, since, until time.Time, orderByType maxapi.OrderByType) (orders []types.Order, err error) {
+func (e *Exchange) queryClosedOrdersByTime(
+	ctx context.Context, symbol string, since, until time.Time, orderByType maxapi.OrderByType,
+) (orders []types.Order, err error) {
 	if err := e.closedOrderQueryLimiter.Wait(ctx); err != nil {
 		return orders, err
 	}

@@ -102,6 +102,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	for _, instrument := range instruments {
 		symbol := toGlobalSymbol(instrument.InstrumentID)
 		market := types.Market{
+			Exchange:    types.ExchangeOKEx,
 			Symbol:      symbol,
 			LocalSymbol: instrument.InstrumentID,
 
@@ -390,7 +391,9 @@ func (e *Exchange) NewStream() types.Stream {
 	return NewStream(e.client, e)
 }
 
-func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryKLines(
+	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
+) ([]types.KLine, error) {
 	if err := queryKLineLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("query k line rate limiter wait error: %w", err)
 	}
@@ -484,7 +487,9 @@ If you want to query all orders within a large time range (e.g. total orders > 1
 
 ** since and until are inclusive, you can include the lastTradeId as well. **
 */
-func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+func (e *Exchange) QueryClosedOrders(
+	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
+) (orders []types.Order, err error) {
 	if symbol == "" {
 		return nil, ErrSymbolRequired
 	}
