@@ -11,5 +11,6 @@ exchangeStrategies:
       threshold: 1%
       maxAmount: 1_000 # max amount to buy or sell per order
       orderType: LIMIT_MAKER # LIMIT, LIMIT_MAKER or MARKET
+      priceType: MAKER # LAST, MID, TAKER or MAKER
       dryRun: true
       onStart: true
