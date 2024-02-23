@@ -243,8 +243,8 @@ func Test_filterPrice1(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rst := filterPrice(tt.args.p, tt.args.prec)
-			assert.Equalf(t, tt.want, rst.String(), "filterPrice(%v, %v)", tt.args.p, tt.args.prec)
+			rst := roundAndTruncatePrice(tt.args.p, tt.args.prec)
+			assert.Equalf(t, tt.want, rst.String(), "roundAndTruncatePrice(%v, %v)", tt.args.p, tt.args.prec)
 		})
 	}
 }

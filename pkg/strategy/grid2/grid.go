@@ -35,8 +35,8 @@ type Grid struct {
 
 type Pin fixedpoint.Value
 
-// filterPrice filters price with the given precision
-func filterPrice(p fixedpoint.Value, prec int) fixedpoint.Value {
+// roundAndTruncatePrice rounds the given price at prec-1 and then truncate the price at prec
+func roundAndTruncatePrice(p fixedpoint.Value, prec int) fixedpoint.Value {
 	var pow10 = math.Pow10(prec)
 	pp := math.Round(p.Float64()*pow10*10.0) / 10.0
 	pp = math.Trunc(pp) / pow10
@@ -71,12 +71,12 @@ func calculateArithmeticPins(lower, upper, spread, tickSize fixedpoint.Value) []
 	var ts = tickSize.Float64()
 	var prec = int(math.Round(math.Log10(ts) * -1.0))
 	for p := lower; p.Compare(upper.Sub(spread)) <= 0; p = p.Add(spread) {
-		price := filterPrice(p, prec)
+		price := roundAndTruncatePrice(p, prec)
 		pins = append(pins, Pin(price))
 	}
 
 	// this makes sure there is no error at the upper price
-	upperPrice := filterPrice(upper, prec)
+	upperPrice := roundAndTruncatePrice(upper, prec)
 	pins = append(pins, Pin(upperPrice))
 
 	return pins
