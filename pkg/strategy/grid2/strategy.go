@@ -22,6 +22,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
 
 const ID = "grid2"
@@ -351,7 +352,7 @@ func (s *Strategy) calculateProfit(o types.Order, buyPrice, buyQuantity fixedpoi
 }
 
 func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
-	tq := aggregateTradesQuantity(trades)
+	tq := tradingutil.AggregateTradesQuantity(trades)
 
 	// on MAX: if order.status == filled, it does not mean order.executedQuantity == order.quantity
 	// order.executedQuantity can be less than order.quantity
@@ -400,8 +401,8 @@ func (s *Strategy) aggregateOrderQuoteAmountAndFee(o types.Order) (fixedpoint.Va
 		// if one of the trades is missing, we need to query the trades from the RESTful API
 		if s.verifyOrderTrades(o, orderTrades) {
 			// if trades are verified
-			quoteAmount := aggregateTradesQuoteQuantity(orderTrades)
-			fees := collectTradeFee(orderTrades)
+			quoteAmount := tradingutil.AggregateTradesQuoteQuantity(orderTrades)
+			fees := tradingutil.CollectTradeFee(orderTrades)
 			if fee, ok := fees[feeCurrency]; ok {
 				return quoteAmount, fee, feeCurrency
 			}
@@ -428,9 +429,9 @@ func (s *Strategy) aggregateOrderQuoteAmountAndFee(o types.Order) (fixedpoint.Va
 		}
 	}
 
-	quoteAmount := aggregateTradesQuoteQuantity(orderTrades)
+	quoteAmount := tradingutil.AggregateTradesQuoteQuantity(orderTrades)
 	// still try to aggregate the trades quantity if we can:
-	fees := collectTradeFee(orderTrades)
+	fees := tradingutil.CollectTradeFee(orderTrades)
 	if fee, ok := fees[feeCurrency]; ok {
 		return quoteAmount, fee, feeCurrency
 	}
