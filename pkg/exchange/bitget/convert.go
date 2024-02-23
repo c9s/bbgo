@@ -391,7 +391,7 @@ func (o *Order) processMarketBuyQuantity() (fixedpoint.Value, error) {
 		if o.FillPrice.IsZero() {
 			return fixedpoint.Zero, fmt.Errorf("fillPrice for a partialFilled should not be zero")
 		}
-		return o.Size.Div(o.FillPrice), nil
+		return o.NewSize.Div(o.FillPrice), nil
 
 	case v2.OrderStatusFilled:
 		return o.AccBaseVolume, nil
@@ -422,7 +422,7 @@ func (o *Order) toGlobalOrder() (types.Order, error) {
 		return types.Order{}, err
 	}
 
-	qty := o.Size
+	qty := o.NewSize
 	if orderType == types.OrderTypeMarket && side == types.SideTypeBuy {
 		qty, err = o.processMarketBuyQuantity()
 		if err != nil {
