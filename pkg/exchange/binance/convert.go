@@ -15,6 +15,7 @@ import (
 
 func toGlobalMarket(symbol binance.Symbol) types.Market {
 	market := types.Market{
+		Exchange:        types.ExchangeBinance,
 		Symbol:          symbol.Symbol,
 		LocalSymbol:     symbol.Symbol,
 		PricePrecision:  symbol.QuotePrecision,
@@ -59,6 +60,7 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 // TODO: Cuz it returns types.Market as well, merge following to the above function
 func toGlobalFuturesMarket(symbol futures.Symbol) types.Market {
 	market := types.Market{
+		Exchange:        types.ExchangeBinance,
 		Symbol:          symbol.Symbol,
 		LocalSymbol:     symbol.Symbol,
 		PricePrecision:  symbol.QuotePrecision,
