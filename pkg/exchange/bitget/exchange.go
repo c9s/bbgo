@@ -359,7 +359,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		return nil, fmt.Errorf("failed to query open order by order id: %s, err: %w", orderId, err)
 	}
 
-	debugf("unfilled order response: %+v", ordersResp)
+	debugf("unfilled order response for order#%s: %+v", orderId, ordersResp)
 
 	if len(ordersResp) == 1 {
 		return unfilledOrderToGlobalOrder(ordersResp[0])
@@ -372,13 +372,13 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		}
 
 		if len(ordersResp) != 1 {
-			return nil, fmt.Errorf("unexpected order length, order id: %s", orderId)
+			return nil, fmt.Errorf("unexpected length of history orders, expecting: 1, given: %d, ids: %s", len(ordersResp), orderId)
 		}
 
 		return toGlobalOrder(ordersResp[0])
 	}
 
-	return nil, fmt.Errorf("unexpected order length, order id: %s", orderId)
+	return nil, fmt.Errorf("unexpected length of unfilled orders, expecting: 1, given: %d, ids: %s", len(ordersResp), orderId)
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
