@@ -172,7 +172,6 @@ func toGlobalOrder(maxOrder max.Order) (*types.Order, error) {
 	executedVolume := maxOrder.ExecutedVolume
 	remainingVolume := maxOrder.RemainingVolume
 	isMargin := maxOrder.WalletType == max.WalletTypeMargin
-
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: maxOrder.ClientOID,
