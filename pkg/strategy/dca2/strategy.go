@@ -8,15 +8,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
-	"go.uber.org/multierr"
+	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
 
 const ID = "dca2"
@@ -289,30 +291,29 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 		return fmt.Errorf("Session is nil, please check it")
 	}
 
-	service, support := session.Exchange.(advancedOrderCancelApi)
-	if !support {
-		return fmt.Errorf("advancedOrderCancelApi interface is not implemented, fallback to default graceful cancel, exchange %T", session)
+	// ignore the first cancel error, this skips one open-orders query request
+	if err := tradingutil.UniversalCancelAllOrders(ctx, session.Exchange, nil); err == nil {
+		return nil
 	}
 
+	// if cancel all orders returns error, get the open orders and retry the cancel in each round
 	var werr error
 	for {
 		s.logger.Infof("checking %s open orders...", s.Symbol)
 
 		openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
 		if err != nil {
-			s.logger.WithError(err).Errorf("CancelOrdersByGroupID api call error")
-			werr = multierr.Append(werr, err)
+			s.logger.WithError(err).Errorf("unable to query open orders")
+			continue
 		}
 
+		// all clean up
 		if len(openOrders) == 0 {
 			break
 		}
 
-		s.logger.Infof("found %d open orders left, using cancel all orders api", len(openOrders))
-
-		s.logger.Infof("using cancal all orders api for canceling grid orders...")
-		if err := retry.CancelAllOrdersUntilSuccessful(ctx, service); err != nil {
-			s.logger.WithError(err).Errorf("CancelAllOrders api call error")
+		if err := tradingutil.UniversalCancelAllOrders(ctx, session.Exchange, openOrders); err != nil {
+			s.logger.WithError(err).Errorf("unable to cancel all orders")
 			werr = multierr.Append(werr, err)
 		}
 
