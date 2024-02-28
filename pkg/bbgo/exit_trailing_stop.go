@@ -42,6 +42,9 @@ type TrailingStop2 struct {
 }
 
 func (s *TrailingStop2) Subscribe(session *ExchangeSession) {
+	if s.Interval == "" {
+		s.Interval = types.Interval1m
+	}
 	// use 1m kline to handle roi stop
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
