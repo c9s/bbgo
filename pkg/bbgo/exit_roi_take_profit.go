@@ -23,6 +23,9 @@ type RoiTakeProfit struct {
 
 func (s *RoiTakeProfit) Subscribe(session *ExchangeSession) {
 	// use kline to handle roi stop
+	if s.Interval == "" {
+		s.Interval = types.Interval1m
+	}
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 

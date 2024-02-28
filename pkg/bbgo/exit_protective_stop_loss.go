@@ -41,6 +41,9 @@ type ProtectiveStopLoss struct {
 }
 
 func (s *ProtectiveStopLoss) Subscribe(session *ExchangeSession) {
+	if s.Interval == "" {
+		s.Interval = types.Interval1m
+	}
 	// use kline to handle roi stop
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
