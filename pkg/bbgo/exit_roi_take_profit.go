@@ -13,13 +13,17 @@ type RoiTakeProfit struct {
 	Percentage         fixedpoint.Value `json:"percentage"`
 	CancelActiveOrders bool             `json:"cancelActiveOrders"`
 
+	// Interval is the time resolution to update the stop order
+	// KLine per Interval will be used for updating the stop order
+	Interval types.Interval `json:"interval,omitempty"`
+
 	session       *ExchangeSession
 	orderExecutor *GeneralOrderExecutor
 }
 
 func (s *RoiTakeProfit) Subscribe(session *ExchangeSession) {
-	// use 1m kline to handle roi stop
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+	// use kline to handle roi stop
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *RoiTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
@@ -27,7 +31,7 @@ func (s *RoiTakeProfit) Bind(session *ExchangeSession, orderExecutor *GeneralOrd
 	s.orderExecutor = orderExecutor
 
 	position := orderExecutor.Position()
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(kline types.KLine) {
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(kline types.KLine) {
 		closePrice := kline.Close
 		if position.IsClosed() || position.IsDust(closePrice) || position.IsClosing() {
 			return
