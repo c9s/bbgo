@@ -12,7 +12,13 @@ type ClosedOrderBatchQuery struct {
 	types.ExchangeTradeHistoryService
 }
 
-func (q *ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64, opts ...Option) (c chan types.Order, errC chan error) {
+func (q *ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64) (c chan types.Order, errC chan error) {
+	jump := 30 * 24 * time.Hour
+	timeRangeProvider, ok := q.ExchangeTradeHistoryService.(types.ExchangeTimeRangeProvider)
+	if ok {
+		jump = timeRangeProvider.GetMaxOrderHistoryTimeRange()
+	}
+
 	query := &AsyncTimeRangedBatchQuery{
 		Type: types.Order{},
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
@@ -29,11 +35,7 @@ func (q *ClosedOrderBatchQuery) Query(ctx context.Context, symbol string, startT
 			}
 			return strconv.FormatUint(order.OrderID, 10)
 		},
-		JumpIfEmpty: 30 * 24 * time.Hour,
-	}
-
-	for _, opt := range opts {
-		opt(query)
+		JumpIfEmpty: jump,
 	}
 
 	c = make(chan types.Order, 100)
