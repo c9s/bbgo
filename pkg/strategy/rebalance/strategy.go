@@ -27,15 +27,16 @@ type Strategy struct {
 
 	Environment *bbgo.Environment
 
-	Schedule      string           `json:"schedule"`
-	QuoteCurrency string           `json:"quoteCurrency"`
-	TargetWeights types.ValueMap   `json:"targetWeights"`
-	Threshold     fixedpoint.Value `json:"threshold"`
-	MaxAmount     fixedpoint.Value `json:"maxAmount"` // max amount to buy or sell per order
-	OrderType     types.OrderType  `json:"orderType"`
-	PriceType     types.PriceType  `json:"priceType"`
-	DryRun        bool             `json:"dryRun"`
-	OnStart       bool             `json:"onStart"` // rebalance on start
+	Schedule      string            `json:"schedule"`
+	QuoteCurrency string            `json:"quoteCurrency"`
+	TargetWeights types.ValueMap    `json:"targetWeights"`
+	Threshold     fixedpoint.Value  `json:"threshold"`
+	MaxAmount     fixedpoint.Value  `json:"maxAmount"` // max amount to buy or sell per order
+	OrderType     types.OrderType   `json:"orderType"`
+	PriceType     types.PriceType   `json:"priceType"`
+	BalanceType   types.BalanceType `json:"balanceType"`
+	DryRun        bool              `json:"dryRun"`
+	OnStart       bool              `json:"onStart"` // rebalance on start
 
 	symbols         []string
 	markets         map[string]types.Market
@@ -50,6 +51,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.PriceType == "" {
 		s.PriceType = types.PriceTypeMaker
+	}
+
+	if s.BalanceType == "" {
+		s.BalanceType = types.BalanceTypeAvailable
 	}
 	return nil
 }
@@ -216,7 +221,7 @@ func (s *Strategy) generateOrder(ctx context.Context) (*types.SubmitOrder, error
 		return nil, err
 	}
 
-	values := prices.Mul(toValueMap(balances))
+	values := prices.Mul(s.toValueMap(balances))
 	weights := values.Normalize()
 
 	for symbol, market := range s.markets {
@@ -286,11 +291,10 @@ func (s *Strategy) generateOrder(ctx context.Context) (*types.SubmitOrder, error
 	return nil, nil
 }
 
-func toValueMap(balances types.BalanceMap) types.ValueMap {
+func (s *Strategy) toValueMap(balances types.BalanceMap) types.ValueMap {
 	m := make(types.ValueMap)
 	for _, b := range balances {
-		// m[b.Currency] = b.Net()
-		m[b.Currency] = b.Available
+		m[b.Currency] = s.BalanceType.Map(b)
 	}
 	return m
 }
