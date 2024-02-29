@@ -48,16 +48,17 @@ func TestGenerateOpenPositionOrders(t *testing.T) {
 
 	t.Run("case 1: all config is valid and we can place enough orders", func(t *testing.T) {
 		quoteInvestment := Number("10500")
+		profit := Number("300")
 		askPrice := Number("30000")
 		margin := Number("0.05")
-		submitOrders, err := generateOpenPositionOrders(strategy.Market, quoteInvestment, askPrice, margin, 4, strategy.OrderGroupID)
+		submitOrders, err := generateOpenPositionOrders(strategy.Market, quoteInvestment, profit, askPrice, margin, 4, strategy.OrderGroupID)
 		if !assert.NoError(err) {
 			return
 		}
 
 		assert.Len(submitOrders, 4)
 		assert.Equal(Number("30000"), submitOrders[0].Price)
-		assert.Equal(Number("0.0875"), submitOrders[0].Quantity)
+		assert.Equal(Number("0.0975"), submitOrders[0].Quantity)
 		assert.Equal(Number("28500"), submitOrders[1].Price)
 		assert.Equal(Number("0.092105"), submitOrders[1].Quantity)
 		assert.Equal(Number("27075"), submitOrders[2].Price)
@@ -66,12 +67,29 @@ func TestGenerateOpenPositionOrders(t *testing.T) {
 		assert.Equal(Number("0.102055"), submitOrders[3].Quantity)
 	})
 
-	t.Run("case 2: some orders' price will below 0, so we should not create such order", func(t *testing.T) {
+	t.Run("case 2: profit need to be truncated to avoid precision problem", func(t *testing.T) {
+		quoteInvestment := Number("1000")
+		profit := Number("99.47871711")
+		askPrice := Number("40409.72")
+		margin := Number("0.1")
+		submitOrders, err := generateOpenPositionOrders(strategy.Market, quoteInvestment, profit, askPrice, margin, 2, strategy.OrderGroupID)
+		if !assert.NoError(err) {
+			return
+		}
+
+		assert.Len(submitOrders, 2)
+		assert.Equal(Number("40409.72"), submitOrders[0].Price)
+		assert.Equal(Number("0.014834"), submitOrders[0].Quantity)
+		assert.Equal(Number("36368.74"), submitOrders[1].Price)
+		assert.Equal(Number("0.013748"), submitOrders[1].Quantity)
 	})
 
-	t.Run("case 3: notional is too small, so we should decrease num of orders", func(t *testing.T) {
+	t.Run("case 3: some orders' price will below 0, so we should not create such order", func(t *testing.T) {
 	})
 
-	t.Run("case 4: quantity is too small, so we should decrease num of orders", func(t *testing.T) {
+	t.Run("case 4: notional is too small, so we should decrease num of orders", func(t *testing.T) {
+	})
+
+	t.Run("case 5: quantity is too small, so we should decrease num of orders", func(t *testing.T) {
 	})
 }
