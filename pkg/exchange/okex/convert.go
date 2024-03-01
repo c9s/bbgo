@@ -5,9 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
-	"go.uber.org/multierr"
-
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -124,31 +121,6 @@ func toLocalSideType(side types.SideType) okexapi.SideType {
 	return okexapi.SideType(strings.ToLower(string(side)))
 }
 
-func segmentOrderDetails(orderDetails []okexapi.OrderDetails) (trades, orders []okexapi.OrderDetails) {
-	for _, orderDetail := range orderDetails {
-		if len(orderDetail.LastTradeID) > 0 {
-			trades = append(trades, orderDetail)
-		}
-		orders = append(orders, orderDetail)
-	}
-	return trades, orders
-}
-
-func toGlobalTrades(orderDetails []okexapi.OrderDetails) ([]types.Trade, error) {
-	var trades []types.Trade
-	var err error
-	for _, orderDetail := range orderDetails {
-		trade, err2 := toGlobalTrade(&orderDetail)
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-			continue
-		}
-		trades = append(trades, *trade)
-	}
-
-	return trades, nil
-}
-
 func tradeToGlobal(trade okexapi.Trade) types.Trade {
 	side := toGlobalSide(trade.Side)
 	return types.Trade{
@@ -244,22 +216,6 @@ func orderDetailToGlobal(order *okexapi.OrderDetail) (*types.Order, error) {
 		CreationTime:     types.Time(order.CreatedTime),
 		UpdateTime:       types.Time(order.UpdatedTime),
 	}, nil
-}
-
-func toGlobalOrders(orderDetails []okexapi.OrderDetails) ([]types.Order, error) {
-	var orders []types.Order
-	var err error
-	for _, orderDetail := range orderDetails {
-
-		o, err2 := toGlobalOrder(&orderDetail)
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-			continue
-		}
-		orders = append(orders, *o)
-	}
-
-	return orders, err
 }
 
 func toGlobalOrderStatus(state okexapi.OrderState) (types.OrderStatus, error) {
@@ -393,46 +349,5 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 		UpdateTime:       types.Time(okexOrder.UpdateTime),
 		IsMargin:         isMargin,
 		IsIsolated:       false,
-	}, nil
-}
-
-func toGlobalTrade(orderDetail *okexapi.OrderDetails) (*types.Trade, error) {
-	// Should use tradeId, but okex use billId to perform pagination, so use billID as tradeID instead.
-	billID := orderDetail.BillID
-
-	orderID, err := strconv.ParseInt(orderDetail.OrderID, 10, 64)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing ordId value: %s", orderDetail.OrderID)
-	}
-
-	side := toGlobalSide(orderDetail.Side)
-
-	isMargin := false
-	if orderDetail.InstrumentType == okexapi.InstrumentTypeMARGIN {
-		isMargin = true
-	}
-
-	isFuture := false
-	if orderDetail.InstrumentType == okexapi.InstrumentTypeFutures {
-		isFuture = true
-	}
-
-	return &types.Trade{
-		ID:            uint64(billID),
-		OrderID:       uint64(orderID),
-		Exchange:      types.ExchangeOKEx,
-		Price:         orderDetail.LastFilledPrice,
-		Quantity:      orderDetail.LastFilledQuantity,
-		QuoteQuantity: orderDetail.LastFilledPrice.Mul(orderDetail.LastFilledQuantity),
-		Symbol:        toGlobalSymbol(orderDetail.InstrumentID),
-		Side:          side,
-		IsBuyer:       side == types.SideTypeBuy,
-		IsMaker:       orderDetail.ExecutionType == "M",
-		Time:          types.Time(orderDetail.LastFilledTime),
-		Fee:           orderDetail.LastFilledFee,
-		FeeCurrency:   orderDetail.LastFilledFeeCurrency,
-		IsMargin:      isMargin,
-		IsFutures:     isFuture,
-		IsIsolated:    false,
 	}, nil
 }
