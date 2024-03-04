@@ -21,7 +21,7 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 		return err
 	}
 
-	orders, err := generateOpenPositionOrders(s.Market, s.ProfitStats.QuoteInvestment, price, s.PriceDeviation, s.MaxOrderCount, s.OrderGroupID)
+	orders, err := generateOpenPositionOrders(s.Market, s.QuoteInvestment, s.ProfitStats.TotalProfit, price, s.PriceDeviation, s.MaxOrderCount, s.OrderGroupID)
 	if err != nil {
 		return err
 	}
@@ -60,8 +60,9 @@ func getBestPriceUntilSuccess(ctx context.Context, ex types.Exchange, symbol str
 	return ticker.Sell, nil
 }
 
-func generateOpenPositionOrders(market types.Market, quoteInvestment, price, priceDeviation fixedpoint.Value, maxOrderCount int64, orderGroupID uint32) ([]types.SubmitOrder, error) {
+func generateOpenPositionOrders(market types.Market, quoteInvestment, profit, price, priceDeviation fixedpoint.Value, maxOrderCount int64, orderGroupID uint32) ([]types.SubmitOrder, error) {
 	factor := fixedpoint.One.Sub(priceDeviation)
+	profit = market.TruncatePrice(profit)
 
 	// calculate all valid prices
 	var prices []fixedpoint.Value
@@ -86,7 +87,13 @@ func generateOpenPositionOrders(market types.Market, quoteInvestment, price, pri
 
 	var submitOrders []types.SubmitOrder
 	for i := 0; i < orderNum; i++ {
-		quantity := market.TruncateQuantity(notional.Div(prices[i]))
+		var quantity fixedpoint.Value
+		// all the profit will use in the first order
+		if i == 0 {
+			quantity = market.TruncateQuantity(notional.Add(profit).Div(prices[i]))
+		} else {
+			quantity = market.TruncateQuantity(notional.Div(prices[i]))
+		}
 		submitOrders = append(submitOrders, types.SubmitOrder{
 			Symbol:      market.Symbol,
 			Market:      market,
