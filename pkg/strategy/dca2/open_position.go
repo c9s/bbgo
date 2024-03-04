@@ -16,7 +16,7 @@ type cancelOrdersByGroupIDApi interface {
 
 func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 	s.logger.Infof("[DCA] start placing open position orders")
-	price, err := getBestPriceUntilSuccess(ctx, s.Session.Exchange, s.Symbol)
+	price, err := getBestPriceUntilSuccess(ctx, s.ExchangeSession.Exchange, s.Symbol)
 	if err != nil {
 		return err
 	}
