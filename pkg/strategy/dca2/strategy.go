@@ -46,10 +46,10 @@ type Strategy struct {
 	Position    *types.Position `json:"position,omitempty" persistence:"position"`
 	ProfitStats *ProfitStats    `json:"profitStats,omitempty" persistence:"profit_stats"`
 
-	Environment   *bbgo.Environment
-	Session       *bbgo.ExchangeSession
-	OrderExecutor *bbgo.GeneralOrderExecutor
-	Market        types.Market
+	Environment     *bbgo.Environment
+	ExchangeSession *bbgo.ExchangeSession
+	OrderExecutor   *bbgo.GeneralOrderExecutor
+	Market          types.Market
 
 	Symbol string `json:"symbol"`
 
@@ -146,8 +146,8 @@ func (s *Strategy) newPrometheusLabels() prometheus.Labels {
 		"symbol":   s.Symbol,
 	}
 
-	if s.Session != nil {
-		labels["exchange"] = s.Session.Name
+	if s.ExchangeSession != nil {
+		labels["exchange"] = s.ExchangeSession.Name
 	}
 
 	if s.PrometheusLabels == nil {
@@ -159,7 +159,7 @@ func (s *Strategy) newPrometheusLabels() prometheus.Labels {
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
-	s.Session = session
+	s.ExchangeSession = session
 	if s.ProfitStats == nil {
 		s.ProfitStats = newProfitStats(s.Market, s.QuoteInvestment)
 	}
@@ -320,7 +320,7 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	_ = s.Initialize()
 	defer s.EmitClosed()
 
-	session := s.Session
+	session := s.ExchangeSession
 	if session == nil {
 		return fmt.Errorf("Session is nil, please check it")
 	}
@@ -358,14 +358,14 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 }
 
 func (s *Strategy) CalculateAndEmitProfit(ctx context.Context) error {
-	historyService, ok := s.Session.Exchange.(types.ExchangeTradeHistoryService)
+	historyService, ok := s.ExchangeSession.Exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
-		return fmt.Errorf("exchange %s doesn't support ExchangeTradeHistoryService", s.Session.Exchange.Name())
+		return fmt.Errorf("exchange %s doesn't support ExchangeTradeHistoryService", s.ExchangeSession.Exchange.Name())
 	}
 
-	queryService, ok := s.Session.Exchange.(types.ExchangeOrderQueryService)
+	queryService, ok := s.ExchangeSession.Exchange.(types.ExchangeOrderQueryService)
 	if !ok {
-		return fmt.Errorf("exchange %s doesn't support ExchangeOrderQueryService", s.Session.Exchange.Name())
+		return fmt.Errorf("exchange %s doesn't support ExchangeOrderQueryService", s.ExchangeSession.Exchange.Name())
 	}
 
 	// TODO: pagination for it
@@ -444,7 +444,7 @@ func (s *Strategy) CalculateAndEmitProfit(ctx context.Context) error {
 
 func (s *Strategy) updateNumOfOrdersMetrics(ctx context.Context) {
 	// update open orders metrics
-	openOrders, err := s.Session.Exchange.QueryOpenOrders(ctx, s.Symbol)
+	openOrders, err := s.ExchangeSession.Exchange.QueryOpenOrders(ctx, s.Symbol)
 	if err != nil {
 		s.logger.WithError(err).Warn("failed to query open orders to update num of the orders metrics")
 	} else {
