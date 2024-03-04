@@ -21,24 +21,13 @@ const (
 
 var ErrInvalidPriceType = errors.New("invalid price type")
 
-func StrToPriceType(s string) (price PriceType, err error) {
-	switch strings.ToLower(s) {
-	case "last":
-		price = PriceTypeLast
-	case "buy":
-		price = PriceTypeBuy
-	case "sell":
-		price = PriceTypeSell
-	case "mid":
-		price = PriceTypeMid
-	case "maker":
-		price = PriceTypeMaker
-	case "taker":
-		price = PriceTypeTaker
-	default:
-		err = ErrInvalidPriceType
+func ParsePriceType(s string) (p PriceType, err error) {
+	p = PriceType(strings.ToUpper(s))
+	switch p {
+	case PriceTypeLast, PriceTypeBuy, PriceTypeSell, PriceTypeMid, PriceTypeMaker, PriceTypeTaker:
+		return p, err
 	}
-	return price, err
+	return p, ErrInvalidPriceType
 }
 
 func (p *PriceType) UnmarshalJSON(data []byte) error {
@@ -48,12 +37,13 @@ func (p *PriceType) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	t, err := StrToPriceType(s)
+	t, err := ParsePriceType(s)
 	if err != nil {
 		return err
 	}
 
 	*p = t
+
 	return nil
 }
 
