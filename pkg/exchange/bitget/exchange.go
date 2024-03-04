@@ -513,12 +513,12 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 		req.Symbol(order.Symbol)
 
 		if err := cancelOrderRateLimiter.Wait(ctx); err != nil {
-			errs = multierr.Append(errs, fmt.Errorf("cancel order rate limiter wait, order id: %s, error: %w", order.ClientOrderID, err))
+			errs = multierr.Append(errs, fmt.Errorf("cancel order rate limiter wait, orderId: %d, clientOrderId: %s, error: %w", order.OrderID, order.ClientOrderID, err))
 			continue
 		}
 		res, err := req.Do(ctx)
 		if err != nil {
-			errs = multierr.Append(errs, fmt.Errorf("failed to cancel order id: %s, err: %w", order.ClientOrderID, err))
+			errs = multierr.Append(errs, fmt.Errorf("failed to cancel orderId: %d, clientOrderId: %s, err: %w", order.OrderID, order.ClientOrderID, err))
 			continue
 		}
 
