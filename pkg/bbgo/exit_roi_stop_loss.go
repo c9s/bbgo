@@ -11,14 +11,20 @@ type RoiStopLoss struct {
 	Symbol             string
 	Percentage         fixedpoint.Value `json:"percentage"`
 	CancelActiveOrders bool             `json:"cancelActiveOrders"`
+	// Interval is the time resolution to update the stop order
+	// KLine per Interval will be used for updating the stop order
+	Interval types.Interval `json:"interval,omitempty"`
 
 	session       *ExchangeSession
 	orderExecutor *GeneralOrderExecutor
 }
 
 func (s *RoiStopLoss) Subscribe(session *ExchangeSession) {
-	// use 1m kline to handle roi stop
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: types.Interval1m})
+	// use kline to handle roi stop
+	if s.Interval == "" {
+		s.Interval = types.Interval1m
+	}
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 func (s *RoiStopLoss) Bind(session *ExchangeSession, orderExecutor *GeneralOrderExecutor) {
@@ -30,8 +36,8 @@ func (s *RoiStopLoss) Bind(session *ExchangeSession, orderExecutor *GeneralOrder
 		s.checkStopPrice(kline.Close, position)
 	}
 
-	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, f))
-	session.MarketDataStream.OnKLine(types.KLineWith(s.Symbol, types.Interval1m, f))
+	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, f))
+	session.MarketDataStream.OnKLine(types.KLineWith(s.Symbol, s.Interval, f))
 
 	if !IsBackTesting && enableMarketTradeStop {
 		session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
