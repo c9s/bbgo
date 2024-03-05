@@ -74,7 +74,7 @@ func TestExchange_QueryMarkets(t *testing.T) {
 		transport := &httptesting.MockTransport{}
 		ex.client.HttpClient.Transport = transport
 
-		f, err := os.ReadFile("bitgetapi/v2/testdata/get_symbols_request_error.json")
+		f, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
 		assert.NoError(t, err)
 
 		transport.GET("/api/v2/spot/public/symbols", func(req *http.Request) (*http.Response, error) {
@@ -83,5 +83,153 @@ func TestExchange_QueryMarkets(t *testing.T) {
 
 		_, err = ex.QueryMarkets(context.Background())
 		assert.ErrorContains(t, err, "Invalid IP")
+	})
+}
+
+func TestExchange_QueryTicker(t *testing.T) {
+	var (
+		assert = assert.New(t)
+		ex     = New("key", "secret", "passphrase")
+		url    = "/api/v2/spot/market/tickers"
+	)
+
+	t.Run("succeeds", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/get_ticker_request.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusOK, string(f)), nil
+		})
+
+		tickers, err := ex.QueryTicker(context.Background(), "BTCUSDT")
+		assert.NoError(err)
+		expTicker := &types.Ticker{
+			Time:   types.NewMillisecondTimestampFromInt(1709626631127).Time(),
+			Volume: fixedpoint.MustNewFromString("29439.351448"),
+			Last:   fixedpoint.MustNewFromString("66554.03"),
+			Open:   fixedpoint.MustNewFromString("64654.54"),
+			High:   fixedpoint.MustNewFromString("68686.93"),
+			Low:    fixedpoint.MustNewFromString("64583.42"),
+			Buy:    fixedpoint.MustNewFromString("66554"),
+			Sell:   fixedpoint.MustNewFromString("66554.07"),
+		}
+		assert.Equal(expTicker, tickers)
+	})
+
+	t.Run("unexpected length", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/get_tickers_request.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusOK, string(f)), nil
+		})
+
+		_, err = ex.QueryTicker(context.Background(), "BTCUSDT")
+		assert.ErrorContains(err, "unexpected length of query")
+	})
+
+	t.Run("error", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusBadRequest, string(f)), nil
+		})
+
+		_, err = ex.QueryTicker(context.Background(), "BTCUSDT")
+		assert.ErrorContains(err, "Invalid IP")
+	})
+}
+
+func TestExchange_QueryTickers(t *testing.T) {
+	var (
+		assert       = assert.New(t)
+		ex           = New("key", "secret", "passphrase")
+		url          = "/api/v2/spot/market/tickers"
+		expBtcSymbol = "BTCUSDT"
+		expBtcTicker = types.Ticker{
+			Time:   types.NewMillisecondTimestampFromInt(1709626631127).Time(),
+			Volume: fixedpoint.MustNewFromString("29439.351448"),
+			Last:   fixedpoint.MustNewFromString("66554.03"),
+			Open:   fixedpoint.MustNewFromString("64654.54"),
+			High:   fixedpoint.MustNewFromString("68686.93"),
+			Low:    fixedpoint.MustNewFromString("64583.42"),
+			Buy:    fixedpoint.MustNewFromString("66554"),
+			Sell:   fixedpoint.MustNewFromString("66554.07"),
+		}
+	)
+
+	t.Run("succeeds", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/get_tickers_request.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusOK, string(f)), nil
+		})
+
+		tickers, err := ex.QueryTickers(context.Background())
+		assert.NoError(err)
+		expTickers := map[string]types.Ticker{
+			expBtcSymbol: expBtcTicker,
+			"ETHUSDT": {
+				Time:   types.NewMillisecondTimestampFromInt(1709626631726).Time(),
+				Volume: fixedpoint.MustNewFromString("243220.866"),
+				Last:   fixedpoint.MustNewFromString("3686.95"),
+				Open:   fixedpoint.MustNewFromString("3506.6"),
+				High:   fixedpoint.MustNewFromString("3740"),
+				Low:    fixedpoint.MustNewFromString("3461.17"),
+				Buy:    fixedpoint.MustNewFromString("3686.94"),
+				Sell:   fixedpoint.MustNewFromString("3686.98"),
+			},
+		}
+		assert.Equal(expTickers, tickers)
+	})
+
+	t.Run("succeeds for query one markets", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/get_ticker_request.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			assert.Contains(req.URL.Query(), "symbol")
+			assert.Equal(req.URL.Query()["symbol"], []string{expBtcSymbol})
+			return httptesting.BuildResponseString(http.StatusOK, string(f)), nil
+		})
+
+		tickers, err := ex.QueryTickers(context.Background(), expBtcSymbol)
+		assert.NoError(err)
+		expTickers := map[string]types.Ticker{
+			expBtcSymbol: expBtcTicker,
+		}
+		assert.Equal(expTickers, tickers)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusBadRequest, string(f)), nil
+		})
+
+		_, err = ex.QueryTicker(context.Background(), expBtcSymbol)
+		assert.ErrorContains(err, "Invalid IP")
 	})
 }
