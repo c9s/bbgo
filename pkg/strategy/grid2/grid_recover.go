@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange"
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -19,7 +20,7 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 	defer func() {
 		s.updateGridNumOfOrdersMetricsWithLock()
 	}()
-	isMax := isMaxExchange(session.Exchange)
+	isMax := exchange.IsMaxExchange(session.Exchange)
 	s.logger.Infof("isMax: %t", isMax)
 
 	historyService, implemented := session.Exchange.(types.ExchangeTradeHistoryService)

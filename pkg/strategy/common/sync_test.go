@@ -1,4 +1,4 @@
-package grid2
+package common
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
 	"github.com/golang/mock/gomock"
-	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,23 +23,12 @@ func TestSyncActiveOrders(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	log := logrus.WithField("strategy", "test")
 	symbol := "ETHUSDT"
-	labels := prometheus.Labels{
-		"exchange": "default",
-		"symbol":   symbol,
-	}
 	t.Run("all open orders are match with active orderbook", func(t *testing.T) {
 		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
 		mockExchange := mocks.NewMockExchange(mockCtrl)
 		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
-
-		opts := SyncActiveOrdersOpts{
-			logger:            log,
-			metricsLabels:     labels,
-			activeOrderBook:   activeOrderbook,
-			orderQueryService: mockOrderQueryService,
-			exchange:          mockExchange,
-		}
 
 		order := types.Order{
 			OrderID: 1,
@@ -47,10 +36,17 @@ func TestSyncActiveOrders(t *testing.T) {
 		}
 		order.Symbol = symbol
 
-		activeOrderbook.Add(order)
-		mockExchange.EXPECT().QueryOpenOrders(ctx, symbol).Return([]types.Order{order}, nil)
+		opts := SyncActiveOrdersOpts{
+			Logger:            log,
+			Exchange:          mockExchange,
+			OrderQueryService: mockOrderQueryService,
+			ActiveOrderBook:   activeOrderbook,
+			OpenOrders:        []types.Order{order},
+		}
 
-		assert.NoError(syncActiveOrders(ctx, opts))
+		activeOrderbook.Add(order)
+
+		assert.NoError(SyncActiveOrders(ctx, opts))
 
 		// verify active orderbook
 		activeOrders := activeOrderbook.Orders()
@@ -64,14 +60,6 @@ func TestSyncActiveOrders(t *testing.T) {
 		mockExchange := mocks.NewMockExchange(mockCtrl)
 		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
 
-		opts := SyncActiveOrdersOpts{
-			logger:            log,
-			metricsLabels:     labels,
-			activeOrderBook:   activeOrderbook,
-			orderQueryService: mockOrderQueryService,
-			exchange:          mockExchange,
-		}
-
 		order := types.Order{
 			OrderID: 1,
 			Status:  types.OrderStatusNew,
@@ -82,14 +70,21 @@ func TestSyncActiveOrders(t *testing.T) {
 		updatedOrder := order
 		updatedOrder.Status = types.OrderStatusFilled
 
+		opts := SyncActiveOrdersOpts{
+			Logger:            log,
+			ActiveOrderBook:   activeOrderbook,
+			OrderQueryService: mockOrderQueryService,
+			Exchange:          mockExchange,
+			OpenOrders:        nil,
+		}
+
 		activeOrderbook.Add(order)
-		mockExchange.EXPECT().QueryOpenOrders(ctx, symbol).Return(nil, nil)
 		mockOrderQueryService.EXPECT().QueryOrder(ctx, types.OrderQuery{
 			Symbol:  symbol,
 			OrderID: strconv.FormatUint(order.OrderID, 10),
 		}).Return(&updatedOrder, nil)
 
-		assert.NoError(syncActiveOrders(ctx, opts))
+		assert.NoError(SyncActiveOrders(ctx, opts))
 
 		// verify active orderbook
 		activeOrders := activeOrderbook.Orders()
@@ -101,14 +96,6 @@ func TestSyncActiveOrders(t *testing.T) {
 		mockExchange := mocks.NewMockExchange(mockCtrl)
 		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
 
-		opts := SyncActiveOrdersOpts{
-			logger:            log,
-			metricsLabels:     labels,
-			activeOrderBook:   activeOrderbook,
-			orderQueryService: mockOrderQueryService,
-			exchange:          mockExchange,
-		}
-
 		order := types.Order{
 			OrderID: 1,
 			Status:  types.OrderStatusNew,
@@ -118,8 +105,14 @@ func TestSyncActiveOrders(t *testing.T) {
 			CreationTime: types.Time(time.Now()),
 		}
 
-		mockExchange.EXPECT().QueryOpenOrders(ctx, symbol).Return([]types.Order{order}, nil)
-		assert.NoError(syncActiveOrders(ctx, opts))
+		opts := SyncActiveOrdersOpts{
+			Logger:            log,
+			ActiveOrderBook:   activeOrderbook,
+			OrderQueryService: mockOrderQueryService,
+			Exchange:          mockExchange,
+			OpenOrders:        []types.Order{order},
+		}
+		assert.NoError(SyncActiveOrders(ctx, opts))
 
 		// verify active orderbook
 		activeOrders := activeOrderbook.Orders()
@@ -132,14 +125,6 @@ func TestSyncActiveOrders(t *testing.T) {
 		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
 		mockExchange := mocks.NewMockExchange(mockCtrl)
 		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
-
-		opts := SyncActiveOrdersOpts{
-			logger:            log,
-			metricsLabels:     labels,
-			activeOrderBook:   activeOrderbook,
-			orderQueryService: mockOrderQueryService,
-			exchange:          mockExchange,
-		}
 
 		order1 := types.Order{
 			OrderID: 1,
@@ -158,14 +143,21 @@ func TestSyncActiveOrders(t *testing.T) {
 			},
 		}
 
+		opts := SyncActiveOrdersOpts{
+			Logger:            log,
+			ActiveOrderBook:   activeOrderbook,
+			OrderQueryService: mockOrderQueryService,
+			Exchange:          mockExchange,
+			OpenOrders:        []types.Order{order2},
+		}
+
 		activeOrderbook.Add(order1)
-		mockExchange.EXPECT().QueryOpenOrders(ctx, symbol).Return([]types.Order{order2}, nil)
 		mockOrderQueryService.EXPECT().QueryOrder(ctx, types.OrderQuery{
 			Symbol:  symbol,
 			OrderID: strconv.FormatUint(order1.OrderID, 10),
 		}).Return(&updatedOrder1, nil)
 
-		assert.NoError(syncActiveOrders(ctx, opts))
+		assert.NoError(SyncActiveOrders(ctx, opts))
 
 		// verify active orderbook
 		activeOrders := activeOrderbook.Orders()
