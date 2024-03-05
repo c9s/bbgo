@@ -51,8 +51,10 @@ func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, stats *ty
 	var allTrades = make([]types.Trade, 0, 1000)
 
 	g, subCtx := errgroup.WithContext(ctx)
-	for n, service := range f.sessions {
+	for n, s := range f.sessions {
+		// allocate a copy of the iteration variables
 		sessionName := n
+		service := s
 		g.Go(func() error {
 			log.Infof("batch querying %s trade history from %s since %s until %s", f.market.Symbol, sessionName, since.String(), until.String())
 			trades, err := f.batchQueryTrades(subCtx, service, f.market.Symbol, since, until)
