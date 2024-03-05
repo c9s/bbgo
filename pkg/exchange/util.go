@@ -1,6 +1,9 @@
 package exchange
 
-import "github.com/c9s/bbgo/pkg/types"
+import (
+	"github.com/c9s/bbgo/pkg/exchange/max"
+	"github.com/c9s/bbgo/pkg/types"
+)
 
 func GetSessionAttributes(exchange types.Exchange) (isMargin, isFutures, isIsolated bool, isolatedSymbol string) {
 	if marginExchange, ok := exchange.(types.MarginExchange); ok {
@@ -26,4 +29,9 @@ func GetSessionAttributes(exchange types.Exchange) (isMargin, isFutures, isIsola
 	}
 
 	return isMargin, isFutures, isIsolated, isolatedSymbol
+}
+
+func IsMaxExchange(exchange interface{}) bool {
+	_, res := exchange.(*max.Exchange)
+	return res
 }

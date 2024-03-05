@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange"
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -273,7 +274,7 @@ func syncActiveOrder(
 	ctx context.Context, activeOrderBook *bbgo.ActiveOrderBook, orderQueryService types.ExchangeOrderQueryService,
 	orderID uint64, syncBefore time.Time,
 ) (isOrderUpdated bool, err error) {
-	isMax := isMaxExchange(orderQueryService)
+	isMax := exchange.IsMaxExchange(orderQueryService)
 
 	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
 		Symbol:  activeOrderBook.Symbol,

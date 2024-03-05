@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -25,9 +24,9 @@ type RecoverApiQueryService interface {
 
 func (s *Strategy) recover(ctx context.Context) error {
 	s.logger.Info("[DCA] recover")
-	queryService, ok := s.Session.Exchange.(RecoverApiQueryService)
+	queryService, ok := s.ExchangeSession.Exchange.(RecoverApiQueryService)
 	if !ok {
-		return fmt.Errorf("[DCA] exchange %s doesn't support queryAPI interface", s.Session.ExchangeName)
+		return fmt.Errorf("[DCA] exchange %s doesn't support queryAPI interface", s.ExchangeSession.ExchangeName)
 	}
 
 	openOrders, err := queryService.QueryOpenOrders(ctx, s.Symbol)
@@ -63,18 +62,18 @@ func (s *Strategy) recover(ctx context.Context) error {
 	s.startTimeOfNextRound = startTimeOfNextRound
 
 	// recover state
-	state, err := recoverState(ctx, s.ProfitStats.QuoteInvestment, int(s.MaxOrderCount), currentRound, s.OrderExecutor)
+	state, err := recoverState(ctx, int(s.MaxOrderCount), currentRound, s.OrderExecutor)
 	if err != nil {
 		return err
 	}
-	s.state = state
+	s.updateState(state)
 	s.logger.Info("recover stats DONE")
 
 	return nil
 }
 
 // recover state
-func recoverState(ctx context.Context, quoteInvestment fixedpoint.Value, maxOrderCount int, currentRound Round, orderExecutor *bbgo.GeneralOrderExecutor) (State, error) {
+func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, orderExecutor *bbgo.GeneralOrderExecutor) (State, error) {
 	activeOrderBook := orderExecutor.ActiveMakerOrders()
 	orderStore := orderExecutor.OrderStore()
 

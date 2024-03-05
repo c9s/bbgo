@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -95,13 +94,12 @@ func (m *MockQueryOrders) QueryClosedOrdersDesc(ctx context.Context, symbol stri
 
 func Test_RecoverState(t *testing.T) {
 	strategy := newTestStrategy()
-	quoteInvestment := fixedpoint.MustNewFromString("1000")
 
 	t.Run("new strategy", func(t *testing.T) {
 		currentRound := Round{}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(nil, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), quoteInvestment, 5, currentRound, orderExecutor)
+		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, WaitToOpenPosition, state)
 	})
@@ -119,7 +117,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(nil, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), quoteInvestment, 5, currentRound, orderExecutor)
+		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionReady, state)
 	})
@@ -137,7 +135,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(nil, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), quoteInvestment, 5, currentRound, orderExecutor)
+		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionOrderFilled, state)
 	})
@@ -155,7 +153,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(nil, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), quoteInvestment, 5, currentRound, orderExecutor)
+		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionOrdersCancelling, state)
 	})
@@ -173,7 +171,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(nil, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), quoteInvestment, 5, currentRound, orderExecutor)
+		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionOrdersCancelling, state)
 	})
@@ -192,7 +190,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(nil, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), quoteInvestment, 5, currentRound, orderExecutor)
+		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, TakeProfitReady, state)
 	})
@@ -211,7 +209,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(nil, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), quoteInvestment, 5, currentRound, orderExecutor)
+		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, WaitToOpenPosition, state)
 	})
