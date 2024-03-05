@@ -37,27 +37,23 @@ func (f *ProfitFixer) batchQueryTrades(
 	ctx context.Context,
 	service types.ExchangeTradeHistoryService,
 	symbol string,
-	since time.Time,
+	since, until time.Time,
 ) ([]types.Trade, error) {
-
-	now := time.Now()
 	q := &batch.TradeBatchQuery{ExchangeTradeHistoryService: service}
-	trades, err := q.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
+	return q.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
 		StartTime: &since,
-		EndTime:   &now,
+		EndTime:   &until,
 	})
-
-	return trades, err
 }
 
-func (f *ProfitFixer) Fix(ctx context.Context, since time.Time, stats *types.ProfitStats, position *types.Position) error {
+func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, stats *types.ProfitStats, position *types.Position) error {
 	var mu sync.Mutex
 	var allTrades = make([]types.Trade, 0, 1000)
 
 	g, subCtx := errgroup.WithContext(ctx)
 	for _, service := range f.sessions {
 		g.Go(func() error {
-			trades, err := f.batchQueryTrades(subCtx, service, f.market.Symbol, since)
+			trades, err := f.batchQueryTrades(subCtx, service, f.market.Symbol, since, until)
 			if err != nil {
 				log.WithError(err).Errorf("unable to batch query trades for fixer")
 				return err

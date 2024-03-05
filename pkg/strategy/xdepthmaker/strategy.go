@@ -341,8 +341,8 @@ func (s *Strategy) CrossRun(
 
 		s.CrossExchangeMarketMakingStrategy.Position = types.NewPositionFromMarket(s.makerMarket)
 		s.CrossExchangeMarketMakingStrategy.ProfitStats = types.NewProfitStats(s.makerMarket)
-		
-		if err2 := fixer.Fix(ctx, s.ProfitFixerConfig.TradesSince.Time(), s.CrossExchangeMarketMakingStrategy.ProfitStats, s.CrossExchangeMarketMakingStrategy.Position); err2 != nil {
+
+		if err2 := fixer.Fix(ctx, s.ProfitFixerConfig.TradesSince.Time(), time.Now(), s.CrossExchangeMarketMakingStrategy.ProfitStats, s.CrossExchangeMarketMakingStrategy.Position); err2 != nil {
 			return err2
 		}
 	}
