@@ -234,18 +234,14 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 		log.Warnf("[ActiveOrderBook] using open orders API to verify the active orders...")
 
 		var symbolOrdersMap = categorizeOrderBySymbol(orders)
-
+		var errOccurred bool
 		var leftOrders types.OrderSlice
-		for symbol := range symbolOrdersMap {
-			symbolOrders, ok := symbolOrdersMap[symbol]
-			if !ok {
-				continue
-			}
-
+		for symbol, symbolOrders := range symbolOrdersMap {
 			openOrders, err := ex.QueryOpenOrders(ctx, symbol)
 			if err != nil {
+				errOccurred = true
 				log.WithError(err).Errorf("can not query %s open orders", symbol)
-				continue
+				break
 			}
 
 			openOrderMap := types.NewOrderMap(openOrders...)
@@ -260,8 +256,11 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 			}
 		}
 
-		// update order slice for the next try
-		orders = leftOrders
+		// if an error occurs, we cannot update the orders because it will result in an empty order slice.
+		if !errOccurred {
+			// update order slice for the next try
+			orders = leftOrders
+		}
 	}
 
 	log.Debugf("[ActiveOrderBook] all %s orders are cancelled successfully in %s", b.Symbol, time.Since(startTime))
