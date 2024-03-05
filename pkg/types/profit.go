@@ -257,6 +257,10 @@ func (s *ProfitStats) AddTrade(trade Trade) {
 
 // IsOver24Hours checks if the since time is over 24 hours
 func (s *ProfitStats) IsOver24Hours() bool {
+	if s.TodaySince == 0 {
+		return false
+	}
+
 	return time.Since(time.Unix(s.TodaySince, 0)) >= 24*time.Hour
 }
 

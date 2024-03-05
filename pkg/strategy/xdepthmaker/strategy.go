@@ -193,6 +193,8 @@ type Strategy struct {
 	// Pips is the pips of the layer prices
 	Pips fixedpoint.Value `json:"pips"`
 
+	ProfitFixerConfig *ProfitFixerConfig `json:"profitFixer"`
+
 	// --------------------------------
 	// private fields
 	// --------------------------------
@@ -324,13 +326,29 @@ func (s *Strategy) CrossRun(
 
 	s.stopC = make(chan struct{})
 
-	if s.RecoverTrade {
-		// go s.runTradeRecover(ctx)
-	}
-
-	s.authedC = make(chan struct{}, 2)
+	s.authedC = make(chan struct{}, 5)
 	bindAuthSignal(ctx, s.makerSession.UserDataStream, s.authedC)
 	bindAuthSignal(ctx, s.hedgeSession.UserDataStream, s.authedC)
+
+	if s.ProfitFixerConfig != nil {
+		if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
+			return errors.New("tradesSince time can not be zero")
+		}
+
+		fixer := NewProfitFixer(s.makerMarket)
+		fixer.AddExchange(s.makerSession.Name, s.makerSession.Exchange.(types.ExchangeTradeHistoryService))
+		fixer.AddExchange(s.hedgeSession.Name, s.hedgeSession.Exchange.(types.ExchangeTradeHistoryService))
+		profitStats, err2 := fixer.Fix(ctx, s.ProfitFixerConfig.TradesSince.Time())
+		if err2 != nil {
+			return err2
+		}
+
+		s.CrossExchangeMarketMakingStrategy.ProfitStats = profitStats
+	}
+
+	if s.RecoverTrade {
+		go s.runTradeRecover(ctx)
+	}
 
 	go func() {
 		log.Infof("waiting for user data stream to get authenticated")
@@ -578,16 +596,14 @@ func (s *Strategy) runTradeRecover(ctx context.Context) {
 		case <-tradeScanTicker.C:
 			log.Infof("scanning trades from %s ago...", tradeScanInterval)
 
-			if s.RecoverTrade {
-				startTime := time.Now().Add(-tradeScanInterval).Add(-tradeScanOverlapBufferPeriod)
+			startTime := time.Now().Add(-tradeScanInterval).Add(-tradeScanOverlapBufferPeriod)
 
-				if err := s.HedgeOrderExecutor.TradeCollector().Recover(ctx, s.hedgeSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
-					log.WithError(err).Errorf("query trades error")
-				}
+			if err := s.HedgeOrderExecutor.TradeCollector().Recover(ctx, s.hedgeSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
+				log.WithError(err).Errorf("query trades error")
+			}
 
-				if err := s.MakerOrderExecutor.TradeCollector().Recover(ctx, s.makerSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
-					log.WithError(err).Errorf("query trades error")
-				}
+			if err := s.MakerOrderExecutor.TradeCollector().Recover(ctx, s.makerSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
+				log.WithError(err).Errorf("query trades error")
 			}
 		}
 	}
