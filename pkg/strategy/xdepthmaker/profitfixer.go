@@ -50,9 +50,7 @@ func (f *ProfitFixer) batchQueryTrades(
 	return trades, err
 }
 
-func (f *ProfitFixer) Fix(ctx context.Context, since time.Time) (*types.ProfitStats, error) {
-	stats := types.NewProfitStats(f.market)
-
+func (f *ProfitFixer) Fix(ctx context.Context, since time.Time, stats *types.ProfitStats, position *types.Position) error {
 	var mu sync.Mutex
 	var allTrades = make([]types.Trade, 0, 1000)
 
@@ -73,13 +71,14 @@ func (f *ProfitFixer) Fix(ctx context.Context, since time.Time) (*types.ProfitSt
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return err
 	}
 
 	allTrades = types.SortTradesAscending(allTrades)
 	for _, trade := range allTrades {
 		stats.AddTrade(trade)
+		position.AddTrade(trade)
 	}
 
-	return stats, nil
+	return nil
 }
