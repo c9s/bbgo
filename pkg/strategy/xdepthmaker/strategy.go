@@ -181,6 +181,8 @@ type Strategy struct {
 	// MaxExposurePosition defines the unhedged quantity of stop
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
+	DisableHedge bool `json:"disableHedge"`
+
 	NotifyTrade bool `json:"notifyTrade"`
 
 	// RecoverTrade tries to find the missing trades via the REStful API
@@ -267,11 +269,11 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Defaults() error {
 	if s.UpdateInterval == 0 {
-		s.UpdateInterval = types.Duration(time.Second)
+		s.UpdateInterval = types.Duration(5 * time.Second)
 	}
 
 	if s.FullReplenishInterval == 0 {
-		s.FullReplenishInterval = types.Duration(15 * time.Minute)
+		s.FullReplenishInterval = types.Duration(10 * time.Minute)
 	}
 
 	if s.HedgeInterval == 0 {
@@ -317,19 +319,6 @@ func (s *Strategy) CrossRun(
 
 	log.Infof("makerSession: %s hedgeSession: %s", makerSession.Name, hedgeSession.Name)
 
-	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx, s.Environment, makerSession, hedgeSession, s.Symbol, ID, s.InstanceID()); err != nil {
-		return err
-	}
-
-	s.pricingBook = types.NewStreamBook(s.Symbol)
-	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
-
-	s.stopC = make(chan struct{})
-
-	s.authedC = make(chan struct{}, 5)
-	bindAuthSignal(ctx, s.makerSession.UserDataStream, s.authedC)
-	bindAuthSignal(ctx, s.hedgeSession.UserDataStream, s.authedC)
-
 	if s.ProfitFixerConfig != nil {
 		if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
 			return errors.New("tradesSince time can not be zero")
@@ -346,6 +335,19 @@ func (s *Strategy) CrossRun(
 			return err2
 		}
 	}
+
+	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx, s.Environment, makerSession, hedgeSession, s.Symbol, ID, s.InstanceID()); err != nil {
+		return err
+	}
+
+	s.pricingBook = types.NewStreamBook(s.Symbol)
+	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
+
+	s.stopC = make(chan struct{})
+
+	s.authedC = make(chan struct{}, 5)
+	bindAuthSignal(ctx, s.makerSession.UserDataStream, s.authedC)
+	bindAuthSignal(ctx, s.hedgeSession.UserDataStream, s.authedC)
 
 	if s.RecoverTrade {
 		go s.runTradeRecover(ctx)
@@ -441,7 +443,9 @@ func (s *Strategy) CrossRun(
 						uncoverPosition,
 					)
 
-					s.Hedge(ctx, uncoverPosition.Neg())
+					if !s.DisableHedge {
+						s.Hedge(ctx, uncoverPosition.Neg())
+					}
 				}
 			}
 		}
