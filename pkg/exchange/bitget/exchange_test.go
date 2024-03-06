@@ -545,13 +545,15 @@ func TestExchange_QueryAccountBalances(t *testing.T) {
 
 func TestExchange_SubmitOrder(t *testing.T) {
 	var (
-		assert        = assert.New(t)
-		ex            = New("key", "secret", "passphrase")
-		placeOrderUrl = "/api/v2/spot/trade/place-order"
-		openOrderUrl  = "/api/v2/spot/trade/unfilled-orders"
-		clientOrderId = "684a79df-f931-474f-a9a5-f1deab1cd770"
-		expBtcSymbol  = "BTCUSDT"
-		expOrder      = &types.Order{
+		assert          = assert.New(t)
+		ex              = New("key", "secret", "passphrase")
+		placeOrderUrl   = "/api/v2/spot/trade/place-order"
+		openOrderUrl    = "/api/v2/spot/trade/unfilled-orders"
+		tickerUrl       = "/api/v2/spot/market/tickers"
+		historyOrderUrl = "/api/v2/spot/trade/history-orders"
+		clientOrderId   = "684a79df-f931-474f-a9a5-f1deab1cd770"
+		expBtcSymbol    = "BTCUSDT"
+		expOrder        = &types.Order{
 			SubmitOrder: types.SubmitOrder{
 				ClientOrderID: clientOrderId,
 				Symbol:        expBtcSymbol,
@@ -642,7 +644,277 @@ func TestExchange_SubmitOrder(t *testing.T) {
 		assert.Equal(expOrder, acct)
 	})
 
-	// TODO: add market buy, limit maker
+	t.Run("Limit Maker order", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		placeOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/place_order_request.json")
+		assert.NoError(err)
+
+		transport.POST(placeOrderUrl, func(req *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(req.Body)
+			assert.NoError(err)
+
+			reqq := &NewOrder{}
+			err = json.Unmarshal(raw, &reqq)
+			assert.NoError(err)
+			assert.Equal(&NewOrder{
+				ClientOid: expOrder.ClientOrderID,
+				Force:     string(v2.OrderForcePostOnly),
+				OrderType: string(v2.OrderTypeLimit),
+				Price:     "66000.00",
+				Side:      string(v2.SideTypeBuy),
+				Size:      "0.000090",
+				Symbol:    expBtcSymbol,
+			}, reqq)
+
+			return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
+		})
+
+		unfilledFile, err := os.ReadFile("bitgetapi/v2/testdata/get_unfilled_orders_request_limit_order.json")
+		assert.NoError(err)
+
+		transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 1)
+			assert.Contains(query, "orderId")
+			assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
+			return httptesting.BuildResponseString(http.StatusOK, string(unfilledFile)), nil
+		})
+
+		reqLimitOrder2 := reqLimitOrder
+		reqLimitOrder2.Type = types.OrderTypeLimitMaker
+		acct, err := ex.SubmitOrder(context.Background(), reqLimitOrder2)
+		assert.NoError(err)
+		assert.Equal(expOrder, acct)
+	})
+
+	t.Run("Market order", func(t *testing.T) {
+		t.Run("Buy", func(t *testing.T) {
+			transport := &httptesting.MockTransport{}
+			ex.client.HttpClient.Transport = transport
+
+			// get ticker to calculate btc amount
+			tickerFile, err := os.ReadFile("bitgetapi/v2/testdata/get_ticker_request.json")
+			assert.NoError(err)
+
+			transport.GET(tickerUrl, func(req *http.Request) (*http.Response, error) {
+				assert.Contains(req.URL.Query(), "symbol")
+				assert.Equal(req.URL.Query()["symbol"], []string{expBtcSymbol})
+				return httptesting.BuildResponseString(http.StatusOK, string(tickerFile)), nil
+			})
+
+			// place order
+			placeOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/place_order_request.json")
+			assert.NoError(err)
+
+			transport.POST(placeOrderUrl, func(req *http.Request) (*http.Response, error) {
+				raw, err := io.ReadAll(req.Body)
+				assert.NoError(err)
+
+				reqq := &NewOrder{}
+				err = json.Unmarshal(raw, &reqq)
+				assert.NoError(err)
+				assert.Equal(&NewOrder{
+					ClientOid: expOrder.ClientOrderID,
+					Force:     string(v2.OrderForceGTC),
+					OrderType: string(v2.OrderTypeMarket),
+					Price:     "",
+					Side:      string(v2.SideTypeBuy),
+					Size:      reqLimitOrder.Market.FormatQuantity(fixedpoint.MustNewFromString("66554").Mul(fixedpoint.MustNewFromString("0.00009"))), // ticker: 66554, size: 0.00009
+					Symbol:    expBtcSymbol,
+				}, reqq)
+
+				return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
+			})
+
+			// unfilled order
+			unfilledFile, err := os.ReadFile("bitgetapi/v2/testdata/get_unfilled_orders_request_market_buy_order.json")
+			assert.NoError(err)
+
+			transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
+				query := req.URL.Query()
+				assert.Len(query, 1)
+				assert.Contains(query, "orderId")
+				assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
+				return httptesting.BuildResponseString(http.StatusOK, string(unfilledFile)), nil
+			})
+
+			reqMarketOrder := reqLimitOrder
+			reqMarketOrder.Side = types.SideTypeBuy
+			reqMarketOrder.Type = types.OrderTypeMarket
+			acct, err := ex.SubmitOrder(context.Background(), reqMarketOrder)
+			assert.NoError(err)
+			expOrder2 := *expOrder
+			expOrder2.Side = types.SideTypeBuy
+			expOrder2.Type = types.OrderTypeMarket
+			expOrder2.Quantity = fixedpoint.Zero
+			expOrder2.Price = fixedpoint.Zero
+			assert.Equal(&expOrder2, acct)
+		})
+
+		t.Run("Sell", func(t *testing.T) {
+			transport := &httptesting.MockTransport{}
+			ex.client.HttpClient.Transport = transport
+
+			// get ticker to calculate btc amount
+			tickerFile, err := os.ReadFile("bitgetapi/v2/testdata/get_ticker_request.json")
+			assert.NoError(err)
+
+			transport.GET(tickerUrl, func(req *http.Request) (*http.Response, error) {
+				assert.Contains(req.URL.Query(), "symbol")
+				assert.Equal(req.URL.Query()["symbol"], []string{expBtcSymbol})
+				return httptesting.BuildResponseString(http.StatusOK, string(tickerFile)), nil
+			})
+
+			// place order
+			placeOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/place_order_request.json")
+			assert.NoError(err)
+
+			transport.POST(placeOrderUrl, func(req *http.Request) (*http.Response, error) {
+				raw, err := io.ReadAll(req.Body)
+				assert.NoError(err)
+
+				reqq := &NewOrder{}
+				err = json.Unmarshal(raw, &reqq)
+				assert.NoError(err)
+				assert.Equal(&NewOrder{
+					ClientOid: expOrder.ClientOrderID,
+					Force:     string(v2.OrderForceGTC),
+					OrderType: string(v2.OrderTypeMarket),
+					Price:     "",
+					Side:      string(v2.SideTypeSell),
+					Size:      "0.000090", // size: 0.00009
+					Symbol:    expBtcSymbol,
+				}, reqq)
+
+				return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
+			})
+
+			// unfilled order
+			unfilledFile, err := os.ReadFile("bitgetapi/v2/testdata/get_unfilled_orders_request_market_sell_order.json")
+			assert.NoError(err)
+
+			transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
+				query := req.URL.Query()
+				assert.Len(query, 1)
+				assert.Contains(query, "orderId")
+				assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
+				return httptesting.BuildResponseString(http.StatusOK, string(unfilledFile)), nil
+			})
+
+			reqMarketOrder := reqLimitOrder
+			reqMarketOrder.Side = types.SideTypeSell
+			reqMarketOrder.Type = types.OrderTypeMarket
+			acct, err := ex.SubmitOrder(context.Background(), reqMarketOrder)
+			assert.NoError(err)
+			expOrder2 := *expOrder
+			expOrder2.Side = types.SideTypeSell
+			expOrder2.Type = types.OrderTypeMarket
+			expOrder2.Price = fixedpoint.Zero
+			assert.Equal(&expOrder2, acct)
+		})
+
+		t.Run("failed to get ticker on buy", func(t *testing.T) {
+			transport := &httptesting.MockTransport{}
+			ex.client.HttpClient.Transport = transport
+
+			// get ticker to calculate btc amount
+			requestErrFile, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
+			assert.NoError(err)
+
+			transport.GET(tickerUrl, func(req *http.Request) (*http.Response, error) {
+				assert.Contains(req.URL.Query(), "symbol")
+				assert.Equal(req.URL.Query()["symbol"], []string{expBtcSymbol})
+				return httptesting.BuildResponseString(http.StatusBadRequest, string(requestErrFile)), nil
+			})
+
+			reqMarketOrder := reqLimitOrder
+			reqMarketOrder.Side = types.SideTypeBuy
+			reqMarketOrder.Type = types.OrderTypeMarket
+			_, err = ex.SubmitOrder(context.Background(), reqMarketOrder)
+			assert.ErrorContains(err, "Invalid IP")
+		})
+
+		t.Run("get order from history due to unfilled order not found", func(t *testing.T) {
+			transport := &httptesting.MockTransport{}
+			ex.client.HttpClient.Transport = transport
+
+			// get ticker to calculate btc amount
+			tickerFile, err := os.ReadFile("bitgetapi/v2/testdata/get_ticker_request.json")
+			assert.NoError(err)
+
+			transport.GET(tickerUrl, func(req *http.Request) (*http.Response, error) {
+				assert.Contains(req.URL.Query(), "symbol")
+				assert.Equal(req.URL.Query()["symbol"], []string{expBtcSymbol})
+				return httptesting.BuildResponseString(http.StatusOK, string(tickerFile)), nil
+			})
+
+			// place order
+			placeOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/place_order_request.json")
+			assert.NoError(err)
+
+			transport.POST(placeOrderUrl, func(req *http.Request) (*http.Response, error) {
+				raw, err := io.ReadAll(req.Body)
+				assert.NoError(err)
+
+				reqq := &NewOrder{}
+				err = json.Unmarshal(raw, &reqq)
+				assert.NoError(err)
+				assert.Equal(&NewOrder{
+					ClientOid: expOrder.ClientOrderID,
+					Force:     string(v2.OrderForceGTC),
+					OrderType: string(v2.OrderTypeMarket),
+					Price:     "",
+					Side:      string(v2.SideTypeBuy),
+					Size:      reqLimitOrder.Market.FormatQuantity(fixedpoint.MustNewFromString("66554").Mul(fixedpoint.MustNewFromString("0.00009"))), // ticker: 66554, size: 0.00009
+					Symbol:    expBtcSymbol,
+				}, reqq)
+
+				return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
+			})
+
+			// unfilled order
+			transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
+				query := req.URL.Query()
+				assert.Len(query, 1)
+				assert.Contains(query, "orderId")
+				assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
+
+				apiResp := v2.APIResponse{Code: "00000"}
+				raw, err := json.Marshal(apiResp)
+				assert.NoError(err)
+				return httptesting.BuildResponseString(http.StatusOK, string(raw)), nil
+			})
+
+			// order history
+			historyOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/get_history_orders_request_market_buy.json")
+			assert.NoError(err)
+
+			transport.GET(historyOrderUrl, func(req *http.Request) (*http.Response, error) {
+				query := req.URL.Query()
+				assert.Len(query, 1)
+				assert.Contains(query, "orderId")
+				assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
+				return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
+			})
+
+			reqMarketOrder := reqLimitOrder
+			reqMarketOrder.Side = types.SideTypeBuy
+			reqMarketOrder.Type = types.OrderTypeMarket
+			acct, err := ex.SubmitOrder(context.Background(), reqMarketOrder)
+			assert.NoError(err)
+			expOrder2 := *expOrder
+			expOrder2.Side = types.SideTypeBuy
+			expOrder2.Type = types.OrderTypeMarket
+			expOrder2.Status = types.OrderStatusFilled
+			expOrder2.ExecutedQuantity = fixedpoint.MustNewFromString("0.000089")
+			expOrder2.Quantity = fixedpoint.MustNewFromString("0.000089")
+			expOrder2.Price = fixedpoint.MustNewFromString("67360.87")
+			expOrder2.IsWorking = false
+			assert.Equal(&expOrder2, acct)
+		})
+	})
 
 	t.Run("error on query open orders", func(t *testing.T) {
 		transport := &httptesting.MockTransport{}
