@@ -9,7 +9,7 @@ import (
 
 type PlaceOrderResponse struct {
 	OrderId       string `json:"orderId"`
-	ClientOrderId string `json:"clientOrderId"`
+	ClientOrderId string `json:"clientOid"`
 }
 
 //go:generate PostRequest -url "/api/v2/spot/trade/place-order" -type PlaceOrderRequest -responseDataType .PlaceOrderResponse
