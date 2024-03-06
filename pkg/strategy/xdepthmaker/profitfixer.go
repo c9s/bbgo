@@ -47,6 +47,7 @@ func (f *ProfitFixer) batchQueryTrades(
 }
 
 func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, stats *types.ProfitStats, position *types.Position) error {
+	log.Infof("starting profitFixer with time range %s <=> %s", since, until)
 	var mu sync.Mutex
 	var allTrades = make([]types.Trade, 0, 1000)
 
@@ -76,9 +77,13 @@ func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, stats *ty
 
 	allTrades = types.SortTradesAscending(allTrades)
 	for _, trade := range allTrades {
-		stats.AddTrade(trade)
-		position.AddTrade(trade)
+		profit, netProfit, madeProfit := position.AddTrade(trade)
+		if madeProfit {
+			p := position.NewProfit(trade, profit, netProfit)
+			stats.AddProfit(p)
+		}
 	}
 
+	log.Infof("profitFixer done: profitStats and position are updated from %d trades", len(allTrades))
 	return nil
 }
