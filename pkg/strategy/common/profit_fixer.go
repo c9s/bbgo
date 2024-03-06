@@ -78,6 +78,11 @@ func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, stats *ty
 	}
 
 	allTrades = types.SortTradesAscending(allTrades)
+	f.FixFromTrades(allTrades, stats, position)
+	return nil
+}
+
+func (f *ProfitFixer) FixFromTrades(allTrades []types.Trade, stats *types.ProfitStats, position *types.Position) {
 	for _, trade := range allTrades {
 		profit, netProfit, madeProfit := position.AddTrade(trade)
 		if madeProfit {
@@ -86,6 +91,5 @@ func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, stats *ty
 		}
 	}
 
-	log.Infof("profitFixer done: profitStats and position are updated from %d trades", len(allTrades))
-	return nil
+	log.Infof("profitFixer fix finished: profitStats and position are updated from %d trades", len(allTrades))
 }
