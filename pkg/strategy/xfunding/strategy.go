@@ -360,24 +360,6 @@ func (s *Strategy) CrossRun(
 		bbgo.Notify("Fixed profit stats", s.ProfitStats.ProfitStats)
 	}
 
-	// adjust QuoteInvestment according to the available quote balance
-	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
-		originalQuoteInvestment := s.QuoteInvestment
-
-		// adjust available quote with the fee rate
-		spotFeeRate := 0.075
-		availableQuoteWithoutFee := b.Available.Mul(fixedpoint.NewFromFloat(1.0 - (spotFeeRate * 0.01)))
-
-		s.QuoteInvestment = fixedpoint.Min(availableQuoteWithoutFee, s.QuoteInvestment)
-
-		if originalQuoteInvestment.Compare(s.QuoteInvestment) != 0 {
-			log.Infof("adjusted quoteInvestment from %f to %f according to the balance",
-				originalQuoteInvestment.Float64(),
-				s.QuoteInvestment.Float64(),
-			)
-		}
-	}
-
 	if err := s.syncPositionRisks(ctx); err != nil {
 		return err
 	}
@@ -401,6 +383,29 @@ func (s *Strategy) CrossRun(
 
 	// TEST CODE:
 	// s.syncFundingFeeRecords(ctx, time.Now().Add(-3*24*time.Hour))
+
+	switch s.State.PositionState {
+	case PositionClosed:
+		// adjust QuoteInvestment according to the available quote balance
+		// ONLY when the position is not opening
+		if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
+			originalQuoteInvestment := s.QuoteInvestment
+
+			// adjust available quote with the fee rate
+			spotFeeRate := 0.075
+			availableQuoteWithoutFee := b.Available.Mul(fixedpoint.NewFromFloat(1.0 - (spotFeeRate * 0.01)))
+
+			s.QuoteInvestment = fixedpoint.Min(availableQuoteWithoutFee, s.QuoteInvestment)
+
+			if originalQuoteInvestment.Compare(s.QuoteInvestment) != 0 {
+				log.Infof("adjusted quoteInvestment from %f to %f according to the balance",
+					originalQuoteInvestment.Float64(),
+					s.QuoteInvestment.Float64(),
+				)
+			}
+		}
+
+	}
 
 	switch s.State.PositionState {
 	case PositionOpening:
