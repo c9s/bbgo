@@ -325,18 +325,23 @@ func (s *Strategy) CrossRun(
 		}
 
 		fixer := NewProfitFixer(s.makerMarket)
-		fixer.AddExchange(s.makerSession.Name, s.makerSession.Exchange.(types.ExchangeTradeHistoryService))
-		fixer.AddExchange(s.hedgeSession.Name, s.hedgeSession.Exchange.(types.ExchangeTradeHistoryService))
+		fixer.AddExchange(makerSession.Name, makerSession.Exchange.(types.ExchangeTradeHistoryService))
+		fixer.AddExchange(hedgeSession.Name, hedgeSession.Exchange.(types.ExchangeTradeHistoryService))
 
-		s.CrossExchangeMarketMakingStrategy.Position = types.NewPositionFromMarket(s.makerMarket)
-		s.CrossExchangeMarketMakingStrategy.ProfitStats = types.NewProfitStats(s.makerMarket)
+		makerMarket, _ := s.makerSession.Market(s.Symbol)
+		s.CrossExchangeMarketMakingStrategy.Position = types.NewPositionFromMarket(makerMarket)
+		s.CrossExchangeMarketMakingStrategy.ProfitStats = types.NewProfitStats(makerMarket)
 
 		if err2 := fixer.Fix(ctx, s.ProfitFixerConfig.TradesSince.Time(), time.Now(), s.CrossExchangeMarketMakingStrategy.ProfitStats, s.CrossExchangeMarketMakingStrategy.Position); err2 != nil {
 			return err2
 		}
 	}
 
-	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx, s.Environment, makerSession, hedgeSession, s.Symbol, ID, s.InstanceID()); err != nil {
+	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx,
+		s.Environment,
+		makerSession,
+		hedgeSession,
+		s.Symbol, ID, s.InstanceID()); err != nil {
 		return err
 	}
 
