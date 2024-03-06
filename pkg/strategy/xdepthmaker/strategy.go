@@ -273,7 +273,7 @@ func (s *Strategy) Defaults() error {
 	}
 
 	if s.FullReplenishInterval == 0 {
-		s.FullReplenishInterval = types.Duration(15 * time.Minute)
+		s.FullReplenishInterval = types.Duration(10 * time.Minute)
 	}
 
 	if s.HedgeInterval == 0 {
