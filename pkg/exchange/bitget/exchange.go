@@ -329,7 +329,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 
 	// set client order id
 	if len(order.ClientOrderID) > maxOrderIdLen {
-		return nil, fmt.Errorf("unexpected length of order id, got: %d", len(order.ClientOrderID))
+		return nil, fmt.Errorf("unexpected length of client order id, got: %d", len(order.ClientOrderID))
 	}
 
 	if len(order.ClientOrderID) > 0 {
