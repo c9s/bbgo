@@ -320,6 +320,8 @@ func (s *Strategy) CrossRun(
 	log.Infof("makerSession: %s hedgeSession: %s", makerSession.Name, hedgeSession.Name)
 
 	if s.ProfitFixerConfig != nil {
+		bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
+
 		log.Infof("profitFixer is enabled, checking checkpoint: %+v", s.ProfitFixerConfig.TradesSince)
 
 		if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
@@ -344,6 +346,9 @@ func (s *Strategy) CrossRun(
 		if err2 := fixer.Fix(ctx, s.ProfitFixerConfig.TradesSince.Time(), time.Now(), s.CrossExchangeMarketMakingStrategy.ProfitStats, s.CrossExchangeMarketMakingStrategy.Position); err2 != nil {
 			return err2
 		}
+
+		bbgo.Notify("Fixed %s position", s.Symbol, s.CrossExchangeMarketMakingStrategy.Position)
+		bbgo.Notify("Fixed %s profitStats", s.Symbol, s.CrossExchangeMarketMakingStrategy.ProfitStats)
 	}
 
 	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx,
