@@ -269,7 +269,7 @@ func (s *Strategy) Validate() error {
 
 func (s *Strategy) Defaults() error {
 	if s.UpdateInterval == 0 {
-		s.UpdateInterval = types.Duration(time.Second)
+		s.UpdateInterval = types.Duration(5 * time.Second)
 	}
 
 	if s.FullReplenishInterval == 0 {
