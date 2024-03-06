@@ -227,7 +227,7 @@ func Test_unfilledOrderToGlobalOrder(t *testing.T) {
 		}
 	)
 
-	t.Run("succeeds", func(t *testing.T) {
+	t.Run("succeeds with limit order", func(t *testing.T) {
 		order, err := unfilledOrderToGlobalOrder(unfilledOrder)
 		assert.NoError(err)
 		assert.Equal(&types.Order{
@@ -245,6 +245,67 @@ func Test_unfilledOrderToGlobalOrder(t *testing.T) {
 			UUID:             strconv.FormatInt(int64(orderId), 10),
 			Status:           types.OrderStatusNew,
 			ExecutedQuantity: fixedpoint.NewFromFloat(0),
+			IsWorking:        true,
+			CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+			UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+		}, order)
+	})
+
+	t.Run("succeeds with market buy order", func(t *testing.T) {
+		unfilledOrder2 := unfilledOrder
+		unfilledOrder2.OrderType = v2.OrderTypeMarket
+		unfilledOrder2.Side = v2.SideTypeBuy
+		unfilledOrder2.Size = unfilledOrder2.PriceAvg.Mul(unfilledOrder2.Size)
+		unfilledOrder2.PriceAvg = fixedpoint.Zero
+		unfilledOrder2.Status = v2.OrderStatusNew
+
+		order, err := unfilledOrderToGlobalOrder(unfilledOrder2)
+		assert.NoError(err)
+		assert.Equal(&types.Order{
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: "74b86af3-6098-479c-acac-bfb074c067f3",
+				Symbol:        "BTCUSDT",
+				Side:          types.SideTypeBuy,
+				Type:          types.OrderTypeMarket,
+				Quantity:      fixedpoint.Zero,
+				Price:         fixedpoint.Zero,
+				TimeInForce:   types.TimeInForceGTC,
+			},
+			Exchange:         types.ExchangeBitget,
+			OrderID:          uint64(orderId),
+			UUID:             strconv.FormatInt(int64(orderId), 10),
+			Status:           types.OrderStatusNew,
+			ExecutedQuantity: fixedpoint.Zero,
+			IsWorking:        true,
+			CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+			UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
+		}, order)
+	})
+
+	t.Run("succeeds with market sell order", func(t *testing.T) {
+		unfilledOrder2 := unfilledOrder
+		unfilledOrder2.OrderType = v2.OrderTypeMarket
+		unfilledOrder2.Side = v2.SideTypeSell
+		unfilledOrder2.PriceAvg = fixedpoint.Zero
+		unfilledOrder2.Status = v2.OrderStatusNew
+
+		order, err := unfilledOrderToGlobalOrder(unfilledOrder2)
+		assert.NoError(err)
+		assert.Equal(&types.Order{
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: "74b86af3-6098-479c-acac-bfb074c067f3",
+				Symbol:        "BTCUSDT",
+				Side:          types.SideTypeSell,
+				Type:          types.OrderTypeMarket,
+				Quantity:      fixedpoint.NewFromInt(5),
+				Price:         fixedpoint.Zero,
+				TimeInForce:   types.TimeInForceGTC,
+			},
+			Exchange:         types.ExchangeBitget,
+			OrderID:          uint64(orderId),
+			UUID:             strconv.FormatInt(int64(orderId), 10),
+			Status:           types.OrderStatusNew,
+			ExecutedQuantity: fixedpoint.Zero,
 			IsWorking:        true,
 			CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
 			UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1660704288118).Time()),
