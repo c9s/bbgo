@@ -181,6 +181,8 @@ type Strategy struct {
 	// MaxExposurePosition defines the unhedged quantity of stop
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
+	DisableHedge bool `json:"disableHedge"`
+
 	NotifyTrade bool `json:"notifyTrade"`
 
 	// RecoverTrade tries to find the missing trades via the REStful API
@@ -441,7 +443,9 @@ func (s *Strategy) CrossRun(
 						uncoverPosition,
 					)
 
-					s.Hedge(ctx, uncoverPosition.Neg())
+					if !s.DisableHedge {
+						s.Hedge(ctx, uncoverPosition.Neg())
+					}
 				}
 			}
 		}
