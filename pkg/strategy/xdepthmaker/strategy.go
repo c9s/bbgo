@@ -333,7 +333,7 @@ func (s *Strategy) CrossRun(
 		s.CrossExchangeMarketMakingStrategy.Position = types.NewPositionFromMarket(makerMarket)
 		s.CrossExchangeMarketMakingStrategy.ProfitStats = types.NewProfitStats(makerMarket)
 
-		fixer := common.NewProfitFixer(makerMarket)
+		fixer := common.NewProfitFixer()
 		if ss, ok := makerSession.Exchange.(types.ExchangeTradeHistoryService); ok {
 			log.Infof("adding makerSession %s to profitFixer", makerSession.Name)
 			fixer.AddExchange(makerSession.Name, ss)
@@ -344,7 +344,11 @@ func (s *Strategy) CrossRun(
 			fixer.AddExchange(hedgeSession.Name, ss)
 		}
 
-		if err2 := fixer.Fix(ctx, s.ProfitFixerConfig.TradesSince.Time(), time.Now(), s.CrossExchangeMarketMakingStrategy.ProfitStats, s.CrossExchangeMarketMakingStrategy.Position); err2 != nil {
+		if err2 := fixer.Fix(ctx, makerMarket.Symbol,
+			s.ProfitFixerConfig.TradesSince.Time(),
+			time.Now(),
+			s.CrossExchangeMarketMakingStrategy.ProfitStats,
+			s.CrossExchangeMarketMakingStrategy.Position); err2 != nil {
 			return err2
 		}
 
