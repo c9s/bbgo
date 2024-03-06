@@ -53,7 +53,7 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset st
 
 	quantity = quantity.Add(s.State.PendingBaseTransfer)
 
-	// a simple protection here -- we can only transfer the rest quota (total base transfer) back to spot
+	// A simple protection here -- we can only transfer the rest quota (total base transfer) back to spot
 	quantity = fixedpoint.Min(s.State.TotalBaseTransfer, quantity)
 
 	available, pending, err := s.queryAvailableTransfer(ctx, s.futuresSession.Exchange, asset, quantity)
