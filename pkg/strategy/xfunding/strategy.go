@@ -258,7 +258,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	return nil
 }
 
-func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+func (s *Strategy) CrossRun(
+	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
+) error {
 	instanceID := s.InstanceID()
 
 	s.spotSession = sessions[s.SpotSession]
@@ -348,7 +350,7 @@ func (s *Strategy) CrossRun(ctx context.Context, orderExecutionRouter bbgo.Order
 	bbgo.Notify("Spot Position", s.SpotPosition)
 	bbgo.Notify("Futures Position", s.FuturesPosition)
 	bbgo.Notify("Neutral Position", s.NeutralPosition)
-	bbgo.Notify("State", s.State.PositionState)
+	bbgo.Notify("State: %s", s.State.PositionState.String())
 
 	// sync funding fee txns
 	s.syncFundingFeeRecords(ctx, s.ProfitStats.LastFundingFeeTime)
@@ -1083,7 +1085,9 @@ func (s *Strategy) notPositionState(state PositionState) bool {
 	return ret
 }
 
-func (s *Strategy) allocateOrderExecutor(ctx context.Context, session *bbgo.ExchangeSession, instanceID string, position *types.Position) *bbgo.GeneralOrderExecutor {
+func (s *Strategy) allocateOrderExecutor(
+	ctx context.Context, session *bbgo.ExchangeSession, instanceID string, position *types.Position,
+) *bbgo.GeneralOrderExecutor {
 	orderExecutor := bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, position)
 	orderExecutor.SetMaxRetries(0)
 	orderExecutor.BindEnvironment(s.Environment)
