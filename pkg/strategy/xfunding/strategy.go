@@ -354,6 +354,10 @@ func (s *Strategy) CrossRun(
 			s.FuturesPosition); err2 != nil {
 			return err2
 		}
+
+		bbgo.Notify("Fixed spot position", s.SpotPosition)
+		bbgo.Notify("Fixed futures position", s.FuturesPosition)
+		bbgo.Notify("Fixed profit stats", s.ProfitStats.ProfitStats)
 	}
 
 	// adjust QuoteInvestment according to the available quote balance
