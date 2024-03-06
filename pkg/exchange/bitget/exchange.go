@@ -362,10 +362,12 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	debugf("unfilled order response for order#%s: %+v", orderId, ordersResp)
 
 	if len(ordersResp) == 1 {
+		// 2023/11/05 The market order will be executed immediately, so we cannot retrieve it through the NewGetUnfilledOrdersRequest API.
+		// Try to get the order from the NewGetHistoryOrdersRequest API.
+		// 2024/03/06 After placing a Market Order, we can retrieve it through the unfilledOrder API, so we still need to
+		// handle the Market Order status.
 		return unfilledOrderToGlobalOrder(ordersResp[0])
 	} else if len(ordersResp) == 0 {
-		// The market order will be executed immediately, so we cannot retrieve it through the NewGetUnfilledOrdersRequest API.
-		// Try to get the order from the NewGetHistoryOrdersRequest API.
 		ordersResp, err := e.v2client.NewGetHistoryOrdersRequest().OrderId(orderId).Do(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query history order by order id: %s, err: %w", orderId, err)

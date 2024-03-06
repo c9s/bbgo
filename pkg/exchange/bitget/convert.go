@@ -189,10 +189,17 @@ func unfilledOrderToGlobalOrder(order v2.UnfilledOrder) (*types.Order, error) {
 	qty := order.Size
 	price := order.PriceAvg
 
-	// The market order will be executed immediately, so this check is used to handle corner cases.
+	// 2023/11/05 The market order will be executed immediately, so this check is used to handle corner cases.
+	// 2024/03/06 After placing a Market Order, we can retrieve it through the unfilledOrder API, so we still need to
+	// handle the Market Order status.
 	if orderType == types.OrderTypeMarket {
-		qty = order.BaseVolume
-		log.Warnf("!!! The price(%f) and quantity(%f) are not verified for market orders, because we only receive limit orders in the test environment !!!", price.Float64(), qty.Float64())
+		price = order.PriceAvg
+		if side == types.SideTypeBuy {
+			qty, err = processMarketBuyQuantity(order.BaseVolume, order.QuoteVolume, order.PriceAvg, order.Size, order.Status)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	return &types.Order{
