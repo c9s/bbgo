@@ -319,19 +319,6 @@ func (s *Strategy) CrossRun(
 
 	log.Infof("makerSession: %s hedgeSession: %s", makerSession.Name, hedgeSession.Name)
 
-	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx, s.Environment, makerSession, hedgeSession, s.Symbol, ID, s.InstanceID()); err != nil {
-		return err
-	}
-
-	s.pricingBook = types.NewStreamBook(s.Symbol)
-	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
-
-	s.stopC = make(chan struct{})
-
-	s.authedC = make(chan struct{}, 5)
-	bindAuthSignal(ctx, s.makerSession.UserDataStream, s.authedC)
-	bindAuthSignal(ctx, s.hedgeSession.UserDataStream, s.authedC)
-
 	if s.ProfitFixerConfig != nil {
 		if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
 			return errors.New("tradesSince time can not be zero")
@@ -348,6 +335,19 @@ func (s *Strategy) CrossRun(
 			return err2
 		}
 	}
+
+	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx, s.Environment, makerSession, hedgeSession, s.Symbol, ID, s.InstanceID()); err != nil {
+		return err
+	}
+
+	s.pricingBook = types.NewStreamBook(s.Symbol)
+	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
+
+	s.stopC = make(chan struct{})
+
+	s.authedC = make(chan struct{}, 5)
+	bindAuthSignal(ctx, s.makerSession.UserDataStream, s.authedC)
+	bindAuthSignal(ctx, s.hedgeSession.UserDataStream, s.authedC)
 
 	if s.RecoverTrade {
 		go s.runTradeRecover(ctx)
