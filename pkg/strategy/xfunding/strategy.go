@@ -404,10 +404,12 @@ func (s *Strategy) CrossRun(
 				)
 			}
 		}
-
+	default:
 	}
 
 	switch s.State.PositionState {
+	case PositionReady:
+
 	case PositionOpening:
 		// transfer all base assets from the spot account into the spot account
 		if err := s.transferIn(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, fixedpoint.Zero); err != nil {
@@ -419,6 +421,7 @@ func (s *Strategy) CrossRun(
 		if err := s.transferOut(ctx, s.binanceSpot, s.spotMarket.BaseCurrency, fixedpoint.Zero); err != nil {
 			log.WithError(err).Errorf("futures asset transfer out error")
 		}
+
 	}
 
 	s.spotOrderExecutor = s.allocateOrderExecutor(ctx, s.spotSession, instanceID, s.SpotPosition)
