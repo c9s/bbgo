@@ -19,14 +19,11 @@ type ProfitFixerConfig struct {
 
 // ProfitFixer implements a trade-history-based profit fixer
 type ProfitFixer struct {
-	market types.Market
-
 	sessions map[string]types.ExchangeTradeHistoryService
 }
 
-func NewProfitFixer(market types.Market) *ProfitFixer {
+func NewProfitFixer() *ProfitFixer {
 	return &ProfitFixer{
-		market:   market,
 		sessions: make(map[string]types.ExchangeTradeHistoryService),
 	}
 }
@@ -48,7 +45,7 @@ func (f *ProfitFixer) batchQueryTrades(
 	})
 }
 
-func (f *ProfitFixer) aggregateAllTrades(ctx context.Context, market types.Market, since, until time.Time) ([]types.Trade, error) {
+func (f *ProfitFixer) aggregateAllTrades(ctx context.Context, symbol string, since, until time.Time) ([]types.Trade, error) {
 	var mu sync.Mutex
 	var allTrades = make([]types.Trade, 0, 1000)
 
@@ -58,8 +55,8 @@ func (f *ProfitFixer) aggregateAllTrades(ctx context.Context, market types.Marke
 		sessionName := n
 		service := s
 		g.Go(func() error {
-			log.Infof("batch querying %s trade history from %s since %s until %s", market.Symbol, sessionName, since.String(), until.String())
-			trades, err := f.batchQueryTrades(subCtx, service, f.market.Symbol, since, until)
+			log.Infof("batch querying %s trade history from %s since %s until %s", symbol, sessionName, since.String(), until.String())
+			trades, err := f.batchQueryTrades(subCtx, service, symbol, since, until)
 			if err != nil {
 				log.WithError(err).Errorf("unable to batch query trades for fixer")
 				return err
@@ -80,9 +77,11 @@ func (f *ProfitFixer) aggregateAllTrades(ctx context.Context, market types.Marke
 	return allTrades, nil
 }
 
-func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, stats *types.ProfitStats, position *types.Position) error {
+func (f *ProfitFixer) Fix(
+	ctx context.Context, symbol string, since, until time.Time, stats *types.ProfitStats, position *types.Position,
+) error {
 	log.Infof("starting profitFixer with time range %s <=> %s", since, until)
-	allTrades, err := f.aggregateAllTrades(ctx, f.market, since, until)
+	allTrades, err := f.aggregateAllTrades(ctx, symbol, since, until)
 	if err != nil {
 		return err
 	}
