@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -195,7 +196,7 @@ type Strategy struct {
 	// Pips is the pips of the layer prices
 	Pips fixedpoint.Value `json:"pips"`
 
-	ProfitFixerConfig *ProfitFixerConfig `json:"profitFixer"`
+	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer"`
 
 	// --------------------------------
 	// private fields
@@ -332,7 +333,7 @@ func (s *Strategy) CrossRun(
 		s.CrossExchangeMarketMakingStrategy.Position = types.NewPositionFromMarket(makerMarket)
 		s.CrossExchangeMarketMakingStrategy.ProfitStats = types.NewProfitStats(makerMarket)
 
-		fixer := NewProfitFixer(makerMarket)
+		fixer := common.NewProfitFixer(makerMarket)
 		if ss, ok := makerSession.Exchange.(types.ExchangeTradeHistoryService); ok {
 			log.Infof("adding makerSession %s to profitFixer", makerSession.Name)
 			fixer.AddExchange(makerSession.Name, ss)
