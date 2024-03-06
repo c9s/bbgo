@@ -1,0 +1,25 @@
+{
+  "code":"00000",
+  "msg":"success",
+  "requestTime":1709692258790,
+  "data":[
+    {
+      "userId":"8672173294",
+      "symbol":"BTCUSDT",
+      "orderId":"1148903850645331968",
+      "clientOid":"684a79df-f931-474f-a9a5-f1deab1cd770",
+      "priceAvg":"0",
+      "size":"6",
+      "orderType":"market",
+      "side":"buy",
+      "status":"live",
+      "basePrice":"0",
+      "baseVolume":"0",
+      "quoteVolume":"0",
+      "enterPointSource":"API",
+      "orderSource":"market",
+      "cTime":"1709645944272",
+      "uTime":"1709645944272"
+    }
+  ]
+}
