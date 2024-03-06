@@ -3,6 +3,7 @@ package bitget
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -1071,5 +1072,191 @@ func TestExchange_SubmitOrder(t *testing.T) {
 		reqOrder2.Type = "GG"
 		_, err := ex.SubmitOrder(context.Background(), reqOrder2)
 		assert.ErrorContains(err, "not supported")
+	})
+}
+
+func TestExchange_QueryOpenOrders(t *testing.T) {
+	var (
+		assert       = assert.New(t)
+		ex           = New("key", "secret", "passphrase")
+		expBtcSymbol = "BTCUSDT"
+		url          = "/api/v2/spot/trade/unfilled-orders"
+	)
+
+	t.Run("succeeds", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/get_unfilled_orders_request_limit_order.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 2)
+			assert.Contains(query, "symbol")
+			assert.Equal(query["symbol"], []string{expBtcSymbol})
+			assert.Equal(query["limit"], []string{strconv.FormatInt(queryLimit, 10)})
+			return httptesting.BuildResponseString(http.StatusOK, string(f)), nil
+		})
+
+		orders, err := ex.QueryOpenOrders(context.Background(), expBtcSymbol)
+		assert.NoError(err)
+		expOrder := []types.Order{
+			{
+				SubmitOrder: types.SubmitOrder{
+					ClientOrderID: "684a79df-f931-474f-a9a5-f1deab1cd770",
+					Symbol:        expBtcSymbol,
+					Side:          types.SideTypeBuy,
+					Type:          types.OrderTypeLimit,
+					Quantity:      fixedpoint.MustNewFromString("0.00009"),
+					Price:         fixedpoint.MustNewFromString("66000"),
+					TimeInForce:   types.TimeInForceGTC,
+				},
+				Exchange:         types.ExchangeBitget,
+				OrderID:          1148903850645331968,
+				UUID:             "1148903850645331968",
+				Status:           types.OrderStatusNew,
+				ExecutedQuantity: fixedpoint.Zero,
+				IsWorking:        true,
+				CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1709645944272).Time()),
+				UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1709645944272).Time()),
+			},
+		}
+		assert.Equal(expOrder, orders)
+	})
+
+	t.Run("succeeds on pagination with mock limit + 1", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		dataTemplate := `{
+      "userId":"8672173294",
+      "symbol":"BTCUSDT",
+      "orderId":"%d",
+      "clientOid":"684a79df-f931-474f-a9a5-f1deab1cd770",
+      "priceAvg":"0",
+      "size":"0.00009",
+      "orderType":"market",
+      "side":"sell",
+      "status":"live",
+      "basePrice":"0",
+      "baseVolume":"0",
+      "quoteVolume":"0",
+      "enterPointSource":"API",
+      "orderSource":"market",
+      "cTime":"1709645944272",
+      "uTime":"1709645944272"
+    }`
+
+		openOrdersStr := make([]string, 0, queryLimit+1)
+		expOrders := make([]types.Order, 0, queryLimit+1)
+		for i := 0; i < queryLimit+1; i++ {
+			dataStr := fmt.Sprintf(dataTemplate, i)
+			openOrdersStr = append(openOrdersStr, dataStr)
+
+			unfilledOdr := &v2.UnfilledOrder{}
+			err := json.Unmarshal([]byte(dataStr), &unfilledOdr)
+			assert.NoError(err)
+			gOdr, err := unfilledOrderToGlobalOrder(*unfilledOdr)
+			assert.NoError(err)
+			expOrders = append(expOrders, *gOdr)
+		}
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Contains(query, "symbol")
+			assert.Equal(query["symbol"], []string{expBtcSymbol})
+			assert.Equal(query["limit"], []string{strconv.FormatInt(queryLimit, 10)})
+			if len(query) == 2 {
+				// first time query
+				resp := &v2.APIResponse{
+					Code: "00000",
+					Data: []byte("[" + strings.Join(openOrdersStr[0:queryLimit], ",") + "]"),
+				}
+				respRaw, err := json.Marshal(resp)
+				assert.NoError(err)
+
+				return httptesting.BuildResponseString(http.StatusOK, string(respRaw)), nil
+			}
+			// second time query
+			// last order id, so need to -1
+			assert.Equal(query["idLessThan"], []string{strconv.FormatInt(queryLimit-1, 10)})
+
+			resp := &v2.APIResponse{
+				Code: "00000",
+				Data: []byte("[" + strings.Join(openOrdersStr[queryLimit:queryLimit+1], ",") + "]"),
+			}
+			respRaw, err := json.Marshal(resp)
+			assert.NoError(err)
+			return httptesting.BuildResponseString(http.StatusOK, string(respRaw)), nil
+		})
+
+		orders, err := ex.QueryOpenOrders(context.Background(), expBtcSymbol)
+		assert.NoError(err)
+		assert.Equal(expOrders, orders)
+	})
+
+	t.Run("succeeds on pagination with mock limit + 1", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		dataTemplate := `{
+      "userId":"8672173294",
+      "symbol":"BTCUSDT",
+      "orderId":"%d",
+      "clientOid":"684a79df-f931-474f-a9a5-f1deab1cd770",
+      "priceAvg":"0",
+      "size":"0.00009",
+      "orderType":"market",
+      "side":"sell",
+      "status":"live",
+      "basePrice":"0",
+      "baseVolume":"0",
+      "quoteVolume":"0",
+      "enterPointSource":"API",
+      "orderSource":"market",
+      "cTime":"1709645944272",
+      "uTime":"1709645944272"
+    }`
+
+		openOrdersStr := make([]string, 0, queryLimit+1)
+		for i := 0; i < queryLimit+1; i++ {
+			dataStr := fmt.Sprintf(dataTemplate, i)
+			openOrdersStr = append(openOrdersStr, dataStr)
+		}
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Contains(query, "symbol")
+			assert.Equal(query["symbol"], []string{expBtcSymbol})
+			assert.Equal(query["limit"], []string{strconv.FormatInt(queryLimit, 10)})
+			// first time query
+			resp := &v2.APIResponse{
+				Code: "00000",
+				Data: []byte("[" + strings.Join(openOrdersStr, ",") + "]"),
+			}
+			respRaw, err := json.Marshal(resp)
+			assert.NoError(err)
+
+			return httptesting.BuildResponseString(http.StatusOK, string(respRaw)), nil
+		})
+
+		_, err := ex.QueryOpenOrders(context.Background(), expBtcSymbol)
+		assert.ErrorContains(err, "unexpected open orders length")
+	})
+
+	t.Run("error", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusBadRequest, string(f)), nil
+		})
+
+		_, err = ex.QueryOpenOrders(context.Background(), "BTCUSDT")
+		assert.ErrorContains(err, "Invalid IP")
 	})
 }
