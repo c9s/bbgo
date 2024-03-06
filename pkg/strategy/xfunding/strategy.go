@@ -13,6 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/util/backoff"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -136,6 +137,8 @@ type Strategy struct {
 
 	// Reset your position info
 	Reset bool `json:"reset"`
+
+	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer"`
 
 	// CloseFuturesPosition can be enabled to close the futures position and then transfer the collateral asset back to the spot account.
 	CloseFuturesPosition bool `json:"closeFuturesPosition"`
@@ -316,6 +319,41 @@ func (s *Strategy) CrossRun(
 
 	if s.State == nil || s.Reset {
 		s.State = newState()
+	}
+
+	if s.ProfitFixerConfig != nil {
+		log.Infof("profitFixer is enabled, start fixing with config: %+v", s.ProfitFixerConfig)
+
+		s.SpotPosition = types.NewPositionFromMarket(s.spotMarket)
+		s.FuturesPosition = types.NewPositionFromMarket(s.futuresMarket)
+		s.ProfitStats.ProfitStats = types.NewProfitStats(s.Market)
+
+		since := s.ProfitFixerConfig.TradesSince.Time()
+		now := time.Now()
+
+		spotFixer := common.NewProfitFixer()
+		if ss, ok := s.spotSession.Exchange.(types.ExchangeTradeHistoryService); ok {
+			spotFixer.AddExchange(s.spotSession.Name, ss)
+		}
+
+		if err2 := spotFixer.Fix(ctx, s.Symbol,
+			since, now,
+			s.ProfitStats.ProfitStats,
+			s.SpotPosition); err2 != nil {
+			return err2
+		}
+
+		futuresFixer := common.NewProfitFixer()
+		if ss, ok := s.futuresSession.Exchange.(types.ExchangeTradeHistoryService); ok {
+			futuresFixer.AddExchange(s.futuresSession.Name, ss)
+		}
+
+		if err2 := futuresFixer.Fix(ctx, s.Symbol,
+			since, now,
+			s.ProfitStats.ProfitStats,
+			s.FuturesPosition); err2 != nil {
+			return err2
+		}
 	}
 
 	// adjust QuoteInvestment according to the available quote balance
