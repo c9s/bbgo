@@ -324,13 +324,13 @@ func (s *Strategy) CrossRun(
 			return errors.New("tradesSince time can not be zero")
 		}
 
-		fixer := NewProfitFixer(s.makerMarket)
-		fixer.AddExchange(makerSession.Name, makerSession.Exchange.(types.ExchangeTradeHistoryService))
-		fixer.AddExchange(hedgeSession.Name, hedgeSession.Exchange.(types.ExchangeTradeHistoryService))
-
-		makerMarket, _ := s.makerSession.Market(s.Symbol)
+		makerMarket, _ := makerSession.Market(s.Symbol)
 		s.CrossExchangeMarketMakingStrategy.Position = types.NewPositionFromMarket(makerMarket)
 		s.CrossExchangeMarketMakingStrategy.ProfitStats = types.NewProfitStats(makerMarket)
+
+		fixer := NewProfitFixer(makerMarket)
+		fixer.AddExchange(makerSession.Name, makerSession.Exchange.(types.ExchangeTradeHistoryService))
+		fixer.AddExchange(hedgeSession.Name, hedgeSession.Exchange.(types.ExchangeTradeHistoryService))
 
 		if err2 := fixer.Fix(ctx, s.ProfitFixerConfig.TradesSince.Time(), time.Now(), s.CrossExchangeMarketMakingStrategy.ProfitStats, s.CrossExchangeMarketMakingStrategy.Position); err2 != nil {
 			return err2
