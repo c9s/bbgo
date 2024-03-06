@@ -101,20 +101,21 @@ func (s *Strategy) transferOut(ctx context.Context, ex FuturesTransfer, asset st
 	return nil
 }
 
-// transferIn transfers the asset from the spot account to the futures account
-func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, asset string, quantity fixedpoint.Value) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Strategy) queryAvailableTransfer(
+	ctx context.Context, ex types.Exchange, asset string, quantity fixedpoint.Value,
+) (available, pending fixedpoint.Value, err error) {
+	available = fixedpoint.Zero
+	pending = fixedpoint.Zero
 
 	// query spot balances to validate the quantity
-	balances, err := s.spotSession.Exchange.QueryAccountBalances(ctx)
+	balances, err := ex.QueryAccountBalances(ctx)
 	if err != nil {
-		return err
+		return available, pending, err
 	}
 
 	b, ok := balances[asset]
 	if !ok {
-		return fmt.Errorf("%s balance not found", asset)
+		return available, pending, fmt.Errorf("%s balance not found", asset)
 	}
 
 	// if quantity = 0, we will transfer all available balance into the futures wallet
@@ -122,37 +123,49 @@ func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, asset str
 		quantity = b.Available
 	}
 
-	// add the pending transfer and reset the pending transfer
-	quantity = s.State.PendingBaseTransfer.Add(quantity)
-	s.State.PendingBaseTransfer = fixedpoint.Zero
-
-	// the available might not be "available" at the time point,
-	// we add the quantity to the pending transfer amount for the next tick.
 	if b.Available.Compare(quantity) < 0 {
 		log.Infof("%s available balance is not enough for transfer (%f < %f)",
 			asset,
 			b.Available.Float64(),
 			quantity.Float64())
 
-		availableToTransfer := fixedpoint.Min(b.Available, quantity)
-		pendingTransfer := quantity.Sub(availableToTransfer)
-		log.Infof("adjusted transfer quantity from %f to %f", quantity.Float64(), availableToTransfer.Float64())
-		quantity = availableToTransfer
-
-		s.State.PendingBaseTransfer = pendingTransfer
+		available = fixedpoint.Min(b.Available, quantity)
+		pending = quantity.Sub(available)
+		log.Infof("adjusted transfer quantity from %f to %f", quantity.Float64(), available.Float64())
+		return available, pending, nil
 	}
 
-	if quantity.IsZero() {
+	available = quantity
+	pending = fixedpoint.Zero
+	return available, pending, nil
+}
+
+// transferIn transfers the asset from the spot account to the futures account
+func (s *Strategy) transferIn(ctx context.Context, ex FuturesTransfer, asset string, quantity fixedpoint.Value) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// add the pending transfer and reset the pending transfer
+	quantity = s.State.PendingBaseTransfer.Add(quantity)
+
+	available, pending, err := s.queryAvailableTransfer(ctx, s.spotSession.Exchange, asset, quantity)
+	if err != nil {
+		return err
+	}
+
+	s.State.PendingBaseTransfer = pending
+
+	if available.IsZero() {
 		return fmt.Errorf("unable to transfer zero %s from spot wallet to futures wallet", asset)
 	}
 
-	log.Infof("transfering %f %s from the spot wallet into futures wallet...", quantity.Float64(), asset)
-	if err := ex.TransferFuturesAccountAsset(ctx, asset, quantity, types.TransferIn); err != nil {
-		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(quantity)
+	log.Infof("transfering %f %s from the spot wallet into futures wallet...", available.Float64(), asset)
+	if err := ex.TransferFuturesAccountAsset(ctx, asset, available, types.TransferIn); err != nil {
+		s.State.PendingBaseTransfer = s.State.PendingBaseTransfer.Add(available)
 		return err
 	}
 
 	// record the transfer in the total base transfer
-	s.State.TotalBaseTransfer = s.State.TotalBaseTransfer.Add(quantity)
+	s.State.TotalBaseTransfer = s.State.TotalBaseTransfer.Add(available)
 	return nil
 }
