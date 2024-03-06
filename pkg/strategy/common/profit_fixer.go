@@ -48,8 +48,7 @@ func (f *ProfitFixer) batchQueryTrades(
 	})
 }
 
-func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, stats *types.ProfitStats, position *types.Position) error {
-	log.Infof("starting profitFixer with time range %s <=> %s", since, until)
+func (f *ProfitFixer) aggregateAllTrades(ctx context.Context, market types.Market, since, until time.Time) ([]types.Trade, error) {
 	var mu sync.Mutex
 	var allTrades = make([]types.Trade, 0, 1000)
 
@@ -59,7 +58,7 @@ func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, stats *ty
 		sessionName := n
 		service := s
 		g.Go(func() error {
-			log.Infof("batch querying %s trade history from %s since %s until %s", f.market.Symbol, sessionName, since.String(), until.String())
+			log.Infof("batch querying %s trade history from %s since %s until %s", market.Symbol, sessionName, since.String(), until.String())
 			trades, err := f.batchQueryTrades(subCtx, service, f.market.Symbol, since, until)
 			if err != nil {
 				log.WithError(err).Errorf("unable to batch query trades for fixer")
@@ -74,10 +73,20 @@ func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, stats *ty
 	}
 
 	if err := g.Wait(); err != nil {
-		return err
+		return nil, err
 	}
 
 	allTrades = types.SortTradesAscending(allTrades)
+	return allTrades, nil
+}
+
+func (f *ProfitFixer) Fix(ctx context.Context, since, until time.Time, stats *types.ProfitStats, position *types.Position) error {
+	log.Infof("starting profitFixer with time range %s <=> %s", since, until)
+	allTrades, err := f.aggregateAllTrades(ctx, f.market, since, until)
+	if err != nil {
+		return err
+	}
+
 	f.FixFromTrades(allTrades, stats, position)
 	return nil
 }
