@@ -2,15 +2,19 @@ package bitget
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"math"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
+	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testing/httptesting"
 	"github.com/c9s/bbgo/pkg/types"
@@ -389,6 +393,411 @@ func TestExchange_QueryKLines(t *testing.T) {
 
 	t.Run("unexpected duraiton", func(t *testing.T) {
 		_, err := ex.QueryKLines(context.Background(), expBtcSymbol, "87h", types.KLineQueryOptions{})
+		assert.ErrorContains(err, "not supported")
+	})
+}
+
+func TestExchange_QueryAccount(t *testing.T) {
+	var (
+		assert     = assert.New(t)
+		ex         = New("key", "secret", "passphrase")
+		url        = "/api/v2/spot/account/assets"
+		expAccount = &types.Account{
+			AccountType:        "spot",
+			FuturesInfo:        nil,
+			MarginInfo:         nil,
+			IsolatedMarginInfo: nil,
+			MarginLevel:        fixedpoint.Zero,
+			MarginTolerance:    fixedpoint.Zero,
+			BorrowEnabled:      false,
+			TransferEnabled:    false,
+			MarginRatio:        fixedpoint.Zero,
+			LiquidationPrice:   fixedpoint.Zero,
+			LiquidationRate:    fixedpoint.Zero,
+			MakerFeeRate:       fixedpoint.Zero,
+			TakerFeeRate:       fixedpoint.Zero,
+			TotalAccountValue:  fixedpoint.Zero,
+			CanDeposit:         false,
+			CanTrade:           false,
+			CanWithdraw:        false,
+		}
+		balances = types.BalanceMap{
+			"BTC": {
+				Currency:          "BTC",
+				Available:         fixedpoint.MustNewFromString("0.00000690"),
+				Locked:            fixedpoint.Zero,
+				Borrowed:          fixedpoint.Zero,
+				Interest:          fixedpoint.Zero,
+				NetAsset:          fixedpoint.Zero,
+				MaxWithdrawAmount: fixedpoint.Zero,
+			},
+			"USDT": {
+				Currency:          "USDT",
+				Available:         fixedpoint.MustNewFromString("0.68360342"),
+				Locked:            fixedpoint.MustNewFromString("9.08096000"),
+				Borrowed:          fixedpoint.Zero,
+				Interest:          fixedpoint.Zero,
+				NetAsset:          fixedpoint.Zero,
+				MaxWithdrawAmount: fixedpoint.Zero,
+			},
+		}
+	)
+	expAccount.UpdateBalances(balances)
+
+	t.Run("succeeds", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/get_account_assets_request.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 1)
+			assert.Contains(query, "limit")
+			assert.Equal(query["limit"], []string{string(v2.AssetTypeHoldOnly)})
+			return httptesting.BuildResponseString(http.StatusOK, string(f)), nil
+		})
+
+		acct, err := ex.QueryAccount(context.Background())
+		assert.NoError(err)
+		assert.Equal(expAccount, acct)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusBadRequest, string(f)), nil
+		})
+
+		_, err = ex.QueryAccount(context.Background())
+		assert.ErrorContains(err, "Invalid IP")
+	})
+}
+
+func TestExchange_QueryAccountBalances(t *testing.T) {
+	var (
+		assert         = assert.New(t)
+		ex             = New("key", "secret", "passphrase")
+		url            = "/api/v2/spot/account/assets"
+		expBalancesMap = types.BalanceMap{
+			"BTC": {
+				Currency:          "BTC",
+				Available:         fixedpoint.MustNewFromString("0.00000690"),
+				Locked:            fixedpoint.Zero,
+				Borrowed:          fixedpoint.Zero,
+				Interest:          fixedpoint.Zero,
+				NetAsset:          fixedpoint.Zero,
+				MaxWithdrawAmount: fixedpoint.Zero,
+			},
+			"USDT": {
+				Currency:          "USDT",
+				Available:         fixedpoint.MustNewFromString("0.68360342"),
+				Locked:            fixedpoint.MustNewFromString("9.08096000"),
+				Borrowed:          fixedpoint.Zero,
+				Interest:          fixedpoint.Zero,
+				NetAsset:          fixedpoint.Zero,
+				MaxWithdrawAmount: fixedpoint.Zero,
+			},
+		}
+	)
+
+	t.Run("succeeds", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/get_account_assets_request.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 1)
+			assert.Contains(query, "limit")
+			assert.Equal(query["limit"], []string{string(v2.AssetTypeHoldOnly)})
+			return httptesting.BuildResponseString(http.StatusOK, string(f)), nil
+		})
+
+		acct, err := ex.QueryAccountBalances(context.Background())
+		assert.NoError(err)
+		assert.Equal(expBalancesMap, acct)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusBadRequest, string(f)), nil
+		})
+
+		_, err = ex.QueryAccountBalances(context.Background())
+		assert.ErrorContains(err, "Invalid IP")
+	})
+}
+
+func TestExchange_SubmitOrder(t *testing.T) {
+	var (
+		assert        = assert.New(t)
+		ex            = New("key", "secret", "passphrase")
+		placeOrderUrl = "/api/v2/spot/trade/place-order"
+		openOrderUrl  = "/api/v2/spot/trade/unfilled-orders"
+		clientOrderId = "684a79df-f931-474f-a9a5-f1deab1cd770"
+		expBtcSymbol  = "BTCUSDT"
+		expOrder      = &types.Order{
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: clientOrderId,
+				Symbol:        expBtcSymbol,
+				Side:          types.SideTypeBuy,
+				Type:          types.OrderTypeLimit,
+				Quantity:      fixedpoint.MustNewFromString("0.00009"),
+				Price:         fixedpoint.MustNewFromString("66000"),
+				TimeInForce:   types.TimeInForceGTC,
+			},
+			Exchange:         types.ExchangeBitget,
+			OrderID:          1148903850645331968,
+			UUID:             "1148903850645331968",
+			Status:           types.OrderStatusNew,
+			ExecutedQuantity: fixedpoint.Zero,
+			IsWorking:        true,
+			CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1709645944272).Time()),
+			UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1709645944272).Time()),
+		}
+		reqLimitOrder = types.SubmitOrder{
+			ClientOrderID: clientOrderId,
+			Symbol:        expBtcSymbol,
+			Side:          types.SideTypeBuy,
+			Type:          types.OrderTypeLimit,
+			Quantity:      fixedpoint.MustNewFromString("0.00009"),
+			Price:         fixedpoint.MustNewFromString("66000"),
+			Market: types.Market{
+				Symbol:          expBtcSymbol,
+				LocalSymbol:     expBtcSymbol,
+				PricePrecision:  fixedpoint.MustNewFromString("2").Int(),
+				VolumePrecision: fixedpoint.MustNewFromString("6").Int(),
+				StepSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(6)),
+				TickSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(2)),
+			},
+			TimeInForce: types.TimeInForceGTC,
+		}
+	)
+
+	type NewOrder struct {
+		ClientOid string `json:"clientOid"`
+		Force     string `json:"force"`
+		OrderType string `json:"orderType"`
+		Price     string `json:"price"`
+		Side      string `json:"side"`
+		Size      string `json:"size"`
+		Symbol    string `json:"symbol"`
+	}
+
+	t.Run("Limit order", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		placeOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/place_order_request.json")
+		assert.NoError(err)
+
+		transport.POST(placeOrderUrl, func(req *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(req.Body)
+			assert.NoError(err)
+
+			reqq := &NewOrder{}
+			err = json.Unmarshal(raw, &reqq)
+			assert.NoError(err)
+			assert.Equal(&NewOrder{
+				ClientOid: expOrder.ClientOrderID,
+				Force:     string(v2.OrderForceGTC),
+				OrderType: string(v2.OrderTypeLimit),
+				Price:     "66000.00",
+				Side:      string(v2.SideTypeBuy),
+				Size:      "0.000090",
+				Symbol:    expBtcSymbol,
+			}, reqq)
+
+			return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
+		})
+
+		unfilledFile, err := os.ReadFile("bitgetapi/v2/testdata/get_unfilled_orders_request_limit_order.json")
+		assert.NoError(err)
+
+		transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 1)
+			assert.Contains(query, "orderId")
+			assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
+			return httptesting.BuildResponseString(http.StatusOK, string(unfilledFile)), nil
+		})
+
+		acct, err := ex.SubmitOrder(context.Background(), reqLimitOrder)
+		assert.NoError(err)
+		assert.Equal(expOrder, acct)
+	})
+
+	// TODO: add market buy, limit maker
+
+	t.Run("error on query open orders", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		placeOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/place_order_request.json")
+		assert.NoError(err)
+
+		transport.POST(placeOrderUrl, func(req *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(req.Body)
+			assert.NoError(err)
+
+			reqq := &NewOrder{}
+			err = json.Unmarshal(raw, &reqq)
+			assert.NoError(err)
+			assert.Equal(&NewOrder{
+				ClientOid: expOrder.ClientOrderID,
+				Force:     string(v2.OrderForceGTC),
+				OrderType: string(v2.OrderTypeLimit),
+				Price:     "66000.00",
+				Side:      string(v2.SideTypeBuy),
+				Size:      "0.000090",
+				Symbol:    expBtcSymbol,
+			}, reqq)
+
+			return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
+		})
+
+		unfilledFile, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
+		assert.NoError(err)
+
+		transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 1)
+			assert.Contains(query, "orderId")
+			assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
+			return httptesting.BuildResponseString(http.StatusBadRequest, string(unfilledFile)), nil
+		})
+
+		_, err = ex.SubmitOrder(context.Background(), reqLimitOrder)
+		assert.ErrorContains(err, "failed to query open order")
+	})
+
+	t.Run("unexpected client order id", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		placeOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/place_order_request.json")
+		assert.NoError(err)
+
+		transport.POST(placeOrderUrl, func(req *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(req.Body)
+			assert.NoError(err)
+
+			reqq := &NewOrder{}
+			err = json.Unmarshal(raw, &reqq)
+			assert.NoError(err)
+			assert.Equal(&NewOrder{
+				ClientOid: expOrder.ClientOrderID,
+				Force:     string(v2.OrderForceGTC),
+				OrderType: string(v2.OrderTypeLimit),
+				Price:     "66000.00",
+				Side:      string(v2.SideTypeBuy),
+				Size:      "0.000090",
+				Symbol:    expBtcSymbol,
+			}, reqq)
+
+			apiResp := &v2.APIResponse{}
+			err = json.Unmarshal(placeOrderFile, &apiResp)
+			assert.NoError(err)
+			placeOrderResp := &v2.PlaceOrderResponse{}
+			err = json.Unmarshal(apiResp.Data, &placeOrderResp)
+			assert.NoError(err)
+			// remove the client order id to test
+			placeOrderResp.ClientOrderId = ""
+
+			return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
+		})
+
+		_, err = ex.SubmitOrder(context.Background(), reqLimitOrder)
+		assert.ErrorContains(err, "failed to query open order")
+	})
+
+	t.Run("failed to place order", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		placeOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/place_order_request.json")
+		assert.NoError(err)
+
+		transport.POST(placeOrderUrl, func(req *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(req.Body)
+			assert.NoError(err)
+
+			reqq := &NewOrder{}
+			err = json.Unmarshal(raw, &reqq)
+			assert.NoError(err)
+			assert.Equal(&NewOrder{
+				ClientOid: expOrder.ClientOrderID,
+				Force:     string(v2.OrderForceGTC),
+				OrderType: string(v2.OrderTypeLimit),
+				Price:     "66000.00",
+				Side:      string(v2.SideTypeBuy),
+				Size:      "0.000090",
+				Symbol:    expBtcSymbol,
+			}, reqq)
+
+			return httptesting.BuildResponseString(http.StatusBadRequest, string(placeOrderFile)), nil
+		})
+
+		_, err = ex.SubmitOrder(context.Background(), reqLimitOrder)
+		assert.ErrorContains(err, "failed to place order")
+	})
+
+	t.Run("unexpected client order id", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		reqOrder2 := reqLimitOrder
+		reqOrder2.ClientOrderID = strings.Repeat("s", maxOrderIdLen+1)
+		_, err := ex.SubmitOrder(context.Background(), reqOrder2)
+		assert.ErrorContains(err, "unexpected length of client order id")
+	})
+
+	t.Run("time-in-force unsupported", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		reqOrder2 := reqLimitOrder
+		reqOrder2.TimeInForce = types.TimeInForceIOC
+		_, err := ex.SubmitOrder(context.Background(), reqOrder2)
+		assert.ErrorContains(err, "not supported")
+
+		reqOrder2.TimeInForce = types.TimeInForceFOK
+		_, err = ex.SubmitOrder(context.Background(), reqOrder2)
+		assert.ErrorContains(err, "not supported")
+	})
+
+	t.Run("unexpected side", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		reqOrder2 := reqLimitOrder
+		reqOrder2.Side = "GG"
+		_, err := ex.SubmitOrder(context.Background(), reqOrder2)
+		assert.ErrorContains(err, "not supported")
+	})
+
+	t.Run("unexpected side", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		reqOrder2 := reqLimitOrder
+		reqOrder2.Type = "GG"
+		_, err := ex.SubmitOrder(context.Background(), reqOrder2)
 		assert.ErrorContains(err, "not supported")
 	})
 }
