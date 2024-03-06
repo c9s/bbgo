@@ -288,22 +288,6 @@ func (s *Strategy) CrossRun(
 		return err
 	}
 
-	// adjust QuoteInvestment
-	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
-		originalQuoteInvestment := s.QuoteInvestment
-
-		// adjust available quote with the fee rate
-		available := b.Available.Mul(fixedpoint.NewFromFloat(1.0 - (0.01 * 0.075)))
-		s.QuoteInvestment = fixedpoint.Min(available, s.QuoteInvestment)
-
-		if originalQuoteInvestment.Compare(s.QuoteInvestment) != 0 {
-			log.Infof("adjusted quoteInvestment from %s to %s according to the balance",
-				originalQuoteInvestment.String(),
-				s.QuoteInvestment.String(),
-			)
-		}
-	}
-
 	if s.ProfitStats == nil || s.Reset {
 		s.ProfitStats = &ProfitStats{
 			ProfitStats: types.NewProfitStats(s.Market),
@@ -334,7 +318,25 @@ func (s *Strategy) CrossRun(
 		s.State = newState()
 	}
 
-	if err := s.checkAndRestorePositionRisks(ctx); err != nil {
+	// adjust QuoteInvestment according to the available quote balance
+	if b, ok := s.spotSession.Account.Balance(s.spotMarket.QuoteCurrency); ok {
+		originalQuoteInvestment := s.QuoteInvestment
+
+		// adjust available quote with the fee rate
+		spotFeeRate := 0.075
+		availableQuoteWithoutFee := b.Available.Mul(fixedpoint.NewFromFloat(1.0 - (spotFeeRate * 0.01)))
+
+		s.QuoteInvestment = fixedpoint.Min(availableQuoteWithoutFee, s.QuoteInvestment)
+
+		if originalQuoteInvestment.Compare(s.QuoteInvestment) != 0 {
+			log.Infof("adjusted quoteInvestment from %f to %f according to the balance",
+				originalQuoteInvestment.Float64(),
+				s.QuoteInvestment.Float64(),
+			)
+		}
+	}
+
+	if err := s.syncPositionRisks(ctx); err != nil {
 		return err
 	}
 
@@ -737,12 +739,14 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 
 	if futuresBase.Sign() > 0 {
 		// unexpected error
-		log.Errorf("unexpected futures position (got positive, expecting negative)")
+		log.Errorf("unexpected futures position, got positive number (long), expecting negative number (short)")
 		return
 	}
 
+	// cancel the previous futures order
 	_ = s.futuresOrderExecutor.GracefulCancel(ctx)
 
+	// get the latest ticker price
 	ticker, err := s.futuresSession.Exchange.QueryTicker(ctx, s.Symbol)
 	if err != nil {
 		log.WithError(err).Errorf("can not query ticker")
@@ -755,6 +759,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		log.WithError(err).Errorf("can not calculate futures account quote value")
 		return
 	}
+
 	log.Infof("calculated futures account quote value = %s", quoteValue.String())
 	if quoteValue.IsZero() {
 		return
@@ -798,12 +803,10 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	orderQuantity = fixedpoint.Max(diffQuantity, s.minQuantity)
 	orderQuantity = s.futuresMarket.AdjustQuantityByMinNotional(orderQuantity, orderPrice)
 
-	/*
-		if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
-			log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
-			return
-		}
-	*/
+	if s.futuresMarket.IsDustQuantity(orderQuantity, orderPrice) {
+		log.Warnf("unexpected dust quantity, skip futures order with dust quantity %s, market = %+v", orderQuantity.String(), s.futuresMarket)
+		return
+	}
 
 	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
@@ -816,7 +819,7 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 	createdOrders, err := s.futuresOrderExecutor.SubmitOrders(ctx, submitOrder)
 
 	if err != nil {
-		log.WithError(err).Errorf("can not submit spot order: %+v", submitOrder)
+		log.WithError(err).Errorf("can not submit futures order: %+v", submitOrder)
 		return
 	}
 
@@ -1145,7 +1148,7 @@ func (s *Strategy) checkAndFixMarginMode(ctx context.Context) error {
 	return nil
 }
 
-func (s *Strategy) checkAndRestorePositionRisks(ctx context.Context) error {
+func (s *Strategy) syncPositionRisks(ctx context.Context) error {
 	futuresClient := s.binanceFutures.GetFuturesClient()
 	req := futuresClient.NewFuturesGetPositionRisksRequest()
 	req.Symbol(s.Symbol)
