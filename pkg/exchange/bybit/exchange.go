@@ -113,7 +113,7 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 	}
 
 	if len(s.List) != 1 {
-		return nil, fmt.Errorf("unexpected ticker lenght, exp:1, got:%d", len(s.List))
+		return nil, fmt.Errorf("unexpected ticker length, exp:1, got:%d", len(s.List))
 	}
 
 	ticker := toGlobalTicker(s.List[0], s.ClosedTime.Time())
