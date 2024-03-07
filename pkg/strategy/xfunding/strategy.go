@@ -829,9 +829,6 @@ func (s *Strategy) syncFuturesPosition(ctx context.Context) {
 		bbgo.Notify("SpotPosition", s.SpotPosition)
 		bbgo.Notify("FuturesPosition", s.FuturesPosition)
 		bbgo.Notify("NeutralPosition", s.NeutralPosition)
-
-		// DEBUG CODE - triggering closing position automatically
-		// s.startClosingPosition()
 		return
 	}
 
