@@ -380,6 +380,8 @@ func (s *Strategy) CrossRun(
 	// sync funding fee txns
 	s.syncFundingFeeRecords(ctx, time.Now().Add(-5*24*time.Hour))
 
+	bbgo.Notify(s.ProfitStats)
+
 	switch s.State.PositionState {
 	case PositionClosed:
 		// adjust QuoteInvestment according to the available quote balance
