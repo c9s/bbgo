@@ -12,7 +12,7 @@ Create and modify the following files in this directory, the secret key inside t
 
 ```bash
 npm i
-# if you want to develope in localhost, try to run npm run devserver separately
+# if you want to develop in localhost, try to run npm run devserver separately
 # ex: npm run devserver
 # it will give you a set of secrets and account addresses
 ```
