@@ -17,8 +17,13 @@ type ProfitStats struct {
 	FundingFeeCurrency string           `json:"fundingFeeCurrency"`
 	TotalFundingFee    fixedpoint.Value `json:"totalFundingFee"`
 	FundingFeeRecords  []FundingFee     `json:"fundingFeeRecords"`
-	LastFundingFeeTxn  int64            `json:"lastFundingFeeTxn"`
-	LastFundingFeeTime time.Time        `json:"lastFundingFeeTime"`
+
+	// Fees map[string]
+	Last *FundingFee `json:"last"`
+
+	LastFundingFeeTime time.Time `json:"lastFundingFeeTime"`
+
+	txns map[int64]struct{}
 }
 
 func (s *ProfitStats) SlackAttachment() slack.Attachment {
@@ -31,24 +36,29 @@ func (s *ProfitStats) SlackAttachment() slack.Attachment {
 		// Pretext:       "",
 		// Text:  text,
 		Fields: fields,
-		Footer: fmt.Sprintf("Last Funding Fee Transation ID: %d Last Funding Fee Time %s", s.LastFundingFeeTxn, s.LastFundingFeeTime.Format(time.RFC822)),
+		Footer: fmt.Sprintf("Last Funding Fee Transation ID: %d Last Funding Fee Time %s", s.Last.Txn, s.Last.Time.Format(time.RFC822)),
 	}
 }
 
 func (s *ProfitStats) AddFundingFee(fee FundingFee) error {
+	if s.txns == nil {
+		s.txns = make(map[int64]struct{})
+	}
+
 	if s.FundingFeeCurrency == "" {
 		s.FundingFeeCurrency = fee.Asset
 	} else if s.FundingFeeCurrency != fee.Asset {
 		return fmt.Errorf("unexpected error, funding fee currency is not matched, given: %s, wanted: %s", fee.Asset, s.FundingFeeCurrency)
 	}
 
-	if s.LastFundingFeeTxn == fee.Txn {
+	if _, ok := s.txns[fee.Txn]; ok {
 		return errDuplicatedFundingFeeTxnId
 	}
 
 	s.FundingFeeRecords = append(s.FundingFeeRecords, fee)
 	s.TotalFundingFee = s.TotalFundingFee.Add(fee.Amount)
-	s.LastFundingFeeTxn = fee.Txn
-	s.LastFundingFeeTime = fee.Time
+	s.Last = &fee
+
+	s.txns[fee.Txn] = struct{}{}
 	return nil
 }

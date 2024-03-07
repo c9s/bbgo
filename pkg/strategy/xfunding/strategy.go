@@ -298,7 +298,6 @@ func (s *Strategy) CrossRun(
 			FundingFeeCurrency: s.futuresMarket.QuoteCurrency,
 			TotalFundingFee:    fixedpoint.Zero,
 			FundingFeeRecords:  nil,
-			LastFundingFeeTime: time.Time{},
 		}
 	}
 
@@ -379,10 +378,7 @@ func (s *Strategy) CrossRun(
 	bbgo.Notify("State: %s", s.State.PositionState.String())
 
 	// sync funding fee txns
-	s.syncFundingFeeRecords(ctx, s.ProfitStats.LastFundingFeeTime)
-
-	// TEST CODE:
-	// s.syncFundingFeeRecords(ctx, time.Now().Add(-3*24*time.Hour))
+	s.syncFundingFeeRecords(ctx, time.Now().Add(-5*24*time.Hour))
 
 	switch s.State.PositionState {
 	case PositionClosed:
