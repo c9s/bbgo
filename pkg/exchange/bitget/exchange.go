@@ -66,8 +66,9 @@ var (
 type Exchange struct {
 	key, secret, passphrase string
 
-	client   *bitgetapi.RestClient
-	v2client *v2.Client
+	client    *bitgetapi.RestClient
+	v2client  *v2.Client
+	timeNowFn func() time.Time
 }
 
 func New(key, secret, passphrase string) *Exchange {
@@ -83,6 +84,9 @@ func New(key, secret, passphrase string) *Exchange {
 		passphrase: passphrase,
 		client:     client,
 		v2client:   v2.NewClient(client),
+		timeNowFn: func() time.Time {
+			return time.Now()
+		},
 	}
 }
 
@@ -437,13 +441,13 @@ func (e *Exchange) QueryClosedOrders(
 	ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
 ) (orders []types.Order, err error) {
 	newSince := since
-	now := time.Now()
+	now := e.timeNowFn()
 
 	if time.Since(newSince) > maxHistoricalDataQueryPeriod {
 		newSince = now.Add(-maxHistoricalDataQueryPeriod)
 		log.Warnf("!!!BITGET EXCHANGE API NOTICE!!! The closed order API cannot query data beyond 90 days from the current date, update %s -> %s", since, newSince)
 	}
-	if until.Before(newSince) {
+	if until.Before(newSince) || until.Equal(newSince) {
 		log.Warnf("!!!BITGET EXCHANGE API NOTICE!!! The 'until' comes before 'since', update until to now(%s -> %s).", until, now)
 		until = now
 	}
@@ -555,7 +559,7 @@ func (e *Exchange) QueryTrades(
 	if options.StartTime != nil {
 		newStartTime = *options.StartTime
 		if time.Since(newStartTime) > maxHistoricalDataQueryPeriod {
-			newStartTime = time.Now().Add(-maxHistoricalDataQueryPeriod)
+			newStartTime = e.timeNowFn().Add(-maxHistoricalDataQueryPeriod)
 			log.Warnf("!!!BITGET EXCHANGE API NOTICE!!! The trade API cannot query data beyond 90 days from the current date, update %s -> %s", *options.StartTime, newStartTime)
 		}
 		req.StartTime(newStartTime)
