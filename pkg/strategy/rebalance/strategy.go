@@ -253,13 +253,13 @@ func (s *Strategy) generateOrder(ctx context.Context) (*types.SubmitOrder, error
 			return nil, err
 		}
 
-		price := s.PriceType.Map(ticker, side)
-
 		if side == types.SideTypeBuy {
-			quantity = fixedpoint.Min(quantity, balances[s.QuoteCurrency].Available.Div(price))
+			quantity = fixedpoint.Min(quantity, balances[s.QuoteCurrency].Available.Div(ticker.Sell))
 		} else if side == types.SideTypeSell {
 			quantity = fixedpoint.Min(quantity, balances[market.BaseCurrency].Available)
 		}
+
+		price := s.PriceType.Map(ticker, side)
 
 		if s.MaxAmount.Float64() > 0 {
 			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, price, s.MaxAmount)
