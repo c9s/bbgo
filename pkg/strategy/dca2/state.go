@@ -202,7 +202,9 @@ func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 	// reset position
 
 	// calculate profit stats
-	s.CalculateAndEmitProfit(ctx)
+	if err := s.CalculateAndEmitProfit(ctx); err != nil {
+		s.logger.WithError(err).Warn("failed to calculate and emit profit")
+	}
 
 	// reset position and open new round for profit stats before position opening
 	s.Position.Reset()
