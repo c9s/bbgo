@@ -65,7 +65,7 @@ func (inc *VolumeProfile) Update(price, volume float64, timestamp types.Time) {
 // peak in the Volume Profile, and is considered to be an important level of support or resistance. It can be used by traders to
 // identify potential entry and exit points for trades, or to confirm other technical analysis signals.
 
-// Get Resistence Level by finding PoC
+// Get Resistance Level by finding PoC
 func (inc *VolumeProfile) PointOfControlAboveEqual(price float64, limit ...float64) (resultPrice float64, vol float64) {
 	filter := inc.maxPrice
 	if len(limit) > 0 {
