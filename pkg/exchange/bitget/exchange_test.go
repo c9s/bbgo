@@ -1260,3 +1260,528 @@ func TestExchange_QueryOpenOrders(t *testing.T) {
 		assert.ErrorContains(err, "Invalid IP")
 	})
 }
+
+func TestExchange_QueryClosedOrders(t *testing.T) {
+	var (
+		assert       = assert.New(t)
+		ex           = New("key", "secret", "passphrase")
+		expBtcSymbol = "BTCUSDT"
+		since        = types.NewMillisecondTimestampFromInt(1709645944272).Time()
+		until        = since.Add(time.Hour)
+		lastOrderId  = uint64(0)
+		url          = "/api/v2/spot/trade/history-orders"
+	)
+
+	t.Run("succeeds on market buy", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		// order history
+		historyOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/get_history_orders_request.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 4)
+			assert.Contains(query, "startTime")
+			assert.Contains(query, "endTime")
+			assert.Contains(query, "limit")
+			assert.Contains(query, "symbol")
+			assert.Equal(query["startTime"], []string{strconv.FormatInt(since.UnixNano()/int64(time.Millisecond), 10)})
+			assert.Equal(query["endTime"], []string{strconv.FormatInt(until.UnixNano()/int64(time.Millisecond), 10)})
+			assert.Equal(query["limit"], []string{strconv.FormatInt(queryLimit, 10)})
+			assert.Equal(query["symbol"], []string{expBtcSymbol})
+			return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
+		})
+
+		orders, err := ex.QueryClosedOrders(context.Background(), expBtcSymbol, since, until, lastOrderId)
+		assert.NoError(err)
+		expOrder := []types.Order{
+			{
+				SubmitOrder: types.SubmitOrder{
+					ClientOrderID: "684a79df-f931-474f-a9a5-f1deab1cd770",
+					Symbol:        expBtcSymbol,
+					Side:          types.SideTypeBuy,
+					Type:          types.OrderTypeLimit,
+					Quantity:      fixedpoint.MustNewFromString("0.00009"),
+					Price:         fixedpoint.MustNewFromString("66000"),
+					TimeInForce:   types.TimeInForceGTC,
+				},
+				Exchange:         types.ExchangeBitget,
+				OrderID:          1148903850645331968,
+				UUID:             "1148903850645331968",
+				Status:           types.OrderStatusCanceled,
+				ExecutedQuantity: fixedpoint.MustNewFromString("0"),
+				IsWorking:        false,
+				CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1709645944272).Time()),
+				UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1709648518713).Time()),
+			},
+			{
+				SubmitOrder: types.SubmitOrder{
+					ClientOrderID: "bf3ba805-66bc-4ef6-bf34-d63d79dc2e4c",
+					Symbol:        expBtcSymbol,
+					Side:          types.SideTypeBuy,
+					Type:          types.OrderTypeMarket,
+					Quantity:      fixedpoint.MustNewFromString("0.000089"),
+					Price:         fixedpoint.MustNewFromString("67360.87"),
+					TimeInForce:   types.TimeInForceGTC,
+				},
+				Exchange:         types.ExchangeBitget,
+				OrderID:          1148914989018062853,
+				UUID:             "1148914989018062853",
+				Status:           types.OrderStatusFilled,
+				ExecutedQuantity: fixedpoint.MustNewFromString("0.000089"),
+				IsWorking:        false,
+				CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1709648599867).Time()),
+				UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1709648600016).Time()),
+			},
+		}
+		assert.Equal(expOrder, orders)
+	})
+
+	t.Run("adjust time range since unexpected since and until", func(t *testing.T) {
+		timeNow := time.Now().Truncate(time.Second)
+		ex.timeNowFn = func() time.Time {
+			return timeNow
+		}
+		defer func() { ex.timeNowFn = func() time.Time { return time.Now() } }()
+		newSince := timeNow.Add(-maxHistoricalDataQueryPeriod * 2)
+		expNewSince := timeNow.Add(-maxHistoricalDataQueryPeriod)
+		newUntil := timeNow.Add(-maxHistoricalDataQueryPeriod)
+		expNewUntil := timeNow
+
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		// order history
+		historyOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/get_history_orders_request.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 4)
+			assert.Contains(query, "startTime")
+			assert.Contains(query, "endTime")
+			assert.Contains(query, "limit")
+			assert.Contains(query, "symbol")
+			assert.Equal(query["startTime"], []string{strconv.FormatInt(expNewSince.UnixNano()/int64(time.Millisecond), 10)})
+			assert.Equal(query["endTime"], []string{strconv.FormatInt(expNewUntil.UnixNano()/int64(time.Millisecond), 10)})
+			assert.Equal(query["limit"], []string{strconv.FormatInt(queryLimit, 10)})
+			assert.Equal(query["symbol"], []string{expBtcSymbol})
+			return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
+		})
+
+		orders, err := ex.QueryClosedOrders(context.Background(), expBtcSymbol, newSince, newUntil, lastOrderId)
+		assert.NoError(err)
+		expOrder := []types.Order{
+			{
+				SubmitOrder: types.SubmitOrder{
+					ClientOrderID: "684a79df-f931-474f-a9a5-f1deab1cd770",
+					Symbol:        expBtcSymbol,
+					Side:          types.SideTypeBuy,
+					Type:          types.OrderTypeLimit,
+					Quantity:      fixedpoint.MustNewFromString("0.00009"),
+					Price:         fixedpoint.MustNewFromString("66000"),
+					TimeInForce:   types.TimeInForceGTC,
+				},
+				Exchange:         types.ExchangeBitget,
+				OrderID:          1148903850645331968,
+				UUID:             "1148903850645331968",
+				Status:           types.OrderStatusCanceled,
+				ExecutedQuantity: fixedpoint.MustNewFromString("0"),
+				IsWorking:        false,
+				CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1709645944272).Time()),
+				UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1709648518713).Time()),
+			},
+			{
+				SubmitOrder: types.SubmitOrder{
+					ClientOrderID: "bf3ba805-66bc-4ef6-bf34-d63d79dc2e4c",
+					Symbol:        expBtcSymbol,
+					Side:          types.SideTypeBuy,
+					Type:          types.OrderTypeMarket,
+					Quantity:      fixedpoint.MustNewFromString("0.000089"),
+					Price:         fixedpoint.MustNewFromString("67360.87"),
+					TimeInForce:   types.TimeInForceGTC,
+				},
+				Exchange:         types.ExchangeBitget,
+				OrderID:          1148914989018062853,
+				UUID:             "1148914989018062853",
+				Status:           types.OrderStatusFilled,
+				ExecutedQuantity: fixedpoint.MustNewFromString("0.000089"),
+				IsWorking:        false,
+				CreationTime:     types.Time(types.NewMillisecondTimestampFromInt(1709648599867).Time()),
+				UpdateTime:       types.Time(types.NewMillisecondTimestampFromInt(1709648600016).Time()),
+			},
+		}
+		assert.Equal(expOrder, orders)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusBadRequest, string(f)), nil
+		})
+
+		_, err = ex.QueryClosedOrders(context.Background(), expBtcSymbol, since, until, lastOrderId)
+		assert.ErrorContains(err, "Invalid IP")
+	})
+}
+
+func TestExchange_CancelOrders(t *testing.T) {
+	var (
+		assert         = assert.New(t)
+		ex             = New("key", "secret", "passphrase")
+		cancelOrderUrl = "/api/v2/spot/trade/cancel-order"
+		order          = types.Order{
+			OrderID: 1149899973610643488,
+			SubmitOrder: types.SubmitOrder{
+				ClientOrderID: "9471cf38-33c2-4aee-a2fb-fcf71629ffb7",
+			},
+		}
+	)
+
+	t.Run("order id first, either orderId or clientOid is required", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		// order history
+		historyOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/cancel_order_request.json")
+		assert.NoError(err)
+
+		transport.POST(cancelOrderUrl, func(req *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(req.Body)
+			assert.NoError(err)
+
+			type cancelOrder struct {
+				OrderId       string `json:"orderId"`
+				ClientOrderId string `json:"clientOrderId"`
+			}
+			reqq := &cancelOrder{}
+			err = json.Unmarshal(raw, &reqq)
+			assert.NoError(err)
+
+			assert.Equal(strconv.FormatUint(order.OrderID, 10), reqq.OrderId)
+			assert.Equal("", reqq.ClientOrderId)
+			return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
+		})
+
+		err = ex.CancelOrders(context.Background(), order)
+		assert.NoError(err)
+	})
+
+	t.Run("unexpected order id and client order id", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		transport.POST(cancelOrderUrl, func(req *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(req.Body)
+			assert.NoError(err)
+
+			type cancelOrder struct {
+				OrderId       string `json:"orderId"`
+				ClientOrderId string `json:"clientOrderId"`
+			}
+			reqq := &cancelOrder{}
+			err = json.Unmarshal(raw, &reqq)
+			assert.NoError(err)
+
+			assert.Equal(strconv.FormatUint(order.OrderID, 10), reqq.OrderId)
+			assert.Equal("", reqq.ClientOrderId)
+
+			reqq.OrderId = "123456789"
+			reqq.ClientOrderId = "test wrong order client id"
+			raw, err = json.Marshal(reqq)
+			assert.NoError(err)
+			apiResp := v2.APIResponse{Code: "00000", Data: raw}
+			raw, err = json.Marshal(apiResp)
+			assert.NoError(err)
+			return httptesting.BuildResponseString(http.StatusOK, string(raw)), nil
+		})
+
+		err := ex.CancelOrders(context.Background(), order)
+		assert.ErrorContains(err, "order id mismatch")
+	})
+
+	t.Run("client order id", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		// order history
+		historyOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/cancel_order_request.json")
+		assert.NoError(err)
+
+		transport.POST(cancelOrderUrl, func(req *http.Request) (*http.Response, error) {
+			raw, err := io.ReadAll(req.Body)
+			assert.NoError(err)
+
+			type cancelOrder struct {
+				OrderId       string `json:"orderId"`
+				ClientOrderId string `json:"clientOid"`
+			}
+			reqq := &cancelOrder{}
+			err = json.Unmarshal(raw, &reqq)
+			assert.NoError(err)
+
+			assert.Equal("", reqq.OrderId)
+			assert.Equal(order.ClientOrderID, reqq.ClientOrderId)
+			return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
+		})
+
+		newOrder := order
+		newOrder.OrderID = 0
+		err = ex.CancelOrders(context.Background(), newOrder)
+		assert.NoError(err)
+	})
+
+	t.Run("empty order id and client order id", func(t *testing.T) {
+		newOrder := order
+		newOrder.OrderID = 0
+		newOrder.ClientOrderID = ""
+		err := ex.CancelOrders(context.Background(), newOrder)
+		assert.ErrorContains(err, "the order uuid and client order id are empty")
+	})
+
+	t.Run("error", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
+		assert.NoError(err)
+
+		transport.POST(cancelOrderUrl, func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusBadRequest, string(f)), nil
+		})
+
+		err = ex.CancelOrders(context.Background(), order)
+		assert.ErrorContains(err, "Invalid IP")
+	})
+}
+
+func TestExchange_QueryTrades(t *testing.T) {
+	var (
+		assert       = assert.New(t)
+		ex           = New("key", "secret", "passphrase")
+		expApeSymbol = "APEUSDT"
+		since        = types.NewMillisecondTimestampFromInt(1709645944272).Time()
+		until        = since.Add(time.Hour)
+		options      = &types.TradeQueryOptions{
+			StartTime:   &since,
+			EndTime:     &until,
+			Limit:       queryLimit,
+			LastTradeID: 0,
+		}
+		url      = "/api/v2/spot/trade/fills"
+		expOrder = []types.Trade{
+			{
+				ID:            1149103068190019665,
+				OrderID:       1149103067745689603,
+				Exchange:      types.ExchangeBitget,
+				Price:         fixedpoint.MustNewFromString("1.9959"),
+				Quantity:      fixedpoint.MustNewFromString("2.98"),
+				QuoteQuantity: fixedpoint.MustNewFromString("5.947782"),
+				Symbol:        expApeSymbol,
+				Side:          types.SideTypeSell,
+				IsBuyer:       false,
+				IsMaker:       false,
+				Time:          types.Time(types.NewMillisecondTimestampFromInt(1709693441436).Time()),
+				Fee:           fixedpoint.MustNewFromString("0.005947782"),
+				FeeCurrency:   "USDT",
+				FeeDiscounted: false,
+			},
+			{
+				ID:            1149101368775479371,
+				OrderID:       1149101366691176462,
+				Exchange:      types.ExchangeBitget,
+				Price:         fixedpoint.MustNewFromString("2.01"),
+				Quantity:      fixedpoint.MustNewFromString("0.0013"),
+				QuoteQuantity: fixedpoint.MustNewFromString("0.002613"),
+				Symbol:        expApeSymbol,
+				Side:          types.SideTypeBuy,
+				IsBuyer:       true,
+				IsMaker:       true,
+				Time:          types.Time(types.NewMillisecondTimestampFromInt(1709693036264).Time()),
+				Fee:           fixedpoint.MustNewFromString("0.0000013"),
+				FeeCurrency:   "APE",
+				FeeDiscounted: false,
+			},
+			{
+				ID:            1149098107964166145,
+				OrderID:       1149098107519836161,
+				Exchange:      types.ExchangeBitget,
+				Price:         fixedpoint.MustNewFromString("2.0087"),
+				Quantity:      fixedpoint.MustNewFromString("2.987"),
+				QuoteQuantity: fixedpoint.MustNewFromString("5.9999869"),
+				Symbol:        expApeSymbol,
+				Side:          types.SideTypeBuy,
+				IsBuyer:       true,
+				IsMaker:       false,
+				Time:          types.Time(types.NewMillisecondTimestampFromInt(1709692258826).Time()),
+				Fee:           fixedpoint.MustNewFromString("0.002987"),
+				FeeCurrency:   "APE",
+				FeeDiscounted: false,
+			},
+			{
+				ID:            1149096769322684417,
+				OrderID:       1149096768878354435,
+				Exchange:      types.ExchangeBitget,
+				Price:         fixedpoint.MustNewFromString("2.0068"),
+				Quantity:      fixedpoint.MustNewFromString("2.9603"),
+				QuoteQuantity: fixedpoint.MustNewFromString("5.94073004"),
+				Symbol:        expApeSymbol,
+				Side:          types.SideTypeSell,
+				IsBuyer:       false,
+				IsMaker:       false,
+				Time:          types.Time(types.NewMillisecondTimestampFromInt(1709691939669).Time()),
+				Fee:           fixedpoint.MustNewFromString("0.00594073004"),
+				FeeCurrency:   "USDT",
+				FeeDiscounted: false,
+			},
+		}
+	)
+
+	t.Run("succeeds", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		// order history
+		historyOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/get_trade_fills_request.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 4)
+			assert.Contains(query, "startTime")
+			assert.Contains(query, "endTime")
+			assert.Contains(query, "limit")
+			assert.Contains(query, "symbol")
+			assert.Equal(query["startTime"], []string{strconv.FormatInt(since.UnixNano()/int64(time.Millisecond), 10)})
+			assert.Equal(query["endTime"], []string{strconv.FormatInt(until.UnixNano()/int64(time.Millisecond), 10)})
+			assert.Equal(query["limit"], []string{strconv.FormatInt(queryLimit, 10)})
+			assert.Equal(query["symbol"], []string{expApeSymbol})
+			return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
+		})
+
+		orders, err := ex.QueryTrades(context.Background(), expApeSymbol, options)
+		assert.NoError(err)
+		assert.Equal(expOrder, orders)
+	})
+
+	t.Run("succeeds with lastTradeId (not supported) and limit 0", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		// order history
+		historyOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/get_trade_fills_request.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 4)
+			assert.Contains(query, "startTime")
+			assert.Contains(query, "endTime")
+			assert.Contains(query, "limit")
+			assert.Contains(query, "symbol")
+			assert.Equal(query["startTime"], []string{strconv.FormatInt(since.UnixNano()/int64(time.Millisecond), 10)})
+			assert.Equal(query["endTime"], []string{strconv.FormatInt(until.UnixNano()/int64(time.Millisecond), 10)})
+			assert.Equal(query["limit"], []string{strconv.FormatInt(queryLimit, 10)})
+			assert.Equal(query["symbol"], []string{expApeSymbol})
+			return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
+		})
+
+		newOpts := *options
+		newOpts.LastTradeID = 50
+		newOpts.Limit = 0
+		orders, err := ex.QueryTrades(context.Background(), expApeSymbol, &newOpts)
+		assert.NoError(err)
+		assert.Equal(expOrder, orders)
+	})
+
+	t.Run("adjust time range since unexpected since and until", func(t *testing.T) {
+		timeNow := time.Now().Truncate(time.Second)
+		ex.timeNowFn = func() time.Time {
+			return timeNow
+		}
+		defer func() { ex.timeNowFn = func() time.Time { return time.Now() } }()
+		newSince := timeNow.Add(-maxHistoricalDataQueryPeriod * 2)
+		expNewSince := timeNow.Add(-maxHistoricalDataQueryPeriod)
+		newUntil := timeNow.Add(-maxHistoricalDataQueryPeriod + 24*time.Hour)
+		newOpts := *options
+		newOpts.StartTime = &newSince
+		newOpts.EndTime = &newUntil
+
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		// order history
+		historyOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/get_trade_fills_request.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 4)
+			assert.Contains(query, "startTime")
+			assert.Contains(query, "endTime")
+			assert.Contains(query, "limit")
+			assert.Contains(query, "symbol")
+			assert.Equal(query["startTime"], []string{strconv.FormatInt(expNewSince.UnixNano()/int64(time.Millisecond), 10)})
+			assert.Equal(query["endTime"], []string{strconv.FormatInt(newUntil.UnixNano()/int64(time.Millisecond), 10)})
+			assert.Equal(query["limit"], []string{strconv.FormatInt(queryLimit, 10)})
+			assert.Equal(query["symbol"], []string{expApeSymbol})
+			return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
+		})
+
+		orders, err := ex.QueryTrades(context.Background(), expApeSymbol, &newOpts)
+		assert.NoError(err)
+		assert.Equal(expOrder, orders)
+	})
+
+	t.Run("failed due to empty since", func(t *testing.T) {
+		timeNow := time.Now().Truncate(time.Second)
+		ex.timeNowFn = func() time.Time {
+			return timeNow
+		}
+		defer func() { ex.timeNowFn = func() time.Time { return time.Now() } }()
+		newSince := timeNow.Add(-maxHistoricalDataQueryPeriod * 2)
+		newUntil := timeNow.Add(-maxHistoricalDataQueryPeriod - time.Second)
+		newOpts := *options
+		newOpts.StartTime = &newSince
+		newOpts.EndTime = &newUntil
+
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		_, err := ex.QueryTrades(context.Background(), expApeSymbol, &newOpts)
+		assert.ErrorContains(err, "before start")
+	})
+
+	t.Run("failed due to empty since", func(t *testing.T) {
+		newOpts := *options
+		newOpts.StartTime = nil
+
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		_, err := ex.QueryTrades(context.Background(), expApeSymbol, &newOpts)
+		assert.ErrorContains(err, "start time is required")
+	})
+
+	t.Run("error", func(t *testing.T) {
+		transport := &httptesting.MockTransport{}
+		ex.client.HttpClient.Transport = transport
+
+		f, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
+		assert.NoError(err)
+
+		transport.GET(url, func(req *http.Request) (*http.Response, error) {
+			return httptesting.BuildResponseString(http.StatusBadRequest, string(f)), nil
+		})
+
+		_, err = ex.QueryTrades(context.Background(), expApeSymbol, options)
+		assert.ErrorContains(err, "Invalid IP")
+	})
+}
