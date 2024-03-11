@@ -87,8 +87,7 @@ func (s *Strategy) runState(ctx context.Context) {
 		case <-monitorTicker.C:
 			s.updateNumOfOrdersMetrics(ctx)
 		case nextState := <-s.nextStateC:
-			s.logger.Infof("[DCA] currenct state: %d, next state: %d", s.state, nextState)
-
+			// s.logger.Infof("[DCA] currenct state: %d, next state: %d", s.state, nextState)
 			// check the next state is valid
 			validNextState, exist := stateTransition[s.state]
 			if !exist {
