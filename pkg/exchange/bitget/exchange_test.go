@@ -646,6 +646,14 @@ func TestExchange_SubmitOrder(t *testing.T) {
 	})
 
 	t.Run("Limit Maker order", func(t *testing.T) {
+		emptyApiResp := v2.APIResponse{
+			Code:    "00000",
+			Message: "",
+			Data:    nil,
+		}
+		rawEmptyApiResp, err := json.Marshal(emptyApiResp)
+		assert.NoError(err)
+
 		transport := &httptesting.MockTransport{}
 		ex.client.HttpClient.Transport = transport
 
@@ -672,22 +680,36 @@ func TestExchange_SubmitOrder(t *testing.T) {
 			return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
 		})
 
-		unfilledFile, err := os.ReadFile("bitgetapi/v2/testdata/get_unfilled_orders_request_limit_order.json")
-		assert.NoError(err)
-
 		transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
 			query := req.URL.Query()
 			assert.Len(query, 1)
 			assert.Contains(query, "orderId")
 			assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
-			return httptesting.BuildResponseString(http.StatusOK, string(unfilledFile)), nil
+			return httptesting.BuildResponseString(http.StatusOK, string(rawEmptyApiResp)), nil
+		})
+
+		transport.GET(historyOrderUrl, func(req *http.Request) (*http.Response, error) {
+			query := req.URL.Query()
+			assert.Len(query, 1)
+			assert.Contains(query, "orderId")
+			assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
+			return httptesting.BuildResponseString(http.StatusOK, string(rawEmptyApiResp)), nil
 		})
 
 		reqLimitOrder2 := reqLimitOrder
 		reqLimitOrder2.Type = types.OrderTypeLimitMaker
 		acct, err := ex.SubmitOrder(context.Background(), reqLimitOrder2)
 		assert.NoError(err)
-		assert.Equal(expOrder, acct)
+
+		expOrder2 := *expOrder
+		expOrder2.OriginalStatus = "FALLBACK_STATUS"
+		expOrder2.Status = types.OrderStatusNew
+		expOrder2.IsWorking = true
+		expOrder2.Type = types.OrderTypeLimitMaker
+		expOrder2.SubmitOrder = reqLimitOrder2
+		acct.CreationTime = expOrder2.CreationTime
+		acct.UpdateTime = expOrder2.UpdateTime
+		assert.Equal(&expOrder2, acct)
 	})
 
 	t.Run("Market order", func(t *testing.T) {
