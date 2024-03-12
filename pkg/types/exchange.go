@@ -87,6 +87,12 @@ type Exchange interface {
 	ExchangeTradeService
 }
 
+//go:generate mockgen -destination=mocks/mock_exchange_public.go -package=mocks . ExchangePublic
+type ExchangePublic interface {
+	ExchangeMinimal
+	ExchangeMarketDataService
+}
+
 // ExchangeBasic is the new type for replacing the original Exchange interface
 type ExchangeBasic = Exchange
 
