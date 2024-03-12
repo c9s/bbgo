@@ -2,6 +2,7 @@ package binance
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -22,6 +23,12 @@ func Test_new(t *testing.T) {
 	assert.NotEmpty(t, ex)
 	ctx := context.Background()
 	ticker, err := ex.QueryTicker(ctx, "btcusdt")
-	assert.NotEmpty(t, ticker)
-	assert.NoError(t, err)
+	if len(os.Getenv("GITHUB_CI")) > 0 {
+		// Github action runs in the US, and therefore binance api is not accessible
+		assert.Empty(t, ticker)
+		assert.Error(t, err)
+	} else {
+		assert.NotEmpty(t, ticker)
+		assert.NoError(t, err)
+	}
 }
