@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Strategy) recoverPeriodically(ctx context.Context) {
-	s.logger.Info("[DCA] monitor and recover periodically")
+	s.logger.Info("monitor and recover periodically")
 	interval := util.MillisecondsJitter(10*time.Minute, 5*60*1000)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
