@@ -8,7 +8,7 @@ import (
 )
 
 func (s *Strategy) placeTakeProfitOrders(ctx context.Context) error {
-	s.logger.Info("[DCA] start placing take profit orders")
+	s.logger.Info("start placing take profit orders")
 	order := generateTakeProfitOrder(s.Market, s.TakeProfitRatio, s.Position, s.OrderGroupID)
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, order)
 	if err != nil {
