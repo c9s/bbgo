@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/cenkalti/backoff/v4"
 
@@ -117,6 +118,54 @@ func QueryOpenOrdersUntilSuccessfulLite(
 
 	err = GeneralLiteBackoff(ctx, op)
 	return openOrders, err
+}
+
+func QueryClosedOrdersUntilSuccessful(
+	ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, since, until time.Time, lastOrderID uint64,
+) (closedOrders []types.Order, err error) {
+	var op = func() (err2 error) {
+		closedOrders, err2 = ex.QueryClosedOrders(ctx, symbol, since, until, lastOrderID)
+		return err2
+	}
+
+	err = GeneralBackoff(ctx, op)
+	return closedOrders, err
+}
+
+func QueryClosedOrdersUntilSuccessfulLite(
+	ctx context.Context, ex types.ExchangeTradeHistoryService, symbol string, since, until time.Time, lastOrderID uint64,
+) (closedOrders []types.Order, err error) {
+	var op = func() (err2 error) {
+		closedOrders, err2 = ex.QueryClosedOrders(ctx, symbol, since, until, lastOrderID)
+		return err2
+	}
+
+	err = GeneralLiteBackoff(ctx, op)
+	return closedOrders, err
+}
+
+func QueryOrderTradesUntilSuccessful(
+	ctx context.Context, ex types.ExchangeOrderQueryService, q types.OrderQuery,
+) (trades []types.Trade, err error) {
+	var op = func() (err2 error) {
+		trades, err2 = ex.QueryOrderTrades(ctx, q)
+		return err2
+	}
+
+	err = GeneralBackoff(ctx, op)
+	return trades, err
+}
+
+func QueryOrderTradesUntilSuccessfulLite(
+	ctx context.Context, ex types.ExchangeOrderQueryService, q types.OrderQuery,
+) (trades []types.Trade, err error) {
+	var op = func() (err2 error) {
+		trades, err2 = ex.QueryOrderTrades(ctx, q)
+		return err2
+	}
+
+	err = GeneralLiteBackoff(ctx, op)
+	return trades, err
 }
 
 func QueryAccountUntilSuccessful(
