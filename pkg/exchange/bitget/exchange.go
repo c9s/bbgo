@@ -378,6 +378,14 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		}
 
 		if len(ordersResp) != 1 {
+			// 2023/03/12 If it's a maker order and there is a corresponding order to be executed, then the order will be canceled,
+			// you can receive the status immediately from the websocket, but the RestAPI requires at least 200ms waiting time.
+			//
+			// Therefore, We don't want to waste time waiting for him, so we choose to manually enter the order
+			// information and send it back.
+			if order.Type == types.OrderTypeLimitMaker {
+				return fallbackPostOnlyOrder(order, orderId)
+			}
 			return nil, fmt.Errorf("unexpected length of history orders, expecting: 1, given: %d, ids: %s", len(ordersResp), orderId)
 		}
 
