@@ -129,24 +129,24 @@ func New(key, secret string) *Exchange {
 	if len(key) > 0 && len(secret) > 0 {
 		client2.Auth(key, secret)
 		futuresClient2.Auth(key, secret)
-
-		ctx := context.Background()
-		go timeSetterOnce.Do(func() {
-			ex.setServerTimeOffset(ctx)
-
-			ticker := time.NewTicker(time.Hour)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-
-				case <-ticker.C:
-					ex.setServerTimeOffset(ctx)
-				}
-			}
-		})
 	}
+
+	ctx := context.Background()
+	go timeSetterOnce.Do(func() {
+		ex.setServerTimeOffset(ctx)
+
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case <-ticker.C:
+				ex.setServerTimeOffset(ctx)
+			}
+		}
+	})
 
 	return ex
 }
