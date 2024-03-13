@@ -24,7 +24,7 @@ func toGlobalMarket(symbol binance.Symbol) types.Market {
 		BaseCurrency:    symbol.BaseAsset,
 	}
 
-	if f := symbol.MinNotionalFilter(); f != nil {
+	if f := symbol.NotionalFilter(); f != nil {
 		market.MinNotional = fixedpoint.MustNewFromString(f.MinNotional)
 		market.MinAmount = fixedpoint.MustNewFromString(f.MinNotional)
 	}
