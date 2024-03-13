@@ -260,6 +260,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		orderReq.ClientOrderID(order.ClientOrderID)
 	}
 
+	timeNow := time.Now()
 	orders, err := orderReq.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -269,16 +270,21 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		return nil, fmt.Errorf("unexpected length of order response: %v", orders)
 	}
 
-	orderRes, err := e.QueryOrder(ctx, types.OrderQuery{
-		Symbol:        order.Symbol,
-		OrderID:       orders[0].OrderID,
-		ClientOrderID: orders[0].ClientOrderID,
-	})
+	orderID, err := strconv.ParseUint(orders[0].OrderID, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query order by id: %s, clientOrderId: %s, err: %w", orders[0].OrderID, orders[0].ClientOrderID, err)
+		return nil, fmt.Errorf("failed to parse response order id: %w", err)
 	}
 
-	return orderRes, nil
+	return &types.Order{
+		SubmitOrder:      order,
+		Exchange:         types.ExchangeOKEx,
+		OrderID:          orderID,
+		Status:           types.OrderStatusNew,
+		ExecutedQuantity: fixedpoint.Zero,
+		IsWorking:        true,
+		CreationTime:     types.Time(timeNow),
+		UpdateTime:       types.Time(timeNow),
+	}, nil
 
 	// TODO: move this to batch place orders interface
 	/*
