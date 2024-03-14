@@ -82,8 +82,9 @@ func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, or
 
 	// dca stop at take-profit order stage
 	if currentRound.TakeProfitOrder.OrderID != 0 {
-		if len(currentRound.OpenPositionOrders) != maxOrderCount {
-			return None, fmt.Errorf("there is take-profit order but the number of open-position orders (%d) is not the same as maxOrderCount(%d). Please check it", len(currentRound.OpenPositionOrders), maxOrderCount)
+		// the number of open-positions orders may not be equal to maxOrderCount, because the notional may not enough to open maxOrderCount orders
+		if len(currentRound.OpenPositionOrders) > maxOrderCount {
+			return None, fmt.Errorf("there is take-profit order but the number of open-position orders (%d) is greater than maxOrderCount(%d). Please check it", len(currentRound.OpenPositionOrders), maxOrderCount)
 		}
 
 		takeProfitOrder := currentRound.TakeProfitOrder

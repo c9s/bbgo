@@ -46,6 +46,10 @@ const (
 	OrderStateFailed     = OrderState("failed")
 )
 
+func IsFilledOrderState(state OrderState) bool {
+	return state == OrderStateDone || state == OrderStateFinalizing
+}
+
 type OrderType string
 
 // Order types that the API can return.

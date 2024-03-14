@@ -431,12 +431,7 @@ func (s *Strategy) CalculateAndEmitProfit(ctx context.Context, historyService ty
 					continue
 				}
 			} else {
-				switch maxapi.OrderState(order.OriginalStatus) {
-				case maxapi.OrderStateDone:
-					// the same as filled
-				case maxapi.OrderStateFinalizing:
-					// the same as filled
-				default:
+				if !maxapi.IsFilledOrderState(maxapi.OrderState(order.OriginalStatus)) {
 					s.logger.Infof("isMax and take-profit order is %s not done or finalizing, so this round is not finished. Skip it", order.OriginalStatus)
 					continue
 				}
@@ -452,7 +447,7 @@ func (s *Strategy) CalculateAndEmitProfit(ctx context.Context, historyService ty
 
 	s.logger.Infof("there are %d rounds from order id #%d", len(rounds), s.ProfitStats.FromOrderID)
 	for _, round := range rounds {
-		debugRoundOrders(s.logger, "calculate", round)
+		debugRoundOrders(s.logger, strconv.FormatInt(s.ProfitStats.Round, 10), round)
 		var roundOrders []types.Order = round.OpenPositionOrders
 		roundOrders = append(roundOrders, round.TakeProfitOrder)
 		for _, order := range roundOrders {
