@@ -225,27 +225,6 @@ func unfilledOrderToGlobalOrder(order v2.UnfilledOrder) (*types.Order, error) {
 	}, nil
 }
 
-func fallbackPostOnlyOrder(order types.SubmitOrder, orderId string) (*types.Order, error) {
-	intOrderId, err := strconv.ParseUint(orderId, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now()
-
-	return &types.Order{
-		SubmitOrder:      order,
-		Exchange:         types.ExchangeBitget,
-		OrderID:          intOrderId,
-		UUID:             orderId,
-		Status:           types.OrderStatusNew,
-		OriginalStatus:   "FALLBACK_STATUS",
-		ExecutedQuantity: fixedpoint.Zero,
-		IsWorking:        true,
-		CreationTime:     types.Time(now),
-		UpdateTime:       types.Time(now),
-	}, nil
-}
-
 func toGlobalOrder(order v2.OrderDetail) (*types.Order, error) {
 	side, err := toGlobalSideType(order.Side)
 	if err != nil {
