@@ -45,11 +45,14 @@ func (s *Strategy) recover(ctx context.Context) error {
 	}
 	debugRoundOrders(s.logger, "current", currentRound)
 
+	// TODO: use flag
 	// recover profit stats
-	if err := recoverProfitStats(ctx, s); err != nil {
-		return err
-	}
-	s.logger.Info("recover profit stats DONE")
+	/*
+		if err := recoverProfitStats(ctx, s); err != nil {
+			return err
+		}
+		s.logger.Info("recover profit stats DONE")
+	*/
 
 	// recover position
 	if err := recoverPosition(ctx, s.Position, queryService, currentRound); err != nil {
@@ -202,6 +205,8 @@ func recoverPosition(ctx context.Context, position *types.Position, queryService
 	return nil
 }
 
+// TODO: use flag to decide which to recover
+/*
 func recoverProfitStats(ctx context.Context, strategy *Strategy) error {
 	if strategy.ProfitStats == nil {
 		return fmt.Errorf("profit stats is nil, please check it")
@@ -209,6 +214,7 @@ func recoverProfitStats(ctx context.Context, strategy *Strategy) error {
 
 	return strategy.CalculateAndEmitProfit(ctx)
 }
+*/
 
 func recoverStartTimeOfNextRound(ctx context.Context, currentRound Round, coolDownInterval types.Duration) time.Time {
 	if currentRound.TakeProfitOrder.OrderID != 0 && currentRound.TakeProfitOrder.Status == types.OrderStatusFilled {
