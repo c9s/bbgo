@@ -53,13 +53,13 @@ type Trade struct {
 	PosSide          string           `json:"posSide"`
 }
 
-//go:generate GetRequest -url "/api/v5/trade/fills-history" -type GetTransactionHistoryRequest -responseDataType []Trade
+//go:generate GetRequest -url "/api/v5/trade/fills-history" -type GetTransactionHistoryRequest -responseDataType []Trade -rateLimiter 1+10/2s
 type GetTransactionHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	instrumentType InstrumentType `param:"instType,query"`
 	instrumentID   *string        `param:"instId,query"`
-	orderID        string         `param:"ordId,query"`
+	orderID        *string        `param:"ordId,query"`
 
 	// Underlying and InstrumentFamily Applicable to FUTURES/SWAP/OPTION
 	underlying       *string `param:"uly,query"`
