@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
@@ -372,7 +373,7 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	return werr
 }
 
-func (s *Strategy) mustCalculateAndEmitProfit(ctx context.Context) error {
+func (s *Strategy) CalculateAndEmitProfitUntilSuccessful(ctx context.Context) error {
 	fromOrderID := s.ProfitStats.FromOrderID
 
 	historyService, ok := s.ExchangeSession.Exchange.(types.ExchangeTradeHistoryService)
@@ -385,23 +386,19 @@ func (s *Strategy) mustCalculateAndEmitProfit(ctx context.Context) error {
 		return fmt.Errorf("exchange %s doesn't support ExchangeOrderQueryService", s.ExchangeSession.Exchange.Name())
 	}
 
-	maxTry := 10
-	for try := 1; try < maxTry; try++ {
+	var op = func() error {
 		if err := s.CalculateAndEmitProfit(ctx, historyService, queryService); err != nil {
-			s.logger.WithError(err).Warnf("failed to calculate and emit profit at #%d try, please check it", try)
-			continue
+			return errors.Wrapf(err, "failed to calculate and emit profit, please check it")
 		}
 
-		if s.ProfitStats.FromOrderID > fromOrderID {
-			break
+		if s.ProfitStats.FromOrderID == fromOrderID {
+			return fmt.Errorf("FromOrderID (%d) is not updated, retry it", s.ProfitStats.FromOrderID)
 		}
+
+		return nil
 	}
 
-	if s.ProfitStats.FromOrderID == fromOrderID {
-		return fmt.Errorf("after trying %d times, we still can't calculate and emit profit, please check it", maxTry)
-	}
-
-	return nil
+	return retry.GeneralLiteBackoff(ctx, op)
 }
 
 func (s *Strategy) CalculateAndEmitProfit(ctx context.Context, historyService types.ExchangeTradeHistoryService, queryService types.ExchangeOrderQueryService) error {
