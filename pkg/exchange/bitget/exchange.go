@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi"
 	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -344,6 +345,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
 	}
 
+	timeNow := time.Now()
 	res, err := req.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to place order, order: %#v, err: %w", order, err)
@@ -355,44 +357,22 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		return nil, fmt.Errorf("unexpected order id, resp: %#v, order: %#v", res, order)
 	}
 
-	orderId := res.OrderId
-
-	debugf("fetching unfilled order info for order #%s", orderId)
-	ordersResp, err := e.v2client.NewGetUnfilledOrdersRequest().OrderId(orderId).Do(ctx)
+	intOrderId, err := strconv.ParseUint(res.OrderId, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query open order by order id: %s, err: %w", orderId, err)
+		return nil, err
 	}
 
-	debugf("unfilled order response for order#%s: %+v", orderId, ordersResp)
-
-	if len(ordersResp) == 1 {
-		// 2023/11/05 The market order will be executed immediately, so we cannot retrieve it through the NewGetUnfilledOrdersRequest API.
-		// Try to get the order from the NewGetHistoryOrdersRequest API.
-		// 2024/03/06 After placing a Market Order, we can retrieve it through the unfilledOrder API, so we still need to
-		// handle the Market Order status.
-		return unfilledOrderToGlobalOrder(ordersResp[0])
-	} else if len(ordersResp) == 0 {
-		ordersResp, err := e.v2client.NewGetHistoryOrdersRequest().OrderId(orderId).Do(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to query history order by order id: %s, err: %w", orderId, err)
-		}
-
-		if len(ordersResp) != 1 {
-			// 2023/03/12 If it's a maker order and there is a corresponding order to be executed, then the order will be canceled,
-			// you can receive the status immediately from the websocket, but the RestAPI requires at least 200ms waiting time.
-			//
-			// Therefore, We don't want to waste time waiting for him, so we choose to manually enter the order
-			// information and send it back.
-			if order.Type == types.OrderTypeLimitMaker {
-				return fallbackPostOnlyOrder(order, orderId)
-			}
-			return nil, fmt.Errorf("unexpected length of history orders, expecting: 1, given: %d, ids: %s", len(ordersResp), orderId)
-		}
-
-		return toGlobalOrder(ordersResp[0])
-	}
-
-	return nil, fmt.Errorf("unexpected length of unfilled orders, expecting: 1, given: %d, ids: %s", len(ordersResp), orderId)
+	return &types.Order{
+		SubmitOrder:      order,
+		Exchange:         types.ExchangeBitget,
+		OrderID:          intOrderId,
+		UUID:             res.OrderId,
+		Status:           types.OrderStatusNew,
+		ExecutedQuantity: fixedpoint.Zero,
+		IsWorking:        true,
+		CreationTime:     types.Time(timeNow),
+		UpdateTime:       types.Time(timeNow),
+	}, nil
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {

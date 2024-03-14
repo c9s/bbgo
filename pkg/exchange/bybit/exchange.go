@@ -318,6 +318,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	if err := orderRateLimiter.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
 	}
+	timeNow := time.Now()
 	res, err := req.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to place order, order: %#v, err: %w", order, err)
@@ -327,16 +328,22 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		return nil, fmt.Errorf("unexpected order id, resp: %#v, order: %#v", res, order)
 	}
 
-	ordersResp, err := e.client.NewGetOpenOrderRequest().OrderId(res.OrderId).Do(ctx)
+	intOrderId, err := strconv.ParseUint(res.OrderId, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query order by client order id: %s, err: %w", res.OrderLinkId, err)
+		return nil, fmt.Errorf("failed to parse orderId: %s", res.OrderId)
 	}
 
-	if len(ordersResp.List) != 1 {
-		return nil, fmt.Errorf("unexpected order length, client order id: %s", res.OrderLinkId)
-	}
-
-	return toGlobalOrder(ordersResp.List[0])
+	return &types.Order{
+		SubmitOrder:      order,
+		Exchange:         types.ExchangeBybit,
+		OrderID:          intOrderId,
+		UUID:             res.OrderId,
+		Status:           types.OrderStatusNew,
+		ExecutedQuantity: fixedpoint.Zero,
+		IsWorking:        true,
+		CreationTime:     types.Time(timeNow),
+		UpdateTime:       types.Time(timeNow),
+	}, nil
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (errs error) {
