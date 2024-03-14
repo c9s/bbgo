@@ -45,11 +45,14 @@ func (s *Strategy) recover(ctx context.Context) error {
 	}
 	debugRoundOrders(s.logger, "current", currentRound)
 
+	// TODO: use flag
 	// recover profit stats
-	if err := recoverProfitStats(ctx, s); err != nil {
-		return err
-	}
-	s.logger.Info("recover profit stats DONE")
+	/*
+		if err := recoverProfitStats(ctx, s); err != nil {
+			return err
+		}
+		s.logger.Info("recover profit stats DONE")
+	*/
 
 	// recover position
 	if err := recoverPosition(ctx, s.Position, queryService, currentRound); err != nil {
@@ -79,8 +82,9 @@ func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, or
 
 	// dca stop at take-profit order stage
 	if currentRound.TakeProfitOrder.OrderID != 0 {
-		if len(currentRound.OpenPositionOrders) != maxOrderCount {
-			return None, fmt.Errorf("there is take-profit order but the number of open-position orders (%d) is not the same as maxOrderCount(%d). Please check it", len(currentRound.OpenPositionOrders), maxOrderCount)
+		// the number of open-positions orders may not be equal to maxOrderCount, because the notional may not enough to open maxOrderCount orders
+		if len(currentRound.OpenPositionOrders) > maxOrderCount {
+			return None, fmt.Errorf("there is take-profit order but the number of open-position orders (%d) is greater than maxOrderCount(%d). Please check it", len(currentRound.OpenPositionOrders), maxOrderCount)
 		}
 
 		takeProfitOrder := currentRound.TakeProfitOrder
@@ -202,6 +206,8 @@ func recoverPosition(ctx context.Context, position *types.Position, queryService
 	return nil
 }
 
+// TODO: use flag to decide which to recover
+/*
 func recoverProfitStats(ctx context.Context, strategy *Strategy) error {
 	if strategy.ProfitStats == nil {
 		return fmt.Errorf("profit stats is nil, please check it")
@@ -209,6 +215,7 @@ func recoverProfitStats(ctx context.Context, strategy *Strategy) error {
 
 	return strategy.CalculateAndEmitProfit(ctx)
 }
+*/
 
 func recoverStartTimeOfNextRound(ctx context.Context, currentRound Round, coolDownInterval types.Duration) time.Time {
 	if currentRound.TakeProfitOrder.OrderID != 0 && currentRound.TakeProfitOrder.Status == types.OrderStatusFilled {
