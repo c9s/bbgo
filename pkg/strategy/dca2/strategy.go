@@ -13,6 +13,8 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange"
+	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
@@ -370,7 +372,9 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	return werr
 }
 
-func (s *Strategy) CalculateAndEmitProfit(ctx context.Context) error {
+func (s *Strategy) mustCalculateAndEmitProfit(ctx context.Context) error {
+	fromOrderID := s.ProfitStats.FromOrderID
+
 	historyService, ok := s.ExchangeSession.Exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
 		return fmt.Errorf("exchange %s doesn't support ExchangeTradeHistoryService", s.ExchangeSession.Exchange.Name())
@@ -381,6 +385,26 @@ func (s *Strategy) CalculateAndEmitProfit(ctx context.Context) error {
 		return fmt.Errorf("exchange %s doesn't support ExchangeOrderQueryService", s.ExchangeSession.Exchange.Name())
 	}
 
+	maxTry := 10
+	for try := 1; try < maxTry; try++ {
+		if err := s.CalculateAndEmitProfit(ctx, historyService, queryService); err != nil {
+			s.logger.WithError(err).Warnf("failed to calculate and emit profit at #%d try, please check it", try)
+			continue
+		}
+
+		if s.ProfitStats.FromOrderID > fromOrderID {
+			break
+		}
+	}
+
+	if s.ProfitStats.FromOrderID == fromOrderID {
+		return fmt.Errorf("after trying %d times, we still can't calculate and emit profit, please check it", maxTry)
+	}
+
+	return nil
+}
+
+func (s *Strategy) CalculateAndEmitProfit(ctx context.Context, historyService types.ExchangeTradeHistoryService, queryService types.ExchangeOrderQueryService) error {
 	// TODO: pagination for it
 	// query the orders
 	s.logger.Infof("query %s closed orders from order id #%d", s.Symbol, s.ProfitStats.FromOrderID)
@@ -389,6 +413,8 @@ func (s *Strategy) CalculateAndEmitProfit(ctx context.Context) error {
 		return err
 	}
 	s.logger.Infof("there are %d closed orders from order id #%d", len(orders), s.ProfitStats.FromOrderID)
+
+	isMax := exchange.IsMaxExchange(s.ExchangeSession.Exchange)
 
 	var rounds []Round
 	var round Round
@@ -402,9 +428,23 @@ func (s *Strategy) CalculateAndEmitProfit(ctx context.Context) error {
 		case types.SideTypeBuy:
 			round.OpenPositionOrders = append(round.OpenPositionOrders, order)
 		case types.SideTypeSell:
-			if order.Status != types.OrderStatusFilled {
-				continue
+			if !isMax {
+				if order.Status != types.OrderStatusFilled {
+					s.logger.Infof("take-profit order is %s not filled, so this round is not finished. Skip it", order.Status)
+					continue
+				}
+			} else {
+				switch maxapi.OrderState(order.OriginalStatus) {
+				case maxapi.OrderStateDone:
+					// the same as filled
+				case maxapi.OrderStateFinalizing:
+					// the same as filled
+				default:
+					s.logger.Infof("isMax and take-profit order is %s not done or finalizing, so this round is not finished. Skip it", order.OriginalStatus)
+					continue
+				}
 			}
+
 			round.TakeProfitOrder = order
 			rounds = append(rounds, round)
 			round = Round{}
