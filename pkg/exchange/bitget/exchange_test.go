@@ -546,15 +546,21 @@ func TestExchange_QueryAccountBalances(t *testing.T) {
 
 func TestExchange_SubmitOrder(t *testing.T) {
 	var (
-		assert          = assert.New(t)
-		ex              = New("key", "secret", "passphrase")
-		placeOrderUrl   = "/api/v2/spot/trade/place-order"
-		openOrderUrl    = "/api/v2/spot/trade/unfilled-orders"
-		tickerUrl       = "/api/v2/spot/market/tickers"
-		historyOrderUrl = "/api/v2/spot/trade/history-orders"
-		clientOrderId   = "684a79df-f931-474f-a9a5-f1deab1cd770"
-		expBtcSymbol    = "BTCUSDT"
-		expOrder        = &types.Order{
+		assert        = assert.New(t)
+		ex            = New("key", "secret", "passphrase")
+		placeOrderUrl = "/api/v2/spot/trade/place-order"
+		tickerUrl     = "/api/v2/spot/market/tickers"
+		clientOrderId = "684a79df-f931-474f-a9a5-f1deab1cd770"
+		expBtcSymbol  = "BTCUSDT"
+		mkt           = types.Market{
+			Symbol:          expBtcSymbol,
+			LocalSymbol:     expBtcSymbol,
+			PricePrecision:  fixedpoint.MustNewFromString("2").Int(),
+			VolumePrecision: fixedpoint.MustNewFromString("6").Int(),
+			StepSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(6)),
+			TickSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(2)),
+		}
+		expOrder = &types.Order{
 			SubmitOrder: types.SubmitOrder{
 				ClientOrderID: clientOrderId,
 				Symbol:        expBtcSymbol,
@@ -563,6 +569,7 @@ func TestExchange_SubmitOrder(t *testing.T) {
 				Quantity:      fixedpoint.MustNewFromString("0.00009"),
 				Price:         fixedpoint.MustNewFromString("66000"),
 				TimeInForce:   types.TimeInForceGTC,
+				Market:        mkt,
 			},
 			Exchange:         types.ExchangeBitget,
 			OrderID:          1148903850645331968,
@@ -580,15 +587,8 @@ func TestExchange_SubmitOrder(t *testing.T) {
 			Type:          types.OrderTypeLimit,
 			Quantity:      fixedpoint.MustNewFromString("0.00009"),
 			Price:         fixedpoint.MustNewFromString("66000"),
-			Market: types.Market{
-				Symbol:          expBtcSymbol,
-				LocalSymbol:     expBtcSymbol,
-				PricePrecision:  fixedpoint.MustNewFromString("2").Int(),
-				VolumePrecision: fixedpoint.MustNewFromString("6").Int(),
-				StepSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(6)),
-				TickSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(2)),
-			},
-			TimeInForce: types.TimeInForceGTC,
+			Market:        mkt,
+			TimeInForce:   types.TimeInForceGTC,
 		}
 	)
 
@@ -629,31 +629,14 @@ func TestExchange_SubmitOrder(t *testing.T) {
 			return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
 		})
 
-		unfilledFile, err := os.ReadFile("bitgetapi/v2/testdata/get_unfilled_orders_request_limit_order.json")
-		assert.NoError(err)
-
-		transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
-			query := req.URL.Query()
-			assert.Len(query, 1)
-			assert.Contains(query, "orderId")
-			assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
-			return httptesting.BuildResponseString(http.StatusOK, string(unfilledFile)), nil
-		})
-
 		acct, err := ex.SubmitOrder(context.Background(), reqLimitOrder)
 		assert.NoError(err)
+		expOrder.CreationTime = acct.CreationTime
+		expOrder.UpdateTime = acct.UpdateTime
 		assert.Equal(expOrder, acct)
 	})
 
 	t.Run("Limit Maker order", func(t *testing.T) {
-		emptyApiResp := v2.APIResponse{
-			Code:    "00000",
-			Message: "",
-			Data:    nil,
-		}
-		rawEmptyApiResp, err := json.Marshal(emptyApiResp)
-		assert.NoError(err)
-
 		transport := &httptesting.MockTransport{}
 		ex.client.HttpClient.Transport = transport
 
@@ -680,29 +663,12 @@ func TestExchange_SubmitOrder(t *testing.T) {
 			return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
 		})
 
-		transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
-			query := req.URL.Query()
-			assert.Len(query, 1)
-			assert.Contains(query, "orderId")
-			assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
-			return httptesting.BuildResponseString(http.StatusOK, string(rawEmptyApiResp)), nil
-		})
-
-		transport.GET(historyOrderUrl, func(req *http.Request) (*http.Response, error) {
-			query := req.URL.Query()
-			assert.Len(query, 1)
-			assert.Contains(query, "orderId")
-			assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
-			return httptesting.BuildResponseString(http.StatusOK, string(rawEmptyApiResp)), nil
-		})
-
 		reqLimitOrder2 := reqLimitOrder
 		reqLimitOrder2.Type = types.OrderTypeLimitMaker
 		acct, err := ex.SubmitOrder(context.Background(), reqLimitOrder2)
 		assert.NoError(err)
 
 		expOrder2 := *expOrder
-		expOrder2.OriginalStatus = "FALLBACK_STATUS"
 		expOrder2.Status = types.OrderStatusNew
 		expOrder2.IsWorking = true
 		expOrder2.Type = types.OrderTypeLimitMaker
@@ -751,18 +717,6 @@ func TestExchange_SubmitOrder(t *testing.T) {
 				return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
 			})
 
-			// unfilled order
-			unfilledFile, err := os.ReadFile("bitgetapi/v2/testdata/get_unfilled_orders_request_market_buy_order.json")
-			assert.NoError(err)
-
-			transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
-				query := req.URL.Query()
-				assert.Len(query, 1)
-				assert.Contains(query, "orderId")
-				assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
-				return httptesting.BuildResponseString(http.StatusOK, string(unfilledFile)), nil
-			})
-
 			reqMarketOrder := reqLimitOrder
 			reqMarketOrder.Side = types.SideTypeBuy
 			reqMarketOrder.Type = types.OrderTypeMarket
@@ -771,8 +725,8 @@ func TestExchange_SubmitOrder(t *testing.T) {
 			expOrder2 := *expOrder
 			expOrder2.Side = types.SideTypeBuy
 			expOrder2.Type = types.OrderTypeMarket
-			expOrder2.Quantity = fixedpoint.Zero
-			expOrder2.Price = fixedpoint.Zero
+			expOrder2.CreationTime = acct.CreationTime
+			expOrder2.UpdateTime = acct.UpdateTime
 			assert.Equal(&expOrder2, acct)
 		})
 
@@ -814,18 +768,6 @@ func TestExchange_SubmitOrder(t *testing.T) {
 				return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
 			})
 
-			// unfilled order
-			unfilledFile, err := os.ReadFile("bitgetapi/v2/testdata/get_unfilled_orders_request_market_sell_order.json")
-			assert.NoError(err)
-
-			transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
-				query := req.URL.Query()
-				assert.Len(query, 1)
-				assert.Contains(query, "orderId")
-				assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
-				return httptesting.BuildResponseString(http.StatusOK, string(unfilledFile)), nil
-			})
-
 			reqMarketOrder := reqLimitOrder
 			reqMarketOrder.Side = types.SideTypeSell
 			reqMarketOrder.Type = types.OrderTypeMarket
@@ -834,7 +776,8 @@ func TestExchange_SubmitOrder(t *testing.T) {
 			expOrder2 := *expOrder
 			expOrder2.Side = types.SideTypeSell
 			expOrder2.Type = types.OrderTypeMarket
-			expOrder2.Price = fixedpoint.Zero
+			expOrder2.CreationTime = acct.CreationTime
+			expOrder2.UpdateTime = acct.UpdateTime
 			assert.Equal(&expOrder2, acct)
 		})
 
@@ -858,127 +801,6 @@ func TestExchange_SubmitOrder(t *testing.T) {
 			_, err = ex.SubmitOrder(context.Background(), reqMarketOrder)
 			assert.ErrorContains(err, "Invalid IP")
 		})
-
-		t.Run("get order from history due to unfilled order not found", func(t *testing.T) {
-			transport := &httptesting.MockTransport{}
-			ex.client.HttpClient.Transport = transport
-
-			// get ticker to calculate btc amount
-			tickerFile, err := os.ReadFile("bitgetapi/v2/testdata/get_ticker_request.json")
-			assert.NoError(err)
-
-			transport.GET(tickerUrl, func(req *http.Request) (*http.Response, error) {
-				assert.Contains(req.URL.Query(), "symbol")
-				assert.Equal(req.URL.Query()["symbol"], []string{expBtcSymbol})
-				return httptesting.BuildResponseString(http.StatusOK, string(tickerFile)), nil
-			})
-
-			// place order
-			placeOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/place_order_request.json")
-			assert.NoError(err)
-
-			transport.POST(placeOrderUrl, func(req *http.Request) (*http.Response, error) {
-				raw, err := io.ReadAll(req.Body)
-				assert.NoError(err)
-
-				reqq := &NewOrder{}
-				err = json.Unmarshal(raw, &reqq)
-				assert.NoError(err)
-				assert.Equal(&NewOrder{
-					ClientOid: expOrder.ClientOrderID,
-					Force:     string(v2.OrderForceGTC),
-					OrderType: string(v2.OrderTypeMarket),
-					Price:     "",
-					Side:      string(v2.SideTypeBuy),
-					Size:      reqLimitOrder.Market.FormatQuantity(fixedpoint.MustNewFromString("66554").Mul(fixedpoint.MustNewFromString("0.00009"))), // ticker: 66554, size: 0.00009
-					Symbol:    expBtcSymbol,
-				}, reqq)
-
-				return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
-			})
-
-			// unfilled order
-			transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
-				query := req.URL.Query()
-				assert.Len(query, 1)
-				assert.Contains(query, "orderId")
-				assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
-
-				apiResp := v2.APIResponse{Code: "00000"}
-				raw, err := json.Marshal(apiResp)
-				assert.NoError(err)
-				return httptesting.BuildResponseString(http.StatusOK, string(raw)), nil
-			})
-
-			// order history
-			historyOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/get_history_orders_request_market_buy.json")
-			assert.NoError(err)
-
-			transport.GET(historyOrderUrl, func(req *http.Request) (*http.Response, error) {
-				query := req.URL.Query()
-				assert.Len(query, 1)
-				assert.Contains(query, "orderId")
-				assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
-				return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
-			})
-
-			reqMarketOrder := reqLimitOrder
-			reqMarketOrder.Side = types.SideTypeBuy
-			reqMarketOrder.Type = types.OrderTypeMarket
-			acct, err := ex.SubmitOrder(context.Background(), reqMarketOrder)
-			assert.NoError(err)
-			expOrder2 := *expOrder
-			expOrder2.Side = types.SideTypeBuy
-			expOrder2.Type = types.OrderTypeMarket
-			expOrder2.Status = types.OrderStatusFilled
-			expOrder2.ExecutedQuantity = fixedpoint.MustNewFromString("0.000089")
-			expOrder2.Quantity = fixedpoint.MustNewFromString("0.000089")
-			expOrder2.Price = fixedpoint.MustNewFromString("67360.87")
-			expOrder2.IsWorking = false
-			assert.Equal(&expOrder2, acct)
-		})
-	})
-
-	t.Run("error on query open orders", func(t *testing.T) {
-		transport := &httptesting.MockTransport{}
-		ex.client.HttpClient.Transport = transport
-
-		placeOrderFile, err := os.ReadFile("bitgetapi/v2/testdata/place_order_request.json")
-		assert.NoError(err)
-
-		transport.POST(placeOrderUrl, func(req *http.Request) (*http.Response, error) {
-			raw, err := io.ReadAll(req.Body)
-			assert.NoError(err)
-
-			reqq := &NewOrder{}
-			err = json.Unmarshal(raw, &reqq)
-			assert.NoError(err)
-			assert.Equal(&NewOrder{
-				ClientOid: expOrder.ClientOrderID,
-				Force:     string(v2.OrderForceGTC),
-				OrderType: string(v2.OrderTypeLimit),
-				Price:     "66000.00",
-				Side:      string(v2.SideTypeBuy),
-				Size:      "0.000090",
-				Symbol:    expBtcSymbol,
-			}, reqq)
-
-			return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
-		})
-
-		unfilledFile, err := os.ReadFile("bitgetapi/v2/testdata/request_error.json")
-		assert.NoError(err)
-
-		transport.GET(openOrderUrl, func(req *http.Request) (*http.Response, error) {
-			query := req.URL.Query()
-			assert.Len(query, 1)
-			assert.Contains(query, "orderId")
-			assert.Equal(query["orderId"], []string{strconv.FormatUint(expOrder.OrderID, 10)})
-			return httptesting.BuildResponseString(http.StatusBadRequest, string(unfilledFile)), nil
-		})
-
-		_, err = ex.SubmitOrder(context.Background(), reqLimitOrder)
-		assert.ErrorContains(err, "failed to query open order")
 	})
 
 	t.Run("unexpected client order id", func(t *testing.T) {
@@ -1012,13 +834,19 @@ func TestExchange_SubmitOrder(t *testing.T) {
 			err = json.Unmarshal(apiResp.Data, &placeOrderResp)
 			assert.NoError(err)
 			// remove the client order id to test
-			placeOrderResp.ClientOrderId = ""
+			placeOrderResp.ClientOrderId = "unexpected client order id"
 
-			return httptesting.BuildResponseString(http.StatusOK, string(placeOrderFile)), nil
+			raw, err = json.Marshal(placeOrderResp)
+			assert.NoError(err)
+			apiResp.Data = raw
+			raw, err = json.Marshal(apiResp)
+			assert.NoError(err)
+
+			return httptesting.BuildResponseString(http.StatusOK, string(raw)), nil
 		})
 
 		_, err = ex.SubmitOrder(context.Background(), reqLimitOrder)
-		assert.ErrorContains(err, "failed to query open order")
+		assert.ErrorContains(err, "unexpected order id")
 	})
 
 	t.Run("failed to place order", func(t *testing.T) {
