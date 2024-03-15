@@ -398,7 +398,7 @@ func (s *Strategy) CalculateAndEmitProfitUntilSuccessful(ctx context.Context) er
 		return nil
 	}
 
-	return retry.GeneralLiteBackoff(ctx, op)
+	return retry.GeneralBackoff(ctx, op)
 }
 
 func (s *Strategy) CalculateAndEmitProfit(ctx context.Context, historyService types.ExchangeTradeHistoryService, queryService types.ExchangeOrderQueryService) error {
