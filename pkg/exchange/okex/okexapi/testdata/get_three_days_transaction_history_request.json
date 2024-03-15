@@ -1,0 +1,32 @@
+{
+  "code":"0",
+  "data":[
+    {
+      "side":"buy",
+      "fillSz":"0.001",
+      "fillPx":"73397.8",
+      "fillPxVol":"",
+      "fillFwdPx":"",
+      "fee":"-0.000001",
+      "fillPnl":"0",
+      "ordId":"688362711456706560",
+      "feeRate":"-0.001",
+      "instType":"SPOT",
+      "fillPxUsd":"",
+      "instId":"BTC-USDT",
+      "clOrdId":"1229606897",
+      "posSide":"net",
+      "billId":"688362711465447466",
+      "fillMarkVol":"",
+      "tag":"",
+      "fillTime":"1710390459571",
+      "execType":"T",
+      "fillIdxPx":"",
+      "tradeId":"749554213",
+      "fillMarkPx":"",
+      "feeCcy":"BTC",
+      "ts":"1710390459574"
+    }
+  ],
+  "msg":""
+}

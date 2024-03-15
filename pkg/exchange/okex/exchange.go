@@ -55,6 +55,7 @@ const (
 	defaultQueryLimit = 100
 
 	maxHistoricalDataQueryPeriod = 90 * 24 * time.Hour
+	threeDaysHistoricalPeriod    = 3 * 24 * time.Hour
 )
 
 var log = logrus.WithFields(logrus.Fields{
@@ -66,7 +67,8 @@ var ErrSymbolRequired = errors.New("symbol is a required parameter")
 type Exchange struct {
 	key, secret, passphrase string
 
-	client *okexapi.RestClient
+	client      *okexapi.RestClient
+	timeNowFunc func() time.Time
 }
 
 func New(key, secret, passphrase string) *Exchange {
@@ -77,10 +79,11 @@ func New(key, secret, passphrase string) *Exchange {
 	}
 
 	return &Exchange{
-		key:        key,
-		secret:     secret,
-		passphrase: passphrase,
-		client:     client,
+		key:         key,
+		secret:      secret,
+		passphrase:  passphrase,
+		client:      client,
+		timeNowFunc: time.Now,
 	}
 }
 
@@ -564,25 +567,23 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		return nil, ErrSymbolRequired
 	}
 
-	req := e.client.NewGetTransactionHistoryRequest().InstrumentID(toLocalSymbol(symbol))
-
 	limit := options.Limit
 	if limit > defaultQueryLimit || limit <= 0 {
 		log.Infof("limit is exceeded default limit %d or zero, got: %d, use default limit", defaultQueryLimit, limit)
 		limit = defaultQueryLimit
 	}
-	req.Limit(uint64(limit))
 
-	var newStartTime time.Time
+	timeNow := e.timeNowFunc()
+	newStartTime := timeNow.Add(-threeDaysHistoricalPeriod)
 	if options.StartTime != nil {
 		newStartTime = *options.StartTime
-		if time.Since(newStartTime) > maxHistoricalDataQueryPeriod {
-			newStartTime = time.Now().Add(-maxHistoricalDataQueryPeriod)
+		if timeNow.Sub(newStartTime) > maxHistoricalDataQueryPeriod {
+			newStartTime = timeNow.Add(-maxHistoricalDataQueryPeriod)
 			log.Warnf("!!!OKX EXCHANGE API NOTICE!!! The trade API cannot query data beyond 90 days from the current date, update %s -> %s", *options.StartTime, newStartTime)
 		}
-		req.StartTime(newStartTime.UTC())
 	}
 
+	endTime := timeNow
 	if options.EndTime != nil {
 		if options.EndTime.Before(newStartTime) {
 			return nil, fmt.Errorf("end time %s before start %s", *options.EndTime, newStartTime)
@@ -590,7 +591,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		if options.EndTime.Sub(newStartTime) > maxHistoricalDataQueryPeriod {
 			return nil, fmt.Errorf("start time %s and end time %s cannot greater than 90 days", newStartTime, options.EndTime)
 		}
-		req.EndTime(options.EndTime.UTC())
+		endTime = *options.EndTime
 	}
 
 	if options.LastTradeID != 0 {
@@ -599,12 +600,33 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		log.Infof("Last trade id not supported on QueryTrades")
 	}
 
-	for {
-		if err := queryTradeLimiter.Wait(ctx); err != nil {
-			return nil, fmt.Errorf("query trades rate limiter wait error: %w", err)
-		}
+	if timeNow.Sub(newStartTime) <= threeDaysHistoricalPeriod {
+		c := e.client.NewGetThreeDaysTransactionHistoryRequest().
+			InstrumentID(toLocalSymbol(symbol)).
+			StartTime(newStartTime).
+			EndTime(endTime).
+			Limit(uint64(limit))
+		return getTrades(ctx, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
+			c.Before(billId)
+			return c.Do(ctx)
+		})
+	}
 
-		response, err := req.Do(ctx)
+	c := e.client.NewGetTransactionHistoryRequest().
+		InstrumentID(toLocalSymbol(symbol)).
+		StartTime(newStartTime).
+		EndTime(endTime).
+		Limit(uint64(limit))
+	return getTrades(ctx, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
+		c.Before(billId)
+		return c.Do(ctx)
+	})
+}
+
+func getTrades(ctx context.Context, limit int64, doFunc func(ctx context.Context, billId string) ([]okexapi.Trade, error)) (trades []types.Trade, err error) {
+	billId := "0"
+	for {
+		response, err := doFunc(ctx, billId)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query trades, err: %w", err)
 		}
@@ -623,9 +645,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			break
 		}
 		// use Before filter to get all data.
-		req.Before(response[tradeLen-1].BillId.String())
+		billId = response[tradeLen-1].BillId.String()
 	}
-
 	return trades, nil
 }
 
