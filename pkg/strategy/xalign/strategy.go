@@ -132,6 +132,11 @@ func (s *Strategy) selectSessionForCurrency(
 		}
 
 		for _, quoteCurrency := range quoteCurrencies {
+			// skip the same currency, because there is no such USDT/USDT market
+			if currency == quoteCurrency {
+				continue
+			}
+
 			// check both quoteCurrency/currency and currency/quoteCurrency
 			symbol := currency + quoteCurrency
 			market, ok := session.Market(symbol)
