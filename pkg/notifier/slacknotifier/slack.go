@@ -14,7 +14,7 @@ import (
 	"github.com/slack-go/slack"
 )
 
-var limiter = rate.NewLimiter(rate.Every(1*time.Second), 1)
+var limiter = rate.NewLimiter(rate.Every(1*time.Second), 3)
 
 type notifyTask struct {
 	Channel string
