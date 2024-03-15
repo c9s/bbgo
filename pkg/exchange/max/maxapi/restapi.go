@@ -275,8 +275,6 @@ func (c *RestClient) newAuthenticatedRequest(
 		req.Header.Set("USER-AGENT", UserAgent)
 	}
 
-	req.Header.Set("USER-AGENT", "Go-http-client/1.1,bbgo/"+version.Version)
-
 	if false {
 		out, _ := httputil.DumpRequestOut(req, true)
 		fmt.Println(string(out))
