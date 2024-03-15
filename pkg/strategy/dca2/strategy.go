@@ -4,18 +4,16 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"strconv"
 	"sync"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	"github.com/c9s/bbgo/pkg/exchange"
-	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
@@ -67,7 +65,9 @@ type Strategy struct {
 	OrderGroupID uint32 `json:"orderGroupID"`
 
 	// RecoverWhenStart option is used for recovering dca states
-	RecoverWhenStart bool `json:"recoverWhenStart"`
+	RecoverWhenStart          bool `json:"recoverWhenStart"`
+	DisableProfitStatsRecover bool `json:"disableProfitStatsRecover"`
+	DisablePositionRecover    bool `json:"disablePositionRecover"`
 
 	// KeepOrdersWhenShutdown option is used for keeping the grid orders when shutting down bbgo
 	KeepOrdersWhenShutdown bool `json:"keepOrdersWhenShutdown"`
@@ -91,6 +91,7 @@ type Strategy struct {
 	startTimeOfNextRound time.Time
 	nextStateC           chan State
 	state                State
+	roundCollector       *RoundCollector
 
 	// callbacks
 	common.StatusCallbacks
@@ -169,6 +170,12 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
+	}
+
+	// round collector
+	s.roundCollector = NewRoundCollector(s.logger, s.Symbol, s.OrderGroupID, s.ExchangeSession.Exchange)
+	if s.roundCollector == nil {
+		return fmt.Errorf("failed to initialize round collector")
 	}
 
 	// prometheus
@@ -373,111 +380,57 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	return werr
 }
 
-func (s *Strategy) CalculateAndEmitProfitUntilSuccessful(ctx context.Context) error {
-	fromOrderID := s.ProfitStats.FromOrderID
-
-	historyService, ok := s.ExchangeSession.Exchange.(types.ExchangeTradeHistoryService)
-	if !ok {
-		return fmt.Errorf("exchange %s doesn't support ExchangeTradeHistoryService", s.ExchangeSession.Exchange.Name())
-	}
-
-	queryService, ok := s.ExchangeSession.Exchange.(types.ExchangeOrderQueryService)
-	if !ok {
-		return fmt.Errorf("exchange %s doesn't support ExchangeOrderQueryService", s.ExchangeSession.Exchange.Name())
-	}
-
+func (s *Strategy) UpdateProfitStatsUntilSuccessful(ctx context.Context) error {
 	var op = func() error {
-		if err := s.CalculateAndEmitProfit(ctx, historyService, queryService); err != nil {
-			return errors.Wrapf(err, "failed to calculate and emit profit, please check it")
-		}
-
-		if s.ProfitStats.FromOrderID == fromOrderID {
-			return fmt.Errorf("FromOrderID (%d) is not updated, retry it", s.ProfitStats.FromOrderID)
+		if updated, err := s.UpdateProfitStats(ctx); err != nil {
+			return errors.Wrapf(err, "failed to update profit stats, please check it")
+		} else if !updated {
+			return fmt.Errorf("there is no round to update profit stats, please check it")
 		}
 
 		return nil
 	}
 
-	return retry.GeneralBackoff(ctx, op)
+	// exponential increased interval retry until success
+	bo := backoff.NewExponentialBackOff()
+	bo.InitialInterval = 5 * time.Second
+	bo.MaxInterval = 20 * time.Minute
+	bo.MaxElapsedTime = 0
+
+	return backoff.Retry(op, backoff.WithContext(bo, ctx))
 }
 
-func (s *Strategy) CalculateAndEmitProfit(ctx context.Context, historyService types.ExchangeTradeHistoryService, queryService types.ExchangeOrderQueryService) error {
-	// TODO: pagination for it
-	// query the orders
-	s.logger.Infof("query %s closed orders from order id #%d", s.Symbol, s.ProfitStats.FromOrderID)
-	orders, err := retry.QueryClosedOrdersUntilSuccessfulLite(ctx, historyService, s.Symbol, time.Time{}, time.Time{}, s.ProfitStats.FromOrderID)
+// UpdateProfitStats will collect round from closed orders and emit update profit stats
+// return true, nil -> there is at least one finished round and all the finished rounds we collect update profit stats successfully
+// return false, nil -> there is no finished round!
+// return true, error -> At least one round update profit stats successfully but there is error when collecting other rounds
+func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
+	rounds, err := s.roundCollector.CollectFinishRounds(ctx, s.ProfitStats.FromOrderID)
 	if err != nil {
-		return err
-	}
-	s.logger.Infof("there are %d closed orders from order id #%d", len(orders), s.ProfitStats.FromOrderID)
-
-	isMax := exchange.IsMaxExchange(s.ExchangeSession.Exchange)
-
-	var rounds []Round
-	var round Round
-	for _, order := range orders {
-		// skip not this strategy order
-		if order.GroupID != s.OrderGroupID {
-			continue
-		}
-
-		switch order.Side {
-		case types.SideTypeBuy:
-			round.OpenPositionOrders = append(round.OpenPositionOrders, order)
-		case types.SideTypeSell:
-			if !isMax {
-				if order.Status != types.OrderStatusFilled {
-					s.logger.Infof("take-profit order is %s not filled, so this round is not finished. Skip it", order.Status)
-					continue
-				}
-			} else {
-				if !maxapi.IsFilledOrderState(maxapi.OrderState(order.OriginalStatus)) {
-					s.logger.Infof("isMax and take-profit order is %s not done or finalizing, so this round is not finished. Skip it", order.OriginalStatus)
-					continue
-				}
-			}
-
-			round.TakeProfitOrder = order
-			rounds = append(rounds, round)
-			round = Round{}
-		default:
-			s.logger.Errorf("there is order with unsupported side")
-		}
+		return false, errors.Wrapf(err, "failed to collect finish rounds from #%d", s.ProfitStats.FromOrderID)
 	}
 
-	s.logger.Infof("there are %d rounds from order id #%d", len(rounds), s.ProfitStats.FromOrderID)
+	var updated bool = false
 	for _, round := range rounds {
-		debugRoundOrders(s.logger, strconv.FormatInt(s.ProfitStats.Round, 10), round)
-		var roundOrders []types.Order = round.OpenPositionOrders
-		roundOrders = append(roundOrders, round.TakeProfitOrder)
-		for _, order := range roundOrders {
-			s.logger.Infof("calculate profit stats from order: %s", order.String())
-
-			// skip no trade orders
-			if order.ExecutedQuantity.Sign() == 0 {
-				continue
-			}
-
-			trades, err := retry.QueryOrderTradesUntilSuccessfulLite(ctx, queryService, types.OrderQuery{
-				Symbol:  order.Symbol,
-				OrderID: strconv.FormatUint(order.OrderID, 10),
-			})
-
-			if err != nil {
-				return err
-			}
-
-			for _, trade := range trades {
-				s.logger.Infof("calculate profit stats from trade: %s", trade.String())
-				s.ProfitStats.AddTrade(trade)
-			}
+		trades, err := s.roundCollector.CollectRoundTrades(ctx, round)
+		if err != nil {
+			return updated, errors.Wrapf(err, "failed to collect the trades of round")
 		}
 
+		for _, trade := range trades {
+			s.logger.Infof("update profit stats from trade: %s", trade.String())
+			s.ProfitStats.AddTrade(trade)
+		}
+
+		// update profit stats FromOrderID to make sure we will not collect duplicated rounds
 		s.ProfitStats.FromOrderID = round.TakeProfitOrder.OrderID + 1
+
+		// update quote investment
 		s.ProfitStats.QuoteInvestment = s.ProfitStats.QuoteInvestment.Add(s.ProfitStats.CurrentRoundProfit)
 
-		// store into persistence
+		// sync to persistence
 		bbgo.Sync(ctx, s)
+		updated = true
 
 		s.logger.Infof("profit stats:\n%s", s.ProfitStats.String())
 
@@ -485,10 +438,11 @@ func (s *Strategy) CalculateAndEmitProfit(ctx context.Context, historyService ty
 		s.EmitProfit(s.ProfitStats)
 		updateProfitMetrics(s.ProfitStats.Round, s.ProfitStats.CurrentRoundProfit.Float64())
 
+		// make profit stats forward to new round
 		s.ProfitStats.NewRound()
 	}
 
-	return nil
+	return updated, nil
 }
 
 func (s *Strategy) updateNumOfOrdersMetrics(ctx context.Context) {
