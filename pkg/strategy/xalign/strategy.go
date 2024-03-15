@@ -90,7 +90,9 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
-func (s *Strategy) aggregateBalances(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (totalBalances types.BalanceMap, sessionBalances map[string]types.BalanceMap) {
+func (s *Strategy) aggregateBalances(
+	ctx context.Context, sessions map[string]*bbgo.ExchangeSession,
+) (totalBalances types.BalanceMap, sessionBalances map[string]types.BalanceMap) {
 	totalBalances = make(types.BalanceMap)
 	sessionBalances = make(map[string]types.BalanceMap)
 
@@ -112,7 +114,9 @@ func (s *Strategy) aggregateBalances(ctx context.Context, sessions map[string]*b
 	return totalBalances, sessionBalances
 }
 
-func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[string]*bbgo.ExchangeSession, currency string, changeQuantity fixedpoint.Value) (*bbgo.ExchangeSession, *types.SubmitOrder) {
+func (s *Strategy) selectSessionForCurrency(
+	ctx context.Context, sessions map[string]*bbgo.ExchangeSession, currency string, changeQuantity fixedpoint.Value,
+) (*bbgo.ExchangeSession, *types.SubmitOrder) {
 	for _, sessionName := range s.PreferredSessions {
 		session := sessions[sessionName]
 
@@ -128,10 +132,19 @@ func (s *Strategy) selectSessionForCurrency(ctx context.Context, sessions map[st
 		}
 
 		for _, quoteCurrency := range quoteCurrencies {
+			// check both quoteCurrency/currency and currency/quoteCurrency
 			symbol := currency + quoteCurrency
 			market, ok := session.Market(symbol)
 			if !ok {
-				continue
+				// for TWD in USDT/TWD market, buy TWD means sell USDT
+				symbol = quoteCurrency + currency
+				market, ok = session.Market(symbol)
+				if !ok {
+					continue
+				}
+
+				// reverse side
+				side = side.Reverse()
 			}
 
 			ticker, err := session.Exchange.QueryTicker(ctx, symbol)
@@ -376,7 +389,9 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 	}
 }
 
-func (s *Strategy) calculateRefillQuantity(totalBalances types.BalanceMap, currency string, expectedBalance fixedpoint.Value) fixedpoint.Value {
+func (s *Strategy) calculateRefillQuantity(
+	totalBalances types.BalanceMap, currency string, expectedBalance fixedpoint.Value,
+) fixedpoint.Value {
 	if b, ok := totalBalances[currency]; ok {
 		netBalance := b.Net()
 		return expectedBalance.Sub(netBalance)
