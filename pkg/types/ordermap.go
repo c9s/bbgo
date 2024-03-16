@@ -26,7 +26,7 @@ func (m OrderMap) Backup() (orderForms []SubmitOrder) {
 	return orderForms
 }
 
-// Add the order the the map
+// Add the order the map
 func (m OrderMap) Add(os ...Order) {
 	for _, o := range os {
 		m[o.OrderID] = o
