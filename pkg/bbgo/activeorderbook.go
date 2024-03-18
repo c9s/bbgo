@@ -268,6 +268,10 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 }
 
 func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
+	if oldOrder, ok := b.Get(order.OrderID); ok {
+		order.Tag = oldOrder.Tag
+		order.GroupID = oldOrder.GroupID
+	}
 	b.Update(order)
 }
 
