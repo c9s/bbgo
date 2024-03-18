@@ -76,6 +76,59 @@ func TestActiveOrderBook_pendingOrders(t *testing.T) {
 	assert.True(t, filled, "filled event should be fired")
 }
 
+func Test_RestoreParametersOnUpdateHandler(t *testing.T) {
+	now := time.Now()
+	t1 := now
+	t2 := now.Add(time.Millisecond)
+	ob := NewActiveOrderBook("BTCUSDT")
+
+	var updatedOrder types.Order
+	ob.OnFilled(func(o types.Order) {
+		updatedOrder = o
+	})
+	quantity := Number("0.01")
+	orderUpdate1 := types.Order{
+		OrderID: 99,
+		SubmitOrder: types.SubmitOrder{
+			Symbol:       "BTCUSDT",
+			Side:         types.SideTypeBuy,
+			Type:         types.OrderTypeLimit,
+			Quantity:     quantity,
+			Price:        Number(19000.0),
+			AveragePrice: fixedpoint.Zero,
+			StopPrice:    fixedpoint.Zero,
+			Tag:          "tag1",
+			GroupID:      uint32(1),
+		},
+		ExecutedQuantity: Number(0.0),
+		Status:           types.OrderStatusNew,
+		CreationTime:     types.Time(t1),
+		UpdateTime:       types.Time(t1),
+	}
+
+	orderUpdate2 := types.Order{
+		OrderID: 99,
+		SubmitOrder: types.SubmitOrder{
+			Symbol:       "BTCUSDT",
+			Side:         types.SideTypeBuy,
+			Type:         types.OrderTypeLimit,
+			Quantity:     quantity,
+			Price:        Number(19000.0),
+			AveragePrice: fixedpoint.Zero,
+			StopPrice:    fixedpoint.Zero,
+		},
+		ExecutedQuantity: quantity,
+		Status:           types.OrderStatusFilled,
+		CreationTime:     types.Time(t1),
+		UpdateTime:       types.Time(t2),
+	}
+	ob.add(orderUpdate1)
+	ob.orderUpdateHandler(orderUpdate2)
+	assert.Equal(t, "tag1", updatedOrder.Tag)
+	assert.Equal(t, uint32(1), updatedOrder.GroupID)
+
+}
+
 func Test_isNewerUpdate(t *testing.T) {
 	a := types.Order{
 		Status:           types.OrderStatusPartiallyFilled,
