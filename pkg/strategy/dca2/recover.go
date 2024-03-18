@@ -45,20 +45,25 @@ func (s *Strategy) recover(ctx context.Context) error {
 	}
 	debugRoundOrders(s.logger, "current", currentRound)
 
-	// TODO: use flag
 	// recover profit stats
-	/*
+	if s.DisableProfitStatsRecover {
+		s.logger.Info("disableProfitStatsRecover is set, skip profit stats recovery")
+	} else {
 		if err := recoverProfitStats(ctx, s); err != nil {
 			return err
 		}
 		s.logger.Info("recover profit stats DONE")
-	*/
+	}
 
 	// recover position
-	if err := recoverPosition(ctx, s.Position, queryService, currentRound); err != nil {
-		return err
+	if s.DisablePositionRecover {
+		s.logger.Info("disablePositionRecover is set, skip position recovery")
+	} else {
+		if err := recoverPosition(ctx, s.Position, queryService, currentRound); err != nil {
+			return err
+		}
+		s.logger.Info("recover position DONE")
 	}
-	s.logger.Info("recover position DONE")
 
 	// recover startTimeOfNextRound
 	startTimeOfNextRound := recoverStartTimeOfNextRound(ctx, currentRound, s.CoolDownInterval)
@@ -206,16 +211,14 @@ func recoverPosition(ctx context.Context, position *types.Position, queryService
 	return nil
 }
 
-// TODO: use flag to decide which to recover
-/*
 func recoverProfitStats(ctx context.Context, strategy *Strategy) error {
 	if strategy.ProfitStats == nil {
 		return fmt.Errorf("profit stats is nil, please check it")
 	}
 
-	return strategy.CalculateAndEmitProfit(ctx)
+	_, err := strategy.UpdateProfitStats(ctx)
+	return err
 }
-*/
 
 func recoverStartTimeOfNextRound(ctx context.Context, currentRound Round, coolDownInterval types.Duration) time.Time {
 	if currentRound.TakeProfitOrder.OrderID != 0 && currentRound.TakeProfitOrder.Status == types.OrderStatusFilled {

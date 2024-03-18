@@ -198,10 +198,8 @@ func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 
 	s.logger.Info("[State] TakeProfitReady - start reseting position and calculate quote investment for next round")
 
-	// reset position
-
-	// calculate profit stats
-	if err := s.CalculateAndEmitProfitUntilSuccessful(ctx); err != nil {
+	// update profit stats
+	if err := s.UpdateProfitStatsUntilSuccessful(ctx); err != nil {
 		s.logger.WithError(err).Warn("failed to calculate and emit profit")
 	}
 
