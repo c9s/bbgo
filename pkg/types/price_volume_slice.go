@@ -12,6 +12,10 @@ type PriceVolume struct {
 	Price, Volume fixedpoint.Value
 }
 
+func (p PriceVolume) InQuote() fixedpoint.Value {
+	return p.Price.Mul(p.Volume)
+}
+
 func (p PriceVolume) Equals(b PriceVolume) bool {
 	return p.Price.Eq(b.Price) && p.Volume.Eq(b.Volume)
 }
