@@ -44,8 +44,9 @@ type advancedOrderCancelApi interface {
 
 //go:generate callbackgen -type Strateg
 type Strategy struct {
-	Position    *types.Position `json:"position,omitempty" persistence:"position"`
-	ProfitStats *ProfitStats    `json:"profitStats,omitempty" persistence:"profit_stats"`
+	Position       *types.Position `json:"position,omitempty" persistence:"position"`
+	ProfitStats    *ProfitStats    `json:"profitStats,omitempty" persistence:"profit_stats"`
+	PersistenceTTL types.Duration  `json:"persistenceTTL"`
 
 	Environment     *bbgo.Environment
 	ExchangeSession *bbgo.ExchangeSession
@@ -87,11 +88,12 @@ type Strategy struct {
 
 	// private field
 	mu                   sync.Mutex
-	takeProfitPrice      fixedpoint.Value
-	startTimeOfNextRound time.Time
 	nextStateC           chan State
 	state                State
 	roundCollector       *RoundCollector
+	takeProfitPrice      fixedpoint.Value
+	startTimeOfNextRound time.Time
+	nextRoundPaused      bool
 
 	// callbacks
 	common.StatusCallbacks
@@ -164,6 +166,8 @@ func (s *Strategy) newPrometheusLabels() prometheus.Labels {
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 	s.ExchangeSession = session
+
+	s.logger.Infof("persistence ttl: %s", s.PersistenceTTL.Duration())
 	if s.ProfitStats == nil {
 		s.ProfitStats = newProfitStats(s.Market, s.QuoteInvestment)
 	}
@@ -171,6 +175,16 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
+
+	// if dev mode is on and it's not a new strategy
+	if s.DevMode != nil && s.DevMode.Enabled && !s.DevMode.IsNewAccount {
+		s.ProfitStats = newProfitStats(s.Market, s.QuoteInvestment)
+		s.Position = types.NewPositionFromMarket(s.Market)
+	}
+
+	// set ttl for persistence
+	s.Position.SetTTL(s.PersistenceTTL.Duration())
+	s.ProfitStats.SetTTL(s.PersistenceTTL.Duration())
 
 	// round collector
 	s.roundCollector = NewRoundCollector(s.logger, s.Symbol, s.OrderGroupID, s.ExchangeSession.Exchange)
@@ -186,12 +200,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	// prometheus labels
 	baseLabels = s.newPrometheusLabels()
-
-	// if dev mode is on and it's not a new strategy
-	if s.DevMode != nil && s.DevMode.Enabled && !s.DevMode.IsNewAccount {
-		s.ProfitStats = newProfitStats(s.Market, s.QuoteInvestment)
-		s.Position = types.NewPositionFromMarket(s.Market)
-	}
 
 	s.Position.Strategy = ID
 	s.Position.StrategyInstanceID = instanceID
@@ -380,6 +388,15 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	return werr
 }
 
+// PauseNextRound will stop openning open-position orders at the next round
+func (s *Strategy) PauseNextRound() {
+	s.nextRoundPaused = true
+}
+
+func (s *Strategy) ContinueNextRound() {
+	s.nextRoundPaused = false
+}
+
 func (s *Strategy) UpdateProfitStatsUntilSuccessful(ctx context.Context) error {
 	var op = func() error {
 		if updated, err := s.UpdateProfitStats(ctx); err != nil {
@@ -456,4 +473,7 @@ func (s *Strategy) updateNumOfOrdersMetrics(ctx context.Context) {
 
 	// update active orders metrics
 	metricsNumOfActiveOrders.With(baseLabels).Set(float64(s.OrderExecutor.ActiveMakerOrders().NumOfOrders()))
+
+	// set persistence
+	bbgo.Sync(ctx, s)
 }
