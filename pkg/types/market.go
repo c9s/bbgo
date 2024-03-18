@@ -219,6 +219,10 @@ func (m Market) CanonicalizeVolume(val fixedpoint.Value) float64 {
 	return math.Trunc(p*val.Float64()) / p
 }
 
+func (m Market) AdjustQuantityByMinQuantity(quantity fixedpoint.Value)  fixedpoint.Value {
+	return fixedpoint.Max(quantity, m.MinQuantity)
+}
+
 // AdjustQuantityByMinNotional adjusts the quantity to make the amount greater than the given minAmount
 func (m Market) AdjustQuantityByMinNotional(quantity, currentPrice fixedpoint.Value) fixedpoint.Value {
 	// modify quantity for the min amount
