@@ -19,7 +19,7 @@ type BreakLow struct {
 	Market types.Market
 	types.IntervalWindow
 
-	// FastWindow is used for fast pivot (this is to to filter the nearest high/low)
+	// FastWindow is used for fast pivot (this is to filter the nearest high/low)
 	FastWindow int `json:"fastWindow"`
 
 	// Ratio is a number less than 1.0, price * ratio will be the price triggers the short order.
