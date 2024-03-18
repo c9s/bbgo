@@ -196,6 +196,14 @@ func (s *Strategy) selectSessionForCurrency(
 					continue
 				}
 
+				if expectedQuoteBalance, ok := s.ExpectedBalances[quoteCurrency]; ok {
+					rest := quoteBalance.Total().Sub(requiredQuoteAmount)
+					if rest.Compare(expectedQuoteBalance) < 0 {
+						log.Warnf("required quote amount %f will use up the expected balance %f, skip", requiredQuoteAmount.Float64(), expectedQuoteBalance.Float64())
+						continue
+					}
+				}
+
 				maxAmount, ok := s.MaxAmounts[market.QuoteCurrency]
 				if ok {
 					requiredQuoteAmount = bbgo.AdjustQuantityByMaxAmount(requiredQuoteAmount, price, maxAmount)
