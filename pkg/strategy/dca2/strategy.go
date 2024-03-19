@@ -186,6 +186,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.Position.SetTTL(s.PersistenceTTL.Duration())
 	s.ProfitStats.SetTTL(s.PersistenceTTL.Duration())
 
+	if s.OrderGroupID == 0 {
+		s.OrderGroupID = util.FNV32(instanceID) % math.MaxInt32
+	}
+
 	// round collector
 	s.roundCollector = NewRoundCollector(s.logger, s.Symbol, s.OrderGroupID, s.ExchangeSession.Exchange)
 	if s.roundCollector == nil {
@@ -214,10 +218,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.OrderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
 	s.OrderExecutor.BindEnvironment(s.Environment)
 	s.OrderExecutor.Bind()
-
-	if s.OrderGroupID == 0 {
-		s.OrderGroupID = util.FNV32(instanceID) % math.MaxInt32
-	}
 
 	// order executor
 	s.OrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
