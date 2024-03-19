@@ -138,15 +138,16 @@ func (s *Strategy) selectSessionForCurrency(
 			}
 
 			// check both fromQuoteCurrency/currency and currency/fromQuoteCurrency
+			reversed := false
 			baseCurrency := currency
 			quoteCurrency := fromQuoteCurrency
-			symbol := currency + fromQuoteCurrency
+			symbol := currency + quoteCurrency
 			market, ok := session.Market(symbol)
 			if !ok {
 				// for TWD in USDT/TWD market, buy TWD means sell USDT
 				baseCurrency = fromQuoteCurrency
 				quoteCurrency = currency
-				symbol = fromQuoteCurrency + currency
+				symbol = baseCurrency + currency
 				market, ok = session.Market(symbol)
 				if !ok {
 					continue
@@ -154,6 +155,7 @@ func (s *Strategy) selectSessionForCurrency(
 
 				// reverse side
 				side = side.Reverse()
+				reversed = true
 			}
 
 			ticker, err := session.Exchange.QueryTicker(ctx, symbol)
@@ -169,9 +171,16 @@ func (s *Strategy) selectSessionForCurrency(
 			q := changeQuantity.Abs()
 
 			// a fast filtering
-			if q.Compare(market.MinQuantity) < 0 {
-				log.Debugf("skip dust quantity: %f", q.Float64())
-				continue
+			if reversed {
+				if q.Compare(market.MinNotional) < 0 {
+					log.Debugf("skip dust notional: %f", q.Float64())
+					continue
+				}
+			} else {
+				if q.Compare(market.MinQuantity) < 0 {
+					log.Debugf("skip dust quantity: %f", q.Float64())
+					continue
+				}
 			}
 
 			log.Infof("%s changeQuantity: %f ticker: %+v market: %+v", symbol, changeQuantity.Float64(), ticker, market)
@@ -193,7 +202,13 @@ func (s *Strategy) selectSessionForCurrency(
 					continue
 				}
 
-				requiredQuoteAmount := q.Mul(price)
+				requiredQuoteAmount := fixedpoint.Zero
+				if reversed {
+					requiredQuoteAmount = q
+				} else {
+					requiredQuoteAmount = q.Mul(price)
+				}
+
 				requiredQuoteAmount = requiredQuoteAmount.Round(market.PricePrecision, fixedpoint.Up)
 				if requiredQuoteAmount.Compare(quoteBalance.Available) > 0 {
 					log.Warnf("required quote amount %f > quote balance %v, skip", requiredQuoteAmount.Float64(), quoteBalance)
@@ -241,6 +256,10 @@ func (s *Strategy) selectSessionForCurrency(
 					price = ticker.Buy.Add(market.TickSize)
 				} else {
 					price = ticker.Sell
+				}
+
+				if reversed {
+					q = q.Div(price)
 				}
 
 				baseBalance, ok := session.Account.Balance(baseCurrency)

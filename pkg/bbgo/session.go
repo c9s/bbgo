@@ -659,6 +659,10 @@ func (session *ExchangeSession) Markets() types.MarketMap {
 	return session.markets
 }
 
+func (session *ExchangeSession) SetMarkets(markets types.MarketMap) {
+	session.markets = markets
+}
+
 func (session *ExchangeSession) OrderStore(symbol string) (store *core.OrderStore, ok bool) {
 	store, ok = session.orderStores[symbol]
 	return store, ok
