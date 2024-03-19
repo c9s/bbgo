@@ -137,8 +137,13 @@ func (s *Strategy) triggerNextState() {
 }
 
 func (s *Strategy) runWaitToOpenPositionState(ctx context.Context, next State) {
-	s.logger.Info("[State] WaitToOpenPosition - check startTimeOfNextRound")
+	if s.nextRoundPaused {
+		s.logger.Info("[State] WaitToOpenPosition - nextRoundPaused is set")
+		return
+	}
+
 	if time.Now().Before(s.startTimeOfNextRound) {
+		s.logger.Infof("[State] WaitToOpenPosition - before the startTimeOfNextRound %s", s.startTimeOfNextRound.String())
 		return
 	}
 
