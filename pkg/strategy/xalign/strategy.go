@@ -131,18 +131,22 @@ func (s *Strategy) selectSessionForCurrency(
 			side = types.SideTypeSell
 		}
 
-		for _, quoteCurrency := range quoteCurrencies {
+		for _, fromQuoteCurrency := range quoteCurrencies {
 			// skip the same currency, because there is no such USDT/USDT market
-			if currency == quoteCurrency {
+			if currency == fromQuoteCurrency {
 				continue
 			}
 
-			// check both quoteCurrency/currency and currency/quoteCurrency
-			symbol := currency + quoteCurrency
+			// check both fromQuoteCurrency/currency and currency/fromQuoteCurrency
+			baseCurrency := currency
+			quoteCurrency := fromQuoteCurrency
+			symbol := currency + fromQuoteCurrency
 			market, ok := session.Market(symbol)
 			if !ok {
 				// for TWD in USDT/TWD market, buy TWD means sell USDT
-				symbol = quoteCurrency + currency
+				baseCurrency = fromQuoteCurrency
+				quoteCurrency = currency
+				symbol = fromQuoteCurrency + currency
 				market, ok = session.Market(symbol)
 				if !ok {
 					continue
@@ -196,11 +200,18 @@ func (s *Strategy) selectSessionForCurrency(
 					continue
 				}
 
-				if expectedQuoteBalance, ok := s.ExpectedBalances[quoteCurrency]; ok {
-					rest := quoteBalance.Total().Sub(requiredQuoteAmount)
-					if rest.Compare(expectedQuoteBalance) < 0 {
-						log.Warnf("required quote amount %f will use up the expected balance %f, skip", requiredQuoteAmount.Float64(), expectedQuoteBalance.Float64())
-						continue
+				// for currency = TWD in market USDT/TWD
+				// since the side is reversed, the quote currency is also "TWD" here.
+				//
+				// for currency = BTC in market BTC/USDT and the side is buy
+				// we want to check if the quote currency USDT used up another expected balance.
+				if quoteCurrency != currency {
+					if expectedQuoteBalance, ok := s.ExpectedBalances[quoteCurrency]; ok {
+						rest := quoteBalance.Total().Sub(requiredQuoteAmount)
+						if rest.Compare(expectedQuoteBalance) < 0 {
+							log.Warnf("required quote amount %f will use up the expected balance %f, skip", requiredQuoteAmount.Float64(), expectedQuoteBalance.Float64())
+							continue
+						}
 					}
 				}
 
@@ -232,7 +243,7 @@ func (s *Strategy) selectSessionForCurrency(
 					price = ticker.Sell
 				}
 
-				baseBalance, ok := session.Account.Balance(currency)
+				baseBalance, ok := session.Account.Balance(baseCurrency)
 				if !ok {
 					continue
 				}
