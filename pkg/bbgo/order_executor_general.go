@@ -517,13 +517,17 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 				return fmt.Errorf("insufficient base balance, can not sell: %+v", submitOrder)
 			}
 		} else if e.position.IsShort() {
-			// TODO: check quote balance here, we also need the current price to validate, need to design.
-			/*
-				if quoteBalance, ok := e.session.Account.Balance(e.position.Market.QuoteCurrency); ok {
-					// AdjustQuantityByMaxAmount(submitOrder.Quantity, quoteBalance.Available)
-					// submitOrder.Quantity = fixedpoint.Min(submitOrder.Quantity,)
+			if quoteBalance, ok := e.session.Account.Balance(e.position.Market.QuoteCurrency); ok {
+				ticker, err := e.session.Exchange.QueryTicker(ctx, e.position.Symbol)
+				if err != nil {
+					return err
 				}
-			*/
+				currentPrice := ticker.Sell
+				submitOrder.Quantity = AdjustQuantityByMaxAmount(submitOrder.Quantity, currentPrice, quoteBalance.Available)
+				if submitOrder.Quantity.IsZero() {
+					return fmt.Errorf("insufficient quote balance, can not buy: %+v", submitOrder)
+				}
+			}
 		}
 	}
 
