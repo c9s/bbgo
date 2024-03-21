@@ -378,7 +378,8 @@ func (s *Strategy) CrossRun(
 	bbgo.Notify("State: %s", s.State.PositionState.String())
 
 	// sync funding fee txns
-	s.syncFundingFeeRecords(ctx, time.Now().Add(-5*24*time.Hour))
+	syncFrom, _ := time.Parse(time.RFC3339, "2024-01-01T00:00:00Z")
+	s.syncFundingFeeRecords(ctx, syncFrom)
 
 	bbgo.Notify(s.ProfitStats)
 
