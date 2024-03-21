@@ -73,9 +73,6 @@ func (s *Strategy) runState(ctx context.Context) {
 	stateTriggerTicker := time.NewTicker(5 * time.Second)
 	defer stateTriggerTicker.Stop()
 
-	monitorTicker := time.NewTicker(10 * time.Minute)
-	defer monitorTicker.Stop()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -84,8 +81,6 @@ func (s *Strategy) runState(ctx context.Context) {
 		case <-stateTriggerTicker.C:
 			// s.logger.Infof("[DCA] triggerNextState current state: %d", s.state)
 			s.triggerNextState()
-		case <-monitorTicker.C:
-			s.updateNumOfOrdersMetrics(ctx)
 		case nextState := <-s.nextStateC:
 			// s.logger.Infof("[DCA] currenct state: %d, next state: %d", s.state, nextState)
 			// check the next state is valid

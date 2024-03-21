@@ -135,40 +135,27 @@ func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, or
 		}
 	}
 
-	// the number of open-position orders is the same as maxOrderCount -> place open-position orders successfully
-	if numOpenPositionOrders == maxOrderCount {
-		// all open-position orders are still not filled -> OpenPositionReady
-		if filledCnt == 0 && cancelledCnt == 0 {
-			return OpenPositionReady, nil
-		}
-
-		// there are at least one open-position orders filled -> OpenPositionOrderFilled
-		if filledCnt > 0 && cancelledCnt == 0 {
-			return OpenPositionOrderFilled, nil
-		}
-
-		// there are at last one open-position orders cancelled ->
-		if cancelledCnt > 0 {
-			return OpenPositionOrdersCancelling, nil
-		}
-
-		return None, fmt.Errorf("unexpected order status combination when numOpenPositionOrders(%d) == maxOrderCount(%d) (opened, filled, cancelled) = (%d, %d, %d)", numOpenPositionOrders, maxOrderCount, openedCnt, filledCnt, cancelledCnt)
-	}
-
-	// the number of open-position orders is less than maxOrderCount -> failed to place open-position orders
-	// 1. This strategy is at position opening, so it may not place all orders we want successfully
-	// 2. There are some errors when placing open-position orders. e.g. cannot lock fund.....
+	// all open-position orders are still not filled -> OpenPositionReady
 	if filledCnt == 0 && cancelledCnt == 0 {
-		// TODO: place the remaining open-position orders
 		return OpenPositionReady, nil
 	}
 
+	// there are at least one open-position orders filled
 	if filledCnt > 0 && cancelledCnt == 0 {
-		// TODO: place the remaing open-position orders and change state to OpenPositionOrderFilled
-		return OpenPositionOrderFilled, nil
+		if openedCnt > 0 {
+			return OpenPositionOrderFilled, nil
+		} else {
+			// all open-position orders filled, change to cancelling and place the take-profit order
+			return OpenPositionOrdersCancelling, nil
+		}
 	}
 
-	return None, fmt.Errorf("unexpected order status combination when numOpenPositionOrders(%d) < maxOrderCount(%d) (opened, filled, cancelled) = (%d, %d, %d)", numOpenPositionOrders, maxOrderCount, openedCnt, filledCnt, cancelledCnt)
+	// there are at last one open-position orders cancelled ->
+	if cancelledCnt > 0 {
+		return OpenPositionOrdersCancelling, nil
+	}
+
+	return None, fmt.Errorf("unexpected order status combination (opened, filled, cancelled) = (%d, %d, %d)", openedCnt, filledCnt, cancelledCnt)
 }
 
 func recoverPosition(ctx context.Context, position *types.Position, queryService RecoverApiQueryService, currentRound Round) error {
