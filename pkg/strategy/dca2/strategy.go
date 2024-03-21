@@ -242,8 +242,25 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			s.logger.Infof("unsupported side (%s) of order: %s", o.Side, o)
 		}
 
-		// update metrics when filled
-		s.updateNumOfOrdersMetrics(ctx)
+		openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, s.ExchangeSession.Exchange, s.Symbol)
+		if err != nil {
+			s.logger.WithError(err).Warn("failed to query open orders when order filled")
+		} else {
+			// update open orders metrics
+			metricsNumOfOpenOrders.With(baseLabels).Set(float64(len(openOrders)))
+		}
+
+		// update active orders metrics
+		numActiveMakerOrders := s.OrderExecutor.ActiveMakerOrders().NumOfOrders()
+		metricsNumOfActiveOrders.With(baseLabels).Set(float64(numActiveMakerOrders))
+
+		if len(openOrders) != numActiveMakerOrders {
+			s.logger.Warnf("num of open orders (%d) and active orders (%d) is different when order filled, please check it.", len(openOrders), numActiveMakerOrders)
+		}
+
+		if err == nil && o.Side == openPositionSide && numActiveMakerOrders == 0 && len(openOrders) == 0 {
+			s.emitNextState(OpenPositionOrdersCancelling)
+		}
 	})
 
 	session.MarketDataStream.OnKLine(func(kline types.KLine) {
@@ -310,6 +327,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			}
 		})
 	})
+
+	go s.runBackgrounTask(ctx)
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -460,20 +479,4 @@ func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
 	}
 
 	return updated, nil
-}
-
-func (s *Strategy) updateNumOfOrdersMetrics(ctx context.Context) {
-	// update open orders metrics
-	openOrders, err := s.ExchangeSession.Exchange.QueryOpenOrders(ctx, s.Symbol)
-	if err != nil {
-		s.logger.WithError(err).Warn("failed to query open orders to update num of the orders metrics")
-	} else {
-		metricsNumOfOpenOrders.With(baseLabels).Set(float64(len(openOrders)))
-	}
-
-	// update active orders metrics
-	metricsNumOfActiveOrders.With(baseLabels).Set(float64(s.OrderExecutor.ActiveMakerOrders().NumOfOrders()))
-
-	// set persistence
-	bbgo.Sync(ctx, s)
 }
