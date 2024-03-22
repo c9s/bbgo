@@ -43,7 +43,7 @@ func init() {
 
 	BacktestCmd.Flags().Bool("base-asset-baseline", false, "use base asset performance as the competitive baseline performance")
 	BacktestCmd.Flags().CountP("verbose", "v", "verbose level")
-	BacktestCmd.Flags().String("config", "config/bbgo.yaml", "strategy config file")
+	BacktestCmd.Flags().String("config", "bbgo.yaml", "strategy config file")
 	BacktestCmd.Flags().Bool("force", false, "force execution without confirm")
 	BacktestCmd.Flags().String("output", "", "the report output directory")
 	BacktestCmd.Flags().Bool("subdir", false, "generate report in the sub-directory of the output directory")
