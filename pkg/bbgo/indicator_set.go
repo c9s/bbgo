@@ -3,7 +3,7 @@ package bbgo
 import (
 	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/indicator/v2"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -107,4 +107,8 @@ func (i *IndicatorSet) ATR(interval types.Interval, window int) *indicatorv2.ATR
 
 func (i *IndicatorSet) ATRP(interval types.Interval, window int) *indicatorv2.ATRPStream {
 	return indicatorv2.ATRP2(i.KLines(interval), window)
+}
+
+func (i *IndicatorSet) ADX(interval types.Interval, window int) *indicatorv2.ADXStream {
+	return indicatorv2.ADX(i.KLines(interval), window)
 }
