@@ -41,12 +41,12 @@ func ADX(source KLineSubscription, window int) *ADXStream {
 		}
 
 		up, dn := k.High.Sub(s.prevHigh), s.prevLow.Sub(k.Low)
-		if up.Compare(dn) > 0 && up > 0 {
+		if up.Compare(dn) > 0 && up.Float64() > 0 {
 			dmp.PushAndEmit(up.Float64())
 		} else {
 			dmp.PushAndEmit(0.0)
 		}
-		if dn.Compare(up) > 0 && dn > 0 {
+		if dn.Compare(up) > 0 && dn.Float64() > 0 {
 			dmn.PushAndEmit(dn.Float64())
 		} else {
 			dmn.PushAndEmit(0.0)
