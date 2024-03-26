@@ -72,7 +72,10 @@ func (e *Exchange) Name() types.ExchangeName {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	ticker, err := e.client.PublicService.Ticker(toLocalSymbol(symbol))
+	req := e.client.NewGetTickerRequest()
+	req.Market(toLocalSymbol(symbol))
+	ticker, err := req.Do(ctx)
+
 	if err != nil {
 		return nil, err
 	}
