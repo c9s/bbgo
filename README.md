@@ -412,6 +412,7 @@ Check out the strategy directory [strategy](pkg/strategy) for all built-in strat
 - `irr` - return rate strategy.
 - `drift` - drift strategy.
 - `grid2` - the second-generation grid strategy.
+- `rebalance` - rebalances your portfolio based on target weights. [rebalance](pkg/strategy/rebalance). See [document](./doc/strategy/rebalance.md).
 
 To run these built-in strategies, just modify the config file to make the configuration suitable for you, for example, if
 you want to run
