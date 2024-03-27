@@ -231,9 +231,10 @@ func (s *Strategy) selectSessionForCurrency(
 				}
 
 				maxAmount, ok := s.MaxAmounts[market.QuoteCurrency]
-				if ok {
-					requiredQuoteAmount = bbgo.AdjustQuantityByMaxAmount(requiredQuoteAmount, price, maxAmount)
-					log.Infof("adjusted quantity %f %s by max amount %f %s", requiredQuoteAmount.Float64(), market.BaseCurrency, maxAmount.Float64(), market.QuoteCurrency)
+				if ok && requiredQuoteAmount.Compare(maxAmount) > 0 {
+					log.Infof("adjusted required quote ammount %f %s by max amount %f %s", requiredQuoteAmount.Float64(), market.QuoteCurrency, maxAmount.Float64(), market.QuoteCurrency)
+
+					requiredQuoteAmount = maxAmount
 				}
 
 				if quantity, ok := market.GreaterThanMinimalOrderQuantity(side, price, requiredQuoteAmount); ok {
