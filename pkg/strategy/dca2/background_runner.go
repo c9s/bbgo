@@ -8,7 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-func (s *Strategy) runBackgrounTask(ctx context.Context) {
+func (s *Strategy) runBackgroundTask(ctx context.Context) {
 	s.logger.Info("run background task")
 
 	// recover active orders
