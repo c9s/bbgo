@@ -47,6 +47,11 @@ var getOrderCmd = &cobra.Command{
 
 		orderID, err := cmd.Flags().GetString("order-id")
 		if err != nil {
+			return fmt.Errorf("can't get the order-id from flags: %w", err)
+		}
+
+		symbol, err := cmd.Flags().GetString("symbol")
+		if err != nil {
 			return fmt.Errorf("can't get the symbol from flags: %w", err)
 		}
 
@@ -57,6 +62,7 @@ var getOrderCmd = &cobra.Command{
 
 		order, err := service.QueryOrder(ctx, types.OrderQuery{
 			OrderID: orderID,
+			Symbol:  symbol,
 		})
 		if err != nil {
 			return err
@@ -100,9 +106,6 @@ var listOrdersCmd = &cobra.Command{
 		symbol, err := cmd.Flags().GetString("symbol")
 		if err != nil {
 			return fmt.Errorf("can't get the symbol from flags: %w", err)
-		}
-		if symbol == "" {
-			return fmt.Errorf("symbol is not found")
 		}
 
 		status := "open"
