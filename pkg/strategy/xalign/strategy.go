@@ -246,6 +246,8 @@ func (s *Strategy) selectSessionForCurrency(
 						Market:      market,
 						TimeInForce: types.TimeInForceGTC,
 					}
+				} else {
+					log.Warnf("The amount %f is not greater than the minimal order quantity for %s", requiredQuoteAmount.Float64(), market.Symbol)
 				}
 
 			case types.SideTypeSell:
@@ -288,6 +290,8 @@ func (s *Strategy) selectSessionForCurrency(
 						Market:      market,
 						TimeInForce: types.TimeInForceGTC,
 					}
+				} else {
+					log.Warnf("The amount %f is not greater than the minimal order quantity for %s", q.Float64(), market.Symbol)
 				}
 			}
 
