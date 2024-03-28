@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/cache"
+	"github.com/c9s/bbgo/pkg/util"
 
 	log "github.com/sirupsen/logrus"
 
@@ -88,6 +89,10 @@ func (s *SyncService) SyncRewardHistory(ctx context.Context, exchange types.Exch
 	}
 
 	log.Infof("syncing %s reward records...", exchange.Name())
+	if util.IsPaperTrade() {
+		log.Info("reward is not supported in paper trading")
+		return nil
+	}
 	if err := s.RewardService.Sync(ctx, exchange, startTime); err != nil {
 		return err
 	}
@@ -97,6 +102,11 @@ func (s *SyncService) SyncRewardHistory(ctx context.Context, exchange types.Exch
 
 func (s *SyncService) SyncDepositHistory(ctx context.Context, exchange types.Exchange, startTime time.Time) error {
 	log.Infof("syncing %s deposit records...", exchange.Name())
+	if util.IsPaperTrade() {
+		log.Info("deposit is not supported in paper trading")
+		return nil
+	}
+
 	if err := s.DepositService.Sync(ctx, exchange, startTime); err != nil {
 		if err != ErrNotImplemented {
 			log.Warnf("%s deposit service is not supported", exchange.Name())
@@ -109,6 +119,11 @@ func (s *SyncService) SyncDepositHistory(ctx context.Context, exchange types.Exc
 
 func (s *SyncService) SyncWithdrawHistory(ctx context.Context, exchange types.Exchange, startTime time.Time) error {
 	log.Infof("syncing %s withdraw records...", exchange.Name())
+	if util.IsPaperTrade() {
+		log.Info("withdraw is not supported in paper trading")
+		return nil
+	}
+
 	if err := s.WithdrawService.Sync(ctx, exchange, startTime); err != nil {
 		if err != ErrNotImplemented {
 			log.Warnf("%s withdraw service is not supported", exchange.Name())

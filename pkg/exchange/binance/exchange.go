@@ -3,7 +3,6 @@ package binance
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -67,12 +66,7 @@ func init() {
 }
 
 func isBinanceUs() bool {
-	v, err := strconv.ParseBool(os.Getenv("BINANCE_US"))
-	return err == nil && v
-}
-
-func paperTrade() bool {
-	v, ok := util.GetEnvVarBool("PAPER_TRADE")
+	v, ok := util.GetEnvVarBool("BINANCE_US")
 	return ok && v
 }
 
@@ -97,6 +91,9 @@ type Exchange struct {
 var timeSetterOnce sync.Once
 
 func New(key, secret string) *Exchange {
+	if util.IsPaperTrade() {
+		binance.UseTestnet = true
+	}
 	var client = binance.NewClient(key, secret)
 	client.HTTPClient = binanceapi.DefaultHttpClient
 	client.Debug = viper.GetBool("debug-binance-client")
@@ -107,11 +104,6 @@ func New(key, secret string) *Exchange {
 
 	if isBinanceUs() {
 		client.BaseURL = BinanceUSBaseURL
-	}
-
-	if paperTrade() {
-		client.BaseURL = BinanceTestBaseURL
-		futuresClient.BaseURL = FutureTestBaseURL
 	}
 
 	client2 := binanceapi.NewClient(client.BaseURL)
