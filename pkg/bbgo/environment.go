@@ -520,11 +520,6 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 		return nil
 	}
 
-	// for paper trade mode, skip sync
-	if util.IsPaperTrade() {
-		return nil
-	}
-
 	environ.syncMutex.Lock()
 	defer environ.syncMutex.Unlock()
 
