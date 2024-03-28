@@ -809,7 +809,7 @@ func (s *Strategy) CrossRun(
 			p.Strategy = ID
 			p.StrategyInstanceID = instanceID
 			bbgo.Notify(&p)
-			s.ProfitStats.AddProfit(p)
+			s.ProfitStats.AddProfit(&p)
 
 			s.Environment.RecordPosition(s.Position, trade, &p)
 		}

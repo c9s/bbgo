@@ -831,9 +831,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if madeProfit {
 			p := s.Position.NewProfit(trade, profit, netProfit)
 			s.Environment.RecordPosition(s.Position, trade, &p)
-			s.TradeStats.Add(&p)
+			s.TradeStats.AddProfit(&p)
 			s.ProfitStats.AddTrade(trade)
-			s.ProfitStats.AddProfit(p)
+			s.ProfitStats.AddProfit(&p)
 			bbgo.Notify(&p)
 			bbgo.Notify(s.ProfitStats)
 		}
