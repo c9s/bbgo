@@ -320,7 +320,9 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 	return resp.Amount, nil
 }
 
-func (e *Exchange) borrowRepayAsset(ctx context.Context, asset string, amount fixedpoint.Value, marginType binanceapi.BorrowRepayType) error {
+func (e *Exchange) borrowRepayAsset(
+	ctx context.Context, asset string, amount fixedpoint.Value, marginType binanceapi.BorrowRepayType,
+) error {
 	req := e.client2.NewPlaceMarginOrderRequest()
 	req.Asset(asset)
 	req.Amount(amount)
@@ -1435,7 +1437,7 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 	return &types.FundingRate{
 		FundingRate: fundingRate,
 		FundingTime: time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
-		Time:        time.Unix(0, rate.Time*int64(time.Millisecond)),
+		Time:        time.Unix(0, rate.FundingTime*int64(time.Millisecond)),
 	}, nil
 }
 

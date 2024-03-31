@@ -2,12 +2,14 @@
 
 module github.com/c9s/bbgo
 
-go 1.20
+go 1.21
+
+toolchain go1.21.6
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Masterminds/squirrel v1.5.3
-	github.com/adshao/go-binance/v2 v2.4.5
+	github.com/adshao/go-binance/v2 v2.5.0
 	github.com/c-bata/goptuna v0.8.1
 	github.com/c9s/requestgen v1.3.6
 	github.com/c9s/rockhopper/v2 v2.0.3-0.20240124055428-2473c6221858
