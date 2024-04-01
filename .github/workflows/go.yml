@@ -58,7 +58,7 @@ jobs:
         go-version: ${{ matrix.go-version }}
 
     - name: Install Migration Tool
-      run: go install github.com/c9s/rockhopper/cmd/rockhopper@v1.2.1
+      run: go install github.com/c9s/rockhopper/cmd/rockhopper@v2.0.3
 
     - name: Test Migration SQL Files For MySQL
       run: |
