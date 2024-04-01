@@ -21,7 +21,7 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 		return err
 	}
 
-	orders, err := generateOpenPositionOrders(s.Market, s.QuoteInvestment, s.ProfitStats.TotalProfit, price, s.PriceDeviation, s.MaxOrderCount, s.OrderGroupID)
+	orders, err := generateOpenPositionOrders(s.Market, s.EnableQuoteInvestmentReallocate, s.QuoteInvestment, s.ProfitStats.TotalProfit, price, s.PriceDeviation, s.MaxOrderCount, s.OrderGroupID)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func getBestPriceUntilSuccess(ctx context.Context, ex types.Exchange, symbol str
 	return ticker.Sell, nil
 }
 
-func generateOpenPositionOrders(market types.Market, quoteInvestment, profit, price, priceDeviation fixedpoint.Value, maxOrderCount int64, orderGroupID uint32) ([]types.SubmitOrder, error) {
+func generateOpenPositionOrders(market types.Market, enableQuoteInvestmentReallocate bool, quoteInvestment, profit, price, priceDeviation fixedpoint.Value, maxOrderCount int64, orderGroupID uint32) ([]types.SubmitOrder, error) {
 	factor := fixedpoint.One.Sub(priceDeviation)
 	profit = market.TruncatePrice(profit)
 
@@ -81,6 +81,10 @@ func generateOpenPositionOrders(market types.Market, quoteInvestment, profit, pr
 	notional, orderNum := calculateNotionalAndNumOrders(market, quoteInvestment, prices)
 	if orderNum == 0 {
 		return nil, fmt.Errorf("failed to calculate notional and num of open position orders, price: %s, quote investment: %s", price, quoteInvestment)
+	}
+
+	if !enableQuoteInvestmentReallocate && orderNum != int(maxOrderCount) {
+		return nil, fmt.Errorf("failed to generate open-position orders due to the orders may be under min notional or quantity")
 	}
 
 	side := types.SideTypeBuy
