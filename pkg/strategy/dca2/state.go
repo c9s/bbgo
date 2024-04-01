@@ -150,8 +150,13 @@ func (s *Strategy) runPositionOpening(ctx context.Context, next State) {
 	s.logger.Info("[State] PositionOpening - start placing open-position orders")
 	if err := s.placeOpenPositionOrders(ctx); err != nil {
 		s.logger.WithError(err).Error("failed to place dca orders, please check it.")
+
+		// try after 1 minute when failed to placing orders
+		s.startTimeOfNextRound = s.startTimeOfNextRound.Add(1 * time.Minute)
+		s.updateState(WaitToOpenPosition)
 		return
 	}
+
 	s.updateState(OpenPositionReady)
 	s.logger.Info("[State] PositionOpening -> OpenPositionReady")
 }
