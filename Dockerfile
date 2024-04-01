@@ -1,5 +1,5 @@
 # First stage container
-FROM golang:1.20-alpine3.18 AS builder
+FROM golang:1.21-alpine3.18 AS builder
 RUN apk add --no-cache git ca-certificates gcc musl-dev libc-dev pkgconfig
 # gcc is for github.com/mattn/go-sqlite3
 # ADD . $GOPATH/src/github.com/c9s/bbgo
