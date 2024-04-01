@@ -70,6 +70,9 @@ type Strategy struct {
 	DisableProfitStatsRecover bool `json:"disableProfitStatsRecover"`
 	DisablePositionRecover    bool `json:"disablePositionRecover"`
 
+	// EnableQuoteInvestmentReallocate set to true, the quote investment will be reallocated when the notional or quantity is under minimum.
+	EnableQuoteInvestmentReallocate bool `json:"enableQuoteInvestmentReallocate"`
+
 	// KeepOrdersWhenShutdown option is used for keeping the grid orders when shutting down bbgo
 	KeepOrdersWhenShutdown bool `json:"keepOrdersWhenShutdown"`
 
