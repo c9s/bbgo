@@ -82,7 +82,11 @@ func (s *Strategy) runState(ctx context.Context) {
 			// s.logger.Infof("[DCA] triggerNextState current state: %d", s.state)
 			s.triggerNextState()
 		case nextState := <-s.nextStateC:
-			// s.logger.Infof("[DCA] currenct state: %d, next state: %d", s.state, nextState)
+			// next state == current state -> skip
+			if nextState == s.state {
+				continue
+			}
+
 			// check the next state is valid
 			validNextState, exist := stateTransition[s.state]
 			if !exist {

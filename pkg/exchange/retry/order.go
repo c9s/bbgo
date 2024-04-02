@@ -9,6 +9,8 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 
+	"github.com/c9s/bbgo/pkg/exchange/max"
+	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -51,6 +53,7 @@ func QueryOrderUntilCanceled(
 func QueryOrderUntilFilled(
 	ctx context.Context, queryOrderService types.ExchangeOrderQueryService, symbol string, orderId uint64,
 ) (o *types.Order, err error) {
+	_, isMax := queryOrderService.(*max.Exchange)
 	var op = func() (err2 error) {
 		o, err2 = queryOrderService.QueryOrder(ctx, types.OrderQuery{
 			Symbol:  symbol,
@@ -67,7 +70,16 @@ func QueryOrderUntilFilled(
 
 		// for final status return nil error to stop the retry
 		switch o.Status {
-		case types.OrderStatusFilled, types.OrderStatusCanceled:
+		case types.OrderStatusFilled:
+			if isMax {
+				// for MAX exchange, the order state done is filled but finalizing is not filled
+				if o.OriginalStatus == string(maxapi.OrderStateDone) {
+					return nil
+				}
+			} else {
+				return nil
+			}
+		case types.OrderStatusCanceled:
 			return nil
 		}
 
