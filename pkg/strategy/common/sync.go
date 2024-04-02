@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -24,6 +25,10 @@ func SyncActiveOrder(ctx context.Context, ex types.Exchange, orderQueryService t
 
 	if err != nil {
 		return isOrderUpdated, err
+	}
+
+	if updatedOrder == nil {
+		return isOrderUpdated, fmt.Errorf("updatedOrder is nil and there is no error, please check it")
 	}
 
 	// maxapi.OrderStateFinalizing does not mean the fee is calculated
