@@ -28,7 +28,7 @@ func SyncActiveOrder(ctx context.Context, ex types.Exchange, orderQueryService t
 	}
 
 	if updatedOrder == nil {
-		return isOrderUpdated, fmt.Errorf("updatedOrder is nil and there is no error, please check it")
+		return isOrderUpdated, fmt.Errorf("unexpected error, order object (%d) is a nil pointer, please check common.SyncActiveOrder()", orderID)
 	}
 
 	// maxapi.OrderStateFinalizing does not mean the fee is calculated
