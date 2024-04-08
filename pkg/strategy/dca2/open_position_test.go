@@ -5,9 +5,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/stretchr/testify/assert"
+
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func newTestMarket() types.Market {
@@ -51,7 +52,7 @@ func TestGenerateOpenPositionOrders(t *testing.T) {
 		profit := Number("300")
 		askPrice := Number("30000")
 		margin := Number("0.05")
-		submitOrders, err := generateOpenPositionOrders(strategy.Market, quoteInvestment, profit, askPrice, margin, 4, strategy.OrderGroupID)
+		submitOrders, err := generateOpenPositionOrders(strategy.Market, false, quoteInvestment, profit, askPrice, margin, 4, strategy.OrderGroupID)
 		if !assert.NoError(err) {
 			return
 		}
@@ -72,7 +73,7 @@ func TestGenerateOpenPositionOrders(t *testing.T) {
 		profit := Number("99.47871711")
 		askPrice := Number("40409.72")
 		margin := Number("0.1")
-		submitOrders, err := generateOpenPositionOrders(strategy.Market, quoteInvestment, profit, askPrice, margin, 2, strategy.OrderGroupID)
+		submitOrders, err := generateOpenPositionOrders(strategy.Market, false, quoteInvestment, profit, askPrice, margin, 2, strategy.OrderGroupID)
 		if !assert.NoError(err) {
 			return
 		}
