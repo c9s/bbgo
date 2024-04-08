@@ -70,12 +70,13 @@ type Trade struct {
 	QuoteQuantity fixedpoint.Value `json:"quoteQuantity" db:"quote_quantity"`
 	Symbol        string           `json:"symbol" db:"symbol"`
 
-	Side        SideType         `json:"side" db:"side"`
-	IsBuyer     bool             `json:"isBuyer" db:"is_buyer"`
-	IsMaker     bool             `json:"isMaker" db:"is_maker"`
-	Time        Time             `json:"tradedAt" db:"traded_at"`
-	Fee         fixedpoint.Value `json:"fee" db:"fee"`
-	FeeCurrency string           `json:"feeCurrency" db:"fee_currency"`
+	Side          SideType         `json:"side" db:"side"`
+	IsBuyer       bool             `json:"isBuyer" db:"is_buyer"`
+	IsMaker       bool             `json:"isMaker" db:"is_maker"`
+	Time          Time             `json:"tradedAt" db:"traded_at"`
+	Fee           fixedpoint.Value `json:"fee" db:"fee"`
+	FeeCurrency   string           `json:"feeCurrency" db:"fee_currency"`
+	FeeProcessing bool             `json:"feeProcessing" db:"-"`
 
 	// FeeDiscounted is an optional field which indicates whether the trade is using the platform fee token for discount.
 	// When FeeDiscounted = true, means the fee is deducted outside the trade

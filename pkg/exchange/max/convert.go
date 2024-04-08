@@ -201,6 +201,11 @@ func toGlobalTradeV3(t v3.Trade) ([]types.Trade, error) {
 	isMargin := t.WalletType == max.WalletTypeMargin
 	side := toGlobalSideType(t.Side)
 
+	fee := fixedpoint.Zero
+	if t.Fee != nil {
+		fee = *t.Fee
+	}
+
 	trade := types.Trade{
 		ID:            t.ID,
 		OrderID:       t.OrderID,
@@ -211,7 +216,8 @@ func toGlobalTradeV3(t v3.Trade) ([]types.Trade, error) {
 		Side:          side,
 		IsBuyer:       t.IsBuyer(),
 		IsMaker:       t.IsMaker(),
-		Fee:           t.Fee,
+		Fee:           fee,
+		FeeProcessing: t.Fee == nil,
 		FeeCurrency:   toGlobalCurrency(t.FeeCurrency),
 		FeeDiscounted: t.FeeDiscounted,
 		QuoteQuantity: t.Funds,
