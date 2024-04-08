@@ -72,13 +72,36 @@ func (s *Strategy) recoverByScanningTrades(ctx context.Context, session *bbgo.Ex
 	// add open orders into avtive maker orders
 	s.addOrdersToActiveOrderBook(openOrders)
 
+	// following is for MAX
+	if isMax {
+		var doneOrders []types.Order
+		for _, filledOrder := range filledOrders {
+			if filledOrder.OriginalStatus != string(maxapi.OrderStateDone) {
+				order, err := retry.QueryOrderUntilFilled(ctx, s.orderQueryService, filledOrder.Symbol, filledOrder.OrderID)
+				if err != nil {
+					return errors.Wrap(err, "unable to query orders until filled, please check it")
+				}
+
+				if order == nil {
+					return fmt.Errorf("after QueryOrderUntilFilled, order and error are both nil. Please check it")
+				}
+
+				doneOrders = append(doneOrders, *order)
+			} else {
+				doneOrders = append(doneOrders, filledOrder)
+			}
+		}
+
+		if len(filledOrders) != len(doneOrders) {
+			return fmt.Errorf("num of filled orders (%d) and num of done orders (%d) should be the same", len(filledOrders), len(doneOrders))
+		}
+
+		filledOrders = doneOrders
+	}
+
 	// emit the filled orders
 	activeOrderBook := s.orderExecutor.ActiveMakerOrders()
 	for _, filledOrder := range filledOrders {
-		if isMax && filledOrder.OriginalStatus != string(maxapi.OrderStateDone) {
-			activeOrderBook.Add(filledOrder)
-			continue
-		}
 		activeOrderBook.EmitFilled(filledOrder)
 	}
 
