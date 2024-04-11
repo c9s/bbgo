@@ -216,7 +216,7 @@ func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 	s.Position.Reset()
 
 	// emit position
-	s.EmitPosition(s.Position)
+	s.OrderExecutor.TradeCollector().EmitPositionUpdate(s.Position)
 
 	// store into redis
 	bbgo.Sync(ctx, s)

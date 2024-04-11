@@ -101,8 +101,7 @@ type Strategy struct {
 
 	// callbacks
 	common.StatusCallbacks
-	positionCallbacks []func(*types.Position)
-	profitCallbacks   []func(*ProfitStats)
+	profitCallbacks []func(*ProfitStats)
 }
 
 func (s *Strategy) ID() string {
@@ -237,9 +236,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		// update take profit price here
 		s.updateTakeProfitPrice()
-
-		// emit position update
-		s.EmitPosition(position)
 	})
 
 	s.OrderExecutor.ActiveMakerOrders().OnFilled(func(o types.Order) {
@@ -280,6 +276,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	session.MarketDataStream.OnKLine(func(kline types.KLine) {
 		// check price here
 		if s.state != OpenPositionOrderFilled {
+			return
+		}
+
+		if s.takeProfitPrice.IsZero() {
+			s.logger.Warn("take profit price should not be 0 when there is at least one open-position order filled, please check it")
 			return
 		}
 
@@ -428,14 +429,6 @@ func (s *Strategy) PauseNextRound() {
 
 func (s *Strategy) ContinueNextRound() {
 	s.nextRoundPaused = false
-}
-
-func (s *Strategy) GetTakeProfitPrice() fixedpoint.Value {
-	if s.Position.Base == 0 {
-		return fixedpoint.Zero
-	}
-
-	return s.takeProfitPrice
 }
 
 func (s *Strategy) UpdateProfitStatsUntilSuccessful(ctx context.Context) error {
