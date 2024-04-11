@@ -52,10 +52,11 @@ func (s *Strategy) recoverActiveOrders(ctx context.Context) error {
 	}
 
 	opts := common.SyncActiveOrdersOpts{
-		Logger:          s.logger,
-		Exchange:        s.ExchangeSession.Exchange,
-		ActiveOrderBook: activeOrders,
-		OpenOrders:      openOrders,
+		Logger:            s.logger,
+		Exchange:          s.ExchangeSession.Exchange,
+		OrderQueryService: s.orderQueryService,
+		ActiveOrderBook:   activeOrders,
+		OpenOrders:        openOrders,
 	}
 
 	return common.SyncActiveOrders(ctx, opts)
