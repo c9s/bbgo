@@ -101,8 +101,7 @@ type Strategy struct {
 
 	// callbacks
 	common.StatusCallbacks
-	positionCallbacks []func(*types.Position)
-	profitCallbacks   []func(*ProfitStats)
+	profitCallbacks []func(*ProfitStats)
 }
 
 func (s *Strategy) ID() string {
@@ -277,6 +276,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	session.MarketDataStream.OnKLine(func(kline types.KLine) {
 		// check price here
 		if s.state != OpenPositionOrderFilled {
+			return
+		}
+
+		if s.takeProfitPrice.IsZero() {
+			s.logger.Warn("take profit price should not be 0 when there is at least one open-position order filled, please check it")
 			return
 		}
 
