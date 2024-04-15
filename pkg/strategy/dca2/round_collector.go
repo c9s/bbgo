@@ -2,6 +2,7 @@ package dca2
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -19,8 +20,11 @@ type RoundCollector struct {
 	isMax   bool
 
 	// service
-	historyService types.ExchangeTradeHistoryService
-	queryService   types.ExchangeOrderQueryService
+	ex                   types.Exchange
+	historyService       types.ExchangeTradeHistoryService
+	queryService         types.ExchangeOrderQueryService
+	tradeService         types.ExchangeTradeService
+	queryClosedOrderDesc descendingClosedOrderQueryService
 }
 
 func NewRoundCollector(logger *logrus.Entry, symbol string, groupID uint32, ex types.Exchange) *RoundCollector {
@@ -37,14 +41,82 @@ func NewRoundCollector(logger *logrus.Entry, symbol string, groupID uint32, ex t
 		return nil
 	}
 
-	return &RoundCollector{
-		logger:         logger,
-		symbol:         symbol,
-		groupID:        groupID,
-		isMax:          isMax,
-		historyService: historyService,
-		queryService:   queryService,
+	tradeService, ok := ex.(types.ExchangeTradeService)
+	if !ok {
+		logger.Errorf("exchange %s doesn't support ExchangeTradeService", ex.Name())
+		return nil
 	}
+
+	queryClosedOrderDesc, ok := ex.(descendingClosedOrderQueryService)
+	if !ok {
+		logger.Errorf("exchange %s doesn't support query closed orders desc", ex.Name())
+		return nil
+	}
+
+	return &RoundCollector{
+		logger:               logger,
+		symbol:               symbol,
+		groupID:              groupID,
+		isMax:                isMax,
+		ex:                   ex,
+		historyService:       historyService,
+		queryService:         queryService,
+		tradeService:         tradeService,
+		queryClosedOrderDesc: queryClosedOrderDesc,
+	}
+}
+
+func (rc RoundCollector) CollectCurrentRound(ctx context.Context) (Round, error) {
+	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, rc.ex, rc.symbol)
+	if err != nil {
+		return Round{}, err
+	}
+
+	var closedOrders []types.Order
+	var op = func() (err2 error) {
+		closedOrders, err2 = rc.queryClosedOrderDesc.QueryClosedOrdersDesc(ctx, rc.symbol, recoverSinceLimit, time.Now(), 0)
+		return err2
+	}
+	if err := retry.GeneralBackoff(ctx, op); err != nil {
+		return Round{}, err
+	}
+
+	openPositionSide := types.SideTypeBuy
+	takeProfitSide := types.SideTypeSell
+
+	var allOrders []types.Order
+	allOrders = append(allOrders, openOrders...)
+	allOrders = append(allOrders, closedOrders...)
+
+	types.SortOrdersDescending(allOrders)
+
+	var currentRound Round
+	lastSide := takeProfitSide
+	for _, order := range allOrders {
+		// group id filter is used for debug when local running
+		if order.GroupID != rc.groupID {
+			continue
+		}
+
+		if order.Side == takeProfitSide && lastSide == openPositionSide {
+			break
+		}
+
+		switch order.Side {
+		case openPositionSide:
+			currentRound.OpenPositionOrders = append(currentRound.OpenPositionOrders, order)
+		case takeProfitSide:
+			if currentRound.TakeProfitOrder.OrderID != 0 {
+				return currentRound, fmt.Errorf("there are two take-profit orders in one round, please check it")
+			}
+			currentRound.TakeProfitOrder = order
+		default:
+		}
+
+		lastSide = order.Side
+	}
+
+	return currentRound, nil
 }
 
 func (rc *RoundCollector) CollectFinishRounds(ctx context.Context, fromOrderID uint64) ([]Round, error) {
@@ -96,13 +168,16 @@ func (rc *RoundCollector) CollectRoundTrades(ctx context.Context, round Round) (
 	debugRoundOrders(rc.logger, "collect round trades", round)
 
 	var roundTrades []types.Trade
-
 	var roundOrders []types.Order = round.OpenPositionOrders
-	roundOrders = append(roundOrders, round.TakeProfitOrder)
+
+	// if the take-profit order's OrderID == 0 -> no take-profit order.
+	if round.TakeProfitOrder.OrderID != 0 {
+		roundOrders = append(roundOrders, round.TakeProfitOrder)
+	}
 
 	for _, order := range roundOrders {
 		rc.logger.Infof("collect trades from order: %s", order.String())
-		if order.ExecutedQuantity.Sign() == 0 {
+		if order.ExecutedQuantity.IsZero() {
 			rc.logger.Info("collect trads from order but no executed quantity ", order.String())
 			continue
 		} else {

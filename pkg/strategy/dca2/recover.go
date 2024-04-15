@@ -24,25 +24,7 @@ type RecoverApiQueryService interface {
 
 func (s *Strategy) recover(ctx context.Context) error {
 	s.logger.Info("[DCA] recover")
-	queryService, ok := s.ExchangeSession.Exchange.(RecoverApiQueryService)
-	if !ok {
-		return fmt.Errorf("[DCA] exchange %s doesn't support queryAPI interface", s.ExchangeSession.ExchangeName)
-	}
-
-	openOrders, err := queryService.QueryOpenOrders(ctx, s.Symbol)
-	if err != nil {
-		return err
-	}
-
-	closedOrders, err := queryService.QueryClosedOrdersDesc(ctx, s.Symbol, recoverSinceLimit, time.Now(), 0)
-	if err != nil {
-		return err
-	}
-
-	currentRound, err := getCurrentRoundOrders(openOrders, closedOrders, s.OrderGroupID)
-	if err != nil {
-		return err
-	}
+	currentRound, err := s.roundCollector.CollectCurrentRound(ctx)
 	debugRoundOrders(s.logger, "current", currentRound)
 
 	// recover profit stats
@@ -59,6 +41,11 @@ func (s *Strategy) recover(ctx context.Context) error {
 	if s.DisablePositionRecover {
 		s.logger.Info("disablePositionRecover is set, skip position recovery")
 	} else {
+		queryService, ok := s.ExchangeSession.Exchange.(RecoverApiQueryService)
+		if !ok {
+			return fmt.Errorf("[DCA] exchange %s doesn't support queryAPI interface", s.ExchangeSession.ExchangeName)
+		}
+
 		if err := recoverPosition(ctx, s.Position, queryService, currentRound); err != nil {
 			return err
 		}

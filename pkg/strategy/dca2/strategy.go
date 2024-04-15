@@ -94,7 +94,6 @@ type Strategy struct {
 	nextStateC           chan State
 	state                State
 	roundCollector       *RoundCollector
-	orderQueryService    types.ExchangeOrderQueryService
 	takeProfitPrice      fixedpoint.Value
 	startTimeOfNextRound time.Time
 	nextRoundPaused      bool
@@ -191,13 +190,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	if s.OrderGroupID == 0 {
 		s.OrderGroupID = util.FNV32(instanceID) % math.MaxInt32
-	}
-
-	// orderQueryService
-	if service, ok := s.ExchangeSession.Exchange.(types.ExchangeOrderQueryService); ok {
-		s.orderQueryService = service
-	} else {
-		return fmt.Errorf("exchange %s doesn't support ExchangeOrderQueryService", s.ExchangeSession.ExchangeName)
 	}
 
 	// round collector
