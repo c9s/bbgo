@@ -21,19 +21,19 @@ func (s *Strategy) placeTakeProfitOrders(ctx context.Context) error {
 		return errors.Wrap(err, "failed to place the take-profit order when collecting round trades")
 	}
 
-	position := types.NewPositionFromMarket(s.Market)
+	roundPosition := types.NewPositionFromMarket(s.Market)
 
 	for _, trade := range trades {
 		if trade.FeeProcessing {
 			return fmt.Errorf("failed to place the take-profit order because there is a trade's fee not ready")
 		}
 
-		position.AddTrade(trade)
+		roundPosition.AddTrade(trade)
 	}
 
-	s.logger.Infof("placeTakeProfitOrders: %s", position.String())
+	s.logger.Infof("position of this round before place the take-profit order: %s", roundPosition.String())
 
-	order := generateTakeProfitOrder(s.Market, s.TakeProfitRatio, position, s.OrderGroupID)
+	order := generateTakeProfitOrder(s.Market, s.TakeProfitRatio, roundPosition, s.OrderGroupID)
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, order)
 	if err != nil {
 		return err
