@@ -215,6 +215,9 @@ func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 	// reset position and open new round for profit stats before position opening
 	s.Position.Reset()
 
+	// emit position
+	s.OrderExecutor.TradeCollector().EmitPositionUpdate(s.Position)
+
 	// store into redis
 	bbgo.Sync(ctx, s)
 
