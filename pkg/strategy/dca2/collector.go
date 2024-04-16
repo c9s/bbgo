@@ -164,7 +164,6 @@ func (rc *Collector) CollectRoundTrades(ctx context.Context, round Round) ([]typ
 	}
 
 	for _, order := range roundOrders {
-		rc.logger.Infof("collect trades from order: %s", order.String())
 		if order.ExecutedQuantity.IsZero() {
 			rc.logger.Info("collect trads from order but no executed quantity ", order.String())
 			continue
