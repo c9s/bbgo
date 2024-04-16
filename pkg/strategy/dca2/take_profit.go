@@ -24,6 +24,7 @@ func (s *Strategy) placeTakeProfitOrders(ctx context.Context) error {
 	roundPosition := types.NewPositionFromMarket(s.Market)
 
 	for _, trade := range trades {
+		s.logger.Infof("add trade into the position of this round %s", trade.String())
 		if trade.FeeProcessing {
 			return fmt.Errorf("failed to place the take-profit order because there is a trade's fee not ready")
 		}
