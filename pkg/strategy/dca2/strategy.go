@@ -93,7 +93,7 @@ type Strategy struct {
 	mu                   sync.Mutex
 	nextStateC           chan State
 	state                State
-	roundCollector       *RoundCollector
+	collector            *Collector
 	takeProfitPrice      fixedpoint.Value
 	startTimeOfNextRound time.Time
 	nextRoundPaused      bool
@@ -192,10 +192,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.OrderGroupID = util.FNV32(instanceID) % math.MaxInt32
 	}
 
-	// round collector
-	s.roundCollector = NewRoundCollector(s.logger, s.Symbol, s.OrderGroupID, s.ExchangeSession.Exchange)
-	if s.roundCollector == nil {
-		return fmt.Errorf("failed to initialize round collector")
+	// collector
+	s.collector = NewCollector(s.logger, s.Symbol, s.OrderGroupID, s.ExchangeSession.Exchange)
+	if s.collector == nil {
+		return fmt.Errorf("failed to initialize collector")
 	}
 
 	// prometheus
@@ -218,6 +218,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	s.OrderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	s.OrderExecutor.SetMaxRetries(10)
 	s.OrderExecutor.BindEnvironment(s.Environment)
 	s.OrderExecutor.Bind()
 
@@ -448,14 +449,14 @@ func (s *Strategy) UpdateProfitStatsUntilSuccessful(ctx context.Context) error {
 // return false, nil -> there is no finished round!
 // return true, error -> At least one round update profit stats successfully but there is error when collecting other rounds
 func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
-	rounds, err := s.roundCollector.CollectFinishRounds(ctx, s.ProfitStats.FromOrderID)
+	rounds, err := s.collector.CollectFinishRounds(ctx, s.ProfitStats.FromOrderID)
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to collect finish rounds from #%d", s.ProfitStats.FromOrderID)
 	}
 
 	var updated bool = false
 	for _, round := range rounds {
-		trades, err := s.roundCollector.CollectRoundTrades(ctx, round)
+		trades, err := s.collector.CollectRoundTrades(ctx, round)
 		if err != nil {
 			return updated, errors.Wrapf(err, "failed to collect the trades of round")
 		}

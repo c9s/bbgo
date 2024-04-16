@@ -6,18 +6,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/exchange"
-	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/sirupsen/logrus"
 )
 
-type RoundCollector struct {
+type Collector struct {
 	logger  *logrus.Entry
 	symbol  string
 	groupID uint32
-	isMax   bool
 
 	// service
 	ex                   types.Exchange
@@ -27,8 +24,7 @@ type RoundCollector struct {
 	queryClosedOrderDesc descendingClosedOrderQueryService
 }
 
-func NewRoundCollector(logger *logrus.Entry, symbol string, groupID uint32, ex types.Exchange) *RoundCollector {
-	isMax := exchange.IsMaxExchange(ex)
+func NewCollector(logger *logrus.Entry, symbol string, groupID uint32, ex types.Exchange) *Collector {
 	historyService, ok := ex.(types.ExchangeTradeHistoryService)
 	if !ok {
 		logger.Errorf("exchange %s doesn't support ExchangeTradeHistoryService", ex.Name())
@@ -53,11 +49,10 @@ func NewRoundCollector(logger *logrus.Entry, symbol string, groupID uint32, ex t
 		return nil
 	}
 
-	return &RoundCollector{
+	return &Collector{
 		logger:               logger,
 		symbol:               symbol,
 		groupID:              groupID,
-		isMax:                isMax,
 		ex:                   ex,
 		historyService:       historyService,
 		queryService:         queryService,
@@ -66,7 +61,7 @@ func NewRoundCollector(logger *logrus.Entry, symbol string, groupID uint32, ex t
 	}
 }
 
-func (rc RoundCollector) CollectCurrentRound(ctx context.Context) (Round, error) {
+func (rc Collector) CollectCurrentRound(ctx context.Context) (Round, error) {
 	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, rc.ex, rc.symbol)
 	if err != nil {
 		return Round{}, err
@@ -119,7 +114,7 @@ func (rc RoundCollector) CollectCurrentRound(ctx context.Context) (Round, error)
 	return currentRound, nil
 }
 
-func (rc *RoundCollector) CollectFinishRounds(ctx context.Context, fromOrderID uint64) ([]Round, error) {
+func (rc *Collector) CollectFinishRounds(ctx context.Context, fromOrderID uint64) ([]Round, error) {
 	// TODO: pagination for it
 	// query the orders
 	rc.logger.Infof("query %s closed orders from order id #%d", rc.symbol, fromOrderID)
@@ -141,16 +136,9 @@ func (rc *RoundCollector) CollectFinishRounds(ctx context.Context, fromOrderID u
 		case types.SideTypeBuy:
 			round.OpenPositionOrders = append(round.OpenPositionOrders, order)
 		case types.SideTypeSell:
-			if !rc.isMax {
-				if order.Status != types.OrderStatusFilled {
-					rc.logger.Infof("take-profit order is %s not filled, so this round is not finished. Skip it", order.Status)
-					continue
-				}
-			} else {
-				if !maxapi.IsFilledOrderState(maxapi.OrderState(order.OriginalStatus)) {
-					rc.logger.Infof("isMax and take-profit order is %s not done or finalizing, so this round is not finished. Skip it", order.OriginalStatus)
-					continue
-				}
+			if order.Status != types.OrderStatusFilled {
+				rc.logger.Infof("take-profit order is %s not filled, so this round is not finished. Skip it", order.Status)
+				continue
 			}
 
 			round.TakeProfitOrder = order
@@ -164,7 +152,7 @@ func (rc *RoundCollector) CollectFinishRounds(ctx context.Context, fromOrderID u
 	return rounds, nil
 }
 
-func (rc *RoundCollector) CollectRoundTrades(ctx context.Context, round Round) ([]types.Trade, error) {
+func (rc *Collector) CollectRoundTrades(ctx context.Context, round Round) ([]types.Trade, error) {
 	debugRoundOrders(rc.logger, "collect round trades", round)
 
 	var roundTrades []types.Trade
@@ -176,7 +164,6 @@ func (rc *RoundCollector) CollectRoundTrades(ctx context.Context, round Round) (
 	}
 
 	for _, order := range roundOrders {
-		rc.logger.Infof("collect trades from order: %s", order.String())
 		if order.ExecutedQuantity.IsZero() {
 			rc.logger.Info("collect trads from order but no executed quantity ", order.String())
 			continue

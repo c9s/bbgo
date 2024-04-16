@@ -7,6 +7,10 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
+const (
+	openPositionRetryInterval = 10 * time.Minute
+)
+
 type State int64
 
 const (
@@ -142,7 +146,6 @@ func (s *Strategy) runWaitToOpenPositionState(ctx context.Context, next State) {
 	}
 
 	if time.Now().Before(s.startTimeOfNextRound) {
-		s.logger.Infof("[State] WaitToOpenPosition - before the startTimeOfNextRound %s", s.startTimeOfNextRound.String())
 		return
 	}
 
@@ -152,11 +155,13 @@ func (s *Strategy) runWaitToOpenPositionState(ctx context.Context, next State) {
 
 func (s *Strategy) runPositionOpening(ctx context.Context, next State) {
 	s.logger.Info("[State] PositionOpening - start placing open-position orders")
+
 	if err := s.placeOpenPositionOrders(ctx); err != nil {
-		s.logger.WithError(err).Error("failed to place dca orders, please check it.")
+		s.logger.WithError(err).Error("failed to place open-position orders, please check it.")
 
 		// try after 1 minute when failed to placing orders
-		s.startTimeOfNextRound = s.startTimeOfNextRound.Add(1 * time.Minute)
+		s.startTimeOfNextRound = s.startTimeOfNextRound.Add(openPositionRetryInterval)
+		s.logger.Infof("reset startTimeOfNextRound to %s", s.startTimeOfNextRound.String())
 		s.updateState(WaitToOpenPosition)
 		return
 	}
@@ -224,5 +229,5 @@ func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 	// set the start time of the next round
 	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())
 	s.updateState(WaitToOpenPosition)
-	s.logger.Info("[State] TakeProfitReady -> WaitToOpenPosition")
+	s.logger.Infof("[State] TakeProfitReady -> WaitToOpenPosition (startTimeOfNextRound: %s)", s.startTimeOfNextRound.String())
 }
