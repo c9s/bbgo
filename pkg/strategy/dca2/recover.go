@@ -16,15 +16,9 @@ type descendingClosedOrderQueryService interface {
 	QueryClosedOrdersDesc(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error)
 }
 
-type RecoverApiQueryService interface {
-	types.ExchangeOrderQueryService
-	types.ExchangeTradeService
-	descendingClosedOrderQueryService
-}
-
 func (s *Strategy) recover(ctx context.Context) error {
 	s.logger.Info("[DCA] recover")
-	currentRound, err := s.roundCollector.CollectCurrentRound(ctx)
+	currentRound, err := s.collector.CollectCurrentRound(ctx)
 	debugRoundOrders(s.logger, "current", currentRound)
 
 	// recover profit stats
@@ -41,12 +35,7 @@ func (s *Strategy) recover(ctx context.Context) error {
 	if s.DisablePositionRecover {
 		s.logger.Info("disablePositionRecover is set, skip position recovery")
 	} else {
-		queryService, ok := s.ExchangeSession.Exchange.(RecoverApiQueryService)
-		if !ok {
-			return fmt.Errorf("[DCA] exchange %s doesn't support queryAPI interface", s.ExchangeSession.ExchangeName)
-		}
-
-		if err := recoverPosition(ctx, s.Position, queryService, currentRound); err != nil {
+		if err := recoverPosition(ctx, s.Position, currentRound, s.collector.queryService); err != nil {
 			return err
 		}
 		s.logger.Info("recover position DONE")
@@ -145,7 +134,7 @@ func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, or
 	return None, fmt.Errorf("unexpected order status combination (opened, filled, cancelled) = (%d, %d, %d)", openedCnt, filledCnt, cancelledCnt)
 }
 
-func recoverPosition(ctx context.Context, position *types.Position, queryService RecoverApiQueryService, currentRound Round) error {
+func recoverPosition(ctx context.Context, position *types.Position, currentRound Round, queryService types.ExchangeOrderQueryService) error {
 	if position == nil {
 		return fmt.Errorf("position is nil, please check it")
 	}
