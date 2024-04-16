@@ -11,12 +11,12 @@ import (
 
 func (s *Strategy) placeTakeProfitOrders(ctx context.Context) error {
 	s.logger.Info("start placing take profit orders")
-	currentRound, err := s.roundCollector.CollectCurrentRound(ctx)
+	currentRound, err := s.collector.CollectCurrentRound(ctx)
 	if currentRound.TakeProfitOrder.OrderID != 0 {
 		return fmt.Errorf("there is a take-profit order before placing the take-profit order, please check it")
 	}
 
-	trades, err := s.roundCollector.CollectRoundTrades(ctx, currentRound)
+	trades, err := s.collector.CollectRoundTrades(ctx, currentRound)
 	if err != nil {
 		return errors.Wrap(err, "failed to place the take-profit order when collecting round trades")
 	}
@@ -24,6 +24,7 @@ func (s *Strategy) placeTakeProfitOrders(ctx context.Context) error {
 	roundPosition := types.NewPositionFromMarket(s.Market)
 
 	for _, trade := range trades {
+		s.logger.Infof("add trade into the position of this round %s", trade.String())
 		if trade.FeeProcessing {
 			return fmt.Errorf("failed to place the take-profit order because there is a trade's fee not ready")
 		}
