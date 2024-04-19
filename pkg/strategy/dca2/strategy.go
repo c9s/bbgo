@@ -100,7 +100,8 @@ type Strategy struct {
 
 	// callbacks
 	common.StatusCallbacks
-	profitCallbacks []func(*ProfitStats)
+	profitCallbacks   []func(*ProfitStats)
+	positionCallbacks []func(*types.Position)
 }
 
 func (s *Strategy) ID() string {
@@ -229,6 +230,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		// update take profit price here
 		s.updateTakeProfitPrice()
+
+		// emit position update
+		s.EmitPosition(position)
 	})
 
 	s.OrderExecutor.ActiveMakerOrders().OnFilled(func(o types.Order) {
