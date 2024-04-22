@@ -326,6 +326,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 				s.logger.Infof("profit stats %s", s.ProfitStats.String())
 				s.logger.Infof("startTimeOfNextRound %s", s.startTimeOfNextRound)
 
+				// emit position after recovery
+				s.OrderExecutor.TradeCollector().EmitPositionUpdate(s.Position)
+
 				s.updateTakeProfitPrice()
 
 				// store persistence
@@ -340,7 +343,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		})
 	})
 
-	go s.runBackgroundTask(ctx)
+	go s.syncPeriodically(ctx)
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
