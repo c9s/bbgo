@@ -4,30 +4,38 @@ import (
 	"context"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-func (s *Strategy) recoverPeriodically(ctx context.Context) {
-	s.logger.Info("monitor and recover periodically")
-	interval := util.MillisecondsJitter(10*time.Minute, 5*60*1000)
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+func (s *Strategy) syncPeriodically(ctx context.Context) {
+	s.logger.Info("sync periodically")
+
+	// sync persistence
+	syncPersistenceTicker := time.NewTicker(1 * time.Hour)
+	defer syncPersistenceTicker.Stop()
+
+	// sync active orders
+	syncActiveOrdersTicker := time.NewTicker(util.MillisecondsJitter(10*time.Minute, 5*60*1000))
+	defer syncActiveOrdersTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			if err := s.recoverActiveOrders(ctx); err != nil {
-				s.logger.WithError(err).Warn(err, "failed to recover active orders")
+		case <-syncPersistenceTicker.C:
+			bbgo.Sync(ctx, s)
+		case <-syncActiveOrdersTicker.C:
+			if err := s.syncActiveOrders(ctx); err != nil {
+				s.logger.WithError(err).Warn(err, "failed to sync active orders")
 			}
 		}
 	}
 }
 
-func (s *Strategy) recoverActiveOrders(ctx context.Context) error {
+func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 	s.logger.Info("recover active orders...")
 	openOrders, err := retry.QueryOpenOrdersUntilSuccessfulLite(ctx, s.ExchangeSession.Exchange, s.Symbol)
 	if err != nil {
