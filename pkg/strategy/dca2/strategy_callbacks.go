@@ -16,12 +16,12 @@ func (s *Strategy) EmitProfit(profitStats *ProfitStats) {
 	}
 }
 
-func (s *Strategy) OnPosition(cb func(*types.Position)) {
-	s.positionCallbacks = append(s.positionCallbacks, cb)
+func (s *Strategy) OnPositionUpdate(cb func(*types.Position)) {
+	s.positionUpdateCallbacks = append(s.positionUpdateCallbacks, cb)
 }
 
-func (s *Strategy) EmitPosition(position *types.Position) {
-	for _, cb := range s.positionCallbacks {
+func (s *Strategy) EmitPositionUpdate(position *types.Position) {
+	for _, cb := range s.positionUpdateCallbacks {
 		cb(position)
 	}
 }
