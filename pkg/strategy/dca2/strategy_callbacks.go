@@ -2,6 +2,10 @@
 
 package dca2
 
+import (
+	"github.com/c9s/bbgo/pkg/types"
+)
+
 func (s *Strategy) OnProfit(cb func(*ProfitStats)) {
 	s.profitCallbacks = append(s.profitCallbacks, cb)
 }
@@ -9,5 +13,15 @@ func (s *Strategy) OnProfit(cb func(*ProfitStats)) {
 func (s *Strategy) EmitProfit(profitStats *ProfitStats) {
 	for _, cb := range s.profitCallbacks {
 		cb(profitStats)
+	}
+}
+
+func (s *Strategy) OnPositionUpdate(cb func(*types.Position)) {
+	s.positionUpdateCallbacks = append(s.positionUpdateCallbacks, cb)
+}
+
+func (s *Strategy) EmitPositionUpdate(position *types.Position) {
+	for _, cb := range s.positionUpdateCallbacks {
+		cb(position)
 	}
 }
