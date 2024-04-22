@@ -41,7 +41,8 @@ type Strategy struct {
 
 	LiquidityUpdateInterval types.Interval `json:"liquidityUpdateInterval"`
 
-	AdjustmentUpdateInterval types.Interval `json:"adjustmentUpdateInterval"`
+	AdjustmentUpdateInterval   types.Interval   `json:"adjustmentUpdateInterval"`
+	MaxAdjustmentOrderQuantity fixedpoint.Value `json:"maxAdjustmentOrderQuantity"`
 
 	NumOfLiquidityLayers int              `json:"numOfLiquidityLayers"`
 	LiquiditySlideRule   *bbgo.SlideRule  `json:"liquidityScale"`
@@ -171,6 +172,11 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 	var adjOrders []types.SubmitOrder
 
 	posSize := s.Position.Base.Abs()
+
+	if !s.MaxAdjustmentOrderQuantity.IsZero() {
+		posSize = fixedpoint.Min(posSize, s.MaxAdjustmentOrderQuantity)
+	}
+
 	tickSize := s.Market.TickSize
 
 	if s.Position.IsShort() {
