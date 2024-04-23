@@ -9,9 +9,10 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator/v2"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 const ID = "emacross"
@@ -85,10 +86,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			opts.Tags = []string{"emaCrossOver"}
 
 			_, err := s.Strategy.OrderExecutor.OpenPosition(ctx, opts)
-			logErr(err, "unable to open position")
+			util.LogErr(err, "unable to open position")
 		case indicatorv2.CrossUnder:
 			err := s.Strategy.OrderExecutor.ClosePosition(ctx, fixedpoint.One)
-			logErr(err, "unable to submit close position order")
+			util.LogErr(err, "unable to submit close position order")
 		}
 	})
 
@@ -97,22 +98,4 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	return nil
-}
-
-func logErr(err error, msgAndArgs ...interface{}) bool {
-	if err == nil {
-		return false
-	}
-
-	if len(msgAndArgs) == 0 {
-		log.WithError(err).Error(err.Error())
-	} else if len(msgAndArgs) == 1 {
-		msg := msgAndArgs[0].(string)
-		log.WithError(err).Error(msg)
-	} else if len(msgAndArgs) > 1 {
-		msg := msgAndArgs[0].(string)
-		log.WithError(err).Errorf(msg, msgAndArgs[1:]...)
-	}
-
-	return true
 }
