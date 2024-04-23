@@ -283,13 +283,13 @@ func (c *RestClient) newAuthenticatedRequest(
 	return req, nil
 }
 
-// ErrorResponse is the custom error type that is returned if the API returns an
-// error.
 type ErrorField struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
+// ErrorResponse is the custom error type that is returned if the API returns an
+// error.
 type ErrorResponse struct {
 	*requestgen.Response
 	Err ErrorField `json:"error"`
