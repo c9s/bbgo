@@ -12,6 +12,7 @@ import (
 	. "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 const ID = "liquiditymaker"
@@ -138,11 +139,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		defer wg.Done()
 
 		if err := s.liquidityOrderBook.GracefulCancel(ctx, s.Session.Exchange); err != nil {
-			logErr(err, "unable to cancel liquidity orders")
+			util.LogErr(err, "unable to cancel liquidity orders")
 		}
 
 		if err := s.adjustmentOrderBook.GracefulCancel(ctx, s.Session.Exchange); err != nil {
-			logErr(err, "unable to cancel adjustment orders")
+			util.LogErr(err, "unable to cancel adjustment orders")
 		}
 	})
 
@@ -157,12 +158,12 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 	}
 
 	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
-	if logErr(err, "unable to query ticker") {
+	if util.LogErr(err, "unable to query ticker") {
 		return
 	}
 
 	if _, err := s.Session.UpdateAccount(ctx); err != nil {
-		logErr(err, "unable to update account")
+		util.LogErr(err, "unable to update account")
 		return
 	}
 
@@ -217,7 +218,7 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 	}
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, adjOrders...)
-	if logErr(err, "unable to place liquidity orders") {
+	if util.LogErr(err, "unable to place liquidity orders") {
 		return
 	}
 
@@ -226,12 +227,12 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 
 func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	err := s.liquidityOrderBook.GracefulCancel(ctx, s.Session.Exchange)
-	if logErr(err, "unable to cancel orders") {
+	if util.LogErr(err, "unable to cancel orders") {
 		return
 	}
 
 	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
-	if logErr(err, "unable to query ticker") {
+	if util.LogErr(err, "unable to query ticker") {
 		return
 	}
 
@@ -241,7 +242,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	}
 
 	if _, err := s.Session.UpdateAccount(ctx); err != nil {
-		logErr(err, "unable to update account")
+		util.LogErr(err, "unable to update account")
 		return
 	}
 
@@ -316,7 +317,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	orderForms := append(bidOrders, askOrders...)
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
-	if logErr(err, "unable to place liquidity orders") {
+	if util.LogErr(err, "unable to place liquidity orders") {
 		return
 	}
 
@@ -357,24 +358,6 @@ func filterAskOrders(askOrders []types.SubmitOrder, available fixedpoint.Value) 
 	}
 
 	return out
-}
-
-func logErr(err error, msgAndArgs ...interface{}) bool {
-	if err == nil {
-		return false
-	}
-
-	if len(msgAndArgs) == 0 {
-		log.WithError(err).Error(err.Error())
-	} else if len(msgAndArgs) == 1 {
-		msg := msgAndArgs[0].(string)
-		log.WithError(err).Error(msg)
-	} else if len(msgAndArgs) > 1 {
-		msg := msgAndArgs[0].(string)
-		log.WithError(err).Errorf(msg, msgAndArgs[1:]...)
-	}
-
-	return true
 }
 
 func preloadKLines(
