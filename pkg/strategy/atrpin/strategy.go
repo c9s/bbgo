@@ -184,6 +184,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		log.Infof("%s bid/ask: %f/%f", s.Symbol, bidPrice.Float64(), askPrice.Float64())
 
+		log.Infof("submit orders: %+v", orderForms)
 		if _, err := s.Strategy.OrderExecutor.SubmitOrders(ctx, orderForms...); err != nil {
 			log.WithError(err).Errorf("unable to submit orders: %+v", orderForms)
 		}
