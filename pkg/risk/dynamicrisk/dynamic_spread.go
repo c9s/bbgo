@@ -56,7 +56,7 @@ func (ds *DynamicSpread) GetBidSpread() (bidSpread float64, err error) {
 	}
 }
 
-// DynamicSpreadAmp uses kline amplitude to calculate spreads
+// DynamicAmpSpread uses kline amplitude to calculate spreads
 type DynamicAmpSpread struct {
 	types.IntervalWindow
 
