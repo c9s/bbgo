@@ -417,7 +417,7 @@ func (s *Strategy) aggregateOrderQuoteAmountAndFee(o types.Order) (fixedpoint.Va
 		s.logger.Warnf("GRID: missing #%d order trades or missing trade fee, pulling order trades from API", o.OrderID)
 
 		// if orderQueryService is supported, use it to query the trades of the filled order
-		apiOrderTrades, err := s.orderQueryService.QueryOrderTrades(context.Background(), types.OrderQuery{
+		apiOrderTrades, err := retry.QueryOrderTradesUntilSuccessful(context.Background(), s.orderQueryService, types.OrderQuery{
 			Symbol:  o.Symbol,
 			OrderID: strconv.FormatUint(o.OrderID, 10),
 		})
