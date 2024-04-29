@@ -156,11 +156,17 @@ func QueryClosedOrdersUntilSuccessfulLite(
 	return closedOrders, err
 }
 
+// QueryOrderTradesUntilSuccessful query order's trades until success (include the trading fee is not processing)
 func QueryOrderTradesUntilSuccessful(
 	ctx context.Context, ex types.ExchangeOrderQueryService, q types.OrderQuery,
 ) (trades []types.Trade, err error) {
 	var op = func() (err2 error) {
 		trades, err2 = ex.QueryOrderTrades(ctx, q)
+		for _, trade := range trades {
+			if trade.FeeProcessing {
+				return fmt.Errorf("there are some trades which trading fee is not ready")
+			}
+		}
 		return err2
 	}
 
@@ -168,11 +174,17 @@ func QueryOrderTradesUntilSuccessful(
 	return trades, err
 }
 
+// QueryOrderTradesUntilSuccessfulLite query order's trades until success (include the trading fee is not processing)
 func QueryOrderTradesUntilSuccessfulLite(
 	ctx context.Context, ex types.ExchangeOrderQueryService, q types.OrderQuery,
 ) (trades []types.Trade, err error) {
 	var op = func() (err2 error) {
 		trades, err2 = ex.QueryOrderTrades(ctx, q)
+		for _, trade := range trades {
+			if trade.FeeProcessing {
+				return fmt.Errorf("there are some trades which trading fee is not ready")
+			}
+		}
 		return err2
 	}
 
