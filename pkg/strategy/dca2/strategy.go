@@ -318,6 +318,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 							s.logger.Errorf("failed to recover after %d trying, please check it", maxTry)
 							return
 						}
+
+						// sleep 10 second to retry the recovery
+						time.Sleep(10 * time.Second)
 					}
 				}
 
@@ -337,13 +340,14 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 				// ready
 				s.EmitReady()
 
+				// start to sync periodically
+				go s.syncPeriodically(ctx)
+
 				// start running state machine
 				s.runState(ctx)
 			}
 		})
 	})
-
-	go s.syncPeriodically(ctx)
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -456,6 +460,7 @@ func (s *Strategy) UpdateProfitStatsUntilSuccessful(ctx context.Context) error {
 // return false, nil -> there is no finished round!
 // return true, error -> At least one round update profit stats successfully but there is error when collecting other rounds
 func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
+	s.logger.Info("update profit stats")
 	rounds, err := s.collector.CollectFinishRounds(ctx, s.ProfitStats.FromOrderID)
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to collect finish rounds from #%d", s.ProfitStats.FromOrderID)
