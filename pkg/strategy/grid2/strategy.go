@@ -383,7 +383,7 @@ func (s *Strategy) verifyOrderTrades(o types.Order, trades []types.Trade) bool {
 	return true
 }
 
-// aggregateOrderQuoteAmountAndBaseFee collects the base fee quantity from the given order
+// aggregateOrderQuoteAmountAndFee collects the base fee quantity from the given order
 // it falls back to query the trades via the RESTful API when the websocket trades are not all received.
 func (s *Strategy) aggregateOrderQuoteAmountAndFee(o types.Order) (fixedpoint.Value, fixedpoint.Value, string) {
 	// try to get the received trades (websocket trades)
