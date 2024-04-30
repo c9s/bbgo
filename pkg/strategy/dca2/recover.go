@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
 )
 
 var recoverSinceLimit = time.Date(2024, time.January, 29, 12, 0, 0, 0, time.Local)
@@ -139,9 +141,12 @@ func recoverPosition(ctx context.Context, position *types.Position, currentRound
 		return fmt.Errorf("position is nil, please check it")
 	}
 
-	var positionOrders []types.Order
+	// reset position to recover
 	position.Reset()
+
+	var positionOrders []types.Order
 	if currentRound.TakeProfitOrder.OrderID != 0 {
+		// if the take-profit order is already filled, the position is 0
 		if !types.IsActiveOrder(currentRound.TakeProfitOrder) {
 			return nil
 		}
@@ -159,15 +164,14 @@ func recoverPosition(ctx context.Context, position *types.Position, currentRound
 	}
 
 	for _, positionOrder := range positionOrders {
-		trades, err := queryService.QueryOrderTrades(ctx, types.OrderQuery{
+		trades, err := retry.QueryOrderTradesUntilSuccessful(ctx, queryService, types.OrderQuery{
 			Symbol:  position.Symbol,
 			OrderID: strconv.FormatUint(positionOrder.OrderID, 10),
 		})
 
 		if err != nil {
-			return fmt.Errorf("failed to get trades of order (%d)", positionOrder.OrderID)
+			return errors.Wrapf(err, "failed to get order (%d) trades", positionOrder.OrderID)
 		}
-
 		position.AddTrades(trades)
 	}
 

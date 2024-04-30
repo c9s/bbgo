@@ -152,6 +152,7 @@ func (rc *Collector) CollectFinishRounds(ctx context.Context, fromOrderID uint64
 	return rounds, nil
 }
 
+// CollectRoundTrades collect the trades of the orders in the given round. The trades' fee are processed (feeProcessing = false)
 func (rc *Collector) CollectRoundTrades(ctx context.Context, round Round) ([]types.Trade, error) {
 	debugRoundOrders(rc.logger, "collect round trades", round)
 
@@ -171,7 +172,8 @@ func (rc *Collector) CollectRoundTrades(ctx context.Context, round Round) ([]typ
 			rc.logger.Info("collect trades from order ", order.String())
 		}
 
-		trades, err := retry.QueryOrderTradesUntilSuccessfulLite(ctx, rc.queryService, types.OrderQuery{
+		// QueryOrderTradesUntilSuccessful will query trades and their feeProcessing = false
+		trades, err := retry.QueryOrderTradesUntilSuccessful(ctx, rc.queryService, types.OrderQuery{
 			Symbol:  order.Symbol,
 			OrderID: strconv.FormatUint(order.OrderID, 10),
 		})
