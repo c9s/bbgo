@@ -317,7 +317,7 @@ func queryTradesToUpdateTwinOrderBook(
 	var fromTradeID uint64 = 0
 	var limit int64 = 1000
 	for {
-		trades, err := queryTradesService.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
+		trades, err := retry.QueryTradesUntilSuccessful(ctx, queryTradesService, symbol, &types.TradeQueryOptions{
 			StartTime:   &since,
 			EndTime:     &until,
 			LastTradeID: fromTradeID,
