@@ -87,10 +87,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		baseBalance, ok := account.Balance(s.Market.BaseCurrency)
 		if !ok {
 			log.Errorf("%s balance not found", s.Market.BaseCurrency)
+			return
 		}
 		quoteBalance, ok := account.Balance(s.Market.QuoteCurrency)
 		if !ok {
 			log.Errorf("%s balance not found", s.Market.QuoteCurrency)
+			return
 		}
 
 		lastAtr := atr.Last(0)
@@ -203,6 +205,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if err := s.Strategy.OrderExecutor.GracefulCancel(ctx); err != nil {
 			log.WithError(err).Error("unable to cancel open orders...")
 		}
+
+		bbgo.Sync(ctx, s)
 	})
 
 	return nil
