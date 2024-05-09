@@ -75,6 +75,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
 		if err := s.Strategy.OrderExecutor.GracefulCancel(ctx); err != nil {
 			log.WithError(err).Error("unable to cancel open orders...")
+			return
 		}
 
 		account, err := session.UpdateAccount(ctx)
@@ -83,8 +84,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			return
 		}
 
-		baseBalance, _ := account.Balance(s.Market.BaseCurrency)
-		quoteBalance, _ := account.Balance(s.Market.QuoteCurrency)
+		baseBalance, ok := account.Balance(s.Market.BaseCurrency)
+		if !ok {
+			log.Errorf("%s balance not found", s.Market.BaseCurrency)
+			return
+		}
+		quoteBalance, ok := account.Balance(s.Market.QuoteCurrency)
+		if !ok {
+			log.Errorf("%s balance not found", s.Market.QuoteCurrency)
+			return
+		}
 
 		lastAtr := atr.Last(0)
 		log.Infof("atr: %f", lastAtr)
@@ -196,6 +205,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		if err := s.Strategy.OrderExecutor.GracefulCancel(ctx); err != nil {
 			log.WithError(err).Error("unable to cancel open orders...")
 		}
+
+		bbgo.Sync(ctx, s)
 	})
 
 	return nil
