@@ -79,9 +79,6 @@ type Strategy struct {
 	// UseCancelAllOrdersApiWhenClose uses a different API to cancel all the orders on the market when closing a grid
 	UseCancelAllOrdersApiWhenClose bool `json:"useCancelAllOrdersApiWhenClose"`
 
-	// dev mode
-	DevMode *DevMode `json:"devMode"`
-
 	// log
 	logger    *logrus.Entry
 	LogFields logrus.Fields `json:"logFields"`
@@ -179,12 +176,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.Position = types.NewPositionFromMarket(s.Market)
 	}
 
-	// if dev mode is on and it's not a new strategy
-	if s.DevMode != nil && s.DevMode.Enabled && !s.DevMode.IsNewAccount {
-		s.ProfitStats = newProfitStats(s.Market, s.QuoteInvestment)
-		s.Position = types.NewPositionFromMarket(s.Market)
-	}
-
 	// set ttl for persistence
 	s.Position.SetTTL(s.PersistenceTTL.Duration())
 	s.ProfitStats.SetTTL(s.PersistenceTTL.Duration())
@@ -219,7 +210,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	s.OrderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
-	s.OrderExecutor.SetMaxRetries(10)
+	s.OrderExecutor.SetMaxRetries(50)
 	s.OrderExecutor.BindEnvironment(s.Environment)
 	s.OrderExecutor.Bind()
 
@@ -271,23 +262,25 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	session.MarketDataStream.OnKLine(func(kline types.KLine) {
-		// check price here
-		if s.state != OpenPositionOrderFilled {
+		switch s.state {
+		case WaitToOpenPosition:
+			s.emitNextState(PositionOpening)
+		case OpenPositionOrderFilled:
+			if s.takeProfitPrice.IsZero() {
+				s.logger.Warn("take profit price should not be 0 when there is at least one open-position order filled, please check it")
+				return
+			}
+
+			compRes := kline.Close.Compare(s.takeProfitPrice)
+			// price doesn't hit the take profit price
+			if compRes < 0 {
+				return
+			}
+
+			s.emitNextState(OpenPositionOrdersCancelling)
+		default:
 			return
 		}
-
-		if s.takeProfitPrice.IsZero() {
-			s.logger.Warn("take profit price should not be 0 when there is at least one open-position order filled, please check it")
-			return
-		}
-
-		compRes := kline.Close.Compare(s.takeProfitPrice)
-		// price doesn't hit the take profit price
-		if compRes < 0 {
-			return
-		}
-
-		s.emitNextState(OpenPositionOrdersCancelling)
 	})
 
 	session.UserDataStream.OnAuth(func() {
@@ -298,7 +291,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 				// no need to recover when two situation
 				// 1. recoverWhenStart is false
 				// 2. dev mode is on and it's not new strategy
-				if !s.RecoverWhenStart || (s.DevMode != nil && s.DevMode.Enabled && !s.DevMode.IsNewAccount) {
+				if !s.RecoverWhenStart {
 					s.updateState(WaitToOpenPosition)
 				} else {
 					// recover
