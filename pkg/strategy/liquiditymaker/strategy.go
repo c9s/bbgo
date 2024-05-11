@@ -13,6 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
 
 const ID = "liquiditymaker"
@@ -50,6 +51,8 @@ type Strategy struct {
 	LiquidityPriceRange  fixedpoint.Value `json:"liquidityPriceRange"`
 	AskLiquidityAmount   fixedpoint.Value `json:"askLiquidityAmount"`
 	BidLiquidityAmount   fixedpoint.Value `json:"bidLiquidityAmount"`
+
+	UseProtectedPriceRange bool `json:"useProtectedPriceRange"`
 
 	UseLastTradePrice bool             `json:"useLastTradePrice"`
 	Spread            fixedpoint.Value `json:"spread"`
@@ -144,6 +147,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		if err := s.adjustmentOrderBook.GracefulCancel(ctx, s.Session.Exchange); err != nil {
 			util.LogErr(err, "unable to cancel adjustment orders")
+		}
+
+		if err := tradingutil.UniversalCancelAllOrders(ctx, s.Session.Exchange, nil); err != nil {
+			util.LogErr(err, "unable to cancel all orders")
 		}
 	})
 
@@ -265,7 +272,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	currentSpread := ticker.Sell.Sub(ticker.Buy)
 	sideSpread := s.Spread.Div(fixedpoint.Two)
 
-	if s.UseLastTradePrice {
+	if s.UseLastTradePrice && !lastTradedPrice.IsZero() {
 		midPrice = lastTradedPrice
 	}
 
@@ -292,9 +299,17 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		if s.Position.IsLong() {
 			availableBase = availableBase.Sub(s.Position.Base)
 			availableBase = s.Market.RoundDownQuantityByPrecision(availableBase)
+
+			if s.UseProtectedPriceRange {
+				ask1Price = profitProtectedPrice(types.SideTypeSell, s.Position.AverageCost, ask1Price, s.Session.MakerFeeRate, s.MinProfit)
+			}
 		} else if s.Position.IsShort() {
 			posSizeInQuote := s.Position.Base.Mul(ticker.Sell)
 			availableQuote = availableQuote.Sub(posSizeInQuote)
+
+			if s.UseProtectedPriceRange {
+				bid1Price = profitProtectedPrice(types.SideTypeBuy, s.Position.AverageCost, bid1Price, s.Session.MakerFeeRate, s.MinProfit)
+			}
 		}
 	}
 
