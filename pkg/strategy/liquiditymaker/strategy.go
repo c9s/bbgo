@@ -52,6 +52,8 @@ type Strategy struct {
 	AskLiquidityAmount   fixedpoint.Value `json:"askLiquidityAmount"`
 	BidLiquidityAmount   fixedpoint.Value `json:"bidLiquidityAmount"`
 
+	UseProtectedPriceRange bool `json:"useProtectedPriceRange"`
+
 	UseLastTradePrice bool             `json:"useLastTradePrice"`
 	Spread            fixedpoint.Value `json:"spread"`
 	MaxPrice          fixedpoint.Value `json:"maxPrice"`
@@ -270,7 +272,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	currentSpread := ticker.Sell.Sub(ticker.Buy)
 	sideSpread := s.Spread.Div(fixedpoint.Two)
 
-	if s.UseLastTradePrice {
+	if s.UseLastTradePrice && !lastTradedPrice.IsZero() {
 		midPrice = lastTradedPrice
 	}
 
@@ -297,9 +299,17 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		if s.Position.IsLong() {
 			availableBase = availableBase.Sub(s.Position.Base)
 			availableBase = s.Market.RoundDownQuantityByPrecision(availableBase)
+
+			if s.UseProtectedPriceRange {
+				ask1Price = profitProtectedPrice(types.SideTypeSell, s.Position.AverageCost, ask1Price, s.Session.MakerFeeRate, s.MinProfit)
+			}
 		} else if s.Position.IsShort() {
 			posSizeInQuote := s.Position.Base.Mul(ticker.Sell)
 			availableQuote = availableQuote.Sub(posSizeInQuote)
+
+			if s.UseProtectedPriceRange {
+				bid1Price = profitProtectedPrice(types.SideTypeBuy, s.Position.AverageCost, bid1Price, s.Session.MakerFeeRate, s.MinProfit)
+			}
 		}
 	}
 
