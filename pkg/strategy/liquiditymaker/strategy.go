@@ -13,6 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
 
 const ID = "liquiditymaker"
@@ -144,6 +145,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		if err := s.adjustmentOrderBook.GracefulCancel(ctx, s.Session.Exchange); err != nil {
 			util.LogErr(err, "unable to cancel adjustment orders")
+		}
+
+		if err := tradingutil.UniversalCancelAllOrders(ctx, s.Session.Exchange, nil); err != nil {
+			util.LogErr(err, "unable to cancel all orders")
 		}
 	})
 
