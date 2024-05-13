@@ -334,6 +334,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 				// start to sync periodically
 				go s.syncPeriodically(ctx)
 
+				// try to trigger position opening immediately
+				if s.state == WaitToOpenPosition {
+					s.emitNextState(PositionOpening)
+				}
+
 				// start running state machine
 				s.runState(ctx)
 			}
