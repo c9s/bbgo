@@ -74,7 +74,7 @@ func (s *Strategy) emitNextState(nextState State) {
 // TakeProfitReady -> the takeProfit order filled ->
 func (s *Strategy) runState(ctx context.Context) {
 	s.logger.Info("[DCA] runState")
-	stateTriggerTicker := time.NewTicker(3 * time.Minute)
+	stateTriggerTicker := time.NewTicker(1 * time.Minute)
 	defer stateTriggerTicker.Stop()
 
 	for {

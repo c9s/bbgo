@@ -263,8 +263,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	session.MarketDataStream.OnKLine(func(kline types.KLine) {
 		switch s.state {
-		case WaitToOpenPosition:
-			s.emitNextState(PositionOpening)
 		case OpenPositionOrderFilled:
 			if s.takeProfitPrice.IsZero() {
 				s.logger.Warn("take profit price should not be 0 when there is at least one open-position order filled, please check it")
