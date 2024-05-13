@@ -74,7 +74,7 @@ func (s *Strategy) emitNextState(nextState State) {
 // TakeProfitReady -> the takeProfit order filled ->
 func (s *Strategy) runState(ctx context.Context) {
 	s.logger.Info("[DCA] runState")
-	stateTriggerTicker := time.NewTicker(5 * time.Second)
+	stateTriggerTicker := time.NewTicker(1 * time.Minute)
 	defer stateTriggerTicker.Stop()
 
 	for {
@@ -83,7 +83,7 @@ func (s *Strategy) runState(ctx context.Context) {
 			s.logger.Info("[DCA] runState DONE")
 			return
 		case <-stateTriggerTicker.C:
-			// s.logger.Infof("[DCA] triggerNextState current state: %d", s.state)
+			// move triggerNextState to the end of next state handler, this ticker is used to avoid the state is stopped unexpectedly
 			s.triggerNextState()
 		case nextState := <-s.nextStateC:
 			// next state == current state -> skip
@@ -120,6 +120,8 @@ func (s *Strategy) runState(ctx context.Context) {
 			case TakeProfitReady:
 				s.runTakeProfitReady(ctx, nextState)
 			}
+
+			s.triggerNextState()
 		}
 	}
 }
@@ -178,9 +180,6 @@ func (s *Strategy) runOpenPositionReady(_ context.Context, next State) {
 func (s *Strategy) runOpenPositionOrderFilled(_ context.Context, next State) {
 	s.updateState(OpenPositionOrdersCancelling)
 	s.logger.Info("[State] OpenPositionOrderFilled -> OpenPositionOrdersCancelling")
-
-	// after open position cancelling, immediately trigger open position cancelled to cancel the other orders
-	s.emitNextState(OpenPositionOrdersCancelled)
 }
 
 func (s *Strategy) runOpenPositionOrdersCancelling(ctx context.Context, next State) {
@@ -191,9 +190,6 @@ func (s *Strategy) runOpenPositionOrdersCancelling(ctx context.Context, next Sta
 	}
 	s.updateState(OpenPositionOrdersCancelled)
 	s.logger.Info("[State] OpenPositionOrdersCancelling -> OpenPositionOrdersCancelled")
-
-	// after open position cancelled, immediately trigger take profit ready to open take-profit order
-	s.emitNextState(TakeProfitReady)
 }
 
 func (s *Strategy) runOpenPositionOrdersCancelled(ctx context.Context, next State) {
