@@ -123,6 +123,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		_ = s.OrderExecutor.GracefulCancel(ctx)
+		bbgo.Sync(ctx, s)
 	})
 
 	return nil

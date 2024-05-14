@@ -205,7 +205,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		close(s.stopC)
-		bbgo.Sync(context.Background(), s)
+		bbgo.Sync(ctx, s)
 	})
 
 	// from here, set data binding

@@ -152,6 +152,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		if err := tradingutil.UniversalCancelAllOrders(ctx, s.Session.Exchange, nil); err != nil {
 			util.LogErr(err, "unable to cancel all orders")
 		}
+
+		bbgo.Sync(ctx, s)
 	})
 
 	return nil

@@ -333,6 +333,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		// check if there is a canceled order had partially filled.
 		s.OrderExecutor.TradeCollector().Process()
+
+		bbgo.Sync(ctx, s)
 	})
 
 	return nil
