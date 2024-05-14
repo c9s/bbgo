@@ -81,12 +81,17 @@ func (g *LiquidityOrderGenerator) Generate(
 		price := layerPrices[i]
 		s := layerScales[i]
 
-		quantity := factor * s
+		quantity := g.Market.TruncateQuantity(fixedpoint.NewFromFloat(factor * s))
+
+		if g.Market.IsDustQuantity(quantity, price) {
+			continue
+		}
+
 		orders = append(orders, types.SubmitOrder{
 			Symbol:   g.Symbol,
 			Price:    price,
 			Type:     types.OrderTypeLimitMaker,
-			Quantity: g.Market.TruncateQuantity(fixedpoint.NewFromFloat(quantity)),
+			Quantity: quantity,
 			Side:     side,
 			Market:   g.Market,
 		})
