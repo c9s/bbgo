@@ -148,6 +148,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		err = s.adjustmentOrderBook.GracefulCancel(ctx, s.Session.Exchange)
 		util.LogErr(err, "unable to cancel adjustment orders")
+
+		bbgo.Sync(ctx, s)
 	})
 
 	return nil

@@ -87,6 +87,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		s.cancelOrders(ctx)
+		bbgo.Sync(ctx, s)
 	})
 
 	s.cron = cron.New()
