@@ -156,6 +156,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		_ = s.OrderExecutor.GracefulCancel(ctx)
+		bbgo.Sync(ctx, s)
 	})
 	return nil
 }
