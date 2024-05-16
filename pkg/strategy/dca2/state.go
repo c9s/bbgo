@@ -104,24 +104,9 @@ func (s *Strategy) runState(ctx context.Context) {
 			}
 
 			// move to next state
-			switch s.state {
-			case WaitToOpenPosition:
-				s.runWaitToOpenPositionState(ctx, nextState)
-			case PositionOpening:
-				s.runPositionOpening(ctx, nextState)
-			case OpenPositionReady:
-				s.runOpenPositionReady(ctx, nextState)
-			case OpenPositionOrderFilled:
-				s.runOpenPositionOrderFilled(ctx, nextState)
-			case OpenPositionOrdersCancelling:
-				s.runOpenPositionOrdersCancelling(ctx, nextState)
-			case OpenPositionOrdersCancelled:
-				s.runOpenPositionOrdersCancelled(ctx, nextState)
-			case TakeProfitReady:
-				s.runTakeProfitReady(ctx, nextState)
+			if triggerImmediately := s.moveToNextState(ctx, nextState); triggerImmediately {
+				s.triggerNextState()
 			}
-
-			s.triggerNextState()
 		}
 	}
 }
@@ -141,68 +126,96 @@ func (s *Strategy) triggerNextState() {
 	}
 }
 
-func (s *Strategy) runWaitToOpenPositionState(ctx context.Context, next State) {
+// moveToNextState will run the process when moving current state to next state
+// it will return true if we want it trigger the next state immediately
+func (s *Strategy) moveToNextState(ctx context.Context, nextState State) bool {
+	switch s.state {
+	case WaitToOpenPosition:
+		return s.runWaitToOpenPositionState(ctx, nextState)
+	case PositionOpening:
+		return s.runPositionOpening(ctx, nextState)
+	case OpenPositionReady:
+		return s.runOpenPositionReady(ctx, nextState)
+	case OpenPositionOrderFilled:
+		return s.runOpenPositionOrderFilled(ctx, nextState)
+	case OpenPositionOrdersCancelling:
+		return s.runOpenPositionOrdersCancelling(ctx, nextState)
+	case OpenPositionOrdersCancelled:
+		return s.runOpenPositionOrdersCancelled(ctx, nextState)
+	case TakeProfitReady:
+		return s.runTakeProfitReady(ctx, nextState)
+	}
+
+	s.logger.Errorf("unexpected state: %d, please check it", s.state)
+	return false
+}
+
+func (s *Strategy) runWaitToOpenPositionState(ctx context.Context, next State) bool {
 	if s.nextRoundPaused {
 		s.logger.Info("[State] WaitToOpenPosition - nextRoundPaused is set")
-		return
+		return false
 	}
 
 	if time.Now().Before(s.startTimeOfNextRound) {
-		return
+		return false
 	}
 
 	s.updateState(PositionOpening)
 	s.logger.Info("[State] WaitToOpenPosition -> PositionOpening")
+	return true
 }
 
-func (s *Strategy) runPositionOpening(ctx context.Context, next State) {
+func (s *Strategy) runPositionOpening(ctx context.Context, next State) bool {
 	s.logger.Info("[State] PositionOpening - start placing open-position orders")
 
 	if err := s.placeOpenPositionOrders(ctx); err != nil {
 		s.logger.WithError(err).Error("failed to place open-position orders, please check it.")
-
-		// try after 1 minute when failed to placing orders
-		s.startTimeOfNextRound = s.startTimeOfNextRound.Add(openPositionRetryInterval)
-		s.logger.Infof("reset startTimeOfNextRound to %s", s.startTimeOfNextRound.String())
-		s.updateState(WaitToOpenPosition)
-		return
+		return false
 	}
 
 	s.updateState(OpenPositionReady)
 	s.logger.Info("[State] PositionOpening -> OpenPositionReady")
+	// do not trigger next state immediately, because OpenPositionReady state only trigger by kline to move to the next state
+	return false
 }
 
-func (s *Strategy) runOpenPositionReady(_ context.Context, next State) {
+func (s *Strategy) runOpenPositionReady(_ context.Context, next State) bool {
 	s.updateState(OpenPositionOrderFilled)
 	s.logger.Info("[State] OpenPositionReady -> OpenPositionOrderFilled")
+	// do not trigger next state immediately, because OpenPositionOrderFilled state only trigger by kline to move to the next state
+	return false
 }
 
-func (s *Strategy) runOpenPositionOrderFilled(_ context.Context, next State) {
+func (s *Strategy) runOpenPositionOrderFilled(_ context.Context, next State) bool {
 	s.updateState(OpenPositionOrdersCancelling)
 	s.logger.Info("[State] OpenPositionOrderFilled -> OpenPositionOrdersCancelling")
+	return true
 }
 
-func (s *Strategy) runOpenPositionOrdersCancelling(ctx context.Context, next State) {
+func (s *Strategy) runOpenPositionOrdersCancelling(ctx context.Context, next State) bool {
 	s.logger.Info("[State] OpenPositionOrdersCancelling - start cancelling open-position orders")
 	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
 		s.logger.WithError(err).Error("failed to cancel maker orders")
-		return
+		return false
 	}
 	s.updateState(OpenPositionOrdersCancelled)
 	s.logger.Info("[State] OpenPositionOrdersCancelling -> OpenPositionOrdersCancelled")
+	return true
 }
 
-func (s *Strategy) runOpenPositionOrdersCancelled(ctx context.Context, next State) {
+func (s *Strategy) runOpenPositionOrdersCancelled(ctx context.Context, next State) bool {
 	s.logger.Info("[State] OpenPositionOrdersCancelled - start placing take-profit orders")
 	if err := s.placeTakeProfitOrders(ctx); err != nil {
 		s.logger.WithError(err).Error("failed to open take profit orders")
-		return
+		return false
 	}
 	s.updateState(TakeProfitReady)
 	s.logger.Info("[State] OpenPositionOrdersCancelled -> TakeProfitReady")
+	// do not trigger next state immediately, because TakeProfitReady state only trigger by kline to move to the next state
+	return false
 }
 
-func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
+func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) bool {
 	// wait 3 seconds to avoid position not update
 	time.Sleep(3 * time.Second)
 
@@ -226,4 +239,6 @@ func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) {
 	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())
 	s.updateState(WaitToOpenPosition)
 	s.logger.Infof("[State] TakeProfitReady -> WaitToOpenPosition (startTimeOfNextRound: %s)", s.startTimeOfNextRound.String())
+
+	return false
 }
