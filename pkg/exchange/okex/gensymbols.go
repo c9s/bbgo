@@ -27,7 +27,7 @@ var spotSymbolMap = map[string]string{
 func main() {
 	ctx := context.Background()
 	client := okexapi.NewClient()
-	instruments, err := client.PublicDataService.NewGetInstrumentsRequest().InstrumentType(okexapi.InstrumentTypeSpot).Do(ctx)
+	instruments, err := client.NewGetInstrumentsInfoRequest().InstType(okexapi.InstrumentTypeSpot).Do(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
