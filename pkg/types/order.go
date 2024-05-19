@@ -365,9 +365,9 @@ func (o Order) PlainText() string {
 		o.Symbol,
 		o.Type,
 		o.Side,
-		o.Price.FormatString(2),
-		o.ExecutedQuantity.FormatString(2),
-		o.Quantity.FormatString(4),
+		o.Price.String(),
+		o.ExecutedQuantity.String(),
+		o.Quantity.String(),
 		o.Status)
 }
 
