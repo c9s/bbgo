@@ -64,7 +64,6 @@ type Strategy struct {
 	MinProfit fixedpoint.Value `json:"minProfit"`
 
 	liquidityOrderBook, adjustmentOrderBook *bbgo.ActiveOrderBook
-	book                                    *types.StreamOrderBook
 
 	liquidityScale bbgo.Scale
 
@@ -87,7 +86,6 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.AdjustmentUpdateInterval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LiquidityUpdateInterval})
 }
@@ -99,9 +97,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		Symbol: s.Symbol,
 		Market: s.Market,
 	}
-
-	s.book = types.NewStreamBook(s.Symbol)
-	s.book.BindStream(session.MarketDataStream)
 
 	s.liquidityOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
 	s.liquidityOrderBook.BindStream(session.UserDataStream)
