@@ -35,7 +35,7 @@ type Strategy struct {
 	OrderType  types.OrderType  `json:"orderType"`
 	DryRun     bool             `json:"dryRun"`
 
-	InventorySkew InventorySkew `json:"inventorySkew"`
+	InventorySkew common.InventorySkew `json:"inventorySkew"`
 
 	activeOrderBook *bbgo.ActiveOrderBook
 }
