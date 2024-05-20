@@ -12,6 +12,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -156,9 +157,14 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 			// we can't use the account from margin
 			amount := d.Amount
 			if service, ok := s.session.Exchange.(spotAccountQueryService); ok {
-				account, err2 := service.QuerySpotAccount(ctx)
-				if err2 != nil {
-					logger.WithError(err2).Errorf("unable to query spot account")
+				var account *types.Account
+				err = retry.GeneralBackoff(ctx, func() (err error) {
+					account, err = service.QuerySpotAccount(ctx)
+					return err
+				})
+
+				if err != nil || account == nil {
+					logger.WithError(err).Errorf("unable to query spot account")
 					continue
 				}
 
@@ -174,7 +180,10 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 				d.Amount.String(), d.Asset,
 				amount.String(), d.Asset)
 
-			if err2 := s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, amount, types.TransferIn); err2 != nil {
+			err2 := retry.GeneralBackoff(ctx, func() error {
+				return s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, amount, types.TransferIn)
+			})
+			if err2 != nil {
 				logger.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
 			}
 		}
@@ -187,7 +196,13 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 
 	now := time.Now()
 	since := now.Add(-duration)
-	deposits, err := s.depositHistoryService.QueryDepositHistory(ctx, asset, since, now)
+
+	var deposits []types.Deposit
+	err := retry.GeneralBackoff(ctx, func() (err error) {
+		deposits, err = s.depositHistoryService.QueryDepositHistory(ctx, asset, since, now)
+		return err
+	})
+
 	if err != nil {
 		return nil, err
 	}
