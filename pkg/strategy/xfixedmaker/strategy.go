@@ -10,7 +10,6 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
-	"github.com/c9s/bbgo/pkg/strategy/fixedmaker"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -36,10 +35,10 @@ type Strategy struct {
 	OrderType       types.OrderType  `json:"orderType"`
 	DryRun          bool             `json:"dryRun"`
 
-	ReferenceExchange       string                   `json:"referenceExchange"`
-	ReferencePriceEMA       types.IntervalWindow     `json:"referencePriceEMA"`
-	OrderPriceLossThreshold fixedpoint.Value         `json:"orderPriceLossThreshold"`
-	InventorySkew           fixedmaker.InventorySkew `json:"inventorySkew"`
+	ReferenceExchange       string               `json:"referenceExchange"`
+	ReferencePriceEMA       types.IntervalWindow `json:"referencePriceEMA"`
+	OrderPriceLossThreshold fixedpoint.Value     `json:"orderPriceLossThreshold"`
+	InventorySkew           common.InventorySkew `json:"inventorySkew"`
 
 	market                types.Market
 	activeOrderBook       *bbgo.ActiveOrderBook
