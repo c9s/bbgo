@@ -9,6 +9,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/risk/riskcontrol"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -42,7 +43,7 @@ type Strategy struct {
 
 	market                types.Market
 	activeOrderBook       *bbgo.ActiveOrderBook
-	orderPriceRiskControl *OrderPriceRiskControl
+	orderPriceRiskControl *riskcontrol.OrderPriceRiskControl
 }
 
 func (s *Strategy) Defaults() error {
@@ -120,7 +121,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	s.Strategy.Initialize(ctx, s.Environment, tradingSession, s.market, ID, s.InstanceID())
 
-	s.orderPriceRiskControl = NewOrderPriceRiskControl(
+	s.orderPriceRiskControl = riskcontrol.NewOrderPriceRiskControl(
 		referenceSession.Indicators(s.Symbol).EMA(s.ReferencePriceEMA),
 		s.OrderPriceLossThreshold,
 	)

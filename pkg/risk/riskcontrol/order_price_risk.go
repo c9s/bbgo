@@ -1,9 +1,10 @@
-package xfixedmaker
+package riskcontrol
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/types"
+	log "github.com/sirupsen/logrus"
 )
 
 type OrderPriceRiskControl struct {
