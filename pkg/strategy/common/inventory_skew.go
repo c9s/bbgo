@@ -1,4 +1,4 @@
-package fixedmaker
+package common
 
 import (
 	"fmt"
