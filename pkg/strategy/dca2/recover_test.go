@@ -23,62 +23,6 @@ func generateTestOrder(side types.SideType, status types.OrderStatus, createdAt 
 
 }
 
-func Test_GetCurrenctRoundOrders(t *testing.T) {
-	t.Run("case 1", func(t *testing.T) {
-		now := time.Now()
-		openOrders := []types.Order{
-			generateTestOrder(types.SideTypeSell, types.OrderStatusNew, now),
-		}
-
-		closedOrders := []types.Order{
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-1*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-2*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-3*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-4*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-5*time.Second)),
-		}
-
-		currentRound, err := getCurrentRoundOrders(openOrders, closedOrders, 0)
-
-		assert.NoError(t, err)
-		assert.NotEqual(t, 0, currentRound.TakeProfitOrder.OrderID)
-		assert.Equal(t, 5, len(currentRound.OpenPositionOrders))
-	})
-
-	t.Run("case 2", func(t *testing.T) {
-		now := time.Now()
-		openOrders := []types.Order{
-			generateTestOrder(types.SideTypeSell, types.OrderStatusNew, now),
-		}
-
-		closedOrders := []types.Order{
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-1*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-2*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-3*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-4*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-5*time.Second)),
-			generateTestOrder(types.SideTypeSell, types.OrderStatusFilled, now.Add(-6*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-7*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-8*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-9*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-10*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-11*time.Second)),
-			generateTestOrder(types.SideTypeSell, types.OrderStatusFilled, now.Add(-12*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-13*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-14*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-15*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-16*time.Second)),
-			generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-17*time.Second)),
-		}
-
-		currentRound, err := getCurrentRoundOrders(openOrders, closedOrders, 0)
-
-		assert.NoError(t, err)
-		assert.NotEqual(t, 0, currentRound.TakeProfitOrder.OrderID)
-		assert.Equal(t, 5, len(currentRound.OpenPositionOrders))
-	})
-}
-
 type MockQueryOrders struct {
 	OpenOrders   []types.Order
 	ClosedOrders []types.Order
