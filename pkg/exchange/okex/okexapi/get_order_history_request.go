@@ -101,7 +101,7 @@ type GetOrderHistoryRequest struct {
 	limit *uint64 `param:"limit,query"`
 }
 
-// NewGetOrderHistoriesRequest is descending order by createdTime
+// NewGetOrderHistoryRequest is descending order by createdTime
 func (c *RestClient) NewGetOrderHistoryRequest() *GetOrderHistoryRequest {
 	return &GetOrderHistoryRequest{
 		client:         c,
