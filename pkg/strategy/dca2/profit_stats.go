@@ -8,11 +8,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type PriceQuantity struct {
-	Price    fixedpoint.Value `json:"price,omitempty"`
-	Quantity fixedpoint.Value `json:"quantity,omitempty"`
-}
-
 type ProfitStats struct {
 	Symbol string       `json:"symbol"`
 	Market types.Market `json:"market,omitempty"`
@@ -27,7 +22,7 @@ type ProfitStats struct {
 	TotalFee           map[string]fixedpoint.Value `json:"totalFee,omitempty"`
 
 	// used to flexible recovery
-	OpenPositionPQs []PriceQuantity `json:"openPositionPQs,omitempty"`
+	OpenPositionPVs []types.PriceVolume `json:"openPositionPVs,omitempty"`
 
 	types.PersistenceTTL
 }

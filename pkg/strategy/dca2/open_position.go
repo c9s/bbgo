@@ -34,12 +34,12 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 	s.debugOrders(createdOrders)
 
 	// store price quantity pairs into persistence
-	var pqs []PriceQuantity
+	var pvs []types.PriceVolume
 	for _, createdOrder := range createdOrders {
-		pqs = append(pqs, PriceQuantity{Price: createdOrder.Price, Quantity: createdOrder.Quantity})
+		pvs = append(pvs, types.PriceVolume{Price: createdOrder.Price, Volume: createdOrder.Quantity})
 	}
 
-	s.ProfitStats.OpenPositionPQs = pqs
+	s.ProfitStats.OpenPositionPVs = pvs
 
 	bbgo.Sync(ctx, s)
 
