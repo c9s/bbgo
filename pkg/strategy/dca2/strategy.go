@@ -76,8 +76,8 @@ type Strategy struct {
 	// KeepOrdersWhenShutdown option is used for keeping the grid orders when shutting down bbgo
 	KeepOrdersWhenShutdown bool `json:"keepOrdersWhenShutdown"`
 
-	// UseCancelAllOrdersApiWhenClose uses a different API to cancel all the orders on the market when closing a grid
-	UseCancelAllOrdersApiWhenClose bool `json:"useCancelAllOrdersApiWhenClose"`
+	// UniversalCancelAllOrdersWhenClose close all orders even though the orders don't belong to this strategy
+	UniversalCancelAllOrdersWhenClose bool `json:"universalCancelAllOrdersWhenClose"`
 
 	// log
 	logger    *logrus.Entry
@@ -372,9 +372,15 @@ func (s *Strategy) Close(ctx context.Context) error {
 
 	defer s.EmitClosed()
 
-	err := s.OrderExecutor.GracefulCancel(ctx)
+	var err error
+	if s.UniversalCancelAllOrdersWhenClose {
+		err = tradingutil.UniversalCancelAllOrders(ctx, s.ExchangeSession.Exchange, nil)
+	} else {
+		err = s.OrderExecutor.GracefulCancel(ctx)
+	}
+
 	if err != nil {
-		s.logger.WithError(err).Errorf("there are errors when cancelling orders at close")
+		s.logger.WithError(err).Errorf("there are errors when cancelling orders when closing (UniversalCancelAllOrdersWhenClose = %t)", s.UniversalCancelAllOrdersWhenClose)
 	}
 
 	bbgo.Sync(ctx, s)
