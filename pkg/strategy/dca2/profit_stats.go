@@ -21,6 +21,9 @@ type ProfitStats struct {
 	TotalProfit        fixedpoint.Value            `json:"totalProfit,omitempty"`
 	TotalFee           map[string]fixedpoint.Value `json:"totalFee,omitempty"`
 
+	// used to flexible recovery
+	OpenPositionPVs []types.PriceVolume `json:"openPositionPVs,omitempty"`
+
 	types.PersistenceTTL
 }
 
