@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -31,6 +32,16 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 	}
 
 	s.debugOrders(createdOrders)
+
+	// store price quantity pairs into persistence
+	var pvs []types.PriceVolume
+	for _, createdOrder := range createdOrders {
+		pvs = append(pvs, types.PriceVolume{Price: createdOrder.Price, Volume: createdOrder.Quantity})
+	}
+
+	s.ProfitStats.OpenPositionPVs = pvs
+
+	bbgo.Sync(ctx, s)
 
 	return nil
 }

@@ -11,6 +11,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type Round struct {
+	OpenPositionOrders []types.Order
+	TakeProfitOrder    types.Order
+}
+
 type Collector struct {
 	logger  *logrus.Entry
 	symbol  string
