@@ -113,13 +113,13 @@ func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, or
 		}
 	}
 
-	// all open-position orders are still not filled -> OpenPositionReady
-	if filledCnt == 0 && cancelledCnt == 0 {
+	// no order is filled -> OpenPositionReady
+	if filledCnt == 0 {
 		return OpenPositionReady, nil
 	}
 
 	// there are at least one open-position orders filled
-	if filledCnt > 0 && cancelledCnt == 0 {
+	if cancelledCnt == 0 {
 		if openedCnt > 0 {
 			return OpenPositionOrderFilled, nil
 		} else {
@@ -128,12 +128,8 @@ func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, or
 		}
 	}
 
-	// there are at last one open-position orders cancelled ->
-	if cancelledCnt > 0 {
-		return OpenPositionOrdersCancelling, nil
-	}
-
-	return None, fmt.Errorf("unexpected order status combination (opened, filled, cancelled) = (%d, %d, %d)", openedCnt, filledCnt, cancelledCnt)
+	// there are at last one open-position orders cancelled and at least one filled order -> open position order cancelling
+	return OpenPositionOrdersCancelling, nil
 }
 
 func recoverPosition(ctx context.Context, position *types.Position, currentRound Round, queryService types.ExchangeOrderQueryService) error {

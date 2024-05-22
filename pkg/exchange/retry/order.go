@@ -180,18 +180,6 @@ func QueryOrderTradesUntilSuccessfulLite(
 	return trades, err
 }
 
-func QueryAccountUntilSuccessful(
-	ctx context.Context, ex types.ExchangeAccountService,
-) (account *types.Account, err error) {
-	var op = func() (err2 error) {
-		account, err2 = ex.QueryAccount(ctx)
-		return err2
-	}
-
-	err = GeneralBackoff(ctx, op)
-	return account, err
-}
-
 func QueryOrderUntilSuccessful(
 	ctx context.Context, query types.ExchangeOrderQueryService, opts types.OrderQuery,
 ) (order *types.Order, err error) {
