@@ -712,7 +712,7 @@ func (s *Strategy) generateMakerOrders(
 
 			log.Infof("side: %s required depth: %f, pvs: %+v", side, requiredDepth.Float64(), pvs)
 
-			depthPrice := pvs.AverageDepthPrice(fixedpoint.Zero, 0)
+			depthPrice := pvs.AverageDepthPriceByQuote(fixedpoint.Zero, 0)
 
 			switch side {
 			case types.SideTypeBuy:
