@@ -206,3 +206,26 @@ func ParsePriceVolumeSliceJSON(b []byte) (slice PriceVolumeSlice, err error) {
 
 	return slice, nil
 }
+
+func (slice PriceVolumeSlice) AverageDepthPrice(requiredDepthInQuote fixedpoint.Value, maxLevel int) fixedpoint.Value {
+	totalQuoteAmount := fixedpoint.Zero
+	totalQuantity := fixedpoint.Zero
+
+	l := len(slice)
+	if maxLevel > 0 && l > maxLevel {
+		l = maxLevel
+	}
+
+	for i := 0; i < l; i++ {
+		pv := slice[i]
+		quoteAmount := fixedpoint.Mul(pv.Volume, pv.Price)
+		totalQuoteAmount = totalQuoteAmount.Add(quoteAmount)
+		totalQuantity = totalQuantity.Add(pv.Volume)
+
+		if requiredDepthInQuote.Sign() > 0 && totalQuoteAmount.Compare(requiredDepthInQuote) > 0 {
+			return totalQuoteAmount.Div(totalQuantity)
+		}
+	}
+
+	return totalQuoteAmount.Div(totalQuantity)
+}
