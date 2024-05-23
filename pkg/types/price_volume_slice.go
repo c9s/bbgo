@@ -207,7 +207,11 @@ func ParsePriceVolumeSliceJSON(b []byte) (slice PriceVolumeSlice, err error) {
 	return slice, nil
 }
 
-func (slice PriceVolumeSlice) AverageDepthPrice(requiredDepthInQuote fixedpoint.Value, maxLevel int) fixedpoint.Value {
+func (slice PriceVolumeSlice) AverageDepthPriceByQuote(requiredDepthInQuote fixedpoint.Value, maxLevel int) fixedpoint.Value {
+	if len(slice) == 0 {
+		return fixedpoint.Zero
+	}
+
 	totalQuoteAmount := fixedpoint.Zero
 	totalQuantity := fixedpoint.Zero
 
@@ -228,4 +232,30 @@ func (slice PriceVolumeSlice) AverageDepthPrice(requiredDepthInQuote fixedpoint.
 	}
 
 	return totalQuoteAmount.Div(totalQuantity)
+}
+
+// AverageDepthPrice uses the required total quantity to calculate the corresponding price
+func (slice PriceVolumeSlice) AverageDepthPrice(requiredQuantity fixedpoint.Value) fixedpoint.Value {
+	// rest quantity
+	rq := requiredQuantity
+	totalAmount := fixedpoint.Zero
+
+	if len(slice) == 0 {
+		return fixedpoint.Zero
+	} else if slice[0].Volume.Compare(requiredQuantity) >= 0 {
+		return slice[0].Price
+	}
+
+	for i := 0; i < len(slice); i++ {
+		pv := slice[i]
+		if pv.Volume.Compare(rq) >= 0 {
+			totalAmount = totalAmount.Add(rq.Mul(pv.Price))
+			break
+		}
+
+		rq = rq.Sub(pv.Volume)
+		totalAmount = totalAmount.Add(pv.Volume.Mul(pv.Price))
+	}
+
+	return totalAmount.Div(requiredQuantity.Sub(rq))
 }
