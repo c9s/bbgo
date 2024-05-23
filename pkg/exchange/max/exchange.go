@@ -645,8 +645,11 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	req.Market(toLocalSymbol(o.Symbol)).
 		Side(toLocalSideType(o.Side)).
 		Volume(quantityString).
-		OrderType(orderType).
-		ClientOrderID(clientOrderID)
+		OrderType(orderType)
+
+	if clientOrderID != "" {
+		req.ClientOrderID(clientOrderID)
+	}
 
 	if o.GroupID > 0 {
 		req.GroupID(strconv.FormatUint(uint64(o.GroupID%math.MaxInt32), 10))

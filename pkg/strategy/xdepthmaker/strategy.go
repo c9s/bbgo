@@ -712,11 +712,7 @@ func (s *Strategy) generateMakerOrders(
 
 			log.Infof("side: %s required depth: %f, pvs: %+v", side, requiredDepth.Float64(), pvs)
 
-			depthPrice, err := averageDepthPrice(pvs)
-			if err != nil {
-				log.WithError(err).Errorf("error aggregating depth price")
-				continue
-			}
+			depthPrice := pvs.AverageDepthPriceByQuote(fixedpoint.Zero, 0)
 
 			switch side {
 			case types.SideTypeBuy:
@@ -921,25 +917,6 @@ func selectSessions2(
 	s1 = sessions[n1]
 	s2 = sessions[n2]
 	return s1, s2, nil
-}
-
-func averageDepthPrice(pvs types.PriceVolumeSlice) (price fixedpoint.Value, err error) {
-	if len(pvs) == 0 {
-		return fixedpoint.Zero, fmt.Errorf("empty pv slice")
-	}
-
-	totalQuoteAmount := fixedpoint.Zero
-	totalQuantity := fixedpoint.Zero
-
-	for i := 0; i < len(pvs); i++ {
-		pv := pvs[i]
-		quoteAmount := fixedpoint.Mul(pv.Volume, pv.Price)
-		totalQuoteAmount = totalQuoteAmount.Add(quoteAmount)
-		totalQuantity = totalQuantity.Add(pv.Volume)
-	}
-
-	price = totalQuoteAmount.Div(totalQuantity)
-	return price, nil
 }
 
 func min(a, b int) int {
