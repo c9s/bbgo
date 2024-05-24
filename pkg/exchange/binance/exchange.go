@@ -745,24 +745,43 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 		return nil, errors.New("binance: symbol parameter is a mandatory parameter for querying order trades")
 	}
 
-	remoteTrades, err := e.client.NewListTradesService().Symbol(q.Symbol).OrderId(orderID).Do(ctx)
-	if err != nil {
-		return nil, err
+	var remoteTrades []binance.TradeV3
+	var trades []types.Trade
+
+	if e.IsMargin {
+		req := e.client2.NewGetMarginTradesRequest()
+		req.Symbol(q.Symbol).OrderID(uint64(orderID))
+
+		if e.IsIsolatedMargin {
+			req.IsIsolated(true)
+		}
+
+		remoteTrades, err = req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		req := e.client2.NewGetMyTradesRequest()
+		req.Symbol(q.Symbol).
+			OrderID(uint64(orderID))
+
+		remoteTrades, err = req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	var trades []types.Trade
 	for _, t := range remoteTrades {
-		localTrade, err := toGlobalTrade(*t, e.IsMargin)
+		localTrade, err := toGlobalTrade(t, e.IsMargin)
 		if err != nil {
-			log.WithError(err).Errorf("binance: can not convert trade: %+v", t)
+			log.WithError(err).Errorf("binance: unable to convert margin trade: %+v", t)
 			continue
 		}
 
 		trades = append(trades, *localTrade)
 	}
 
-	trades = types.SortTradesAscending(trades)
-	return trades, nil
+	return types.SortTradesAscending(trades), nil
 }
 
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
