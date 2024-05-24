@@ -745,20 +745,46 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 		return nil, errors.New("binance: symbol parameter is a mandatory parameter for querying order trades")
 	}
 
-	remoteTrades, err := e.client.NewListTradesService().Symbol(q.Symbol).OrderId(orderID).Do(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	var trades []types.Trade
-	for _, t := range remoteTrades {
-		localTrade, err := toGlobalTrade(*t, e.IsMargin)
-		if err != nil {
-			log.WithError(err).Errorf("binance: can not convert trade: %+v", t)
-			continue
+
+	if e.IsMargin {
+		req := e.client2.NewGetMarginTradesRequest()
+		req.Symbol(q.Symbol).OrderID(uint64(orderID))
+
+		if e.IsIsolatedMargin {
+			req.IsIsolated(true)
 		}
 
-		trades = append(trades, *localTrade)
+		remoteTrades, err := req.Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, t := range remoteTrades {
+			localTrade, err := toGlobalTrade(t, e.IsMargin)
+			if err != nil {
+				log.WithError(err).Errorf("binance: unable to convert margin trade: %+v", t)
+				continue
+			}
+
+			trades = append(trades, *localTrade)
+		}
+
+	} else {
+		remoteTrades, err := e.client.NewListTradesService().Symbol(q.Symbol).OrderId(orderID).Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, t := range remoteTrades {
+			localTrade, err := toGlobalTrade(*t, e.IsMargin)
+			if err != nil {
+				log.WithError(err).Errorf("binance: unable to convert trade: %+v", t)
+				continue
+			}
+
+			trades = append(trades, *localTrade)
+		}
 	}
 
 	trades = types.SortTradesAscending(trades)
