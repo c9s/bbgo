@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/pkg/errors"
@@ -39,6 +40,27 @@ func (s *Strategy) placeTakeProfitOrders(ctx context.Context) error {
 	s.logger.Infof("position of this round before place the take-profit order: %s", roundPosition.String())
 
 	order := generateTakeProfitOrder(s.Market, s.TakeProfitRatio, roundPosition, s.OrderGroupID)
+
+	// verify the volume of order
+	bals, err := retry.QueryAccountBalancesUntilSuccessfulLite(ctx, s.ExchangeSession.Exchange)
+	if err != nil {
+		return errors.Wrapf(err, "failed to query balance to verify")
+	}
+
+	bal, exist := bals[s.Market.BaseCurrency]
+	if !exist {
+		return fmt.Errorf("there is no %s in the balances %+v", s.Market.BaseCurrency, bals)
+	}
+
+	quantityDiff := bal.Available.Sub(order.Quantity)
+	if quantityDiff.Sign() < 0 {
+		return fmt.Errorf("the balance (%s) is not enough for the order (%s)", bal.String(), order.Quantity.String())
+	}
+
+	if quantityDiff.Compare(s.Market.MinQuantity) > 0 {
+		s.logger.Warnf("the diff between balance (%s) and the take-profit order (%s) is larger than min quantity %s", bal.String(), order.Quantity.String(), s.Market.MinQuantity.String())
+	}
+
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, order)
 	if err != nil {
 		return err
