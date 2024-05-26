@@ -1,6 +1,7 @@
 package common
 
 import (
+	"sync"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -11,6 +12,8 @@ import (
 type FeeBudget struct {
 	DailyFeeBudgets map[string]fixedpoint.Value `json:"dailyFeeBudgets,omitempty"`
 	State           *State                      `persistence:"state"`
+
+	mu sync.Mutex
 }
 
 func (f *FeeBudget) Initialize() {
@@ -31,6 +34,11 @@ func (f *FeeBudget) IsBudgetAllowed() bool {
 	}
 
 	if f.State.AccumulatedFees == nil {
+		return true
+	}
+
+	if f.State.IsOver24Hours() {
+		f.State.Reset()
 		return true
 	}
 
@@ -55,18 +63,18 @@ func (f *FeeBudget) HandleTradeUpdate(trade types.Trade) {
 
 	// safe check
 	if f.State.AccumulatedFees == nil {
+		f.mu.Lock()
 		f.State.AccumulatedFees = make(map[string]fixedpoint.Value)
+		f.mu.Unlock()
 	}
 
 	f.State.AccumulatedFees[trade.FeeCurrency] = f.State.AccumulatedFees[trade.FeeCurrency].Add(trade.Fee)
-	f.State.AccumulatedVolume = f.State.AccumulatedVolume.Add(trade.Quantity)
 	log.Infof("[FeeBudget] accumulated fee: %s %s", f.State.AccumulatedFees[trade.FeeCurrency].String(), trade.FeeCurrency)
 }
 
 type State struct {
 	AccumulatedFeeStartedAt time.Time                   `json:"accumulatedFeeStartedAt,omitempty"`
 	AccumulatedFees         map[string]fixedpoint.Value `json:"accumulatedFees,omitempty"`
-	AccumulatedVolume       fixedpoint.Value            `json:"accumulatedVolume,omitempty"`
 }
 
 func (s *State) IsOver24Hours() bool {
@@ -81,5 +89,4 @@ func (s *State) Reset() {
 
 	s.AccumulatedFeeStartedAt = dateTime
 	s.AccumulatedFees = make(map[string]fixedpoint.Value)
-	s.AccumulatedVolume = fixedpoint.Zero
 }
