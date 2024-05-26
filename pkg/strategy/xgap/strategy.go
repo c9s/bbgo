@@ -37,29 +37,9 @@ func (s *Strategy) InstanceID() string {
 	return fmt.Sprintf("%s:%s", ID, s.Symbol)
 }
 
-type State struct {
-	AccumulatedFeeStartedAt time.Time                   `json:"accumulatedFeeStartedAt,omitempty"`
-	AccumulatedFees         map[string]fixedpoint.Value `json:"accumulatedFees,omitempty"`
-	AccumulatedVolume       fixedpoint.Value            `json:"accumulatedVolume,omitempty"`
-}
-
-func (s *State) IsOver24Hours() bool {
-	return time.Since(s.AccumulatedFeeStartedAt) >= 24*time.Hour
-}
-
-func (s *State) Reset() {
-	t := time.Now()
-	dateTime := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-
-	log.Infof("resetting accumulated started time to: %s", dateTime)
-
-	s.AccumulatedFeeStartedAt = dateTime
-	s.AccumulatedFees = make(map[string]fixedpoint.Value)
-	s.AccumulatedVolume = fixedpoint.Zero
-}
-
 type Strategy struct {
 	*common.Strategy
+	*common.FeeBudget
 
 	Environment *bbgo.Environment
 
@@ -70,17 +50,14 @@ type Strategy struct {
 	Quantity        fixedpoint.Value `json:"quantity"`
 	DryRun          bool             `json:"dryRun"`
 
-	DailyFeeBudgets   map[string]fixedpoint.Value `json:"dailyFeeBudgets,omitempty"`
-	DailyMaxVolume    fixedpoint.Value            `json:"dailyMaxVolume,omitempty"`
-	DailyTargetVolume fixedpoint.Value            `json:"dailyTargetVolume,omitempty"`
-	UpdateInterval    types.Duration              `json:"updateInterval"`
-	SimulateVolume    bool                        `json:"simulateVolume"`
-	SimulatePrice     bool                        `json:"simulatePrice"`
+	DailyMaxVolume    fixedpoint.Value `json:"dailyMaxVolume,omitempty"`
+	DailyTargetVolume fixedpoint.Value `json:"dailyTargetVolume,omitempty"`
+	UpdateInterval    types.Duration   `json:"updateInterval"`
+	SimulateVolume    bool             `json:"simulateVolume"`
+	SimulatePrice     bool             `json:"simulatePrice"`
 
 	sourceSession, tradingSession *bbgo.ExchangeSession
 	sourceMarket, tradingMarket   types.Market
-
-	State *State `persistence:"state"`
 
 	mu                                sync.Mutex
 	lastSourceKLine, lastTradingKLine types.KLine
@@ -92,6 +69,10 @@ type Strategy struct {
 func (s *Strategy) Initialize() error {
 	if s.Strategy == nil {
 		s.Strategy = &common.Strategy{}
+	}
+
+	if s.FeeBudget == nil {
+		s.FeeBudget = &common.FeeBudget{}
 	}
 	return nil
 }
@@ -105,48 +86,6 @@ func (s *Strategy) Defaults() error {
 		s.UpdateInterval = types.Duration(time.Second)
 	}
 	return nil
-}
-
-func (s *Strategy) isBudgetAllowed() bool {
-	if s.DailyFeeBudgets == nil {
-		return true
-	}
-
-	if s.State.AccumulatedFees == nil {
-		return true
-	}
-
-	for asset, budget := range s.DailyFeeBudgets {
-		if fee, ok := s.State.AccumulatedFees[asset]; ok {
-			if fee.Compare(budget) >= 0 {
-				log.Warnf("accumulative fee %s exceeded the fee budget %s, skipping...", fee.String(), budget.String())
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
-func (s *Strategy) handleTradeUpdate(trade types.Trade) {
-	log.Infof("received trade %s", trade.String())
-
-	if trade.Symbol != s.Symbol {
-		return
-	}
-
-	if s.State.IsOver24Hours() {
-		s.State.Reset()
-	}
-
-	// safe check
-	if s.State.AccumulatedFees == nil {
-		s.State.AccumulatedFees = make(map[string]fixedpoint.Value)
-	}
-
-	s.State.AccumulatedFees[trade.FeeCurrency] = s.State.AccumulatedFees[trade.FeeCurrency].Add(trade.Fee)
-	s.State.AccumulatedVolume = s.State.AccumulatedVolume.Add(trade.Quantity)
-	log.Infof("accumulated fee: %s %s", s.State.AccumulatedFees[trade.FeeCurrency].String(), trade.FeeCurrency)
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
@@ -191,18 +130,9 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 
 	s.Strategy.Initialize(ctx, s.Environment, tradingSession, s.tradingMarket, ID, s.InstanceID())
+	s.FeeBudget.Initialize()
 
 	s.stopC = make(chan struct{})
-
-	if s.State == nil {
-		s.State = &State{}
-		s.State.Reset()
-	}
-
-	if s.State.IsOver24Hours() {
-		log.Warn("state is over 24 hours, resetting to zero")
-		s.State.Reset()
-	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -230,7 +160,12 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	s.tradingBook = types.NewStreamBook(s.Symbol)
 	s.tradingBook.BindStream(s.tradingSession.MarketDataStream)
 
-	s.tradingSession.UserDataStream.OnTradeUpdate(s.handleTradeUpdate)
+	s.tradingSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
+		if trade.Symbol != s.Symbol {
+			return
+		}
+		s.FeeBudget.HandleTradeUpdate(trade)
+	})
 
 	go func() {
 		ticker := time.NewTicker(
@@ -247,7 +182,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				return
 
 			case <-ticker.C:
-				if !s.isBudgetAllowed() {
+				if !s.IsBudgetAllowed() {
 					continue
 				}
 
