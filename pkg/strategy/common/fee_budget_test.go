@@ -2,6 +2,7 @@ package common
 
 import (
 	"testing"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -46,7 +47,10 @@ func TestFeeBudget(t *testing.T) {
 		for _, trade := range c.trades {
 			feeBudget.HandleTradeUpdate(trade)
 		}
-
 		assert.Equal(t, c.expected, feeBudget.IsBudgetAllowed())
+
+		// test reset
+		feeBudget.State.AccumulatedFeeStartedAt = feeBudget.State.AccumulatedFeeStartedAt.Add(-24 * time.Hour)
+		assert.True(t, feeBudget.IsBudgetAllowed())
 	}
 }
