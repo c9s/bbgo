@@ -2,7 +2,6 @@ package dca2
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -11,9 +10,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Round contains the open-position orders and the take-profit orders
+// 1. len(OpenPositionOrders) == 0 -> not open position
+// 2. len(TakeProfitOrders) == 0   -> not in the take-profit stage
+// 3. There are take-profit orders only when open-position orders are cancelled
+// 4. We need to make sure the order: open-position (BUY) -> take-profit (SELL) -> open-position (BUY) -> take-profit (SELL) -> ...
+// 5. When there is one filled take-profit order, this round must be finished. We need to verify all take-profit orders are not active
 type Round struct {
 	OpenPositionOrders []types.Order
-	TakeProfitOrder    types.Order
+	TakeProfitOrders   []types.Order
 }
 
 type Collector struct {
@@ -106,10 +111,7 @@ func (rc Collector) CollectCurrentRound(ctx context.Context) (Round, error) {
 		case openPositionSide:
 			currentRound.OpenPositionOrders = append(currentRound.OpenPositionOrders, order)
 		case takeProfitSide:
-			if currentRound.TakeProfitOrder.OrderID != 0 {
-				return currentRound, fmt.Errorf("there are two take-profit orders in one round, please check it")
-			}
-			currentRound.TakeProfitOrder = order
+			currentRound.TakeProfitOrders = append(currentRound.TakeProfitOrders, order)
 		default:
 		}
 
@@ -141,12 +143,20 @@ func (rc *Collector) CollectFinishRounds(ctx context.Context, fromOrderID uint64
 		case types.SideTypeBuy:
 			round.OpenPositionOrders = append(round.OpenPositionOrders, order)
 		case types.SideTypeSell:
+			round.TakeProfitOrders = append(round.TakeProfitOrders, order)
+
 			if order.Status != types.OrderStatusFilled {
-				rc.logger.Infof("take-profit order is %s not filled, so this round is not finished. Skip it", order.Status)
+				rc.logger.Infof("take-profit order is %s not filled, so this round is not finished. Keep collecting", order.Status)
 				continue
 			}
 
-			round.TakeProfitOrder = order
+			for _, o := range round.TakeProfitOrders {
+				if types.IsActiveOrder(o) {
+					// Should not happen ! but we only log it
+					rc.logger.Errorf("there is at least one take-profit order (%d) is still active, please check it", o.OrderID)
+				}
+			}
+
 			rounds = append(rounds, round)
 			round = Round{}
 		default:
@@ -164,10 +174,7 @@ func (rc *Collector) CollectRoundTrades(ctx context.Context, round Round) ([]typ
 	var roundTrades []types.Trade
 	var roundOrders []types.Order = round.OpenPositionOrders
 
-	// if the take-profit order's OrderID == 0 -> no take-profit order.
-	if round.TakeProfitOrder.OrderID != 0 {
-		roundOrders = append(roundOrders, round.TakeProfitOrder)
-	}
+	roundOrders = append(roundOrders, round.TakeProfitOrders...)
 
 	for _, order := range roundOrders {
 		if order.ExecutedQuantity.IsZero() {

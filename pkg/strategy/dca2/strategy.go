@@ -481,7 +481,11 @@ func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
 		}
 
 		// update profit stats FromOrderID to make sure we will not collect duplicated rounds
-		s.ProfitStats.FromOrderID = round.TakeProfitOrder.OrderID + 1
+		for _, order := range round.TakeProfitOrders {
+			if order.OrderID >= s.ProfitStats.FromOrderID {
+				s.ProfitStats.FromOrderID = order.OrderID + 1
+			}
+		}
 
 		// update quote investment
 		s.ProfitStats.QuoteInvestment = s.ProfitStats.QuoteInvestment.Add(s.ProfitStats.CurrentRoundProfit)
