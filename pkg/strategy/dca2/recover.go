@@ -64,63 +64,55 @@ func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, or
 	orderStore := orderExecutor.OrderStore()
 
 	// dca stop at take-profit order stage
-	if currentRound.TakeProfitOrder.OrderID != 0 {
-		// the number of open-positions orders may not be equal to maxOrderCount, because the notional may not enough to open maxOrderCount orders
-		if len(currentRound.OpenPositionOrders) > maxOrderCount {
-			return None, fmt.Errorf("there is take-profit order but the number of open-position orders (%d) is greater than maxOrderCount(%d). Please check it", len(currentRound.OpenPositionOrders), maxOrderCount)
+	if len(currentRound.TakeProfitOrders) > 0 {
+		openedOrders, cancelledOrders, filledOrders, unexpectedOrders := classifyOrders(currentRound.TakeProfitOrders)
+
+		if len(unexpectedOrders) > 0 {
+			return None, fmt.Errorf("there is unexpected status in orders %+v", unexpectedOrders)
 		}
 
-		takeProfitOrder := currentRound.TakeProfitOrder
-		if takeProfitOrder.Status == types.OrderStatusFilled {
+		if len(filledOrders) > 0 && len(openedOrders) == 0 {
 			return WaitToOpenPosition, nil
-		} else if types.IsActiveOrder(takeProfitOrder) {
-			activeOrderBook.Add(takeProfitOrder)
-			orderStore.Add(takeProfitOrder)
-			return TakeProfitReady, nil
-		} else {
-			return None, fmt.Errorf("the status of take-profit order is %s. Please check it", takeProfitOrder.Status)
 		}
+
+		if len(filledOrders) == 0 && len(openedOrders) > 0 {
+			// add opened order into order store
+			for _, order := range openedOrders {
+				activeOrderBook.Add(order)
+				orderStore.Add(order)
+			}
+			return TakeProfitReady, nil
+		}
+
+		return None, fmt.Errorf("the classify orders count is not expected (opened: %d, cancelled: %d, filled: %d)", len(openedOrders), len(cancelledOrders), len(filledOrders))
 	}
 
 	// dca stop at no take-profit order stage
 	openPositionOrders := currentRound.OpenPositionOrders
-	numOpenPositionOrders := len(openPositionOrders)
 
 	// new strategy
 	if len(openPositionOrders) == 0 {
 		return WaitToOpenPosition, nil
 	}
 
-	// should not happen
-	if numOpenPositionOrders > maxOrderCount {
-		return None, fmt.Errorf("the number of open-position orders (%d) is > max order number", numOpenPositionOrders)
-	}
-
 	// collect open-position orders' status
-	var openedCnt, filledCnt, cancelledCnt int64
-	for _, order := range currentRound.OpenPositionOrders {
-		switch order.Status {
-		case types.OrderStatusNew, types.OrderStatusPartiallyFilled:
-			activeOrderBook.Add(order)
-			orderStore.Add(order)
-			openedCnt++
-		case types.OrderStatusFilled:
-			filledCnt++
-		case types.OrderStatusCanceled:
-			cancelledCnt++
-		default:
-			return None, fmt.Errorf("there is unexpected status %s of order %s", order.Status, order)
-		}
+	openedOrders, cancelledOrders, filledOrders, unexpectedOrders := classifyOrders(currentRound.OpenPositionOrders)
+	if len(unexpectedOrders) > 0 {
+		return None, fmt.Errorf("there is unexpected status of orders %+v", unexpectedOrders)
+	}
+	for _, order := range openedOrders {
+		activeOrderBook.Add(order)
+		orderStore.Add(order)
 	}
 
 	// no order is filled -> OpenPositionReady
-	if filledCnt == 0 {
+	if len(filledOrders) == 0 {
 		return OpenPositionReady, nil
 	}
 
 	// there are at least one open-position orders filled
-	if cancelledCnt == 0 {
-		if openedCnt > 0 {
+	if len(cancelledOrders) == 0 {
+		if len(openedOrders) > 0 {
 			return OpenPositionOrderFilled, nil
 		} else {
 			// all open-position orders filled, change to cancelling and place the take-profit order
@@ -141,13 +133,18 @@ func recoverPosition(ctx context.Context, position *types.Position, currentRound
 	position.Reset()
 
 	var positionOrders []types.Order
-	if currentRound.TakeProfitOrder.OrderID != 0 {
-		// if the take-profit order is already filled, the position is 0
-		if !types.IsActiveOrder(currentRound.TakeProfitOrder) {
-			return nil
-		}
 
-		positionOrders = append(positionOrders, currentRound.TakeProfitOrder)
+	var filledCnt int64
+	for _, order := range currentRound.TakeProfitOrders {
+		if !types.IsActiveOrder(order) {
+			filledCnt++
+		}
+		positionOrders = append(positionOrders, order)
+	}
+
+	// all take-profit orders are filled
+	if len(currentRound.TakeProfitOrders) > 0 && filledCnt == int64(len(currentRound.TakeProfitOrders)) {
+		return nil
 	}
 
 	for _, order := range currentRound.OpenPositionOrders {
@@ -184,9 +181,30 @@ func recoverProfitStats(ctx context.Context, strategy *Strategy) error {
 }
 
 func recoverStartTimeOfNextRound(ctx context.Context, currentRound Round, coolDownInterval types.Duration) time.Time {
-	if currentRound.TakeProfitOrder.OrderID != 0 && currentRound.TakeProfitOrder.Status == types.OrderStatusFilled {
-		return currentRound.TakeProfitOrder.UpdateTime.Time().Add(coolDownInterval.Duration())
+	var startTimeOfNextRound time.Time
+
+	for _, order := range currentRound.TakeProfitOrders {
+		if t := order.UpdateTime.Time().Add(coolDownInterval.Duration()); t.After(startTimeOfNextRound) {
+			startTimeOfNextRound = t
+		}
 	}
 
-	return time.Time{}
+	return startTimeOfNextRound
+}
+
+func classifyOrders(orders []types.Order) (opened, cancelled, filled, unexpected []types.Order) {
+	for _, order := range orders {
+		switch order.Status {
+		case types.OrderStatusNew, types.OrderStatusPartiallyFilled:
+			opened = append(opened, order)
+		case types.OrderStatusFilled:
+			filled = append(filled, order)
+		case types.OrderStatusCanceled:
+			cancelled = append(cancelled, order)
+		default:
+			unexpected = append(unexpected, order)
+		}
+	}
+
+	return opened, cancelled, filled, unexpected
 }
