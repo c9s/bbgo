@@ -63,7 +63,8 @@ type Strategy struct {
 	CoolDownInterval types.Duration   `json:"coolDownInterval"`
 
 	// OrderGroupID is the group ID used for the strategy instance for canceling orders
-	OrderGroupID uint32 `json:"orderGroupID"`
+	OrderGroupID              uint32 `json:"orderGroupID"`
+	DisableOrderGroupIDFilter bool   `json:"disableOrderGroupIDFilter"`
 
 	// RecoverWhenStart option is used for recovering dca states
 	RecoverWhenStart          bool `json:"recoverWhenStart"`
@@ -185,7 +186,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	// collector
-	s.collector = NewCollector(s.logger, s.Symbol, s.OrderGroupID, s.ExchangeSession.Exchange)
+	s.collector = NewCollector(s.logger, s.Symbol, s.OrderGroupID, !s.DisableOrderGroupIDFilter, s.ExchangeSession.Exchange)
 	if s.collector == nil {
 		return fmt.Errorf("failed to initialize collector")
 	}
