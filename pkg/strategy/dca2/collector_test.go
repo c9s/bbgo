@@ -18,7 +18,7 @@ func Test_NewCollector(t *testing.T) {
 		mockEx := mocks.NewMockExchange(mockCtrl)
 		mockEx.EXPECT().Name().Return(types.ExchangeMax)
 
-		collector := NewCollector(logger, symbol, 0, mockEx)
+		collector := NewCollector(logger, symbol, 0, false, mockEx)
 
 		assert.Nil(t, collector)
 	})
@@ -40,7 +40,7 @@ func Test_NewCollector(t *testing.T) {
 			ExchangeTradeHistoryService: mockTradeHistoryService,
 		}
 
-		collector := NewCollector(logger, symbol, 0, ex)
+		collector := NewCollector(logger, symbol, 0, false, ex)
 
 		assert.Nil(t, collector)
 	})
@@ -65,7 +65,7 @@ func Test_NewCollector(t *testing.T) {
 			ExchangeOrderQueryService:   mockOrderQueryService,
 		}
 
-		collector := NewCollector(logger, symbol, 0, ex)
+		collector := NewCollector(logger, symbol, 0, false, ex)
 
 		assert.Nil(t, collector)
 	})

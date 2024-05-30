@@ -22,9 +22,10 @@ type Round struct {
 }
 
 type Collector struct {
-	logger  *logrus.Entry
-	symbol  string
-	groupID uint32
+	logger        *logrus.Entry
+	symbol        string
+	groupID       uint32
+	filterGroupID bool
 
 	// service
 	ex                   types.Exchange
@@ -34,7 +35,7 @@ type Collector struct {
 	queryClosedOrderDesc descendingClosedOrderQueryService
 }
 
-func NewCollector(logger *logrus.Entry, symbol string, groupID uint32, ex types.Exchange) *Collector {
+func NewCollector(logger *logrus.Entry, symbol string, groupID uint32, filterGroupID bool, ex types.Exchange) *Collector {
 	historyService, ok := ex.(types.ExchangeTradeHistoryService)
 	if !ok {
 		logger.Errorf("exchange %s doesn't support ExchangeTradeHistoryService", ex.Name())
@@ -63,6 +64,7 @@ func NewCollector(logger *logrus.Entry, symbol string, groupID uint32, ex types.
 		logger:               logger,
 		symbol:               symbol,
 		groupID:              groupID,
+		filterGroupID:        filterGroupID,
 		ex:                   ex,
 		historyService:       historyService,
 		queryService:         queryService,
@@ -99,7 +101,7 @@ func (rc Collector) CollectCurrentRound(ctx context.Context) (Round, error) {
 	lastSide := takeProfitSide
 	for _, order := range allOrders {
 		// group id filter is used for debug when local running
-		if order.GroupID != rc.groupID {
+		if rc.filterGroupID && order.GroupID != rc.groupID {
 			continue
 		}
 
@@ -135,7 +137,7 @@ func (rc *Collector) CollectFinishRounds(ctx context.Context, fromOrderID uint64
 	var round Round
 	for _, order := range orders {
 		// skip not this strategy order
-		if order.GroupID != rc.groupID {
+		if rc.filterGroupID && order.GroupID != rc.groupID {
 			continue
 		}
 
@@ -146,14 +148,14 @@ func (rc *Collector) CollectFinishRounds(ctx context.Context, fromOrderID uint64
 			round.TakeProfitOrders = append(round.TakeProfitOrders, order)
 
 			if order.Status != types.OrderStatusFilled {
-				rc.logger.Infof("take-profit order is %s not filled, so this round is not finished. Keep collecting", order.Status)
+				rc.logger.Infof("take-profit order is not filled (%s), so this round is not finished. Keep collecting", order.Status)
 				continue
 			}
 
 			for _, o := range round.TakeProfitOrders {
 				if types.IsActiveOrder(o) {
 					// Should not happen ! but we only log it
-					rc.logger.Errorf("there is at least one take-profit order (%d) is still active, please check it", o.OrderID)
+					rc.logger.Errorf("unexpected error, there is at least one take-profit order #%d is still active, please check it. %s", o.OrderID, o.String())
 				}
 			}
 
