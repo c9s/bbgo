@@ -849,6 +849,46 @@ func TestWebSocketEvent_IsValid(t *testing.T) {
 
 		assert.ErrorContains(t, opEvent.IsValid(), "unexpected event type")
 	})
+
+	t.Run("conn count info", func(t *testing.T) {
+		input := `{
+    "event":"channel-conn-count",
+    "channel":"orders",
+    "connCount": "2",
+    "connId":"abcd1234"
+}`
+		res, err := parseWebSocketEvent([]byte(input))
+		assert.NoError(t, err)
+		opEvent, ok := res.(*WebSocketEvent)
+		assert.True(t, ok)
+		assert.Equal(t, WebSocketEvent{
+			Event:     "channel-conn-count",
+			Channel:   "orders",
+			ConnCount: "2",
+		}, *opEvent)
+
+		assert.NoError(t, opEvent.IsValid())
+	})
+
+	t.Run("conn count error", func(t *testing.T) {
+		input := `{
+    "event": "channel-conn-count-error",
+    "channel": "orders",
+    "connCount": "20",
+    "connId":"a4d3ae55"
+}`
+		res, err := parseWebSocketEvent([]byte(input))
+		assert.NoError(t, err)
+		opEvent, ok := res.(*WebSocketEvent)
+		assert.True(t, ok)
+		assert.Equal(t, WebSocketEvent{
+			Event:     "channel-conn-count-error",
+			Channel:   "orders",
+			ConnCount: "20",
+		}, *opEvent)
+
+		assert.ErrorContains(t, opEvent.IsValid(), "rate limit")
+	})
 }
 
 func TestOrderTradeEvent(t *testing.T) {
