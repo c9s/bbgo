@@ -15,8 +15,25 @@ import (
 type Channel string
 
 const (
-	ChannelBooks        Channel = "books"
-	ChannelBook5        Channel = "book5"
+	// books: 400 depth levels will be pushed in the initial full snapshot.
+	// Incremental data will be pushed every 100 ms for the changes in the order book during that period of time.
+	ChannelBooks Channel = "books"
+
+	// ChannelBooks5 is books5
+	// 5 depth levels snapshot will be pushed every time.
+	// Snapshot data will be pushed every 100 ms when there are changes in the 5 depth levels snapshot.
+	ChannelBooks5 Channel = "books5"
+
+	// ChannelBooks50 is books50-l2-tbt:
+	// 50 depth levels will be pushed in the initial full snapshot.
+	// Incremental data will be pushed every 10 ms for the changes in the order book during that period of time.
+	ChannelBooks50 Channel = "books50-l2-tbt"
+
+	// ChannelBooks1 is bbo-tbt
+	// 1 depth level snapshot will be pushed every time.
+	// Snapshot data will be pushed every 10 ms when there are changes in the 1 depth level snapshot.
+	ChannelBooks1 Channel = "bbo-tbt"
+
 	ChannelCandlePrefix Channel = "candle"
 	ChannelAccount      Channel = "account"
 	ChannelMarketTrades Channel = "trades"
@@ -44,7 +61,7 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 	case ChannelAccount:
 		return parseAccount(event.Data)
 
-	case ChannelBooks, ChannelBook5:
+	case ChannelBooks, ChannelBooks5:
 		var bookEvent BookEvent
 		err = json.Unmarshal(event.Data, &bookEvent.Data)
 		if err != nil {
