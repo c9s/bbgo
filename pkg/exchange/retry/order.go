@@ -144,17 +144,34 @@ func QueryClosedOrdersUntilSuccessfulLite(
 	return closedOrders, err
 }
 
+var ErrTradeFeeIsProcessing = errors.New("trading fee is still processing")
+var ErrTradeNotExecutedYet = errors.New("trades not executed yet")
+
 // QueryOrderTradesUntilSuccessful query order's trades until success (include the trading fee is not processing)
 func QueryOrderTradesUntilSuccessful(
 	ctx context.Context, ex types.ExchangeOrderQueryService, q types.OrderQuery,
 ) (trades []types.Trade, err error) {
+	// sometimes the api might return empty trades without an error when we query the order too soon,
+	// so in the initial attempts, we should check the len(trades) and retry the query
+	var initialAttempts = 3
 	var op = func() (err2 error) {
 		trades, err2 = ex.QueryOrderTrades(ctx, q)
+		if err2 != nil {
+			return err2
+		}
+
+		initialAttempts--
+
+		if initialAttempts > 0 && len(trades) == 0 {
+			return ErrTradeNotExecutedYet
+		}
+
 		for _, trade := range trades {
 			if trade.FeeProcessing {
-				return fmt.Errorf("there are some trades which trading fee is not ready")
+				return ErrTradeFeeIsProcessing
 			}
 		}
+
 		return err2
 	}
 
