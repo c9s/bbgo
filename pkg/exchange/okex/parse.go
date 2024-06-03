@@ -99,10 +99,12 @@ func parseWebSocketEvent(in []byte) (interface{}, error) {
 type WsEventType string
 
 const (
-	WsEventTypeLogin       = "login"
-	WsEventTypeError       = "error"
-	WsEventTypeSubscribe   = "subscribe"
-	WsEventTypeUnsubscribe = "unsubscribe"
+	WsEventTypeLogin           WsEventType = "login"
+	WsEventTypeError           WsEventType = "error"
+	WsEventTypeSubscribe       WsEventType = "subscribe"
+	WsEventTypeUnsubscribe     WsEventType = "unsubscribe"
+	WsEventTypeConnectionInfo  WsEventType = "channel-conn-count"
+	WsEventTypeConnectionError WsEventType = "channel-conn-count-error"
 )
 
 type WebSocketEvent struct {
@@ -115,6 +117,8 @@ type WebSocketEvent struct {
 	} `json:"arg,omitempty"`
 	Data       json.RawMessage `json:"data"`
 	ActionType ActionType      `json:"action"`
+	Channel    Channel         `json:"channel"`
+	ConnCount  string          `json:"connCount"`
 }
 
 func (w *WebSocketEvent) IsValid() error {
@@ -132,6 +136,12 @@ func (w *WebSocketEvent) IsValid() error {
 			return fmt.Errorf("websocket request error, code: %s, msg: %s", w.Code, w.Message)
 		}
 		return nil
+
+	case WsEventTypeConnectionInfo:
+		return nil
+
+	case WsEventTypeConnectionError:
+		return fmt.Errorf("connection rate limit exceeded, channel: %s, connCount: %s", w.Channel, w.ConnCount)
 
 	default:
 		return fmt.Errorf("unexpected event type: %+v", w)
@@ -400,4 +410,11 @@ func (m *MarketTradeEvent) toGlobalTrade() (types.Trade, error) {
 		Fee:           fixedpoint.Zero, // not supported
 		FeeCurrency:   "",              // not supported
 	}, nil
+}
+
+type ConnectionInfoEvent struct {
+	Event     string  `json:"event"`
+	Channel   Channel `json:"channel"`
+	ConnCount string  `json:"connCount"`
+	ConnId    string  `json:"connId"`
 }
