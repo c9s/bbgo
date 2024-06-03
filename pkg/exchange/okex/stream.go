@@ -303,7 +303,7 @@ func (s *Stream) dispatchEvent(e interface{}) {
 
 	case *BookEvent:
 		// there's "books" for 400 depth and books5 for 5 depth
-		if et.channel != ChannelBook5 {
+		if et.channel != ChannelBooks5 {
 			s.EmitBookEvent(*et)
 		}
 		s.EmitBookTickerUpdate(et.BookTicker())
