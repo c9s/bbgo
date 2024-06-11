@@ -1116,7 +1116,7 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 		assert       = assert.New(t)
 		ex           = New("key", "secret", "passphrase")
 		expBtcSymbol = "BTCUSDT"
-		since        = types.NewMillisecondTimestampFromInt(1709645944272).Time()
+		since        = time.Now().Add(-24 * time.Hour)
 		until        = since.Add(time.Hour)
 		lastOrderId  = uint64(0)
 		url          = "/api/v2/spot/trade/history-orders"
@@ -1417,7 +1417,7 @@ func TestExchange_QueryTrades(t *testing.T) {
 		assert       = assert.New(t)
 		ex           = New("key", "secret", "passphrase")
 		expApeSymbol = "APEUSDT"
-		since        = types.NewMillisecondTimestampFromInt(1709645944272).Time()
+		since        = time.Now().Add(-24 * time.Hour)
 		until        = since.Add(time.Hour)
 		options      = &types.TradeQueryOptions{
 			StartTime:   &since,
