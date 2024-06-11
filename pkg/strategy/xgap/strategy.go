@@ -21,7 +21,7 @@ const ID = "xgap"
 
 var log = logrus.WithField("strategy", ID)
 
-var StepPercentageGap = fixedpoint.NewFromFloat(0.05)
+var maxStepPercentageGap = fixedpoint.NewFromFloat(0.05)
 
 var Two = fixedpoint.NewFromInt(2)
 
@@ -74,6 +74,7 @@ type Strategy struct {
 	DailyMaxVolume  fixedpoint.Value            `json:"dailyMaxVolume,omitempty"`
 	UpdateInterval  types.Duration              `json:"updateInterval"`
 	SimulateVolume  bool                        `json:"simulateVolume"`
+	SimulatePrice   bool                        `json:"simulatePrice"`
 
 	sourceSession, tradingSession *bbgo.ExchangeSession
 	sourceMarket, tradingMarket   types.Market
@@ -274,8 +275,8 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		log.Infof("trading book spread=%s %s",
 			spread.String(), spreadPercentage.Percentage())
 
-		// use the source book price if the spread percentage greater than 10%
-		if spreadPercentage.Compare(StepPercentageGap) > 0 {
+		// use the source book price if the spread percentage greater than 5%
+		if s.SimulatePrice && spreadPercentage.Compare(maxStepPercentageGap) > 0 {
 			log.Warnf("spread too large (%s %s), using source book",
 				spread.String(), spreadPercentage.Percentage())
 			bestBid, hasBid = s.sourceBook.BestBid()
@@ -335,12 +336,12 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 
 	minQuantity := s.tradingMarket.AdjustQuantityByMinNotional(s.tradingMarket.MinQuantity, price)
 
-	if baseBalance.Available.Compare(minQuantity) < 0 {
+	if baseBalance.Available.Compare(minQuantity) <= 0 {
 		log.Infof("base balance: %s %s is not enough, skip", baseBalance.Available.String(), s.tradingMarket.BaseCurrency)
 		return
 	}
 
-	if quoteBalance.Available.Div(price).Compare(minQuantity) < 0 {
+	if quoteBalance.Available.Div(price).Compare(minQuantity) <= 0 {
 		log.Infof("quote balance: %s %s is not enough, skip", quoteBalance.Available.String(), s.tradingMarket.QuoteCurrency)
 		return
 	}
