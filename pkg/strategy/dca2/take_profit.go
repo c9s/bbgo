@@ -17,8 +17,8 @@ func (s *Strategy) placeTakeProfitOrders(ctx context.Context) error {
 		return errors.Wrap(err, "failed to place the take-profit order when collecting current round")
 	}
 
-	if currentRound.TakeProfitOrder.OrderID != 0 {
-		return fmt.Errorf("there is a take-profit order before placing the take-profit order, please check it")
+	if len(currentRound.TakeProfitOrders) > 0 {
+		return fmt.Errorf("there is a take-profit order before placing the take-profit order, please check it and manually fix it")
 	}
 
 	trades, err := s.collector.CollectRoundTrades(ctx, currentRound)
