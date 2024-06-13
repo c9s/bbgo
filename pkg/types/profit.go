@@ -216,7 +216,7 @@ func (s *ProfitStats) Init(market Market) {
 	}
 }
 
-func (s *ProfitStats) AddProfit(profit Profit) {
+func (s *ProfitStats) AddProfit(profit *Profit) {
 	if s.IsOver24Hours() {
 		s.ResetToday(profit.TradedAt)
 	}
