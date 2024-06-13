@@ -221,8 +221,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		s.mu.Unlock()
 	})
 
-	s.sourceBook = types.NewStreamBook(s.Symbol)
-	s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
+	if s.SourceExchange != "" {
+		s.sourceBook = types.NewStreamBook(s.Symbol)
+		s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
+	}
 
 	s.tradingBook = types.NewStreamBook(s.Symbol)
 	s.tradingBook.BindStream(s.tradingSession.MarketDataStream)
@@ -276,7 +278,7 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 			spread.String(), spreadPercentage.Percentage())
 
 		// use the source book price if the spread percentage greater than 5%
-		if s.SimulatePrice && spreadPercentage.Compare(maxStepPercentageGap) > 0 {
+		if s.SimulatePrice && s.sourceBook != nil && spreadPercentage.Compare(maxStepPercentageGap) > 0 {
 			log.Warnf("spread too large (%s %s), using source book",
 				spread.String(), spreadPercentage.Percentage())
 			bestBid, hasBid = s.sourceBook.BestBid()
@@ -299,7 +301,7 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 			return
 		}
 
-	} else {
+	} else if s.sourceBook != nil {
 		bestBid, hasBid = s.sourceBook.BestBid()
 		bestAsk, hasAsk = s.sourceBook.BestAsk()
 	}
