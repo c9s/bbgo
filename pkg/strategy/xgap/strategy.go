@@ -311,9 +311,15 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		return
 	}
 
+	if bestBid.Price.IsZero() || bestAsk.Price.IsZero() {
+		log.Warn("bid price or ask price is zero")
+		return
+	}
+
 	var spread = bestAsk.Price.Sub(bestBid.Price)
 	var spreadPercentage = spread.Div(bestAsk.Price)
-	log.Infof("spread=%s %s ask=%s bid=%s",
+
+	log.Infof("spread:%s %s ask:%s bid:%s",
 		spread.String(), spreadPercentage.Percentage(),
 		bestAsk.Price.String(), bestBid.Price.String())
 	// var spreadPercentage = spread.Float64() / bestBid.Price.Float64()
@@ -330,6 +336,7 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		log.Errorf("base balance %s not found", s.tradingMarket.BaseCurrency)
 		return
 	}
+
 	quoteBalance, ok := balances[s.tradingMarket.QuoteCurrency]
 	if !ok {
 		log.Errorf("quote balance %s not found", s.tradingMarket.QuoteCurrency)
@@ -348,9 +355,14 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		return
 	}
 
-	maxQuantity := fixedpoint.Min(baseBalance.Available, quoteBalance.Available.Div(price))
+	maxQuantity := baseBalance.Available
+	if !quoteBalance.Available.IsZero() {
+		maxQuantity = fixedpoint.Min(maxQuantity, quoteBalance.Available.Div(price))
+	}
+
 	quantity := minQuantity
 
+	// if we set the fixed quantity, we should use the fixed
 	if s.Quantity.Sign() > 0 {
 		quantity = fixedpoint.Max(s.Quantity, quantity)
 	} else if s.SimulateVolume {
@@ -374,7 +386,11 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		quantity = quantity.Mul(fixedpoint.NewFromFloat(jitter))
 	}
 
+	log.Infof("%s quantity: %f", s.Symbol, quantity.Float64())
+
 	quantity = fixedpoint.Min(quantity, maxQuantity)
+
+	log.Infof("%s adjusted quantity: %f", s.Symbol, quantity.Float64())
 
 	orderForms := []types.SubmitOrder{
 		{
