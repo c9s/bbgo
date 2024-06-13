@@ -23,19 +23,6 @@ func generateTestOrder(side types.SideType, status types.OrderStatus, createdAt 
 
 }
 
-type MockQueryOrders struct {
-	OpenOrders   []types.Order
-	ClosedOrders []types.Order
-}
-
-func (m *MockQueryOrders) QueryOpenOrders(ctx context.Context, symbol string) ([]types.Order, error) {
-	return m.OpenOrders, nil
-}
-
-func (m *MockQueryOrders) QueryClosedOrdersDesc(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error) {
-	return m.ClosedOrders, nil
-}
-
 func Test_RecoverState(t *testing.T) {
 	strategy := newTestStrategy()
 
@@ -123,7 +110,9 @@ func Test_RecoverState(t *testing.T) {
 	t.Run("at take profit stage, and not filled yet", func(t *testing.T) {
 		now := time.Now()
 		currentRound := Round{
-			TakeProfitOrder: generateTestOrder(types.SideTypeSell, types.OrderStatusNew, now),
+			TakeProfitOrders: []types.Order{
+				generateTestOrder(types.SideTypeSell, types.OrderStatusNew, now),
+			},
 			OpenPositionOrders: []types.Order{
 				generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-1*time.Second)),
 				generateTestOrder(types.SideTypeBuy, types.OrderStatusCanceled, now.Add(-2*time.Second)),
@@ -142,7 +131,9 @@ func Test_RecoverState(t *testing.T) {
 	t.Run("at take profit stage, take-profit order filled", func(t *testing.T) {
 		now := time.Now()
 		currentRound := Round{
-			TakeProfitOrder: generateTestOrder(types.SideTypeSell, types.OrderStatusFilled, now),
+			TakeProfitOrders: []types.Order{
+				generateTestOrder(types.SideTypeSell, types.OrderStatusFilled, now),
+			},
 			OpenPositionOrders: []types.Order{
 				generateTestOrder(types.SideTypeBuy, types.OrderStatusFilled, now.Add(-1*time.Second)),
 				generateTestOrder(types.SideTypeBuy, types.OrderStatusCanceled, now.Add(-2*time.Second)),
@@ -157,4 +148,25 @@ func Test_RecoverState(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, WaitToOpenPosition, state)
 	})
+}
+
+func Test_classifyOrders(t *testing.T) {
+	orders := []types.Order{
+		types.Order{Status: types.OrderStatusCanceled},
+		types.Order{Status: types.OrderStatusFilled},
+		types.Order{Status: types.OrderStatusCanceled},
+		types.Order{Status: types.OrderStatusFilled},
+		types.Order{Status: types.OrderStatusPartiallyFilled},
+		types.Order{Status: types.OrderStatusCanceled},
+		types.Order{Status: types.OrderStatusPartiallyFilled},
+		types.Order{Status: types.OrderStatusNew},
+		types.Order{Status: types.OrderStatusRejected},
+		types.Order{Status: types.OrderStatusCanceled},
+	}
+
+	opened, cancelled, filled, unexpected := classifyOrders(orders)
+	assert.Equal(t, 3, len(opened))
+	assert.Equal(t, 4, len(cancelled))
+	assert.Equal(t, 2, len(filled))
+	assert.Equal(t, 1, len(unexpected))
 }

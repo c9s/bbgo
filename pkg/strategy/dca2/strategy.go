@@ -63,7 +63,8 @@ type Strategy struct {
 	CoolDownInterval types.Duration   `json:"coolDownInterval"`
 
 	// OrderGroupID is the group ID used for the strategy instance for canceling orders
-	OrderGroupID uint32 `json:"orderGroupID"`
+	OrderGroupID              uint32 `json:"orderGroupID"`
+	DisableOrderGroupIDFilter bool   `json:"disableOrderGroupIDFilter"`
 
 	// RecoverWhenStart option is used for recovering dca states
 	RecoverWhenStart          bool `json:"recoverWhenStart"`
@@ -185,7 +186,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	// collector
-	s.collector = NewCollector(s.logger, s.Symbol, s.OrderGroupID, s.ExchangeSession.Exchange)
+	s.collector = NewCollector(s.logger, s.Symbol, s.OrderGroupID, !s.DisableOrderGroupIDFilter, s.ExchangeSession.Exchange)
 	if s.collector == nil {
 		return fmt.Errorf("failed to initialize collector")
 	}
@@ -481,7 +482,11 @@ func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
 		}
 
 		// update profit stats FromOrderID to make sure we will not collect duplicated rounds
-		s.ProfitStats.FromOrderID = round.TakeProfitOrder.OrderID + 1
+		for _, order := range round.TakeProfitOrders {
+			if order.OrderID >= s.ProfitStats.FromOrderID {
+				s.ProfitStats.FromOrderID = order.OrderID + 1
+			}
+		}
 
 		// update quote investment
 		s.ProfitStats.QuoteInvestment = s.ProfitStats.QuoteInvestment.Add(s.ProfitStats.CurrentRoundProfit)
