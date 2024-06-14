@@ -47,6 +47,7 @@ var (
 	_ types.ExchangeTradeService      = &Exchange{}
 	_ types.Exchange                  = &Exchange{}
 	_ types.ExchangeOrderQueryService = &Exchange{}
+	_ types.ExchangeTimeRangeProvider = &Exchange{}
 )
 
 type Exchange struct {
@@ -597,6 +598,20 @@ func (e *Exchange) GetAllFeeRates(ctx context.Context) (bybitapi.FeeRates, error
 	}
 
 	return *feeRates, nil
+}
+
+// GetMaxTradeHistoryTimeRange returns a time range of 180 days, which is the maximum supported by the exchange.
+//
+// see more: QueryTrades
+func (e *Exchange) GetMaxTradeHistoryTimeRange() time.Duration {
+	return 180 * 24 * time.Hour
+}
+
+// GetMaxOrderHistoryTimeRange returns 0 since the exchange not supported by time-range-based query
+//
+// see more: QueryClosedOrders
+func (e *Exchange) GetMaxOrderHistoryTimeRange() time.Duration {
+	return 0
 }
 
 func (e *Exchange) NewStream() types.Stream {
