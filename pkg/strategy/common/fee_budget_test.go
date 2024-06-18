@@ -50,7 +50,7 @@ func TestFeeBudget(t *testing.T) {
 		assert.Equal(t, c.expected, feeBudget.IsBudgetAllowed())
 
 		// test reset
-		feeBudget.State.AccumulatedFeeStartedAt = feeBudget.State.AccumulatedFeeStartedAt.Add(-24 * time.Hour)
+		feeBudget.State.StartedAt = feeBudget.State.StartedAt.Add(-24 * time.Hour)
 		assert.True(t, feeBudget.IsBudgetAllowed())
 	}
 }
