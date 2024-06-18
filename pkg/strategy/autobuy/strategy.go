@@ -28,12 +28,15 @@ type Strategy struct {
 	Environment *bbgo.Environment
 	Market      types.Market
 
-	Symbol    string                  `json:"symbol"`
-	Schedule  string                  `json:"schedule"`
-	Threshold fixedpoint.Value        `json:"threshold"`
-	PriceType types.PriceType         `json:"priceType"`
-	Bollinger *types.BollingerSetting `json:"bollinger"`
-	DryRun    bool                    `json:"dryRun"`
+	Symbol         string                  `json:"symbol"`
+	Schedule       string                  `json:"schedule"`
+	MinBaseBalance fixedpoint.Value        `json:"minBaseBalance"`
+	PriceType      types.PriceType         `json:"priceType"`
+	Bollinger      *types.BollingerSetting `json:"bollinger"`
+	DryRun         bool                    `json:"dryRun"`
+
+	// Deprecated, to be replaced by MinBaseBalance
+	Threshold fixedpoint.Value `json:"threshold"`
 
 	bbgo.QuantityOrAmount
 
@@ -44,6 +47,10 @@ type Strategy struct {
 func (s *Strategy) Initialize() error {
 	if s.Strategy == nil {
 		s.Strategy = &common.Strategy{}
+	}
+
+	if s.Threshold.Sign() > 0 && s.MinBaseBalance.IsZero() {
+		s.MinBaseBalance = s.Threshold
 	}
 	return nil
 }
@@ -87,7 +94,6 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		s.cancelOrders(ctx)
-		bbgo.Sync(ctx, s)
 	})
 
 	s.cron = cron.New()
@@ -129,11 +135,11 @@ func (s *Strategy) autobuy(ctx context.Context) {
 		return
 	}
 
-	if balance.Available.Compare(s.Threshold) > 0 {
-		log.Infof("balance %s is higher than threshold %s", balance.Available.String(), s.Threshold.String())
+	if balance.Available.Compare(s.MinBaseBalance) > 0 {
+		log.Infof("balance %s is higher than minBaseBalance %s", balance.Available.String(), s.MinBaseBalance.String())
 		return
 	}
-	log.Infof("balance %s is lower than threshold %s", balance.Available.String(), s.Threshold.String())
+	log.Infof("balance %s is lower than minBaseBalance %s", balance.Available.String(), s.MinBaseBalance.String())
 
 	quantity := s.CalculateQuantity(price)
 	submitOrder := types.SubmitOrder{
