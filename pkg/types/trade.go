@@ -95,6 +95,8 @@ type Trade struct {
 
 	// PnL is the profit and loss value of the executed trade
 	PnL sql.NullFloat64 `json:"pnl" db:"pnl"`
+
+	InsertedAt Time `json:"insertedAt" db:"inserted_at"`
 }
 
 func (trade Trade) CsvHeader() []string {
