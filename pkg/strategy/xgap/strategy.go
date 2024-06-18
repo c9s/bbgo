@@ -70,11 +70,12 @@ type Strategy struct {
 	Quantity        fixedpoint.Value `json:"quantity"`
 	DryRun          bool             `json:"dryRun"`
 
-	DailyFeeBudgets map[string]fixedpoint.Value `json:"dailyFeeBudgets,omitempty"`
-	DailyMaxVolume  fixedpoint.Value            `json:"dailyMaxVolume,omitempty"`
-	UpdateInterval  types.Duration              `json:"updateInterval"`
-	SimulateVolume  bool                        `json:"simulateVolume"`
-	SimulatePrice   bool                        `json:"simulatePrice"`
+	DailyFeeBudgets   map[string]fixedpoint.Value `json:"dailyFeeBudgets,omitempty"`
+	DailyMaxVolume    fixedpoint.Value            `json:"dailyMaxVolume,omitempty"`
+	DailyTargetVolume fixedpoint.Value            `json:"dailyTargetVolume,omitempty"`
+	UpdateInterval    types.Duration              `json:"updateInterval"`
+	SimulateVolume    bool                        `json:"simulateVolume"`
+	SimulatePrice     bool                        `json:"simulatePrice"`
 
 	sourceSession, tradingSession *bbgo.ExchangeSession
 	sourceMarket, tradingMarket   types.Market
@@ -380,10 +381,13 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 			}
 		}
 		s.mu.Unlock()
+	} else if s.DailyTargetVolume.Sign() > 0 {
+		numOfTicks := (24 * time.Hour) / s.UpdateInterval.Duration()
+		quantity = fixedpoint.NewFromFloat(s.DailyTargetVolume.Float64() / float64(numOfTicks))
+		quantity = quantityJitter(quantity, 0.02)
 	} else {
 		// plus a 2% quantity jitter
-		jitter := 1.0 + math.Max(0.02, rand.Float64())
-		quantity = quantity.Mul(fixedpoint.NewFromFloat(jitter))
+		quantity = quantityJitter(quantity, 0.02)
 	}
 
 	log.Infof("%s quantity: %f", s.Symbol, quantity.Float64())
@@ -429,4 +433,9 @@ func (s *Strategy) cancelOrders(ctx context.Context) {
 	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
 		log.WithError(err).Error("cancel order error")
 	}
+}
+
+func quantityJitter(q fixedpoint.Value, rg float64) fixedpoint.Value {
+	jitter := 1.0 + math.Max(rg, rand.Float64())
+	return q.Mul(fixedpoint.NewFromFloat(jitter))
 }
