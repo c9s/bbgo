@@ -346,6 +346,8 @@ type EnvironmentConfig struct {
 	DisableMarketDataStore bool `json:"disableMarketDataStore"`
 
 	MaxSessionTradeBufferSize int `json:"maxSessionTradeBufferSize"`
+
+	SyncBufferPeriod *types.Duration `json:"syncBufferPeriod"`
 }
 
 type Config struct {
