@@ -37,6 +37,8 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+var defaultSyncBufferPeriod = 30 * time.Minute
+
 // IsBackTesting is a global variable that indicates the current environment is back-test or not.
 var IsBackTesting = false
 
@@ -645,7 +647,17 @@ func (environ *Environment) syncSession(
 
 	log.Infof("syncing symbols %v from session %s", symbols, session.Name)
 
-	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, syncStartTime, symbols...)
+	syncBufferPeriod := -defaultSyncBufferPeriod
+	if environ.environmentConfig.SyncBufferPeriod != nil {
+		syncBufferPeriod = -environ.environmentConfig.SyncBufferPeriod.Duration()
+	}
+
+	if syncBufferPeriod > 0 {
+		log.Warnf("syncBufferPeriod should be a negative number, given: %d", syncBufferPeriod)
+	}
+
+	syncEndTime := time.Now().Add(syncBufferPeriod)
+	return environ.SyncService.SyncSessionSymbols(ctx, session.Exchange, syncStartTime, syncEndTime, symbols...)
 }
 
 func (environ *Environment) ConfigureNotificationSystem(ctx context.Context, userConfig *Config) error {

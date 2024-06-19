@@ -19,7 +19,10 @@ type OrderService struct {
 	DB *sqlx.DB
 }
 
-func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol string, startTime time.Time) error {
+func (s *OrderService) Sync(
+	ctx context.Context, exchange types.Exchange, symbol string,
+	startTime, endTime time.Time,
+) error {
 	isMargin, isFutures, isIsolated, isolatedSymbol := exchange2.GetSessionAttributes(exchange)
 	// override symbol if isolatedSymbol is not empty
 	if isIsolated && len(isolatedSymbol) > 0 {
@@ -77,7 +80,7 @@ func (s *OrderService) Sync(ctx context.Context, exchange types.Exchange, symbol
 	}
 
 	for _, sel := range tasks {
-		if err := sel.execute(ctx, s.DB, startTime); err != nil {
+		if err := sel.execute(ctx, s.DB, startTime, endTime); err != nil {
 			return err
 		}
 	}

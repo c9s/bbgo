@@ -27,7 +27,9 @@ type SyncService struct {
 
 // SyncSessionSymbols syncs the trades from the given exchange session
 func (s *SyncService) SyncSessionSymbols(
-	ctx context.Context, exchange types.Exchange, startTime time.Time, symbols ...string,
+	ctx context.Context, exchange types.Exchange,
+	startTime, endTime time.Time,
+	symbols ...string,
 ) error {
 	markets, err := cache.LoadExchangeMarketsWithCache(ctx, exchange)
 	if err != nil {
@@ -41,12 +43,12 @@ func (s *SyncService) SyncSessionSymbols(
 		}
 
 		log.Infof("syncing %s %s trades from %s...", exchange.Name(), symbol, startTime)
-		if err := s.TradeService.Sync(ctx, exchange, symbol, startTime); err != nil {
+		if err := s.TradeService.Sync(ctx, exchange, symbol, startTime, endTime); err != nil {
 			return err
 		}
 
 		log.Infof("syncing %s %s orders from %s...", exchange.Name(), symbol, startTime)
-		if err := s.OrderService.Sync(ctx, exchange, symbol, startTime); err != nil {
+		if err := s.OrderService.Sync(ctx, exchange, symbol, startTime, endTime); err != nil {
 			return err
 		}
 	}

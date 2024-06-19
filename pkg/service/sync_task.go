@@ -54,7 +54,10 @@ type SyncTask struct {
 	LogInsert bool
 }
 
-func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Time, args ...time.Time) error {
+func (sel SyncTask) execute(
+	ctx context.Context,
+	db *sqlx.DB, startTime time.Time, endTimeArgs ...time.Time,
+) error {
 	batchBufferRefVal := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(sel.Type)), 0, sel.BatchInsertBuffer)
 
 	// query from db
@@ -84,8 +87,8 @@ func (sel SyncTask) execute(ctx context.Context, db *sqlx.DB, startTime time.Tim
 	startTime = lastRecordTime(sel, recordSliceRef, startTime)
 
 	endTime := time.Now()
-	if len(args) > 0 {
-		endTime = args[0]
+	if len(endTimeArgs) > 0 {
+		endTime = endTimeArgs[0]
 	}
 
 	// asset "" means all assets
