@@ -335,7 +335,7 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 func (s *TradeService) Load(ctx context.Context, id int64) (*types.Trade, error) {
 	var trade types.Trade
 
-	rows, err := s.DB.NamedQuery("SELECT * FROM trades WHERE id = :id", map[string]interface{}{
+	rows, err := s.DB.NamedQueryContext(ctx, "SELECT * FROM trades WHERE id = :id", map[string]interface{}{
 		"id": id,
 	})
 	if err != nil {
