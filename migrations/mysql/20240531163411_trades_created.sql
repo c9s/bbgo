@@ -1,10 +1,10 @@
 -- +up
 -- +begin
-ALTER TABLE `trades` ADD COLUMN `inserted_at` DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL AFTER `traded_at`;
+ALTER TABLE `trades` ADD COLUMN `inserted_at` DATETIME(3) DEFAULT CURRENT_TIMESTAMP NOT NULL AFTER `traded_at`;
 -- +end
 
 -- +begin
-UPDATE `trades` SET `inserted_at`=`traded_at`;
+UPDATE `trades` SET `inserted_at` = `traded_at`;
 -- +end
 
 -- +down
