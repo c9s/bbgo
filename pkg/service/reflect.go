@@ -27,11 +27,14 @@ func tableNameOf(record interface{}) string {
 }
 
 func placeholdersOf(record interface{}) []string {
-	vt := reflect.ValueOf(record)
 	rt := reflect.TypeOf(record)
-
 	if rt.Kind() == reflect.Ptr {
 		rt = rt.Elem()
+	}
+
+	vt := reflect.ValueOf(record)
+	if vt.Kind() == reflect.Ptr {
+		vt = vt.Elem()
 	}
 
 	if rt.Kind() != reflect.Struct {
@@ -60,11 +63,14 @@ func placeholdersOf(record interface{}) []string {
 }
 
 func fieldsNamesOf(record interface{}) []string {
-	vt := reflect.ValueOf(record)
 	rt := reflect.TypeOf(record)
-
 	if rt.Kind() == reflect.Ptr {
 		rt = rt.Elem()
+	}
+
+	vt := reflect.ValueOf(record)
+	if vt.Kind() == reflect.Ptr {
+		vt = vt.Elem()
 	}
 
 	if rt.Kind() != reflect.Struct {
