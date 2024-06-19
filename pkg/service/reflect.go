@@ -27,7 +27,9 @@ func tableNameOf(record interface{}) string {
 }
 
 func placeholdersOf(record interface{}) []string {
+	vt := reflect.ValueOf(record)
 	rt := reflect.TypeOf(record)
+
 	if rt.Kind() == reflect.Ptr {
 		rt = rt.Elem()
 	}
@@ -39,6 +41,12 @@ func placeholdersOf(record interface{}) []string {
 	var dbFields []string
 	for i := 0; i < rt.NumField(); i++ {
 		fieldType := rt.Field(i)
+		fieldValue := vt.Field(i)
+
+		if fieldType.Type.Kind() == reflect.Ptr && fieldValue.IsNil() {
+			continue
+		}
+
 		if tag, ok := fieldType.Tag.Lookup("db"); ok {
 			if tag == "gid" || tag == "-" || tag == "" {
 				continue
@@ -52,7 +60,9 @@ func placeholdersOf(record interface{}) []string {
 }
 
 func fieldsNamesOf(record interface{}) []string {
+	vt := reflect.ValueOf(record)
 	rt := reflect.TypeOf(record)
+
 	if rt.Kind() == reflect.Ptr {
 		rt = rt.Elem()
 	}
@@ -64,6 +74,13 @@ func fieldsNamesOf(record interface{}) []string {
 	var dbFields []string
 	for i := 0; i < rt.NumField(); i++ {
 		fieldType := rt.Field(i)
+		fieldValue := vt.Field(i)
+
+		// skip value=nil field
+		if fieldType.Type.Kind() == reflect.Ptr && fieldValue.IsNil() {
+			continue
+		}
+
 		if tag, ok := fieldType.Tag.Lookup("db"); ok {
 			if tag == "gid" || tag == "-" || tag == "" {
 				continue
