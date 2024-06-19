@@ -16,7 +16,7 @@ func up_main_tradesCreated(ctx context.Context, tx rockhopper.SQLExecutor) (err 
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, "UPDATE `trades` SET `inserted_at`=`traded_at`;")
+	_, err = tx.ExecContext(ctx, "UPDATE `trades` SET `inserted_at` = `traded_at`;")
 	if err != nil {
 		return err
 	}

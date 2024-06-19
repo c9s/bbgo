@@ -648,7 +648,7 @@ func (environ *Environment) syncSession(
 	log.Infof("syncing symbols %v from session %s", symbols, session.Name)
 
 	syncBufferPeriod := -defaultSyncBufferPeriod
-	if environ.environmentConfig.SyncBufferPeriod != nil {
+	if environ.environmentConfig != nil && environ.environmentConfig.SyncBufferPeriod != nil {
 		syncBufferPeriod = -environ.environmentConfig.SyncBufferPeriod.Duration()
 	}
 

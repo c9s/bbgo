@@ -4,7 +4,7 @@ ALTER TABLE `trades` ADD COLUMN `inserted_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 -- +end
 
 -- +begin
-UPDATE `trades` SET `inserted_at`=`traded_at`;
+UPDATE `trades` SET `inserted_at` = `traded_at`;
 -- +end
 
 -- +down
