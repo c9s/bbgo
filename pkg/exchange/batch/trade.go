@@ -31,6 +31,7 @@ func (e TradeBatchQuery) Query(
 			return e.ExchangeTradeHistoryService.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
 				StartTime:   &startTime,
 				EndTime:     &endTime,
+				Limit:       options.Limit,
 				LastTradeID: options.LastTradeID,
 			})
 		},
@@ -45,7 +46,7 @@ func (e TradeBatchQuery) Query(
 
 			return trade.Key().String()
 		},
-		JumpIfEmpty: 23 * time.Hour, // exchange may not have trades in the last 24 hours
+		JumpIfEmpty: 24*time.Hour - 5*time.Minute, // exchange may not have trades in the last 24 hours
 	}
 
 	for _, opt := range opts {
