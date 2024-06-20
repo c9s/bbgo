@@ -33,6 +33,10 @@ type Strategy struct {
 	Multiplier    float64          `json:"multiplier"`
 	MinPriceRange fixedpoint.Value `json:"minPriceRange"`
 
+	// handle missing trades, will be removed in the future
+	TakeProfitByExpectedBaseBalance bool             `json:"takeProfitByExpectedBaseBalance"`
+	ExpectedBaseBalance             fixedpoint.Value `json:"expectedBaseBalance"`
+
 	bbgo.QuantityOrAmount
 	// bbgo.OpenPositionOptions
 
@@ -50,6 +54,14 @@ func (s *Strategy) Initialize() error {
 	})
 	return nil
 }
+
+func (s *Strategy) Validate() error {
+	if s.ExpectedBaseBalance.Sign() < 0 {
+		return fmt.Errorf("expectedBaseBalance should be non-negative")
+	}
+	return nil
+}
+
 func (s *Strategy) ID() string {
 	return ID
 }
@@ -136,14 +148,19 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		position := s.Strategy.OrderExecutor.Position()
 		s.logger.Infof("position: %+v", position)
 
-		side := types.SideTypeBuy
-		takerPrice := ticker.Sell
-		if position.IsLong() {
-			side = types.SideTypeSell
-			takerPrice = ticker.Buy
+		base := position.GetBase()
+		if s.TakeProfitByExpectedBaseBalance {
+			base = baseBalance.Available.Sub(s.ExpectedBaseBalance)
 		}
 
-		if !position.IsDust(takerPrice) {
+		side := types.SideTypeSell
+		takerPrice := ticker.Buy
+		if base.Sign() < 0 {
+			side = types.SideTypeBuy
+			takerPrice = ticker.Sell
+		}
+
+		if !s.Market.IsDustQuantity(base, takerPrice) {
 			s.logger.Infof("%s position is not dust", s.Symbol)
 
 			orderForms = append(orderForms, types.SubmitOrder{
@@ -151,7 +168,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				Type:        types.OrderTypeLimit,
 				Side:        side,
 				Price:       takerPrice,
-				Quantity:    position.GetQuantity(),
+				Quantity:    base.Abs(),
 				Market:      s.Market,
 				TimeInForce: types.TimeInForceGTC,
 				Tag:         "takeProfit",
