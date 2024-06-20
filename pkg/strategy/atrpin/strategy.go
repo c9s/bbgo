@@ -160,7 +160,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			takerPrice = ticker.Sell
 		}
 
-		if !s.Market.IsDustQuantity(base, takerPrice) {
+		positionQuantity := base.Abs()
+		if !s.Market.IsDustQuantity(positionQuantity, takerPrice) {
 			s.logger.Infof("%s position is not dust", s.Symbol)
 
 			orderForms = append(orderForms, types.SubmitOrder{
@@ -168,7 +169,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 				Type:        types.OrderTypeLimit,
 				Side:        side,
 				Price:       takerPrice,
-				Quantity:    base.Abs(),
+				Quantity:    positionQuantity,
 				Market:      s.Market,
 				TimeInForce: types.TimeInForceGTC,
 				Tag:         "takeProfit",
