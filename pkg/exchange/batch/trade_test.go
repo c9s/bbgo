@@ -2,6 +2,7 @@ package batch
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,49 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
 )
+
+func matchTradeQueryOptions(expected *types.TradeQueryOptions) *TradeQueryOptionsMatcher {
+	return &TradeQueryOptionsMatcher{
+		expected: expected,
+	}
+}
+
+type TradeQueryOptionsMatcher struct {
+	expected *types.TradeQueryOptions
+}
+
+func (m TradeQueryOptionsMatcher) Matches(arg interface{}) bool {
+	given, ok := arg.(*types.TradeQueryOptions)
+	if !ok {
+		return false
+	}
+
+	if given.StartTime != nil && m.expected.StartTime != nil {
+		if !given.StartTime.Equal(*m.expected.StartTime) {
+			return false
+		}
+	}
+
+	if given.EndTime != nil && m.expected.EndTime != nil {
+		if !given.EndTime.Equal(*m.expected.EndTime) {
+			return false
+		}
+	}
+
+	if given.Limit != m.expected.Limit {
+		return false
+	}
+
+	if given.LastTradeID != m.expected.LastTradeID {
+		return false
+	}
+
+	return true
+}
+
+func (m TradeQueryOptionsMatcher) String() string {
+	return fmt.Sprintf("%+v", m.expected)
+}
 
 func Test_TradeBatchQuery(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -55,7 +99,7 @@ func Test_TradeBatchQuery(t *testing.T) {
 			mockExchange = mocks.NewMockExchangeTradeHistoryService(ctrl)
 		)
 
-		mockExchange.EXPECT().QueryTrades(ctx, expSymbol, expOptions).DoAndReturn(
+		mockExchange.EXPECT().QueryTrades(ctx, expSymbol, matchTradeQueryOptions(expOptions)).DoAndReturn(
 			func(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
 				assert.Equal(t, startTime, *options.StartTime)
 				assert.Equal(t, endTime, *options.EndTime)
@@ -63,7 +107,13 @@ func Test_TradeBatchQuery(t *testing.T) {
 				assert.Equal(t, expOptions.Limit, options.Limit)
 				return queryTrades1, nil
 			}).Times(1)
-		mockExchange.EXPECT().QueryTrades(ctx, expSymbol, expOptions).DoAndReturn(
+
+		mockExchange.EXPECT().QueryTrades(ctx, expSymbol, matchTradeQueryOptions(&types.TradeQueryOptions{
+			StartTime:   timePtr(queryTrades1[0].Time.Time()),
+			EndTime:     expOptions.EndTime,
+			LastTradeID: 1,
+			Limit:       50,
+		})).DoAndReturn(
 			func(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
 				assert.Equal(t, queryTrades1[0].Time.Time(), *options.StartTime)
 				assert.Equal(t, endTime, *options.EndTime)
@@ -71,7 +121,13 @@ func Test_TradeBatchQuery(t *testing.T) {
 				assert.Equal(t, expOptions.Limit, options.Limit)
 				return queryTrades2, nil
 			}).Times(1)
-		mockExchange.EXPECT().QueryTrades(ctx, expSymbol, expOptions).DoAndReturn(
+
+		mockExchange.EXPECT().QueryTrades(ctx, expSymbol, matchTradeQueryOptions(&types.TradeQueryOptions{
+			StartTime:   timePtr(queryTrades2[1].Time.Time()),
+			EndTime:     expOptions.EndTime,
+			LastTradeID: queryTrades2[1].ID,
+			Limit:       50,
+		})).DoAndReturn(
 			func(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
 				assert.Equal(t, queryTrades2[1].Time.Time(), *options.StartTime)
 				assert.Equal(t, endTime, *options.EndTime)
@@ -137,4 +193,8 @@ func Test_TradeBatchQuery(t *testing.T) {
 		wg.Wait()
 		assert.Equal(t, rcvCount, 0)
 	})
+}
+
+func timePtr(t time.Time) *time.Time {
+	return &t
 }
