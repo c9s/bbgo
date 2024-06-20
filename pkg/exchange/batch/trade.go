@@ -17,20 +17,23 @@ type TradeBatchQuery struct {
 	types.ExchangeTradeHistoryService
 }
 
-func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *types.TradeQueryOptions, opts ...Option) (c chan types.Trade, errC chan error) {
+func (e TradeBatchQuery) Query(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions, opts ...Option,
+) (c chan types.Trade, errC chan error) {
 	if options.EndTime == nil {
 		now := time.Now()
 		options.EndTime = &now
 	}
 
-	startTime := *options.StartTime
-	endTime := *options.EndTime
 	query := &AsyncTimeRangedBatchQuery{
 		Type: types.Trade{},
 		Q: func(startTime, endTime time.Time) (interface{}, error) {
-			options.StartTime = &startTime
-			options.EndTime = &endTime
-			return e.ExchangeTradeHistoryService.QueryTrades(ctx, symbol, options)
+			return e.ExchangeTradeHistoryService.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
+				StartTime:   &startTime,
+				EndTime:     &endTime,
+				Limit:       options.Limit,
+				LastTradeID: options.LastTradeID,
+			})
 		},
 		T: func(obj interface{}) time.Time {
 			return time.Time(obj.(types.Trade).Time)
@@ -40,9 +43,10 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 			if trade.ID > options.LastTradeID {
 				options.LastTradeID = trade.ID
 			}
+
 			return trade.Key().String()
 		},
-		JumpIfEmpty: 24 * time.Hour,
+		JumpIfEmpty: 24*time.Hour - 5*time.Minute, // exchange may not have trades in the last 24 hours
 	}
 
 	for _, opt := range opts {
@@ -50,6 +54,6 @@ func (e TradeBatchQuery) Query(ctx context.Context, symbol string, options *type
 	}
 
 	c = make(chan types.Trade, 100)
-	errC = query.Query(ctx, c, startTime, endTime)
+	errC = query.Query(ctx, c, *options.StartTime, *options.EndTime)
 	return c, errC
 }
