@@ -5,7 +5,7 @@ exchangeStrategies:
     autobuy:
       symbol: MAXTWD
       schedule: "@every 1s"
-      threshold: 200
+      minBaseBalance: 200
       # price type: LAST, BUY, SELL, MID, TAKER, MAKER
       priceType: BUY
 
