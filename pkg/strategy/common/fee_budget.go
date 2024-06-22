@@ -2,10 +2,10 @@ package common
 
 import (
 	"sync"
-	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -73,20 +73,12 @@ func (f *FeeBudget) HandleTradeUpdate(trade types.Trade) {
 }
 
 type State struct {
-	AccumulatedFeeStartedAt time.Time                   `json:"accumulatedFeeStartedAt,omitempty"`
-	AccumulatedFees         map[string]fixedpoint.Value `json:"accumulatedFees,omitempty"`
-}
+	util.Countdown
 
-func (s *State) IsOver24Hours() bool {
-	return time.Since(s.AccumulatedFeeStartedAt) >= 24*time.Hour
+	AccumulatedFees map[string]fixedpoint.Value `json:"accumulatedFees,omitempty"`
 }
 
 func (s *State) Reset() {
-	t := time.Now()
-	dateTime := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-
-	log.Infof("[State] resetting accumulated started time to: %s", dateTime)
-
-	s.AccumulatedFeeStartedAt = dateTime
+	s.Countdown.Reset()
 	s.AccumulatedFees = make(map[string]fixedpoint.Value)
 }
