@@ -136,8 +136,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	// the shutdown handler, you can cancel all orders
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-		_ = s.OrderExecutorMap.GracefulCancel(ctx)
-		bbgo.Sync(ctx, s)
+		if err := s.activeOrderBook.GracefulCancel(ctx, s.Session.Exchange); err != nil {
+			log.WithError(err).Errorf("failed to cancel orders")
+		}
 	})
 
 	s.cron = cron.New()
@@ -174,7 +175,7 @@ func (s *Strategy) rebalance(ctx context.Context) {
 
 	createdOrders, err := s.OrderExecutorMap.SubmitOrders(ctx, *order)
 	if err != nil {
-		log.WithError(err).Error("failed to submit orders")
+		log.WithError(err).Errorf("failed to submit order: %s", order.String())
 		return
 	}
 	s.activeOrderBook.Add(createdOrders...)
@@ -255,9 +256,9 @@ func (s *Strategy) generateOrder(ctx context.Context) (*types.SubmitOrder, error
 		}
 
 		if side == types.SideTypeBuy {
-			quantity = fixedpoint.Min(quantity, balances[s.QuoteCurrency].Available.Div(ticker.Sell))
+			quantity = fixedpoint.Min(quantity, balances[s.QuoteCurrency].Available.Div(ticker.Sell)).Round(market.VolumePrecision, fixedpoint.Down)
 		} else if side == types.SideTypeSell {
-			quantity = fixedpoint.Min(quantity, balances[market.BaseCurrency].Available)
+			quantity = fixedpoint.Min(quantity, balances[market.BaseCurrency].Available).Round(market.VolumePrecision, fixedpoint.Down)
 		}
 
 		price := s.PriceType.Map(ticker, side)
