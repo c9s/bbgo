@@ -53,7 +53,7 @@ func TestTwinOrderBook(t *testing.T) {
 	}
 
 	for _, order := range orders {
-		assert.NoError(book.AddOrder(order))
+		assert.NoError(book.AddOrder(order, false))
 	}
 	assert.Equal(2, book.Size())
 	assert.Equal(2, book.EmptyTwinOrderSize())
