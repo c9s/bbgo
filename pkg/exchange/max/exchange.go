@@ -985,15 +985,10 @@ func (e *Exchange) QueryDepositHistory(
 
 // QueryTrades
 // For MAX API spec
-// start_time and end_time need to be within 3 days
-// without any parameters      -> return trades within 24 hours
-// give start_time or end_time -> ignore parameter from_id
-// give start_time or from_id  -> order by time asc
-// give end_time               -> order by time desc
+// give from_id -> query trades from this id and order by asc
+// give timestamp and order is asc -> query trades after timestamp and order by asc
+// give timestamp and order is desc -> query trades before timestamp and order by desc
 // limit should b1 1~1000
-// For this QueryTrades spec (to be compatible with batch.TradeBatchQuery)
-// give LastTradeID       -> ignore start_time (but still can filter the end_time)
-// without any parameters -> return trades within 24 hours
 func (e *Exchange) QueryTrades(
 	ctx context.Context, symbol string, options *types.TradeQueryOptions,
 ) (trades []types.Trade, err error) {
@@ -1020,23 +1015,15 @@ func (e *Exchange) QueryTrades(
 	// However, we want to use from_id as main parameter for batch.TradeBatchQuery
 	if options.LastTradeID > 0 {
 		// MAX uses inclusive last trade ID
-		req.From(options.LastTradeID)
+		req.FromID(options.LastTradeID)
+		req.Order("asc")
 	} else {
-		// option's start_time and end_time need to be within 3 days
-		// so if the start_time and end_time is over 3 days, we make end_time down to start_time + 3 days
-		if options.StartTime != nil && options.EndTime != nil {
-			endTime := *options.EndTime
-			startTime := *options.StartTime
-			if endTime.Sub(startTime) > 72*time.Hour {
-				startTime := *options.StartTime
-				endTime = startTime.Add(72 * time.Hour)
-			}
-			req.StartTime(startTime)
-			req.EndTime(endTime)
-		} else if options.StartTime != nil {
-			req.StartTime(*options.StartTime)
+		if options.StartTime != nil {
+			req.Timestamp(*options.StartTime)
+			req.Order("asc")
 		} else if options.EndTime != nil {
-			req.EndTime(*options.EndTime)
+			req.Timestamp(*options.EndTime)
+			req.Order("desc")
 		}
 	}
 
@@ -1046,6 +1033,14 @@ func (e *Exchange) QueryTrades(
 	}
 
 	for _, t := range maxTrades {
+		if options.StartTime != nil && options.StartTime.After(t.CreatedAt.Time()) {
+			continue
+		}
+
+		if options.EndTime != nil && options.EndTime.Before(t.CreatedAt.Time()) {
+			continue
+		}
+
 		localTrades, err := toGlobalTradeV3(t)
 		if err != nil {
 			log.WithError(err).Errorf("can not convert trade: %+v", t)

@@ -14,15 +14,15 @@ func (s *Client) NewGetWalletTradesRequest(walletType WalletType) *GetWalletTrad
 	return &GetWalletTradesRequest{client: s.Client, walletType: walletType}
 }
 
-//go:generate GetRequest -url "/api/v3/wallet/:walletType/trades" -type GetWalletTradesRequest -responseType []Trade
+//go:generate GetRequest -url "/api/v3/wallet/:walletType/new/trades" -type GetWalletTradesRequest -responseType []Trade
 type GetWalletTradesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	walletType WalletType `param:"walletType,slug,required"`
 
 	market    string     `param:"market,required"`
-	from      *uint64    `param:"from_id"`
-	startTime *time.Time `param:"start_time,milliseconds"`
-	endTime   *time.Time `param:"end_time,milliseconds"`
+	timestamp *time.Time `param:"timestamp,milliseconds,omitempty"`
+	fromID    *uint64    `param:"from_id,omitempty"`
+	order     *string    `param:"order,omitempty" validValues:"asc,desc"`
 	limit     *uint64    `param:"limit"`
 }
