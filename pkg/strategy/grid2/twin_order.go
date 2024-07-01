@@ -175,6 +175,9 @@ func (b *TwinOrderBook) String() string {
 	sb.WriteString("================== TWIN ORDERBOOK ==================\n")
 	for _, pin := range b.pins {
 		twin := b.m[fixedpoint.Value(pin)]
+		if twin == nil {
+			continue
+		}
 		twinOrder := twin.GetOrder()
 		sb.WriteString(fmt.Sprintf("-> %8s) %s\n", pin, twinOrder.String()))
 	}
@@ -217,7 +220,7 @@ func (b *TwinOrderBook) GetTwinOrderPin(order types.Order) (fixedpoint.Value, er
 	return b.pins[idx], nil
 }
 
-func (b *TwinOrderBook) AddOrder(order types.Order) error {
+func (b *TwinOrderBook) AddOrder(order types.Order, checkUpdateTime bool) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -238,7 +241,12 @@ func (b *TwinOrderBook) AddOrder(order types.Order) error {
 	// Exist == false means there is no twin order on this pin
 	if !twinOrder.Exist() {
 		b.size++
+	} else {
+		if checkUpdateTime && twinOrder.GetOrder().UpdateTime.After(order.UpdateTime.Time()) {
+			return nil
+		}
 	}
+
 	if b.size >= len(b.pins) {
 		return fmt.Errorf("the maximum size of twin orderbook is len(pins) - 1, need to check it")
 	}
@@ -249,13 +257,6 @@ func (b *TwinOrderBook) AddOrder(order types.Order) error {
 
 func (b *TwinOrderBook) GetTwinOrder(pin fixedpoint.Value) *TwinOrder {
 	return b.m[pin]
-}
-
-func (b *TwinOrderBook) AddTwinOrder(pin fixedpoint.Value, order *TwinOrder) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	b.m[pin] = order
 }
 
 // Size is the valid twin order on grid.
