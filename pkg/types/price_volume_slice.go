@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -180,15 +181,40 @@ func (slice *PriceVolumeSlice) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// ParsePriceVolumeKvSliceJSON parses a JSON array of objects into PriceVolumeSlice
+// [{"Price":...,"Volume":...}, ...]
+func ParsePriceVolumeKvSliceJSON(b []byte) (PriceVolumeSlice, error) {
+	type S PriceVolumeSlice
+	var ts S
+
+	err := json.Unmarshal(b, &ts)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ts) > 0 && ts[0].Price.IsZero() {
+		return nil, fmt.Errorf("unable to parse price volume slice correctly, input given: %s", string(b))
+	}
+
+	return PriceVolumeSlice(ts), nil
+}
+
 // ParsePriceVolumeSliceJSON tries to parse a 2 dimensional string array into a PriceVolumeSlice
 //
 //	[["9000", "10"], ["9900", "10"], ... ]
+//
+// if parse failed, then it will try to parse the JSON array of objects, function ParsePriceVolumeKvSliceJSON will be called.
 func ParsePriceVolumeSliceJSON(b []byte) (slice PriceVolumeSlice, err error) {
 	var as [][]fixedpoint.Value
 
 	err = json.Unmarshal(b, &as)
 	if err != nil {
-		return slice, err
+		// fallback unmarshalling: if the prefix looks like an object array
+		if bytes.HasPrefix(b, []byte(`[{`)) {
+			return ParsePriceVolumeKvSliceJSON(b)
+		}
+
+		return nil, err
 	}
 
 	for _, a := range as {
