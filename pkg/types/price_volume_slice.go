@@ -181,6 +181,8 @@ func (slice *PriceVolumeSlice) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// ParsePriceVolumeKvSliceJSON parses a JSON array of objects into PriceVolumeSlice
+// [{"Price":...,"Volume":...}, ...]
 func ParsePriceVolumeKvSliceJSON(b []byte) (PriceVolumeSlice, error) {
 	type S PriceVolumeSlice
 	var ts S
@@ -200,6 +202,8 @@ func ParsePriceVolumeKvSliceJSON(b []byte) (PriceVolumeSlice, error) {
 // ParsePriceVolumeSliceJSON tries to parse a 2 dimensional string array into a PriceVolumeSlice
 //
 //	[["9000", "10"], ["9900", "10"], ... ]
+//
+// if parse failed, then it will try to parse the JSON array of objects, function ParsePriceVolumeKvSliceJSON will be called.
 func ParsePriceVolumeSliceJSON(b []byte) (slice PriceVolumeSlice, err error) {
 	var as [][]fixedpoint.Value
 
