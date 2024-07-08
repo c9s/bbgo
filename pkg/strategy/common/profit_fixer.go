@@ -2,12 +2,14 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -100,4 +102,39 @@ func (f *ProfitFixer) FixFromTrades(allTrades []types.Trade, stats *types.Profit
 
 	log.Infof("profitFixer fix finished: profitStats and position are updated from %d trades", len(allTrades))
 	return nil
+}
+
+type ProfitFixerBundle struct {
+	ProfitFixerConfig *ProfitFixerConfig `json:"profitFixer,omitempty"`
+}
+
+func (f *ProfitFixerBundle) Fix(
+	ctx context.Context,
+	symbol string,
+	position *types.Position,
+	profitStats *types.ProfitStats,
+	sessions ...*bbgo.ExchangeSession,
+) error {
+	bbgo.Notify("Fixing %s profitStats and position...", symbol)
+
+	log.Infof("profitFixer is enabled, checking checkpoint: %+v", f.ProfitFixerConfig.TradesSince)
+
+	if f.ProfitFixerConfig.TradesSince.Time().IsZero() {
+		return fmt.Errorf("tradesSince time can not be zero")
+	}
+
+	fixer := NewProfitFixer()
+	for _, session := range sessions {
+		if ss, ok := session.Exchange.(types.ExchangeTradeHistoryService); ok {
+			log.Infof("adding makerSession %s to profitFixer", session.Name)
+			fixer.AddExchange(session.Name, ss)
+		}
+	}
+
+	return fixer.Fix(ctx,
+		symbol,
+		f.ProfitFixerConfig.TradesSince.Time(),
+		time.Now(),
+		profitStats,
+		position)
 }
