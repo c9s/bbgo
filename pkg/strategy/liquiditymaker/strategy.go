@@ -63,6 +63,8 @@ type Strategy struct {
 
 	MinProfit fixedpoint.Value `json:"minProfit"`
 
+	common.ProfitFixerBundle
+
 	liquidityOrderBook, adjustmentOrderBook *bbgo.ActiveOrderBook
 
 	liquidityScale bbgo.Scale
@@ -91,6 +93,19 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
+	if s.ProfitFixerBundle.ProfitFixerConfig != nil {
+		market, _ := session.Market(s.Symbol)
+		s.Position = types.NewPositionFromMarket(market)
+		s.ProfitStats = types.NewProfitStats(market)
+
+		if err := s.ProfitFixerBundle.Fix(ctx, s.Symbol, s.Position, s.ProfitStats, session); err != nil {
+			return err
+		}
+
+		bbgo.Notify("Fixed %s position", s.Symbol, s.Position)
+		bbgo.Notify("Fixed %s profitStats", s.Symbol, s.ProfitStats)
+	}
+
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
 	s.orderGenerator = &LiquidityOrderGenerator{

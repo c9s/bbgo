@@ -196,7 +196,7 @@ type Strategy struct {
 	// Pips is the pips of the layer prices
 	Pips fixedpoint.Value `json:"pips"`
 
-	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer"`
+	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer,omitempty"`
 
 	// --------------------------------
 	// private fields
