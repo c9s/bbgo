@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -26,41 +25,6 @@ type advancedOrderCancelApi interface {
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
-}
-
-type ProfitFixer struct {
-	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer,omitempty"`
-}
-
-func (f *ProfitFixer) Fix(
-	ctx context.Context,
-	symbol string,
-	position *types.Position,
-	profitStats *types.ProfitStats,
-	sessions ...*bbgo.ExchangeSession,
-) error {
-	bbgo.Notify("Fixing %s profitStats and position...", symbol)
-
-	log.Infof("profitFixer is enabled, checking checkpoint: %+v", f.ProfitFixerConfig.TradesSince)
-
-	if f.ProfitFixerConfig.TradesSince.Time().IsZero() {
-		return fmt.Errorf("tradesSince time can not be zero")
-	}
-
-	fixer := common.NewProfitFixer()
-	for _, session := range sessions {
-		if ss, ok := session.Exchange.(types.ExchangeTradeHistoryService); ok {
-			log.Infof("adding makerSession %s to profitFixer", session.Name)
-			fixer.AddExchange(session.Name, ss)
-		}
-	}
-
-	return fixer.Fix(ctx,
-		symbol,
-		f.ProfitFixerConfig.TradesSince.Time(),
-		time.Now(),
-		profitStats,
-		position)
 }
 
 // Strategy is the strategy struct of LiquidityMaker
@@ -99,7 +63,7 @@ type Strategy struct {
 
 	MinProfit fixedpoint.Value `json:"minProfit"`
 
-	ProfitFixer
+	common.ProfitFixerBundle
 
 	liquidityOrderBook, adjustmentOrderBook *bbgo.ActiveOrderBook
 
@@ -129,12 +93,12 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
-	if s.ProfitFixer.ProfitFixerConfig != nil {
+	if s.ProfitFixerBundle.ProfitFixerConfig != nil {
 		market, _ := session.Market(s.Symbol)
 		s.Position = types.NewPositionFromMarket(market)
 		s.ProfitStats = types.NewProfitStats(market)
 
-		if err := s.ProfitFixer.Fix(ctx, s.Symbol, s.Position, s.ProfitStats, session); err != nil {
+		if err := s.ProfitFixerBundle.Fix(ctx, s.Symbol, s.Position, s.ProfitStats, session); err != nil {
 			return err
 		}
 
