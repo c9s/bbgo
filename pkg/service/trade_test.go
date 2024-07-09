@@ -1,9 +1,11 @@
 package service
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 
@@ -86,4 +88,37 @@ func Test_queryTradesSQL(t *testing.T) {
 			Limit:    500,
 		}))
 	})
+}
+
+func TestTradeService_Query(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if !assert.NoError(t, err) {
+		return
+	}
+	defer db.Close()
+
+	sqlxDB := sqlx.NewDb(db, "mysql")
+	defer sqlxDB.Close()
+
+	s := NewTradeService(sqlxDB)
+
+	_, err = s.Query(QueryTradesOptions{Ordering: "test_ordering"})
+	assert.Error(t, err)
+	assert.Equal(t, "invalid ordering: test_ordering", err.Error())
+
+	_, err = s.Query(QueryTradesOptions{OrderByColumn: "invalid_column"})
+	assert.Error(t, err)
+	assert.Equal(t, "invalid order by column: invalid_column", err.Error())
+
+	mock.ExpectQuery("SELECT \\* FROM trades WHERE gid > \\? ORDER BY gid ASC").WithArgs(1234).WillReturnError(sql.ErrNoRows)
+	_, err = s.Query(QueryTradesOptions{LastGID: 1234, Ordering: "ASC", OrderByColumn: "gid"})
+	assert.Equal(t, sql.ErrNoRows, err)
+
+	mock.ExpectQuery("SELECT \\* FROM trades ORDER BY gid DESC").WillReturnError(sql.ErrNoRows)
+	_, err = s.Query(QueryTradesOptions{Ordering: "DESC", OrderByColumn: "gid"})
+	assert.Equal(t, sql.ErrNoRows, err)
+
+	mock.ExpectQuery("SELECT \\* FROM trades ORDER BY traded_at ASC").WillReturnError(sql.ErrNoRows)
+	_, err = s.Query(QueryTradesOptions{Ordering: "ASC", OrderByColumn: "traded_at"})
+	assert.Equal(t, sql.ErrNoRows, err)
 }
