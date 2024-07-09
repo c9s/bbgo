@@ -110,6 +110,10 @@ func TestTradeService_Query(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, "invalid order by column: invalid_column", err.Error())
 
+	mock.ExpectQuery("SELECT \\* FROM trades WHERE gid > \\? ORDER BY gid ASC").WithArgs(1234).WillReturnError(sql.ErrNoRows)
+	_, err = s.Query(QueryTradesOptions{LastGID: 1234, Ordering: "ASC", OrderByColumn: "gid"})
+	assert.Equal(t, sql.ErrNoRows, err)
+
 	mock.ExpectQuery("SELECT \\* FROM trades ORDER BY gid DESC").WillReturnError(sql.ErrNoRows)
 	_, err = s.Query(QueryTradesOptions{Ordering: "DESC", OrderByColumn: "gid"})
 	assert.Equal(t, sql.ErrNoRows, err)
