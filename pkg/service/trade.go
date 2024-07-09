@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -32,7 +33,11 @@ type QueryTradesOptions struct {
 
 	// ASC or DESC
 	Ordering string
-	Limit    uint64
+
+	// OrderByColumn is the column name to order by
+	// Currently we only support traded_at and gid column.
+	OrderByColumn string
+	Limit         uint64
 }
 
 type TradingVolume struct {
@@ -304,11 +309,28 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 		sel = sel.Where(sq.Eq{"exchange": options.Sessions})
 	}
 
-	if options.Ordering != "" {
-		sel = sel.OrderBy("traded_at " + options.Ordering)
-	} else {
-		sel = sel.OrderBy("traded_at ASC")
+	var orderByColumn string
+	switch options.OrderByColumn {
+	case "":
+		orderByColumn = "traded_at"
+	case "traded_at", "gid":
+		orderByColumn = options.OrderByColumn
+	default:
+		return nil, fmt.Errorf("invalid order by column: %s", options.OrderByColumn)
 	}
+
+	var ordering string
+
+	switch strings.ToUpper(options.Ordering) {
+	case "":
+		ordering = "ASC"
+	case "ASC", "DESC":
+		ordering = strings.ToUpper(options.Ordering)
+	default:
+		return nil, fmt.Errorf("invalid ordering: %s", options.Ordering)
+	}
+
+	sel = sel.OrderBy(orderByColumn + " " + ordering)
 
 	if options.Limit > 0 {
 		sel = sel.Limit(options.Limit)
