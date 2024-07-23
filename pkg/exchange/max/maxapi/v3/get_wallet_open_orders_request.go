@@ -14,7 +14,7 @@ func (s *Client) NewGetWalletOpenOrdersRequest(walletType WalletType) *GetWallet
 	return &GetWalletOpenOrdersRequest{client: s.Client, walletType: walletType}
 }
 
-//go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/new/open" -type GetWalletOpenOrdersRequest -responseType []Order
+//go:generate GetRequest -url "/api/v3/wallet/:walletType/orders/open" -type GetWalletOpenOrdersRequest -responseType []Order
 type GetWalletOpenOrdersRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
