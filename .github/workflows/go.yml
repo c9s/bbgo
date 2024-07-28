@@ -32,7 +32,7 @@ jobs:
         # lfs: 'true'
         ssh-key: ${{ secrets.git_ssh_key }}
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v4
       with:
         path: |
           ~/.cache/go-build
