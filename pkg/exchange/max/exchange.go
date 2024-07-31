@@ -867,23 +867,7 @@ func (e *Exchange) QueryWithdrawHistory(
 			}
 
 			// we can convert this later
-			status := d.State
-			switch d.State {
-
-			case "confirmed":
-				status = "completed" // make it compatible with binance
-
-			case "submitting", "submitted", "accepted",
-				"rejected", "suspect", "approved", "delisted_processing",
-				"processing", "retryable", "sent", "canceled",
-				"failed", "pending",
-				"kgi_manually_processing", "kgi_manually_confirmed", "kgi_possible_failed",
-				"sygna_verifying":
-
-			default:
-				status = d.State
-
-			}
+			status := convertWithdrawStatus(d.State)
 
 			txIDs[d.TxID] = struct{}{}
 			withdraw := types.Withdraw{
@@ -891,14 +875,16 @@ func (e *Exchange) QueryWithdrawHistory(
 				ApplyTime:              types.Time(d.CreatedAt),
 				Asset:                  toGlobalCurrency(d.Currency),
 				Amount:                 d.Amount,
-				Address:                "",
+				Address:                d.Address,
 				AddressTag:             "",
 				TransactionID:          d.TxID,
 				TransactionFee:         d.Fee,
 				TransactionFeeCurrency: d.FeeCurrency,
+				Network:                d.NetworkProtocol,
 				// WithdrawOrderID: d.WithdrawOrderID,
 				// Network:         d.Network,
-				Status: status,
+				Status:         status,
+				OriginalStatus: string(d.State),
 			}
 			allWithdraws = append(allWithdraws, withdraw)
 		}

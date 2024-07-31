@@ -340,3 +340,27 @@ func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 		UpdateTime:       types.Time(time.Unix(0, u.UpdateTime*int64(time.Millisecond))),
 	}, nil
 }
+
+func convertWithdrawStatus(state max.WithdrawState) types.WithdrawStatus {
+	switch state {
+
+	case max.WithdrawStateSent, max.WithdrawStateSubmitting, max.WithdrawStatePending, "accepted", "approved":
+		return types.WithdrawStatusSent
+
+	case max.WithdrawStateProcessing, "delisted_processing", "kgi_manually_processing", "kgi_manually_confirmed", "sygna_verifying":
+		return types.WithdrawStatusProcessing
+
+	case max.WithdrawStateFailed, "kgi_possible_failed", "rejected", "suspect", "retryable":
+		return types.WithdrawStatusFailed
+
+	case max.WithdrawStateCanceled:
+		return types.WithdrawStatusCancelled
+
+	case "confirmed":
+		// make it compatible with binance
+		return types.WithdrawStatusCompleted
+
+	default:
+		return types.WithdrawStatus(state)
+	}
+}

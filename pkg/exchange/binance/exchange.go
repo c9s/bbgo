@@ -571,6 +571,11 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			return nil, err
 		}
 
+		status, err := toGlobalWithdrawStatus(d.Status)
+		if err != nil {
+			return nil, err
+		}
+
 		withdraws = append(withdraws, types.Withdraw{
 			Exchange:        types.ExchangeBinance,
 			ApplyTime:       types.Time(applyTime),
@@ -581,7 +586,8 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 			TransactionFee:  d.TransactionFee,
 			WithdrawOrderID: d.WithdrawOrderID,
 			Network:         d.Network,
-			Status:          d.Status.String(),
+			Status:          status,
+			OriginalStatus:  fmt.Sprintf("%s (%d)", d.Status.String(), int(d.Status)),
 		})
 	}
 
