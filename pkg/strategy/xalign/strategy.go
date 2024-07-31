@@ -114,24 +114,32 @@ func (s *Strategy) aggregateBalances(
 	return totalBalances, sessionBalances
 }
 
-func (s *Strategy) detectActiveTransfers(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
+func (s *Strategy) detectActiveTransfers(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (bool, error) {
+	var err2 error
 	until := time.Now()
 	since := until.Add(-time.Hour * 24)
 	for _, session := range sessions {
-		if transferService, ok := session.Exchange.(types.ExchangeTransferHistoryService); ok {
-			withdraws, err := transferService.QueryWithdrawHistory(ctx, "", since, until)
-			if err != nil {
-				log.WithError(err).Errorf("unable to query withdraw history")
-				continue
-			}
+		transferService, ok := session.Exchange.(types.ExchangeTransferHistoryService)
+		if !ok {
+			continue
+		}
 
-			for _, withdraw := range withdraws {
-				_ = withdraw
-				// withdraw.
+		withdraws, err := transferService.QueryWithdrawHistory(ctx, "", since, until)
+		if err != nil {
+			log.WithError(err).Errorf("unable to query withdraw history")
+			err2 = err
+			continue
+		}
+
+		for _, withdraw := range withdraws {
+			switch withdraw.Status {
+			case types.WithdrawStatusProcessing, types.WithdrawStatusSent, types.WithdrawStatusAwaitingApproval:
+				return true, nil
 			}
 		}
 	}
 
+	return false, err2
 }
 
 func (s *Strategy) selectSessionForCurrency(
@@ -409,6 +417,14 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 				log.WithError(err).Errorf("can not cancel order")
 			}
 		}
+	}
+
+	foundActiveTransfer, err := s.detectActiveTransfers(ctx, sessions)
+	if err != nil {
+		log.WithError(err).Errorf("unable to check active transfers")
+	} else if foundActiveTransfer {
+		log.Warnf("found active transfer, skip balance align check")
+		return
 	}
 
 	totalBalances, sessionBalances := s.aggregateBalances(ctx, sessions)
