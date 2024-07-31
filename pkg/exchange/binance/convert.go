@@ -9,9 +9,31 @@ import (
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/pkg/errors"
 
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+func toGlobalWithdrawStatus(status binanceapi.WithdrawStatus) (types.WithdrawStatus, error) {
+	switch status {
+	case binanceapi.WithdrawStatusEmailSent:
+		return types.WithdrawStatusSent, nil
+	case binanceapi.WithdrawStatusCancelled:
+		return types.WithdrawStatusCancelled, nil
+	case binanceapi.WithdrawStatusAwaitingApproval:
+		return types.WithdrawStatusAwaitingApproval, nil
+	case binanceapi.WithdrawStatusRejected:
+		return types.WithdrawStatusRejected, nil
+	case binanceapi.WithdrawStatusProcessing:
+		return types.WithdrawStatusProcessing, nil
+	case binanceapi.WithdrawStatusFailure:
+		return types.WithdrawStatusFailed, nil
+	case binanceapi.WithdrawStatusCompleted:
+		return types.WithdrawStatusCompleted, nil
+	default:
+		return types.WithdrawStatusUnknown, fmt.Errorf("unable to convert the withdraw status: %s", status)
+	}
+}
 
 func toGlobalMarket(symbol binance.Symbol) types.Market {
 	market := types.Market{

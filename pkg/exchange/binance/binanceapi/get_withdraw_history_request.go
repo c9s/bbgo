@@ -8,8 +8,9 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
-//go:generate stringer -type=TransferType
 // 1 for internal transfer, 0 for external transfer
+//
+//go:generate stringer -type=TransferType
 type TransferType int
 
 const (
@@ -33,7 +34,7 @@ type WithdrawRecord struct {
 	TxID            string           `json:"txId"`
 }
 
-//go:generate stringer -type=WithdrawStatus
+//go:generate stringer -type=WithdrawStatus -trimprefix=WithdrawStatus
 type WithdrawStatus int
 
 // WithdrawStatus: 0(0:Email Sent,1:Cancelled 2:Awaiting Approval 3:Rejected 4:Processing 5:Failure 6:Completed)

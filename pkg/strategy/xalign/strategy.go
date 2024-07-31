@@ -114,6 +114,26 @@ func (s *Strategy) aggregateBalances(
 	return totalBalances, sessionBalances
 }
 
+func (s *Strategy) detectActiveTransfers(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
+	until := time.Now()
+	since := until.Add(-time.Hour * 24)
+	for _, session := range sessions {
+		if transferService, ok := session.Exchange.(types.ExchangeTransferHistoryService); ok {
+			withdraws, err := transferService.QueryWithdrawHistory(ctx, "", since, until)
+			if err != nil {
+				log.WithError(err).Errorf("unable to query withdraw history")
+				continue
+			}
+
+			for _, withdraw := range withdraws {
+				_ = withdraw
+				// withdraw.
+			}
+		}
+	}
+
+}
+
 func (s *Strategy) selectSessionForCurrency(
 	ctx context.Context, sessions map[string]*bbgo.ExchangeSession, currency string, changeQuantity fixedpoint.Value,
 ) (*bbgo.ExchangeSession, *types.SubmitOrder) {

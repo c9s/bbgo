@@ -149,6 +149,11 @@ type CustomIntervalProvider interface {
 	IsSupportedInterval(interval Interval) bool
 }
 
+type ExchangeTransferHistoryService interface {
+	QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error)
+	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
+}
+
 type ExchangeTransferService interface {
 	QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []Deposit, err error)
 	QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (allWithdraws []Withdraw, err error)
