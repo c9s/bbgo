@@ -7,14 +7,28 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+type WithdrawStatus string
+
+const (
+	WithdrawStatusSent             WithdrawStatus = "sent"
+	WithdrawStatusCancelled        WithdrawStatus = "cancelled"
+	WithdrawStatusAwaitingApproval WithdrawStatus = "awaiting_approval"
+	WithdrawStatusRejected         WithdrawStatus = "rejected"
+	WithdrawStatusProcessing       WithdrawStatus = "processing"
+	WithdrawStatusFailed           WithdrawStatus = "failed"
+	WithdrawStatusCompleted        WithdrawStatus = "completed"
+	WithdrawStatusUnknown          WithdrawStatus = "unknown"
+)
+
 type Withdraw struct {
-	GID        int64            `json:"gid" db:"gid"`
-	Exchange   ExchangeName     `json:"exchange" db:"exchange"`
-	Asset      string           `json:"asset" db:"asset"`
-	Amount     fixedpoint.Value `json:"amount" db:"amount"`
-	Address    string           `json:"address" db:"address"`
-	AddressTag string           `json:"addressTag"`
-	Status     string           `json:"status"`
+	GID            int64            `json:"gid" db:"gid"`
+	Exchange       ExchangeName     `json:"exchange" db:"exchange"`
+	Asset          string           `json:"asset" db:"asset"`
+	Amount         fixedpoint.Value `json:"amount" db:"amount"`
+	Address        string           `json:"address" db:"address"`
+	AddressTag     string           `json:"addressTag"`
+	Status         WithdrawStatus   `json:"status"`
+	OriginalStatus string           `json:"originalStatus"`
 
 	TransactionID          string           `json:"transactionID" db:"txn_id"`
 	TransactionFee         fixedpoint.Value `json:"transactionFee" db:"txn_fee"`

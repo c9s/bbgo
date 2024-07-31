@@ -155,7 +155,23 @@ type WithdrawState string
 
 const (
 	WithdrawStateSubmitting WithdrawState = "submitting"
+	WithdrawStateSubmitted  WithdrawState = "submitted"
 	WithdrawStateConfirmed  WithdrawState = "confirmed"
+	WithdrawStatePending    WithdrawState = "pending"
+	WithdrawStateProcessing WithdrawState = "processing"
+	WithdrawStateCanceled   WithdrawState = "canceled"
+	WithdrawStateFailed     WithdrawState = "failed"
+	WithdrawStateSent       WithdrawState = "sent"
+	WithdrawStateRejected   WithdrawState = "rejected"
+)
+
+type WithdrawStatus string
+
+const (
+	WithdrawStatusPending   WithdrawStatus = "pending"
+	WithdrawStatusCancelled WithdrawStatus = "cancelled"
+	WithdrawStatusFailed    WithdrawStatus = "failed"
+	WithdrawStatusOK        WithdrawStatus = "ok"
 )
 
 type Withdraw struct {
@@ -167,17 +183,22 @@ type Withdraw struct {
 	FeeCurrency     string           `json:"fee_currency"`
 	TxID            string           `json:"txid"`
 
+	NetworkProtocol string `json:"network_protocol"`
+	Address         string `json:"to_address"`
+
 	// State can be "submitting", "submitted",
 	//     "rejected", "accepted", "suspect", "approved", "delisted_processing",
 	//     "processing", "retryable", "sent", "canceled",
 	//     "failed", "pending", "confirmed",
 	//     "kgi_manually_processing", "kgi_manually_confirmed", "kgi_possible_failed",
 	//     "sygna_verifying"
-	State         string                     `json:"state"`
-	Confirmations int                        `json:"confirmations"`
-	CreatedAt     types.MillisecondTimestamp `json:"created_at"`
-	UpdatedAt     types.MillisecondTimestamp `json:"updated_at"`
-	Notes         string                     `json:"notes"`
+	State WithdrawState `json:"state"`
+
+	Status WithdrawStatus `json:"status,omitempty"`
+
+	CreatedAt types.MillisecondTimestamp `json:"created_at"`
+	UpdatedAt types.MillisecondTimestamp `json:"updated_at"`
+	Notes     string                     `json:"notes"`
 }
 
 //go:generate GetRequest -url "v2/withdrawals" -type GetWithdrawHistoryRequest -responseType []Withdraw
