@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
@@ -19,6 +20,8 @@ import (
 const ID = "xalign"
 
 var log = logrus.WithField("strategy", ID)
+
+var activeTransferNotificationLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -46,6 +49,10 @@ type Strategy struct {
 	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
 	Duration                 types.Duration              `json:"for"`
 	MaxAmounts               map[string]fixedpoint.Value `json:"maxAmounts"`
+
+	SlackNotify                bool             `json:"slackNotify"`
+	SlackNotifyMentions        []string         `json:"slackNotifyMentions"`
+	SlackNotifyThresholdAmount fixedpoint.Value `json:"slackNotifyThresholdAmount,omitempty"`
 
 	faultBalanceRecords map[string][]TimeBalance
 
@@ -114,7 +121,10 @@ func (s *Strategy) aggregateBalances(
 	return totalBalances, sessionBalances
 }
 
-func (s *Strategy) detectActiveTransfers(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (bool, error) {
+func (s *Strategy) detectActiveWithdraw(
+	ctx context.Context,
+	sessions map[string]*bbgo.ExchangeSession,
+) (*types.Withdraw, error) {
 	var err2 error
 	until := time.Now()
 	since := until.Add(-time.Hour * 24)
@@ -134,12 +144,12 @@ func (s *Strategy) detectActiveTransfers(ctx context.Context, sessions map[strin
 		for _, withdraw := range withdraws {
 			switch withdraw.Status {
 			case types.WithdrawStatusProcessing, types.WithdrawStatusSent, types.WithdrawStatusAwaitingApproval:
-				return true, nil
+				return &withdraw, nil
 			}
 		}
 	}
 
-	return false, err2
+	return nil, err2
 }
 
 func (s *Strategy) selectSessionForCurrency(
@@ -405,7 +415,6 @@ func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
 }
 
 func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
-
 	for sessionName, session := range sessions {
 		ob, ok := s.orderBooks[sessionName]
 		if !ok {
@@ -414,16 +423,20 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 		}
 		if ok {
 			if err := ob.GracefulCancel(ctx, session.Exchange); err != nil {
-				log.WithError(err).Errorf("can not cancel order")
+				log.WithError(err).Errorf("unable to cancel order")
 			}
 		}
 	}
 
-	foundActiveTransfer, err := s.detectActiveTransfers(ctx, sessions)
+	pendingWithdraw, err := s.detectActiveWithdraw(ctx, sessions)
 	if err != nil {
 		log.WithError(err).Errorf("unable to check active transfers")
-	} else if foundActiveTransfer {
+	} else if pendingWithdraw != nil {
 		log.Warnf("found active transfer, skip balance align check")
+
+		if activeTransferNotificationLimiter.Allow() {
+			bbgo.Notify("Found active withdraw, skip balance align", pendingWithdraw)
+		}
 		return
 	}
 
