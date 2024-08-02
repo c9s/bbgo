@@ -38,7 +38,7 @@ func TestSimplePriceResolver(t *testing.T) {
 	}
 
 	t.Run("direct reference", func(t *testing.T) {
-		pm := NewPriceMap(markets)
+		pm := NewSimplePriceResolver(markets)
 		pm.UpdateFromTrade(types.Trade{
 			Symbol: "BTCUSDT",
 			Price:  Number(48000.0),
@@ -69,7 +69,7 @@ func TestSimplePriceResolver(t *testing.T) {
 	})
 
 	t.Run("simple reference", func(t *testing.T) {
-		pm := NewPriceMap(markets)
+		pm := NewSimplePriceResolver(markets)
 		pm.UpdateFromTrade(types.Trade{
 			Symbol: "BTCUSDT",
 			Price:  Number(48000.0),
@@ -90,7 +90,7 @@ func TestSimplePriceResolver(t *testing.T) {
 	})
 
 	t.Run("crypto reference", func(t *testing.T) {
-		pm := NewPriceMap(markets)
+		pm := NewSimplePriceResolver(markets)
 		pm.UpdateFromTrade(types.Trade{
 			Symbol: "BTCUSDT",
 			Price:  Number(52000.0),
@@ -111,7 +111,7 @@ func TestSimplePriceResolver(t *testing.T) {
 	})
 
 	t.Run("inverse reference", func(t *testing.T) {
-		pm := NewPriceMap(markets)
+		pm := NewSimplePriceResolver(markets)
 		pm.UpdateFromTrade(types.Trade{
 			Symbol: "BTCTWD",
 			Price:  Number(1536000.0),
@@ -128,7 +128,7 @@ func TestSimplePriceResolver(t *testing.T) {
 	})
 
 	t.Run("inverse reference", func(t *testing.T) {
-		pm := NewPriceMap(markets)
+		pm := NewSimplePriceResolver(markets)
 		pm.UpdateFromTrade(types.Trade{
 			Symbol: "BTCTWD",
 			Price:  Number(1536000.0),

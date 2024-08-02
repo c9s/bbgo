@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/priceresolver"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -55,6 +56,8 @@ type Strategy struct {
 	SlackNotifyThresholdAmount fixedpoint.Value `json:"slackNotifyThresholdAmount,omitempty"`
 
 	faultBalanceRecords map[string][]TimeBalance
+
+	priceResolver *priceresolver.SimplePriceResolver
 
 	sessions   map[string]*bbgo.ExchangeSession
 	orderBooks map[string]*bbgo.ActiveOrderBook
@@ -350,6 +353,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	s.orderStore = core.NewOrderStore("")
 
+	markets := types.MarketMap{}
 	for _, sessionName := range s.PreferredSessions {
 		session, ok := sessions[sessionName]
 		if !ok {
@@ -363,7 +367,11 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		s.orderBooks[sessionName] = orderBook
 
 		s.sessions[sessionName] = session
+
+		// session.Market(symbol)
 	}
+
+	s.priceResolver = priceresolver.NewSimplePriceResolver(markets)
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
