@@ -201,14 +201,14 @@ type Withdraw struct {
 	Notes     string                     `json:"notes"`
 }
 
-//go:generate GetRequest -url "v2/withdrawals" -type GetWithdrawHistoryRequest -responseType []Withdraw
+//go:generate GetRequest -url "v3/withdrawals" -type GetWithdrawHistoryRequest -responseType []Withdraw
 type GetWithdrawHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	currency string     `param:"currency"`
+	currency *string    `param:"currency"`
+	state    *string    `param:"state"`        // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
 	from     *time.Time `param:"from,seconds"` // seconds
 	to       *time.Time `param:"to,seconds"`   // seconds
-	state    *string    `param:"state"`        // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
 	limit    *int       `param:"limit"`
 }
 
