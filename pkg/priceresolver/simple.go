@@ -28,7 +28,7 @@ type SimplePriceResolver struct {
 	mu sync.Mutex
 }
 
-func NewPriceMap(markets types.MarketMap) *SimplePriceResolver {
+func NewSimplePriceResolver(markets types.MarketMap) *SimplePriceResolver {
 	return &SimplePriceResolver{
 		markets:       markets,
 		symbolPrices:  make(map[string]fixedpoint.Value),
