@@ -27,7 +27,7 @@ jobs:
 
     steps:
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         # lfs: 'true'
         ssh-key: ${{ secrets.git_ssh_key }}
