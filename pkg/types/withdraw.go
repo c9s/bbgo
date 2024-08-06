@@ -47,7 +47,7 @@ func cutstr(s string, maxLen, head, tail int) string {
 }
 
 func (w Withdraw) String() (o string) {
-	o = fmt.Sprintf("%s WITHDRAW %8f %s -> ", w.Exchange, w.Amount.Float64(), w.Asset)
+	o = fmt.Sprintf("%s WITHDRAW %s %s -> ", w.Exchange, w.Amount.String(), w.Asset)
 
 	if len(w.Network) > 0 && w.Network != w.Asset {
 		o += w.Network + ":"
@@ -68,6 +68,7 @@ func (w Withdraw) String() (o string) {
 		o += fmt.Sprintf(" TxID: %s", cutstr(w.TransactionID, 12, 4, 4))
 	}
 
+	o += fmt.Sprintf(" STATUS: %s (%s)", w.Status, w.OriginalStatus)
 	return o
 }
 
