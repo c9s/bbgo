@@ -145,6 +145,7 @@ func (s *Strategy) detectActiveWithdraw(
 		}
 
 		for _, withdraw := range withdraws {
+			log.Infof("checking withdraw status: %s", withdraw.String())
 			switch withdraw.Status {
 			case types.WithdrawStatusSent, types.WithdrawStatusProcessing, types.WithdrawStatusAwaitingApproval:
 				return &withdraw, nil
