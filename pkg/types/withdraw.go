@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/slack-go/slack"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -74,6 +76,67 @@ func (w Withdraw) String() (o string) {
 
 func (w Withdraw) EffectiveTime() time.Time {
 	return w.ApplyTime.Time()
+}
+
+func (w *Withdraw) SlackAttachment() slack.Attachment {
+	var fields []slack.AttachmentField
+
+	if len(w.TransactionID) > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "TransactionID",
+			Value: w.TransactionID,
+			Short: false,
+		})
+	}
+
+	if w.TransactionFee.Sign() > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Transaction Fee",
+			Value: fmt.Sprintf("%s %s", w.TransactionFee.String(), w.TransactionFeeCurrency),
+			Short: false,
+		})
+	}
+
+	if len(w.Status) > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Status",
+			Value: fmt.Sprintf("%s (%s)", w.Status, w.OriginalStatus),
+			Short: false,
+		})
+	}
+
+	return slack.Attachment{
+		Color: withdrawStatusSlackColor(w.Status),
+		Title: fmt.Sprintf("Withdraw %s %s To %s (Network %s)", w.Amount.String(), w.Asset, w.Address, w.Network),
+		// TitleLink:   "",
+		Pretext: "",
+		Text:    "",
+		// ServiceName: "",
+		// ServiceIcon: "",
+		// FromURL:     "",
+		// OriginalURL: "",
+		Fields: fields,
+		Footer: fmt.Sprintf("Apply Time: %s", w.ApplyTime.Time().Format(time.RFC3339)),
+		// FooterIcon: "",
+	}
+}
+
+func withdrawStatusSlackColor(status WithdrawStatus) string {
+	switch status {
+
+	case WithdrawStatusCompleted:
+		return "good"
+
+	case WithdrawStatusFailed:
+		return "red"
+
+	case WithdrawStatusCancelled:
+		return "gray"
+
+	default:
+		return "gray"
+
+	}
 }
 
 type WithdrawalOptions struct {
