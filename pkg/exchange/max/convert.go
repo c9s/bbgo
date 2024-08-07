@@ -361,7 +361,7 @@ func convertWithdrawStatusV3(status max.WithdrawStatus) types.WithdrawStatus {
 	return types.WithdrawStatus(status)
 }
 
-func convertWithdrawStatus(state max.WithdrawState) types.WithdrawStatus {
+func convertWithdrawStatusV2(state max.WithdrawState) types.WithdrawStatus {
 	switch state {
 
 	case max.WithdrawStateSent, max.WithdrawStateSubmitting, max.WithdrawStatePending, "accepted", "approved":

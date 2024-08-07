@@ -56,7 +56,8 @@ type CrossExchangeMarketMakingStrategy struct {
 func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	ctx context.Context, environ *bbgo.Environment,
 	makerSession, hedgeSession *bbgo.ExchangeSession,
-	symbol, strategyID, instanceID string,
+	symbol, hedgeSymbol,
+	strategyID, instanceID string,
 ) error {
 	s.parent = ctx
 	s.ctx, s.cancel = context.WithCancel(ctx)
@@ -67,9 +68,9 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	s.hedgeSession = hedgeSession
 
 	var ok bool
-	s.hedgeMarket, ok = s.hedgeSession.Market(symbol)
+	s.hedgeMarket, ok = s.hedgeSession.Market(hedgeSymbol)
 	if !ok {
-		return fmt.Errorf("source session market %s is not defined", symbol)
+		return fmt.Errorf("hedge session market %s is not defined", hedgeSymbol)
 	}
 
 	s.makerMarket, ok = s.makerSession.Market(symbol)
@@ -150,14 +151,19 @@ type Strategy struct {
 
 	Symbol string `json:"symbol"`
 
-	// HedgeExchange session name
-	HedgeExchange string `json:"hedgeExchange"`
+	// HedgeSymbol is the symbol for the hedge exchange
+	// symbol could be different from the maker exchange
+	HedgeSymbol string `json:"hedgeSymbol"`
 
 	// MakerExchange session name
 	MakerExchange string `json:"makerExchange"`
 
+	// HedgeExchange session name
+	HedgeExchange string `json:"hedgeExchange"`
+
 	UpdateInterval types.Duration `json:"updateInterval"`
-	HedgeInterval  types.Duration `json:"hedgeInterval"`
+
+	HedgeInterval types.Duration `json:"hedgeInterval"`
 
 	FullReplenishInterval types.Duration `json:"fullReplenishInterval"`
 
@@ -239,12 +245,12 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		panic(err)
 	}
 
-	hedgeSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
+	hedgeSession.Subscribe(types.BookChannel, s.HedgeSymbol, types.SubscribeOptions{
 		Depth: types.DepthLevelMedium,
 		Speed: types.SpeedLow,
 	})
 
-	hedgeSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+	hedgeSession.Subscribe(types.KLineChannel, s.HedgeSymbol, types.SubscribeOptions{Interval: "1m"})
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
@@ -279,6 +285,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.HedgeInterval == 0 {
 		s.HedgeInterval = types.Duration(3 * time.Second)
+	}
+
+	if s.HedgeSymbol == "" {
+		s.HedgeSymbol = s.Symbol
 	}
 
 	if s.NumLayers == 0 {
@@ -358,13 +368,13 @@ func (s *Strategy) CrossRun(
 
 	if err := s.CrossExchangeMarketMakingStrategy.Initialize(ctx,
 		s.Environment,
-		makerSession,
-		hedgeSession,
-		s.Symbol, ID, s.InstanceID()); err != nil {
+		makerSession, hedgeSession,
+		s.Symbol, s.HedgeSymbol,
+		ID, s.InstanceID()); err != nil {
 		return err
 	}
 
-	s.pricingBook = types.NewStreamBook(s.Symbol)
+	s.pricingBook = types.NewStreamBook(s.HedgeSymbol)
 	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
 
 	s.stopC = make(chan struct{})
@@ -488,7 +498,7 @@ func (s *Strategy) CrossRun(
 		}
 
 		if err := s.HedgeOrderExecutor.GracefulCancel(ctx); err != nil {
-			log.WithError(err).Errorf("graceful cancel %s order error", s.Symbol)
+			log.WithError(err).Errorf("graceful cancel %s order error", s.HedgeSymbol)
 		}
 
 		bbgo.Sync(ctx, s)
@@ -576,12 +586,12 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		s.hedgeErrorRateReservation = nil
 	}
 
-	log.Infof("submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
-	bbgo.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
+	log.Infof("submitting %s hedge order %s %v", s.HedgeSymbol, side.String(), quantity)
+	bbgo.Notify("Submitting %s hedge order %s %v", s.HedgeSymbol, side.String(), quantity)
 
 	_, err := s.HedgeOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Market:   s.hedgeMarket,
-		Symbol:   s.Symbol,
+		Symbol:   s.hedgeMarket.Symbol,
 		Type:     types.OrderTypeMarket,
 		Side:     side,
 		Quantity: quantity,
@@ -627,7 +637,7 @@ func (s *Strategy) runTradeRecover(ctx context.Context) {
 
 			startTime := time.Now().Add(-tradeScanInterval).Add(-tradeScanOverlapBufferPeriod)
 
-			if err := s.HedgeOrderExecutor.TradeCollector().Recover(ctx, s.hedgeSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
+			if err := s.HedgeOrderExecutor.TradeCollector().Recover(ctx, s.hedgeSession.Exchange.(types.ExchangeTradeHistoryService), s.HedgeSymbol, startTime); err != nil {
 				log.WithError(err).Errorf("query trades error")
 			}
 
@@ -639,7 +649,9 @@ func (s *Strategy) runTradeRecover(ctx context.Context) {
 }
 
 func (s *Strategy) generateMakerOrders(
-	pricingBook *types.StreamOrderBook, maxLayer int, availableBase fixedpoint.Value, availableQuote fixedpoint.Value,
+	pricingBook *types.StreamOrderBook,
+	maxLayer int,
+	availableBase, availableQuote fixedpoint.Value,
 ) ([]types.SubmitOrder, error) {
 	_, _, hasPrice := pricingBook.BestBidAndAsk()
 	if !hasPrice {
@@ -776,7 +788,7 @@ func (s *Strategy) generateMakerOrders(
 			}
 
 			submitOrders = append(submitOrders, types.SubmitOrder{
-				Symbol:   s.Symbol,
+				Symbol:   s.makerMarket.Symbol,
 				Type:     types.OrderTypeLimitMaker,
 				Market:   s.makerMarket,
 				Side:     side,
@@ -829,7 +841,7 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 
 	bestBidPrice := bestBid.Price
 	bestAskPrice := bestAsk.Price
-	log.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
+	log.Infof("%s book ticker: best ask / best bid = %v / %v", s.HedgeSymbol, bestAskPrice, bestBidPrice)
 
 	s.lastPrice = bestBidPrice.Add(bestAskPrice).Div(Two)
 
@@ -898,11 +910,7 @@ func (s *Strategy) cleanUpOpenOrders(ctx context.Context, session *bbgo.Exchange
 	log.Infof("found existing open orders:")
 	types.OrderSlice(openOrders).Print()
 
-	if err := session.Exchange.CancelOrders(ctx, openOrders...); err != nil {
-		return err
-	}
-
-	return nil
+	return session.Exchange.CancelOrders(ctx, openOrders...)
 }
 
 func selectSessions2(

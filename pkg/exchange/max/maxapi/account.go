@@ -194,7 +194,7 @@ type Withdraw struct {
 	//     "sygna_verifying"
 	State WithdrawState `json:"state"`
 
-	Status WithdrawStatus `json:"status,omitempty"`
+	// Status WithdrawStatus `json:"status,omitempty"`
 
 	CreatedAt types.MillisecondTimestamp `json:"created_at"`
 	UpdatedAt types.MillisecondTimestamp `json:"updated_at"`
