@@ -865,8 +865,7 @@ func (e *Exchange) QueryWithdrawHistory(
 				continue
 			}
 
-			// we can convert this later
-			status := convertWithdrawStatusV3(d.Status)
+			status := convertWithdrawStatusV2(d.State)
 
 			txIDs[d.TxID] = struct{}{}
 			withdraw := types.Withdraw{
