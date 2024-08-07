@@ -824,8 +824,7 @@ func (e *Exchange) QueryWithdrawHistory(
 	limit := 1000
 	txIDs := map[string]struct{}{}
 
-	emptyTime := time.Time{}
-	if startTime == emptyTime {
+	if startTime.IsZero() {
 		startTime, err = e.getLaunchDate()
 		if err != nil {
 			return nil, err
@@ -867,7 +866,7 @@ func (e *Exchange) QueryWithdrawHistory(
 			}
 
 			// we can convert this later
-			status := convertWithdrawStatus(d.State)
+			status := convertWithdrawStatusV3(d.Status)
 
 			txIDs[d.TxID] = struct{}{}
 			withdraw := types.Withdraw{
@@ -881,11 +880,10 @@ func (e *Exchange) QueryWithdrawHistory(
 				TransactionFee:         d.Fee,
 				TransactionFeeCurrency: d.FeeCurrency,
 				Network:                d.NetworkProtocol,
-				// WithdrawOrderID: d.WithdrawOrderID,
-				// Network:         d.Network,
-				Status:         status,
-				OriginalStatus: string(d.State),
+				Status:                 status,
+				OriginalStatus:         string(d.State),
 			}
+
 			allWithdraws = append(allWithdraws, withdraw)
 		}
 

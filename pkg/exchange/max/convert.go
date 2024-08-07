@@ -341,6 +341,26 @@ func convertWebSocketOrderUpdate(u max.OrderUpdate) (*types.Order, error) {
 	}, nil
 }
 
+func convertWithdrawStatusV3(status max.WithdrawStatus) types.WithdrawStatus {
+	switch status {
+
+	case max.WithdrawStatusPending:
+		return types.WithdrawStatusSent
+
+	case max.WithdrawStatusOK:
+		return types.WithdrawStatusCompleted
+
+	case max.WithdrawStatusFailed:
+		return types.WithdrawStatusFailed
+
+	case max.WithdrawStatusCancelled:
+		return types.WithdrawStatusCancelled
+
+	}
+
+	return types.WithdrawStatus(status)
+}
+
 func convertWithdrawStatus(state max.WithdrawState) types.WithdrawStatus {
 	switch state {
 
