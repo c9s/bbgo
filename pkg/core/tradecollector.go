@@ -12,8 +12,12 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type OrderConverter interface {
+	ConvertOrder(order types.Order) (types.Order, error)
+}
+
 type TradeConverter interface {
-	Convert(trade types.Trade) (types.Trade, error)
+	ConvertTrade(trade types.Trade) (types.Trade, error)
 }
 
 //go:generate callbackgen -type TradeCollector
@@ -65,7 +69,7 @@ func (c *TradeCollector) convertTrade(trade types.Trade) types.Trade {
 	}
 
 	for _, converter := range c.tradeConverters {
-		convTrade, err := converter.Convert(trade)
+		convTrade, err := converter.ConvertTrade(trade)
 		if err != nil {
 			logrus.WithError(err).Errorf("trade %+v converter error, trade: %s", converter, trade.String())
 			continue
