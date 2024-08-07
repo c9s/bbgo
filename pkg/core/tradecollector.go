@@ -12,6 +12,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type TradeConverter func(trade types.Trade) (types.Trade, error)
+
 //go:generate callbackgen -type TradeCollector
 type TradeCollector struct {
 	Symbol   string
@@ -24,6 +26,8 @@ type TradeCollector struct {
 	doneTrades map[types.TradeKey]struct{}
 
 	mu sync.Mutex
+
+	tradeConverters []TradeConverter
 
 	recoverCallbacks []func(trade types.Trade)
 
@@ -47,6 +51,24 @@ func NewTradeCollector(symbol string, position *types.Position, orderStore *Orde
 		position:   position,
 		orderStore: orderStore,
 	}
+}
+
+func (c *TradeCollector) AddTradeConverter(converter TradeConverter) {
+	c.tradeConverters = append(c.tradeConverters, converter)
+}
+
+func (c *TradeCollector) convertTrade(trade types.Trade) types.Trade {
+	for _, converter := range c.tradeConverters {
+		convTrade, err := converter(trade)
+		if err != nil {
+			logrus.WithError(err).Errorf("trade converter error, trade: %s", trade.String())
+			continue
+		}
+
+		trade = convTrade
+	}
+
+	return trade
 }
 
 // OrderStore returns the order store used by the trade collector
