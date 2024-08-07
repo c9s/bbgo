@@ -13,7 +13,7 @@ type Float64Series struct {
 func NewFloat64Series(v ...float64) *Float64Series {
 	s := &Float64Series{}
 	s.Slice = v
-	s.SeriesBase.Series = s.Slice
+	s.SeriesBase.Series = &s.Slice
 	return s
 }
 
