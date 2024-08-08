@@ -13,19 +13,27 @@ import (
 )
 
 type ConverterManager struct {
-	converters []Converter
+	Converters []Converter `json:"converters,omitempty" yaml:"converters,omitempty"`
+}
+
+func (c *ConverterManager) Initialize() error {
+	for _, converter := range c.Converters {
+		_ = converter
+	}
+
+	return nil
 }
 
 func (c *ConverterManager) AddConverter(converter Converter) {
-	c.converters = append(c.converters, converter)
+	c.Converters = append(c.Converters, converter)
 }
 
 func (c *ConverterManager) ConvertOrder(order types.Order) types.Order {
-	if len(c.converters) == 0 {
+	if len(c.Converters) == 0 {
 		return order
 	}
 
-	for _, converter := range c.converters {
+	for _, converter := range c.Converters {
 		convOrder, err := converter.ConvertOrder(order)
 		if err != nil {
 			logrus.WithError(err).Errorf("converter %+v error, order: %s", converter, order.String())
@@ -39,11 +47,11 @@ func (c *ConverterManager) ConvertOrder(order types.Order) types.Order {
 }
 
 func (c *ConverterManager) ConvertTrade(trade types.Trade) types.Trade {
-	if len(c.converters) == 0 {
+	if len(c.Converters) == 0 {
 		return trade
 	}
 
-	for _, converter := range c.converters {
+	for _, converter := range c.Converters {
 		convTrade, err := converter.ConvertTrade(trade)
 		if err != nil {
 			logrus.WithError(err).Errorf("converter %+v error, trade: %s", converter, trade.String())
