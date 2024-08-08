@@ -17,26 +17,47 @@ type TradeConverter interface {
 	ConvertTrade(trade types.Trade) (types.Trade, error)
 }
 
+type OrderConvertFunc func(order types.Order) (types.Order, error)
+type TradeConvertFunc func(trade types.Trade) (types.Trade, error)
+
+type DynamicConverter struct {
+	orderConverter OrderConvertFunc
+	tradeConverter TradeConvertFunc
+}
+
+func NewDynamicConverter(orderConverter OrderConvertFunc, tradeConverter TradeConvertFunc) *DynamicConverter {
+	return &DynamicConverter{orderConverter: orderConverter, tradeConverter: tradeConverter}
+}
+
+func (c *DynamicConverter) ConvertOrder(order types.Order) (types.Order, error) {
+	return c.orderConverter(order)
+}
+
+func (c *DynamicConverter) ConvertTrade(trade types.Trade) (types.Trade, error) {
+	return c.tradeConverter(trade)
+}
+
 // SymbolConverter converts the symbol to another symbol
 type SymbolConverter struct {
-	fromSymbol, toSymbol string
+	FromSymbol string `json:"from"`
+	ToSymbol   string `json:"to"`
 }
 
 func NewSymbolConverter(fromSymbol, toSymbol string) *SymbolConverter {
-	return &SymbolConverter{fromSymbol: fromSymbol, toSymbol: toSymbol}
+	return &SymbolConverter{FromSymbol: fromSymbol, ToSymbol: toSymbol}
 }
 
 func (c *SymbolConverter) ConvertOrder(order types.Order) (types.Order, error) {
-	if order.Symbol == c.fromSymbol {
-		order.Symbol = c.toSymbol
+	if order.Symbol == c.FromSymbol {
+		order.Symbol = c.ToSymbol
 	}
 
 	return order, nil
 }
 
 func (c *SymbolConverter) ConvertTrade(trade types.Trade) (types.Trade, error) {
-	if trade.Symbol == c.fromSymbol {
-		trade.Symbol = c.toSymbol
+	if trade.Symbol == c.FromSymbol {
+		trade.Symbol = c.ToSymbol
 	}
 
 	return trade, nil
