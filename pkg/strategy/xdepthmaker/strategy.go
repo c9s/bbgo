@@ -12,6 +12,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
@@ -146,6 +147,8 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 
 type Strategy struct {
 	*CrossExchangeMarketMakingStrategy
+
+	*core.ConverterManager
 
 	Environment *bbgo.Environment
 
