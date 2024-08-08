@@ -5,6 +5,7 @@ import "github.com/c9s/bbgo/pkg/types"
 type Converter interface {
 	OrderConverter
 	TradeConverter
+	Initialize() error
 }
 
 // OrderConverter converts the order to another order
@@ -29,6 +30,10 @@ func NewDynamicConverter(orderConverter OrderConvertFunc, tradeConverter TradeCo
 	return &DynamicConverter{orderConverter: orderConverter, tradeConverter: tradeConverter}
 }
 
+func (c *DynamicConverter) Initialize() error {
+	return nil
+}
+
 func (c *DynamicConverter) ConvertOrder(order types.Order) (types.Order, error) {
 	return c.orderConverter(order)
 }
@@ -45,6 +50,10 @@ type SymbolConverter struct {
 
 func NewSymbolConverter(fromSymbol, toSymbol string) *SymbolConverter {
 	return &SymbolConverter{FromSymbol: fromSymbol, ToSymbol: toSymbol}
+}
+
+func (c *SymbolConverter) Initialize() error {
+	return nil
 }
 
 func (c *SymbolConverter) ConvertOrder(order types.Order) (types.Order, error) {
