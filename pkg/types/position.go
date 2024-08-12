@@ -19,16 +19,19 @@ const (
 	PositionClosed = PositionType("Closed")
 )
 
+// ExchangeFee stores the exchange fee rate
 type ExchangeFee struct {
 	MakerFeeRate fixedpoint.Value
 	TakerFeeRate fixedpoint.Value
 }
 
+// PositionRisk stores the position risk data
 type PositionRisk struct {
-	Leverage         fixedpoint.Value `json:"leverage"`
-	LiquidationPrice fixedpoint.Value `json:"liquidationPrice"`
+	Leverage         fixedpoint.Value `json:"leverage,omitempty"`
+	LiquidationPrice fixedpoint.Value `json:"liquidationPrice,omitempty"`
 }
 
+// Position stores the position data
 type Position struct {
 	Symbol        string `json:"symbol" db:"symbol"`
 	BaseCurrency  string `json:"baseCurrency" db:"base"`
@@ -281,8 +284,14 @@ type FuturesPosition struct {
 	ExchangeFeeRates map[ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
 
 	// Futures data fields
-	Isolated     bool  `json:"isolated"`
-	UpdateTime   int64 `json:"updateTime"`
+	// -------------------
+	// Isolated margin mode
+	Isolated bool `json:"isolated"`
+
+	// UpdateTime is the time when the position is updated
+	UpdateTime int64 `json:"updateTime"`
+
+	// PositionRisk stores the position risk data
 	PositionRisk *PositionRisk
 }
 
