@@ -82,6 +82,10 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 		return fmt.Errorf("maker session market %s is not defined", symbol)
 	}
 
+	if err := s.ConverterManager.Initialize(); err != nil {
+		return err
+	}
+
 	if s.ProfitStats == nil {
 		s.ProfitStats = types.NewProfitStats(s.makerMarket)
 	}
