@@ -160,6 +160,7 @@ type Strategy struct {
 
 	Environment *bbgo.Environment
 
+	// Symbol is the maker exchange symbol
 	Symbol string `json:"symbol"`
 
 	// HedgeSymbol is the symbol for the hedge exchange
@@ -262,6 +263,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	})
 
 	hedgeSession.Subscribe(types.KLineChannel, s.HedgeSymbol, types.SubscribeOptions{Interval: "1m"})
+
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
@@ -355,6 +357,8 @@ func (s *Strategy) CrossRun(
 		s.CrossExchangeMarketMakingStrategy.ProfitStats = types.NewProfitStats(makerMarket)
 
 		fixer := common.NewProfitFixer()
+		fixer.ConverterManager = s.ConverterManager
+
 		if ss, ok := makerSession.Exchange.(types.ExchangeTradeHistoryService); ok {
 			log.Infof("adding makerSession %s to profitFixer", makerSession.Name)
 			fixer.AddExchange(makerSession.Name, ss)

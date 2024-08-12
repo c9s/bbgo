@@ -134,7 +134,7 @@ func (c *TradeCollector) BindStreamForBackground(stream types.Stream) {
 
 func (c *TradeCollector) BindStream(stream types.Stream) {
 	stream.OnTradeUpdate(func(trade types.Trade) {
-		c.processTrade(trade)
+		c.ProcessTrade(trade)
 	})
 }
 

@@ -10,6 +10,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -22,6 +23,8 @@ type ProfitFixerConfig struct {
 // ProfitFixer implements a trade-history-based profit fixer
 type ProfitFixer struct {
 	sessions map[string]types.ExchangeTradeHistoryService
+
+	core.ConverterManager
 }
 
 func NewProfitFixer() *ProfitFixer {
@@ -106,6 +109,8 @@ func (f *ProfitFixer) Fix(
 
 func (f *ProfitFixer) FixFromTrades(allTrades []types.Trade, stats *types.ProfitStats, position *types.Position) error {
 	for _, trade := range allTrades {
+		trade = f.ConverterManager.ConvertTrade(trade)
+
 		profit, netProfit, madeProfit := position.AddTrade(trade)
 		if madeProfit {
 			p := position.NewProfit(trade, profit, netProfit)
