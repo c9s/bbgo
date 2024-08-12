@@ -8,6 +8,7 @@ import (
 
 const (
 	PrivateWebSocketURL = "wss://ws.bitget.com/v2/ws/private"
+	PublicWebSocketURL  = "wss://ws.bitget.com/v2/ws/public"
 )
 
 type APIResponse = bitgetapi.APIResponse
