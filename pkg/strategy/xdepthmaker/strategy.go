@@ -12,6 +12,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
@@ -48,7 +49,10 @@ type CrossExchangeMarketMakingStrategy struct {
 	Position        *types.Position    `json:"position,omitempty" persistence:"position"`
 	ProfitStats     *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
 	CoveredPosition fixedpoint.Value   `json:"coveredPosition,omitempty" persistence:"covered_position"`
-	mu              sync.Mutex
+
+	core.ConverterManager
+
+	mu sync.Mutex
 
 	MakerOrderExecutor, HedgeOrderExecutor *bbgo.GeneralOrderExecutor
 }
@@ -76,6 +80,10 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	s.makerMarket, ok = s.makerSession.Market(symbol)
 	if !ok {
 		return fmt.Errorf("maker session market %s is not defined", symbol)
+	}
+
+	if err := s.ConverterManager.Initialize(); err != nil {
+		return err
 	}
 
 	if s.ProfitStats == nil {
@@ -106,6 +114,10 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 		s.makerMarket.Symbol,
 		strategyID, instanceID,
 		s.Position)
+
+	// update converter manager
+	s.MakerOrderExecutor.TradeCollector().ConverterManager = s.ConverterManager
+
 	s.MakerOrderExecutor.BindEnvironment(environ)
 	s.MakerOrderExecutor.BindProfitStats(s.ProfitStats)
 	s.MakerOrderExecutor.Bind()
@@ -121,6 +133,9 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	s.HedgeOrderExecutor.BindEnvironment(environ)
 	s.HedgeOrderExecutor.BindProfitStats(s.ProfitStats)
 	s.HedgeOrderExecutor.Bind()
+
+	s.HedgeOrderExecutor.TradeCollector().ConverterManager = s.ConverterManager
+
 	s.HedgeOrderExecutor.TradeCollector().OnPositionUpdate(func(position *types.Position) {
 		// bbgo.Sync(ctx, s)
 	})
@@ -149,6 +164,7 @@ type Strategy struct {
 
 	Environment *bbgo.Environment
 
+	// Symbol is the maker exchange symbol
 	Symbol string `json:"symbol"`
 
 	// HedgeSymbol is the symbol for the hedge exchange
@@ -251,6 +267,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	})
 
 	hedgeSession.Subscribe(types.KLineChannel, s.HedgeSymbol, types.SubscribeOptions{Interval: "1m"})
+
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 }
 
@@ -344,6 +361,8 @@ func (s *Strategy) CrossRun(
 		s.CrossExchangeMarketMakingStrategy.ProfitStats = types.NewProfitStats(makerMarket)
 
 		fixer := common.NewProfitFixer()
+		fixer.ConverterManager = s.ConverterManager
+
 		if ss, ok := makerSession.Exchange.(types.ExchangeTradeHistoryService); ok {
 			log.Infof("adding makerSession %s to profitFixer", makerSession.Name)
 			fixer.AddExchange(makerSession.Name, ss)

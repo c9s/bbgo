@@ -12,8 +12,87 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type TradeConverter interface {
-	Convert(trade types.Trade) (types.Trade, error)
+type ConverterSetting struct {
+	SymbolConverter *SymbolConverter `json:"symbolConverter" yaml:"symbolConverter"`
+}
+
+func (s *ConverterSetting) getConverter() Converter {
+	if s.SymbolConverter != nil {
+		return s.SymbolConverter
+	}
+
+	return nil
+}
+
+func (s *ConverterSetting) InitializeConverter() (Converter, error) {
+	converter := s.getConverter()
+	if converter == nil {
+		return nil, nil
+	}
+
+	logrus.Infof("initializing converter %T ...", converter)
+	err := converter.Initialize()
+	return nil, err
+}
+
+type ConverterManager struct {
+	ConverterSettings []ConverterSetting `json:"converters,omitempty" yaml:"converters,omitempty"`
+
+	converters []Converter
+}
+
+func (c *ConverterManager) Initialize() error {
+	for _, setting := range c.ConverterSettings {
+
+		converter, err := setting.InitializeConverter()
+		if err != nil {
+			return err
+		}
+
+		c.AddConverter(converter)
+	}
+
+	return nil
+}
+
+func (c *ConverterManager) AddConverter(converter Converter) {
+	c.converters = append(c.converters, converter)
+}
+
+func (c *ConverterManager) ConvertOrder(order types.Order) types.Order {
+	if len(c.converters) == 0 {
+		return order
+	}
+
+	for _, converter := range c.converters {
+		convOrder, err := converter.ConvertOrder(order)
+		if err != nil {
+			logrus.WithError(err).Errorf("converter %+v error, order: %s", converter, order.String())
+			continue
+		}
+
+		order = convOrder
+	}
+
+	return order
+}
+
+func (c *ConverterManager) ConvertTrade(trade types.Trade) types.Trade {
+	if len(c.converters) == 0 {
+		return trade
+	}
+
+	for _, converter := range c.converters {
+		convTrade, err := converter.ConvertTrade(trade)
+		if err != nil {
+			logrus.WithError(err).Errorf("converter %+v error, trade: %s", converter, trade.String())
+			continue
+		}
+
+		trade = convTrade
+	}
+
+	return trade
 }
 
 //go:generate callbackgen -type TradeCollector
@@ -29,14 +108,14 @@ type TradeCollector struct {
 
 	mu sync.Mutex
 
-	tradeConverters []TradeConverter
-
 	recoverCallbacks []func(trade types.Trade)
 
 	tradeCallbacks []func(trade types.Trade, profit, netProfit fixedpoint.Value)
 
 	positionUpdateCallbacks []func(position *types.Position)
 	profitCallbacks         []func(trade types.Trade, profit *types.Profit)
+
+	ConverterManager
 }
 
 func NewTradeCollector(symbol string, position *types.Position, orderStore *OrderStore) *TradeCollector {
@@ -53,28 +132,6 @@ func NewTradeCollector(symbol string, position *types.Position, orderStore *Orde
 		position:   position,
 		orderStore: orderStore,
 	}
-}
-
-func (c *TradeCollector) AddTradeConverter(converter TradeConverter) {
-	c.tradeConverters = append(c.tradeConverters, converter)
-}
-
-func (c *TradeCollector) convertTrade(trade types.Trade) types.Trade {
-	if len(c.tradeConverters) == 0 {
-		return trade
-	}
-
-	for _, converter := range c.tradeConverters {
-		convTrade, err := converter.Convert(trade)
-		if err != nil {
-			logrus.WithError(err).Errorf("trade %+v converter error, trade: %s", converter, trade.String())
-			continue
-		}
-
-		trade = convTrade
-	}
-
-	return trade
 }
 
 // OrderStore returns the order store used by the trade collector
@@ -108,7 +165,7 @@ func (c *TradeCollector) BindStreamForBackground(stream types.Stream) {
 
 func (c *TradeCollector) BindStream(stream types.Stream) {
 	stream.OnTradeUpdate(func(trade types.Trade) {
-		c.processTrade(trade)
+		c.ProcessTrade(trade)
 	})
 }
 
@@ -144,7 +201,7 @@ func (c *TradeCollector) Recover(
 }
 
 func (c *TradeCollector) RecoverTrade(td types.Trade) bool {
-	td = c.convertTrade(td)
+	td = c.ConvertTrade(td)
 
 	logrus.Debugf("checking trade: %s", td.String())
 	if c.processTrade(td) {
@@ -260,7 +317,7 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 // return true when the given trade is added
 // return false when the given trade is not added
 func (c *TradeCollector) ProcessTrade(trade types.Trade) bool {
-	return c.processTrade(c.convertTrade(trade))
+	return c.processTrade(c.ConvertTrade(trade))
 }
 
 // Run is a goroutine executed in the background
@@ -279,7 +336,7 @@ func (c *TradeCollector) Run(ctx context.Context) {
 			c.Process()
 
 		case trade := <-c.tradeC:
-			c.processTrade(c.convertTrade(trade))
+			c.processTrade(c.ConvertTrade(trade))
 
 		}
 	}
