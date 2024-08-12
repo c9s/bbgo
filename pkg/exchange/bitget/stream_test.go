@@ -179,7 +179,7 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 		input := `{
 		   "event":"subscribe",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"books5",
 			  "instId":"BTCUSDT"
 		   }
@@ -191,7 +191,7 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 		assert.Equal(t, WsEvent{
 			Event: WsEventSubscribe,
 			Arg: WsArg{
-				InstType: instSp,
+				InstType: instSpV2,
 				Channel:  ChannelOrderBook5,
 				InstId:   "BTCUSDT",
 			},
@@ -204,7 +204,7 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 		input := `{
 		   "event":"unsubscribe",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"books5",
 			  "instId":"BTCUSDT"
 		   }
@@ -216,7 +216,7 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 		assert.Equal(t, WsEvent{
 			Event: WsEventUnsubscribe,
 			Arg: WsArg{
-				InstType: instSp,
+				InstType: instSpV2,
 				Channel:  ChannelOrderBook5,
 				InstId:   "BTCUSDT",
 			},
@@ -227,7 +227,7 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 		input := `{
 		   "event":"error",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"books5",
 			  "instId":"BTCUSDT-"
 		   },
@@ -245,7 +245,7 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 			Msg:   "instType:sp,channel:books5,instId:BTCUSDT- doesn't exist",
 			Op:    "subscribe",
 			Arg: WsArg{
-				InstType: instSp,
+				InstType: instSpV2,
 				Channel:  ChannelOrderBook5,
 				InstId:   "BTCUSDT-",
 			},
@@ -256,7 +256,7 @@ func TestStream_parseWebSocketEvent(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"books5",
 			  "instId":"BTCUSDT"
 		   },
@@ -349,7 +349,7 @@ func Test_parseWebSocketEvent_MarketTrade(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"trade",
 			  "instId":"BTCUSDT"
 		   },
@@ -434,7 +434,7 @@ func Test_parseWebSocketEvent_MarketTrade(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"trade",
 			  "instId":"BTCUSDT"
 		   },
@@ -456,7 +456,7 @@ func Test_parseWebSocketEvent_MarketTrade(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"trade",
 			  "instId":"BTCUSDT"
 		   },
@@ -478,7 +478,7 @@ func Test_parseWebSocketEvent_MarketTrade(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"trade",
 			  "instId":"BTCUSDT"
 		   },
@@ -500,7 +500,7 @@ func Test_parseWebSocketEvent_MarketTrade(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"trade",
 			  "instId":"BTCUSDT"
 		   },
@@ -524,12 +524,12 @@ func Test_parseWebSocketEvent_KLine(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"candle5m",
 			  "instId":"BTCUSDT"
 		   },
 		   "data":[
-				["1698744600000","34361.49","34458.98","34355.53","34416.41","99.6631"]
+				["1698744600000","34361.49","34458.98","34355.53","34416.41","99.6631", "123456", "123"]
 		   ],
 		   "ts":1697697791670
 		}`
@@ -549,6 +549,7 @@ func Test_parseWebSocketEvent_KLine(t *testing.T) {
 						LowestPrice:  fixedpoint.NewFromFloat(34355.53),
 						ClosePrice:   fixedpoint.NewFromFloat(34416.41),
 						Volume:       fixedpoint.NewFromFloat(99.6631),
+						QuoteVolume:  fixedpoint.NewFromFloat(123456),
 					},
 				},
 				actionType: actionType,
@@ -571,12 +572,12 @@ func Test_parseWebSocketEvent_KLine(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"candle5m",
 			  "instId":"BTCUSDT"
 		   },
 		   "data":[
-			  ["1698744600000","34361.45","34458.98","34355.53","34416.41","99.6631", "123456"]
+			  ["1698744600000","34361.49","34458.98","34355.53","34416.41","99.6631", "123456", "123", "123"]
 		   ],
 		   "ts":1697697791670
 		}`
@@ -588,12 +589,12 @@ func Test_parseWebSocketEvent_KLine(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"candle5m",
 			  "instId":"BTCUSDT"
 		   },
 		   "data":[
-			  ["timestamp","34361.49","34458.98","34355.53","34416.41","99.6631"]
+              ["timestamp","34361.49","34458.98","34355.53","34416.41","99.6631", "123456", "123"]
 		   ],
 		   "ts":1697697791670
 		}`
@@ -605,12 +606,12 @@ func Test_parseWebSocketEvent_KLine(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"candle5m",
 			  "instId":"BTCUSDT"
 		   },
 		   "data":[
-				["1698744600000","1p","34458.98","34355.53","34416.41","99.6631"]
+  				["1698744600000","1p","34458.98","34355.53","34416.41","99.6631", "123456", "123"]
 		   ],
 		   "ts":1697697791670
 		}`
@@ -622,12 +623,12 @@ func Test_parseWebSocketEvent_KLine(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"candle5m",
 			  "instId":"BTCUSDT"
 		   },
 		   "data":[
-			  ["1698744600000","34361.45","3p","34355.53","34416.41","99.6631"]
+              ["1698744600000","34361.49","3p","34355.53","34416.41","99.6631", "123456", "123"]
 		   ],
 		   "ts":1697697791670
 		}`
@@ -639,12 +640,12 @@ func Test_parseWebSocketEvent_KLine(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"candle5m",
 			  "instId":"BTCUSDT"
 		   },
 		   "data":[
-			  ["1698744600000","34361.45","34458.98","1p","34416.41","99.6631"]
+  			  ["1698744600000","34361.49","34458.98","1p","34416.41","99.6631", "123456", "123"]
 		   ],
 		   "ts":1697697791670
 		}`
@@ -656,12 +657,12 @@ func Test_parseWebSocketEvent_KLine(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"candle5m",
 			  "instId":"BTCUSDT"
 		   },
 		   "data":[
-			  ["1698744600000","34361.45","34458.98","34355.53","1c","99.6631"]
+  			  ["1698744600000","34361.49","34458.98","34355.53","1c","99.6631", "123456", "123"]
 		   ],
 		   "ts":1697697791670
 		}`
@@ -673,12 +674,12 @@ func Test_parseWebSocketEvent_KLine(t *testing.T) {
 		input := `{
 		   "action":"%s",
 		   "arg":{
-			  "instType":"sp",
+			  "instType":"SPOT",
 			  "channel":"candle5m",
 			  "instId":"BTCUSDT"
 		   },
 		   "data":[
-			  ["1698744600000","34361.45","34458.98","34355.53","34416.41", "1v"]
+  			  ["1698744600000","34361.49","34458.98","34355.53","34416.41","1v", "123456", "123"]
 		   ],
 		   "ts":1697697791670
 		}`
@@ -698,7 +699,7 @@ func Test_convertSubscription(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, WsArg{
-			InstType: instSp,
+			InstType: instSpV2,
 			Channel:  ChannelOrderBook5,
 			InstId:   "BTCUSDT",
 		}, res)
@@ -713,7 +714,7 @@ func Test_convertSubscription(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, WsArg{
-			InstType: instSp,
+			InstType: instSpV2,
 			Channel:  ChannelOrderBook15,
 			InstId:   "BTCUSDT",
 		}, res)
@@ -728,7 +729,7 @@ func Test_convertSubscription(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, WsArg{
-			InstType: instSp,
+			InstType: instSpV2,
 			Channel:  ChannelOrderBook,
 			InstId:   "BTCUSDT",
 		}, res)
@@ -741,7 +742,7 @@ func Test_convertSubscription(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, WsArg{
-			InstType: instSp,
+			InstType: instSpV2,
 			Channel:  ChannelTrade,
 			InstId:   "BTCUSDT",
 		}, res)
@@ -757,7 +758,7 @@ func Test_convertSubscription(t *testing.T) {
 			})
 			assert.NoError(t, err)
 			assert.Equal(t, WsArg{
-				InstType: instSp,
+				InstType: instSpV2,
 				Channel:  ChannelType(localInterval),
 				InstId:   "BTCUSDT",
 			}, res)
