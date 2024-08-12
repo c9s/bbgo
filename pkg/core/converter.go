@@ -1,6 +1,10 @@
 package core
 
-import "github.com/c9s/bbgo/pkg/types"
+import (
+	"errors"
+
+	"github.com/c9s/bbgo/pkg/types"
+)
 
 type Converter interface {
 	OrderConverter
@@ -53,6 +57,14 @@ func NewSymbolConverter(fromSymbol, toSymbol string) *SymbolConverter {
 }
 
 func (c *SymbolConverter) Initialize() error {
+	if c.ToSymbol == "" {
+		return errors.New("toSymbol can not be empty")
+	}
+
+	if c.FromSymbol == "" {
+		return errors.New("fromSymbol can not be empty")
+	}
+
 	return nil
 }
 

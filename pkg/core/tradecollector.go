@@ -12,28 +12,59 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type ConverterSetting struct {
+	SymbolConverter *SymbolConverter `json:"symbolConverter" yaml:"symbolConverter"`
+}
+
+func (s *ConverterSetting) getConverter() Converter {
+	if s.SymbolConverter != nil {
+		return s.SymbolConverter
+	}
+
+	return nil
+}
+
+func (s *ConverterSetting) InitializeConverter() (Converter, error) {
+	converter := s.getConverter()
+	if converter == nil {
+		return nil, nil
+	}
+
+	logrus.Infof("initializing converter %T ...", converter)
+	err := converter.Initialize()
+	return nil, err
+}
+
 type ConverterManager struct {
-	Converters []Converter `json:"converters,omitempty" yaml:"converters,omitempty"`
+	ConverterSettings []ConverterSetting `json:"converters,omitempty" yaml:"converters,omitempty"`
+
+	converters []Converter
 }
 
 func (c *ConverterManager) Initialize() error {
-	for _, converter := range c.Converters {
-		_ = converter
+	for _, setting := range c.ConverterSettings {
+
+		converter, err := setting.InitializeConverter()
+		if err != nil {
+			return err
+		}
+
+		c.AddConverter(converter)
 	}
 
 	return nil
 }
 
 func (c *ConverterManager) AddConverter(converter Converter) {
-	c.Converters = append(c.Converters, converter)
+	c.converters = append(c.converters, converter)
 }
 
 func (c *ConverterManager) ConvertOrder(order types.Order) types.Order {
-	if len(c.Converters) == 0 {
+	if len(c.converters) == 0 {
 		return order
 	}
 
-	for _, converter := range c.Converters {
+	for _, converter := range c.converters {
 		convOrder, err := converter.ConvertOrder(order)
 		if err != nil {
 			logrus.WithError(err).Errorf("converter %+v error, order: %s", converter, order.String())
@@ -47,11 +78,11 @@ func (c *ConverterManager) ConvertOrder(order types.Order) types.Order {
 }
 
 func (c *ConverterManager) ConvertTrade(trade types.Trade) types.Trade {
-	if len(c.Converters) == 0 {
+	if len(c.converters) == 0 {
 		return trade
 	}
 
-	for _, converter := range c.Converters {
+	for _, converter := range c.converters {
 		convTrade, err := converter.ConvertTrade(trade)
 		if err != nil {
 			logrus.WithError(err).Errorf("converter %+v error, trade: %s", converter, trade.String())
