@@ -120,7 +120,7 @@ func (s *Stream) Unsubscribe() {
 func (s *Stream) createEndpoint(_ context.Context) (string, error) {
 	var url string
 	if s.PublicOnly {
-		url = bitgetapi.PublicWebSocketURL
+		url = v2.PublicWebSocketURL
 	} else {
 		url = v2.PrivateWebSocketURL
 	}
@@ -245,7 +245,7 @@ func (s *Stream) ping(conn *websocket.Conn) error {
 func convertSubscription(sub types.Subscription) (WsArg, error) {
 	arg := WsArg{
 		// support spot only
-		InstType: instSp,
+		InstType: instSpV2,
 		Channel:  "",
 		InstId:   sub.Symbol,
 	}
