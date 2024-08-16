@@ -190,6 +190,7 @@ func (p *Position) NewMarketCloseOrder(percentage fixedpoint.Value) *SubmitOrder
 	}
 }
 
+// IsDust checks if the position is dust, the first argument is the price to calculate the dust quantity
 func (p *Position) IsDust(a ...fixedpoint.Value) bool {
 	price := p.AverageCost
 	if len(a) > 0 {
@@ -448,6 +449,7 @@ func (p *Position) String() string {
 	)
 }
 
+// BindStream binds the trade update callback and update the position
 func (p *Position) BindStream(stream Stream) {
 	stream.OnTradeUpdate(func(trade Trade) {
 		if p.Symbol == trade.Symbol {
@@ -540,7 +542,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	p.addTradeFee(td)
 
 	// Base > 0 means we're in long position
-	// Base < 0  means we're in short position
+	// Base < 0 means we're in short position
 	switch td.Side {
 
 	case SideTypeBuy:

@@ -9,6 +9,28 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func TestTradeCollector_NilConvertManager(t *testing.T) {
+	symbol := "BTCUSDT"
+	position := types.NewPosition(symbol, "BTC", "USDT")
+	orderStore := NewOrderStore(symbol)
+	collector := NewTradeCollector(symbol, position, orderStore)
+
+	trade := types.Trade{
+		ID:            1,
+		OrderID:       399,
+		Exchange:      types.ExchangeBinance,
+		Price:         fixedpoint.NewFromInt(40000),
+		Quantity:      fixedpoint.One,
+		QuoteQuantity: fixedpoint.NewFromInt(40000),
+		Symbol:        "BTCUSDT",
+		Side:          types.SideTypeBuy,
+		IsBuyer:       true,
+	}
+
+	trade = collector.ConvertTrade(trade)
+	assert.Equal(t, "BTCUSDT", trade.Symbol)
+}
+
 func TestTradeCollector_ShouldNotCountDuplicatedTrade(t *testing.T) {
 	symbol := "BTCUSDT"
 	position := types.NewPosition(symbol, "BTC", "USDT")
