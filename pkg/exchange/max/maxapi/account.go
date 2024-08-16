@@ -133,15 +133,17 @@ type Deposit struct {
 	UpdatedAt       types.MillisecondTimestamp `json:"updated_at"`
 }
 
-//go:generate GetRequest -url "v2/deposits" -type GetDepositHistoryRequest -responseType []Deposit
+//go:generate GetRequest -url "v3/deposits" -type GetDepositHistoryRequest -responseType []Deposit
 type GetDepositHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	currency *string    `param:"currency"`
-	from     *time.Time `param:"from,seconds"` // seconds
-	to       *time.Time `param:"to,seconds"`   // seconds
-	state    *string    `param:"state"`        // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	limit    *int       `param:"limit"`
+	currency  *string    `param:"currency"`
+	timestamp *time.Time `param:"timestamp,milliseconds"` // seconds
+	state     *string    `param:"state"`                  // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+
+	order *string `param:"order"`
+
+	limit *int `param:"limit"`
 }
 
 func (c *RestClient) NewGetDepositHistoryRequest() *GetDepositHistoryRequest {
