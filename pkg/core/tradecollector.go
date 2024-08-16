@@ -35,6 +35,8 @@ func (s *ConverterSetting) InitializeConverter() (Converter, error) {
 	return converter, err
 }
 
+// ConverterManager manages the converters for trade conversion
+// It can be used to convert the trade symbol into the target symbol, or convert the price, volume into different units.
 type ConverterManager struct {
 	ConverterSettings []ConverterSetting `json:"converters,omitempty" yaml:"converters,omitempty"`
 
@@ -53,6 +55,8 @@ func (c *ConverterManager) Initialize() error {
 		}
 	}
 
+	numConverters := len(c.converters)
+	logrus.Infof("%d converters loaded", numConverters)
 	return nil
 }
 
