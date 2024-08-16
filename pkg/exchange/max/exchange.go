@@ -846,6 +846,7 @@ func (e *Exchange) QueryWithdrawHistory(
 
 		withdraws, err := req.
 			Timestamp(startTime).
+			Order("asc").
 			Limit(limit).
 			Do(ctx)
 
@@ -927,8 +928,8 @@ func (e *Exchange) QueryDepositHistory(
 		}
 
 		deposits, err := req.
-			From(startTime).
-			To(endTime).
+			Timestamp(startTime).
+			Order("asc").
 			Limit(limit).
 			Do(ctx)
 
