@@ -845,8 +845,7 @@ func (e *Exchange) QueryWithdrawHistory(
 		}
 
 		withdraws, err := req.
-			From(startTime).
-			To(endTime).
+			Timestamp(startTime).
 			Limit(limit).
 			Do(ctx)
 
