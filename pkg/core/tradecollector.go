@@ -43,13 +43,14 @@ type ConverterManager struct {
 
 func (c *ConverterManager) Initialize() error {
 	for _, setting := range c.ConverterSettings {
-
 		converter, err := setting.InitializeConverter()
 		if err != nil {
 			return err
 		}
 
-		c.AddConverter(converter)
+		if converter != nil {
+			c.AddConverter(converter)
+		}
 	}
 
 	return nil
