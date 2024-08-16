@@ -32,7 +32,7 @@ func (s *ConverterSetting) InitializeConverter() (Converter, error) {
 
 	logrus.Infof("initializing converter %T ...", converter)
 	err := converter.Initialize()
-	return nil, err
+	return converter, err
 }
 
 type ConverterManager struct {
