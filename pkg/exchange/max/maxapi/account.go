@@ -205,11 +205,15 @@ type Withdraw struct {
 type GetWithdrawHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	currency *string    `param:"currency"`
-	state    *string    `param:"state"`        // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
-	from     *time.Time `param:"from,seconds"` // seconds
-	to       *time.Time `param:"to,seconds"`   // seconds
-	limit    *int       `param:"limit"`
+	currency  *string    `param:"currency"`
+	state     *string    `param:"state"`                  // submitting, submitted, rejected, accepted, checking, refunded, canceled, suspect
+	timestamp *time.Time `param:"timestamp,milliseconds"` // milli-seconds
+
+	// order could be desc or asc
+	order *string `param:"order"`
+
+	// limit's default = 50
+	limit *int `param:"limit"`
 }
 
 func (c *RestClient) NewGetWithdrawalHistoryRequest() *GetWithdrawHistoryRequest {
