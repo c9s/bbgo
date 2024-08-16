@@ -32,9 +32,11 @@ func (s *ConverterSetting) InitializeConverter() (Converter, error) {
 
 	logrus.Infof("initializing converter %T ...", converter)
 	err := converter.Initialize()
-	return nil, err
+	return converter, err
 }
 
+// ConverterManager manages the converters for trade conversion
+// It can be used to convert the trade symbol into the target symbol, or convert the price, volume into different units.
 type ConverterManager struct {
 	ConverterSettings []ConverterSetting `json:"converters,omitempty" yaml:"converters,omitempty"`
 
@@ -43,15 +45,18 @@ type ConverterManager struct {
 
 func (c *ConverterManager) Initialize() error {
 	for _, setting := range c.ConverterSettings {
-
 		converter, err := setting.InitializeConverter()
 		if err != nil {
 			return err
 		}
 
-		c.AddConverter(converter)
+		if converter != nil {
+			c.AddConverter(converter)
+		}
 	}
 
+	numConverters := len(c.converters)
+	logrus.Infof("%d converters loaded", numConverters)
 	return nil
 }
 
