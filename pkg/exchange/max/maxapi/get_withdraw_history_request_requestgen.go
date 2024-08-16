@@ -23,13 +23,13 @@ func (g *GetWithdrawHistoryRequest) State(state string) *GetWithdrawHistoryReque
 	return g
 }
 
-func (g *GetWithdrawHistoryRequest) From(from time.Time) *GetWithdrawHistoryRequest {
-	g.from = &from
+func (g *GetWithdrawHistoryRequest) Timestamp(timestamp time.Time) *GetWithdrawHistoryRequest {
+	g.timestamp = &timestamp
 	return g
 }
 
-func (g *GetWithdrawHistoryRequest) To(to time.Time) *GetWithdrawHistoryRequest {
-	g.to = &to
+func (g *GetWithdrawHistoryRequest) Order(order string) *GetWithdrawHistoryRequest {
+	g.order = &order
 	return g
 }
 
@@ -69,22 +69,21 @@ func (g *GetWithdrawHistoryRequest) GetParameters() (map[string]interface{}, err
 		params["state"] = state
 	} else {
 	}
-	// check from field -> json key from
-	if g.from != nil {
-		from := *g.from
+	// check timestamp field -> json key timestamp
+	if g.timestamp != nil {
+		timestamp := *g.timestamp
 
-		// assign parameter of from
-		// convert time.Time to seconds time stamp
-		params["from"] = strconv.FormatInt(from.Unix(), 10)
+		// assign parameter of timestamp
+		// convert time.Time to milliseconds time stamp
+		params["timestamp"] = strconv.FormatInt(timestamp.UnixNano()/int64(time.Millisecond), 10)
 	} else {
 	}
-	// check to field -> json key to
-	if g.to != nil {
-		to := *g.to
+	// check order field -> json key order
+	if g.order != nil {
+		order := *g.order
 
-		// assign parameter of to
-		// convert time.Time to seconds time stamp
-		params["to"] = strconv.FormatInt(to.Unix(), 10)
+		// assign parameter of order
+		params["order"] = order
 	} else {
 	}
 	// check limit field -> json key limit
