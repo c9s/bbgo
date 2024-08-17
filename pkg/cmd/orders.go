@@ -256,7 +256,7 @@ var executeOrderCmd = &cobra.Command{
 		executionCtx, cancelExecution := context.WithCancel(ctx)
 		defer cancelExecution()
 
-		execution := &twap.Execution{
+		execution := &twap.StreamExecutor{
 			Session:        session,
 			Symbol:         symbol,
 			Side:           side,
