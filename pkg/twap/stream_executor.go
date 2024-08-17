@@ -48,8 +48,6 @@ type StreamExecutor struct {
 
 	stoppedC chan struct{}
 
-	state int
-
 	mu sync.Mutex
 }
 
@@ -349,6 +347,7 @@ func (e *StreamExecutor) cancelContextIfTargetQuantityFilled() bool {
 		e.cancelExecution()
 		return true
 	}
+
 	return false
 }
 
@@ -399,10 +398,10 @@ func (e *StreamExecutor) Run(parentCtx context.Context) error {
 
 	e.orderBook = types.NewStreamBook(e.Symbol)
 	e.orderBook.BindStream(e.marketDataStream)
-	go e.connectMarketData(e.executionCtx)
 
 	e.userDataStream = e.Session.Exchange.NewStream()
 	e.userDataStream.OnTradeUpdate(e.handleTradeUpdate)
+
 	e.position = &types.Position{
 		Symbol:        e.Symbol,
 		BaseCurrency:  e.market.BaseCurrency,
@@ -415,6 +414,7 @@ func (e *StreamExecutor) Run(parentCtx context.Context) error {
 	e.activeMakerOrders.OnFilled(e.handleFilledOrder)
 	e.activeMakerOrders.BindStream(e.userDataStream)
 
+	go e.connectMarketData(e.executionCtx)
 	go e.connectUserData(e.userDataStreamCtx)
 	go e.orderUpdater(e.executionCtx)
 	return nil
