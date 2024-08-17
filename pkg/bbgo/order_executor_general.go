@@ -84,6 +84,7 @@ func NewGeneralOrderExecutor(
 	executor := &GeneralOrderExecutor{
 		BaseOrderExecutor: BaseOrderExecutor{
 			session:           session,
+			exchange:          session.Exchange,
 			activeMakerOrders: NewActiveOrderBook(symbol),
 			orderStore:        orderStore,
 		},
