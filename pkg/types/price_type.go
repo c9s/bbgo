@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
@@ -70,6 +71,11 @@ func (p *PriceType) UnmarshalJSON(data []byte) error {
 
 // GetPrice returns the price from the given ticker based on the price type
 func (p PriceType) GetPrice(ticker *Ticker, side SideType) fixedpoint.Value {
+	switch p {
+	case PriceTypeBestBidOfferQueue5, PriceTypeBestBidOfferCounterParty5:
+		log.Warnf("price type %s is not supported with ticker", p)
+	}
+
 	price := ticker.Last
 
 	switch p {
@@ -81,13 +87,13 @@ func (p PriceType) GetPrice(ticker *Ticker, side SideType) fixedpoint.Value {
 		price = ticker.Sell
 	case PriceTypeMid:
 		price = ticker.Buy.Add(ticker.Sell).Div(fixedpoint.NewFromInt(2))
-	case PriceTypeMaker, PriceTypeBestBidOfferQueue1:
+	case PriceTypeMaker, PriceTypeBestBidOfferQueue1, PriceTypeBestBidOfferQueue5:
 		if side == SideTypeBuy {
 			price = ticker.Buy
 		} else if side == SideTypeSell {
 			price = ticker.Sell
 		}
-	case PriceTypeTaker, PriceTypeBestBidOfferCounterParty1:
+	case PriceTypeTaker, PriceTypeBestBidOfferCounterParty1, PriceTypeBestBidOfferCounterParty5:
 		if side == SideTypeBuy {
 			price = ticker.Sell
 		} else if side == SideTypeSell {
