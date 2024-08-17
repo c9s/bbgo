@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/twap"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/types"
@@ -255,7 +256,7 @@ var executeOrderCmd = &cobra.Command{
 		executionCtx, cancelExecution := context.WithCancel(ctx)
 		defer cancelExecution()
 
-		execution := &bbgo.TwapExecution{
+		execution := &twap.Execution{
 			Session:        session,
 			Symbol:         symbol,
 			Side:           side,
