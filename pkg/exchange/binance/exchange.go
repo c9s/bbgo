@@ -796,13 +796,24 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		return nil, err
 	}
 
-	var order *binance.Order
 	if e.IsMargin {
-		order, err = e.client.NewGetMarginOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
-	} else {
-		order, err = e.client.NewGetOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
+		order, err := e.client.NewGetMarginOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return toGlobalOrder(order, e.IsMargin)
 	}
 
+	if e.IsFutures {
+		order, err := e.futuresClient.NewGetOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return toGlobalFuturesOrder(order, false)
+	}
+
+	order, err := e.client.NewGetOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
 	if err != nil {
 		return nil, err
 	}
