@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
@@ -238,7 +237,7 @@ func (e *FixedQuantityExecutor) cancelActiveOrders(ctx context.Context) error {
 }
 
 func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
-	updateLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
+	// updateLimiter := rate.NewLimiter(rate.Every(3*time.Second), 2)
 
 	defer func() {
 		if err := e.cancelActiveOrders(ctx); err != nil {
@@ -266,9 +265,11 @@ func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
 			}
 
 			// orderBook.C sends a signal when any price or quantity changes in the order book
-			if !updateLimiter.Allow() {
-				break
-			}
+			/*
+				if !updateLimiter.Allow() {
+					break
+				}
+			*/
 
 			if e.cancelContextIfTargetQuantityFilled() {
 				return
@@ -286,9 +287,11 @@ func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
 				continue
 			}
 
-			if !updateLimiter.Allow() {
-				break
-			}
+			/*
+				if !updateLimiter.Allow() {
+					break
+				}
+			*/
 
 			if e.cancelContextIfTargetQuantityFilled() {
 				return
@@ -321,7 +324,6 @@ func (e *FixedQuantityExecutor) updateOrder(ctx context.Context) error {
 	tickSpread := tickSize.Mul(numOfTicks)
 
 	// check and see if we need to cancel the existing active orders
-
 	for e.activeMakerOrders.NumOfOrders() > 0 {
 		orders := e.activeMakerOrders.Orders()
 		if len(orders) > 1 {
@@ -370,6 +372,8 @@ func (e *FixedQuantityExecutor) updateOrder(ctx context.Context) error {
 			e.logger.Warnf("cancel active orders error: %v", err)
 		}
 	}
+
+	e.tradeCollector.Process()
 
 	orderForm, err := e.generateOrder()
 	if err != nil {
@@ -560,19 +564,27 @@ func (e *FixedQuantityExecutor) Start(ctx context.Context) error {
 	go e.connectUserData(e.userDataStreamCtx)
 
 	e.logger.Infof("waiting for connections ready...")
-	if !selectSignalOrTimeout(ctx, e.marketDataStreamConnectC, 10*time.Second) {
-		e.cancelExecution()
-		return fmt.Errorf("market data stream connection timeout")
-	}
 
-	if !selectSignalOrTimeout(ctx, e.userDataStreamConnectC, 10*time.Second) {
+	if err := e.WaitForConnection(ctx); err != nil {
 		e.cancelExecution()
-		return fmt.Errorf("user data stream connection timeout")
+		return err
 	}
 
 	e.logger.Infof("connections ready, starting order updater...")
 
 	go e.orderUpdater(e.executionCtx)
+	return nil
+}
+
+func (e *FixedQuantityExecutor) WaitForConnection(ctx context.Context) error {
+	if !selectSignalOrTimeout(ctx, e.marketDataStreamConnectC, 10*time.Second) {
+		return fmt.Errorf("market data stream connection timeout")
+	}
+
+	if !selectSignalOrTimeout(ctx, e.userDataStreamConnectC, 10*time.Second) {
+		return fmt.Errorf("user data stream connection timeout")
+	}
+
 	return nil
 }
 
