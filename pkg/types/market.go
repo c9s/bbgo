@@ -247,6 +247,19 @@ func (m Market) AdjustQuantityByMinNotional(quantity, currentPrice fixedpoint.Va
 	return quantity
 }
 
+// AdjustQuantityByMaxAmount adjusts the quantity to make the amount less than the given maxAmount
+func (m Market) AdjustQuantityByMaxAmount(quantity, currentPrice, maxAmount fixedpoint.Value) fixedpoint.Value {
+	// modify quantity for the min amount
+	amount := currentPrice.Mul(quantity)
+	if amount.Compare(maxAmount) < 0 {
+		return quantity
+	}
+
+	ratio := maxAmount.Div(amount)
+	quantity = quantity.Mul(ratio)
+	return m.TruncateQuantity(quantity)
+}
+
 type MarketMap map[string]Market
 
 func (m MarketMap) Add(market Market) {

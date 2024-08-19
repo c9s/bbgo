@@ -90,9 +90,11 @@ type FixedQuantityExecutor struct {
 
 	market           types.Market
 	marketDataStream types.Stream
-	orderBook        *types.StreamOrderBook
 
-	userDataStream    types.Stream
+	orderBook *types.StreamOrderBook
+
+	userDataStream types.Stream
+
 	activeMakerOrders *bbgo.ActiveOrderBook
 	orderStore        *core.OrderStore
 	position          *types.Position
@@ -102,7 +104,9 @@ type FixedQuantityExecutor struct {
 
 	mu sync.Mutex
 
-	done *DoneSignal
+	userDataStreamConnectC   chan struct{}
+	marketDataStreamConnectC chan struct{}
+	done                     *DoneSignal
 }
 
 func NewStreamExecutor(
@@ -112,10 +116,25 @@ func NewStreamExecutor(
 	side types.SideType,
 	targetQuantity, sliceQuantity fixedpoint.Value,
 ) *FixedQuantityExecutor {
+
+	marketDataStream := exchange.NewStream()
+	marketDataStream.SetPublicOnly()
+	marketDataStream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{
+		Depth: types.DepthLevelMedium,
+	})
+
+	orderBook := types.NewStreamBook(symbol)
+	orderBook.BindStream(marketDataStream)
+
+	userDataStream := exchange.NewStream()
 	orderStore := core.NewOrderStore(symbol)
 	position := types.NewPositionFromMarket(market)
 	tradeCollector := core.NewTradeCollector(symbol, position, orderStore)
-	return &FixedQuantityExecutor{
+	orderStore.BindStream(userDataStream)
+
+	activeMakerOrders := bbgo.NewActiveOrderBook(symbol)
+
+	e := &FixedQuantityExecutor{
 		exchange:       exchange,
 		symbol:         symbol,
 		side:           side,
@@ -128,11 +147,43 @@ func NewStreamExecutor(
 			"symbol":   symbol,
 		}),
 
-		orderStore:     orderStore,
-		tradeCollector: tradeCollector,
-		position:       position,
-		done:           NewDoneSignal(),
+		marketDataStream: marketDataStream,
+		orderBook:        orderBook,
+
+		userDataStream: userDataStream,
+
+		activeMakerOrders: activeMakerOrders,
+		orderStore:        orderStore,
+		tradeCollector:    tradeCollector,
+		position:          position,
+		done:              NewDoneSignal(),
+
+		userDataStreamConnectC:   make(chan struct{}),
+		marketDataStreamConnectC: make(chan struct{}),
 	}
+
+	e.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		e.logger.Info(trade.String())
+	})
+	e.tradeCollector.BindStream(e.userDataStream)
+
+	activeMakerOrders.OnFilled(e.handleFilledOrder)
+	activeMakerOrders.BindStream(e.userDataStream)
+
+	e.marketDataStream.OnConnect(func() {
+		e.logger.Info("market data stream on connect")
+		close(e.marketDataStreamConnectC)
+		e.logger.Infof("marketDataStreamConnectC closed")
+	})
+
+	// private channels
+	e.userDataStream.OnAuth(func() {
+		e.logger.Info("user data stream on auth")
+		close(e.userDataStreamConnectC)
+		e.logger.Info("userDataStreamConnectC closed")
+	})
+
+	return e
 }
 
 func (e *FixedQuantityExecutor) SetDeadlineTime(t time.Time) {
@@ -270,11 +321,11 @@ func (e *FixedQuantityExecutor) updateOrder(ctx context.Context) error {
 	tickSpread := tickSize.Mul(numOfTicks)
 
 	// check and see if we need to cancel the existing active orders
+
 	for e.activeMakerOrders.NumOfOrders() > 0 {
 		orders := e.activeMakerOrders.Orders()
-
 		if len(orders) > 1 {
-			logrus.Warnf("more than 1 %s open orders in the strategy...", e.symbol)
+			e.logger.Warnf("found more than 1 %s open orders on the orderbook", e.symbol)
 		}
 
 		// get the first active order
@@ -397,39 +448,65 @@ func (e *FixedQuantityExecutor) getNewPrice() (fixedpoint.Value, error) {
 	return newPrice, nil
 }
 
-func (e *FixedQuantityExecutor) generateOrder() (orderForm *types.SubmitOrder, err error) {
+func (e *FixedQuantityExecutor) getRemainingQuantity() fixedpoint.Value {
+	base := e.position.GetBase()
+	return e.targetQuantity.Sub(base.Abs())
+}
+
+func (e *FixedQuantityExecutor) isDeadlineExceeded() bool {
+	if e.deadlineTime != nil && !e.deadlineTime.IsZero() {
+		return time.Since(*e.deadlineTime) > 0
+	}
+
+	return false
+}
+
+func (e *FixedQuantityExecutor) calculateNewOrderQuantity(price fixedpoint.Value) (fixedpoint.Value, error) {
+	minQuantity := e.market.MinQuantity
+	remainingQuantity := e.getRemainingQuantity()
+
+	if remainingQuantity.Sign() <= 0 {
+		e.cancelExecution()
+		return fixedpoint.Zero, nil
+	}
+
+	if remainingQuantity.Compare(minQuantity) < 0 {
+		e.logger.Warnf("can not continue placing orders, the remaining quantity %s is less than the min quantity %s", remainingQuantity.String(), minQuantity.String())
+
+		e.cancelExecution()
+		return fixedpoint.Zero, nil
+	}
+
+	// if deadline exceeded, we should return the remaining quantity
+	if e.isDeadlineExceeded() {
+		return remainingQuantity, nil
+	}
+
+	// when slice = 1000, if we only have 998, we should adjust our quantity to 998
+	orderQuantity := fixedpoint.Min(e.sliceQuantity, remainingQuantity)
+
+	// if the remaining quantity in the next round is not enough, we should merge the remaining quantity into this round
+	// if there are rest slices
+	nextRemainingQuantity := remainingQuantity.Sub(e.sliceQuantity)
+
+	if nextRemainingQuantity.Sign() > 0 && e.market.IsDustQuantity(nextRemainingQuantity, price) {
+		orderQuantity = remainingQuantity
+	}
+
+	orderQuantity = e.market.AdjustQuantityByMinNotional(orderQuantity, price)
+	return orderQuantity, nil
+}
+
+func (e *FixedQuantityExecutor) generateOrder() (*types.SubmitOrder, error) {
 	newPrice, err := e.getNewPrice()
 	if err != nil {
 		return nil, err
 	}
 
-	minQuantity := e.market.MinQuantity
-	base := e.position.GetBase()
-
-	restQuantity := e.targetQuantity.Sub(base.Abs())
-
-	if restQuantity.Sign() <= 0 {
-		if e.cancelContextIfTargetQuantityFilled() {
-			return nil, nil
-		}
+	orderQuantity, err := e.calculateNewOrderQuantity(newPrice)
+	if err != nil {
+		return nil, err
 	}
-
-	if restQuantity.Compare(minQuantity) < 0 {
-		return nil, fmt.Errorf("can not continue placing orders, rest quantity %s is less than the min quantity %s", restQuantity.String(), minQuantity.String())
-	}
-
-	// when slice = 1000, if we only have 998, we should adjust our quantity to 998
-	orderQuantity := fixedpoint.Min(e.sliceQuantity, restQuantity)
-
-	// if the rest quantity in the next round is not enough, we should merge the rest quantity into this round
-	// if there are rest slices
-	nextRestQuantity := restQuantity.Sub(e.sliceQuantity)
-	if nextRestQuantity.Sign() > 0 && nextRestQuantity.Compare(minQuantity) < 0 {
-		orderQuantity = restQuantity
-	}
-
-	minNotional := e.market.MinNotional
-	orderQuantity = bbgo.AdjustQuantityByMinAmount(orderQuantity, newPrice, minNotional)
 
 	balances, err := e.exchange.QueryAccountBalances(e.executionCtx)
 	if err != nil {
@@ -446,67 +523,55 @@ func (e *FixedQuantityExecutor) generateOrder() (orderForm *types.SubmitOrder, e
 	case types.SideTypeBuy:
 		// check base balance for sell, try to sell as more as possible
 		if b, ok := balances[e.market.QuoteCurrency]; ok {
-			orderQuantity = bbgo.AdjustQuantityByMaxAmount(orderQuantity, newPrice, b.Available)
+			orderQuantity = e.market.AdjustQuantityByMaxAmount(orderQuantity, newPrice, b.Available)
 		}
 	}
 
-	if e.deadlineTime != nil && !e.deadlineTime.IsZero() {
-		now := time.Now()
-		if now.After(*e.deadlineTime) {
-			orderForm = &types.SubmitOrder{
-				Symbol:   e.symbol,
-				Side:     e.side,
-				Type:     types.OrderTypeMarket,
-				Quantity: restQuantity,
-				Market:   e.market,
-			}
-			return orderForm, nil
-		}
+	if e.isDeadlineExceeded() {
+		return &types.SubmitOrder{
+			Symbol:   e.symbol,
+			Side:     e.side,
+			Type:     types.OrderTypeMarket,
+			Quantity: orderQuantity,
+			Market:   e.market,
+		}, nil
 	}
 
-	orderForm = &types.SubmitOrder{
+	return &types.SubmitOrder{
 		Symbol:      e.symbol,
 		Side:        e.side,
 		Type:        types.OrderTypeLimitMaker,
 		Quantity:    orderQuantity,
 		Price:       newPrice,
 		Market:      e.market,
-		TimeInForce: "GTC",
-	}
-
-	return orderForm, err
+		TimeInForce: types.TimeInForceGTC,
+	}, nil
 }
 
 func (e *FixedQuantityExecutor) Start(ctx context.Context) error {
-	if e.marketDataStream != nil {
-		return errors.New("market data stream is not nil, you can't start the executor twice")
+	if e.executionCtx != nil {
+		return errors.New("executionCtx is not nil, you can't start the executor twice")
 	}
 
 	e.executionCtx, e.cancelExecution = context.WithCancel(ctx)
 	e.userDataStreamCtx, e.cancelUserDataStream = context.WithCancel(ctx)
 
-	e.marketDataStream = e.exchange.NewStream()
-	e.marketDataStream.SetPublicOnly()
-	e.marketDataStream.Subscribe(types.BookChannel, e.symbol, types.SubscribeOptions{
-		Depth: types.DepthLevelMedium,
-	})
-
-	e.orderBook = types.NewStreamBook(e.symbol)
-	e.orderBook.BindStream(e.marketDataStream)
-
-	// private channels
-	e.userDataStream = e.exchange.NewStream()
-	e.orderStore.BindStream(e.userDataStream)
-	e.activeMakerOrders = bbgo.NewActiveOrderBook(e.symbol)
-	e.activeMakerOrders.OnFilled(e.handleFilledOrder)
-	e.activeMakerOrders.BindStream(e.userDataStream)
-	e.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
-		e.logger.Info(trade.String())
-	})
-	e.tradeCollector.BindStream(e.userDataStream)
-
 	go e.connectMarketData(e.executionCtx)
 	go e.connectUserData(e.userDataStreamCtx)
+
+	e.logger.Infof("waiting for connections ready...")
+	if !selectSignalOrTimeout(ctx, e.marketDataStreamConnectC, 10*time.Second) {
+		e.cancelExecution()
+		return fmt.Errorf("market data stream connection timeout")
+	}
+
+	if !selectSignalOrTimeout(ctx, e.userDataStreamConnectC, 10*time.Second) {
+		e.cancelExecution()
+		return fmt.Errorf("user data stream connection timeout")
+	}
+
+	e.logger.Infof("connections ready, starting order updater...")
+
 	go e.orderUpdater(e.executionCtx)
 	return nil
 }
@@ -538,5 +603,16 @@ func (e *FixedQuantityExecutor) Shutdown(shutdownCtx context.Context) {
 			return
 
 		}
+	}
+}
+
+func selectSignalOrTimeout(ctx context.Context, c chan struct{}, timeout time.Duration) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(timeout):
+		return false
+	case <-c:
+		return true
 	}
 }
