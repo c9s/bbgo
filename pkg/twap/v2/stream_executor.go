@@ -276,7 +276,7 @@ func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
 			return
 
 		case <-e.orderBook.C:
-			changed := monitor.OnUpdateFromBook(e.orderBook)
+			changed := monitor.UpdateFromBook(e.orderBook)
 			if !changed {
 				continue
 			}
@@ -293,7 +293,7 @@ func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
 			}
 
 		case <-ticker.C:
-			changed := monitor.OnUpdateFromBook(e.orderBook)
+			changed := monitor.UpdateFromBook(e.orderBook)
 			if !changed {
 				continue
 			}
