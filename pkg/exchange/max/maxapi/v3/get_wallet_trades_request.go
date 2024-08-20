@@ -14,7 +14,7 @@ func (s *Client) NewGetWalletTradesRequest(walletType WalletType) *GetWalletTrad
 	return &GetWalletTradesRequest{client: s.Client, walletType: walletType}
 }
 
-//go:generate GetRequest -url "/api/v3/wallet/:walletType/new/trades" -type GetWalletTradesRequest -responseType []Trade
+//go:generate GetRequest -url "/api/v3/wallet/:walletType/trades" -type GetWalletTradesRequest -responseType []Trade
 type GetWalletTradesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
