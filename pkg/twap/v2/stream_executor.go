@@ -74,7 +74,7 @@ type FixedQuantityExecutor struct {
 	done                     *DoneSignal
 }
 
-func NewStreamExecutor(
+func NewFixedQuantityExecutor(
 	exchange types.Exchange,
 	symbol string,
 	market types.Market,
