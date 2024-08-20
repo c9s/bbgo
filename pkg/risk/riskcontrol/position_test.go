@@ -23,7 +23,7 @@ func Test_ModifiedQuantity(t *testing.T) {
 			BaseCurrency:    "BTC",
 		},
 	}
-	orderExecutor := bbgo.NewGeneralOrderExecutor(nil, "BTCUSDT", "strategy", "strategy-1", pos)
+	orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, "BTCUSDT", "strategy", "strategy-1", pos)
 	riskControl := NewPositionRiskControl(orderExecutor, fixedpoint.NewFromInt(10), fixedpoint.NewFromInt(2))
 
 	cases := []struct {

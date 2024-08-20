@@ -27,7 +27,9 @@ var quantityReduceDelta = fixedpoint.NewFromFloat(0.005)
 // This is for the maximum retries
 const submitOrderRetryLimit = 5
 
+// BaseOrderExecutor provides the common accessors for order executor
 type BaseOrderExecutor struct {
+	exchange          types.Exchange
 	session           *ExchangeSession
 	activeMakerOrders *ActiveOrderBook
 	orderStore        *core.OrderStore
@@ -43,8 +45,8 @@ func (e *BaseOrderExecutor) ActiveMakerOrders() *ActiveOrderBook {
 
 // GracefulCancel cancels all active maker orders if orders are not given, otherwise cancel all the given orders
 func (e *BaseOrderExecutor) GracefulCancel(ctx context.Context, orders ...types.Order) error {
-	if err := e.activeMakerOrders.GracefulCancel(ctx, e.session.Exchange, orders...); err != nil {
-		return errors.Wrap(err, "graceful cancel error")
+	if err := e.activeMakerOrders.GracefulCancel(ctx, e.exchange, orders...); err != nil {
+		return errors.Wrap(err, "graceful cancel order error")
 	}
 
 	return nil
@@ -84,6 +86,7 @@ func NewGeneralOrderExecutor(
 	executor := &GeneralOrderExecutor{
 		BaseOrderExecutor: BaseOrderExecutor{
 			session:           session,
+			exchange:          session.Exchange,
 			activeMakerOrders: NewActiveOrderBook(symbol),
 			orderStore:        orderStore,
 		},
@@ -111,7 +114,7 @@ func (e *GeneralOrderExecutor) SetMaxRetries(maxRetries uint) {
 }
 
 func (e *GeneralOrderExecutor) startMarginAssetUpdater(ctx context.Context) {
-	marginService, ok := e.session.Exchange.(types.MarginBorrowRepayService)
+	marginService, ok := e.exchange.(types.MarginBorrowRepayService)
 	if !ok {
 		log.Warnf("session %s (%T) exchange does not support MarginBorrowRepayService", e.session.Name, e.session.Exchange)
 		return

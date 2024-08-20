@@ -262,7 +262,7 @@ func (s *Strategy) generateOrder(ctx context.Context) (*types.SubmitOrder, error
 		}
 		quantity = market.RoundDownQuantityByPrecision(quantity)
 
-		price := s.PriceType.Map(ticker, side)
+		price := s.PriceType.GetPrice(ticker, side)
 
 		if s.MaxAmount.Float64() > 0 {
 			quantity = bbgo.AdjustQuantityByMaxAmount(quantity, price, s.MaxAmount)

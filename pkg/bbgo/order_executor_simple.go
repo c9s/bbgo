@@ -22,6 +22,7 @@ func NewSimpleOrderExecutor(session *ExchangeSession) *SimpleOrderExecutor {
 	return &SimpleOrderExecutor{
 		BaseOrderExecutor: BaseOrderExecutor{
 			session:           session,
+			exchange:          session.Exchange,
 			activeMakerOrders: NewActiveOrderBook(""),
 			orderStore:        core.NewOrderStore(""),
 		},

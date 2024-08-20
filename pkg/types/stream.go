@@ -24,6 +24,7 @@ var defaultDialer = &websocket.Dialer{
 	ReadBufferSize:   4096,
 }
 
+//go:generate mockgen -destination=mocks/mock_stream.go -package=mocks . Stream
 type Stream interface {
 	StandardStreamEventHub
 
