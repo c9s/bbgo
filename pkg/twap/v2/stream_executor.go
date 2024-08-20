@@ -220,10 +220,14 @@ func (e *FixedQuantityExecutor) handleFilledOrder(order types.Order) {
 }
 
 func (e *FixedQuantityExecutor) cancelContextIfTargetQuantityFilled() bool {
+	// ensure that the trades are processed
+	e.tradeCollector.Process()
+
+	// now get the base quantity from the position
 	base := e.position.GetBase()
 
-	if base.Abs().Compare(e.targetQuantity) >= 0 {
-		e.logger.Infof("filled target quantity, canceling the order execution context")
+	if base.Abs().Sub(e.targetQuantity).Compare(e.market.MinQuantity.Neg()) >= 0 {
+		e.logger.Infof("position is filled with target quantity, canceling the order execution context")
 		e.cancelExecution()
 		return true
 	}
