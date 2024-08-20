@@ -1006,13 +1006,15 @@ func (e *Exchange) submitMarginOrder(ctx context.Context, order types.SubmitOrde
 	}
 
 	// could be IOC or FOK
-	if len(order.TimeInForce) > 0 {
-		// TODO: check the TimeInForce value
-		req.TimeInForce(binance.TimeInForceType(order.TimeInForce))
-	} else {
-		switch order.Type {
-		case types.OrderTypeLimit, types.OrderTypeStopLimit:
-			req.TimeInForce(binance.TimeInForceTypeGTC)
+	switch order.Type {
+	case types.OrderTypeLimit, types.OrderTypeStopLimit:
+		req.TimeInForce(binance.TimeInForceTypeGTC)
+	case types.OrderTypeLimitMaker:
+		// do not set TimeInForce for LimitMaker
+	default:
+		if len(order.TimeInForce) > 0 {
+			// TODO: check the TimeInForce value
+			req.TimeInForce(binance.TimeInForceType(order.TimeInForce))
 		}
 	}
 

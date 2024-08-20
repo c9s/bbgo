@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/robfig/cron/v3"
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/robfig/cron/v3"
-	"github.com/sirupsen/logrus"
 )
 
 const ID = "autobuy"
@@ -128,7 +129,7 @@ func (s *Strategy) autobuy(ctx context.Context) {
 	}
 
 	side := types.SideTypeBuy
-	price := s.PriceType.Map(ticker, side)
+	price := s.PriceType.GetPrice(ticker, side)
 
 	if price.Float64() > s.boll.UpBand.Last(0) {
 		log.Infof("price %s is higher than upper band %f, skip", price.String(), s.boll.UpBand.Last(0))
