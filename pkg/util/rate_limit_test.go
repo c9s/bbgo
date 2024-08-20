@@ -41,3 +41,32 @@ func TestShouldDelay(t *testing.T) {
 		assert.True(t, ShouldDelay(limiter, minInterval) > 0)
 	}
 }
+
+func TestParseRateLimitSyntax(t *testing.T) {
+	var tests = []struct {
+		desc          string
+		expectedBurst int
+		expectedRate  float64
+
+		wantErr bool
+	}{
+		{"2+1/5s", 2, 1.0 / 5.0, false},
+		{"5+1/3m", 5, 1 / 3 * 60.0, false},
+		{"1m", 1, 1.0 / 60.0, false},
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			limiter, err := ParseRateLimitSyntax(test.desc)
+			if test.wantErr {
+				assert.Error(t, err)
+			} else if assert.NoError(t, err) {
+				assert.NotNil(t, limiter)
+				burst := limiter.Burst()
+				assert.Equal(t, test.expectedBurst, burst)
+
+				limit := limiter.Limit()
+				assert.InDeltaf(t, test.expectedRate, float64(limit), 0.01, "expected rate %f, got %f", test.expectedRate, limit)
+			}
+		})
+	}
+}

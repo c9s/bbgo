@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
@@ -83,6 +84,8 @@ type FixedQuantityExecutor struct {
 
 	executionCtx    context.Context
 	cancelExecution context.CancelFunc
+
+	orderUpdateRateLimit *rate.Limiter
 
 	userDataStreamCtx    context.Context
 	cancelUserDataStream context.CancelFunc
@@ -242,6 +245,10 @@ func (e *FixedQuantityExecutor) cancelContextIfTargetQuantityFilled() bool {
 	return false
 }
 
+func (e *FixedQuantityExecutor) SetOrderUpdateRateLimit(rateLimit *rate.Limiter) {
+	e.orderUpdateRateLimit = rateLimit
+}
+
 func (e *FixedQuantityExecutor) cancelActiveOrders(ctx context.Context) error {
 	gracefulCtx, gracefulCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer gracefulCancel()
@@ -249,8 +256,6 @@ func (e *FixedQuantityExecutor) cancelActiveOrders(ctx context.Context) error {
 }
 
 func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
-	// updateLimiter := rate.NewLimiter(rate.Every(3*time.Second), 2)
-
 	defer func() {
 		if err := e.cancelActiveOrders(ctx); err != nil {
 			e.logger.WithError(err).Error("cancel active orders error")
@@ -277,12 +282,6 @@ func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
 			}
 
 			// orderBook.C sends a signal when any price or quantity changes in the order book
-			/*
-				if !updateLimiter.Allow() {
-					break
-				}
-			*/
-
 			if e.cancelContextIfTargetQuantityFilled() {
 				return
 			}
@@ -299,12 +298,6 @@ func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
 				continue
 			}
 
-			/*
-				if !updateLimiter.Allow() {
-					break
-				}
-			*/
-
 			if e.cancelContextIfTargetQuantityFilled() {
 				return
 			}
@@ -317,6 +310,11 @@ func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
 }
 
 func (e *FixedQuantityExecutor) updateOrder(ctx context.Context) error {
+	if e.orderUpdateRateLimit != nil && !e.orderUpdateRateLimit.Allow() {
+		e.logger.Infof("rate limit exceeded, skip updating order")
+		return nil
+	}
+
 	book := e.orderBook.Copy()
 	sideBook := book.SideBook(e.side)
 
