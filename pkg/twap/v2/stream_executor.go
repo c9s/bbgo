@@ -363,7 +363,11 @@ func (e *FixedQuantityExecutor) updateOrder(ctx context.Context) error {
 		return nil
 	}
 
-	createdOrder, err := e.exchange.SubmitOrder(ctx, *orderForm)
+	return e.submitOrder(ctx, *orderForm)
+}
+
+func (e *FixedQuantityExecutor) submitOrder(ctx context.Context, orderForm types.SubmitOrder) error {
+	createdOrder, err := e.exchange.SubmitOrder(ctx, orderForm)
 	if err != nil {
 		return err
 	}
