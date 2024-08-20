@@ -16,6 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	_ "github.com/c9s/bbgo/pkg/twap"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 
 	"github.com/c9s/bbgo/pkg/twap/v2"
 )
@@ -27,6 +28,7 @@ func init() {
 	executeOrderCmd.Flags().String("target-quantity", "", "target quantity")
 	executeOrderCmd.Flags().String("slice-quantity", "", "slice quantity")
 	executeOrderCmd.Flags().String("stop-price", "0", "stop price")
+	executeOrderCmd.Flags().String("order-update-rate-limit", "1s", "order update rate limit, syntax: 1+1/1m")
 	executeOrderCmd.Flags().Duration("update-interval", time.Second*10, "order update time")
 	executeOrderCmd.Flags().Duration("delay-interval", time.Second*3, "order delay time after filled")
 	executeOrderCmd.Flags().Duration("deadline", 0, "deadline duration of the order execution, e.g. 1h")
@@ -112,7 +114,17 @@ var executeOrderCmd = &cobra.Command{
 			return err
 		}
 
+		orderUpdateRateLimitStr, err := cmd.Flags().GetString("order-update-rate-limit")
+		if err != nil {
+			return err
+		}
+
 		updateInterval, err := cmd.Flags().GetDuration("update-interval")
+		if err != nil {
+			return err
+		}
+
+		delayInterval, err := cmd.Flags().GetDuration("delay-interval")
 		if err != nil {
 			return err
 		}
@@ -150,7 +162,23 @@ var executeOrderCmd = &cobra.Command{
 		}
 
 		executor := twap.NewStreamExecutor(session.Exchange, symbol, market, side, targetQuantity, sliceQuantity)
-		executor.SetUpdateInterval(updateInterval)
+
+		if updateInterval > 0 {
+			executor.SetUpdateInterval(updateInterval)
+		}
+
+		if len(orderUpdateRateLimitStr) > 0 {
+			rateLimit, err := util.ParseRateLimitSyntax(orderUpdateRateLimitStr)
+			if err != nil {
+				return err
+			}
+
+			executor.SetOrderUpdateRateLimit(rateLimit)
+		}
+
+		if delayInterval > 0 {
+			executor.SetDelayInterval(delayInterval)
+		}
 
 		if stopPrice.Sign() > 0 {
 			executor.SetStopPrice(stopPrice)
