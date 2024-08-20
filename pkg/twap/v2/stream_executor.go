@@ -603,6 +603,8 @@ func (e *FixedQuantityExecutor) Done() <-chan struct{} {
 // 1. Stop the order updater (by using the execution context)
 // 2. The order updater cancels all open orders and closes the user data stream
 func (e *FixedQuantityExecutor) Shutdown(shutdownCtx context.Context) {
+	e.tradeCollector.Process()
+
 	e.mu.Lock()
 	if e.cancelExecution != nil {
 		e.cancelExecution()
