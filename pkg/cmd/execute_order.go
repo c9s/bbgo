@@ -161,7 +161,7 @@ var executeOrderCmd = &cobra.Command{
 			return fmt.Errorf("market %s not found", symbol)
 		}
 
-		executor := twap.NewStreamExecutor(session.Exchange, symbol, market, side, targetQuantity, sliceQuantity)
+		executor := twap.NewFixedQuantityExecutor(session.Exchange, symbol, market, side, targetQuantity, sliceQuantity)
 
 		if updateInterval > 0 {
 			executor.SetUpdateInterval(updateInterval)
