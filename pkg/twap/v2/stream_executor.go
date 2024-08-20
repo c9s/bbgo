@@ -197,6 +197,14 @@ func (e *FixedQuantityExecutor) SetUpdateInterval(updateInterval time.Duration) 
 	e.updateInterval = updateInterval
 }
 
+func (e *FixedQuantityExecutor) SetNumOfTicks(numOfTicks int) {
+	e.numOfTicks = numOfTicks
+}
+
+func (e *FixedQuantityExecutor) SetStopPrice(price fixedpoint.Value) {
+	e.stopPrice = price
+}
+
 func (e *FixedQuantityExecutor) connectMarketData(ctx context.Context) {
 	e.logger.Infof("connecting market data stream...")
 	if err := e.marketDataStream.Connect(ctx); err != nil {
@@ -350,24 +358,28 @@ func (e *FixedQuantityExecutor) updateOrder(ctx context.Context) error {
 		// DO NOT UPDATE IF:
 		//   tickSpread > 0 AND current order price == second price + tickSpread
 		//   current order price == first price
-		logrus.Infof("orderPrice = %s first.Price = %s second.Price = %s tickSpread = %s", orderPrice.String(), first.Price.String(), second.Price.String(), tickSpread.String())
+		logrus.Infof("orderPrice = %s, best price = %s, second level price = %s, tickSpread = %s",
+			orderPrice.String(),
+			first.Price.String(),
+			second.Price.String(),
+			tickSpread.String())
 
 		switch e.side {
 		case types.SideTypeBuy:
-			if tickSpread.Sign() > 0 && orderPrice == second.Price.Add(tickSpread) {
-				logrus.Infof("the current order is already on the best ask price %s", orderPrice.String())
+			if tickSpread.Sign() > 0 && orderPrice.Compare(second.Price.Add(tickSpread)) == 0 {
+				e.logger.Infof("the current order is already on the best ask price %s, skip update", orderPrice.String())
 				return nil
 			} else if orderPrice == first.Price {
-				logrus.Infof("the current order is already on the best bid price %s", orderPrice.String())
+				e.logger.Infof("the current order is already on the best bid price %s, skip update", orderPrice.String())
 				return nil
 			}
 
 		case types.SideTypeSell:
-			if tickSpread.Sign() > 0 && orderPrice == second.Price.Sub(tickSpread) {
-				logrus.Infof("the current order is already on the best ask price %s", orderPrice.String())
+			if tickSpread.Sign() > 0 && orderPrice.Compare(second.Price.Sub(tickSpread)) == 0 {
+				e.logger.Infof("the current order is already on the best ask price %s, skip update", orderPrice.String())
 				return nil
 			} else if orderPrice == first.Price {
-				logrus.Infof("the current order is already on the best ask price %s", orderPrice.String())
+				e.logger.Infof("the current order is already on the best ask price %s, skip update", orderPrice.String())
 				return nil
 			}
 		}
