@@ -49,8 +49,6 @@ type FixedQuantityExecutor struct {
 	executionCtx    context.Context
 	cancelExecution context.CancelFunc
 
-	orderUpdateRateLimit *rate.Limiter
-
 	userDataStreamCtx    context.Context
 	cancelUserDataStream context.CancelFunc
 
@@ -61,10 +59,11 @@ type FixedQuantityExecutor struct {
 
 	userDataStream types.Stream
 
-	activeMakerOrders *bbgo.ActiveOrderBook
-	orderStore        *core.OrderStore
-	position          *types.Position
-	tradeCollector    *core.TradeCollector
+	orderUpdateRateLimit *rate.Limiter
+	activeMakerOrders    *bbgo.ActiveOrderBook
+	orderStore           *core.OrderStore
+	position             *types.Position
+	tradeCollector       *core.TradeCollector
 
 	logger logrus.FieldLogger
 
@@ -352,6 +351,10 @@ func (e *FixedQuantityExecutor) updateOrder(ctx context.Context) error {
 	}
 
 	e.tradeCollector.Process()
+
+	if e.delayInterval > 0 {
+		time.Sleep(e.delayInterval)
+	}
 
 	orderForm, err := e.generateOrder()
 	if err != nil {
