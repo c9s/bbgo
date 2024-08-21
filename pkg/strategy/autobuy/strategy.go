@@ -67,6 +67,16 @@ func (s *Strategy) Validate() error {
 	if err := s.QuantityOrAmount.Validate(); err != nil {
 		return err
 	}
+
+	if s.Bollinger != nil {
+		if s.Bollinger.Interval == "" {
+			return fmt.Errorf("bollinger interval is required")
+		}
+
+		if s.Bollinger.BandWidth <= 0 {
+			return fmt.Errorf("bollinger band width must be greater than 0")
+		}
+	}
 	return nil
 }
 
@@ -78,13 +88,17 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Bollinger.Interval})
+	if s.Bollinger != nil {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Bollinger.Interval})
+	}
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
-	s.boll = session.Indicators(s.Symbol).BOLL(s.Bollinger.IntervalWindow, s.Bollinger.BandWidth)
+	if s.Bollinger != nil {
+		s.boll = session.Indicators(s.Symbol).BOLL(s.Bollinger.IntervalWindow, s.Bollinger.BandWidth)
+	}
 
 	s.OrderExecutor.ActiveMakerOrders().OnFilled(func(order types.Order) {
 		s.autobuy(ctx)
@@ -130,7 +144,7 @@ func (s *Strategy) autobuy(ctx context.Context) {
 	side := types.SideTypeBuy
 	price := s.PriceType.Map(ticker, side)
 
-	if price.Float64() > s.boll.UpBand.Last(0) {
+	if s.boll != nil && price.Float64() > s.boll.UpBand.Last(0) {
 		log.Infof("price %s is higher than upper band %f, skip", price.String(), s.boll.UpBand.Last(0))
 		return
 	}
