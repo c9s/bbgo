@@ -170,7 +170,7 @@ func TestNewStreamExecutor(t *testing.T) {
 	}
 	mockEx.EXPECT().SubmitOrder(gomock.AssignableToTypeOf(ctx), firstSubmitOrder).Return(&firstOrder, nil)
 
-	executor := NewStreamExecutor(mockEx, symbol, market, types.SideTypeBuy, targetQuantity, sliceQuantity)
+	executor := NewFixedQuantityExecutor(mockEx, symbol, market, types.SideTypeBuy, targetQuantity, sliceQuantity)
 	executor.SetUpdateInterval(200 * time.Millisecond)
 
 	go func() {
