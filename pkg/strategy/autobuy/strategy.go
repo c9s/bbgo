@@ -65,6 +65,18 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Validate() error {
+	if s.Symbol == "" {
+		return fmt.Errorf("symbol is required")
+	}
+
+	if s.Schedule == "" {
+		return fmt.Errorf("schedule is required")
+	}
+
+	if s.MinBaseBalance.Sign() <= 0 {
+		return fmt.Errorf("minBaseBalance must be greater than 0")
+	}
+
 	if err := s.QuantityOrAmount.Validate(); err != nil {
 		return err
 	}
