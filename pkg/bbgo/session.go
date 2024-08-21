@@ -886,15 +886,16 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	return nil
 }
 
-func (session *ExchangeSession) MarginType() string {
-	margin := "none"
+func (session *ExchangeSession) MarginType() types.MarginType {
 	if session.Margin {
-		margin = "margin"
 		if session.IsolatedMargin {
-			margin = "isolated"
+			return types.MarginTypeIsolatedMargin
+		} else {
+			return types.MarginTypeCrossMargin
 		}
 	}
-	return margin
+
+	return types.MarginTypeSpot
 }
 
 func (session *ExchangeSession) metricsBalancesUpdater(balances types.BalanceMap) {
