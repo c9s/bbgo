@@ -21,7 +21,7 @@ func NewBboMonitor() *BboMonitor {
 	return &BboMonitor{}
 }
 
-func (m *BboMonitor) OnUpdateFromBook(book *types.StreamOrderBook) bool {
+func (m *BboMonitor) UpdateFromBook(book *types.StreamOrderBook) bool {
 	bestBid, ok1 := book.BestBid()
 	bestAsk, ok2 := book.BestAsk()
 	if !ok1 || !ok2 {

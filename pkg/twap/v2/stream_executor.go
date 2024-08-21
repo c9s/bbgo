@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
@@ -16,42 +17,6 @@ import (
 )
 
 var defaultUpdateInterval = time.Minute
-
-type DoneSignal struct {
-	doneC chan struct{}
-	mu    sync.Mutex
-}
-
-func NewDoneSignal() *DoneSignal {
-	return &DoneSignal{
-		doneC: make(chan struct{}),
-	}
-}
-
-func (e *DoneSignal) Emit() {
-	e.mu.Lock()
-	if e.doneC == nil {
-		e.doneC = make(chan struct{})
-	}
-
-	close(e.doneC)
-	e.mu.Unlock()
-}
-
-// Chan returns a channel that emits a signal when the execution is done.
-func (e *DoneSignal) Chan() (c <-chan struct{}) {
-	// if the channel is not allocated, it means it's not started yet, we need to return a closed channel
-	e.mu.Lock()
-	if e.doneC == nil {
-		e.doneC = make(chan struct{})
-		c = e.doneC
-	} else {
-		c = e.doneC
-	}
-	e.mu.Unlock()
-
-	return c
-}
 
 // FixedQuantityExecutor is a TWAP executor that places orders on the exchange using the exchange's stream API.
 // It uses a fixed target quantity to place orders.
@@ -94,10 +59,11 @@ type FixedQuantityExecutor struct {
 
 	userDataStream types.Stream
 
-	activeMakerOrders *bbgo.ActiveOrderBook
-	orderStore        *core.OrderStore
-	position          *types.Position
-	tradeCollector    *core.TradeCollector
+	orderUpdateRateLimit *rate.Limiter
+	activeMakerOrders    *bbgo.ActiveOrderBook
+	orderStore           *core.OrderStore
+	position             *types.Position
+	tradeCollector       *core.TradeCollector
 
 	logger logrus.FieldLogger
 
@@ -108,7 +74,7 @@ type FixedQuantityExecutor struct {
 	done                     *DoneSignal
 }
 
-func NewStreamExecutor(
+func NewFixedQuantityExecutor(
 	exchange types.Exchange,
 	symbol string,
 	market types.Market,
@@ -197,6 +163,14 @@ func (e *FixedQuantityExecutor) SetUpdateInterval(updateInterval time.Duration) 
 	e.updateInterval = updateInterval
 }
 
+func (e *FixedQuantityExecutor) SetNumOfTicks(numOfTicks int) {
+	e.numOfTicks = numOfTicks
+}
+
+func (e *FixedQuantityExecutor) SetStopPrice(price fixedpoint.Value) {
+	e.stopPrice = price
+}
+
 func (e *FixedQuantityExecutor) connectMarketData(ctx context.Context) {
 	e.logger.Infof("connecting market data stream...")
 	if err := e.marketDataStream.Connect(ctx); err != nil {
@@ -234,6 +208,10 @@ func (e *FixedQuantityExecutor) cancelContextIfTargetQuantityFilled() bool {
 	return false
 }
 
+func (e *FixedQuantityExecutor) SetOrderUpdateRateLimit(rateLimit *rate.Limiter) {
+	e.orderUpdateRateLimit = rateLimit
+}
+
 func (e *FixedQuantityExecutor) cancelActiveOrders(ctx context.Context) error {
 	gracefulCtx, gracefulCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer gracefulCancel()
@@ -241,8 +219,6 @@ func (e *FixedQuantityExecutor) cancelActiveOrders(ctx context.Context) error {
 }
 
 func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
-	// updateLimiter := rate.NewLimiter(rate.Every(3*time.Second), 2)
-
 	defer func() {
 		if err := e.cancelActiveOrders(ctx); err != nil {
 			e.logger.WithError(err).Error("cancel active orders error")
@@ -263,18 +239,12 @@ func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
 			return
 
 		case <-e.orderBook.C:
-			changed := monitor.OnUpdateFromBook(e.orderBook)
+			changed := monitor.UpdateFromBook(e.orderBook)
 			if !changed {
 				continue
 			}
 
 			// orderBook.C sends a signal when any price or quantity changes in the order book
-			/*
-				if !updateLimiter.Allow() {
-					break
-				}
-			*/
-
 			if e.cancelContextIfTargetQuantityFilled() {
 				return
 			}
@@ -286,16 +256,10 @@ func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
 			}
 
 		case <-ticker.C:
-			changed := monitor.OnUpdateFromBook(e.orderBook)
+			changed := monitor.UpdateFromBook(e.orderBook)
 			if !changed {
 				continue
 			}
-
-			/*
-				if !updateLimiter.Allow() {
-					break
-				}
-			*/
 
 			if e.cancelContextIfTargetQuantityFilled() {
 				return
@@ -309,6 +273,11 @@ func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
 }
 
 func (e *FixedQuantityExecutor) updateOrder(ctx context.Context) error {
+	if e.orderUpdateRateLimit != nil && !e.orderUpdateRateLimit.Allow() {
+		e.logger.Infof("rate limit exceeded, skip updating order")
+		return nil
+	}
+
 	book := e.orderBook.Copy()
 	sideBook := book.SideBook(e.side)
 
@@ -350,24 +319,28 @@ func (e *FixedQuantityExecutor) updateOrder(ctx context.Context) error {
 		// DO NOT UPDATE IF:
 		//   tickSpread > 0 AND current order price == second price + tickSpread
 		//   current order price == first price
-		logrus.Infof("orderPrice = %s first.Price = %s second.Price = %s tickSpread = %s", orderPrice.String(), first.Price.String(), second.Price.String(), tickSpread.String())
+		logrus.Infof("orderPrice = %s, best price = %s, second level price = %s, tickSpread = %s",
+			orderPrice.String(),
+			first.Price.String(),
+			second.Price.String(),
+			tickSpread.String())
 
 		switch e.side {
 		case types.SideTypeBuy:
-			if tickSpread.Sign() > 0 && orderPrice == second.Price.Add(tickSpread) {
-				logrus.Infof("the current order is already on the best ask price %s", orderPrice.String())
+			if tickSpread.Sign() > 0 && orderPrice.Compare(second.Price.Add(tickSpread)) == 0 {
+				e.logger.Infof("the current order is already on the best ask price %s, skip update", orderPrice.String())
 				return nil
 			} else if orderPrice == first.Price {
-				logrus.Infof("the current order is already on the best bid price %s", orderPrice.String())
+				e.logger.Infof("the current order is already on the best bid price %s, skip update", orderPrice.String())
 				return nil
 			}
 
 		case types.SideTypeSell:
-			if tickSpread.Sign() > 0 && orderPrice == second.Price.Sub(tickSpread) {
-				logrus.Infof("the current order is already on the best ask price %s", orderPrice.String())
+			if tickSpread.Sign() > 0 && orderPrice.Compare(second.Price.Sub(tickSpread)) == 0 {
+				e.logger.Infof("the current order is already on the best ask price %s, skip update", orderPrice.String())
 				return nil
 			} else if orderPrice == first.Price {
-				logrus.Infof("the current order is already on the best ask price %s", orderPrice.String())
+				e.logger.Infof("the current order is already on the best ask price %s, skip update", orderPrice.String())
 				return nil
 			}
 		}
@@ -379,6 +352,10 @@ func (e *FixedQuantityExecutor) updateOrder(ctx context.Context) error {
 
 	e.tradeCollector.Process()
 
+	if e.delayInterval > 0 {
+		time.Sleep(e.delayInterval)
+	}
+
 	orderForm, err := e.generateOrder()
 	if err != nil {
 		return err
@@ -386,7 +363,11 @@ func (e *FixedQuantityExecutor) updateOrder(ctx context.Context) error {
 		return nil
 	}
 
-	createdOrder, err := e.exchange.SubmitOrder(ctx, *orderForm)
+	return e.submitOrder(ctx, *orderForm)
+}
+
+func (e *FixedQuantityExecutor) submitOrder(ctx context.Context, orderForm types.SubmitOrder) error {
+	createdOrder, err := e.exchange.SubmitOrder(ctx, orderForm)
 	if err != nil {
 		return err
 	}
@@ -603,6 +584,8 @@ func (e *FixedQuantityExecutor) Done() <-chan struct{} {
 // 1. Stop the order updater (by using the execution context)
 // 2. The order updater cancels all open orders and closes the user data stream
 func (e *FixedQuantityExecutor) Shutdown(shutdownCtx context.Context) {
+	e.tradeCollector.Process()
+
 	e.mu.Lock()
 	if e.cancelExecution != nil {
 		e.cancelExecution()
