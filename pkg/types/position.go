@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -534,6 +535,8 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	p.Lock()
 	defer p.Unlock()
 
+	defer p.updateMetrics()
+
 	// update changedAt field before we unlock in the defer func
 	defer func() {
 		p.ChangedAt = td.Time.Time()
@@ -634,4 +637,18 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	}
 
 	return fixedpoint.Zero, fixedpoint.Zero, false
+}
+
+func (p *Position) updateMetrics() {
+	if p.StrategyInstanceID == "" || p.Strategy == "" {
+		return
+	}
+
+	labels := prometheus.Labels{
+		"strategy_id":   p.StrategyInstanceID,
+		"strategy_type": p.Strategy,
+	}
+	positionAverageCostMetrics.With(labels).Set(p.AverageCost.Float64())
+	positionBaseQuantityMetrics.With(labels).Set(p.Base.Float64())
+	positionQuoteQuantityMetrics.With(labels).Set(p.Quote.Float64())
 }
