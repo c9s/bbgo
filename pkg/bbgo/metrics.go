@@ -9,35 +9,87 @@ var (
 			Help: "bbgo exchange session connection status",
 		},
 		[]string{
-			"exchange", // exchange name
-			"channel",  // channel: user or market
-			"margin",   // margin type: none, margin or isolated
-			"symbol",   // margin symbol of the connection.
+			"exchange",    // exchange name
+			"channel",     // channel: user or market
+			"margin_type", // margin type: none, margin or isolated
+			"symbol",      // margin symbol of the connection.
 		},
 	)
 
-	metricsLockedBalances = prometheus.NewGaugeVec(
+	metricsBalanceLockedMetrics = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "bbgo_balances_locked",
 			Help: "bbgo exchange locked balances",
 		},
 		[]string{
-			"exchange", // exchange name
-			"margin",   // margin of connection. 1 or 0
-			"symbol",   // margin symbol of the connection.
+			"exchange",    // exchange name
+			"margin_type", // margin of connection. 1 or 0
+			"symbol",      // margin symbol of the connection.
 			"currency",
 		},
 	)
 
-	metricsAvailableBalances = prometheus.NewGaugeVec(
+	metricsBalanceAvailableMetrics = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "bbgo_balances_available",
 			Help: "bbgo exchange available balances",
 		},
 		[]string{
-			"exchange", // exchange name
-			"margin",   // margin of connection. none, margin or isolated
-			"symbol",   // margin symbol of the connection.
+			"exchange",    // exchange name
+			"margin_type", // margin of connection. none, margin or isolated
+			"symbol",      // margin symbol of the connection.
+			"currency",
+		},
+	)
+
+	metricsBalanceDebtMetrics = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_balances_debt",
+			Help: "bbgo exchange balance debt",
+		},
+		[]string{
+			"exchange",    // exchange name
+			"margin_type", // margin of connection. none, margin or isolated
+			"symbol",      // margin symbol of the connection.
+			"currency",
+		},
+	)
+
+	metricsBalanceBorrowedMetrics = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_balances_borrowed",
+			Help: "bbgo exchange balance borrowed",
+		},
+		[]string{
+			"exchange",    // exchange name
+			"margin_type", // margin of connection. none, margin or isolated
+			"symbol",      // margin symbol of the connection.
+			"currency",
+		},
+	)
+
+	metricsBalanceInterestMetrics = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_balances_interest",
+			Help: "bbgo exchange balance interest",
+		},
+		[]string{
+			"exchange",    // exchange name
+			"margin_type", // margin of connection. none, margin or isolated
+			"symbol",      // margin symbol of the connection.
+			"currency",
+		},
+	)
+
+	metricsBalanceNetMetrics = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bbgo_balances_net",
+			Help: "bbgo exchange session total net balances",
+		},
+		[]string{
+			"exchange",    // exchange name
+			"margin_type", // margin of connection. none, margin or isolated
+			"symbol",      // margin symbol of the connection.
 			"currency",
 		},
 	)
@@ -48,9 +100,9 @@ var (
 			Help: "bbgo exchange session total balances",
 		},
 		[]string{
-			"exchange", // exchange name
-			"margin",   // margin of connection. none, margin or isolated
-			"symbol",   // margin symbol of the connection.
+			"exchange",    // exchange name
+			"margin_type", // margin of connection. none, margin or isolated
+			"symbol",      // margin symbol of the connection.
 			"currency",
 		},
 	)
@@ -61,11 +113,11 @@ var (
 			Help: "bbgo exchange session trades",
 		},
 		[]string{
-			"exchange",  // exchange name
-			"margin",    // margin of connection. none, margin or isolated
-			"symbol",    // margin symbol of the connection.
-			"side",      // side: buy or sell
-			"liquidity", // maker or taker
+			"exchange",    // exchange name
+			"margin_type", // margin of connection. none, margin or isolated
+			"symbol",      // margin symbol of the connection.
+			"side",        // side: buy or sell
+			"liquidity",   // maker or taker
 		},
 	)
 
@@ -75,26 +127,26 @@ var (
 			Help: "bbgo trading volume",
 		},
 		[]string{
-			"exchange",  // exchange name
-			"margin",    // margin of connection. none, margin or isolated
-			"symbol",    // margin symbol of the connection.
-			"side",      // side: buy or sell
-			"liquidity", // maker or taker
+			"exchange",    // exchange name
+			"margin_type", // margin of connection. none, margin or isolated
+			"symbol",      // margin symbol of the connection.
+			"side",        // side: buy or sell
+			"liquidity",   // maker or taker
 		},
 	)
 
-	metricsLastUpdateTimeBalance = prometheus.NewGaugeVec(
+	metricsLastUpdateTimeMetrics = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "bbgo_last_update_time",
 			Help: "bbgo last update time of different channel",
 		},
 		[]string{
-			"exchange",  // exchange name
-			"margin",    // margin of connection. none, margin or isolated
-			"channel",   // channel: user, market
-			"data_type", // type: balance, ticker, kline, orderbook, trade, order
-			"symbol",    // for market data, trade and order
-			"currency",  // for balance
+			"exchange",    // exchange name
+			"margin_type", // margin of connection. none, margin or isolated
+			"channel",     // channel: user, market
+			"data_type",   // type: balance, ticker, kline, orderbook, trade, order
+			"symbol",      // for market data, trade and order
+			"currency",    // for balance
 		},
 	)
 )
@@ -103,10 +155,14 @@ func init() {
 	prometheus.MustRegister(
 		metricsConnectionStatus,
 		metricsTotalBalances,
-		metricsLockedBalances,
-		metricsAvailableBalances,
+		metricsBalanceNetMetrics,
+		metricsBalanceLockedMetrics,
+		metricsBalanceAvailableMetrics,
+		metricsBalanceDebtMetrics,
+		metricsBalanceBorrowedMetrics,
+		metricsBalanceInterestMetrics,
 		metricsTradesTotal,
 		metricsTradingVolume,
-		metricsLastUpdateTimeBalance,
+		metricsLastUpdateTimeMetrics,
 	)
 }
