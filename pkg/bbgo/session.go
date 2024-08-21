@@ -54,11 +54,11 @@ type ExchangeSession struct {
 	PublicOnly bool `json:"publicOnly,omitempty" yaml:"publicOnly"`
 
 	// PrivateChannels is used for filtering the private user data channel, .e.g, orders, trades, balances.. etc
-	// This option is exchange specific
+	// This option is exchange-specific, currently only MAX exchange reads this option
 	PrivateChannels []string `json:"privateChannels,omitempty" yaml:"privateChannels,omitempty"`
 
 	// PrivateChannelSymbols is used for filtering the private user data channel, .e.g, order symbol subscription.
-	// This option is exchange specific
+	// This option is exchange-specific, currently only Bitget exchange reads this option
 	PrivateChannelSymbols []string `json:"privateChannelSymbols,omitempty" yaml:"privateChannelSymbols,omitempty"`
 
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
