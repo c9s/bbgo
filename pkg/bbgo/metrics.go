@@ -9,6 +9,7 @@ var (
 			Help: "bbgo exchange session connection status",
 		},
 		[]string{
+			"session",
 			"exchange",    // exchange name
 			"channel",     // channel: user or market
 			"margin_type", // margin type: none, margin or isolated
@@ -22,6 +23,7 @@ var (
 			Help: "bbgo exchange locked balances",
 		},
 		[]string{
+			"session",
 			"exchange",    // exchange name
 			"margin_type", // margin of connection. 1 or 0
 			"symbol",      // margin symbol of the connection.
@@ -35,6 +37,7 @@ var (
 			Help: "bbgo exchange available balances",
 		},
 		[]string{
+			"session",
 			"exchange",    // exchange name
 			"margin_type", // margin of connection. none, margin or isolated
 			"symbol",      // margin symbol of the connection.
@@ -48,6 +51,7 @@ var (
 			Help: "bbgo exchange balance debt",
 		},
 		[]string{
+			"session",
 			"exchange",    // exchange name
 			"margin_type", // margin of connection. none, margin or isolated
 			"symbol",      // margin symbol of the connection.
@@ -61,6 +65,7 @@ var (
 			Help: "bbgo exchange balance borrowed",
 		},
 		[]string{
+			"session",
 			"exchange",    // exchange name
 			"margin_type", // margin of connection. none, margin or isolated
 			"symbol",      // margin symbol of the connection.
@@ -74,6 +79,7 @@ var (
 			Help: "bbgo exchange balance interest",
 		},
 		[]string{
+			"session",
 			"exchange",    // exchange name
 			"margin_type", // margin of connection. none, margin or isolated
 			"symbol",      // margin symbol of the connection.
@@ -87,6 +93,7 @@ var (
 			Help: "bbgo exchange session total net balances",
 		},
 		[]string{
+			"session",
 			"exchange",    // exchange name
 			"margin_type", // margin of connection. none, margin or isolated
 			"symbol",      // margin symbol of the connection.
@@ -100,6 +107,7 @@ var (
 			Help: "bbgo exchange session total balances",
 		},
 		[]string{
+			"session",
 			"exchange",    // exchange name
 			"margin_type", // margin of connection. none, margin or isolated
 			"symbol",      // margin symbol of the connection.
@@ -113,6 +121,7 @@ var (
 			Help: "bbgo exchange session trades",
 		},
 		[]string{
+			"session",
 			"exchange",    // exchange name
 			"margin_type", // margin of connection. none, margin or isolated
 			"symbol",      // margin symbol of the connection.
@@ -127,6 +136,7 @@ var (
 			Help: "bbgo trading volume",
 		},
 		[]string{
+			"session",
 			"exchange",    // exchange name
 			"margin_type", // margin of connection. none, margin or isolated
 			"symbol",      // margin symbol of the connection.
@@ -141,6 +151,7 @@ var (
 			Help: "bbgo last update time of different channel",
 		},
 		[]string{
+			"session",
 			"exchange",    // exchange name
 			"margin_type", // margin of connection. none, margin or isolated
 			"channel",     // channel: user, market

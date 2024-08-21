@@ -901,10 +901,11 @@ func (session *ExchangeSession) MarginType() types.MarginType {
 func (session *ExchangeSession) metricsBalancesUpdater(balances types.BalanceMap) {
 	for currency, balance := range balances {
 		labels := prometheus.Labels{
-			"exchange": session.ExchangeName.String(),
-			"margin":   string(session.MarginType()),
-			"symbol":   session.IsolatedMarginSymbol,
-			"currency": currency,
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"symbol":      session.IsolatedMarginSymbol,
+			"currency":    currency,
 		}
 
 		metricsTotalBalances.With(labels).Set(balance.Total().Float64())
@@ -918,6 +919,7 @@ func (session *ExchangeSession) metricsBalancesUpdater(balances types.BalanceMap
 		metricsBalanceInterestMetrics.With(labels).Set(balance.Interest.Float64())
 
 		metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+			"session":     session.Name,
 			"exchange":    session.ExchangeName.String(),
 			"margin_type": string(session.MarginType()),
 			"channel":     "user",
@@ -931,6 +933,7 @@ func (session *ExchangeSession) metricsBalancesUpdater(balances types.BalanceMap
 
 func (session *ExchangeSession) metricsOrderUpdater(order types.Order) {
 	metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+		"session":     session.Name,
 		"exchange":    session.ExchangeName.String(),
 		"margin_type": string(session.MarginType()),
 		"channel":     "user",
@@ -942,6 +945,7 @@ func (session *ExchangeSession) metricsOrderUpdater(order types.Order) {
 
 func (session *ExchangeSession) metricsTradeUpdater(trade types.Trade) {
 	labels := prometheus.Labels{
+		"session":     session.Name,
 		"exchange":    session.ExchangeName.String(),
 		"margin_type": string(session.MarginType()),
 		"side":        trade.Side.String(),
@@ -951,6 +955,7 @@ func (session *ExchangeSession) metricsTradeUpdater(trade types.Trade) {
 	metricsTradingVolume.With(labels).Add(trade.Quantity.Mul(trade.Price).Float64())
 	metricsTradesTotal.With(labels).Inc()
 	metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+		"session":     session.Name,
 		"exchange":    session.ExchangeName.String(),
 		"margin_type": string(session.MarginType()),
 		"channel":     "user",
@@ -963,6 +968,7 @@ func (session *ExchangeSession) metricsTradeUpdater(trade types.Trade) {
 func (session *ExchangeSession) bindMarketDataStreamMetrics(stream types.Stream) {
 	stream.OnBookUpdate(func(book types.SliceOrderBook) {
 		metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+			"session":     session.Name,
 			"exchange":    session.ExchangeName.String(),
 			"margin_type": string(session.MarginType()),
 			"channel":     "market",
@@ -973,6 +979,7 @@ func (session *ExchangeSession) bindMarketDataStreamMetrics(stream types.Stream)
 	})
 	stream.OnKLineClosed(func(kline types.KLine) {
 		metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+			"session":     session.Name,
 			"exchange":    session.ExchangeName.String(),
 			"margin_type": string(session.MarginType()),
 			"channel":     "market",
@@ -991,6 +998,7 @@ func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
 	stream.OnDisconnect(func() {
 		metricsConnectionStatus.With(prometheus.Labels{
 			"channel":     "user",
+			"session":     session.Name,
 			"exchange":    session.ExchangeName.String(),
 			"margin_type": string(session.MarginType()),
 			"symbol":      session.IsolatedMarginSymbol,
@@ -999,6 +1007,7 @@ func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
 	stream.OnConnect(func() {
 		metricsConnectionStatus.With(prometheus.Labels{
 			"channel":     "user",
+			"session":     session.Name,
 			"exchange":    session.ExchangeName.String(),
 			"margin_type": string(session.MarginType()),
 			"symbol":      session.IsolatedMarginSymbol,
