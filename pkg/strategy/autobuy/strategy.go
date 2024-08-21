@@ -31,6 +31,7 @@ type Strategy struct {
 	Symbol         string                  `json:"symbol"`
 	Schedule       string                  `json:"schedule"`
 	MinBaseBalance fixedpoint.Value        `json:"minBaseBalance"`
+	OrderType      types.OrderType         `json:"orderType"`
 	PriceType      types.PriceType         `json:"priceType"`
 	Bollinger      *types.BollingerSetting `json:"bollinger"`
 	DryRun         bool                    `json:"dryRun"`
@@ -81,6 +82,10 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Defaults() error {
+	if s.OrderType == "" {
+		s.OrderType = types.OrderTypeLimit
+	}
+
 	if s.PriceType == "" {
 		s.PriceType = types.PriceTypeMaker
 	}
@@ -159,7 +164,7 @@ func (s *Strategy) autobuy(ctx context.Context) {
 	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     side,
-		Type:     types.OrderTypeLimitMaker,
+		Type:     s.OrderType,
 		Quantity: quantity,
 		Price:    price,
 	}
