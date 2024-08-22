@@ -354,12 +354,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 			s.highestPrice = 0
 			s.lowestPrice = 0
 		} else if s.Position.IsLong() {
-			s.buyPrice = s.Position.ApproximateAverageCost.Float64()
+			s.buyPrice = s.Position.AverageCost.Float64()
 			s.sellPrice = 0
 			s.highestPrice = math.Max(s.buyPrice, s.highestPrice)
 			s.lowestPrice = 0
 		} else {
-			s.sellPrice = s.Position.ApproximateAverageCost.Float64()
+			s.sellPrice = s.Position.AverageCost.Float64()
 			s.buyPrice = 0
 			s.highestPrice = 0
 			if s.lowestPrice == 0 {
