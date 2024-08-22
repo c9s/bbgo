@@ -54,11 +54,11 @@ type ExchangeSession struct {
 	PublicOnly bool `json:"publicOnly,omitempty" yaml:"publicOnly"`
 
 	// PrivateChannels is used for filtering the private user data channel, .e.g, orders, trades, balances.. etc
-	// This option is exchange specific
+	// This option is exchange-specific, currently only MAX exchange reads this option
 	PrivateChannels []string `json:"privateChannels,omitempty" yaml:"privateChannels,omitempty"`
 
 	// PrivateChannelSymbols is used for filtering the private user data channel, .e.g, order symbol subscription.
-	// This option is exchange specific
+	// This option is exchange-specific, currently only Bitget exchange reads this option
 	PrivateChannelSymbols []string `json:"privateChannelSymbols,omitempty" yaml:"privateChannelSymbols,omitempty"`
 
 	Margin               bool   `json:"margin,omitempty" yaml:"margin"`
@@ -886,91 +886,106 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	return nil
 }
 
-func (session *ExchangeSession) MarginType() string {
-	margin := "none"
+func (session *ExchangeSession) MarginType() types.MarginType {
 	if session.Margin {
-		margin = "margin"
 		if session.IsolatedMargin {
-			margin = "isolated"
+			return types.MarginTypeIsolatedMargin
+		} else {
+			return types.MarginTypeCrossMargin
 		}
 	}
-	return margin
+
+	return types.MarginTypeSpot
 }
 
 func (session *ExchangeSession) metricsBalancesUpdater(balances types.BalanceMap) {
 	for currency, balance := range balances {
 		labels := prometheus.Labels{
-			"exchange": session.ExchangeName.String(),
-			"margin":   session.MarginType(),
-			"symbol":   session.IsolatedMarginSymbol,
-			"currency": currency,
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"symbol":      session.IsolatedMarginSymbol,
+			"currency":    currency,
 		}
 
 		metricsTotalBalances.With(labels).Set(balance.Total().Float64())
-		metricsLockedBalances.With(labels).Set(balance.Locked.Float64())
-		metricsAvailableBalances.With(labels).Set(balance.Available.Float64())
-		metricsLastUpdateTimeBalance.With(prometheus.Labels{
-			"exchange":  session.ExchangeName.String(),
-			"margin":    session.MarginType(),
-			"channel":   "user",
-			"data_type": "balance",
-			"symbol":    "",
-			"currency":  currency,
+		metricsBalanceNetMetrics.With(labels).Set(balance.Net().Float64())
+		metricsBalanceAvailableMetrics.With(labels).Set(balance.Available.Float64())
+		metricsBalanceLockedMetrics.With(labels).Set(balance.Locked.Float64())
+
+		// margin metrics
+		metricsBalanceDebtMetrics.With(labels).Set(balance.Debt().Float64())
+		metricsBalanceBorrowedMetrics.With(labels).Set(balance.Borrowed.Float64())
+		metricsBalanceInterestMetrics.With(labels).Set(balance.Interest.Float64())
+
+		metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"channel":     "user",
+			"data_type":   "balance",
+			"symbol":      "",
+			"currency":    currency,
 		}).SetToCurrentTime()
 	}
 
 }
 
 func (session *ExchangeSession) metricsOrderUpdater(order types.Order) {
-	metricsLastUpdateTimeBalance.With(prometheus.Labels{
-		"exchange":  session.ExchangeName.String(),
-		"margin":    session.MarginType(),
-		"channel":   "user",
-		"data_type": "order",
-		"symbol":    order.Symbol,
-		"currency":  "",
+	metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+		"session":     session.Name,
+		"exchange":    session.ExchangeName.String(),
+		"margin_type": string(session.MarginType()),
+		"channel":     "user",
+		"data_type":   "order",
+		"symbol":      order.Symbol,
+		"currency":    "",
 	}).SetToCurrentTime()
 }
 
 func (session *ExchangeSession) metricsTradeUpdater(trade types.Trade) {
 	labels := prometheus.Labels{
-		"exchange":  session.ExchangeName.String(),
-		"margin":    session.MarginType(),
-		"side":      trade.Side.String(),
-		"symbol":    trade.Symbol,
-		"liquidity": trade.Liquidity(),
+		"session":     session.Name,
+		"exchange":    session.ExchangeName.String(),
+		"margin_type": string(session.MarginType()),
+		"side":        trade.Side.String(),
+		"symbol":      trade.Symbol,
+		"liquidity":   trade.Liquidity(),
 	}
 	metricsTradingVolume.With(labels).Add(trade.Quantity.Mul(trade.Price).Float64())
 	metricsTradesTotal.With(labels).Inc()
-	metricsLastUpdateTimeBalance.With(prometheus.Labels{
-		"exchange":  session.ExchangeName.String(),
-		"margin":    session.MarginType(),
-		"channel":   "user",
-		"data_type": "trade",
-		"symbol":    trade.Symbol,
-		"currency":  "",
+	metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+		"session":     session.Name,
+		"exchange":    session.ExchangeName.String(),
+		"margin_type": string(session.MarginType()),
+		"channel":     "user",
+		"data_type":   "trade",
+		"symbol":      trade.Symbol,
+		"currency":    "",
 	}).SetToCurrentTime()
 }
 
 func (session *ExchangeSession) bindMarketDataStreamMetrics(stream types.Stream) {
 	stream.OnBookUpdate(func(book types.SliceOrderBook) {
-		metricsLastUpdateTimeBalance.With(prometheus.Labels{
-			"exchange":  session.ExchangeName.String(),
-			"margin":    session.MarginType(),
-			"channel":   "market",
-			"data_type": "book",
-			"symbol":    book.Symbol,
-			"currency":  "",
+		metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"channel":     "market",
+			"data_type":   "book",
+			"symbol":      book.Symbol,
+			"currency":    "",
 		}).SetToCurrentTime()
 	})
 	stream.OnKLineClosed(func(kline types.KLine) {
-		metricsLastUpdateTimeBalance.With(prometheus.Labels{
-			"exchange":  session.ExchangeName.String(),
-			"margin":    session.MarginType(),
-			"channel":   "market",
-			"data_type": "kline",
-			"symbol":    kline.Symbol,
-			"currency":  "",
+		metricsLastUpdateTimeMetrics.With(prometheus.Labels{
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"channel":     "market",
+			"data_type":   "kline",
+			"symbol":      kline.Symbol,
+			"currency":    "",
 		}).SetToCurrentTime()
 	})
 }
@@ -982,18 +997,20 @@ func (session *ExchangeSession) bindUserDataStreamMetrics(stream types.Stream) {
 	stream.OnOrderUpdate(session.metricsOrderUpdater)
 	stream.OnDisconnect(func() {
 		metricsConnectionStatus.With(prometheus.Labels{
-			"channel":  "user",
-			"exchange": session.ExchangeName.String(),
-			"margin":   session.MarginType(),
-			"symbol":   session.IsolatedMarginSymbol,
+			"channel":     "user",
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"symbol":      session.IsolatedMarginSymbol,
 		}).Set(0.0)
 	})
 	stream.OnConnect(func() {
 		metricsConnectionStatus.With(prometheus.Labels{
-			"channel":  "user",
-			"exchange": session.ExchangeName.String(),
-			"margin":   session.MarginType(),
-			"symbol":   session.IsolatedMarginSymbol,
+			"channel":     "user",
+			"session":     session.Name,
+			"exchange":    session.ExchangeName.String(),
+			"margin_type": string(session.MarginType()),
+			"symbol":      session.IsolatedMarginSymbol,
 		}).Set(1.0)
 	})
 }
