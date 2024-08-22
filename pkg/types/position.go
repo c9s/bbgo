@@ -54,6 +54,10 @@ type Position struct {
 	// TotalFee stores the fee currency -> total fee quantity
 	TotalFee map[string]fixedpoint.Value `json:"totalFee" db:"-"`
 
+	// FeeAverageCosts stores the fee currency -> average cost of the fee
+	// e.g. BNB -> 341.0
+	FeeAverageCosts map[string]fixedpoint.Value `json:"feeAverageCosts" db:"-"`
+
 	OpenedAt  time.Time `json:"openedAt,omitempty" db:"-"`
 	ChangedAt time.Time `json:"changedAt,omitempty" db:"changed_at"`
 
@@ -307,7 +311,10 @@ func NewPositionFromMarket(market Market) *Position {
 		BaseCurrency:  market.BaseCurrency,
 		QuoteCurrency: market.QuoteCurrency,
 		Market:        market,
-		TotalFee:      make(map[string]fixedpoint.Value),
+
+		FeeAverageCosts:  make(map[string]fixedpoint.Value),
+		TotalFee:         make(map[string]fixedpoint.Value),
+		ExchangeFeeRates: make(map[ExchangeName]ExchangeFee),
 	}
 }
 
@@ -316,7 +323,10 @@ func NewPosition(symbol, base, quote string) *Position {
 		Symbol:        symbol,
 		BaseCurrency:  base,
 		QuoteCurrency: quote,
-		TotalFee:      make(map[string]fixedpoint.Value),
+
+		TotalFee:         make(map[string]fixedpoint.Value),
+		FeeAverageCosts:  make(map[string]fixedpoint.Value),
+		ExchangeFeeRates: make(map[ExchangeName]ExchangeFee),
 	}
 }
 
@@ -344,6 +354,10 @@ func (p *Position) SetExchangeFeeRate(ex ExchangeName, exchangeFee ExchangeFee) 
 	}
 
 	p.ExchangeFeeRates[ex] = exchangeFee
+}
+
+func (p *Position) SetFeeAverageCost(currency string, cost fixedpoint.Value) {
+	p.FeeAverageCosts[currency] = cost
 }
 
 func (p *Position) IsShort() bool {
@@ -640,6 +654,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 }
 
 func (p *Position) updateMetrics() {
+	// update the position metrics only if the position defines the strategy ID
 	if p.StrategyInstanceID == "" || p.Strategy == "" {
 		return
 	}
