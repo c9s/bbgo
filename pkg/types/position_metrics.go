@@ -16,8 +16,8 @@ var positionBaseQuantityMetrics = prometheus.NewGaugeVec(
 
 var positionQuoteQuantityMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "bbgo_position_base_qty",
-		Help: "bbgo position base quantity metrics",
+		Name: "bbgo_position_quote_qty",
+		Help: "bbgo position quote quantity metrics",
 	}, []string{"strategy_id", "strategy_type", "symbol"})
 
 func init() {
