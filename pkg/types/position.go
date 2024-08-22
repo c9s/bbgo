@@ -504,6 +504,34 @@ func (p *Position) AddTrades(trades []Trade) (fixedpoint.Value, fixedpoint.Value
 	return totalProfitAmount, totalNetProfit, !totalProfitAmount.IsZero()
 }
 
+func (p *Position) calculateFeeInQuote(td Trade) fixedpoint.Value {
+	var quoteQuantity = td.QuoteQuantity
+
+	if cost, ok := p.FeeAverageCosts[td.FeeCurrency]; ok {
+		return td.Fee.Mul(cost)
+	}
+
+	if p.ExchangeFeeRates != nil {
+		if exchangeFee, ok := p.ExchangeFeeRates[td.Exchange]; ok {
+			if td.IsMaker {
+				return exchangeFee.MakerFeeRate.Mul(quoteQuantity)
+			} else {
+				return exchangeFee.TakerFeeRate.Mul(quoteQuantity)
+			}
+		}
+	}
+
+	if p.FeeRate != nil {
+		if td.IsMaker {
+			return p.FeeRate.MakerFeeRate.Mul(quoteQuantity)
+		} else {
+			return p.FeeRate.TakerFeeRate.Mul(quoteQuantity)
+		}
+	}
+
+	return fixedpoint.Zero
+}
+
 func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedpoint.Value, madeProfit bool) {
 	price := td.Price
 	quantity := td.Quantity
@@ -517,6 +545,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	switch td.FeeCurrency {
 
 	case p.BaseCurrency:
+		// USD-M futures use the quote currency as the fee currency.
 		if !td.IsFutures {
 			quantity = quantity.Sub(fee)
 		}
@@ -528,21 +557,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 
 	default:
 		if !td.Fee.IsZero() {
-			if p.ExchangeFeeRates != nil {
-				if exchangeFee, ok := p.ExchangeFeeRates[td.Exchange]; ok {
-					if td.IsMaker {
-						feeInQuote = feeInQuote.Add(exchangeFee.MakerFeeRate.Mul(quoteQuantity))
-					} else {
-						feeInQuote = feeInQuote.Add(exchangeFee.TakerFeeRate.Mul(quoteQuantity))
-					}
-				}
-			} else if p.FeeRate != nil {
-				if td.IsMaker {
-					feeInQuote = feeInQuote.Add(p.FeeRate.MakerFeeRate.Mul(quoteQuantity))
-				} else {
-					feeInQuote = feeInQuote.Add(p.FeeRate.TakerFeeRate.Mul(quoteQuantity))
-				}
-			}
+			feeInQuote = p.calculateFeeInQuote(td)
 		}
 	}
 
