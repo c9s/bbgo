@@ -44,10 +44,6 @@ type Position struct {
 	Quote       fixedpoint.Value `json:"quote" db:"quote"`
 	AverageCost fixedpoint.Value `json:"averageCost" db:"average_cost"`
 
-	// ApproximateAverageCost adds the computed fee in quote in the average cost
-	// This is used for calculating net profit
-	ApproximateAverageCost fixedpoint.Value `json:"approximateAverageCost"`
-
 	FeeRate          *ExchangeFee                 `json:"feeRate,omitempty"`
 	ExchangeFeeRates map[ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
 
@@ -281,10 +277,6 @@ type FuturesPosition struct {
 	Base        fixedpoint.Value `json:"base"`
 	Quote       fixedpoint.Value `json:"quote"`
 	AverageCost fixedpoint.Value `json:"averageCost"`
-
-	// ApproximateAverageCost adds the computed fee in quote in the average cost
-	// This is used for calculating net profit
-	ApproximateAverageCost fixedpoint.Value `json:"approximateAverageCost"`
 
 	FeeRate          *ExchangeFee                 `json:"feeRate,omitempty"`
 	ExchangeFeeRates map[ExchangeName]ExchangeFee `json:"exchangeFeeRates"`
@@ -583,11 +575,10 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 			// convert short position to long position
 			if p.Base.Add(quantity).Sign() > 0 {
 				profit = p.AverageCost.Sub(price).Mul(p.Base.Neg())
-				netProfit = p.ApproximateAverageCost.Sub(price).Mul(p.Base.Neg()).Sub(feeInQuote)
+				netProfit = p.AverageCost.Sub(price).Mul(p.Base.Neg()).Sub(feeInQuote)
 				p.Base = p.Base.Add(quantity)
 				p.Quote = p.Quote.Sub(quoteQuantity)
 				p.AverageCost = price
-				p.ApproximateAverageCost = price
 				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
 				p.OpenedAt = td.Time.Time()
 				return profit, netProfit, true
@@ -596,7 +587,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 				p.Base = p.Base.Add(quantity)
 				p.Quote = p.Quote.Sub(quoteQuantity)
 				profit = p.AverageCost.Sub(price).Mul(quantity)
-				netProfit = p.ApproximateAverageCost.Sub(price).Mul(quantity).Sub(feeInQuote)
+				netProfit = p.AverageCost.Sub(price).Mul(quantity).Sub(feeInQuote)
 				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
 				return profit, netProfit, true
 			}
@@ -610,11 +601,12 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 
 		// here the case is: base == 0 or base > 0
 		divisor := p.Base.Add(quantity)
-		p.ApproximateAverageCost = p.ApproximateAverageCost.Mul(p.Base).
+
+		p.AverageCost = p.AverageCost.Mul(p.Base).
 			Add(quoteQuantity).
 			Add(feeInQuote).
 			Div(divisor)
-		p.AverageCost = p.AverageCost.Mul(p.Base).Add(quoteQuantity).Div(divisor)
+
 		p.Base = p.Base.Add(quantity)
 		p.Quote = p.Quote.Sub(quoteQuantity)
 		return fixedpoint.Zero, fixedpoint.Zero, false
@@ -625,11 +617,10 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 			// convert long position to short position
 			if p.Base.Compare(quantity) < 0 {
 				profit = price.Sub(p.AverageCost).Mul(p.Base)
-				netProfit = price.Sub(p.ApproximateAverageCost).Mul(p.Base).Sub(feeInQuote)
+				netProfit = price.Sub(p.AverageCost).Mul(p.Base).Sub(feeInQuote)
 				p.Base = p.Base.Sub(quantity)
 				p.Quote = p.Quote.Add(quoteQuantity)
 				p.AverageCost = price
-				p.ApproximateAverageCost = price
 				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
 				p.OpenedAt = td.Time.Time()
 				return profit, netProfit, true
@@ -637,7 +628,7 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 				p.Base = p.Base.Sub(quantity)
 				p.Quote = p.Quote.Add(quoteQuantity)
 				profit = price.Sub(p.AverageCost).Mul(quantity)
-				netProfit = price.Sub(p.ApproximateAverageCost).Mul(quantity).Sub(feeInQuote)
+				netProfit = price.Sub(p.AverageCost).Mul(quantity).Sub(feeInQuote)
 				p.AccumulatedProfit = p.AccumulatedProfit.Add(profit)
 				return profit, netProfit, true
 			}
@@ -651,13 +642,10 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 
 		// handling short position, since Base here is negative we need to reverse the sign
 		divisor := quantity.Sub(p.Base)
-		p.ApproximateAverageCost = p.ApproximateAverageCost.Mul(p.Base.Neg()).
-			Add(quoteQuantity).
-			Sub(feeInQuote).
-			Div(divisor)
 
 		p.AverageCost = p.AverageCost.Mul(p.Base.Neg()).
 			Add(quoteQuantity).
+			Sub(feeInQuote).
 			Div(divisor)
 		p.Base = p.Base.Sub(quantity)
 		p.Quote = p.Quote.Add(quoteQuantity)

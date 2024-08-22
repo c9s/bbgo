@@ -2,8 +2,9 @@ package binance
 
 import (
 	"fmt"
-	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/pkg/errors"
@@ -42,11 +43,10 @@ func toGlobalFuturesPositions(futuresPositions []*binanceapi.FuturesAccountPosit
 	retFuturesPositions := make(types.FuturesPositionMap)
 	for _, futuresPosition := range futuresPositions {
 		retFuturesPositions[futuresPosition.Symbol] = types.FuturesPosition{ // TODO: types.FuturesPosition
-			Isolated:               futuresPosition.Isolated,
-			AverageCost:            fixedpoint.MustNewFromString(futuresPosition.EntryPrice),
-			ApproximateAverageCost: fixedpoint.MustNewFromString(futuresPosition.EntryPrice),
-			Base:                   fixedpoint.MustNewFromString(futuresPosition.PositionAmt),
-			Quote:                  fixedpoint.MustNewFromString(futuresPosition.Notional),
+			Isolated:    futuresPosition.Isolated,
+			AverageCost: fixedpoint.MustNewFromString(futuresPosition.EntryPrice),
+			Base:        fixedpoint.MustNewFromString(futuresPosition.PositionAmt),
+			Quote:       fixedpoint.MustNewFromString(futuresPosition.Notional),
 
 			PositionRisk: &types.PositionRisk{
 				Leverage: fixedpoint.MustNewFromString(futuresPosition.Leverage),
