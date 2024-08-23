@@ -13,12 +13,17 @@ import (
 )
 
 type ConverterSetting struct {
-	SymbolConverter *SymbolConverter `json:"symbolConverter" yaml:"symbolConverter"`
+	SymbolConverter   *SymbolConverter   `json:"symbolConverter" yaml:"symbolConverter"`
+	CurrencyConverter *CurrencyConverter `json:"currencyConverter" yaml:"currencyConverter"`
 }
 
 func (s *ConverterSetting) getConverter() Converter {
 	if s.SymbolConverter != nil {
 		return s.SymbolConverter
+	}
+
+	if s.CurrencyConverter != nil {
+		return s.CurrencyConverter
 	}
 
 	return nil
