@@ -1,3 +1,4 @@
+{{- if .Values.sync.enabled }}
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -51,3 +52,4 @@ spec:
             {{- else }}
               name: {{ include "bbgo.fullname" . }}
             {{- end }}
+{{- end -}}
