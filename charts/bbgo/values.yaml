@@ -91,7 +91,7 @@ debug:
 
 sync:
   enabled: false
-  schedule: "* * * * *"
+  schedule: "0 * * * *"
   ## since: sync from time
   since: false
 
