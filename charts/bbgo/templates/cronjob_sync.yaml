@@ -30,6 +30,10 @@ spec:
             - "sync"
             - "--config"
             - "/config/bbgo.yaml"
+            {{- if .Values.sync.since }}
+            - "--since"
+            - {{ .Values.sync.since | quote }}
+            {{- end }}
             resources:
               {{- toYaml .Values.resources | nindent 12 }}
             volumeMounts:
