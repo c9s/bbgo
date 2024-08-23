@@ -572,11 +572,12 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	bbgo.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-		Market:   s.sourceMarket,
-		Symbol:   s.Symbol,
-		Type:     types.OrderTypeMarket,
-		Side:     side,
-		Quantity: quantity,
+		Market:           s.sourceMarket,
+		Symbol:           s.Symbol,
+		Type:             types.OrderTypeMarket,
+		Side:             side,
+		Quantity:         quantity,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
 	})
 
 	if err != nil {
