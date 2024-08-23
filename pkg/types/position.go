@@ -665,6 +665,7 @@ func (p *Position) updateMetrics() {
 	labels := prometheus.Labels{
 		"strategy_id":   p.StrategyInstanceID,
 		"strategy_type": p.Strategy,
+		"symbol":        p.Symbol,
 	}
 	positionAverageCostMetrics.With(labels).Set(p.AverageCost.Float64())
 	positionBaseQuantityMetrics.With(labels).Set(p.Base.Float64())
