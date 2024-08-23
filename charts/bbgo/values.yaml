@@ -75,11 +75,11 @@ webserver:
   enabled: false
 
 metrics:
-  enabled: false
+  enabled: true
   port: 9090
 
 logFormatter:
-  enabled: false
+  enabled: true
   format: json
 
 grpc:
@@ -88,6 +88,10 @@ grpc:
 
 debug:
   enabled: false
+
+sync:
+  enabled: false
+  schedule: "* * * * *"
 
 resources:
   # We usually recommend not to specify default resources and to leave this as a conscious
