@@ -100,6 +100,60 @@ func (c *ConverterManager) ConvertTrade(trade types.Trade) types.Trade {
 	return trade
 }
 
+func (c *ConverterManager) ConvertKLine(kline types.KLine) types.KLine {
+	if len(c.converters) == 0 {
+		return kline
+	}
+
+	for _, converter := range c.converters {
+		convKline, err := converter.ConvertKLine(kline)
+		if err != nil {
+			logrus.WithError(err).Errorf("converter %+v error, kline: %s", converter, kline.String())
+			continue
+		}
+
+		kline = convKline
+	}
+
+	return kline
+}
+
+func (c *ConverterManager) ConvertMarket(market types.Market) types.Market {
+	if len(c.converters) == 0 {
+		return market
+	}
+
+	for _, converter := range c.converters {
+		convMarket, err := converter.ConvertMarket(market)
+		if err != nil {
+			logrus.WithError(err).Errorf("converter %+v error, market: %+v", converter, market)
+			continue
+		}
+
+		market = convMarket
+	}
+
+	return market
+}
+
+func (c *ConverterManager) ConvertBalance(balance types.Balance) types.Balance {
+	if len(c.converters) == 0 {
+		return balance
+	}
+
+	for _, converter := range c.converters {
+		convBal, err := converter.ConvertBalance(balance)
+		if err != nil {
+			logrus.WithError(err).Errorf("converter %+v error, balance: %s", converter, balance.String())
+			continue
+		}
+
+		balance = convBal
+	}
+
+	return balance
+}
+
 //go:generate callbackgen -type TradeCollector
 type TradeCollector struct {
 	Symbol   string
