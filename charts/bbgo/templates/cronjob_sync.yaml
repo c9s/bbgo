@@ -19,7 +19,7 @@ spec:
           containers:
           - name: bbgo
             securityContext:
-              {{- toYaml .Values.securityContext | nindent 12 }}
+              {{- toYaml .Values.securityContext | nindent 14 }}
             image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             imagePullPolicy: {{ .Values.image.pullPolicy }}
             args:
@@ -36,7 +36,7 @@ spec:
             - {{ .Values.sync.since | quote }}
             {{- end }}
             resources:
-              {{- toYaml .Values.resources | nindent 12 }}
+              {{- toYaml .Values.resources | nindent 14 }}
             volumeMounts:
             - name: config-volume
               mountPath: /config
