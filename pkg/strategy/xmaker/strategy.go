@@ -22,6 +22,9 @@ import (
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
 var Two = fixedpoint.NewFromInt(2)
 
+// circuitBreakerAlertLimiter is for CircuitBreaker alerts
+var circuitBreakerAlertLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 2)
+
 const priceUpdateTimeout = 30 * time.Second
 
 const ID = "xmaker"
@@ -188,6 +191,19 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 	if s.activeMakerOrders.NumOfOrders() > 0 {
 		return
+	}
+
+	if s.CircuitBreaker != nil {
+		now := time.Now()
+		if reason, halted := s.CircuitBreaker.IsHalted(now); halted {
+			log.Warnf("[arbWorker] strategy is halted, reason: %s", reason)
+
+			if circuitBreakerAlertLimiter.AllowN(now, 1) {
+				bbgo.Notify("Strategy is halted, reason: %s", reason)
+			}
+
+			return
+		}
 	}
 
 	bestBid, bestAsk, hasPrice := s.book.BestBidAndAsk()
@@ -573,6 +589,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	log.Infof("submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
 	bbgo.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
+
+	// TODO: improve order executor
 	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
 	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Market:           s.sourceMarket,
@@ -824,6 +842,10 @@ func (s *Strategy) CrossRun(
 			s.ProfitStats.AddProfit(p)
 
 			s.Environment.RecordPosition(s.Position, trade, &p)
+
+			if s.CircuitBreaker != nil {
+				s.CircuitBreaker.RecordProfit(profit, trade.Time.Time())
+			}
 		}
 	})
 
