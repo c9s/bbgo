@@ -770,9 +770,8 @@ func (s *Strategy) CrossRun(
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.makerMarket)
-
-		// force update for legacy code
-		s.Position.Market = s.makerMarket
+		s.Position.Strategy = ID
+		s.Position.StrategyInstanceID = instanceID
 	}
 
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
