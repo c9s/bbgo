@@ -120,7 +120,7 @@ func NewBasicCircuitBreaker(strategyID, strategyInstance string) *BasicCircuitBr
 		MaximumConsecutiveLossTimes:   8,
 		MaximumHaltTimes:              3,
 		MaximumHaltTimesExceededPanic: false,
-		HaltDuration:                  types.Duration(30 * time.Minute),
+		HaltDuration:                  types.Duration(1 * time.Hour),
 		strategyID:                    strategyID,
 		strategyInstance:              strategyInstance,
 		metricsLabels:                 prometheus.Labels{"strategy": strategyID, "strategyInstance": strategyInstance},
