@@ -587,7 +587,6 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		s.hedgeErrorRateReservation = nil
 	}
 
-	log.Infof("submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
 	bbgo.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
 
 	submitOrders := []types.SubmitOrder{
@@ -603,7 +602,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	formattedOrders, err := s.sourceSession.FormatOrders(submitOrders)
 	if err != nil {
-		log.WithError(err).Errorf("unable to format orders")
+		log.WithError(err).Errorf("unable to format hedge orders")
 		return
 	}
 
