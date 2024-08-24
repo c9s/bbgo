@@ -116,7 +116,7 @@ type BasicCircuitBreaker struct {
 }
 
 func NewBasicCircuitBreaker(strategyID, strategyInstance string) *BasicCircuitBreaker {
-	return &BasicCircuitBreaker{
+	b := &BasicCircuitBreaker{
 		MaximumConsecutiveLossTimes:   8,
 		MaximumHaltTimes:              3,
 		MaximumHaltTimesExceededPanic: false,
@@ -125,6 +125,8 @@ func NewBasicCircuitBreaker(strategyID, strategyInstance string) *BasicCircuitBr
 		strategyInstance:              strategyInstance,
 		metricsLabels:                 prometheus.Labels{"strategy": strategyID, "strategyInstance": strategyInstance},
 	}
+	b.updateMetrics()
+	return b
 }
 
 func (b *BasicCircuitBreaker) getMetricsLabels() prometheus.Labels {

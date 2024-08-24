@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
@@ -97,6 +98,8 @@ type Strategy struct {
 	boll *indicator.BOLL
 
 	state *State
+
+	CircuitBreaker *circuitbreaker.BasicCircuitBreaker `json:"circuitBreaker"`
 
 	// persistence fields
 	Position        *types.Position  `json:"position,omitempty" persistence:"position"`
@@ -628,6 +631,14 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (s *Strategy) Defaults() error {
+	if s.CircuitBreaker == nil {
+		s.CircuitBreaker = circuitbreaker.NewBasicCircuitBreaker(ID, s.InstanceID())
+	}
+
+	return nil
 }
 
 func (s *Strategy) Validate() error {
