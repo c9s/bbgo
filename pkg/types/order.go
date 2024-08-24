@@ -39,9 +39,10 @@ var (
 type MarginOrderSideEffectType string
 
 var (
-	SideEffectTypeNoSideEffect MarginOrderSideEffectType = "NO_SIDE_EFFECT"
-	SideEffectTypeMarginBuy    MarginOrderSideEffectType = "MARGIN_BUY"
-	SideEffectTypeAutoRepay    MarginOrderSideEffectType = "AUTO_REPAY"
+	SideEffectTypeNoSideEffect    MarginOrderSideEffectType = "NO_SIDE_EFFECT"
+	SideEffectTypeMarginBuy       MarginOrderSideEffectType = "MARGIN_BUY"
+	SideEffectTypeAutoRepay       MarginOrderSideEffectType = "AUTO_REPAY"
+	SideEffectTypeAutoBorrowRepay MarginOrderSideEffectType = "AUTO_BORROW_REPAY"
 )
 
 func (t *MarginOrderSideEffectType) UnmarshalJSON(data []byte) error {
@@ -63,6 +64,10 @@ func (t *MarginOrderSideEffectType) UnmarshalJSON(data []byte) error {
 
 	case string(SideEffectTypeAutoRepay), "REPAY", "AUTOREPAY":
 		*t = SideEffectTypeAutoRepay
+		return nil
+
+	case string(SideEffectTypeAutoBorrowRepay), "BORROWREPAY", "AUTOBORROWREPAY":
+		*t = SideEffectTypeAutoBorrowRepay
 		return nil
 
 	}
@@ -143,7 +148,7 @@ type SubmitOrder struct {
 
 	GroupID uint32 `json:"groupID,omitempty"`
 
-	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect,omitempty"` // AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
+	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect,omitempty"` // AUTO_BORROW_REPAY = borrowrepay, AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
 
 	ReduceOnly    bool `json:"reduceOnly,omitempty" db:"reduce_only"`
 	ClosePosition bool `json:"closePosition,omitempty" db:"close_position"`
