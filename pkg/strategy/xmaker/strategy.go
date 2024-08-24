@@ -13,7 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/types"
@@ -96,7 +96,7 @@ type Strategy struct {
 	makerMarket, sourceMarket types.Market
 
 	// boll is the BOLLINGER indicator we used for predicting the price.
-	boll *indicator.BOLL
+	boll *indicatorv2.BOLLStream
 
 	state *State
 
@@ -769,23 +769,15 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
 
-	standardIndicatorSet := s.sourceSession.StandardIndicatorSet(s.Symbol)
+	indicators := s.sourceSession.Indicators(s.Symbol)
 	if !ok {
 		return fmt.Errorf("%s standard indicator set not found", s.Symbol)
 	}
 
-	s.boll = standardIndicatorSet.BOLL(types.IntervalWindow{
+	s.boll = indicators.BOLL(types.IntervalWindow{
 		Interval: s.BollBandInterval,
 		Window:   21,
 	}, 1.0)
-
-	if store, ok := s.sourceSession.MarketDataStore(s.Symbol); ok {
-		if klines, ok2 := store.KLinesOfInterval(s.BollBandInterval); ok2 {
-			for i := 0; i < len(*klines); i++ {
-				s.boll.CalculateAndUpdate((*klines)[0 : i+1])
-			}
-		}
-	}
 
 	// restore state
 	instanceID := s.InstanceID()
@@ -956,10 +948,7 @@ func (s *Strategy) CrossRun(
 		// wait for the quoter to stop
 		time.Sleep(s.UpdateInterval.Duration())
 
-		shutdownCtx, cancelShutdown := context.WithTimeout(context.TODO(), time.Minute)
-		defer cancelShutdown()
-
-		if err := s.activeMakerOrders.GracefulCancel(shutdownCtx, s.makerSession.Exchange); err != nil {
+		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 			log.WithError(err).Errorf("graceful cancel error")
 		}
 
