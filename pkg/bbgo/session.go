@@ -464,7 +464,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	for _, sub := range session.Subscriptions {
 		switch sub.Channel {
 		case types.BookChannel:
-			book := types.NewStreamBook(sub.Symbol)
+			book := types.NewStreamBook(sub.Symbol, session.ExchangeName)
 			book.BindStream(session.MarketDataStream)
 			session.orderBooks[sub.Symbol] = book
 

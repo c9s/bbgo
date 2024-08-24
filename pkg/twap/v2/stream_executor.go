@@ -88,7 +88,7 @@ func NewFixedQuantityExecutor(
 		Depth: types.DepthLevelMedium,
 	})
 
-	orderBook := types.NewStreamBook(symbol)
+	orderBook := types.NewStreamBook(symbol, exchange.Name())
 	orderBook.BindStream(marketDataStream)
 
 	userDataStream := exchange.NewStream()
