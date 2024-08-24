@@ -22,9 +22,6 @@ import (
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
 var Two = fixedpoint.NewFromInt(2)
 
-// circuitBreakerAlertLimiter is for CircuitBreaker alerts
-var circuitBreakerAlertLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 2)
-
 const priceUpdateTimeout = 30 * time.Second
 
 const ID = "xmaker"
@@ -124,6 +121,9 @@ type Strategy struct {
 	groupID   uint32
 
 	stopC chan struct{}
+
+	reportProfitStatsRateLimiter *rate.Limiter
+	circuitBreakerAlertLimiter   *rate.Limiter
 }
 
 func (s *Strategy) ID() string {
@@ -198,7 +198,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		if reason, halted := s.CircuitBreaker.IsHalted(now); halted {
 			log.Warnf("[arbWorker] strategy is halted, reason: %s", reason)
 
-			if circuitBreakerAlertLimiter.AllowN(now, 1) {
+			if s.circuitBreakerAlertLimiter.AllowN(now, 1) {
 				bbgo.Notify("Strategy is halted, reason: %s", reason)
 			}
 
@@ -669,6 +669,9 @@ func (s *Strategy) Defaults() error {
 		s.CircuitBreaker = circuitbreaker.NewBasicCircuitBreaker(ID, s.InstanceID())
 	}
 
+	// circuitBreakerAlertLimiter is for CircuitBreaker alerts
+	s.circuitBreakerAlertLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 2)
+	s.reportProfitStatsRateLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
 	return nil
 }
 
@@ -876,14 +879,11 @@ func (s *Strategy) CrossRun(
 	}
 
 	go func() {
-		posTicker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
-		defer posTicker.Stop()
+		hedgeTicker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
+		defer hedgeTicker.Stop()
 
 		quoteTicker := time.NewTicker(util.MillisecondsJitter(s.UpdateInterval.Duration(), 200))
 		defer quoteTicker.Stop()
-
-		reportTicker := time.NewTicker(time.Hour)
-		defer reportTicker.Stop()
 
 		defer func() {
 			if err := s.activeMakerOrders.GracefulCancel(context.Background(), s.makerSession.Exchange); err != nil {
@@ -905,10 +905,7 @@ func (s *Strategy) CrossRun(
 			case <-quoteTicker.C:
 				s.updateQuote(ctx, orderExecutionRouter)
 
-			case <-reportTicker.C:
-				bbgo.Notify(s.ProfitStats)
-
-			case <-posTicker.C:
+			case <-hedgeTicker.C:
 				// For positive position and positive covered position:
 				// uncover position = +5 - +3 (covered position) = 2
 				//
@@ -934,6 +931,10 @@ func (s *Strategy) CrossRun(
 					)
 
 					s.Hedge(ctx, uncoverPosition.Neg())
+				}
+
+				if s.reportProfitStatsRateLimiter.Allow() {
+					bbgo.Notify(s.ProfitStats)
 				}
 			}
 		}
