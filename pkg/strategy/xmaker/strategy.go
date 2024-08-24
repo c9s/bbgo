@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -99,6 +100,7 @@ type Strategy struct {
 
 	state *State
 
+	priceSolver    *pricesolver.SimplePriceSolver
 	CircuitBreaker *circuitbreaker.BasicCircuitBreaker `json:"circuitBreaker"`
 
 	// persistence fields
@@ -213,6 +215,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 	// use mid-price for the last price
 	s.lastPrice = bestBid.Price.Add(bestAsk.Price).Div(Two)
+
+	s.priceSolver.Update(s.Symbol, s.lastPrice)
 
 	bookLastUpdateTime := s.book.LastUpdateTime()
 
@@ -743,6 +747,10 @@ func (s *Strategy) CrossRun(
 	}
 
 	s.sourceSession = sourceSession
+
+	// initialize the price resolver
+	sourceMarkets := s.sourceSession.Markets()
+	s.priceSolver = pricesolver.NewSimplePriceResolver(sourceMarkets)
 
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
