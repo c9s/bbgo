@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
@@ -384,6 +385,16 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		}
 	}
 
+	labels := prometheus.Labels{
+		"strategy_type": ID,
+		"strategy_id":   s.InstanceID(),
+		"exchange":      s.MakerExchange,
+		"symbol":        s.Symbol,
+	}
+
+	bidExposureInUsd := fixedpoint.Zero
+	askExposureInUsd := fixedpoint.Zero
+
 	bidPrice := bestBidPrice
 	askPrice := bestAskPrice
 	for i := 0; i < s.NumLayers; i++ {
@@ -417,6 +428,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					Mul(s.makerMarket.TickSize)))
 			}
 
+			makerBestBidPriceMetrics.With(labels).Set(bidPrice.Float64())
+
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
@@ -431,6 +444,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 				makerQuota.Commit()
 				hedgeQuota.Commit()
+				bidExposureInUsd = bidExposureInUsd.Add(bidQuantity.Mul(bidPrice))
 			} else {
 				makerQuota.Rollback()
 				hedgeQuota.Rollback()
@@ -470,7 +484,10 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				askPrice = askPrice.Add(pips.Mul(fixedpoint.NewFromInt(int64(i)).Mul(s.makerMarket.TickSize)))
 			}
 
+			makerBestAskPriceMetrics.With(labels).Set(askPrice.Float64())
+
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
+
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
@@ -484,6 +501,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				})
 				makerQuota.Commit()
 				hedgeQuota.Commit()
+
+				askExposureInUsd = askExposureInUsd.Add(askQuantity.Mul(askPrice))
 			} else {
 				makerQuota.Rollback()
 				hedgeQuota.Rollback()
@@ -500,14 +519,28 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	makerOrders, err := orderExecutionRouter.SubmitOrdersTo(ctx, s.MakerExchange, submitOrders...)
+	formattedOrders, err := s.makerSession.FormatOrders(submitOrders)
 	if err != nil {
-		log.WithError(err).Errorf("order error: %s", err.Error())
 		return
 	}
 
-	s.activeMakerOrders.Add(makerOrders...)
-	s.orderStore.Add(makerOrders...)
+	orderCreateCallback := func(createdOrder types.Order) {
+		s.orderStore.Add(createdOrder)
+		s.activeMakerOrders.Add(createdOrder)
+	}
+
+	defer s.tradeCollector.Process()
+
+	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, s.makerSession.Exchange, orderCreateCallback, formattedOrders...)
+	if err != nil {
+		log.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
+	}
+
+	openOrderBidExposureInUsdMetrics.With(labels).Set(bidExposureInUsd.Float64())
+	openOrderAskExposureInUsdMetrics.With(labels).Set(askExposureInUsd.Float64())
+
+	_ = errIdx
+	_ = createdOrders
 }
 
 var lastPriceModifier = fixedpoint.NewFromFloat(1.001)
