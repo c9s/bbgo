@@ -98,7 +98,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
-	s.book = types.NewStreamBook(s.Symbol)
+	s.book = types.NewStreamBook(s.Symbol, session.Exchange.Name())
 	s.book.BindStream(session.MarketDataStream)
 
 	s.liquidityOrderBook = bbgo.NewActiveOrderBook(s.Symbol)

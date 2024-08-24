@@ -513,7 +513,9 @@ func notifyUsdPnL(profit fixedpoint.Value) {
 	bbgo.Notify(title)
 }
 
-func (s *Strategy) iocOrderExecution(ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder, ratio float64) (types.OrderSlice, error) {
+func (s *Strategy) iocOrderExecution(
+	ctx context.Context, session *bbgo.ExchangeSession, orders [3]types.SubmitOrder, ratio float64,
+) (types.OrderSlice, error) {
 	service, ok := session.Exchange.(types.ExchangeOrderQueryService)
 	if !ok {
 		return nil, errors.New("exchange does not support ExchangeOrderQueryService")
@@ -700,7 +702,9 @@ func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, t
 	}
 }
 
-func (s *Strategy) waitOrdersAndCollectTrades(ctx context.Context, service types.ExchangeOrderQueryService, createdOrders types.OrderSlice) (map[uint64][]types.Trade, types.OrderSlice, error) {
+func (s *Strategy) waitOrdersAndCollectTrades(
+	ctx context.Context, service types.ExchangeOrderQueryService, createdOrders types.OrderSlice,
+) (map[uint64][]types.Trade, types.OrderSlice, error) {
 	var err error
 	var orderTrades = make(map[uint64][]types.Trade)
 	var updatedOrders types.OrderSlice
@@ -763,7 +767,9 @@ func (s *Strategy) analyzeOrders(orders types.OrderSlice) {
 	}
 }
 
-func (s *Strategy) buildArbMarkets(session *bbgo.ExchangeSession, symbols []string, separateStream bool, sigC sigchan.Chan) (map[string]*ArbMarket, error) {
+func (s *Strategy) buildArbMarkets(
+	session *bbgo.ExchangeSession, symbols []string, separateStream bool, sigC sigchan.Chan,
+) (map[string]*ArbMarket, error) {
 	markets := make(map[string]*ArbMarket)
 	// build market object
 	for _, symbol := range symbols {
@@ -790,7 +796,7 @@ func (s *Strategy) buildArbMarkets(session *bbgo.ExchangeSession, symbols []stri
 				Speed: types.SpeedHigh,
 			})
 
-			book := types.NewStreamBook(symbol)
+			book := types.NewStreamBook(symbol, session.ExchangeName)
 			priceUpdater := func(_ types.SliceOrderBook) {
 				bestBid, bestAsk, _ := book.BestBidAndAsk()
 				if bestAsk.Equals(m.bestAsk) && bestBid.Equals(m.bestBid) {

@@ -819,7 +819,7 @@ func (s *Strategy) CrossRun(
 		})
 	}
 
-	s.book = types.NewStreamBook(s.Symbol)
+	s.book = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
 	s.book.BindStream(s.sourceSession.MarketDataStream)
 
 	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
