@@ -2,11 +2,17 @@ package xmaker
 
 import "github.com/prometheus/client_golang/prometheus"
 
-var openOrderExposureInUsdMetrics = prometheus.NewGaugeVec(
+var openOrderBidExposureInUsdMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "xmaker_open_order_exposure_in_usd",
+		Name: "xmaker_open_order_bid_exposure_in_usd",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol", "side"})
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+
+var openOrderAskExposureInUsdMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_open_order_ask_exposure_in_usd",
+		Help: "",
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
 var makerBestBidPriceMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
@@ -28,7 +34,8 @@ var numOfLayersMetrics = prometheus.NewGaugeVec(
 
 func init() {
 	prometheus.MustRegister(
-		openOrderExposureInUsdMetrics,
+		openOrderBidExposureInUsdMetrics,
+		openOrderAskExposureInUsdMetrics,
 		makerBestBidPriceMetrics,
 		makerBestAskPriceMetrics,
 		numOfLayersMetrics,
