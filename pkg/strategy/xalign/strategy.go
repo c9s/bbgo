@@ -14,7 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/priceresolver"
+	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -57,7 +57,7 @@ type Strategy struct {
 
 	faultBalanceRecords map[string][]TimeBalance
 
-	priceResolver *priceresolver.SimplePriceResolver
+	priceResolver *pricesolver.SimplePriceSolver
 
 	sessions   map[string]*bbgo.ExchangeSession
 	orderBooks map[string]*bbgo.ActiveOrderBook
@@ -372,7 +372,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		// session.Market(symbol)
 	}
 
-	s.priceResolver = priceresolver.NewSimplePriceResolver(markets)
+	s.priceResolver = pricesolver.NewSimplePriceResolver(markets)
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
