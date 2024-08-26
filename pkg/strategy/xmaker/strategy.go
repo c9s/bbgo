@@ -929,14 +929,16 @@ func (s *Strategy) CrossRun(
 	})
 
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
-		if s.CircuitBreaker != nil {
-			s.CircuitBreaker.RecordProfit(profit.Profit, trade.Time.Time())
+		if profit != nil {
+			if s.CircuitBreaker != nil {
+				s.CircuitBreaker.RecordProfit(profit.Profit, trade.Time.Time())
+			}
+
+			bbgo.Notify(profit)
+
+			s.ProfitStats.AddProfit(*profit)
+			s.Environment.RecordPosition(s.Position, trade, profit)
 		}
-
-		bbgo.Notify(profit)
-
-		s.ProfitStats.AddProfit(*profit)
-		s.Environment.RecordPosition(s.Position, trade, profit)
 	})
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
