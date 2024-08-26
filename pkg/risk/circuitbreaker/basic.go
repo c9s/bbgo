@@ -116,15 +116,17 @@ type BasicCircuitBreaker struct {
 }
 
 func NewBasicCircuitBreaker(strategyID, strategyInstance string) *BasicCircuitBreaker {
-	return &BasicCircuitBreaker{
+	b := &BasicCircuitBreaker{
 		MaximumConsecutiveLossTimes:   8,
 		MaximumHaltTimes:              3,
 		MaximumHaltTimesExceededPanic: false,
-		HaltDuration:                  types.Duration(30 * time.Minute),
+		HaltDuration:                  types.Duration(1 * time.Hour),
 		strategyID:                    strategyID,
 		strategyInstance:              strategyInstance,
 		metricsLabels:                 prometheus.Labels{"strategy": strategyID, "strategyInstance": strategyInstance},
 	}
+	b.updateMetrics()
+	return b
 }
 
 func (b *BasicCircuitBreaker) getMetricsLabels() prometheus.Labels {
@@ -221,21 +223,21 @@ func (b *BasicCircuitBreaker) reset() {
 	b.updateMetrics()
 }
 
-func (b *BasicCircuitBreaker) IsHalted(now time.Time) bool {
+func (b *BasicCircuitBreaker) IsHalted(now time.Time) (string, bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	if !b.halted {
-		return false
+		return "", false
 	}
 
 	// check if it's an expired halt
 	if now.After(b.haltTo) {
 		b.reset()
-		return false
+		return "", false
 	}
 
-	return true
+	return b.haltReason, true
 }
 
 func (b *BasicCircuitBreaker) halt(now time.Time, reason string) {
