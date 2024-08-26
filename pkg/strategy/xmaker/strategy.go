@@ -22,9 +22,6 @@ import (
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
 var Two = fixedpoint.NewFromInt(2)
 
-// circuitBreakerAlertLimiter is for CircuitBreaker alerts
-var circuitBreakerAlertLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 2)
-
 const priceUpdateTimeout = 30 * time.Second
 
 const ID = "xmaker"
@@ -124,6 +121,9 @@ type Strategy struct {
 	groupID   uint32
 
 	stopC chan struct{}
+
+	reportProfitStatsRateLimiter *rate.Limiter
+	circuitBreakerAlertLimiter   *rate.Limiter
 }
 
 func (s *Strategy) ID() string {
@@ -198,7 +198,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		if reason, halted := s.CircuitBreaker.IsHalted(now); halted {
 			log.Warnf("[arbWorker] strategy is halted, reason: %s", reason)
 
-			if circuitBreakerAlertLimiter.AllowN(now, 1) {
+			if s.circuitBreakerAlertLimiter.AllowN(now, 1) {
 				bbgo.Notify("Strategy is halted, reason: %s", reason)
 			}
 
@@ -587,34 +587,47 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		s.hedgeErrorRateReservation = nil
 	}
 
-	log.Infof("submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
 	bbgo.Notify("Submitting %s hedge order %s %v", s.Symbol, side.String(), quantity)
 
-	// TODO: improve order executor
-	orderExecutor := &bbgo.ExchangeOrderExecutor{Session: s.sourceSession}
-	returnOrders, err := orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
-		Market:           s.sourceMarket,
-		Symbol:           s.Symbol,
-		Type:             types.OrderTypeMarket,
-		Side:             side,
-		Quantity:         quantity,
-		MarginSideEffect: types.SideEffectTypeMarginBuy,
-	})
+	submitOrders := []types.SubmitOrder{
+		{
+			Market:           s.sourceMarket,
+			Symbol:           s.Symbol,
+			Type:             types.OrderTypeMarket,
+			Side:             side,
+			Quantity:         quantity,
+			MarginSideEffect: types.SideEffectTypeMarginBuy,
+		},
+	}
 
+	formattedOrders, err := s.sourceSession.FormatOrders(submitOrders)
+	if err != nil {
+		log.WithError(err).Errorf("unable to format hedge orders")
+		return
+	}
+
+	orderCreateCallback := func(createdOrder types.Order) {
+		s.orderStore.Add(createdOrder)
+		s.activeMakerOrders.Add(createdOrder)
+	}
+
+	defer s.tradeCollector.Process()
+
+	createdOrders, _, err := bbgo.BatchPlaceOrder(ctx, s.sourceSession.Exchange, orderCreateCallback, formattedOrders...)
 	if err != nil {
 		s.hedgeErrorRateReservation = s.hedgeErrorLimiter.Reserve()
 		log.WithError(err).Errorf("market order submit error: %s", err.Error())
 		return
 	}
 
-	// if it's selling, than we should add positive position
+	log.Infof("submitted hedge orders: %+v", createdOrders)
+
+	// if it's selling, then we should add a positive position
 	if side == types.SideTypeSell {
 		s.CoveredPosition = s.CoveredPosition.Add(quantity)
 	} else {
 		s.CoveredPosition = s.CoveredPosition.Add(quantity.Neg())
 	}
-
-	s.orderStore.Add(returnOrders...)
 }
 
 func (s *Strategy) tradeRecover(ctx context.Context) {
@@ -656,6 +669,9 @@ func (s *Strategy) Defaults() error {
 		s.CircuitBreaker = circuitbreaker.NewBasicCircuitBreaker(ID, s.InstanceID())
 	}
 
+	// circuitBreakerAlertLimiter is for CircuitBreaker alerts
+	s.circuitBreakerAlertLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 2)
+	s.reportProfitStatsRateLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
 	return nil
 }
 
@@ -770,9 +786,8 @@ func (s *Strategy) CrossRun(
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.makerMarket)
-
-		// force update for legacy code
-		s.Position.Market = s.makerMarket
+		s.Position.Strategy = ID
+		s.Position.StrategyInstanceID = instanceID
 	}
 
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
@@ -832,21 +847,18 @@ func (s *Strategy) CrossRun(
 
 		if profit.Compare(fixedpoint.Zero) == 0 {
 			s.Environment.RecordPosition(s.Position, trade, nil)
-		} else {
-			log.Infof("%s generated profit: %v", s.Symbol, profit)
-
-			p := s.Position.NewProfit(trade, profit, netProfit)
-			p.Strategy = ID
-			p.StrategyInstanceID = instanceID
-			bbgo.Notify(&p)
-			s.ProfitStats.AddProfit(p)
-
-			s.Environment.RecordPosition(s.Position, trade, &p)
-
-			if s.CircuitBreaker != nil {
-				s.CircuitBreaker.RecordProfit(profit, trade.Time.Time())
-			}
 		}
+	})
+
+	s.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
+		if s.CircuitBreaker != nil {
+			s.CircuitBreaker.RecordProfit(profit.Profit, trade.Time.Time())
+		}
+
+		bbgo.Notify(profit)
+
+		s.ProfitStats.AddProfit(*profit)
+		s.Environment.RecordPosition(s.Position, trade, profit)
 	})
 
 	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
@@ -855,6 +867,8 @@ func (s *Strategy) CrossRun(
 	s.tradeCollector.OnRecover(func(trade types.Trade) {
 		bbgo.Notify("Recovered trade", trade)
 	})
+
+	// bind two user data streams so that we can collect the trades together
 	s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
 
@@ -865,14 +879,11 @@ func (s *Strategy) CrossRun(
 	}
 
 	go func() {
-		posTicker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
-		defer posTicker.Stop()
+		hedgeTicker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
+		defer hedgeTicker.Stop()
 
 		quoteTicker := time.NewTicker(util.MillisecondsJitter(s.UpdateInterval.Duration(), 200))
 		defer quoteTicker.Stop()
-
-		reportTicker := time.NewTicker(time.Hour)
-		defer reportTicker.Stop()
 
 		defer func() {
 			if err := s.activeMakerOrders.GracefulCancel(context.Background(), s.makerSession.Exchange); err != nil {
@@ -894,10 +905,7 @@ func (s *Strategy) CrossRun(
 			case <-quoteTicker.C:
 				s.updateQuote(ctx, orderExecutionRouter)
 
-			case <-reportTicker.C:
-				bbgo.Notify(s.ProfitStats)
-
-			case <-posTicker.C:
+			case <-hedgeTicker.C:
 				// For positive position and positive covered position:
 				// uncover position = +5 - +3 (covered position) = 2
 				//
@@ -923,6 +931,10 @@ func (s *Strategy) CrossRun(
 					)
 
 					s.Hedge(ctx, uncoverPosition.Neg())
+				}
+
+				if s.reportProfitStatsRateLimiter.Allow() {
+					bbgo.Notify(s.ProfitStats)
 				}
 			}
 		}
