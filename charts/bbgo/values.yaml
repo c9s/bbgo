@@ -89,6 +89,12 @@ grpc:
 debug:
   enabled: false
 
+environment: dev
+
+# this set ENABLE_RBT_ORDERBOOK env
+rbTreeOrderbook:
+  enabled: false
+
 sync:
   enabled: false
   schedule: "0 * * * *"
