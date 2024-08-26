@@ -75,6 +75,8 @@ func init() {
 }
 
 type BasicCircuitBreaker struct {
+	Enabled bool `json:"enabled"`
+
 	MaximumConsecutiveTotalLoss fixedpoint.Value `json:"maximumConsecutiveTotalLoss"`
 
 	MaximumConsecutiveLossTimes int `json:"maximumConsecutiveLossTimes"`
@@ -117,14 +119,17 @@ type BasicCircuitBreaker struct {
 
 func NewBasicCircuitBreaker(strategyID, strategyInstance string) *BasicCircuitBreaker {
 	b := &BasicCircuitBreaker{
+		Enabled:                       true,
 		MaximumConsecutiveLossTimes:   8,
 		MaximumHaltTimes:              3,
 		MaximumHaltTimesExceededPanic: false,
-		HaltDuration:                  types.Duration(1 * time.Hour),
-		strategyID:                    strategyID,
-		strategyInstance:              strategyInstance,
-		metricsLabels:                 prometheus.Labels{"strategy": strategyID, "strategyInstance": strategyInstance},
+
+		HaltDuration:     types.Duration(1 * time.Hour),
+		strategyID:       strategyID,
+		strategyInstance: strategyInstance,
+		metricsLabels:    prometheus.Labels{"strategy": strategyID, "strategyInstance": strategyInstance},
 	}
+
 	b.updateMetrics()
 	return b
 }
@@ -182,7 +187,7 @@ func (b *BasicCircuitBreaker) RecordProfit(profit fixedpoint.Value, now time.Tim
 		b.winRatio = float64(b.winTimes) / float64(b.lossTimes)
 	}
 
-	b.updateMetrics()
+	defer b.updateMetrics()
 
 	if b.MaximumConsecutiveLossTimes > 0 && b.consecutiveLossTimes >= b.MaximumConsecutiveLossTimes {
 		b.halt(now, "exceeded MaximumConsecutiveLossTimes")
@@ -224,6 +229,10 @@ func (b *BasicCircuitBreaker) reset() {
 }
 
 func (b *BasicCircuitBreaker) IsHalted(now time.Time) (string, bool) {
+	if !b.Enabled {
+		return "disabled", false
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -250,6 +259,8 @@ func (b *BasicCircuitBreaker) halt(now time.Time, reason string) {
 	labels := b.getMetricsLabels()
 	haltCounterMetrics.With(labels).Set(float64(b.haltCounter))
 	haltMetrics.With(labels).Set(1.0)
+
+	defer b.updateMetrics()
 
 	if b.MaximumHaltTimesExceededPanic && b.haltCounter > b.MaximumHaltTimes {
 		panic(fmt.Errorf("total %d halt times > maximumHaltTimesExceededPanic %d", b.haltCounter, b.MaximumHaltTimes))
