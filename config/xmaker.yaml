@@ -59,6 +59,9 @@ crossExchangeStrategies:
     # 0.1 pip is 0.01, here we use 10, so we will get 18000.00, 18001.00 and
     # 18002.00
     pips: 10
+    ## profitFixer is used for fixing the profit stats and the position
+    # profitFixer:
+    #   tradesSince: "2024-08-01T15:00:00.000+08:00"
     circuitBreaker:
       maximumConsecutiveTotalLoss: 36.0
       maximumConsecutiveLossTimes: 10
