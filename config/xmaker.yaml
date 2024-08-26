@@ -21,7 +21,7 @@ logging:
   trade: true
   order: true
   fields:
-    env: staging
+    env: local
 
 sessions:
   max:
