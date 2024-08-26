@@ -2,6 +2,7 @@ package audacitymaker
 
 import (
 	"context"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -38,7 +39,7 @@ func (s *PerTrade) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	position := orderExecutor.Position()
 	symbol := position.Symbol
 	// ger best bid/ask, not used yet
-	s.StreamBook = types.NewStreamBook(symbol)
+	s.StreamBook = types.NewStreamBook(symbol, session.ExchangeName)
 	s.StreamBook.BindStream(session.MarketDataStream)
 
 	// use queue to do time-series rolling
@@ -59,7 +60,7 @@ func (s *PerTrade) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 
 	session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
 
-		//log.Infof("%s trade @ %f", trade.Side, trade.Price.Float64())
+		// log.Infof("%s trade @ %f", trade.Side, trade.Price.Float64())
 
 		ctx := context.Background()
 
@@ -80,10 +81,10 @@ func (s *PerTrade) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			sellTradesNumber.Update(1)
 		}
 
-		//canceled := s.orderExecutor.GracefulCancel(ctx)
-		//if canceled != nil {
+		// canceled := s.orderExecutor.GracefulCancel(ctx)
+		// if canceled != nil {
 		//	_ = s.orderExecutor.GracefulCancel(ctx)
-		//}
+		// }
 
 		sizeFraction := buyTradeSize.Sum() / sellTradeSize.Sum()
 		numberFraction := buyTradesNumber.Sum() / sellTradesNumber.Sum()
@@ -112,15 +113,15 @@ func (s *PerTrade) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 			if outlier(orderFlowSizeMinMax.Tail(100), threshold) > 0 && outlier(orderFlowNumberMinMax.Tail(100), threshold) > 0 {
 				_ = s.orderExecutor.GracefulCancel(ctx)
 				log.Infof("long!!")
-				//_ = s.placeTrade(ctx, types.SideTypeBuy, s.Quantity, symbol)
+				// _ = s.placeTrade(ctx, types.SideTypeBuy, s.Quantity, symbol)
 				_ = s.placeOrder(ctx, types.SideTypeBuy, s.Quantity, bid.Price, symbol)
-				//_ = s.placeOrder(ctx, types.SideTypeSell, s.Quantity, ask.Price.Mul(fixedpoint.NewFromFloat(1.0005)), symbol)
+				// _ = s.placeOrder(ctx, types.SideTypeSell, s.Quantity, ask.Price.Mul(fixedpoint.NewFromFloat(1.0005)), symbol)
 			} else if outlier(orderFlowSizeMinMax.Tail(100), threshold) < 0 && outlier(orderFlowNumberMinMax.Tail(100), threshold) < 0 {
 				_ = s.orderExecutor.GracefulCancel(ctx)
 				log.Infof("short!!")
-				//_ = s.placeTrade(ctx, types.SideTypeSell, s.Quantity, symbol)
+				// _ = s.placeTrade(ctx, types.SideTypeSell, s.Quantity, symbol)
 				_ = s.placeOrder(ctx, types.SideTypeSell, s.Quantity, ask.Price, symbol)
-				//_ = s.placeOrder(ctx, types.SideTypeBuy, s.Quantity, bid.Price.Mul(fixedpoint.NewFromFloat(0.9995)), symbol)
+				// _ = s.placeOrder(ctx, types.SideTypeBuy, s.Quantity, bid.Price.Mul(fixedpoint.NewFromFloat(0.9995)), symbol)
 			}
 		}
 
@@ -138,7 +139,9 @@ func (s *PerTrade) Bind(session *bbgo.ExchangeSession, orderExecutor *bbgo.Gener
 	}
 }
 
-func (s *PerTrade) placeOrder(ctx context.Context, side types.SideType, quantity fixedpoint.Value, price fixedpoint.Value, symbol string) error {
+func (s *PerTrade) placeOrder(
+	ctx context.Context, side types.SideType, quantity fixedpoint.Value, price fixedpoint.Value, symbol string,
+) error {
 	market, _ := s.session.Market(symbol)
 	_, err := s.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 		Symbol:   symbol,

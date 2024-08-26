@@ -143,6 +143,7 @@ func TestNewStreamExecutor(t *testing.T) {
 		},
 	}
 
+	mockEx.EXPECT().Name().Return(exchangeName)
 	mockEx.EXPECT().NewStream().Return(mockMarketDataStream)
 	mockEx.EXPECT().NewStream().Return(mockUserDataStream)
 	mockEx.EXPECT().QueryAccountBalances(gomock.AssignableToTypeOf(ctx)).Return(initialBalances, nil)

@@ -60,6 +60,7 @@ crossExchangeStrategies:
     # 18002.00
     pips: 10
     circuitBreaker:
+      enabled: true
       maximumConsecutiveTotalLoss: 36.0
       maximumConsecutiveLossTimes: 10
       maximumLossPerRound: 15.0

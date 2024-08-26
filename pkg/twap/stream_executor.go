@@ -396,7 +396,7 @@ func (e *StreamExecutor) Run(parentCtx context.Context) error {
 	e.marketDataStream.SetPublicOnly()
 	e.marketDataStream.Subscribe(types.BookChannel, e.Symbol, types.SubscribeOptions{})
 
-	e.orderBook = types.NewStreamBook(e.Symbol)
+	e.orderBook = types.NewStreamBook(e.Symbol, e.Session.ExchangeName)
 	e.orderBook.BindStream(e.marketDataStream)
 
 	e.userDataStream = e.Session.Exchange.NewStream()
