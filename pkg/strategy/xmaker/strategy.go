@@ -928,6 +928,7 @@ func (s *Strategy) CrossRun(
 		}
 	})
 
+	// TODO: remove this nil value behavior, check all OnProfit usage and remove the EmitProfit call with nil profit
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
 		if profit != nil {
 			if s.CircuitBreaker != nil {
