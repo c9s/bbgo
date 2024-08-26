@@ -17,12 +17,16 @@ import (
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
+	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
 
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
-var Two = fixedpoint.NewFromInt(2)
+var two = fixedpoint.NewFromInt(2)
+
+var lastPriceModifier = fixedpoint.NewFromFloat(1.001)
+var minGap = fixedpoint.NewFromFloat(1.02)
 
 const priceUpdateTimeout = 30 * time.Second
 
@@ -88,6 +92,9 @@ type Strategy struct {
 
 	// Pips is the pips of the layer prices
 	Pips fixedpoint.Value `json:"pips"`
+
+	// ProfitFixerConfig is the profit fixer configuration
+	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer,omitempty"`
 
 	// --------------------------------
 	// private field
@@ -215,7 +222,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	}
 
 	// use mid-price for the last price
-	s.lastPrice = bestBid.Price.Add(bestAsk.Price).Div(Two)
+	s.lastPrice = bestBid.Price.Add(bestAsk.Price).Div(two)
 
 	s.priceSolver.Update(s.Symbol, s.lastPrice)
 
@@ -543,9 +550,6 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 	_ = createdOrders
 }
 
-var lastPriceModifier = fixedpoint.NewFromFloat(1.001)
-var minGap = fixedpoint.NewFromFloat(1.02)
-
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	side := types.SideTypeBuy
 	if pos.IsZero() {
@@ -850,6 +854,47 @@ func (s *Strategy) CrossRun(
 			MakerFeeRate: s.sourceSession.MakerFeeRate,
 			TakerFeeRate: s.sourceSession.TakerFeeRate,
 		})
+	}
+
+	if s.ProfitFixerConfig != nil {
+		bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
+
+		log.Infof("profitFixer is enabled, checking checkpoint: %+v", s.ProfitFixerConfig.TradesSince)
+
+		if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
+			return errors.New("tradesSince time can not be zero")
+		}
+
+		makerMarket, _ := makerSession.Market(s.Symbol)
+		position := types.NewPositionFromMarket(makerMarket)
+		profitStats := types.NewProfitStats(makerMarket)
+
+		fixer := common.NewProfitFixer()
+		// fixer.ConverterManager = s.ConverterManager
+
+		if ss, ok := makerSession.Exchange.(types.ExchangeTradeHistoryService); ok {
+			log.Infof("adding makerSession %s to profitFixer", makerSession.Name)
+			fixer.AddExchange(makerSession.Name, ss)
+		}
+
+		if ss, ok := sourceSession.Exchange.(types.ExchangeTradeHistoryService); ok {
+			log.Infof("adding hedgeSession %s to profitFixer", sourceSession.Name)
+			fixer.AddExchange(sourceSession.Name, ss)
+		}
+
+		if err2 := fixer.Fix(ctx, makerMarket.Symbol,
+			s.ProfitFixerConfig.TradesSince.Time(),
+			time.Now(),
+			profitStats,
+			position); err2 != nil {
+			return err2
+		}
+
+		bbgo.Notify("Fixed %s position", s.Symbol, position)
+		bbgo.Notify("Fixed %s profitStats", s.Symbol, profitStats)
+
+		s.Position = position
+		s.ProfitStats.ProfitStats = profitStats
 	}
 
 	s.book = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
