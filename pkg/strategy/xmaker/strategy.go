@@ -7,13 +7,15 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/indicator"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
+	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -95,10 +97,11 @@ type Strategy struct {
 	makerMarket, sourceMarket types.Market
 
 	// boll is the BOLLINGER indicator we used for predicting the price.
-	boll *indicator.BOLL
+	boll *indicatorv2.BOLLStream
 
 	state *State
 
+	priceSolver    *pricesolver.SimplePriceSolver
 	CircuitBreaker *circuitbreaker.BasicCircuitBreaker `json:"circuitBreaker"`
 
 	// persistence fields
@@ -213,6 +216,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 	// use mid-price for the last price
 	s.lastPrice = bestBid.Price.Add(bestAsk.Price).Div(Two)
+
+	s.priceSolver.Update(s.Symbol, s.lastPrice)
 
 	bookLastUpdateTime := s.book.LastUpdateTime()
 
@@ -380,6 +385,16 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		}
 	}
 
+	labels := prometheus.Labels{
+		"strategy_type": ID,
+		"strategy_id":   s.InstanceID(),
+		"exchange":      s.MakerExchange,
+		"symbol":        s.Symbol,
+	}
+
+	bidExposureInUsd := fixedpoint.Zero
+	askExposureInUsd := fixedpoint.Zero
+
 	bidPrice := bestBidPrice
 	askPrice := bestAskPrice
 	for i := 0; i < s.NumLayers; i++ {
@@ -413,6 +428,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 					Mul(s.makerMarket.TickSize)))
 			}
 
+			makerBestBidPriceMetrics.With(labels).Set(bidPrice.Float64())
+
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
@@ -427,6 +444,7 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 
 				makerQuota.Commit()
 				hedgeQuota.Commit()
+				bidExposureInUsd = bidExposureInUsd.Add(bidQuantity.Mul(bidPrice))
 			} else {
 				makerQuota.Rollback()
 				hedgeQuota.Rollback()
@@ -466,7 +484,10 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				askPrice = askPrice.Add(pips.Mul(fixedpoint.NewFromInt(int64(i)).Mul(s.makerMarket.TickSize)))
 			}
 
+			makerBestAskPriceMetrics.With(labels).Set(askPrice.Float64())
+
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
+
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
@@ -480,6 +501,8 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 				})
 				makerQuota.Commit()
 				hedgeQuota.Commit()
+
+				askExposureInUsd = askExposureInUsd.Add(askQuantity.Mul(askPrice))
 			} else {
 				makerQuota.Rollback()
 				hedgeQuota.Rollback()
@@ -496,14 +519,28 @@ func (s *Strategy) updateQuote(ctx context.Context, orderExecutionRouter bbgo.Or
 		return
 	}
 
-	makerOrders, err := orderExecutionRouter.SubmitOrdersTo(ctx, s.MakerExchange, submitOrders...)
+	formattedOrders, err := s.makerSession.FormatOrders(submitOrders)
 	if err != nil {
-		log.WithError(err).Errorf("order error: %s", err.Error())
 		return
 	}
 
-	s.activeMakerOrders.Add(makerOrders...)
-	s.orderStore.Add(makerOrders...)
+	orderCreateCallback := func(createdOrder types.Order) {
+		s.orderStore.Add(createdOrder)
+		s.activeMakerOrders.Add(createdOrder)
+	}
+
+	defer s.tradeCollector.Process()
+
+	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, s.makerSession.Exchange, orderCreateCallback, formattedOrders...)
+	if err != nil {
+		log.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
+	}
+
+	openOrderBidExposureInUsdMetrics.With(labels).Set(bidExposureInUsd.Float64())
+	openOrderAskExposureInUsdMetrics.With(labels).Set(askExposureInUsd.Float64())
+
+	_ = errIdx
+	_ = createdOrders
 }
 
 var lastPriceModifier = fixedpoint.NewFromFloat(1.001)
@@ -744,6 +781,10 @@ func (s *Strategy) CrossRun(
 
 	s.sourceSession = sourceSession
 
+	// initialize the price resolver
+	sourceMarkets := s.sourceSession.Markets()
+	s.priceSolver = pricesolver.NewSimplePriceResolver(sourceMarkets)
+
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
 		return fmt.Errorf("maker exchange session %s is not defined", s.MakerExchange)
@@ -761,23 +802,15 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
 
-	standardIndicatorSet := s.sourceSession.StandardIndicatorSet(s.Symbol)
+	indicators := s.sourceSession.Indicators(s.Symbol)
 	if !ok {
 		return fmt.Errorf("%s standard indicator set not found", s.Symbol)
 	}
 
-	s.boll = standardIndicatorSet.BOLL(types.IntervalWindow{
+	s.boll = indicators.BOLL(types.IntervalWindow{
 		Interval: s.BollBandInterval,
 		Window:   21,
 	}, 1.0)
-
-	if store, ok := s.sourceSession.MarketDataStore(s.Symbol); ok {
-		if klines, ok2 := store.KLinesOfInterval(s.BollBandInterval); ok2 {
-			for i := 0; i < len(*klines); i++ {
-				s.boll.CalculateAndUpdate((*klines)[0 : i+1])
-			}
-		}
-	}
 
 	// restore state
 	instanceID := s.InstanceID()
@@ -819,7 +852,7 @@ func (s *Strategy) CrossRun(
 		})
 	}
 
-	s.book = types.NewStreamBook(s.Symbol)
+	s.book = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
 	s.book.BindStream(s.sourceSession.MarketDataStream)
 
 	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
@@ -948,10 +981,7 @@ func (s *Strategy) CrossRun(
 		// wait for the quoter to stop
 		time.Sleep(s.UpdateInterval.Duration())
 
-		shutdownCtx, cancelShutdown := context.WithTimeout(context.TODO(), time.Minute)
-		defer cancelShutdown()
-
-		if err := s.activeMakerOrders.GracefulCancel(shutdownCtx, s.makerSession.Exchange); err != nil {
+		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 			log.WithError(err).Errorf("graceful cancel error")
 		}
 

@@ -1,4 +1,4 @@
-package priceresolver
+package pricesolver
 
 import (
 	"sync"
@@ -9,8 +9,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-// SimplePriceResolver implements a map-structure-based price index
-type SimplePriceResolver struct {
+// SimplePriceSolver implements a map-structure-based price index
+type SimplePriceSolver struct {
 	// symbolPrices stores the latest trade price by mapping symbol to price
 	symbolPrices map[string]fixedpoint.Value
 	markets      types.MarketMap
@@ -28,8 +28,8 @@ type SimplePriceResolver struct {
 	mu sync.Mutex
 }
 
-func NewSimplePriceResolver(markets types.MarketMap) *SimplePriceResolver {
-	return &SimplePriceResolver{
+func NewSimplePriceResolver(markets types.MarketMap) *SimplePriceSolver {
+	return &SimplePriceSolver{
 		markets:       markets,
 		symbolPrices:  make(map[string]fixedpoint.Value),
 		pricesByBase:  make(map[string]map[string]fixedpoint.Value),
@@ -37,7 +37,7 @@ func NewSimplePriceResolver(markets types.MarketMap) *SimplePriceResolver {
 	}
 }
 
-func (m *SimplePriceResolver) Update(symbol string, price fixedpoint.Value) {
+func (m *SimplePriceSolver) Update(symbol string, price fixedpoint.Value) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -65,11 +65,11 @@ func (m *SimplePriceResolver) Update(symbol string, price fixedpoint.Value) {
 	baseMap[market.BaseCurrency] = price
 }
 
-func (m *SimplePriceResolver) UpdateFromTrade(trade types.Trade) {
+func (m *SimplePriceSolver) UpdateFromTrade(trade types.Trade) {
 	m.Update(trade.Symbol, trade.Price)
 }
 
-func (m *SimplePriceResolver) inferencePrice(asset string, assetPrice fixedpoint.Value, preferredFiats ...string) (fixedpoint.Value, bool) {
+func (m *SimplePriceSolver) inferencePrice(asset string, assetPrice fixedpoint.Value, preferredFiats ...string) (fixedpoint.Value, bool) {
 	// log.Infof("inferencePrice %s = %f", asset, assetPrice.Float64())
 	quotePrices, ok := m.pricesByBase[asset]
 	if ok {
@@ -112,7 +112,7 @@ func (m *SimplePriceResolver) inferencePrice(asset string, assetPrice fixedpoint
 	return fixedpoint.Zero, false
 }
 
-func (m *SimplePriceResolver) ResolvePrice(asset string, preferredFiats ...string) (fixedpoint.Value, bool) {
+func (m *SimplePriceSolver) ResolvePrice(asset string, preferredFiats ...string) (fixedpoint.Value, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.inferencePrice(asset, fixedpoint.One, preferredFiats...)

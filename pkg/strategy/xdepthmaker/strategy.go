@@ -393,7 +393,7 @@ func (s *Strategy) CrossRun(
 		return err
 	}
 
-	s.pricingBook = types.NewStreamBook(s.HedgeSymbol)
+	s.pricingBook = types.NewStreamBook(s.HedgeSymbol, s.hedgeSession.ExchangeName)
 	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
 
 	s.stopC = make(chan struct{})

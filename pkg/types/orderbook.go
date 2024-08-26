@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -26,12 +28,13 @@ type OrderBook interface {
 type MutexOrderBook struct {
 	sync.Mutex
 
-	Symbol string
+	Symbol   string
+	Exchange ExchangeName
 
 	orderBook OrderBook
 }
 
-func NewMutexOrderBook(symbol string) *MutexOrderBook {
+func NewMutexOrderBook(symbol string, exchangeName ExchangeName) *MutexOrderBook {
 	var book OrderBook = NewSliceOrderBook(symbol)
 
 	if v, _ := strconv.ParseBool(os.Getenv("ENABLE_RBT_ORDERBOOK")); v {
@@ -40,6 +43,7 @@ func NewMutexOrderBook(symbol string) *MutexOrderBook {
 
 	return &MutexOrderBook{
 		Symbol:    symbol,
+		Exchange:  exchangeName,
 		orderBook: book,
 	}
 }
@@ -134,6 +138,46 @@ type BookSignal struct {
 	Time time.Time
 }
 
+var streamOrderBookBestBidPriceMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "bbgo_stream_order_book_best_bid_price",
+		Help: "",
+	}, []string{"symbol", "exchange"})
+
+var streamOrderBookBestAskPriceMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "bbgo_stream_order_book_best_ask_price",
+		Help: "",
+	}, []string{"symbol", "exchange"})
+
+var streamOrderBookBestBidVolumeMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "bbgo_stream_order_book_best_bid_volume",
+		Help: "",
+	}, []string{"symbol", "exchange"})
+
+var streamOrderBookBestAskVolumeMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "bbgo_stream_order_book_best_ask_volume",
+		Help: "",
+	}, []string{"symbol", "exchange"})
+
+var streamOrderBookUpdateTimeMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "bbgo_stream_order_book_update_time_milliseconds",
+		Help: "",
+	}, []string{"symbol", "exchange"})
+
+func init() {
+	prometheus.MustRegister(
+		streamOrderBookBestBidPriceMetrics,
+		streamOrderBookBestAskPriceMetrics,
+		streamOrderBookBestBidVolumeMetrics,
+		streamOrderBookBestAskVolumeMetrics,
+		streamOrderBookUpdateTimeMetrics,
+	)
+}
+
 // StreamOrderBook receives streaming data from websocket connection and
 // update the order book with mutex lock, so you can safely access it.
 //
@@ -147,10 +191,22 @@ type StreamOrderBook struct {
 	snapshotCallbacks []func(snapshot SliceOrderBook)
 }
 
-func NewStreamBook(symbol string) *StreamOrderBook {
+func NewStreamBook(symbol string, exchangeName ExchangeName) *StreamOrderBook {
 	return &StreamOrderBook{
-		MutexOrderBook: NewMutexOrderBook(symbol),
+		MutexOrderBook: NewMutexOrderBook(symbol, exchangeName),
 		C:              make(chan *BookSignal, 1),
+	}
+}
+
+func (sb *StreamOrderBook) updateMetrics(t time.Time) {
+	bestBid, bestAsk, ok := sb.BestBidAndAsk()
+	if ok {
+		exchangeName := string(sb.Exchange)
+		streamOrderBookBestAskPriceMetrics.WithLabelValues(sb.Symbol, exchangeName).Set(bestAsk.Price.Float64())
+		streamOrderBookBestBidPriceMetrics.WithLabelValues(sb.Symbol, exchangeName).Set(bestBid.Price.Float64())
+		streamOrderBookBestAskVolumeMetrics.WithLabelValues(sb.Symbol, exchangeName).Set(bestAsk.Volume.Float64())
+		streamOrderBookBestBidVolumeMetrics.WithLabelValues(sb.Symbol, exchangeName).Set(bestBid.Volume.Float64())
+		streamOrderBookUpdateTimeMetrics.WithLabelValues(sb.Symbol, exchangeName).Set(float64(t.UnixMilli()))
 	}
 }
 
@@ -163,6 +219,7 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 		sb.Load(book)
 		sb.EmitSnapshot(book)
 		sb.emitChange(BookSignalSnapshot, book.Time)
+		sb.updateMetrics(book.Time)
 	})
 
 	stream.OnBookUpdate(func(book SliceOrderBook) {
@@ -173,6 +230,7 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 		sb.Update(book)
 		sb.EmitUpdate(book)
 		sb.emitChange(BookSignalUpdate, book.Time)
+		sb.updateMetrics(book.Time)
 	})
 }
 

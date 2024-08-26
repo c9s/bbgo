@@ -48,7 +48,7 @@ var rootCmd = &cobra.Command{
 		stream.SetPublicOnly()
 		stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{})
 
-		streamBook := types.NewStreamBook(symbol)
+		streamBook := types.NewStreamBook(symbol, exchange.Name())
 		streamBook.BindStream(stream)
 
 		go func() {

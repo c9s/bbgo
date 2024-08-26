@@ -1,4 +1,4 @@
-package priceresolver
+package pricesolver
 
 import (
 	"testing"
