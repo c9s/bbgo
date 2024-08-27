@@ -26,7 +26,6 @@ var defaultMargin = fixedpoint.NewFromFloat(0.003)
 var two = fixedpoint.NewFromInt(2)
 
 var lastPriceModifier = fixedpoint.NewFromFloat(1.001)
-var minGap = fixedpoint.NewFromFloat(1.02)
 
 const priceUpdateTimeout = 30 * time.Second
 
@@ -134,6 +133,8 @@ type Strategy struct {
 
 	reportProfitStatsRateLimiter *rate.Limiter
 	circuitBreakerAlertLimiter   *rate.Limiter
+
+	logger logrus.FieldLogger
 }
 
 func (s *Strategy) ID() string {
@@ -189,6 +190,12 @@ func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Valu
 func (s *Strategy) Initialize() error {
 	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
 	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
+
+	s.logger = logrus.WithFields(logrus.Fields{
+		"symbol":      s.Symbol,
+		"strategy":    ID,
+		"strategy_id": s.InstanceID(),
+	})
 	return nil
 }
 
@@ -208,7 +215,7 @@ func (s *Strategy) getBollingerTrend(quote *Quote) int {
 	lastDownBand := fixedpoint.NewFromFloat(s.boll.DownBand.Last(0))
 	lastUpBand := fixedpoint.NewFromFloat(s.boll.UpBand.Last(0))
 
-	log.Infof("bollinger band: up/down = %f/%f, bid/ask = %f/%f",
+	s.logger.Infof("bollinger band: up/down = %f/%f, bid/ask = %f/%f",
 		lastUpBand.Float64(),
 		lastDownBand.Float64(),
 		quote.BestBidPrice.Float64(),
@@ -231,7 +238,7 @@ func (s *Strategy) applyBollingerMargin(
 	lastUpBand := fixedpoint.NewFromFloat(s.boll.UpBand.Last(0))
 
 	if lastUpBand.IsZero() || lastDownBand.IsZero() {
-		log.Warnf("bollinger band value is zero, skipping")
+		s.logger.Warnf("bollinger band value is zero, skipping")
 		return nil
 	}
 
@@ -245,7 +252,7 @@ func (s *Strategy) applyBollingerMargin(
 		// so that 1.x can multiply the original bid margin
 		bollMargin := s.BollBandMargin.Mul(ratio).Mul(factor)
 
-		log.Infof("%s bollband downtrend: increasing bid margin %f (bidMargin) + %f (bollMargin) = %f (finalBidMargin)",
+		s.logger.Infof("%s bollband downtrend: increasing bid margin %f (bidMargin) + %f (bollMargin) = %f (finalBidMargin)",
 			s.Symbol,
 			quote.BidMargin.Float64(),
 			bollMargin.Float64(),
@@ -262,7 +269,7 @@ func (s *Strategy) applyBollingerMargin(
 		// so that the original bid margin can be multiplied by 1.x
 		bollMargin := s.BollBandMargin.Mul(ratio).Mul(factor)
 
-		log.Infof("%s bollband uptrend adjusting bid margin %f (askMargin) + %f (bollMargin) = %f (finalAskMargin)",
+		s.logger.Infof("%s bollband uptrend adjusting bid margin %f (askMargin) + %f (bollMargin) = %f (finalAskMargin)",
 			s.Symbol,
 			quote.AskMargin.Float64(),
 			bollMargin.Float64(),
@@ -281,7 +288,7 @@ func (s *Strategy) applyBollingerMargin(
 
 func (s *Strategy) updateQuote(ctx context.Context) {
 	if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
-		log.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
+		s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
 		s.activeMakerOrders.Print()
 		return
 	}
@@ -293,7 +300,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	if s.CircuitBreaker != nil {
 		now := time.Now()
 		if reason, halted := s.CircuitBreaker.IsHalted(now); halted {
-			log.Warnf("[arbWorker] strategy is halted, reason: %s", reason)
+			s.logger.Warnf("[arbWorker] strategy is halted, reason: %s", reason)
 
 			if s.circuitBreakerAlertLimiter.AllowN(now, 1) {
 				bbgo.Notify("Strategy is halted, reason: %s", reason)
@@ -316,14 +323,14 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	bookLastUpdateTime := s.book.LastUpdateTime()
 
 	if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
-		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
+		s.logger.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
 		return
 	}
 
 	if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
-		log.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
+		s.logger.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
 		return
@@ -331,7 +338,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	sourceBook := s.book.CopyDepth(10)
 	if valid, err := sourceBook.IsValid(); !valid {
-		log.WithError(err).Errorf("%s invalid copied order book, skip quoting: %v", s.Symbol, err)
+		s.logger.WithError(err).Errorf("%s invalid copied order book, skip quoting: %v", s.Symbol, err)
 		return
 	}
 
@@ -369,13 +376,13 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			if b.Available.Compare(minAvailable) > 0 {
 				hedgeQuota.BaseAsset.Add(b.Available.Sub(minAvailable))
 			} else {
-				log.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
+				s.logger.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
 				disableMakerBid = true
 			}
 		} else if b.Available.Compare(s.sourceMarket.MinQuantity) > 0 {
 			hedgeQuota.BaseAsset.Add(b.Available)
 		} else {
-			log.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
+			s.logger.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
 			disableMakerBid = true
 		}
 	}
@@ -388,13 +395,13 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			if b.Available.Compare(minAvailable) > 0 {
 				hedgeQuota.QuoteAsset.Add(b.Available.Sub(minAvailable))
 			} else {
-				log.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
+				s.logger.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
 				disableMakerAsk = true
 			}
 		} else if b.Available.Compare(s.sourceMarket.MinNotional) > 0 {
 			hedgeQuota.QuoteAsset.Add(b.Available)
 		} else {
-			log.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
+			s.logger.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
 			disableMakerAsk = true
 		}
 	}
@@ -421,7 +428,15 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	bestBidPrice := bestBid.Price
 	bestAskPrice := bestAsk.Price
-	log.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
+	s.logger.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
+
+	if bestBidPrice.Compare(bestAskPrice) > 0 {
+		log.Errorf("best bid price %f is higher than best ask price %f, skip quoting",
+			bestBidPrice.Float64(),
+			bestAskPrice.Float64(),
+		)
+		return
+	}
 
 	var submitOrders []types.SubmitOrder
 	var accumulativeBidQuantity, accumulativeAskQuantity fixedpoint.Value
@@ -454,6 +469,14 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	askExposureInUsd := fixedpoint.Zero
 	bidPrice := quote.BestBidPrice
 	askPrice := quote.BestAskPrice
+
+	if bidPrice.Compare(askPrice) > 0 {
+		log.Errorf("maker bid price %f is higher than maker ask price %f, skip quoting",
+			bidPrice.Float64(),
+			askPrice.Float64(),
+		)
+		return
+	}
 
 	bidMarginMetrics.With(labels).Set(quote.BidMargin.Float64())
 	askMarginMetrics.With(labels).Set(quote.AskMargin.Float64())
