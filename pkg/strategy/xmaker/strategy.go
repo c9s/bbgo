@@ -401,9 +401,12 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	bidExposureInUsd := fixedpoint.Zero
 	askExposureInUsd := fixedpoint.Zero
-
 	bidPrice := bestBidPrice
 	askPrice := bestAskPrice
+
+	bidMarginMetrics.With(labels).Set(bidMargin.Float64())
+	askMarginMetrics.With(labels).Set(askMargin.Float64())
+
 	for i := 0; i < s.NumLayers; i++ {
 		// for maker bid orders
 		if !disableMakerBid {
@@ -430,12 +433,12 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			}
 
 			bidPrice = bidPrice.Mul(fixedpoint.One.Sub(bidMargin))
-			if i > 0 && pips.Sign() > 0 {
+			if i == 0 {
+				makerBestBidPriceMetrics.With(labels).Set(bidPrice.Float64())
+			} else if i > 0 && pips.Sign() > 0 {
 				bidPrice = bidPrice.Sub(pips.Mul(fixedpoint.NewFromInt(int64(i)).
 					Mul(s.makerMarket.TickSize)))
 			}
-
-			makerBestBidPriceMetrics.With(labels).Set(bidPrice.Float64())
 
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
 				// if we bought, then we need to sell the base from the hedge session
@@ -487,11 +490,11 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			}
 
 			askPrice = askPrice.Mul(fixedpoint.One.Add(askMargin))
-			if i > 0 && pips.Sign() > 0 {
+			if i == 0 {
+				makerBestAskPriceMetrics.With(labels).Set(askPrice.Float64())
+			} else if i > 0 && pips.Sign() > 0 {
 				askPrice = askPrice.Add(pips.Mul(fixedpoint.NewFromInt(int64(i)).Mul(s.makerMarket.TickSize)))
 			}
-
-			makerBestAskPriceMetrics.With(labels).Set(askPrice.Float64())
 
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
 
