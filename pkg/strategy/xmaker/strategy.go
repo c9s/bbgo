@@ -612,13 +612,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	// truncate quantity for the supported precision
 	quantity = s.sourceMarket.TruncateQuantity(quantity)
 
-	if notional.Compare(s.sourceMarket.MinNotional.Mul(minGap)) <= 0 {
-		log.Warnf("the adjusted amount %v is less than minimal notional %v, skipping hedge", notional, s.sourceMarket.MinNotional)
-		return
-	}
-
-	if quantity.Compare(s.sourceMarket.MinQuantity.Mul(minGap)) <= 0 {
-		log.Warnf("the adjusted quantity %v is less than minimal quantity %v, skipping hedge", quantity, s.sourceMarket.MinQuantity)
+	if s.sourceMarket.IsDustQuantity(quantity, lastPrice) {
+		log.Warnf("skip dust quantity: %s", quantity.String())
 		return
 	}
 
