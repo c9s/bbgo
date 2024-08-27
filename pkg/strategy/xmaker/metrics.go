@@ -38,6 +38,18 @@ var configMaxExposureMetrics = prometheus.NewGaugeVec(
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "symbol"})
 
+var configBidMarginMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_config_bid_margin",
+		Help: "",
+	}, []string{"strategy_type", "strategy_id", "symbol"})
+
+var configAskMarginMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_config_ask_margin",
+		Help: "",
+	}, []string{"strategy_type", "strategy_id", "symbol"})
+
 func init() {
 	prometheus.MustRegister(
 		openOrderBidExposureInUsdMetrics,
@@ -46,5 +58,7 @@ func init() {
 		makerBestAskPriceMetrics,
 		configNumOfLayersMetrics,
 		configMaxExposureMetrics,
+		configBidMarginMetrics,
+		configAskMarginMetrics,
 	)
 }

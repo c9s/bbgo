@@ -894,6 +894,8 @@ func (s *Strategy) CrossRun(
 	configLabels := prometheus.Labels{"strategy_id": s.InstanceID(), "strategy_type": ID, "symbol": s.Symbol}
 	configNumOfLayersMetrics.With(configLabels).Set(float64(s.NumLayers))
 	configMaxExposureMetrics.With(configLabels).Set(s.MaxExposurePosition.Float64())
+	configBidMarginMetrics.With(configLabels).Set(s.BidMargin.Float64())
+	configAskMarginMetrics.With(configLabels).Set(s.AskMargin.Float64())
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.makerMarket)
