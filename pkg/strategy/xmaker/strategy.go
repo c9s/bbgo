@@ -1037,8 +1037,12 @@ func (s *Strategy) CrossRun(
 	go s.quoteWorker(ctx)
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
+		// the ctx here is the shutdown context (not the strategy context)
+
+		// defer work group done to mark the strategy as stopped
 		defer wg.Done()
 
+		// send stop signal to the quoteWorker
 		close(s.stopC)
 
 		// wait for the quoter to stop
@@ -1048,7 +1052,7 @@ func (s *Strategy) CrossRun(
 			log.WithError(err).Errorf("graceful cancel error")
 		}
 
-		bbgo.Notify("%s: %s position", ID, s.Symbol, s.Position)
+		bbgo.Notify("Shutting down %s %s", ID, s.Symbol, s.Position)
 	})
 
 	return nil
