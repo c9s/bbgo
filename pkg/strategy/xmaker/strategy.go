@@ -750,7 +750,7 @@ func (s *Strategy) Defaults() error {
 
 	// circuitBreakerAlertLimiter is for CircuitBreaker alerts
 	s.circuitBreakerAlertLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 2)
-	s.reportProfitStatsRateLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
+	s.reportProfitStatsRateLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 1)
 	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(1*time.Minute), 1)
 	return nil
 }
@@ -803,6 +803,9 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 	ticker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
 	defer ticker.Stop()
 
+	profitChanged := false
+	reportTicker := time.NewTicker(5 * time.Minute)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -836,8 +839,15 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				s.Hedge(ctx, uncoverPosition.Neg())
 			}
 
-			if s.reportProfitStatsRateLimiter.Allow() {
-				bbgo.Notify(s.ProfitStats)
+			profitChanged = true
+
+		case <-reportTicker.C:
+			if profitChanged {
+				if s.reportProfitStatsRateLimiter.Allow() {
+					bbgo.Notify(s.ProfitStats)
+				}
+
+				profitChanged = false
 			}
 		}
 	}
