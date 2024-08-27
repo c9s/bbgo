@@ -26,11 +26,17 @@ var makerBestAskPriceMetrics = prometheus.NewGaugeVec(
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
-var numOfLayersMetrics = prometheus.NewGaugeVec(
+var configNumOfLayersMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "xmaker_num_of_layers",
+		Name: "xmaker_config_num_of_layers",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+	}, []string{"strategy_type", "strategy_id", "symbol"})
+
+var configMaxExposureMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_config_max_exposure",
+		Help: "",
+	}, []string{"strategy_type", "strategy_id", "symbol"})
 
 func init() {
 	prometheus.MustRegister(
@@ -38,6 +44,7 @@ func init() {
 		openOrderAskExposureInUsdMetrics,
 		makerBestBidPriceMetrics,
 		makerBestAskPriceMetrics,
-		numOfLayersMetrics,
+		configNumOfLayersMetrics,
+		configMaxExposureMetrics,
 	)
 }

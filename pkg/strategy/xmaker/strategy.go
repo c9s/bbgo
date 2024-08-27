@@ -753,6 +753,7 @@ func (s *Strategy) Defaults() error {
 	// circuitBreakerAlertLimiter is for CircuitBreaker alerts
 	s.circuitBreakerAlertLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 2)
 	s.reportProfitStatsRateLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
+	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(1*time.Minute), 1)
 	return nil
 }
 
@@ -773,8 +774,8 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) quoteWorker(ctx context.Context) {
-	quoteTicker := time.NewTicker(util.MillisecondsJitter(s.UpdateInterval.Duration(), 200))
-	defer quoteTicker.Stop()
+	ticker := time.NewTicker(util.MillisecondsJitter(s.UpdateInterval.Duration(), 200))
+	defer ticker.Stop()
 
 	defer func() {
 		if err := s.activeMakerOrders.GracefulCancel(context.Background(), s.makerSession.Exchange); err != nil {
@@ -793,7 +794,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 			log.Warnf("%s maker goroutine stopped, due to the cancelled context", s.Symbol)
 			return
 
-		case <-quoteTicker.C:
+		case <-ticker.C:
 			s.updateQuote(ctx)
 
 		}
@@ -848,7 +849,7 @@ func (s *Strategy) CrossRun(
 	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
 
-	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(1*time.Minute), 1)
+	instanceID := s.InstanceID()
 
 	// configure sessions
 	sourceSession, ok := sessions[s.SourceExchange]
@@ -880,9 +881,6 @@ func (s *Strategy) CrossRun(
 	}
 
 	indicators := s.sourceSession.Indicators(s.Symbol)
-	if !ok {
-		return fmt.Errorf("%s standard indicator set not found", s.Symbol)
-	}
 
 	s.boll = indicators.BOLL(types.IntervalWindow{
 		Interval: s.BollBandInterval,
@@ -890,9 +888,12 @@ func (s *Strategy) CrossRun(
 	}, 1.0)
 
 	// restore state
-	instanceID := s.InstanceID()
 	s.groupID = util.FNV32(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
+
+	configLabels := prometheus.Labels{"strategy_id": s.InstanceID(), "strategy_type": ID, "symbol": s.Symbol}
+	configNumOfLayersMetrics.With(configLabels).Set(float64(s.NumLayers))
+	configMaxExposureMetrics.With(configLabels).Set(s.MaxExposurePosition.Float64())
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.makerMarket)
