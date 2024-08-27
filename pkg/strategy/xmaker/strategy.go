@@ -498,21 +498,32 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			}
 
 			accumulativeBidQuantity = accumulativeBidQuantity.Add(bidQuantity)
+
 			if s.UseDepthPrice {
 				sideBook := sourceBook.SideBook(types.SideTypeBuy)
 				if s.DepthQuantity.Sign() > 0 {
-					bidPrice = aggregatePrice(sideBook, s.DepthQuantity)
+					if i == 0 {
+						bidPrice = aggregatePrice(sideBook, s.DepthQuantity)
+						bidPrice = bidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
+					} else if i > 0 && quote.BidLayerPips.Sign() > 0 {
+						pips := quote.BidLayerPips.Mul(s.makerMarket.TickSize)
+						bidPrice = bidPrice.Sub(pips)
+					}
 				} else {
 					bidPrice = aggregatePrice(sideBook, accumulativeBidQuantity)
+					bidPrice = bidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
+				}
+			} else {
+				if i == 0 {
+					bidPrice = bidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
+				} else if i > 0 && quote.BidLayerPips.Sign() > 0 {
+					pips := quote.BidLayerPips.Mul(s.makerMarket.TickSize)
+					bidPrice = bidPrice.Sub(pips)
 				}
 			}
 
 			if i == 0 {
-				bidPrice = bidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
 				makerBestBidPriceMetrics.With(labels).Set(bidPrice.Float64())
-			} else if i > 0 && quote.BidLayerPips.Sign() > 0 {
-				pips := quote.BidLayerPips.Mul(s.makerMarket.TickSize)
-				bidPrice = bidPrice.Sub(pips)
 			}
 
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
@@ -558,18 +569,28 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 			if s.UseDepthPrice {
 				if s.DepthQuantity.Sign() > 0 {
-					askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), s.DepthQuantity)
+					if i == 0 {
+						askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), s.DepthQuantity)
+						askPrice = askPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
+					} else if i > 0 && quote.AskLayerPips.Sign() > 0 {
+						pips := quote.AskLayerPips.Mul(s.makerMarket.TickSize)
+						askPrice = askPrice.Add(pips)
+					}
 				} else {
 					askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
+					askPrice = askPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
+				}
+			} else {
+				if i == 0 {
+					askPrice = askPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
+				} else if i > 0 && quote.AskLayerPips.Sign() > 0 {
+					pips := quote.AskLayerPips.Mul(s.makerMarket.TickSize)
+					askPrice = askPrice.Add(pips)
 				}
 			}
 
 			if i == 0 {
-				askPrice = askPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
 				makerBestAskPriceMetrics.With(labels).Set(askPrice.Float64())
-			} else if i > 0 && quote.AskLayerPips.Sign() > 0 {
-				pips := quote.AskLayerPips.Mul(s.makerMarket.TickSize)
-				askPrice = askPrice.Add(pips)
 			}
 
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
