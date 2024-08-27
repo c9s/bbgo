@@ -677,6 +677,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		}
 	}
 
+	notional := quantity.Mul(lastPrice)
+
 	// adjust quantity according to the balances
 	account := s.sourceSession.GetAccount()
 	switch side {
