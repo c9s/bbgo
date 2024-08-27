@@ -401,9 +401,12 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	bidExposureInUsd := fixedpoint.Zero
 	askExposureInUsd := fixedpoint.Zero
-
 	bidPrice := bestBidPrice
 	askPrice := bestAskPrice
+
+	bidMarginMetrics.With(labels).Set(bidMargin.Float64())
+	askMarginMetrics.With(labels).Set(askMargin.Float64())
+
 	for i := 0; i < s.NumLayers; i++ {
 		// for maker bid orders
 		if !disableMakerBid {
@@ -430,12 +433,12 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			}
 
 			bidPrice = bidPrice.Mul(fixedpoint.One.Sub(bidMargin))
-			if i > 0 && pips.Sign() > 0 {
+			if i == 0 {
+				makerBestBidPriceMetrics.With(labels).Set(bidPrice.Float64())
+			} else if i > 0 && pips.Sign() > 0 {
 				bidPrice = bidPrice.Sub(pips.Mul(fixedpoint.NewFromInt(int64(i)).
 					Mul(s.makerMarket.TickSize)))
 			}
-
-			makerBestBidPriceMetrics.With(labels).Set(bidPrice.Float64())
 
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
 				// if we bought, then we need to sell the base from the hedge session
@@ -487,11 +490,11 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			}
 
 			askPrice = askPrice.Mul(fixedpoint.One.Add(askMargin))
-			if i > 0 && pips.Sign() > 0 {
+			if i == 0 {
+				makerBestAskPriceMetrics.With(labels).Set(askPrice.Float64())
+			} else if i > 0 && pips.Sign() > 0 {
 				askPrice = askPrice.Add(pips.Mul(fixedpoint.NewFromInt(int64(i)).Mul(s.makerMarket.TickSize)))
 			}
-
-			makerBestAskPriceMetrics.With(labels).Set(askPrice.Float64())
 
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
 
@@ -753,6 +756,7 @@ func (s *Strategy) Defaults() error {
 	// circuitBreakerAlertLimiter is for CircuitBreaker alerts
 	s.circuitBreakerAlertLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 2)
 	s.reportProfitStatsRateLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
+	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(1*time.Minute), 1)
 	return nil
 }
 
@@ -773,8 +777,8 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) quoteWorker(ctx context.Context) {
-	quoteTicker := time.NewTicker(util.MillisecondsJitter(s.UpdateInterval.Duration(), 200))
-	defer quoteTicker.Stop()
+	ticker := time.NewTicker(util.MillisecondsJitter(s.UpdateInterval.Duration(), 200))
+	defer ticker.Stop()
 
 	defer func() {
 		if err := s.activeMakerOrders.GracefulCancel(context.Background(), s.makerSession.Exchange); err != nil {
@@ -793,7 +797,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 			log.Warnf("%s maker goroutine stopped, due to the cancelled context", s.Symbol)
 			return
 
-		case <-quoteTicker.C:
+		case <-ticker.C:
 			s.updateQuote(ctx)
 
 		}
@@ -848,7 +852,7 @@ func (s *Strategy) CrossRun(
 	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
 
-	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(1*time.Minute), 1)
+	instanceID := s.InstanceID()
 
 	// configure sessions
 	sourceSession, ok := sessions[s.SourceExchange]
@@ -880,9 +884,6 @@ func (s *Strategy) CrossRun(
 	}
 
 	indicators := s.sourceSession.Indicators(s.Symbol)
-	if !ok {
-		return fmt.Errorf("%s standard indicator set not found", s.Symbol)
-	}
 
 	s.boll = indicators.BOLL(types.IntervalWindow{
 		Interval: s.BollBandInterval,
@@ -890,9 +891,14 @@ func (s *Strategy) CrossRun(
 	}, 1.0)
 
 	// restore state
-	instanceID := s.InstanceID()
 	s.groupID = util.FNV32(instanceID)
 	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
+
+	configLabels := prometheus.Labels{"strategy_id": s.InstanceID(), "strategy_type": ID, "symbol": s.Symbol}
+	configNumOfLayersMetrics.With(configLabels).Set(float64(s.NumLayers))
+	configMaxExposureMetrics.With(configLabels).Set(s.MaxExposurePosition.Float64())
+	configBidMarginMetrics.With(configLabels).Set(s.BidMargin.Float64())
+	configAskMarginMetrics.With(configLabels).Set(s.AskMargin.Float64())
 
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.makerMarket)
@@ -1037,8 +1043,12 @@ func (s *Strategy) CrossRun(
 	go s.quoteWorker(ctx)
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
+		// the ctx here is the shutdown context (not the strategy context)
+
+		// defer work group done to mark the strategy as stopped
 		defer wg.Done()
 
+		// send stop signal to the quoteWorker
 		close(s.stopC)
 
 		// wait for the quoter to stop
@@ -1048,7 +1058,7 @@ func (s *Strategy) CrossRun(
 			log.WithError(err).Errorf("graceful cancel error")
 		}
 
-		bbgo.Notify("%s: %s position", ID, s.Symbol, s.Position)
+		bbgo.Notify("Shutting down %s %s", ID, s.Symbol, s.Position)
 	})
 
 	return nil
