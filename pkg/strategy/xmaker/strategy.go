@@ -677,12 +677,6 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		}
 	}
 
-	notional := quantity.Mul(lastPrice)
-	if notional.Compare(s.sourceMarket.MinNotional) <= 0 {
-		log.Warnf("%s %v less than min notional, skipping hedge", s.Symbol, notional)
-		return
-	}
-
 	// adjust quantity according to the balances
 	account := s.sourceSession.GetAccount()
 	switch side {
@@ -934,9 +928,8 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				)
 
 				s.Hedge(ctx, uncoverPosition.Neg())
+				profitChanged = true
 			}
-
-			profitChanged = true
 
 		case <-reportTicker.C:
 			if profitChanged {
