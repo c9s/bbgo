@@ -63,6 +63,9 @@ type Strategy struct {
 	BollBandMargin       fixedpoint.Value `json:"bollBandMargin"`
 	BollBandMarginFactor fixedpoint.Value `json:"bollBandMarginFactor"`
 
+	// MinMarginLevel is the minimum margin level to trigger the hedge
+	MinMarginLevel fixedpoint.Value `json:"minMarginLevel"`
+
 	StopHedgeQuoteBalance fixedpoint.Value `json:"stopHedgeQuoteBalance"`
 	StopHedgeBaseBalance  fixedpoint.Value `json:"stopHedgeBaseBalance"`
 
@@ -650,6 +653,36 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	_ = createdOrders
 }
 
+func (s *Strategy) adjustHedgeQuantityWithAvailableBalance(side types.SideType, quantity, lastPrice fixedpoint.Value) fixedpoint.Value {
+	// adjust quantity according to the balances
+	account := s.sourceSession.GetAccount()
+
+	switch side {
+
+	case types.SideTypeBuy:
+		// check quote quantity
+		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
+			if quote.Available.Compare(s.sourceMarket.MinNotional) < 0 {
+				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
+				availableQuote := s.sourceMarket.TruncateQuoteQuantity(quote.Available)
+				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, lastPrice, availableQuote)
+
+			}
+		}
+
+	case types.SideTypeSell:
+		// check quote quantity
+		if base, ok := account.Balance(s.sourceMarket.BaseCurrency); ok {
+			if base.Available.Compare(quantity) < 0 {
+				quantity = base.Available
+			}
+		}
+	}
+
+	// truncate the quantity to the supported precision
+	return s.sourceMarket.TruncateQuantity(quantity)
+}
+
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	side := types.SideTypeBuy
 	if pos.IsZero() {
@@ -677,36 +710,27 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		}
 	}
 
-	notional := quantity.Mul(lastPrice)
-
-	// adjust quantity according to the balances
-	account := s.sourceSession.GetAccount()
-	switch side {
-
-	case types.SideTypeBuy:
-		// check quote quantity
-		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
-			if quote.Available.Compare(notional) < 0 {
-				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
-				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, lastPrice.Mul(lastPriceModifier), quote.Available)
-				quantity = s.sourceMarket.TruncateQuantity(quantity)
-			}
+	if s.sourceSession.Margin {
+		// check the margin level
+		account, err := s.sourceSession.UpdateAccount(ctx)
+		if err != nil {
+			log.WithError(err).Errorf("unable to update account")
+			return
 		}
 
-	case types.SideTypeSell:
-		// check quote quantity
-		if base, ok := account.Balance(s.sourceMarket.BaseCurrency); ok {
-			if base.Available.Compare(quantity) < 0 {
-				quantity = base.Available
-			}
+		if !s.MinMarginLevel.IsZero() && !account.MarginLevel.IsZero() && account.MarginLevel.Compare(s.MinMarginLevel) < 0 {
+			log.Errorf("margin level %f is too low (< %f), skip hedge", account.MarginLevel.Float64(), s.MinMarginLevel.Float64())
+			return
 		}
+	} else {
+		quantity = s.adjustHedgeQuantityWithAvailableBalance(side, quantity, lastPrice)
 	}
 
 	// truncate quantity for the supported precision
 	quantity = s.sourceMarket.TruncateQuantity(quantity)
 
 	if s.sourceMarket.IsDustQuantity(quantity, lastPrice) {
-		log.Warnf("skip dust quantity: %s", quantity.String())
+		log.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
 		return
 	}
 
@@ -819,6 +843,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.NumLayers == 0 {
 		s.NumLayers = 1
+	}
+
+	if s.MinMarginLevel.IsZero() {
+		s.MinMarginLevel = fixedpoint.NewFromFloat(3.0)
 	}
 
 	if s.BidMargin.IsZero() {
