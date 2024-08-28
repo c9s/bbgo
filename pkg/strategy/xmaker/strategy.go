@@ -962,7 +962,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 }
 
 func (s *Strategy) accountUpdater(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(3 * time.Minute)
 	defer ticker.Stop()
 	for {
 		select {
