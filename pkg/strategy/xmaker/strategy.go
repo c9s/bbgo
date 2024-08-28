@@ -63,6 +63,9 @@ type Strategy struct {
 	BollBandMargin       fixedpoint.Value `json:"bollBandMargin"`
 	BollBandMarginFactor fixedpoint.Value `json:"bollBandMarginFactor"`
 
+	// MinMarginLevel is the minimum margin level to trigger the hedge
+	MinMarginLevel fixedpoint.Value `json:"minMarginLevel"`
+
 	StopHedgeQuoteBalance fixedpoint.Value `json:"stopHedgeQuoteBalance"`
 	StopHedgeBaseBalance  fixedpoint.Value `json:"stopHedgeBaseBalance"`
 
@@ -125,6 +128,8 @@ type Strategy struct {
 	tradeCollector *core.TradeCollector
 
 	askPriceHeartBeat, bidPriceHeartBeat *types.PriceHeartBeat
+
+	accountValueCalculator *bbgo.AccountValueCalculator
 
 	lastPrice fixedpoint.Value
 	groupID   uint32
@@ -190,7 +195,6 @@ func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Valu
 func (s *Strategy) Initialize() error {
 	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
 	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
-
 	s.logger = logrus.WithFields(logrus.Fields{
 		"symbol":      s.Symbol,
 		"strategy":    ID,
@@ -269,7 +273,7 @@ func (s *Strategy) applyBollingerMargin(
 		// so that the original bid margin can be multiplied by 1.x
 		bollMargin := s.BollBandMargin.Mul(ratio).Mul(factor)
 
-		s.logger.Infof("%s bollband uptrend adjusting bid margin %f (askMargin) + %f (bollMargin) = %f (finalAskMargin)",
+		s.logger.Infof("%s bollband uptrend adjusting ask margin %f (askMargin) + %f (bollMargin) = %f (finalAskMargin)",
 			s.Symbol,
 			quote.AskMargin.Float64(),
 			bollMargin.Float64(),
@@ -366,44 +370,90 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		}
 	}
 
-	hedgeBalances := s.sourceSession.GetAccount().Balances()
+	// if
+	//  1) the source session is a margin session
+	//  2) the min margin level is configured
+	//  3) the hedge account's margin level is lower than the min margin level
+	hedgeAccount := s.sourceSession.GetAccount()
+	hedgeBalances := hedgeAccount.Balances()
 	hedgeQuota := &bbgo.QuotaTransaction{}
-	if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
-		// to make bid orders, we need enough base asset in the foreign exchange,
-		// if the base asset balance is not enough for selling
-		if s.StopHedgeBaseBalance.Sign() > 0 {
-			minAvailable := s.StopHedgeBaseBalance.Add(s.sourceMarket.MinQuantity)
-			if b.Available.Compare(minAvailable) > 0 {
-				hedgeQuota.BaseAsset.Add(b.Available.Sub(minAvailable))
+
+	if s.sourceSession.Margin &&
+		!s.MinMarginLevel.IsZero() &&
+		!hedgeAccount.MarginLevel.IsZero() {
+
+		if hedgeAccount.MarginLevel.Compare(s.MinMarginLevel) < 0 {
+			if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
+				quoteDebt := quote.Debt()
+				if quoteDebt.Sign() > 0 {
+					hedgeQuota.BaseAsset.Add(quoteDebt.Div(bestBid.Price))
+				}
+			}
+
+			if base, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
+				baseDebt := base.Debt()
+				if baseDebt.Sign() > 0 {
+					hedgeQuota.QuoteAsset.Add(baseDebt.Mul(bestAsk.Price))
+				}
+			}
+		} else {
+			// credit buffer
+			creditBufferRatio := fixedpoint.NewFromFloat(1.2)
+			if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
+				netQuote := quote.Net()
+				if netQuote.Sign() > 0 {
+					hedgeQuota.QuoteAsset.Add(netQuote.Mul(creditBufferRatio))
+				}
+			}
+
+			if base, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
+				netBase := base.Net()
+				if netBase.Sign() > 0 {
+					hedgeQuota.BaseAsset.Add(netBase.Mul(creditBufferRatio))
+				}
+			}
+			// netValueInUsd, err := s.accountValueCalculator.NetValue(ctx)
+		}
+
+	} else {
+		if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
+			// to make bid orders, we need enough base asset in the foreign exchange,
+			// if the base asset balance is not enough for selling
+			if s.StopHedgeBaseBalance.Sign() > 0 {
+				minAvailable := s.StopHedgeBaseBalance.Add(s.sourceMarket.MinQuantity)
+				if b.Available.Compare(minAvailable) > 0 {
+					hedgeQuota.BaseAsset.Add(b.Available.Sub(minAvailable))
+				} else {
+					s.logger.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
+					disableMakerBid = true
+				}
+			} else if b.Available.Compare(s.sourceMarket.MinQuantity) > 0 {
+				hedgeQuota.BaseAsset.Add(b.Available)
 			} else {
 				s.logger.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
 				disableMakerBid = true
 			}
-		} else if b.Available.Compare(s.sourceMarket.MinQuantity) > 0 {
-			hedgeQuota.BaseAsset.Add(b.Available)
-		} else {
-			s.logger.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
-			disableMakerBid = true
 		}
-	}
 
-	if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
-		// to make ask orders, we need enough quote asset in the foreign exchange,
-		// if the quote asset balance is not enough for buying
-		if s.StopHedgeQuoteBalance.Sign() > 0 {
-			minAvailable := s.StopHedgeQuoteBalance.Add(s.sourceMarket.MinNotional)
-			if b.Available.Compare(minAvailable) > 0 {
-				hedgeQuota.QuoteAsset.Add(b.Available.Sub(minAvailable))
+		if b, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
+			// to make ask orders, we need enough quote asset in the foreign exchange,
+			// if the quote asset balance is not enough for buying
+			if s.StopHedgeQuoteBalance.Sign() > 0 {
+				minAvailable := s.StopHedgeQuoteBalance.Add(s.sourceMarket.MinNotional)
+				if b.Available.Compare(minAvailable) > 0 {
+					hedgeQuota.QuoteAsset.Add(b.Available.Sub(minAvailable))
+				} else {
+					s.logger.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
+					disableMakerAsk = true
+				}
+			} else if b.Available.Compare(s.sourceMarket.MinNotional) > 0 {
+				hedgeQuota.QuoteAsset.Add(b.Available)
 			} else {
 				s.logger.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
 				disableMakerAsk = true
 			}
-		} else if b.Available.Compare(s.sourceMarket.MinNotional) > 0 {
-			hedgeQuota.QuoteAsset.Add(b.Available)
-		} else {
-			s.logger.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
-			disableMakerAsk = true
 		}
+
 	}
 
 	// if max exposure position is configured, we should not:
@@ -650,6 +700,35 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	_ = createdOrders
 }
 
+func (s *Strategy) adjustHedgeQuantityWithAvailableBalance(
+	account *types.Account, side types.SideType, quantity, lastPrice fixedpoint.Value,
+) fixedpoint.Value {
+	switch side {
+
+	case types.SideTypeBuy:
+		// check quote quantity
+		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
+			if quote.Available.Compare(s.sourceMarket.MinNotional) < 0 {
+				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
+				availableQuote := s.sourceMarket.TruncateQuoteQuantity(quote.Available)
+				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, lastPrice, availableQuote)
+
+			}
+		}
+
+	case types.SideTypeSell:
+		// check quote quantity
+		if base, ok := account.Balance(s.sourceMarket.BaseCurrency); ok {
+			if base.Available.Compare(quantity) < 0 {
+				quantity = base.Available
+			}
+		}
+	}
+
+	// truncate the quantity to the supported precision
+	return s.sourceMarket.TruncateQuantity(quantity)
+}
+
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	side := types.SideTypeBuy
 	if pos.IsZero() {
@@ -677,36 +756,22 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		}
 	}
 
-	notional := quantity.Mul(lastPrice)
-
-	// adjust quantity according to the balances
 	account := s.sourceSession.GetAccount()
-	switch side {
-
-	case types.SideTypeBuy:
-		// check quote quantity
-		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
-			if quote.Available.Compare(notional) < 0 {
-				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
-				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, lastPrice.Mul(lastPriceModifier), quote.Available)
-				quantity = s.sourceMarket.TruncateQuantity(quantity)
-			}
+	if s.sourceSession.Margin {
+		// check the margin level
+		if !s.MinMarginLevel.IsZero() && !account.MarginLevel.IsZero() && account.MarginLevel.Compare(s.MinMarginLevel) < 0 {
+			log.Errorf("margin level %f is too low (< %f), skip hedge", account.MarginLevel.Float64(), s.MinMarginLevel.Float64())
+			return
 		}
-
-	case types.SideTypeSell:
-		// check quote quantity
-		if base, ok := account.Balance(s.sourceMarket.BaseCurrency); ok {
-			if base.Available.Compare(quantity) < 0 {
-				quantity = base.Available
-			}
-		}
+	} else {
+		quantity = s.adjustHedgeQuantityWithAvailableBalance(account, side, quantity, lastPrice)
 	}
 
 	// truncate quantity for the supported precision
 	quantity = s.sourceMarket.TruncateQuantity(quantity)
 
 	if s.sourceMarket.IsDustQuantity(quantity, lastPrice) {
-		log.Warnf("skip dust quantity: %s", quantity.String())
+		log.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
 		return
 	}
 
@@ -821,6 +886,10 @@ func (s *Strategy) Defaults() error {
 		s.NumLayers = 1
 	}
 
+	if s.MinMarginLevel.IsZero() {
+		s.MinMarginLevel = fixedpoint.NewFromFloat(3.0)
+	}
+
 	if s.BidMargin.IsZero() {
 		if !s.Margin.IsZero() {
 			s.BidMargin = s.Margin
@@ -888,6 +957,35 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 		case <-ticker.C:
 			s.updateQuote(ctx)
 
+		}
+	}
+}
+
+func (s *Strategy) accountUpdater(ctx context.Context) {
+	ticker := time.NewTicker(3 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			if _, err := s.sourceSession.UpdateAccount(ctx); err != nil {
+				log.WithError(err).Errorf("unable to update account")
+			}
+
+			if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
+				log.WithError(err).Errorf("unable to update account value with prices")
+				return
+			}
+
+			netValue, err := s.accountValueCalculator.NetValue(ctx)
+			if err != nil {
+				log.WithError(err).Errorf("unable to update account")
+				return
+			}
+
+			s.logger.Infof("hedge session net value ~= %f USD", netValue.Float64())
 		}
 	}
 }
@@ -979,6 +1077,8 @@ func (s *Strategy) CrossRun(
 	if !ok {
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
+
+	s.accountValueCalculator = bbgo.NewAccountValueCalculator(s.sourceSession, s.sourceMarket.QuoteCurrency)
 
 	indicators := s.sourceSession.Indicators(s.Symbol)
 
@@ -1136,6 +1236,7 @@ func (s *Strategy) CrossRun(
 		go s.tradeRecover(ctx)
 	}
 
+	go s.accountUpdater(ctx)
 	go s.hedgeWorker(ctx)
 	go s.quoteWorker(ctx)
 
