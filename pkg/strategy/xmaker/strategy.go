@@ -801,7 +801,6 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	orderCreateCallback := func(createdOrder types.Order) {
 		s.orderStore.Add(createdOrder)
-		s.activeMakerOrders.Add(createdOrder)
 	}
 
 	defer s.tradeCollector.Process()
