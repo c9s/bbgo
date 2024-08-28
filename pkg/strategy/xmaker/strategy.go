@@ -402,14 +402,14 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
 				netQuote := quote.Net()
 				if netQuote.Sign() > 0 {
-					hedgeQuota.BaseAsset.Add(netQuote.Mul(creditBufferRatio).Div(bestBid.Price))
+					hedgeQuota.QuoteAsset.Add(netQuote.Mul(creditBufferRatio))
 				}
 			}
 
 			if base, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
 				netBase := base.Net()
 				if netBase.Sign() > 0 {
-					hedgeQuota.QuoteAsset.Add(netBase.Mul(creditBufferRatio).Mul(bestAsk.Price))
+					hedgeQuota.BaseAsset.Add(netBase.Mul(creditBufferRatio))
 				}
 			}
 			// netValueInUsd, err := s.accountValueCalculator.NetValue(ctx)
