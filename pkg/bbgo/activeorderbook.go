@@ -466,6 +466,12 @@ func (b *ActiveOrderBook) Lookup(f func(o types.Order) bool) *types.Order {
 
 func (b *ActiveOrderBook) filterExistingOrders(orders []types.Order) (existingOrders types.OrderSlice) {
 	for _, o := range orders {
+		// skip market order
+		// this prevents if someone added a market order to the active order book
+		if o.Type == types.OrderTypeMarket {
+			continue
+		}
+
 		if b.Exists(o) {
 			existingOrders.Add(o)
 		}
