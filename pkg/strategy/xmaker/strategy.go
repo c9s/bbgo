@@ -573,6 +573,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			}
 
 			if i == 0 {
+				s.logger.Infof("maker best bid price %f", bidPrice.Float64())
 				makerBestBidPriceMetrics.With(labels).Set(bidPrice.Float64())
 			}
 
@@ -640,6 +641,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			}
 
 			if i == 0 {
+				s.logger.Infof("maker best ask price %f", askPrice.Float64())
 				makerBestAskPriceMetrics.With(labels).Set(askPrice.Float64())
 			}
 
