@@ -25,8 +25,6 @@ import (
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
 var two = fixedpoint.NewFromInt(2)
 
-var lastPriceModifier = fixedpoint.NewFromFloat(1.001)
-
 const priceUpdateTimeout = 30 * time.Second
 
 const ID = "xmaker"
