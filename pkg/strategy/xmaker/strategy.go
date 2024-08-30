@@ -85,7 +85,9 @@ type Strategy struct {
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
 
-	SignalConfigList []SignalConfig `json:"signals"`
+	EnableSignalMargin bool            `json:"enableSignalMargin"`
+	SignalConfigList   []SignalConfig  `json:"signals"`
+	SignalMarginScale  *bbgo.SlideRule `json:"signalMarginScale,omitempty"`
 
 	Margin        fixedpoint.Value `json:"margin"`
 	BidMargin     fixedpoint.Value `json:"bidMargin"`
@@ -257,6 +259,39 @@ func (s *Strategy) getBollingerTrend(quote *Quote) int {
 	}
 }
 
+func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
+	signal, err := s.calculateSignal(ctx)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Infof("final signal: %f", signal)
+
+	scale, err := s.SignalMarginScale.Scale()
+	if err != nil {
+		return err
+	}
+
+	margin := scale.Call(signal)
+
+	s.logger.Infof("signalMargin: %f", margin)
+
+	marginFp := fixedpoint.NewFromFloat(margin)
+	if signal < 0.0 {
+		quote.BidMargin = quote.BidMargin.Add(marginFp)
+		if signal <= -2.0 {
+			// quote.BidMargin = fixedpoint.Zero
+		}
+	} else if signal > 0.0 {
+		quote.AskMargin = quote.AskMargin.Add(marginFp)
+		if signal >= 2.0 {
+			// quote.AskMargin = fixedpoint.Zero
+		}
+	}
+
+	return nil
+}
+
 // applyBollingerMargin applies the bollinger band margin to the quote
 func (s *Strategy) applyBollingerMargin(
 	quote *Quote,
@@ -323,6 +358,10 @@ func (s *Strategy) calculateSignal(ctx context.Context) (float64, error) {
 				return 0, err
 			}
 
+			if sig == 0.0 {
+				continue
+			}
+
 			if signal.Weight > 0.0 {
 				sum += sig * signal.Weight
 				voters += signal.Weight
@@ -335,6 +374,10 @@ func (s *Strategy) calculateSignal(ctx context.Context) (float64, error) {
 			sig, err := signal.BollingerBandTrendSignal.CalculateSignal(ctx)
 			if err != nil {
 				return 0, err
+			}
+
+			if sig == 0.0 {
+				continue
 			}
 
 			if signal.Weight > 0.0 {
@@ -366,9 +409,8 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		return
 	}
 
-	s.logger.Infof("Final signal: %f", signal)
-
-	finalSignalMetrics.With(s.metricsLabels).Set(signal)
+	s.logger.Infof("aggregated signal: %f", signal)
+	aggregatedSignalMetrics.With(s.metricsLabels).Set(signal)
 
 	if s.CircuitBreaker != nil {
 		now := time.Now()
@@ -571,7 +613,12 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		AskLayerPips: s.Pips,
 	}
 
-	if s.EnableBollBandMargin {
+	if s.EnableSignalMargin {
+		if err := s.applySignalMargin(ctx, quote); err != nil {
+			s.logger.WithError(err).Errorf("unable to apply signal margin")
+		}
+
+	} else if s.EnableBollBandMargin {
 		if err := s.applyBollingerMargin(quote); err != nil {
 			log.WithError(err).Errorf("unable to apply bollinger margin")
 		}
@@ -1245,6 +1292,16 @@ func (s *Strategy) CrossRun(
 
 	s.book = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
 	s.book.BindStream(s.sourceSession.MarketDataStream)
+
+	if s.EnableSignalMargin {
+		scale, err := s.SignalMarginScale.Scale()
+		if err != nil {
+			return err
+		}
+		if solveErr := scale.Solve(); solveErr != nil {
+			return solveErr
+		}
+	}
 
 	for _, signalConfig := range s.SignalConfigList {
 		if signalConfig.OrderBookBestPriceSignal != nil {
