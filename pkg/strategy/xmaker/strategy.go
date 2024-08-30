@@ -31,6 +31,41 @@ const ID = "xmaker"
 
 var log = logrus.WithField("strategy", ID)
 
+type Quote struct {
+	BestBidPrice, BestAskPrice fixedpoint.Value
+
+	BidMargin, AskMargin fixedpoint.Value
+
+	// BidLayerPips is the price pips between each layer
+	BidLayerPips, AskLayerPips fixedpoint.Value
+}
+
+type SessionBinder interface {
+	Bind(ctx context.Context, session *bbgo.ExchangeSession, symbol string) error
+}
+
+type SignalNumber float64
+
+const (
+	SignalNumberMaxLong  = 2.0
+	SignalNumberMaxShort = -2.0
+)
+
+type SignalProvider interface {
+	CalculateSignal(ctx context.Context) (float64, error)
+}
+
+type KLineShapeSignal struct {
+	FullBodyThreshold float64 `json:"fullBodyThreshold"`
+}
+
+type SignalConfig struct {
+	Weight                   float64                         `json:"weight"`
+	BollingerBandTrendSignal *BollingerBandTrendSignal       `json:"bollingerBandTrend,omitempty"`
+	OrderBookBestPriceSignal *OrderBookBestPriceVolumeSignal `json:"orderBookBestPrice,omitempty"`
+	KLineShapeSignal         *KLineShapeSignal               `json:"klineShape,omitempty"`
+}
+
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -49,6 +84,8 @@ type Strategy struct {
 	UpdateInterval      types.Duration `json:"updateInterval"`
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
+
+	SignalConfigList []SignalConfig `json:"signals"`
 
 	Margin        fixedpoint.Value `json:"margin"`
 	BidMargin     fixedpoint.Value `json:"bidMargin"`
@@ -138,6 +175,8 @@ type Strategy struct {
 	circuitBreakerAlertLimiter   *rate.Limiter
 
 	logger logrus.FieldLogger
+
+	metricsLabels prometheus.Labels
 }
 
 func (s *Strategy) ID() string {
@@ -192,16 +231,14 @@ func (s *Strategy) Initialize() error {
 		"strategy":    ID,
 		"strategy_id": s.InstanceID(),
 	})
+
+	s.metricsLabels = prometheus.Labels{
+		"strategy_type": ID,
+		"strategy_id":   s.InstanceID(),
+		"exchange":      s.MakerExchange,
+		"symbol":        s.Symbol,
+	}
 	return nil
-}
-
-type Quote struct {
-	BestBidPrice, BestAskPrice fixedpoint.Value
-
-	BidMargin, AskMargin fixedpoint.Value
-
-	// BidLayerPips is the price pips between each layer
-	BidLayerPips, AskLayerPips fixedpoint.Value
 }
 
 // getBollingerTrend returns -1 when the price is in the downtrend, 1 when the price is in the uptrend, 0 when the price is in the band
@@ -210,12 +247,6 @@ func (s *Strategy) getBollingerTrend(quote *Quote) int {
 	// when ask price is higher than the up band, then it's in the uptrend
 	lastDownBand := fixedpoint.NewFromFloat(s.boll.DownBand.Last(0))
 	lastUpBand := fixedpoint.NewFromFloat(s.boll.UpBand.Last(0))
-
-	s.logger.Infof("bollinger band: up/down = %f/%f, bid/ask = %f/%f",
-		lastUpBand.Float64(),
-		lastDownBand.Float64(),
-		quote.BestBidPrice.Float64(),
-		quote.BestAskPrice.Float64())
 
 	if quote.BestAskPrice.Compare(lastDownBand) < 0 {
 		return -1
@@ -282,6 +313,43 @@ func (s *Strategy) applyBollingerMargin(
 	return nil
 }
 
+func (s *Strategy) calculateSignal(ctx context.Context) (float64, error) {
+	sum := 0.0
+	voters := 0.0
+	for _, signal := range s.SignalConfigList {
+		if signal.OrderBookBestPriceSignal != nil {
+			sig, err := signal.OrderBookBestPriceSignal.CalculateSignal(ctx)
+			if err != nil {
+				return 0, err
+			}
+
+			if signal.Weight > 0.0 {
+				sum += sig * signal.Weight
+				voters += signal.Weight
+			} else {
+				sum += sig
+				voters++
+			}
+
+		} else if signal.BollingerBandTrendSignal != nil {
+			sig, err := signal.BollingerBandTrendSignal.CalculateSignal(ctx)
+			if err != nil {
+				return 0, err
+			}
+
+			if signal.Weight > 0.0 {
+				sum += sig * signal.Weight
+				voters += signal.Weight
+			} else {
+				sum += sig
+				voters++
+			}
+		}
+	}
+
+	return sum / voters, nil
+}
+
 func (s *Strategy) updateQuote(ctx context.Context) {
 	if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 		s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
@@ -292,6 +360,15 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	if s.activeMakerOrders.NumOfOrders() > 0 {
 		return
 	}
+
+	signal, err := s.calculateSignal(ctx)
+	if err != nil {
+		return
+	}
+
+	s.logger.Infof("Final signal: %f", signal)
+
+	finalSignalMetrics.With(s.metricsLabels).Set(signal)
 
 	if s.CircuitBreaker != nil {
 		now := time.Now()
@@ -500,13 +577,6 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		}
 	}
 
-	labels := prometheus.Labels{
-		"strategy_type": ID,
-		"strategy_id":   s.InstanceID(),
-		"exchange":      s.MakerExchange,
-		"symbol":        s.Symbol,
-	}
-
 	bidExposureInUsd := fixedpoint.Zero
 	askExposureInUsd := fixedpoint.Zero
 	bidPrice := quote.BestBidPrice
@@ -520,8 +590,8 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		return
 	}
 
-	bidMarginMetrics.With(labels).Set(quote.BidMargin.Float64())
-	askMarginMetrics.With(labels).Set(quote.AskMargin.Float64())
+	bidMarginMetrics.With(s.metricsLabels).Set(quote.BidMargin.Float64())
+	askMarginMetrics.With(s.metricsLabels).Set(quote.AskMargin.Float64())
 
 	for i := 0; i < s.NumLayers; i++ {
 		// for maker bid orders
@@ -566,7 +636,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 			if i == 0 {
 				s.logger.Infof("maker best bid price %f", bidPrice.Float64())
-				makerBestBidPriceMetrics.With(labels).Set(bidPrice.Float64())
+				makerBestBidPriceMetrics.With(s.metricsLabels).Set(bidPrice.Float64())
 			}
 
 			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
@@ -634,7 +704,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 			if i == 0 {
 				s.logger.Infof("maker best ask price %f", askPrice.Float64())
-				makerBestAskPriceMetrics.With(labels).Set(askPrice.Float64())
+				makerBestAskPriceMetrics.With(s.metricsLabels).Set(askPrice.Float64())
 			}
 
 			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
@@ -687,8 +757,8 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		log.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
 	}
 
-	openOrderBidExposureInUsdMetrics.With(labels).Set(bidExposureInUsd.Float64())
-	openOrderAskExposureInUsdMetrics.With(labels).Set(askExposureInUsd.Float64())
+	openOrderBidExposureInUsdMetrics.With(s.metricsLabels).Set(bidExposureInUsd.Float64())
+	openOrderAskExposureInUsdMetrics.With(s.metricsLabels).Set(askExposureInUsd.Float64())
 
 	_ = errIdx
 	_ = createdOrders
@@ -1039,7 +1109,6 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 func (s *Strategy) CrossRun(
 	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
-
 	instanceID := s.InstanceID()
 
 	// configure sessions
@@ -1125,6 +1194,14 @@ func (s *Strategy) CrossRun(
 		})
 	}
 
+	s.sourceSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
+		s.priceSolver.Update(k.Symbol, k.Close)
+		feeToken := s.sourceSession.Exchange.PlatformFeeCurrency()
+		if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, "USDT"); ok {
+			s.Position.SetFeeAverageCost(feeToken, feePrice)
+		}
+	}))
+
 	if s.ProfitFixerConfig != nil {
 		bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
 
@@ -1168,6 +1245,25 @@ func (s *Strategy) CrossRun(
 
 	s.book = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
 	s.book.BindStream(s.sourceSession.MarketDataStream)
+
+	for _, signalConfig := range s.SignalConfigList {
+		var sigAny any
+		switch {
+		case signalConfig.OrderBookBestPriceSignal != nil:
+			sig := signalConfig.OrderBookBestPriceSignal
+			sig.book = s.book
+			sigAny = sig
+
+		case signalConfig.BollingerBandTrendSignal != nil:
+
+		}
+
+		if sigAny != nil {
+			if binder, ok := sigAny.(SessionBinder); ok {
+				binder.Bind(ctx, s.sourceSession, s.Symbol)
+			}
+		}
+	}
 
 	s.activeMakerOrders = bbgo.NewActiveOrderBook(s.Symbol)
 	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
