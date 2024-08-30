@@ -267,6 +267,10 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 
 	s.logger.Infof("aggregated signal: %f", signal)
 
+	if signal == 0.0 {
+		return nil
+	}
+
 	scale, err := s.SignalMarginScale.Scale()
 	if err != nil {
 		return err
