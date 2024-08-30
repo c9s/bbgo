@@ -265,7 +265,7 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		return err
 	}
 
-	s.logger.Infof("final signal: %f", signal)
+	s.logger.Infof("aggregated signal: %f", signal)
 
 	scale, err := s.SignalMarginScale.Scale()
 	if err != nil {
@@ -274,7 +274,7 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 
 	margin := scale.Call(signal)
 
-	s.logger.Infof("signalMargin: %f", margin)
+	s.logger.Infof("signal margin: %f", margin)
 
 	marginFp := fixedpoint.NewFromFloat(margin)
 	if signal < 0.0 {
@@ -282,11 +282,15 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		if signal <= -2.0 {
 			// quote.BidMargin = fixedpoint.Zero
 		}
+
+		s.logger.Infof("adjusted bid margin: %f", quote.BidMargin.Float64())
 	} else if signal > 0.0 {
 		quote.AskMargin = quote.AskMargin.Add(marginFp)
 		if signal >= 2.0 {
 			// quote.AskMargin = fixedpoint.Zero
 		}
+
+		s.logger.Infof("adjusted ask margin: %f", quote.AskMargin.Float64())
 	}
 
 	return nil
