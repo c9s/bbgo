@@ -38,6 +38,12 @@ var askMarginMetrics = prometheus.NewGaugeVec(
 		Help: "the current ask margin (dynamic)",
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
+var aggregatedSignalMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_aggregated_signal",
+		Help: "",
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+
 var configNumOfLayersMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "xmaker_config_num_of_layers",
@@ -70,6 +76,7 @@ func init() {
 		makerBestAskPriceMetrics,
 		bidMarginMetrics,
 		askMarginMetrics,
+		aggregatedSignalMetrics,
 		configNumOfLayersMetrics,
 		configMaxExposureMetrics,
 		configBidMarginMetrics,
