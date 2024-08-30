@@ -63,15 +63,14 @@ func (s *BollingerBandTrendSignal) CalculateSignal(ctx context.Context) (float64
 	lastDownBand := fixedpoint.NewFromFloat(s.indicator.DownBand.Last(0))
 	lastUpBand := fixedpoint.NewFromFloat(s.indicator.UpBand.Last(0))
 
-	// if the price is inside the band, do not vote
-	if closePrice.Compare(lastDownBand) > 0 && closePrice.Compare(lastUpBand) < 0 {
-		return 0.0, nil
-	}
-
 	maxBandWidth := s.indicator.StdDev.Last(0) * s.MaxBandWidth
 
 	signal := 0.0
-	if closePrice.Compare(lastDownBand) < 0 {
+
+	// if the price is inside the band, do not vote
+	if closePrice.Compare(lastDownBand) > 0 && closePrice.Compare(lastUpBand) < 0 {
+		signal = 0.0
+	} else if closePrice.Compare(lastDownBand) < 0 {
 		signal = lastDownBand.Sub(closePrice).Float64() / maxBandWidth * -2.0
 	} else if closePrice.Compare(lastUpBand) > 0 {
 		signal = closePrice.Sub(lastUpBand).Float64() / maxBandWidth * 2.0
@@ -82,5 +81,7 @@ func (s *BollingerBandTrendSignal) CalculateSignal(ctx context.Context) (float64
 		lastUpBand.Float64(),
 		lastDownBand.Float64(),
 		closePrice.Float64())
+
+	bollingerBandSignalMetrics.WithLabelValues(s.symbol).Set(signal)
 	return signal, nil
 }

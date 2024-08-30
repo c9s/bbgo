@@ -45,17 +45,15 @@ func (s *OrderBookBestPriceVolumeSignal) CalculateSignal(ctx context.Context) (f
 		return 0.0, nil
 	}
 
-	if bid.Volume.Compare(s.MinVolume) < 0 && ask.Volume.Compare(s.MinVolume) < 0 {
-		return 0.0, nil
-	}
-
 	// TODO: may use scale to define this
 	sumVol := bid.Volume.Add(ask.Volume)
 	bidRatio := bid.Volume.Div(sumVol)
 	askRatio := ask.Volume.Div(sumVol)
 	denominator := fixedpoint.One.Sub(s.RatioThreshold)
 	signal := 0.0
-	if bidRatio.Compare(s.RatioThreshold) >= 0 {
+	if bid.Volume.Compare(s.MinVolume) < 0 && ask.Volume.Compare(s.MinVolume) < 0 {
+		signal = 0.0
+	} else if bidRatio.Compare(s.RatioThreshold) >= 0 {
 		numerator := bidRatio.Sub(s.RatioThreshold)
 		signal = numerator.Div(denominator).Float64()
 	} else if askRatio.Compare(s.RatioThreshold) >= 0 {
