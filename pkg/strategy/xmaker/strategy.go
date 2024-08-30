@@ -1247,20 +1247,14 @@ func (s *Strategy) CrossRun(
 	s.book.BindStream(s.sourceSession.MarketDataStream)
 
 	for _, signalConfig := range s.SignalConfigList {
-		var sigAny any
-		switch {
-		case signalConfig.OrderBookBestPriceSignal != nil:
-			sig := signalConfig.OrderBookBestPriceSignal
-			sig.book = s.book
-			sigAny = sig
-
-		case signalConfig.BollingerBandTrendSignal != nil:
-
-		}
-
-		if sigAny != nil {
-			if binder, ok := sigAny.(SessionBinder); ok {
-				binder.Bind(ctx, s.sourceSession, s.Symbol)
+		if signalConfig.OrderBookBestPriceSignal != nil {
+			signalConfig.OrderBookBestPriceSignal.book = s.book
+			if err := signalConfig.OrderBookBestPriceSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
+				return err
+			}
+		} else if signalConfig.BollingerBandTrendSignal != nil {
+			if err := signalConfig.BollingerBandTrendSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
+				return err
 			}
 		}
 	}
