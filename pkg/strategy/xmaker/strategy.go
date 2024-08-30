@@ -276,7 +276,7 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		return err
 	}
 
-	margin := scale.Call(signal)
+	margin := scale.Call(math.Abs(signal))
 
 	s.logger.Infof("signal margin: %f", margin)
 
