@@ -533,13 +533,13 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				s.logger.Infof("hedge account net value in usd: %f", netValueInUsd.Float64())
 
 				maximumHedgeAccountLeverage := fixedpoint.NewFromFloat(1.2)
-				netValueInUsd = netValueInUsd.Mul(maximumHedgeAccountLeverage)
+				maximumValueInUsd := netValueInUsd.Mul(maximumHedgeAccountLeverage)
 
-				s.logger.Infof("hedge account maximum leveraged value in usd: %f", netValueInUsd.Float64())
+				s.logger.Infof("hedge account maximum leveraged value in usd: %f", maximumValueInUsd.Float64())
 
 				if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
 					debt := quote.Debt()
-					quota := netValueInUsd.Sub(debt)
+					quota := maximumValueInUsd.Sub(debt)
 
 					s.logger.Infof("hedge account quote balance: %s, debt: %s, quota: %s",
 						quote.String(),
@@ -551,7 +551,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 				if base, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
 					debt := base.Debt()
-					quota := netValueInUsd.Div(bestAsk.Price).Sub(debt)
+					quota := maximumValueInUsd.Div(bestAsk.Price).Sub(debt)
 
 					s.logger.Infof("hedge account base balance: %s, debt: %s, quota: %s",
 						base.String(),
