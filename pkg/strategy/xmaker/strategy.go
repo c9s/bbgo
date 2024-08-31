@@ -532,6 +532,11 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				// calculate credit buffer
 				s.logger.Infof("hedge account net value in usd: %f", netValueInUsd.Float64())
 
+				maximumHedgeAccountLeverage := fixedpoint.NewFromFloat(1.2)
+				netValueInUsd = netValueInUsd.Mul(maximumHedgeAccountLeverage)
+
+				s.logger.Infof("hedge account maximum leveraged value in usd: %f", netValueInUsd.Float64())
+
 				if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
 					debt := quote.Debt()
 					quota := netValueInUsd.Sub(debt)
