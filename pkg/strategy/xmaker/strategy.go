@@ -1300,9 +1300,8 @@ func (s *Strategy) CrossRun(
 			return errors.New("tradesSince time can not be zero")
 		}
 
-		makerMarket, _ := makerSession.Market(s.Symbol)
-		position := types.NewPositionFromMarket(makerMarket)
-		profitStats := types.NewProfitStats(makerMarket)
+		position := types.NewPositionFromMarket(s.makerMarket)
+		profitStats := types.NewProfitStats(s.makerMarket)
 
 		fixer := common.NewProfitFixer()
 		// fixer.ConverterManager = s.ConverterManager
@@ -1317,7 +1316,7 @@ func (s *Strategy) CrossRun(
 			fixer.AddExchange(sourceSession.Name, ss)
 		}
 
-		if err2 := fixer.Fix(ctx, makerMarket.Symbol,
+		if err2 := fixer.Fix(ctx, s.makerMarket.Symbol,
 			s.ProfitFixerConfig.TradesSince.Time(),
 			time.Now(),
 			profitStats,
