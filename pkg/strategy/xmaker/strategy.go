@@ -481,6 +481,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			makerQuota.BaseAsset.Add(b.Available)
 		} else {
 			disableMakerAsk = true
+			s.logger.Infof("%s maker ask disabled: insufficient base balance %s", s.Symbol, b.String())
 		}
 	}
 
@@ -489,6 +490,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			makerQuota.QuoteAsset.Add(b.Available)
 		} else {
 			disableMakerBid = true
+			s.logger.Infof("%s maker bid disabled: insufficient quote balance %s", s.Symbol, b.String())
 		}
 	}
 
@@ -572,13 +574,13 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				if b.Available.Compare(minAvailable) > 0 {
 					hedgeQuota.BaseAsset.Add(b.Available.Sub(minAvailable))
 				} else {
-					s.logger.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
+					s.logger.Warnf("%s maker bid disabled: insufficient hedge base balance %s", s.Symbol, b.String())
 					disableMakerBid = true
 				}
 			} else if b.Available.Compare(s.sourceMarket.MinQuantity) > 0 {
 				hedgeQuota.BaseAsset.Add(b.Available)
 			} else {
-				s.logger.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
+				s.logger.Warnf("%s maker bid disabled: insufficient hedge base balance %s", s.Symbol, b.String())
 				disableMakerBid = true
 			}
 		}
@@ -591,17 +593,16 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				if b.Available.Compare(minAvailable) > 0 {
 					hedgeQuota.QuoteAsset.Add(b.Available.Sub(minAvailable))
 				} else {
-					s.logger.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
+					s.logger.Warnf("%s maker ask disabled: insufficient hedge quote balance %s", s.Symbol, b.String())
 					disableMakerAsk = true
 				}
 			} else if b.Available.Compare(s.sourceMarket.MinNotional) > 0 {
 				hedgeQuota.QuoteAsset.Add(b.Available)
 			} else {
-				s.logger.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
+				s.logger.Warnf("%s maker ask disabled: insufficient hedge quote balance %s", s.Symbol, b.String())
 				disableMakerAsk = true
 			}
 		}
-
 	}
 
 	// if max exposure position is configured, we should not:
