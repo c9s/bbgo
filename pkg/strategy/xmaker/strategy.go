@@ -119,6 +119,8 @@ type Strategy struct {
 	// MaxExposurePosition defines the unhedged quantity of stop
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
+	MaxHedgeAccountLeverage fixedpoint.Value `json:"maxHedgeAccountLeverage"`
+
 	DisableHedge bool `json:"disableHedge"`
 
 	NotifyTrade bool `json:"notifyTrade"`
@@ -532,10 +534,9 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				// calculate credit buffer
 				s.logger.Infof("hedge account net value in usd: %f", netValueInUsd.Float64())
 
-				maximumHedgeAccountLeverage := fixedpoint.NewFromFloat(1.2)
-				maximumValueInUsd := netValueInUsd.Mul(maximumHedgeAccountLeverage)
+				maximumValueInUsd := netValueInUsd.Mul(s.MaxHedgeAccountLeverage)
 
-				s.logger.Infof("hedge account maximum leveraged value in usd: %f", maximumValueInUsd.Float64())
+				s.logger.Infof("hedge account maximum leveraged value in usd: %f (%f x)", maximumValueInUsd.Float64(), s.MaxHedgeAccountLeverage.Float64())
 
 				if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
 					debt := quote.Debt()
@@ -562,7 +563,6 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				}
 			}
 		}
-
 	} else {
 		if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 			// to make bid orders, we need enough base asset in the foreign exchange,
@@ -1035,6 +1035,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.MinMarginLevel.IsZero() {
 		s.MinMarginLevel = fixedpoint.NewFromFloat(3.0)
+	}
+
+	if s.MaxHedgeAccountLeverage.IsZero() {
+		s.MaxHedgeAccountLeverage = fixedpoint.NewFromFloat(1.2)
 	}
 
 	if s.BidMargin.IsZero() {
