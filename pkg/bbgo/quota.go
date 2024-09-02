@@ -51,6 +51,13 @@ func (q *Quota) Rollback() {
 	q.mu.Unlock()
 }
 
+func (q *Quota) String() string {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	return q.Locked.String() + "/" + q.Available.String()
+}
+
 // QuotaTransaction is a transactional quota manager
 type QuotaTransaction struct {
 	mu         sync.Mutex
