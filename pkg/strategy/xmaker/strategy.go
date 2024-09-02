@@ -475,7 +475,10 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	// check maker's balance quota
 	// we load the balances from the account while we're generating the orders,
 	// the balance may have a chance to be deducted by other strategies or manual orders submitted by the user
-	makerBalances := s.makerSession.GetAccount().Balances()
+	makerBalances := s.makerSession.GetAccount().Balances().NotZero()
+
+	s.logger.Infof("maker balances: %+v", makerBalances)
+
 	makerQuota := &bbgo.QuotaTransaction{}
 	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
 		if s.makerMarket.IsDustQuantity(b.Available, s.lastPrice) {
@@ -484,6 +487,9 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		} else {
 			makerQuota.BaseAsset.Add(b.Available)
 		}
+	} else {
+		disableMakerAsk = true
+		s.logger.Infof("%s maker ask disabled: base balance %s not found", s.Symbol, b.String())
 	}
 
 	if b, ok := makerBalances[s.makerMarket.QuoteCurrency]; ok {
@@ -493,6 +499,9 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			disableMakerBid = true
 			s.logger.Infof("%s maker bid disabled: insufficient quote balance %s", s.Symbol, b.String())
 		}
+	} else {
+		disableMakerBid = true
+		s.logger.Infof("%s maker bid disabled: quote balance %s not found", s.Symbol, b.String())
 	}
 
 	// if
