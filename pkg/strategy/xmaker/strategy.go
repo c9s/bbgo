@@ -504,6 +504,8 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		s.logger.Infof("%s maker bid disabled: quote balance %s not found", s.Symbol, b.String())
 	}
 
+	s.logger.Infof("maker quota: %+v", makerQuota)
+
 	// if
 	//  1) the source session is a margin session
 	//  2) the min margin level is configured
