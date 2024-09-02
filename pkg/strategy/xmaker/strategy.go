@@ -119,6 +119,8 @@ type Strategy struct {
 	// MaxExposurePosition defines the unhedged quantity of stop
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
+	MaxHedgeAccountLeverage fixedpoint.Value `json:"maxHedgeAccountLeverage"`
+
 	DisableHedge bool `json:"disableHedge"`
 
 	NotifyTrade bool `json:"notifyTrade"`
@@ -479,6 +481,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			makerQuota.BaseAsset.Add(b.Available)
 		} else {
 			disableMakerAsk = true
+			s.logger.Infof("%s maker ask disabled: insufficient base balance %s", s.Symbol, b.String())
 		}
 	}
 
@@ -487,6 +490,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 			makerQuota.QuoteAsset.Add(b.Available)
 		} else {
 			disableMakerBid = true
+			s.logger.Infof("%s maker bid disabled: insufficient quote balance %s", s.Symbol, b.String())
 		}
 	}
 
@@ -503,6 +507,10 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		!hedgeAccount.MarginLevel.IsZero() {
 
 		if hedgeAccount.MarginLevel.Compare(s.MinMarginLevel) < 0 {
+			s.logger.Infof("hedge account margin level %s is less then the min margin level %s, calculating the borrowed positions",
+				hedgeAccount.MarginLevel.String(),
+				s.MinMarginLevel.String())
+
 			if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
 				quoteDebt := quote.Debt()
 				if quoteDebt.Sign() > 0 {
@@ -517,24 +525,46 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				}
 			}
 		} else {
-			// credit buffer
-			creditBufferRatio := fixedpoint.NewFromFloat(1.2)
-			if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
-				netQuote := quote.Net()
-				if netQuote.Sign() > 0 {
-					hedgeQuota.QuoteAsset.Add(netQuote.Mul(creditBufferRatio))
-				}
-			}
+			s.logger.Infof("hedge account margin level %s is greater than the min margin level %s, calculating the net value",
+				hedgeAccount.MarginLevel.String(),
+				s.MinMarginLevel.String())
 
-			if base, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
-				netBase := base.Net()
-				if netBase.Sign() > 0 {
-					hedgeQuota.BaseAsset.Add(netBase.Mul(creditBufferRatio))
+			netValueInUsd, calcErr := s.accountValueCalculator.NetValue(ctx)
+			if calcErr != nil {
+				s.logger.WithError(calcErr).Errorf("unable to calculate the net value")
+			} else {
+				// calculate credit buffer
+				s.logger.Infof("hedge account net value in usd: %f", netValueInUsd.Float64())
+
+				maximumValueInUsd := netValueInUsd.Mul(s.MaxHedgeAccountLeverage)
+
+				s.logger.Infof("hedge account maximum leveraged value in usd: %f (%f x)", maximumValueInUsd.Float64(), s.MaxHedgeAccountLeverage.Float64())
+
+				if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
+					debt := quote.Debt()
+					quota := maximumValueInUsd.Sub(debt)
+
+					s.logger.Infof("hedge account quote balance: %s, debt: %s, quota: %s",
+						quote.String(),
+						debt.String(),
+						quota.String())
+
+					hedgeQuota.QuoteAsset.Add(quota)
+				}
+
+				if base, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
+					debt := base.Debt()
+					quota := maximumValueInUsd.Div(bestAsk.Price).Sub(debt)
+
+					s.logger.Infof("hedge account base balance: %s, debt: %s, quota: %s",
+						base.String(),
+						debt.String(),
+						quota.String())
+
+					hedgeQuota.BaseAsset.Add(quota)
 				}
 			}
-			// netValueInUsd, err := s.accountValueCalculator.NetValue(ctx)
 		}
-
 	} else {
 		if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 			// to make bid orders, we need enough base asset in the foreign exchange,
@@ -544,13 +574,13 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				if b.Available.Compare(minAvailable) > 0 {
 					hedgeQuota.BaseAsset.Add(b.Available.Sub(minAvailable))
 				} else {
-					s.logger.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
+					s.logger.Warnf("%s maker bid disabled: insufficient hedge base balance %s", s.Symbol, b.String())
 					disableMakerBid = true
 				}
 			} else if b.Available.Compare(s.sourceMarket.MinQuantity) > 0 {
 				hedgeQuota.BaseAsset.Add(b.Available)
 			} else {
-				s.logger.Warnf("%s maker bid disabled: insufficient base balance %s", s.Symbol, b.String())
+				s.logger.Warnf("%s maker bid disabled: insufficient hedge base balance %s", s.Symbol, b.String())
 				disableMakerBid = true
 			}
 		}
@@ -563,17 +593,16 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				if b.Available.Compare(minAvailable) > 0 {
 					hedgeQuota.QuoteAsset.Add(b.Available.Sub(minAvailable))
 				} else {
-					s.logger.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
+					s.logger.Warnf("%s maker ask disabled: insufficient hedge quote balance %s", s.Symbol, b.String())
 					disableMakerAsk = true
 				}
 			} else if b.Available.Compare(s.sourceMarket.MinNotional) > 0 {
 				hedgeQuota.QuoteAsset.Add(b.Available)
 			} else {
-				s.logger.Warnf("%s maker ask disabled: insufficient quote balance %s", s.Symbol, b.String())
+				s.logger.Warnf("%s maker ask disabled: insufficient hedge quote balance %s", s.Symbol, b.String())
 				disableMakerAsk = true
 			}
 		}
-
 	}
 
 	// if max exposure position is configured, we should not:
@@ -1009,6 +1038,10 @@ func (s *Strategy) Defaults() error {
 		s.MinMarginLevel = fixedpoint.NewFromFloat(3.0)
 	}
 
+	if s.MaxHedgeAccountLeverage.IsZero() {
+		s.MaxHedgeAccountLeverage = fixedpoint.NewFromFloat(1.2)
+	}
+
 	if s.BidMargin.IsZero() {
 		if !s.Margin.IsZero() {
 			s.BidMargin = s.Margin
@@ -1267,9 +1300,8 @@ func (s *Strategy) CrossRun(
 			return errors.New("tradesSince time can not be zero")
 		}
 
-		makerMarket, _ := makerSession.Market(s.Symbol)
-		position := types.NewPositionFromMarket(makerMarket)
-		profitStats := types.NewProfitStats(makerMarket)
+		position := types.NewPositionFromMarket(s.makerMarket)
+		profitStats := types.NewProfitStats(s.makerMarket)
 
 		fixer := common.NewProfitFixer()
 		// fixer.ConverterManager = s.ConverterManager
@@ -1284,7 +1316,7 @@ func (s *Strategy) CrossRun(
 			fixer.AddExchange(sourceSession.Name, ss)
 		}
 
-		if err2 := fixer.Fix(ctx, makerMarket.Symbol,
+		if err2 := fixer.Fix(ctx, s.makerMarket.Symbol,
 			s.ProfitFixerConfig.TradesSince.Time(),
 			time.Now(),
 			profitStats,
