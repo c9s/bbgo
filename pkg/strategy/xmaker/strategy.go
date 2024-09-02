@@ -624,12 +624,14 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	if s.MaxExposurePosition.Sign() > 0 {
 		pos := s.Position.GetBase()
 
-		if pos.Compare(s.MaxExposurePosition.Neg()) > 0 {
+		if pos.Compare(s.MaxExposurePosition.Neg()) <= 0 {
 			// stop sell if we over-sell
 			disableMakerAsk = true
-		} else if pos.Compare(s.MaxExposurePosition) > 0 {
+			s.logger.Warnf("%s ask maker is disabled: %f exceeded max exposure %f", s.Symbol, pos.Float64(), s.MaxExposurePosition.Float64())
+		} else if pos.Compare(s.MaxExposurePosition) >= 0 {
 			// stop buy if we over buy
 			disableMakerBid = true
+			s.logger.Warnf("%s bid maker is disabled: %f exceeded max exposure %f", s.Symbol, pos.Float64(), s.MaxExposurePosition.Float64())
 		}
 	}
 
