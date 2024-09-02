@@ -426,10 +426,10 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	if s.CircuitBreaker != nil {
 		now := time.Now()
 		if reason, halted := s.CircuitBreaker.IsHalted(now); halted {
-			s.logger.Warnf("[arbWorker] strategy is halted, reason: %s", reason)
+			s.logger.Warnf("strategy %s is halted, reason: %s", ID, reason)
 
 			if s.circuitBreakerAlertLimiter.AllowN(now, 1) {
-				bbgo.Notify("Strategy is halted, reason: %s", reason)
+				bbgo.Notify("Strategy %s is halted, reason: %s", ID, reason)
 			}
 
 			return
@@ -438,6 +438,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	bestBid, bestAsk, hasPrice := s.book.BestBidAndAsk()
 	if !hasPrice {
+		s.logger.Warnf("no valid price, skip quoting")
 		return
 	}
 
@@ -477,11 +478,11 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	makerBalances := s.makerSession.GetAccount().Balances()
 	makerQuota := &bbgo.QuotaTransaction{}
 	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
-		if b.Available.Compare(s.makerMarket.MinQuantity) > 0 {
-			makerQuota.BaseAsset.Add(b.Available)
-		} else {
+		if s.makerMarket.IsDustQuantity(b.Available, s.lastPrice) {
 			disableMakerAsk = true
 			s.logger.Infof("%s maker ask disabled: insufficient base balance %s", s.Symbol, b.String())
+		} else {
+			makerQuota.BaseAsset.Add(b.Available)
 		}
 	}
 
@@ -511,6 +512,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				hedgeAccount.MarginLevel.String(),
 				s.MinMarginLevel.String())
 
+			// TODO: should consider base asset debt as well.
 			if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
 				quoteDebt := quote.Debt()
 				if quoteDebt.Sign() > 0 {
@@ -840,6 +842,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, s.makerSession.Exchange, orderCreateCallback, formattedOrders...)
 	if err != nil {
 		log.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
+		return
 	}
 
 	openOrderBidExposureInUsdMetrics.With(s.metricsLabels).Set(bidExposureInUsd.Float64())
@@ -1240,7 +1243,7 @@ func (s *Strategy) CrossRun(
 
 	// restore state
 	s.groupID = util.FNV32(instanceID)
-	log.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
+	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
 	configLabels := prometheus.Labels{"strategy_id": s.InstanceID(), "strategy_type": ID, "symbol": s.Symbol}
 	configNumOfLayersMetrics.With(configLabels).Set(float64(s.NumLayers))
