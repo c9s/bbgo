@@ -656,6 +656,12 @@ func (p *Position) AddTrade(td Trade) (profit fixedpoint.Value, netProfit fixedp
 	return fixedpoint.Zero, fixedpoint.Zero, false
 }
 
+func (p *Position) UpdateMetrics() {
+	p.Lock()
+	p.updateMetrics()
+	p.Unlock()
+}
+
 func (p *Position) updateMetrics() {
 	// update the position metrics only if the position defines the strategy ID
 	if p.StrategyInstanceID == "" || p.Strategy == "" {
