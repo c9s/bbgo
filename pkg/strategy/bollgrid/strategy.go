@@ -77,7 +77,7 @@ type Strategy struct {
 	// boll is the BOLLINGER indicator we used for predicting the price.
 	boll *indicator.BOLL
 
-	CancelProfitOrdersOnShutdown bool `json: "shutdownCancelProfitOrders"`
+	CancelProfitOrdersOnShutdown bool `json:"shutdownCancelProfitOrders"`
 }
 
 func (s *Strategy) ID() string {
