@@ -65,6 +65,7 @@ type SignalConfig struct {
 	BollingerBandTrendSignal *BollingerBandTrendSignal       `json:"bollingerBandTrend,omitempty"`
 	OrderBookBestPriceSignal *OrderBookBestPriceVolumeSignal `json:"orderBookBestPrice,omitempty"`
 	KLineShapeSignal         *KLineShapeSignal               `json:"klineShape,omitempty"`
+	TradeVolumeWindowSignal  *TradeVolumeWindowSignal        `json:"tradeVolumeWindow,omitempty"`
 }
 
 func init() {
@@ -205,7 +206,14 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	if !ok {
 		panic(fmt.Errorf("maker session %s is not defined", s.MakerExchange))
 	}
+
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+
+	for _, sig := range s.SignalConfigList {
+		if sig.TradeVolumeWindowSignal != nil {
+			sourceSession.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+		}
+	}
 }
 
 func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Value) (price fixedpoint.Value) {
@@ -363,42 +371,33 @@ func (s *Strategy) calculateSignal(ctx context.Context) (float64, error) {
 	sum := 0.0
 	voters := 0.0
 	for _, signal := range s.SignalConfigList {
+		var sig float64
+		var err error
 		if signal.OrderBookBestPriceSignal != nil {
-			sig, err := signal.OrderBookBestPriceSignal.CalculateSignal(ctx)
-			if err != nil {
-				return 0, err
-			}
-
-			if sig == 0.0 {
-				continue
-			}
-
-			if signal.Weight > 0.0 {
-				sum += sig * signal.Weight
-				voters += signal.Weight
-			} else {
-				sum += sig
-				voters++
-			}
-
+			sig, err = signal.OrderBookBestPriceSignal.CalculateSignal(ctx)
 		} else if signal.BollingerBandTrendSignal != nil {
-			sig, err := signal.BollingerBandTrendSignal.CalculateSignal(ctx)
-			if err != nil {
-				return 0, err
-			}
-
-			if sig == 0.0 {
-				continue
-			}
-
-			if signal.Weight > 0.0 {
-				sum += sig * signal.Weight
-				voters += signal.Weight
-			} else {
-				sum += sig
-				voters++
-			}
+			sig, err = signal.BollingerBandTrendSignal.CalculateSignal(ctx)
+		} else if signal.TradeVolumeWindowSignal != nil {
+			sig, err = signal.TradeVolumeWindowSignal.CalculateSignal(ctx)
 		}
+
+		if err != nil {
+			return 0, err
+		} else if sig == 0.0 {
+			continue
+		}
+
+		if signal.Weight > 0.0 {
+			sum += sig * signal.Weight
+			voters += signal.Weight
+		} else {
+			sum += sig
+			voters++
+		}
+	}
+
+	if sum == 0.0 {
+		return 0.0, nil
 	}
 
 	return sum / voters, nil
@@ -1372,6 +1371,10 @@ func (s *Strategy) CrossRun(
 			}
 		} else if signalConfig.BollingerBandTrendSignal != nil {
 			if err := signalConfig.BollingerBandTrendSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
+				return err
+			}
+		} else if signalConfig.TradeVolumeWindowSignal != nil {
+			if err := signalConfig.TradeVolumeWindowSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
 				return err
 			}
 		}
