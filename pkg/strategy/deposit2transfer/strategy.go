@@ -236,7 +236,7 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 						s.watchingDeposits[deposit.TransactionID] = deposit
 					}
 				} else {
-					// ignore all initial deposit history that are already success
+					// ignore all initial deposits that are already in success status
 					logger.Infof("ignored succeess deposit: %s %+v", deposit.TransactionID, deposit)
 				}
 
