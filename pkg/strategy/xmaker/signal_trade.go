@@ -75,7 +75,7 @@ func (s *TradeVolumeWindowSignal) filterTrades(now time.Time) []types.Trade {
 	return trades
 }
 
-func (s *TradeVolumeWindowSignal) calculateTradeVolume(trades []types.Trade) (buyVolume, sellVolume float64) {
+func (s *TradeVolumeWindowSignal) aggTradeVolume(trades []types.Trade) (buyVolume, sellVolume float64) {
 	for _, td := range trades {
 		if td.IsBuyer {
 			buyVolume += td.Quantity.Float64()
@@ -87,10 +87,10 @@ func (s *TradeVolumeWindowSignal) calculateTradeVolume(trades []types.Trade) (bu
 	return buyVolume, sellVolume
 }
 
-func (s *TradeVolumeWindowSignal) CalculateSignal(ctx context.Context) (float64, error) {
+func (s *TradeVolumeWindowSignal) CalculateSignal(_ context.Context) (float64, error) {
 	now := time.Now()
 	trades := s.filterTrades(now)
-	buyVolume, sellVolume := s.calculateTradeVolume(trades)
+	buyVolume, sellVolume := s.aggTradeVolume(trades)
 	totalVolume := buyVolume + sellVolume
 
 	threshold := s.Threshold.Float64()
