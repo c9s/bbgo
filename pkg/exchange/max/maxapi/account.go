@@ -119,6 +119,7 @@ const (
 
 	// v3 states
 	DepositStateProcessing DepositState = "processing"
+	DepositStateFailed     DepositState = "failed"
 	DepositStateDone       DepositState = "done"
 )
 
