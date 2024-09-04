@@ -295,7 +295,7 @@ func toGlobalDepositStatus(a max.DepositState) types.DepositStatus {
 
 	// other states goes to this
 	// max.DepositStateSuspect, max.DepositStateSuspended
-	log.Warnf("unsupported deposit state %q from max exchange", a)
+	log.Errorf("unsupported deposit state %q from max exchange", a)
 	return types.DepositStatus(a)
 }
 
