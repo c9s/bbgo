@@ -1373,6 +1373,10 @@ func (s *Strategy) CrossRun(
 			if err := signalConfig.BollingerBandTrendSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
 				return err
 			}
+		} else if signalConfig.TradeVolumeWindowSignal != nil {
+			if err := signalConfig.TradeVolumeWindowSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
+				return err
+			}
 		}
 	}
 

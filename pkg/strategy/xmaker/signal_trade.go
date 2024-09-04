@@ -2,6 +2,7 @@ package xmaker
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,10 +28,14 @@ type TradeVolumeWindowSignal struct {
 
 	trades []types.Trade
 	symbol string
+
+	mu sync.Mutex
 }
 
 func (s *TradeVolumeWindowSignal) handleTrade(trade types.Trade) {
+	s.mu.Lock()
 	s.trades = append(s.trades, trade)
+	s.mu.Unlock()
 }
 
 func (s *TradeVolumeWindowSignal) Bind(ctx context.Context, session *bbgo.ExchangeSession, symbol string) error {
@@ -52,6 +57,9 @@ func (s *TradeVolumeWindowSignal) filterTrades(now time.Time) []types.Trade {
 	startTime := now.Add(-time.Duration(s.Window))
 	startIdx := 0
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for idx, td := range s.trades {
 		// skip trades before the start time
 		if td.Time.Before(startTime) {
@@ -62,8 +70,9 @@ func (s *TradeVolumeWindowSignal) filterTrades(now time.Time) []types.Trade {
 		break
 	}
 
-	s.trades = s.trades[startIdx:]
-	return s.trades
+	trades := s.trades[startIdx:]
+	s.trades = trades
+	return trades
 }
 
 func (s *TradeVolumeWindowSignal) calculateTradeVolume(trades []types.Trade) (buyVolume, sellVolume float64) {
@@ -95,7 +104,7 @@ func (s *TradeVolumeWindowSignal) CalculateSignal(ctx context.Context) (float64,
 		sig = -(sellRatio - threshold) / 2.0
 	}
 
-	log.Infof("[TradeVolumeWindowSignal] sig: %f buy/sell = %f/%f", sig, buyVolume, sellVolume)
+	log.Infof("[TradeVolumeWindowSignal] %f buy/sell = %f/%f", sig, buyVolume, sellVolume)
 
 	tradeVolumeWindowSignalMetrics.WithLabelValues(s.symbol).Set(sig)
 	return sig, nil
