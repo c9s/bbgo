@@ -13,6 +13,13 @@ type PriceVolume struct {
 	Price, Volume fixedpoint.Value
 }
 
+func NewPriceVolume(p, v fixedpoint.Value) PriceVolume {
+	return PriceVolume{
+		Price:  p,
+		Volume: v,
+	}
+}
+
 func (p PriceVolume) InQuote() fixedpoint.Value {
 	return p.Price.Mul(p.Volume)
 }
