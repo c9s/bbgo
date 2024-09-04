@@ -262,6 +262,9 @@ func toGlobalDepositStatus(a max.DepositState) types.DepositStatus {
 	case max.DepositStateAccepted:
 		return types.DepositSuccess
 
+	case max.DepositStateFailed: // v3 state
+		return types.DepositRejected
+
 	case max.DepositStateProcessing: // v3 states
 		return types.DepositPending
 
