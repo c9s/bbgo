@@ -16,8 +16,18 @@ import (
 )
 
 // Strategy method calls:
-// -> Initialize()   (optional method)
 // -> Defaults()     (optional method)
+//
+//	setup default static values from constants
+//
+// -> Initialize()   (optional method)
+//
+//	initialize dynamic runtime objects
+//
+// -> Subscribe()
+//
+//	register the subscriptions
+//
 // -> Validate()     (optional method)
 // -> Run()          (optional method)
 // -> Shutdown(shutdownCtx context.Context, wg *sync.WaitGroup)
@@ -171,12 +181,6 @@ func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
 func (trader *Trader) RunSingleExchangeStrategy(
 	ctx context.Context, strategy SingleExchangeStrategy, session *ExchangeSession, orderExecutor OrderExecutor,
 ) error {
-	if v, ok := strategy.(StrategyValidator); ok {
-		if err := v.Validate(); err != nil {
-			return fmt.Errorf("failed to validate the config: %w", err)
-		}
-	}
-
 	if shutdown, ok := strategy.(StrategyShutdown); ok {
 		trader.gracefulShutdown.OnShutdown(shutdown.Shutdown)
 	}
@@ -236,12 +240,6 @@ func (trader *Trader) injectFieldsAndSubscribe(ctx context.Context) error {
 
 			if err := trader.injectCommonServices(ctx, strategy); err != nil {
 				return err
-			}
-
-			if defaulter, ok := strategy.(StrategyDefaulter); ok {
-				if err := defaulter.Defaults(); err != nil {
-					panic(err)
-				}
 			}
 
 			if subscriber, ok := strategy.(ExchangeSessionSubscriber); ok {
@@ -304,12 +302,6 @@ func (trader *Trader) injectFieldsAndSubscribe(ctx context.Context) error {
 			}
 		}
 
-		if initializer, ok := strategy.(StrategyInitializer); ok {
-			if err := initializer.Initialize(); err != nil {
-				return err
-			}
-		}
-
 		if subscriber, ok := strategy.(CrossExchangeSessionSubscriber); ok {
 			subscriber.CrossSubscribe(trader.environment.sessions)
 		} else {
@@ -356,8 +348,23 @@ func (trader *Trader) Run(ctx context.Context) error {
 	return trader.environment.Connect(ctx)
 }
 
+// Initialize initializes the strategies, this method is called before the Run method.
+// It sets the default values and validates the strategy configurations.
+// And calls the Initialize method if the strategy implements the Initialize method.
 func (trader *Trader) Initialize(ctx context.Context) error {
 	return trader.IterateStrategies(func(strategy StrategyID) error {
+		if defaulter, ok := strategy.(StrategyDefaulter); ok {
+			if err := defaulter.Defaults(); err != nil {
+				return err
+			}
+		}
+
+		if v, ok := strategy.(StrategyValidator); ok {
+			if err := v.Validate(); err != nil {
+				return fmt.Errorf("found invalid strategy config: %w", err)
+			}
+		}
+
 		if initializer, ok := strategy.(StrategyInitializer); ok {
 			return initializer.Initialize()
 		}
