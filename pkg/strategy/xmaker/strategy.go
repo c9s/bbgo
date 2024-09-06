@@ -91,11 +91,12 @@ type Strategy struct {
 	SignalConfigList   []SignalConfig  `json:"signals"`
 	SignalMarginScale  *bbgo.SlideRule `json:"signalMarginScale,omitempty"`
 
-	Margin        fixedpoint.Value `json:"margin"`
-	BidMargin     fixedpoint.Value `json:"bidMargin"`
-	AskMargin     fixedpoint.Value `json:"askMargin"`
-	UseDepthPrice bool             `json:"useDepthPrice"`
-	DepthQuantity fixedpoint.Value `json:"depthQuantity"`
+	Margin           fixedpoint.Value `json:"margin"`
+	BidMargin        fixedpoint.Value `json:"bidMargin"`
+	AskMargin        fixedpoint.Value `json:"askMargin"`
+	UseDepthPrice    bool             `json:"useDepthPrice"`
+	DepthQuantity    fixedpoint.Value `json:"depthQuantity"`
+	SourceDepthLevel types.Depth      `json:"sourceDepthLevel"`
 
 	EnableBollBandMargin bool             `json:"enableBollBandMargin"`
 	BollBandInterval     types.Interval   `json:"bollBandInterval"`
@@ -159,7 +160,7 @@ type Strategy struct {
 	ProfitStats     *ProfitStats     `json:"profitStats,omitempty" persistence:"profit_stats"`
 	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty" persistence:"covered_position"`
 
-	book              *types.StreamOrderBook
+	sourceBook        *types.StreamOrderBook
 	activeMakerOrders *bbgo.ActiveOrderBook
 
 	hedgeErrorLimiter         *rate.Limiter
@@ -199,7 +200,10 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		panic(fmt.Errorf("source session %s is not defined", s.SourceExchange))
 	}
 
-	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
+	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
+		Depth: s.SourceDepthLevel,
+	})
+
 	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 
 	makerSession, ok := sessions[s.MakerExchange]
@@ -212,6 +216,8 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	for _, sig := range s.SignalConfigList {
 		if sig.TradeVolumeWindowSignal != nil {
 			sourceSession.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+		} else if sig.BollingerBandTrendSignal != nil {
+			sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: sig.BollingerBandTrendSignal.Interval})
 		}
 	}
 }
@@ -435,7 +441,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		}
 	}
 
-	bestBid, bestAsk, hasPrice := s.book.BestBidAndAsk()
+	bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
 	if !hasPrice {
 		s.logger.Warnf("no valid price, skip quoting")
 		return
@@ -446,7 +452,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	s.priceSolver.Update(s.Symbol, s.lastPrice)
 
-	bookLastUpdateTime := s.book.LastUpdateTime()
+	bookLastUpdateTime := s.sourceBook.LastUpdateTime()
 
 	if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
 		s.logger.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
@@ -462,7 +468,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		return
 	}
 
-	sourceBook := s.book.CopyDepth(10)
+	sourceBook := s.sourceBook.CopyDepth(10)
 	if valid, err := sourceBook.IsValid(); !valid {
 		s.logger.WithError(err).Errorf("%s invalid copied order book, skip quoting: %v", s.Symbol, err)
 		return
@@ -906,7 +912,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	lastPrice := s.lastPrice
-	sourceBook := s.book.CopyDepth(1)
+	sourceBook := s.sourceBook.CopyDepth(1)
 	switch side {
 
 	case types.SideTypeBuy:
@@ -1027,6 +1033,10 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 func (s *Strategy) Defaults() error {
 	if s.BollBandInterval == "" {
 		s.BollBandInterval = types.Interval1m
+	}
+
+	if s.SourceDepthLevel == "" {
+		s.SourceDepthLevel = types.DepthLevelMedium
 	}
 
 	if s.BollBandMarginFactor.IsZero() {
@@ -1350,8 +1360,8 @@ func (s *Strategy) CrossRun(
 		s.ProfitStats.ProfitStats = profitStats
 	}
 
-	s.book = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
-	s.book.BindStream(s.sourceSession.MarketDataStream)
+	s.sourceBook = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
+	s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
 
 	if s.EnableSignalMargin {
 		scale, err := s.SignalMarginScale.Scale()
@@ -1365,7 +1375,7 @@ func (s *Strategy) CrossRun(
 
 	for _, signalConfig := range s.SignalConfigList {
 		if signalConfig.OrderBookBestPriceSignal != nil {
-			signalConfig.OrderBookBestPriceSignal.book = s.book
+			signalConfig.OrderBookBestPriceSignal.book = s.sourceBook
 			if err := signalConfig.OrderBookBestPriceSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
 				return err
 			}
