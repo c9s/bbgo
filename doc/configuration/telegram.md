@@ -17,7 +17,7 @@ TELEGRAM_BOT_TOKEN=347374838:ABFTjfiweajfiawoejfiaojfeijoaef
 ```
 
 For the telegram chat authentication (your bot needs to verify it's you), if you only need a fixed authentication token,
-you can set `TELEGRAM_AUTH_TOKEN` in the `.env.local` file, e.g.,
+you can set `TELEGRAM_BOT_AUTH_TOKEN` in the `.env.local` file, e.g.,
 
 ```sh
 TELEGRAM_BOT_AUTH_TOKEN=itsme55667788
