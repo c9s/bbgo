@@ -440,9 +440,9 @@ for t in 1 .. n:
 return argmax(alpha[t,si] over si)
 */
 func hmm(y_t []float64, x_t []float64, l int) float64 {
-	al := make([]float64, l)
-	an := make([]float64, l)
-	as := make([]float64, l)
+	al := make([]float64, 0, l)
+	an := make([]float64, 0, l)
+	as := make([]float64, 0, l)
 	long := 0.
 	neut := 0.
 	short := 0.
@@ -453,9 +453,9 @@ func hmm(y_t []float64, x_t []float64, l int) float64 {
 			sin := make([]float64, 3)
 			sis := make([]float64, 3)
 			for i := -1; i <= 1; i++ {
-				sil = append(sil, x_t[n-1-1]*transitProbability(i, j))
-				sin = append(sin, x_t[n-1-1]*transitProbability(i, j))
-				sis = append(sis, x_t[n-1-1]*transitProbability(i, j))
+				sil = append(sil, 0, x_t[n-1-1]*transitProbability(i, j))
+				sin = append(sin, 0, x_t[n-1-1]*transitProbability(i, j))
+				sis = append(sis, 0, x_t[n-1-1]*transitProbability(i, j))
 			}
 			if j > 0 {
 				_, longArr := floats.MinMax(sil, 3)
