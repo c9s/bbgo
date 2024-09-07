@@ -127,6 +127,8 @@ type Strategy struct {
 
 	NotifyTrade bool `json:"notifyTrade"`
 
+	EnableArbitrage bool `json:"arbitrage"`
+
 	// RecoverTrade tries to find the missing trades via the REStful API
 	RecoverTrade bool `json:"recoverTrade"`
 
@@ -160,8 +162,8 @@ type Strategy struct {
 	ProfitStats     *ProfitStats     `json:"profitStats,omitempty" persistence:"profit_stats"`
 	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty" persistence:"covered_position"`
 
-	sourceBook        *types.StreamOrderBook
-	activeMakerOrders *bbgo.ActiveOrderBook
+	sourceBook, makerBook *types.StreamOrderBook
+	activeMakerOrders     *bbgo.ActiveOrderBook
 
 	hedgeErrorLimiter         *rate.Limiter
 	hedgeErrorRateReservation *rate.Reservation
@@ -212,6 +214,12 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	}
 
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+
+	if s.EnableArbitrage {
+		makerSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
+			Depth: types.DepthLevelMedium,
+		})
+	}
 
 	for _, sig := range s.SignalConfigList {
 		if sig.TradeVolumeWindowSignal != nil {
@@ -277,7 +285,7 @@ func (s *Strategy) getBollingerTrend(quote *Quote) int {
 }
 
 func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
-	signal, err := s.calculateSignal(ctx)
+	signal, err := s.aggregateSignal(ctx)
 	if err != nil {
 		return err
 	}
@@ -373,7 +381,7 @@ func (s *Strategy) applyBollingerMargin(
 	return nil
 }
 
-func (s *Strategy) calculateSignal(ctx context.Context) (float64, error) {
+func (s *Strategy) aggregateSignal(ctx context.Context) (float64, error) {
 	sum := 0.0
 	voters := 0.0
 	for _, signal := range s.SignalConfigList {
@@ -417,10 +425,11 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	}
 
 	if s.activeMakerOrders.NumOfOrders() > 0 {
+		s.logger.Warnf("unable to cancel all %s orders, skipping placing maker orders", s.Symbol)
 		return
 	}
 
-	signal, err := s.calculateSignal(ctx)
+	signal, err := s.aggregateSignal(ctx)
 	if err != nil {
 		return
 	}
@@ -445,6 +454,34 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	if !hasPrice {
 		s.logger.Warnf("no valid price, skip quoting")
 		return
+	}
+
+	bestBidPrice := bestBid.Price
+	bestAskPrice := bestAsk.Price
+	s.logger.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
+
+	if bestBidPrice.Compare(bestAskPrice) > 0 {
+		log.Errorf("best bid price %f is higher than best ask price %f, skip quoting",
+			bestBidPrice.Float64(),
+			bestAskPrice.Float64(),
+		)
+		return
+	}
+
+	if s.EnableArbitrage {
+		if makerBid, makerAsk, ok := s.makerBook.BestBidAndAsk(); ok {
+			if makerAsk.Price.Compare(bestBid.Price) <= 0 {
+				askPvs := s.makerBook.SideBook(types.SideTypeSell)
+				for _, pv := range askPvs {
+					if pv.Price.Compare(bestBid.Price) <= 0 {
+
+					}
+				}
+				// send ioc order for arbitrage
+			} else if makerBid.Price.Compare(bestAsk.Price) >= 0 {
+				// send ioc order for arbitrage
+			}
+		}
 	}
 
 	// use mid-price for the last price
@@ -645,18 +682,6 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		return
 	}
 
-	bestBidPrice := bestBid.Price
-	bestAskPrice := bestAsk.Price
-	s.logger.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
-
-	if bestBidPrice.Compare(bestAskPrice) > 0 {
-		log.Errorf("best bid price %f is higher than best ask price %f, skip quoting",
-			bestBidPrice.Float64(),
-			bestAskPrice.Float64(),
-		)
-		return
-	}
-
 	var submitOrders []types.SubmitOrder
 	var accumulativeBidQuantity, accumulativeAskQuantity fixedpoint.Value
 	var bidQuantity = s.Quantity
@@ -686,14 +711,6 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	askExposureInUsd := fixedpoint.Zero
 	bidPrice := quote.BestBidPrice
 	askPrice := quote.BestAskPrice
-
-	if bidPrice.Compare(askPrice) > 0 {
-		log.Errorf("maker bid price %f is higher than maker ask price %f, skip quoting",
-			bidPrice.Float64(),
-			askPrice.Float64(),
-		)
-		return
-	}
 
 	bidMarginMetrics.With(s.metricsLabels).Set(quote.BidMargin.Float64())
 	askMarginMetrics.With(s.metricsLabels).Set(quote.AskMargin.Float64())
@@ -1359,6 +1376,9 @@ func (s *Strategy) CrossRun(
 		s.Position = position
 		s.ProfitStats.ProfitStats = profitStats
 	}
+
+	s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
+	s.makerBook.BindStream(s.makerSession.MarketDataStream)
 
 	s.sourceBook = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
 	s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
