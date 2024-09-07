@@ -417,21 +417,48 @@ func (s *Strategy) aggregateSignal(ctx context.Context) (float64, error) {
 	return sum / voters, nil
 }
 
-func (s *Strategy) updateQuote(ctx context.Context) {
+// getInitialLayerQuantity returns the initial quantity for the layer
+// i is the layer index, starting from 0
+func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
+	if s.QuantityScale != nil {
+		qf, err := s.QuantityScale.Scale(i + 1)
+		if err != nil {
+			return fixedpoint.Zero, fmt.Errorf("quantityScale error: %w", err)
+		}
+
+		log.Infof("%s scaling bid #%d quantity to %f", s.Symbol, i+1, qf)
+
+		// override the default quantity
+		return fixedpoint.NewFromFloat(qf), nil
+	}
+
+	q := s.Quantity
+
+	if s.QuantityMultiplier.Sign() > 0 && i > 0 {
+		q = fixedpoint.NewFromFloat(
+			q.Float64() * math.Pow(
+				s.QuantityMultiplier.Float64(), float64(i+1)))
+	}
+
+	// fallback to the fixed quantity
+	return q, nil
+}
+
+func (s *Strategy) updateQuote(ctx context.Context) error {
 	if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 		s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
 		s.activeMakerOrders.Print()
-		return
+		return nil
 	}
 
 	if s.activeMakerOrders.NumOfOrders() > 0 {
 		s.logger.Warnf("unable to cancel all %s orders, skipping placing maker orders", s.Symbol)
-		return
+		return nil
 	}
 
 	signal, err := s.aggregateSignal(ctx)
 	if err != nil {
-		return
+		return err
 	}
 
 	s.logger.Infof("aggregated signal: %f", signal)
@@ -446,14 +473,14 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				bbgo.Notify("Strategy %s is halted, reason: %s", ID, reason)
 			}
 
-			return
+			return nil
 		}
 	}
 
 	bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
 	if !hasPrice {
 		s.logger.Warnf("no valid price, skip quoting")
-		return
+		return fmt.Errorf("no valid book price")
 	}
 
 	bestBidPrice := bestBid.Price
@@ -461,11 +488,10 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	s.logger.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
 
 	if bestBidPrice.Compare(bestAskPrice) > 0 {
-		log.Errorf("best bid price %f is higher than best ask price %f, skip quoting",
+		return fmt.Errorf("best bid price %f is higher than best ask price %f, skip quoting",
 			bestBidPrice.Float64(),
 			bestAskPrice.Float64(),
 		)
-		return
 	}
 
 	if s.EnableArbitrage {
@@ -495,20 +521,20 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 		s.logger.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
-		return
+		return err
 	}
 
 	if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
 		s.logger.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
-		return
+		return err
 	}
 
 	sourceBook := s.sourceBook.CopyDepth(10)
 	if valid, err := sourceBook.IsValid(); !valid {
 		s.logger.WithError(err).Errorf("%s invalid copied order book, skip quoting: %v", s.Symbol, err)
-		return
+		return err
 	}
 
 	var disableMakerBid = false
@@ -679,12 +705,11 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	if disableMakerAsk && disableMakerBid {
 		log.Warnf("%s bid/ask maker is disabled due to insufficient balances", s.Symbol)
-		return
+		return nil
 	}
 
 	var submitOrders []types.SubmitOrder
 	var accumulativeBidQuantity, accumulativeAskQuantity fixedpoint.Value
-	var bidQuantity = s.Quantity
 	var askQuantity = s.Quantity
 
 	var quote = &Quote{
@@ -715,22 +740,14 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	bidMarginMetrics.With(s.metricsLabels).Set(quote.BidMargin.Float64())
 	askMarginMetrics.With(s.metricsLabels).Set(quote.AskMargin.Float64())
 
-	for i := 0; i < s.NumLayers; i++ {
-		// for maker bid orders
-		if !disableMakerBid {
-			if s.QuantityScale != nil {
-				qf, err := s.QuantityScale.Scale(i + 1)
-				if err != nil {
-					log.WithError(err).Errorf("quantityScale error")
-					return
-				}
-
-				log.Infof("%s scaling bid #%d quantity to %f", s.Symbol, i+1, qf)
-
-				// override the default bid quantity
-				bidQuantity = fixedpoint.NewFromFloat(qf)
+	if !disableMakerBid {
+		for i := 0; i < s.NumLayers; i++ {
+			bidQuantity, err := s.getInitialLayerQuantity(i)
+			if err != nil {
+				return err
 			}
 
+			// for maker bid orders
 			accumulativeBidQuantity = accumulativeBidQuantity.Add(bidQuantity)
 
 			if s.UseDepthPrice {
@@ -785,14 +802,15 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				bidQuantity = bidQuantity.Mul(s.QuantityMultiplier)
 			}
 		}
+	}
 
+	for i := 0; i < s.NumLayers; i++ {
 		// for maker ask orders
 		if !disableMakerAsk {
 			if s.QuantityScale != nil {
 				qf, err := s.QuantityScale.Scale(i + 1)
 				if err != nil {
-					log.WithError(err).Errorf("quantityScale error")
-					return
+					return fmt.Errorf("quantityScale error: %w", err)
 				}
 
 				log.Infof("%s scaling ask #%d quantity to %f", s.Symbol, i+1, qf)
@@ -859,12 +877,12 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	if len(submitOrders) == 0 {
 		log.Warnf("no orders generated")
-		return
+		return nil
 	}
 
 	formattedOrders, err := s.makerSession.FormatOrders(submitOrders)
 	if err != nil {
-		return
+		return err
 	}
 
 	orderCreateCallback := func(createdOrder types.Order) {
@@ -877,7 +895,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, s.makerSession.Exchange, orderCreateCallback, formattedOrders...)
 	if err != nil {
 		log.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
-		return
+		return err
 	}
 
 	openOrderBidExposureInUsdMetrics.With(s.metricsLabels).Set(bidExposureInUsd.Float64())
@@ -885,6 +903,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	_ = errIdx
 	_ = createdOrders
+	return nil
 }
 
 func (s *Strategy) adjustHedgeQuantityWithAvailableBalance(
