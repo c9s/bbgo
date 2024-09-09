@@ -122,6 +122,12 @@ func (trader *Trader) DisableLogging() {
 }
 
 func (trader *Trader) Configure(userConfig *Config) error {
+	// config environment
+	if userConfig.Environment != nil && trader.environment != nil {
+		trader.environment.environmentConfig = userConfig.Environment
+	}
+
+	// config risk control
 	if userConfig.RiskControls != nil {
 		trader.SetRiskControls(userConfig.RiskControls)
 	}
