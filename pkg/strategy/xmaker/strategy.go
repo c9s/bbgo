@@ -774,7 +774,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	askMarginMetrics.With(s.metricsLabels).Set(quote.AskMargin.Float64())
 
 	if s.EnableArbitrage {
-		done, err := s.tryArbitrage(ctx, quote, makerBalances)
+		done, err := s.tryArbitrage(ctx, quote, makerBalances, hedgeBalances)
 		if err != nil {
 			s.logger.WithError(err).Errorf("unable to arbitrage")
 		} else if done {
@@ -935,66 +935,94 @@ func aggregatePriceVolumeSliceWithPriceFilter(pvs types.PriceVolumeSlice, filter
 }
 
 // tryArbitrage tries to arbitrage between the source and maker exchange
-func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, balances types.BalanceMap) (bool, error) {
+func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances, hedgeBalances types.BalanceMap) (bool, error) {
 	marginBidPrice := quote.BestBidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
 	marginAskPrice := quote.BestAskPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
 
-	quoteBalance, hasQuote := balances[s.makerMarket.QuoteCurrency]
-	baseBalance, hasBase := balances[s.makerMarket.BaseCurrency]
+	makerBid, makerAsk, ok := s.makerBook.BestBidAndAsk()
+	if !ok {
+		return false, nil
+	}
 
 	var iocOrders []types.SubmitOrder
-	if makerBid, makerAsk, ok := s.makerBook.BestBidAndAsk(); ok {
-		if hasQuote && makerAsk.Price.Compare(marginBidPrice) <= 0 {
-			askPvs := s.makerBook.SideBook(types.SideTypeSell)
-			sumPv := aggregatePriceVolumeSliceWithPriceFilter(askPvs, marginBidPrice)
-			qty := fixedpoint.Min(quoteBalance.Available.Div(sumPv.Price), sumPv.Volume)
-			iocOrders = append(iocOrders, types.SubmitOrder{
-				Symbol:      s.Symbol,
-				Type:        types.OrderTypeLimit,
-				Side:        types.SideTypeBuy,
-				Price:       sumPv.Price,
-				Quantity:    qty,
-				TimeInForce: types.TimeInForceIOC,
-			})
-
-		} else if hasBase && makerBid.Price.Compare(marginAskPrice) >= 0 {
-			bidPvs := s.makerBook.SideBook(types.SideTypeBuy)
-			sumPv := aggregatePriceVolumeSliceWithPriceFilter(bidPvs, marginBidPrice)
-			qty := fixedpoint.Min(baseBalance.Available, sumPv.Volume)
-
-			// send ioc order for arbitrage
-			iocOrders = append(iocOrders, types.SubmitOrder{
-				Symbol:      s.Symbol,
-				Type:        types.OrderTypeLimit,
-				Side:        types.SideTypeSell,
-				Price:       sumPv.Price,
-				Quantity:    qty,
-				TimeInForce: types.TimeInForceIOC,
-			})
+	if makerAsk.Price.Compare(marginBidPrice) <= 0 {
+		quoteBalance, hasQuote := makerBalances[s.makerMarket.QuoteCurrency]
+		if !hasQuote {
+			return false, nil
 		}
 
-		if len(iocOrders) == 0 {
+		askPvs := s.makerBook.SideBook(types.SideTypeSell)
+		sumPv := aggregatePriceVolumeSliceWithPriceFilter(askPvs, marginBidPrice)
+		qty := fixedpoint.Min(quoteBalance.Available.Div(sumPv.Price), sumPv.Volume)
+
+		if sourceBase, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
+			qty = fixedpoint.Min(qty, sourceBase.Available)
+		} else {
+			// insufficient hedge base balance for arbitrage
+			return false, nil
+		}
+
+		iocOrders = append(iocOrders, types.SubmitOrder{
+			Symbol:      s.Symbol,
+			Type:        types.OrderTypeLimit,
+			Side:        types.SideTypeBuy,
+			Price:       sumPv.Price,
+			Quantity:    qty,
+			TimeInForce: types.TimeInForceIOC,
+		})
+
+	} else if makerBid.Price.Compare(marginAskPrice) >= 0 {
+		baseBalance, hasBase := makerBalances[s.makerMarket.BaseCurrency]
+		if !hasBase {
+			return false, nil
+		}
+
+		bidPvs := s.makerBook.SideBook(types.SideTypeBuy)
+		sumPv := aggregatePriceVolumeSliceWithPriceFilter(bidPvs, marginAskPrice)
+		qty := fixedpoint.Min(baseBalance.Available, sumPv.Volume)
+
+		if sourceQuote, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
+			qty = fixedpoint.Min(qty, quote.BestAskPrice.Div(sourceQuote.Available))
+		} else {
+			// insufficient hedge quote balance for arbitrage
 			return false, nil
 		}
 
 		// send ioc order for arbitrage
-		formattedOrders, err := s.makerSession.FormatOrders(iocOrders)
-		if err != nil {
-			return false, err
-		}
-
-		defer s.tradeCollector.Process()
-
-		createdOrders, _, err := bbgo.BatchPlaceOrder(ctx, s.makerSession.Exchange, s.makerOrderCreateCallback, formattedOrders...)
-		if err != nil {
-			return false, err
-		}
-
-		s.logger.Infof("sent arbitrage orders: %+v", createdOrders)
-		return true, nil
+		iocOrders = append(iocOrders, types.SubmitOrder{
+			Symbol:      s.Symbol,
+			Type:        types.OrderTypeLimit,
+			Side:        types.SideTypeSell,
+			Price:       sumPv.Price,
+			Quantity:    qty,
+			TimeInForce: types.TimeInForceIOC,
+		})
 	}
 
-	return false, nil
+	if len(iocOrders) == 0 {
+		return false, nil
+	}
+
+	// send ioc order for arbitrage
+	formattedOrders, err := s.makerSession.FormatOrders(iocOrders)
+	if err != nil {
+		return false, err
+	}
+
+	defer s.tradeCollector.Process()
+
+	createdOrders, _, err := bbgo.BatchPlaceOrder(
+		ctx,
+		s.makerSession.Exchange,
+		s.makerOrderCreateCallback,
+		formattedOrders...)
+
+	if err != nil {
+		return len(createdOrders) > 0, err
+	}
+
+	s.logger.Infof("sent arbitrage IOC order: %+v", createdOrders)
+	return true, nil
 }
 
 func (s *Strategy) adjustHedgeQuantityWithAvailableBalance(
