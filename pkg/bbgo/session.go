@@ -405,6 +405,12 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		return fmt.Errorf("market %s is not defined", symbol)
 	}
 
+	if environ == nil {
+		session.logger.Info("environment is nil")
+	} else {
+		session.logger.Infof("environment config: %+v", environ.environmentConfig)
+	}
+
 	disableMarketDataStore := environ.environmentConfig != nil && environ.environmentConfig.DisableMarketDataStore
 	disableSessionTradeBuffer := environ.environmentConfig != nil && environ.environmentConfig.DisableSessionTradeBuffer
 	maxSessionTradeBufferSize := 0
