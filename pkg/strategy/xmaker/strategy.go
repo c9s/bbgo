@@ -444,6 +444,53 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 	return q, nil
 }
 
+func (s *Strategy) getLayerPrice(
+	i int,
+	side types.SideType,
+	sourceBook *types.StreamOrderBook,
+	quote *Quote,
+	requiredDepth fixedpoint.Value,
+) (price fixedpoint.Value) {
+	var margin, delta, pips fixedpoint.Value
+
+	switch side {
+	case types.SideTypeSell:
+		margin = quote.AskMargin
+		delta = margin
+
+		if quote.AskLayerPips.Sign() > 0 {
+			pips = quote.AskLayerPips
+		} else {
+			pips = fixedpoint.One
+		}
+
+	case types.SideTypeBuy:
+		margin = quote.BidMargin
+		delta = margin.Neg()
+
+		if quote.BidLayerPips.Sign() > 0 {
+			pips = quote.BidLayerPips.Neg()
+		} else {
+			pips = fixedpoint.One.Neg()
+		}
+	}
+
+	if s.UseDepthPrice {
+		price = aggregatePrice(sourceBook.SideBook(side), requiredDepth)
+		price = price.Mul(fixedpoint.One.Add(delta))
+		if i > 0 {
+			price = price.Add(pips.Mul(s.makerMarket.TickSize))
+		}
+	} else {
+		price = price.Mul(fixedpoint.One.Add(delta))
+		if i > 0 {
+			price = price.Add(pips.Mul(s.makerMarket.TickSize))
+		}
+	}
+
+	return price
+}
+
 func (s *Strategy) updateQuote(ctx context.Context) error {
 	if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 		s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
@@ -710,7 +757,6 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	var submitOrders []types.SubmitOrder
 	var accumulativeBidQuantity, accumulativeAskQuantity fixedpoint.Value
-	var askQuantity = s.Quantity
 
 	var quote = &Quote{
 		BestBidPrice: bestBidPrice,
@@ -798,26 +844,17 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				hedgeQuota.Rollback()
 			}
 
-			if s.QuantityMultiplier.Sign() > 0 {
-				bidQuantity = bidQuantity.Mul(s.QuantityMultiplier)
-			}
 		}
 	}
 
-	for i := 0; i < s.NumLayers; i++ {
-		// for maker ask orders
-		if !disableMakerAsk {
-			if s.QuantityScale != nil {
-				qf, err := s.QuantityScale.Scale(i + 1)
-				if err != nil {
-					return fmt.Errorf("quantityScale error: %w", err)
-				}
-
-				log.Infof("%s scaling ask #%d quantity to %f", s.Symbol, i+1, qf)
-
-				// override the default bid quantity
-				askQuantity = fixedpoint.NewFromFloat(qf)
+	// for maker ask orders
+	if !disableMakerAsk {
+		for i := 0; i < s.NumLayers; i++ {
+			askQuantity, err := s.getInitialLayerQuantity(i)
+			if err != nil {
+				return err
 			}
+
 			accumulativeAskQuantity = accumulativeAskQuantity.Add(askQuantity)
 
 			if s.UseDepthPrice {
