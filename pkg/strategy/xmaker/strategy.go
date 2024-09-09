@@ -774,7 +774,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	askMarginMetrics.With(s.metricsLabels).Set(quote.AskMargin.Float64())
 
 	if s.EnableArbitrage {
-		done, err := s.tryArbitrage(ctx, quote)
+		done, err := s.tryArbitrage(ctx, quote, makerBalances)
 		if err != nil {
 			s.logger.WithError(err).Errorf("unable to arbitrage")
 		} else if done {
@@ -935,28 +935,32 @@ func aggregatePriceVolumeSliceWithPriceFilter(pvs types.PriceVolumeSlice, filter
 }
 
 // tryArbitrage tries to arbitrage between the source and maker exchange
-func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote) (bool, error) {
+func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, balances types.BalanceMap) (bool, error) {
 	marginBidPrice := quote.BestBidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
 	marginAskPrice := quote.BestAskPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
 
+	quoteBalance, hasQuote := balances[s.makerMarket.QuoteCurrency]
+	baseBalance, hasBase := balances[s.makerMarket.BaseCurrency]
+
 	var iocOrders []types.SubmitOrder
 	if makerBid, makerAsk, ok := s.makerBook.BestBidAndAsk(); ok {
-		if makerAsk.Price.Compare(marginBidPrice) <= 0 {
+		if hasQuote && makerAsk.Price.Compare(marginBidPrice) <= 0 {
 			askPvs := s.makerBook.SideBook(types.SideTypeSell)
 			sumPv := aggregatePriceVolumeSliceWithPriceFilter(askPvs, marginBidPrice)
-
+			qty := fixedpoint.Min(quoteBalance.Available.Div(sumPv.Price), sumPv.Volume)
 			iocOrders = append(iocOrders, types.SubmitOrder{
 				Symbol:      s.Symbol,
 				Type:        types.OrderTypeLimit,
 				Side:        types.SideTypeBuy,
 				Price:       sumPv.Price,
-				Quantity:    sumPv.Volume,
+				Quantity:    qty,
 				TimeInForce: types.TimeInForceIOC,
 			})
 
-		} else if makerBid.Price.Compare(marginAskPrice) >= 0 {
+		} else if hasBase && makerBid.Price.Compare(marginAskPrice) >= 0 {
 			bidPvs := s.makerBook.SideBook(types.SideTypeBuy)
 			sumPv := aggregatePriceVolumeSliceWithPriceFilter(bidPvs, marginBidPrice)
+			qty := fixedpoint.Min(baseBalance.Available, sumPv.Volume)
 
 			// send ioc order for arbitrage
 			iocOrders = append(iocOrders, types.SubmitOrder{
@@ -964,7 +968,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote) (bool, error)
 				Type:        types.OrderTypeLimit,
 				Side:        types.SideTypeSell,
 				Price:       sumPv.Price,
-				Quantity:    sumPv.Volume,
+				Quantity:    qty,
 				TimeInForce: types.TimeInForceIOC,
 			})
 		}
