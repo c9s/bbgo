@@ -91,11 +91,12 @@ type Strategy struct {
 	SignalConfigList   []SignalConfig  `json:"signals"`
 	SignalMarginScale  *bbgo.SlideRule `json:"signalMarginScale,omitempty"`
 
-	Margin        fixedpoint.Value `json:"margin"`
-	BidMargin     fixedpoint.Value `json:"bidMargin"`
-	AskMargin     fixedpoint.Value `json:"askMargin"`
-	UseDepthPrice bool             `json:"useDepthPrice"`
-	DepthQuantity fixedpoint.Value `json:"depthQuantity"`
+	Margin           fixedpoint.Value `json:"margin"`
+	BidMargin        fixedpoint.Value `json:"bidMargin"`
+	AskMargin        fixedpoint.Value `json:"askMargin"`
+	UseDepthPrice    bool             `json:"useDepthPrice"`
+	DepthQuantity    fixedpoint.Value `json:"depthQuantity"`
+	SourceDepthLevel types.Depth      `json:"sourceDepthLevel"`
 
 	EnableBollBandMargin bool             `json:"enableBollBandMargin"`
 	BollBandInterval     types.Interval   `json:"bollBandInterval"`
@@ -125,6 +126,8 @@ type Strategy struct {
 	DisableHedge bool `json:"disableHedge"`
 
 	NotifyTrade bool `json:"notifyTrade"`
+
+	EnableArbitrage bool `json:"arbitrage"`
 
 	// RecoverTrade tries to find the missing trades via the REStful API
 	RecoverTrade bool `json:"recoverTrade"`
@@ -159,8 +162,8 @@ type Strategy struct {
 	ProfitStats     *ProfitStats     `json:"profitStats,omitempty" persistence:"profit_stats"`
 	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty" persistence:"covered_position"`
 
-	book              *types.StreamOrderBook
-	activeMakerOrders *bbgo.ActiveOrderBook
+	sourceBook, makerBook *types.StreamOrderBook
+	activeMakerOrders     *bbgo.ActiveOrderBook
 
 	hedgeErrorLimiter         *rate.Limiter
 	hedgeErrorRateReservation *rate.Reservation
@@ -199,7 +202,11 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		panic(fmt.Errorf("source session %s is not defined", s.SourceExchange))
 	}
 
-	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{})
+	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
+		// TODO: fix depth20 stream for binance
+		// Depth: s.SourceDepthLevel,
+	})
+
 	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 
 	makerSession, ok := sessions[s.MakerExchange]
@@ -209,9 +216,17 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 
+	if s.EnableArbitrage {
+		makerSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
+			Depth: types.DepthLevelMedium,
+		})
+	}
+
 	for _, sig := range s.SignalConfigList {
 		if sig.TradeVolumeWindowSignal != nil {
 			sourceSession.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+		} else if sig.BollingerBandTrendSignal != nil {
+			sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: sig.BollingerBandTrendSignal.Interval})
 		}
 	}
 }
@@ -271,7 +286,7 @@ func (s *Strategy) getBollingerTrend(quote *Quote) int {
 }
 
 func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
-	signal, err := s.calculateSignal(ctx)
+	signal, err := s.aggregateSignal(ctx)
 	if err != nil {
 		return err
 	}
@@ -367,7 +382,7 @@ func (s *Strategy) applyBollingerMargin(
 	return nil
 }
 
-func (s *Strategy) calculateSignal(ctx context.Context) (float64, error) {
+func (s *Strategy) aggregateSignal(ctx context.Context) (float64, error) {
 	sum := 0.0
 	voters := 0.0
 	for _, signal := range s.SignalConfigList {
@@ -403,20 +418,99 @@ func (s *Strategy) calculateSignal(ctx context.Context) (float64, error) {
 	return sum / voters, nil
 }
 
-func (s *Strategy) updateQuote(ctx context.Context) {
+// getInitialLayerQuantity returns the initial quantity for the layer
+// i is the layer index, starting from 0
+func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
+	if s.QuantityScale != nil {
+		qf, err := s.QuantityScale.Scale(i + 1)
+		if err != nil {
+			return fixedpoint.Zero, fmt.Errorf("quantityScale error: %w", err)
+		}
+
+		log.Infof("%s scaling bid #%d quantity to %f", s.Symbol, i+1, qf)
+
+		// override the default quantity
+		return fixedpoint.NewFromFloat(qf), nil
+	}
+
+	q := s.Quantity
+
+	if s.QuantityMultiplier.Sign() > 0 && i > 0 {
+		q = fixedpoint.NewFromFloat(
+			q.Float64() * math.Pow(
+				s.QuantityMultiplier.Float64(), float64(i+1)))
+	}
+
+	// fallback to the fixed quantity
+	return q, nil
+}
+
+// getLayerPrice returns the price for the layer
+// i is the layer index, starting from 0
+// side is the side of the order
+// sourceBook is the source order book
+func (s *Strategy) getLayerPrice(
+	i int,
+	side types.SideType,
+	sourceBook *types.StreamOrderBook,
+	quote *Quote,
+	requiredDepth fixedpoint.Value,
+) (price fixedpoint.Value) {
+	var margin, delta, pips fixedpoint.Value
+
+	switch side {
+	case types.SideTypeSell:
+		margin = quote.AskMargin
+		delta = margin
+
+		if quote.AskLayerPips.Sign() > 0 {
+			pips = quote.AskLayerPips
+		} else {
+			pips = fixedpoint.One
+		}
+
+	case types.SideTypeBuy:
+		margin = quote.BidMargin
+		delta = margin.Neg()
+
+		if quote.BidLayerPips.Sign() > 0 {
+			pips = quote.BidLayerPips.Neg()
+		} else {
+			pips = fixedpoint.One.Neg()
+		}
+	}
+
+	if requiredDepth.Sign() > 0 {
+		price = aggregatePrice(sourceBook.SideBook(side), requiredDepth)
+		price = price.Mul(fixedpoint.One.Add(delta))
+		if i > 0 {
+			price = price.Add(pips.Mul(s.makerMarket.TickSize))
+		}
+	} else {
+		price = price.Mul(fixedpoint.One.Add(delta))
+		if i > 0 {
+			price = price.Add(pips.Mul(s.makerMarket.TickSize))
+		}
+	}
+
+	return price
+}
+
+func (s *Strategy) updateQuote(ctx context.Context) error {
 	if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 		s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
 		s.activeMakerOrders.Print()
-		return
+		return nil
 	}
 
 	if s.activeMakerOrders.NumOfOrders() > 0 {
-		return
+		s.logger.Warnf("unable to cancel all %s orders, skipping placing maker orders", s.Symbol)
+		return nil
 	}
 
-	signal, err := s.calculateSignal(ctx)
+	signal, err := s.aggregateSignal(ctx)
 	if err != nil {
-		return
+		return err
 	}
 
 	s.logger.Infof("aggregated signal: %f", signal)
@@ -431,14 +525,41 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				bbgo.Notify("Strategy %s is halted, reason: %s", ID, reason)
 			}
 
-			return
+			return nil
 		}
 	}
 
-	bestBid, bestAsk, hasPrice := s.book.BestBidAndAsk()
+	bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
 	if !hasPrice {
 		s.logger.Warnf("no valid price, skip quoting")
-		return
+		return fmt.Errorf("no valid book price")
+	}
+
+	bestBidPrice := bestBid.Price
+	bestAskPrice := bestAsk.Price
+	s.logger.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
+
+	if bestBidPrice.Compare(bestAskPrice) > 0 {
+		return fmt.Errorf("best bid price %f is higher than best ask price %f, skip quoting",
+			bestBidPrice.Float64(),
+			bestAskPrice.Float64(),
+		)
+	}
+
+	if s.EnableArbitrage {
+		if makerBid, makerAsk, ok := s.makerBook.BestBidAndAsk(); ok {
+			if makerAsk.Price.Compare(bestBid.Price) <= 0 {
+				askPvs := s.makerBook.SideBook(types.SideTypeSell)
+				for _, pv := range askPvs {
+					if pv.Price.Compare(bestBid.Price) <= 0 {
+
+					}
+				}
+				// send ioc order for arbitrage
+			} else if makerBid.Price.Compare(bestAsk.Price) >= 0 {
+				// send ioc order for arbitrage
+			}
+		}
 	}
 
 	// use mid-price for the last price
@@ -446,26 +567,26 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	s.priceSolver.Update(s.Symbol, s.lastPrice)
 
-	bookLastUpdateTime := s.book.LastUpdateTime()
+	bookLastUpdateTime := s.sourceBook.LastUpdateTime()
 
 	if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
 		s.logger.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
-		return
+		return err
 	}
 
 	if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
 		s.logger.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
-		return
+		return err
 	}
 
-	sourceBook := s.book.CopyDepth(10)
+	sourceBook := s.sourceBook.CopyDepth(10)
 	if valid, err := sourceBook.IsValid(); !valid {
 		s.logger.WithError(err).Errorf("%s invalid copied order book, skip quoting: %v", s.Symbol, err)
-		return
+		return err
 	}
 
 	var disableMakerBid = false
@@ -636,25 +757,11 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	if disableMakerAsk && disableMakerBid {
 		log.Warnf("%s bid/ask maker is disabled due to insufficient balances", s.Symbol)
-		return
-	}
-
-	bestBidPrice := bestBid.Price
-	bestAskPrice := bestAsk.Price
-	s.logger.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
-
-	if bestBidPrice.Compare(bestAskPrice) > 0 {
-		log.Errorf("best bid price %f is higher than best ask price %f, skip quoting",
-			bestBidPrice.Float64(),
-			bestAskPrice.Float64(),
-		)
-		return
+		return nil
 	}
 
 	var submitOrders []types.SubmitOrder
 	var accumulativeBidQuantity, accumulativeAskQuantity fixedpoint.Value
-	var bidQuantity = s.Quantity
-	var askQuantity = s.Quantity
 
 	var quote = &Quote{
 		BestBidPrice: bestBidPrice,
@@ -681,57 +788,29 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	bidPrice := quote.BestBidPrice
 	askPrice := quote.BestAskPrice
 
-	if bidPrice.Compare(askPrice) > 0 {
-		log.Errorf("maker bid price %f is higher than maker ask price %f, skip quoting",
-			bidPrice.Float64(),
-			askPrice.Float64(),
-		)
-		return
-	}
-
 	bidMarginMetrics.With(s.metricsLabels).Set(quote.BidMargin.Float64())
 	askMarginMetrics.With(s.metricsLabels).Set(quote.AskMargin.Float64())
 
-	for i := 0; i < s.NumLayers; i++ {
-		// for maker bid orders
-		if !disableMakerBid {
-			if s.QuantityScale != nil {
-				qf, err := s.QuantityScale.Scale(i + 1)
-				if err != nil {
-					log.WithError(err).Errorf("quantityScale error")
-					return
-				}
-
-				log.Infof("%s scaling bid #%d quantity to %f", s.Symbol, i+1, qf)
-
-				// override the default bid quantity
-				bidQuantity = fixedpoint.NewFromFloat(qf)
+	if !disableMakerBid {
+		for i := 0; i < s.NumLayers; i++ {
+			bidQuantity, err := s.getInitialLayerQuantity(i)
+			if err != nil {
+				return err
 			}
 
+			// for maker bid orders
 			accumulativeBidQuantity = accumulativeBidQuantity.Add(bidQuantity)
 
+			requiredDepth := fixedpoint.Zero
 			if s.UseDepthPrice {
-				sideBook := sourceBook.SideBook(types.SideTypeBuy)
 				if s.DepthQuantity.Sign() > 0 {
-					if i == 0 {
-						bidPrice = aggregatePrice(sideBook, s.DepthQuantity)
-						bidPrice = bidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
-					} else if i > 0 && quote.BidLayerPips.Sign() > 0 {
-						pips := quote.BidLayerPips.Mul(s.makerMarket.TickSize)
-						bidPrice = bidPrice.Sub(pips)
-					}
+					requiredDepth = s.DepthQuantity
 				} else {
-					bidPrice = aggregatePrice(sideBook, accumulativeBidQuantity)
-					bidPrice = bidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
-				}
-			} else {
-				if i == 0 {
-					bidPrice = bidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
-				} else if i > 0 && quote.BidLayerPips.Sign() > 0 {
-					pips := quote.BidLayerPips.Mul(s.makerMarket.TickSize)
-					bidPrice = bidPrice.Sub(pips)
+					requiredDepth = accumulativeBidQuantity
 				}
 			}
+
+			bidPrice = s.getLayerPrice(i, types.SideTypeBuy, s.sourceBook, quote, requiredDepth)
 
 			if i == 0 {
 				s.logger.Infof("maker best bid price %f", bidPrice.Float64())
@@ -758,48 +837,29 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 				hedgeQuota.Rollback()
 			}
 
-			if s.QuantityMultiplier.Sign() > 0 {
-				bidQuantity = bidQuantity.Mul(s.QuantityMultiplier)
-			}
 		}
+	}
 
-		// for maker ask orders
-		if !disableMakerAsk {
-			if s.QuantityScale != nil {
-				qf, err := s.QuantityScale.Scale(i + 1)
-				if err != nil {
-					log.WithError(err).Errorf("quantityScale error")
-					return
-				}
-
-				log.Infof("%s scaling ask #%d quantity to %f", s.Symbol, i+1, qf)
-
-				// override the default bid quantity
-				askQuantity = fixedpoint.NewFromFloat(qf)
+	// for maker ask orders
+	if !disableMakerAsk {
+		for i := 0; i < s.NumLayers; i++ {
+			askQuantity, err := s.getInitialLayerQuantity(i)
+			if err != nil {
+				return err
 			}
+
 			accumulativeAskQuantity = accumulativeAskQuantity.Add(askQuantity)
 
+			requiredDepth := fixedpoint.Zero
 			if s.UseDepthPrice {
 				if s.DepthQuantity.Sign() > 0 {
-					if i == 0 {
-						askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), s.DepthQuantity)
-						askPrice = askPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
-					} else if i > 0 && quote.AskLayerPips.Sign() > 0 {
-						pips := quote.AskLayerPips.Mul(s.makerMarket.TickSize)
-						askPrice = askPrice.Add(pips)
-					}
+					requiredDepth = s.DepthQuantity
 				} else {
-					askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
-					askPrice = askPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
-				}
-			} else {
-				if i == 0 {
-					askPrice = askPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
-				} else if i > 0 && quote.AskLayerPips.Sign() > 0 {
-					pips := quote.AskLayerPips.Mul(s.makerMarket.TickSize)
-					askPrice = askPrice.Add(pips)
+					requiredDepth = accumulativeAskQuantity
 				}
 			}
+
+			askPrice = s.getLayerPrice(i, types.SideTypeSell, s.sourceBook, quote, requiredDepth)
 
 			if i == 0 {
 				s.logger.Infof("maker best ask price %f", askPrice.Float64())
@@ -836,12 +896,12 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	if len(submitOrders) == 0 {
 		log.Warnf("no orders generated")
-		return
+		return nil
 	}
 
 	formattedOrders, err := s.makerSession.FormatOrders(submitOrders)
 	if err != nil {
-		return
+		return err
 	}
 
 	orderCreateCallback := func(createdOrder types.Order) {
@@ -854,7 +914,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, s.makerSession.Exchange, orderCreateCallback, formattedOrders...)
 	if err != nil {
 		log.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
-		return
+		return err
 	}
 
 	openOrderBidExposureInUsdMetrics.With(s.metricsLabels).Set(bidExposureInUsd.Float64())
@@ -862,6 +922,7 @@ func (s *Strategy) updateQuote(ctx context.Context) {
 
 	_ = errIdx
 	_ = createdOrders
+	return nil
 }
 
 func (s *Strategy) adjustHedgeQuantityWithAvailableBalance(
@@ -906,7 +967,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	lastPrice := s.lastPrice
-	sourceBook := s.book.CopyDepth(1)
+	sourceBook := s.sourceBook.CopyDepth(1)
 	switch side {
 
 	case types.SideTypeBuy:
@@ -1029,6 +1090,10 @@ func (s *Strategy) Defaults() error {
 		s.BollBandInterval = types.Interval1m
 	}
 
+	if s.SourceDepthLevel == "" {
+		s.SourceDepthLevel = types.DepthLevelMedium
+	}
+
 	if s.BollBandMarginFactor.IsZero() {
 		s.BollBandMarginFactor = fixedpoint.One
 	}
@@ -1085,7 +1150,7 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Validate() error {
-	if s.Quantity.IsZero() || s.QuantityScale == nil {
+	if s.Quantity.IsZero() && s.QuantityScale == nil {
 		return errors.New("quantity or quantityScale can not be empty")
 	}
 
@@ -1350,8 +1415,11 @@ func (s *Strategy) CrossRun(
 		s.ProfitStats.ProfitStats = profitStats
 	}
 
-	s.book = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
-	s.book.BindStream(s.sourceSession.MarketDataStream)
+	s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
+	s.makerBook.BindStream(s.makerSession.MarketDataStream)
+
+	s.sourceBook = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
+	s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
 
 	if s.EnableSignalMargin {
 		scale, err := s.SignalMarginScale.Scale()
@@ -1365,7 +1433,7 @@ func (s *Strategy) CrossRun(
 
 	for _, signalConfig := range s.SignalConfigList {
 		if signalConfig.OrderBookBestPriceSignal != nil {
-			signalConfig.OrderBookBestPriceSignal.book = s.book
+			signalConfig.OrderBookBestPriceSignal.book = s.sourceBook
 			if err := signalConfig.OrderBookBestPriceSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
 				return err
 			}
