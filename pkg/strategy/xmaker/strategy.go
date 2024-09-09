@@ -203,7 +203,8 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	}
 
 	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
-		Depth: s.SourceDepthLevel,
+		// TODO: fix depth20 stream for binance
+		// Depth: s.SourceDepthLevel,
 	})
 
 	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
@@ -444,6 +445,10 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 	return q, nil
 }
 
+// getLayerPrice returns the price for the layer
+// i is the layer index, starting from 0
+// side is the side of the order
+// sourceBook is the source order book
 func (s *Strategy) getLayerPrice(
 	i int,
 	side types.SideType,
@@ -475,7 +480,7 @@ func (s *Strategy) getLayerPrice(
 		}
 	}
 
-	if s.UseDepthPrice {
+	if requiredDepth.Sign() > 0 {
 		price = aggregatePrice(sourceBook.SideBook(side), requiredDepth)
 		price = price.Mul(fixedpoint.One.Add(delta))
 		if i > 0 {
@@ -796,28 +801,16 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			// for maker bid orders
 			accumulativeBidQuantity = accumulativeBidQuantity.Add(bidQuantity)
 
+			requiredDepth := fixedpoint.Zero
 			if s.UseDepthPrice {
-				sideBook := sourceBook.SideBook(types.SideTypeBuy)
 				if s.DepthQuantity.Sign() > 0 {
-					if i == 0 {
-						bidPrice = aggregatePrice(sideBook, s.DepthQuantity)
-						bidPrice = bidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
-					} else if i > 0 && quote.BidLayerPips.Sign() > 0 {
-						pips := quote.BidLayerPips.Mul(s.makerMarket.TickSize)
-						bidPrice = bidPrice.Sub(pips)
-					}
+					requiredDepth = s.DepthQuantity
 				} else {
-					bidPrice = aggregatePrice(sideBook, accumulativeBidQuantity)
-					bidPrice = bidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
-				}
-			} else {
-				if i == 0 {
-					bidPrice = bidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
-				} else if i > 0 && quote.BidLayerPips.Sign() > 0 {
-					pips := quote.BidLayerPips.Mul(s.makerMarket.TickSize)
-					bidPrice = bidPrice.Sub(pips)
+					requiredDepth = accumulativeBidQuantity
 				}
 			}
+
+			bidPrice = s.getLayerPrice(i, types.SideTypeBuy, s.sourceBook, quote, requiredDepth)
 
 			if i == 0 {
 				s.logger.Infof("maker best bid price %f", bidPrice.Float64())
@@ -857,27 +850,16 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			accumulativeAskQuantity = accumulativeAskQuantity.Add(askQuantity)
 
+			requiredDepth := fixedpoint.Zero
 			if s.UseDepthPrice {
 				if s.DepthQuantity.Sign() > 0 {
-					if i == 0 {
-						askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), s.DepthQuantity)
-						askPrice = askPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
-					} else if i > 0 && quote.AskLayerPips.Sign() > 0 {
-						pips := quote.AskLayerPips.Mul(s.makerMarket.TickSize)
-						askPrice = askPrice.Add(pips)
-					}
+					requiredDepth = s.DepthQuantity
 				} else {
-					askPrice = aggregatePrice(sourceBook.SideBook(types.SideTypeSell), accumulativeAskQuantity)
-					askPrice = askPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
-				}
-			} else {
-				if i == 0 {
-					askPrice = askPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
-				} else if i > 0 && quote.AskLayerPips.Sign() > 0 {
-					pips := quote.AskLayerPips.Mul(s.makerMarket.TickSize)
-					askPrice = askPrice.Add(pips)
+					requiredDepth = accumulativeAskQuantity
 				}
 			}
+
+			askPrice = s.getLayerPrice(i, types.SideTypeSell, s.sourceBook, quote, requiredDepth)
 
 			if i == 0 {
 				s.logger.Infof("maker best ask price %f", askPrice.Float64())
@@ -1168,7 +1150,7 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Validate() error {
-	if s.Quantity.IsZero() || s.QuantityScale == nil {
+	if s.Quantity.IsZero() && s.QuantityScale == nil {
 		return errors.New("quantity or quantityScale can not be empty")
 	}
 
