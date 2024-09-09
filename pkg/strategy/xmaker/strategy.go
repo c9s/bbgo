@@ -937,7 +937,7 @@ func aggregatePriceVolumeSliceWithPriceFilter(pvs types.PriceVolumeSlice, filter
 // tryArbitrage tries to arbitrage between the source and maker exchange
 func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote) (bool, error) {
 	marginBidPrice := quote.BestBidPrice.Mul(fixedpoint.One.Sub(quote.BidMargin))
-	marginAskPrice := quote.BestAskPrice.Mul(fixedpoint.One.Add(quote.BidMargin))
+	marginAskPrice := quote.BestAskPrice.Mul(fixedpoint.One.Add(quote.AskMargin))
 
 	var iocOrders []types.SubmitOrder
 	if makerBid, makerAsk, ok := s.makerBook.BestBidAndAsk(); ok {
@@ -955,8 +955,8 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote) (bool, error)
 			})
 
 		} else if makerBid.Price.Compare(marginAskPrice) >= 0 {
-			askPvs := s.makerBook.SideBook(types.SideTypeSell)
-			sumPv := aggregatePriceVolumeSliceWithPriceFilter(askPvs, marginBidPrice)
+			bidPvs := s.makerBook.SideBook(types.SideTypeBuy)
+			sumPv := aggregatePriceVolumeSliceWithPriceFilter(bidPvs, marginBidPrice)
 
 			// send ioc order for arbitrage
 			iocOrders = append(iocOrders, types.SubmitOrder{
