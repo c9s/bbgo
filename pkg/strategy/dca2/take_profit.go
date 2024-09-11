@@ -27,6 +27,10 @@ func (s *Strategy) placeTakeProfitOrders(ctx context.Context) error {
 	}
 
 	roundPosition := types.NewPositionFromMarket(s.Market)
+	roundPosition.SetExchangeFeeRate(s.ExchangeSession.ExchangeName, types.ExchangeFee{
+		MakerFeeRate: s.ExchangeSession.MakerFeeRate,
+		TakerFeeRate: s.ExchangeSession.TakerFeeRate,
+	})
 
 	for _, trade := range trades {
 		s.logger.Infof("add trade into the position of this round %s", trade.String())
