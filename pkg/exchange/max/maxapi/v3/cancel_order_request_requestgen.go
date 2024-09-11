@@ -136,6 +136,12 @@ func (c *CancelOrderRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (c *CancelOrderRequest) GetPath() string {
+	return "/api/v3/order"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (c *CancelOrderRequest) Do(ctx context.Context) (*max.Order, error) {
 
 	params, err := c.GetParameters()
@@ -144,7 +150,9 @@ func (c *CancelOrderRequest) Do(ctx context.Context) (*max.Order, error) {
 	}
 	query := url.Values{}
 
-	apiURL := "/api/v3/order"
+	var apiURL string
+
+	apiURL = c.GetPath()
 
 	req, err := c.client.NewAuthenticatedRequest(ctx, "DELETE", apiURL, query, params)
 	if err != nil {
@@ -157,8 +165,32 @@ func (c *CancelOrderRequest) Do(ctx context.Context) (*max.Order, error) {
 	}
 
 	var apiResponse max.Order
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return &apiResponse, nil
 }
