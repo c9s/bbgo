@@ -9,8 +9,6 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
-
-	max "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 )
 
 func (c *CancelWalletOrderAllRequest) Side(side string) *CancelWalletOrderAllRequest {
@@ -28,7 +26,7 @@ func (c *CancelWalletOrderAllRequest) GroupID(groupID uint32) *CancelWalletOrder
 	return c
 }
 
-func (c *CancelWalletOrderAllRequest) WalletType(walletType max.WalletType) *CancelWalletOrderAllRequest {
+func (c *CancelWalletOrderAllRequest) WalletType(walletType WalletType) *CancelWalletOrderAllRequest {
 	c.walletType = walletType
 	return c
 }
@@ -166,6 +164,12 @@ func (c *CancelWalletOrderAllRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (c *CancelWalletOrderAllRequest) GetPath() string {
+	return "/api/v3/wallet/:walletType/orders"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (c *CancelWalletOrderAllRequest) Do(ctx context.Context) ([]OrderCancelResponse, error) {
 
 	params, err := c.GetParameters()
@@ -174,7 +178,9 @@ func (c *CancelWalletOrderAllRequest) Do(ctx context.Context) ([]OrderCancelResp
 	}
 	query := url.Values{}
 
-	apiURL := "/api/v3/wallet/:walletType/orders"
+	var apiURL string
+
+	apiURL = c.GetPath()
 	slugs, err := c.GetSlugsMap()
 	if err != nil {
 		return nil, err
@@ -193,8 +199,32 @@ func (c *CancelWalletOrderAllRequest) Do(ctx context.Context) ([]OrderCancelResp
 	}
 
 	var apiResponse []OrderCancelResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return apiResponse, nil
 }
