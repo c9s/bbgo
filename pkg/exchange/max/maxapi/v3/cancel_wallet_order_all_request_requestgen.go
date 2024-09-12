@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -26,7 +27,7 @@ func (c *CancelWalletOrderAllRequest) GroupID(groupID uint32) *CancelWalletOrder
 	return c
 }
 
-func (c *CancelWalletOrderAllRequest) WalletType(walletType WalletType) *CancelWalletOrderAllRequest {
+func (c *CancelWalletOrderAllRequest) WalletType(walletType max.WalletType) *CancelWalletOrderAllRequest {
 	c.walletType = walletType
 	return c
 }
