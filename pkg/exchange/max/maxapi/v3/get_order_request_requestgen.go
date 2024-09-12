@@ -136,6 +136,12 @@ func (g *GetOrderRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetOrderRequest) GetPath() string {
+	return "/api/v3/order"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetOrderRequest) Do(ctx context.Context) (*max.Order, error) {
 
 	// empty params for GET operation
@@ -145,7 +151,9 @@ func (g *GetOrderRequest) Do(ctx context.Context) (*max.Order, error) {
 		return nil, err
 	}
 
-	apiURL := "/api/v3/order"
+	var apiURL string
+
+	apiURL = g.GetPath()
 
 	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
@@ -158,8 +166,32 @@ func (g *GetOrderRequest) Do(ctx context.Context) (*max.Order, error) {
 	}
 
 	var apiResponse max.Order
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return &apiResponse, nil
 }
