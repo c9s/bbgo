@@ -249,7 +249,7 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 
 		default:
 			if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
-				log.WithError(err).Errorf("set read deadline error: %s", err.Error())
+				log.WithError(err).Errorf("unable to set read deadline: %v", err)
 			}
 
 			mt, message, err := conn.ReadMessage()
@@ -300,7 +300,7 @@ func (s *StandardStream) Read(ctx context.Context, conn *websocket.Conn, cancel 
 			var e interface{}
 			e, err = s.parser(message)
 			if err != nil {
-				log.WithError(err).Errorf("websocket event parse error, message: %s", message)
+				log.WithError(err).Errorf("unable to parse the websocket message. err: %v, message: %s", err, message)
 				// emit raw message even if occurs error, because we want anything can be detected
 				s.EmitRawMessage(message)
 				continue
@@ -352,7 +352,7 @@ func (s *StandardStream) ping(
 			}
 
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
-				log.WithError(err).Error("ping error", err)
+				log.WithError(err).Warnf("unable to write ws control message, ping error: %v", err)
 				s.Reconnect()
 				return
 			}
@@ -439,7 +439,7 @@ func (s *StandardStream) reconnector(ctx context.Context) {
 
 			log.Warnf("re-connecting...")
 			if err := s.DialAndConnect(ctx); err != nil {
-				log.WithError(err).Errorf("re-connect error, try to reconnect later")
+				log.WithError(err).Warnf("re-connect error: %v, will reconnect again later...", err)
 
 				// re-emit the re-connect signal if error
 				s.Reconnect()
