@@ -359,6 +359,7 @@ func (b *ActiveOrderBook) Add(orders ...types.Order) {
 		}
 
 		b.add(order)
+		b.EmitNew(order)
 	}
 }
 
