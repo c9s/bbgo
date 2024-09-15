@@ -480,8 +480,13 @@ func (s *Strategy) getLayerPrice(
 		}
 	}
 
+	sideBook := sourceBook.SideBook(side)
+	if pv, ok := sideBook.First(); ok {
+		price = pv.Price
+	}
+
 	if requiredDepth.Sign() > 0 {
-		price = aggregatePrice(sourceBook.SideBook(side), requiredDepth)
+		price = aggregatePrice(sideBook, requiredDepth)
 		price = price.Mul(fixedpoint.One.Add(delta))
 		if i > 0 {
 			price = price.Add(pips.Mul(s.makerMarket.TickSize))
