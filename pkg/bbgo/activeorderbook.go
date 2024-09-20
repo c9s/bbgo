@@ -359,7 +359,6 @@ func (b *ActiveOrderBook) Add(orders ...types.Order) {
 		}
 
 		b.add(order)
-		b.EmitNew(order)
 	}
 }
 
@@ -424,6 +423,7 @@ func (b *ActiveOrderBook) add(order types.Order) {
 
 		b.orders.Add(order)
 		b.pendingOrderUpdates.Remove(pendingOrder.OrderID)
+		b.EmitNew(order)
 
 		// when using add(order), it's usually a new maker order on the order book.
 		// so, when it's not status=new, we should trigger order update handler
@@ -434,6 +434,7 @@ func (b *ActiveOrderBook) add(order types.Order) {
 
 	} else {
 		b.orders.Add(order)
+		b.EmitNew(order)
 	}
 }
 
