@@ -16,6 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
+	"github.com/c9s/bbgo/pkg/strategy/xmaker"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
@@ -570,37 +571,15 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	// adjust quantity according to the balances
 	account := s.hedgeSession.GetAccount()
-	switch side {
 
-	case types.SideTypeBuy:
-		// check quote quantity
-		if quote, ok := account.Balance(s.hedgeMarket.QuoteCurrency); ok {
-			if quote.Available.Compare(notional) < 0 {
-				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
-				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, lastPrice.Mul(lastPriceModifier), quote.Available)
-				quantity = s.hedgeMarket.TruncateQuantity(quantity)
-			}
-		}
-
-	case types.SideTypeSell:
-		// check quote quantity
-		if base, ok := account.Balance(s.hedgeMarket.BaseCurrency); ok {
-			if base.Available.Compare(quantity) < 0 {
-				quantity = base.Available
-			}
-		}
-	}
+	quantity = xmaker.AdjustHedgeQuantityWithAvailableBalance(account,
+		s.hedgeMarket, side, quantity, lastPrice)
 
 	// truncate quantity for the supported precision
 	quantity = s.hedgeMarket.TruncateQuantity(quantity)
 
-	if notional.Compare(s.hedgeMarket.MinNotional.Mul(minGap)) <= 0 {
-		log.Warnf("the adjusted amount %v is less than minimal notional %v, skipping hedge", notional, s.hedgeMarket.MinNotional)
-		return
-	}
-
-	if quantity.Compare(s.hedgeMarket.MinQuantity.Mul(minGap)) <= 0 {
-		log.Warnf("the adjusted quantity %v is less than minimal quantity %v, skipping hedge", quantity, s.hedgeMarket.MinQuantity)
+	if s.hedgeMarket.IsDustQuantity(quantity, lastPrice) {
+		log.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
 		return
 	}
 
@@ -613,7 +592,6 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		s.hedgeErrorRateReservation = nil
 	}
 
-	log.Infof("submitting %s hedge order %s %v", s.HedgeSymbol, side.String(), quantity)
 	bbgo.Notify("Submitting %s hedge order %s %v", s.HedgeSymbol, side.String(), quantity)
 
 	_, err := s.HedgeOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
