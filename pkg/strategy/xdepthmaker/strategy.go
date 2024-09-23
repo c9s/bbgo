@@ -487,10 +487,8 @@ func (s *Strategy) CrossRun(
 
 				position := s.Position.GetBase()
 
-				s.mu.Lock()
 				coveredPosition := s.CoveredPosition.Get()
 				uncoverPosition := position.Sub(coveredPosition)
-				s.mu.Unlock()
 
 				absPos := uncoverPosition.Abs()
 				if absPos.Compare(s.hedgeMarket.MinQuantity) > 0 {
@@ -537,16 +535,17 @@ func (s *Strategy) CrossRun(
 }
 
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
-	side := types.SideTypeBuy
 	if pos.IsZero() {
 		return
 	}
 
-	quantity := pos.Abs()
-
+	// the default side
+	side := types.SideTypeBuy
 	if pos.Sign() < 0 {
 		side = types.SideTypeSell
 	}
+
+	quantity := pos.Abs()
 
 	lastPrice := s.lastPrice
 	sourceBook := s.pricingBook.CopyDepth(1)
