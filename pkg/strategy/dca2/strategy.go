@@ -375,7 +375,7 @@ func (s *Strategy) Close(ctx context.Context) error {
 
 	var err error
 	if s.UniversalCancelAllOrdersWhenClose {
-		err = tradingutil.UniversalCancelAllOrders(ctx, s.ExchangeSession.Exchange, nil)
+		err = tradingutil.UniversalCancelAllOrders(ctx, s.ExchangeSession.Exchange, s.Symbol, nil)
 	} else {
 		err = s.OrderExecutor.GracefulCancel(ctx)
 	}
@@ -398,7 +398,7 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	}
 
 	// ignore the first cancel error, this skips one open-orders query request
-	if err := tradingutil.UniversalCancelAllOrders(ctx, session.Exchange, nil); err == nil {
+	if err := tradingutil.UniversalCancelAllOrders(ctx, session.Exchange, s.Symbol, nil); err == nil {
 		return nil
 	}
 
@@ -418,7 +418,7 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 			break
 		}
 
-		if err := tradingutil.UniversalCancelAllOrders(ctx, session.Exchange, openOrders); err != nil {
+		if err := tradingutil.UniversalCancelAllOrders(ctx, session.Exchange, s.Symbol, openOrders); err != nil {
 			s.logger.WithError(err).Errorf("unable to cancel all orders")
 			werr = multierr.Append(werr, err)
 		}

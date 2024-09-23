@@ -18,6 +18,7 @@ import (
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
 
 var lastPriceModifier = fixedpoint.NewFromFloat(1.001)
@@ -46,9 +47,10 @@ type CrossExchangeMarketMakingStrategy struct {
 	makerMarket, hedgeMarket   types.Market
 
 	// persistence fields
-	Position        *types.Position    `json:"position,omitempty" persistence:"position"`
-	ProfitStats     *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
-	CoveredPosition fixedpoint.Value   `json:"coveredPosition,omitempty" persistence:"covered_position"`
+	Position    *types.Position    `json:"position,omitempty" persistence:"position"`
+	ProfitStats *types.ProfitStats `json:"profitStats,omitempty" persistence:"profit_stats"`
+
+	CoveredPosition fixedpoint.MutexValue
 
 	core.ConverterManager
 
@@ -152,9 +154,7 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 		// 	  2) short position -> increase short position
 
 		// TODO: make this atomic
-		s.mu.Lock()
-		s.CoveredPosition = s.CoveredPosition.Add(c)
-		s.mu.Unlock()
+		s.CoveredPosition.Add(c)
 	})
 	return nil
 }
@@ -486,13 +486,18 @@ func (s *Strategy) CrossRun(
 				s.MakerOrderExecutor.TradeCollector().Process()
 
 				position := s.Position.GetBase()
-				uncoverPosition := position.Sub(s.CoveredPosition)
+
+				s.mu.Lock()
+				coveredPosition := s.CoveredPosition.Get()
+				uncoverPosition := position.Sub(coveredPosition)
+				s.mu.Unlock()
+
 				absPos := uncoverPosition.Abs()
 				if absPos.Compare(s.hedgeMarket.MinQuantity) > 0 {
 					log.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
 						s.Symbol,
 						position,
-						s.CoveredPosition,
+						coveredPosition,
 						uncoverPosition,
 					)
 
@@ -518,6 +523,10 @@ func (s *Strategy) CrossRun(
 
 		if err := s.HedgeOrderExecutor.GracefulCancel(ctx); err != nil {
 			log.WithError(err).Errorf("graceful cancel %s order error", s.HedgeSymbol)
+		}
+
+		if err := tradingutil.UniversalCancelAllOrders(ctx, s.makerSession.Exchange, s.Symbol, s.MakerOrderExecutor.ActiveMakerOrders().Orders()); err != nil {
+			log.WithError(err).Errorf("unable to cancel all orders")
 		}
 
 		bbgo.Sync(ctx, s)
@@ -625,13 +634,9 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	// if the hedge is on sell side, then we should add positive position
 	switch side {
 	case types.SideTypeSell:
-		s.mu.Lock()
-		s.CoveredPosition = s.CoveredPosition.Add(quantity)
-		s.mu.Unlock()
+		s.CoveredPosition.Add(quantity)
 	case types.SideTypeBuy:
-		s.mu.Lock()
-		s.CoveredPosition = s.CoveredPosition.Add(quantity.Neg())
-		s.mu.Unlock()
+		s.CoveredPosition.Add(quantity.Neg())
 	}
 }
 
