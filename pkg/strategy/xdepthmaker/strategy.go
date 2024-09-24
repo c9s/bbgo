@@ -593,10 +593,10 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) error {
 	case HedgeStrategyMarket:
 		return s.executeHedgeMarket(ctx, side, quantity)
 	case HedgeStrategyBboCounterParty1:
-
+		return s.executeHedgeBboCounterParty1(ctx, side, quantity)
+	default:
+		return fmt.Errorf("unsupported hedge strategy %s, please check your configuration", s.HedgeStrategy)
 	}
-
-	return nil
 }
 
 func (s *Strategy) executeHedgeBboCounterParty1(
@@ -629,14 +629,15 @@ func (s *Strategy) executeHedgeBboCounterParty1(
 	}
 
 	if s.hedgeMarket.IsDustQuantity(quantity, price) {
-		s.logger.Warnf("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
 		return ErrDustQuantity
 	}
 
+	// submit order as limit taker
 	return s.executeHedgeOrder(ctx, types.SubmitOrder{
 		Market:   s.hedgeMarket,
 		Symbol:   s.hedgeMarket.Symbol,
 		Type:     types.OrderTypeLimit,
+		Price:    price,
 		Side:     side,
 		Quantity: quantity,
 	})
@@ -672,7 +673,6 @@ func (s *Strategy) executeHedgeMarket(
 	}
 
 	if s.hedgeMarket.IsDustQuantity(quantity, price) {
-		s.logger.Warnf("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
 		return ErrDustQuantity
 	}
 
@@ -687,23 +687,25 @@ func (s *Strategy) executeHedgeMarket(
 
 // getSourceBboPrice returns the best bid offering price from the source order book
 func (s *Strategy) getSourceBboPrice(side types.SideType) fixedpoint.Value {
-	switch side {
-
-	case types.SideTypeSell:
-		if bestAsk, ok := s.sourceBook.BestAsk(); ok {
-			return bestAsk.Price
-		}
-
-	case types.SideTypeBuy:
-		if bestBid, ok := s.sourceBook.BestBid(); ok {
-			return bestBid.Price
-		}
+	bid, ask, ok := s.sourceBook.BestBidAndAsk()
+	if !ok {
+		return fixedpoint.Zero
 	}
 
+	switch side {
+	case types.SideTypeSell:
+		return ask.Price
+	case types.SideTypeBuy:
+		return bid.Price
+	}
 	return fixedpoint.Zero
 }
 
 func (s *Strategy) executeHedgeOrder(ctx context.Context, submitOrder types.SubmitOrder) error {
+	if err := s.HedgeOrderExecutor.GracefulCancel(ctx); err != nil {
+		s.logger.WithError(err).Warnf("graceful cancel order error")
+	}
+
 	if s.hedgeErrorRateReservation != nil {
 		if !s.hedgeErrorRateReservation.OK() {
 			s.logger.Warnf("rate reservation hitted, skip executing hedge order")
@@ -717,9 +719,12 @@ func (s *Strategy) executeHedgeOrder(ctx context.Context, submitOrder types.Subm
 		s.hedgeErrorRateReservation = nil
 	}
 
-	bbgo.Notify("Submitting %s hedge order on %s %s %s", s.HedgeSymbol, s.HedgeExchange,
+	bbgo.Notify("Submitting hedge %s order on %s %s %s %s @ %s",
+		submitOrder.Type, s.HedgeSymbol, s.HedgeExchange,
 		submitOrder.Side.String(),
-		submitOrder.Quantity.String())
+		submitOrder.Quantity.String(),
+		submitOrder.Price.String(),
+	)
 
 	_, err := s.HedgeOrderExecutor.SubmitOrders(ctx, submitOrder)
 	if err != nil {
