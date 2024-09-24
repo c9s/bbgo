@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,6 +34,10 @@ const priceUpdateTimeout = 5 * time.Minute
 const ID = "xdepthmaker"
 
 var log = logrus.WithField("strategy", ID)
+
+var ErrZeroQuantity = stderrors.New("quantity is zero")
+var ErrDustQuantity = stderrors.New("quantity is dust")
+var ErrZeroPrice = stderrors.New("price is zero")
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
@@ -160,6 +165,14 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	return nil
 }
 
+type HedgeStrategy string
+
+const (
+	HedgeStrategyMarket           HedgeStrategy = "market"
+	HedgeStrategyBboCounterParty1 HedgeStrategy = "bbo-counter-party-1"
+	HedgeStrategyBboQueue1        HedgeStrategy = "bbo-queue-1"
+)
+
 type Strategy struct {
 	*CrossExchangeMarketMakingStrategy
 
@@ -181,6 +194,8 @@ type Strategy struct {
 	UpdateInterval types.Duration `json:"updateInterval"`
 
 	HedgeInterval types.Duration `json:"hedgeInterval"`
+
+	HedgeStrategy HedgeStrategy `json:"hedgeStrategy"`
 
 	FullReplenishInterval types.Duration `json:"fullReplenishInterval"`
 
@@ -226,16 +241,18 @@ type Strategy struct {
 	// --------------------------------
 
 	// pricingBook is the order book (depth) from the hedging session
-	pricingBook *types.StreamOrderBook
+	sourceBook *types.StreamOrderBook
 
 	hedgeErrorLimiter         *rate.Limiter
 	hedgeErrorRateReservation *rate.Reservation
 
 	askPriceHeartBeat, bidPriceHeartBeat *types.PriceHeartBeat
 
-	lastPrice fixedpoint.Value
+	lastPrice fixedpoint.MutexValue
 
 	stopC, authedC chan struct{}
+
+	logger logrus.FieldLogger
 }
 
 func (s *Strategy) ID() string {
@@ -243,7 +260,14 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("%s:%s:%s-%s", ID, s.Symbol, s.MakerExchange, s.HedgeExchange)
+	// this generates a unique instance ID for the strategy
+	return strings.Join([]string{
+		ID,
+		s.MakerExchange,
+		s.Symbol,
+		s.HedgeExchange,
+		s.HedgeSymbol,
+	}, "-")
 }
 
 func (s *Strategy) Initialize() error {
@@ -253,6 +277,12 @@ func (s *Strategy) Initialize() error {
 
 	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
 	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
+	s.logger = log.WithFields(logrus.Fields{
+		"symbol":            s.Symbol,
+		"strategy":          ID,
+		"strategy_instance": s.InstanceID(),
+	})
+
 	return nil
 }
 
@@ -303,6 +333,10 @@ func (s *Strategy) Defaults() error {
 
 	if s.HedgeInterval == 0 {
 		s.HedgeInterval = types.Duration(3 * time.Second)
+	}
+
+	if s.HedgeStrategy == "" {
+		s.HedgeStrategy = HedgeStrategyMarket
 	}
 
 	if s.HedgeSymbol == "" {
@@ -394,8 +428,8 @@ func (s *Strategy) CrossRun(
 		return err
 	}
 
-	s.pricingBook = types.NewStreamBook(s.HedgeSymbol, s.hedgeSession.ExchangeName)
-	s.pricingBook.BindStream(s.hedgeSession.MarketDataStream)
+	s.sourceBook = types.NewStreamBook(s.HedgeSymbol, s.hedgeSession.ExchangeName)
+	s.sourceBook.BindStream(s.hedgeSession.MarketDataStream)
 
 	s.stopC = make(chan struct{})
 
@@ -452,7 +486,7 @@ func (s *Strategy) CrossRun(
 				s.updateQuote(ctx, 0)
 				lastOrderReplenishTime = time.Now()
 
-			case sig, ok := <-s.pricingBook.C:
+			case sig, ok := <-s.sourceBook.C:
 				// when any book change event happened
 				if !ok {
 					return
@@ -501,7 +535,14 @@ func (s *Strategy) CrossRun(
 					)
 
 					if !s.DisableHedge {
-						s.Hedge(ctx, uncoverPosition.Neg())
+						if err := s.Hedge(ctx, uncoverPosition.Neg()); err != nil {
+							//goland:noinspection GoDirectComparisonOfErrors
+							switch err {
+							case ErrZeroQuantity, ErrDustQuantity:
+							default:
+								s.logger.WithError(err).Errorf("unable to hedge position")
+							}
+						}
 					}
 				}
 			}
@@ -535,9 +576,9 @@ func (s *Strategy) CrossRun(
 	return nil
 }
 
-func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
+func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) error {
 	if pos.IsZero() {
-		return
+		return nil
 	}
 
 	// the default side
@@ -548,73 +589,154 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	quantity := pos.Abs()
 
-	lastPrice := s.lastPrice
-	sourceBook := s.pricingBook.CopyDepth(1)
-	switch side {
+	switch s.HedgeStrategy {
+	case HedgeStrategyMarket:
+		return s.executeHedgeMarket(ctx, side, quantity)
+	case HedgeStrategyBboCounterParty1:
 
-	case types.SideTypeBuy:
-		if bestAsk, ok := sourceBook.BestAsk(); ok {
-			lastPrice = bestAsk.Price
-		}
-
-	case types.SideTypeSell:
-		if bestBid, ok := sourceBook.BestBid(); ok {
-			lastPrice = bestBid.Price
-		}
 	}
 
-	notional := quantity.Mul(lastPrice)
-	if notional.Compare(s.hedgeMarket.MinNotional) <= 0 {
-		log.Warnf("%s %v less than min notional, skipping hedge", s.Symbol, notional)
-		return
+	return nil
+}
+
+func (s *Strategy) executeHedgeBboCounterParty1(
+	ctx context.Context,
+	side types.SideType,
+	quantity fixedpoint.Value,
+) error {
+	lastPrice := s.lastPrice.Get()
+	if sourcePrice := s.getSourceBboPrice(side.Reverse()); sourcePrice.Sign() > 0 {
+		lastPrice = sourcePrice
+	}
+
+	if lastPrice.IsZero() {
+		return ErrZeroPrice
 	}
 
 	// adjust quantity according to the balances
 	account := s.hedgeSession.GetAccount()
 
 	quantity = xmaker.AdjustHedgeQuantityWithAvailableBalance(account,
-		s.hedgeMarket, side, quantity, lastPrice)
+		s.hedgeMarket,
+		side,
+		quantity,
+		lastPrice)
 
 	// truncate quantity for the supported precision
 	quantity = s.hedgeMarket.TruncateQuantity(quantity)
+	if quantity.IsZero() {
+		return ErrZeroQuantity
+	}
 
 	if s.hedgeMarket.IsDustQuantity(quantity, lastPrice) {
-		log.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
-		return
+		s.logger.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
+		return ErrDustQuantity
 	}
 
-	if s.hedgeErrorRateReservation != nil {
-		if !s.hedgeErrorRateReservation.OK() {
-			return
-		}
-		bbgo.Notify("Hit hedge error rate limit, waiting...")
-		time.Sleep(s.hedgeErrorRateReservation.Delay())
-		s.hedgeErrorRateReservation = nil
+	return s.executeHedgeOrder(ctx, types.SubmitOrder{
+		Market:   s.hedgeMarket,
+		Symbol:   s.hedgeMarket.Symbol,
+		Type:     types.OrderTypeLimit,
+		Side:     side,
+		Quantity: quantity,
+	})
+}
+
+func (s *Strategy) executeHedgeMarket(
+	ctx context.Context,
+	side types.SideType,
+	quantity fixedpoint.Value,
+) error {
+	lastPrice := s.lastPrice.Get()
+	if sourcePrice := s.getSourceBboPrice(side.Reverse()); sourcePrice.Sign() > 0 {
+		lastPrice = sourcePrice
 	}
 
-	bbgo.Notify("Submitting %s hedge order %s %v", s.HedgeSymbol, side.String(), quantity)
+	if lastPrice.IsZero() {
+		return ErrZeroPrice
+	}
 
-	_, err := s.HedgeOrderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+	// adjust quantity according to the balances
+	account := s.hedgeSession.GetAccount()
+
+	quantity = xmaker.AdjustHedgeQuantityWithAvailableBalance(account,
+		s.hedgeMarket,
+		side,
+		quantity,
+		lastPrice)
+
+	// truncate quantity for the supported precision
+	quantity = s.hedgeMarket.TruncateQuantity(quantity)
+	if quantity.IsZero() {
+		return ErrZeroQuantity
+	}
+
+	if s.hedgeMarket.IsDustQuantity(quantity, lastPrice) {
+		s.logger.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
+		return ErrDustQuantity
+	}
+
+	return s.executeHedgeOrder(ctx, types.SubmitOrder{
 		Market:   s.hedgeMarket,
 		Symbol:   s.hedgeMarket.Symbol,
 		Type:     types.OrderTypeMarket,
 		Side:     side,
 		Quantity: quantity,
 	})
+}
 
+// getSourceBboPrice returns the best bid offering price from the source order book
+func (s *Strategy) getSourceBboPrice(side types.SideType) fixedpoint.Value {
+	switch side {
+
+	case types.SideTypeSell:
+		if bestAsk, ok := s.sourceBook.BestAsk(); ok {
+			return bestAsk.Price
+		}
+
+	case types.SideTypeBuy:
+		if bestBid, ok := s.sourceBook.BestBid(); ok {
+			return bestBid.Price
+		}
+	}
+
+	return fixedpoint.Zero
+}
+
+func (s *Strategy) executeHedgeOrder(ctx context.Context, submitOrder types.SubmitOrder) error {
+	if s.hedgeErrorRateReservation != nil {
+		if !s.hedgeErrorRateReservation.OK() {
+			s.logger.Warnf("rate reservation hitted, skip executing hedge order")
+			return nil
+		}
+
+		bbgo.Notify("Hit hedge error rate limit, waiting...")
+		time.Sleep(s.hedgeErrorRateReservation.Delay())
+
+		// reset reservation
+		s.hedgeErrorRateReservation = nil
+	}
+
+	bbgo.Notify("Submitting %s hedge order on %s %s %s", s.HedgeSymbol, s.HedgeExchange,
+		submitOrder.Side.String(),
+		submitOrder.Quantity.String())
+
+	_, err := s.HedgeOrderExecutor.SubmitOrders(ctx, submitOrder)
 	if err != nil {
+		// allocate a new reservation
 		s.hedgeErrorRateReservation = s.hedgeErrorLimiter.Reserve()
-		log.WithError(err).Errorf("market order submit error: %s", err.Error())
-		return
+		return err
 	}
 
 	// if the hedge is on sell side, then we should add positive position
-	switch side {
+	switch submitOrder.Side {
 	case types.SideTypeSell:
-		s.CoveredPosition.Add(quantity)
+		s.CoveredPosition.Add(submitOrder.Quantity)
 	case types.SideTypeBuy:
-		s.CoveredPosition.Add(quantity.Neg())
+		s.CoveredPosition.Add(submitOrder.Quantity.Neg())
 	}
+
+	return nil
 }
 
 func (s *Strategy) runTradeRecover(ctx context.Context) {
@@ -835,7 +957,7 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 		return
 	}
 
-	bestBid, bestAsk, hasPrice := s.pricingBook.BestBidAndAsk()
+	bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
 	if !hasPrice {
 		return
 	}
@@ -844,9 +966,9 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 	bestAskPrice := bestAsk.Price
 	log.Infof("%s book ticker: best ask / best bid = %v / %v", s.HedgeSymbol, bestAskPrice, bestBidPrice)
 
-	s.lastPrice = bestBidPrice.Add(bestAskPrice).Div(Two)
+	s.lastPrice.Set(bestBidPrice.Add(bestAskPrice).Div(Two))
 
-	bookLastUpdateTime := s.pricingBook.LastUpdateTime()
+	bookLastUpdateTime := s.sourceBook.LastUpdateTime()
 
 	if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
 		log.WithError(err).Warnf("quote update error, %s price not updating, order book last update: %s ago",
@@ -880,7 +1002,7 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 
 	log.Infof("quote balance: %s, base balance: %s", quoteBalance, baseBalance)
 
-	submitOrders, err := s.generateMakerOrders(s.pricingBook, maxLayer, baseBalance.Available, quoteBalance.Available)
+	submitOrders, err := s.generateMakerOrders(s.sourceBook, maxLayer, baseBalance.Available, quoteBalance.Available)
 	if err != nil {
 		log.WithError(err).Errorf("generate order error")
 		return
