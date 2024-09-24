@@ -594,8 +594,10 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) error {
 		return s.executeHedgeMarket(ctx, side, quantity)
 	case HedgeStrategyBboCounterParty1:
 		return s.executeHedgeBboCounterParty1(ctx, side, quantity)
+	case HedgeStrategyBboQueue1:
+		return s.executeHedgeBboQueue1(ctx, side, quantity)
 	default:
-		return fmt.Errorf("unsupported hedge strategy %s, please check your configuration", s.HedgeStrategy)
+		return fmt.Errorf("unsupported or invalid hedge strategy setup %q, please check your configuration", s.HedgeStrategy)
 	}
 }
 
@@ -606,6 +608,50 @@ func (s *Strategy) executeHedgeBboCounterParty1(
 ) error {
 	price := s.lastSourcePrice.Get()
 	if sourcePrice := s.getSourceBboPrice(side.Reverse()); sourcePrice.Sign() > 0 {
+		price = sourcePrice
+	}
+
+	if price.IsZero() {
+		return ErrZeroPrice
+	}
+
+	// adjust quantity according to the balances
+	account := s.hedgeSession.GetAccount()
+
+	quantity = xmaker.AdjustHedgeQuantityWithAvailableBalance(account,
+		s.hedgeMarket,
+		side,
+		quantity,
+		price)
+
+	// truncate quantity for the supported precision
+	quantity = s.hedgeMarket.TruncateQuantity(quantity)
+	if quantity.IsZero() {
+		return ErrZeroQuantity
+	}
+
+	if s.hedgeMarket.IsDustQuantity(quantity, price) {
+		return ErrDustQuantity
+	}
+
+	// submit order as limit taker
+	return s.executeHedgeOrder(ctx, types.SubmitOrder{
+		Market:   s.hedgeMarket,
+		Symbol:   s.hedgeMarket.Symbol,
+		Type:     types.OrderTypeLimit,
+		Price:    price,
+		Side:     side,
+		Quantity: quantity,
+	})
+}
+
+func (s *Strategy) executeHedgeBboQueue1(
+	ctx context.Context,
+	side types.SideType,
+	quantity fixedpoint.Value,
+) error {
+	price := s.lastSourcePrice.Get()
+	if sourcePrice := s.getSourceBboPrice(side); sourcePrice.Sign() > 0 {
 		price = sourcePrice
 	}
 
