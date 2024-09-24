@@ -395,7 +395,9 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	return errs
 }
 
-func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, since, util time.Time, lastOrderID uint64) (orders []types.Order, err error) {
+func (e *Exchange) QueryClosedOrders(
+	ctx context.Context, symbol string, since, util time.Time, lastOrderID uint64,
+) (orders []types.Order, err error) {
 	if !since.IsZero() || !util.IsZero() {
 		log.Warn("!!!BYBIT EXCHANGE API NOTICE!!! the since/until conditions will not be effected on SPOT account, bybit exchange does not support time-range-based query currently")
 	}
@@ -465,7 +467,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	limit := uint64(options.Limit)
 	if limit > defaultQueryLimit || limit <= 0 {
-		log.Debugf("limtit is exceeded or zero, update to %d, got: %d", defaultQueryLimit, options.Limit)
+		log.Debugf("the parameter limit exceeds the server boundary or is set to zero. changed to %d, original value: %d", defaultQueryLimit, options.Limit)
 		limit = defaultQueryLimit
 	}
 	req.Limit(limit)
@@ -533,7 +535,9 @@ on the requested interval.
 A k-line's start time is inclusive, but end time is not(startTime + interval - 1 millisecond).
 e.q. 15m interval k line can be represented as 00:00:00.000 ~ 00:14:59.999
 */
-func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+func (e *Exchange) QueryKLines(
+	ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions,
+) ([]types.KLine, error) {
 	req := e.client.NewGetKLinesRequest().Symbol(symbol)
 	intervalStr, err := toLocalInterval(interval)
 	if err != nil {
@@ -543,7 +547,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 	limit := uint64(options.Limit)
 	if limit > defaultKLineLimit || limit <= 0 {
-		log.Debugf("limtit is exceeded or zero, update to %d, got: %d", defaultKLineLimit, options.Limit)
+		log.Debugf("the parameter limit exceeds the server boundary or is set to zero. changed to %d, original value: %d", defaultQueryLimit, options.Limit)
 		limit = defaultKLineLimit
 	}
 	req.Limit(limit)

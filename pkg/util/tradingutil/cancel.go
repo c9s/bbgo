@@ -2,7 +2,6 @@ package tradingutil
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -28,7 +27,7 @@ type CancelAllOrdersByGroupIDService interface {
 //
 // if CancelAllOrdersService is not supported, then it tries CancelAllOrdersBySymbolService which needs at least one symbol
 // for the cancel api request.
-func UniversalCancelAllOrders(ctx context.Context, exchange types.Exchange, openOrders []types.Order) error {
+func UniversalCancelAllOrders(ctx context.Context, exchange types.Exchange, symbol string, openOrders []types.Order) error {
 	if service, ok := exchange.(CancelAllOrdersService); ok {
 		if _, err := service.CancelAllOrders(ctx); err == nil {
 			return nil
@@ -37,23 +36,28 @@ func UniversalCancelAllOrders(ctx context.Context, exchange types.Exchange, open
 		}
 	}
 
-	if len(openOrders) == 0 {
-		return errors.New("to cancel all orders, openOrders can not be empty")
-	}
-
 	var anyErr error
 	if service, ok := exchange.(CancelAllOrdersBySymbolService); ok {
-		var symbols = CollectOrderSymbols(openOrders)
-		for _, symbol := range symbols {
-			_, err := service.CancelOrdersBySymbol(ctx, symbol)
-			if err != nil {
-				anyErr = err
+		if len(symbol) > 0 {
+			_, anyErr = service.CancelOrdersBySymbol(ctx, symbol)
+		} else if len(openOrders) > 0 {
+			var orderSymbols = CollectOrderSymbols(openOrders)
+			for _, orderSymbol := range orderSymbols {
+				_, err := service.CancelOrdersBySymbol(ctx, orderSymbol)
+				if err != nil {
+					anyErr = err
+				}
 			}
 		}
 
 		if anyErr == nil {
 			return nil
 		}
+	}
+
+	if len(openOrders) == 0 {
+		log.Warnf("empty open orders, unable to call specific cancel all orders api, skip")
+		return nil
 	}
 
 	if service, ok := exchange.(CancelAllOrdersByGroupIDService); ok {

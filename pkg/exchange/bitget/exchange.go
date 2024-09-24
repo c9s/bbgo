@@ -197,7 +197,7 @@ func (e *Exchange) QueryKLines(
 
 	limit := uint64(options.Limit)
 	if limit > defaultKLineLimit || limit <= 0 {
-		log.Debugf("limtit is exceeded or zero, update to %d, got: %d", defaultKLineLimit, options.Limit)
+		log.Debugf("the parameter limit exceeds the server boundary or is set to zero. changed to %d, original value: %d", defaultKLineLimit, options.Limit)
 		limit = defaultKLineLimit
 	}
 	req.Limit(strconv.FormatUint(limit, 10))
@@ -568,7 +568,7 @@ func (e *Exchange) QueryTrades(
 
 	limit := options.Limit
 	if limit > queryLimit || limit <= 0 {
-		log.Debugf("limtit is exceeded or zero, update to %d, got: %d", queryLimit, options.Limit)
+		log.Debugf("the parameter limit exceeds the server boundary or is set to zero. changed to %d, original value: %d", queryLimit, options.Limit)
 		limit = queryLimit
 	}
 	req.Limit(strconv.FormatInt(limit, 10))
