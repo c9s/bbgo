@@ -248,7 +248,7 @@ type Strategy struct {
 
 	askPriceHeartBeat, bidPriceHeartBeat *types.PriceHeartBeat
 
-	lastPrice fixedpoint.MutexValue
+	lastSourcePrice fixedpoint.MutexValue
 
 	stopC, authedC chan struct{}
 
@@ -308,7 +308,7 @@ func (s *Strategy) Validate() error {
 	}
 
 	if s.HedgeExchange == "" {
-		return errors.New("maker exchange is not configured")
+		return errors.New("hedge exchange is not configured")
 	}
 
 	if s.DepthScale == nil {
@@ -604,12 +604,12 @@ func (s *Strategy) executeHedgeBboCounterParty1(
 	side types.SideType,
 	quantity fixedpoint.Value,
 ) error {
-	lastPrice := s.lastPrice.Get()
+	price := s.lastSourcePrice.Get()
 	if sourcePrice := s.getSourceBboPrice(side.Reverse()); sourcePrice.Sign() > 0 {
-		lastPrice = sourcePrice
+		price = sourcePrice
 	}
 
-	if lastPrice.IsZero() {
+	if price.IsZero() {
 		return ErrZeroPrice
 	}
 
@@ -620,7 +620,7 @@ func (s *Strategy) executeHedgeBboCounterParty1(
 		s.hedgeMarket,
 		side,
 		quantity,
-		lastPrice)
+		price)
 
 	// truncate quantity for the supported precision
 	quantity = s.hedgeMarket.TruncateQuantity(quantity)
@@ -628,8 +628,8 @@ func (s *Strategy) executeHedgeBboCounterParty1(
 		return ErrZeroQuantity
 	}
 
-	if s.hedgeMarket.IsDustQuantity(quantity, lastPrice) {
-		s.logger.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
+	if s.hedgeMarket.IsDustQuantity(quantity, price) {
+		s.logger.Warnf("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
 		return ErrDustQuantity
 	}
 
@@ -647,12 +647,12 @@ func (s *Strategy) executeHedgeMarket(
 	side types.SideType,
 	quantity fixedpoint.Value,
 ) error {
-	lastPrice := s.lastPrice.Get()
+	price := s.lastSourcePrice.Get()
 	if sourcePrice := s.getSourceBboPrice(side.Reverse()); sourcePrice.Sign() > 0 {
-		lastPrice = sourcePrice
+		price = sourcePrice
 	}
 
-	if lastPrice.IsZero() {
+	if price.IsZero() {
 		return ErrZeroPrice
 	}
 
@@ -663,7 +663,7 @@ func (s *Strategy) executeHedgeMarket(
 		s.hedgeMarket,
 		side,
 		quantity,
-		lastPrice)
+		price)
 
 	// truncate quantity for the supported precision
 	quantity = s.hedgeMarket.TruncateQuantity(quantity)
@@ -671,8 +671,8 @@ func (s *Strategy) executeHedgeMarket(
 		return ErrZeroQuantity
 	}
 
-	if s.hedgeMarket.IsDustQuantity(quantity, lastPrice) {
-		s.logger.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
+	if s.hedgeMarket.IsDustQuantity(quantity, price) {
+		s.logger.Warnf("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
 		return ErrDustQuantity
 	}
 
@@ -966,7 +966,7 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 	bestAskPrice := bestAsk.Price
 	log.Infof("%s book ticker: best ask / best bid = %v / %v", s.HedgeSymbol, bestAskPrice, bestBidPrice)
 
-	s.lastPrice.Set(bestBidPrice.Add(bestAskPrice).Div(Two))
+	s.lastSourcePrice.Set(bestBidPrice.Add(bestAskPrice).Div(Two))
 
 	bookLastUpdateTime := s.sourceBook.LastUpdateTime()
 
