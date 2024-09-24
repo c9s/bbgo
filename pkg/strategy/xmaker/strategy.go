@@ -1030,17 +1030,19 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 	return true, nil
 }
 
-func (s *Strategy) adjustHedgeQuantityWithAvailableBalance(
-	account *types.Account, side types.SideType, quantity, lastPrice fixedpoint.Value,
+func AdjustHedgeQuantityWithAvailableBalance(
+	account *types.Account,
+	market types.Market,
+	side types.SideType, quantity, lastPrice fixedpoint.Value,
 ) fixedpoint.Value {
 	switch side {
 
 	case types.SideTypeBuy:
 		// check quote quantity
-		if quote, ok := account.Balance(s.sourceMarket.QuoteCurrency); ok {
-			if quote.Available.Compare(s.sourceMarket.MinNotional) < 0 {
+		if quote, ok := account.Balance(market.QuoteCurrency); ok {
+			if quote.Available.Compare(market.MinNotional) < 0 {
 				// adjust price to higher 0.1%, so that we can ensure that the order can be executed
-				availableQuote := s.sourceMarket.TruncateQuoteQuantity(quote.Available)
+				availableQuote := market.TruncateQuoteQuantity(quote.Available)
 				quantity = bbgo.AdjustQuantityByMaxAmount(quantity, lastPrice, availableQuote)
 
 			}
@@ -1048,7 +1050,7 @@ func (s *Strategy) adjustHedgeQuantityWithAvailableBalance(
 
 	case types.SideTypeSell:
 		// check quote quantity
-		if base, ok := account.Balance(s.sourceMarket.BaseCurrency); ok {
+		if base, ok := account.Balance(market.BaseCurrency); ok {
 			if base.Available.Compare(quantity) < 0 {
 				quantity = base.Available
 			}
@@ -1056,7 +1058,7 @@ func (s *Strategy) adjustHedgeQuantityWithAvailableBalance(
 	}
 
 	// truncate the quantity to the supported precision
-	return s.sourceMarket.TruncateQuantity(quantity)
+	return market.TruncateQuantity(quantity)
 }
 
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
@@ -1094,7 +1096,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 			return
 		}
 	} else {
-		quantity = s.adjustHedgeQuantityWithAvailableBalance(account, side, quantity, lastPrice)
+		quantity = AdjustHedgeQuantityWithAvailableBalance(
+			account, s.sourceMarket, side, quantity, lastPrice)
 	}
 
 	// truncate quantity for the supported precision

@@ -159,7 +159,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			util.LogErr(err, "unable to cancel adjustment orders")
 		}
 
-		if err := tradingutil.UniversalCancelAllOrders(ctx, s.Session.Exchange, nil); err != nil {
+		if err := tradingutil.UniversalCancelAllOrders(ctx, s.Session.Exchange, s.Symbol, nil); err != nil {
 			util.LogErr(err, "unable to cancel all orders")
 		}
 

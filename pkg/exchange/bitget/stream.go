@@ -435,10 +435,14 @@ func (s *Stream) handleOrderTradeEvent(m OrderTradeEvent) {
 		return
 	}
 
-	debugf("received OrderTradeEvent: %+v", m)
+	debugf("received OrderTradeEvent %s (%s): %+v", m.instId, m.actionType, m)
 
 	for _, order := range m.Orders {
-		debugf("received Order: %+v", order)
+		if order.TradeId == 0 {
+			debugf("received %s order update #%d: %+v", m.instId, order.OrderId, order)
+		} else {
+			debugf("received %s order update #%d and trade update #%d: %+v", m.instId, order.OrderId, order.TradeId, order)
+		}
 
 		globalOrder, err := order.toGlobalOrder()
 		if err != nil {
