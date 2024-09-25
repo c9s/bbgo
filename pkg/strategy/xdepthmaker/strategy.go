@@ -883,6 +883,9 @@ func (s *Strategy) generateMakerOrders(
 			continue
 		}
 
+		accumulatedDepth := fixedpoint.Zero
+		lastMakerPrice := fixedpoint.Zero
+
 	layerLoop:
 		for i := 1; i <= maxLayer; i++ {
 			// simple break, we need to check the market minNotional and minQuantity later
@@ -899,8 +902,9 @@ func (s *Strategy) generateMakerOrders(
 
 			// requiredDepth is the required depth in quote currency
 			requiredDepth := fixedpoint.NewFromFloat(requiredDepthFloat)
+			accumulatedDepth = accumulatedDepth.Add(requiredDepth)
 
-			index := sideBook.IndexByQuoteVolumeDepth(requiredDepth)
+			index := sideBook.IndexByQuoteVolumeDepth(accumulatedDepth)
 
 			pvs := types.PriceVolumeSlice{}
 			if index == -1 {
@@ -913,9 +917,7 @@ func (s *Strategy) generateMakerOrders(
 				continue
 			}
 
-			log.Infof("side: %s required depth: %f, pvs: %+v", side, requiredDepth.Float64(), pvs)
-
-			depthPrice := pvs.AverageDepthPriceByQuote(fixedpoint.Zero, 0)
+			depthPrice := pvs.AverageDepthPriceByQuote(accumulatedDepth, 0)
 
 			switch side {
 			case types.SideTypeBuy:
@@ -935,9 +937,19 @@ func (s *Strategy) generateMakerOrders(
 
 			depthPrice = s.makerMarket.TruncatePrice(depthPrice)
 
+			if lastMakerPrice.Sign() > 0 && depthPrice.Compare(lastMakerPrice) == 0 {
+				switch side {
+				case types.SideTypeBuy:
+					depthPrice = depthPrice.Sub(s.makerMarket.TickSize)
+				case types.SideTypeSell:
+					depthPrice = depthPrice.Add(s.makerMarket.TickSize)
+				}
+			}
+
 			quantity := requiredDepth.Div(depthPrice)
 			quantity = s.makerMarket.TruncateQuantity(quantity)
-			log.Infof("side: %s required depth: %f price: %f quantity: %f", side, requiredDepth.Float64(), depthPrice.Float64(), quantity.Float64())
+
+			s.logger.Infof("%d) %s required depth: %f %s@%s", i, side, accumulatedDepth.Float64(), quantity.String(), depthPrice.String())
 
 			switch side {
 			case types.SideTypeBuy:
@@ -986,6 +998,8 @@ func (s *Strategy) generateMakerOrders(
 				Price:    depthPrice,
 				Quantity: quantity,
 			})
+
+			lastMakerPrice = depthPrice
 		}
 	}
 
@@ -1052,7 +1066,7 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 
 	balances, err := s.MakerOrderExecutor.Session().Exchange.QueryAccountBalances(ctx)
 	if err != nil {
-		log.WithError(err).Errorf("balance query error")
+		s.logger.WithError(err).Errorf("balance query error")
 		return
 	}
 
@@ -1068,22 +1082,22 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 		return
 	}
 
-	log.Infof("quote balance: %s, base balance: %s", quoteBalance, baseBalance)
+	s.logger.Infof("quote balance: %s, base balance: %s", quoteBalance, baseBalance)
 
 	submitOrders, err := s.generateMakerOrders(s.sourceBook, maxLayer, baseBalance.Available, quoteBalance.Available)
 	if err != nil {
-		log.WithError(err).Errorf("generate order error")
+		s.logger.WithError(err).Errorf("generate order error")
 		return
 	}
 
 	if len(submitOrders) == 0 {
-		log.Warnf("no orders are generated")
+		s.logger.Warnf("no orders are generated")
 		return
 	}
 
 	_, err = s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
-		log.WithError(err).Errorf("order error: %s", err.Error())
+		s.logger.WithError(err).Errorf("order error: %s", err.Error())
 		return
 	}
 }

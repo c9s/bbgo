@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -42,6 +43,7 @@ func TestStrategy_generateMakerOrders(t *testing.T) {
 		CrossExchangeMarketMakingStrategy: &CrossExchangeMarketMakingStrategy{
 			makerMarket: newTestBTCUSDTMarket(),
 		},
+		logger: logrus.New(),
 	}
 
 	pricingBook := types.NewStreamBook("BTCUSDT", types.ExchangeBinance)
@@ -70,6 +72,6 @@ func TestStrategy_generateMakerOrders(t *testing.T) {
 		{Side: types.SideTypeBuy, Price: Number("24800"), Quantity: Number("0.283123")},    // =~ $7021.4504, accumulated amount =~ $1000.00 + $7005.3111219 + $7021.4504 = $8005.3111219 + $7021.4504 =~ $15026.7615219
 		{Side: types.SideTypeSell, Price: Number("25100"), Quantity: Number("0.03984")},
 		{Side: types.SideTypeSell, Price: Number("25233.33"), Quantity: Number("0.2772")},
-		{Side: types.SideTypeSell, Price: Number("25233.33"), Quantity: Number("0.277411")},
+		{Side: types.SideTypeSell, Price: Number("25300"), Quantity: Number("0.275845")},
 	}, orders)
 }
