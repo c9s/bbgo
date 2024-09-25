@@ -255,10 +255,9 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 			if cancelAll {
 				orders = b.Orders()
 			} else {
-				// partial cancel
+				// for partial cancel
 				orders = filterCanceledOrders(orders)
 			}
-
 		} else {
 			log.Warnf("[ActiveOrderBook] using open orders API to verify the active orders...")
 
