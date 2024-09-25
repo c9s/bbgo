@@ -148,6 +148,16 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 		// bbgo.Sync(ctx, s)
 	})
 
+	s.HedgeOrderExecutor.ActiveMakerOrders().OnCanceled(func(o types.Order) {
+		remaining := o.Quantity.Sub(o.ExecutedQuantity)
+		switch o.Side {
+		case types.SideTypeSell:
+			remaining = remaining.Neg()
+		}
+
+		s.CoveredPosition.Sub(remaining)
+	})
+
 	s.HedgeOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		c := trade.PositionChange()
 
