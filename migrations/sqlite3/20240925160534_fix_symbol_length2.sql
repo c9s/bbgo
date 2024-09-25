@@ -1,6 +1,6 @@
 -- +up
 -- +begin
-ALTER TABLE profits CHANGE symbol symbol VARCHAR(32) NOT NULL;
+SELECT 1;
 -- +end
 
 -- +down
