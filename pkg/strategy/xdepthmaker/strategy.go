@@ -604,7 +604,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) error {
 
 	quantity := pos.Abs()
 
-	if s.HedgeMaxOrderQuantity.Sign() > 0 {
+	if s.HedgeMaxOrderQuantity.Sign() > 0 && quantity.Compare(s.HedgeMaxOrderQuantity) > 0 {
 		s.logger.Infof("hedgeMaxOrderQuantity is set to %s, limiting the given quantity %s", s.HedgeMaxOrderQuantity.String(), quantity.String())
 		quantity = fixedpoint.Min(s.HedgeMaxOrderQuantity, quantity)
 	}
