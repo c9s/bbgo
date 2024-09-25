@@ -207,6 +207,8 @@ type Strategy struct {
 
 	HedgeStrategy HedgeStrategy `json:"hedgeStrategy"`
 
+	HedgeMaxOrderQuantity fixedpoint.Value `json:"hedgeMaxOrderQuantity"`
+
 	FullReplenishInterval types.Duration `json:"fullReplenishInterval"`
 
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
@@ -598,6 +600,11 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) error {
 	}
 
 	quantity := pos.Abs()
+
+	if s.HedgeMaxOrderQuantity.Sign() > 0 {
+		s.logger.Infof("hedgeMaxOrderQuantity is set to %s, limiting the given quantity %s", s.HedgeMaxOrderQuantity.String(), quantity.String())
+		quantity = fixedpoint.Min(s.HedgeMaxOrderQuantity, quantity)
+	}
 
 	switch s.HedgeStrategy {
 	case HedgeStrategyMarket:
