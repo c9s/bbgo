@@ -150,12 +150,17 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 
 	s.HedgeOrderExecutor.ActiveMakerOrders().OnCanceled(func(o types.Order) {
 		remaining := o.Quantity.Sub(o.ExecutedQuantity)
+
+		log.Infof("canceled order #%d, remaining quantity: %f", o.OrderID, remaining.Float64())
+
 		switch o.Side {
 		case types.SideTypeSell:
 			remaining = remaining.Neg()
 		}
 
 		s.CoveredPosition.Sub(remaining)
+
+		log.Infof("coveredPosition - %f => %f", remaining.Float64(), s.CoveredPosition.Get().Float64())
 	})
 
 	s.HedgeOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
