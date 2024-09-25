@@ -158,9 +158,11 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 			remaining = remaining.Neg()
 		}
 
+		remaining = remaining.Neg()
+		coveredPosition := s.CoveredPosition.Get()
 		s.CoveredPosition.Sub(remaining)
 
-		log.Infof("coveredPosition - %f => %f", remaining.Float64(), s.CoveredPosition.Get().Float64())
+		log.Infof("coveredPosition %f - %f => %f", coveredPosition.Float64(), remaining.Float64(), s.CoveredPosition.Get().Float64())
 	})
 
 	s.HedgeOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
