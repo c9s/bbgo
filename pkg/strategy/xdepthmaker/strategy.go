@@ -173,8 +173,6 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 		// buy trade -> positive delta ->
 		// 	  1) short position -> reduce short position
 		// 	  2) short position -> increase short position
-
-		// TODO: make this atomic
 		s.CoveredPosition.Add(c)
 	})
 	return nil
