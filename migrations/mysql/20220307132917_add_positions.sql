@@ -6,9 +6,9 @@ CREATE TABLE `positions`
     `strategy`             VARCHAR(32)             NOT NULL,
     `strategy_instance_id` VARCHAR(64)             NOT NULL,
 
-    `symbol`               VARCHAR(20)             NOT NULL,
+    `symbol`               VARCHAR(32)             NOT NULL,
     `quote_currency`       VARCHAR(10)             NOT NULL,
-    `base_currency`        VARCHAR(10)             NOT NULL,
+    `base_currency`        VARCHAR(15)             NOT NULL,
 
     -- average_cost is the position average cost
     `average_cost`         DECIMAL(16, 8) UNSIGNED NOT NULL,
