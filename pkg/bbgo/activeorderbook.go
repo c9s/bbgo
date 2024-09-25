@@ -146,12 +146,11 @@ func (b *ActiveOrderBook) FastCancel(ctx context.Context, ex types.Exchange, ord
 
 	// optimize order cancel for back-testing
 	if IsBackTesting {
-		return ex.CancelOrders(context.Background(), orders...)
+		return ex.CancelOrders(ctx, orders...)
 	}
 
 	log.Debugf("[ActiveOrderBook] no wait cancelling %s orders...", b.Symbol)
-	// since ctx might be canceled, we should use background context here
-	if err := ex.CancelOrders(context.Background(), orders...); err != nil {
+	if err := ex.CancelOrders(ctx, orders...); err != nil {
 		log.WithError(err).Errorf("[ActiveOrderBook] no wait can not cancel %s orders", b.Symbol)
 	}
 
