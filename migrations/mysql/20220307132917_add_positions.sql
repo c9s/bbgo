@@ -6,9 +6,9 @@ CREATE TABLE `positions`
     `strategy`             VARCHAR(32)             NOT NULL,
     `strategy_instance_id` VARCHAR(64)             NOT NULL,
 
-    `symbol`               VARCHAR(20)             NOT NULL,
+    `symbol`               VARCHAR(32)             NOT NULL,
     `quote_currency`       VARCHAR(10)             NOT NULL,
-    `base_currency`        VARCHAR(10)             NOT NULL,
+    `base_currency`        VARCHAR(16)             NOT NULL,
 
     -- average_cost is the position average cost
     `average_cost`         DECIMAL(16, 8) UNSIGNED NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE `positions`
     -- trade related columns
     `trade_id`             BIGINT UNSIGNED         NOT NULL, -- the trade id in the exchange
     `side`                 VARCHAR(4)              NOT NULL, -- side of the trade
-    `exchange`             VARCHAR(12)             NOT NULL, -- exchange of the trade
+    `exchange`             VARCHAR(20)             NOT NULL, -- exchange of the trade
     `traded_at`            DATETIME(3)             NOT NULL, -- millisecond timestamp
 
     PRIMARY KEY (`gid`),

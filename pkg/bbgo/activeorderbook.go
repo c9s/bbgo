@@ -3,17 +3,21 @@ package bbgo
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 const DefaultCancelOrderWaitTime = 20 * time.Millisecond
+const DefaultOrderCancelTimeout = 5 * time.Second
 
 // ActiveOrderBook manages the local active order books.
 //
@@ -35,6 +39,7 @@ type ActiveOrderBook struct {
 	mu sync.Mutex
 
 	cancelOrderWaitTime time.Duration
+	cancelOrderTimeout  time.Duration
 }
 
 func NewActiveOrderBook(symbol string) *ActiveOrderBook {
@@ -44,6 +49,7 @@ func NewActiveOrderBook(symbol string) *ActiveOrderBook {
 		pendingOrderUpdates: types.NewSyncOrderMap(),
 		C:                   sigchan.New(1),
 		cancelOrderWaitTime: DefaultCancelOrderWaitTime,
+		cancelOrderTimeout:  DefaultOrderCancelTimeout,
 	}
 }
 
@@ -146,12 +152,11 @@ func (b *ActiveOrderBook) FastCancel(ctx context.Context, ex types.Exchange, ord
 
 	// optimize order cancel for back-testing
 	if IsBackTesting {
-		return ex.CancelOrders(context.Background(), orders...)
+		return ex.CancelOrders(ctx, orders...)
 	}
 
 	log.Debugf("[ActiveOrderBook] no wait cancelling %s orders...", b.Symbol)
-	// since ctx might be canceled, we should use background context here
-	if err := ex.CancelOrders(context.Background(), orders...); err != nil {
+	if err := ex.CancelOrders(ctx, orders...); err != nil {
 		log.WithError(err).Errorf("[ActiveOrderBook] no wait can not cancel %s orders", b.Symbol)
 	}
 
@@ -175,7 +180,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 		hasSymbol := b.Symbol != ""
 		for _, o := range orders {
 			if hasSymbol && o.Symbol != b.Symbol {
-				return errors.New("[ActiveOrderBook] cancel " + b.Symbol + " orderbook with different symbol: " + o.Symbol)
+				return fmt.Errorf("[ActiveOrderBook] canceling %s orderbook with different symbol: %s", b.Symbol, o.Symbol)
 			}
 		}
 	}
@@ -187,7 +192,6 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 
 	log.Debugf("[ActiveOrderBook] gracefully cancelling %s orders...", b.Symbol)
 	waitTime := b.cancelOrderWaitTime
-	orderCancelTimeout := 5 * time.Second
 
 	startTime := time.Now()
 	// ensure every order is canceled
@@ -205,7 +209,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 		log.Debugf("[ActiveOrderBook] waiting %s for %d %s orders to be cancelled...", waitTime, len(orders), b.Symbol)
 
 		if cancelAll {
-			clear, err := b.waitAllClear(ctx, waitTime, orderCancelTimeout)
+			clear, err := b.waitAllClear(ctx, waitTime, b.cancelOrderTimeout)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
 					log.WithError(err).Errorf("order cancel error")
@@ -231,36 +235,63 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 		}
 
 		// verify the current open orders via the RESTful API
-		log.Warnf("[ActiveOrderBook] using open orders API to verify the active orders...")
+		if orderQueryService, ok := ex.(types.ExchangeOrderQueryService); ok {
+			for idx, o := range orders {
+				retOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
+					Symbol:  o.Symbol,
+					OrderID: strconv.FormatUint(o.OrderID, 10),
+				})
 
-		var symbolOrdersMap = categorizeOrderBySymbol(orders)
-		var errOccurred bool
-		var leftOrders types.OrderSlice
-		for symbol, symbolOrders := range symbolOrdersMap {
-			openOrders, err := ex.QueryOpenOrders(ctx, symbol)
-			if err != nil {
-				errOccurred = true
-				log.WithError(err).Errorf("can not query %s open orders", symbol)
-				break
-			}
+				if err != nil {
+					log.WithError(err).Errorf("unable to update order #%d", o.OrderID)
+					continue
+				} else if retOrder != nil {
+					b.Update(*retOrder)
 
-			openOrderMap := types.NewOrderMap(openOrders...)
-			for _, o := range symbolOrders {
-				// if it's not on the order book (open orders),
-				// we should remove it from our local side
-				if !openOrderMap.Exists(o.OrderID) {
-					b.Remove(o)
-				} else {
-					leftOrders.Add(o)
+					orders[idx] = *retOrder
 				}
 			}
+
+			if cancelAll {
+				orders = b.Orders()
+			} else {
+				// for partial cancel
+				orders = filterCanceledOrders(orders)
+			}
+		} else {
+			log.Warnf("[ActiveOrderBook] using open orders API to verify the active orders...")
+
+			var symbolOrdersMap = categorizeOrderBySymbol(orders)
+			var errOccurred bool
+			var leftOrders types.OrderSlice
+			for symbol, symbolOrders := range symbolOrdersMap {
+				openOrders, err := ex.QueryOpenOrders(ctx, symbol)
+				if err != nil {
+					errOccurred = true
+					log.WithError(err).Errorf("can not query %s open orders", symbol)
+					break
+				}
+
+				openOrderMap := types.NewOrderMap(openOrders...)
+				for _, o := range symbolOrders {
+					// if it's not on the order book (open orders),
+					// we should remove it from our local side
+					if !openOrderMap.Exists(o.OrderID) {
+						b.Remove(o)
+					} else {
+						leftOrders.Add(o)
+					}
+				}
+			}
+
+			// if an error occurs, we cannot update the orders because it will result in an empty order slice.
+			if !errOccurred {
+				// update order slice for the next try
+				orders = leftOrders
+			}
+
 		}
 
-		// if an error occurs, we cannot update the orders because it will result in an empty order slice.
-		if !errOccurred {
-			// update order slice for the next try
-			orders = leftOrders
-		}
 	}
 
 	log.Debugf("[ActiveOrderBook] all %s orders are cancelled successfully in %s", b.Symbol, time.Since(startTime))
@@ -490,4 +521,16 @@ func categorizeOrderBySymbol(orders types.OrderSlice) map[string]types.OrderSlic
 	}
 
 	return orderMap
+}
+
+func filterCanceledOrders(orders types.OrderSlice) (ret types.OrderSlice) {
+	for _, o := range orders {
+		if o.Status == types.OrderStatusCanceled {
+			continue
+		}
+
+		ret = append(ret, o)
+	}
+
+	return ret
 }

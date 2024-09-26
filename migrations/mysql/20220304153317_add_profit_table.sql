@@ -6,7 +6,7 @@ CREATE TABLE `profits`
     `strategy`             VARCHAR(32)             NOT NULL,
     `strategy_instance_id` VARCHAR(64)             NOT NULL,
 
-    `symbol`               VARCHAR(8)              NOT NULL,
+    `symbol`               VARCHAR(32)              NOT NULL,
 
     -- average_cost is the position average cost
     `average_cost`         DECIMAL(16, 8) UNSIGNED NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE `profits`
 
     `quote_currency`       VARCHAR(10)             NOT NULL,
 
-    `base_currency`        VARCHAR(10)             NOT NULL,
+    `base_currency`        VARCHAR(16)             NOT NULL,
 
     -- -------------------------------------------------------
     -- embedded trade data --
@@ -61,7 +61,7 @@ CREATE TABLE `profits`
     -- fee
     `fee_in_usd`           DECIMAL(16, 8),
     `fee`                  DECIMAL(16, 8)          NOT NULL,
-    `fee_currency`         VARCHAR(10)             NOT NULL,
+    `fee_currency`         VARCHAR(16)             NOT NULL,
 
     PRIMARY KEY (`gid`),
     UNIQUE KEY `trade_id` (`trade_id`)
