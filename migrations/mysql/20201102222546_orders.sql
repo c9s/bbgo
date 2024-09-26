@@ -9,7 +9,7 @@ CREATE TABLE `orders`
     `order_id`          BIGINT UNSIGNED         NOT NULL,
     `client_order_id`   VARCHAR(122)            NOT NULL DEFAULT '',
     `order_type`        VARCHAR(16)             NOT NULL,
-    `symbol`            VARCHAR(20)             NOT NULL,
+    `symbol`            VARCHAR(32)             NOT NULL,
     `status`            VARCHAR(12)             NOT NULL,
     `time_in_force`     VARCHAR(4)              NOT NULL,
     `price`             DECIMAL(16, 8) UNSIGNED NOT NULL,
