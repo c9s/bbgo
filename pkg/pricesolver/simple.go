@@ -1,6 +1,7 @@
 package pricesolver
 
 import (
+	"context"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -67,6 +68,28 @@ func (m *SimplePriceSolver) Update(symbol string, price fixedpoint.Value) {
 
 func (m *SimplePriceSolver) UpdateFromTrade(trade types.Trade) {
 	m.Update(trade.Symbol, trade.Price)
+}
+
+func (m *SimplePriceSolver) BindStream(stream types.Stream) {
+	stream.OnKLineClosed(func(k types.KLine) {
+		m.Update(k.Symbol, k.Close)
+	})
+}
+
+func (m *SimplePriceSolver) UpdateFromTickers(ctx context.Context, ex types.Exchange, symbols ...string) error {
+	for _, symbol := range symbols {
+		ticker, err := ex.QueryTicker(ctx, symbol)
+		if err != nil {
+			return err
+		}
+
+		price := ticker.GetValidPrice()
+		if !price.IsZero() {
+			m.Update(symbol, price)
+		}
+	}
+
+	return nil
 }
 
 func (m *SimplePriceSolver) inferencePrice(asset string, assetPrice fixedpoint.Value, preferredFiats ...string) (fixedpoint.Value, bool) {
