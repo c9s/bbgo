@@ -79,6 +79,19 @@ func (slice PriceVolumeSlice) First() (PriceVolume, bool) {
 	return PriceVolume{}, false
 }
 
+// ElemOrLast returns the element on the index i, if i is out of range, it will return the last element
+func (slice PriceVolumeSlice) ElemOrLast(i int) (PriceVolume, bool) {
+	if len(slice) == 0 {
+		return PriceVolume{}, false
+	}
+
+	if i > len(slice)-1 {
+		return slice[len(slice)-1], true
+	}
+
+	return slice[i], true
+}
+
 func (slice PriceVolumeSlice) IndexByQuoteVolumeDepth(requiredQuoteVolume fixedpoint.Value) int {
 	var totalQuoteVolume = fixedpoint.Zero
 	for x, pv := range slice {

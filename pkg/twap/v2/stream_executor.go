@@ -231,7 +231,7 @@ func (e *FixedQuantityExecutor) orderUpdater(ctx context.Context) {
 	ticker := time.NewTimer(e.updateInterval)
 	defer ticker.Stop()
 
-	monitor := NewBboMonitor()
+	monitor := bbgo.NewBboMonitor()
 
 	for {
 		select {
