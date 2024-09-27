@@ -267,9 +267,11 @@ type Strategy struct {
 
 	lastSourcePrice fixedpoint.MutexValue
 
-	stopC, authedC chan struct{}
+	stopC chan struct{}
 
 	logger logrus.FieldLogger
+
+	connectivityGroup *types.ConnectivityGroup
 }
 
 func (s *Strategy) ID() string {
@@ -388,6 +390,116 @@ func (s *Strategy) Defaults() error {
 	return nil
 }
 
+func (s *Strategy) quoteWorker(ctx context.Context) {
+	updateTicker := time.NewTicker(util.MillisecondsJitter(s.UpdateInterval.Duration(), 200))
+	defer updateTicker.Stop()
+
+	fullReplenishTicker := time.NewTicker(util.MillisecondsJitter(s.FullReplenishInterval.Duration(), 200))
+	defer fullReplenishTicker.Stop()
+
+	// clean up the previous open orders
+	if err := s.cleanUpOpenOrders(ctx, s.makerSession); err != nil {
+		log.WithError(err).Errorf("error cleaning up open orders")
+		return
+	}
+
+	s.updateQuote(ctx, 0)
+
+	lastOrderReplenishTime := time.Now()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-s.stopC:
+			log.Warnf("%s maker goroutine stopped, due to the stop signal", s.Symbol)
+			return
+
+		case <-fullReplenishTicker.C:
+			s.updateQuote(ctx, 0)
+			lastOrderReplenishTime = time.Now()
+
+		case sig, ok := <-s.sourceBook.C:
+			// when any book change event happened
+			if !ok {
+				return
+			}
+
+			if time.Since(lastOrderReplenishTime) < 10*time.Second {
+				continue
+			}
+
+			switch sig.Type {
+			case types.BookSignalSnapshot:
+				s.updateQuote(ctx, 0)
+
+			case types.BookSignalUpdate:
+				s.updateQuote(ctx, 5)
+			}
+
+			lastOrderReplenishTime = time.Now()
+		}
+	}
+}
+
+func (s *Strategy) hedgeWorker(ctx context.Context) {
+	ticker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			s.logger.Warnf("maker goroutine stopped, due to context canceled")
+			return
+
+		case <-s.stopC:
+			s.logger.Warnf("maker goroutine stopped, due to the stop signal")
+			return
+
+		case <-ticker.C:
+			// For positive position and positive covered position:
+			// uncover position = +5 - +3 (covered position) = 2
+			//
+			// For positive position and negative covered position:
+			// uncover position = +5 - (-3) (covered position) = 8
+			//
+			// meaning we bought 5 on MAX and sent buy order with 3 on binance
+			//
+			// For negative position:
+			// uncover position = -5 - -3 (covered position) = -2
+			s.HedgeOrderExecutor.TradeCollector().Process()
+			s.MakerOrderExecutor.TradeCollector().Process()
+
+			position := s.Position.GetBase()
+
+			coveredPosition := s.CoveredPosition.Get()
+			uncoverPosition := position.Sub(coveredPosition)
+
+			absPos := uncoverPosition.Abs()
+			if !s.hedgeMarket.IsDustQuantity(absPos, s.lastSourcePrice.Get()) {
+				log.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
+					s.Symbol,
+					position,
+					coveredPosition,
+					uncoverPosition,
+				)
+
+				if !s.DisableHedge {
+					if err := s.Hedge(ctx, uncoverPosition.Neg()); err != nil {
+						//goland:noinspection GoDirectComparisonOfErrors
+						switch err {
+						case ErrZeroQuantity, ErrDustQuantity:
+						default:
+							s.logger.WithError(err).Errorf("unable to hedge position")
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 func (s *Strategy) CrossRun(
 	ctx context.Context, _ bbgo.OrderExecutionRouter,
 	sessions map[string]*bbgo.ExchangeSession,
@@ -450,9 +562,14 @@ func (s *Strategy) CrossRun(
 
 	s.stopC = make(chan struct{})
 
-	s.authedC = make(chan struct{}, 5)
-	bindAuthSignal(ctx, s.makerSession.UserDataStream, s.authedC)
-	bindAuthSignal(ctx, s.hedgeSession.UserDataStream, s.authedC)
+	makerConnectivity := types.NewConnectivity()
+	makerConnectivity.Bind(s.makerSession.UserDataStream)
+
+	hedgerConnectivity := types.NewConnectivity()
+	hedgerConnectivity.Bind(s.hedgeSession.UserDataStream)
+
+	connGroup := types.NewConnectivityGroup(makerConnectivity, hedgerConnectivity)
+	s.connectivityGroup = connGroup
 
 	if s.RecoverTrade {
 		go s.runTradeRecover(ctx)
@@ -460,110 +577,17 @@ func (s *Strategy) CrossRun(
 
 	go func() {
 		log.Infof("waiting for user data stream to get authenticated")
-		select {
-		case <-ctx.Done():
-			return
-		case <-s.authedC:
-		}
 
 		select {
 		case <-ctx.Done():
 			return
-		case <-s.authedC:
+		case <-connGroup.AllAuthedC(ctx, time.Minute):
 		}
 
 		log.Infof("user data stream authenticated, start placing orders...")
 
-		posTicker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
-		defer posTicker.Stop()
-
-		fullReplenishTicker := time.NewTicker(util.MillisecondsJitter(s.FullReplenishInterval.Duration(), 200))
-		defer fullReplenishTicker.Stop()
-
-		// clean up the previous open orders
-		if err := s.cleanUpOpenOrders(ctx, s.makerSession); err != nil {
-			log.WithError(err).Errorf("error cleaning up open orders")
-		}
-
-		s.updateQuote(ctx, 0)
-
-		lastOrderReplenishTime := time.Now()
-		for {
-			select {
-
-			case <-s.stopC:
-				log.Warnf("%s maker goroutine stopped, due to the stop signal", s.Symbol)
-				return
-
-			case <-ctx.Done():
-				log.Warnf("%s maker goroutine stopped, due to the cancelled context", s.Symbol)
-				return
-
-			case <-fullReplenishTicker.C:
-				s.updateQuote(ctx, 0)
-				lastOrderReplenishTime = time.Now()
-
-			case sig, ok := <-s.sourceBook.C:
-				// when any book change event happened
-				if !ok {
-					return
-				}
-
-				if time.Since(lastOrderReplenishTime) < 10*time.Second {
-					continue
-				}
-
-				switch sig.Type {
-				case types.BookSignalSnapshot:
-					s.updateQuote(ctx, 0)
-
-				case types.BookSignalUpdate:
-					s.updateQuote(ctx, 5)
-				}
-
-				lastOrderReplenishTime = time.Now()
-
-			case <-posTicker.C:
-				// For positive position and positive covered position:
-				// uncover position = +5 - +3 (covered position) = 2
-				//
-				// For positive position and negative covered position:
-				// uncover position = +5 - (-3) (covered position) = 8
-				//
-				// meaning we bought 5 on MAX and sent buy order with 3 on binance
-				//
-				// For negative position:
-				// uncover position = -5 - -3 (covered position) = -2
-				s.HedgeOrderExecutor.TradeCollector().Process()
-				s.MakerOrderExecutor.TradeCollector().Process()
-
-				position := s.Position.GetBase()
-
-				coveredPosition := s.CoveredPosition.Get()
-				uncoverPosition := position.Sub(coveredPosition)
-
-				absPos := uncoverPosition.Abs()
-				if absPos.Compare(s.hedgeMarket.MinQuantity) > 0 {
-					log.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
-						s.Symbol,
-						position,
-						coveredPosition,
-						uncoverPosition,
-					)
-
-					if !s.DisableHedge {
-						if err := s.Hedge(ctx, uncoverPosition.Neg()); err != nil {
-							//goland:noinspection GoDirectComparisonOfErrors
-							switch err {
-							case ErrZeroQuantity, ErrDustQuantity:
-							default:
-								s.logger.WithError(err).Errorf("unable to hedge position")
-							}
-						}
-					}
-				}
-			}
-		}
+		go s.hedgeWorker(ctx)
+		go s.quoteWorker(ctx)
 	}()
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
@@ -1143,15 +1167,4 @@ func min(a, b int) int {
 	}
 
 	return b
-}
-
-func bindAuthSignal(ctx context.Context, stream types.Stream, c chan<- struct{}) {
-	stream.OnAuth(func() {
-		select {
-		case <-ctx.Done():
-			return
-		case c <- struct{}{}:
-		default:
-		}
-	})
 }
