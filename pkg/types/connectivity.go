@@ -24,14 +24,36 @@ func (g *ConnectivityGroup) Add(con *Connectivity) {
 	g.connections = append(g.connections, con)
 }
 
+func (g *ConnectivityGroup) AnyDisconnected(ctx context.Context) bool {
+	g.mu.Lock()
+	conns := g.connections
+	g.mu.Unlock()
+
+	for _, conn := range conns {
+		select {
+		case <-ctx.Done():
+			return false
+
+		case <-conn.connectedC:
+			continue
+
+		case <-conn.disconnectedC:
+			return true
+		}
+	}
+
+	return false
+}
+
 func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, c chan struct{}, allTimeoutDuration time.Duration) {
 	g.mu.Lock()
-	defer g.mu.Unlock()
+	conns := g.connections
+	g.mu.Unlock()
 
-	authedConns := make([]bool, len(g.connections))
+	authedConns := make([]bool, len(conns))
 	allTimeout := time.After(allTimeoutDuration)
 	for {
-		for idx, con := range g.connections {
+		for idx, con := range conns {
 			// if the connection is not authed, mark it as false
 			if !con.authed {
 				// authedConns[idx] = false

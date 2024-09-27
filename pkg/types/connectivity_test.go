@@ -39,6 +39,7 @@ func TestConnectivity(t *testing.T) {
 
 func TestConnectivityGroupAuthC(t *testing.T) {
 	timeout := 100 * time.Millisecond
+	delay := timeout * 2
 
 	ctx := context.Background()
 	conn1 := NewConnectivity()
@@ -46,13 +47,13 @@ func TestConnectivityGroupAuthC(t *testing.T) {
 	group := NewConnectivityGroup(conn1, conn2)
 	allAuthedC := group.AllAuthedC(ctx, time.Second)
 
-	time.Sleep(timeout)
+	time.Sleep(delay)
 	conn1.handleConnect()
 	assert.True(t, waitSigChan(conn1.ConnectedC(), timeout))
 	conn1.handleAuth()
 	assert.True(t, waitSigChan(conn1.AuthedC(), timeout))
 
-	time.Sleep(timeout)
+	time.Sleep(delay)
 	conn2.handleConnect()
 	assert.True(t, waitSigChan(conn2.ConnectedC(), timeout))
 
@@ -82,9 +83,13 @@ func TestConnectivityGroupReconnect(t *testing.T) {
 
 	assert.True(t, waitSigChan(group.AllAuthedC(ctx, time.Second), timeout), "all connections are authenticated")
 
+	assert.False(t, group.AnyDisconnected(ctx))
+
 	// this should re-allocate authedC
 	conn1.handleDisconnect()
 	assert.NotEqual(t, conn1authC, conn1.authedC)
+
+	assert.True(t, group.AnyDisconnected(ctx))
 
 	assert.False(t, waitSigChan(group.AllAuthedC(ctx, time.Second), timeout), "one connection should be un-authed")
 
