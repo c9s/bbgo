@@ -24,14 +24,25 @@ func (g *ConnectivityGroup) Add(con *Connectivity) {
 	g.connections = append(g.connections, con)
 }
 
-func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, c chan struct{}) {
+func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, c chan struct{}, allTimeoutDuration time.Duration) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
 	authedConns := make([]bool, len(g.connections))
+	allTimeout := time.After(allTimeoutDuration)
 	for {
 		for idx, con := range g.connections {
-			timeout := time.After(3 * time.Second)
+			// if the connection is not authed, mark it as false
+			if !con.authed {
+				// authedConns[idx] = false
+			}
 
+			timeout := time.After(3 * time.Second)
 			select {
 			case <-ctx.Done():
+				return
+
+			case <-allTimeout:
 				return
 
 			case <-timeout:
@@ -49,9 +60,12 @@ func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, c chan struct{}) 
 	}
 }
 
-func (g *ConnectivityGroup) AllAuthedC(ctx context.Context) <-chan struct{} {
+// AllAuthedC returns a channel that will be closed when all connections are authenticated
+// the returned channel will be closed when all connections are authenticated
+// and the channel can only be used once (because we can't close a channel twice)
+func (g *ConnectivityGroup) AllAuthedC(ctx context.Context, timeout time.Duration) <-chan struct{} {
 	c := make(chan struct{})
-	go g.waitAllAuthed(ctx, c)
+	go g.waitAllAuthed(ctx, c, timeout)
 	return c
 }
 
@@ -105,15 +119,6 @@ func (c *Connectivity) handleDisconnect() {
 	defer c.mu.Unlock()
 
 	c.connected = false
-
-	if c.connectedC != nil {
-		close(c.connectedC)
-	}
-
-	if c.authedC != nil {
-		close(c.authedC)
-	}
-
 	c.authedC = make(chan struct{})
 	c.connectedC = make(chan struct{})
 	close(c.disconnectedC)

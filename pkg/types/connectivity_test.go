@@ -4,38 +4,103 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestConnectivityGroup(t *testing.T) {
+func TestConnectivity(t *testing.T) {
+	t.Run("general", func(t *testing.T) {
+		conn1 := NewConnectivity()
+		conn1.handleConnect()
+		conn1.handleAuth()
+		conn1.handleDisconnect()
+	})
+
+	t.Run("reconnect", func(t *testing.T) {
+		conn1 := NewConnectivity()
+		conn1.handleConnect()
+		conn1.handleAuth()
+		conn1.handleDisconnect()
+
+		conn1.handleConnect()
+		conn1.handleAuth()
+		conn1.handleDisconnect()
+	})
+
+	t.Run("no-auth reconnect", func(t *testing.T) {
+		conn1 := NewConnectivity()
+		conn1.handleConnect()
+		conn1.handleDisconnect()
+
+		conn1.handleConnect()
+		conn1.handleDisconnect()
+	})
+}
+
+func TestConnectivityGroupAuthC(t *testing.T) {
+	timeout := 100 * time.Millisecond
+
 	ctx := context.Background()
 	conn1 := NewConnectivity()
 	conn2 := NewConnectivity()
 	group := NewConnectivityGroup(conn1, conn2)
-	allAuthedC := group.AllAuthedC(ctx)
+	allAuthedC := group.AllAuthedC(ctx, time.Second)
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(timeout)
 	conn1.handleConnect()
-	waitSigChan(t, conn1.ConnectedC(), time.Second)
+	assert.True(t, waitSigChan(conn1.ConnectedC(), timeout))
 	conn1.handleAuth()
-	waitSigChan(t, conn1.AuthedC(), time.Second)
+	assert.True(t, waitSigChan(conn1.AuthedC(), timeout))
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(timeout)
 	conn2.handleConnect()
-	waitSigChan(t, conn2.ConnectedC(), time.Second)
+	assert.True(t, waitSigChan(conn2.ConnectedC(), timeout))
 
 	conn2.handleAuth()
-	waitSigChan(t, conn2.AuthedC(), time.Second)
+	assert.True(t, waitSigChan(conn2.AuthedC(), timeout))
 
-	waitSigChan(t, allAuthedC, time.Second)
+	assert.True(t, waitSigChan(allAuthedC, timeout))
 }
 
-func waitSigChan(t *testing.T, c <-chan struct{}, timeoutDuration time.Duration) {
+func TestConnectivityGroupReconnect(t *testing.T) {
+	timeout := 100 * time.Millisecond
+	delay := timeout * 2
+
+	ctx := context.Background()
+	conn1 := NewConnectivity()
+	conn2 := NewConnectivity()
+	group := NewConnectivityGroup(conn1, conn2)
+
+	time.Sleep(delay)
+	conn1.handleConnect()
+	conn1.handleAuth()
+	conn1authC := conn1.authedC
+
+	time.Sleep(delay)
+	conn2.handleConnect()
+	conn2.handleAuth()
+
+	assert.True(t, waitSigChan(group.AllAuthedC(ctx, time.Second), timeout), "all connections are authenticated")
+
+	// this should re-allocate authedC
+	conn1.handleDisconnect()
+	assert.NotEqual(t, conn1authC, conn1.authedC)
+
+	assert.False(t, waitSigChan(group.AllAuthedC(ctx, time.Second), timeout), "one connection should be un-authed")
+
+	time.Sleep(delay)
+
+	conn1.handleConnect()
+	conn1.handleAuth()
+	assert.True(t, waitSigChan(group.AllAuthedC(ctx, time.Second), timeout), "all connections are authenticated, again")
+}
+
+func waitSigChan(c <-chan struct{}, timeoutDuration time.Duration) bool {
 	select {
 	case <-time.After(timeoutDuration):
-		t.Log("timeout")
-		t.Fail()
+		return false
 
 	case <-c:
-		t.Log("signal received")
+		return true
 	}
 }

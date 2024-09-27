@@ -267,9 +267,11 @@ type Strategy struct {
 
 	lastSourcePrice fixedpoint.MutexValue
 
-	stopC, authedC chan struct{}
+	stopC chan struct{}
 
 	logger logrus.FieldLogger
+
+	connectivityGroup *types.ConnectivityGroup
 }
 
 func (s *Strategy) ID() string {
@@ -559,9 +561,14 @@ func (s *Strategy) CrossRun(
 
 	s.stopC = make(chan struct{})
 
-	s.authedC = make(chan struct{}, 5)
-	bindAuthSignal(ctx, s.makerSession.UserDataStream, s.authedC)
-	bindAuthSignal(ctx, s.hedgeSession.UserDataStream, s.authedC)
+	makerConnectivity := types.NewConnectivity()
+	makerConnectivity.Bind(s.makerSession.UserDataStream)
+
+	hedgerConnectivity := types.NewConnectivity()
+	hedgerConnectivity.Bind(s.hedgeSession.UserDataStream)
+
+	connGroup := types.NewConnectivityGroup(makerConnectivity, hedgerConnectivity)
+	s.connectivityGroup = connGroup
 
 	if s.RecoverTrade {
 		go s.runTradeRecover(ctx)
@@ -569,16 +576,11 @@ func (s *Strategy) CrossRun(
 
 	go func() {
 		log.Infof("waiting for user data stream to get authenticated")
-		select {
-		case <-ctx.Done():
-			return
-		case <-s.authedC:
-		}
 
 		select {
 		case <-ctx.Done():
 			return
-		case <-s.authedC:
+		case <-connGroup.AllAuthedC(ctx, time.Minute):
 		}
 
 		log.Infof("user data stream authenticated, start placing orders...")
@@ -1164,15 +1166,4 @@ func min(a, b int) int {
 	}
 
 	return b
-}
-
-func bindAuthSignal(ctx context.Context, stream types.Stream, c chan<- struct{}) {
-	stream.OnAuth(func() {
-		select {
-		case <-ctx.Done():
-			return
-		case c <- struct{}{}:
-		default:
-		}
-	})
 }
