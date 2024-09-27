@@ -210,8 +210,8 @@ type Strategy struct {
 	// HedgeExchange session name
 	HedgeExchange string `json:"hedgeExchange"`
 
-	UpdateInterval types.Duration `json:"updateInterval"`
-	UpdateLayers   int            `json:"updateLayers"`
+	FastLayerUpdateInterval types.Duration `json:"fastLayerUpdateInterval"`
+	NumOfFastLayers         int            `json:"numOfFastLayers"`
 
 	HedgeInterval types.Duration `json:"hedgeInterval"`
 
@@ -249,6 +249,8 @@ type Strategy struct {
 	// RecoverTrade tries to find the missing trades via the REStful API
 	RecoverTrade bool `json:"recoverTrade"`
 
+	PriceImpactRatio fixedpoint.Value `json:"priceImpactRatio"`
+
 	RecoverTradeScanPeriod types.Duration `json:"recoverTradeScanPeriod"`
 
 	NumLayers int `json:"numLayers"`
@@ -281,6 +283,7 @@ type Strategy struct {
 	connectivityGroup                     *types.ConnectivityGroup
 
 	priceSolver *pricesolver.SimplePriceSolver
+	bboMonitor  *bbgo.BboMonitor
 }
 
 func (s *Strategy) ID() string {
@@ -353,12 +356,12 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) Defaults() error {
-	if s.UpdateInterval == 0 {
-		s.UpdateInterval = types.Duration(5 * time.Second)
+	if s.FastLayerUpdateInterval == 0 {
+		s.FastLayerUpdateInterval = types.Duration(5 * time.Second)
 	}
 
-	if s.UpdateLayers == 0 {
-		s.UpdateLayers = 5
+	if s.NumOfFastLayers == 0 {
+		s.NumOfFastLayers = 5
 	}
 
 	if s.FullReplenishInterval == 0 {
@@ -406,8 +409,7 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) quoteWorker(ctx context.Context) {
-
-	updateTicker := time.NewTicker(util.MillisecondsJitter(s.UpdateInterval.Duration(), 200))
+	updateTicker := time.NewTicker(util.MillisecondsJitter(s.FastLayerUpdateInterval.Duration(), 200))
 	defer updateTicker.Stop()
 
 	fullReplenishTicker := time.NewTicker(util.MillisecondsJitter(s.FullReplenishInterval.Duration(), 200))
@@ -420,8 +422,6 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 	}
 
 	s.updateQuote(ctx, 0)
-
-	lastOrderReplenishTime := time.Now()
 
 	for {
 		select {
@@ -438,7 +438,9 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 
 		case <-fullReplenishTicker.C:
 			s.updateQuote(ctx, 0)
-			lastOrderReplenishTime = time.Now()
+
+		case <-updateTicker.C:
+			s.updateQuote(ctx, s.NumOfFastLayers)
 
 		case sig, ok := <-s.sourceBook.C:
 			// when any book change event happened
@@ -446,19 +448,10 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 				return
 			}
 
-			if time.Since(lastOrderReplenishTime) < 10*time.Second {
-				continue
-			}
-
-			switch sig.Type {
-			case types.BookSignalSnapshot:
+			changed := s.bboMonitor.UpdateFromBook(s.sourceBook)
+			if changed || sig.Type == types.BookSignalSnapshot {
 				s.updateQuote(ctx, 0)
-
-			case types.BookSignalUpdate:
-				s.updateQuote(ctx, s.UpdateLayers)
 			}
-
-			lastOrderReplenishTime = time.Now()
 		}
 	}
 }
@@ -584,6 +577,11 @@ func (s *Strategy) CrossRun(
 	s.priceSolver.BindStream(s.hedgeSession.MarketDataStream)
 	s.priceSolver.BindStream(s.makerSession.MarketDataStream)
 
+	s.bboMonitor = bbgo.NewBboMonitor()
+	if !s.PriceImpactRatio.IsZero() {
+		s.bboMonitor.SetPriceImpactRatio(s.PriceImpactRatio)
+	}
+
 	if err := s.priceSolver.UpdateFromTickers(ctx, s.makerSession.Exchange,
 		s.Symbol, s.makerSession.Exchange.PlatformFeeCurrency()+"USDT"); err != nil {
 		return err
@@ -640,7 +638,7 @@ func (s *Strategy) CrossRun(
 		close(s.stopC)
 
 		// wait for the quoter to stop
-		time.Sleep(s.UpdateInterval.Duration())
+		time.Sleep(s.FastLayerUpdateInterval.Duration())
 
 		if err := s.MakerOrderExecutor.GracefulCancel(ctx); err != nil {
 			log.WithError(err).Errorf("graceful cancel %s order error", s.Symbol)
