@@ -1,8 +1,9 @@
-package twap
+package bbgo
 
 import (
 	"time"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -14,11 +15,17 @@ type BboMonitor struct {
 	Ask         types.PriceVolume
 	UpdatedTime time.Time
 
+	priceImpactRatio fixedpoint.Value
+
 	updateCallbacks []func(bid, ask types.PriceVolume)
 }
 
 func NewBboMonitor() *BboMonitor {
 	return &BboMonitor{}
+}
+
+func (m *BboMonitor) SetPriceImpactRatio(ratio fixedpoint.Value) {
+	m.priceImpactRatio = ratio
 }
 
 func (m *BboMonitor) UpdateFromBook(book *types.StreamOrderBook) bool {
@@ -34,11 +41,23 @@ func (m *BboMonitor) UpdateFromBook(book *types.StreamOrderBook) bool {
 func (m *BboMonitor) Update(bid, ask types.PriceVolume, t time.Time) bool {
 	changed := false
 	if m.Bid.Price.Compare(bid.Price) != 0 || m.Bid.Volume.Compare(bid.Volume) != 0 {
-		changed = true
+		if m.priceImpactRatio.IsZero() {
+			changed = true
+		} else {
+			if bid.Price.Sub(m.Bid.Price).Abs().Div(m.Bid.Price).Compare(m.priceImpactRatio) >= 0 {
+				changed = true
+			}
+		}
 	}
 
 	if m.Ask.Price.Compare(ask.Price) != 0 || m.Ask.Volume.Compare(ask.Volume) != 0 {
-		changed = true
+		if m.priceImpactRatio.IsZero() {
+			changed = true
+		} else {
+			if ask.Price.Sub(m.Ask.Price).Abs().Div(m.Ask.Price).Compare(m.priceImpactRatio) >= 0 {
+				changed = true
+			}
+		}
 	}
 
 	m.Bid = bid

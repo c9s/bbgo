@@ -166,6 +166,12 @@ func (c *Connectivity) ConnectedC() chan struct{} {
 	return c.connectedC
 }
 
+func (c *Connectivity) DisconnectedC() chan struct{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.disconnectedC
+}
+
 func (c *Connectivity) Bind(stream Stream) {
 	stream.OnConnect(c.handleConnect)
 	stream.OnDisconnect(c.handleDisconnect)

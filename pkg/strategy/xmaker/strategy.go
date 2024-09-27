@@ -1398,7 +1398,6 @@ func (s *Strategy) CrossRun(
 
 	// initialize the price resolver
 	sourceMarkets := s.sourceSession.Markets()
-	s.priceSolver = pricesolver.NewSimplePriceResolver(sourceMarkets)
 
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
@@ -1474,6 +1473,9 @@ func (s *Strategy) CrossRun(
 			TakerFeeRate: s.sourceSession.TakerFeeRate,
 		})
 	}
+
+	s.priceSolver = pricesolver.NewSimplePriceResolver(sourceMarkets)
+	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
 
 	s.sourceSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
 		s.priceSolver.Update(k.Symbol, k.Close)
