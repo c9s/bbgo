@@ -400,6 +400,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 	// clean up the previous open orders
 	if err := s.cleanUpOpenOrders(ctx, s.makerSession); err != nil {
 		log.WithError(err).Errorf("error cleaning up open orders")
+		return
 	}
 
 	s.updateQuote(ctx, 0)
