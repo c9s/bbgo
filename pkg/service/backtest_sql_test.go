@@ -40,7 +40,7 @@ func TestBacktestService_FindMissingTimeRanges_EmptyData(t *testing.T) {
 	now := time.Now()
 	startTime1 := now.AddDate(0, 0, -7).Truncate(time.Hour)
 	endTime1 := now.AddDate(0, 0, -6).Truncate(time.Hour)
-	timeRanges, err := service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime1)
+	timeRanges, err := service.findMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime1)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, timeRanges)
 }
@@ -70,7 +70,7 @@ func TestBacktestService_QueryExistingDataRange(t *testing.T) {
 	startTime1 := now.AddDate(0, 0, -7).Truncate(time.Hour)
 	endTime1 := now.AddDate(0, 0, -6).Truncate(time.Hour)
 	// empty range
-	t1, t2, err := service.QueryExistingDataRange(ctx, ex, symbol, types.Interval1h, startTime1, endTime1)
+	t1, t2, err := service.queryExistingDataRange(ctx, ex, symbol, types.Interval1h, startTime1, endTime1)
 	assert.Error(t, sql.ErrNoRows, err)
 	assert.Nil(t, t1)
 	assert.Nil(t, t2)
@@ -105,22 +105,22 @@ func TestBacktestService_SyncPartial(t *testing.T) {
 	endTime2 := now.AddDate(0, 0, -4).Truncate(time.Hour)
 
 	// kline query is exclusive
-	err = service.SyncKLineByInterval(ctx, ex, symbol, types.Interval1h, startTime1.Add(-time.Second), endTime1.Add(time.Second))
+	err = service.syncKLineByInterval(ctx, ex, symbol, types.Interval1h, startTime1.Add(-time.Second), endTime1.Add(time.Second))
 	assert.NoError(t, err)
 
-	err = service.SyncKLineByInterval(ctx, ex, symbol, types.Interval1h, startTime2.Add(-time.Second), endTime2.Add(time.Second))
+	err = service.syncKLineByInterval(ctx, ex, symbol, types.Interval1h, startTime2.Add(-time.Second), endTime2.Add(time.Second))
 	assert.NoError(t, err)
 
-	timeRanges, err := service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
+	timeRanges, err := service.findMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, timeRanges)
 	assert.Len(t, timeRanges, 1)
 
 	t.Run("fill missing time ranges", func(t *testing.T) {
-		err = service.SyncPartial(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
+		err = service.syncPartial(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
 		assert.NoError(t, err, "sync partial should not return error")
 
-		timeRanges2, err := service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
+		timeRanges2, err := service.findMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
 		assert.NoError(t, err)
 		assert.Empty(t, timeRanges2)
 	})
@@ -155,19 +155,19 @@ func TestBacktestService_FindMissingTimeRanges(t *testing.T) {
 	endTime2 := now.AddDate(0, 0, -3).Truncate(time.Hour)
 
 	// kline query is exclusive
-	err = service.SyncKLineByInterval(ctx, ex, symbol, types.Interval1h, startTime1.Add(-time.Second), endTime1.Add(time.Second))
+	err = service.syncKLineByInterval(ctx, ex, symbol, types.Interval1h, startTime1.Add(-time.Second), endTime1.Add(time.Second))
 	assert.NoError(t, err)
 
-	err = service.SyncKLineByInterval(ctx, ex, symbol, types.Interval1h, startTime2.Add(-time.Second), endTime2.Add(time.Second))
+	err = service.syncKLineByInterval(ctx, ex, symbol, types.Interval1h, startTime2.Add(-time.Second), endTime2.Add(time.Second))
 	assert.NoError(t, err)
 
-	t1, t2, err := service.QueryExistingDataRange(ctx, ex, symbol, types.Interval1h)
+	t1, t2, err := service.queryExistingDataRange(ctx, ex, symbol, types.Interval1h)
 	if assert.NoError(t, err) {
 		assert.Equal(t, startTime1, t1.Time(), "start time point should match")
 		assert.Equal(t, endTime2, t2.Time(), "end time point should match")
 	}
 
-	timeRanges, err := service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
+	timeRanges, err := service.findMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
 	if assert.NoError(t, err) {
 		assert.NotEmpty(t, timeRanges)
 		assert.Len(t, timeRanges, 1, "should find one missing time range")
@@ -176,11 +176,11 @@ func TestBacktestService_FindMissingTimeRanges(t *testing.T) {
 		log.SetLevel(log.DebugLevel)
 
 		for _, timeRange := range timeRanges {
-			err = service.SyncKLineByInterval(ctx, ex, symbol, types.Interval1h, timeRange.Start.Add(time.Second), timeRange.End.Add(-time.Second))
+			err = service.syncKLineByInterval(ctx, ex, symbol, types.Interval1h, timeRange.Start.Add(time.Second), timeRange.End.Add(-time.Second))
 			assert.NoError(t, err)
 		}
 
-		timeRanges, err = service.FindMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
+		timeRanges, err = service.findMissingTimeRanges(ctx, ex, symbol, types.Interval1h, startTime1, endTime2)
 		assert.NoError(t, err)
 		assert.Empty(t, timeRanges, "after partial sync, missing time ranges should be back-filled")
 	}
