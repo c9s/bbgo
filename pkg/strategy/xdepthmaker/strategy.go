@@ -207,6 +207,7 @@ type Strategy struct {
 	HedgeExchange string `json:"hedgeExchange"`
 
 	UpdateInterval types.Duration `json:"updateInterval"`
+	UpdateLayers   int            `json:"updateLayers"`
 
 	HedgeInterval types.Duration `json:"hedgeInterval"`
 
@@ -346,6 +347,10 @@ func (s *Strategy) Defaults() error {
 		s.UpdateInterval = types.Duration(5 * time.Second)
 	}
 
+	if s.UpdateLayers == 0 {
+		s.UpdateLayers = 5
+	}
+
 	if s.FullReplenishInterval == 0 {
 		s.FullReplenishInterval = types.Duration(10 * time.Minute)
 	}
@@ -426,7 +431,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 				return
 			}
 
-			if time.Since(lastOrderReplenishTime) < 10*time.Second {
+			if time.Since(lastOrderReplenishTime) < 15*time.Second {
 				continue
 			}
 
@@ -435,7 +440,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 				s.updateQuote(ctx, 0)
 
 			case types.BookSignalUpdate:
-				s.updateQuote(ctx, 5)
+				s.updateQuote(ctx, s.UpdateLayers)
 			}
 
 			lastOrderReplenishTime = time.Now()
