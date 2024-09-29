@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
+	"github.com/sirupsen/logrus"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -232,6 +233,15 @@ func (g *GetTradesRequest) Do(ctx context.Context) (*TradesResponse, error) {
 	response, err := g.client.SendRequest(req)
 	if err != nil {
 		return nil, err
+	}
+	if limitStatus := response.Header.Get("X-Bapi-Limit-Status"); len(limitStatus) != 0 {
+		logrus.Infof("[bybit] limit status: %d", limitStatus)
+	}
+	if limit := response.Header.Get("X-Bapi-Limit"); len(limit) != 0 {
+		logrus.Infof("[bybit] rate limit: %d", limit)
+	}
+	if ts := response.Header.Get("X-Bapi-Limit-Reset-Timestamp"); len(ts) != 0 {
+		logrus.Infof("[bybit] rate limit ts: %d", ts)
 	}
 
 	var apiResponse bybitapi.APIResponse
