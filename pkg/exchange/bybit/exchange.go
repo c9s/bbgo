@@ -465,6 +465,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		req.EndTime(options.EndTime.UTC())
 	}
 
+	log.Infof("bbgo QueryTrades start time: %s, end time: %s, limit: %d, tradeid: %d", options.StartTime.String(), options.EndTime.String(), options.Limit, options.LastTradeID)
+
 	limit := uint64(options.Limit)
 	if limit > defaultQueryLimit || limit <= 0 {
 		log.Debugf("the parameter limit exceeds the server boundary or is set to zero. changed to %d, original value: %d", defaultQueryLimit, options.Limit)
