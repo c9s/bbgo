@@ -59,7 +59,7 @@ type Stream struct {
 
 	key, secret        string
 	streamDataProvider StreamDataProvider
-	feeRateProvider    *feeRatePoller
+	feeRateProvider    FeeRatePoller
 	marketsInfo        types.MarketMap
 
 	bookEventCallbacks        []func(e BookEvent)
@@ -70,14 +70,14 @@ type Stream struct {
 	tradeEventCallbacks       []func(e []TradeEvent)
 }
 
-func NewStream(key, secret string, userDataProvider StreamDataProvider) *Stream {
+func NewStream(key, secret string, userDataProvider StreamDataProvider, poller FeeRatePoller) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
 		// pragma: allowlist nextline secret
 		key:                key,
 		secret:             secret,
 		streamDataProvider: userDataProvider,
-		feeRateProvider:    newFeeRatePoller(userDataProvider),
+		feeRateProvider:    poller,
 	}
 
 	stream.SetEndpointCreator(stream.createEndpoint)
@@ -439,37 +439,49 @@ func (s *Stream) handleKLineEvent(klineEvent KLineEvent) {
 	}
 }
 
-func (s *Stream) handleTradeEvent(events []TradeEvent) {
-	for _, event := range events {
-		feeRate, found := s.feeRateProvider.Get(event.Symbol)
-		if !found {
-			feeRate = symbolFeeDetail{
-				FeeRate: bybitapi.FeeRate{
-					Symbol:       event.Symbol,
-					TakerFeeRate: defaultTakerFee,
-					MakerFeeRate: defaultMakerFee,
-				},
-				BaseCoin:  "",
-				QuoteCoin: "",
-			}
+func pollAndGetFeeRate(ctx context.Context, symbol string, poller FeeRatePoller, marketsInfo types.MarketMap) (symbolFeeDetail, error) {
+	err := poller.Poll(ctx)
+	if err != nil {
+		return symbolFeeDetail{}, err
+	}
+	return getFeeRate(symbol, poller, marketsInfo), nil
+}
 
-			if market, ok := s.marketsInfo[event.Symbol]; ok {
-				feeRate.BaseCoin = market.BaseCurrency
-				feeRate.QuoteCoin = market.QuoteCurrency
-			}
-
-			if tradeLogLimiter.Allow() {
-				// The error log level was utilized due to a detected discrepancy in the fee calculations.
-				log.Errorf("failed to get %s fee rate, use default taker fee %f, maker fee %f, base coin: %s, quote coin: %s",
-					event.Symbol,
-					feeRate.TakerFeeRate.Float64(),
-					feeRate.MakerFeeRate.Float64(),
-					feeRate.BaseCoin,
-					feeRate.QuoteCoin,
-				)
-			}
+func getFeeRate(symbol string, poller FeeRatePoller, marketsInfo types.MarketMap) symbolFeeDetail {
+	feeRate, found := poller.Get(symbol)
+	if !found {
+		feeRate = symbolFeeDetail{
+			FeeRate: bybitapi.FeeRate{
+				Symbol:       symbol,
+				TakerFeeRate: defaultTakerFee,
+				MakerFeeRate: defaultMakerFee,
+			},
+			BaseCoin:  "",
+			QuoteCoin: "",
 		}
 
+		if market, ok := marketsInfo[symbol]; ok {
+			feeRate.BaseCoin = market.BaseCurrency
+			feeRate.QuoteCoin = market.QuoteCurrency
+		}
+
+		if tradeLogLimiter.Allow() {
+			// The error log level was utilized due to a detected discrepancy in the fee calculations.
+			log.Errorf("failed to get %s fee rate, use default taker fee %f, maker fee %f, base coin: %s, quote coin: %s",
+				symbol,
+				feeRate.TakerFeeRate.Float64(),
+				feeRate.MakerFeeRate.Float64(),
+				feeRate.BaseCoin,
+				feeRate.QuoteCoin,
+			)
+		}
+	}
+	return feeRate
+}
+
+func (s *Stream) handleTradeEvent(events []TradeEvent) {
+	for _, event := range events {
+		feeRate := getFeeRate(event.Symbol, s.feeRateProvider, s.marketsInfo)
 		gTrade, err := event.toGlobalTrade(feeRate)
 		if err != nil {
 			if tradeLogLimiter.Allow() {

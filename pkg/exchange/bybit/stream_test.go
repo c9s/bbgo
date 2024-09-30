@@ -30,7 +30,7 @@ func getTestClientOrSkip(t *testing.T) *Stream {
 
 	exchange, err := New(key, secret)
 	assert.NoError(t, err)
-	return NewStream(key, secret, exchange)
+	return NewStream(key, secret, exchange, newFeeRatePoller(exchange))
 }
 
 func TestStream(t *testing.T) {
