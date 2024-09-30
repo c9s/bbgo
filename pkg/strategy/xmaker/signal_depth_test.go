@@ -33,7 +33,7 @@ func TestDepthRatioSignal_CalculateSignal(t *testing.T) {
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name: "test1",
+			name: "medium short",
 			fields: fields{
 				PriceRange: fixedpoint.NewFromFloat(0.02),
 				MinRatio:   0.01,
@@ -57,6 +57,60 @@ func TestDepthRatioSignal_CalculateSignal(t *testing.T) {
 				`),
 			},
 			want:    -0.4641,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "strong short",
+			fields: fields{
+				PriceRange: fixedpoint.NewFromFloat(0.02),
+				MinRatio:   0.01,
+				symbol:     "BTCUSDT",
+			},
+			args: args{
+				ctx: context.Background(),
+				asks: PriceVolumeSliceFromText(`
+					19310,10.0
+					19320,0.2
+					19330,0.3
+					19340,0.4
+					19350,0.5
+				`),
+				bids: PriceVolumeSliceFromText(`
+					19300,0.1
+					19290,0.1
+					19280,0.1
+					19270,0.1
+					19260,0.1
+				`),
+			},
+			want:    -1.8322,
+			wantErr: assert.NoError,
+		},
+		{
+			name: "strong long",
+			fields: fields{
+				PriceRange: fixedpoint.NewFromFloat(0.02),
+				MinRatio:   0.01,
+				symbol:     "BTCUSDT",
+			},
+			args: args{
+				ctx: context.Background(),
+				asks: PriceVolumeSliceFromText(`
+					19310,0.1
+					19320,0.1
+					19330,0.1
+					19340,0.1
+					19350,0.1
+				`),
+				bids: PriceVolumeSliceFromText(`
+					19300,10.0
+					19290,0.1
+					19280,0.1
+					19270,0.1
+					19260,0.1
+				`),
+			},
+			want:    1.81623,
 			wantErr: assert.NoError,
 		},
 		{
