@@ -528,7 +528,7 @@ func TestTradeEvent_toGlobalTrade(t *testing.T) {
 		}
 	*/
 	t.Run("succeeds", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -597,7 +597,7 @@ func TestTradeEvent_toGlobalTrade(t *testing.T) {
 			Category: "test-spot",
 		}
 
-		actualTrade, err := tradeEvent.toGlobalTrade(symbolFeeDetail{})
+		actualTrade, err := tradeEvent.toGlobalTrade(SymbolFeeDetail{})
 		assert.Equal(t, fmt.Errorf("unexected category: %s", tradeEvent.Category), err)
 		assert.Nil(t, actualTrade)
 	})
@@ -610,7 +610,7 @@ func TestTradeEvent_toGlobalTrade(t *testing.T) {
 			Category: "spot",
 		}
 
-		actualTrade, err := tradeEvent.toGlobalTrade(symbolFeeDetail{})
+		actualTrade, err := tradeEvent.toGlobalTrade(SymbolFeeDetail{})
 		assert.Equal(t, fmt.Errorf("unexpected side: BOTH"), err)
 		assert.Nil(t, actualTrade)
 	})
@@ -625,7 +625,7 @@ func TestTradeEvent_toGlobalTrade(t *testing.T) {
 		}
 
 		_, nerr := strconv.ParseUint(tradeEvent.OrderId, 10, 64)
-		actualTrade, err := tradeEvent.toGlobalTrade(symbolFeeDetail{})
+		actualTrade, err := tradeEvent.toGlobalTrade(SymbolFeeDetail{})
 		assert.Equal(t, fmt.Errorf("unexpected order id: %s, err: %w", tradeEvent.OrderId, nerr), err)
 		assert.Nil(t, actualTrade)
 	})
@@ -641,7 +641,7 @@ func TestTradeEvent_toGlobalTrade(t *testing.T) {
 		}
 
 		_, nerr := strconv.ParseUint(tradeEvent.ExecId, 10, 64)
-		actualTrade, err := tradeEvent.toGlobalTrade(symbolFeeDetail{})
+		actualTrade, err := tradeEvent.toGlobalTrade(SymbolFeeDetail{})
 		assert.Equal(t, fmt.Errorf("unexpected exec id: %s, err: %w", tradeEvent.ExecId, nerr), err)
 		assert.Nil(t, actualTrade)
 	})
@@ -649,7 +649,7 @@ func TestTradeEvent_toGlobalTrade(t *testing.T) {
 
 func TestTradeEvent_CalculateFee(t *testing.T) {
 	t.Run("maker fee positive, maker, buyer", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -676,7 +676,7 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 	})
 
 	t.Run("maker fee positive, maker, seller", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -703,7 +703,7 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 	})
 
 	t.Run("maker fee positive, taker, buyer", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -730,7 +730,7 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 	})
 
 	t.Run("maker fee positive, taker, seller", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -757,7 +757,7 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 	})
 
 	t.Run("maker fee negative, maker, buyer", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(-0.001),
@@ -784,7 +784,7 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 	})
 
 	t.Run("maker fee negative, maker, seller", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(-0.001),
@@ -811,7 +811,7 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 	})
 
 	t.Run("maker fee negative, taker, buyer", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(-0.001),
@@ -838,7 +838,7 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 	})
 
 	t.Run("maker fee negative, taker, seller", func(t *testing.T) {
-		symbolFee := symbolFeeDetail{
+		symbolFee := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       "BTCUSDT",
 				TakerFeeRate: fixedpoint.NewFromFloat(-0.001),
@@ -867,7 +867,7 @@ func TestTradeEvent_CalculateFee(t *testing.T) {
 }
 
 func TestTradeEvent_baseCoinAsFee(t *testing.T) {
-	symbolFee := symbolFeeDetail{
+	symbolFee := SymbolFeeDetail{
 		FeeRate: bybitapi.FeeRate{
 			Symbol:       "BTCUSDT",
 			TakerFeeRate: fixedpoint.NewFromFloat(0.001),
@@ -892,7 +892,7 @@ func TestTradeEvent_baseCoinAsFee(t *testing.T) {
 }
 
 func TestTradeEvent_quoteCoinAsFee(t *testing.T) {
-	symbolFee := symbolFeeDetail{
+	symbolFee := SymbolFeeDetail{
 		FeeRate: bybitapi.FeeRate{
 			Symbol:       "BTCUSDT",
 			TakerFeeRate: fixedpoint.NewFromFloat(0.001),

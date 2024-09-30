@@ -62,7 +62,7 @@ func TestFeeRatePoller_getAllFeeRates(t *testing.T) {
 		mockMarketProvider.EXPECT().GetAllFeeRates(ctx).Return(feeRates, nil).Times(1)
 		mockMarketProvider.EXPECT().QueryMarkets(ctx).Return(mkts, nil).Times(1)
 
-		expFeeRates := map[string]symbolFeeDetail{
+		expFeeRates := map[string]SymbolFeeDetail{
 			"BTCUSDT": {
 				FeeRate:   feeRates.List[0],
 				BaseCoin:  "BTC",
@@ -111,7 +111,7 @@ func TestFeeRatePoller_getAllFeeRates(t *testing.T) {
 
 		symbolFeeDetails, err := s.getAllFeeRates(ctx)
 		assert.Equal(t, fmt.Errorf("failed to get markets: %w", unknownErr), err)
-		assert.Equal(t, map[string]symbolFeeDetail(nil), symbolFeeDetails)
+		assert.Equal(t, map[string]SymbolFeeDetail(nil), symbolFeeDetails)
 	})
 
 	t.Run("failed to get fee rates", func(t *testing.T) {
@@ -126,7 +126,7 @@ func TestFeeRatePoller_getAllFeeRates(t *testing.T) {
 
 		symbolFeeDetails, err := s.getAllFeeRates(ctx)
 		assert.Equal(t, fmt.Errorf("failed to call get fee rates: %w", unknownErr), err)
-		assert.Equal(t, map[string]symbolFeeDetail(nil), symbolFeeDetails)
+		assert.Equal(t, map[string]SymbolFeeDetail(nil), symbolFeeDetails)
 	})
 }
 
@@ -137,7 +137,7 @@ func Test_feeRatePoller_Get(t *testing.T) {
 	mockMarketProvider := mocks.NewMockStreamDataProvider(mockCtrl)
 	t.Run("found", func(t *testing.T) {
 		symbol := "BTCUSDT"
-		expFeeDetail := symbolFeeDetail{
+		expFeeDetail := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       symbol,
 				TakerFeeRate: fixedpoint.NewFromFloat(0.1),
@@ -149,7 +149,7 @@ func Test_feeRatePoller_Get(t *testing.T) {
 
 		s := &feeRatePoller{
 			client: mockMarketProvider,
-			symbolFeeDetail: map[string]symbolFeeDetail{
+			symbolFeeDetail: map[string]SymbolFeeDetail{
 				symbol: expFeeDetail,
 			},
 		}
@@ -162,7 +162,7 @@ func Test_feeRatePoller_Get(t *testing.T) {
 		symbol := "BTCUSDT"
 		s := &feeRatePoller{
 			client:          mockMarketProvider,
-			symbolFeeDetail: map[string]symbolFeeDetail{},
+			symbolFeeDetail: map[string]SymbolFeeDetail{},
 		}
 
 		_, found := s.Get(symbol)

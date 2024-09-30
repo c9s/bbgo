@@ -23,11 +23,11 @@ var (
 
 type FeeRatePoller interface {
 	Start(ctx context.Context)
-	Get(symbol string) (symbolFeeDetail, bool)
+	Get(symbol string) (SymbolFeeDetail, bool)
 	Poll(ctx context.Context) error
 }
 
-type symbolFeeDetail struct {
+type SymbolFeeDetail struct {
 	bybitapi.FeeRate
 
 	BaseCoin  string
@@ -43,13 +43,13 @@ type feeRatePoller struct {
 	// lastSyncTime is the last time the fee rate was updated.
 	lastSyncTime time.Time
 
-	symbolFeeDetail map[string]symbolFeeDetail
+	symbolFeeDetail map[string]SymbolFeeDetail
 }
 
 func newFeeRatePoller(marketInfoProvider MarketInfoProvider) *feeRatePoller {
 	return &feeRatePoller{
 		client:          marketInfoProvider,
-		symbolFeeDetail: map[string]symbolFeeDetail{},
+		symbolFeeDetail: map[string]SymbolFeeDetail{},
 	}
 }
 
@@ -105,7 +105,7 @@ func (p *feeRatePoller) Poll(ctx context.Context) error {
 	return nil
 }
 
-func (p *feeRatePoller) Get(symbol string) (symbolFeeDetail, bool) {
+func (p *feeRatePoller) Get(symbol string) (SymbolFeeDetail, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -113,16 +113,16 @@ func (p *feeRatePoller) Get(symbol string) (symbolFeeDetail, bool) {
 	return fee, found
 }
 
-func (e *feeRatePoller) getAllFeeRates(ctx context.Context) (map[string]symbolFeeDetail, error) {
+func (e *feeRatePoller) getAllFeeRates(ctx context.Context) (map[string]SymbolFeeDetail, error) {
 	feeRates, err := e.client.GetAllFeeRates(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call get fee rates: %w", err)
 	}
 
-	symbolMap := map[string]symbolFeeDetail{}
+	symbolMap := map[string]SymbolFeeDetail{}
 	for _, f := range feeRates.List {
 		if _, found := symbolMap[f.Symbol]; !found {
-			symbolMap[f.Symbol] = symbolFeeDetail{FeeRate: f}
+			symbolMap[f.Symbol] = SymbolFeeDetail{FeeRate: f}
 		}
 	}
 
@@ -131,7 +131,7 @@ func (e *feeRatePoller) getAllFeeRates(ctx context.Context) (map[string]symbolFe
 		return nil, fmt.Errorf("failed to get markets: %w", err)
 	}
 
-	// update base coin, quote coin into symbolFeeDetail
+	// update base coin, quote coin into SymbolFeeDetail
 	for _, mkt := range mkts {
 		feeRate, found := symbolMap[mkt.Symbol]
 		if !found {

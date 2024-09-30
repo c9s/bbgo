@@ -325,7 +325,7 @@ func v3ToGlobalTrade(trade v3.Trade) (*types.Trade, error) {
 	}, nil
 }
 
-func toGlobalTrade(trade bybitapi.Trade, feeDetail symbolFeeDetail) (*types.Trade, error) {
+func toGlobalTrade(trade bybitapi.Trade, feeDetail SymbolFeeDetail) (*types.Trade, error) {
 	side, err := toGlobalSideType(trade.Side)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected side: %s, err: %w", trade.Side, err)
