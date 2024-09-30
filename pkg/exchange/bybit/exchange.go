@@ -58,7 +58,7 @@ type Exchange struct {
 	// Because the bybit exchange does not provide a fee currency on traditional SPOT accounts, we need to query the marker
 	// fee rate to get the fee currency.
 	// https://bybit-exchange.github.io/docs/v5/enum#spot-fee-currency-instruction
-	feeRateProvider FeeRatePoller
+	FeeRatePoller
 }
 
 func New(key, secret string) (*Exchange, error) {
@@ -74,7 +74,7 @@ func New(key, secret string) (*Exchange, error) {
 	}
 	if len(key) > 0 && len(secret) > 0 {
 		client.Auth(key, secret)
-		ex.feeRateProvider = newFeeRatePoller(ex)
+		ex.FeeRatePoller = newFeeRatePoller(ex)
 
 		ctx, cancel := context.WithTimeoutCause(context.Background(), 5*time.Second, errors.New("query markets timeout"))
 		defer cancel()
@@ -437,7 +437,7 @@ func (e *Exchange) queryTrades(ctx context.Context, req *bybitapi.GetExecutionLi
 		}
 
 		for _, trade := range res.List {
-			feeRate, err := pollAndGetFeeRate(ctx, trade.Symbol, e.feeRateProvider, e.marketsInfo)
+			feeRate, err := pollAndGetFeeRate(ctx, trade.Symbol, e.FeeRatePoller, e.marketsInfo)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get fee rate, err: %v", err)
 			}
@@ -607,5 +607,5 @@ func (e *Exchange) GetAllFeeRates(ctx context.Context) (bybitapi.FeeRates, error
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e.key, e.secret, e, e.feeRateProvider)
+	return NewStream(e.key, e.secret, e)
 }
