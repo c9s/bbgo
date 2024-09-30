@@ -287,33 +287,18 @@ func (k *KLine) toGlobalKLine(symbol string) (types.KLine, error) {
 }
 
 type TradeEvent struct {
+	bybitapi.Trade
 	// linear and inverse order id format: 42f4f364-82e1-49d3-ad1d-cd8cf9aa308d (UUID format)
 	// spot: 1468264727470772736 (only numbers)
 	// we only use spot trading.
-	OrderId     string            `json:"orderId"`
 	OrderLinkId string            `json:"orderLinkId"`
 	Category    bybitapi.Category `json:"category"`
-	Symbol      string            `json:"symbol"`
-	ExecId      string            `json:"execId"`
-	ExecPrice   fixedpoint.Value  `json:"execPrice"`
-	ExecQty     fixedpoint.Value  `json:"execQty"`
 
-	// Is maker order. true: maker, false: taker
-	IsMaker bool `json:"isMaker"`
 	// Paradigm block trade ID
 	BlockTradeId string `json:"blockTradeId"`
-	// Order type. Market,Limit
-	OrderType bybitapi.OrderType `json:"orderType"`
-	// 	Side. Buy,Sell
-	Side bybitapi.Side `json:"side"`
-	// 	Executed timestamp（ms）
-	ExecTime types.MillisecondTimestamp `json:"execTime"`
 	// 	Closed position size
 	ClosedSize fixedpoint.Value `json:"closedSize"`
 
-	/* The following parameters do not support SPOT trading. */
-	// Executed trading fee. You can get spot fee currency instruction here. Normal spot is not supported
-	ExecFee fixedpoint.Value `json:"execFee"`
 	// Executed type. Normal spot is not supported
 	ExecType string `json:"execType"`
 	// Executed order value. Normal spot is not supported
@@ -377,7 +362,7 @@ func (t *TradeEvent) toGlobalTrade(symbolFee symbolFeeDetail) (*types.Trade, err
 		Fee:           fixedpoint.Zero,
 		FeeCurrency:   "",
 	}
-	trade.FeeCurrency, trade.Fee = calculateFee(*t, symbolFee)
+	trade.FeeCurrency, trade.Fee = calculateFee(t.Trade, symbolFee)
 	return trade, nil
 }
 
@@ -400,7 +385,7 @@ func (t *TradeEvent) toGlobalTrade(symbolFee symbolFeeDetail) (*types.Trade, err
 //     IsMakerOrder = FALSE
 //     -> Side = Buy -> base currency (BTC)
 //     -> Side = Sell -> quote currency (USDT)
-func calculateFee(t TradeEvent, feeDetail symbolFeeDetail) (string, fixedpoint.Value) {
+func calculateFee(t bybitapi.Trade, feeDetail symbolFeeDetail) (string, fixedpoint.Value) {
 	if feeDetail.MakerFeeRate.Sign() > 0 || !t.IsMaker {
 		if t.Side == bybitapi.SideBuy {
 			return feeDetail.BaseCoin, baseCoinAsFee(t, feeDetail)
@@ -414,14 +399,14 @@ func calculateFee(t TradeEvent, feeDetail symbolFeeDetail) (string, fixedpoint.V
 	return feeDetail.BaseCoin, baseCoinAsFee(t, feeDetail)
 }
 
-func baseCoinAsFee(t TradeEvent, feeDetail symbolFeeDetail) fixedpoint.Value {
+func baseCoinAsFee(t bybitapi.Trade, feeDetail symbolFeeDetail) fixedpoint.Value {
 	if t.IsMaker {
 		return feeDetail.MakerFeeRate.Mul(t.ExecQty)
 	}
 	return feeDetail.TakerFeeRate.Mul(t.ExecQty)
 }
 
-func quoteCoinAsFee(t TradeEvent, feeDetail symbolFeeDetail) fixedpoint.Value {
+func quoteCoinAsFee(t bybitapi.Trade, feeDetail symbolFeeDetail) fixedpoint.Value {
 	baseFee := t.ExecPrice.Mul(t.ExecQty)
 	if t.IsMaker {
 		return feeDetail.MakerFeeRate.Mul(baseFee)
