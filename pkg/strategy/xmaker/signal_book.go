@@ -29,6 +29,10 @@ type OrderBookBestPriceVolumeSignal struct {
 	book   *types.StreamOrderBook
 }
 
+func (s *OrderBookBestPriceVolumeSignal) BindStreamBook(book *types.StreamOrderBook) {
+	s.book = book
+}
+
 func (s *OrderBookBestPriceVolumeSignal) Bind(ctx context.Context, session *bbgo.ExchangeSession, symbol string) error {
 	if s.book == nil {
 		return errors.New("s.book can not be nil")
