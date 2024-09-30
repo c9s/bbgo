@@ -21,6 +21,12 @@ var (
 	pollFeeRateRateLimiter = rate.NewLimiter(rate.Every(10*time.Minute), 1)
 )
 
+type FeeRatePoller interface {
+	Start(ctx context.Context)
+	Get(symbol string) (symbolFeeDetail, bool)
+	Poll(ctx context.Context) error
+}
+
 type symbolFeeDetail struct {
 	bybitapi.FeeRate
 
@@ -33,6 +39,9 @@ type feeRatePoller struct {
 	mu     sync.Mutex
 	once   sync.Once
 	client MarketInfoProvider
+
+	// lastSyncTime is the last time the fee rate was updated.
+	lastSyncTime time.Time
 
 	symbolFeeDetail map[string]symbolFeeDetail
 }
@@ -51,7 +60,7 @@ func (p *feeRatePoller) Start(ctx context.Context) {
 }
 
 func (p *feeRatePoller) startLoop(ctx context.Context) {
-	err := p.poll(ctx)
+	err := p.Poll(ctx)
 	if err != nil {
 		log.WithError(err).Warn("failed to initialize the fee rate, the ticker is scheduled to update it subsequently")
 	}
@@ -67,22 +76,27 @@ func (p *feeRatePoller) startLoop(ctx context.Context) {
 
 			return
 		case <-ticker.C:
-			if err := p.poll(ctx); err != nil {
+			if err := p.Poll(ctx); err != nil {
 				log.WithError(err).Warn("failed to update fee rate")
 			}
 		}
 	}
 }
 
-func (p *feeRatePoller) poll(ctx context.Context) error {
+func (p *feeRatePoller) Poll(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	// the poll will be called frequently, so we need to check the last sync time.
+	if time.Since(p.lastSyncTime) < feeRatePollingPeriod {
+		return nil
+	}
 	symbolFeeRate, err := p.getAllFeeRates(ctx)
 	if err != nil {
 		return err
 	}
 
-	p.mu.Lock()
 	p.symbolFeeDetail = symbolFeeRate
-	p.mu.Unlock()
+	p.lastSyncTime = time.Now()
 
 	if pollFeeRateRateLimiter.Allow() {
 		log.Infof("updated fee rate: %+v", p.symbolFeeDetail)
