@@ -12,17 +12,17 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
-	v3 "github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi/v3"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 const (
-	maxOrderIdLen     = 36
-	defaultQueryLimit = 50
-	defaultKLineLimit = 1000
+	maxOrderIdLen          = 36
+	defaultQueryLimit      = 50
+	defaultQueryTradeLimit = 100
+	defaultKLineLimit      = 1000
 
-	halfYearDuration = 6 * 30 * 24 * time.Hour
+	queryTradeDurationLimit = 7 * 24 * time.Hour
 )
 
 // https://bybit-exchange.github.io/docs/zh-TW/v5/rate-limit
@@ -52,7 +52,13 @@ var (
 type Exchange struct {
 	key, secret string
 	client      *bybitapi.RestClient
-	v3client    *v3.Client
+	marketsInfo types.MarketMap
+
+	// feeRateProvider provides the fee rate and fee currency for each symbol.
+	// Because the bybit exchange does not provide a fee currency on traditional SPOT accounts, we need to query the marker
+	// fee rate to get the fee currency.
+	// https://bybit-exchange.github.io/docs/v5/enum#spot-fee-currency-instruction
+	feeRateProvider FeeRatePoller
 }
 
 func New(key, secret string) (*Exchange, error) {
@@ -60,18 +66,25 @@ func New(key, secret string) (*Exchange, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if len(key) > 0 && len(secret) > 0 {
-		client.Auth(key, secret)
-	}
-
-	return &Exchange{
+	ex := &Exchange{
 		key: key,
 		// pragma: allowlist nextline secret
-		secret:   secret,
-		client:   client,
-		v3client: v3.NewClient(client),
-	}, nil
+		secret: secret,
+		client: client,
+	}
+	if len(key) > 0 && len(secret) > 0 {
+		client.Auth(key, secret)
+		ex.feeRateProvider = newFeeRatePoller(ex)
+
+		ctx, cancel := context.WithTimeoutCause(context.Background(), 5*time.Second, errors.New("query markets timeout"))
+		defer cancel()
+		ex.marketsInfo, err = ex.QueryMarkets(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query markets, err: %w", err)
+		}
+	}
+
+	return ex, nil
 }
 
 func (e *Exchange) Name() types.ExchangeName {
@@ -226,35 +239,14 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (tr
 	if len(q.OrderID) == 0 {
 		return nil, errors.New("orderID is required parameter")
 	}
-	req := e.v3client.NewGetTradesRequest().OrderId(q.OrderID)
+	req := e.client.NewGetExecutionListRequest().OrderId(q.OrderID)
 
 	if len(q.Symbol) != 0 {
 		req.Symbol(q.Symbol)
 	}
+	req.Limit(defaultQueryTradeLimit)
 
-	if err := queryOrderTradeRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("trade rate limiter wait error: %w", err)
-	}
-	response, err := req.Do(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query order trades, err: %w", err)
-	}
-
-	var errs error
-	for _, trade := range response.List {
-		res, err := v3ToGlobalTrade(trade)
-		if err != nil {
-			errs = multierr.Append(errs, err)
-			continue
-		}
-		trades = append(trades, *res)
-	}
-
-	if errs != nil {
-		return nil, errs
-	}
-
-	return trades, nil
+	return e.queryTrades(ctx, req)
 }
 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
@@ -432,32 +424,65 @@ func (e *Exchange) QueryClosedOrders(
 	return types.SortOrdersAscending(orders), nil
 }
 
-/*
-QueryTrades queries trades by time range or trade id range.
-If options.StartTime is not specified, you can only query for records in the last 7 days.
-If you want to query for records older than 7 days, options.StartTime is required.
-It supports to query records up to 180 days.
+func (e *Exchange) queryTrades(ctx context.Context, req *bybitapi.GetExecutionListRequest) (trades []types.Trade, err error) {
+	cursor := ""
+	for {
+		if len(cursor) != 0 {
+			req = req.Cursor(cursor)
+		}
 
-** Here includes MakerRebate. If needed, let's discuss how to modify it to return in trade. **
-** StartTime and EndTime are inclusive. **
-** StartTime and EndTime cannot exceed 180 days. **
-** StartTime, EndTime, FromTradeId can be used together. **
-** If the `FromTradeId` is passed, and `ToTradeId` is null, then the result is sorted by tradeId in `ascend`.
-Otherwise, the result is sorted by tradeId in `descend`. **
+		res, err := req.Do(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query trades, err: %w", err)
+		}
+
+		for _, trade := range res.List {
+			feeRate, err := pollAndGetFeeRate(ctx, trade.Symbol, e.feeRateProvider, e.marketsInfo)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get fee rate, err: %v", err)
+			}
+			trade, err := toGlobalTrade(trade, feeRate)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert trade, err: %v", err)
+			}
+
+			trades = append(trades, *trade)
+		}
+
+		if len(res.NextPageCursor) == 0 {
+			break
+		}
+		cursor = res.NextPageCursor
+	}
+
+	return trades, nil
+
+}
+
+/*
+QueryTrades queries trades by time range.
+** startTime and endTime are not passed, return 7 days by default **
+** Only startTime is passed, return range between startTime and startTime+7 days **
+** Only endTime is passed, return range between endTime-7 days and endTime **
+** If both are passed, the rule is endTime - startTime <= 7 days **
 */
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
-	// using v3 client, since the v5 API does not support feeCurrency.
-	req := e.v3client.NewGetTradesRequest()
+	req := e.client.NewGetExecutionListRequest()
 	req.Symbol(symbol)
 
-	// If `lastTradeId` is given and greater than 0, the query will use it as a condition and the retrieved result will be
-	// in `ascending` order. We can use `lastTradeId` to retrieve all the data. So we hack it to '1' if `lastTradeID` is '0'.
-	// If 0 is given, it will not be used as a condition and the result will be in `descending` order. The FromTradeId
-	// option cannot be used to retrieve more data.
-	req.FromTradeId(strconv.FormatUint(options.LastTradeID, 10))
-	if options.LastTradeID == 0 {
-		req.FromTradeId("1")
+	if options.StartTime != nil && options.EndTime != nil {
+		if options.EndTime.Before(*options.StartTime) {
+			return nil, fmt.Errorf("end time is before start time, start time: %s, end time: %s", options.StartTime.String(), options.EndTime.String())
+		}
+
+		if options.EndTime.Sub(*options.StartTime) > queryTradeDurationLimit {
+			newStartTime := options.EndTime.Add(-queryTradeDurationLimit)
+
+			log.Warnf("!!!BYBIT EXCHANGE API NOTICE!!! The time range exceeds the server boundary: %s, start time: %s, end time: %s, updated start time %s -> %s", queryTradeDurationLimit, options.StartTime.String(), options.EndTime.String(), options.StartTime.String(), newStartTime.String())
+			options.StartTime = &newStartTime
+		}
 	}
+
 	if options.StartTime != nil {
 		req.StartTime(options.StartTime.UTC())
 	}
@@ -466,35 +491,13 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	limit := uint64(options.Limit)
-	if limit > defaultQueryLimit || limit <= 0 {
-		log.Debugf("the parameter limit exceeds the server boundary or is set to zero. changed to %d, original value: %d", defaultQueryLimit, options.Limit)
-		limit = defaultQueryLimit
+	if limit > defaultQueryTradeLimit || limit <= 0 {
+		log.Debugf("the parameter limit exceeds the server boundary or is set to zero. changed to %d, original value: %d", defaultQueryTradeLimit, options.Limit)
+		limit = defaultQueryTradeLimit
 	}
 	req.Limit(limit)
 
-	if err := queryOrderTradeRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("trade rate limiter wait error: %w", err)
-	}
-	response, err := req.Do(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query trades, err: %w", err)
-	}
-
-	var errs error
-	for _, trade := range response.List {
-		res, err := v3ToGlobalTrade(trade)
-		if err != nil {
-			errs = multierr.Append(errs, err)
-			continue
-		}
-		trades = append(trades, *res)
-	}
-
-	if errs != nil {
-		return nil, errs
-	}
-
-	return trades, nil
+	return e.queryTrades(ctx, req)
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
@@ -604,5 +607,5 @@ func (e *Exchange) GetAllFeeRates(ctx context.Context) (bybitapi.FeeRates, error
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e.key, e.secret, e)
+	return NewStream(e.key, e.secret, e, e.feeRateProvider)
 }
