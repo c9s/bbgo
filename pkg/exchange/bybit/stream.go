@@ -439,18 +439,18 @@ func (s *Stream) handleKLineEvent(klineEvent KLineEvent) {
 	}
 }
 
-func pollAndGetFeeRate(ctx context.Context, symbol string, poller FeeRatePoller, marketsInfo types.MarketMap) (symbolFeeDetail, error) {
+func pollAndGetFeeRate(ctx context.Context, symbol string, poller FeeRatePoller, marketsInfo types.MarketMap) (SymbolFeeDetail, error) {
 	err := poller.Poll(ctx)
 	if err != nil {
-		return symbolFeeDetail{}, err
+		return SymbolFeeDetail{}, err
 	}
 	return getFeeRate(symbol, poller, marketsInfo), nil
 }
 
-func getFeeRate(symbol string, poller FeeRatePoller, marketsInfo types.MarketMap) symbolFeeDetail {
+func getFeeRate(symbol string, poller FeeRatePoller, marketsInfo types.MarketMap) SymbolFeeDetail {
 	feeRate, found := poller.Get(symbol)
 	if !found {
-		feeRate = symbolFeeDetail{
+		feeRate = SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       symbol,
 				TakerFeeRate: defaultTakerFee,

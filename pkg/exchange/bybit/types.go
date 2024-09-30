@@ -327,7 +327,7 @@ type TradeEvent struct {
 	TradeIv string `json:"tradeIv"`
 }
 
-func (t *TradeEvent) toGlobalTrade(symbolFee symbolFeeDetail) (*types.Trade, error) {
+func (t *TradeEvent) toGlobalTrade(symbolFee SymbolFeeDetail) (*types.Trade, error) {
 	if t.Category != bybitapi.CategorySpot {
 		return nil, fmt.Errorf("unexected category: %s", t.Category)
 	}
@@ -385,7 +385,7 @@ func (t *TradeEvent) toGlobalTrade(symbolFee symbolFeeDetail) (*types.Trade, err
 //     IsMakerOrder = FALSE
 //     -> Side = Buy -> base currency (BTC)
 //     -> Side = Sell -> quote currency (USDT)
-func calculateFee(t bybitapi.Trade, feeDetail symbolFeeDetail) (string, fixedpoint.Value) {
+func calculateFee(t bybitapi.Trade, feeDetail SymbolFeeDetail) (string, fixedpoint.Value) {
 	if feeDetail.MakerFeeRate.Sign() > 0 || !t.IsMaker {
 		if t.Side == bybitapi.SideBuy {
 			return feeDetail.BaseCoin, baseCoinAsFee(t, feeDetail)
@@ -399,14 +399,14 @@ func calculateFee(t bybitapi.Trade, feeDetail symbolFeeDetail) (string, fixedpoi
 	return feeDetail.BaseCoin, baseCoinAsFee(t, feeDetail)
 }
 
-func baseCoinAsFee(t bybitapi.Trade, feeDetail symbolFeeDetail) fixedpoint.Value {
+func baseCoinAsFee(t bybitapi.Trade, feeDetail SymbolFeeDetail) fixedpoint.Value {
 	if t.IsMaker {
 		return feeDetail.MakerFeeRate.Mul(t.ExecQty)
 	}
 	return feeDetail.TakerFeeRate.Mul(t.ExecQty)
 }
 
-func quoteCoinAsFee(t bybitapi.Trade, feeDetail symbolFeeDetail) fixedpoint.Value {
+func quoteCoinAsFee(t bybitapi.Trade, feeDetail SymbolFeeDetail) fixedpoint.Value {
 	baseFee := t.ExecPrice.Mul(t.ExecQty)
 	if t.IsMaker {
 		return feeDetail.MakerFeeRate.Mul(baseFee)
