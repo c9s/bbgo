@@ -51,6 +51,7 @@ type AccountBalanceProvider interface {
 type StreamDataProvider interface {
 	MarketInfoProvider
 	AccountBalanceProvider
+	FeeRatePoller
 }
 
 //go:generate callbackgen -type Stream
@@ -70,14 +71,13 @@ type Stream struct {
 	tradeEventCallbacks       []func(e []TradeEvent)
 }
 
-func NewStream(key, secret string, userDataProvider StreamDataProvider, poller FeeRatePoller) *Stream {
+func NewStream(key, secret string, userDataProvider StreamDataProvider) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
 		// pragma: allowlist nextline secret
 		key:                key,
 		secret:             secret,
 		streamDataProvider: userDataProvider,
-		feeRateProvider:    poller,
 	}
 
 	stream.SetEndpointCreator(stream.createEndpoint)
@@ -91,7 +91,7 @@ func NewStream(key, secret string, userDataProvider StreamDataProvider, poller F
 		}
 
 		// get account fee rate
-		go stream.feeRateProvider.Start(ctx)
+		go stream.streamDataProvider.StartFeeRatePoller(ctx)
 
 		stream.marketsInfo, err = stream.streamDataProvider.QueryMarkets(ctx)
 		if err != nil {
@@ -440,7 +440,7 @@ func (s *Stream) handleKLineEvent(klineEvent KLineEvent) {
 }
 
 func pollAndGetFeeRate(ctx context.Context, symbol string, poller FeeRatePoller, marketsInfo types.MarketMap) (SymbolFeeDetail, error) {
-	err := poller.Poll(ctx)
+	err := poller.PollFeeRate(ctx)
 	if err != nil {
 		return SymbolFeeDetail{}, err
 	}
@@ -448,7 +448,7 @@ func pollAndGetFeeRate(ctx context.Context, symbol string, poller FeeRatePoller,
 }
 
 func getFeeRate(symbol string, poller FeeRatePoller, marketsInfo types.MarketMap) SymbolFeeDetail {
-	feeRate, found := poller.Get(symbol)
+	feeRate, found := poller.GetFeeRate(symbol)
 	if !found {
 		feeRate = SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{

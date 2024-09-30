@@ -154,7 +154,7 @@ func Test_feeRatePoller_Get(t *testing.T) {
 			},
 		}
 
-		res, found := s.Get(symbol)
+		res, found := s.GetFeeRate(symbol)
 		assert.True(t, found)
 		assert.Equal(t, expFeeDetail, res)
 	})
@@ -165,7 +165,7 @@ func Test_feeRatePoller_Get(t *testing.T) {
 			symbolFeeDetail: map[string]SymbolFeeDetail{},
 		}
 
-		_, found := s.Get(symbol)
+		_, found := s.GetFeeRate(symbol)
 		assert.False(t, found)
 	})
 }

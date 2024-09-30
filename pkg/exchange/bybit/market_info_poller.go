@@ -22,9 +22,9 @@ var (
 )
 
 type FeeRatePoller interface {
-	Start(ctx context.Context)
-	Get(symbol string) (SymbolFeeDetail, bool)
-	Poll(ctx context.Context) error
+	StartFeeRatePoller(ctx context.Context)
+	GetFeeRate(symbol string) (SymbolFeeDetail, bool)
+	PollFeeRate(ctx context.Context) error
 }
 
 type SymbolFeeDetail struct {
@@ -53,14 +53,14 @@ func newFeeRatePoller(marketInfoProvider MarketInfoProvider) *feeRatePoller {
 	}
 }
 
-func (p *feeRatePoller) Start(ctx context.Context) {
+func (p *feeRatePoller) StartFeeRatePoller(ctx context.Context) {
 	p.once.Do(func() {
 		p.startLoop(ctx)
 	})
 }
 
 func (p *feeRatePoller) startLoop(ctx context.Context) {
-	err := p.Poll(ctx)
+	err := p.PollFeeRate(ctx)
 	if err != nil {
 		log.WithError(err).Warn("failed to initialize the fee rate, the ticker is scheduled to update it subsequently")
 	}
@@ -76,14 +76,14 @@ func (p *feeRatePoller) startLoop(ctx context.Context) {
 
 			return
 		case <-ticker.C:
-			if err := p.Poll(ctx); err != nil {
+			if err := p.PollFeeRate(ctx); err != nil {
 				log.WithError(err).Warn("failed to update fee rate")
 			}
 		}
 	}
 }
 
-func (p *feeRatePoller) Poll(ctx context.Context) error {
+func (p *feeRatePoller) PollFeeRate(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	// the poll will be called frequently, so we need to check the last sync time.
@@ -105,7 +105,7 @@ func (p *feeRatePoller) Poll(ctx context.Context) error {
 	return nil
 }
 
-func (p *feeRatePoller) Get(symbol string) (SymbolFeeDetail, bool) {
+func (p *feeRatePoller) GetFeeRate(symbol string) (SymbolFeeDetail, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
