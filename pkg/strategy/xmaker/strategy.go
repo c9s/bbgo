@@ -64,6 +64,7 @@ type SignalConfig struct {
 	Weight                   float64                         `json:"weight"`
 	BollingerBandTrendSignal *BollingerBandTrendSignal       `json:"bollingerBandTrend,omitempty"`
 	OrderBookBestPriceSignal *OrderBookBestPriceVolumeSignal `json:"orderBookBestPrice,omitempty"`
+	DepthRatioSignal         *DepthRatioSignal               `json:"depthRatio,omitempty"`
 	KLineShapeSignal         *KLineShapeSignal               `json:"klineShape,omitempty"`
 	TradeVolumeWindowSignal  *TradeVolumeWindowSignal        `json:"tradeVolumeWindow,omitempty"`
 }
@@ -390,6 +391,8 @@ func (s *Strategy) aggregateSignal(ctx context.Context) (float64, error) {
 		var err error
 		if signal.OrderBookBestPriceSignal != nil {
 			sig, err = signal.OrderBookBestPriceSignal.CalculateSignal(ctx)
+		} else if signal.DepthRatioSignal != nil {
+			sig, err = signal.DepthRatioSignal.CalculateSignal(ctx)
 		} else if signal.BollingerBandTrendSignal != nil {
 			sig, err = signal.BollingerBandTrendSignal.CalculateSignal(ctx)
 		} else if signal.TradeVolumeWindowSignal != nil {
@@ -1545,6 +1548,11 @@ func (s *Strategy) CrossRun(
 		if signalConfig.OrderBookBestPriceSignal != nil {
 			signalConfig.OrderBookBestPriceSignal.book = s.sourceBook
 			if err := signalConfig.OrderBookBestPriceSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
+				return err
+			}
+		} else if signalConfig.DepthRatioSignal != nil {
+			signalConfig.DepthRatioSignal.book = s.sourceBook
+			if err := signalConfig.DepthRatioSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
 				return err
 			}
 		} else if signalConfig.BollingerBandTrendSignal != nil {

@@ -280,6 +280,28 @@ func (slice PriceVolumeSlice) AverageDepthPriceByQuote(requiredDepthInQuote fixe
 	return totalQuoteAmount.Div(totalQuantity)
 }
 
+func (slice PriceVolumeSlice) InPriceRange(midPrice fixedpoint.Value, side SideType, r fixedpoint.Value) (sub PriceVolumeSlice) {
+	switch side {
+	case SideTypeSell:
+		boundaryPrice := midPrice.Add(midPrice.Mul(r))
+		for _, pv := range slice {
+			if pv.Price.Compare(boundaryPrice) <= 0 {
+				sub = append(sub, pv)
+			}
+		}
+
+	case SideTypeBuy:
+		boundaryPrice := midPrice.Sub(midPrice.Mul(r))
+		for _, pv := range slice {
+			if pv.Price.Compare(boundaryPrice) >= 0 {
+				sub = append(sub, pv)
+			}
+		}
+	}
+
+	return sub
+}
+
 // AverageDepthPrice uses the required total quantity to calculate the corresponding price
 func (slice PriceVolumeSlice) AverageDepthPrice(requiredQuantity fixedpoint.Value) fixedpoint.Value {
 	// rest quantity
