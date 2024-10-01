@@ -325,6 +325,42 @@ func v3ToGlobalTrade(trade v3.Trade) (*types.Trade, error) {
 	}, nil
 }
 
+func toGlobalTrade(trade bybitapi.Trade, feeDetail SymbolFeeDetail) (*types.Trade, error) {
+	side, err := toGlobalSideType(trade.Side)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected side: %s, err: %w", trade.Side, err)
+	}
+	orderIdNum, err := strconv.ParseUint(trade.OrderId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected order id: %s, err: %w", trade.OrderId, err)
+	}
+	tradeIdNum, err := strconv.ParseUint(trade.ExecId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("unexpected trade id: %s, err: %w", trade.ExecId, err)
+	}
+
+	fc, _ := calculateFee(trade, feeDetail)
+
+	return &types.Trade{
+		ID:            tradeIdNum,
+		OrderID:       orderIdNum,
+		Exchange:      types.ExchangeBybit,
+		Price:         trade.ExecPrice,
+		Quantity:      trade.ExecQty,
+		QuoteQuantity: trade.ExecPrice.Mul(trade.ExecQty),
+		Symbol:        trade.Symbol,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       trade.IsMaker,
+		Time:          types.Time(trade.ExecTime),
+		Fee:           trade.ExecFee,
+		FeeCurrency:   fc,
+		IsMargin:      false,
+		IsFutures:     false,
+		IsIsolated:    false,
+	}, nil
+}
+
 func toGlobalBalanceMap(events []bybitapi.WalletBalances) types.BalanceMap {
 	bm := types.BalanceMap{}
 	for _, event := range events {

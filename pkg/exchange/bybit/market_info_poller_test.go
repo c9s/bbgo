@@ -3,16 +3,14 @@ package bybit
 import (
 	"context"
 	"fmt"
-	"testing"
-
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
-
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	"github.com/c9s/bbgo/pkg/exchange/bybit/mocks"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+	"testing"
 )
 
 func TestFeeRatePoller_getAllFeeRates(t *testing.T) {
@@ -64,7 +62,7 @@ func TestFeeRatePoller_getAllFeeRates(t *testing.T) {
 		mockMarketProvider.EXPECT().GetAllFeeRates(ctx).Return(feeRates, nil).Times(1)
 		mockMarketProvider.EXPECT().QueryMarkets(ctx).Return(mkts, nil).Times(1)
 
-		expFeeRates := map[string]symbolFeeDetail{
+		expFeeRates := map[string]SymbolFeeDetail{
 			"BTCUSDT": {
 				FeeRate:   feeRates.List[0],
 				BaseCoin:  "BTC",
@@ -113,7 +111,7 @@ func TestFeeRatePoller_getAllFeeRates(t *testing.T) {
 
 		symbolFeeDetails, err := s.getAllFeeRates(ctx)
 		assert.Equal(t, fmt.Errorf("failed to get markets: %w", unknownErr), err)
-		assert.Equal(t, map[string]symbolFeeDetail(nil), symbolFeeDetails)
+		assert.Equal(t, map[string]SymbolFeeDetail(nil), symbolFeeDetails)
 	})
 
 	t.Run("failed to get fee rates", func(t *testing.T) {
@@ -128,7 +126,7 @@ func TestFeeRatePoller_getAllFeeRates(t *testing.T) {
 
 		symbolFeeDetails, err := s.getAllFeeRates(ctx)
 		assert.Equal(t, fmt.Errorf("failed to call get fee rates: %w", unknownErr), err)
-		assert.Equal(t, map[string]symbolFeeDetail(nil), symbolFeeDetails)
+		assert.Equal(t, map[string]SymbolFeeDetail(nil), symbolFeeDetails)
 	})
 }
 
@@ -139,7 +137,7 @@ func Test_feeRatePoller_Get(t *testing.T) {
 	mockMarketProvider := mocks.NewMockStreamDataProvider(mockCtrl)
 	t.Run("found", func(t *testing.T) {
 		symbol := "BTCUSDT"
-		expFeeDetail := symbolFeeDetail{
+		expFeeDetail := SymbolFeeDetail{
 			FeeRate: bybitapi.FeeRate{
 				Symbol:       symbol,
 				TakerFeeRate: fixedpoint.NewFromFloat(0.1),
@@ -151,12 +149,12 @@ func Test_feeRatePoller_Get(t *testing.T) {
 
 		s := &feeRatePoller{
 			client: mockMarketProvider,
-			symbolFeeDetail: map[string]symbolFeeDetail{
+			symbolFeeDetail: map[string]SymbolFeeDetail{
 				symbol: expFeeDetail,
 			},
 		}
 
-		res, found := s.Get(symbol)
+		res, found := s.GetFeeRate(symbol)
 		assert.True(t, found)
 		assert.Equal(t, expFeeDetail, res)
 	})
@@ -164,10 +162,10 @@ func Test_feeRatePoller_Get(t *testing.T) {
 		symbol := "BTCUSDT"
 		s := &feeRatePoller{
 			client:          mockMarketProvider,
-			symbolFeeDetail: map[string]symbolFeeDetail{},
+			symbolFeeDetail: map[string]SymbolFeeDetail{},
 		}
 
-		_, found := s.Get(symbol)
+		_, found := s.GetFeeRate(symbol)
 		assert.False(t, found)
 	})
 }
