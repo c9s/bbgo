@@ -41,7 +41,7 @@ func (s *DepthRatioSignal) Bind(ctx context.Context, session *bbgo.ExchangeSessi
 	}
 
 	s.symbol = symbol
-	orderBookSignalMetrics.WithLabelValues(s.symbol).Set(0.0)
+	depthRatioSignalMetrics.WithLabelValues(s.symbol).Set(0.0)
 	return nil
 }
 
