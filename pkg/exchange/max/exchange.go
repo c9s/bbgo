@@ -1147,23 +1147,6 @@ func (e *Exchange) QueryDepth(ctx context.Context, symbol string, limit int) (sn
 	return convertDepth(symbol, depth)
 }
 
-func convertDepth(symbol string, depth *v3.Depth) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
-	snapshot.Symbol = symbol
-	snapshot.Time = time.Unix(depth.Timestamp, 0)
-	snapshot.LastUpdateId = depth.LastUpdateId
-
-	finalUpdateID = depth.LastUpdateId
-	for _, entry := range depth.Bids {
-		snapshot.Bids = append(snapshot.Bids, types.PriceVolume{Price: entry[0], Volume: entry[1]})
-	}
-
-	for _, entry := range depth.Asks {
-		snapshot.Asks = append(snapshot.Asks, types.PriceVolume{Price: entry[0], Volume: entry[1]})
-	}
-
-	return snapshot, finalUpdateID, err
-}
-
 var Two = fixedpoint.NewFromInt(2)
 
 func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedpoint.Value, error) {
