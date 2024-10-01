@@ -21,7 +21,13 @@ var (
 	pollFeeRateRateLimiter = rate.NewLimiter(rate.Every(10*time.Minute), 1)
 )
 
-type symbolFeeDetail struct {
+type FeeRatePoller interface {
+	StartFeeRatePoller(ctx context.Context)
+	GetFeeRate(symbol string) (SymbolFeeDetail, bool)
+	PollFeeRate(ctx context.Context) error
+}
+
+type SymbolFeeDetail struct {
 	bybitapi.FeeRate
 
 	BaseCoin  string
@@ -34,24 +40,27 @@ type feeRatePoller struct {
 	once   sync.Once
 	client MarketInfoProvider
 
-	symbolFeeDetail map[string]symbolFeeDetail
+	// lastSyncTime is the last time the fee rate was updated.
+	lastSyncTime time.Time
+
+	symbolFeeDetail map[string]SymbolFeeDetail
 }
 
 func newFeeRatePoller(marketInfoProvider MarketInfoProvider) *feeRatePoller {
 	return &feeRatePoller{
 		client:          marketInfoProvider,
-		symbolFeeDetail: map[string]symbolFeeDetail{},
+		symbolFeeDetail: map[string]SymbolFeeDetail{},
 	}
 }
 
-func (p *feeRatePoller) Start(ctx context.Context) {
+func (p *feeRatePoller) StartFeeRatePoller(ctx context.Context) {
 	p.once.Do(func() {
 		p.startLoop(ctx)
 	})
 }
 
 func (p *feeRatePoller) startLoop(ctx context.Context) {
-	err := p.poll(ctx)
+	err := p.PollFeeRate(ctx)
 	if err != nil {
 		log.WithError(err).Warn("failed to initialize the fee rate, the ticker is scheduled to update it subsequently")
 	}
@@ -67,22 +76,27 @@ func (p *feeRatePoller) startLoop(ctx context.Context) {
 
 			return
 		case <-ticker.C:
-			if err := p.poll(ctx); err != nil {
+			if err := p.PollFeeRate(ctx); err != nil {
 				log.WithError(err).Warn("failed to update fee rate")
 			}
 		}
 	}
 }
 
-func (p *feeRatePoller) poll(ctx context.Context) error {
+func (p *feeRatePoller) PollFeeRate(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	// the poll will be called frequently, so we need to check the last sync time.
+	if time.Since(p.lastSyncTime) < feeRatePollingPeriod {
+		return nil
+	}
 	symbolFeeRate, err := p.getAllFeeRates(ctx)
 	if err != nil {
 		return err
 	}
 
-	p.mu.Lock()
 	p.symbolFeeDetail = symbolFeeRate
-	p.mu.Unlock()
+	p.lastSyncTime = time.Now()
 
 	if pollFeeRateRateLimiter.Allow() {
 		log.Infof("updated fee rate: %+v", p.symbolFeeDetail)
@@ -91,7 +105,7 @@ func (p *feeRatePoller) poll(ctx context.Context) error {
 	return nil
 }
 
-func (p *feeRatePoller) Get(symbol string) (symbolFeeDetail, bool) {
+func (p *feeRatePoller) GetFeeRate(symbol string) (SymbolFeeDetail, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -99,16 +113,16 @@ func (p *feeRatePoller) Get(symbol string) (symbolFeeDetail, bool) {
 	return fee, found
 }
 
-func (e *feeRatePoller) getAllFeeRates(ctx context.Context) (map[string]symbolFeeDetail, error) {
+func (e *feeRatePoller) getAllFeeRates(ctx context.Context) (map[string]SymbolFeeDetail, error) {
 	feeRates, err := e.client.GetAllFeeRates(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call get fee rates: %w", err)
 	}
 
-	symbolMap := map[string]symbolFeeDetail{}
+	symbolMap := map[string]SymbolFeeDetail{}
 	for _, f := range feeRates.List {
 		if _, found := symbolMap[f.Symbol]; !found {
-			symbolMap[f.Symbol] = symbolFeeDetail{FeeRate: f}
+			symbolMap[f.Symbol] = SymbolFeeDetail{FeeRate: f}
 		}
 	}
 
@@ -117,7 +131,7 @@ func (e *feeRatePoller) getAllFeeRates(ctx context.Context) (map[string]symbolFe
 		return nil, fmt.Errorf("failed to get markets: %w", err)
 	}
 
-	// update base coin, quote coin into symbolFeeDetail
+	// update base coin, quote coin into SymbolFeeDetail
 	for _, mkt := range mkts {
 		feeRate, found := symbolMap[mkt.Symbol]
 		if !found {
