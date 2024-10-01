@@ -60,7 +60,6 @@ type Stream struct {
 
 	key, secret        string
 	streamDataProvider StreamDataProvider
-	feeRateProvider    FeeRatePoller
 	marketsInfo        types.MarketMap
 
 	bookEventCallbacks        []func(e BookEvent)
@@ -481,7 +480,7 @@ func getFeeRate(symbol string, poller FeeRatePoller, marketsInfo types.MarketMap
 
 func (s *Stream) handleTradeEvent(events []TradeEvent) {
 	for _, event := range events {
-		feeRate := getFeeRate(event.Symbol, s.feeRateProvider, s.marketsInfo)
+		feeRate := getFeeRate(event.Symbol, s.streamDataProvider, s.marketsInfo)
 		gTrade, err := event.toGlobalTrade(feeRate)
 		if err != nil {
 			if tradeLogLimiter.Allow() {
