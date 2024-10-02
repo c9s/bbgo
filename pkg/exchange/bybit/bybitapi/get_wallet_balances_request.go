@@ -70,7 +70,7 @@ type WalletBalances struct {
 	} `json:"coin"`
 }
 
-//go:generate GetRequest -url "/v5/account/wallet-balance" -type GetWalletBalancesRequest -responseDataType .WalletBalancesResponse
+//go:generate GetRequest -url "/v5/account/wallet-balance" -type GetWalletBalancesRequest -responseDataType .WalletBalancesResponse -rateLimiter 1+15/1s
 type GetWalletBalancesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
