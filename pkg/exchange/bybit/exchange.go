@@ -518,10 +518,6 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	if err := sharedRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("query account balances rate limiter wait error: %w", err)
-	}
-
 	req := e.client.NewGetWalletBalancesRequest()
 	accounts, err := req.Do(ctx)
 	if err != nil {
