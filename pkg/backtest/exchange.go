@@ -136,12 +136,6 @@ func (e *Exchange) resetMatchingBooks() {
 	e.matchingBooksMutex.Unlock()
 }
 
-func (e *Exchange) addMatchingBook(symbol string, market types.Market) {
-	e.matchingBooksMutex.Lock()
-	e._addMatchingBook(symbol, market)
-	e.matchingBooksMutex.Unlock()
-}
-
 func (e *Exchange) _addMatchingBook(symbol string, market types.Market) {
 	matching := &SimplePriceMatching{
 		currentTime:     e.currentTime,
