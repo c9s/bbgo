@@ -91,6 +91,9 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 						continue
 					}
 					if jtag := tt.Tag.Get("json"); jtag != "" && jtag != "-" {
+						if ig := tt.Tag.Get("ignore"); ig == "true" {
+							continue
+						}
 						name := strings.Split(jtag, ",")[0]
 						if _, ok := redundantSet[name]; ok {
 							continue
@@ -106,6 +109,9 @@ func PrintConfig(s interface{}, f io.Writer, style *table.Style, withColor bool,
 			}
 		default:
 			name := strings.Split(jsonTag, ",")[0]
+			if ig := t.Tag.Get("ignore"); ig == "true" {
+				continue
+			}
 			if _, ok := redundantSet[name]; ok {
 				continue
 			}
