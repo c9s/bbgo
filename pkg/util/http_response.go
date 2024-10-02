@@ -2,7 +2,7 @@ package util
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
@@ -17,7 +17,7 @@ type Response struct {
 
 // NewResponse is a wrapper of the http.Response instance, it reads the response body and close the file.
 func NewResponse(r *http.Response) (response *Response, err error) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}

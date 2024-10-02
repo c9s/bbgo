@@ -2,7 +2,7 @@ package bbgo
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -128,7 +128,7 @@ func TestLoadConfig(t *testing.T) {
 				yamlText, err := config.YAML()
 				assert.NoError(t, err)
 
-				yamlTextSource, err := ioutil.ReadFile("testdata/strategy.yaml")
+				yamlTextSource, err := os.ReadFile("testdata/strategy.yaml")
 				assert.NoError(t, err)
 
 				var sourceMap map[string]interface{}
