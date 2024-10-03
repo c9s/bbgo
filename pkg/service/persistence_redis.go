@@ -22,13 +22,18 @@ type RedisPersistenceService struct {
 }
 
 func NewRedisPersistenceService(config *RedisPersistenceConfig) *RedisPersistenceService {
-	client := redis.NewClient(&redis.Options{
-		Addr: net.JoinHostPort(config.Host, config.Port),
-		// Username:           "", // username is only for redis 6.0
-		// pragma: allowlist nextline secret
-		Password: config.Password, // no password set
-		DB:       config.DB,       // use default DB
-	})
+	var client *redis.Client
+	if config.Redis != nil {
+		client = config.Redis
+	} else {
+		client = redis.NewClient(&redis.Options{
+			Addr: net.JoinHostPort(config.Host, config.Port),
+			// Username:           "", // username is only for redis 6.0
+			// pragma: allowlist nextline secret
+			Password: config.Password, // no password set
+			DB:       config.DB,       // use default DB
+		})
+	}
 
 	return &RedisPersistenceService{
 		redis:  client,
