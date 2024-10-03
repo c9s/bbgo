@@ -1,6 +1,10 @@
 package service
 
-import "time"
+import (
+	"time"
+
+	"github.com/go-redis/redis/v8"
+)
 
 type PersistenceService interface {
 	NewStore(id string, subIDs ...string) Store
@@ -22,6 +26,10 @@ type RedisPersistenceConfig struct {
 	Password  string `yaml:"password,omitempty" json:"password,omitempty" env:"REDIS_PASSWORD"`
 	DB        int    `yaml:"db" json:"db" env:"REDIS_DB"`
 	Namespace string `yaml:"namespace" json:"namespace" env:"REDIS_NAMESPACE"`
+
+	// Redis is the redis client field
+	// this field is optional, only used when you want to set the redis client instance in the runtime
+	Redis *redis.Client
 }
 
 type JsonPersistenceConfig struct {
