@@ -70,11 +70,7 @@ func NewStream(ex *Exchange, key, secret string) *Stream {
 	stream.OnTradeUpdateEvent(stream.handleTradeEvent)
 	stream.OnAccountSnapshotEvent(stream.handleAccountSnapshotEvent)
 	stream.OnAccountUpdateEvent(stream.handleAccountUpdateEvent)
-	if key == "new" {
-		stream.OnBookEvent(stream.handleBookEventNew(ex))
-	} else {
-		stream.OnBookEvent(stream.handleBookEvent)
-	}
+	stream.OnBookEvent(stream.handleBookEvent(ex))
 	return stream
 }
 
@@ -217,25 +213,7 @@ func (s *Stream) handleTradeEvent(e max.TradeUpdateEvent) {
 	}
 }
 
-func (s *Stream) handleBookEvent(e max.BookEvent) {
-	newBook, err := e.OrderBook()
-	if err != nil {
-		log.WithError(err).Error("book convert error")
-		return
-	}
-
-	newBook.Symbol = toGlobalSymbol(e.Market)
-	newBook.Time = e.Time()
-
-	switch e.Event {
-	case "snapshot":
-		s.EmitBookSnapshot(newBook)
-	case "update":
-		s.EmitBookUpdate(newBook)
-	}
-}
-
-func (s *Stream) handleBookEventNew(ex *Exchange) func(e max.BookEvent) {
+func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
 	return func(e max.BookEvent) {
 		symbol := toGlobalSymbol(e.Market)
 		f, ok := s.depthBuffers[symbol]
