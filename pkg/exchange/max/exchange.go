@@ -1134,6 +1134,19 @@ func (e *Exchange) QueryKLines(
 	return kLines, nil
 }
 
+func (e *Exchange) QueryDepth(ctx context.Context, symbol string, limit int) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+	req := e.v3client.NewGetDepthRequest()
+	req.Market(symbol)
+	req.Limit(limit)
+
+	depth, err := req.Do(ctx)
+	if err != nil {
+		return snapshot, finalUpdateID, err
+	}
+
+	return convertDepth(symbol, depth)
+}
+
 var Two = fixedpoint.NewFromInt(2)
 
 func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedpoint.Value, error) {
