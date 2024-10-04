@@ -187,13 +187,13 @@ func Test_aggregateUsdValue(t *testing.T) {
 		{
 			name: "mixed",
 			args: args{
-				balances: types.BalanceMap{
-					"USDC": types.Balance{Currency: "USDC", Available: Number(70.0 + 80.0)},
-					"USDT": types.Balance{Currency: "USDT", Available: Number(100.0)},
-					"BTC":  types.Balance{Currency: "BTC", Available: Number(0.01)},
-				},
+				balances: BalancesFromText(`
+					USDC, 150.0
+					USDT, 100.0
+					BTC, 0.01
+					`),
 			},
-			want: number(250.0),
+			want: Number(250.0),
 		},
 	}
 	for _, tt := range tests {
