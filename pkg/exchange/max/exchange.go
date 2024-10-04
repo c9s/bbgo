@@ -178,7 +178,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	stream := NewStream(e.key, e.secret)
+	stream := NewStream(e, e.key, e.secret)
 	stream.MarginSettings = e.MarginSettings
 	return stream
 }
