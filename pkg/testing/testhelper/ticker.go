@@ -8,7 +8,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var tickers = map[string]types.Ticker{
+var _tickers = map[string]types.Ticker{
 	"BTCUSDT": {
 		Time:   time.Now(),
 		Volume: fixedpoint.Zero,
@@ -33,7 +33,7 @@ var tickers = map[string]types.Ticker{
 }
 
 func Ticker(symbol string) types.Ticker {
-	ticker, ok := tickers[symbol]
+	ticker, ok := _tickers[symbol]
 	if !ok {
 		panic(fmt.Errorf("%s test ticker not found, valid tickers: %+v", symbol, []string{"BTCUSDT", "ETHUSDT"}))
 	}

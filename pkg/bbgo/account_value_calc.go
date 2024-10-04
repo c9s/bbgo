@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -20,6 +21,8 @@ var maxIsolatedMarginLeverage = fixedpoint.NewFromInt(10)
 var maxCrossMarginLeverage = fixedpoint.NewFromInt(3)
 
 type AccountValueCalculator struct {
+	priceSolver *pricesolver.SimplePriceSolver
+
 	session       *ExchangeSession
 	quoteCurrency string
 	prices        map[string]fixedpoint.Value
@@ -27,8 +30,13 @@ type AccountValueCalculator struct {
 	updateTime    time.Time
 }
 
-func NewAccountValueCalculator(session *ExchangeSession, quoteCurrency string) *AccountValueCalculator {
+func NewAccountValueCalculator(
+	session *ExchangeSession,
+	priceSolver *pricesolver.SimplePriceSolver,
+	quoteCurrency string,
+) *AccountValueCalculator {
 	return &AccountValueCalculator{
+		priceSolver:   priceSolver,
 		session:       session,
 		quoteCurrency: quoteCurrency,
 		prices:        make(map[string]fixedpoint.Value),
@@ -39,6 +47,8 @@ func NewAccountValueCalculator(session *ExchangeSession, quoteCurrency string) *
 func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
 	balances := c.session.Account.Balances()
 	currencies := balances.Currencies()
+
+	// TODO: improve this part
 	var symbols []string
 	for _, currency := range currencies {
 		if currency == c.quoteCurrency {
@@ -49,19 +59,7 @@ func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
 		symbols = append(symbols, symbol)
 	}
 
-	tickers, err := c.session.Exchange.QueryTickers(ctx, symbols...)
-	if err != nil {
-		return err
-	}
-
-	c.tickers = tickers
-	for symbol, ticker := range tickers {
-		c.prices[symbol] = ticker.Last
-		if ticker.Time.After(c.updateTime) {
-			c.updateTime = ticker.Time
-		}
-	}
-	return nil
+	return c.priceSolver.UpdateFromTickers(ctx, c.session.Exchange, symbols...)
 }
 
 func (c *AccountValueCalculator) DebtValue(ctx context.Context) (fixedpoint.Value, error) {
@@ -103,13 +101,16 @@ func (c *AccountValueCalculator) MarketValue(ctx context.Context) (fixedpoint.Va
 			continue
 		}
 
-		symbol := b.Currency + c.quoteCurrency
-		price, ok := c.prices[symbol]
-		if !ok {
-			continue
+		if c.priceSolver != nil {
+			if price, ok := c.priceSolver.ResolvePrice(b.Currency, c.quoteCurrency); ok {
+				marketValue = marketValue.Add(b.Total().Mul(price))
+			}
+		} else {
+			symbol := b.Currency + c.quoteCurrency
+			if price, ok := c.prices[symbol]; ok {
+				marketValue = marketValue.Add(b.Total().Mul(price))
+			}
 		}
-
-		marketValue = marketValue.Add(b.Total().Mul(price))
 	}
 
 	return marketValue, nil
@@ -123,25 +124,22 @@ func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value
 	}
 
 	balances := c.session.Account.Balances()
-	accountValue := calculateNetValueInQuote(balances, c.prices, c.quoteCurrency)
+	accountValue := calculateNetValueInQuote(balances, c.priceSolver, c.quoteCurrency)
 	return accountValue, nil
 }
 
-func calculateNetValueInQuote(balances types.BalanceMap, prices types.PriceMap, quoteCurrency string) (accountValue fixedpoint.Value) {
+func calculateNetValueInQuote(
+	balances types.BalanceMap, priceSolver *pricesolver.SimplePriceSolver, quoteCurrency string,
+) (accountValue fixedpoint.Value) {
 	accountValue = fixedpoint.Zero
-
 	for _, b := range balances {
 		if b.Currency == quoteCurrency {
 			accountValue = accountValue.Add(b.Net())
 			continue
 		}
 
-		symbol := b.Currency + quoteCurrency        // for BTC/USDT, ETH/USDT pairs
-		symbolReverse := quoteCurrency + b.Currency // for USDT/USDC or USDT/TWD pairs
-		if price, ok := prices[symbol]; ok {
+		if price, ok := priceSolver.ResolvePrice(b.Currency, quoteCurrency); ok {
 			accountValue = accountValue.Add(b.Net().Mul(price))
-		} else if priceReverse, ok2 := prices[symbolReverse]; ok2 {
-			accountValue = accountValue.Add(b.Net().Div(priceReverse))
 		}
 	}
 
@@ -220,7 +218,9 @@ func usdFiatBalances(balances types.BalanceMap) (fiats types.BalanceMap, rest ty
 	return fiats, rest
 }
 
-func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value) (fixedpoint.Value, error) {
+func CalculateBaseQuantity(
+	session *ExchangeSession, market types.Market, price, quantity, leverage fixedpoint.Value,
+) (fixedpoint.Value, error) {
 	// default leverage guard
 	if leverage.IsZero() {
 		leverage = defaultLeverage
@@ -254,7 +254,7 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 	if len(restBalances) == 1 && types.IsUSDFiatCurrency(market.QuoteCurrency) {
 		totalUsdValue = aggregateUsdNetValue(balances)
 	} else if len(restBalances) > 1 {
-		accountValue := NewAccountValueCalculator(session, "USDT")
+		accountValue := NewAccountValueCalculator(session, nil, "USDT")
 		netValue, err := accountValue.NetValue(context.Background())
 		if err != nil {
 			return quantity, err
@@ -329,7 +329,9 @@ func CalculateBaseQuantity(session *ExchangeSession, market types.Market, price,
 		errors.New("quantity is zero, can not submit sell order, please check your settings"))
 }
 
-func CalculateQuoteQuantity(ctx context.Context, session *ExchangeSession, quoteCurrency string, leverage fixedpoint.Value) (fixedpoint.Value, error) {
+func CalculateQuoteQuantity(
+	ctx context.Context, session *ExchangeSession, quoteCurrency string, leverage fixedpoint.Value,
+) (fixedpoint.Value, error) {
 	// default leverage guard
 	if leverage.IsZero() {
 		leverage = defaultLeverage
@@ -359,7 +361,7 @@ func CalculateQuoteQuantity(ctx context.Context, session *ExchangeSession, quote
 	}
 
 	// using leverage -- starts from here
-	accountValue := NewAccountValueCalculator(session, quoteCurrency)
+	accountValue := NewAccountValueCalculator(session, nil, quoteCurrency)
 	availableQuote, err := accountValue.AvailableQuote(ctx)
 	if err != nil {
 		log.WithError(err).Errorf("can not update available quote")
