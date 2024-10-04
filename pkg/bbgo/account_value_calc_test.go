@@ -215,19 +215,19 @@ func Test_usdFiatBalances(t *testing.T) {
 	}{
 		{
 			args: args{
-				balances: types.BalanceMap{
-					"USDC": types.Balance{Currency: "USDC", Available: Number(70.0 + 80.0)},
-					"USDT": types.Balance{Currency: "USDT", Available: Number(100.0)},
-					"BTC":  types.Balance{Currency: "BTC", Available: Number(0.01)},
-				},
+				balances: BalancesFromText(`
+					USDC, 150.0
+					USDT, 100.0
+					BTC, 0.01
+				`),
 			},
-			wantFiats: types.BalanceMap{
-				"USDC": types.Balance{Currency: "USDC", Available: Number(70.0 + 80.0)},
-				"USDT": types.Balance{Currency: "USDT", Available: Number(100.0)},
-			},
-			wantRest: types.BalanceMap{
-				"BTC": types.Balance{Currency: "BTC", Available: Number(0.01)},
-			},
+			wantFiats: BalancesFromText(`
+				USDC, 150.0
+				USDT, 100.0
+				`),
+			wantRest: BalancesFromText(`
+				BTC, 0.01
+				`),
 		},
 	}
 	for _, tt := range tests {
