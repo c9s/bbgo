@@ -78,6 +78,12 @@ func (m *SimplePriceSolver) BindStream(stream types.Stream) {
 
 func (m *SimplePriceSolver) UpdateFromTickers(ctx context.Context, ex types.Exchange, symbols ...string) error {
 	for _, symbol := range symbols {
+		// only query the ticker for the symbol that is in the market map
+		_, ok := m.markets[symbol]
+		if !ok {
+			continue
+		}
+
 		ticker, err := ex.QueryTicker(ctx, symbol)
 		if err != nil {
 			return err
