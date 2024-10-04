@@ -164,12 +164,15 @@ func parsePublicTradeEvent(val *fastjson.Value) (*PublicTradeEvent, error) {
 }
 
 type BookEvent struct {
-	Event     string `json:"e"`
-	Market    string `json:"M"`
-	Channel   string `json:"c"`
-	Timestamp int64  `json:"t"` // Millisecond timestamp
-	Bids      types.PriceVolumeSlice
-	Asks      types.PriceVolumeSlice
+	Event         string `json:"e"`
+	Market        string `json:"M"`
+	Channel       string `json:"c"`
+	Timestamp     int64  `json:"t"` // Millisecond timestamp
+	Bids          types.PriceVolumeSlice
+	Asks          types.PriceVolumeSlice
+	FirstUpdateID int64 `json:"fi"`
+	LastUpdateID  int64 `json:"li"`
+	Version       int64 `json:"v"`
 }
 
 func (e *BookEvent) Time() time.Time {
@@ -181,6 +184,7 @@ func (e *BookEvent) OrderBook() (snapshot types.SliceOrderBook, err error) {
 	snapshot.Time = e.Time()
 	snapshot.Bids = e.Bids
 	snapshot.Asks = e.Asks
+	snapshot.LastUpdateId = e.LastUpdateID
 	return snapshot, nil
 }
 
@@ -212,10 +216,13 @@ func parseKLineEvent(val *fastjson.Value) (*KLineEvent, error) {
 
 func parseBookEvent(val *fastjson.Value) (event *BookEvent, err error) {
 	event = &BookEvent{
-		Event:     string(val.GetStringBytes("e")),
-		Market:    string(val.GetStringBytes("M")),
-		Channel:   string(val.GetStringBytes("c")),
-		Timestamp: val.GetInt64("T"),
+		Event:         string(val.GetStringBytes("e")),
+		Market:        string(val.GetStringBytes("M")),
+		Channel:       string(val.GetStringBytes("c")),
+		Timestamp:     val.GetInt64("T"),
+		FirstUpdateID: val.GetInt64("fi"),
+		LastUpdateID:  val.GetInt64("li"),
+		Version:       val.GetInt64("v"),
 	}
 
 	// t := time.Unix(0, event.Timestamp*int64(time.Millisecond))

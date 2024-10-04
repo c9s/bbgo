@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/c9s/bbgo/pkg/depth"
 	max "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -40,19 +41,24 @@ type Stream struct {
 
 	accountSnapshotEventCallbacks []func(e max.AccountSnapshotEvent)
 	accountUpdateEventCallbacks   []func(e max.AccountUpdateEvent)
+
+	// depthBuffers is used for storing the depth info
+	depthBuffers map[string]*depth.Buffer
 }
 
-func NewStream(key, secret string) *Stream {
+func NewStream(ex *Exchange, key, secret string) *Stream {
 	stream := &Stream{
 		StandardStream: types.NewStandardStream(),
 		key:            key,
 		// pragma: allowlist nextline secret
-		secret: secret,
+		secret:       secret,
+		depthBuffers: make(map[string]*depth.Buffer),
 	}
 	stream.SetEndpointCreator(stream.getEndpoint)
 	stream.SetParser(max.ParseMessage)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.OnConnect(stream.handleConnect)
+	stream.OnDisconnect(stream.handleDisconnect)
 	stream.OnAuthEvent(func(e max.AuthEvent) {
 		log.Infof("max websocket connection authenticated: %+v", e)
 		stream.EmitAuth()
@@ -62,9 +68,13 @@ func NewStream(key, secret string) *Stream {
 	stream.OnOrderSnapshotEvent(stream.handleOrderSnapshotEvent)
 	stream.OnOrderUpdateEvent(stream.handleOrderUpdateEvent)
 	stream.OnTradeUpdateEvent(stream.handleTradeEvent)
-	stream.OnBookEvent(stream.handleBookEvent)
 	stream.OnAccountSnapshotEvent(stream.handleAccountSnapshotEvent)
 	stream.OnAccountUpdateEvent(stream.handleAccountUpdateEvent)
+	if key == "new" {
+		stream.OnBookEvent(stream.handleBookEventNew(ex))
+	} else {
+		stream.OnBookEvent(stream.handleBookEvent)
+	}
 	return stream
 }
 
@@ -156,6 +166,13 @@ func (s *Stream) handleConnect() {
 	}
 }
 
+func (s *Stream) handleDisconnect() {
+	log.Debugf("resetting depth snapshots...")
+	for _, f := range s.depthBuffers {
+		f.Reset()
+	}
+}
+
 func (s *Stream) handleKLineEvent(e max.KLineEvent) {
 	kline := e.KLine.KLine()
 	s.EmitKLine(kline)
@@ -215,6 +232,41 @@ func (s *Stream) handleBookEvent(e max.BookEvent) {
 		s.EmitBookSnapshot(newBook)
 	case "update":
 		s.EmitBookUpdate(newBook)
+	}
+}
+
+func (s *Stream) handleBookEventNew(ex *Exchange) func(e max.BookEvent) {
+	return func(e max.BookEvent) {
+		symbol := toGlobalSymbol(e.Market)
+		f, ok := s.depthBuffers[symbol]
+		if ok {
+			err := f.AddUpdate(types.SliceOrderBook{
+				Symbol: toGlobalSymbol(e.Market),
+				Time:   e.Time(),
+				Bids:   e.Bids,
+				Asks:   e.Asks,
+			}, e.FirstUpdateID, e.LastUpdateID)
+			if err != nil {
+				log.WithError(err).Errorf("found missing %s update event", e.Market)
+			}
+		} else {
+			f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
+				log.Infof("fetching %s depth...", e.Market)
+				// the depth of websocket orderbook event is 50 by default, so we use 50 as limit here
+				return ex.QueryDepth(context.Background(), e.Market, 50)
+			})
+			f.SetBufferingPeriod(time.Second)
+			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
+				s.EmitBookSnapshot(snapshot)
+				for _, u := range updates {
+					s.EmitBookUpdate(u.Object)
+				}
+			})
+			f.OnPush(func(update depth.Update) {
+				s.EmitBookUpdate(update.Object)
+			})
+			s.depthBuffers[symbol] = f
+		}
 	}
 }
 
