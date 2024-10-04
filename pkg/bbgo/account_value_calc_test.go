@@ -9,6 +9,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/pricesolver"
+	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
 )
@@ -27,6 +29,8 @@ func newTestTicker() types.Ticker {
 }
 
 func TestAccountValueCalculator_NetValue(t *testing.T) {
+	symbol := "BTCUSDT"
+	markets := AllMarkets()
 
 	t.Run("borrow and available", func(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
@@ -35,8 +39,8 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 		mockEx := mocks.NewMockExchange(mockCtrl)
 		// for market data stream and user data stream
 		mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
-		mockEx.EXPECT().QueryTickers(gomock.Any(), []string{"BTCUSDT"}).Return(map[string]types.Ticker{
-			"BTCUSDT": newTestTicker(),
+		mockEx.EXPECT().QueryTickers(gomock.Any(), []string{symbol}).Return(map[string]types.Ticker{
+			"BTCUSDT": Ticker(symbol),
 		}, nil)
 
 		session := NewExchangeSession("test", mockEx)
@@ -60,10 +64,12 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 		})
 		assert.NotNil(t, session)
 
-		cal := NewAccountValueCalculator(session, "USDT")
+		ctx := context.Background()
+		priceSolver := pricesolver.NewSimplePriceResolver(markets)
+
+		cal := NewAccountValueCalculator(session, priceSolver, "USDT")
 		assert.NotNil(t, cal)
 
-		ctx := context.Background()
 		netValue, err := cal.NetValue(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, "20000", netValue.String())
@@ -76,8 +82,8 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 		mockEx := mocks.NewMockExchange(mockCtrl)
 		// for market data stream and user data stream
 		mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
-		mockEx.EXPECT().QueryTickers(gomock.Any(), []string{"BTCUSDT"}).Return(map[string]types.Ticker{
-			"BTCUSDT": newTestTicker(),
+		mockEx.EXPECT().QueryTickers(gomock.Any(), []string{symbol}).Return(map[string]types.Ticker{
+			symbol: Ticker(symbol),
 		}, nil)
 
 		session := NewExchangeSession("test", mockEx)
@@ -101,10 +107,12 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 		})
 		assert.NotNil(t, session)
 
-		cal := NewAccountValueCalculator(session, "USDT")
+		ctx := context.Background()
+		priceSolver := pricesolver.NewSimplePriceResolver(markets)
+
+		cal := NewAccountValueCalculator(session, priceSolver, "USDT")
 		assert.NotNil(t, cal)
 
-		ctx := context.Background()
 		netValue, err := cal.NetValue(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, "2000", netValue.String()) // 21000-19000
@@ -115,11 +123,13 @@ func TestNewAccountValueCalculator_MarginLevel(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
+	ticker := newTestTicker()
+
 	mockEx := mocks.NewMockExchange(mockCtrl)
 	// for market data stream and user data stream
 	mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
 	mockEx.EXPECT().QueryTickers(gomock.Any(), []string{"BTCUSDT"}).Return(map[string]types.Ticker{
-		"BTCUSDT": newTestTicker(),
+		"BTCUSDT": ticker,
 	}, nil)
 
 	session := NewExchangeSession("test", mockEx)
@@ -143,10 +153,15 @@ func TestNewAccountValueCalculator_MarginLevel(t *testing.T) {
 	})
 	assert.NotNil(t, session)
 
-	cal := NewAccountValueCalculator(session, "USDT")
+	ctx := context.Background()
+	markets := AllMarkets()
+	priceSolver := pricesolver.NewSimplePriceResolver(markets)
+	err := priceSolver.UpdateFromTickers(ctx, mockEx, "BTCUSDT")
+	assert.NoError(t, err)
+
+	cal := NewAccountValueCalculator(session, priceSolver, "USDT")
 	assert.NotNil(t, cal)
 
-	ctx := context.Background()
 	marginLevel, err := cal.MarginLevel(ctx)
 	assert.NoError(t, err)
 
@@ -173,10 +188,9 @@ func Test_aggregateUsdValue(t *testing.T) {
 			name: "mixed",
 			args: args{
 				balances: types.BalanceMap{
-					"USDC": types.Balance{Currency: "USDC", Available: number(70.0)},
-					"USDT": types.Balance{Currency: "USDT", Available: number(100.0)},
-					"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
-					"BTC":  types.Balance{Currency: "BTC", Available: number(0.01)},
+					"USDC": types.Balance{Currency: "USDC", Available: Number(70.0 + 80.0)},
+					"USDT": types.Balance{Currency: "USDT", Available: Number(100.0)},
+					"BTC":  types.Balance{Currency: "BTC", Available: Number(0.01)},
 				},
 			},
 			want: number(250.0),
@@ -202,19 +216,17 @@ func Test_usdFiatBalances(t *testing.T) {
 		{
 			args: args{
 				balances: types.BalanceMap{
-					"USDC": types.Balance{Currency: "USDC", Available: number(70.0)},
-					"USDT": types.Balance{Currency: "USDT", Available: number(100.0)},
-					"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
-					"BTC":  types.Balance{Currency: "BTC", Available: number(0.01)},
+					"USDC": types.Balance{Currency: "USDC", Available: Number(70.0 + 80.0)},
+					"USDT": types.Balance{Currency: "USDT", Available: Number(100.0)},
+					"BTC":  types.Balance{Currency: "BTC", Available: Number(0.01)},
 				},
 			},
 			wantFiats: types.BalanceMap{
-				"USDC": types.Balance{Currency: "USDC", Available: number(70.0)},
-				"USDT": types.Balance{Currency: "USDT", Available: number(100.0)},
-				"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
+				"USDC": types.Balance{Currency: "USDC", Available: Number(70.0 + 80.0)},
+				"USDT": types.Balance{Currency: "USDT", Available: Number(100.0)},
 			},
 			wantRest: types.BalanceMap{
-				"BTC": types.Balance{Currency: "BTC", Available: number(0.01)},
+				"BTC": types.Balance{Currency: "BTC", Available: Number(0.01)},
 			},
 		},
 	}
@@ -242,52 +254,46 @@ func Test_calculateNetValueInQuote(t *testing.T) {
 			name: "positive asset",
 			args: args{
 				balances: types.BalanceMap{
-					"USDC": types.Balance{Currency: "USDC", Available: number(70.0)},
+					"USDC": types.Balance{Currency: "USDC", Available: number(70.0 + 80.0)},
 					"USDT": types.Balance{Currency: "USDT", Available: number(100.0)},
-					"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
 					"BTC":  types.Balance{Currency: "BTC", Available: number(0.01)},
 				},
 				prices: types.PriceMap{
-					"USDCUSDT": number(1.0),
-					"BUSDUSDT": number(1.0),
-					"BTCUSDT":  number(19000.0),
+					"USDCUSDT": Number(1.0),
+					"BTCUSDT":  Number(19000.0),
 				},
 				quoteCurrency: "USDT",
 			},
-			wantAccountValue: number(19000.0*0.01 + 100.0 + 80.0 + 70.0),
+			wantAccountValue: Number(19000.0*0.01 + 100.0 + 80.0 + 70.0),
 		},
 		{
 			name: "reversed usdt price",
 			args: args{
 				balances: types.BalanceMap{
-					"USDC": types.Balance{Currency: "USDC", Available: number(70.0)},
-					"TWD":  types.Balance{Currency: "TWD", Available: number(3000.0)},
-					"USDT": types.Balance{Currency: "USDT", Available: number(100.0)},
-					"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
-					"BTC":  types.Balance{Currency: "BTC", Available: number(0.01)},
+					"USDC": types.Balance{Currency: "USDC", Available: Number(70.0 + 80.0)},
+					"TWD":  types.Balance{Currency: "TWD", Available: Number(3000.0)},
+					"USDT": types.Balance{Currency: "USDT", Available: Number(100.0)},
+					"BTC":  types.Balance{Currency: "BTC", Available: Number(0.01)},
 				},
 				prices: types.PriceMap{
-					"USDTTWD":  number(30.0),
-					"USDCUSDT": number(1.0),
-					"BUSDUSDT": number(1.0),
-					"BTCUSDT":  number(19000.0),
+					"USDTTWD":  Number(30.0),
+					"USDCUSDT": Number(1.0),
+					"BTCUSDT":  Number(19000.0),
 				},
 				quoteCurrency: "USDT",
 			},
-			wantAccountValue: number(19000.0*0.01 + 100.0 + 80.0 + 70.0 + (3000.0 / 30.0)),
+			wantAccountValue: Number(19000.0*0.01 + 100.0 + 80.0 + 70.0 + (3000.0 / 30.0)),
 		},
 		{
 			name: "borrow base asset",
 			args: args{
 				balances: types.BalanceMap{
-					"USDT": types.Balance{Currency: "USDT", Available: number(20000.0 * 2)},
-					"USDC": types.Balance{Currency: "USDC", Available: number(70.0)},
-					"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
-					"BTC":  types.Balance{Currency: "BTC", Available: number(0), Borrowed: number(2.0)},
+					"USDT": types.Balance{Currency: "USDT", Available: Number(20000.0*2 + 80.0)},
+					"USDC": types.Balance{Currency: "USDC", Available: Number(70.0)},
+					"BTC":  types.Balance{Currency: "BTC", Available: Number(0), Borrowed: Number(2.0)},
 				},
 				prices: types.PriceMap{
 					"USDCUSDT": number(1.0),
-					"BUSDUSDT": number(1.0),
 					"BTCUSDT":  number(19000.0),
 				},
 				quoteCurrency: "USDT",
@@ -298,26 +304,35 @@ func Test_calculateNetValueInQuote(t *testing.T) {
 			name: "multi base asset",
 			args: args{
 				balances: types.BalanceMap{
-					"USDT": types.Balance{Currency: "USDT", Available: number(20000.0 * 2)},
-					"USDC": types.Balance{Currency: "USDC", Available: number(70.0)},
-					"BUSD": types.Balance{Currency: "BUSD", Available: number(80.0)},
-					"ETH":  types.Balance{Currency: "ETH", Available: number(10.0)},
-					"BTC":  types.Balance{Currency: "BTC", Available: number(0), Borrowed: number(2.0)},
+					"USDT": types.Balance{Currency: "USDT", Available: Number(20000.0*2 + 80.0)},
+					"USDC": types.Balance{Currency: "USDC", Available: Number(70.0)},
+					"ETH":  types.Balance{Currency: "ETH", Available: Number(10.0)},
+					"BTC":  types.Balance{Currency: "BTC", Available: Number(0), Borrowed: Number(2.0)},
 				},
 				prices: types.PriceMap{
-					"USDCUSDT": number(1.0),
-					"BUSDUSDT": number(1.0),
-					"ETHUSDT":  number(1700.0),
-					"BTCUSDT":  number(19000.0),
+					"USDCUSDT": Number(1.0),
+					"BTCUSDT":  Number(19000.0),
+					"ETHUSDT":  Number(1700.0),
 				},
 				quoteCurrency: "USDT",
 			},
-			wantAccountValue: number(19000.0*-2.0 + 1700.0*10.0 + 20000.0*2 + 80.0 + 70.0),
+			wantAccountValue: Number(19000.0*-2.0 + 1700.0*10.0 + 20000.0*2 + 80.0 + 70.0),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.wantAccountValue, calculateNetValueInQuote(tt.args.balances, tt.args.prices, tt.args.quoteCurrency), "calculateNetValueInQuote(%v, %v, %v)", tt.args.balances, tt.args.prices, tt.args.quoteCurrency)
+			markets := AllMarkets()
+			priceSolver := pricesolver.NewSimplePriceResolver(markets)
+
+			for symbol, price := range tt.args.prices {
+				priceSolver.Update(symbol, price)
+			}
+
+			assert.InDeltaf(t,
+				tt.wantAccountValue.Float64(),
+				calculateNetValueInQuote(tt.args.balances, priceSolver, tt.args.quoteCurrency).Float64(),
+				0.01,
+				"calculateNetValueInQuote(%v, %v, %v)", tt.args.balances, tt.args.prices, tt.args.quoteCurrency)
 		})
 	}
 }
