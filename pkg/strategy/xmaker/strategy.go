@@ -150,6 +150,8 @@ type Strategy struct {
 
 	makerMarket, sourceMarket types.Market
 
+	allMarkets types.MarketMap
+
 	// boll is the BOLLINGER indicator we used for predicting the price.
 	boll *indicatorv2.BOLLStream
 
@@ -1393,9 +1395,6 @@ func (s *Strategy) CrossRun(
 
 	s.sourceSession = sourceSession
 
-	// initialize the price resolver
-	sourceMarkets := s.sourceSession.Markets()
-
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
 		return fmt.Errorf("maker exchange session %s is not defined", s.MakerExchange)
@@ -1412,6 +1411,10 @@ func (s *Strategy) CrossRun(
 	if !ok {
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
+
+	sourceMarkets := s.sourceSession.Markets()
+	makerMarkets := s.makerSession.Markets()
+	s.allMarkets = sourceMarkets.Merge(makerMarkets)
 
 	indicators := s.sourceSession.Indicators(s.Symbol)
 
@@ -1469,7 +1472,7 @@ func (s *Strategy) CrossRun(
 		})
 	}
 
-	s.priceSolver = pricesolver.NewSimplePriceResolver(sourceMarkets)
+	s.priceSolver = pricesolver.NewSimplePriceResolver(s.allMarkets)
 	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
 
 	s.accountValueCalculator = bbgo.NewAccountValueCalculator(s.sourceSession, s.priceSolver, s.sourceMarket.QuoteCurrency)

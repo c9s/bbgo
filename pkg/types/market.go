@@ -270,3 +270,22 @@ func (m MarketMap) Has(symbol string) bool {
 	_, ok := m[symbol]
 	return ok
 }
+
+// Merge merges the given market map into the current market map
+// if the market already exists, it will be skipped
+func (m MarketMap) Merge(b MarketMap) MarketMap {
+	var a = MarketMap{}
+	for k, v := range m {
+		a[k] = v
+	}
+
+	for k, v := range b {
+		if _, exists := a[k]; exists {
+			continue
+		}
+
+		a[k] = v
+	}
+
+	return a
+}
