@@ -9,7 +9,7 @@ func ExchangeFooterIcon(exName ExchangeName) string {
 	case ExchangeMax:
 		footerIcon = "https://max.maicoin.com/favicon-16x16.png"
 	case ExchangeOKEx:
-		footerIcon = "https://static.okex.com/cdn/assets/imgs/MjAxODg/D91A7323087D31A588E0D2A379DD7747.png"
+		footerIcon = "https://www.okx.com/cdn/assets/plugins/2022/01/07104210.png"
 	case ExchangeKucoin:
 		footerIcon = "https://assets.staticimg.com/cms/media/7AV75b9jzr9S8H3eNuOuoqj8PwdUjaDQGKGczGqTS.png"
 	}
