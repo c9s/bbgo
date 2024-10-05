@@ -133,7 +133,7 @@ func TestNewAccountValueCalculator_MarginLevel(t *testing.T) {
 	cal := NewAccountValueCalculator(session, priceSolver, "USDT")
 	assert.NotNil(t, cal)
 
-	marginLevel, err := cal.MarginLevel()
+	marginLevel := cal.MarginLevel()
 	assert.NoError(t, err)
 
 	// expected (21000 / 19000 * 1.003)

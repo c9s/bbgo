@@ -70,7 +70,7 @@ func (c *AccountValueCalculator) DebtValue() fixedpoint.Value {
 	})
 }
 
-func (c *AccountValueCalculator) MarketValue() fixedpoint.Value {
+func (c *AccountValueCalculator) TotalValue() fixedpoint.Value {
 	balances := c.session.Account.Balances()
 	return totalValueInQuote(balances, c.priceSolver, c.quoteCurrency, func(
 		prev fixedpoint.Value, b types.Balance, price fixedpoint.Value,
@@ -141,15 +141,26 @@ func (c *AccountValueCalculator) AvailableQuote() (fixedpoint.Value, error) {
 
 // MarginLevel calculates the margin level from the asset market value and the debt value
 // See https://www.binance.com/en/support/faq/360030493931
-func (c *AccountValueCalculator) MarginLevel() (fixedpoint.Value, error) {
-	marketValue := c.MarketValue()
+func (c *AccountValueCalculator) MarginLevel() fixedpoint.Value {
+	marketValue := c.TotalValue()
 	debtValue := c.DebtValue()
 
 	if marketValue.IsZero() || debtValue.IsZero() {
-		return fixedpoint.NewFromFloat(999.0), nil
+		return fixedpoint.NewFromFloat(999.0)
 	}
 
-	return marketValue.Div(debtValue), nil
+	return marketValue.Div(debtValue)
+}
+
+func (c *AccountValueCalculator) Leverage() fixedpoint.Value {
+	netValue := c.NetValue()
+	debtValue := c.DebtValue()
+
+	if debtValue.IsZero() || netValue.IsZero() {
+		return fixedpoint.One
+	}
+
+	return debtValue.Div(netValue)
 }
 
 func aggregateUsdNetValue(balances types.BalanceMap) fixedpoint.Value {
