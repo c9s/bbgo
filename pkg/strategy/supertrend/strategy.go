@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/datatype/floats"
+	"github.com/c9s/bbgo/pkg/pricesolver"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -383,8 +384,14 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ProfitStatsTracker.Bind(s.session, s.orderExecutor.TradeCollector())
 	}
 
+	priceSolver := pricesolver.NewSimplePriceResolver(session.Markets())
+	priceSolver.BindStream(session.MarketDataStream)
+
 	// AccountValueCalculator
-	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, nil, s.Market.QuoteCurrency)
+	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, priceSolver, s.Market.QuoteCurrency)
+	if err := s.AccountValueCalculator.UpdatePrices(ctx); err != nil {
+		return err
+	}
 
 	// For drawing
 	profitSlice := floats.Slice{1., 1.}

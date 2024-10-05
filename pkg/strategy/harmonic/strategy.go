@@ -13,6 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
+	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -259,7 +260,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindTradeStats(s.TradeStats)
 
 	// AccountValueCalculator
-	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, nil, s.Market.QuoteCurrency)
+	priceSolver := pricesolver.NewSimplePriceResolver(session.Markets())
+	priceSolver.BindStream(s.session.MarketDataStream)
+	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, priceSolver, s.Market.QuoteCurrency)
+	if err := s.AccountValueCalculator.UpdatePrices(ctx); err != nil {
+		return err
+	}
 
 	// Accumulated profit report
 	if bbgo.IsBackTesting {
