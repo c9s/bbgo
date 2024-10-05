@@ -260,7 +260,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	priceSolver.BindStream(session.MarketDataStream)
 
 	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, priceSolver, s.Market.QuoteCurrency)
-	if err := s.AccountValueCalculator.UpdatePrices(ctx); err != nil {
+	if err := s.AccountValueCalculator.UpdatePriceFromBalances(ctx); err != nil {
 		return err
 	}
 

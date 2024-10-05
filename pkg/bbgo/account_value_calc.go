@@ -37,8 +37,8 @@ func NewAccountValueCalculator(
 	}
 }
 
-// UpdatePrices updates the price index from the existing balances
-func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
+// UpdatePriceFromBalances updates the price index from the existing balances
+func (c *AccountValueCalculator) UpdatePriceFromBalances(ctx context.Context) error {
 	balances := c.session.Account.Balances()
 	currencies := balances.Currencies()
 	markets := c.session.Markets()
@@ -227,7 +227,7 @@ func CalculateBaseQuantity(
 	} else if len(restBalances) > 1 {
 		priceSolver := pricesolver.NewSimplePriceResolver(session.Markets())
 		accountValue := NewAccountValueCalculator(session, priceSolver, "USDT")
-		if err := accountValue.UpdatePrices(context.Background()); err != nil {
+		if err := accountValue.UpdatePriceFromBalances(context.Background()); err != nil {
 			return fixedpoint.Zero, err
 		}
 
@@ -336,7 +336,7 @@ func CalculateQuoteQuantity(
 	priceSolver := pricesolver.NewSimplePriceResolver(session.Markets())
 
 	accountValue := NewAccountValueCalculator(session, priceSolver, quoteCurrency)
-	if err := accountValue.UpdatePrices(ctx); err != nil {
+	if err := accountValue.UpdatePriceFromBalances(ctx); err != nil {
 		return fixedpoint.Zero, err
 	}
 

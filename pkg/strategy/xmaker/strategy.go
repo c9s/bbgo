@@ -1316,7 +1316,7 @@ func (s *Strategy) accountUpdater(ctx context.Context) {
 				log.WithError(err).Errorf("unable to update account")
 			}
 
-			if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
+			if err := s.accountValueCalculator.UpdatePriceFromBalances(ctx); err != nil {
 				log.WithError(err).Errorf("unable to update account value with prices")
 				return
 			}
@@ -1473,7 +1473,7 @@ func (s *Strategy) CrossRun(
 	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
 
 	s.accountValueCalculator = bbgo.NewAccountValueCalculator(s.sourceSession, s.priceSolver, s.sourceMarket.QuoteCurrency)
-	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
+	if err := s.accountValueCalculator.UpdatePriceFromBalances(ctx); err != nil {
 		return err
 	}
 
