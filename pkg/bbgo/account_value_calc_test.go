@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -15,19 +14,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types/mocks"
 )
 
-func newTestTicker() types.Ticker {
-	return types.Ticker{
-		Time:   time.Now(),
-		Volume: fixedpoint.Zero,
-		Last:   fixedpoint.NewFromFloat(19000.0),
-		Open:   fixedpoint.NewFromFloat(19500.0),
-		High:   fixedpoint.NewFromFloat(19900.0),
-		Low:    fixedpoint.NewFromFloat(18800.0),
-		Buy:    fixedpoint.NewFromFloat(19500.0),
-		Sell:   fixedpoint.NewFromFloat(18900.0),
-	}
-}
-
 func TestAccountValueCalculator_NetValue(t *testing.T) {
 	symbol := "BTCUSDT"
 	markets := AllMarkets()
@@ -36,12 +22,11 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		defer mockCtrl.Finish()
 
+		ticker := Ticker(symbol)
 		mockEx := mocks.NewMockExchange(mockCtrl)
 		// for market data stream and user data stream
 		mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
-		mockEx.EXPECT().QueryTickers(gomock.Any(), []string{symbol}).Return(map[string]types.Ticker{
-			"BTCUSDT": Ticker(symbol),
-		}, nil)
+		mockEx.EXPECT().QueryTicker(gomock.Any(), symbol).Return(&ticker, nil).AnyTimes()
 
 		session := NewExchangeSession("test", mockEx)
 		session.Account.UpdateBalances(types.BalanceMap{
@@ -64,14 +49,12 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 		})
 		assert.NotNil(t, session)
 
-		ctx := context.Background()
 		priceSolver := pricesolver.NewSimplePriceResolver(markets)
+		priceSolver.Update(symbol, ticker.GetValidPrice())
 
 		cal := NewAccountValueCalculator(session, priceSolver, "USDT")
-		assert.NotNil(t, cal)
 
-		netValue, err := cal.NetValue(ctx)
-		assert.NoError(t, err)
+		netValue := cal.NetValue()
 		assert.Equal(t, "20000", netValue.String())
 	})
 
@@ -79,12 +62,12 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		defer mockCtrl.Finish()
 
+		ticker := Ticker(symbol)
+
 		mockEx := mocks.NewMockExchange(mockCtrl)
 		// for market data stream and user data stream
 		mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
-		mockEx.EXPECT().QueryTickers(gomock.Any(), []string{symbol}).Return(map[string]types.Ticker{
-			symbol: Ticker(symbol),
-		}, nil)
+		mockEx.EXPECT().QueryTicker(gomock.Any(), symbol).Return(&ticker, nil).AnyTimes()
 
 		session := NewExchangeSession("test", mockEx)
 		session.Account.UpdateBalances(types.BalanceMap{
@@ -105,16 +88,12 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 				NetAsset:  fixedpoint.Zero,
 			},
 		})
-		assert.NotNil(t, session)
 
-		ctx := context.Background()
 		priceSolver := pricesolver.NewSimplePriceResolver(markets)
+		priceSolver.Update(symbol, ticker.GetValidPrice())
 
 		cal := NewAccountValueCalculator(session, priceSolver, "USDT")
-		assert.NotNil(t, cal)
-
-		netValue, err := cal.NetValue(ctx)
-		assert.NoError(t, err)
+		netValue := cal.NetValue()
 		assert.Equal(t, "2000", netValue.String()) // 21000-19000
 	})
 }
@@ -123,14 +102,13 @@ func TestNewAccountValueCalculator_MarginLevel(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	ticker := newTestTicker()
+	symbol := "BTCUSDT"
+	ticker := Ticker(symbol)
 
 	mockEx := mocks.NewMockExchange(mockCtrl)
 	// for market data stream and user data stream
 	mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
-	mockEx.EXPECT().QueryTickers(gomock.Any(), []string{"BTCUSDT"}).Return(map[string]types.Ticker{
-		"BTCUSDT": ticker,
-	}, nil)
+	mockEx.EXPECT().QueryTicker(gomock.Any(), symbol).Return(&ticker, nil).AnyTimes()
 
 	session := NewExchangeSession("test", mockEx)
 	session.Account.UpdateBalances(types.BalanceMap{
@@ -142,27 +120,20 @@ func TestNewAccountValueCalculator_MarginLevel(t *testing.T) {
 			Interest:  fixedpoint.NewFromFloat(0.003),
 			NetAsset:  fixedpoint.Zero,
 		},
-		"USDT": {
-			Currency:  "USDT",
-			Available: fixedpoint.NewFromFloat(21000.0),
-			Locked:    fixedpoint.Zero,
-			Borrowed:  fixedpoint.Zero,
-			Interest:  fixedpoint.Zero,
-			NetAsset:  fixedpoint.Zero,
-		},
+		"USDT": Balance("USDT", Number(21000.0)),
 	})
 	assert.NotNil(t, session)
 
 	ctx := context.Background()
 	markets := AllMarkets()
 	priceSolver := pricesolver.NewSimplePriceResolver(markets)
-	err := priceSolver.UpdateFromTickers(ctx, mockEx, "BTCUSDT")
+	err := priceSolver.UpdateFromTickers(ctx, mockEx, symbol)
 	assert.NoError(t, err)
 
 	cal := NewAccountValueCalculator(session, priceSolver, "USDT")
 	assert.NotNil(t, cal)
 
-	marginLevel, err := cal.MarginLevel(ctx)
+	marginLevel, err := cal.MarginLevel()
 	assert.NoError(t, err)
 
 	// expected (21000 / 19000 * 1.003)

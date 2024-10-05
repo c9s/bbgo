@@ -6,13 +6,14 @@ import (
 	"os"
 	"sync"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/sirupsen/logrus"
 )
 
 const ID = "harmonic"
@@ -29,7 +30,7 @@ type Strategy struct {
 	Market      types.Market
 
 	types.IntervalWindow
-	//bbgo.OpenPositionOptions
+	// bbgo.OpenPositionOptions
 
 	// persistence fields
 	Position    *types.Position    `persistence:"position"`
@@ -239,7 +240,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		// Cancel active orders
 		_ = s.orderExecutor.GracefulCancel(ctx)
 		// Close 100% position
-		//_ = s.ClosePosition(ctx, fixedpoint.One)
+		// _ = s.ClosePosition(ctx, fixedpoint.One)
 	})
 
 	s.session = session
@@ -258,7 +259,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindTradeStats(s.TradeStats)
 
 	// AccountValueCalculator
-	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
+	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, nil, s.Market.QuoteCurrency)
 
 	// Accumulated profit report
 	if bbgo.IsBackTesting {

@@ -99,7 +99,6 @@ func (m *SimplePriceSolver) UpdateFromTickers(ctx context.Context, ex types.Exch
 }
 
 func (m *SimplePriceSolver) inferencePrice(asset string, assetPrice fixedpoint.Value, preferredFiats ...string) (fixedpoint.Value, bool) {
-	// log.Infof("inferencePrice %s = %f", asset, assetPrice.Float64())
 	quotePrices, ok := m.pricesByBase[asset]
 	if ok {
 		for quote, price := range quotePrices {
@@ -122,10 +121,8 @@ func (m *SimplePriceSolver) inferencePrice(asset string, assetPrice fixedpoint.V
 	basePrices, ok := m.pricesByQuote[asset]
 	if ok {
 		for base, basePrice := range basePrices {
-			// log.Infof("base %s @ %s", base, basePrice.String())
 			for _, fiat := range preferredFiats {
 				if base == fiat {
-					// log.Infof("ret %f / %f = %f", assetPrice.Float64(), basePrice.Float64(), assetPrice.Div(basePrice).Float64())
 					return assetPrice.Div(basePrice), true
 				}
 			}
@@ -142,6 +139,12 @@ func (m *SimplePriceSolver) inferencePrice(asset string, assetPrice fixedpoint.V
 }
 
 func (m *SimplePriceSolver) ResolvePrice(asset string, preferredFiats ...string) (fixedpoint.Value, bool) {
+	if len(preferredFiats) == 0 {
+		return fixedpoint.Zero, false
+	} else if asset == preferredFiats[0] {
+		return fixedpoint.One, true
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.inferencePrice(asset, fixedpoint.One, preferredFiats...)
