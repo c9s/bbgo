@@ -255,7 +255,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.orderExecutor.BindTradeStats(s.TradeStats)
 
 	// AccountValueCalculator
-	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
+	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, nil, s.Market.QuoteCurrency)
 
 	// Accumulated profit report
 	if bbgo.IsBackTesting {

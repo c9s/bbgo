@@ -255,7 +255,9 @@ func (s *Strategy) getSide(stSignal types.Direction, demaSignal types.Direction,
 	return side
 }
 
-func (s *Strategy) generateOrderForm(side types.SideType, quantity fixedpoint.Value, marginOrderSideEffect types.MarginOrderSideEffectType) types.SubmitOrder {
+func (s *Strategy) generateOrderForm(
+	side types.SideType, quantity fixedpoint.Value, marginOrderSideEffect types.MarginOrderSideEffectType,
+) types.SubmitOrder {
 	orderForm := types.SubmitOrder{
 		Symbol:           s.Symbol,
 		Market:           s.Market,
@@ -382,7 +384,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	// AccountValueCalculator
-	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, s.Market.QuoteCurrency)
+	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, nil, s.Market.QuoteCurrency)
 
 	// For drawing
 	profitSlice := floats.Slice{1., 1.}

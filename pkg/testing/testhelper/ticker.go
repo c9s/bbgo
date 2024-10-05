@@ -30,12 +30,23 @@ var _tickers = map[string]types.Ticker{
 		Buy:    fixedpoint.NewFromFloat(2519.0),
 		Sell:   fixedpoint.NewFromFloat(2521.0),
 	},
+
+	"USDTTWD": {
+		Time:   time.Now(),
+		Volume: fixedpoint.Zero,
+		Open:   fixedpoint.NewFromFloat(32.1),
+		High:   fixedpoint.NewFromFloat(32.31),
+		Low:    fixedpoint.NewFromFloat(32.01),
+		Last:   fixedpoint.NewFromFloat(32.0),
+		Buy:    fixedpoint.NewFromFloat(32.0),
+		Sell:   fixedpoint.NewFromFloat(32.01),
+	},
 }
 
 func Ticker(symbol string) types.Ticker {
 	ticker, ok := _tickers[symbol]
 	if !ok {
-		panic(fmt.Errorf("%s test ticker not found, valid tickers: %+v", symbol, []string{"BTCUSDT", "ETHUSDT"}))
+		panic(fmt.Errorf("%s test ticker not found, valid tickers: %+v", symbol, []string{"BTCUSDT", "ETHUSDT", "USDTTWD"}))
 	}
 
 	return ticker

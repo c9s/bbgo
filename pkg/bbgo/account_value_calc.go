@@ -39,7 +39,6 @@ func NewAccountValueCalculator(
 		priceSolver:   priceSolver,
 		session:       session,
 		quoteCurrency: quoteCurrency,
-		prices:        make(map[string]fixedpoint.Value),
 		tickers:       make(map[string]types.Ticker),
 	}
 }
@@ -62,98 +61,68 @@ func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
 	return c.priceSolver.UpdateFromTickers(ctx, c.session.Exchange, symbols...)
 }
 
-func (c *AccountValueCalculator) DebtValue(ctx context.Context) (fixedpoint.Value, error) {
-	debtValue := fixedpoint.Zero
-
-	if len(c.prices) == 0 {
-		if err := c.UpdatePrices(ctx); err != nil {
-			return debtValue, err
-		}
-	}
-
+func (c *AccountValueCalculator) DebtValue() fixedpoint.Value {
 	balances := c.session.Account.Balances()
-	for _, b := range balances {
-		symbol := b.Currency + c.quoteCurrency
-		price, ok := c.prices[symbol]
-		if !ok {
-			continue
-		}
-
-		debtValue = debtValue.Add(b.Debt().Mul(price))
-	}
-
-	return debtValue, nil
+	return totalValueInQuote(balances, c.priceSolver, c.quoteCurrency, func(
+		prev fixedpoint.Value, b types.Balance, price fixedpoint.Value,
+	) fixedpoint.Value {
+		return prev.Add(b.Debt().Mul(price))
+	})
 }
 
-func (c *AccountValueCalculator) MarketValue(ctx context.Context) (fixedpoint.Value, error) {
-	marketValue := fixedpoint.Zero
-
-	if len(c.prices) == 0 {
-		if err := c.UpdatePrices(ctx); err != nil {
-			return marketValue, err
-		}
-	}
-
+func (c *AccountValueCalculator) MarketValue() fixedpoint.Value {
 	balances := c.session.Account.Balances()
-	for _, b := range balances {
-		if b.Currency == c.quoteCurrency {
-			marketValue = marketValue.Add(b.Total())
-			continue
-		}
+	return totalValueInQuote(balances, c.priceSolver, c.quoteCurrency, func(
+		prev fixedpoint.Value, b types.Balance, price fixedpoint.Value,
+	) fixedpoint.Value {
+		return prev.Add(b.Total().Mul(price))
+	})
 
-		if c.priceSolver != nil {
-			if price, ok := c.priceSolver.ResolvePrice(b.Currency, c.quoteCurrency); ok {
-				marketValue = marketValue.Add(b.Total().Mul(price))
-			}
-		} else {
-			symbol := b.Currency + c.quoteCurrency
-			if price, ok := c.prices[symbol]; ok {
-				marketValue = marketValue.Add(b.Total().Mul(price))
-			}
-		}
-	}
-
-	return marketValue, nil
 }
 
-func (c *AccountValueCalculator) NetValue(ctx context.Context) (fixedpoint.Value, error) {
-	if len(c.prices) == 0 {
-		if err := c.UpdatePrices(ctx); err != nil {
-			return fixedpoint.Zero, err
+func (c *AccountValueCalculator) NetValue() fixedpoint.Value {
+	balances := c.session.Account.Balances()
+	return totalValueInQuote(balances, c.priceSolver, c.quoteCurrency, func(
+		prev fixedpoint.Value, b types.Balance, price fixedpoint.Value,
+	) fixedpoint.Value {
+		return prev.Add(b.Net().Mul(price))
+	})
+}
+
+func totalValueInQuote(
+	balances types.BalanceMap,
+	priceSolver *pricesolver.SimplePriceSolver,
+	quoteCurrency string,
+	algo func(prev fixedpoint.Value, b types.Balance, price fixedpoint.Value) fixedpoint.Value,
+) (totalValue fixedpoint.Value) {
+	totalValue = fixedpoint.Zero
+
+	for _, b := range balances {
+		if b.Currency == quoteCurrency {
+			totalValue = algo(totalValue, b, fixedpoint.One)
+			continue
+		} else if price, ok := priceSolver.ResolvePrice(b.Currency, quoteCurrency); ok {
+			totalValue = algo(totalValue, b, price)
 		}
 	}
 
-	balances := c.session.Account.Balances()
-	accountValue := calculateNetValueInQuote(balances, c.priceSolver, c.quoteCurrency)
-	return accountValue, nil
+	return totalValue
 }
 
 func calculateNetValueInQuote(
-	balances types.BalanceMap, priceSolver *pricesolver.SimplePriceSolver, quoteCurrency string,
-) (accountValue fixedpoint.Value) {
-	accountValue = fixedpoint.Zero
-	for _, b := range balances {
-		if b.Currency == quoteCurrency {
-			accountValue = accountValue.Add(b.Net())
-			continue
-		}
-
-		if price, ok := priceSolver.ResolvePrice(b.Currency, quoteCurrency); ok {
-			accountValue = accountValue.Add(b.Net().Mul(price))
-		}
-	}
-
-	return accountValue
+	balances types.BalanceMap,
+	priceSolver *pricesolver.SimplePriceSolver,
+	quoteCurrency string,
+) fixedpoint.Value {
+	return totalValueInQuote(balances, priceSolver, quoteCurrency, func(
+		prev fixedpoint.Value, b types.Balance, price fixedpoint.Value,
+	) fixedpoint.Value {
+		return prev.Add(b.Net().Mul(price))
+	})
 }
 
-func (c *AccountValueCalculator) AvailableQuote(ctx context.Context) (fixedpoint.Value, error) {
+func (c *AccountValueCalculator) AvailableQuote() (fixedpoint.Value, error) {
 	accountValue := fixedpoint.Zero
-
-	if len(c.prices) == 0 {
-		if err := c.UpdatePrices(ctx); err != nil {
-			return accountValue, err
-		}
-	}
 
 	balances := c.session.Account.Balances()
 	for _, b := range balances {
@@ -162,13 +131,9 @@ func (c *AccountValueCalculator) AvailableQuote(ctx context.Context) (fixedpoint
 			continue
 		}
 
-		symbol := b.Currency + c.quoteCurrency
-		price, ok := c.prices[symbol]
-		if !ok {
-			continue
+		if price, ok := c.priceSolver.ResolvePrice(b.Currency, c.quoteCurrency); ok {
+			accountValue = accountValue.Add(b.Net().Mul(price))
 		}
-
-		accountValue = accountValue.Add(b.Net().Mul(price))
 	}
 
 	return accountValue, nil
@@ -176,20 +141,15 @@ func (c *AccountValueCalculator) AvailableQuote(ctx context.Context) (fixedpoint
 
 // MarginLevel calculates the margin level from the asset market value and the debt value
 // See https://www.binance.com/en/support/faq/360030493931
-func (c *AccountValueCalculator) MarginLevel(ctx context.Context) (fixedpoint.Value, error) {
-	marginLevel := fixedpoint.Zero
-	marketValue, err := c.MarketValue(ctx)
-	if err != nil {
-		return marginLevel, err
+func (c *AccountValueCalculator) MarginLevel() (fixedpoint.Value, error) {
+	marketValue := c.MarketValue()
+	debtValue := c.DebtValue()
+
+	if marketValue.IsZero() || debtValue.IsZero() {
+		return fixedpoint.NewFromFloat(999.0), nil
 	}
 
-	debtValue, err := c.DebtValue(ctx)
-	if err != nil {
-		return marginLevel, err
-	}
-
-	marginLevel = marketValue.Div(debtValue)
-	return marginLevel, nil
+	return marketValue.Div(debtValue), nil
 }
 
 func aggregateUsdNetValue(balances types.BalanceMap) fixedpoint.Value {
@@ -255,11 +215,7 @@ func CalculateBaseQuantity(
 		totalUsdValue = aggregateUsdNetValue(balances)
 	} else if len(restBalances) > 1 {
 		accountValue := NewAccountValueCalculator(session, nil, "USDT")
-		netValue, err := accountValue.NetValue(context.Background())
-		if err != nil {
-			return quantity, err
-		}
-
+		netValue := accountValue.NetValue()
 		totalUsdValue = netValue
 	} else {
 		// TODO: translate quote currency like BTC of ETH/BTC to usd value
@@ -362,7 +318,7 @@ func CalculateQuoteQuantity(
 
 	// using leverage -- starts from here
 	accountValue := NewAccountValueCalculator(session, nil, quoteCurrency)
-	availableQuote, err := accountValue.AvailableQuote(ctx)
+	availableQuote, err := accountValue.AvailableQuote()
 	if err != nil {
 		log.WithError(err).Errorf("can not update available quote")
 		return fixedpoint.Zero, err
