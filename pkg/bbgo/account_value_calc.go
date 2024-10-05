@@ -3,7 +3,6 @@ package bbgo
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -21,13 +20,9 @@ var maxIsolatedMarginLeverage = fixedpoint.NewFromInt(10)
 var maxCrossMarginLeverage = fixedpoint.NewFromInt(3)
 
 type AccountValueCalculator struct {
-	priceSolver *pricesolver.SimplePriceSolver
-
+	priceSolver   *pricesolver.SimplePriceSolver
 	session       *ExchangeSession
 	quoteCurrency string
-	prices        map[string]fixedpoint.Value
-	tickers       map[string]types.Ticker
-	updateTime    time.Time
 }
 
 func NewAccountValueCalculator(
@@ -39,15 +34,15 @@ func NewAccountValueCalculator(
 		priceSolver:   priceSolver,
 		session:       session,
 		quoteCurrency: quoteCurrency,
-		tickers:       make(map[string]types.Ticker),
 	}
 }
 
+// UpdatePrices updates the price index from the existing balances
 func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
 	balances := c.session.Account.Balances()
 	currencies := balances.Currencies()
+	markets := c.session.Markets()
 
-	// TODO: improve this part
 	var symbols []string
 	for _, currency := range currencies {
 		if currency == c.quoteCurrency {
@@ -55,7 +50,12 @@ func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
 		}
 
 		symbol := currency + c.quoteCurrency
-		symbols = append(symbols, symbol)
+		reversedSymbol := c.quoteCurrency + currency
+		if _, ok := markets[symbol]; ok {
+			symbols = append(symbols, symbol)
+		} else if _, ok2 := markets[reversedSymbol]; ok2 {
+			symbols = append(symbols, reversedSymbol)
+		}
 	}
 
 	return c.priceSolver.UpdateFromTickers(ctx, c.session.Exchange, symbols...)
@@ -209,12 +209,17 @@ func CalculateBaseQuantity(
 
 	usdBalances, restBalances := usdFiatBalances(balances)
 
-	// for isolated margin we can calculate from these two pair
+	// for isolated margin, we can calculate from these two pair
 	totalUsdValue := fixedpoint.Zero
 	if len(restBalances) == 1 && types.IsUSDFiatCurrency(market.QuoteCurrency) {
 		totalUsdValue = aggregateUsdNetValue(balances)
 	} else if len(restBalances) > 1 {
-		accountValue := NewAccountValueCalculator(session, nil, "USDT")
+		priceSolver := pricesolver.NewSimplePriceResolver(session.Markets())
+		accountValue := NewAccountValueCalculator(session, priceSolver, "USDT")
+		if err := accountValue.UpdatePrices(context.Background()); err != nil {
+			return fixedpoint.Zero, err
+		}
+
 		netValue := accountValue.NetValue()
 		totalUsdValue = netValue
 	} else {
@@ -317,7 +322,13 @@ func CalculateQuoteQuantity(
 	}
 
 	// using leverage -- starts from here
-	accountValue := NewAccountValueCalculator(session, nil, quoteCurrency)
+	priceSolver := pricesolver.NewSimplePriceResolver(session.Markets())
+
+	accountValue := NewAccountValueCalculator(session, priceSolver, quoteCurrency)
+	if err := accountValue.UpdatePrices(ctx); err != nil {
+		return fixedpoint.Zero, err
+	}
+
 	availableQuote, err := accountValue.AvailableQuote()
 	if err != nil {
 		log.WithError(err).Errorf("can not update available quote")

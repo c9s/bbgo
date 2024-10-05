@@ -1413,8 +1413,6 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
 
-	s.accountValueCalculator = bbgo.NewAccountValueCalculator(s.sourceSession, nil, s.sourceMarket.QuoteCurrency)
-
 	indicators := s.sourceSession.Indicators(s.Symbol)
 
 	s.boll = indicators.BOLL(types.IntervalWindow{
@@ -1473,6 +1471,11 @@ func (s *Strategy) CrossRun(
 
 	s.priceSolver = pricesolver.NewSimplePriceResolver(sourceMarkets)
 	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
+
+	s.accountValueCalculator = bbgo.NewAccountValueCalculator(s.sourceSession, s.priceSolver, s.sourceMarket.QuoteCurrency)
+	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
+		return err
+	}
 
 	s.sourceSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
 		s.priceSolver.Update(k.Symbol, k.Close)
