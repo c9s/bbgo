@@ -924,11 +924,17 @@ func (s *Strategy) makerOrderCreateCallback(createdOrder types.Order) {
 	s.activeMakerOrders.Add(createdOrder)
 }
 
-func aggregatePriceVolumeSliceWithPriceFilter(pvs types.PriceVolumeSlice, filterPrice fixedpoint.Value) types.PriceVolume {
+func aggregatePriceVolumeSliceWithPriceFilter(
+	side types.SideType,
+	pvs types.PriceVolumeSlice,
+	filterPrice fixedpoint.Value,
+) types.PriceVolume {
 	var totalVolume = fixedpoint.Zero
 	var lastPrice = fixedpoint.Zero
 	for _, pv := range pvs {
-		if pv.Price.Compare(filterPrice) > 0 {
+		if side == types.SideTypeSell && pv.Price.Compare(filterPrice) > 0 {
+			break
+		} else if side == types.SideTypeBuy && pv.Price.Compare(filterPrice) < 0 {
 			break
 		}
 
@@ -960,13 +966,17 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 		}
 
 		askPvs := s.makerBook.SideBook(types.SideTypeSell)
-		sumPv := aggregatePriceVolumeSliceWithPriceFilter(askPvs, marginBidPrice)
+		sumPv := aggregatePriceVolumeSliceWithPriceFilter(types.SideTypeSell, askPvs, marginBidPrice)
 		qty := fixedpoint.Min(quoteBalance.Available.Div(sumPv.Price), sumPv.Volume)
 
 		if sourceBase, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 			qty = fixedpoint.Min(qty, sourceBase.Available)
 		} else {
 			// insufficient hedge base balance for arbitrage
+			return false, nil
+		}
+
+		if qty.IsZero() {
 			return false, nil
 		}
 
@@ -986,13 +996,17 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 		}
 
 		bidPvs := s.makerBook.SideBook(types.SideTypeBuy)
-		sumPv := aggregatePriceVolumeSliceWithPriceFilter(bidPvs, marginAskPrice)
+		sumPv := aggregatePriceVolumeSliceWithPriceFilter(types.SideTypeBuy, bidPvs, marginAskPrice)
 		qty := fixedpoint.Min(baseBalance.Available, sumPv.Volume)
 
 		if sourceQuote, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
 			qty = fixedpoint.Min(qty, quote.BestAskPrice.Div(sourceQuote.Available))
 		} else {
 			// insufficient hedge quote balance for arbitrage
+			return false, nil
+		}
+
+		if qty.IsZero() {
 			return false, nil
 		}
 
