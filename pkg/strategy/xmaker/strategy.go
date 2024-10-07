@@ -26,6 +26,8 @@ import (
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
 var two = fixedpoint.NewFromInt(2)
 
+const feeTokenQuote = "USDT"
+
 const priceUpdateTimeout = 30 * time.Second
 
 const ID = "xmaker"
@@ -236,7 +238,6 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	}
 
 	if s.SubscribeFeeTokenMarkets {
-		feeTokenQuote := "USDT"
 		subscribeOpts := types.SubscribeOptions{Interval: "1m"}
 		sourceSession.Subscribe(types.KLineChannel, sourceSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts)
 		makerSession.Subscribe(types.KLineChannel, makerSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts)
@@ -1494,6 +1495,7 @@ func (s *Strategy) CrossRun(
 
 	s.priceSolver = pricesolver.NewSimplePriceResolver(sourceMarkets)
 	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
+	s.sourceSession.UserDataStream.OnTradeUpdate(s.priceSolver.UpdateFromTrade)
 
 	s.accountValueCalculator = bbgo.NewAccountValueCalculator(s.sourceSession, s.priceSolver, s.sourceMarket.QuoteCurrency)
 	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
@@ -1502,7 +1504,14 @@ func (s *Strategy) CrossRun(
 
 	s.sourceSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
 		feeToken := s.sourceSession.Exchange.PlatformFeeCurrency()
-		if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, "USDT"); ok {
+		if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuote); ok {
+			s.Position.SetFeeAverageCost(feeToken, feePrice)
+		}
+	}))
+
+	s.makerSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
+		feeToken := s.makerSession.Exchange.PlatformFeeCurrency()
+		if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuote); ok {
 			s.Position.SetFeeAverageCost(feeToken, feePrice)
 		}
 	}))
