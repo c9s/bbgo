@@ -26,6 +26,8 @@ import (
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
 var two = fixedpoint.NewFromInt(2)
 
+const feeTokenQuote = "USDT"
+
 const priceUpdateTimeout = 30 * time.Second
 
 const ID = "xmaker"
@@ -87,6 +89,8 @@ type Strategy struct {
 	UpdateInterval      types.Duration `json:"updateInterval"`
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
+
+	SubscribeFeeTokenMarkets bool `json:"subscribeFeeTokenMarkets"`
 
 	EnableSignalMargin bool            `json:"enableSignalMargin"`
 	SignalConfigList   []SignalConfig  `json:"signals"`
@@ -231,6 +235,12 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		} else if sig.BollingerBandTrendSignal != nil {
 			sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: sig.BollingerBandTrendSignal.Interval})
 		}
+	}
+
+	if s.SubscribeFeeTokenMarkets {
+		subscribeOpts := types.SubscribeOptions{Interval: "1m"}
+		sourceSession.Subscribe(types.KLineChannel, sourceSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts)
+		makerSession.Subscribe(types.KLineChannel, makerSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts)
 	}
 }
 
@@ -1453,6 +1463,20 @@ func (s *Strategy) CrossRun(
 		s.Position.StrategyInstanceID = instanceID
 	}
 
+	if s.makerSession.MakerFeeRate.Sign() > 0 || s.makerSession.TakerFeeRate.Sign() > 0 {
+		s.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), types.ExchangeFee{
+			MakerFeeRate: s.makerSession.MakerFeeRate,
+			TakerFeeRate: s.makerSession.TakerFeeRate,
+		})
+	}
+
+	if s.sourceSession.MakerFeeRate.Sign() > 0 || s.sourceSession.TakerFeeRate.Sign() > 0 {
+		s.Position.SetExchangeFeeRate(types.ExchangeName(s.SourceExchange), types.ExchangeFee{
+			MakerFeeRate: s.sourceSession.MakerFeeRate,
+			TakerFeeRate: s.sourceSession.TakerFeeRate,
+		})
+	}
+
 	s.Position.UpdateMetrics()
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
@@ -1469,22 +1493,9 @@ func (s *Strategy) CrossRun(
 		}
 	}
 
-	if s.makerSession.MakerFeeRate.Sign() > 0 || s.makerSession.TakerFeeRate.Sign() > 0 {
-		s.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), types.ExchangeFee{
-			MakerFeeRate: s.makerSession.MakerFeeRate,
-			TakerFeeRate: s.makerSession.TakerFeeRate,
-		})
-	}
-
-	if s.sourceSession.MakerFeeRate.Sign() > 0 || s.sourceSession.TakerFeeRate.Sign() > 0 {
-		s.Position.SetExchangeFeeRate(types.ExchangeName(s.SourceExchange), types.ExchangeFee{
-			MakerFeeRate: s.sourceSession.MakerFeeRate,
-			TakerFeeRate: s.sourceSession.TakerFeeRate,
-		})
-	}
-
 	s.priceSolver = pricesolver.NewSimplePriceResolver(sourceMarkets)
 	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
+	s.sourceSession.UserDataStream.OnTradeUpdate(s.priceSolver.UpdateFromTrade)
 
 	s.accountValueCalculator = bbgo.NewAccountValueCalculator(s.sourceSession, s.priceSolver, s.sourceMarket.QuoteCurrency)
 	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
@@ -1492,9 +1503,15 @@ func (s *Strategy) CrossRun(
 	}
 
 	s.sourceSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
-		s.priceSolver.Update(k.Symbol, k.Close)
 		feeToken := s.sourceSession.Exchange.PlatformFeeCurrency()
-		if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, "USDT"); ok {
+		if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuote); ok {
+			s.Position.SetFeeAverageCost(feeToken, feePrice)
+		}
+	}))
+
+	s.makerSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
+		feeToken := s.makerSession.Exchange.PlatformFeeCurrency()
+		if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuote); ok {
 			s.Position.SetFeeAverageCost(feeToken, feePrice)
 		}
 	}))
@@ -1509,6 +1526,11 @@ func (s *Strategy) CrossRun(
 		}
 
 		position := types.NewPositionFromMarket(s.makerMarket)
+		position.ExchangeFeeRates = s.Position.ExchangeFeeRates
+		position.FeeRate = s.Position.FeeRate
+		position.StrategyInstanceID = s.Position.StrategyInstanceID
+		position.Strategy = s.Position.Strategy
+
 		profitStats := types.NewProfitStats(s.makerMarket)
 
 		fixer := common.NewProfitFixer()
