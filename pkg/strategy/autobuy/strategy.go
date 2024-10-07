@@ -146,12 +146,18 @@ func (s *Strategy) cancelOrders(ctx context.Context) {
 func (s *Strategy) autobuy(ctx context.Context) {
 	s.cancelOrders(ctx)
 
-	balance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
+	baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
 	if !ok {
 		log.Errorf("%s balance not found", s.Market.BaseCurrency)
 		return
 	}
-	log.Infof("balance: %s", balance.String())
+	log.Infof("balance: %s", baseBalance.String())
+
+	quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
+	if !ok {
+		log.Errorf("%s balance not found", s.Market.QuoteCurrency)
+		return
+	}
 
 	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
 	if err != nil {
@@ -167,13 +173,20 @@ func (s *Strategy) autobuy(ctx context.Context) {
 		return
 	}
 
-	if balance.Available.Compare(s.MinBaseBalance) > 0 {
-		log.Infof("balance %s is higher than minBaseBalance %s", balance.Available.String(), s.MinBaseBalance.String())
+	if baseBalance.Available.Compare(s.MinBaseBalance) > 0 {
+		log.Infof("balance %s is higher than minBaseBalance %s", baseBalance.Available.String(), s.MinBaseBalance.String())
 		return
 	}
-	log.Infof("balance %s is lower than minBaseBalance %s", balance.Available.String(), s.MinBaseBalance.String())
+	log.Infof("balance %s is lower than minBaseBalance %s", baseBalance.Available.String(), s.MinBaseBalance.String())
 
 	quantity := s.CalculateQuantity(price)
+
+	requiredQuote := quantity.Mul(price)
+	if quoteBalance.Available.Compare(requiredQuote) < 0 {
+		log.Warnf("quote balance %s is not enough: %s < %s", s.Market.QuoteCurrency, quoteBalance.Available.String(), requiredQuote.String())
+		return
+	}
+
 	submitOrder := types.SubmitOrder{
 		Symbol:   s.Symbol,
 		Side:     side,
