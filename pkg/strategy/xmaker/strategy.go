@@ -187,6 +187,8 @@ type Strategy struct {
 	logger logrus.FieldLogger
 
 	metricsLabels prometheus.Labels
+
+	connectivityGroup *types.ConnectivityGroup
 }
 
 func (s *Strategy) ID() string {
@@ -654,40 +656,37 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				hedgeAccount.MarginLevel.String(),
 				s.MinMarginLevel.String())
 
-			netValueInUsd, calcErr := s.accountValueCalculator.NetValue(ctx)
-			if calcErr != nil {
-				s.logger.WithError(calcErr).Errorf("unable to calculate the net value")
-			} else {
-				// calculate credit buffer
-				s.logger.Infof("hedge account net value in usd: %f", netValueInUsd.Float64())
+			netValueInUsd := s.accountValueCalculator.NetValue()
 
-				maximumValueInUsd := netValueInUsd.Mul(s.MaxHedgeAccountLeverage)
+			// calculate credit buffer
+			s.logger.Infof("hedge account net value in usd: %f", netValueInUsd.Float64())
 
-				s.logger.Infof("hedge account maximum leveraged value in usd: %f (%f x)", maximumValueInUsd.Float64(), s.MaxHedgeAccountLeverage.Float64())
+			maximumValueInUsd := netValueInUsd.Mul(s.MaxHedgeAccountLeverage)
 
-				if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
-					debt := quote.Debt()
-					quota := maximumValueInUsd.Sub(debt)
+			s.logger.Infof("hedge account maximum leveraged value in usd: %f (%f x)", maximumValueInUsd.Float64(), s.MaxHedgeAccountLeverage.Float64())
 
-					s.logger.Infof("hedge account quote balance: %s, debt: %s, quota: %s",
-						quote.String(),
-						debt.String(),
-						quota.String())
+			if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
+				debt := quote.Debt()
+				quota := maximumValueInUsd.Sub(debt)
 
-					hedgeQuota.QuoteAsset.Add(quota)
-				}
+				s.logger.Infof("hedge account quote balance: %s, debt: %s, quota: %s",
+					quote.String(),
+					debt.String(),
+					quota.String())
 
-				if base, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
-					debt := base.Debt()
-					quota := maximumValueInUsd.Div(bestAsk.Price).Sub(debt)
+				hedgeQuota.QuoteAsset.Add(quota)
+			}
 
-					s.logger.Infof("hedge account base balance: %s, debt: %s, quota: %s",
-						base.String(),
-						debt.String(),
-						quota.String())
+			if base, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
+				debt := base.Debt()
+				quota := maximumValueInUsd.Div(bestAsk.Price).Sub(debt)
 
-					hedgeQuota.BaseAsset.Add(quota)
-				}
+				s.logger.Infof("hedge account base balance: %s, debt: %s, quota: %s",
+					base.String(),
+					debt.String(),
+					quota.String())
+
+				hedgeQuota.BaseAsset.Add(quota)
 			}
 		}
 	} else {
@@ -1336,12 +1335,7 @@ func (s *Strategy) accountUpdater(ctx context.Context) {
 				return
 			}
 
-			netValue, err := s.accountValueCalculator.NetValue(ctx)
-			if err != nil {
-				log.WithError(err).Errorf("unable to update account")
-				return
-			}
-
+			netValue := s.accountValueCalculator.NetValue()
 			s.logger.Infof("hedge session net value ~= %f USD", netValue.Float64())
 		}
 	}
@@ -1433,8 +1427,6 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
 
-	s.accountValueCalculator = bbgo.NewAccountValueCalculator(s.sourceSession, s.sourceMarket.QuoteCurrency)
-
 	indicators := s.sourceSession.Indicators(s.Symbol)
 
 	s.boll = indicators.BOLL(types.IntervalWindow{
@@ -1493,6 +1485,11 @@ func (s *Strategy) CrossRun(
 
 	s.priceSolver = pricesolver.NewSimplePriceResolver(sourceMarkets)
 	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
+
+	s.accountValueCalculator = bbgo.NewAccountValueCalculator(s.sourceSession, s.priceSolver, s.sourceMarket.QuoteCurrency)
+	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
+		return err
+	}
 
 	s.sourceSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
 		s.priceSolver.Update(k.Symbol, k.Close)
@@ -1636,13 +1633,27 @@ func (s *Strategy) CrossRun(
 
 	s.stopC = make(chan struct{})
 
+	sourceConnectivity := types.NewConnectivity()
+	sourceConnectivity.Bind(s.sourceSession.UserDataStream)
+
+	s.connectivityGroup = types.NewConnectivityGroup(sourceConnectivity)
+
 	if s.RecoverTrade {
 		go s.tradeRecover(ctx)
 	}
 
-	go s.accountUpdater(ctx)
-	go s.hedgeWorker(ctx)
-	go s.quoteWorker(ctx)
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-s.connectivityGroup.AllAuthedC(ctx, 15*time.Second):
+		}
+
+		s.logger.Infof("all user data streams are connected, starting workers...")
+
+		go s.accountUpdater(ctx)
+		go s.hedgeWorker(ctx)
+		go s.quoteWorker(ctx)
+	}()
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		// the ctx here is the shutdown context (not the strategy context)
