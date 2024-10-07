@@ -88,6 +88,8 @@ type Strategy struct {
 	HedgeInterval       types.Duration `json:"hedgeInterval"`
 	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
 
+	SubscribeFeeTokenMarkets bool `json:"subscribeFeeTokenMarkets"`
+
 	EnableSignalMargin bool            `json:"enableSignalMargin"`
 	SignalConfigList   []SignalConfig  `json:"signals"`
 	SignalMarginScale  *bbgo.SlideRule `json:"signalMarginScale,omitempty"`
@@ -231,6 +233,13 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		} else if sig.BollingerBandTrendSignal != nil {
 			sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: sig.BollingerBandTrendSignal.Interval})
 		}
+	}
+
+	if s.SubscribeFeeTokenMarkets {
+		feeTokenQuote := "USDT"
+		subscribeOpts := types.SubscribeOptions{Interval: "1m"}
+		sourceSession.Subscribe(types.KLineChannel, sourceSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts)
+		makerSession.Subscribe(types.KLineChannel, makerSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts)
 	}
 }
 
