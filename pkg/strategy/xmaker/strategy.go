@@ -1453,6 +1453,20 @@ func (s *Strategy) CrossRun(
 		s.Position.StrategyInstanceID = instanceID
 	}
 
+	if s.makerSession.MakerFeeRate.Sign() > 0 || s.makerSession.TakerFeeRate.Sign() > 0 {
+		s.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), types.ExchangeFee{
+			MakerFeeRate: s.makerSession.MakerFeeRate,
+			TakerFeeRate: s.makerSession.TakerFeeRate,
+		})
+	}
+
+	if s.sourceSession.MakerFeeRate.Sign() > 0 || s.sourceSession.TakerFeeRate.Sign() > 0 {
+		s.Position.SetExchangeFeeRate(types.ExchangeName(s.SourceExchange), types.ExchangeFee{
+			MakerFeeRate: s.sourceSession.MakerFeeRate,
+			TakerFeeRate: s.sourceSession.TakerFeeRate,
+		})
+	}
+
 	s.Position.UpdateMetrics()
 	bbgo.Notify("xmaker: %s position is restored", s.Symbol, s.Position)
 
@@ -1469,20 +1483,6 @@ func (s *Strategy) CrossRun(
 		}
 	}
 
-	if s.makerSession.MakerFeeRate.Sign() > 0 || s.makerSession.TakerFeeRate.Sign() > 0 {
-		s.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), types.ExchangeFee{
-			MakerFeeRate: s.makerSession.MakerFeeRate,
-			TakerFeeRate: s.makerSession.TakerFeeRate,
-		})
-	}
-
-	if s.sourceSession.MakerFeeRate.Sign() > 0 || s.sourceSession.TakerFeeRate.Sign() > 0 {
-		s.Position.SetExchangeFeeRate(types.ExchangeName(s.SourceExchange), types.ExchangeFee{
-			MakerFeeRate: s.sourceSession.MakerFeeRate,
-			TakerFeeRate: s.sourceSession.TakerFeeRate,
-		})
-	}
-
 	s.priceSolver = pricesolver.NewSimplePriceResolver(sourceMarkets)
 	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
 
@@ -1492,7 +1492,6 @@ func (s *Strategy) CrossRun(
 	}
 
 	s.sourceSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
-		s.priceSolver.Update(k.Symbol, k.Close)
 		feeToken := s.sourceSession.Exchange.PlatformFeeCurrency()
 		if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, "USDT"); ok {
 			s.Position.SetFeeAverageCost(feeToken, feePrice)
@@ -1509,6 +1508,11 @@ func (s *Strategy) CrossRun(
 		}
 
 		position := types.NewPositionFromMarket(s.makerMarket)
+		position.ExchangeFeeRates = s.Position.ExchangeFeeRates
+		position.FeeRate = s.Position.FeeRate
+		position.StrategyInstanceID = s.Position.StrategyInstanceID
+		position.Strategy = s.Position.Strategy
+
 		profitStats := types.NewProfitStats(s.makerMarket)
 
 		fixer := common.NewProfitFixer()
