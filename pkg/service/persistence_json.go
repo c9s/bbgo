@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -49,7 +48,7 @@ func (store JsonStore) Load(val interface{}) error {
 		return ErrPersistenceNotExists
 	}
 
-	data, err := ioutil.ReadFile(p)
+	data, err := os.ReadFile(p)
 	if err != nil {
 		return err
 	}
@@ -74,5 +73,5 @@ func (store JsonStore) Save(val interface{}) error {
 	}
 
 	p := filepath.Join(store.Directory, store.ID) + ".json"
-	return ioutil.WriteFile(p, data, 0666)
+	return os.WriteFile(p, data, 0666)
 }

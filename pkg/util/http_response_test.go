@@ -2,7 +2,7 @@ package util
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -14,7 +14,7 @@ func TestResponse_DecodeJSON(t *testing.T) {
 		Name string `json:"name"`
 	}
 	json := `{"name":"Test Name","a":"a"}`
-	reader := ioutil.NopCloser(bytes.NewReader([]byte(json)))
+	reader := io.NopCloser(bytes.NewReader([]byte(json)))
 	resp, err := NewResponse(&http.Response{
 		StatusCode: 200,
 		Body:       reader,

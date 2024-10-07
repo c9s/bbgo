@@ -2,7 +2,7 @@ package accounting
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +16,7 @@ func TestStockManager(t *testing.T) {
 	t.Run("testdata", func(t *testing.T) {
 		var trades []types.Trade
 
-		out, err := ioutil.ReadFile("testdata/btcusdt-trades.json")
+		out, err := os.ReadFile("testdata/btcusdt-trades.json")
 		assert.NoError(t, err)
 
 		err = json.Unmarshal(out, &trades)

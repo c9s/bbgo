@@ -3,7 +3,6 @@ package util
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"os"
 )
 
@@ -13,7 +12,7 @@ func WriteJsonFile(p string, obj interface{}) error {
 		return err
 	}
 
-	return ioutil.WriteFile(p, out, 0644)
+	return os.WriteFile(p, out, 0644)
 }
 
 func ReadJsonFile(file string, obj interface{}) error {
