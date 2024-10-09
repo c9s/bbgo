@@ -6,14 +6,14 @@ var cancelOrderDurationMetrics = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Name:    "xmaker_cancel_order_duration_milliseconds",
 		Help:    "cancel order duration in milliseconds",
-		Buckets: prometheus.ExponentialBuckets(50, 1.3, 10),
+		Buckets: prometheus.ExponentialBuckets(50, 2.0, 13),
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
 var makerOrderPlacementDurationMetrics = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Name:    "xmaker_maker_order_placement_duration_milliseconds",
 		Help:    "maker order placement duration in milliseconds",
-		Buckets: prometheus.ExponentialBuckets(50, 1.3, 10),
+		Buckets: prometheus.ExponentialBuckets(50, 2.0, 13),
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
 var openOrderBidExposureInUsdMetrics = prometheus.NewGaugeVec(
