@@ -1599,9 +1599,19 @@ func (s *Strategy) CrossRun(
 		if err != nil {
 			return err
 		}
+
 		if solveErr := scale.Solve(); solveErr != nil {
 			return solveErr
 		}
+
+		minAdditionalMargin := scale.Call(0.0)
+		middleAdditionalMargin := scale.Call(1.0)
+		maxAdditionalMargin := scale.Call(2.0)
+		s.logger.Infof("signal margin range: %.2f%% @ 0.0 ~ %.2f%% @ 1.0 ~ %.2f%% @ 2.0",
+			minAdditionalMargin*100.0,
+			middleAdditionalMargin*100.0,
+			maxAdditionalMargin*100.0)
+		return nil
 	}
 
 	for _, signalConfig := range s.SignalConfigList {
