@@ -546,11 +546,15 @@ func (s *Strategy) getLayerPrice(
 }
 
 func (s *Strategy) updateQuote(ctx context.Context) error {
+	cancelMakerOrdersProfile := timeprofile.Start("cancelMakerOrders")
+
 	if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
 		s.logger.Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
 		s.activeMakerOrders.Print()
 		return nil
 	}
+
+	cancelOrderDurationMetrics.With(s.metricsLabels).Observe(float64(cancelMakerOrdersProfile.Stop().Milliseconds()))
 
 	if s.activeMakerOrders.NumOfOrders() > 0 {
 		s.logger.Warnf("unable to cancel all %s orders, skipping placing maker orders", s.Symbol)
