@@ -69,7 +69,13 @@ func (s *OrderBookBestPriceVolumeSignal) CalculateSignal(ctx context.Context) (f
 		signal = -numerator.Div(denominator).Float64()
 	}
 
-	log.Infof("[OrderBookBestPriceVolumeSignal] %f bid/ask = %f/%f", signal, bid.Volume.Float64(), ask.Volume.Float64())
+	log.Infof("[OrderBookBestPriceVolumeSignal] %f bid/ask = %f/%f, bid ratio = %f, ratio threshold = %f",
+		signal,
+		bid.Volume.Float64(),
+		ask.Volume.Float64(),
+		bidRatio.Float64(),
+		s.RatioThreshold.Float64(),
+	)
 
 	orderBookSignalMetrics.WithLabelValues(s.symbol).Set(signal)
 	return signal, nil
