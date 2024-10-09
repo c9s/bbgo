@@ -21,6 +21,10 @@ func init() {
 	prometheus.MustRegister(orderBookSignalMetrics)
 }
 
+type StreamBookSetter interface {
+	SetStreamBook(book *types.StreamOrderBook)
+}
+
 type OrderBookBestPriceVolumeSignal struct {
 	RatioThreshold fixedpoint.Value `json:"ratioThreshold"`
 	MinVolume      fixedpoint.Value `json:"minVolume"`
@@ -29,7 +33,7 @@ type OrderBookBestPriceVolumeSignal struct {
 	book   *types.StreamOrderBook
 }
 
-func (s *OrderBookBestPriceVolumeSignal) BindStreamBook(book *types.StreamOrderBook) {
+func (s *OrderBookBestPriceVolumeSignal) SetStreamBook(book *types.StreamOrderBook) {
 	s.book = book
 }
 
