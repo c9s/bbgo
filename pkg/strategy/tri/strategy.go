@@ -18,10 +18,10 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/style"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 //go:generate bash symbols.sh
@@ -675,7 +675,7 @@ func (s *Strategy) iocOrderExecution(
 }
 
 func (s *Strategy) waitWebSocketOrderDone(ctx context.Context, orderID uint64, timeoutDuration time.Duration) (*types.Order, error) {
-	prof := util.StartTimeProfile("waitWebSocketOrderDone")
+	prof := timeprofile.Start("waitWebSocketOrderDone")
 	defer prof.StopAndLog(log.Infof)
 
 	if order, ok := s.orderStore.Get(orderID); ok {
@@ -869,7 +869,7 @@ func (s *Strategy) calculateRanks(minRatio float64, method func(p *Path) float64
 func waitForOrderFilled(
 	ctx context.Context, ex types.ExchangeOrderQueryService, order types.Order, timeout time.Duration,
 ) (*types.Order, error) {
-	prof := util.StartTimeProfile("waitForOrderFilled")
+	prof := timeprofile.Start("waitForOrderFilled")
 	defer prof.StopAndLog(log.Infof)
 
 	timeoutC := time.After(timeout)
@@ -880,7 +880,7 @@ func waitForOrderFilled(
 			return nil, fmt.Errorf("order wait timeout %s", timeout)
 
 		default:
-			p := util.StartTimeProfile("queryOrder")
+			p := timeprofile.Start("queryOrder")
 			remoteOrder, err2 := ex.QueryOrder(ctx, types.OrderQuery{
 				Symbol:  order.Symbol,
 				OrderID: strconv.FormatUint(order.OrderID, 10),
