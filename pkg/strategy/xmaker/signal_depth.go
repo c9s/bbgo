@@ -31,7 +31,7 @@ type DepthRatioSignal struct {
 	book   *types.StreamOrderBook
 }
 
-func (s *DepthRatioSignal) BindStreamBook(book *types.StreamOrderBook) {
+func (s *DepthRatioSignal) SetStreamBook(book *types.StreamOrderBook) {
 	s.book = book
 }
 

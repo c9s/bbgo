@@ -17,6 +17,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/pricesolver"
+	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
@@ -33,6 +34,24 @@ const priceUpdateTimeout = 30 * time.Second
 const ID = "xmaker"
 
 var log = logrus.WithField("strategy", ID)
+
+type MutexFloat64 struct {
+	value float64
+	mu    sync.Mutex
+}
+
+func (m *MutexFloat64) Set(v float64) {
+	m.mu.Lock()
+	m.value = v
+	m.mu.Unlock()
+}
+
+func (m *MutexFloat64) Get() float64 {
+	m.mu.Lock()
+	v := m.value
+	m.mu.Unlock()
+	return v
+}
 
 type Quote struct {
 	BestBidPrice, BestAskPrice fixedpoint.Value
@@ -69,6 +88,20 @@ type SignalConfig struct {
 	DepthRatioSignal         *DepthRatioSignal               `json:"depthRatio,omitempty"`
 	KLineShapeSignal         *KLineShapeSignal               `json:"klineShape,omitempty"`
 	TradeVolumeWindowSignal  *TradeVolumeWindowSignal        `json:"tradeVolumeWindow,omitempty"`
+}
+
+func (c *SignalConfig) Get() SignalProvider {
+	if c.OrderBookBestPriceSignal != nil {
+		return c.OrderBookBestPriceSignal
+	} else if c.DepthRatioSignal != nil {
+		return c.DepthRatioSignal
+	} else if c.BollingerBandTrendSignal != nil {
+		return c.BollingerBandTrendSignal
+	} else if c.TradeVolumeWindowSignal != nil {
+		return c.TradeVolumeWindowSignal
+	}
+
+	panic(fmt.Errorf("no valid signal provider found, please check your config"))
 }
 
 func init() {
@@ -193,6 +226,10 @@ type Strategy struct {
 	metricsLabels prometheus.Labels
 
 	connectivityGroup *types.ConnectivityGroup
+
+	// lastAggregatedSignal stores the last aggregated signal with mutex
+	// TODO: use float64 series instead, so that we can store history signal values
+	lastAggregatedSignal MutexFloat64
 }
 
 func (s *Strategy) ID() string {
@@ -304,6 +341,7 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		return err
 	}
 
+	s.lastAggregatedSignal.Set(signal)
 	s.logger.Infof("aggregated signal: %f", signal)
 
 	if signal == 0.0 {
@@ -398,18 +436,9 @@ func (s *Strategy) applyBollingerMargin(
 func (s *Strategy) aggregateSignal(ctx context.Context) (float64, error) {
 	sum := 0.0
 	voters := 0.0
-	for _, signal := range s.SignalConfigList {
-		var sig float64
-		var err error
-		if signal.OrderBookBestPriceSignal != nil {
-			sig, err = signal.OrderBookBestPriceSignal.CalculateSignal(ctx)
-		} else if signal.DepthRatioSignal != nil {
-			sig, err = signal.DepthRatioSignal.CalculateSignal(ctx)
-		} else if signal.BollingerBandTrendSignal != nil {
-			sig, err = signal.BollingerBandTrendSignal.CalculateSignal(ctx)
-		} else if signal.TradeVolumeWindowSignal != nil {
-			sig, err = signal.TradeVolumeWindowSignal.CalculateSignal(ctx)
-		}
+	for _, signalConfig := range s.SignalConfigList {
+		signalProvider := signalConfig.Get()
+		sig, err := signalProvider.CalculateSignal(ctx)
 
 		if err != nil {
 			return 0, err
@@ -417,9 +446,9 @@ func (s *Strategy) aggregateSignal(ctx context.Context) (float64, error) {
 			continue
 		}
 
-		if signal.Weight > 0.0 {
-			sum += sig * signal.Weight
-			voters += signal.Weight
+		if signalConfig.Weight > 0.0 {
+			sum += sig * signalConfig.Weight
+			voters += signalConfig.Weight
 		} else {
 			sum += sig
 			voters++
@@ -577,6 +606,9 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		s.logger.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
+
+		s.sourceBook.Reset()
+		s.sourceSession.MarketDataStream.Reconnect()
 		return err
 	}
 
@@ -584,6 +616,9 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		s.logger.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
+
+		s.sourceBook.Reset()
+		s.sourceSession.MarketDataStream.Reconnect()
 		return err
 	}
 
@@ -914,11 +949,14 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	defer s.tradeCollector.Process()
 
+	makerOrderPlacementProfile := timeprofile.Start("makerOrderPlacement")
 	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, s.makerSession.Exchange, s.makerOrderCreateCallback, formattedOrders...)
 	if err != nil {
 		log.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
 		return err
 	}
+
+	makerOrderPlacementDurationMetrics.With(s.metricsLabels).Observe(float64(makerOrderPlacementProfile.Stop().Milliseconds()))
 
 	openOrderBidExposureInUsdMetrics.With(s.metricsLabels).Set(bidExposureInUsd.Float64())
 	openOrderAskExposureInUsdMetrics.With(s.metricsLabels).Set(askExposureInUsd.Float64())
@@ -1568,32 +1606,36 @@ func (s *Strategy) CrossRun(
 	s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
 
 	if s.EnableSignalMargin {
+		s.logger.Infof("signal margin is enabled")
+
 		scale, err := s.SignalMarginScale.Scale()
 		if err != nil {
 			return err
 		}
+
 		if solveErr := scale.Solve(); solveErr != nil {
 			return solveErr
 		}
+
+		minAdditionalMargin := scale.Call(0.0)
+		middleAdditionalMargin := scale.Call(1.0)
+		maxAdditionalMargin := scale.Call(2.0)
+		s.logger.Infof("signal margin range: %.2f%% @ 0.0 ~ %.2f%% @ 1.0 ~ %.2f%% @ 2.0",
+			minAdditionalMargin*100.0,
+			middleAdditionalMargin*100.0,
+			maxAdditionalMargin*100.0)
 	}
 
 	for _, signalConfig := range s.SignalConfigList {
-		if signalConfig.OrderBookBestPriceSignal != nil {
-			signalConfig.OrderBookBestPriceSignal.book = s.sourceBook
-			if err := signalConfig.OrderBookBestPriceSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
-				return err
-			}
-		} else if signalConfig.DepthRatioSignal != nil {
-			signalConfig.DepthRatioSignal.book = s.sourceBook
-			if err := signalConfig.DepthRatioSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
-				return err
-			}
-		} else if signalConfig.BollingerBandTrendSignal != nil {
-			if err := signalConfig.BollingerBandTrendSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
-				return err
-			}
-		} else if signalConfig.TradeVolumeWindowSignal != nil {
-			if err := signalConfig.TradeVolumeWindowSignal.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
+		signal := signalConfig.Get()
+		if setter, ok := signal.(StreamBookSetter); ok {
+			s.logger.Infof("setting stream book on signal %T", signal)
+			setter.SetStreamBook(s.sourceBook)
+		}
+
+		if binder, ok := signal.(SessionBinder); ok {
+			s.logger.Infof("binding session on signal %T", signal)
+			if err := binder.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
 				return err
 			}
 		}
@@ -1660,11 +1702,8 @@ func (s *Strategy) CrossRun(
 
 	s.connectivityGroup = types.NewConnectivityGroup(sourceConnectivity)
 
-	if s.RecoverTrade {
-		go s.tradeRecover(ctx)
-	}
-
 	go func() {
+		s.logger.Infof("waiting for authentication connections to be ready...")
 		select {
 		case <-ctx.Done():
 		case <-s.connectivityGroup.AllAuthedC(ctx, 15*time.Second):
@@ -1675,6 +1714,10 @@ func (s *Strategy) CrossRun(
 		go s.accountUpdater(ctx)
 		go s.hedgeWorker(ctx)
 		go s.quoteWorker(ctx)
+
+		if s.RecoverTrade {
+			go s.tradeRecover(ctx)
+		}
 	}()
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
