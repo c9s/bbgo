@@ -35,6 +35,24 @@ const ID = "xmaker"
 
 var log = logrus.WithField("strategy", ID)
 
+type MutexFloat64 struct {
+	value float64
+	mu    sync.Mutex
+}
+
+func (m *MutexFloat64) Set(v float64) {
+	m.mu.Lock()
+	m.value = v
+	m.mu.Unlock()
+}
+
+func (m *MutexFloat64) Get() float64 {
+	m.mu.Lock()
+	v := m.value
+	m.mu.Unlock()
+	return v
+}
+
 type Quote struct {
 	BestBidPrice, BestAskPrice fixedpoint.Value
 
@@ -194,6 +212,10 @@ type Strategy struct {
 	metricsLabels prometheus.Labels
 
 	connectivityGroup *types.ConnectivityGroup
+
+	// lastAggregatedSignal stores the last aggregated signal with mutex
+	// TODO: use float64 series instead, so that we can store history signal values
+	lastAggregatedSignal MutexFloat64
 }
 
 func (s *Strategy) ID() string {
@@ -305,6 +327,7 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		return err
 	}
 
+	s.lastAggregatedSignal.Set(signal)
 	s.logger.Infof("aggregated signal: %f", signal)
 
 	if signal == 0.0 {
