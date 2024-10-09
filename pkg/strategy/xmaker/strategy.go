@@ -17,6 +17,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/pricesolver"
+	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
@@ -914,11 +915,14 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	defer s.tradeCollector.Process()
 
+	makerOrderPlacementProfile := timeprofile.Start("makerOrderPlacement")
 	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, s.makerSession.Exchange, s.makerOrderCreateCallback, formattedOrders...)
 	if err != nil {
 		log.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
 		return err
 	}
+
+	makerOrderPlacementDurationMetrics.With(s.metricsLabels).Observe(float64(makerOrderPlacementProfile.Stop().Milliseconds()))
 
 	openOrderBidExposureInUsdMetrics.With(s.metricsLabels).Set(bidExposureInUsd.Float64())
 	openOrderAskExposureInUsdMetrics.With(s.metricsLabels).Set(askExposureInUsd.Float64())

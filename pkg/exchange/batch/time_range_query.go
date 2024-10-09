@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 )
 
 var log = logrus.WithField("component", "batch")
@@ -56,7 +56,7 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 
 			log.Debugf("batch querying %T: %v <=> %v", q.Type, startTime, endTime)
 
-			queryProfiler := util.StartTimeProfile("remoteQuery")
+			queryProfiler := timeprofile.Start("remoteQuery")
 
 			sliceInf, err := q.Q(startTime, endTime)
 			if err != nil {
