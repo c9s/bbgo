@@ -12,7 +12,7 @@ type PlaceOrderResponse struct {
 	OrderLinkId string `json:"orderLinkId"`
 }
 
-//go:generate PostRequest -url "/v5/order/create" -type PlaceOrderRequest -responseDataType .PlaceOrderResponse
+//go:generate PostRequest -url "/v5/order/create" -type PlaceOrderRequest -responseDataType .PlaceOrderResponse -rateLimiter 5+15/1s
 type PlaceOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
@@ -23,6 +23,8 @@ type PlaceOrderRequest struct {
 	qty         string      `param:"qty"`
 	orderLinkId string      `param:"orderLinkId"`
 	timeInForce TimeInForce `param:"timeInForce"`
+	// Select the unit for qty when create Spot market orders for UTA account
+	marketUnit *MarketUnit `param:"marketUnit"`
 
 	isLeverage       *bool   `param:"isLeverage"`
 	price            *string `param:"price"`

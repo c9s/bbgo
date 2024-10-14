@@ -272,23 +272,18 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		return nil, err
 	}
 	req.Side(side)
+	req.Qty(order.Market.FormatQuantity(order.Quantity))
 
-	// set quantity
-	orderQty := order.Quantity
-	// if the order is market buy, the quantity is quote coin, instead of base coin. so we need to convert it.
-	if order.Type == types.OrderTypeMarket && order.Side == types.SideTypeBuy {
-		ticker, err := e.QueryTicker(ctx, order.Market.Symbol)
-		if err != nil {
-			return nil, err
-		}
-		orderQty = order.Quantity.Mul(ticker.Buy)
-	}
-	req.Qty(order.Market.FormatQuantity(orderQty))
-
-	// set price
 	switch order.Type {
-	case types.OrderTypeLimit:
+	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		req.Price(order.Market.FormatPrice(order.Price))
+	case types.OrderTypeMarket:
+		// Because our order.Quantity unit is base coin, so we indicate the target currency to Base.
+		if order.Side == types.SideTypeBuy {
+			req.MarketUnit(bybitapi.MarketUnitBase)
+		} else {
+			req.MarketUnit(bybitapi.MarketUnitQuote)
+		}
 	}
 
 	// set timeInForce
@@ -309,9 +304,6 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		req.OrderLinkId(order.ClientOrderID)
 	}
 
-	if err := orderRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
-	}
 	timeNow := time.Now()
 	res, err := req.Do(ctx)
 	if err != nil {
