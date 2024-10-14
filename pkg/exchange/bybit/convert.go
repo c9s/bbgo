@@ -325,7 +325,7 @@ func v3ToGlobalTrade(trade v3.Trade) (*types.Trade, error) {
 	}, nil
 }
 
-func toGlobalTrade(trade bybitapi.Trade, feeDetail SymbolFeeDetail) (*types.Trade, error) {
+func toGlobalTrade(trade bybitapi.Trade) (*types.Trade, error) {
 	side, err := toGlobalSideType(trade.Side)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected side: %s, err: %w", trade.Side, err)
@@ -338,8 +338,6 @@ func toGlobalTrade(trade bybitapi.Trade, feeDetail SymbolFeeDetail) (*types.Trad
 	if err != nil {
 		return nil, fmt.Errorf("unexpected trade id: %s, err: %w", trade.ExecId, err)
 	}
-
-	fc, _ := calculateFee(trade, feeDetail)
 
 	return &types.Trade{
 		ID:            tradeIdNum,
@@ -354,7 +352,7 @@ func toGlobalTrade(trade bybitapi.Trade, feeDetail SymbolFeeDetail) (*types.Trad
 		IsMaker:       trade.IsMaker,
 		Time:          types.Time(trade.ExecTime),
 		Fee:           trade.ExecFee,
-		FeeCurrency:   fc,
+		FeeCurrency:   trade.FeeCurrency,
 		IsMargin:      false,
 		IsFutures:     false,
 		IsIsolated:    false,

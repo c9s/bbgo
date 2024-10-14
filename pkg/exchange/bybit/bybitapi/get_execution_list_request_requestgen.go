@@ -31,6 +31,11 @@ func (g *GetExecutionListRequest) OrderId(orderId string) *GetExecutionListReque
 	return g
 }
 
+func (g *GetExecutionListRequest) OrderLinkId(orderLinkId string) *GetExecutionListRequest {
+	g.orderLinkId = &orderLinkId
+	return g
+}
+
 func (g *GetExecutionListRequest) StartTime(startTime time.Time) *GetExecutionListRequest {
 	g.startTime = &startTime
 	return g
@@ -84,6 +89,14 @@ func (g *GetExecutionListRequest) GetQueryParameters() (url.Values, error) {
 
 		// assign parameter of orderId
 		params["orderId"] = orderId
+	} else {
+	}
+	// check orderLinkId field -> json key orderLinkId
+	if g.orderLinkId != nil {
+		orderLinkId := *g.orderLinkId
+
+		// assign parameter of orderLinkId
+		params["orderLinkId"] = orderLinkId
 	} else {
 	}
 	// check startTime field -> json key startTime
@@ -275,7 +288,6 @@ func (g *GetExecutionListRequest) Do(ctx context.Context) (*TradesResponse, erro
 			return nil, err
 		}
 	}
-
 	var data TradesResponse
 	if err := json.Unmarshal(apiResponse.Result, &data); err != nil {
 		return nil, err

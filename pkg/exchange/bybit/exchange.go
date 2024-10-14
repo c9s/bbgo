@@ -231,15 +231,17 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	return toGlobalOrder(res.List[0])
 }
 
+// QueryOrderTrades You can query by symbol, baseCoin, orderId and orderLinkId, and if you pass multiple params,
+// the system will process them according to this priority: orderId > orderLinkId > symbol > baseCoin.
 func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (trades []types.Trade, err error) {
+	req := e.client.NewGetExecutionListRequest()
 	if len(q.ClientOrderID) != 0 {
-		log.Warn("!!!BYBIT EXCHANGE API NOTICE!!! Bybit does not support searching for trades using OrderClientId.")
+		req.OrderLinkId(q.ClientOrderID)
 	}
 
-	if len(q.OrderID) == 0 {
-		return nil, errors.New("orderID is required parameter")
+	if len(q.OrderID) != 0 {
+		req.OrderLinkId(q.OrderID)
 	}
-	req := e.client.NewGetExecutionListRequest().OrderId(q.OrderID)
 
 	if len(q.Symbol) != 0 {
 		req.Symbol(q.Symbol)
@@ -437,11 +439,7 @@ func (e *Exchange) queryTrades(ctx context.Context, req *bybitapi.GetExecutionLi
 		}
 
 		for _, trade := range res.List {
-			feeRate, err := pollAndGetFeeRate(ctx, trade.Symbol, e.FeeRatePoller, e.marketsInfo)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get fee rate, err: %v", err)
-			}
-			trade, err := toGlobalTrade(trade, feeRate)
+			trade, err := toGlobalTrade(trade)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert trade, err: %v", err)
 			}
