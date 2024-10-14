@@ -128,3 +128,10 @@ const (
 type AccountType string
 
 const AccountTypeSpot AccountType = "SPOT"
+
+type MarketUnit string
+
+const (
+	MarketUnitBase  MarketUnit = "baseCoin"
+	MarketUnitQuote MarketUnit = "quoteCoin"
+)
