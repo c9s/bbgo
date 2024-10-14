@@ -23,6 +23,8 @@ const (
 	defaultKLineLimit      = 1000
 
 	queryTradeDurationLimit = 7 * 24 * time.Hour
+
+	maxHistoricalDataQueryPeriod = 2 * 365 * 24 * time.Hour
 )
 
 // https://bybit-exchange.github.io/docs/zh-TW/v5/rate-limit
@@ -376,38 +378,68 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	return errs
 }
 
+// QueryClosedOrders queries closed orders by symbol, since, until, and lastOrderID.
+// startTime and endTime are not passed, return 7 days by default
+// Only startTime is passed, return range between startTime and startTime+7 days
+// Only endTime is passed, return range between endTime-7 days and endTime
+// If both are passed, the rule is endTime - startTime <= 7 days
+//
+// ** since and until are inclusive. **
+// ** sort by creation time in descending order. **
 func (e *Exchange) QueryClosedOrders(
-	ctx context.Context, symbol string, since, util time.Time, lastOrderID uint64,
+	ctx context.Context, symbol string, since, until time.Time, _ uint64,
 ) (orders []types.Order, err error) {
-	if !since.IsZero() || !util.IsZero() {
-		log.Warn("!!!BYBIT EXCHANGE API NOTICE!!! the since/until conditions will not be effected on SPOT account, bybit exchange does not support time-range-based query currently")
+
+	now := time.Now()
+
+	if time.Since(since) > maxHistoricalDataQueryPeriod {
+		newSince := now.Add(-maxHistoricalDataQueryPeriod)
+		log.Warnf("!!!BYBIT EXCHANGE API NOTICE!!! The closed order API cannot query data beyond 2 years from the current date, update %s -> %s", since, newSince)
+		since = newSince
+	}
+	if until.Before(since) {
+		newUntil := since.Add(queryTradeDurationLimit)
+		log.Warnf("!!!BYBIT EXCHANGE API NOTICE!!! The 'until' comes before 'since', add 7 days to until (%s -> %s).", until, newUntil)
+		until = newUntil
 	}
 
-	if err := closedOrderQueryLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
+	// if the time range exceeds the server boundary, get the last 7 days of data
+	if until.Sub(since) > queryTradeDurationLimit {
+		newStartTime := until.Add(-queryTradeDurationLimit)
+
+		log.Warnf("!!!BYBIT EXCHANGE API NOTICE!!! The time range exceeds the server boundary: %s, start time: %s, end time: %s, updated start time %s -> %s", queryTradeDurationLimit, since.String(), until.String(), since.String(), newStartTime.String())
+		since = newStartTime
 	}
-	res, err := e.client.NewGetOrderHistoriesRequest().
+	req := e.client.NewGetOrderHistoriesRequest().
 		Symbol(symbol).
-		Cursor(strconv.FormatUint(lastOrderID, 10)).
 		Limit(defaultQueryLimit).
-		Do(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
-	}
+		StartTime(since).
+		EndTime(until)
 
-	for _, order := range res.List {
-		o, err2 := toGlobalOrder(order)
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-			continue
+	cursor := ""
+	for {
+		if len(cursor) != 0 {
+			req = req.Cursor(cursor)
 		}
 
-		if o.Status.Closed() {
-			orders = append(orders, *o)
+		res, err := req.Do(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to call get order histories error: %w", err)
 		}
-	}
-	if err != nil {
-		return nil, err
+
+		for _, order := range res.List {
+			order, err := toGlobalOrder(order)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert order, err: %v", err)
+			}
+
+			orders = append(orders, *order)
+		}
+
+		if len(res.NextPageCursor) == 0 {
+			break
+		}
+		cursor = res.NextPageCursor
 	}
 
 	return types.SortOrdersAscending(orders), nil
