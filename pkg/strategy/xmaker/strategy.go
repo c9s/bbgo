@@ -1027,7 +1027,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 			return false, nil
 		}
 
-		if qty.IsZero() {
+		if qty.IsZero() || s.makerMarket.IsDustQuantity(qty, sumPv.Price) {
 			return false, nil
 		}
 
@@ -1057,7 +1057,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 			return false, nil
 		}
 
-		if qty.IsZero() {
+		if qty.IsZero() || s.makerMarket.IsDustQuantity(qty, sumPv.Price) {
 			return false, nil
 		}
 
