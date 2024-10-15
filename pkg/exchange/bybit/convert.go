@@ -362,14 +362,14 @@ func toGlobalTrade(trade bybitapi.Trade) (*types.Trade, error) {
 func toGlobalBalanceMap(events []bybitapi.WalletBalances) types.BalanceMap {
 	bm := types.BalanceMap{}
 	for _, event := range events {
-		if event.AccountType != bybitapi.AccountTypeSpot {
+		if event.AccountType != bybitapi.AccountTypeUnified {
 			continue
 		}
 
 		for _, obj := range event.Coins {
 			bm[obj.Coin] = types.Balance{
 				Currency:  obj.Coin,
-				Available: obj.Free,
+				Available: obj.WalletBalance.Sub(obj.Locked),
 				Locked:    obj.Locked,
 			}
 		}
