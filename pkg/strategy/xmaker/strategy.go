@@ -1166,6 +1166,27 @@ func AdjustHedgeQuantityWithAvailableBalance(
 	return market.TruncateQuantity(quantity)
 }
 
+func (s *Strategy) canDelayHedge(side types.SideType, pos fixedpoint.Value) bool {
+	if !s.EnableDelayHedge {
+		return false
+	}
+
+	signal := s.lastAggregatedSignal.Get()
+
+	// if the signal is strong enough, we can delay the hedge and wait for the next tick
+	if math.Abs(signal) > s.DelayHedgeSignalThreshold {
+		period, ok := s.getPositionHoldingPeriod(time.Now())
+		if ok && (signal > 0 && side == types.SideTypeSell) || (signal < 0 && side == types.SideTypeBuy) {
+			if period < s.MaxDelayHedgeDuration.Duration() {
+				s.logger.Infof("delay hedge enabled, signal %f is strong enough, waiting for the next tick to hedge %s quantity (max period %s)", signal, pos, s.MaxDelayHedgeDuration.Duration().String())
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	side := types.SideTypeBuy
 	if pos.IsZero() {
@@ -1178,15 +1199,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		side = types.SideTypeSell
 	}
 
-	signal := s.lastAggregatedSignal.Get()
-
-	// if the signal is strong enough, we can delay the hedge and wait for the next tick
-	if math.Abs(signal) > s.DelayHedgeSignalThreshold {
-		if period, ok := s.getPositionHoldingPeriod(time.Now()); ok {
-			if period < s.MaxDelayHedgeDuration.Duration() {
-				return
-			}
-		}
+	if s.canDelayHedge(side, pos) {
+		return
 	}
 
 	lastPrice := s.lastPrice.Get()
