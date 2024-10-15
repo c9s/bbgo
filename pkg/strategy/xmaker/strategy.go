@@ -136,6 +136,10 @@ type Strategy struct {
 	DepthQuantity    fixedpoint.Value `json:"depthQuantity"`
 	SourceDepthLevel types.Depth      `json:"sourceDepthLevel"`
 
+	// MaxHedgeDelayDuration is the maximum delay duration to hedge the position
+	MaxDelayHedgeDuration     types.Duration `json:"maxHedgeDelayDuration"`
+	DelayHedgeSignalThreshold float64        `json:"delayHedgeSignalThreshold"`
+
 	EnableBollBandMargin bool             `json:"enableBollBandMargin"`
 	BollBandInterval     types.Interval   `json:"bollBandInterval"`
 	BollBandMargin       fixedpoint.Value `json:"bollBandMargin"`
@@ -230,6 +234,9 @@ type Strategy struct {
 	// lastAggregatedSignal stores the last aggregated signal with mutex
 	// TODO: use float64 series instead, so that we can store history signal values
 	lastAggregatedSignal MutexFloat64
+
+	positionStartedAt      *time.Time
+	positionStartedAtMutex sync.Mutex
 }
 
 func (s *Strategy) ID() string {
@@ -333,6 +340,34 @@ func (s *Strategy) getBollingerTrend(quote *Quote) int {
 	} else {
 		return 0
 	}
+}
+
+// setPositionStartTime sets the position start time only if it's not set
+func (s *Strategy) setPositionStartTime(now time.Time) {
+	s.positionStartedAtMutex.Lock()
+	if s.positionStartedAt == nil {
+		s.positionStartedAt = &now
+	}
+
+	s.positionStartedAtMutex.Unlock()
+}
+
+func (s *Strategy) resetPositionStartTime() {
+	s.positionStartedAtMutex.Lock()
+	s.positionStartedAt = nil
+	s.positionStartedAtMutex.Unlock()
+}
+
+func (s *Strategy) getPositionHoldingPeriod(now time.Time) (time.Duration, bool) {
+	s.positionStartedAtMutex.Lock()
+	startedAt := s.positionStartedAt
+	s.positionStartedAtMutex.Unlock()
+
+	if startedAt == nil || startedAt.IsZero() {
+		return 0, false
+	}
+
+	return now.Sub(*startedAt), true
 }
 
 func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
@@ -1160,7 +1195,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	if s.sourceSession.Margin {
 		// check the margin level
 		if !s.MinMarginLevel.IsZero() && !account.MarginLevel.IsZero() && account.MarginLevel.Compare(s.MinMarginLevel) < 0 {
-			log.Errorf("margin level %f is too low (< %f), skip hedge", account.MarginLevel.Float64(), s.MinMarginLevel.Float64())
+			s.logger.Errorf("margin level %f is too low (< %f), skip hedge", account.MarginLevel.Float64(), s.MinMarginLevel.Float64())
 			return
 		}
 	} else {
@@ -1172,7 +1207,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	quantity = s.sourceMarket.TruncateQuantity(quantity)
 
 	if s.sourceMarket.IsDustQuantity(quantity, lastPrice) {
-		log.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
+		s.logger.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
 		return
 	}
 
@@ -1180,6 +1215,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		if !s.hedgeErrorRateReservation.OK() {
 			return
 		}
+
 		bbgo.Notify("Hit hedge error rate limit, waiting...")
 		time.Sleep(s.hedgeErrorRateReservation.Delay())
 		s.hedgeErrorRateReservation = nil
@@ -1355,15 +1391,17 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 		select {
 
 		case <-s.stopC:
-			log.Warnf("%s maker goroutine stopped, due to the stop signal", s.Symbol)
+			s.logger.Warnf("%s maker goroutine stopped, due to the stop signal", s.Symbol)
 			return
 
 		case <-ctx.Done():
-			log.Warnf("%s maker goroutine stopped, due to the cancelled context", s.Symbol)
+			s.logger.Warnf("%s maker goroutine stopped, due to the cancelled context", s.Symbol)
 			return
 
 		case <-ticker.C:
-			s.updateQuote(ctx)
+			if err := s.updateQuote(ctx); err != nil {
+				s.logger.WithError(err).Errorf("unable to place maker orders")
+			}
 
 		}
 	}
@@ -1379,11 +1417,11 @@ func (s *Strategy) accountUpdater(ctx context.Context) {
 
 		case <-ticker.C:
 			if _, err := s.sourceSession.UpdateAccount(ctx); err != nil {
-				log.WithError(err).Errorf("unable to update account")
+				s.logger.WithError(err).Errorf("unable to update account")
 			}
 
 			if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
-				log.WithError(err).Errorf("unable to update account value with prices")
+				s.logger.WithError(err).Errorf("unable to update account value with prices")
 				return
 			}
 
@@ -1405,7 +1443,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 
-		case <-ticker.C:
+		case tt := <-ticker.C:
 			// For positive position and positive covered position:
 			// uncover position = +5 - +3 (covered position) = 2
 			//
@@ -1420,11 +1458,17 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 
 			position := s.Position.GetBase()
 
+			if position.IsZero() || s.Position.IsDust() {
+				s.resetPositionStartTime()
+			} else {
+				s.setPositionStartTime(tt)
+			}
+
 			coveredPosition := s.CoveredPosition.Get()
 			uncoverPosition := position.Sub(coveredPosition)
 			absPos := uncoverPosition.Abs()
 			if !s.DisableHedge && absPos.Compare(s.sourceMarket.MinQuantity) > 0 {
-				log.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
+				s.logger.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
 					s.Symbol,
 					position,
 					coveredPosition,
