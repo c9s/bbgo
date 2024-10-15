@@ -33,7 +33,6 @@ var (
 	// this includes QueryMarkets, QueryTicker, QueryAccountBalances, GetFeeRates
 	sharedRateLimiter          = rate.NewLimiter(rate.Every(time.Second/5), 5)
 	queryOrderTradeRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
-	orderRateLimiter           = rate.NewLimiter(rate.Every(time.Second/10), 10)
 	closedOrderQueryLimiter    = rate.NewLimiter(rate.Every(time.Second), 1)
 
 	log = logrus.WithFields(logrus.Fields{
@@ -361,10 +360,6 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 		req.Symbol(order.Market.Symbol)
 
-		if err := orderRateLimiter.Wait(ctx); err != nil {
-			errs = multierr.Append(errs, fmt.Errorf("cancel order rate limiter wait, order id: %s, error: %w", order.ClientOrderID, err))
-			continue
-		}
 		res, err := req.Do(ctx)
 		if err != nil {
 			errs = multierr.Append(errs, fmt.Errorf("failed to cancel order id: %s, err: %w", order.ClientOrderID, err))
