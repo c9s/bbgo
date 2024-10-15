@@ -33,9 +33,7 @@ var (
 	// sharedRateLimiter indicates that the API belongs to the public API.
 	// The default order limiter apply 5 requests per second and a 5 initial bucket
 	// this includes QueryMarkets, QueryTicker, QueryAccountBalances, GetFeeRates
-	sharedRateLimiter          = rate.NewLimiter(rate.Every(time.Second/5), 5)
-	queryOrderTradeRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
-	closedOrderQueryLimiter    = rate.NewLimiter(rate.Every(time.Second), 1)
+	sharedRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
 
 	log = logrus.WithFields(logrus.Fields{
 		"exchange": "bybit",
@@ -164,18 +162,24 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	return tickers, nil
 }
 
+// QueryOpenOrders queries open orders by symbol.
+//
+// Primarily query unfilled or partially filled orders in real-time, but also supports querying recent 500 closed status
+// (Cancelled, Filled) orders. Please see the usage of request param openOnly.
+// UTA2.0 can query filled, canceled, and rejected orders to the most recent 500 orders for spot, linear, inverse and
+// option categories
+//
+// The records are sorted by the createdTime from newest to oldest.
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	cursor := ""
+	// OpenOnlyOrder: UTA2.0, UTA1.0, classic account query open status orders (e.g., New, PartiallyFilled) only
+	req := e.client.NewGetOpenOrderRequest().Symbol(symbol).OpenOnly(bybitapi.OpenOnlyOrder).Limit(defaultQueryLimit)
 	for {
-		req := e.client.NewGetOpenOrderRequest().Symbol(symbol)
 		if len(cursor) != 0 {
 			// the default limit is 20.
 			req = req.Cursor(cursor)
 		}
 
-		if err = queryOrderTradeRateLimiter.Wait(ctx); err != nil {
-			return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
-		}
 		res, err := req.Do(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query open orders, err: %w", err)

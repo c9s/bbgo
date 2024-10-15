@@ -78,7 +78,7 @@ type Order struct {
 	PlaceType          string           `json:"placeType"`
 }
 
-//go:generate GetRequest -url "/v5/order/realtime" -type GetOpenOrdersRequest -responseDataType .OrdersResponse
+//go:generate GetRequest -url "/v5/order/realtime" -type GetOpenOrdersRequest -responseDataType .OrdersResponse -rateLimiter 1+45/1s
 type GetOpenOrdersRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
