@@ -136,6 +136,8 @@ type Strategy struct {
 	DepthQuantity    fixedpoint.Value `json:"depthQuantity"`
 	SourceDepthLevel types.Depth      `json:"sourceDepthLevel"`
 
+	// EnableDelayHedge enables the delay hedge feature
+	EnableDelayHedge bool `json:"enableDelayHedge"`
 	// MaxHedgeDelayDuration is the maximum delay duration to hedge the position
 	MaxDelayHedgeDuration     types.Duration `json:"maxHedgeDelayDuration"`
 	DelayHedgeSignalThreshold float64        `json:"delayHedgeSignalThreshold"`
@@ -217,7 +219,7 @@ type Strategy struct {
 
 	accountValueCalculator *bbgo.AccountValueCalculator
 
-	lastPrice fixedpoint.Value
+	lastPrice fixedpoint.MutexValue
 	groupID   uint32
 
 	stopC chan struct{}
@@ -635,9 +637,9 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	// use mid-price for the last price
-	s.lastPrice = bestBid.Price.Add(bestAsk.Price).Div(two)
-
-	s.priceSolver.Update(s.Symbol, s.lastPrice)
+	midPrice := bestBid.Price.Add(bestAsk.Price).Div(two)
+	s.lastPrice.Set(midPrice)
+	s.priceSolver.Update(s.Symbol, midPrice)
 
 	bookLastUpdateTime := s.sourceBook.LastUpdateTime()
 
@@ -679,7 +681,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	makerQuota := &bbgo.QuotaTransaction{}
 	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
-		if s.makerMarket.IsDustQuantity(b.Available, s.lastPrice) {
+		if s.makerMarket.IsDustQuantity(b.Available, s.lastPrice.Get()) {
 			disableMakerAsk = true
 			s.logger.Infof("%s maker ask disabled: insufficient base balance %s", s.Symbol, b.String())
 		} else {
@@ -1176,7 +1178,18 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 		side = types.SideTypeSell
 	}
 
-	lastPrice := s.lastPrice
+	signal := s.lastAggregatedSignal.Get()
+
+	// if the signal is strong enough, we can delay the hedge and wait for the next tick
+	if math.Abs(signal) > s.DelayHedgeSignalThreshold {
+		if period, ok := s.getPositionHoldingPeriod(time.Now()); ok {
+			if period < s.MaxDelayHedgeDuration.Duration() {
+				return
+			}
+		}
+	}
+
+	lastPrice := s.lastPrice.Get()
 	sourceBook := s.sourceBook.CopyDepth(1)
 	switch side {
 
@@ -1300,6 +1313,14 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 func (s *Strategy) Defaults() error {
 	if s.BollBandInterval == "" {
 		s.BollBandInterval = types.Interval1m
+	}
+
+	if s.MaxDelayHedgeDuration == 0 {
+		s.MaxDelayHedgeDuration = types.Duration(10 * time.Second)
+	}
+
+	if s.DelayHedgeSignalThreshold == 0.0 {
+		s.DelayHedgeSignalThreshold = 0.5
 	}
 
 	if s.SourceDepthLevel == "" {
@@ -1467,6 +1488,10 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 			coveredPosition := s.CoveredPosition.Get()
 			uncoverPosition := position.Sub(coveredPosition)
 			absPos := uncoverPosition.Abs()
+
+			if s.sourceMarket.IsDustQuantity(absPos, s.lastPrice.Get()) {
+				continue
+			}
 
 			if !s.DisableHedge {
 				continue
