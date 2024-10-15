@@ -196,9 +196,9 @@ type Strategy struct {
 	CircuitBreaker *circuitbreaker.BasicCircuitBreaker `json:"circuitBreaker"`
 
 	// persistence fields
-	Position        *types.Position  `json:"position,omitempty" persistence:"position"`
-	ProfitStats     *ProfitStats     `json:"profitStats,omitempty" persistence:"profit_stats"`
-	CoveredPosition fixedpoint.Value `json:"coveredPosition,omitempty" persistence:"covered_position"`
+	Position        *types.Position       `json:"position,omitempty" persistence:"position"`
+	ProfitStats     *ProfitStats          `json:"profitStats,omitempty" persistence:"profit_stats"`
+	CoveredPosition fixedpoint.MutexValue `json:"coveredPosition,omitempty" persistence:"covered_position"`
 
 	sourceBook, makerBook *types.StreamOrderBook
 	activeMakerOrders     *bbgo.ActiveOrderBook
@@ -1221,9 +1221,9 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	// if it's selling, then we should add a positive position
 	if side == types.SideTypeSell {
-		s.CoveredPosition = s.CoveredPosition.Add(quantity)
+		s.CoveredPosition.Add(quantity)
 	} else {
-		s.CoveredPosition = s.CoveredPosition.Add(quantity.Neg())
+		s.CoveredPosition.Add(quantity.Neg())
 	}
 }
 
@@ -1420,13 +1420,14 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 
 			position := s.Position.GetBase()
 
-			uncoverPosition := position.Sub(s.CoveredPosition)
+			coveredPosition := s.CoveredPosition.Get()
+			uncoverPosition := position.Sub(coveredPosition)
 			absPos := uncoverPosition.Abs()
 			if !s.DisableHedge && absPos.Compare(s.sourceMarket.MinQuantity) > 0 {
 				log.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
 					s.Symbol,
 					position,
-					s.CoveredPosition,
+					coveredPosition,
 					uncoverPosition,
 				)
 
@@ -1526,12 +1527,6 @@ func (s *Strategy) CrossRun(
 		s.ProfitStats = &ProfitStats{
 			ProfitStats:   types.NewProfitStats(s.makerMarket),
 			MakerExchange: s.makerSession.ExchangeName,
-		}
-	}
-
-	if s.CoveredPosition.IsZero() {
-		if s.state != nil && !s.CoveredPosition.IsZero() {
-			s.CoveredPosition = s.state.CoveredPosition
 		}
 	}
 
@@ -1663,7 +1658,7 @@ func (s *Strategy) CrossRun(
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		c := trade.PositionChange()
 		if trade.Exchange == s.sourceSession.ExchangeName {
-			s.CoveredPosition = s.CoveredPosition.Add(c)
+			s.CoveredPosition.Add(c)
 		}
 
 		s.ProfitStats.AddTrade(trade)
