@@ -1467,17 +1467,20 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 			coveredPosition := s.CoveredPosition.Get()
 			uncoverPosition := position.Sub(coveredPosition)
 			absPos := uncoverPosition.Abs()
-			if !s.DisableHedge && absPos.Compare(s.sourceMarket.MinQuantity) > 0 {
-				s.logger.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
-					s.Symbol,
-					position,
-					coveredPosition,
-					uncoverPosition,
-				)
 
-				s.Hedge(ctx, uncoverPosition.Neg())
-				profitChanged = true
+			if !s.DisableHedge {
+				continue
 			}
+
+			s.logger.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
+				s.Symbol,
+				position,
+				coveredPosition,
+				uncoverPosition,
+			)
+
+			s.Hedge(ctx, uncoverPosition.Neg())
+			profitChanged = true
 
 		case <-reportTicker.C:
 			if profitChanged {
