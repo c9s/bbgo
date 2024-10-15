@@ -76,9 +76,9 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 		return nil, fmt.Errorf("unexpected order id: %s, err: %w", order.OrderId, err)
 	}
 
-	qty, err := processMarketBuyQuantity(order)
-	if err != nil {
-		return nil, err
+	price := order.Price
+	if orderType == types.OrderTypeMarket {
+		price = order.AvgPrice
 	}
 
 	return &types.Order{
@@ -87,9 +87,11 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 			Symbol:        order.Symbol,
 			Side:          side,
 			Type:          orderType,
-			Quantity:      qty,
-			Price:         order.Price,
-			TimeInForce:   timeInForce,
+			// We specified the quantity for the market buy order as the base coin when we submitted the order,
+			// so we can just use the Qty field.
+			Quantity:    order.Qty,
+			Price:       price,
+			TimeInForce: timeInForce,
 		},
 		Exchange:         types.ExchangeBybit,
 		OrderID:          orderIdNum,
