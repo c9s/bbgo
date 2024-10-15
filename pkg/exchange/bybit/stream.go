@@ -438,14 +438,6 @@ func (s *Stream) handleKLineEvent(klineEvent KLineEvent) {
 	}
 }
 
-func pollAndGetFeeRate(ctx context.Context, symbol string, poller FeeRatePoller, marketsInfo types.MarketMap) (SymbolFeeDetail, error) {
-	err := poller.PollFeeRate(ctx)
-	if err != nil {
-		return SymbolFeeDetail{}, err
-	}
-	return getFeeRate(symbol, poller, marketsInfo), nil
-}
-
 func getFeeRate(symbol string, poller FeeRatePoller, marketsInfo types.MarketMap) SymbolFeeDetail {
 	feeRate, found := poller.GetFeeRate(symbol)
 	if !found {
