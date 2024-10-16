@@ -202,9 +202,10 @@ type Strategy struct {
 	CircuitBreaker *circuitbreaker.BasicCircuitBreaker `json:"circuitBreaker"`
 
 	// persistence fields
-	Position        *types.Position       `json:"position,omitempty" persistence:"position"`
-	ProfitStats     *ProfitStats          `json:"profitStats,omitempty" persistence:"profit_stats"`
-	CoveredPosition fixedpoint.MutexValue `json:"coveredPosition,omitempty" persistence:"covered_position"`
+	Position    *types.Position `json:"position,omitempty" persistence:"position"`
+	ProfitStats *ProfitStats    `json:"profitStats,omitempty" persistence:"profit_stats"`
+
+	coveredPosition fixedpoint.MutexValue
 
 	sourceBook, makerBook *types.StreamOrderBook
 	activeMakerOrders     *bbgo.ActiveOrderBook
@@ -1284,9 +1285,9 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	// if it's selling, then we should add a positive position
 	if side == types.SideTypeSell {
-		s.CoveredPosition.Add(quantity)
+		s.coveredPosition.Add(quantity)
 	} else {
-		s.CoveredPosition.Add(quantity.Neg())
+		s.coveredPosition.Add(quantity.Neg())
 	}
 }
 
@@ -1499,7 +1500,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				s.setPositionStartTime(tt)
 			}
 
-			coveredPosition := s.CoveredPosition.Get()
+			coveredPosition := s.coveredPosition.Get()
 			uncoverPosition := position.Sub(coveredPosition)
 			absPos := uncoverPosition.Abs()
 
@@ -1744,7 +1745,7 @@ func (s *Strategy) CrossRun(
 	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 		c := trade.PositionChange()
 		if trade.Exchange == s.sourceSession.ExchangeName {
-			s.CoveredPosition.Add(c)
+			s.coveredPosition.Add(c)
 		}
 
 		s.ProfitStats.AddTrade(trade)
