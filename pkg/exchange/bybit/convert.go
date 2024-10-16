@@ -76,9 +76,9 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 		return nil, fmt.Errorf("unexpected order id: %s, err: %w", order.OrderId, err)
 	}
 
-	qty, err := processMarketBuyQuantity(order)
-	if err != nil {
-		return nil, err
+	price := order.Price
+	if orderType == types.OrderTypeMarket {
+		price = order.AvgPrice
 	}
 
 	return &types.Order{
@@ -87,9 +87,11 @@ func toGlobalOrder(order bybitapi.Order) (*types.Order, error) {
 			Symbol:        order.Symbol,
 			Side:          side,
 			Type:          orderType,
-			Quantity:      qty,
-			Price:         order.Price,
-			TimeInForce:   timeInForce,
+			// We specified the quantity for the market buy order as the base coin when we submitted the order,
+			// so we can just use the Qty field.
+			Quantity:    order.Qty,
+			Price:       price,
+			TimeInForce: timeInForce,
 		},
 		Exchange:         types.ExchangeBybit,
 		OrderID:          orderIdNum,
@@ -325,7 +327,7 @@ func v3ToGlobalTrade(trade v3.Trade) (*types.Trade, error) {
 	}, nil
 }
 
-func toGlobalTrade(trade bybitapi.Trade, feeDetail SymbolFeeDetail) (*types.Trade, error) {
+func toGlobalTrade(trade bybitapi.Trade) (*types.Trade, error) {
 	side, err := toGlobalSideType(trade.Side)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected side: %s, err: %w", trade.Side, err)
@@ -338,8 +340,6 @@ func toGlobalTrade(trade bybitapi.Trade, feeDetail SymbolFeeDetail) (*types.Trad
 	if err != nil {
 		return nil, fmt.Errorf("unexpected trade id: %s, err: %w", trade.ExecId, err)
 	}
-
-	fc, _ := calculateFee(trade, feeDetail)
 
 	return &types.Trade{
 		ID:            tradeIdNum,
@@ -354,7 +354,7 @@ func toGlobalTrade(trade bybitapi.Trade, feeDetail SymbolFeeDetail) (*types.Trad
 		IsMaker:       trade.IsMaker,
 		Time:          types.Time(trade.ExecTime),
 		Fee:           trade.ExecFee,
-		FeeCurrency:   fc,
+		FeeCurrency:   trade.FeeCurrency,
 		IsMargin:      false,
 		IsFutures:     false,
 		IsIsolated:    false,
@@ -364,14 +364,14 @@ func toGlobalTrade(trade bybitapi.Trade, feeDetail SymbolFeeDetail) (*types.Trad
 func toGlobalBalanceMap(events []bybitapi.WalletBalances) types.BalanceMap {
 	bm := types.BalanceMap{}
 	for _, event := range events {
-		if event.AccountType != bybitapi.AccountTypeSpot {
+		if event.AccountType != bybitapi.AccountTypeUnified {
 			continue
 		}
 
 		for _, obj := range event.Coins {
 			bm[obj.Coin] = types.Balance{
 				Currency:  obj.Coin,
-				Available: obj.Free,
+				Available: obj.WalletBalance.Sub(obj.Locked),
 				Locked:    obj.Locked,
 			}
 		}

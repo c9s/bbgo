@@ -80,6 +80,26 @@ func TestClient(t *testing.T) {
 		}
 	})
 
+	t.Run("GetTrade", func(t *testing.T) {
+		cursor := ""
+		for {
+			req := client.NewGetExecutionListRequest().Limit(50)
+			if len(cursor) != 0 {
+				req = req.Cursor(cursor)
+			}
+			trades, err := req.Do(ctx)
+			assert.NoError(t, err)
+
+			for _, o := range trades.List {
+				t.Logf("openOrders: %+v", o)
+			}
+			if len(trades.NextPageCursor) == 0 {
+				break
+			}
+			cursor = trades.NextPageCursor
+		}
+	})
+
 	t.Run("PlaceOrderRequest", func(t *testing.T) {
 		req := client.NewPlaceOrderRequest().
 			Symbol("DOTUSDT").
