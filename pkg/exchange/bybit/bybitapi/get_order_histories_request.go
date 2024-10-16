@@ -9,7 +9,7 @@ import (
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Result
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Result
 
-//go:generate GetRequest -url "/v5/order/history" -type GetOrderHistoriesRequest -responseDataType .OrdersResponse
+//go:generate GetRequest -url "/v5/order/history" -type GetOrderHistoriesRequest -responseDataType .OrdersResponse -rateLimiter 5+45/1s
 type GetOrderHistoriesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 

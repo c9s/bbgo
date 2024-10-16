@@ -24,12 +24,14 @@ type Trade struct {
 	Side      Side      `json:"side"`
 	OrderType OrderType `json:"orderType"`
 	// ExecFee is supported on restful API v5, but not on websocket API.
-	ExecFee   fixedpoint.Value           `json:"execFee"`
-	ExecId    string                     `json:"execId"`
-	ExecPrice fixedpoint.Value           `json:"execPrice"`
-	ExecQty   fixedpoint.Value           `json:"execQty"`
-	ExecTime  types.MillisecondTimestamp `json:"execTime"`
-	IsMaker   bool                       `json:"isMaker"`
+	ExecFee     fixedpoint.Value           `json:"execFee"`
+	ExecId      string                     `json:"execId"`
+	ExecPrice   fixedpoint.Value           `json:"execPrice"`
+	ExecQty     fixedpoint.Value           `json:"execQty"`
+	ExecTime    types.MillisecondTimestamp `json:"execTime"`
+	IsMaker     bool                       `json:"isMaker"`
+	FeeRate     fixedpoint.Value           `json:"feeRate"`
+	FeeCurrency string                     `json:"feeCurrency"`
 }
 
 //go:generate GetRequest -url "/v5/execution/list" -type GetExecutionListRequest -responseDataType .TradesResponse -rateLimiter 5+15/1s
@@ -38,8 +40,9 @@ type GetExecutionListRequest struct {
 
 	category Category `param:"category,query" validValues:"spot"`
 
-	symbol  *string `param:"symbol,query"`
-	orderId *string `param:"orderId,query"`
+	symbol      *string `param:"symbol,query"`
+	orderId     *string `param:"orderId,query"`
+	orderLinkId *string `param:"orderLinkId,query"`
 
 	// startTime the start timestamp (ms)
 	// startTime and endTime are not passed, return 7 days by default;

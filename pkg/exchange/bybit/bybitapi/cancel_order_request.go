@@ -12,7 +12,7 @@ type CancelOrderResponse struct {
 	OrderLinkId string `json:"orderLinkId"`
 }
 
-//go:generate PostRequest -url "/v5/order/cancel" -type CancelOrderRequest -responseDataType .CancelOrderResponse
+//go:generate PostRequest -url "/v5/order/cancel" -type CancelOrderRequest -responseDataType .CancelOrderResponse -rateLimiter 5+15/1s
 type CancelOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 

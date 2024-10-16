@@ -23,6 +23,8 @@ const (
 	defaultKLineLimit      = 1000
 
 	queryTradeDurationLimit = 7 * 24 * time.Hour
+
+	maxHistoricalDataQueryPeriod = 2 * 365 * 24 * time.Hour
 )
 
 // https://bybit-exchange.github.io/docs/zh-TW/v5/rate-limit
@@ -31,10 +33,7 @@ var (
 	// sharedRateLimiter indicates that the API belongs to the public API.
 	// The default order limiter apply 5 requests per second and a 5 initial bucket
 	// this includes QueryMarkets, QueryTicker, QueryAccountBalances, GetFeeRates
-	sharedRateLimiter          = rate.NewLimiter(rate.Every(time.Second/5), 5)
-	queryOrderTradeRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
-	orderRateLimiter           = rate.NewLimiter(rate.Every(time.Second/10), 10)
-	closedOrderQueryLimiter    = rate.NewLimiter(rate.Every(time.Second), 1)
+	sharedRateLimiter = rate.NewLimiter(rate.Every(time.Second/5), 5)
 
 	log = logrus.WithFields(logrus.Fields{
 		"exchange": "bybit",
@@ -163,18 +162,24 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 	return tickers, nil
 }
 
+// QueryOpenOrders queries open orders by symbol.
+//
+// Primarily query unfilled or partially filled orders in real-time, but also supports querying recent 500 closed status
+// (Cancelled, Filled) orders. Please see the usage of request param openOnly.
+// UTA2.0 can query filled, canceled, and rejected orders to the most recent 500 orders for spot, linear, inverse and
+// option categories
+//
+// The records are sorted by the createdTime from newest to oldest.
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
 	cursor := ""
+	// OpenOnlyOrder: UTA2.0, UTA1.0, classic account query open status orders (e.g., New, PartiallyFilled) only
+	req := e.client.NewGetOpenOrderRequest().Symbol(symbol).OpenOnly(bybitapi.OpenOnlyOrder).Limit(defaultQueryLimit)
 	for {
-		req := e.client.NewGetOpenOrderRequest().Symbol(symbol)
 		if len(cursor) != 0 {
 			// the default limit is 20.
 			req = req.Cursor(cursor)
 		}
 
-		if err = queryOrderTradeRateLimiter.Wait(ctx); err != nil {
-			return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
-		}
 		res, err := req.Do(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query open orders, err: %w", err)
@@ -231,15 +236,17 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	return toGlobalOrder(res.List[0])
 }
 
+// QueryOrderTrades You can query by symbol, baseCoin, orderId and orderLinkId, and if you pass multiple params,
+// the system will process them according to this priority: orderId > orderLinkId > symbol > baseCoin.
 func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (trades []types.Trade, err error) {
+	req := e.client.NewGetExecutionListRequest()
 	if len(q.ClientOrderID) != 0 {
-		log.Warn("!!!BYBIT EXCHANGE API NOTICE!!! Bybit does not support searching for trades using OrderClientId.")
+		req.OrderLinkId(q.ClientOrderID)
 	}
 
-	if len(q.OrderID) == 0 {
-		return nil, errors.New("orderID is required parameter")
+	if len(q.OrderID) != 0 {
+		req.OrderLinkId(q.OrderID)
 	}
-	req := e.client.NewGetExecutionListRequest().OrderId(q.OrderID)
 
 	if len(q.Symbol) != 0 {
 		req.Symbol(q.Symbol)
@@ -270,23 +277,18 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		return nil, err
 	}
 	req.Side(side)
+	req.Qty(order.Market.FormatQuantity(order.Quantity))
 
-	// set quantity
-	orderQty := order.Quantity
-	// if the order is market buy, the quantity is quote coin, instead of base coin. so we need to convert it.
-	if order.Type == types.OrderTypeMarket && order.Side == types.SideTypeBuy {
-		ticker, err := e.QueryTicker(ctx, order.Market.Symbol)
-		if err != nil {
-			return nil, err
-		}
-		orderQty = order.Quantity.Mul(ticker.Buy)
-	}
-	req.Qty(order.Market.FormatQuantity(orderQty))
-
-	// set price
 	switch order.Type {
-	case types.OrderTypeLimit:
+	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		req.Price(order.Market.FormatPrice(order.Price))
+	case types.OrderTypeMarket:
+		// Because our order.Quantity unit is base coin, so we indicate the target currency to Base.
+		if order.Side == types.SideTypeBuy {
+			req.MarketUnit(bybitapi.MarketUnitBase)
+		} else {
+			req.MarketUnit(bybitapi.MarketUnitQuote)
+		}
 	}
 
 	// set timeInForce
@@ -307,9 +309,6 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		req.OrderLinkId(order.ClientOrderID)
 	}
 
-	if err := orderRateLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("place order rate limiter wait error: %w", err)
-	}
 	timeNow := time.Now()
 	res, err := req.Do(ctx)
 	if err != nil {
@@ -367,10 +366,6 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 
 		req.Symbol(order.Market.Symbol)
 
-		if err := orderRateLimiter.Wait(ctx); err != nil {
-			errs = multierr.Append(errs, fmt.Errorf("cancel order rate limiter wait, order id: %s, error: %w", order.ClientOrderID, err))
-			continue
-		}
 		res, err := req.Do(ctx)
 		if err != nil {
 			errs = multierr.Append(errs, fmt.Errorf("failed to cancel order id: %s, err: %w", order.ClientOrderID, err))
@@ -387,38 +382,68 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	return errs
 }
 
+// QueryClosedOrders queries closed orders by symbol, since, until, and lastOrderID.
+// startTime and endTime are not passed, return 7 days by default
+// Only startTime is passed, return range between startTime and startTime+7 days
+// Only endTime is passed, return range between endTime-7 days and endTime
+// If both are passed, the rule is endTime - startTime <= 7 days
+//
+// ** since and until are inclusive. **
+// ** sort by creation time in descending order. **
 func (e *Exchange) QueryClosedOrders(
-	ctx context.Context, symbol string, since, util time.Time, lastOrderID uint64,
+	ctx context.Context, symbol string, since, until time.Time, _ uint64,
 ) (orders []types.Order, err error) {
-	if !since.IsZero() || !util.IsZero() {
-		log.Warn("!!!BYBIT EXCHANGE API NOTICE!!! the since/until conditions will not be effected on SPOT account, bybit exchange does not support time-range-based query currently")
+
+	now := time.Now()
+
+	if time.Since(since) > maxHistoricalDataQueryPeriod {
+		newSince := now.Add(-maxHistoricalDataQueryPeriod)
+		log.Warnf("!!!BYBIT EXCHANGE API NOTICE!!! The closed order API cannot query data beyond 2 years from the current date, update %s -> %s", since, newSince)
+		since = newSince
+	}
+	if until.Before(since) {
+		newUntil := since.Add(queryTradeDurationLimit)
+		log.Warnf("!!!BYBIT EXCHANGE API NOTICE!!! The 'until' comes before 'since', add 7 days to until (%s -> %s).", until, newUntil)
+		until = newUntil
 	}
 
-	if err := closedOrderQueryLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
+	// if the time range exceeds the server boundary, get the last 7 days of data
+	if until.Sub(since) > queryTradeDurationLimit {
+		newStartTime := until.Add(-queryTradeDurationLimit)
+
+		log.Warnf("!!!BYBIT EXCHANGE API NOTICE!!! The time range exceeds the server boundary: %s, start time: %s, end time: %s, updated start time %s -> %s", queryTradeDurationLimit, since.String(), until.String(), since.String(), newStartTime.String())
+		since = newStartTime
 	}
-	res, err := e.client.NewGetOrderHistoriesRequest().
+	req := e.client.NewGetOrderHistoriesRequest().
 		Symbol(symbol).
-		Cursor(strconv.FormatUint(lastOrderID, 10)).
 		Limit(defaultQueryLimit).
-		Do(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
-	}
+		StartTime(since).
+		EndTime(until)
 
-	for _, order := range res.List {
-		o, err2 := toGlobalOrder(order)
-		if err2 != nil {
-			err = multierr.Append(err, err2)
-			continue
+	cursor := ""
+	for {
+		if len(cursor) != 0 {
+			req = req.Cursor(cursor)
 		}
 
-		if o.Status.Closed() {
-			orders = append(orders, *o)
+		res, err := req.Do(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to call get order histories error: %w", err)
 		}
-	}
-	if err != nil {
-		return nil, err
+
+		for _, order := range res.List {
+			order, err := toGlobalOrder(order)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert order, err: %v", err)
+			}
+
+			orders = append(orders, *order)
+		}
+
+		if len(res.NextPageCursor) == 0 {
+			break
+		}
+		cursor = res.NextPageCursor
 	}
 
 	return types.SortOrdersAscending(orders), nil
@@ -437,11 +462,7 @@ func (e *Exchange) queryTrades(ctx context.Context, req *bybitapi.GetExecutionLi
 		}
 
 		for _, trade := range res.List {
-			feeRate, err := pollAndGetFeeRate(ctx, trade.Symbol, e.FeeRatePoller, e.marketsInfo)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get fee rate, err: %v", err)
-			}
-			trade, err := toGlobalTrade(trade, feeRate)
+			trade, err := toGlobalTrade(trade)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert trade, err: %v", err)
 			}

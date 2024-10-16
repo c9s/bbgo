@@ -107,6 +107,7 @@ const (
 	TopicTypeWallet      TopicType = "wallet"
 	TopicTypeOrder       TopicType = "order"
 	TopicTypeKLine       TopicType = "kline"
+	TopicTypeFastTrade   TopicType = "execution.fast"
 	TopicTypeTrade       TopicType = "execution"
 )
 
@@ -385,6 +386,11 @@ func (t *TradeEvent) toGlobalTrade(symbolFee SymbolFeeDetail) (*types.Trade, err
 //     IsMakerOrder = FALSE
 //     -> Side = Buy -> base currency (BTC)
 //     -> Side = Sell -> quote currency (USDT)
+//
+// The `execution.fast` topic doesn't support fee currency and execution fees, so we're calculating the transaction fees here.
+// Although the `execution` topic is supported, it only covers the execution fee, so you'll still need to calculate the
+// fee currency.
+// Overall, I chose the one with lower latency (execution.fast) and calculated the fee myself.
 func calculateFee(t bybitapi.Trade, feeDetail SymbolFeeDetail) (string, fixedpoint.Value) {
 	if feeDetail.MakerFeeRate.Sign() > 0 || !t.IsMaker {
 		if t.Side == bybitapi.SideBuy {
