@@ -1516,7 +1516,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				continue
 			}
 
-			if !s.DisableHedge {
+			if s.DisableHedge {
 				continue
 			}
 
