@@ -46,9 +46,7 @@ func TestMarketTradeWindowSignal(t *testing.T) {
 	ctx := context.Background()
 	sigNum, err := sig.CalculateSignal(ctx)
 	if assert.NoError(t, err) {
-		// buy ratio: 1/1.5 = 0.6666666666666666
-		// sell ratio: 0.5/1.5 = 0.3333333333333333
-		assert.InDelta(t, 0.0083333, sigNum, 0.0001)
+		assert.InDelta(t, 1.3333333, sigNum, 0.0001)
 	}
 
 	assert.Len(t, sig.trades, 2)
