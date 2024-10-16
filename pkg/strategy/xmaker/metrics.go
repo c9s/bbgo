@@ -2,6 +2,12 @@ package xmaker
 
 import "github.com/prometheus/client_golang/prometheus"
 
+var delayHedgeCounterMetrics = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "xmaker_delay_hedge_counter",
+		Help: "delay hedge counter",
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+
 var cancelOrderDurationMetrics = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Name:    "xmaker_cancel_order_duration_milliseconds",
@@ -97,5 +103,6 @@ func init() {
 		configMaxExposureMetrics,
 		configBidMarginMetrics,
 		configAskMarginMetrics,
+		delayHedgeCounterMetrics,
 	)
 }
