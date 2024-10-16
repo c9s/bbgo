@@ -5,7 +5,6 @@ import (
 )
 
 const MaxNumOfRMA = 1000
-const MaxNumOfRMATruncateSize = 500
 
 type RMAStream struct {
 	// embedded structs
@@ -51,9 +50,7 @@ func (s *RMAStream) Calculate(x float64) float64 {
 }
 
 func (s *RMAStream) Truncate() {
-	if len(s.Slice) > MaxNumOfRMA {
-		s.Slice = s.Slice[MaxNumOfRMATruncateSize-1:]
-	}
+	s.Slice = generalTruncate(s.Slice)
 }
 
 func checkWindow(window int) {
