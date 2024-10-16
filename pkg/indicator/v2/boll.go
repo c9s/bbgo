@@ -55,3 +55,7 @@ func (s *BOLLStream) Calculate(v float64) float64 {
 	band := stdDev * s.k
 	return band
 }
+
+func (s *BOLLStream) Truncate() {
+	s.Slice = generalTruncate(s.Slice)
+}

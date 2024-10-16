@@ -26,3 +26,7 @@ func (s *StdDevStream) Calculate(x float64) float64 {
 	var std = s.rawValues.Stdev()
 	return std
 }
+
+func (s *StdDevStream) Truncate() {
+	s.Slice = generalTruncate(s.Slice)
+}
