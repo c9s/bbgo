@@ -171,7 +171,7 @@ type Strategy struct {
 
 	NotifyTrade bool `json:"notifyTrade"`
 
-	EnableArbitrage bool `json:"arbitrage"`
+	EnableArbitrage bool `json:"enableArbitrage"`
 
 	// RecoverTrade tries to find the missing trades via the REStful API
 	RecoverTrade bool `json:"recoverTrade"`
