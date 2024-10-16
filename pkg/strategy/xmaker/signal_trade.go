@@ -53,8 +53,7 @@ func (s *TradeVolumeWindowSignal) Bind(ctx context.Context, session *bbgo.Exchan
 	return nil
 }
 
-func (s *TradeVolumeWindowSignal) filterTrades(now time.Time) []types.Trade {
-	startTime := now.Add(-time.Duration(s.Window))
+func (s *TradeVolumeWindowSignal) filterTrades(startTime time.Time) []types.Trade {
 	startIdx := 0
 
 	s.mu.Lock()
@@ -89,7 +88,7 @@ func (s *TradeVolumeWindowSignal) aggTradeVolume(trades []types.Trade) (buyVolum
 
 func (s *TradeVolumeWindowSignal) CalculateSignal(_ context.Context) (float64, error) {
 	now := time.Now()
-	trades := s.filterTrades(now)
+	trades := s.filterTrades(now.Add(-time.Duration(s.Window)))
 	buyVolume, sellVolume := s.aggTradeVolume(trades)
 	totalVolume := buyVolume + sellVolume
 
@@ -99,9 +98,9 @@ func (s *TradeVolumeWindowSignal) CalculateSignal(_ context.Context) (float64, e
 
 	sig := 0.0
 	if buyRatio > threshold {
-		sig = (buyRatio - threshold) / 2.0
+		sig = buyRatio * 2.0
 	} else if sellRatio > threshold {
-		sig = -(sellRatio - threshold) / 2.0
+		sig = -sellRatio * 2.0
 	}
 
 	log.Infof("[TradeVolumeWindowSignal] %f buy/sell = %f/%f", sig, buyVolume, sellVolume)
