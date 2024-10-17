@@ -4,16 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/c9s/bbgo/pkg/optimizer"
 	"github.com/fatih/color"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 func init() {
@@ -69,7 +69,7 @@ var hoptimizeCmd = &cobra.Command{
 			return err
 		}
 
-		yamlBody, err := ioutil.ReadFile(configFile)
+		yamlBody, err := os.ReadFile(configFile)
 		if err != nil {
 			return err
 		}

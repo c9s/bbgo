@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -308,7 +307,7 @@ func runWrapperBinary(ctx context.Context, cmd *cobra.Command, userConfig *bbgo.
 
 // buildAndRun builds the package natively and run the binary with the given args
 func buildAndRun(ctx context.Context, userConfig *bbgo.Config, args ...string) (*exec.Cmd, error) {
-	packageDir, err := ioutil.TempDir("build", "bbgow")
+	packageDir, err := os.MkdirTemp("build", "bbgow")
 	if err != nil {
 		return nil, err
 	}

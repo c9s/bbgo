@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"runtime"
 	"strings"
@@ -496,7 +496,7 @@ func loadStash(config []byte) (Stash, error) {
 func LoadBuildConfig(configFile string) (*Config, error) {
 	var config Config
 
-	content, err := ioutil.ReadFile(configFile)
+	content, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}
@@ -526,7 +526,7 @@ func LoadBuildConfig(configFile string) (*Config, error) {
 func Load(configFile string, loadStrategies bool) (*Config, error) {
 	var config Config
 
-	content, err := ioutil.ReadFile(configFile)
+	content, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, err
 	}

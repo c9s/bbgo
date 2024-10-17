@@ -867,7 +867,7 @@ type MarkPriceUpdateEvent struct {
 type ContinuousKLineEvent struct {
 	EventBase
 	Symbol string `json:"ps"`
-	ct     string `json:"ct"`
+	CT     string `json:"ct"`
 	KLine  KLine  `json:"k,omitempty"`
 }
 

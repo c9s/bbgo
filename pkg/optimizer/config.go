@@ -2,7 +2,7 @@ package optimizer
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -57,7 +57,7 @@ var defaultLocalExecutorConfig = &LocalExecutorConfig{
 }
 
 func LoadConfig(yamlConfigFileName string) (*Config, error) {
-	configYaml, err := ioutil.ReadFile(yamlConfigFileName)
+	configYaml, err := os.ReadFile(yamlConfigFileName)
 	if err != nil {
 		return nil, err
 	}

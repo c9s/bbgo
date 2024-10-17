@@ -70,7 +70,7 @@ func (b *ActiveOrderBook) BindStream(stream types.Stream) {
 	stream.OnOrderUpdate(b.orderUpdateHandler)
 }
 
-func (b *ActiveOrderBook) waitClear(
+func (b *ActiveOrderBook) waitOrderClear(
 	ctx context.Context, order types.Order, waitTime, timeout time.Duration,
 ) (bool, error) {
 	if !b.orders.Exists(order.OrderID) {
