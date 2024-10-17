@@ -10,7 +10,7 @@ import (
 type FuturesPositionRisk struct {
 	Symbol                 string           `json:"symbol"`
 	PositionSide           string           `json:"positionSide"`
-	PositionAmt            fixedpoint.Value `json:"positionAmt"`
+	PositionAmount         fixedpoint.Value `json:"positionAmt"`
 	EntryPrice             fixedpoint.Value `json:"entryPrice"`
 	BreakEvenPrice         fixedpoint.Value `json:"breakEvenPrice"`
 	MarkPrice              fixedpoint.Value `json:"markPrice"`
