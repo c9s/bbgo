@@ -2,6 +2,7 @@ package core
 
 import (
 	"sync"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -136,6 +137,24 @@ func (s *OrderStore) BindStream(stream types.Stream) {
 
 		s.HandleOrderUpdate(order)
 	})
+}
+
+func (s *OrderStore) Prune(expiryDuration time.Duration) {
+	cutOffTime := time.Now().Add(-expiryDuration)
+	orders := make(map[uint64]types.Order, len(s.orders))
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for idx, o := range s.orders {
+		if o.UpdateTime.Time().Before(cutOffTime) {
+			continue
+		}
+
+		orders[idx] = o
+	}
+
+	s.orders = orders
 }
 
 func (s *OrderStore) HandleOrderUpdate(order types.Order) {
