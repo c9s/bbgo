@@ -1475,6 +1475,25 @@ func (s *Strategy) accountUpdater(ctx context.Context) {
 	}
 }
 
+func (s *Strategy) houseCleanWorker(ctx context.Context) {
+	expiryDuration := 3 * time.Hour
+	ticker := time.NewTicker(time.Hour)
+
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			s.orderStore.Prune(expiryDuration)
+
+		}
+
+	}
+
+}
+
 func (s *Strategy) hedgeWorker(ctx context.Context) {
 	ticker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
 	defer ticker.Stop()
@@ -1809,6 +1828,7 @@ func (s *Strategy) CrossRun(
 		go s.accountUpdater(ctx)
 		go s.hedgeWorker(ctx)
 		go s.quoteWorker(ctx)
+		go s.houseCleanWorker(ctx)
 
 		if s.RecoverTrade {
 			go s.tradeRecover(ctx)
