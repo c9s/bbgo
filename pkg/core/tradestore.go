@@ -17,16 +17,31 @@ type TradeStore struct {
 	// any created trades for tracking trades
 	sync.Mutex
 
-	EnablePrune bool
-
-	trades        map[uint64]types.Trade
-	lastTradeTime time.Time
+	pruneEnabled        bool
+	storeSize           int
+	trades              map[uint64]types.Trade
+	tradeExpiryDuration time.Duration
+	lastTradeTime       time.Time
 }
 
 func NewTradeStore() *TradeStore {
 	return &TradeStore{
-		trades: make(map[uint64]types.Trade),
+		trades:              make(map[uint64]types.Trade),
+		storeSize:           MaximumTradeStoreSize,
+		tradeExpiryDuration: TradeExpiryTime,
 	}
+}
+
+func (s *TradeStore) SetPruneEnabled(enabled bool) {
+	s.pruneEnabled = enabled
+}
+
+func (s *TradeStore) SetTradeExpiryDuration(d time.Duration) {
+	s.tradeExpiryDuration = d
+}
+
+func (s *TradeStore) SetStoreSize(size int) {
+	s.storeSize = size
 }
 
 func (s *TradeStore) Num() (num int) {
@@ -122,7 +137,7 @@ func (s *TradeStore) Prune(curTime time.Time) {
 	defer s.Unlock()
 
 	var trades = make(map[uint64]types.Trade)
-	var cutOffTime = curTime.Add(-TradeExpiryTime)
+	var cutOffTime = curTime.Add(-s.tradeExpiryDuration)
 
 	log.Infof("pruning expired trades, cutoff time = %s", cutOffTime.String())
 	for _, trade := range s.trades {
@@ -144,7 +159,7 @@ func (s *TradeStore) isCoolTrade(trade types.Trade) bool {
 }
 
 func (s *TradeStore) exceededMaximumTradeStoreSize() bool {
-	return len(s.trades) > MaximumTradeStoreSize
+	return len(s.trades) > s.storeSize
 }
 
 func (s *TradeStore) BindStream(stream types.Stream) {
@@ -152,7 +167,7 @@ func (s *TradeStore) BindStream(stream types.Stream) {
 		s.Add(trade)
 	})
 
-	if s.EnablePrune {
+	if s.pruneEnabled {
 		stream.OnTradeUpdate(func(trade types.Trade) {
 			if s.isCoolTrade(trade) || s.exceededMaximumTradeStoreSize() {
 				s.Prune(time.Time(trade.Time))
