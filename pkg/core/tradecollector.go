@@ -125,7 +125,7 @@ type TradeCollector struct {
 
 func NewTradeCollector(symbol string, position *types.Position, orderStore *OrderStore) *TradeCollector {
 	tradeStore := NewTradeStore()
-	tradeStore.EnablePrune = true
+	tradeStore.pruneEnabled = true
 
 	return &TradeCollector{
 		Symbol:   symbol,
