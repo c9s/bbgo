@@ -147,8 +147,10 @@ func (s *OrderStore) Prune(expiryDuration time.Duration) {
 	defer s.mu.Unlock()
 
 	for idx, o := range s.orders {
-		if o.UpdateTime.Time().Before(cutOffTime) {
-			continue
+		if o.Status == types.OrderStatusCanceled || o.Status == types.OrderStatusFilled {
+			if o.UpdateTime.Time().Before(cutOffTime) {
+				continue
+			}
 		}
 
 		orders[idx] = o
