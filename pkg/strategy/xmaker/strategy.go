@@ -1743,6 +1743,7 @@ func (s *Strategy) CrossRun(
 	s.orderStore.BindStream(s.makerSession.UserDataStream)
 
 	s.tradeCollector = core.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
+	s.tradeCollector.TradeStore().SetPruneEnabled(true)
 
 	if s.NotifyTrade {
 		s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
