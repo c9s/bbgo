@@ -1297,6 +1297,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	} else {
 		s.coveredPosition.Add(quantity.Neg())
 	}
+
+	s.resetPositionStartTime()
 }
 
 func (s *Strategy) tradeRecover(ctx context.Context) {
