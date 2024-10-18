@@ -1297,6 +1297,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	} else {
 		s.coveredPosition.Add(quantity.Neg())
 	}
+
+	s.resetPositionStartTime()
 }
 
 func (s *Strategy) tradeRecover(ctx context.Context) {
@@ -1473,6 +1475,25 @@ func (s *Strategy) accountUpdater(ctx context.Context) {
 			s.logger.Infof("hedge session net value ~= %f USD", netValue.Float64())
 		}
 	}
+}
+
+func (s *Strategy) houseCleanWorker(ctx context.Context) {
+	expiryDuration := 3 * time.Hour
+	ticker := time.NewTicker(time.Hour)
+
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			s.orderStore.Prune(expiryDuration)
+
+		}
+
+	}
+
 }
 
 func (s *Strategy) hedgeWorker(ctx context.Context) {
@@ -1743,6 +1764,7 @@ func (s *Strategy) CrossRun(
 	s.orderStore.BindStream(s.makerSession.UserDataStream)
 
 	s.tradeCollector = core.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
+	s.tradeCollector.TradeStore().SetPruneEnabled(true)
 
 	if s.NotifyTrade {
 		s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
@@ -1808,6 +1830,7 @@ func (s *Strategy) CrossRun(
 		go s.accountUpdater(ctx)
 		go s.hedgeWorker(ctx)
 		go s.quoteWorker(ctx)
+		go s.houseCleanWorker(ctx)
 
 		if s.RecoverTrade {
 			go s.tradeRecover(ctx)
