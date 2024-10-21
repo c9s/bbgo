@@ -503,7 +503,6 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 			newQuantity = newQuantity.Round(s.Market.VolumePrecision, fixedpoint.Down)
 			s.logger.Infof("round down %s %s order base quantity %s to %s by base precision %d", s.Symbol, newSide, origQuantity.String(), newQuantity.String(), s.Market.VolumePrecision)
 
-			newQuantity = fixedpoint.Max(newQuantity, s.Market.MinQuantity)
 		} else if s.QuantityOrAmount.Quantity.Sign() > 0 {
 			newQuantity = s.QuantityOrAmount.Quantity
 		}
@@ -527,13 +526,17 @@ func (s *Strategy) processFilledOrder(o types.Order) {
 
 		// if EarnBase is enabled, we should sell less to get the same quote amount back
 		if s.EarnBase {
-			newQuantity = fixedpoint.Max(orderExecutedQuoteAmount.Div(newPrice).Sub(fee), s.Market.MinQuantity)
+			newQuantity = orderExecutedQuoteAmount.Div(newPrice).Sub(fee)
 		}
 
 		// always round down the base quantity for placing sell order to avoid the base currency fund locking issue
 		origQuantity := newQuantity
 		newQuantity = newQuantity.Round(s.Market.VolumePrecision, fixedpoint.Down)
 		s.logger.Infof("round down sell order quantity %s to %s by base quantity precision %d", origQuantity.String(), newQuantity.String(), s.Market.VolumePrecision)
+	}
+
+	if newQuantity.Compare(s.Market.MinQuantity) < 0 {
+		s.logger.Infof("new quantity %s @ price %s is less than min base quantity %s, please check it. it may due to trading fee or the min base quantity setting changes", newQuantity.String(), newPrice.String(), s.Market.MinQuantity.String())
 	}
 
 	orderForm := types.SubmitOrder{
@@ -1848,6 +1851,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.LowerPrice = fixedpoint.NewFromFloat(pivotLow.Last(0))
 		s.logger.Infof("autoRange is enabled, using pivot high %f and pivot low %f", s.UpperPrice.Float64(), s.LowerPrice.Float64())
 	}
+
+	s.logger.Infof("market info: %+v", s.Market)
 
 	if s.ProfitSpread.Sign() > 0 {
 		s.ProfitSpread = s.Market.TruncatePrice(s.ProfitSpread)
