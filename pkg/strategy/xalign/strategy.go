@@ -156,6 +156,38 @@ func (s *Strategy) detectActiveWithdraw(
 	return nil, err2
 }
 
+func (s *Strategy) detectActiveDeposit(
+	ctx context.Context,
+	sessions map[string]*bbgo.ExchangeSession,
+) (*types.Deposit, error) {
+	var err2 error
+	until := time.Now()
+	since := until.Add(-time.Hour * 24)
+	for _, session := range sessions {
+		transferService, ok := session.Exchange.(types.ExchangeTransferHistoryService)
+		if !ok {
+			continue
+		}
+
+		deposits, err := transferService.QueryDepositHistory(ctx, "", since, until)
+		if err != nil {
+			log.WithError(err).Errorf("unable to query deposit history")
+			err2 = err
+			continue
+		}
+
+		for _, deposit := range deposits {
+			log.Infof("checking deposit status: %s", deposit.String())
+			switch deposit.Status {
+			case types.DepositPending:
+				return &deposit, nil
+			}
+		}
+	}
+
+	return nil, err2
+}
+
 func (s *Strategy) selectSessionForCurrency(
 	ctx context.Context, sessions map[string]*bbgo.ExchangeSession, currency string, changeQuantity fixedpoint.Value,
 ) (*bbgo.ExchangeSession, *types.SubmitOrder) {
@@ -439,12 +471,24 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 	pendingWithdraw, err := s.detectActiveWithdraw(ctx, sessions)
 	if err != nil {
-		log.WithError(err).Errorf("unable to check active transfers")
+		log.WithError(err).Errorf("unable to check active transfers (withdraw)")
 	} else if pendingWithdraw != nil {
-		log.Warnf("found active transfer, skip balance align check")
+		log.Warnf("found active transfer (withdraw), skip balance align check")
 
 		if activeTransferNotificationLimiter.Allow() {
 			bbgo.Notify("Found active withdraw, skip balance align", pendingWithdraw)
+		}
+		return
+	}
+
+	pendingDeposit, err := s.detectActiveDeposit(ctx, sessions)
+	if err != nil {
+		log.WithError(err).Errorf("unable to check active transfers (deposit)")
+	} else if pendingDeposit != nil {
+		log.Warnf("found active transfer (deposit), skip balance align check")
+
+		if activeTransferNotificationLimiter.Allow() {
+			bbgo.Notify("Found active deposit, skip balance align", pendingDeposit)
 		}
 		return
 	}
