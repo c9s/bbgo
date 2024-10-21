@@ -42,7 +42,7 @@ type PlaceOrderRequest struct {
 	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
 	clientOrderID *string `param:"clOrdId"`
 
-	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 8 characters.
+	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 16 characters.
 	tag *string `param:"tag"`
 
 	// "buy" or "sell"
