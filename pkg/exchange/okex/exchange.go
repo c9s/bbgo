@@ -65,26 +65,40 @@ var log = logrus.WithFields(logrus.Fields{
 var ErrSymbolRequired = errors.New("symbol is a required parameter")
 
 type Exchange struct {
-	key, secret, passphrase string
+	key, secret, passphrase, brokerId string
 
 	client      *okexapi.RestClient
 	timeNowFunc func() time.Time
 }
 
-func New(key, secret, passphrase string) *Exchange {
+type Option func(exchange *Exchange)
+
+func WithBrokerId(id string) Option {
+	return func(exchange *Exchange) {
+		exchange.brokerId = id
+	}
+}
+
+func New(key, secret, passphrase string, opts ...Option) *Exchange {
 	client := okexapi.NewClient()
 
 	if len(key) > 0 && len(secret) > 0 {
 		client.Auth(key, secret, passphrase)
 	}
 
-	return &Exchange{
+	ex := &Exchange{
 		key:         key,
 		secret:      secret,
 		passphrase:  passphrase,
 		client:      client,
 		timeNowFunc: time.Now,
 	}
+
+	for _, o := range opts {
+		o(ex)
+	}
+
+	return ex
 }
 
 func (e *Exchange) Name() types.ExchangeName {
@@ -261,6 +275,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 			return nil, fmt.Errorf("client order id should be case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters: %s", order.ClientOrderID)
 		}
 		orderReq.ClientOrderID(order.ClientOrderID)
+	}
+
+	if len(e.brokerId) != 0 {
+		orderReq.Tag(e.brokerId)
 	}
 
 	timeNow := time.Now()
