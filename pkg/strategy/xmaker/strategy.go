@@ -1213,16 +1213,13 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	lastPrice := s.lastPrice.Get()
-	sourceBook := s.sourceBook.CopyDepth(1)
-	switch side {
 
-	case types.SideTypeBuy:
-		if bestAsk, ok := sourceBook.BestAsk(); ok {
+	bestBid, bestAsk, ok := s.sourceBook.BestBidAndAsk()
+	if ok {
+		switch side {
+		case types.SideTypeBuy:
 			lastPrice = bestAsk.Price
-		}
-
-	case types.SideTypeSell:
-		if bestBid, ok := sourceBook.BestBid(); ok {
+		case types.SideTypeSell:
 			lastPrice = bestBid.Price
 		}
 	}

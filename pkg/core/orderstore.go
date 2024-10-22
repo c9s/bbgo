@@ -147,6 +147,7 @@ func (s *OrderStore) Prune(expiryDuration time.Duration) {
 	defer s.mu.Unlock()
 
 	for idx, o := range s.orders {
+		// if the order is canceled or filled, we should remove the order if the update time is before the cut off time
 		if o.Status == types.OrderStatusCanceled || o.Status == types.OrderStatusFilled {
 			if o.UpdateTime.Time().Before(cutOffTime) {
 				continue
