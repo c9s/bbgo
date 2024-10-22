@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,7 +50,7 @@ func generateRunFile(filepath string, config *Config, imports []string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(filepath, buf.Bytes(), 0644)
+	return os.WriteFile(filepath, buf.Bytes(), 0644)
 }
 
 // compilePackage generates the main.go file of the wrapper package
@@ -80,7 +79,7 @@ func Build(ctx context.Context, userConfig *Config, targetConfig BuildTargetConf
 		buildDir = "build"
 	}
 
-	packageDir, err := ioutil.TempDir(buildDir, "bbgow-") // with prefix bbgow
+	packageDir, err := os.MkdirTemp(buildDir, "bbgow-") // with prefix bbgow
 	if err != nil {
 		return "", err
 	}

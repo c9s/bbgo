@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"path"
 	"reflect"
-	"strconv"
-	"strings"
 
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -554,19 +552,6 @@ func getStrategySignature(strategy SingleExchangeStrategy) (string, error) {
 	}
 
 	return signature, nil
-}
-
-func parseFloatPercent(s string, bitSize int) (f float64, err error) {
-	i := strings.Index(s, "%")
-	if i < 0 {
-		return strconv.ParseFloat(s, bitSize)
-	}
-
-	f, err = strconv.ParseFloat(s[:i], bitSize)
-	if err != nil {
-		return 0, err
-	}
-	return f / 100.0, nil
 }
 
 func getStrategySignatures(exchangeStrategies map[string]SingleExchangeStrategy) []string {

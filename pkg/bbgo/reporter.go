@@ -11,9 +11,8 @@ type PnLReporter interface {
 }
 
 type baseReporter struct {
-	notifier    Notifier
-	cron        *cron.Cron
-	environment *Environment
+	notifier Notifier
+	cron     *cron.Cron
 }
 
 type PnLReporterManager struct {

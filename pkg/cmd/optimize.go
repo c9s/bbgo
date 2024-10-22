@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -60,7 +59,7 @@ var optimizeCmd = &cobra.Command{
 			return err
 		}
 
-		yamlBody, err := ioutil.ReadFile(configFile)
+		yamlBody, err := os.ReadFile(configFile)
 		if err != nil {
 			return err
 		}

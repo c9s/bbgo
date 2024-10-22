@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"image/png"
-	"io/ioutil"
 	stdlog "log"
 	"math/rand"
 	"os"
@@ -34,7 +33,7 @@ import (
 
 func init() {
 	// randomize pulling
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 }
 
 var defaultSyncBufferPeriod = 30 * time.Minute
@@ -68,8 +67,6 @@ func RegisterStrategy(key string, s interface{}) {
 		panic(fmt.Errorf("%T does not implement SingleExchangeStrategy or CrossExchangeStrategy", s))
 	}
 }
-
-var emptyTime time.Time
 
 type SyncStatus int
 
@@ -971,7 +968,7 @@ func writeOTPKeyAsQRCodePNG(key *otp.Key, imagePath string) error {
 		return err
 	}
 
-	if err := ioutil.WriteFile(imagePath, buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(imagePath, buf.Bytes(), 0644); err != nil {
 		return err
 	}
 

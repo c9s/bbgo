@@ -48,6 +48,7 @@ func init() {
 }
 
 // SimplePriceMatching implements a simple kline data driven matching engine for backtest
+//
 //go:generate callbackgen -type SimplePriceMatching
 type SimplePriceMatching struct {
 	Symbol string

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -119,14 +118,14 @@ func Embed(file string, dirs ...string) error {
 
 			log.Printf("packing %s...", path)
 
-			b, err := ioutil.ReadFile(path)
+			b, err := os.ReadFile(path)
 			if err != nil {
 				return err
 			}
 
 			path = filepath.ToSlash(path)
 			fmt.Fprintf(w, `	assets[%q] = []byte{`, strings.TrimPrefix(path, dir))
-			fmt.Fprintf(w, formatBytes(b))
+			fmt.Fprint(w, formatBytes(b))
 			fmt.Fprintln(w, `}`)
 			return nil
 		})

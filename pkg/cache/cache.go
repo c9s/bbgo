@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"reflect"
@@ -99,7 +98,7 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 			return err
 		}
 
-		if err := ioutil.WriteFile(cacheFile, out, 0666); err != nil {
+		if err := os.WriteFile(cacheFile, out, 0666); err != nil {
 			return err
 		}
 
@@ -113,7 +112,7 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 	} else {
 		log.Debugf("cache %s found", cacheFile)
 
-		data, err := ioutil.ReadFile(cacheFile)
+		data, err := os.ReadFile(cacheFile)
 		if err != nil {
 			return err
 		}
