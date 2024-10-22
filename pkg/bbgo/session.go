@@ -14,7 +14,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/cache"
-	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 
@@ -120,8 +119,6 @@ type ExchangeSession struct {
 	// indicators is the v2 api indicators
 	indicators map[string]*IndicatorSet
 
-	orderStores map[string]*core.OrderStore
-
 	usedSymbols        map[string]struct{}
 	initializedSymbols map[string]struct{}
 
@@ -150,7 +147,6 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
 		indicators:            make(map[string]*IndicatorSet),
-		orderStores:           make(map[string]*core.OrderStore),
 		usedSymbols:           make(map[string]struct{}),
 		initializedSymbols:    make(map[string]struct{}),
 		logger:                log.WithField("session", name),
@@ -442,11 +438,6 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	position.BindStream(session.UserDataStream)
 	session.positions[symbol] = position
 
-	orderStore := core.NewOrderStore(symbol)
-	orderStore.AddOrderUpdate = true
-	orderStore.BindStream(session.UserDataStream)
-	session.orderStores[symbol] = orderStore
-
 	marketDataStore := NewMarketDataStore(symbol)
 	if !disableMarketDataStore {
 		if _, ok := session.marketDataStores[symbol]; !ok {
@@ -668,15 +659,6 @@ func (session *ExchangeSession) SetMarkets(markets types.MarketMap) {
 	session.markets = markets
 }
 
-func (session *ExchangeSession) OrderStore(symbol string) (store *core.OrderStore, ok bool) {
-	store, ok = session.orderStores[symbol]
-	return store, ok
-}
-
-func (session *ExchangeSession) OrderStores() map[string]*core.OrderStore {
-	return session.orderStores
-}
-
 // Subscribe save the subscription info, later it will be assigned to the stream
 func (session *ExchangeSession) Subscribe(
 	channel types.Channel, symbol string, options types.SubscribeOptions,
@@ -879,7 +861,6 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	session.positions = make(map[string]*types.Position)
 	session.standardIndicatorSets = make(map[string]*StandardIndicatorSet)
 	session.indicators = make(map[string]*IndicatorSet)
-	session.orderStores = make(map[string]*core.OrderStore)
 	session.OrderExecutor = &ExchangeOrderExecutor{
 		// copy the notification system so that we can route
 		Session: session,
