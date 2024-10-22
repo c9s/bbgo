@@ -37,11 +37,11 @@ var marginCmd = &cobra.Command{
 	Short:        "margin related history",
 	SilenceUsage: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := cobraLoadDotenv(cmd, args); err != nil {
+		if err := cobraLoadDotenv(cmd); err != nil {
 			return err
 		}
 
-		if err := cobraLoadConfig(cmd, args); err != nil {
+		if err := cobraLoadConfig(cmd); err != nil {
 			return err
 		}
 

@@ -22,8 +22,6 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 
 	_ "time/tzdata"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 var cpuProfileFile *os.File
@@ -38,7 +36,7 @@ var RootCmd = &cobra.Command{
 	SilenceUsage: true,
 
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := cobraLoadDotenv(cmd, args); err != nil {
+		if err := cobraLoadDotenv(cmd); err != nil {
 			return err
 		}
 
@@ -101,7 +99,7 @@ var RootCmd = &cobra.Command{
 			}
 		}
 
-		return cobraLoadConfig(cmd, args)
+		return cobraLoadConfig(cmd)
 	},
 	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
 		pprof.StopCPUProfile()
@@ -116,7 +114,7 @@ var RootCmd = &cobra.Command{
 	},
 }
 
-func cobraLoadDotenv(cmd *cobra.Command, args []string) error {
+func cobraLoadDotenv(cmd *cobra.Command) error {
 	disableDotEnv, err := cmd.Flags().GetBool("no-dotenv")
 	if err != nil {
 		return err
@@ -137,7 +135,7 @@ func cobraLoadDotenv(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func cobraLoadConfig(cmd *cobra.Command, args []string) error {
+func cobraLoadConfig(cmd *cobra.Command) error {
 	configFile, err := cmd.Flags().GetString("config")
 	if err != nil {
 		return errors.Wrapf(err, "failed to get the config flag")

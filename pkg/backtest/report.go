@@ -3,7 +3,6 @@ package backtest
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,7 +54,7 @@ type SummaryReport struct {
 }
 
 func ReadSummaryReport(filename string) (*SummaryReport, error) {
-	o, err := ioutil.ReadFile(filename)
+	o, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +246,7 @@ func loadReportIndexLocked(indexFilePath string) (*ReportIndex, error) {
 	if fileInfo, err := os.Stat(indexFilePath); err != nil {
 		return nil, err
 	} else if fileInfo.Size() != 0 {
-		o, err := ioutil.ReadFile(indexFilePath)
+		o, err := os.ReadFile(indexFilePath)
 		if err != nil {
 			return nil, err
 		}
