@@ -16,7 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const DefaultCancelOrderWaitTime = 20 * time.Millisecond
+const DefaultCancelOrderWaitTime = 50 * time.Millisecond
 const DefaultOrderCancelTimeout = 5 * time.Second
 
 // ActiveOrderBook manages the local active order books.
