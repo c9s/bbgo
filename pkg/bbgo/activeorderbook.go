@@ -336,7 +336,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 		// if we can't detect which is newer, isNewerOrderUpdate returns false
 		// if you pass two same objects to isNewerOrderUpdate, it returns false
 		if !isNewerOrderUpdate(order, previousOrder) {
-			log.Infof("[ActiveOrderBook] order #%d updateTime %s is out of date, skip it", order.OrderID, order.UpdateTime)
+			log.Infof("[ActiveOrderBook] order #%d (update time %s) is out of date, skip it", order.OrderID, order.UpdateTime)
 			b.mu.Unlock()
 			return
 		}
@@ -393,26 +393,33 @@ func (b *ActiveOrderBook) Add(orders ...types.Order) {
 	}
 }
 
+// isNewerOrderUpdate checks if the order a is newer than the order b.
 func isNewerOrderUpdate(a, b types.Order) bool {
 	// compare state first
 	switch a.Status {
 
 	case types.OrderStatusCanceled, types.OrderStatusRejected: // canceled is a final state
 		switch b.Status {
-		case types.OrderStatusNew, types.OrderStatusPartiallyFilled:
+
+		case types.OrderStatusCanceled, types.OrderStatusRejected, types.OrderStatusNew, types.OrderStatusPartiallyFilled:
 			return true
 		}
 
 	case types.OrderStatusPartiallyFilled:
 		switch b.Status {
+
 		case types.OrderStatusNew:
 			return true
+
 		case types.OrderStatusPartiallyFilled:
 			// unknown for equal
 			if a.ExecutedQuantity.Compare(b.ExecutedQuantity) > 0 {
 				return true
 			}
 
+			if a.UpdateTime.After(b.UpdateTime.Time()) {
+				return true
+			}
 		}
 
 	case types.OrderStatusFilled:
