@@ -405,20 +405,8 @@ func (s *Server) getSessionAccountBalance(c *gin.Context) {
 }
 
 func (s *Server) listSessionOpenOrders(c *gin.Context) {
-	sessionName := c.Param("session")
-	session, ok := s.Environ.Session(sessionName)
-
-	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("session %s not found", sessionName)})
-		return
-	}
-
-	marketOrders := make(map[string][]types.Order)
-	for symbol, orderStore := range session.OrderStores() {
-		marketOrders[symbol] = orderStore.Orders()
-	}
-
-	c.JSON(http.StatusOK, gin.H{"orders": marketOrders})
+	// FIXME
+	c.JSON(http.StatusOK, gin.H{"orders": nil})
 }
 
 func genFakeAssets() types.AssetMap {
