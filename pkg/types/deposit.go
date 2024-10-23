@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/slack-go/slack"
 )
 
 type DepositStatus string
@@ -80,4 +81,54 @@ func (d Deposit) String() (o string) {
 	}
 
 	return o
+}
+
+func (d *Deposit) SlackAttachment() slack.Attachment {
+	var fields []slack.AttachmentField
+
+	if len(d.TransactionID) > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "TransactionID",
+			Value: d.TransactionID,
+			Short: false,
+		})
+	}
+
+	if len(d.Status) > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Status",
+			Value: string(d.Status),
+			Short: false,
+		})
+	}
+
+	return slack.Attachment{
+		Color: depositStatusSlackColor(d.Status),
+		Title: fmt.Sprintf("Deposit %s %s To %s", d.Amount.String(), d.Asset, d.Address),
+		// TitleLink:   "",
+		Pretext: "",
+		Text:    "",
+		// ServiceName: "",
+		// ServiceIcon: "",
+		// FromURL:     "",
+		// OriginalURL: "",
+		Fields: fields,
+		Footer: fmt.Sprintf("Apply Time: %s", d.Time.Time().Format(time.RFC3339)),
+		// FooterIcon: "",
+	}
+}
+
+func depositStatusSlackColor(status DepositStatus) string {
+	switch status {
+
+	case DepositSuccess:
+		return "good"
+
+	case DepositRejected:
+		return "red"
+
+	default:
+		return "gray"
+
+	}
 }
