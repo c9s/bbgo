@@ -78,6 +78,9 @@ type ExchangeSession struct {
 
 	IsInitialized bool `json:"-" yaml:"-"`
 
+	// OrderExecutor is the default order executor for the session
+	//
+	// Deprecated: use GeneralOrderExecutor instead
 	OrderExecutor *ExchangeOrderExecutor `json:"orderExecutor,omitempty" yaml:"orderExecutor,omitempty"`
 
 	// UserDataStream is the connection stream of the exchange
