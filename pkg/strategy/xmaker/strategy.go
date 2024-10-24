@@ -232,7 +232,8 @@ type Strategy struct {
 
 	metricsLabels prometheus.Labels
 
-	connectivityGroup *types.ConnectivityGroup
+	sourceMarketDataConnectivity, sourceUserDataConnectivity *types.Connectivity
+	connectivityGroup                                        *types.ConnectivityGroup
 
 	// lastAggregatedSignal stores the last aggregated signal with mutex
 	// TODO: use float64 series instead, so that we can store history signal values
@@ -596,6 +597,10 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	if s.activeMakerOrders.NumOfOrders() > 0 {
 		s.logger.Warnf("unable to cancel all %s orders, skipping placing maker orders", s.Symbol)
+		return nil
+	}
+
+	if !s.sourceMarketDataConnectivity.IsConnected() || !s.sourceUserDataConnectivity.IsConnected() {
 		return nil
 	}
 
@@ -1442,6 +1447,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 			return
 
 		case <-ticker.C:
+
 			if err := s.updateQuote(ctx); err != nil {
 				s.logger.WithError(err).Errorf("unable to place maker orders")
 			}
@@ -1810,10 +1816,13 @@ func (s *Strategy) CrossRun(
 
 	s.stopC = make(chan struct{})
 
-	sourceConnectivity := types.NewConnectivity()
-	sourceConnectivity.Bind(s.sourceSession.UserDataStream)
+	s.sourceUserDataConnectivity = types.NewConnectivity()
+	s.sourceUserDataConnectivity.Bind(s.sourceSession.UserDataStream)
 
-	s.connectivityGroup = types.NewConnectivityGroup(sourceConnectivity)
+	s.sourceMarketDataConnectivity = types.NewConnectivity()
+	s.sourceMarketDataConnectivity.Bind(s.sourceSession.MarketDataStream)
+
+	s.connectivityGroup = types.NewConnectivityGroup(s.sourceUserDataConnectivity)
 
 	go func() {
 		s.logger.Infof("waiting for authentication connections to be ready...")
