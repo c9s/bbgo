@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -39,6 +40,55 @@ type QuoteCurrencyPreference struct {
 	Sell []string `json:"sell"`
 }
 
+type AmountAlertConfig struct {
+	QuoteCurrency string           `json:"quoteCurrency"`
+	Amount        fixedpoint.Value `json:"amount"`
+	SlackMentions []string         `json:"slackMentions"`
+}
+
+type LargeAmountAlert struct {
+	QuoteCurrency string
+	AlertAmount   fixedpoint.Value
+	SlackMentions []string
+
+	BaseCurrency string
+	Side         types.SideType
+	Price        fixedpoint.Value
+	Quantity     fixedpoint.Value
+	Amount       fixedpoint.Value
+}
+
+func (m *LargeAmountAlert) SlackAttachment() slack.Attachment {
+	return slack.Attachment{
+		Color: "red",
+		Title: fmt.Sprintf("xalign amount alert - try to align %s with quote %s amount %f > %f",
+			m.BaseCurrency, m.QuoteCurrency, m.Amount.Float64(), m.AlertAmount.Float64()),
+		Text: strings.Join(m.SlackMentions, " "),
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Base Currency",
+				Value: m.BaseCurrency,
+				Short: true,
+			},
+			{
+				Title: "Side",
+				Value: m.Side.String(),
+				Short: true,
+			},
+			{
+				Title: "Price",
+				Value: m.Price.String(),
+				Short: true,
+			},
+			{
+				Title: "Quantity",
+				Value: m.Quantity.String(),
+				Short: true,
+			},
+		},
+	}
+}
+
 type Strategy struct {
 	*bbgo.Environment
 	Interval                 types.Interval              `json:"interval"`
@@ -50,6 +100,7 @@ type Strategy struct {
 	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
 	Duration                 types.Duration              `json:"for"`
 	MaxAmounts               map[string]fixedpoint.Value `json:"maxAmounts"`
+	LargeAmountAlert         *AmountAlertConfig          `json:"largeAmountAlert"`
 
 	SlackNotify                bool             `json:"slackNotify"`
 	SlackNotifyMentions        []string         `json:"slackNotifyMentions"`
@@ -84,7 +135,6 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
-
 }
 
 func (s *Strategy) Defaults() error {
@@ -191,19 +241,19 @@ func (s *Strategy) detectActiveDeposit(
 func (s *Strategy) selectSessionForCurrency(
 	ctx context.Context, sessions map[string]*bbgo.ExchangeSession, currency string, changeQuantity fixedpoint.Value,
 ) (*bbgo.ExchangeSession, *types.SubmitOrder) {
+	var taker = s.UseTakerOrder
+	var side types.SideType
+	var quoteCurrencies []string
+	if changeQuantity.Sign() > 0 {
+		quoteCurrencies = s.PreferredQuoteCurrencies.Buy
+		side = types.SideTypeBuy
+	} else {
+		quoteCurrencies = s.PreferredQuoteCurrencies.Sell
+		side = types.SideTypeSell
+	}
+
 	for _, sessionName := range s.PreferredSessions {
 		session := sessions[sessionName]
-
-		var taker = s.UseTakerOrder
-		var side types.SideType
-		var quoteCurrencies []string
-		if changeQuantity.Sign() > 0 {
-			quoteCurrencies = s.PreferredQuoteCurrencies.Buy
-			side = types.SideTypeBuy
-		} else {
-			quoteCurrencies = s.PreferredQuoteCurrencies.Sell
-			side = types.SideTypeSell
-		}
 
 		for _, fromQuoteCurrency := range quoteCurrencies {
 			// skip the same currency, because there is no such USDT/USDT market
@@ -405,6 +455,16 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 
 	s.priceResolver = pricesolver.NewSimplePriceResolver(markets)
+	for _, session := range s.sessions {
+		// init the price
+		marketPrices := session.LastPrices()
+		for market, price := range marketPrices {
+			s.priceResolver.Update(market, price)
+		}
+
+		// bind on trade to update price
+		session.UserDataStream.OnTradeUpdate(s.priceResolver.UpdateFromTrade)
+	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -525,6 +585,30 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 					log.Infof("%s fault record since: %s < persistence period %s", currency, faultBalance[0].Time, s.Duration.Duration())
 					continue
 				}
+			}
+		}
+
+		if price, ok := s.priceResolver.ResolvePrice(currency, s.LargeAmountAlert.QuoteCurrency); ok {
+			quantity := q.Abs()
+			amount := price.Mul(quantity)
+			if amount.Compare(s.LargeAmountAlert.Amount) > 0 {
+				alert := &LargeAmountAlert{
+					QuoteCurrency: s.LargeAmountAlert.QuoteCurrency,
+					AlertAmount:   s.LargeAmountAlert.Amount,
+					SlackMentions: s.LargeAmountAlert.SlackMentions,
+					BaseCurrency:  currency,
+					Price:         price,
+					Quantity:      quantity,
+					Amount:        amount,
+				}
+
+				if q.Sign() > 0 {
+					alert.Side = types.SideTypeBuy
+				} else {
+					alert.Side = types.SideTypeSell
+				}
+
+				bbgo.Notify(alert)
 			}
 		}
 
