@@ -17,6 +17,8 @@ const (
 	TransferAssetTypeIsolatedMarginToMain TransferAssetType = "ISOLATED_MARGIN_MAIN"
 )
 
+// User Universal Transfer (USER_DATA)
+//
 //go:generate requestgen -method POST -url "/sapi/v1/asset/transfer" -type TransferAssetRequest -responseType .TransferResponse
 type TransferAssetRequest struct {
 	client requestgen.AuthenticatedAPIClient

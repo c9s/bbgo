@@ -127,6 +127,20 @@ func NewConnectivity() *Connectivity {
 	}
 }
 
+func (c *Connectivity) IsConnected() (conn bool) {
+	c.mu.Lock()
+	conn = c.connected
+	c.mu.Unlock()
+	return conn
+}
+
+func (c *Connectivity) IsAuthed() (authed bool) {
+	c.mu.Lock()
+	authed = c.authed
+	c.mu.Unlock()
+	return authed
+}
+
 func (c *Connectivity) handleConnect() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
