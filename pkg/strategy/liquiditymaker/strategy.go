@@ -131,11 +131,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		return err
 	}
 
-	if cancelApi, ok := session.Exchange.(advancedOrderCancelApi); ok {
-		_, _ = cancelApi.CancelOrdersBySymbol(ctx, s.Symbol)
-	}
-
 	s.liquidityScale = scale
+
+	if err := tradingutil.UniversalCancelAllOrders(ctx, session.Exchange, s.Symbol, nil); err != nil {
+		return err
+	}
 
 	session.UserDataStream.OnStart(func() {
 		s.placeLiquidityOrders(ctx)
