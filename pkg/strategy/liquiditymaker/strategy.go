@@ -52,6 +52,9 @@ type Strategy struct {
 	AskLiquidityAmount   fixedpoint.Value `json:"askLiquidityAmount"`
 	BidLiquidityAmount   fixedpoint.Value `json:"bidLiquidityAmount"`
 
+	StopBidPrice fixedpoint.Value `json:"stopBidPrice"`
+	StopAskPrice fixedpoint.Value `json:"stopAskPrice"`
+
 	UseProtectedPriceRange bool `json:"useProtectedPriceRange"`
 
 	UseLastTradePrice bool             `json:"useLastTradePrice"`
@@ -59,7 +62,7 @@ type Strategy struct {
 	MaxPrice          fixedpoint.Value `json:"maxPrice"`
 	MinPrice          fixedpoint.Value `json:"minPrice"`
 
-	MaxExposure fixedpoint.Value `json:"maxExposure"`
+	MaxPositionExposure fixedpoint.Value `json:"maxPositionExposure"`
 
 	MinProfit fixedpoint.Value `json:"minProfit"`
 
@@ -300,6 +303,19 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		ask1Price.Float64(), askLastPrice.Float64(),
 		bid1Price.Float64(), bidLastPrice.Float64())
 
+	placeBid := true
+	placeAsk := true
+
+	if s.StopBidPrice.Sign() > 0 && midPrice.Compare(s.StopBidPrice) > 0 {
+		log.Infof("mid price %f > stop bid price %f, turning off bid orders", midPrice.Float64(), s.StopBidPrice.Float64())
+		placeBid = false
+	}
+
+	if s.StopAskPrice.Sign() > 0 && midPrice.Compare(s.StopAskPrice) < 0 {
+		log.Infof("mid price %f < stop ask price %f, turning off ask orders", midPrice.Float64(), s.StopAskPrice.Float64())
+		placeAsk = false
+	}
+
 	availableBase := baseBal.Available
 	availableQuote := quoteBal.Available
 
@@ -308,40 +324,58 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		quoteBal.String())
 
 	if !s.Position.IsDust() {
+		positionBase := s.Position.GetBase()
 		if s.Position.IsLong() {
-			availableBase = availableBase.Sub(s.Position.Base)
+			availableBase = availableBase.Sub(positionBase)
 			availableBase = s.Market.RoundDownQuantityByPrecision(availableBase)
 
 			if s.UseProtectedPriceRange {
 				ask1Price = profitProtectedPrice(types.SideTypeSell, s.Position.AverageCost, ask1Price, s.Session.MakerFeeRate, s.MinProfit)
 			}
 		} else if s.Position.IsShort() {
-			posSizeInQuote := s.Position.Base.Mul(ticker.Sell)
+			posSizeInQuote := positionBase.Mul(ticker.Sell)
 			availableQuote = availableQuote.Sub(posSizeInQuote)
 
 			if s.UseProtectedPriceRange {
 				bid1Price = profitProtectedPrice(types.SideTypeBuy, s.Position.AverageCost, bid1Price, s.Session.MakerFeeRate, s.MinProfit)
 			}
 		}
+
+		if s.MaxPositionExposure.Sign() > 0 {
+			if positionBase.Abs().Compare(s.MaxPositionExposure) > 0 {
+				if s.Position.IsLong() {
+					placeBid = false
+				}
+				if s.Position.IsShort() {
+					placeAsk = false
+				}
+			}
+		}
 	}
 
-	bidOrders := s.orderGenerator.Generate(types.SideTypeBuy,
-		fixedpoint.Min(s.BidLiquidityAmount, quoteBal.Available),
-		bid1Price,
-		bidLastPrice,
-		s.NumOfLiquidityLayers,
-		s.liquidityScale)
+	var orderForms []types.SubmitOrder
+	if placeBid {
+		bidOrders := s.orderGenerator.Generate(types.SideTypeBuy,
+			fixedpoint.Min(s.BidLiquidityAmount, quoteBal.Available),
+			bid1Price,
+			bidLastPrice,
+			s.NumOfLiquidityLayers,
+			s.liquidityScale)
 
-	askOrders := s.orderGenerator.Generate(types.SideTypeSell,
-		s.AskLiquidityAmount,
-		ask1Price,
-		askLastPrice,
-		s.NumOfLiquidityLayers,
-		s.liquidityScale)
+		orderForms = append(orderForms, bidOrders...)
+	}
 
-	askOrders = filterAskOrders(askOrders, baseBal.Available)
+	if placeAsk {
+		askOrders := s.orderGenerator.Generate(types.SideTypeSell,
+			s.AskLiquidityAmount,
+			ask1Price,
+			askLastPrice,
+			s.NumOfLiquidityLayers,
+			s.liquidityScale)
 
-	orderForms := append(bidOrders, askOrders...)
+		askOrders = filterAskOrders(askOrders, baseBal.Available)
+		orderForms = append(orderForms, askOrders...)
+	}
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
 	if util.LogErr(err, "unable to place liquidity orders") {
