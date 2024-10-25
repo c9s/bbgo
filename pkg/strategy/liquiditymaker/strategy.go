@@ -9,7 +9,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	. "github.com/c9s/bbgo/pkg/indicator/v2"
+	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -53,6 +53,13 @@ type Strategy struct {
 	StopBidPrice fixedpoint.Value `json:"stopBidPrice"`
 	StopAskPrice fixedpoint.Value `json:"stopAskPrice"`
 
+	StopEMA *struct {
+		Enabled bool `json:"enabled"`
+		types.IntervalWindow
+	} `json:"stopEMA"`
+
+	stopEMA *indicatorv2.EWMAStream
+
 	UseProtectedPriceRange bool `json:"useProtectedPriceRange"`
 
 	UseLastTradePrice bool             `json:"useLastTradePrice"`
@@ -71,12 +78,18 @@ type Strategy struct {
 	liquidityScale bbgo.Scale
 
 	orderGenerator *LiquidityOrderGenerator
+
+	logger log.FieldLogger
 }
 
 func (s *Strategy) Initialize() error {
 	if s.Strategy == nil {
 		s.Strategy = &common.Strategy{}
 	}
+
+	s.logger = log.WithField("strategy", ID).WithFields(log.Fields{
+		"symbol": s.Symbol,
+	})
 	return nil
 }
 
@@ -124,6 +137,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
+
+	if s.StopEMA != nil && s.StopEMA.Enabled {
+		s.stopEMA = session.Indicators(s.Symbol).EMA(s.StopEMA.IntervalWindow)
+	}
 
 	s.orderGenerator = &LiquidityOrderGenerator{
 		Symbol: s.Symbol,
@@ -275,7 +292,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	}
 
 	if s.IsHalted(ticker.Time) {
-		log.Warn("circuitBreakRiskControl: trading halted")
+		s.logger.Warn("circuitBreakRiskControl: trading halted")
 		return
 	}
 
@@ -296,7 +313,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		ticker.Sell = ticker.Buy.Add(s.Market.TickSize)
 	}
 
-	log.Infof("ticker: %+v", ticker)
+	s.logger.Infof("ticker: %+v", ticker)
 
 	lastTradedPrice := ticker.Last
 	midPrice := ticker.Sell.Add(ticker.Buy).Div(fixedpoint.Two)
@@ -307,14 +324,14 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		midPrice = lastTradedPrice
 	}
 
-	log.Infof("current spread: %f lastTradedPrice: %f midPrice: %f", currentSpread.Float64(), lastTradedPrice.Float64(), midPrice.Float64())
+	s.logger.Infof("current spread: %f lastTradedPrice: %f midPrice: %f", currentSpread.Float64(), lastTradedPrice.Float64(), midPrice.Float64())
 
 	ask1Price := midPrice.Mul(fixedpoint.One.Add(sideSpread))
 	bid1Price := midPrice.Mul(fixedpoint.One.Sub(sideSpread))
 
 	askLastPrice := midPrice.Mul(fixedpoint.One.Add(s.LiquidityPriceRange))
 	bidLastPrice := midPrice.Mul(fixedpoint.One.Sub(s.LiquidityPriceRange))
-	log.Infof("wanted side spread: %f askRange: %f ~ %f bidRange: %f ~ %f",
+	s.logger.Infof("wanted side spread: %f askRange: %f ~ %f bidRange: %f ~ %f",
 		sideSpread.Float64(),
 		ask1Price.Float64(), askLastPrice.Float64(),
 		bid1Price.Float64(), bidLastPrice.Float64())
@@ -323,19 +340,32 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	placeAsk := true
 
 	if s.StopBidPrice.Sign() > 0 && midPrice.Compare(s.StopBidPrice) > 0 {
-		log.Infof("mid price %f > stop bid price %f, turning off bid orders", midPrice.Float64(), s.StopBidPrice.Float64())
+		s.logger.Infof("mid price %f > stop bid price %f, turning off bid orders", midPrice.Float64(), s.StopBidPrice.Float64())
 		placeBid = false
 	}
 
 	if s.StopAskPrice.Sign() > 0 && midPrice.Compare(s.StopAskPrice) < 0 {
-		log.Infof("mid price %f < stop ask price %f, turning off ask orders", midPrice.Float64(), s.StopAskPrice.Float64())
+		s.logger.Infof("mid price %f < stop ask price %f, turning off ask orders", midPrice.Float64(), s.StopAskPrice.Float64())
 		placeAsk = false
+	}
+
+	if s.stopEMA != nil {
+		emaPrice := fixedpoint.NewFromFloat(s.stopEMA.Last(0))
+		if midPrice.Compare(emaPrice) > 0 {
+			s.logger.Infof("mid price %f < stop ema price %f, turning off ask orders", midPrice.Float64(), emaPrice.Float64())
+			placeBid = false
+		}
+
+		if midPrice.Compare(emaPrice) < 0 {
+			s.logger.Infof("mid price %f < stop ema price %f, turning off ask orders", midPrice.Float64(), emaPrice.Float64())
+			placeAsk = false
+		}
 	}
 
 	availableBase := baseBal.Available
 	availableQuote := quoteBal.Available
 
-	log.Infof("balances before liq orders: %s, %s",
+	s.logger.Infof("balances before liq orders: %s, %s",
 		baseBal.String(),
 		quoteBal.String())
 
@@ -399,9 +429,10 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	}
 
 	s.liquidityOrderBook.Add(createdOrders...)
-	log.Infof("%d liq orders are placed successfully", len(orderForms))
+
+	s.logger.Infof("%d liq orders are placed successfully", len(orderForms))
 	for _, o := range createdOrders {
-		log.Infof("liq order: %+v", o)
+		s.logger.Infof("liq order: %+v", o)
 	}
 }
 
@@ -435,16 +466,4 @@ func filterAskOrders(askOrders []types.SubmitOrder, available fixedpoint.Value) 
 	}
 
 	return out
-}
-
-func preloadKLines(
-	inc *KLineStream, session *bbgo.ExchangeSession, symbol string, interval types.Interval,
-) {
-	if store, ok := session.MarketDataStore(symbol); ok {
-		if kLinesData, ok := store.KLinesOfInterval(interval); ok {
-			for _, k := range *kLinesData {
-				inc.EmitUpdate(k)
-			}
-		}
-	}
 }
