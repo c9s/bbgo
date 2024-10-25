@@ -41,7 +41,8 @@ type Strategy struct {
 	LiquidityUpdateInterval types.Interval `json:"liquidityUpdateInterval"`
 
 	AdjustmentUpdateInterval   types.Interval   `json:"adjustmentUpdateInterval"`
-	MaxAdjustmentOrderQuantity fixedpoint.Value `json:"maxAdjustmentOrderQuantity"`
+	AdjustmentOrderMaxQuantity fixedpoint.Value `json:"adjustmentOrderMaxQuantity"`
+	AdjustmentOrderPriceType   types.PriceType  `json:"adjustmentOrderPriceType"`
 
 	NumOfLiquidityLayers int              `json:"numOfLiquidityLayers"`
 	LiquiditySlideRule   *bbgo.SlideRule  `json:"liquidityScale"`
@@ -90,6 +91,22 @@ func (s *Strategy) InstanceID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.AdjustmentUpdateInterval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LiquidityUpdateInterval})
+}
+
+func (s *Strategy) Defaults() error {
+	if s.AdjustmentOrderPriceType == "" {
+		s.AdjustmentOrderPriceType = types.PriceTypeMaker
+	}
+
+	if s.LiquidityUpdateInterval == "" {
+		s.LiquidityUpdateInterval = types.Interval1h
+	}
+
+	if s.AdjustmentUpdateInterval == "" {
+		s.AdjustmentUpdateInterval = types.Interval5m
+	}
+
+	return nil
 }
 
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
@@ -193,14 +210,15 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 
 	posSize := s.Position.Base.Abs()
 
-	if !s.MaxAdjustmentOrderQuantity.IsZero() {
-		posSize = fixedpoint.Min(posSize, s.MaxAdjustmentOrderQuantity)
+	if !s.AdjustmentOrderMaxQuantity.IsZero() {
+		posSize = fixedpoint.Min(posSize, s.AdjustmentOrderMaxQuantity)
 	}
 
 	tickSize := s.Market.TickSize
 
 	if s.Position.IsShort() {
-		price := profitProtectedPrice(types.SideTypeBuy, s.Position.AverageCost, ticker.Sell.Add(tickSize.Neg()), s.Session.MakerFeeRate, s.MinProfit)
+		price := s.AdjustmentOrderPriceType.GetPrice(ticker, types.SideTypeBuy)
+		price = profitProtectedPrice(types.SideTypeBuy, s.Position.AverageCost, price.Add(tickSize.Neg()), s.Session.MakerFeeRate, s.MinProfit)
 		quoteQuantity := fixedpoint.Min(price.Mul(posSize), quoteBal.Available)
 		bidQuantity := quoteQuantity.Div(price)
 
@@ -218,7 +236,8 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 			TimeInForce: types.TimeInForceGTC,
 		})
 	} else if s.Position.IsLong() {
-		price := profitProtectedPrice(types.SideTypeSell, s.Position.AverageCost, ticker.Buy.Add(tickSize), s.Session.MakerFeeRate, s.MinProfit)
+		price := s.AdjustmentOrderPriceType.GetPrice(ticker, types.SideTypeSell)
+		price = profitProtectedPrice(types.SideTypeSell, s.Position.AverageCost, price.Add(tickSize), s.Session.MakerFeeRate, s.MinProfit)
 		askQuantity := fixedpoint.Min(posSize, baseBal.Available)
 
 		if s.Market.IsDustQuantity(askQuantity, price) {
