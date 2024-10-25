@@ -19,11 +19,6 @@ import (
 const ID = "liquiditymaker"
 const IDAlias = "liqmaker"
 
-type advancedOrderCancelApi interface {
-	CancelAllOrders(ctx context.Context) ([]types.Order, error)
-	CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error)
-}
-
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 	bbgo.RegisterStrategy(IDAlias, &Strategy{})
