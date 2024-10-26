@@ -145,6 +145,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.orderGenerator = &LiquidityOrderGenerator{
 		Symbol: s.Symbol,
 		Market: s.Market,
+		logger: s.logger,
 	}
 
 	s.liquidityOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
@@ -390,9 +391,15 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		if s.MaxPositionExposure.Sign() > 0 {
 			if positionBase.Abs().Compare(s.MaxPositionExposure) > 0 {
 				if s.Position.IsLong() {
+					s.logger.Infof("long position size %f exceeded max position exposure %f, turnning off bid orders",
+						positionBase.Float64(), s.MaxPositionExposure.Float64())
+
 					placeBid = false
 				}
 				if s.Position.IsShort() {
+					s.logger.Infof("short position size %f exceeded max position exposure %f, turnning off ask orders",
+						positionBase.Float64(), s.MaxPositionExposure.Float64())
+
 					placeAsk = false
 				}
 			}
