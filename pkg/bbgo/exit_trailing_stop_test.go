@@ -182,3 +182,80 @@ func TestTrailingStop_LongPosition(t *testing.T) {
 		assert.False(t, stop.activated)
 	}
 }
+
+func TestTrailingStop_CallbackProfitRate(t *testing.T) {
+	market := getTestMarket()
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockEx := mocks.NewMockExchange(mockCtrl)
+	mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
+	mockEx.EXPECT().SubmitOrder(gomock.Any(), types.SubmitOrder{
+		Symbol:           "BTCUSDT",
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeMarket,
+		Market:           market,
+		Quantity:         fixedpoint.NewFromFloat(1.0),
+		Tag:              "trailingStop:activation=1%,callbackProfit=10%",
+		MarginSideEffect: types.SideEffectTypeAutoRepay,
+	})
+
+	session := NewExchangeSession("test", mockEx)
+	assert.NotNil(t, session)
+
+	session.markets[market.Symbol] = market
+
+	position := types.NewPositionFromMarket(market)
+	position.AverageCost = fixedpoint.NewFromFloat(20000.0)
+	position.Base = fixedpoint.NewFromFloat(1.0)
+
+	orderExecutor := NewGeneralOrderExecutor(session, "BTCUSDT", "test", "test-01", position)
+
+	activationRatio := fixedpoint.NewFromFloat(0.01)
+	callbackProfitRatio := fixedpoint.NewFromFloat(0.1)
+	stop := &TrailingStop2{
+		Symbol:             "BTCUSDT",
+		Interval:           types.Interval1m,
+		Side:               types.SideTypeSell,
+		CallbackProfitRate: callbackProfitRatio,
+		ActivationRatio:    activationRatio,
+	}
+	stop.Bind(session, orderExecutor)
+
+	// the same price
+	currentPrice := fixedpoint.NewFromFloat(20000.0)
+	err := stop.checkStopPrice(currentPrice, position)
+	if assert.NoError(t, err) {
+		assert.False(t, stop.activated)
+	}
+
+	// 20000 + 1% = 20200
+	currentPrice = currentPrice.Mul(one.Add(activationRatio))
+	assert.Equal(t, fixedpoint.NewFromFloat(20200.0), currentPrice)
+
+	err = stop.checkStopPrice(currentPrice, position)
+	if assert.NoError(t, err) {
+		assert.True(t, stop.activated)
+		assert.Equal(t, fixedpoint.NewFromFloat(200), stop.latestHighProfit)
+	}
+
+	// 20200 + 1% = 20402
+	currentPrice = currentPrice.Mul(one.Add(activationRatio))
+	assert.Equal(t, fixedpoint.NewFromFloat(20402.0), currentPrice)
+
+	err = stop.checkStopPrice(currentPrice, position)
+	if assert.NoError(t, err) {
+		assert.Equal(t, fixedpoint.NewFromFloat(402), stop.latestHighProfit)
+		assert.True(t, stop.activated)
+	}
+
+	// 20402 - 402*(1-10%)
+	currentPrice = currentPrice.Sub(stop.latestHighProfit.Mul(one.Sub(callbackProfitRatio)))
+	assert.Equal(t, fixedpoint.NewFromFloat(20040.2), currentPrice)
+	err = stop.checkStopPrice(currentPrice, position)
+	if assert.NoError(t, err) {
+		assert.False(t, stop.activated)
+		assert.Equal(t, fixedpoint.Zero, stop.latestHighProfit)
+	}
+}

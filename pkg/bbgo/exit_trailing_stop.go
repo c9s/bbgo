@@ -16,6 +16,9 @@ type TrailingStop2 struct {
 	// CallbackRate is the callback rate from the previous high price
 	CallbackRate fixedpoint.Value `json:"callbackRate,omitempty"`
 
+	// CallbackProfitRate is the callback rate from the previous high profit
+	CallbackProfitRate fixedpoint.Value `json:"callbackProfitRate,omitempty"`
+
 	ActivationRatio fixedpoint.Value `json:"activationRatio,omitempty"`
 
 	// ClosePosition is a percentage of the position to be closed
@@ -31,7 +34,8 @@ type TrailingStop2 struct {
 
 	Side types.SideType `json:"side,omitempty"`
 
-	latestHigh fixedpoint.Value
+	latestHigh       fixedpoint.Value
+	latestHighProfit fixedpoint.Value
 
 	// activated: when the price reaches the min profit price, we set the activated to true to enable trailing stop
 	activated bool
@@ -140,32 +144,48 @@ func (s *TrailingStop2) checkStopPrice(price fixedpoint.Value, position *types.P
 		return nil
 	}
 
-	switch s.Side {
-	case types.SideTypeBuy:
-		change := price.Sub(s.latestHigh).Div(s.latestHigh)
-		if change.Compare(s.CallbackRate) >= 0 {
-			// submit order
-			return s.triggerStop(price)
-		}
-	case types.SideTypeSell:
-		change := s.latestHigh.Sub(price).Div(s.latestHigh)
-		if change.Compare(s.CallbackRate) >= 0 {
-			// submit order
-			return s.triggerStop(price)
-		}
-	default:
-		if position.IsLong() {
-			change := s.latestHigh.Sub(price).Div(s.latestHigh)
-			if change.Compare(s.CallbackRate) >= 0 {
-				// submit order
-				return s.triggerStop(price)
-			}
-		} else if position.IsShort() {
+	if !s.CallbackRate.IsZero() {
+		switch s.Side {
+		case types.SideTypeBuy:
 			change := price.Sub(s.latestHigh).Div(s.latestHigh)
 			if change.Compare(s.CallbackRate) >= 0 {
 				// submit order
 				return s.triggerStop(price)
 			}
+		case types.SideTypeSell:
+			change := s.latestHigh.Sub(price).Div(s.latestHigh)
+			if change.Compare(s.CallbackRate) >= 0 {
+				// submit order
+				return s.triggerStop(price)
+			}
+		default:
+			if position.IsLong() {
+				change := s.latestHigh.Sub(price).Div(s.latestHigh)
+				if change.Compare(s.CallbackRate) >= 0 {
+					// submit order
+					return s.triggerStop(price)
+				}
+			} else if position.IsShort() {
+				change := price.Sub(s.latestHigh).Div(s.latestHigh)
+				if change.Compare(s.CallbackRate) >= 0 {
+					// submit order
+					return s.triggerStop(price)
+				}
+			}
+		}
+	}
+
+	if !s.CallbackProfitRate.IsZero() {
+		if s.latestHighProfit.IsZero() {
+			s.latestHighProfit = position.UnrealizedProfit(price)
+		} else {
+			profit := position.UnrealizedProfit(price)
+			change := s.latestHighProfit.Sub(profit).Div(s.latestHighProfit)
+			if change.Compare(s.CallbackProfitRate) >= 0 {
+				// submit order
+				return s.triggerStop(price)
+			}
+			s.latestHighProfit = fixedpoint.Max(profit, s.latestHighProfit)
 		}
 	}
 
@@ -177,16 +197,32 @@ func (s *TrailingStop2) triggerStop(price fixedpoint.Value) error {
 	defer func() {
 		s.activated = false
 		s.latestHigh = fixedpoint.Zero
+		s.latestHighProfit = fixedpoint.Zero
 	}()
 
-	Notify("[TrailingStop] %s %s tailingStop is triggered. price: %f callbackRate: %s", s.Symbol, s.ActivationRatio.Percentage(), price.Float64(), s.CallbackRate.Percentage())
+	message := fmt.Sprintf("[TrailingStop] %s %s tailingStop is triggered. price: %f ",
+		s.Symbol, s.ActivationRatio.Percentage(), price.Float64())
+	if !s.CallbackRate.IsZero() {
+		message += fmt.Sprintf(" callbackRate: %s", s.CallbackRate.Percentage())
+	}
+	if !s.CallbackProfitRate.IsZero() {
+		message += fmt.Sprintf(" callbackProfitRate: %s", s.CallbackProfitRate.Percentage())
+	}
+	Notify("%s", message)
+
 	ctx := context.Background()
 	p := fixedpoint.One
 	if !s.ClosePosition.IsZero() {
 		p = s.ClosePosition
 	}
 
-	tagName := fmt.Sprintf("trailingStop:activation=%s,callback=%s", s.ActivationRatio.Percentage(), s.CallbackRate.Percentage())
+	tagName := fmt.Sprintf("trailingStop:activation=%s", s.ActivationRatio.Percentage())
+	if !s.CallbackRate.IsZero() {
+		tagName += fmt.Sprintf(",callback=%s", s.CallbackRate.Percentage())
+	}
+	if !s.CallbackProfitRate.IsZero() {
+		tagName += fmt.Sprintf(",callbackProfit=%s", s.CallbackProfitRate.Percentage())
+	}
 
 	return s.orderExecutor.ClosePosition(ctx, p, tagName)
 }
