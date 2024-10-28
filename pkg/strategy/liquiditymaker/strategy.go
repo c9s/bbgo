@@ -392,7 +392,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	if s.stopEMA != nil {
 		emaPrice := fixedpoint.NewFromFloat(s.stopEMA.Last(0))
 		if midPrice.Compare(emaPrice) > 0 {
-			s.logger.Infof("mid price %f < stop ema price %f, turning off ask orders", midPrice.Float64(), emaPrice.Float64())
+			s.logger.Infof("mid price %f > stop ema price %f, turning off bid orders", midPrice.Float64(), emaPrice.Float64())
 			placeBid = false
 		}
 
@@ -444,6 +444,8 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 			}
 		}
 	}
+
+	s.logger.Infof("place bid: %v, place ask: %v", placeBid, placeAsk)
 
 	var bidExposureInUsd = fixedpoint.Zero
 	var askExposureInUsd = fixedpoint.Zero
