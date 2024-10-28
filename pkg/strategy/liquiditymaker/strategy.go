@@ -99,7 +99,7 @@ func (s *Strategy) Initialize() error {
 	s.metricsLabels = prometheus.Labels{
 		"strategy_type": ID,
 		"strategy_id":   s.InstanceID(),
-		"exchange":      string(s.Session.Exchange.Name()),
+		"exchange":      "", // FIXME
 		"symbol":        s.Symbol,
 	}
 
