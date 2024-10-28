@@ -21,7 +21,7 @@ import (
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/strategy/xmaker"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/timejitter"
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
 
@@ -409,10 +409,10 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) quoteWorker(ctx context.Context) {
-	updateTicker := time.NewTicker(util.MillisecondsJitter(s.FastLayerUpdateInterval.Duration(), 200))
+	updateTicker := time.NewTicker(timejitter.Milliseconds(s.FastLayerUpdateInterval.Duration(), 200))
 	defer updateTicker.Stop()
 
-	fullReplenishTicker := time.NewTicker(util.MillisecondsJitter(s.FullReplenishInterval.Duration(), 200))
+	fullReplenishTicker := time.NewTicker(timejitter.Milliseconds(s.FullReplenishInterval.Duration(), 200))
 	defer fullReplenishTicker.Stop()
 
 	// clean up the previous open orders
@@ -456,7 +456,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 }
 
 func (s *Strategy) hedgeWorker(ctx context.Context) {
-	ticker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
+	ticker := time.NewTicker(timejitter.Milliseconds(s.HedgeInterval.Duration(), 200))
 	defer ticker.Stop()
 
 	for {

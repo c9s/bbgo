@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -135,6 +136,22 @@ func (s *Strategy) Defaults() error {
 	return nil
 }
 
+func (s *Strategy) liquidityWorker(ctx context.Context, interval types.Interval) {
+	ticker := time.NewTicker(interval.Duration())
+	defer ticker.Stop()
+
+	s.placeLiquidityOrders(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			s.placeLiquidityOrders(ctx)
+		}
+	}
+}
+
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	if s.ProfitFixerBundle.ProfitFixerConfig != nil {
 		market, _ := session.Market(s.Symbol)
@@ -182,19 +199,28 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		return err
 	}
 
-	session.UserDataStream.OnStart(func() {
-		s.placeLiquidityOrders(ctx)
-	})
-
 	session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
 		if k.Interval == s.AdjustmentUpdateInterval {
 			s.placeAdjustmentOrders(ctx)
 		}
-
-		if k.Interval == s.LiquidityUpdateInterval {
-			s.placeLiquidityOrders(ctx)
-		}
 	})
+
+	if intervalProvider, ok := session.Exchange.(types.CustomIntervalProvider); ok {
+		if intervalProvider.IsSupportedInterval(s.LiquidityUpdateInterval) {
+			session.UserDataStream.OnAuth(func() {
+				s.placeLiquidityOrders(ctx)
+			})
+			session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
+				if k.Interval == s.LiquidityUpdateInterval {
+					s.placeLiquidityOrders(ctx)
+				}
+			})
+		} else {
+			session.UserDataStream.OnStart(func() {
+				go s.liquidityWorker(ctx, s.LiquidityUpdateInterval)
+			})
+		}
+	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
