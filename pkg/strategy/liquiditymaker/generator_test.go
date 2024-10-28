@@ -123,7 +123,7 @@ func TestLiquidityOrderGenerator(t *testing.T) {
 		assert.InDelta(t, 1000.0, totalQuoteQuantity.Float64(), 1.0)
 
 		AssertOrdersPriceSideQuantityFromText(t, `
-		BUY,0.2899,65.41
+  		BUY,0.2899,65.41
         BUY,0.2868,68.61
         BUY,0.2837,71.97
         BUY,0.2806,75.5
@@ -136,6 +136,23 @@ func TestLiquidityOrderGenerator(t *testing.T) {
         BUY,0.2589,105.5
         BUY,0.2558,110.67
         BUY,0.2527,116.09
-		`, orders[0:13])
+        BUY,0.2496,121.77
+        BUY,0.2465,127.74
+        BUY,0.2434,133.99
+        BUY,0.2403,140.55
+        BUY,0.2372,147.44
+        BUY,0.2341,154.65
+        BUY,0.231,162.23
+        BUY,0.2279,170.17
+        BUY,0.2248,178.5
+        BUY,0.2217,187.24
+        BUY,0.2186,196.41
+        BUY,0.2155,206.03
+        BUY,0.2124,216.12
+        BUY,0.2093,226.7
+        BUY,0.2062,237.8
+        BUY,0.2031,249.44
+        BUY,0.2,261.66
+		`, orders)
 	})
 }

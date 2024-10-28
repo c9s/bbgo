@@ -62,17 +62,19 @@ func AssertOrdersPriceSideQuantityFromText(
 ) {
 	asserts := ParsePriceSideQuantityAssertions(text)
 	assert.Equalf(t, len(asserts), len(orders), "expecting %d orders", len(asserts))
-	actualInText := "Actual Orders:\n"
 	for i, a := range asserts {
 		order := orders[i]
 		assert.Equalf(t, a.Price.Float64(), order.Price.Float64(), "order #%d price should be %f", i+1, a.Price.Float64())
 		assert.Equalf(t, a.Quantity.Float64(), order.Quantity.Float64(), "order #%d quantity should be %f", i+1, a.Quantity.Float64())
 		assert.Equalf(t, a.Side, orders[i].Side, "order at price %f should be %s", a.Price.Float64(), a.Side)
 
-		actualInText += fmt.Sprintf("%s,%s,%s\n", order.Side, order.Price.String(), order.Quantity.String())
 	}
 
 	if t.Failed() {
+		actualInText := "Actual Orders:\n"
+		for _, order := range orders {
+			actualInText += fmt.Sprintf("%s,%s,%s\n", order.Side, order.Price.String(), order.Quantity.String())
+		}
 		t.Log(actualInText)
 	}
 }
