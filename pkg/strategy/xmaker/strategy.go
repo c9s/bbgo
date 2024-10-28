@@ -22,6 +22,7 @@ import (
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/timejitter"
 )
 
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
@@ -1426,7 +1427,7 @@ func (s *Strategy) Validate() error {
 }
 
 func (s *Strategy) quoteWorker(ctx context.Context) {
-	ticker := time.NewTicker(util.MillisecondsJitter(s.UpdateInterval.Duration(), 200))
+	ticker := time.NewTicker(timejitter.Milliseconds(s.UpdateInterval.Duration(), 200))
 	defer ticker.Stop()
 
 	defer func() {
@@ -1500,7 +1501,7 @@ func (s *Strategy) houseCleanWorker(ctx context.Context) {
 }
 
 func (s *Strategy) hedgeWorker(ctx context.Context) {
-	ticker := time.NewTicker(util.MillisecondsJitter(s.HedgeInterval.Duration(), 200))
+	ticker := time.NewTicker(timejitter.Milliseconds(s.HedgeInterval.Duration(), 200))
 	defer ticker.Stop()
 
 	profitChanged := false
