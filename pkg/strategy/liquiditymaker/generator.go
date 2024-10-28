@@ -46,6 +46,14 @@ func (g *LiquidityOrderGenerator) Generate(
 		g.logger = logger
 	}
 
+	g.logger.Infof("generating %s orders with total amount %s from price %s to price %s with %d layers",
+		side,
+		totalAmount.String(),
+		startPrice.String(),
+		endPrice.String(),
+		numLayers,
+	)
+
 	layerSpread := endPrice.Sub(startPrice).Div(fixedpoint.NewFromInt(int64(numLayers - 1)))
 	switch side {
 	case types.SideTypeSell:
@@ -58,6 +66,8 @@ func (g *LiquidityOrderGenerator) Generate(
 			layerSpread = g.Market.TickSize.Neg()
 		}
 	}
+
+	g.logger.Infof("side %s layer spread: %s", side, layerSpread.String())
 
 	quantityBase := 0.0
 	var layerPrices []fixedpoint.Value

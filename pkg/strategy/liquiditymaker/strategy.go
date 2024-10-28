@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/dbg"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
@@ -79,7 +81,8 @@ type Strategy struct {
 
 	orderGenerator *LiquidityOrderGenerator
 
-	logger log.FieldLogger
+	logger        log.FieldLogger
+	metricsLabels prometheus.Labels
 }
 
 func (s *Strategy) Initialize() error {
@@ -87,9 +90,19 @@ func (s *Strategy) Initialize() error {
 		s.Strategy = &common.Strategy{}
 	}
 
-	s.logger = log.WithField("strategy", ID).WithFields(log.Fields{
-		"symbol": s.Symbol,
+	s.logger = log.WithFields(log.Fields{
+		"symbol":      s.Symbol,
+		"strategy":    ID,
+		"strategy_id": s.InstanceID(),
 	})
+
+	s.metricsLabels = prometheus.Labels{
+		"strategy_type": ID,
+		"strategy_id":   s.InstanceID(),
+		"exchange":      string(s.Session.Exchange.Name()),
+		"symbol":        s.Symbol,
+	}
+
 	return nil
 }
 
@@ -406,6 +419,8 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		}
 	}
 
+	var bidExposureInUsd = fixedpoint.Zero
+	var askExposureInUsd = fixedpoint.Zero
 	var orderForms []types.SubmitOrder
 	if placeBid {
 		bidOrders := s.orderGenerator.Generate(types.SideTypeBuy,
@@ -415,6 +430,7 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 			s.NumOfLiquidityLayers,
 			s.liquidityScale)
 
+		bidExposureInUsd = sumOrderQuoteQuantity(bidOrders)
 		orderForms = append(orderForms, bidOrders...)
 	}
 
@@ -427,8 +443,11 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 			s.liquidityScale)
 
 		askOrders = filterAskOrders(askOrders, baseBal.Available)
+		askExposureInUsd = sumOrderQuoteQuantity(askOrders)
 		orderForms = append(orderForms, askOrders...)
 	}
+
+	dbg.DebugSubmitOrders(s.logger, orderForms)
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
 	if util.LogErr(err, "unable to place liquidity orders") {
@@ -436,6 +455,9 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	}
 
 	s.liquidityOrderBook.Add(createdOrders...)
+
+	openOrderBidExposureInUsdMetrics.With(s.metricsLabels).Set(bidExposureInUsd.Float64())
+	openOrderAskExposureInUsdMetrics.With(s.metricsLabels).Set(askExposureInUsd.Float64())
 
 	s.logger.Infof("%d liq orders are placed successfully", len(orderForms))
 	for _, o := range createdOrders {
@@ -459,6 +481,14 @@ func profitProtectedPrice(
 
 	}
 	return price
+}
+
+func sumOrderQuoteQuantity(orders []types.SubmitOrder) fixedpoint.Value {
+	sum := fixedpoint.Zero
+	for _, order := range orders {
+		sum = sum.Add(order.Price.Mul(order.Quantity))
+	}
+	return sum
 }
 
 func filterAskOrders(askOrders []types.SubmitOrder, available fixedpoint.Value) (out []types.SubmitOrder) {
