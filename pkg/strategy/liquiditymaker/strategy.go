@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/dbg"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
@@ -429,6 +430,8 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		askOrders = filterAskOrders(askOrders, baseBal.Available)
 		orderForms = append(orderForms, askOrders...)
 	}
+
+	dbg.DebugSubmitOrders(s.logger, orderForms)
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
 	if util.LogErr(err, "unable to place liquidity orders") {

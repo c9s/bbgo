@@ -6,10 +6,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/pkg/errors"
 )
 
 var recoverSinceLimit = time.Date(2024, time.January, 29, 12, 0, 0, 0, time.Local)
@@ -65,7 +66,7 @@ func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, or
 
 	// dca stop at take-profit order stage
 	if len(currentRound.TakeProfitOrders) > 0 {
-		openedOrders, cancelledOrders, filledOrders, unexpectedOrders := classifyOrders(currentRound.TakeProfitOrders)
+		openedOrders, cancelledOrders, filledOrders, unexpectedOrders := types.ClassifyOrdersByStatus(currentRound.TakeProfitOrders)
 
 		if len(unexpectedOrders) > 0 {
 			return None, fmt.Errorf("there is unexpected status in orders %+v", unexpectedOrders)
@@ -96,7 +97,7 @@ func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, or
 	}
 
 	// collect open-position orders' status
-	openedOrders, cancelledOrders, filledOrders, unexpectedOrders := classifyOrders(currentRound.OpenPositionOrders)
+	openedOrders, cancelledOrders, filledOrders, unexpectedOrders := types.ClassifyOrdersByStatus(currentRound.OpenPositionOrders)
 	if len(unexpectedOrders) > 0 {
 		return None, fmt.Errorf("there is unexpected status of orders %+v", unexpectedOrders)
 	}
@@ -124,7 +125,9 @@ func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, or
 	return OpenPositionOrdersCancelling, nil
 }
 
-func recoverPosition(ctx context.Context, position *types.Position, currentRound Round, queryService types.ExchangeOrderQueryService) error {
+func recoverPosition(
+	ctx context.Context, position *types.Position, currentRound Round, queryService types.ExchangeOrderQueryService,
+) error {
 	if position == nil {
 		return fmt.Errorf("position is nil, please check it")
 	}
@@ -190,21 +193,4 @@ func recoverStartTimeOfNextRound(ctx context.Context, currentRound Round, coolDo
 	}
 
 	return startTimeOfNextRound
-}
-
-func classifyOrders(orders []types.Order) (opened, cancelled, filled, unexpected []types.Order) {
-	for _, order := range orders {
-		switch order.Status {
-		case types.OrderStatusNew, types.OrderStatusPartiallyFilled:
-			opened = append(opened, order)
-		case types.OrderStatusFilled:
-			filled = append(filled, order)
-		case types.OrderStatusCanceled:
-			cancelled = append(cancelled, order)
-		default:
-			unexpected = append(unexpected, order)
-		}
-	}
-
-	return opened, cancelled, filled, unexpected
 }
