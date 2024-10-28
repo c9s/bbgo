@@ -118,6 +118,10 @@ func (s *Strategy) InstanceID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.AdjustmentUpdateInterval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LiquidityUpdateInterval})
+
+	if s.StopEMA != nil && s.StopEMA.Interval != "" {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.StopEMA.Interval})
+	}
 }
 
 func (s *Strategy) Defaults() error {
