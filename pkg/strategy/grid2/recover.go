@@ -14,7 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/timejitter"
 )
 
 var syncWindow = -3 * time.Minute
@@ -48,7 +48,7 @@ func (s *Strategy) recoverPeriodically(ctx context.Context) {
 		return
 	}
 
-	interval := util.MillisecondsJitter(25*time.Minute, 10*60*1000)
+	interval := timejitter.Milliseconds(25*time.Minute, 10*60*1000)
 	s.logger.Infof("[Recover] interval: %s", interval)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()

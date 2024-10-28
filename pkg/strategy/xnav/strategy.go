@@ -9,8 +9,8 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
+	"github.com/c9s/bbgo/pkg/util/timejitter"
 
 	"github.com/robfig/cron/v3"
 	"github.com/sirupsen/logrus"
@@ -173,7 +173,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	if s.Interval != "" {
 		go func() {
-			ticker := time.NewTicker(util.MillisecondsJitter(s.Interval.Duration(), 1000))
+			ticker := time.NewTicker(timejitter.Milliseconds(s.Interval.Duration(), 1000))
 			defer ticker.Stop()
 
 			for {

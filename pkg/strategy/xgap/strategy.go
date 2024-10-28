@@ -14,7 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/timejitter"
 )
 
 const ID = "xgap"
@@ -169,7 +169,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	go func() {
 		ticker := time.NewTicker(
-			util.MillisecondsJitter(s.UpdateInterval.Duration(), 1000),
+			timejitter.Milliseconds(s.UpdateInterval.Duration(), 1000),
 		)
 		defer ticker.Stop()
 
@@ -187,7 +187,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				}
 
 				// < 10 seconds jitter sleep
-				delay := util.MillisecondsJitter(s.UpdateInterval.Duration(), 10*1000)
+				delay := timejitter.Milliseconds(s.UpdateInterval.Duration(), 10*1000)
 				if delay < s.UpdateInterval.Duration() {
 					time.Sleep(delay)
 				}

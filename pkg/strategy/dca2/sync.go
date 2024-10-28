@@ -7,7 +7,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/strategy/common"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/util/timejitter"
 )
 
 func (s *Strategy) syncPeriodically(ctx context.Context) {
@@ -18,7 +18,7 @@ func (s *Strategy) syncPeriodically(ctx context.Context) {
 	defer syncPersistenceTicker.Stop()
 
 	// sync active orders
-	syncActiveOrdersTicker := time.NewTicker(util.MillisecondsJitter(10*time.Minute, 5*60*1000))
+	syncActiveOrdersTicker := time.NewTicker(timejitter.Milliseconds(10*time.Minute, 5*60*1000))
 	defer syncActiveOrdersTicker.Stop()
 
 	for {
