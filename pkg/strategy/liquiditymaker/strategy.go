@@ -447,6 +447,8 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 
 	s.logger.Infof("place bid: %v, place ask: %v", placeBid, placeAsk)
 
+	s.logger.Infof("bid liquidity amount %f, ask liquidity amount %f", s.BidLiquidityAmount.Float64(), s.AskLiquidityAmount.Float64())
+
 	var bidExposureInUsd = fixedpoint.Zero
 	var askExposureInUsd = fixedpoint.Zero
 	var orderForms []types.SubmitOrder
