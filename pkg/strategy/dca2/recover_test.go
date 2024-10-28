@@ -165,7 +165,7 @@ func Test_classifyOrders(t *testing.T) {
 		types.Order{Status: types.OrderStatusCanceled},
 	}
 
-	opened, cancelled, filled, unexpected := classifyOrders(orders)
+	opened, cancelled, filled, unexpected := types.ClassifyOrdersByStatus(orders)
 	assert.Equal(t, 3, len(opened))
 	assert.Equal(t, 4, len(cancelled))
 	assert.Equal(t, 2, len(filled))
