@@ -80,7 +80,7 @@ var orderPlacementStatusMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_order_placement_status",
 		Help: "",
-	}, generalLabels)
+	}, append(generalLabels, "side"))
 
 var liquidityPriceRangeMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
