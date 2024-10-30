@@ -2,71 +2,91 @@ package liquiditymaker
 
 import "github.com/prometheus/client_golang/prometheus"
 
+var generalLabels = []string{"strategy_type", "strategy_id", "exchange", "symbol"}
+
+var spreadMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "liqmaker_spread",
+		Help: "",
+	}, generalLabels)
+
+var tickerBidMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "liqmaker_ticker_bid",
+		Help: "",
+	}, generalLabels)
+
+var tickerAskMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "liqmaker_ticker_ask",
+		Help: "",
+	}, generalLabels)
+
 var openOrderBidExposureInUsdMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_open_order_bid_exposure_in_usd",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+	}, generalLabels)
 
 var openOrderAskExposureInUsdMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_open_order_ask_exposure_in_usd",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+	}, generalLabels)
 
 var askLiquidityAmountMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_ask_liquidity_amount",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+	}, generalLabels)
 
 var bidLiquidityAmountMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_bid_liquidity_amount",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+	}, generalLabels)
 
 var askLiquidityPriceHighMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_ask_liquidity_price_high",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+	}, generalLabels)
 
 var askLiquidityPriceLowMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_ask_liquidity_price_low",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+	}, generalLabels)
 
 var bidLiquidityPriceHighMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_bid_liquidity_price_high",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+	}, generalLabels)
 
 var bidLiquidityPriceLowMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_bid_liquidity_price_low",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+	}, generalLabels)
 
 var midPriceMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_mid_price",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+	}, generalLabels)
 
 var orderPlacementStatusMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_order_placement_status",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol", "side"})
+	}, generalLabels)
 
 var liquidityPriceRangeMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_liquidity_price_range",
 		Help: "",
-	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+	}, generalLabels)
 
 func init() {
 	prometheus.MustRegister(
@@ -86,5 +106,10 @@ func init() {
 		bidLiquidityPriceLowMetrics,
 
 		orderPlacementStatusMetrics,
+
+		tickerBidMetrics,
+		tickerAskMetrics,
+
+		spreadMetrics,
 	)
 }
