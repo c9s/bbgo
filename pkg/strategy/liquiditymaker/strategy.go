@@ -86,27 +86,6 @@ type Strategy struct {
 	metricsLabels prometheus.Labels
 }
 
-func (s *Strategy) Initialize() error {
-	if s.Strategy == nil {
-		s.Strategy = &common.Strategy{}
-	}
-
-	s.logger = log.WithFields(log.Fields{
-		"symbol":      s.Symbol,
-		"strategy":    ID,
-		"strategy_id": s.InstanceID(),
-	})
-
-	s.metricsLabels = prometheus.Labels{
-		"strategy_type": ID,
-		"strategy_id":   s.InstanceID(),
-		"exchange":      "", // FIXME
-		"symbol":        s.Symbol,
-	}
-
-	return nil
-}
-
 func (s *Strategy) ID() string {
 	return ID
 }
@@ -140,7 +119,45 @@ func (s *Strategy) Defaults() error {
 	return nil
 }
 
+func (s *Strategy) Initialize() error {
+	if s.Strategy == nil {
+		s.Strategy = &common.Strategy{}
+	}
+
+	s.logger = log.WithFields(log.Fields{
+		"symbol":      s.Symbol,
+		"strategy":    ID,
+		"strategy_id": s.InstanceID(),
+	})
+
+	s.metricsLabels = prometheus.Labels{
+		"strategy_type": ID,
+		"strategy_id":   s.InstanceID(),
+		"exchange":      "", // FIXME
+		"symbol":        s.Symbol,
+	}
+
+	return nil
+}
+
+func (s *Strategy) updateMarketMetrics(ctx context.Context) error {
+	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	currentSpread := ticker.Sell.Sub(ticker.Buy)
+
+	tickerBidMetrics.With(s.metricsLabels).Set(ticker.Buy.Float64())
+	tickerAskMetrics.With(s.metricsLabels).Set(ticker.Sell.Float64())
+	spreadMetrics.With(s.metricsLabels).Set(currentSpread.Float64())
+	return nil
+}
+
 func (s *Strategy) liquidityWorker(ctx context.Context, interval types.Interval) {
+	metricsTicker := time.NewTicker(5 * time.Second)
+	defer metricsTicker.Stop()
+
 	ticker := time.NewTicker(interval.Duration())
 	defer ticker.Stop()
 
@@ -149,6 +166,9 @@ func (s *Strategy) liquidityWorker(ctx context.Context, interval types.Interval)
 		select {
 		case <-ctx.Done():
 			return
+
+		case <-metricsTicker.C:
+			s.updateMarketMetrics(ctx)
 
 		case <-ticker.C:
 			s.placeLiquidityOrders(ctx)
@@ -175,6 +195,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	if s.StopEMA != nil && s.StopEMA.Enabled {
 		s.stopEMA = session.Indicators(s.Symbol).EMA(s.StopEMA.IntervalWindow)
 	}
+
+	s.metricsLabels["exchange"] = session.ExchangeName.String()
 
 	s.orderGenerator = &LiquidityOrderGenerator{
 		Symbol: s.Symbol,
@@ -359,12 +381,12 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 
 	s.logger.Infof("ticker: %+v", ticker)
 
-	lastTradedPrice := ticker.Last
+	lastTradedPrice := ticker.GetValidPrice()
 	midPrice := ticker.Sell.Add(ticker.Buy).Div(fixedpoint.Two)
 	currentSpread := ticker.Sell.Sub(ticker.Buy)
 	sideSpread := s.Spread.Div(fixedpoint.Two)
 
-	if s.UseLastTradePrice && !lastTradedPrice.IsZero() {
+	if !lastTradedPrice.IsZero() && (s.UseLastTradePrice || midPrice.IsZero()) {
 		midPrice = lastTradedPrice
 	}
 
@@ -379,6 +401,8 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		sideSpread.Float64(),
 		ask1Price.Float64(), askLastPrice.Float64(),
 		bid1Price.Float64(), bidLastPrice.Float64())
+
+	midPriceMetrics.With(s.metricsLabels).Set(midPrice.Float64())
 
 	placeBid := true
 	placeAsk := true
@@ -456,17 +480,14 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	var bidExposureInUsd = fixedpoint.Zero
 	var askExposureInUsd = fixedpoint.Zero
 	var orderForms []types.SubmitOrder
-	if placeBid {
-		bidOrders := s.orderGenerator.Generate(types.SideTypeBuy,
-			fixedpoint.Min(s.BidLiquidityAmount, quoteBal.Available),
-			bid1Price,
-			bidLastPrice,
-			s.NumOfLiquidityLayers,
-			s.liquidityScale)
 
-		bidExposureInUsd = sumOrderQuoteQuantity(bidOrders)
-		orderForms = append(orderForms, bidOrders...)
-	}
+	orderPlacementStatusMetrics.With(extendLabels(s.metricsLabels, prometheus.Labels{
+		"side": "bid",
+	})).Set(bool2float(placeBid))
+
+	orderPlacementStatusMetrics.With(extendLabels(s.metricsLabels, prometheus.Labels{
+		"side": "ask",
+	})).Set(bool2float(placeAsk))
 
 	if placeAsk {
 		askOrders := s.orderGenerator.Generate(types.SideTypeSell,
@@ -477,8 +498,36 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 			s.liquidityScale)
 
 		askOrders = filterAskOrders(askOrders, baseBal.Available)
+
+		if len(askOrders) > 0 {
+			askLiquidityPriceLowMetrics.With(s.metricsLabels).Set(askOrders[0].Price.Float64())
+			askLiquidityPriceHighMetrics.With(s.metricsLabels).Set(askOrders[len(askOrders)-1].Price.Float64())
+		}
+
 		askExposureInUsd = sumOrderQuoteQuantity(askOrders)
 		orderForms = append(orderForms, askOrders...)
+	}
+
+	bidLiquidityAmountMetrics.With(s.metricsLabels).Set(s.BidLiquidityAmount.Float64())
+	askLiquidityAmountMetrics.With(s.metricsLabels).Set(s.AskLiquidityAmount.Float64())
+	liquidityPriceRangeMetrics.With(s.metricsLabels).Set(s.LiquidityPriceRange.Float64())
+
+	if placeBid {
+		bidOrders := s.orderGenerator.Generate(types.SideTypeBuy,
+			fixedpoint.Min(s.BidLiquidityAmount, quoteBal.Available),
+			bid1Price,
+			bidLastPrice,
+			s.NumOfLiquidityLayers,
+			s.liquidityScale)
+
+		bidExposureInUsd = sumOrderQuoteQuantity(bidOrders)
+
+		if len(bidOrders) > 0 {
+			bidLiquidityPriceHighMetrics.With(s.metricsLabels).Set(bidOrders[0].Price.Float64())
+			bidLiquidityPriceLowMetrics.With(s.metricsLabels).Set(bidOrders[len(bidOrders)-1].Price.Float64())
+		}
+
+		orderForms = append(orderForms, bidOrders...)
 	}
 
 	dbg.DebugSubmitOrders(s.logger, orderForms)
@@ -537,4 +586,22 @@ func filterAskOrders(askOrders []types.SubmitOrder, available fixedpoint.Value) 
 	}
 
 	return out
+}
+
+func extendLabels(a, o prometheus.Labels) prometheus.Labels {
+	for k, v := range a {
+		if _, exists := o[k]; !exists {
+			o[k] = v
+		}
+	}
+
+	return o
+}
+
+func bool2float(b bool) float64 {
+	if b {
+		return 1.0
+	} else {
+		return -1.0
+	}
 }
