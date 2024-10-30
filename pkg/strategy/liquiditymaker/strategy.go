@@ -140,7 +140,24 @@ func (s *Strategy) Initialize() error {
 	return nil
 }
 
+func (s *Strategy) updateMarketMetrics(ctx context.Context) error {
+	ticker, err := s.Session.Exchange.QueryTicker(ctx, s.Symbol)
+	if err != nil {
+		return err
+	}
+
+	currentSpread := ticker.Sell.Sub(ticker.Buy)
+
+	tickerBidMetrics.With(s.metricsLabels).Set(ticker.Buy.Float64())
+	tickerAskMetrics.With(s.metricsLabels).Set(ticker.Sell.Float64())
+	spreadMetrics.With(s.metricsLabels).Set(currentSpread.Float64())
+	return nil
+}
+
 func (s *Strategy) liquidityWorker(ctx context.Context, interval types.Interval) {
+	metricsTicker := time.NewTicker(5 * time.Second)
+	defer metricsTicker.Stop()
+
 	ticker := time.NewTicker(interval.Duration())
 	defer ticker.Stop()
 
@@ -149,6 +166,9 @@ func (s *Strategy) liquidityWorker(ctx context.Context, interval types.Interval)
 		select {
 		case <-ctx.Done():
 			return
+
+		case <-metricsTicker.C:
+			s.updateMarketMetrics(ctx)
 
 		case <-ticker.C:
 			s.placeLiquidityOrders(ctx)
