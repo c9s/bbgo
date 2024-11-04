@@ -45,7 +45,8 @@ type Strategy struct {
 
 	Assets []string `json:"assets"`
 
-	Interval types.Duration `json:"interval"`
+	Interval      types.Duration `json:"interval"`
+	TransferDelay types.Duration `json:"transferDelay"`
 
 	marginTransferService marginTransferService
 	depositHistoryService types.ExchangeTransferService
@@ -70,6 +71,14 @@ func (s *Strategy) Defaults() error {
 		s.Interval = types.Duration(5 * time.Minute)
 	}
 
+	if s.TransferDelay == 0 {
+		s.TransferDelay = types.Duration(3 * time.Second)
+	}
+
+	return nil
+}
+
+func (s *Strategy) Initialize() error {
 	if s.logger == nil {
 		s.logger = log.Dup()
 	}
@@ -144,6 +153,13 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 		if len(succeededDeposits) == 0 {
 			logger.Debugf("no %s deposit found", asset)
 			continue
+		} else {
+			logger.Infof("found %d %s deposits", len(succeededDeposits), asset)
+		}
+
+		if s.TransferDelay > 0 {
+			logger.Infof("delaying transfer for %s...", s.TransferDelay.Duration())
+			time.Sleep(s.TransferDelay.Duration())
 		}
 
 		for _, d := range succeededDeposits {
@@ -168,11 +184,19 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 					continue
 				}
 
-				if bal, ok := account.Balance(d.Asset); ok {
+				bal, ok := account.Balance(d.Asset)
+				if ok {
 					logger.Infof("spot account balance %s: %+v", d.Asset, bal)
 					amount = fixedpoint.Min(bal.Available, amount)
 				} else {
 					logger.Errorf("unexpected error: %s balance not found", d.Asset)
+				}
+
+				if amount.IsZero() || amount.Sign() < 0 {
+					bbgo.Notify("Found succeeded deposit %s %s, but the balance %s %s is insufficient, skip transferring",
+						d.Amount.String(), d.Asset,
+						bal.Available.String(), bal.Currency)
+					continue
 				}
 			}
 
