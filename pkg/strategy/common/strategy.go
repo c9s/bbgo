@@ -38,7 +38,9 @@ type Strategy struct {
 	RiskController
 }
 
-func (s *Strategy) Initialize(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string) {
+func (s *Strategy) Initialize(
+	ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string,
+) {
 	s.parent = ctx
 	s.ctx, s.cancel = context.WithCancel(ctx)
 
@@ -92,6 +94,7 @@ func (s *Strategy) IsHalted(t time.Time) bool {
 	if s.circuitBreakRiskControl == nil {
 		return false
 	}
+
 	_, isHalted := s.circuitBreakRiskControl.IsHalted(t)
 	return isHalted
 }

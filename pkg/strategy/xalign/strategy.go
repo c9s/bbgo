@@ -436,6 +436,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	return nil
 }
 
+func (s *Strategy) resetFaultBalanceRecords(currency string) {
+	s.faultBalanceRecords[currency] = nil
+}
+
 func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
 	now := time.Now()
 	for currency, expectedBalance := range s.ExpectedBalances {
@@ -450,7 +454,7 @@ func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
 			})
 		} else {
 			// reset counter
-			s.faultBalanceRecords[currency] = nil
+			s.resetFaultBalanceRecords(currency)
 		}
 	}
 }
@@ -473,11 +477,18 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 	if err != nil {
 		log.WithError(err).Errorf("unable to check active transfers (withdraw)")
 	} else if pendingWithdraw != nil {
-		log.Warnf("found active transfer (withdraw), skip balance align check")
+		log.Warnf("found active transfer (%f %s withdraw), skip balance align check",
+			pendingWithdraw.Amount.Float64(),
+			pendingWithdraw.Asset)
+
+		s.resetFaultBalanceRecords(pendingWithdraw.Asset)
 
 		if activeTransferNotificationLimiter.Allow() {
-			bbgo.Notify("Found active withdraw, skip balance align", pendingWithdraw)
+			bbgo.Notify("Found active %s withdraw, skip balance align",
+				pendingWithdraw.Asset,
+				pendingWithdraw)
 		}
+
 		return
 	}
 
@@ -485,10 +496,16 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 	if err != nil {
 		log.WithError(err).Errorf("unable to check active transfers (deposit)")
 	} else if pendingDeposit != nil {
-		log.Warnf("found active transfer (deposit), skip balance align check")
+		log.Warnf("found active transfer (%f %s deposit), skip balance align check",
+			pendingDeposit.Amount.Float64(),
+			pendingDeposit.Asset)
+
+		s.resetFaultBalanceRecords(pendingDeposit.Asset)
 
 		if activeTransferNotificationLimiter.Allow() {
-			bbgo.Notify("Found active deposit, skip balance align", pendingDeposit)
+			bbgo.Notify("Found active %s deposit, skip balance align",
+				pendingDeposit.Asset,
+				pendingDeposit)
 		}
 		return
 	}
@@ -502,7 +519,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 		q := s.calculateRefillQuantity(totalBalances, currency, expectedBalance)
 
 		if s.Duration > 0 {
-			log.Infof("checking fault balance records...")
+			log.Infof("checking %s fault balance records...", currency)
 			if faultBalance, ok := s.faultBalanceRecords[currency]; ok && len(faultBalance) > 0 {
 				if time.Since(faultBalance[0].Time) < s.Duration.Duration() {
 					log.Infof("%s fault record since: %s < persistence period %s", currency, faultBalance[0].Time, s.Duration.Duration())
@@ -513,9 +530,13 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 		selectedSession, submitOrder := s.selectSessionForCurrency(ctx, sessions, currency, q)
 		if selectedSession != nil && submitOrder != nil {
-			log.Infof("placing order on %s: %+v", selectedSession.Name, submitOrder)
+			log.Infof("placing %s order on %s: %+v", submitOrder.Symbol, selectedSession.Name, submitOrder)
 
-			bbgo.Notify("Aligning position on exchange session %s, delta: %f", selectedSession.Name, q.Float64(), submitOrder)
+			bbgo.Notify("Aligning %s position on exchange session %s, delta: %f %s, expected balance: %f %s",
+				currency, selectedSession.Name,
+				q.Float64(), currency,
+				expectedBalance.Float64(), currency,
+				submitOrder)
 
 			if s.DryRun {
 				return
@@ -523,7 +544,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 			createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
 			if err != nil {
-				log.WithError(err).Errorf("can not place order")
+				log.WithError(err).Errorf("can not place order: %+v", submitOrder)
 				return
 			}
 
@@ -533,6 +554,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 				} else {
 					log.Errorf("orderbook %s not found", selectedSession.Name)
 				}
+
 				s.orderBooks[selectedSession.Name].Add(*createdOrder)
 			}
 		}
