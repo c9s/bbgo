@@ -1060,9 +1060,11 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 			return false, nil
 		}
 
+		availableQuote := s.makerMarket.TruncateQuoteQuantity(quoteBalance.Available)
+
 		askPvs := s.makerBook.SideBook(types.SideTypeSell)
 		sumPv := aggregatePriceVolumeSliceWithPriceFilter(types.SideTypeSell, askPvs, marginBidPrice)
-		qty := fixedpoint.Min(quoteBalance.Available.Div(sumPv.Price), sumPv.Volume)
+		qty := fixedpoint.Min(availableQuote.Div(sumPv.Price), sumPv.Volume)
 
 		if sourceBase, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
 			qty = fixedpoint.Min(qty, sourceBase.Available)
@@ -1077,6 +1079,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 
 		iocOrders = append(iocOrders, types.SubmitOrder{
 			Symbol:      s.Symbol,
+			Market:      s.makerMarket,
 			Type:        types.OrderTypeLimit,
 			Side:        types.SideTypeBuy,
 			Price:       sumPv.Price,
@@ -1090,9 +1093,11 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 			return false, nil
 		}
 
+		availableBase := s.makerMarket.TruncateQuantity(baseBalance.Available)
+
 		bidPvs := s.makerBook.SideBook(types.SideTypeBuy)
 		sumPv := aggregatePriceVolumeSliceWithPriceFilter(types.SideTypeBuy, bidPvs, marginAskPrice)
-		qty := fixedpoint.Min(baseBalance.Available, sumPv.Volume)
+		qty := fixedpoint.Min(availableBase, sumPv.Volume)
 
 		if sourceQuote, ok := hedgeBalances[s.sourceMarket.QuoteCurrency]; ok {
 			qty = fixedpoint.Min(qty, quote.BestAskPrice.Div(sourceQuote.Available))
@@ -1108,6 +1113,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 		// send ioc order for arbitrage
 		iocOrders = append(iocOrders, types.SubmitOrder{
 			Symbol:      s.Symbol,
+			Market:      s.makerMarket,
 			Type:        types.OrderTypeLimit,
 			Side:        types.SideTypeSell,
 			Price:       sumPv.Price,
