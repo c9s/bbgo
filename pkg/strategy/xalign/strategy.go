@@ -436,6 +436,10 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	return nil
 }
 
+func (s *Strategy) resetFaultBalanceRecords(currency string) {
+	s.faultBalanceRecords[currency] = nil
+}
+
 func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
 	now := time.Now()
 	for currency, expectedBalance := range s.ExpectedBalances {
@@ -450,7 +454,7 @@ func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
 			})
 		} else {
 			// reset counter
-			s.faultBalanceRecords[currency] = nil
+			s.resetFaultBalanceRecords(currency)
 		}
 	}
 }
@@ -473,11 +477,18 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 	if err != nil {
 		log.WithError(err).Errorf("unable to check active transfers (withdraw)")
 	} else if pendingWithdraw != nil {
-		log.Warnf("found active transfer (withdraw), skip balance align check")
+		log.Warnf("found active transfer (%f %s withdraw), skip balance align check",
+			pendingWithdraw.Amount.Float64(),
+			pendingWithdraw.Asset)
+
+		s.resetFaultBalanceRecords(pendingWithdraw.Asset)
 
 		if activeTransferNotificationLimiter.Allow() {
-			bbgo.Notify("Found active withdraw, skip balance align", pendingWithdraw)
+			bbgo.Notify("Found active %s withdraw, skip balance align",
+				pendingWithdraw.Asset,
+				pendingWithdraw)
 		}
+
 		return
 	}
 
@@ -485,10 +496,16 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 	if err != nil {
 		log.WithError(err).Errorf("unable to check active transfers (deposit)")
 	} else if pendingDeposit != nil {
-		log.Warnf("found active transfer (deposit), skip balance align check")
+		log.Warnf("found active transfer (%f %s deposit), skip balance align check",
+			pendingDeposit.Amount.Float64(),
+			pendingDeposit.Asset)
+
+		s.resetFaultBalanceRecords(pendingDeposit.Asset)
 
 		if activeTransferNotificationLimiter.Allow() {
-			bbgo.Notify("Found active deposit, skip balance align", pendingDeposit)
+			bbgo.Notify("Found active %s deposit, skip balance align",
+				pendingDeposit.Asset,
+				pendingDeposit)
 		}
 		return
 	}
