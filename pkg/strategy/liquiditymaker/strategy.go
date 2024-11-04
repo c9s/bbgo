@@ -168,7 +168,9 @@ func (s *Strategy) liquidityWorker(ctx context.Context, interval types.Interval)
 			return
 
 		case <-metricsTicker.C:
-			s.updateMarketMetrics(ctx)
+			if err := s.updateMarketMetrics(ctx); err != nil {
+				s.logger.WithError(err).Errorf("unable to update market metrics")
+			}
 
 		case <-ticker.C:
 			s.placeLiquidityOrders(ctx)
