@@ -515,7 +515,11 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 		if selectedSession != nil && submitOrder != nil {
 			log.Infof("placing %s order on %s: %+v", submitOrder.Symbol, selectedSession.Name, submitOrder)
 
-			bbgo.Notify("Aligning %s position on exchange session %s, delta: %f", currency, selectedSession.Name, q.Float64(), submitOrder)
+			bbgo.Notify("Aligning %s position on exchange session %s, delta: %f %s, expected balance: %f %s",
+				currency, selectedSession.Name,
+				q.Float64(), currency,
+				expectedBalance.Float64(), currency,
+				submitOrder)
 
 			if s.DryRun {
 				return
