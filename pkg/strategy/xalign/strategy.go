@@ -502,7 +502,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 		q := s.calculateRefillQuantity(totalBalances, currency, expectedBalance)
 
 		if s.Duration > 0 {
-			log.Infof("checking fault balance records...")
+			log.Infof("checking %s fault balance records...", currency)
 			if faultBalance, ok := s.faultBalanceRecords[currency]; ok && len(faultBalance) > 0 {
 				if time.Since(faultBalance[0].Time) < s.Duration.Duration() {
 					log.Infof("%s fault record since: %s < persistence period %s", currency, faultBalance[0].Time, s.Duration.Duration())
@@ -513,9 +513,9 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 		selectedSession, submitOrder := s.selectSessionForCurrency(ctx, sessions, currency, q)
 		if selectedSession != nil && submitOrder != nil {
-			log.Infof("placing order on %s: %+v", selectedSession.Name, submitOrder)
+			log.Infof("placing %s order on %s: %+v", submitOrder.Symbol, selectedSession.Name, submitOrder)
 
-			bbgo.Notify("Aligning position on exchange session %s, delta: %f", selectedSession.Name, q.Float64(), submitOrder)
+			bbgo.Notify("Aligning %s position on exchange session %s, delta: %f", currency, selectedSession.Name, q.Float64(), submitOrder)
 
 			if s.DryRun {
 				return
@@ -523,7 +523,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 			createdOrder, err := selectedSession.Exchange.SubmitOrder(ctx, *submitOrder)
 			if err != nil {
-				log.WithError(err).Errorf("can not place order")
+				log.WithError(err).Errorf("can not place order: %+v", submitOrder)
 				return
 			}
 
@@ -533,6 +533,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 				} else {
 					log.Errorf("orderbook %s not found", selectedSession.Name)
 				}
+
 				s.orderBooks[selectedSession.Name].Add(*createdOrder)
 			}
 		}
