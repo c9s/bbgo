@@ -54,7 +54,8 @@ func (n *Notifier) worker() {
 			return
 
 		case task := <-n.taskC:
-			limiter.Wait(ctx)
+			// ignore the wait error
+			_ = limiter.Wait(ctx)
 
 			_, _, err := n.client.PostMessageContext(ctx, task.Channel, task.Opts...)
 			if err != nil {
@@ -66,7 +67,40 @@ func (n *Notifier) worker() {
 	}
 }
 
+func (n *Notifier) PostLiveNote(note *types.LiveNote) error {
+	ctx := context.Background()
+
+	channel := note.ChannelID
+	if channel == "" {
+		channel = n.channel
+	}
+
+	if note.MessageID != "" {
+		// UpdateMessageContext returns channel, timestamp, text, err
+		_, _, _, err := n.client.UpdateMessageContext(ctx, channel, note.MessageID, slack.MsgOptionText(note.ObjectID(), true))
+		if err != nil {
+			return err
+		}
+
+	} else {
+
+		respCh, respTs, err := n.client.PostMessageContext(ctx, channel)
+		if err != nil {
+			log.WithError(err).
+				WithField("channel", n.channel).
+				Errorf("slack api error: %s", err.Error())
+			return err
+		}
+
+		note.SetChannelID(respCh)
+		note.SetMessageID(respTs)
+	}
+
+	return nil
+}
+
 func (n *Notifier) Notify(obj interface{}, args ...interface{}) {
+	// TODO: filter args for the channel option
 	n.NotifyTo(n.channel, obj, args...)
 }
 
