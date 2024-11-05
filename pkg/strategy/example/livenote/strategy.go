@@ -50,7 +50,8 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 // This strategy simply spent all available quote currency to buy the symbol whenever kline gets closed
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	callback := func(k types.KLine) {
-		// bbgo.PostLiveNote(k)
+		log.Info(k)
+		bbgo.PostLiveNote(&k)
 	}
 
 	// register our kline event handler

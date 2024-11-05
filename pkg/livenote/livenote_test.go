@@ -11,7 +11,7 @@ import (
 
 func TestLiveNotePool(t *testing.T) {
 	t.Run("same-kline", func(t *testing.T) {
-		pool := NewPool()
+		pool := NewPool(100)
 		k := &types.KLine{
 			Symbol:    "BTCUSDT",
 			Interval:  types.Interval1m,
@@ -24,7 +24,7 @@ func TestLiveNotePool(t *testing.T) {
 	})
 
 	t.Run("different-kline", func(t *testing.T) {
-		pool := NewPool()
+		pool := NewPool(100)
 		k := &types.KLine{
 			Symbol:    "BTCUSDT",
 			Interval:  types.Interval1m,

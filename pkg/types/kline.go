@@ -284,8 +284,9 @@ func (k *KLine) SlackAttachment() slack.Attachment {
 				Short: true,
 			},
 		},
-		Footer:     "",
-		FooterIcon: "",
+
+		FooterIcon: ExchangeFooterIcon(k.Exchange),
+		Footer:     k.StartTime.String() + " ~ " + k.EndTime.String(),
 	}
 }
 
