@@ -33,6 +33,10 @@ func (n *LiveNote) ObjectID() string {
 	return n.cachedObjID
 }
 
+func (n *LiveNote) SetObject(object Object) {
+	n.Object = object
+}
+
 func (n *LiveNote) SetMessageID(messageID string) {
 	n.MessageID = messageID
 }
@@ -46,9 +50,9 @@ type Pool struct {
 	mu    sync.Mutex
 }
 
-func NewPool() *Pool {
+func NewPool(size int64) *Pool {
 	return &Pool{
-		notes: make(map[string]*LiveNote, 100),
+		notes: make(map[string]*LiveNote, size),
 	}
 }
 
@@ -60,6 +64,8 @@ func (p *Pool) Update(obj Object) *LiveNote {
 
 	for _, note := range p.notes {
 		if note.ObjectID() == objID {
+			// update the object inside the note
+			note.SetObject(obj)
 			return note
 		}
 	}
