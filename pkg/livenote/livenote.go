@@ -14,6 +14,8 @@ type LiveNote struct {
 	ChannelID string `json:"channelId"`
 
 	Object Object
+
+	cachedObjID string
 }
 
 func NewLiveNote(object Object) *LiveNote {
@@ -23,7 +25,12 @@ func NewLiveNote(object Object) *LiveNote {
 }
 
 func (n *LiveNote) ObjectID() string {
-	return n.Object.ObjectID()
+	if n.cachedObjID != "" {
+		return n.cachedObjID
+	}
+
+	n.cachedObjID = n.Object.ObjectID()
+	return n.cachedObjID
 }
 
 func (n *LiveNote) SetMessageID(messageID string) {
