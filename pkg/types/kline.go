@@ -74,6 +74,10 @@ type KLine struct {
 	Closed         bool   `json:"closed" db:"closed"`
 }
 
+func (k *KLine) ObjectID() string {
+	return "kline-" + k.Symbol + k.Interval.String() + k.StartTime.Time().Format(time.RFC3339)
+}
+
 func (k *KLine) Set(o *KLine) {
 	k.GID = o.GID
 	k.Exchange = o.Exchange
