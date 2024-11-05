@@ -370,8 +370,8 @@ persistence:
 
 查看策略目錄 [strategy](pkg/strategy) 以獲得所有內置策略：
 
-- `pricealert` 策略演示如何使用通知系統 [pricealert](pkg/strategy/pricealert)。參見[文件](./doc/strategy/pricealert.md).
-- `buyandhold` 策略演示如何訂閱 kline 事件並提交市場訂單 [buyandhold](pkg/strategy/pricedrop)
+- `pricealert` 策略演示如何使用通知系統 [pricealert](pkg/strategy/example/pricealert)。參見[文件](./doc/strategy/pricealert.md).
+- `buyandhold` 策略演示如何訂閱 kline 事件並提交市場訂單 [buyandhold](pkg/strategy/example/pricedrop)
 - `bollgrid` 策略實現了一個基本的網格策略，使用內置的布林通道指標 [bollgrid](pkg/strategy/bollgrid)
 - `grid` 策略實現了固定價格帶網格策略 [grid](pkg/strategy/grid)。參見[文件](./doc/strategy/grid.md).
 - `supertrend` 策略使用 Supertrend 指標作為趨勢，並使用 DEMA 指標作為噪聲

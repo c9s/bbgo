@@ -22,8 +22,6 @@ const ID = "xalign"
 
 var log = logrus.WithField("strategy", ID)
 
-var activeTransferNotificationLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
-
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -63,6 +61,8 @@ type Strategy struct {
 	orderBooks map[string]*bbgo.ActiveOrderBook
 
 	orderStore *core.OrderStore
+
+	activeTransferNotificationLimiter *rate.Limiter
 }
 
 func (s *Strategy) ID() string {
@@ -89,6 +89,11 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 func (s *Strategy) Defaults() error {
 	s.BalanceToleranceRange = fixedpoint.NewFromFloat(0.01)
+	return nil
+}
+
+func (s *Strategy) Initialize() error {
+	s.activeTransferNotificationLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
 	return nil
 }
 
@@ -483,7 +488,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 		s.resetFaultBalanceRecords(pendingWithdraw.Asset)
 
-		if activeTransferNotificationLimiter.Allow() {
+		if s.activeTransferNotificationLimiter.Allow() {
 			bbgo.Notify("Found active %s withdraw, skip balance align",
 				pendingWithdraw.Asset,
 				pendingWithdraw)
@@ -502,7 +507,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 		s.resetFaultBalanceRecords(pendingDeposit.Asset)
 
-		if activeTransferNotificationLimiter.Allow() {
+		if s.activeTransferNotificationLimiter.Allow() {
 			bbgo.Notify("Found active %s deposit, skip balance align",
 				pendingDeposit.Asset,
 				pendingDeposit)

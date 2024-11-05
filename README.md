@@ -392,10 +392,10 @@ persistence:
 
 Check out the strategy directory [strategy](pkg/strategy) for all built-in strategies:
 
-- `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/pricealert). See
+- `pricealert` strategy demonstrates how to use the notification system [pricealert](pkg/strategy/example/pricealert). See
   [document](./doc/strategy/pricealert.md).
 - `buyandhold` strategy demonstrates how to subscribe kline events and submit market
-  order [buyandhold](pkg/strategy/pricedrop)
+  order [buyandhold](pkg/strategy/example/pricedrop)
 - `bollgrid` strategy implements a basic grid strategy with the built-in bollinger
   indicator [bollgrid](pkg/strategy/bollgrid)
 - `grid` strategy implements the fixed price band grid strategy [grid](pkg/strategy/grid). See

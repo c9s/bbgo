@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"github.com/c9s/bbgo/pkg/livenote"
 	"github.com/c9s/bbgo/pkg/types"
 
 	log "github.com/sirupsen/logrus"
@@ -26,15 +27,18 @@ type Notifier struct {
 	channel string
 
 	taskC chan notifyTask
+
+	liveNotePool *livenote.Pool
 }
 
 type NotifyOption func(notifier *Notifier)
 
 func New(client *slack.Client, channel string, options ...NotifyOption) *Notifier {
 	notifier := &Notifier{
-		channel: channel,
-		client:  client,
-		taskC:   make(chan notifyTask, 100),
+		channel:      channel,
+		client:       client,
+		taskC:        make(chan notifyTask, 100),
+		liveNotePool: livenote.NewPool(100),
 	}
 
 	for _, o := range options {
@@ -54,7 +58,8 @@ func (n *Notifier) worker() {
 			return
 
 		case task := <-n.taskC:
-			limiter.Wait(ctx)
+			// ignore the wait error
+			_ = limiter.Wait(ctx)
 
 			_, _, err := n.client.PostMessageContext(ctx, task.Channel, task.Opts...)
 			if err != nil {
@@ -66,7 +71,50 @@ func (n *Notifier) worker() {
 	}
 }
 
+func (n *Notifier) PostLiveNote(obj livenote.Object) error {
+	note := n.liveNotePool.Update(obj)
+	ctx := context.Background()
+
+	channel := note.ChannelID
+	if channel == "" {
+		channel = n.channel
+	}
+
+	var attachment slack.Attachment
+	if creator, ok := note.Object.(types.SlackAttachmentCreator); ok {
+		attachment = creator.SlackAttachment()
+	} else {
+		return fmt.Errorf("livenote object does not support types.SlackAttachmentCreator interface")
+	}
+
+	opts := slack.MsgOptionAttachments(attachment)
+
+	if note.MessageID != "" {
+		// UpdateMessageContext returns channel, timestamp, text, err
+		_, _, _, err := n.client.UpdateMessageContext(ctx, channel, note.MessageID, opts)
+		if err != nil {
+			return err
+		}
+
+	} else {
+
+		respCh, respTs, err := n.client.PostMessageContext(ctx, channel, opts)
+		if err != nil {
+			log.WithError(err).
+				WithField("channel", n.channel).
+				Errorf("slack api error: %s", err.Error())
+			return err
+		}
+
+		note.SetChannelID(respCh)
+		note.SetMessageID(respTs)
+	}
+
+	return nil
+}
+
 func (n *Notifier) Notify(obj interface{}, args ...interface{}) {
+	// TODO: filter args for the channel option
 	n.NotifyTo(n.channel, obj, args...)
 }
 
