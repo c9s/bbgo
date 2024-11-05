@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"github.com/c9s/bbgo/pkg/livenote"
 	"github.com/c9s/bbgo/pkg/types"
 
 	log "github.com/sirupsen/logrus"
@@ -67,7 +68,9 @@ func (n *Notifier) worker() {
 	}
 }
 
-func (n *Notifier) PostLiveNote(note *types.LiveNote) error {
+func (n *Notifier) PostLiveNote(obj livenote.Object) error {
+	// TODO: maintain the object pool for live notes
+	var note = livenote.NewLiveNote(obj)
 	ctx := context.Background()
 
 	channel := note.ChannelID
