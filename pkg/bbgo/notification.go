@@ -48,7 +48,9 @@ func (n *NullNotifier) SendPhoto(buffer *bytes.Buffer) {}
 func (n *NullNotifier) SendPhotoTo(channel string, buffer *bytes.Buffer) {}
 
 type Notifiability struct {
-	notifiers            []Notifier
+	notifiers       []Notifier
+	liveNotePosters []LiveNotePoster
+
 	SessionChannelRouter *PatternChannelRouter `json:"-"`
 	SymbolChannelRouter  *PatternChannelRouter `json:"-"`
 	ObjectChannelRouter  *ObjectChannelRouter  `json:"-"`
@@ -81,6 +83,10 @@ func (m *Notifiability) RouteObject(obj interface{}) (channel string, ok bool) {
 // AddNotifier adds the notifier that implements the Notifier interface.
 func (m *Notifiability) AddNotifier(notifier Notifier) {
 	m.notifiers = append(m.notifiers, notifier)
+
+	if poster, ok := notifier.(LiveNotePoster); ok {
+		m.liveNotePosters = append(m.liveNotePosters, poster)
+	}
 }
 
 func (m *Notifiability) Notify(obj interface{}, args ...interface{}) {

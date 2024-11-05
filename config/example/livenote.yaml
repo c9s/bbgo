@@ -1,0 +1,16 @@
+---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "dev-bbgo"
+
+sessions:
+  binance:
+    exchange: binance
+    envVarPrefix: binance
+
+exchangeStrategies:
+- on: binance
+  livenote:
+    symbol: BTCUSDT
+    interval: 5m

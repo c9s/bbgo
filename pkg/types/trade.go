@@ -208,7 +208,6 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 
 	liquidity := trade.Liquidity()
 	text := templateutil.Render(slackTradeTextTemplate, trade)
-	footerIcon := ExchangeFooterIcon(trade.Exchange)
 
 	return slack.Attachment{
 		Text: text,
@@ -225,7 +224,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 			{Title: "Liquidity", Value: liquidity, Short: true},
 			{Title: "Order ID", Value: strconv.FormatUint(trade.OrderID, 10), Short: true},
 		},
-		FooterIcon: footerIcon,
+		FooterIcon: ExchangeFooterIcon(trade.Exchange),
 		Footer:     strings.ToLower(trade.Exchange.String()) + templateutil.Render(" creation time {{ . }}", trade.Time.Time().Format(time.StampMilli)),
 	}
 }

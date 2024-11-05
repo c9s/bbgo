@@ -317,6 +317,10 @@ func (o Order) CsvRecords() [][]string {
 	}
 }
 
+func (o *Order) ObjectID() string {
+	return "order-" + o.Exchange.String() + "-" + o.Symbol + "-" + strconv.FormatUint(o.OrderID, 10)
+}
+
 // Backup backs up the current order quantity to a SubmitOrder object
 // so that we can post the order later when we want to restore the orders.
 func (o Order) Backup() SubmitOrder {

@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/slack-go/slack"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type DepositStatus string
@@ -62,6 +63,10 @@ func (d Deposit) GetCurrentConfirmation() (current int, required int) {
 
 func (d Deposit) EffectiveTime() time.Time {
 	return d.Time.Time()
+}
+
+func (d *Deposit) ObjectID() string {
+	return "deposit-" + d.Exchange.String() + "-" + d.Asset + "-" + d.Address + "-" + d.TransactionID
 }
 
 func (d Deposit) String() (o string) {
