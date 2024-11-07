@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
@@ -41,7 +42,7 @@ func Compare(a, b interface{}) ([]Diff, error) {
 		return nil, fmt.Errorf("kind mismatch: %s != %s", raKind, rbKind)
 	}
 
-	if isSimpleType(raKind) {
+	if isSimpleType(ra) {
 		if compareSimpleValue(ra, rb) {
 			// no changes
 			return nil, nil
@@ -62,13 +63,8 @@ func Compare(a, b interface{}) ([]Diff, error) {
 }
 
 func compareStruct(a, b reflect.Value) ([]Diff, error) {
-	if a.Kind() == reflect.Ptr {
-		a = a.Elem()
-	}
-
-	if b.Kind() == reflect.Ptr {
-		b = b.Elem()
-	}
+	a = reflect.Indirect(a)
+	b = reflect.Indirect(b)
 
 	if a.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("value is not a struct")
@@ -96,7 +92,7 @@ func compareStruct(a, b reflect.Value) ([]Diff, error) {
 			continue
 		}
 
-		if isSimpleType(fieldValueA.Kind()) {
+		if isSimpleType(fieldValueA) {
 			if compareSimpleValue(fieldValueA, fieldValueB) {
 				continue
 			} else {
@@ -125,7 +121,20 @@ func compareStruct(a, b reflect.Value) ([]Diff, error) {
 	return diffs, nil
 }
 
-func isSimpleType(kind reflect.Kind) bool {
+func isSimpleType(a reflect.Value) bool {
+	a = reflect.Indirect(a)
+	aInf := a.Interface()
+
+	switch aInf.(type) {
+	case time.Time:
+		return true
+
+	case fixedpoint.Value:
+		return true
+
+	}
+
+	kind := a.Kind()
 	switch kind {
 	case reflect.Bool, reflect.Int, reflect.Int32, reflect.Int64, reflect.Uint64, reflect.String, reflect.Float64:
 		return true
@@ -169,21 +178,37 @@ func compareSimpleValue(a, b reflect.Value) bool {
 		// TODO: compare slice
 
 	default:
-		// unhandled case
+		ainf := a.Interface()
+		binf := b.Interface()
 
+		switch aa := ainf.(type) {
+		case fixedpoint.Value:
+			if bb, ok := binf.(fixedpoint.Value); ok {
+				return bb.Compare(aa) == 0
+			}
+		case time.Time:
+			if bb, ok := binf.(time.Time); ok {
+				return bb.Compare(aa) == 0
+			}
+		}
+
+		// other unhandled cases
 	}
 
 	return false
 }
 
 func convertToStr(val reflect.Value) string {
-	if val.Type() == reflect.TypeOf(fixedpoint.Zero) {
-		fp := val.Interface().(fixedpoint.Value)
-		return fp.String()
-	}
+	val = reflect.Indirect(val)
 
-	if val.Kind() == reflect.Ptr {
-		val = val.Elem()
+	if val.Type() == reflect.TypeOf(fixedpoint.Zero) {
+		inf := val.Interface()
+		switch aa := inf.(type) {
+		case fixedpoint.Value:
+			return aa.String()
+		case time.Time:
+			return aa.String()
+		}
 	}
 
 	switch val.Kind() {
