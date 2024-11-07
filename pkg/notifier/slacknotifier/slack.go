@@ -71,17 +71,7 @@ func (n *Notifier) worker() {
 	}
 }
 
-type LiveNoteOption interface{}
-
-type Mention struct {
-	User string
-}
-
-type Comment struct {
-	Text string
-}
-
-func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...LiveNoteOption) error {
+func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) error {
 	note := n.liveNotePool.Update(obj)
 	ctx := context.Background()
 
@@ -100,15 +90,17 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...LiveNoteOption) err
 	var slackOpts []slack.MsgOption
 	slackOpts = append(slackOpts, slack.MsgOptionAttachments(attachment))
 
-	var mentions []*Mention
-	var comments []*Comment
+	var userIds []string
+	var mentions []*livenote.Mention
+	var comments []*livenote.Comment
 	for _, opt := range opts {
 		switch val := opt.(type) {
-		case *Mention:
+		case *livenote.Mention:
 			mentions = append(mentions, val)
-		case *Comment:
+			userIds = append(userIds, val.User)
+		case *livenote.Comment:
 			comments = append(comments, val)
-
+			userIds = append(userIds, val.Users...)
 		}
 	}
 
