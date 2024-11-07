@@ -17,8 +17,6 @@ type Diff struct {
 // a (after)
 // b (before)
 func Compare(a, b interface{}) ([]Diff, error) {
-	var diffs []Diff
-
 	ra := reflect.ValueOf(a)
 	if ra.Kind() == reflect.Ptr {
 		ra = ra.Elem()
@@ -56,13 +54,11 @@ func Compare(a, b interface{}) ([]Diff, error) {
 				},
 			}, nil
 		}
+	} else if raKind == reflect.Struct {
+		return compareStruct(ra, rb)
 	}
 
-	if raKind == reflect.Struct {
-
-	}
-
-	return diffs, nil
+	return nil, nil
 }
 
 func compareStruct(a, b reflect.Value) ([]Diff, error) {
@@ -93,7 +89,12 @@ func compareStruct(a, b reflect.Value) ([]Diff, error) {
 		fieldValueA := a.Field(i)
 		fieldValueB := b.Field(i)
 
-		fieldName := a.Type().Field(i).Name
+		fieldA := a.Type().Field(i)
+		fieldName := fieldA.Name
+
+		if !fieldA.IsExported() {
+			continue
+		}
 
 		if isSimpleType(fieldValueA.Kind()) {
 			if compareSimpleValue(fieldValueA, fieldValueB) {

@@ -55,6 +55,81 @@ func Test_convertToStr(t *testing.T) {
 	})
 }
 
+func Test_Compare(t *testing.T) {
+	tests := []struct {
+		name    string
+		a, b    interface{}
+		want    []Diff
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name:    "order",
+			wantErr: assert.NoError,
+			a: &types.Order{
+				SubmitOrder: types.SubmitOrder{
+					Symbol:   "BTCUSDT",
+					Quantity: fixedpoint.NewFromFloat(100.0),
+				},
+				Status:           types.OrderStatusFilled,
+				ExecutedQuantity: fixedpoint.NewFromFloat(100.0),
+			},
+			b: &types.Order{
+				SubmitOrder: types.SubmitOrder{
+					Symbol:   "BTCUSDT",
+					Quantity: fixedpoint.NewFromFloat(100.0),
+				},
+				ExecutedQuantity: fixedpoint.NewFromFloat(50.0),
+				Status:           types.OrderStatusPartiallyFilled,
+			},
+			want: []Diff{
+				{
+					Field:  "Status",
+					Before: "PARTIALLY_FILLED",
+					After:  "FILLED",
+				},
+				{
+					Field:  "ExecutedQuantity",
+					Before: "50",
+					After:  "100",
+				},
+			},
+		},
+		{
+			name:    "deposit and order",
+			wantErr: assert.NoError,
+			a: &types.Deposit{
+				Address:       "0x6666",
+				TransactionID: "0x3333",
+				Status:        types.DepositPending,
+				Confirmation:  "10/15",
+			},
+			b: &types.Deposit{
+				Address:       "0x6666",
+				TransactionID: "0x3333",
+				Status:        types.DepositPending,
+				Confirmation:  "1/15",
+			},
+			want: []Diff{
+				{
+					Field:  "Confirmation",
+					Before: "1/15",
+					After:  "10/15",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Compare(tt.a, tt.b)
+			if !tt.wantErr(t, err, fmt.Sprintf("Compare(%v, %v)", tt.a, tt.b)) {
+				return
+			}
+
+			assert.Equalf(t, tt.want, got, "Compare(%v, %v)", tt.a, tt.b)
+		})
+	}
+}
+
 func Test_compareStruct(t *testing.T) {
 	tests := []struct {
 		name    string
