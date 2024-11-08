@@ -655,8 +655,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
 
-		s.sourceBook.Reset()
 		s.sourceSession.MarketDataStream.Reconnect()
+		s.sourceBook.Reset()
 		return err
 	}
 
@@ -665,8 +665,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
 
-		s.sourceBook.Reset()
 		s.sourceSession.MarketDataStream.Reconnect()
+		s.sourceBook.Reset()
 		return err
 	}
 
