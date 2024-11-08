@@ -3,7 +3,9 @@ package slacknotifier
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"regexp"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -29,6 +31,9 @@ type Notifier struct {
 	taskC chan notifyTask
 
 	liveNotePool *livenote.Pool
+
+	userIdCache  map[string]string
+	groupIdCache map[string]slack.UserGroup
 }
 
 type NotifyOption func(notifier *Notifier)
@@ -39,10 +44,36 @@ func New(client *slack.Client, channel string, options ...NotifyOption) *Notifie
 		client:       client,
 		taskC:        make(chan notifyTask, 100),
 		liveNotePool: livenote.NewPool(100),
+		userIdCache:  make(map[string]string, 30),
+		groupIdCache: make(map[string]slack.UserGroup, 50),
 	}
 
 	for _, o := range options {
 		o(notifier)
+	}
+
+	userGroups, err := client.GetUserGroupsContext(context.Background())
+	if err != nil {
+		log.WithError(err).Error("failed to get the slack user groups")
+	} else {
+		for _, group := range userGroups {
+			notifier.groupIdCache[group.Name] = group
+		}
+
+		// user groups: map[
+		//   Development Team:{
+		//      ID:S08004CQYQK
+		//      TeamID:T036FASR3
+		//      IsUserGroup:true
+		//      Name:Development Team
+		//      Description:dev
+		//      Handle:dev
+		//      IsExternal:false
+		//      DateCreate:"Fri Nov  8"
+		//      DateUpdate:"Fri Nov  8" DateDelete:"Thu Jan  1"
+		//      AutoType: CreatedBy:U036FASR5 UpdatedBy:U12345678 DeletedBy:
+		//      Prefs:{Channels:[] Groups:[]} UserCount:1 Users:[]}]
+		log.Debugf("slack user groups: %+v", notifier.groupIdCache)
 	}
 
 	go notifier.worker()
@@ -71,6 +102,34 @@ func (n *Notifier) worker() {
 	}
 }
 
+// userIdRegExp matches strings like <@U012AB3CD>
+var userIdRegExp = regexp.MustCompile(`^<@(.+?)>$`)
+
+// groupIdRegExp matches strings like <!subteam^ID>
+var groupIdRegExp = regexp.MustCompile(`^<!subteam\^(.+?)>$`)
+
+func (n *Notifier) lookupUserID(ctx context.Context, username string) (string, error) {
+	if username == "" {
+		return "", errors.New("username is empty")
+	}
+
+	// if the given username is already in slack user id format, we don't need to look up
+	if userIdRegExp.MatchString(username) {
+		return username, nil
+	}
+
+	if id, exists := n.userIdCache[username]; exists {
+		return id, nil
+	}
+
+	slackUser, err := n.client.GetUserInfoContext(ctx, username)
+	if err != nil {
+		return "", err
+	}
+
+	return slackUser.ID, nil
+}
+
 func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) error {
 	note := n.liveNotePool.Update(obj)
 	ctx := context.Background()
@@ -91,20 +150,25 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 	slackOpts = append(slackOpts, slack.MsgOptionAttachments(attachment))
 
 	var userIds []string
-	var mentions []*livenote.Mention
-	var comments []*livenote.Comment
+	var mentions []*livenote.OptionMention
+	var comments []*livenote.OptionComment
 	for _, opt := range opts {
 		switch val := opt.(type) {
-		case *livenote.Mention:
+		case *livenote.OptionMention:
 			mentions = append(mentions, val)
-			userIds = append(userIds, val.User)
-		case *livenote.Comment:
+			userIds = append(userIds, val.Users...)
+		case *livenote.OptionComment:
 			comments = append(comments, val)
 			userIds = append(userIds, val.Users...)
 		}
 	}
 
+	// format: mention slack user
+	// <@U012AB3CD>
+
 	if note.MessageID != "" {
+		// If compare is enabled, we need to attach the comments
+
 		// UpdateMessageContext returns channel, timestamp, text, err
 		_, _, _, err := n.client.UpdateMessageContext(ctx, channel, note.MessageID, slackOpts...)
 		if err != nil {
