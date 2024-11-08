@@ -32,7 +32,7 @@ type Notifier struct {
 
 	liveNotePool *livenote.Pool
 
-	userIdCache  map[string]string
+	userIdCache  map[string]*slack.User
 	groupIdCache map[string]slack.UserGroup
 }
 
@@ -44,7 +44,7 @@ func New(client *slack.Client, channel string, options ...NotifyOption) *Notifie
 		client:       client,
 		taskC:        make(chan notifyTask, 100),
 		liveNotePool: livenote.NewPool(100),
-		userIdCache:  make(map[string]string, 30),
+		userIdCache:  make(map[string]*slack.User, 30),
 		groupIdCache: make(map[string]slack.UserGroup, 50),
 	}
 
@@ -108,26 +108,48 @@ var userIdRegExp = regexp.MustCompile(`^<@(.+?)>$`)
 // groupIdRegExp matches strings like <!subteam^ID>
 var groupIdRegExp = regexp.MustCompile(`^<!subteam\^(.+?)>$`)
 
-func (n *Notifier) lookupUserID(ctx context.Context, username string) (string, error) {
-	if username == "" {
-		return "", errors.New("username is empty")
+func (n *Notifier) translateHandle(ctx context.Context, handle string) (string, error) {
+	if handle == "" {
+		return "", errors.New("handle is empty")
 	}
 
-	// if the given username is already in slack user id format, we don't need to look up
-	if userIdRegExp.MatchString(username) {
-		return username, nil
+	// trim the prefix '@' if we get a string like '@username'
+	if handle[0] == '@' {
+		handle = handle[1:]
 	}
 
-	if id, exists := n.userIdCache[username]; exists {
-		return id, nil
+	// if the given handle is already in slack user id format, we don't need to look up
+	if userIdRegExp.MatchString(handle) || groupIdRegExp.MatchString(handle) {
+		return handle, nil
 	}
 
-	slackUser, err := n.client.GetUserInfoContext(ctx, username)
+	if user, exists := n.userIdCache[handle]; exists {
+		return toUserHandle(user.ID), nil
+	}
+
+	if group, exists := n.groupIdCache[handle]; exists {
+		return toSubteamHandle(group.ID), nil
+	}
+
+	slackUser, err := n.client.GetUserInfoContext(ctx, handle)
 	if err != nil {
 		return "", err
 	}
 
-	return slackUser.ID, nil
+	if slackUser != nil {
+		n.userIdCache[handle] = slackUser
+		return toUserHandle(slackUser.ID), nil
+	}
+
+	return "", fmt.Errorf("handle %s not found", handle)
+}
+
+func toUserHandle(id string) string {
+	return fmt.Sprintf("<@%s>", id)
+}
+
+func toSubteamHandle(id string) string {
+	return fmt.Sprintf("<!subteam^%s>", id)
 }
 
 func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) error {
