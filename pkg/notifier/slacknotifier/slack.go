@@ -71,7 +71,7 @@ func (n *Notifier) worker() {
 	}
 }
 
-func (n *Notifier) PostLiveNote(obj livenote.Object) error {
+func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) error {
 	note := n.liveNotePool.Update(obj)
 	ctx := context.Background()
 
@@ -87,18 +87,32 @@ func (n *Notifier) PostLiveNote(obj livenote.Object) error {
 		return fmt.Errorf("livenote object does not support types.SlackAttachmentCreator interface")
 	}
 
-	opts := slack.MsgOptionAttachments(attachment)
+	var slackOpts []slack.MsgOption
+	slackOpts = append(slackOpts, slack.MsgOptionAttachments(attachment))
+
+	var userIds []string
+	var mentions []*livenote.Mention
+	var comments []*livenote.Comment
+	for _, opt := range opts {
+		switch val := opt.(type) {
+		case *livenote.Mention:
+			mentions = append(mentions, val)
+			userIds = append(userIds, val.User)
+		case *livenote.Comment:
+			comments = append(comments, val)
+			userIds = append(userIds, val.Users...)
+		}
+	}
 
 	if note.MessageID != "" {
 		// UpdateMessageContext returns channel, timestamp, text, err
-		_, _, _, err := n.client.UpdateMessageContext(ctx, channel, note.MessageID, opts)
+		_, _, _, err := n.client.UpdateMessageContext(ctx, channel, note.MessageID, slackOpts...)
 		if err != nil {
 			return err
 		}
 
 	} else {
-
-		respCh, respTs, err := n.client.PostMessageContext(ctx, channel, opts)
+		respCh, respTs, err := n.client.PostMessageContext(ctx, channel, slackOpts...)
 		if err != nil {
 			log.WithError(err).
 				WithField("channel", n.channel).
