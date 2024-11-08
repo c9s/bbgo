@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -108,6 +109,20 @@ var userIdRegExp = regexp.MustCompile(`^<@(.+?)>$`)
 // groupIdRegExp matches strings like <!subteam^ID>
 var groupIdRegExp = regexp.MustCompile(`^<!subteam\^(.+?)>$`)
 
+func (n *Notifier) translateHandles(ctx context.Context, handles []string) ([]string, error) {
+	var tags []string
+	for _, handle := range handles {
+		tag, err := n.translateHandle(ctx, handle)
+		if err != nil {
+			return nil, err
+		}
+
+		tags = append(tags, tag)
+	}
+
+	return tags, nil
+}
+
 func (n *Notifier) translateHandle(ctx context.Context, handle string) (string, error) {
 	if handle == "" {
 		return "", errors.New("handle is empty")
@@ -133,7 +148,7 @@ func (n *Notifier) translateHandle(ctx context.Context, handle string) (string, 
 
 	slackUser, err := n.client.GetUserInfoContext(ctx, handle)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("user handle %s not found: %v", handle, err)
 	}
 
 	if slackUser != nil {
@@ -142,14 +157,6 @@ func (n *Notifier) translateHandle(ctx context.Context, handle string) (string, 
 	}
 
 	return "", fmt.Errorf("handle %s not found", handle)
-}
-
-func toUserHandle(id string) string {
-	return fmt.Sprintf("<@%s>", id)
-}
-
-func toSubteamHandle(id string) string {
-	return fmt.Sprintf("<!subteam^%s>", id)
 }
 
 func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) error {
@@ -171,18 +178,29 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 	var slackOpts []slack.MsgOption
 	slackOpts = append(slackOpts, slack.MsgOptionAttachments(attachment))
 
-	var userIds []string
-	var mentions []*livenote.OptionMention
+	var firstTimeHandles []string
+	var commentHandles []string
+	var mentions []*livenote.OptionOneTimeMention
 	var comments []*livenote.OptionComment
 	for _, opt := range opts {
 		switch val := opt.(type) {
-		case *livenote.OptionMention:
+		case *livenote.OptionOneTimeMention:
 			mentions = append(mentions, val)
-			userIds = append(userIds, val.Users...)
+			firstTimeHandles = append(firstTimeHandles, val.Users...)
 		case *livenote.OptionComment:
 			comments = append(comments, val)
-			userIds = append(userIds, val.Users...)
+			commentHandles = append(commentHandles, val.Users...)
 		}
+	}
+
+	firstTimeTags, err := n.translateHandles(context.Background(), firstTimeHandles)
+	if err != nil {
+		return err
+	}
+
+	commentTags, err := n.translateHandles(context.Background(), commentHandles)
+	if err != nil {
+		return err
 	}
 
 	// format: mention slack user
@@ -197,6 +215,8 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 			return err
 		}
 
+		_ = commentTags
+
 	} else {
 		respCh, respTs, err := n.client.PostMessageContext(ctx, channel, slackOpts...)
 		if err != nil {
@@ -208,6 +228,13 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 
 		note.SetChannelID(respCh)
 		note.SetMessageID(respTs)
+
+		_, _, err = n.client.PostMessageContext(ctx, channel,
+			slack.MsgOptionText(joinTags(firstTimeTags), false),
+			slack.MsgOptionTS(respTs))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -309,4 +336,16 @@ func (n *Notifier) SendPhoto(buffer *bytes.Buffer) {
 
 func (n *Notifier) SendPhotoTo(channel string, buffer *bytes.Buffer) {
 	// TODO
+}
+
+func toUserHandle(id string) string {
+	return fmt.Sprintf("<@%s>", id)
+}
+
+func toSubteamHandle(id string) string {
+	return fmt.Sprintf("<!subteam^%s>", id)
+}
+
+func joinTags(tags []string) string {
+	return strings.Join(tags, " ")
 }
