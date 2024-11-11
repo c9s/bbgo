@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/livenote"
 	"github.com/c9s/bbgo/pkg/types"
 
@@ -229,12 +230,49 @@ func (n *Notifier) translateHandle(ctx context.Context, handle string) (string, 
 }
 
 func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) error {
-	note := n.liveNotePool.Update(obj)
-	ctx := n.ctx
+	var slackOpts []slack.MsgOption
 
-	channel := note.ChannelID
-	if channel == "" {
-		channel = n.channel
+	var firstTimeHandles []string
+	var commentHandles []string
+	var comments []string
+	var shouldCompare bool
+	for _, opt := range opts {
+		switch val := opt.(type) {
+		case *livenote.OptionOneTimeMention:
+			firstTimeHandles = append(firstTimeHandles, val.Users...)
+		case *livenote.OptionComment:
+			comments = append(comments, val.Text)
+			commentHandles = append(commentHandles, val.Users...)
+		case *livenote.OptionCompare:
+			shouldCompare = val.Value
+		}
+	}
+
+	var ctx = n.ctx
+	var curObj, prevObj any
+	if shouldCompare {
+		if prevNote := n.liveNotePool.Get(obj); prevNote != nil {
+			prevObj = prevNote.Object
+		}
+	}
+
+	channel := n.channel
+	note := n.liveNotePool.Update(obj)
+	curObj = note.Object
+
+	if shouldCompare && prevObj != nil {
+		diffs, err := dynamic.Compare(curObj, prevObj)
+		if err != nil {
+			log.WithError(err).Warnf("unable to compare objects: %T and %T", curObj, prevObj)
+		} else {
+			if comment := diffsToComment(curObj, diffs); len(comment) > 0 {
+				comments = append(comments, comment)
+			}
+		}
+	}
+
+	if note.ChannelID != "" {
+		channel = note.ChannelID
 	}
 
 	var attachment slack.Attachment
@@ -244,34 +282,17 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 		return fmt.Errorf("livenote object does not support types.SlackAttachmentCreator interface")
 	}
 
-	var slackOpts []slack.MsgOption
 	slackOpts = append(slackOpts, slack.MsgOptionAttachments(attachment))
 
-	var firstTimeHandles []string
-	var commentHandles []string
-	var comments []string
-	for _, opt := range opts {
-		switch val := opt.(type) {
-		case *livenote.OptionOneTimeMention:
-			firstTimeHandles = append(firstTimeHandles, val.Users...)
-		case *livenote.OptionComment:
-			comments = append(comments, val.Text)
-			commentHandles = append(commentHandles, val.Users...)
-		}
-	}
-
-	firstTimeTags, err := n.translateHandles(context.Background(), firstTimeHandles)
+	firstTimeTags, err := n.translateHandles(n.ctx, firstTimeHandles)
 	if err != nil {
 		return err
 	}
 
-	commentTags, err := n.translateHandles(context.Background(), commentHandles)
+	commentTags, err := n.translateHandles(n.ctx, commentHandles)
 	if err != nil {
 		return err
 	}
-
-	// format: mention slack user
-	// <@U012AB3CD>
 
 	if note.MessageID != "" {
 		// If compare is enabled, we need to attach the comments
@@ -312,7 +333,7 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 		note.SetMessageID(respTs)
 
 		if len(firstTimeTags) > 0 {
-			n.queueTask(context.Background(), notifyTask{
+			n.queueTask(n.ctx, notifyTask{
 				channel:  respCh,
 				threadTs: respTs,
 				opts: []slack.MsgOption{
@@ -321,7 +342,7 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 				},
 			}, 100*time.Millisecond)
 		}
-	
+
 		if len(comments) > 0 {
 			var text string
 			if len(commentTags) > 0 {
@@ -329,7 +350,7 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 			}
 
 			text += joinComments(comments)
-			n.queueTask(context.Background(), notifyTask{
+			n.queueTask(n.ctx, notifyTask{
 				channel:  respCh,
 				threadTs: respTs,
 				opts: []slack.MsgOption{
@@ -462,4 +483,18 @@ func joinTags(tags []string) string {
 
 func joinComments(comments []string) string {
 	return strings.Join(comments, "\n")
+}
+
+func diffsToComment(obj any, diffs []dynamic.Diff) (text string) {
+	if len(diffs) == 0 {
+		return text
+	}
+
+	text += fmt.Sprintf("%T updated\n", obj)
+
+	for _, diff := range diffs {
+		text += fmt.Sprintf("- %s: `%s` transited to `%s`\n", diff.Field, diff.Before, diff.After)
+	}
+
+	return text
 }
