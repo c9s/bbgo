@@ -39,6 +39,8 @@ type Deposit struct {
 	TransactionID string           `json:"transactionID" db:"txn_id"`
 	Status        DepositStatus    `json:"status"`
 
+	RawStatus string `json:"rawStatus"`
+
 	// Required confirm for unlock balance
 	UnlockConfirm int `json:"unlockConfirm"`
 
