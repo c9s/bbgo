@@ -109,6 +109,8 @@ var userIdRegExp = regexp.MustCompile(`^<@(.+?)>$`)
 // groupIdRegExp matches strings like <!subteam^ID>
 var groupIdRegExp = regexp.MustCompile(`^<!subteam\^(.+?)>$`)
 
+var emailRegExp = regexp.MustCompile("`^(?P<name>[a-zA-Z0-9.!#$%&'*+/=?^_ \\x60{|}~-]+)@(?P<domain>[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*)$`gm")
+
 func (n *Notifier) translateHandles(ctx context.Context, handles []string) ([]string, error) {
 	var tags []string
 	for _, handle := range handles {
@@ -146,9 +148,18 @@ func (n *Notifier) translateHandle(ctx context.Context, handle string) (string, 
 		return toSubteamHandle(group.ID), nil
 	}
 
-	slackUser, err := n.client.GetUserInfoContext(ctx, handle)
-	if err != nil {
-		return "", fmt.Errorf("user handle %s not found: %v", handle, err)
+	var slackUser *slack.User
+	var err error
+	if emailRegExp.MatchString(handle) {
+		slackUser, err = n.client.GetUserByEmailContext(ctx, handle)
+		if err != nil {
+			return "", fmt.Errorf("user %s not found: %v", handle, err)
+		}
+	} else {
+		slackUser, err = n.client.GetUserInfoContext(ctx, handle)
+		if err != nil {
+			return "", fmt.Errorf("user handle %s not found: %v", handle, err)
+		}
 	}
 
 	if slackUser != nil {
