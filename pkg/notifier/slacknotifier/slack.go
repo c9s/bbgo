@@ -52,6 +52,8 @@ func (t *notifyTask) addMsgOption(opts ...slack.MsgOption) {
 // To use this notifier, you need to setup the slack app permissions:
 // - channels:read
 // - chat:write
+//
+// When using "pins", you will need permission: "pins:write"
 type Notifier struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -236,6 +238,9 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 	var commentHandles []string
 	var comments []string
 	var shouldCompare bool
+	var shouldPin bool
+	var ttl time.Duration = 0
+
 	for _, opt := range opts {
 		switch val := opt.(type) {
 		case *livenote.OptionOneTimeMention:
@@ -245,6 +250,10 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 			commentHandles = append(commentHandles, val.Users...)
 		case *livenote.OptionCompare:
 			shouldCompare = val.Value
+		case *livenote.OptionPin:
+			shouldPin = val.Value
+		case *livenote.OptionTimeToLive:
+			ttl = val.Duration
 		}
 	}
 
@@ -259,6 +268,10 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 	channel := n.channel
 	note := n.liveNotePool.Update(obj)
 	curObj = note.Object
+
+	if ttl > 0 {
+		note.SetTimeToLive(ttl)
+	}
 
 	if shouldCompare && prevObj != nil {
 		diffs, err := dynamic.Compare(curObj, prevObj)
@@ -331,6 +344,18 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 
 		note.SetChannelID(respCh)
 		note.SetMessageID(respTs)
+		note.SetPostedTime(time.Now())
+
+		if shouldPin {
+			note.SetPin(true)
+
+			if err := n.client.AddPinContext(ctx, respCh, slack.ItemRef{
+				Channel:   respCh,
+				Timestamp: respTs,
+			}); err != nil {
+				log.WithError(err).Warnf("unable to pin the slack message: %s", respTs)
+			}
+		}
 
 		if len(firstTimeTags) > 0 {
 			n.queueTask(n.ctx, notifyTask{

@@ -1,6 +1,9 @@
 package livenote
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 type Object interface {
 	ObjectID() string
@@ -13,9 +16,15 @@ type LiveNote struct {
 
 	ChannelID string `json:"channelId"`
 
+	Pin bool `json:"pin"`
+
+	TimeToLive time.Duration `json:"timeToLive"`
+
 	Object Object
 
 	cachedObjID string
+
+	postedTime time.Time
 }
 
 func NewLiveNote(object Object) *LiveNote {
@@ -33,6 +42,14 @@ func (n *LiveNote) ObjectID() string {
 	return n.cachedObjID
 }
 
+func (n *LiveNote) SetTimeToLive(du time.Duration) {
+	n.TimeToLive = du
+}
+
+func (n *LiveNote) SetPostedTime(tt time.Time) {
+	n.postedTime = tt
+}
+
 func (n *LiveNote) SetObject(object Object) {
 	n.Object = object
 }
@@ -43,6 +60,19 @@ func (n *LiveNote) SetMessageID(messageID string) {
 
 func (n *LiveNote) SetChannelID(channelID string) {
 	n.ChannelID = channelID
+}
+
+func (n *LiveNote) SetPin(enabled bool) {
+	n.Pin = enabled
+}
+
+func (n *LiveNote) IsExpired(now time.Time) bool {
+	if n.postedTime.IsZero() || n.TimeToLive == 0 {
+		return false
+	}
+
+	expiryTime := n.postedTime.Add(n.TimeToLive)
+	return now.After(expiryTime)
 }
 
 type Pool struct {
@@ -64,6 +94,10 @@ func (p *Pool) Get(obj Object) *LiveNote {
 
 	for _, note := range p.notes {
 		if note.ObjectID() == objID {
+			if note.IsExpired(time.Now()) {
+				return nil
+			}
+
 			return note
 		}
 	}
@@ -79,6 +113,10 @@ func (p *Pool) Update(obj Object) *LiveNote {
 
 	for _, note := range p.notes {
 		if note.ObjectID() == objID {
+			if note.IsExpired(time.Now()) {
+				break
+			}
+
 			// update the object inside the note
 			note.SetObject(obj)
 			return note
