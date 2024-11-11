@@ -7,6 +7,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/livenote"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -32,7 +33,10 @@ func init() {
 // Strategy is a struct that contains the settings of your strategy.
 // These settings will be loaded from the BBGO YAML config file "bbgo.yaml" automatically.
 type Strategy struct {
-	Symbol string `json:"symbol"`
+	Symbol   string         `json:"symbol"`
+	Interval types.Interval `json:"interval"`
+
+	UserID string `json:"userID"`
 }
 
 func (s *Strategy) ID() string {
@@ -43,15 +47,26 @@ func (s *Strategy) InstanceID() string {
 	return ID + "-" + s.Symbol
 }
 
+func (s *Strategy) Defaults() error {
+	if s.Interval == "" {
+		s.Interval = types.Interval1m
+	}
+
+	return nil
+}
+
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
 }
 
 // This strategy simply spent all available quote currency to buy the symbol whenever kline gets closed
 func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	callback := func(k types.KLine) {
 		log.Info(k)
-		bbgo.PostLiveNote(&k)
+		bbgo.PostLiveNote(&k,
+			livenote.OneTimeMention(s.UserID),
+			livenote.Comment("please check the deposit", s.UserID),
+			livenote.CompareObject(true))
 	}
 
 	// register our kline event handler
