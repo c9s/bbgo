@@ -4,6 +4,16 @@ import "time"
 
 type Option interface{}
 
+type OptionChannel struct {
+	Channel string
+}
+
+func Channel(channel string) *OptionChannel {
+	return &OptionChannel{
+		Channel: channel,
+	}
+}
+
 type OptionCompare struct {
 	Value bool
 }
