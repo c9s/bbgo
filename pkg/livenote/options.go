@@ -1,5 +1,7 @@
 package livenote
 
+import "time"
+
 type Option interface{}
 
 type OptionCompare struct {
@@ -27,5 +29,23 @@ func Comment(text string, users ...string) *OptionComment {
 	return &OptionComment{
 		Text:  text,
 		Users: users,
+	}
+}
+
+type OptionTimeToLive struct {
+	Duration time.Duration
+}
+
+func TimeToLive(du time.Duration) *OptionTimeToLive {
+	return &OptionTimeToLive{Duration: du}
+}
+
+type OptionPin struct {
+	Value bool
+}
+
+func Pin(value bool) *OptionPin {
+	return &OptionPin{
+		Value: value,
 	}
 }

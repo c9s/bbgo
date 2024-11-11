@@ -2,6 +2,7 @@ package livenote
 
 import (
 	"context"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -66,7 +67,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		bbgo.PostLiveNote(&k,
 			livenote.OneTimeMention(s.UserID),
 			livenote.Comment("please check the deposit"),
-			livenote.CompareObject(true))
+			livenote.CompareObject(true),
+			livenote.TimeToLive(time.Minute),
+			// livenote.Pin(true),
+		)
 	}
 
 	// register our kline event handler
