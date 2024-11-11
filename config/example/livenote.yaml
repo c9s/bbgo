@@ -14,3 +14,4 @@ exchangeStrategies:
   livenote:
     symbol: BTCUSDT
     interval: 5m
+    userID: U12345678
