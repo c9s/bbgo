@@ -241,6 +241,9 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 	var shouldPin bool
 	var ttl time.Duration = 0
 
+	// load the default channel
+	channel := n.channel
+
 	for _, opt := range opts {
 		switch val := opt.(type) {
 		case *livenote.OptionOneTimeMention:
@@ -254,6 +257,10 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 			shouldPin = val.Value
 		case *livenote.OptionTimeToLive:
 			ttl = val.Duration
+		case *livenote.OptionChannel:
+			if val.Channel != "" {
+				channel = val.Channel
+			}
 		}
 	}
 
@@ -265,7 +272,6 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 		}
 	}
 
-	channel := n.channel
 	note := n.liveNotePool.Update(obj)
 	curObj = note.Object
 
