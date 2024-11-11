@@ -862,7 +862,12 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 
 	var client = slack.New(slackToken, slackOpts...)
 
-	var notifier = slacknotifier.New(client, conf.DefaultChannel)
+	var notifierOpts []slacknotifier.NotifyOption
+	if conf.QueueSize > 0 {
+		notifierOpts = append(notifierOpts, slacknotifier.OptionQueueSize(conf.QueueSize))
+	}
+
+	var notifier = slacknotifier.New(client, conf.DefaultChannel, notifierOpts...)
 	Notification.AddNotifier(notifier)
 
 	// allocate a store, so that we can save the chatID for the owner
