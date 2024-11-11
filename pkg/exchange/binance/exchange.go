@@ -622,12 +622,16 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 	}
 
 	for _, d := range records {
-		// 0(0:pending,6: credited but cannot withdraw, 1:success)
+		// 0(0:pending,6: credited but cannot withdraw, 7=Wrong Deposit,8=Waiting User confirm, 1:success)
 		// set the default status
 		status := types.DepositStatus(fmt.Sprintf("code: %d", d.Status))
 
 		// https://www.binance.com/en/support/faq/115003736451
 		switch d.Status {
+
+		case binanceapi.DepositStatusWrong:
+			status = types.DepositRejected
+
 		case binanceapi.DepositStatusPending:
 			status = types.DepositPending
 
@@ -647,6 +651,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			AddressTag:    d.AddressTag,
 			TransactionID: d.TxId,
 			Status:        status,
+			RawStatus:     strconv.Itoa(int(d.Status)),
 			UnlockConfirm: d.UnlockConfirm,
 			Confirmation:  d.ConfirmTimes,
 		})
