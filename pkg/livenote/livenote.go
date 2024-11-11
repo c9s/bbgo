@@ -56,6 +56,21 @@ func NewPool(size int64) *Pool {
 	}
 }
 
+func (p *Pool) Get(obj Object) *LiveNote {
+	objID := obj.ObjectID()
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for _, note := range p.notes {
+		if note.ObjectID() == objID {
+			return note
+		}
+	}
+
+	return nil
+}
+
 func (p *Pool) Update(obj Object) *LiveNote {
 	objID := obj.ObjectID()
 

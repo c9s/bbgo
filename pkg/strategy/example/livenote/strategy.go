@@ -65,7 +65,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		log.Info(k)
 		bbgo.PostLiveNote(&k,
 			livenote.OneTimeMention(s.UserID),
-			livenote.Comment("please check the deposit", s.UserID),
+			livenote.Comment("please check the deposit"),
 			livenote.CompareObject(true))
 	}
 

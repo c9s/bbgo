@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -91,6 +92,52 @@ func Test_Compare(t *testing.T) {
 					Field:  "ExecutedQuantity",
 					Before: "50",
 					After:  "100",
+				},
+			},
+		},
+		{
+			name:    "kline",
+			wantErr: assert.NoError,
+			a: types.KLine{
+				Open:  Number(60000),
+				High:  Number(61000),
+				Low:   Number(59500),
+				Close: Number(60100),
+			},
+			b: types.KLine{
+				Open:  Number(60000),
+				High:  Number(61000),
+				Low:   Number(59500),
+				Close: Number(60200),
+			},
+			want: []Diff{
+				{
+					Field:  "Close",
+					Before: "60200",
+					After:  "60100",
+				},
+			},
+		},
+		{
+			name:    "kline ptr",
+			wantErr: assert.NoError,
+			a: &types.KLine{
+				Open:  Number(60000),
+				High:  Number(61000),
+				Low:   Number(59500),
+				Close: Number(60100),
+			},
+			b: &types.KLine{
+				Open:  Number(60000),
+				High:  Number(61000),
+				Low:   Number(59500),
+				Close: Number(60200),
+			},
+			want: []Diff{
+				{
+					Field:  "Close",
+					Before: "60200",
+					After:  "60100",
 				},
 			},
 		},
