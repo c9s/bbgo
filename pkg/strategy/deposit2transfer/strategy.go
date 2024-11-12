@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/livenote"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -40,6 +41,12 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+type SlackAlert struct {
+	Channel  string   `json:"channel"`
+	Mentions []string `json:"mentions"`
+	Pin      bool     `json:"pin"`
+}
+
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -48,10 +55,13 @@ type Strategy struct {
 	Interval      types.Duration `json:"interval"`
 	TransferDelay types.Duration `json:"transferDelay"`
 
+	SlackAlert *SlackAlert `json:"slackAlert"`
+
 	marginTransferService marginTransferService
 	depositHistoryService types.ExchangeTransferService
 
-	session          *bbgo.ExchangeSession
+	session *bbgo.ExchangeSession
+
 	watchingDeposits map[string]types.Deposit
 	mu               sync.Mutex
 
@@ -68,7 +78,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
 
 func (s *Strategy) Defaults() error {
 	if s.Interval == 0 {
-		s.Interval = types.Duration(5 * time.Minute)
+		s.Interval = types.Duration(3 * time.Minute)
 	}
 
 	if s.TransferDelay == 0 {
@@ -137,7 +147,7 @@ func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
 }
 
 func (s *Strategy) checkDeposits(ctx context.Context) {
-	accountLimiter := rate.NewLimiter(rate.Every(3*time.Second), 1)
+	accountLimiter := rate.NewLimiter(rate.Every(5*time.Second), 1)
 
 	for _, asset := range s.Assets {
 		logger := s.logger.WithField("asset", asset)
@@ -204,13 +214,40 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 				d.Amount.String(), d.Asset,
 				amount.String(), d.Asset)
 
+			if s.SlackAlert != nil {
+				bbgo.PostLiveNote(&d,
+					livenote.Channel(s.SlackAlert.Channel),
+					livenote.Comment(fmt.Sprintf("Transferring deposit asset %s %s into the margin account", amount.String(), d.Asset)),
+				)
+			}
+
 			err2 := retry.GeneralBackoff(ctx, func() error {
 				return s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, amount, types.TransferIn)
 			})
 			if err2 != nil {
 				logger.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
+
+				if s.SlackAlert != nil {
+					bbgo.PostLiveNote(&d,
+						livenote.Channel(s.SlackAlert.Channel),
+						livenote.Comment(fmt.Sprintf("Margin account transfer error: %+v", err2)),
+					)
+				}
 			}
 		}
+	}
+}
+
+func (s *Strategy) addWatchingDeposit(deposit types.Deposit) {
+	s.watchingDeposits[deposit.TransactionID] = deposit
+
+	if s.SlackAlert != nil {
+		bbgo.PostLiveNote(&deposit,
+			livenote.Channel(s.SlackAlert.Channel),
+			livenote.Pin(s.SlackAlert.Pin),
+			livenote.CompareObject(true),
+			livenote.OneTimeMention(s.SlackAlert.Mentions...),
+		)
 	}
 }
 
@@ -239,6 +276,7 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// update the watching deposits
 	for _, deposit := range deposits {
 		logger.Debugf("checking deposit: %+v", deposit)
 
@@ -246,27 +284,31 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 			continue
 		}
 
+		// if the deposit record is already in the watch list, update it
 		if _, ok := s.watchingDeposits[deposit.TransactionID]; ok {
-			// if the deposit record is in the watch list, update it
-			s.watchingDeposits[deposit.TransactionID] = deposit
+			s.addWatchingDeposit(deposit)
 		} else {
+			// if the deposit record is not in the watch list, we need to check the status
+			// here the deposit is outside the watching list
 			switch deposit.Status {
 
 			case types.DepositSuccess:
+				// if the deposit is in success status, we need to check if it's newer than the latest deposit time
+				// this usually happens when the deposit is credited to the account very quickly
 				if depositTime, ok := s.lastAssetDepositTimes[asset]; ok {
 					// if it's newer than the latest deposit time, then we just add it the monitoring list
 					if deposit.Time.After(depositTime) {
-						logger.Infof("adding new success deposit: %s", deposit.TransactionID)
-						s.watchingDeposits[deposit.TransactionID] = deposit
+						logger.Infof("adding new succeedded deposit: %s", deposit.TransactionID)
+						s.addWatchingDeposit(deposit)
 					}
 				} else {
 					// ignore all initial deposits that are already in success status
-					logger.Infof("ignored succeess deposit: %s %+v", deposit.TransactionID, deposit)
+					logger.Infof("ignored expired succeedded deposit: %s %+v", deposit.TransactionID, deposit)
 				}
 
 			case types.DepositCredited, types.DepositPending:
 				logger.Infof("adding pending deposit: %s", deposit.TransactionID)
-				s.watchingDeposits[deposit.TransactionID] = deposit
+				s.addWatchingDeposit(deposit)
 			}
 		}
 	}
@@ -281,10 +323,12 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 	}
 
 	var succeededDeposits []types.Deposit
-	for _, deposit := range s.watchingDeposits {
-		if deposit.Status == types.DepositSuccess {
-			logger.Infof("found pending -> success deposit: %+v", deposit)
 
+	// find and move out succeeded deposits
+	for _, deposit := range s.watchingDeposits {
+		switch deposit.Status {
+		case types.DepositSuccess:
+			logger.Infof("found pending -> success deposit: %+v", deposit)
 			current, required := deposit.GetCurrentConfirmation()
 			if required > 0 && deposit.UnlockConfirm > 0 && current < deposit.UnlockConfirm {
 				logger.Infof("deposit %s unlock confirm %d is not reached, current: %d, required: %d, skip this round", deposit.TransactionID, deposit.UnlockConfirm, current, required)
