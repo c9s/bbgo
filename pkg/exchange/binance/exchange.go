@@ -654,6 +654,7 @@ func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since,
 			RawStatus:     strconv.Itoa(int(d.Status)),
 			UnlockConfirm: d.UnlockConfirm,
 			Confirmation:  d.ConfirmTimes,
+			Network:       d.Network,
 		})
 	}
 
