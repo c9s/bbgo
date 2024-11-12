@@ -593,27 +593,29 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 			}
 		}
 
-		if price, ok := s.priceResolver.ResolvePrice(currency, s.LargeAmountAlert.QuoteCurrency); ok {
-			quantity := q.Abs()
-			amount := price.Mul(quantity)
-			if amount.Compare(s.LargeAmountAlert.Amount) > 0 {
-				alert := &LargeAmountAlert{
-					QuoteCurrency: s.LargeAmountAlert.QuoteCurrency,
-					AlertAmount:   s.LargeAmountAlert.Amount,
-					SlackMentions: s.LargeAmountAlert.SlackMentions,
-					BaseCurrency:  currency,
-					Price:         price,
-					Quantity:      quantity,
-					Amount:        amount,
-				}
+		if s.LargeAmountAlert != nil {
+			if price, ok := s.priceResolver.ResolvePrice(currency, s.LargeAmountAlert.QuoteCurrency); ok {
+				quantity := q.Abs()
+				amount := price.Mul(quantity)
+				if amount.Compare(s.LargeAmountAlert.Amount) > 0 {
+					alert := &LargeAmountAlert{
+						QuoteCurrency: s.LargeAmountAlert.QuoteCurrency,
+						AlertAmount:   s.LargeAmountAlert.Amount,
+						SlackMentions: s.LargeAmountAlert.SlackMentions,
+						BaseCurrency:  currency,
+						Price:         price,
+						Quantity:      quantity,
+						Amount:        amount,
+					}
 
-				if q.Sign() > 0 {
-					alert.Side = types.SideTypeBuy
-				} else {
-					alert.Side = types.SideTypeSell
-				}
+					if q.Sign() > 0 {
+						alert.Side = types.SideTypeBuy
+					} else {
+						alert.Side = types.SideTypeSell
+					}
 
-				bbgo.Notify(alert)
+					bbgo.Notify(alert)
+				}
 			}
 		}
 
