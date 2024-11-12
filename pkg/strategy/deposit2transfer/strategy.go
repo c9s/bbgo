@@ -44,6 +44,7 @@ func init() {
 type SlackAlert struct {
 	Channel  string   `json:"channel"`
 	Mentions []string `json:"mentions"`
+	Pin      bool     `json:"pin"`
 }
 
 type Strategy struct {
@@ -243,6 +244,7 @@ func (s *Strategy) addWatchingDeposit(deposit types.Deposit) {
 	if s.SlackAlert != nil {
 		bbgo.PostLiveNote(&deposit,
 			livenote.Channel(s.SlackAlert.Channel),
+			livenote.Pin(s.SlackAlert.Pin),
 			livenote.CompareObject(true),
 			livenote.OneTimeMention(s.SlackAlert.Mentions...),
 		)
