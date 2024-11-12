@@ -65,6 +65,7 @@ func (m *ExchangeStrategyMount) Map() (map[string]interface{}, error) {
 type SlackNotification struct {
 	DefaultChannel string `json:"defaultChannel,omitempty"  yaml:"defaultChannel,omitempty"`
 	ErrorChannel   string `json:"errorChannel,omitempty"  yaml:"errorChannel,omitempty"`
+	QueueSize      int    `json:"queueSize,omitempty" yaml:"queueSize,omitempty"`
 }
 
 type SlackNotificationRouting struct {

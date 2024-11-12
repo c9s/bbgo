@@ -39,11 +39,15 @@ type Deposit struct {
 	TransactionID string           `json:"transactionID" db:"txn_id"`
 	Status        DepositStatus    `json:"status"`
 
+	RawStatus string `json:"rawStatus"`
+
 	// Required confirm for unlock balance
 	UnlockConfirm int `json:"unlockConfirm"`
 
 	// Confirmation format = "current/required", for example: "7/16"
 	Confirmation string `json:"confirmation"`
+
+	Network string `json:"network,omitempty"`
 }
 
 func (d Deposit) GetCurrentConfirmation() (current int, required int) {
@@ -107,9 +111,35 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 		})
 	}
 
+	if len(d.Confirmation) > 0 {
+		text := d.Confirmation
+		if d.UnlockConfirm > 0 {
+			text = fmt.Sprintf("%s (unlock %d)", d.Confirmation, d.UnlockConfirm)
+		}
+		fields = append(fields, slack.AttachmentField{
+			Title: "Confirmation",
+			Value: text,
+			Short: false,
+		})
+	}
+
+	if len(d.Network) > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Network",
+			Value: d.Network,
+			Short: false,
+		})
+	}
+
+	fields = append(fields, slack.AttachmentField{
+		Title: "Amount",
+		Value: d.Amount.String() + " " + d.Asset,
+		Short: false,
+	})
+
 	return slack.Attachment{
 		Color: depositStatusSlackColor(d.Status),
-		Title: fmt.Sprintf("Deposit %s %s To %s", d.Amount.String(), d.Asset, d.Address),
+		Title: fmt.Sprintf("Deposit %s %s To %s (%s)", d.Amount.String(), d.Asset, d.Address, d.Exchange),
 		// TitleLink:   "",
 		Pretext: "",
 		Text:    "",
@@ -117,9 +147,9 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 		// ServiceIcon: "",
 		// FromURL:     "",
 		// OriginalURL: "",
-		Fields: fields,
-		Footer: fmt.Sprintf("Apply Time: %s", d.Time.Time().Format(time.RFC3339)),
-		// FooterIcon: "",
+		Fields:     fields,
+		Footer:     fmt.Sprintf("Apply Time: %s", d.Time.Time().Format(time.RFC3339)),
+		FooterIcon: ExchangeFooterIcon(d.Exchange),
 	}
 }
 
