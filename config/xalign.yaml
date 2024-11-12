@@ -47,3 +47,9 @@ crossExchangeStrategies:
       USDT: 100
       USDC: 100
       TWD: 3000
+    largeAmountAlert:
+      quote: USDT
+      amount: 200
+      slackMentions:
+      - '<@USER_ID>'
+      - '<!subteam^TEAM_ID>'
