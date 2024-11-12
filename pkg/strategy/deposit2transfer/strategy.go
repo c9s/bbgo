@@ -59,7 +59,8 @@ type Strategy struct {
 	marginTransferService marginTransferService
 	depositHistoryService types.ExchangeTransferService
 
-	session          *bbgo.ExchangeSession
+	session *bbgo.ExchangeSession
+
 	watchingDeposits map[string]types.Deposit
 	mu               sync.Mutex
 
@@ -76,7 +77,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
 
 func (s *Strategy) Defaults() error {
 	if s.Interval == 0 {
-		s.Interval = types.Duration(5 * time.Minute)
+		s.Interval = types.Duration(3 * time.Minute)
 	}
 
 	if s.TransferDelay == 0 {
@@ -295,12 +296,12 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 				if depositTime, ok := s.lastAssetDepositTimes[asset]; ok {
 					// if it's newer than the latest deposit time, then we just add it the monitoring list
 					if deposit.Time.After(depositTime) {
-						logger.Infof("adding new success deposit: %s", deposit.TransactionID)
+						logger.Infof("adding new succeedded deposit: %s", deposit.TransactionID)
 						s.addWatchingDeposit(deposit)
 					}
 				} else {
 					// ignore all initial deposits that are already in success status
-					logger.Infof("ignored succeess deposit: %s %+v", deposit.TransactionID, deposit)
+					logger.Infof("ignored expired succeedded deposit: %s %+v", deposit.TransactionID, deposit)
 				}
 
 			case types.DepositCredited, types.DepositPending:
@@ -321,7 +322,7 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 
 	var succeededDeposits []types.Deposit
 
-	// find the succeeded deposits
+	// find and move out succeeded deposits
 	for _, deposit := range s.watchingDeposits {
 		switch deposit.Status {
 		case types.DepositSuccess:
