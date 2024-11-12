@@ -42,6 +42,7 @@ func init() {
 }
 
 type SlackAlert struct {
+	Channel  string   `json:"channel"`
 	Mentions []string `json:"mentions"`
 }
 
@@ -213,6 +214,7 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 
 			if s.SlackAlert != nil {
 				bbgo.PostLiveNote(&d,
+					livenote.Channel(s.SlackAlert.Channel),
 					livenote.Comment(fmt.Sprintf("Transferring deposit asset %s %s into the margin account", amount.String(), d.Asset)),
 				)
 			}
@@ -225,6 +227,7 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 
 				if s.SlackAlert != nil {
 					bbgo.PostLiveNote(&d,
+						livenote.Channel(s.SlackAlert.Channel),
 						livenote.Comment(fmt.Sprintf("Margin account transfer error: %+v", err2)),
 					)
 				}
@@ -238,6 +241,7 @@ func (s *Strategy) addWatchingDeposit(deposit types.Deposit) {
 
 	if s.SlackAlert != nil {
 		bbgo.PostLiveNote(&deposit,
+			livenote.Channel(s.SlackAlert.Channel),
 			livenote.CompareObject(true),
 			livenote.OneTimeMention(s.SlackAlert.Mentions...),
 		)
