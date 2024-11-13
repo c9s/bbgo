@@ -300,10 +300,12 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 					if deposit.Time.After(depositTime) {
 						logger.Infof("adding new succeedded deposit: %s", deposit.TransactionID)
 						s.addWatchingDeposit(deposit)
+					} else {
+						// ignore all initial deposits that are already in success status
+						logger.Infof("ignored expired succeedded deposit: %s %+v", deposit.TransactionID, deposit)
 					}
 				} else {
-					// ignore all initial deposits that are already in success status
-					logger.Infof("ignored expired succeedded deposit: %s %+v", deposit.TransactionID, deposit)
+					s.addWatchingDeposit(deposit)
 				}
 
 			case types.DepositCredited, types.DepositPending:
