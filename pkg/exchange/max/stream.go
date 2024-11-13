@@ -217,17 +217,7 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
 	return func(e max.BookEvent) {
 		symbol := toGlobalSymbol(e.Market)
 		f, ok := s.depthBuffers[symbol]
-		if ok {
-			err := f.AddUpdate(types.SliceOrderBook{
-				Symbol: toGlobalSymbol(e.Market),
-				Time:   e.Time(),
-				Bids:   e.Bids,
-				Asks:   e.Asks,
-			}, e.FirstUpdateID, e.LastUpdateID)
-			if err != nil {
-				log.WithError(err).Errorf("found missing %s update event", e.Market)
-			}
-		} else {
+		if !ok {
 			f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
 				log.Infof("fetching %s depth...", e.Market)
 				// the depth of websocket orderbook event is 50 by default, so we use 50 as limit here
@@ -244,6 +234,22 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
 				s.EmitBookUpdate(update.Object)
 			})
 			s.depthBuffers[symbol] = f
+		}
+
+		// if we receive orderbook event with both asks and bids are empty, it means we need to rebuild this orderbook
+		shouldReset := len(e.Asks) == 0 && len(e.Bids) == 0
+		if shouldReset {
+			f.Reset()
+			return
+		}
+
+		if err := f.AddUpdate(types.SliceOrderBook{
+			Symbol: symbol,
+			Time:   e.Time(),
+			Bids:   e.Bids,
+			Asks:   e.Asks,
+		}, e.FirstUpdateID, e.LastUpdateID); err != nil {
+			log.WithError(err).Errorf("found missing %s update event", e.Market)
 		}
 	}
 }
