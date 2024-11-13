@@ -948,11 +948,13 @@ func (e *Exchange) QueryDepositHistory(
 				Time:          types.Time(d.CreatedAt),
 				Amount:        d.Amount,
 				Asset:         toGlobalCurrency(d.Currency),
-				Address:       d.Address, // not supported
-				AddressTag:    "",        // not supported
+				Address:       d.Address,
+				AddressTag:    "", // not supported
 				TransactionID: d.TxID,
 				Status:        toGlobalDepositStatus(d.State),
-				Confirmation:  "",
+				Confirmation:  strconv.FormatInt(d.Confirmations, 10),
+				Network:       d.NetworkProtocol,
+				RawStatus:     fmt.Sprintf("%s (%s: %s)", d.Status, d.State, d.StateReason),
 			})
 		}
 
@@ -1134,7 +1136,9 @@ func (e *Exchange) QueryKLines(
 	return kLines, nil
 }
 
-func (e *Exchange) QueryDepth(ctx context.Context, symbol string, limit int) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+func (e *Exchange) QueryDepth(
+	ctx context.Context, symbol string, limit int,
+) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	req := e.v3client.NewGetDepthRequest()
 	req.Market(symbol)
 	req.Limit(limit)
