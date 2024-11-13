@@ -86,17 +86,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 
 	stream.OnDepthEvent(func(e *DepthEvent) {
 		f, ok := stream.depthBuffers[e.Symbol]
-		if ok {
-			err := f.AddUpdate(types.SliceOrderBook{
-				Symbol: e.Symbol,
-				Time:   e.EventBase.Time.Time(),
-				Bids:   e.Bids,
-				Asks:   e.Asks,
-			}, e.FirstUpdateID, e.FinalUpdateID)
-			if err != nil {
-				log.WithError(err).Errorf("found missing %s update event", e.Symbol)
-			}
-		} else {
+		if !ok {
 			f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
 				log.Infof("fetching %s depth...", e.Symbol)
 				return ex.QueryDepth(context.Background(), e.Symbol)
@@ -112,6 +102,15 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 				stream.EmitBookUpdate(update.Object)
 			})
 			stream.depthBuffers[e.Symbol] = f
+		}
+
+		if err := f.AddUpdate(types.SliceOrderBook{
+			Symbol: e.Symbol,
+			Time:   e.EventBase.Time.Time(),
+			Bids:   e.Bids,
+			Asks:   e.Asks,
+		}, e.FirstUpdateID, e.FinalUpdateID); err != nil {
+			log.WithError(err).Errorf("found missing %s update event", e.Symbol)
 		}
 	})
 
