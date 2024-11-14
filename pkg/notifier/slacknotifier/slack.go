@@ -29,6 +29,8 @@ var groupIdRegExp = regexp.MustCompile(`^<!subteam\^(.+?)>$`)
 
 var emailRegExp = regexp.MustCompile("`^(?P<name>[a-zA-Z0-9.!#$%&'*+/=?^_ \\x60{|}~-]+)@(?P<domain>[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*)$`gm")
 
+var typeNamePrefixRE = regexp.MustCompile(`^\*?([a-zA-Z0-9_]+\.)?`)
+
 type notifyTask struct {
 	channel string
 
@@ -521,11 +523,25 @@ func diffsToComment(obj any, diffs []dynamic.Diff) (text string) {
 		return text
 	}
 
-	text += fmt.Sprintf("%T updated\n", obj)
+	text += fmt.Sprintf("_%s_ updated\n", objectName(obj))
 
 	for _, diff := range diffs {
 		text += fmt.Sprintf("- %s: `%s` transited to `%s`\n", diff.Field, diff.Before, diff.After)
 	}
 
 	return text
+}
+
+func objectName(obj any) string {
+	type labelInf interface {
+		Label() string
+	}
+
+	if ll, ok := obj.(labelInf); ok {
+		return ll.Label()
+	}
+
+	typeName := fmt.Sprintf("%T", obj)
+	typeName = typeNamePrefixRE.ReplaceAllString(typeName, "")
+	return typeName
 }

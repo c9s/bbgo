@@ -55,6 +55,9 @@ type Strategy struct {
 	Interval      types.Duration `json:"interval"`
 	TransferDelay types.Duration `json:"transferDelay"`
 
+	IgnoreDust  bool                        `json:"ignoreDust"`
+	DustAmounts map[string]fixedpoint.Value `json:"dustAmounts"`
+
 	SlackAlert *SlackAlert `json:"slackAlert"`
 
 	marginTransferService marginTransferService
@@ -83,6 +86,15 @@ func (s *Strategy) Defaults() error {
 
 	if s.TransferDelay == 0 {
 		s.TransferDelay = types.Duration(3 * time.Second)
+	}
+
+	if s.DustAmounts == nil {
+		s.DustAmounts = map[string]fixedpoint.Value{
+			"USDC": fixedpoint.NewFromFloat(1.0),
+			"USDT": fixedpoint.NewFromFloat(1.0),
+			"BTC":  fixedpoint.NewFromFloat(0.00001),
+			"ETH":  fixedpoint.NewFromFloat(0.00001),
+		}
 	}
 
 	return nil
@@ -127,6 +139,16 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	})
 
 	return nil
+}
+
+func (s *Strategy) isDust(asset string, amount fixedpoint.Value) bool {
+	if s.IgnoreDust {
+		if dustAmount, ok := s.DustAmounts[asset]; ok {
+			return amount.Compare(dustAmount) <= 0
+		}
+	}
+
+	return false
 }
 
 func (s *Strategy) tickWatcher(ctx context.Context, interval time.Duration) {
@@ -281,6 +303,10 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 		logger.Debugf("checking deposit: %+v", deposit)
 
 		if deposit.Asset != asset {
+			continue
+		}
+
+		if s.isDust(asset, deposit.Amount) {
 			continue
 		}
 

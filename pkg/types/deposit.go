@@ -28,6 +28,21 @@ const (
 	DepositCredited = DepositStatus("credited")
 )
 
+func (s DepositStatus) SlackEmoji() string {
+	switch s {
+	case DepositPending:
+		return ":hourglass_not_done:"
+	case DepositCredited:
+		return ":dollar_banknote:"
+	case DepositSuccess:
+		return ":check_mark_button:"
+	case DepositCancelled:
+		return ":stop_button:"
+	}
+
+	return ""
+}
+
 type Deposit struct {
 	GID           int64            `json:"gid" db:"gid"`
 	Exchange      ExchangeName     `json:"exchange" db:"exchange"`
@@ -106,7 +121,7 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 	if len(d.Status) > 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Status",
-			Value: string(d.Status),
+			Value: string(d.Status) + " " + d.Status.SlackEmoji(),
 			Short: false,
 		})
 	}
@@ -138,19 +153,57 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 	})
 
 	return slack.Attachment{
-		Color: depositStatusSlackColor(d.Status),
-		Title: fmt.Sprintf("Deposit %s %s To %s (%s)", d.Amount.String(), d.Asset, d.Address, d.Exchange),
-		// TitleLink:   "",
-		Pretext: "",
-		Text:    "",
+		Color:       depositStatusSlackColor(d.Status),
+		Fallback:    "",
+		ID:          0,
+		Title:       fmt.Sprintf("Deposit %s %s To %s (%s)", d.Amount.String(), d.Asset, d.Address, d.Exchange),
+		TitleLink:   getExplorerURL(d.Network, d.TransactionID),
+		Pretext:     "",
+		Text:        "",
+		ImageURL:    "",
+		ThumbURL:    "",
+		ServiceName: "",
+		ServiceIcon: "",
+		FromURL:     "",
+		OriginalURL: "",
 		// ServiceName: "",
 		// ServiceIcon: "",
 		// FromURL:     "",
 		// OriginalURL: "",
 		Fields:     fields,
+		Actions:    nil,
+		MarkdownIn: nil,
+		Blocks:     slack.Blocks{},
 		Footer:     fmt.Sprintf("Apply Time: %s", d.Time.Time().Format(time.RFC3339)),
 		FooterIcon: ExchangeFooterIcon(d.Exchange),
+		Ts:         "",
 	}
+}
+
+func getExplorerURL(network string, txID string) string {
+	switch strings.ToUpper(network) {
+	case "BTC":
+		return getBitcoinNetworkExplorerURL(txID)
+	case "BSC":
+		return getBscNetworkExplorerURL(txID)
+	case "ETH":
+		return getEthNetworkExplorerURL(txID)
+
+	}
+
+	return ""
+}
+
+func getEthNetworkExplorerURL(txID string) string {
+	return "https://etherscan.io/tx/" + txID
+}
+
+func getBitcoinNetworkExplorerURL(txID string) string {
+	return "https://www.blockchain.com/explorer/transactions/btc/" + txID
+}
+
+func getBscNetworkExplorerURL(txID string) string {
+	return "https://bscscan.com/tx/" + txID
 }
 
 func depositStatusSlackColor(status DepositStatus) string {
