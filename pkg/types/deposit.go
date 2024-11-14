@@ -28,6 +28,21 @@ const (
 	DepositCredited = DepositStatus("credited")
 )
 
+func (s DepositStatus) SlackEmoji() string {
+	switch s {
+	case DepositPending:
+		return ":hourglass_not_done:"
+	case DepositCredited:
+		return ":dollar_banknote:"
+	case DepositSuccess:
+		return ":check_mark_button:"
+	case DepositCancelled:
+		return ":stop_button:"
+	}
+
+	return ""
+}
+
 type Deposit struct {
 	GID           int64            `json:"gid" db:"gid"`
 	Exchange      ExchangeName     `json:"exchange" db:"exchange"`
@@ -106,7 +121,7 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 	if len(d.Status) > 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Status",
-			Value: string(d.Status),
+			Value: string(d.Status) + " " + d.Status.SlackEmoji(),
 			Short: false,
 		})
 	}
