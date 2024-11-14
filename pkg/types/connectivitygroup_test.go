@@ -16,7 +16,7 @@ func TestConnectivityGroupAuthC(t *testing.T) {
 	conn1 := NewConnectivity()
 	conn2 := NewConnectivity()
 	group := NewConnectivityGroup(conn1, conn2)
-	allAuthedC := group.AllAuthedC(ctx, time.Second)
+	allAuthedC := group.AllAuthedC(ctx)
 
 	time.Sleep(delay)
 	conn1.setConnect()
@@ -124,10 +124,10 @@ func TestConnectivityGroup(t *testing.T) {
 		}()
 
 		authed1 := false
-		authedC1 := group.AllAuthedC(ctx, 3*time.Second)
+		authedC1 := group.AllAuthedC(ctx)
 
 		authed2 := false
-		authedC2 := group.AllAuthedC(ctx, 3*time.Second)
+		authedC2 := group.AllAuthedC(ctx)
 
 		select {
 		case <-authedC1:
@@ -185,10 +185,10 @@ func TestConnectivityGroup(t *testing.T) {
 		}()
 
 		authed1 := false
-		authedC1 := group1.AllAuthedC(ctx, 3*time.Second)
+		authedC1 := group1.AllAuthedC(ctx)
 
 		authed2 := false
-		authedC2 := group2.AllAuthedC(ctx, 3*time.Second)
+		authedC2 := group2.AllAuthedC(ctx)
 
 		select {
 		case <-authedC1:
