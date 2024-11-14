@@ -1406,7 +1406,9 @@ func (s *Strategy) Defaults() error {
 	}
 
 	if s.CircuitBreaker == nil {
-		s.CircuitBreaker = circuitbreaker.NewBasicCircuitBreaker(ID, s.InstanceID())
+		s.CircuitBreaker = circuitbreaker.NewBasicCircuitBreaker(ID, s.InstanceID(), s.Symbol)
+	} else {
+		s.CircuitBreaker.SetMetricsInfo(ID, s.InstanceID(), s.Symbol)
 	}
 
 	// circuitBreakerAlertLimiter is for CircuitBreaker alerts
