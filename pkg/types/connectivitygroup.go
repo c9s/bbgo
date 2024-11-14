@@ -12,7 +12,6 @@ type ConnectivityGroup struct {
 
 	connections []*Connectivity
 	mu          sync.Mutex
-	authedC     chan struct{}
 
 	states   map[*Connectivity]ConnectivityState
 	sumState ConnectivityState
@@ -99,7 +98,6 @@ func NewConnectivityGroup(cons ...*Connectivity) *ConnectivityGroup {
 	g := &ConnectivityGroup{
 		Connectivity: NewConnectivity(),
 		connections:  cons,
-		authedC:      make(chan struct{}),
 		states:       states,
 		sumState:     sumState,
 	}
@@ -109,6 +107,13 @@ func NewConnectivityGroup(cons ...*Connectivity) *ConnectivityGroup {
 	}
 
 	return g
+}
+
+func (g *ConnectivityGroup) GetState() (state ConnectivityState) {
+	g.mu.Lock()
+	state = g.sumState
+	g.mu.Unlock()
+	return state
 }
 
 func (g *ConnectivityGroup) setState(con *Connectivity, state ConnectivityState) {
@@ -190,40 +195,23 @@ func (g *ConnectivityGroup) AnyDisconnected(ctx context.Context) bool {
 	return false
 }
 
-func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, allTimeoutDuration time.Duration) {
-	g.mu.Lock()
-	conns := g.connections
-	c := g.authedC
-	g.mu.Unlock()
-
-	authedConns := make([]bool, len(conns))
+func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, c chan struct{}, allTimeoutDuration time.Duration) {
 	allTimeout := time.After(allTimeoutDuration)
 	for {
-		for idx, con := range conns {
-			// if the connection is not authed, mark it as false
-			if !con.authed {
-				// authedConns[idx] = false
-			}
-
-			timeout := time.After(3 * time.Second)
-			select {
-			case <-ctx.Done():
-				return
-
-			case <-allTimeout:
-				return
-
-			case <-timeout:
-				continue
-
-			case <-con.AuthedC():
-				authedConns[idx] = true
-			}
-		}
-
-		if allTrue(authedConns) {
-			close(c)
+		select {
+		case <-ctx.Done():
 			return
+
+		case <-allTimeout:
+			return
+
+		default:
+			if g.GetState() == ConnectivityStateAuthed {
+				close(c)
+				return
+			}
+
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
@@ -232,6 +220,7 @@ func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, allTimeoutDuratio
 // the returned channel will be closed when all connections are authenticated
 // and the channel can only be used once (because we can't close a channel twice)
 func (g *ConnectivityGroup) AllAuthedC(ctx context.Context, timeout time.Duration) <-chan struct{} {
-	go g.waitAllAuthed(ctx, timeout)
-	return g.authedC
+	c := make(chan struct{})
+	go g.waitAllAuthed(ctx, c, timeout)
+	return c
 }
