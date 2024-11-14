@@ -144,6 +144,17 @@ func NewBasicCircuitBreaker(strategyID, strategyInstance, symbol string) *BasicC
 	return b
 }
 
+func (b *BasicCircuitBreaker) SetMetricsInfo(strategyID, strategyInstance, symbol string) {
+	b.strategyID = strategyID
+	b.strategyInstance = strategyInstance
+	b.symbol = symbol
+	b.metricsLabels = prometheus.Labels{
+		"strategy":         b.strategyID,
+		"strategyInstance": b.strategyInstance,
+		"symbol":           b.symbol,
+	}
+}
+
 func (b *BasicCircuitBreaker) getMetricsLabels() prometheus.Labels {
 	if b.metricsLabels != nil {
 		return b.metricsLabels
