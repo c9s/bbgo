@@ -97,7 +97,6 @@ func NewConnectivityGroup(cons ...*Connectivity) *ConnectivityGroup {
 	sumState := sumStates(states)
 	g := &ConnectivityGroup{
 		Connectivity: NewConnectivity(),
-		connections:  cons,
 		states:       states,
 		sumState:     sumState,
 	}
@@ -206,7 +205,8 @@ func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, c chan struct{}, 
 			return
 
 		default:
-			if g.GetState() == ConnectivityStateAuthed {
+			state := g.GetState()
+			if state == ConnectivityStateAuthed {
 				close(c)
 				return
 			}

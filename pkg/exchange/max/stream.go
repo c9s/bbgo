@@ -254,6 +254,22 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
 	}
 }
 
+func (s *Stream) String() string {
+	ss := "max.Stream"
+
+	if s.PublicOnly {
+		ss += " (public only)"
+	} else {
+		ss += " (user data)"
+	}
+
+	if s.MarginSettings.IsMargin {
+		ss += " (margin)"
+	}
+
+	return ss
+}
+
 func (s *Stream) handleAccountSnapshotEvent(e max.AccountSnapshotEvent) {
 	snapshot := map[string]types.Balance{}
 	for _, bm := range e.Balances {

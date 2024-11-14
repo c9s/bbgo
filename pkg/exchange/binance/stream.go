@@ -148,7 +148,9 @@ func (s *Stream) handleConnect() {
 	if !s.PublicOnly {
 		// Emit Auth before establishing the connection to prevent the caller from missing the Update data after
 		// creating the order.
-		s.EmitAuth()
+
+		// spawn a goroutine to emit auth event to prevent blocking the main event loop
+		go s.EmitAuth()
 		return
 	}
 
@@ -448,6 +450,24 @@ func (s *Stream) closeListenKey(ctx context.Context, listenKey string) (err erro
 	}
 
 	return err
+}
+
+func (s *Stream) String() string {
+	ss := "binance.Stream"
+
+	if s.PublicOnly {
+		ss += " (public only)"
+	} else {
+		ss += " (user data)"
+	}
+
+	if s.MarginSettings.IsMargin {
+		ss += " (margin)"
+	} else if s.FuturesSettings.IsFutures {
+		ss += " (futures)"
+	}
+
+	return ss
 }
 
 // listenKeyKeepAlive

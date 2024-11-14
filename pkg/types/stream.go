@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -531,6 +532,12 @@ func (s *StandardStream) Close() error {
 	// let the reader close the connection
 	<-time.After(time.Second)
 	return nil
+}
+
+func (s *StandardStream) String() string {
+	ss := "StandardStream"
+	ss += fmt.Sprintf("(%p)", s)
+	return ss
 }
 
 // SetHeartBeat sets the custom heart beat implementation if needed
