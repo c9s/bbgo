@@ -188,10 +188,16 @@ func getExplorerURL(network string, txID string) string {
 		return getBscNetworkExplorerURL(txID)
 	case "ETH":
 		return getEthNetworkExplorerURL(txID)
+	case "ARBITRUM", "ARB":
+		return getArbitrumExplorerURL(txID)
 
 	}
 
 	return ""
+}
+
+func getArbitrumExplorerURL(txID string) string {
+	return "https://arbiscan.io/tx/" + txID
 }
 
 func getEthNetworkExplorerURL(txID string) string {
