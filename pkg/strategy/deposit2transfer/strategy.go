@@ -246,13 +246,21 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 			err2 := retry.GeneralBackoff(ctx, func() error {
 				return s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, amount, types.TransferIn)
 			})
+
 			if err2 != nil {
 				logger.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
 
 				if s.SlackAlert != nil {
 					bbgo.PostLiveNote(&d,
 						livenote.Channel(s.SlackAlert.Channel),
-						livenote.Comment(fmt.Sprintf("Margin account transfer error: %+v", err2)),
+						livenote.Comment(fmt.Sprintf(":cross_mark: Margin account transfer error: %+v", err2)),
+					)
+				}
+			} else {
+				if s.SlackAlert != nil {
+					bbgo.PostLiveNote(&d,
+						livenote.Channel(s.SlackAlert.Channel),
+						livenote.Comment(fmt.Sprintf(":check_mark_button: %s %s transferred successfully", amount.String(), d.Asset)),
 					)
 				}
 			}
