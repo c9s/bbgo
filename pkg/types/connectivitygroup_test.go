@@ -150,6 +150,71 @@ func TestConnectivityGroup(t *testing.T) {
 		assert.Equal(t, ConnectivityStateAuthed, callbackState)
 	})
 
+	t.Run("allAuthedC with 2 diff groups", func(t *testing.T) {
+		conn1 := NewConnectivity()
+		conn1.setDisconnect()
+		conn2 := NewConnectivity()
+		conn2.setDisconnect()
+
+		// callbackState is used to test the callback state
+		callbackState := ConnectivityStateDisconnected
+
+		group1 := NewConnectivityGroup(conn1, conn2)
+		group1.OnConnect(func() {
+			callbackState = ConnectivityStateConnected
+		})
+		group1.OnAuth(func() {
+			callbackState = ConnectivityStateAuthed
+		})
+		group1.OnDisconnect(func() {
+			callbackState = ConnectivityStateDisconnected
+		})
+
+		group2 := NewConnectivityGroup(conn1, conn2)
+
+		conn1.setConnect()
+		conn2.setConnect()
+
+		assert.Equal(t, ConnectivityStateConnected, group1.sumState)
+		assert.True(t, group1.IsConnected())
+		assert.False(t, group1.IsAuthed())
+		assert.Equal(t, ConnectivityStateConnected, callbackState)
+
+		go func() {
+			conn1.setAuthed()
+			conn2.setAuthed()
+		}()
+
+		authed1 := false
+		authedC1 := group1.AllAuthedC(ctx, 3*time.Second)
+
+		authed2 := false
+		authedC2 := group2.AllAuthedC(ctx, 3*time.Second)
+
+		select {
+		case <-authedC1:
+			authed1 = true
+		case <-time.After(4 * time.Second):
+		}
+
+		select {
+		case <-authedC2:
+			authed2 = true
+		case <-time.After(4 * time.Second):
+		}
+
+		assert.True(t, authed1)
+		assert.True(t, authed2)
+
+		assert.Equal(t, ConnectivityStateAuthed, group1.sumState)
+		assert.True(t, group1.IsConnected())
+		assert.True(t, group1.IsAuthed())
+
+		assert.Equal(t, ConnectivityStateAuthed, group2.sumState)
+		assert.True(t, group2.IsConnected())
+		assert.True(t, group2.IsAuthed())
+	})
+
 	t.Run("reconnect", func(t *testing.T) {
 		conn1 := NewConnectivity()
 		conn1.setDisconnect()
