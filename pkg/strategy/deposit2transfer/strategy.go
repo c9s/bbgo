@@ -271,6 +271,12 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 func (s *Strategy) addWatchingDeposit(deposit types.Deposit) {
 	s.watchingDeposits[deposit.TransactionID] = deposit
 
+	if lastTime, ok := s.lastAssetDepositTimes[deposit.Asset]; ok {
+		s.lastAssetDepositTimes[deposit.Asset] = later(deposit.Time.Time(), lastTime)
+	} else {
+		s.lastAssetDepositTimes[deposit.Asset] = deposit.Time.Time()
+	}
+
 	if s.SlackAlert != nil {
 		bbgo.PostLiveNote(&deposit,
 			livenote.Channel(s.SlackAlert.Channel),
@@ -339,22 +345,19 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 						logger.Infof("ignored expired succeedded deposit: %s %+v", deposit.TransactionID, deposit)
 					}
 				} else {
-					s.addWatchingDeposit(deposit)
+					// if the latest deposit time is not found, check if the deposit is older than 5 minutes
+					expiryTime := 5 * time.Minute
+					if deposit.Time.Before(time.Now().Add(-expiryTime)) {
+						logger.Infof("ignored expired (%s) succeedded deposit: %s %+v", expiryTime, deposit.TransactionID, deposit)
+					} else {
+						s.addWatchingDeposit(deposit)
+					}
 				}
 
 			case types.DepositCredited, types.DepositPending:
 				logger.Infof("adding pending deposit: %s", deposit.TransactionID)
 				s.addWatchingDeposit(deposit)
 			}
-		}
-	}
-
-	if len(deposits) > 0 {
-		lastDeposit := deposits[len(deposits)-1]
-		if lastTime, ok := s.lastAssetDepositTimes[asset]; ok {
-			s.lastAssetDepositTimes[asset] = later(lastDeposit.Time.Time(), lastTime)
-		} else {
-			s.lastAssetDepositTimes[asset] = lastDeposit.Time.Time()
 		}
 	}
 
