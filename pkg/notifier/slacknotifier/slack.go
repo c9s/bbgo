@@ -521,11 +521,27 @@ func diffsToComment(obj any, diffs []dynamic.Diff) (text string) {
 		return text
 	}
 
-	text += fmt.Sprintf("%T updated\n", obj)
+	text += fmt.Sprintf("_%s_ updated\n", objectName(obj))
 
 	for _, diff := range diffs {
 		text += fmt.Sprintf("- %s: `%s` transited to `%s`\n", diff.Field, diff.Before, diff.After)
 	}
 
 	return text
+}
+
+var typeNamePrefixRE = regexp.MustCompile("^\\*?([a-zA-Z0-9_]+\\.)?")
+
+func objectName(obj any) string {
+	type labelInf interface {
+		Label() string
+	}
+
+	if ll, ok := obj.(labelInf); ok {
+		return ll.Label()
+	}
+
+	typeName := fmt.Sprintf("%T", obj)
+	typeName = typeNamePrefixRE.ReplaceAllString(typeName, "")
+	return typeName
 }
