@@ -234,6 +234,7 @@ type Strategy struct {
 	metricsLabels prometheus.Labels
 
 	sourceMarketDataConnectivity, sourceUserDataConnectivity *types.Connectivity
+	makerMarketDataConnectivity, makerUserDataConnectivity   *types.Connectivity
 	connectivityGroup                                        *types.ConnectivityGroup
 
 	// lastAggregatedSignal stores the last aggregated signal with mutex
@@ -1831,10 +1832,13 @@ func (s *Strategy) CrossRun(
 	s.sourceUserDataConnectivity = types.NewConnectivity()
 	s.sourceUserDataConnectivity.Bind(s.sourceSession.UserDataStream)
 
+	s.makerUserDataConnectivity = types.NewConnectivity()
+	s.makerUserDataConnectivity.Bind(s.makerSession.UserDataStream)
+
 	s.sourceMarketDataConnectivity = types.NewConnectivity()
 	s.sourceMarketDataConnectivity.Bind(s.sourceSession.MarketDataStream)
 
-	s.connectivityGroup = types.NewConnectivityGroup(s.sourceUserDataConnectivity)
+	s.connectivityGroup = types.NewConnectivityGroup(s.sourceUserDataConnectivity, s.makerUserDataConnectivity)
 
 	go func() {
 		s.logger.Infof("waiting for authentication connections to be ready...")
