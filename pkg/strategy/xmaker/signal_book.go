@@ -28,6 +28,7 @@ type StreamBookSetter interface {
 type OrderBookBestPriceVolumeSignal struct {
 	RatioThreshold fixedpoint.Value `json:"ratioThreshold"`
 	MinVolume      fixedpoint.Value `json:"minVolume"`
+	MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
 
 	symbol string
 	book   *types.StreamOrderBook
