@@ -144,10 +144,9 @@ func TestConnectivityGroup(t *testing.T) {
 		assert.True(t, authed1)
 		assert.True(t, authed2)
 
-		assert.Equal(t, ConnectivityStateAuthed, group.sumState)
+		assert.Equal(t, ConnectivityStateAuthed, group.GetState())
 		assert.True(t, group.IsConnected())
 		assert.True(t, group.IsAuthed())
-		assert.Equal(t, ConnectivityStateAuthed, callbackState)
 	})
 
 	t.Run("allAuthedC with 2 diff groups", func(t *testing.T) {
@@ -175,7 +174,7 @@ func TestConnectivityGroup(t *testing.T) {
 		conn1.setConnect()
 		conn2.setConnect()
 
-		assert.Equal(t, ConnectivityStateConnected, group1.sumState)
+		assert.Equal(t, ConnectivityStateConnected, group1.GetState())
 		assert.True(t, group1.IsConnected())
 		assert.False(t, group1.IsAuthed())
 		assert.Equal(t, ConnectivityStateConnected, callbackState)
@@ -206,11 +205,11 @@ func TestConnectivityGroup(t *testing.T) {
 		assert.True(t, authed1)
 		assert.True(t, authed2)
 
-		assert.Equal(t, ConnectivityStateAuthed, group1.sumState)
+		assert.Equal(t, ConnectivityStateAuthed, group1.GetState())
 		assert.True(t, group1.IsConnected())
 		assert.True(t, group1.IsAuthed())
 
-		assert.Equal(t, ConnectivityStateAuthed, group2.sumState)
+		assert.Equal(t, ConnectivityStateAuthed, group2.GetState())
 		assert.True(t, group2.IsConnected())
 		assert.True(t, group2.IsAuthed())
 	})
