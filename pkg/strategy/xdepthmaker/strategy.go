@@ -620,7 +620,9 @@ func (s *Strategy) CrossRun(
 		select {
 		case <-ctx.Done():
 			return
-		case <-connGroup.AllAuthedC(ctx, time.Minute):
+		case <-time.After(3 * time.Minute):
+			log.Panicf("authentication timeout, exiting...")
+		case <-connGroup.AllAuthedC(ctx):
 		}
 
 		log.Infof("user data stream authenticated, start placing orders...")

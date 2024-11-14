@@ -194,14 +194,10 @@ func (g *ConnectivityGroup) AnyDisconnected(ctx context.Context) bool {
 	return false
 }
 
-func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, c chan struct{}, allTimeoutDuration time.Duration) {
-	allTimeout := time.After(allTimeoutDuration)
+func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, c chan struct{}) {
 	for {
 		select {
 		case <-ctx.Done():
-			return
-
-		case <-allTimeout:
 			return
 
 		default:
@@ -219,8 +215,8 @@ func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, c chan struct{}, 
 // AllAuthedC returns a channel that will be closed when all connections are authenticated
 // the returned channel will be closed when all connections are authenticated
 // and the channel can only be used once (because we can't close a channel twice)
-func (g *ConnectivityGroup) AllAuthedC(ctx context.Context, timeout time.Duration) <-chan struct{} {
+func (g *ConnectivityGroup) AllAuthedC(ctx context.Context) <-chan struct{} {
 	c := make(chan struct{})
-	go g.waitAllAuthed(ctx, c, timeout)
+	go g.waitAllAuthed(ctx, c)
 	return c
 }

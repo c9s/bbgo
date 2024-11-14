@@ -1844,7 +1844,11 @@ func (s *Strategy) CrossRun(
 		s.logger.Infof("waiting for authentication connections to be ready...")
 		select {
 		case <-ctx.Done():
-		case <-s.connectivityGroup.AllAuthedC(ctx, 3*time.Minute):
+
+		case <-time.After(3 * time.Minute):
+			s.logger.Panicf("authentication timeout, exiting...")
+
+		case <-s.connectivityGroup.AllAuthedC(ctx):
 		}
 
 		s.logger.Infof("all user data streams are connected, starting workers...")
