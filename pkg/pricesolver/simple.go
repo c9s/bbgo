@@ -45,7 +45,7 @@ func (m *SimplePriceSolver) Update(symbol string, price fixedpoint.Value) {
 	m.symbolPrices[symbol] = price
 	market, ok := m.markets[symbol]
 	if !ok {
-		log.Warnf("market info %s not found, unable to update price", symbol)
+		log.Warnf("market info %s not found, unable to update price (%s)", symbol, price.String())
 		return
 	}
 
