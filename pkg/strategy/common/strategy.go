@@ -81,7 +81,7 @@ func (s *Strategy) Initialize(
 
 	if !s.CircuitBreakLossThreshold.IsZero() {
 		log.Infof("circuitBreakLossThreshold is configured, setting up CircuitBreakRiskControl...")
-		s.circuitBreakRiskControl = circuitbreaker.NewBasicCircuitBreaker(strategyID, instanceID)
+		s.circuitBreakRiskControl = circuitbreaker.NewBasicCircuitBreaker(strategyID, instanceID, "")
 		s.OrderExecutor.TradeCollector().OnProfit(func(trade types.Trade, profit *types.Profit) {
 			if profit != nil && s.circuitBreakRiskControl != nil {
 				s.circuitBreakRiskControl.RecordProfit(profit.Profit, trade.Time.Time())

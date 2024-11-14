@@ -13,53 +13,55 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var metricsLabels = []string{"strategy", "strategyInstance", "symbol"}
+
 var consecutiveTotalLossMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_circuit_breaker_consecutive_total_loss",
 		Help: "",
-	}, []string{"strategy", "strategyInstance"})
+	}, metricsLabels)
 
 var consecutiveLossTimesCounterMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_circuit_breaker_consecutive_loss_times",
 		Help: "",
-	}, []string{"strategy", "strategyInstance"})
+	}, metricsLabels)
 
 var haltCounterMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_circuit_breaker_halt_counter",
 		Help: "",
-	}, []string{"strategy", "strategyInstance"})
+	}, metricsLabels)
 
 var haltMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_circuit_breaker_halt",
 		Help: "",
-	}, []string{"strategy", "strategyInstance"})
+	}, metricsLabels)
 
 var totalProfitMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_circuit_breaker_total_profit",
 		Help: "",
-	}, []string{"strategy", "strategyInstance"})
+	}, metricsLabels)
 
 var profitWinCounterMetrics = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "bbgo_circuit_breaker_profit_win_counter",
 		Help: "profit winning counter",
-	}, []string{"strategy", "strategyInstance"})
+	}, metricsLabels)
 
 var profitLossCounterMetrics = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "bbgo_circuit_breaker_profit_loss_counter",
-		Help: "profit los counter",
-	}, []string{"strategy", "strategyInstance"})
+		Help: "profit loss counter",
+	}, metricsLabels)
 
 var winningRatioMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_circuit_breaker_winning_ratio",
 		Help: "winning ratio",
-	}, []string{"strategy", "strategyInstance"})
+	}, metricsLabels)
 
 func init() {
 	prometheus.MustRegister(
@@ -74,6 +76,7 @@ func init() {
 	)
 }
 
+//go:generate callbackgen -type BasicCircuitBreaker
 type BasicCircuitBreaker struct {
 	Enabled bool `json:"enabled"`
 
@@ -94,7 +97,9 @@ type BasicCircuitBreaker struct {
 
 	HaltDuration types.Duration `json:"haltDuration"`
 
-	strategyID, strategyInstance string
+	strategyID, strategyInstance, symbol string
+
+	panicCallbacks []func()
 
 	haltCounter int
 	haltReason  string
@@ -117,7 +122,7 @@ type BasicCircuitBreaker struct {
 	metricsLabels prometheus.Labels
 }
 
-func NewBasicCircuitBreaker(strategyID, strategyInstance string) *BasicCircuitBreaker {
+func NewBasicCircuitBreaker(strategyID, strategyInstance, symbol string) *BasicCircuitBreaker {
 	b := &BasicCircuitBreaker{
 		Enabled:                       true,
 		MaximumConsecutiveLossTimes:   8,
@@ -127,7 +132,12 @@ func NewBasicCircuitBreaker(strategyID, strategyInstance string) *BasicCircuitBr
 		HaltDuration:     types.Duration(1 * time.Hour),
 		strategyID:       strategyID,
 		strategyInstance: strategyInstance,
-		metricsLabels:    prometheus.Labels{"strategy": strategyID, "strategyInstance": strategyInstance},
+		symbol:           symbol,
+		metricsLabels: prometheus.Labels{
+			"strategy":         strategyID,
+			"strategyInstance": strategyInstance,
+			"symbol":           symbol,
+		},
 	}
 
 	b.updateMetrics()
@@ -139,7 +149,11 @@ func (b *BasicCircuitBreaker) getMetricsLabels() prometheus.Labels {
 		return b.metricsLabels
 	}
 
-	return prometheus.Labels{"strategy": b.strategyID, "strategyInstance": b.strategyInstance}
+	return prometheus.Labels{
+		"strategy":         b.strategyID,
+		"strategyInstance": b.strategyInstance,
+		"symbol":           b.symbol,
+	}
 }
 
 func (b *BasicCircuitBreaker) updateMetrics() {
@@ -263,6 +277,8 @@ func (b *BasicCircuitBreaker) halt(now time.Time, reason string) {
 	defer b.updateMetrics()
 
 	if b.MaximumHaltTimesExceededPanic && b.haltCounter > b.MaximumHaltTimes {
+		b.EmitPanic()
+
 		panic(fmt.Errorf("total %d halt times > maximumHaltTimesExceededPanic %d", b.haltCounter, b.MaximumHaltTimes))
 	}
 }
