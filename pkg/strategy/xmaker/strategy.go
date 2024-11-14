@@ -148,6 +148,8 @@ type Strategy struct {
 	BollBandMargin       fixedpoint.Value `json:"bollBandMargin"`
 	BollBandMarginFactor fixedpoint.Value `json:"bollBandMarginFactor"`
 
+	SeparateMarketDataStream bool `json:"separateMarketDataStream"`
+
 	// MinMarginLevel is the minimum margin level to trigger the hedge
 	MinMarginLevel fixedpoint.Value `json:"minMarginLevel"`
 
@@ -232,6 +234,8 @@ type Strategy struct {
 	logger logrus.FieldLogger
 
 	metricsLabels prometheus.Labels
+
+	sourceMarketDataStream, makerMarketDataStream types.Stream
 
 	sourceMarketDataConnectivity, sourceUserDataConnectivity *types.Connectivity
 	connectivityGroup                                        *types.ConnectivityGroup
@@ -1726,11 +1730,37 @@ func (s *Strategy) CrossRun(
 		s.ProfitStats.ProfitStats = profitStats
 	}
 
+	s.makerMarketDataStream = s.makerSession.MarketDataStream
+	s.sourceMarketDataStream = s.sourceSession.MarketDataStream
+
+	// separate market data stream
+	if s.SeparateMarketDataStream {
+		s.makerMarketDataStream = s.makerSession.Exchange.NewStream()
+		s.makerMarketDataStream.SetPublicOnly()
+		for _, sub := range s.makerSession.MarketDataStream.GetSubscriptions() {
+			s.makerMarketDataStream.Subscribe(sub.Channel, sub.Symbol, sub.Options)
+		}
+
+		if err := s.makerMarketDataStream.Connect(ctx); err != nil {
+			return err
+		}
+
+		s.sourceMarketDataStream = s.sourceSession.Exchange.NewStream()
+		s.sourceMarketDataStream.SetPublicOnly()
+		for _, sub := range s.sourceSession.MarketDataStream.GetSubscriptions() {
+			s.sourceMarketDataStream.Subscribe(sub.Channel, sub.Symbol, sub.Options)
+		}
+
+		if err := s.sourceMarketDataStream.Connect(ctx); err != nil {
+			return err
+		}
+	}
+
 	s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
-	s.makerBook.BindStream(s.makerSession.MarketDataStream)
+	s.makerBook.BindStream(s.makerMarketDataStream)
 
 	s.sourceBook = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
-	s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
+	s.sourceBook.BindStream(s.sourceMarketDataStream)
 
 	if s.EnableSignalMargin {
 		s.logger.Infof("signal margin is enabled")
