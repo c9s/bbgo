@@ -1590,6 +1590,9 @@ func (s *Strategy) CrossRun(
 
 	// initialize the price resolver
 	sourceMarkets := s.sourceSession.Markets()
+	if len(sourceMarkets) == 0 {
+		return fmt.Errorf("source exchange %s has no markets", s.SourceExchange)
+	}
 
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
