@@ -1,95 +1,8 @@
 package types
 
 import (
-	"context"
 	"sync"
-	"time"
 )
-
-type ConnectivityGroup struct {
-	connections []*Connectivity
-	mu          sync.Mutex
-}
-
-func NewConnectivityGroup(cons ...*Connectivity) *ConnectivityGroup {
-	return &ConnectivityGroup{
-		connections: cons,
-	}
-}
-
-func (g *ConnectivityGroup) Add(con *Connectivity) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	g.connections = append(g.connections, con)
-}
-
-func (g *ConnectivityGroup) AnyDisconnected(ctx context.Context) bool {
-	g.mu.Lock()
-	conns := g.connections
-	g.mu.Unlock()
-
-	for _, conn := range conns {
-		select {
-		case <-ctx.Done():
-			return false
-
-		case <-conn.connectedC:
-			continue
-
-		case <-conn.disconnectedC:
-			return true
-		}
-	}
-
-	return false
-}
-
-func (g *ConnectivityGroup) waitAllAuthed(ctx context.Context, c chan struct{}, allTimeoutDuration time.Duration) {
-	g.mu.Lock()
-	conns := g.connections
-	g.mu.Unlock()
-
-	authedConns := make([]bool, len(conns))
-	allTimeout := time.After(allTimeoutDuration)
-	for {
-		for idx, con := range conns {
-			// if the connection is not authed, mark it as false
-			if !con.authed {
-				// authedConns[idx] = false
-			}
-
-			timeout := time.After(3 * time.Second)
-			select {
-			case <-ctx.Done():
-				return
-
-			case <-allTimeout:
-				return
-
-			case <-timeout:
-				continue
-
-			case <-con.AuthedC():
-				authedConns[idx] = true
-			}
-		}
-
-		if allTrue(authedConns) {
-			close(c)
-			return
-		}
-	}
-}
-
-// AllAuthedC returns a channel that will be closed when all connections are authenticated
-// the returned channel will be closed when all connections are authenticated
-// and the channel can only be used once (because we can't close a channel twice)
-func (g *ConnectivityGroup) AllAuthedC(ctx context.Context, timeout time.Duration) <-chan struct{} {
-	c := make(chan struct{})
-	go g.waitAllAuthed(ctx, c, timeout)
-	return c
-}
 
 func allTrue(bools []bool) bool {
 	for _, b := range bools {
@@ -101,6 +14,7 @@ func allTrue(bools []bool) bool {
 	return true
 }
 
+//go:generate callbackgen -type Connectivity
 type Connectivity struct {
 	authed  bool
 	authedC chan struct{}
@@ -109,7 +23,12 @@ type Connectivity struct {
 	connectedC    chan struct{}
 	disconnectedC chan struct{}
 
-	mu sync.Mutex
+	connectCallbacks    []func()
+	disconnectCallbacks []func()
+	authCallbacks       []func()
+
+	stream Stream
+	mu     sync.Mutex
 }
 
 func NewConnectivity() *Connectivity {
@@ -141,31 +60,39 @@ func (c *Connectivity) IsAuthed() (authed bool) {
 	return authed
 }
 
-func (c *Connectivity) handleConnect() {
+func (c *Connectivity) setConnect() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.connected = true
-	close(c.connectedC)
-	c.disconnectedC = make(chan struct{})
+	if !c.connected {
+		c.connected = true
+		close(c.connectedC)
+		c.disconnectedC = make(chan struct{})
+	}
+	c.mu.Unlock()
+	c.EmitConnect()
 }
 
-func (c *Connectivity) handleDisconnect() {
+func (c *Connectivity) setDisconnect() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.connected = false
-	c.authedC = make(chan struct{})
-	c.connectedC = make(chan struct{})
-	close(c.disconnectedC)
+	if c.connected {
+		c.connected = false
+		c.authed = false
+		c.authedC = make(chan struct{})
+		c.connectedC = make(chan struct{})
+		close(c.disconnectedC)
+	}
+	c.mu.Unlock()
+	c.EmitDisconnect()
 }
 
-func (c *Connectivity) handleAuth() {
+func (c *Connectivity) setAuthed() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	if !c.authed {
+		c.authed = true
+		close(c.authedC)
+	}
+	c.mu.Unlock()
 
-	c.authed = true
-	close(c.authedC)
+	c.EmitAuth()
 }
 
 func (c *Connectivity) AuthedC() chan struct{} {
@@ -187,7 +114,8 @@ func (c *Connectivity) DisconnectedC() chan struct{} {
 }
 
 func (c *Connectivity) Bind(stream Stream) {
-	stream.OnConnect(c.handleConnect)
-	stream.OnDisconnect(c.handleDisconnect)
-	stream.OnAuth(c.handleAuth)
+	stream.OnConnect(c.setConnect)
+	stream.OnDisconnect(c.setDisconnect)
+	stream.OnAuth(c.setAuthed)
+	c.stream = stream
 }
