@@ -834,13 +834,6 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 		return
 	}
 
-	// app-level token (for specific api)
-	slackAppToken := viper.GetString("slack-app-token")
-	if len(slackAppToken) > 0 && !strings.HasPrefix(slackAppToken, "xapp-") {
-		log.Errorf("SLACK_APP_TOKEN must have the prefix \"xapp-\".")
-		return
-	}
-
 	if conf.ErrorChannel != "" {
 		log.Debugf("found slack configured, setting up log hook...")
 		log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
@@ -852,7 +845,15 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 		slack.OptionLog(stdlog.New(os.Stdout, "api: ", stdlog.Lshortfile|stdlog.LstdFlags)),
 	}
 
-	if len(slackAppToken) > 0 {
+	// app-level token (for specific api)
+	slackAppToken := viper.GetString("slack-app-token")
+	hasSlackAppToken := len(slackAppToken) > 0
+	if hasSlackAppToken {
+		if !strings.HasPrefix(slackAppToken, "xapp-") {
+			log.Errorf("SLACK_APP_TOKEN must have the prefix \"xapp-\".")
+			return
+		}
+
 		slackOpts = append(slackOpts, slack.OptionAppLevelToken(slackAppToken))
 	}
 
@@ -870,31 +871,31 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 	var notifier = slacknotifier.New(client, conf.DefaultChannel, notifierOpts...)
 	Notification.AddNotifier(notifier)
 
-	// allocate a store, so that we can save the chatID for the owner
-	var messenger = interact.NewSlack(client)
+	if hasSlackAppToken {
+		// allocate a store, so that we can save the chatID for the owner
+		var messenger = interact.NewSlack(client)
+		var sessions = interact.SlackSessionMap{}
+		var sessionStore = persistence.NewStore("bbgo", "slack")
+		if err := sessionStore.Load(&sessions); err != nil {
 
-	var sessions = interact.SlackSessionMap{}
-	var sessionStore = persistence.NewStore("bbgo", "slack")
-	if err := sessionStore.Load(&sessions); err != nil {
-
-	} else {
-		// TODO: this is not necessary for slack, but we should find a way to restore the sessions
-		/*
-			for _, session := range sessions {
-				if session.IsAuthorized() {
-					// notifier.AddChat(session.Chat)
+		} else {
+			// TODO: this is not necessary for slack, but we should find a way to restore the sessions
+			/*
+				for _, session := range sessions {
+					if session.IsAuthorized() {
+						// notifier.AddChat(session.Chat)
+					}
 				}
-			}
-			messenger.RestoreSessions(sessions)
-			messenger.OnAuthorized(func(userSession *interact.SlackSession) {
-				if userSession.IsAuthorized() {
-					// notifier.AddChat(userSession.Chat)
-				}
-			})
-		*/
+				messenger.RestoreSessions(sessions)
+				messenger.OnAuthorized(func(userSession *interact.SlackSession) {
+					if userSession.IsAuthorized() {
+						// notifier.AddChat(userSession.Chat)
+					}
+				})
+			*/
+		}
+		interact.AddMessenger(messenger)
 	}
-
-	interact.AddMessenger(messenger)
 }
 
 func (environ *Environment) setupTelegram(
