@@ -39,7 +39,7 @@ func NewAccountValueCalculator(
 
 // UpdatePrices updates the price index from the existing balances
 func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
-	balances := c.session.Account.Balances()
+	balances := c.session.Account.Balances().NotZero()
 	currencies := balances.Currencies()
 	markets := c.session.Markets()
 
