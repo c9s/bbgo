@@ -1127,15 +1127,6 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 		return
 	}
 
-	// if it's disconnected or context is canceled, then return
-	select {
-	case <-ctx.Done():
-		return
-	case <-s.makerConnectivity.DisconnectedC():
-		return
-	default:
-	}
-
 	bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
 	if !hasPrice {
 		return
