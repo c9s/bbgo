@@ -7,6 +7,7 @@ import (
 	"runtime/pprof"
 	"strings"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/heroku/rollrus"
 	"github.com/joho/godotenv"
@@ -20,8 +21,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/util"
-
-	_ "time/tzdata"
 )
 
 var cpuProfileFile *os.File
@@ -77,6 +76,24 @@ var RootCmd = &cobra.Command{
 				err := http.ListenAndServe(":"+port, nil)
 				if err != nil {
 					log.WithError(err).Errorf("metrics server error")
+				}
+			}()
+		}
+
+		enableProfileServer, err := cmd.Flags().GetBool("enable-profile-server")
+		if err != nil {
+			return err
+		}
+
+		if enableProfileServer {
+			profileServerBind, err := cmd.Flags().GetString("profile-server-bind")
+			if err != nil {
+				return err
+			}
+
+			go func() {
+				if err := http.ListenAndServe(profileServerBind, nil); err != nil {
+					log.WithError(err).Errorf("profile server error")
 				}
 			}()
 		}
@@ -195,6 +212,8 @@ func init() {
 	RootCmd.PersistentFlags().String("max-api-secret", "", "max api secret")
 
 	RootCmd.PersistentFlags().String("cpu-profile", "", "cpu profile")
+	RootCmd.PersistentFlags().Bool("enable-profile-server", false, "enable profile server binding")
+	RootCmd.PersistentFlags().String("profile-server-bind", "localhost:6060", "profile server binding")
 
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
