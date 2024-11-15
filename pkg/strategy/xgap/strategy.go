@@ -105,13 +105,15 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
-	sourceSession, ok := sessions[s.SourceExchange]
-	if !ok {
-		panic(fmt.Errorf("source session %s is not defined", s.SourceExchange))
-	}
+	if len(s.SourceExchange) > 0 && len(s.SourceSymbol) > 0 {
+		sourceSession, ok := sessions[s.SourceExchange]
+		if !ok {
+			panic(fmt.Errorf("source session %s is not defined", s.SourceExchange))
+		}
 
-	sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: "1m"})
-	sourceSession.Subscribe(types.BookChannel, s.SourceSymbol, types.SubscribeOptions{Depth: types.DepthLevel5})
+		sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: "1m"})
+		sourceSession.Subscribe(types.BookChannel, s.SourceSymbol, types.SubscribeOptions{Depth: types.DepthLevel5})
+	}
 
 	tradingSession, ok := sessions[s.TradingExchange]
 	if !ok {
