@@ -222,8 +222,6 @@ type Strategy struct {
 
 	FullReplenishInterval types.Duration `json:"fullReplenishInterval"`
 
-	OrderCancelWaitTime types.Duration `json:"orderCancelWaitTime"`
-
 	Margin    fixedpoint.Value `json:"margin"`
 	BidMargin fixedpoint.Value `json:"bidMargin"`
 	AskMargin fixedpoint.Value `json:"askMargin"`
@@ -1129,6 +1127,7 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 
 	bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
 	if !hasPrice {
+		s.logger.Warnf("source book has no price")
 		return
 	}
 
