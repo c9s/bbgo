@@ -16,6 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/metrics"
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/strategy/common"
@@ -1192,6 +1193,8 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 	}
 
 	s.logger.Infof("%d orders are generated, placing...", len(submitOrders))
+
+	metrics.UpdateOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
 
 	_, err = s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
