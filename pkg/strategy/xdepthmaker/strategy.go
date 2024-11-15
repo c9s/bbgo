@@ -14,6 +14,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/dbg"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/metrics"
@@ -1187,6 +1188,8 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 	if maxLayer == 0 {
 		metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
 	}
+
+	dbg.DebugSubmitOrders(s.logger, submitOrders)
 
 	_, err = s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
