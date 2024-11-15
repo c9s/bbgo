@@ -369,8 +369,13 @@ func (s *Strategy) scanDepositHistory(ctx context.Context, asset string, duratio
 		case types.DepositSuccess:
 			logger.Infof("found pending -> success deposit: %+v", deposit)
 			current, required := deposit.GetCurrentConfirmation()
-			if required > 0 && deposit.UnlockConfirm > 0 && current < deposit.UnlockConfirm {
-				logger.Infof("deposit %s unlock confirm %d is not reached, current: %d, required: %d, skip this round", deposit.TransactionID, deposit.UnlockConfirm, current, required)
+			if deposit.UnlockConfirm > 0 {
+				if current < deposit.UnlockConfirm {
+					logger.Infof("deposit %s unlock confirm %d is not reached, current: %d, required: %d, skip this round", deposit.TransactionID, deposit.UnlockConfirm, current, required)
+					continue
+				}
+			} else if required > 0 && current < required {
+				logger.Infof("deposit %s confirm %d/%d is not reached", deposit.TransactionID, current, required)
 				continue
 			}
 
