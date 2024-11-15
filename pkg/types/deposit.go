@@ -195,7 +195,8 @@ func getExplorerURL(network string, txID string) string {
 	switch strings.ToUpper(network) {
 	case "BTC":
 		return getBitcoinNetworkExplorerURL(txID)
-	case "BSC":
+	case "BSC", "BSC-BEP20":
+		// MAX uses "BSC-BEP20"
 		return getBscNetworkExplorerURL(txID)
 	case "ETH", "ETHEREUM":
 		// binance uses "ETH"
