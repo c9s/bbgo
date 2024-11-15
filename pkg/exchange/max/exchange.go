@@ -913,6 +913,14 @@ func (e *Exchange) QueryDepositHistory(
 		}
 	}
 
+	toRawStatusStr := func(d maxapi.Deposit) string {
+		if len(d.StateReason) > 0 {
+			return fmt.Sprintf("%s (%s: %s)", d.Status, d.State, d.StateReason)
+		}
+
+		return fmt.Sprintf("%s (%s)", d.Status, d.State)
+	}
+
 	for startTime.Before(until) {
 		// startTime ~ endTime must be in 90 days
 		endTime := startTime.AddDate(0, 0, 60)
@@ -935,14 +943,6 @@ func (e *Exchange) QueryDepositHistory(
 
 		if err != nil {
 			return nil, err
-		}
-
-		toRawStatusStr := func(d maxapi.Deposit) string {
-			if len(d.StateReason) > 0 {
-				return fmt.Sprintf("%s (%s: %s)", d.Status, d.State, d.StateReason)
-			}
-
-			return fmt.Sprintf("%s (%s)", d.Status, d.State)
 		}
 
 		for i := len(deposits) - 1; i >= 0; i-- {
