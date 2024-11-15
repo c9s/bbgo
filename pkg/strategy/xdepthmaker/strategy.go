@@ -1027,9 +1027,9 @@ func (s *Strategy) generateMakerOrders(
 			if lastMakerPrice.Sign() > 0 && depthPrice.Compare(lastMakerPrice) == 0 {
 				switch side {
 				case types.SideTypeBuy:
-					depthPrice = depthPrice.Sub(s.makerMarket.TickSize)
+					depthPrice = depthPrice.Sub(s.makerMarket.TickSize.Mul(s.Pips))
 				case types.SideTypeSell:
-					depthPrice = depthPrice.Add(s.makerMarket.TickSize)
+					depthPrice = depthPrice.Add(s.makerMarket.TickSize.Mul(s.Pips))
 				}
 			}
 
