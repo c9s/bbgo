@@ -1194,7 +1194,7 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 
 	s.logger.Infof("%d orders are generated, placing...", len(submitOrders))
 
-	metrics.UpdateOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
+	metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
 
 	_, err = s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {

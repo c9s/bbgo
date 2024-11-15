@@ -7,47 +7,51 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var OpenOrderBidExposureInUsdMetrics = prometheus.NewGaugeVec(
+var makerOpenOrderBidExposureInUsdMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_maker_open_order_bid_exposure_in_usd",
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
-var OpenOrderAskExposureInUsdMetrics = prometheus.NewGaugeVec(
+var makerOpenOrderAskExposureInUsdMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_maker_open_order_ask_exposure_in_usd",
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
-var OpenOrderBidOrderCountMetrics = prometheus.NewGaugeVec(
+var makerOpenOrderBidOrderCountMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_maker_open_order_bid_count",
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
-var OpenOrderAskOrderCountMetrics = prometheus.NewGaugeVec(
+var makerOpenOrderAskOrderCountMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_maker_open_order_ask_count",
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
-var MakerBestBidPriceMetrics = prometheus.NewGaugeVec(
+var makerBestBidPriceMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_maker_best_bid_price",
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
-var MakerBestAskPriceMetrics = prometheus.NewGaugeVec(
+var makerBestAskPriceMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_maker_best_ask_price",
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
-func UpdateOpenOrderMetrics(strategyType, strategyId, exchangeName, symbol string, submitOrders []types.SubmitOrder) {
+func UpdateMakerOpenOrderMetrics(strategyType, strategyId, exchangeName, symbol string, submitOrders []types.SubmitOrder) {
 	bidOrderCount := 0
 	askOrderCount := 0
 	bidExposureQuoteAmount := fixedpoint.Zero
 	askExposureQuoteAmount := fixedpoint.Zero
+
+	bestAskPrice := fixedpoint.Zero
+	bestBidPrice := fixedpoint.Zero
+
 	for _, submitOrder := range submitOrders {
 		quoteAmount := submitOrder.Quantity.Mul(submitOrder.Price)
 
@@ -55,10 +59,21 @@ func UpdateOpenOrderMetrics(strategyType, strategyId, exchangeName, symbol strin
 		case types.SideTypeSell:
 			askExposureQuoteAmount = askExposureQuoteAmount.Add(quoteAmount)
 			askOrderCount++
+			if bestAskPrice.IsZero() {
+				bestAskPrice = submitOrder.Price
+			} else {
+				bestAskPrice = fixedpoint.Min(bestAskPrice, submitOrder.Price)
+			}
 
 		case types.SideTypeBuy:
 			bidExposureQuoteAmount = bidExposureQuoteAmount.Add(quoteAmount)
 			bidOrderCount++
+
+			if bestBidPrice.IsZero() {
+				bestBidPrice = submitOrder.Price
+			} else {
+				bestBidPrice = fixedpoint.Max(bestBidPrice, submitOrder.Price)
+			}
 
 		}
 	}
@@ -70,19 +85,21 @@ func UpdateOpenOrderMetrics(strategyType, strategyId, exchangeName, symbol strin
 		"symbol":        symbol,
 	}
 
-	OpenOrderBidExposureInUsdMetrics.With(labels).Set(bidExposureQuoteAmount.Float64())
-	OpenOrderAskExposureInUsdMetrics.With(labels).Set(askExposureQuoteAmount.Float64())
-	OpenOrderBidOrderCountMetrics.With(labels).Set(float64(bidOrderCount))
-	OpenOrderAskOrderCountMetrics.With(labels).Set(float64(askOrderCount))
+	makerOpenOrderBidExposureInUsdMetrics.With(labels).Set(bidExposureQuoteAmount.Float64())
+	makerOpenOrderAskExposureInUsdMetrics.With(labels).Set(askExposureQuoteAmount.Float64())
+	makerOpenOrderBidOrderCountMetrics.With(labels).Set(float64(bidOrderCount))
+	makerOpenOrderAskOrderCountMetrics.With(labels).Set(float64(askOrderCount))
+	makerBestBidPriceMetrics.With(labels).Set(bestBidPrice.Float64())
+	makerBestAskPriceMetrics.With(labels).Set(bestAskPrice.Float64())
 }
 
 func init() {
 	prometheus.MustRegister(
-		OpenOrderAskExposureInUsdMetrics,
-		OpenOrderBidExposureInUsdMetrics,
-		MakerBestAskPriceMetrics,
-		MakerBestBidPriceMetrics,
-		OpenOrderAskOrderCountMetrics,
-		OpenOrderBidOrderCountMetrics,
+		makerOpenOrderAskExposureInUsdMetrics,
+		makerOpenOrderBidExposureInUsdMetrics,
+		makerBestAskPriceMetrics,
+		makerBestBidPriceMetrics,
+		makerOpenOrderAskOrderCountMetrics,
+		makerOpenOrderBidOrderCountMetrics,
 	)
 }
