@@ -6,7 +6,11 @@ import (
 
 var LossEmoji = "🔥"
 var ProfitEmoji = "💰"
+
+// 0.1% = 10 bps
 var DefaultPnLLevelResolution = fixedpoint.NewFromFloat(0.001)
+
+const MaxEmojiRepeat = 6
 
 func PnLColor(pnl fixedpoint.Value) string {
 	if pnl.Sign() > 0 {
@@ -41,7 +45,7 @@ func PnLEmojiMargin(pnl, margin, resolution fixedpoint.Value) (out string) {
 
 	if pnl.Sign() < 0 {
 		out = LossEmoji
-		level := (margin.Neg()).Div(resolution).Int()
+		level := max((margin.Neg()).Div(resolution).Int(), MaxEmojiRepeat)
 		for i := 1; i < level; i++ {
 			out += LossEmoji
 		}
@@ -53,9 +57,10 @@ func PnLEmojiMargin(pnl, margin, resolution fixedpoint.Value) (out string) {
 	}
 
 	out = ProfitEmoji
-	level := margin.Div(resolution).Int()
+	level := max(margin.Div(resolution).Int(), MaxEmojiRepeat)
 	for i := 1; i < level; i++ {
 		out += ProfitEmoji
 	}
+
 	return out
 }
