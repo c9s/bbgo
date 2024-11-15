@@ -186,9 +186,13 @@ func getExplorerURL(network string, txID string) string {
 		return getBitcoinNetworkExplorerURL(txID)
 	case "BSC":
 		return getBscNetworkExplorerURL(txID)
-	case "ETH":
+	case "ETH", "ETHEREUM":
+		// binance uses "ETH"
+		// max uses "ethereum"
 		return getEthNetworkExplorerURL(txID)
-	case "ARBITRUM", "ARB":
+	case "ARB", "ARBITRUM":
+		// binance uses "ARB"
+		// max uses "ARBITRUM"
 		return getArbitrumExplorerURL(txID)
 
 	}
