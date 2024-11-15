@@ -871,7 +871,7 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 	var notifier = slacknotifier.New(client, conf.DefaultChannel, notifierOpts...)
 	Notification.AddNotifier(notifier)
 
-	if hasSlackAppToken {
+	if hasSlackAppToken && conf.EnableInteraction {
 		// allocate a store, so that we can save the chatID for the owner
 		var messenger = interact.NewSlack(client)
 		var sessions = interact.SlackSessionMap{}
