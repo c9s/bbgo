@@ -225,21 +225,21 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 				}
 
 				if amount.IsZero() || amount.Sign() < 0 {
-					bbgo.Notify("Found succeeded deposit %s %s, but the balance %s %s is insufficient, skip transferring",
+					bbgo.Notify("🔍 Found succeeded deposit %s %s, but the balance %s %s is insufficient, skip transferring",
 						d.Amount.String(), d.Asset,
 						bal.Available.String(), bal.Currency)
 					continue
 				}
 			}
 
-			bbgo.Notify("Found succeeded deposit %s %s, transferring %s %s into the margin account",
+			bbgo.Notify("🔍 Found succeeded deposit %s %s, transferring %s %s into the margin account",
 				d.Amount.String(), d.Asset,
 				amount.String(), d.Asset)
 
 			if s.SlackAlert != nil {
 				bbgo.PostLiveNote(&d,
 					livenote.Channel(s.SlackAlert.Channel),
-					livenote.Comment(fmt.Sprintf("Transferring deposit asset %s %s into the margin account", amount.String(), d.Asset)),
+					livenote.Comment(fmt.Sprintf("🚥 Transferring deposit asset %s %s into the margin account", amount.String(), d.Asset)),
 				)
 			}
 
@@ -253,14 +253,14 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 				if s.SlackAlert != nil {
 					bbgo.PostLiveNote(&d,
 						livenote.Channel(s.SlackAlert.Channel),
-						livenote.Comment(fmt.Sprintf(":cross_mark: Margin account transfer error: %+v", err2)),
+						livenote.Comment(fmt.Sprintf("❌ Margin account transfer error: %+v", err2)),
 					)
 				}
 			} else {
 				if s.SlackAlert != nil {
 					bbgo.PostLiveNote(&d,
 						livenote.Channel(s.SlackAlert.Channel),
-						livenote.Comment(fmt.Sprintf(":check_mark_button: %s %s transferred successfully", amount.String(), d.Asset)),
+						livenote.Comment(fmt.Sprintf("✅ %s %s transferred successfully", amount.String(), d.Asset)),
 					)
 				}
 			}
