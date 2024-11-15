@@ -325,7 +325,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 	}
 
 	hedgeSession.Subscribe(types.BookChannel, s.HedgeSymbol, types.SubscribeOptions{
-		Depth: types.DepthLevelMedium,
+		Depth: types.DepthLevelFull,
 		Speed: types.SpeedLow,
 	})
 
