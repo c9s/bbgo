@@ -323,11 +323,6 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		panic(err)
 	}
 
-	hedgeSession.Subscribe(types.BookChannel, s.HedgeSymbol, types.SubscribeOptions{
-		Depth: types.DepthLevelFull,
-		Speed: types.SpeedLow,
-	})
-
 	hedgeSession.Subscribe(types.KLineChannel, s.HedgeSymbol, types.SubscribeOptions{Interval: "1m"})
 	hedgeSession.Subscribe(types.KLineChannel, hedgeSession.Exchange.PlatformFeeCurrency()+"USDT", types.SubscribeOptions{Interval: "1m"})
 
@@ -569,8 +564,19 @@ func (s *Strategy) CrossRun(
 		return err
 	}
 
+	sourceMarketStream := s.hedgeSession.Exchange.NewStream()
+	sourceMarketStream.SetPublicOnly()
+	sourceMarketStream.Subscribe(types.BookChannel, s.HedgeSymbol, types.SubscribeOptions{
+		Depth: types.DepthLevelFull,
+		Speed: types.SpeedLow,
+	})
+
 	s.sourceBook = types.NewStreamBook(s.HedgeSymbol, s.hedgeSession.ExchangeName)
-	s.sourceBook.BindStream(s.hedgeSession.MarketDataStream)
+	s.sourceBook.BindStream(sourceMarketStream)
+
+	if err := sourceMarketStream.Connect(ctx); err != nil {
+		return err
+	}
 
 	s.priceSolver = pricesolver.NewSimplePriceResolver(s.makerSession.Markets())
 	s.priceSolver.BindStream(s.hedgeSession.MarketDataStream)
