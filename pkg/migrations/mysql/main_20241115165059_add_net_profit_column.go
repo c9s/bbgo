@@ -16,6 +16,10 @@ func up_main_addNetProfitColumn(ctx context.Context, tx rockhopper.SQLExecutor) 
 	if err != nil {
 		return err
 	}
+	_, err = tx.ExecContext(ctx, "UPDATE positions SET net_profit = profit WHERE net_profit = 0.0;")
+	if err != nil {
+		return err
+	}
 	return err
 }
 
