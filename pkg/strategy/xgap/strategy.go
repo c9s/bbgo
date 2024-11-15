@@ -170,7 +170,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		s.mu.Unlock()
 	})
 
-	if s.SourceExchange != "" {
+	if s.SourceExchange != "" && s.SourceSymbol != "" {
 		s.sourceBook = types.NewStreamBook(s.SourceSymbol, sourceSession.ExchangeName)
 		s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
 	}
@@ -211,7 +211,6 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				}
 
 				s.placeOrders(ctx)
-
 				s.cancelOrders(ctx)
 			}
 		}
