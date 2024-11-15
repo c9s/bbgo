@@ -587,7 +587,7 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 
 	log.Infof("recordPosition: position = %s, trade = %+v, profit = %+v", position.Base.String(), trade, profit)
 	if profit != nil {
-		if err := environ.PositionService.Insert(position, trade, profit.Profit); err != nil {
+		if err := environ.PositionService.Insert(position, trade, profit.Profit, profit.NetProfit); err != nil {
 			log.WithError(err).Errorf("can not insert position record")
 		}
 
@@ -595,7 +595,7 @@ func (environ *Environment) RecordPosition(position *types.Position, trade types
 			log.WithError(err).Errorf("can not insert profit record: %+v", profit)
 		}
 	} else {
-		if err := environ.PositionService.Insert(position, trade, fixedpoint.Zero); err != nil {
+		if err := environ.PositionService.Insert(position, trade, fixedpoint.Zero, fixedpoint.Zero); err != nil {
 			log.WithError(err).Errorf("can not insert position record")
 		}
 	}
