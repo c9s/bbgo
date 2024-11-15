@@ -1110,20 +1110,20 @@ func (s *Strategy) partiallyCancelOrders(ctx context.Context, maxLayer int) erro
 func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 	if maxLayer == 0 {
 		if err := s.MakerOrderExecutor.GracefulCancel(ctx); err != nil {
-			log.WithError(err).Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
+			s.logger.WithError(err).Warnf("there are some %s orders not canceled, skipping placing maker orders", s.Symbol)
 			s.MakerOrderExecutor.ActiveMakerOrders().Print()
 			return
 		}
 	} else {
 		if err := s.partiallyCancelOrders(ctx, maxLayer); err != nil {
-			log.WithError(err).Warnf("%s partial order cancel failed", s.Symbol)
+			s.logger.WithError(err).Warnf("%s partial order cancel failed", s.Symbol)
 			return
 		}
 	}
 
 	numOfMakerOrders := s.MakerOrderExecutor.ActiveMakerOrders().NumOfOrders()
 	if numOfMakerOrders > 0 {
-		log.Warnf("maker orders are not all canceled")
+		s.logger.Warnf("maker orders are not all canceled")
 		return
 	}
 
@@ -1143,20 +1143,20 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 
 	bestBidPrice := bestBid.Price
 	bestAskPrice := bestAsk.Price
-	log.Infof("%s book ticker: best ask / best bid = %v / %v", s.HedgeSymbol, bestAskPrice, bestBidPrice)
+	s.logger.Infof("%s book ticker: best ask / best bid = %v / %v", s.HedgeSymbol, bestAskPrice, bestBidPrice)
 
 	s.lastSourcePrice.Set(bestBidPrice.Add(bestAskPrice).Div(Two))
 
 	bookLastUpdateTime := s.sourceBook.LastUpdateTime()
 
 	if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
-		log.WithError(err).Warnf("quote update error, %s price not updating, order book last update: %s ago",
+		s.logger.WithError(err).Warnf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
 	}
 
 	if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
-		log.WithError(err).Warnf("quote update error, %s price not updating, order book last update: %s ago",
+		s.logger.WithError(err).Warnf("quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
 			time.Since(bookLastUpdateTime))
 	}
@@ -1167,7 +1167,7 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 		return
 	}
 
-	log.Infof("balances: %+v", balances.NotZero())
+	s.logger.Infof("balances: %+v", balances.NotZero())
 
 	quoteBalance, ok := balances[s.makerMarket.QuoteCurrency]
 	if !ok {
@@ -1194,7 +1194,9 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 
 	s.logger.Infof("%d orders are generated, placing...", len(submitOrders))
 
-	metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
+	if maxLayer == 0 {
+		metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
+	}
 
 	_, err = s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
