@@ -50,9 +50,11 @@ type Strategy struct {
 	SourceSymbol   string `json:"sourceSymbol"`
 	SourceExchange string `json:"sourceExchange"`
 
-	MinSpread fixedpoint.Value `json:"minSpread"`
-	Quantity  fixedpoint.Value `json:"quantity"`
-	DryRun    bool             `json:"dryRun"`
+	MinSpread         fixedpoint.Value `json:"minSpread"`
+	Quantity          fixedpoint.Value `json:"quantity"`
+	MaxJitterQuantity fixedpoint.Value `json:"maxJitterQuantity"`
+
+	DryRun bool `json:"dryRun"`
 
 	DailyMaxVolume    fixedpoint.Value `json:"dailyMaxVolume,omitempty"`
 	DailyTargetVolume fixedpoint.Value `json:"dailyTargetVolume,omitempty"`
@@ -113,7 +115,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		}
 
 		sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: "1m"})
-		sourceSession.Subscribe(types.BookChannel, s.SourceSymbol, types.SubscribeOptions{Depth: types.DepthLevel5})
+		sourceSession.Subscribe(types.BookChannel, s.SourceSymbol, types.SubscribeOptions{Depth: types.DepthLevelFull})
 	}
 
 	tradingSession, ok := sessions[s.TradingExchange]
@@ -327,26 +329,30 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		quantity = fixedpoint.Max(s.Quantity, quantity)
 	} else if s.SimulateVolume {
 		s.mu.Lock()
-		if s.lastTradingKLine.Volume.Sign() > 0 && s.lastSourceKLine.Volume.Sign() > 0 {
-			log.Infof("trading exchange %s price: %s volume: %s",
-				s.Symbol, s.lastTradingKLine.Close.String(), s.lastTradingKLine.Volume.String())
-			log.Infof("source exchange %s price: %s volume: %s",
-				s.Symbol, s.lastSourceKLine.Close.String(), s.lastSourceKLine.Volume.String())
+		lastTradingKLine := s.lastTradingKLine
+		lastSourceKLine := s.lastSourceKLine
+		s.mu.Unlock()
 
-			volumeDiff := s.lastSourceKLine.Volume.Sub(s.lastTradingKLine.Volume)
+		if lastTradingKLine.Volume.Sign() > 0 && lastSourceKLine.Volume.Sign() > 0 {
+			log.Infof("trading exchange %s price: %s volume: %s",
+				s.Symbol, lastTradingKLine.Close.String(), lastTradingKLine.Volume.String())
+			log.Infof("source exchange %s price: %s volume: %s",
+				s.Symbol, lastSourceKLine.Close.String(), lastSourceKLine.Volume.String())
+
+			volumeDiff := s.lastSourceKLine.Volume.Sub(lastTradingKLine.Volume)
+
 			// change the current quantity only diff is positive
 			if volumeDiff.Sign() > 0 {
 				quantity = volumeDiff
 			}
 		}
-		s.mu.Unlock()
 	} else if s.DailyTargetVolume.Sign() > 0 {
 		numOfTicks := (24 * time.Hour) / s.UpdateInterval.Duration()
 		quantity = fixedpoint.NewFromFloat(s.DailyTargetVolume.Float64() / float64(numOfTicks))
-		quantity = quantityJitter(quantity, 0.02)
-	} else {
-		// plus a 2% quantity jitter
-		quantity = quantityJitter(quantity, 0.02)
+	}
+
+	if s.MaxJitterQuantity.Sign() > 0 {
+		quantity = quantityJitter2(quantity, s.MaxJitterQuantity)
 	}
 
 	log.Infof("%s quantity: %f", s.Symbol, quantity.Float64())
@@ -397,4 +403,10 @@ func (s *Strategy) cancelOrders(ctx context.Context) {
 func quantityJitter(q fixedpoint.Value, rg float64) fixedpoint.Value {
 	jitter := 1.0 + math.Max(rg, rand.Float64())
 	return q.Mul(fixedpoint.NewFromFloat(jitter))
+}
+
+func quantityJitter2(q, maxJitterQ fixedpoint.Value) fixedpoint.Value {
+	rg := maxJitterQ.Sub(q).Float64()
+	randQuantity := fixedpoint.NewFromFloat(q.Float64() + rg*rand.Float64())
+	return randQuantity
 }
