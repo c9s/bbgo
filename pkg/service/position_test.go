@@ -34,7 +34,7 @@ func TestPositionService(t *testing.T) {
 			ChangedAt:     time.Now(),
 		}, types.Trade{
 			Time: types.Time(time.Now()),
-		}, fixedpoint.Zero)
+		}, fixedpoint.Zero, fixedpoint.Zero)
 		assert.NoError(t, err)
 	})
 
@@ -54,7 +54,7 @@ func TestPositionService(t *testing.T) {
 			Exchange: types.ExchangeBinance,
 			Side:     types.SideTypeSell,
 			Time:     types.Time(time.Now()),
-		}, fixedpoint.NewFromFloat(10.9))
+		}, fixedpoint.NewFromFloat(10.9), fixedpoint.Zero)
 		assert.NoError(t, err)
 	})
 
