@@ -34,7 +34,7 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("%s:%s", ID, s.Symbol)
+	return fmt.Sprintf("%s:%s:%s", ID, s.TradingExchange, s.Symbol)
 }
 
 type Strategy struct {
@@ -43,12 +43,15 @@ type Strategy struct {
 
 	Environment *bbgo.Environment
 
-	Symbol          string           `json:"symbol"`
-	SourceExchange  string           `json:"sourceExchange"`
-	TradingExchange string           `json:"tradingExchange"`
-	MinSpread       fixedpoint.Value `json:"minSpread"`
-	Quantity        fixedpoint.Value `json:"quantity"`
-	DryRun          bool             `json:"dryRun"`
+	Symbol          string `json:"symbol"`
+	TradingExchange string `json:"tradingExchange"`
+
+	SourceSymbol   string `json:"sourceSymbol"`
+	SourceExchange string `json:"sourceExchange"`
+
+	MinSpread fixedpoint.Value `json:"minSpread"`
+	Quantity  fixedpoint.Value `json:"quantity"`
+	DryRun    bool             `json:"dryRun"`
 
 	DailyMaxVolume    fixedpoint.Value `json:"dailyMaxVolume,omitempty"`
 	DailyTargetVolume fixedpoint.Value `json:"dailyTargetVolume,omitempty"`
@@ -63,6 +66,8 @@ type Strategy struct {
 	lastSourceKLine, lastTradingKLine types.KLine
 	sourceBook, tradingBook           *types.StreamOrderBook
 
+	logger logrus.FieldLogger
+
 	stopC chan struct{}
 }
 
@@ -74,6 +79,12 @@ func (s *Strategy) Initialize() error {
 	if s.FeeBudget == nil {
 		s.FeeBudget = &common.FeeBudget{}
 	}
+
+	s.logger = logrus.WithFields(logrus.Fields{
+		"strategy":          ID,
+		"strategy_instance": s.InstanceID(),
+		"symbol":            s.Symbol,
+	})
 	return nil
 }
 
@@ -85,6 +96,11 @@ func (s *Strategy) Defaults() error {
 	if s.UpdateInterval == 0 {
 		s.UpdateInterval = types.Duration(time.Second)
 	}
+
+	if s.SourceSymbol == "" {
+		s.SourceSymbol = s.Symbol
+	}
+
 	return nil
 }
 
@@ -94,8 +110,8 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		panic(fmt.Errorf("source session %s is not defined", s.SourceExchange))
 	}
 
-	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
-	sourceSession.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{Depth: types.DepthLevel5})
+	sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: "1m"})
+	sourceSession.Subscribe(types.BookChannel, s.SourceSymbol, types.SubscribeOptions{Depth: types.DepthLevel5})
 
 	tradingSession, ok := sessions[s.TradingExchange]
 	if !ok {
@@ -153,7 +169,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	})
 
 	if s.SourceExchange != "" {
-		s.sourceBook = types.NewStreamBook(s.Symbol, sourceSession.ExchangeName)
+		s.sourceBook = types.NewStreamBook(s.SourceSymbol, sourceSession.ExchangeName)
 		s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
 	}
 
