@@ -51,7 +51,11 @@ func (s *PositionService) scanRows(rows *sqlx.Rows) (positions []types.Position,
 	return positions, rows.Err()
 }
 
-func (s *PositionService) Insert(position *types.Position, trade types.Trade, profit fixedpoint.Value) error {
+func (s *PositionService) Insert(
+	position *types.Position,
+	trade types.Trade,
+	profit, netProfit fixedpoint.Value,
+) error {
 	_, err := s.DB.NamedExec(`
 		INSERT INTO positions (
 			strategy,
@@ -63,6 +67,7 @@ func (s *PositionService) Insert(position *types.Position, trade types.Trade, pr
 		   	base,
 		    quote,
 			profit,
+			net_profit,
 			trade_id,
 		    exchange,
 		    side,
@@ -77,6 +82,7 @@ func (s *PositionService) Insert(position *types.Position, trade types.Trade, pr
 		    :base,
 		    :quote,
 			:profit,
+			:net_profit,
 			:trade_id,
 		    :exchange,
 		    :side,
@@ -92,6 +98,7 @@ func (s *PositionService) Insert(position *types.Position, trade types.Trade, pr
 			"base":                 position.Base,
 			"quote":                position.Quote,
 			"profit":               profit,
+			"net_profit":           netProfit,
 			"trade_id":             trade.ID,
 			"exchange":             trade.Exchange,
 			"side":                 trade.Side,
