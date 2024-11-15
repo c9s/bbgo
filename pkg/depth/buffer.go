@@ -112,6 +112,12 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 		return nil
 	}
 
+	if u.FinalUpdateID <= b.finalUpdateID {
+		log.Infof("the final update id %d of event is less than equal to the final update id %d of the snapshot, skip", u.FinalUpdateID, b.finalUpdateID)
+		b.mu.Unlock()
+		return nil
+	}
+
 	// if there is a missing update, we should reset the snapshot and re-fetch the snapshot
 	if u.FirstUpdateID > b.finalUpdateID+1 {
 		// emitReset will reset the once outside the mutex lock section
