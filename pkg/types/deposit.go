@@ -28,7 +28,7 @@ const (
 	DepositCredited = DepositStatus("credited")
 )
 
-func (s DepositStatus) SlackEmoji() string {
+func (s DepositStatus) Emoji() string {
 	switch s {
 	case DepositPending:
 		return "⏳"
@@ -121,7 +121,7 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 	if len(d.Status) > 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Status",
-			Value: string(d.Status) + " " + d.Status.SlackEmoji(),
+			Value: string(d.Status) + " " + d.Status.Emoji(),
 			Short: false,
 		})
 	}
