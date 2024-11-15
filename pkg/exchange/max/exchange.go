@@ -937,6 +937,14 @@ func (e *Exchange) QueryDepositHistory(
 			return nil, err
 		}
 
+		toRawStatusStr := func(d maxapi.Deposit) string {
+			if len(d.StateReason) > 0 {
+				return fmt.Sprintf("%s (%s: %s)", d.Status, d.State, d.StateReason)
+			}
+
+			return fmt.Sprintf("%s (%s)", d.Status, d.State)
+		}
+
 		for i := len(deposits) - 1; i >= 0; i-- {
 			d := deposits[i]
 			if _, ok := txIDs[d.TxID]; ok {
@@ -954,7 +962,7 @@ func (e *Exchange) QueryDepositHistory(
 				Status:        toGlobalDepositStatus(d.State),
 				Confirmation:  strconv.FormatInt(d.Confirmations, 10),
 				Network:       d.NetworkProtocol,
-				RawStatus:     fmt.Sprintf("%s (%s: %s)", d.Status, d.State, d.StateReason),
+				RawStatus:     toRawStatusStr(d),
 			})
 		}
 
