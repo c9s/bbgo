@@ -132,16 +132,16 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 	s.sourceSession = sourceSession
 
+	s.sourceMarket, ok = s.sourceSession.Market(s.SourceSymbol)
+	if !ok {
+		return fmt.Errorf("source session market %s is not defined", s.Symbol)
+	}
+
 	tradingSession, ok := sessions[s.TradingExchange]
 	if !ok {
 		return fmt.Errorf("trading session %s is not defined", s.TradingExchange)
 	}
 	s.tradingSession = tradingSession
-
-	s.sourceMarket, ok = s.sourceSession.Market(s.SourceSymbol)
-	if !ok {
-		return fmt.Errorf("source session market %s is not defined", s.Symbol)
-	}
 
 	s.tradingMarket, ok = s.tradingSession.Market(s.Symbol)
 	if !ok {
