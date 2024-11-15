@@ -236,7 +236,7 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
 				// the depth of websocket orderbook event is 50 by default, so we use 50 as limit here
 				return ex.QueryDepth(context.Background(), e.Market, bookDepth)
 			})
-			f.SetBufferingPeriod(time.Second)
+			f.SetBufferingPeriod(3 * time.Second)
 			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 				s.EmitBookSnapshot(snapshot)
 				for _, u := range updates {
