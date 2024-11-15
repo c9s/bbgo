@@ -31,13 +31,13 @@ const (
 func (s DepositStatus) SlackEmoji() string {
 	switch s {
 	case DepositPending:
-		return ":hourglass_not_done:"
+		return "⏳"
 	case DepositCredited:
-		return ":dollar_banknote:"
+		return "💵"
 	case DepositSuccess:
-		return ":check_mark_button:"
+		return "✅"
 	case DepositCancelled:
-		return ":stop_button:"
+		return "⏏"
 	}
 
 	return ""
@@ -138,6 +138,14 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 		})
 	}
 
+	if len(d.Exchange) > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Exchange",
+			Value: d.Exchange.String(),
+			Short: false,
+		})
+	}
+
 	if len(d.Network) > 0 {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Network",
@@ -156,7 +164,7 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 		Color:       depositStatusSlackColor(d.Status),
 		Fallback:    "",
 		ID:          0,
-		Title:       fmt.Sprintf("Deposit %s %s To %s (%s)", d.Amount.String(), d.Asset, d.Address, d.Exchange),
+		Title:       fmt.Sprintf("Deposit %s %s To %s", d.Amount.String(), d.Asset, d.Address),
 		TitleLink:   getExplorerURL(d.Network, d.TransactionID),
 		Pretext:     "",
 		Text:        "",
