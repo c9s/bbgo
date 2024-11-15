@@ -607,8 +607,7 @@ func (s *Strategy) CrossRun(
 	s.hedgerConnectivity = types.NewConnectivity()
 	s.hedgerConnectivity.Bind(s.hedgeSession.UserDataStream)
 
-	connGroup := types.NewConnectivityGroup(s.makerConnectivity, s.hedgerConnectivity)
-	s.connectivityGroup = connGroup
+	s.connectivityGroup = types.NewConnectivityGroup(s.makerConnectivity, s.hedgerConnectivity)
 
 	if s.RecoverTrade {
 		go s.runTradeRecover(ctx)
@@ -622,7 +621,7 @@ func (s *Strategy) CrossRun(
 			return
 		case <-time.After(3 * time.Minute):
 			log.Panicf("authentication timeout, exiting...")
-		case <-connGroup.AllAuthedC(ctx):
+		case <-s.connectivityGroup.AllAuthedC(ctx):
 		}
 
 		log.Infof("user data stream authenticated, start placing orders...")
@@ -1191,6 +1190,8 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 		s.logger.Warnf("no orders are generated")
 		return
 	}
+
+	s.logger.Infof("%d orders are generated, placing...", len(submitOrders))
 
 	_, err = s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {

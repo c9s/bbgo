@@ -55,26 +55,39 @@ func UniversalCancelAllOrders(ctx context.Context, exchange types.Exchange, symb
 		}
 	}
 
-	if len(openOrders) == 0 {
-		log.Warnf("empty open orders, unable to call specific cancel all orders api, skip")
-		return nil
-	}
+	if len(openOrders) > 0 {
+		if service, ok := exchange.(CancelAllOrdersByGroupIDService); ok {
+			var groupIds = CollectOrderGroupIds(openOrders)
+			for _, groupId := range groupIds {
+				if _, err := service.CancelOrdersByGroupID(ctx, groupId); err != nil {
+					anyErr = err
+				}
+			}
 
-	if service, ok := exchange.(CancelAllOrdersByGroupIDService); ok {
-		var groupIds = CollectOrderGroupIds(openOrders)
-		for _, groupId := range groupIds {
-			if _, err := service.CancelOrdersByGroupID(ctx, groupId); err != nil {
-				anyErr = err
+			if anyErr == nil {
+				return nil
 			}
 		}
 
-		if anyErr == nil {
-			return nil
+		if anyErr != nil {
+			return anyErr
 		}
 	}
 
-	if anyErr != nil {
-		return anyErr
+	// if we have no open order, then use the exchange service query to get the open orders and then cancel them all
+	if len(openOrders) == 0 {
+		if len(symbol) == 0 {
+			log.Warnf("empty open orders, unable to call specific cancel all orders api, skip")
+			return nil
+		}
+
+		var err error
+		openOrders, err = retry.QueryOpenOrdersUntilSuccessful(ctx, exchange, symbol)
+		if err != nil {
+			return err
+		}
+
+		return retry.CancelOrdersUntilSuccessful(ctx, exchange, openOrders...)
 	}
 
 	return fmt.Errorf("unable to cancel all orders, openOrders:%+v", openOrders)
