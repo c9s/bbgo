@@ -71,7 +71,10 @@ func (d Deposit) GetCurrentConfirmation() (current int, required int) {
 	}
 
 	strs := strings.Split(d.Confirmation, "/")
-	if len(strs) < 2 {
+	if len(strs) == 1 {
+		current, _ = strconv.Atoi(strs[0])
+		return current, 0
+	} else if len(strs) < 2 {
 		return 0, 0
 	}
 
