@@ -51,7 +51,7 @@ func PnLEmojiMargin(pnl, margin, resolution fixedpoint.Value) string {
 	}
 
 	if pnl.Sign() < 0 {
-		level := min((margin.Neg()).Div(resolution).Int(), MaxEmojiRepeat)
+		level := min(margin.Abs().Div(resolution).Int(), MaxEmojiRepeat)
 		return strings.Repeat(LossEmoji, level)
 	}
 
