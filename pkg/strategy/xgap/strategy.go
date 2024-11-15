@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util/timejitter"
+	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
 
 const ID = "xgap"
@@ -154,6 +155,11 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
+
+		if err := tradingutil.UniversalCancelAllOrders(ctx, s.tradingSession.Exchange, s.Symbol, nil); err != nil {
+			s.logger.WithError(err).Errorf("cancel all orders error")
+		}
+
 		close(s.stopC)
 		bbgo.Sync(ctx, s)
 	})
