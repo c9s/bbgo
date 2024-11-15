@@ -86,33 +86,32 @@ func (s *Stream) SetPrivateChannels(channels []string) {
 	s.privateChannels = channels
 }
 
+func ToLocalDepth(depth types.Depth) int {
+	if len(depth) > 0 {
+		switch depth {
+		case types.DepthLevelFull:
+			return 50
+		case types.DepthLevelMedium:
+			return 20
+		case types.DepthLevel1:
+			return 1
+		case types.DepthLevel5:
+			return 5
+		default:
+			return 20
+		}
+	}
+
+	return 0
+}
+
 func (s *Stream) handleConnect() {
 	if s.PublicOnly {
 		cmd := &max.WebsocketCommand{
 			Action: "subscribe",
 		}
 		for _, sub := range s.Subscriptions {
-			var depth int
-
-			if len(sub.Options.Depth) > 0 {
-				switch sub.Options.Depth {
-				case types.DepthLevelFull:
-					depth = 50
-
-				case types.DepthLevelMedium:
-					depth = 20
-
-				case types.DepthLevel1:
-					depth = 1
-
-				case types.DepthLevel5:
-					depth = 5
-
-				default:
-					depth = 20
-
-				}
-			}
+			depth := ToLocalDepth(sub.Options.Depth)
 
 			cmd.Subscriptions = append(cmd.Subscriptions, max.Subscription{
 				Channel:    string(sub.Channel),
@@ -122,6 +121,7 @@ func (s *Stream) handleConnect() {
 			})
 		}
 
+		log.Infof("public subscription commands: %+v", cmd)
 		if err := s.Conn.WriteJSON(cmd); err != nil {
 			log.WithError(err).Error("failed to send subscription request")
 		}
@@ -218,10 +218,23 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
 		symbol := toGlobalSymbol(e.Market)
 		f, ok := s.depthBuffers[symbol]
 		if !ok {
+			bookDepth := 0
+			for _, subscription := range s.Subscriptions {
+				if subscription.Channel == types.BookChannel && toLocalSymbol(subscription.Symbol) == e.Market {
+					bookDepth = ToLocalDepth(subscription.Options.Depth)
+					break
+				}
+			}
+
+			// the default depth of websocket channel is 50, we need to make sure both RESTful API and WS channel use the same depth
+			if bookDepth == 0 {
+				bookDepth = 50
+			}
+
 			f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
-				log.Infof("fetching %s depth...", e.Market)
+				log.Infof("fetching %s depth with depth = %d...", e.Market, bookDepth)
 				// the depth of websocket orderbook event is 50 by default, so we use 50 as limit here
-				return ex.QueryDepth(context.Background(), e.Market, 50)
+				return ex.QueryDepth(context.Background(), e.Market, bookDepth)
 			})
 			f.SetBufferingPeriod(time.Second)
 			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
