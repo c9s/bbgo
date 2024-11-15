@@ -138,7 +138,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 	s.tradingSession = tradingSession
 
-	s.sourceMarket, ok = s.sourceSession.Market(s.Symbol)
+	s.sourceMarket, ok = s.sourceSession.Market(s.SourceSymbol)
 	if !ok {
 		return fmt.Errorf("source session market %s is not defined", s.Symbol)
 	}
@@ -156,11 +156,12 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
+		close(s.stopC)
+
 		if err := tradingutil.UniversalCancelAllOrders(ctx, s.tradingSession.Exchange, s.Symbol, nil); err != nil {
 			s.logger.WithError(err).Errorf("cancel all orders error")
 		}
 
-		close(s.stopC)
 		bbgo.Sync(ctx, s)
 	})
 
@@ -193,6 +194,9 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 			timejitter.Milliseconds(s.UpdateInterval.Duration(), 1000),
 		)
 		defer ticker.Stop()
+
+		s.placeOrders(ctx)
+		s.cancelOrders(ctx)
 
 		for {
 			select {
