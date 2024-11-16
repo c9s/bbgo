@@ -90,8 +90,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 			f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
 				log.Infof("fetching %s depth...", e.Symbol)
 				return ex.QueryDepth(context.Background(), e.Symbol)
-			})
-			f.SetBufferingPeriod(time.Second)
+			}, 3*time.Second)
 			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 				stream.EmitBookSnapshot(snapshot)
 				for _, u := range updates {

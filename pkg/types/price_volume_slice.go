@@ -92,6 +92,7 @@ func (slice PriceVolumeSlice) ElemOrLast(i int) (PriceVolume, bool) {
 	return slice[i], true
 }
 
+// IndexByQuoteVolumeDepth returns the index of the price volume slice by the required quote volume depth
 func (slice PriceVolumeSlice) IndexByQuoteVolumeDepth(requiredQuoteVolume fixedpoint.Value) int {
 	var totalQuoteVolume = fixedpoint.Zero
 	for x, pv := range slice {
