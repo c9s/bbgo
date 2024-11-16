@@ -80,9 +80,8 @@ func (s *Stream) handleOrderBookL2Event(e *WebSocketOrderBookL2Event) {
 	} else {
 		f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
 			return s.exchange.QueryDepth(context.Background(), e.Symbol)
-		})
+		}, 3*time.Second)
 		s.depthBuffers[e.Symbol] = f
-		f.SetBufferingPeriod(time.Second)
 		f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 			if valid, err := snapshot.IsValid(); !valid {
 				log.Errorf("depth snapshot is invalid, error: %v", err)
