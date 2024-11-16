@@ -158,7 +158,7 @@ func (b *Buffer) fetchAndPush() error {
 	var pushUpdates []Update
 	for _, u := range b.buffer {
 		// skip old events
-		if u.FirstUpdateID < finalUpdateID+1 {
+		if u.FinalUpdateID <= finalUpdateID {
 			continue
 		}
 
