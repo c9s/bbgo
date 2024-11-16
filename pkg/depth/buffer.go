@@ -148,8 +148,8 @@ func (b *Buffer) fetchAndPush() error {
 	if len(b.buffer) > 0 {
 		// the snapshot is too early
 		if finalUpdateID < b.buffer[0].FirstUpdateID-1 {
-			b.resetSnapshot()
-			b.emitReset()
+			// reset buffer
+			b.buffer = nil
 			b.mu.Unlock()
 			return fmt.Errorf("depth snapshot is too early, final update %d is < the first update id %d", finalUpdateID, b.buffer[0].FirstUpdateID)
 		}
@@ -163,8 +163,8 @@ func (b *Buffer) fetchAndPush() error {
 		}
 
 		if u.FirstUpdateID > finalUpdateID+1 {
-			b.resetSnapshot()
-			b.emitReset()
+			// reset buffer
+			b.buffer = nil
 			b.mu.Unlock()
 			return fmt.Errorf("there is a missing depth update, the update id %d > final update id %d + 1", u.FirstUpdateID, finalUpdateID)
 		}
