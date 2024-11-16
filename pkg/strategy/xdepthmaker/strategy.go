@@ -230,6 +230,8 @@ type Strategy struct {
 	StopHedgeQuoteBalance fixedpoint.Value `json:"stopHedgeQuoteBalance"`
 	StopHedgeBaseBalance  fixedpoint.Value `json:"stopHedgeBaseBalance"`
 
+	SkipCleanUpOpenOrders bool `json:"skipCleanUpOpenOrders"`
+
 	// Quantity is used for fixed quantity of the first layer
 	Quantity fixedpoint.Value `json:"quantity"`
 
@@ -410,9 +412,11 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 	fullReplenishTicker := time.NewTicker(timejitter.Milliseconds(s.FullReplenishInterval.Duration(), 200))
 	defer fullReplenishTicker.Stop()
 
-	// clean up the previous open orders
-	if err := s.cleanUpOpenOrders(ctx, s.makerSession); err != nil {
-		log.WithError(err).Warnf("error cleaning up open orders")
+	// clean up the previous open orders before starting the quote worker
+	if !s.SkipCleanUpOpenOrders {
+		if err := s.cleanUpOpenOrders(ctx, s.makerSession); err != nil {
+			log.WithError(err).Warnf("error cleaning up open orders")
+		}
 	}
 
 	s.updateQuote(ctx, 0)
@@ -966,8 +970,12 @@ func (s *Strategy) generateMakerOrders(
 	for _, side := range []types.SideType{types.SideTypeBuy, types.SideTypeSell} {
 		sideBook := dupPricingBook.SideBook(side)
 		if sideBook.Len() == 0 {
-			log.Warnf("orderbook %s side is empty", side)
+			s.logger.Warnf("orderbook %s side is empty", side)
 			continue
+		}
+
+		if sideBook.Len() < 5 {
+			s.logger.Warnf("order book %s side is too thin, size: %d, levels: %+v", side, sideBook.Len(), sideBook)
 		}
 
 		availableSideBalance, ok := availableBalances[side]

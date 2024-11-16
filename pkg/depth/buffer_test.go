@@ -26,8 +26,7 @@ func TestDepthBuffer_ReadyState(t *testing.T) {
 				{Price: itov(99), Volume: itov(1)},
 			},
 		}, 33, nil
-	})
-	buf.SetBufferingPeriod(time.Millisecond * 5)
+	}, time.Millisecond*5)
 
 	readyC := make(chan struct{})
 	buf.OnReady(func(snapshot types.SliceOrderBook, updates []Update) {
