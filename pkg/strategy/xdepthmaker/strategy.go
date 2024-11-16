@@ -1026,17 +1026,15 @@ func (s *Strategy) generateMakerOrders(
 					depthPrice = depthPrice.Mul(fixedpoint.One.Sub(s.BidMargin))
 				}
 
-				depthPrice = depthPrice.Round(s.makerMarket.PricePrecision+1, fixedpoint.Down)
+				depthPrice = depthPrice.Round(s.makerMarket.PricePrecision, fixedpoint.Down)
 
 			case types.SideTypeSell:
 				if s.AskMargin.Sign() > 0 {
 					depthPrice = depthPrice.Mul(fixedpoint.One.Add(s.AskMargin))
 				}
 
-				depthPrice = depthPrice.Round(s.makerMarket.PricePrecision+1, fixedpoint.Up)
+				depthPrice = depthPrice.Round(s.makerMarket.PricePrecision, fixedpoint.Up)
 			}
-
-			depthPrice = s.makerMarket.TruncatePrice(depthPrice)
 
 			if lastMakerPrice.Sign() > 0 && depthPrice.Compare(lastMakerPrice) == 0 {
 				switch side {
