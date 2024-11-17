@@ -1037,11 +1037,17 @@ func (s *Strategy) generateMakerOrders(
 			}
 
 			if lastMakerPrice.Sign() > 0 && depthPrice.Compare(lastMakerPrice) == 0 {
-				switch side {
-				case types.SideTypeBuy:
-					depthPrice = depthPrice.Sub(s.makerMarket.TickSize.Mul(s.Pips))
-				case types.SideTypeSell:
-					depthPrice = depthPrice.Add(s.makerMarket.TickSize.Mul(s.Pips))
+				tickSize := s.makerMarket.TickSize
+				if tickSize.IsZero() {
+					s.logger.Warnf("maker market tick size is zero")
+				} else if tickSize.Sign() > 0 {
+					tickSize = s.makerMarket.TickSize.Mul(s.Pips)
+					switch side {
+					case types.SideTypeBuy:
+						depthPrice = depthPrice.Sub(tickSize)
+					case types.SideTypeSell:
+						depthPrice = depthPrice.Add(tickSize)
+					}
 				}
 			}
 
@@ -1056,15 +1062,15 @@ func (s *Strategy) generateMakerOrders(
 
 				accumulatedBidQuantity = accumulatedBidQuantity.Add(quantity)
 				quoteQuantity := fixedpoint.Mul(quantity, depthPrice)
-				quoteQuantity = quoteQuantity.Round(s.makerMarket.PricePrecision, fixedpoint.Up)
+				quoteQuantity = quoteQuantity.Round(s.makerMarket.PricePrecision, fixedpoint.Down)
 
 				if !availableSideBalance.Eq(fixedpoint.PosInf) && availableSideBalance.Compare(quoteQuantity) <= 0 {
 					quoteQuantity = availableSideBalance
 					quantity = quoteQuantity.Div(depthPrice).Round(s.makerMarket.PricePrecision, fixedpoint.Down)
 				}
 
-				if quantity.Compare(s.makerMarket.MinQuantity) <= 0 || quoteQuantity.Compare(s.makerMarket.MinNotional) <= 0 {
-					break layerLoop
+				if s.makerMarket.IsDustQuantity(quantity, depthPrice) {
+					continue layerLoop
 				}
 
 				availableSideBalance = availableSideBalance.Sub(quoteQuantity)
@@ -1073,19 +1079,17 @@ func (s *Strategy) generateMakerOrders(
 
 			case types.SideTypeSell:
 				quantity = quantity.Sub(accumulatedAskQuantity)
-				quoteQuantity := quantity.Mul(depthPrice)
 
 				// balance check
 				if !availableSideBalance.Eq(fixedpoint.PosInf) && availableSideBalance.Compare(quantity) <= 0 {
 					break layerLoop
 				}
 
-				if quantity.Compare(s.makerMarket.MinQuantity) <= 0 || quoteQuantity.Compare(s.makerMarket.MinNotional) <= 0 {
-					break layerLoop
+				if s.makerMarket.IsDustQuantity(quantity, depthPrice) {
+					continue layerLoop
 				}
 
 				availableSideBalance = availableSideBalance.Sub(quantity)
-
 				accumulatedAskQuantity = accumulatedAskQuantity.Add(quantity)
 			}
 
