@@ -254,6 +254,8 @@ func ParsePriceVolumeSliceJSON(b []byte) (slice PriceVolumeSlice, err error) {
 	return slice, nil
 }
 
+// AverageDepthPriceByQuote calculates the average price by the required quote depth
+// maxLevel is the maximum level to calculate the average price
 func (slice PriceVolumeSlice) AverageDepthPriceByQuote(requiredDepthInQuote fixedpoint.Value, maxLevel int) fixedpoint.Value {
 	if len(slice) == 0 {
 		return fixedpoint.Zero
