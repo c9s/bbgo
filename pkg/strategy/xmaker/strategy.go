@@ -1737,7 +1737,7 @@ func (s *Strategy) CrossRun(
 		})
 
 		s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
-		s.makerBook.BindStream(s.makerSession.MarketDataStream)
+		s.makerBook.BindStream(makerMarketStream)
 
 		if err := makerMarketStream.Connect(ctx); err != nil {
 			return err
