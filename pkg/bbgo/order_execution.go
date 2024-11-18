@@ -48,7 +48,9 @@ type ExchangeOrderExecutionRouter struct {
 	executors map[string]OrderExecutor
 }
 
-func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (types.OrderSlice, error) {
+func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(
+	ctx context.Context, session string, orders ...types.SubmitOrder,
+) (types.OrderSlice, error) {
 	if executor, ok := e.executors[session]; ok {
 		return executor.SubmitOrders(ctx, orders...)
 	}
@@ -80,6 +82,7 @@ func (e *ExchangeOrderExecutionRouter) CancelOrdersTo(ctx context.Context, sessi
 }
 
 // ExchangeOrderExecutor is an order executor wrapper for single exchange instance.
+// Deprecated: please use GeneralOrderExecutor instead.
 //
 //go:generate callbackgen -type ExchangeOrderExecutor
 type ExchangeOrderExecutor struct {
@@ -128,7 +131,9 @@ type BasicRiskController struct {
 // 1. Increase the quantity by the minimal requirement
 // 2. Decrease the quantity by risk controls
 // 3. If the quantity does not meet minimal requirement, we should ignore the submit order.
-func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...types.SubmitOrder) (outOrders []types.SubmitOrder, errs []error) {
+func (c *BasicRiskController) ProcessOrders(
+	session *ExchangeSession, orders ...types.SubmitOrder,
+) (outOrders []types.SubmitOrder, errs []error) {
 	balances := session.GetAccount().Balances()
 
 	addError := func(err error) {
@@ -310,7 +315,9 @@ func (c *BasicRiskController) ProcessOrders(session *ExchangeSession, orders ...
 type OrderCallback func(order types.Order)
 
 // BatchPlaceOrder
-func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, orderCallback OrderCallback, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
+func BatchPlaceOrder(
+	ctx context.Context, exchange types.Exchange, orderCallback OrderCallback, submitOrders ...types.SubmitOrder,
+) (types.OrderSlice, []int, error) {
 	var createdOrders types.OrderSlice
 	var err error
 
@@ -335,7 +342,10 @@ func BatchPlaceOrder(ctx context.Context, exchange types.Exchange, orderCallback
 }
 
 // BatchRetryPlaceOrder places the orders and retries the failed orders
-func BatchRetryPlaceOrder(ctx context.Context, exchange types.Exchange, errIdx []int, orderCallback OrderCallback, logger log.FieldLogger, submitOrders ...types.SubmitOrder) (types.OrderSlice, []int, error) {
+func BatchRetryPlaceOrder(
+	ctx context.Context, exchange types.Exchange, errIdx []int, orderCallback OrderCallback, logger log.FieldLogger,
+	submitOrders ...types.SubmitOrder,
+) (types.OrderSlice, []int, error) {
 	if logger == nil {
 		logger = log.StandardLogger()
 	}
