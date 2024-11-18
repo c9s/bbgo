@@ -96,7 +96,7 @@ jobs:
         fail_on_error: true
 
     - name: Upload Coverage Report
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         files: ./coverage.txt,./coverage_dnum.txt
 
