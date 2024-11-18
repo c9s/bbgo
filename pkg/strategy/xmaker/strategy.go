@@ -234,7 +234,6 @@ type Strategy struct {
 	metricsLabels prometheus.Labels
 
 	sourceMarketDataConnectivity, sourceUserDataConnectivity *types.Connectivity
-	makerMarketDataConnectivity, makerUserDataConnectivity   *types.Connectivity
 	connectivityGroup                                        *types.ConnectivityGroup
 
 	// lastAggregatedSignal stores the last aggregated signal with mutex
@@ -591,7 +590,13 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return nil
 	}
 
-	if !s.sourceMarketDataConnectivity.IsConnected() || !s.sourceUserDataConnectivity.IsConnected() {
+	if !s.sourceSession.Connectivity.IsConnected() {
+		s.logger.Warnf("source session is disconnected, skipping update quote")
+		return nil
+	}
+
+	if !s.makerSession.Connectivity.IsConnected() {
+		s.logger.Warnf("maker session is disconnected, skipping update quote")
 		return nil
 	}
 
@@ -1846,16 +1851,10 @@ func (s *Strategy) CrossRun(
 
 	s.stopC = make(chan struct{})
 
-	s.sourceUserDataConnectivity = types.NewConnectivity()
-	s.sourceUserDataConnectivity.Bind(s.sourceSession.UserDataStream)
+	s.sourceUserDataConnectivity = s.sourceSession.UserDataConnectivity
+	s.sourceMarketDataConnectivity = s.sourceSession.MarketDataConnectivity
 
-	s.makerUserDataConnectivity = types.NewConnectivity()
-	s.makerUserDataConnectivity.Bind(s.makerSession.UserDataStream)
-
-	s.sourceMarketDataConnectivity = types.NewConnectivity()
-	s.sourceMarketDataConnectivity.Bind(s.sourceSession.MarketDataStream)
-
-	s.connectivityGroup = types.NewConnectivityGroup(s.sourceUserDataConnectivity, s.makerUserDataConnectivity)
+	s.connectivityGroup = types.NewConnectivityGroup(s.sourceSession.UserDataConnectivity, s.makerSession.UserDataConnectivity)
 
 	go func() {
 		s.logger.Infof("waiting for authentication connections to be ready...")

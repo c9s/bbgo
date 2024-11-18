@@ -83,14 +83,29 @@ type ExchangeSession struct {
 	// Deprecated: use GeneralOrderExecutor instead
 	OrderExecutor *ExchangeOrderExecutor `json:"orderExecutor,omitempty" yaml:"orderExecutor,omitempty"`
 
-	// UserDataStream is the connection stream of the exchange
-	UserDataStream   types.Stream `json:"-" yaml:"-"`
+	// UserDataStream is the user data connection stream of the exchange
+	// This stream is used for managing user data, such as orders, trades, balances, etc.
+	UserDataStream types.Stream `json:"-" yaml:"-"`
+
+	// MarketDataStream is the market data connection stream of the exchange
+	// This stream is used for managing market data, such as klines, trades, order books, etc.
 	MarketDataStream types.Stream `json:"-" yaml:"-"`
 
-	// Subscriptions
-	// this is a read-only field when running strategy
+	// UserDataConnectivity is the connectivity of the user data stream
+	UserDataConnectivity *types.Connectivity `json:"-" yaml:"-"`
+
+	// MarketDataConnectivity is the connectivity of the market data stream
+	MarketDataConnectivity *types.Connectivity `json:"-" yaml:"-"`
+
+	// Connectivity is the group of connectivity of the session
+	// This is used for managing both user data and market data connectivity
+	Connectivity *types.ConnectivityGroup `json:"-" yaml:"-"`
+
+	// Subscriptions is the subscription list of the session
+	// This is a read-only field when running strategy
 	Subscriptions map[types.Subscription]types.Subscription `json:"-" yaml:"-"`
 
+	// Exchange is the exchange instance, it is used for querying the exchange data or submitting orders
 	Exchange types.Exchange `json:"-" yaml:"-"`
 
 	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
@@ -130,17 +145,33 @@ type ExchangeSession struct {
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	userDataStream := exchange.NewStream()
+
 	marketDataStream := exchange.NewStream()
 	marketDataStream.SetPublicOnly()
 
+	userDataConnectivity := types.NewConnectivity()
+	userDataConnectivity.Bind(userDataStream)
+
+	marketDataConnectivity := types.NewConnectivity()
+	marketDataConnectivity.Bind(marketDataStream)
+
+	connectivityGroup := types.NewConnectivityGroup(marketDataConnectivity, userDataConnectivity)
+
 	session := &ExchangeSession{
-		Name:             name,
-		Exchange:         exchange,
-		UserDataStream:   userDataStream,
-		MarketDataStream: marketDataStream,
-		Subscriptions:    make(map[types.Subscription]types.Subscription),
-		Account:          &types.Account{},
-		Trades:           make(map[string]*types.TradeSlice),
+		Name:     name,
+		Exchange: exchange,
+
+		UserDataStream:       userDataStream,
+		UserDataConnectivity: userDataConnectivity,
+
+		MarketDataStream:       marketDataStream,
+		MarketDataConnectivity: marketDataConnectivity,
+
+		Connectivity: connectivityGroup,
+
+		Subscriptions: make(map[types.Subscription]types.Subscription),
+		Account:       &types.Account{},
+		Trades:        make(map[string]*types.TradeSlice),
 
 		orderBooks:            make(map[string]*types.StreamOrderBook),
 		markets:               make(map[string]types.Market),
@@ -850,6 +881,14 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	session.UserDataStream = ex.NewStream()
 	session.MarketDataStream = ex.NewStream()
 	session.MarketDataStream.SetPublicOnly()
+
+	session.UserDataConnectivity = types.NewConnectivity()
+	session.UserDataConnectivity.Bind(session.UserDataStream)
+
+	session.MarketDataConnectivity = types.NewConnectivity()
+	session.MarketDataConnectivity.Bind(session.MarketDataStream)
+
+	session.Connectivity = types.NewConnectivityGroup(session.MarketDataConnectivity, session.MarketDataConnectivity)
 
 	// pointer fields
 	session.Subscriptions = make(map[types.Subscription]types.Subscription)
