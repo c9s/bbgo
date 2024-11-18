@@ -202,11 +202,12 @@ func (sb *StreamOrderBook) updateMetrics(t time.Time) {
 	bestBid, bestAsk, ok := sb.BestBidAndAsk()
 	if ok {
 		exchangeName := string(sb.Exchange)
-		streamOrderBookBestAskPriceMetrics.WithLabelValues(sb.Symbol, exchangeName).Set(bestAsk.Price.Float64())
-		streamOrderBookBestBidPriceMetrics.WithLabelValues(sb.Symbol, exchangeName).Set(bestBid.Price.Float64())
-		streamOrderBookBestAskVolumeMetrics.WithLabelValues(sb.Symbol, exchangeName).Set(bestAsk.Volume.Float64())
-		streamOrderBookBestBidVolumeMetrics.WithLabelValues(sb.Symbol, exchangeName).Set(bestBid.Volume.Float64())
-		streamOrderBookUpdateTimeMetrics.WithLabelValues(sb.Symbol, exchangeName).Set(float64(t.UnixMilli()))
+		labels := prometheus.Labels{"symbol": sb.Symbol, "exchange": exchangeName}
+		streamOrderBookBestAskPriceMetrics.With(labels).Set(bestAsk.Price.Float64())
+		streamOrderBookBestBidPriceMetrics.With(labels).Set(bestBid.Price.Float64())
+		streamOrderBookBestAskVolumeMetrics.With(labels).Set(bestAsk.Volume.Float64())
+		streamOrderBookBestBidVolumeMetrics.With(labels).Set(bestBid.Volume.Float64())
+		streamOrderBookUpdateTimeMetrics.With(labels).Set(float64(t.UnixMilli()))
 	}
 }
 
