@@ -13,8 +13,15 @@ import (
 
 var ErrIncorrectBookEntryElementLength = errors.New("incorrect book entry element length")
 
-const Buy = 1
-const Sell = -1
+const (
+	Buy  = 1
+	Sell = -1
+)
+
+const (
+	BookEventSnapshot string = "snapshot"
+	BookEventUpdate   string = "update"
+)
 
 var parserPool fastjson.ParserPool
 

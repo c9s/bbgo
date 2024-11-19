@@ -75,6 +75,32 @@ func (b *Buffer) Reset() {
 	b.mu.Unlock()
 }
 
+func (b *Buffer) SetSnapshot(snapshot types.SliceOrderBook, firstUpdateID int64, finalArgs ...int64) error {
+	finalUpdateID := firstUpdateID
+	if len(finalArgs) > 0 {
+		finalUpdateID = finalArgs[0]
+	}
+
+	b.mu.Lock()
+
+	if b.finalUpdateID >= finalUpdateID {
+		b.mu.Unlock()
+		return nil
+	}
+
+	// set the final update ID so that we will know if there is an update missing
+	b.finalUpdateID = finalUpdateID
+
+	// set the snapshot
+	b.snapshot = &snapshot
+
+	b.mu.Unlock()
+
+	// should unlock first then call ready
+	b.EmitReady(snapshot, nil)
+	return nil
+}
+
 // AddUpdate adds the update to the buffer or push the update to the subscriber
 func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArgs ...int64) error {
 	finalUpdateID := firstUpdateID
