@@ -109,6 +109,12 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+type SignalMargin struct {
+	Enabled   bool            `json:"enabled"`
+	Scale     *bbgo.SlideRule `json:"scale,omitempty"`
+	Threshold float64         `json:"threshold,omitempty"`
+}
+
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -126,14 +132,20 @@ type Strategy struct {
 
 	SubscribeFeeTokenMarkets bool `json:"subscribeFeeTokenMarkets"`
 
-	EnableSignalMargin           bool            `json:"enableSignalMargin"`
-	SignalConfigList             []SignalConfig  `json:"signals"`
-	SignalReverseSideMarginScale *bbgo.SlideRule `json:"signalReverseSideMarginScale,omitempty"`
-	SignalTrendSideMarginScale   *bbgo.SlideRule `json:"signalTrendSideMarginScale,omitempty"`
+	EnableSignalMargin bool           `json:"enableSignalMargin"`
+	SignalConfigList   []SignalConfig `json:"signals"`
 
-	Margin           fixedpoint.Value `json:"margin"`
-	BidMargin        fixedpoint.Value `json:"bidMargin"`
-	AskMargin        fixedpoint.Value `json:"askMargin"`
+	SignalReverseSideMargin *SignalMargin `json:"signalReverseSideMargin,omitempty"`
+	SignalTrendSideMargin   *SignalMargin `json:"signalTrendSideMargin,omitempty"`
+
+	// Margin is the default margin for the quote
+	Margin    fixedpoint.Value `json:"margin"`
+	BidMargin fixedpoint.Value `json:"bidMargin"`
+	AskMargin fixedpoint.Value `json:"askMargin"`
+
+	// MinMargin is the minimum margin protection for signal margin
+	MinMargin *fixedpoint.Value `json:"minMargin"`
+
 	UseDepthPrice    bool             `json:"useDepthPrice"`
 	DepthQuantity    fixedpoint.Value `json:"depthQuantity"`
 	SourceDepthLevel types.Depth      `json:"sourceDepthLevel"`
@@ -180,7 +192,7 @@ type Strategy struct {
 
 	RecoverTradeScanPeriod types.Duration `json:"recoverTradeScanPeriod"`
 
-	MaxQuoteUsageRatio fixedpoint.Value `json:"maxQuoteUsageRatio"`
+	MaxQuoteQuotaRatio fixedpoint.Value `json:"maxQuoteQuotaRatio,omitempty"`
 
 	NumLayers int `json:"numLayers"`
 
@@ -321,8 +333,8 @@ func (s *Strategy) Initialize() error {
 		"symbol":        s.Symbol,
 	}
 
-	if s.SignalReverseSideMarginScale != nil {
-		scale, err := s.SignalReverseSideMarginScale.Scale()
+	if s.SignalReverseSideMargin != nil && s.SignalReverseSideMargin.Scale != nil {
+		scale, err := s.SignalReverseSideMargin.Scale.Scale()
 		if err != nil {
 			return err
 		}
@@ -332,8 +344,8 @@ func (s *Strategy) Initialize() error {
 		}
 	}
 
-	if s.SignalTrendSideMarginScale != nil {
-		scale, err := s.SignalTrendSideMarginScale.Scale()
+	if s.SignalTrendSideMargin != nil && s.SignalTrendSideMargin.Scale != nil {
+		scale, err := s.SignalTrendSideMargin.Scale.Scale()
 		if err != nil {
 			return err
 		}
@@ -403,31 +415,64 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		return nil
 	}
 
-	scale, err := s.SignalReverseSideMarginScale.Scale()
-	if err != nil {
-		return err
-	}
+	signalAbs := math.Abs(signal)
 
-	margin := scale.Call(math.Abs(signal))
-
-	s.logger.Infof("signal margin: %f", margin)
-
-	marginFp := fixedpoint.NewFromFloat(margin)
-	if signal < 0.0 {
-		quote.BidMargin = quote.BidMargin.Add(marginFp)
-		if signal <= -2.0 {
-			// quote.BidMargin = fixedpoint.Zero
+	var trendSideMarginDiscount, reverseSideMargin float64
+	var trendSideMarginDiscountFp, reverseSideMarginFp fixedpoint.Value
+	if s.SignalTrendSideMargin != nil && s.SignalTrendSideMargin.Enabled {
+		trendSideMarginScale, err := s.SignalTrendSideMargin.Scale.Scale()
+		if err != nil {
+			return err
 		}
 
-		s.logger.Infof("adjusted bid margin: %f", quote.BidMargin.Float64())
-	} else if signal > 0.0 {
-		quote.AskMargin = quote.AskMargin.Add(marginFp)
-		if signal >= 2.0 {
-			// quote.AskMargin = fixedpoint.Zero
+		if signalAbs > s.SignalTrendSideMargin.Threshold {
+			// trendSideMarginDiscount is the discount for the trend side margin
+			trendSideMarginDiscount = trendSideMarginScale.Call(math.Abs(signal))
+			trendSideMarginDiscountFp = fixedpoint.NewFromFloat(trendSideMarginDiscount)
+
+			if signal > 0.0 {
+				quote.BidMargin = quote.BidMargin.Sub(trendSideMarginDiscountFp)
+			} else if signal < 0.0 {
+				quote.AskMargin = quote.AskMargin.Sub(trendSideMarginDiscountFp)
+			}
+		}
+	}
+
+	if s.SignalReverseSideMargin != nil && s.SignalReverseSideMargin.Enabled {
+		reverseSideMarginScale, err := s.SignalReverseSideMargin.Scale.Scale()
+		if err != nil {
+			return err
 		}
 
-		s.logger.Infof("adjusted ask margin: %f", quote.AskMargin.Float64())
+		if signalAbs > s.SignalReverseSideMargin.Threshold {
+			reverseSideMargin = reverseSideMarginScale.Call(math.Abs(signal))
+			reverseSideMarginFp = fixedpoint.NewFromFloat(reverseSideMargin)
+			if signal < 0.0 {
+				quote.BidMargin = quote.BidMargin.Add(reverseSideMarginFp)
+			} else if signal > 0.0 {
+				quote.AskMargin = quote.AskMargin.Add(reverseSideMarginFp)
+			}
+		}
 	}
+
+	s.logger.Infof("signal margin params: signal = %f, reverseSideMargin = %f, trendSideMarginDiscount = %f", signal, reverseSideMargin, trendSideMarginDiscount)
+
+	s.logger.Infof("calculated signal margin: signal = %f, askMargin = %s, bidMargin = %s",
+		signal,
+		quote.AskMargin,
+		quote.BidMargin,
+	)
+
+	if s.MinMargin != nil {
+		quote.AskMargin = fixedpoint.Max(*s.MinMargin, quote.AskMargin)
+		quote.BidMargin = fixedpoint.Max(*s.MinMargin, quote.BidMargin)
+	}
+
+	s.logger.Infof("final signal margin: signal = %f, askMargin = %s, bidMargin = %s",
+		signal,
+		quote.AskMargin,
+		quote.BidMargin,
+	)
 
 	return nil
 }
@@ -722,8 +767,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	if b, ok := makerBalances[s.makerMarket.QuoteCurrency]; ok {
 		if b.Available.Compare(s.makerMarket.MinNotional) > 0 {
-			if s.MaxQuoteUsageRatio.Sign() > 0 {
-				quoteAvailable := b.Available.Mul(s.MaxQuoteUsageRatio)
+			if s.MaxQuoteQuotaRatio.Sign() > 0 {
+				quoteAvailable := b.Available.Mul(s.MaxQuoteQuotaRatio)
 				makerQuota.QuoteAsset.Add(quoteAvailable)
 			} else {
 				// use all quote balances as much as possible
@@ -1396,6 +1441,7 @@ func (s *Strategy) Defaults() error {
 	if s.BollBandMarginFactor.IsZero() {
 		s.BollBandMarginFactor = fixedpoint.One
 	}
+
 	if s.BollBandMargin.IsZero() {
 		s.BollBandMargin = fixedpoint.NewFromFloat(0.001)
 	}
@@ -1444,8 +1490,8 @@ func (s *Strategy) Defaults() error {
 	}
 
 	if s.EnableSignalMargin {
-		if s.SignalReverseSideMarginScale == nil {
-			s.SignalReverseSideMarginScale = &bbgo.SlideRule{
+		if s.SignalReverseSideMargin.Scale == nil {
+			s.SignalReverseSideMargin.Scale = &bbgo.SlideRule{
 				ExpScale: &bbgo.ExponentialScale{
 					Domain: [2]float64{0, 2.0},
 					Range:  [2]float64{0.00010, 0.00500},
@@ -1454,13 +1500,17 @@ func (s *Strategy) Defaults() error {
 			}
 		}
 
-		if s.SignalTrendSideMarginScale == nil {
-			s.SignalTrendSideMarginScale = &bbgo.SlideRule{
+		if s.SignalTrendSideMargin.Scale == nil {
+			s.SignalTrendSideMargin.Scale = &bbgo.SlideRule{
 				ExpScale: &bbgo.ExponentialScale{
 					Domain: [2]float64{0, 2.0},
 					Range:  [2]float64{0.00010, 0.00500},
 				},
 			}
+		}
+
+		if s.SignalTrendSideMargin.Threshold == 0.0 {
+			s.SignalTrendSideMargin.Threshold = 1.0
 		}
 	}
 
@@ -1815,15 +1865,15 @@ func (s *Strategy) CrossRun(
 	if s.EnableSignalMargin {
 		s.logger.Infof("signal margin is enabled")
 
-		if s.SignalReverseSideMarginScale == nil {
+		if s.SignalReverseSideMargin == nil || s.SignalReverseSideMargin.Scale == nil {
 			return errors.New("signalReverseSideMarginScale can not be nil when signal margin is enabled")
 		}
 
-		if s.SignalTrendSideMarginScale == nil {
+		if s.SignalTrendSideMargin == nil || s.SignalTrendSideMargin.Scale == nil {
 			return errors.New("signalTrendSideMarginScale can not be nil when signal margin is enabled")
 		}
 
-		scale, err := s.SignalReverseSideMarginScale.Scale()
+		scale, err := s.SignalReverseSideMargin.Scale.Scale()
 		if err != nil {
 			return err
 		}
