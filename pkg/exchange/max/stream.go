@@ -255,13 +255,26 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
 			return
 		}
 
-		if err := f.AddUpdate(types.SliceOrderBook{
-			Symbol: symbol,
-			Time:   e.Time(),
-			Bids:   e.Bids,
-			Asks:   e.Asks,
-		}, e.FirstUpdateID, e.LastUpdateID); err != nil {
-			log.WithError(err).Errorf("found missing %s update event", e.Market)
+		if e.Event == max.BookEventSnapshot {
+			if err := f.SetSnapshot(types.SliceOrderBook{
+				Symbol:       symbol,
+				Time:         e.Time(),
+				Bids:         e.Bids,
+				Asks:         e.Asks,
+				LastUpdateId: e.LastUpdateID,
+			}, e.FirstUpdateID, e.LastUpdateID); err != nil {
+				log.WithError(err).Errorf("failed to set %s snapshot", e.Market)
+			}
+		} else {
+			if err := f.AddUpdate(types.SliceOrderBook{
+				Symbol:       symbol,
+				Time:         e.Time(),
+				Bids:         e.Bids,
+				Asks:         e.Asks,
+				LastUpdateId: e.LastUpdateID,
+			}, e.FirstUpdateID, e.LastUpdateID); err != nil {
+				log.WithError(err).Errorf("found missing %s update event", e.Market)
+			}
 		}
 	}
 }
