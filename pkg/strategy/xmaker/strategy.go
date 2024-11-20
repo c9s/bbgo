@@ -126,9 +126,10 @@ type Strategy struct {
 
 	SubscribeFeeTokenMarkets bool `json:"subscribeFeeTokenMarkets"`
 
-	EnableSignalMargin bool            `json:"enableSignalMargin"`
-	SignalConfigList   []SignalConfig  `json:"signals"`
-	SignalMarginScale  *bbgo.SlideRule `json:"signalMarginScale,omitempty"`
+	EnableSignalMargin           bool            `json:"enableSignalMargin"`
+	SignalConfigList             []SignalConfig  `json:"signals"`
+	SignalReverseSideMarginScale *bbgo.SlideRule `json:"signalReverseSideMarginScale,omitempty"`
+	SignalTrendSideMarginScale   *bbgo.SlideRule `json:"signalTrendSideMarginScale,omitempty"`
 
 	Margin           fixedpoint.Value `json:"margin"`
 	BidMargin        fixedpoint.Value `json:"bidMargin"`
@@ -379,7 +380,7 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		return nil
 	}
 
-	scale, err := s.SignalMarginScale.Scale()
+	scale, err := s.SignalReverseSideMarginScale.Scale()
 	if err != nil {
 		return err
 	}
@@ -844,7 +845,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	if disableMakerAsk && disableMakerBid {
-		log.Warnf("%s bid/ask maker is disabled due to insufficient balances", s.Symbol)
+		log.Warnf("%s bid/ask maker is disabled", s.Symbol)
 		return nil
 	}
 
@@ -1419,6 +1420,27 @@ func (s *Strategy) Defaults() error {
 		s.CircuitBreaker.SetMetricsInfo(ID, s.InstanceID(), s.Symbol)
 	}
 
+	if s.EnableSignalMargin {
+		if s.SignalReverseSideMarginScale == nil {
+			s.SignalReverseSideMarginScale = &bbgo.SlideRule{
+				ExpScale: &bbgo.ExponentialScale{
+					Domain: [2]float64{0, 2.0},
+					Range:  [2]float64{0.00010, 0.00500},
+				},
+				QuadraticScale: nil,
+			}
+		}
+
+		if s.SignalTrendSideMarginScale == nil {
+			s.SignalTrendSideMarginScale = &bbgo.SlideRule{
+				ExpScale: &bbgo.ExponentialScale{
+					Domain: [2]float64{0, 2.0},
+					Range:  [2]float64{0.00010, 0.00500},
+				},
+			}
+		}
+	}
+
 	// circuitBreakerAlertLimiter is for CircuitBreaker alerts
 	s.circuitBreakerAlertLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 2)
 	s.reportProfitStatsRateLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 1)
@@ -1770,7 +1792,15 @@ func (s *Strategy) CrossRun(
 	if s.EnableSignalMargin {
 		s.logger.Infof("signal margin is enabled")
 
-		scale, err := s.SignalMarginScale.Scale()
+		if s.SignalReverseSideMarginScale == nil {
+			return errors.New("signalReverseSideMarginScale can not be nil when signal margin is enabled")
+		}
+
+		if s.SignalTrendSideMarginScale == nil {
+			return errors.New("signalTrendSideMarginScale can not be nil when signal margin is enabled")
+		}
+
+		scale, err := s.SignalReverseSideMarginScale.Scale()
 		if err != nil {
 			return err
 		}
