@@ -179,6 +179,8 @@ type Strategy struct {
 
 	RecoverTradeScanPeriod types.Duration `json:"recoverTradeScanPeriod"`
 
+	MaxQuoteUsageRatio fixedpoint.Value `json:"maxQuoteUsageRatio"`
+
 	NumLayers int `json:"numLayers"`
 
 	// Pips is the pips of the layer prices
@@ -696,7 +698,14 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	if b, ok := makerBalances[s.makerMarket.QuoteCurrency]; ok {
 		if b.Available.Compare(s.makerMarket.MinNotional) > 0 {
-			makerQuota.QuoteAsset.Add(b.Available)
+			if s.MaxQuoteUsageRatio.Sign() > 0 {
+				quoteAvailable := b.Available.Mul(s.MaxQuoteUsageRatio)
+				makerQuota.QuoteAsset.Add(quoteAvailable)
+			} else {
+				// use all quote balances as much as possible
+				makerQuota.QuoteAsset.Add(b.Available)
+			}
+
 		} else {
 			disableMakerBid = true
 			s.logger.Infof("%s maker bid disabled: insufficient quote balance %s", s.Symbol, b.String())
