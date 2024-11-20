@@ -81,6 +81,9 @@ func bindMockMarketDataStream(mockStream *mocks.MockStream, stream *types.Standa
 	mockStream.EXPECT().OnConnect(Catch(func(x any) {
 		stream.OnConnect(x.(func()))
 	})).AnyTimes()
+	mockStream.EXPECT().OnDisconnect(Catch(func(x any) {
+		stream.OnDisconnect(x.(func()))
+	})).AnyTimes()
 }
 
 func bindMockUserDataStream(mockStream *mocks.MockStream, stream *types.StandardStream) {
