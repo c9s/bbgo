@@ -64,7 +64,7 @@ func TestDepthBuffer_CorruptedUpdateAtTheBeginning(t *testing.T) {
 				{Price: itov(99), Volume: itov(1)},
 			},
 		}, snapshotFinalID, nil
-	})
+	}, time.Millisecond*5)
 
 	resetC := make(chan struct{}, 1)
 
@@ -104,7 +104,7 @@ func TestDepthBuffer_ConcurrentRun(t *testing.T) {
 				{Price: itov(99), Volume: itov(1)},
 			},
 		}, snapshotFinalID, nil
-	})
+	}, time.Millisecond*5)
 
 	readyCnt := 0
 	resetCnt := 0
