@@ -320,6 +320,29 @@ func (s *Strategy) Initialize() error {
 		"exchange":      s.MakerExchange,
 		"symbol":        s.Symbol,
 	}
+
+	if s.SignalReverseSideMarginScale != nil {
+		scale, err := s.SignalReverseSideMarginScale.Scale()
+		if err != nil {
+			return err
+		}
+
+		if solveErr := scale.Solve(); solveErr != nil {
+			return solveErr
+		}
+	}
+
+	if s.SignalTrendSideMarginScale != nil {
+		scale, err := s.SignalTrendSideMarginScale.Scale()
+		if err != nil {
+			return err
+		}
+
+		if solveErr := scale.Solve(); solveErr != nil {
+			return solveErr
+		}
+	}
+
 	return nil
 }
 
@@ -1803,10 +1826,6 @@ func (s *Strategy) CrossRun(
 		scale, err := s.SignalReverseSideMarginScale.Scale()
 		if err != nil {
 			return err
-		}
-
-		if solveErr := scale.Solve(); solveErr != nil {
-			return solveErr
 		}
 
 		minAdditionalMargin := scale.Call(0.0)
