@@ -3,10 +3,13 @@ package xmaker
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -14,12 +17,14 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/profile/timeprofile"
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/strategy/common"
+	"github.com/c9s/bbgo/pkg/style"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/timejitter"
@@ -115,6 +120,23 @@ type SignalMargin struct {
 	Threshold float64         `json:"threshold,omitempty"`
 }
 
+type DelayedHedge struct {
+	// EnableDelayHedge enables the delay hedge feature
+	Enabled bool `json:"enabled"`
+
+	// MaxDelayDuration is the maximum delay duration to hedge the position
+	MaxDelayDuration types.Duration `json:"maxDelay"`
+
+	// FixedDelayDuration is the fixed delay duration
+	FixedDelayDuration types.Duration `json:"fixedDelay"`
+
+	// SignalThreshold is the signal threshold to trigger the delay hedge
+	SignalThreshold float64 `json:"signalThreshold"`
+
+	// DynamicDelayScale is the dynamic delay scale
+	DynamicDelayScale *bbgo.SlideRule `json:"dynamicDelayScale,omitempty"`
+}
+
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -135,8 +157,8 @@ type Strategy struct {
 	EnableSignalMargin bool           `json:"enableSignalMargin"`
 	SignalConfigList   []SignalConfig `json:"signals"`
 
-	SignalReverseSideMargin *SignalMargin `json:"signalReverseSideMargin,omitempty"`
-	SignalTrendSideMargin   *SignalMargin `json:"signalTrendSideMargin,omitempty"`
+	SignalReverseSideMargin       *SignalMargin `json:"signalReverseSideMargin,omitempty"`
+	SignalTrendSideMarginDiscount *SignalMargin `json:"signalTrendSideMarginDiscount,omitempty"`
 
 	// Margin is the default margin for the quote
 	Margin    fixedpoint.Value `json:"margin"`
@@ -155,6 +177,8 @@ type Strategy struct {
 	// MaxHedgeDelayDuration is the maximum delay duration to hedge the position
 	MaxDelayHedgeDuration     types.Duration `json:"maxHedgeDelayDuration"`
 	DelayHedgeSignalThreshold float64        `json:"delayHedgeSignalThreshold"`
+
+	DelayedHedge *DelayedHedge `json:"delayedHedge,omitempty"`
 
 	EnableBollBandMargin bool             `json:"enableBollBandMargin"`
 	BollBandInterval     types.Interval   `json:"bollBandInterval"`
@@ -344,8 +368,8 @@ func (s *Strategy) Initialize() error {
 		}
 	}
 
-	if s.SignalTrendSideMargin != nil && s.SignalTrendSideMargin.Scale != nil {
-		scale, err := s.SignalTrendSideMargin.Scale.Scale()
+	if s.SignalTrendSideMarginDiscount != nil && s.SignalTrendSideMarginDiscount.Scale != nil {
+		scale, err := s.SignalTrendSideMarginDiscount.Scale.Scale()
 		if err != nil {
 			return err
 		}
@@ -355,7 +379,25 @@ func (s *Strategy) Initialize() error {
 		}
 	}
 
+	if s.DelayedHedge != nil && s.DelayedHedge.DynamicDelayScale != nil {
+		if scale, _ := s.DelayedHedge.DynamicDelayScale.Scale(); scale != nil {
+			if err := scale.Solve(); err != nil {
+				return err
+			}
+		}
+	}
+
+	s.PrintConfig(os.Stdout, true, false)
 	return nil
+}
+
+func (s *Strategy) PrintConfig(f io.Writer, pretty bool, withColor ...bool) {
+	var tableStyle *table.Style
+	if pretty {
+		tableStyle = style.NewDefaultTableStyle()
+	}
+
+	dynamic.PrintConfig(s, f, tableStyle, len(withColor) > 0 && withColor[0], dynamic.DefaultWhiteList()...)
 }
 
 // getBollingerTrend returns -1 when the price is in the downtrend, 1 when the price is in the uptrend, 0 when the price is in the band
@@ -419,13 +461,13 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 
 	var trendSideMarginDiscount, reverseSideMargin float64
 	var trendSideMarginDiscountFp, reverseSideMarginFp fixedpoint.Value
-	if s.SignalTrendSideMargin != nil && s.SignalTrendSideMargin.Enabled {
-		trendSideMarginScale, err := s.SignalTrendSideMargin.Scale.Scale()
+	if s.SignalTrendSideMarginDiscount != nil && s.SignalTrendSideMarginDiscount.Enabled {
+		trendSideMarginScale, err := s.SignalTrendSideMarginDiscount.Scale.Scale()
 		if err != nil {
 			return err
 		}
 
-		if signalAbs > s.SignalTrendSideMargin.Threshold {
+		if signalAbs > s.SignalTrendSideMarginDiscount.Threshold {
 			// trendSideMarginDiscount is the discount for the trend side margin
 			trendSideMarginDiscount = trendSideMarginScale.Call(math.Abs(signal))
 			trendSideMarginDiscountFp = fixedpoint.NewFromFloat(trendSideMarginDiscount)
@@ -1256,14 +1298,16 @@ func AdjustHedgeQuantityWithAvailableBalance(
 	return market.TruncateQuantity(quantity)
 }
 
-func (s *Strategy) canDelayHedge(side types.SideType, pos fixedpoint.Value) bool {
-	if !s.EnableDelayHedge {
+// canDelayHedge returns true if the hedge can be delayed
+func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value) bool {
+	if s.DelayedHedge == nil || !s.DelayedHedge.Enabled {
 		return false
 	}
 
 	signal := s.lastAggregatedSignal.Get()
 
-	if math.Abs(signal) < s.DelayHedgeSignalThreshold {
+	signalAbs := math.Abs(signal)
+	if signalAbs < s.DelayedHedge.SignalThreshold {
 		return false
 	}
 
@@ -1273,8 +1317,21 @@ func (s *Strategy) canDelayHedge(side types.SideType, pos fixedpoint.Value) bool
 		return false
 	}
 
-	if (signal > 0 && side == types.SideTypeSell) || (signal < 0 && side == types.SideTypeBuy) {
-		if period < s.MaxDelayHedgeDuration.Duration() {
+	var maxDelay = s.DelayedHedge.MaxDelayDuration.Duration()
+	var delay = s.DelayedHedge.FixedDelayDuration.Duration()
+
+	if s.DelayedHedge.DynamicDelayScale != nil {
+		if scale, _ := s.DelayedHedge.DynamicDelayScale.Scale(); scale != nil {
+			delay = time.Duration(scale.Call(signalAbs)) * time.Millisecond
+		}
+	}
+
+	if delay > maxDelay {
+		delay = maxDelay
+	}
+
+	if (signal > 0 && hedgeSide == types.SideTypeSell) || (signal < 0 && hedgeSide == types.SideTypeBuy) {
+		if period < delay {
 			s.logger.Infof("delay hedge enabled, signal %f is strong enough, waiting for the next tick to hedge %s quantity (max period %s)", signal, pos, s.MaxDelayHedgeDuration.Duration().String())
 
 			delayHedgeCounterMetrics.With(s.metricsLabels).Inc()
@@ -1500,8 +1557,8 @@ func (s *Strategy) Defaults() error {
 			}
 		}
 
-		if s.SignalTrendSideMargin.Scale == nil {
-			s.SignalTrendSideMargin.Scale = &bbgo.SlideRule{
+		if s.SignalTrendSideMarginDiscount.Scale == nil {
+			s.SignalTrendSideMarginDiscount.Scale = &bbgo.SlideRule{
 				ExpScale: &bbgo.ExponentialScale{
 					Domain: [2]float64{0, 2.0},
 					Range:  [2]float64{0.00010, 0.00500},
@@ -1509,8 +1566,19 @@ func (s *Strategy) Defaults() error {
 			}
 		}
 
-		if s.SignalTrendSideMargin.Threshold == 0.0 {
-			s.SignalTrendSideMargin.Threshold = 1.0
+		if s.SignalTrendSideMarginDiscount.Threshold == 0.0 {
+			s.SignalTrendSideMarginDiscount.Threshold = 1.0
+		}
+	}
+
+	if s.DelayedHedge != nil {
+		// default value protection for delayed hedge
+		if s.DelayedHedge.MaxDelayDuration == 0 {
+			s.DelayedHedge.MaxDelayDuration = types.Duration(3 * time.Second)
+		}
+
+		if s.DelayedHedge.SignalThreshold == 0.0 {
+			s.DelayedHedge.SignalThreshold = 0.5
 		}
 	}
 
@@ -1869,7 +1937,7 @@ func (s *Strategy) CrossRun(
 			return errors.New("signalReverseSideMarginScale can not be nil when signal margin is enabled")
 		}
 
-		if s.SignalTrendSideMargin == nil || s.SignalTrendSideMargin.Scale == nil {
+		if s.SignalTrendSideMarginDiscount == nil || s.SignalTrendSideMarginDiscount.Scale == nil {
 			return errors.New("signalTrendSideMarginScale can not be nil when signal margin is enabled")
 		}
 
