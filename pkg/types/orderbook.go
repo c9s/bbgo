@@ -212,6 +212,10 @@ func (sb *StreamOrderBook) updateMetrics(t time.Time) {
 }
 
 func (sb *StreamOrderBook) BindStream(stream Stream) {
+	stream.OnDisconnect(func() {
+		sb.Reset()
+	})
+
 	stream.OnBookSnapshot(func(book SliceOrderBook) {
 		if sb.MutexOrderBook.Symbol != book.Symbol {
 			return
