@@ -1,11 +1,11 @@
 package xmaker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"sync"
 	"time"
 
@@ -387,7 +387,6 @@ func (s *Strategy) Initialize() error {
 		}
 	}
 
-	s.PrintConfig(os.Stdout, true, false)
 	return nil
 }
 
@@ -1750,6 +1749,10 @@ func (s *Strategy) CrossRun(
 	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
 	instanceID := s.InstanceID()
+
+	configWriter := bytes.NewBuffer(nil)
+	s.PrintConfig(configWriter, true, false)
+	s.logger.Infof("config: %s", configWriter.String())
 
 	// configure sessions
 	sourceSession, ok := sessions[s.SourceExchange]
