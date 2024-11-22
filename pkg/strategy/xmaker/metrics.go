@@ -2,10 +2,17 @@ package xmaker
 
 import "github.com/prometheus/client_golang/prometheus"
 
-var delayHedgeCounterMetrics = prometheus.NewCounterVec(
+var delayedHedgeCounterMetrics = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
-		Name: "xmaker_delay_hedge_counter",
+		Name: "xmaker_delayed_hedge_counter",
 		Help: "delay hedge counter",
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+
+var delayedHedgeMaxDurationMetrics = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name:    "xmaker_delayed_hedge_max_duration",
+		Help:    "delay hedge max duration in milliseconds",
+		Buckets: prometheus.ExponentialBuckets(50, 2.0, 13),
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
 var cancelOrderDurationMetrics = prometheus.NewHistogramVec(
@@ -88,6 +95,13 @@ var configAskMarginMetrics = prometheus.NewGaugeVec(
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "symbol"})
 
+var netProfitMarginHistogram = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name:    "xmaker_net_profit_margin",
+		Help:    "net profit",
+		Buckets: prometheus.ExponentialBuckets(0.001, 2.0, 10),
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+
 func init() {
 	prometheus.MustRegister(
 		openOrderBidExposureInUsdMetrics,
@@ -103,6 +117,8 @@ func init() {
 		configMaxExposureMetrics,
 		configBidMarginMetrics,
 		configAskMarginMetrics,
-		delayHedgeCounterMetrics,
+		delayedHedgeCounterMetrics,
+		delayedHedgeMaxDurationMetrics,
+		netProfitMarginHistogram,
 	)
 }

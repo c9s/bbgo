@@ -1331,9 +1331,10 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 
 	if (signal > 0 && hedgeSide == types.SideTypeSell) || (signal < 0 && hedgeSide == types.SideTypeBuy) {
 		if period < delay {
-			s.logger.Infof("delay hedge enabled, signal %f is strong enough, waiting for the next tick to hedge %s quantity (max period %s)", signal, pos, s.MaxDelayHedgeDuration.Duration().String())
+			s.logger.Infof("delay hedge enabled, signal %f is strong enough, waiting for the next tick to hedge %s quantity (max delay %s)", signal, pos, delay)
 
-			delayHedgeCounterMetrics.With(s.metricsLabels).Inc()
+			delayedHedgeCounterMetrics.With(s.metricsLabels).Inc()
+			delayedHedgeMaxDurationMetrics.With(s.metricsLabels).Observe(float64(delay.Milliseconds()))
 			return true
 		}
 	}
@@ -2010,6 +2011,8 @@ func (s *Strategy) CrossRun(
 			}
 
 			bbgo.Notify(profit)
+
+			netProfitMarginHistogram.With(s.metricsLabels).Observe(profit.NetProfitMargin.Float64())
 
 			s.ProfitStats.AddProfit(*profit)
 			s.Environment.RecordPosition(s.Position, trade, profit)
