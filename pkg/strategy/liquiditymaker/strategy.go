@@ -155,6 +155,8 @@ func (s *Strategy) updateMarketMetrics(ctx context.Context) error {
 }
 
 func (s *Strategy) liquidityWorker(ctx context.Context, interval types.Interval) {
+	s.logger.Infof("starting liquidity worker with interval %v", interval)
+
 	metricsTicker := time.NewTicker(5 * time.Second)
 	defer metricsTicker.Stop()
 
@@ -233,21 +235,19 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		}
 	})
 
-	if intervalProvider, ok := session.Exchange.(types.CustomIntervalProvider); ok {
-		if intervalProvider.IsSupportedInterval(s.LiquidityUpdateInterval) {
-			session.UserDataStream.OnAuth(func() {
+	if intervalProvider, ok := session.Exchange.(types.CustomIntervalProvider); ok && intervalProvider.IsSupportedInterval(s.LiquidityUpdateInterval) {
+		session.UserDataStream.OnAuth(func() {
+			s.placeLiquidityOrders(ctx)
+		})
+		session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
+			if k.Interval == s.LiquidityUpdateInterval {
 				s.placeLiquidityOrders(ctx)
-			})
-			session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
-				if k.Interval == s.LiquidityUpdateInterval {
-					s.placeLiquidityOrders(ctx)
-				}
-			})
-		} else {
-			session.UserDataStream.OnStart(func() {
-				go s.liquidityWorker(ctx, s.LiquidityUpdateInterval)
-			})
-		}
+			}
+		})
+	} else {
+		session.UserDataStream.OnStart(func() {
+			go s.liquidityWorker(ctx, s.LiquidityUpdateInterval)
+		})
 	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
