@@ -132,13 +132,21 @@ func (s *Stream) handleConnect() {
 		if len(s.privateChannels) > 0 {
 			// TODO: maybe check the valid private channels
 			filters = s.privateChannels
-		} else if s.MarginSettings.IsMargin {
-			filters = []string{
-				"mwallet_order",
-				"mwallet_trade",
-				"mwallet_account",
-				"ad_ratio",
-				"borrowing",
+		} else {
+			if s.MarginSettings.IsMargin {
+				filters = []string{
+					"mwallet_order",
+					"mwallet_trade",
+					"mwallet_account",
+					"ad_ratio",
+					"borrowing",
+				}
+			} else {
+				filters = []string{
+					"order",
+					"trade",
+					"account",
+				}
 			}
 		}
 
