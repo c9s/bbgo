@@ -470,6 +470,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		// bind on trade to update price
 		session.UserDataStream.OnTradeUpdate(s.priceResolver.UpdateFromTrade)
 	}
+	log.Infof("large amount alert: %+v", s.LargeAmountAlert)
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -597,6 +598,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 			if price, ok := s.priceResolver.ResolvePrice(currency, s.LargeAmountAlert.QuoteCurrency); ok {
 				quantity := q.Abs()
 				amount := price.Mul(quantity)
+				log.Infof("resolved price for currency: %s, price: %f, quantity: %f, amount: %f", currency, price.Float64(), quantity.Float64(), amount.Float64())
 				if amount.Compare(s.LargeAmountAlert.Amount) > 0 {
 					alert := &LargeAmountAlert{
 						QuoteCurrency: s.LargeAmountAlert.QuoteCurrency,
@@ -616,6 +618,8 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 					bbgo.Notify(alert)
 				}
+			} else {
+				log.Info("price resolver can not resolve price, skip alert checking")
 			}
 		}
 
