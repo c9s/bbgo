@@ -1099,13 +1099,13 @@ func (s *Strategy) openGrid(ctx context.Context, session *bbgo.ExchangeSession) 
 	// if the buy order is filled, then we will submit another sell order at the higher grid.
 	if s.QuantityOrAmount.IsSet() {
 		if quantity := s.QuantityOrAmount.Quantity; !quantity.IsZero() {
-			if _, _, err2 := s.checkRequiredInvestmentByQuantity(totalBase, totalQuote, lastPrice, s.QuantityOrAmount.Quantity, s.grid.Pins); err != nil {
+			if _, _, err2 := s.checkRequiredInvestmentByQuantity(totalBase, totalQuote, s.QuantityOrAmount.Quantity, lastPrice, s.grid.Pins); err2 != nil {
 				s.EmitGridError(err2)
 				return err2
 			}
 		}
 		if amount := s.QuantityOrAmount.Amount; !amount.IsZero() {
-			if _, _, err2 := s.checkRequiredInvestmentByAmount(totalBase, totalQuote, lastPrice, amount, s.grid.Pins); err != nil {
+			if _, _, err2 := s.checkRequiredInvestmentByAmount(totalBase, totalQuote, amount, lastPrice, s.grid.Pins); err2 != nil {
 				s.EmitGridError(err2)
 				return err2
 			}
