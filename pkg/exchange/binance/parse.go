@@ -426,6 +426,11 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		err = json.Unmarshal([]byte(message), &event)
 		return &event, err
 
+	case "TRADE_LITE":
+		var event OrderTradeLiteUpdateEvent
+		err = json.Unmarshal([]byte(message), &event)
+		return &event, err
+
 	// Event: Balance and Position Update
 	case "ACCOUNT_UPDATE":
 		var event AccountUpdateEvent
@@ -1178,4 +1183,37 @@ func (k *BookTickerEvent) BookTicker() types.BookTicker {
 		Sell:     k.Sell,
 		SellSize: k.SellSize,
 	}
+}
+
+/*
+{
+	"e":"TRADE_LITE",             // Event Type
+	"E":1721895408092,            // Event Time
+	"T":1721895408214,            // Transaction Time
+	"s":"BTCUSDT",                // Symbol
+	"q":"0.001",                  // Original Quantity
+	"p":"0",                      // Original Price
+	"m":false,                    // Is this trade the maker side?
+	"c":"z8hcUoOsqEdKMeKPSABslD", // Client Order Id
+	"S":"BUY",                    // Side
+	"L":"64089.20",               // Last Filled Price
+	"l":"0.040",                  // Order Last Filled Quantity
+	"t":109100866,                // Trade Id
+	"i":8886774,                  // Order Id
+}
+*/
+
+type OrderTradeLiteUpdateEvent struct {
+	EventBase
+	Symbol                  string           `json:"s"`
+	Transaction             int64            `json:"T"`
+	ClientOrderID           string           `json:"c"`
+	Side                    string           `json:"S"`
+	OriginalQuantity        fixedpoint.Value `json:"q"`
+	OriginalPrice           fixedpoint.Value `json:"p"`
+	IsMaker                 bool             `json:"m"`
+	LastFilledPrice         fixedpoint.Value `json:"L"`
+	OrderLastFilledQuantity fixedpoint.Value `json:"l"`
+	TradeID                 int64            `json:"t"`
+	OrderID                 int64            `json:"i"`
 }
