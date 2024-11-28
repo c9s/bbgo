@@ -91,9 +91,6 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		return
 	}
 	tradingSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.Interval})
-	if !s.CircuitBreakLossThreshold.IsZero() {
-		tradingSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.CircuitBreakEMA.Interval})
-	}
 
 	referenceSession, ok := sessions[s.ReferenceExchange]
 	if !ok {
