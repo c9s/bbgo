@@ -23,7 +23,6 @@ const (
 	PrivateChannelOrderUpdate     PrivateChannel = "order_update"
 	PrivateChannelTrade           PrivateChannel = "trade"
 	PrivateChannelTradeUpdate     PrivateChannel = "trade_update"
-	PrivateChannelTradeFast       PrivateChannel = "trade_fast"
 	PrivateChannelTradeFastUpdate PrivateChannel = "trade_fast_update"
 	PrivateChannelAccount         PrivateChannel = "account"
 	PrivateChannelAccountUpdate   PrivateChannel = "account_update"
@@ -87,7 +86,6 @@ var AllPrivateChannels = map[PrivateChannel]struct{}{
 	PrivateChannelOrderUpdate:         {},
 	PrivateChannelTrade:               {},
 	PrivateChannelTradeUpdate:         {},
-	PrivateChannelTradeFast:           {},
 	PrivateChannelTradeFastUpdate:     {},
 	PrivateChannelAccount:             {},
 	PrivateChannelAccountUpdate:       {},
