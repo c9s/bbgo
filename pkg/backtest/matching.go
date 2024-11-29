@@ -9,9 +9,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 var orderID uint64 = 1
@@ -35,14 +35,14 @@ var useFeeToken = true
 
 func init() {
 	logger := logrus.New()
-	if v, ok := util.GetEnvVarBool("DEBUG_MATCHING"); ok && v {
+	if v, ok := envvar.Bool("DEBUG_MATCHING"); ok && v {
 		logger.SetLevel(logrus.DebugLevel)
 	} else {
 		logger.SetLevel(logrus.ErrorLevel)
 	}
 	klineMatchingLogger = logger.WithField("backtest", "klineEngine")
 
-	if v, ok := util.GetEnvVarBool("BACKTEST_USE_FEE_TOKEN"); ok {
+	if v, ok := envvar.Bool("BACKTEST_USE_FEE_TOKEN"); ok {
 		useFeeToken = v
 	}
 }

@@ -11,15 +11,15 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 var DefaultSubmitOrderRetryTimeout = 5 * time.Minute
 
 func init() {
-	if du, ok := util.GetEnvVarDuration("BBGO_SUBMIT_ORDER_RETRY_TIMEOUT"); ok && du > 0 {
+	if du, ok := envvar.Duration("BBGO_SUBMIT_ORDER_RETRY_TIMEOUT", 5*time.Minute); ok && du > 0 {
 		DefaultSubmitOrderRetryTimeout = du
 	}
 }

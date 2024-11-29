@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/cache"
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 
@@ -237,7 +238,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	var disableMarketsCache = false
 	var markets types.MarketMap
 	var err error
-	if util.SetEnvVarBool("DISABLE_MARKETS_CACHE", &disableMarketsCache); disableMarketsCache {
+	if envvar.SetBool("DISABLE_MARKETS_CACHE", &disableMarketsCache); disableMarketsCache {
 		markets, err = session.Exchange.QueryMarkets(ctx)
 		if err != nil {
 			return err
