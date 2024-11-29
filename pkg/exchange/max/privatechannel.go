@@ -8,7 +8,7 @@ const (
 	PrivateChannelOrderUpdate     PrivateChannel = "order_update"
 	PrivateChannelTrade           PrivateChannel = "trade"
 	PrivateChannelTradeUpdate     PrivateChannel = "trade_update"
-	PrivateChannelTradeFastUpdate PrivateChannel = "trade_fast_update"
+	PrivateChannelFastTradeUpdate PrivateChannel = "fast_trade_update"
 	PrivateChannelAccount         PrivateChannel = "account"
 	PrivateChannelAccountUpdate   PrivateChannel = "account_update"
 
