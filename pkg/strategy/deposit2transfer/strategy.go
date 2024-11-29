@@ -58,9 +58,13 @@ type Strategy struct {
 	IgnoreDust  bool                        `json:"ignoreDust"`
 	DustAmounts map[string]fixedpoint.Value `json:"dustAmounts"`
 
+	AutoRepay bool `json:"autoRepay"`
+
 	SlackAlert *SlackAlert `json:"slackAlert"`
 
-	marginTransferService marginTransferService
+	marginTransferService    marginTransferService
+	marginBorrowRepayService types.MarginBorrowRepayService
+
 	depositHistoryService types.ExchangeTransferService
 
 	session *bbgo.ExchangeSession
@@ -128,6 +132,8 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if !ok {
 		return errMarginTransferNotSupport
 	}
+
+	s.marginBorrowRepayService, _ = session.Exchange.(types.MarginBorrowRepayService)
 
 	s.depositHistoryService, ok = session.Exchange.(types.ExchangeTransferService)
 	if !ok {
@@ -262,6 +268,30 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 						livenote.Channel(s.SlackAlert.Channel),
 						livenote.Comment(fmt.Sprintf("✅ %s %s transferred successfully", amount.String(), d.Asset)),
 					)
+				}
+
+				if s.AutoRepay && s.marginBorrowRepayService != nil {
+					s.logger.Infof("autoRepay is enabled, repaying %s %s...", amount.String(), d.Asset)
+				
+					if err2 := s.marginBorrowRepayService.RepayMarginAsset(ctx, d.Asset, amount); err2 != nil {
+						s.logger.WithError(err).Errorf("unable to repay the margin asset")
+
+						if s.SlackAlert != nil {
+							bbgo.PostLiveNote(&d,
+								livenote.Channel(s.SlackAlert.Channel),
+								livenote.Comment(fmt.Sprintf("❌ Unable to repay, error: %+v", err2)),
+							)
+						}
+					} else {
+						s.logger.Infof("%s %s repayed successfully", amount.String(), d.Asset)
+
+						if s.SlackAlert != nil {
+							bbgo.PostLiveNote(&d,
+								livenote.Channel(s.SlackAlert.Channel),
+								livenote.Comment(fmt.Sprintf("✅ %s %s repayed successfully", amount.String(), d.Asset)),
+							)
+						}
+					}
 				}
 			}
 		}
