@@ -242,12 +242,7 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 				d.Amount.String(), d.Asset,
 				amount.String(), d.Asset)
 
-			if s.SlackAlert != nil {
-				bbgo.PostLiveNote(&d,
-					livenote.Channel(s.SlackAlert.Channel),
-					livenote.Comment(fmt.Sprintf("🚥 Transferring deposit asset %s %s into the margin account", amount.String(), d.Asset)),
-				)
-			}
+			s.postLiveNoteMessage(d, "🚥 Transferring deposit asset %s %s into the margin account", amount.String(), d.Asset)
 
 			err2 := retry.GeneralBackoff(ctx, func() error {
 				return s.marginTransferService.TransferMarginAccountAsset(ctx, d.Asset, amount, types.TransferIn)
@@ -256,45 +251,70 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 			if err2 != nil {
 				logger.WithError(err2).Errorf("unable to transfer deposit asset into the margin account")
 
-				if s.SlackAlert != nil {
-					bbgo.PostLiveNote(&d,
-						livenote.Channel(s.SlackAlert.Channel),
-						livenote.Comment(fmt.Sprintf("❌ Margin account transfer error: %+v", err2)),
-					)
-				}
+				s.postLiveNoteError(d, "❌ Unable to transfer deposit asset into the margin account, error: %+v", err2)
 			} else {
-				if s.SlackAlert != nil {
-					bbgo.PostLiveNote(&d,
-						livenote.Channel(s.SlackAlert.Channel),
-						livenote.Comment(fmt.Sprintf("✅ %s %s transferred successfully", amount.String(), d.Asset)),
-					)
-				}
+				s.logger.Infof("%s %s has been transferred successfully", amount.String(), d.Asset)
+
+				s.postLiveNoteMessage(d, "✅ %s %s has been transferred successfully", amount.String(), d.Asset)
 
 				if s.AutoRepay && s.marginBorrowRepayService != nil {
 					s.logger.Infof("autoRepay is enabled, repaying %s %s...", amount.String(), d.Asset)
-				
-					if err2 := s.marginBorrowRepayService.RepayMarginAsset(ctx, d.Asset, amount); err2 != nil {
-						s.logger.WithError(err).Errorf("unable to repay the margin asset")
 
-						if s.SlackAlert != nil {
-							bbgo.PostLiveNote(&d,
-								livenote.Channel(s.SlackAlert.Channel),
-								livenote.Comment(fmt.Sprintf("❌ Unable to repay, error: %+v", err2)),
-							)
-						}
-					} else {
-						s.logger.Infof("%s %s repayed successfully", amount.String(), d.Asset)
-
-						if s.SlackAlert != nil {
-							bbgo.PostLiveNote(&d,
-								livenote.Channel(s.SlackAlert.Channel),
-								livenote.Comment(fmt.Sprintf("✅ %s %s repayed successfully", amount.String(), d.Asset)),
-							)
-						}
+					if err2 := s.repay(ctx, d, amount); err2 != nil {
+						s.logger.WithError(err2).Errorf("unable to repay the margin asset")
 					}
 				}
 			}
 		}
+	}
+}
+
+func (s *Strategy) repay(ctx context.Context, d types.Deposit, amount fixedpoint.Value) error {
+	if !s.session.Margin {
+		return fmt.Errorf("session does not support margin")
+	}
+
+	bals, err := s.session.Exchange.QueryAccountBalances(ctx)
+	if err != nil {
+		return err
+	}
+
+	bal, ok := bals[d.Asset]
+	if !ok {
+		return nil
+	}
+
+	s.logger.Infof("found %s balance debt: %s", d.Asset, bal.Debt().String())
+
+	amount = fixedpoint.Min(bal.Debt(), amount)
+
+	s.logger.Infof("adjusted repay amount to %s", amount.String())
+
+	if err := s.marginBorrowRepayService.RepayMarginAsset(ctx, d.Asset, amount); err != nil {
+		s.postLiveNoteError(d, "❌ Unable to repay, error: %+v", err)
+		return err
+	}
+
+	s.logger.Infof("%s %s was successfully repaid", amount.String(), d.Asset)
+	s.postLiveNoteMessage(d, "✅ %s %s was successfully repaid", amount.String(), d.Asset)
+	return nil
+}
+
+func (s *Strategy) postLiveNoteError(d types.Deposit, msgf string, err error) {
+	if s.SlackAlert != nil {
+		bbgo.PostLiveNote(&d,
+			livenote.Channel(s.SlackAlert.Channel),
+			livenote.Comment(fmt.Sprintf(msgf, err)),
+		)
+	}
+}
+
+func (s *Strategy) postLiveNoteMessage(d types.Deposit, msgf string, args ...any) {
+	if s.SlackAlert != nil {
+		bbgo.PostLiveNote(&d,
+			livenote.Channel(s.SlackAlert.Channel),
+			livenote.Comment(fmt.Sprintf(msgf, args...)),
+		)
 	}
 }
 
