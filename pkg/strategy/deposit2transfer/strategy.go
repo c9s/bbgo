@@ -231,15 +231,17 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 				}
 
 				if amount.IsZero() || amount.Sign() < 0 {
-					bbgo.Notify("🔍 Found succeeded deposit %s %s, but the balance %s %s is insufficient, skip transferring",
+					bbgo.Notify("🔍 Found succeeded deposit %s %s on %s, but the balance %s %s is insufficient, skip transferring",
 						d.Amount.String(), d.Asset,
+						s.session.Name,
 						bal.Available.String(), bal.Currency)
 					continue
 				}
 			}
 
-			bbgo.Notify("🔍 Found succeeded deposit %s %s, transferring %s %s into the margin account",
+			bbgo.Notify("🔍 Found succeeded deposit %s %s on %s, transferring %s %s into the margin account",
 				d.Amount.String(), d.Asset,
+				s.session.Name,
 				amount.String(), d.Asset)
 
 			s.postLiveNoteMessage(d, "🚥 Transferring deposit asset %s %s into the margin account", amount.String(), d.Asset)
