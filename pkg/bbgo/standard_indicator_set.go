@@ -3,9 +3,9 @@ package bbgo
 import (
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 var (
@@ -15,7 +15,7 @@ var (
 func init() {
 	// when using --dotenv option, the dotenv is loaded from command.PersistentPreRunE, not init.
 	// hence here the env var won't enable the debug flag
-	util.SetEnvVarBool("DEBUG_BOLL", &debugBOLL)
+	envvar.SetBool("DEBUG_BOLL", &debugBOLL)
 }
 
 type MACDConfig struct {

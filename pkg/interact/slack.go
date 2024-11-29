@@ -14,7 +14,7 @@ import (
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
 
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/envvar"
 )
 
 type SlackReply struct {
@@ -179,7 +179,7 @@ func NewSlack(client *slack.Client) *Slack {
 				stdlog.Lshortfile|stdlog.LstdFlags)),
 	}
 
-	if b, ok := util.GetEnvVarBool("DEBUG_SLACK"); ok {
+	if b, ok := envvar.Bool("DEBUG_SLACK"); ok {
 		opts = append(opts, socketmode.OptionDebug(b))
 	}
 

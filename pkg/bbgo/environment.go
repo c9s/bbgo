@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/tucnak/telebot.v2"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/interact"
@@ -745,7 +746,7 @@ func (environ *Environment) setupInteraction(persistence service.PersistenceServ
 	var keyURL string
 	var authStore = environ.getAuthStore(persistence)
 
-	if v, ok := util.GetEnvVarBool("FLUSH_OTP_KEY"); v && ok {
+	if v, ok := envvar.Bool("FLUSH_OTP_KEY"); v && ok {
 		log.Warnf("flushing otp key...")
 		if err := authStore.Reset(); err != nil {
 			return err
@@ -857,7 +858,7 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 		slackOpts = append(slackOpts, slack.OptionAppLevelToken(slackAppToken))
 	}
 
-	if b, ok := util.GetEnvVarBool("DEBUG_SLACK"); ok {
+	if b, ok := envvar.Bool("DEBUG_SLACK"); ok {
 		slackOpts = append(slackOpts, slack.OptionDebug(b))
 	}
 
