@@ -16,90 +16,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type PrivateChannel string
-
-const (
-	PrivateChannelOrder           PrivateChannel = "order"
-	PrivateChannelOrderUpdate     PrivateChannel = "order_update"
-	PrivateChannelTrade           PrivateChannel = "trade"
-	PrivateChannelTradeUpdate     PrivateChannel = "trade_update"
-	PrivateChannelTradeFastUpdate PrivateChannel = "trade_fast_update"
-	PrivateChannelAccount         PrivateChannel = "account"
-	PrivateChannelAccountUpdate   PrivateChannel = "account_update"
-
-	PrivateChannelAveragePrice   PrivateChannel = "average_price"
-	PrivateChannelFavoriteMarket PrivateChannel = "favorite_market"
-
-	// @group Margin
-	PrivateChannelMWalletOrder           PrivateChannel = "mwallet_order"
-	PrivateChannelMWalletTrade           PrivateChannel = "mwallet_trade"
-	PrivateChannelMWalletTradeFastUpdate PrivateChannel = "mwallet_trade_fast_update"
-	PrivateChannelMWalletAccount         PrivateChannel = "mwallet_account"
-	PrivateChannelMWalletAveragePrice    PrivateChannel = "mwallet_average_price"
-	PrivateChannelBorrowing              PrivateChannel = "borrowing"
-	PrivateChannelAdRatio                PrivateChannel = "ad_ratio"
-	PrivateChannelPoolQuota              PrivateChannel = "borrowing_pool_quota"
-)
-
-// PrivateChannelStrings converts a slice of PrivateChannel to a slice of string
-func PrivateChannelStrings(slice []PrivateChannel) (out []string) {
-	for _, el := range slice {
-		out = append(out, string(el))
-	}
-
-	return out
-}
-
-// PrivateChannelKeys converts a map of PrivateChannel to a slice of PrivateChannel
-func PrivateChannelKeys(values map[PrivateChannel]struct{}) (slice []PrivateChannel) {
-	for k := range values {
-		slice = append(slice, k)
-	}
-
-	return slice
-}
-
-// ValidatePrivateChannel validates the private channel
-func ValidatePrivateChannel(ch PrivateChannel) bool {
-	_, ok := AllPrivateChannels[ch]
-	return ok
-}
-
-var defaultSpotPrivateChannels = []PrivateChannel{
-	PrivateChannelOrder,
-	PrivateChannelTrade,
-	PrivateChannelAccount,
-}
-
-var AllMarginPrivateChannels = map[PrivateChannel]struct{}{
-	PrivateChannelMWalletOrder:        {},
-	PrivateChannelMWalletTrade:        {},
-	PrivateChannelMWalletAccount:      {},
-	PrivateChannelMWalletAveragePrice: {},
-	PrivateChannelBorrowing:           {},
-	PrivateChannelAdRatio:             {},
-	PrivateChannelPoolQuota:           {},
-}
-
-var AllPrivateChannels = map[PrivateChannel]struct{}{
-	PrivateChannelOrder:               {},
-	PrivateChannelOrderUpdate:         {},
-	PrivateChannelTrade:               {},
-	PrivateChannelTradeUpdate:         {},
-	PrivateChannelTradeFastUpdate:     {},
-	PrivateChannelAccount:             {},
-	PrivateChannelAccountUpdate:       {},
-	PrivateChannelAveragePrice:        {},
-	PrivateChannelFavoriteMarket:      {},
-	PrivateChannelMWalletOrder:        {},
-	PrivateChannelMWalletTrade:        {},
-	PrivateChannelMWalletAccount:      {},
-	PrivateChannelMWalletAveragePrice: {},
-	PrivateChannelBorrowing:           {},
-	PrivateChannelAdRatio:             {},
-	PrivateChannelPoolQuota:           {},
-}
-
 //go:generate callbackgen -type Stream
 type Stream struct {
 	types.StandardStream
@@ -116,7 +32,8 @@ type Stream struct {
 	errorEventCallbacks        []func(e max.ErrorEvent)
 	subscriptionEventCallbacks []func(e max.SubscriptionEvent)
 
-	tradeUpdateEventCallbacks   []func(e max.TradeUpdateEvent)
+	tradeUpdateEventCallbacks []func(e max.TradeUpdateEvent)
+
 	tradeSnapshotEventCallbacks []func(e max.TradeSnapshotEvent)
 	orderUpdateEventCallbacks   []func(e max.OrderUpdateEvent)
 	orderSnapshotEventCallbacks []func(e max.OrderSnapshotEvent)
@@ -153,7 +70,9 @@ func NewStream(ex *Exchange, key, secret string) *Stream {
 	stream.OnKLineEvent(stream.handleKLineEvent)
 	stream.OnOrderSnapshotEvent(stream.handleOrderSnapshotEvent)
 	stream.OnOrderUpdateEvent(stream.handleOrderUpdateEvent)
+
 	stream.OnTradeUpdateEvent(stream.handleTradeEvent)
+
 	stream.OnAccountSnapshotEvent(stream.handleAccountSnapshotEvent)
 	stream.OnAccountUpdateEvent(stream.handleAccountUpdateEvent)
 	stream.OnBookEvent(stream.handleBookEvent(ex))
