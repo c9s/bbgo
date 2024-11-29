@@ -1027,6 +1027,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				makerQuota.QuoteAsset.Available,
 			)
 
+			bidQuantity = s.makerMarket.TruncateQuantity(requiredQuote.Div(bidPrice))
+
 			// if we bought, then we need to sell the base from the hedge session
 			// if the hedge session is a margin session, we don't need to lock the base asset
 			if makerQuota.QuoteAsset.Lock(requiredQuote) &&
@@ -1082,6 +1084,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			}
 
 			requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
+			askQuantity = requiredBase
 			if makerQuota.BaseAsset.Lock(requiredBase) &&
 				(s.sourceSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice))) {
 
