@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -157,6 +158,16 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 		})
 	}
 
+	// This is actually a hack to display the deposited account in the slack message
+	hostname := getHostname()
+	if hostname != "" && hostname != "localhost" {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Hostname",
+			Value: hostname,
+			Short: false,
+		})
+	}
+
 	fields = append(fields, slack.AttachmentField{
 		Title: "Amount",
 		Value: d.Amount.String() + " " + d.Asset,
@@ -241,4 +252,8 @@ func depositStatusSlackColor(status DepositStatus) string {
 		return "gray"
 
 	}
+}
+
+func getHostname() string {
+	return os.Getenv("HOSTNAME")
 }
