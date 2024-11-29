@@ -1082,7 +1082,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
 			if makerQuota.BaseAsset.Lock(requiredBase) &&
-				(s.sourceSession.Margin || hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice))) {
+				(s.sourceSession.Margin || hedgeQuota.BaseAsset.Lock(requiredBase)) {
 
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
