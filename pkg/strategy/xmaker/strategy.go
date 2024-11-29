@@ -1022,7 +1022,16 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				makerBestBidPriceMetrics.With(s.metricsLabels).Set(bidPrice.Float64())
 			}
 
-			if makerQuota.QuoteAsset.Lock(bidQuantity.Mul(bidPrice)) && hedgeQuota.BaseAsset.Lock(bidQuantity) {
+			requiredQuote := fixedpoint.Min(
+				bidQuantity.Mul(bidPrice),
+				makerQuota.QuoteAsset.Available,
+			)
+
+			// if we bought, then we need to sell the base from the hedge session
+			// if the hedge session is a margin session, we don't need to lock the base asset
+			if makerQuota.QuoteAsset.Lock(requiredQuote) &&
+				(s.sourceSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity)) {
+
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
@@ -1036,7 +1045,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 				makerQuota.Commit()
 				hedgeQuota.Commit()
-				bidExposureInUsd = bidExposureInUsd.Add(bidQuantity.Mul(bidPrice))
+				bidExposureInUsd = bidExposureInUsd.Add(requiredQuote)
 			} else {
 				makerQuota.Rollback()
 				hedgeQuota.Rollback()
@@ -1071,7 +1080,9 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				makerBestAskPriceMetrics.With(s.metricsLabels).Set(askPrice.Float64())
 			}
 
-			if makerQuota.BaseAsset.Lock(askQuantity) && hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice)) {
+			requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
+			if makerQuota.BaseAsset.Lock(requiredBase) &&
+				(s.sourceSession.Margin || hedgeQuota.QuoteAsset.Lock(askQuantity.Mul(askPrice))) {
 
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
