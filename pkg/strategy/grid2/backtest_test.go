@@ -12,10 +12,10 @@ import (
 
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 func RunBacktest(t *testing.T, strategy bbgo.SingleExchangeStrategy) {
@@ -158,7 +158,7 @@ func RunBacktest(t *testing.T, strategy bbgo.SingleExchangeStrategy) {
 }
 
 func TestBacktestStrategy(t *testing.T) {
-	if v, ok := util.GetEnvVarBool("TEST_BACKTEST"); !ok || !v {
+	if v, ok := envvar.Bool("TEST_BACKTEST"); !ok || !v {
 		t.Skip("backtest flag is required")
 		return
 	}

@@ -13,8 +13,8 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/backoff"
 )
 
@@ -126,7 +126,7 @@ func WithCache(key string, obj interface{}, fetcher DataFetcher) error {
 }
 
 func LoadExchangeMarketsWithCache(ctx context.Context, ex types.ExchangePublic) (markets types.MarketMap, err error) {
-	inMem, ok := util.GetEnvVarBool("USE_MARKETS_CACHE_IN_MEMORY")
+	inMem, ok := envvar.Bool("USE_MARKETS_CACHE_IN_MEMORY")
 	if ok && inMem {
 		return loadMarketsFromMem(ctx, ex)
 	}

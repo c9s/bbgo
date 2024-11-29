@@ -8,13 +8,13 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/dynamic"
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/envvar"
 )
 
 var enableMarketTradeStop = true
 
 func init() {
-	if v, defined := util.GetEnvVarBool("DISABLE_MARKET_TRADE_STOP"); defined && v {
+	if v, defined := envvar.Bool("DISABLE_MARKET_TRADE_STOP"); defined && v {
 		enableMarketTradeStop = false
 	}
 }

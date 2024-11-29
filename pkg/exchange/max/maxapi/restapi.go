@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/util"
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/util/backoff"
 	"github.com/c9s/bbgo/pkg/version"
 )
@@ -49,19 +49,19 @@ var disableUserAgentHeader = false
 
 func init() {
 
-	if val, ok := util.GetEnvVarInt("HTTP_TRANSPORT_MAX_IDLE_CONNS_PER_HOST"); ok {
+	if val, ok := envvar.Int("HTTP_TRANSPORT_MAX_IDLE_CONNS_PER_HOST"); ok {
 		httpTransportMaxIdleConnsPerHost = val
 	}
 
-	if val, ok := util.GetEnvVarInt("HTTP_TRANSPORT_MAX_IDLE_CONNS"); ok {
+	if val, ok := envvar.Int("HTTP_TRANSPORT_MAX_IDLE_CONNS"); ok {
 		httpTransportMaxIdleConns = val
 	}
 
-	if val, ok := util.GetEnvVarDuration("HTTP_TRANSPORT_IDLE_CONN_TIMEOUT"); ok {
+	if val, ok := envvar.Duration("HTTP_TRANSPORT_IDLE_CONN_TIMEOUT"); ok {
 		httpTransportIdleConnTimeout = val
 	}
 
-	if val, ok := util.GetEnvVarBool("DISABLE_MAX_USER_AGENT_HEADER"); ok {
+	if val, ok := envvar.Bool("DISABLE_MAX_USER_AGENT_HEADER"); ok {
 		disableUserAgentHeader = val
 	}
 }
