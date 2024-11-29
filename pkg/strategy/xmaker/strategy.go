@@ -795,7 +795,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	makerQuota := &bbgo.QuotaTransaction{}
 	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
-		if s.makerMarket.IsDustQuantity(b.Available, s.lastPrice.Get()) {
+		if b.Available.Sign() < 0 || b.Available.IsZero() || s.makerMarket.IsDustQuantity(b.Available, s.lastPrice.Get()) {
 			disableMakerAsk = true
 			s.logger.Infof("%s maker ask disabled: insufficient base balance %s", s.Symbol, b.String())
 		} else {
