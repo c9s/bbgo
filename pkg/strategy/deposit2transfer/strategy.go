@@ -260,6 +260,8 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 				if s.AutoRepay && s.marginBorrowRepayService != nil {
 					s.logger.Infof("autoRepay is enabled, repaying %s %s...", amount.String(), d.Asset)
 
+					time.Sleep(3 * time.Second)
+
 					if err2 := s.repay(ctx, d, amount); err2 != nil {
 						s.logger.WithError(err2).Errorf("unable to repay the margin asset")
 					}
