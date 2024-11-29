@@ -24,10 +24,7 @@ exchangeStrategies:
 
       positionHardLimit: 1500
       maxPositionQuantity: 1500
-      circuitBreakLossThreshold: -0.15
-      circuitBreakEMA:
-        interval: 1m
-        window: 14
+      circuitBreakLossThreshold: 0.15
 
       inventorySkew:
         inventoryRangeMultiplier: 1.0

@@ -14,10 +14,9 @@ import (
 )
 
 type RiskController struct {
-	PositionHardLimit         fixedpoint.Value     `json:"positionHardLimit"`
-	MaxPositionQuantity       fixedpoint.Value     `json:"maxPositionQuantity"`
-	CircuitBreakLossThreshold fixedpoint.Value     `json:"circuitBreakLossThreshold"`
-	CircuitBreakEMA           types.IntervalWindow `json:"circuitBreakEMA"`
+	PositionHardLimit         fixedpoint.Value `json:"positionHardLimit"`
+	MaxPositionQuantity       fixedpoint.Value `json:"maxPositionQuantity"`
+	CircuitBreakLossThreshold fixedpoint.Value `json:"circuitBreakLossThreshold"`
 
 	positionRiskControl     *riskcontrol.PositionRiskControl
 	circuitBreakRiskControl *circuitbreaker.BasicCircuitBreaker
@@ -81,7 +80,12 @@ func (s *Strategy) Initialize(
 
 	if !s.CircuitBreakLossThreshold.IsZero() {
 		log.Infof("circuitBreakLossThreshold is configured, setting up CircuitBreakRiskControl...")
-		s.circuitBreakRiskControl = circuitbreaker.NewBasicCircuitBreaker(strategyID, instanceID, market.Symbol)
+		s.circuitBreakRiskControl = &circuitbreaker.BasicCircuitBreaker{
+			Enabled:          true,
+			MaximumTotalLoss: s.CircuitBreakLossThreshold,
+			HaltDuration:     types.Duration(24 * time.Hour),
+		}
+		s.circuitBreakRiskControl.SetMetricsInfo(strategyID, instanceID, market.Symbol)
 
 		s.OrderExecutor.TradeCollector().OnProfit(func(trade types.Trade, profit *types.Profit) {
 			if profit != nil && s.circuitBreakRiskControl != nil {
