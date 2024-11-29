@@ -165,7 +165,7 @@ func (s *Stream) handleConnect() {
 			filters = s.privateChannels
 		} else {
 			if s.MarginSettings.IsMargin {
-				filters = PrivateChannelStrings(PrivateChannelKeys(AllMarginPrivateChannels))
+				filters = PrivateChannelStrings(defaultMarginPrivateChannels)
 			} else {
 				filters = PrivateChannelStrings(defaultSpotPrivateChannels)
 			}
