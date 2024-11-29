@@ -272,6 +272,14 @@ func (s *Strategy) checkDeposits(ctx context.Context) {
 }
 
 func (s *Strategy) repay(ctx context.Context, d types.Deposit, amount fixedpoint.Value) error {
+	if amount.IsZero() {
+		return nil
+	}
+
+	if amount.Sign() < 0 {
+		return fmt.Errorf("invalid repay amount: %s", amount.String())
+	}
+
 	if !s.session.Margin {
 		return fmt.Errorf("session does not support margin")
 	}
