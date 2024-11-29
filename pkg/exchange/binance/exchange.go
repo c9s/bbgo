@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -56,17 +57,17 @@ func init() {
 	_ = types.MarginExchange(&Exchange{})
 	_ = types.FuturesExchange(&Exchange{})
 
-	if n, ok := util.GetEnvVarInt("BINANCE_ORDER_RATE_LIMITER"); ok {
+	if n, ok := envvar.Int("BINANCE_ORDER_RATE_LIMITER"); ok {
 		orderLimiter = rate.NewLimiter(rate.Every(time.Duration(n)*time.Minute), 2)
 	}
 
-	if n, ok := util.GetEnvVarInt("BINANCE_QUERY_TRADES_RATE_LIMITER"); ok {
+	if n, ok := envvar.Int("BINANCE_QUERY_TRADES_RATE_LIMITER"); ok {
 		queryTradeLimiter = rate.NewLimiter(rate.Every(time.Duration(n)*time.Minute), 2)
 	}
 }
 
 func isBinanceUs() bool {
-	v, ok := util.GetEnvVarBool("BINANCE_US")
+	v, ok := envvar.Bool("BINANCE_US")
 	return ok && v
 }
 
