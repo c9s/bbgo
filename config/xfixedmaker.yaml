@@ -41,10 +41,7 @@ crossExchangeStrategies:
       positionHardLimit: 200
       maxPositionQuantity: 0.005
 
-      circuitBreakLossThreshold: -10
-      circuitBreakEMA:
-        interval: 1m
-        window: 14
+      circuitBreakLossThreshold: 10
 
       inventorySkew:
         inventoryRangeMultiplier: 1.0
