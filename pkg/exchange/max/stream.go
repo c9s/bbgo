@@ -98,9 +98,9 @@ func (s *Stream) SetPrivateChannels(channels []string) {
 		}
 
 		switch ch {
-		case PrivateChannelTradeFastUpdate, PrivateChannelTradeUpdate:
+		case PrivateChannelFastTradeUpdate, PrivateChannelTradeUpdate, PrivateChannelMWalletTrade, PrivateChannelMWalletFastTradeUpdate:
 			tradeUpdate++
-			if ch == PrivateChannelTradeFastUpdate {
+			if ch == PrivateChannelFastTradeUpdate || ch == PrivateChannelMWalletFastTradeUpdate {
 				fastTrade = true
 			}
 		}
