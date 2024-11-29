@@ -809,7 +809,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	if b, ok := makerBalances[s.makerMarket.QuoteCurrency]; ok {
 		if b.Available.Compare(s.makerMarket.MinNotional) > 0 {
 			if s.MaxQuoteQuotaRatio.Sign() > 0 {
-				quoteAvailable := b.Available.Mul(s.MaxQuoteQuotaRatio)
+				quoteAvailable := b.Total().Mul(s.MaxQuoteQuotaRatio)
 				makerQuota.QuoteAsset.Add(quoteAvailable)
 			} else {
 				// use all quote balances as much as possible
