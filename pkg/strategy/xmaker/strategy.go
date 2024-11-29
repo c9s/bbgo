@@ -1098,7 +1098,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				makerQuota.Commit()
 				hedgeQuota.Commit()
 
-				askExposureInUsd = askExposureInUsd.Add(askQuantity.Mul(askPrice))
+				askExposureInUsd = askExposureInUsd.Add(requiredBase)
 			} else {
 				makerQuota.Rollback()
 				hedgeQuota.Rollback()
