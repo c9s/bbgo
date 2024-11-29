@@ -795,7 +795,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	makerQuota := &bbgo.QuotaTransaction{}
 	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
-		if b.Available.Sign() < 0 || b.Available.IsZero() || s.makerMarket.IsDustQuantity(b.Available, s.lastPrice.Get()) {
+		if b.Available.Sign() <= 0 || s.makerMarket.IsDustQuantity(b.Available, s.lastPrice.Get()) {
 			disableMakerAsk = true
 			s.logger.Infof("%s maker ask disabled: insufficient base balance %s", s.Symbol, b.String())
 		} else {
@@ -1029,6 +1029,10 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			bidQuantity = s.makerMarket.TruncateQuantity(requiredQuote.Div(bidPrice))
 
+			if bidQuantity.Sign() <= 0 {
+				continue
+			}
+
 			// if we bought, then we need to sell the base from the hedge session
 			// if the hedge session is a margin session, we don't need to lock the base asset
 			if makerQuota.QuoteAsset.Lock(requiredQuote) &&
@@ -1085,6 +1089,10 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
 			askQuantity = requiredBase
+			if askQuantity.Sign() <= 0 {
+				continue
+			}
+
 			if makerQuota.BaseAsset.Lock(requiredBase) &&
 				(s.sourceSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice))) {
 
