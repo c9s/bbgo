@@ -8,6 +8,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+func String(n string, args ...string) (string, bool) {
+	defaultValue := ""
+	if len(args) > 0 {
+		defaultValue = args[0]
+	}
+
+	str, ok := os.LookupEnv(n)
+	if !ok {
+		return defaultValue, false
+	}
+
+	return str, true
+}
+
 func Duration(n string, args ...time.Duration) (time.Duration, bool) {
 	defaultValue := time.Duration(0)
 	if len(args) > 0 {
