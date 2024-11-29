@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/livenote"
+	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -41,12 +42,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-type SlackAlert struct {
-	Channel  string   `json:"channel"`
-	Mentions []string `json:"mentions"`
-	Pin      bool     `json:"pin"`
-}
-
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -60,7 +55,7 @@ type Strategy struct {
 
 	AutoRepay bool `json:"autoRepay"`
 
-	SlackAlert *SlackAlert `json:"slackAlert"`
+	SlackAlert *envvar.SlackAlert `json:"slackAlert"`
 
 	marginTransferService    marginTransferService
 	marginBorrowRepayService types.MarginBorrowRepayService
