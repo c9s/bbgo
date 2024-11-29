@@ -1035,6 +1035,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
+					Market:      s.makerMarket,
 					Type:        types.OrderTypeLimit,
 					Side:        types.SideTypeBuy,
 					Price:       bidPrice,
@@ -1082,7 +1083,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
 			if makerQuota.BaseAsset.Lock(requiredBase) &&
-				(s.sourceSession.Margin || hedgeQuota.BaseAsset.Lock(requiredBase)) {
+				(s.sourceSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice))) {
 
 				// if we bought, then we need to sell the base from the hedge session
 				submitOrders = append(submitOrders, types.SubmitOrder{
@@ -1098,7 +1099,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				makerQuota.Commit()
 				hedgeQuota.Commit()
 
-				askExposureInUsd = askExposureInUsd.Add(requiredBase)
+				askExposureInUsd = askExposureInUsd.Add(requiredBase.Mul(askPrice))
 			} else {
 				makerQuota.Rollback()
 				hedgeQuota.Rollback()
