@@ -795,7 +795,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	makerQuota := &bbgo.QuotaTransaction{}
 	if b, ok := makerBalances[s.makerMarket.BaseCurrency]; ok {
-		if b.Available.Sign() <= 0 || s.makerMarket.IsDustQuantity(b.Available, s.lastPrice.Get()) {
+		if s.makerMarket.IsDustQuantity(b.Available, s.lastPrice.Get()) {
 			disableMakerAsk = true
 			s.logger.Infof("%s maker ask disabled: insufficient base balance %s", s.Symbol, b.String())
 		} else {
@@ -1029,7 +1029,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			bidQuantity = s.makerMarket.TruncateQuantity(requiredQuote.Div(bidPrice))
 
-			if bidQuantity.Sign() <= 0 {
+			if s.makerMarket.IsDustQuantity(bidQuantity, bidPrice) {
 				continue
 			}
 
@@ -1089,7 +1089,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
 			askQuantity = requiredBase
-			if askQuantity.Sign() <= 0 {
+
+			if s.makerMarket.IsDustQuantity(askQuantity, askPrice) {
 				continue
 			}
 
@@ -1214,7 +1215,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 			return false, nil
 		}
 
-		if qty.IsZero() || s.makerMarket.IsDustQuantity(qty, sumPv.Price) {
+		if s.makerMarket.IsDustQuantity(qty, sumPv.Price) {
 			return false, nil
 		}
 
@@ -1247,7 +1248,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 			return false, nil
 		}
 
-		if qty.IsZero() || s.makerMarket.IsDustQuantity(qty, sumPv.Price) {
+		if s.makerMarket.IsDustQuantity(qty, sumPv.Price) {
 			return false, nil
 		}
 
