@@ -1027,6 +1027,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				makerQuota.QuoteAsset.Available,
 			)
 
+			requiredQuote = s.makerMarket.TruncateQuoteQuantity(requiredQuote)
 			bidQuantity = s.makerMarket.TruncateQuantity(requiredQuote.Div(bidPrice))
 
 			if s.makerMarket.IsDustQuantity(bidQuantity, bidPrice) {
@@ -1088,7 +1089,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			}
 
 			requiredBase := fixedpoint.Min(askQuantity, makerQuota.BaseAsset.Available)
-			askQuantity = requiredBase
+			askQuantity = s.makerMarket.TruncateQuantity(requiredBase)
 
 			if s.makerMarket.IsDustQuantity(askQuantity, askPrice) {
 				continue
