@@ -448,7 +448,7 @@ Write your own strategy in the strategy file:
 vim strategy.go
 ```
 
-You can grab the skeleton strategy from <https://github.com/c9s/bbgo/blob/main/pkg/strategy/skeleton/strategy.go>
+You can grab the skeleton strategy from <https://github.com/c9s/bbgo/blob/main/pkg/strategy/example/skeleton/strategy.go>
 
 Now add your config:
 
