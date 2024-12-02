@@ -22,10 +22,7 @@ func TestBalanceDeviationDetector(t *testing.T) {
 	now := time.Now()
 
 	// Add a balance record within tolerance
-	reset, sustainedDuration := detector.AddRecord(
-		types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(10.05)},
-		now,
-	)
+	reset, sustainedDuration := detector.AddRecord(now, types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(10.05)})
 	if reset {
 		t.Errorf("Expected no sustained deviation for value within tolerance")
 	}
@@ -34,10 +31,7 @@ func TestBalanceDeviationDetector(t *testing.T) {
 	}
 
 	// Add a balance record outside tolerance
-	reset, sustainedDuration = detector.AddRecord(
-		types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(11.0)},
-		now.Add(2*time.Minute),
-	)
+	reset, sustainedDuration = detector.AddRecord(now.Add(2*time.Minute), types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(11.0)})
 	if reset {
 		t.Errorf("Expected no sustained deviation initially")
 	}
@@ -46,10 +40,7 @@ func TestBalanceDeviationDetector(t *testing.T) {
 	}
 
 	// Add another record exceeding duration
-	reset, sustainedDuration = detector.AddRecord(
-		types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(11.5)},
-		now.Add(6*time.Minute),
-	)
+	reset, sustainedDuration = detector.AddRecord(now.Add(6*time.Minute), types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(11.5)})
 	if !reset {
 		t.Errorf("Expected reset to be true")
 	}
@@ -72,10 +63,7 @@ func TestBalanceRecordTracking(t *testing.T) {
 	now := time.Now()
 
 	// Add a balance record outside tolerance
-	_, _ = detector.AddRecord(
-		types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(11.0)},
-		now,
-	)
+	_, _ = detector.AddRecord(now, types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(11.0)})
 
 	// Check if record is being tracked
 	records := detector.GetRecords()
@@ -84,20 +72,14 @@ func TestBalanceRecordTracking(t *testing.T) {
 	}
 
 	// Add another record
-	_, _ = detector.AddRecord(
-		types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(11.5)},
-		now.Add(2*time.Minute),
-	)
+	_, _ = detector.AddRecord(now.Add(2*time.Minute), types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(11.5)})
 	records = detector.GetRecords()
 	if len(records) != 2 {
 		t.Errorf("Expected 2 records, got %d", len(records))
 	}
 
 	// Add a balance record within tolerance to reset
-	_, _ = detector.AddRecord(
-		types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(10.05)},
-		now.Add(4*time.Minute),
-	)
+	_, _ = detector.AddRecord(now.Add(4*time.Minute), types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(10.05)})
 	records = detector.GetRecords()
 	if len(records) != 0 {
 		t.Errorf("Expected records to be cleared, got %d", len(records))

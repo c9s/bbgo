@@ -55,7 +55,7 @@ type Strategy struct {
 
 	AutoRepay bool `json:"autoRepay"`
 
-	SlackAlert *envvar.SlackAlert `json:"slackAlert"`
+	SlackAlert *slackalert.SlackAlert `json:"slackAlert"`
 
 	marginTransferService    marginTransferService
 	marginBorrowRepayService types.MarginBorrowRepayService

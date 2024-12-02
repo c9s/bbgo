@@ -12,13 +12,14 @@ import (
 )
 
 type MarginLevelAlertConfig struct {
-	slackalert.SlackAlert
-	Interval  types.Duration   `json:"interval"`
-	MinMargin fixedpoint.Value `json:"minMargin"`
+	Slack     *slackalert.SlackAlert `json:"slack"`
+	Interval  types.Duration         `json:"interval"`
+	MinMargin fixedpoint.Value       `json:"minMargin"`
 }
 
 // MarginLevelAlert is used to send the slack mention alerts when the current margin is less than the required margin level
 type MarginLevelAlert struct {
+	SlackAlert         *slackalert.SlackAlert
 	CurrentMarginLevel fixedpoint.Value
 	MinimalMarginLevel fixedpoint.Value
 	SlackMentions      []string

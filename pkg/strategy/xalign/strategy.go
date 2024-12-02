@@ -16,6 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/pricesolver"
+	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/strategy/xalign/detector"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -39,16 +40,18 @@ type QuoteCurrencyPreference struct {
 	Sell []string `json:"sell"`
 }
 
-type AmountAlertConfig struct {
+type LargeAmountAlertConfig struct {
+	Slack *slackalert.SlackAlert `json:"slack"`
+
 	QuoteCurrency string           `json:"quoteCurrency"`
 	Amount        fixedpoint.Value `json:"amount"`
-	SlackMentions []string         `json:"slackMentions"`
 }
 
 type LargeAmountAlert struct {
+	SlackAlert *slackalert.SlackAlert
+
 	QuoteCurrency string
 	AlertAmount   fixedpoint.Value
-	SlackMentions []string
 
 	BaseCurrency string
 	Side         types.SideType
@@ -62,7 +65,7 @@ func (m *LargeAmountAlert) SlackAttachment() slack.Attachment {
 		Color: "red",
 		Title: fmt.Sprintf("xalign amount alert - try to align %s with quote %s amount %f > %f",
 			m.BaseCurrency, m.QuoteCurrency, m.Amount.Float64(), m.AlertAmount.Float64()),
-		Text: strings.Join(m.SlackMentions, " "),
+		Text: strings.Join(m.SlackAlert.Mentions, " "),
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Base Currency",
@@ -99,13 +102,11 @@ type Strategy struct {
 	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
 	Duration                 types.Duration              `json:"for"`
 	MaxAmounts               map[string]fixedpoint.Value `json:"maxAmounts"`
-	LargeAmountAlert         *AmountAlertConfig          `json:"largeAmountAlert"`
+	LargeAmountAlert         *LargeAmountAlertConfig     `json:"largeAmountAlert"`
 
 	SlackNotify                bool             `json:"slackNotify"`
 	SlackNotifyMentions        []string         `json:"slackNotifyMentions"`
 	SlackNotifyThresholdAmount fixedpoint.Value `json:"slackNotifyThresholdAmount,omitempty"`
-
-	faultBalanceRecords map[string][]TimeBalance
 
 	deviationDetectors map[string]*detector.DeviationDetector[types.Balance]
 
@@ -446,10 +447,8 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	instanceID := s.InstanceID()
 	_ = instanceID
 
-	s.faultBalanceRecords = make(map[string][]TimeBalance)
 	s.sessions = make(map[string]*bbgo.ExchangeSession)
 	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
-
 	s.orderStore = core.NewOrderStore("")
 
 	for currency, expectedValue := range s.ExpectedBalances {
@@ -521,24 +520,22 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 }
 
 func (s *Strategy) resetFaultBalanceRecords(currency string) {
-	s.faultBalanceRecords[currency] = nil
+	if d, ok := s.deviationDetectors[currency]; ok {
+		d.ClearRecords()
+	}
 }
 
 func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
 	now := time.Now()
-	for currency, expectedBalance := range s.ExpectedBalances {
-		q := s.calculateRefillQuantity(totalBalances, currency, expectedBalance)
-		rf := q.Div(expectedBalance).Abs().Float64()
-		tr := s.BalanceToleranceRange.Float64()
-		if rf > tr {
-			balance := totalBalances[currency]
-			s.faultBalanceRecords[currency] = append(s.faultBalanceRecords[currency], TimeBalance{
-				Time:    now,
-				Balance: balance,
-			})
-		} else {
-			// reset counter
-			s.resetFaultBalanceRecords(currency)
+
+	for currency := range s.ExpectedBalances {
+		balance, hasBal := totalBalances[currency]
+		if d, ok := s.deviationDetectors[currency]; ok {
+			if hasBal {
+				d.AddRecord(now, balance)
+			} else {
+				d.AddRecord(now, types.NewZeroBalance(currency))
+			}
 		}
 	}
 }
@@ -599,17 +596,19 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 	s.recordBalance(totalBalances)
 
+	log.Debugf("checking all fault balance records...")
 	for currency, expectedBalance := range s.ExpectedBalances {
 		q := s.calculateRefillQuantity(totalBalances, currency, expectedBalance)
 
-		if s.Duration > 0 {
-			log.Infof("checking %s fault balance records...", currency)
-			if faultBalance, ok := s.faultBalanceRecords[currency]; ok && len(faultBalance) > 0 {
-				if time.Since(faultBalance[0].Time) < s.Duration.Duration() {
-					log.Infof("%s fault record since: %s < persistence period %s", currency, faultBalance[0].Time, s.Duration.Duration())
-					continue
-				}
+		log.Debugf("checking %s fault balance records...", currency)
+
+		if d, ok := s.deviationDetectors[currency]; ok {
+			should, sustainedDuration := d.ShouldFix()
+			if !should {
+				continue
 			}
+
+			log.Infof("%s sustained deviation for %s...", currency, sustainedDuration)
 		}
 
 		if s.LargeAmountAlert != nil {
@@ -619,9 +618,9 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 				log.Infof("resolved price for currency: %s, price: %f, quantity: %f, amount: %f", currency, price.Float64(), quantity.Float64(), amount.Float64())
 				if amount.Compare(s.LargeAmountAlert.Amount) > 0 {
 					alert := &LargeAmountAlert{
+						SlackAlert:    s.LargeAmountAlert.Slack,
 						QuoteCurrency: s.LargeAmountAlert.QuoteCurrency,
 						AlertAmount:   s.LargeAmountAlert.Amount,
-						SlackMentions: s.LargeAmountAlert.SlackMentions,
 						BaseCurrency:  currency,
 						Price:         price,
 						Quantity:      quantity,
