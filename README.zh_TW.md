@@ -416,7 +416,7 @@ go get github.com/c9s/bbgo@main
 vim strategy.go
 ```
 
-您可以從 <https://github.com/c9s/bbgo/blob/main/pkg/strategy/skeleton/strategy.go> 獲取策略骨架。 現在添加您的配置
+您可以從 <https://github.com/c9s/bbgo/blob/main/pkg/strategy/example/skeleton/strategy.go> 獲取策略骨架。 現在添加您的配置
 
 ```sh
 mkdir config
