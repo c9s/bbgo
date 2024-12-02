@@ -13,18 +13,17 @@ type Record[T any] struct {
 
 type DeviationDetector[T any] struct {
 	mu            sync.Mutex
-	records       map[string][]Record[T] // Stores records for different keys
-	expectedValue T                      // Expected value for comparison
-	tolerance     float64                // Tolerance percentage (e.g., 0.01 for 1%)
-	duration      time.Duration          // Time limit for sustained deviation
-	toFloat64     func(T) float64        // Function to convert T to float64
+	expectedValue T               // Expected value for comparison
+	tolerance     float64         // Tolerance percentage (e.g., 0.01 for 1%)
+	duration      time.Duration   // Time limit for sustained deviation
+	toFloat64     func(T) float64 // Function to convert T to float64
+	records       []Record[T]     // Tracks deviation records
 }
 
 // NewDeviationDetector creates a new instance of DeviationDetector
 func NewDeviationDetector[T any](
 	expectedValue T, tolerance float64, duration time.Duration, toFloat64 func(T) float64,
 ) *DeviationDetector[T] {
-	// If no conversion function is provided and T is float64, use the default converter
 	if toFloat64 == nil {
 		if _, ok := any(expectedValue).(float64); ok {
 			toFloat64 = func(value T) float64 {
@@ -36,16 +35,15 @@ func NewDeviationDetector[T any](
 	}
 
 	return &DeviationDetector[T]{
-		records:       make(map[string][]Record[T]),
 		expectedValue: expectedValue,
 		tolerance:     tolerance,
 		duration:      duration,
 		toFloat64:     toFloat64,
+		records:       nil,
 	}
 }
 
-// AddRecord adds a new record and checks deviation status
-func (d *DeviationDetector[T]) AddRecord(key string, value T, at time.Time) (bool, time.Duration) {
+func (d *DeviationDetector[T]) AddRecord(value T, at time.Time) (bool, time.Duration) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -56,58 +54,38 @@ func (d *DeviationDetector[T]) AddRecord(key string, value T, at time.Time) (boo
 
 	// Reset records if deviation is within tolerance
 	if deviationPercentage <= d.tolerance {
-		delete(d.records, key)
+		d.records = nil
 		return false, 0
 	}
 
 	// If deviation exceeds tolerance, track the record
-	records, exists := d.records[key]
-	if !exists {
+	if len(d.records) == 0 {
 		// No prior deviation, start tracking
-		d.records[key] = []Record[T]{{Value: value, Time: at}}
+		d.records = []Record[T]{{Value: value, Time: at}}
 		return false, 0
 	}
 
-	// If deviation already being tracked, append the new record
-	d.records[key] = append(records, Record[T]{Value: value, Time: at})
+	// Append new record
+	d.records = append(d.records, Record[T]{Value: value, Time: at})
 
-	// Calculate the duration of sustained deviation
-	firstRecord := records[0]
+	// Calculate the sustained duration
+	firstRecord := d.records[0]
 	sustainedDuration := at.Sub(firstRecord.Time)
 	return sustainedDuration >= d.duration, sustainedDuration
 }
 
-// GetRecords retrieves all records associated with the specified key
-func (d *DeviationDetector[T]) GetRecords(key string) []Record[T] {
+// GetRecords retrieves all deviation records
+func (d *DeviationDetector[T]) GetRecords() []Record[T] {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	if records, exists := d.records[key]; exists {
-		return records
-	}
-	return nil
+	return append([]Record[T](nil), d.records...) // Return a copy of the records
 }
 
-// ClearRecords removes all records associated with the specified key
-func (d *DeviationDetector[T]) ClearRecords(key string) {
+// ClearRecords clears all deviation records
+func (d *DeviationDetector[T]) ClearRecords() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	delete(d.records, key)
-}
-
-// PruneOldRecords removes records that are older than the specified duration
-func (d *DeviationDetector[T]) PruneOldRecords(now time.Time) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	for key, records := range d.records {
-		prunedRecords := make([]Record[T], 0)
-		for _, record := range records {
-			if now.Sub(record.Time) <= d.duration {
-				prunedRecords = append(prunedRecords, record)
-			}
-		}
-		d.records[key] = prunedRecords
-	}
+	d.records = nil
 }
