@@ -16,6 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/pricesolver"
+	"github.com/c9s/bbgo/pkg/strategy/xalign/detector"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -105,6 +106,8 @@ type Strategy struct {
 	SlackNotifyThresholdAmount fixedpoint.Value `json:"slackNotifyThresholdAmount,omitempty"`
 
 	faultBalanceRecords map[string][]TimeBalance
+
+	detector detector.Record[fixedpoint.Value]
 
 	priceResolver *pricesolver.SimplePriceSolver
 
