@@ -3,7 +3,6 @@ package autoborrow
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -12,6 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -44,73 +44,7 @@ func init() {
     maxTotalBorrow: 10.0
 */
 
-// MarginAlert is used to send the slack mention alerts when the current margin is less than the required margin level
-type MarginAlert struct {
-	CurrentMarginLevel fixedpoint.Value
-	MinimalMarginLevel fixedpoint.Value
-	SlackMentions      []string
-	SessionName        string
-}
-
-func (m *MarginAlert) SlackAttachment() slack.Attachment {
-	return slack.Attachment{
-		Color: "red",
-		Title: fmt.Sprintf("Margin Level Alert: %s session - current margin level %f < required margin level %f",
-			m.SessionName, m.CurrentMarginLevel.Float64(), m.MinimalMarginLevel.Float64()),
-		Text: strings.Join(m.SlackMentions, " "),
-		Fields: []slack.AttachmentField{
-			{
-				Title: "Session",
-				Value: m.SessionName,
-				Short: true,
-			},
-			{
-				Title: "Current Margin Level",
-				Value: m.CurrentMarginLevel.String(),
-				Short: true,
-			},
-			{
-				Title: "Minimal Margin Level",
-				Value: m.MinimalMarginLevel.String(),
-				Short: true,
-			},
-		},
-		// Footer:     "",
-		// FooterIcon: "",
-	}
-}
-
-// RepaidAlert
-type RepaidAlert struct {
-	SessionName   string
-	Asset         string
-	Amount        fixedpoint.Value
-	SlackMentions []string
-}
-
-func (m *RepaidAlert) SlackAttachment() slack.Attachment {
-	return slack.Attachment{
-		Color: "red",
-		Title: fmt.Sprintf("Margin Repaid on %s session", m.SessionName),
-		Text:  strings.Join(m.SlackMentions, " "),
-		Fields: []slack.AttachmentField{
-			{
-				Title: "Session",
-				Value: m.SessionName,
-				Short: true,
-			},
-			{
-				Title: "Asset",
-				Value: m.Amount.String() + " " + m.Asset,
-				Short: true,
-			},
-		},
-		// Footer:     "",
-		// FooterIcon: "",
-	}
-}
-
-type MarginAsset struct {
+type MarginAssetConfig struct {
 	Asset                string           `json:"asset"`
 	Low                  fixedpoint.Value `json:"low"`
 	MaxTotalBorrow       fixedpoint.Value `json:"maxTotalBorrow"`
@@ -119,26 +53,16 @@ type MarginAsset struct {
 	DebtRatio            fixedpoint.Value `json:"debtRatio"`
 }
 
-type MarginLevelAlert struct {
-	Interval      types.Duration   `json:"interval"`
-	MinMargin     fixedpoint.Value `json:"minMargin"`
-	SlackMentions []string         `json:"slackMentions"`
-}
-
-type MarginRepayAlert struct {
-	SlackMentions []string `json:"slackMentions"`
-}
-
 type Strategy struct {
 	Interval             types.Interval   `json:"interval"`
 	MinMarginLevel       fixedpoint.Value `json:"minMarginLevel"`
 	MaxMarginLevel       fixedpoint.Value `json:"maxMarginLevel"`
 	AutoRepayWhenDeposit bool             `json:"autoRepayWhenDeposit"`
 
-	MarginLevelAlert *MarginLevelAlert `json:"marginLevelAlert"`
-	MarginRepayAlert *MarginRepayAlert `json:"marginRepayAlert"`
+	MarginLevelAlert *MarginLevelAlertConfig `json:"marginLevelAlert"`
+	MarginRepayAlert *slackalert.SlackAlert  `json:"marginRepayAlert"`
 
-	Assets []MarginAsset `json:"assets"`
+	Assets []MarginAssetConfig `json:"assets"`
 
 	ExchangeSession *bbgo.ExchangeSession
 
@@ -201,7 +125,7 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 				SessionName:   s.ExchangeSession.Name,
 				Asset:         b.Currency,
 				Amount:        toRepay,
-				SlackMentions: s.MarginRepayAlert.SlackMentions,
+				SlackMentions: s.MarginRepayAlert.Mentions,
 			})
 		}
 
@@ -310,7 +234,7 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 				SessionName:   s.ExchangeSession.Name,
 				Asset:         b.Currency,
 				Amount:        toRepay,
-				SlackMentions: s.MarginRepayAlert.SlackMentions,
+				SlackMentions: s.MarginRepayAlert.Mentions,
 			})
 		}
 
@@ -667,7 +591,7 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 			case <-ticker.C:
 				account := s.ExchangeSession.GetAccount()
 				if s.MarginLevelAlert != nil && account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0 {
-					bbgo.Notify(&MarginAlert{
+					bbgo.Notify(&MarginLevelAlert{
 						CurrentMarginLevel: account.MarginLevel,
 						MinimalMarginLevel: s.MarginLevelAlert.MinMargin,
 						SlackMentions:      s.MarginLevelAlert.SlackMentions,

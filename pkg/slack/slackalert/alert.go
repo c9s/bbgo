@@ -1,4 +1,4 @@
-package envvar
+package slackalert
 
 type SlackAlert struct {
 	Channel  string   `json:"channel"`
