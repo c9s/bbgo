@@ -7,13 +7,14 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 type MarginLevelAlertConfig struct {
-	Interval      types.Duration   `json:"interval"`
-	MinMargin     fixedpoint.Value `json:"minMargin"`
-	SlackMentions []string         `json:"slackMentions"`
+	slackalert.SlackAlert
+	Interval  types.Duration   `json:"interval"`
+	MinMargin fixedpoint.Value `json:"minMargin"`
 }
 
 // MarginLevelAlert is used to send the slack mention alerts when the current margin is less than the required margin level
