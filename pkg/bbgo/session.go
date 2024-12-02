@@ -69,6 +69,12 @@ type ExchangeSession struct {
 	IsolatedFutures       bool   `json:"isolatedFutures,omitempty" yaml:"isolatedFutures,omitempty"`
 	IsolatedFuturesSymbol string `json:"isolatedFuturesSymbol,omitempty" yaml:"isolatedFuturesSymbol,omitempty"`
 
+	// AccountName is used for labeling the account name of the session
+	AccountName string `json:"accountName,omitempty" yaml:"accountName,omitempty"`
+
+	// AccountOwner is used for labeling the account owner of the session
+	AccountOwner string `json:"accountOwner,omitempty" yaml:"accountOwner,omitempty"`
+
 	// ---------------------------
 	// Runtime fields
 	// ---------------------------
