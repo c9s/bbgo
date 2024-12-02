@@ -107,7 +107,7 @@ type Strategy struct {
 
 	faultBalanceRecords map[string][]TimeBalance
 
-	detector detector.Record[fixedpoint.Value]
+	deviationDetectors map[string]*detector.DeviationDetector[types.Balance]
 
 	priceResolver *pricesolver.SimplePriceSolver
 
@@ -141,12 +141,20 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) Defaults() error {
-	s.BalanceToleranceRange = fixedpoint.NewFromFloat(0.01)
+	if s.BalanceToleranceRange == fixedpoint.Zero {
+		s.BalanceToleranceRange = fixedpoint.NewFromFloat(0.01)
+	}
+
+	if s.Duration == 0 {
+		s.Duration = types.Duration(15 * time.Minute)
+	}
+
 	return nil
 }
 
 func (s *Strategy) Initialize() error {
 	s.activeTransferNotificationLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
+	s.deviationDetectors = make(map[string]*detector.DeviationDetector[types.Balance])
 	return nil
 }
 
@@ -443,6 +451,17 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
 
 	s.orderStore = core.NewOrderStore("")
+
+	for currency, expectedValue := range s.ExpectedBalances {
+		s.deviationDetectors[currency] = detector.NewDeviationDetector(
+			types.Balance{Currency: currency, NetAsset: expectedValue}, // Expected value
+			s.BalanceToleranceRange.Float64(),                          // Tolerance (1%)
+			s.Duration.Duration(),                                      // Duration for sustained deviation
+			func(b types.Balance) float64 {
+				return b.Net().Float64()
+			},
+		)
+	}
 
 	markets := types.MarketMap{}
 	for _, sessionName := range s.PreferredSessions {

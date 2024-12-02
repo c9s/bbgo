@@ -45,8 +45,11 @@ func (b Balance) Total() fixedpoint.Value {
 
 // Net returns the net asset value (total - debt)
 func (b Balance) Net() fixedpoint.Value {
-	total := b.Total()
-	return total.Sub(b.Debt())
+	if !b.NetAsset.IsZero() {
+		return b.NetAsset
+	}
+
+	return b.Total().Sub(b.Debt())
 }
 
 func (b Balance) Debt() fixedpoint.Value {
