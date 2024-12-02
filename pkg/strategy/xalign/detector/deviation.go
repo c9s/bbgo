@@ -4,6 +4,8 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Record[T any] struct {
@@ -18,6 +20,8 @@ type DeviationDetector[T any] struct {
 	duration      time.Duration   // Time limit for sustained deviation
 	toFloat64     func(T) float64 // Function to convert T to float64
 	records       []Record[T]     // Tracks deviation records
+
+	logger logrus.FieldLogger
 }
 
 // NewDeviationDetector creates a new instance of DeviationDetector
@@ -34,23 +38,33 @@ func NewDeviationDetector[T any](
 		}
 	}
 
+	logger := logrus.New()
+	// logger.SetLevel(logrus.ErrorLevel)
+	logger.SetLevel(logrus.DebugLevel)
 	return &DeviationDetector[T]{
 		expectedValue: expectedValue,
 		tolerance:     tolerance,
 		duration:      duration,
 		toFloat64:     toFloat64,
 		records:       nil,
+		logger:        logger,
 	}
 }
 
-func (d *DeviationDetector[T]) AddRecord(value T, at time.Time) (bool, time.Duration) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+func (d *DeviationDetector[T]) SetLogger(logger logrus.FieldLogger) {
+	d.logger = logger
+}
 
+func (d *DeviationDetector[T]) AddRecord(at time.Time, value T) (bool, time.Duration) {
 	// Calculate deviation percentage
 	expected := d.toFloat64(d.expectedValue)
 	current := d.toFloat64(value)
 	deviationPercentage := math.Abs((current - expected) / expected)
+
+	d.logger.Infof("deviation detection: expected=%f, current=%f, deviation=%f", expected, current, deviationPercentage)
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
 	// Reset records if deviation is within tolerance
 	if deviationPercentage <= d.tolerance {
@@ -58,19 +72,30 @@ func (d *DeviationDetector[T]) AddRecord(value T, at time.Time) (bool, time.Dura
 		return false, 0
 	}
 
+	record := Record[T]{Value: value, Time: at}
+
 	// If deviation exceeds tolerance, track the record
 	if len(d.records) == 0 {
 		// No prior deviation, start tracking
-		d.records = []Record[T]{{Value: value, Time: at}}
+		d.records = []Record[T]{record}
 		return false, 0
 	}
 
 	// Append new record
-	d.records = append(d.records, Record[T]{Value: value, Time: at})
+	d.records = append(d.records, record)
 
 	// Calculate the sustained duration
+	return d.ShouldFix()
+}
+
+func (d *DeviationDetector[T]) ShouldFix() (bool, time.Duration) {
+	if len(d.records) == 0 {
+		return false, 0
+	}
+
+	last := d.records[len(d.records)-1]
 	firstRecord := d.records[0]
-	sustainedDuration := at.Sub(firstRecord.Time)
+	sustainedDuration := last.Time.Sub(firstRecord.Time)
 	return sustainedDuration >= d.duration, sustainedDuration
 }
 

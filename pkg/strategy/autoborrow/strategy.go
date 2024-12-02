@@ -592,9 +592,10 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 				account := s.ExchangeSession.GetAccount()
 				if s.MarginLevelAlert != nil && account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0 {
 					bbgo.Notify(&MarginLevelAlert{
+						SlackAlert:         s.MarginLevelAlert.Slack,
 						CurrentMarginLevel: account.MarginLevel,
 						MinimalMarginLevel: s.MarginLevelAlert.MinMargin,
-						SlackMentions:      s.MarginLevelAlert.Mentions,
+						SlackMentions:      s.MarginLevelAlert.Slack.Mentions,
 						SessionName:        s.ExchangeSession.Name,
 					})
 					bbgo.Notify(account.Balances().Debts())
