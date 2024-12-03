@@ -36,7 +36,7 @@ func TestDepthBuffer_ReadyState(t *testing.T) {
 
 	var updateID int64 = 1
 	for ; updateID < 100; updateID++ {
-		buf.AddUpdate(
+		err := buf.AddUpdate(
 			types.SliceOrderBook{
 				Bids: types.PriceVolumeSlice{
 					{Price: itov(100), Volume: itov(updateID)},
@@ -45,9 +45,15 @@ func TestDepthBuffer_ReadyState(t *testing.T) {
 					{Price: itov(99), Volume: itov(updateID)},
 				},
 			}, updateID)
+
+		assert.NoError(t, err)
 	}
 
-	<-readyC
+	select {
+	case <-readyC:
+	case <-time.After(time.Minute):
+		t.Fail()
+	}
 }
 
 func TestDepthBuffer_CorruptedUpdateAtTheBeginning(t *testing.T) {
@@ -64,21 +70,25 @@ func TestDepthBuffer_CorruptedUpdateAtTheBeginning(t *testing.T) {
 				{Price: itov(99), Volume: itov(1)},
 			},
 		}, snapshotFinalID, nil
-	}, time.Millisecond*5)
+	}, time.Millisecond)
 
-	resetC := make(chan struct{}, 1)
+	resetC := make(chan struct{}, 2)
 
 	buf.OnReset(func() {
+		t.Logf("reset triggered")
 		resetC <- struct{}{}
 	})
 
 	var updateID int64 = 10
 	for ; updateID < 100; updateID++ {
+		time.Sleep(time.Millisecond)
+
+		// send corrupt update when updateID = 50
 		if updateID == 50 {
 			updateID += 5
 		}
 
-		buf.AddUpdate(types.SliceOrderBook{
+		err := buf.AddUpdate(types.SliceOrderBook{
 			Bids: types.PriceVolumeSlice{
 				{Price: itov(100), Volume: itov(updateID)},
 			},
@@ -86,9 +96,18 @@ func TestDepthBuffer_CorruptedUpdateAtTheBeginning(t *testing.T) {
 				{Price: itov(99), Volume: itov(updateID)},
 			},
 		}, updateID)
+
+		if err != nil {
+			t.Log("emit reset")
+			buf.Reset()
+		}
 	}
 
-	<-resetC
+	select {
+	case <-resetC:
+	case <-time.After(10 * time.Second):
+		t.Fail()
+	}
 }
 
 func TestDepthBuffer_ConcurrentRun(t *testing.T) {
