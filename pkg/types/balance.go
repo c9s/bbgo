@@ -37,7 +37,7 @@ func NewZeroBalance(currency string) Balance {
 		Borrowed:          fixedpoint.Zero,
 		Interest:          fixedpoint.Zero,
 		NetAsset:          fixedpoint.Zero,
-		MaxWithdrawAmount: 0,
+		MaxWithdrawAmount: fixedpoint.Zero,
 	}
 }
 
