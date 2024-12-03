@@ -274,3 +274,15 @@ func (m MarketMap) Has(symbol string) bool {
 	_, ok := m[symbol]
 	return ok
 }
+
+// FindAssetMarkets returns the markets that contains the given asset
+func (m MarketMap) FindAssetMarkets(asset string) MarketMap {
+	var markets = make(MarketMap)
+	for symbol, market := range m {
+		if market.BaseCurrency == asset {
+			markets[symbol] = market
+		}
+	}
+
+	return markets
+}
