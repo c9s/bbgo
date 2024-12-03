@@ -456,17 +456,13 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 		s.sessions[sessionName] = session
 
-		// session.Market(symbol)
+		for _, market := range session.Markets() {
+			markets.Add(market)
+		}
 	}
 
 	s.priceResolver = pricesolver.NewSimplePriceResolver(markets)
 	for _, session := range s.sessions {
-		// init the price
-		marketPrices := session.LastPrices()
-		for market, price := range marketPrices {
-			s.priceResolver.Update(market, price)
-		}
-
 		// bind on trade to update price
 		session.UserDataStream.OnTradeUpdate(s.priceResolver.UpdateFromTrade)
 	}
