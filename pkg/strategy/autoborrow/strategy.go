@@ -53,6 +53,10 @@ type MarginAssetConfig struct {
 	DebtRatio            fixedpoint.Value `json:"debtRatio"`
 }
 
+type MarginRepayAlertConfig struct {
+	Slack *slackalert.SlackAlert `json:"slack,omitempty"`
+}
+
 type Strategy struct {
 	Interval             types.Interval   `json:"interval"`
 	MinMarginLevel       fixedpoint.Value `json:"minMarginLevel"`
@@ -60,7 +64,7 @@ type Strategy struct {
 	AutoRepayWhenDeposit bool             `json:"autoRepayWhenDeposit"`
 
 	MarginLevelAlert *MarginLevelAlertConfig `json:"marginLevelAlert"`
-	MarginRepayAlert *slackalert.SlackAlert  `json:"marginRepayAlert"`
+	MarginRepayAlert *MarginRepayAlertConfig `json:"marginRepayAlert"`
 
 	Assets []MarginAssetConfig `json:"assets"`
 
@@ -125,7 +129,7 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 				SessionName:   s.ExchangeSession.Name,
 				Asset:         b.Currency,
 				Amount:        toRepay,
-				SlackMentions: s.MarginRepayAlert.Mentions,
+				SlackMentions: s.MarginRepayAlert.Slack.Mentions,
 			})
 		}
 
@@ -234,7 +238,7 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 				SessionName:   s.ExchangeSession.Name,
 				Asset:         b.Currency,
 				Amount:        toRepay,
-				SlackMentions: s.MarginRepayAlert.Mentions,
+				SlackMentions: s.MarginRepayAlert.Slack.Mentions,
 			})
 		}
 
