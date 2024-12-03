@@ -29,12 +29,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-type TimeBalance struct {
-	types.Balance
-
-	Time time.Time
-}
-
 type QuoteCurrencyPreference struct {
 	Buy  []string `json:"buy"`
 	Sell []string `json:"sell"`
