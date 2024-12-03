@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -199,6 +200,29 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	}
 
 	return session
+}
+
+func (session *ExchangeSession) GetAccountLabel() string {
+	var label string
+
+	if len(session.AccountOwner) > 0 {
+		label = session.AccountOwner
+		if len(session.AccountName) > 0 {
+			label = " (" + session.AccountName + ")"
+		}
+	} else if len(session.AccountName) > 0 {
+		label = session.AccountName
+	}
+
+	if len(label) == 0 {
+		label = os.Getenv("POD_NAME")
+	}
+
+	if len(label) == 0 {
+		label = os.Getenv("HOSTNAME")
+	}
+
+	return label
 }
 
 func (session *ExchangeSession) GetAccount() (a *types.Account) {
