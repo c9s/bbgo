@@ -2,7 +2,7 @@ package autoborrow
 
 import (
 	"fmt"
-	"strings"
+	"time"
 
 	"github.com/slack-go/slack"
 
@@ -19,37 +19,71 @@ type MarginLevelAlertConfig struct {
 
 // MarginLevelAlert is used to send the slack mention alerts when the current margin is less than the required margin level
 type MarginLevelAlert struct {
-	SlackAlert         *slackalert.SlackAlert
+	AccountLabel       string
 	CurrentMarginLevel fixedpoint.Value
 	MinimalMarginLevel fixedpoint.Value
-	SlackMentions      []string
 	SessionName        string
+	Exchange           types.ExchangeName
+	Debts              types.BalanceMap
+}
+
+func (m *MarginLevelAlert) ObjectID() string {
+	return m.AccountLabel
 }
 
 func (m *MarginLevelAlert) SlackAttachment() slack.Attachment {
+	var fields []slack.AttachmentField
+
+	if len(m.AccountLabel) > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Account",
+			Value: m.AccountLabel,
+		})
+	}
+
+	if len(m.Exchange) > 0 {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Exchange",
+			Value: string(m.Exchange),
+		})
+	}
+
+	fields = append(fields, []slack.AttachmentField{
+		{
+			Title: "Session",
+			Value: m.SessionName,
+			Short: true,
+		},
+		{
+			Title: "Current Margin Level",
+			Value: m.CurrentMarginLevel.String(),
+			Short: true,
+		},
+		{
+			Title: "Minimal Margin Level",
+			Value: m.MinimalMarginLevel.String(),
+			Short: true,
+		},
+	}...)
+
+	// collect the current debts into the alert fields
+	if m.Debts != nil && len(m.Debts) > 0 {
+		fields = append(fields, m.Debts.SlackAttachment().Fields...)
+	}
+
+	footer := fmt.Sprintf("%s - %s", m.Exchange, time.Now().String())
+
 	return slack.Attachment{
 		Color: "red",
-		Title: fmt.Sprintf("Margin Level Alert: %s session - current margin level %f < required margin level %f",
-			m.SessionName, m.CurrentMarginLevel.Float64(), m.MinimalMarginLevel.Float64()),
-		Text: strings.Join(m.SlackMentions, " "),
-		Fields: []slack.AttachmentField{
-			{
-				Title: "Session",
-				Value: m.SessionName,
-				Short: true,
-			},
-			{
-				Title: "Current Margin Level",
-				Value: m.CurrentMarginLevel.String(),
-				Short: true,
-			},
-			{
-				Title: "Minimal Margin Level",
-				Value: m.MinimalMarginLevel.String(),
-				Short: true,
-			},
-		},
-		// Footer:     "",
-		// FooterIcon: "",
+		Title: fmt.Sprintf("Margin Level Alert: %s session",
+			m.SessionName,
+		),
+		Text: fmt.Sprintf("The current margin level %f is less than required margin level %f",
+			m.CurrentMarginLevel.Float64(),
+			m.MinimalMarginLevel.Float64(),
+		),
+		Fields:     fields,
+		Footer:     footer,
+		FooterIcon: types.ExchangeFooterIcon(m.Exchange),
 	}
 }

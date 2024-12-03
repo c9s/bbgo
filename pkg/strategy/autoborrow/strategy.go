@@ -11,6 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/livenote"
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
@@ -593,6 +594,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 }
 
 func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Duration) {
+	if s.MarginLevelAlert == nil {
+		return
+	}
+
 	go func() {
 		ticker := time.NewTicker(alertInterval)
 		defer ticker.Stop()
@@ -601,16 +606,27 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				account := s.ExchangeSession.GetAccount()
-				if s.MarginLevelAlert != nil && account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0 {
-					bbgo.Notify(&MarginLevelAlert{
-						SlackAlert:         s.MarginLevelAlert.Slack,
+				account, err := s.ExchangeSession.UpdateAccount(ctx)
+				if err != nil {
+					log.WithError(err).Errorf("unable to update account")
+					continue
+				}
+
+				if account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0 {
+					alert := &MarginLevelAlert{
+						AccountLabel:       s.ExchangeSession.GetAccountLabel(),
+						Exchange:           s.ExchangeSession.ExchangeName,
 						CurrentMarginLevel: account.MarginLevel,
 						MinimalMarginLevel: s.MarginLevelAlert.MinMargin,
-						SlackMentions:      s.MarginLevelAlert.Slack.Mentions,
 						SessionName:        s.ExchangeSession.Name,
-					})
-					bbgo.Notify(account.Balances().Debts())
+						Debts:              account.Balances().Debts(),
+					}
+
+					bbgo.PostLiveNote(alert,
+						livenote.Channel(s.MarginLevelAlert.Slack.Channel),
+						livenote.OneTimeMention(s.MarginLevelAlert.Slack.Mentions...),
+						livenote.Comment("Please repay your debt or borrow more to avoid liquidation"),
+					)
 				}
 			}
 		}
