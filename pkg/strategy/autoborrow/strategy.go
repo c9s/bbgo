@@ -618,14 +618,28 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 			// if the previous danger is set to true, we should send the alert again to
 			// update the previous danger margin alert message
 			if danger || account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0 {
+				// calculate the debt value by the price solver
+				totalDebtValueInUSDT := fixedpoint.Zero
+				debts := account.Balances().Debts()
+				for currency, bal := range debts {
+					price, ok := s.priceSolver.ResolvePrice(currency, types.USDT)
+					if !ok {
+						log.Warnf("unable to resolve price for %s", currency)
+						continue
+					}
+
+					debtValue := bal.Debt().Mul(price)
+					totalDebtValueInUSDT = totalDebtValueInUSDT.Add(debtValue)
+				}
 
 				alert := &MarginLevelAlert{
-					AccountLabel:       s.ExchangeSession.GetAccountLabel(),
-					Exchange:           s.ExchangeSession.ExchangeName,
-					CurrentMarginLevel: account.MarginLevel,
-					MinimalMarginLevel: s.MarginLevelAlert.MinMargin,
-					SessionName:        s.ExchangeSession.Name,
-					Debts:              account.Balances().Debts(),
+					AccountLabel:        s.ExchangeSession.GetAccountLabel(),
+					Exchange:            s.ExchangeSession.ExchangeName,
+					CurrentMarginLevel:  account.MarginLevel,
+					MinimalMarginLevel:  s.MarginLevelAlert.MinMargin,
+					SessionName:         s.ExchangeSession.Name,
+					TotalDebtValueInUSD: totalDebtValueInUSDT,
+					Debts:               account.Balances().Debts(),
 				}
 
 				bbgo.PostLiveNote(alert,
@@ -638,6 +652,7 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 					s.postLiveNoteMessage(alert, s.MarginLevelAlert.Slack, "the current margin level %f is less than the minimal margin level %f, please repay the debt",
 						account.MarginLevel.Float64(),
 						s.MarginLevelAlert.MinMargin.Float64())
+
 				}
 
 				// update danger flag
