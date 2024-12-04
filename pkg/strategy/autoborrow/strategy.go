@@ -645,6 +645,7 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 				bbgo.PostLiveNote(alert,
 					livenote.Channel(s.MarginLevelAlert.Slack.Channel),
 					livenote.OneTimeMention(s.MarginLevelAlert.Slack.Mentions...),
+					livenote.CompareObject(true),
 				)
 
 				// if the previous danger flag is not set, we should send the alert at the first time
