@@ -668,8 +668,9 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 }
 
 func (s *Strategy) postLiveNoteMessage(obj livenote.Object, alert *slackalert.SlackAlert, msgf string, args ...any) {
+	log.Infof(msgf, args...)
+
 	if alert == nil {
-		log.Infof(msgf, args...)
 		return
 	}
 
