@@ -71,10 +71,24 @@ func (m *MarginLevelAlert) SlackAttachment() slack.Attachment {
 		fields = append(fields, m.Debts.SlackAttachment().Fields...)
 	}
 
+	color := "good"
+	isDanger := m.CurrentMarginLevel.Compare(m.MinimalMarginLevel) <= 0
+	if isDanger {
+		color = "danger"
+	}
+
+	isSolved := !isDanger
+	if isSolved {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Status",
+			Value: "✅ Solved",
+		})
+	}
+
 	footer := fmt.Sprintf("%s - %s", m.Exchange, time.Now().String())
 
 	return slack.Attachment{
-		Color: "red",
+		Color: color,
 		Title: fmt.Sprintf("Margin Level Alert: %s session",
 			m.SessionName,
 		),
