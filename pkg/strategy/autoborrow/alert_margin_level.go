@@ -19,12 +19,13 @@ type MarginLevelAlertConfig struct {
 
 // MarginLevelAlert is used to send the slack mention alerts when the current margin is less than the required margin level
 type MarginLevelAlert struct {
-	AccountLabel       string
-	CurrentMarginLevel fixedpoint.Value
-	MinimalMarginLevel fixedpoint.Value
-	SessionName        string
-	Exchange           types.ExchangeName
-	Debts              types.BalanceMap
+	AccountLabel        string
+	CurrentMarginLevel  fixedpoint.Value
+	MinimalMarginLevel  fixedpoint.Value
+	SessionName         string
+	Exchange            types.ExchangeName
+	TotalDebtValueInUSD fixedpoint.Value
+	Debts               types.BalanceMap
 }
 
 func (m *MarginLevelAlert) ObjectID() string {
@@ -65,6 +66,13 @@ func (m *MarginLevelAlert) SlackAttachment() slack.Attachment {
 			Short: true,
 		},
 	}...)
+
+	if !m.TotalDebtValueInUSD.IsZero() {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Total Debt Value In USD",
+			Value: m.TotalDebtValueInUSD.String(),
+		})
+	}
 
 	// collect the current debts into the alert fields
 	if m.Debts != nil && len(m.Debts) > 0 {

@@ -17,7 +17,6 @@ sessions:
   binance:
     exchange: binance
     envVarPrefix: binance
-    margin: true
 
 persistence:
   json:
@@ -54,6 +53,7 @@ crossExchangeStrategies:
       quoteCurrency: USDT
       amount: 200
       slack:
+        channel: ""
         mentions:
         - '<@USER_ID>'
         - '<!subteam^TEAM_ID>'

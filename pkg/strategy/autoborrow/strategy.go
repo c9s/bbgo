@@ -585,6 +585,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	markets := session.Markets()
+
 	s.priceSolver = pricesolver.NewSimplePriceResolver(markets)
 	s.priceSolver.BindStream(session.MarketDataStream)
 	s.priceSolver.BindStream(session.UserDataStream)
@@ -617,24 +618,64 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 			// if the previous danger is set to true, we should send the alert again to
 			// update the previous danger margin alert message
 			if danger || account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0 {
-				// update danger flag
-				danger = account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0
+				// calculate the debt value by the price solver
+				totalDebtValueInUSDT := fixedpoint.Zero
+				debts := account.Balances().Debts()
+				for currency, bal := range debts {
+					price, ok := s.priceSolver.ResolvePrice(currency, types.USDT)
+					if !ok {
+						log.Warnf("unable to resolve price for %s", currency)
+						continue
+					}
+
+					debtValue := bal.Debt().Mul(price)
+					totalDebtValueInUSDT = totalDebtValueInUSDT.Add(debtValue)
+				}
 
 				alert := &MarginLevelAlert{
-					AccountLabel:       s.ExchangeSession.GetAccountLabel(),
-					Exchange:           s.ExchangeSession.ExchangeName,
-					CurrentMarginLevel: account.MarginLevel,
-					MinimalMarginLevel: s.MarginLevelAlert.MinMargin,
-					SessionName:        s.ExchangeSession.Name,
-					Debts:              account.Balances().Debts(),
+					AccountLabel:        s.ExchangeSession.GetAccountLabel(),
+					Exchange:            s.ExchangeSession.ExchangeName,
+					CurrentMarginLevel:  account.MarginLevel,
+					MinimalMarginLevel:  s.MarginLevelAlert.MinMargin,
+					SessionName:         s.ExchangeSession.Name,
+					TotalDebtValueInUSD: totalDebtValueInUSDT,
+					Debts:               account.Balances().Debts(),
 				}
 
 				bbgo.PostLiveNote(alert,
 					livenote.Channel(s.MarginLevelAlert.Slack.Channel),
 					livenote.OneTimeMention(s.MarginLevelAlert.Slack.Mentions...),
-					livenote.Comment("Please repay your debt or borrow more to avoid liquidation"),
 				)
+
+				// if the previous danger flag is not set, we should send the alert at the first time
+				if !danger {
+					s.postLiveNoteMessage(alert, s.MarginLevelAlert.Slack, "the current margin level %f is less than the minimal margin level %f, please repay the debt",
+						account.MarginLevel.Float64(),
+						s.MarginLevelAlert.MinMargin.Float64())
+
+				}
+
+				// update danger flag
+				danger = account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0
+
+				// if it's not in danger anymore, send a solved message
+				if !danger {
+					s.postLiveNoteMessage(alert, s.MarginLevelAlert.Slack, "the current margin level %f is safe now", account.MarginLevel.Float64())
+				}
 			}
 		}
 	}
+}
+
+func (s *Strategy) postLiveNoteMessage(obj livenote.Object, alert *slackalert.SlackAlert, msgf string, args ...any) {
+	log.Infof(msgf, args...)
+
+	if alert == nil {
+		return
+	}
+
+	bbgo.PostLiveNote(obj,
+		livenote.Channel(alert.Channel),
+		livenote.Comment(fmt.Sprintf(msgf, args...)),
+	)
 }
