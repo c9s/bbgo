@@ -454,6 +454,8 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 				return b.Net().Float64()
 			},
 		)
+
+		s.deviationDetectors[currency].SetLogger(log)
 	}
 
 	markets := types.MarketMap{}
