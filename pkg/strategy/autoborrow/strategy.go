@@ -649,7 +649,7 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 
 				// if the previous danger flag is not set, we should send the alert at the first time
 				if !danger {
-					s.postLiveNoteMessage(alert, s.MarginLevelAlert.Slack, "the current margin level %f is less than the minimal margin level %f, please repay the debt",
+					s.postLiveNoteMessage(alert, s.MarginLevelAlert.Slack, "⚠️ The current margin level %f is less than the minimal margin level %f, please repay the debt",
 						account.MarginLevel.Float64(),
 						s.MarginLevelAlert.MinMargin.Float64())
 
@@ -660,7 +660,7 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 
 				// if it's not in danger anymore, send a solved message
 				if !danger {
-					s.postLiveNoteMessage(alert, s.MarginLevelAlert.Slack, "the current margin level %f is safe now", account.MarginLevel.Float64())
+					s.postLiveNoteMessage(alert, s.MarginLevelAlert.Slack, "✅ The current margin level %f is safe now", account.MarginLevel.Float64())
 				}
 			}
 		}
@@ -668,9 +668,8 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 }
 
 func (s *Strategy) postLiveNoteMessage(obj livenote.Object, alert *slackalert.SlackAlert, msgf string, args ...any) {
-	log.Infof(msgf, args...)
-
 	if alert == nil {
+		log.Infof(msgf, args...)
 		return
 	}
 
