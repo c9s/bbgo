@@ -483,6 +483,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		// bind on trade to update price
 		session.UserDataStream.OnTradeUpdate(s.priceResolver.UpdateFromTrade)
 	}
+
 	log.Infof("large amount alert: %+v", s.LargeAmountAlert)
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
