@@ -23,6 +23,7 @@ exchangeStrategies:
       interval: 5m
       minMargin: 2.0
       slack:
+        channel: "channel_id"
         mentions:
         - '<@USER_ID>'
         - '<!subteam^TEAM_ID>'
