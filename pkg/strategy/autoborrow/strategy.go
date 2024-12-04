@@ -598,37 +598,43 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 		return
 	}
 
-	go func() {
-		ticker := time.NewTicker(alertInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				account, err := s.ExchangeSession.UpdateAccount(ctx)
-				if err != nil {
-					log.WithError(err).Errorf("unable to update account")
-					continue
+	ticker := time.NewTicker(alertInterval)
+	defer ticker.Stop()
+
+	danger := false
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			account, err := s.ExchangeSession.UpdateAccount(ctx)
+			if err != nil {
+				log.WithError(err).Errorf("unable to update account")
+				continue
+			}
+
+			// either danger or margin level is less than the minimal margin level
+			// if the previous danger is set to true, we should send the alert again to
+			// update the previous danger margin alert message
+			if danger || account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0 {
+				// update danger flag
+				danger = account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0
+
+				alert := &MarginLevelAlert{
+					AccountLabel:       s.ExchangeSession.GetAccountLabel(),
+					Exchange:           s.ExchangeSession.ExchangeName,
+					CurrentMarginLevel: account.MarginLevel,
+					MinimalMarginLevel: s.MarginLevelAlert.MinMargin,
+					SessionName:        s.ExchangeSession.Name,
+					Debts:              account.Balances().Debts(),
 				}
 
-				if account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0 {
-					alert := &MarginLevelAlert{
-						AccountLabel:       s.ExchangeSession.GetAccountLabel(),
-						Exchange:           s.ExchangeSession.ExchangeName,
-						CurrentMarginLevel: account.MarginLevel,
-						MinimalMarginLevel: s.MarginLevelAlert.MinMargin,
-						SessionName:        s.ExchangeSession.Name,
-						Debts:              account.Balances().Debts(),
-					}
-
-					bbgo.PostLiveNote(alert,
-						livenote.Channel(s.MarginLevelAlert.Slack.Channel),
-						livenote.OneTimeMention(s.MarginLevelAlert.Slack.Mentions...),
-						livenote.Comment("Please repay your debt or borrow more to avoid liquidation"),
-					)
-				}
+				bbgo.PostLiveNote(alert,
+					livenote.Channel(s.MarginLevelAlert.Slack.Channel),
+					livenote.OneTimeMention(s.MarginLevelAlert.Slack.Mentions...),
+					livenote.Comment("Please repay your debt or borrow more to avoid liquidation"),
+				)
 			}
 		}
-	}()
+	}
 }
