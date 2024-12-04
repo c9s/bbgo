@@ -3,7 +3,6 @@ package autoborrow
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -12,6 +11,9 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/livenote"
+	"github.com/c9s/bbgo/pkg/pricesolver"
+	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -44,73 +46,7 @@ func init() {
     maxTotalBorrow: 10.0
 */
 
-// MarginAlert is used to send the slack mention alerts when the current margin is less than the required margin level
-type MarginAlert struct {
-	CurrentMarginLevel fixedpoint.Value
-	MinimalMarginLevel fixedpoint.Value
-	SlackMentions      []string
-	SessionName        string
-}
-
-func (m *MarginAlert) SlackAttachment() slack.Attachment {
-	return slack.Attachment{
-		Color: "red",
-		Title: fmt.Sprintf("Margin Level Alert: %s session - current margin level %f < required margin level %f",
-			m.SessionName, m.CurrentMarginLevel.Float64(), m.MinimalMarginLevel.Float64()),
-		Text: strings.Join(m.SlackMentions, " "),
-		Fields: []slack.AttachmentField{
-			{
-				Title: "Session",
-				Value: m.SessionName,
-				Short: true,
-			},
-			{
-				Title: "Current Margin Level",
-				Value: m.CurrentMarginLevel.String(),
-				Short: true,
-			},
-			{
-				Title: "Minimal Margin Level",
-				Value: m.MinimalMarginLevel.String(),
-				Short: true,
-			},
-		},
-		// Footer:     "",
-		// FooterIcon: "",
-	}
-}
-
-// RepaidAlert
-type RepaidAlert struct {
-	SessionName   string
-	Asset         string
-	Amount        fixedpoint.Value
-	SlackMentions []string
-}
-
-func (m *RepaidAlert) SlackAttachment() slack.Attachment {
-	return slack.Attachment{
-		Color: "red",
-		Title: fmt.Sprintf("Margin Repaid on %s session", m.SessionName),
-		Text:  strings.Join(m.SlackMentions, " "),
-		Fields: []slack.AttachmentField{
-			{
-				Title: "Session",
-				Value: m.SessionName,
-				Short: true,
-			},
-			{
-				Title: "Asset",
-				Value: m.Amount.String() + " " + m.Asset,
-				Short: true,
-			},
-		},
-		// Footer:     "",
-		// FooterIcon: "",
-	}
-}
-
-type MarginAsset struct {
+type MarginAssetConfig struct {
 	Asset                string           `json:"asset"`
 	Low                  fixedpoint.Value `json:"low"`
 	MaxTotalBorrow       fixedpoint.Value `json:"maxTotalBorrow"`
@@ -119,14 +55,8 @@ type MarginAsset struct {
 	DebtRatio            fixedpoint.Value `json:"debtRatio"`
 }
 
-type MarginLevelAlert struct {
-	Interval      types.Duration   `json:"interval"`
-	MinMargin     fixedpoint.Value `json:"minMargin"`
-	SlackMentions []string         `json:"slackMentions"`
-}
-
-type MarginRepayAlert struct {
-	SlackMentions []string `json:"slackMentions"`
+type MarginRepayAlertConfig struct {
+	Slack *slackalert.SlackAlert `json:"slack,omitempty"`
 }
 
 type Strategy struct {
@@ -135,14 +65,16 @@ type Strategy struct {
 	MaxMarginLevel       fixedpoint.Value `json:"maxMarginLevel"`
 	AutoRepayWhenDeposit bool             `json:"autoRepayWhenDeposit"`
 
-	MarginLevelAlert *MarginLevelAlert `json:"marginLevelAlert"`
-	MarginRepayAlert *MarginRepayAlert `json:"marginRepayAlert"`
+	MarginLevelAlert *MarginLevelAlertConfig `json:"marginLevelAlert"`
+	MarginRepayAlert *MarginRepayAlertConfig `json:"marginRepayAlert"`
 
-	Assets []MarginAsset `json:"assets"`
+	Assets []MarginAssetConfig `json:"assets"`
 
 	ExchangeSession *bbgo.ExchangeSession
 
 	marginBorrowRepay types.MarginBorrowRepayService
+
+	priceSolver *pricesolver.SimplePriceSolver
 }
 
 func (s *Strategy) ID() string {
@@ -201,7 +133,7 @@ func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
 				SessionName:   s.ExchangeSession.Name,
 				Asset:         b.Currency,
 				Amount:        toRepay,
-				SlackMentions: s.MarginRepayAlert.SlackMentions,
+				SlackMentions: s.MarginRepayAlert.Slack.Mentions,
 			})
 		}
 
@@ -310,7 +242,7 @@ func (s *Strategy) reBalanceDebt(ctx context.Context) {
 				SessionName:   s.ExchangeSession.Name,
 				Asset:         b.Currency,
 				Amount:        toRepay,
-				SlackMentions: s.MarginRepayAlert.SlackMentions,
+				SlackMentions: s.MarginRepayAlert.Slack.Mentions,
 			})
 		}
 
@@ -652,30 +584,57 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		go s.marginAlertWorker(ctx, alertInterval)
 	}
 
+	markets := session.Markets()
+	s.priceSolver = pricesolver.NewSimplePriceResolver(markets)
+	s.priceSolver.BindStream(session.MarketDataStream)
+	s.priceSolver.BindStream(session.UserDataStream)
+
 	go s.run(ctx, s.Interval.Duration())
 	return nil
 }
 
 func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Duration) {
-	go func() {
-		ticker := time.NewTicker(alertInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				account := s.ExchangeSession.GetAccount()
-				if s.MarginLevelAlert != nil && account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0 {
-					bbgo.Notify(&MarginAlert{
-						CurrentMarginLevel: account.MarginLevel,
-						MinimalMarginLevel: s.MarginLevelAlert.MinMargin,
-						SlackMentions:      s.MarginLevelAlert.SlackMentions,
-						SessionName:        s.ExchangeSession.Name,
-					})
-					bbgo.Notify(account.Balances().Debts())
+	if s.MarginLevelAlert == nil {
+		return
+	}
+
+	ticker := time.NewTicker(alertInterval)
+	defer ticker.Stop()
+
+	danger := false
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			account, err := s.ExchangeSession.UpdateAccount(ctx)
+			if err != nil {
+				log.WithError(err).Errorf("unable to update account")
+				continue
+			}
+
+			// either danger or margin level is less than the minimal margin level
+			// if the previous danger is set to true, we should send the alert again to
+			// update the previous danger margin alert message
+			if danger || account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0 {
+				// update danger flag
+				danger = account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0
+
+				alert := &MarginLevelAlert{
+					AccountLabel:       s.ExchangeSession.GetAccountLabel(),
+					Exchange:           s.ExchangeSession.ExchangeName,
+					CurrentMarginLevel: account.MarginLevel,
+					MinimalMarginLevel: s.MarginLevelAlert.MinMargin,
+					SessionName:        s.ExchangeSession.Name,
+					Debts:              account.Balances().Debts(),
 				}
+
+				bbgo.PostLiveNote(alert,
+					livenote.Channel(s.MarginLevelAlert.Slack.Channel),
+					livenote.OneTimeMention(s.MarginLevelAlert.Slack.Mentions...),
+					livenote.Comment("Please repay your debt or borrow more to avoid liquidation"),
+				)
 			}
 		}
-	}()
+	}
 }

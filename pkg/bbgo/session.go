@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -68,6 +69,12 @@ type ExchangeSession struct {
 	Futures               bool   `json:"futures,omitempty" yaml:"futures"`
 	IsolatedFutures       bool   `json:"isolatedFutures,omitempty" yaml:"isolatedFutures,omitempty"`
 	IsolatedFuturesSymbol string `json:"isolatedFuturesSymbol,omitempty" yaml:"isolatedFuturesSymbol,omitempty"`
+
+	// AccountName is used for labeling the account name of the session
+	AccountName string `json:"accountName,omitempty" yaml:"accountName,omitempty"`
+
+	// AccountOwner is used for labeling the account owner of the session
+	AccountOwner string `json:"accountOwner,omitempty" yaml:"accountOwner,omitempty"`
 
 	// ---------------------------
 	// Runtime fields
@@ -193,6 +200,29 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	}
 
 	return session
+}
+
+func (session *ExchangeSession) GetAccountLabel() string {
+	var label string
+
+	if len(session.AccountOwner) > 0 {
+		label = session.AccountOwner
+		if len(session.AccountName) > 0 {
+			label = " (" + session.AccountName + ")"
+		}
+	} else if len(session.AccountName) > 0 {
+		label = session.AccountName
+	}
+
+	if len(label) == 0 {
+		label = os.Getenv("POD_NAME")
+	}
+
+	if len(label) == 0 {
+		label = os.Getenv("HOSTNAME")
+	}
+
+	return label
 }
 
 func (session *ExchangeSession) GetAccount() (a *types.Account) {

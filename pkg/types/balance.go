@@ -29,6 +29,18 @@ type Balance struct {
 	MaxWithdrawAmount fixedpoint.Value `json:"maxWithdrawAmount,omitempty"`
 }
 
+func NewZeroBalance(currency string) Balance {
+	return Balance{
+		Currency:          currency,
+		Available:         fixedpoint.Zero,
+		Locked:            fixedpoint.Zero,
+		Borrowed:          fixedpoint.Zero,
+		Interest:          fixedpoint.Zero,
+		NetAsset:          fixedpoint.Zero,
+		MaxWithdrawAmount: fixedpoint.Zero,
+	}
+}
+
 func (b Balance) Add(b2 Balance) Balance {
 	var newB = b
 	newB.Available = b.Available.Add(b2.Available)
@@ -45,8 +57,11 @@ func (b Balance) Total() fixedpoint.Value {
 
 // Net returns the net asset value (total - debt)
 func (b Balance) Net() fixedpoint.Value {
-	total := b.Total()
-	return total.Sub(b.Debt())
+	if !b.NetAsset.IsZero() {
+		return b.NetAsset
+	}
+
+	return b.Total().Sub(b.Debt())
 }
 
 func (b Balance) Debt() fixedpoint.Value {

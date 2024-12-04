@@ -14,16 +14,18 @@ exchangeStrategies:
     maxMarginLevel: 20.0
 
     marginRepayAlert:
-      slackMentions:
-      - '<@USER_ID>'
-      - '<!subteam^TEAM_ID>'
+      slack:
+        mentions:
+        - '<@USER_ID>'
+        - '<!subteam^TEAM_ID>'
 
     marginLevelAlert:
       interval: 5m
       minMargin: 2.0
-      slackMentions:
-      - '<@USER_ID>'
-      - '<!subteam^TEAM_ID>'
+      slack:
+        mentions:
+        - '<@USER_ID>'
+        - '<!subteam^TEAM_ID>'
 
     assets:
     - asset: ETH
