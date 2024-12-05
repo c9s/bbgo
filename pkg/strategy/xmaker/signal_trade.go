@@ -12,6 +12,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const maxTradeVolumeSliceSize = 20480
+
 var tradeVolumeWindowSignalMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "xmaker_trade_volume_window_signal",
@@ -35,6 +37,11 @@ type TradeVolumeWindowSignal struct {
 func (s *TradeVolumeWindowSignal) handleTrade(trade types.Trade) {
 	s.mu.Lock()
 	s.trades = append(s.trades, trade)
+
+	if len(s.trades) > maxTradeVolumeSliceSize {
+		s.trades = s.trades[maxTradeVolumeSliceSize/3:]
+	}
+
 	s.mu.Unlock()
 }
 
