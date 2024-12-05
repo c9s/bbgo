@@ -49,6 +49,8 @@ func (s *TradeVolumeWindowSignal) Bind(ctx context.Context, session *bbgo.Exchan
 		s.Threshold = fixedpoint.NewFromFloat(0.7)
 	}
 
+	s.trades = make([]types.Trade, 0, 4096)
+
 	session.MarketDataStream.OnMarketTrade(s.handleTrade)
 	return nil
 }
