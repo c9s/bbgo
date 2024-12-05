@@ -246,6 +246,9 @@ type Strategy struct {
 	Position    *types.Position `json:"position,omitempty" persistence:"position"`
 	ProfitStats *ProfitStats    `json:"profitStats,omitempty" persistence:"profit_stats"`
 
+	tradingCtx    context.Context
+	cancelTrading context.CancelFunc
+
 	coveredPosition fixedpoint.MutexValue
 
 	sourceBook, makerBook *types.StreamOrderBook
@@ -1862,6 +1865,8 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 func (s *Strategy) CrossRun(
 	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
+	s.tradingCtx, s.cancelTrading = context.WithCancel(ctx)
+
 	instanceID := s.InstanceID()
 
 	configWriter := bytes.NewBuffer(nil)
@@ -2034,6 +2039,8 @@ func (s *Strategy) CrossRun(
 	}
 
 	s.CircuitBreaker.OnPanic(func() {
+		s.cancelTrading()
+
 		bbgo.Sync(ctx, s)
 	})
 
@@ -2170,7 +2177,7 @@ func (s *Strategy) CrossRun(
 
 		go s.accountUpdater(ctx)
 		go s.hedgeWorker(ctx)
-		go s.quoteWorker(ctx)
+		go s.quoteWorker(s.tradingCtx)
 		go s.houseCleanWorker(ctx)
 
 		if s.RecoverTrade {
@@ -2179,6 +2186,8 @@ func (s *Strategy) CrossRun(
 	}()
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
+		s.cancelTrading()
+
 		// the ctx here is the shutdown context (not the strategy context)
 
 		// defer work group done to mark the strategy as stopped
