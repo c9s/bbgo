@@ -115,7 +115,7 @@ func toGlobalFuturesOrders(futuresOrders []*futures.Order, isIsolated bool) (ord
 
 func toGlobalFuturesOrder(futuresOrder *futures.Order, isIsolated bool) (*types.Order, error) {
 	orderPrice := futuresOrder.Price
-	if orderPrice.IsZero() {
+	if orderPrice == "" {
 		orderPrice = futuresOrder.AvgPrice
 	}
 
