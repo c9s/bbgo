@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
@@ -603,6 +604,12 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 	defer ticker.Stop()
 
 	danger := false
+
+	// alertId is used to identify the alert message when the alert is solved, we
+	// should send a new alert message instead of replacing the previous one, so the
+	// alertId will be updated to a new uuid once the alert is solved
+	alertId := uuid.New().String()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -633,6 +640,7 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 				}
 
 				alert := &MarginLevelAlert{
+					AlertID:             alertId,
 					AccountLabel:        s.ExchangeSession.GetAccountLabel(),
 					Exchange:            s.ExchangeSession.ExchangeName,
 					CurrentMarginLevel:  account.MarginLevel,
@@ -661,6 +669,7 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 
 				// if it's not in danger anymore, send a solved message
 				if !danger {
+					alertId = uuid.New().String()
 					s.postLiveNoteMessage(alert, s.MarginLevelAlert.Slack, "✅ The current margin level %f is safe now", account.MarginLevel.Float64())
 				}
 			}
