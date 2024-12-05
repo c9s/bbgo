@@ -19,6 +19,7 @@ type MarginLevelAlertConfig struct {
 
 // MarginLevelAlert is used to send the slack mention alerts when the current margin is less than the required margin level
 type MarginLevelAlert struct {
+	AlertID             string
 	AccountLabel        string
 	CurrentMarginLevel  fixedpoint.Value
 	MinimalMarginLevel  fixedpoint.Value
@@ -28,8 +29,13 @@ type MarginLevelAlert struct {
 	Debts               types.BalanceMap
 }
 
-func (m *MarginLevelAlert) ObjectID() string {
-	return m.AccountLabel
+func (m *MarginLevelAlert) ObjectID() (str string) {
+	str = m.AccountLabel
+	if m.AlertID != "" {
+		str += "-" + m.AlertID
+	}
+
+	return str
 }
 
 func (m *MarginLevelAlert) SlackAttachment() slack.Attachment {
