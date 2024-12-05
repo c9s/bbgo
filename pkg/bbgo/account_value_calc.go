@@ -71,7 +71,7 @@ func (c *AccountValueCalculator) DebtValue() fixedpoint.Value {
 }
 
 func (c *AccountValueCalculator) MarketValue() fixedpoint.Value {
-	balances := c.session.Account.Balances()
+	balances := c.session.Account.Balances().NotZero()
 	return totalValueInQuote(balances, c.priceSolver, c.quoteCurrency, func(
 		prev fixedpoint.Value, b types.Balance, price fixedpoint.Value,
 	) fixedpoint.Value {
@@ -81,7 +81,7 @@ func (c *AccountValueCalculator) MarketValue() fixedpoint.Value {
 }
 
 func (c *AccountValueCalculator) NetValue() fixedpoint.Value {
-	balances := c.session.Account.Balances()
+	balances := c.session.Account.Balances().NotZero()
 	return totalValueInQuote(balances, c.priceSolver, c.quoteCurrency, func(
 		prev fixedpoint.Value, b types.Balance, price fixedpoint.Value,
 	) fixedpoint.Value {
