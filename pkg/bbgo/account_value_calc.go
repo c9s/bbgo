@@ -62,7 +62,7 @@ func (c *AccountValueCalculator) UpdatePrices(ctx context.Context) error {
 }
 
 func (c *AccountValueCalculator) DebtValue() fixedpoint.Value {
-	balances := c.session.Account.Balances()
+	balances := c.session.Account.Balances().Debts()
 	return totalValueInQuote(balances, c.priceSolver, c.quoteCurrency, func(
 		prev fixedpoint.Value, b types.Balance, price fixedpoint.Value,
 	) fixedpoint.Value {
@@ -100,9 +100,12 @@ func totalValueInQuote(
 	for _, b := range balances {
 		if b.Currency == quoteCurrency {
 			totalValue = algo(totalValue, b, fixedpoint.One)
-			continue
-		} else if price, ok := priceSolver.ResolvePrice(b.Currency, quoteCurrency); ok {
-			totalValue = algo(totalValue, b, price)
+		} else {
+			if price, ok := priceSolver.ResolvePrice(b.Currency, quoteCurrency); ok {
+				totalValue = algo(totalValue, b, price)
+			} else {
+				log.Warnf("unable to solve price for %s/%s", b.Currency, quoteCurrency)
+			}
 		}
 	}
 
