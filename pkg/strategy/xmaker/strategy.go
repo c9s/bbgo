@@ -687,6 +687,110 @@ func (s *Strategy) getLayerPrice(
 	return price
 }
 
+// margin level = totalValue / totalDebtValue
+func calculateDebtQuota(totalValue, debtValue, minMarginLevel fixedpoint.Value) fixedpoint.Value {
+	if minMarginLevel.IsZero() || totalValue.IsZero() {
+		return fixedpoint.Zero
+	}
+
+	debtCap := totalValue.Div(minMarginLevel)
+	debtQuota := debtCap.Sub(debtValue)
+	if debtQuota.Sign() < 0 {
+		return fixedpoint.Zero
+	}
+
+	return debtQuota
+}
+
+func (s *Strategy) allowMarginHedge(side types.SideType) (bool, fixedpoint.Value) {
+	zero := fixedpoint.Zero
+
+	if !s.sourceSession.Margin {
+		return false, zero
+	}
+
+	// GetAccount() is a lightweight operation, it doesn't make any API request
+	hedgeAccount := s.sourceSession.GetAccount()
+	lastPrice := s.lastPrice.Get()
+
+	if hedgeAccount.MarginLevel.IsZero() || s.MinMarginLevel.IsZero() {
+		return false, zero
+	}
+
+	marketValue := s.accountValueCalculator.MarketValue()
+	debtValue := s.accountValueCalculator.DebtValue()
+
+	// if the margin level is higher than the minimal margin level,
+	// we can hedge the position, but we need to check the debt quota
+	if hedgeAccount.MarginLevel.Compare(s.MinMarginLevel) > 0 {
+		debtQuota := calculateDebtQuota(marketValue, debtValue, s.MinMarginLevel)
+
+		if debtQuota.Sign() <= 0 {
+			return false, zero
+		}
+
+		switch side {
+		case types.SideTypeBuy:
+			return true, debtQuota
+
+		case types.SideTypeSell:
+			if lastPrice.IsZero() {
+				return false, zero
+			}
+
+			return true, debtQuota.Div(lastPrice)
+
+		}
+		return true, zero
+	}
+
+	// side here is the side of maker
+	// if the margin level is too low, check if we can hedge the position with repayments to reduce the position
+	quoteBal, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency)
+	if !ok {
+		quoteBal = types.NewZeroBalance(s.sourceMarket.QuoteCurrency)
+	}
+
+	baseBal, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency)
+	if !ok {
+		baseBal = types.NewZeroBalance(s.sourceMarket.BaseCurrency)
+	}
+
+	switch side {
+	case types.SideTypeBuy:
+		if baseBal.Available.IsZero() {
+			return false, zero
+		}
+
+		quota := baseBal.Available.Mul(lastPrice)
+
+		// for buy orders, we need to check if we can repay the quoteBal asset via selling the base balance
+		quoteDebt := quoteBal.Debt()
+		if quoteDebt.Sign() > 0 {
+			return true, fixedpoint.Min(quota, quoteDebt)
+		}
+
+		return false, zero
+
+	case types.SideTypeSell:
+		if quoteBal.Available.IsZero() {
+			return false, zero
+		}
+
+		quota := quoteBal.Available.Div(lastPrice)
+
+		baseDebt := baseBal.Debt()
+		if baseDebt.Sign() > 0 {
+			// return how much quote bal amount we can use to place the buy order
+			return true, fixedpoint.Min(quota, baseDebt)
+		}
+
+		return false, zero
+	}
+
+	return false, zero
+}
+
 func (s *Strategy) updateQuote(ctx context.Context) error {
 	cancelMakerOrdersProfile := timeprofile.Start("cancelMakerOrders")
 
@@ -844,58 +948,31 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			s.logger.Infof("hedge account margin level %s is less then the min margin level %s, calculating the borrowed positions",
 				hedgeAccount.MarginLevel.String(),
 				s.MinMarginLevel.String())
-
-			// TODO: should consider base asset debt as well.
-			if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
-				quoteDebt := quote.Debt()
-				if quoteDebt.Sign() > 0 {
-					hedgeQuota.BaseAsset.Add(quoteDebt.Div(bestBid.Price))
-				}
-			}
-
-			if base, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
-				baseDebt := base.Debt()
-				if baseDebt.Sign() > 0 {
-					hedgeQuota.QuoteAsset.Add(baseDebt.Mul(bestAsk.Price))
-				}
-			}
 		} else {
 			s.logger.Infof("hedge account margin level %s is greater than the min margin level %s, calculating the net value",
 				hedgeAccount.MarginLevel.String(),
 				s.MinMarginLevel.String())
+		}
 
-			netValueInUsd := s.accountValueCalculator.NetValue()
+		// calculate credit buffer
+		netValueInUsd := s.accountValueCalculator.NetValue()
+		s.logger.Infof("hedge account net value in usd: %f", netValueInUsd.Float64())
 
-			// calculate credit buffer
-			s.logger.Infof("hedge account net value in usd: %f", netValueInUsd.Float64())
+		maximumValueInUsd := netValueInUsd.Mul(s.MaxHedgeAccountLeverage)
+		s.logger.Infof("hedge account maximum leveraged value in usd: %f (%f x)", maximumValueInUsd.Float64(), s.MaxHedgeAccountLeverage.Float64())
 
-			maximumValueInUsd := netValueInUsd.Mul(s.MaxHedgeAccountLeverage)
+		allowMarginBuy, bidQuota := s.allowMarginHedge(types.SideTypeBuy)
+		if allowMarginBuy {
+			hedgeQuota.BaseAsset.Add(bidQuota.Div(bestBid.Price))
+		} else {
+			disableMakerBid = true
+		}
 
-			s.logger.Infof("hedge account maximum leveraged value in usd: %f (%f x)", maximumValueInUsd.Float64(), s.MaxHedgeAccountLeverage.Float64())
-
-			if quote, ok := hedgeAccount.Balance(s.sourceMarket.QuoteCurrency); ok {
-				debt := quote.Debt()
-				quota := maximumValueInUsd.Sub(debt)
-
-				s.logger.Infof("hedge account quote balance: %s, debt: %s, quota: %s",
-					quote.String(),
-					debt.String(),
-					quota.String())
-
-				hedgeQuota.QuoteAsset.Add(quota)
-			}
-
-			if base, ok := hedgeAccount.Balance(s.sourceMarket.BaseCurrency); ok {
-				debt := base.Debt()
-				quota := maximumValueInUsd.Div(bestAsk.Price).Sub(debt)
-
-				s.logger.Infof("hedge account base balance: %s, debt: %s, quota: %s",
-					base.String(),
-					debt.String(),
-					quota.String())
-
-				hedgeQuota.BaseAsset.Add(quota)
-			}
+		allowMarginSell, sellQuota := s.allowMarginHedge(types.SideTypeSell)
+		if allowMarginSell {
+			hedgeQuota.QuoteAsset.Add(sellQuota.Mul(bestAsk.Price))
+		} else {
+			disableMakerAsk = true
 		}
 	} else {
 		if b, ok := hedgeBalances[s.sourceMarket.BaseCurrency]; ok {
@@ -1610,6 +1687,10 @@ func (s *Strategy) Defaults() error {
 		if s.DelayedHedge.SignalThreshold == 0.0 {
 			s.DelayedHedge.SignalThreshold = 0.5
 		}
+	}
+
+	if s.MinMarginLevel.IsZero() {
+		s.MinMarginLevel = fixedpoint.NewFromFloat(2.0)
 	}
 
 	// circuitBreakerAlertLimiter is for CircuitBreaker alerts
