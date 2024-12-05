@@ -140,6 +140,14 @@ func (a *Account) Balance(currency string) (balance Balance, ok bool) {
 	return balance, ok
 }
 
+func (a *Account) SetBalance(currency string, bal Balance) {
+	a.Lock()
+	defer a.Unlock()
+
+	bal.Currency = currency
+	a.balances[currency] = bal
+}
+
 func (a *Account) AddBalance(currency string, fund fixedpoint.Value) {
 	a.Lock()
 	defer a.Unlock()
