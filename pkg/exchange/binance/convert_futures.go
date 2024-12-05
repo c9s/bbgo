@@ -114,6 +114,11 @@ func toGlobalFuturesOrders(futuresOrders []*futures.Order, isIsolated bool) (ord
 }
 
 func toGlobalFuturesOrder(futuresOrder *futures.Order, isIsolated bool) (*types.Order, error) {
+	orderPrice := futuresOrder.Price
+	if orderPrice.IsZero() {
+		orderPrice = futuresOrder.AvgPrice
+	}
+
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: futuresOrder.ClientOrderID,
@@ -123,7 +128,7 @@ func toGlobalFuturesOrder(futuresOrder *futures.Order, isIsolated bool) (*types.
 			ReduceOnly:    futuresOrder.ReduceOnly,
 			ClosePosition: futuresOrder.ClosePosition,
 			Quantity:      fixedpoint.MustNewFromString(futuresOrder.OrigQuantity),
-			Price:         fixedpoint.MustNewFromString(futuresOrder.Price),
+			Price:         fixedpoint.MustNewFromString(orderPrice),
 			TimeInForce:   types.TimeInForce(futuresOrder.TimeInForce),
 		},
 		Exchange:         types.ExchangeBinance,
