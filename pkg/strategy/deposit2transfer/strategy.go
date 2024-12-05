@@ -295,6 +295,11 @@ func (s *Strategy) repay(ctx context.Context, d types.Deposit, amount fixedpoint
 
 	amount = fixedpoint.Min(bal.Debt(), amount)
 
+	if amount.Sign() <= 0 {
+		s.logger.Infof("%s has no debt to repay", d.Asset)
+		return nil
+	}
+
 	s.logger.Infof("adjusted repay amount to %s", amount.String())
 
 	if err := s.marginBorrowRepayService.RepayMarginAsset(ctx, d.Asset, amount); err != nil {
