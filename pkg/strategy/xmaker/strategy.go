@@ -203,7 +203,8 @@ type Strategy struct {
 	// MaxExposurePosition defines the unhedged quantity of stop
 	MaxExposurePosition fixedpoint.Value `json:"maxExposurePosition"`
 
-	MaxHedgeAccountLeverage fixedpoint.Value `json:"maxHedgeAccountLeverage"`
+	MaxHedgeAccountLeverage       fixedpoint.Value `json:"maxHedgeAccountLeverage"`
+	MaxHedgeQuoteQuantityPerOrder fixedpoint.Value `json:"maxHedgeQuoteQuantityPerOrder"`
 
 	DisableHedge bool `json:"disableHedge"`
 
@@ -1407,8 +1408,12 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 			account, s.sourceMarket, side, quantity, lastPrice)
 	}
 
-	// truncate quantity for the supported precision
-	quantity = s.sourceMarket.TruncateQuantity(quantity)
+	if s.MaxHedgeQuoteQuantityPerOrder.Sign() > 0 && !lastPrice.IsZero() {
+		quantity = s.sourceMarket.AdjustQuantityByMaxAmount(quantity, lastPrice, s.MaxHedgeQuoteQuantityPerOrder)
+	} else {
+		// truncate quantity for the supported precision
+		quantity = s.sourceMarket.TruncateQuantity(quantity)
+	}
 
 	if s.sourceMarket.IsDustQuantity(quantity, lastPrice) {
 		s.logger.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
