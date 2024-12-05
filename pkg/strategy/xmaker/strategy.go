@@ -2033,6 +2033,10 @@ func (s *Strategy) CrossRun(
 		}
 	}
 
+	s.CircuitBreaker.OnPanic(func() {
+		bbgo.Sync(ctx, s)
+	})
+
 	sourceMarketStream := s.sourceSession.Exchange.NewStream()
 	sourceMarketStream.SetPublicOnly()
 	sourceMarketStream.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
@@ -2190,6 +2194,7 @@ func (s *Strategy) CrossRun(
 			log.WithError(err).Errorf("graceful cancel error")
 		}
 
+		bbgo.Sync(ctx, s)
 		bbgo.Notify("Shutting down %s %s", ID, s.Symbol, s.Position)
 	})
 
