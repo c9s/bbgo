@@ -1066,7 +1066,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	askMarginMetrics.With(s.metricsLabels).Set(quote.AskMargin.Float64())
 
 	if s.EnableArbitrage {
-		done, err := s.tryArbitrage(ctx, quote, makerBalances, hedgeBalances)
+		done, err := s.tryArbitrage(ctx, quote, makerBalances, hedgeBalances, disableMakerBid, disableMakerAsk)
 		if err != nil {
 			s.logger.WithError(err).Errorf("unable to arbitrage")
 		} else if done {
@@ -1261,7 +1261,9 @@ func aggregatePriceVolumeSliceWithPriceFilter(
 }
 
 // tryArbitrage tries to arbitrage between the source and maker exchange
-func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances, hedgeBalances types.BalanceMap) (bool, error) {
+func (s *Strategy) tryArbitrage(
+	ctx context.Context, quote *Quote, makerBalances, hedgeBalances types.BalanceMap, disableBid, disableAsk bool,
+) (bool, error) {
 	if s.makerBook == nil {
 		return false, nil
 	}
@@ -1277,7 +1279,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 	var iocOrders []types.SubmitOrder
 	if makerAsk.Price.Compare(marginBidPrice) <= 0 {
 		quoteBalance, hasQuote := makerBalances[s.makerMarket.QuoteCurrency]
-		if !hasQuote {
+		if !hasQuote || disableBid {
 			return false, nil
 		}
 
@@ -1310,7 +1312,7 @@ func (s *Strategy) tryArbitrage(ctx context.Context, quote *Quote, makerBalances
 
 	} else if makerBid.Price.Compare(marginAskPrice) >= 0 {
 		baseBalance, hasBase := makerBalances[s.makerMarket.BaseCurrency]
-		if !hasBase {
+		if !hasBase || disableAsk {
 			return false, nil
 		}
 
