@@ -9,28 +9,28 @@ import (
 )
 
 const (
-	defaultNumTrees   = 100
-	defaultSampleSize = 256
-	defaultThreshold  = 0.6
+	defaultNumTrees       = 100
+	defaultSampleSize     = 256
+	defaultScoreThreshold = 0.6
 )
 
 // Isolation Forest algorithm
 // https://cs.nju.edu.cn/zhouzh/zhouzh.files/publication/icdm08b.pdf
 // https://www.lamda.nju.edu.cn/publication/tkdd11.pdf
 type IsolationForest struct {
-	Forest     []*TreeNode
-	Threshold  float64 `json:"threshold"`
-	NumTrees   int     `json:"numTrees"`
-	SampleSize int     `json:"sampleSize"`
-	MaxDepth   int     `json:"heightLimit"`
+	Forest         []*TreeNode
+	ScoreThreshold float64 `json:"threshold"`
+	NumTrees       int     `json:"numTrees"`
+	SampleSize     int     `json:"sampleSize"`
+	MaxDepth       int     `json:"heightLimit"`
 }
 
 func New() *IsolationForest {
 	return &IsolationForest{
-		Threshold:  defaultThreshold,
-		NumTrees:   defaultNumTrees,
-		SampleSize: defaultSampleSize,
-		MaxDepth:   int(math.Ceil(math.Log2(float64(defaultSampleSize)))),
+		ScoreThreshold: defaultScoreThreshold,
+		NumTrees:       defaultNumTrees,
+		SampleSize:     defaultSampleSize,
+		MaxDepth:       int(math.Ceil(math.Log2(float64(defaultSampleSize)))),
 	}
 }
 
@@ -97,7 +97,7 @@ func (f *IsolationForest) Predict(samples *mat.Dense) []int {
 	scores := f.Score(samples)
 	predictions := make([]int, len(scores))
 	for i, score := range scores {
-		if score > f.Threshold {
+		if score > f.ScoreThreshold {
 			predictions[i] = 1
 		} else {
 			predictions[i] = 0
