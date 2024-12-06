@@ -720,16 +720,34 @@ func (s *Strategy) allowMarginHedge(side types.SideType) (bool, fixedpoint.Value
 		return false, zero
 	}
 
+	bufMinMarginLevel := s.MinMarginLevel.Mul(fixedpoint.NewFromFloat(1.005))
 	marketValue := s.accountValueCalculator.MarketValue()
 	debtValue := s.accountValueCalculator.DebtValue()
+	netValueInUsd := s.accountValueCalculator.NetValue()
+	s.logger.Infof("hedge account net value in usd: %f, debt value in usd: %f",
+		netValueInUsd.Float64(),
+		debtValue.Float64())
 
 	// if the margin level is higher than the minimal margin level,
 	// we can hedge the position, but we need to check the debt quota
 	if hedgeAccount.MarginLevel.Compare(s.MinMarginLevel) > 0 {
-		debtQuota := calculateDebtQuota(marketValue, debtValue, s.MinMarginLevel)
-
+		// debtQuota is the quota with minimal margin level
+		debtQuota := calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel)
 		if debtQuota.Sign() <= 0 {
 			return false, zero
+		}
+
+		// if MaxHedgeAccountLeverage is set, we need to calculate credit buffer
+		if s.MaxHedgeAccountLeverage.Sign() > 0 {
+			maximumValueInUsd := netValueInUsd.Mul(s.MaxHedgeAccountLeverage)
+			leverageQuotaInUsd := maximumValueInUsd.Sub(debtValue)
+			s.logger.Infof("hedge account maximum leveraged value in usd: %f (%f x), quota in usd: %f",
+				maximumValueInUsd.Float64(),
+				s.MaxHedgeAccountLeverage.Float64(),
+				leverageQuotaInUsd.Float64(),
+			)
+
+			debtQuota = fixedpoint.Min(debtQuota, leverageQuotaInUsd)
 		}
 
 		switch side {
@@ -956,13 +974,6 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				hedgeAccount.MarginLevel.String(),
 				s.MinMarginLevel.String())
 		}
-
-		// calculate credit buffer
-		netValueInUsd := s.accountValueCalculator.NetValue()
-		s.logger.Infof("hedge account net value in usd: %f", netValueInUsd.Float64())
-
-		maximumValueInUsd := netValueInUsd.Mul(s.MaxHedgeAccountLeverage)
-		s.logger.Infof("hedge account maximum leveraged value in usd: %f (%f x)", maximumValueInUsd.Float64(), s.MaxHedgeAccountLeverage.Float64())
 
 		allowMarginBuy, bidQuota := s.allowMarginHedge(types.SideTypeBuy)
 		if allowMarginBuy {
