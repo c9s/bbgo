@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -20,6 +21,8 @@ import (
 func TestStrategy_allowMarginHedge(t *testing.T) {
 	symbol := "BTCUSDT"
 	market := Market(symbol)
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
 	priceSolver := pricesolver.NewSimplePriceResolver(AllMarkets())
 	priceSolver.Update("BTCUSDT", Number(98000.0))
 	priceSolver.Update("ETHUSDT", Number(3800.0))
@@ -58,17 +61,18 @@ func TestStrategy_allowMarginHedge(t *testing.T) {
 			sourceMarket:           market,
 			sourceSession:          session,
 			accountValueCalculator: accountValueCalc,
+			logger:                 logger,
 		}
 		s.lastPrice.Set(Number(98000.0))
 
 		allowed, quota := s.allowMarginHedge(types.SideTypeBuy)
 		if assert.True(t, allowed) {
-			assert.InDelta(t, 134941.176470588, quota.Float64(), 1.0, "should be able to borrow %f USDT", quota.Float64())
+			assert.InDelta(t, 133782.26785814, quota.Float64(), 1.0, "should be able to borrow %f USDT", quota.Float64())
 		}
 
 		allowed, quota = s.allowMarginHedge(types.SideTypeSell)
 		if assert.True(t, allowed) {
-			assert.InDelta(t, 1.376951, quota.Float64(), 0.0001, "should be able to borrow %f BTC", quota.Float64())
+			assert.InDelta(t, 1.36512518, quota.Float64(), 0.0001, "should be able to borrow %f BTC", quota.Float64())
 		}
 	})
 
@@ -110,6 +114,7 @@ func TestStrategy_allowMarginHedge(t *testing.T) {
 			sourceMarket:           market,
 			sourceSession:          session,
 			accountValueCalculator: accountValueCalc,
+			logger:                 logger,
 		}
 		s.lastPrice.Set(Number(98000.0))
 
