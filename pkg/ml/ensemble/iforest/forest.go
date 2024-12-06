@@ -105,3 +105,15 @@ func (f *IsolationForest) Predict(samples *mat.Dense) []int {
 	}
 	return predictions
 }
+
+func (f *IsolationForest) FeatureImportance(sample []float64) []float64 {
+	o := make([]float64, len(sample))
+
+	for _, tree := range f.Forest {
+		for i, c := range tree.FeatureImportance(sample) {
+			o[i] += float64(c) / float64(f.NumTrees)
+		}
+	}
+
+	return o
+}
