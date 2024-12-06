@@ -2,6 +2,7 @@ package dca2
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -169,7 +170,12 @@ func (s *Strategy) runPositionOpening(ctx context.Context, next State) bool {
 	s.logger.Info("[State] PositionOpening - start placing open-position orders")
 
 	if err := s.placeOpenPositionOrders(ctx); err != nil {
-		s.logger.WithError(err).Error("failed to place open-position orders, please check it.")
+		if strings.Contains(err.Error(), "failed to generate open position orders") {
+			s.logger.WithError(err).Warn("failed to place open-position orders, please check it.")
+		} else {
+			s.logger.WithError(err).Error("failed to place open-position orders, please check it.")
+		}
+
 		return false
 	}
 
