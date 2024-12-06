@@ -1,0 +1,19 @@
+sessions:
+  max:
+    exchange: &exchange max
+    envVarPrefix: max
+
+persistence:
+  json:
+    directory: var/data
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+exchangeStrategies:
+- on: *exchange
+  sentinel:
+    symbol: BTCUSDT
+    interval: 1m
+    scoreThreshold: 0.6
