@@ -18,17 +18,17 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 	s.logger.Infof("start placing open position orders")
 	price, err := getBestPriceUntilSuccess(ctx, s.ExchangeSession.Exchange, s.Symbol)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get best price: %w", err)
 	}
 
 	orders, err := generateOpenPositionOrders(s.Market, s.EnableQuoteInvestmentReallocate, s.QuoteInvestment, s.ProfitStats.TotalProfit, price, s.PriceDeviation, s.MaxOrderCount, s.OrderGroupID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate open position orders: %w", err)
 	}
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orders...)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to submit open position orders: %w", err)
 	}
 
 	s.debugOrders(createdOrders)
@@ -75,11 +75,11 @@ func generateOpenPositionOrders(market types.Market, enableQuoteInvestmentReallo
 
 	notional, orderNum := calculateNotionalAndNumOrders(market, quoteInvestment, prices)
 	if orderNum == 0 {
-		return nil, fmt.Errorf("failed to calculate notional and num of open position orders, price: %s, quote investment: %s", price, quoteInvestment)
+		return nil, fmt.Errorf("notional and num of open position orders can't be calculated, price: %s, quote investment: %s", price, quoteInvestment)
 	}
 
 	if !enableQuoteInvestmentReallocate && orderNum != int(maxOrderCount) {
-		return nil, fmt.Errorf("failed to generate open-position orders due to the orders may be under min notional or quantity")
+		return nil, fmt.Errorf("the orders may be under min notional or quantity")
 	}
 
 	side := types.SideTypeBuy
