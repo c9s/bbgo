@@ -56,6 +56,7 @@ func (b *Buffer) SetUpdateTimeout(d time.Duration) {
 }
 
 func (b *Buffer) resetSnapshot() {
+	log.Info("resetting the snapshot")
 	b.snapshot = nil
 	b.finalUpdateID = 0
 }
@@ -91,16 +92,16 @@ func (b *Buffer) SetSnapshot(snapshot types.SliceOrderBook, firstUpdateID int64,
 		return nil
 	}
 
+	log.Info("setting the snapshot")
 	// set the final update ID so that we will know if there is an update missing
 	b.finalUpdateID = finalUpdateID
 
 	// set the snapshot
 	b.snapshot = &snapshot
+	b.EmitReady(snapshot, nil)
 
 	b.mu.Unlock()
 
-	// should unlock first then call ready
-	b.EmitReady(snapshot, nil)
 	return nil
 }
 
@@ -176,9 +177,9 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 
 	log.Debugf("depth update id %d -> %d", b.finalUpdateID, u.FinalUpdateID)
 	b.finalUpdateID = u.FinalUpdateID
-	b.mu.Unlock()
-
 	b.EmitPush(u)
+
+	b.mu.Unlock()
 
 	return nil
 }
@@ -243,10 +244,9 @@ func (b *Buffer) fetchAndPush() error {
 
 	// set the snapshot
 	b.snapshot = &book
+	b.EmitReady(book, pushUpdates)
 
 	b.mu.Unlock()
 
-	// should unlock first then call ready
-	b.EmitReady(book, pushUpdates)
 	return nil
 }
