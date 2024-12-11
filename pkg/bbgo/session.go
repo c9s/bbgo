@@ -17,6 +17,7 @@ import (
 	"github.com/c9s/bbgo/pkg/cache"
 	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
+	"github.com/c9s/bbgo/pkg/metrics"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
@@ -232,12 +233,31 @@ func (session *ExchangeSession) GetAccount() (a *types.Account) {
 	return a
 }
 
+func (session *ExchangeSession) GetIsolatedSymbol() string {
+	isolatedSymbol := ""
+	if session.IsolatedMarginSymbol != "" {
+		isolatedSymbol = session.IsolatedMarginSymbol
+	} else if session.IsolatedFuturesSymbol != "" {
+		isolatedSymbol = session.IsolatedFuturesSymbol
+	}
+
+	return isolatedSymbol
+}
+
 // UpdateAccount locks the account mutex and update the account object
 func (session *ExchangeSession) UpdateAccount(ctx context.Context) (*types.Account, error) {
 	account, err := session.Exchange.QueryAccount(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	isolatedSymbol := session.GetIsolatedSymbol()
+
+	metrics.AccountMarginLevelMetrics.With(prometheus.Labels{
+		"exchange":        session.ExchangeName.String(),
+		"account_type":    string(account.AccountType),
+		"isolated_symbol": isolatedSymbol,
+	}).Set(account.MarginLevel.Float64())
 
 	session.setAccount(account)
 	return account, nil
