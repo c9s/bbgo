@@ -242,6 +242,8 @@ func (s *Stream) handleTradeEvent(e max.TradeUpdateEvent) {
 	}
 }
 
+// handleBookEvent returns a callback that will be registered to the websocket stream
+// this callback will be called when the websocket stream receives a book event
 func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
 	return func(e max.BookEvent) {
 		symbol := toGlobalSymbol(e.Market)
