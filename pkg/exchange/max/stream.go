@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/depth"
 	max "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -47,6 +48,8 @@ type Stream struct {
 
 	// depthBuffers is used for storing the depth info
 	depthBuffers map[string]*depth.Buffer
+
+	debts map[string]max.Debt
 }
 
 func NewStream(ex *Exchange, key, secret string) *Stream {
@@ -56,12 +59,14 @@ func NewStream(ex *Exchange, key, secret string) *Stream {
 		// pragma: allowlist nextline secret
 		secret:       secret,
 		depthBuffers: make(map[string]*depth.Buffer),
+		debts:        make(map[string]max.Debt, 20),
 	}
 	stream.SetEndpointCreator(stream.getEndpoint)
 	stream.SetParser(max.ParseMessage)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.OnConnect(stream.handleConnect)
 	stream.OnDisconnect(stream.handleDisconnect)
+	stream.OnDebtEvent(stream.handleDebtEvent)
 	stream.OnAuthEvent(func(e max.AuthEvent) {
 		log.Infof("max websocket connection authenticated: %+v", e)
 		stream.EmitAuth()
@@ -326,29 +331,52 @@ func (s *Stream) String() string {
 	return ss
 }
 
+func (s *Stream) handleDebtEvent(e max.DebtEvent) {
+	for _, debt := range e.Debts {
+		currency := toGlobalCurrency(debt.Currency)
+		s.debts[currency] = debt
+	}
+}
+
 func (s *Stream) handleAccountSnapshotEvent(e max.AccountSnapshotEvent) {
-	snapshot := map[string]types.Balance{}
+	snapshot := types.BalanceMap{}
 	for _, bm := range e.Balances {
-		balance, err := bm.Balance()
-		if err != nil {
-			continue
+		bal := types.Balance{
+			Currency:  toGlobalCurrency(bm.Currency),
+			Locked:    bm.Locked,
+			Available: bm.Available,
+			Borrowed:  fixedpoint.Zero,
+			Interest:  fixedpoint.Zero,
 		}
 
-		snapshot[balance.Currency] = *balance
+		if debt, ok := s.debts[bal.Currency]; ok {
+			bal.Borrowed = debt.DebtPrincipal
+			bal.Interest = debt.DebtInterest
+		}
+
+		snapshot[bal.Currency] = bal
 	}
 
 	s.EmitBalanceSnapshot(snapshot)
 }
 
 func (s *Stream) handleAccountUpdateEvent(e max.AccountUpdateEvent) {
-	snapshot := map[string]types.Balance{}
+	snapshot := types.BalanceMap{}
 	for _, bm := range e.Balances {
-		balance, err := bm.Balance()
-		if err != nil {
-			continue
+		bal := types.Balance{
+			Currency:  toGlobalCurrency(bm.Currency),
+			Available: bm.Available,
+			Locked:    bm.Locked,
+			Borrowed:  fixedpoint.Zero,
+			Interest:  fixedpoint.Zero,
 		}
 
-		snapshot[toGlobalCurrency(balance.Currency)] = *balance
+		if debt, ok := s.debts[bal.Currency]; ok {
+			bal.Borrowed = debt.DebtPrincipal
+			bal.Interest = debt.DebtInterest
+		}
+
+		snapshot[bal.Currency] = bal
 	}
 
 	s.EmitBalanceUpdate(snapshot)
