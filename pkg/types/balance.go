@@ -198,8 +198,9 @@ func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) AssetMap {
 	for currency, b := range m {
 		total := b.Total()
 		netAsset := b.Net()
+		debt := b.Debt()
 
-		if total.IsZero() && netAsset.IsZero() {
+		if total.IsZero() && netAsset.IsZero() && debt.IsZero() {
 			continue
 		}
 
