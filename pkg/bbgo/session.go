@@ -368,8 +368,10 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 			}
 
 			session.setAccount(account)
-			session.metricsBalancesUpdater(account.Balances())
-			logger.Infof("account %s balances:\n%s", session.Name, account.Balances().String())
+
+			balances := account.Balances()
+			session.metricsBalancesUpdater(balances)
+			logger.Infof("session %s account balances:\n%s", session.Name, balances.NotZero().String())
 		}
 
 		// forward trade updates and order updates to the order executor
