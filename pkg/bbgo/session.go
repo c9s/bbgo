@@ -18,6 +18,7 @@ import (
 	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/metrics"
+	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
@@ -150,6 +151,8 @@ type ExchangeSession struct {
 	initializedSymbols map[string]struct{}
 
 	logger log.FieldLogger
+
+	priceSolver *pricesolver.SimplePriceSolver
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
@@ -304,7 +307,10 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		return ErrEmptyMarketInfo
 	}
 
+	logger.Infof("%d markets loaded", len(markets))
 	session.markets = markets
+
+	session.priceSolver = pricesolver.NewSimplePriceResolver(markets)
 
 	if feeRateProvider, ok := session.Exchange.(types.ExchangeDefaultFeeRates); ok {
 		defaultFeeRates := feeRateProvider.DefaultFeeRates()
@@ -327,10 +333,14 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	}
 
 	if session.UseHeikinAshi {
+		// replace the existing market data stream
 		session.MarketDataStream = &types.HeikinAshiStream{
 			StandardStreamEmitter: session.MarketDataStream.(types.StandardStreamEmitter),
 		}
 	}
+
+	session.priceSolver.BindStream(session.UserDataStream)
+	session.priceSolver.BindStream(session.MarketDataStream)
 
 	// query and initialize the balances
 	if !session.PublicOnly {
