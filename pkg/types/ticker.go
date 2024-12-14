@@ -18,6 +18,11 @@ type Ticker struct {
 	Sell   fixedpoint.Value // `sell` from Max, `askPrice` from binance
 }
 
+// GetValidPrice returns the valid price from the ticker
+// if the last price is not zero, return the last price
+// if the buy price is not zero, return the buy price
+// if the sell price is not zero, return the sell price
+// otherwise return the open price
 func (t *Ticker) GetValidPrice() fixedpoint.Value {
 	if !t.Last.IsZero() {
 		return t.Last

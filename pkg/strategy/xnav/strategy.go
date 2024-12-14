@@ -109,7 +109,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 		account := session.GetAccount()
 		balances := account.Balances()
-		if err := session.UpdatePrices(ctx, balances.Currencies(), quoteCurrency); err != nil {
+		if err := session.UpdatePrices(ctx, balances.NotZero().Currencies(), quoteCurrency); err != nil {
 			log.WithError(err).Error("price update failed")
 			return
 		}
