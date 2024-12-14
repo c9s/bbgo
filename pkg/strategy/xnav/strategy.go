@@ -118,7 +118,10 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		s.Environment.RecordAsset(priceTime, session, assets)
 
 		for _, as := range assets {
-			log.Infof("session %s %s asset = net:%s available:%s",
+			log.WithFields(logrus.Fields{
+				"session":  sessionName,
+				"exchange": session.ExchangeName,
+			}).Infof("session %s %s asset = net:%s available:%s",
 				sessionName,
 				as.Currency,
 				as.NetAsset.String(),
