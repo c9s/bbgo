@@ -9,6 +9,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/asset"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 	"github.com/c9s/bbgo/pkg/util/timejitter"
 
@@ -58,10 +59,11 @@ func (s *State) Reset() {
 type Strategy struct {
 	*bbgo.Environment
 
-	Interval      types.Interval `json:"interval"`
-	Schedule      string         `json:"schedule"`
-	ReportOnStart bool           `json:"reportOnStart"`
-	IgnoreDusts   bool           `json:"ignoreDusts"`
+	Interval         types.Interval `json:"interval"`
+	Schedule         string         `json:"schedule"`
+	ReportOnStart    bool           `json:"reportOnStart"`
+	IgnoreDusts      bool           `json:"ignoreDusts"`
+	DisplayBreakdown bool           `json:"displayBreakdown"`
 
 	State *State `persistence:"state"`
 
@@ -88,10 +90,8 @@ var ten = fixedpoint.NewFromInt(10)
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
 func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
-	totalBalances := types.BalanceMap{}
-	allPrices := map[string]fixedpoint.Value{}
-	sessionBalances := map[string]types.BalanceMap{}
 	priceTime := time.Now()
+	allAssets := map[string]types.AssetMap{}
 
 	// iterate the sessions and record them
 	quoteCurrency := "USDT"
@@ -108,38 +108,38 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		}
 
 		account := session.GetAccount()
-		balances := account.Balances()
-		if err := session.UpdatePrices(ctx, balances.NotZero().Currencies(), quoteCurrency); err != nil {
+		balances := account.Balances().NotZero()
+		if err := session.UpdatePrices(ctx, balances.Currencies(), quoteCurrency); err != nil {
 			log.WithError(err).Error("price update failed")
 			return
 		}
 
-		sessionBalances[sessionName] = balances
-		totalBalances = totalBalances.Add(balances)
-
-		prices := session.LastPrices()
-		assets := balances.Assets(prices, priceTime)
-
-		// merge prices
-		for m, p := range prices {
-			allPrices[m] = p
-		}
-
+		assets := asset.NewMapFromBalanceMap(session.GetPriceSolver(), priceTime, balances, quoteCurrency)
 		s.Environment.RecordAsset(priceTime, session, assets)
+
+		allAssets[sessionName] = assets
+
+		if s.DisplayBreakdown {
+			slackAttachment := assets.SlackAttachment()
+			slackAttachment.Title = "Session " + sessionName + " " + slackAttachment.Title
+			bbgo.Notify(slackAttachment)
+		}
 	}
 
-	displayAssets := types.AssetMap{}
-	totalAssets := totalBalances.Assets(allPrices, priceTime)
-	s.Environment.RecordAsset(priceTime, &bbgo.ExchangeSession{Name: "ALL"}, totalAssets)
+	totalAssets := types.AssetMap{}
+	for _, assets := range allAssets {
+		totalAssets = totalAssets.Merge(assets)
+	}
 
-	for currency, asset := range totalAssets {
-		// calculated if it's dust only when InUSD (usd value) is defined.
-		if s.IgnoreDusts && !asset.InUSD.IsZero() && asset.InUSD.Compare(ten) < 0 && asset.InUSD.Compare(ten.Neg()) > 0 {
-			continue
+	displayAssets := totalAssets.Filter(func(asset *types.Asset) bool {
+		if s.IgnoreDusts && !asset.InUSD.IsZero() && asset.InUSD.Abs().Compare(ten) < 0 {
+			return false
 		}
 
-		displayAssets[currency] = asset
-	}
+		return true
+	})
+
+	s.Environment.RecordAsset(priceTime, &bbgo.ExchangeSession{Name: "ALL"}, totalAssets)
 
 	bbgo.Notify(displayAssets)
 

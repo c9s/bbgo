@@ -34,6 +34,38 @@ type Asset struct {
 
 type AssetMap map[string]Asset
 
+func (m AssetMap) Merge(other AssetMap) AssetMap {
+	newMap := make(AssetMap)
+	for currency, asset := range other {
+		if existing, ok := m[currency]; ok {
+			asset.Total = asset.Total.Add(existing.Total)
+			asset.NetAsset = asset.NetAsset.Add(existing.NetAsset)
+			asset.Interest = asset.Interest.Add(existing.Interest)
+			asset.Locked = asset.Locked.Add(existing.Locked)
+			asset.Available = asset.Available.Add(existing.Available)
+			asset.Borrowed = asset.Borrowed.Add(existing.Borrowed)
+			asset.InUSD = asset.InUSD.Add(existing.InUSD)
+			asset.InBTC = asset.InBTC.Add(existing.InBTC)
+		}
+
+		m[currency] = asset
+	}
+
+	return newMap
+}
+
+func (m AssetMap) Filter(f func(asset *Asset) bool) AssetMap {
+	newMap := make(AssetMap)
+
+	for currency, asset := range m {
+		if f(&asset) {
+			newMap[currency] = asset
+		}
+	}
+
+	return newMap
+}
+
 func (m AssetMap) InUSD() (total fixedpoint.Value) {
 	for _, a := range m {
 		if a.InUSD.IsZero() {
@@ -42,6 +74,7 @@ func (m AssetMap) InUSD() (total fixedpoint.Value) {
 
 		total = total.Add(a.InUSD)
 	}
+
 	return total
 }
 
@@ -116,6 +149,10 @@ func (m AssetMap) SlackAttachment() slack.Attachment {
 
 			if !a.Borrowed.IsZero() {
 				text += fmt.Sprintf(" Borrowed: %s", a.Borrowed.String())
+			}
+
+			if !a.Interest.IsZero() {
+				text += fmt.Sprintf(" Interest: %s", a.Interest.String())
 			}
 
 			fields = append(fields, slack.AttachmentField{
