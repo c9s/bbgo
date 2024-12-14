@@ -13,7 +13,7 @@ backtest:
   # see here for more details
   # https://www.investopedia.com/terms/m/maximum-drawdown-mdd.asp
   startTime: "2020-01-01"
-  account:
+  accounts:
     binance:
       makerFeeRate: 15
       takerFeeRate: 15

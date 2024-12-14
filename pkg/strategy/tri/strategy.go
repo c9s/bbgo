@@ -820,7 +820,9 @@ func (s *Strategy) buildArbMarkets(
 			m.book = book
 			m.stream = stream
 		} else {
-			book, _ := session.OrderBook(symbol)
+
+			book := types.NewStreamBook(symbol, session.ExchangeName)
+			book.BindStream(session.MarketDataStream)
 			priceUpdater := func(_ types.SliceOrderBook) {
 				bestAsk, bestBid, _ := book.BestBidAndAsk()
 				if bestAsk.Equals(m.bestAsk) && bestBid.Equals(m.bestBid) {

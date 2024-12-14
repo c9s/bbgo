@@ -18,6 +18,7 @@ import (
 	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/metrics"
+	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
@@ -47,10 +48,9 @@ type ExchangeSession struct {
 	SubAccount   string             `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
 	// Withdrawal is used for enabling withdrawal functions
-	Withdrawal              bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
-	MakerFeeRate            fixedpoint.Value `json:"makerFeeRate" yaml:"makerFeeRate"`
-	TakerFeeRate            fixedpoint.Value `json:"takerFeeRate" yaml:"takerFeeRate"`
-	ModifyOrderAmountForFee bool             `json:"modifyOrderAmountForFee" yaml:"modifyOrderAmountForFee"`
+	Withdrawal   bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
+	MakerFeeRate fixedpoint.Value `json:"makerFeeRate" yaml:"makerFeeRate"`
+	TakerFeeRate fixedpoint.Value `json:"takerFeeRate" yaml:"takerFeeRate"`
 
 	// PublicOnly is used for setting the session to public only (without authentication, no private user data)
 	PublicOnly bool `json:"publicOnly,omitempty" yaml:"publicOnly"`
@@ -126,9 +126,6 @@ type ExchangeSession struct {
 	// markets defines market configuration of a symbol
 	markets map[string]types.Market
 
-	// orderBooks stores the streaming order book
-	orderBooks map[string]*types.StreamOrderBook
-
 	// startPrices is used for backtest
 	startPrices map[string]fixedpoint.Value
 
@@ -150,6 +147,8 @@ type ExchangeSession struct {
 	initializedSymbols map[string]struct{}
 
 	logger log.FieldLogger
+
+	priceSolver *pricesolver.SimplePriceSolver
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
@@ -182,10 +181,9 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		Account:       &types.Account{},
 		Trades:        make(map[string]*types.TradeSlice),
 
-		orderBooks:            make(map[string]*types.StreamOrderBook),
-		markets:               make(map[string]types.Market),
-		startPrices:           make(map[string]fixedpoint.Value),
-		lastPrices:            make(map[string]fixedpoint.Value),
+		markets:               make(map[string]types.Market, 100),
+		startPrices:           make(map[string]fixedpoint.Value, 30),
+		lastPrices:            make(map[string]fixedpoint.Value, 30),
 		positions:             make(map[string]*types.Position),
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
@@ -193,6 +191,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		usedSymbols:           make(map[string]struct{}),
 		initializedSymbols:    make(map[string]struct{}),
 		logger:                log.WithField("session", name),
+		priceSolver:           pricesolver.NewSimplePriceResolver(nil),
 	}
 
 	session.OrderExecutor = &ExchangeOrderExecutor{
@@ -304,7 +303,10 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		return ErrEmptyMarketInfo
 	}
 
+	logger.Infof("%d markets loaded", len(markets))
 	session.markets = markets
+
+	session.priceSolver = pricesolver.NewSimplePriceResolver(markets)
 
 	if feeRateProvider, ok := session.Exchange.(types.ExchangeDefaultFeeRates); ok {
 		defaultFeeRates := feeRateProvider.DefaultFeeRates()
@@ -316,21 +318,15 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		}
 	}
 
-	if session.ModifyOrderAmountForFee {
-		amountProtectExchange, ok := session.Exchange.(types.ExchangeAmountFeeProtect)
-		if !ok {
-			return fmt.Errorf("exchange %s does not support order amount protection", session.ExchangeName.String())
-		}
-
-		fees := types.ExchangeFee{MakerFeeRate: session.MakerFeeRate, TakerFeeRate: session.TakerFeeRate}
-		amountProtectExchange.SetModifyOrderAmountForFee(fees)
-	}
-
 	if session.UseHeikinAshi {
+		// replace the existing market data stream
 		session.MarketDataStream = &types.HeikinAshiStream{
 			StandardStreamEmitter: session.MarketDataStream.(types.StandardStreamEmitter),
 		}
 	}
+
+	session.priceSolver.BindStream(session.UserDataStream)
+	session.priceSolver.BindStream(session.MarketDataStream)
 
 	// query and initialize the balances
 	if !session.PublicOnly {
@@ -358,8 +354,10 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 			}
 
 			session.setAccount(account)
-			session.metricsBalancesUpdater(account.Balances())
-			logger.Infof("account %s balances:\n%s", session.Name, account.Balances().String())
+
+			balances := account.Balances()
+			session.metricsBalancesUpdater(balances)
+			logger.Infof("session %s account balances:\n%s", session.Name, balances.NotZero().String())
 		}
 
 		// forward trade updates and order updates to the order executor
@@ -545,9 +543,6 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	for _, sub := range session.Subscriptions {
 		switch sub.Channel {
 		case types.BookChannel:
-			book := types.NewStreamBook(sub.Symbol, session.ExchangeName)
-			book.BindStream(session.MarketDataStream)
-			session.orderBooks[sub.Symbol] = book
 
 		case types.KLineChannel:
 			if sub.Options.Interval == "" {
@@ -705,12 +700,6 @@ func (session *ExchangeSession) SerialMarketDataStore(
 	}
 	store.BindStream(ctx, session.MarketDataStream)
 	return store, true
-}
-
-// OrderBook returns the personal orderbook of a symbol
-func (session *ExchangeSession) OrderBook(symbol string) (s *types.StreamOrderBook, ok bool) {
-	s, ok = session.orderBooks[symbol]
-	return s, ok
 }
 
 func (session *ExchangeSession) StartPrice(symbol string) (price fixedpoint.Value, ok bool) {
@@ -946,7 +935,6 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	session.Account = &types.Account{}
 	session.Trades = make(map[string]*types.TradeSlice)
 
-	session.orderBooks = make(map[string]*types.StreamOrderBook)
 	session.markets = make(map[string]types.Market)
 	session.lastPrices = make(map[string]fixedpoint.Value)
 	session.startPrices = make(map[string]fixedpoint.Value)
