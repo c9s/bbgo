@@ -122,10 +122,6 @@ type ExchangeDefaultFeeRates interface {
 	DefaultFeeRates() ExchangeFee
 }
 
-type ExchangeAmountFeeProtect interface {
-	SetModifyOrderAmountForFee(ExchangeFee)
-}
-
 //go:generate mockgen -destination=mocks/mock_exchange_trade_history.go -package=mocks . ExchangeTradeHistoryService
 type ExchangeTradeHistoryService interface {
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)

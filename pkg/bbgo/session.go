@@ -48,10 +48,9 @@ type ExchangeSession struct {
 	SubAccount   string             `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
 	// Withdrawal is used for enabling withdrawal functions
-	Withdrawal              bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
-	MakerFeeRate            fixedpoint.Value `json:"makerFeeRate" yaml:"makerFeeRate"`
-	TakerFeeRate            fixedpoint.Value `json:"takerFeeRate" yaml:"takerFeeRate"`
-	ModifyOrderAmountForFee bool             `json:"modifyOrderAmountForFee" yaml:"modifyOrderAmountForFee"`
+	Withdrawal   bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
+	MakerFeeRate fixedpoint.Value `json:"makerFeeRate" yaml:"makerFeeRate"`
+	TakerFeeRate fixedpoint.Value `json:"takerFeeRate" yaml:"takerFeeRate"`
 
 	// PublicOnly is used for setting the session to public only (without authentication, no private user data)
 	PublicOnly bool `json:"publicOnly,omitempty" yaml:"publicOnly"`
@@ -317,16 +316,6 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 		if session.TakerFeeRate.IsZero() {
 			session.TakerFeeRate = defaultFeeRates.TakerFeeRate
 		}
-	}
-
-	if session.ModifyOrderAmountForFee {
-		amountProtectExchange, ok := session.Exchange.(types.ExchangeAmountFeeProtect)
-		if !ok {
-			return fmt.Errorf("exchange %s does not support order amount protection", session.ExchangeName.String())
-		}
-
-		fees := types.ExchangeFee{MakerFeeRate: session.MakerFeeRate, TakerFeeRate: session.TakerFeeRate}
-		amountProtectExchange.SetModifyOrderAmountForFee(fees)
 	}
 
 	if session.UseHeikinAshi {
