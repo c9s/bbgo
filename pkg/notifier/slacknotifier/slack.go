@@ -468,6 +468,9 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 	case slack.Attachment:
 		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{a}, slackAttachments...)...))
 
+	case *slack.Attachment:
+		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{*a}, slackAttachments...)...))
+
 	case types.SlackAttachmentCreator:
 		// convert object to slack attachment (if supported)
 		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{a.SlackAttachment()}, slackAttachments...)...))
