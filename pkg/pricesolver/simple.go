@@ -30,6 +30,10 @@ type SimplePriceSolver struct {
 }
 
 func NewSimplePriceResolver(markets types.MarketMap) *SimplePriceSolver {
+	if markets == nil {
+		markets = make(types.MarketMap)
+	}
+
 	return &SimplePriceSolver{
 		markets:       markets,
 		symbolPrices:  make(map[string]fixedpoint.Value),
