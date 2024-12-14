@@ -117,6 +117,14 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		assets := asset.NewMapFromBalanceMap(session.GetPriceSolver(), priceTime, balances, quoteCurrency)
 		s.Environment.RecordAsset(priceTime, session, assets)
 
+		for _, as := range assets {
+			log.Infof("session %s %s asset = net:%s available:%s",
+				sessionName,
+				as.Currency,
+				as.NetAsset.String(),
+				as.Available.String())
+		}
+
 		allAssets[sessionName] = assets
 
 		if s.DisplayBreakdown {
