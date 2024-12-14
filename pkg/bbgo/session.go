@@ -127,9 +127,6 @@ type ExchangeSession struct {
 	// markets defines market configuration of a symbol
 	markets map[string]types.Market
 
-	// orderBooks stores the streaming order book
-	orderBooks map[string]*types.StreamOrderBook
-
 	// startPrices is used for backtest
 	startPrices map[string]fixedpoint.Value
 
@@ -185,10 +182,9 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		Account:       &types.Account{},
 		Trades:        make(map[string]*types.TradeSlice),
 
-		orderBooks:            make(map[string]*types.StreamOrderBook),
-		markets:               make(map[string]types.Market),
-		startPrices:           make(map[string]fixedpoint.Value),
-		lastPrices:            make(map[string]fixedpoint.Value),
+		markets:               make(map[string]types.Market, 100),
+		startPrices:           make(map[string]fixedpoint.Value, 30),
+		lastPrices:            make(map[string]fixedpoint.Value, 30),
 		positions:             make(map[string]*types.Position),
 		marketDataStores:      make(map[string]*MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
@@ -557,9 +553,6 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	for _, sub := range session.Subscriptions {
 		switch sub.Channel {
 		case types.BookChannel:
-			book := types.NewStreamBook(sub.Symbol, session.ExchangeName)
-			book.BindStream(session.MarketDataStream)
-			session.orderBooks[sub.Symbol] = book
 
 		case types.KLineChannel:
 			if sub.Options.Interval == "" {
@@ -717,12 +710,6 @@ func (session *ExchangeSession) SerialMarketDataStore(
 	}
 	store.BindStream(ctx, session.MarketDataStream)
 	return store, true
-}
-
-// OrderBook returns the personal orderbook of a symbol
-func (session *ExchangeSession) OrderBook(symbol string) (s *types.StreamOrderBook, ok bool) {
-	s, ok = session.orderBooks[symbol]
-	return s, ok
 }
 
 func (session *ExchangeSession) StartPrice(symbol string) (price fixedpoint.Value, ok bool) {
@@ -958,7 +945,6 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	session.Account = &types.Account{}
 	session.Trades = make(map[string]*types.TradeSlice)
 
-	session.orderBooks = make(map[string]*types.StreamOrderBook)
 	session.markets = make(map[string]types.Market)
 	session.lastPrices = make(map[string]fixedpoint.Value)
 	session.startPrices = make(map[string]fixedpoint.Value)
