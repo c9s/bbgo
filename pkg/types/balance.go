@@ -10,6 +10,7 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/pricesolver"
 )
 
 type PriceMap map[string]fixedpoint.Value
@@ -194,6 +195,47 @@ func (m BalanceMap) Copy() (d BalanceMap) {
 		d[c] = b
 	}
 	return d
+}
+
+func NewAssetMapFromBalanceMap(priceSolver *pricesolver.SimplePriceSolver, m BalanceMap, fiat string) AssetMap {
+	assets := make(AssetMap)
+
+	btcInUSD, hasBtcPrice := priceSolver.ResolvePrice("BTC", fiat, "USDT")
+
+	now := time.Now()
+	for currency, b := range m {
+
+		total := b.Total()
+		netAsset := b.Net()
+		debt := b.Debt()
+
+		if total.IsZero() && netAsset.IsZero() && debt.IsZero() {
+			continue
+		}
+
+		asset := Asset{
+			Currency:  currency,
+			Total:     total,
+			Time:      now,
+			Locked:    b.Locked,
+			Available: b.Available,
+			Borrowed:  b.Borrowed,
+			Interest:  b.Interest,
+			NetAsset:  netAsset,
+		}
+
+		if assetPrice, ok := priceSolver.ResolvePrice(currency, fiat, "USDT"); ok {
+			asset.PriceInUSD = assetPrice
+			asset.InUSD = netAsset.Mul(assetPrice)
+			if hasBtcPrice {
+				asset.InBTC = asset.InUSD.Div(btcInUSD)
+			}
+		}
+
+		assets[currency] = asset
+	}
+
+	return assets
 }
 
 // Assets converts balances into assets with the given prices
