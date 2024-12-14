@@ -265,13 +265,16 @@ func (slice PriceVolumeSlice) AverageDepthPriceByQuote(requiredDepthInQuote fixe
 	totalQuantity := fixedpoint.Zero
 
 	l := len(slice)
-	if maxLevel > 0 && l > maxLevel {
-		l = maxLevel
+	if maxLevel > 0 {
+		l = min(l, maxLevel)
 	}
 
 	for i := 0; i < l; i++ {
 		pv := slice[i]
-		quoteAmount := fixedpoint.Mul(pv.Volume, pv.Price)
+
+		// quoteAmount is the total quote amount of the current price level
+		quoteAmount := pv.Volume.Mul(pv.Price)
+
 		totalQuoteAmount = totalQuoteAmount.Add(quoteAmount)
 		totalQuantity = totalQuantity.Add(pv.Volume)
 
@@ -321,11 +324,12 @@ func (slice PriceVolumeSlice) AverageDepthPrice(requiredQuantity fixedpoint.Valu
 		pv := slice[i]
 		if pv.Volume.Compare(rq) >= 0 {
 			totalAmount = totalAmount.Add(rq.Mul(pv.Price))
+			rq = fixedpoint.Zero
 			break
 		}
 
-		rq = rq.Sub(pv.Volume)
 		totalAmount = totalAmount.Add(pv.Volume.Mul(pv.Price))
+		rq = rq.Sub(pv.Volume)
 	}
 
 	return totalAmount.Div(requiredQuantity.Sub(rq))
