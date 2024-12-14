@@ -90,12 +90,16 @@ var ten = fixedpoint.NewFromInt(10)
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
 func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
+	log.Infof("recording net asset value...")
+
 	priceTime := time.Now()
 	allAssets := map[string]types.AssetMap{}
 
 	// iterate the sessions and record them
 	quoteCurrency := "USDT"
 	for sessionName, session := range sessions {
+		log.Infof("recording net asset value for session %s...", sessionName)
+
 		if session.PublicOnly {
 			log.Infof("session %s is public only, skip", sessionName)
 			continue
@@ -162,6 +166,21 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 	}
 }
 
+func (s *Strategy) worker(ctx context.Context, sessions map[string]*bbgo.ExchangeSession, interval time.Duration) {
+	ticker := time.NewTicker(timejitter.Milliseconds(interval, 1000))
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			s.recordNetAssetValue(ctx, sessions)
+		}
+	}
+}
+
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
 	if s.State == nil {
 		s.State = &State{}
@@ -184,21 +203,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 
 	if s.Interval != "" {
-		go func() {
-			ticker := time.NewTicker(timejitter.Milliseconds(s.Interval.Duration(), 1000))
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-
-				case <-ticker.C:
-					s.recordNetAssetValue(ctx, sessions)
-				}
-			}
-		}()
-
+		go s.worker(ctx, sessions, s.Interval.Duration())
 	} else if s.Schedule != "" {
 		s.cron = cron.New()
 		_, err := s.cron.AddFunc(s.Schedule, func() {
