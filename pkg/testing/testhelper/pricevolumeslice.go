@@ -12,6 +12,13 @@ func PriceVolumeSliceFromText(str string) (slice types.PriceVolumeSlice) {
 	lines := strings.Split(str, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
+
+		// strip comments
+		commentIdx := strings.Index(line, "//")
+		if commentIdx >= 0 {
+			line = line[:commentIdx]
+		}
+
 		if len(line) == 0 {
 			continue
 		}

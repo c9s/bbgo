@@ -75,3 +75,49 @@ func TestStrategy_generateMakerOrders(t *testing.T) {
 		{Side: types.SideTypeSell, Price: Number("25300"), Quantity: Number("0.275845")},
 	}, orders)
 }
+
+func TestPriceVolumeSlice_AverageDepthPrice(t *testing.T) {
+	book := types.NewSliceOrderBook("BTCUSDT")
+	book.Update(types.SliceOrderBook{
+		Symbol: "BTCUSDT",
+		Asks: PriceVolumeSliceFromText(`
+			59400,0.5123
+			59402,0.0244
+			59405,0.0413
+			59450,0.02821
+			60000,3
+		`),
+		Bids: PriceVolumeSliceFromText(`
+			59399,0.3441 // = 20,439.1959
+			59398,0.221  // = 13,126.958
+			59395,0.000123 // = 7.305585
+			59390,0.03312 // = 1,966.9968
+			59000,3 // = 177,000
+			// sum = 212,540.456285
+		`),
+		Time:         time.Now(),
+		LastUpdateId: 0,
+	})
+
+	t.Run("test average price by base quantity", func(t *testing.T) {
+		// Test buying 2 BTC
+		buyPrice := book.Asks.AverageDepthPrice(fixedpoint.NewFromFloat(2))
+		assert.InDelta(t, 59818.9699, 0.001, buyPrice.Float64())
+
+		// Test selling 2 BTC
+		sellPrice := book.Bids.AverageDepthPrice(fixedpoint.NewFromFloat(2))
+		assert.InDelta(t, 59119.1096, 0.001, sellPrice.Float64())
+	})
+
+	t.Run("test average price by quote quantity", func(t *testing.T) {
+		// Test buying with ~119637.9398 quote
+		buyPrice := book.Asks.AverageDepthPriceByQuote(fixedpoint.NewFromFloat(119637.9398), 0)
+		assert.InDelta(t, 59899.6009, buyPrice.Float64(), 0.001)
+
+		// Test selling with ~118238.219281 quote
+		sellPrice := book.Bids.AverageDepthPriceByQuote(fixedpoint.NewFromFloat(118238.219281), 0)
+		assert.InDelta(t, 59066.2024, sellPrice.Float64(), 0.001)
+
+		assert.Less(t, sellPrice.Float64(), buyPrice.Float64(), "the sell price should be lower than the buy price")
+	})
+}
