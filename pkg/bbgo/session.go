@@ -192,6 +192,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		usedSymbols:           make(map[string]struct{}),
 		initializedSymbols:    make(map[string]struct{}),
 		logger:                log.WithField("session", name),
+		priceSolver:           pricesolver.NewSimplePriceResolver(nil),
 	}
 
 	session.OrderExecutor = &ExchangeOrderExecutor{
