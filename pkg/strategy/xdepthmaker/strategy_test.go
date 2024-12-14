@@ -112,11 +112,11 @@ func TestPriceVolumeSlice_AverageDepthPrice(t *testing.T) {
 	t.Run("test average price by quote quantity", func(t *testing.T) {
 		// Test buying with ~119637.9398 quote
 		buyPrice := book.Asks.AverageDepthPriceByQuote(fixedpoint.NewFromFloat(119637.9398), 0)
-		assert.InDelta(t, 59899.6009, buyPrice.Float64(), 0.001)
+		assert.InDelta(t, 59818.9699, buyPrice.Float64(), 0.001)
 
 		// Test selling with ~118238.219281 quote
 		sellPrice := book.Bids.AverageDepthPriceByQuote(fixedpoint.NewFromFloat(118238.219281), 0)
-		assert.InDelta(t, 59066.2024, sellPrice.Float64(), 0.001)
+		assert.InDelta(t, 59119.10993609, sellPrice.Float64(), 0.001)
 
 		assert.Less(t, sellPrice.Float64(), buyPrice.Float64(), "the sell price should be lower than the buy price")
 	})

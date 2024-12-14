@@ -261,6 +261,7 @@ func (slice PriceVolumeSlice) AverageDepthPriceByQuote(requiredDepthInQuote fixe
 		return fixedpoint.Zero
 	}
 
+	remainingQuote := requiredDepthInQuote
 	totalQuoteAmount := fixedpoint.Zero
 	totalQuantity := fixedpoint.Zero
 
@@ -272,15 +273,23 @@ func (slice PriceVolumeSlice) AverageDepthPriceByQuote(requiredDepthInQuote fixe
 	for i := 0; i < l; i++ {
 		pv := slice[i]
 
-		// quoteAmount is the total quote amount of the current price level
-		quoteAmount := pv.Volume.Mul(pv.Price)
+		quoteVolume := pv.Price.Mul(pv.Volume)
 
-		totalQuoteAmount = totalQuoteAmount.Add(quoteAmount)
-		totalQuantity = totalQuantity.Add(pv.Volume)
-
-		if requiredDepthInQuote.Sign() > 0 && totalQuoteAmount.Compare(requiredDepthInQuote) > 0 {
-			return totalQuoteAmount.Div(totalQuantity)
+		if remainingQuote.Compare(quoteVolume) >= 0 {
+			totalQuantity = totalQuantity.Add(pv.Volume)
+			totalQuoteAmount = totalQuoteAmount.Add(quoteVolume)
+			remainingQuote = remainingQuote.Sub(quoteVolume)
+		} else {
+			baseAmount := remainingQuote.Div(pv.Price)
+			totalQuantity = totalQuantity.Add(baseAmount)
+			totalQuoteAmount = totalQuoteAmount.Add(remainingQuote)
+			remainingQuote = fixedpoint.Zero
+			break
 		}
+	}
+
+	if totalQuantity.IsZero() {
+		return fixedpoint.Zero
 	}
 
 	return totalQuoteAmount.Div(totalQuantity)
