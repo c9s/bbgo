@@ -180,6 +180,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	if s.Environment.BacktestService != nil {
 		log.Warnf("xnav does not support backtesting")
+		return nil
 	}
 
 	if s.Interval != "" {
