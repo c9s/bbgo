@@ -83,7 +83,7 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
-var Ten = fixedpoint.NewFromInt(10)
+var ten = fixedpoint.NewFromInt(10)
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
@@ -134,7 +134,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 	for currency, asset := range totalAssets {
 		// calculated if it's dust only when InUSD (usd value) is defined.
-		if s.IgnoreDusts && !asset.InUSD.IsZero() && asset.InUSD.Compare(Ten) < 0 && asset.InUSD.Compare(Ten.Neg()) > 0 {
+		if s.IgnoreDusts && !asset.InUSD.IsZero() && asset.InUSD.Compare(ten) < 0 && asset.InUSD.Compare(ten.Neg()) > 0 {
 			continue
 		}
 

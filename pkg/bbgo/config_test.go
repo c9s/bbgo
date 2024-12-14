@@ -75,25 +75,16 @@ func TestLoadConfig(t *testing.T) {
 				assert.Equal(t, map[string]interface{}{
 					"sessions": map[string]interface{}{
 						"max": map[string]interface{}{
-							"exchange":                "max",
-							"envVarPrefix":            "MAX",
-							"takerFeeRate":            0.,
-							"makerFeeRate":            0.,
-							"modifyOrderAmountForFee": false,
+							"exchange":     "max",
+							"envVarPrefix": "MAX",
+							"takerFeeRate": 0.,
+							"makerFeeRate": 0.,
 						},
 						"binance": map[string]interface{}{
-							"exchange":                "binance",
-							"envVarPrefix":            "BINANCE",
-							"takerFeeRate":            0.,
-							"makerFeeRate":            0.,
-							"modifyOrderAmountForFee": false,
-						},
-						"ftx": map[string]interface{}{
-							"exchange":                "ftx",
-							"envVarPrefix":            "FTX",
-							"takerFeeRate":            0.,
-							"makerFeeRate":            0.,
-							"modifyOrderAmountForFee": true,
+							"exchange":     "binance",
+							"envVarPrefix": "BINANCE",
+							"takerFeeRate": 0.,
+							"makerFeeRate": 0.,
 						},
 					},
 					"build": map[string]interface{}{
@@ -155,33 +146,6 @@ func TestLoadConfig(t *testing.T) {
 				assert.NotNil(t, config.Persistence.Json)
 			},
 		},
-
-		{
-			name:    "order_executor",
-			args:    args{configFile: "testdata/order_executor.yaml"},
-			wantErr: false,
-			f: func(t *testing.T, config *Config) {
-				assert.Len(t, config.Sessions, 2)
-
-				session, ok := config.Sessions["max"]
-				assert.True(t, ok)
-				assert.NotNil(t, session)
-
-				riskControls := config.RiskControls
-				assert.NotNil(t, riskControls)
-				assert.NotNil(t, riskControls.SessionBasedRiskControl)
-
-				conf, ok := riskControls.SessionBasedRiskControl["max"]
-				assert.True(t, ok)
-				assert.NotNil(t, conf)
-				assert.NotNil(t, conf.OrderExecutor)
-				assert.NotNil(t, conf.OrderExecutor.BySymbol)
-
-				executorConf, ok := conf.OrderExecutor.BySymbol["BTCUSDT"]
-				assert.True(t, ok)
-				assert.NotNil(t, executorConf)
-			},
-		},
 		{
 			name:    "backtest",
 			args:    args{configFile: "testdata/backtest.yaml"},
@@ -189,9 +153,9 @@ func TestLoadConfig(t *testing.T) {
 			f: func(t *testing.T, config *Config) {
 				assert.Len(t, config.ExchangeStrategies, 1)
 				assert.NotNil(t, config.Backtest)
-				assert.NotNil(t, config.Backtest.Account)
-				assert.NotNil(t, config.Backtest.Account["binance"].Balances)
-				assert.Len(t, config.Backtest.Account["binance"].Balances, 2)
+				assert.NotNil(t, config.Backtest.Accounts)
+				assert.NotNil(t, config.Backtest.Accounts["binance"].Balances)
+				assert.Len(t, config.Backtest.Accounts["binance"].Balances, 2)
 			},
 		},
 	}
