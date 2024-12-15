@@ -27,8 +27,10 @@ type Strategy struct {
 
 	IsolationForest      *iforest.IsolationForest `json:"isolationForest"`
 	NotificationInterval time.Duration            `json:"notificationInterval"`
+	RetrainingInterval   time.Duration            `json:"retrainingInterval"`
 
 	notificationRateLimiter *rate.Limiter
+	retrainingRateLimiter   *rate.Limiter
 }
 
 func (s *Strategy) ID() string {
@@ -52,7 +54,12 @@ func (s *Strategy) Defaults() error {
 		s.NotificationInterval = 10 * time.Minute
 	}
 
+	if s.RetrainingInterval == 0 {
+		s.RetrainingInterval = 1 * time.Hour
+	}
+
 	s.notificationRateLimiter = rate.NewLimiter(rate.Every(s.NotificationInterval), 1)
+	s.retrainingRateLimiter = rate.NewLimiter(rate.Every(s.RetrainingInterval), 1)
 	return nil
 }
 
@@ -82,7 +89,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 		s.fitIsolationForest(samples)
 		scores := s.IsolationForest.Score(samples)
-		s.handleIsolationForestScore(scores, kline)
+		s.notifyOnIsolationForestScore(scores, kline)
 	}))
 	return nil
 }
@@ -136,15 +143,19 @@ func (s *Strategy) logSkipIsolationForest(samples [][]float64, volumes floats.Sl
 }
 
 func (s *Strategy) fitIsolationForest(samples [][]float64) {
-	s.IsolationForest = iforest.New()
-	s.IsolationForest.Fit(samples)
-	log.Infof("Isolation forest fitted with %d samples and %d/%d trees", len(samples), len(s.IsolationForest.Trees), s.IsolationForest.NumTrees)
+	if s.retrainingRateLimiter.Allow() {
+		s.IsolationForest = iforest.New()
+		s.IsolationForest.Fit(samples)
+		log.Infof("Isolation forest fitted with %d samples and %d/%d trees", len(samples), len(s.IsolationForest.Trees), s.IsolationForest.NumTrees)
+	}
 }
 
-func (s *Strategy) handleIsolationForestScore(scores []float64, kline types.KLine) {
+func (s *Strategy) notifyOnIsolationForestScore(scores []float64, kline types.KLine) {
 	lastScore := scores[len(scores)-1]
 	log.Warnf("Symbol: %s, isolation forest score: %f, threshold: %f, kline: %s", s.Symbol, lastScore, s.ScoreThreshold, kline.String())
-	if lastScore > s.ScoreThreshold && s.notificationRateLimiter.Allow() {
-		bbgo.Notify("symbol: %s isolation forest score: %f", s.Symbol, lastScore)
+	if lastScore > s.ScoreThreshold {
+		if s.notificationRateLimiter.Allow() {
+			bbgo.Notify("symbol: %s isolation forest score: %f", s.Symbol, lastScore)
+		}
 	}
 }
