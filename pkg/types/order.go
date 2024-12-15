@@ -11,6 +11,7 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types/currency"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 )
 
@@ -216,10 +217,10 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 	}
 
 	if o.Price.Sign() > 0 && o.Quantity.Sign() > 0 && len(o.Market.QuoteCurrency) > 0 {
-		if IsFiatCurrency(o.Market.QuoteCurrency) {
+		if currency.IsFiatCurrency(o.Market.QuoteCurrency) {
 			fields = append(fields, slack.AttachmentField{
 				Title: "Amount",
-				Value: USD.FormatMoney(o.Price.Mul(o.Quantity)),
+				Value: currency.USD.FormatMoney(o.Price.Mul(o.Quantity)),
 				Short: true,
 			})
 		} else {

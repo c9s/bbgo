@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/currency"
 
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 )
@@ -51,7 +52,7 @@ func TestStrategy_allowMarginHedge(t *testing.T) {
 			Account: account,
 		}
 
-		accountValueCalc := bbgo.NewAccountValueCalculator(session, priceSolver, types.USDT)
+		accountValueCalc := bbgo.NewAccountValueCalculator(session, priceSolver, currency.USDT)
 		assert.Equal(t, "98000", accountValueCalc.DebtValue().String())
 		assert.Equal(t, "298000", accountValueCalc.NetValue().String())
 
@@ -98,7 +99,7 @@ func TestStrategy_allowMarginHedge(t *testing.T) {
 			Account: account,
 		}
 
-		accountValueCalc := bbgo.NewAccountValueCalculator(session, priceSolver, types.USDT)
+		accountValueCalc := bbgo.NewAccountValueCalculator(session, priceSolver, currency.USDT)
 		assert.Equal(t, "392000", accountValueCalc.DebtValue().String())
 		assert.Equal(t, "4000", accountValueCalc.NetValue().String())
 

@@ -7,6 +7,7 @@ import (
 	"github.com/leekchan/accounting"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types/currency"
 )
 
 type Market struct {
@@ -181,13 +182,13 @@ func (m Market) FormatPriceCurrency(val fixedpoint.Value) string {
 	switch m.QuoteCurrency {
 
 	case "USD", "USDT":
-		return USD.FormatMoney(val)
+		return currency.USD.FormatMoney(val)
 
 	case "BTC":
-		return BTC.FormatMoney(val)
+		return currency.BTC.FormatMoney(val)
 
 	case "BNB":
-		return BNB.FormatMoney(val)
+		return currency.BNB.FormatMoney(val)
 
 	}
 

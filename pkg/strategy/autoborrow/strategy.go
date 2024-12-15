@@ -16,6 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
+	currency2 "github.com/c9s/bbgo/pkg/types/currency"
 )
 
 const ID = "autoborrow"
@@ -629,7 +630,7 @@ func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Dur
 				totalDebtValueInUSDT := fixedpoint.Zero
 				debts := account.Balances().Debts()
 				for currency, bal := range debts {
-					price, ok := s.priceSolver.ResolvePrice(currency, types.USDT)
+					price, ok := s.priceSolver.ResolvePrice(currency, currency2.USDT)
 					if !ok {
 						log.Warnf("unable to resolve price for %s", currency)
 						continue

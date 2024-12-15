@@ -5,6 +5,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/currency"
 )
 
 type MultiCurrencyPosition struct {
@@ -51,9 +52,9 @@ func (p *MultiCurrencyPosition) handleTrade(trade types.Trade) {
 		p.Currencies[market.QuoteCurrency] = p.Currencies[market.QuoteCurrency].Add(trade.QuoteQuantity)
 	}
 
-	if types.IsUSDFiatCurrency(market.QuoteCurrency) {
+	if currency.IsUSDFiatCurrency(market.QuoteCurrency) {
 		p.TradePrices[market.BaseCurrency] = trade.Price
-	} else if types.IsUSDFiatCurrency(market.BaseCurrency) { // For USDT/TWD pair, convert USDT/TWD price to TWD/USDT
+	} else if currency.IsUSDFiatCurrency(market.BaseCurrency) { // For USDT/TWD pair, convert USDT/TWD price to TWD/USDT
 		p.TradePrices[market.QuoteCurrency] = one.Div(trade.Price)
 	}
 
@@ -81,7 +82,7 @@ func (p *MultiCurrencyPosition) CollectProfits() []Profit {
 
 		if price, ok := p.TradePrices[currency]; ok && !price.IsZero() {
 			profit.ProfitInUSD = base.Mul(price)
-		} else if types.IsUSDFiatCurrency(currency) {
+		} else if currency.IsUSDFiatCurrency(currency) {
 			profit.ProfitInUSD = base
 		}
 

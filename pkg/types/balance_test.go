@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/asset"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -48,7 +49,7 @@ func TestBalanceMap_Assets(t *testing.T) {
 		name string
 		m    BalanceMap
 		args args
-		want AssetMap
+		want asset.Map
 	}{
 		{
 			m: BalanceMap{
@@ -60,7 +61,7 @@ func TestBalanceMap_Assets(t *testing.T) {
 					"BTCUSDT": number(19000.0),
 				},
 			},
-			want: AssetMap{
+			want: asset.Map{
 				"USDT": {
 					Currency:   "USDT",
 					Total:      number(100),

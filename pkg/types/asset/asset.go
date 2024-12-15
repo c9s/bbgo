@@ -5,14 +5,15 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	asset2 "github.com/c9s/bbgo/pkg/asset"
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
 func NewMapFromBalanceMap(
 	priceSolver *pricesolver.SimplePriceSolver, priceTime time.Time, m types.BalanceMap, fiat string,
-) types.AssetMap {
-	assets := make(types.AssetMap)
+) asset2.Map {
+	assets := make(asset2.Map)
 
 	btcInUSD, hasBtcPrice := priceSolver.ResolvePrice("BTC", fiat, "USDT")
 	if !hasBtcPrice {
@@ -29,7 +30,7 @@ func NewMapFromBalanceMap(
 			continue
 		}
 
-		asset := types.Asset{
+		asset := asset2.Asset{
 			Currency:  currency,
 			Total:     total,
 			Time:      priceTime,

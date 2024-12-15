@@ -1,4 +1,4 @@
-package types
+package currency
 
 import (
 	"math/big"
@@ -8,16 +8,14 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
-type Acc = accounting.Accounting
-
 type wrapper struct {
-	Acc
+	accounting.Accounting
 }
 
 func (w *wrapper) FormatMoney(v fixedpoint.Value) string {
 	f := new(big.Float)
 	f.SetString(v.String())
-	return w.Acc.FormatMoneyBigFloat(f)
+	return w.Accounting.FormatMoneyBigFloat(f)
 }
 
 var USD = wrapper{accounting.Accounting{Symbol: "$ ", Precision: 2}}
