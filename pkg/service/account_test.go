@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/asset"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -23,8 +24,8 @@ func TestAccountService(t *testing.T) {
 	service := &AccountService{DB: xdb}
 
 	t1 := time.Now()
-	err = service.InsertAsset(t1, "binance", types.ExchangeBinance, "main", false, false, "", types.AssetMap{
-		"BTC": types.Asset{
+	err = service.InsertAsset(t1, "binance", types.ExchangeBinance, "main", false, false, "", asset.Map{
+		"BTC": asset.Asset{
 			Currency:   "BTC",
 			Total:      fixedpoint.MustNewFromString("1.0"),
 			InUSD:      fixedpoint.MustNewFromString("10.0"),

@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/tucnak/telebot.v2"
 
+	"github.com/c9s/bbgo/pkg/asset"
 	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -542,7 +543,7 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	return nil
 }
 
-func (environ *Environment) RecordAsset(t time.Time, session *ExchangeSession, assets types.AssetMap) {
+func (environ *Environment) RecordAsset(t time.Time, session *ExchangeSession, assets asset.Map) {
 	// skip for back-test
 	if environ.BacktestService != nil {
 		return

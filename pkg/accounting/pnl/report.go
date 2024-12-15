@@ -9,6 +9,7 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types/currency"
 
 	"github.com/c9s/bbgo/pkg/slack/slackstyle"
 	"github.com/c9s/bbgo/pkg/types"
@@ -45,28 +46,28 @@ func (report AverageCostPnLReport) Print() {
 	color.Green("TRADES SINCE: %v", report.StartTime)
 	color.Green("NUMBER OF TRADES: %d", report.NumTrades)
 	color.Green(report.Position.String())
-	color.Green("AVERAGE COST: %s", types.USD.FormatMoney(report.AverageCost))
+	color.Green("AVERAGE COST: %s", currency.USD.FormatMoney(report.AverageCost))
 	color.Green("BASE ASSET POSITION: %s", report.BaseAssetPosition.String())
 
 	color.Green("TOTAL BUY VOLUME: %v", report.BuyVolume)
 	color.Green("TOTAL SELL VOLUME: %v", report.SellVolume)
 
-	color.Green("CURRENT PRICE: %s", types.USD.FormatMoney(report.LastPrice))
+	color.Green("CURRENT PRICE: %s", currency.USD.FormatMoney(report.LastPrice))
 	color.Green("CURRENCY FEES:")
 	for currency, fee := range report.CurrencyFees {
 		color.Green(" - %s: %s", currency, fee.String())
 	}
 
 	if report.Profit.Sign() > 0 {
-		color.Green("PROFIT: %s", types.USD.FormatMoney(report.Profit))
+		color.Green("PROFIT: %s", currency.USD.FormatMoney(report.Profit))
 	} else {
-		color.Red("PROFIT: %s", types.USD.FormatMoney(report.Profit))
+		color.Red("PROFIT: %s", currency.USD.FormatMoney(report.Profit))
 	}
 
 	if report.UnrealizedProfit.Sign() > 0 {
-		color.Green("UNREALIZED PROFIT: %s", types.USD.FormatMoney(report.UnrealizedProfit))
+		color.Green("UNREALIZED PROFIT: %s", currency.USD.FormatMoney(report.UnrealizedProfit))
 	} else {
-		color.Red("UNREALIZED PROFIT: %s", types.USD.FormatMoney(report.UnrealizedProfit))
+		color.Red("UNREALIZED PROFIT: %s", currency.USD.FormatMoney(report.UnrealizedProfit))
 	}
 }
 
@@ -79,13 +80,13 @@ func (report AverageCostPnLReport) SlackAttachment() slack.Attachment {
 
 	return slack.Attachment{
 		Title: report.Symbol + " Profit and Loss report",
-		Text:  "Profit " + types.USD.FormatMoney(report.Profit),
+		Text:  "Profit " + currency.USD.FormatMoney(report.Profit),
 		Color: color,
 		// Pretext:       "",
 		// Text:          "",
 		Fields: []slack.AttachmentField{
-			{Title: "Profit", Value: types.USD.FormatMoney(report.Profit)},
-			{Title: "Unrealized Profit", Value: types.USD.FormatMoney(report.UnrealizedProfit)},
+			{Title: "Profit", Value: currency.USD.FormatMoney(report.Profit)},
+			{Title: "Unrealized Profit", Value: currency.USD.FormatMoney(report.UnrealizedProfit)},
 			{Title: "Current Price", Value: report.Market.FormatPrice(report.LastPrice), Short: true},
 			{Title: "Average Cost", Value: report.Market.FormatPrice(report.AverageCost), Short: true},
 

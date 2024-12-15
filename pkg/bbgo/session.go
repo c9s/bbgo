@@ -19,6 +19,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/metrics"
 	"github.com/c9s/bbgo/pkg/pricesolver"
+	currency2 "github.com/c9s/bbgo/pkg/types/currency"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
@@ -799,7 +800,7 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context, currencies []s
 		// for {Crypto}/USDT markets
 		// map things like BTCUSDT = {price}
 		if market, ok := markets[k]; ok {
-			if types.IsFiatCurrency(market.BaseCurrency) {
+			if currency2.IsFiatCurrency(market.BaseCurrency) {
 				session.lastPrices[k] = validPrice.Div(fixedpoint.One)
 			} else {
 				session.lastPrices[k] = validPrice
@@ -828,7 +829,7 @@ func (session *ExchangeSession) FindPossibleAssetSymbols() (symbols []string, er
 	var balances = session.GetAccount().Balances()
 	var fiatAssets []string
 
-	for _, currency := range types.FiatCurrencies {
+	for _, currency := range currency2.FiatCurrencies {
 		if balance, ok := balances[currency]; ok && balance.Total().Sign() > 0 {
 			fiatAssets = append(fiatAssets, currency)
 		}
