@@ -9,7 +9,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
+	"github.com/c9s/bbgo/pkg/asset"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	currency2 "github.com/c9s/bbgo/pkg/types/currency"
 )
 
 type PriceMap map[string]fixedpoint.Value
@@ -197,8 +199,8 @@ func (m BalanceMap) Copy() (d BalanceMap) {
 }
 
 // Assets converts balances into assets with the given prices
-func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) AssetMap {
-	assets := make(AssetMap)
+func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) asset.Map {
+	assets := make(asset.Map)
 
 	_, btcInUSD, hasBtcPrice := findUSDMarketPrice("BTC", prices)
 
@@ -211,7 +213,7 @@ func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) AssetMap {
 			continue
 		}
 
-		asset := Asset{
+		asset := asset.Asset{
 			Currency:  currency,
 			Total:     total,
 			Time:      priceTime,
@@ -222,7 +224,7 @@ func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) AssetMap {
 			NetAsset:  netAsset,
 		}
 
-		if IsUSDFiatCurrency(currency) { // for usd
+		if currency2.IsUSDFiatCurrency(currency) { // for usd
 			asset.InUSD = netAsset
 			asset.PriceInUSD = fixedpoint.One
 			if hasBtcPrice && !asset.InUSD.IsZero() {

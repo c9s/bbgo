@@ -16,6 +16,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/asset"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
@@ -408,9 +409,9 @@ func (s *Server) listSessionOpenOrders(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"orders": nil})
 }
 
-func genFakeAssets() types.AssetMap {
+func genFakeAssets() asset.Map {
 
-	totalAssets := types.AssetMap{}
+	totalAssets := asset.Map{}
 	balances := types.BalanceMap{
 		"BTC":  types.Balance{Currency: "BTC", Available: fixedpoint.NewFromFloat(10.0 * rand.Float64())},
 		"BCH":  types.Balance{Currency: "BCH", Available: fixedpoint.NewFromFloat(0.01 * rand.Float64())},
@@ -447,7 +448,7 @@ func (s *Server) listAssets(c *gin.Context) {
 		return
 	}
 
-	totalAssets := types.AssetMap{}
+	totalAssets := asset.Map{}
 	for _, session := range s.Environ.Sessions() {
 		balances := session.GetAccount().Balances()
 
