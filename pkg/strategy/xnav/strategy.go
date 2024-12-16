@@ -66,6 +66,8 @@ type Strategy struct {
 	IgnoreDusts   bool           `json:"ignoreDusts"`
 	ShowBreakdown bool           `json:"showBreakdown"`
 
+	ShowDebtDetails bool `json:"showDebtDetails"`
+
 	State *State `persistence:"state"`
 
 	cron *cron.Cron
