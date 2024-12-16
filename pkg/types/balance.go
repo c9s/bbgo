@@ -46,7 +46,6 @@ func (b Balance) Add(b2 Balance) Balance {
 	newB.Available = b.Available.Add(b2.Available)
 	newB.Locked = b.Locked.Add(b2.Locked)
 	newB.Borrowed = b.Borrowed.Add(b2.Borrowed)
-	newB.NetAsset = b.NetAsset.Add(b2.NetAsset)
 	newB.Interest = b.Interest.Add(b2.Interest)
 	return newB
 }
