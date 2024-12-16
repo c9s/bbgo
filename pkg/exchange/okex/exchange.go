@@ -3,6 +3,7 @@ package okex
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"time"
@@ -92,6 +93,11 @@ func New(key, secret, passphrase string, opts ...Option) *Exchange {
 		passphrase:  passphrase,
 		client:      client,
 		timeNowFunc: time.Now,
+		brokerId:    defaultBrokerId,
+	}
+
+	if str, ok := os.LookupEnv("OKEX_BROKER_ID"); ok {
+		ex.brokerId = str
 	}
 
 	for _, o := range opts {
