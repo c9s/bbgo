@@ -216,7 +216,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 	bbgo.Notify(displayAssets)
 
-	if s.ShowBreakdown {
+	if s.ShowBreakdown && len(sessionAssets) > 1 {
 		for sessionName, assets := range sessionAssets {
 			slackAttachment := assets.SlackAttachment()
 			slackAttachment.Title = "Session " + sessionName + " " + slackAttachment.Title
