@@ -23,6 +23,7 @@ type Asset struct {
 	// NetAssetInUSD is net asset in USD
 	NetAssetInUSD fixedpoint.Value `json:"netAssetInUSD" db:"net_asset_in_usd"`
 
+	Debt      fixedpoint.Value `json:"debt" db:"debt"`
 	DebtInUSD fixedpoint.Value `json:"debtInUSD" db:"debt_in_usd"`
 
 	InterestInUSD fixedpoint.Value `json:"interestInUSD" db:"interest_in_usd"`
@@ -45,6 +46,7 @@ func (m Map) Merge(other Map) Map {
 		if existing, ok := m[cu]; ok {
 			asset.Total = asset.Total.Add(existing.Total)
 			asset.NetAsset = asset.NetAsset.Add(existing.NetAsset)
+			asset.Debt = asset.Debt.Add(existing.Debt)
 			asset.Interest = asset.Interest.Add(existing.Interest)
 			asset.Locked = asset.Locked.Add(existing.Locked)
 			asset.Available = asset.Available.Add(existing.Available)
@@ -55,7 +57,7 @@ func (m Map) Merge(other Map) Map {
 			asset.InterestInUSD = asset.InterestInUSD.Add(existing.InterestInUSD)
 		}
 
-		m[cu] = asset
+		newMap[cu] = asset
 	}
 
 	return newMap
