@@ -14,27 +14,25 @@ import (
 type Asset struct {
 	Currency string `json:"currency" db:"currency"`
 
-	Total fixedpoint.Value `json:"total" db:"total"`
+	Total     fixedpoint.Value `json:"total" db:"total"`
+	Locked    fixedpoint.Value `json:"lock" db:"lock" `
+	Available fixedpoint.Value `json:"available"  db:"available"`
+	Borrowed  fixedpoint.Value `json:"borrowed" db:"borrowed"`
+	Interest  fixedpoint.Value `json:"interest" db:"interest"`
 
 	NetAsset fixedpoint.Value `json:"netAsset" db:"net_asset"`
-
-	Interest fixedpoint.Value `json:"interest" db:"interest"`
 
 	// NetAssetInUSD is net asset in USD
 	NetAssetInUSD fixedpoint.Value `json:"netAssetInUSD" db:"net_asset_in_usd"`
 
-	Debt      fixedpoint.Value `json:"debt" db:"debt"`
-	DebtInUSD fixedpoint.Value `json:"debtInUSD" db:"debt_in_usd"`
-
-	InterestInUSD fixedpoint.Value `json:"interestInUSD" db:"interest_in_usd"`
-
 	// NetAssetInBTC is net asset in BTC
 	NetAssetInBTC fixedpoint.Value `json:"netAssetInBTC" db:"net_asset_in_btc"`
 
+	Debt          fixedpoint.Value `json:"debt" db:"debt"`
+	DebtInUSD     fixedpoint.Value `json:"debtInUSD" db:"debt_in_usd"`
+	InterestInUSD fixedpoint.Value `json:"interestInUSD" db:"interest_in_usd"`
+
 	Time       time.Time        `json:"time" db:"time"`
-	Locked     fixedpoint.Value `json:"lock" db:"lock" `
-	Available  fixedpoint.Value `json:"available"  db:"available"`
-	Borrowed   fixedpoint.Value `json:"borrowed" db:"borrowed"`
 	PriceInUSD fixedpoint.Value `json:"priceInUSD" db:"price_in_usd"`
 }
 
@@ -45,16 +43,22 @@ func (m Map) Merge(other Map) Map {
 	for cu, asset := range other {
 		if existing, ok := m[cu]; ok {
 			asset.Total = asset.Total.Add(existing.Total)
-			asset.NetAsset = asset.NetAsset.Add(existing.NetAsset)
-			asset.Debt = asset.Debt.Add(existing.Debt)
-			asset.Interest = asset.Interest.Add(existing.Interest)
 			asset.Locked = asset.Locked.Add(existing.Locked)
 			asset.Available = asset.Available.Add(existing.Available)
 			asset.Borrowed = asset.Borrowed.Add(existing.Borrowed)
+
+			asset.NetAsset = asset.NetAsset.Add(existing.NetAsset)
 			asset.NetAssetInUSD = asset.NetAssetInUSD.Add(existing.NetAssetInUSD)
 			asset.NetAssetInBTC = asset.NetAssetInBTC.Add(existing.NetAssetInBTC)
+
+			asset.Debt = asset.Debt.Add(existing.Debt)
 			asset.DebtInUSD = asset.DebtInUSD.Add(existing.DebtInUSD)
+			asset.Interest = asset.Interest.Add(existing.Interest)
 			asset.InterestInUSD = asset.InterestInUSD.Add(existing.InterestInUSD)
+
+			if asset.PriceInUSD.IsZero() && existing.PriceInUSD.Sign() > 0 {
+				asset.PriceInUSD = existing.PriceInUSD
+			}
 		}
 
 		newMap[cu] = asset
