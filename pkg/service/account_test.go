@@ -9,6 +9,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/asset"
 )
 
 func TestAccountService(t *testing.T) {
@@ -23,18 +24,18 @@ func TestAccountService(t *testing.T) {
 	service := &AccountService{DB: xdb}
 
 	t1 := time.Now()
-	err = service.InsertAsset(t1, "binance", types.ExchangeBinance, "main", false, false, "", types.AssetMap{
-		"BTC": types.Asset{
-			Currency:   "BTC",
-			Total:      fixedpoint.MustNewFromString("1.0"),
-			InUSD:      fixedpoint.MustNewFromString("10.0"),
-			InBTC:      fixedpoint.MustNewFromString("0.0001"),
-			Time:       t1,
-			Locked:     fixedpoint.MustNewFromString("0"),
-			Available:  fixedpoint.MustNewFromString("1.0"),
-			Borrowed:   fixedpoint.MustNewFromString("0"),
-			NetAsset:   fixedpoint.MustNewFromString("1"),
-			PriceInUSD: fixedpoint.MustNewFromString("44870"),
+	err = service.InsertAsset(t1, "binance", types.ExchangeBinance, "main", false, false, "", asset.Map{
+		"BTC": asset.Asset{
+			Currency:      "BTC",
+			Total:         fixedpoint.MustNewFromString("1.0"),
+			NetAssetInUSD: fixedpoint.MustNewFromString("10.0"),
+			NetAssetInBTC: fixedpoint.MustNewFromString("0.0001"),
+			Time:          t1,
+			Locked:        fixedpoint.MustNewFromString("0"),
+			Available:     fixedpoint.MustNewFromString("1.0"),
+			Borrowed:      fixedpoint.MustNewFromString("0"),
+			NetAsset:      fixedpoint.MustNewFromString("1"),
+			PriceInUSD:    fixedpoint.MustNewFromString("44870"),
 		},
 	})
 	assert.NoError(t, err)

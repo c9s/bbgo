@@ -31,6 +31,14 @@ var emailRegExp = regexp.MustCompile("`^(?P<name>[a-zA-Z0-9.!#$%&'*+/=?^_ \\x60{
 
 var typeNamePrefixRE = regexp.MustCompile(`^\*?([a-zA-Z0-9_]+\.)?`)
 
+type SlackAttachmentCreator interface {
+	SlackAttachment() slack.Attachment
+}
+
+type SlackBlocksCreator interface {
+	SlackBlocks() slack.Blocks
+}
+
 type notifyTask struct {
 	channel string
 
@@ -297,7 +305,7 @@ func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) er
 	}
 
 	var attachment slack.Attachment
-	if creator, ok := note.Object.(types.SlackAttachmentCreator); ok {
+	if creator, ok := note.Object.(SlackAttachmentCreator); ok {
 		attachment = creator.SlackAttachment()
 	} else {
 		return fmt.Errorf("livenote object does not support types.SlackAttachmentCreator interface")
@@ -422,7 +430,7 @@ func filterSlackAttachments(args []interface{}) (slackAttachments []slack.Attach
 
 			slackAttachments = append(slackAttachments, *a)
 
-		case types.SlackAttachmentCreator:
+		case SlackAttachmentCreator:
 			if firstAttachmentOffset == -1 {
 				firstAttachmentOffset = idx
 			}
@@ -468,7 +476,10 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 	case slack.Attachment:
 		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{a}, slackAttachments...)...))
 
-	case types.SlackAttachmentCreator:
+	case *slack.Attachment:
+		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{*a}, slackAttachments...)...))
+
+	case SlackAttachmentCreator:
 		// convert object to slack attachment (if supported)
 		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{a.SlackAttachment()}, slackAttachments...)...))
 
