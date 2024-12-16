@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/c9s/bbgo/pkg/testutil"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_QueryTrades(t *testing.T) {
@@ -22,7 +23,7 @@ func Test_QueryTrades(t *testing.T) {
 		Symbol: "BTCUSDT",
 	}
 
-	since := time.Now().AddDate(0, -3, 0)
+	since := time.Now().AddDate(0, -1, 0)
 	until := time.Now()
 
 	queryOption := types.TradeQueryOptions{
@@ -34,6 +35,7 @@ func Test_QueryTrades(t *testing.T) {
 	transactionDetail, err := e.QueryTrades(context.Background(), queryOrder.Symbol, &queryOption)
 	if assert.NoError(t, err) {
 		assert.NotEmpty(t, transactionDetail)
+		t.Logf("trades: %+v", transactionDetail)
 	}
 	// query by trade id
 	transactionDetail, err = e.QueryTrades(context.Background(), queryOrder.Symbol, &types.TradeQueryOptions{LastTradeID: 432044402})

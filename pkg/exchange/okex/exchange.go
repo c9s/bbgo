@@ -589,7 +589,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	limit := options.Limit
 	if limit > defaultQueryLimit || limit <= 0 {
-		log.Infof("limit is exceeded default limit %d or zero, got: %d, use default limit", defaultQueryLimit, limit)
+		log.Infof("param limit exceeded default limit %d or zero, got: %d, use default limit", defaultQueryLimit, limit)
 		limit = defaultQueryLimit
 	}
 
