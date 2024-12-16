@@ -151,6 +151,8 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	}
 
 	s.Strategy.Initialize(ctx, s.Environment, tradingSession, s.tradingMarket, ID, s.InstanceID())
+	s.Strategy.OrderExecutor.DisableNotify()
+
 	s.FeeBudget.Initialize()
 
 	s.stopC = make(chan struct{})
