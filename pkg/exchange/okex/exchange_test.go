@@ -17,6 +17,8 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testing/httptesting"
+	. "github.com/c9s/bbgo/pkg/testing/testhelper"
+	"github.com/c9s/bbgo/pkg/testutil"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -40,6 +42,40 @@ func Test_clientOrderIdRegex(t *testing.T) {
 	t.Run("invalid char: `-`", func(t *testing.T) {
 		assert.False(t, clientOrderIdRegex.MatchString(uuid.NewString()))
 	})
+}
+
+func TestExchange_SubmitOrder(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ctx := context.Background()
+	ex := New(key, secret, passphrase)
+
+	balances, err := ex.QueryAccountBalances(ctx)
+	assert.NoError(t, err)
+
+	t.Logf("balances: %+v", balances)
+
+	markets, err := ex.QueryMarkets(ctx)
+	assert.NoError(t, err)
+
+	market, ok := markets["BTCUSDT"]
+	if assert.True(t, ok) {
+		createdOrder, err := ex.SubmitOrder(ctx, types.SubmitOrder{
+			Symbol:   "BTCUSDT",
+			Type:     types.OrderTypeMarket,
+			Price:    Number(105200),
+			Quantity: Number(0.0001), // 10usdt
+			Side:     types.SideTypeBuy,
+			Market:   market,
+		})
+		assert.NoError(t, err)
+		t.Logf("createdOrder: %+v", createdOrder)
+	}
+
 }
 
 func TestExchange_QueryTrades(t *testing.T) {

@@ -242,13 +242,15 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		orderReq.Price(order.Market.FormatPrice(order.Price))
 	case types.OrderTypeMarket:
+		// target currency = Default is quote_ccy for buy, base_ccy for sell
 		// Because our order.Quantity unit is base coin, so we indicate the target currency to Base.
-		if order.Side == types.SideTypeBuy {
+		switch order.Side {
+		case types.SideTypeSell:
 			orderReq.Size(order.Market.FormatQuantity(order.Quantity))
 			orderReq.TargetCurrency(okexapi.TargetCurrencyBase)
-		} else {
+		case types.SideTypeBuy:
 			orderReq.Size(order.Market.FormatQuantity(order.Quantity))
-			orderReq.TargetCurrency(okexapi.TargetCurrencyQuote)
+			orderReq.TargetCurrency(okexapi.TargetCurrencyBase)
 		}
 	}
 
@@ -641,7 +643,9 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	})
 }
 
-func getTrades(ctx context.Context, limit int64, doFunc func(ctx context.Context, billId string) ([]okexapi.Trade, error)) (trades []types.Trade, err error) {
+func getTrades(
+	ctx context.Context, limit int64, doFunc func(ctx context.Context, billId string) ([]okexapi.Trade, error),
+) (trades []types.Trade, err error) {
 	billId := "0"
 	for {
 		response, err := doFunc(ctx, billId)
