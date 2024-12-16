@@ -38,6 +38,7 @@ func NewAssetMapFromBalanceMap(
 			Borrowed:  b.Borrowed,
 			Interest:  b.Interest,
 			NetAsset:  netAsset,
+			Debt:      debt,
 		}
 
 		if assetPrice, ok := priceSolver.ResolvePrice(cu, fiat, "USDT"); ok {
