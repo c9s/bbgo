@@ -129,9 +129,13 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	s.cron = cron.New()
-	s.cron.AddFunc(s.Schedule, func() {
+	_, err := s.cron.AddFunc(s.Schedule, func() {
 		s.autobuy(ctx)
 	})
+	if err != nil {
+		return err
+	}
+
 	s.cron.Start()
 
 	return nil
