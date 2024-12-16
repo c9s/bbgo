@@ -19,7 +19,6 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/tucnak/telebot.v2"
 
-	"github.com/c9s/bbgo/pkg/asset"
 	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -30,6 +29,7 @@ import (
 	googleservice "github.com/c9s/bbgo/pkg/service/google"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/asset"
 	"github.com/c9s/bbgo/pkg/util"
 )
 

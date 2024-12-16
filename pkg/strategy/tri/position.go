@@ -69,29 +69,29 @@ func (p *MultiCurrencyPosition) handleTrade(trade types.Trade) {
 
 func (p *MultiCurrencyPosition) CollectProfits() []Profit {
 	var profits []Profit
-	for currency, base := range p.Currencies {
+	for cu, base := range p.Currencies {
 		if base.IsZero() {
 			continue
 		}
 
 		profit := Profit{
-			Asset:       currency,
+			Asset:       cu,
 			Profit:      base,
 			ProfitInUSD: fixedpoint.Zero,
 		}
 
-		if price, ok := p.TradePrices[currency]; ok && !price.IsZero() {
+		if price, ok := p.TradePrices[cu]; ok && !price.IsZero() {
 			profit.ProfitInUSD = base.Mul(price)
-		} else if currency.IsUSDFiatCurrency(currency) {
+		} else if currency.IsUSDFiatCurrency(cu) {
 			profit.ProfitInUSD = base
 		}
 
 		profits = append(profits, profit)
 
-		if total, ok := p.TotalProfits[currency]; ok {
-			p.TotalProfits[currency] = total.Add(base)
+		if total, ok := p.TotalProfits[cu]; ok {
+			p.TotalProfits[cu] = total.Add(base)
 		} else {
-			p.TotalProfits[currency] = base
+			p.TotalProfits[cu] = base
 		}
 	}
 
@@ -100,40 +100,40 @@ func (p *MultiCurrencyPosition) CollectProfits() []Profit {
 }
 
 func (p *MultiCurrencyPosition) Reset() {
-	for currency := range p.Currencies {
-		p.Currencies[currency] = fixedpoint.Zero
+	for cu := range p.Currencies {
+		p.Currencies[cu] = fixedpoint.Zero
 	}
 }
 
 func (p *MultiCurrencyPosition) String() (o string) {
 	o += "position: \n"
 
-	for currency, base := range p.Currencies {
+	for cu, base := range p.Currencies {
 		if base.IsZero() {
 			continue
 		}
 
-		o += fmt.Sprintf("- %s: %f\n", currency, base.Float64())
+		o += fmt.Sprintf("- %s: %f\n", cu, base.Float64())
 	}
 
 	o += "totalProfits: \n"
 
-	for currency, total := range p.TotalProfits {
+	for cu, total := range p.TotalProfits {
 		if total.IsZero() {
 			continue
 		}
 
-		o += fmt.Sprintf("- %s: %f\n", currency, total.Float64())
+		o += fmt.Sprintf("- %s: %f\n", cu, total.Float64())
 	}
 
 	o += "fees: \n"
 
-	for currency, fee := range p.Fees {
+	for cu, fee := range p.Fees {
 		if fee.IsZero() {
 			continue
 		}
 
-		o += fmt.Sprintf("- %s: %f\n", currency, fee.Float64())
+		o += fmt.Sprintf("- %s: %f\n", cu, fee.Float64())
 	}
 
 	return o

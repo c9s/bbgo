@@ -9,8 +9,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
-	"github.com/c9s/bbgo/pkg/asset"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types/asset"
 	currency2 "github.com/c9s/bbgo/pkg/types/currency"
 )
 
@@ -204,7 +204,7 @@ func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) asset.Map {
 
 	_, btcInUSD, hasBtcPrice := findUSDMarketPrice("BTC", prices)
 
-	for currency, b := range m {
+	for cu, b := range m {
 		total := b.Total()
 		netAsset := b.Net()
 		debt := b.Debt()
@@ -213,8 +213,8 @@ func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) asset.Map {
 			continue
 		}
 
-		asset := asset.Asset{
-			Currency:  currency,
+		as := asset.Asset{
+			Currency:  cu,
 			Total:     total,
 			Time:      priceTime,
 			Locked:    b.Locked,
@@ -224,34 +224,34 @@ func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) asset.Map {
 			NetAsset:  netAsset,
 		}
 
-		if currency2.IsUSDFiatCurrency(currency) { // for usd
-			asset.InUSD = netAsset
-			asset.PriceInUSD = fixedpoint.One
-			if hasBtcPrice && !asset.InUSD.IsZero() {
-				asset.InBTC = asset.InUSD.Div(btcInUSD)
+		if currency2.IsUSDFiatCurrency(cu) { // for usd
+			as.NetAssetInUSD = netAsset
+			as.PriceInUSD = fixedpoint.One
+			if hasBtcPrice && !as.NetAssetInUSD.IsZero() {
+				as.NetAssetInBTC = as.NetAssetInUSD.Div(btcInUSD)
 			}
 		} else { // for crypto
-			if market, usdPrice, ok := findUSDMarketPrice(currency, prices); ok {
+			if market, usdPrice, ok := findUSDMarketPrice(cu, prices); ok {
 				// this includes USDT, USD, USDC and so on
 				if strings.HasPrefix(market, "USD") || strings.HasPrefix(market, "BUSD") { // for prices like USDT/TWD, BUSD/USDT
-					if !asset.NetAsset.IsZero() {
-						asset.InUSD = asset.NetAsset.Div(usdPrice)
+					if !as.NetAsset.IsZero() {
+						as.NetAssetInUSD = as.NetAsset.Div(usdPrice)
 					}
-					asset.PriceInUSD = fixedpoint.One.Div(usdPrice)
+					as.PriceInUSD = fixedpoint.One.Div(usdPrice)
 				} else { // for prices like BTC/USDT
-					if !asset.NetAsset.IsZero() {
-						asset.InUSD = asset.NetAsset.Mul(usdPrice)
+					if !as.NetAsset.IsZero() {
+						as.NetAssetInUSD = as.NetAsset.Mul(usdPrice)
 					}
-					asset.PriceInUSD = usdPrice
+					as.PriceInUSD = usdPrice
 				}
 
-				if hasBtcPrice && !asset.InUSD.IsZero() {
-					asset.InBTC = asset.InUSD.Div(btcInUSD)
+				if hasBtcPrice && !as.NetAssetInUSD.IsZero() {
+					as.NetAssetInBTC = as.NetAssetInUSD.Div(btcInUSD)
 				}
 			}
 		}
 
-		assets[currency] = asset
+		assets[cu] = as
 	}
 
 	return assets
