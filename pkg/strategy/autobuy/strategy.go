@@ -146,16 +146,14 @@ func (s *Strategy) cancelOrders(ctx context.Context) {
 func (s *Strategy) autobuy(ctx context.Context) {
 	s.cancelOrders(ctx)
 
-	baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
-	if !ok {
-		baseBalance = types.NewZeroBalance(s.Market.BaseCurrency)
-	}
+	account := s.Session.GetAccount()
+	baseBalance, _ := account.Balance(s.Market.BaseCurrency)
 
 	log.Infof("balance: %s", baseBalance.String())
 
-	quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
+	quoteBalance, ok := account.Balance(s.Market.QuoteCurrency)
 	if !ok {
-		log.Errorf("%s balance not found", s.Market.QuoteCurrency)
+		log.Errorf("quote balance is zero")
 		return
 	}
 
