@@ -26,6 +26,12 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
+type AllAssetSnapshot struct {
+	SessionAssets map[string]asset.Map
+	TotalAssets   asset.Map
+	Time          time.Time
+}
+
 type State struct {
 	Since int64 `json:"since"`
 }
@@ -67,6 +73,8 @@ type Strategy struct {
 
 	ShowDebtDetails bool `json:"showDebtDetails"`
 
+	lastAllAssetSnapshot *AllAssetSnapshot
+
 	State *State `persistence:"state"`
 
 	cron *cron.Cron
@@ -95,7 +103,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 	log.Infof("recording net asset value...")
 
 	priceTime := time.Now()
-	allAssets := map[string]asset.Map{}
+	sessionAssets := map[string]asset.Map{}
 
 	// iterate the sessions and record them
 	quoteCurrency := "USDT"
@@ -134,7 +142,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 				as.Available.String())
 		}
 
-		allAssets[sessionName] = assets
+		sessionAssets[sessionName] = assets
 
 		if s.ShowBreakdown {
 			slackAttachment := assets.SlackAttachment()
@@ -144,7 +152,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 	}
 
 	totalAssets := asset.Map{}
-	for _, assets := range allAssets {
+	for _, assets := range sessionAssets {
 		totalAssets = totalAssets.Merge(assets)
 	}
 
@@ -159,6 +167,12 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 	s.Environment.RecordAsset(priceTime, &bbgo.ExchangeSession{Name: "ALL"}, totalAssets)
 
 	bbgo.Notify(displayAssets)
+
+	s.lastAllAssetSnapshot = &AllAssetSnapshot{
+		SessionAssets: sessionAssets,
+		TotalAssets:   totalAssets,
+		Time:          priceTime,
+	}
 
 	if s.State != nil {
 		if s.State.IsOver24Hours() {
