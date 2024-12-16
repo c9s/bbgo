@@ -40,8 +40,13 @@ type Map map[string]Asset
 
 func (m Map) Merge(other Map) Map {
 	newMap := make(Map)
+
+	for cu, asset := range m {
+		newMap[cu] = asset
+	}
+
 	for cu, asset := range other {
-		if existing, ok := m[cu]; ok {
+		if existing, ok := newMap[cu]; ok {
 			asset.Total = asset.Total.Add(existing.Total)
 			asset.Locked = asset.Locked.Add(existing.Locked)
 			asset.Available = asset.Available.Add(existing.Available)
