@@ -60,11 +60,11 @@ func (s *State) Reset() {
 type Strategy struct {
 	*bbgo.Environment
 
-	Interval         types.Interval `json:"interval"`
-	Schedule         string         `json:"schedule"`
-	ReportOnStart    bool           `json:"reportOnStart"`
-	IgnoreDusts      bool           `json:"ignoreDusts"`
-	DisplayBreakdown bool           `json:"displayBreakdown"`
+	Interval      types.Interval `json:"interval"`
+	Schedule      string         `json:"schedule"`
+	ReportOnStart bool           `json:"reportOnStart"`
+	IgnoreDusts   bool           `json:"ignoreDusts"`
+	ShowBreakdown bool           `json:"showBreakdown"`
 
 	State *State `persistence:"state"`
 
@@ -135,7 +135,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 		allAssets[sessionName] = assets
 
-		if s.DisplayBreakdown {
+		if s.ShowBreakdown {
 			slackAttachment := assets.SlackAttachment()
 			slackAttachment.Title = "Session " + sessionName + " " + slackAttachment.Title
 			bbgo.Notify(slackAttachment)
