@@ -961,7 +961,7 @@ func (e *Exchange) QueryDepositHistory(
 				TransactionID: d.TxID,
 				Status:        toGlobalDepositStatus(d.State),
 				Confirmation:  strconv.FormatInt(d.Confirmations, 10),
-				Network:       d.NetworkProtocol,
+				Network:       toGlobalNetwork(d.NetworkProtocol),
 				RawStatus:     toRawStatusStr(d),
 			})
 		}
