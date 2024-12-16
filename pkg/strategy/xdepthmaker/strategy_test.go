@@ -68,11 +68,11 @@ func TestStrategy_generateMakerOrders(t *testing.T) {
 	assert.NoError(t, err)
 	AssertOrdersPriceSideQuantity(t, []PriceSideQuantityAssert{
 		{Side: types.SideTypeBuy, Price: Number("25000"), Quantity: Number("0.04")},        // =~ $1000.00
-		{Side: types.SideTypeBuy, Price: Number("24866.66"), Quantity: Number("0.281715")}, // =~ $7005.3111219, accumulated amount =~ $1000.00 + $7005.3111219 = $8005.3111219
-		{Side: types.SideTypeBuy, Price: Number("24800"), Quantity: Number("0.283123")},    // =~ $7021.4504, accumulated amount =~ $1000.00 + $7005.3111219 + $7021.4504 = $8005.3111219 + $7021.4504 =~ $15026.7615219
-		{Side: types.SideTypeSell, Price: Number("25100"), Quantity: Number("0.03984")},
-		{Side: types.SideTypeSell, Price: Number("25233.34"), Quantity: Number("0.2772")},
-		{Side: types.SideTypeSell, Price: Number("25300"), Quantity: Number("0.275845")},
+		{Side: types.SideTypeBuy, Price: Number("24910.71"), Quantity: Number("0.281147")}, // =~ $7005.3111219, accumulated amount =~ $1000.00 + $7005.3111219 = $8005.3111219
+		{Side: types.SideTypeBuy, Price: Number("24803.34"), Quantity: Number("0.28361")},  // =~ $7021.4504, accumulated amount =~ $1000.00 + $7005.3111219 + $7021.4504 = $8005.3111219 + $7021.4504 =~ $15026.7615219
+		{Side: types.SideTypeSell, Price: Number("25100.01"), Quantity: Number("0.03984")},
+		{Side: types.SideTypeSell, Price: Number("25188.06"), Quantity: Number("0.27777")},
+		{Side: types.SideTypeSell, Price: Number("25294.61"), Quantity: Number("0.275401")},
 	}, orders)
 }
 
