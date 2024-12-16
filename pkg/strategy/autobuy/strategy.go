@@ -148,9 +148,9 @@ func (s *Strategy) autobuy(ctx context.Context) {
 
 	baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
 	if !ok {
-		log.Errorf("%s balance not found", s.Market.BaseCurrency)
-		return
+		baseBalance = types.NewZeroBalance(s.Market.BaseCurrency)
 	}
+
 	log.Infof("balance: %s", baseBalance.String())
 
 	quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)

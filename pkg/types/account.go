@@ -137,6 +137,10 @@ func (a *Account) Balance(currency string) (balance Balance, ok bool) {
 	a.Lock()
 	balance, ok = a.balances[currency]
 	a.Unlock()
+	if !ok {
+		balance = NewZeroBalance(currency)
+	}
+
 	return balance, ok
 }
 
