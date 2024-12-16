@@ -126,7 +126,7 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Status",
 			Value: string(d.Status) + " " + d.Status.Emoji(),
-			Short: false,
+			Short: true,
 		})
 	}
 
@@ -138,7 +138,7 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Confirmation",
 			Value: text,
-			Short: false,
+			Short: true,
 		})
 	}
 
@@ -146,7 +146,7 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Exchange",
 			Value: d.Exchange.String(),
-			Short: false,
+			Short: true,
 		})
 	}
 
@@ -154,7 +154,7 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Network",
 			Value: d.Network,
-			Short: false,
+			Short: true,
 		})
 	}
 
@@ -164,14 +164,14 @@ func (d *Deposit) SlackAttachment() slack.Attachment {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Hostname",
 			Value: hostname,
-			Short: false,
+			Short: true,
 		})
 	}
 
 	fields = append(fields, slack.AttachmentField{
 		Title: "Amount",
 		Value: d.Amount.String() + " " + d.Asset,
-		Short: false,
+		Short: true,
 	})
 
 	return slack.Attachment{
