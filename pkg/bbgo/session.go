@@ -19,6 +19,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/metrics"
 	"github.com/c9s/bbgo/pkg/pricesolver"
+	currency2 "github.com/c9s/bbgo/pkg/types/currency"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
@@ -200,6 +201,14 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	}
 
 	return session
+}
+
+func (session *ExchangeSession) GetPriceSolver() *pricesolver.SimplePriceSolver {
+	if session.priceSolver == nil {
+		session.priceSolver = pricesolver.NewSimplePriceResolver(session.markets)
+	}
+
+	return session.priceSolver
 }
 
 func (session *ExchangeSession) GetAccountLabel() string {
@@ -764,16 +773,12 @@ func (session *ExchangeSession) FormatOrder(order types.SubmitOrder) (types.Subm
 }
 
 func (session *ExchangeSession) UpdatePrices(ctx context.Context, currencies []string, fiat string) (err error) {
-	// TODO: move this cache check to the http routes
-	// if session.lastPriceUpdatedAt.After(time.Now().Add(-time.Hour)) {
-	// 	return nil
-	// }
-
 	markets := session.Markets()
-	var symbols []string
+	symbols := make([]string, 0, 50)
 	for _, c := range currencies {
-		possibleSymbols := findPossibleMarketSymbols(markets, c, fiat)
-		symbols = append(symbols, possibleSymbols...)
+		for symbol := range markets.FindAssetMarkets(c) {
+			symbols = append(symbols, symbol)
+		}
 	}
 
 	if len(symbols) == 0 {
@@ -785,15 +790,20 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context, currencies []s
 		return err
 	}
 
+	priceSolver := session.GetPriceSolver()
+
 	var lastTime time.Time
 	for k, v := range tickers {
+		validPrice := v.GetValidPrice()
+		priceSolver.Update(k, validPrice)
+
 		// for {Crypto}/USDT markets
 		// map things like BTCUSDT = {price}
 		if market, ok := markets[k]; ok {
-			if types.IsFiatCurrency(market.BaseCurrency) {
-				session.lastPrices[k] = v.Last.Div(fixedpoint.One)
+			if currency2.IsFiatCurrency(market.BaseCurrency) {
+				session.lastPrices[k] = validPrice.Div(fixedpoint.One)
 			} else {
-				session.lastPrices[k] = v.Last
+				session.lastPrices[k] = validPrice
 			}
 		} else {
 			session.lastPrices[k] = v.Last
@@ -819,7 +829,7 @@ func (session *ExchangeSession) FindPossibleAssetSymbols() (symbols []string, er
 	var balances = session.GetAccount().Balances()
 	var fiatAssets []string
 
-	for _, currency := range types.FiatCurrencies {
+	for _, currency := range currency2.FiatCurrencies {
 		if balance, ok := balances[currency]; ok && balance.Total().Sign() > 0 {
 			fiatAssets = append(fiatAssets, currency)
 		}
@@ -1114,25 +1124,4 @@ func (session *ExchangeSession) FormatOrders(orders []types.SubmitOrder) (format
 	}
 
 	return formattedOrders, err
-}
-
-func findPossibleMarketSymbols(markets types.MarketMap, c, fiat string) (symbols []string) {
-	var tries []string
-	// expand USD stable coin currencies
-	if types.IsUSDFiatCurrency(fiat) {
-		for _, usdFiat := range types.USDFiatCurrencies {
-			tries = append(tries, c+usdFiat, usdFiat+c)
-		}
-	} else {
-		tries = []string{c + fiat, fiat + c}
-	}
-
-	for _, try := range tries {
-		if markets.Has(try) {
-			symbols = append(symbols, try)
-			break
-		}
-	}
-
-	return symbols
 }

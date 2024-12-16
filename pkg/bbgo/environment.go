@@ -29,6 +29,7 @@ import (
 	googleservice "github.com/c9s/bbgo/pkg/service/google"
 	"github.com/c9s/bbgo/pkg/slack/slacklog"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/asset"
 	"github.com/c9s/bbgo/pkg/util"
 )
 
@@ -542,7 +543,7 @@ func (environ *Environment) Sync(ctx context.Context, userConfig ...*Config) err
 	return nil
 }
 
-func (environ *Environment) RecordAsset(t time.Time, session *ExchangeSession, assets types.AssetMap) {
+func (environ *Environment) RecordAsset(t time.Time, session *ExchangeSession, assets asset.Map) {
 	// skip for back-test
 	if environ.BacktestService != nil {
 		return

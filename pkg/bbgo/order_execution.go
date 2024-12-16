@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/currency"
 )
 
 var DefaultSubmitOrderRetryTimeout = 5 * time.Minute
@@ -176,8 +177,8 @@ func (c *BasicRiskController) ProcessOrders(
 
 			if quoteBalance.Available.Compare(c.MinQuoteBalance) < 0 {
 				addError(errors.Wrapf(ErrQuoteBalanceLevelTooLow, "can not place buy order, quote balance level is too low: %s < %s, order: %s",
-					types.USD.FormatMoney(quoteBalance.Available),
-					types.USD.FormatMoney(c.MinQuoteBalance), order.String()))
+					currency.USD.FormatMoney(quoteBalance.Available),
+					currency.USD.FormatMoney(c.MinQuoteBalance), order.String()))
 				continue
 			}
 

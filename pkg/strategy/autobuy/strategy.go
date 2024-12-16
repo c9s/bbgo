@@ -129,9 +129,13 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	})
 
 	s.cron = cron.New()
-	s.cron.AddFunc(s.Schedule, func() {
+	_, err := s.cron.AddFunc(s.Schedule, func() {
 		s.autobuy(ctx)
 	})
+	if err != nil {
+		return err
+	}
+
 	s.cron.Start()
 
 	return nil
@@ -146,16 +150,14 @@ func (s *Strategy) cancelOrders(ctx context.Context) {
 func (s *Strategy) autobuy(ctx context.Context) {
 	s.cancelOrders(ctx)
 
-	baseBalance, ok := s.Session.GetAccount().Balance(s.Market.BaseCurrency)
-	if !ok {
-		log.Errorf("%s balance not found", s.Market.BaseCurrency)
-		return
-	}
+	account := s.Session.GetAccount()
+	baseBalance, _ := account.Balance(s.Market.BaseCurrency)
+
 	log.Infof("balance: %s", baseBalance.String())
 
-	quoteBalance, ok := s.Session.GetAccount().Balance(s.Market.QuoteCurrency)
+	quoteBalance, ok := account.Balance(s.Market.QuoteCurrency)
 	if !ok {
-		log.Errorf("%s balance not found", s.Market.QuoteCurrency)
+		log.Errorf("quote balance is zero")
 		return
 	}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/risk"
 	"github.com/c9s/bbgo/pkg/types"
+	currency2 "github.com/c9s/bbgo/pkg/types/currency"
 )
 
 var defaultLeverage = fixedpoint.NewFromInt(3)
@@ -159,7 +160,7 @@ func aggregateUsdNetValue(balances types.BalanceMap) fixedpoint.Value {
 	totalUsdValue := fixedpoint.Zero
 	// get all usd value if any
 	for currency, balance := range balances {
-		if types.IsUSDFiatCurrency(currency) {
+		if currency2.IsUSDFiatCurrency(currency) {
 			totalUsdValue = totalUsdValue.Add(balance.Net())
 		}
 	}
@@ -171,7 +172,7 @@ func usdFiatBalances(balances types.BalanceMap) (fiats types.BalanceMap, rest ty
 	rest = make(types.BalanceMap)
 	fiats = make(types.BalanceMap)
 	for currency, balance := range balances {
-		if types.IsUSDFiatCurrency(currency) {
+		if currency2.IsUSDFiatCurrency(currency) {
 			fiats[currency] = balance
 		} else {
 			rest[currency] = balance
@@ -214,7 +215,7 @@ func CalculateBaseQuantity(
 
 	// for isolated margin, we can calculate from these two pair
 	totalUsdValue := fixedpoint.Zero
-	if len(restBalances) == 1 && types.IsUSDFiatCurrency(market.QuoteCurrency) {
+	if len(restBalances) == 1 && currency2.IsUSDFiatCurrency(market.QuoteCurrency) {
 		totalUsdValue = aggregateUsdNetValue(balances)
 	} else if len(restBalances) > 1 {
 		priceSolver := pricesolver.NewSimplePriceResolver(session.Markets())

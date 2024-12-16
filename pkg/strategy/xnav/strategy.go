@@ -3,12 +3,15 @@ package xnav
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/asset"
+	"github.com/c9s/bbgo/pkg/types/currency"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
 	"github.com/c9s/bbgo/pkg/util/timejitter"
 
@@ -23,6 +26,63 @@ var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
+}
+
+type AllAssetSnapshot struct {
+	SessionAssets map[string]asset.Map
+	TotalAssets   asset.Map
+	Time          time.Time
+}
+
+type DebtAssetMap asset.Map
+
+func (m DebtAssetMap) SlackAttachment() slack.Attachment {
+	var fields []slack.AttachmentField
+	var netAssetInUSD, debtInUSD fixedpoint.Value
+
+	var assets = asset.Map(m).Slice()
+
+	// sort assets
+	sort.Slice(assets, func(i, j int) bool {
+		return assets[i].DebtInUSD.Compare(assets[j].DebtInUSD) > 0
+	})
+
+	for _, a := range assets {
+		debtInUSD = debtInUSD.Add(a.DebtInUSD)
+		netAssetInUSD = netAssetInUSD.Add(a.NetAssetInUSD)
+	}
+
+	for _, a := range assets {
+		if a.DebtInUSD.IsZero() {
+			continue
+		}
+
+		text := fmt.Sprintf("%s (≈ %s) (≈ %s)",
+			a.Debt.String(),
+			currency.USD.FormatMoney(a.DebtInUSD),
+			a.DebtInUSD.Div(netAssetInUSD).FormatPercentage(2),
+		)
+
+		if !a.Borrowed.IsZero() {
+			text += fmt.Sprintf(" Principle: %s (≈ %s)", a.Borrowed.String(), currency.USD.FormatMoney(a.Borrowed.Mul(a.PriceInUSD)))
+		}
+
+		if !a.Interest.IsZero() {
+			text += fmt.Sprintf(" Interest: %s (≈ %s)", a.Interest.String(), currency.USD.FormatMoney(a.InterestInUSD))
+		}
+
+		fields = append(fields, slack.AttachmentField{
+			Title: a.Currency,
+			Value: text,
+		})
+	}
+
+	return slack.Attachment{
+		Title: fmt.Sprintf("Debt Overview %s",
+			currency.USD.FormatMoney(debtInUSD),
+		),
+		Fields: fields,
+	}
 }
 
 type State struct {
@@ -63,6 +123,11 @@ type Strategy struct {
 	ReportOnStart bool           `json:"reportOnStart"`
 	IgnoreDusts   bool           `json:"ignoreDusts"`
 
+	ShowBreakdown   bool `json:"showBreakdown"`
+	ShowDebtDetails bool `json:"showDebtDetails"`
+
+	lastAllAssetSnapshot *AllAssetSnapshot
+
 	State *State `persistence:"state"`
 
 	cron *cron.Cron
@@ -88,14 +153,16 @@ var ten = fixedpoint.NewFromInt(10)
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
 
 func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
-	totalBalances := types.BalanceMap{}
-	allPrices := map[string]fixedpoint.Value{}
-	sessionBalances := map[string]types.BalanceMap{}
+	log.Infof("recording net asset value...")
+
 	priceTime := time.Now()
+	sessionAssets := map[string]asset.Map{}
 
 	// iterate the sessions and record them
 	quoteCurrency := "USDT"
 	for sessionName, session := range sessions {
+		log.Infof("recording net asset value for session %s...", sessionName)
+
 		if session.PublicOnly {
 			log.Infof("session %s is public only, skip", sessionName)
 			continue
@@ -108,46 +175,96 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		}
 
 		account := session.GetAccount()
-		balances := account.Balances()
+		balances := account.Balances().NotZero()
 		if err := session.UpdatePrices(ctx, balances.Currencies(), quoteCurrency); err != nil {
 			log.WithError(err).Error("price update failed")
 			return
 		}
 
-		sessionBalances[sessionName] = balances
-		totalBalances = totalBalances.Add(balances)
+		assets := NewAssetMapFromBalanceMap(session.GetPriceSolver(), priceTime, balances, quoteCurrency)
+		s.Environment.RecordAsset(priceTime, session, assets)
 
-		prices := session.LastPrices()
-		assets := balances.Assets(prices, priceTime)
-
-		// merge prices
-		for m, p := range prices {
-			allPrices[m] = p
+		for _, as := range assets {
+			log.WithFields(logrus.Fields{
+				"session":  sessionName,
+				"exchange": session.ExchangeName,
+			}).Infof("session %s %s asset = net:%s available:%s",
+				sessionName,
+				as.Currency,
+				as.NetAsset.String(),
+				as.Available.String())
 		}
 
-		s.Environment.RecordAsset(priceTime, session, assets)
+		sessionAssets[sessionName] = assets
+
 	}
 
-	displayAssets := types.AssetMap{}
-	totalAssets := totalBalances.Assets(allPrices, priceTime)
+	totalAssets := asset.Map{}
+	for _, assets := range sessionAssets {
+		totalAssets = totalAssets.Merge(assets)
+	}
+
 	s.Environment.RecordAsset(priceTime, &bbgo.ExchangeSession{Name: "ALL"}, totalAssets)
 
-	for currency, asset := range totalAssets {
-		// calculated if it's dust only when InUSD (usd value) is defined.
-		if s.IgnoreDusts && !asset.InUSD.IsZero() && asset.InUSD.Compare(ten) < 0 && asset.InUSD.Compare(ten.Neg()) > 0 {
-			continue
+	displayAssets := totalAssets.Filter(func(asset *asset.Asset) bool {
+		if s.IgnoreDusts && asset.NetAssetInUSD.Abs().Compare(ten) < 0 && asset.DebtInUSD.Abs().Compare(ten) < 0 {
+			return false
 		}
 
-		displayAssets[currency] = asset
-	}
+		return true
+	})
 
 	bbgo.Notify(displayAssets)
+
+	if s.ShowBreakdown && len(sessionAssets) > 1 {
+		for sessionName, assets := range sessionAssets {
+			slackAttachment := assets.SlackAttachment()
+			slackAttachment.Title = "Session " + sessionName + " " + slackAttachment.Title
+			bbgo.Notify(slackAttachment)
+		}
+	}
+
+	if s.ShowDebtDetails {
+		debtAssets := DebtAssetMap(displayAssets.Filter(func(asset *asset.Asset) bool {
+			return asset.DebtInUSD.Compare(ten) > 0
+		}))
+
+		if len(debtAssets) > 0 {
+			bbgo.Notify(debtAssets)
+		}
+	}
+
+	allAssetSnapshot := &AllAssetSnapshot{
+		SessionAssets: sessionAssets,
+		TotalAssets:   totalAssets,
+		Time:          priceTime,
+	}
+
+	if s.lastAllAssetSnapshot != nil {
+		// TODO: compare the last snapshot with the current snapshot
+	}
+	s.lastAllAssetSnapshot = allAssetSnapshot
 
 	if s.State != nil {
 		if s.State.IsOver24Hours() {
 			s.State.Reset()
 		}
 		bbgo.Sync(ctx, s)
+	}
+}
+
+func (s *Strategy) worker(ctx context.Context, sessions map[string]*bbgo.ExchangeSession, interval time.Duration) {
+	ticker := time.NewTicker(timejitter.Milliseconds(interval, 1000))
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			s.recordNetAssetValue(ctx, sessions)
+		}
 	}
 }
 
@@ -169,24 +286,11 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	if s.Environment.BacktestService != nil {
 		log.Warnf("xnav does not support backtesting")
+		return nil
 	}
 
 	if s.Interval != "" {
-		go func() {
-			ticker := time.NewTicker(timejitter.Milliseconds(s.Interval.Duration(), 1000))
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-
-				case <-ticker.C:
-					s.recordNetAssetValue(ctx, sessions)
-				}
-			}
-		}()
-
+		go s.worker(ctx, sessions, s.Interval.Duration())
 	} else if s.Schedule != "" {
 		s.cron = cron.New()
 		_, err := s.cron.AddFunc(s.Schedule, func() {
