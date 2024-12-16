@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/c9s/bbgo/pkg/asset"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types/asset"
 )
 
 func TestBalanceMap_Add(t *testing.T) {
@@ -63,30 +63,30 @@ func TestBalanceMap_Assets(t *testing.T) {
 			},
 			want: asset.Map{
 				"USDT": {
-					Currency:   "USDT",
-					Total:      number(100),
-					NetAsset:   number(100.0),
-					Interest:   number(0),
-					InUSD:      number(100.0),
-					InBTC:      number(100.0 / 19000.0),
-					Time:       time.Time{},
-					Locked:     number(0),
-					Available:  number(100.0),
-					Borrowed:   number(0),
-					PriceInUSD: number(1.0),
+					Currency:      "USDT",
+					Total:         number(100),
+					NetAsset:      number(100.0),
+					Interest:      number(0),
+					NetAssetInUSD: number(100.0),
+					NetAssetInBTC: number(100.0 / 19000.0),
+					Time:          time.Time{},
+					Locked:        number(0),
+					Available:     number(100.0),
+					Borrowed:      number(0),
+					PriceInUSD:    number(1.0),
 				},
 				"BTC": {
-					Currency:   "BTC",
-					Total:      number(0),
-					NetAsset:   number(-2),
-					Interest:   number(0),
-					InUSD:      number(-2 * 19000.0),
-					InBTC:      number(-2),
-					Time:       time.Time{},
-					Locked:     number(0),
-					Available:  number(0),
-					Borrowed:   number(2),
-					PriceInUSD: number(19000.0),
+					Currency:      "BTC",
+					Total:         number(0),
+					NetAsset:      number(-2),
+					Interest:      number(0),
+					NetAssetInUSD: number(-2 * 19000.0),
+					NetAssetInBTC: number(-2),
+					Time:          time.Time{},
+					Locked:        number(0),
+					Available:     number(0),
+					Borrowed:      number(2),
+					PriceInUSD:    number(19000.0),
 				},
 			},
 		},

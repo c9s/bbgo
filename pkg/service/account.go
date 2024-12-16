@@ -6,8 +6,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"go.uber.org/multierr"
 
-	"github.com/c9s/bbgo/pkg/asset"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/asset"
 )
 
 type AccountService struct {
@@ -52,8 +52,8 @@ func (s *AccountService) InsertAsset(
 			account,
 			time,
 			v.Currency,
-			v.InUSD,
-			v.InBTC,
+			v.NetAssetInUSD,
+			v.NetAssetInBTC,
 			v.Total,
 			v.Available,
 			v.Locked,

@@ -121,7 +121,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 			return
 		}
 
-		assets := asset.NewMapFromBalanceMap(session.GetPriceSolver(), priceTime, balances, quoteCurrency)
+		assets := NewAssetMapFromBalanceMap(session.GetPriceSolver(), priceTime, balances, quoteCurrency)
 		s.Environment.RecordAsset(priceTime, session, assets)
 
 		for _, as := range assets {
