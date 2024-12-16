@@ -11,13 +11,15 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func toGlobalNetwork(network string) string {
+func toGlobalNetwork(network string) (out string) {
+	out = network
 	parts := strings.SplitN(network, "-", 2)
 	if len(parts) > 0 {
-		return parts[0]
+		out = parts[0]
 	}
 
-	return network
+	out = strings.ToUpper(out)
+	return out
 }
 
 func toGlobalCurrency(currency string) string {
