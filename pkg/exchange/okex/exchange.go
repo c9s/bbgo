@@ -308,37 +308,6 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		CreationTime:     types.Time(timeNow),
 		UpdateTime:       types.Time(timeNow),
 	}, nil
-
-	// TODO: move this to batch place orders interface
-	/*
-		batchReq := e.client.TradeService.NewBatchPlaceOrderRequest()
-		batchReq.Add(reqs...)
-		orderHeads, err := batchReq.Do(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		for idx, orderHead := range orderHeads {
-			orderID, err := strconv.ParseInt(orderHead.OrderID, 10, 64)
-			if err != nil {
-				return createdOrder, err
-			}
-
-			submitOrder := order[idx]
-			createdOrder = append(createdOrder, types.Order{
-				SubmitOrder:      submitOrder,
-				Exchange:         types.ExchangeOKEx,
-				OrderID:          uint64(orderID),
-				Status:           types.OrderStatusNew,
-				ExecutedQuantity: fixedpoint.Zero,
-				IsWorking:        true,
-				CreationTime:     types.Time(time.Now()),
-				UpdateTime:       types.Time(time.Now()),
-				IsMargin:         false,
-				IsIsolated:       false,
-			})
-		}
-	*/
 }
 
 // QueryOpenOrders retrieves the pending orders. The data returned is ordered by createdTime, and we utilized the
