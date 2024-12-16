@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	asset2 "github.com/c9s/bbgo/pkg/asset"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -96,7 +95,7 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 	log.Infof("recording net asset value...")
 
 	priceTime := time.Now()
-	allAssets := map[string]asset2.Map{}
+	allAssets := map[string]asset.Map{}
 
 	// iterate the sessions and record them
 	quoteCurrency := "USDT"
@@ -144,13 +143,13 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		}
 	}
 
-	totalAssets := asset2.Map{}
+	totalAssets := asset.Map{}
 	for _, assets := range allAssets {
 		totalAssets = totalAssets.Merge(assets)
 	}
 
-	displayAssets := totalAssets.Filter(func(asset *asset2.Asset) bool {
-		if s.IgnoreDusts && !asset.InUSD.IsZero() && asset.InUSD.Abs().Compare(ten) < 0 {
+	displayAssets := totalAssets.Filter(func(asset *asset.Asset) bool {
+		if s.IgnoreDusts && asset.NetAssetInUSD.Abs().Compare(ten) < 0 && asset.DebtInUSD.Abs().Compare(ten) < 0 {
 			return false
 		}
 
