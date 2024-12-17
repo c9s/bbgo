@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/depth"
 	max "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
@@ -197,7 +198,7 @@ func (s *Stream) handleConnect() {
 }
 
 func (s *Stream) handleDisconnect() {
-	log.Debugf("resetting depth snapshots...")
+	log.Info("resetting depth snapshots...")
 	for _, f := range s.depthBuffers {
 		f.Reset()
 	}
@@ -272,6 +273,7 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
 				// the depth of websocket orderbook event is 50 by default, so we use 50 as limit here
 				return ex.QueryDepth(context.Background(), e.Market, bookDepth)
 			}, 3*time.Second)
+			f.SetLogger(logrus.WithFields(logrus.Fields{"exchange": "max", "symbol": symbol, "component": "depthBuffer"}))
 			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 				s.EmitBookSnapshot(snapshot)
 				for _, u := range updates {
@@ -287,6 +289,7 @@ func (s *Stream) handleBookEvent(ex *Exchange) func(e max.BookEvent) {
 		// if we receive orderbook event with both asks and bids are empty, it means we need to rebuild this orderbook
 		shouldReset := len(e.Asks) == 0 && len(e.Bids) == 0
 		if shouldReset {
+			log.Infof("resetting %s orderbook due to both empty asks/bids...", e.Market)
 			f.Reset()
 			return
 		}
