@@ -71,30 +71,6 @@ var aggregatedSignalMetrics = prometheus.NewGaugeVec(
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
-var configNumOfLayersMetrics = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "xmaker_config_num_of_layers",
-		Help: "",
-	}, []string{"strategy_type", "strategy_id", "symbol"})
-
-var configMaxExposureMetrics = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "xmaker_config_max_exposure",
-		Help: "",
-	}, []string{"strategy_type", "strategy_id", "symbol"})
-
-var configBidMarginMetrics = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "xmaker_config_bid_margin",
-		Help: "",
-	}, []string{"strategy_type", "strategy_id", "symbol"})
-
-var configAskMarginMetrics = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "xmaker_config_ask_margin",
-		Help: "",
-	}, []string{"strategy_type", "strategy_id", "symbol"})
-
 var netProfitMarginHistogram = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Name:    "xmaker_net_profit_margin",
@@ -113,10 +89,6 @@ func init() {
 		aggregatedSignalMetrics,
 		cancelOrderDurationMetrics,
 		makerOrderPlacementDurationMetrics,
-		configNumOfLayersMetrics,
-		configMaxExposureMetrics,
-		configBidMarginMetrics,
-		configAskMarginMetrics,
 		delayedHedgeCounterMetrics,
 		delayedHedgeMaxDurationMetrics,
 		netProfitMarginHistogram,

@@ -1884,6 +1884,10 @@ func (s *Strategy) CrossRun(
 	s.PrintConfig(configWriter, true, false)
 	s.logger.Infof("config: %s", configWriter.String())
 
+	if err := dynamic.InitializeConfigMetrics(ID, instanceID, s); err != nil {
+		return err
+	}
+
 	// configure sessions
 	sourceSession, ok := sessions[s.SourceExchange]
 	if !ok {
@@ -1926,20 +1930,12 @@ func (s *Strategy) CrossRun(
 	s.groupID = util.FNV32(instanceID)
 	s.logger.Infof("using group id %d from fnv(%s)", s.groupID, instanceID)
 
-	configLabels := prometheus.Labels{"strategy_id": s.InstanceID(), "strategy_type": ID, "symbol": s.Symbol}
-	configNumOfLayersMetrics.With(configLabels).Set(float64(s.NumLayers))
-	configMaxExposureMetrics.With(configLabels).Set(s.MaxExposurePosition.Float64())
-	configBidMarginMetrics.With(configLabels).Set(s.BidMargin.Float64())
-	configAskMarginMetrics.With(configLabels).Set(s.AskMargin.Float64())
-
 	if s.Position == nil {
 		s.Position = types.NewPositionFromMarket(s.makerMarket)
-		s.Position.Strategy = ID
-		s.Position.StrategyInstanceID = instanceID
-	} else {
-		s.Position.Strategy = ID
-		s.Position.StrategyInstanceID = instanceID
 	}
+
+	s.Position.Strategy = ID
+	s.Position.StrategyInstanceID = instanceID
 
 	if s.makerSession.MakerFeeRate.Sign() > 0 || s.makerSession.TakerFeeRate.Sign() > 0 {
 		s.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), types.ExchangeFee{
