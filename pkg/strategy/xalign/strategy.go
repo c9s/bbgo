@@ -14,6 +14,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
@@ -439,11 +440,14 @@ func (s *Strategy) selectSessionForCurrency(
 
 func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
-	_ = instanceID
 
 	s.sessions = make(map[string]*bbgo.ExchangeSession)
 	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
 	s.orderStore = core.NewOrderStore("")
+
+	if err := dynamic.InitializeConfigMetrics(ID, instanceID, s); err != nil {
+		return err
+	}
 
 	for currency, expectedValue := range s.ExpectedBalances {
 		s.deviationDetectors[currency] = detector.NewDeviationDetector(

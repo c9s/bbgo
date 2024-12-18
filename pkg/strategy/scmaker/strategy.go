@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	. "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
@@ -121,6 +122,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	s.liquidityScale = scale
+
+	instanceID := s.InstanceID()
+	if err := dynamic.InitializeConfigMetrics(ID, instanceID, s); err != nil {
+		return err
+	}
 
 	s.initializeMidPriceEMA(session)
 	s.initializePriceRangeBollinger(session)

@@ -565,7 +565,9 @@ func getStrategySignatures(exchangeStrategies map[string]SingleExchangeStrategy)
 
 // filterStrategies filters the exchange strategies by a filter tester function
 // if filter() returns true, the strategy will be added to the returned map.
-func filterStrategies(exchangeStrategies map[string]SingleExchangeStrategy, filter func(s SingleExchangeStrategy) bool) (map[string]SingleExchangeStrategy, error) {
+func filterStrategies(
+	exchangeStrategies map[string]SingleExchangeStrategy, filter func(s SingleExchangeStrategy) bool,
+) (map[string]SingleExchangeStrategy, error) {
 	retStrategies := make(map[string]SingleExchangeStrategy)
 	for signature, strategy := range exchangeStrategies {
 		if ok := filter(strategy); ok {
@@ -594,14 +596,18 @@ func testInterface(obj interface{}, checkType interface{}) bool {
 	return reflect.TypeOf(obj).Implements(rt)
 }
 
-func filterStrategiesByInterface(exchangeStrategies map[string]SingleExchangeStrategy, checkInterface interface{}) (map[string]SingleExchangeStrategy, error) {
+func filterStrategiesByInterface(
+	exchangeStrategies map[string]SingleExchangeStrategy, checkInterface interface{},
+) (map[string]SingleExchangeStrategy, error) {
 	rt := reflect.TypeOf(checkInterface).Elem()
 	return filterStrategies(exchangeStrategies, func(s SingleExchangeStrategy) bool {
 		return reflect.TypeOf(s).Implements(rt)
 	})
 }
 
-func filterStrategiesByField(exchangeStrategies map[string]SingleExchangeStrategy, fieldName string, fieldType reflect.Type) (map[string]SingleExchangeStrategy, error) {
+func filterStrategiesByField(
+	exchangeStrategies map[string]SingleExchangeStrategy, fieldName string, fieldType reflect.Type,
+) (map[string]SingleExchangeStrategy, error) {
 	return filterStrategies(exchangeStrategies, func(s SingleExchangeStrategy) bool {
 		r := reflect.ValueOf(s).Elem()
 		f := r.FieldByName(fieldName)
