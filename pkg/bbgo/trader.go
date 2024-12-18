@@ -13,32 +13,18 @@ import (
 
 	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/interact"
+	"github.com/c9s/bbgo/pkg/types"
 )
-
-// Strategy method calls:
-// -> Defaults()     (optional method)
-//
-//	setup default static values from constants
-//
-// -> Initialize()   (optional method)
-//
-//	initialize dynamic runtime objects
-//
-// -> Subscribe()
-//
-//	register the subscriptions
-//
-// -> Validate()     (optional method)
-// -> Run()          (optional method)
-// -> Shutdown(shutdownCtx context.Context, wg *sync.WaitGroup)
-type StrategyID interface {
-	ID() string
-}
 
 // SingleExchangeStrategy represents the single Exchange strategy
 type SingleExchangeStrategy interface {
-	StrategyID
+	types.StrategyID
 	Run(ctx context.Context, orderExecutor OrderExecutor, session *ExchangeSession) error
+}
+
+type CrossExchangeStrategy interface {
+	types.StrategyID
+	CrossRun(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
 // StrategyInitializer's Initialize method is called before the Subscribe method call.
@@ -66,11 +52,6 @@ type ExchangeSessionSubscriber interface {
 
 type CrossExchangeSessionSubscriber interface {
 	CrossSubscribe(sessions map[string]*ExchangeSession)
-}
-
-type CrossExchangeStrategy interface {
-	StrategyID
-	CrossRun(ctx context.Context, orderExecutionRouter OrderExecutionRouter, sessions map[string]*ExchangeSession) error
 }
 
 type Logging interface {
@@ -358,7 +339,7 @@ func (trader *Trader) Run(ctx context.Context) error {
 // It sets the default values and validates the strategy configurations.
 // And calls the Initialize method if the strategy implements the Initialize method.
 func (trader *Trader) Initialize(ctx context.Context) error {
-	return trader.IterateStrategies(func(strategy StrategyID) error {
+	return trader.IterateStrategies(func(strategy types.StrategyID) error {
 		if defaulter, ok := strategy.(StrategyDefaulter); ok {
 			if err := defaulter.Defaults(); err != nil {
 				return err
@@ -388,13 +369,13 @@ func (trader *Trader) LoadState(ctx context.Context) error {
 	ps := isolation.persistenceServiceFacade.Get()
 
 	log.Infof("loading strategies states...")
-	return trader.IterateStrategies(func(strategy StrategyID) error {
+	return trader.IterateStrategies(func(strategy types.StrategyID) error {
 		id := dynamic.CallID(strategy)
 		return loadPersistenceFields(strategy, id, ps)
 	})
 }
 
-func (trader *Trader) IterateStrategies(f func(st StrategyID) error) error {
+func (trader *Trader) IterateStrategies(f func(st types.StrategyID) error) error {
 	for _, strategies := range trader.exchangeStrategies {
 		for _, strategy := range strategies {
 			if err := f(strategy); err != nil {
@@ -423,7 +404,7 @@ func (trader *Trader) SaveState(ctx context.Context) error {
 	ps := isolation.persistenceServiceFacade.Get()
 
 	log.Debugf("saving strategy persistence states...")
-	return trader.IterateStrategies(func(strategy StrategyID) error {
+	return trader.IterateStrategies(func(strategy types.StrategyID) error {
 		id := dynamic.CallID(strategy)
 		if len(id) == 0 {
 			return nil
