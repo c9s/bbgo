@@ -16,6 +16,7 @@ var dynamicStrategyConfigMetrics = map[string]any{}
 
 func InitializeConfigMetrics(id, instanceId string, s types.StrategyID) error {
 	matchFirstCapRE := regexp.MustCompile("(.)([A-Z][a-z]+)")
+	matchAllCap := regexp.MustCompile("([a-z0-9])([A-Z])")
 
 	tv := reflect.TypeOf(s).Elem()
 	sv := reflect.Indirect(reflect.ValueOf(s))
@@ -37,7 +38,9 @@ nextStructField:
 		}
 
 		fieldName := tagAttrs[0]
-		fieldName = strings.ToLower(matchFirstCapRE.ReplaceAllString(fieldName, "${1}_${2}"))
+		fieldName = matchFirstCapRE.ReplaceAllString(fieldName, "${1}_${2}")
+		fieldName = matchAllCap.ReplaceAllString(fieldName, "${1}_${2}")
+		fieldName = strings.ToLower(fieldName)
 
 		isStr := false
 
