@@ -11,6 +11,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/dbg"
+	"github.com/c9s/bbgo/pkg/dynamic"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
@@ -198,6 +199,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	if s.StopEMA != nil && s.StopEMA.Enabled {
 		s.stopEMA = session.Indicators(s.Symbol).EMA(s.StopEMA.IntervalWindow)
+	}
+
+	instanceID := s.InstanceID()
+	if err := dynamic.InitializeConfigMetrics(ID, instanceID, s); err != nil {
+		return err
 	}
 
 	s.metricsLabels["exchange"] = session.ExchangeName.String()
