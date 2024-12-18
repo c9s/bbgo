@@ -7,6 +7,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/depth"
 	"github.com/c9s/bbgo/pkg/util"
+	"github.com/sirupsen/logrus"
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
@@ -91,6 +92,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 				log.Infof("fetching %s depth...", e.Symbol)
 				return ex.QueryDepth(context.Background(), e.Symbol)
 			}, 3*time.Second)
+			f.SetLogger(logrus.WithFields(logrus.Fields{"exchange": "binance", "symbol": e.Symbol, "component": "depthBuffer"}))
 			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 				stream.EmitBookSnapshot(snapshot)
 				for _, u := range updates {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/depth"
 	"github.com/c9s/bbgo/pkg/exchange/kucoin/kucoinapi"
@@ -81,6 +82,7 @@ func (s *Stream) handleOrderBookL2Event(e *WebSocketOrderBookL2Event) {
 		f = depth.NewBuffer(func() (types.SliceOrderBook, int64, error) {
 			return s.exchange.QueryDepth(context.Background(), e.Symbol)
 		}, 3*time.Second)
+		f.SetLogger(logrus.WithFields(logrus.Fields{"exchange": "kucoin", "symbol": e.Symbol, "component": "depthBuffer"}))
 		s.depthBuffers[e.Symbol] = f
 		f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 			if valid, err := snapshot.IsValid(); !valid {
