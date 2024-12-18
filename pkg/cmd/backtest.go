@@ -378,7 +378,7 @@ var BacktestCmd = &cobra.Command{
 			}
 
 			stateRecorder := backtest.NewStateRecorder(reportDir)
-			err = trader.IterateStrategies(func(st bbgo.StrategyID) error {
+			err = trader.IterateStrategies(func(st types.StrategyID) error {
 				return stateRecorder.Scan(st.(backtest.Instance))
 			})
 			if err != nil {
