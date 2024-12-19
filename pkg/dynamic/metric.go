@@ -5,21 +5,26 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 var matchFirstCapRE = regexp.MustCompile("(.)([A-Z][a-z]+)")
 var matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
 
 var dynamicStrategyConfigMetrics = map[string]*prometheus.GaugeVec{}
+var dynamicStrategyConfigMetricsMutex sync.Mutex
 
-func getOrCreateMetric(id, fieldName string) (*prometheus.GaugeVec, error) {
+func getOrCreateMetric(id, fieldName string) (*prometheus.GaugeVec, string, error) {
 	metricName := id + "_config_" + fieldName
+
+	dynamicStrategyConfigMetricsMutex.Lock()
 	metric, ok := dynamicStrategyConfigMetrics[metricName]
+	defer dynamicStrategyConfigMetricsMutex.Unlock()
+
 	if !ok {
 		metric = prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -30,11 +35,13 @@ func getOrCreateMetric(id, fieldName string) (*prometheus.GaugeVec, error) {
 		)
 
 		if err := prometheus.Register(metric); err != nil {
-			return nil, fmt.Errorf("unable to register metrics on field %+v, error: %+v", fieldName, err)
+			return nil, "", fmt.Errorf("unable to register metrics on field %+v, error: %+v", fieldName, err)
 		}
+
+		dynamicStrategyConfigMetrics[metricName] = metric
 	}
 
-	return metric, nil
+	return metric, metricName, nil
 }
 
 func toSnakeCase(input string) string {
@@ -74,15 +81,31 @@ func castToFloat64(valInf any) (float64, bool) {
 	return val, true
 }
 
-func InitializeConfigMetrics(id, instanceId string, s types.StrategyID) error {
-	tv := reflect.TypeOf(s).Elem()
-	sv := reflect.Indirect(reflect.ValueOf(s))
+func InitializeConfigMetrics(id, instanceId string, st any) error {
+	_, err := initializeConfigMetricsWithFieldPrefix(id, instanceId, "", st)
+	return err
+}
+
+func initializeConfigMetricsWithFieldPrefix(id, instanceId, fieldPrefix string, st any) ([]string, error) {
+	var metricNames []string
+	tv := reflect.TypeOf(st).Elem()
+
+	vv := reflect.ValueOf(st)
+	if vv.IsNil() {
+		return nil, nil
+	}
+
+	sv := reflect.Indirect(vv)
 
 	symbolField := sv.FieldByName("Symbol")
 	hasSymbolField := symbolField.IsValid()
 
 	for i := 0; i < tv.NumField(); i++ {
 		field := tv.Field(i)
+		if !field.IsExported() {
+			continue
+		}
+
 		jsonTag := field.Tag.Get("json")
 		if jsonTag == "" {
 			continue
@@ -93,7 +116,16 @@ func InitializeConfigMetrics(id, instanceId string, s types.StrategyID) error {
 			continue
 		}
 
-		fieldName := toSnakeCase(tagAttrs[0])
+		fieldName := fieldPrefix + toSnakeCase(tagAttrs[0])
+		if field.Type.Kind() == reflect.Pointer && field.Type.Elem().Kind() == reflect.Struct {
+			subMetricNames, err := initializeConfigMetricsWithFieldPrefix(id, instanceId, fieldName+"_", sv.Field(i).Interface())
+			if err != nil {
+				return nil, err
+			}
+
+			metricNames = append(metricNames, subMetricNames...)
+			continue
+		}
 
 		val := 0.0
 		valInf := sv.Field(i).Interface()
@@ -107,9 +139,9 @@ func InitializeConfigMetrics(id, instanceId string, s types.StrategyID) error {
 			symbol = symbolField.String()
 		}
 
-		metric, err := getOrCreateMetric(id, fieldName)
+		metric, metricName, err := getOrCreateMetric(id, fieldName)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		metric.With(prometheus.Labels{
@@ -117,7 +149,9 @@ func InitializeConfigMetrics(id, instanceId string, s types.StrategyID) error {
 			"strategy_id":   instanceId,
 			"symbol":        symbol,
 		}).Set(val)
+
+		metricNames = append(metricNames, metricName)
 	}
 
-	return nil
+	return metricNames, nil
 }
