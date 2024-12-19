@@ -384,7 +384,7 @@ func convertWithdrawStatusV2(state max.WithdrawState) types.WithdrawStatus {
 }
 
 func convertDepth(symbol string, depth *v3.Depth) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
-	snapshot.Symbol = symbol
+	snapshot.Symbol = toGlobalSymbol(symbol)
 	snapshot.Time = time.Unix(depth.Timestamp, 0)
 	snapshot.LastUpdateId = depth.LastUpdateId
 
