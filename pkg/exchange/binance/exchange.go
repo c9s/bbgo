@@ -306,9 +306,12 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
-func (e *Exchange) QueryHourlyInterestRate(ctx context.Context, assets []string) (rates types.MarginNextHourlyInterestRateMap, err error) {
+func (e *Exchange) QueryMarginFutureHourlyInterestRate(
+	ctx context.Context, assets []string,
+) (rates types.MarginNextHourlyInterestRateMap, err error) {
 	req := e.client2.NewGetMarginFutureHourlyInterestRateRequest()
 	req.Assets(strings.Join(assets, ","))
+	req.Isolated("FALSE")
 	rateSlice, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
