@@ -148,9 +148,17 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
+const anchorSymbol = "BTCUSDT"
+
 var ten = fixedpoint.NewFromInt(10)
 
-func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {}
+func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
+	for _, session := range sessions {
+		session.Subscribe(types.KLineChannel, anchorSymbol, types.SubscribeOptions{
+			Interval: types.Interval1m,
+		})
+	}
+}
 
 func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
 	log.Infof("recording net asset value...")
