@@ -166,8 +166,9 @@ type IsolatedUserAsset struct {
 }
 
 type MarginNextHourlyInterestRate struct {
-	Asset      string           `json:"asset"`
-	HourlyRate fixedpoint.Value `json:"hourlyRate"`
+	Asset          string           `json:"asset"`
+	HourlyRate     fixedpoint.Value `json:"hourlyRate"`
+	AnnualizedRate fixedpoint.Value `json:"annualizedRate"`
 }
 
 type MarginNextHourlyInterestRateMap map[string]*MarginNextHourlyInterestRate
