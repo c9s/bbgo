@@ -309,6 +309,11 @@ func (e *Exchange) NewStream() types.Stream {
 func (e *Exchange) QueryMarginFutureHourlyInterestRate(
 	ctx context.Context, assets []string,
 ) (rates types.MarginNextHourlyInterestRateMap, err error) {
+
+	if len(assets) > 20 {
+		return nil, fmt.Errorf("assets length must be less than 20, got %d", len(assets))
+	}
+
 	req := e.client2.NewGetMarginFutureHourlyInterestRateRequest()
 	req.Assets(strings.Join(assets, ","))
 	req.IsIsolated("FALSE")

@@ -52,7 +52,7 @@ func TestClient_GetMarginFutureNextHourlyInterestRate(t *testing.T) {
 	err := client.SetTimeOffsetFromServer(ctx)
 	if assert.NoError(t, err) {
 		req := client.NewGetMarginFutureHourlyInterestRateRequest().
-			Assets("BTC,USDT").
+			Assets("BTC,ETH,USDT,USDC").
 			IsIsolated("FALSE")
 		rates, err := req.Do(ctx)
 		assert.NoError(t, err)
