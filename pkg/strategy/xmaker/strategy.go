@@ -208,7 +208,8 @@ type Strategy struct {
 
 	DisableHedge bool `json:"disableHedge"`
 
-	NotifyTrade bool `json:"notifyTrade"`
+	NotifyTrade                        bool             `json:"notifyTrade"`
+	NotifyIgnoreSmallAmountProfitTrade fixedpoint.Value `json:"notifyIgnoreSmallAmountProfitTrade"`
 
 	EnableArbitrage bool `json:"enableArbitrage"`
 
@@ -2141,7 +2142,13 @@ func (s *Strategy) CrossRun(
 				s.CircuitBreaker.RecordProfit(profit.Profit, trade.Time.Time())
 			}
 
-			bbgo.Notify(profit)
+			if amount := s.NotifyIgnoreSmallAmountProfitTrade; amount.Sign() > 0 {
+				if profit.QuoteQuantity.Compare(amount) > 0 {
+					bbgo.Notify(profit)
+				}
+			} else {
+				bbgo.Notify(profit)
+			}
 
 			netProfitMarginHistogram.With(s.metricsLabels).Observe(profit.NetProfitMargin.Float64())
 
