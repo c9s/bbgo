@@ -311,7 +311,7 @@ func (e *Exchange) QueryMarginFutureHourlyInterestRate(
 ) (rates types.MarginNextHourlyInterestRateMap, err error) {
 	req := e.client2.NewGetMarginFutureHourlyInterestRateRequest()
 	req.Assets(strings.Join(assets, ","))
-	req.Isolated("FALSE")
+	req.IsIsolated("FALSE")
 	rateSlice, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -320,8 +320,9 @@ func (e *Exchange) QueryMarginFutureHourlyInterestRate(
 	rateMap := make(types.MarginNextHourlyInterestRateMap)
 	for _, entry := range rateSlice {
 		rateMap[entry.Asset] = &types.MarginNextHourlyInterestRate{
-			Asset:      entry.Asset,
-			HourlyRate: entry.NextHourlyInterestRate,
+			Asset:          entry.Asset,
+			HourlyRate:     entry.NextHourlyInterestRate,
+			AnnualizedRate: entry.GetAnnualizedInterestRate(),
 		}
 	}
 
