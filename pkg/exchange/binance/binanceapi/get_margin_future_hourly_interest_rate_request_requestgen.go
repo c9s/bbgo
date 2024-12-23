@@ -16,8 +16,8 @@ func (g *GetMarginFutureHourlyInterestRateRequest) Assets(assets string) *GetMar
 	return g
 }
 
-func (g *GetMarginFutureHourlyInterestRateRequest) Isolated(isolated string) *GetMarginFutureHourlyInterestRateRequest {
-	g.isolated = isolated
+func (g *GetMarginFutureHourlyInterestRateRequest) IsIsolated(isIsolated string) *GetMarginFutureHourlyInterestRateRequest {
+	g.isIsolated = isIsolated
 	return g
 }
 
@@ -41,11 +41,11 @@ func (g *GetMarginFutureHourlyInterestRateRequest) GetParameters() (map[string]i
 
 	// assign parameter of assets
 	params["assets"] = assets
-	// check isolated field -> json key isolated
-	isolated := g.isolated
+	// check isIsolated field -> json key isIsolated
+	isIsolated := g.isIsolated
 
-	// assign parameter of isolated
-	params["isolated"] = isolated
+	// assign parameter of isIsolated
+	params["isIsolated"] = isIsolated
 
 	return params, nil
 }

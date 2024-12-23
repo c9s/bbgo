@@ -45,6 +45,28 @@ func TestClient_GetTradeFeeRequest(t *testing.T) {
 	t.Logf("tradeFees: %+v", tradeFees)
 }
 
+func TestClient_GetMarginFutureNextHourlyInterestRate(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+
+	err := client.SetTimeOffsetFromServer(ctx)
+	if assert.NoError(t, err) {
+		req := client.NewGetMarginFutureHourlyInterestRateRequest().
+			Assets("BTC,USDT").
+			IsIsolated("FALSE")
+		rates, err := req.Do(ctx)
+		assert.NoError(t, err)
+
+		t.Logf("rates: %+v", rates)
+		for _, rate := range rates {
+			t.Logf("%s: %s (annualized: %s)", rate.Asset,
+				rate.NextHourlyInterestRate.FormatPercentage(4),
+				rate.GetAnnualizedInterestRate().FormatPercentage(4),
+			)
+		}
+	}
+}
+
 func TestClient_GetDepositAddressRequest(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()

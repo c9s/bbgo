@@ -1,6 +1,8 @@
 package binanceapi
 
 import (
+	"math"
+
 	"github.com/c9s/requestgen"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -11,6 +13,11 @@ type HourlyInterestRate struct {
 	NextHourlyInterestRate fixedpoint.Value `json:"nextHourlyInterestRate"`
 }
 
+func (r *HourlyInterestRate) GetAnnualizedInterestRate() fixedpoint.Value {
+	rf := r.NextHourlyInterestRate.Float64()
+	return fixedpoint.NewFromFloat(math.Pow(rf+1.0, 24*365) - 1.0)
+}
+
 //go:generate requestgen -method GET -url "/sapi/v1/margin/next-hourly-interest-rate" -type GetMarginFutureHourlyInterestRateRequest -responseType []HourlyInterestRate
 type GetMarginFutureHourlyInterestRateRequest struct {
 	client requestgen.AuthenticatedAPIClient
@@ -18,8 +25,8 @@ type GetMarginFutureHourlyInterestRateRequest struct {
 	// assets: List of assets, separated by commas, up to 20
 	assets string `param:"assets"`
 
-	// isolated: for isolated margin or not, "TRUE", "FALSE"
-	isolated string `param:"isolated"` // TRUE or FALSE
+	// isIsolated: for isolated margin or not, "TRUE", "FALSE"
+	isIsolated string `param:"isIsolated"` // TRUE or FALSE
 }
 
 func (c *RestClient) NewGetMarginFutureHourlyInterestRateRequest() *GetMarginFutureHourlyInterestRateRequest {
