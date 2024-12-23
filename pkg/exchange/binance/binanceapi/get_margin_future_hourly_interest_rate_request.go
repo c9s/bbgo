@@ -2,11 +2,13 @@ package binanceapi
 
 import (
 	"github.com/c9s/requestgen"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 type HourlyInterestRate struct {
-	Asset                  string `json:"asset"`
-	NextHourlyInterestRate string `json:"nextHourlyInterestRate"`
+	Asset                  string           `json:"asset"`
+	NextHourlyInterestRate fixedpoint.Value `json:"nextHourlyInterestRate"`
 }
 
 //go:generate requestgen -method GET -url "/sapi/v1/margin/next-hourly-interest-rate" -type GetMarginFutureHourlyInterestRateRequest -responseType []HourlyInterestRate

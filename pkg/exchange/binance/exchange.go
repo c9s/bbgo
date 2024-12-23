@@ -306,6 +306,25 @@ func (e *Exchange) NewStream() types.Stream {
 	return stream
 }
 
+func (e *Exchange) QueryHourlyInterestRate(ctx context.Context, assets []string) (rates types.MarginNextHourlyInterestRateMap, err error) {
+	req := e.client2.NewGetMarginFutureHourlyInterestRateRequest()
+	req.Assets(strings.Join(assets, ","))
+	rateSlice, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rateMap := make(types.MarginNextHourlyInterestRateMap)
+	for _, entry := range rateSlice {
+		rateMap[entry.Asset] = &types.MarginNextHourlyInterestRate{
+			Asset:      entry.Asset,
+			HourlyRate: entry.NextHourlyInterestRate,
+		}
+	}
+
+	return rateMap, nil
+}
+
 func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error) {
 	req := e.client2.NewGetMarginMaxBorrowableRequest()
 	req.Asset(asset)

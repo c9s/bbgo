@@ -164,3 +164,10 @@ type IsolatedUserAsset struct {
 	RepayEnabled  bool             `json:"repayEnabled"`
 	TotalAsset    fixedpoint.Value `json:"totalAsset"`
 }
+
+type MarginNextHourlyInterestRate struct {
+	Asset      string           `json:"asset"`
+	HourlyRate fixedpoint.Value `json:"hourlyRate"`
+}
+
+type MarginNextHourlyInterestRateMap map[string]*MarginNextHourlyInterestRate
