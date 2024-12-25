@@ -87,6 +87,24 @@ func (s Slice) Mean() (mean float64) {
 	return s.Sum() / float64(length)
 }
 
+func (s Slice) Var() float64 {
+	length := len(s)
+	if length == 0 {
+		panic("zero length slice")
+	}
+
+	mean := s.Mean()
+	variance := 0.0
+	for _, v := range s {
+		variance += (v - mean) * (v - mean)
+	}
+	return variance / float64(length)
+}
+
+func (s Slice) Std() float64 {
+	return math.Sqrt(s.Var())
+}
+
 func (s Slice) Tail(size int) Slice {
 	length := len(s)
 	if length <= size {
