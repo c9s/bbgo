@@ -184,26 +184,34 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 
 			log.Infof("found high interest rate assets: %+v", highRateAssets)
 
-			shouldAlert := func() bool { return len(highRateAssets) > 0 }
+			totalDebtValue := fixedpoint.Zero
+			nextTotalInterestValue := fixedpoint.Zero
+			debts := w.session.Account.Balances().Debts()
+			for cur, bal := range debts {
+				price, ok := w.session.GetPriceSolver().ResolvePrice(cur, currency.USDT)
+				if !ok {
+					log.Warnf("unable to resolve price for %s", cur)
+					continue
+				}
+
+				rate := rateMap[cur]
+				nextTotalInterestValue = nextTotalInterestValue.Add(
+					bal.Debt().Mul(rate.HourlyRate).Mul(price))
+
+				totalDebtValue = totalDebtValue.Add(bal.Debt().Mul(price))
+			}
+
+			shouldAlert := func() bool {
+				return len(highRateAssets) > 0 &&
+					w.config.MinDebtAmount.Sign() > 0 &&
+					totalDebtValue.Compare(w.config.MinDebtAmount) > 0
+			}
 
 			// either danger or margin level is less than the minimal margin level
 			// if the previous danger is set to true, we should send the alert again to
 			// update the previous danger margin alert message
 			if danger || shouldAlert() {
 				// calculate the debt value by the price solver
-				nextTotalInterestValue := fixedpoint.Zero
-				debts := w.session.Account.Balances().Debts()
-				for cur, bal := range debts {
-					price, ok := w.session.GetPriceSolver().ResolvePrice(cur, currency.USDT)
-					if !ok {
-						log.Warnf("unable to resolve price for %s", cur)
-						continue
-					}
-
-					rate := rateMap[cur]
-					nextTotalInterestValue = nextTotalInterestValue.Add(
-						bal.Debt().Mul(rate.HourlyRate).Mul(price))
-				}
 
 				alert := &MarginHighInterestRateAlert{
 					AlertID:        alertId,
