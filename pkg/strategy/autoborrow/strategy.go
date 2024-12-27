@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
@@ -13,10 +12,9 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/livenote"
-	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
-	currency2 "github.com/c9s/bbgo/pkg/types/currency"
+	"github.com/c9s/bbgo/pkg/types/currency"
 )
 
 const ID = "autoborrow"
@@ -61,6 +59,14 @@ type MarginRepayAlertConfig struct {
 	Slack *slackalert.SlackAlert `json:"slack,omitempty"`
 }
 
+type MarginHighInterestRateAlertConfig struct {
+	Slack *slackalert.SlackAlert `json:"slack,omitempty"`
+
+	Interval types.Duration `json:"interval"`
+
+	MinAnnualInterestRate fixedpoint.Value `json:"minAnnualInterestRate"`
+}
+
 type Strategy struct {
 	Interval             types.Interval   `json:"interval"`
 	MinMarginLevel       fixedpoint.Value `json:"minMarginLevel"`
@@ -68,15 +74,16 @@ type Strategy struct {
 	AutoRepayWhenDeposit bool             `json:"autoRepayWhenDeposit"`
 
 	MarginLevelAlert *MarginLevelAlertConfig `json:"marginLevelAlert"`
+
 	MarginRepayAlert *MarginRepayAlertConfig `json:"marginRepayAlert"`
+
+	MarginHighInterestRateAlertConfig *MarginHighInterestRateAlertConfig `json:"marginHighInterestRateAlert"`
 
 	Assets []MarginAssetConfig `json:"assets"`
 
 	ExchangeSession *bbgo.ExchangeSession
 
 	marginBorrowRepay types.MarginBorrowRepayService
-
-	priceSolver *pricesolver.SimplePriceSolver
 }
 
 func (s *Strategy) ID() string {
@@ -84,7 +91,24 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+	markets := session.Markets()
+	for _, asset := range s.Assets {
+		if currency.IsFiatCurrency(asset.Asset) {
+			continue
+		}
+
+		if market, ok := markets.FindPair(asset.Asset, currency.USDT); ok {
+			session.Subscribe(types.KLineChannel, market.Symbol, types.SubscribeOptions{Interval: types.Interval5m})
+		}
+	}
+}
+
+func (s *Strategy) getAssetStringSlice() []string {
+	var assets []string
+	for _, a := range s.Assets {
+		assets = append(assets, a.Asset)
+	}
+	return assets
 }
 
 func (s *Strategy) tryToRepayAnyDebt(ctx context.Context) {
@@ -578,104 +602,15 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	if s.MarginLevelAlert != nil && !s.MarginLevelAlert.MinMargin.IsZero() {
-		alertInterval := time.Minute * 5
-		if s.MarginLevelAlert.Interval > 0 {
-			alertInterval = s.MarginLevelAlert.Interval.Duration()
-		}
-
-		go s.marginAlertWorker(ctx, alertInterval)
+		go s.marginLevelAlertWorker(ctx, s.MarginLevelAlert)
 	}
 
-	markets := session.Markets()
-
-	s.priceSolver = pricesolver.NewSimplePriceResolver(markets)
-	s.priceSolver.BindStream(session.MarketDataStream)
-	s.priceSolver.BindStream(session.UserDataStream)
+	if s.MarginHighInterestRateAlertConfig != nil {
+		go newMarginHighInterestRateWorker(s, s.MarginHighInterestRateAlertConfig).Run(ctx)
+	}
 
 	go s.run(ctx, s.Interval.Duration())
 	return nil
-}
-
-func (s *Strategy) marginAlertWorker(ctx context.Context, alertInterval time.Duration) {
-	if s.MarginLevelAlert == nil {
-		return
-	}
-
-	ticker := time.NewTicker(alertInterval)
-	defer ticker.Stop()
-
-	danger := false
-
-	// alertId is used to identify the alert message when the alert is solved, we
-	// should send a new alert message instead of replacing the previous one, so the
-	// alertId will be updated to a new uuid once the alert is solved
-	alertId := uuid.New().String()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			account, err := s.ExchangeSession.UpdateAccount(ctx)
-			if err != nil {
-				log.WithError(err).Errorf("unable to update account")
-				continue
-			}
-
-			// either danger or margin level is less than the minimal margin level
-			// if the previous danger is set to true, we should send the alert again to
-			// update the previous danger margin alert message
-			if danger || account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0 {
-				// calculate the debt value by the price solver
-				totalDebtValueInUSDT := fixedpoint.Zero
-				debts := account.Balances().Debts()
-				for currency, bal := range debts {
-					price, ok := s.priceSolver.ResolvePrice(currency, currency2.USDT)
-					if !ok {
-						log.Warnf("unable to resolve price for %s", currency)
-						continue
-					}
-
-					debtValue := bal.Debt().Mul(price)
-					totalDebtValueInUSDT = totalDebtValueInUSDT.Add(debtValue)
-				}
-
-				alert := &MarginLevelAlert{
-					AlertID:             alertId,
-					AccountLabel:        s.ExchangeSession.GetAccountLabel(),
-					Exchange:            s.ExchangeSession.ExchangeName,
-					CurrentMarginLevel:  account.MarginLevel,
-					MinimalMarginLevel:  s.MarginLevelAlert.MinMargin,
-					SessionName:         s.ExchangeSession.Name,
-					TotalDebtValueInUSD: totalDebtValueInUSDT,
-					Debts:               account.Balances().Debts(),
-				}
-
-				bbgo.PostLiveNote(alert,
-					livenote.Channel(s.MarginLevelAlert.Slack.Channel),
-					livenote.OneTimeMention(s.MarginLevelAlert.Slack.Mentions...),
-					livenote.CompareObject(true),
-				)
-
-				// if the previous danger flag is not set, we should send the alert at the first time
-				if !danger {
-					s.postLiveNoteMessage(alert, s.MarginLevelAlert.Slack, "⚠️ The current margin level %f is less than the minimal margin level %f, please repay the debt",
-						account.MarginLevel.Float64(),
-						s.MarginLevelAlert.MinMargin.Float64())
-
-				}
-
-				// update danger flag
-				danger = account.MarginLevel.Compare(s.MarginLevelAlert.MinMargin) <= 0
-
-				// if it's not in danger anymore, send a solved message
-				if !danger {
-					alertId = uuid.New().String()
-					s.postLiveNoteMessage(alert, s.MarginLevelAlert.Slack, "✅ The current margin level %f is safe now", account.MarginLevel.Float64())
-				}
-			}
-		}
-	}
 }
 
 func (s *Strategy) postLiveNoteMessage(obj livenote.Object, alert *slackalert.SlackAlert, msgf string, args ...any) {
