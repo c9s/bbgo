@@ -122,11 +122,17 @@ func newMarginHighInterestRateWorker(strategy *Strategy, config *MarginHighInter
 }
 
 func (w *MarginHighInterestRateWorker) findMarginHighInterestRateAssets(
+	debts types.BalanceMap,
 	rateMap types.MarginNextHourlyInterestRateMap,
 	minAnnualRate float64,
 ) (highRates types.MarginNextHourlyInterestRateMap, err error) {
 	highRates = make(types.MarginNextHourlyInterestRateMap)
 	for asset, rate := range rateMap {
+		_, ok := debts[asset]
+		if !ok {
+			continue
+		}
+
 		if rate.AnnualizedRate.IsZero() {
 			log.Warnf("annualized rate is zero for %s", asset)
 		}
@@ -176,7 +182,9 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 
 			log.Infof("rates: %+v", rateMap)
 
-			highRateAssets, err := w.findMarginHighInterestRateAssets(rateMap, w.config.MinAnnualInterestRate.Float64())
+			debts := w.session.Account.Balances().Debts()
+
+			highRateAssets, err := w.findMarginHighInterestRateAssets(debts, rateMap, w.config.MinAnnualInterestRate.Float64())
 			if err != nil {
 				log.WithError(err).Errorf("unable to query the next future hourly interest rate")
 				continue
@@ -184,9 +192,8 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 
 			log.Infof("found high interest rate assets: %+v", highRateAssets)
 
-			totalDebtValue := fixedpoint.Zero
 			nextTotalInterestValue := fixedpoint.Zero
-			debts := w.session.Account.Balances().Debts()
+			exceededDebtAmount := false
 			for cur, bal := range debts {
 				price, ok := w.session.GetPriceSolver().ResolvePrice(cur, currency.USDT)
 				if !ok {
@@ -198,13 +205,15 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 				nextTotalInterestValue = nextTotalInterestValue.Add(
 					bal.Debt().Mul(rate.HourlyRate).Mul(price))
 
-				totalDebtValue = totalDebtValue.Add(bal.Debt().Mul(price))
+				debtValue := bal.Debt().Mul(price)
+				if w.config.MinDebtAmount.Sign() > 0 &&
+					debtValue.Compare(w.config.MinDebtAmount) > 0 {
+					exceededDebtAmount = true
+				}
 			}
 
 			shouldAlert := func() bool {
-				return len(highRateAssets) > 0 &&
-					w.config.MinDebtAmount.Sign() > 0 &&
-					totalDebtValue.Compare(w.config.MinDebtAmount) > 0
+				return len(highRateAssets) > 0 && exceededDebtAmount
 			}
 
 			// either danger or margin level is less than the minimal margin level
