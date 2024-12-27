@@ -172,3 +172,11 @@ type MarginNextHourlyInterestRate struct {
 }
 
 type MarginNextHourlyInterestRateMap map[string]*MarginNextHourlyInterestRate
+
+func (m MarginNextHourlyInterestRateMap) String() (out string) {
+	for k, v := range m {
+		out += k + " Hourly:" + v.HourlyRate.FormatPercentage(5) + " APY: " + v.AnnualizedRate.FormatPercentage(3) + "\n"
+	}
+
+	return out
+}

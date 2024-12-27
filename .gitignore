@@ -31,6 +31,8 @@
 /bbgow*
 
 /config/bbgo.yaml
+/config/*.local.yaml
+/config/*.yaml.local
 
 /localconfig
 
@@ -66,3 +68,5 @@ coverage_dum.txt
 /.chglog/
 
 /.credentials
+
+

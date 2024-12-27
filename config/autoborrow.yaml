@@ -1,6 +1,12 @@
 ---
+sessions:
+  binance_margin:
+    exchange: binance
+    envVarPrefix: BINANCE
+    margin: true
+
 exchangeStrategies:
-- on: binance
+- on: binance_margin
   autoborrow:
     interval: 30m
     autoRepayWhenDeposit: true
@@ -15,6 +21,15 @@ exchangeStrategies:
 
     marginRepayAlert:
       slack:
+        mentions:
+        - '<@USER_ID>'
+        - '<!subteam^TEAM_ID>'
+
+    marginHighInterestRateAlert:
+      interval: 5m
+      minAnnualInterestRate: "5%"
+      slack:
+        channel: "channel_id"
         mentions:
         - '<@USER_ID>'
         - '<!subteam^TEAM_ID>'
