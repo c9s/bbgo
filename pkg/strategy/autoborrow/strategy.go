@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/currency"
 )
 
 const ID = "autoborrow"
@@ -93,7 +94,16 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
-	// session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+	markets := session.Markets()
+	for _, asset := range s.Assets {
+		if currency.IsFiatCurrency(asset.Asset) {
+			continue
+		}
+
+		if market, ok := markets.FindPair(asset.Asset, currency.USDT); ok {
+			session.Subscribe(types.KLineChannel, market.Symbol, types.SubscribeOptions{Interval: types.Interval5m})
+		}
+	}
 }
 
 func (s *Strategy) getAssetStringSlice() []string {
@@ -599,7 +609,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	}
 
 	if s.MarginHighInterestRateAlertConfig != nil {
-		go s.marginHighInterestAlertWorker(ctx, s.MarginHighInterestRateAlertConfig)
+		go newMarginHighInterestRateWorker(s, s.MarginHighInterestRateAlertConfig).Run(ctx)
 	}
 
 	markets := session.Markets()

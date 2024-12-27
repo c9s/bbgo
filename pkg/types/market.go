@@ -276,6 +276,20 @@ func (m MarketMap) Has(symbol string) bool {
 	return ok
 }
 
+func (m MarketMap) FindPair(asset, quote string) (Market, bool) {
+	symbol := asset + quote
+	if market, ok := m[symbol]; ok {
+		return market, true
+	}
+
+	reversedSymbol := asset + quote
+	if market, ok := m[reversedSymbol]; ok {
+		return market, true
+	}
+
+	return Market{}, false
+}
+
 // FindAssetMarkets returns the markets that contains the given asset
 func (m MarketMap) FindAssetMarkets(asset string) MarketMap {
 	var markets = make(MarketMap)

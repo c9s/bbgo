@@ -98,7 +98,21 @@ type marginFutureInterestQueryService interface {
 	QueryMarginFutureHourlyInterestRate(ctx context.Context, assets []string) (rates types.MarginNextHourlyInterestRateMap, err error)
 }
 
-func (s *Strategy) findMarginHighInterestRateAssets(
+type MarginHighInterestRateWorker struct {
+	strategy *Strategy
+	session  *bbgo.ExchangeSession
+	config   *MarginHighInterestRateAlertConfig
+}
+
+func newMarginHighInterestRateWorker(strategy *Strategy, config *MarginHighInterestRateAlertConfig) *MarginHighInterestRateWorker {
+	return &MarginHighInterestRateWorker{
+		strategy: strategy,
+		session:  strategy.ExchangeSession,
+		config:   config,
+	}
+}
+
+func (w *MarginHighInterestRateWorker) findMarginHighInterestRateAssets(
 	rateMap types.MarginNextHourlyInterestRateMap,
 	minAnnualRate float64,
 ) (highRates types.MarginNextHourlyInterestRateMap, err error) {
@@ -115,13 +129,13 @@ func (s *Strategy) findMarginHighInterestRateAssets(
 	return highRates, nil
 }
 
-func (s *Strategy) marginHighInterestAlertWorker(ctx context.Context, config *MarginHighInterestRateAlertConfig) {
+func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 	alertInterval := time.Minute * 5
-	if config.Interval > 0 {
-		alertInterval = config.Interval.Duration()
+	if w.config.Interval > 0 {
+		alertInterval = w.config.Interval.Duration()
 	}
 
-	ex := s.ExchangeSession.Exchange
+	ex := w.session.Exchange
 	service, support := ex.(marginFutureInterestQueryService)
 	if !support {
 		log.Warnf("exchange %T does not support margin future interest rate query", ex)
@@ -144,7 +158,7 @@ func (s *Strategy) marginHighInterestAlertWorker(ctx context.Context, config *Ma
 			return
 
 		case <-ticker.C:
-			assets := s.getAssetStringSlice()
+			assets := w.strategy.getAssetStringSlice()
 
 			rateMap, err := service.QueryMarginFutureHourlyInterestRate(ctx, assets)
 			if err != nil {
@@ -152,7 +166,7 @@ func (s *Strategy) marginHighInterestAlertWorker(ctx context.Context, config *Ma
 				continue
 			}
 
-			highRateAssets, err := s.findMarginHighInterestRateAssets(rateMap, config.MinAnnualInterestRate.Float64())
+			highRateAssets, err := w.findMarginHighInterestRateAssets(rateMap, w.config.MinAnnualInterestRate.Float64())
 			if err != nil {
 				log.WithError(err).Errorf("unable to query the next future hourly interest rate")
 				continue
@@ -168,9 +182,9 @@ func (s *Strategy) marginHighInterestAlertWorker(ctx context.Context, config *Ma
 			if danger || shouldAlert() {
 				// calculate the debt value by the price solver
 				nextTotalInterestValue := fixedpoint.Zero
-				debts := s.ExchangeSession.Account.Balances().Debts()
+				debts := w.session.Account.Balances().Debts()
 				for cur, bal := range debts {
-					price, ok := s.priceSolver.ResolvePrice(cur, currency.USDT)
+					price, ok := w.strategy.priceSolver.ResolvePrice(cur, currency.USDT)
 					if !ok {
 						log.Warnf("unable to resolve price for %s", cur)
 						continue
@@ -183,22 +197,22 @@ func (s *Strategy) marginHighInterestAlertWorker(ctx context.Context, config *Ma
 
 				alert := &MarginHighInterestRateAlert{
 					AlertID:        alertId,
-					AccountLabel:   s.ExchangeSession.GetAccountLabel(),
-					Exchange:       s.ExchangeSession.ExchangeName,
-					SessionName:    s.ExchangeSession.Name,
+					AccountLabel:   w.session.GetAccountLabel(),
+					Exchange:       w.session.ExchangeName,
+					SessionName:    w.session.Name,
 					Debts:          debts,
 					HighRateAssets: highRateAssets,
 				}
 
 				bbgo.PostLiveNote(alert,
-					livenote.Channel(config.Slack.Channel),
-					livenote.OneTimeMention(config.Slack.Mentions...),
+					livenote.Channel(w.config.Slack.Channel),
+					livenote.OneTimeMention(w.config.Slack.Mentions...),
 					livenote.CompareObject(true),
 				)
 
 				// if the previous danger flag is not set, we should send the alert at the first time
 				if !danger {
-					s.postLiveNoteMessage(alert, config.Slack, "⚠️ High interest rate assets found, please repay the debt")
+					w.strategy.postLiveNoteMessage(alert, w.config.Slack, "⚠️ High interest rate assets found, please repay the debt")
 				}
 
 				// update danger flag
@@ -207,7 +221,7 @@ func (s *Strategy) marginHighInterestAlertWorker(ctx context.Context, config *Ma
 				// if it's not in danger anymore, send a solved message
 				if !danger {
 					alertId = uuid.New().String()
-					s.postLiveNoteMessage(alert, s.MarginLevelAlert.Slack, "✅ High interest rate alert is solved")
+					w.strategy.postLiveNoteMessage(alert, w.config.Slack, "✅ High interest rate alert is solved")
 				}
 			}
 		}
