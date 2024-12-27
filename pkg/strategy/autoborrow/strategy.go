@@ -12,7 +12,6 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/binance"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/livenote"
-	"github.com/c9s/bbgo/pkg/pricesolver"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/currency"
@@ -85,8 +84,6 @@ type Strategy struct {
 	ExchangeSession *bbgo.ExchangeSession
 
 	marginBorrowRepay types.MarginBorrowRepayService
-
-	priceSolver *pricesolver.SimplePriceSolver
 }
 
 func (s *Strategy) ID() string {
@@ -611,12 +608,6 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	if s.MarginHighInterestRateAlertConfig != nil {
 		go newMarginHighInterestRateWorker(s, s.MarginHighInterestRateAlertConfig).Run(ctx)
 	}
-
-	markets := session.Markets()
-
-	s.priceSolver = pricesolver.NewSimplePriceResolver(markets)
-	s.priceSolver.BindStream(session.MarketDataStream)
-	s.priceSolver.BindStream(session.UserDataStream)
 
 	go s.run(ctx, s.Interval.Duration())
 	return nil
