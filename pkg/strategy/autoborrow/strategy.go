@@ -64,6 +64,8 @@ type MarginHighInterestRateAlertConfig struct {
 
 	Interval types.Duration `json:"interval"`
 
+	MinDebtAmount fixedpoint.Value `json:"minDebtAmount"`
+
 	MinAnnualInterestRate fixedpoint.Value `json:"minAnnualInterestRate"`
 }
 
