@@ -2135,18 +2135,24 @@ func (s *Strategy) CrossRun(
 		}
 	})
 
-	// TODO: remove this nil value behavior, check all OnProfit usage and remove the EmitProfit call with nil profit
+	shouldNotifyProfit := func(trade types.Trade, profit *types.Profit) bool {
+		amountThreshold := s.NotifyIgnoreSmallAmountProfitTrade
+		if amountThreshold.IsZero() {
+			return true
+		} else if trade.QuoteQuantity.Compare(amountThreshold) >= 0 {
+			return true
+		}
+
+		return false
+	}
+
 	s.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
 		if profit != nil {
 			if s.CircuitBreaker != nil {
 				s.CircuitBreaker.RecordProfit(profit.Profit, trade.Time.Time())
 			}
 
-			if amount := s.NotifyIgnoreSmallAmountProfitTrade; amount.Sign() > 0 {
-				if profit.QuoteQuantity.Compare(amount) > 0 {
-					bbgo.Notify(profit)
-				}
-			} else {
+			if shouldNotifyProfit(trade, profit) {
 				bbgo.Notify(profit)
 			}
 
