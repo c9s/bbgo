@@ -156,7 +156,7 @@ func (s *Strategy) marginLevelAlertWorker(ctx context.Context, config *MarginLev
 				totalDebtValueInUSDT := fixedpoint.Zero
 				debts := account.Balances().Debts()
 				for cur, bal := range debts {
-					price, ok := s.priceSolver.ResolvePrice(cur, currency.USDT)
+					price, ok := s.ExchangeSession.GetPriceSolver().ResolvePrice(cur, currency.USDT)
 					if !ok {
 						log.Warnf("unable to resolve price for %s", cur)
 						continue

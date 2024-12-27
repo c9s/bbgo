@@ -102,13 +102,22 @@ type MarginHighInterestRateWorker struct {
 	strategy *Strategy
 	session  *bbgo.ExchangeSession
 	config   *MarginHighInterestRateAlertConfig
+
+	service marginFutureInterestQueryService
 }
 
 func newMarginHighInterestRateWorker(strategy *Strategy, config *MarginHighInterestRateAlertConfig) *MarginHighInterestRateWorker {
+	session := strategy.ExchangeSession
+	service, support := session.Exchange.(marginFutureInterestQueryService)
+	if !support {
+		log.Warnf("exchange %T does not support margin future interest rate query", session.Exchange)
+	}
+
 	return &MarginHighInterestRateWorker{
 		strategy: strategy,
-		session:  strategy.ExchangeSession,
+		session:  session,
 		config:   config,
+		service:  service,
 	}
 }
 
@@ -116,6 +125,7 @@ func (w *MarginHighInterestRateWorker) findMarginHighInterestRateAssets(
 	rateMap types.MarginNextHourlyInterestRateMap,
 	minAnnualRate float64,
 ) (highRates types.MarginNextHourlyInterestRateMap, err error) {
+	highRates = make(types.MarginNextHourlyInterestRateMap)
 	for asset, rate := range rateMap {
 		if rate.AnnualizedRate.IsZero() {
 			log.Warnf("annualized rate is zero for %s", asset)
@@ -135,10 +145,8 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 		alertInterval = w.config.Interval.Duration()
 	}
 
-	ex := w.session.Exchange
-	service, support := ex.(marginFutureInterestQueryService)
-	if !support {
-		log.Warnf("exchange %T does not support margin future interest rate query", ex)
+	if w.service == nil {
+		log.Warnf("exchange %T does not support margin future interest rate query", w.session.Exchange)
 		return
 	}
 
@@ -160,11 +168,13 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 		case <-ticker.C:
 			assets := w.strategy.getAssetStringSlice()
 
-			rateMap, err := service.QueryMarginFutureHourlyInterestRate(ctx, assets)
+			rateMap, err := w.service.QueryMarginFutureHourlyInterestRate(ctx, assets)
 			if err != nil {
 				log.WithError(err).Errorf("unable to query the next future hourly interest rate")
 				continue
 			}
+
+			log.Infof("rates: %+v", rateMap)
 
 			highRateAssets, err := w.findMarginHighInterestRateAssets(rateMap, w.config.MinAnnualInterestRate.Float64())
 			if err != nil {
@@ -184,7 +194,7 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 				nextTotalInterestValue := fixedpoint.Zero
 				debts := w.session.Account.Balances().Debts()
 				for cur, bal := range debts {
-					price, ok := w.strategy.priceSolver.ResolvePrice(cur, currency.USDT)
+					price, ok := w.session.GetPriceSolver().ResolvePrice(cur, currency.USDT)
 					if !ok {
 						log.Warnf("unable to resolve price for %s", cur)
 						continue

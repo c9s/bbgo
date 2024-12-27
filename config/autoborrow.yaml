@@ -1,6 +1,12 @@
 ---
+sessions:
+  binance_margin:
+    exchange: binance
+    envVarPrefix: BINANCE
+    margin: true
+
 exchangeStrategies:
-- on: binance
+- on: binance_margin
   autoborrow:
     interval: 30m
     autoRepayWhenDeposit: true
