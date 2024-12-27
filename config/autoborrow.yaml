@@ -19,6 +19,15 @@ exchangeStrategies:
         - '<@USER_ID>'
         - '<!subteam^TEAM_ID>'
 
+    marginHighInterestRateAlert:
+      interval: 5m
+      minAnnualInterestRate: "5%"
+      slack:
+        channel: "channel_id"
+        mentions:
+        - '<@USER_ID>'
+        - '<!subteam^TEAM_ID>'
+
     marginLevelAlert:
       interval: 5m
       minMargin: 2.0
