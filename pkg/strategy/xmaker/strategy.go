@@ -2139,7 +2139,7 @@ func (s *Strategy) CrossRun(
 		amountThreshold := s.NotifyIgnoreSmallAmountProfitTrade
 		if amountThreshold.IsZero() {
 			return true
-		} else if trade.QuoteQuantity.Compare(amountThreshold) >= 0 {
+		} else if trade.QuoteQuantity.Sign() > 0 && trade.QuoteQuantity.Compare(amountThreshold) >= 0 {
 			return true
 		}
 
