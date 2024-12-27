@@ -195,7 +195,9 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 				continue
 			}
 
-			log.Infof("found high interest rate assets: %+v", highRateAssets)
+			if len(highRateAssets) > 0 {
+				log.Infof("found high interest rate assets: %+v", highRateAssets)
+			}
 
 			nextTotalInterestValue := fixedpoint.Zero
 			exceededDebtAmount := false
