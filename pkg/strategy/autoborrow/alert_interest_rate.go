@@ -128,8 +128,13 @@ func (w *MarginHighInterestRateWorker) findMarginHighInterestRateAssets(
 ) (highRates types.MarginNextHourlyInterestRateMap, err error) {
 	highRates = make(types.MarginNextHourlyInterestRateMap)
 	for asset, rate := range rateMap {
-		_, ok := debts[asset]
+		bal, ok := debts[asset]
 		if !ok {
+			continue
+		}
+
+		debt := bal.Debt()
+		if debt.IsZero() {
 			continue
 		}
 
@@ -202,10 +207,10 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 				}
 
 				rate := rateMap[cur]
-				nextTotalInterestValue = nextTotalInterestValue.Add(
-					bal.Debt().Mul(rate.HourlyRate).Mul(price))
-
 				debtValue := bal.Debt().Mul(price)
+				nextTotalInterestValue = nextTotalInterestValue.Add(
+					debtValue.Mul(rate.HourlyRate))
+
 				if w.config.MinDebtAmount.Sign() > 0 &&
 					debtValue.Compare(w.config.MinDebtAmount) > 0 {
 					exceededDebtAmount = true
