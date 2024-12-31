@@ -293,7 +293,8 @@ func (s *Strategy) repay(ctx context.Context, d types.Deposit, amount fixedpoint
 
 	s.logger.Infof("found %s balance debt: %s", d.Asset, bal.Debt().String())
 
-	amount = fixedpoint.Min(bal.Debt(), amount)
+	amount = fixedpoint.Min(bal.Debt(),
+		fixedpoint.Max(amount, bal.Available))
 
 	if amount.Sign() <= 0 {
 		s.logger.Infof("%s has no debt to repay", d.Asset)
