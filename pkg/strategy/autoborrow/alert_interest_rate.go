@@ -150,6 +150,29 @@ func (w *MarginHighInterestRateWorker) findMarginHighInterestRateAssets(
 	return highRates, nil
 }
 
+func (w *MarginHighInterestRateWorker) tryFix(ctx context.Context, asset string) error {
+	log.Infof("trying to repay %s to fix high interest rate alert", asset)
+
+	bal, ok := w.session.Account.Balance(asset)
+	if !ok {
+		return fmt.Errorf("balance of %s not found", asset)
+	}
+
+	if bal.Available.IsZero() {
+		return fmt.Errorf("available balance of %s is zero", asset)
+	}
+
+	repayService, support := w.session.Exchange.(types.MarginBorrowRepayService)
+	if !support {
+		return fmt.Errorf("exchange %s does not support margin borrow repay service", w.session.ExchangeName)
+	}
+
+	log.Infof("repaying %s %s", bal.Debt().String(), asset)
+
+	repay := fixedpoint.Min(bal.Available, bal.Debt())
+	return repayService.RepayMarginAsset(ctx, asset, repay)
+}
+
 func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 	alertInterval := time.Minute * 5
 	if w.config.Interval > 0 {
@@ -227,7 +250,21 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 			// if the previous danger is set to true, we should send the alert again to
 			// update the previous danger margin alert message
 			if danger || shouldAlert() {
-				// calculate the debt value by the price solver
+				allRepaid := 0
+				for asset := range highRateAssets {
+					if err := w.tryFix(ctx, asset); err != nil {
+						log.WithError(err).Errorf("unable to fix high interest rate alert")
+					} else {
+						allRepaid++
+					}
+				}
+
+				// if the previous danger flag is not set, and all high interest rate assets are repaid
+				// we should not send the alert
+				if !danger && allRepaid == len(highRateAssets) {
+					log.Infof("all high interest rate assets are repaid")
+					continue
+				}
 
 				alert := &MarginHighInterestRateAlert{
 					AlertID:        alertId,
