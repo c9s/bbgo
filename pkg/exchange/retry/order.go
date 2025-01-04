@@ -153,7 +153,7 @@ func QueryOrderTradesUntilSuccessful(
 ) (trades []types.Trade, err error) {
 	// sometimes the api might return empty trades without an error when we query the order too soon,
 	// so in the initial attempts, we should check the len(trades) and retry the query
-	var initialAttempts = 3
+	var initialAttempts = 5
 	var op = func() (err2 error) {
 		trades, err2 = ex.QueryOrderTrades(ctx, q)
 		if err2 != nil {
