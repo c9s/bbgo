@@ -169,6 +169,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	session := &ExchangeSession{
 		Name:     name,
 		Exchange: exchange,
+		ExchangeName: exchange.Name(),
 
 		UserDataStream:       userDataStream,
 		UserDataConnectivity: userDataConnectivity,
