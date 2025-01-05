@@ -34,6 +34,7 @@ func TestTrailingStop_ShortPosition(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	mockEx := mocks.NewMockExchange(mockCtrl)
+	mockEx.EXPECT().Name().Return(types.ExchangeName("test")).AnyTimes()
 	mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
 	mockEx.EXPECT().SubmitOrder(gomock.Any(), types.SubmitOrder{
 		Symbol:           "BTCUSDT",
@@ -112,6 +113,7 @@ func TestTrailingStop_LongPosition(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	mockEx := mocks.NewMockExchange(mockCtrl)
+	mockEx.EXPECT().Name().Return(types.ExchangeName("test")).AnyTimes()
 	mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
 	mockEx.EXPECT().SubmitOrder(gomock.Any(), types.SubmitOrder{
 		Symbol:           "BTCUSDT",
