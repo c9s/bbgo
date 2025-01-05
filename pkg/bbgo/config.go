@@ -591,7 +591,7 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 		for id, conf := range configStash {
 			// look up the real struct type
 			if st, ok := LoadedCrossExchangeStrategies[id]; ok {
-				val, err := reUnmarshal(conf, st)
+				val, err := ReUnmarshal(conf, st)
 				if err != nil {
 					return err
 				}
@@ -606,7 +606,7 @@ func loadCrossExchangeStrategies(config *Config, stash Stash) (err error) {
 
 func NewStrategyFromMap(id string, conf interface{}) (SingleExchangeStrategy, error) {
 	if st, ok := LoadedExchangeStrategies[id]; ok {
-		val, err := reUnmarshal(conf, st)
+		val, err := ReUnmarshal(conf, st)
 		if err != nil {
 			return nil, err
 		}
@@ -687,7 +687,8 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 	return nil
 }
 
-func reUnmarshal(conf interface{}, tpe interface{}) (interface{}, error) {
+// ReUnmarshal unmarshals the given config into the given type
+func ReUnmarshal(conf interface{}, tpe interface{}) (interface{}, error) {
 	// get the type "*Strategy"
 	rt := reflect.TypeOf(tpe)
 
