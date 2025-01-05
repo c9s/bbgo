@@ -664,23 +664,32 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 				return fmt.Errorf("unexpected mount type: %T value: %+v", val, val)
 			}
 		}
+
 		for id, conf := range configStash {
-
-			// look up the real struct type
-			if _, ok := LoadedExchangeStrategies[id]; ok {
-				st, err := NewStrategyFromMap(id, conf)
-				if err != nil {
-					return err
-				}
-
-				config.ExchangeStrategies = append(config.ExchangeStrategies, ExchangeStrategyMount{
-					Mounts:   mounts,
-					Strategy: st,
-				})
-			} else if id != "on" && id != "off" {
+			if id == "on" {
 				// Show error when we didn't find the Strategy
-				return fmt.Errorf("strategy %s in config not found", id)
+				return fmt.Errorf("strategy %s is not defined, possibly caused by an incorrect config format, please check your config file", id)
 			}
+
+			strategyStruct, err := GetRegisteredStrategy(id)
+			if err != nil {
+				return err
+			}
+
+			strategyInstance, err := ReUnmarshal(conf, strategyStruct)
+			if err != nil {
+				return err
+			}
+
+			singleExchangeStrategyInstance, typeOk := strategyInstance.(SingleExchangeStrategy)
+			if !typeOk {
+				return fmt.Errorf("strategy %s is not a SingleExchangeStrategy", id)
+			}
+
+			config.ExchangeStrategies = append(config.ExchangeStrategies, ExchangeStrategyMount{
+				Mounts:   mounts,
+				Strategy: singleExchangeStrategyInstance,
+			})
 		}
 	}
 

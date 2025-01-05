@@ -53,6 +53,7 @@ func SetBackTesting(s *service.BacktestService) {
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
 var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
 
+// GetRegisteredStrategy returns the registered strategy struct value by the given id
 func GetRegisteredStrategy(id string) (types.StrategyID, error) {
 	if st, ok := LoadedExchangeStrategies[id]; ok {
 		return st, nil
