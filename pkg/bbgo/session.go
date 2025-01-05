@@ -167,8 +167,8 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	connectivityGroup := types.NewConnectivityGroup(marketDataConnectivity, userDataConnectivity)
 
 	session := &ExchangeSession{
-		Name:     name,
-		Exchange: exchange,
+		Name:         name,
+		Exchange:     exchange,
 		ExchangeName: exchange.Name(),
 
 		UserDataStream:       userDataStream,
@@ -353,9 +353,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 		disableStartupBalanceQuery := environ.environmentConfig != nil && environ.environmentConfig.DisableStartupBalanceQuery
 		if disableStartupBalanceQuery {
-			session.accountMutex.Lock()
-			session.Account = types.NewAccount()
-			session.accountMutex.Unlock()
+			session.setAccount(types.NewAccount())
 		} else {
 			logger.Infof("querying account balances...")
 			account, err := retry.QueryAccountUntilSuccessful(ctx, session.Exchange)
@@ -943,7 +941,7 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 
 	// pointer fields
 	session.Subscriptions = make(map[types.Subscription]types.Subscription)
-	session.Account = &types.Account{}
+	session.Account = types.NewAccount()
 	session.Trades = make(map[string]*types.TradeSlice)
 
 	session.markets = make(map[string]types.Market)
