@@ -163,14 +163,12 @@ func TestLoadConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config, err := Load(tt.args.configFile, true)
-			if err != nil {
-				t.Errorf("Load() error = %v", err)
+
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			} else {
-				if tt.wantErr {
-					t.Errorf("Load() error = %v, wantErr %v", err, tt.wantErr)
-					return
-				}
+				assert.NoError(t, err)
 			}
 
 			assert.NotNil(t, config)

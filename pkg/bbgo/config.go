@@ -665,10 +665,12 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 			}
 		}
 
+		// configStash is a map of strategy id and its config
+		// it has two keys: "on" and {strategyID}
+		strategyLoaded := false
 		for id, conf := range configStash {
-			if id == "on" {
-				// Show error when we didn't find the Strategy
-				return fmt.Errorf("strategy %s is not defined, possibly caused by an incorrect config format, please check your config file", id)
+			if id == "on" || id == "off" {
+				continue
 			}
 
 			strategyStruct, err := GetRegisteredStrategy(id)
@@ -690,6 +692,12 @@ func loadExchangeStrategies(config *Config, stash Stash) (err error) {
 				Mounts:   mounts,
 				Strategy: singleExchangeStrategyInstance,
 			})
+
+			strategyLoaded = true
+		}
+
+		if !strategyLoaded {
+			return fmt.Errorf("strategy is not loaded, possibly caused by an incorrect config format, please check your config file")
 		}
 	}
 

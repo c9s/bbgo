@@ -25,6 +25,7 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 		ticker := Ticker(symbol)
 		mockEx := mocks.NewMockExchange(mockCtrl)
 		// for market data stream and user data stream
+		mockEx.EXPECT().Name().Return(types.ExchangeName("test")).AnyTimes()
 		mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
 		mockEx.EXPECT().QueryTicker(gomock.Any(), symbol).Return(&ticker, nil).AnyTimes()
 
@@ -65,6 +66,8 @@ func TestAccountValueCalculator_NetValue(t *testing.T) {
 		ticker := Ticker(symbol)
 
 		mockEx := mocks.NewMockExchange(mockCtrl)
+		mockEx.EXPECT().Name().Return(types.ExchangeName("test")).AnyTimes()
+
 		// for market data stream and user data stream
 		mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
 		mockEx.EXPECT().QueryTicker(gomock.Any(), symbol).Return(&ticker, nil).AnyTimes()
@@ -106,6 +109,7 @@ func TestNewAccountValueCalculator_MarginLevel(t *testing.T) {
 	ticker := Ticker(symbol)
 
 	mockEx := mocks.NewMockExchange(mockCtrl)
+	mockEx.EXPECT().Name().Return(types.ExchangeName("test")).AnyTimes()
 	// for market data stream and user data stream
 	mockEx.EXPECT().NewStream().Return(&types.StandardStream{}).Times(2)
 	mockEx.EXPECT().QueryTicker(gomock.Any(), symbol).Return(&ticker, nil).AnyTimes()
