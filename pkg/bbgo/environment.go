@@ -53,6 +53,18 @@ func SetBackTesting(s *service.BacktestService) {
 var LoadedExchangeStrategies = make(map[string]SingleExchangeStrategy)
 var LoadedCrossExchangeStrategies = make(map[string]CrossExchangeStrategy)
 
+func GetRegisteredStrategy(id string) (types.StrategyID, error) {
+	if st, ok := LoadedExchangeStrategies[id]; ok {
+		return st, nil
+	}
+
+	if st, ok := LoadedCrossExchangeStrategies[id]; ok {
+		return st, nil
+	}
+
+	return nil, fmt.Errorf("strategy %s is not defined or registered, be sure to call the RegisterStrategy() func", id)
+}
+
 func RegisterStrategy(key string, s interface{}) {
 	loaded := 0
 	if d, ok := s.(SingleExchangeStrategy); ok {
