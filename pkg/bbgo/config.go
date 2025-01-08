@@ -152,7 +152,8 @@ type Backtest struct {
 	Sessions []string                   `json:"sessions" yaml:"sessions"`
 
 	// sync 1 second interval KLines
-	SyncSecKLines bool `json:"syncSecKLines,omitempty" yaml:"syncSecKLines,omitempty"`
+	SyncSecKLines bool             `json:"syncSecKLines,omitempty" yaml:"syncSecKLines,omitempty"`
+	CsvSource     *CsvSourceConfig `json:"csvConfig,omitempty" yaml:"csvConfig,omitempty"`
 }
 
 func (b *Backtest) GetAccount(n string) BacktestAccount {
@@ -725,4 +726,9 @@ func ReUnmarshal(conf interface{}, tpe interface{}) (interface{}, error) {
 	}
 
 	return val.Elem().Interface(), nil
+}
+
+type CsvSourceConfig struct {
+	Market      types.MarketType     `json:"market"`
+	Granularity types.MarketDataType `json:"granularity"`
 }
