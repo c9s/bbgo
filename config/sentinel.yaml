@@ -17,3 +17,4 @@ exchangeStrategies:
     symbol: BTCUSDT
     interval: 1m
     scoreThreshold: 0.6
+    klineLimit: 43200
