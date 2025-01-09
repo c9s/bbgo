@@ -41,8 +41,6 @@ var (
 	queryOpenOrderLimiter = rate.NewLimiter(rate.Every(33*time.Millisecond), 1)
 	// Rate Limit: 20 requests per 2 seconds, Rate limit rule: UserID
 	queryClosedOrderRateLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 1)
-	// Rate Limit: 10 requests per 2 seconds, Rate limit rule: UserID
-	queryTradeLimiter = rate.NewLimiter(rate.Every(200*time.Millisecond), 1)
 	// Rate Limit: 40 requests per 2 seconds, Rate limit rule: IP
 	queryKLineLimiter = rate.NewLimiter(rate.Every(50*time.Millisecond), 1)
 )
@@ -454,13 +452,13 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	return toGlobalOrder(order)
 }
 
-// QueryOrderTrades quires order trades can query trades in last 3 months.
+// QueryOrderTrades quires order trades can query trades in last 3 days.
 func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (trades []types.Trade, err error) {
 	if len(q.ClientOrderID) != 0 {
 		log.Warn("!!!OKEX EXCHANGE API NOTICE!!! Okex does not support searching for trades using OrderClientId.")
 	}
 
-	req := e.client.NewGetTransactionHistoryRequest()
+	req := e.client.NewGetThreeDaysTransactionHistoryRequest()
 	if len(q.Symbol) != 0 {
 		req.InstrumentID(toLocalSymbol(q.Symbol))
 	}
@@ -469,9 +467,6 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (tr
 		req.OrderID(q.OrderID)
 	}
 
-	if err := queryTradeLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("order trade rate limiter wait error: %w", err)
-	}
 	response, err := req.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query order trades, err: %w", err)
