@@ -7,9 +7,9 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/datatype/floats"
+	"github.com/c9s/bbgo/pkg/ensemble/iforest"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/narumiruna/go-iforest/pkg/iforest"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 )
