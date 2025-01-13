@@ -70,7 +70,7 @@ func (g *GetOpenOrdersRequest) GetQueryParameters() (url.Values, error) {
 
 	// TEMPLATE check-valid-values
 	switch instrumentType {
-	case InstrumentTypeSpot, InstrumentTypeSwap, InstrumentTypeFutures, InstrumentTypeOption, InstrumentTypeMARGIN:
+	case InstrumentTypeSpot, InstrumentTypeSwap, InstrumentTypeFutures, InstrumentTypeOption, InstrumentTypeMargin:
 		params["instType"] = instrumentType
 
 	default:

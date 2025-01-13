@@ -13,9 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
 const defaultHTTPTimeout = time.Second * 15
@@ -23,42 +24,6 @@ const RestBaseURL = "https://aws.okx.com/"
 const PublicWebSocketURL = "wss://wsaws.okx.com:8443/ws/v5/public"
 const PrivateWebSocketURL = "wss://wsaws.okx.com:8443/ws/v5/private"
 const PublicBusinessWebSocketURL = "wss://wsaws.okx.com:8443/ws/v5/business"
-
-type SideType string
-
-const (
-	SideTypeBuy  SideType = "buy"
-	SideTypeSell SideType = "sell"
-)
-
-type OrderType string
-
-const (
-	OrderTypeMarket   OrderType = "market"
-	OrderTypeLimit    OrderType = "limit"
-	OrderTypePostOnly OrderType = "post_only"
-	OrderTypeFOK      OrderType = "fok"
-	OrderTypeIOC      OrderType = "ioc"
-)
-
-type InstrumentType string
-
-const (
-	InstrumentTypeSpot    InstrumentType = "SPOT"
-	InstrumentTypeSwap    InstrumentType = "SWAP"
-	InstrumentTypeFutures InstrumentType = "FUTURES"
-	InstrumentTypeOption  InstrumentType = "OPTION"
-	InstrumentTypeMARGIN  InstrumentType = "MARGIN"
-)
-
-type OrderState string
-
-const (
-	OrderStateCanceled        OrderState = "canceled"
-	OrderStateLive            OrderState = "live"
-	OrderStatePartiallyFilled OrderState = "partially_filled"
-	OrderStateFilled          OrderState = "filled"
-)
 
 func (o OrderState) IsWorking() bool {
 	return o == OrderStateLive || o == OrderStatePartiallyFilled
@@ -100,7 +65,9 @@ func (c *RestClient) Auth(key, secret, passphrase string) {
 }
 
 // NewAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(
+	ctx context.Context, method, refURL string, params url.Values, payload interface{},
+) (*http.Request, error) {
 	if len(c.Key) == 0 {
 		return nil, errors.New("empty api key")
 	}
