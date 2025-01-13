@@ -2,21 +2,6 @@ package okexapi
 
 import "github.com/c9s/requestgen"
 
-type TradeMode string
-
-const (
-	TradeModeCash     TradeMode = "cash"
-	TradeModeIsolated TradeMode = "isolated"
-	TradeModeCross    TradeMode = "cross"
-)
-
-type TargetCurrency string
-
-const (
-	TargetCurrencyBase  TargetCurrency = "base_ccy"
-	TargetCurrencyQuote TargetCurrency = "quote_ccy"
-)
-
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Data
 
