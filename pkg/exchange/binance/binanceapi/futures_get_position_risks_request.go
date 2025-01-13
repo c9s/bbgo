@@ -21,7 +21,7 @@ type FuturesPositionRisk struct {
 	UpdateTime       types.MillisecondTimestamp `json:"updateTime"`
 
 	BreakEvenPrice         fixedpoint.Value `json:"breakEvenPrice"`
-	MarginAsset            fixedpoint.Value `json:"marginAsset"`
+	MarginAsset            string           `json:"marginAsset"`
 	InitialMargin          fixedpoint.Value `json:"initialMargin"`
 	MaintMargin            fixedpoint.Value `json:"maintMargin"`
 	PositionInitialMargin  fixedpoint.Value `json:"positionInitialMargin"`
