@@ -334,6 +334,11 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		req := e.client.NewGetOpenOrdersRequest().
 			InstrumentID(instrumentID).
 			After(strconv.FormatInt(nextCursor, 10))
+
+		if e.MarginSettings.IsMargin {
+			req.InstrumentType(okexapi.InstrumentTypeMargin)
+		}
+
 		openOrders, err := req.Do(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query open orders: %w", err)
@@ -469,6 +474,10 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (tr
 		req.InstrumentID(toLocalSymbol(q.Symbol))
 	}
 
+	if e.MarginSettings.IsMargin {
+		req.InstrumentType(okexapi.InstrumentTypeMargin)
+	}
+
 	if len(q.OrderID) != 0 {
 		req.OrderID(q.OrderID)
 	}
@@ -602,6 +611,11 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			StartTime(newStartTime).
 			EndTime(endTime).
 			Limit(uint64(limit))
+
+		if e.MarginSettings.IsMargin {
+			c.InstrumentType(okexapi.InstrumentTypeMargin)
+		}
+
 		return getTrades(ctx, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
 			c.Before(billId)
 			return c.Do(ctx)
@@ -613,6 +627,11 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		StartTime(newStartTime).
 		EndTime(endTime).
 		Limit(uint64(limit))
+
+	if e.MarginSettings.IsMargin {
+		c.InstrumentType(okexapi.InstrumentTypeMargin)
+	}
+
 	return getTrades(ctx, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
 		c.Before(billId)
 		return c.Do(ctx)
