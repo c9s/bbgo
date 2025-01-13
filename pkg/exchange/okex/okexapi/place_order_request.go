@@ -1,6 +1,10 @@
 package okexapi
 
-import "github.com/c9s/requestgen"
+import (
+	"github.com/c9s/requestgen"
+
+	"github.com/c9s/bbgo/pkg/types"
+)
 
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Data
@@ -9,8 +13,10 @@ type OrderResponse struct {
 	OrderID       string `json:"ordId"`
 	ClientOrderID string `json:"clOrdId"`
 	Tag           string `json:"tag"`
-	Code          string `json:"sCode"`
-	Message       string `json:"sMsg"`
+
+	Timestamp types.StrInt64 `json:"ts"`
+	Code      string         `json:"sCode"`
+	Message   string         `json:"sMsg"`
 }
 
 //go:generate PostRequest -url "/api/v5/trade/order" -type PlaceOrderRequest -responseDataType []OrderResponse
@@ -24,11 +30,15 @@ type PlaceOrderRequest struct {
 	// non-margin mode cash
 	tradeMode TradeMode `param:"tdMode" validValues:"cross,isolated,cash"`
 
-	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
+	// clientOrderID is a combination of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
 	clientOrderID *string `param:"clOrdId"`
 
-	// A combination of case-sensitive alphanumerics, all numbers, or all letters of up to 16 characters.
+	// tag is a combination of case-sensitive alphanumerics, all numbers, or all letters of up to 16 characters.
 	tag *string `param:"tag"`
+
+	// currency is the margin currency
+	// Only applicable to cross MARGIN orders in Spot and futures mode.
+	currency *string `param:"ccy"`
 
 	// "buy" or "sell"
 	side SideType `param:"side" validValues:"buy,sell"`
@@ -45,6 +55,12 @@ type PlaceOrderRequest struct {
 	// Only applicable to SPOT Market Orders
 	// Default is quote_ccy for buy, base_ccy for sell
 	targetCurrency *TargetCurrency `param:"tgtCcy" validValues:"quote_ccy,base_ccy"`
+
+	// reduceOnly -- whether orders can only reduce in position size.
+	// Valid options: true or false. The default value is false.
+	// Only applicable to MARGIN orders, and FUTURES/SWAP orders in net mode
+	// Only applicable to Spot and futures mode and Multi-currency margin
+	reduceOnly *bool `param:"reduceOnly"`
 }
 
 func (c *RestClient) NewPlaceOrderRequest() *PlaceOrderRequest {

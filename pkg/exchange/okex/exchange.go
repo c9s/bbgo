@@ -64,6 +64,8 @@ var log = logrus.WithFields(logrus.Fields{
 var ErrSymbolRequired = errors.New("symbol is a required parameter")
 
 type Exchange struct {
+	types.MarginSettings
+
 	key, secret, passphrase, brokerId string
 
 	client      *okexapi.RestClient
@@ -240,6 +242,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	orderReq.InstrumentID(toLocalSymbol(order.Symbol))
 	orderReq.Side(toLocalSideType(order.Side))
 	orderReq.Size(order.Market.FormatQuantity(order.Quantity))
+
+	if e.MarginSettings.IsMargin {
+		orderReq.TradeMode(okexapi.TradeModeCross)
+	}
 
 	// set price field for limit orders
 	switch order.Type {
