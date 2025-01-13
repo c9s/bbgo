@@ -15,7 +15,7 @@ type SpotBorrowRepayResponse struct {
 	Amount   fixedpoint.Value `json:"amt"`
 }
 
-//go:generate PostRequest -url "/api/v5/account/set-leverage" -type SpotManualBorrowRepayRequest -responseDataType []SpotBorrowRepayResponse
+//go:generate PostRequest -url "/api/v5/account/set-leverage" -type SpotManualBorrowRepayRequest -responseDataType []SpotBorrowRepayResponse -rateLimiter 1+20/2s
 type SpotManualBorrowRepayRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
