@@ -17,7 +17,7 @@ type LeverageInfo struct {
 	Lever   fixedpoint.Value `json:"lever"`
 }
 
-//go:generate GetRequest -url "/api/v5/account/leverage-info" -type GetAccountLeverageInfoRequest -responseDataType []LeverageInfo
+//go:generate GetRequest -url "/api/v5/account/leverage-info" -type GetAccountLeverageInfoRequest -responseDataType []LeverageInfo -rateLimiter 1+20/2s
 type GetAccountLeverageInfoRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
