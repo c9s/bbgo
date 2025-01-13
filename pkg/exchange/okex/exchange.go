@@ -527,13 +527,18 @@ func (e *Exchange) QueryClosedOrders(
 		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
 	}
 
-	res, err := e.client.NewGetOrderHistoryRequest().
+	req := e.client.NewGetOrderHistoryRequest().
 		InstrumentID(toLocalSymbol(symbol)).
 		StartTime(since).
 		EndTime(until).
 		Limit(defaultQueryLimit).
-		Before(strconv.FormatUint(lastOrderID, 10)).
-		Do(ctx)
+		Before(strconv.FormatUint(lastOrderID, 10))
+
+	if e.MarginSettings.IsMargin {
+		req.InstrumentType(okexapi.InstrumentTypeMargin)
+	}
+
+	res, err := req.Do(ctx)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
