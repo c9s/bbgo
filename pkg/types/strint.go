@@ -35,6 +35,12 @@ func (s *StrInt64) UnmarshalJSON(body []byte) error {
 	case int:
 		*s = StrInt64(ta)
 
+	case float32:
+		*s = StrInt64(ta)
+
+	case float64:
+		*s = StrInt64(ta)
+
 	default:
 		return fmt.Errorf("StrInt64 error: unsupported value type %T", ta)
 	}
