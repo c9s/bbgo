@@ -12,13 +12,6 @@ import (
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Data
 
-type LiquidityType string
-
-const (
-	LiquidityTypeMaker = "M"
-	LiquidityTypeTaker = "T"
-)
-
 type Trade struct {
 	InstrumentType InstrumentType `json:"instType"`
 	InstrumentId   string         `json:"instId"`
@@ -40,7 +33,7 @@ type Trade struct {
 	// Last filled quantity
 	FillSize fixedpoint.Value `json:"fillSz"`
 	// Index price at the moment of trade execution
-	//For cross currency spot pairs, it returns baseCcy-USDT index price. For example, for LTC-ETH, this field returns the index price of LTC-USDT.
+	// For cross currency spot pairs, it returns baseCcy-USDT index price. For example, for LTC-ETH, this field returns the index price of LTC-USDT.
 	FillIndexPrice fixedpoint.Value `json:"fillIdxPx"`
 	FillPnl        string           `json:"fillPnl"`
 

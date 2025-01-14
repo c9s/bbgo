@@ -6,6 +6,7 @@ import (
 	"strconv"
 )
 
+// StrInt64 is a string type for int64
 type StrInt64 int64
 
 func (s *StrInt64) MarshalJSON() ([]byte, error) {
@@ -33,6 +34,12 @@ func (s *StrInt64) UnmarshalJSON(body []byte) error {
 	case int32:
 		*s = StrInt64(ta)
 	case int:
+		*s = StrInt64(ta)
+
+	case float32:
+		*s = StrInt64(ta)
+
+	case float64:
 		*s = StrInt64(ta)
 
 	default:
