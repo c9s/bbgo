@@ -336,7 +336,7 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 	}
 
 	isMargin := false
-	if okexOrder.InstrumentType == okexapi.InstrumentTypeMARGIN {
+	if okexOrder.InstrumentType == okexapi.InstrumentTypeMargin {
 		isMargin = true
 	}
 

@@ -64,6 +64,8 @@ var log = logrus.WithFields(logrus.Fields{
 var ErrSymbolRequired = errors.New("symbol is a required parameter")
 
 type Exchange struct {
+	types.MarginSettings
+
 	key, secret, passphrase, brokerId string
 
 	client      *okexapi.RestClient
@@ -241,6 +243,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	orderReq.Side(toLocalSideType(order.Side))
 	orderReq.Size(order.Market.FormatQuantity(order.Quantity))
 
+	if e.MarginSettings.IsMargin {
+		orderReq.TradeMode(okexapi.TradeModeCross)
+	}
+
 	// set price field for limit orders
 	switch order.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
@@ -328,6 +334,11 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		req := e.client.NewGetOpenOrdersRequest().
 			InstrumentID(instrumentID).
 			After(strconv.FormatInt(nextCursor, 10))
+
+		if e.MarginSettings.IsMargin {
+			req.InstrumentType(okexapi.InstrumentTypeMargin)
+		}
+
 		openOrders, err := req.Do(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query open orders: %w", err)
@@ -463,6 +474,10 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (tr
 		req.InstrumentID(toLocalSymbol(q.Symbol))
 	}
 
+	if e.MarginSettings.IsMargin {
+		req.InstrumentType(okexapi.InstrumentTypeMargin)
+	}
+
 	if len(q.OrderID) != 0 {
 		req.OrderID(q.OrderID)
 	}
@@ -512,13 +527,18 @@ func (e *Exchange) QueryClosedOrders(
 		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
 	}
 
-	res, err := e.client.NewGetOrderHistoryRequest().
+	req := e.client.NewGetOrderHistoryRequest().
 		InstrumentID(toLocalSymbol(symbol)).
 		StartTime(since).
 		EndTime(until).
 		Limit(defaultQueryLimit).
-		Before(strconv.FormatUint(lastOrderID, 10)).
-		Do(ctx)
+		Before(strconv.FormatUint(lastOrderID, 10))
+
+	if e.MarginSettings.IsMargin {
+		req.InstrumentType(okexapi.InstrumentTypeMargin)
+	}
+
+	res, err := req.Do(ctx)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
@@ -596,6 +616,11 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			StartTime(newStartTime).
 			EndTime(endTime).
 			Limit(uint64(limit))
+
+		if e.MarginSettings.IsMargin {
+			c.InstrumentType(okexapi.InstrumentTypeMargin)
+		}
+
 		return getTrades(ctx, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
 			c.Before(billId)
 			return c.Do(ctx)
@@ -607,6 +632,11 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		StartTime(newStartTime).
 		EndTime(endTime).
 		Limit(uint64(limit))
+
+	if e.MarginSettings.IsMargin {
+		c.InstrumentType(okexapi.InstrumentTypeMargin)
+	}
+
 	return getTrades(ctx, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
 		c.Before(billId)
 		return c.Do(ctx)

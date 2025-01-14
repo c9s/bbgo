@@ -322,24 +322,31 @@ type OrderTradeEvent struct {
 	Msg           string                `json:"msg"`
 	AmendResult   string                `json:"amendResult"`
 	ExecutionType okexapi.LiquidityType `json:"execType"`
+
 	// FillFee last filled fee amount or rebate amount:
 	// Negative number represents the user transaction fee charged by the platform;
 	// Positive number represents rebate
 	FillFee fixedpoint.Value `json:"fillFee"`
+
 	// FillFeeCurrency last filled fee currency or rebate currency.
 	// It is fee currency when fillFee is less than 0; It is rebate currency when fillFee>=0.
 	FillFeeCurrency string `json:"fillFeeCcy"`
+
 	// FillNotionalUsd Filled notional value in USD of order
 	FillNotionalUsd fixedpoint.Value `json:"fillNotionalUsd"`
 	FillPnl         fixedpoint.Value `json:"fillPnl"`
+
 	// NotionalUsd Estimated national value in USD of order
 	NotionalUsd fixedpoint.Value `json:"notionalUsd"`
+
 	// ReqId Client Request ID as assigned by the client for order amendment. "" will be returned if there is no order amendment.
 	ReqId     string           `json:"reqId"`
 	LastPrice fixedpoint.Value `json:"lastPx"`
+
 	// QuickMgnType Quick Margin type, Only applicable to Quick Margin Mode of isolated margin
 	// manual, auto_borrow, auto_repay
 	QuickMgnType string `json:"quickMgnType"`
+
 	// AmendSource Source of the order amendation.
 	AmendSource string `json:"amendSource"`
 	// CancelSource Source of the order cancellation.

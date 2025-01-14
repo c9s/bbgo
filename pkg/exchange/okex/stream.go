@@ -107,10 +107,14 @@ func syncSubscriptions(conn *websocket.Conn, subscriptions []types.Subscription,
 func (s *Stream) Unsubscribe() {
 	// errors are handled in the syncSubscriptions, so they are skipped here.
 	_ = syncSubscriptions(s.StandardStream.Conn, s.StandardStream.Subscriptions, WsEventTypeUnsubscribe)
-	s.Resubscribe(func(old []types.Subscription) (new []types.Subscription, err error) {
+
+	err := s.Resubscribe(func(old []types.Subscription) (new []types.Subscription, err error) {
 		// clear the subscriptions
 		return []types.Subscription{}, nil
 	})
+	if err != nil {
+		log.WithError(err).Warnf("Resubscribe error")
+	}
 
 	s.kLineStream.Unsubscribe()
 }
@@ -119,6 +123,7 @@ func (s *Stream) Connect(ctx context.Context) error {
 	if err := s.StandardStream.Connect(ctx); err != nil {
 		return err
 	}
+
 	if err := s.kLineStream.Connect(ctx); err != nil {
 		return err
 	}
