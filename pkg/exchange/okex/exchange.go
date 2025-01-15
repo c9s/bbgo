@@ -560,6 +560,21 @@ func (e *Exchange) QueryClosedOrders(
 	return types.SortOrdersAscending(orders), nil
 }
 
+func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (fixedpoint.Value, error) {
+	req := e.client.NewGetMaxAvailableSizeRequest()
+
+	req.Currency(asset)
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return fixedpoint.Zero, err
+	}
+
+	_ = resp
+
+	return fixedpoint.Zero, nil
+}
+
 /*
 QueryTrades can query trades in last 3 months, there are no time interval limitations, as long as end_time >= start_time.
 okx does not provide an API to query by trade ID, so we use the bill ID to do it. The trades result is ordered by timestamp.
