@@ -28,6 +28,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/timejitter"
+	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
 
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
@@ -1950,6 +1951,10 @@ func (s *Strategy) CrossRun(
 			MakerFeeRate: s.sourceSession.MakerFeeRate,
 			TakerFeeRate: s.sourceSession.TakerFeeRate,
 		})
+	}
+
+	if err := tradingutil.UniversalCancelAllOrders(ctx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
+		s.logger.WithError(err).Warnf("unable to cancel all orders: %v", err)
 	}
 
 	s.Position.UpdateMetrics()
