@@ -17,16 +17,24 @@ type BorrowInterestLimit struct {
 	NextDiscountTime types.MillisecondTimestamp `json:"nextDiscountTime"`
 	NextInterestTime types.MillisecondTimestamp `json:"nextInterestTime"`
 	Records          []struct {
-		Currency  string           `json:"ccy"`
+		Currency string `json:"ccy"`
+
+		// AvailableLoad = Available amount for current account (Within the locked quota)
 		AvailLoan fixedpoint.Value `json:"availLoan"`
 		AvgRate   fixedpoint.Value `json:"avgRate"`
 		Interest  fixedpoint.Value `json:"interest"`
+
+		// LoanQuota = Borrow limit of master account
+		// If loan allocation has been assigned, then it is the borrow limit of the current trading account
 		LoanQuota fixedpoint.Value `json:"loanQuota"`
 		PosLoan   fixedpoint.Value `json:"posLoan"`
 		Rate      fixedpoint.Value `json:"rate"`
 
 		SurplusLimit        fixedpoint.Value `json:"surplusLmt"`
 		SurplusLimitDetails struct {
+			AllAcctRemainingQuota fixedpoint.Value `json:"allAcctRemainingQuota"`
+			CurAcctRemainingQuota fixedpoint.Value `json:"curAcctRemainingQuota"`
+			PlatRemainingQuota    fixedpoint.Value `json:"platRemainingQuota"`
 		} `json:"surplusLmtDetails"`
 		UsedLimit fixedpoint.Value `json:"usedLmt"`
 		UsedLoan  fixedpoint.Value `json:"usedLoan"`
