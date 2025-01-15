@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -145,6 +147,8 @@ func (s *OrderStore) Prune(expiryDuration time.Duration) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	logrus.Infof("orderStore: pruning orders before %s, %d orders", cutOffTime.String(), len(s.orders))
 
 	for idx, o := range s.orders {
 		// if the order is canceled or filled, we should remove the order if the update time is before the cut off time
