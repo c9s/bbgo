@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -560,9 +561,37 @@ func (e *Exchange) QueryClosedOrders(
 	return types.SortOrdersAscending(orders), nil
 }
 
-func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (fixedpoint.Value, error) {
-	req := e.client.NewGetMaxAvailableSizeRequest()
+func (e *Exchange) RepayMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	req := e.client.NewSpotManualBorrowRepayRequest()
+	req.Currency(strings.ToUpper(asset))
+	req.Amount(amount.String())
+	req.Side(okexapi.MarginSideRepay)
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
 
+	log.Infof("spot repay response: %+v", resp)
+	return nil
+}
+
+func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount fixedpoint.Value) error {
+	req := e.client.NewSpotManualBorrowRepayRequest()
+	req.Currency(strings.ToUpper(asset))
+	req.Amount(amount.String())
+	req.Side(okexapi.MarginSideBorrow)
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("spot borrow response: %+v", resp)
+	return nil
+}
+
+func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (fixedpoint.Value, error) {
+	req := e.client.NewGetAccountInterestLimitsRequest()
 	req.Currency(asset)
 
 	resp, err := req.Do(ctx)
@@ -570,7 +599,17 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 		return fixedpoint.Zero, err
 	}
 
-	_ = resp
+	log.Infof("%+v", resp)
+
+	if len(resp) == 0 || len(resp[0].Records) == 0 {
+		return fixedpoint.Zero, nil
+	}
+
+	for _, record := range resp[0].Records {
+		if strings.ToUpper(record.Currency) == asset {
+			return record.LoanQuota, nil
+		}
+	}
 
 	return fixedpoint.Zero, nil
 }
