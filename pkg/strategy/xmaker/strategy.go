@@ -1791,7 +1791,7 @@ func (s *Strategy) accountUpdater(ctx context.Context) {
 
 func (s *Strategy) houseCleanWorker(ctx context.Context) {
 	expiryDuration := 3 * time.Hour
-	ticker := time.NewTicker(time.Hour)
+	ticker := time.NewTicker(15 * time.Minute)
 
 	defer ticker.Stop()
 	for {
@@ -1801,7 +1801,6 @@ func (s *Strategy) houseCleanWorker(ctx context.Context) {
 
 		case <-ticker.C:
 			s.orderStore.Prune(expiryDuration)
-
 		}
 
 	}
