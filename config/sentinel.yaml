@@ -9,55 +9,63 @@ exchangeStrategies:
     sentinel:
       symbol: BTCUSDT
       interval: &intervel 1m
-      scoreThreshold: &threshold 0.7
-      klineLimit: &limit 43200
-      window: &window 1440
+      threshold: &threshold 0.7
+      proportion: &proportion 0.05
+      numSamples: &numSamples 1440
+      window: &window 60
   - on: *exchange
     sentinel:
       symbol: ETHUSDT
       interval: *intervel
-      scoreThreshold: *threshold
-      klineLimit: *limit
+      threshold: *threshold
+      proportion: *proportion
+      numSamples: *numSamples
       window: *window
   - on: *exchange
     sentinel:
       symbol: BCHUSDT
       interval: *intervel
-      scoreThreshold: *threshold
-      klineLimit: *limit
+      threshold: *threshold
+      proportion: *proportion
+      numSamples: *numSamples
       window: *window
   - on: *exchange
     sentinel:
       symbol: LTCUSDT
       interval: *intervel
-      scoreThreshold: *threshold
-      klineLimit: *limit
+      threshold: *threshold
+      proportion: *proportion
+      numSamples: *numSamples
       window: *window
   - on: *exchange
     sentinel:
       symbol: XRPUSDT
       interval: *intervel
-      scoreThreshold: *threshold
-      klineLimit: *limit
+      threshold: *threshold
+      proportion: *proportion
+      numSamples: *numSamples
       window: *window
   - on: *exchange
     sentinel:
       symbol: MAXUSDT
       interval: *intervel
-      scoreThreshold: *threshold
-      klineLimit: *limit
+      threshold: *threshold
+      proportion: *proportion
+      numSamples: *numSamples
       window: *window
   - on: *exchange
     sentinel:
       symbol: BCNTUSDT
       interval: *intervel
-      scoreThreshold: *threshold
-      klineLimit: *limit
+      threshold: *threshold
+      proportion: *proportion
+      numSamples: *numSamples
       window: *window
   - on: *exchange
     sentinel:
       symbol: ARBUSDT
       interval: *intervel
-      scoreThreshold: *threshold
-      klineLimit: *limit
+      threshold: *threshold
+      proportion: *proportion
+      numSamples: *numSamples
       window: *window
