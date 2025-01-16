@@ -1,8 +1,12 @@
 package bbgo
 
-import "github.com/c9s/bbgo/pkg/types"
+import (
+	"github.com/c9s/bbgo/pkg/types"
+)
 
-const CapacityOfKLineWindowLimit = 5_000
+const KLineWindowCapacityLimit = 5_000
+const KLineWindowShrinkThreshold = KLineWindowCapacityLimit * 4 / 5
+const KLineWindowShrinkSize = KLineWindowCapacityLimit / 5
 
 // MarketDataStore receives and maintain the public market data of a single symbol
 //
@@ -51,7 +55,7 @@ func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
 func (store *MarketDataStore) AddKLine(k types.KLine) {
 	window, ok := store.KLineWindows[k.Interval]
 	if !ok {
-		var tmp = make(types.KLineWindow, 0, CapacityOfKLineWindowLimit)
+		var tmp = make(types.KLineWindow, 0, KLineWindowCapacityLimit)
 		store.KLineWindows[k.Interval] = &tmp
 		window = &tmp
 	}
@@ -63,14 +67,6 @@ func (store *MarketDataStore) AddKLine(k types.KLine) {
 	store.EmitKLineWindowUpdate(k.Interval, *window)
 }
 
-func truncateKLineWindowIfNeeded(window *types.KLineWindow) {
-	lenOfWindow := len(*window)
-	capOfWindow := cap(*window)
-
-	if lenOfWindow == capOfWindow && capOfWindow > CapacityOfKLineWindowLimit {
-		size := CapacityOfKLineWindowLimit / 2
-		start := lenOfWindow - size
-		copy(*window, (*window)[start:])
-		*window = (*window)[:size]
-	}
+func truncateKLineWindowIfNeeded(window *types.KLineWindow) int {
+	return types.ShrinkSlice(window, KLineWindowShrinkThreshold, KLineWindowShrinkSize)
 }

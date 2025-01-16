@@ -12,7 +12,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const maxTradeVolumeSliceSize = 20480
+const tradeSliceCapacityLimit = 20000
+const tradeSliceShrinkThreshold = tradeSliceCapacityLimit * 4 / 5
+const tradeSliceShrinkSize = tradeSliceCapacityLimit * 1 / 5
 
 var tradeVolumeWindowSignalMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
@@ -37,11 +39,7 @@ type TradeVolumeWindowSignal struct {
 func (s *TradeVolumeWindowSignal) handleTrade(trade types.Trade) {
 	s.mu.Lock()
 	s.trades = append(s.trades, trade)
-
-	if len(s.trades) > maxTradeVolumeSliceSize {
-		s.trades = s.trades[maxTradeVolumeSliceSize/3:]
-	}
-
+	types.ShrinkSlice(&s.trades, tradeSliceShrinkThreshold, tradeSliceShrinkSize)
 	s.mu.Unlock()
 }
 
@@ -56,7 +54,7 @@ func (s *TradeVolumeWindowSignal) Bind(ctx context.Context, session *bbgo.Exchan
 		s.Threshold = fixedpoint.NewFromFloat(0.7)
 	}
 
-	s.trades = make([]types.Trade, 0, 4096)
+	s.trades = make([]types.Trade, 0, tradeSliceCapacityLimit)
 
 	session.MarketDataStream.OnMarketTrade(s.handleTrade)
 	return nil
@@ -78,9 +76,8 @@ func (s *TradeVolumeWindowSignal) filterTrades(startTime time.Time) []types.Trad
 		break
 	}
 
-	trades := s.trades[startIdx:]
-	s.trades = trades
-	return trades
+	s.trades = s.trades[startIdx:]
+	return s.trades
 }
 
 func (s *TradeVolumeWindowSignal) aggTradeVolume(trades []types.Trade) (buyVolume, sellVolume float64) {

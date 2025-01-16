@@ -50,7 +50,7 @@ func (s *RMAStream) Calculate(x float64) float64 {
 }
 
 func (s *RMAStream) Truncate() {
-	s.Slice = generalTruncate(s.Slice)
+	types.ShrinkSlice(&s.Slice, MaxSliceSize, TruncateSize)
 }
 
 func checkWindow(window int) {
