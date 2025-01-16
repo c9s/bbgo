@@ -143,11 +143,10 @@ func (s *Strategy) extractVolumes(klines []types.KLine) floats.Slice {
 func (s *Strategy) generateSamples(volumes floats.Slice) [][]float64 {
 	samples := make([][]float64, 0, len(volumes))
 	for i := range volumes {
-		if i < s.Window {
-			continue
+		if i+s.Window > len(volumes) {
+			break
 		}
-
-		subset := volumes.Tail(s.Window)
+		subset := volumes[i : i+s.Window]
 
 		mean := subset.Mean()
 		std := subset.Std()
