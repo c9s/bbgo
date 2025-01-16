@@ -1,8 +1,10 @@
 package indicatorv2
 
-import "github.com/c9s/bbgo/pkg/types"
+import (
+	"github.com/c9s/bbgo/pkg/types"
+)
 
-const MaxNumOfKLines = 4_000
+const MaxNumOfKLines = 5_000
 
 //go:generate callbackgen -type KLineStream
 type KLineStream struct {
@@ -53,9 +55,7 @@ func KLines(source types.Stream, symbol string, interval types.Interval) *KLineS
 		s.kLines = append(s.kLines, k)
 		s.EmitUpdate(k)
 
-		if len(s.kLines) > MaxNumOfKLines {
-			s.kLines = s.kLines[len(s.kLines)-1-MaxNumOfKLines:]
-		}
+		types.ShrinkSlice(&s.kLines, MaxNumOfKLines, MaxNumOfKLines/5)
 	}))
 
 	return s
