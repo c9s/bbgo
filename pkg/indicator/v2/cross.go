@@ -38,8 +38,8 @@ func Cross(a, b types.Float64Source) *CrossStream {
 }
 
 func (s *CrossStream) Truncate() {
-	types.ShrinkSlice(&s.a, MaxSliceSize, TruncateSize)
-	types.ShrinkSlice(&s.b, MaxSliceSize, TruncateSize)
+	s.a = types.ShrinkSlice(s.a, MaxSliceSize, TruncateSize)
+	s.b = types.ShrinkSlice(s.b, MaxSliceSize, TruncateSize)
 }
 
 func (s *CrossStream) calculate() {

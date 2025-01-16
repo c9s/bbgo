@@ -67,6 +67,6 @@ func (store *MarketDataStore) AddKLine(k types.KLine) {
 	store.EmitKLineWindowUpdate(k.Interval, *window)
 }
 
-func truncateKLineWindowIfNeeded(window *types.KLineWindow) int {
-	return types.ShrinkSlice(window, KLineWindowShrinkThreshold, KLineWindowShrinkSize)
+func truncateKLineWindowIfNeeded(window *types.KLineWindow) {
+	*window = types.ShrinkSlice(*window, KLineWindowShrinkThreshold, KLineWindowShrinkSize)
 }
