@@ -706,12 +706,12 @@ func ShrinkSlice[S ~[]E, E comparable](slice *S, thresholdLen, newSize int) int 
 		newSize = curCap / 2
 	}
 
-	if curLen >= thresholdLen {
-		start := curLen - newSize
-		copy(*slice, (*slice)[start:])
-		*slice = (*slice)[:newSize]
-		return newSize
+	if curLen < thresholdLen {
+		return 0
 	}
 
-	return 0
+	start := curLen - newSize
+	copy(*slice, (*slice)[start:])
+	*slice = (*slice)[:newSize]
+	return newSize
 }
