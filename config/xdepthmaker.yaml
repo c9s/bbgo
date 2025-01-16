@@ -23,6 +23,10 @@ logging:
   fields:
     env: staging
 
+profiling:
+  enabled: false
+  pyroscopeUrl: ""
+
 sessions:
   max:
     exchange: max

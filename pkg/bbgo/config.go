@@ -335,6 +335,11 @@ type DatabaseConfig struct {
 	ExtraMigrationPackages []string `json:"extraMigrationPackages" yaml:"extraMigrationPackages"`
 }
 
+type ProfilingConfig struct {
+	Enabled      bool   `json:"enabled" yaml:"enabled"`
+	PyroscopeURL string `json:"pyroscopeUrl" yaml:"pyroscopeUrl"`
+}
+
 type EnvironmentConfig struct {
 	DisableDefaultKLineSubscription bool `json:"disableDefaultKLineSubscription"`
 	DisableHistoryKLinePreload      bool `json:"disableHistoryKLinePreload"`
@@ -383,6 +388,8 @@ type Config struct {
 	CrossExchangeStrategies []CrossExchangeStrategy `json:"-" yaml:"-"`
 
 	PnLReporters []PnLReporterConfig `json:"reportPnL,omitempty" yaml:"reportPnL,omitempty"`
+
+	ProfilingConfig *ProfilingConfig `json:"profiling,omitempty" yaml:"profiling,omitempty"`
 }
 
 func (c *Config) Map() (map[string]interface{}, error) {
