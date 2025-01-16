@@ -10,6 +10,5 @@ const MaxSliceSize = 5000
 const TruncateSize = 1000
 
 func generalTruncate(slice []float64) []float64 {
-	types.ShrinkSlice(&slice, MaxSliceSize, TruncateSize)
-	return slice
+	return types.ShrinkSlice(slice, MaxSliceSize, TruncateSize)
 }

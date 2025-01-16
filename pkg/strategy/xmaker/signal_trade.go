@@ -12,7 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const tradeSliceCapacityLimit = 20000
+const tradeSliceCapacityLimit = 10000
 const tradeSliceShrinkThreshold = tradeSliceCapacityLimit * 4 / 5
 const tradeSliceShrinkSize = tradeSliceCapacityLimit * 1 / 5
 
@@ -39,7 +39,7 @@ type TradeVolumeWindowSignal struct {
 func (s *TradeVolumeWindowSignal) handleTrade(trade types.Trade) {
 	s.mu.Lock()
 	s.trades = append(s.trades, trade)
-	types.ShrinkSlice(&s.trades, tradeSliceShrinkThreshold, tradeSliceShrinkSize)
+	s.trades = types.ShrinkSlice(s.trades, tradeSliceShrinkThreshold, tradeSliceShrinkSize)
 	s.mu.Unlock()
 }
 

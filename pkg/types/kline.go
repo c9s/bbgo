@@ -697,21 +697,21 @@ func KLineHighPriceMapper(k KLine) float64 {
 }
 
 // ShrinkSlice shrinks the slice to the new size by removing the old klines
-func ShrinkSlice[S ~[]E, E comparable](slice *S, thresholdLen, newSize int) int {
-	curLen := len(*slice)
-	curCap := cap(*slice)
+func ShrinkSlice[S ~[]E, E comparable](slice S, thresholdLen, newSize int) S {
+	curLen := len(slice)
+	curCap := cap(slice)
 
 	// newSize can't be larger than half of the current capacity
 	if newSize > curCap/2 {
 		newSize = curCap / 2
 	}
 
-	if curLen < thresholdLen {
-		return 0
+	if curLen < thresholdLen || curLen <= newSize {
+		return slice
 	}
 
 	start := curLen - newSize
-	copy(*slice, (*slice)[start:])
-	*slice = (*slice)[:newSize]
-	return newSize
+	newSlice := make(S, newSize)
+	copy(newSlice, slice[start:])
+	return newSlice
 }

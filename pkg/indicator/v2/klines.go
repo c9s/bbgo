@@ -55,7 +55,7 @@ func KLines(source types.Stream, symbol string, interval types.Interval) *KLineS
 		s.kLines = append(s.kLines, k)
 		s.EmitUpdate(k)
 
-		types.ShrinkSlice(&s.kLines, MaxNumOfKLines, MaxNumOfKLines/5)
+		s.kLines = types.ShrinkSlice(s.kLines, MaxNumOfKLines, MaxNumOfKLines/5)
 	}))
 
 	return s
