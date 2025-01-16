@@ -10,21 +10,12 @@ const (
 	defaultNumTrees       = 100
 	defaultSampleSize     = 256
 	defaultScoreThreshold = 0.6
-	defaultDetectionType  = DetectionTypeThreshold
 	offset                = 0.5
 )
 
 type DetectionType string
 
-const (
-	DetectionTypeThreshold  DetectionType = "threshold"
-	DetectionTypeProportion DetectionType = "proportion"
-)
-
 type Options struct {
-	// The method used for anomaly detection
-	DetectionType DetectionType `json:"detectionType"`
-
 	// The anomaly score threshold
 	Threshold float64 `json:"threshold"`
 
@@ -43,10 +34,6 @@ type Options struct {
 
 // SetDefaultValues applies default settings to unspecified fields
 func (o *Options) SetDefaultValues() {
-	if o.DetectionType == "" {
-		o.DetectionType = defaultDetectionType
-	}
-
 	if o.Threshold == 0 {
 		o.Threshold = defaultScoreThreshold
 	}
@@ -153,14 +140,9 @@ func (f *IsolationForest) Predict(samples [][]float64) []int {
 	predictions := make([]int, len(samples))
 	scores := f.Score(samples)
 
-	var threshold float64
-	switch f.DetectionType {
-	case DetectionTypeThreshold:
-		threshold = f.Threshold
-	case DetectionTypeProportion:
+	threshold := f.Threshold
+	if f.Proportion > 0 {
 		threshold = Quantile(f.Score(samples), 1-f.Proportion)
-	default:
-		panic("Invalid detection type")
 	}
 
 	for i, score := range scores {
