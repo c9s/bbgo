@@ -5,10 +5,59 @@ sessions:
     publicOnly: true
 
 exchangeStrategies:
-- on: *exchange
-  sentinel:
-    symbol: BTCUSDT
-    interval: 1m
-    scoreThreshold: 0.7
-    klineLimit: 43200
-    window: 1440
+  - on: *exchange
+    sentinel:
+      symbol: BTCUSDT
+      interval: &intervel 1m
+      scoreThreshold: &threshold 0.7
+      klineLimit: &limit 43200
+      window: &window 1440
+  - on: *exchange
+    sentinel:
+      symbol: ETHUSDT
+      interval: *intervel
+      scoreThreshold: *threshold
+      klineLimit: *limit
+      window: *window
+  - on: *exchange
+    sentinel:
+      symbol: BCHUSDT
+      interval: *intervel
+      scoreThreshold: *threshold
+      klineLimit: *limit
+      window: *window
+  - on: *exchange
+    sentinel:
+      symbol: LTCUSDT
+      interval: *intervel
+      scoreThreshold: *threshold
+      klineLimit: *limit
+      window: *window
+  - on: *exchange
+    sentinel:
+      symbol: XRPUSDT
+      interval: *intervel
+      scoreThreshold: *threshold
+      klineLimit: *limit
+      window: *window
+  - on: *exchange
+    sentinel:
+      symbol: MAXUSDT
+      interval: *intervel
+      scoreThreshold: *threshold
+      klineLimit: *limit
+      window: *window
+  - on: *exchange
+    sentinel:
+      symbol: BCNTUSDT
+      interval: *intervel
+      scoreThreshold: *threshold
+      klineLimit: *limit
+      window: *window
+  - on: *exchange
+    sentinel:
+      symbol: ARBUSDT
+      interval: *intervel
+      scoreThreshold: *threshold
+      klineLimit: *limit
+      window: *window
