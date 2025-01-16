@@ -19,6 +19,10 @@ func EWMA2(source types.Float64Source, window int) *EWMAStream {
 	return s
 }
 
+func (s *EWMAStream) Truncate() {
+	types.ShrinkSlice(&s.Slice, s.window*5, s.window*2)
+}
+
 func (s *EWMAStream) Calculate(v float64) float64 {
 	last := s.Slice.Last(0)
 	if last == 0.0 {
