@@ -2,12 +2,10 @@ package bbgo
 
 import "github.com/c9s/bbgo/pkg/types"
 
-const MaxNumOfKLines = 5_000
-const MaxNumOfKLinesTruncate = 100
-
 const CapacityOfKLineWindowLimit = 5_000
 
 // MarketDataStore receives and maintain the public market data of a single symbol
+//
 //go:generate callbackgen -type MarketDataStore
 type MarketDataStore struct {
 	Symbol string
@@ -53,7 +51,7 @@ func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
 func (store *MarketDataStore) AddKLine(k types.KLine) {
 	window, ok := store.KLineWindows[k.Interval]
 	if !ok {
-		var tmp = make(types.KLineWindow, 0, 1000)
+		var tmp = make(types.KLineWindow, 0, CapacityOfKLineWindowLimit)
 		store.KLineWindows[k.Interval] = &tmp
 		window = &tmp
 	}
