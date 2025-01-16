@@ -208,6 +208,12 @@ func runConfig(basectx context.Context, cmd *cobra.Command, userConfig *bbgo.Con
 	shtCtx, cancelShutdown := context.WithTimeout(bbgo.NewTodoContextWithExistingIsolation(tradingCtx), gracefulShutdownPeriod)
 	bbgo.Shutdown(shtCtx)
 
+	if environ.ProfilingService != nil {
+		if err = environ.ProfilingService.Stop(); err != nil {
+			log.WithError(err).Errorf("profiling service stop error")
+		}
+	}
+
 	if err := trader.SaveState(shtCtx); err != nil {
 		log.WithError(err).Errorf("can not save strategy persistence states")
 	}
