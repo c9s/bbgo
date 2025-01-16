@@ -1,8 +1,6 @@
 package bbgo
 
 import (
-	"runtime"
-
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -63,9 +61,7 @@ func (store *MarketDataStore) AddKLine(k types.KLine) {
 	}
 	window.Add(k)
 
-	if truncateKLineWindowIfNeeded(window) > 0 {
-		runtime.GC()
-	}
+	truncateKLineWindowIfNeeded(window)
 
 	store.EmitKLineClosed(k)
 	store.EmitKLineWindowUpdate(k.Interval, *window)
