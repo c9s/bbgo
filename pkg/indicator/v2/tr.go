@@ -27,7 +27,7 @@ func TR2(source KLineSubscription) *TRStream {
 }
 
 func (s *TRStream) Truncate() {
-	s.Slice = generalTruncate(s.Slice)
+	types.ShrinkSlice(&s.Slice, MaxSliceSize, TruncateSize)
 }
 
 func (s *TRStream) calculateAndPush(high, low, cls float64) {
