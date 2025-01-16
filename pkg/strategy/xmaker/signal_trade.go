@@ -2,7 +2,6 @@ package xmaker
 
 import (
 	"context"
-	"runtime"
 	"sync"
 	"time"
 
@@ -40,11 +39,7 @@ type TradeVolumeWindowSignal struct {
 func (s *TradeVolumeWindowSignal) handleTrade(trade types.Trade) {
 	s.mu.Lock()
 	s.trades = append(s.trades, trade)
-
-	if types.ShrinkSlice(&s.trades, tradeSliceShrinkThreshold, tradeSliceShrinkSize) > 0 {
-		runtime.GC()
-	}
-
+	types.ShrinkSlice(&s.trades, tradeSliceShrinkThreshold, tradeSliceShrinkSize)
 	s.mu.Unlock()
 }
 
