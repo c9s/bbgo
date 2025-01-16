@@ -147,7 +147,9 @@ func (b *RBTOrderBook) CopyDepth(limit int) OrderBook {
 	return book
 }
 
-func (b *RBTOrderBook) convertTreeToPriceVolumeSlice(tree *RBTree, limit int, descending bool) (pvs PriceVolumeSlice) {
+func (b *RBTOrderBook) convertTreeToPriceVolumeSlice(tree *RBTree, limit int, descending bool) PriceVolumeSlice {
+	pvs := make(PriceVolumeSlice, 0, limit)
+
 	if descending {
 		tree.InorderReverse(func(n *RBNode) bool {
 			pvs = append(pvs, PriceVolume{

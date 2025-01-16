@@ -1,5 +1,7 @@
 package indicatorv2
 
+import "github.com/c9s/bbgo/pkg/types"
+
 // MaxSliceSize is the maximum slice size
 // byte size = 8 * 5000 = 40KB per slice
 const MaxSliceSize = 5000
@@ -8,9 +10,6 @@ const MaxSliceSize = 5000
 const TruncateSize = 1000
 
 func generalTruncate(slice []float64) []float64 {
-	if len(slice) < MaxSliceSize {
-		return slice
-	}
-
-	return slice[TruncateSize-1:]
+	types.ShrinkSlice(&slice, MaxSliceSize, TruncateSize)
+	return slice
 }
