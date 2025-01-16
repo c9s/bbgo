@@ -2,6 +2,7 @@ sessions:
   max:
     exchange: &exchange max
     envVarPrefix: max
+    publicOnly: true
 
 persistence:
   json:
