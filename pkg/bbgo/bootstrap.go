@@ -58,6 +58,12 @@ func BootstrapEnvironment(ctx context.Context, environ *Environment, userConfig 
 		}
 	}
 
+	if userConfig.ProfilingConfig != nil {
+		if err := environ.ConfigureProfiling(userConfig.ProfilingConfig); err != nil {
+			return errors.Wrap(err, "profiling configure error")
+		}
+	}
+
 	if err := environ.ConfigureNotificationSystem(ctx, userConfig); err != nil {
 		return errors.Wrap(err, "notification configure error")
 	}
