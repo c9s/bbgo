@@ -81,9 +81,8 @@ func (s *TradeVolumeWindowSignal) filterTrades(startTime time.Time) []types.Trad
 		break
 	}
 
-	trades := s.trades[startIdx:]
-	s.trades = trades
-	return trades
+	s.trades = s.trades[startIdx:]
+	return s.trades
 }
 
 func (s *TradeVolumeWindowSignal) aggTradeVolume(trades []types.Trade) (buyVolume, sellVolume float64) {
