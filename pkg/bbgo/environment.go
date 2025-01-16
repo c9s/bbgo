@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/pyroscope-go"
 	"github.com/pkg/errors"
 	"github.com/pquerna/otp"
 	log "github.com/sirupsen/logrus"
@@ -107,6 +108,7 @@ type Environment struct {
 	WithdrawService   *service.WithdrawService
 	DepositService    *service.DepositService
 	PersistentService *service.PersistenceServiceFacade
+	ProfilingService  *pyroscope.Profiler
 
 	// external services
 	GoogleSpreadSheetService *googleservice.SpreadSheetService
@@ -261,6 +263,21 @@ func (environ *Environment) AddExchange(name string, exchange types.Exchange) (s
 func (environ *Environment) ConfigureService(ctx context.Context, srvConfig *ServiceConfig) error {
 	if srvConfig.GoogleSpreadSheetService != nil {
 		environ.GoogleSpreadSheetService = googleservice.NewSpreadSheetService(ctx, srvConfig.GoogleSpreadSheetService.JsonTokenFile, srvConfig.GoogleSpreadSheetService.SpreadSheetID)
+	}
+
+	return nil
+}
+
+func (environ *Environment) ConfigureProfiling(config *ProfilingConfig) (err error) {
+	if !config.Enabled {
+		return nil
+	}
+
+	if config.PyroscopeURL != "" {
+		environ.ProfilingService, err = setupPyroscopeProfiling(GetCurrentEnv(), config.PyroscopeURL)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -975,6 +992,36 @@ func (environ *Environment) setupTelegram(
 
 	interact.AddMessenger(messenger)
 	return nil
+}
+
+func setupPyroscopeProfiling(env string, pyroscopeURL string) (profile *pyroscope.Profiler, err error) {
+	namespace := "bbgo"
+	hostName := os.Getenv("HOSTNAME")
+	log.Infof("profiling is enabled: %s, namespace: %s, hostName: %s", pyroscopeURL, namespace, hostName)
+
+	return pyroscope.Start(pyroscope.Config{
+		ApplicationName: fmt.Sprintf("bbgo.%s", hostName),
+		// The tags is used for filtering the profiles in the pyroscope dashboard.
+		Tags: map[string]string{
+			"environment": env,
+			"namespace":   namespace,
+		},
+		ServerAddress: pyroscopeURL,
+		Logger:        log.StandardLogger(),
+		ProfileTypes: []pyroscope.ProfileType{
+			pyroscope.ProfileCPU,
+			pyroscope.ProfileInuseObjects,
+			pyroscope.ProfileAllocObjects,
+			pyroscope.ProfileInuseSpace,
+			pyroscope.ProfileAllocSpace,
+			pyroscope.ProfileGoroutines,
+			pyroscope.ProfileMutexCount,
+			pyroscope.ProfileMutexDuration,
+			pyroscope.ProfileBlockCount,
+			pyroscope.ProfileBlockDuration,
+		},
+		DisableGCRuns: false,
+	})
 }
 
 func writeOTPKeyAsQRCodePNG(key *otp.Key, imagePath string) error {
