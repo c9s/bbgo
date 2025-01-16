@@ -2,6 +2,7 @@ package xmaker
 
 import (
 	"context"
+	"runtime"
 	"sync"
 	"time"
 
@@ -12,7 +13,9 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const maxTradeVolumeSliceSize = 20480
+const tradeSliceCapacityLimit = 20000
+const tradeSliceShrinkThreshold = tradeSliceCapacityLimit * 4 / 5
+const tradeSliceShrinkSize = tradeSliceCapacityLimit * 1 / 5
 
 var tradeVolumeWindowSignalMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
@@ -38,8 +41,8 @@ func (s *TradeVolumeWindowSignal) handleTrade(trade types.Trade) {
 	s.mu.Lock()
 	s.trades = append(s.trades, trade)
 
-	if len(s.trades) > maxTradeVolumeSliceSize {
-		s.trades = s.trades[maxTradeVolumeSliceSize/3:]
+	if types.ShrinkSlice(&s.trades, tradeSliceShrinkThreshold, tradeSliceShrinkSize) > 0 {
+		runtime.GC()
 	}
 
 	s.mu.Unlock()
@@ -56,7 +59,7 @@ func (s *TradeVolumeWindowSignal) Bind(ctx context.Context, session *bbgo.Exchan
 		s.Threshold = fixedpoint.NewFromFloat(0.7)
 	}
 
-	s.trades = make([]types.Trade, 0, 4096)
+	s.trades = make([]types.Trade, 0, tradeSliceCapacityLimit)
 
 	session.MarketDataStream.OnMarketTrade(s.handleTrade)
 	return nil
