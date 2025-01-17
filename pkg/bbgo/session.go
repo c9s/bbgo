@@ -977,14 +977,15 @@ func (session *ExchangeSession) MarginType() types.MarginType {
 }
 
 func (session *ExchangeSession) metricsBalancesUpdater(balances types.BalanceMap) {
+	labels := prometheus.Labels{
+		"session":     session.Name,
+		"exchange":    session.ExchangeName.String(),
+		"margin_type": string(session.MarginType()),
+		"symbol":      session.IsolatedMarginSymbol,
+	}
+
 	for currency, balance := range balances {
-		labels := prometheus.Labels{
-			"session":     session.Name,
-			"exchange":    session.ExchangeName.String(),
-			"margin_type": string(session.MarginType()),
-			"symbol":      session.IsolatedMarginSymbol,
-			"currency":    currency,
-		}
+		labels["currency"] = currency
 
 		metricsTotalBalances.With(labels).Set(balance.Total().Float64())
 		metricsBalanceNetMetrics.With(labels).Set(balance.Net().Float64())
