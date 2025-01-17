@@ -148,7 +148,12 @@ func (b *RBTOrderBook) CopyDepth(limit int) OrderBook {
 }
 
 func (b *RBTOrderBook) convertTreeToPriceVolumeSlice(tree *RBTree, limit int, descending bool) PriceVolumeSlice {
-	pvs := make(PriceVolumeSlice, 0, limit)
+	defCap := limit
+	if defCap == 0 {
+		defCap = tree.size
+	}
+
+	pvs := make(PriceVolumeSlice, 0, defCap)
 
 	if descending {
 		tree.InorderReverse(func(n *RBNode) bool {
