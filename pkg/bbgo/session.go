@@ -984,18 +984,28 @@ func (session *ExchangeSession) metricsBalancesUpdater(balances types.BalanceMap
 		"symbol":      session.IsolatedMarginSymbol,
 	}
 
-	for currency, balance := range balances {
-		labels["currency"] = currency
+	metricsTotalBalancesCurry := metricsTotalBalances.MustCurryWith(labels)
+	metricsBalanceNetMetricsCurry := metricsBalanceNetMetrics.MustCurryWith(labels)
+	metricsBalanceAvailableMetricsCurry := metricsBalanceAvailableMetrics.MustCurryWith(labels)
+	metricsBalanceLockedMetricsCurry := metricsBalanceLockedMetrics.MustCurryWith(labels)
+	metricsBalanceDebtMetricsCurry := metricsBalanceDebtMetrics.MustCurryWith(labels)
+	metricsBalanceBorrowedMetricsCurry := metricsBalanceBorrowedMetrics.MustCurryWith(labels)
+	metricsBalanceInterestMetricsCurry := metricsBalanceInterestMetrics.MustCurryWith(labels)
 
-		metricsTotalBalances.With(labels).Set(balance.Total().Float64())
-		metricsBalanceNetMetrics.With(labels).Set(balance.Net().Float64())
-		metricsBalanceAvailableMetrics.With(labels).Set(balance.Available.Float64())
-		metricsBalanceLockedMetrics.With(labels).Set(balance.Locked.Float64())
+	for currency, balance := range balances {
+		curLabels := prometheus.Labels{
+			"currency": currency,
+		}
+
+		metricsTotalBalancesCurry.With(curLabels).Set(balance.Total().Float64())
+		metricsBalanceNetMetricsCurry.With(curLabels).Set(balance.Net().Float64())
+		metricsBalanceAvailableMetricsCurry.With(curLabels).Set(balance.Available.Float64())
+		metricsBalanceLockedMetricsCurry.With(curLabels).Set(balance.Locked.Float64())
 
 		// margin metrics
-		metricsBalanceDebtMetrics.With(labels).Set(balance.Debt().Float64())
-		metricsBalanceBorrowedMetrics.With(labels).Set(balance.Borrowed.Float64())
-		metricsBalanceInterestMetrics.With(labels).Set(balance.Interest.Float64())
+		metricsBalanceDebtMetricsCurry.With(curLabels).Set(balance.Debt().Float64())
+		metricsBalanceBorrowedMetricsCurry.With(curLabels).Set(balance.Borrowed.Float64())
+		metricsBalanceInterestMetricsCurry.With(curLabels).Set(balance.Interest.Float64())
 
 		metricsLastUpdateTimeMetrics.With(prometheus.Labels{
 			"session":     session.Name,
@@ -1007,7 +1017,6 @@ func (session *ExchangeSession) metricsBalancesUpdater(balances types.BalanceMap
 			"currency":    currency,
 		}).SetToCurrentTime()
 	}
-
 }
 
 func (session *ExchangeSession) metricsOrderUpdater(order types.Order) {
