@@ -12,7 +12,13 @@ type Float64Series struct {
 
 func NewFloat64Series(v ...float64) *Float64Series {
 	s := &Float64Series{}
-	s.Slice = v
+
+	if len(v) == 0 {
+		s.Slice = make([]float64, 0, 1024)
+	} else {
+		s.Slice = v
+	}
+
 	s.SeriesBase.Series = &s.Slice
 	return s
 }
@@ -59,7 +65,6 @@ func (f *Float64Series) AddSubscriber(fn func(v float64)) {
 		fn(vv)
 	}
 }
-
 
 // Bind binds the source event to the target (Float64Calculator)
 // A Float64Calculator should be able to calculate the float64 result from a single float64 argument input
