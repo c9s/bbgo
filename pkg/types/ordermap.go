@@ -55,6 +55,10 @@ func (m OrderMap) Remove(orderID uint64) {
 	delete(m, orderID)
 }
 
+func (m *OrderMap) Clear() {
+	*m = make(OrderMap, 10)
+}
+
 func (m OrderMap) IDs() (ids []uint64) {
 	for id := range m {
 		ids = append(ids, id)
@@ -121,6 +125,13 @@ func (m *SyncOrderMap) Backup() (orders []SubmitOrder) {
 	orders = m.orders.Backup()
 	m.Unlock()
 	return orders
+}
+
+func (m *SyncOrderMap) Clear() {
+	m.Lock()
+	m.orders.Clear()
+	m.pendingRemoval = make(map[uint64]time.Time, 10)
+	m.Unlock()
 }
 
 func (m *SyncOrderMap) Remove(orderID uint64) (exists bool) {
