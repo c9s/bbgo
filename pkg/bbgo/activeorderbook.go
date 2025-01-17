@@ -24,13 +24,13 @@ const DefaultOrderCancelTimeout = 5 * time.Second
 //go:generate callbackgen -type ActiveOrderBook
 type ActiveOrderBook struct {
 	Symbol string
-	orders *types.SyncOrderMap
+
+	orders              *types.SyncOrderMap
+	pendingOrderUpdates *types.SyncOrderMap
 
 	newCallbacks      []func(o types.Order)
 	filledCallbacks   []func(o types.Order)
 	canceledCallbacks []func(o types.Order)
-
-	pendingOrderUpdates *types.SyncOrderMap
 
 	// sig is the order update signal
 	// this signal will be emitted when a new order is added or removed.
@@ -291,11 +291,19 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 			}
 
 		}
+	}
 
+	if cancelAll {
+		b.clear()
 	}
 
 	log.Debugf("[ActiveOrderBook] all %s orders are cancelled successfully in %s", b.Symbol, time.Since(startTime))
 	return nil
+}
+
+func (b *ActiveOrderBook) clear() {
+	b.orders.Clear()
+	b.pendingOrderUpdates.Clear()
 }
 
 func (b *ActiveOrderBook) orderUpdateHandler(order types.Order) {
