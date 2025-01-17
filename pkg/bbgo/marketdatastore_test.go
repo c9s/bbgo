@@ -31,7 +31,7 @@ func TestMarketDataStore_AddKLineAndTruncateWindow(t *testing.T) {
 	window := store.KLineWindows[interval]
 
 	// make sure the capacity is fixed
-	assert.Equal(t, KLineWindowCapacityLimit, cap(*window))
+	assert.Equal(t, KLineWindowShrinkSize, cap(*window))
 
 	// after truncate, it will remain (KLineWindowCapacityLimit / 2) KLine in the window
 	// so the first GIC will be the maxCap - (KLineWindowCapacityLimit / 2)
