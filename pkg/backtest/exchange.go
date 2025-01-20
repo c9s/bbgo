@@ -337,7 +337,10 @@ func (e *Exchange) BindUserData(userDataStream types.StandardStreamEmitter) {
 }
 
 func (e *Exchange) SubscribeMarketData(
-	startTime, endTime time.Time, requiredInterval types.Interval, extraIntervals ...types.Interval,
+	startTime, endTime time.Time,
+	defaultSymbols []string,
+	requiredInterval types.Interval,
+	extraIntervals ...types.Interval,
 ) (chan types.KLine, error) {
 	log.Infof("collecting backtest configurations...")
 
@@ -370,6 +373,10 @@ func (e *Exchange) SubscribeMarketData(
 		symbols = append(symbols, symbol)
 	}
 
+	if len(symbols) == 0 {
+		symbols = defaultSymbols
+	}
+
 	var intervals []types.Interval
 	for interval := range loadedIntervals {
 		intervals = append(intervals, interval)
@@ -389,7 +396,7 @@ func (e *Exchange) SubscribeMarketData(
 	}
 
 	if len(symbols) == 0 {
-		log.Warnf("empty symbols, will not query kline data from the database")
+		log.Warnf("empty symbols, will not query kline data from the database, default symbols = %v", defaultSymbols)
 
 		c := make(chan types.KLine)
 		close(c)

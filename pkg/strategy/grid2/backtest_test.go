@@ -131,7 +131,7 @@ func RunBacktest(t *testing.T, strategy bbgo.SingleExchangeStrategy) {
 	t.Logf("requiredInterval: %s backTestIntervals: %v", requiredInterval, backTestIntervals)
 
 	_ = allKLineIntervals
-	exchangeSources, err := backtest.InitializeExchangeSources(environ.Sessions(), startTime.Time(), endTime.Time(), requiredInterval, backTestIntervals...)
+	exchangeSources, err := backtest.InitializeExchangeSources(environ.Sessions(), startTime.Time(), endTime.Time(), nil, requiredInterval, backTestIntervals...)
 	if !assert.NoError(t, err) {
 		return
 	}
