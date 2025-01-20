@@ -393,7 +393,7 @@ batchRetryOrder:
 				// can allocate permanent error backoff.Permanent(err) to stop backoff
 				createdOrder, err2 := exchange.SubmitOrder(timeoutCtx, submitOrder)
 				if err2 != nil {
-					logger.WithError(err2).Errorf("submit order error: %s", submitOrder.String())
+					logger.WithError(err2).Warnf("submit order error: %s", submitOrder.String())
 				}
 
 				if err2 == nil && createdOrder != nil {
