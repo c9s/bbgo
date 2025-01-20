@@ -35,11 +35,16 @@ func CollectSubscriptionIntervals(environ *bbgo.Environment) (allKLineIntervals 
 	return allKLineIntervals, requiredInterval, backTestIntervals
 }
 
-func InitializeExchangeSources(sessions map[string]*bbgo.ExchangeSession, startTime, endTime time.Time, requiredInterval types.Interval, extraIntervals ...types.Interval) (exchangeSources []*ExchangeDataSource, err error) {
+func InitializeExchangeSources(
+	sessions map[string]*bbgo.ExchangeSession,
+	startTime, endTime time.Time,
+	defaultSymbols []string, requiredInterval types.Interval,
+	extraIntervals ...types.Interval,
+) (exchangeSources []*ExchangeDataSource, err error) {
 	for _, session := range sessions {
 		backtestEx := session.Exchange.(*Exchange)
 
-		c, err := backtestEx.SubscribeMarketData(startTime, endTime, requiredInterval, extraIntervals...)
+		c, err := backtestEx.SubscribeMarketData(startTime, endTime, defaultSymbols, requiredInterval, extraIntervals...)
 		if err != nil {
 			return exchangeSources, err
 		}

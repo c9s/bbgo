@@ -311,7 +311,10 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		allKLineIntervals, requiredInterval, backTestIntervals := backtest.CollectSubscriptionIntervals(environ)
-		exchangeSources, err := backtest.InitializeExchangeSources(environ.Sessions(), startTime, endTime, requiredInterval, backTestIntervals...)
+		exchangeSources, err := backtest.InitializeExchangeSources(environ.Sessions(),
+			startTime, endTime,
+			userConfig.Backtest.Symbols,
+			requiredInterval, backTestIntervals...)
 		if err != nil {
 			return err
 		}
