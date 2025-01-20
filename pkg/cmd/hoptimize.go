@@ -94,11 +94,12 @@ var hoptimizeCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
 		go func() {
-			c := make(chan os.Signal)
-			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-			<-c
-			log.Info("Early stop by manual cancelation.")
+			<-sigs
+			log.Info("Early stop by manual cancelation")
 			cancel()
 		}()
 
