@@ -1901,6 +1901,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.historicalTrades.BindStream(session.UserDataStream)
 
 	orderExecutor := bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
+	orderExecutor.SetLogger(s.logger)
 	orderExecutor.BindEnvironment(s.Environment)
 	orderExecutor.Bind()
 	orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
