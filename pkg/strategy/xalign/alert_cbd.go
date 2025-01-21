@@ -37,9 +37,9 @@ func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
 		color = "yellow"
 	}
 
-	titlePrefix := "Critical Balance Discrepancy Alert: "
+	titlePrefix := "Critical Balance Discrepancy Alert:"
 	if m.Warning {
-		titlePrefix = "Critical Balance Discrepancy Warning: "
+		titlePrefix = "Critical Balance Discrepancy Warning:"
 	}
 
 	if m.Delta.Sign() > 0 {
@@ -48,16 +48,16 @@ func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
 		m.Side = types.SideTypeSell
 	}
 
-	title := titlePrefix + fmt.Sprintf("%f %s",
+	title := titlePrefix + fmt.Sprintf(" %f %s",
 		m.Delta.Float64(),
 		m.BaseCurrency,
 	)
 
 	if m.SustainedDuration > 0 {
-		title += fmt.Sprintf(" (sustained for %s)", m.SustainedDuration)
+		title += fmt.Sprintf(" sustained for %s", m.SustainedDuration)
 	}
 
-	title += fmt.Sprintf("(~= %f %s > %f %s)",
+	title += fmt.Sprintf(" (~= %f %s > %f %s)",
 		m.Amount.Float64(),
 		m.QuoteCurrency,
 		m.AlertAmount.Float64(),
