@@ -6,66 +6,38 @@ sessions:
 
 exchangeStrategies:
   - on: *exchange
-    sentinel:
+    sentinel: &sentinel
       symbol: BTCUSDT
-      interval: &intervel 1m
-      threshold: &threshold 0.7
-      proportion: &proportion 0.05
-      numSamples: &numSamples 1440
-      window: &window 60
+      interval: 1m
+      threshold: 0.6
+      proportion: 0.05
+      numSamples: 1440
+      window: 60
   - on: *exchange
     sentinel:
+      <<: *sentinel
       symbol: ETHUSDT
-      interval: *intervel
-      threshold: *threshold
-      proportion: *proportion
-      numSamples: *numSamples
-      window: *window
   - on: *exchange
     sentinel:
+      <<: *sentinel
       symbol: BCHUSDT
-      interval: *intervel
-      threshold: *threshold
-      proportion: *proportion
-      numSamples: *numSamples
-      window: *window
   - on: *exchange
     sentinel:
+      <<: *sentinel
       symbol: LTCUSDT
-      interval: *intervel
-      threshold: *threshold
-      proportion: *proportion
-      numSamples: *numSamples
-      window: *window
   - on: *exchange
     sentinel:
+      <<: *sentinel
       symbol: XRPUSDT
-      interval: *intervel
-      threshold: *threshold
-      proportion: *proportion
-      numSamples: *numSamples
-      window: *window
   - on: *exchange
     sentinel:
+      <<: *sentinel
       symbol: MAXUSDT
-      interval: *intervel
-      threshold: *threshold
-      proportion: *proportion
-      numSamples: *numSamples
-      window: *window
   - on: *exchange
     sentinel:
+      <<: *sentinel
       symbol: BCNTUSDT
-      interval: *intervel
-      threshold: *threshold
-      proportion: *proportion
-      numSamples: *numSamples
-      window: *window
   - on: *exchange
     sentinel:
+      <<: *sentinel
       symbol: ARBUSDT
-      interval: *intervel
-      threshold: *threshold
-      proportion: *proportion
-      numSamples: *numSamples
-      window: *window
