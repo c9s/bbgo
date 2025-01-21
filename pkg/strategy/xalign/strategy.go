@@ -42,7 +42,7 @@ type LargeAmountAlertConfig struct {
 	Amount        fixedpoint.Value `json:"amount"`
 }
 
-type LargeAmountAlert struct {
+type CriticalBalanceDiscrepancyAlert struct {
 	SlackAlert *slackalert.SlackAlert
 
 	QuoteCurrency string
@@ -55,12 +55,19 @@ type LargeAmountAlert struct {
 	Amount       fixedpoint.Value
 }
 
-func (m *LargeAmountAlert) SlackAttachment() slack.Attachment {
+func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
 	return slack.Attachment{
 		Color: "red",
-		Title: fmt.Sprintf("xalign amount alert - try to align %s with quote %s amount %f > %f",
-			m.BaseCurrency, m.QuoteCurrency, m.Amount.Float64(), m.AlertAmount.Float64()),
-		Text: strings.Join(m.SlackAlert.Mentions, " "),
+		Title: fmt.Sprintf("Critical Balance Discrepancy Alert: %f %s (~= %f %s > %f %s)",
+			m.Quantity.Float64(),
+			m.BaseCurrency,
+			m.Amount.Float64(),
+			m.QuoteCurrency,
+			m.AlertAmount.Float64(),
+			m.QuoteCurrency,
+		),
+		Text:   strings.Join(m.SlackAlert.Mentions, " "),
+		Footer: fmt.Sprintf("strategy: %s", ID),
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Base Currency",
@@ -96,8 +103,11 @@ type Strategy struct {
 	DryRun                   bool                        `json:"dryRun"`
 	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
 	Duration                 types.Duration              `json:"for"`
-	MaxAmounts               map[string]fixedpoint.Value `json:"maxAmounts"`
-	LargeAmountAlert         *LargeAmountAlertConfig     `json:"largeAmountAlert"`
+
+	WarningDuration types.Duration `json:"warningAfter"`
+
+	MaxAmounts       map[string]fixedpoint.Value `json:"maxAmounts"`
+	LargeAmountAlert *LargeAmountAlertConfig     `json:"largeAmountAlert"`
 
 	SlackNotify                bool             `json:"slackNotify"`
 	SlackNotifyMentions        []string         `json:"slackNotifyMentions"`
@@ -605,20 +615,27 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 
 		if d, ok := s.deviationDetectors[currency]; ok {
 			should, sustainedDuration := d.ShouldFix()
+			if sustainedDuration > 0 {
+				log.Infof("%s sustained deviation for %s...", currency, sustainedDuration)
+			}
+
+			if s.WarningDuration > 0 && sustainedDuration >= s.WarningDuration.Duration() {
+				bbgo.Notify("Sustained deviation for %s: %s", currency, sustainedDuration)
+			}
+
 			if !should {
 				continue
 			}
-
-			log.Infof("%s sustained deviation for %s...", currency, sustainedDuration)
 		}
 
 		if s.LargeAmountAlert != nil {
 			if price, ok := s.priceResolver.ResolvePrice(currency, s.LargeAmountAlert.QuoteCurrency); ok {
 				quantity := q.Abs()
 				amount := price.Mul(quantity)
+
 				log.Infof("resolved price for currency: %s, price: %f, quantity: %f, amount: %f", currency, price.Float64(), quantity.Float64(), amount.Float64())
 				if amount.Compare(s.LargeAmountAlert.Amount) > 0 {
-					alert := &LargeAmountAlert{
+					alert := &CriticalBalanceDiscrepancyAlert{
 						SlackAlert:    s.LargeAmountAlert.Slack,
 						QuoteCurrency: s.LargeAmountAlert.QuoteCurrency,
 						AlertAmount:   s.LargeAmountAlert.Amount,
