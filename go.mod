@@ -141,7 +141,6 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
-	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tebeka/strftime v0.1.3 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
