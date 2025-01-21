@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/slack-go/slack"
 	"golang.org/x/time/rate"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -42,50 +41,6 @@ type LargeAmountAlertConfig struct {
 	Amount        fixedpoint.Value `json:"amount"`
 }
 
-type LargeAmountAlert struct {
-	SlackAlert *slackalert.SlackAlert
-
-	QuoteCurrency string
-	AlertAmount   fixedpoint.Value
-
-	BaseCurrency string
-	Side         types.SideType
-	Price        fixedpoint.Value
-	Quantity     fixedpoint.Value
-	Amount       fixedpoint.Value
-}
-
-func (m *LargeAmountAlert) SlackAttachment() slack.Attachment {
-	return slack.Attachment{
-		Color: "red",
-		Title: fmt.Sprintf("xalign amount alert - try to align %s with quote %s amount %f > %f",
-			m.BaseCurrency, m.QuoteCurrency, m.Amount.Float64(), m.AlertAmount.Float64()),
-		Text: strings.Join(m.SlackAlert.Mentions, " "),
-		Fields: []slack.AttachmentField{
-			{
-				Title: "Base Currency",
-				Value: m.BaseCurrency,
-				Short: true,
-			},
-			{
-				Title: "Side",
-				Value: m.Side.String(),
-				Short: true,
-			},
-			{
-				Title: "Price",
-				Value: m.Price.String(),
-				Short: true,
-			},
-			{
-				Title: "Quantity",
-				Value: m.Quantity.String(),
-				Short: true,
-			},
-		},
-	}
-}
-
 type Strategy struct {
 	*bbgo.Environment
 	Interval                 types.Interval              `json:"interval"`
@@ -96,8 +51,11 @@ type Strategy struct {
 	DryRun                   bool                        `json:"dryRun"`
 	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
 	Duration                 types.Duration              `json:"for"`
-	MaxAmounts               map[string]fixedpoint.Value `json:"maxAmounts"`
-	LargeAmountAlert         *LargeAmountAlertConfig     `json:"largeAmountAlert"`
+
+	WarningDuration types.Duration `json:"warningFor"`
+
+	MaxAmounts       map[string]fixedpoint.Value `json:"maxAmounts"`
+	LargeAmountAlert *LargeAmountAlertConfig     `json:"largeAmountAlert"`
 
 	SlackNotify                bool             `json:"slackNotify"`
 	SlackNotifyMentions        []string         `json:"slackNotifyMentions"`
@@ -488,8 +446,6 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		session.UserDataStream.OnTradeUpdate(s.priceResolver.UpdateFromTrade)
 	}
 
-	log.Infof("large amount alert: %+v", s.LargeAmountAlert)
-
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		for n, session := range s.sessions {
@@ -598,46 +554,73 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 	s.recordBalance(totalBalances)
 
 	log.Debugf("checking all fault balance records...")
+
+	amountQuoteCurrency := "USDT"
+	if s.LargeAmountAlert != nil {
+		amountQuoteCurrency = s.LargeAmountAlert.QuoteCurrency
+	}
+
 	for currency, expectedBalance := range s.ExpectedBalances {
 		q := s.calculateRefillQuantity(totalBalances, currency, expectedBalance)
+		quantity := q.Abs()
+
+		price, ok := s.priceResolver.ResolvePrice(currency, amountQuoteCurrency)
+
+		if !ok {
+			log.Warnf("unable to resolve price for %s, skip alert checking", currency)
+		}
+
+		amount := price.Mul(quantity)
+		if price.Sign() > 0 {
+			log.Infof("resolved price for currency: %s, price: %f, quantity: %f, amount: %f", currency, price.Float64(), quantity.Float64(), amount.Float64())
+		}
 
 		log.Debugf("checking %s fault balance records...", currency)
 
 		if d, ok := s.deviationDetectors[currency]; ok {
 			should, sustainedDuration := d.ShouldFix()
+			if sustainedDuration > 0 {
+				log.Infof("%s sustained deviation for %s...", currency, sustainedDuration)
+			}
+
+			if s.WarningDuration > 0 && sustainedDuration >= s.WarningDuration.Duration() {
+				if s.LargeAmountAlert != nil && price.Sign() > 0 {
+					if amount.Compare(s.LargeAmountAlert.Amount) > 0 {
+						bbgo.Notify(&CriticalBalanceDiscrepancyAlert{
+							Warning:           true,
+							SlackAlert:        s.LargeAmountAlert.Slack,
+							QuoteCurrency:     s.LargeAmountAlert.QuoteCurrency,
+							AlertAmount:       s.LargeAmountAlert.Amount,
+							BaseCurrency:      currency,
+							SustainedDuration: sustainedDuration,
+
+							Price:    price,
+							Delta:    q,
+							Quantity: quantity,
+							Amount:   amount,
+						})
+					}
+				}
+			}
+
 			if !should {
 				continue
 			}
-
-			log.Infof("%s sustained deviation for %s...", currency, sustainedDuration)
 		}
 
-		if s.LargeAmountAlert != nil {
-			if price, ok := s.priceResolver.ResolvePrice(currency, s.LargeAmountAlert.QuoteCurrency); ok {
-				quantity := q.Abs()
-				amount := price.Mul(quantity)
-				log.Infof("resolved price for currency: %s, price: %f, quantity: %f, amount: %f", currency, price.Float64(), quantity.Float64(), amount.Float64())
-				if amount.Compare(s.LargeAmountAlert.Amount) > 0 {
-					alert := &LargeAmountAlert{
-						SlackAlert:    s.LargeAmountAlert.Slack,
-						QuoteCurrency: s.LargeAmountAlert.QuoteCurrency,
-						AlertAmount:   s.LargeAmountAlert.Amount,
-						BaseCurrency:  currency,
-						Price:         price,
-						Quantity:      quantity,
-						Amount:        amount,
-					}
-
-					if q.Sign() > 0 {
-						alert.Side = types.SideTypeBuy
-					} else {
-						alert.Side = types.SideTypeSell
-					}
-
-					bbgo.Notify(alert)
-				}
-			} else {
-				log.Info("price resolver can not resolve price, skip alert checking")
+		if s.LargeAmountAlert != nil && price.Sign() > 0 {
+			if amount.Compare(s.LargeAmountAlert.Amount) > 0 {
+				bbgo.Notify(&CriticalBalanceDiscrepancyAlert{
+					SlackAlert:        s.LargeAmountAlert.Slack,
+					QuoteCurrency:     s.LargeAmountAlert.QuoteCurrency,
+					AlertAmount:       s.LargeAmountAlert.Amount,
+					BaseCurrency:      currency,
+					Delta:             q,
+					SustainedDuration: s.Duration.Duration(),
+					Price:             price,
+					Quantity:          quantity,
+					Amount:            amount,
+				})
 			}
 		}
 
