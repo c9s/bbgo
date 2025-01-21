@@ -8,7 +8,7 @@ exchangeStrategies:
   - on: *exchange
     sentinel: &sentinel
       symbol: BTCUSDT
-      interval: 1m
+      interval: 5m
       threshold: 0.6
       proportion: 0.05
       numSamples: 1440
