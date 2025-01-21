@@ -52,7 +52,7 @@ type Strategy struct {
 	BalanceToleranceRange    fixedpoint.Value            `json:"balanceToleranceRange"`
 	Duration                 types.Duration              `json:"for"`
 
-	WarningDuration types.Duration `json:"warningAfter"`
+	WarningDuration types.Duration `json:"warningFor"`
 
 	MaxAmounts       map[string]fixedpoint.Value `json:"maxAmounts"`
 	LargeAmountAlert *LargeAmountAlertConfig     `json:"largeAmountAlert"`
