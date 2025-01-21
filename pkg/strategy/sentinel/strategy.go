@@ -124,6 +124,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		volume := volumes.Last(0)
 		mean := volumes.Mean()
 		std := volumes.Std()
+		if std == 0 {
+			log.Warnf("symbol: %s, interval: %s, volume std is zero.", s.Symbol, s.Interval)
+			return
+		}
 		// if the volume is not significantly above the mean, we don't need to calculate the isolation forest
 		if volume < mean+2*std {
 			log.Infof("Volume is not significantly above mean, skipping isolation forest calculation, symbol: %s, volume: %f, mean: %f, std: %f", s.Symbol, volume, mean, std)
@@ -136,9 +140,10 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		scores := s.IsolationForest.Score(samples)
 		score := scores[len(scores)-1]
 		quantile := iforest.Quantile(scores, 1-s.Proportion)
-		log.Infof("symbol: %s, volume: %f, mean: %f, std: %f, iforest score: %f, quantile: %f", s.Symbol, volume, mean, std, score, quantile)
+		pr := percentileRank(score, scores)
+		log.Infof("symbol: %s, volume: %f, mean: %f, std: %f, iforest score: %f, quantile: %f, percentile rank: %.2f%%", s.Symbol, volume, mean, std, score, quantile, pr*100)
 
-		s.notifyOnScoreThresholdExceeded(score, quantile)
+		s.notifyOnScoreThresholdExceeded(score, quantile, pr)
 	}))
 	return nil
 }
@@ -205,7 +210,7 @@ func (s *Strategy) trainIsolationForest(samples [][]float64) {
 	log.Infof("Isolation forest fitted with %d samples and %d/%d trees", len(samples), len(s.IsolationForest.Trees), s.IsolationForest.NumTrees)
 }
 
-func (s *Strategy) notifyOnScoreThresholdExceeded(score float64, quantile float64) {
+func (s *Strategy) notifyOnScoreThresholdExceeded(score float64, quantile float64, pr float64) {
 	// if the score is below the threshold, we don't need to notify
 	if score < s.Threshold {
 		return
@@ -221,7 +226,7 @@ func (s *Strategy) notifyOnScoreThresholdExceeded(score float64, quantile float6
 		return
 	}
 
-	bbgo.Notify("symbol: %s, iforest score: %f, threshold: %f, quantile: %f", s.Symbol, score, s.Threshold, quantile)
+	bbgo.Notify("symbol: %s, iforest score: %f, threshold: %f, quantile: %f, percentile rank: %.2f%%", s.Symbol, score, s.Threshold, quantile, pr*100)
 }
 
 func (s *Strategy) isNewKline(kline types.KLine) bool {
@@ -231,4 +236,23 @@ func (s *Strategy) isNewKline(kline types.KLine) bool {
 
 	lastKline := s.klines[len(s.klines)-1]
 	return lastKline.EndTime.Before(kline.EndTime.Time())
+}
+
+func rankOf(value float64, values []float64) int {
+	rank := 0
+	for _, v := range values {
+		if v > value {
+			rank++
+		}
+	}
+	return rank
+}
+
+func percentileRank(value float64, values []float64) float64 {
+	n := len(values)
+	if n == 0 {
+		return 0
+	}
+	rank := rankOf(value, values)
+	return float64(rank) / float64(n)
 }
