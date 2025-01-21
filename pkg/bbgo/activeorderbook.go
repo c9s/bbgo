@@ -372,7 +372,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 
 		b.C.Emit()
 
-	case types.OrderStatusCanceled, types.OrderStatusRejected:
+	case types.OrderStatusCanceled, types.OrderStatusRejected, types.OrderStatusExpired:
 		// TODO: note that orders transit to "canceled" may have partially filled
 		log.Debugf("[ActiveOrderBook] order is %s, removing order %s", order.Status, order)
 		b.orders.Remove(order.OrderID)
