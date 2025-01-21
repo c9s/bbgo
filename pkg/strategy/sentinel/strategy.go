@@ -72,6 +72,14 @@ func (s *Strategy) Defaults() error {
 }
 
 func (s *Strategy) Validate() error {
+	if s.Symbol == "" {
+		return fmt.Errorf("symbol is required")
+	}
+
+	if s.Interval == "" {
+		return fmt.Errorf("interval is required")
+	}
+
 	if s.NumSamples < 0 {
 		return fmt.Errorf("num samples should be greater than 0")
 	}
