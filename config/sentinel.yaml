@@ -4,18 +4,40 @@ sessions:
     envVarPrefix: max
     publicOnly: true
 
-persistence:
-  json:
-    directory: var/data
-  redis:
-    host: 127.0.0.1
-    port: 6379
-    db: 0
-
 exchangeStrategies:
-- on: *exchange
-  sentinel:
-    symbol: BTCUSDT
-    interval: 1m
-    scoreThreshold: 0.6
-    klineLimit: 43200
+  - on: *exchange
+    sentinel: &sentinel
+      symbol: BTCUSDT
+      interval: 1m
+      threshold: 0.6
+      proportion: 0.05
+      numSamples: 1440
+      window: 60
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: ETHUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: BCHUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: LTCUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: XRPUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: MAXUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: BCNTUSDT
+  - on: *exchange
+    sentinel:
+      <<: *sentinel
+      symbol: ARBUSDT
