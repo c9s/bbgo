@@ -75,7 +75,6 @@ func TestExchange_SubmitOrder(t *testing.T) {
 		assert.NoError(t, err)
 		t.Logf("createdOrder: %+v", createdOrder)
 	}
-
 }
 
 func TestExchange_QueryTrades(t *testing.T) {
@@ -418,5 +417,24 @@ func TestExchange_QueryTrades(t *testing.T) {
 
 		_, err := ex.QueryTrades(context.Background(), "", &newOpts)
 		assert.ErrorContains(err, ErrSymbolRequired.Error())
+	})
+}
+
+func TestExchange_Margin(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ctx := context.Background()
+	ex := New(key, secret, passphrase)
+
+	t.Run("QueryMarginAssetMaxBorrowable", func(t *testing.T) {
+		maxBorrowable, err := ex.QueryMarginAssetMaxBorrowable(ctx, "BTC")
+		if assert.NoError(t, err) {
+			assert.NotZero(t, maxBorrowable.Float64())
+			t.Logf("max borrowable: %f", maxBorrowable.Float64())
+		}
 	})
 }
