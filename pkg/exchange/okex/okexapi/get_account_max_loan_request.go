@@ -23,9 +23,10 @@ type MaxLoanResponse struct {
 type GetAccountMaxLoanRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	instrumentId   *string `param:"instId"`
-	currency       *string `param:"ccy"`
-	marginCurrency *string `param:"mgnCcy"`
+	instrumentId   *string    `param:"instId"`
+	currency       *string    `param:"ccy"`
+	marginCurrency *string    `param:"mgnCcy"`
+	marginMode     MarginMode `param:"mgnMode"`
 }
 
 func (c *RestClient) NewGetAccountMaxLoanRequest() *GetAccountMaxLoanRequest {

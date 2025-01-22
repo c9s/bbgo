@@ -387,20 +387,35 @@ func TestClient_Margin(t *testing.T) {
 		}
 	})
 
-	t.Run("GetMaxAvailableSizeRequest", func(t *testing.T) {
-		if accountConfigResp[0].AccountLevel == 1 {
-			t.Skip("unable to call GetMaxAvailableSizeRequest under spot mode")
-			return
-		}
-
-		req := client.NewGetMaxAvailableSizeRequest()
-		resp, err := req.
-			Currency("BTC").
-			TdMode(TradeModeCross).
-			InstrumentID("BTC-USDT").
-			Do(ctx)
+	t.Run("GetAccountMaxLoanRequest", func(t *testing.T) {
+		resp, err := client.NewGetAccountMaxLoanRequest().
+			MarginMode(MarginModeCross).
+			Currency("BTC").Do(ctx)
 		if assert.NoError(t, err) {
 			t.Logf("response: %+v", resp)
+		}
+	})
+
+	t.Run("GetMaxAvailableSizeRequest", func(t *testing.T) {
+		if accountConfigResp[0].AccountLevel == 1 {
+			t.Logf("can not call GetMaxAvailableSizeRequest with TradeModeMargin under spot mode")
+			req := client.NewGetMaxAvailableSizeRequest()
+			resp, err := req.
+				TdMode(TradeModeCash).
+				InstrumentID("BTC-USDT").
+				Do(ctx)
+			if assert.NoError(t, err) {
+				t.Logf("response: %+v", resp)
+			}
+		} else {
+			req := client.NewGetMaxAvailableSizeRequest()
+			resp, err := req.
+				TdMode(TradeModeCross).
+				InstrumentID("BTC-USDT").
+				Do(ctx)
+			if assert.NoError(t, err) {
+				t.Logf("response: %+v", resp)
+			}
 		}
 	})
 

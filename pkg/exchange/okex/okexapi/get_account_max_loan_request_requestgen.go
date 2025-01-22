@@ -29,6 +29,11 @@ func (g *GetAccountMaxLoanRequest) MarginCurrency(marginCurrency string) *GetAcc
 	return g
 }
 
+func (g *GetAccountMaxLoanRequest) MarginMode(marginMode MarginMode) *GetAccountMaxLoanRequest {
+	g.marginMode = marginMode
+	return g
+}
+
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (g *GetAccountMaxLoanRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
@@ -68,6 +73,11 @@ func (g *GetAccountMaxLoanRequest) GetParameters() (map[string]interface{}, erro
 		params["mgnCcy"] = marginCurrency
 	} else {
 	}
+	// check marginMode field -> json key mgnMode
+	marginMode := g.marginMode
+
+	// assign parameter of marginMode
+	params["mgnMode"] = marginMode
 
 	return params, nil
 }
