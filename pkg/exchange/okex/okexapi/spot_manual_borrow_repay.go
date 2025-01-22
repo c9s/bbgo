@@ -9,20 +9,29 @@ import (
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Data
 
+type MarginSide string
+
+const (
+	MarginSideBorrow MarginSide = "borrow"
+	MarginSideRepay  MarginSide = "repay"
+)
+
 type SpotBorrowRepayResponse struct {
 	Currency string           `json:"ccy"`
-	Side     string           `json:"side"`
+	Side     MarginSide       `json:"side"`
 	Amount   fixedpoint.Value `json:"amt"`
 }
 
-//go:generate PostRequest -url "/api/v5/account/set-leverage" -type SpotManualBorrowRepayRequest -responseDataType []SpotBorrowRepayResponse -rateLimiter 1+20/2s
+//go:generate PostRequest -url "/api/v5/account/spot-manual-borrow-repay" -type SpotManualBorrowRepayRequest -responseDataType []SpotBorrowRepayResponse -rateLimiter 1+20/2s
 type SpotManualBorrowRepayRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	// side = borrow or repay
-	side string `param:"side"`
+	currency string `param:"ccy"`
 
-	amount string `param:"amount"`
+	// side = borrow or repay
+	side MarginSide `param:"side"`
+
+	amount string `param:"amt"`
 }
 
 func (c *RestClient) NewSpotManualBorrowRepayRequest() *SpotManualBorrowRepayRequest {

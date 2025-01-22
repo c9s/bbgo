@@ -24,6 +24,8 @@ type GetAccountLeverageInfoRequest struct {
 	currency *string `param:"ccy"`
 
 	marginMode MarginMode `param:"mgnMode"`
+
+	instrumentId *string `param:"instId"`
 }
 
 func (c *RestClient) NewGetAccountLeverageInfoRequest() *GetAccountLeverageInfoRequest {
