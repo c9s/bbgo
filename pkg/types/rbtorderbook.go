@@ -150,7 +150,11 @@ func (b *RBTOrderBook) CopyDepth(limit int) OrderBook {
 func (b *RBTOrderBook) convertTreeToPriceVolumeSlice(tree *RBTree, limit int, descending bool) PriceVolumeSlice {
 	defCap := limit
 	if defCap == 0 {
-		defCap = tree.size
+		if tree.size > 0 {
+			defCap = tree.size
+		} else {
+			defCap = 50
+		}
 	}
 
 	pvs := make(PriceVolumeSlice, 0, defCap)
