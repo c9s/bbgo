@@ -380,7 +380,6 @@ func TestClient_Margin(t *testing.T) {
 		req := client.NewGetAccountLeverageInfoRequest()
 		req.MarginMode(MarginModeCross)
 		req.Currency("BTC")
-		// req.InstrumentId("BTC-USDT")
 		resp, err := req.Do(ctx)
 		if assert.NoError(t, err) {
 			t.Logf("response: %+v", resp)
