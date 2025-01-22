@@ -225,7 +225,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
 	}
 
-	accountBalances, err := e.client.NewGetAccountInfoRequest().Do(ctx)
+	accountBalances, err := e.client.NewGetAccountBalanceRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}

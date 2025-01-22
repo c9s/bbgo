@@ -31,7 +31,7 @@ type SpotManualBorrowRepayRequest struct {
 	// side = borrow or repay
 	side MarginSide `param:"side"`
 
-	amount string `param:"amount"`
+	amount string `param:"amt"`
 }
 
 func (c *RestClient) NewSpotManualBorrowRepayRequest() *SpotManualBorrowRepayRequest {
