@@ -28,13 +28,13 @@ type Account struct {
 	Details          []BalanceDetail            `json:"details"`
 }
 
-//go:generate GetRequest -url "/api/v5/account/balance" -type GetAccountInfoRequest -responseDataType []Account
-type GetAccountInfoRequest struct {
+//go:generate GetRequest -url "/api/v5/account/balance" -type GetAccountBalanceRequest -responseDataType []Account
+type GetAccountBalanceRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
 
-func (c *RestClient) NewGetAccountInfoRequest() *GetAccountInfoRequest {
-	return &GetAccountInfoRequest{
+func (c *RestClient) NewGetAccountBalanceRequest() *GetAccountBalanceRequest {
+	return &GetAccountBalanceRequest{
 		client: c,
 	}
 }

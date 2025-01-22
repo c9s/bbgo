@@ -65,11 +65,11 @@ func (s *SpotManualBorrowRepayRequest) GetParameters() (map[string]interface{}, 
 
 	// assign parameter of side
 	params["side"] = side
-	// check amount field -> json key amount
+	// check amount field -> json key amt
 	amount := s.amount
 
 	// assign parameter of amount
-	params["amount"] = amount
+	params["amt"] = amount
 
 	return params, nil
 }
