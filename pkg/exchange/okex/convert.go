@@ -388,3 +388,71 @@ func toGlobalMarginRepay(record okexapi.MarginHistoryEntry) types.MarginRepay {
 		IsolatedSymbol: "",
 	}
 }
+
+// DepositRecord.state represents the deposit state
+/*
+Status of deposit
+0: Waiting for confirmation
+1: Deposit credited
+2: Deposit successful
+8: Pending due to temporary deposit suspension on this crypto currency
+11: Match the address blacklist
+12: Account or deposit is frozen
+13: Sub-account deposit interception
+14: KYC limit
+*/
+func toDepositStatusMessage(state int64) string {
+	switch state {
+	case 0:
+		return "Waiting for confirmation"
+	case 1:
+		return "Deposit credited"
+	case 2:
+		return "Deposit successful"
+	case 8:
+		return "Pending due to temporary deposit suspension on this crypto currency"
+	case 11:
+		return "Match the address blacklist"
+	case 12:
+		return "Account or deposit is frozen"
+	case 13:
+		return "Sub-account deposit interception"
+	case 14:
+		return "KYC limit"
+	}
+
+	return ""
+}
+
+func toGlobalDepositStatus(state int64) types.DepositStatus {
+	switch state {
+	case 0:
+		return types.DepositPending
+	case 1:
+		return types.DepositCredited
+	case 2:
+		return types.DepositSuccess
+	case 8:
+		return types.DepositPending
+	default:
+		return types.DepositRejected
+	}
+}
+
+func toGlobalDeposit(record okexapi.DepositRecord) types.Deposit {
+	return types.Deposit{
+		Exchange:      types.ExchangeOKEx,
+		Time:          types.Time(record.Ts),
+		Amount:        record.Amount,
+		Asset:         record.Currency,
+		Address:       record.To,
+		AddressTag:    "",
+		TransactionID: record.DepId,
+		Status:        toGlobalDepositStatus(int64(record.State)),
+		RawStatus:     fmt.Sprintf("%s (%s)", record.State.String(), toDepositStatusMessage(int64(record.State))),
+		UnlockConfirm: 0,
+		Confirmation:  record.ActualDepBlkConfirm.String(),
+		Network:       strings.ToUpper(record.Chain),
+	}
+
+}
