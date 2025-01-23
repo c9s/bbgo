@@ -13,6 +13,7 @@ import (
 
 func toGlobalMarket(m bybitapi.Instrument) types.Market {
 	return types.Market{
+		Exchange:        types.ExchangeBybit,
 		Symbol:          m.Symbol,
 		LocalSymbol:     m.Symbol,
 		PricePrecision:  m.LotSizeFilter.QuotePrecision.NumFractionalDigits(),
