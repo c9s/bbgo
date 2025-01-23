@@ -2,6 +2,7 @@ package okexapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -429,6 +430,11 @@ func TestClient_Margin(t *testing.T) {
 		if assert.NoError(t, err) {
 			t.Logf("borrow response: %+v", resp)
 
+			positionRiskResp, err2 := client.NewGetAccountPositionRiskRequest().Do(ctx)
+			if assert.NoError(t, err2) {
+				t.Logf("position risk response: %+v", positionRiskResp)
+			}
+
 			time.Sleep(1 * time.Second)
 			repayResp, repayErr := client.NewSpotManualBorrowRepayRequest().
 				Currency("BTC").
@@ -448,6 +454,19 @@ func TestClient_Margin(t *testing.T) {
 		historyResp, err2 := req.Do(ctx)
 		if assert.NoError(t, err2) {
 			t.Logf("history response: %+v", historyResp)
+		}
+	})
+
+	t.Run("get account positions", func(t *testing.T) {
+		resp, err := client.NewGetAccountPositionsRequest().InstType(InstrumentTypeMargin).Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("positions: %+v", resp)
+
+			if len(resp) > 0 {
+				out, err2 := json.MarshalIndent(resp[0], "", "  ")
+				assert.NoError(t, err2)
+				t.Logf("positions: %s", out)
+			}
 		}
 	})
 }
