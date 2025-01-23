@@ -210,22 +210,28 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	bals, err := e.QueryAccountBalances(ctx)
+	accounts, err := e.queryAccountBalance(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	if len(accounts) == 0 {
+		return nil, fmt.Errorf("account balance is empty")
+	}
+
+	balances := toGlobalBalance(&accounts[0])
 	account := types.NewAccount()
-	account.UpdateBalances(bals)
+	account.UpdateBalances(balances)
+
+	// for margin account
+	account.MarginRatio = accounts[0].MarginRatio
+	account.TotalAccountValue = accounts[0].TotalEquityInUSD
+
 	return account, nil
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	if err := queryAccountLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
-	}
-
-	accountBalances, err := e.client.NewGetAccountBalanceRequest().Do(ctx)
+	accountBalances, err := e.queryAccountBalance(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -237,6 +243,14 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return toGlobalBalance(&accountBalances[0]), nil
 }
 
+func (e *Exchange) queryAccountBalance(ctx context.Context) ([]okexapi.Account, error) {
+	if err := queryAccountLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
+	}
+
+	return e.client.NewGetAccountBalanceRequest().Do(ctx)
+}
+
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
 	orderReq := e.client.NewPlaceOrderRequest()
 
@@ -245,7 +259,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	orderReq.Size(order.Market.FormatQuantity(order.Quantity))
 
 	if e.MarginSettings.IsMargin {
-		orderReq.TradeMode(okexapi.TradeModeCross)
+		// okx market order with trade mode cross will be rejected:
+		//   "The corresponding product of this BTC-USDT doesn't support the tgtCcy parameter"
+		//
+		// orderReq.TradeMode(okexapi.TradeModeCross)
 	}
 
 	// set price field for limit orders
@@ -346,7 +363,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		}
 
 		for _, o := range openOrders {
-			o, err := orderDetailToGlobal(&o.OrderDetail)
+			o, err := orderDetailToGlobalOrder(&o.OrderDetail)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert order, err: %v", err)
 			}
@@ -489,7 +506,7 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (tr
 	}
 
 	for _, trade := range response {
-		trades = append(trades, tradeToGlobal(trade))
+		trades = append(trades, toGlobalTrade(trade))
 	}
 
 	return trades, nil
@@ -546,7 +563,7 @@ func (e *Exchange) QueryClosedOrders(
 	}
 
 	for _, order := range res {
-		o, err2 := orderDetailToGlobal(&order)
+		o, err2 := orderDetailToGlobalOrder(&order)
 		if err2 != nil {
 			err = multierr.Append(err, err2)
 			continue
@@ -591,27 +608,78 @@ func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount f
 }
 
 func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (fixedpoint.Value, error) {
-	req := e.client.NewGetAccountInterestLimitsRequest()
-	req.Currency(asset)
+	req := e.client.NewGetAccountMaxLoanRequest()
+	req.Currency(asset).
+		MarginMode(okexapi.MarginModeCross)
 
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return fixedpoint.Zero, err
 	}
 
-	log.Infof("%+v", resp)
-
-	if len(resp) == 0 || len(resp[0].Records) == 0 {
+	if len(resp) == 0 {
 		return fixedpoint.Zero, nil
 	}
 
-	for _, record := range resp[0].Records {
-		if strings.ToUpper(record.Currency) == asset {
-			return record.LoanQuota, nil
+	return resp[0].MaxLoan, nil
+}
+
+func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginLoan, error) {
+	req := e.client.NewGetAccountSpotBorrowRepayHistoryRequest().Currency(asset)
+	if endTime != nil {
+		req.Before(*endTime)
+	}
+	if startTime != nil {
+		req.After(*startTime)
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var records []types.MarginLoan
+	for _, r := range resp {
+		switch r.Type {
+		case okexapi.MarginEventTypeManualBorrow, okexapi.MarginEventTypeAutoBorrow:
+			records = append(records, toGlobalMarginLoan(r))
 		}
 	}
 
-	return fixedpoint.Zero, nil
+	return records, nil
+}
+
+func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginRepay, error) {
+	req := e.client.NewGetAccountSpotBorrowRepayHistoryRequest().Currency(asset)
+	if endTime != nil {
+		req.Before(*endTime)
+	}
+	if startTime != nil {
+		req.After(*startTime)
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var records []types.MarginRepay
+	for _, r := range resp {
+		switch r.Type {
+		case okexapi.MarginEventTypeManualRepay, okexapi.MarginEventTypeAutoRepay:
+			records = append(records, toGlobalMarginRepay(r))
+		}
+	}
+
+	return records, nil
+}
+
+func (e *Exchange) QueryLiquidationHistory(ctx context.Context, startTime, endTime *time.Time) ([]types.MarginLiquidation, error) {
+	return nil, nil
+}
+
+func (e *Exchange) QueryInterestHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginInterest, error) {
+	return nil, nil
 }
 
 /*
@@ -708,7 +776,7 @@ func getTrades(
 		}
 
 		for _, trade := range response {
-			trades = append(trades, tradeToGlobal(trade))
+			trades = append(trades, toGlobalTrade(trade))
 		}
 
 		tradeLen := int64(len(response))

@@ -63,7 +63,7 @@ func Test_orderDetailToGlobal(t *testing.T) {
 	)
 
 	t.Run("succeeds", func(t *testing.T) {
-		order, err := orderDetailToGlobal(openOrder)
+		order, err := orderDetailToGlobalOrder(openOrder)
 		assert.NoError(err)
 		assert.Equal(expOrder, order)
 	})
@@ -83,7 +83,7 @@ func Test_orderDetailToGlobal(t *testing.T) {
 		newExpOrder.Quantity = fixedpoint.NewFromFloat(100)
 		newExpOrder.Status = types.OrderStatusPartiallyFilled
 		newExpOrder.OriginalStatus = string(okexapi.OrderStatePartiallyFilled)
-		order, err := orderDetailToGlobal(&newOrder)
+		order, err := orderDetailToGlobalOrder(&newOrder)
 		assert.NoError(err)
 		assert.Equal(&newExpOrder, order)
 	})
@@ -91,14 +91,14 @@ func Test_orderDetailToGlobal(t *testing.T) {
 	t.Run("unexpected order status", func(t *testing.T) {
 		newOrder := *openOrder
 		newOrder.State = "xxx"
-		_, err := orderDetailToGlobal(&newOrder)
+		_, err := orderDetailToGlobalOrder(&newOrder)
 		assert.ErrorContains(err, "xxx")
 	})
 
 	t.Run("unexpected order type", func(t *testing.T) {
 		newOrder := *openOrder
 		newOrder.OrderType = "xxx"
-		_, err := orderDetailToGlobal(&newOrder)
+		_, err := orderDetailToGlobalOrder(&newOrder)
 		assert.ErrorContains(err, "xxx")
 	})
 
@@ -114,7 +114,7 @@ func Test_tradeToGlobal(t *testing.T) {
 	assert.NoError(err)
 
 	t.Run("succeeds with sell/taker", func(t *testing.T) {
-		assert.Equal(tradeToGlobal(res), types.Trade{
+		assert.Equal(toGlobalTrade(res), types.Trade{
 			ID:            uint64(724072849),
 			OrderID:       uint64(665951654130348158),
 			Exchange:      types.ExchangeOKEx,
@@ -134,7 +134,7 @@ func Test_tradeToGlobal(t *testing.T) {
 	t.Run("succeeds with buy/taker", func(t *testing.T) {
 		newRes := res
 		newRes.Side = okexapi.SideTypeBuy
-		assert.Equal(tradeToGlobal(newRes), types.Trade{
+		assert.Equal(toGlobalTrade(newRes), types.Trade{
 			ID:            uint64(724072849),
 			OrderID:       uint64(665951654130348158),
 			Exchange:      types.ExchangeOKEx,
@@ -154,7 +154,7 @@ func Test_tradeToGlobal(t *testing.T) {
 	t.Run("succeeds with sell/maker", func(t *testing.T) {
 		newRes := res
 		newRes.ExecutionType = okexapi.LiquidityTypeMaker
-		assert.Equal(tradeToGlobal(newRes), types.Trade{
+		assert.Equal(toGlobalTrade(newRes), types.Trade{
 			ID:            uint64(724072849),
 			OrderID:       uint64(665951654130348158),
 			Exchange:      types.ExchangeOKEx,
@@ -175,7 +175,7 @@ func Test_tradeToGlobal(t *testing.T) {
 		newRes := res
 		newRes.Side = okexapi.SideTypeBuy
 		newRes.ExecutionType = okexapi.LiquidityTypeMaker
-		assert.Equal(tradeToGlobal(newRes), types.Trade{
+		assert.Equal(toGlobalTrade(newRes), types.Trade{
 			ID:            uint64(724072849),
 			OrderID:       uint64(665951654130348158),
 			Exchange:      types.ExchangeOKEx,

@@ -1,5 +1,6 @@
 package okexapi
 
+// TradeMode: see https://www.okx.com/docs-v5/trick_en/#order-management-trade-mode
 type TradeMode string
 
 const (
