@@ -682,6 +682,28 @@ func (e *Exchange) QueryInterestHistory(ctx context.Context, asset string, start
 	return nil, nil
 }
 
+func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.Deposit, error) {
+	req := e.client.NewGetAssetDepositHistoryRequest().Currency(asset)
+	if endTime != nil {
+		req.Before(*endTime)
+	}
+	if startTime != nil {
+		req.After(*startTime)
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var records []types.Deposit
+	for _, r := range resp {
+		records = append(records, toGlobalDeposit(r))
+	}
+
+	return records, nil
+}
+
 /*
 QueryTrades can query trades in last 3 months, there are no time interval limitations, as long as end_time >= start_time.
 okx does not provide an API to query by trade ID, so we use the bill ID to do it. The trades result is ordered by timestamp.
