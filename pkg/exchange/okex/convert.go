@@ -401,7 +401,7 @@ Status of deposit
 13: Sub-account deposit interception
 14: KYC limit
 */
-func toDepositStatusMessage(state types.StrInt64) string {
+func toDepositStatusMessage(state int64) string {
 	switch state {
 	case 0:
 		return "Waiting for confirmation"
@@ -424,7 +424,7 @@ func toDepositStatusMessage(state types.StrInt64) string {
 	return ""
 }
 
-func toGlobalDepositStatus(state types.StrInt64) types.DepositStatus {
+func toGlobalDepositStatus(state int64) types.DepositStatus {
 	switch state {
 	case 0:
 		return types.DepositPending
@@ -448,8 +448,8 @@ func toGlobalDeposit(record okexapi.DepositRecord) types.Deposit {
 		Address:       record.To,
 		AddressTag:    "",
 		TransactionID: record.DepId,
-		Status:        toGlobalDepositStatus(record.State),
-		RawStatus:     record.State.String(),
+		Status:        toGlobalDepositStatus(int64(record.State)),
+		RawStatus:     fmt.Sprintf("%s (%s)", record.State.String(), toDepositStatusMessage(int64(record.State))),
 		UnlockConfirm: 0,
 		Confirmation:  record.ActualDepBlkConfirm.String(),
 		Network:       strings.ToUpper(record.Chain),
