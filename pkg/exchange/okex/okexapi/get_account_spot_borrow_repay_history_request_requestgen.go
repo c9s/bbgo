@@ -9,7 +9,34 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"strconv"
+	"time"
 )
+
+func (g *GetAccountSpotBorrowRepayHistoryRequest) EventType(eventType MarginEventType) *GetAccountSpotBorrowRepayHistoryRequest {
+	g.eventType = &eventType
+	return g
+}
+
+func (g *GetAccountSpotBorrowRepayHistoryRequest) Currency(currency string) *GetAccountSpotBorrowRepayHistoryRequest {
+	g.currency = &currency
+	return g
+}
+
+func (g *GetAccountSpotBorrowRepayHistoryRequest) After(after time.Time) *GetAccountSpotBorrowRepayHistoryRequest {
+	g.after = &after
+	return g
+}
+
+func (g *GetAccountSpotBorrowRepayHistoryRequest) Before(before time.Time) *GetAccountSpotBorrowRepayHistoryRequest {
+	g.before = &before
+	return g
+}
+
+func (g *GetAccountSpotBorrowRepayHistoryRequest) Limit(limit uint64) *GetAccountSpotBorrowRepayHistoryRequest {
+	g.limit = &limit
+	return g
+}
 
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (g *GetAccountSpotBorrowRepayHistoryRequest) GetQueryParameters() (url.Values, error) {
@@ -26,6 +53,59 @@ func (g *GetAccountSpotBorrowRepayHistoryRequest) GetQueryParameters() (url.Valu
 // GetParameters builds and checks the parameters and return the result in a map object
 func (g *GetAccountSpotBorrowRepayHistoryRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
+	// check eventType field -> json key type
+	if g.eventType != nil {
+		eventType := *g.eventType
+
+		// TEMPLATE check-valid-values
+		switch eventType {
+		case MarginEventTypeAutoBorrow, MarginEventTypeAutoRepay, MarginEventTypeManualBorrow, MarginEventTypeManualRepay:
+			params["type"] = eventType
+
+		default:
+			return nil, fmt.Errorf("type value %v is invalid", eventType)
+
+		}
+		// END TEMPLATE check-valid-values
+
+		// assign parameter of eventType
+		params["type"] = eventType
+	} else {
+	}
+	// check currency field -> json key ccy
+	if g.currency != nil {
+		currency := *g.currency
+
+		// assign parameter of currency
+		params["ccy"] = currency
+	} else {
+	}
+	// check after field -> json key after
+	if g.after != nil {
+		after := *g.after
+
+		// assign parameter of after
+		// convert time.Time to milliseconds time stamp
+		params["after"] = strconv.FormatInt(after.UnixNano()/int64(time.Millisecond), 10)
+	} else {
+	}
+	// check before field -> json key before
+	if g.before != nil {
+		before := *g.before
+
+		// assign parameter of before
+		// convert time.Time to milliseconds time stamp
+		params["before"] = strconv.FormatInt(before.UnixNano()/int64(time.Millisecond), 10)
+	} else {
+	}
+	// check limit field -> json key limit
+	if g.limit != nil {
+		limit := *g.limit
+
+		// assign parameter of limit
+		params["limit"] = limit
+	} else {
+	}
 
 	return params, nil
 }
@@ -117,9 +197,12 @@ func (g *GetAccountSpotBorrowRepayHistoryRequest) GetPath() string {
 // Do generates the request object and send the request object to the API endpoint
 func (g *GetAccountSpotBorrowRepayHistoryRequest) Do(ctx context.Context) ([]MarginHistoryEntry, error) {
 
-	// no body params
+	// empty params for GET operation
 	var params interface{}
-	query := url.Values{}
+	query, err := g.GetParametersQuery()
+	if err != nil {
+		return nil, err
+	}
 
 	var apiURL string
 

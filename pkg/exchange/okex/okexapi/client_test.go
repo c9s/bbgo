@@ -440,4 +440,14 @@ func TestClient_Margin(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("get history for manual borrow", func(t *testing.T) {
+		req := client.NewGetAccountSpotBorrowRepayHistoryRequest()
+		req.Currency("BTC")
+		req.EventType(MarginEventTypeManualBorrow)
+		historyResp, err2 := req.Do(ctx)
+		if assert.NoError(t, err2) {
+			t.Logf("history response: %+v", historyResp)
+		}
+	})
 }

@@ -1,6 +1,8 @@
 package okexapi
 
 import (
+	"time"
+
 	"github.com/c9s/requestgen"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -32,6 +34,12 @@ type MarginHistoryEntry struct {
 //go:generate GetRequest -url "/api/v5/account/spot-borrow-repay-history" -type GetAccountSpotBorrowRepayHistoryRequest -responseDataType []MarginHistoryEntry
 type GetAccountSpotBorrowRepayHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
+
+	eventType *MarginEventType `param:"type"`
+	currency  *string          `param:"ccy"`
+	after     *time.Time       `param:"after,milliseconds"`
+	before    *time.Time       `param:"before,milliseconds"`
+	limit     *uint64          `param:"limit" defaultValue:"100"`
 }
 
 func (c *RestClient) NewGetAccountSpotBorrowRepayHistoryRequest() *GetAccountSpotBorrowRepayHistoryRequest {
