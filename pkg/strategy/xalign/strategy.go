@@ -152,7 +152,7 @@ func (s *Strategy) detectActiveWithdraw(
 	until := time.Now()
 	since := until.Add(-time.Hour * 24)
 	for _, session := range sessions {
-		transferService, ok := session.Exchange.(types.ExchangeTransferHistoryService)
+		transferService, ok := session.Exchange.(types.WithdrawHistoryService)
 		if !ok {
 			continue
 		}
@@ -184,7 +184,7 @@ func (s *Strategy) detectActiveDeposit(
 	until := time.Now()
 	since := until.Add(-time.Hour * 24)
 	for _, session := range sessions {
-		transferService, ok := session.Exchange.(types.ExchangeTransferHistoryService)
+		transferService, ok := session.Exchange.(types.DepositHistoryService)
 		if !ok {
 			continue
 		}
