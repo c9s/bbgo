@@ -44,12 +44,8 @@ func Test_clientOrderIdRegex(t *testing.T) {
 	})
 }
 
-func TestExchange_SubmitOrder(t *testing.T) {
-	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
-	if !ok {
-		t.SkipNow()
-		return
-	}
+func TestExchange_SubmitMarketOrder(t *testing.T) {
+	key, secret, passphrase, _ := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
 
 	ctx := context.Background()
 	ex := New(key, secret, passphrase)
@@ -64,16 +60,21 @@ func TestExchange_SubmitOrder(t *testing.T) {
 
 	market, ok := markets["BTCUSDT"]
 	if assert.True(t, ok) {
+		t.Logf("market: %+v", market)
+
+		ex.MarginSettings.IsMargin = true
+
 		createdOrder, err := ex.SubmitOrder(ctx, types.SubmitOrder{
 			Symbol:   "BTCUSDT",
 			Type:     types.OrderTypeMarket,
 			Price:    Number(105200),
-			Quantity: Number(0.0001), // 10usdt
+			Quantity: fixedpoint.Max(market.MinQuantity, Number(6.0/105200.0)), // 8usdt
 			Side:     types.SideTypeBuy,
 			Market:   market,
 		})
-		assert.NoError(t, err)
-		t.Logf("createdOrder: %+v", createdOrder)
+		if assert.NoError(t, err) {
+			t.Logf("createdOrder: %+v", createdOrder)
+		}
 	}
 }
 
