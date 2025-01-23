@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi"
 	v3 "github.com/c9s/bbgo/pkg/exchange/bybit/bybitapi/v3"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestToGlobalMarket(t *testing.T) {
@@ -64,6 +65,7 @@ func TestToGlobalMarket(t *testing.T) {
 	}
 
 	exp := types.Market{
+		Exchange:        types.ExchangeBybit,
 		Symbol:          inst.Symbol,
 		LocalSymbol:     inst.Symbol,
 		PricePrecision:  8,
