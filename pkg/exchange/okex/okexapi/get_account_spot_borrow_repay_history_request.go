@@ -19,7 +19,7 @@ const (
 	MarginEventTypeManualRepay  MarginEventType = "manual_repay"
 )
 
-type BorrowEntryResponse struct {
+type MarginHistoryEntry struct {
 	AccumulatedBorrowAmount fixedpoint.Value `json:"accBorrowed"`
 
 	Amount   fixedpoint.Value `json:"amt"`
@@ -29,7 +29,7 @@ type BorrowEntryResponse struct {
 	Type MarginEventType            `json:"type"`
 }
 
-//go:generate GetRequest -url "/api/v5/account/spot-borrow-repay-history" -type GetAccountSpotBorrowRepayHistoryRequest -responseDataType []BorrowEntryResponse
+//go:generate GetRequest -url "/api/v5/account/spot-borrow-repay-history" -type GetAccountSpotBorrowRepayHistoryRequest -responseDataType []MarginHistoryEntry
 type GetAccountSpotBorrowRepayHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
