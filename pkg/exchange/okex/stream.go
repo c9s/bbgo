@@ -248,7 +248,7 @@ func (s *Stream) handleOrderDetailsEvent(orderTrades []OrderTradeEvent) {
 			}
 		}
 
-		order, err := orderDetailToGlobal(&evt.OrderDetail)
+		order, err := orderDetailToGlobalOrder(&evt.OrderDetail)
 		if err != nil {
 			if tradeLogLimiter.Allow() {
 				log.WithError(err).Errorf("failed to convert global order")

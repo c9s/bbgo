@@ -136,7 +136,7 @@ func toLocalSideType(side types.SideType) okexapi.SideType {
 	return okexapi.SideType(strings.ToLower(string(side)))
 }
 
-func tradeToGlobal(trade okexapi.Trade) types.Trade {
+func toGlobalTrade(trade okexapi.Trade) types.Trade {
 	side := toGlobalSide(trade.Side)
 	return types.Trade{
 		ID:            uint64(trade.TradeId),
@@ -153,8 +153,8 @@ func tradeToGlobal(trade okexapi.Trade) types.Trade {
 		// The fees obtained from the exchange are negative, hence they are forcibly converted to positive.
 		Fee:         trade.Fee.Abs(),
 		FeeCurrency: trade.FeeCurrency,
-		IsMargin:    false,
-		IsFutures:   false,
+		IsMargin:    trade.InstrumentType == okexapi.InstrumentTypeMargin,
+		IsFutures:   trade.InstrumentType == okexapi.InstrumentTypeFutures,
 		IsIsolated:  false,
 	}
 }
@@ -178,7 +178,7 @@ func processMarketBuySize(o *okexapi.OrderDetail) (fixedpoint.Value, error) {
 	}
 }
 
-func orderDetailToGlobal(order *okexapi.OrderDetail) (*types.Order, error) {
+func orderDetailToGlobalOrder(order *okexapi.OrderDetail) (*types.Order, error) {
 	side := toGlobalSide(order.Side)
 
 	orderType, err := toGlobalOrderType(order.OrderType)
@@ -230,6 +230,8 @@ func orderDetailToGlobal(order *okexapi.OrderDetail) (*types.Order, error) {
 		IsWorking:        order.State.IsWorking(),
 		CreationTime:     types.Time(order.CreatedTime),
 		UpdateTime:       types.Time(order.UpdatedTime),
+		IsMargin:         order.InstrumentType == okexapi.InstrumentTypeMargin,
+		IsFutures:        order.InstrumentType == okexapi.InstrumentTypeFutures,
 	}, nil
 }
 
