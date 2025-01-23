@@ -251,34 +251,32 @@ func toGlobalOrderStatus(state okexapi.OrderState) (types.OrderStatus, error) {
 	return "", fmt.Errorf("unknown or unsupported okex order state: %s", state)
 }
 
+var localOrderTypeMap = map[types.OrderType]okexapi.OrderType{
+	types.OrderTypeMarket:     okexapi.OrderTypeMarket,
+	types.OrderTypeLimit:      okexapi.OrderTypeLimit,
+	types.OrderTypeLimitMaker: okexapi.OrderTypePostOnly,
+}
+
 func toLocalOrderType(orderType types.OrderType) (okexapi.OrderType, error) {
-	switch orderType {
-	case types.OrderTypeMarket:
-		return okexapi.OrderTypeMarket, nil
-
-	case types.OrderTypeLimit:
-		return okexapi.OrderTypeLimit, nil
-
-	case types.OrderTypeLimitMaker:
-		return okexapi.OrderTypePostOnly, nil
-
+	if ot, ok := localOrderTypeMap[orderType]; ok {
+		return ot, nil
 	}
 
 	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
 }
 
+var globalOrderTypeMap = map[okexapi.OrderType]types.OrderType{
+	okexapi.OrderTypeMarket:   types.OrderTypeMarket,
+	okexapi.OrderTypeLimit:    types.OrderTypeLimit,
+	okexapi.OrderTypePostOnly: types.OrderTypeLimitMaker,
+	okexapi.OrderTypeFOK:      types.OrderTypeLimit,
+	okexapi.OrderTypeIOC:      types.OrderTypeLimit,
+}
+
 func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
 	// IOC, FOK are only allowed with limit order type, so we assume the order type is always limit order for FOK, IOC orders
-	switch orderType {
-	case okexapi.OrderTypeMarket:
-		return types.OrderTypeMarket, nil
-
-	case okexapi.OrderTypeLimit, okexapi.OrderTypeFOK, okexapi.OrderTypeIOC:
-		return types.OrderTypeLimit, nil
-
-	case okexapi.OrderTypePostOnly:
-		return types.OrderTypeLimitMaker, nil
-
+	if ot, ok := globalOrderTypeMap[orderType]; ok {
+		return ot, nil
 	}
 
 	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
