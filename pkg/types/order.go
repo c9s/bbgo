@@ -120,12 +120,16 @@ const (
 
 	// OrderStatusRejected means the order is not placed successfully, it's rejected by the api
 	OrderStatusRejected OrderStatus = "REJECTED"
+
+	// OrderStatusExpired means the order is expired, it's an end state.
+	OrderStatusExpired OrderStatus = "EXPIRED"
 )
 
 func (o OrderStatus) Closed() bool {
 	return o == OrderStatusFilled ||
 		o == OrderStatusCanceled ||
-		o == OrderStatusRejected
+		o == OrderStatusRejected ||
+		o == OrderStatusExpired
 }
 
 type SubmitOrder struct {

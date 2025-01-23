@@ -87,11 +87,11 @@ func toLocalFuturesOrderType(orderType types.OrderType) (futures.OrderType, erro
 	case types.OrderTypeLimit, types.OrderTypeLimitMaker:
 		return futures.OrderTypeLimit, nil
 
-	// case types.OrderTypeStopLimit:
-	// 	return futures.OrderTypeStopLossLimit, nil //TODO
+	case types.OrderTypeStopLimit:
+		return futures.OrderTypeStop, nil
 
-	// case types.OrderTypeStopMarket:
-	// 	return futures.OrderTypeStopLoss, nil //TODO
+	case types.OrderTypeStopMarket:
+		return futures.OrderTypeStopMarket, nil
 
 	case types.OrderTypeMarket:
 		return futures.OrderTypeMarket, nil
@@ -223,6 +223,9 @@ func toGlobalFuturesOrderType(orderType futures.OrderType) types.OrderType {
 
 	case futures.OrderTypeLimit:
 		return types.OrderTypeLimit
+
+	case futures.OrderTypeStop:
+		return types.OrderTypeStopLimit
 
 	case futures.OrderTypeMarket:
 		return types.OrderTypeMarket
