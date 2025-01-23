@@ -210,22 +210,28 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	bals, err := e.QueryAccountBalances(ctx)
+	accounts, err := e.queryAccountBalance(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	if len(accounts) == 0 {
+		return nil, fmt.Errorf("account balance is empty")
+	}
+
+	balances := toGlobalBalance(&accounts[0])
 	account := types.NewAccount()
-	account.UpdateBalances(bals)
+	account.UpdateBalances(balances)
+
+	// for margin account
+	account.MarginRatio = accounts[0].MarginRatio
+	account.TotalAccountValue = accounts[0].TotalEquityInUSD
+
 	return account, nil
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	if err := queryAccountLimiter.Wait(ctx); err != nil {
-		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
-	}
-
-	accountBalances, err := e.client.NewGetAccountBalanceRequest().Do(ctx)
+	accountBalances, err := e.queryAccountBalance(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -237,6 +243,14 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	return toGlobalBalance(&accountBalances[0]), nil
 }
 
+func (e *Exchange) queryAccountBalance(ctx context.Context) ([]okexapi.Account, error) {
+	if err := queryAccountLimiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("account rate limiter wait error: %w", err)
+	}
+
+	return e.client.NewGetAccountBalanceRequest().Do(ctx)
+}
+
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
 	orderReq := e.client.NewPlaceOrderRequest()
 
@@ -245,7 +259,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	orderReq.Size(order.Market.FormatQuantity(order.Quantity))
 
 	if e.MarginSettings.IsMargin {
-		orderReq.TradeMode(okexapi.TradeModeCross)
+		// okx market order with trade mode cross will be rejected:
+		//   "The corresponding product of this BTC-USDT doesn't support the tgtCcy parameter"
+		//
+		// orderReq.TradeMode(okexapi.TradeModeCross)
 	}
 
 	// set price field for limit orders

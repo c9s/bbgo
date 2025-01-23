@@ -66,15 +66,17 @@ func TestClient_GetMarketTicker(t *testing.T) {
 	t.Logf("tickers: %+v", tickers)
 }
 
-func TestClient_GetAcountInfo(t *testing.T) {
+func TestClient_GetAccountBalance(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
 	req := client.NewGetAccountBalanceRequest()
 
-	acct, err := req.Do(ctx)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, acct)
-	t.Logf("acct: %+v", acct)
+	resp, err := req.Do(ctx)
+	if assert.NoError(t, err) {
+		assert.NotEmpty(t, resp)
+		t.Logf("account balance: %+v", resp[0])
+		debugJson(t, resp[0])
+	}
 }
 
 func TestClient_GetFundingRateRequest(t *testing.T) {
@@ -463,10 +465,15 @@ func TestClient_Margin(t *testing.T) {
 			t.Logf("positions: %+v", resp)
 
 			if len(resp) > 0 {
-				out, err2 := json.MarshalIndent(resp[0], "", "  ")
-				assert.NoError(t, err2)
-				t.Logf("positions: %s", out)
+				debugJson(t, resp[0])
 			}
 		}
 	})
+}
+
+func debugJson(t *testing.T, a any) {
+	out, err := json.MarshalIndent(a, "", "  ")
+	if assert.NoError(t, err) {
+		t.Log(string(out))
+	}
 }

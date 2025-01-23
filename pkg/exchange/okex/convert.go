@@ -40,11 +40,15 @@ func toGlobalTicker(marketTicker okexapi.MarketTicker) *types.Ticker {
 
 func toGlobalBalance(account *okexapi.Account) types.BalanceMap {
 	var balanceMap = types.BalanceMap{}
-	for _, balanceDetail := range account.Details {
-		balanceMap[balanceDetail.Currency] = types.Balance{
-			Currency:  balanceDetail.Currency,
-			Available: balanceDetail.CashBalance,
-			Locked:    balanceDetail.Frozen,
+	for _, detail := range account.Details {
+
+		balanceMap[detail.Currency] = types.Balance{
+			Currency:  detail.Currency,
+			Available: detail.Available,
+			Locked:    detail.FrozenBalance,
+			Interest:  detail.Interest,        // accrued interest
+			Borrowed:  detail.Liability.Abs(), // okx liability does not include the accrued interest
+			NetAsset:  detail.Equity,
 		}
 	}
 	return balanceMap
