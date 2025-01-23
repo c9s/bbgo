@@ -445,7 +445,7 @@ func toGlobalDeposit(record okexapi.DepositRecord) types.Deposit {
 		Time:          types.Time(record.Ts),
 		Amount:        record.Amount,
 		Asset:         record.Currency,
-		Address:       record.From,
+		Address:       record.To,
 		AddressTag:    "",
 		TransactionID: record.DepId,
 		Status:        toGlobalDepositStatus(record.State),
