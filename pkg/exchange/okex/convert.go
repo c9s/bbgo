@@ -362,3 +362,25 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 		IsIsolated:       false,
 	}, nil
 }
+
+func toGlobalMarginLoan(record okexapi.MarginHistoryEntry) types.MarginLoan {
+	return types.MarginLoan{
+		Exchange:       types.ExchangeOKEx,
+		TransactionID:  uint64(record.Ts.Time().UnixMilli()),
+		Asset:          record.Currency,
+		Principle:      record.Amount,
+		Time:           types.Time(record.Ts.Time()),
+		IsolatedSymbol: "",
+	}
+}
+
+func toGlobalMarginRepay(record okexapi.MarginHistoryEntry) types.MarginRepay {
+	return types.MarginRepay{
+		Exchange:       types.ExchangeOKEx,
+		TransactionID:  uint64(record.Ts.Time().UnixMilli()),
+		Asset:          record.Currency,
+		Principle:      record.Amount,
+		Time:           types.Time(record.Ts.Time()),
+		IsolatedSymbol: "",
+	}
+}

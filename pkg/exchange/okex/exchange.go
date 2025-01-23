@@ -607,6 +607,64 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 	return resp[0].MaxLoan, nil
 }
 
+func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginLoan, error) {
+	req := e.client.NewGetAccountSpotBorrowRepayHistoryRequest().Currency(asset)
+	if endTime != nil {
+		req.Before(*endTime)
+	}
+	if startTime != nil {
+		req.After(*startTime)
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var records []types.MarginLoan
+	for _, r := range resp {
+		switch r.Type {
+		case okexapi.MarginEventTypeManualBorrow, okexapi.MarginEventTypeAutoBorrow:
+			records = append(records, toGlobalMarginLoan(r))
+		}
+	}
+
+	return records, nil
+}
+
+func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginRepay, error) {
+	req := e.client.NewGetAccountSpotBorrowRepayHistoryRequest().Currency(asset)
+	if endTime != nil {
+		req.Before(*endTime)
+	}
+	if startTime != nil {
+		req.After(*startTime)
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var records []types.MarginRepay
+	for _, r := range resp {
+		switch r.Type {
+		case okexapi.MarginEventTypeManualRepay, okexapi.MarginEventTypeAutoRepay:
+			records = append(records, toGlobalMarginRepay(r))
+		}
+	}
+
+	return records, nil
+}
+
+func (e *Exchange) QueryLiquidationHistory(ctx context.Context, startTime, endTime *time.Time) ([]types.MarginLiquidation, error) {
+	return nil, nil
+}
+
+func (e *Exchange) QueryInterestHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginInterest, error) {
+	return nil, nil
+}
+
 /*
 QueryTrades can query trades in last 3 months, there are no time interval limitations, as long as end_time >= start_time.
 okx does not provide an API to query by trade ID, so we use the bill ID to do it. The trades result is ordered by timestamp.
