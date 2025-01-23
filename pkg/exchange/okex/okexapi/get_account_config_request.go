@@ -24,19 +24,21 @@ type AccountConfig struct {
 	Label                 string         `json:"label"`
 	Level                 string         `json:"level"`
 	LevelTmp              string         `json:"levelTmp"`
-	LiquidationGear       string         `json:"liquidationGear"`
-	MainUid               string         `json:"mainUid"`
-	MgnIsoMode            string         `json:"mgnIsoMode"`
-	OpAuth                string         `json:"opAuth"`
-	Perm                  string         `json:"perm"`
-	PosMode               string         `json:"posMode"`
-	RoleType              types.StrInt64 `json:"roleType"`
-	SpotBorrowAutoRepay   bool           `json:"spotBorrowAutoRepay"`
-	SpotOffsetType        string         `json:"spotOffsetType"`
-	SpotRoleType          string         `json:"spotRoleType"`
-	SpotTraderInsts       []interface{}  `json:"spotTraderInsts"`
-	TraderInsts           []interface{}  `json:"traderInsts"`
-	Uid                   string         `json:"uid"`
+
+	LiquidationGear types.StrInt64 `json:"liquidationGear"`
+
+	MainUid             string         `json:"mainUid"`
+	MarginIsoMode       string         `json:"mgnIsoMode"`
+	OpAuth              string         `json:"opAuth"`
+	Perm                string         `json:"perm"`
+	PosMode             string         `json:"posMode"`
+	RoleType            types.StrInt64 `json:"roleType"`
+	SpotBorrowAutoRepay bool           `json:"spotBorrowAutoRepay"`
+	SpotOffsetType      string         `json:"spotOffsetType"`
+	SpotRoleType        string         `json:"spotRoleType"`
+	SpotTraderInsts     []interface{}  `json:"spotTraderInsts"`
+	TraderInsts         []interface{}  `json:"traderInsts"`
+	Uid                 string         `json:"uid"`
 }
 
 //go:generate GetRequest -url "/api/v5/account/config" -type GetAccountConfigRequest -responseDataType []AccountConfig

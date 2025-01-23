@@ -40,11 +40,15 @@ func toGlobalTicker(marketTicker okexapi.MarketTicker) *types.Ticker {
 
 func toGlobalBalance(account *okexapi.Account) types.BalanceMap {
 	var balanceMap = types.BalanceMap{}
-	for _, balanceDetail := range account.Details {
-		balanceMap[balanceDetail.Currency] = types.Balance{
-			Currency:  balanceDetail.Currency,
-			Available: balanceDetail.CashBalance,
-			Locked:    balanceDetail.Frozen,
+	for _, detail := range account.Details {
+
+		balanceMap[detail.Currency] = types.Balance{
+			Currency:  detail.Currency,
+			Available: detail.Available,
+			Locked:    detail.FrozenBalance,
+			Interest:  detail.Interest,        // accrued interest
+			Borrowed:  detail.Liability.Abs(), // okx liability does not include the accrued interest
+			NetAsset:  detail.Equity,
 		}
 	}
 	return balanceMap
@@ -132,7 +136,7 @@ func toLocalSideType(side types.SideType) okexapi.SideType {
 	return okexapi.SideType(strings.ToLower(string(side)))
 }
 
-func tradeToGlobal(trade okexapi.Trade) types.Trade {
+func toGlobalTrade(trade okexapi.Trade) types.Trade {
 	side := toGlobalSide(trade.Side)
 	return types.Trade{
 		ID:            uint64(trade.TradeId),
@@ -149,8 +153,8 @@ func tradeToGlobal(trade okexapi.Trade) types.Trade {
 		// The fees obtained from the exchange are negative, hence they are forcibly converted to positive.
 		Fee:         trade.Fee.Abs(),
 		FeeCurrency: trade.FeeCurrency,
-		IsMargin:    false,
-		IsFutures:   false,
+		IsMargin:    trade.InstrumentType == okexapi.InstrumentTypeMargin,
+		IsFutures:   trade.InstrumentType == okexapi.InstrumentTypeFutures,
 		IsIsolated:  false,
 	}
 }
@@ -174,7 +178,7 @@ func processMarketBuySize(o *okexapi.OrderDetail) (fixedpoint.Value, error) {
 	}
 }
 
-func orderDetailToGlobal(order *okexapi.OrderDetail) (*types.Order, error) {
+func orderDetailToGlobalOrder(order *okexapi.OrderDetail) (*types.Order, error) {
 	side := toGlobalSide(order.Side)
 
 	orderType, err := toGlobalOrderType(order.OrderType)
@@ -226,6 +230,8 @@ func orderDetailToGlobal(order *okexapi.OrderDetail) (*types.Order, error) {
 		IsWorking:        order.State.IsWorking(),
 		CreationTime:     types.Time(order.CreatedTime),
 		UpdateTime:       types.Time(order.UpdatedTime),
+		IsMargin:         order.InstrumentType == okexapi.InstrumentTypeMargin,
+		IsFutures:        order.InstrumentType == okexapi.InstrumentTypeFutures,
 	}, nil
 }
 
@@ -245,34 +251,32 @@ func toGlobalOrderStatus(state okexapi.OrderState) (types.OrderStatus, error) {
 	return "", fmt.Errorf("unknown or unsupported okex order state: %s", state)
 }
 
+var localOrderTypeMap = map[types.OrderType]okexapi.OrderType{
+	types.OrderTypeMarket:     okexapi.OrderTypeMarket,
+	types.OrderTypeLimit:      okexapi.OrderTypeLimit,
+	types.OrderTypeLimitMaker: okexapi.OrderTypePostOnly,
+}
+
 func toLocalOrderType(orderType types.OrderType) (okexapi.OrderType, error) {
-	switch orderType {
-	case types.OrderTypeMarket:
-		return okexapi.OrderTypeMarket, nil
-
-	case types.OrderTypeLimit:
-		return okexapi.OrderTypeLimit, nil
-
-	case types.OrderTypeLimitMaker:
-		return okexapi.OrderTypePostOnly, nil
-
+	if ot, ok := localOrderTypeMap[orderType]; ok {
+		return ot, nil
 	}
 
 	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
 }
 
+var globalOrderTypeMap = map[okexapi.OrderType]types.OrderType{
+	okexapi.OrderTypeMarket:   types.OrderTypeMarket,
+	okexapi.OrderTypeLimit:    types.OrderTypeLimit,
+	okexapi.OrderTypePostOnly: types.OrderTypeLimitMaker,
+	okexapi.OrderTypeFOK:      types.OrderTypeLimit,
+	okexapi.OrderTypeIOC:      types.OrderTypeLimit,
+}
+
 func toGlobalOrderType(orderType okexapi.OrderType) (types.OrderType, error) {
 	// IOC, FOK are only allowed with limit order type, so we assume the order type is always limit order for FOK, IOC orders
-	switch orderType {
-	case okexapi.OrderTypeMarket:
-		return types.OrderTypeMarket, nil
-
-	case okexapi.OrderTypeLimit, okexapi.OrderTypeFOK, okexapi.OrderTypeIOC:
-		return types.OrderTypeLimit, nil
-
-	case okexapi.OrderTypePostOnly:
-		return types.OrderTypeLimitMaker, nil
-
+	if ot, ok := globalOrderTypeMap[orderType]; ok {
+		return ot, nil
 	}
 
 	return "", fmt.Errorf("unknown or unsupported okex order type: %s", orderType)
@@ -361,4 +365,26 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 		IsMargin:         isMargin,
 		IsIsolated:       false,
 	}, nil
+}
+
+func toGlobalMarginLoan(record okexapi.MarginHistoryEntry) types.MarginLoan {
+	return types.MarginLoan{
+		Exchange:       types.ExchangeOKEx,
+		TransactionID:  uint64(record.Ts.Time().UnixMilli()),
+		Asset:          record.Currency,
+		Principle:      record.Amount,
+		Time:           types.Time(record.Ts.Time()),
+		IsolatedSymbol: "",
+	}
+}
+
+func toGlobalMarginRepay(record okexapi.MarginHistoryEntry) types.MarginRepay {
+	return types.MarginRepay{
+		Exchange:       types.ExchangeOKEx,
+		TransactionID:  uint64(record.Ts.Time().UnixMilli()),
+		Asset:          record.Currency,
+		Principle:      record.Amount,
+		Time:           types.Time(record.Ts.Time()),
+		IsolatedSymbol: "",
+	}
 }

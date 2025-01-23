@@ -2,6 +2,7 @@ package okexapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -65,15 +66,17 @@ func TestClient_GetMarketTicker(t *testing.T) {
 	t.Logf("tickers: %+v", tickers)
 }
 
-func TestClient_GetAcountInfo(t *testing.T) {
+func TestClient_GetAccountBalance(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()
 	req := client.NewGetAccountBalanceRequest()
 
-	acct, err := req.Do(ctx)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, acct)
-	t.Logf("acct: %+v", acct)
+	resp, err := req.Do(ctx)
+	if assert.NoError(t, err) {
+		assert.NotEmpty(t, resp)
+		t.Logf("account balance: %+v", resp[0])
+		debugJson(t, resp[0])
+	}
 }
 
 func TestClient_GetFundingRateRequest(t *testing.T) {
@@ -392,6 +395,8 @@ func TestClient_Margin(t *testing.T) {
 			Currency("BTC").Do(ctx)
 		if assert.NoError(t, err) {
 			t.Logf("response: %+v", resp)
+			assert.Equal(t, "BTC", resp[0].Ccy)
+			assert.True(t, resp[0].MaxLoan.Sign() > 0)
 		}
 	})
 
@@ -427,6 +432,11 @@ func TestClient_Margin(t *testing.T) {
 		if assert.NoError(t, err) {
 			t.Logf("borrow response: %+v", resp)
 
+			positionRiskResp, err2 := client.NewGetAccountPositionRiskRequest().Do(ctx)
+			if assert.NoError(t, err2) {
+				t.Logf("position risk response: %+v", positionRiskResp)
+			}
+
 			time.Sleep(1 * time.Second)
 			repayResp, repayErr := client.NewSpotManualBorrowRepayRequest().
 				Currency("BTC").
@@ -438,4 +448,32 @@ func TestClient_Margin(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("get history for manual borrow", func(t *testing.T) {
+		req := client.NewGetAccountSpotBorrowRepayHistoryRequest()
+		req.Currency("BTC")
+		req.EventType(MarginEventTypeManualBorrow)
+		historyResp, err2 := req.Do(ctx)
+		if assert.NoError(t, err2) {
+			t.Logf("history response: %+v", historyResp)
+		}
+	})
+
+	t.Run("get account positions", func(t *testing.T) {
+		resp, err := client.NewGetAccountPositionsRequest().InstType(InstrumentTypeMargin).Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("positions: %+v", resp)
+
+			if len(resp) > 0 {
+				debugJson(t, resp[0])
+			}
+		}
+	})
+}
+
+func debugJson(t *testing.T, a any) {
+	out, err := json.MarshalIndent(a, "", "  ")
+	if assert.NoError(t, err) {
+		t.Log(string(out))
+	}
 }
