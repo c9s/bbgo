@@ -190,7 +190,7 @@ func TestExchange_QueryTrades(t *testing.T) {
 				trade := &okexapi.Trade{}
 				err := json.Unmarshal([]byte(dataStr), &trade)
 				assert.NoError(err)
-				expTrades = append(expTrades, tradeToGlobal(*trade))
+				expTrades = append(expTrades, toGlobalTrade(*trade))
 			}
 
 			transport.GET(threeDayUrl, func(req *http.Request) (*http.Response, error) {
@@ -315,7 +315,7 @@ func TestExchange_QueryTrades(t *testing.T) {
 				trade := &okexapi.Trade{}
 				err := json.Unmarshal([]byte(dataStr), &trade)
 				assert.NoError(err)
-				expTrades = append(expTrades, tradeToGlobal(*trade))
+				expTrades = append(expTrades, toGlobalTrade(*trade))
 			}
 
 			transport.GET(historyUrl, func(req *http.Request) (*http.Response, error) {

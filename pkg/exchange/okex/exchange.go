@@ -363,7 +363,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		}
 
 		for _, o := range openOrders {
-			o, err := orderDetailToGlobal(&o.OrderDetail)
+			o, err := orderDetailToGlobalOrder(&o.OrderDetail)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert order, err: %v", err)
 			}
@@ -506,7 +506,7 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (tr
 	}
 
 	for _, trade := range response {
-		trades = append(trades, tradeToGlobal(trade))
+		trades = append(trades, toGlobalTrade(trade))
 	}
 
 	return trades, nil
@@ -563,7 +563,7 @@ func (e *Exchange) QueryClosedOrders(
 	}
 
 	for _, order := range res {
-		o, err2 := orderDetailToGlobal(&order)
+		o, err2 := orderDetailToGlobalOrder(&order)
 		if err2 != nil {
 			err = multierr.Append(err, err2)
 			continue
@@ -776,7 +776,7 @@ func getTrades(
 		}
 
 		for _, trade := range response {
-			trades = append(trades, tradeToGlobal(trade))
+			trades = append(trades, toGlobalTrade(trade))
 		}
 
 		tradeLen := int64(len(response))
