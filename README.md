@@ -130,7 +130,7 @@ the implementation.
 ## Supported Exchanges
 
 - Binance Spot Exchange (and binance.us)
-- OKEx Spot Exchange
+- OKX Spot Exchange (previous OKEX)
 - Kucoin Spot Exchange
 - MAX Spot Exchange (located in Taiwan)
 - Bitget Exchange
@@ -142,7 +142,7 @@ the implementation.
 
 ## Requirements
 
-* Go SDK 1.20
+* Go SDK 1.22
 
 * Linux / MacOS / Windows (WSL)
 
