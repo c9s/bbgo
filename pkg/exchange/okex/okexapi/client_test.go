@@ -392,6 +392,8 @@ func TestClient_Margin(t *testing.T) {
 			Currency("BTC").Do(ctx)
 		if assert.NoError(t, err) {
 			t.Logf("response: %+v", resp)
+			assert.Equal(t, "BTC", resp[0].Ccy)
+			assert.True(t, resp[0].MaxLoan.Sign() > 0)
 		}
 	})
 
