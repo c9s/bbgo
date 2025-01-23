@@ -430,11 +430,16 @@ func TestExchange_Margin(t *testing.T) {
 	ctx := context.Background()
 	ex := New(key, secret, passphrase)
 
-	t.Run("QueryMarginAssetMaxBorrowable", func(t *testing.T) {
-		maxBorrowable, err := ex.QueryMarginAssetMaxBorrowable(ctx, "BTC")
-		if assert.NoError(t, err) {
-			assert.NotZero(t, maxBorrowable.Float64())
-			t.Logf("max borrowable: %f", maxBorrowable.Float64())
+	maxBorrowable, err := ex.QueryMarginAssetMaxBorrowable(ctx, "BTC")
+	if assert.NoError(t, err) {
+		assert.NotZero(t, maxBorrowable.Float64())
+		t.Logf("max borrowable: %f", maxBorrowable.Float64())
+
+		err2 := ex.BorrowMarginAsset(ctx, "BTC", maxBorrowable)
+		if assert.NoError(t, err2) {
+			time.Sleep(time.Second)
+			err3 := ex.RepayMarginAsset(ctx, "BTC", maxBorrowable)
+			assert.NoError(t, err3)
 		}
-	})
+	}
 }

@@ -591,27 +591,20 @@ func (e *Exchange) BorrowMarginAsset(ctx context.Context, asset string, amount f
 }
 
 func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (fixedpoint.Value, error) {
-	req := e.client.NewGetAccountInterestLimitsRequest()
-	req.Currency(asset)
+	req := e.client.NewGetAccountMaxLoanRequest()
+	req.Currency(asset).
+		MarginMode(okexapi.MarginModeCross)
 
 	resp, err := req.Do(ctx)
 	if err != nil {
 		return fixedpoint.Zero, err
 	}
 
-	log.Infof("%+v", resp)
-
-	if len(resp) == 0 || len(resp[0].Records) == 0 {
+	if len(resp) == 0 {
 		return fixedpoint.Zero, nil
 	}
 
-	for _, record := range resp[0].Records {
-		if strings.ToUpper(record.Currency) == asset {
-			return record.LoanQuota, nil
-		}
-	}
-
-	return fixedpoint.Zero, nil
+	return resp[0].MaxLoan, nil
 }
 
 /*
