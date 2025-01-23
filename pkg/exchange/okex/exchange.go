@@ -219,13 +219,27 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, fmt.Errorf("account balance is empty")
 	}
 
+	accountConfigs, err := e.client.NewGetAccountConfigRequest().Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(accountConfigs) == 0 {
+		return nil, fmt.Errorf("account config is empty")
+	}
+
 	balances := toGlobalBalance(&accounts[0])
 	account := types.NewAccount()
 	account.UpdateBalances(balances)
 
 	// for margin account
 	account.MarginRatio = accounts[0].MarginRatio
+	account.MarginLevel = accounts[0].MarginRatio
 	account.TotalAccountValue = accounts[0].TotalEquityInUSD
+
+	if e.MarginSettings.IsMargin && !accountConfigs[0].EnableSpotBorrow {
+		log.Warnf("margin is set, but okx enableSpotBorrow field is false, please turn on auto-borrow from the okx UI")
+	}
 
 	return account, nil
 }
@@ -680,6 +694,28 @@ func (e *Exchange) QueryLiquidationHistory(ctx context.Context, startTime, endTi
 
 func (e *Exchange) QueryInterestHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginInterest, error) {
 	return nil, nil
+}
+
+func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.Deposit, error) {
+	req := e.client.NewGetAssetDepositHistoryRequest().Currency(asset)
+	if endTime != nil {
+		req.Before(*endTime)
+	}
+	if startTime != nil {
+		req.After(*startTime)
+	}
+
+	resp, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var records []types.Deposit
+	for _, r := range resp {
+		records = append(records, toGlobalDeposit(r))
+	}
+
+	return records, nil
 }
 
 /*
