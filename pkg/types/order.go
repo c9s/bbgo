@@ -290,6 +290,17 @@ type Order struct {
 	IsIsolated bool `json:"isIsolated,omitempty" db:"is_isolated"`
 }
 
+func (o *Order) GetRemainingQuantity() fixedpoint.Value {
+	return o.Quantity.Sub(o.ExecutedQuantity)
+}
+
+func (o Order) AsQuery() OrderQuery {
+	return OrderQuery{
+		Symbol:  o.Symbol,
+		OrderID: strconv.FormatUint(o.OrderID, 10),
+	}
+}
+
 func (o Order) CsvHeader() []string {
 	return []string{
 		"order_id",

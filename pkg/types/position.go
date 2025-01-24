@@ -202,6 +202,13 @@ func (p *Position) IsDust(a ...fixedpoint.Value) bool {
 	return p.Market.IsDustQuantity(base, price)
 }
 
+func (p *Position) GetAverageCost() (averageCost fixedpoint.Value) {
+	p.Lock()
+	averageCost = p.AverageCost
+	p.Unlock()
+	return averageCost
+}
+
 // GetBase locks the mutex and return the base quantity
 // The base quantity can be negative
 func (p *Position) GetBase() (base fixedpoint.Value) {
@@ -375,6 +382,16 @@ func (p *Position) Type() PositionType {
 		return PositionShort
 	}
 	return PositionClosed
+}
+
+func (p *Position) Side() SideType {
+	if p.Base.Sign() > 0 {
+		return SideTypeBuy
+	} else if p.Base.Sign() < 0 {
+		return SideTypeSell
+	}
+
+	return SideTypeNone
 }
 
 func (p *Position) SlackAttachment() slack.Attachment {

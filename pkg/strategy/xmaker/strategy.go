@@ -121,23 +121,6 @@ type SignalMargin struct {
 	Threshold float64         `json:"threshold,omitempty"`
 }
 
-type DelayedHedge struct {
-	// EnableDelayHedge enables the delay hedge feature
-	Enabled bool `json:"enabled"`
-
-	// MaxDelayDuration is the maximum delay duration to hedge the position
-	MaxDelayDuration types.Duration `json:"maxDelay"`
-
-	// FixedDelayDuration is the fixed delay duration
-	FixedDelayDuration types.Duration `json:"fixedDelay"`
-
-	// SignalThreshold is the signal threshold to trigger the delay hedge
-	SignalThreshold float64 `json:"signalThreshold"`
-
-	// DynamicDelayScale is the dynamic delay scale
-	DynamicDelayScale *bbgo.SlideRule `json:"dynamicDelayScale,omitempty"`
-}
-
 type Strategy struct {
 	Environment *bbgo.Environment
 
@@ -180,6 +163,8 @@ type Strategy struct {
 	DelayHedgeSignalThreshold float64        `json:"delayHedgeSignalThreshold"`
 
 	DelayedHedge *DelayedHedge `json:"delayedHedge,omitempty"`
+
+	SpreadMaker *SpreadMaker `json:"spreadMaker,omitempty"`
 
 	EnableBollBandMargin bool             `json:"enableBollBandMargin"`
 	BollBandInterval     types.Interval   `json:"bollBandInterval"`
@@ -1425,7 +1410,6 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 	}
 
 	signal := s.lastAggregatedSignal.Get()
-
 	signalAbs := math.Abs(signal)
 	if signalAbs < s.DelayedHedge.SignalThreshold {
 		return false
@@ -1464,15 +1448,78 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 }
 
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
-	side := types.SideTypeBuy
 	if pos.IsZero() {
 		return
 	}
 
-	quantity := pos.Abs()
-
+	side := types.SideTypeBuy
 	if pos.Sign() < 0 {
 		side = types.SideTypeSell
+	}
+
+	now := time.Now()
+	signal := s.lastAggregatedSignal.Get()
+
+	if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.makerBook != nil {
+		if makerBid, makerAsk, hasPrice := s.makerBook.BestBidAndAsk(); hasPrice {
+			if makerOrderForm, ok := s.SpreadMaker.canSpreadMaking(signal, s.Position, s.makerMarket, makerBid.Price, makerAsk.Price); ok {
+
+				spreadMakerCounterMetrics.With(s.metricsLabels).Inc()
+
+				s.logger.Infof("spread maker order form: %+v", makerOrderForm)
+
+				// if we have the existing order, cancel it and return the covered position
+				// keptOrder means we kept the current order and we don't need to place a new order
+				keptOrder := false
+				curOrder, hasOrder := s.SpreadMaker.getOrder()
+				if hasOrder {
+					keptOrder = s.SpreadMaker.shouldKeepOrder(curOrder, now)
+					if !keptOrder {
+						s.logger.Infof("canceling current spread maker order...")
+
+						finalOrder, err := s.SpreadMaker.cancelAndQueryOrder(ctx)
+						if err != nil {
+							s.logger.WithError(err).Errorf("spread maker: cancel order error")
+						}
+
+						if finalOrder != nil {
+							spreadMakerVolumeMetrics.With(s.metricsLabels).Add(finalOrder.ExecutedQuantity.Float64())
+							spreadMakerQuoteVolumeMetrics.With(s.metricsLabels).Add(finalOrder.ExecutedQuantity.Mul(finalOrder.Price).Float64())
+
+							remainingQuantity := finalOrder.GetRemainingQuantity()
+
+							s.logger.Infof("returning remaining quantity %f to the covered position", remainingQuantity.Float64())
+							switch finalOrder.Side {
+							case types.SideTypeSell:
+								s.coveredPosition.Sub(remainingQuantity)
+							case types.SideTypeBuy:
+								s.coveredPosition.Add(remainingQuantity)
+
+							}
+						}
+					}
+				}
+
+				if !keptOrder {
+					s.logger.Infof("placing new spread maker order: %+v...", makerOrderForm)
+
+					retOrder, err := s.SpreadMaker.placeOrder(ctx, makerOrderForm)
+					if err != nil {
+						s.logger.WithError(err).Errorf("unable to place spread maker order")
+					} else {
+						// add covered position from the created order
+						switch side {
+						case types.SideTypeSell:
+							s.coveredPosition.Add(retOrder.Quantity)
+							pos = pos.Add(retOrder.Quantity)
+						case types.SideTypeBuy:
+							s.coveredPosition.Sub(retOrder.Quantity)
+							pos = pos.Sub(retOrder.Quantity)
+						}
+					}
+				}
+			}
+		}
 	}
 
 	if s.canDelayHedge(side, pos) {
@@ -1480,6 +1527,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	lastPrice := s.lastPrice.Get()
+	quantity := pos.Abs()
 
 	bestBid, bestAsk, ok := s.sourceBook.BestBidAndAsk()
 	if ok {
@@ -1560,9 +1608,10 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	log.Infof("submitted hedge orders: %+v", createdOrders)
 
 	// if it's selling, then we should add a positive position
-	if side == types.SideTypeSell {
+	switch side {
+	case types.SideTypeSell:
 		s.coveredPosition.Add(quantity)
-	} else {
+	case types.SideTypeBuy:
 		s.coveredPosition.Add(quantity.Neg())
 	}
 
@@ -2034,6 +2083,12 @@ func (s *Strategy) CrossRun(
 		s.ProfitStats.ProfitStats = profitStats
 	}
 
+	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
+		if err := s.SpreadMaker.Bind(ctx, s.makerSession, s.Symbol); err != nil {
+			return err
+		}
+	}
+
 	if s.EnableArbitrage {
 		makerMarketStream := s.makerSession.Exchange.NewStream()
 		makerMarketStream.SetPublicOnly()
@@ -2232,4 +2287,30 @@ func (s *Strategy) CrossRun(
 	})
 
 	return nil
+}
+
+func isSignalSidePosition(signal float64, side types.SideType) bool {
+	switch side {
+	case types.SideTypeBuy:
+		return signal > 0
+
+	case types.SideTypeSell:
+		return signal < 0
+
+	}
+
+	return false
+}
+
+func getPositionProfitPrice(side types.SideType, cost, profitRatio fixedpoint.Value) fixedpoint.Value {
+	switch side {
+	case types.SideTypeBuy:
+		return cost.Mul(profitRatio.Add(fixedpoint.One))
+
+	case types.SideTypeSell:
+		return cost.Mul(fixedpoint.One.Sub(profitRatio))
+
+	}
+
+	return cost
 }
