@@ -81,7 +81,9 @@ func (c *SpreadMaker) canSpreadMaking(
 	profitPrice := getPositionProfitPrice(side, cost, c.MinProfitRatio)
 
 	maxQuantity := c.MaxQuoteAmount.Div(cost)
-	orderQuantity := fixedpoint.Min(base, maxQuantity)
+
+	orderQuantity := base.Abs()
+	orderQuantity = fixedpoint.Min(orderQuantity, maxQuantity)
 	orderSide := side.Reverse()
 
 	switch side {
