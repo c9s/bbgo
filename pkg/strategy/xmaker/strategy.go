@@ -1506,7 +1506,9 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 					retOrder, err := s.SpreadMaker.placeOrder(ctx, makerOrderForm)
 					if err != nil {
 						s.logger.WithError(err).Errorf("unable to place spread maker order")
-					} else {
+					} else if retOrder != nil {
+						s.orderStore.Add(*retOrder)
+
 						// add covered position from the created order
 						switch side {
 						case types.SideTypeSell:
@@ -1559,7 +1561,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	}
 
 	if s.sourceMarket.IsDustQuantity(quantity, lastPrice) {
-		s.logger.Warnf("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
+		s.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
 		return
 	}
 

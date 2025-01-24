@@ -2,6 +2,7 @@ package xmaker
 
 import (
 	"context"
+	"math"
 	"sync"
 	"time"
 
@@ -19,6 +20,7 @@ type SpreadMaker struct {
 	MaxQuoteAmount   fixedpoint.Value `json:"maxQuoteAmount"`
 	MaxOrderLifespan types.Duration   `json:"maxOrderLifespan"`
 	MakerOnly        bool             `json:"makerOnly"`
+	SignalThreshold  float64          `json:"signalThreshold"`
 
 	// order is the current spread maker order on the maker exchange
 	order *types.Order
@@ -72,27 +74,34 @@ func (c *SpreadMaker) canSpreadMaking(
 	bestBidPrice, bestAskPrice fixedpoint.Value, // maker best bid price
 ) (*types.SubmitOrder, bool) {
 	side := position.Side()
+
 	if !isSignalSidePosition(signal, side) {
+		return nil, false
+	}
+
+	if math.Abs(signal) < c.SignalThreshold {
 		return nil, false
 	}
 
 	base := position.GetBase()
 	cost := position.GetAverageCost()
-	profitPrice := getPositionProfitPrice(side, cost, c.MinProfitRatio)
+	profitPrice := cost
+	if c.MinProfitRatio.Sign() > 0 {
+		profitPrice = getPositionProfitPrice(side, profitPrice, c.MinProfitRatio)
+	}
 
 	maxQuantity := c.MaxQuoteAmount.Div(cost)
-
 	orderQuantity := base.Abs()
 	orderQuantity = fixedpoint.Min(orderQuantity, maxQuantity)
 	orderSide := side.Reverse()
 
-	switch side {
-	case types.SideTypeBuy:
+	switch orderSide {
+	case types.SideTypeSell:
 		targetPrice := bestBidPrice.Add(makerMarket.TickSize)
 		targetPrice = fixedpoint.Max(profitPrice, targetPrice)
 		return c.newMakerOrder(makerMarket, orderSide, targetPrice, orderQuantity), true
 
-	case types.SideTypeSell:
+	case types.SideTypeBuy:
 		targetPrice := bestAskPrice.Sub(makerMarket.TickSize)
 		targetPrice = fixedpoint.Min(profitPrice, targetPrice)
 		return c.newMakerOrder(makerMarket, orderSide, targetPrice, orderQuantity), true
