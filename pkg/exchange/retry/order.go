@@ -190,7 +190,7 @@ func QueryOrderTradesUntilSuccessfulLite(
 		}
 
 		if len(trades) == 0 {
-			return fmt.Errorf("empty trades of order #%d on exchange %T", q.OrderID, ex)
+			return fmt.Errorf("empty trades of order #%s on exchange %T", q.OrderID, ex)
 		}
 
 		for _, trade := range trades {
