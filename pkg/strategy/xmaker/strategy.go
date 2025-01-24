@@ -1447,6 +1447,31 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 	return false
 }
 
+func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(ctx context.Context) {
+	s.logger.Infof("canceling current spread maker order...")
+
+	finalOrder, err := s.SpreadMaker.cancelAndQueryOrder(ctx)
+	if err != nil {
+		s.logger.WithError(err).Errorf("spread maker: cancel order error")
+	}
+
+	if finalOrder != nil {
+		spreadMakerVolumeMetrics.With(s.metricsLabels).Add(finalOrder.ExecutedQuantity.Float64())
+		spreadMakerQuoteVolumeMetrics.With(s.metricsLabels).Add(finalOrder.ExecutedQuantity.Mul(finalOrder.Price).Float64())
+
+		remainingQuantity := finalOrder.GetRemainingQuantity()
+
+		s.logger.Infof("returning remaining quantity %f to the covered position", remainingQuantity.Float64())
+		switch finalOrder.Side {
+		case types.SideTypeSell:
+			s.coveredPosition.Sub(remainingQuantity)
+		case types.SideTypeBuy:
+			s.coveredPosition.Add(remainingQuantity)
+
+		}
+	}
+}
+
 func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	if pos.IsZero() {
 		return
@@ -1476,27 +1501,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 					keptOrder = s.SpreadMaker.shouldKeepOrder(curOrder, now)
 					if !keptOrder {
 						s.logger.Infof("canceling current spread maker order...")
-
-						finalOrder, err := s.SpreadMaker.cancelAndQueryOrder(ctx)
-						if err != nil {
-							s.logger.WithError(err).Errorf("spread maker: cancel order error")
-						}
-
-						if finalOrder != nil {
-							spreadMakerVolumeMetrics.With(s.metricsLabels).Add(finalOrder.ExecutedQuantity.Float64())
-							spreadMakerQuoteVolumeMetrics.With(s.metricsLabels).Add(finalOrder.ExecutedQuantity.Mul(finalOrder.Price).Float64())
-
-							remainingQuantity := finalOrder.GetRemainingQuantity()
-
-							s.logger.Infof("returning remaining quantity %f to the covered position", remainingQuantity.Float64())
-							switch finalOrder.Side {
-							case types.SideTypeSell:
-								s.coveredPosition.Sub(remainingQuantity)
-							case types.SideTypeBuy:
-								s.coveredPosition.Add(remainingQuantity)
-
-							}
-						}
+						s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 					}
 				}
 
@@ -1519,6 +1524,10 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 							pos = pos.Sub(retOrder.Quantity)
 						}
 					}
+				}
+			} else {
+				if _, hasOrder := s.SpreadMaker.getOrder(); hasOrder {
+					s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 				}
 			}
 		}
