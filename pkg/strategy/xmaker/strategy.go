@@ -155,6 +155,7 @@ type Strategy struct {
 	UseDepthPrice    bool             `json:"useDepthPrice"`
 	DepthQuantity    fixedpoint.Value `json:"depthQuantity"`
 	SourceDepthLevel types.Depth      `json:"sourceDepthLevel"`
+	MakerOnly        bool             `json:"makerOnly"`
 
 	// EnableDelayHedge enables the delay hedge feature
 	EnableDelayHedge bool `json:"enableDelayHedge"`
@@ -1037,6 +1038,11 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return nil
 	}
 
+	var orderType = types.OrderTypeLimit
+	if s.MakerOnly {
+		orderType = types.OrderTypeLimitMaker
+	}
+
 	var submitOrders []types.SubmitOrder
 	var accumulativeBidQuantity, accumulativeAskQuantity fixedpoint.Value
 
@@ -1122,7 +1128,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
 					Market:      s.makerMarket,
-					Type:        types.OrderTypeLimit,
+					Type:        orderType,
 					Side:        types.SideTypeBuy,
 					Price:       bidPrice,
 					Quantity:    bidQuantity,
@@ -1181,7 +1187,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				submitOrders = append(submitOrders, types.SubmitOrder{
 					Symbol:      s.Symbol,
 					Market:      s.makerMarket,
-					Type:        types.OrderTypeLimit,
+					Type:        orderType,
 					Side:        types.SideTypeSell,
 					Price:       askPrice,
 					Quantity:    askQuantity,
