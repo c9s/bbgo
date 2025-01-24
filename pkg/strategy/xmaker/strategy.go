@@ -1486,12 +1486,16 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	signal := s.lastAggregatedSignal.Get()
 
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.makerBook != nil {
-		if makerBid, makerAsk, hasPrice := s.makerBook.BestBidAndAsk(); hasPrice {
+		if makerBid, makerAsk, hasMakerPrice := s.makerBook.BestBidAndAsk(); hasMakerPrice {
 			if makerOrderForm, ok := s.SpreadMaker.canSpreadMaking(signal, s.Position, s.makerMarket, makerBid.Price, makerAsk.Price); ok {
-
 				spreadMakerCounterMetrics.With(s.metricsLabels).Inc()
 
-				s.logger.Infof("spread maker order form: %+v", makerOrderForm)
+				s.logger.Infof("position: %f@%f, maker book bid: %f/%f, spread maker order form: %+v",
+					s.Position.GetBase().Float64(),
+					s.Position.GetAverageCost().Float64(),
+					makerAsk.Price.Float64(),
+					makerBid.Price.Float64(),
+					makerOrderForm)
 
 				// if we have the existing order, cancel it and return the covered position
 				// keptOrder means we kept the current order and we don't need to place a new order
@@ -1514,6 +1518,8 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 					} else if retOrder != nil {
 						s.orderStore.Add(*retOrder)
 
+						s.logger.Infof("spread maker order placed: #%d %f@%f (%s)", retOrder.OrderID, retOrder.Quantity.Float64(), retOrder.Price.Float64(), retOrder.Status)
+
 						// add covered position from the created order
 						switch side {
 						case types.SideTypeSell:
@@ -1525,7 +1531,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 						}
 					}
 				}
-			} else {
+			} else if s.SpreadMaker.ReverseSignalOrderCancel {
 				if _, hasOrder := s.SpreadMaker.getOrder(); hasOrder {
 					s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 				}

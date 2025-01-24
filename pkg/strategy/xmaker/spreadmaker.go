@@ -19,8 +19,12 @@ type SpreadMaker struct {
 	MinProfitRatio   fixedpoint.Value `json:"minProfitRatio"`
 	MaxQuoteAmount   fixedpoint.Value `json:"maxQuoteAmount"`
 	MaxOrderLifespan types.Duration   `json:"maxOrderLifespan"`
-	MakerOnly        bool             `json:"makerOnly"`
-	SignalThreshold  float64          `json:"signalThreshold"`
+
+	SignalThreshold float64 `json:"signalThreshold"`
+
+	ReverseSignalOrderCancel bool `json:"reverseSignalOrderCancel"`
+
+	MakerOnly bool `json:"makerOnly"`
 
 	// order is the current spread maker order on the maker exchange
 	order *types.Order
@@ -159,6 +163,10 @@ func (c *SpreadMaker) cancelAndQueryOrder(ctx context.Context) (*types.Order, er
 	if err := c.cancelOrder(ctx); err != nil {
 		return nil, err
 	}
+
+	c.mu.Lock()
+	c.order = nil
+	c.mu.Unlock()
 
 	finalOrder, err := retry.QueryOrderUntilCanceled(ctx, c.orderQueryService, c.order.Symbol, c.order.OrderID)
 	if err != nil {
