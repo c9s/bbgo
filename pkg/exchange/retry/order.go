@@ -185,11 +185,20 @@ func QueryOrderTradesUntilSuccessfulLite(
 ) (trades []types.Trade, err error) {
 	var op = func() (err2 error) {
 		trades, err2 = ex.QueryOrderTrades(ctx, q)
+		if err2 != nil {
+			return err2
+		}
+
+		if len(trades) == 0 {
+			return fmt.Errorf("empty trades of order #%d on exchange %T", q.OrderID, ex)
+		}
+
 		for _, trade := range trades {
 			if trade.FeeProcessing {
 				return fmt.Errorf("there are some trades which trading fee is not ready")
 			}
 		}
+
 		return err2
 	}
 
