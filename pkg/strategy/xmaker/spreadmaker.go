@@ -89,10 +89,7 @@ func (c *SpreadMaker) canSpreadMaking(
 
 	base := position.GetBase()
 	cost := position.GetAverageCost()
-	profitPrice := cost
-	if c.MinProfitRatio.Sign() > 0 {
-		profitPrice = getPositionProfitPrice(side, profitPrice, c.MinProfitRatio)
-	}
+	profitPrice := getPositionProfitPrice(side, cost, c.session.MakerFeeRate.Add(c.MinProfitRatio))
 
 	maxQuantity := c.MaxQuoteAmount.Div(cost)
 	orderQuantity := base.Abs()
