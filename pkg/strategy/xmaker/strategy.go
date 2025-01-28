@@ -1525,7 +1525,6 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.makerBook != nil {
 		if makerBid, makerAsk, hasMakerPrice := s.makerBook.BestBidAndAsk(); hasMakerPrice {
 			if makerOrderForm, ok := s.SpreadMaker.canSpreadMaking(signal, s.Position, s.makerMarket, makerBid.Price, makerAsk.Price); ok {
-				spreadMakerCounterMetrics.With(s.metricsLabels).Inc()
 
 				s.logger.Infof("position: %f@%f, maker book bid: %f/%f, spread maker order form: %+v",
 					s.Position.GetBase().Float64(),
@@ -1547,6 +1546,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 				}
 
 				if !hasOrder || !keptOrder {
+					spreadMakerCounterMetrics.With(s.metricsLabels).Inc()
 					s.logger.Infof("placing new spread maker order: %+v...", makerOrderForm)
 
 					retOrder, err := s.SpreadMaker.placeOrder(ctx, makerOrderForm)
