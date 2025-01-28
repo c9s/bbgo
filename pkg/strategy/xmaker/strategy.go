@@ -1546,7 +1546,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 					}
 				}
 
-				if !keptOrder {
+				if !hasOrder || !keptOrder {
 					s.logger.Infof("placing new spread maker order: %+v...", makerOrderForm)
 
 					retOrder, err := s.SpreadMaker.placeOrder(ctx, makerOrderForm)
