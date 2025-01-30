@@ -78,6 +78,24 @@ var netProfitMarginHistogram = prometheus.NewHistogramVec(
 		Buckets: prometheus.ExponentialBuckets(0.001, 2.0, 10),
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
+var spreadMakerCounterMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_spread_maker_counter",
+		Help: "spread maker counter",
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+
+var spreadMakerVolumeMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_spread_maker_volume",
+		Help: "spread maker volume",
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+
+var spreadMakerQuoteVolumeMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "xmaker_spread_maker_quote_volume",
+		Help: "spread maker quote volume",
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
+
 func init() {
 	prometheus.MustRegister(
 		openOrderBidExposureInUsdMetrics,
@@ -92,5 +110,9 @@ func init() {
 		delayedHedgeCounterMetrics,
 		delayedHedgeMaxDurationMetrics,
 		netProfitMarginHistogram,
+
+		spreadMakerCounterMetrics,
+		spreadMakerVolumeMetrics,
+		spreadMakerQuoteVolumeMetrics,
 	)
 }

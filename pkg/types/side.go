@@ -19,6 +19,7 @@ const (
 
 	// SideTypeBoth is only used for the configuration context
 	SideTypeBoth = SideType("BOTH")
+	SideTypeNone = SideType("")
 )
 
 var ErrInvalidSideType = errors.New("invalid side type")
