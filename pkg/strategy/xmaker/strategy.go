@@ -1484,6 +1484,7 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 	return false
 }
 
+// TODO: move this method to SpreadMaker
 func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(ctx context.Context, coveredPosition *fixedpoint.MutexValue) {
 	s.logger.Infof("canceling current spread maker order...")
 
