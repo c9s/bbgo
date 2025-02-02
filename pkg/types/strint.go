@@ -9,6 +9,36 @@ import (
 // StrInt64 is a string type for int64
 type StrInt64 int64
 
+func NewStrInt64FromString(ss string) (StrInt64, error) {
+	i, err := strconv.ParseInt(ss, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return StrInt64(i), nil
+}
+
+func (s *StrInt64) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
+	var a int64
+	if err = unmarshal(&a); err == nil {
+		*s = StrInt64(a)
+		return
+	}
+
+	var ss string
+	if err = unmarshal(&ss); err == nil {
+		s2, err := NewStrInt64FromString(ss)
+		if err != nil {
+			return err
+		}
+
+		*s = s2
+		return
+	}
+
+	return fmt.Errorf("StrInt64.UnmarshalYAML error: unsupported value type, not int64 or string")
+}
+
 func (s *StrInt64) MarshalJSON() ([]byte, error) {
 	ss := strconv.FormatInt(int64(*s), 10)
 	return json.Marshal(ss)
@@ -22,12 +52,12 @@ func (s *StrInt64) UnmarshalJSON(body []byte) error {
 
 	switch ta := arg.(type) {
 	case string:
-		// parse string
-		i, err := strconv.ParseInt(ta, 10, 64)
+		s2, err := NewStrInt64FromString(ta)
 		if err != nil {
 			return err
 		}
-		*s = StrInt64(i)
+
+		*s = StrInt64(s2)
 
 	case int64:
 		*s = StrInt64(ta)
