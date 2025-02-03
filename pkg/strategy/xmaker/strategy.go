@@ -1555,7 +1555,7 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 						s.logger.WithError(err).Errorf("unable to place spread maker order")
 					} else if retOrder != nil {
 						s.orderStore.Add(*retOrder)
-						s.orderStore.Prune(24 * time.Hour)
+						s.orderStore.Prune(8 * time.Hour)
 
 						s.logger.Infof("spread maker order placed: #%d %f@%f (%s)", retOrder.OrderID, retOrder.Quantity.Float64(), retOrder.Price.Float64(), retOrder.Status)
 
