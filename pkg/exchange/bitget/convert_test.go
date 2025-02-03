@@ -10,6 +10,7 @@ import (
 	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 func Test_toGlobalBalance(t *testing.T) {
@@ -210,7 +211,7 @@ func Test_unfilledOrderToGlobalOrder(t *testing.T) {
 		orderId       = 1105087175647989764
 		unfilledOrder = v2.UnfilledOrder{
 			Symbol:           "BTCUSDT",
-			OrderId:          types.StrInt64(orderId),
+			OrderId:          strint.Int64(orderId),
 			ClientOrderId:    "74b86af3-6098-479c-acac-bfb074c067f3",
 			PriceAvg:         fixedpoint.NewFromFloat(1.2),
 			Size:             fixedpoint.NewFromFloat(5),
@@ -344,7 +345,7 @@ func Test_toGlobalOrder(t *testing.T) {
 		unfilledOrder = v2.OrderDetail{
 			UserId:           123456,
 			Symbol:           "BTCUSDT",
-			OrderId:          types.StrInt64(orderId),
+			OrderId:          strint.Int64(orderId),
 			ClientOrderId:    "74b86af3-6098-479c-acac-bfb074c067f3",
 			Price:            fixedpoint.NewFromFloat(1.2),
 			Size:             fixedpoint.NewFromFloat(5),
@@ -604,10 +605,10 @@ func Test_toGlobalTrade(t *testing.T) {
 	//   "uTime":"1699020564687"
 	// }
 	trade := v2.Trade{
-		UserId:    types.StrInt64(8672173294),
+		UserId:    strint.Int64(8672173294),
 		Symbol:    "APEUSDT",
-		OrderId:   types.StrInt64(1104337778433757184),
-		TradeId:   types.StrInt64(1104337778504044545),
+		OrderId:   strint.Int64(1104337778433757184),
+		TradeId:   strint.Int64(1104337778504044545),
 		OrderType: v2.OrderTypeLimit,
 		Side:      v2.SideTypeSell,
 		PriceAvg:  fixedpoint.NewFromFloat(1.4001),
@@ -816,7 +817,7 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 	o := Order{
 		Trade: Trade{
 			FillPrice:   fixedpoint.NewFromFloat(0.49016),
-			TradeId:     types.StrInt64(1107950490073112582),
+			TradeId:     strint.Int64(1107950490073112582),
 			BaseVolume:  fixedpoint.NewFromFloat(33.6558),
 			FillTime:    types.NewMillisecondTimestampFromInt(1699881902235),
 			FillFee:     fixedpoint.NewFromFloat(-0.0336558),
@@ -824,7 +825,7 @@ func TestOrder_toGlobalOrder(t *testing.T) {
 			TradeScope:  "T",
 		},
 		InstId:           "BGBUSDT",
-		OrderId:          types.StrInt64(1107950489998626816),
+		OrderId:          strint.Int64(1107950489998626816),
 		ClientOrderId:    "cc73aab9-1e44-4022-8458-60d8c6a08753",
 		NewSize:          fixedpoint.NewFromFloat(39.0),
 		Notional:         fixedpoint.NewFromFloat(39.0),
@@ -1133,7 +1134,7 @@ func TestOrder_toGlobalTrade(t *testing.T) {
 	o := Order{
 		Trade: Trade{
 			FillPrice:   fixedpoint.NewFromFloat(0.49016),
-			TradeId:     types.StrInt64(1107950490073112582),
+			TradeId:     strint.Int64(1107950490073112582),
 			BaseVolume:  fixedpoint.NewFromFloat(33.6558),
 			FillTime:    types.NewMillisecondTimestampFromInt(1699881902235),
 			FillFee:     fixedpoint.NewFromFloat(-0.0336558),
@@ -1141,7 +1142,7 @@ func TestOrder_toGlobalTrade(t *testing.T) {
 			TradeScope:  "T",
 		},
 		InstId:           "BGBUSDT",
-		OrderId:          types.StrInt64(1107950489998626816),
+		OrderId:          strint.Int64(1107950489998626816),
 		ClientOrderId:    "cc73aab9-1e44-4022-8458-60d8c6a08753",
 		NewSize:          fixedpoint.NewFromFloat(39.0),
 		Notional:         fixedpoint.NewFromFloat(39.0),

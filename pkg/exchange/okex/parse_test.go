@@ -9,6 +9,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 )
@@ -1000,7 +1001,7 @@ func TestOrderTradeEvent(t *testing.T) {
 					FillTime:            types.NewMillisecondTimestampFromInt(1705384184503),
 					InstrumentID:        "OKB-USDT",
 					InstrumentType:      okexapi.InstrumentTypeSpot,
-					OrderId:             types.StrInt64(667364871905857536),
+					OrderId:             strint.Int64(667364871905857536),
 					OrderType:           okexapi.OrderTypeMarket,
 					Price:               fixedpoint.Zero,
 					Side:                okexapi.SideTypeBuy,
@@ -1037,7 +1038,7 @@ func TestOrderTradeEvent(t *testing.T) {
 					AlgoClOrdId:         "",
 					AlgoId:              "",
 				},
-				Code:            types.StrInt64(0),
+				Code:            strint.Int64(0),
 				Msg:             "",
 				AmendResult:     "",
 				ExecutionType:   okexapi.LiquidityTypeTaker,

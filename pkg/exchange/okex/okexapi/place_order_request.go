@@ -3,7 +3,7 @@ package okexapi
 import (
 	"github.com/c9s/requestgen"
 
-	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
@@ -14,9 +14,9 @@ type OrderResponse struct {
 	ClientOrderID string `json:"clOrdId"`
 	Tag           string `json:"tag"`
 
-	Timestamp types.StrInt64 `json:"ts"`
-	Code      string         `json:"sCode"`
-	Message   string         `json:"sMsg"`
+	Timestamp strint.Int64 `json:"ts"`
+	Code      string       `json:"sCode"`
+	Message   string       `json:"sMsg"`
 }
 
 //go:generate PostRequest -url "/api/v5/trade/order" -type PlaceOrderRequest -responseDataType []OrderResponse

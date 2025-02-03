@@ -10,6 +10,8 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
+
 	"github.com/c9s/requestgen"
 )
 
@@ -22,7 +24,7 @@ type FeeDetail struct {
 		// Amount deducted in BGB (Bitget Coin), unit：BGB
 		DeductedInBGB fixedpoint.Value `json:"d"`
 		// If the BGB balance is insufficient to cover the fees, the remaining amount is deducted from the
-		//currency obtained from the transaction.
+		// currency obtained from the transaction.
 		DeductedFromCurrency fixedpoint.Value `json:"r"`
 		// The total fee amount to be paid, unit ：currency obtained from the transaction.
 		ToBePaid fixedpoint.Value `json:"t"`
@@ -34,10 +36,10 @@ type FeeDetail struct {
 }
 
 type OrderDetail struct {
-	UserId types.StrInt64 `json:"userId"`
-	Symbol string         `json:"symbol"`
+	UserId strint.Int64 `json:"userId"`
+	Symbol string       `json:"symbol"`
 	// OrderId are always numeric. It's confirmed with official customer service. https://t.me/bitgetOpenapi/24172
-	OrderId       types.StrInt64   `json:"orderId"`
+	OrderId       strint.Int64     `json:"orderId"`
 	ClientOrderId string           `json:"clientOid"`
 	Price         fixedpoint.Value `json:"price"`
 	// Size is base coin when orderType=limit; quote coin when orderType=market

@@ -7,6 +7,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
@@ -38,10 +39,10 @@ type TradeFee struct {
 }
 
 type Trade struct {
-	UserId      types.StrInt64             `json:"userId"`
+	UserId      strint.Int64               `json:"userId"`
 	Symbol      string                     `json:"symbol"`
-	OrderId     types.StrInt64             `json:"orderId"`
-	TradeId     types.StrInt64             `json:"tradeId"`
+	OrderId     strint.Int64               `json:"orderId"`
+	TradeId     strint.Int64               `json:"tradeId"`
 	OrderType   OrderType                  `json:"orderType"`
 	Side        SideType                   `json:"side"`
 	PriceAvg    fixedpoint.Value           `json:"priceAvg"`

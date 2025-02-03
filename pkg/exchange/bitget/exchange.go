@@ -15,6 +15,7 @@ import (
 	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 const (
@@ -376,7 +377,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	var nextCursor types.StrInt64
+	var nextCursor strint.Int64
 	for {
 		if err := queryOpenOrdersRateLimiter.Wait(ctx); err != nil {
 			return nil, fmt.Errorf("open order rate limiter wait error: %w", err)

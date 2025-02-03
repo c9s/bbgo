@@ -10,6 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 func Test_orderDetailToGlobal(t *testing.T) {
@@ -30,7 +31,7 @@ func Test_orderDetailToGlobal(t *testing.T) {
 			FillTime:            types.NewMillisecondTimestampFromInt(0),
 			InstrumentID:        "BTC-USDT",
 			InstrumentType:      okexapi.InstrumentTypeSpot,
-			OrderId:             types.StrInt64(orderId),
+			OrderId:             strint.Int64(orderId),
 			OrderType:           okexapi.OrderTypeLimit,
 			Price:               fixedpoint.NewFromFloat(48174.5),
 			Side:                okexapi.SideTypeBuy,
