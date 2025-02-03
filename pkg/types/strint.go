@@ -27,16 +27,16 @@ func (s *StrInt64) UnmarshalYAML(unmarshal func(a interface{}) error) (err error
 
 	var ss string
 	if err = unmarshal(&ss); err == nil {
-		s2, err := NewStrInt64FromString(ss)
-		if err != nil {
-			return err
+		s2, err2 := NewStrInt64FromString(ss)
+		if err2 != nil {
+			return err2
 		}
 
 		*s = s2
 		return
 	}
 
-	return fmt.Errorf("StrInt64.UnmarshalYAML error: unsupported value type, not int64 or string")
+	return fmt.Errorf("StrInt64.UnmarshalYAML error: unsupported value type, not int64 or string: %w", err)
 }
 
 func (s *StrInt64) MarshalJSON() ([]byte, error) {
