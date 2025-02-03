@@ -141,9 +141,23 @@ func (s *OrderStore) BindStream(stream types.Stream) {
 	})
 }
 
+func (s *OrderStore) Size() (l int) {
+	s.mu.Lock()
+	l = len(s.orders)
+	s.mu.Unlock()
+	return l
+}
+
 func (s *OrderStore) Prune(expiryDuration time.Duration) {
+	size := s.Size()
+
+	// skip prune if the size is less than 100
+	if size < 100 {
+		return
+	}
+
 	cutOffTime := time.Now().Add(-expiryDuration)
-	orders := make(map[uint64]types.Order, len(s.orders))
+	orders := make(map[uint64]types.Order, size)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
