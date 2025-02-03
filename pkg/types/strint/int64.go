@@ -73,7 +73,7 @@ func (s *Int64) UnmarshalJSON(body []byte) error {
 		*s = Int64(ta)
 
 	default:
-		return fmt.Errorf("Int64 error: unsupported value type %T", ta)
+		return fmt.Errorf("strint error: unsupported value type %T", ta)
 	}
 
 	return nil
