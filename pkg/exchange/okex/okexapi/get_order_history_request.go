@@ -7,6 +7,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
@@ -24,7 +25,7 @@ type OrderDetail struct {
 	FillTime       types.MillisecondTimestamp `json:"fillTime"`
 	InstrumentID   string                     `json:"instId"`
 	InstrumentType InstrumentType             `json:"instType"`
-	OrderId        types.StrInt64             `json:"ordId"`
+	OrderId        strint.Int64               `json:"ordId"`
 	OrderType      OrderType                  `json:"ordType"`
 	Price          fixedpoint.Value           `json:"px"`
 	Side           SideType                   `json:"side"`

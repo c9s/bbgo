@@ -10,6 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 type Channel string
@@ -318,7 +319,7 @@ func parseAccount(v []byte) (*okexapi.Account, error) {
 type OrderTradeEvent struct {
 	okexapi.OrderDetail
 
-	Code          types.StrInt64        `json:"code"`
+	Code          strint.Int64          `json:"code"`
 	Msg           string                `json:"msg"`
 	AmendResult   string                `json:"amendResult"`
 	ExecutionType okexapi.LiquidityType `json:"execType"`
@@ -400,12 +401,12 @@ func toGlobalSideType(side okexapi.SideType) (types.SideType, error) {
 
 type MarketTradeEvent struct {
 	InstId    string                     `json:"instId"`
-	TradeId   types.StrInt64             `json:"tradeId"`
+	TradeId   strint.Int64               `json:"tradeId"`
 	Px        fixedpoint.Value           `json:"px"`
 	Sz        fixedpoint.Value           `json:"sz"`
 	Side      okexapi.SideType           `json:"side"`
 	Timestamp types.MillisecondTimestamp `json:"ts"`
-	Count     types.StrInt64             `json:"count"`
+	Count     strint.Int64               `json:"count"`
 }
 
 func (m *MarketTradeEvent) toGlobalTrade() (types.Trade, error) {

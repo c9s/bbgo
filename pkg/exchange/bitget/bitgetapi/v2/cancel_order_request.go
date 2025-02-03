@@ -6,13 +6,13 @@ package bitgetapi
 import (
 	"github.com/c9s/requestgen"
 
-	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 type CancelOrder struct {
 	// OrderId are always numeric. It's confirmed with official customer service. https://t.me/bitgetOpenapi/24172
-	OrderId       types.StrInt64 `json:"orderId"`
-	ClientOrderId string         `json:"clientOid"`
+	OrderId       strint.Int64 `json:"orderId"`
+	ClientOrderId string       `json:"clientOid"`
 }
 
 //go:generate PostRequest -url "/api/v2/spot/trade/cancel-order" -type CancelOrderRequest -responseDataType .CancelOrder

@@ -7,13 +7,14 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Data
 
 type DepositRecord struct {
-	ActualDepBlkConfirm types.StrInt64   `json:"actualDepBlkConfirm"`
+	ActualDepBlkConfirm strint.Int64     `json:"actualDepBlkConfirm"`
 	Amount              fixedpoint.Value `json:"amt"`
 	AreaCodeFrom        string           `json:"areaCodeFrom"`
 	Currency            string           `json:"ccy"`
@@ -21,7 +22,7 @@ type DepositRecord struct {
 	DepId               string           `json:"depId"`
 	From                string           `json:"from"`
 	FromWdId            string           `json:"fromWdId"`
-	State               types.StrInt64   `json:"state"`
+	State               strint.Int64     `json:"state"`
 	To                  string           `json:"to"`
 
 	Ts types.MillisecondTimestamp `json:"ts"`
