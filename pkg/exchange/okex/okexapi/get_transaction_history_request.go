@@ -7,6 +7,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
@@ -15,15 +16,15 @@ import (
 type Trade struct {
 	InstrumentType InstrumentType `json:"instType"`
 	InstrumentId   string         `json:"instId"`
-	TradeId        types.StrInt64 `json:"tradeId"`
-	OrderId        types.StrInt64 `json:"ordId"`
+	TradeId        strint.Int64   `json:"tradeId"`
+	OrderId        strint.Int64   `json:"ordId"`
 	ClientOrderId  string         `json:"clOrdId"`
 	// Data generation time, Unix timestamp format in milliseconds, e.g. 1597026383085.
 	Timestamp     types.MillisecondTimestamp `json:"ts"`
 	FillTime      types.MillisecondTimestamp `json:"fillTime"`
 	FeeCurrency   string                     `json:"feeCcy"`
 	Fee           fixedpoint.Value           `json:"fee"`
-	BillId        types.StrInt64             `json:"billId"`
+	BillId        strint.Int64               `json:"billId"`
 	Side          SideType                   `json:"side"`
 	ExecutionType LiquidityType              `json:"execType"`
 

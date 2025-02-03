@@ -17,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 const defaultHTTPTimeout = time.Second * 15
@@ -216,10 +216,10 @@ type APIResponse struct {
 	Data    json.RawMessage `json:"data"`
 
 	// InTime is the timestamp at REST gateway when the request is received, Unix timestamp format in microseconds, e.g. 1597026383085123
-	InTime types.StrInt64 `json:"inTime"`
+	InTime strint.Int64 `json:"inTime"`
 
 	// OutTime is the timestamp at REST gateway when the response is sent, Unix timestamp format in microseconds, e.g. 1597026383085123
-	OutTime types.StrInt64 `json:"outTime"`
+	OutTime strint.Int64 `json:"outTime"`
 }
 
 func (a APIResponse) Validate() error {

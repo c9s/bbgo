@@ -9,7 +9,7 @@ import (
 // Int64 is a string type for int64
 type Int64 int64
 
-func NewStrInt64FromString(ss string) (Int64, error) {
+func NewFromString(ss string) (Int64, error) {
 	i, err := strconv.ParseInt(ss, 10, 64)
 	if err != nil {
 		return 0, err
@@ -27,7 +27,7 @@ func (s *Int64) UnmarshalYAML(unmarshal func(a interface{}) error) (err error) {
 
 	var ss string
 	if err = unmarshal(&ss); err == nil {
-		s2, err2 := NewStrInt64FromString(ss)
+		s2, err2 := NewFromString(ss)
 		if err2 != nil {
 			return err2
 		}
@@ -45,37 +45,17 @@ func (s *Int64) MarshalJSON() ([]byte, error) {
 }
 
 func (s *Int64) UnmarshalJSON(body []byte) error {
-	var arg interface{}
+	var arg any
 	if err := json.Unmarshal(body, &arg); err != nil {
 		return err
 	}
 
-	switch ta := arg.(type) {
-	case string:
-		s2, err := NewStrInt64FromString(ta)
-		if err != nil {
-			return err
-		}
-
-		*s = Int64(s2)
-
-	case int64:
-		*s = Int64(ta)
-	case int32:
-		*s = Int64(ta)
-	case int:
-		*s = Int64(ta)
-
-	case float32:
-		*s = Int64(ta)
-
-	case float64:
-		*s = Int64(ta)
-
-	default:
-		return fmt.Errorf("Int64 error: unsupported value type %T", ta)
+	val, err := cast(arg)
+	if err != nil {
+		return err
 	}
 
+	*s = Int64(val)
 	return nil
 }
 
@@ -84,4 +64,31 @@ func (s *Int64) String() string {
 		return ""
 	}
 	return strconv.FormatInt(int64(*s), 10)
+}
+
+func cast(arg any) (int64, error) {
+	switch ta := arg.(type) {
+	case string:
+		s2, err := strconv.ParseInt(ta, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+
+		return s2, nil
+	case int64:
+		return ta, nil
+	case int32:
+		return int64(ta), nil
+	case int:
+		return int64(ta), nil
+
+	case float32:
+		return int64(ta), nil
+
+	case float64:
+		return int64(ta), nil
+
+	default:
+		return 0, fmt.Errorf("strint error: unsupported value type %T", ta)
+	}
 }

@@ -10,13 +10,14 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 type UnfilledOrder struct {
-	UserId types.StrInt64 `json:"userId"`
-	Symbol string         `json:"symbol"`
+	UserId strint.Int64 `json:"userId"`
+	Symbol string       `json:"symbol"`
 	// OrderId are always numeric. It's confirmed with official customer service. https://t.me/bitgetOpenapi/24172
-	OrderId       types.StrInt64   `json:"orderId"`
+	OrderId       strint.Int64     `json:"orderId"`
 	ClientOrderId string           `json:"clientOid"`
 	PriceAvg      fixedpoint.Value `json:"priceAvg"`
 	// Size is base coin when orderType=limit; quote coin when orderType=market
