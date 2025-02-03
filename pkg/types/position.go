@@ -385,9 +385,10 @@ func (p *Position) Type() PositionType {
 }
 
 func (p *Position) Side() SideType {
-	if p.Base.Sign() > 0 {
+	b := p.GetBase()
+	if b.Sign() > 0 {
 		return SideTypeBuy
-	} else if p.Base.Sign() < 0 {
+	} else if b.Sign() < 0 {
 		return SideTypeSell
 	}
 
