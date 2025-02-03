@@ -8,6 +8,7 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 func TestOrderDetail_UnmarshalJSON(t *testing.T) {
@@ -38,9 +39,9 @@ func TestOrderDetail_UnmarshalJSON(t *testing.T) {
 		err := json.Unmarshal([]byte(input), &od)
 		assert.NoError(err)
 		assert.Equal(OrderDetail{
-			UserId:           types.StrInt64(8672173294),
+			UserId:           strint.Int64(8672173294),
 			Symbol:           "APEUSDT",
-			OrderId:          types.StrInt64(1104342023170068480),
+			OrderId:          strint.Int64(1104342023170068480),
 			ClientOrderId:    "f3d6a1ee-4e94-48b5-a6e0-25f3e93d92e1",
 			Price:            fixedpoint.NewFromFloat(1.2),
 			Size:             fixedpoint.NewFromFloat(5),
@@ -83,9 +84,9 @@ func TestOrderDetail_UnmarshalJSON(t *testing.T) {
 		err := json.Unmarshal([]byte(input), &od)
 		assert.NoError(err)
 		assert.Equal(OrderDetail{
-			UserId:           types.StrInt64(8672173294),
+			UserId:           strint.Int64(8672173294),
 			Symbol:           "APEUSDT",
-			OrderId:          types.StrInt64(1104337778433757184),
+			OrderId:          strint.Int64(1104337778433757184),
 			ClientOrderId:    "8afea7bd-d873-44fe-aff8-6a1fae3cc765",
 			Price:            fixedpoint.NewFromFloat(1.4),
 			Size:             fixedpoint.NewFromFloat(5),

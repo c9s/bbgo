@@ -9,6 +9,7 @@ import (
 	v2 "github.com/c9s/bbgo/pkg/exchange/bitget/bitgetapi/v2"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/types/strint"
 )
 
 type InstType string
@@ -194,7 +195,7 @@ type MarketTrade struct {
 	Price   fixedpoint.Value
 	Size    fixedpoint.Value
 	Side    SideType
-	TradeId types.StrInt64
+	TradeId strint.Int64
 }
 
 type MarketTradeSlice []MarketTrade
@@ -430,7 +431,7 @@ type AccountEvent struct {
 type Trade struct {
 	// Latest filled price
 	FillPrice fixedpoint.Value `json:"fillPrice"`
-	TradeId   types.StrInt64   `json:"tradeId"`
+	TradeId   strint.Int64     `json:"tradeId"`
 	// Number of latest filled orders
 	BaseVolume fixedpoint.Value           `json:"baseVolume"`
 	FillTime   types.MillisecondTimestamp `json:"fillTime"`
@@ -447,8 +448,8 @@ type Order struct {
 
 	InstId string `json:"instId"`
 	// OrderId are always numeric. It's confirmed with official customer service. https://t.me/bitgetOpenapi/24172
-	OrderId       types.StrInt64 `json:"orderId"`
-	ClientOrderId string         `json:"clientOid"`
+	OrderId       strint.Int64 `json:"orderId"`
+	ClientOrderId string       `json:"clientOid"`
 	// NewSize represents the order quantity, following the specified rules:
 	// when orderType=limit, newSize represents the quantity of base coin,
 	// when orderType=marketandside=buy, newSize represents the quantity of quote coin,
