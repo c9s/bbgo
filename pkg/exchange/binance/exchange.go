@@ -1423,6 +1423,8 @@ func convertDepth(symbol string, response *binanceapi.Depth) (snapshot types.Sli
 	snapshot.Symbol = symbol
 	snapshot.Time = time.Now()
 	snapshot.LastUpdateId = response.LastUpdateId
+	snapshot.Bids = make([]types.PriceVolume, 0, len(response.Bids))
+	snapshot.Asks = make([]types.PriceVolume, 0, len(response.Asks))
 
 	finalUpdateID = response.LastUpdateId
 	for _, entry := range response.Bids {
