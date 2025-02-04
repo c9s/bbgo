@@ -159,27 +159,21 @@ func (b *RBTOrderBook) convertTreeToPriceVolumeSlice(tree *RBTree, limit int, de
 
 	pvs := make(PriceVolumeSlice, 0, defCap)
 
-	if descending {
-		tree.InorderReverse(func(n *RBNode) bool {
-			pvs = append(pvs, PriceVolume{
-				Price:  n.key,
-				Volume: n.value,
-			})
-
-			return !(limit > 0 && len(pvs) >= limit)
-		})
-
-		return pvs
-	}
-
-	tree.Inorder(func(n *RBNode) bool {
+	cb := func(n *RBNode) bool {
 		pvs = append(pvs, PriceVolume{
 			Price:  n.key,
 			Volume: n.value,
 		})
 
 		return !(limit > 0 && len(pvs) >= limit)
-	})
+	}
+
+	if descending {
+		tree.InorderReverse(cb)
+	} else {
+		tree.Inorder(cb)
+	}
+
 	return pvs
 }
 
