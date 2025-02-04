@@ -184,6 +184,8 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 		}
 	}
 
+	tree.size++
+
 	tree.InsertFixup(node)
 }
 
