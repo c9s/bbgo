@@ -382,13 +382,13 @@ func (tree *RBTree) Successor(current *RBNode) *RBNode {
 		return tree.LeftmostOf(current.right)
 	}
 
-	var newNode = current.parent
-	for !newNode.isNil() && current == newNode.right {
-		current = newNode
-		newNode = newNode.parent
+	var suc = current.parent
+	for !suc.isNil() && current == suc.right {
+		current = suc
+		suc = suc.parent
 	}
 
-	return newNode
+	return suc
 }
 
 func (tree *RBTree) Preorder(cb func(n *RBNode)) {
