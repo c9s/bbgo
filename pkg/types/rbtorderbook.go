@@ -9,6 +9,8 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+const defaultRbTreeSideBookLimit = 200
+
 //go:generate callbackgen -type RBTOrderBook
 type RBTOrderBook struct {
 	Symbol string
@@ -181,10 +183,10 @@ func (b *RBTOrderBook) SideBook(sideType SideType) PriceVolumeSlice {
 	switch sideType {
 
 	case SideTypeBuy:
-		return b.convertTreeToPriceVolumeSlice(b.Bids, 0, true)
+		return b.convertTreeToPriceVolumeSlice(b.Bids, defaultRbTreeSideBookLimit, true)
 
 	case SideTypeSell:
-		return b.convertTreeToPriceVolumeSlice(b.Asks, 0, false)
+		return b.convertTreeToPriceVolumeSlice(b.Asks, defaultRbTreeSideBookLimit, false)
 
 	default:
 		return nil
