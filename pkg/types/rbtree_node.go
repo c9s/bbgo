@@ -21,7 +21,7 @@ type RBNode struct {
 	color               Color
 }
 
-func NewNil() *RBNode {
+func newNilNode() *RBNode {
 	return &RBNode{color: Black}
 }
 
