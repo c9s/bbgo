@@ -124,6 +124,9 @@ type ExchangeSession struct {
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
+	//
+	// Trades field here is used for collecting trades in the back-test mode
+	// in the production environment, we usually use trade store in the strategy instance to collect trades
 	Trades map[string]*types.TradeSlice `json:"-" yaml:"-"`
 
 	// markets defines market configuration of a symbol
