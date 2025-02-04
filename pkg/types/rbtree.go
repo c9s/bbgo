@@ -66,6 +66,10 @@ func (tree *RBTree) Delete(key fixedpoint.Value) bool {
 	if y != deleting {
 		deleting.key = y.key
 		deleting.value = y.value
+		clearNode(y)
+	} else {
+		// clear the reference
+		clearNode(deleting)
 	}
 
 	if y.color == Black {
@@ -184,7 +188,7 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 }
 
 func (tree *RBTree) Insert(key, val fixedpoint.Value) {
-	var y = newNilNode()
+	var y *RBNode
 	var x = tree.Root
 	var node = &RBNode{
 		key:    key,
@@ -205,14 +209,16 @@ func (tree *RBTree) Insert(key, val fixedpoint.Value) {
 		}
 	}
 
-	node.parent = y
-
-	if y.isNil() {
+	if y == nil {
+		node.parent = newNilNode()
 		tree.Root = node
-	} else if node.key.Compare(y.key) < 0 {
-		y.left = node
 	} else {
-		y.right = node
+		node.parent = y
+		if node.key.Compare(y.key) < 0 {
+			y.left = node
+		} else {
+			y.right = node
+		}
 	}
 
 	tree.size++
@@ -342,7 +348,7 @@ func (tree *RBTree) Rightmost() *RBNode {
 }
 
 func (tree *RBTree) RightmostOf(current *RBNode) *RBNode {
-	if current.isNil() || current == nil {
+	if current == nil || current.isNil() {
 		return nil
 	}
 
@@ -358,7 +364,7 @@ func (tree *RBTree) Leftmost() *RBNode {
 }
 
 func (tree *RBTree) LeftmostOf(current *RBNode) *RBNode {
-	if current.isNil() || current == nil {
+	if current == nil || current.isNil() {
 		return nil
 	}
 
@@ -388,7 +394,7 @@ func (tree *RBTree) Preorder(cb func(n *RBNode)) {
 }
 
 func (tree *RBTree) PreorderOf(current *RBNode, cb func(n *RBNode)) {
-	if !current.isNil() && current != nil {
+	if current != nil && !current.isNil() {
 		cb(current)
 		tree.PreorderOf(current.left, cb)
 		tree.PreorderOf(current.right, cb)
@@ -401,11 +407,12 @@ func (tree *RBTree) Inorder(cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) InorderOf(current *RBNode, cb func(n *RBNode) bool) {
-	if !current.isNil() && current != nil {
+	if current != nil && !current.isNil() {
 		tree.InorderOf(current.left, cb)
 		if !cb(current) {
 			return
 		}
+
 		tree.InorderOf(current.right, cb)
 	}
 }
@@ -416,7 +423,7 @@ func (tree *RBTree) InorderReverse(cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) InorderReverseOf(current *RBNode, cb func(n *RBNode) bool) {
-	if !current.isNil() && current != nil {
+	if current != nil && !current.isNil() {
 		tree.InorderReverseOf(current.right, cb)
 		if !cb(current) {
 			return
@@ -430,7 +437,7 @@ func (tree *RBTree) Postorder(cb func(n *RBNode) bool) {
 }
 
 func (tree *RBTree) PostorderOf(current *RBNode, cb func(n *RBNode) bool) {
-	if !current.isNil() && current != nil {
+	if current != nil && !current.isNil() {
 		tree.PostorderOf(current.left, cb)
 		tree.PostorderOf(current.right, cb)
 		if !cb(current) {
@@ -466,6 +473,12 @@ func (tree *RBTree) Print() {
 		fmt.Printf("%v -> %v\n", n.key, n.value)
 		return true
 	})
+}
+
+func clearNode(deleting *RBNode) {
+	deleting.left = nil
+	deleting.right = nil
+	deleting.parent = nil
 }
 
 func copyNodeFast(newTree *RBTree) func(n *RBNode) bool {
