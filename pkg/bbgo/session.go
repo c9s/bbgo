@@ -28,6 +28,8 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
+const defaultMaxSessionTradeBufferSize = 3500
+
 var KLinePreloadLimit int64 = 1000
 
 var ErrEmptyMarketInfo = errors.New("market info should not be empty, 0 markets loaded")
@@ -122,6 +124,9 @@ type ExchangeSession struct {
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
+	//
+	// Trades field here is used for collecting trades in the back-test mode
+	// in the production environment, we usually use trade store in the strategy instance to collect trades
 	Trades map[string]*types.TradeSlice `json:"-" yaml:"-"`
 
 	// markets defines market configuration of a symbol
@@ -499,12 +504,13 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 
 	disableMarketDataStore := environ.environmentConfig != nil && environ.environmentConfig.DisableMarketDataStore
 	disableSessionTradeBuffer := environ.environmentConfig != nil && environ.environmentConfig.DisableSessionTradeBuffer
-	maxSessionTradeBufferSize := 0
+
+	maxSessionTradeBufferSize := defaultMaxSessionTradeBufferSize
 	if environ.environmentConfig != nil && environ.environmentConfig.MaxSessionTradeBufferSize > 0 {
 		maxSessionTradeBufferSize = environ.environmentConfig.MaxSessionTradeBufferSize
 	}
 
-	session.Trades[symbol] = &types.TradeSlice{Trades: nil}
+	session.Trades[symbol] = types.NewTradeSlice(100)
 
 	if !disableSessionTradeBuffer {
 		session.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
