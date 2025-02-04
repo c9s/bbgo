@@ -12,8 +12,8 @@ type RBTree struct {
 }
 
 func NewRBTree() *RBTree {
-	var root = NewNil()
-	root.parent = NewNil()
+	var root = newNilNode()
+	root.parent = newNilNode()
 	return &RBTree{
 		Root: root,
 	}
@@ -142,15 +142,15 @@ func (tree *RBTree) DeleteFixup(current *RBNode) {
 }
 
 func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
-	var y = NewNil()
+	var y *RBNode = nil
 	var x = tree.Root
 	var node = &RBNode{
 		key:    key,
 		value:  val,
 		color:  Red,
-		left:   NewNil(),
-		right:  NewNil(),
-		parent: NewNil(),
+		left:   newNilNode(),
+		right:  newNilNode(),
+		parent: newNilNode(),
 	}
 
 	for !x.isNil() {
@@ -167,29 +167,32 @@ func (tree *RBTree) Upsert(key, val fixedpoint.Value) {
 		}
 	}
 
-	node.parent = y
-
-	if y.isNil() {
+	if y == nil {
 		tree.Root = node
-	} else if node.key.Compare(y.key) < 0 {
-		y.left = node
+		node.parent = newNilNode()
 	} else {
-		y.right = node
+		node.parent = y
+
+		if node.key.Compare(y.key) < 0 {
+			y.left = node
+		} else {
+			y.right = node
+		}
 	}
 
 	tree.InsertFixup(node)
 }
 
 func (tree *RBTree) Insert(key, val fixedpoint.Value) {
-	var y = NewNil()
+	var y = newNilNode()
 	var x = tree.Root
 	var node = &RBNode{
 		key:    key,
 		value:  val,
 		color:  Red,
-		left:   NewNil(),
-		right:  NewNil(),
-		parent: NewNil(),
+		left:   newNilNode(),
+		right:  newNilNode(),
+		parent: newNilNode(),
 	}
 
 	for !x.isNil() {
