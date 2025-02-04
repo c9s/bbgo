@@ -12,7 +12,7 @@ require (
 	github.com/adshao/go-binance/v2 v2.6.0
 	github.com/c-bata/goptuna v0.8.1
 	github.com/c9s/requestgen v1.4.3
-	github.com/c9s/rockhopper/v2 v2.0.4
+	github.com/c9s/rockhopper/v2 v2.0.6
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/cheggaaa/pb/v3 v3.0.8
 	github.com/codingconcepts/env v0.0.0-20200821220118-a8fbf8d84482
@@ -153,7 +153,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
 	golang.org/x/arch v0.9.0 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
-	golang.org/x/exp v0.0.0-20240404231335-c0f41cb1a7a0 // indirect
+	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/image v0.22.0 // indirect
 	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/net v0.28.0 // indirect

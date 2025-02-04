@@ -25,6 +25,12 @@ type TradeSlice struct {
 	Trades []Trade
 }
 
+func NewTradeSlice(cap int) *TradeSlice {
+	return &TradeSlice{
+		Trades: make([]Trade, 0, cap),
+	}
+}
+
 func (s *TradeSlice) Copy() []Trade {
 	s.mu.Lock()
 	slice := make([]Trade, len(s.Trades))
