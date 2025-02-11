@@ -140,6 +140,10 @@ type ExchangeMarketDataService interface {
 	QueryKLines(ctx context.Context, symbol string, interval Interval, options KLineQueryOptions) ([]KLine, error)
 }
 
+type OTCExchange interface {
+	RequestForQuote(ctx context.Context, symbol string, side SideType, quantity fixedpoint.Value) (submitOrder SubmitOrder, err error)
+}
+
 type CustomIntervalProvider interface {
 	SupportedInterval() map[Interval]int
 	IsSupportedInterval(interval Interval) bool
