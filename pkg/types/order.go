@@ -135,6 +135,9 @@ func (o OrderStatus) Closed() bool {
 type SubmitOrder struct {
 	ClientOrderID string `json:"clientOrderID,omitempty" db:"client_order_id"`
 
+	// QuoteID is for OTC exchange
+	QuoteID string `json:"quoteID,omitempty" db:"quote_id"`
+
 	Symbol string    `json:"symbol" db:"symbol"`
 	Side   SideType  `json:"side" db:"side"`
 	Type   OrderType `json:"orderType" db:"order_type"`

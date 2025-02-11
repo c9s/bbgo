@@ -4,8 +4,6 @@ module github.com/c9s/bbgo
 
 go 1.21.6
 
-toolchain go1.21.6
-
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/squirrel v1.5.3
