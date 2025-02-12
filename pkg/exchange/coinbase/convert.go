@@ -1,0 +1,59 @@
+package coinbase
+
+import (
+	"hash/fnv"
+	"math"
+
+	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
+)
+
+func toGlobalOrder(cbOrder *api.Order) *types.Order {
+	return &types.Order{
+		Exchange:       types.ExchangeCoinBase,
+		Status:         cbOrder.Status.GlobalOrderStatus(),
+		UUID:           cbOrder.ID,
+		OriginalStatus: string(cbOrder.Status),
+		CreationTime:   types.Time(cbOrder.CreatedAt),
+	}
+}
+
+func toGlobalTrade(cbTrade *api.Trade) *types.Trade {
+	return &types.Trade{
+		ID:            uint64(cbTrade.TradeID),
+		OrderID:       FNV64a(cbTrade.OrderID),
+		Exchange:      types.ExchangeCoinBase,
+		Price:         cbTrade.Price,
+		Quantity:      cbTrade.Size,
+		QuoteQuantity: cbTrade.Size.Mul(cbTrade.Price),
+		Symbol:        cbTrade.ProductID,
+		Side:          cbTrade.Side.GlobalSideType(),
+		IsBuyer:       cbTrade.Liquidity == "T",
+		IsMaker:       cbTrade.Liquidity == "M",
+		Fee:           cbTrade.Fee,
+		FeeCurrency:   cbTrade.FundingCurrency,
+	}
+}
+
+func toGlobalMarket(cbMarket *api.MarketInfo) *types.Market {
+	pricePrecision := int(math.Log10(fixedpoint.One.Div(cbMarket.QuoteIncrement).Float64()))
+	volumnPrecision := int(math.Log10(fixedpoint.One.Div(cbMarket.BaseIncrement).Float64()))
+	return &types.Market{
+		Exchange:        types.ExchangeCoinBase,
+		Symbol:          toGlobalSymbol(cbMarket.ID),
+		LocalSymbol:     cbMarket.ID,
+		PricePrecision:  pricePrecision,
+		VolumePrecision: volumnPrecision,
+		QuoteCurrency:   cbMarket.QuoteCurrency,
+		BaseCurrency:    cbMarket.BaseCurrency,
+		MinNotional:     cbMarket.MinMarketFunds,
+	}
+}
+
+func FNV64a(text string) uint64 {
+	hash := fnv.New64a()
+	// In hash implementation, it says never return an error.
+	_, _ = hash.Write([]byte(text))
+	return hash.Sum64()
+}
