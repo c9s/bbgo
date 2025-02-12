@@ -14,7 +14,7 @@ import (
 type SnapshotFetcher func() (snapshot types.SliceOrderBook, finalUpdateID int64, err error)
 
 type Update struct {
-	FirstUpdateID, FinalUpdateID int64
+	FirstUpdateID, FinalUpdateID, PreviousUpdateID int64
 
 	// Object is the update object
 	Object types.SliceOrderBook
@@ -43,6 +43,9 @@ type Buffer struct {
 	bufferingPeriod time.Duration
 
 	logger *logrus.Entry
+
+	// isFutures indicates whether the buffer is for futures or spot
+	isFutures bool
 }
 
 func NewBuffer(fetcher SnapshotFetcher, bufferingPeriod time.Duration) *Buffer {
@@ -60,6 +63,10 @@ func (b *Buffer) SetLogger(logger *logrus.Entry) {
 
 func (b *Buffer) SetUpdateTimeout(d time.Duration) {
 	b.updateTimeout = d
+}
+
+func (b *Buffer) UseInFutures() {
+	b.isFutures = true
 }
 
 func (b *Buffer) resetSnapshot() {
@@ -121,30 +128,28 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 		finalUpdateID = finalArgs[0]
 	}
 
+	var previousUpdateID int64
+	if len(finalArgs) > 1 {
+		previousUpdateID = finalArgs[1]
+	}
+
 	u := Update{
-		FirstUpdateID: firstUpdateID,
-		FinalUpdateID: finalUpdateID,
-		Object:        o,
+		FirstUpdateID:    firstUpdateID,
+		FinalUpdateID:    finalUpdateID,
+		PreviousUpdateID: previousUpdateID,
+		Object:           o,
 	}
 
 	// if the snapshot is set to nil, we need to buffer the message
 	b.mu.Lock()
+	defer b.mu.Unlock()
 
+	// handle fetch signal
 	select {
 	case <-b.fetchC:
-		b.logger.Info("fetch signal received")
-		b.buffer = append(b.buffer, u)
-		b.resetSnapshot()
-		b.once.Reset()
-		b.once.Do(func() {
-			b.logger.Info("try fetching the snapshot due to fetch signal received")
-			go b.tryFetch()
-		})
-		b.mu.Unlock()
+		b.handleFetchSignal(u)
 		return nil
-
 	default:
-
 	}
 
 	// snapshot is nil means we haven't fetched the snapshot yet
@@ -155,7 +160,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 			b.logger.Info("try fetching the snapshot due to no snapshot")
 			go b.tryFetch()
 		})
-		b.mu.Unlock()
+
 		return nil
 	}
 
@@ -163,38 +168,62 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 
 	// skip older events
 	if u.FinalUpdateID <= b.finalUpdateID {
-		b.logger.Infof("the final update id %d of event is less than equal to the final update id %d of the snapshot, skip", u.FinalUpdateID, b.finalUpdateID)
-		b.mu.Unlock()
+		b.logger.Infof("the final update id %d of event is less than equal to the final update id %d of the snapshot, skip",
+			u.FinalUpdateID, b.finalUpdateID)
 		return nil
 	}
 
 	// if there is a missing update, we should reset the snapshot and re-fetch the snapshot
-	if u.FirstUpdateID > b.finalUpdateID+1 {
-		// drop the prior updates in the buffer since it's corrupted
-		b.buffer = []Update{u}
-		b.resetSnapshot()
-		b.once.Reset()
-		b.once.Do(func() {
-			b.logger.Info("try fetching the snapshot due to missing update")
-			go b.tryFetch()
-		})
-
-		b.mu.Unlock()
-		b.EmitReset()
-
-		return fmt.Errorf("found missing update between finalUpdateID %d and firstUpdateID %d, diff: %d",
-			b.finalUpdateID+1,
-			u.FirstUpdateID,
-			u.FirstUpdateID-b.finalUpdateID)
+	if err := b.checkMissingUpdates(u); err != nil {
+		return err
 	}
 
 	b.logger.Debugf("depth update id %d -> %d", b.finalUpdateID, u.FinalUpdateID)
 	b.finalUpdateID = u.FinalUpdateID
 	b.EmitPush(u)
 
-	b.mu.Unlock()
-
 	return nil
+}
+
+func (b *Buffer) handleFetchSignal(u Update) {
+	b.logger.Info("fetch signal received")
+	b.buffer = append(b.buffer, u)
+	b.resetSnapshot()
+	b.once.Reset()
+	b.once.Do(func() {
+		b.logger.Info("try fetching the snapshot due to fetch signal received")
+		go b.tryFetch()
+	})
+}
+
+func (b *Buffer) checkMissingUpdates(u Update) error {
+	if b.isFutures {
+		previousUpdateID := b.finalUpdateID
+		if previousUpdateID != 0 && u.PreviousUpdateID != previousUpdateID {
+			b.handleMissingUpdate(u)
+			return fmt.Errorf("found missing update, new event's previousUpdateID: %d not equal previous event's finalUpdateID: %d",
+				u.PreviousUpdateID, previousUpdateID)
+		}
+	} else {
+		if u.FirstUpdateID > b.finalUpdateID+1 {
+			b.handleMissingUpdate(u)
+			return fmt.Errorf("found missing update between finalUpdateID %d and firstUpdateID %d, diff: %d",
+				b.finalUpdateID+1, u.FirstUpdateID, u.FirstUpdateID-b.finalUpdateID)
+		}
+	}
+	return nil
+}
+
+func (b *Buffer) handleMissingUpdate(u Update) {
+	// drop the prior updates in the buffer since it's corrupted
+	b.buffer = []Update{u}
+	b.resetSnapshot()
+	b.once.Reset()
+	b.once.Do(func() {
+		b.logger.Info("try fetching the snapshot due to missing update")
+		go b.tryFetch()
+	})
+	b.EmitReset()
 }
 
 // tryFetch tries to fetch the snapshot and push the updates
@@ -230,29 +259,43 @@ func (b *Buffer) fetchAndPush() error {
 	}
 
 	var pushUpdates []Update
-	for idx, u := range b.buffer {
-		// skip old events
-		if u.FinalUpdateID <= finalUpdateID {
-			continue
+	if b.isFutures {
+		for _, u := range b.buffer {
+			if u.FinalUpdateID < finalUpdateID {
+				continue
+			}
+			if u.FirstUpdateID <= finalUpdateID && u.FinalUpdateID >= finalUpdateID {
+				pushUpdates = append(pushUpdates, u)
+			}
 		}
+	} else {
+		for idx, u := range b.buffer {
+			// skip old events
+			if u.FinalUpdateID <= finalUpdateID {
+				continue
+			}
 
-		if u.FirstUpdateID > finalUpdateID+1 {
-			// drop prior updates in the buffer since it's corrupted
-			b.buffer = b.buffer[idx:]
-			b.mu.Unlock()
-			return fmt.Errorf("there is a missing depth update, the update id %d > final update id %d + 1", u.FirstUpdateID, finalUpdateID)
+			if u.FirstUpdateID > finalUpdateID+1 {
+				// drop prior updates in the buffer since it's corrupted
+				b.buffer = b.buffer[idx:]
+				b.mu.Unlock()
+				return fmt.Errorf("there is a missing depth update, the update id %d > final update id %d + 1", u.FirstUpdateID, finalUpdateID)
+			}
+
+			pushUpdates = append(pushUpdates, u)
+
+			// update the final update id to the correct final update id
+			finalUpdateID = u.FinalUpdateID
 		}
-
-		pushUpdates = append(pushUpdates, u)
-
-		// update the final update id to the correct final update id
-		finalUpdateID = u.FinalUpdateID
 	}
 
 	// clean the buffer since we have filtered out the buffer we want
 	b.buffer = nil
 
 	// set the final update ID so that we will know if there is an update missing
+	if b.isFutures && len(pushUpdates) > 0 {
+		finalUpdateID = pushUpdates[0].FinalUpdateID
+	}
 	b.finalUpdateID = finalUpdateID
 
 	// set the snapshot

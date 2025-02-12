@@ -92,6 +92,11 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 				log.Infof("fetching %s depth...", e.Symbol)
 				return ex.QueryDepth(context.Background(), e.Symbol)
 			}, 3*time.Second)
+
+			if ex.IsFutures {
+				f.UseInFutures()
+			}
+
 			f.SetLogger(logrus.WithFields(logrus.Fields{"exchange": "binance", "symbol": e.Symbol, "component": "depthBuffer"}))
 			f.OnReady(func(snapshot types.SliceOrderBook, updates []depth.Update) {
 				stream.EmitBookSnapshot(snapshot)
@@ -110,7 +115,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 			Time:   e.EventBase.Time.Time(),
 			Bids:   e.Bids,
 			Asks:   e.Asks,
-		}, e.FirstUpdateID, e.FinalUpdateID); err != nil {
+		}, e.FirstUpdateID, e.FinalUpdateID, e.PreviousUpdateID); err != nil {
 			log.WithError(err).Errorf("found missing %s update event", e.Symbol)
 		}
 	})

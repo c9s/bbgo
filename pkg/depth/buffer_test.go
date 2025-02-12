@@ -173,3 +173,45 @@ func TestDepthBuffer_ConcurrentRun(t *testing.T) {
 		}
 	}
 }
+
+func TestDepthBuffer_FuturesReadyState(t *testing.T) {
+	buf := NewBuffer(func() (book types.SliceOrderBook, finalID int64, err error) {
+		return types.SliceOrderBook{
+			Bids: types.PriceVolumeSlice{
+				{Price: itov(100), Volume: itov(1)},
+			},
+			Asks: types.PriceVolumeSlice{
+				{Price: itov(99), Volume: itov(1)},
+			},
+		}, 33, nil
+	}, time.Millisecond*5)
+
+	buf.UseInFutures()
+
+	readyC := make(chan struct{})
+	buf.OnReady(func(snapshot types.SliceOrderBook, updates []Update) {
+		assert.Equal(t, len(updates), 33)
+		close(readyC)
+	})
+
+	var updateID int64 = 1
+	for ; updateID < 100; updateID++ {
+		err := buf.AddUpdate(
+			types.SliceOrderBook{
+				Bids: types.PriceVolumeSlice{
+					{Price: itov(100), Volume: itov(updateID)},
+				},
+				Asks: types.PriceVolumeSlice{
+					{Price: itov(99), Volume: itov(updateID)},
+				},
+			}, updateID, updateID+33)
+
+		assert.NoError(t, err)
+	}
+
+	select {
+	case <-readyC:
+	case <-time.After(time.Minute):
+		t.Fail()
+	}
+}
