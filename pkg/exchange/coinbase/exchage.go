@@ -15,6 +15,11 @@ import (
 var (
 	// Rate Limit: 10 requests per 2 seconds, Rate limit rule: UserID
 	queryAccountLimiter = rate.NewLimiter(rate.Every(200*time.Millisecond), 1)
+
+	// compile time check: implemented interface
+	_ types.Exchange                  = &Exchange{}
+	_ types.ExchangeMarketDataService = &Exchange{}
+	_ types.CustomIntervalProvider    = &Exchange{}
 )
 
 const (
@@ -26,8 +31,6 @@ const (
 var log = logrus.WithField("exchange", ID)
 
 type Exchange struct {
-	types.MarginSettings
-
 	client                  *api.RestAPIClient
 	key, secret, passphrase string
 }
@@ -40,6 +43,25 @@ func New(key, secret, passphrase string) *Exchange {
 		secret:     secret,
 		passphrase: passphrase,
 	}
+}
+
+// CustomIntervalProvider
+var supportedIntervalMap = map[types.Interval]int{
+	types.Interval1m:  60,
+	types.Interval5m:  5 * 60,
+	types.Interval15m: 15 * 60,
+	types.Interval1h:  60 * 60,
+	types.Interval6h:  6 * 60 * 60,
+	types.Interval1d:  24 * 60 * 60,
+}
+
+func (e *Exchange) SupportedInterval() map[types.Interval]int {
+	return supportedIntervalMap
+}
+
+func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
+	_, ok := supportedIntervalMap[interval]
+	return ok
 }
 
 // ExchangeMinimal
@@ -178,7 +200,12 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	return nil, nil
+	req := e.client.NewGetTickerRequest(toLocalSymbol(symbol))
+	ticker, err := req.Do(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get ticker: %v", symbol)
+	}
+	return toGlobalTicker(ticker), nil
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
@@ -186,8 +213,19 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
+	if !e.IsSupportedInterval(interval) {
+		return nil, errors.Errorf("unsupported interval: %v", interval)
+	}
+	// default limit is 300, which is the maximum limit of the Coinbase Exchange API
+	if options.Limit == 0 {
+		options.Limit = 300
+	}
+	if options.Limit > 300 {
+		log.Warnf("limit %d is greater than the maximum limit 300, set to 300", options.Limit)
+		options.Limit = 300
+	}
 	var start, end *string
-	granity := string(interval)
+	granity := interval.String()
 	req := e.client.NewGetCandlesRequest(toLocalSymbol(symbol), &granity, start, end)
 	candles, err := req.Do(ctx)
 	if err != nil {
