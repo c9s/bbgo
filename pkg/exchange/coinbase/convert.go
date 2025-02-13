@@ -57,3 +57,19 @@ func FNV64a(text string) uint64 {
 	_, _ = hash.Write([]byte(text))
 	return hash.Sum64()
 }
+
+func toGlobalKline(symbol string, granity string, candle *api.Candle) *types.KLine {
+	kline := types.KLine{
+		Exchange:  types.ExchangeCoinBase,
+		Symbol:    symbol,
+		StartTime: types.Time(candle.Time),
+		EndTime:   types.Time(candle.Time.Add(types.Interval(granity).Duration())),
+		Interval:  types.Interval(granity),
+		Open:      candle.Open,
+		Close:     candle.Close,
+		High:      candle.High,
+		Low:       candle.Low,
+		Volume:    candle.Volume,
+	}
+	return &kline
+}
