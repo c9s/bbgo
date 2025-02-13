@@ -186,7 +186,21 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
-	return nil, nil
+	var start, end *string
+	granity := string(interval)
+	req := e.client.NewGetCandlesRequest(toLocalSymbol(symbol), &granity, start, end)
+	candles, err := req.Do(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get klines(%v): %v", interval, symbol)
+	}
+	if len(candles) > options.Limit {
+		candles = candles[:options.Limit]
+	}
+	klines := make([]types.KLine, 0, len(candles))
+	for _, candle := range candles {
+		klines = append(klines, *toGlobalKline(symbol, granity, &candle))
+	}
+	return klines, nil
 }
 
 // ExchangeOrderQueryService
