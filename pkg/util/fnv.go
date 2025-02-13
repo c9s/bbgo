@@ -7,3 +7,9 @@ func FNV32(s string) uint32 {
 	h.Write([]byte(s))
 	return h.Sum32()
 }
+
+func FNV64(s string) uint64 {
+	h := fnv.New64a()
+	h.Write([]byte(s))
+	return h.Sum64()
+}
