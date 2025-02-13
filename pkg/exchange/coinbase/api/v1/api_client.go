@@ -34,15 +34,19 @@ type RestAPIClient struct {
 	requestgen.BaseAPIClient
 
 	key, secret, passphrase string
+	timeout                 time.Duration
 }
 
 func NewClient(
-	key, secret, passphrase string,
+	key, secret, passphrase string, timeout time.Duration,
 ) RestAPIClient {
+	if timeout == 0 {
+		timeout = DefaultHTTPTimeout
+	}
 	return RestAPIClient{
 		BaseAPIClient: requestgen.BaseAPIClient{
 			BaseURL:    parsedBaseURL,
-			HttpClient: &http.Client{Timeout: DefaultHTTPTimeout},
+			HttpClient: &http.Client{Timeout: timeout},
 		},
 		key:        key,
 		secret:     secret,
