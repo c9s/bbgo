@@ -73,3 +73,13 @@ func toGlobalKline(symbol string, granity string, candle *api.Candle) *types.KLi
 	}
 	return &kline
 }
+
+func toGlobalTicker(cbTicker *api.Ticker) *types.Ticker {
+	ticker := types.Ticker{
+		Time:   cbTicker.Time,
+		Volume: cbTicker.Volume,
+		Buy:    cbTicker.Bid,
+		Sell:   cbTicker.Ask,
+	}
+	return &ticker
+}

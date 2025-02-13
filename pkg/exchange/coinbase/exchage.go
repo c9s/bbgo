@@ -25,23 +25,18 @@ var (
 const (
 	ID            = "coinbase"
 	PlatformToken = "COIN"
-	APITimeout    = 15 * time.Second
 )
 
 var log = logrus.WithField("exchange", ID)
 
 type Exchange struct {
-	client                  *api.RestAPIClient
-	key, secret, passphrase string
+	client *api.RestAPIClient
 }
 
-func New(key, secret, passphrase string) *Exchange {
-	client := api.NewClient(key, secret, passphrase)
+func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
+	client := api.NewClient(key, secret, passphrase, timeout)
 	return &Exchange{
-		client:     &client,
-		key:        key,
-		secret:     secret,
-		passphrase: passphrase,
+		client: &client,
 	}
 }
 
@@ -209,7 +204,15 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 }
 
 func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
-	return nil, nil
+	tickers := make(map[string]types.Ticker)
+	for _, s := range symbol {
+		ticker, err := e.QueryTicker(ctx, s)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get tickers")
+		}
+		tickers[s] = *ticker
+	}
+	return tickers, nil
 }
 
 func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
