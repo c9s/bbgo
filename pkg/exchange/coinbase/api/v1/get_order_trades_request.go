@@ -38,3 +38,9 @@ type GetOrderTradesRequest struct {
 	startDate  *string     `param:"start_date"`
 	endDate    *string     `param:"end_date"`
 }
+
+func (c *RestAPIClient) NewGetOrderTradesRequest() *GetOrderTradesRequest {
+	return &GetOrderTradesRequest{
+		client: c,
+	}
+}

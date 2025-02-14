@@ -2,7 +2,6 @@ package coinbase
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
 
@@ -57,12 +56,8 @@ type CreateOrderRequest struct {
 	clientOrderID *string `param:"client_oid"`
 }
 
-func (client *RestAPIClient) NewCreateOrderRequest(order types.SubmitOrder) *CreateOrderRequest {
+func (client *RestAPIClient) NewCreateOrderRequest() *CreateOrderRequest {
 	return &CreateOrderRequest{
-		client:    client,
-		orderType: string(order.Type),
-		side:      string(order.Side),
-		productID: order.Symbol,
-		size:      order.Quantity.String(),
+		client: client,
 	}
 }

@@ -75,3 +75,17 @@ type GetSingleOrderRequest struct {
 
 	orderID string `param:"order_id,required"`
 }
+
+func (client *RestAPIClient) NewGetOrdersRequest() *GetOrdersRequest {
+	req := GetOrdersRequest{
+		client: client,
+	}
+	return &req
+}
+
+func (client *RestAPIClient) NewSingleOrderRequst() *GetSingleOrderRequest {
+	req := GetSingleOrderRequest{
+		client: client,
+	}
+	return &req
+}
