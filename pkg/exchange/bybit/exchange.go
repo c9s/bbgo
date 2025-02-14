@@ -229,6 +229,9 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	if err != nil {
 		return nil, fmt.Errorf("failed to query order, queryConfig: %+v, err: %w", q, err)
 	}
+	if len(res.List) == 0 {
+		return nil, fmt.Errorf("order not found, queryConfig: %+v", q)
+	}
 	if len(res.List) != 1 {
 		return nil, fmt.Errorf("unexpected order histories length: %d, queryConfig: %+v", len(res.List), q)
 	}
