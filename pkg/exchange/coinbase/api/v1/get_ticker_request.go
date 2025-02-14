@@ -26,9 +26,8 @@ type GetTickerRequest struct {
 	productID string `param:"product_id,required"`
 }
 
-func (client *RestAPIClient) NewGetTickerRequest(productID string) *GetTickerRequest {
+func (client *RestAPIClient) NewGetTickerRequest() *GetTickerRequest {
 	return &GetTickerRequest{
-		client:    client,
-		productID: productID,
+		client: client,
 	}
 }

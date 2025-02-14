@@ -14,6 +14,6 @@ type CancelOrderRequest struct {
 	productID *string `param:"product_id"`
 }
 
-func (c *RestAPIClient) NewCancelOrderRequest(orderID string) *CancelOrderRequest {
-	return &CancelOrderRequest{client: c, orderID: orderID}
+func (c *RestAPIClient) NewCancelOrderRequest() *CancelOrderRequest {
+	return &CancelOrderRequest{client: c}
 }

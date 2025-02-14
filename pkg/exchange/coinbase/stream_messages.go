@@ -4,6 +4,7 @@ package coinbase
 import (
 	"time"
 
+	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
@@ -98,7 +99,7 @@ type RfqMessage struct {
 	ProductID    string           `json:"product_id"`
 	Size         fixedpoint.Value `json:"size"`
 	Price        fixedpoint.Value `json:"price"`
-	Side         SideType         `json:"side"`
+	Side         api.SideType     `json:"side"`
 }
 
 type TickerMessage struct {
@@ -114,7 +115,7 @@ type TickerMessage struct {
 	BestBidSize fixedpoint.Value `json:"best_bid_size"`
 	BestAsk     fixedpoint.Value `json:"best_ask"`
 	BestAskSize fixedpoint.Value `json:"best_ask_size"`
-	Side        SideType         `json:"side"`
+	Side        api.SideType     `json:"side"`
 	Time        time.Time        `json:"time"`
 	TradeID     int              `json:"trade_id"`
 	LastSize    fixedpoint.Value `json:"last_size"`
@@ -123,11 +124,11 @@ type TickerMessage struct {
 type ReceivedLimitOrderMessage struct {
 	seqenceMessageType
 
-	ClientOid string    `json:"client-oid"`
-	OrderID   string    `json:"order_id"`
-	OrderType string    `json:"order_type"`
-	Side      SideType  `json:"side"`
-	Time      time.Time `json:"time"`
+	ClientOid string       `json:"client-oid"`
+	OrderID   string       `json:"order_id"`
+	OrderType string       `json:"order_type"`
+	Side      api.SideType `json:"side"`
+	Time      time.Time    `json:"time"`
 
 	// limit order fields
 	Size  fixedpoint.Value `json:"size"`
@@ -137,11 +138,11 @@ type ReceivedLimitOrderMessage struct {
 type ReceivedMarketOrderMessage struct {
 	seqenceMessageType
 
-	ClientOid string    `json:"client-oid"`
-	OrderID   string    `json:"order_id"`
-	OrderType string    `json:"order_type"`
-	Side      SideType  `json:"side"`
-	Time      time.Time `json:"time"`
+	ClientOid string       `json:"client-oid"`
+	OrderID   string       `json:"order_id"`
+	OrderType string       `json:"order_type"`
+	Side      api.SideType `json:"side"`
+	Time      time.Time    `json:"time"`
 
 	// market order fields
 	Funds fixedpoint.Value `json:"funds"`
@@ -154,7 +155,7 @@ type OpenMessage struct {
 	OrderID       string           `json:"order_id"`
 	Price         fixedpoint.Value `json:"price"`
 	RemainingSize fixedpoint.Value `json:"remaining_size"`
-	Side          SideType         `json:"side"`
+	Side          api.SideType     `json:"side"`
 }
 
 type DoneMessage struct {
@@ -178,7 +179,7 @@ type MatchMessage struct {
 	Time         time.Time        `json:"time"`
 	Size         fixedpoint.Value `json:"size"`
 	Price        fixedpoint.Value `json:"price"`
-	Side         SideType         `json:"side"`
+	Side         api.SideType     `json:"side"`
 }
 
 type AuthTakerMatchMessage struct {
@@ -211,7 +212,7 @@ type changeMessageType struct {
 	Reason  string           `json:"reason"` // "STP" or "modify_order"
 	Time    time.Time        `json:"time"`
 	OrderID string           `json:"order_id"`
-	Side    SideType         `json:"side"`
+	Side    api.SideType     `json:"side"`
 	OldSize fixedpoint.Value `json:"old_size"`
 	NewSize fixedpoint.Value `json:"new_size"`
 }
@@ -240,7 +241,7 @@ type ActiveMessage struct {
 	ProfileID string           `json:"profile_id"`
 	OrderID   string           `json:"order_id"`
 	StopType  string           `json:"stop_type"`
-	Side      SideType         `json:"side"`
+	Side      api.SideType     `json:"side"`
 	StopPrice fixedpoint.Value `json:"stop_price"`
 	Size      fixedpoint.Value `json:"size"`
 	Funds     fixedpoint.Value `json:"funds"`

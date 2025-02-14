@@ -88,7 +88,8 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 		return nil, err
 	}
 
-	accounts, err := e.client.GetBalances(ctx)
+	req := e.client.NewGetBalancesRequest()
+	accounts, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +106,8 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 
 // ExchangeTradeService
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
-	res, err := e.client.CreateOrder(ctx, order)
+	req := e.client.NewCreateOrderRequest().OrderType(string(order.Type)).Side(string(order.Side)).ProductID(toLocalSymbol(order.Symbol)).Size(order.Quantity.String())
+	res, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -133,29 +135,33 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 	before := time.Now()
 	localSymbol := toLocalSymbol(symbol)
 	paginationLimit := 1000
-	cbOrders, err := e.client.GetOrders(ctx, localSymbol, status, paginationLimit, &sortedBy, &sorting, &before)
+	getOrdersReq := e.client.NewGetOrdersRequest()
+	getOrdersReq.ProductID(localSymbol).Status(status).SortedBy(sortedBy).Sorting(sorting).Before(before).Limit(paginationLimit)
+	cbOrders, err := getOrdersReq.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get orders")
 	}
 
-	done := false
-	if len(cbOrders) < 1000 || len(cbOrders) == 0 {
-		done = true
+	if len(cbOrders) < paginationLimit {
+		return cbOrders, nil
 	}
+
+	done := false
 	for {
 		if done {
 			break
 		}
 
 		before = cbOrders[len(cbOrders)-1].CreatedAt
-		new_orders, err := e.client.GetOrders(ctx, localSymbol, status, paginationLimit, &sortedBy, &sorting, &before)
+		getOrdersReq.Before(before)
+		newOrders, err := getOrdersReq.Do(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get orders while paginating")
 		}
-		if len(new_orders) < paginationLimit {
+		if len(newOrders) < paginationLimit {
 			done = true
 		}
-		cbOrders = append(cbOrders, new_orders...)
+		cbOrders = append(cbOrders, newOrders...)
 	}
 	return cbOrders, nil
 }
@@ -163,7 +169,7 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	failedOrderIDs := make([]string, 0)
 	for _, order := range orders {
-		req := e.client.NewCancelOrderRequest(order.UUID)
+		req := e.client.NewCancelOrderRequest().OrderID(order.UUID)
 		res, err := req.Do(ctx)
 		if err != nil {
 			log.WithError(err).Errorf("failed to cancel order: %v", order.UUID)
@@ -183,7 +189,8 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-	markets, err := e.client.GetMarketInfo(ctx)
+	req := e.client.NewGetMarketInfoRequest()
+	markets, err := req.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get markets")
 	}
@@ -195,7 +202,7 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	req := e.client.NewGetTickerRequest(toLocalSymbol(symbol))
+	req := e.client.NewGetTickerRequest().ProductID(toLocalSymbol(symbol))
 	ticker, err := req.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get ticker: %v", symbol)
@@ -227,9 +234,8 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		log.Warnf("limit %d is greater than the maximum limit 300, set to 300", options.Limit)
 		options.Limit = 300
 	}
-	var start, end *string
 	granity := interval.String()
-	req := e.client.NewGetCandlesRequest(toLocalSymbol(symbol), &granity, start, end)
+	req := e.client.NewGetCandlesRequest().ProductID(toLocalSymbol(symbol)).Granularity(granity)
 	candles, err := req.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get klines(%v): %v", interval, symbol)
@@ -246,7 +252,8 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 // ExchangeOrderQueryService
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
-	cbOrder, err := e.client.GetSingleOrder(ctx, q.OrderID)
+	req := e.client.NewSingleOrderRequst().OrderID(q.OrderID)
+	cbOrder, err := req.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get order: %v", q.OrderID)
 	}
@@ -267,23 +274,26 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 
 func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, orderID string) (api.TradeSnapshot, error) {
 	paginationLimit := 100
-	cbTrades, err := e.client.GetOrderTrades(ctx, orderID, paginationLimit, nil)
+	req := e.client.NewGetOrderTradesRequest().OrderID(orderID).Limit(paginationLimit)
+	cbTrades, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if len(cbTrades) < paginationLimit {
 		return cbTrades, nil
 	}
-	done := false
-	if len(cbTrades) < paginationLimit || len(cbTrades) == 0 {
-		done = true
+
+	if len(cbTrades) < paginationLimit {
+		return cbTrades, nil
 	}
+	done := false
 	for {
 		if done {
 			break
 		}
 		lastTrade := cbTrades[len(cbTrades)-1]
-		newTrades, err := e.client.GetOrderTrades(ctx, orderID, paginationLimit, &lastTrade.OrderID)
+		req.Before(lastTrade.OrderID)
+		newTrades, err := req.Do(ctx)
 		if err != nil {
 			return nil, err
 		}

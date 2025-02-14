@@ -14,6 +14,7 @@ func toGlobalOrder(cbOrder *api.Order) *types.Order {
 		Exchange:       types.ExchangeCoinBase,
 		Status:         cbOrder.Status.GlobalOrderStatus(),
 		UUID:           cbOrder.ID,
+		OrderID:        FNV64a(cbOrder.ID),
 		OriginalStatus: string(cbOrder.Status),
 		CreationTime:   types.Time(cbOrder.CreatedAt),
 	}

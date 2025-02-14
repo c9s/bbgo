@@ -30,17 +30,9 @@ type GetCandlesRequest struct {
 	end         *string `param:"end"`
 }
 
-func (client *RestAPIClient) NewGetCandlesRequest(
-	productID string,
-	granularity, start, end *string,
-) *GetCandlesRequest {
+func (client *RestAPIClient) NewGetCandlesRequest() *GetCandlesRequest {
 	req := GetCandlesRequest{
 		client: client,
-		start:  start,
-		end:    end,
-	}
-	if granularity == nil {
-		req.Granularity("60")
 	}
 	return &req
 }
