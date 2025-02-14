@@ -1,10 +1,10 @@
 package coinbase
 
 import (
-	"encoding/json"
 	"strings"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
@@ -20,35 +20,35 @@ func (s *OrderStatus) GlobalOrderStatus() types.OrderStatus {
 }
 
 type Order struct {
-	Type      string      `json:"type"`
-	Size      json.Number `json:"size"`
-	Side      string      `json:"side"`
-	ProductID string      `json:"product_id"`
+	Type      string           `json:"type"`
+	Size      fixedpoint.Value `json:"size"`
+	Side      string           `json:"side"`
+	ProductID string           `json:"product_id"`
 	// ClientOID must be uuid
-	ClientOID string      `json:"client_oid"`
-	Stop      string      `json:"stop"`
-	StopPrice json.Number `json:"stop_price"`
+	ClientOID string           `json:"client_oid"`
+	Stop      string           `json:"stop"`
+	StopPrice fixedpoint.Value `json:"stop_price"`
 
 	// Limit Order
-	Price       json.Number `json:"price"`
-	TimeInForce string      `json:"time_in_force"`
-	PostOnly    bool        `json:"post_only"`
-	CancelAfter string      `json:"cancel_after"`
+	Price       fixedpoint.Value `json:"price"`
+	TimeInForce string           `json:"time_in_force"`
+	PostOnly    bool             `json:"post_only"`
+	CancelAfter string           `json:"cancel_after"`
 
 	// Market Order
-	Funds          json.Number `json:"funds"`
-	SpecifiedFunds json.Number `json:"specified_funds"`
+	Funds          fixedpoint.Value `json:"funds"`
+	SpecifiedFunds fixedpoint.Value `json:"specified_funds"`
 
 	// Response Fields
-	ID            string      `json:"id"`
-	Status        OrderStatus `json:"status"`
-	Settled       bool        `json:"settled"`
-	DoneReason    string      `json:"done_reason"`
-	DoneAt        time.Time   `json:"done_at"`
-	CreatedAt     time.Time   `json:"created_at"`
-	FillFees      json.Number `json:"fill_fees"`
-	FilledSize    json.Number `json:"filled_size"`
-	ExecutedValue json.Number `json:"executed_value"`
+	ID            string           `json:"id"`
+	Status        OrderStatus      `json:"status"`
+	Settled       bool             `json:"settled"`
+	DoneReason    string           `json:"done_reason"`
+	DoneAt        time.Time        `json:"done_at"`
+	CreatedAt     time.Time        `json:"created_at"`
+	FillFees      fixedpoint.Value `json:"fill_fees"`
+	FilledSize    fixedpoint.Value `json:"filled_size"`
+	ExecutedValue fixedpoint.Value `json:"executed_value"`
 }
 
 type OrderSnapshot []Order

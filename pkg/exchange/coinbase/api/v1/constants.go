@@ -54,3 +54,27 @@ const (
 	OrderStatusReceived OrderStatus = "received"
 	OrderStatusAll      OrderStatus = "all"
 )
+
+type OrderType string
+
+const (
+	OrderTypeLimit  OrderType = "limit"
+	OrderTypeMarket OrderType = "market"
+	OrderTypeStop   OrderType = "stop"
+)
+
+type TimeInForceType string
+
+const (
+	TimeInForceGTC TimeInForceType = "GTC"
+	TimeInForceGTT TimeInForceType = "GTT"
+	TimeInForceIOC TimeInForceType = "IOC"
+	TimeInForceFOK TimeInForceType = "FOK"
+)
+
+type OrderStopType string
+
+const (
+	OrderStopTypeLoss  OrderStopType = "loss"
+	OrderStopTypeEntry OrderStopType = "entry"
+)
