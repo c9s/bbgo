@@ -4,34 +4,8 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
-
-type Liquidity string
-
-const (
-	LiquidityMaker Liquidity = "M"
-	LiquidityTaker Liquidity = "T"
-	LiquidityOther Liquidity = "O"
-)
-
-type SideType string
-
-const (
-	SideTypeBuy  SideType = "buy"
-	SideTypeSell SideType = "sell"
-)
-
-func (s *SideType) GlobalSideType() types.SideType {
-	switch *s {
-	case SideTypeBuy:
-		return types.SideTypeBuy
-	case SideTypeSell:
-		return types.SideTypeSell
-	}
-	return types.SideTypeNone
-}
 
 type Trade struct {
 	TradeID         int              `json:"trade_id"`
@@ -51,13 +25,6 @@ type Trade struct {
 }
 
 type TradeSnapshot []Trade
-
-type MarketType string
-
-const (
-	MarketTypeSpot MarketType = "spot"
-	MarketTypeRfq  MarketType = "rfq"
-)
 
 //go:generate requestgen -method GET -url "/orders/fills" -type GetOrderTradesRequest -responseType .TradeSnapshot
 type GetOrderTradesRequest struct {

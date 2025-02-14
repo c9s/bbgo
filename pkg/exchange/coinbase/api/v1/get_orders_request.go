@@ -9,18 +9,6 @@ import (
 	"github.com/c9s/requestgen"
 )
 
-type OrderStatus string
-
-const (
-	OrderStatusOpen     OrderStatus = "open"
-	OrderStatusPending  OrderStatus = "pending"
-	OrderStatusRejected OrderStatus = "rejected"
-	OrderStatusDone     OrderStatus = "done"
-	OrderStatusActive   OrderStatus = "active"
-	OrderStatusReceived OrderStatus = "received"
-	OrderStatusAll      OrderStatus = "all"
-)
-
 func (s *OrderStatus) GlobalOrderStatus() types.OrderStatus {
 	switch *s {
 	case OrderStatusRejected:
