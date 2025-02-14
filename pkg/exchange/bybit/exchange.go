@@ -230,7 +230,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		return nil, fmt.Errorf("failed to query order, queryConfig: %+v, err: %w", q, err)
 	}
 	if len(res.List) != 1 {
-		return nil, fmt.Errorf("unexpected order length, queryConfig: %+v", q)
+		return nil, fmt.Errorf("unexpected order histories length: %d, queryConfig: %+v", len(res.List), q)
 	}
 
 	return toGlobalOrder(res.List[0])
