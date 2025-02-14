@@ -20,35 +20,35 @@ func (s *OrderStatus) GlobalOrderStatus() types.OrderStatus {
 }
 
 type Order struct {
-	Type      string      `json:"type" db:"type"`
-	Size      json.Number `json:"size" db:"size"`
-	Side      string      `json:"side" db:"side"`
-	ProductID string      `json:"product_id" db:"product_id"`
+	Type      string      `json:"type"`
+	Size      json.Number `json:"size"`
+	Side      string      `json:"side"`
+	ProductID string      `json:"product_id"`
 	// ClientOID must be uuid
-	ClientOID string      `json:"client_oid" db:"client_oid"`
-	Stop      string      `json:"stop" db:"stop"`
-	StopPrice json.Number `json:"stop_price" db:"stop_price"`
+	ClientOID string      `json:"client_oid"`
+	Stop      string      `json:"stop"`
+	StopPrice json.Number `json:"stop_price"`
 
 	// Limit Order
-	Price       json.Number `json:"price" db:"price"`
-	TimeInForce string      `json:"time_in_force" db:"time_in_force"`
-	PostOnly    bool        `json:"post_only" db:"post_only"`
-	CancelAfter string      `json:"cancel_after" db:"cancel_after"`
+	Price       json.Number `json:"price"`
+	TimeInForce string      `json:"time_in_force"`
+	PostOnly    bool        `json:"post_only"`
+	CancelAfter string      `json:"cancel_after"`
 
 	// Market Order
-	Funds          json.Number `json:"funds" db:"funds"`
-	SpecifiedFunds json.Number `json:"specified_funds" db:"specified_funds"`
+	Funds          json.Number `json:"funds"`
+	SpecifiedFunds json.Number `json:"specified_funds"`
 
 	// Response Fields
-	ID            string      `json:"id" db:"order_id"`
-	Status        OrderStatus `json:"status" db:"status"`
-	Settled       bool        `json:"settled" db:"settled"`
-	DoneReason    string      `json:"done_reason" db:"done_reason"`
-	DoneAt        time.Time   `json:"done_at" db:"done_at"`
-	CreatedAt     time.Time   `json:"created_at" db:"created_at"`
-	FillFees      json.Number `json:"fill_fees" db:"fill_fees"`
-	FilledSize    json.Number `json:"filled_size" db:"filled_size"`
-	ExecutedValue json.Number `json:"executed_value" db:"executed_value"`
+	ID            string      `json:"id"`
+	Status        OrderStatus `json:"status"`
+	Settled       bool        `json:"settled"`
+	DoneReason    string      `json:"done_reason"`
+	DoneAt        time.Time   `json:"done_at"`
+	CreatedAt     time.Time   `json:"created_at"`
+	FillFees      json.Number `json:"fill_fees"`
+	FilledSize    json.Number `json:"filled_size"`
+	ExecutedValue json.Number `json:"executed_value"`
 }
 
 type OrderSnapshot []Order
