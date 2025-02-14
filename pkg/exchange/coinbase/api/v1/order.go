@@ -2,23 +2,15 @@ package coinbase
 
 import (
 	"context"
-	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func (client *RestAPIClient) GetOrders(ctx context.Context, symbol string, status []string, limit int,
-	sortedBy *string, sorting *string, before *time.Time) (OrderSnapshot, error) {
+func (client *RestAPIClient) NewGetOrdersRequest() *GetOrdersRequest {
 	req := GetOrdersRequest{
-		client:    client,
-		productID: &symbol,
-		status:    status,
-		limit:     limit,
-		sortedBy:  sortedBy,
-		sorting:   sorting,
-		before:    before,
+		client: client,
 	}
-	return req.Do(ctx)
+	return &req
 }
 
 func (client *RestAPIClient) GetSingleOrder(ctx context.Context, orderID string) (*Order, error) {

@@ -133,29 +133,33 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 	before := time.Now()
 	localSymbol := toLocalSymbol(symbol)
 	paginationLimit := 1000
-	cbOrders, err := e.client.GetOrders(ctx, localSymbol, status, paginationLimit, &sortedBy, &sorting, &before)
+	getOrdersReq := e.client.NewGetOrdersRequest()
+	getOrdersReq.ProductID(localSymbol).Status(status).SortedBy(sortedBy).Sorting(sorting).Before(before).Limit(paginationLimit)
+	cbOrders, err := getOrdersReq.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get orders")
 	}
 
-	done := false
-	if len(cbOrders) < 1000 || len(cbOrders) == 0 {
-		done = true
+	if len(cbOrders) < paginationLimit {
+		return cbOrders, nil
 	}
+
+	done := false
 	for {
 		if done {
 			break
 		}
 
 		before = cbOrders[len(cbOrders)-1].CreatedAt
-		new_orders, err := e.client.GetOrders(ctx, localSymbol, status, paginationLimit, &sortedBy, &sorting, &before)
+		getOrdersReq.Before(before)
+		newOrders, err := getOrdersReq.Do(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get orders while paginating")
 		}
-		if len(new_orders) < paginationLimit {
+		if len(newOrders) < paginationLimit {
 			done = true
 		}
-		cbOrders = append(cbOrders, new_orders...)
+		cbOrders = append(cbOrders, newOrders...)
 	}
 	return cbOrders, nil
 }
@@ -274,10 +278,11 @@ func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, orderID str
 	if len(cbTrades) < paginationLimit {
 		return cbTrades, nil
 	}
-	done := false
-	if len(cbTrades) < paginationLimit || len(cbTrades) == 0 {
-		done = true
+
+	if len(cbTrades) < paginationLimit {
+		return cbTrades, nil
 	}
+	done := false
 	for {
 		if done {
 			break
