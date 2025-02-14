@@ -12,12 +12,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/google/uuid"
-
-	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
-	"github.com/c9s/bbgo/pkg/core"
-	"github.com/c9s/bbgo/pkg/data/tsv"
-	"github.com/c9s/bbgo/pkg/util"
-
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -26,13 +20,18 @@ import (
 	"github.com/c9s/bbgo/pkg/accounting/pnl"
 	"github.com/c9s/bbgo/pkg/backtest"
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/cmd/cmdutil"
+	"github.com/c9s/bbgo/pkg/core"
+	"github.com/c9s/bbgo/pkg/data/tsv"
 	"github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 func init() {
+	BacktestCmd.Flags().Bool("csv", false, "use csv data source for exchange (if supported)")
 	BacktestCmd.Flags().Bool("sync", false, "sync backtest data")
 	BacktestCmd.Flags().Bool("sync-only", false, "sync backtest data only, do not run backtest")
 	BacktestCmd.Flags().String("sync-from", "", "sync backtest data from the given time, which will override the time range in the backtest config")
@@ -73,6 +72,11 @@ var BacktestCmd = &cobra.Command{
 		}
 
 		wantBaseAssetBaseline, err := cmd.Flags().GetBool("base-asset-baseline")
+		if err != nil {
+			return err
+		}
+
+		modeCsv, err := cmd.Flags().GetBool("csv")
 		if err != nil {
 			return err
 		}
@@ -156,15 +160,29 @@ var BacktestCmd = &cobra.Command{
 		log.Infof("starting backtest with startTime %s", startTime.Format(time.RFC3339))
 
 		environ := bbgo.NewEnvironment()
-		if err := bbgo.BootstrapBacktestEnvironment(ctx, environ); err != nil {
-			return err
-		}
 
-		if environ.DatabaseService == nil {
-			return errors.New("database service is not enabled, please check your environment variables DB_DRIVER and DB_DSN")
+		if userConfig.Backtest.CsvSource == nil {
+			return fmt.Errorf("user config backtest section needs csvsource config")
 		}
+		backtestService := service.NewBacktestServiceCSV(
+			outputDirectory,
+			userConfig.Backtest.CsvSource.Market,
+			userConfig.Backtest.CsvSource.Granularity,
+		)
+		if modeCsv {
+			if err := bbgo.BootstrapEnvironmentLightweight(ctx, environ, userConfig); err != nil {
+				return err
+			}
+		} else {
+			backtestService = service.NewBacktestService(environ.DatabaseService.DB)
+			if err := bbgo.BootstrapBacktestEnvironment(ctx, environ); err != nil {
+				return err
+			}
 
-		backtestService := &service.BacktestService{DB: environ.DatabaseService.DB}
+			if environ.DatabaseService == nil {
+				return errors.New("database service is not enabled, please check your environment variables DB_DRIVER and DB_DSN")
+			}
+		}
 		environ.BacktestService = backtestService
 		bbgo.SetBackTesting(backtestService)
 
@@ -695,7 +713,7 @@ func createSymbolReport(
 }
 
 func verify(
-	userConfig *bbgo.Config, backtestService *service.BacktestService,
+	userConfig *bbgo.Config, backtestService service.BackTestable,
 	sourceExchanges map[types.ExchangeName]types.Exchange, startTime, endTime time.Time,
 ) error {
 	for _, sourceExchange := range sourceExchanges {
@@ -738,7 +756,7 @@ func getExchangeIntervals(ex types.Exchange) types.IntervalMap {
 }
 
 func sync(
-	ctx context.Context, userConfig *bbgo.Config, backtestService *service.BacktestService,
+	ctx context.Context, userConfig *bbgo.Config, backtestService service.BackTestable,
 	sourceExchanges map[types.ExchangeName]types.Exchange, syncFrom, syncTo time.Time,
 ) error {
 	for _, symbol := range userConfig.Backtest.Symbols {
@@ -753,10 +771,8 @@ func sync(
 			var intervals = supportIntervals.Slice()
 			intervals.Sort()
 
-			for _, interval := range intervals {
-				if err := backtestService.Sync(ctx, sourceExchange, symbol, interval, syncFrom, syncTo); err != nil {
-					return err
-				}
+			if err := backtestService.Sync(ctx, sourceExchange, symbol, intervals, syncFrom, syncTo); err != nil {
+				return err
 			}
 		}
 	}
