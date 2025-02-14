@@ -1,0 +1,32 @@
+---
+notifications:
+  switches:
+    trade: true
+    orderUpdate: false
+    submitOrder: false
+
+persistence:
+  json:
+    directory: var/data
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    db: 0
+
+sessions:
+  binance_future:
+    exchange: binance
+    futures: true
+  binance:
+    exchange: binance
+
+crossExchangeStrategies:
+
+- neutralmaker:
+    symbol: BTCUSDT
+    spotExchange: binance
+    futureExchange: binance_future
+    halfSpread: 40
+    lotSize: 0.01
+    positionLimit: 0.1
+    dryRun: true
