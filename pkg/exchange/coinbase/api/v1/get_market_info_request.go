@@ -5,15 +5,6 @@ import (
 	"github.com/c9s/requestgen"
 )
 
-type MarketStatus string
-
-const (
-	MarketStatusOnline   MarketStatus = "online"
-	MarketStatusOffline  MarketStatus = "offline"
-	MarketStatusInternal MarketStatus = "internal"
-	MarketStatusDelisted MarketStatus = "delisted"
-)
-
 type MarketInfo struct {
 	ID                     string           `json:"id"`
 	BaseCurrency           string           `json:"base_currency"`
