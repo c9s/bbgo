@@ -23,6 +23,7 @@ const (
 	ExchangeBitget   ExchangeName = "bitget"
 	ExchangeBacktest ExchangeName = "backtest"
 	ExchangeBybit    ExchangeName = "bybit"
+	ExchangeCoinBase ExchangeName = "coinbase"
 )
 
 var SupportedExchanges = []ExchangeName{
@@ -32,6 +33,7 @@ var SupportedExchanges = []ExchangeName{
 	ExchangeKucoin,
 	ExchangeBitget,
 	ExchangeBybit,
+	ExchangeCoinBase,
 	// note: we are not using "backtest"
 }
 
@@ -55,7 +57,7 @@ func (n *ExchangeName) UnmarshalJSON(data []byte) error {
 
 func (n ExchangeName) IsValid() bool {
 	switch n {
-	case ExchangeBinance, ExchangeBitget, ExchangeBybit, ExchangeMax, ExchangeOKEx, ExchangeKucoin:
+	case ExchangeBinance, ExchangeBitget, ExchangeBybit, ExchangeMax, ExchangeOKEx, ExchangeKucoin, ExchangeCoinBase:
 		return true
 	}
 	return false
