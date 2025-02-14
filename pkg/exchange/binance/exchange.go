@@ -1125,19 +1125,11 @@ func newSpotClientOrderID(originalID string) (clientOrderID string) {
 		return ""
 	}
 
-	prefix := "x-" + spotBrokerID
-	prefixLen := len(prefix)
-
 	if originalID != "" {
-		// try to keep the whole original client order ID if user specifies it.
-		if prefixLen+len(originalID) > 32 {
-			return originalID
-		}
-
-		clientOrderID = prefix + originalID
-		return clientOrderID
+		return originalID
 	}
 
+	prefix := "x-" + spotBrokerID
 	clientOrderID = uuid.New().String()
 	clientOrderID = prefix + clientOrderID
 	if len(clientOrderID) > 32 {
