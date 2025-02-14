@@ -34,7 +34,6 @@ type RestAPIClient struct {
 	requestgen.BaseAPIClient
 
 	key, secret, passphrase string
-	timeout                 time.Duration
 }
 
 func NewClient(
