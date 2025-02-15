@@ -94,7 +94,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 			}, 3*time.Second)
 
 			if ex.IsFutures {
-				f.UseInFutures()
+				f.UseFutures()
 			}
 
 			f.SetLogger(logrus.WithFields(logrus.Fields{"exchange": "binance", "symbol": e.Symbol, "component": "depthBuffer"}))
