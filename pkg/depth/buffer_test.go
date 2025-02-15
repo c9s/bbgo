@@ -186,11 +186,11 @@ func TestDepthBuffer_FuturesReadyState(t *testing.T) {
 		}, 33, nil
 	}, time.Millisecond*5)
 
-	buf.UseInFutures()
+	buf.UseFutures()
 
 	readyC := make(chan struct{})
 	buf.OnReady(func(snapshot types.SliceOrderBook, updates []Update) {
-		assert.Equal(t, len(updates), 33)
+		assert.Greater(t, len(updates), 33)
 		close(readyC)
 	})
 
@@ -204,7 +204,7 @@ func TestDepthBuffer_FuturesReadyState(t *testing.T) {
 				Asks: types.PriceVolumeSlice{
 					{Price: itov(99), Volume: itov(updateID)},
 				},
-			}, updateID, updateID+33)
+			}, updateID, updateID, updateID-1)
 
 		assert.NoError(t, err)
 	}
@@ -212,6 +212,63 @@ func TestDepthBuffer_FuturesReadyState(t *testing.T) {
 	select {
 	case <-readyC:
 	case <-time.After(time.Minute):
+		t.Fail()
+	}
+}
+
+func TestDepthBuffer_FuturesCorruptedUpdateAtTheBeginning(t *testing.T) {
+	// snapshot starts from 30,
+	// the first ready event should have a snapshot(30) and updates (31~50)
+	var snapshotFinalID int64 = 0
+	buf := NewBuffer(func() (types.SliceOrderBook, int64, error) {
+		snapshotFinalID += 30
+		return types.SliceOrderBook{
+			Bids: types.PriceVolumeSlice{
+				{Price: itov(100), Volume: itov(1)},
+			},
+			Asks: types.PriceVolumeSlice{
+				{Price: itov(99), Volume: itov(1)},
+			},
+		}, snapshotFinalID, nil
+	}, time.Millisecond)
+
+	buf.UseFutures()
+
+	resetC := make(chan struct{}, 2)
+
+	buf.OnReset(func() {
+		t.Logf("reset triggered")
+		resetC <- struct{}{}
+	})
+
+	var updateID int64 = 10
+	for ; updateID < 100; updateID++ {
+		time.Sleep(time.Millisecond)
+
+		// send corrupt update when updateID = 50
+		previousUpdateId := updateID - 1
+		if updateID == 50 {
+			previousUpdateId = updateID + 1
+		}
+
+		err := buf.AddUpdate(types.SliceOrderBook{
+			Bids: types.PriceVolumeSlice{
+				{Price: itov(100), Volume: itov(updateID)},
+			},
+			Asks: types.PriceVolumeSlice{
+				{Price: itov(99), Volume: itov(updateID)},
+			},
+		}, updateID, updateID, previousUpdateId)
+
+		if err != nil {
+			t.Log("emit reset")
+			buf.Reset()
+		}
+	}
+
+	select {
+	case <-resetC:
+	case <-time.After(10 * time.Second):
 		t.Fail()
 	}
 }
