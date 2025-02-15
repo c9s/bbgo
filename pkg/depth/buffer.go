@@ -65,7 +65,7 @@ func (b *Buffer) SetUpdateTimeout(d time.Duration) {
 	b.updateTimeout = d
 }
 
-func (b *Buffer) UseInFutures() {
+func (b *Buffer) UseFutures() {
 	b.isFutures = true
 }
 
@@ -259,34 +259,23 @@ func (b *Buffer) fetchAndPush() error {
 	}
 
 	var pushUpdates []Update
-	if b.isFutures {
-		for _, u := range b.buffer {
-			if u.FinalUpdateID < finalUpdateID {
-				continue
-			}
-			if u.FirstUpdateID <= finalUpdateID && u.FinalUpdateID >= finalUpdateID {
-				pushUpdates = append(pushUpdates, u)
-			}
+	for idx, u := range b.buffer {
+		// skip old events
+		if u.FinalUpdateID <= finalUpdateID {
+			continue
 		}
-	} else {
-		for idx, u := range b.buffer {
-			// skip old events
-			if u.FinalUpdateID <= finalUpdateID {
-				continue
-			}
 
-			if u.FirstUpdateID > finalUpdateID+1 {
-				// drop prior updates in the buffer since it's corrupted
-				b.buffer = b.buffer[idx:]
-				b.mu.Unlock()
-				return fmt.Errorf("there is a missing depth update, the update id %d > final update id %d + 1", u.FirstUpdateID, finalUpdateID)
-			}
-
-			pushUpdates = append(pushUpdates, u)
-
-			// update the final update id to the correct final update id
-			finalUpdateID = u.FinalUpdateID
+		if u.FirstUpdateID > finalUpdateID+1 || (b.isFutures && idx > 0 && u.PreviousUpdateID != b.buffer[idx-1].FinalUpdateID) {
+			// drop prior updates in the buffer since it's corrupted
+			b.buffer = b.buffer[idx:]
+			b.mu.Unlock()
+			return fmt.Errorf("there is a missing depth update, the update id %d > final update id %d + 1", u.FirstUpdateID, finalUpdateID)
 		}
+
+		pushUpdates = append(pushUpdates, u)
+
+		// update the final update id to the correct final update id
+		finalUpdateID = u.FinalUpdateID
 	}
 
 	// clean the buffer since we have filtered out the buffer we want
@@ -294,6 +283,7 @@ func (b *Buffer) fetchAndPush() error {
 
 	// set the final update ID so that we will know if there is an update missing
 	if b.isFutures && len(pushUpdates) > 0 {
+		// reset finalUpdateId to first update event
 		finalUpdateID = pushUpdates[0].FinalUpdateID
 	}
 	b.finalUpdateID = finalUpdateID
