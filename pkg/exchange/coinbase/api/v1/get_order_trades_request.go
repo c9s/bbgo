@@ -1,9 +1,8 @@
 package coinbase
 
 import (
-	"time"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
 
@@ -17,7 +16,7 @@ type Trade struct {
 	Price           fixedpoint.Value `json:"price"`
 	Size            fixedpoint.Value `json:"size"`
 	Fee             fixedpoint.Value `json:"fee"`
-	CreatedAt       time.Time        `json:"created_at"`
+	CreatedAt       types.Time       `json:"created_at"`
 	Side            SideType         `json:"side"`
 	Settled         bool             `json:"settled"`
 	UsdVolume       string           `json:"usd_volume"`

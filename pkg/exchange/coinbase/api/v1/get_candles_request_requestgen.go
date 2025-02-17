@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"time"
 )
 
 func (g *GetCandlesRequest) ProductID(productID string) *GetCandlesRequest {
@@ -21,12 +22,12 @@ func (g *GetCandlesRequest) Granularity(granularity string) *GetCandlesRequest {
 	return g
 }
 
-func (g *GetCandlesRequest) Start(start string) *GetCandlesRequest {
+func (g *GetCandlesRequest) Start(start time.Time) *GetCandlesRequest {
 	g.start = &start
 	return g
 }
 
-func (g *GetCandlesRequest) End(end string) *GetCandlesRequest {
+func (g *GetCandlesRequest) End(end time.Time) *GetCandlesRequest {
 	g.end = &end
 	return g
 }

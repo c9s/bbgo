@@ -2,6 +2,7 @@ package coinbase
 
 import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
 
@@ -16,10 +17,10 @@ type CreateOrderResponse struct {
 	SpecifiedFunds   fixedpoint.Value `json:"specified_funds,omitempty"`
 	Type             OrderType        `json:"type"`
 	TimeInForce      TimeInForceType  `json:"time_in_force,omitempty"`
-	ExpireTime       string           `json:"expire_time,omitempty"`
+	ExpireTime       types.Time       `json:"expire_time,omitempty"`
 	PostOnly         bool             `json:"post_only"`
-	CreatedAt        string           `json:"created_at"`
-	DoneAt           string           `json:"done_at,omitempty"`
+	CreatedAt        types.Time       `json:"created_at"`
+	DoneAt           types.Time       `json:"done_at,omitempty"`
 	DoneReason       string           `json:"done_reason,omitempty"`
 	RejectReason     string           `json:"reject_reason,omitempty"`
 	FillFees         fixedpoint.Value `json:"fill_fees"`

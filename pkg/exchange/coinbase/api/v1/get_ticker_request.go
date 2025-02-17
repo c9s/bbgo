@@ -1,9 +1,8 @@
 package coinbase
 
 import (
-	"time"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
 
@@ -14,7 +13,7 @@ type Ticker struct {
 	Volume            fixedpoint.Value `json:"volume"`
 	Price             fixedpoint.Value `json:"price"`
 	Size              fixedpoint.Value `json:"size"`
-	Time              time.Time        `json:"time"`
+	Time              types.Time       `json:"time"`
 	RfqVolume         string           `json:"rfq_volume"`
 	ConversionsVolume string           `json:"conversions_volume"`
 }

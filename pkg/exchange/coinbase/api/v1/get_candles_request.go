@@ -4,11 +4,12 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
 
 type Candle struct {
-	Time   time.Time        `json:"time"`
+	Time   types.Time       `json:"time"`
 	Low    fixedpoint.Value `json:"low"`
 	High   fixedpoint.Value `json:"high"`
 	Open   fixedpoint.Value `json:"open"`
@@ -24,10 +25,10 @@ type GetCandlesResponse []Candle
 type GetCandlesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	productID   string  `param:"product_id,required"`
-	granularity *string `param:"granularity" validValues:"60,300,900,3600,21600,86400"`
-	start       *string `param:"start"`
-	end         *string `param:"end"`
+	productID   string     `param:"product_id,required"`
+	granularity *string    `param:"granularity" validValues:"60,300,900,3600,21600,86400"`
+	start       *time.Time `param:"start"`
+	end         *time.Time `param:"end"`
 }
 
 func (client *RestAPIClient) NewGetCandlesRequest() *GetCandlesRequest {

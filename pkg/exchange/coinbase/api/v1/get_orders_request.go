@@ -44,8 +44,8 @@ type Order struct {
 	Status        OrderStatus      `json:"status"`
 	Settled       bool             `json:"settled"`
 	DoneReason    string           `json:"done_reason"`
-	DoneAt        time.Time        `json:"done_at"`
-	CreatedAt     time.Time        `json:"created_at"`
+	DoneAt        types.Time       `json:"done_at"`
+	CreatedAt     types.Time       `json:"created_at"`
 	FillFees      fixedpoint.Value `json:"fill_fees"`
 	FilledSize    fixedpoint.Value `json:"filled_size"`
 	ExecutedValue fixedpoint.Value `json:"executed_value"`
