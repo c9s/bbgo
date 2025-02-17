@@ -84,3 +84,9 @@ func toGlobalTicker(cbTicker *api.Ticker) *types.Ticker {
 	}
 	return &ticker
 }
+
+func toGlobalBalance(cur string, cbBalance *api.Balance) *types.Balance {
+	balance := types.NewZeroBalance(cur)
+	balance.Available = cbBalance.Available
+	return &balance
+}

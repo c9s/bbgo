@@ -94,12 +94,9 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 		return nil, err
 	}
 	balances := make(types.BalanceMap)
-	for _, b := range accounts {
-		cur := strings.ToUpper(b.Currency)
-		balances[cur] = types.Balance{
-			Currency:  cur,
-			Available: b.Available,
-		}
+	for _, cbBalance := range accounts {
+		cur := strings.ToUpper(cbBalance.Currency)
+		balances[cur] = *toGlobalBalance(cur, &cbBalance)
 	}
 	return balances, nil
 }
