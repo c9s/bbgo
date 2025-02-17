@@ -38,11 +38,11 @@ type RestAPIClient struct {
 
 func NewClient(
 	key, secret, passphrase string, timeout time.Duration,
-) RestAPIClient {
+) *RestAPIClient {
 	if timeout == 0 {
 		timeout = DefaultHTTPTimeout
 	}
-	return RestAPIClient{
+	return &RestAPIClient{
 		BaseAPIClient: requestgen.BaseAPIClient{
 			BaseURL:    parsedBaseURL,
 			HttpClient: &http.Client{Timeout: timeout},
