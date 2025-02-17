@@ -36,7 +36,7 @@ type Exchange struct {
 func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
 	client := api.NewClient(key, secret, passphrase, timeout)
 	return &Exchange{
-		client: &client,
+		client: client,
 	}
 }
 
@@ -149,7 +149,7 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 			break
 		}
 
-		before = cbOrders[len(cbOrders)-1].CreatedAt
+		before = time.Time(cbOrders[len(cbOrders)-1].CreatedAt)
 		getOrdersReq.Before(before)
 		newOrders, err := getOrdersReq.Do(ctx)
 		if err != nil {
@@ -233,6 +233,12 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	}
 	granity := interval.String()
 	req := e.client.NewGetCandlesRequest().ProductID(toLocalSymbol(symbol)).Granularity(granity)
+	if options.StartTime != nil {
+		req.Start(*options.StartTime)
+	}
+	if options.EndTime != nil {
+		req.End(*options.EndTime)
+	}
 	candles, err := req.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get klines(%v): %v", interval, symbol)
