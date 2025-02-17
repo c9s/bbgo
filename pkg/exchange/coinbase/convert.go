@@ -3,6 +3,7 @@ package coinbase
 import (
 	"hash/fnv"
 	"math"
+	"time"
 
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -64,7 +65,7 @@ func toGlobalKline(symbol string, granity string, candle *api.Candle) *types.KLi
 		Exchange:  types.ExchangeCoinBase,
 		Symbol:    symbol,
 		StartTime: types.Time(candle.Time),
-		EndTime:   types.Time(candle.Time.Add(types.Interval(granity).Duration())),
+		EndTime:   types.Time(time.Time(candle.Time).Add(types.Interval(granity).Duration())),
 		Interval:  types.Interval(granity),
 		Open:      candle.Open,
 		Close:     candle.Close,
@@ -77,7 +78,7 @@ func toGlobalKline(symbol string, granity string, candle *api.Candle) *types.KLi
 
 func toGlobalTicker(cbTicker *api.Ticker) *types.Ticker {
 	ticker := types.Ticker{
-		Time:   cbTicker.Time,
+		Time:   time.Time(cbTicker.Time),
 		Volume: cbTicker.Volume,
 		Buy:    cbTicker.Bid,
 		Sell:   cbTicker.Ask,
