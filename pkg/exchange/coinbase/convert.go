@@ -30,8 +30,8 @@ func toGlobalTrade(cbTrade *api.Trade) *types.Trade {
 		QuoteQuantity: cbTrade.Size.Mul(cbTrade.Price),
 		Symbol:        cbTrade.ProductID,
 		Side:          cbTrade.Side.GlobalSideType(),
-		IsBuyer:       cbTrade.Liquidity == "T",
-		IsMaker:       cbTrade.Liquidity == "M",
+		IsBuyer:       cbTrade.Liquidity == api.LiquidityTaker,
+		IsMaker:       cbTrade.Liquidity == api.LiquidityMaker,
 		Fee:           cbTrade.Fee,
 		FeeCurrency:   cbTrade.FundingCurrency,
 	}
