@@ -25,6 +25,12 @@ type Balance struct {
 	Borrowed fixedpoint.Value `json:"borrowed,omitempty"`
 	Interest fixedpoint.Value `json:"interest,omitempty"`
 
+	// credit related fields
+	// long available in base currency amount for credit account
+	LongAvailableCredit fixedpoint.Value `json:"longAvailableCredit,omitempty"`
+	// short available in base currency amount for credit account
+	ShortAvailableCredit fixedpoint.Value `json:"shortAvailableCredit,omitempty"`
+
 	// NetAsset = (Available + Locked) - Borrowed - Interest
 	NetAsset fixedpoint.Value `json:"net,omitempty"`
 
@@ -33,13 +39,15 @@ type Balance struct {
 
 func NewZeroBalance(currency string) Balance {
 	return Balance{
-		Currency:          currency,
-		Available:         fixedpoint.Zero,
-		Locked:            fixedpoint.Zero,
-		Borrowed:          fixedpoint.Zero,
-		Interest:          fixedpoint.Zero,
-		NetAsset:          fixedpoint.Zero,
-		MaxWithdrawAmount: fixedpoint.Zero,
+		Currency:             currency,
+		Available:            fixedpoint.Zero,
+		Locked:               fixedpoint.Zero,
+		Borrowed:             fixedpoint.Zero,
+		Interest:             fixedpoint.Zero,
+		LongAvailableCredit:  fixedpoint.Zero,
+		ShortAvailableCredit: fixedpoint.Zero,
+		NetAsset:             fixedpoint.Zero,
+		MaxWithdrawAmount:    fixedpoint.Zero,
 	}
 }
 
