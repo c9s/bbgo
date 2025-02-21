@@ -1129,17 +1129,16 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 			s.MakerOrderExecutor.ActiveMakerOrders().Print()
 			return
 		}
+
+		numOfMakerOrders := s.MakerOrderExecutor.ActiveMakerOrders().NumOfOrders()
+		if numOfMakerOrders > 0 {
+			s.logger.Warnf("maker orders are not all canceled")
+		}
 	} else {
 		if err := s.partiallyCancelOrders(ctx, maxLayer); err != nil {
 			s.logger.WithError(err).Warnf("%s partial order cancel failed", s.Symbol)
 			return
 		}
-	}
-
-	numOfMakerOrders := s.MakerOrderExecutor.ActiveMakerOrders().NumOfOrders()
-	if numOfMakerOrders > 0 {
-		s.logger.Warnf("maker orders are not all canceled")
-		return
 	}
 
 	bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
