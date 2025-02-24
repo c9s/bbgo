@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -25,7 +26,6 @@ import (
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
-	"github.com/c9s/bbgo/pkg/util"
 )
 
 const defaultMaxSessionTradeBufferSize = 3500
@@ -846,7 +846,7 @@ func (session *ExchangeSession) FindPossibleAssetSymbols() (symbols []string, er
 
 	for _, market := range session.Markets() {
 		// ignore the markets that are not fiat currency markets
-		if !util.StringSliceContains(fiatAssets, market.QuoteCurrency) {
+		if !slices.Contains(fiatAssets, market.QuoteCurrency) {
 			continue
 		}
 
