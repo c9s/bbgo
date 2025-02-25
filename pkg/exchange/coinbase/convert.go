@@ -10,8 +10,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func toGlobalOrder(cbOrder *api.Order) *types.Order {
-	return &types.Order{
+func toGlobalOrder(cbOrder *api.Order) types.Order {
+	return types.Order{
 		Exchange:       types.ExchangeCoinBase,
 		Status:         cbOrder.Status.GlobalOrderStatus(),
 		UUID:           cbOrder.ID,
@@ -21,8 +21,8 @@ func toGlobalOrder(cbOrder *api.Order) *types.Order {
 	}
 }
 
-func toGlobalTrade(cbTrade *api.Trade) *types.Trade {
-	return &types.Trade{
+func toGlobalTrade(cbTrade *api.Trade) types.Trade {
+	return types.Trade{
 		ID:            uint64(cbTrade.TradeID),
 		OrderID:       FNV64a(cbTrade.OrderID),
 		Exchange:      types.ExchangeCoinBase,
@@ -38,10 +38,10 @@ func toGlobalTrade(cbTrade *api.Trade) *types.Trade {
 	}
 }
 
-func toGlobalMarket(cbMarket *api.MarketInfo) *types.Market {
+func toGlobalMarket(cbMarket *api.MarketInfo) types.Market {
 	pricePrecision := int(math.Log10(fixedpoint.One.Div(cbMarket.QuoteIncrement).Float64()))
 	volumnPrecision := int(math.Log10(fixedpoint.One.Div(cbMarket.BaseIncrement).Float64()))
-	return &types.Market{
+	return types.Market{
 		Exchange:        types.ExchangeCoinBase,
 		Symbol:          toGlobalSymbol(cbMarket.ID),
 		LocalSymbol:     cbMarket.ID,
@@ -60,7 +60,7 @@ func FNV64a(text string) uint64 {
 	return hash.Sum64()
 }
 
-func toGlobalKline(symbol string, granity string, candle *api.Candle) *types.KLine {
+func toGlobalKline(symbol string, granity string, candle *api.Candle) types.KLine {
 	kline := types.KLine{
 		Exchange:  types.ExchangeCoinBase,
 		Symbol:    symbol,
@@ -73,23 +73,23 @@ func toGlobalKline(symbol string, granity string, candle *api.Candle) *types.KLi
 		Low:       candle.Low,
 		Volume:    candle.Volume,
 	}
-	return &kline
+	return kline
 }
 
-func toGlobalTicker(cbTicker *api.Ticker) *types.Ticker {
+func toGlobalTicker(cbTicker *api.Ticker) types.Ticker {
 	ticker := types.Ticker{
 		Time:   time.Time(cbTicker.Time),
 		Volume: cbTicker.Volume,
 		Buy:    cbTicker.Bid,
 		Sell:   cbTicker.Ask,
 	}
-	return &ticker
+	return ticker
 }
 
-func toGlobalBalance(cur string, cbBalance *api.Balance) *types.Balance {
+func toGlobalBalance(cur string, cbBalance *api.Balance) types.Balance {
 	balance := types.NewZeroBalance(cur)
 	balance.Available = cbBalance.Available
 	balance.Locked = cbBalance.Balance.Sub(cbBalance.Available)
 	balance.NetAsset = cbBalance.Balance
-	return &balance
+	return balance
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -36,22 +37,27 @@ func (c *CreateOrderRequest) Stp(stp string) *CreateOrderRequest {
 	return c
 }
 
-func (c *CreateOrderRequest) StopPrice(stopPrice string) *CreateOrderRequest {
+func (c *CreateOrderRequest) Stop(stop string) *CreateOrderRequest {
+	c.stop = &stop
+	return c
+}
+
+func (c *CreateOrderRequest) StopPrice(stopPrice fixedpoint.Value) *CreateOrderRequest {
 	c.stopPrice = &stopPrice
 	return c
 }
 
-func (c *CreateOrderRequest) Price(price string) *CreateOrderRequest {
+func (c *CreateOrderRequest) Price(price fixedpoint.Value) *CreateOrderRequest {
 	c.price = &price
 	return c
 }
 
-func (c *CreateOrderRequest) Size(size string) *CreateOrderRequest {
+func (c *CreateOrderRequest) Size(size fixedpoint.Value) *CreateOrderRequest {
 	c.size = size
 	return c
 }
 
-func (c *CreateOrderRequest) Funds(funds string) *CreateOrderRequest {
+func (c *CreateOrderRequest) Funds(funds fixedpoint.Value) *CreateOrderRequest {
 	c.funds = &funds
 	return c
 }
@@ -173,20 +179,28 @@ func (c *CreateOrderRequest) GetParameters() (map[string]interface{}, error) {
 		params["stp"] = stp
 	} else {
 	}
-	// check stopPrice field -> json key stop_price
-	if c.stopPrice != nil {
-		stopPrice := *c.stopPrice
+	// check stop field -> json key stop
+	if c.stop != nil {
+		stop := *c.stop
 
 		// TEMPLATE check-valid-values
-		switch stopPrice {
+		switch stop {
 		case "loss", "entry":
-			params["stop_price"] = stopPrice
+			params["stop"] = stop
 
 		default:
-			return nil, fmt.Errorf("stop_price value %v is invalid", stopPrice)
+			return nil, fmt.Errorf("stop value %v is invalid", stop)
 
 		}
 		// END TEMPLATE check-valid-values
+
+		// assign parameter of stop
+		params["stop"] = stop
+	} else {
+	}
+	// check stopPrice field -> json key stop_price
+	if c.stopPrice != nil {
+		stopPrice := *c.stopPrice
 
 		// assign parameter of stopPrice
 		params["stop_price"] = stopPrice
@@ -204,8 +218,8 @@ func (c *CreateOrderRequest) GetParameters() (map[string]interface{}, error) {
 	size := c.size
 
 	// TEMPLATE check-required
-	if len(size) == 0 {
-		return nil, fmt.Errorf("size is required, empty string given")
+	if size == 0 {
+		return nil, fmt.Errorf("size is required, 0 given")
 	}
 	// END TEMPLATE check-required
 

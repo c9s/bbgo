@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"strconv"
 	"time"
 )
 
@@ -82,7 +83,8 @@ func (g *GetCandlesRequest) GetParameters() (map[string]interface{}, error) {
 		start := *g.start
 
 		// assign parameter of start
-		params["start"] = start
+		// convert time.Time to seconds time stamp
+		params["start"] = strconv.FormatInt(start.Unix(), 10)
 	} else {
 	}
 	// check end field -> json key end
@@ -90,7 +92,8 @@ func (g *GetCandlesRequest) GetParameters() (map[string]interface{}, error) {
 		end := *g.end
 
 		// assign parameter of end
-		params["end"] = end
+		// convert time.Time to seconds time stamp
+		params["end"] = strconv.FormatInt(end.Unix(), 10)
 	} else {
 	}
 
