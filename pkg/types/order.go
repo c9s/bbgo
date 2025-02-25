@@ -34,6 +34,7 @@ var (
 	TimeInForceGTC TimeInForce = "GTC"
 	TimeInForceIOC TimeInForce = "IOC"
 	TimeInForceFOK TimeInForce = "FOK"
+	TimeInForceGTT TimeInForce = "GTT" // for coinbase exchange api
 )
 
 // MarginOrderSideEffectType define side effect type for orders

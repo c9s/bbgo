@@ -42,19 +42,20 @@ type CreateOrderResponse struct {
 type CreateOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	profileID     *string `param:"profile_id"`
-	orderType     string  `param:"type,required" validValues:"limit,market,stop"`
-	side          string  `param:"side,required" validValues:"buy,sell"`
-	productID     string  `param:"product_id,required"`
-	stp           *string `param:"stp" validValues:"dc,co,cn,cb"`
-	stopPrice     *string `param:"stop_price" validValues:"loss,entry"`
-	price         *string `param:"price"`
-	size          string  `param:"size,required"`
-	funds         *string `param:"funds"`
-	timeInForce   *string `param:"time_in_force" validValues:"GTC,GCC,IOC,FOK"`
-	cancelAfter   *string `param:"cancel_after" validValues:"min,hour,day"`
-	postOnly      *bool   `param:"post_only"`
-	clientOrderID *string `param:"client_oid"`
+	profileID     *string           `param:"profile_id"`
+	orderType     string            `param:"type,required" validValues:"limit,market,stop"`
+	side          string            `param:"side,required" validValues:"buy,sell"`
+	productID     string            `param:"product_id,required"`
+	stp           *string           `param:"stp" validValues:"dc,co,cn,cb"`
+	stop          *string           `param:"stop" validValues:"loss,entry"`
+	stopPrice     *fixedpoint.Value `param:"stop_price"`
+	price         *fixedpoint.Value `param:"price"`
+	size          fixedpoint.Value  `param:"size,required"`
+	funds         *fixedpoint.Value `param:"funds"`
+	timeInForce   *string           `param:"time_in_force" validValues:"GTC,GCC,IOC,FOK"`
+	cancelAfter   *string           `param:"cancel_after" validValues:"min,hour,day"`
+	postOnly      *bool             `param:"post_only"`
+	clientOrderID *string           `param:"client_oid"`
 }
 
 func (client *RestAPIClient) NewCreateOrderRequest() *CreateOrderRequest {

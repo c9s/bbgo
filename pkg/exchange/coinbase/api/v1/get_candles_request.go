@@ -27,8 +27,8 @@ type GetCandlesRequest struct {
 
 	productID   string     `param:"product_id,required"`
 	granularity *string    `param:"granularity" validValues:"60,300,900,3600,21600,86400"`
-	start       *time.Time `param:"start"`
-	end         *time.Time `param:"end"`
+	start       *time.Time `param:"start,seconds"`
+	end         *time.Time `param:"end,seconds"`
 }
 
 func (client *RestAPIClient) NewGetCandlesRequest() *GetCandlesRequest {
