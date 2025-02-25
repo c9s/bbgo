@@ -50,7 +50,7 @@ type CreateOrderRequest struct {
 	stop          *string           `param:"stop" validValues:"loss,entry"`
 	stopPrice     *fixedpoint.Value `param:"stop_price"`
 	price         *fixedpoint.Value `param:"price"`
-	size          fixedpoint.Value  `param:"size,required"`
+	size          string            `param:"size,required"` // don't use fixedpoint.Value because it's required and it will lead to an error in requestgen.
 	funds         *fixedpoint.Value `param:"funds"`
 	timeInForce   *string           `param:"time_in_force" validValues:"GTC,GCC,IOC,FOK"`
 	cancelAfter   *string           `param:"cancel_after" validValues:"min,hour,day"`
