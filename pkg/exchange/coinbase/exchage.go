@@ -218,9 +218,6 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 		case <-ctx.Done():
 			return cbOrders, ctx.Err()
 		default:
-			if done {
-				break
-			}
 			before = time.Time(cbOrders[len(cbOrders)-1].CreatedAt)
 			getOrdersReq.Before(before)
 			newOrders, err := getOrdersReq.Do(ctx)
@@ -374,9 +371,6 @@ func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, orderID str
 		case <-ctx.Done():
 			return cbTrades, ctx.Err()
 		default:
-			if done {
-				break
-			}
 			lastTrade := cbTrades[len(cbTrades)-1]
 			req.Before(lastTrade.OrderID)
 			newTrades, err := req.Do(ctx)
