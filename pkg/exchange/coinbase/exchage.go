@@ -139,7 +139,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		}
 		qty = qty.Mul(ticker.Buy)
 	}
-	req.Size(qty)
+	req.Size(qty.String())
 	// set price
 	if order.Type == types.OrderTypeLimit {
 		req.Price(order.Price)
