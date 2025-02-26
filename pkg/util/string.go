@@ -5,15 +5,6 @@ import (
 	"unicode/utf8"
 )
 
-func StringSliceContains(slice []string, needle string) bool {
-	for _, s := range slice {
-		if s == needle {
-			return true
-		}
-	}
-
-	return false
-}
 
 func MaskKey(key string) string {
 	if len(key) == 0 {

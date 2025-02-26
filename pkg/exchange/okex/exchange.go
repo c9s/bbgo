@@ -481,9 +481,16 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		return nil, errors.New("okex.QueryOrder: OrderId or ClientOrderId is required parameter")
 	}
 	req := e.client.NewGetOrderDetailsRequest()
-	req.InstrumentID(toLocalSymbol(q.Symbol)).
-		OrderID(q.OrderID).
-		ClientOrderID(q.ClientOrderID)
+	req.InstrumentID(toLocalSymbol(q.Symbol))
+	// Either ordId or clOrdId is required, if both are passed, ordId will be used
+	// ref: https://www.okx.com/docs-v5/en/#order-book-trading-trade-get-order-details
+	if len(q.OrderID) != 0 {
+		req.OrderID(q.OrderID)
+	}
+	// If the clOrdId is associated with multiple orders, only the latest one will be returned.
+	if len(q.ClientOrderID) != 0 {
+		req.ClientOrderID(q.ClientOrderID)
+	}
 
 	var order *okexapi.OrderDetails
 	order, err := req.Do(ctx)

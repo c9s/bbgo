@@ -52,7 +52,7 @@ func (c *CreateOrderRequest) Price(price fixedpoint.Value) *CreateOrderRequest {
 	return c
 }
 
-func (c *CreateOrderRequest) Size(size fixedpoint.Value) *CreateOrderRequest {
+func (c *CreateOrderRequest) Size(size string) *CreateOrderRequest {
 	c.size = size
 	return c
 }
@@ -218,8 +218,8 @@ func (c *CreateOrderRequest) GetParameters() (map[string]interface{}, error) {
 	size := c.size
 
 	// TEMPLATE check-required
-	if size == 0 {
-		return nil, fmt.Errorf("size is required, 0 given")
+	if len(size) == 0 {
+		return nil, fmt.Errorf("size is required, empty string given")
 	}
 	// END TEMPLATE check-required
 
