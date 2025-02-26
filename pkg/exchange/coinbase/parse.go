@@ -3,99 +3,132 @@ package coinbase
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 // See https://docs.cdp.coinbase.com/exchange/docs/websocket-channels for message types
-func (s *Stream) parseMessage(data []byte) (interface{}, error) {
-	var msgType string
-	{
-		var e messageBaseType
-		json.Unmarshal(data, &e)
-		msgType = e.Type
+func (s *Stream) parseMessage(data []byte) (msg interface{}, err error) {
+	var baseMsg messageBaseType
+	err = json.Unmarshal(data, &baseMsg)
+	if err != nil {
+		return
 	}
 
-	switch msgType {
+	switch baseMsg.Type {
 	case "heartbeat":
-		var msg HeartbeatMessage
-		json.Unmarshal(data, &msg)
-		return &msg, nil
+		var heartbeatMsg HeartbeatMessage
+		err = json.Unmarshal(data, &heartbeatMsg)
+		if err == nil {
+			msg = heartbeatMsg
+		}
 	case "status":
-		var msg StatusMessage
-		json.Unmarshal(data, &msg)
-		return &msg, nil
+		var statusMsg StatusMessage
+		err = json.Unmarshal(data, &statusMsg)
+		if err == nil {
+			msg = statusMsg
+		}
 	case "auction":
-		var msg AuctionMessage
-		json.Unmarshal(data, &msg)
-		return &msg, nil
+		var aucMsg AuctionMessage
+		err = json.Unmarshal(data, &aucMsg)
+		if err == nil {
+			msg = aucMsg
+		}
 	case "rfq_match":
-		var msg RfqMessage
-		json.Unmarshal(data, &msg)
-		return &msg, nil
+		var rfqMsg RfqMessage
+		err = json.Unmarshal(data, &rfqMsg)
+		if err == nil {
+			msg = rfqMsg
+		}
 	case "ticker":
-		var msg TickerMessage
-		json.Unmarshal(data, &msg)
-		return &msg, nil
+		var tickerMsg TickerMessage
+		err = json.Unmarshal(data, &tickerMsg)
+		if err == nil {
+			msg = tickerMsg
+		}
 	case "received":
 		// try market order first
-		{
-			var msg ReceivedMarketOrderMessage
-			json.Unmarshal(data, &msg)
-			if !msg.Funds.IsZero() {
-				return &msg, nil
+		var marketOrderMsg ReceivedMarketOrderMessage
+		err = json.Unmarshal(data, &marketOrderMsg)
+		done := false
+		if err != nil && !marketOrderMsg.Funds.IsZero() {
+			msg = marketOrderMsg
+			done = true
+		}
+		// try limit order
+		if !done {
+			var limitOrderMsg ReceivedLimitOrderMessage
+			err = json.Unmarshal(data, &limitOrderMsg)
+			if err == nil {
+				msg = limitOrderMsg
 			}
 		}
-		var msg ReceivedLimitOrderMessage
-		json.Unmarshal(data, &msg)
-		return &msg, nil
 	case "open":
-		var msg OpenMessage
-		json.Unmarshal(data, &msg)
-		return &msg, nil
+		var openMsg OpenMessage
+		err = json.Unmarshal(data, &openMsg)
+		if err == nil {
+			msg = openMsg
+		}
 	case "done":
-		var msg DoneMessage
-		json.Unmarshal(data, &msg)
-		return &msg, nil
+		var doneMsg DoneMessage
+		err = json.Unmarshal(data, &doneMsg)
+		if err == nil {
+			msg = doneMsg
+		}
 	case "match", "last_match":
 		// authenticated stream
-		if !s.PublicOnly {
-			// try maker order first
-			{
-				var msg AuthMakerMatchMessage
-				json.Unmarshal(data, &msg)
-				if len(msg.MakerUserID) > 0 {
-					return &msg, nil
-				}
+		done := false
+		// try maker order first
+		var makerMsg AuthMakerMatchMessage
+		err = json.Unmarshal(data, &makerMsg)
+		if err == nil && len(makerMsg.MakerUserID) > 0 {
+			msg = makerMsg
+			done = true
+		}
+		// try taker order
+		if !done {
+			var takerMsg AuthTakerMatchMessage
+			err = json.Unmarshal(data, &takerMsg)
+			if err == nil && len(takerMsg.TakerUserID) > 0 {
+				msg = takerMsg
+				done = true
 			}
-			// should be taker order
-			var msg AuthTakerMatchMessage
-			json.Unmarshal(data, &msg)
-			return &msg, nil
 		}
 		// public stream
-		var msg MatchMessage
-		json.Unmarshal(data, &msg)
-		return &msg, nil
-	case "change":
-		var reason string
-		{
-			var e changeMessageType
-			json.Unmarshal(data, &e)
-			reason = e.Reason
+		if !done {
+			var publicMsg MatchMessage
+			err = json.Unmarshal(data, &publicMsg)
+			if err == nil {
+				msg = publicMsg
+			}
 		}
-		switch reason {
+	case "change":
+		var changeMsg changeMessageType
+		err = json.Unmarshal(data, &changeMsg)
+		if err == nil {
+			break
+		}
+		switch changeMsg.Reason {
 		case "stp":
-			var msg StpChangeMessage
-			json.Unmarshal(data, &msg)
-			return &msg, nil
+			var stpMsg StpChangeMessage
+			err = json.Unmarshal(data, &stpMsg)
+			if err == nil {
+				msg = stpMsg
+			}
 		case "modify_order":
-			var msg ModifyOrderChangeMessage
-			json.Unmarshal(data, &msg)
-			return &msg, nil
+			var modifyMsg ModifyOrderChangeMessage
+			err = json.Unmarshal(data, &modifyMsg)
+			if err == nil {
+				msg = modifyMsg
+			}
 		}
 	case "active":
-		var msg ActiveMessage
-		json.Unmarshal(data, &msg)
-		return &msg, nil
+		var activeMsg ActiveMessage
+		err = json.Unmarshal(data, &activeMsg)
+		if err == nil {
+			msg = activeMsg
+		}
+	default:
+		err = errors.New(fmt.Sprintf("unknown message type: %s", baseMsg.Type))
 	}
-	return nil, errors.New("unknown message type")
+	return
 }
