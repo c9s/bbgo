@@ -2,6 +2,7 @@ package coinbase
 
 // https://docs.cdp.coinbase.com/exchange/docs/websocket-channels
 import (
+	"encoding/json"
 	"time"
 
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
@@ -14,6 +15,7 @@ import (
 
 type messageBaseType struct {
 	Type string `json:"type"`
+	Data json.RawMessage
 }
 
 type seqenceMessageType struct {
