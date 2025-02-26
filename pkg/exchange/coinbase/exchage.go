@@ -307,8 +307,8 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		log.Warnf("limit %d is greater than the maximum limit 300, set to 300", options.Limit)
 		options.Limit = DefaultKLineLimit
 	}
-	granity := fmt.Sprintf("%d", interval.Seconds())
-	req := e.client.NewGetCandlesRequest().ProductID(toLocalSymbol(symbol)).Granularity(granity)
+	granularity := fmt.Sprintf("%d", interval.Seconds())
+	req := e.client.NewGetCandlesRequest().ProductID(toLocalSymbol(symbol)).Granularity(granularity)
 	if options.StartTime != nil {
 		req.Start(*options.StartTime)
 	}
