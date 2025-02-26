@@ -198,17 +198,15 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 	}
 	sortedBy := "created_at"
 	sorting := "desc"
-	before := time.Now()
 	localSymbol := toLocalSymbol(symbol)
-	paginationLimit := 1000
 	getOrdersReq := e.client.NewGetOrdersRequest()
-	getOrdersReq.ProductID(localSymbol).Status(status).SortedBy(sortedBy).Sorting(sorting).Before(before).Limit(paginationLimit)
+	getOrdersReq.ProductID(localSymbol).Status(status).SortedBy(sortedBy).Sorting(sorting).Limit(PaginationLimit)
 	cbOrders, err := getOrdersReq.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get orders")
 	}
 
-	if len(cbOrders) < paginationLimit {
+	if len(cbOrders) < PaginationLimit {
 		return cbOrders, nil
 	}
 
@@ -221,13 +219,13 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 			if done {
 				break
 			}
-			before = time.Time(cbOrders[len(cbOrders)-1].CreatedAt)
-			getOrdersReq.Before(before)
+			after := time.Time(cbOrders[len(cbOrders)-1].CreatedAt)
+			getOrdersReq.After(after)
 			newOrders, err := getOrdersReq.Do(ctx)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get orders while paginating")
 			}
-			if len(newOrders) < paginationLimit {
+			if len(newOrders) < PaginationLimit {
 				done = true
 			}
 			cbOrders = append(cbOrders, newOrders...)
@@ -318,16 +316,17 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	if options.EndTime != nil {
 		req.End(*options.EndTime)
 	}
-	candles, err := req.Do(ctx)
+	rawCandles, err := req.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get klines(%v): %v", interval, symbol)
 	}
-	if len(candles) > options.Limit {
-		candles = candles[:options.Limit]
+	if len(rawCandles) > options.Limit {
+		rawCandles = rawCandles[:options.Limit]
 	}
-	klines := make([]types.KLine, 0, len(candles))
-	for _, candle := range candles {
-		klines = append(klines, toGlobalKline(symbol, granity, &candle))
+	klines := make([]types.KLine, 0, len(rawCandles))
+	for _, rawCandle := range rawCandles {
+		candle := rawCandle.Candle()
+		klines = append(klines, toGlobalKline(symbol, granity, candle))
 	}
 	return klines, nil
 }
@@ -378,7 +377,7 @@ func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, orderID str
 				break
 			}
 			lastTrade := cbTrades[len(cbTrades)-1]
-			req.Before(lastTrade.OrderID)
+			req.After(lastTrade.TradeID)
 			newTrades, err := req.Do(ctx)
 			if err != nil {
 				return nil, err
