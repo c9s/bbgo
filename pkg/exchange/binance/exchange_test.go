@@ -15,7 +15,7 @@ func Test_newClientOrderID(t *testing.T) {
 	strings.HasPrefix(cID, "x-"+spotBrokerID)
 
 	cID = newSpotClientOrderID("myid1")
-	assert.Equal(t, cID, "x-"+spotBrokerID+"myid1")
+	assert.Equal(t, "myid1", cID)
 }
 
 func Test_new(t *testing.T) {

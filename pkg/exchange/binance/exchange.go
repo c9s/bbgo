@@ -827,13 +827,32 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 }
 
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
-	orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
-	if err != nil {
-		return nil, err
+	if len(q.Symbol) == 0 {
+		return nil, errors.New("symbol parameter is a mandatory parameter for querying order")
+	}
+
+	var orderID int64
+	var err error
+	if len(q.OrderID) > 0 {
+		orderID, err = strconv.ParseInt(q.OrderID, 10, 64)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if e.IsMargin {
-		order, err := e.client.NewGetMarginOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
+		var order *binance.Order
+		req := e.client.NewGetMarginOrderService().Symbol(q.Symbol)
+
+		if len(q.OrderID) > 0 {
+			req.OrderID(orderID)
+		} else if len(q.ClientOrderID) > 0 {
+			req.OrigClientOrderID(q.ClientOrderID)
+		} else {
+			return nil, errors.New("empty order id")
+		}
+
+		order, err = req.Do(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -841,19 +860,39 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 	}
 
 	if e.IsFutures {
-		order, err := e.futuresClient.NewGetOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
+		var order *futures.Order
+		req := e.futuresClient.NewGetOrderService().Symbol(q.Symbol)
+
+		if len(q.OrderID) > 0 {
+			req.OrderID(orderID)
+		} else if len(q.ClientOrderID) > 0 {
+			req.OrigClientOrderID(q.ClientOrderID)
+		} else {
+			return nil, errors.New("empty order id")
+		}
+
+		order, err = req.Do(ctx)
 		if err != nil {
 			return nil, err
 		}
-
 		return toGlobalFuturesOrder(order, false)
 	}
 
-	order, err := e.client.NewGetOrderService().Symbol(q.Symbol).OrderID(orderID).Do(ctx)
+	var order *binance.Order
+	req := e.client.NewGetOrderService().Symbol(q.Symbol)
+
+	if len(q.OrderID) > 0 {
+		req.OrderID(orderID)
+	} else if len(q.ClientOrderID) > 0 {
+		req.OrigClientOrderID(q.ClientOrderID)
+	} else {
+		return nil, errors.New("empty order id")
+	}
+
+	order, err = req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-
 	return toGlobalOrder(order, e.IsMargin)
 }
 
@@ -1086,19 +1125,11 @@ func newSpotClientOrderID(originalID string) (clientOrderID string) {
 		return ""
 	}
 
-	prefix := "x-" + spotBrokerID
-	prefixLen := len(prefix)
-
 	if originalID != "" {
-		// try to keep the whole original client order ID if user specifies it.
-		if prefixLen+len(originalID) > 32 {
-			return originalID
-		}
-
-		clientOrderID = prefix + originalID
-		return clientOrderID
+		return originalID
 	}
 
+	prefix := "x-" + spotBrokerID
 	clientOrderID = uuid.New().String()
 	clientOrderID = prefix + clientOrderID
 	if len(clientOrderID) > 32 {

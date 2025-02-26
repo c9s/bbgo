@@ -139,7 +139,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		}
 		qty = qty.Mul(ticker.Buy)
 	}
-	req.Size(qty)
+	req.Size(qty.String())
 	// set price
 	if order.Type == types.OrderTypeLimit {
 		req.Price(order.Price)
@@ -216,9 +216,6 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 		case <-ctx.Done():
 			return cbOrders, ctx.Err()
 		default:
-			if done {
-				break
-			}
 			after := time.Time(cbOrders[len(cbOrders)-1].CreatedAt)
 			getOrdersReq.After(after)
 			newOrders, err := getOrdersReq.Do(ctx)
@@ -373,9 +370,6 @@ func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, orderID str
 		case <-ctx.Done():
 			return cbTrades, ctx.Err()
 		default:
-			if done {
-				break
-			}
 			lastTrade := cbTrades[len(cbTrades)-1]
 			req.After(lastTrade.TradeID)
 			newTrades, err := req.Do(ctx)
