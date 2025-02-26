@@ -322,7 +322,11 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	}
 	klines := make([]types.KLine, 0, len(rawCandles))
 	for _, rawCandle := range rawCandles {
-		candle := rawCandle.Candle()
+		candle, err := rawCandle.Candle()
+		if err != nil {
+			log.Warnf("invalid raw candle detected, skipped: %v", rawCandle)
+			continue
+		}
 		klines = append(klines, toGlobalKline(symbol, granity, candle))
 	}
 	return klines, nil

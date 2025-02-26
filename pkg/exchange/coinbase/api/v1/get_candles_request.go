@@ -1,6 +1,7 @@
 package coinbase
 
 import (
+	"errors"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -23,7 +24,10 @@ type Candle struct {
 
 type GetCandlesResponse []RawCandle
 
-func (rc *RawCandle) Candle() *Candle {
+func (rc *RawCandle) Candle() (*Candle, error) {
+	if rc == nil || len(*rc) != 6 {
+		return nil, errors.New("invalid raw candle")
+	}
 	values := *rc
 	return &Candle{
 		Time:   types.Time(time.Unix(values[0].Int64(), 0)),
@@ -32,7 +36,7 @@ func (rc *RawCandle) Candle() *Candle {
 		Open:   values[3],
 		Close:  values[4],
 		Volume: values[5],
-	}
+	}, nil
 }
 
 // https://docs.cdp.coinbase.com/exchange/reference/exchangerestapi_getproductcandles
