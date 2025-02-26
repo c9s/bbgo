@@ -61,16 +61,19 @@ func FNV64a(text string) uint64 {
 }
 
 func toGlobalKline(symbol string, interval types.Interval, candle *api.Candle) types.KLine {
+	startTime := candle.Time.Time()
+	endTime := startTime.Add(interval.Duration())
 	kline := types.KLine{
-		Exchange: types.ExchangeCoinBase,
-		Symbol:   symbol,
-		EndTime:  types.Time(candle.Time),
-		Interval: interval,
-		Open:     candle.Open,
-		Close:    candle.Close,
-		High:     candle.High,
-		Low:      candle.Low,
-		Volume:   candle.Volume,
+		Exchange:  types.ExchangeCoinBase,
+		Symbol:    symbol,
+		StartTime: types.Time(startTime),
+		EndTime:   types.Time(endTime),
+		Interval:  interval,
+		Open:      candle.Open,
+		Close:     candle.Close,
+		High:      candle.High,
+		Low:       candle.Low,
+		Volume:    candle.Volume,
 	}
 	return kline
 }

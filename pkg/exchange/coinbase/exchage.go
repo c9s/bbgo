@@ -328,17 +328,11 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		}
 		candles = append(candles, *candle)
 	}
-	numCandles := len(candles)
-	klines := make([]types.KLine, 0, numCandles)
-	if numCandles > 0 {
-		for idx, candle := range candles {
-			kline := toGlobalKline(symbol, interval, &candle)
-			klines = append(klines, kline)
-			if idx > 0 {
-				klines[idx-1].StartTime = kline.EndTime
-			}
-		}
-		klines[numCandles-1].StartTime = types.Time(klines[numCandles-1].EndTime.Time().Add(-interval.Duration()))
+
+	klines := make([]types.KLine, 0, len(candles))
+	for _, candle := range candles {
+		kline := toGlobalKline(symbol, interval, &candle)
+		klines = append(klines, kline)
 	}
 	return klines, nil
 }
