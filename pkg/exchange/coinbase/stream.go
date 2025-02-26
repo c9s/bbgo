@@ -29,9 +29,6 @@ func NewStream() *Stream {
 	s := Stream{
 		StandardStream: types.NewStandardStream(),
 	}
+	s.SetParser(s.parseMessage)
 	return &s
 }
-
-// func (s *Stream) handleAuth() {
-// 	return
-// }
