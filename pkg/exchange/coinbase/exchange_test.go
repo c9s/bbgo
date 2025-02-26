@@ -71,6 +71,17 @@ func Test_OrdersAPI(t *testing.T) {
 	order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: "ETHUSD", OrderID: order.UUID, ClientOrderID: order.UUID})
 	assert.NoError(t, err)
 
+	// the status might be pending at the beginning. Wait until it is open
+	// only retry 5 times
+	for i := 0; i < 5; i++ {
+		if order.OriginalStatus == "open" {
+			break
+		}
+		time.Sleep(time.Millisecond * 500)
+		order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: "ETHUSD", OrderID: order.UUID, ClientOrderID: order.UUID})
+		assert.NoError(t, err)
+	}
+
 	orders, err := ex.QueryOpenOrders(ctx, "ETHUSD")
 	assert.NoError(t, err)
 	found := false
