@@ -145,18 +145,20 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		req.Price(order.Price)
 	}
 
-	// set time in force
-	switch order.TimeInForce {
-	case types.TimeInForceGTC:
-		req.TimeInForce("GTC")
-	case types.TimeInForceIOC:
-		req.TimeInForce("IOC")
-	case types.TimeInForceFOK:
-		req.TimeInForce("FOK")
-	case types.TimeInForceGTT:
-		req.TimeInForce("GTT")
-	default:
-		return nil, fmt.Errorf("unsupported time in force: %v", order.TimeInForce)
+	// set time in force, using default if not set
+	if len(order.TimeInForce) > 0 {
+		switch order.TimeInForce {
+		case types.TimeInForceGTC:
+			req.TimeInForce("GTC")
+		case types.TimeInForceIOC:
+			req.TimeInForce("IOC")
+		case types.TimeInForceFOK:
+			req.TimeInForce("FOK")
+		case types.TimeInForceGTT:
+			req.TimeInForce("GTT")
+		default:
+			return nil, fmt.Errorf("unsupported time in force: %v", order.TimeInForce)
+		}
 	}
 	// client order id
 	if len(order.ClientOrderID) > 0 {
@@ -286,7 +288,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 	for _, s := range symbol {
 		ticker, err := e.QueryTicker(ctx, s)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get tickers")
+			return nil, errors.Wrapf(err, "failed to get ticker for %v", s)
 		}
 		tickers[s] = *ticker
 	}
@@ -305,7 +307,7 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 		log.Warnf("limit %d is greater than the maximum limit 300, set to 300", options.Limit)
 		options.Limit = DefaultKLineLimit
 	}
-	granity := interval.String()
+	granity := fmt.Sprintf("%d", interval.Seconds())
 	req := e.client.NewGetCandlesRequest().ProductID(toLocalSymbol(symbol)).Granularity(granity)
 	if options.StartTime != nil {
 		req.Start(*options.StartTime)
@@ -313,21 +315,30 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	if options.EndTime != nil {
 		req.End(*options.EndTime)
 	}
-	rawCandles, err := req.Do(ctx)
+	res, err := req.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get klines(%v): %v", interval, symbol)
 	}
-	if len(rawCandles) > options.Limit {
-		rawCandles = rawCandles[:options.Limit]
-	}
-	klines := make([]types.KLine, 0, len(rawCandles))
-	for _, rawCandle := range rawCandles {
-		candle, err := rawCandle.Candle()
+	candles := make([]api.Candle, 0, len(res))
+	for _, c := range res {
+		candle, err := c.Candle()
 		if err != nil {
-			log.Warnf("invalid raw candle detected, skipped: %v", rawCandle)
+			log.Warnf("invalid raw candle detected, skipping: %v", c)
 			continue
 		}
-		klines = append(klines, toGlobalKline(symbol, granity, candle))
+		candles = append(candles, *candle)
+	}
+	numCandles := len(candles)
+	klines := make([]types.KLine, 0, numCandles)
+	if numCandles > 0 {
+		for idx, candle := range candles {
+			kline := toGlobalKline(symbol, interval, &candle)
+			klines = append(klines, kline)
+			if idx > 0 {
+				klines[idx-1].StartTime = kline.EndTime
+			}
+		}
+		klines[numCandles-1].StartTime = types.Time(klines[numCandles-1].EndTime.Time().Add(-interval.Duration()))
 	}
 	return klines, nil
 }
@@ -344,7 +355,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 }
 
 func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
-	cbTrades, err := e.queryOrderTradesByPagination(ctx, q.OrderID)
+	cbTrades, err := e.queryOrderTradesByPagination(ctx, q)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get order trades: %v", q.OrderID)
 	}
@@ -355,14 +366,17 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 	return trades, nil
 }
 
-func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, orderID string) (api.TradeSnapshot, error) {
-	req := e.client.NewGetOrderTradesRequest().OrderID(orderID).Limit(PaginationLimit)
+func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, q types.OrderQuery) (api.TradeSnapshot, error) {
+	req := e.client.NewGetOrderTradesRequest().Limit(PaginationLimit)
+	if len(q.OrderID) > 0 {
+		req.OrderID(q.OrderID)
+	}
+	if len(q.Symbol) > 0 {
+		req.ProductID(toLocalSymbol(q.Symbol))
+	}
 	cbTrades, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
-	}
-	if len(cbTrades) < PaginationLimit {
-		return cbTrades, nil
 	}
 
 	if len(cbTrades) < PaginationLimit {
