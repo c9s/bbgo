@@ -315,15 +315,15 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 	if options.EndTime != nil {
 		req.End(*options.EndTime)
 	}
-	res, err := req.Do(ctx)
+	rawCandles, err := req.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get klines(%v): %v", interval, symbol)
 	}
-	candles := make([]api.Candle, 0, len(res))
-	for _, c := range res {
-		candle, err := c.Candle()
+	candles := make([]api.Candle, 0, len(rawCandles))
+	for _, rawCandle := range rawCandles {
+		candle, err := rawCandle.Candle()
 		if err != nil {
-			log.Warnf("invalid raw candle detected, skipping: %v", c)
+			log.Warnf("invalid raw candle detected, skipping: %v", rawCandle)
 			continue
 		}
 		candles = append(candles, *candle)
