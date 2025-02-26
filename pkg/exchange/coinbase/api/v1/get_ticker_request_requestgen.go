@@ -31,17 +31,6 @@ func (g *GetTickerRequest) GetQueryParameters() (url.Values, error) {
 // GetParameters builds and checks the parameters and return the result in a map object
 func (g *GetTickerRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
-	// check productID field -> json key product_id
-	productID := g.productID
-
-	// TEMPLATE check-required
-	if len(productID) == 0 {
-		return nil, fmt.Errorf("product_id is required, empty string given")
-	}
-	// END TEMPLATE check-required
-
-	// assign parameter of productID
-	params["product_id"] = productID
 
 	return params, nil
 }
@@ -81,6 +70,17 @@ func (g *GetTickerRequest) GetParametersJSON() ([]byte, error) {
 // GetSlugParameters builds and checks the slug parameters and return the result in a map object
 func (g *GetTickerRequest) GetSlugParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
+	// check productID field -> json key product_id
+	productID := g.productID
+
+	// TEMPLATE check-required
+	if len(productID) == 0 {
+		return nil, fmt.Errorf("product_id is required, empty string given")
+	}
+	// END TEMPLATE check-required
+
+	// assign parameter of productID
+	params["product_id"] = productID
 
 	return params, nil
 }
@@ -133,16 +133,19 @@ func (g *GetTickerRequest) GetPath() string {
 // Do generates the request object and send the request object to the API endpoint
 func (g *GetTickerRequest) Do(ctx context.Context) (*Ticker, error) {
 
-	// empty params for GET operation
+	// no body params
 	var params interface{}
-	query, err := g.GetParametersQuery()
-	if err != nil {
-		return nil, err
-	}
+	query := url.Values{}
 
 	var apiURL string
 
 	apiURL = g.GetPath()
+	slugs, err := g.GetSlugsMap()
+	if err != nil {
+		return nil, err
+	}
+
+	apiURL = g.applySlugsToUrl(apiURL, slugs)
 
 	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {

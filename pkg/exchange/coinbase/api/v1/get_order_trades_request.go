@@ -25,14 +25,15 @@ type Trade struct {
 
 type TradeSnapshot []Trade
 
-//go:generate requestgen -method GET -url "/orders/fills" -type GetOrderTradesRequest -responseType .TradeSnapshot
+//go:generate requestgen -method GET -url "/fills" -type GetOrderTradesRequest -responseType .TradeSnapshot
 type GetOrderTradesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	orderID    string      `param:"order_id,required"`
+	orderID    string      `param:"order_id"`
+	productID  string      `param:"product_id"` // one of order_id or product_id is required
 	limit      int         `param:"limit"`
-	before     *string     `param:"before"`
-	after      *string     `param:"after"`
+	before     *int        `param:"before"` // pagination id, which is the trade_id (exclusive)
+	after      *int        `param:"after"`  // pagination id, which is the trade_id (exclusive)
 	marketType *MarketType `param:"market_type"`
 	startDate  *string     `param:"start_date"`
 	endDate    *string     `param:"end_date"`

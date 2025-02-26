@@ -13,11 +13,6 @@ import (
 	"time"
 )
 
-func (g *GetCandlesRequest) ProductID(productID string) *GetCandlesRequest {
-	g.productID = productID
-	return g
-}
-
 func (g *GetCandlesRequest) Granularity(granularity string) *GetCandlesRequest {
 	g.granularity = &granularity
 	return g
@@ -30,6 +25,11 @@ func (g *GetCandlesRequest) Start(start time.Time) *GetCandlesRequest {
 
 func (g *GetCandlesRequest) End(end time.Time) *GetCandlesRequest {
 	g.end = &end
+	return g
+}
+
+func (g *GetCandlesRequest) ProductID(productID string) *GetCandlesRequest {
+	g.productID = productID
 	return g
 }
 
@@ -48,17 +48,6 @@ func (g *GetCandlesRequest) GetQueryParameters() (url.Values, error) {
 // GetParameters builds and checks the parameters and return the result in a map object
 func (g *GetCandlesRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
-	// check productID field -> json key product_id
-	productID := g.productID
-
-	// TEMPLATE check-required
-	if len(productID) == 0 {
-		return nil, fmt.Errorf("product_id is required, empty string given")
-	}
-	// END TEMPLATE check-required
-
-	// assign parameter of productID
-	params["product_id"] = productID
 	// check granularity field -> json key granularity
 	if g.granularity != nil {
 		granularity := *g.granularity
@@ -135,6 +124,17 @@ func (g *GetCandlesRequest) GetParametersJSON() ([]byte, error) {
 // GetSlugParameters builds and checks the slug parameters and return the result in a map object
 func (g *GetCandlesRequest) GetSlugParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
+	// check productID field -> json key product_id
+	productID := g.productID
+
+	// TEMPLATE check-required
+	if len(productID) == 0 {
+		return nil, fmt.Errorf("product_id is required, empty string given")
+	}
+	// END TEMPLATE check-required
+
+	// assign parameter of productID
+	params["product_id"] = productID
 
 	return params, nil
 }
@@ -197,6 +197,12 @@ func (g *GetCandlesRequest) Do(ctx context.Context) (GetCandlesResponse, error) 
 	var apiURL string
 
 	apiURL = g.GetPath()
+	slugs, err := g.GetSlugsMap()
+	if err != nil {
+		return nil, err
+	}
+
+	apiURL = g.applySlugsToUrl(apiURL, slugs)
 
 	req, err := g.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
