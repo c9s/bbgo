@@ -21,6 +21,18 @@ func Test_new(t *testing.T) {
 	_ = ex.PlatformFeeCurrency()
 }
 
+func Test_Symbols(t *testing.T) {
+	globalSymbol := "NOTEXIST"
+	localSymbol := toLocalSymbol(globalSymbol)
+	assert.Equal(t, globalSymbol, toGlobalSymbol(localSymbol))
+	assert.Equal(t, localSymbol, toLocalSymbol(globalSymbol))
+
+	globalSymbol = "ETHUSD"
+	localSymbol = toLocalSymbol(globalSymbol)
+	assert.Equal(t, globalSymbol, toGlobalSymbol(localSymbol))
+	assert.Equal(t, localSymbol, toLocalSymbol(globalSymbol))
+}
+
 func Test_OrdersAPI(t *testing.T) {
 	ex := getExchangeOrSkip(t)
 	ctx := context.Background()
