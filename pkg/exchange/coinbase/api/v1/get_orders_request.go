@@ -63,8 +63,8 @@ type GetOrdersRequest struct {
 	sorting   *string    `param:"sorting" validValues:"asc,desc"`
 	startDate *time.Time `param:"start_date" timeFormat:"RFC3339"`
 	endDate   *time.Time `param:"end_date" timeFormat:"RFC3339"`
-	before    *time.Time `param:"before" timeFormat:"RFC3339"`
-	after     *time.Time `param:"after" timeFormat:"RFC3339"`
+	before    *time.Time `param:"before" timeFormat:"RFC3339"` // pagination id, which is the date of the order (exclusive)
+	after     *time.Time `param:"after" timeFormat:"RFC3339"`  // pagination id, which is the date of the order (exclusive)
 	limit     int        `param:"limit,required"`
 	status    []string   `param:"status,required"`
 }
@@ -73,7 +73,7 @@ type GetOrdersRequest struct {
 type GetSingleOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	orderID string `param:"order_id,required"`
+	orderID string `param:"order_id,slug,required"`
 }
 
 func (client *RestAPIClient) NewGetOrdersRequest() *GetOrdersRequest {

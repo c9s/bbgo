@@ -22,7 +22,7 @@ type Ticker struct {
 type GetTickerRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	productID string `param:"product_id,required"`
+	productID string `param:"product_id,slug,required"`
 }
 
 func (client *RestAPIClient) NewGetTickerRequest() *GetTickerRequest {
