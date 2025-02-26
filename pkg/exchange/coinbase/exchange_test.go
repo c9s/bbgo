@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -146,6 +147,20 @@ func Test_QueryKLines(t *testing.T) {
 	assert.Error(t, err)
 
 	klines, err := ex.QueryKLines(ctx, "BTCUSD", types.Interval1m, types.KLineQueryOptions{})
+	assert.NoError(t, err)
+	assert.NotNil(t, klines)
+
+	endTime := time.Now()
+	startTime := endTime.Add(-time.Hour * 5)
+	klines, err = ex.QueryKLines(
+		ctx,
+		"BTCUSD",
+		types.Interval1m,
+		types.KLineQueryOptions{
+			StartTime: &startTime,
+			EndTime:   &endTime,
+		},
+	)
 	assert.NoError(t, err)
 	assert.NotNil(t, klines)
 }
