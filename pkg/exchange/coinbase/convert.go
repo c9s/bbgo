@@ -17,7 +17,7 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 		UUID:           cbOrder.ID,
 		OrderID:        FNV64a(cbOrder.ID),
 		OriginalStatus: string(cbOrder.Status),
-		CreationTime:   types.Time(cbOrder.CreatedAt),
+		CreationTime:   cbOrder.CreatedAt,
 	}
 }
 
@@ -60,18 +60,17 @@ func FNV64a(text string) uint64 {
 	return hash.Sum64()
 }
 
-func toGlobalKline(symbol string, granity string, candle *api.Candle) types.KLine {
+func toGlobalKline(symbol string, interval types.Interval, candle *api.Candle) types.KLine {
 	kline := types.KLine{
-		Exchange:  types.ExchangeCoinBase,
-		Symbol:    symbol,
-		StartTime: types.Time(candle.Time),
-		EndTime:   types.Time(time.Time(candle.Time).Add(types.Interval(granity).Duration())),
-		Interval:  types.Interval(granity),
-		Open:      candle.Open,
-		Close:     candle.Close,
-		High:      candle.High,
-		Low:       candle.Low,
-		Volume:    candle.Volume,
+		Exchange: types.ExchangeCoinBase,
+		Symbol:   symbol,
+		EndTime:  types.Time(candle.Time),
+		Interval: interval,
+		Open:     candle.Open,
+		Close:    candle.Close,
+		High:     candle.High,
+		Low:      candle.Low,
+		Volume:   candle.Volume,
 	}
 	return kline
 }
