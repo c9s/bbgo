@@ -5,7 +5,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"strconv"
 	"time"
 
@@ -45,7 +44,6 @@ func NewStream(
 		passphrase:     passphrase,
 		secretKey:      secretKey,
 	}
-	s.PublicOnly = (apiKey == "" || passphrase == "" || secretKey == "")
 	s.SetParser(s.parseMessage)
 	s.SetDispatcher(s.dispatchEvent)
 	s.SetEndpointCreator(createEndpoint)
@@ -131,6 +129,7 @@ func (s *Stream) handleConnect() {
 	}
 	subCmds := []websocketCommand{}
 	signature, ts := s.generateSignature()
+	authEnabled := !s.PublicOnly && len(s.apiKey) > 0 && len(s.passphrase) > 0 && len(s.secretKey) > 0
 	for channel, productIDs := range subProductsMap {
 		var subType string
 		switch channel {
@@ -148,7 +147,7 @@ func (s *Stream) handleConnect() {
 				},
 			},
 		}
-		if !s.PublicOnly {
+		if authEnabled {
 			subCmd.Signature = &signature
 			subCmd.Key = &s.apiKey
 			subCmd.Passphrase = &s.passphrase
@@ -162,14 +161,6 @@ func (s *Stream) handleConnect() {
 			log.WithError(err).Errorf("subscription error: %v", subCmd)
 		}
 	}
-}
-
-func (subCmd *websocketCommand) String() string {
-	jsonData, err := json.Marshal(subCmd)
-	if err != nil {
-		return "<unknown subscription>"
-	}
-	return string(jsonData)
 }
 
 func (s *Stream) generateSignature() (string, string) {
