@@ -116,20 +116,15 @@ func (s *Stream) handleConnect() {
 	subProductsMap := make(map[string][]string)
 	for _, sub := range s.Subscriptions {
 		strChannel := string(sub.Channel)
-		if _, ok := subProductsMap[strChannel]; !ok {
-			subProductsMap[strChannel] = []string{}
-		}
 		// "rfq_matches" allow empty symbol
 		if sub.Channel != "rfq_matches" && len(sub.Symbol) == 0 {
 			continue
 		}
-		products := subProductsMap[strChannel]
-		products = append(products, sub.Symbol)
+		products := append(subProductsMap[strChannel], sub.Symbol)
 		subProductsMap[strChannel] = products
 	}
 	subCmds := []websocketCommand{}
 	signature, ts := s.generateSignature()
-	authEnabled := !s.PublicOnly && len(s.apiKey) > 0 && len(s.passphrase) > 0 && len(s.secretKey) > 0
 	for channel, productIDs := range subProductsMap {
 		var subType string
 		switch channel {
@@ -147,7 +142,7 @@ func (s *Stream) handleConnect() {
 				},
 			},
 		}
-		if authEnabled {
+		if s.authEnabled() {
 			subCmd.Signature = &signature
 			subCmd.Key = &s.apiKey
 			subCmd.Passphrase = &s.passphrase
@@ -161,6 +156,10 @@ func (s *Stream) handleConnect() {
 			log.WithError(err).Errorf("subscription error: %v", subCmd)
 		}
 	}
+}
+
+func (s *Stream) authEnabled() bool {
+	return !s.PublicOnly && len(s.apiKey) > 0 && len(s.passphrase) > 0 && len(s.secretKey) > 0
 }
 
 func (s *Stream) generateSignature() (string, string) {
