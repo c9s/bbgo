@@ -131,11 +131,11 @@ type ReceivedMessage struct {
 	Time      time.Time    `json:"time"`
 
 	// limit order fields
-	Size  fixedpoint.Value `json:"size"`
-	Price fixedpoint.Value `json:"price"`
+	Size  fixedpoint.Value `json:"size,omitempty"`
+	Price fixedpoint.Value `json:"price,omitempty"`
 
 	// market order fields
-	Funds fixedpoint.Value `json:"funds"`
+	Funds fixedpoint.Value `json:"funds,omitempty"`
 }
 
 func (m *ReceivedMessage) IsMarketOrder() bool {
@@ -179,14 +179,14 @@ type MatchMessage struct {
 	ProfileID string `json:"profile_id"`
 
 	// extra fields for taker
-	TakerUserID    string `json:"taker_user_id"`
-	TakerProfileID string `json:"taker_profile_id"`
-	TakerFeeRate   string `json:"taker_fee_rate"`
+	TakerUserID    string `json:"taker_user_id,omitempty"`
+	TakerProfileID string `json:"taker_profile_id,omitempty"`
+	TakerFeeRate   string `json:"taker_fee_rate,omitempty"`
 
 	// extra fields for maker
-	MakerUserID    string `json:"maker_user_id"`
-	MakerProfileID string `json:"maker_profile_id"`
-	MakerFeeRate   string `json:"maker_fee_rate"`
+	MakerUserID    string `json:"maker_user_id,omitempty"`
+	MakerProfileID string `json:"maker_profile_id,omitempty"`
+	MakerFeeRate   string `json:"maker_fee_rate,omitempty"`
 }
 
 func (m *MatchMessage) IsAuthTaker() bool {
@@ -204,11 +204,11 @@ type ChangeMessage struct {
 	NewSize fixedpoint.Value `json:"new_size"`
 
 	// STP fields
-	Price fixedpoint.Value `json:"price"`
+	Price fixedpoint.Value `json:"price,omitempty"`
 
 	// modify_order fields
-	OldPrice fixedpoint.Value `json:"old_price"`
-	NewPrice fixedpoint.Value `json:"new_price"`
+	OldPrice fixedpoint.Value `json:"old_price,omitempty"`
+	NewPrice fixedpoint.Value `json:"new_price,omitempty"`
 }
 
 func (m *ChangeMessage) IsStp() bool {
