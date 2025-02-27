@@ -64,24 +64,16 @@ func (s *Stream) dispatchEvent(e interface{}) {
 		s.EmitRfqMessage(e)
 	case *TickerMessage:
 		s.EmitTickerMessage(e)
-	case *ReceivedLimitOrderMessage:
-		s.EmitReceivedLimitOrderMessage(e)
-	case *ReceivedMarketOrderMessage:
-		s.EmitReceivedMarketOrderMessage(e)
+	case *ReceivedMessage:
+		s.EmitReceivedMessage(e)
 	case *OpenMessage:
 		s.EmitOpenMessage(e)
 	case *DoneMessage:
 		s.EmitDoneMessage(e)
 	case *MatchMessage:
 		s.EmitMatchMessage(e)
-	case *AuthMakerMatchMessage:
-		s.EmitAuthMakerMatchMessage(e)
-	case *AuthTakerMatchMessage:
-		s.EmitAuthTakerMatchMessage(e)
-	case *StpChangeMessage:
-		s.EmitStpChangeMessage(e)
-	case *ModifyOrderChangeMessage:
-		s.EmitModifyOrderChangeMessage(e)
+	case *ChangeMessage:
+		s.EmitChangeMessage(e)
 	case *ActiveMessage:
 		s.EmitActiveMessage(e)
 	default:
@@ -120,8 +112,7 @@ func (s *Stream) handleConnect() {
 		if sub.Channel != "rfq_matches" && len(sub.Symbol) == 0 {
 			continue
 		}
-		products := append(subProductsMap[strChannel], sub.Symbol)
-		subProductsMap[strChannel] = products
+		subProductsMap[strChannel] = append(subProductsMap[strChannel], sub.Symbol)
 	}
 	subCmds := []websocketCommand{}
 	signature, ts := s.generateSignature()
