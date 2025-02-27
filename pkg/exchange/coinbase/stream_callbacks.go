@@ -44,22 +44,12 @@ func (S *Stream) EmitTickerMessage(m *TickerMessage) {
 	}
 }
 
-func (S *Stream) OnReceivedLimitOrderMessage(cb func(m *ReceivedLimitOrderMessage)) {
-	S.receivedLimitOrderMessageCallbacks = append(S.receivedLimitOrderMessageCallbacks, cb)
+func (S *Stream) OnReceivedMessage(cb func(m *ReceivedMessage)) {
+	S.receivedMessageCallbacks = append(S.receivedMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitReceivedLimitOrderMessage(m *ReceivedLimitOrderMessage) {
-	for _, cb := range S.receivedLimitOrderMessageCallbacks {
-		cb(m)
-	}
-}
-
-func (S *Stream) OnReceivedMarketOrderMessage(cb func(m *ReceivedMarketOrderMessage)) {
-	S.receivedMarketOrderMessageCallbacks = append(S.receivedMarketOrderMessageCallbacks, cb)
-}
-
-func (S *Stream) EmitReceivedMarketOrderMessage(m *ReceivedMarketOrderMessage) {
-	for _, cb := range S.receivedMarketOrderMessageCallbacks {
+func (S *Stream) EmitReceivedMessage(m *ReceivedMessage) {
+	for _, cb := range S.receivedMessageCallbacks {
 		cb(m)
 	}
 }
@@ -94,42 +84,12 @@ func (S *Stream) EmitMatchMessage(m *MatchMessage) {
 	}
 }
 
-func (S *Stream) OnAuthMakerMatchMessage(cb func(m *AuthMakerMatchMessage)) {
-	S.authMakerMatchMessageCallbacks = append(S.authMakerMatchMessageCallbacks, cb)
+func (S *Stream) OnChangeMessage(cb func(m *ChangeMessage)) {
+	S.changeMessageCallbacks = append(S.changeMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitAuthMakerMatchMessage(m *AuthMakerMatchMessage) {
-	for _, cb := range S.authMakerMatchMessageCallbacks {
-		cb(m)
-	}
-}
-
-func (S *Stream) OnAuthTakerMatchMessage(cb func(m *AuthTakerMatchMessage)) {
-	S.authTakerMatchMessageCallbacks = append(S.authTakerMatchMessageCallbacks, cb)
-}
-
-func (S *Stream) EmitAuthTakerMatchMessage(m *AuthTakerMatchMessage) {
-	for _, cb := range S.authTakerMatchMessageCallbacks {
-		cb(m)
-	}
-}
-
-func (S *Stream) OnStpChangeMessage(cb func(m *StpChangeMessage)) {
-	S.stpChangeMessageCallbacks = append(S.stpChangeMessageCallbacks, cb)
-}
-
-func (S *Stream) EmitStpChangeMessage(m *StpChangeMessage) {
-	for _, cb := range S.stpChangeMessageCallbacks {
-		cb(m)
-	}
-}
-
-func (S *Stream) OnModifyOrderChangeMessage(cb func(m *ModifyOrderChangeMessage)) {
-	S.modifyOrderChangeMessageCallbacks = append(S.modifyOrderChangeMessageCallbacks, cb)
-}
-
-func (S *Stream) EmitModifyOrderChangeMessage(m *ModifyOrderChangeMessage) {
-	for _, cb := range S.modifyOrderChangeMessageCallbacks {
+func (S *Stream) EmitChangeMessage(m *ChangeMessage) {
+	for _, cb := range S.changeMessageCallbacks {
 		cb(m)
 	}
 }

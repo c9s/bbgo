@@ -7,128 +7,91 @@ import (
 )
 
 // See https://docs.cdp.coinbase.com/exchange/docs/websocket-channels for message types
-func (s *Stream) parseMessage(data []byte) (msg interface{}, err error) {
+func (s *Stream) parseMessage(data []byte) (interface{}, error) {
 	var baseMsg messageBaseType
-	err = json.Unmarshal(data, &baseMsg)
+	err := json.Unmarshal(data, &baseMsg)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	switch baseMsg.Type {
 	case "heartbeat":
 		var heartbeatMsg HeartbeatMessage
 		err = json.Unmarshal(data, &heartbeatMsg)
-		if err == nil {
-			msg = &heartbeatMsg
+		if err != nil {
+			return nil, err
 		}
+		return &heartbeatMsg, nil
 	case "status":
 		var statusMsg StatusMessage
 		err = json.Unmarshal(data, &statusMsg)
-		if err == nil {
-			msg = &statusMsg
+		if err != nil {
+			return nil, err
 		}
+		return &statusMsg, nil
 	case "auction":
 		var aucMsg AuctionMessage
 		err = json.Unmarshal(data, &aucMsg)
-		if err == nil {
-			msg = &aucMsg
+		if err != nil {
+			return nil, err
 		}
+		return &aucMsg, nil
 	case "rfq_match":
 		var rfqMsg RfqMessage
 		err = json.Unmarshal(data, &rfqMsg)
-		if err == nil {
-			msg = &rfqMsg
+		if err != nil {
+			return nil, err
 		}
+		return &rfqMsg, nil
 	case "ticker":
 		var tickerMsg TickerMessage
 		err = json.Unmarshal(data, &tickerMsg)
-		if err == nil {
-			msg = &tickerMsg
+		if err != nil {
+			return nil, err
 		}
+		return &tickerMsg, nil
 	case "received":
-		// try market order first
-		var marketOrderMsg ReceivedMarketOrderMessage
-		err = json.Unmarshal(data, &marketOrderMsg)
-		done := false
-		if err != nil && !marketOrderMsg.Funds.IsZero() {
-			msg = &marketOrderMsg
-			done = true
+		var receivedMsg ReceivedMessage
+		err = json.Unmarshal(data, &receivedMsg)
+		if err != nil {
+			return nil, err
 		}
-		// try limit order
-		if !done {
-			var limitOrderMsg ReceivedLimitOrderMessage
-			err = json.Unmarshal(data, &limitOrderMsg)
-			if err == nil {
-				msg = &limitOrderMsg
-			}
-		}
+		return &receivedMsg, nil
 	case "open":
 		var openMsg OpenMessage
 		err = json.Unmarshal(data, &openMsg)
-		if err == nil {
-			msg = &openMsg
+		if err != nil {
+			return nil, err
 		}
+		return &openMsg, nil
 	case "done":
 		var doneMsg DoneMessage
 		err = json.Unmarshal(data, &doneMsg)
-		if err == nil {
-			msg = &doneMsg
+		if err != nil {
+			return nil, err
 		}
+		return &doneMsg, nil
 	case "match", "last_match":
-		// authenticated stream
-		done := false
-		// try maker order first
-		var makerMsg AuthMakerMatchMessage
-		err = json.Unmarshal(data, &makerMsg)
-		if err == nil && len(makerMsg.MakerUserID) > 0 {
-			msg = &makerMsg
-			done = true
+		var matchMsg MatchMessage
+		err = json.Unmarshal(data, &matchMsg)
+		if err != nil {
+			return nil, err
 		}
-		// try taker order
-		if !done {
-			var takerMsg AuthTakerMatchMessage
-			err = json.Unmarshal(data, &takerMsg)
-			if err == nil && len(takerMsg.TakerUserID) > 0 {
-				msg = &takerMsg
-				done = true
-			}
-		}
-		// public stream
-		if !done {
-			var publicMsg MatchMessage
-			err = json.Unmarshal(data, &publicMsg)
-			if err == nil {
-				msg = &publicMsg
-			}
-		}
+		return &matchMsg, nil
 	case "change":
-		var changeMsg changeMessageType
+		var changeMsg ChangeMessage
 		err = json.Unmarshal(data, &changeMsg)
-		if err == nil {
-			break
+		if err != nil {
+			return nil, err
 		}
-		switch changeMsg.Reason {
-		case "stp":
-			var stpMsg StpChangeMessage
-			err = json.Unmarshal(data, &stpMsg)
-			if err == nil {
-				msg = &stpMsg
-			}
-		case "modify_order":
-			var modifyMsg ModifyOrderChangeMessage
-			err = json.Unmarshal(data, &modifyMsg)
-			if err == nil {
-				msg = &modifyMsg
-			}
-		}
+		return &changeMsg, nil
 	case "active":
 		var activeMsg ActiveMessage
 		err = json.Unmarshal(data, &activeMsg)
-		if err == nil {
-			msg = &activeMsg
+		if err != nil {
+			return nil, err
 		}
-	default:
-		err = errors.New(fmt.Sprintf("unknown message type: %s", baseMsg.Type))
+		return &activeMsg, nil
 	}
-	return
+	return nil, errors.New(fmt.Sprintf("unknown message type: %s", baseMsg.Type))
 }
