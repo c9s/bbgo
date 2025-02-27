@@ -121,7 +121,7 @@ type TickerMessage struct {
 	LastSize    fixedpoint.Value `json:"last_size"`
 }
 
-type ReceivedLimitOrderMessage struct {
+type ReceivedMessage struct {
 	seqenceMessageType
 
 	ClientOid string       `json:"client-oid"`
@@ -131,21 +131,15 @@ type ReceivedLimitOrderMessage struct {
 	Time      time.Time    `json:"time"`
 
 	// limit order fields
-	Size  fixedpoint.Value `json:"size"`
-	Price fixedpoint.Value `json:"price"`
-}
-
-type ReceivedMarketOrderMessage struct {
-	seqenceMessageType
-
-	ClientOid string       `json:"client-oid"`
-	OrderID   string       `json:"order_id"`
-	OrderType string       `json:"order_type"`
-	Side      api.SideType `json:"side"`
-	Time      time.Time    `json:"time"`
+	Size  fixedpoint.Value `json:"size,omitempty"`
+	Price fixedpoint.Value `json:"price,omitempty"`
 
 	// market order fields
-	Funds fixedpoint.Value `json:"funds"`
+	Funds fixedpoint.Value `json:"funds,omitempty"`
+}
+
+func (m *ReceivedMessage) IsMarketOrder() bool {
+	return !m.Funds.IsZero()
 }
 
 type OpenMessage struct {
@@ -180,33 +174,26 @@ type MatchMessage struct {
 	Size         fixedpoint.Value `json:"size"`
 	Price        fixedpoint.Value `json:"price"`
 	Side         api.SideType     `json:"side"`
-}
-
-type AuthTakerMatchMessage struct {
-	MatchMessage
 
 	UserID    string `json:"user_id"`
 	ProfileID string `json:"profile_id"`
 
 	// extra fields for taker
-	TakerUserID    string `json:"taker_user_id"`
-	TakerProfileID string `json:"taker_profile_id"`
-	TakerFeeRate   string `json:"taker_fee_rate"`
-}
-
-type AuthMakerMatchMessage struct {
-	MatchMessage
-
-	UserID    string `json:"user_id"`
-	ProfileID string `json:"profile_id"`
+	TakerUserID    string `json:"taker_user_id,omitempty"`
+	TakerProfileID string `json:"taker_profile_id,omitempty"`
+	TakerFeeRate   string `json:"taker_fee_rate,omitempty"`
 
 	// extra fields for maker
-	MakerUserID    string `json:"maker_user_id"`
-	MakerProfileID string `json:"maker_profile_id"`
-	MakerFeeRate   string `json:"maker_fee_rate"`
+	MakerUserID    string `json:"maker_user_id,omitempty"`
+	MakerProfileID string `json:"maker_profile_id,omitempty"`
+	MakerFeeRate   string `json:"maker_fee_rate,omitempty"`
 }
 
-type changeMessageType struct {
+func (m *MatchMessage) IsAuthTaker() bool {
+	return len(m.TakerUserID) > 0
+}
+
+type ChangeMessage struct {
 	seqenceMessageType
 
 	Reason  string           `json:"reason"` // "STP" or "modify_order"
@@ -215,21 +202,21 @@ type changeMessageType struct {
 	Side    api.SideType     `json:"side"`
 	OldSize fixedpoint.Value `json:"old_size"`
 	NewSize fixedpoint.Value `json:"new_size"`
-}
-
-type StpChangeMessage struct {
-	changeMessageType
 
 	// STP fields
-	Price fixedpoint.Value `json:"price"`
-}
-
-type ModifyOrderChangeMessage struct {
-	changeMessageType
+	Price fixedpoint.Value `json:"price,omitempty"`
 
 	// modify_order fields
-	OldPrice fixedpoint.Value `json:"old_price"`
-	NewPrice fixedpoint.Value `json:"new_price"`
+	OldPrice fixedpoint.Value `json:"old_price,omitempty"`
+	NewPrice fixedpoint.Value `json:"new_price,omitempty"`
+}
+
+func (m *ChangeMessage) IsStp() bool {
+	return m.Reason == "STP"
+}
+
+func (m *ChangeMessage) IsModifyOrder() bool {
+	return m.Reason == "modify_order"
 }
 
 type ActiveMessage struct {
