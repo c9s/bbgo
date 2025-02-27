@@ -50,6 +50,11 @@ func toGlobalMarket(cbMarket *api.MarketInfo) types.Market {
 		QuoteCurrency:   cbMarket.QuoteCurrency,
 		BaseCurrency:    cbMarket.BaseCurrency,
 		MinNotional:     cbMarket.MinMarketFunds,
+		MinAmount:       cbMarket.MinMarketFunds,
+		TickSize:        cbMarket.QuoteIncrement,
+		StepSize:        cbMarket.BaseIncrement,
+		MinPrice:        fixedpoint.Zero,
+		MaxPrice:        fixedpoint.Zero,
 	}
 }
 
