@@ -2,7 +2,6 @@ package coinbase
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 )
 
@@ -93,5 +92,5 @@ func (s *Stream) parseMessage(data []byte) (interface{}, error) {
 		}
 		return &activeMsg, nil
 	}
-	return nil, errors.New(fmt.Sprintf("unknown message type: %s", baseMsg.Type))
+	return nil, fmt.Errorf("unknown message type: %s", baseMsg.Type)
 }
