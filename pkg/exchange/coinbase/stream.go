@@ -12,6 +12,7 @@ import (
 )
 
 const wsFeedURL = "wss://ws-feed.exchange.coinbase.com"
+const rfqMatchChannel = "rfq_matches"
 
 //go:generate callbackgen -type Stream
 type Stream struct {
@@ -108,8 +109,8 @@ func (s *Stream) handleConnect() {
 	subProductsMap := make(map[string][]string)
 	for _, sub := range s.Subscriptions {
 		strChannel := string(sub.Channel)
-		// "rfq_matches" allow empty symbol
-		if sub.Channel != "rfq_matches" && len(sub.Symbol) == 0 {
+		// rfqMatchChannel allow empty symbol
+		if sub.Channel != rfqMatchChannel && len(sub.Symbol) == 0 {
 			continue
 		}
 		subProductsMap[strChannel] = append(subProductsMap[strChannel], sub.Symbol)
