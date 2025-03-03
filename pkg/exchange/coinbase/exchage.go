@@ -15,8 +15,12 @@ import (
 )
 
 var (
+	// https://docs.cdp.coinbase.com/exchange/docs/rate-limits
+	//
 	// Rate Limit: 10 requests per 2 seconds, Rate limit rule: UserID
 	queryAccountLimiter = rate.NewLimiter(rate.Every(200*time.Millisecond), 1)
+	// Rate Limit: 10 requests per second
+	queryMarketDataLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 1)
 
 	// compile time check: implemented interface
 	_ types.Exchange                  = &Exchange{}
@@ -261,16 +265,53 @@ func (e *Exchange) NewStream() types.Stream {
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-	req := e.client.NewGetMarketInfoRequest()
-	markets, err := req.Do(ctx)
+	reqMarketInfo := e.client.NewGetMarketInfoRequest()
+	markets, err := reqMarketInfo.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get markets")
 	}
+
 	marketMap := make(types.MarketMap)
 	for _, m := range markets {
-		marketMap[toGlobalSymbol(m.ID)] = toGlobalMarket(&m)
+		// skip products that are not online
+		if m.Status != "online" {
+			continue
+		}
+		marketInfo, err := e.queryMarketDetails(ctx, m)
+		if err != nil {
+			log.WithError(err).Errorf("failed to query market: %v", m.ID)
+		}
+		marketMap[toGlobalSymbol(m.ID)] = *marketInfo
 	}
 	return marketMap, nil
+}
+
+func (e *Exchange) queryMarketDetails(ctx context.Context, m api.MarketInfo) (*types.Market, error) {
+	// wait for the rate limit
+	done := false
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			err := queryMarketDataLimiter.Wait(ctx)
+			if err == nil {
+				done = true
+				break
+			}
+		}
+		if done {
+			break
+		}
+	}
+	reqTicker := e.client.NewGetTickerRequest()
+	reqTicker.ProductID(m.ID)
+	ticker, err := reqTicker.Do(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to fetch ticker for %v", m.ID)
+	}
+	market := toGlobalMarket(&m, ticker)
+	return &market, nil
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {

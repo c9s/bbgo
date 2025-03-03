@@ -38,9 +38,22 @@ func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 	}
 }
 
-func toGlobalMarket(cbMarket *api.MarketInfo) types.Market {
+// The max order size is estimated according to the trading rules. See below:
+// - https://www.coinbase.com/legal/trading_rules
+//
+// According to the markets list, the PPP is the max slippage percentage:
+// - https://exchange.coinbase.com/markets
+func toGlobalMarket(cbMarket *api.MarketInfo, cbTicker *api.Ticker) types.Market {
 	pricePrecision := int(math.Log10(fixedpoint.One.Div(cbMarket.QuoteIncrement).Float64()))
 	volumnPrecision := int(math.Log10(fixedpoint.One.Div(cbMarket.BaseIncrement).Float64()))
+	minQuantity := cbMarket.BaseIncrement
+	if cbTicker != nil {
+		minQuantity = cbMarket.MinMarketFunds.Div(cbTicker.Price)
+	}
+	// TODO: estimate max quantity by PPP
+	// fill a dummy value for now.
+	maxQuantity := minQuantity.Mul(fixedpoint.NewFromFloat(1.5))
+
 	return types.Market{
 		Exchange:        types.ExchangeCoinBase,
 		Symbol:          toGlobalSymbol(cbMarket.ID),
@@ -55,6 +68,8 @@ func toGlobalMarket(cbMarket *api.MarketInfo) types.Market {
 		StepSize:        cbMarket.BaseIncrement,
 		MinPrice:        fixedpoint.Zero,
 		MaxPrice:        fixedpoint.Zero,
+		MinQuantity:     minQuantity,
+		MaxQuantity:     maxQuantity,
 	}
 }
 
