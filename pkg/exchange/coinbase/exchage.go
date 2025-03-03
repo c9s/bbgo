@@ -279,7 +279,8 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		}
 		marketInfo, err := e.queryMarketDetails(ctx, m)
 		if err != nil {
-			log.WithError(err).Errorf("failed to query market: %v", m.ID)
+			log.WithError(err).Warnf("failed to query market info for product: %v, skipped", m.ID)
+			continue
 		}
 		marketMap[toGlobalSymbol(m.ID)] = *marketInfo
 	}
