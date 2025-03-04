@@ -36,7 +36,8 @@ func Test_Symbols(t *testing.T) {
 
 func Test_OrdersAPI(t *testing.T) {
 	ex := getExchangeOrSkip(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
 
 	// should fail on unsupported symbol
 	order, err := ex.SubmitOrder(
@@ -103,21 +104,26 @@ func Test_OrdersAPI(t *testing.T) {
 
 func Test_QueryAccount(t *testing.T) {
 	ex := getExchangeOrSkip(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
 	_, err := ex.QueryAccount(ctx)
 	assert.NoError(t, err)
 }
 
 func Test_QueryAccountBalances(t *testing.T) {
 	ex := getExchangeOrSkip(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
 	_, err := ex.QueryAccountBalances(ctx)
 	assert.NoError(t, err)
 }
 
 func Test_QueryOpenOrders(t *testing.T) {
 	ex := getExchangeOrSkip(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
 
 	symbols := []string{"BTCUSD", "ETHUSD", "ETHBTC"}
 	for _, k := range symbols {
@@ -128,14 +134,18 @@ func Test_QueryOpenOrders(t *testing.T) {
 
 func Test_QueryMarkets(t *testing.T) {
 	ex := getExchangeOrSkip(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
 	_, err := ex.QueryMarkets(ctx)
 	assert.NoError(t, err)
 }
 
 func Test_QueryTicker(t *testing.T) {
 	ex := getExchangeOrSkip(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
 	ticker, err := ex.QueryTicker(ctx, "BTCUSD")
 	assert.NoError(t, err)
 	assert.NotNil(t, ticker)
@@ -143,7 +153,9 @@ func Test_QueryTicker(t *testing.T) {
 
 func Test_QueryTickers(t *testing.T) {
 	ex := getExchangeOrSkip(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
 	symbols := []string{"BTCUSD", "ETHUSD", "ETHBTC"}
 	tickers, err := ex.QueryTickers(ctx, symbols...)
 	assert.NoError(t, err)
@@ -152,7 +164,9 @@ func Test_QueryTickers(t *testing.T) {
 
 func Test_QueryKLines(t *testing.T) {
 	ex := getExchangeOrSkip(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
 	// should fail on unsupported interval
 	_, err := ex.QueryKLines(ctx, "BTCUSD", types.Interval12h, types.KLineQueryOptions{})
 	assert.Error(t, err)
@@ -178,7 +192,8 @@ func Test_QueryKLines(t *testing.T) {
 
 func Test_QueryOrderTrades(t *testing.T) {
 	ex := getExchangeOrSkip(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
 
 	trades, err := ex.QueryOrderTrades(ctx, types.OrderQuery{Symbol: "ETHUSD"})
 	assert.NoError(t, err)
