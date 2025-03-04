@@ -43,13 +43,14 @@ func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 //
 // According to the markets list, the PPP is the max slippage percentage:
 // - https://exchange.coinbase.com/markets
-func toGlobalMarket(cbMarket *api.MarketInfo, cbTicker *api.Ticker) types.Market {
+func toGlobalMarket(cbMarket *api.MarketInfo) types.Market {
 	pricePrecision := int(math.Log10(fixedpoint.One.Div(cbMarket.QuoteIncrement).Float64()))
 	volumnPrecision := int(math.Log10(fixedpoint.One.Div(cbMarket.BaseIncrement).Float64()))
+
+	// NOTE: Coinbase does not appose a min quantity, but a min notional.
+	// So we set the min quantity to the base increment. Or it may require more API calls
+	// to calculate the excact min quantity, which is costy.
 	minQuantity := cbMarket.BaseIncrement
-	if cbTicker != nil {
-		minQuantity = cbMarket.MinMarketFunds.Div(cbTicker.Price)
-	}
 	// TODO: estimate max quantity by PPP
 	// fill a dummy value for now.
 	maxQuantity := minQuantity.Mul(fixedpoint.NewFromFloat(1.5))
