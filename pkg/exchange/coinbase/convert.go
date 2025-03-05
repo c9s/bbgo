@@ -10,14 +10,38 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func toGlobalSide(cbSide api.SideType) types.SideType {
+	switch cbSide {
+	case api.SideTypeBuy:
+		return types.SideTypeBuy
+	case api.SideTypeSell:
+		return types.SideTypeSell
+	}
+	return types.SideTypeNone
+}
+
 func toGlobalOrder(cbOrder *api.Order) types.Order {
+	var orderType types.OrderType
+	switch api.OrderType(cbOrder.Type) {
+	case api.OrderTypeLimit:
+		orderType = types.OrderTypeLimit
+	case api.OrderTypeMarket:
+		orderType = types.OrderTypeMarket
+	case api.OrderTypeStop:
+		orderType = types.OrderTypeStopLimit
+	default:
+		orderType = types.OrderType(cbOrder.Type)
+	}
+
 	return types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: cbOrder.ClientOID,
-			Side:          cbOrder.Side.GlobalSideType(),
+			Type:          orderType,
+			Side:          toGlobalSide(cbOrder.Side),
 			Quantity:      cbOrder.Size,
 			Price:         cbOrder.Price,
 			StopPrice:     cbOrder.StopPrice,
+			TimeInForce:   types.TimeInForce(cbOrder.TimeInForce),
 		},
 		Exchange:       types.ExchangeCoinBase,
 		Status:         cbOrder.Status.GlobalOrderStatus(),
@@ -25,7 +49,7 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 		OrderID:        FNV64a(cbOrder.ID),
 		OriginalStatus: string(cbOrder.Status),
 		CreationTime:   cbOrder.CreatedAt,
-		IsWorking:      cbOrder.Status == api.OrderStatusOpen,
+		IsWorking:      cbOrder.Status != api.OrderStatusRejected && cbOrder.Status != api.OrderStatusDone,
 	}
 }
 
@@ -38,7 +62,7 @@ func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 		Quantity:      cbTrade.Size,
 		QuoteQuantity: cbTrade.Size.Mul(cbTrade.Price),
 		Symbol:        cbTrade.ProductID,
-		Side:          cbTrade.Side.GlobalSideType(),
+		Side:          toGlobalSide(cbTrade.Side),
 		IsBuyer:       cbTrade.Liquidity == api.LiquidityTaker,
 		IsMaker:       cbTrade.Liquidity == api.LiquidityMaker,
 		Fee:           cbTrade.Fee,
