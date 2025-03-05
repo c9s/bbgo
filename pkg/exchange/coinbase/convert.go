@@ -12,6 +12,13 @@ import (
 
 func toGlobalOrder(cbOrder *api.Order) types.Order {
 	return types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: cbOrder.ClientOID,
+			Side:          cbOrder.Side.GlobalSideType(),
+			Quantity:      cbOrder.Size,
+			Price:         cbOrder.Price,
+			StopPrice:     cbOrder.StopPrice,
+		},
 		Exchange:       types.ExchangeCoinBase,
 		Status:         cbOrder.Status.GlobalOrderStatus(),
 		UUID:           cbOrder.ID,
