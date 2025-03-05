@@ -104,7 +104,8 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	balances := make(types.BalanceMap)
 	for _, cbBalance := range accounts {
 		cur := strings.ToUpper(cbBalance.Currency)
-		balances[cur] = toGlobalBalance(cur, &cbBalance)
+		tb := balances[cur]
+		balances[cur] = tb.Add(toGlobalBalance(cur, &cbBalance))
 	}
 	return balances, nil
 }
