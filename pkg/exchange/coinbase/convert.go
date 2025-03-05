@@ -25,6 +25,7 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 		OrderID:        FNV64a(cbOrder.ID),
 		OriginalStatus: string(cbOrder.Status),
 		CreationTime:   cbOrder.CreatedAt,
+		IsWorking:      cbOrder.Status == api.OrderStatusOpen,
 	}
 }
 
