@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -17,30 +18,40 @@ const rfqMatchChannel = "rfq_matches"
 //go:generate callbackgen -type Stream
 type Stream struct {
 	types.StandardStream
+
+	exchange   *Exchange
 	apiKey     string
 	passphrase string
 	secretKey  string
 
 	// callbacks
-	statusMessageCallbacks   []func(m *StatusMessage)
-	auctionMessageCallbacks  []func(m *AuctionMessage)
-	rfqMessageCallbacks      []func(m *RfqMessage)
-	tickerMessageCallbacks   []func(m *TickerMessage)
-	receivedMessageCallbacks []func(m *ReceivedMessage)
-	openMessageCallbacks     []func(m *OpenMessage)
-	doneMessageCallbacks     []func(m *DoneMessage)
-	matchMessageCallbacks    []func(m *MatchMessage)
-	changeMessageCallbacks   []func(m *ChangeMessage)
-	activeMessageCallbacks   []func(m *ActiveMessage)
+	statusMessageCallbacks            []func(m *StatusMessage)
+	auctionMessageCallbacks           []func(m *AuctionMessage)
+	rfqMessageCallbacks               []func(m *RfqMessage)
+	tickerMessageCallbacks            []func(m *TickerMessage)
+	receivedMessageCallbacks          []func(m *ReceivedMessage)
+	openMessageCallbacks              []func(m *OpenMessage)
+	doneMessageCallbacks              []func(m *DoneMessage)
+	matchMessageCallbacks             []func(m *MatchMessage)
+	changeMessageCallbacks            []func(m *ChangeMessage)
+	activeMessageCallbacks            []func(m *ActiveMessage)
+	balanceMessageCallbacks           []func(m *BalanceMessage)
+	orderbookSnapshotMessageCallbacks []func(m *OrderBookSnapshotMessage)
+	orderbookUpdateMessageCallbacks   []func(m *OrderBookUpdateMessage)
+
+	lock               sync.Mutex
+	lastSequenceMsgMap map[MessageType]SequenceNumberType
 }
 
 func NewStream(
+	exchange *Exchange,
 	apiKey string,
 	passphrase string,
 	secretKey string,
 ) *Stream {
 	s := Stream{
 		StandardStream: types.NewStandardStream(),
+		exchange:       exchange,
 		apiKey:         apiKey,
 		passphrase:     passphrase,
 		secretKey:      secretKey,
@@ -51,7 +62,6 @@ func NewStream(
 
 	// public handlers
 	s.OnConnect(s.handleConnect)
-
 	return &s
 }
 
@@ -77,6 +87,12 @@ func (s *Stream) dispatchEvent(e interface{}) {
 		s.EmitChangeMessage(e)
 	case *ActiveMessage:
 		s.EmitActiveMessage(e)
+	case *BalanceMessage:
+		s.EmitBalanceMessage(e)
+	case *OrderBookSnapshotMessage:
+		s.EmitOrderbookSnapshotMessage(e)
+	case *OrderBookUpdateMessage:
+		s.EmitOrderbookUpdateMessage(e)
 	default:
 		log.Warnf("skip dispatching msg due to unknown message type: %T", e)
 	}
@@ -86,75 +102,14 @@ func createEndpoint(ctx context.Context) (string, error) {
 	return wsFeedURL, nil
 }
 
-type channelType struct {
-	Name       string   `json:"name"`
-	ProductIDs []string `json:"product_ids,omitempty"`
-}
-
-type websocketCommand struct {
-	Type       string        `json:"type"`
-	Channels   []channelType `json:"channels"`
-	Signature  *string       `json:"signature,omitempty"`
-	Key        *string       `json:"key,omitempty"`
-	Passphrase *string       `json:"passphrase,omitempty"`
-	Timestamp  *string       `json:"timestamp,omitempty"`
-}
-
-func (s *Stream) handleConnect() {
-	// subscribe to channels
-	if len(s.Subscriptions) == 0 {
-		return
-	}
-
-	subProductsMap := make(map[string][]string)
-	for _, sub := range s.Subscriptions {
-		strChannel := string(sub.Channel)
-		// rfqMatchChannel allow empty symbol
-		if sub.Channel != rfqMatchChannel && len(sub.Symbol) == 0 {
-			continue
-		}
-		subProductsMap[strChannel] = append(subProductsMap[strChannel], sub.Symbol)
-	}
-	subCmds := []websocketCommand{}
-	signature, ts := s.generateSignature()
-	for channel, productIDs := range subProductsMap {
-		var subType string
-		switch channel {
-		case "rfq_matches":
-			subType = "subscriptions"
-		default:
-			subType = "subscribe"
-		}
-		subCmd := websocketCommand{
-			Type: subType,
-			Channels: []channelType{
-				{
-					Name:       channel,
-					ProductIDs: productIDs,
-				},
-			},
-		}
-		if s.authEnabled() {
-			subCmd.Signature = &signature
-			subCmd.Key = &s.apiKey
-			subCmd.Passphrase = &s.passphrase
-			subCmd.Timestamp = &ts
-		}
-		subCmds = append(subCmds, subCmd)
-	}
-	for _, subCmd := range subCmds {
-		err := s.Conn.WriteJSON(subCmd)
-		if err != nil {
-			log.WithError(err).Errorf("subscription error: %v", subCmd)
-		}
-	}
-}
-
-func (s *Stream) authEnabled() bool {
+func (s *Stream) AuthEnabled() bool {
 	return !s.PublicOnly && len(s.apiKey) > 0 && len(s.passphrase) > 0 && len(s.secretKey) > 0
 }
 
 func (s *Stream) generateSignature() (string, string) {
+	if len(s.apiKey) == 0 || len(s.passphrase) == 0 || len(s.secretKey) == 0 {
+		return "", ""
+	}
 	// Convert current time to string timestamp
 	ts := strconv.FormatInt(time.Now().Unix(), 10)
 
@@ -176,4 +131,9 @@ func (s *Stream) generateSignature() (string, string) {
 	signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
 	return signature, ts
+}
+
+func (s *Stream) handleConnect() {
+	// TODO: dummy, will add connection logic later
+	return
 }

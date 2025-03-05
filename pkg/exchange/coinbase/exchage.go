@@ -39,12 +39,21 @@ var log = logrus.WithField("exchange", ID)
 
 type Exchange struct {
 	client *api.RestAPIClient
+
+	// api keys
+	apiKey        string
+	apiSecret     string
+	apiPassphrase string
 }
 
 func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
 	client := api.NewClient(key, secret, passphrase, timeout)
 	return &Exchange{
 		client: client,
+
+		apiKey:        key,
+		apiSecret:     secret,
+		apiPassphrase: passphrase,
 	}
 }
 
@@ -261,8 +270,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 
 // ExchangeMarketDataService
 func (e *Exchange) NewStream() types.Stream {
-	// TODO: implement stream
-	return nil
+	return NewStream(e, e.apiKey, e.apiPassphrase, e.apiSecret)
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
