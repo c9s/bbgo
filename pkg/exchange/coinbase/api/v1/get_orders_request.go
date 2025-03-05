@@ -22,7 +22,7 @@ func (s *OrderStatus) GlobalOrderStatus() types.OrderStatus {
 type Order struct {
 	Type      string           `json:"type"`
 	Size      fixedpoint.Value `json:"size"`
-	Side      string           `json:"side"`
+	Side      SideType         `json:"side"`
 	ProductID string           `json:"product_id"`
 	// ClientOID must be uuid
 	ClientOID string           `json:"client_oid"`
