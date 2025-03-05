@@ -273,46 +273,13 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 
 	marketMap := make(types.MarketMap)
 	for _, m := range markets {
-		// skip products that are not online
+		// skip products that is not online
 		if m.Status != "online" {
 			continue
 		}
-		marketInfo, err := e.queryMarketDetails(ctx, m)
-		if err != nil {
-			log.WithError(err).Warnf("failed to query market info for product: %v, skipped", m.ID)
-			continue
-		}
-		marketMap[toGlobalSymbol(m.ID)] = *marketInfo
+		marketMap[toGlobalSymbol(m.ID)] = toGlobalMarket(&m)
 	}
 	return marketMap, nil
-}
-
-func (e *Exchange) queryMarketDetails(ctx context.Context, m api.MarketInfo) (*types.Market, error) {
-	// wait for the rate limit
-	done := false
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-			err := queryMarketDataLimiter.Wait(ctx)
-			if err == nil {
-				done = true
-				break
-			}
-		}
-		if done {
-			break
-		}
-	}
-	reqTicker := e.client.NewGetTickerRequest()
-	reqTicker.ProductID(m.ID)
-	ticker, err := reqTicker.Do(ctx)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to fetch ticker for %v", m.ID)
-	}
-	market := toGlobalMarket(&m, ticker)
-	return &market, nil
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
