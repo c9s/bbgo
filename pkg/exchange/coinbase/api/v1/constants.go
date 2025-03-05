@@ -1,7 +1,5 @@
 package coinbase
 
-import "github.com/c9s/bbgo/pkg/types"
-
 type MarketStatus string
 
 const (
@@ -25,16 +23,6 @@ const (
 	SideTypeBuy  SideType = "buy"
 	SideTypeSell SideType = "sell"
 )
-
-func (s *SideType) GlobalSideType() types.SideType {
-	switch *s {
-	case SideTypeBuy:
-		return types.SideTypeBuy
-	case SideTypeSell:
-		return types.SideTypeSell
-	}
-	return types.SideTypeNone
-}
 
 type MarketType string
 
