@@ -31,7 +31,7 @@ type Order struct {
 
 	// Limit Order
 	Price       fixedpoint.Value `json:"price"`
-	TimeInForce string           `json:"time_in_force"`
+	TimeInForce TimeInForceType  `json:"time_in_force"`
 	PostOnly    bool             `json:"post_only"`
 	CancelAfter string           `json:"cancel_after"`
 
