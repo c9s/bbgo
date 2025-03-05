@@ -112,7 +112,7 @@ func toGlobalTicker(cbTicker *api.Ticker) types.Ticker {
 func toGlobalBalance(cur string, cbBalance *api.Balance) types.Balance {
 	balance := types.NewZeroBalance(cur)
 	balance.Available = cbBalance.Available
-	balance.Locked = cbBalance.Balance.Sub(cbBalance.Available)
+	balance.Locked = cbBalance.Hold
 	balance.NetAsset = cbBalance.Balance
 	return balance
 }
