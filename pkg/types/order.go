@@ -294,6 +294,24 @@ type Order struct {
 	IsIsolated bool `json:"isIsolated,omitempty" db:"is_isolated"`
 }
 
+func (o *Order) Update(update Order) {
+	if len(update.Status) > 0 {
+		o.Status = update.Status
+	}
+	if len(update.OriginalStatus) > 0 {
+		o.OriginalStatus = update.OriginalStatus
+	}
+	if update.ExecutedQuantity.Sign() > 0 {
+		o.ExecutedQuantity = update.ExecutedQuantity
+	}
+	if !update.UpdateTime.Time().IsZero() {
+		o.UpdateTime = update.UpdateTime
+	}
+	if update.IsWorking {
+		o.IsWorking = update.IsWorking
+	}
+}
+
 func (o *Order) GetRemainingQuantity() fixedpoint.Value {
 	return o.Quantity.Sub(o.ExecutedQuantity)
 }
