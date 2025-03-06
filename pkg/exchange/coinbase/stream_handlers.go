@@ -2,6 +2,7 @@ package coinbase
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -14,11 +15,23 @@ type channelType struct {
 	ProductIDs []string `json:"product_ids,omitempty"`
 }
 
+func (c channelType) String() string {
+	return fmt.Sprintf(`(Name:       %s,
+ProductIDs: %s)`, c.Name, c.ProductIDs)
+}
+
 type authMsg struct {
 	Signature  string `json:"signature,omitempty"`
 	Key        string `json:"key,omitempty"`
 	Passphrase string `json:"passphrase,omitempty"`
 	Timestamp  string `json:"timestamp,omitempty"`
+}
+
+func (msg authMsg) String() string {
+	return fmt.Sprintf(`(Signature:  %s,
+Key:        ****,
+Passphrase: ****,
+Timestamp:  %s)`, msg.Signature, msg.Timestamp)
 }
 
 type subscribeMsgType1 struct {
@@ -28,6 +41,12 @@ type subscribeMsgType1 struct {
 	authMsg
 }
 
+func (msg subscribeMsgType1) String() string {
+	return fmt.Sprintf(`(Type:     %s,
+Channels: %s,
+%s)`, msg.Type, msg.Channels, msg.authMsg.String())
+}
+
 type subscribeMsgType2 struct {
 	Type       string   `json:"type"`
 	Channels   []string `json:"channels"`
@@ -35,6 +54,14 @@ type subscribeMsgType2 struct {
 	AccountIDs []string `json:"account_ids,omitempty"` // for balance channel
 
 	authMsg
+}
+
+func (msg subscribeMsgType2) String() string {
+	return fmt.Sprintf(`(Type:       %s,
+Channels:   %s,
+ProductIDs: %s,
+AccountIDs: %s,
+%s`, msg.Type, msg.Channels, msg.ProductIDs, msg.AccountIDs, msg.authMsg.String())
 }
 
 func (s *Stream) handleConnect() {
@@ -112,9 +139,9 @@ func (s *Stream) handleConnect() {
 	for _, subCmd := range subCmds {
 		err := s.Conn.WriteJSON(subCmd)
 		if err != nil {
-			log.WithError(err).Errorf("subscription error: %v", subCmd)
+			log.WithError(err).Errorf("subscription error: %s", subCmd)
 		} else {
-			log.Infof("subscribed to %v", subCmd)
+			log.Infof("subscribed to %s", subCmd)
 		}
 	}
 
