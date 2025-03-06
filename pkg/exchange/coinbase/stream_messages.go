@@ -2,28 +2,40 @@ package coinbase
 
 // https://docs.cdp.coinbase.com/exchange/docs/websocket-channels
 import (
+	"strings"
 	"time"
 
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/types"
 )
 
-// TODOs:
-// - Level2 channels
-// - Level3 channels
+// TODO: Level3 channels
+
+type MessageType string
+type SequenceNumberType uint64
 
 type messageBaseType struct {
-	Type string `json:"type"`
+	Type MessageType `json:"type"`
 }
 
 type seqenceMessageType struct {
 	messageBaseType
 
-	ProductID string `json:"product_id"`
-	Sequence  int    `json:"sequence"`
+	ProductID string             `json:"product_id"`
+	Sequence  SequenceNumberType `json:"sequence"`
+}
+
+func (s *seqenceMessageType) QuoteCurrency() string {
+	splits := strings.Split(s.ProductID, "-")
+	if len(splits) == 2 {
+		return splits[1]
+	}
+	return ""
 }
 
 // Websocket message types
+// heartbeat channel
 type HeartbeatMessage struct {
 	seqenceMessageType
 
@@ -31,6 +43,7 @@ type HeartbeatMessage struct {
 	Time        time.Time `json:"time"`
 }
 
+// status channel
 type StatusMessage struct {
 	messageBaseType
 	Products []struct {
@@ -75,6 +88,7 @@ type StatusMessage struct {
 	} `json:"currencies"`
 }
 
+// auction channel
 type AuctionMessage struct {
 	seqenceMessageType
 
@@ -89,6 +103,7 @@ type AuctionMessage struct {
 	Timestamp    time.Time        `json:"timestamp"` // ex: "2015-11-14T20:46:03.511254Z"
 }
 
+// rfq_matches channel
 type RfqMessage struct {
 	messageBaseType
 
@@ -102,6 +117,7 @@ type RfqMessage struct {
 	Side         api.SideType     `json:"side"`
 }
 
+// ticker channel
 type TickerMessage struct {
 	seqenceMessageType
 
@@ -121,6 +137,34 @@ type TickerMessage struct {
 	LastSize    fixedpoint.Value `json:"last_size"`
 }
 
+func (msg *TickerMessage) Trade() types.Trade {
+	var side types.SideType
+	switch msg.Side {
+	case "buy":
+		side = types.SideTypeBuy
+	case "sell":
+		side = types.SideTypeSell
+	default:
+		side = types.SideType(msg.Side)
+	}
+	isBuyer := side == types.SideTypeBuy
+	quoteQuantity := msg.Price.Mul(msg.LastSize)
+	return types.Trade{
+		Exchange:      types.ExchangeCoinBase,
+		Price:         msg.Price,
+		Quantity:      msg.LastSize,
+		QuoteQuantity: quoteQuantity,
+		Side:          side,
+		Symbol:        toGlobalSymbol(msg.ProductID),
+		IsBuyer:       isBuyer,
+		IsMaker:       !isBuyer,
+		Time:          types.Time(msg.Time),
+		FeeCurrency:   msg.QuoteCurrency(),
+		Fee:           fixedpoint.Zero, // not available
+	}
+}
+
+// full channel
 type ReceivedMessage struct {
 	seqenceMessageType
 
@@ -140,6 +184,16 @@ type ReceivedMessage struct {
 
 func (m *ReceivedMessage) IsMarketOrder() bool {
 	return !m.Funds.IsZero()
+}
+
+func (m *ReceivedMessage) ToGlobalOrder() types.Order {
+	return types.Order{
+		SubmitOrder: types.SubmitOrder{
+			ClientOrderID: m.ClientOid,
+		},
+		Exchange:  types.ExchangeCoinBase,
+		IsWorking: false,
+	}
 }
 
 type OpenMessage struct {
@@ -179,18 +233,64 @@ type MatchMessage struct {
 	ProfileID string `json:"profile_id"`
 
 	// extra fields for taker
-	TakerUserID    string `json:"taker_user_id,omitempty"`
-	TakerProfileID string `json:"taker_profile_id,omitempty"`
-	TakerFeeRate   string `json:"taker_fee_rate,omitempty"`
+	TakerUserID    string           `json:"taker_user_id,omitempty"`
+	TakerProfileID string           `json:"taker_profile_id,omitempty"`
+	TakerFeeRate   fixedpoint.Value `json:"taker_fee_rate,omitempty"`
 
 	// extra fields for maker
-	MakerUserID    string `json:"maker_user_id,omitempty"`
-	MakerProfileID string `json:"maker_profile_id,omitempty"`
-	MakerFeeRate   string `json:"maker_fee_rate,omitempty"`
+	MakerUserID    string           `json:"maker_user_id,omitempty"`
+	MakerProfileID string           `json:"maker_profile_id,omitempty"`
+	MakerFeeRate   fixedpoint.Value `json:"maker_fee_rate,omitempty"`
 }
 
-func (m *MatchMessage) IsAuthTaker() bool {
-	return len(m.TakerUserID) > 0
+func (msg *MatchMessage) Trade() types.Trade {
+	var side types.SideType
+	switch msg.Side {
+	case "buy":
+		side = types.SideTypeBuy
+	case "sell":
+		side = types.SideTypeSell
+	default:
+		side = types.SideType(msg.Side)
+	}
+	quoteQuantity := msg.Size.Mul(msg.Price)
+	return types.Trade{
+		Exchange:      types.ExchangeCoinBase,
+		Price:         msg.Price,
+		Quantity:      msg.Size,
+		QuoteQuantity: quoteQuantity,
+		Side:          side,
+		Symbol:        toGlobalSymbol(msg.ProductID),
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       msg.IsAuthMaker(),
+		Time:          types.Time(msg.Time),
+		FeeCurrency:   msg.QuoteCurrency(),
+		Fee:           quoteQuantity.Mul(msg.FeeRate()),
+	}
+}
+
+func (m *MatchMessage) isAuth() bool {
+	return len(m.TakerUserID) > 0 || len(m.MakerUserID) > 0
+}
+
+func (m *MatchMessage) IsAuthMaker() bool {
+	// not authenticated
+	if !m.isAuth() {
+		return false
+	}
+	return len(m.MakerUserID) > 0
+}
+
+// https://help.coinbase.com/en/exchange/trading-and-funding/exchange-fees
+func (m *MatchMessage) FeeRate() fixedpoint.Value {
+	if !m.isAuth() {
+		// not available
+		return fixedpoint.Zero
+	}
+	if m.IsAuthMaker() {
+		return m.MakerFeeRate
+	}
+	return m.TakerFeeRate
 }
 
 type ChangeMessage struct {
@@ -233,4 +333,33 @@ type ActiveMessage struct {
 	Size      fixedpoint.Value `json:"size"`
 	Funds     fixedpoint.Value `json:"funds"`
 	Private   bool             `json:"private"`
+}
+
+// balance channel
+type BalanceMessage struct {
+	messageBaseType
+
+	AccountID string           `json:"account_id"`
+	Currency  string           `json:"currency"`
+	Holds     fixedpoint.Value `json:"holds"`
+	Available fixedpoint.Value `json:"available"`
+	Updated   types.Time       `json:"updated"`
+	Timestamp types.Time       `json:"timestamp"`
+}
+
+// level2 channel
+type OrderBookSnapshotMessage struct {
+	messageBaseType
+
+	ProductID string               `json:"product_id"`
+	Bids      [][]fixedpoint.Value `json:"bids"` // [["price", "size"], ...]
+	Asks      [][]fixedpoint.Value `json:"asks"` // [["price", "size"], ...]
+}
+
+type OrderBookUpdateMessage struct {
+	messageBaseType
+
+	ProductID string     `json:"product_id"`
+	Time      time.Time  `json:"time"`
+	Changes   [][]string `json:"changes"` // [["side", "price", "size"], ...]
 }

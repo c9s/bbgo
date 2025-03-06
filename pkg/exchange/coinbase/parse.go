@@ -6,7 +6,7 @@ import (
 )
 
 // See https://docs.cdp.coinbase.com/exchange/docs/websocket-channels for message types
-func (s *Stream) parseMessage(data []byte) (interface{}, error) {
+func parseMessage(data []byte) (interface{}, error) {
 	var baseMsg messageBaseType
 	err := json.Unmarshal(data, &baseMsg)
 	if err != nil {
@@ -91,6 +91,27 @@ func (s *Stream) parseMessage(data []byte) (interface{}, error) {
 			return nil, err
 		}
 		return &activeMsg, nil
+	case "balance":
+		var balanceMsg BalanceMessage
+		err = json.Unmarshal(data, &balanceMsg)
+		if err != nil {
+			return nil, err
+		}
+		return &balanceMsg, nil
+	case "snapshot":
+		var snapshotMsg OrderBookSnapshotMessage
+		err = json.Unmarshal(data, &snapshotMsg)
+		if err != nil {
+			return nil, err
+		}
+		return &snapshotMsg, nil
+	case "l2update":
+		var updateMsg OrderBookUpdateMessage
+		err = json.Unmarshal(data, &updateMsg)
+		if err != nil {
+			return nil, err
+		}
+		return &updateMsg, nil
 	}
 	return nil, fmt.Errorf("unknown message type: %s", baseMsg.Type)
 }
