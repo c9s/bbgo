@@ -4,102 +4,132 @@ package coinbase
 
 import ()
 
-func (S *Stream) OnStatusMessage(cb func(m *StatusMessage)) {
-	S.statusMessageCallbacks = append(S.statusMessageCallbacks, cb)
+func (s *Stream) OnStatusMessage(cb func(m *StatusMessage)) {
+	s.statusMessageCallbacks = append(s.statusMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitStatusMessage(m *StatusMessage) {
-	for _, cb := range S.statusMessageCallbacks {
+func (s *Stream) EmitStatusMessage(m *StatusMessage) {
+	for _, cb := range s.statusMessageCallbacks {
 		cb(m)
 	}
 }
 
-func (S *Stream) OnAuctionMessage(cb func(m *AuctionMessage)) {
-	S.auctionMessageCallbacks = append(S.auctionMessageCallbacks, cb)
+func (s *Stream) OnAuctionMessage(cb func(m *AuctionMessage)) {
+	s.auctionMessageCallbacks = append(s.auctionMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitAuctionMessage(m *AuctionMessage) {
-	for _, cb := range S.auctionMessageCallbacks {
+func (s *Stream) EmitAuctionMessage(m *AuctionMessage) {
+	for _, cb := range s.auctionMessageCallbacks {
 		cb(m)
 	}
 }
 
-func (S *Stream) OnRfqMessage(cb func(m *RfqMessage)) {
-	S.rfqMessageCallbacks = append(S.rfqMessageCallbacks, cb)
+func (s *Stream) OnRfqMessage(cb func(m *RfqMessage)) {
+	s.rfqMessageCallbacks = append(s.rfqMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitRfqMessage(m *RfqMessage) {
-	for _, cb := range S.rfqMessageCallbacks {
+func (s *Stream) EmitRfqMessage(m *RfqMessage) {
+	for _, cb := range s.rfqMessageCallbacks {
 		cb(m)
 	}
 }
 
-func (S *Stream) OnTickerMessage(cb func(m *TickerMessage)) {
-	S.tickerMessageCallbacks = append(S.tickerMessageCallbacks, cb)
+func (s *Stream) OnTickerMessage(cb func(m *TickerMessage)) {
+	s.tickerMessageCallbacks = append(s.tickerMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitTickerMessage(m *TickerMessage) {
-	for _, cb := range S.tickerMessageCallbacks {
+func (s *Stream) EmitTickerMessage(m *TickerMessage) {
+	for _, cb := range s.tickerMessageCallbacks {
 		cb(m)
 	}
 }
 
-func (S *Stream) OnReceivedMessage(cb func(m *ReceivedMessage)) {
-	S.receivedMessageCallbacks = append(S.receivedMessageCallbacks, cb)
+func (s *Stream) OnReceivedMessage(cb func(m *ReceivedMessage)) {
+	s.receivedMessageCallbacks = append(s.receivedMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitReceivedMessage(m *ReceivedMessage) {
-	for _, cb := range S.receivedMessageCallbacks {
+func (s *Stream) EmitReceivedMessage(m *ReceivedMessage) {
+	for _, cb := range s.receivedMessageCallbacks {
 		cb(m)
 	}
 }
 
-func (S *Stream) OnOpenMessage(cb func(m *OpenMessage)) {
-	S.openMessageCallbacks = append(S.openMessageCallbacks, cb)
+func (s *Stream) OnOpenMessage(cb func(m *OpenMessage)) {
+	s.openMessageCallbacks = append(s.openMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitOpenMessage(m *OpenMessage) {
-	for _, cb := range S.openMessageCallbacks {
+func (s *Stream) EmitOpenMessage(m *OpenMessage) {
+	for _, cb := range s.openMessageCallbacks {
 		cb(m)
 	}
 }
 
-func (S *Stream) OnDoneMessage(cb func(m *DoneMessage)) {
-	S.doneMessageCallbacks = append(S.doneMessageCallbacks, cb)
+func (s *Stream) OnDoneMessage(cb func(m *DoneMessage)) {
+	s.doneMessageCallbacks = append(s.doneMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitDoneMessage(m *DoneMessage) {
-	for _, cb := range S.doneMessageCallbacks {
+func (s *Stream) EmitDoneMessage(m *DoneMessage) {
+	for _, cb := range s.doneMessageCallbacks {
 		cb(m)
 	}
 }
 
-func (S *Stream) OnMatchMessage(cb func(m *MatchMessage)) {
-	S.matchMessageCallbacks = append(S.matchMessageCallbacks, cb)
+func (s *Stream) OnMatchMessage(cb func(m *MatchMessage)) {
+	s.matchMessageCallbacks = append(s.matchMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitMatchMessage(m *MatchMessage) {
-	for _, cb := range S.matchMessageCallbacks {
+func (s *Stream) EmitMatchMessage(m *MatchMessage) {
+	for _, cb := range s.matchMessageCallbacks {
 		cb(m)
 	}
 }
 
-func (S *Stream) OnChangeMessage(cb func(m *ChangeMessage)) {
-	S.changeMessageCallbacks = append(S.changeMessageCallbacks, cb)
+func (s *Stream) OnChangeMessage(cb func(m *ChangeMessage)) {
+	s.changeMessageCallbacks = append(s.changeMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitChangeMessage(m *ChangeMessage) {
-	for _, cb := range S.changeMessageCallbacks {
+func (s *Stream) EmitChangeMessage(m *ChangeMessage) {
+	for _, cb := range s.changeMessageCallbacks {
 		cb(m)
 	}
 }
 
-func (S *Stream) OnActiveMessage(cb func(m *ActiveMessage)) {
-	S.activeMessageCallbacks = append(S.activeMessageCallbacks, cb)
+func (s *Stream) OnActiveMessage(cb func(m *ActiveMessage)) {
+	s.activeMessageCallbacks = append(s.activeMessageCallbacks, cb)
 }
 
-func (S *Stream) EmitActiveMessage(m *ActiveMessage) {
-	for _, cb := range S.activeMessageCallbacks {
+func (s *Stream) EmitActiveMessage(m *ActiveMessage) {
+	for _, cb := range s.activeMessageCallbacks {
+		cb(m)
+	}
+}
+
+func (s *Stream) OnBalanceMessage(cb func(m *BalanceMessage)) {
+	s.balanceMessageCallbacks = append(s.balanceMessageCallbacks, cb)
+}
+
+func (s *Stream) EmitBalanceMessage(m *BalanceMessage) {
+	for _, cb := range s.balanceMessageCallbacks {
+		cb(m)
+	}
+}
+
+func (s *Stream) OnOrderbookSnapshotMessage(cb func(m *OrderBookSnapshotMessage)) {
+	s.orderbookSnapshotMessageCallbacks = append(s.orderbookSnapshotMessageCallbacks, cb)
+}
+
+func (s *Stream) EmitOrderbookSnapshotMessage(m *OrderBookSnapshotMessage) {
+	for _, cb := range s.orderbookSnapshotMessageCallbacks {
+		cb(m)
+	}
+}
+
+func (s *Stream) OnOrderbookUpdateMessage(cb func(m *OrderBookUpdateMessage)) {
+	s.orderbookUpdateMessageCallbacks = append(s.orderbookUpdateMessageCallbacks, cb)
+}
+
+func (s *Stream) EmitOrderbookUpdateMessage(m *OrderBookUpdateMessage) {
+	for _, cb := range s.orderbookUpdateMessageCallbacks {
 		cb(m)
 	}
 }
