@@ -277,7 +277,7 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 		return
 	}
 	isWorking := true
-	if msg.Reason == "cancelled" {
+	if msg.Reason == "canceled" {
 		isWorking = false
 	}
 	orderUpdate := types.Order{
