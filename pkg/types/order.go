@@ -295,21 +295,29 @@ type Order struct {
 }
 
 func (o *Order) Update(update Order) {
+	// if the update time is older than the current order, ignore it
+	if update.UpdateTime.Before(o.UpdateTime.Time()) {
+		return
+	}
+	o.UpdateTime = update.UpdateTime
 	if len(update.Status) > 0 {
 		o.Status = update.Status
 	}
 	if len(update.OriginalStatus) > 0 {
 		o.OriginalStatus = update.OriginalStatus
 	}
-	if update.ExecutedQuantity.Sign() > 0 {
+	// executed quantity should be increasing
+	if update.ExecutedQuantity.Compare(o.ExecutedQuantity) > 0 {
 		o.ExecutedQuantity = update.ExecutedQuantity
 	}
-	if !update.UpdateTime.Time().IsZero() {
-		o.UpdateTime = update.UpdateTime
+	// update quantity and price only if the update value is greater than 0
+	if update.Quantity.Sign() > 0 {
+		o.Quantity = update.Quantity
 	}
-	if update.IsWorking {
-		o.IsWorking = update.IsWorking
+	if update.Price.Sign() > 0 {
+		o.Price = update.Price
 	}
+	o.IsWorking = update.IsWorking
 }
 
 func (o *Order) GetRemainingQuantity() fixedpoint.Value {
