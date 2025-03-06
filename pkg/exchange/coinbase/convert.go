@@ -41,27 +41,15 @@ func toGlobalOrderStatus(order *api.Order) types.OrderStatus {
 }
 
 func toGlobalOrder(cbOrder *api.Order) types.Order {
-	var orderType types.OrderType
-	switch api.OrderType(cbOrder.Type) {
-	case api.OrderTypeLimit:
-		orderType = types.OrderTypeLimit
-	case api.OrderTypeMarket:
-		orderType = types.OrderTypeMarket
-	case api.OrderTypeStop:
-		orderType = types.OrderTypeStopLimit
-	default:
-		orderType = types.OrderType(cbOrder.Type)
-	}
-
 	return types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: cbOrder.ClientOID,
-			Type:          orderType,
+			Type:          toGlobalOrderType(cbOrder.Type),
 			Side:          toGlobalSide(cbOrder.Side),
 			Quantity:      cbOrder.Size,
 			Price:         cbOrder.Price,
 			StopPrice:     cbOrder.StopPrice,
-			TimeInForce:   types.TimeInForce(cbOrder.TimeInForce),
+			TimeInForce:   toGlobalTimeInForce(cbOrder.TimeInForce),
 		},
 		Exchange:       types.ExchangeCoinBase,
 		Status:         toGlobalOrderStatus(cbOrder),
@@ -69,7 +57,7 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 		OrderID:        FNV64a(cbOrder.ID),
 		OriginalStatus: string(cbOrder.Status),
 		CreationTime:   cbOrder.CreatedAt,
-		IsWorking:      cbOrder.Status != api.OrderStatusRejected && cbOrder.Status != api.OrderStatusDone,
+		IsWorking:      isWorkingOrder(cbOrder.Status),
 	}
 }
 
@@ -167,4 +155,43 @@ func toGlobalBalance(cur string, cbBalance *api.Balance) types.Balance {
 	balance.Locked = cbBalance.Hold
 	balance.NetAsset = cbBalance.Balance
 	return balance
+}
+
+func toGlobalOrderType(localType string) types.OrderType {
+	switch localType {
+	case "limit":
+		return types.OrderTypeLimit
+	case "market":
+		return types.OrderTypeMarket
+	case "stop":
+		return types.OrderTypeStopLimit
+	default:
+		return types.OrderType(strings.ToUpper(localType))
+	}
+}
+
+func toGlobalTimeInForce(localTIF api.TimeInForceType) types.TimeInForce {
+	switch localTIF {
+	case api.TimeInForceGTC:
+		return types.TimeInForceGTC
+	case api.TimeInForceIOC:
+		return types.TimeInForceIOC
+	case api.TimeInForceFOK:
+		return types.TimeInForceFOK
+	case api.TimeInForceGTT:
+		return types.TimeInForceGTT
+	default:
+		return types.TimeInForce(strings.ToUpper(string(localTIF)))
+	}
+}
+
+func isWorkingOrder(status api.OrderStatus) bool {
+	switch status {
+	case api.OrderStatusRejected, api.OrderStatusDone:
+		return false
+	case api.OrderStatusReceived, api.OrderStatusOpen, api.OrderStatusPending:
+		return true
+	default:
+		return false
+	}
 }
