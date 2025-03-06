@@ -51,6 +51,7 @@ type Strategy struct {
 	SourceExchange string `json:"sourceExchange"`
 
 	MinSpread         fixedpoint.Value `json:"minSpread"`
+	MakeSpread        bool             `json:"makeSpread"`
 	Quantity          fixedpoint.Value `json:"quantity"`
 	MaxJitterQuantity fixedpoint.Value `json:"maxJitterQuantity"`
 
@@ -230,6 +231,28 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	return nil
 }
 
+func (s *Strategy) makeSpread(ctx context.Context, bestBid, bestAsk types.PriceVolume) error {
+	orderForms := []types.SubmitOrder{
+		{
+			Symbol:   s.Symbol,
+			Side:     types.SideTypeSell,
+			Type:     types.OrderTypeLimit,
+			Quantity: bestBid.Volume,
+			Price:    bestBid.Price,
+			Market:   s.tradingMarket,
+		},
+	}
+	log.Infof("make spread order forms: %+v", orderForms)
+
+	if s.DryRun {
+		log.Infof("dry run, skip")
+		return nil
+	}
+
+	_, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
+	return err
+}
+
 func (s *Strategy) placeOrders(ctx context.Context) {
 	bestBid, hasBid := s.tradingBook.BestBid()
 	bestAsk, hasAsk := s.tradingBook.BestAsk()
@@ -254,6 +277,12 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 				log.Warnf("spread < min spread, spread=%s minSpread=%s bid=%s ask=%s",
 					spread.String(), s.MinSpread.String(),
 					bestBid.Price.String(), bestAsk.Price.String())
+
+				if s.MakeSpread {
+					if err := s.makeSpread(ctx, bestBid, bestAsk); err != nil {
+						log.WithError(err).Error("make spread error")
+					}
+				}
 				return
 			}
 		}
