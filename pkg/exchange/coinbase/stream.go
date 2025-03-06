@@ -68,6 +68,8 @@ func NewStream(
 	s.OnBalanceMessage(s.handleBalanceMessage)
 	s.OnReceivedMessage(s.handleReceivedMessage)
 	s.OnOpenMessage(s.handleOpenMessage)
+	s.OnDoneMessage(s.handleDoneMessage)
+	s.OnChangeMessage(s.handleChangeMessage)
 
 	// public handlers
 	s.OnConnect(s.handleConnect)

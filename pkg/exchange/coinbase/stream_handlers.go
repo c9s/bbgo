@@ -238,7 +238,7 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 		return
 	}
 
-	order := types.Order{
+	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
 			Side:     toGlobalSide(msg.Side),
@@ -250,14 +250,14 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 		UpdateTime: types.Time(msg.Time),
 		IsWorking:  true,
 	}
-	s.EmitOrderUpdate(order)
+	s.EmitOrderUpdate(orderUpdate)
 }
 
 func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
 		return
 	}
-	order := types.Order{
+	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
 			Side:     toGlobalSide(msg.Side),
@@ -269,7 +269,53 @@ func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 		IsWorking:  true,
 		UpdateTime: types.Time(msg.Time),
 	}
-	s.EmitOrderUpdate(order)
+	s.EmitOrderUpdate(orderUpdate)
+}
+
+func (s *Stream) handleDoneMessage(msg *DoneMessage) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+		return
+	}
+	isWorking := true
+	if msg.Reason == "cancelled" {
+		isWorking = false
+	}
+	orderUpdate := types.Order{
+		SubmitOrder: types.SubmitOrder{
+			Symbol:   toGlobalSymbol(msg.ProductID),
+			Side:     toGlobalSide(msg.Side),
+			Price:    msg.Price,
+			Quantity: msg.RemainingSize,
+		},
+		UUID:       msg.OrderID,
+		Exchange:   types.ExchangeCoinBase,
+		IsWorking:  isWorking,
+		UpdateTime: types.Time(msg.Time),
+	}
+	s.EmitOrderUpdate(orderUpdate)
+}
+
+func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+		return
+	}
+	price := msg.Price
+	if msg.Reason == "modify_order" {
+		price = msg.NewPrice
+	}
+	orderUpdate := types.Order{
+		SubmitOrder: types.SubmitOrder{
+			Symbol:   toGlobalSymbol(msg.ProductID),
+			Side:     toGlobalSide(msg.Side),
+			Price:    price,
+			Quantity: msg.NewSize,
+		},
+		UUID:       msg.OrderID,
+		Exchange:   types.ExchangeCoinBase,
+		IsWorking:  true,
+		UpdateTime: types.Time(msg.Time),
+	}
+	s.EmitOrderUpdate(orderUpdate)
 }
 
 // balance update
