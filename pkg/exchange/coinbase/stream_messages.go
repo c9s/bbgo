@@ -270,7 +270,7 @@ func (msg *MatchMessage) Trade() types.Trade {
 }
 
 func (m *MatchMessage) isAuth() bool {
-	return len(m.TakerUserID) > 0 || len(m.TakerProfileID) > 0
+	return len(m.TakerUserID) > 0 || len(m.MakerUserID) > 0
 }
 
 func (m *MatchMessage) IsAuthMaker() bool {

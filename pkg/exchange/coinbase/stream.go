@@ -56,7 +56,7 @@ func NewStream(
 		passphrase:     passphrase,
 		secretKey:      secretKey,
 	}
-	s.SetParser(s.parseMessage)
+	s.SetParser(parseMessage)
 	s.SetDispatcher(s.dispatchEvent)
 	s.SetEndpointCreator(createEndpoint)
 

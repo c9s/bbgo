@@ -6,7 +6,7 @@ import (
 )
 
 // See https://docs.cdp.coinbase.com/exchange/docs/websocket-channels for message types
-func (s *Stream) parseMessage(data []byte) (interface{}, error) {
+func parseMessage(data []byte) (interface{}, error) {
 	var baseMsg messageBaseType
 	err := json.Unmarshal(data, &baseMsg)
 	if err != nil {
