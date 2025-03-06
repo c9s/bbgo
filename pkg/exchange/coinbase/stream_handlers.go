@@ -3,7 +3,7 @@ package coinbase
 import (
 	"context"
 	"fmt"
-	"strings"
+	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -81,7 +81,7 @@ func (s *Stream) handleConnect() {
 	for channel, productIDs := range subProductsMap {
 		var subType string
 		switch channel {
-		case "rfq_matches":
+		case rfqMatchChannel:
 			subType = "subscriptions"
 		default:
 			subType = "subscribe"
@@ -142,11 +142,11 @@ func (s *Stream) handleConnect() {
 		}
 	}
 
-	// emit balance snapshot on connection
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 
+		// emit balance snapshot on connection
 		// query account balances
 		balances, err := s.exchange.QueryAccountBalances(ctx)
 		if err != nil {
@@ -154,15 +154,30 @@ func (s *Stream) handleConnect() {
 			balances = make(types.BalanceMap)
 		}
 		s.EmitBalanceSnapshot(balances)
+
+		// query open orders and cache them
+		workingRawOrders, err := s.exchange.queryOrdersByPagination(ctx, "", []string{"received", "pending", "open", "active"})
+		if err != nil {
+			log.WithError(err).Warn("failed to query open orders, the orders snapshot is initialized with empty orders")
+		} else {
+			openOrders := make([]types.Order, 0, len(workingRawOrders))
+			for _, rawOrder := range workingRawOrders {
+				openOrders = append(openOrders, toGlobalOrder(&rawOrder))
+			}
+			s.updateWorkingOrders(openOrders...)
+		}
 	}()
 }
 
 func (s *Stream) handleDisconnect() {
 	// clear sequence numbers
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lockSeqNumMap.Lock()
+	defer s.lockSeqNumMap.Unlock()
+	s.lockWorkingOrderMap.Lock()
+	defer s.lockWorkingOrderMap.Unlock()
 
 	s.lastSequenceMsgMap = make(map[MessageType]SequenceNumberType)
+	s.workingOrdersMap = make(map[string]types.Order)
 }
 
 // order book, trade
@@ -261,19 +276,42 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
 		return
 	}
-
+	if msg.OrderType == "stop" {
+		// stop order is not supported
+		log.Warnf("should not receive stop order via received channeld: %s", msg.OrderID)
+		return
+	}
+	// A valid order has been received and is now active.
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
-			Symbol:   toGlobalSymbol(msg.ProductID),
-			Side:     toGlobalSide(msg.Side),
-			Price:    msg.Price,
-			Quantity: msg.Size,
-			Type:     types.OrderType(strings.ToUpper(msg.OrderType)),
+			Symbol: toGlobalSymbol(msg.ProductID),
+			Side:   toGlobalSide(msg.Side),
 		},
+		Status:     types.OrderStatusReceived,
+		UUID:       msg.OrderID,
 		Exchange:   types.ExchangeCoinBase,
 		UpdateTime: types.Time(msg.Time),
 		IsWorking:  true,
 	}
+	switch msg.OrderType {
+	case "limit":
+		orderUpdate.SubmitOrder.Type = types.OrderTypeLimit
+		orderUpdate.SubmitOrder.Price = msg.Price
+		orderUpdate.SubmitOrder.Quantity = msg.Size
+	case "market":
+		// NOTE: the Exchange.SubmitOrder method garantees that the market order does not support funds.
+		// So we simply check the size for market order here.
+		if msg.Size.IsZero() {
+			log.Warnf("received empty order size, dropped: %s", msg.OrderID)
+			return
+		}
+		orderUpdate.SubmitOrder.Type = types.OrderTypeMarket
+		orderUpdate.SubmitOrder.Quantity = msg.Size
+	default:
+		log.Warnf("unknown order type, dropped: %s", msg.OrderType)
+		return
+	}
+	s.updateWorkingOrders(orderUpdate)
 	s.EmitOrderUpdate(orderUpdate)
 }
 
@@ -281,6 +319,7 @@ func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
 		return
 	}
+	// The order is now open on the order book.
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
@@ -288,6 +327,7 @@ func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 			Price:    msg.Price,
 			Quantity: msg.RemainingSize,
 		},
+		Status:     types.OrderStatusNew,
 		UUID:       msg.OrderID,
 		Exchange:   types.ExchangeCoinBase,
 		IsWorking:  true,
@@ -300,22 +340,38 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
 		return
 	}
-	isWorking := true
-	if msg.Reason == "canceled" {
-		isWorking = false
+	// The order is no longer on the order book.
+	order, ok := s.workingOrdersMap[msg.OrderID]
+	if !ok {
+		log.Warnf("order not found in working orders map: %s", msg.OrderID)
+		return
 	}
+	quantityExecuted := order.SubmitOrder.Quantity.Sub(msg.RemainingSize)
+	status := types.OrderStatusFilled
+	if msg.Reason == "canceled" {
+		quantityExecuted = fixedpoint.Zero
+		status = types.OrderStatusCanceled
+	} else {
+		if msg.RemainingSize.Sign() > 0 {
+			status = types.OrderStatusPartiallyFilled
+		}
+	}
+
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
 			Side:     toGlobalSide(msg.Side),
 			Price:    msg.Price,
-			Quantity: msg.RemainingSize,
+			Quantity: order.Quantity,
 		},
-		UUID:       msg.OrderID,
-		Exchange:   types.ExchangeCoinBase,
-		IsWorking:  isWorking,
-		UpdateTime: types.Time(msg.Time),
+		Status:           status,
+		UUID:             msg.OrderID,
+		Exchange:         types.ExchangeCoinBase,
+		ExecutedQuantity: quantityExecuted,
+		IsWorking:        false,
+		UpdateTime:       types.Time(msg.Time),
 	}
+	s.updateWorkingOrders(orderUpdate)
 	s.EmitOrderUpdate(orderUpdate)
 }
 
@@ -323,15 +379,18 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
 		return
 	}
-	price := msg.Price
-	if msg.Reason == "modify_order" {
-		price = msg.NewPrice
+	// An order has changed.
+	// Since we do not support market order with funds, we can ignore the STP change.
+	if msg.IsStp() {
+		log.Warnf("received STP order, dropped: %s", msg.OrderID)
+		return
 	}
+	// the change message should be of modify order type
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
 			Side:     toGlobalSide(msg.Side),
-			Price:    price,
+			Price:    msg.NewPrice,
 			Quantity: msg.NewSize,
 		},
 		UUID:       msg.OrderID,
@@ -339,7 +398,43 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 		IsWorking:  true,
 		UpdateTime: types.Time(msg.Time),
 	}
+	s.updateWorkingOrders(orderUpdate)
 	s.EmitOrderUpdate(orderUpdate)
+}
+
+func (s *Stream) handleActiveMessage(msg *ActivateMessage) {
+	// An activate message is sent when a stop order is placed.
+	// the stop order now becomes a limit order.
+	existing, ok := s.workingOrdersMap[msg.OrderID]
+	if !ok {
+		log.Warnf("order not found in working orders map: %s", msg.OrderID)
+		return
+	}
+	var updateTime types.Time
+	timestamp, err := strconv.ParseFloat(msg.Timestamp, 64)
+	if err != nil {
+		updateTime = types.Time(time.Now())
+	} else {
+		updateTime = types.Time(time.UnixMilli(int64(timestamp * 1000)))
+	}
+	// do no consider limit order with funds
+	order := types.Order{
+		SubmitOrder: types.SubmitOrder{
+			Type:      types.OrderTypeStopLimit,
+			Symbol:    toGlobalSymbol(msg.ProductID),
+			Side:      toGlobalSide(msg.Side),
+			Price:     existing.Price,
+			StopPrice: msg.StopPrice,
+			Quantity:  msg.Size,
+		},
+		Status:     types.OrderStatusNew,
+		UUID:       msg.OrderID,
+		Exchange:   types.ExchangeCoinBase,
+		IsWorking:  true,
+		UpdateTime: updateTime,
+	}
+	s.updateWorkingOrders(order)
+	s.EmitOrderUpdate(order)
 }
 
 // balance update
@@ -356,8 +451,8 @@ func (s *Stream) handleBalanceMessage(msg *BalanceMessage) {
 
 // helpers
 func (s *Stream) checkAndUpdateSequenceNumber(msgType MessageType, currentSeqNum SequenceNumberType) bool {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lockSeqNumMap.Lock()
+	defer s.lockSeqNumMap.Unlock()
 
 	latestSeq := s.lastSequenceMsgMap[msgType]
 	if latestSeq >= currentSeqNum {
@@ -365,4 +460,27 @@ func (s *Stream) checkAndUpdateSequenceNumber(msgType MessageType, currentSeqNum
 	}
 	s.lastSequenceMsgMap[msgType] = currentSeqNum
 	return true
+}
+
+func (s *Stream) updateWorkingOrders(orders ...types.Order) {
+	s.lockWorkingOrderMap.Lock()
+	defer s.lockWorkingOrderMap.Unlock()
+
+	for _, order := range orders {
+		exisiting, ok := s.workingOrdersMap[order.UUID]
+		if ok {
+			if !order.IsWorking {
+				// order is already in the map and not working, remove it
+				delete(s.workingOrdersMap, order.UUID)
+				continue
+			} else {
+				// order is already in the map and working, update it
+				exisiting.Update(order)
+				s.workingOrdersMap[order.UUID] = exisiting
+			}
+		} else {
+			// order is not in the map, add it
+			s.workingOrdersMap[order.UUID] = order
+		}
+	}
 }
