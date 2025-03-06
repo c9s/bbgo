@@ -135,5 +135,4 @@ func (s *Stream) generateSignature() (string, string) {
 
 func (s *Stream) handleConnect() {
 	// TODO: dummy, will add connection logic later
-	return
 }
