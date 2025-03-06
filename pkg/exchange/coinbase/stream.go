@@ -68,8 +68,6 @@ func NewStream(
 	s.OnBalanceMessage(s.handleBalanceMessage)
 	s.OnReceivedMessage(s.handleReceivedMessage)
 	s.OnOpenMessage(s.handleOpenMessage)
-	s.OnDoneMessage(s.handleDoneMessage)
-	s.OnChangeMessage(s.handleChangeMessage)
 
 	// public handlers
 	s.OnConnect(s.handleConnect)
@@ -144,10 +142,3 @@ func (s *Stream) generateSignature() (string, string) {
 
 	return signature, ts
 }
-<<<<<<< HEAD
-
-func (s *Stream) handleConnect() {
-	// TODO: dummy, will add connection logic later
-}
-=======
->>>>>>> 24b0cff7 (🔧 feat(coinbase): implement stream message handlers for various events and enhance connection logic)
