@@ -82,6 +82,16 @@ func (c *CreateOrderRequest) ClientOrderID(clientOrderID string) *CreateOrderReq
 	return c
 }
 
+func (c *CreateOrderRequest) MaxFloor(maxFloor string) *CreateOrderRequest {
+	c.maxFloor = &maxFloor
+	return c
+}
+
+func (c *CreateOrderRequest) StopLimitPrice(stopLimitPrice fixedpoint.Value) *CreateOrderRequest {
+	c.stopLimitPrice = &stopLimitPrice
+	return c
+}
+
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (c *CreateOrderRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
@@ -282,6 +292,22 @@ func (c *CreateOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of clientOrderID
 		params["client_oid"] = clientOrderID
+	} else {
+	}
+	// check maxFloor field -> json key max_floor
+	if c.maxFloor != nil {
+		maxFloor := *c.maxFloor
+
+		// assign parameter of maxFloor
+		params["max_floor"] = maxFloor
+	} else {
+	}
+	// check stopLimitPrice field -> json key stop_limit_price
+	if c.stopLimitPrice != nil {
+		stopLimitPrice := *c.stopLimitPrice
+
+		// assign parameter of stopLimitPrice
+		params["stop_limit_price"] = stopLimitPrice
 	} else {
 	}
 
