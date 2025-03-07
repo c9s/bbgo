@@ -17,6 +17,10 @@ func Test_SubCmdString(t *testing.T) {
 				Name:       "ticker",
 				ProductIDs: []string{"BTC-USD"},
 			},
+			{
+				Name:       "matches",
+				ProductIDs: []string{"BTC-USD"},
+			},
 		},
 		authMsg: authMsg{
 			Signature:  "signature",

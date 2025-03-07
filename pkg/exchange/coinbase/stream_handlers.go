@@ -16,8 +16,7 @@ type channelType struct {
 }
 
 func (c channelType) String() string {
-	return fmt.Sprintf(`(Name:       %s,
-ProductIDs: %s)`, c.Name, c.ProductIDs)
+	return fmt.Sprintf("(channelType Name:%s, ProductIDs: %s)", c.Name, c.ProductIDs)
 }
 
 type authMsg struct {
@@ -28,10 +27,7 @@ type authMsg struct {
 }
 
 func (msg authMsg) String() string {
-	return fmt.Sprintf(`(Signature:  %s,
-Key:        ****,
-Passphrase: ****,
-Timestamp:  %s)`, msg.Signature, msg.Timestamp)
+	return fmt.Sprintf("(authMsg Signature:%s, Timestamp:%s)", msg.Signature, msg.Timestamp)
 }
 
 type subscribeMsgType1 struct {
@@ -42,9 +38,7 @@ type subscribeMsgType1 struct {
 }
 
 func (msg subscribeMsgType1) String() string {
-	return fmt.Sprintf(`(Type:     %s,
-Channels: %s,
-%s)`, msg.Type, msg.Channels, msg.authMsg.String())
+	return fmt.Sprintf("(subscribeMsg Type:%s, Channels: %s, %s)", msg.Type, msg.Channels, msg.authMsg.String())
 }
 
 type subscribeMsgType2 struct {
@@ -57,11 +51,14 @@ type subscribeMsgType2 struct {
 }
 
 func (msg subscribeMsgType2) String() string {
-	return fmt.Sprintf(`(Type:       %s,
-Channels:   %s,
-ProductIDs: %s,
-AccountIDs: %s,
-%s`, msg.Type, msg.Channels, msg.ProductIDs, msg.AccountIDs, msg.authMsg.String())
+	return fmt.Sprintf(
+		"(Type:%s, Channels:%s, ProductIDs:%s, AccountIDs:%s, %s",
+		msg.Type,
+		msg.Channels,
+		msg.ProductIDs,
+		msg.AccountIDs,
+		msg.authMsg.String(),
+	)
 }
 
 func (s *Stream) handleConnect() {
@@ -154,7 +151,7 @@ func (s *Stream) handleConnect() {
 		balances, err := s.exchange.QueryAccountBalances(ctx)
 		if err != nil {
 			log.WithError(err).Warn("failed to query account balances, the balance snapshot is initialized with empty balances")
-			return
+			balances = make(types.BalanceMap)
 		}
 		s.EmitBalanceSnapshot(balances)
 	}()
