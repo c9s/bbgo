@@ -237,7 +237,7 @@ func (s *Strategy) makeSpread(ctx context.Context, bestBid, bestAsk types.PriceV
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeSell,
 			Type:     types.OrderTypeLimit,
-			Quantity: fixedpoint.Min(bestBid.Volume, s.tradingMarket.MinQuantity),
+			Quantity: fixedpoint.Max(bestBid.Volume, s.tradingMarket.MinQuantity),
 			Price:    bestBid.Price,
 			Market:   s.tradingMarket,
 		},
