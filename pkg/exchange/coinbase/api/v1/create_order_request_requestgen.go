@@ -52,8 +52,8 @@ func (c *CreateOrderRequest) Price(price fixedpoint.Value) *CreateOrderRequest {
 	return c
 }
 
-func (c *CreateOrderRequest) Size(size string) *CreateOrderRequest {
-	c.size = size
+func (c *CreateOrderRequest) Size(size fixedpoint.Value) *CreateOrderRequest {
+	c.size = &size
 	return c
 }
 
@@ -79,6 +79,16 @@ func (c *CreateOrderRequest) PostOnly(postOnly bool) *CreateOrderRequest {
 
 func (c *CreateOrderRequest) ClientOrderID(clientOrderID string) *CreateOrderRequest {
 	c.clientOrderID = &clientOrderID
+	return c
+}
+
+func (c *CreateOrderRequest) MaxFloor(maxFloor string) *CreateOrderRequest {
+	c.maxFloor = &maxFloor
+	return c
+}
+
+func (c *CreateOrderRequest) StopLimitPrice(stopLimitPrice fixedpoint.Value) *CreateOrderRequest {
+	c.stopLimitPrice = &stopLimitPrice
 	return c
 }
 
@@ -215,16 +225,13 @@ func (c *CreateOrderRequest) GetParameters() (map[string]interface{}, error) {
 	} else {
 	}
 	// check size field -> json key size
-	size := c.size
+	if c.size != nil {
+		size := *c.size
 
-	// TEMPLATE check-required
-	if len(size) == 0 {
-		return nil, fmt.Errorf("size is required, empty string given")
+		// assign parameter of size
+		params["size"] = size
+	} else {
 	}
-	// END TEMPLATE check-required
-
-	// assign parameter of size
-	params["size"] = size
 	// check funds field -> json key funds
 	if c.funds != nil {
 		funds := *c.funds
@@ -285,6 +292,22 @@ func (c *CreateOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of clientOrderID
 		params["client_oid"] = clientOrderID
+	} else {
+	}
+	// check maxFloor field -> json key max_floor
+	if c.maxFloor != nil {
+		maxFloor := *c.maxFloor
+
+		// assign parameter of maxFloor
+		params["max_floor"] = maxFloor
+	} else {
+	}
+	// check stopLimitPrice field -> json key stop_limit_price
+	if c.stopLimitPrice != nil {
+		stopLimitPrice := *c.stopLimitPrice
+
+		// assign parameter of stopLimitPrice
+		params["stop_limit_price"] = stopLimitPrice
 	} else {
 	}
 
