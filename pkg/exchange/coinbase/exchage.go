@@ -167,7 +167,12 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	case types.OrderTypeMarket:
 		switch order.Side {
 		case types.SideTypeBuy:
-			funds := order.Price.Mul(order.Quantity)
+			// buy with market price
+			ticker, err := e.QueryTicker(ctx, order.Market.Symbol)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get ticker for market order: %v", order.Market.Symbol)
+			}
+			funds := ticker.Buy.Mul(order.Quantity)
 			req.Funds(funds)
 		case types.SideTypeSell:
 			req.Size(order.Quantity)
