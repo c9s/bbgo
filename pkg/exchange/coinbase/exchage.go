@@ -124,6 +124,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 }
 
 // ExchangeTradeService
+// For the stop-limit order, we only support the long position
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
 	if len(order.Market.Symbol) == 0 {
 		return nil, fmt.Errorf("order.Market.Symbol is required: %+v", order)
@@ -164,8 +165,15 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		req.Price(order.Price)
 		req.Size(order.Quantity)
 	case types.OrderTypeMarket:
-		funds := order.Price.Mul(order.Quantity)
-		req.Funds(funds)
+		switch order.Side {
+		case types.SideTypeBuy:
+			funds := order.Price.Mul(order.Quantity)
+			req.Funds(funds)
+		case types.SideTypeSell:
+			req.Size(order.Quantity)
+		default:
+			return nil, fmt.Errorf("unsupported side for market order: %v", order.Side)
+		}
 	case types.OrderTypeStopLimit:
 		req.StopPrice(order.StopPrice)
 		req.Price(order.Price)
