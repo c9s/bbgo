@@ -213,7 +213,7 @@ type DoneMessage struct {
 	Price         fixedpoint.Value `json:"price"`
 	OrderID       string           `json:"order_id"`
 	Reason        string           `json:"reason"` // filled, canceled
-	Side          string           `json:"side"`
+	Side          api.SideType     `json:"side"`
 	RemainingSize fixedpoint.Value `json:"remaining_size"`
 	CancelReason  string           `json:"cancel_reason,omitempty"` // non-empty if reason is canceled
 }
