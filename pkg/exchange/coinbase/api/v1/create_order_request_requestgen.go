@@ -52,8 +52,8 @@ func (c *CreateOrderRequest) Price(price fixedpoint.Value) *CreateOrderRequest {
 	return c
 }
 
-func (c *CreateOrderRequest) Size(size string) *CreateOrderRequest {
-	c.size = size
+func (c *CreateOrderRequest) Size(size fixedpoint.Value) *CreateOrderRequest {
+	c.size = &size
 	return c
 }
 
@@ -215,16 +215,13 @@ func (c *CreateOrderRequest) GetParameters() (map[string]interface{}, error) {
 	} else {
 	}
 	// check size field -> json key size
-	size := c.size
+	if c.size != nil {
+		size := *c.size
 
-	// TEMPLATE check-required
-	if len(size) == 0 {
-		return nil, fmt.Errorf("size is required, empty string given")
+		// assign parameter of size
+		params["size"] = size
+	} else {
 	}
-	// END TEMPLATE check-required
-
-	// assign parameter of size
-	params["size"] = size
 	// check funds field -> json key funds
 	if c.funds != nil {
 		funds := *c.funds

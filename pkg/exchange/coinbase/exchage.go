@@ -57,6 +57,10 @@ func New(key, secret, passphrase string, timeout time.Duration) *Exchange {
 	}
 }
 
+func (e *Exchange) Client() *api.RestAPIClient {
+	return e.client
+}
+
 // CustomIntervalProvider
 var supportedIntervalMap = map[types.Interval]int{
 	types.Interval1m:  60,
@@ -132,6 +136,16 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		req.OrderType("limit")
 	case types.OrderTypeMarket:
 		req.OrderType("market")
+	case types.OrderTypeStopLimit:
+		req.OrderType("stop")
+		switch order.Side {
+		case types.SideTypeSell:
+			req.Stop("entry") // trigger order when the price >= stop price
+		case types.SideTypeBuy:
+			req.Stop("loss") // trigger order when the price <= stop price
+		default:
+			return nil, fmt.Errorf("unsupported order side: %v", order.Side)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported order type: %v", order.Type)
 	}
@@ -144,19 +158,20 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	default:
 		return nil, fmt.Errorf("unsupported order side: %v", order.Side)
 	}
-	// set quantity
-	qty := order.Quantity
-	if order.Type == types.OrderTypeMarket && order.Side == types.SideTypeBuy {
-		ticker, err := e.QueryTicker(ctx, order.Market.Symbol)
-		if err != nil {
-			return nil, err
-		}
-		qty = qty.Mul(ticker.Buy)
-	}
-	req.Size(qty.String())
-	// set price
-	if order.Type == types.OrderTypeLimit {
+	// set price and quanity
+	switch order.Type {
+	case types.OrderTypeLimit:
 		req.Price(order.Price)
+		req.Size(order.Quantity)
+	case types.OrderTypeMarket:
+		funds := order.Price.Mul(order.Quantity)
+		req.Funds(funds)
+	case types.OrderTypeStopLimit:
+		req.StopPrice(order.StopPrice)
+		req.Price(order.Price)
+		req.Size(order.Quantity)
+	default:
+		return nil, fmt.Errorf("unsupported order type: %v", order.Type)
 	}
 
 	// set time in force, using default if not set
@@ -197,7 +212,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.Order, error) {
-	cbOrders, err := e.queryOrdersByPagination(ctx, toLocalSymbol(symbol), []string{"open"})
+	cbOrders, err := e.queryOrdersByPagination(ctx, symbol, []string{"open"})
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +223,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.
 	return orders, nil
 }
 
+// if symbol is empty string, it will return all orders
 func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, status []string) ([]api.Order, error) {
 	if err := queryAccountLimiter.Wait(ctx); err != nil {
 		return nil, err
