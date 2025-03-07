@@ -177,6 +177,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	case types.OrderTypeStopLimit:
 		req.StopPrice(order.StopPrice)
 		req.Price(order.Price)
+		req.StopLimitPrice(order.Price)
 		req.Size(order.Quantity)
 	default:
 		return nil, fmt.Errorf("unsupported order type: %v", order.Type)
