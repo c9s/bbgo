@@ -46,7 +46,7 @@ func SortOrdersByPrice(orders []Order, descending bool) []Order {
 	return orders
 }
 
-// SortOrdersAscending sorts by update time ascending-ly
+// SortOrdersUpdateTimeAscending sorts by update time ascending-ly
 func SortOrdersUpdateTimeAscending(orders []Order) []Order {
 	sort.Slice(orders, func(i, j int) bool {
 		return orders[i].UpdateTime.Time().Before(orders[j].UpdateTime.Time())

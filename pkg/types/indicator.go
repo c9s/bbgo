@@ -748,7 +748,7 @@ func Rolling(a Series, window int) *RollingResult {
 	return &RollingResult{a, window}
 }
 
-// SoftMax returns the input value in the range of 0 to 1
+// Softmax returns the input value in the range of 0 to 1
 // with sum of all the probabilities being equal to one.
 // It is commonly used in machine learning neural networks.
 // Will return Softmax SeriesExtend result based in latest [window] numbers from [a] Series
