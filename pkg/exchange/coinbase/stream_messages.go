@@ -319,7 +319,7 @@ func (m *ChangeMessage) IsModifyOrder() bool {
 	return m.Reason == "modify_order"
 }
 
-type ActiveMessage struct {
+type ActivateMessage struct {
 	messageBaseType
 
 	ProductID string           `json:"product_id"`
