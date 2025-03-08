@@ -34,7 +34,7 @@ type Stream struct {
 	doneMessageCallbacks              []func(m *DoneMessage)
 	matchMessageCallbacks             []func(m *MatchMessage)
 	changeMessageCallbacks            []func(m *ChangeMessage)
-	activeMessageCallbacks            []func(m *ActiveMessage)
+	activateMessageCallbacks          []func(m *ActivateMessage)
 	balanceMessageCallbacks           []func(m *BalanceMessage)
 	orderbookSnapshotMessageCallbacks []func(m *OrderBookSnapshotMessage)
 	orderbookUpdateMessageCallbacks   []func(m *OrderBookUpdateMessage)
@@ -95,8 +95,8 @@ func (s *Stream) dispatchEvent(e interface{}) {
 		s.EmitMatchMessage(e)
 	case *ChangeMessage:
 		s.EmitChangeMessage(e)
-	case *ActiveMessage:
-		s.EmitActiveMessage(e)
+	case *ActivateMessage:
+		s.EmitActivateMessage(e)
 	case *BalanceMessage:
 		s.EmitBalanceMessage(e)
 	case *OrderBookSnapshotMessage:

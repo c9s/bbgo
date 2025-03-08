@@ -3,6 +3,7 @@ package coinbase
 import (
 	"hash/fnv"
 	"math"
+	"strings"
 	"time"
 
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
@@ -18,6 +19,31 @@ func toGlobalSide(cbSide api.SideType) types.SideType {
 		return types.SideTypeSell
 	}
 	return types.SideTypeNone
+}
+
+func toGlobalOrderStatus(order *api.Order) types.OrderStatus {
+	switch order.Status {
+	case api.OrderStatusRejected:
+		return types.OrderStatusRejected
+	case api.OrderStatusReceived:
+		return types.OrderStatusReceived
+	case api.OrderStatusOpen, api.OrderStatusPending:
+		return types.OrderStatusNew
+	case api.OrderStatusDone:
+		switch order.DoneReason {
+		case "filled":
+			if order.FilledSize.Eq(order.Size) {
+				return types.OrderStatusFilled
+			} else {
+				return types.OrderStatusPartiallyFilled
+			}
+		case "canceled":
+			return types.OrderStatusCanceled
+		case "rejected":
+			return types.OrderStatusRejected
+		}
+	}
+	return types.OrderStatus(strings.ToUpper(string(order.Status)))
 }
 
 func toGlobalOrder(cbOrder *api.Order) types.Order {
@@ -44,7 +70,7 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 			TimeInForce:   types.TimeInForce(cbOrder.TimeInForce),
 		},
 		Exchange:       types.ExchangeCoinBase,
-		Status:         cbOrder.Status.GlobalOrderStatus(),
+		Status:         toGlobalOrderStatus(cbOrder),
 		UUID:           cbOrder.ID,
 		OrderID:        FNV64a(cbOrder.ID),
 		OriginalStatus: string(cbOrder.Status),

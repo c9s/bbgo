@@ -107,6 +107,9 @@ const NoClientOrderID = "0"
 type OrderStatus string
 
 const (
+	// OrderStatusReceived means the order is received by the exchange, but not yet placed on the orderbook.
+	OrderStatusReceived OrderStatus = "RECEIVED"
+
 	// OrderStatusNew means the order is active on the orderbook without any filling.
 	OrderStatusNew OrderStatus = "NEW"
 
