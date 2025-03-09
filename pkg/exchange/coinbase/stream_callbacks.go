@@ -94,12 +94,12 @@ func (s *Stream) EmitChangeMessage(m *ChangeMessage) {
 	}
 }
 
-func (s *Stream) OnActiveMessage(cb func(m *ActiveMessage)) {
-	s.activeMessageCallbacks = append(s.activeMessageCallbacks, cb)
+func (s *Stream) OnActivateMessage(cb func(m *ActivateMessage)) {
+	s.activateMessageCallbacks = append(s.activateMessageCallbacks, cb)
 }
 
-func (s *Stream) EmitActiveMessage(m *ActiveMessage) {
-	for _, cb := range s.activeMessageCallbacks {
+func (s *Stream) EmitActivateMessage(m *ActivateMessage) {
+	for _, cb := range s.activateMessageCallbacks {
 		cb(m)
 	}
 }

@@ -384,7 +384,7 @@ func Test_ParseActive(t *testing.T) {
 `)
 	msg, err := parseMessage(data)
 	assert.NoError(t, err)
-	assert.IsType(t, &ActiveMessage{}, msg)
+	assert.IsType(t, &ActivateMessage{}, msg)
 }
 
 func Test_ParseBalance(t *testing.T) {

@@ -1,23 +1,12 @@
 package coinbase
 
 import (
-	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/requestgen"
 )
-
-func (s *OrderStatus) GlobalOrderStatus() types.OrderStatus {
-	switch *s {
-	case OrderStatusRejected:
-		return types.OrderStatusRejected
-	case OrderStatusOpen, OrderStatusPending, OrderStatusDone, OrderStatusActive, OrderStatusReceived, OrderStatusAll:
-		return types.OrderStatus(strings.ToUpper(string(*s)))
-	}
-	return types.OrderStatus(strings.ToUpper(string(*s)))
-}
 
 type Order struct {
 	Type      string           `json:"type"`
