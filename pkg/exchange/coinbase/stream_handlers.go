@@ -142,6 +142,9 @@ func (s *Stream) handleConnect() {
 		}
 	}
 
+	s.lockSeqNumMap.Lock()
+	defer s.lockSeqNumMap.Unlock()
+	s.lastSequenceMsgMap = make(map[MessageType]SequenceNumberType)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
@@ -155,7 +158,10 @@ func (s *Stream) handleConnect() {
 		}
 		s.EmitBalanceSnapshot(balances)
 
-		// query open orders and cache them
+		// query working orders and cache them
+		// the cache is required since we do note receive the original order
+		// size in the order update messages. Hence we need the cache to find
+		// the original order size to calculate the executed quantity.
 		workingRawOrders, err := s.exchange.queryOrdersByPagination(ctx, "", []string{"received", "pending", "open", "active"})
 		if err != nil {
 			log.WithError(err).Warn("failed to query open orders, the orders snapshot is initialized with empty orders")
