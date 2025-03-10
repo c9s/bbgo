@@ -5,7 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"strconv"
+	"fmt"
 	"sync"
 	"time"
 
@@ -14,8 +14,7 @@ import (
 )
 
 // https://docs.cdp.coinbase.com/exchange/docs/websocket-overview
-const wsFeedUrl = "wss://ws-feed.exchange.coinbase.com"         // ws feeds available without auth
-const wsFeedUrlDirect = "wss://ws-direct.exchange.coinbase.com" // ws feeds require auth
+const wsFeedUrl = "wss://ws-feed.exchange.coinbase.com" // ws feeds available without auth
 const rfqMatchChannel = "rfq_matches"
 
 //go:generate callbackgen -type Stream
@@ -92,12 +91,14 @@ func logSubscriptions(m *SubscriptionsMessage) {
 		return
 	}
 	for _, channel := range m.Channels {
-		log.Infof("subscribed to channel confirmed: %s (product ids: %s)", channel.Name, channel.ProductIDs)
+		log.Infof("Confirmed subscription to channel: %s (product ids: %s)", channel.Name, channel.ProductIDs)
 	}
 }
 
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch e := e.(type) {
+	case *SubscriptionsMessage:
+		s.EmitSubscriptions(e)
 	case *StatusMessage:
 		s.EmitStatusMessage(e)
 	case *AuctionMessage:
@@ -130,14 +131,7 @@ func (s *Stream) dispatchEvent(e interface{}) {
 }
 
 func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
-	if s.authEnabled() {
-		return wsFeedUrlDirect, nil
-	}
 	return wsFeedUrl, nil
-}
-
-func (s *Stream) authEnabled() bool {
-	return !s.PublicOnly && len(s.apiKey) > 0 && len(s.passphrase) > 0 && len(s.secretKey) > 0
 }
 
 func (s *Stream) generateSignature() (string, string) {
@@ -145,7 +139,7 @@ func (s *Stream) generateSignature() (string, string) {
 		return "", ""
 	}
 	// Convert current time to string timestamp
-	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	ts := fmt.Sprintf("%d", time.Now().Unix())
 
 	// Create message string
 	message := ts + "GET/users/self/verify"

@@ -57,9 +57,8 @@ func Test_SubCmdString(t *testing.T) {
 
 func TestStreamBasic(t *testing.T) {
 	stream := getTestStreamOrSkip(t)
-	// productId := "BTC-USD"
+	c := make(chan any)
 
-	c := make(chan *StatusMessage, 1)
 	t.Run("Test Status", func(t *testing.T) {
 		stream.Subscribe("status", "", types.SubscribeOptions{})
 		stream.OnStatusMessage(func(m *StatusMessage) {
@@ -68,10 +67,10 @@ func TestStreamBasic(t *testing.T) {
 			c <- m
 		})
 		err := stream.Connect(context.Background())
-		defer stream.Close()
 		assert.NoError(t, err)
 	})
 	<-c
+	close(c)
 }
 
 func getTestStreamOrSkip(t *testing.T) *Stream {
