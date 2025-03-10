@@ -55,11 +55,12 @@ func Test_SubCmdString(t *testing.T) {
 	assert.False(t, strings.Contains(outStr, "<secret_passphrase!>"))
 }
 
-func TestStreamBasic(t *testing.T) {
-	stream := getTestStreamOrSkip(t)
+func TestStream(t *testing.T) {
 	c := make(chan any)
+	defer close(c)
 
 	t.Run("Test Status", func(t *testing.T) {
+		stream := getTestStreamOrSkip(t)
 		stream.Subscribe("status", "", types.SubscribeOptions{})
 		stream.OnStatusMessage(func(m *StatusMessage) {
 			assert.NotNil(t, m)
@@ -70,7 +71,32 @@ func TestStreamBasic(t *testing.T) {
 		assert.NoError(t, err)
 	})
 	<-c
-	close(c)
+
+	t.Run("Test Ticker", func(t *testing.T) {
+		stream := getTestStreamOrSkip(t)
+		stream.Subscribe("ticker", "BTC-USD", types.SubscribeOptions{})
+		stream.OnTickerMessage(func(m *TickerMessage) {
+			assert.NotNil(t, m)
+			t.Logf("get ticker message: %v", *m)
+			c <- m
+		})
+		err := stream.Connect(context.Background())
+		assert.NoError(t, err)
+	})
+	<-c
+
+	t.Run("Test Match", func(t *testing.T) {
+		stream := getTestStreamOrSkip(t)
+		stream.Subscribe("matches", "BTC-USD", types.SubscribeOptions{})
+		stream.OnMatchMessage(func(m *MatchMessage) {
+			assert.NotNil(t, m)
+			t.Logf("get match message: %v", *m)
+			c <- m
+		})
+		err := stream.Connect(context.Background())
+		assert.NoError(t, err)
+	})
+	<-c
 }
 
 func getTestStreamOrSkip(t *testing.T) *Stream {
