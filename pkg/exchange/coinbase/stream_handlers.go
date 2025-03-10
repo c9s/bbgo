@@ -358,18 +358,27 @@ func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 		return
 	}
 	// The order is now open on the order book.
+	// Getting an open message means that it's not fully filled immediately at receipt of the order or not canceled.
+	// We need to consider the case of partially filled orders here.
+	lastOrder, ok := s.workingOrdersMap[msg.OrderID]
+	if !ok {
+		log.Warnf("A new open message which is not in the working orders map: %s", msg.OrderID)
+		return
+	}
+	amountExecuted := lastOrder.SubmitOrder.Quantity.Sub(msg.RemainingSize)
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
 			Side:     toGlobalSide(msg.Side),
 			Price:    msg.Price,
-			Quantity: msg.RemainingSize,
+			Quantity: lastOrder.Quantity,
 		},
-		Status:     types.OrderStatusNew,
-		UUID:       msg.OrderID,
-		Exchange:   types.ExchangeCoinBase,
-		IsWorking:  true,
-		UpdateTime: types.Time(msg.Time),
+		ExecutedQuantity: amountExecuted,
+		Status:           types.OrderStatusNew,
+		UUID:             msg.OrderID,
+		Exchange:         types.ExchangeCoinBase,
+		IsWorking:        true,
+		UpdateTime:       types.Time(msg.Time),
 	}
 	s.EmitOrderUpdate(orderUpdate)
 }
@@ -378,21 +387,18 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
 		return
 	}
-	// The order is no longer on the order book.
-	order, ok := s.workingOrdersMap[msg.OrderID]
+	// The lastOrder is no longer on the lastOrder book.
+	lastOrder, ok := s.workingOrdersMap[msg.OrderID]
 	if !ok {
 		log.Warnf("order not found in working orders map: %s", msg.OrderID)
 		return
 	}
-	quantityExecuted := order.SubmitOrder.Quantity.Sub(msg.RemainingSize)
+	quantityExecuted := lastOrder.SubmitOrder.Quantity.Sub(msg.RemainingSize)
 	status := types.OrderStatusFilled
 	if msg.Reason == "canceled" {
-		quantityExecuted = fixedpoint.Zero
 		status = types.OrderStatusCanceled
 	} else {
-		if msg.RemainingSize.Sign() > 0 {
-			status = types.OrderStatusPartiallyFilled
-		}
+		status = types.OrderStatusFilled
 	}
 
 	orderUpdate := types.Order{
@@ -400,7 +406,7 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 			Symbol:   toGlobalSymbol(msg.ProductID),
 			Side:     toGlobalSide(msg.Side),
 			Price:    msg.Price,
-			Quantity: order.Quantity,
+			Quantity: lastOrder.Quantity,
 		},
 		Status:           status,
 		UUID:             msg.OrderID,
@@ -418,11 +424,7 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 		return
 	}
 	// An order has changed.
-	// Since we do not support market order with funds, we can ignore the STP change.
-	if msg.IsStp() {
-		log.Warnf("received STP order, dropped: %s", msg.OrderID)
-		return
-	}
+
 	// the change message should be of modify order type
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
