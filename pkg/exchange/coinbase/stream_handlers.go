@@ -175,7 +175,7 @@ func (s *Stream) handleConnect() {
 
 	s.lockSeqNumMap.Lock()
 	defer s.lockSeqNumMap.Unlock()
-	s.lastSequenceMsgMap = make(map[MessageType]SequenceNumberType)
+	s.lastSequenceMsgMap = make(map[string]SequenceNumberType)
 	s.workingOrdersMap = make(map[string]types.Order)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -214,14 +214,14 @@ func (s *Stream) handleDisconnect() {
 	s.lockWorkingOrderMap.Lock()
 	defer s.lockWorkingOrderMap.Unlock()
 
-	s.lastSequenceMsgMap = make(map[MessageType]SequenceNumberType)
+	s.lastSequenceMsgMap = make(map[string]SequenceNumberType)
 	s.workingOrdersMap = make(map[string]types.Order)
 }
 
 // order book, trade
 func (s *Stream) handleTickerMessage(msg *TickerMessage) {
 	// ignore outdated messages
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	trade := msg.Trade()
@@ -230,7 +230,7 @@ func (s *Stream) handleTickerMessage(msg *TickerMessage) {
 
 func (s *Stream) handleMatchMessage(msg *MatchMessage) {
 	// ignore outdated messages
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	trade := msg.Trade()
@@ -311,7 +311,7 @@ func (s *Stream) handleOrderbookUpdateMessage(msg *OrderBookUpdateMessage) {
 
 // order update
 func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	if msg.OrderType == "stop" {
@@ -354,45 +354,51 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 }
 
 func (s *Stream) handleOpenMessage(msg *OpenMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	// The order is now open on the order book.
+	// Getting an open message means that it's not fully filled immediately at receipt of the order or not canceled.
+	// We need to consider the case of partially filled orders here.
+	lastOrder, ok := s.workingOrdersMap[msg.OrderID]
+	if !ok {
+		log.Warnf("A new open message which is not in the working orders map: %s", msg.OrderID)
+		return
+	}
+	amountExecuted := lastOrder.SubmitOrder.Quantity.Sub(msg.RemainingSize)
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
 			Side:     toGlobalSide(msg.Side),
 			Price:    msg.Price,
-			Quantity: msg.RemainingSize,
+			Quantity: lastOrder.Quantity,
 		},
-		Status:     types.OrderStatusNew,
-		UUID:       msg.OrderID,
-		Exchange:   types.ExchangeCoinBase,
-		IsWorking:  true,
-		UpdateTime: types.Time(msg.Time),
+		ExecutedQuantity: amountExecuted,
+		Status:           types.OrderStatusNew,
+		UUID:             msg.OrderID,
+		Exchange:         types.ExchangeCoinBase,
+		IsWorking:        true,
+		UpdateTime:       types.Time(msg.Time),
 	}
 	s.EmitOrderUpdate(orderUpdate)
 }
 
 func (s *Stream) handleDoneMessage(msg *DoneMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
-	// The order is no longer on the order book.
-	order, ok := s.workingOrdersMap[msg.OrderID]
+	// The lastOrder is no longer on the lastOrder book.
+	lastOrder, ok := s.workingOrdersMap[msg.OrderID]
 	if !ok {
 		log.Warnf("order not found in working orders map: %s", msg.OrderID)
 		return
 	}
-	quantityExecuted := order.SubmitOrder.Quantity.Sub(msg.RemainingSize)
+	quantityExecuted := lastOrder.SubmitOrder.Quantity.Sub(msg.RemainingSize)
 	status := types.OrderStatusFilled
 	if msg.Reason == "canceled" {
-		quantityExecuted = fixedpoint.Zero
 		status = types.OrderStatusCanceled
 	} else {
-		if msg.RemainingSize.Sign() > 0 {
-			status = types.OrderStatusPartiallyFilled
-		}
+		status = types.OrderStatusFilled
 	}
 
 	orderUpdate := types.Order{
@@ -400,7 +406,7 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 			Symbol:   toGlobalSymbol(msg.ProductID),
 			Side:     toGlobalSide(msg.Side),
 			Price:    msg.Price,
-			Quantity: order.Quantity,
+			Quantity: lastOrder.Quantity,
 		},
 		Status:           status,
 		UUID:             msg.OrderID,
@@ -414,16 +420,10 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 }
 
 func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	// An order has changed.
-	// Since we do not support market order with funds, we can ignore the STP change.
-	if msg.IsStp() {
-		log.Warnf("received STP order, dropped: %s", msg.OrderID)
-		return
-	}
-	// the change message should be of modify order type
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
@@ -488,15 +488,16 @@ func (s *Stream) handleBalanceMessage(msg *BalanceMessage) {
 }
 
 // helpers
-func (s *Stream) checkAndUpdateSequenceNumber(msgType MessageType, currentSeqNum SequenceNumberType) bool {
+func (s *Stream) checkAndUpdateSequenceNumber(msgType MessageType, productId string, currentSeqNum SequenceNumberType) bool {
 	s.lockSeqNumMap.Lock()
 	defer s.lockSeqNumMap.Unlock()
 
-	latestSeq := s.lastSequenceMsgMap[msgType]
+	key := fmt.Sprintf("%s-%s", msgType, productId)
+	latestSeq := s.lastSequenceMsgMap[key]
 	if latestSeq >= currentSeqNum {
 		return false
 	}
-	s.lastSequenceMsgMap[msgType] = currentSeqNum
+	s.lastSequenceMsgMap[key] = currentSeqNum
 	return true
 }
 
