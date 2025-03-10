@@ -214,7 +214,7 @@ func TestBalance(t *testing.T) {
 	accountsStr := os.Getenv("COINBASE_ACCOUNT_IDS")
 	accounts := strings.Split(accountsStr, ",")
 
-	c := make(chan bool)
+	c := make(chan struct{})
 
 	t.Run("Run Balance", func(t *testing.T) {
 		stream := getTestStreamOrSkip(t)
@@ -229,7 +229,7 @@ func TestBalance(t *testing.T) {
 			triggered = true
 			assert.NotNil(t, m)
 			t.Logf("get balance message: %v", *m)
-			c <- true
+			c <- struct{}{}
 		})
 		err := stream.Connect(context.Background())
 		assert.NoError(t, err)
