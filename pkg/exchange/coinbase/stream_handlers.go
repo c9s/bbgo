@@ -175,7 +175,7 @@ func (s *Stream) handleConnect() {
 
 	s.lockSeqNumMap.Lock()
 	defer s.lockSeqNumMap.Unlock()
-	s.lastSequenceMsgMap = make(map[MessageType]SequenceNumberType)
+	s.lastSequenceMsgMap = make(map[string]SequenceNumberType)
 	s.workingOrdersMap = make(map[string]types.Order)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -214,14 +214,14 @@ func (s *Stream) handleDisconnect() {
 	s.lockWorkingOrderMap.Lock()
 	defer s.lockWorkingOrderMap.Unlock()
 
-	s.lastSequenceMsgMap = make(map[MessageType]SequenceNumberType)
+	s.lastSequenceMsgMap = make(map[string]SequenceNumberType)
 	s.workingOrdersMap = make(map[string]types.Order)
 }
 
 // order book, trade
 func (s *Stream) handleTickerMessage(msg *TickerMessage) {
 	// ignore outdated messages
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	trade := msg.Trade()
@@ -230,7 +230,7 @@ func (s *Stream) handleTickerMessage(msg *TickerMessage) {
 
 func (s *Stream) handleMatchMessage(msg *MatchMessage) {
 	// ignore outdated messages
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	trade := msg.Trade()
@@ -311,7 +311,7 @@ func (s *Stream) handleOrderbookUpdateMessage(msg *OrderBookUpdateMessage) {
 
 // order update
 func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	if msg.OrderType == "stop" {
@@ -354,7 +354,7 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 }
 
 func (s *Stream) handleOpenMessage(msg *OpenMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	// The order is now open on the order book.
@@ -384,7 +384,7 @@ func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 }
 
 func (s *Stream) handleDoneMessage(msg *DoneMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	// The lastOrder is no longer on the lastOrder book.
@@ -420,7 +420,7 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 }
 
 func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	// An order has changed.
@@ -488,15 +488,16 @@ func (s *Stream) handleBalanceMessage(msg *BalanceMessage) {
 }
 
 // helpers
-func (s *Stream) checkAndUpdateSequenceNumber(msgType MessageType, currentSeqNum SequenceNumberType) bool {
+func (s *Stream) checkAndUpdateSequenceNumber(msgType MessageType, productId string, currentSeqNum SequenceNumberType) bool {
 	s.lockSeqNumMap.Lock()
 	defer s.lockSeqNumMap.Unlock()
 
-	latestSeq := s.lastSequenceMsgMap[msgType]
+	key := fmt.Sprintf("%s-%s", msgType, productId)
+	latestSeq := s.lastSequenceMsgMap[key]
 	if latestSeq >= currentSeqNum {
 		return false
 	}
-	s.lastSequenceMsgMap[msgType] = currentSeqNum
+	s.lastSequenceMsgMap[key] = currentSeqNum
 	return true
 }
 
