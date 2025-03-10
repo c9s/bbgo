@@ -34,13 +34,13 @@ const (
 type OrderStatus string
 
 const (
-	OrderStatusOpen     OrderStatus = "open"
+	OrderStatusReceived OrderStatus = "received"
 	OrderStatusPending  OrderStatus = "pending"
+	OrderStatusOpen     OrderStatus = "open"
 	OrderStatusRejected OrderStatus = "rejected"
 	OrderStatusDone     OrderStatus = "done"
-	OrderStatusActive   OrderStatus = "active"
-	OrderStatusReceived OrderStatus = "received"
-	OrderStatusAll      OrderStatus = "all"
+	OrderStatusActive   OrderStatus = "active" // query only status
+	OrderStatusAll      OrderStatus = "all"    // query only status
 )
 
 type OrderType string
