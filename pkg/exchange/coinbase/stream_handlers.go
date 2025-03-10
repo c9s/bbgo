@@ -424,8 +424,6 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 		return
 	}
 	// An order has changed.
-
-	// the change message should be of modify order type
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
