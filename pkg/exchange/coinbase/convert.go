@@ -25,18 +25,12 @@ func toGlobalOrderStatus(order *api.Order) types.OrderStatus {
 	switch order.Status {
 	case api.OrderStatusRejected:
 		return types.OrderStatusRejected
-	case api.OrderStatusReceived:
-		return types.OrderStatusReceived
-	case api.OrderStatusOpen, api.OrderStatusPending:
+	case api.OrderStatusReceived, api.OrderStatusOpen, api.OrderStatusPending:
 		return types.OrderStatusNew
 	case api.OrderStatusDone:
 		switch order.DoneReason {
 		case "filled":
-			if order.FilledSize.Eq(order.Size) {
-				return types.OrderStatusFilled
-			} else {
-				return types.OrderStatusPartiallyFilled
-			}
+			return types.OrderStatusFilled
 		case "canceled":
 			return types.OrderStatusCanceled
 		case "rejected":
