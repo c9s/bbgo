@@ -28,6 +28,7 @@ type Stream struct {
 	secretKey  string
 
 	// callbacks
+	subscriptionsCallbacks            []func(m *SubscriptionsMessage)
 	statusMessageCallbacks            []func(m *StatusMessage)
 	auctionMessageCallbacks           []func(m *AuctionMessage)
 	rfqMessageCallbacks               []func(m *RfqMessage)
@@ -68,6 +69,7 @@ func NewStream(
 	s.SetHeartBeat(ping)
 
 	// private handlers
+	s.OnSubscriptions(logSubscriptions)
 	s.OnTickerMessage(s.handleTickerMessage)
 	s.OnMatchMessage(s.handleMatchMessage)
 	s.OnOrderbookSnapshotMessage(s.handleOrderBookSnapshotMessage)
@@ -83,6 +85,15 @@ func NewStream(
 	s.OnConnect(s.handleConnect)
 	s.OnDisconnect(s.handleDisconnect)
 	return &s
+}
+
+func logSubscriptions(m *SubscriptionsMessage) {
+	if m == nil {
+		return
+	}
+	for _, channel := range m.Channels {
+		log.Infof("subscribed to channel confirmed: %s (product ids: %s)", channel.Name, channel.ProductIDs)
+	}
 }
 
 func (s *Stream) dispatchEvent(e interface{}) {
