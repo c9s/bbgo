@@ -71,7 +71,7 @@ func (s *Stream) handleConnect() {
 	for _, sub := range s.Subscriptions {
 		strChannel := string(sub.Channel)
 		// rfqMatchChannel allow empty symbol
-		if sub.Channel != rfqMatchChannel && len(sub.Symbol) == 0 {
+		if sub.Channel != rfqMatchChannel && sub.Channel != "status" && len(sub.Symbol) == 0 {
 			continue
 		}
 		subProductsMap[strChannel] = append(subProductsMap[strChannel], sub.Symbol)
@@ -88,11 +88,49 @@ func (s *Stream) handleConnect() {
 		}
 		var subCmd any
 		switch channel {
-		case "ticker", "ticker_batch", "level2", "level2_batch":
+		case "status":
+			subCmd = subscribeMsgType1{
+				Type: subType,
+				Channels: []channelType{
+					{
+						Name: channel,
+					},
+				},
+			}
+		case "auctionfeed", "matches", rfqMatchChannel:
+			subCmd = subscribeMsgType1{
+				Type: subType,
+				Channels: []channelType{
+					{
+						Name:       channel,
+						ProductIDs: productIDs,
+					},
+				},
+			}
+		case "ticker", "ticker_batch":
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []string{channel},
 				ProductIDs: productIDs,
+			}
+		case "full":
+			subCmd = subscribeMsgType2{
+				Type:       subType,
+				Channels:   []string{channel},
+				ProductIDs: productIDs,
+				authMsg: authMsg{
+					Signature:  signature,
+					Key:        s.apiKey,
+					Passphrase: s.passphrase,
+					Timestamp:  ts,
+				},
+			}
+		case "level2", "level2_batch":
+			subCmd = subscribeMsgType2{
+				Type:       subType,
+				Channels:   []string{channel},
+				ProductIDs: productIDs,
+
 				authMsg: authMsg{
 					Signature:  signature,
 					Key:        s.apiKey,
@@ -122,13 +160,6 @@ func (s *Stream) handleConnect() {
 						ProductIDs: productIDs,
 					},
 				},
-
-				authMsg: authMsg{
-					Signature:  signature,
-					Key:        s.apiKey,
-					Passphrase: s.passphrase,
-					Timestamp:  ts,
-				},
 			}
 		}
 		subCmds = append(subCmds, subCmd)
@@ -145,6 +176,7 @@ func (s *Stream) handleConnect() {
 	s.lockSeqNumMap.Lock()
 	defer s.lockSeqNumMap.Unlock()
 	s.lastSequenceMsgMap = make(map[MessageType]SequenceNumberType)
+	s.workingOrdersMap = make(map[string]types.Order)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
@@ -162,7 +194,7 @@ func (s *Stream) handleConnect() {
 		// the cache is required since we do note receive the original order
 		// size in the order update messages. Hence we need the cache to find
 		// the original order size to calculate the executed quantity.
-		workingRawOrders, err := s.exchange.queryOrdersByPagination(ctx, "", []string{"received", "pending", "open", "active"})
+		workingRawOrders, err := s.exchange.queryOrdersByPagination(ctx, "", []string{"pending", "open", "active"})
 		if err != nil {
 			log.WithError(err).Warn("failed to query open orders, the orders snapshot is initialized with empty orders")
 		} else {

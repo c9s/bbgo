@@ -14,6 +14,13 @@ func parseMessage(data []byte) (interface{}, error) {
 	}
 
 	switch baseMsg.Type {
+	case "subscriptions":
+		var subMsg SubscriptionsMessage
+		err = json.Unmarshal(data, &subMsg)
+		if err != nil {
+			return nil, err
+		}
+		return &subMsg, nil
 	case "heartbeat":
 		var heartbeatMsg HeartbeatMessage
 		err = json.Unmarshal(data, &heartbeatMsg)
