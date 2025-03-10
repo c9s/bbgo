@@ -43,7 +43,7 @@ type Stream struct {
 	orderbookUpdateMessageCallbacks   []func(m *OrderBookUpdateMessage)
 
 	lockSeqNumMap      sync.Mutex // lock to protect lastSequenceMsgMap
-	lastSequenceMsgMap map[MessageType]SequenceNumberType
+	lastSequenceMsgMap map[string]SequenceNumberType
 
 	lockWorkingOrderMap sync.Mutex // lock to protect lastOrderMap
 	workingOrdersMap    map[string]types.Order
