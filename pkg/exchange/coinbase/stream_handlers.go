@@ -325,7 +325,7 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 			Symbol: toGlobalSymbol(msg.ProductID),
 			Side:   toGlobalSide(msg.Side),
 		},
-		Status:     types.OrderStatusReceived,
+		Status:     types.OrderStatusNew,
 		UUID:       msg.OrderID,
 		Exchange:   types.ExchangeCoinBase,
 		UpdateTime: types.Time(msg.Time),
