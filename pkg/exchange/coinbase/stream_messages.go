@@ -35,6 +35,12 @@ func (s *seqenceMessageType) QuoteCurrency() string {
 }
 
 // Websocket message types
+type SubscriptionsMessage struct {
+	messageBaseType
+
+	Channels []channelType `json:"channels"`
+}
+
 // heartbeat channel
 type HeartbeatMessage struct {
 	seqenceMessageType
