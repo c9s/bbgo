@@ -134,7 +134,7 @@ func TestStreamFull(t *testing.T) {
 			stream.Subscribe("full", productID, types.SubscribeOptions{})
 		}
 		// TODO: test full order life cycle
-		// received -> open -> change* -> match? -> done
+		// received -> open+ -> change* -> match? -> done
 		stream.OnReceivedMessage(func(m *ReceivedMessage) {
 			// t.Log("get received message")
 			assert.NotNil(t, m)

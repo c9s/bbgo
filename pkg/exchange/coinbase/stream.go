@@ -15,7 +15,6 @@ import (
 
 // https://docs.cdp.coinbase.com/exchange/docs/websocket-overview
 const wsFeedUrl = "wss://ws-feed.exchange.coinbase.com" // ws feeds available without auth
-const rfqMatchChannel = "rfq_matches"
 
 //go:generate callbackgen -type Stream
 type Stream struct {
