@@ -70,7 +70,7 @@ func TestStreamBasic(t *testing.T) {
 			}
 			triggered = true
 			assert.NotNil(t, m)
-			t.Log("get status message")
+			// t.Log("get status message")
 			c <- *m
 		})
 		err := stream.Connect(context.Background())
@@ -91,7 +91,7 @@ func TestStreamBasic(t *testing.T) {
 			}
 			triggered = true
 			assert.NotNil(t, m)
-			t.Logf("get ticker message: %v", *m)
+			// t.Logf("get ticker message: %v", *m)
 			c <- *m
 		})
 		err := stream.Connect(context.Background())
@@ -112,7 +112,7 @@ func TestStreamBasic(t *testing.T) {
 			}
 			triggered = true
 			assert.NotNil(t, m)
-			t.Logf("get match message: %v", *m)
+			// t.Logf("get match message: %v", *m)
 			c <- *m
 		})
 		err := stream.Connect(context.Background())
@@ -136,32 +136,32 @@ func TestStreamFull(t *testing.T) {
 		// TODO: test full order life cycle
 		// received -> open -> change* -> match? -> done
 		stream.OnReceivedMessage(func(m *ReceivedMessage) {
-			t.Log("get received message")
+			// t.Log("get received message")
 			assert.NotNil(t, m)
 			c <- true
 		})
 		stream.OnOpenMessage(func(m *OpenMessage) {
-			t.Log("get open message")
+			// t.Log("get open message")
 			assert.NotNil(t, m)
 			c <- true
 		})
 		stream.OnDoneMessage(func(m *DoneMessage) {
-			t.Log("get done message")
+			// t.Log("get done message")
 			assert.NotNil(t, m)
 			c <- true
 		})
 		stream.OnMatchMessage(func(m *MatchMessage) {
-			t.Log("get match message")
+			// t.Log("get match message")
 			assert.NotNil(t, m)
 			c <- true
 		})
 		stream.OnChangeMessage(func(m *ChangeMessage) {
-			t.Log("get change message")
+			// t.Log("get change message")
 			assert.NotNil(t, m)
 			c <- true
 		})
 		stream.OnActivateMessage(func(m *ActivateMessage) {
-			t.Log("get activate message")
+			// t.Log("get activate message")
 			assert.NotNil(t, m)
 			c <- true
 		})
@@ -183,12 +183,12 @@ func TestLevel2(t *testing.T) {
 			stream.Subscribe("level2", productID, types.SubscribeOptions{})
 		}
 		stream.OnOrderbookSnapshotMessage(func(m *OrderBookSnapshotMessage) {
-			t.Log("get orderbook snapshot message")
+			// t.Log("get orderbook snapshot message")
 			assert.NotNil(t, m)
 			c <- "snapshot"
 		})
 		stream.OnOrderbookUpdateMessage(func(m *OrderBookUpdateMessage) {
-			t.Log("get orderbook update message")
+			// t.Log("get orderbook update message")
 			assert.NotNil(t, m)
 			c <- "update"
 		})
@@ -228,7 +228,7 @@ func TestBalance(t *testing.T) {
 			}
 			triggered = true
 			assert.NotNil(t, m)
-			t.Logf("get balance message: %v", *m)
+			// t.Logf("get balance message: %v", *m)
 			c <- struct{}{}
 		})
 		err := stream.Connect(context.Background())

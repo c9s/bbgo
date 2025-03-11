@@ -173,10 +173,8 @@ func (s *Stream) handleConnect() {
 		}
 	}
 
-	s.lockSeqNumMap.Lock()
-	defer s.lockSeqNumMap.Unlock()
-	s.lastSequenceMsgMap = make(map[string]SequenceNumberType)
-	s.workingOrdersMap = make(map[string]types.Order)
+	s.clearSequenceNumber()
+	s.clearWorkingOrders()
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
@@ -208,14 +206,12 @@ func (s *Stream) handleConnect() {
 }
 
 func (s *Stream) handleDisconnect() {
-	// clear sequence numbers
-	s.lockSeqNumMap.Lock()
-	defer s.lockSeqNumMap.Unlock()
 	s.lockWorkingOrderMap.Lock()
 	defer s.lockWorkingOrderMap.Unlock()
 
-	s.lastSequenceMsgMap = make(map[string]SequenceNumberType)
-	s.workingOrdersMap = make(map[string]types.Order)
+	// clear sequence numbers
+	s.clearSequenceNumber()
+	s.clearWorkingOrders()
 }
 
 // order book, trade
@@ -360,7 +356,7 @@ func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 	// The order is now open on the order book.
 	// Getting an open message means that it's not fully filled immediately at receipt of the order or not canceled.
 	// We need to consider the case of partially filled orders here.
-	lastOrder, ok := s.workingOrdersMap[msg.OrderID]
+	lastOrder, ok := s.getOrderById(msg.OrderID)
 	if !ok {
 		log.Warnf("A new open message which is not in the working orders map: %s", msg.OrderID)
 		return
@@ -388,7 +384,7 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 		return
 	}
 	// The lastOrder is no longer on the lastOrder book.
-	lastOrder, ok := s.workingOrdersMap[msg.OrderID]
+	lastOrder, ok := s.getOrderById(msg.OrderID)
 	if !ok {
 		log.Warnf("order not found in working orders map: %s", msg.OrderID)
 		return
@@ -443,7 +439,7 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 func (s *Stream) handleActiveMessage(msg *ActivateMessage) {
 	// An activate message is sent when a stop order is placed.
 	// the stop order now becomes a limit order.
-	existing, ok := s.workingOrdersMap[msg.OrderID]
+	existing, ok := s.getOrderById(msg.OrderID)
 	if !ok {
 		log.Warnf("order not found in working orders map: %s", msg.OrderID)
 		return
@@ -501,6 +497,13 @@ func (s *Stream) checkAndUpdateSequenceNumber(msgType MessageType, productId str
 	return true
 }
 
+func (s *Stream) clearSequenceNumber() {
+	s.lockSeqNumMap.Lock()
+	defer s.lockSeqNumMap.Unlock()
+
+	s.lastSequenceMsgMap = make(map[string]SequenceNumberType)
+}
+
 func (s *Stream) updateWorkingOrders(orders ...types.Order) {
 	s.lockWorkingOrderMap.Lock()
 	defer s.lockWorkingOrderMap.Unlock()
@@ -522,4 +525,19 @@ func (s *Stream) updateWorkingOrders(orders ...types.Order) {
 			s.workingOrdersMap[order.UUID] = order
 		}
 	}
+}
+
+func (s *Stream) getOrderById(orderId string) (types.Order, bool) {
+	s.lockWorkingOrderMap.Lock()
+	defer s.lockWorkingOrderMap.Unlock()
+
+	order, ok := s.workingOrdersMap[orderId]
+	return order, ok
+}
+
+func (s *Stream) clearWorkingOrders() {
+	s.lockWorkingOrderMap.Lock()
+	defer s.lockWorkingOrderMap.Unlock()
+
+	s.workingOrdersMap = make(map[string]types.Order)
 }
