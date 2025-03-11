@@ -41,6 +41,7 @@ type Stream struct {
 	orderbookSnapshotMessageCallbacks []func(m *OrderBookSnapshotMessage)
 	orderbookUpdateMessageCallbacks   []func(m *OrderBookUpdateMessage)
 
+	authEnabled        bool
 	lockSeqNumMap      sync.Mutex // lock to protect lastSequenceMsgMap
 	lastSequenceMsgMap map[string]SequenceNumberType
 
@@ -60,6 +61,7 @@ func NewStream(
 		apiKey:         apiKey,
 		passphrase:     passphrase,
 		secretKey:      secretKey,
+		authEnabled:    len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
 	}
 	s.SetParser(parseMessage)
 	s.SetDispatcher(s.dispatchEvent)
@@ -77,7 +79,7 @@ func NewStream(
 	s.OnOpenMessage(s.handleOpenMessage)
 	s.OnDoneMessage(s.handleDoneMessage)
 	s.OnChangeMessage(s.handleChangeMessage)
-	s.OnActivateMessage(s.handleActiveMessage)
+	s.OnActivateMessage(s.handleActivateMessage)
 
 	// public handlers
 	s.OnConnect(s.handleConnect)

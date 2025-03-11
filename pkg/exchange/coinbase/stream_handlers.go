@@ -20,6 +20,7 @@ const (
 	level2Channel      types.Channel = "level2"
 	level2BatchChannel types.Channel = "level2_batch"
 	fullChannel        types.Channel = "full"
+	userChannel        types.Channel = "user"
 	balanceChannel     types.Channel = "balance"
 )
 
@@ -86,7 +87,7 @@ func (s *Stream) handleConnect() {
 		if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
 			continue
 		}
-		subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], sub.Symbol)
+		subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], toLocalSymbol(sub.Symbol))
 	}
 	var subCmds []any
 	signature, ts := s.generateSignature()
@@ -109,7 +110,7 @@ func (s *Stream) handleConnect() {
 					},
 				},
 			}
-		case auctionChannel, matchesChannel, rfqMatchChannel:
+		case auctionChannel, rfqMatchChannel:
 			subCmd = subscribeMsgType1{
 				Type: subType,
 				Channels: []channelType{
@@ -119,13 +120,32 @@ func (s *Stream) handleConnect() {
 					},
 				},
 			}
+		case matchesChannel:
+			subCmd = subscribeMsgType1{
+				Type: subType,
+				Channels: []channelType{
+					{
+						Name:       channel,
+						ProductIDs: productIDs,
+					},
+				},
+			}
+			if v, _ := subCmd.(subscribeMsgType1); s.authEnabled {
+				v.authMsg = authMsg{
+					Signature:  signature,
+					Key:        s.apiKey,
+					Passphrase: s.passphrase,
+					Timestamp:  ts,
+				}
+				subCmd = v
+			}
 		case tickerChannel, tickerBatchChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []types.Channel{channel},
 				ProductIDs: productIDs,
 			}
-		case fullChannel:
+		case fullChannel, userChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []types.Channel{channel},
@@ -171,6 +191,13 @@ func (s *Stream) handleConnect() {
 						Name:       channel,
 						ProductIDs: productIDs,
 					},
+				},
+
+				authMsg: authMsg{
+					Signature:  signature,
+					Key:        s.apiKey,
+					Passphrase: s.passphrase,
+					Timestamp:  ts,
 				},
 			}
 		}
@@ -466,7 +493,7 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 	s.EmitOrderUpdate(orderUpdate)
 }
 
-func (s *Stream) handleActiveMessage(msg *ActivateMessage) {
+func (s *Stream) handleActivateMessage(msg *ActivateMessage) {
 	// An activate message is sent when a stop order is placed.
 	// the stop order now becomes a limit order.
 	lastOrder, found := s.getOrderById(msg.OrderID)

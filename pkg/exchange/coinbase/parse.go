@@ -91,7 +91,7 @@ func parseMessage(data []byte) (interface{}, error) {
 			return nil, err
 		}
 		return &changeMsg, nil
-	case "active":
+	case "activate":
 		var activeMsg ActivateMessage
 		err = json.Unmarshal(data, &activeMsg)
 		if err != nil {
