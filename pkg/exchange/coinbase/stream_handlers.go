@@ -10,24 +10,22 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type ChannelName = string
-
 const (
-	rfqMatchChannel    ChannelName = "rfq_matches"
-	statusChannel      ChannelName = "status"
-	auctionChannel     ChannelName = "auctionfeed"
-	matchesChannel     ChannelName = "matches"
-	tickerChannel      ChannelName = "ticker"
-	tickerBatchChannel ChannelName = "ticker_batch"
-	level2Channel      ChannelName = "level2"
-	level2BatchChannel ChannelName = "level2_batch"
-	fullChannel        ChannelName = "full"
-	balanceChannel     ChannelName = "balance"
+	rfqMatchChannel    types.Channel = "rfq_matches"
+	statusChannel      types.Channel = "status"
+	auctionChannel     types.Channel = "auctionfeed"
+	matchesChannel     types.Channel = "matches"
+	tickerChannel      types.Channel = "ticker"
+	tickerBatchChannel types.Channel = "ticker_batch"
+	level2Channel      types.Channel = "level2"
+	level2BatchChannel types.Channel = "level2_batch"
+	fullChannel        types.Channel = "full"
+	balanceChannel     types.Channel = "balance"
 )
 
 type channelType struct {
-	Name       ChannelName `json:"name"`
-	ProductIDs []string    `json:"product_ids,omitempty"`
+	Name       types.Channel `json:"name"`
+	ProductIDs []string      `json:"product_ids,omitempty"`
 }
 
 func (c channelType) String() string {
@@ -57,10 +55,10 @@ func (msg subscribeMsgType1) String() string {
 }
 
 type subscribeMsgType2 struct {
-	Type       string   `json:"type"`
-	Channels   []string `json:"channels"`
-	ProductIDs []string `json:"product_ids,omitempty"`
-	AccountIDs []string `json:"account_ids,omitempty"` // for balance channel
+	Type       string          `json:"type"`
+	Channels   []types.Channel `json:"channels"`
+	ProductIDs []string        `json:"product_ids,omitempty"`
+	AccountIDs []string        `json:"account_ids,omitempty"` // for balance channel
 
 	authMsg
 }
@@ -82,27 +80,26 @@ func (s *Stream) handleConnect() {
 		return
 	}
 
-	subProductsMap := make(map[string][]string)
+	subProductsMap := make(map[types.Channel][]string)
 	for _, sub := range s.Subscriptions {
-		strChannel := string(sub.Channel)
 		// rfqMatchChannel allow empty symbol
-		if strChannel != rfqMatchChannel && strChannel != "status" && len(sub.Symbol) == 0 {
+		if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
 			continue
 		}
-		subProductsMap[strChannel] = append(subProductsMap[strChannel], sub.Symbol)
+		subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], sub.Symbol)
 	}
 	var subCmds []any
 	signature, ts := s.generateSignature()
 	for channel, productIDs := range subProductsMap {
 		var subType string
-		switch channel {
+		switch types.Channel(channel) {
 		case rfqMatchChannel:
 			subType = "subscriptions"
 		default:
 			subType = "subscribe"
 		}
 		var subCmd any
-		switch channel {
+		switch types.Channel(channel) {
 		case statusChannel:
 			subCmd = subscribeMsgType1{
 				Type: subType,
@@ -125,13 +122,13 @@ func (s *Stream) handleConnect() {
 		case tickerChannel, tickerBatchChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
-				Channels:   []string{channel},
+				Channels:   []types.Channel{channel},
 				ProductIDs: productIDs,
 			}
 		case fullChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
-				Channels:   []string{channel},
+				Channels:   []types.Channel{channel},
 				ProductIDs: productIDs,
 				authMsg: authMsg{
 					Signature:  signature,
@@ -143,7 +140,7 @@ func (s *Stream) handleConnect() {
 		case level2Channel, level2BatchChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
-				Channels:   []string{channel},
+				Channels:   []types.Channel{channel},
 				ProductIDs: productIDs,
 
 				authMsg: authMsg{
@@ -156,7 +153,7 @@ func (s *Stream) handleConnect() {
 		case balanceChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
-				Channels:   []string{channel},
+				Channels:   []types.Channel{channel},
 				AccountIDs: productIDs,
 
 				authMsg: authMsg{
@@ -373,8 +370,8 @@ func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 	// The order is now open on the order book.
 	// Getting an open message means that it's not fully filled immediately at receipt of the order or not canceled.
 	// We need to consider the case of partially filled orders here.
-	lastOrder, ok := s.getOrderById(msg.OrderID)
-	if !ok {
+	lastOrder, found := s.getOrderById(msg.OrderID)
+	if !found {
 		// the order is not in the working orders map, retrieve it via the API
 		order, err := s.retrieveOrderById(msg.OrderID)
 		if err != nil {
@@ -409,8 +406,8 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 		return
 	}
 	// The lastOrder is no longer on the lastOrder book.
-	lastOrder, ok := s.getOrderById(msg.OrderID)
-	if !ok {
+	lastOrder, found := s.getOrderById(msg.OrderID)
+	if !found {
 		// the order is not in the working orders map, retrieve it via the API
 		order, err := s.retrieveOrderById(msg.OrderID)
 		if err != nil {
@@ -472,8 +469,8 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 func (s *Stream) handleActiveMessage(msg *ActivateMessage) {
 	// An activate message is sent when a stop order is placed.
 	// the stop order now becomes a limit order.
-	lastOrder, ok := s.getOrderById(msg.OrderID)
-	if !ok {
+	lastOrder, found := s.getOrderById(msg.OrderID)
+	if !found {
 		// the order is not in the working orders map, retrieve it via the API
 		order, err := s.retrieveOrderById(msg.OrderID)
 		if err != nil {
@@ -572,8 +569,8 @@ func (s *Stream) getOrderById(orderId string) (types.Order, bool) {
 	s.lockWorkingOrderMap.Lock()
 	defer s.lockWorkingOrderMap.Unlock()
 
-	order, ok := s.workingOrdersMap[orderId]
-	return order, ok
+	order, found := s.workingOrdersMap[orderId]
+	return order, found
 }
 
 func (s *Stream) clearWorkingOrders() {

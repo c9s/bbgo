@@ -40,7 +40,7 @@ func Test_SubCmdString(t *testing.T) {
 
 	subCmd = subscribeMsgType2{
 		Type:       "subscribe",
-		Channels:   []string{},
+		Channels:   []types.Channel{},
 		ProductIDs: []string{},
 		AccountIDs: []string{},
 		authMsg: authMsg{
