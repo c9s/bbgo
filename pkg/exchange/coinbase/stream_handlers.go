@@ -207,7 +207,9 @@ func (s *Stream) handleConnect() {
 		// the cache is required since we do note receive the original order
 		// size in the order update messages. Hence we need the cache to find
 		// the original order size to calculate the executed quantity.
-		workingRawOrders, err := s.exchange.queryOrdersByPagination(ctx, "", []string{"pending", "open", "active"})
+		// empty symbol -> all symbols
+		// empty status array -> all orders that are open or un-settled
+		workingRawOrders, err := s.exchange.queryOrdersByPagination(ctx, "", []string{})
 		if err != nil {
 			log.WithError(err).Warn("failed to query open orders, the orders snapshot is initialized with empty orders")
 		} else {
@@ -327,7 +329,7 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 	}
 	if msg.OrderType == "stop" {
 		// stop order is not supported
-		log.Warnf("should not receive stop order via received channeld: %s", msg.OrderID)
+		log.Warnf("should not receive stop order via received channel: %s", msg.OrderID)
 		return
 	}
 	// A valid order has been received and is now active.
@@ -373,8 +375,16 @@ func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 	// We need to consider the case of partially filled orders here.
 	lastOrder, ok := s.getOrderById(msg.OrderID)
 	if !ok {
-		log.Warnf("A new open message which is not in the working orders map: %s", msg.OrderID)
-		return
+		// the order is not in the working orders map, retrieve it via the API
+		order, err := s.retrieveOrderById(msg.OrderID)
+		if err != nil {
+			log.Warnf(
+				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
+				msg.OrderID,
+			)
+			return
+		}
+		lastOrder = *order
 	}
 	amountExecuted := lastOrder.SubmitOrder.Quantity.Sub(msg.RemainingSize)
 	orderUpdate := types.Order{
@@ -401,8 +411,16 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 	// The lastOrder is no longer on the lastOrder book.
 	lastOrder, ok := s.getOrderById(msg.OrderID)
 	if !ok {
-		log.Warnf("order not found in working orders map: %s", msg.OrderID)
-		return
+		// the order is not in the working orders map, retrieve it via the API
+		order, err := s.retrieveOrderById(msg.OrderID)
+		if err != nil {
+			log.Warnf(
+				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
+				msg.OrderID,
+			)
+			return
+		}
+		lastOrder = *order
 	}
 	quantityExecuted := lastOrder.SubmitOrder.Quantity.Sub(msg.RemainingSize)
 	status := types.OrderStatusFilled
@@ -454,10 +472,18 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 func (s *Stream) handleActiveMessage(msg *ActivateMessage) {
 	// An activate message is sent when a stop order is placed.
 	// the stop order now becomes a limit order.
-	existing, ok := s.getOrderById(msg.OrderID)
+	lastOrder, ok := s.getOrderById(msg.OrderID)
 	if !ok {
-		log.Warnf("order not found in working orders map: %s", msg.OrderID)
-		return
+		// the order is not in the working orders map, retrieve it via the API
+		order, err := s.retrieveOrderById(msg.OrderID)
+		if err != nil {
+			log.Warnf(
+				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
+				msg.OrderID,
+			)
+			return
+		}
+		lastOrder = *order
 	}
 	var updateTime types.Time
 	timestamp, err := strconv.ParseFloat(msg.Timestamp, 64)
@@ -472,7 +498,7 @@ func (s *Stream) handleActiveMessage(msg *ActivateMessage) {
 			Type:      types.OrderTypeStopLimit,
 			Symbol:    toGlobalSymbol(msg.ProductID),
 			Side:      toGlobalSide(msg.Side),
-			Price:     existing.Price,
+			Price:     lastOrder.Price,
 			StopPrice: msg.StopPrice,
 			Quantity:  msg.Size,
 		},
@@ -555,4 +581,15 @@ func (s *Stream) clearWorkingOrders() {
 	defer s.lockWorkingOrderMap.Unlock()
 
 	s.workingOrdersMap = make(map[string]types.Order)
+}
+
+func (s *Stream) retrieveOrderById(orderId string) (*types.Order, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	order, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderID: orderId})
+	if err != nil {
+		return nil, err
+	}
+	s.updateWorkingOrders(*order)
+	return order, nil
 }
