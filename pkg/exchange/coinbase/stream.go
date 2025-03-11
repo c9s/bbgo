@@ -77,6 +77,7 @@ func NewStream(
 	s.SetHeartBeat(ping)
 
 	// private handlers
+	s.OnErrorMessage(logErrorMessage)
 	s.OnSubscriptions(logSubscriptions)
 	s.OnTickerMessage(s.handleTickerMessage)
 	s.OnMatchMessage(s.handleMatchMessage)
@@ -102,6 +103,13 @@ func logSubscriptions(m *SubscriptionsMessage) {
 	for _, channel := range m.Channels {
 		logStream.Infof("Confirmed subscription to channel: %s (product ids: %s)", channel.Name, channel.ProductIDs)
 	}
+}
+
+func logErrorMessage(m *ErrorMessage) {
+	if m == nil {
+		return
+	}
+	logStream.Errorf("Get error message: %s", m.Reason)
 }
 
 func (s *Stream) dispatchEvent(e interface{}) {
