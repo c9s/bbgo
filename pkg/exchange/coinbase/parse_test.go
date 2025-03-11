@@ -6,6 +6,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_ParseInvalidMessage(t *testing.T) {
+	data := []byte(`{"type": "invalid_type"}`)
+	msg, err := parseMessage(data)
+	assert.Error(t, err)
+	assert.Nil(t, msg)
+
+	data = []byte(`{}`)
+	msg, err = parseMessage(data)
+	assert.Error(t, err)
+	assert.Nil(t, msg)
+
+	data = []byte(`{ // broken json`)
+	msg, err = parseMessage(data)
+	assert.Error(t, err)
+	assert.Nil(t, msg)
+}
+
 func Test_ParseHeartbeat(t *testing.T) {
 	data := []byte(`
 {

@@ -10,9 +10,24 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type ChannelName = string
+
+const (
+	rfqMatchChannel    ChannelName = "rfq_matches"
+	statusChannel      ChannelName = "status"
+	auctionChannel     ChannelName = "auctionfeed"
+	matchesChannel     ChannelName = "matches"
+	tickerChannel      ChannelName = "ticker"
+	tickerBatchChannel ChannelName = "ticker_batch"
+	level2Channel      ChannelName = "level2"
+	level2BatchChannel ChannelName = "level2_batch"
+	fullChannel        ChannelName = "full"
+	balanceChannel     ChannelName = "balance"
+)
+
 type channelType struct {
-	Name       string   `json:"name"`
-	ProductIDs []string `json:"product_ids,omitempty"`
+	Name       ChannelName `json:"name"`
+	ProductIDs []string    `json:"product_ids,omitempty"`
 }
 
 func (c channelType) String() string {
@@ -71,7 +86,7 @@ func (s *Stream) handleConnect() {
 	for _, sub := range s.Subscriptions {
 		strChannel := string(sub.Channel)
 		// rfqMatchChannel allow empty symbol
-		if sub.Channel != rfqMatchChannel && sub.Channel != "status" && len(sub.Symbol) == 0 {
+		if strChannel != rfqMatchChannel && strChannel != "status" && len(sub.Symbol) == 0 {
 			continue
 		}
 		subProductsMap[strChannel] = append(subProductsMap[strChannel], sub.Symbol)
@@ -88,7 +103,7 @@ func (s *Stream) handleConnect() {
 		}
 		var subCmd any
 		switch channel {
-		case "status":
+		case statusChannel:
 			subCmd = subscribeMsgType1{
 				Type: subType,
 				Channels: []channelType{
@@ -97,7 +112,7 @@ func (s *Stream) handleConnect() {
 					},
 				},
 			}
-		case "auctionfeed", "matches", rfqMatchChannel:
+		case auctionChannel, matchesChannel, rfqMatchChannel:
 			subCmd = subscribeMsgType1{
 				Type: subType,
 				Channels: []channelType{
@@ -107,13 +122,13 @@ func (s *Stream) handleConnect() {
 					},
 				},
 			}
-		case "ticker", "ticker_batch":
+		case tickerChannel, tickerBatchChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []string{channel},
 				ProductIDs: productIDs,
 			}
-		case "full":
+		case fullChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []string{channel},
@@ -125,7 +140,7 @@ func (s *Stream) handleConnect() {
 					Timestamp:  ts,
 				},
 			}
-		case "level2", "level2_batch":
+		case level2Channel, level2BatchChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []string{channel},
@@ -138,7 +153,7 @@ func (s *Stream) handleConnect() {
 					Timestamp:  ts,
 				},
 			}
-		case "balance":
+		case balanceChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []string{channel},
