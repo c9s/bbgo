@@ -1,5 +1,7 @@
 package coinbase
 
+// TODO: support "funds" for submitting orders
+
 import (
 	"context"
 	"fmt"
