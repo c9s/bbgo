@@ -11,10 +11,15 @@ import (
 
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 )
 
 // https://docs.cdp.coinbase.com/exchange/docs/websocket-overview
 const wsFeedUrl = "wss://ws-feed.exchange.coinbase.com" // ws feeds available without auth
+var logStream = logrus.WithFields(logrus.Fields{
+	"exchange": ID,
+	"module":   "stream",
+})
 
 //go:generate callbackgen -type Stream
 type Stream struct {
@@ -26,6 +31,7 @@ type Stream struct {
 	secretKey  string
 
 	// callbacks
+	errorMessageCallbacks             []func(m *ErrorMessage)
 	subscriptionsCallbacks            []func(m *SubscriptionsMessage)
 	statusMessageCallbacks            []func(m *StatusMessage)
 	auctionMessageCallbacks           []func(m *AuctionMessage)
@@ -41,7 +47,9 @@ type Stream struct {
 	orderbookSnapshotMessageCallbacks []func(m *OrderBookSnapshotMessage)
 	orderbookUpdateMessageCallbacks   []func(m *OrderBookUpdateMessage)
 
-	authEnabled        bool
+	authEnabled   bool
+	userOrderOnly bool
+
 	lockSeqNumMap      sync.Mutex // lock to protect lastSequenceMsgMap
 	lastSequenceMsgMap map[string]SequenceNumberType
 
@@ -92,12 +100,14 @@ func logSubscriptions(m *SubscriptionsMessage) {
 		return
 	}
 	for _, channel := range m.Channels {
-		log.Infof("Confirmed subscription to channel: %s (product ids: %s)", channel.Name, channel.ProductIDs)
+		logStream.Infof("Confirmed subscription to channel: %s (product ids: %s)", channel.Name, channel.ProductIDs)
 	}
 }
 
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch e := e.(type) {
+	case *ErrorMessage:
+		s.EmitErrorMessage(e)
 	case *SubscriptionsMessage:
 		s.EmitSubscriptions(e)
 	case *StatusMessage:
@@ -127,7 +137,7 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case *OrderBookUpdateMessage:
 		s.EmitOrderbookUpdateMessage(e)
 	default:
-		log.Warnf("skip dispatching msg due to unknown message type: %T", e)
+		logStream.Warnf("skip dispatching msg due to unknown message type: %T", e)
 	}
 }
 
@@ -148,7 +158,7 @@ func (s *Stream) generateSignature() (string, string) {
 	// Decode base64 secret
 	secretBytes, err := base64.StdEncoding.DecodeString(s.secretKey)
 	if err != nil {
-		log.WithError(err).Error("failed to decode secret key")
+		logStream.WithError(err).Error("failed to decode secret key")
 		return "", ""
 	}
 
@@ -167,7 +177,7 @@ func ping(conn *websocket.Conn) error {
 
 	err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
 	if err != nil {
-		log.WithError(err).Error("ping error")
+		logStream.WithError(err).Error("ping error")
 		return err
 	}
 	return nil

@@ -41,6 +41,12 @@ type SubscriptionsMessage struct {
 	Channels []channelType `json:"channels"`
 }
 
+type ErrorMessage struct {
+	messageBaseType
+
+	Reason string `json:"reason"`
+}
+
 // heartbeat channel
 type HeartbeatMessage struct {
 	seqenceMessageType

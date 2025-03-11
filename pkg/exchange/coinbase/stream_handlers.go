@@ -89,6 +89,10 @@ func (s *Stream) handleConnect() {
 		}
 		subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], toLocalSymbol(sub.Symbol))
 	}
+
+	_, subscribeFull := subProductsMap[fullChannel]
+	s.userOrderOnly = !subscribeFull
+
 	var subCmds []any
 	signature, ts := s.generateSignature()
 	for channel, productIDs := range subProductsMap {
@@ -206,9 +210,9 @@ func (s *Stream) handleConnect() {
 	for _, subCmd := range subCmds {
 		err := s.Conn.WriteJSON(subCmd)
 		if err != nil {
-			log.WithError(err).Errorf("subscription error: %s", subCmd)
+			logStream.WithError(err).Errorf("subscription error: %s", subCmd)
 		} else {
-			log.Infof("subscribed to %s", subCmd)
+			logStream.Infof("subscribed to %s", subCmd)
 		}
 	}
 
@@ -222,7 +226,7 @@ func (s *Stream) handleConnect() {
 		// query account balances
 		balances, err := s.exchange.QueryAccountBalances(ctx)
 		if err != nil {
-			log.WithError(err).Warn("failed to query account balances, the balance snapshot is initialized with empty balances")
+			logStream.WithError(err).Warn("failed to query account balances, the balance snapshot is initialized with empty balances")
 			balances = make(types.BalanceMap)
 		}
 		s.EmitBalanceSnapshot(balances)
@@ -235,7 +239,7 @@ func (s *Stream) handleConnect() {
 		// empty status array -> all orders that are open or un-settled
 		workingRawOrders, err := s.exchange.queryOrdersByPagination(ctx, "", []string{})
 		if err != nil {
-			log.WithError(err).Warn("failed to query open orders, the orders snapshot is initialized with empty orders")
+			logStream.WithError(err).Warn("failed to query open orders, the orders snapshot is initialized with empty orders")
 		} else {
 			openOrders := make([]types.Order, 0, len(workingRawOrders))
 			for _, rawOrder := range workingRawOrders {
@@ -331,7 +335,7 @@ func (s *Stream) handleOrderbookUpdateMessage(msg *OrderBookUpdateMessage) {
 				Volume: volume,
 			})
 		default:
-			log.Warnf("unknown order book update side: %s", side)
+			logStream.Warnf("unknown order book update side: %s", side)
 		}
 	}
 	if len(bids) > 0 || len(asks) > 0 {
@@ -353,7 +357,7 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 	}
 	if msg.OrderType == "stop" {
 		// stop order is not supported
-		log.Warnf("should not receive stop order via received channel: %s", msg.OrderID)
+		logStream.Warnf("should not receive stop order via received channel: %s", msg.OrderID)
 		return
 	}
 	// A valid order has been received and is now active.
@@ -377,13 +381,13 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 		// NOTE: the Exchange.SubmitOrder method garantees that the market order does not support funds.
 		// So we simply check the size for market order here.
 		if msg.Size.IsZero() {
-			log.Warnf("received empty order size, dropped: %s", msg.OrderID)
+			logStream.Warnf("received empty order size, dropped: %s", msg.OrderID)
 			return
 		}
 		orderUpdate.SubmitOrder.Type = types.OrderTypeMarket
 		orderUpdate.SubmitOrder.Quantity = msg.Size
 	default:
-		log.Warnf("unknown order type, dropped: %s", msg.OrderType)
+		logStream.Warnf("unknown order type, dropped: %s", msg.OrderType)
 		return
 	}
 	s.updateWorkingOrders(orderUpdate)
@@ -402,7 +406,7 @@ func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 		// the order is not in the working orders map, retrieve it via the API
 		order, err := s.retrieveOrderById(msg.OrderID)
 		if err != nil {
-			log.Warnf(
+			logStream.Warnf(
 				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
 				msg.OrderID,
 			)
@@ -438,7 +442,7 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 		// the order is not in the working orders map, retrieve it via the API
 		order, err := s.retrieveOrderById(msg.OrderID)
 		if err != nil {
-			log.Warnf(
+			logStream.Warnf(
 				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
 				msg.OrderID,
 			)
@@ -477,6 +481,18 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 		return
 	}
 	// An order has changed.
+	_, found := s.getOrderById(msg.OrderID)
+	if !found {
+		// We assume the change should only apply to the orders that are cached in the working orders map.
+		// The rationale is that
+		// 1. If the order is submitted after the connection is established, there should be a received/open message
+		//    before the change message. So we should have the order in the working orders map.
+		// 2. If the order is submitted before the connection is established, it should be cached in the working orders map
+		//    since the map is created on connection.
+		// Skip the message if not found since it should be orders that are not belong to the user.
+		logStream.Warnf("the order is not found in the cache: %s. Skipped the change", msg.OrderID)
+		return
+	}
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
@@ -501,7 +517,7 @@ func (s *Stream) handleActivateMessage(msg *ActivateMessage) {
 		// the order is not in the working orders map, retrieve it via the API
 		order, err := s.retrieveOrderById(msg.OrderID)
 		if err != nil {
-			log.Warnf(
+			logStream.Warnf(
 				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
 				msg.OrderID,
 			)
@@ -610,6 +626,12 @@ func (s *Stream) clearWorkingOrders() {
 func (s *Stream) retrieveOrderById(orderId string) (*types.Order, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
+
+	if !s.userOrderOnly {
+		msg := fmt.Sprintf("retrieve order by id disabled on a stream feeds including non-user orders: %s", orderId)
+		logStream.Warn(msg)
+		return nil, fmt.Errorf(msg)
+	}
 	order, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderID: orderId})
 	if err != nil {
 		return nil, err

@@ -4,6 +4,16 @@ package coinbase
 
 import ()
 
+func (s *Stream) OnErrorMessage(cb func(m *ErrorMessage)) {
+	s.errorMessageCallbacks = append(s.errorMessageCallbacks, cb)
+}
+
+func (s *Stream) EmitErrorMessage(m *ErrorMessage) {
+	for _, cb := range s.errorMessageCallbacks {
+		cb(m)
+	}
+}
+
 func (s *Stream) OnSubscriptions(cb func(m *SubscriptionsMessage)) {
 	s.subscriptionsCallbacks = append(s.subscriptionsCallbacks, cb)
 }
