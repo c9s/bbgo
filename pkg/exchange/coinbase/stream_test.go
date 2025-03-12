@@ -78,6 +78,8 @@ func TestStreamBasic(t *testing.T) {
 		case <-time.After(time.Second * 10):
 			t.Fatal("No message from status channel after 10 seconds")
 		}
+		err = stream.Close()
+		assert.NoError(t, err)
 	})
 
 	t.Run("Test Ticker", func(t *testing.T) {
@@ -101,6 +103,8 @@ func TestStreamBasic(t *testing.T) {
 		case <-time.After(time.Second * 10):
 			t.Fatal("No message from ticker channel after 10 seconds")
 		}
+		err = stream.Close()
+		assert.NoError(t, err)
 	})
 
 	t.Run("Test Match", func(t *testing.T) {
@@ -126,6 +130,8 @@ func TestStreamBasic(t *testing.T) {
 		case <-time.After(time.Second * 10):
 			t.Fatal("No message from match channel after 10 seconds")
 		}
+		err = stream.Close()
+		assert.NoError(t, err)
 	})
 
 	// TODO: test Rfq message
@@ -179,6 +185,8 @@ func TestStreamFull(t *testing.T) {
 		case <-time.After(time.Second * 10):
 			t.Fatal("No message from full channel after 10 seconds")
 		}
+		err = stream.Close()
+		assert.NoError(t, err)
 	})
 
 }
@@ -225,6 +233,8 @@ func TestLevel2(t *testing.T) {
 				break
 			}
 		}
+		err = stream.Close()
+		assert.NoError(t, err)
 	})
 }
 
@@ -251,6 +261,8 @@ func TestBalance(t *testing.T) {
 		case <-time.After(time.Second * 10):
 			t.Fatal("No message from balance channel after 10 seconds")
 		}
+		err = stream.Close()
+		assert.NoError(t, err)
 	})
 }
 
