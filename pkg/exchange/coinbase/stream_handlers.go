@@ -3,16 +3,30 @@ package coinbase
 import (
 	"context"
 	"fmt"
-	"strings"
+	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+const (
+	rfqMatchChannel    types.Channel = "rfq_matches"
+	statusChannel      types.Channel = "status"
+	auctionChannel     types.Channel = "auctionfeed"
+	matchesChannel     types.Channel = "matches"
+	tickerChannel      types.Channel = "ticker"
+	tickerBatchChannel types.Channel = "ticker_batch"
+	level2Channel      types.Channel = "level2"
+	level2BatchChannel types.Channel = "level2_batch"
+	fullChannel        types.Channel = "full"
+	userChannel        types.Channel = "user"
+	balanceChannel     types.Channel = "balance"
+)
+
 type channelType struct {
-	Name       string   `json:"name"`
-	ProductIDs []string `json:"product_ids,omitempty"`
+	Name       types.Channel `json:"name"`
+	ProductIDs []string      `json:"product_ids,omitempty"`
 }
 
 func (c channelType) String() string {
@@ -42,10 +56,10 @@ func (msg subscribeMsgType1) String() string {
 }
 
 type subscribeMsgType2 struct {
-	Type       string   `json:"type"`
-	Channels   []string `json:"channels"`
-	ProductIDs []string `json:"product_ids,omitempty"`
-	AccountIDs []string `json:"account_ids,omitempty"` // for balance channel
+	Type       string          `json:"type"`
+	Channels   []types.Channel `json:"channels"`
+	ProductIDs []string        `json:"product_ids,omitempty"`
+	AccountIDs []string        `json:"account_ids,omitempty"` // for balance channel
 
 	authMsg
 }
@@ -67,31 +81,78 @@ func (s *Stream) handleConnect() {
 		return
 	}
 
-	subProductsMap := make(map[string][]string)
+	subProductsMap := make(map[types.Channel][]string)
 	for _, sub := range s.Subscriptions {
-		strChannel := string(sub.Channel)
 		// rfqMatchChannel allow empty symbol
-		if sub.Channel != rfqMatchChannel && len(sub.Symbol) == 0 {
+		if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
 			continue
 		}
-		subProductsMap[strChannel] = append(subProductsMap[strChannel], sub.Symbol)
+		subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], toLocalSymbol(sub.Symbol))
 	}
+
+	_, subscribeFull := subProductsMap[fullChannel]
+	s.userOrderOnly = !subscribeFull
+
 	var subCmds []any
 	signature, ts := s.generateSignature()
 	for channel, productIDs := range subProductsMap {
 		var subType string
-		switch channel {
-		case "rfq_matches":
+		switch types.Channel(channel) {
+		case rfqMatchChannel:
 			subType = "subscriptions"
 		default:
 			subType = "subscribe"
 		}
 		var subCmd any
-		switch channel {
-		case "ticker", "ticker_batch", "level2", "level2_batch":
+		switch types.Channel(channel) {
+		case statusChannel:
+			subCmd = subscribeMsgType1{
+				Type: subType,
+				Channels: []channelType{
+					{
+						Name: channel,
+					},
+				},
+			}
+		case auctionChannel, rfqMatchChannel:
+			subCmd = subscribeMsgType1{
+				Type: subType,
+				Channels: []channelType{
+					{
+						Name:       channel,
+						ProductIDs: productIDs,
+					},
+				},
+			}
+		case matchesChannel:
+			subCmd = subscribeMsgType1{
+				Type: subType,
+				Channels: []channelType{
+					{
+						Name:       channel,
+						ProductIDs: productIDs,
+					},
+				},
+			}
+			if v, _ := subCmd.(subscribeMsgType1); s.authEnabled {
+				v.authMsg = authMsg{
+					Signature:  signature,
+					Key:        s.apiKey,
+					Passphrase: s.passphrase,
+					Timestamp:  ts,
+				}
+				subCmd = v
+			}
+		case tickerChannel, tickerBatchChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
-				Channels:   []string{channel},
+				Channels:   []types.Channel{channel},
+				ProductIDs: productIDs,
+			}
+		case fullChannel, userChannel:
+			subCmd = subscribeMsgType2{
+				Type:       subType,
+				Channels:   []types.Channel{channel},
 				ProductIDs: productIDs,
 				authMsg: authMsg{
 					Signature:  signature,
@@ -100,10 +161,23 @@ func (s *Stream) handleConnect() {
 					Timestamp:  ts,
 				},
 			}
-		case "balance":
+		case level2Channel, level2BatchChannel:
 			subCmd = subscribeMsgType2{
 				Type:       subType,
-				Channels:   []string{channel},
+				Channels:   []types.Channel{channel},
+				ProductIDs: productIDs,
+
+				authMsg: authMsg{
+					Signature:  signature,
+					Key:        s.apiKey,
+					Passphrase: s.passphrase,
+					Timestamp:  ts,
+				},
+			}
+		case balanceChannel:
+			subCmd = subscribeMsgType2{
+				Type:       subType,
+				Channels:   []types.Channel{channel},
 				AccountIDs: productIDs,
 
 				authMsg: authMsg{
@@ -136,39 +210,56 @@ func (s *Stream) handleConnect() {
 	for _, subCmd := range subCmds {
 		err := s.Conn.WriteJSON(subCmd)
 		if err != nil {
-			log.WithError(err).Errorf("subscription error: %s", subCmd)
+			logStream.WithError(err).Errorf("subscription error: %s", subCmd)
 		} else {
-			log.Infof("subscribed to %s", subCmd)
+			logStream.Infof("subscribed to %s", subCmd)
 		}
 	}
 
-	// emit balance snapshot on connection
+	s.clearSequenceNumber()
+	s.clearWorkingOrders()
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 
+		// emit balance snapshot on connection
 		// query account balances
 		balances, err := s.exchange.QueryAccountBalances(ctx)
 		if err != nil {
-			log.WithError(err).Warn("failed to query account balances, the balance snapshot is initialized with empty balances")
+			logStream.WithError(err).Warn("failed to query account balances, the balance snapshot is initialized with empty balances")
 			balances = make(types.BalanceMap)
 		}
 		s.EmitBalanceSnapshot(balances)
+
+		// query working orders and cache them
+		// the cache is required since we do note receive the original order
+		// size in the order update messages. Hence we need the cache to find
+		// the original order size to calculate the executed quantity.
+		// empty symbol -> all symbols
+		// empty status array -> all orders that are open or un-settled
+		workingRawOrders, err := s.exchange.queryOrdersByPagination(ctx, "", []string{})
+		if err != nil {
+			logStream.WithError(err).Warn("failed to query open orders, the orders snapshot is initialized with empty orders")
+		} else {
+			openOrders := make([]types.Order, 0, len(workingRawOrders))
+			for _, rawOrder := range workingRawOrders {
+				openOrders = append(openOrders, toGlobalOrder(&rawOrder))
+			}
+			s.updateWorkingOrders(openOrders...)
+		}
 	}()
 }
 
 func (s *Stream) handleDisconnect() {
 	// clear sequence numbers
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.lastSequenceMsgMap = make(map[MessageType]SequenceNumberType)
+	s.clearSequenceNumber()
+	s.clearWorkingOrders()
 }
 
 // order book, trade
 func (s *Stream) handleTickerMessage(msg *TickerMessage) {
 	// ignore outdated messages
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	trade := msg.Trade()
@@ -177,7 +268,7 @@ func (s *Stream) handleTickerMessage(msg *TickerMessage) {
 
 func (s *Stream) handleMatchMessage(msg *MatchMessage) {
 	// ignore outdated messages
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
 	trade := msg.Trade()
@@ -241,7 +332,7 @@ func (s *Stream) handleOrderbookUpdateMessage(msg *OrderBookUpdateMessage) {
 				Volume: volume,
 			})
 		default:
-			log.Warnf("unknown order book update side: %s", side)
+			logStream.Warnf("unknown order book update side: %s", side)
 		}
 	}
 	if len(bids) > 0 || len(asks) > 0 {
@@ -258,80 +349,152 @@ func (s *Stream) handleOrderbookUpdateMessage(msg *OrderBookUpdateMessage) {
 
 // order update
 func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
-
+	if msg.OrderType == "stop" {
+		// stop order is not supported
+		logStream.Warnf("should not receive stop order via received channel: %s", msg.OrderID)
+		return
+	}
+	// A valid order has been received and is now active.
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
-			Symbol:   toGlobalSymbol(msg.ProductID),
-			Side:     toGlobalSide(msg.Side),
-			Price:    msg.Price,
-			Quantity: msg.Size,
-			Type:     types.OrderType(strings.ToUpper(msg.OrderType)),
+			Symbol: toGlobalSymbol(msg.ProductID),
+			Side:   toGlobalSide(msg.Side),
 		},
+		Status:     types.OrderStatusNew,
+		UUID:       msg.OrderID,
 		Exchange:   types.ExchangeCoinBase,
 		UpdateTime: types.Time(msg.Time),
 		IsWorking:  true,
 	}
+	switch msg.OrderType {
+	case "limit":
+		orderUpdate.SubmitOrder.Type = types.OrderTypeLimit
+		orderUpdate.SubmitOrder.Price = msg.Price
+		orderUpdate.SubmitOrder.Quantity = msg.Size
+	case "market":
+		// NOTE: the Exchange.SubmitOrder method garantees that the market order does not support funds.
+		// So we simply check the size for market order here.
+		if msg.Size.IsZero() {
+			logStream.Warnf("received empty order size, dropped: %s", msg.OrderID)
+			return
+		}
+		orderUpdate.SubmitOrder.Type = types.OrderTypeMarket
+		orderUpdate.SubmitOrder.Quantity = msg.Size
+	default:
+		logStream.Warnf("unknown order type, dropped: %s", msg.OrderType)
+		return
+	}
+	s.updateWorkingOrders(orderUpdate)
 	s.EmitOrderUpdate(orderUpdate)
 }
 
 func (s *Stream) handleOpenMessage(msg *OpenMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
+	// The order is now open on the order book.
+	// Getting an open message means that it's not fully filled immediately at receipt of the order or not canceled.
+	// We need to consider the case of partially filled orders here.
+	lastOrder, found := s.getOrderById(msg.OrderID)
+	if !found {
+		// the order is not in the working orders map, retrieve it via the API
+		order, err := s.retrieveOrderById(msg.OrderID)
+		if err != nil {
+			logStream.Warnf(
+				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
+				msg.OrderID,
+			)
+			return
+		}
+		lastOrder = *order
+	}
+	amountExecuted := lastOrder.SubmitOrder.Quantity.Sub(msg.RemainingSize)
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
 			Side:     toGlobalSide(msg.Side),
 			Price:    msg.Price,
-			Quantity: msg.RemainingSize,
+			Quantity: lastOrder.Quantity,
 		},
-		UUID:       msg.OrderID,
-		Exchange:   types.ExchangeCoinBase,
-		IsWorking:  true,
-		UpdateTime: types.Time(msg.Time),
+		ExecutedQuantity: amountExecuted,
+		Status:           types.OrderStatusNew,
+		UUID:             msg.OrderID,
+		Exchange:         types.ExchangeCoinBase,
+		IsWorking:        true,
+		UpdateTime:       types.Time(msg.Time),
 	}
 	s.EmitOrderUpdate(orderUpdate)
 }
 
 func (s *Stream) handleDoneMessage(msg *DoneMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
-	isWorking := true
-	if msg.Reason == "canceled" {
-		isWorking = false
+	// The lastOrder is no longer on the lastOrder book.
+	lastOrder, found := s.getOrderById(msg.OrderID)
+	if !found {
+		// the order is not in the working orders map, retrieve it via the API
+		order, err := s.retrieveOrderById(msg.OrderID)
+		if err != nil {
+			logStream.Warnf(
+				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
+				msg.OrderID,
+			)
+			return
+		}
+		lastOrder = *order
 	}
+	quantityExecuted := lastOrder.SubmitOrder.Quantity.Sub(msg.RemainingSize)
+	status := types.OrderStatusFilled
+	if msg.Reason == "canceled" {
+		status = types.OrderStatusCanceled
+	} else {
+		status = types.OrderStatusFilled
+	}
+
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
 			Side:     toGlobalSide(msg.Side),
 			Price:    msg.Price,
-			Quantity: msg.RemainingSize,
+			Quantity: lastOrder.Quantity,
 		},
-		UUID:       msg.OrderID,
-		Exchange:   types.ExchangeCoinBase,
-		IsWorking:  isWorking,
-		UpdateTime: types.Time(msg.Time),
+		Status:           status,
+		UUID:             msg.OrderID,
+		Exchange:         types.ExchangeCoinBase,
+		ExecutedQuantity: quantityExecuted,
+		IsWorking:        false,
+		UpdateTime:       types.Time(msg.Time),
 	}
+	s.updateWorkingOrders(orderUpdate)
 	s.EmitOrderUpdate(orderUpdate)
 }
 
 func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
-	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.Sequence) {
+	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
-	price := msg.Price
-	if msg.Reason == "modify_order" {
-		price = msg.NewPrice
+	// An order has changed.
+	_, found := s.getOrderById(msg.OrderID)
+	if !found {
+		// We assume the change should only apply to the orders that are cached in the working orders map.
+		// The rationale is that
+		// 1. If the order is submitted after the connection is established, there should be a received/open message
+		//    before the change message. So we should have the order in the working orders map.
+		// 2. If the order is submitted before the connection is established, it should be cached in the working orders map
+		//    since the map is created on connection.
+		// Skip the message if not found since it should be orders that are not belong to the user.
+		logStream.Warnf("the order is not found in the cache: %s. Skipped the change", msg.OrderID)
+		return
 	}
 	orderUpdate := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			Symbol:   toGlobalSymbol(msg.ProductID),
 			Side:     toGlobalSide(msg.Side),
-			Price:    price,
+			Price:    msg.NewPrice,
 			Quantity: msg.NewSize,
 		},
 		UUID:       msg.OrderID,
@@ -339,7 +502,51 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 		IsWorking:  true,
 		UpdateTime: types.Time(msg.Time),
 	}
+	s.updateWorkingOrders(orderUpdate)
 	s.EmitOrderUpdate(orderUpdate)
+}
+
+func (s *Stream) handleActivateMessage(msg *ActivateMessage) {
+	// An activate message is sent when a stop order is placed.
+	// the stop order now becomes a limit order.
+	lastOrder, found := s.getOrderById(msg.OrderID)
+	if !found {
+		// the order is not in the working orders map, retrieve it via the API
+		order, err := s.retrieveOrderById(msg.OrderID)
+		if err != nil {
+			logStream.Warnf(
+				"the order is not found in the cache and cannot be retrieved via API: %s. Skipped",
+				msg.OrderID,
+			)
+			return
+		}
+		lastOrder = *order
+	}
+	var updateTime types.Time
+	timestamp, err := strconv.ParseFloat(msg.Timestamp, 64)
+	if err != nil {
+		updateTime = types.Time(time.Now())
+	} else {
+		updateTime = types.Time(time.UnixMilli(int64(timestamp * 1000)))
+	}
+	// do no consider limit order with funds
+	order := types.Order{
+		SubmitOrder: types.SubmitOrder{
+			Type:      types.OrderTypeStopLimit,
+			Symbol:    toGlobalSymbol(msg.ProductID),
+			Side:      toGlobalSide(msg.Side),
+			Price:     lastOrder.Price,
+			StopPrice: msg.StopPrice,
+			Quantity:  msg.Size,
+		},
+		Status:     types.OrderStatusNew,
+		UUID:       msg.OrderID,
+		Exchange:   types.ExchangeCoinBase,
+		IsWorking:  true,
+		UpdateTime: updateTime,
+	}
+	s.updateWorkingOrders(order)
+	s.EmitOrderUpdate(order)
 }
 
 // balance update
@@ -355,14 +562,77 @@ func (s *Stream) handleBalanceMessage(msg *BalanceMessage) {
 }
 
 // helpers
-func (s *Stream) checkAndUpdateSequenceNumber(msgType MessageType, currentSeqNum SequenceNumberType) bool {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (s *Stream) checkAndUpdateSequenceNumber(msgType MessageType, productId string, currentSeqNum SequenceNumberType) bool {
+	s.lockSeqNumMap.Lock()
+	defer s.lockSeqNumMap.Unlock()
 
-	latestSeq := s.lastSequenceMsgMap[msgType]
+	key := fmt.Sprintf("%s-%s", msgType, productId)
+	latestSeq := s.lastSequenceMsgMap[key]
 	if latestSeq >= currentSeqNum {
 		return false
 	}
-	s.lastSequenceMsgMap[msgType] = currentSeqNum
+	s.lastSequenceMsgMap[key] = currentSeqNum
 	return true
+}
+
+func (s *Stream) clearSequenceNumber() {
+	s.lockSeqNumMap.Lock()
+	defer s.lockSeqNumMap.Unlock()
+
+	s.lastSequenceMsgMap = make(map[string]SequenceNumberType)
+}
+
+func (s *Stream) updateWorkingOrders(orders ...types.Order) {
+	s.lockWorkingOrderMap.Lock()
+	defer s.lockWorkingOrderMap.Unlock()
+
+	for _, order := range orders {
+		exisiting, ok := s.workingOrdersMap[order.UUID]
+		if ok {
+			if !order.IsWorking {
+				// order is already in the map and not working, remove it
+				delete(s.workingOrdersMap, order.UUID)
+				continue
+			} else {
+				// order is already in the map and working, update it
+				exisiting.Update(order)
+				s.workingOrdersMap[order.UUID] = exisiting
+			}
+		} else {
+			// order is not in the map, add it
+			s.workingOrdersMap[order.UUID] = order
+		}
+	}
+}
+
+func (s *Stream) getOrderById(orderId string) (types.Order, bool) {
+	s.lockWorkingOrderMap.Lock()
+	defer s.lockWorkingOrderMap.Unlock()
+
+	order, found := s.workingOrdersMap[orderId]
+	return order, found
+}
+
+func (s *Stream) clearWorkingOrders() {
+	s.lockWorkingOrderMap.Lock()
+	defer s.lockWorkingOrderMap.Unlock()
+
+	s.workingOrdersMap = make(map[string]types.Order)
+}
+
+func (s *Stream) retrieveOrderById(orderId string) (*types.Order, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	if !s.userOrderOnly {
+		msg := fmt.Sprintf("retrieve order by id disabled on a stream feeds including non-user orders: %s", orderId)
+		logStream.Warn(msg)
+		return nil, fmt.Errorf(msg)
+	}
+	order, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderID: orderId})
+	if err != nil {
+		return nil, err
+	}
+	s.updateWorkingOrders(*order)
+	return order, nil
 }

@@ -5,15 +5,21 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"strconv"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 )
 
-const wsFeedURL = "wss://ws-feed.exchange.coinbase.com"
-const rfqMatchChannel = "rfq_matches"
+// https://docs.cdp.coinbase.com/exchange/docs/websocket-overview
+const wsFeedUrl = "wss://ws-feed.exchange.coinbase.com" // ws feeds available without auth
+var logStream = logrus.WithFields(logrus.Fields{
+	"exchange": ID,
+	"module":   "stream",
+})
 
 //go:generate callbackgen -type Stream
 type Stream struct {
@@ -25,6 +31,8 @@ type Stream struct {
 	secretKey  string
 
 	// callbacks
+	errorMessageCallbacks             []func(m *ErrorMessage)
+	subscriptionsCallbacks            []func(m *SubscriptionsMessage)
 	statusMessageCallbacks            []func(m *StatusMessage)
 	auctionMessageCallbacks           []func(m *AuctionMessage)
 	rfqMessageCallbacks               []func(m *RfqMessage)
@@ -39,8 +47,14 @@ type Stream struct {
 	orderbookSnapshotMessageCallbacks []func(m *OrderBookSnapshotMessage)
 	orderbookUpdateMessageCallbacks   []func(m *OrderBookUpdateMessage)
 
-	lock               sync.Mutex // lock to protect lastSequenceMsgMap
-	lastSequenceMsgMap map[MessageType]SequenceNumberType
+	authEnabled   bool
+	userOrderOnly bool
+
+	lockSeqNumMap      sync.Mutex // lock to protect lastSequenceMsgMap
+	lastSequenceMsgMap map[string]SequenceNumberType
+
+	lockWorkingOrderMap sync.Mutex // lock to protect lastOrderMap
+	workingOrdersMap    map[string]types.Order
 }
 
 func NewStream(
@@ -55,12 +69,16 @@ func NewStream(
 		apiKey:         apiKey,
 		passphrase:     passphrase,
 		secretKey:      secretKey,
+		authEnabled:    len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
 	}
 	s.SetParser(parseMessage)
 	s.SetDispatcher(s.dispatchEvent)
-	s.SetEndpointCreator(createEndpoint)
+	s.SetEndpointCreator(s.createEndpoint)
+	s.SetHeartBeat(ping)
 
 	// private handlers
+	s.OnErrorMessage(logErrorMessage)
+	s.OnSubscriptions(logSubscriptions)
 	s.OnTickerMessage(s.handleTickerMessage)
 	s.OnMatchMessage(s.handleMatchMessage)
 	s.OnOrderbookSnapshotMessage(s.handleOrderBookSnapshotMessage)
@@ -68,6 +86,9 @@ func NewStream(
 	s.OnBalanceMessage(s.handleBalanceMessage)
 	s.OnReceivedMessage(s.handleReceivedMessage)
 	s.OnOpenMessage(s.handleOpenMessage)
+	s.OnDoneMessage(s.handleDoneMessage)
+	s.OnChangeMessage(s.handleChangeMessage)
+	s.OnActivateMessage(s.handleActivateMessage)
 
 	// public handlers
 	s.OnConnect(s.handleConnect)
@@ -75,8 +96,28 @@ func NewStream(
 	return &s
 }
 
+func logSubscriptions(m *SubscriptionsMessage) {
+	if m == nil {
+		return
+	}
+	for _, channel := range m.Channels {
+		logStream.Infof("Confirmed subscription to channel: %s (product ids: %s)", channel.Name, channel.ProductIDs)
+	}
+}
+
+func logErrorMessage(m *ErrorMessage) {
+	if m == nil {
+		return
+	}
+	logStream.Errorf("Get error message: %s", m.Reason)
+}
+
 func (s *Stream) dispatchEvent(e interface{}) {
 	switch e := e.(type) {
+	case *ErrorMessage:
+		s.EmitErrorMessage(e)
+	case *SubscriptionsMessage:
+		s.EmitSubscriptions(e)
 	case *StatusMessage:
 		s.EmitStatusMessage(e)
 	case *AuctionMessage:
@@ -104,16 +145,12 @@ func (s *Stream) dispatchEvent(e interface{}) {
 	case *OrderBookUpdateMessage:
 		s.EmitOrderbookUpdateMessage(e)
 	default:
-		log.Warnf("skip dispatching msg due to unknown message type: %T", e)
+		logStream.Warnf("skip dispatching msg due to unknown message type: %T", e)
 	}
 }
 
-func createEndpoint(ctx context.Context) (string, error) {
-	return wsFeedURL, nil
-}
-
-func (s *Stream) AuthEnabled() bool {
-	return !s.PublicOnly && len(s.apiKey) > 0 && len(s.passphrase) > 0 && len(s.secretKey) > 0
+func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
+	return wsFeedUrl, nil
 }
 
 func (s *Stream) generateSignature() (string, string) {
@@ -121,7 +158,7 @@ func (s *Stream) generateSignature() (string, string) {
 		return "", ""
 	}
 	// Convert current time to string timestamp
-	ts := strconv.FormatInt(time.Now().Unix(), 10)
+	ts := fmt.Sprintf("%d", time.Now().Unix())
 
 	// Create message string
 	message := ts + "GET/users/self/verify"
@@ -129,7 +166,7 @@ func (s *Stream) generateSignature() (string, string) {
 	// Decode base64 secret
 	secretBytes, err := base64.StdEncoding.DecodeString(s.secretKey)
 	if err != nil {
-		log.WithError(err).Error("failed to decode secret key")
+		logStream.WithError(err).Error("failed to decode secret key")
 		return "", ""
 	}
 
@@ -141,4 +178,15 @@ func (s *Stream) generateSignature() (string, string) {
 	signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
 	return signature, ts
+}
+
+func ping(conn *websocket.Conn) error {
+	writeWait := 10 * time.Second
+
+	err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
+	if err != nil {
+		logStream.WithError(err).Error("ping error")
+		return err
+	}
+	return nil
 }

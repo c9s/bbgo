@@ -1,5 +1,7 @@
 package coinbase
 
+// TODO: support "funds" for submitting orders
+
 import (
 	"context"
 	"fmt"
@@ -125,9 +127,14 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 
 // ExchangeTradeService
 // For the stop-limit order, we only support the long position
+// For the market order, though Coinbase supports both funds and size, we only support size in order to simplify the stream handler logic
+// We do not support limit order with funds.
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
 	if len(order.Market.Symbol) == 0 {
 		return nil, fmt.Errorf("order.Market.Symbol is required: %+v", order)
+	}
+	if order.Quantity.IsZero() {
+		return nil, fmt.Errorf("order.Quantity is required: %+v", order)
 	}
 	req := e.client.NewCreateOrderRequest().ProductID(toLocalSymbol(order.Market.Symbol))
 
@@ -162,28 +169,21 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	// set price and quanity
 	switch order.Type {
 	case types.OrderTypeLimit:
-		req.Price(order.Price)
+		if order.Price.IsZero() || order.Quantity.IsZero() {
+			return nil, fmt.Errorf("order.Price and order.Quantity are required for limit order: %+v", order)
+		}
 		req.Size(order.Quantity)
+		req.Price(order.Price)
 	case types.OrderTypeMarket:
-		switch order.Side {
-		case types.SideTypeBuy:
-			// buy with market price
-			ticker, err := e.QueryTicker(ctx, order.Market.Symbol)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to get ticker for market order: %v", order.Market.Symbol)
-			}
-			funds := ticker.Buy.Mul(order.Quantity)
-			req.Funds(funds)
-		case types.SideTypeSell:
-			req.Size(order.Quantity)
-		default:
-			return nil, fmt.Errorf("unsupported side for market order: %v", order.Side)
+		req.Size(order.Quantity)
+		if !order.Price.IsZero() {
+			log.Warning("the price is ignored for market order")
 		}
 	case types.OrderTypeStopLimit:
+		req.Size(order.Quantity)
 		req.StopPrice(order.StopPrice)
 		req.Price(order.Price)
 		req.StopLimitPrice(order.Price)
-		req.Size(order.Quantity)
 	default:
 		return nil, fmt.Errorf("unsupported order type: %v", order.Type)
 	}
@@ -246,7 +246,11 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 	sorting := "desc"
 	localSymbol := toLocalSymbol(symbol)
 	getOrdersReq := e.client.NewGetOrdersRequest()
-	getOrdersReq.ProductID(localSymbol).Status(status).SortedBy(sortedBy).Sorting(sorting).Limit(PaginationLimit)
+	getOrdersReq.Status(status).SortedBy(sortedBy).Sorting(sorting).Limit(PaginationLimit)
+	// query all orders if symbol is empty
+	if len(localSymbol) > 0 {
+		getOrdersReq.ProductID(localSymbol)
+	}
 	cbOrders, err := getOrdersReq.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get orders")
