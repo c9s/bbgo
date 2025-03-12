@@ -251,9 +251,6 @@ func (s *Stream) handleConnect() {
 }
 
 func (s *Stream) handleDisconnect() {
-	s.lockWorkingOrderMap.Lock()
-	defer s.lockWorkingOrderMap.Unlock()
-
 	// clear sequence numbers
 	s.clearSequenceNumber()
 	s.clearWorkingOrders()
