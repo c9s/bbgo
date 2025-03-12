@@ -6,6 +6,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_ParseInvalidMessage(t *testing.T) {
+	data := []byte(`{"type": "invalid_type"}`)
+	msg, err := parseMessage(data)
+	assert.Error(t, err)
+	assert.Nil(t, msg)
+
+	data = []byte(`{}`)
+	msg, err = parseMessage(data)
+	assert.Error(t, err)
+	assert.Nil(t, msg)
+
+	data = []byte(`{ // broken json`)
+	msg, err = parseMessage(data)
+	assert.Error(t, err)
+	assert.Nil(t, msg)
+}
+
 func Test_ParseHeartbeat(t *testing.T) {
 	data := []byte(`
 {
@@ -370,10 +387,10 @@ func Test_ParseChange(t *testing.T) {
 	assert.True(t, changeMsg.IsModifyOrder())
 }
 
-func Test_ParseActive(t *testing.T) {
+func Test_ParseActivate(t *testing.T) {
 	data := []byte(`
 {
-  "type": "active",
+  "type": "activate",
   "time": "2014-11-07T08:19:27.028459Z",
   "product_id": "BTC-USD",
   "sequence": 10,

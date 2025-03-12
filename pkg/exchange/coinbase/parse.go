@@ -14,6 +14,20 @@ func parseMessage(data []byte) (interface{}, error) {
 	}
 
 	switch baseMsg.Type {
+	case "error":
+		var errMsg ErrorMessage
+		err = json.Unmarshal(data, &errMsg)
+		if err != nil {
+			return nil, err
+		}
+		return &errMsg, nil
+	case "subscriptions":
+		var subMsg SubscriptionsMessage
+		err = json.Unmarshal(data, &subMsg)
+		if err != nil {
+			return nil, err
+		}
+		return &subMsg, nil
 	case "heartbeat":
 		var heartbeatMsg HeartbeatMessage
 		err = json.Unmarshal(data, &heartbeatMsg)
@@ -84,7 +98,7 @@ func parseMessage(data []byte) (interface{}, error) {
 			return nil, err
 		}
 		return &changeMsg, nil
-	case "active":
+	case "activate":
 		var activeMsg ActivateMessage
 		err = json.Unmarshal(data, &activeMsg)
 		if err != nil {
