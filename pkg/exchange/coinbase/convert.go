@@ -89,7 +89,7 @@ func toGlobalMarket(cbMarket *api.MarketInfo) types.Market {
 
 	// NOTE: Coinbase does not appose a min quantity, but a min notional.
 	// So we set the min quantity to the base increment. Or it may require more API calls
-	// to calculate the excact min quantity, which is costy.
+	// to calculate the exact min quantity, which is costy.
 	minQuantity := cbMarket.BaseIncrement
 	// TODO: estimate max quantity by PPP
 	// fill a dummy value for now.

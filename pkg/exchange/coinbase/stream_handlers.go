@@ -375,7 +375,7 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 		orderUpdate.SubmitOrder.Price = msg.Price
 		orderUpdate.SubmitOrder.Quantity = msg.Size
 	case "market":
-		// NOTE: the Exchange.SubmitOrder method garantees that the market order does not support funds.
+		// NOTE: the Exchange.SubmitOrder method guarantees that the market order does not support funds.
 		// So we simply check the size for market order here.
 		if msg.Size.IsZero() {
 			logStream.Warnf("received empty order size, dropped: %s", msg.OrderID)
