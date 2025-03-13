@@ -587,7 +587,7 @@ func (s *Stream) updateWorkingOrders(orders ...types.Order) {
 	defer s.lockWorkingOrderMap.Unlock()
 
 	for _, order := range orders {
-		exisiting, ok := s.workingOrdersMap[order.UUID]
+		existing, ok := s.workingOrdersMap[order.UUID]
 		if ok {
 			if !order.IsWorking {
 				// order is already in the map and not working, remove it
@@ -595,8 +595,8 @@ func (s *Stream) updateWorkingOrders(orders ...types.Order) {
 				continue
 			} else {
 				// order is already in the map and working, update it
-				exisiting.Update(order)
-				s.workingOrdersMap[order.UUID] = exisiting
+				existing.Update(order)
+				s.workingOrdersMap[order.UUID] = existing
 			}
 		} else {
 			// order is not in the map, add it

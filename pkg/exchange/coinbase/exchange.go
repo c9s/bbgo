@@ -166,7 +166,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	default:
 		return nil, fmt.Errorf("unsupported order side: %v", order.Side)
 	}
-	// set price and quanity
+	// set price and quantity
 	switch order.Type {
 	case types.OrderTypeLimit:
 		if order.Price.IsZero() || order.Quantity.IsZero() {
