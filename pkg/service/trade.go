@@ -83,7 +83,7 @@ func (s *TradeService) Sync(
 	tasks := []SyncTask{
 		{
 			Type:   types.Trade{},
-			Select: SelectLastTrades(exchange.Name(), symbol, isMargin, isFutures, isIsolated, 100),
+			Select: SelectLastTrades(exchange.Name(), symbol, isMargin, isFutures, isIsolated, startTime, endTime),
 			OnLoad: func(objs interface{}) {
 				// update last trade ID
 				trades := objs.([]types.Trade)
@@ -438,7 +438,7 @@ func (s *TradeService) DeleteAll() error {
 	return err
 }
 
-func SelectLastTrades(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, limit uint64) sq.SelectBuilder {
+func SelectLastTrades(ex types.ExchangeName, symbol string, isMargin, isFutures, isIsolated bool, startTime, endTime time.Time) sq.SelectBuilder {
 	return sq.Select("*").
 		From("trades").
 		Where(sq.And{
@@ -447,7 +447,8 @@ func SelectLastTrades(ex types.ExchangeName, symbol string, isMargin, isFutures,
 			sq.Eq{"is_margin": isMargin},
 			sq.Eq{"is_futures": isFutures},
 			sq.Eq{"is_isolated": isIsolated},
+			sq.GtOrEq{"traded_at": startTime},
+			sq.LtOrEq{"traded_at": endTime},
 		}).
-		OrderBy("traded_at DESC").
-		Limit(limit)
+		OrderBy("traded_at DESC")
 }
