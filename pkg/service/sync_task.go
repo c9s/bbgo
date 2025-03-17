@@ -75,9 +75,12 @@ func (sel SyncTask) execute(
 
 	logrus.Debugf("loaded %d %T records", recordSliceRef.Len(), sel.Type)
 
-	ids, err := buildIdMap(ctx, db, sel, recordSliceRef)
-	if err != nil {
-		return err
+	ids := buildIdMap(sel, recordSliceRef)
+	switch sel.Type.(type) {
+	case types.Trade:
+		if err := patchSelfTrade(ctx, db, sel, recordSliceRef, &ids); err != nil {
+			return err
+		}
 	}
 
 	if err := sortRecordsAscending(sel, recordSliceRef); err != nil {
@@ -206,31 +209,19 @@ func sortRecordsAscending(sel SyncTask, recordSlice reflect.Value) error {
 	return nil
 }
 
-func buildIdMap(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value) (map[string]struct{}, error) {
+func buildIdMap(sel SyncTask, recordSliceRef reflect.Value) map[string]struct{} {
 	ids := map[string]struct{}{}
-	refLen := recordSliceRef.Len()
-	for i := 0; i < refLen; i++ {
+	for i := 0; i < recordSliceRef.Len(); i++ {
 		entryRef := recordSliceRef.Index(i)
 		id := sel.ID(entryRef.Interface())
 		ids[id] = struct{}{}
 	}
-	if refLen == 0 {
-		return ids, nil
-	}
-	switch sel.Type.(type) {
-	case types.Trade:
-		err := patchSelfTrade(ctx, db, sel, recordSliceRef, &ids)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return ids, nil
+	return ids
 }
 
 func patchSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value, ids *map[string]struct{}) error {
 	// address the issue if the last record is a self-trade
-	// this patch will make sure both the buy and self side of the self-trade are in the ids map
+	// this patch will make sure both the buy and sell side of the self-trade are in the ids map
 	last := recordSliceRef.Index(recordSliceRef.Len() - 1)
 	idRef := last.FieldByName("ID")
 	lastTradeId := strconv.FormatUint(idRef.Uint(), 10)
