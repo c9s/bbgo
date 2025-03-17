@@ -78,7 +78,7 @@ func (sel SyncTask) execute(
 	ids := buildIdMap(sel, recordSliceRef)
 	switch sel.Type.(type) {
 	case types.Trade:
-		if err := patchSelfTrade(ctx, db, sel, recordSliceRef, &ids); err != nil {
+		if err := patchSelfTrade(ctx, db, sel, recordSliceRef, ids); err != nil {
 			return err
 		}
 	}
@@ -219,7 +219,7 @@ func buildIdMap(sel SyncTask, recordSliceRef reflect.Value) map[string]struct{} 
 	return ids
 }
 
-func patchSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value, ids *map[string]struct{}) error {
+func patchSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value, ids map[string]struct{}) error {
 	// address the issue if the last record is a self-trade
 	// this patch will make sure both the buy and sell side of the self-trade are in the ids map
 	last := recordSliceRef.Index(recordSliceRef.Len() - 1)
@@ -251,10 +251,10 @@ func patchSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceR
 	len := recordsRef.Len()
 	for i := 0; i < len; i++ {
 		id := sel.ID(recordsRef.Index(i).Interface())
-		if _, exists := (*ids)[id]; exists {
+		if _, exists := ids[id]; exists {
 			continue
 		}
-		(*ids)[id] = struct{}{}
+		ids[id] = struct{}{}
 	}
 
 	return nil
