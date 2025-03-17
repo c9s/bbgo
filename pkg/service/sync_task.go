@@ -4,9 +4,11 @@ import (
 	"context"
 	"reflect"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -74,6 +76,12 @@ func (sel SyncTask) execute(
 	logrus.Debugf("loaded %d %T records", recordSliceRef.Len(), sel.Type)
 
 	ids := buildIdMap(sel, recordSliceRef)
+	switch sel.Type.(type) {
+	case types.Trade:
+		if err := patchSelfTrade(ctx, db, sel, recordSliceRef, ids); err != nil {
+			return err
+		}
+	}
 
 	if err := sortRecordsAscending(sel, recordSliceRef); err != nil {
 		return err
@@ -208,6 +216,46 @@ func buildIdMap(sel SyncTask, recordSliceRef reflect.Value) map[string]struct{} 
 		id := sel.ID(entryRef.Interface())
 		ids[id] = struct{}{}
 	}
-
 	return ids
+}
+
+func patchSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value, ids map[string]struct{}) error {
+	// address the issue if the last record is a self-trade
+	// this patch will make sure both the buy and sell side of the self-trade are in the ids map
+	last := recordSliceRef.Index(recordSliceRef.Len() - 1)
+	idRef := last.FieldByName("ID")
+	lastTradeId := strconv.FormatUint(idRef.Uint(), 10)
+	query := squirrel.Select("*").
+		From("trades").
+		Where(squirrel.Eq{"id": lastTradeId})
+	sql, args, err := query.ToSql()
+	if err != nil {
+		logrus.Warnf("can not build sql for self-trade records: %s", err)
+		return nil
+	}
+	rows, err := db.QueryxContext(ctx, sql, args...)
+	if err != nil {
+		logrus.Warnf("can not query self-trade records: %s", err)
+		return nil
+	}
+	defer rows.Close()
+
+	records, err := scanRowsOfType(rows, sel.Type)
+	if err != nil {
+		return err
+	}
+	recordsRef := reflect.ValueOf(records)
+	if recordsRef.Kind() == reflect.Ptr {
+		recordsRef = recordsRef.Elem()
+	}
+	len := recordsRef.Len()
+	for i := 0; i < len; i++ {
+		id := sel.ID(recordsRef.Index(i).Interface())
+		if _, exists := ids[id]; exists {
+			continue
+		}
+		ids[id] = struct{}{}
+	}
+
+	return nil
 }
