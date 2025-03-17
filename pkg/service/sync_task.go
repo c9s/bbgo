@@ -76,15 +76,17 @@ func (sel SyncTask) execute(
 	logrus.Debugf("loaded %d %T records", recordSliceRef.Len(), sel.Type)
 
 	ids := buildIdMap(sel, recordSliceRef)
+
+	if err := sortRecordsAscending(sel, recordSliceRef); err != nil {
+		return err
+	}
+
+	// NOTE: these patches assumes that the last record is the most recent one
 	switch sel.Type.(type) {
 	case types.Trade:
 		if err := patchSelfTrade(ctx, db, sel, recordSliceRef, ids); err != nil {
 			return err
 		}
-	}
-
-	if err := sortRecordsAscending(sel, recordSliceRef); err != nil {
-		return err
 	}
 
 	if sel.OnLoad != nil {
