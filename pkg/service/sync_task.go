@@ -87,7 +87,7 @@ func (sel SyncTask) execute(
 	case types.Trade:
 		// use upsert if the last record is a self-trade
 		// or it will cause a duplicate key error
-		useUpsert = detectLastSelfTrade(ctx, db, sel, recordSliceRef)
+		useUpsert = detectLastestSelfTrade(ctx, db, sel, recordSliceRef)
 	}
 
 	if sel.OnLoad != nil {
@@ -222,13 +222,25 @@ func buildIdMap(sel SyncTask, recordSliceRef reflect.Value) map[string]struct{} 
 	return ids
 }
 
-func detectLastSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value) bool {
+func detectLastestSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value) bool {
 	// address the issue if the last record is a self-trade
-	// detect self-trade by counting the number of trades with trade id as the last record
+	// detect self-trade by counting the number of trades with trade id as the lastest record
 	// if the number of trades is 2, then it's a self-trade
-	last := recordSliceRef.Index(recordSliceRef.Len() - 1)
-	idRef := last.FieldByName("ID")
-	lastTradeId := strconv.FormatUint(idRef.Uint(), 10)
+	if recordSliceRef.Len() == 0 {
+		logrus.Warnf("empty record slice")
+		return false
+	}
+	// find the latest record by time
+	latestTrade := recordSliceRef.Index(0).Interface().(types.Trade)
+	latestTime := latestTrade.Time
+	for i := 0; i < recordSliceRef.Len(); i++ {
+		trade := recordSliceRef.Index(i).Interface().(types.Trade)
+		if trade.Time.After(latestTime.Time()) {
+			latestTime = trade.Time
+			latestTrade = trade
+		}
+	}
+	lastTradeId := strconv.FormatUint(latestTrade.ID, 10)
 	query := squirrel.Select("*").
 		From("trades").
 		Where(squirrel.Eq{"id": lastTradeId})

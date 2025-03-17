@@ -178,9 +178,9 @@ func (c *ReflectCache) UpsertSqlOf(t interface{}) string {
 		updates = append(updates, field+"="+placeholders[idx])
 	}
 	updatesClause := strings.Join(updates, ", ")
-
+	// NOTE: `ON DUPLICATE KEY UPDATE` is only supported in mysql
 	sql = `INSERT INTO ` + tableName + ` (` + fieldClause + `) VALUES (` + placeholderClause + `)` + `
-		ON DUPLICATE KEY UPDATE ` + updatesClause + ";"
+ON DUPLICATE KEY UPDATE ` + updatesClause + ";"
 	c.insertSqls[key] = sql
 	return sql
 }
@@ -260,12 +260,17 @@ func scanRowsOfType(rows *sqlx.Rows, tpe interface{}) (interface{}, error) {
 }
 
 func insertType(db *sqlx.DB, record interface{}, useUpsert bool) error {
+	// TODO: support upsert for other databases (ex: postgres)
 	var sql string
+	sqlFunc := dbCache.InsertSqlOf
 	if useUpsert {
-		sql = dbCache.UpsertSqlOf(record)
-	} else {
-		sql = dbCache.InsertSqlOf(record)
+		if db.DriverName() != "mysql" {
+			logrus.Warnf("upsert is only supported in mysql")
+		} else {
+			sqlFunc = dbCache.UpsertSqlOf
+		}
 	}
+	sql = sqlFunc(record)
 	_, err := db.NamedExec(sql, record)
 	return err
 }
