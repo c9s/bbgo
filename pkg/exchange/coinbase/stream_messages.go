@@ -162,6 +162,7 @@ func (msg *TickerMessage) Trade() types.Trade {
 	isBuyer := side == types.SideTypeBuy
 	quoteQuantity := msg.Price.Mul(msg.LastSize)
 	return types.Trade{
+		ID:            uint64(msg.TradeID),
 		Exchange:      types.ExchangeCoinBase,
 		Price:         msg.Price,
 		Quantity:      msg.LastSize,
@@ -267,6 +268,7 @@ func (msg *MatchMessage) Trade() types.Trade {
 	}
 	quoteQuantity := msg.Size.Mul(msg.Price)
 	return types.Trade{
+		ID:            uint64(msg.TradeID),
 		Exchange:      types.ExchangeCoinBase,
 		Price:         msg.Price,
 		Quantity:      msg.Size,
