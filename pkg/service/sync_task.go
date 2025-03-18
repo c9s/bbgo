@@ -76,15 +76,18 @@ func (sel SyncTask) execute(
 	logrus.Debugf("loaded %d %T records", recordSliceRef.Len(), sel.Type)
 
 	ids := buildIdMap(sel, recordSliceRef)
-	switch sel.Type.(type) {
-	case types.Trade:
-		if err := patchSelfTrade(ctx, db, sel, recordSliceRef, ids); err != nil {
-			return err
-		}
-	}
 
 	if err := sortRecordsAscending(sel, recordSliceRef); err != nil {
 		return err
+	}
+
+	// NOTE: `detectLastSelfTrade` assumes that the last record is the most recent one
+	useUpsert := false
+	switch sel.Type.(type) {
+	case types.Trade:
+		// use upsert if the last record is a self-trade
+		// or it will cause a duplicate key error
+		useUpsert = detectLastestSelfTrade(ctx, db, sel, recordSliceRef)
 	}
 
 	if sel.OnLoad != nil {
@@ -174,7 +177,7 @@ func (sel SyncTask) execute(
 						return err
 					}
 				} else {
-					if err := insertType(db, obj); err != nil {
+					if err := insertType(db, obj, useUpsert); err != nil {
 						logrus.WithError(err).Errorf("can not insert record: %v", obj)
 						return err
 					}
@@ -219,43 +222,47 @@ func buildIdMap(sel SyncTask, recordSliceRef reflect.Value) map[string]struct{} 
 	return ids
 }
 
-func patchSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value, ids map[string]struct{}) error {
+func detectLastestSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value) bool {
 	// address the issue if the last record is a self-trade
-	// this patch will make sure both the buy and sell side of the self-trade are in the ids map
-	last := recordSliceRef.Index(recordSliceRef.Len() - 1)
-	idRef := last.FieldByName("ID")
-	lastTradeId := strconv.FormatUint(idRef.Uint(), 10)
+	// detect self-trade by counting the number of trades with trade id as the lastest record
+	// if the number of trades is 2, then it's a self-trade
+	if recordSliceRef.Len() == 0 {
+		logrus.Warnf("empty record slice")
+		return false
+	}
+	// find the latest record by time
+	latestTrade := recordSliceRef.Index(0).Interface().(types.Trade)
+	latestTime := latestTrade.Time
+	for i := 0; i < recordSliceRef.Len(); i++ {
+		trade := recordSliceRef.Index(i).Interface().(types.Trade)
+		if trade.Time.After(latestTime.Time()) {
+			latestTime = trade.Time
+			latestTrade = trade
+		}
+	}
+	lastTradeId := strconv.FormatUint(latestTrade.ID, 10)
 	query := squirrel.Select("*").
 		From("trades").
 		Where(squirrel.Eq{"id": lastTradeId})
 	sql, args, err := query.ToSql()
 	if err != nil {
 		logrus.Warnf("can not build sql for self-trade records: %s", err)
-		return nil
+		return false
 	}
 	rows, err := db.QueryxContext(ctx, sql, args...)
 	if err != nil {
 		logrus.Warnf("can not query self-trade records: %s", err)
-		return nil
+		return false
 	}
 	defer rows.Close()
 
 	records, err := scanRowsOfType(rows, sel.Type)
 	if err != nil {
-		return err
+		return false
 	}
 	recordsRef := reflect.ValueOf(records)
 	if recordsRef.Kind() == reflect.Ptr {
 		recordsRef = recordsRef.Elem()
 	}
-	len := recordsRef.Len()
-	for i := 0; i < len; i++ {
-		id := sel.ID(recordsRef.Index(i).Interface())
-		if _, exists := ids[id]; exists {
-			continue
-		}
-		ids[id] = struct{}{}
-	}
-
-	return nil
+	return recordsRef.Len() == 2
 }

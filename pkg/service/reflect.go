@@ -155,6 +155,36 @@ func (c *ReflectCache) InsertSqlOf(t interface{}) string {
 	return sql
 }
 
+func (c *ReflectCache) UpsertSqlOf(t interface{}) string {
+	rt := reflect.TypeOf(t)
+	if rt.Kind() == reflect.Ptr {
+		rt = rt.Elem()
+	}
+
+	typeName := rt.Name()
+	key := typeName + "_upsert"
+	sql, ok := c.insertSqls[key]
+	if ok {
+		return sql
+	}
+
+	tableName := dbCache.TableNameOf(t)
+	fields := dbCache.FieldsOf(t)
+	placeholders := dbCache.PlaceholderOf(t)
+	fieldClause := strings.Join(fields, ", ")
+	placeholderClause := strings.Join(placeholders, ", ")
+	updates := make([]string, 0, len(fields))
+	for idx, field := range fields {
+		updates = append(updates, field+"="+placeholders[idx])
+	}
+	updatesClause := strings.Join(updates, ", ")
+	// NOTE: `ON DUPLICATE KEY UPDATE` is only supported in mysql
+	sql = `INSERT INTO ` + tableName + ` (` + fieldClause + `) VALUES (` + placeholderClause + `)` + `
+ON DUPLICATE KEY UPDATE ` + updatesClause + ";"
+	c.insertSqls[key] = sql
+	return sql
+}
+
 func (c *ReflectCache) TableNameOf(t interface{}) string {
 	rt := reflect.TypeOf(t)
 	if rt.Kind() == reflect.Ptr {
@@ -229,8 +259,18 @@ func scanRowsOfType(rows *sqlx.Rows, tpe interface{}) (interface{}, error) {
 	return sliceRef.Interface(), rows.Err()
 }
 
-func insertType(db *sqlx.DB, record interface{}) error {
-	sql := dbCache.InsertSqlOf(record)
+func insertType(db *sqlx.DB, record interface{}, useUpsert bool) error {
+	// TODO: support upsert for other databases (ex: postgres)
+	var sql string
+	sqlFunc := dbCache.InsertSqlOf
+	if useUpsert {
+		if db.DriverName() != "mysql" {
+			logrus.Warnf("upsert is only supported in mysql")
+		} else {
+			sqlFunc = dbCache.UpsertSqlOf
+		}
+	}
+	sql = sqlFunc(record)
 	_, err := db.NamedExec(sql, record)
 	return err
 }
