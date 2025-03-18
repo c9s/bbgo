@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/c9s/bbgo/pkg/service"
+	"github.com/sirupsen/logrus"
 )
 
 const IsolationContextKey = "bbgo"
@@ -13,6 +14,7 @@ var defaultIsolation = NewDefaultIsolation()
 type Isolation struct {
 	gracefulShutdown         GracefulShutdown
 	persistenceServiceFacade *service.PersistenceServiceFacade
+	logger                   logrus.FieldLogger
 }
 
 func NewDefaultIsolation() *Isolation {
@@ -27,6 +29,17 @@ func NewIsolation(persistenceFacade *service.PersistenceServiceFacade) *Isolatio
 		gracefulShutdown:         GracefulShutdown{},
 		persistenceServiceFacade: persistenceFacade,
 	}
+}
+
+func (i *Isolation) SetLogger(logger logrus.FieldLogger) {
+	i.logger = logger
+}
+
+func (i *Isolation) GetLogger() logrus.FieldLogger {
+	if i.logger == nil {
+		return logrus.StandardLogger()
+	}
+	return i.logger
 }
 
 func GetIsolationFromContext(ctx context.Context) *Isolation {

@@ -20,13 +20,14 @@ var defaultPersistenceServiceFacade = &service.PersistenceServiceFacade{
 
 // Sync syncs the object properties into the persistence layer
 func Sync(ctx context.Context, obj interface{}) {
+	isolation := GetIsolationFromContext(ctx)
+	logger := isolation.GetLogger()
+
 	id := dynamic.CallID(obj)
 	if len(id) == 0 {
-		log.Warnf("InstanceID() is not provided, can not sync persistence")
+		logger.Warnf("InstanceID() is not provided, can not sync persistence")
 		return
 	}
-
-	isolation := GetIsolationFromContext(ctx)
 
 	ps := isolation.persistenceServiceFacade.Get()
 
@@ -38,7 +39,7 @@ func Sync(ctx context.Context, obj interface{}) {
 
 	err := storePersistenceFields(obj, id, ps)
 	if err != nil {
-		log.WithError(err).Errorf("persistence sync failed")
+		logger.WithError(err).Errorf("persistence sync failed")
 	}
 }
 
