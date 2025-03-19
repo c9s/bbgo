@@ -451,3 +451,23 @@ func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, q types.Ord
 	}
 	return cbTrades, nil
 }
+
+// Utils
+func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error) {
+	cbOrders, err := e.queryOrdersByPagination(ctx, symbol, []string{})
+	if err != nil {
+		return nil, err
+	}
+	orders := make([]types.Order, 0, len(cbOrders))
+	for _, cbOrder := range cbOrders {
+		req := e.client.NewCancelOrderRequest().OrderID(cbOrder.ID)
+		_, err := req.Do(ctx)
+		if err != nil {
+			log.WithError(err).Errorf("failed to cancel order: %v", cbOrder.ID)
+			continue
+		}
+		log.Infof("order %v has been cancelled", cbOrder.ID)
+		orders = append(orders, toGlobalOrder(&cbOrder))
+	}
+	return orders, nil
+}
