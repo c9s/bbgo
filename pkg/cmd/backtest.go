@@ -174,7 +174,7 @@ var BacktestCmd = &cobra.Command{
 			userConfig.Backtest.Sessions = []string{syncExchangeName}
 		} else if len(userConfig.Backtest.Sessions) == 0 {
 			log.Infof("backtest.sessions is not defined, using all supported exchanges: %v", types.SupportedExchanges)
-			for _, exName := range types.SupportedExchanges {
+			for exName, _ := range types.SupportedExchanges {
 				userConfig.Backtest.Sessions = append(userConfig.Backtest.Sessions, exName.String())
 			}
 		}

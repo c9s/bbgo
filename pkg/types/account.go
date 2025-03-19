@@ -29,6 +29,7 @@ const (
 	AccountTypeMargin         = AccountType("margin")
 	AccountTypeIsolatedMargin = AccountType("isolated_margin")
 	AccountTypeSpot           = AccountType("spot")
+	AccountTypeCredit         = AccountType("credit")
 )
 
 type Account struct {

@@ -293,7 +293,7 @@ func (environ *Environment) ConfigureExchangeSessions(userConfig *Config) error 
 }
 
 func (environ *Environment) AddExchangesByViperKeys() error {
-	for _, n := range types.SupportedExchanges {
+	for n, _ := range types.SupportedExchanges {
 		if viper.IsSet(string(n) + "-api-key") {
 			exMinimal, err := exchange.NewWithEnvVarPrefix(n, "")
 			if err != nil {
