@@ -267,6 +267,10 @@ func (s *Stream) handleTickerMessage(msg *TickerMessage) {
 }
 
 func (s *Stream) handleMatchMessage(msg *MatchMessage) {
+	if msg.Type == "last_match" {
+		// TODO: fetch missing trades from the REST API and emit them
+		return
+	}
 	// ignore outdated messages
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
