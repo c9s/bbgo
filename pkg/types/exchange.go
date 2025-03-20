@@ -26,14 +26,14 @@ const (
 	ExchangeCoinBase ExchangeName = "coinbase"
 )
 
-var SupportedExchanges = []ExchangeName{
-	ExchangeMax,
-	ExchangeBinance,
-	ExchangeOKEx,
-	ExchangeKucoin,
-	ExchangeBitget,
-	ExchangeBybit,
-	ExchangeCoinBase,
+var SupportedExchanges = map[ExchangeName]struct{}{
+	ExchangeMax:      struct{}{},
+	ExchangeBinance:  struct{}{},
+	ExchangeOKEx:     struct{}{},
+	ExchangeKucoin:   struct{}{},
+	ExchangeBitget:   struct{}{},
+	ExchangeBybit:    struct{}{},
+	ExchangeCoinBase: struct{}{},
 	// note: we are not using "backtest"
 }
 
@@ -56,10 +56,10 @@ func (n *ExchangeName) UnmarshalJSON(data []byte) error {
 }
 
 func (n ExchangeName) IsValid() bool {
-	switch n {
-	case ExchangeBinance, ExchangeBitget, ExchangeBybit, ExchangeMax, ExchangeOKEx, ExchangeKucoin, ExchangeCoinBase:
+	if _, exist := SupportedExchanges[n]; exist {
 		return true
 	}
+
 	return false
 }
 
