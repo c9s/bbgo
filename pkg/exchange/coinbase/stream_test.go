@@ -60,10 +60,10 @@ func TestStreamBasic(t *testing.T) {
 	productIDs := []string{"BTC-USD", "ETH-USD"}
 
 	t.Run("Test Status", func(t *testing.T) {
-		stream := getTestStreamOrSkip(t)
+		stream := getTestStreamOrSkip(t, false)
 		chanStatus := make(chan StatusMessage)
 
-		stream.StandardStream.Subscribe("status", "", types.SubscribeOptions{})
+		stream.Subscribe("status", "", types.SubscribeOptions{})
 		stream.OnStatusMessage(func(m *StatusMessage) {
 			assert.NotNil(t, m)
 			// t.Log("get status message")
@@ -83,11 +83,11 @@ func TestStreamBasic(t *testing.T) {
 	})
 
 	t.Run("Test Ticker", func(t *testing.T) {
-		stream := getTestStreamOrSkip(t)
+		stream := getTestStreamOrSkip(t, false)
 		chanTicker := make(chan TickerMessage)
 
 		for _, productID := range productIDs {
-			stream.StandardStream.Subscribe("ticker", productID, types.SubscribeOptions{})
+			stream.Subscribe("ticker", productID, types.SubscribeOptions{})
 		}
 		stream.OnTickerMessage(func(m *TickerMessage) {
 			assert.NotNil(t, m)
@@ -108,11 +108,11 @@ func TestStreamBasic(t *testing.T) {
 	})
 
 	t.Run("Test Match", func(t *testing.T) {
-		stream := getTestStreamOrSkip(t)
+		stream := getTestStreamOrSkip(t, false)
 		chanMatch := make(chan MatchMessage)
 
 		for _, productID := range productIDs {
-			stream.StandardStream.Subscribe("matches", productID, types.SubscribeOptions{})
+			stream.Subscribe("matches", productID, types.SubscribeOptions{})
 		}
 		stream.OnMatchMessage(func(m *MatchMessage) {
 			assert.NotNil(t, m)
@@ -141,9 +141,9 @@ func TestStreamFull(t *testing.T) {
 	t.Run("Run Full", func(t *testing.T) {
 		productIDs := []string{"BTC-USD", "ETH-USD"}
 		c := make(chan struct{}, 10)
-		stream := getTestStreamOrSkip(t)
+		stream := getTestStreamOrSkip(t, false)
 		for _, productID := range productIDs {
-			stream.StandardStream.Subscribe("full", productID, types.SubscribeOptions{})
+			stream.Subscribe("full", productID, types.SubscribeOptions{})
 		}
 
 		// received -> open* -> change* -> match? -> done
@@ -193,14 +193,14 @@ func TestStreamFull(t *testing.T) {
 
 func TestLevel2(t *testing.T) {
 	t.Run("Run Level2", func(t *testing.T) {
-		stream := getTestStreamOrSkip(t)
+		stream := getTestStreamOrSkip(t, false)
 		c := make(chan string, 2)
 		productIDs := []string{"BTC-USD"}
 		getSnapshot := false
 		getUpdate := false
 
 		for _, productID := range productIDs {
-			stream.StandardStream.Subscribe("level2", productID, types.SubscribeOptions{})
+			stream.Subscribe("level2", productID, types.SubscribeOptions{})
 		}
 
 		stream.OnOrderbookSnapshotMessage(func(m *OrderBookSnapshotMessage) {
@@ -245,9 +245,9 @@ func TestBalance(t *testing.T) {
 		accounts := strings.Split(accountsStr, ",")
 
 		c := make(chan struct{}, 1)
-		stream := getTestStreamOrSkip(t)
+		stream := getTestStreamOrSkip(t, false)
 		for _, accountID := range accounts {
-			stream.StandardStream.Subscribe("balance", accountID, types.SubscribeOptions{})
+			stream.Subscribe("balance", accountID, types.SubscribeOptions{})
 		}
 		stream.OnBalanceMessage(func(m *BalanceMessage) {
 			assert.NotNil(t, m)
@@ -266,7 +266,7 @@ func TestBalance(t *testing.T) {
 	})
 }
 
-func getTestStreamOrSkip(t *testing.T) *Stream {
+func getTestStreamOrSkip(t *testing.T, bbgoChannelsOnly bool) *Stream {
 	if isCI, _ := strconv.ParseBool(os.Getenv("CI")); isCI {
 		t.Skip("skip test for CI")
 	}
@@ -277,5 +277,6 @@ func getTestStreamOrSkip(t *testing.T) *Stream {
 	}
 	exchange := New(key, secret, passphrase, 0)
 	stream := NewStream(exchange, key, passphrase, secret)
+	stream.SetBbgoChannelsOnly(bbgoChannelsOnly)
 	return stream
 }
