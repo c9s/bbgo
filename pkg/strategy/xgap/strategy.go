@@ -288,7 +288,7 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		}
 
 		// if the spread is less than 2 ticks, skip
-		if spread.Compare(s.tradingMarket.TickSize.Mul(2)) < 0 {
+		if spread.Compare(s.tradingMarket.TickSize.Mul(fixedpoint.NewFromFloat(2.0))) < 0 {
 			log.Warnf("spread too small, we can't place orders: spread=%s bid=%s ask=%s",
 				spread.String(), bestBid.Price.String(), bestAsk.Price.String())
 			return
