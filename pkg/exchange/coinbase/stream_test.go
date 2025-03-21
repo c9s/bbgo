@@ -266,6 +266,64 @@ func TestBalance(t *testing.T) {
 	})
 }
 
+func TestStreamBbgoChannels(t *testing.T) {
+	t.Run("Test Book", func(t *testing.T) {
+		c := make(chan string, 1)
+		stream := getTestStreamOrSkip(t, true)
+		stream.Subscribe(types.BookChannel, "BTCUSD", types.SubscribeOptions{})
+		stream.OnOrderbookSnapshotMessage(func(m *OrderBookSnapshotMessage) {
+			assert.NotNil(t, m)
+			c <- "snapshot"
+		})
+		stream.OnOrderbookUpdateMessage(func(m *OrderBookUpdateMessage) {
+			assert.NotNil(t, m)
+			c <- "update"
+		})
+		err := stream.Connect(context.Background())
+		assert.NoError(t, err)
+		getSnapshot := false
+		getUpdate := false
+	outer:
+		for {
+			select {
+			case sig := <-c:
+				switch sig {
+				case "snapshot":
+					getSnapshot = true
+				case "update":
+					getUpdate = true
+				}
+				if getSnapshot && getUpdate {
+					break outer
+				}
+			case <-time.After(time.Second * 10):
+				t.Fatal("No message from book channel after 10 seconds")
+			}
+		}
+		err = stream.Close()
+		assert.NoError(t, err)
+	})
+
+	t.Run("Test Market Trade", func(t *testing.T) {
+		c := make(chan struct{}, 1)
+		stream := getTestStreamOrSkip(t, true)
+		stream.SetPublicOnly()
+		stream.Subscribe(types.MarketTradeChannel, "BTCUSD", types.SubscribeOptions{})
+		stream.OnTradeUpdate(func(m types.Trade) {
+			c <- struct{}{}
+		})
+		err := stream.Connect(context.Background())
+		assert.NoError(t, err)
+		select {
+		case <-c:
+		case <-time.After(time.Second * 10):
+			t.Fatal("No message from market trade channel after 10 seconds")
+		}
+		err = stream.Close()
+		assert.NoError(t, err)
+	})
+}
+
 func getTestStreamOrSkip(t *testing.T, bbgoChannelsOnly bool) *Stream {
 	if isCI, _ := strconv.ParseBool(os.Getenv("CI")); isCI {
 		t.Skip("skip test for CI")
