@@ -47,14 +47,19 @@ type Stream struct {
 	orderbookSnapshotMessageCallbacks []func(m *OrderBookSnapshotMessage)
 	orderbookUpdateMessageCallbacks   []func(m *OrderBookUpdateMessage)
 
-	authEnabled   bool
-	userOrderOnly bool
+	bbgoChannelsOnly bool
+	authEnabled      bool
+	userOrderOnly    bool
 
 	lockSeqNumMap      sync.Mutex // lock to protect lastSequenceMsgMap
 	lastSequenceMsgMap map[string]SequenceNumberType
 
 	lockWorkingOrderMap sync.Mutex // lock to protect lastOrderMap
 	workingOrdersMap    map[string]types.Order
+}
+
+func (s *Stream) SetBbgoChannelsOnly(bbgoChannelsOnly bool) {
+	s.bbgoChannelsOnly = bbgoChannelsOnly
 }
 
 func NewStream(
@@ -64,12 +69,13 @@ func NewStream(
 	secretKey string,
 ) *Stream {
 	s := Stream{
-		StandardStream: types.NewStandardStream(),
-		exchange:       exchange,
-		apiKey:         apiKey,
-		passphrase:     passphrase,
-		secretKey:      secretKey,
-		authEnabled:    len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
+		StandardStream:   types.NewStandardStream(),
+		exchange:         exchange,
+		apiKey:           apiKey,
+		passphrase:       passphrase,
+		secretKey:        secretKey,
+		authEnabled:      len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
+		bbgoChannelsOnly: true,
 	}
 	s.SetParser(parseMessage)
 	s.SetDispatcher(s.dispatchEvent)
