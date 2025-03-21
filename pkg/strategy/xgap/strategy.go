@@ -273,9 +273,9 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		}
 
 		if s.MinSpread.Sign() > 0 {
-			if spread.Compare(s.MinSpread) < 0 {
+			if spreadPercentage.Compare(s.MinSpread) < 0 {
 				log.Warnf("spread < min spread, spread=%s minSpread=%s bid=%s ask=%s",
-					spread.String(), s.MinSpread.String(),
+					spreadPercentage.String(), s.MinSpread.String(),
 					bestBid.Price.String(), bestAsk.Price.String())
 
 				if s.MakeSpread {
@@ -287,8 +287,8 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 			}
 		}
 
-		// if the spread is less than 100 ticks (100 pips), skip
-		if spread.Compare(s.tradingMarket.TickSize.MulExp(2)) < 0 {
+		// if the spread is less than 2 ticks, skip
+		if spread.Compare(s.tradingMarket.TickSize.Mul(2)) < 0 {
 			log.Warnf("spread too small, we can't place orders: spread=%s bid=%s ask=%s",
 				spread.String(), bestBid.Price.String(), bestAsk.Price.String())
 			return
