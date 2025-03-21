@@ -83,11 +83,36 @@ func (s *Stream) handleConnect() {
 
 	subProductsMap := make(map[types.Channel][]string)
 	for _, sub := range s.Subscriptions {
-		// rfqMatchChannel allow empty symbol
-		if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
-			continue
+		localSymbol := toLocalSymbol(sub.Symbol)
+		if !s.bbgoChannelsOnly {
+			// rfqMatchChannel allow empty symbol
+			if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
+				continue
+			}
+			subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], localSymbol)
+		} else {
+			switch sub.Channel {
+			case types.BookChannel:
+				logStream.Infof("bridge %s to level2 channel (%s)", sub.Channel, sub.Symbol)
+				subProductsMap["level2"] = append(subProductsMap["level2"], localSymbol)
+			case types.BookTickerChannel:
+				logStream.Infof("bridge %s to ticker channel (%s)", sub.Channel, sub.Symbol)
+				subProductsMap["ticker"] = append(subProductsMap["ticker"], localSymbol)
+			case types.MarketTradeChannel:
+				if s.PublicOnly {
+					logStream.Infof("bridge %s to full channel (%s)", sub.Channel, sub.Symbol)
+					subProductsMap["full"] = append(subProductsMap["full"], localSymbol)
+				} else {
+
+					logStream.Infof("bridge %s to user channel (%s)", sub.Channel, sub.Symbol)
+					subProductsMap["user"] = append(subProductsMap["user"], localSymbol)
+				}
+			case types.KLineChannel, types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
+				logStream.Warnf("coinbase stream does not support subscription to %s", sub.Channel)
+			default:
+				logStream.Warnf("do not support subscription to non-standard channel %s (use `.StandardStream.Subscribe` to bypass it)", sub.Channel)
+			}
 		}
-		subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], toLocalSymbol(sub.Symbol))
 	}
 
 	_, subscribeFull := subProductsMap[fullChannel]
