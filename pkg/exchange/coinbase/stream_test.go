@@ -63,7 +63,7 @@ func TestStreamBasic(t *testing.T) {
 		stream := getTestStreamOrSkip(t)
 		chanStatus := make(chan StatusMessage)
 
-		stream.Subscribe("status", "", types.SubscribeOptions{})
+		stream.StandardStream.Subscribe("status", "", types.SubscribeOptions{})
 		stream.OnStatusMessage(func(m *StatusMessage) {
 			assert.NotNil(t, m)
 			// t.Log("get status message")
@@ -87,7 +87,7 @@ func TestStreamBasic(t *testing.T) {
 		chanTicker := make(chan TickerMessage)
 
 		for _, productID := range productIDs {
-			stream.Subscribe("ticker", productID, types.SubscribeOptions{})
+			stream.StandardStream.Subscribe("ticker", productID, types.SubscribeOptions{})
 		}
 		stream.OnTickerMessage(func(m *TickerMessage) {
 			assert.NotNil(t, m)
@@ -112,7 +112,7 @@ func TestStreamBasic(t *testing.T) {
 		chanMatch := make(chan MatchMessage)
 
 		for _, productID := range productIDs {
-			stream.Subscribe("matches", productID, types.SubscribeOptions{})
+			stream.StandardStream.Subscribe("matches", productID, types.SubscribeOptions{})
 		}
 		stream.OnMatchMessage(func(m *MatchMessage) {
 			assert.NotNil(t, m)
@@ -143,7 +143,7 @@ func TestStreamFull(t *testing.T) {
 		c := make(chan struct{}, 10)
 		stream := getTestStreamOrSkip(t)
 		for _, productID := range productIDs {
-			stream.Subscribe("full", productID, types.SubscribeOptions{})
+			stream.StandardStream.Subscribe("full", productID, types.SubscribeOptions{})
 		}
 
 		// received -> open* -> change* -> match? -> done
@@ -200,7 +200,7 @@ func TestLevel2(t *testing.T) {
 		getUpdate := false
 
 		for _, productID := range productIDs {
-			stream.Subscribe("level2", productID, types.SubscribeOptions{})
+			stream.StandardStream.Subscribe("level2", productID, types.SubscribeOptions{})
 		}
 
 		stream.OnOrderbookSnapshotMessage(func(m *OrderBookSnapshotMessage) {
@@ -247,7 +247,7 @@ func TestBalance(t *testing.T) {
 		c := make(chan struct{}, 1)
 		stream := getTestStreamOrSkip(t)
 		for _, accountID := range accounts {
-			stream.Subscribe("balance", accountID, types.SubscribeOptions{})
+			stream.StandardStream.Subscribe("balance", accountID, types.SubscribeOptions{})
 		}
 		stream.OnBalanceMessage(func(m *BalanceMessage) {
 			assert.NotNil(t, m)
