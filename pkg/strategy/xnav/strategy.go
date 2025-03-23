@@ -36,6 +36,46 @@ type AllAssetSnapshot struct {
 
 type DebtAssetMap asset.Map
 
+func (m DebtAssetMap) PlainText() (out string) {
+	var netAssetInUSD, debtInUSD fixedpoint.Value
+
+	var assets = asset.Map(m).Slice()
+
+	// sort assets
+	sort.Slice(assets, func(i, j int) bool {
+		return assets[i].DebtInUSD.Compare(assets[j].DebtInUSD) > 0
+	})
+
+	for _, a := range assets {
+		debtInUSD = debtInUSD.Add(a.DebtInUSD)
+		netAssetInUSD = netAssetInUSD.Add(a.NetAssetInUSD)
+	}
+
+	for _, a := range assets {
+		if a.DebtInUSD.IsZero() {
+			continue
+		}
+
+		text := fmt.Sprintf("%s (≈ %s) (≈ %s)",
+			a.Debt.String(),
+			currency.USD.FormatMoney(a.DebtInUSD),
+			a.DebtInUSD.Div(netAssetInUSD).FormatPercentage(2),
+		)
+
+		if !a.Borrowed.IsZero() {
+			text += fmt.Sprintf(" Principle: %s (≈ %s)", a.Borrowed.String(), currency.USD.FormatMoney(a.Borrowed.Mul(a.PriceInUSD)))
+		}
+
+		if !a.Interest.IsZero() {
+			text += fmt.Sprintf(" Interest: %s (≈ %s)", a.Interest.String(), currency.USD.FormatMoney(a.InterestInUSD))
+		}
+
+		out += text
+	}
+
+	return out
+}
+
 func (m DebtAssetMap) SlackAttachment() slack.Attachment {
 	var fields []slack.AttachmentField
 	var netAssetInUSD, debtInUSD fixedpoint.Value
@@ -81,6 +121,7 @@ func (m DebtAssetMap) SlackAttachment() slack.Attachment {
 		Title: fmt.Sprintf("Debt Overview %s",
 			currency.USD.FormatMoney(debtInUSD),
 		),
+		Color:  "warning",
 		Fields: fields,
 	}
 }
