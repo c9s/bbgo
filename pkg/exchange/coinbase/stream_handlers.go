@@ -81,6 +81,8 @@ func (s *Stream) handleConnect() {
 	if len(s.Subscriptions) == 0 {
 		return
 	}
+	// bridge bbgo channels to coinbase channels
+	// auth required: level2, full, user
 	subProductsMap := make(map[types.Channel][]string)
 	for _, sub := range s.Subscriptions {
 		localSymbol := toLocalSymbol(sub.Symbol)
@@ -186,6 +188,9 @@ func (s *Stream) handleConnect() {
 				ProductIDs: productIDs,
 			}
 		case fullChannel, userChannel:
+			if !s.authEnabled {
+				panic("full/user channel requires authentication")
+			}
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []types.Channel{channel},
@@ -197,7 +202,10 @@ func (s *Stream) handleConnect() {
 					Timestamp:  ts,
 				},
 			}
-		case level2Channel, level2BatchChannel:
+		case level2Channel:
+			if !s.authEnabled {
+				panic("level2 channel requires authentication")
+			}
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []types.Channel{channel},
@@ -210,7 +218,16 @@ func (s *Stream) handleConnect() {
 					Timestamp:  ts,
 				},
 			}
+		case level2BatchChannel:
+			subCmd = subscribeMsgType2{
+				Type:       subType,
+				Channels:   []types.Channel{channel},
+				ProductIDs: productIDs,
+			}
 		case balanceChannel:
+			if !s.authEnabled {
+				panic("balance channel requires authentication")
+			}
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []types.Channel{channel},
