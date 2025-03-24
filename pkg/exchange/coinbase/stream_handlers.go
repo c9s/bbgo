@@ -2,6 +2,7 @@ package coinbase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -85,23 +86,31 @@ func (s *Stream) handleConnect() {
 		localSymbol := toLocalSymbol(sub.Symbol)
 		switch sub.Channel {
 		case types.BookChannel:
-			// bridge to level2 channel
+			// bridge to level2 channel, which provides order book snapshot and book updates
 			logStream.Infof("bridge %s to level2 channel (%s)", sub.Channel, sub.Symbol)
-			subProductsMap["level2"] = append(subProductsMap["level2"], localSymbol)
+			subProductsMap[level2Channel] = append(subProductsMap[level2Channel], localSymbol)
 		case types.MarketTradeChannel:
+			// full/user channels both provide feeds on orders and trades
+			// full: all orders/trades on Coinbase Exchange
+			// user: orders/trades belong to the user
 			var localChannel types.Channel
 			if s.PublicOnly {
-				localChannel = "full"
+				localChannel = fullChannel
 			} else {
-				localChannel = "user"
+				localChannel = userChannel
 			}
 			subProductsMap[localChannel] = append(subProductsMap[localChannel], localSymbol)
 			logStream.Infof("bridge %s to %s(%s)", sub.Channel, localChannel, localSymbol)
+		case types.BookTickerChannel:
+			// ticker channel provides feeds on best bid/ask prices
+			subProductsMap[tickerChannel] = append(subProductsMap[tickerChannel], localSymbol)
+			logStream.Infof("bridge %s to %s(%s)", sub.Channel, tickerChannel, localSymbol)
 		case types.KLineChannel:
 			// TODO: add support to kline channel
-		case types.BookTickerChannel, types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
-			logStream.Warnf("coinbase stream does not support subscription to %s", sub.Channel)
+		case types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
+			logStream.Warnf("coinbase stream does not support subscription to %s, skipped", sub.Channel)
 		default:
+			// handle the channels that are not standard bbgo channels
 			if !s.bbgoChannelsOnly {
 				// rfqMatchChannel allow empty symbol
 				if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
@@ -109,26 +118,29 @@ func (s *Stream) handleConnect() {
 				}
 				subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], localSymbol)
 			} else {
-				logStream.Warnf("do not support subscription to non-standard channel %s (use `.StandardStream.Subscribe` to bypass it)", sub.Channel)
+				logStream.Warnf("subscription to non-standard channel %s disabled (use `.SetBbgoChannelsOnly(false)` to enable it)", sub.Channel)
 			}
 		}
 	}
 
-	_, subscribeFull := subProductsMap[fullChannel]
-	s.userOrderOnly = !subscribeFull
+	s.subLocalChannelsMap = make(map[types.Channel]struct{})
+	for channel := range subProductsMap {
+		s.subLocalChannelsMap[channel] = struct{}{}
+	}
 
+	// do subscription
 	var subCmds []any
 	signature, ts := s.generateSignature()
 	for channel, productIDs := range subProductsMap {
 		var subType string
-		switch types.Channel(channel) {
+		switch channel {
 		case rfqMatchChannel:
 			subType = "subscriptions"
 		default:
 			subType = "subscribe"
 		}
 		var subCmd any
-		switch types.Channel(channel) {
+		switch channel {
 		case statusChannel:
 			subCmd = subscribeMsgType1{
 				Type: subType,
@@ -286,8 +298,14 @@ func (s *Stream) handleTickerMessage(msg *TickerMessage) {
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
-	trade := msg.Trade()
-	s.EmitTradeUpdate(trade)
+	bookTicker := types.BookTicker{
+		Symbol:   toGlobalSymbol(msg.ProductID),
+		Buy:      msg.BestBid,
+		BuySize:  msg.BestBidSize,
+		Sell:     msg.BestAsk,
+		SellSize: msg.BestAskSize,
+	}
+	s.EmitBookTickerUpdate(bookTicker)
 }
 
 func (s *Stream) handleMatchMessage(msg *MatchMessage) {
@@ -300,7 +318,13 @@ func (s *Stream) handleMatchMessage(msg *MatchMessage) {
 		return
 	}
 	trade := msg.Trade()
-	s.EmitTradeUpdate(trade)
+	if _, fullExist := s.subLocalChannelsMap[fullChannel]; fullExist {
+		// the stream contains all matches, emit market trade
+		s.EmitMarketTrade(trade)
+	} else {
+		// the stream contains matches belong to the user only, emit trade update
+		s.EmitTradeUpdate(trade)
+	}
 }
 
 func (s *Stream) handleOrderBookSnapshotMessage(msg *OrderBookSnapshotMessage) {
@@ -372,7 +396,6 @@ func (s *Stream) handleOrderbookUpdateMessage(msg *OrderBookUpdateMessage) {
 		}
 		s.EmitBookUpdate(book)
 	}
-
 }
 
 // order update
@@ -652,10 +675,10 @@ func (s *Stream) retrieveOrderById(orderId string) (*types.Order, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	if !s.userOrderOnly {
+	if _, fullExists := s.subLocalChannelsMap[fullChannel]; fullExists {
 		msg := fmt.Sprintf("retrieve order by id disabled on a stream feeds including non-user orders: %s", orderId)
 		logStream.Warn(msg)
-		return nil, fmt.Errorf(msg)
+		return nil, errors.New(msg)
 	}
 	order, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderID: orderId})
 	if err != nil {

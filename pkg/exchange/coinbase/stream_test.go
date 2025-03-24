@@ -63,7 +63,7 @@ func TestStreamBasic(t *testing.T) {
 		stream := getTestStreamOrSkip(t, false)
 		chanStatus := make(chan StatusMessage)
 
-		stream.Subscribe("status", "", types.SubscribeOptions{})
+		stream.Subscribe(statusChannel, "", types.SubscribeOptions{})
 		stream.OnStatusMessage(func(m *StatusMessage) {
 			assert.NotNil(t, m)
 			// t.Log("get status message")
@@ -87,7 +87,7 @@ func TestStreamBasic(t *testing.T) {
 		chanTicker := make(chan TickerMessage)
 
 		for _, productID := range productIDs {
-			stream.Subscribe("ticker", productID, types.SubscribeOptions{})
+			stream.Subscribe(tickerChannel, productID, types.SubscribeOptions{})
 		}
 		stream.OnTickerMessage(func(m *TickerMessage) {
 			assert.NotNil(t, m)
@@ -112,7 +112,7 @@ func TestStreamBasic(t *testing.T) {
 		chanMatch := make(chan MatchMessage)
 
 		for _, productID := range productIDs {
-			stream.Subscribe("matches", productID, types.SubscribeOptions{})
+			stream.Subscribe(matchesChannel, productID, types.SubscribeOptions{})
 		}
 		stream.OnMatchMessage(func(m *MatchMessage) {
 			assert.NotNil(t, m)
@@ -143,7 +143,7 @@ func TestStreamFull(t *testing.T) {
 		c := make(chan struct{}, 10)
 		stream := getTestStreamOrSkip(t, false)
 		for _, productID := range productIDs {
-			stream.Subscribe("full", productID, types.SubscribeOptions{})
+			stream.Subscribe(fullChannel, productID, types.SubscribeOptions{})
 		}
 
 		// received -> open* -> change* -> match? -> done
@@ -200,7 +200,7 @@ func TestLevel2(t *testing.T) {
 		getUpdate := false
 
 		for _, productID := range productIDs {
-			stream.Subscribe("level2", productID, types.SubscribeOptions{})
+			stream.Subscribe(level2Channel, productID, types.SubscribeOptions{})
 		}
 
 		stream.OnOrderbookSnapshotMessage(func(m *OrderBookSnapshotMessage) {
@@ -247,7 +247,7 @@ func TestBalance(t *testing.T) {
 		c := make(chan struct{}, 1)
 		stream := getTestStreamOrSkip(t, false)
 		for _, accountID := range accounts {
-			stream.Subscribe("balance", accountID, types.SubscribeOptions{})
+			stream.Subscribe(balanceChannel, accountID, types.SubscribeOptions{})
 		}
 		stream.OnBalanceMessage(func(m *BalanceMessage) {
 			assert.NotNil(t, m)
@@ -309,7 +309,7 @@ func TestStreamBbgoChannels(t *testing.T) {
 		stream := getTestStreamOrSkip(t, true)
 		stream.SetPublicOnly()
 		stream.Subscribe(types.MarketTradeChannel, "BTCUSD", types.SubscribeOptions{})
-		stream.OnTradeUpdate(func(m types.Trade) {
+		stream.OnMarketTrade(func(m types.Trade) {
 			c <- struct{}{}
 		})
 		err := stream.Connect(context.Background())
