@@ -292,7 +292,7 @@ func (s *Stream) handleDisconnect() {
 	s.clearWorkingOrders()
 }
 
-// order book, trade
+// ticker update (real-time price update when there is a match)
 func (s *Stream) handleTickerMessage(msg *TickerMessage) {
 	// ignore outdated messages
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
@@ -308,6 +308,7 @@ func (s *Stream) handleTickerMessage(msg *TickerMessage) {
 	s.EmitBookTickerUpdate(bookTicker)
 }
 
+// matches channel (or match message from full/user channel)
 func (s *Stream) handleMatchMessage(msg *MatchMessage) {
 	if msg.Type == "last_match" {
 		// TODO: fetch missing trades from the REST API and emit them
@@ -327,6 +328,7 @@ func (s *Stream) handleMatchMessage(msg *MatchMessage) {
 	}
 }
 
+// level2 handlers
 func (s *Stream) handleOrderBookSnapshotMessage(msg *OrderBookSnapshotMessage) {
 	symbol := toGlobalSymbol(msg.ProductID)
 	var bids types.PriceVolumeSlice
@@ -398,7 +400,7 @@ func (s *Stream) handleOrderbookUpdateMessage(msg *OrderBookUpdateMessage) {
 	}
 }
 
-// order update
+// order update (full or user channel)
 func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return

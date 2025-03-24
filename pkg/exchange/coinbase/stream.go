@@ -47,7 +47,7 @@ type Stream struct {
 	orderbookSnapshotMessageCallbacks []func(m *OrderBookSnapshotMessage)
 	orderbookUpdateMessageCallbacks   []func(m *OrderBookUpdateMessage)
 
-	bbgoChannelsOnly    bool
+	bbgoChannelsOnly    bool // if true, only subscribe to bbgo channels on connect. Otherwise, the user can subscribe to both bbgo and coinbase channels
 	authEnabled         bool
 	subLocalChannelsMap map[types.Channel]struct{}
 
