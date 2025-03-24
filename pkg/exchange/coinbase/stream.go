@@ -47,9 +47,9 @@ type Stream struct {
 	orderbookSnapshotMessageCallbacks []func(m *OrderBookSnapshotMessage)
 	orderbookUpdateMessageCallbacks   []func(m *OrderBookUpdateMessage)
 
-	bbgoChannelsOnly bool
-	authEnabled      bool
-	userOrderOnly    bool
+	bbgoChannelsOnly    bool
+	authEnabled         bool
+	subLocalChannelsMap map[types.Channel]struct{}
 
 	lockSeqNumMap      sync.Mutex // lock to protect lastSequenceMsgMap
 	lastSequenceMsgMap map[string]SequenceNumberType
