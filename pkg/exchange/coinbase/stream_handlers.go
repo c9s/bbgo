@@ -133,12 +133,12 @@ func (s *Stream) handleConnect() {
 	signature, ts := s.generateSignature()
 	for channel, productIDs := range subProductsMap {
 		var subType string
-		switch channel {
-		case rfqMatchChannel:
+		if channel == rfqMatchChannel {
 			subType = "subscriptions"
-		default:
+		} else {
 			subType = "subscribe"
 		}
+
 		var subCmd any
 		switch channel {
 		case statusChannel:
