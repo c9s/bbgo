@@ -100,7 +100,7 @@ func (g *LiquidityOrderGenerator) Generate(
 		orders = append(orders, types.SubmitOrder{
 			Symbol:   g.Symbol,
 			Price:    price,
-			Type:     types.OrderTypeLimitMaker,
+			Type:     types.OrderTypeLimit,
 			Quantity: quantity,
 			Side:     side,
 			Market:   g.Market,
