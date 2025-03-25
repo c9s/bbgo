@@ -72,6 +72,7 @@ func Test_OrdersAPI(t *testing.T) {
 	// test query open orders
 	order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderID: order.UUID, ClientOrderID: order.UUID})
 	assert.NoError(t, err)
+	assert.NotNil(t, order)
 
 	// the status might be pending at the beginning. Wait until it is open
 	// only retry 5 times
