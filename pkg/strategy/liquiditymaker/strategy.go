@@ -298,6 +298,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
+		// sync trades before canceling orders
+		// the order cancelation may take some time, we need to wait for the order cancelation to complete
 		s.OrderExecutor.TradeCollector().Process()
 		bbgo.Sync(ctx, s)
 
