@@ -187,7 +187,7 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 		message = a.String()
 
 	default:
-		log.Errorf("unsupported notification format: %T %+v", a, a)
+		log.Warnf("unsupported notification format: %T %+v", a, a)
 
 	}
 
