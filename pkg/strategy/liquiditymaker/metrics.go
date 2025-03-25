@@ -22,6 +22,18 @@ var tickerAskMetrics = prometheus.NewGaugeVec(
 		Help: "",
 	}, generalLabels)
 
+var midPriceBiasRatioMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "liqmaker_mid_price_bias_ratio",
+		Help: "",
+	}, generalLabels)
+
+var midPriceEMAMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "liqmaker_mid_price_ema",
+		Help: "",
+	}, generalLabels)
+
 var openOrderBidExposureInUsdMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "liqmaker_open_order_bid_exposure_in_usd",
@@ -93,8 +105,6 @@ func init() {
 		openOrderBidExposureInUsdMetrics,
 		openOrderAskExposureInUsdMetrics,
 
-		midPriceMetrics,
-
 		askLiquidityAmountMetrics,
 		bidLiquidityAmountMetrics,
 		liquidityPriceRangeMetrics,
@@ -109,6 +119,10 @@ func init() {
 
 		tickerBidMetrics,
 		tickerAskMetrics,
+
+		midPriceMetrics,
+		midPriceEMAMetrics,
+		midPriceBiasRatioMetrics,
 
 		spreadMetrics,
 	)
