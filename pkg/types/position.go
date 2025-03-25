@@ -435,13 +435,24 @@ func (p *Position) SlackAttachment() slack.Attachment {
 		}
 	}
 
+	footer := templateutil.Render("last updated time: {{ . }}",
+		time.Now().Format(time.RFC822))
+
+	if len(p.Strategy) > 0 {
+		footer += " strategy: " + p.Strategy
+	}
+
+	if len(p.StrategyInstanceID) > 0 {
+		footer += " instance: " + p.StrategyInstanceID
+	}
+
 	return slack.Attachment{
 		// Pretext:       "",
 		// Text:  text,
 		Title:  title,
 		Color:  color,
 		Fields: fields,
-		Footer: templateutil.Render("update time {{ . }}", time.Now().Format(time.RFC822)),
+		Footer: footer,
 		// FooterIcon: "",
 	}
 }
