@@ -57,6 +57,13 @@ type Strategy struct {
 	StopBidPrice fixedpoint.Value `json:"stopBidPrice"`
 	StopAskPrice fixedpoint.Value `json:"stopAskPrice"`
 
+	MidPriceEMA *struct {
+		Enabled bool `json:"enabled"`
+		types.IntervalWindow
+	} `json:"midPriceEMA"`
+
+	midPriceEMA *indicatorv2.EWMAStream
+
 	StopEMA *struct {
 		Enabled bool `json:"enabled"`
 		types.IntervalWindow
@@ -98,9 +105,16 @@ func (s *Strategy) InstanceID() string {
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.AdjustmentUpdateInterval})
 	session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.LiquidityUpdateInterval})
+	session.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
+		Depth: types.DepthLevelFull,
+	})
 
 	if s.StopEMA != nil && s.StopEMA.Interval != "" {
 		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.StopEMA.Interval})
+	}
+
+	if s.MidPriceEMA != nil && s.MidPriceEMA.Interval != "" {
+		session.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: s.MidPriceEMA.Interval})
 	}
 }
 
@@ -199,6 +213,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	if s.StopEMA != nil && s.StopEMA.Enabled {
 		s.stopEMA = session.Indicators(s.Symbol).EMA(s.StopEMA.IntervalWindow)
+	}
+
+	if s.MidPriceEMA != nil && s.MidPriceEMA.Enabled {
+		s.midPriceEMA = session.Indicators(s.Symbol).EMA(s.MidPriceEMA.IntervalWindow)
 	}
 
 	instanceID := s.InstanceID()
