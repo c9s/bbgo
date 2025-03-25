@@ -47,7 +47,6 @@ type Stream struct {
 	orderbookSnapshotMessageCallbacks []func(m *OrderBookSnapshotMessage)
 	orderbookUpdateMessageCallbacks   []func(m *OrderBookUpdateMessage)
 
-	bbgoChannelsOnly    bool // if true, only subscribe to bbgo channels on connect. Otherwise, the user can subscribe to both bbgo and coinbase channels
 	authEnabled         bool
 	subLocalChannelsMap map[types.Channel]struct{}
 
@@ -58,10 +57,6 @@ type Stream struct {
 	workingOrdersMap    map[string]types.Order
 }
 
-func (s *Stream) SetBbgoChannelsOnly(bbgoChannelsOnly bool) {
-	s.bbgoChannelsOnly = bbgoChannelsOnly
-}
-
 func NewStream(
 	exchange *Exchange,
 	apiKey string,
@@ -69,13 +64,12 @@ func NewStream(
 	passphrase string,
 ) *Stream {
 	s := Stream{
-		StandardStream:   types.NewStandardStream(),
-		exchange:         exchange,
-		apiKey:           apiKey,
-		passphrase:       passphrase,
-		secretKey:        secretKey,
-		authEnabled:      len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
-		bbgoChannelsOnly: true,
+		StandardStream: types.NewStandardStream(),
+		exchange:       exchange,
+		apiKey:         apiKey,
+		passphrase:     passphrase,
+		secretKey:      secretKey,
+		authEnabled:    len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
 	}
 	s.SetParser(parseMessage)
 	s.SetDispatcher(s.dispatchEvent)

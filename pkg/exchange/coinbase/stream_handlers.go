@@ -112,16 +112,12 @@ func (s *Stream) handleConnect() {
 		case types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
 			logStream.Warnf("coinbase stream does not support subscription to %s, skipped", sub.Channel)
 		default:
-			// handle the channels that are not standard bbgo channels
-			if !s.bbgoChannelsOnly {
-				// rfqMatchChannel allow empty symbol
-				if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
-					continue
-				}
-				subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], localSymbol)
-			} else {
-				logStream.Warnf("subscription to non-standard channel %s disabled (use `.SetBbgoChannelsOnly(false)` to enable it)", sub.Channel)
+			// rfqMatchChannel allow empty symbol
+			if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
+				logStream.Warnf("do not support subscription to %s without symbol, skipped", sub.Channel)
+				continue
 			}
+			subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], localSymbol)
 		}
 	}
 
