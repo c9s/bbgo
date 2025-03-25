@@ -1219,9 +1219,10 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 			labels["strategy_id"] = s.InstanceID()
 			labels["exchange"] = s.MakerExchange
 			labels["symbol"] = s.Symbol
-			requireDepthMargin := fixedpoint.MustNewFromString("0.05")
+			labels["price_range"] = "5%"
+			priceRange := fixedpoint.MustNewFromString("0.05")
 
-			sellPriceUbd := lastPrice.Mul(fixedpoint.One.Add(requireDepthMargin))
+			sellPriceUbd := lastPrice.Mul(fixedpoint.One.Add(priceRange))
 			sellTiersCnt := 0
 			for _, priceVolumn := range s.sourceBook.SideBook(types.SideTypeSell) {
 				if priceVolumn.Price.Compare(sellPriceUbd) < 0 {
@@ -1229,9 +1230,10 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 				}
 			}
 			labels["side"] = string(types.SideTypeSell)
-			pendingOrderTiersCountMetrics.With(prometheus.Labels(labels)).Set(float64(sellTiersCnt))
+			openOrdersCountMetrics.With(prometheus.Labels(labels)).Set(float64(sellTiersCnt))
+			s.logger.Debugf("sell side pending order cnt within %s: %d", labels["price_range"], sellTiersCnt)
 
-			buyPriceLbd := lastPrice.Mul(fixedpoint.One.Sub(requireDepthMargin))
+			buyPriceLbd := lastPrice.Mul(fixedpoint.One.Sub(priceRange))
 			buySideBook := s.sourceBook.SideBook(types.SideTypeBuy)
 			buyTiersCnt := 0
 			for _, priceVolumn := range buySideBook {
@@ -1240,7 +1242,8 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 				}
 			}
 			labels["side"] = string(types.SideTypeBuy)
-			pendingOrderTiersCountMetrics.With(prometheus.Labels(labels)).Set(float64(buyTiersCnt))
+			openOrdersCountMetrics.With(prometheus.Labels(labels)).Set(float64(buyTiersCnt))
+			s.logger.Debugf("buy side pending order cnt within %s: %d", labels["price_range"], buyTiersCnt)
 		}
 	}
 }
