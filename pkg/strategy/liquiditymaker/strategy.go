@@ -318,6 +318,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 }
 
 func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
+
 	_ = s.adjustmentOrderBook.GracefulCancel(ctx, s.Session.Exchange)
 
 	if s.Position.IsDust() {
@@ -395,6 +396,9 @@ func (s *Strategy) placeAdjustmentOrders(ctx context.Context) {
 }
 
 func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
+	s.OrderExecutor.TradeCollector().Process()
+	bbgo.Sync(ctx, s)
+
 	err := s.liquidityOrderBook.GracefulCancel(ctx, s.Session.Exchange)
 	if util.LogErr(err, "unable to cancel orders") {
 		return
