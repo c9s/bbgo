@@ -298,6 +298,9 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
+		s.OrderExecutor.TradeCollector().Process()
+		bbgo.Sync(ctx, s)
+
 		if err := s.liquidityOrderBook.GracefulCancel(ctx, s.Session.Exchange); err != nil {
 			util.LogErr(err, "unable to cancel liquidity orders")
 		}
