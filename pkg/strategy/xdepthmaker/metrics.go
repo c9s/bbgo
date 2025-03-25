@@ -17,3 +17,10 @@ var openOrderExposureInUsdtMetrics = prometheus.NewGaugeVec(
 	},
 	[]string{"strategy_type", "strategy_id", "exchange", "side", "price_range", "symbol"},
 )
+
+func init() {
+	prometheus.MustRegister(
+		openOrdersCountMetrics,
+		openOrderExposureInUsdtMetrics,
+	)
+}
