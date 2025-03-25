@@ -324,6 +324,42 @@ func TestStreamBbgoChannels(t *testing.T) {
 	})
 }
 
+func TestStreamInvalidCredentials(t *testing.T) {
+	t.Run("Test Book Channel Panic", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				return
+			}
+			t.Fatal("Expected panic but got none")
+		}()
+		key := ""
+		secret := ""
+		passphrase := ""
+		exchange := New(key, secret, passphrase, 0)
+		stream := exchange.NewStream()
+		stream.Subscribe(types.BookChannel, "BTCUSD", types.SubscribeOptions{})
+		// should panic
+		_ = stream.Connect(context.Background())
+	})
+
+	t.Run("Test Market Trade Channel Panic", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				return
+			}
+			t.Fatal("Expected panic but got none")
+		}()
+		key := ""
+		secret := ""
+		passphrase := ""
+		exchange := New(key, secret, passphrase, 0)
+		stream := exchange.NewStream()
+		stream.Subscribe(types.MarketTradeChannel, "BTCUSD", types.SubscribeOptions{})
+		// should panic
+		_ = stream.Connect(context.Background())
+	})
+}
+
 func getTestStreamOrSkip(t *testing.T, bbgoChannelsOnly bool) *Stream {
 	if isCI, _ := strconv.ParseBool(os.Getenv("CI")); isCI {
 		t.Skip("skip test for CI")
@@ -334,7 +370,7 @@ func getTestStreamOrSkip(t *testing.T, bbgoChannelsOnly bool) *Stream {
 		t.Skip("COINBASE_* env vars not set")
 	}
 	exchange := New(key, secret, passphrase, 0)
-	stream := NewStream(exchange, key, passphrase, secret)
+	stream := NewStream(exchange, key, secret, passphrase)
 	stream.SetBbgoChannelsOnly(bbgoChannelsOnly)
 	return stream
 }
