@@ -274,6 +274,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		return err
 	}
 
+	s.Position.UpdateMetrics()
+
 	session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
 		if k.Interval == s.AdjustmentUpdateInterval {
 			s.placeAdjustmentOrders(ctx)
