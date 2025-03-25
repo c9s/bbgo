@@ -142,6 +142,7 @@ func TestStreamFull(t *testing.T) {
 		productIDs := []string{"BTC-USD", "ETH-USD"}
 		c := make(chan struct{}, 10)
 		stream := getTestStreamOrSkip(t)
+		stream.SetPublicOnly()
 		for _, productID := range productIDs {
 			stream.Subscribe(fullChannel, productID, types.SubscribeOptions{})
 		}
