@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
@@ -1208,6 +1209,39 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 	}
 	if maxLayer == 0 {
 		metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
+
+		lastPrice, ok := s.hedgeSession.LastPrice(s.Symbol)
+		if !ok {
+			s.logger.Infof("the last price of %s is not available, abort update pending orders count metric")
+		} else {
+			labels := make(map[string]string)
+			labels["strategy_type"] = ID
+			labels["strategy_id"] = s.InstanceID()
+			labels["exchange"] = s.MakerExchange
+			labels["symbol"] = s.Symbol
+			requireDepthMargin := fixedpoint.MustNewFromString("0.05")
+
+			sellPriceUbd := lastPrice.Mul(fixedpoint.One.Add(requireDepthMargin))
+			sellTiersCnt := 0
+			for _, priceVolumn := range s.sourceBook.SideBook(types.SideTypeSell) {
+				if priceVolumn.Price.Compare(sellPriceUbd) < 0 {
+					sellTiersCnt++
+				}
+			}
+			labels["side"] = string(types.SideTypeSell)
+			pendingOrderTiersCountMetrics.With(prometheus.Labels(labels)).Set(float64(sellTiersCnt))
+
+			buyPriceLbd := lastPrice.Mul(fixedpoint.One.Sub(requireDepthMargin))
+			buySideBook := s.sourceBook.SideBook(types.SideTypeBuy)
+			buyTiersCnt := 0
+			for _, priceVolumn := range buySideBook {
+				if priceVolumn.Price.Compare(buyPriceLbd) > 0 {
+					buyTiersCnt++
+				}
+			}
+			labels["side"] = string(types.SideTypeBuy)
+			pendingOrderTiersCountMetrics.With(prometheus.Labels(labels)).Set(float64(buyTiersCnt))
+		}
 	}
 }
 
