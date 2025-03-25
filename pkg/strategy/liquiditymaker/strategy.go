@@ -245,6 +245,14 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		logger: s.logger,
 	}
 
+	if s.AskLiquidityPriceRange.IsZero() {
+		s.AskLiquidityPriceRange = fixedpoint.NewFromFloat(0.02)
+	}
+
+	if s.BidLiquidityPriceRange.IsZero() {
+		s.BidLiquidityPriceRange = fixedpoint.NewFromFloat(0.02)
+	}
+
 	s.liquidityOrderBook = bbgo.NewActiveOrderBook(s.Symbol)
 	s.liquidityOrderBook.BindStream(session.UserDataStream)
 
@@ -302,6 +310,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			util.LogErr(err, "unable to cancel all orders")
 		}
 
+		s.OrderExecutor.TradeCollector().Process()
 		bbgo.Sync(ctx, s)
 	})
 
@@ -429,6 +438,8 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		midPrice = lastTradedPrice
 	}
 
+	midPriceMetrics.With(s.metricsLabels).Set(midPrice.Float64())
+
 	s.logger.Infof("current spread: %f lastTradedPrice: %f midPrice: %f", currentSpread.Float64(), lastTradedPrice.Float64(), midPrice.Float64())
 
 	placeBid := true
@@ -458,13 +469,24 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 	}
 
 	if s.MidPriceEMA != nil && s.MidPriceEMA.Enabled && s.MidPriceEMA.MaxBiasRatio.Sign() > 0 {
-		emaMidPrice := s.midPriceEMA.Last(0)
-		biasRatio := (midPrice.Float64() - emaMidPrice) / emaMidPrice
+		s.logger.Infof("mid price ema protection is enabled, checking bias ratio...")
 
-		// only handle positive case
-		if biasRatio > s.MidPriceEMA.MaxBiasRatio.Float64() {
-			// fix midPrice
-			midPrice = fixedpoint.NewFromFloat(emaMidPrice)
+		emaMidPrice := s.midPriceEMA.Last(0)
+		if emaMidPrice > 0 {
+			biasRatio := (midPrice.Float64() - emaMidPrice) / emaMidPrice
+
+			midPriceEMAMetrics.With(s.metricsLabels).Set(emaMidPrice)
+			midPriceBiasRatioMetrics.With(s.metricsLabels).Set(biasRatio)
+
+			s.logger.Infof("mid price bias ratio: %f, mid price: %f, ema mid price: %f",
+				biasRatio, midPrice.Float64(), emaMidPrice)
+
+			// only handle positive case
+			if biasRatio > s.MidPriceEMA.MaxBiasRatio.Float64() {
+				// fix midPrice
+				s.logger.Infof("fixing mid price %f to ema mid price %f", midPrice.Float64(), emaMidPrice)
+				midPrice = fixedpoint.NewFromFloat(emaMidPrice)
+			}
 		}
 	}
 
@@ -476,8 +498,6 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 		sideSpread.Float64(),
 		ask1Price.Float64(), askLastPrice.Float64(),
 		bid1Price.Float64(), bidLastPrice.Float64())
-
-	midPriceMetrics.With(s.metricsLabels).Set(midPrice.Float64())
 
 	availableBase := baseBal.Available
 	availableQuote := quoteBal.Available
