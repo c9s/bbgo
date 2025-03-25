@@ -44,6 +44,9 @@ var makerBestAskPriceMetrics = prometheus.NewGaugeVec(
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
 func UpdateMakerOpenOrderMetrics(strategyType, strategyId, exchangeName, symbol string, submitOrders []types.SubmitOrder) {
+	if len(submitOrders) == 0 {
+		return
+	}
 	bidOrderCount := 0
 	askOrderCount := 0
 	bidExposureQuoteAmount := fixedpoint.Zero
