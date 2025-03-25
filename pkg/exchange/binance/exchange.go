@@ -48,6 +48,8 @@ const FuturesWebSocketTestURL = "wss://stream.binancefuture.com"
 var orderLimiter = rate.NewLimiter(5, 2)
 var queryTradeLimiter = rate.NewLimiter(1, 2)
 
+var dualSidePosition = false
+
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
 })
@@ -63,6 +65,10 @@ func init() {
 
 	if n, ok := envvar.Int("BINANCE_QUERY_TRADES_RATE_LIMITER"); ok {
 		queryTradeLimiter = rate.NewLimiter(rate.Every(time.Duration(n)*time.Minute), 2)
+	}
+
+	if val, ok := envvar.Bool("BINANCE_FUTURES_DUAL_SIDE_POSITION"); ok {
+		dualSidePosition = val
 	}
 }
 
