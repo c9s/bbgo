@@ -1199,17 +1199,15 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 	}
 
 	s.logger.Infof("%d orders are generated, placing...", len(submitOrders))
-
-	if maxLayer == 0 {
-		metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
-	}
-
 	dbg.DebugSubmitOrders(s.logger, submitOrders)
 
 	_, err = s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
 		s.logger.WithError(err).Errorf("submit order error: %s", err.Error())
 		return
+	}
+	if maxLayer == 0 {
+		metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
 	}
 }
 

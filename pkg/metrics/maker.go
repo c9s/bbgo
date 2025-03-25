@@ -43,7 +43,18 @@ var makerBestAskPriceMetrics = prometheus.NewGaugeVec(
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
+var makerSpreadRatioMetrics = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "bbgo_maker_spread_ratio",
+		Help: "the current spread ratio",
+	},
+	[]string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
+
 func UpdateMakerOpenOrderMetrics(strategyType, strategyId, exchangeName, symbol string, submitOrders []types.SubmitOrder) {
+	if len(submitOrders) == 0 {
+		return
+	}
 	bidOrderCount := 0
 	askOrderCount := 0
 	bidExposureQuoteAmount := fixedpoint.Zero
@@ -77,6 +88,7 @@ func UpdateMakerOpenOrderMetrics(strategyType, strategyId, exchangeName, symbol 
 
 		}
 	}
+	spreadRatio := bestAskPrice.Sub(bestBidPrice).Div(bestBidPrice)
 
 	labels := prometheus.Labels{
 		"strategy_type": strategyType,
@@ -91,6 +103,7 @@ func UpdateMakerOpenOrderMetrics(strategyType, strategyId, exchangeName, symbol 
 	makerOpenOrderAskOrderCountMetrics.With(labels).Set(float64(askOrderCount))
 	makerBestBidPriceMetrics.With(labels).Set(bestBidPrice.Float64())
 	makerBestAskPriceMetrics.With(labels).Set(bestAskPrice.Float64())
+	makerSpreadRatioMetrics.With(labels).Set(spreadRatio.Float64())
 }
 
 func init() {
