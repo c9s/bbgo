@@ -48,17 +48,22 @@ type Strategy struct {
 	AdjustmentOrderMaxQuantity fixedpoint.Value `json:"adjustmentOrderMaxQuantity"`
 	AdjustmentOrderPriceType   types.PriceType  `json:"adjustmentOrderPriceType"`
 
-	NumOfLiquidityLayers int              `json:"numOfLiquidityLayers"`
-	LiquiditySlideRule   *bbgo.SlideRule  `json:"liquidityScale"`
-	LiquidityPriceRange  fixedpoint.Value `json:"liquidityPriceRange"`
-	AskLiquidityAmount   fixedpoint.Value `json:"askLiquidityAmount"`
-	BidLiquidityAmount   fixedpoint.Value `json:"bidLiquidityAmount"`
+	NumOfLiquidityLayers int             `json:"numOfLiquidityLayers"`
+	LiquiditySlideRule   *bbgo.SlideRule `json:"liquidityScale"`
+
+	LiquidityPriceRange    fixedpoint.Value `json:"liquidityPriceRange"`
+	AskLiquidityPriceRange fixedpoint.Value `json:"askLiquidityPriceRange"`
+	BidLiquidityPriceRange fixedpoint.Value `json:"bidLiquidityPriceRange"`
+
+	AskLiquidityAmount fixedpoint.Value `json:"askLiquidityAmount"`
+	BidLiquidityAmount fixedpoint.Value `json:"bidLiquidityAmount"`
 
 	StopBidPrice fixedpoint.Value `json:"stopBidPrice"`
 	StopAskPrice fixedpoint.Value `json:"stopAskPrice"`
 
 	MidPriceEMA *struct {
-		Enabled bool `json:"enabled"`
+		Enabled      bool             `json:"enabled"`
+		MaxBiasRatio fixedpoint.Value `json:"maxBiasRatio"`
 		types.IntervalWindow
 	} `json:"midPriceEMA"`
 
@@ -129,6 +134,14 @@ func (s *Strategy) Defaults() error {
 
 	if s.AdjustmentUpdateInterval == "" {
 		s.AdjustmentUpdateInterval = types.Interval5m
+	}
+
+	if s.AskLiquidityPriceRange.IsZero() {
+		s.AskLiquidityPriceRange = s.LiquidityPriceRange
+	}
+
+	if s.BidLiquidityPriceRange.IsZero() {
+		s.BidLiquidityPriceRange = s.LiquidityPriceRange
 	}
 
 	return nil
@@ -418,18 +431,6 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 
 	s.logger.Infof("current spread: %f lastTradedPrice: %f midPrice: %f", currentSpread.Float64(), lastTradedPrice.Float64(), midPrice.Float64())
 
-	ask1Price := midPrice.Mul(fixedpoint.One.Add(sideSpread))
-	bid1Price := midPrice.Mul(fixedpoint.One.Sub(sideSpread))
-
-	askLastPrice := midPrice.Mul(fixedpoint.One.Add(s.LiquidityPriceRange))
-	bidLastPrice := midPrice.Mul(fixedpoint.One.Sub(s.LiquidityPriceRange))
-	s.logger.Infof("wanted side spread: %f askRange: %f ~ %f bidRange: %f ~ %f",
-		sideSpread.Float64(),
-		ask1Price.Float64(), askLastPrice.Float64(),
-		bid1Price.Float64(), bidLastPrice.Float64())
-
-	midPriceMetrics.With(s.metricsLabels).Set(midPrice.Float64())
-
 	placeBid := true
 	placeAsk := true
 
@@ -455,6 +456,28 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 			placeAsk = false
 		}
 	}
+
+	if s.MidPriceEMA != nil && s.MidPriceEMA.Enabled && s.MidPriceEMA.MaxBiasRatio.Sign() > 0 {
+		emaMidPrice := s.midPriceEMA.Last(0)
+		biasRatio := (midPrice.Float64() - emaMidPrice) / emaMidPrice
+
+		// only handle positive case
+		if biasRatio > s.MidPriceEMA.MaxBiasRatio.Float64() {
+			// fix midPrice
+			midPrice = fixedpoint.NewFromFloat(emaMidPrice)
+		}
+	}
+
+	ask1Price := midPrice.Mul(fixedpoint.One.Add(sideSpread))
+	bid1Price := midPrice.Mul(fixedpoint.One.Sub(sideSpread))
+	askLastPrice := midPrice.Mul(fixedpoint.One.Add(s.AskLiquidityPriceRange))
+	bidLastPrice := midPrice.Mul(fixedpoint.One.Sub(s.BidLiquidityPriceRange))
+	s.logger.Infof("wanted side spread: %f askRange: %f ~ %f bidRange: %f ~ %f",
+		sideSpread.Float64(),
+		ask1Price.Float64(), askLastPrice.Float64(),
+		bid1Price.Float64(), bidLastPrice.Float64())
+
+	midPriceMetrics.With(s.metricsLabels).Set(midPrice.Float64())
 
 	availableBase := baseBal.Available
 	availableQuote := quoteBal.Available
