@@ -27,8 +27,6 @@ import (
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
 
-var lastPriceModifier = fixedpoint.NewFromFloat(1.001)
-var minGap = fixedpoint.NewFromFloat(1.02)
 var defaultMargin = fixedpoint.NewFromFloat(0.003)
 
 var Two = fixedpoint.NewFromInt(2)
@@ -37,6 +35,7 @@ const priceUpdateTimeout = 5 * time.Minute
 
 const ID = "xdepthmaker"
 
+var prometheusPriceRange = fixedpoint.MustNewFromString("5%")
 var log = logrus.WithField("strategy", ID)
 
 var ErrZeroQuantity = stderrors.New("quantity is zero")
@@ -64,8 +63,6 @@ type CrossExchangeMarketMakingStrategy struct {
 
 	core.ConverterManager
 
-	mu sync.Mutex
-
 	MakerOrderExecutor, HedgeOrderExecutor *bbgo.GeneralOrderExecutor
 }
 
@@ -92,6 +89,14 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	s.makerMarket, ok = s.makerSession.Market(symbol)
 	if !ok {
 		return fmt.Errorf("maker session market %s is not defined", symbol)
+	}
+
+	// TODO: support other quote currencies
+	if s.hedgeMarket.QuoteCurrency != "USDT" ||
+		s.makerMarket.QuoteCurrency != "USDT" {
+		return fmt.Errorf(
+			"hedge market %s and maker market %s quote currency must be USDT",
+			s.hedgeMarket.Symbol, s.makerMarket.Symbol)
 	}
 
 	if err := s.ConverterManager.Initialize(); err != nil {
@@ -266,8 +271,9 @@ type Strategy struct {
 	// private fields
 	// --------------------------------
 
-	// pricingBook is the order book (depth) from the hedging session
-	sourceBook *types.StreamOrderBook
+	// sourceBook is the order book (depth) from the hedging session
+	// makerBook is the order book (depth) from the maker session
+	sourceBook, makerBook *types.StreamOrderBook
 
 	hedgeErrorLimiter         *rate.Limiter
 	hedgeErrorRateReservation *rate.Reservation
@@ -567,16 +573,62 @@ func (s *Strategy) CrossRun(
 		ID, s.InstanceID()); err != nil {
 		return err
 	}
-
+	// initialize source book
 	sourceMarketStream := s.hedgeSession.Exchange.NewStream()
 	sourceMarketStream.SetPublicOnly()
 	sourceMarketStream.Subscribe(types.BookChannel, s.HedgeSymbol, types.SubscribeOptions{
 		Depth: types.DepthLevelFull,
 		Speed: types.SpeedLow,
 	})
-
 	s.sourceBook = types.NewStreamBook(s.HedgeSymbol, s.hedgeSession.ExchangeName)
 	s.sourceBook.BindStream(sourceMarketStream)
+
+	// initialize maker book
+	makerMarketStream := s.makerSession.Exchange.NewStream()
+	makerMarketStream.SetPublicOnly()
+	makerMarketStream.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
+		Depth: types.DepthLevelFull,
+		Speed: types.SpeedLow,
+	})
+	s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
+	s.makerBook.BindStream(makerMarketStream)
+	s.makerBook.OnUpdate(func(_ types.SliceOrderBook) {
+		bestBid, bestAsk, hasPrice := s.makerBook.BestBidAndAsk()
+		if hasPrice {
+			updateSpreadRatioMetrics(
+				bestBid.Price,
+				bestAsk.Price,
+				ID,
+				s.InstanceID(),
+				string(s.makerSession.ExchangeName),
+				s.Symbol,
+			)
+
+			midPrice := bestBid.Price.Add(bestAsk.Price).Div(fixedpoint.Two)
+			for _, side := range []types.SideType{types.SideTypeBuy, types.SideTypeSell} {
+				updateOpenOrderMetrics(
+					s.makerBook.SideBook(side),
+					side,
+					midPrice,
+					prometheusPriceRange,
+					ID,
+					s.InstanceID(),
+					string(s.makerSession.ExchangeName),
+					s.Symbol,
+				)
+				updateMarketDepthInUsd(
+					s.makerBook.SideBook(side),
+					side,
+					midPrice,
+					prometheusPriceRange,
+					ID,
+					s.InstanceID(),
+					string(s.makerSession.ExchangeName),
+					s.Symbol,
+				)
+			}
+		}
+	})
 
 	if err := sourceMarketStream.Connect(ctx); err != nil {
 		return err
@@ -937,11 +989,11 @@ func (s *Strategy) runTradeRecover(ctx context.Context) {
 }
 
 func (s *Strategy) generateMakerOrders(
-	pricingBook *types.StreamOrderBook,
+	sourceBook *types.StreamOrderBook,
 	maxLayer int,
 	availableBase, availableQuote fixedpoint.Value,
 ) ([]types.SubmitOrder, error) {
-	_, _, hasPrice := pricingBook.BestBidAndAsk()
+	_, _, hasPrice := sourceBook.BestBidAndAsk()
 	if !hasPrice {
 		return nil, nil
 	}
@@ -952,7 +1004,7 @@ func (s *Strategy) generateMakerOrders(
 	var accumulatedBidQuoteQuantity = fixedpoint.Zero
 
 	// copy the pricing book because during the generation the book data could change
-	dupPricingBook := pricingBook.Copy()
+	dupPricingBook := sourceBook.Copy()
 
 	log.Infof("pricingBook: \n\tbids: %+v \n\tasks: %+v",
 		dupPricingBook.SideBook(types.SideTypeBuy),
@@ -1199,17 +1251,16 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 	}
 
 	s.logger.Infof("%d orders are generated, placing...", len(submitOrders))
-
-	if maxLayer == 0 {
-		metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
-	}
-
 	dbg.DebugSubmitOrders(s.logger, submitOrders)
 
 	_, err = s.MakerOrderExecutor.SubmitOrders(ctx, submitOrders...)
 	if err != nil {
 		s.logger.WithError(err).Errorf("submit order error: %s", err.Error())
 		return
+	}
+
+	if maxLayer == 0 {
+		metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
 	}
 }
 
