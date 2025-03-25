@@ -65,8 +65,8 @@ func (s *Stream) SetBbgoChannelsOnly(bbgoChannelsOnly bool) {
 func NewStream(
 	exchange *Exchange,
 	apiKey string,
-	passphrase string,
 	secretKey string,
+	passphrase string,
 ) *Stream {
 	s := Stream{
 		StandardStream:   types.NewStandardStream(),
