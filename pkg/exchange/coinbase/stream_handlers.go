@@ -84,6 +84,7 @@ func (s *Stream) handleConnect() {
 	// bridge bbgo channels to coinbase channels
 	// auth required: level2, full, user
 	subProductsMap := make(map[types.Channel][]string)
+	allProductsMap := make(map[string]struct{})
 	for _, sub := range s.Subscriptions {
 		localSymbol := toLocalSymbol(sub.Symbol)
 		switch sub.Channel {
@@ -92,17 +93,12 @@ func (s *Stream) handleConnect() {
 			logStream.Infof("bridge %s to level2 channel (%s)", sub.Channel, sub.Symbol)
 			subProductsMap[level2Channel] = append(subProductsMap[level2Channel], localSymbol)
 		case types.MarketTradeChannel:
-			// full/user channels both provide feeds on orders and trades
 			// full: all orders/trades on Coinbase Exchange
-			// user: orders/trades belong to the user
-			var localChannel types.Channel
-			if s.PublicOnly {
-				localChannel = fullChannel
-			} else {
-				localChannel = userChannel
+			if !s.PublicOnly {
+				panic("subscribe to market trade channel for a public stream is not allowed")
 			}
-			subProductsMap[localChannel] = append(subProductsMap[localChannel], localSymbol)
-			logStream.Infof("bridge %s to %s(%s)", sub.Channel, localChannel, localSymbol)
+			subProductsMap[fullChannel] = append(subProductsMap[fullChannel], localSymbol)
+			logStream.Infof("bridge %s to %s(%s)", sub.Channel, fullChannel, localSymbol)
 		case types.BookTickerChannel:
 			// ticker channel provides feeds on best bid/ask prices
 			subProductsMap[tickerChannel] = append(subProductsMap[tickerChannel], localSymbol)
@@ -121,9 +117,19 @@ func (s *Stream) handleConnect() {
 		}
 	}
 
-	s.subLocalChannelsMap = make(map[types.Channel]struct{})
-	for channel := range subProductsMap {
-		s.subLocalChannelsMap[channel] = struct{}{}
+	for _, products := range subProductsMap {
+		for _, product := range products {
+			allProductsMap[product] = struct{}{}
+		}
+	}
+	// user data strea, subscribe to user channel for the user order/trade updates
+	if !s.PublicOnly {
+		if !s.authEnabled {
+			panic("user channel requires authentication")
+		}
+		for product := range allProductsMap {
+			subProductsMap[userChannel] = append(subProductsMap[userChannel], product)
+		}
 	}
 
 	// do subscription
@@ -186,6 +192,9 @@ func (s *Stream) handleConnect() {
 		case fullChannel, userChannel:
 			if !s.authEnabled {
 				panic("full/user channel requires authentication")
+			}
+			if channel == fullChannel && !s.PublicOnly {
+				panic("cannot subscribe to full channel on a private stream")
 			}
 			subCmd = subscribeMsgType2{
 				Type:       subType,
@@ -332,11 +341,11 @@ func (s *Stream) handleMatchMessage(msg *MatchMessage) {
 		return
 	}
 	trade := msg.Trade()
-	if _, fullExist := s.subLocalChannelsMap[fullChannel]; fullExist {
-		// the stream contains all matches, emit market trade
+	if s.PublicOnly {
+		// the stream is a public stream, providing feeds on public market trades, emit market trade
 		s.EmitMarketTrade(trade)
 	} else {
-		// the stream contains matches belong to the user only, emit trade update
+		// the stream is a user stream, providing feeds on user trades, emit user trade update
 		s.EmitTradeUpdate(trade)
 	}
 }
@@ -690,8 +699,8 @@ func (s *Stream) retrieveOrderById(orderId string) (*types.Order, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	if _, fullExists := s.subLocalChannelsMap[fullChannel]; fullExists {
-		msg := fmt.Sprintf("retrieve order by id disabled on a stream feeds including non-user orders: %s", orderId)
+	if s.PublicOnly {
+		msg := fmt.Sprintf("retrieve order by id disabled on a public stream: %s", orderId)
 		logStream.Warn(msg)
 		return nil, errors.New(msg)
 	}
