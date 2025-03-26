@@ -5,12 +5,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/cache"
-	"github.com/c9s/bbgo/pkg/util"
-
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/cache"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var ErrNotImplemented = errors.New("not implemented")
@@ -36,18 +36,20 @@ func (s *SyncService) SyncSessionSymbols(
 		return err
 	}
 
+	logger := log.WithFields(log.Fields{"service": "sync", "exchange": exchange.Name(), "uuid": uuid.New().String()})
+	ctx = util.SetLoggerToCtx(ctx, logger)
 	for _, symbol := range symbols {
 		// skip symbols do not exist in the market info
 		if _, ok := markets[symbol]; !ok {
 			continue
 		}
 
-		log.Infof("syncing %s %s trades from %s...", exchange.Name(), symbol, startTime)
+		logger.Infof("syncing %s %s trades from %s to %s ...", exchange.Name(), symbol, startTime, endTime)
 		if err := s.TradeService.Sync(ctx, exchange, symbol, startTime, endTime); err != nil {
 			return err
 		}
 
-		log.Infof("syncing %s %s orders from %s...", exchange.Name(), symbol, startTime)
+		logger.Infof("syncing %s %s orders from %s to %s...", exchange.Name(), symbol, startTime, endTime)
 		if err := s.OrderService.Sync(ctx, exchange, symbol, startTime, endTime); err != nil {
 			return err
 		}

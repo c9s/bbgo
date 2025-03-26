@@ -15,6 +15,7 @@ import (
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var ErrTradeNotFound = errors.New("trade not found")
@@ -74,6 +75,9 @@ func (s *TradeService) Sync(
 		symbol = isolatedSymbol
 	}
 
+	logger := util.GetLoggerFromCtx(ctx)
+	logger.Infof("session attributes: isMargin=%v isFutures=%v isIsolated=%v isolatedSymbol=%s", isMargin, isFutures, isIsolated, isolatedSymbol)
+
 	api, ok := exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
 		return nil
@@ -92,11 +96,13 @@ func (s *TradeService) Sync(
 					last := trades[end]
 					lastTradeID = last.ID
 				}
+				logger.Infof("on load: last trade ID: %d", lastTradeID)
 			},
 			BatchQuery: func(ctx context.Context, startTime, endTime time.Time) (interface{}, chan error) {
 				query := &batch.TradeBatchQuery{
 					ExchangeTradeHistoryService: api,
 				}
+				logger.Infof("sync trades from %s to %s, lastTradeID: %d", startTime, endTime, lastTradeID)
 				return query.Query(ctx, symbol, &types.TradeQueryOptions{
 					StartTime:   &startTime,
 					EndTime:     &endTime,
@@ -108,7 +114,9 @@ func (s *TradeService) Sync(
 			},
 			ID: func(obj interface{}) string {
 				trade := obj.(types.Trade)
-				return strconv.FormatUint(trade.ID, 10) + trade.Side.String()
+				id := strconv.FormatUint(trade.ID, 10) + trade.Side.String()
+				logger.Infof("id: %s", id)
+				return id
 			},
 			LogInsert: true,
 		},

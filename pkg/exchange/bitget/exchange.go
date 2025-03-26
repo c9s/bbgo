@@ -581,7 +581,6 @@ func (e *Exchange) QueryTrades(
 	if err != nil {
 		return nil, fmt.Errorf("failed to query trades, err: %w", err)
 	}
-
 	var errs error
 	for _, trade := range response {
 		res, err := toGlobalTrade(trade)
