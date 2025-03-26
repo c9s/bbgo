@@ -19,7 +19,7 @@ func (s *Strategy) handleMakerBookUpdate(_ types.SliceOrderBook) {
 
 		midPrice := bestBid.Price.Add(bestAsk.Price).Div(fixedpoint.Two)
 		for _, side := range []types.SideType{types.SideTypeBuy, types.SideTypeSell} {
-			updateOpenOrderMetrics(
+			updateOrderBookMetrics(
 				s.makerBook.SideBook(side),
 				side,
 				midPrice,

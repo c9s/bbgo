@@ -14,17 +14,17 @@ var spreadRatioMetrics = prometheus.NewGaugeVec(
 	[]string{"strategy_type", "strategy_id", "exchange", "symbol"},
 )
 
-var openOrderMaxPriceSpacingMetrics = prometheus.NewGaugeVec(
+var orderBookMaxPriceSpacingMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "bbgo_xdepthmaker_open_order_max_price_spacing",
+		Name: "bbgo_xdepthmaker_order_book_max_price_spacing",
 		Help: "the max price spacing of open orders on the market",
 	},
 	[]string{"strategy_type", "strategy_id", "exchange", "side", "symbol"},
 )
 
-var openOrdersCountMetrics = prometheus.NewGaugeVec(
+var orderBookInRangeCountMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "bbgo_xdepthmaker_market_open_order_count",
+		Name: "bbgo_xdepthmaker_order_book_count",
 		Help: "the number of in-range open orders on the market",
 	},
 	[]string{"strategy_type", "strategy_id", "exchange", "side", "price_range", "symbol"},
@@ -41,8 +41,8 @@ var marketDepthInUsdMetrics = prometheus.NewGaugeVec(
 func init() {
 	prometheus.MustRegister(
 		spreadRatioMetrics,
-		openOrdersCountMetrics,
-		openOrderMaxPriceSpacingMetrics,
+		orderBookInRangeCountMetrics,
+		orderBookMaxPriceSpacingMetrics,
 		marketDepthInUsdMetrics,
 	)
 }
@@ -57,7 +57,7 @@ func updateSpreadRatioMetrics(bestBidPrice, bestAskPrice fixedpoint.Value, strat
 	}).Set(spreadRatio.Float64())
 }
 
-func updateOpenOrderMetrics(
+func updateOrderBookMetrics(
 	book types.PriceVolumeSlice,
 	side types.SideType,
 	midPrice, priceRange fixedpoint.Value,
@@ -87,10 +87,10 @@ func updateOpenOrderMetrics(
 		"symbol":        symbol,
 		"side":          string(side),
 	}
-	openOrderMaxPriceSpacingMetrics.
+	orderBookMaxPriceSpacingMetrics.
 		With(sharedLabels).
 		Set(maxPriceSpacing.Float64())
-	openOrdersCountMetrics.
+	orderBookInRangeCountMetrics.
 		MustCurryWith(sharedLabels).
 		With(
 			prometheus.Labels{
