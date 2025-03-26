@@ -43,6 +43,11 @@ var ErrZeroQuantity = stderrors.New("quantity is zero")
 var ErrDustQuantity = stderrors.New("quantity is dust")
 var ErrZeroPrice = stderrors.New("price is zero")
 
+type DepthQueryService interface {
+	QueryDepth(ctx context.Context, symbol string, limit int,
+	) (snapshot types.SliceOrderBook, finalUpdateID int64, err error)
+}
+
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -965,6 +970,45 @@ func (s *Strategy) generateMakerOrders(
 	var availableBalances = map[types.SideType]fixedpoint.Value{
 		types.SideTypeBuy:  availableQuote,
 		types.SideTypeSell: availableBase,
+	}
+
+	requireFullDepthRequest := false
+	actualDepth := fixedpoint.Zero
+	requiredDepth := fixedpoint.Zero
+	for _, side := range []types.SideType{types.SideTypeBuy, types.SideTypeSell} {
+		sideBook := dupPricingBook.SideBook(side)
+
+		if sideBook.Len() == 0 {
+			requireFullDepthRequest = true
+			break
+		}
+		
+		depthInQuote := sideBook.SumDepthInQuote()
+		if scale, err := s.DepthScale.LayerRule.Scale(); err == nil {
+			requiredDepth = fixedpoint.NewFromFloat(scale.Call(float64(s.NumLayers)))
+			if depthInQuote.Compare(requiredDepth) < 0 {
+				requireFullDepthRequest = true
+				actualDepth = depthInQuote
+				break
+			}
+		}
+	}
+
+	if requireFullDepthRequest {
+		s.logger.Warnf("source book depth (%f) from websocket is not engouh (< %f), falling back to RESTful api query...",
+			actualDepth.Float64(), requiredDepth.Float64())
+
+		if depthService, ok := s.makerSession.Exchange.(DepthQueryService); ok {
+			snapshot, _, err := depthService.QueryDepth(context.Background(), s.Symbol, 0)
+			if err != nil {
+				s.logger.WithError(err).Errorf("unable to query source book depth via RESTful API")
+			} else {
+				dupPricingBook.Load(snapshot)
+				s.logger.Infof("source depth snapshot is loaded from RESTful API")
+			}
+		} else {
+			s.logger.Warnf("exchange %s does not support depth query service", s.makerSession.ExchangeName)
+		}
 	}
 
 	for _, side := range []types.SideType{types.SideTypeBuy, types.SideTypeSell} {
