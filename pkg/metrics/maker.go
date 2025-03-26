@@ -43,7 +43,25 @@ var makerBestAskPriceMetrics = prometheus.NewGaugeVec(
 		Help: "",
 	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"})
 
+// UpdateMakerOpenOrderMetrics updates the metrics for maker open orders.
+// It assumes that the orders have been partially or all canceled.
+// In the case of a partial cancel, the submitOrders should be the active orders.
 func UpdateMakerOpenOrderMetrics(strategyType, strategyId, exchangeName, symbol string, submitOrders []types.SubmitOrder) {
+	labels := prometheus.Labels{
+		"strategy_type": strategyType,
+		"strategy_id":   strategyId,
+		"exchange":      exchangeName,
+		"symbol":        symbol,
+	}
+	if len(submitOrders) == 0 {
+		makerOpenOrderBidExposureInUsdMetrics.With(labels).Set(0.0)
+		makerOpenOrderAskExposureInUsdMetrics.With(labels).Set(0.0)
+		makerOpenOrderBidOrderCountMetrics.With(labels).Set(0.0)
+		makerOpenOrderAskOrderCountMetrics.With(labels).Set(0.0)
+		makerBestBidPriceMetrics.With(labels).Set(0.0)
+		makerBestAskPriceMetrics.With(labels).Set(0.0)
+		return
+	}
 	bidOrderCount := 0
 	askOrderCount := 0
 	bidExposureQuoteAmount := fixedpoint.Zero
@@ -76,13 +94,6 @@ func UpdateMakerOpenOrderMetrics(strategyType, strategyId, exchangeName, symbol 
 			}
 
 		}
-	}
-
-	labels := prometheus.Labels{
-		"strategy_type": strategyType,
-		"strategy_id":   strategyId,
-		"exchange":      exchangeName,
-		"symbol":        symbol,
 	}
 
 	makerOpenOrderBidExposureInUsdMetrics.With(labels).Set(bidExposureQuoteAmount.Float64())

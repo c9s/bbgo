@@ -294,3 +294,10 @@ func (s OrderSlice) Print() {
 		logrus.Infof("%s", o)
 	}
 }
+
+func (s *OrderSlice) SubmitOrders() (submitOrders []SubmitOrder) {
+	for _, o := range *s {
+		submitOrders = append(submitOrders, o.SubmitOrder)
+	}
+	return submitOrders
+}
