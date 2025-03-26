@@ -592,43 +592,7 @@ func (s *Strategy) CrossRun(
 	})
 	s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
 	s.makerBook.BindStream(makerMarketStream)
-	s.makerBook.OnUpdate(func(_ types.SliceOrderBook) {
-		bestBid, bestAsk, hasPrice := s.makerBook.BestBidAndAsk()
-		if hasPrice {
-			updateSpreadRatioMetrics(
-				bestBid.Price,
-				bestAsk.Price,
-				ID,
-				s.InstanceID(),
-				string(s.makerSession.ExchangeName),
-				s.Symbol,
-			)
-
-			midPrice := bestBid.Price.Add(bestAsk.Price).Div(fixedpoint.Two)
-			for _, side := range []types.SideType{types.SideTypeBuy, types.SideTypeSell} {
-				updateOpenOrderMetrics(
-					s.makerBook.SideBook(side),
-					side,
-					midPrice,
-					prometheusPriceRange,
-					ID,
-					s.InstanceID(),
-					string(s.makerSession.ExchangeName),
-					s.Symbol,
-				)
-				updateMarketDepthInUsd(
-					s.makerBook.SideBook(side),
-					side,
-					midPrice,
-					prometheusPriceRange,
-					ID,
-					s.InstanceID(),
-					string(s.makerSession.ExchangeName),
-					s.Symbol,
-				)
-			}
-		}
-	})
+	s.makerBook.OnUpdate(s.handleMakerBookUpdate)
 
 	if err := sourceMarketStream.Connect(ctx); err != nil {
 		return err
