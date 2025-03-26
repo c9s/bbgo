@@ -1151,7 +1151,7 @@ func (e *Exchange) QueryDepth(
 	req.Market(symbol)
 
 	// maximum limit is 300
-	if limit > 300 {
+	if limit > 300 || limit <= 0 {
 		limit = 300
 	}
 
