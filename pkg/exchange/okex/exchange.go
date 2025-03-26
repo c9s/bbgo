@@ -17,6 +17,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 var (
@@ -738,13 +739,14 @@ If you want to query all trades within a large time range (e.g. total orders > 1
 We don't support the last trade id as a filter because okx supports bill ID only.
 */
 func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+	logger := util.GetLoggerFromCtxOrFallback(ctx, log)
 	if symbol == "" {
 		return nil, ErrSymbolRequired
 	}
 
 	limit := options.Limit
 	if limit > defaultQueryLimit || limit <= 0 {
-		log.Infof("param limit exceeded default limit %d or zero, got: %d, use default limit", defaultQueryLimit, limit)
+		logger.Infof("param limit exceeded default limit %d or zero, got: %d, use default limit", defaultQueryLimit, limit)
 		limit = defaultQueryLimit
 	}
 
@@ -754,7 +756,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		newStartTime = *options.StartTime
 		if timeNow.Sub(newStartTime) > maxHistoricalDataQueryPeriod {
 			newStartTime = timeNow.Add(-maxHistoricalDataQueryPeriod)
-			log.Warnf("!!!OKX EXCHANGE API NOTICE!!! The trade API cannot query data beyond 90 days from the current date, update %s -> %s", *options.StartTime, newStartTime)
+			logger.Warnf("!!!OKX EXCHANGE API NOTICE!!! The trade API cannot query data beyond 90 days from the current date, update %s -> %s", *options.StartTime, newStartTime)
 		}
 	}
 
@@ -772,10 +774,13 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	if options.LastTradeID != 0 {
 		// we don't support the last trade id as a filter because okx supports bill ID only.
 		// we don't have any more fields (types.Trade) to store it.
-		log.Infof("Last trade id not supported on QueryTrades")
+		logger.Infof("Last trade id: %d not supported on QueryTrades", options.LastTradeID)
 	}
 
-	if timeNow.Sub(newStartTime) <= threeDaysHistoricalPeriod {
+	lessThan3Day := timeNow.Sub(newStartTime) <= threeDaysHistoricalPeriod
+	logger.Infof("QueryTrades: symbol=%s, limit=%d, start=%s, end=%s, lastTradeId=%d, less3Day=%t, margin=%t", symbol, limit, newStartTime, endTime, options.LastTradeID, lessThan3Day, e.MarginSettings.IsMargin)
+
+	if lessThan3Day {
 		c := e.client.NewGetThreeDaysTransactionHistoryRequest().
 			InstrumentID(toLocalSymbol(symbol)).
 			StartTime(newStartTime).
@@ -786,7 +791,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 			c.InstrumentType(okexapi.InstrumentTypeMargin)
 		}
 
-		return getTrades(ctx, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
+		return getTrades(ctx, logger, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
 			c.Before(billId)
 			return c.Do(ctx)
 		})
@@ -802,19 +807,20 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		c.InstrumentType(okexapi.InstrumentTypeMargin)
 	}
 
-	return getTrades(ctx, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
+	return getTrades(ctx, logger, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
 		c.Before(billId)
 		return c.Do(ctx)
 	})
 }
 
 func getTrades(
-	ctx context.Context, limit int64, doFunc func(ctx context.Context, billId string) ([]okexapi.Trade, error),
+	ctx context.Context, log *logrus.Entry, limit int64, doFunc func(ctx context.Context, billId string) ([]okexapi.Trade, error),
 ) (trades []types.Trade, err error) {
 	billId := "0"
 	for {
 		response, err := doFunc(ctx, billId)
 		if err != nil {
+			log.WithError(err).Warn("failed to query trades")
 			return nil, fmt.Errorf("failed to query trades, err: %w", err)
 		}
 
@@ -823,12 +829,15 @@ func getTrades(
 		}
 
 		tradeLen := int64(len(response))
+		log.Infof("getTrades: billId=%s, tradeLen=%d, limit=%d", billId, tradeLen, limit)
 		// a defensive programming to ensure the length of order response is expected.
 		if tradeLen > limit {
+			log.WithError(err).Warnf("getTrades: trade length %d exceeds limit %d", tradeLen, limit)
 			return nil, fmt.Errorf("unexpected trade length %d", tradeLen)
 		}
 
 		if tradeLen < limit {
+			log.Warnf("getTrades: trade length %d less than limit %d", tradeLen, limit)
 			break
 		}
 		// use Before filter to get all data.

@@ -12,6 +12,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 // SyncTask defines the behaviors for syncing remote records
@@ -60,6 +62,7 @@ func (sel SyncTask) execute(
 	ctx context.Context,
 	db *sqlx.DB, startTime time.Time, endTimeArgs ...time.Time,
 ) error {
+	logger := util.GetLoggerFromCtx(ctx)
 	batchBufferRefVal := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(sel.Type)), 0, sel.BatchInsertBuffer)
 
 	// query from db
@@ -73,7 +76,7 @@ func (sel SyncTask) execute(
 		recordSliceRef = recordSliceRef.Elem()
 	}
 
-	logrus.Debugf("loaded %d %T records", recordSliceRef.Len(), sel.Type)
+	logger.Debugf("loaded %d %T records", recordSliceRef.Len(), sel.Type)
 
 	ids := buildIdMap(sel, recordSliceRef)
 
@@ -102,6 +105,7 @@ func (sel SyncTask) execute(
 		endTime = endTimeArgs[0]
 	}
 
+	// 這裡可能有問題
 	// asset "" means all assets
 	dataC, errC := sel.BatchQuery(ctx, startTime, endTime)
 	dataCRef := reflect.ValueOf(dataC)
@@ -110,7 +114,7 @@ func (sel SyncTask) execute(
 		if sel.BatchInsert != nil && batchBufferRefVal.Len() > 0 {
 			slice := batchBufferRefVal.Interface()
 			if err := sel.BatchInsert(slice); err != nil {
-				logrus.WithError(err).Errorf("batch insert error: %+v", slice)
+				logger.WithError(err).Errorf("batch insert error: %+v", slice)
 			}
 		}
 	}()
@@ -118,7 +122,7 @@ func (sel SyncTask) execute(
 	for {
 		select {
 		case <-ctx.Done():
-			logrus.Warnf("context is cancelled, stop syncing")
+			logger.Warnf("context is cancelled, stop syncing")
 			return ctx.Err()
 
 		default:
@@ -131,19 +135,19 @@ func (sel SyncTask) execute(
 			obj := v.Interface()
 			id := sel.ID(obj)
 			if _, exists := ids[id]; exists {
-				logrus.Debugf("object %s already exists, skipping", id)
+				logger.Debugf("object %s already exists, skipping", id)
 				continue
 			}
 
 			tt := sel.Time(obj)
 			if tt.Before(startTime) || tt.After(endTime) {
-				logrus.Debugf("object %s time %s is outside of the time range", id, tt)
+				logger.Debugf("object %s time %s is outside of the time range", id, tt)
 				continue
 			}
 
 			if sel.Filter != nil {
 				if !sel.Filter(obj) {
-					logrus.Debugf("object %s is filtered", id)
+					logger.Debugf("object %s is filtered", id)
 					continue
 				}
 			}
@@ -152,9 +156,9 @@ func (sel SyncTask) execute(
 			if sel.BatchInsert != nil {
 				if batchBufferRefVal.Len() > sel.BatchInsertBuffer-1 {
 					if sel.LogInsert {
-						logrus.Infof("batch inserting %d %T", batchBufferRefVal.Len(), obj)
+						logger.Infof("batch inserting %d %T", batchBufferRefVal.Len(), obj)
 					} else {
-						logrus.Debugf("batch inserting %d %T", batchBufferRefVal.Len(), obj)
+						logger.Debugf("batch inserting %d %T", batchBufferRefVal.Len(), obj)
 					}
 
 					if err := sel.BatchInsert(batchBufferRefVal.Interface()); err != nil {
@@ -166,19 +170,19 @@ func (sel SyncTask) execute(
 				batchBufferRefVal = reflect.Append(batchBufferRefVal, v)
 			} else {
 				if sel.LogInsert {
-					logrus.Infof("inserting %T: %+v", obj, obj)
+					logger.Infof("inserting %T: %+v", obj, obj)
 				} else {
-					logrus.Debugf("inserting %T: %+v", obj, obj)
+					logger.Debugf("inserting %T: %+v", obj, obj)
 				}
 				if sel.Insert != nil {
 					// for custom insert
 					if err := sel.Insert(obj); err != nil {
-						logrus.WithError(err).Errorf("can not insert record: %v", obj)
+						logger.WithError(err).Errorf("can not insert record: %v", obj)
 						return err
 					}
 				} else {
 					if err := insertType(db, obj, useUpsert); err != nil {
-						logrus.WithError(err).Errorf("can not insert record: %v", obj)
+						logger.WithError(err).Errorf("can not insert record: %v", obj)
 						return err
 					}
 				}
