@@ -141,7 +141,9 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		Type(orderType).
 		Side(futures.SideType(order.Side))
 
-	if order.ReduceOnly {
+	if dualSidePosition {
+		setDualSidePosition(req, order)
+	} else if order.ReduceOnly {
 		req.ReduceOnly(order.ReduceOnly)
 	} else if order.ClosePosition {
 		req.ClosePosition(order.ClosePosition)
@@ -410,4 +412,21 @@ func (e *Exchange) QueryFuturesIncomeHistory(
 
 	resp, err := req.Do(ctx)
 	return resp, err
+}
+
+func setDualSidePosition(req *futures.CreateOrderService, order types.SubmitOrder) {
+	switch order.Side {
+	case types.SideTypeBuy:
+		if order.ReduceOnly {
+			req.PositionSide(futures.PositionSideTypeShort)
+		} else {
+			req.PositionSide(futures.PositionSideTypeLong)
+		}
+	case types.SideTypeSell:
+		if order.ReduceOnly {
+			req.PositionSide(futures.PositionSideTypeLong)
+		} else {
+			req.PositionSide(futures.PositionSideTypeShort)
+		}
+	}
 }
