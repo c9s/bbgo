@@ -1156,6 +1156,8 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 			return
 		}
 	}
+	activeOrders := s.MakerOrderExecutor.ActiveMakerOrders().Orders()
+	metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, activeOrders.SubmitOrders())
 
 	bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
 	if !hasPrice {
@@ -1225,6 +1227,9 @@ func (s *Strategy) updateQuote(ctx context.Context, maxLayer int) {
 
 	if maxLayer == 0 {
 		metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, submitOrders)
+	} else {
+		activeOrders := s.MakerOrderExecutor.ActiveMakerOrders().Orders()
+		metrics.UpdateMakerOpenOrderMetrics(ID, s.InstanceID(), s.MakerExchange, s.Symbol, activeOrders.SubmitOrders())
 	}
 }
 
