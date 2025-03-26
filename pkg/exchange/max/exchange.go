@@ -1149,7 +1149,16 @@ func (e *Exchange) QueryDepth(
 ) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	req := e.v3client.NewGetDepthRequest()
 	req.Market(symbol)
-	req.Limit(limit)
+
+	// maximum limit is 300
+	if limit > 300 || limit <= 0 {
+		limit = 300
+	}
+
+	if limit > 0 {
+		// default limit is 300
+		req.Limit(limit)
+	}
 
 	depth, err := req.Do(ctx)
 	if err != nil {
