@@ -63,7 +63,7 @@ func TestStreamBasic(t *testing.T) {
 		stream := getTestStreamOrSkip(t)
 		chanStatus := make(chan StatusMessage)
 
-		stream.StandardStream.Subscribe("status", "", types.SubscribeOptions{})
+		stream.Subscribe(statusChannel, "", types.SubscribeOptions{})
 		stream.OnStatusMessage(func(m *StatusMessage) {
 			assert.NotNil(t, m)
 			// t.Log("get status message")
@@ -87,7 +87,7 @@ func TestStreamBasic(t *testing.T) {
 		chanTicker := make(chan TickerMessage)
 
 		for _, productID := range productIDs {
-			stream.StandardStream.Subscribe("ticker", productID, types.SubscribeOptions{})
+			stream.Subscribe(tickerChannel, productID, types.SubscribeOptions{})
 		}
 		stream.OnTickerMessage(func(m *TickerMessage) {
 			assert.NotNil(t, m)
@@ -112,7 +112,7 @@ func TestStreamBasic(t *testing.T) {
 		chanMatch := make(chan MatchMessage)
 
 		for _, productID := range productIDs {
-			stream.StandardStream.Subscribe("matches", productID, types.SubscribeOptions{})
+			stream.Subscribe(matchesChannel, productID, types.SubscribeOptions{})
 		}
 		stream.OnMatchMessage(func(m *MatchMessage) {
 			assert.NotNil(t, m)
@@ -142,8 +142,9 @@ func TestStreamFull(t *testing.T) {
 		productIDs := []string{"BTC-USD", "ETH-USD"}
 		c := make(chan struct{}, 10)
 		stream := getTestStreamOrSkip(t)
+		stream.SetPublicOnly()
 		for _, productID := range productIDs {
-			stream.StandardStream.Subscribe("full", productID, types.SubscribeOptions{})
+			stream.Subscribe(fullChannel, productID, types.SubscribeOptions{})
 		}
 
 		// received -> open* -> change* -> match? -> done
@@ -200,7 +201,7 @@ func TestLevel2(t *testing.T) {
 		getUpdate := false
 
 		for _, productID := range productIDs {
-			stream.StandardStream.Subscribe("level2", productID, types.SubscribeOptions{})
+			stream.Subscribe(level2Channel, productID, types.SubscribeOptions{})
 		}
 
 		stream.OnOrderbookSnapshotMessage(func(m *OrderBookSnapshotMessage) {
@@ -247,7 +248,7 @@ func TestBalance(t *testing.T) {
 		c := make(chan struct{}, 1)
 		stream := getTestStreamOrSkip(t)
 		for _, accountID := range accounts {
-			stream.StandardStream.Subscribe("balance", accountID, types.SubscribeOptions{})
+			stream.Subscribe(balanceChannel, accountID, types.SubscribeOptions{})
 		}
 		stream.OnBalanceMessage(func(m *BalanceMessage) {
 			assert.NotNil(t, m)
@@ -266,6 +267,101 @@ func TestBalance(t *testing.T) {
 	})
 }
 
+func TestStreamBbgoChannels(t *testing.T) {
+	t.Run("Test Book", func(t *testing.T) {
+		c := make(chan string, 1)
+		stream := getTestStreamOrSkip(t)
+		stream.SetPublicOnly()
+		stream.Subscribe(types.BookChannel, "BTCUSD", types.SubscribeOptions{})
+		stream.OnOrderbookSnapshotMessage(func(m *OrderBookSnapshotMessage) {
+			assert.NotNil(t, m)
+			c <- "snapshot"
+		})
+		stream.OnOrderbookUpdateMessage(func(m *OrderBookUpdateMessage) {
+			assert.NotNil(t, m)
+			c <- "update"
+		})
+		err := stream.Connect(context.Background())
+		assert.NoError(t, err)
+		getSnapshot := false
+		getUpdate := false
+	outer:
+		for {
+			select {
+			case sig := <-c:
+				switch sig {
+				case "snapshot":
+					getSnapshot = true
+				case "update":
+					getUpdate = true
+				}
+				if getSnapshot && getUpdate {
+					break outer
+				}
+			case <-time.After(time.Second * 10):
+				t.Fatal("No message from book channel after 10 seconds")
+			}
+		}
+		err = stream.Close()
+		assert.NoError(t, err)
+	})
+
+	t.Run("Test Market Trade", func(t *testing.T) {
+		c := make(chan struct{}, 1)
+		stream := getTestStreamOrSkip(t)
+		stream.SetPublicOnly()
+		stream.Subscribe(types.MarketTradeChannel, "BTCUSD", types.SubscribeOptions{})
+		stream.OnMarketTrade(func(m types.Trade) {
+			c <- struct{}{}
+		})
+		err := stream.Connect(context.Background())
+		assert.NoError(t, err)
+		select {
+		case <-c:
+		case <-time.After(time.Second * 10):
+			t.Fatal("No message from market trade channel after 10 seconds")
+		}
+		err = stream.Close()
+		assert.NoError(t, err)
+	})
+}
+
+func TestStreamInvalidCredentials(t *testing.T) {
+	t.Run("Test Book Channel Panic", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				return
+			}
+			t.Fatal("Expected panic but got none")
+		}()
+		key := ""
+		secret := ""
+		passphrase := ""
+		exchange := New(key, secret, passphrase, 0)
+		stream := exchange.NewStream()
+		stream.Subscribe(types.BookChannel, "BTCUSD", types.SubscribeOptions{})
+		// should panic
+		_ = stream.Connect(context.Background())
+	})
+
+	t.Run("Test Market Trade Channel Panic", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				return
+			}
+			t.Fatal("Expected panic but got none")
+		}()
+		key := ""
+		secret := ""
+		passphrase := ""
+		exchange := New(key, secret, passphrase, 0)
+		stream := exchange.NewStream()
+		stream.Subscribe(types.MarketTradeChannel, "BTCUSD", types.SubscribeOptions{})
+		// should panic
+		_ = stream.Connect(context.Background())
+	})
+}
+
 func getTestStreamOrSkip(t *testing.T) *Stream {
 	if isCI, _ := strconv.ParseBool(os.Getenv("CI")); isCI {
 		t.Skip("skip test for CI")
@@ -276,6 +372,6 @@ func getTestStreamOrSkip(t *testing.T) *Stream {
 		t.Skip("COINBASE_* env vars not set")
 	}
 	exchange := New(key, secret, passphrase, 0)
-	stream := NewStream(exchange, key, passphrase, secret)
+	stream := NewStream(exchange, key, secret, passphrase)
 	return stream
 }

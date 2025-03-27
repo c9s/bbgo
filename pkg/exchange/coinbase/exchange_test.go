@@ -54,11 +54,12 @@ func Test_OrdersAPI(t *testing.T) {
 	assert.Error(t, err)
 	assert.Empty(t, order)
 	// should succeed
+	symbol := "ETHUSD"
 	order, err = ex.SubmitOrder(
 		ctx,
 		types.SubmitOrder{
 			Market: types.Market{
-				Symbol: "ETHUSD",
+				Symbol: symbol,
 			},
 			Side:     types.SideTypeBuy,
 			Type:     types.OrderTypeLimit,
@@ -69,8 +70,9 @@ func Test_OrdersAPI(t *testing.T) {
 	assert.NotEmpty(t, order)
 
 	// test query open orders
-	order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: "ETHUSD", OrderID: order.UUID, ClientOrderID: order.UUID})
+	order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderID: order.UUID, ClientOrderID: order.UUID})
 	assert.NoError(t, err)
+	assert.NotNil(t, order)
 
 	// the status might be pending at the beginning. Wait until it is open
 	// only retry 5 times
@@ -79,11 +81,11 @@ func Test_OrdersAPI(t *testing.T) {
 			break
 		}
 		time.Sleep(time.Millisecond * 500)
-		order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: "ETHUSD", OrderID: order.UUID, ClientOrderID: order.UUID})
+		order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderID: order.UUID, ClientOrderID: order.UUID})
 		assert.NoError(t, err)
 	}
 
-	orders, err := ex.QueryOpenOrders(ctx, "ETHUSD")
+	orders, err := ex.QueryOpenOrders(ctx, symbol)
 	assert.NoError(t, err)
 	found := false
 	for _, o := range orders {

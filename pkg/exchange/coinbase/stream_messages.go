@@ -149,34 +149,6 @@ type TickerMessage struct {
 	LastSize    fixedpoint.Value `json:"last_size"`
 }
 
-func (msg *TickerMessage) Trade() types.Trade {
-	var side types.SideType
-	switch msg.Side {
-	case "buy":
-		side = types.SideTypeBuy
-	case "sell":
-		side = types.SideTypeSell
-	default:
-		side = types.SideType(msg.Side)
-	}
-	isBuyer := side == types.SideTypeBuy
-	quoteQuantity := msg.Price.Mul(msg.LastSize)
-	return types.Trade{
-		ID:            uint64(msg.TradeID),
-		Exchange:      types.ExchangeCoinBase,
-		Price:         msg.Price,
-		Quantity:      msg.LastSize,
-		QuoteQuantity: quoteQuantity,
-		Side:          side,
-		Symbol:        toGlobalSymbol(msg.ProductID),
-		IsBuyer:       isBuyer,
-		IsMaker:       !isBuyer,
-		Time:          types.Time(msg.Time),
-		FeeCurrency:   msg.QuoteCurrency(),
-		Fee:           fixedpoint.Zero, // not available
-	}
-}
-
 // full channel
 type ReceivedMessage struct {
 	seqenceMessageType

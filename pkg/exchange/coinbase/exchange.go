@@ -304,7 +304,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 
 // ExchangeMarketDataService
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e, e.apiKey, e.apiPassphrase, e.apiSecret)
+	return NewStream(e, e.apiKey, e.apiSecret, e.apiPassphrase)
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
