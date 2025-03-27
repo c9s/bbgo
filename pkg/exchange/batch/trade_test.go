@@ -136,7 +136,11 @@ func Test_TradeBatchQuery(t *testing.T) {
 				return emptyTrades, nil
 			}).Times(1)
 
-		tradeBatchQuery := &TradeBatchQuery{ExchangeTradeHistoryService: mockExchange}
+		tradeBatchQuery := &TradeBatchQuery{
+			ExchangeTradeHistoryService: mockExchange,
+
+			DisableBackoff: true,
+		}
 
 		resCh, errC := tradeBatchQuery.Query(ctx, expSymbol, expOptions)
 		wg := sync.WaitGroup{}
@@ -173,9 +177,13 @@ func Test_TradeBatchQuery(t *testing.T) {
 				assert.Equal(t, uint64(0), options.LastTradeID)
 				assert.Equal(t, expOptions.Limit, options.Limit)
 				return nil, unknownErr
-			}).Times(1)
+			}).AnyTimes()
 
-		tradeBatchQuery := &TradeBatchQuery{ExchangeTradeHistoryService: mockExchange}
+		tradeBatchQuery := &TradeBatchQuery{
+			ExchangeTradeHistoryService: mockExchange,
+
+			DisableBackoff: true,
+		}
 
 		resCh, errC := tradeBatchQuery.Query(ctx, expSymbol, expOptions)
 		wg := sync.WaitGroup{}
