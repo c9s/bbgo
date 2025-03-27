@@ -239,6 +239,12 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 	})
 }
 
+func (sb *StreamOrderBook) BindUpdate(updateFunc func(book *StreamOrderBook, update SliceOrderBook)) {
+	sb.OnUpdate(func(update_ SliceOrderBook) {
+		updateFunc(sb, update_)
+	})
+}
+
 func (sb *StreamOrderBook) emitChange(signalType BookSignalType, bookTime time.Time) {
 	select {
 	case sb.C <- &BookSignal{Type: signalType, Time: defaultTime(bookTime, time.Now)}:

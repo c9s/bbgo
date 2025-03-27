@@ -587,6 +587,11 @@ func (s *Strategy) CrossRun(
 	})
 	s.sourceBook = types.NewStreamBook(s.HedgeSymbol, s.hedgeSession.ExchangeName)
 	s.sourceBook.BindStream(sourceMarketStream)
+	s.sourceBook.BindUpdate(s.newUpdateMetrics(
+		string(s.hedgeSession.ExchangeName),
+		s.HedgeSymbol,
+		prometheusPriceRange,
+	))
 
 	// initialize maker book
 	makerMarketStream := s.makerSession.Exchange.NewStream()
@@ -597,7 +602,11 @@ func (s *Strategy) CrossRun(
 	})
 	s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
 	s.makerBook.BindStream(makerMarketStream)
-	s.makerBook.OnUpdate(s.handleMakerBookUpdate)
+	s.makerBook.BindUpdate(s.newUpdateMetrics(
+		string(s.makerSession.ExchangeName),
+		s.Symbol,
+		prometheusPriceRange,
+	))
 
 	if err := sourceMarketStream.Connect(ctx); err != nil {
 		return err
@@ -998,7 +1007,7 @@ func (s *Strategy) generateMakerOrders(
 			requireFullDepthRequest = true
 			break
 		}
-		
+
 		depthInQuote := sideBook.SumDepthInQuote()
 		if scale, err := s.DepthScale.LayerRule.Scale(); err == nil {
 			requiredDepth = fixedpoint.NewFromFloat(scale.Call(float64(s.NumLayers)))
