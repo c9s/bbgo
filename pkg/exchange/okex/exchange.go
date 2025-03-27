@@ -276,8 +276,15 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	if e.MarginSettings.IsMargin {
 		// okx market order with trade mode cross will be rejected:
 		//   "The corresponding product of this BTC-USDT doesn't support the tgtCcy parameter"
-		//
-		// orderReq.TradeMode(okexapi.TradeModeCross)
+		if order.Type == types.OrderTypeMarket {
+			log.Warnf("market order with margin mode is not supported, fallback to cash mode, please see %s for more details",
+				"https://www.okx.com/docs-v5/trick_en/#order-management-trade-mode")
+			orderReq.TradeMode(okexapi.TradeModeCash)
+		} else {
+			orderReq.TradeMode(okexapi.TradeModeCross)
+		}
+	} else {
+		orderReq.TradeMode(okexapi.TradeModeCash)
 	}
 
 	// set price field for limit orders
@@ -789,6 +796,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 		if e.MarginSettings.IsMargin {
 			c.InstrumentType(okexapi.InstrumentTypeMargin)
+		} else {
+			c.InstrumentType(okexapi.InstrumentTypeSpot)
 		}
 
 		return getTrades(ctx, logger, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
@@ -805,6 +814,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	if e.MarginSettings.IsMargin {
 		c.InstrumentType(okexapi.InstrumentTypeMargin)
+	} else {
+		c.InstrumentType(okexapi.InstrumentTypeSpot)
 	}
 
 	return getTrades(ctx, logger, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
