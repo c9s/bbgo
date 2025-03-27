@@ -35,6 +35,9 @@ spec:
             - "--since"
             - {{ .Values.sync.since | quote }}
             {{- end }}
+            {{- if .Values.debug.enabled }}
+            - "--debug"
+            {{- end }}
             resources:
               {{- toYaml .Values.resources | nindent 14 }}
             volumeMounts:
