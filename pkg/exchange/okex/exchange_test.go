@@ -126,19 +126,17 @@ func TestExchange_QueryTrades(t *testing.T) {
 
 			transport.GET(threeDayUrl, func(req *http.Request) (*http.Response, error) {
 				query := req.URL.Query()
-				assert.Len(query, 6)
+				assert.Len(query, 5)
 				assert.Contains(query, "begin")
 				assert.Contains(query, "end")
 				assert.Contains(query, "limit")
 				assert.Contains(query, "instId")
 				assert.Contains(query, "instType")
-				assert.Contains(query, "before")
 				assert.Equal(query["begin"], []string{strconv.FormatInt(since.UnixNano()/int64(time.Millisecond), 10)})
 				assert.Equal(query["end"], []string{strconv.FormatInt(until.UnixNano()/int64(time.Millisecond), 10)})
 				assert.Equal(query["limit"], []string{strconv.FormatInt(defaultQueryLimit, 10)})
 				assert.Equal(query["instId"], []string{expLocalBtcSymbol})
 				assert.Equal(query["instType"], []string{string(okexapi.InstrumentTypeSpot)})
-				assert.Equal(query["before"], []string{"0"})
 				return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
 			})
 
@@ -205,9 +203,8 @@ func TestExchange_QueryTrades(t *testing.T) {
 				assert.Equal(query["limit"], []string{strconv.FormatInt(defaultQueryLimit, 10)})
 				assert.Equal(query["instId"], []string{expLocalBtcSymbol})
 				assert.Equal(query["instType"], []string{string(okexapi.InstrumentTypeSpot)})
-				assert.Len(query, 6)
 
-				if query["before"][0] == "0" {
+				if _, found := query["after"]; !found {
 					resp := &okexapi.APIResponse{
 						Code: "0",
 						Data: []byte("[" + strings.Join(tradesStr[0:defaultQueryLimit], ",") + "]"),
@@ -220,7 +217,7 @@ func TestExchange_QueryTrades(t *testing.T) {
 
 				// second time query
 				// last order id, so need to -1
-				assert.Equal(query["before"], []string{strconv.FormatInt(int64(billId+defaultQueryLimit-1), 10)})
+				assert.Equal(query["after"], []string{strconv.FormatInt(int64(billId+defaultQueryLimit-1), 10)})
 
 				resp := okexapi.APIResponse{
 					Code: "0",
@@ -249,19 +246,17 @@ func TestExchange_QueryTrades(t *testing.T) {
 
 			transport.GET(historyUrl, func(req *http.Request) (*http.Response, error) {
 				query := req.URL.Query()
-				assert.Len(query, 6)
+				assert.Len(query, 5)
 				assert.Contains(query, "begin")
 				assert.Contains(query, "end")
 				assert.Contains(query, "limit")
 				assert.Contains(query, "instId")
 				assert.Contains(query, "instType")
-				assert.Contains(query, "before")
 				assert.Equal(query["begin"], []string{strconv.FormatInt(newSince.UnixNano()/int64(time.Millisecond), 10)})
 				assert.Equal(query["end"], []string{strconv.FormatInt(until.UnixNano()/int64(time.Millisecond), 10)})
 				assert.Equal(query["limit"], []string{strconv.FormatInt(defaultQueryLimit, 10)})
 				assert.Equal(query["instId"], []string{expLocalBtcSymbol})
 				assert.Equal(query["instType"], []string{string(okexapi.InstrumentTypeSpot)})
-				assert.Equal(query["before"], []string{"0"})
 				return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
 			})
 
@@ -330,9 +325,8 @@ func TestExchange_QueryTrades(t *testing.T) {
 				assert.Equal(query["limit"], []string{strconv.FormatInt(defaultQueryLimit, 10)})
 				assert.Equal(query["instId"], []string{expLocalBtcSymbol})
 				assert.Equal(query["instType"], []string{string(okexapi.InstrumentTypeSpot)})
-				assert.Len(query, 6)
 
-				if query["before"][0] == "0" {
+				if _, found := query["after"]; !found {
 					resp := &okexapi.APIResponse{
 						Code: "0",
 						Data: []byte("[" + strings.Join(tradesStr[0:defaultQueryLimit], ",") + "]"),
@@ -345,7 +339,7 @@ func TestExchange_QueryTrades(t *testing.T) {
 
 				// second time query
 				// last order id, so need to -1
-				assert.Equal(query["before"], []string{strconv.FormatInt(int64(billId+defaultQueryLimit-1), 10)})
+				assert.Equal(query["after"], []string{strconv.FormatInt(int64(billId+defaultQueryLimit-1), 10)})
 
 				resp := okexapi.APIResponse{
 					Code: "0",
@@ -377,19 +371,16 @@ func TestExchange_QueryTrades(t *testing.T) {
 
 		transport.GET(historyUrl, func(req *http.Request) (*http.Response, error) {
 			query := req.URL.Query()
-			assert.Len(query, 6)
 			assert.Contains(query, "begin")
 			assert.Contains(query, "end")
 			assert.Contains(query, "limit")
 			assert.Contains(query, "instId")
 			assert.Contains(query, "instType")
-			assert.Contains(query, "before")
 			assert.Equal(query["begin"], []string{strconv.FormatInt(expSinceTime.UnixNano()/int64(time.Millisecond), 10)})
 			assert.Equal(query["end"], []string{strconv.FormatInt(until.UnixNano()/int64(time.Millisecond), 10)})
 			assert.Equal(query["limit"], []string{strconv.FormatInt(defaultQueryLimit, 10)})
 			assert.Equal(query["instId"], []string{expLocalBtcSymbol})
 			assert.Equal(query["instType"], []string{string(okexapi.InstrumentTypeSpot)})
-			assert.Equal(query["before"], []string{"0"})
 			return httptesting.BuildResponseString(http.StatusOK, string(historyOrderFile)), nil
 		})
 
