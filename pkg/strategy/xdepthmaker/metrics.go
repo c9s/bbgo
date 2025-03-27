@@ -19,15 +19,15 @@ var orderBookMaxPriceSpacingMetrics = prometheus.NewGaugeVec(
 		Name: "bbgo_xdepthmaker_order_book_max_price_spacing",
 		Help: "the max price spacing of open orders on the market",
 	},
-	[]string{"strategy_type", "strategy_id", "exchange", "side", "symbol"},
+	[]string{"strategy_type", "strategy_id", "exchange", "symbol", "side"},
 )
 
 var orderBookInRangeCountMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_xdepthmaker_order_book_count",
-		Help: "the number of in-range open orders on the market",
+		Help: "the number of in-range orders on the market",
 	},
-	[]string{"strategy_type", "strategy_id", "exchange", "side", "price_range", "symbol"},
+	[]string{"strategy_type", "strategy_id", "exchange", "symbol", "side", "price_range"},
 )
 
 var marketDepthInUsdMetrics = prometheus.NewGaugeVec(
@@ -35,7 +35,7 @@ var marketDepthInUsdMetrics = prometheus.NewGaugeVec(
 		Name: "bbgo_xdepthmaker_depth_in_usd",
 		Help: "the market depth in USD",
 	},
-	[]string{"strategy_type", "strategy_id", "exchange", "side", "price_range", "symbol"},
+	[]string{"strategy_type", "strategy_id", "exchange", "symbol", "side", "price_range"},
 )
 
 func init() {
@@ -47,21 +47,54 @@ func init() {
 	)
 }
 
-func updateSpreadRatioMetrics(bestBidPrice, bestAskPrice fixedpoint.Value, strategyType, strategyID, exchangeName, symbol string) {
+func (s *Strategy) newUpdateMetrics(exchangeName, symbol string, priceRange fixedpoint.Value) func(*types.StreamOrderBook, types.SliceOrderBook) {
+	return func(book *types.StreamOrderBook, _ types.SliceOrderBook) {
+		bestBid, bestAsk, hasPrice := book.BestBidAndAsk()
+		if !hasPrice {
+			return
+		}
+		labels := prometheus.Labels{
+			"strategy_type": ID,
+			"strategy_id":   s.InstanceID(),
+			"exchange":      exchangeName,
+			"symbol":        symbol,
+		}
+		updateSpreadRatioMetrics(
+			bestBid.Price,
+			bestAsk.Price,
+			labels,
+		)
+
+		midPrice := bestBid.Price.Add(bestAsk.Price).Div(fixedpoint.Two)
+		for _, side := range []types.SideType{types.SideTypeBuy, types.SideTypeSell} {
+			updateOrderBookMetrics(
+				book.SideBook(side),
+				side,
+				midPrice,
+				priceRange,
+				labels,
+			)
+			updateMarketDepthInUsd(
+				book.SideBook(side),
+				side,
+				midPrice,
+				priceRange,
+				labels,
+			)
+		}
+	}
+}
+
+func updateSpreadRatioMetrics(bestBidPrice, bestAskPrice fixedpoint.Value, labels prometheus.Labels) {
 	spreadRatio := bestAskPrice.Sub(bestBidPrice).Div(bestBidPrice)
-	spreadRatioMetrics.With(prometheus.Labels{
-		"strategy_type": strategyType,
-		"strategy_id":   strategyID,
-		"exchange":      exchangeName,
-		"symbol":        symbol,
-	}).Set(spreadRatio.Float64())
+	spreadRatioMetrics.With(labels).Set(spreadRatio.Float64())
 }
 
 func updateOrderBookMetrics(
 	book types.PriceVolumeSlice,
 	side types.SideType,
 	midPrice, priceRange fixedpoint.Value,
-	strategyType, strategyID, exchangeName, symbol string,
+	labels prometheus.Labels,
 ) {
 	inRangeOrderCount := 0
 	maxPriceSpacing := fixedpoint.Zero
@@ -80,20 +113,17 @@ func updateOrderBookMetrics(
 			}
 		}
 	}
-	sharedLabels := prometheus.Labels{
-		"strategy_type": strategyType,
-		"strategy_id":   strategyID,
-		"exchange":      exchangeName,
-		"symbol":        symbol,
-		"side":          string(side),
-	}
 	orderBookMaxPriceSpacingMetrics.
-		With(sharedLabels).
+		MustCurryWith(labels).
+		With(prometheus.Labels{
+			"side": string(side),
+		}).
 		Set(maxPriceSpacing.Float64())
 	orderBookInRangeCountMetrics.
-		MustCurryWith(sharedLabels).
+		MustCurryWith(labels).
 		With(
 			prometheus.Labels{
+				"side":        string(side),
 				"price_range": priceRange.String(),
 			},
 		).
@@ -104,7 +134,7 @@ func updateMarketDepthInUsd(
 	book types.PriceVolumeSlice,
 	side types.SideType,
 	midPrice, priceRange fixedpoint.Value,
-	strategyType, strategyID, exchangeName, symbol string,
+	labels prometheus.Labels,
 ) {
 	depthInUsd := fixedpoint.Zero
 	for _, priceVolume := range book {
@@ -115,14 +145,11 @@ func updateMarketDepthInUsd(
 		}
 	}
 	marketDepthInUsdMetrics.
+		MustCurryWith(labels).
 		With(
 			prometheus.Labels{
-				"strategy_type": strategyType,
-				"strategy_id":   strategyID,
-				"exchange":      exchangeName,
-				"symbol":        symbol,
-				"side":          string(side),
-				"price_range":   priceRange.String(),
+				"side":        string(side),
+				"price_range": priceRange.String(),
 			},
 		).
 		Set(depthInUsd.Float64())
