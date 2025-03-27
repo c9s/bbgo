@@ -47,8 +47,7 @@ type Stream struct {
 	orderbookSnapshotMessageCallbacks []func(m *OrderBookSnapshotMessage)
 	orderbookUpdateMessageCallbacks   []func(m *OrderBookUpdateMessage)
 
-	authEnabled   bool
-	userOrderOnly bool
+	authEnabled bool
 
 	lockSeqNumMap      sync.Mutex // lock to protect lastSequenceMsgMap
 	lastSequenceMsgMap map[string]SequenceNumberType
@@ -60,8 +59,8 @@ type Stream struct {
 func NewStream(
 	exchange *Exchange,
 	apiKey string,
-	passphrase string,
 	secretKey string,
+	passphrase string,
 ) *Stream {
 	s := Stream{
 		StandardStream: types.NewStandardStream(),

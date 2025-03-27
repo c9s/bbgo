@@ -2,6 +2,7 @@ package coinbase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -80,31 +81,70 @@ func (s *Stream) handleConnect() {
 	if len(s.Subscriptions) == 0 {
 		return
 	}
-
+	// bridge bbgo channels to coinbase channels
+	// auth required: level2, full, user
 	subProductsMap := make(map[types.Channel][]string)
+	allProductsMap := make(map[string]struct{})
 	for _, sub := range s.Subscriptions {
-		// rfqMatchChannel allow empty symbol
-		if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
-			continue
+		localSymbol := toLocalSymbol(sub.Symbol)
+		switch sub.Channel {
+		case types.BookChannel:
+			// bridge to level2 channel, which provides order book snapshot and book updates
+			logStream.Infof("bridge %s to level2_batch channel (%s)", sub.Channel, sub.Symbol)
+			subProductsMap[level2BatchChannel] = append(subProductsMap[level2Channel], localSymbol)
+		case types.MarketTradeChannel:
+			// full: all orders/trades on Coinbase Exchange
+			if !s.PublicOnly {
+				panic("subscribe to market trade channel for a public stream is not allowed")
+			}
+			subProductsMap[matchesChannel] = append(subProductsMap[matchesChannel], localSymbol)
+			logStream.Infof("bridge %s to %s(%s)", sub.Channel, matchesChannel, localSymbol)
+		case types.BookTickerChannel:
+			// ticker channel provides feeds on best bid/ask prices
+			subProductsMap[tickerChannel] = append(subProductsMap[tickerChannel], localSymbol)
+			logStream.Infof("bridge %s to %s(%s)", sub.Channel, tickerChannel, localSymbol)
+		case types.KLineChannel:
+			// TODO: add support to kline channel
+		case types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
+			logStream.Warnf("coinbase stream does not support subscription to %s, skipped", sub.Channel)
+		default:
+			// rfqMatchChannel allow empty symbol
+			if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
+				logStream.Warnf("do not support subscription to %s without symbol, skipped", sub.Channel)
+				continue
+			}
+			subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], localSymbol)
 		}
-		subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], toLocalSymbol(sub.Symbol))
 	}
 
-	_, subscribeFull := subProductsMap[fullChannel]
-	s.userOrderOnly = !subscribeFull
+	for _, products := range subProductsMap {
+		for _, product := range products {
+			allProductsMap[product] = struct{}{}
+		}
+	}
+	// user data strea, subscribe to user channel for the user order/trade updates
+	if !s.PublicOnly {
+		if !s.authEnabled {
+			panic("user channel requires authentication")
+		}
+		for product := range allProductsMap {
+			subProductsMap[userChannel] = append(subProductsMap[userChannel], product)
+		}
+	}
 
+	// do subscription
 	var subCmds []any
 	signature, ts := s.generateSignature()
 	for channel, productIDs := range subProductsMap {
 		var subType string
-		switch types.Channel(channel) {
-		case rfqMatchChannel:
+		if channel == rfqMatchChannel {
 			subType = "subscriptions"
-		default:
+		} else {
 			subType = "subscribe"
 		}
+
 		var subCmd any
-		switch types.Channel(channel) {
+		switch channel {
 		case statusChannel:
 			subCmd = subscribeMsgType1{
 				Type: subType,
@@ -150,6 +190,12 @@ func (s *Stream) handleConnect() {
 				ProductIDs: productIDs,
 			}
 		case fullChannel, userChannel:
+			if !s.authEnabled {
+				panic("full/user channel requires authentication")
+			}
+			if channel == fullChannel && !s.PublicOnly {
+				panic("cannot subscribe to full channel on a private stream")
+			}
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []types.Channel{channel},
@@ -161,7 +207,10 @@ func (s *Stream) handleConnect() {
 					Timestamp:  ts,
 				},
 			}
-		case level2Channel, level2BatchChannel:
+		case level2Channel:
+			if !s.authEnabled {
+				panic("level2 channel requires authentication")
+			}
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []types.Channel{channel},
@@ -174,7 +223,16 @@ func (s *Stream) handleConnect() {
 					Timestamp:  ts,
 				},
 			}
+		case level2BatchChannel:
+			subCmd = subscribeMsgType2{
+				Type:       subType,
+				Channels:   []types.Channel{channel},
+				ProductIDs: productIDs,
+			}
 		case balanceChannel:
+			if !s.authEnabled {
+				panic("balance channel requires authentication")
+			}
 			subCmd = subscribeMsgType2{
 				Type:       subType,
 				Channels:   []types.Channel{channel},
@@ -256,16 +314,23 @@ func (s *Stream) handleDisconnect() {
 	s.clearWorkingOrders()
 }
 
-// order book, trade
+// ticker update (real-time price update when there is a match)
 func (s *Stream) handleTickerMessage(msg *TickerMessage) {
 	// ignore outdated messages
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
 	}
-	trade := msg.Trade()
-	s.EmitTradeUpdate(trade)
+	bookTicker := types.BookTicker{
+		Symbol:   toGlobalSymbol(msg.ProductID),
+		Buy:      msg.BestBid,
+		BuySize:  msg.BestBidSize,
+		Sell:     msg.BestAsk,
+		SellSize: msg.BestAskSize,
+	}
+	s.EmitBookTickerUpdate(bookTicker)
 }
 
+// matches channel (or match message from full/user channel)
 func (s *Stream) handleMatchMessage(msg *MatchMessage) {
 	if msg.Type == "last_match" {
 		// TODO: fetch missing trades from the REST API and emit them
@@ -276,9 +341,16 @@ func (s *Stream) handleMatchMessage(msg *MatchMessage) {
 		return
 	}
 	trade := msg.Trade()
-	s.EmitTradeUpdate(trade)
+	if s.PublicOnly {
+		// the stream is a public stream, providing feeds on public market trades, emit market trade
+		s.EmitMarketTrade(trade)
+	} else {
+		// the stream is a user stream, providing feeds on user trades, emit user trade update
+		s.EmitTradeUpdate(trade)
+	}
 }
 
+// level2 handlers
 func (s *Stream) handleOrderBookSnapshotMessage(msg *OrderBookSnapshotMessage) {
 	symbol := toGlobalSymbol(msg.ProductID)
 	var bids types.PriceVolumeSlice
@@ -348,10 +420,9 @@ func (s *Stream) handleOrderbookUpdateMessage(msg *OrderBookUpdateMessage) {
 		}
 		s.EmitBookUpdate(book)
 	}
-
 }
 
-// order update
+// order update (full or user channel)
 func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 	if !s.checkAndUpdateSequenceNumber(msg.Type, msg.ProductID, msg.Sequence) {
 		return
@@ -628,10 +699,10 @@ func (s *Stream) retrieveOrderById(orderId string) (*types.Order, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	if !s.userOrderOnly {
-		msg := fmt.Sprintf("retrieve order by id disabled on a stream feeds including non-user orders: %s", orderId)
+	if s.PublicOnly {
+		msg := fmt.Sprintf("retrieve order by id disabled on a public stream: %s", orderId)
 		logStream.Warn(msg)
-		return nil, fmt.Errorf(msg)
+		return nil, errors.New(msg)
 	}
 	order, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderID: orderId})
 	if err != nil {
