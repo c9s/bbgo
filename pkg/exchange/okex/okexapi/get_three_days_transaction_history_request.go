@@ -9,7 +9,7 @@ import (
 //go:generate -command GetRequest requestgen -method GET -responseType .APIResponse -responseDataField Data
 //go:generate -command PostRequest requestgen -method POST -responseType .APIResponse -responseDataField Data
 
-//go:generate GetRequest -url "/api/v5/trade/fills" -type GetThreeDaysTransactionHistoryRequest -responseDataType []Trade -rateLimiter 1+60/2s
+//go:generate GetRequest -url "/api/v5/trade/fills" -type GetThreeDaysTransactionHistoryRequest -responseDataType []Trade -rateLimiter 1+30/2s
 type GetThreeDaysTransactionHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 

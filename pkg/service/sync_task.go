@@ -105,7 +105,6 @@ func (sel SyncTask) execute(
 		endTime = endTimeArgs[0]
 	}
 
-	// 這裡可能有問題
 	// asset "" means all assets
 	dataC, errC := sel.BatchQuery(ctx, startTime, endTime)
 	dataCRef := reflect.ValueOf(dataC)
