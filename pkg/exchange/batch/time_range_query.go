@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
@@ -58,7 +59,22 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 
 			queryProfiler := timeprofile.Start("remoteQuery")
 
-			sliceInf, err := q.Q(startTime, endTime)
+			var sliceInf any
+			doQuery := func() (queryErr error) {
+				sliceInf, queryErr = q.Q(startTime, endTime)
+				if queryErr != nil {
+					log.WithError(queryErr).Errorf("unable to query %T, error: %v", q.Type, queryErr)
+				}
+
+				return queryErr
+			}
+
+			err := backoff.Retry(doQuery, backoff.WithContext(
+				backoff.WithMaxRetries(
+					backoff.NewExponentialBackOff(),
+					32),
+				ctx))
+
 			if err != nil {
 				errC <- err
 				return
