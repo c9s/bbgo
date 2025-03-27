@@ -57,10 +57,11 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 
 			log.Debugf("batch querying %T: %v <=> %v", q.Type, startTime, endTime)
 
-			queryProfiler := timeprofile.Start("remoteQuery")
-
 			var sliceInf any
 			doQuery := func() (queryErr error) {
+				queryProfiler := timeprofile.Start("remoteQuery")
+				defer queryProfiler.StopAndLog(log.Debugf)
+				
 				sliceInf, queryErr = q.Q(startTime, endTime)
 				if queryErr != nil {
 					log.WithError(queryErr).Errorf("unable to query %T, error: %v", q.Type, queryErr)
@@ -83,8 +84,6 @@ func (q *AsyncTimeRangedBatchQuery) Query(ctx context.Context, ch interface{}, s
 			listRef := reflect.ValueOf(sliceInf)
 			listLen := listRef.Len()
 			log.Debugf("batch querying %T: %d remote records", q.Type, listLen)
-
-			queryProfiler.StopAndLog(log.Debugf)
 
 			if listLen == 0 {
 				if q.JumpIfEmpty > 0 {
