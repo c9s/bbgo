@@ -15,6 +15,8 @@ func init() {
 
 type TradeBatchQuery struct {
 	types.ExchangeTradeHistoryService
+
+	DisableBackoff bool
 }
 
 func (e TradeBatchQuery) Query(
@@ -46,7 +48,8 @@ func (e TradeBatchQuery) Query(
 
 			return trade.Key().String()
 		},
-		JumpIfEmpty: 24*time.Hour - 5*time.Minute, // exchange may not have trades in the last 24 hours
+		JumpIfEmpty:    24*time.Hour - 5*time.Minute, // exchange may not have trades in the last 24 hours
+		DisableBackoff: e.DisableBackoff,
 	}
 
 	for _, opt := range opts {
