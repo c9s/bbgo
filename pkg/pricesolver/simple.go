@@ -41,6 +41,16 @@ func NewSimplePriceResolver(markets types.MarketMap) *SimplePriceSolver {
 		pricesByQuote: make(map[string]map[string]float64),
 	}
 }
+func (m *SimplePriceSolver) SetMarkets(markets types.MarketMap) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if markets == nil {
+		markets = make(types.MarketMap)
+	}
+
+	m.markets = markets
+}
 
 func (m *SimplePriceSolver) Update(symbol string, price fixedpoint.Value) {
 	m.mu.Lock()
