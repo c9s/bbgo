@@ -746,7 +746,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 
 	limit := options.Limit
 	if limit > defaultQueryLimit || limit <= 0 {
-		logger.Infof("param limit exceeded default limit %d or zero, got: %d, use default limit", defaultQueryLimit, limit)
+		logger.Debugf("param limit exceeded default limit %d or zero, got: %d, use default limit", defaultQueryLimit, limit)
 		limit = defaultQueryLimit
 	}
 
@@ -774,7 +774,7 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	if options.LastTradeID != 0 {
 		// we don't support the last trade id as a filter because okx supports bill ID only.
 		// we don't have any more fields (types.Trade) to store it.
-		logger.Infof("Last trade id: %d not supported on QueryTrades", options.LastTradeID)
+		logger.Debugf("Last trade id: %d not supported on QueryTrades", options.LastTradeID)
 	}
 
 	lessThan3Day := timeNow.Sub(newStartTime) <= threeDaysHistoricalPeriod

@@ -47,7 +47,7 @@ type Trade struct {
 	PosSide          string           `json:"posSide"`
 }
 
-//go:generate GetRequest -url "/api/v5/trade/fills-history" -type GetTransactionHistoryRequest -responseDataType []Trade -rateLimiter 1+10/2s
+//go:generate GetRequest -url "/api/v5/trade/fills-history" -type GetTransactionHistoryRequest -responseDataType []Trade -rateLimiter 1+5/2s
 type GetTransactionHistoryRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
