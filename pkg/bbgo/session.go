@@ -130,7 +130,8 @@ type ExchangeSession struct {
 	Trades map[string]*types.TradeSlice `json:"-" yaml:"-"`
 
 	// markets defines market configuration of a symbol
-	markets map[string]types.Market
+	markets     map[string]types.Market
+	marketMutex sync.Mutex
 
 	// startPrices is used for backtest
 	startPrices map[string]fixedpoint.Value
@@ -211,7 +212,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 
 func (session *ExchangeSession) GetPriceSolver() *pricesolver.SimplePriceSolver {
 	if session.priceSolver == nil {
-		session.priceSolver = pricesolver.NewSimplePriceResolver(session.markets)
+		session.priceSolver = pricesolver.NewSimplePriceResolver(session.Markets())
 	}
 
 	return session.priceSolver
@@ -319,7 +320,7 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	}
 
 	logger.Infof("%d markets loaded", len(markets))
-	session.markets = markets
+	session.SetMarkets(markets)
 
 	session.priceSolver = pricesolver.NewSimplePriceResolver(markets)
 
@@ -495,7 +496,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 		return nil
 	}
 
-	market, ok := session.markets[symbol]
+	market, ok := session.Market(symbol)
 	if !ok {
 		return fmt.Errorf("market %s is not defined", symbol)
 	}
@@ -656,7 +657,7 @@ func (session *ExchangeSession) Position(symbol string) (pos *types.Position, ok
 		return pos, ok
 	}
 
-	market, ok := session.markets[symbol]
+	market, ok := session.Market(symbol)
 	if !ok {
 		return nil, false
 	}
@@ -737,16 +738,38 @@ func (session *ExchangeSession) LastPrices() map[string]fixedpoint.Value {
 }
 
 func (session *ExchangeSession) Market(symbol string) (market types.Market, ok bool) {
+	session.marketMutex.Lock()
+	defer session.marketMutex.Unlock()
+
 	market, ok = session.markets[symbol]
 	return market, ok
 }
 
 func (session *ExchangeSession) Markets() types.MarketMap {
+	session.marketMutex.Lock()
+	defer session.marketMutex.Unlock()
+
 	return session.markets
 }
 
+func (session *ExchangeSession) UpdateMarkets(ctx context.Context) error {
+	markets, err := session.Exchange.QueryMarkets(ctx)
+	if err != nil {
+		return err
+	}
+
+	session.SetMarkets(markets)
+	return nil
+}
+
 func (session *ExchangeSession) SetMarkets(markets types.MarketMap) {
+	session.marketMutex.Lock()
+	defer session.marketMutex.Unlock()
+
 	session.markets = markets
+	if session.priceSolver != nil {
+		session.priceSolver.SetMarkets(markets)
+	}
 }
 
 // Subscribe save the subscription info, later it will be assigned to the stream

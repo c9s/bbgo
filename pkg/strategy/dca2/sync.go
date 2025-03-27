@@ -21,10 +21,18 @@ func (s *Strategy) syncPeriodically(ctx context.Context) {
 	syncActiveOrdersTicker := time.NewTicker(timejitter.Milliseconds(10*time.Minute, 5*60*1000))
 	defer syncActiveOrdersTicker.Stop()
 
+	// sync markets info
+	syncMarketsTicker := time.NewTicker(4 * time.Hour)
+	defer syncMarketsTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-syncMarketsTicker.C:
+			if err := s.ExchangeSession.UpdateMarkets(ctx); err != nil {
+				s.logger.WithError(err).Warn("failed to update markets")
+			}
 		case <-syncPersistenceTicker.C:
 			bbgo.Sync(ctx, s)
 		case <-syncActiveOrdersTicker.C:

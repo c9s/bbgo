@@ -50,8 +50,12 @@ func (s *Strategy) recoverPeriodically(ctx context.Context) {
 
 	interval := timejitter.Milliseconds(25*time.Minute, 10*60*1000)
 	s.logger.Infof("[Recover] interval: %s", interval)
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+
+	recoverTicker := time.NewTicker(interval)
+	defer recoverTicker.Stop()
+
+	syncMarketTicker := time.NewTicker(4 * time.Hour)
+	defer syncMarketTicker.Stop()
 
 	var lastRecoverTime time.Time
 
@@ -59,8 +63,12 @@ func (s *Strategy) recoverPeriodically(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-recoverTicker.C:
 			s.recoverC <- struct{}{}
+		case <-syncMarketTicker.C:
+			if err := s.ExchangeSession.UpdateMarkets(ctx); err != nil {
+				s.logger.WithError(err).Warn("failed to update markets")
+			}
 		case <-s.recoverC:
 			// if we already recovered in 10 min, we should skip to avoid recovering too frequently
 			if !time.Now().After(lastRecoverTime.Add(10 * time.Minute)) {
