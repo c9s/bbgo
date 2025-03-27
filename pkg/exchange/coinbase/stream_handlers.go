@@ -90,15 +90,15 @@ func (s *Stream) handleConnect() {
 		switch sub.Channel {
 		case types.BookChannel:
 			// bridge to level2 channel, which provides order book snapshot and book updates
-			logStream.Infof("bridge %s to level2 channel (%s)", sub.Channel, sub.Symbol)
-			subProductsMap[level2Channel] = append(subProductsMap[level2Channel], localSymbol)
+			logStream.Infof("bridge %s to level2_batch channel (%s)", sub.Channel, sub.Symbol)
+			subProductsMap[level2BatchChannel] = append(subProductsMap[level2Channel], localSymbol)
 		case types.MarketTradeChannel:
 			// full: all orders/trades on Coinbase Exchange
 			if !s.PublicOnly {
 				panic("subscribe to market trade channel for a public stream is not allowed")
 			}
-			subProductsMap[fullChannel] = append(subProductsMap[fullChannel], localSymbol)
-			logStream.Infof("bridge %s to %s(%s)", sub.Channel, fullChannel, localSymbol)
+			subProductsMap[matchesChannel] = append(subProductsMap[matchesChannel], localSymbol)
+			logStream.Infof("bridge %s to %s(%s)", sub.Channel, matchesChannel, localSymbol)
 		case types.BookTickerChannel:
 			// ticker channel provides feeds on best bid/ask prices
 			subProductsMap[tickerChannel] = append(subProductsMap[tickerChannel], localSymbol)

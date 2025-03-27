@@ -271,6 +271,7 @@ func TestStreamBbgoChannels(t *testing.T) {
 	t.Run("Test Book", func(t *testing.T) {
 		c := make(chan string, 1)
 		stream := getTestStreamOrSkip(t)
+		stream.SetPublicOnly()
 		stream.Subscribe(types.BookChannel, "BTCUSD", types.SubscribeOptions{})
 		stream.OnOrderbookSnapshotMessage(func(m *OrderBookSnapshotMessage) {
 			assert.NotNil(t, m)
