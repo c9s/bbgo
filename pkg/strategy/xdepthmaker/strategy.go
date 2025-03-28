@@ -611,6 +611,9 @@ func (s *Strategy) CrossRun(
 	if err := sourceMarketStream.Connect(ctx); err != nil {
 		return err
 	}
+	if err := makerMarketStream.Connect(ctx); err != nil {
+		return err
+	}
 
 	s.priceSolver = pricesolver.NewSimplePriceResolver(s.makerSession.Markets())
 	s.priceSolver.BindStream(s.hedgeSession.MarketDataStream)
