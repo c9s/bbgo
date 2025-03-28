@@ -22,10 +22,10 @@ var orderBookMaxPriceSpacingMetrics = prometheus.NewGaugeVec(
 	[]string{"strategy_type", "strategy_id", "exchange", "symbol", "side"},
 )
 
-var orderBookInRangeCountMetrics = prometheus.NewGaugeVec(
+var orderBookInRangePriceLevelCountMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
-		Name: "bbgo_xdepthmaker_order_book_count",
-		Help: "the number of in-range orders on the market",
+		Name: "bbgo_xdepthmaker_price_level_count",
+		Help: "the number of in-range price level on the market",
 	},
 	[]string{"strategy_type", "strategy_id", "exchange", "symbol", "side", "price_range"},
 )
@@ -41,7 +41,7 @@ var marketDepthInUsdMetrics = prometheus.NewGaugeVec(
 func init() {
 	prometheus.MustRegister(
 		spreadRatioMetrics,
-		orderBookInRangeCountMetrics,
+		orderBookInRangePriceLevelCountMetrics,
 		orderBookMaxPriceSpacingMetrics,
 		marketDepthInUsdMetrics,
 	)
@@ -90,9 +90,10 @@ func updateSpreadRatioMetrics(bestBidPrice, bestAskPrice fixedpoint.Value, label
 	spreadRatioMetrics.With(labels).Set(spreadRatio.Float64())
 }
 
-func inRange(price, refPrice, priceRange fixedpoint.Value) bool {
-	priceRatio := price.Div(refPrice).Sub(fixedpoint.One).Abs()
-	return priceRatio.Compare(priceRange) < 0
+func priceLbdUbd(refPrice, priceRange fixedpoint.Value) (lbd fixedpoint.Value, ubd fixedpoint.Value) {
+	lbd = refPrice.Mul(fixedpoint.One.Sub(priceRange))
+	ubd = refPrice.Mul(fixedpoint.One.Add(priceRange))
+	return lbd, ubd
 }
 
 func updateOrderBookMetrics(
@@ -101,13 +102,14 @@ func updateOrderBookMetrics(
 	midPrice, priceRange fixedpoint.Value,
 	labels prometheus.Labels,
 ) {
-	inRangeOrderCount := 0
+	inRangePriceLevelCount := 0
 	maxPriceSpacing := fixedpoint.Zero
 
+	lbd, ubd := priceLbdUbd(midPrice, priceRange)
 	for idx, priceVolume := range book {
 		price := priceVolume.Price
-		if inRange(price, midPrice, priceRange) {
-			inRangeOrderCount++
+		if price.Compare(lbd) >= 0 && price.Compare(ubd) <= 0 {
+			inRangePriceLevelCount++
 		}
 		if idx > 0 {
 			prevPrice := book[idx-1].Price
@@ -123,7 +125,7 @@ func updateOrderBookMetrics(
 			"side": string(side),
 		}).
 		Set(maxPriceSpacing.Float64())
-	orderBookInRangeCountMetrics.
+	orderBookInRangePriceLevelCountMetrics.
 		MustCurryWith(labels).
 		With(
 			prometheus.Labels{
@@ -131,7 +133,7 @@ func updateOrderBookMetrics(
 				"price_range": priceRange.String(),
 			},
 		).
-		Set(float64(inRangeOrderCount))
+		Set(float64(inRangePriceLevelCount))
 }
 
 func updateMarketDepthInUsd(
@@ -141,9 +143,10 @@ func updateMarketDepthInUsd(
 	labels prometheus.Labels,
 ) {
 	depthInUsd := fixedpoint.Zero
+	lbd, ubd := priceLbdUbd(midPrice, priceRange)
 	for _, priceVolume := range book {
 		price := priceVolume.Price
-		if inRange(price, midPrice, priceRange) {
+		if price.Compare(lbd) >= 0 && price.Compare(ubd) <= 0 {
 			depthInUsd = depthInUsd.Add(priceVolume.InQuote())
 		}
 	}
