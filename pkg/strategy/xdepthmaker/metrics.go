@@ -14,14 +14,6 @@ var spreadRatioMetrics = prometheus.NewGaugeVec(
 	[]string{"strategy_type", "strategy_id", "exchange", "symbol"},
 )
 
-var orderBookMaxPriceSpacingMetrics = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "bbgo_xdepthmaker_order_book_max_price_spacing",
-		Help: "the max price spacing of open orders on the market",
-	},
-	[]string{"strategy_type", "strategy_id", "exchange", "symbol", "side"},
-)
-
 var orderBookInRangePriceLevelCountMetrics = prometheus.NewGaugeVec(
 	prometheus.GaugeOpts{
 		Name: "bbgo_xdepthmaker_price_level_count",
@@ -42,7 +34,6 @@ func init() {
 	prometheus.MustRegister(
 		spreadRatioMetrics,
 		orderBookInRangePriceLevelCountMetrics,
-		orderBookMaxPriceSpacingMetrics,
 		marketDepthInUsdMetrics,
 	)
 }
@@ -67,15 +58,16 @@ func (s *Strategy) newUpdateMetrics(exchangeName, symbol string, priceRange fixe
 
 		midPrice := bestBid.Price.Add(bestAsk.Price).Div(fixedpoint.Two)
 		for _, side := range []types.SideType{types.SideTypeBuy, types.SideTypeSell} {
+			sideBook := book.SideBook(side)
 			updateOrderBookMetrics(
-				book.SideBook(side),
+				sideBook,
 				side,
 				midPrice,
 				priceRange,
 				labels,
 			)
 			updateMarketDepthInUsd(
-				book.SideBook(side),
+				sideBook,
 				side,
 				midPrice,
 				priceRange,
@@ -103,28 +95,14 @@ func updateOrderBookMetrics(
 	labels prometheus.Labels,
 ) {
 	inRangePriceLevelCount := 0
-	maxPriceSpacing := fixedpoint.Zero
 
 	lbd, ubd := priceLbdUbd(midPrice, priceRange)
-	for idx, priceVolume := range book {
+	for _, priceVolume := range book {
 		price := priceVolume.Price
 		if price.Compare(lbd) >= 0 && price.Compare(ubd) <= 0 {
 			inRangePriceLevelCount++
 		}
-		if idx > 0 {
-			prevPrice := book[idx-1].Price
-			priceSpacing := price.Sub(prevPrice).Abs().Div(price)
-			if priceSpacing.Compare(maxPriceSpacing) > 0 {
-				maxPriceSpacing = priceSpacing
-			}
-		}
 	}
-	orderBookMaxPriceSpacingMetrics.
-		MustCurryWith(labels).
-		With(prometheus.Labels{
-			"side": string(side),
-		}).
-		Set(maxPriceSpacing.Float64())
 	orderBookInRangePriceLevelCountMetrics.
 		MustCurryWith(labels).
 		With(
