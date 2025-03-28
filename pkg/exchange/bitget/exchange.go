@@ -319,11 +319,27 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		return nil, fmt.Errorf("time-in-force %s not supported", order.TimeInForce)
 	}
 
+	// bitget's "force" field is mandatory, so we need to set it.
 	switch order.Type {
 	case types.OrderTypeLimitMaker:
 		req.Force(v2.OrderForcePostOnly)
-	default:
+	case types.OrderTypeMarket:
+		// From the doc: It is invalid when orderType is market)
 		req.Force(v2.OrderForceGTC)
+	default:
+		if len(order.TimeInForce) != 0 {
+			switch order.TimeInForce {
+			case types.TimeInForceGTC:
+				req.Force(v2.OrderForceGTC)
+			case types.TimeInForceIOC:
+				req.Force(v2.OrderForceIOC)
+			case types.TimeInForceFOK:
+				req.Force(v2.OrderForceFOK)
+			}
+		} else {
+			// set default force to GTC
+			req.Force(v2.OrderForceGTC)
+		}
 	}
 
 	// set price

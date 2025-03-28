@@ -234,12 +234,13 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 func (s *Strategy) makeSpread(ctx context.Context, bestBid, bestAsk types.PriceVolume) error {
 	orderForms := []types.SubmitOrder{
 		{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeSell,
-			Type:     types.OrderTypeLimit,
-			Quantity: fixedpoint.Max(bestBid.Volume, s.tradingMarket.MinQuantity),
-			Price:    bestBid.Price,
-			Market:   s.tradingMarket,
+			Symbol:      s.Symbol,
+			Side:        types.SideTypeSell,
+			Type:        types.OrderTypeLimit,
+			Quantity:    fixedpoint.Max(bestBid.Volume, s.tradingMarket.MinQuantity),
+			Price:       bestBid.Price,
+			Market:      s.tradingMarket,
+			TimeInForce: types.TimeInForceIOC,
 		},
 	}
 	log.Infof("make spread order forms: %+v", orderForms)
@@ -402,12 +403,13 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 			Market:   s.tradingMarket,
 		},
 		{
-			Symbol:   s.Symbol,
-			Side:     types.SideTypeSell,
-			Type:     types.OrderTypeLimit,
-			Quantity: quantity,
-			Price:    price,
-			Market:   s.tradingMarket,
+			Symbol:      s.Symbol,
+			Side:        types.SideTypeSell,
+			Type:        types.OrderTypeLimit,
+			Quantity:    quantity,
+			Price:       price,
+			Market:      s.tradingMarket,
+			TimeInForce: types.TimeInForceIOC,
 		},
 	}
 	log.Infof("order forms: %+v", orderForms)
@@ -423,6 +425,10 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 	}
 
 	time.Sleep(time.Second)
+
+	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
+		log.WithError(err).Warnf("cancel order error")
+	}
 }
 
 func (s *Strategy) cancelOrders(ctx context.Context) {
