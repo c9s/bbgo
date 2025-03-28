@@ -90,6 +90,11 @@ func updateSpreadRatioMetrics(bestBidPrice, bestAskPrice fixedpoint.Value, label
 	spreadRatioMetrics.With(labels).Set(spreadRatio.Float64())
 }
 
+func inRange(price, refPrice, priceRange fixedpoint.Value) bool {
+	priceRatio := price.Div(refPrice).Sub(fixedpoint.One).Abs()
+	return priceRatio.Compare(priceRange) < 0
+}
+
 func updateOrderBookMetrics(
 	book types.PriceVolumeSlice,
 	side types.SideType,
@@ -101,8 +106,7 @@ func updateOrderBookMetrics(
 
 	for idx, priceVolume := range book {
 		price := priceVolume.Price
-		priceRatio := price.Sub(midPrice).Div(midPrice).Abs().Sub(fixedpoint.One).Abs()
-		if priceRatio.Compare(priceRange) < 0 {
+		if inRange(price, midPrice, priceRange) {
 			inRangeOrderCount++
 		}
 		if idx > 0 {
@@ -139,8 +143,7 @@ func updateMarketDepthInUsd(
 	depthInUsd := fixedpoint.Zero
 	for _, priceVolume := range book {
 		price := priceVolume.Price
-		priceRatio := price.Sub(midPrice).Div(midPrice).Abs()
-		if priceRatio.Compare(priceRange) < 0 {
+		if inRange(price, midPrice, priceRange) {
 			depthInUsd = depthInUsd.Add(priceVolume.InQuote())
 		}
 	}
