@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
@@ -785,7 +786,17 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	lessThan3Day := timeNow.Sub(newStartTime) <= threeDaysHistoricalPeriod
-	logger.Infof("QueryTrades: symbol=%s, limit=%d, start=%s, end=%s, lastTradeId=%d, less3Day=%t, margin=%t", symbol, limit, newStartTime, endTime, options.LastTradeID, lessThan3Day, e.MarginSettings.IsMargin)
+
+	logger = logger.WithFields(logrus.Fields{
+		"symbol":        symbol,
+		"limit":         limit,
+		"start_time":    newStartTime,
+		"end_time":      endTime,
+		"last_trade_id": options.LastTradeID,
+		"less_3day":     lessThan3Day,
+		"margin":        e.MarginSettings.IsMargin,
+		"req_id":        uuid.New().String(),
+	})
 
 	if lessThan3Day {
 		c := e.client.NewGetThreeDaysTransactionHistoryRequest().
@@ -801,7 +812,11 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		}
 
 		return getTrades(ctx, logger, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
-			c.Before(billId)
+			if billId != "" && billId != "0" {
+				// the `after` will get the data after the billId
+				// so DON'T fill the billId if it's 0
+				c.After(billId)
+			}
 			return c.Do(ctx)
 		})
 	}
@@ -819,19 +834,23 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	return getTrades(ctx, logger, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
-		c.Before(billId)
+		if billId != "" && billId != "0" {
+			// the `after` will get the data after the billId
+			// so DON'T fill the billId if it's 0
+			c.After(billId)
+		}
 		return c.Do(ctx)
 	})
 }
 
 func getTrades(
-	ctx context.Context, log *logrus.Entry, limit int64, doFunc func(ctx context.Context, billId string) ([]okexapi.Trade, error),
+	ctx context.Context, logger *logrus.Entry, limit int64, doFunc func(ctx context.Context, billId string) ([]okexapi.Trade, error),
 ) (trades []types.Trade, err error) {
 	billId := "0"
 	for {
 		response, err := doFunc(ctx, billId)
 		if err != nil {
-			log.WithError(err).Warn("failed to query trades")
+			logger.WithError(err).Warn("failed to query trades")
 			return nil, fmt.Errorf("failed to query trades, err: %w", err)
 		}
 
@@ -840,18 +859,18 @@ func getTrades(
 		}
 
 		tradeLen := int64(len(response))
-		log.Infof("getTrades: billId=%s, tradeLen=%d, limit=%d", billId, tradeLen, limit)
 		// a defensive programming to ensure the length of order response is expected.
 		if tradeLen > limit {
-			log.WithError(err).Warnf("getTrades: trade length %d exceeds limit %d", tradeLen, limit)
+			logger.WithError(err).Warnf("getTrades: trade length %d exceeds limit %d", tradeLen, limit)
 			return nil, fmt.Errorf("unexpected trade length %d", tradeLen)
 		}
 
 		if tradeLen < limit {
-			log.Warnf("getTrades: trade length %d less than limit %d", tradeLen, limit)
+			logger.Warnf("getTrades: trade length %d less than limit %d", tradeLen, limit)
 			break
 		}
-		// use Before filter to get all data.
+
+		// use After filter to get all data.
 		billId = response[tradeLen-1].BillId.String()
 	}
 	return trades, nil
