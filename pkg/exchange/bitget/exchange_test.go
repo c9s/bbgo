@@ -890,20 +890,6 @@ func TestExchange_SubmitOrder(t *testing.T) {
 		assert.ErrorContains(err, "unexpected length of client order id")
 	})
 
-	t.Run("time-in-force unsupported", func(t *testing.T) {
-		transport := &httptesting.MockTransport{}
-		ex.client.HttpClient.Transport = transport
-
-		reqOrder2 := reqLimitOrder
-		reqOrder2.TimeInForce = types.TimeInForceIOC
-		_, err := ex.SubmitOrder(context.Background(), reqOrder2)
-		assert.ErrorContains(err, "not supported")
-
-		reqOrder2.TimeInForce = types.TimeInForceFOK
-		_, err = ex.SubmitOrder(context.Background(), reqOrder2)
-		assert.ErrorContains(err, "not supported")
-	})
-
 	t.Run("unexpected side", func(t *testing.T) {
 		transport := &httptesting.MockTransport{}
 		ex.client.HttpClient.Transport = transport

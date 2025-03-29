@@ -313,11 +313,6 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	// we only support GTC/PostOnly, because:
 	// 1. we only support SPOT trading.
 	// 2. The query open/closed order does not include the `force` in SPOT.
-	// If we support FOK/IOC, but you can't query them, that would be unreasonable.
-	// The other case to consider is 'PostOnly', which is a trade-off because we want to support 'xmaker'.
-	if len(order.TimeInForce) != 0 && order.TimeInForce != types.TimeInForceGTC {
-		return nil, fmt.Errorf("time-in-force %s not supported", order.TimeInForce)
-	}
 
 	// bitget's "force" field is mandatory, so we need to set it.
 	switch order.Type {
