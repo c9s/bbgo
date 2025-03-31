@@ -435,6 +435,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			log.Warnf("%s maker goroutine stopped, due to context canceled", s.Symbol)
 			return
 
 		case <-s.stopC:
@@ -472,11 +473,11 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			s.logger.Warnf("maker goroutine stopped, due to context canceled")
+			s.logger.Warnf("hedge %s goroutine stopped, due to context canceled", s.HedgeSymbol)
 			return
 
 		case <-s.stopC:
-			s.logger.Warnf("maker goroutine stopped, due to the stop signal")
+			s.logger.Warnf("hedge %s goroutine stopped, due to the stop signal", s.HedgeSymbol)
 			return
 
 		case <-ticker.C:
