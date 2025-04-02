@@ -244,3 +244,11 @@ func Test_processMarketBuyQuantity(t *testing.T) {
 		assert.ErrorContains(err, "unexpected")
 	})
 }
+
+func TestToGlobalSymbol(t *testing.T) {
+	symbol := "BTC-USDT"
+	assert.Equal(t, "BTCUSDT", toGlobalSymbol(symbol))
+
+	symbol = "BTC-USDT-SWAP"
+	assert.Equal(t, "BTCUSDT", toGlobalSymbol(symbol))
+}

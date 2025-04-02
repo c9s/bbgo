@@ -11,12 +11,20 @@ import (
 )
 
 func toGlobalSymbol(symbol string) string {
+	symbol = strings.TrimSuffix(symbol, "-SWAP")
 	return strings.ReplaceAll(symbol, "-", "")
 }
 
-//go:generate sh -c "echo \"package okex\nvar spotSymbolMap = map[string]string{\n\" $(curl -s -L 'https://www.okx.com/api/v5/public/instruments?instType=SPOT' | jq -r '.data[] | \"\\(.instId | sub(\"-\" ; \"\") | tojson ): \\( .instId | tojson),\n\"') \"\n}\" > symbols.go"
 //go:generate go run gensymbols.go
-func toLocalSymbol(symbol string) string {
+func toLocalSymbol(symbol string, instType ...okexapi.InstrumentType) string {
+	if len(instType) == 1 {
+		if instType[0] == okexapi.InstrumentTypeSwap {
+			if s, ok := swapSymbolMap[symbol]; ok {
+				return s
+			}
+		}
+	}
+
 	if s, ok := spotSymbolMap[symbol]; ok {
 		return s
 	}
@@ -154,8 +162,9 @@ func toGlobalTrade(trade okexapi.Trade) types.Trade {
 		Fee:         trade.Fee.Abs(),
 		FeeCurrency: trade.FeeCurrency,
 		IsMargin:    trade.InstrumentType == okexapi.InstrumentTypeMargin,
-		IsFutures:   trade.InstrumentType == okexapi.InstrumentTypeFutures,
-		IsIsolated:  false,
+		IsFutures: trade.InstrumentType == okexapi.InstrumentTypeFutures ||
+			trade.InstrumentType == okexapi.InstrumentTypeSwap,
+		IsIsolated: false,
 	}
 }
 

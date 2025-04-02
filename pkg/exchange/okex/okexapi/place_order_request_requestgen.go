@@ -31,6 +31,11 @@ func (r *PlaceOrderRequest) Tag(tag string) *PlaceOrderRequest {
 	return r
 }
 
+func (r *PlaceOrderRequest) Currency(currency string) *PlaceOrderRequest {
+	r.currency = &currency
+	return r
+}
+
 func (r *PlaceOrderRequest) Side(side SideType) *PlaceOrderRequest {
 	r.side = side
 	return r
@@ -53,6 +58,16 @@ func (r *PlaceOrderRequest) Price(price string) *PlaceOrderRequest {
 
 func (r *PlaceOrderRequest) TargetCurrency(targetCurrency TargetCurrency) *PlaceOrderRequest {
 	r.targetCurrency = &targetCurrency
+	return r
+}
+
+func (r *PlaceOrderRequest) ReduceOnly(reduceOnly bool) *PlaceOrderRequest {
+	r.reduceOnly = &reduceOnly
+	return r
+}
+
+func (r *PlaceOrderRequest) PosSide(posSide PosSide) *PlaceOrderRequest {
+	r.posSide = &posSide
 	return r
 }
 
@@ -106,6 +121,14 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of tag
 		params["tag"] = tag
+	} else {
+	}
+	// check currency field -> json key ccy
+	if r.currency != nil {
+		currency := *r.currency
+
+		// assign parameter of currency
+		params["ccy"] = currency
 	} else {
 	}
 	// check side field -> json key side
@@ -170,6 +193,33 @@ func (r *PlaceOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 		// assign parameter of targetCurrency
 		params["tgtCcy"] = targetCurrency
+	} else {
+	}
+	// check reduceOnly field -> json key reduceOnly
+	if r.reduceOnly != nil {
+		reduceOnly := *r.reduceOnly
+
+		// assign parameter of reduceOnly
+		params["reduceOnly"] = reduceOnly
+	} else {
+	}
+	// check posSide field -> json key posSide
+	if r.posSide != nil {
+		posSide := *r.posSide
+
+		// TEMPLATE check-valid-values
+		switch posSide {
+		case "long", "short":
+			params["posSide"] = posSide
+
+		default:
+			return nil, fmt.Errorf("posSide value %v is invalid", posSide)
+
+		}
+		// END TEMPLATE check-valid-values
+
+		// assign parameter of posSide
+		params["posSide"] = posSide
 	} else {
 	}
 

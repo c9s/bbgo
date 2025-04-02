@@ -42,6 +42,8 @@ type Stream struct {
 	client          *okexapi.RestClient
 	balanceProvider types.ExchangeAccountService
 
+	isFutures bool
+
 	// public callbacks
 	kLineEventCallbacks       []func(candle KLineEvent)
 	bookEventCallbacks        []func(book BookEvent)
@@ -73,6 +75,10 @@ func NewStream(client *okexapi.RestClient, balanceProvider types.ExchangeAccount
 	stream.kLineStream.OnKLine(stream.EmitKLine)
 
 	return stream
+}
+
+func (s *Stream) UseFutures() {
+	s.isFutures = true
 }
 
 func syncSubscriptions(conn *websocket.Conn, subscriptions []types.Subscription, opType WsEventType) error {
@@ -196,9 +202,14 @@ func (s *Stream) handleConnect() {
 
 func (s *Stream) subscribePrivateChannels(next func()) func() {
 	return func() {
+		instType := string(okexapi.InstrumentTypeSpot)
+		if s.isFutures {
+			instType = string(okexapi.InstrumentTypeSwap)
+		}
+
 		var subs = []WebsocketSubscription{
 			{Channel: ChannelAccount},
-			{Channel: "orders", InstrumentType: string(okexapi.InstrumentTypeSpot)},
+			{Channel: "orders", InstrumentType: instType},
 		}
 
 		// https://www.okx.com/docs-v5/zh/#overview-websocket-connect
