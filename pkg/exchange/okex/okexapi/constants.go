@@ -65,3 +65,10 @@ const (
 	OrderStatePartiallyFilled OrderState = "partially_filled"
 	OrderStateFilled          OrderState = "filled"
 )
+
+type PosSide string
+
+const (
+	PosSideLong  PosSide = "long"
+	PosSideShort PosSide = "short"
+)

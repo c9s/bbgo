@@ -23,6 +23,8 @@ type InstrumentInfo struct {
 	TickSize              fixedpoint.Value           `json:"tickSz"`
 	LotSize               fixedpoint.Value           `json:"lotSz"`
 
+	InstrumentFamily string `json:"instFamily"`
+
 	// MinSize = min order size
 	MinSize fixedpoint.Value `json:"minSz"`
 
@@ -34,7 +36,7 @@ type InstrumentInfo struct {
 type GetInstrumentsInfoRequest struct {
 	client requestgen.APIClient
 
-	instType InstrumentType `param:"instType,query" validValues:"SPOT"`
+	instType InstrumentType `param:"instType,query" validValues:"SPOT,SWAP"`
 
 	instId *string `param:"instId,query"`
 }

@@ -18,27 +18,23 @@ func main() {
 
 	ctx := context.Background()
 
-	var req *maxapi.GetRewardsRequest
+	var (
+		rewards []maxapi.Reward
+		err     error
+	)
 
 	if len(os.Args) > 1 {
 		pathType := os.Args[1]
-		rewardType, err := maxapi.ParseRewardType(pathType)
-		if err != nil {
-			log.Fatal(err)
+		rewardType, err1 := maxapi.ParseRewardType(pathType)
+		if err1 != nil {
+			log.Fatal(err1)
 		}
 
-		req = api.RewardService.NewGetRewardsOfTypeRequest(rewardType)
+		rewards, err = api.RewardService.NewGetRewardsOfTypeRequest(rewardType).Limit(100).Do(ctx)
 	} else {
-		req = api.RewardService.NewGetRewardsRequest()
+		rewards, err = api.RewardService.NewGetRewardsRequest().Limit(100).Do(ctx)
 	}
 
-	// req.From(1613931192)
-	// req.From(1613240048)
-	// req.From(maxapi.TimestampSince)
-	// req.To(maxapi.TimestampSince + 3600 * 24)
-	req.Limit(100)
-
-	rewards, err := req.Do(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
