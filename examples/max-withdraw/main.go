@@ -11,7 +11,7 @@ import (
 )
 
 func waitWithdrawalsComplete(ctx context.Context, client *maxapi.RestClient, currency string, limit int) error {
-	var lastState string
+	var lastState maxapi.WithdrawState
 	for {
 		withdrawals, err := client.WithdrawalService.NewGetWithdrawalHistoryRequest().
 			Currency(currency).

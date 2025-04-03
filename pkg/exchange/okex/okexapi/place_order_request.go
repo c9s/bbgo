@@ -61,6 +61,12 @@ type PlaceOrderRequest struct {
 	// Only applicable to MARGIN orders, and FUTURES/SWAP orders in net mode
 	// Only applicable to Spot and futures mode and Multi-currency margin
 	reduceOnly *bool `param:"reduceOnly"`
+
+	// Position side
+	// The default is net in the net mode
+	// It is required in the long/short mode, and can only be long or short.
+	// Only applicable to FUTURES/SWAP.
+	posSide *PosSide `param:"posSide" validValues:"long,short"`
 }
 
 func (c *RestClient) NewPlaceOrderRequest() *PlaceOrderRequest {
