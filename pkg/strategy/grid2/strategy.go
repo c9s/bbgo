@@ -14,7 +14,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
@@ -62,12 +61,6 @@ type OrderExecutor interface {
 	ClosePosition(ctx context.Context, percentage fixedpoint.Value, tags ...string) error
 	GracefulCancel(ctx context.Context, orders ...types.Order) error
 	ActiveMakerOrders() *bbgo.ActiveOrderBook
-}
-
-type advancedOrderCancelApi interface {
-	CancelAllOrders(ctx context.Context) ([]types.Order, error)
-	CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error)
-	CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([]types.Order, error)
 }
 
 //go:generate callbackgen -type Strategy
@@ -143,7 +136,7 @@ type Strategy struct {
 
 	ClearDuplicatedPriceOpenOrders bool `json:"clearDuplicatedPriceOpenOrders"`
 
-	// UseCancelAllOrdersApiWhenClose uses a different API to cancel all the orders on the market when closing a grid
+	// UseCancelAllOrdersApiWhenClose close all orders even though the orders don't belong to this strategy
 	UseCancelAllOrdersApiWhenClose bool `json:"useCancelAllOrdersApiWhenClose"`
 
 	// ResetPositionWhenStart resets the position when the strategy is started
@@ -980,52 +973,19 @@ func (s *Strategy) OpenGrid(ctx context.Context) error {
 
 // TODO: make sure the context here is the trading context or the shutdown context?
 func (s *Strategy) cancelAll(ctx context.Context) error {
-	var werr error
-
 	session := s.session
 	if session == nil {
 		session = s.ExchangeSession
 	}
 
-	service, support := session.Exchange.(advancedOrderCancelApi)
-	if s.UseCancelAllOrdersApiWhenClose && !support {
-		s.logger.Warnf("advancedOrderCancelApi interface is not implemented, fallback to default graceful cancel, exchange %T", session)
-		s.UseCancelAllOrdersApiWhenClose = false
-	}
-
+	var err error
 	if s.UseCancelAllOrdersApiWhenClose {
-		s.logger.Infof("useCancelAllOrdersApiWhenClose is set, using advanced order cancel api for canceling...")
-
-		for {
-			s.logger.Infof("checking %s open orders...", s.Symbol)
-
-			openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
-			if err != nil {
-				s.logger.WithError(err).Errorf("CancelOrdersByGroupID api call error")
-				werr = multierr.Append(werr, err)
-			}
-
-			if len(openOrders) == 0 {
-				break
-			}
-
-			s.logger.Infof("found %d open orders left, using cancel all orders api", len(openOrders))
-
-			s.logger.Infof("using cancal all orders api for canceling grid orders...")
-			if err := retry.CancelAllOrdersUntilSuccessful(ctx, service); err != nil {
-				s.logger.WithError(err).Errorf("CancelAllOrders api call error")
-				werr = multierr.Append(werr, err)
-			}
-
-			time.Sleep(1 * time.Second)
-		}
+		err = tradingutil.UniversalCancelAllOrders(ctx, session.Exchange, s.Symbol, nil)
 	} else {
-		if err := s.orderExecutor.GracefulCancel(ctx); err != nil {
-			werr = multierr.Append(werr, err)
-		}
+		err = s.orderExecutor.GracefulCancel(ctx)
 	}
 
-	return werr
+	return err
 }
 
 // CloseGrid closes the grid orders
@@ -1044,6 +1004,10 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 	// free the grid object
 	s.setGrid(nil)
 	s.updateGridNumOfOrdersMetricsWithLock()
+
+	// store the grid into persistence if we wanna get the profit or positions after the grid is closed
+	bbgo.Sync(ctx, s)
+
 	return err
 }
 

@@ -36,12 +36,6 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-type advancedOrderCancelApi interface {
-	CancelAllOrders(ctx context.Context) ([]types.Order, error)
-	CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error)
-	CancelOrdersByGroupID(ctx context.Context, groupID uint32) ([]types.Order, error)
-}
-
 //go:generate callbackgen -type Strateg
 type Strategy struct {
 	Position       *types.Position `json:"position,omitempty" persistence:"position"`
@@ -77,8 +71,8 @@ type Strategy struct {
 	// KeepOrdersWhenShutdown option is used for keeping the grid orders when shutting down bbgo
 	KeepOrdersWhenShutdown bool `json:"keepOrdersWhenShutdown"`
 
-	// UniversalCancelAllOrdersWhenClose close all orders even though the orders don't belong to this strategy
-	UniversalCancelAllOrdersWhenClose bool `json:"universalCancelAllOrdersWhenClose"`
+	// UseCancelAllOrdersApiWhenClose close all orders even though the orders don't belong to this strategy
+	UseCancelAllOrdersApiWhenClose bool `json:"useCancelAllOrdersApiWhenClose"`
 
 	// log
 	logger    *logrus.Entry
@@ -375,14 +369,14 @@ func (s *Strategy) Close(ctx context.Context) error {
 	defer s.EmitClosed()
 
 	var err error
-	if s.UniversalCancelAllOrdersWhenClose {
+	if s.UseCancelAllOrdersApiWhenClose {
 		err = tradingutil.UniversalCancelAllOrders(ctx, s.ExchangeSession.Exchange, s.Symbol, nil)
 	} else {
 		err = s.OrderExecutor.GracefulCancel(ctx)
 	}
 
 	if err != nil {
-		s.logger.WithError(err).Errorf("there are errors when cancelling orders when closing (UniversalCancelAllOrdersWhenClose = %t)", s.UniversalCancelAllOrdersWhenClose)
+		s.logger.WithError(err).Errorf("there are errors when cancelling orders when closing (UseCancelAllOrdersApiWhenClose = %t)", s.UseCancelAllOrdersApiWhenClose)
 	}
 
 	bbgo.Sync(ctx, s)
