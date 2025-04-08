@@ -182,10 +182,12 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 	if s.SourceExchange != "" && s.SourceSymbol != "" {
 		s.sourceBook = types.NewStreamBook(s.SourceSymbol, sourceSession.ExchangeName)
 		s.sourceBook.BindStream(s.sourceSession.MarketDataStream)
+		s.sourceBook.DebugBindStream(s.sourceSession.MarketDataStream, log)
 	}
 
 	s.tradingBook = types.NewStreamBook(s.Symbol, tradingSession.ExchangeName)
 	s.tradingBook.BindStream(s.tradingSession.MarketDataStream)
+	s.tradingBook.DebugBindStream(s.tradingSession.MarketDataStream, log)
 
 	s.tradingSession.UserDataStream.OnTradeUpdate(func(trade types.Trade) {
 		if trade.Symbol != s.Symbol {
@@ -262,8 +264,8 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 	if hasBid && hasAsk {
 		var spread = bestAsk.Price.Sub(bestBid.Price)
 		var spreadPercentage = spread.Div(bestAsk.Price)
-		log.Infof("trading book spread=%s %s",
-			spread.String(), spreadPercentage.Percentage())
+		log.Infof("trading book spread=%s(%s-%s) %s",
+			spread.String(), bestAsk.Price.String(), bestBid.Price.String(), spreadPercentage.Percentage())
 
 		// use the source book price if the spread percentage greater than 5%
 		if s.SimulatePrice && s.sourceBook != nil && spreadPercentage.Compare(maxStepPercentageGap) > 0 {
