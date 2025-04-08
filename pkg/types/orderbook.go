@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
@@ -236,6 +237,20 @@ func (sb *StreamOrderBook) BindStream(stream Stream) {
 		sb.EmitUpdate(book)
 		sb.emitChange(BookSignalUpdate, book.Time)
 		sb.updateMetrics(book.Time)
+	})
+}
+
+func (sb *StreamOrderBook) DebugBindStream(stream Stream, log logrus.FieldLogger) {
+	stream.OnDisconnect(func() {
+		log.Infof("stream disconnected, resetting order book %s on %s", sb.Symbol, sb.Exchange)
+	})
+
+	stream.OnBookSnapshot(func(snapshot SliceOrderBook) {
+		log.Infof("received order book snapshot for %s on %s: %+v", sb.Symbol, sb.Exchange, snapshot)
+	})
+
+	stream.OnBookUpdate(func(update SliceOrderBook) {
+		log.Infof("received order book update for %s on %s: %+v", sb.Symbol, sb.Exchange, update)
 	})
 }
 
