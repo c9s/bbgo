@@ -588,6 +588,7 @@ func (s *Strategy) CrossRun(
 	})
 	s.sourceBook = types.NewStreamBook(s.HedgeSymbol, s.hedgeSession.ExchangeName)
 	s.sourceBook.BindStream(sourceMarketStream)
+	s.sourceBook.DebugBindStream(sourceMarketStream, log)
 	s.sourceBook.BindUpdate(s.newUpdateMetrics(
 		string(s.hedgeSession.ExchangeName),
 		s.HedgeSymbol,
@@ -603,6 +604,7 @@ func (s *Strategy) CrossRun(
 	})
 	s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
 	s.makerBook.BindStream(makerMarketStream)
+	s.makerBook.DebugBindStream(makerMarketStream, log)
 	s.makerBook.BindUpdate(s.newUpdateMetrics(
 		string(s.makerSession.ExchangeName),
 		s.Symbol,
