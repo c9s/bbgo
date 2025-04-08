@@ -8,16 +8,11 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
-const (
-	openPositionRetryInterval = 10 * time.Minute
-)
-
 type State int64
 
 const (
 	None State = iota
 	WaitToOpenPosition
-	PositionOpening
 	OpenPositionReady
 	OpenPositionOrderFilled
 	OpenPositionOrdersCancelling
@@ -26,8 +21,7 @@ const (
 )
 
 var stateTransition map[State]State = map[State]State{
-	WaitToOpenPosition:           PositionOpening,
-	PositionOpening:              OpenPositionReady,
+	WaitToOpenPosition:           OpenPositionReady,
 	OpenPositionReady:            OpenPositionOrderFilled,
 	OpenPositionOrderFilled:      OpenPositionOrdersCancelling,
 	OpenPositionOrdersCancelling: OpenPositionOrdersCancelled,
@@ -132,9 +126,7 @@ func (s *Strategy) triggerNextState() {
 func (s *Strategy) moveToNextState(ctx context.Context, nextState State) bool {
 	switch s.state {
 	case WaitToOpenPosition:
-		return s.runWaitToOpenPositionState(ctx, nextState)
-	case PositionOpening:
-		return s.runPositionOpening(ctx, nextState)
+		return s.openPosition(ctx)
 	case OpenPositionReady:
 		return s.runOpenPositionReady(ctx, nextState)
 	case OpenPositionOrderFilled:
@@ -151,9 +143,9 @@ func (s *Strategy) moveToNextState(ctx context.Context, nextState State) bool {
 	return false
 }
 
-func (s *Strategy) runWaitToOpenPositionState(ctx context.Context, next State) bool {
+func (s *Strategy) openPosition(ctx context.Context) bool {
 	if s.nextRoundPaused {
-		s.logger.Info("[State] WaitToOpenPosition - nextRoundPaused is set")
+		s.logger.Info("[State] openPosition - nextRoundPaused is set to true")
 		return false
 	}
 
@@ -161,13 +153,7 @@ func (s *Strategy) runWaitToOpenPositionState(ctx context.Context, next State) b
 		return false
 	}
 
-	s.updateState(PositionOpening)
-	s.logger.Info("[State] WaitToOpenPosition -> PositionOpening")
-	return true
-}
-
-func (s *Strategy) runPositionOpening(ctx context.Context, next State) bool {
-	s.logger.Info("[State] PositionOpening - start placing open-position orders")
+	s.logger.Info("[State] openPosition - start placing open-position orders")
 
 	if err := s.placeOpenPositionOrders(ctx); err != nil {
 		if strings.Contains(err.Error(), "failed to generate open position orders") {
@@ -180,8 +166,8 @@ func (s *Strategy) runPositionOpening(ctx context.Context, next State) bool {
 	}
 
 	s.updateState(OpenPositionReady)
-	s.logger.Info("[State] PositionOpening -> OpenPositionReady")
-	// do not trigger next state immediately, because OpenPositionReady state only trigger by kline to move to the next state
+	s.logger.Info("[State] WaitToOpenPosition -> OpenPositionReady")
+	// do not trigger next state immediately, because OpenPositionReady state only triggers by kline to move to the next state
 	return false
 }
 
