@@ -257,11 +257,10 @@ func (s *Strategy) makeSpread(ctx context.Context, bestBid, bestAsk types.PriceV
 }
 
 func (s *Strategy) placeOrders(ctx context.Context) {
-	bestBid, hasBid := s.tradingBook.BestBid()
-	bestAsk, hasAsk := s.tradingBook.BestAsk()
+	bestBid, bestAsk, hasPrice := s.tradingBook.BestBidAndAsk()
 
 	// try to use the bid/ask price from the trading book
-	if hasBid && hasAsk {
+	if hasPrice {
 		var spread = bestAsk.Price.Sub(bestBid.Price)
 		var spreadPercentage = spread.Div(bestAsk.Price)
 		log.Infof("trading book spread=%s(%s-%s) %s",
@@ -271,8 +270,7 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		if s.SimulatePrice && s.sourceBook != nil && spreadPercentage.Compare(maxStepPercentageGap) > 0 {
 			log.Warnf("spread too large (%s %s), using source book",
 				spread.String(), spreadPercentage.Percentage())
-			bestBid, hasBid = s.sourceBook.BestBid()
-			bestAsk, hasAsk = s.sourceBook.BestAsk()
+			bestBid, bestAsk, hasPrice = s.sourceBook.BestBidAndAsk()
 		}
 
 		if s.MinSpread.Sign() > 0 {
@@ -298,56 +296,55 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		}
 
 	} else if s.sourceBook != nil {
-		bestBid, hasBid = s.sourceBook.BestBid()
-		bestAsk, hasAsk = s.sourceBook.BestAsk()
+		bestBid, bestAsk, hasPrice = s.sourceBook.BestBidAndAsk()
+
+		s.logger.Infof("trading book has no price, fall back to sourceBook: ask/bid = %s/%s", bestAsk.String(), bestBid.String())
 	}
 
-	if !hasBid || !hasAsk {
-		log.Warn("no bids or asks on the source book or the trading book")
+	if !hasPrice {
+		s.logger.Warn("no bids or asks on the source book or the trading book")
 		return
 	}
 
 	if bestBid.Price.IsZero() || bestAsk.Price.IsZero() {
-		log.Warn("bid price or ask price is zero")
+		s.logger.Warn("bid price or ask price is zero")
 		return
 	}
 
 	var spread = bestAsk.Price.Sub(bestBid.Price)
 	var spreadPercentage = spread.Div(bestAsk.Price)
-
-	log.Infof("spread:%s %s ask:%s bid:%s",
-		spread.String(), spreadPercentage.Percentage(),
-		bestAsk.Price.String(), bestBid.Price.String())
-	// var spreadPercentage = spread.Float64() / bestBid.Price.Float64()
-
 	var midPrice = bestAsk.Price.Add(bestBid.Price).Div(Two)
-	var price = midPrice
 
-	log.Infof("mid price %s", midPrice.String())
+	s.logger.Infof("spread = %s (%s) ask/bid = %s/%s midPrice = %s",
+		spread.String(),
+		spreadPercentage.Percentage(),
+		bestAsk.Price.String(), bestBid.Price.String(), midPrice)
+
+	var price = midPrice
 
 	var balances = s.tradingSession.GetAccount().Balances()
 
 	baseBalance, ok := balances[s.tradingMarket.BaseCurrency]
 	if !ok {
-		log.Errorf("base balance %s not found", s.tradingMarket.BaseCurrency)
+		s.logger.Errorf("base balance %s not found", s.tradingMarket.BaseCurrency)
 		return
 	}
 
 	quoteBalance, ok := balances[s.tradingMarket.QuoteCurrency]
 	if !ok {
-		log.Errorf("quote balance %s not found", s.tradingMarket.QuoteCurrency)
+		s.logger.Errorf("quote balance %s not found", s.tradingMarket.QuoteCurrency)
 		return
 	}
 
 	minQuantity := s.tradingMarket.AdjustQuantityByMinNotional(s.tradingMarket.MinQuantity, price)
 
 	if baseBalance.Available.Compare(minQuantity) <= 0 {
-		log.Infof("base balance: %s %s is not enough, skip", baseBalance.Available.String(), s.tradingMarket.BaseCurrency)
+		s.logger.Infof("base balance: %s %s is not enough, skip", baseBalance.Available.String(), s.tradingMarket.BaseCurrency)
 		return
 	}
 
 	if quoteBalance.Available.Div(price).Compare(minQuantity) <= 0 {
-		log.Infof("quote balance: %s %s is not enough, skip", quoteBalance.Available.String(), s.tradingMarket.QuoteCurrency)
+		s.logger.Infof("quote balance: %s %s is not enough, skip", quoteBalance.Available.String(), s.tradingMarket.QuoteCurrency)
 		return
 	}
 
@@ -368,9 +365,9 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		s.mu.Unlock()
 
 		if lastTradingKLine.Volume.Sign() > 0 && lastSourceKLine.Volume.Sign() > 0 {
-			log.Infof("trading exchange %s price: %s volume: %s",
+			s.logger.Infof("trading exchange %s price: %s volume: %s",
 				s.Symbol, lastTradingKLine.Close.String(), lastTradingKLine.Volume.String())
-			log.Infof("source exchange %s price: %s volume: %s",
+			s.logger.Infof("source exchange %s price: %s volume: %s",
 				s.Symbol, lastSourceKLine.Close.String(), lastSourceKLine.Volume.String())
 
 			volumeDiff := s.lastSourceKLine.Volume.Sub(lastTradingKLine.Volume)
@@ -389,7 +386,7 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		quantity = quantityJitter2(quantity, s.MaxJitterQuantity)
 	}
 
-	log.Infof("%s quantity: %f", s.Symbol, quantity.Float64())
+	s.logger.Infof("%s order quantity %s at price %s", s.Symbol, quantity.String(), price.String())
 
 	quantity = fixedpoint.Min(quantity, maxQuantity)
 
@@ -421,21 +418,21 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		return
 	}
 
-	_, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
+	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
 	if err != nil {
 		log.WithError(err).Error("order submit error")
 	}
 
 	time.Sleep(time.Second)
 
-	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
+	if err := s.OrderExecutor.GracefulCancel(ctx, createdOrders...); err != nil {
 		log.WithError(err).Warnf("cancel order error")
 	}
 }
 
 func (s *Strategy) cancelOrders(ctx context.Context) {
 	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
-		log.WithError(err).Error("cancel order error")
+		s.logger.WithError(err).Error("cancel order error")
 	}
 }
 
