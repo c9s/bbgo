@@ -282,9 +282,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		time.AfterFunc(3*time.Second, func() {
 			if isInitialize := s.initializeNextStateC(); !isInitialize {
 
-				// no need to recover when two situation
-				// 1. recoverWhenStart is false
-				// 2. dev mode is on and it's not new strategy
+				// no need to recover when two situations if recoverWhenStart is false
 				if !s.RecoverWhenStart {
 					s.updateState(WaitToOpenPosition)
 				} else {
@@ -332,7 +330,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 				// try to trigger position opening immediately
 				if s.state == WaitToOpenPosition {
-					s.emitNextState(PositionOpening)
+					s.emitNextState(OpenPositionReady)
 				}
 
 				// start running state machine
