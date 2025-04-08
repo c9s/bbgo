@@ -416,14 +416,14 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		return
 	}
 
-	_, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
+	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
 	if err != nil {
 		log.WithError(err).Error("order submit error")
 	}
 
 	time.Sleep(time.Second)
 
-	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
+	if err := s.OrderExecutor.GracefulCancel(ctx, createdOrders...); err != nil {
 		log.WithError(err).Warnf("cancel order error")
 	}
 }
