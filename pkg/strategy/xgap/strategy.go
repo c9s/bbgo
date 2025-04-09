@@ -322,6 +322,8 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		bestAsk.Price.String(), bestBid.Price.String(), midPrice)
 
 	var price = adjustPrice(midPrice, s.tradingMarket.PricePrecision)
+	log.Infof("adjusted price: %s -> %s", midPrice.String(), price.String())
+
 	var balances = s.tradingSession.GetAccount().Balances()
 
 	baseBalance, ok := balances[s.tradingMarket.BaseCurrency]
@@ -453,6 +455,5 @@ func adjustPrice(price fixedpoint.Value, pricePrecision int) fixedpoint.Value {
 	}
 	rate := math.Pow(10, float64(-pricePrecision))*0.1 + 1
 	priceAdjusted := util.RoundAndTruncatePrice(price.Mul(fixedpoint.NewFromFloat(rate)), pricePrecision)
-	log.Infof("adjusted price: %s -> %s", price.String(), priceAdjusted.String())
 	return priceAdjusted
 }

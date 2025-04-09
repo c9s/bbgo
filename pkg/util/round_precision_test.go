@@ -4,25 +4,11 @@ import (
 	"testing"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/testing/testhelper"
 	"github.com/stretchr/testify/assert"
 )
 
-func number(a interface{}) fixedpoint.Value {
-	switch v := a.(type) {
-	case string:
-		return fixedpoint.MustNewFromString(v)
-	case int:
-		return fixedpoint.NewFromInt(int64(v))
-	case int64:
-		return fixedpoint.NewFromInt(int64(v))
-	case float64:
-		return fixedpoint.NewFromFloat(v)
-	}
-
-	return fixedpoint.Zero
-}
-
-func Test_RoundPrice(t *testing.T) {
+func Test_RoundAndTruncatePrice(t *testing.T) {
 	type args struct {
 		p    fixedpoint.Value
 		prec int
@@ -34,17 +20,17 @@ func Test_RoundPrice(t *testing.T) {
 	}{
 		{
 			name: "basic",
-			args: args{p: number("31.2222"), prec: 3},
+			args: args{p: testhelper.Number("31.2222"), prec: 3},
 			want: "31.222",
 		},
 		{
 			name: "roundup",
-			args: args{p: number("31.22295"), prec: 3},
+			args: args{p: testhelper.Number("31.22295"), prec: 3},
 			want: "31.223",
 		},
 		{
 			name: "roundup2",
-			args: args{p: number("31.22290"), prec: 3},
+			args: args{p: testhelper.Number("31.22290"), prec: 3},
 			want: "31.222",
 		},
 	}
