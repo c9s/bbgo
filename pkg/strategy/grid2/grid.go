@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strconv"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type PinCalculator func() []Pin
@@ -35,17 +35,6 @@ type Grid struct {
 
 type Pin fixedpoint.Value
 
-// roundAndTruncatePrice rounds the given price at prec-1 and then truncate the price at prec
-func roundAndTruncatePrice(p fixedpoint.Value, prec int) fixedpoint.Value {
-	var pow10 = math.Pow10(prec)
-	pp := math.Round(p.Float64()*pow10*10.0) / 10.0
-	pp = math.Trunc(pp) / pow10
-
-	pps := strconv.FormatFloat(pp, 'f', prec, 64)
-	price := fixedpoint.MustNewFromString(pps)
-	return price
-}
-
 func removeDuplicatedPins(pins []Pin) []Pin {
 	var buckets = map[string]struct{}{}
 	var out []Pin
@@ -71,12 +60,12 @@ func calculateArithmeticPins(lower, upper, spread, tickSize fixedpoint.Value) []
 	var ts = tickSize.Float64()
 	var prec = int(math.Round(math.Log10(ts) * -1.0))
 	for p := lower; p.Compare(upper.Sub(spread)) <= 0; p = p.Add(spread) {
-		price := roundAndTruncatePrice(p, prec)
+		price := util.RoundAndTruncatePrice(p, prec)
 		pins = append(pins, Pin(price))
 	}
 
 	// this makes sure there is no error at the upper price
-	upperPrice := roundAndTruncatePrice(upper, prec)
+	upperPrice := util.RoundAndTruncatePrice(upper, prec)
 	pins = append(pins, Pin(upperPrice))
 
 	return pins
