@@ -32,11 +32,16 @@ func Test_AdjustPrice(t *testing.T) {
 			args: args{p: fixedpoint.MustNewFromString("0.321600"), prec: 4},
 			want: "0.3216",
 		},
+		{
+			name: "negPrecision",
+			args: args{p: fixedpoint.MustNewFromString("0.3213333"), prec: -1},
+			want: "0.3213333",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rst := adjustPrice(tt.args.p, tt.args.prec)
-			assert.Equalf(t, tt.want, rst.String(), "AdjustPrice(%v, %v)", tt.args.p, tt.args.prec)
+			assert.Equalf(t, tt.want, rst.String(), "adjustPrice(%v, %v)", tt.args.p, tt.args.prec)
 		})
 	}
 }
