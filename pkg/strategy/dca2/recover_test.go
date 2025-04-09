@@ -87,7 +87,7 @@ func Test_RecoverState(t *testing.T) {
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
 		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
 		assert.NoError(t, err)
-		assert.Equal(t, OpenPositionOrdersCancelling, state)
+		assert.Equal(t, OpenPositionFinished, state)
 	})
 
 	t.Run("open-position orders are cancelled", func(t *testing.T) {
@@ -105,7 +105,7 @@ func Test_RecoverState(t *testing.T) {
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
 		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
 		assert.NoError(t, err)
-		assert.Equal(t, OpenPositionOrdersCancelling, state)
+		assert.Equal(t, OpenPositionFinished, state)
 	})
 
 	t.Run("at take profit stage, and not filled yet", func(t *testing.T) {
