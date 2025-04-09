@@ -14,6 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/timejitter"
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
 )
@@ -320,7 +321,8 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		spreadPercentage.Percentage(),
 		bestAsk.Price.String(), bestBid.Price.String(), midPrice)
 
-	var price = midPrice
+	var price = adjustPrice(midPrice, s.tradingMarket.PricePrecision)
+	log.Infof("adjusted price: %s -> %s (precision: %v)", midPrice.String(), price.String(), s.tradingMarket.PricePrecision)
 
 	var balances = s.tradingSession.GetAccount().Balances()
 
@@ -445,4 +447,13 @@ func quantityJitter2(q, maxJitterQ fixedpoint.Value) fixedpoint.Value {
 	rg := maxJitterQ.Sub(q).Float64()
 	randQuantity := fixedpoint.NewFromFloat(q.Float64() + rg*rand.Float64())
 	return randQuantity
+}
+
+func adjustPrice(price fixedpoint.Value, pricePrecision int) fixedpoint.Value {
+	if pricePrecision <= 0 {
+		return price
+	}
+
+	priceAdjusted := util.RoundAndTruncatePrice(price, pricePrecision)
+	return priceAdjusted
 }
