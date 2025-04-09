@@ -453,7 +453,7 @@ func adjustPrice(price fixedpoint.Value, pricePrecision int) fixedpoint.Value {
 	if pricePrecision <= 0 {
 		return price
 	}
-	rate := math.Pow(10, float64(-pricePrecision))*0.1 + 1
-	priceAdjusted := util.RoundAndTruncatePrice(price.Mul(fixedpoint.NewFromFloat(rate)), pricePrecision)
+
+	priceAdjusted := util.RoundAndTruncatePrice(price, pricePrecision)
 	return priceAdjusted
 }
