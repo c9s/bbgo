@@ -322,7 +322,7 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		bestAsk.Price.String(), bestBid.Price.String(), midPrice)
 
 	var price = adjustPrice(midPrice, s.tradingMarket.PricePrecision)
-	log.Infof("adjusted price: %s -> %s", midPrice.String(), price.String())
+	log.Infof("adjusted price: %s -> %s (precision: %v)", midPrice.String(), price.String(), s.tradingMarket.PricePrecision)
 
 	var balances = s.tradingSession.GetAccount().Balances()
 
