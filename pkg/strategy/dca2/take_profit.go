@@ -78,14 +78,13 @@ func (s *Strategy) placeTakeProfitOrders(ctx context.Context) error {
 }
 
 func generateTakeProfitOrder(market types.Market, takeProfitRatio fixedpoint.Value, position *types.Position, orderGroupID uint32) types.SubmitOrder {
-	side := types.SideTypeSell
 	takeProfitPrice := market.TruncatePrice(position.AverageCost.Mul(fixedpoint.One.Add(takeProfitRatio)))
 	return types.SubmitOrder{
 		Symbol:      market.Symbol,
 		Market:      market,
 		Type:        types.OrderTypeLimit,
 		Price:       takeProfitPrice,
-		Side:        side,
+		Side:        TakeProfitSide,
 		TimeInForce: types.TimeInForceGTC,
 		Quantity:    position.GetBase().Abs(),
 		Tag:         orderTag,
