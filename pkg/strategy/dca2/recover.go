@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -22,6 +23,9 @@ type descendingClosedOrderQueryService interface {
 func (s *Strategy) recover(ctx context.Context) error {
 	s.logger.Info("[DCA] recover")
 	currentRound, err := s.collector.CollectCurrentRound(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to collect current round: %w", err)
+	}
 	debugRoundOrders(s.logger, "current", currentRound)
 
 	// recover profit stats
@@ -49,7 +53,7 @@ func (s *Strategy) recover(ctx context.Context) error {
 	s.startTimeOfNextRound = startTimeOfNextRound
 
 	// recover state
-	state, err := recoverState(ctx, int(s.MaxOrderCount), currentRound, s.OrderExecutor)
+	state, err := recoverState(currentRound, s.OrderExecutor)
 	if err != nil {
 		return err
 	}
@@ -60,74 +64,89 @@ func (s *Strategy) recover(ctx context.Context) error {
 }
 
 // recover state
-func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, orderExecutor *bbgo.GeneralOrderExecutor) (State, error) {
+func recoverState(currentRound Round, orderExecutor *bbgo.GeneralOrderExecutor) (State, error) {
+	// no open-position orders and no take-profit orders means this is the whole new strategy
+	if len(currentRound.OpenPositionOrders) == 0 && len(currentRound.TakeProfitOrders) == 0 {
+		return IdleWaiting, nil
+	}
+
+	// it should not happen
+	if len(currentRound.OpenPositionOrders) == 0 && len(currentRound.TakeProfitOrders) > 0 {
+		return None, fmt.Errorf("there is no open-position orders but there are take-profit orders. it should not happen, please check it")
+	}
+
 	activeOrderBook := orderExecutor.ActiveMakerOrders()
 	orderStore := orderExecutor.OrderStore()
 
-	// dca stop at take-profit order stage
 	if len(currentRound.TakeProfitOrders) > 0 {
-		openedOrders, cancelledOrders, filledOrders, unexpectedOrders := types.ClassifyOrdersByStatus(currentRound.TakeProfitOrders)
-
-		if len(unexpectedOrders) > 0 {
-			return None, fmt.Errorf("there is unexpected status in orders %+v", unexpectedOrders)
-		}
-
-		if len(filledOrders) > 0 && len(openedOrders) == 0 {
-			return WaitToOpenPosition, nil
-		}
-
-		if len(filledOrders) == 0 && len(openedOrders) > 0 {
-			// add opened order into order store
-			for _, order := range openedOrders {
-				activeOrderBook.Add(order)
-				orderStore.Add(order)
-			}
-			return TakeProfitReady, nil
-		}
-
-		return None, fmt.Errorf("the classify orders count is not expected (opened: %d, cancelled: %d, filled: %d)", len(openedOrders), len(cancelledOrders), len(filledOrders))
+		return recoverStateIfAtTakeProfitStage(currentRound.TakeProfitOrders, activeOrderBook, orderStore)
 	}
 
-	// dca stop at no take-profit order stage
-	openPositionOrders := currentRound.OpenPositionOrders
+	return recoverStateIfAtOpenPositionStage(currentRound.OpenPositionOrders, activeOrderBook, orderStore)
+}
 
-	// new strategy
-	if len(openPositionOrders) == 0 {
-		return WaitToOpenPosition, nil
-	}
+// recoverStateIfAtTakeProfitStage will recover the state if the strategy is stopped at take-profit stage
+func recoverStateIfAtTakeProfitStage(orders types.OrderSlice, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore) (State, error) {
+	// because we may manually recover the strategy by cancelling the orders and placing the orders again, so we don't need to consider the cancelled orders
+	openedOrders, cancelledOrders, filledOrders, unexpectedOrders := orders.ClassifyByStatus()
 
-	// collect open-position orders' status
-	openedOrders, cancelledOrders, filledOrders, unexpectedOrders := types.ClassifyOrdersByStatus(currentRound.OpenPositionOrders)
 	if len(unexpectedOrders) > 0 {
-		return None, fmt.Errorf("there is unexpected status of orders %+v", unexpectedOrders)
+		return None, fmt.Errorf("there is unexpected status in orders %+v at take-profit stage recovery", unexpectedOrders)
 	}
+
+	// add opened order into order store
 	for _, order := range openedOrders {
 		activeOrderBook.Add(order)
 		orderStore.Add(order)
 	}
 
-	// no order is filled -> OpenPositionReady
+	// no open orders and there are filled orders -> means this round is finished, will start a new round
+	if len(filledOrders) > 0 && len(openedOrders) == 0 {
+		return IdleWaiting, nil
+	}
+
+	// there are open orders -> means this round is not finished, we still at TakeProfitReady state
+	if len(openedOrders) > 0 {
+		return TakeProfitReady, nil
+	}
+
+	// only len(openedOrders) == 0 and len(filledOrders) == 0 len(cancelledOrders) > 0 will reach this line
+	return None, fmt.Errorf("the classify orders count is not expected (opened: %d, cancelled: %d, filled: %d) at take-profit stage recovery", len(openedOrders), len(cancelledOrders), len(filledOrders))
+}
+
+// recoverStateIfAtOpenPositionStage will recover the state if the strategy is stopped at open-position stage
+func recoverStateIfAtOpenPositionStage(orders types.OrderSlice, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore) (State, error) {
+	openedOrders, cancelledOrders, filledOrders, unexpectedOrders := orders.ClassifyByStatus()
+	if len(unexpectedOrders) > 0 {
+		return None, fmt.Errorf("there is unexpected status of orders %+v at open-position stage recovery", unexpectedOrders)
+	}
+
+	// add opened order into order store
+	for _, order := range openedOrders {
+		activeOrderBook.Add(order)
+		orderStore.Add(order)
+	}
+
+	// if there is any cancelled order, it means the open-position stage is finished
+	if len(cancelledOrders) > 0 {
+		return OpenPositionFinished, nil
+	}
+
+	// if there is no open order, it means all the orders were filled so this open-position stage is finished
+	if len(openedOrders) == 0 {
+		return OpenPositionFinished, nil
+	}
+
+	// if there is no filled order, it means we need to wait for at least one order filled
 	if len(filledOrders) == 0 {
 		return OpenPositionReady, nil
 	}
 
-	// there are at least one open-position orders filled
-	if len(cancelledOrders) == 0 {
-		if len(openedOrders) > 0 {
-			return OpenPositionOrderFilled, nil
-		} else {
-			// all open-position orders filled, change to cancelling and place the take-profit order
-			return OpenPositionFinished, nil
-		}
-	}
-
-	// there are at last one open-position orders cancelled and at least one filled order -> open position order cancelling
-	return OpenPositionFinished, nil
+	// if there is at least one filled order and still open orders, it means we are ready to take profit if we hit the take-profit price
+	return OpenPositionOrderFilled, nil
 }
 
-func recoverPosition(
-	ctx context.Context, position *types.Position, currentRound Round, queryService types.ExchangeOrderQueryService,
-) error {
+func recoverPosition(ctx context.Context, position *types.Position, currentRound Round, queryService types.ExchangeOrderQueryService) error {
 	if position == nil {
 		return fmt.Errorf("position is nil, please check it")
 	}
