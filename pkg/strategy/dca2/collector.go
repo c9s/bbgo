@@ -88,9 +88,6 @@ func (rc Collector) CollectCurrentRound(ctx context.Context) (Round, error) {
 		return Round{}, err
 	}
 
-	openPositionSide := types.SideTypeBuy
-	takeProfitSide := types.SideTypeSell
-
 	var allOrders []types.Order
 	allOrders = append(allOrders, openOrders...)
 	allOrders = append(allOrders, closedOrders...)
@@ -98,21 +95,21 @@ func (rc Collector) CollectCurrentRound(ctx context.Context) (Round, error) {
 	types.SortOrdersDescending(allOrders)
 
 	var currentRound Round
-	lastSide := takeProfitSide
+	lastSide := TakeProfitSide
 	for _, order := range allOrders {
 		// group id filter is used for debug when local running
 		if rc.filterGroupID && order.GroupID != rc.groupID {
 			continue
 		}
 
-		if order.Side == takeProfitSide && lastSide == openPositionSide {
+		if order.Side == TakeProfitSide && lastSide == OpenPositionSide {
 			break
 		}
 
 		switch order.Side {
-		case openPositionSide:
+		case OpenPositionSide:
 			currentRound.OpenPositionOrders = append(currentRound.OpenPositionOrders, order)
-		case takeProfitSide:
+		case TakeProfitSide:
 			currentRound.TakeProfitOrders = append(currentRound.TakeProfitOrders, order)
 		default:
 		}
