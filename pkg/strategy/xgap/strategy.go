@@ -391,9 +391,19 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 	s.logger.Infof("%s order quantity %s at price %s", s.Symbol, quantity.String(), price.String())
 
 	quantity = fixedpoint.Min(quantity, maxQuantity)
-
 	log.Infof("%s adjusted quantity: %f", s.Symbol, quantity.Float64())
 
+	price = s.tradingMarket.TruncatePrice(price)
+	log.Infof("%s truncated price: %f", s.Symbol, price.Float64())
+
+	bid, ask, _ := s.tradingBook.BestBidAndAsk()
+	if price.Compare(bid.Price) <= 0 || price.Compare(ask.Price) >= 0 {
+		s.logger.Warnf(
+			"price (%s) is not between bid(%s) and ask(%s), abort placing orders",
+			price.String(), bid.Price.String(), ask.Price.String(),
+		)
+		return
+	}
 	orderForms := []types.SubmitOrder{
 		{
 			Symbol:   s.Symbol,
