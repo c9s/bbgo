@@ -26,8 +26,8 @@ type Symbol struct {
 	Symbol              string           `json:"symbol"`
 	BaseCoin            string           `json:"baseCoin"`
 	QuoteCoin           string           `json:"quoteCoin"`
-	MinTradeAmount      fixedpoint.Value `json:"minTradeAmount"`
-	MaxTradeAmount      fixedpoint.Value `json:"maxTradeAmount"`
+	MinTradeAmount      string           `json:"minTradeAmount"`
+	MaxTradeAmount      string           `json:"maxTradeAmount"`
 	TakerFeeRate        fixedpoint.Value `json:"takerFeeRate"`
 	MakerFeeRate        fixedpoint.Value `json:"makerFeeRate"`
 	PricePrecision      fixedpoint.Value `json:"pricePrecision"`
