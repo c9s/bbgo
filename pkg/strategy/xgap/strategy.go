@@ -51,8 +51,11 @@ type Strategy struct {
 	SourceSymbol   string `json:"sourceSymbol"`
 	SourceExchange string `json:"sourceExchange"`
 
-	MinSpread         fixedpoint.Value `json:"minSpread"`
-	MakeSpread        bool             `json:"makeSpread"`
+	MinSpread  fixedpoint.Value `json:"minSpread"`
+	MakeSpread struct {
+		Enabled                    bool             `json:"enabled"`
+		SkipLargeQuantityThreshold fixedpoint.Value `json:"skipLargeQuantityThreshold"`
+	} `json:"makeSpread"`
 	Quantity          fixedpoint.Value `json:"quantity"`
 	MaxJitterQuantity fixedpoint.Value `json:"maxJitterQuantity"`
 
@@ -237,12 +240,20 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 }
 
 func (s *Strategy) makeSpread(ctx context.Context, bestBid, bestAsk types.PriceVolume) error {
+	quantity := fixedpoint.Max(bestBid.Volume, s.tradingMarket.MinQuantity)
+	if quantity.Compare(s.MakeSpread.SkipLargeQuantityThreshold) >= 0 {
+		return fmt.Errorf(
+			"make spread quantity %s is too large (>=%s), skip",
+			quantity.String(),
+			s.MakeSpread.SkipLargeQuantityThreshold.String(),
+		)
+	}
 	orderForms := []types.SubmitOrder{
 		{
 			Symbol:      s.Symbol,
 			Side:        types.SideTypeSell,
 			Type:        types.OrderTypeLimit,
-			Quantity:    fixedpoint.Max(bestBid.Volume, s.tradingMarket.MinQuantity),
+			Quantity:    quantity,
 			Price:       bestBid.Price,
 			Market:      s.tradingMarket,
 			TimeInForce: types.TimeInForceIOC,
@@ -343,7 +354,7 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 					spreadPercentage.String(), s.MinSpread.String(),
 					bestBid.Price.String(), bestAsk.Price.String())
 
-				if s.MakeSpread {
+				if s.MakeSpread.Enabled {
 					if err := s.makeSpread(ctx, bestBid, bestAsk); err != nil {
 						log.WithError(err).Error("make spread error")
 					}
