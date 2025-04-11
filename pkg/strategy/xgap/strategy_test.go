@@ -59,6 +59,7 @@ func Test_adjustPositionOrder(t *testing.T) {
 	type args struct {
 		bestBid, bestAsk types.PriceVolume
 		currentPosition  *types.Position
+		balances         types.BalanceMap
 	}
 	tests := []struct {
 		name             string
@@ -85,6 +86,14 @@ func Test_adjustPositionOrder(t *testing.T) {
 					Base:          fixedpoint.NewFromFloat(-123),
 					AverageCost:   fixedpoint.MustNewFromString("0.3220"),
 				},
+				balances: types.BalanceMap{
+					tradingMarket.BaseCurrency: {
+						Available: fixedpoint.NewFromFloat(1e5),
+					},
+					tradingMarket.QuoteCurrency: {
+						Available: fixedpoint.NewFromFloat(1e5),
+					},
+				},
 			},
 			expectNumOrders:  1,
 			expectOrderPrice: fixedpoint.MustNewFromString("0.3219"),
@@ -107,6 +116,14 @@ func Test_adjustPositionOrder(t *testing.T) {
 					Market:        tradingMarket,
 					Base:          fixedpoint.NewFromFloat(123),
 					AverageCost:   fixedpoint.MustNewFromString("0.3215"),
+				},
+				balances: types.BalanceMap{
+					tradingMarket.BaseCurrency: {
+						Available: fixedpoint.NewFromFloat(1e5),
+					},
+					tradingMarket.QuoteCurrency: {
+						Available: fixedpoint.NewFromFloat(1e5),
+					},
 				},
 			},
 			expectNumOrders:  1,
@@ -131,6 +148,14 @@ func Test_adjustPositionOrder(t *testing.T) {
 					Base:          fixedpoint.Zero,
 					AverageCost:   fixedpoint.MustNewFromString("0.32185"),
 				},
+				balances: types.BalanceMap{
+					tradingMarket.BaseCurrency: {
+						Available: fixedpoint.NewFromFloat(1e5),
+					},
+					tradingMarket.QuoteCurrency: {
+						Available: fixedpoint.NewFromFloat(1e5),
+					},
+				},
 			},
 			expectNumOrders: 0,
 		},
@@ -151,6 +176,14 @@ func Test_adjustPositionOrder(t *testing.T) {
 					Market:        tradingMarket,
 					Base:          fixedpoint.NewFromFloat(-123),
 					AverageCost:   fixedpoint.MustNewFromString("0.32185"),
+				},
+				balances: types.BalanceMap{
+					tradingMarket.BaseCurrency: {
+						Available: fixedpoint.NewFromFloat(1e5),
+					},
+					tradingMarket.QuoteCurrency: {
+						Available: fixedpoint.NewFromFloat(1e5),
+					},
 				},
 			},
 			expectNumOrders: 0,
@@ -173,13 +206,85 @@ func Test_adjustPositionOrder(t *testing.T) {
 					Base:          fixedpoint.NewFromFloat(123),
 					AverageCost:   fixedpoint.MustNewFromString("0.32185"),
 				},
+				balances: types.BalanceMap{
+					tradingMarket.BaseCurrency: {
+						Available: fixedpoint.NewFromFloat(1e5),
+					},
+					tradingMarket.QuoteCurrency: {
+						Available: fixedpoint.NewFromFloat(1e5),
+					},
+				},
+			},
+			expectNumOrders: 0,
+		},
+		{
+			name: "Short Position - Insufficient Balance",
+			args: args{
+				bestBid: types.PriceVolume{
+					Price:  fixedpoint.MustNewFromString("0.3218"),
+					Volume: fixedpoint.MustNewFromString("0.1"),
+				},
+				bestAsk: types.PriceVolume{
+					Price:  fixedpoint.MustNewFromString("0.3219"),
+					Volume: fixedpoint.MustNewFromString("0.1"),
+				},
+				currentPosition: &types.Position{
+					BaseCurrency:  tradingMarket.BaseCurrency,
+					QuoteCurrency: tradingMarket.QuoteCurrency,
+					Market:        tradingMarket,
+					Base:          fixedpoint.NewFromFloat(-123),
+					AverageCost:   fixedpoint.MustNewFromString("0.32185"),
+				},
+				balances: types.BalanceMap{
+					tradingMarket.BaseCurrency: {
+						Available: fixedpoint.NewFromFloat(0),
+					},
+					tradingMarket.QuoteCurrency: {
+						Available: fixedpoint.NewFromFloat(0),
+					},
+				},
+			},
+			expectNumOrders: 0,
+		},
+		{
+			name: "Long Position - Insufficient Balance",
+			args: args{
+				bestBid: types.PriceVolume{
+					Price:  fixedpoint.MustNewFromString("0.3218"),
+					Volume: fixedpoint.MustNewFromString("0.1"),
+				},
+				bestAsk: types.PriceVolume{
+					Price:  fixedpoint.MustNewFromString("0.3219"),
+					Volume: fixedpoint.MustNewFromString("0.1"),
+				},
+				currentPosition: &types.Position{
+					BaseCurrency:  tradingMarket.BaseCurrency,
+					QuoteCurrency: tradingMarket.QuoteCurrency,
+					Market:        tradingMarket,
+					Base:          fixedpoint.NewFromFloat(123),
+					AverageCost:   fixedpoint.MustNewFromString("0.32185"),
+				},
+				balances: types.BalanceMap{
+					tradingMarket.BaseCurrency: {
+						Available: fixedpoint.NewFromFloat(0),
+					},
+					tradingMarket.QuoteCurrency: {
+						Available: fixedpoint.NewFromFloat(0),
+					},
+				},
 			},
 			expectNumOrders: 0,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			orders := getAdjustPositionOrder(tradingMarket.Symbol, tradingMarket, tt.args.currentPosition, tt.args.bestBid, tt.args.bestAsk)
+			orders := getAdjustPositionOrder(
+				tradingMarket.Symbol,
+				tradingMarket,
+				tt.args.balances,
+				tt.args.currentPosition,
+				tt.args.bestBid,
+				tt.args.bestAsk)
 			assert.Equal(t, len(orders), tt.expectNumOrders)
 			if tt.expectNumOrders > 0 {
 				order := orders[0]

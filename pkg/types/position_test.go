@@ -334,7 +334,7 @@ func TestPosition_GetBaseAndAverageCost(t *testing.T) {
 		Base:          fixedpoint.NewFromFloat(0.01),
 		AverageCost:   fixedpoint.NewFromFloat(1000),
 	}
-	base, avgCost := pos.GetBaseAndAverageCost()
-	assert.Equal(t, pos.Base, base)
-	assert.Equal(t, pos.AverageCost, avgCost)
+	status := pos.GetStatus()
+	assert.Equal(t, PositionLong, status.Type)
+	assert.Equal(t, pos.AverageCost, status.AverageCost)
 }
