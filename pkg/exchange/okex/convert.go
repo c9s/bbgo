@@ -240,7 +240,8 @@ func orderDetailToGlobalOrder(order *okexapi.OrderDetail) (*types.Order, error) 
 		CreationTime:     types.Time(order.CreatedTime),
 		UpdateTime:       types.Time(order.UpdatedTime),
 		IsMargin:         order.InstrumentType == okexapi.InstrumentTypeMargin,
-		IsFutures:        order.InstrumentType == okexapi.InstrumentTypeFutures,
+		IsFutures: order.InstrumentType == okexapi.InstrumentTypeFutures ||
+			order.InstrumentType == okexapi.InstrumentTypeSwap,
 	}, nil
 }
 
@@ -353,6 +354,12 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 		isMargin = true
 	}
 
+	isFutures := false
+	if okexOrder.InstrumentType == okexapi.InstrumentTypeFutures ||
+		okexOrder.InstrumentType == okexapi.InstrumentTypeSwap {
+		isFutures = true
+	}
+
 	return &types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: okexOrder.ClientOrderID,
@@ -373,6 +380,7 @@ func toGlobalOrder(okexOrder *okexapi.OrderDetails) (*types.Order, error) {
 		UpdateTime:       types.Time(okexOrder.UpdateTime),
 		IsMargin:         isMargin,
 		IsIsolated:       false,
+		IsFutures:        isFutures,
 	}, nil
 }
 
