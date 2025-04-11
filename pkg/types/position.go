@@ -218,14 +218,22 @@ func (p *Position) GetBase() (base fixedpoint.Value) {
 	return base
 }
 
-// GetBaseAndAverageCost locks the mutex and return the base quantity and average cost
-func (p *Position) GetBaseAndAverageCost() (base fixedpoint.Value, averageCost fixedpoint.Value) {
+type PositionStatus struct {
+	Base        fixedpoint.Value
+	AverageCost fixedpoint.Value
+	Type        PositionType
+}
+
+// GetStatus locks the mutex and return the position status
+func (p *Position) GetStatus() PositionStatus {
 	p.Lock()
 	defer p.Unlock()
 
-	base = p.Base
-	averageCost = p.AverageCost
-	return
+	return PositionStatus{
+		Base:        p.Base,
+		AverageCost: p.AverageCost,
+		Type:        p.Type(),
+	}
 }
 
 // GetQuantity calls GetBase() and then convert the number into a positive number
