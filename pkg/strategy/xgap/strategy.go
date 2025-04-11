@@ -246,6 +246,7 @@ func (s *Strategy) makeSpread(ctx context.Context, bestBid, bestAsk types.PriceV
 			TimeInForce: types.TimeInForceIOC,
 		},
 	}
+
 	log.Infof("make spread order forms: %+v", orderForms)
 
 	if s.DryRun {
@@ -257,15 +258,75 @@ func (s *Strategy) makeSpread(ctx context.Context, bestBid, bestAsk types.PriceV
 	return err
 }
 
+func getAdjustPositionOrder(symbol string, tradingMarket types.Market, currentPosition *types.Position, bestBid, bestAsk types.PriceVolume) (orderForms []types.SubmitOrder) {
+	basePosition, avgCost := currentPosition.GetBaseAndAverageCost()
+	if basePosition.Eq(fixedpoint.Zero) {
+		return
+	}
+	inShortPosition := basePosition.Sign() < 0
+	if inShortPosition && bestAsk.Price.Compare(avgCost) < 0 {
+		log.Infof(
+			"in short position, best ask price %s < average cost %s",
+			bestAsk.Price.String(),
+			avgCost.String(),
+		)
+		orderForms = append(orderForms, types.SubmitOrder{
+			Symbol:      symbol,
+			Side:        types.SideTypeBuy,
+			Type:        types.OrderTypeLimit,
+			Quantity:    fixedpoint.Max(bestAsk.Volume, tradingMarket.MinQuantity),
+			Price:       bestAsk.Price,
+			Market:      tradingMarket,
+			TimeInForce: types.TimeInForceIOC,
+		})
+	} else if !inShortPosition && bestBid.Price.Compare(avgCost) > 0 {
+		log.Infof(
+			"in long position, best bid price %s > average cost %s",
+			bestBid.Price.String(),
+			avgCost.String(),
+		)
+		orderForms = append(orderForms, types.SubmitOrder{
+			Symbol:      symbol,
+			Side:        types.SideTypeSell,
+			Type:        types.OrderTypeLimit,
+			Quantity:    fixedpoint.Max(bestBid.Volume, tradingMarket.MinQuantity),
+			Price:       bestBid.Price,
+			Market:      tradingMarket,
+			TimeInForce: types.TimeInForceIOC,
+		})
+	}
+	return
+}
+
 func (s *Strategy) placeOrders(ctx context.Context) {
 	bestBid, bestAsk, hasPrice := s.tradingBook.BestBidAndAsk()
 
 	// try to use the bid/ask price from the trading book
 	if hasPrice {
+		// try to place orders that can adjust the position
+		if s.Position != nil {
+			orders := getAdjustPositionOrder(
+				s.Symbol,
+				s.tradingMarket,
+				s.Position,
+				bestBid,
+				bestAsk,
+			)
+			if len(orders) > 0 {
+				s.logger.Infof("adjust position order forms: %+v", orders)
+				createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orders...)
+				if err != nil {
+					log.WithError(err).Errorf("order submit error for adjust position, created orders: %+v", createdOrders)
+				}
+				return
+			}
+		}
 		var spread = bestAsk.Price.Sub(bestBid.Price)
 		var spreadPercentage = spread.Div(bestAsk.Price)
-		log.Infof("trading book spread=%s(%s-%s) %s",
-			spread.String(), bestAsk.Price.String(), bestBid.Price.String(), spreadPercentage.Percentage())
+		log.Infof("trading book spread=%s(%s-%s) %s, position=%s",
+			spread.String(), bestAsk.Price.String(), bestBid.Price.String(), spreadPercentage.Percentage(),
+			s.Position.GetBase().String(),
+		)
 
 		// use the source book price if the spread percentage greater than 5%
 		if s.SimulatePrice && s.sourceBook != nil && spreadPercentage.Compare(maxStepPercentageGap) > 0 {

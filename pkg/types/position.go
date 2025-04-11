@@ -218,6 +218,16 @@ func (p *Position) GetBase() (base fixedpoint.Value) {
 	return base
 }
 
+// GetBaseAndAverageCost locks the mutex and return the base quantity and average cost
+func (p *Position) GetBaseAndAverageCost() (base fixedpoint.Value, averageCost fixedpoint.Value) {
+	p.Lock()
+	defer p.Unlock()
+
+	base = p.Base
+	averageCost = p.AverageCost
+	return
+}
+
 // GetQuantity calls GetBase() and then convert the number into a positive number
 // that could be treated as a quantity.
 func (p *Position) GetQuantity() fixedpoint.Value {
