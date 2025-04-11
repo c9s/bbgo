@@ -186,3 +186,74 @@ func TestStream(t *testing.T) {
 		<-c
 	})
 }
+
+func TestUseFutures(t *testing.T) {
+	s := getTestClientOrSkip(t)
+	s.UseFutures()
+
+	err := s.Connect(context.Background())
+	assert.NoError(t, err)
+	assert.True(t, s.isFutures)
+}
+
+func TestSubscribePrivateChannels(t *testing.T) {
+	s := getTestClientOrSkip(t)
+
+	// Test normal case
+	t.Run("normal case", func(t *testing.T) {
+		// Create a channel to track if the next function is called
+		nextCalled := make(chan struct{})
+
+		// Get the function returned by subscribePrivateChannels
+		subscribeFunc := s.subscribePrivateChannels(func() {
+			close(nextCalled)
+		})
+
+		// Connect to the exchange
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		// Call the returned function
+		subscribeFunc()
+
+		// Wait for the next function to be called or timeout
+		select {
+		case <-nextCalled:
+			// next function was called, test passed
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout waiting for next function to be called")
+		}
+	})
+
+	// Test futures mode
+	t.Run("futures mode", func(t *testing.T) {
+		s := getTestClientOrSkip(t)
+		s.UseFutures()
+
+		// Create a channel to track if the next function is called
+		nextCalled := make(chan struct{})
+
+		// Get the function returned by subscribePrivateChannels
+		subscribeFunc := s.subscribePrivateChannels(func() {
+			close(nextCalled)
+		})
+
+		// Connect to the exchange
+		err := s.Connect(context.Background())
+		assert.NoError(t, err)
+
+		// Call the returned function
+		subscribeFunc()
+
+		// Wait for the next function to be called or timeout
+		select {
+		case <-nextCalled:
+			// next function was called, test passed
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout waiting for next function to be called")
+		}
+
+		// Verify that the isFutures flag is correctly set
+		assert.True(t, s.isFutures)
+	})
+}

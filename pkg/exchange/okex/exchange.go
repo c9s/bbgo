@@ -130,7 +130,12 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		return nil, fmt.Errorf("markets rate limiter wait error: %w", err)
 	}
 
-	instruments, err := e.client.NewGetInstrumentsInfoRequest().Do(ctx)
+	req := e.client.NewGetInstrumentsInfoRequest()
+	if e.IsFutures {
+		req.InstType(okexapi.InstrumentTypeSwap)
+	}
+
+	instruments, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
