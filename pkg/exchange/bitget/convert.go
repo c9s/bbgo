@@ -29,6 +29,21 @@ func toGlobalMarket(s v2.Symbol) types.Market {
 		log.Warnf("The market symbol status %s is not online: %s", s.Symbol, s.Status)
 	}
 
+	var minQuantity, maxQuantity fixedpoint.Value
+	if v, err := fixedpoint.NewFromString(s.MinTradeAmount); err == nil {
+		minQuantity = v
+	} else {
+		log.Warnf("fail to convert min trade amount %s for %s, setting it to 0: %v", s.MinTradeAmount, s.Symbol, err)
+		minQuantity = fixedpoint.NewFromFloat(0.0)
+	}
+
+	if v, err := fixedpoint.NewFromString(s.MaxTradeAmount); err == nil {
+		maxQuantity = v
+	} else {
+		log.Warnf("fail to convert max trade amount %s for %s, setting it to unlimited (Inf): %v", s.MaxTradeAmount, s.Symbol, err)
+		maxQuantity = fixedpoint.PosInf
+	}
+
 	return types.Market{
 		Exchange:        types.ExchangeBitget,
 		Symbol:          s.Symbol,
@@ -39,8 +54,8 @@ func toGlobalMarket(s v2.Symbol) types.Market {
 		BaseCurrency:    s.BaseCoin,
 		MinNotional:     s.MinTradeUSDT,
 		MinAmount:       s.MinTradeUSDT,
-		MinQuantity:     s.MinTradeAmount,
-		MaxQuantity:     s.MaxTradeAmount,
+		MinQuantity:     minQuantity,
+		MaxQuantity:     maxQuantity,
 		StepSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(s.QuantityPrecision.Int())),
 		TickSize:        fixedpoint.NewFromFloat(1.0 / math.Pow10(s.PricePrecision.Int())),
 		MinPrice:        fixedpoint.Zero,
