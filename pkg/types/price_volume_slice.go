@@ -32,6 +32,10 @@ func (p PriceVolume) String() string {
 	return fmt.Sprintf("PriceVolume{ Price: %s, Volume: %s }", p.Price.String(), p.Volume.String())
 }
 
+func (p PriceVolume) IsZero() bool {
+	return p.Price.IsZero() && p.Volume.IsZero()
+}
+
 type PriceVolumeSlice []PriceVolume
 
 func (slice PriceVolumeSlice) Len() int           { return len(slice) }
