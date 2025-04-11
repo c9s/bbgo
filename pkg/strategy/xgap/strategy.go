@@ -56,6 +56,8 @@ type Strategy struct {
 	Quantity          fixedpoint.Value `json:"quantity"`
 	MaxJitterQuantity fixedpoint.Value `json:"maxJitterQuantity"`
 
+	SellBelowBestAsk bool `json:"sellBelowBestAsk"`
+
 	DryRun bool `json:"dryRun"`
 
 	DailyMaxVolume    fixedpoint.Value `json:"dailyMaxVolume,omitempty"`
@@ -382,8 +384,14 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		spreadPercentage.Percentage(),
 		bestAsk.Price.String(), bestBid.Price.String(), midPrice)
 
-	var price = adjustPrice(midPrice, s.tradingMarket.PricePrecision)
-	log.Infof("adjusted price: %s -> %s (precision: %v)", midPrice.String(), price.String(), s.tradingMarket.PricePrecision)
+	var price fixedpoint.Value
+	if s.SellBelowBestAsk {
+		price = bestAsk.Price.Sub(s.tradingMarket.TickSize)
+		log.Infof("price at 1 tick below best ask: %s (%s)", price.String(), s.tradingMarket.TickSize.String())
+	} else {
+		price = adjustPrice(midPrice, s.tradingMarket.PricePrecision)
+		log.Infof("adjusted mid price: %s -> %s (precision: %v)", midPrice.String(), price.String(), s.tradingMarket.PricePrecision)
+	}
 
 	var balances = s.tradingSession.GetAccount().Balances()
 
