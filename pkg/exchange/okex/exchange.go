@@ -15,6 +15,7 @@ import (
 	"go.uber.org/multierr"
 	"golang.org/x/time/rate"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -60,14 +61,24 @@ const (
 	threeDaysHistoricalPeriod    = 3 * 24 * time.Hour
 )
 
+// Enable dual side position mode (hedge mode) for futures trading
+var dualSidePosition = false
+
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": ID,
 })
 
 var ErrSymbolRequired = errors.New("symbol is a required parameter")
 
+func init() {
+	if val, ok := envvar.Bool("OKEX_ENABLE_FUTURES_HEDGE_MODE"); ok {
+		dualSidePosition = val
+	}
+}
+
 type Exchange struct {
 	types.MarginSettings
+	types.FuturesSettings
 
 	key, secret, passphrase, brokerId string
 
@@ -119,7 +130,12 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		return nil, fmt.Errorf("markets rate limiter wait error: %w", err)
 	}
 
-	instruments, err := e.client.NewGetInstrumentsInfoRequest().Do(ctx)
+	req := e.client.NewGetInstrumentsInfoRequest()
+	if e.IsFutures {
+		req.InstType(okexapi.InstrumentTypeSwap)
+	}
+
+	instruments, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -164,6 +180,9 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 	}
 
 	symbol = toLocalSymbol(symbol)
+	if e.IsFutures {
+		symbol = toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)
+	}
 	marketTicker, err := e.client.NewGetTickerRequest().InstId(symbol).Do(ctx)
 	if err != nil {
 		return nil, err
@@ -181,7 +200,12 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbols ...string) (map[str
 		return nil, fmt.Errorf("tickers rate limiter wait error: %w", err)
 	}
 
-	marketTickers, err := e.client.NewGetTickersRequest().Do(ctx)
+	req := e.client.NewGetTickersRequest()
+	if e.IsFutures {
+		req.InstType(okexapi.InstrumentTypeSwap)
+	}
+
+	marketTickers, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -284,6 +308,17 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		} else {
 			orderReq.TradeMode(okexapi.TradeModeCross)
 		}
+	} else if e.IsFutures {
+		orderReq.InstrumentID(toLocalSymbol(order.Symbol, okexapi.InstrumentTypeSwap))
+		if e.FuturesSettings.IsIsolatedFutures {
+			orderReq.TradeMode(okexapi.TradeModeIsolated)
+		} else {
+			orderReq.TradeMode(okexapi.TradeModeCross)
+		}
+
+		if dualSidePosition {
+			setDualSidePosition(orderReq, order)
+		}
 	} else {
 		orderReq.TradeMode(okexapi.TradeModeCash)
 	}
@@ -378,6 +413,9 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 
 		if e.MarginSettings.IsMargin {
 			req.InstrumentType(okexapi.InstrumentTypeMargin)
+		} else if e.IsFutures {
+			req.InstrumentID(toLocalSymbol(symbol, okexapi.InstrumentTypeSwap))
+			req.InstrumentType(okexapi.InstrumentTypeSwap)
 		}
 
 		openOrders, err := req.Do(ctx)
@@ -422,6 +460,9 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 
 		req := e.client.NewCancelOrderRequest()
 		req.InstrumentID(toLocalSymbol(order.Symbol))
+		if e.IsFutures {
+			req.InstrumentID(toLocalSymbol(order.Symbol, okexapi.InstrumentTypeSwap))
+		}
 		req.OrderID(strconv.FormatUint(order.OrderID, 10))
 		if len(order.ClientOrderID) > 0 {
 			if ok := clientOrderIdRegex.MatchString(order.ClientOrderID); !ok {
@@ -442,7 +483,12 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	return NewStream(e.client, e)
+	s := NewStream(e.client, e)
+	if e.IsFutures {
+		s.UseFutures()
+	}
+
+	return s
 }
 
 func (e *Exchange) QueryKLines(
@@ -457,7 +503,12 @@ func (e *Exchange) QueryKLines(
 		return nil, fmt.Errorf("failed to get interval: %w", err)
 	}
 
-	req := e.client.NewGetCandlesRequest().InstrumentID(toLocalSymbol(symbol))
+	instrumentID := toLocalSymbol(symbol)
+	if e.IsFutures {
+		instrumentID = toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)
+	}
+
+	req := e.client.NewGetCandlesRequest().InstrumentID(instrumentID)
 	req.Bar(intervalParam)
 
 	if options.StartTime != nil {
@@ -490,7 +541,11 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		return nil, errors.New("okex.QueryOrder: OrderId or ClientOrderId is required parameter")
 	}
 	req := e.client.NewGetOrderDetailsRequest()
-	req.InstrumentID(toLocalSymbol(q.Symbol))
+	instrumentID := toLocalSymbol(q.Symbol)
+	if e.IsFutures {
+		instrumentID = toLocalSymbol(q.Symbol, okexapi.InstrumentTypeSwap)
+	}
+	req.InstrumentID(instrumentID)
 	// Either ordId or clOrdId is required, if both are passed, ordId will be used
 	// ref: https://www.okx.com/docs-v5/en/#order-book-trading-trade-get-order-details
 	if len(q.OrderID) != 0 {
@@ -519,11 +574,17 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (tr
 
 	req := e.client.NewGetThreeDaysTransactionHistoryRequest()
 	if len(q.Symbol) != 0 {
-		req.InstrumentID(toLocalSymbol(q.Symbol))
+		instrumentID := toLocalSymbol(q.Symbol)
+		if e.IsFutures {
+			instrumentID = toLocalSymbol(q.Symbol, okexapi.InstrumentTypeSwap)
+		}
+		req.InstrumentID(instrumentID)
 	}
 
 	if e.MarginSettings.IsMargin {
 		req.InstrumentType(okexapi.InstrumentTypeMargin)
+	} else if e.IsFutures {
+		req.InstrumentType(okexapi.InstrumentTypeSwap)
 	}
 
 	if len(q.OrderID) != 0 {
@@ -575,8 +636,14 @@ func (e *Exchange) QueryClosedOrders(
 		return nil, fmt.Errorf("query closed order rate limiter wait error: %w", err)
 	}
 
-	req := e.client.NewGetOrderHistoryRequest().
-		InstrumentID(toLocalSymbol(symbol)).
+	req := e.client.NewGetOrderHistoryRequest()
+	instrumentID := toLocalSymbol(symbol)
+	if e.IsFutures {
+		instrumentID = toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)
+		req.InstrumentType(okexapi.InstrumentTypeSwap)
+	}
+
+	req.InstrumentID(instrumentID).
 		StartTime(since).
 		EndTime(until).
 		Limit(defaultQueryLimit).
@@ -798,15 +865,22 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		"req_id":        uuid.New().String(),
 	})
 
+	instrumentID := toLocalSymbol(symbol)
+	if e.IsFutures {
+		instrumentID = toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)
+	}
+
 	if lessThan3Day {
 		c := e.client.NewGetThreeDaysTransactionHistoryRequest().
-			InstrumentID(toLocalSymbol(symbol)).
+			InstrumentID(instrumentID).
 			StartTime(newStartTime).
 			EndTime(endTime).
 			Limit(uint64(limit))
 
 		if e.MarginSettings.IsMargin {
 			c.InstrumentType(okexapi.InstrumentTypeMargin)
+		} else if e.FuturesSettings.IsFutures {
+			c.InstrumentType(okexapi.InstrumentTypeSwap)
 		} else {
 			c.InstrumentType(okexapi.InstrumentTypeSpot)
 		}
@@ -822,13 +896,15 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 	}
 
 	c := e.client.NewGetTransactionHistoryRequest().
-		InstrumentID(toLocalSymbol(symbol)).
+		InstrumentID(instrumentID).
 		StartTime(newStartTime).
 		EndTime(endTime).
 		Limit(uint64(limit))
 
 	if e.MarginSettings.IsMargin {
 		c.InstrumentType(okexapi.InstrumentTypeMargin)
+	} else if e.FuturesSettings.IsFutures {
+		c.InstrumentType(okexapi.InstrumentTypeSwap)
 	} else {
 		c.InstrumentType(okexapi.InstrumentTypeSpot)
 	}
@@ -883,4 +959,25 @@ func (e *Exchange) SupportedInterval() map[types.Interval]int {
 func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 	_, ok := SupportedIntervals[interval]
 	return ok
+}
+
+func (e *Exchange) GetClient() *okexapi.RestClient {
+	return e.client
+}
+
+func setDualSidePosition(req *okexapi.PlaceOrderRequest, order types.SubmitOrder) {
+	switch order.Side {
+	case types.SideTypeBuy:
+		if order.ReduceOnly {
+			req.PosSide(okexapi.PosSideShort).ReduceOnly(true)
+		} else {
+			req.PosSide(okexapi.PosSideLong)
+		}
+	case types.SideTypeSell:
+		if order.ReduceOnly {
+			req.PosSide(okexapi.PosSideLong).ReduceOnly(true)
+		} else {
+			req.PosSide(okexapi.PosSideShort)
+		}
+	}
 }

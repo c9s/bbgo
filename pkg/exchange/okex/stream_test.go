@@ -186,3 +186,12 @@ func TestStream(t *testing.T) {
 		<-c
 	})
 }
+
+func TestUseFutures(t *testing.T) {
+	s := getTestClientOrSkip(t)
+	s.UseFutures()
+
+	err := s.Connect(context.Background())
+	assert.NoError(t, err)
+	assert.True(t, s.isFutures)
+}

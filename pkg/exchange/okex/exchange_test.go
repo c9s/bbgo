@@ -435,3 +435,39 @@ func TestExchange_Margin(t *testing.T) {
 		}
 	}
 }
+
+func TestExchange_QueryMarkets(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := New(key, secret, passphrase)
+	markets, err := ex.QueryMarkets(context.Background())
+	assert.NoError(t, err)
+	assert.NotEmpty(t, markets)
+
+	ex.IsFutures = true
+	markets1, err := ex.QueryMarkets(context.Background())
+	assert.NoError(t, err)
+	assert.NotEmpty(t, markets1)
+
+	assert.NotEqual(t, len(markets), len(markets1))
+}
+
+func TestExchange_QueryOpenOrders(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := New(key, secret, passphrase)
+	ex.UseFutures()
+
+	orders, err := ex.QueryOpenOrders(context.Background(), "BTCUSDT")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, orders)
+	assert.True(t, orders[0].IsFutures)
+}
