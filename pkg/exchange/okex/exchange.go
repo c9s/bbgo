@@ -236,6 +236,10 @@ func (e *Exchange) PlatformFeeCurrency() string {
 }
 
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
+	if e.IsFutures {
+		return e.QueryFuturesAccount(ctx)
+	}
+
 	accounts, err := e.queryAccountBalance(ctx)
 	if err != nil {
 		return nil, err
