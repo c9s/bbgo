@@ -15,18 +15,16 @@ const (
 	WaitToOpenPosition
 	OpenPositionReady
 	OpenPositionOrderFilled
-	OpenPositionOrdersCancelling
-	OpenPositionOrdersCancelled
+	OpenPositionFinished
 	TakeProfitReady
 )
 
 var stateTransition map[State]State = map[State]State{
-	WaitToOpenPosition:           OpenPositionReady,
-	OpenPositionReady:            OpenPositionOrderFilled,
-	OpenPositionOrderFilled:      OpenPositionOrdersCancelling,
-	OpenPositionOrdersCancelling: OpenPositionOrdersCancelled,
-	OpenPositionOrdersCancelled:  TakeProfitReady,
-	TakeProfitReady:              WaitToOpenPosition,
+	WaitToOpenPosition:      OpenPositionReady,
+	OpenPositionReady:       OpenPositionOrderFilled,
+	OpenPositionOrderFilled: OpenPositionFinished,
+	OpenPositionFinished:    TakeProfitReady,
+	TakeProfitReady:         WaitToOpenPosition,
 }
 
 func (s *Strategy) initializeNextStateC() bool {
@@ -61,12 +59,11 @@ func (s *Strategy) emitNextState(nextState State) {
 }
 
 // runState
-// WaitToOpenPosition -> after startTimeOfNextRound, place dca orders ->
-// PositionOpening
-// OpenPositionReady -> any dca maker order filled ->
-// OpenPositionOrderFilled -> price hit the take profit ration, start cancelling ->
-// OpenPositionOrdersCancelled -> place the takeProfit order ->
-// TakeProfitReady -> the takeProfit order filled ->
+// WaitToOpenPosition      -> [openPosition]                                    ->
+// OpenPositionReady       -> [readyToFinishOpenPositionStage] 	                ->
+// OpenPositionOrderFilled -> [finishOpenPositionStage]                         ->
+// OpenPositionFinish      -> [cancelOpenPositionOrdersAndPlaceTakeProfitOrder] ->
+// TakeProfitReady 	       -> [finishTakeProfitStage]                           ->
 func (s *Strategy) runState(ctx context.Context) {
 	s.logger.Info("[DCA] runState")
 	stateTriggerTicker := time.NewTicker(1 * time.Minute)
@@ -128,21 +125,23 @@ func (s *Strategy) moveToNextState(ctx context.Context, nextState State) bool {
 	case WaitToOpenPosition:
 		return s.openPosition(ctx)
 	case OpenPositionReady:
-		return s.runOpenPositionReady(ctx, nextState)
+		return s.readyToFinishOpenPositionStage(ctx)
 	case OpenPositionOrderFilled:
-		return s.runOpenPositionOrderFilled(ctx, nextState)
-	case OpenPositionOrdersCancelling:
-		return s.runOpenPositionOrdersCancelling(ctx, nextState)
-	case OpenPositionOrdersCancelled:
-		return s.runOpenPositionOrdersCancelled(ctx, nextState)
+		return s.finishOpenPositionStage(ctx)
+	case OpenPositionFinished:
+		return s.cancelOpenPositionOrdersAndPlaceTakeProfitOrder(ctx)
 	case TakeProfitReady:
-		return s.runTakeProfitReady(ctx, nextState)
+		return s.finishTakeProfitStage(ctx, nextState)
 	}
 
 	s.logger.Errorf("unexpected state: %d, please check it", s.state)
 	return false
 }
 
+// openPosition will place the open-position orders
+// if nextRoundPaused is set to true, it will not place the open-position orders
+// if startTimeOfNextRound is not reached, it will not place the open-position orders
+// if it place open-position orders successfully, it will update the state to OpenPositionReady and return true to trigger the next state immediately
 func (s *Strategy) openPosition(ctx context.Context) bool {
 	if s.nextRoundPaused {
 		s.logger.Info("[State] openPosition - nextRoundPaused is set to true")
@@ -171,47 +170,48 @@ func (s *Strategy) openPosition(ctx context.Context) bool {
 	return false
 }
 
-func (s *Strategy) runOpenPositionReady(_ context.Context, next State) bool {
+// readyToFinishOpenPositionStage will update the state to OpenPositionOrderFilled if there is at least one open-position order filled
+// it will not trigger the next state immediately because OpenPositionOrderFilled state only trigger by kline to move to the next state
+func (s *Strategy) readyToFinishOpenPositionStage(_ context.Context) bool {
 	s.updateState(OpenPositionOrderFilled)
 	s.logger.Info("[State] OpenPositionReady -> OpenPositionOrderFilled")
 	// do not trigger next state immediately, because OpenPositionOrderFilled state only trigger by kline to move to the next state
 	return false
 }
 
-func (s *Strategy) runOpenPositionOrderFilled(_ context.Context, next State) bool {
-	s.updateState(OpenPositionOrdersCancelling)
-	s.logger.Info("[State] OpenPositionOrderFilled -> OpenPositionOrdersCancelling")
+// finishOpenPositionStage will update the state to OpenPositionFinish and return true to trigger the next state immediately
+func (s *Strategy) finishOpenPositionStage(_ context.Context) bool {
+	s.updateState(OpenPositionFinished)
+	s.logger.Info("[State] OpenPositionOrderFilled -> OpenPositionFinished")
 	return true
 }
 
-func (s *Strategy) runOpenPositionOrdersCancelling(ctx context.Context, next State) bool {
-	s.logger.Info("[State] OpenPositionOrdersCancelling - start cancelling open-position orders")
+// cancelOpenPositionOrdersAndPlaceTakeProfitOrder will cancel the open-position orders and place the take-profit orders
+func (s *Strategy) cancelOpenPositionOrdersAndPlaceTakeProfitOrder(ctx context.Context) bool {
+	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - start cancelling open-position orders")
 	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
 		s.logger.WithError(err).Error("failed to cancel maker orders")
 		return false
 	}
-	s.updateState(OpenPositionOrdersCancelled)
-	s.logger.Info("[State] OpenPositionOrdersCancelling -> OpenPositionOrdersCancelled")
-	return true
-}
 
-func (s *Strategy) runOpenPositionOrdersCancelled(ctx context.Context, next State) bool {
-	s.logger.Info("[State] OpenPositionOrdersCancelled - start placing take-profit orders")
+	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - start placing the take-profit order")
 	if err := s.placeTakeProfitOrders(ctx); err != nil {
 		s.logger.WithError(err).Error("failed to open take profit orders")
 		return false
 	}
+
 	s.updateState(TakeProfitReady)
 	s.logger.Info("[State] OpenPositionOrdersCancelled -> TakeProfitReady")
 	// do not trigger next state immediately, because TakeProfitReady state only trigger by kline to move to the next state
 	return false
 }
 
-func (s *Strategy) runTakeProfitReady(ctx context.Context, next State) bool {
+// finishTakeProfitStage will update the profit stats and reset the position, then wait the next round
+func (s *Strategy) finishTakeProfitStage(ctx context.Context, next State) bool {
 	// wait 3 seconds to avoid position not update
 	time.Sleep(3 * time.Second)
 
-	s.logger.Info("[State] TakeProfitReady - start reseting position and calculate quote investment for next round")
+	s.logger.Info("[State] finishTakeProfitStage - start resetting position and calculate quote investment for next round")
 
 	// update profit stats
 	if err := s.UpdateProfitStatsUntilSuccessful(ctx); err != nil {
