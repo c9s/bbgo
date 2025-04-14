@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange"
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
@@ -15,7 +16,11 @@ import (
 	"go.uber.org/multierr"
 )
 
-func SyncActiveOrder(ctx context.Context, ex types.Exchange, orderQueryService types.ExchangeOrderQueryService, activeOrderBook *bbgo.ActiveOrderBook, orderID uint64, syncBefore time.Time) (isOrderUpdated bool, err error) {
+func SyncActiveOrder(ctx context.Context, ex types.Exchange, orderQueryService types.ExchangeOrderQueryService, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore, orderID uint64, syncBefore time.Time) (isOrderUpdated bool, err error) {
+	if activeOrderBook == nil {
+		return isOrderUpdated, fmt.Errorf("active order book is nil, please check it")
+	}
+
 	isMax := exchange.IsMaxExchange(ex)
 
 	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
@@ -41,6 +46,10 @@ func SyncActiveOrder(ctx context.Context, ex types.Exchange, orderQueryService t
 	isOrderUpdated = updatedOrder.UpdateTime.Before(syncBefore)
 	if isOrderUpdated {
 		activeOrderBook.Update(*updatedOrder)
+
+		if orderStore != nil {
+			orderStore.Update(*updatedOrder)
+		}
 	}
 
 	return isOrderUpdated, nil
@@ -51,11 +60,16 @@ type SyncActiveOrdersOpts struct {
 	Exchange          types.Exchange
 	OrderQueryService types.ExchangeOrderQueryService
 	ActiveOrderBook   *bbgo.ActiveOrderBook
+	OrderStore        *core.OrderStore
 	OpenOrders        []types.Order
 }
 
 func SyncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 	opts.Logger.Infof("[ActiveOrderRecover] syncActiveOrders")
+	// ActiveOrderBook should not be nil, but OrderStore can be nil
+	if opts.ActiveOrderBook == nil {
+		return fmt.Errorf("[ActiveOrderRecover] active order book is nil, please check it")
+	}
 
 	// only sync orders which is updated over 3 min, because we may receive from websocket and handle it twice
 	syncBefore := time.Now().Add(-3 * time.Minute)
@@ -76,7 +90,7 @@ func SyncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 		} else {
 			opts.Logger.Infof("[ActiveOrderRecover] found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
 
-			isActiveOrderBookUpdated, err := SyncActiveOrder(ctx, opts.Exchange, opts.OrderQueryService, opts.ActiveOrderBook, activeOrder.OrderID, syncBefore)
+			isActiveOrderBookUpdated, err := SyncActiveOrder(ctx, opts.Exchange, opts.OrderQueryService, opts.ActiveOrderBook, opts.OrderStore, activeOrder.OrderID, syncBefore)
 			if err != nil {
 				opts.Logger.WithError(err).Errorf("[ActiveOrderRecover] unable to query order #%d", activeOrder.OrderID)
 				errs = multierr.Append(errs, err)
@@ -99,6 +113,9 @@ func SyncActiveOrders(ctx context.Context, opts SyncActiveOrdersOpts) error {
 		}
 
 		opts.ActiveOrderBook.Add(openOrder)
+		if opts.OrderStore != nil {
+			opts.OrderStore.Add(openOrder)
+		}
 	}
 
 	return errs

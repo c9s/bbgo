@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
 	"github.com/sirupsen/logrus"
@@ -29,6 +30,7 @@ func TestSyncActiveOrders(t *testing.T) {
 		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
 		mockExchange := mocks.NewMockExchange(mockCtrl)
 		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
+		orderStore := core.NewOrderStore(symbol)
 
 		order := types.Order{
 			OrderID: 1,
@@ -41,10 +43,12 @@ func TestSyncActiveOrders(t *testing.T) {
 			Exchange:          mockExchange,
 			OrderQueryService: mockOrderQueryService,
 			ActiveOrderBook:   activeOrderbook,
+			OrderStore:        orderStore,
 			OpenOrders:        []types.Order{order},
 		}
 
 		activeOrderbook.Add(order)
+		orderStore.Add(order)
 
 		assert.NoError(SyncActiveOrders(ctx, opts))
 
@@ -53,12 +57,14 @@ func TestSyncActiveOrders(t *testing.T) {
 		assert.Equal(1, len(activeOrders))
 		assert.Equal(uint64(1), activeOrders[0].OrderID)
 		assert.Equal(types.OrderStatusNew, activeOrders[0].Status)
+		assert.True(orderStore.Exists(order.OrderID))
 	})
 
 	t.Run("there is order in active orderbook but not in open orders", func(t *testing.T) {
 		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
 		mockExchange := mocks.NewMockExchange(mockCtrl)
 		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
+		orderStore := core.NewOrderStore(symbol)
 
 		order := types.Order{
 			OrderID: 1,
@@ -73,12 +79,14 @@ func TestSyncActiveOrders(t *testing.T) {
 		opts := SyncActiveOrdersOpts{
 			Logger:            log,
 			ActiveOrderBook:   activeOrderbook,
+			OrderStore:        orderStore,
 			OrderQueryService: mockOrderQueryService,
 			Exchange:          mockExchange,
 			OpenOrders:        nil,
 		}
 
 		activeOrderbook.Add(order)
+		orderStore.Add(order)
 		mockOrderQueryService.EXPECT().QueryOrder(ctx, types.OrderQuery{
 			Symbol:  symbol,
 			OrderID: strconv.FormatUint(order.OrderID, 10),
@@ -89,12 +97,14 @@ func TestSyncActiveOrders(t *testing.T) {
 		// verify active orderbook
 		activeOrders := activeOrderbook.Orders()
 		assert.Equal(0, len(activeOrders))
+		assert.True(orderStore.Exists(order.OrderID))
 	})
 
 	t.Run("there is order on open orders but not in active orderbook", func(t *testing.T) {
 		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
 		mockExchange := mocks.NewMockExchange(mockCtrl)
 		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
+		orderStore := core.NewOrderStore(symbol)
 
 		order := types.Order{
 			OrderID: 1,
@@ -108,6 +118,7 @@ func TestSyncActiveOrders(t *testing.T) {
 		opts := SyncActiveOrdersOpts{
 			Logger:            log,
 			ActiveOrderBook:   activeOrderbook,
+			OrderStore:        orderStore,
 			OrderQueryService: mockOrderQueryService,
 			Exchange:          mockExchange,
 			OpenOrders:        []types.Order{order},
@@ -119,12 +130,14 @@ func TestSyncActiveOrders(t *testing.T) {
 		assert.Equal(1, len(activeOrders))
 		assert.Equal(uint64(1), activeOrders[0].OrderID)
 		assert.Equal(types.OrderStatusNew, activeOrders[0].Status)
+		assert.True(orderStore.Exists(order.OrderID))
 	})
 
 	t.Run("there is order on open order but not in active orderbook also order in active orderbook but not on open orders", func(t *testing.T) {
 		mockOrderQueryService := mocks.NewMockExchangeOrderQueryService(mockCtrl)
 		mockExchange := mocks.NewMockExchange(mockCtrl)
 		activeOrderbook := bbgo.NewActiveOrderBook(symbol)
+		orderStore := core.NewOrderStore(symbol)
 
 		order1 := types.Order{
 			OrderID: 1,
@@ -146,12 +159,14 @@ func TestSyncActiveOrders(t *testing.T) {
 		opts := SyncActiveOrdersOpts{
 			Logger:            log,
 			ActiveOrderBook:   activeOrderbook,
+			OrderStore:        orderStore,
 			OrderQueryService: mockOrderQueryService,
 			Exchange:          mockExchange,
 			OpenOrders:        []types.Order{order2},
 		}
 
 		activeOrderbook.Add(order1)
+		orderStore.Add(order1)
 		mockOrderQueryService.EXPECT().QueryOrder(ctx, types.OrderQuery{
 			Symbol:  symbol,
 			OrderID: strconv.FormatUint(order1.OrderID, 10),
@@ -164,5 +179,6 @@ func TestSyncActiveOrders(t *testing.T) {
 		assert.Equal(1, len(activeOrders))
 		assert.Equal(uint64(2), activeOrders[0].OrderID)
 		assert.Equal(types.OrderStatusNew, activeOrders[0].Status)
+		assert.True(orderStore.Exists(order2.OrderID))
 	})
 }
