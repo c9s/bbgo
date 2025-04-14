@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/envvar"
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testing/httptesting"
@@ -433,5 +434,201 @@ func TestExchange_Margin(t *testing.T) {
 			err3 := ex.RepayMarginAsset(ctx, "BTC", maxBorrowable)
 			assert.NoError(t, err3)
 		}
+	}
+}
+
+func TestExchange_QueryMarkets(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := New(key, secret, passphrase)
+	markets, err := ex.QueryMarkets(context.Background())
+	assert.NoError(t, err)
+	assert.NotEmpty(t, markets)
+
+	ex.IsFutures = true
+	markets1, err := ex.QueryMarkets(context.Background())
+	assert.NoError(t, err)
+	assert.NotEmpty(t, markets1)
+
+	assert.NotEqual(t, len(markets), len(markets1))
+}
+
+func TestExchange_QueryFuturesOpenOrders(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := New(key, secret, passphrase)
+	ex.UseFutures()
+
+	orders, err := ex.QueryOpenOrders(context.Background(), "BTCUSDT")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, orders)
+	assert.True(t, orders[0].IsFutures)
+}
+
+func TestExchange_Futures_SubmitOrder(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := New(key, secret, passphrase)
+	ex.UseFutures()
+	dualSidePosition = true
+
+	markets, err := ex.QueryMarkets(context.Background())
+	assert.NoError(t, err)
+
+	market := markets["BTCUSDT"]
+	orders, err := ex.SubmitOrder(context.Background(), types.SubmitOrder{
+		Symbol:   "BTCUSDT",
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeLimit,
+		Price:    fixedpoint.MustNewFromString("90000"),
+		Quantity: market.MinQuantity,
+		Market:   market,
+	})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, orders)
+}
+
+func TestExchange_QueryKlines(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := New(key, secret, passphrase)
+
+	klines, err := ex.QueryKLines(context.Background(), "BTCUSDT", types.Interval1m, types.KLineQueryOptions{})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, klines)
+
+	ex.UseFutures()
+	klines, err = ex.QueryKLines(context.Background(), "BTCUSDT", types.Interval1m, types.KLineQueryOptions{})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, klines)
+}
+
+func Test_init(t *testing.T) {
+	t.Run("env var not set", func(t *testing.T) {
+		os.Unsetenv("OKEX_ENABLE_FUTURES_HEDGE_MODE")
+
+		dualSidePosition = false
+		if val, ok := envvar.Bool("OKEX_ENABLE_FUTURES_HEDGE_MODE"); ok {
+			dualSidePosition = val
+		}
+
+		assert.False(t, dualSidePosition)
+	})
+
+	t.Run("env var set true", func(t *testing.T) {
+		os.Setenv("OKEX_ENABLE_FUTURES_HEDGE_MODE", "true")
+
+		dualSidePosition = false
+		if val, ok := envvar.Bool("OKEX_ENABLE_FUTURES_HEDGE_MODE"); ok {
+			dualSidePosition = val
+		}
+
+		assert.True(t, dualSidePosition)
+	})
+
+	t.Run("env var set false", func(t *testing.T) {
+		os.Setenv("OKEX_ENABLE_FUTURES_HEDGE_MODE", "false")
+
+		dualSidePosition = true
+		if val, ok := envvar.Bool("OKEX_ENABLE_FUTURES_HEDGE_MODE"); ok {
+			dualSidePosition = val
+		}
+
+		assert.False(t, dualSidePosition)
+	})
+}
+
+func TestSetDualSidePosition(t *testing.T) {
+	trueValue := true
+	tests := []struct {
+		name               string
+		order              types.SubmitOrder
+		expectedPosSide    okexapi.PosSide
+		expectedReduceOnly *bool
+	}{
+		{
+			name: "Buy order without reduce only",
+			order: types.SubmitOrder{
+				Side:       types.SideTypeBuy,
+				ReduceOnly: false,
+				Type:       types.OrderTypeLimit,
+			},
+			expectedPosSide:    okexapi.PosSideLong,
+			expectedReduceOnly: nil,
+		},
+		{
+			name: "Buy order with reduce only",
+			order: types.SubmitOrder{
+				Side:       types.SideTypeBuy,
+				ReduceOnly: true,
+				Type:       types.OrderTypeLimit,
+			},
+			expectedPosSide:    okexapi.PosSideShort,
+			expectedReduceOnly: &trueValue,
+		},
+		{
+			name: "Sell order without reduce only",
+			order: types.SubmitOrder{
+				Side:       types.SideTypeSell,
+				ReduceOnly: false,
+				Type:       types.OrderTypeLimit,
+			},
+			expectedPosSide:    okexapi.PosSideShort,
+			expectedReduceOnly: nil,
+		},
+		{
+			name: "Sell order with reduce only",
+			order: types.SubmitOrder{
+				Side:       types.SideTypeSell,
+				ReduceOnly: true,
+				Type:       types.OrderTypeLimit,
+			},
+			expectedPosSide:    okexapi.PosSideLong,
+			expectedReduceOnly: &trueValue,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a new PlaceOrderRequest
+			req := &okexapi.PlaceOrderRequest{}
+			req.TradeMode(okexapi.TradeModeCross)
+			req.Side(toLocalSideType(tt.order.Side))
+
+			ordType, err := toLocalOrderType(tt.order.Type)
+			assert.NoError(t, err)
+			req.OrderType(ordType)
+
+			// Call the function being tested
+			setDualSidePosition(req, tt.order)
+
+			// Get the parameters to verify the results
+			params, err := req.GetParameters()
+			assert.NoError(t, err)
+
+			// Assert the results
+			assert.Equal(t, tt.expectedPosSide, params["posSide"])
+			if tt.expectedReduceOnly == nil {
+				assert.NotContains(t, params, "reduceOnly")
+			} else {
+				assert.Equal(t, *tt.expectedReduceOnly, params["reduceOnly"])
+			}
+		})
 	}
 }

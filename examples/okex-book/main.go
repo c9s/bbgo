@@ -48,8 +48,8 @@ var rootCmd = &cobra.Command{
 
 		client.Auth(key, secret, passphrase)
 
-		instruments, err := client.NewGetInstrumentsRequest().
-			InstrumentType("SPOT").Do(ctx)
+		instruments, err := client.NewGetInstrumentsInfoRequest().
+			InstType("SPOT").Do(ctx)
 		if err != nil {
 			return err
 		}
@@ -63,7 +63,7 @@ var rootCmd = &cobra.Command{
 		log.Infof("funding rate: %+v", fundingRate)
 
 		log.Infof("ACCOUNT BALANCES:")
-		account, err := client.AccountBalances(ctx)
+		account, err := client.NewGetAccountBalanceRequest().Do(ctx)
 		if err != nil {
 			return err
 		}
@@ -91,7 +91,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		log.Infof("MARKET TICKERS:")
-		tickers, err := client.MarketTickers(ctx, okexapi.InstrumentTypeSpot)
+		tickers, err := client.NewMarketTickersRequest(string(okexapi.InstrumentTypeSpot)).Do(ctx)
 		if err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ var rootCmd = &cobra.Command{
 			log.Infof("%T%+v", ticker, ticker)
 		}
 
-		ticker, err := client.MarketTicker(ctx, "ETH-USDT")
+		ticker, err := client.NewMarketTickerRequest("ETH-USDT").Do(ctx)
 		if err != nil {
 			return err
 		}
@@ -113,7 +113,7 @@ var rootCmd = &cobra.Command{
 			OrderType(okexapi.OrderTypeLimit).
 			Side(okexapi.SideTypeBuy).
 			Price("50.0").
-			Quantity("0.5").
+			Size("0.5").
 			Do(ctx)
 		if err != nil {
 			return err
@@ -125,7 +125,7 @@ var rootCmd = &cobra.Command{
 		log.Infof("getting order detail...")
 		orderDetail, err := client.NewGetOrderDetailsRequest().
 			InstrumentID("LTC-USDT").
-			OrderID(placeResponse.OrderID).
+			OrderID(placeResponse[0].OrderID).
 			Do(ctx)
 		if err != nil {
 			return err
@@ -135,7 +135,7 @@ var rootCmd = &cobra.Command{
 
 		cancelResponse, err := client.NewCancelOrderRequest().
 			InstrumentID("LTC-USDT").
-			OrderID(placeResponse.OrderID).
+			OrderID(placeResponse[0].OrderID).
 			Do(ctx)
 		if err != nil {
 			return err
@@ -151,14 +151,14 @@ var rootCmd = &cobra.Command{
 			OrderType(okexapi.OrderTypeLimit).
 			Side(okexapi.SideTypeBuy).
 			Price("50.0").
-			Quantity("0.5"))
+			Size("0.5"))
 
 		batchPlaceReq.Add(client.NewPlaceOrderRequest().
 			InstrumentID("LTC-USDT").
 			OrderType(okexapi.OrderTypeLimit).
 			Side(okexapi.SideTypeBuy).
 			Price("30.0").
-			Quantity("0.5"))
+			Size("0.5"))
 
 		batchPlaceResponse, err := batchPlaceReq.Do(ctx)
 		if err != nil {
@@ -169,7 +169,7 @@ var rootCmd = &cobra.Command{
 		time.Sleep(time.Second)
 
 		log.Infof("getting pending orders...")
-		pendingOrders, err := client.NewGetPendingOrderRequest().Do(ctx)
+		pendingOrders, err := client.NewGetOpenOrdersRequest().Do(ctx)
 		if err != nil {
 			return err
 		}

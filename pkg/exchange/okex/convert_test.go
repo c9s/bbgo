@@ -244,3 +244,41 @@ func Test_processMarketBuyQuantity(t *testing.T) {
 		assert.ErrorContains(err, "unexpected")
 	})
 }
+
+func Test_toGlobalSymbol(t *testing.T) {
+	symbol := "BTC-USDT"
+	assert.Equal(t, "BTCUSDT", toGlobalSymbol(symbol))
+
+	symbol = "BTC-USDT-SWAP"
+	assert.Equal(t, "BTCUSDT", toGlobalSymbol(symbol))
+}
+
+func Test_toLocalSymbol(t *testing.T) {
+	symbol := "BTCUSDT"
+	assert.Equal(t, "BTC-USDT", toLocalSymbol(symbol))
+	assert.Equal(t, "BTC-USDT-SWAP", toLocalSymbol(symbol, okexapi.InstrumentTypeSwap))
+}
+
+func Test_toGlobalOrder(t *testing.T) {
+	localOrder := &okexapi.OrderDetails{
+		OrderID:        "665576973905014786",
+		Currency:       "BTC",
+		Fee:            fixedpoint.Zero,
+		FeeCurrency:    "USDT",
+		InstrumentID:   "BTC-USDT",
+		InstrumentType: okexapi.InstrumentTypeSpot,
+		OrderType:      okexapi.OrderTypeLimit,
+		Price:          fixedpoint.NewFromFloat(48174.5),
+		Side:           okexapi.SideTypeBuy,
+		State:          okexapi.OrderStateLive,
+	}
+
+	globalOrder, err := toGlobalOrder(localOrder)
+	assert.NoError(t, err)
+	assert.False(t, globalOrder.IsFutures)
+
+	localOrder.InstrumentType = okexapi.InstrumentTypeSwap
+	globalOrder, err = toGlobalOrder(localOrder)
+	assert.NoError(t, err)
+	assert.True(t, globalOrder.IsFutures)
+}
