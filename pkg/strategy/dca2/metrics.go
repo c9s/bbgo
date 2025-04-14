@@ -2,15 +2,14 @@ package dca2
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
-	metricsState             *prometheus.GaugeVec
 	metricsNumOfActiveOrders *prometheus.GaugeVec
-	metricsNumOfOpenOrders   *prometheus.GaugeVec
-	metricsProfit            *prometheus.GaugeVec
+	metricsState             *prometheus.GaugeVec
 )
 
 func labelKeys(labels prometheus.Labels) []string {
@@ -35,19 +34,6 @@ func mergeLabels(a, b prometheus.Labels) prometheus.Labels {
 }
 
 func initMetrics(extendedLabels []string) {
-	if metricsState == nil {
-		metricsState = prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "bbgo_dca2_state",
-				Help: "state of this DCA2 strategy",
-			},
-			append([]string{
-				"exchange",
-				"symbol",
-			}, extendedLabels...),
-		)
-	}
-
 	if metricsNumOfActiveOrders == nil {
 		metricsNumOfActiveOrders = prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -57,33 +43,21 @@ func initMetrics(extendedLabels []string) {
 			append([]string{
 				"exchange",
 				"symbol",
+				"ts",
 			}, extendedLabels...),
 		)
 	}
 
-	if metricsNumOfOpenOrders == nil {
-		metricsNumOfOpenOrders = prometheus.NewGaugeVec(
+	if metricsState == nil {
+		metricsState = prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "bbgo_dca2_num_of_open_orders",
-				Help: "number of open orders",
+				Name: "bbgo_dca2_state",
+				Help: "state of this strategy",
 			},
 			append([]string{
 				"exchange",
 				"symbol",
-			}, extendedLabels...),
-		)
-	}
-
-	if metricsProfit == nil {
-		metricsProfit = prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "bbgo_dca2_profit",
-				Help: "profit of this DCA@ strategy",
-			},
-			append([]string{
-				"exchange",
-				"symbol",
-				"round",
+				"ts",
 			}, extendedLabels...),
 		)
 	}
@@ -99,18 +73,21 @@ func registerMetrics() {
 	initMetrics(nil)
 
 	prometheus.MustRegister(
-		metricsState,
 		metricsNumOfActiveOrders,
-		metricsNumOfOpenOrders,
-		metricsProfit,
+		metricsState,
 	)
 
 	metricsRegistered = true
 }
 
-func updateProfitMetrics(round int64, profit float64) {
+func updateNumOfActiveOrdersMetrics(state State, numOfActiveOrders int64) {
+	now := time.Now()
+
+	// use ts to bind the state and numOfActiveOrders
 	labels := mergeLabels(baseLabels, prometheus.Labels{
-		"round": strconv.FormatInt(round, 10),
+		"ts": strconv.FormatInt(now.UnixMilli(), 10),
 	})
-	metricsProfit.With(labels).Set(profit)
+
+	metricsState.With(labels).Set(float64(state))
+	metricsNumOfActiveOrders.With(labels).Set(float64(numOfActiveOrders))
 }

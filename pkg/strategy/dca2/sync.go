@@ -43,8 +43,9 @@ func (s *Strategy) syncPeriodically(ctx context.Context) {
 	}
 }
 
+// syncActiveOrders syncs the active orders (orders in ActiveMakerOrders) with the open orders by QueryOpenOrders API
 func (s *Strategy) syncActiveOrders(ctx context.Context) error {
-	s.logger.Info("recover active orders...")
+	s.logger.Info("sync active orders...")
 	openOrders, err := retry.QueryOpenOrdersUntilSuccessfulLite(ctx, s.ExchangeSession.Exchange, s.Symbol)
 	if err != nil {
 		s.logger.WithError(err).Warn("failed to query open orders")
@@ -52,16 +53,6 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 	}
 
 	activeOrders := s.OrderExecutor.ActiveMakerOrders()
-
-	// update num of open orders metrics
-	if metricsNumOfOpenOrders != nil {
-		metricsNumOfOpenOrders.With(baseLabels).Set(float64(len(openOrders)))
-	}
-
-	// update num of active orders metrics
-	if metricsNumOfActiveOrders != nil {
-		metricsNumOfActiveOrders.With(baseLabels).Set(float64(activeOrders.NumOfOrders()))
-	}
 
 	if len(openOrders) != activeOrders.NumOfOrders() {
 		s.logger.Warnf("num of open orders (%d) and active orders (%d) is different before active orders recovery, please check it.", len(openOrders), activeOrders.NumOfOrders())
@@ -71,7 +62,8 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 		Logger:            s.logger,
 		Exchange:          s.ExchangeSession.Exchange,
 		OrderQueryService: s.collector.queryService,
-		ActiveOrderBook:   activeOrders,
+		ActiveOrderBook:   s.OrderExecutor.ActiveMakerOrders(),
+		OrderStore:        s.OrderExecutor.OrderStore(),
 		OpenOrders:        openOrders,
 	}
 

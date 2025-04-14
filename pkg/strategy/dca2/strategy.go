@@ -113,7 +113,7 @@ func (s *Strategy) Validate() error {
 	}
 
 	if s.PriceDeviation.Sign() <= 0 {
-		return fmt.Errorf("margin can not be <= 0")
+		return fmt.Errorf("priceDeviation can not be <= 0")
 	}
 
 	// TODO: validate balance is enough
@@ -240,14 +240,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, s.ExchangeSession.Exchange, s.Symbol)
 		if err != nil {
 			s.logger.WithError(err).Warn("failed to query open orders when order filled")
-		} else {
-			// update open orders metrics
-			metricsNumOfOpenOrders.With(baseLabels).Set(float64(len(openOrders)))
 		}
 
 		// update active orders metrics
 		numActiveMakerOrders := s.OrderExecutor.ActiveMakerOrders().NumOfOrders()
-		metricsNumOfActiveOrders.With(baseLabels).Set(float64(numActiveMakerOrders))
+		updateNumOfActiveOrdersMetrics(s.state, int64(numActiveMakerOrders))
 
 		if len(openOrders) != numActiveMakerOrders {
 			s.logger.Warnf("num of open orders (%d) and active orders (%d) is different when order filled, please check it.", len(openOrders), numActiveMakerOrders)
@@ -493,7 +490,6 @@ func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
 
 		// emit profit
 		s.EmitProfit(s.ProfitStats)
-		updateProfitMetrics(s.ProfitStats.Round, s.ProfitStats.CurrentRoundProfit.Float64())
 
 		// make profit stats forward to new round
 		s.ProfitStats.NewRound()
