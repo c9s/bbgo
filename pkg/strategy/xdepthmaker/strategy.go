@@ -679,8 +679,8 @@ func (s *Strategy) CrossRun(
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		bbgo.Notify("Shutting down %s: %s", ID, s.Symbol)
-
+		bbgo.Notify("Shutting down %s", s.InstanceID())
+		s.stopC <- struct{}{}
 		close(s.stopC)
 
 		// wait for the quoter to stop
@@ -704,7 +704,7 @@ func (s *Strategy) CrossRun(
 
 		bbgo.Sync(ctx, s)
 
-		bbgo.Notify("Shutdown %s: %s position", ID, s.Symbol, s.Position)
+		bbgo.Notify("Shutdown %s: position %v", s.InstanceID(), s.Position)
 	})
 
 	return nil

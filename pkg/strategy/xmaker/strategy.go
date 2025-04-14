@@ -2331,6 +2331,8 @@ func (s *Strategy) CrossRun(
 		defer wg.Done()
 
 		// send stop signal to the quoteWorker
+		bbgo.Notify("Shutting down %s", s.InstanceID())
+		s.stopC <- struct{}{}
 		close(s.stopC)
 
 		// wait for the quoter to stop
@@ -2341,7 +2343,7 @@ func (s *Strategy) CrossRun(
 		}
 
 		bbgo.Sync(ctx, s)
-		bbgo.Notify("Shutting down %s %s", ID, s.Symbol, s.Position)
+		bbgo.Notify("Shutdown %s: position %v", s.InstanceID(), s.Position)
 	})
 
 	return nil

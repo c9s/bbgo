@@ -166,7 +166,8 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-
+		bbgo.Notify("Shutting down: %s", s.InstanceID())
+		s.stopC <- struct{}{}
 		close(s.stopC)
 
 		if err := tradingutil.UniversalCancelAllOrders(ctx, s.tradingSession.Exchange, s.Symbol, nil); err != nil {
@@ -174,6 +175,7 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		}
 
 		bbgo.Sync(ctx, s)
+		bbgo.Notify("Shutdown %s: position %s", s.InstanceID(), s.Position)
 	})
 
 	// from here, set data binding
