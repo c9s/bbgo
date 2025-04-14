@@ -117,12 +117,12 @@ func recoverState(ctx context.Context, maxOrderCount int, currentRound Round, or
 			return OpenPositionOrderFilled, nil
 		} else {
 			// all open-position orders filled, change to cancelling and place the take-profit order
-			return OpenPositionOrdersCancelling, nil
+			return OpenPositionFinished, nil
 		}
 	}
 
 	// there are at last one open-position orders cancelled and at least one filled order -> open position order cancelling
-	return OpenPositionOrdersCancelling, nil
+	return OpenPositionFinished, nil
 }
 
 func recoverPosition(

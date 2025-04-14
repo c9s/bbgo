@@ -253,7 +253,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		}
 
 		if err == nil && o.Side == openPositionSide && numActiveMakerOrders == 0 && len(openOrders) == 0 {
-			s.emitNextState(OpenPositionOrdersCancelling)
+			s.emitNextState(OpenPositionFinished)
 		}
 	})
 
@@ -271,7 +271,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 				return
 			}
 
-			s.emitNextState(OpenPositionOrdersCancelling)
+			s.emitNextState(OpenPositionFinished)
 		default:
 			return
 		}
