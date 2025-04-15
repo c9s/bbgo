@@ -186,6 +186,7 @@ func Test_adjustPositionOrder(t *testing.T) {
 				tt.args.bestAsk)
 			assert.Equal(t, tt.expectAvailability, ok)
 			if tt.expectAvailability {
+				assert.Equal(t, types.TimeInForceIOC, adjPosOrder.TimeInForce)
 				assert.Equal(t, adjPosOrder.Price.String(), tt.expectOrderPrice.String())
 				assert.Equal(t, adjPosOrder.Side, tt.expectSide)
 			}
