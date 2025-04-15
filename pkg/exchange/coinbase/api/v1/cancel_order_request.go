@@ -17,3 +17,17 @@ type CancelOrderRequest struct {
 func (c *RestAPIClient) NewCancelOrderRequest() *CancelOrderRequest {
 	return &CancelOrderRequest{client: c}
 }
+
+type CancelAllOrdersResponse []string
+
+//go:generate requestgen -method DELETE -url "/orders" -type CancelAllOrdersRequest -responseType .CancelAllOrdersResponse
+type CancelAllOrdersRequest struct {
+	client requestgen.AuthenticatedAPIClient
+
+	profileID *string `param:"profile_id"`
+	productID *string `param:"product_id"`
+}
+
+func (c *RestAPIClient) NewCancelAllOrdersRequest() *CancelAllOrdersRequest {
+	return &CancelAllOrdersRequest{client: c}
+}
