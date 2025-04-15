@@ -61,14 +61,14 @@ func Test_adjustPositionOrder(t *testing.T) {
 		currentPosition  *types.Position
 	}
 	tests := []struct {
-		name             string
-		args             args
-		expectNumOrders  int
-		expectOrderPrice fixedpoint.Value
-		expectSide       types.SideType
+		name               string
+		args               args
+		expectAvailability bool
+		expectOrderPrice   fixedpoint.Value
+		expectSide         types.SideType
 	}{
 		{
-			name: "Short Position",
+			name: "Short_Position",
 			args: args{
 				bestBid: types.PriceVolume{
 					Price:  fixedpoint.MustNewFromString("0.3218"),
@@ -86,12 +86,12 @@ func Test_adjustPositionOrder(t *testing.T) {
 					AverageCost:   fixedpoint.MustNewFromString("0.3220"),
 				},
 			},
-			expectNumOrders:  1,
-			expectOrderPrice: fixedpoint.MustNewFromString("0.3219"),
-			expectSide:       types.SideTypeBuy,
+			expectAvailability: true,
+			expectOrderPrice:   fixedpoint.MustNewFromString("0.3219"),
+			expectSide:         types.SideTypeBuy,
 		},
 		{
-			name: "Long Position",
+			name: "Long_Position",
 			args: args{
 				bestBid: types.PriceVolume{
 					Price:  fixedpoint.MustNewFromString("0.3218"),
@@ -109,12 +109,12 @@ func Test_adjustPositionOrder(t *testing.T) {
 					AverageCost:   fixedpoint.MustNewFromString("0.3215"),
 				},
 			},
-			expectNumOrders:  1,
-			expectOrderPrice: fixedpoint.MustNewFromString("0.3218"),
-			expectSide:       types.SideTypeSell,
+			expectAvailability: true,
+			expectOrderPrice:   fixedpoint.MustNewFromString("0.3218"),
+			expectSide:         types.SideTypeSell,
 		},
 		{
-			name: "Zero Position",
+			name: "Zero_Position",
 			args: args{
 				bestBid: types.PriceVolume{
 					Price:  fixedpoint.MustNewFromString("0.3218"),
@@ -132,10 +132,10 @@ func Test_adjustPositionOrder(t *testing.T) {
 					AverageCost:   fixedpoint.MustNewFromString("0.32185"),
 				},
 			},
-			expectNumOrders: 0,
+			expectAvailability: false,
 		},
 		{
-			name: "Short Position - No Adjustment",
+			name: "Short_Position_No_Adjustment",
 			args: args{
 				bestBid: types.PriceVolume{
 					Price:  fixedpoint.MustNewFromString("0.3218"),
@@ -153,10 +153,10 @@ func Test_adjustPositionOrder(t *testing.T) {
 					AverageCost:   fixedpoint.MustNewFromString("0.32185"),
 				},
 			},
-			expectNumOrders: 0,
+			expectAvailability: false,
 		},
 		{
-			name: "Long Position - No Adjustment",
+			name: "Long_Position_No_Adjustment",
 			args: args{
 				bestBid: types.PriceVolume{
 					Price:  fixedpoint.MustNewFromString("0.3218"),
@@ -174,17 +174,20 @@ func Test_adjustPositionOrder(t *testing.T) {
 					AverageCost:   fixedpoint.MustNewFromString("0.32185"),
 				},
 			},
-			expectNumOrders: 0,
+			expectAvailability: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			orders := getAdjustPositionOrder(tradingMarket.Symbol, tradingMarket, tt.args.currentPosition, tt.args.bestBid, tt.args.bestAsk)
-			assert.Equal(t, len(orders), tt.expectNumOrders)
-			if tt.expectNumOrders > 0 {
-				order := orders[0]
-				assert.Equal(t, order.Price.String(), tt.expectOrderPrice.String())
-				assert.Equal(t, order.Side, tt.expectSide)
+			ok, adjPosOrder := buildAdjustPositionOrder(
+				tradingMarket.Symbol,
+				tt.args.currentPosition,
+				tt.args.bestBid,
+				tt.args.bestAsk)
+			assert.Equal(t, tt.expectAvailability, ok)
+			if tt.expectAvailability {
+				assert.Equal(t, adjPosOrder.Price.String(), tt.expectOrderPrice.String())
+				assert.Equal(t, adjPosOrder.Side, tt.expectSide)
 			}
 		})
 	}

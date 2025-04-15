@@ -248,17 +248,28 @@ func (s *Strategy) makeSpread(ctx context.Context, bestBid, bestAsk types.PriceV
 			s.MakeSpread.SkipLargeQuantityThreshold.String(),
 		)
 	}
-	orderForms := []types.SubmitOrder{
-		{
-			Symbol:      s.Symbol,
-			Side:        types.SideTypeSell,
-			Type:        types.OrderTypeLimit,
-			Quantity:    quantity,
-			Price:       bestBid.Price,
-			Market:      s.tradingMarket,
-			TimeInForce: types.TimeInForceIOC,
-		},
+	balances := s.tradingSession.GetAccount().Balances()
+	order := types.SubmitOrder{
+		Symbol:      s.Symbol,
+		Side:        types.SideTypeSell,
+		Type:        types.OrderTypeLimit,
+		Quantity:    quantity,
+		Price:       bestBid.Price,
+		Market:      s.tradingMarket,
+		TimeInForce: types.TimeInForceIOC,
 	}
+	if ok, err := tradingutil.HasSufficientBalance(
+		s.tradingMarket,
+		order,
+		balances,
+	); !ok {
+		return fmt.Errorf(
+			"cannot make spread for %s: %s",
+			s.Symbol,
+			err,
+		)
+	}
+	orderForms := []types.SubmitOrder{order}
 
 	log.Infof("make spread order forms: %+v", orderForms)
 
@@ -271,67 +282,75 @@ func (s *Strategy) makeSpread(ctx context.Context, bestBid, bestAsk types.PriceV
 	return err
 }
 
-func getAdjustPositionOrder(symbol string, tradingMarket types.Market, currentPosition *types.Position, bestBid, bestAsk types.PriceVolume) (orderForms []types.SubmitOrder) {
-	basePosition, avgCost := currentPosition.GetBaseAndAverageCost()
-	if basePosition.Eq(fixedpoint.Zero) {
+// buildAdjustPositionOrder returns the order form that can adjust the current position if possible.
+// When in a short position, it will try to place a buy order.
+// When in a long position, it will try to place a sell order.
+// It's based on the spread and the condition of the current position.
+func buildAdjustPositionOrder(
+	symbol string,
+	positionSnapshot *types.Position,
+	bestBid, bestAsk types.PriceVolume,
+) (ok bool, order types.SubmitOrder) {
+	if positionSnapshot.IsClosed() {
 		return
 	}
-	inShortPosition := basePosition.Sign() < 0
-	if inShortPosition && bestAsk.Price.Compare(avgCost) < 0 {
-		log.Infof(
-			"in short position, best ask price %s < average cost %s",
-			bestAsk.Price.String(),
-			avgCost.String(),
-		)
-		orderForms = append(orderForms, types.SubmitOrder{
+
+	var pv types.PriceVolume
+	var side types.SideType
+	if positionSnapshot.IsShort() && bestAsk.Price.Compare(positionSnapshot.AverageCost) < 0 {
+		// in short position and the best ask price is less than the average cost
+		pv = bestAsk
+		side = types.SideTypeBuy
+	} else if positionSnapshot.IsLong() && bestBid.Price.Compare(positionSnapshot.AverageCost) > 0 {
+		// in long position and the best bid price is greater than the average cost
+		pv = bestBid
+		side = types.SideTypeSell
+	}
+	ok = !pv.IsZero()
+	if ok {
+		quantity := fixedpoint.Max(pv.Volume, positionSnapshot.Market.MinQuantity)
+		price := pv.Price
+		order = types.SubmitOrder{
 			Symbol:      symbol,
-			Side:        types.SideTypeBuy,
+			Side:        side,
 			Type:        types.OrderTypeLimit,
-			Quantity:    fixedpoint.Max(bestAsk.Volume, tradingMarket.MinQuantity),
-			Price:       bestAsk.Price,
-			Market:      tradingMarket,
+			Quantity:    quantity,
+			Price:       price,
+			Market:      positionSnapshot.Market,
 			TimeInForce: types.TimeInForceIOC,
-		})
-	} else if !inShortPosition && bestBid.Price.Compare(avgCost) > 0 {
-		log.Infof(
-			"in long position, best bid price %s > average cost %s",
-			bestBid.Price.String(),
-			avgCost.String(),
-		)
-		orderForms = append(orderForms, types.SubmitOrder{
-			Symbol:      symbol,
-			Side:        types.SideTypeSell,
-			Type:        types.OrderTypeLimit,
-			Quantity:    fixedpoint.Max(bestBid.Volume, tradingMarket.MinQuantity),
-			Price:       bestBid.Price,
-			Market:      tradingMarket,
-			TimeInForce: types.TimeInForceIOC,
-		})
+		}
 	}
 	return
 }
 
 func (s *Strategy) placeOrders(ctx context.Context) {
 	bestBid, bestAsk, hasPrice := s.tradingBook.BestBidAndAsk()
-
+	balances := s.tradingSession.GetAccount().Balances()
 	// try to use the bid/ask price from the trading book
 	if hasPrice {
 		// try to place orders that can adjust the position
 		if s.Position != nil {
-			orders := getAdjustPositionOrder(
+			positionSnapshot := getPositionSnapshot(s.Position)
+			s.logger.Infof("position snapshot: %+v", positionSnapshot)
+			adjPosIsPossible, adjPosOrder := buildAdjustPositionOrder(
 				s.Symbol,
-				s.tradingMarket,
-				s.Position,
+				positionSnapshot,
 				bestBid,
 				bestAsk,
 			)
-			if len(orders) > 0 {
-				s.logger.Infof("adjust position order forms: %+v", orders)
-				createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orders...)
+			if balanceOk, balanceErr := tradingutil.HasSufficientBalance(
+				s.tradingMarket,
+				adjPosOrder,
+				balances,
+			); adjPosIsPossible && balanceOk {
+				s.logger.Infof("adjust position order forms: %+v", adjPosOrder)
+				createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, adjPosOrder)
 				if err != nil {
 					log.WithError(err).Errorf("order submit error for adjust position, created orders: %+v", createdOrders)
 				}
 				return
+			} else if balanceErr != nil {
+				s.logger.WithError(balanceErr).Warnf("cannot place position adjusting orders")
 			}
 		}
 		var spread = bestAsk.Price.Sub(bestBid.Price)
@@ -403,8 +422,6 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		price = adjustPrice(midPrice, s.tradingMarket.PricePrecision)
 		log.Infof("adjusted mid price: %s -> %s (precision: %v)", midPrice.String(), price.String(), s.tradingMarket.PricePrecision)
 	}
-
-	var balances = s.tradingSession.GetAccount().Balances()
 
 	baseBalance, ok := balances[s.tradingMarket.BaseCurrency]
 	if !ok {
