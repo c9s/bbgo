@@ -231,7 +231,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		case openPositionSide:
 			s.emitNextState(OpenPositionOrderFilled)
 		case takeProfitSide:
-			s.emitNextState(WaitToOpenPosition)
+			s.emitNextState(IdleWaiting)
 		default:
 			s.logger.Infof("unsupported side (%s) of order: %s", o.Side, o)
 		}
@@ -284,7 +284,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 				// no need to recover when two situations if recoverWhenStart is false
 				if !s.RecoverWhenStart {
-					s.updateState(WaitToOpenPosition)
+					s.updateState(IdleWaiting)
 				} else {
 					// recover
 					maxTry := 3
@@ -329,7 +329,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 				go s.syncPeriodically(ctx)
 
 				// try to trigger position opening immediately
-				if s.state == WaitToOpenPosition {
+				if s.state == IdleWaiting {
 					s.emitNextState(OpenPositionReady)
 				}
 

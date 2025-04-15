@@ -289,6 +289,22 @@ func (s OrderSlice) SeparateBySide() (buyOrders, sellOrders []Order) {
 	return buyOrders, sellOrders
 }
 
+func (s OrderSlice) ClassifyByStatus() (opened, cancelled, filled, unexpected []Order) {
+	for _, order := range s {
+		switch order.Status {
+		case OrderStatusNew, OrderStatusPartiallyFilled:
+			opened = append(opened, order)
+		case OrderStatusFilled:
+			filled = append(filled, order)
+		case OrderStatusCanceled:
+			cancelled = append(cancelled, order)
+		default:
+			unexpected = append(unexpected, order)
+		}
+	}
+	return opened, cancelled, filled, unexpected
+}
+
 func (s OrderSlice) Print() {
 	for _, o := range s {
 		logrus.Infof("%s", o)
