@@ -1,7 +1,6 @@
 package dca2
 
 import (
-	"context"
 	"math/rand"
 	"testing"
 	"time"
@@ -31,9 +30,9 @@ func Test_RecoverState(t *testing.T) {
 		currentRound := Round{}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
+		state, err := recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
-		assert.Equal(t, WaitToOpenPosition, state)
+		assert.Equal(t, IdleWaiting, state)
 	})
 
 	t.Run("at open position stage and no filled order", func(t *testing.T) {
@@ -49,7 +48,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
+		state, err := recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionReady, state)
 	})
@@ -67,7 +66,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
+		state, err := recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionOrderFilled, state)
 	})
@@ -85,7 +84,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
+		state, err := recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionFinished, state)
 	})
@@ -103,7 +102,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
+		state, err := recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionFinished, state)
 	})
@@ -124,7 +123,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
+		state, err := recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, TakeProfitReady, state)
 	})
@@ -145,27 +144,27 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(context.Background(), 5, currentRound, orderExecutor)
+		state, err := recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
-		assert.Equal(t, WaitToOpenPosition, state)
+		assert.Equal(t, IdleWaiting, state)
 	})
 }
 
 func Test_classifyOrders(t *testing.T) {
-	orders := []types.Order{
-		types.Order{Status: types.OrderStatusCanceled},
-		types.Order{Status: types.OrderStatusFilled},
-		types.Order{Status: types.OrderStatusCanceled},
-		types.Order{Status: types.OrderStatusFilled},
-		types.Order{Status: types.OrderStatusPartiallyFilled},
-		types.Order{Status: types.OrderStatusCanceled},
-		types.Order{Status: types.OrderStatusPartiallyFilled},
-		types.Order{Status: types.OrderStatusNew},
-		types.Order{Status: types.OrderStatusRejected},
-		types.Order{Status: types.OrderStatusCanceled},
+	orders := types.OrderSlice{
+		{Status: types.OrderStatusCanceled},
+		{Status: types.OrderStatusFilled},
+		{Status: types.OrderStatusCanceled},
+		{Status: types.OrderStatusFilled},
+		{Status: types.OrderStatusPartiallyFilled},
+		{Status: types.OrderStatusCanceled},
+		{Status: types.OrderStatusPartiallyFilled},
+		{Status: types.OrderStatusNew},
+		{Status: types.OrderStatusRejected},
+		{Status: types.OrderStatusCanceled},
 	}
 
-	opened, cancelled, filled, unexpected := types.ClassifyOrdersByStatus(orders)
+	opened, cancelled, filled, unexpected := orders.ClassifyByStatus()
 	assert.Equal(t, 3, len(opened))
 	assert.Equal(t, 4, len(cancelled))
 	assert.Equal(t, 2, len(filled))

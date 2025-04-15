@@ -12,7 +12,7 @@ type State int64
 
 const (
 	None State = iota
-	WaitToOpenPosition
+	IdleWaiting
 	OpenPositionReady
 	OpenPositionOrderFilled
 	OpenPositionFinished
@@ -20,11 +20,11 @@ const (
 )
 
 var stateTransition map[State]State = map[State]State{
-	WaitToOpenPosition:      OpenPositionReady,
+	IdleWaiting:             OpenPositionReady,
 	OpenPositionReady:       OpenPositionOrderFilled,
 	OpenPositionOrderFilled: OpenPositionFinished,
 	OpenPositionFinished:    TakeProfitReady,
-	TakeProfitReady:         WaitToOpenPosition,
+	TakeProfitReady:         IdleWaiting,
 }
 
 func (s *Strategy) initializeNextStateC() bool {
@@ -59,7 +59,7 @@ func (s *Strategy) emitNextState(nextState State) {
 }
 
 // runState
-// WaitToOpenPosition      -> [openPosition]                                    ->
+// IdleWaiting             -> [openPosition]                                    ->
 // OpenPositionReady       -> [readyToFinishOpenPositionStage] 	                ->
 // OpenPositionOrderFilled -> [finishOpenPositionStage]                         ->
 // OpenPositionFinish      -> [cancelOpenPositionOrdersAndPlaceTakeProfitOrder] ->
@@ -122,7 +122,7 @@ func (s *Strategy) triggerNextState() {
 // it will return true if we want it trigger the next state immediately
 func (s *Strategy) moveToNextState(ctx context.Context, nextState State) bool {
 	switch s.state {
-	case WaitToOpenPosition:
+	case IdleWaiting:
 		return s.openPosition(ctx)
 	case OpenPositionReady:
 		return s.readyToFinishOpenPositionStage(ctx)
@@ -165,7 +165,7 @@ func (s *Strategy) openPosition(ctx context.Context) bool {
 	}
 
 	s.updateState(OpenPositionReady)
-	s.logger.Info("[State] WaitToOpenPosition -> OpenPositionReady")
+	s.logger.Info("[State] IdleWaiting -> OpenPositionReady")
 	// do not trigger next state immediately, because OpenPositionReady state only triggers by kline to move to the next state
 	return false
 }
@@ -229,8 +229,8 @@ func (s *Strategy) finishTakeProfitStage(ctx context.Context, next State) bool {
 
 	// set the start time of the next round
 	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())
-	s.updateState(WaitToOpenPosition)
-	s.logger.Infof("[State] TakeProfitReady -> WaitToOpenPosition (startTimeOfNextRound: %s)", s.startTimeOfNextRound.String())
+	s.updateState(IdleWaiting)
+	s.logger.Infof("[State] TakeProfitReady -> IdleWaiting (startTimeOfNextRound: %s)", s.startTimeOfNextRound.String())
 
 	return false
 }
