@@ -306,10 +306,14 @@ func buildAdjustPositionOrder(
 		pv = bestBid
 		side = types.SideTypeSell
 	}
+	price := pv.Price
+	// the quantity should be less or equal to the position size
+	quantity := fixedpoint.Min(
+		positionSnapshot.Base.Abs(),
+		pv.Volume,
+	)
 	ok = !pv.IsZero()
 	if ok {
-		quantity := fixedpoint.Max(pv.Volume, positionSnapshot.Market.MinQuantity)
-		price := pv.Price
 		order = types.SubmitOrder{
 			Symbol:      symbol,
 			Side:        side,
@@ -323,34 +327,59 @@ func buildAdjustPositionOrder(
 	return
 }
 
+func (s *Strategy) tryPlaceAdjustPositionOrder(ctx context.Context, bestBid, bestAsk types.PriceVolume, balances types.BalanceMap) bool {
+	positionSnapshot := getPositionSnapshot(s.Position)
+	s.logger.Infof("position snapshot: %+v", positionSnapshot)
+	adjPosIsPossible, adjPosOrder := buildAdjustPositionOrder(
+		s.Symbol,
+		positionSnapshot,
+		bestBid,
+		bestAsk,
+	)
+	if !adjPosIsPossible {
+		return false
+	}
+	// sanity checks on the order
+	// check dust quantity
+	if s.tradingMarket.IsDustQuantity(adjPosOrder.Quantity, adjPosOrder.Price) {
+		s.logger.Warnf("adjust position order is of dust quantity: %+v", adjPosOrder)
+		return false
+	}
+	// check balance
+	balanceOk, balanceErr := tradingutil.HasSufficientBalance(
+		s.tradingMarket,
+		adjPosOrder,
+		balances,
+	)
+	if !balanceOk {
+		s.logger.WithError(balanceErr).Warnf("cannot place position adjusting order: %+v", adjPosOrder)
+		return false
+	}
+
+	s.logger.Infof("adjust position order forms: %+v", adjPosOrder)
+	_, err := s.OrderExecutor.SubmitOrders(ctx, adjPosOrder)
+	if err != nil {
+		// note that, since the order is IOC order, we don't need to cancel it if there is an error
+		s.logger.WithError(err).Error("adjust position order submit error")
+		return false
+	}
+	return true
+}
+
 func (s *Strategy) placeOrders(ctx context.Context) {
 	bestBid, bestAsk, hasPrice := s.tradingBook.BestBidAndAsk()
 	balances := s.tradingSession.GetAccount().Balances()
 	// try to use the bid/ask price from the trading book
 	if hasPrice {
-		// try to place orders that can adjust the position
+		// try to place orders that can adjust the position if possible
 		if s.Position != nil {
-			positionSnapshot := getPositionSnapshot(s.Position)
-			s.logger.Infof("position snapshot: %+v", positionSnapshot)
-			adjPosIsPossible, adjPosOrder := buildAdjustPositionOrder(
-				s.Symbol,
-				positionSnapshot,
-				bestBid,
-				bestAsk,
-			)
-			if balanceOk, balanceErr := tradingutil.HasSufficientBalance(
-				s.tradingMarket,
-				adjPosOrder,
+			if canAdj := s.tryPlaceAdjustPositionOrder(
+				ctx,
+				bestBid, bestAsk,
 				balances,
-			); adjPosIsPossible && balanceOk {
-				s.logger.Infof("adjust position order forms: %+v", adjPosOrder)
-				createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, adjPosOrder)
-				if err != nil {
-					log.WithError(err).Errorf("order submit error for adjust position, created orders: %+v", createdOrders)
-				}
+			); canAdj {
+				// adjust position order placed, abort placing new orders
 				return
-			} else if balanceErr != nil {
-				s.logger.WithError(balanceErr).Warnf("cannot place position adjusting orders")
 			}
 		}
 		var spread = bestAsk.Price.Sub(bestBid.Price)
@@ -501,7 +530,12 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		)
 		return
 	}
-	orderForms := []types.SubmitOrder{
+	if s.tradingMarket.IsDustQuantity(quantity, price) {
+		s.logger.Warnf("order is of dust quantity: %s, %s", quantity.String(), price.String())
+		return
+	}
+	var orderForms []types.SubmitOrder
+	for _, order := range []types.SubmitOrder{
 		{
 			Symbol:   s.Symbol,
 			Side:     types.SideTypeBuy,
@@ -519,6 +553,18 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 			Market:      s.tradingMarket,
 			TimeInForce: types.TimeInForceIOC,
 		},
+	} {
+		okBalance, errBalance := tradingutil.HasSufficientBalance(
+			s.tradingMarket,
+			order,
+			balances,
+		)
+		if !okBalance {
+			// since self-trading is not possible, return here
+			s.logger.WithError(errBalance).Warnf("insufficient balance for order: %+v", order)
+			return
+		}
+		orderForms = append(orderForms, order)
 	}
 	log.Infof("order forms: %+v", orderForms)
 
@@ -526,7 +572,6 @@ func (s *Strategy) placeOrders(ctx context.Context) {
 		log.Infof("dry run, skip")
 		return
 	}
-
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
 	if err != nil {
 		log.WithError(err).Error("order submit error")
