@@ -33,8 +33,17 @@ func getTestClientOrSkip(t *testing.T) *RestClient {
 	return client
 }
 
-func TestClient_GetInstrumentsRequest(t *testing.T) {
+func getPublicTestClientOrSkip(t *testing.T) *RestClient {
+	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
+		t.Skip("skip test for CI")
+	}
+
 	client := NewClient()
+	return client
+}
+
+func TestClient_GetInstrumentsRequest(t *testing.T) {
+	client := getPublicTestClientOrSkip(t)
 	ctx := context.Background()
 	req := client.NewGetInstrumentsInfoRequest()
 
@@ -45,7 +54,7 @@ func TestClient_GetInstrumentsRequest(t *testing.T) {
 }
 
 func TestClient_GetMarketTickers(t *testing.T) {
-	client := NewClient()
+	client := getPublicTestClientOrSkip(t)
 	ctx := context.Background()
 	req := client.NewGetTickersRequest()
 
@@ -56,7 +65,7 @@ func TestClient_GetMarketTickers(t *testing.T) {
 }
 
 func TestClient_GetMarketTicker(t *testing.T) {
-	client := NewClient()
+	client := getPublicTestClientOrSkip(t)
 	ctx := context.Background()
 	req := client.NewGetTickerRequest().InstId("BTC-USDT")
 
@@ -80,7 +89,7 @@ func TestClient_GetAccountBalance(t *testing.T) {
 }
 
 func TestClient_GetFundingRateRequest(t *testing.T) {
-	client := NewClient()
+	client := getPublicTestClientOrSkip(t)
 	ctx := context.Background()
 	req := client.NewGetFundingRate()
 
@@ -353,15 +362,9 @@ func TestClient_CandlesTicksRequest(t *testing.T) {
 }
 
 func TestClient_Margin(t *testing.T) {
-	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
-	if !ok {
-		t.SkipNow()
-		return
-	}
 
+	client := getTestClientOrSkip(t)
 	ctx := context.Background()
-	client := NewClient()
-	client.Auth(key, secret, passphrase)
 
 	accountConfigResp, err := client.NewGetAccountConfigRequest().Do(ctx)
 	if assert.NoError(t, err) {
