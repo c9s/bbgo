@@ -77,58 +77,53 @@ func (msg subscribeMsgType2) String() string {
 }
 
 func (s *Stream) handleConnect() {
-	// subscribe to channels
-	if len(s.Subscriptions) == 0 {
-		return
-	}
-	// bridge bbgo channels to coinbase channels
-	// auth required: level2, full, user
 	subProductsMap := make(map[types.Channel][]string)
-	allProductsMap := make(map[string]struct{})
-	for _, sub := range s.Subscriptions {
-		localSymbol := toLocalSymbol(sub.Symbol)
-		switch sub.Channel {
-		case types.BookChannel:
-			// bridge to level2 channel, which provides order book snapshot and book updates
-			logStream.Infof("bridge %s to level2_batch channel (%s)", sub.Channel, sub.Symbol)
-			subProductsMap[level2BatchChannel] = append(subProductsMap[level2Channel], localSymbol)
-		case types.MarketTradeChannel:
-			// full: all orders/trades on Coinbase Exchange
-			if !s.PublicOnly {
-				panic("subscribe to market trade channel for a public stream is not allowed")
-			}
-			subProductsMap[matchesChannel] = append(subProductsMap[matchesChannel], localSymbol)
-			logStream.Infof("bridge %s to %s(%s)", sub.Channel, matchesChannel, localSymbol)
-		case types.BookTickerChannel:
-			// ticker channel provides feeds on best bid/ask prices
-			subProductsMap[tickerChannel] = append(subProductsMap[tickerChannel], localSymbol)
-			logStream.Infof("bridge %s to %s(%s)", sub.Channel, tickerChannel, localSymbol)
-		case types.KLineChannel:
-			// TODO: add support to kline channel
-		case types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
-			logStream.Warnf("coinbase stream does not support subscription to %s, skipped", sub.Channel)
-		default:
-			// rfqMatchChannel allow empty symbol
-			if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
-				logStream.Warnf("do not support subscription to %s without symbol, skipped", sub.Channel)
-				continue
-			}
-			subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], localSymbol)
-		}
-	}
 
-	for _, products := range subProductsMap {
-		for _, product := range products {
-			allProductsMap[product] = struct{}{}
-		}
-	}
 	// user data strea, subscribe to user channel for the user order/trade updates
 	if !s.PublicOnly {
 		if !s.authEnabled {
 			panic("user channel requires authentication")
 		}
-		for product := range allProductsMap {
-			subProductsMap[userChannel] = append(subProductsMap[userChannel], product)
+		// subscribe private symbols to user channel
+		subProductsMap[userChannel] = append(subProductsMap[userChannel], s.privateChannelSymbols...)
+	} else {
+		// market data stream: subscribe to channels
+		if len(s.Subscriptions) == 0 {
+			return
+		}
+		// bridge bbgo channels to coinbase channels
+		// auth required: level2, full, user
+		for _, sub := range s.Subscriptions {
+			localSymbol := toLocalSymbol(sub.Symbol)
+			switch sub.Channel {
+			case types.BookChannel:
+				// bridge to level2 channel, which provides order book snapshot and book updates
+				logStream.Infof("bridge %s to level2_batch channel (%s)", sub.Channel, sub.Symbol)
+				subProductsMap[level2BatchChannel] = append(subProductsMap[level2Channel], localSymbol)
+			case types.MarketTradeChannel:
+				// full: all orders/trades on Coinbase Exchange
+				if !s.PublicOnly {
+					panic("subscribe to market trade channel for a public stream is not allowed")
+				}
+				subProductsMap[matchesChannel] = append(subProductsMap[matchesChannel], localSymbol)
+				logStream.Infof("bridge %s to %s(%s)", sub.Channel, matchesChannel, localSymbol)
+			case types.BookTickerChannel:
+				// ticker channel provides feeds on best bid/ask prices
+				subProductsMap[tickerChannel] = append(subProductsMap[tickerChannel], localSymbol)
+				logStream.Infof("bridge %s to %s(%s)", sub.Channel, tickerChannel, localSymbol)
+			case types.KLineChannel:
+				// TODO: add support to kline channel
+				// kline stream is available on Advanced Trade API only: https://docs.cdp.coinbase.com/advanced-trade/docs/ws-channels#candles-channel
+			case types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
+				logStream.Warnf("coinbase stream does not support subscription to %s, skipped", sub.Channel)
+			default:
+				// rfqMatchChannel allow empty symbol
+				if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
+					logStream.Warnf("do not support subscription to %s without symbol, skipped", sub.Channel)
+					continue
+				}
+				subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], localSymbol)
+			}
 		}
 	}
 
