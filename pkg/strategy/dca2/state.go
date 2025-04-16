@@ -152,8 +152,20 @@ func (s *Strategy) openPosition(ctx context.Context) bool {
 		return false
 	}
 
-	s.logger.Info("[State] openPosition - start placing open-position orders")
+	// validate the stage by orders
+	s.logger.Info("[State] openPosition - validate we are not in open-position stage")
+	currentRound, err := s.collector.CollectCurrentRound(ctx)
+	if err != nil {
+		s.logger.WithError(err).Error("openPosition - failed to collect current round")
+		return false
+	}
 
+	if len(currentRound.OpenPositionOrders) > 0 && len(currentRound.TakeProfitOrders) == 0 {
+		s.logger.Error("openPosition - there is an open-position order so we are already in open-position stage. please check it and manually fix it")
+		return false
+	}
+
+	s.logger.Info("[State] openPosition - place open-position orders")
 	if err := s.placeOpenPositionOrders(ctx); err != nil {
 		if strings.Contains(err.Error(), "failed to generate open position orders") {
 			s.logger.WithError(err).Warn("failed to place open-position orders, please check it.")
@@ -188,14 +200,29 @@ func (s *Strategy) finishOpenPositionStage(_ context.Context) bool {
 
 // cancelOpenPositionOrdersAndPlaceTakeProfitOrder will cancel the open-position orders and place the take-profit orders
 func (s *Strategy) cancelOpenPositionOrdersAndPlaceTakeProfitOrder(ctx context.Context) bool {
-	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - start cancelling open-position orders")
+	// validate we are still in open-position stage
+	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - validate we are still in open-position stage")
+	currentRound, err := s.collector.CollectCurrentRound(ctx)
+	if err != nil {
+		s.logger.WithError(err).Error("cancelOpenPositionOrdersAndPlaceTakeProfitOrder - failed to collect current round")
+		return false
+	}
+
+	if len(currentRound.TakeProfitOrders) > 0 {
+		s.logger.Error("cancelOpenPositionOrdersAndPlaceTakeProfitOrder - there is a take-profit order so we are already in take-profit stage. please check it and manually fix it")
+		return false
+	}
+
+	// cancel open-position orders
+	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - cancel open-position orders")
 	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
 		s.logger.WithError(err).Error("failed to cancel maker orders")
 		return false
 	}
 
-	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - start placing the take-profit order")
-	if err := s.placeTakeProfitOrders(ctx); err != nil {
+	// place the take-profit order
+	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - place the take-profit order")
+	if err := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
 		s.logger.WithError(err).Error("failed to open take profit orders")
 		return false
 	}

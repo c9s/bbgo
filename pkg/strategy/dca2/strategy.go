@@ -25,6 +25,9 @@ import (
 const (
 	ID       = "dca2"
 	orderTag = "dca2"
+
+	OpenPositionSide = types.SideTypeBuy
+	TakeProfitSide   = types.SideTypeSell
 )
 
 var (
@@ -224,13 +227,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	s.OrderExecutor.ActiveMakerOrders().OnFilled(func(o types.Order) {
 		s.logger.Infof("FILLED ORDER: %s", o.String())
-		openPositionSide := types.SideTypeBuy
-		takeProfitSide := types.SideTypeSell
 
 		switch o.Side {
-		case openPositionSide:
+		case OpenPositionSide:
 			s.emitNextState(OpenPositionOrderFilled)
-		case takeProfitSide:
+		case TakeProfitSide:
 			s.emitNextState(IdleWaiting)
 		default:
 			s.logger.Infof("unsupported side (%s) of order: %s", o.Side, o)
@@ -252,7 +253,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			s.logger.Warnf("num of open orders (%d) and active orders (%d) is different when order filled, please check it.", len(openOrders), numActiveMakerOrders)
 		}
 
-		if err == nil && o.Side == openPositionSide && numActiveMakerOrders == 0 && len(openOrders) == 0 {
+		if err == nil && o.Side == OpenPositionSide && numActiveMakerOrders == 0 && len(openOrders) == 0 {
 			s.emitNextState(OpenPositionFinished)
 		}
 	})
@@ -387,7 +388,7 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 
 	session := s.ExchangeSession
 	if session == nil {
-		return fmt.Errorf("Session is nil, please check it")
+		return fmt.Errorf("session is nil, please check it")
 	}
 
 	// ignore the first cancel error, this skips one open-orders query request

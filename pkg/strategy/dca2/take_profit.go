@@ -10,17 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (s *Strategy) placeTakeProfitOrders(ctx context.Context) error {
-	s.logger.Info("start placing take profit orders")
-	currentRound, err := s.collector.CollectCurrentRound(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to place the take-profit order when collecting current round")
-	}
-
-	if len(currentRound.TakeProfitOrders) > 0 {
-		return fmt.Errorf("there is a take-profit order before placing the take-profit order, please check it and manually fix it")
-	}
-
+func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round) error {
 	trades, err := s.collector.CollectRoundTrades(ctx, currentRound)
 	if err != nil {
 		return errors.Wrap(err, "failed to place the take-profit order when collecting round trades")
@@ -78,14 +68,13 @@ func (s *Strategy) placeTakeProfitOrders(ctx context.Context) error {
 }
 
 func generateTakeProfitOrder(market types.Market, takeProfitRatio fixedpoint.Value, position *types.Position, orderGroupID uint32) types.SubmitOrder {
-	side := types.SideTypeSell
 	takeProfitPrice := market.TruncatePrice(position.AverageCost.Mul(fixedpoint.One.Add(takeProfitRatio)))
 	return types.SubmitOrder{
 		Symbol:      market.Symbol,
 		Market:      market,
 		Type:        types.OrderTypeLimit,
 		Price:       takeProfitPrice,
-		Side:        side,
+		Side:        TakeProfitSide,
 		TimeInForce: types.TimeInForceGTC,
 		Quantity:    position.GetBase().Abs(),
 		Tag:         orderTag,
