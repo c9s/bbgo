@@ -10,7 +10,10 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 
+	"github.com/c9s/bbgo/pkg/exchange"
+	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/sigchan"
 	"github.com/c9s/bbgo/pkg/types"
@@ -526,6 +529,92 @@ func (b *ActiveOrderBook) filterExistingOrders(orders []types.Order) (existingOr
 	}
 
 	return existingOrders
+}
+
+func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange) (types.OrderSlice, error) {
+	openOrders, err := retry.QueryOpenOrdersUntilSuccessfulLite(ctx, ex, b.Symbol)
+	if err != nil {
+		return nil, err
+	}
+
+	openOrdersMap := types.OrderSlice(openOrders).Map()
+
+	// only sync orders which is updated over 3 min, because we may receive from websocket and handle it twice
+	syncBefore := time.Now().Add(-3 * time.Minute)
+
+	activeOrders := b.Orders()
+	var errs error
+	var updatedOrders types.OrderSlice
+
+	// update active orders not in open orders
+	for _, activeOrder := range activeOrders {
+		if _, exist := openOrdersMap[activeOrder.OrderID]; exist {
+			// no need to sync active order already in active orderbook, because we only need to know if it filled or not.
+			delete(openOrdersMap, activeOrder.OrderID)
+		} else {
+			log.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
+			updatedOrder, err := b.SyncOrder(ctx, ex, activeOrder.OrderID, syncBefore)
+			if err != nil {
+				errs = multierr.Append(errs, err)
+				continue
+			}
+
+			if updatedOrder != nil {
+				updatedOrders = append(updatedOrders, *updatedOrder)
+			}
+		}
+	}
+
+	// update open orders not in active orders
+	for _, openOrder := range openOrdersMap {
+		log.Infof("found open order #%d is not in active orderbook, updating...", openOrder.OrderID)
+		// we don't add open orders into active orderbook if updated in 3 min, because we may receive message from websocket and add it twice.
+		if openOrder.UpdateTime.After(syncBefore) {
+			log.Infof("open order #%d is updated in 3 min, skip updating...", openOrder.OrderID)
+			continue
+		}
+
+		b.Add(openOrder)
+		updatedOrders = append(updatedOrders, openOrder)
+	}
+
+	return updatedOrders, errs
+}
+
+func (b *ActiveOrderBook) SyncOrder(ctx context.Context, ex types.Exchange, orderID uint64, syncBefore time.Time) (*types.Order, error) {
+	isMax := exchange.IsMaxExchange(ex)
+
+	orderQueryService, ok := ex.(types.ExchangeOrderQueryService)
+	if !ok {
+		return nil, fmt.Errorf("exchange %s doesn't support ExchangeOrderQueryService", ex.Name())
+	}
+
+	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
+		Symbol:  b.Symbol,
+		OrderID: strconv.FormatUint(orderID, 10),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if updatedOrder == nil {
+		return nil, fmt.Errorf("unexpected error, order object (%d) is a nil pointer, please check it", orderID)
+	}
+
+	// maxapi.OrderStateFinalizing does not mean the fee is calculated
+	// we should only consider order state done for MAX
+	if isMax && updatedOrder.OriginalStatus != string(maxapi.OrderStateDone) {
+		return nil, nil
+	}
+
+	// should only trigger order update when the updated time is old enough
+	if updatedOrder.UpdateTime.After(syncBefore) {
+		return nil, nil
+	}
+
+	b.Update(*updatedOrder)
+	return updatedOrder, nil
 }
 
 func categorizeOrderBySymbol(orders types.OrderSlice) map[string]types.OrderSlice {

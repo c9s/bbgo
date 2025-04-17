@@ -48,7 +48,8 @@ func (s *Strategy) updateState(state State) {
 
 	s.logger.Infof("[state] update state to %d", state)
 
-	updateNumOfActiveOrdersMetrics(state, int64(len(s.OrderExecutor.ActiveMakerOrders().Orders())))
+	updateStatsMetrics(state)
+	updateNumOfActiveOrdersMetrics(s.OrderExecutor.ActiveMakerOrders().NumOfOrders())
 }
 
 func (s *Strategy) emitNextState(nextState State) {
