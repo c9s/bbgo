@@ -244,7 +244,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 		// update active orders metrics
 		numActiveMakerOrders := s.OrderExecutor.ActiveMakerOrders().NumOfOrders()
-		updateNumOfActiveOrdersMetrics(s.state, int64(numActiveMakerOrders))
+		updateNumOfActiveOrdersMetrics(numActiveMakerOrders)
 
 		if len(openOrders) != numActiveMakerOrders {
 			s.logger.Warnf("num of open orders (%d) and active orders (%d) is different when order filled, please check it.", len(openOrders), numActiveMakerOrders)

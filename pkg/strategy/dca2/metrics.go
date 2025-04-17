@@ -1,9 +1,6 @@
 package dca2
 
 import (
-	"strconv"
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -43,7 +40,6 @@ func initMetrics(extendedLabels []string) {
 			append([]string{
 				"exchange",
 				"symbol",
-				"ts",
 			}, extendedLabels...),
 		)
 	}
@@ -57,7 +53,6 @@ func initMetrics(extendedLabels []string) {
 			append([]string{
 				"exchange",
 				"symbol",
-				"ts",
 			}, extendedLabels...),
 		)
 	}
@@ -80,14 +75,20 @@ func registerMetrics() {
 	metricsRegistered = true
 }
 
-func updateNumOfActiveOrdersMetrics(state State, numOfActiveOrders int64) {
-	now := time.Now()
-
+func updateNumOfActiveOrdersMetrics(numOfActiveOrders int) {
 	// use ts to bind the state and numOfActiveOrders
 	labels := mergeLabels(baseLabels, prometheus.Labels{
-		"ts": strconv.FormatInt(now.UnixMilli(), 10),
+		// "ts": strconv.FormatInt(now.UnixMilli(), 10),
+	})
+
+	metricsNumOfActiveOrders.With(labels).Set(float64(numOfActiveOrders))
+}
+
+func updateStatsMetrics(state State) {
+	// use ts to bind the state and numOfActiveOrders
+	labels := mergeLabels(baseLabels, prometheus.Labels{
+		// "ts": strconv.FormatInt(now.UnixMilli(), 10),
 	})
 
 	metricsState.With(labels).Set(float64(state))
-	metricsNumOfActiveOrders.With(labels).Set(float64(numOfActiveOrders))
 }
