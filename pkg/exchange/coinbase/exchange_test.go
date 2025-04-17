@@ -14,7 +14,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func Test_new(t *testing.T) {
+func TestExchange_new(t *testing.T) {
 	ex := getExchangeOrSkip(t)
 	assert.Equal(t, ex.Name(), types.ExchangeCoinBase)
 	t.Log("successfully created coinbase exchange client")
@@ -22,7 +22,7 @@ func Test_new(t *testing.T) {
 	_ = ex.PlatformFeeCurrency()
 }
 
-func Test_Symbols(t *testing.T) {
+func TestExchange_Symbols(t *testing.T) {
 	globalSymbol := "NOTEXIST"
 	localSymbol := toLocalSymbol(globalSymbol)
 	assert.Equal(t, globalSymbol, toGlobalSymbol(localSymbol))
@@ -34,7 +34,7 @@ func Test_Symbols(t *testing.T) {
 	assert.Equal(t, localSymbol, toLocalSymbol(globalSymbol))
 }
 
-func Test_OrdersAPI(t *testing.T) {
+func TestExchange_OrdersAPI(t *testing.T) {
 	ex := getExchangeOrSkip(t)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -104,7 +104,38 @@ func Test_OrdersAPI(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_QueryAccount(t *testing.T) {
+func TestExchange_CancelOrdersBySymbol(t *testing.T) {
+	ex := getExchangeOrSkip(t)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	// test cancel order by symbol
+	symbol := "BTCUSD"
+	order, err := ex.SubmitOrder(
+		ctx,
+		types.SubmitOrder{
+			Market: types.Market{
+				Symbol: symbol,
+			},
+			Side:     types.SideTypeBuy,
+			Type:     types.OrderTypeLimit,
+			Price:    fixedpoint.MustNewFromString("0.01"),
+			Quantity: fixedpoint.MustNewFromString("100"), // min funds is $1
+		})
+	assert.NoError(t, err)
+	for i := 0; i < 5; i++ {
+		if order.OriginalStatus == "open" {
+			break
+		}
+		time.Sleep(time.Millisecond * 500)
+		order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderID: order.UUID, ClientOrderID: order.UUID})
+		assert.NoError(t, err)
+	}
+	_, err = ex.CancelOrdersBySymbol(ctx, symbol)
+	assert.NoError(t, err)
+}
+
+func TestExchange_QueryAccount(t *testing.T) {
 	ex := getExchangeOrSkip(t)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -113,7 +144,7 @@ func Test_QueryAccount(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_QueryAccountBalances(t *testing.T) {
+func TestExchange_QueryAccountBalances(t *testing.T) {
 	ex := getExchangeOrSkip(t)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -122,7 +153,7 @@ func Test_QueryAccountBalances(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_QueryOpenOrders(t *testing.T) {
+func TestExchange_QueryOpenOrders(t *testing.T) {
 	ex := getExchangeOrSkip(t)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -134,7 +165,7 @@ func Test_QueryOpenOrders(t *testing.T) {
 	}
 }
 
-func Test_QueryMarkets(t *testing.T) {
+func TestExchange_QueryMarkets(t *testing.T) {
 	ex := getExchangeOrSkip(t)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -143,7 +174,7 @@ func Test_QueryMarkets(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func Test_QueryTicker(t *testing.T) {
+func TestExchange_QueryTicker(t *testing.T) {
 	ex := getExchangeOrSkip(t)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -153,7 +184,7 @@ func Test_QueryTicker(t *testing.T) {
 	assert.NotNil(t, ticker)
 }
 
-func Test_QueryTickers(t *testing.T) {
+func TestExchange_QueryTickers(t *testing.T) {
 	ex := getExchangeOrSkip(t)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -164,7 +195,7 @@ func Test_QueryTickers(t *testing.T) {
 	assert.NotNil(t, tickers)
 }
 
-func Test_QueryKLines(t *testing.T) {
+func TestExchange_QueryKLines(t *testing.T) {
 	ex := getExchangeOrSkip(t)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -192,7 +223,7 @@ func Test_QueryKLines(t *testing.T) {
 	assert.NotNil(t, klines)
 }
 
-func Test_QueryOrderTrades(t *testing.T) {
+func TestExchange_QueryOrderTrades(t *testing.T) {
 	ex := getExchangeOrSkip(t)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
