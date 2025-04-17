@@ -632,3 +632,30 @@ func TestSetDualSidePosition(t *testing.T) {
 		})
 	}
 }
+
+func TestExchange_QueryFuturesAccount(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	// Create new exchange instance and enable futures mode
+	ex := New(key, secret, passphrase)
+	ex.UseFutures()
+
+	ctx := context.Background()
+	account, err := ex.QueryAccount(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, account)
+
+	// Verify account type is futures
+	assert.Equal(t, types.AccountTypeFutures, account.AccountType)
+
+	// Verify basic account information
+	assert.NotEmpty(t, account.Balances)
+
+	// Verify futures specific information
+	assert.NotNil(t, account.FuturesInfo)
+	assert.NotEmpty(t, account.FuturesInfo.Positions)
+}

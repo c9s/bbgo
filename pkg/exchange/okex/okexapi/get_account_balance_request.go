@@ -68,6 +68,10 @@ type Account struct {
 	NotionalUsd      fixedpoint.Value           `json:"notionalUsd,omitempty"`
 	UnrealizedPnl    fixedpoint.Value           `json:"upl,omitempty"`
 	Details          []BalanceDetail            `json:"details"`
+
+	TotalInitialMargin          fixedpoint.Value `json:"imr,omitempty"`
+	TotalMaintMargin            fixedpoint.Value `json:"mmr,omitempty"`
+	TotalOpenOrderInitialMargin fixedpoint.Value `json:"ordFroz,omitempty"`
 }
 
 //go:generate GetRequest -url "/api/v5/account/balance" -type GetAccountBalanceRequest -responseDataType []Account
