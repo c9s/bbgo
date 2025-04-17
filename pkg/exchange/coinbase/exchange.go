@@ -11,6 +11,7 @@ import (
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util/tradingutil"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
@@ -25,9 +26,10 @@ var (
 	queryMarketDataLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 1)
 
 	// compile time check: implemented interface
-	_ types.Exchange                  = &Exchange{}
-	_ types.ExchangeMarketDataService = &Exchange{}
-	_ types.CustomIntervalProvider    = &Exchange{}
+	_ types.Exchange                             = &Exchange{}
+	_ types.ExchangeMarketDataService            = &Exchange{}
+	_ types.CustomIntervalProvider               = &Exchange{}
+	_ tradingutil.CancelAllOrdersBySymbolService = &Exchange{}
 )
 
 const (
@@ -119,8 +121,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 	balances := make(types.BalanceMap)
 	for _, cbBalance := range accounts {
 		cur := strings.ToUpper(cbBalance.Currency)
-		tb := balances[cur]
-		balances[cur] = tb.Add(toGlobalBalance(cur, &cbBalance))
+		balances[cur] = toGlobalBalance(cur, &cbBalance)
 	}
 	return balances, nil
 }
@@ -293,7 +294,7 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 			log.WithError(err).Errorf("failed to cancel order: %v", order.UUID)
 			failedOrderIDs = append(failedOrderIDs, order.UUID)
 		} else {
-			log.Infof("order %v has been cancelled", res)
+			log.Infof("order %v has been cancelled", *res)
 		}
 	}
 	if len(failedOrderIDs) > 0 {
@@ -450,4 +451,32 @@ func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, q types.Ord
 		}
 	}
 	return cbTrades, nil
+}
+
+// tradingutil.CancelAllOrdersBySymbolService
+func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]types.Order, error) {
+	cancelReq := e.client.NewCancelAllOrdersRequest()
+	cancelReq.ProductID(toLocalSymbol(symbol))
+	canceledOrderIds, err := cancelReq.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(canceledOrderIds) == 0 {
+		return nil, nil
+	}
+
+	// Once the order is cancelled and it has no matches, it can not be queried by the API (always 404 error)
+	// If we want to retrieve the original order at this point, we also need to check if it was filled or not.
+	// The overhead of doing this is huge.
+	// As a result, we simply construct empty orders here (without price, quantity, side ...etc)
+	orders := make([]types.Order, 0, len(canceledOrderIds))
+	for _, orderID := range canceledOrderIds {
+		orders = append(orders, types.Order{
+			Exchange:  types.ExchangeCoinBase,
+			UUID:      orderID,
+			Status:    types.OrderStatusCanceled,
+			IsWorking: false,
+		})
+	}
+	return orders, nil
 }
