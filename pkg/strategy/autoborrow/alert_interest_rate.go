@@ -235,14 +235,15 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 					continue
 				}
 
-				rate := rateMap[cur]
-				debtValue := bal.Debt().Mul(price)
-				nextTotalInterestValue = nextTotalInterestValue.Add(
-					debtValue.Mul(rate.HourlyRate))
+				if rate, ok := rateMap[cur]; ok {
+					debtValue := bal.Debt().Mul(price)
+					nextTotalInterestValue = nextTotalInterestValue.Add(
+						debtValue.Mul(rate.HourlyRate))
 
-				if w.config.MinDebtAmount.Sign() > 0 &&
-					debtValue.Compare(w.config.MinDebtAmount) > 0 {
-					exceededDebtAmount = true
+					if w.config.MinDebtAmount.Sign() > 0 &&
+						debtValue.Compare(w.config.MinDebtAmount) > 0 {
+						exceededDebtAmount = true
+					}
 				}
 			}
 
