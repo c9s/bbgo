@@ -96,6 +96,7 @@ func WithBrokerId(id string) Option {
 
 func New(key, secret, passphrase string, opts ...Option) *Exchange {
 	client := okexapi.NewClient()
+	log.Infof("creating new okex rest client with base url: %s", okexapi.RestBaseURL)
 
 	if len(key) > 0 && len(secret) > 0 {
 		client.Auth(key, secret, passphrase)
