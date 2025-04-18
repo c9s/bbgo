@@ -587,6 +587,11 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.ExchangeSession = session
 
+	if !session.Margin {
+		log.Warnf("session %s is not margin enabled, skip autoborrow strategy", session.Name)
+		return nil
+	}
+
 	marginBorrowRepay, ok := session.Exchange.(types.MarginBorrowRepayService)
 	if !ok {
 		return fmt.Errorf("exchange %s does not implement types.MarginBorrowRepayService", session.Name)
