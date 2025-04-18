@@ -21,7 +21,7 @@ import (
 )
 
 const defaultHTTPTimeout = time.Second * 15
-const RestBaseURL = "https://www.okx.com/"
+const RestBaseURL = "https://www.okx.com"
 const PublicWebSocketURL = "wss://ws.okx.com:8443/ws/v5/public"
 const PrivateWebSocketURL = "wss://ws.okx.com:8443/ws/v5/private"
 const PublicBusinessWebSocketURL = "wss://ws.okx.com:8443/ws/v5/business"
