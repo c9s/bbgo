@@ -21,6 +21,12 @@ var logStream = logrus.WithFields(logrus.Fields{
 	"module":   "stream",
 })
 
+var (
+	// interface implementations compile-time check
+	_ types.PrivateChannelSymbolSetter = (*Stream)(nil)
+	_ types.Stream                     = (*Stream)(nil)
+)
+
 //go:generate callbackgen -type Stream
 type Stream struct {
 	types.StandardStream
@@ -54,6 +60,8 @@ type Stream struct {
 
 	lockWorkingOrderMap sync.Mutex // lock to protect lastOrderMap
 	workingOrdersMap    map[string]types.Order
+
+	privateChannelSymbols []string
 }
 
 func NewStream(
@@ -93,6 +101,11 @@ func NewStream(
 	s.OnConnect(s.handleConnect)
 	s.OnDisconnect(s.handleDisconnect)
 	return &s
+}
+
+// types.PrivateChannelSymbolSetter
+func (s *Stream) SetPrivateChannelSymbols(symbols []string) {
+	s.privateChannelSymbols = symbols
 }
 
 func logSubscriptions(m *SubscriptionsMessage) {
