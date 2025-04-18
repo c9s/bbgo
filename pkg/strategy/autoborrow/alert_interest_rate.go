@@ -208,6 +208,10 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 				continue
 			}
 
+			if rateMap == nil {
+				continue
+			}
+
 			log.Infof("rates: %+v", rateMap)
 
 			debts := w.session.Account.Balances().Debts()
