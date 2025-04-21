@@ -72,6 +72,8 @@ func (c *SpreadMaker) updateOrder(ctx context.Context) (*types.Order, error) {
 	return retOrder, nil
 }
 
+// canSpreadMaking checks if the current position and signal can place a spread-making order
+// if true, then it returns the order to be placed
 func (c *SpreadMaker) canSpreadMaking(
 	signal float64, position *types.Position,
 	uncoveredPosition fixedpoint.Value,
