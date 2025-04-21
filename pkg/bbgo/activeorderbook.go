@@ -531,7 +531,7 @@ func (b *ActiveOrderBook) filterExistingOrders(orders []types.Order) (existingOr
 	return existingOrders
 }
 
-func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange) (types.OrderSlice, error) {
+func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange, bufferDuration time.Duration) (types.OrderSlice, error) {
 	openOrders, err := retry.QueryOpenOrdersUntilSuccessfulLite(ctx, ex, b.Symbol)
 	if err != nil {
 		return nil, err
@@ -540,7 +540,7 @@ func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange) (ty
 	openOrdersMap := types.OrderSlice(openOrders).Map()
 
 	// only sync orders which is updated over 3 min, because we may receive from websocket and handle it twice
-	syncBefore := time.Now().Add(-3 * time.Minute)
+	syncBefore := time.Now().Add(-bufferDuration)
 
 	activeOrders := b.Orders()
 	var errs error
@@ -570,7 +570,7 @@ func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange) (ty
 		log.Infof("found open order #%d is not in active orderbook, updating...", openOrder.OrderID)
 		// we don't add open orders into active orderbook if updated in 3 min, because we may receive message from websocket and add it twice.
 		if openOrder.UpdateTime.After(syncBefore) {
-			log.Infof("open order #%d is updated in 3 min, skip updating...", openOrder.OrderID)
+			log.Infof("open order #%d is updated in buffer duration (%s), skip updating...", openOrder.OrderID, bufferDuration.String())
 			continue
 		}
 

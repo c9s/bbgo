@@ -57,7 +57,7 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 		s.logger.Warnf("num of open orders (%d) and active orders (%d) is different before active orders recovery, please check it.", len(openOrders), activeOrders.NumOfOrders())
 	}
 
-	updatedOrders, err := s.OrderExecutor.ActiveMakerOrders().SyncOrders(ctx, s.ExchangeSession.Exchange)
+	updatedOrders, err := s.OrderExecutor.ActiveMakerOrders().SyncOrders(ctx, s.ExchangeSession.Exchange, 3*time.Minute)
 	if err != nil {
 		return err
 	}
