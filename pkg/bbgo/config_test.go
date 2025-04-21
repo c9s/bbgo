@@ -52,7 +52,6 @@ func TestLoadConfig(t *testing.T) {
 				assert.Equal(t, "#error", config.Notifications.Slack.ErrorChannel)
 			},
 		},
-
 		{
 			name:    "strategy",
 			args:    args{configFile: "testdata/strategy.yaml"},
@@ -75,16 +74,18 @@ func TestLoadConfig(t *testing.T) {
 				assert.Equal(t, map[string]interface{}{
 					"sessions": map[string]interface{}{
 						"max": map[string]interface{}{
-							"exchange":     "max",
-							"envVarPrefix": "MAX",
-							"takerFeeRate": 0.,
-							"makerFeeRate": 0.,
+							"exchange":                  "max",
+							"envVarPrefix":              "MAX",
+							"takerFeeRate":              0.,
+							"makerFeeRate":              0.,
+							"marginInfoUpdaterInterval": "3m0s",
 						},
 						"binance": map[string]interface{}{
-							"exchange":     "binance",
-							"envVarPrefix": "BINANCE",
-							"takerFeeRate": 0.,
-							"makerFeeRate": 0.,
+							"exchange":                  "binance",
+							"envVarPrefix":              "BINANCE",
+							"takerFeeRate":              0.,
+							"makerFeeRate":              0.,
+							"marginInfoUpdaterInterval": "5m0s",
 						},
 					},
 					"build": map[string]interface{}{
@@ -135,7 +136,6 @@ func TestLoadConfig(t *testing.T) {
 				assert.Equal(t, sourceMap, actualMap)
 			},
 		},
-
 		{
 			name:    "persistence",
 			args:    args{configFile: "testdata/persistence.yaml"},
