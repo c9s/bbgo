@@ -47,14 +47,16 @@ func (s *Strategy) updateState(state State) {
 	s.state = state
 
 	s.logger.Infof("[state] update state to %d", state)
-	metricsState.With(baseLabels).Set(float64(s.state))
+
+	updateStatsMetrics(state)
+	updateNumOfActiveOrdersMetrics(s.OrderExecutor.ActiveMakerOrders().NumOfOrders())
 }
 
 func (s *Strategy) emitNextState(nextState State) {
 	select {
 	case s.nextStateC <- nextState:
 	default:
-		s.logger.Info("[DCA] nextStateC is full or not initialized")
+		s.logger.Warn("[DCA] nextStateC is full or not initialized")
 	}
 }
 
