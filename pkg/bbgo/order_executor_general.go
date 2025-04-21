@@ -15,7 +15,6 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util/backoff"
-	"github.com/c9s/bbgo/pkg/util/timejitter"
 )
 
 var ErrExceededSubmitOrderRetryLimit = errors.New("exceeded submit order retry limit")
@@ -97,9 +96,28 @@ func NewGeneralOrderExecutor(
 		position:           position,
 		tradeCollector:     core.NewTradeCollector(symbol, position, orderStore),
 	}
-
-	if session != nil && session.Margin {
-		executor.startMarginAssetUpdater(context.Background())
+	if session != nil && executor.position != nil {
+		session.OnMaxBorrowable(
+			func(asset string, maxBorrowable fixedpoint.Value) {
+				switch asset {
+				case executor.position.BaseCurrency:
+					log.Infof("updating margin base asset %s max borrowable amount: %f", asset, maxBorrowable.Float64())
+					executor.marginBaseMaxBorrowable = maxBorrowable
+				case executor.position.QuoteCurrency:
+					log.Infof("updating margin quote asset %s max borrowable amount: %f", asset, maxBorrowable.Float64())
+					executor.marginQuoteMaxBorrowable = maxBorrowable
+				default:
+					log.Warnf("unknown asset %s for margin base/quote", asset)
+				}
+			},
+		)
+		session.AddMarginAssets(
+			executor.position.BaseCurrency,
+			executor.position.QuoteCurrency,
+		)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+		defer cancel()
+		session.UpdateMaxBorrowable(ctx)
 	}
 
 	return executor
@@ -111,54 +129,6 @@ func (e *GeneralOrderExecutor) DisableNotify() {
 
 func (e *GeneralOrderExecutor) SetMaxRetries(maxRetries uint) {
 	e.maxRetries = maxRetries
-}
-
-func (e *GeneralOrderExecutor) startMarginAssetUpdater(ctx context.Context) {
-	marginService, ok := e.exchange.(types.MarginBorrowRepayService)
-	if !ok {
-		log.Warnf("session %s (%T) exchange does not support MarginBorrowRepayService", e.session.Name, e.session.Exchange)
-		return
-	}
-
-	go e.marginAssetMaxBorrowableUpdater(ctx, 30*time.Minute, marginService, e.position.Market)
-}
-
-func (e *GeneralOrderExecutor) updateMarginAssetMaxBorrowable(
-	ctx context.Context, marginService types.MarginBorrowRepayService, market types.Market,
-) {
-	maxBorrowable, err := marginService.QueryMarginAssetMaxBorrowable(ctx, market.BaseCurrency)
-	if err != nil {
-		log.WithError(err).Warnf("can not query margin base asset %s max borrowable", market.BaseCurrency)
-	} else {
-		log.Infof("updating margin base asset %s max borrowable amount: %f", market.BaseCurrency, maxBorrowable.Float64())
-		e.marginBaseMaxBorrowable = maxBorrowable
-	}
-
-	maxBorrowable, err = marginService.QueryMarginAssetMaxBorrowable(ctx, market.QuoteCurrency)
-	if err != nil {
-		log.WithError(err).Warnf("can not query margin quote asset %s max borrowable", market.QuoteCurrency)
-	} else {
-		log.Infof("updating margin quote asset %s max borrowable amount: %f", market.QuoteCurrency, maxBorrowable.Float64())
-		e.marginQuoteMaxBorrowable = maxBorrowable
-	}
-}
-
-func (e *GeneralOrderExecutor) marginAssetMaxBorrowableUpdater(
-	ctx context.Context, interval time.Duration, marginService types.MarginBorrowRepayService, market types.Market,
-) {
-	t := time.NewTicker(timejitter.Milliseconds(interval, 500))
-	defer t.Stop()
-
-	e.updateMarginAssetMaxBorrowable(ctx, marginService, market)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		case <-t.C:
-			e.updateMarginAssetMaxBorrowable(ctx, marginService, market)
-		}
-	}
 }
 
 func (e *GeneralOrderExecutor) BindEnvironment(environ *Environment) {

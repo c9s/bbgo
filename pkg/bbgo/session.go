@@ -36,6 +36,8 @@ var ErrEmptyMarketInfo = errors.New("market info should not be empty, 0 markets 
 
 // ExchangeSession presents the exchange connection Session
 // It also maintains and collects the data returned from the stream.
+//
+//go:generate callbackgen -type ExchangeSession
 type ExchangeSession struct {
 	// ---------------------------
 	// Session config fields
@@ -122,6 +124,10 @@ type ExchangeSession struct {
 
 	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
 
+	// Margin Assets Configs
+	MarginInfoUpdaterInterval types.Duration     `json:"marginInfoUpdaterInterval" yaml:"marginInfoUpdaterInterval"`
+	marginInfoUpdater         *MarginInfoUpdater `json:"-" yaml:"-"`
+
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
 	//
@@ -158,6 +164,9 @@ type ExchangeSession struct {
 	priceSolver *pricesolver.SimplePriceSolver
 }
 
+// NewExchangeSession creates a new exchange session instance
+// NOTE: make sure it intialize the session as the way as InitExchange
+// TODO: unify the session creation and initialization (ex: calling InitExchange in NewExchangeSession)
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	userDataStream := exchange.NewStream()
 
@@ -464,6 +473,18 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
 		session.lastPrices[trade.Symbol] = trade.Price
 	})
+
+	// session-wide max borrowable updating worker
+	if session.Margin {
+		marginUpdater := NewMarginInfoUpdaterFromExchange(session.Exchange)
+		session.marginInfoUpdater = &marginUpdater
+
+		if session.MarginInfoUpdaterInterval == 0 {
+			session.MarginInfoUpdaterInterval = types.Duration(30 * time.Minute)
+		}
+		session.logger.Infof("max borrowable update interval: %s", session.MarginInfoUpdaterInterval.Duration())
+		go session.marginInfoUpdater.Run(ctx, session.MarginInfoUpdaterInterval)
+	}
 
 	session.IsInitialized = true
 	return nil
@@ -1169,4 +1190,30 @@ func (session *ExchangeSession) FormatOrders(orders []types.SubmitOrder) (format
 	}
 
 	return formattedOrders, err
+}
+
+// Expose margin updator APIs via ExchangeSession
+
+func (session *ExchangeSession) AddMarginAssets(
+	assets ...string,
+) {
+	if session.marginInfoUpdater == nil {
+		return
+	}
+	session.logger.Infof("adding margin assets: %v", assets)
+	session.marginInfoUpdater.AddAssets(assets...)
+}
+
+func (session *ExchangeSession) OnMaxBorrowable(cb MaxBorrowableCallback) {
+	if session.marginInfoUpdater == nil {
+		return
+	}
+	session.marginInfoUpdater.OnMaxBorrowable(cb)
+}
+
+func (session *ExchangeSession) UpdateMaxBorrowable(ctx context.Context) {
+	if session.marginInfoUpdater == nil {
+		return
+	}
+	session.marginInfoUpdater.UpdateMaxBorrowable(ctx)
 }
