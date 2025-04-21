@@ -74,8 +74,9 @@ func (c *SpreadMaker) updateOrder(ctx context.Context) (*types.Order, error) {
 
 func (c *SpreadMaker) canSpreadMaking(
 	signal float64, position *types.Position,
+	uncoveredPosition fixedpoint.Value,
 	makerMarket types.Market,
-	bestBidPrice, bestAskPrice fixedpoint.Value, // maker best bid price
+	bestBidPrice, bestAskPrice fixedpoint.Value,
 ) (*types.SubmitOrder, bool) {
 	side := position.Side()
 
@@ -87,7 +88,7 @@ func (c *SpreadMaker) canSpreadMaking(
 		return nil, false
 	}
 
-	base := position.GetBase()
+	base := uncoveredPosition.Neg()
 	cost := position.GetAverageCost()
 	profitPrice := getPositionProfitPrice(side, cost, c.session.MakerFeeRate.Add(c.MinProfitRatio))
 
@@ -122,7 +123,6 @@ func (c *SpreadMaker) newMakerOrder(
 	}
 
 	return &types.SubmitOrder{
-		// ClientOrderID:    "",
 		Symbol:      c.symbol,
 		Side:        side,
 		Type:        orderType,
