@@ -6,7 +6,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
-	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/util/timejitter"
 )
 
@@ -43,8 +42,9 @@ func (s *Strategy) syncPeriodically(ctx context.Context) {
 	}
 }
 
+// syncActiveOrders syncs the active orders (orders in ActiveMakerOrders) with the open orders by QueryOpenOrders API
 func (s *Strategy) syncActiveOrders(ctx context.Context) error {
-	s.logger.Info("recover active orders...")
+	s.logger.Info("sync active orders...")
 	openOrders, err := retry.QueryOpenOrdersUntilSuccessfulLite(ctx, s.ExchangeSession.Exchange, s.Symbol)
 	if err != nil {
 		s.logger.WithError(err).Warn("failed to query open orders")
@@ -53,27 +53,22 @@ func (s *Strategy) syncActiveOrders(ctx context.Context) error {
 
 	activeOrders := s.OrderExecutor.ActiveMakerOrders()
 
-	// update num of open orders metrics
-	if metricsNumOfOpenOrders != nil {
-		metricsNumOfOpenOrders.With(baseLabels).Set(float64(len(openOrders)))
-	}
-
-	// update num of active orders metrics
-	if metricsNumOfActiveOrders != nil {
-		metricsNumOfActiveOrders.With(baseLabels).Set(float64(activeOrders.NumOfOrders()))
-	}
-
 	if len(openOrders) != activeOrders.NumOfOrders() {
 		s.logger.Warnf("num of open orders (%d) and active orders (%d) is different before active orders recovery, please check it.", len(openOrders), activeOrders.NumOfOrders())
 	}
 
-	opts := common.SyncActiveOrdersOpts{
-		Logger:            s.logger,
-		Exchange:          s.ExchangeSession.Exchange,
-		OrderQueryService: s.collector.queryService,
-		ActiveOrderBook:   activeOrders,
-		OpenOrders:        openOrders,
+	updatedOrders, err := s.OrderExecutor.ActiveMakerOrders().SyncOrders(ctx, s.ExchangeSession.Exchange, 3*time.Minute)
+	if err != nil {
+		return err
 	}
 
-	return common.SyncActiveOrders(ctx, opts)
+	for _, order := range updatedOrders {
+		if s.OrderExecutor.OrderStore().Exists(order.OrderID) {
+			s.OrderExecutor.OrderStore().Update(order)
+		} else {
+			s.OrderExecutor.OrderStore().Add(order)
+		}
+	}
+
+	return nil
 }
