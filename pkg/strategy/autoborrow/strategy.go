@@ -86,10 +86,19 @@ type Strategy struct {
 	ExchangeSession *bbgo.ExchangeSession
 
 	marginBorrowRepay types.MarginBorrowRepayService
+	logger            logrus.FieldLogger
 }
 
 func (s *Strategy) ID() string {
 	return ID
+}
+
+func (s *Strategy) Initialize() error {
+	s.logger = logrus.WithFields(logrus.Fields{
+		"strategy": ID,
+		"exchange": s.ExchangeSession.Name,
+	})
+	return nil
 }
 
 func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
@@ -375,7 +384,7 @@ func (s *Strategy) checkAndBorrow(ctx context.Context) {
 
 			maxBorrowable, err2 := s.marginBorrowRepay.QueryMarginAssetMaxBorrowable(ctx, marginAsset.Asset)
 			if err2 != nil {
-				log.WithError(err2).Errorf("max borrowable query error")
+				s.logger.WithError(err2).Errorf("max borrowable query error")
 				continue
 			}
 
