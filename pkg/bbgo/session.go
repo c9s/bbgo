@@ -22,6 +22,7 @@ import (
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	currency2 "github.com/c9s/bbgo/pkg/types/currency"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
+	"github.com/c9s/bbgo/pkg/util/timejitter"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -36,6 +37,8 @@ var ErrEmptyMarketInfo = errors.New("market info should not be empty, 0 markets 
 
 // ExchangeSession presents the exchange connection Session
 // It also maintains and collects the data returned from the stream.
+//
+//go:generate callbackgen -type ExchangeSession
 type ExchangeSession struct {
 	// ---------------------------
 	// Session config fields
@@ -122,6 +125,9 @@ type ExchangeSession struct {
 
 	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
 
+	// Margin Assets Configs
+	MaxBorrowableUpdateInterval time.Duration `json:"maxBorrowableUpdateInterval" yaml:"maxBorrowableUpdateInterval"`
+
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
 	//
@@ -156,6 +162,9 @@ type ExchangeSession struct {
 	logger log.FieldLogger
 
 	priceSolver *pricesolver.SimplePriceSolver
+
+	marginAssets           map[string]struct{}
+	maxBorrowableCallbacks []func(asset string, amount fixedpoint.Value)
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
@@ -200,6 +209,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		initializedSymbols:    make(map[string]struct{}),
 		logger:                log.WithField("session", name),
 		priceSolver:           pricesolver.NewSimplePriceResolver(nil),
+		marginAssets:          make(map[string]struct{}),
 	}
 
 	session.OrderExecutor = &ExchangeOrderExecutor{
@@ -464,6 +474,18 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
 		session.lastPrices[trade.Symbol] = trade.Price
 	})
+
+	// session-wide max borrowable updating worker
+	if session.Margin {
+		var interval time.Duration
+		if session.MaxBorrowableUpdateInterval == 0 {
+			interval = 30 * time.Minute
+		} else {
+			interval = session.MaxBorrowableUpdateInterval
+		}
+		session.logger.Infof("max borrowable update interval: %s", interval)
+		go session.updateMaxBorrowable(ctx, interval)
+	}
 
 	session.IsInitialized = true
 	return nil
@@ -1169,4 +1191,62 @@ func (session *ExchangeSession) FormatOrders(orders []types.SubmitOrder) (format
 	}
 
 	return formattedOrders, err
+}
+
+func (session *ExchangeSession) AddMarginAssets(
+	assets ...string,
+) {
+	if session.Margin {
+		if session.marginAssets == nil {
+			// hotfix to bypass the tests
+			session.marginAssets = make(map[string]struct{})
+		}
+		for _, asset := range assets {
+			session.marginAssets[asset] = struct{}{}
+		}
+	}
+}
+
+func (session *ExchangeSession) updateMaxBorrowable(
+	ctx context.Context,
+	interval time.Duration,
+) {
+	t := time.NewTicker(timejitter.Milliseconds(interval, 500))
+	defer t.Stop()
+	defer session.logger.Info("max borrowable updating worker exit")
+
+	ex, ok := session.Exchange.(types.MarginBorrowRepayService)
+	if !ok {
+		session.logger.Warnf("exchange %s does not support margin borrow update", session.ExchangeName)
+		return
+	}
+	session.logger.Infof("start max borrowable updating worker for %s", session.ExchangeName)
+	session.doUpdateMaxBorrowable(ctx, ex)
+UpdateLoop:
+	for {
+		select {
+		case <-ctx.Done():
+			break UpdateLoop
+		case <-t.C:
+			session.doUpdateMaxBorrowable(ctx, ex)
+		}
+	}
+}
+
+func (session *ExchangeSession) doUpdateMaxBorrowable(
+	ctx context.Context,
+	ex types.MarginBorrowRepayService,
+) {
+	for asset := range session.marginAssets {
+		maxBorrable, err := ex.QueryMarginAssetMaxBorrowable(
+			ctx, asset,
+		)
+		if err != nil {
+			session.logger.WithError(err).Warnf(
+				"fail to query max borrowable for %s", asset,
+			)
+			continue
+		}
+		session.EmitMaxBorrowable(asset, maxBorrable)
+	}
 }
