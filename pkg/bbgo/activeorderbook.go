@@ -464,6 +464,10 @@ func (b *ActiveOrderBook) add(order types.Order) {
 		log.Debugf("found pending order update: %+v", pendingOrder)
 		if isNewerOrderUpdate(pendingOrder, order) {
 			log.Debugf("pending order update is newer: %+v", pendingOrder)
+			if pendingOrder.Tag == "" {
+				pendingOrder.Tag = order.Tag
+				pendingOrder.GroupID = order.GroupID
+			}
 			order = pendingOrder
 		}
 
