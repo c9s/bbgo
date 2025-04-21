@@ -72,10 +72,13 @@ func (c *SpreadMaker) updateOrder(ctx context.Context) (*types.Order, error) {
 	return retOrder, nil
 }
 
+// canSpreadMaking checks if the current position and signal can place a spread-making order
+// if true, then it returns the order to be placed
 func (c *SpreadMaker) canSpreadMaking(
 	signal float64, position *types.Position,
+	uncoveredPosition fixedpoint.Value,
 	makerMarket types.Market,
-	bestBidPrice, bestAskPrice fixedpoint.Value, // maker best bid price
+	bestBidPrice, bestAskPrice fixedpoint.Value,
 ) (*types.SubmitOrder, bool) {
 	side := position.Side()
 
@@ -87,7 +90,7 @@ func (c *SpreadMaker) canSpreadMaking(
 		return nil, false
 	}
 
-	base := position.GetBase()
+	base := uncoveredPosition.Neg()
 	cost := position.GetAverageCost()
 	profitPrice := getPositionProfitPrice(side, cost, c.session.MakerFeeRate.Add(c.MinProfitRatio))
 
@@ -122,7 +125,6 @@ func (c *SpreadMaker) newMakerOrder(
 	}
 
 	return &types.SubmitOrder{
-		// ClientOrderID:    "",
 		Symbol:      c.symbol,
 		Side:        side,
 		Type:        orderType,
