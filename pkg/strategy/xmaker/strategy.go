@@ -302,14 +302,20 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		if sig.TradeVolumeWindowSignal != nil {
 			sourceSession.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
 		} else if sig.BollingerBandTrendSignal != nil {
-			sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: sig.BollingerBandTrendSignal.Interval})
+			sourceSession.Subscribe(
+				types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: sig.BollingerBandTrendSignal.Interval},
+			)
 		}
 	}
 
 	if s.SubscribeFeeTokenMarkets {
 		subscribeOpts := types.SubscribeOptions{Interval: "1m"}
-		sourceSession.Subscribe(types.KLineChannel, sourceSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts)
-		makerSession.Subscribe(types.KLineChannel, makerSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts)
+		sourceSession.Subscribe(
+			types.KLineChannel, sourceSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts,
+		)
+		makerSession.Subscribe(
+			types.KLineChannel, makerSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts,
+		)
 	}
 }
 
@@ -336,11 +342,13 @@ func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Valu
 func (s *Strategy) Initialize() error {
 	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
 	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
-	s.logger = logrus.WithFields(logrus.Fields{
-		"symbol":      s.Symbol,
-		"strategy":    ID,
-		"strategy_id": s.InstanceID(),
-	})
+	s.logger = logrus.WithFields(
+		logrus.Fields{
+			"symbol":      s.Symbol,
+			"strategy":    ID,
+			"strategy_id": s.InstanceID(),
+		},
+	)
 
 	s.metricsLabels = prometheus.Labels{
 		"strategy_type": ID,
@@ -488,9 +496,13 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		}
 	}
 
-	s.logger.Infof("signal margin params: signal = %f, reverseSideMargin = %f, trendSideMarginDiscount = %f", signal, reverseSideMargin, trendSideMarginDiscount)
+	s.logger.Infof(
+		"signal margin params: signal = %f, reverseSideMargin = %f, trendSideMarginDiscount = %f", signal,
+		reverseSideMargin, trendSideMarginDiscount,
+	)
 
-	s.logger.Infof("calculated signal margin: signal = %f, askMargin = %s, bidMargin = %s",
+	s.logger.Infof(
+		"calculated signal margin: signal = %f, askMargin = %s, bidMargin = %s",
 		signal,
 		quote.AskMargin,
 		quote.BidMargin,
@@ -501,7 +513,8 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		quote.BidMargin = fixedpoint.Max(*s.MinMargin, quote.BidMargin)
 	}
 
-	s.logger.Infof("final signal margin: signal = %f, askMargin = %s, bidMargin = %s",
+	s.logger.Infof(
+		"final signal margin: signal = %f, askMargin = %s, bidMargin = %s",
 		signal,
 		quote.AskMargin,
 		quote.BidMargin,
@@ -532,11 +545,13 @@ func (s *Strategy) applyBollingerMargin(
 		// so that 1.x can multiply the original bid margin
 		bollMargin := s.BollBandMargin.Mul(ratio).Mul(factor)
 
-		s.logger.Infof("%s bollband downtrend: increasing bid margin %f (bidMargin) + %f (bollMargin) = %f (finalBidMargin)",
+		s.logger.Infof(
+			"%s bollband downtrend: increasing bid margin %f (bidMargin) + %f (bollMargin) = %f (finalBidMargin)",
 			s.Symbol,
 			quote.BidMargin.Float64(),
 			bollMargin.Float64(),
-			quote.BidMargin.Add(bollMargin).Float64())
+			quote.BidMargin.Add(bollMargin).Float64(),
+		)
 
 		quote.BidMargin = quote.BidMargin.Add(bollMargin)
 		quote.BidLayerPips = quote.BidLayerPips.Mul(ratio)
@@ -549,11 +564,13 @@ func (s *Strategy) applyBollingerMargin(
 		// so that the original bid margin can be multiplied by 1.x
 		bollMargin := s.BollBandMargin.Mul(ratio).Mul(factor)
 
-		s.logger.Infof("%s bollband uptrend adjusting ask margin %f (askMargin) + %f (bollMargin) = %f (finalAskMargin)",
+		s.logger.Infof(
+			"%s bollband uptrend adjusting ask margin %f (askMargin) + %f (bollMargin) = %f (finalAskMargin)",
 			s.Symbol,
 			quote.AskMargin.Float64(),
 			bollMargin.Float64(),
-			quote.AskMargin.Add(bollMargin).Float64())
+			quote.AskMargin.Add(bollMargin).Float64(),
+		)
 
 		quote.AskMargin = quote.AskMargin.Add(bollMargin)
 		quote.AskLayerPips = quote.AskLayerPips.Mul(ratio)
@@ -615,7 +632,9 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 	if s.QuantityMultiplier.Sign() > 0 && i > 0 {
 		q = fixedpoint.NewFromFloat(
 			q.Float64() * math.Pow(
-				s.QuantityMultiplier.Float64(), float64(i+1)))
+				s.QuantityMultiplier.Float64(), float64(i+1),
+			),
+		)
 	}
 
 	// fallback to the fixed quantity
@@ -700,7 +719,8 @@ func calculateDebtQuota(totalValue, debtValue, minMarginLevel, leverage fixedpoi
 	debtCap := totalValue.Div(minMarginLevel).Div(defaultMmr)
 	marginLevel := totalValue.Div(debtValue).Div(defaultMmr)
 
-	log.Infof("calculateDebtQuota: debtCap=%f, debtValue=%f currentMarginLevel=%f mmr=%f",
+	log.Infof(
+		"calculateDebtQuota: debtCap=%f, debtValue=%f currentMarginLevel=%f mmr=%f",
 		debtCap.Float64(),
 		debtValue.Float64(),
 		marginLevel.Float64(),
@@ -734,7 +754,8 @@ func (s *Strategy) allowMarginHedge(makerSide types.SideType) (bool, fixedpoint.
 	marketValue := s.accountValueCalculator.MarketValue()
 	debtValue := s.accountValueCalculator.DebtValue()
 	netValueInUsd := s.accountValueCalculator.NetValue()
-	s.logger.Infof("hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
+	s.logger.Infof(
+		"hedge account net value in usd: %f, debt value in usd: %f, total value in usd: %f",
 		netValueInUsd.Float64(),
 		debtValue.Float64(),
 		marketValue.Float64(),
@@ -747,8 +768,10 @@ func (s *Strategy) allowMarginHedge(makerSide types.SideType) (bool, fixedpoint.
 		// debtQuota is the quota with minimal margin level
 		debtQuota := calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, s.MaxHedgeAccountLeverage)
 
-		s.logger.Infof("hedge account margin level %f > %f, debt quota: %f",
-			hedgeAccount.MarginLevel.Float64(), s.MinMarginLevel.Float64(), debtQuota.Float64())
+		s.logger.Infof(
+			"hedge account margin level %f > %f, debt quota: %f",
+			hedgeAccount.MarginLevel.Float64(), s.MinMarginLevel.Float64(), debtQuota.Float64(),
+		)
 
 		if debtQuota.Sign() <= 0 {
 			return false, zero
@@ -758,7 +781,8 @@ func (s *Strategy) allowMarginHedge(makerSide types.SideType) (bool, fixedpoint.
 		if s.MaxHedgeAccountLeverage.Sign() > 0 {
 			maximumValueInUsd := netValueInUsd.Mul(s.MaxHedgeAccountLeverage)
 			leverageQuotaInUsd := maximumValueInUsd.Sub(debtValue)
-			s.logger.Infof("hedge account maximum leveraged value in usd: %f (%f x), quota in usd: %f",
+			s.logger.Infof(
+				"hedge account maximum leveraged value in usd: %f (%f x), quota in usd: %f",
 				maximumValueInUsd.Float64(),
 				s.MaxHedgeAccountLeverage.Float64(),
 				leverageQuotaInUsd.Float64(),
@@ -887,7 +911,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	s.logger.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
 
 	if bestBidPrice.Compare(bestAskPrice) > 0 {
-		return fmt.Errorf("best bid price %f is higher than best ask price %f, skip quoting",
+		return fmt.Errorf(
+			"best bid price %f is higher than best ask price %f, skip quoting",
 			bestBidPrice.Float64(),
 			bestAskPrice.Float64(),
 		)
@@ -901,9 +926,11 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	bookLastUpdateTime := s.sourceBook.LastUpdateTime()
 
 	if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
-		s.logger.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
+		s.logger.WithError(err).Errorf(
+			"quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
-			time.Since(bookLastUpdateTime))
+			time.Since(bookLastUpdateTime),
+		)
 
 		s.sourceSession.MarketDataStream.Reconnect()
 		s.sourceBook.Reset()
@@ -911,9 +938,11 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
-		s.logger.WithError(err).Errorf("quote update error, %s price not updating, order book last update: %s ago",
+		s.logger.WithError(err).Errorf(
+			"quote update error, %s price not updating, order book last update: %s ago",
 			s.Symbol,
-			time.Since(bookLastUpdateTime))
+			time.Since(bookLastUpdateTime),
+		)
 
 		s.sourceSession.MarketDataStream.Reconnect()
 		s.sourceBook.Reset()
@@ -983,13 +1012,17 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		!hedgeAccount.MarginLevel.IsZero() {
 
 		if hedgeAccount.MarginLevel.Compare(s.MinMarginLevel) < 0 {
-			s.logger.Warnf("hedge account margin level %s is less then the min margin level %s, calculating the borrowed positions",
+			s.logger.Warnf(
+				"hedge account margin level %s is less then the min margin level %s, calculating the borrowed positions",
 				hedgeAccount.MarginLevel.String(),
-				s.MinMarginLevel.String())
+				s.MinMarginLevel.String(),
+			)
 		} else {
-			s.logger.Infof("hedge account margin level %s is greater than the min margin level %s, calculating the net value",
+			s.logger.Infof(
+				"hedge account margin level %s is greater than the min margin level %s, calculating the net value",
 				hedgeAccount.MarginLevel.String(),
-				s.MinMarginLevel.String())
+				s.MinMarginLevel.String(),
+			)
 		}
 
 		allowMarginSell, bidQuota := s.allowMarginHedge(types.SideTypeBuy)
@@ -1056,11 +1089,17 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		if pos.Compare(s.MaxExposurePosition.Neg()) <= 0 {
 			// stop sell if we over-sell
 			disableMakerAsk = true
-			s.logger.Warnf("%s ask maker is disabled: %f exceeded max exposure %f", s.Symbol, pos.Float64(), s.MaxExposurePosition.Float64())
+			s.logger.Warnf(
+				"%s ask maker is disabled: %f exceeded max exposure %f", s.Symbol, pos.Float64(),
+				s.MaxExposurePosition.Float64(),
+			)
 		} else if pos.Compare(s.MaxExposurePosition) >= 0 {
 			// stop buy if we over buy
 			disableMakerBid = true
-			s.logger.Warnf("%s bid maker is disabled: %f exceeded max exposure %f", s.Symbol, pos.Float64(), s.MaxExposurePosition.Float64())
+			s.logger.Warnf(
+				"%s bid maker is disabled: %f exceeded max exposure %f", s.Symbol, pos.Float64(),
+				s.MaxExposurePosition.Float64(),
+			)
 		}
 	}
 
@@ -1156,16 +1195,18 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				(s.sourceSession.Margin || hedgeQuota.BaseAsset.Lock(bidQuantity)) {
 
 				// if we bought, then we need to sell the base from the hedge session
-				submitOrders = append(submitOrders, types.SubmitOrder{
-					Symbol:      s.Symbol,
-					Market:      s.makerMarket,
-					Type:        orderType,
-					Side:        types.SideTypeBuy,
-					Price:       bidPrice,
-					Quantity:    bidQuantity,
-					TimeInForce: types.TimeInForceGTC,
-					GroupID:     s.groupID,
-				})
+				submitOrders = append(
+					submitOrders, types.SubmitOrder{
+						Symbol:      s.Symbol,
+						Market:      s.makerMarket,
+						Type:        orderType,
+						Side:        types.SideTypeBuy,
+						Price:       bidPrice,
+						Quantity:    bidQuantity,
+						TimeInForce: types.TimeInForceGTC,
+						GroupID:     s.groupID,
+					},
+				)
 
 				makerQuota.Commit()
 				hedgeQuota.Commit()
@@ -1215,16 +1256,18 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				(s.sourceSession.Margin || hedgeQuota.QuoteAsset.Lock(requiredBase.Mul(askPrice))) {
 
 				// if we bought, then we need to sell the base from the hedge session
-				submitOrders = append(submitOrders, types.SubmitOrder{
-					Symbol:      s.Symbol,
-					Market:      s.makerMarket,
-					Type:        orderType,
-					Side:        types.SideTypeSell,
-					Price:       askPrice,
-					Quantity:    askQuantity,
-					TimeInForce: types.TimeInForceGTC,
-					GroupID:     s.groupID,
-				})
+				submitOrders = append(
+					submitOrders, types.SubmitOrder{
+						Symbol:      s.Symbol,
+						Market:      s.makerMarket,
+						Type:        orderType,
+						Side:        types.SideTypeSell,
+						Price:       askPrice,
+						Quantity:    askQuantity,
+						TimeInForce: types.TimeInForceGTC,
+						GroupID:     s.groupID,
+					},
+				)
 				makerQuota.Commit()
 				hedgeQuota.Commit()
 
@@ -1253,7 +1296,9 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	defer s.tradeCollector.Process()
 
 	makerOrderPlacementProfile := timeprofile.Start("makerOrderPlacement")
-	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(ctx, s.makerSession.Exchange, s.makerOrderCreateCallback, formattedOrders...)
+	createdOrders, errIdx, err := bbgo.BatchPlaceOrder(
+		ctx, s.makerSession.Exchange, s.makerOrderCreateCallback, formattedOrders...,
+	)
 	if err != nil {
 		log.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
 		return err
@@ -1338,15 +1383,17 @@ func (s *Strategy) tryArbitrage(
 			return false, nil
 		}
 
-		iocOrders = append(iocOrders, types.SubmitOrder{
-			Symbol:      s.Symbol,
-			Market:      s.makerMarket,
-			Type:        types.OrderTypeLimit,
-			Side:        types.SideTypeBuy,
-			Price:       sumPv.Price,
-			Quantity:    qty,
-			TimeInForce: types.TimeInForceIOC,
-		})
+		iocOrders = append(
+			iocOrders, types.SubmitOrder{
+				Symbol:      s.Symbol,
+				Market:      s.makerMarket,
+				Type:        types.OrderTypeLimit,
+				Side:        types.SideTypeBuy,
+				Price:       sumPv.Price,
+				Quantity:    qty,
+				TimeInForce: types.TimeInForceIOC,
+			},
+		)
 
 	} else if makerBid.Price.Compare(marginAskPrice) >= 0 {
 		baseBalance, hasBase := makerBalances[s.makerMarket.BaseCurrency]
@@ -1372,15 +1419,17 @@ func (s *Strategy) tryArbitrage(
 		}
 
 		// send ioc order for arbitrage
-		iocOrders = append(iocOrders, types.SubmitOrder{
-			Symbol:      s.Symbol,
-			Market:      s.makerMarket,
-			Type:        types.OrderTypeLimit,
-			Side:        types.SideTypeSell,
-			Price:       sumPv.Price,
-			Quantity:    qty,
-			TimeInForce: types.TimeInForceIOC,
-		})
+		iocOrders = append(
+			iocOrders, types.SubmitOrder{
+				Symbol:      s.Symbol,
+				Market:      s.makerMarket,
+				Type:        types.OrderTypeLimit,
+				Side:        types.SideTypeSell,
+				Price:       sumPv.Price,
+				Quantity:    qty,
+				TimeInForce: types.TimeInForceIOC,
+			},
+		)
 	}
 
 	if len(iocOrders) == 0 {
@@ -1399,7 +1448,8 @@ func (s *Strategy) tryArbitrage(
 		ctx,
 		s.makerSession.Exchange,
 		s.makerOrderCreateCallback,
-		formattedOrders...)
+		formattedOrders...,
+	)
 
 	if err != nil {
 		return len(createdOrders) > 0, err
@@ -1473,7 +1523,10 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 
 	if (signal > 0 && hedgeSide == types.SideTypeSell) || (signal < 0 && hedgeSide == types.SideTypeBuy) {
 		if period < delay {
-			s.logger.Infof("delay hedge enabled, signal %f is strong enough, waiting for the next tick to hedge %s quantity (max delay %s)", signal, pos, delay)
+			s.logger.Infof(
+				"delay hedge enabled, signal %f is strong enough, waiting for the next tick to hedge %s quantity (max delay %s)",
+				signal, pos, delay,
+			)
 
 			delayedHedgeCounterMetrics.With(s.metricsLabels).Inc()
 			delayedHedgeMaxDurationMetrics.With(s.metricsLabels).Observe(float64(delay.Milliseconds()))
@@ -1485,32 +1538,38 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 }
 
 // TODO: move this method to SpreadMaker
-func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(ctx context.Context, coveredPosition *fixedpoint.MutexValue) {
+func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(
+	ctx context.Context, coveredPosition *fixedpoint.MutexValue,
+) {
 	s.logger.Infof("canceling current spread maker order...")
 
 	finalOrder, err := s.SpreadMaker.cancelAndQueryOrder(ctx)
 	if err != nil {
 		s.logger.WithError(err).Errorf("spread maker: cancel order error")
+		return
 	}
 
-	if finalOrder != nil {
-		spreadMakerVolumeMetrics.With(s.metricsLabels).Add(finalOrder.ExecutedQuantity.Float64())
-		spreadMakerQuoteVolumeMetrics.With(s.metricsLabels).Add(finalOrder.ExecutedQuantity.Mul(finalOrder.Price).Float64())
+	if finalOrder == nil {
+		s.logger.Errorf("spread maker: no order found")
+		return
+	}
 
-		remainingQuantity := finalOrder.GetRemainingQuantity()
+	spreadMakerVolumeMetrics.With(s.metricsLabels).Add(finalOrder.ExecutedQuantity.Float64())
+	spreadMakerQuoteVolumeMetrics.With(s.metricsLabels).Add(finalOrder.ExecutedQuantity.Mul(finalOrder.Price).Float64())
 
-		s.logger.Infof("returning remaining quantity %f to the covered position", remainingQuantity.Float64())
-		switch finalOrder.Side {
-		case types.SideTypeSell:
-			coveredPosition.Sub(remainingQuantity)
-		case types.SideTypeBuy:
-			coveredPosition.Add(remainingQuantity)
+	remainingQuantity := finalOrder.GetRemainingQuantity()
 
-		}
+	s.logger.Infof("returning remaining quantity %f to the covered position", remainingQuantity.Float64())
+	switch finalOrder.Side {
+	case types.SideTypeSell:
+		coveredPosition.Sub(remainingQuantity)
+	case types.SideTypeBuy:
+		coveredPosition.Add(remainingQuantity)
 	}
 }
 
-func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
+func (s *Strategy) Hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
+	pos := uncoveredPosition.Neg()
 	if pos.IsZero() {
 		return
 	}
@@ -1525,14 +1584,18 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.makerBook != nil {
 		if makerBid, makerAsk, hasMakerPrice := s.makerBook.BestBidAndAsk(); hasMakerPrice {
-			if makerOrderForm, ok := s.SpreadMaker.canSpreadMaking(signal, s.Position, s.makerMarket, makerBid.Price, makerAsk.Price); ok {
+			if makerOrderForm, ok := s.SpreadMaker.canSpreadMaking(
+				signal, s.Position, uncoveredPosition, s.makerMarket, makerBid.Price, makerAsk.Price,
+			); ok {
 
-				s.logger.Infof("position: %f@%f, maker book bid: %f/%f, spread maker order form: %+v",
+				s.logger.Infof(
+					"position: %f@%f, maker book bid: %f/%f, spread maker order form: %+v",
 					s.Position.GetBase().Float64(),
 					s.Position.GetAverageCost().Float64(),
 					makerAsk.Price.Float64(),
 					makerBid.Price.Float64(),
-					makerOrderForm)
+					makerOrderForm,
+				)
 
 				// if we have the existing order, cancel it and return the covered position
 				// keptOrder means we kept the current order and we don't need to place a new order
@@ -1557,7 +1620,10 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 						s.orderStore.Add(*retOrder)
 						s.orderStore.Prune(8 * time.Hour)
 
-						s.logger.Infof("spread maker order placed: #%d %f@%f (%s)", retOrder.OrderID, retOrder.Quantity.Float64(), retOrder.Price.Float64(), retOrder.Status)
+						s.logger.Infof(
+							"spread maker order placed: #%d %f@%f (%s)", retOrder.OrderID, retOrder.Quantity.Float64(),
+							retOrder.Price.Float64(), retOrder.Status,
+						)
 
 						// add covered position from the created order
 						switch side {
@@ -1601,12 +1667,16 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 	if s.sourceSession.Margin {
 		// check the margin level
 		if !s.MinMarginLevel.IsZero() && !account.MarginLevel.IsZero() && account.MarginLevel.Compare(s.MinMarginLevel) < 0 {
-			s.logger.Errorf("margin level %f is too low (< %f), skip hedge", account.MarginLevel.Float64(), s.MinMarginLevel.Float64())
+			s.logger.Errorf(
+				"margin level %f is too low (< %f), skip hedge", account.MarginLevel.Float64(),
+				s.MinMarginLevel.Float64(),
+			)
 			return
 		}
 	} else {
 		quantity = AdjustHedgeQuantityWithAvailableBalance(
-			account, s.sourceMarket, side, quantity, lastPrice)
+			account, s.sourceMarket, side, quantity, lastPrice,
+		)
 	}
 
 	if s.MaxHedgeQuoteQuantityPerOrder.Sign() > 0 && !lastPrice.IsZero() {
@@ -1656,7 +1726,9 @@ func (s *Strategy) Hedge(ctx context.Context, pos fixedpoint.Value) {
 
 	defer s.tradeCollector.Process()
 
-	createdOrders, _, err := bbgo.BatchPlaceOrder(ctx, s.sourceSession.Exchange, orderCreateCallback, formattedOrders...)
+	createdOrders, _, err := bbgo.BatchPlaceOrder(
+		ctx, s.sourceSession.Exchange, orderCreateCallback, formattedOrders...,
+	)
 	if err != nil {
 		s.hedgeErrorRateReservation = s.hedgeErrorLimiter.Reserve()
 		log.WithError(err).Errorf("market order submit error: %s", err.Error())
@@ -1698,11 +1770,15 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 			if s.RecoverTrade {
 				startTime := time.Now().Add(-tradeScanInterval).Add(-tradeScanOverlapBufferPeriod)
 
-				if err := s.tradeCollector.Recover(ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
+				if err := s.tradeCollector.Recover(
+					ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime,
+				); err != nil {
 					log.WithError(err).Errorf("query trades error")
 				}
 
-				if err := s.tradeCollector.Recover(ctx, s.makerSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime); err != nil {
+				if err := s.tradeCollector.Recover(
+					ctx, s.makerSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime,
+				); err != nil {
 					log.WithError(err).Errorf("query trades error")
 				}
 			}
@@ -1911,7 +1987,28 @@ func (s *Strategy) houseCleanWorker(ctx context.Context) {
 		}
 
 	}
+}
 
+func (s *Strategy) getCoveredPosition() fixedpoint.Value {
+	coveredPosition := s.coveredPosition.Get()
+	coveredPositionMetrics.With(s.metricsLabels).Set(coveredPosition.Float64())
+	return coveredPosition
+}
+
+func (s *Strategy) getUncoveredPosition() fixedpoint.Value {
+	position := s.Position.GetBase()
+	coveredPosition := s.getCoveredPosition()
+	uncoverPosition := position.Sub(coveredPosition)
+
+	s.logger.Infof(
+		"%s base position %v coveredPosition: %v uncoveredPosition: %v",
+		s.Symbol,
+		position,
+		coveredPosition,
+		uncoverPosition,
+	)
+
+	return uncoverPosition
 }
 
 func (s *Strategy) hedgeWorker(ctx context.Context) {
@@ -1947,8 +2044,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				s.setPositionStartTime(tt)
 			}
 
-			coveredPosition := s.coveredPosition.Get()
-			uncoverPosition := position.Sub(coveredPosition)
+			uncoverPosition := s.getUncoveredPosition()
 			absPos := uncoverPosition.Abs()
 
 			if s.sourceMarket.IsDustQuantity(absPos, s.lastPrice.Get()) {
@@ -1959,14 +2055,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				continue
 			}
 
-			s.logger.Infof("%s base position %v coveredPosition: %v uncoverPosition: %v",
-				s.Symbol,
-				position,
-				coveredPosition,
-				uncoverPosition,
-			)
-
-			s.Hedge(ctx, uncoverPosition.Neg())
+			s.Hedge(ctx, uncoverPosition)
 			profitChanged = true
 
 		case <-reportTicker.C:
@@ -2029,10 +2118,12 @@ func (s *Strategy) CrossRun(
 
 	indicators := s.sourceSession.Indicators(s.Symbol)
 
-	s.boll = indicators.BOLL(types.IntervalWindow{
-		Interval: s.BollBandInterval,
-		Window:   21,
-	}, 1.0)
+	s.boll = indicators.BOLL(
+		types.IntervalWindow{
+			Interval: s.BollBandInterval,
+			Window:   21,
+		}, 1.0,
+	)
 
 	// restore state
 	s.groupID = util.FNV32(instanceID)
@@ -2046,17 +2137,21 @@ func (s *Strategy) CrossRun(
 	s.Position.StrategyInstanceID = instanceID
 
 	if s.makerSession.MakerFeeRate.Sign() > 0 || s.makerSession.TakerFeeRate.Sign() > 0 {
-		s.Position.SetExchangeFeeRate(types.ExchangeName(s.MakerExchange), types.ExchangeFee{
-			MakerFeeRate: s.makerSession.MakerFeeRate,
-			TakerFeeRate: s.makerSession.TakerFeeRate,
-		})
+		s.Position.SetExchangeFeeRate(
+			types.ExchangeName(s.MakerExchange), types.ExchangeFee{
+				MakerFeeRate: s.makerSession.MakerFeeRate,
+				TakerFeeRate: s.makerSession.TakerFeeRate,
+			},
+		)
 	}
 
 	if s.sourceSession.MakerFeeRate.Sign() > 0 || s.sourceSession.TakerFeeRate.Sign() > 0 {
-		s.Position.SetExchangeFeeRate(types.ExchangeName(s.SourceExchange), types.ExchangeFee{
-			MakerFeeRate: s.sourceSession.MakerFeeRate,
-			TakerFeeRate: s.sourceSession.TakerFeeRate,
-		})
+		s.Position.SetExchangeFeeRate(
+			types.ExchangeName(s.SourceExchange), types.ExchangeFee{
+				MakerFeeRate: s.sourceSession.MakerFeeRate,
+				TakerFeeRate: s.sourceSession.TakerFeeRate,
+			},
+		)
 	}
 
 	if err := tradingutil.UniversalCancelAllOrders(ctx, s.makerSession.Exchange, s.Symbol, nil); err != nil {
@@ -2077,24 +2172,34 @@ func (s *Strategy) CrossRun(
 	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
 	s.sourceSession.UserDataStream.OnTradeUpdate(s.priceSolver.UpdateFromTrade)
 
-	s.accountValueCalculator = bbgo.NewAccountValueCalculator(s.sourceSession, s.priceSolver, s.sourceMarket.QuoteCurrency)
+	s.accountValueCalculator = bbgo.NewAccountValueCalculator(
+		s.sourceSession, s.priceSolver, s.sourceMarket.QuoteCurrency,
+	)
 	if err := s.accountValueCalculator.UpdatePrices(ctx); err != nil {
 		return err
 	}
 
-	s.sourceSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
-		feeToken := s.sourceSession.Exchange.PlatformFeeCurrency()
-		if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuote); ok {
-			s.Position.SetFeeAverageCost(feeToken, feePrice)
-		}
-	}))
+	s.sourceSession.MarketDataStream.OnKLineClosed(
+		types.KLineWith(
+			s.Symbol, types.Interval1m, func(k types.KLine) {
+				feeToken := s.sourceSession.Exchange.PlatformFeeCurrency()
+				if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuote); ok {
+					s.Position.SetFeeAverageCost(feeToken, feePrice)
+				}
+			},
+		),
+	)
 
-	s.makerSession.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, types.Interval1m, func(k types.KLine) {
-		feeToken := s.makerSession.Exchange.PlatformFeeCurrency()
-		if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuote); ok {
-			s.Position.SetFeeAverageCost(feeToken, feePrice)
-		}
-	}))
+	s.makerSession.MarketDataStream.OnKLineClosed(
+		types.KLineWith(
+			s.Symbol, types.Interval1m, func(k types.KLine) {
+				feeToken := s.makerSession.Exchange.PlatformFeeCurrency()
+				if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuote); ok {
+					s.Position.SetFeeAverageCost(feeToken, feePrice)
+				}
+			},
+		),
+	)
 
 	if s.ProfitFixerConfig != nil {
 		bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
@@ -2126,11 +2231,13 @@ func (s *Strategy) CrossRun(
 			fixer.AddExchange(sourceSession.Name, ss)
 		}
 
-		if err2 := fixer.Fix(ctx, s.makerMarket.Symbol,
+		if err2 := fixer.Fix(
+			ctx, s.makerMarket.Symbol,
 			s.ProfitFixerConfig.TradesSince.Time(),
 			time.Now(),
 			profitStats,
-			position); err2 != nil {
+			position,
+		); err2 != nil {
 			return err2
 		}
 
@@ -2150,10 +2257,12 @@ func (s *Strategy) CrossRun(
 	if s.EnableArbitrage {
 		makerMarketStream := s.makerSession.Exchange.NewStream()
 		makerMarketStream.SetPublicOnly()
-		makerMarketStream.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
-			Depth: types.DepthLevelFull,
-			Speed: types.SpeedLow,
-		})
+		makerMarketStream.Subscribe(
+			types.BookChannel, s.Symbol, types.SubscribeOptions{
+				Depth: types.DepthLevelFull,
+				Speed: types.SpeedLow,
+			},
+		)
 
 		s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
 		s.makerBook.BindStream(makerMarketStream)
@@ -2163,18 +2272,22 @@ func (s *Strategy) CrossRun(
 		}
 	}
 
-	s.CircuitBreaker.OnPanic(func() {
-		s.cancelTrading()
+	s.CircuitBreaker.OnPanic(
+		func() {
+			s.cancelTrading()
 
-		bbgo.Sync(ctx, s)
-	})
+			bbgo.Sync(ctx, s)
+		},
+	)
 
 	sourceMarketStream := s.sourceSession.Exchange.NewStream()
 	sourceMarketStream.SetPublicOnly()
-	sourceMarketStream.Subscribe(types.BookChannel, s.Symbol, types.SubscribeOptions{
-		Depth: types.DepthLevelFull,
-		Speed: types.SpeedLow,
-	})
+	sourceMarketStream.Subscribe(
+		types.BookChannel, s.Symbol, types.SubscribeOptions{
+			Depth: types.DepthLevelFull,
+			Speed: types.SpeedLow,
+		},
+	)
 
 	s.sourceBook = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
 	s.sourceBook.BindStream(sourceMarketStream)
@@ -2202,10 +2315,12 @@ func (s *Strategy) CrossRun(
 		minAdditionalMargin := scale.Call(0.0)
 		middleAdditionalMargin := scale.Call(1.0)
 		maxAdditionalMargin := scale.Call(2.0)
-		s.logger.Infof("signal margin range: %.2f%% @ 0.0 ~ %.2f%% @ 1.0 ~ %.2f%% @ 2.0",
+		s.logger.Infof(
+			"signal margin range: %.2f%% @ 0.0 ~ %.2f%% @ 1.0 ~ %.2f%% @ 2.0",
 			minAdditionalMargin*100.0,
 			middleAdditionalMargin*100.0,
-			maxAdditionalMargin*100.0)
+			maxAdditionalMargin*100.0,
+		)
 	}
 
 	for _, signalConfig := range s.SignalConfigList {
@@ -2234,23 +2349,25 @@ func (s *Strategy) CrossRun(
 	s.tradeCollector.TradeStore().SetPruneEnabled(true)
 
 	if s.NotifyTrade {
-		s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-			bbgo.Notify(trade)
-		})
+		s.tradeCollector.OnTrade(
+			func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+				bbgo.Notify(trade)
+			},
+		)
 	}
 
-	s.tradeCollector.OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		c := trade.PositionChange()
-		if trade.Exchange == s.sourceSession.ExchangeName {
+	s.tradeCollector.OnTrade(
+		func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+			c := trade.PositionChange()
 			s.coveredPosition.Add(c)
-		}
 
-		s.ProfitStats.AddTrade(trade)
+			s.ProfitStats.AddTrade(trade)
 
-		if profit.Compare(fixedpoint.Zero) == 0 {
-			s.Environment.RecordPosition(s.Position, trade, nil)
-		}
-	})
+			if profit.Compare(fixedpoint.Zero) == 0 {
+				s.Environment.RecordPosition(s.Position, trade, nil)
+			}
+		},
+	)
 
 	shouldNotifyProfit := func(trade types.Trade, profit *types.Profit) bool {
 		amountThreshold := s.NotifyIgnoreSmallAmountProfitTrade
@@ -2263,30 +2380,36 @@ func (s *Strategy) CrossRun(
 		return false
 	}
 
-	s.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
-		if profit != nil {
-			if s.CircuitBreaker != nil {
-				s.CircuitBreaker.RecordProfit(profit.Profit, trade.Time.Time())
+	s.tradeCollector.OnProfit(
+		func(trade types.Trade, profit *types.Profit) {
+			if profit != nil {
+				if s.CircuitBreaker != nil {
+					s.CircuitBreaker.RecordProfit(profit.Profit, trade.Time.Time())
+				}
+
+				if shouldNotifyProfit(trade, profit) {
+					bbgo.Notify(profit)
+				}
+
+				netProfitMarginHistogram.With(s.metricsLabels).Observe(profit.NetProfitMargin.Float64())
+
+				s.ProfitStats.AddProfit(*profit)
+				s.Environment.RecordPosition(s.Position, trade, profit)
 			}
+		},
+	)
 
-			if shouldNotifyProfit(trade, profit) {
-				bbgo.Notify(profit)
-			}
+	s.tradeCollector.OnPositionUpdate(
+		func(position *types.Position) {
+			bbgo.Notify(position)
+		},
+	)
 
-			netProfitMarginHistogram.With(s.metricsLabels).Observe(profit.NetProfitMargin.Float64())
-
-			s.ProfitStats.AddProfit(*profit)
-			s.Environment.RecordPosition(s.Position, trade, profit)
-		}
-	})
-
-	s.tradeCollector.OnPositionUpdate(func(position *types.Position) {
-		bbgo.Notify(position)
-	})
-
-	s.tradeCollector.OnRecover(func(trade types.Trade) {
-		bbgo.Notify("Recovered trade", trade)
-	})
+	s.tradeCollector.OnRecover(
+		func(trade types.Trade) {
+			bbgo.Notify("Recovered trade", trade)
+		},
+	)
 
 	// bind two user data streams so that we can collect the trades together
 	s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
@@ -2297,7 +2420,9 @@ func (s *Strategy) CrossRun(
 	s.sourceUserDataConnectivity = s.sourceSession.UserDataConnectivity
 	s.sourceMarketDataConnectivity = s.sourceSession.MarketDataConnectivity
 
-	s.connectivityGroup = types.NewConnectivityGroup(s.sourceSession.UserDataConnectivity, s.makerSession.UserDataConnectivity)
+	s.connectivityGroup = types.NewConnectivityGroup(
+		s.sourceSession.UserDataConnectivity, s.makerSession.UserDataConnectivity,
+	)
 
 	go func() {
 		s.logger.Infof("waiting for authentication connections to be ready...")
@@ -2322,27 +2447,29 @@ func (s *Strategy) CrossRun(
 		}
 	}()
 
-	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
-		s.cancelTrading()
+	bbgo.OnShutdown(
+		ctx, func(ctx context.Context, wg *sync.WaitGroup) {
+			s.cancelTrading()
 
-		// the ctx here is the shutdown context (not the strategy context)
+			// the ctx here is the shutdown context (not the strategy context)
 
-		// defer work group done to mark the strategy as stopped
-		defer wg.Done()
+			// defer work group done to mark the strategy as stopped
+			defer wg.Done()
 
-		// send stop signal to the quoteWorker
-		close(s.stopC)
+			// send stop signal to the quoteWorker
+			close(s.stopC)
 
-		// wait for the quoter to stop
-		time.Sleep(s.UpdateInterval.Duration())
+			// wait for the quoter to stop
+			time.Sleep(s.UpdateInterval.Duration())
 
-		if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
-			log.WithError(err).Errorf("graceful cancel error")
-		}
+			if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
+				log.WithError(err).Errorf("graceful cancel error")
+			}
 
-		bbgo.Sync(ctx, s)
-		bbgo.Notify("Shutting down %s %s", ID, s.Symbol, s.Position)
-	})
+			bbgo.Sync(ctx, s)
+			bbgo.Notify("Shutting down %s %s", ID, s.Symbol, s.Position)
+		},
+	)
 
 	return nil
 }
