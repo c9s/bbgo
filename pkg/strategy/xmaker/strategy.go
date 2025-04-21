@@ -1995,13 +1995,13 @@ func (s *Strategy) getCoveredPosition() fixedpoint.Value {
 	return coveredPosition
 }
 
-func (s *Strategy) getUncoverPosition() fixedpoint.Value {
+func (s *Strategy) getUncoveredPosition() fixedpoint.Value {
 	position := s.Position.GetBase()
 	coveredPosition := s.getCoveredPosition()
 	uncoverPosition := position.Sub(coveredPosition)
 
 	s.logger.Infof(
-		"%s base position %v coveredPosition: %v uncoverPosition: %v",
+		"%s base position %v coveredPosition: %v uncoveredPosition: %v",
 		s.Symbol,
 		position,
 		coveredPosition,
@@ -2044,7 +2044,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				s.setPositionStartTime(tt)
 			}
 
-			uncoverPosition := s.getUncoverPosition()
+			uncoverPosition := s.getUncoveredPosition()
 			absPos := uncoverPosition.Abs()
 
 			if s.sourceMarket.IsDustQuantity(absPos, s.lastPrice.Get()) {
