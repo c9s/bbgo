@@ -111,13 +111,13 @@ func NewGeneralOrderExecutor(
 				}
 			},
 		)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
-		defer cancel()
 		session.AddMarginAssets(
-			ctx,
 			executor.position.BaseCurrency,
 			executor.position.QuoteCurrency,
 		)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+		defer cancel()
+		session.UpdateMaxBorrowable(ctx)
 	}
 
 	return executor

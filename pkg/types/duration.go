@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
 )
 
 var simpleDurationRegExp = regexp.MustCompile(`^(\d+)([hdw])$`)
@@ -100,6 +101,48 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 	var o interface{}
 
 	if err := json.Unmarshal(data, &o); err != nil {
+		return err
+	}
+
+	switch t := o.(type) {
+	case string:
+		sd, err := ParseSimpleDuration(t)
+		if err == nil {
+			*d = sd.Duration
+			return nil
+		}
+
+		dd, err := time.ParseDuration(t)
+		if err != nil {
+			return err
+		}
+
+		*d = Duration(dd)
+
+	case float64:
+		*d = Duration(int64(t * float64(time.Second)))
+
+	case int64:
+		*d = Duration(t * int64(time.Second))
+	case int:
+		*d = Duration(t * int(time.Second))
+
+	default:
+		return fmt.Errorf("unsupported type %T value: %v", t, t)
+
+	}
+
+	return nil
+}
+
+func (d *Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.Duration().String())
+}
+
+func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
+	var o interface{}
+
+	if err := value.Decode(&o); err != nil {
 		return err
 	}
 

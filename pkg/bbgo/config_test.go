@@ -74,18 +74,18 @@ func TestLoadConfig(t *testing.T) {
 				assert.Equal(t, map[string]interface{}{
 					"sessions": map[string]interface{}{
 						"max": map[string]interface{}{
-							"exchange":                    "max",
-							"envVarPrefix":                "MAX",
-							"takerFeeRate":                0.,
-							"makerFeeRate":                0.,
-							"maxBorrowableUpdateInterval": "3m",
+							"exchange":                  "max",
+							"envVarPrefix":              "MAX",
+							"takerFeeRate":              0.,
+							"makerFeeRate":              0.,
+							"marginInfoUpdaterInterval": "3m0s",
 						},
 						"binance": map[string]interface{}{
-							"exchange":                    "binance",
-							"envVarPrefix":                "BINANCE",
-							"takerFeeRate":                0.,
-							"makerFeeRate":                0.,
-							"maxBorrowableUpdateInterval": "5m",
+							"exchange":                  "binance",
+							"envVarPrefix":              "BINANCE",
+							"takerFeeRate":              0.,
+							"makerFeeRate":              0.,
+							"marginInfoUpdaterInterval": "5m0s",
 						},
 					},
 					"build": map[string]interface{}{

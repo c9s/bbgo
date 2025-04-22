@@ -22,7 +22,6 @@ import (
 	"github.com/c9s/bbgo/pkg/pricesolver"
 	currency2 "github.com/c9s/bbgo/pkg/types/currency"
 	"github.com/c9s/bbgo/pkg/util/templateutil"
-	"github.com/c9s/bbgo/pkg/util/timejitter"
 
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -126,7 +125,8 @@ type ExchangeSession struct {
 	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
 
 	// Margin Assets Configs
-	MaxBorrowableUpdateInterval string `json:"maxBorrowableUpdateInterval" yaml:"maxBorrowableUpdateInterval"`
+	MarginInfoUpdaterInterval types.Duration     `json:"marginInfoUpdaterInterval" yaml:"marginInfoUpdaterInterval"`
+	marginInfoUpdater         *MarginInfoUpdater `json:"-" yaml:"-"`
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
@@ -162,9 +162,6 @@ type ExchangeSession struct {
 	logger log.FieldLogger
 
 	priceSolver *pricesolver.SimplePriceSolver
-
-	marginAssets           map[string]struct{}
-	maxBorrowableCallbacks []func(asset string, amount fixedpoint.Value)
 }
 
 func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
@@ -209,12 +206,15 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		initializedSymbols:    make(map[string]struct{}),
 		logger:                log.WithField("session", name),
 		priceSolver:           pricesolver.NewSimplePriceResolver(nil),
-		marginAssets:          make(map[string]struct{}),
 	}
 
 	session.OrderExecutor = &ExchangeOrderExecutor{
 		// copy the notification system so that we can route
 		Session: session,
+	}
+	if session.Margin {
+		marginUpdater := NewMarginInfoUpdaterFromExchange(session.Exchange)
+		session.marginInfoUpdater = &marginUpdater
 	}
 
 	return session
@@ -476,16 +476,12 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	})
 
 	// session-wide max borrowable updating worker
-	if session.MaxBorrowableUpdateInterval == "" {
-		session.MaxBorrowableUpdateInterval = "30m"
-	}
-	if session.Margin {
-		interval, err := time.ParseDuration(session.MaxBorrowableUpdateInterval)
-		if err != nil {
-			return fmt.Errorf("invalid max borrowable update interval: %s", session.MaxBorrowableUpdateInterval)
+	if session.marginInfoUpdater != nil {
+		if session.MarginInfoUpdaterInterval == 0 {
+			session.MarginInfoUpdaterInterval = types.Duration(30 * time.Minute)
 		}
-		session.logger.Infof("max borrowable update interval: %s", interval)
-		go session.updateMaxBorrowable(ctx, interval)
+		session.logger.Infof("max borrowable update interval: %s", session.MarginInfoUpdaterInterval.Duration())
+		go session.marginInfoUpdater.Run(ctx, session.MarginInfoUpdaterInterval)
 	}
 
 	session.IsInitialized = true
@@ -1194,72 +1190,28 @@ func (session *ExchangeSession) FormatOrders(orders []types.SubmitOrder) (format
 	return formattedOrders, err
 }
 
-// AddMarginAssets adds the margin assets to the session
-// IPPORTANT: After adding the margin assets, it will trigger an update on the max borrowable amount.
-// It's recommended to add callback for the update on the max borrowable amount first before calling this method.
+// Expose margin updator APIs via ExchangeSession
+
 func (session *ExchangeSession) AddMarginAssets(
-	ctx context.Context,
 	assets ...string,
 ) {
-	if session.Margin {
-		session.logger.Infof("adding margin assets: %v", assets)
-		if session.marginAssets == nil {
-			// hotfix to bypass the tests
-			session.marginAssets = make(map[string]struct{})
-		}
-		for _, asset := range assets {
-			session.marginAssets[asset] = struct{}{}
-		}
-		ex, ok := session.Exchange.(types.MarginBorrowRepayService)
-		if !ok {
-			session.logger.Warnf("exchange %s does not support max borrowable query", session.ExchangeName)
-			return
-		}
-		session.doUpdateMaxBorrowable(ctx, ex)
-	}
-}
-
-// worker goroutine to update the max borrowable amount
-func (session *ExchangeSession) updateMaxBorrowable(
-	ctx context.Context,
-	interval time.Duration,
-) {
-	t := time.NewTicker(timejitter.Milliseconds(interval, 500))
-	defer t.Stop()
-	defer session.logger.Info("max borrowable updating worker exit")
-
-	ex, ok := session.Exchange.(types.MarginBorrowRepayService)
-	if !ok {
-		session.logger.Warnf("cannot start worker for max borrowable on exchange %s", session.ExchangeName)
+	if session.marginInfoUpdater == nil {
 		return
 	}
-	session.logger.Infof("start max borrowable updating worker for %s", session.ExchangeName)
-UpdateLoop:
-	for {
-		select {
-		case <-ctx.Done():
-			break UpdateLoop
-		case <-t.C:
-			session.doUpdateMaxBorrowable(ctx, ex)
-		}
-	}
+	session.logger.Infof("adding margin assets: %v", assets)
+	session.marginInfoUpdater.AddAssets(assets...)
 }
 
-func (session *ExchangeSession) doUpdateMaxBorrowable(
-	ctx context.Context,
-	ex types.MarginBorrowRepayService,
-) {
-	for asset := range session.marginAssets {
-		maxBorrable, err := ex.QueryMarginAssetMaxBorrowable(
-			ctx, asset,
-		)
-		if err != nil {
-			session.logger.WithError(err).Warnf(
-				"fail to query max borrowable for %s", asset,
-			)
-			continue
-		}
-		session.logger.Info("update max borrowable for %s: %s", asset, maxBorrable)
-		session.EmitMaxBorrowable(asset, maxBorrable)
+func (session *ExchangeSession) OnMaxBorrowable(cb MaxBorrowableCallback) {
+	if session.marginInfoUpdater == nil {
+		return
 	}
+	session.marginInfoUpdater.OnMaxBorrowable(cb)
+}
+
+func (session *ExchangeSession) UpdateMaxBorrowable(ctx context.Context) {
+	if session.marginInfoUpdater == nil {
+		return
+	}
+	session.marginInfoUpdater.UpdateMaxBorrowable(ctx)
 }
