@@ -2358,11 +2358,13 @@ func (s *Strategy) CrossRun(
 
 	s.tradeCollector.OnTrade(
 		func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-			c := trade.PositionChange()
+			delta := trade.PositionDelta()
 
 			// only consider hedge here
 			if trade.Exchange == s.sourceSession.ExchangeName {
-				s.coveredPosition.Add(c)
+				s.coveredPosition.Add(delta)
+			} else if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.SpreadMaker.orderStore.Exists(trade.OrderID) {
+				s.coveredPosition.Add(delta)
 			}
 
 			s.ProfitStats.AddTrade(trade)

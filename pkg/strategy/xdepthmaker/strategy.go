@@ -43,7 +43,8 @@ var ErrDustQuantity = stderrors.New("quantity is dust")
 var ErrZeroPrice = stderrors.New("price is zero")
 
 type DepthQueryService interface {
-	QueryDepth(ctx context.Context, symbol string, limit int,
+	QueryDepth(
+		ctx context.Context, symbol string, limit int,
 	) (snapshot types.SliceOrderBook, finalUpdateID int64, err error)
 }
 
@@ -180,7 +181,7 @@ func (s *CrossExchangeMarketMakingStrategy) Initialize(
 	})
 
 	s.HedgeOrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
-		c := trade.PositionChange()
+		c := trade.PositionDelta()
 
 		// sync covered position
 		// sell trade -> negative delta ->
