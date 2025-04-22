@@ -476,13 +476,13 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	})
 
 	// session-wide max borrowable updating worker
+	if session.MaxBorrowableUpdateInterval == "" {
+		session.MaxBorrowableUpdateInterval = "30m"
+	}
 	if session.Margin {
 		interval, err := time.ParseDuration(session.MaxBorrowableUpdateInterval)
 		if err != nil {
 			return fmt.Errorf("invalid max borrowable update interval: %s", session.MaxBorrowableUpdateInterval)
-		}
-		if interval == 0 {
-			interval = 30 * time.Minute
 		}
 		session.logger.Infof("max borrowable update interval: %s", interval)
 		go session.updateMaxBorrowable(ctx, interval)
