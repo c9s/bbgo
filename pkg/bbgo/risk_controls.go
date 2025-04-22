@@ -19,7 +19,9 @@ type RiskControlOrderExecutor struct {
 	BySymbol map[string]*SymbolBasedRiskController `json:"bySymbol,omitempty" yaml:"bySymbol,omitempty"`
 }
 
-func (e *RiskControlOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (retOrders types.OrderSlice, err error) {
+func (e *RiskControlOrderExecutor) SubmitOrders(
+	ctx context.Context, orders ...types.SubmitOrder,
+) (retOrders types.OrderSlice, err error) {
 	var symbolOrders = groupSubmitOrdersBySymbol(orders)
 	for symbol, orders := range symbolOrders {
 		if controller, ok := e.BySymbol[symbol]; ok && controller != nil {
@@ -67,8 +69,4 @@ func groupSubmitOrdersBySymbol(orders []types.SubmitOrder) map[string][]types.Su
 	}
 
 	return symbolOrders
-}
-
-type RiskControls struct {
-	SessionBasedRiskControl map[string]*SessionBasedRiskControl `json:"sessionBased,omitempty" yaml:"sessionBased,omitempty"`
 }
