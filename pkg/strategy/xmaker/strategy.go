@@ -1584,6 +1584,9 @@ func (s *Strategy) Hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.makerBook != nil {
 		if makerBid, makerAsk, hasMakerPrice := s.makerBook.BestBidAndAsk(); hasMakerPrice {
+
+			curOrder, hasOrder := s.SpreadMaker.getOrder()
+
 			if makerOrderForm, ok := s.SpreadMaker.canSpreadMaking(
 				signal, s.Position, uncoveredPosition, s.makerMarket, makerBid.Price, makerAsk.Price,
 			); ok {
@@ -1600,7 +1603,6 @@ func (s *Strategy) Hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 				// if we have the existing order, cancel it and return the covered position
 				// keptOrder means we kept the current order and we don't need to place a new order
 				keptOrder := false
-				curOrder, hasOrder := s.SpreadMaker.getOrder()
 				if hasOrder {
 					keptOrder = s.SpreadMaker.shouldKeepOrder(curOrder, now)
 					if !keptOrder {
@@ -1631,16 +1633,14 @@ func (s *Strategy) Hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 							s.coveredPosition.Add(retOrder.Quantity)
 							pos = pos.Add(retOrder.Quantity)
 						case types.SideTypeBuy:
-							s.coveredPosition.Sub(retOrder.Quantity)
-							pos = pos.Sub(retOrder.Quantity)
+							s.coveredPosition.Add(retOrder.Quantity.Neg())
+							pos = pos.Add(retOrder.Quantity.Neg())
 						}
 					}
 				}
 			} else if s.SpreadMaker.ReverseSignalOrderCancel {
 				if !isSignalSidePosition(signal, s.Position.Side()) {
-					if _, hasOrder := s.SpreadMaker.getOrder(); hasOrder {
-						s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, &s.coveredPosition)
-					}
+					s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, &s.coveredPosition)
 				}
 			}
 		}
@@ -2359,7 +2359,11 @@ func (s *Strategy) CrossRun(
 	s.tradeCollector.OnTrade(
 		func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 			c := trade.PositionChange()
-			s.coveredPosition.Add(c)
+
+			// only consider hedge here
+			if trade.Exchange == s.sourceSession.ExchangeName {
+				s.coveredPosition.Add(c)
+			}
 
 			s.ProfitStats.AddTrade(trade)
 
