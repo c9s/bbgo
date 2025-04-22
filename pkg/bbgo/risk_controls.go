@@ -50,18 +50,6 @@ func (e *RiskControlOrderExecutor) SubmitOrders(
 	return
 }
 
-type SessionBasedRiskControl struct {
-	OrderExecutor *RiskControlOrderExecutor `json:"orderExecutor,omitempty" yaml:"orderExecutor"`
-}
-
-func (control *SessionBasedRiskControl) SetBaseOrderExecutor(executor *ExchangeOrderExecutor) {
-	if control.OrderExecutor == nil {
-		return
-	}
-
-	control.OrderExecutor.ExchangeOrderExecutor = executor
-}
-
 func groupSubmitOrdersBySymbol(orders []types.SubmitOrder) map[string][]types.SubmitOrder {
 	var symbolOrders = make(map[string][]types.SubmitOrder, len(orders))
 	for _, order := range orders {
