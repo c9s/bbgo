@@ -1194,10 +1194,15 @@ func (session *ExchangeSession) FormatOrders(orders []types.SubmitOrder) (format
 	return formattedOrders, err
 }
 
+// AddMarginAssets adds the margin assets to the session
+// IPPORTANT: After adding the margin assets, it will trigger an update on the max borrowable amount.
+// It's recommended to add callback for the update on the max borrowable amount first before calling this method.
 func (session *ExchangeSession) AddMarginAssets(
+	ctx context.Context,
 	assets ...string,
 ) {
 	if session.Margin {
+		session.logger.Infof("adding margin assets: %v", assets)
 		if session.marginAssets == nil {
 			// hotfix to bypass the tests
 			session.marginAssets = make(map[string]struct{})
@@ -1205,9 +1210,16 @@ func (session *ExchangeSession) AddMarginAssets(
 		for _, asset := range assets {
 			session.marginAssets[asset] = struct{}{}
 		}
+		ex, ok := session.Exchange.(types.MarginBorrowRepayService)
+		if !ok {
+			session.logger.Warnf("exchange %s does not support max borrowable query", session.ExchangeName)
+			return
+		}
+		session.doUpdateMaxBorrowable(ctx, ex)
 	}
 }
 
+// worker goroutine to update the max borrowable amount
 func (session *ExchangeSession) updateMaxBorrowable(
 	ctx context.Context,
 	interval time.Duration,
@@ -1218,11 +1230,10 @@ func (session *ExchangeSession) updateMaxBorrowable(
 
 	ex, ok := session.Exchange.(types.MarginBorrowRepayService)
 	if !ok {
-		session.logger.Warnf("exchange %s does not support margin borrow update", session.ExchangeName)
+		session.logger.Warnf("cannot start worker for max borrowable on exchange %s", session.ExchangeName)
 		return
 	}
 	session.logger.Infof("start max borrowable updating worker for %s", session.ExchangeName)
-	session.doUpdateMaxBorrowable(ctx, ex)
 UpdateLoop:
 	for {
 		select {
@@ -1248,6 +1259,7 @@ func (session *ExchangeSession) doUpdateMaxBorrowable(
 			)
 			continue
 		}
+		session.logger.Info("update max borrowable for %s: %s", asset, maxBorrable)
 		session.EmitMaxBorrowable(asset, maxBorrable)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -96,10 +97,6 @@ func NewGeneralOrderExecutor(
 		tradeCollector:     core.NewTradeCollector(symbol, position, orderStore),
 	}
 	if session != nil && executor.position != nil {
-		session.AddMarginAssets(
-			executor.position.BaseCurrency,
-			executor.position.QuoteCurrency,
-		)
 		session.OnMaxBorrowable(
 			func(asset string, maxBorrowable fixedpoint.Value) {
 				switch asset {
@@ -113,6 +110,13 @@ func NewGeneralOrderExecutor(
 					log.Warnf("unknown asset %s for margin base/quote", asset)
 				}
 			},
+		)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*3)
+		defer cancel()
+		session.AddMarginAssets(
+			ctx,
+			executor.position.BaseCurrency,
+			executor.position.QuoteCurrency,
 		)
 	}
 
