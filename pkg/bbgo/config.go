@@ -380,8 +380,6 @@ type Config struct {
 
 	Sessions map[string]*ExchangeSession `json:"sessions,omitempty" yaml:"sessions,omitempty"`
 
-	RiskControls *RiskControls `json:"riskControls,omitempty" yaml:"riskControls,omitempty"`
-
 	Logging *LoggingConfig `json:"logging,omitempty"`
 
 	ExchangeStrategies      []ExchangeStrategyMount `json:"-" yaml:"-"`

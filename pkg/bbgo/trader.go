@@ -74,8 +74,6 @@ func (logger *SilentLogger) Errorf(string, ...interface{}) {}
 type Trader struct {
 	environment *Environment
 
-	riskControls *RiskControls
-
 	crossExchangeStrategies []CrossExchangeStrategy
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
@@ -106,11 +104,6 @@ func (trader *Trader) Configure(userConfig *Config) error {
 	// config environment
 	if userConfig.Environment != nil && trader.environment != nil {
 		trader.environment.environmentConfig = userConfig.Environment
-	}
-
-	// config risk control
-	if userConfig.RiskControls != nil {
-		trader.SetRiskControls(userConfig.RiskControls)
 	}
 
 	for _, entry := range userConfig.ExchangeStrategies {
@@ -157,13 +150,6 @@ func (trader *Trader) AttachCrossExchangeStrategy(strategy CrossExchangeStrategy
 	trader.crossExchangeStrategies = append(trader.crossExchangeStrategies, strategy)
 
 	return trader
-}
-
-// SetRiskControls sets the risk controller
-// TODO: provide a more DSL way to configure risk controls
-// Deprecated: this will be removed in the future
-func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
-	trader.riskControls = riskControls
 }
 
 func (trader *Trader) RunSingleExchangeStrategy(
