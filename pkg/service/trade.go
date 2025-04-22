@@ -115,7 +115,6 @@ func (s *TradeService) Sync(
 			ID: func(obj interface{}) string {
 				trade := obj.(types.Trade)
 				id := strconv.FormatUint(trade.ID, 10) + trade.Side.String()
-				logger.Infof("id: %s", id)
 				return id
 			},
 			LogInsert: true,
