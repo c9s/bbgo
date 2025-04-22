@@ -5,11 +5,13 @@ sessions:
     envVarPrefix: MAX
     takerFeeRate: 0
     makerFeeRate: 0
+    maxBorrowableUpdateInterval: 3m
   binance:
     exchange: binance
     envVarPrefix: BINANCE
     takerFeeRate: 0
     makerFeeRate: 0
+    maxBorrowableUpdateInterval: 5m
 
 exchangeStrategies:
 - on: ["binance"]

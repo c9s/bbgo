@@ -126,7 +126,7 @@ type ExchangeSession struct {
 	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
 
 	// Margin Assets Configs
-	MaxBorrowableUpdateInterval time.Duration `json:"maxBorrowableUpdateInterval" yaml:"maxBorrowableUpdateInterval"`
+	MaxBorrowableUpdateInterval string `json:"maxBorrowableUpdateInterval" yaml:"maxBorrowableUpdateInterval"`
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
@@ -477,11 +477,12 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 
 	// session-wide max borrowable updating worker
 	if session.Margin {
-		var interval time.Duration
-		if session.MaxBorrowableUpdateInterval == 0 {
+		interval, err := time.ParseDuration(session.MaxBorrowableUpdateInterval)
+		if err != nil {
+			return fmt.Errorf("invalid max borrowable update interval: %s", session.MaxBorrowableUpdateInterval)
+		}
+		if interval == 0 {
 			interval = 30 * time.Minute
-		} else {
-			interval = session.MaxBorrowableUpdateInterval
 		}
 		session.logger.Infof("max borrowable update interval: %s", interval)
 		go session.updateMaxBorrowable(ctx, interval)
