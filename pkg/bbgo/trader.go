@@ -74,8 +74,6 @@ func (logger *SilentLogger) Errorf(string, ...interface{}) {}
 type Trader struct {
 	environment *Environment
 
-	riskControls *RiskControls
-
 	crossExchangeStrategies []CrossExchangeStrategy
 	exchangeStrategies      map[string][]SingleExchangeStrategy
 
@@ -106,11 +104,6 @@ func (trader *Trader) Configure(userConfig *Config) error {
 	// config environment
 	if userConfig.Environment != nil && trader.environment != nil {
 		trader.environment.environmentConfig = userConfig.Environment
-	}
-
-	// config risk control
-	if userConfig.RiskControls != nil {
-		trader.SetRiskControls(userConfig.RiskControls)
 	}
 
 	for _, entry := range userConfig.ExchangeStrategies {
@@ -159,13 +152,6 @@ func (trader *Trader) AttachCrossExchangeStrategy(strategy CrossExchangeStrategy
 	return trader
 }
 
-// SetRiskControls sets the risk controller
-// TODO: provide a more DSL way to configure risk controls
-// Deprecated: this will be removed in the future
-func (trader *Trader) SetRiskControls(riskControls *RiskControls) {
-	trader.riskControls = riskControls
-}
-
 func (trader *Trader) RunSingleExchangeStrategy(
 	ctx context.Context, strategy SingleExchangeStrategy, session *ExchangeSession, orderExecutor OrderExecutor,
 ) error {
@@ -181,19 +167,6 @@ func (trader *Trader) getSessionOrderExecutor(sessionName string) OrderExecutor 
 
 	// default to base order executor
 	var orderExecutor OrderExecutor = session.OrderExecutor
-
-	// Since the risk controls are loaded from the config file
-	if trader.riskControls != nil && trader.riskControls.SessionBasedRiskControl != nil {
-		if control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]; ok {
-			control.SetBaseOrderExecutor(session.OrderExecutor)
-
-			// pick the wrapped order executor
-			if control.OrderExecutor != nil {
-				return control.OrderExecutor
-			}
-		}
-	}
-
 	return orderExecutor
 }
 
