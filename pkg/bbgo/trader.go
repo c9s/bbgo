@@ -167,19 +167,6 @@ func (trader *Trader) getSessionOrderExecutor(sessionName string) OrderExecutor 
 
 	// default to base order executor
 	var orderExecutor OrderExecutor = session.OrderExecutor
-
-	// Since the risk controls are loaded from the config file
-	if trader.riskControls != nil && trader.riskControls.SessionBasedRiskControl != nil {
-		if control, ok := trader.riskControls.SessionBasedRiskControl[sessionName]; ok {
-			control.SetBaseOrderExecutor(session.OrderExecutor)
-
-			// pick the wrapped order executor
-			if control.OrderExecutor != nil {
-				return control.OrderExecutor
-			}
-		}
-	}
-
 	return orderExecutor
 }
 
