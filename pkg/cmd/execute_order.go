@@ -14,7 +14,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	_ "github.com/c9s/bbgo/pkg/twap"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 
