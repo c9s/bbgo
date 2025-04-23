@@ -1,11 +1,13 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 func TestParseSimpleDuration(t *testing.T) {
@@ -52,4 +54,24 @@ func TestParseSimpleDuration(t *testing.T) {
 			assert.Equalf(t, tt.want, got, "ParseSimpleDuration(%v)", tt.args.s)
 		})
 	}
+}
+
+func TestSerialization(t *testing.T) {
+	d := Duration(3 * time.Minute)
+	jsonData, err := json.Marshal(&d)
+	assert.NoError(t, err)
+	assert.Equal(t, `"3m0s"`, string(jsonData))
+
+	var d2 Duration
+	err = json.Unmarshal(jsonData, &d2)
+	assert.NoError(t, err)
+	assert.Equal(t, d, d2)
+
+	ymalData, err := yaml.Marshal(&d)
+	assert.NoError(t, err)
+	assert.Equal(t, "3m0s\n", string(ymalData))
+
+	err = yaml.Unmarshal(ymalData, &d2)
+	assert.NoError(t, err)
+	assert.Equal(t, d, d2)
 }
