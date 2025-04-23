@@ -322,11 +322,13 @@ func (s *Strategy) Initialize() error {
 
 	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
 	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
-	s.logger = log.WithFields(logrus.Fields{
+	logger := log.WithFields(logrus.Fields{
 		"symbol":            s.Symbol,
 		"strategy":          ID,
 		"strategy_instance": s.InstanceID(),
 	})
+	logger.Logger.SetReportCaller(true)
+	s.logger = logger
 
 	return nil
 }

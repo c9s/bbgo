@@ -151,12 +151,13 @@ func (s *Strategy) Initialize() error {
 	if s.Strategy == nil {
 		s.Strategy = &common.Strategy{}
 	}
-
-	s.logger = log.WithFields(log.Fields{
+	logger := log.WithFields(log.Fields{
 		"symbol":      s.Symbol,
 		"strategy":    ID,
 		"strategy_id": s.InstanceID(),
 	})
+	logger.Logger.SetReportCaller(true)
+	s.logger = logger
 
 	s.metricsLabels = prometheus.Labels{
 		"strategy_type": ID,

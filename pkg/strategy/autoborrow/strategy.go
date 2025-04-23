@@ -94,9 +94,11 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) Initialize() error {
-	s.logger = logrus.WithFields(logrus.Fields{
+	logger := logrus.WithFields(logrus.Fields{
 		"strategy": ID,
 	})
+	logger.Logger.SetReportCaller(true)
+	s.logger = logger
 	return nil
 }
 
@@ -595,10 +597,12 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 
 	s.ExchangeSession = session
 
-	s.logger = logrus.WithFields(logrus.Fields{
+	logger := logrus.WithFields(logrus.Fields{
 		"strategy": ID,
 		"exchange": s.ExchangeSession.Name,
 	})
+	logger.Logger.SetReportCaller(true)
+	s.logger = logger
 
 	if !session.Margin {
 		log.Warnf("session %s is not margin enabled, skip autoborrow strategy", session.Name)

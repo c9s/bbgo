@@ -254,6 +254,7 @@ func (s *Strategy) Defaults() error {
 func (s *Strategy) Initialize() error {
 	s.filledOrderIDMap = types.NewSyncOrderMap()
 	s.logger = log.WithFields(s.LogFields)
+	s.logger.Logger.SetReportCaller(true)
 	return nil
 }
 

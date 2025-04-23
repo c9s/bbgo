@@ -101,7 +101,9 @@ func (s *Strategy) Defaults() error {
 
 func (s *Strategy) Initialize() error {
 	if s.logger == nil {
-		s.logger = log.Dup()
+		logger := log.Dup()
+		logger.Logger.SetReportCaller(true)
+		s.logger = logger
 	}
 
 	return nil
@@ -119,7 +121,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	s.session = session
 	s.watchingDeposits = make(map[string]types.Deposit)
 	s.lastAssetDepositTimes = make(map[string]time.Time)
-	s.logger = s.logger.WithField("exchange", session.ExchangeName)
+	logger := s.logger.WithField("exchange", session.ExchangeName)
+	logger.Logger.SetReportCaller(true)
+	s.logger = logger
 
 	var ok bool
 

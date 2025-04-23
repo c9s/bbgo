@@ -89,12 +89,13 @@ func (s *Strategy) Initialize() error {
 	if s.FeeBudget == nil {
 		s.FeeBudget = &common.FeeBudget{}
 	}
-
-	s.logger = logrus.WithFields(logrus.Fields{
+	logger := logrus.WithFields(logrus.Fields{
 		"strategy":          ID,
 		"strategy_instance": s.InstanceID(),
 		"symbol":            s.Symbol,
 	})
+	logger.Logger.SetReportCaller(true)
+	s.logger = logger
 	return nil
 }
 

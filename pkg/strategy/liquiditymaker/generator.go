@@ -43,6 +43,7 @@ func (g *LiquidityOrderGenerator) Generate(
 	if g.logger == nil {
 		logger := log.New()
 		logger.SetLevel(log.ErrorLevel)
+		logger.SetReportCaller(true)
 		g.logger = logger
 	}
 

@@ -48,10 +48,12 @@ func (s *Strategy) Initialize() error {
 		s.Strategy = &common.Strategy{}
 	}
 
-	s.logger = log.WithFields(logrus.Fields{
+	logger := log.WithFields(logrus.Fields{
 		"symbol": s.Symbol,
 		"window": s.Window,
 	})
+	logger.Logger.SetReportCaller(true)
+	s.logger = logger
 	return nil
 }
 

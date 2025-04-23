@@ -342,13 +342,15 @@ func aggregatePrice(pvs types.PriceVolumeSlice, requiredQuantity fixedpoint.Valu
 func (s *Strategy) Initialize() error {
 	s.bidPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
 	s.askPriceHeartBeat = types.NewPriceHeartBeat(priceUpdateTimeout)
-	s.logger = logrus.WithFields(
+	logger := logrus.WithFields(
 		logrus.Fields{
 			"symbol":      s.Symbol,
 			"strategy":    ID,
 			"strategy_id": s.InstanceID(),
 		},
 	)
+	logger.Logger.SetReportCaller(true)
+	s.logger = logger
 
 	s.metricsLabels = prometheus.Labels{
 		"strategy_type": ID,

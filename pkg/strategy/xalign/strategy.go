@@ -27,6 +27,7 @@ var log = logrus.WithField("strategy", ID)
 
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
+	log.Logger.SetReportCaller(true)
 }
 
 type QuoteCurrencyPreference struct {
