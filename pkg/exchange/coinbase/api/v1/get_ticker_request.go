@@ -18,7 +18,7 @@ type Ticker struct {
 	ConversionsVolume string           `json:"conversions_volume"`
 }
 
-//go:generate requestgen -method GET -url /products/:product_id/ticker -type GetTickerRequest -responseType .Ticker
+//go:generate requestgen -method GET -url /products/:product_id/ticker -rateLimiter 1+20/2s -type GetTickerRequest -responseType .Ticker
 type GetTickerRequest struct {
 	client requestgen.AuthenticatedAPIClient
 

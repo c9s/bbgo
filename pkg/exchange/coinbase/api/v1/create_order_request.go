@@ -38,7 +38,7 @@ type CreateOrderResponse struct {
 	StopLimitPrice   fixedpoint.Value `json:"stop_limit_price,omitempty"`
 }
 
-//go:generate requestgen -method POST -url "/orders" -type CreateOrderRequest -responseType .CreateOrderResponse
+//go:generate requestgen -method POST -url "/orders" -rateLimiter 1+20/2s -type CreateOrderRequest -responseType .CreateOrderResponse
 type CreateOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 

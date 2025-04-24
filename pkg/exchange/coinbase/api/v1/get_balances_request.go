@@ -17,7 +17,7 @@ type Balance struct {
 
 type BalanceSnapshot []Balance
 
-//go:generate requestgen -method GET -url /accounts -type GetBalancesRequest -responseType .BalanceSnapshot
+//go:generate requestgen -method GET -url /accounts -rateLimiter 1+20/2s -type GetBalancesRequest -responseType .BalanceSnapshot
 type GetBalancesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 }
