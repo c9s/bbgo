@@ -1148,7 +1148,8 @@ func (e *Exchange) QueryDepth(
 	ctx context.Context, symbol string, limit int,
 ) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	req := e.v3client.NewGetDepthRequest()
-	req.Market(symbol)
+	localSymbol := toLocalSymbol(symbol)
+	req.Market(localSymbol)
 
 	// maximum limit is 300
 	if limit > 300 || limit <= 0 {
@@ -1165,7 +1166,7 @@ func (e *Exchange) QueryDepth(
 		return snapshot, finalUpdateID, err
 	}
 
-	return convertDepth(symbol, depth)
+	return convertDepth(localSymbol, depth)
 }
 
 var Two = fixedpoint.NewFromInt(2)
