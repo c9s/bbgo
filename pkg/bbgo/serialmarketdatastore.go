@@ -15,7 +15,7 @@ type SerialMarketDataStore struct {
 	UseMarketTrade           bool
 	KLines                   map[types.Interval]*types.KLine
 	MinInterval              types.Interval
-	Subscription             []types.Interval
+	Subscription             map[types.Interval]struct{}
 	o, h, l, c, v, qv, price fixedpoint.Value
 	mu                       sync.Mutex
 }
@@ -28,19 +28,14 @@ func NewSerialMarketDataStore(symbol string, minInterval types.Interval, useMark
 		MarketDataStore: NewMarketDataStore(symbol),
 		KLines:          make(map[types.Interval]*types.KLine),
 		UseMarketTrade:  len(useMarketTrade) > 0 && useMarketTrade[0],
-		Subscription:    []types.Interval{},
+		Subscription:    make(map[types.Interval]struct{}),
 		MinInterval:     minInterval,
 	}
 }
 
 func (store *SerialMarketDataStore) Subscribe(interval types.Interval) {
 	// dedup
-	for _, i := range store.Subscription {
-		if i == interval {
-			return
-		}
-	}
-	store.Subscription = append(store.Subscription, interval)
+	store.Subscription[interval] = struct{}{}
 }
 
 func (store *SerialMarketDataStore) BindStream(ctx context.Context, stream types.Stream) {
@@ -147,7 +142,7 @@ func (store *SerialMarketDataStore) AddKLine(kline types.KLine, async ...bool) {
 	// endtime
 	duration := store.MinInterval.Duration()
 	timestamp := kline.StartTime.Time().Add(duration)
-	for _, val := range store.Subscription {
+	for val := range store.Subscription {
 		k, ok := store.KLines[val]
 		if !ok {
 			k = &types.KLine{}
