@@ -4,7 +4,7 @@ import "github.com/c9s/requestgen"
 
 type CancelOrderResponse string
 
-//go:generate requestgen -method DELETE -url "/orders/:order_id" -type CancelOrderRequest -responseType .CancelOrderResponse
+//go:generate requestgen -method DELETE -url "/orders/:order_id" -rateLimiter 1+20/2s -type CancelOrderRequest -responseType .CancelOrderResponse
 type CancelOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
@@ -20,7 +20,7 @@ func (c *RestAPIClient) NewCancelOrderRequest() *CancelOrderRequest {
 
 type CancelAllOrdersResponse []string
 
-//go:generate requestgen -method DELETE -url "/orders" -type CancelAllOrdersRequest -responseType .CancelAllOrdersResponse
+//go:generate requestgen -method DELETE -url "/orders" -rateLimiter 1+20/2s -type CancelAllOrdersRequest -responseType .CancelAllOrdersResponse
 type CancelAllOrdersRequest struct {
 	client requestgen.AuthenticatedAPIClient
 

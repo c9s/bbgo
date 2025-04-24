@@ -25,7 +25,7 @@ type Trade struct {
 
 type TradeSnapshot []Trade
 
-//go:generate requestgen -method GET -url "/fills" -type GetOrderTradesRequest -responseType .TradeSnapshot
+//go:generate requestgen -method GET -url "/fills" -rateLimiter 1+20/2s -type GetOrderTradesRequest -responseType .TradeSnapshot
 type GetOrderTradesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
