@@ -1031,7 +1031,7 @@ func (s *Strategy) generateMakerOrders(
 			actualDepth.Float64(), requiredDepth.Float64())
 
 		if depthService, ok := s.hedgeSession.Exchange.(DepthQueryService); ok {
-			snapshot, _, err := depthService.QueryDepth(context.Background(), s.Symbol, 0)
+			snapshot, _, err := depthService.QueryDepth(context.Background(), s.HedgeSymbol, 0)
 			if err != nil {
 				s.logger.WithError(err).Errorf("unable to query source book depth via RESTful API")
 			} else {
