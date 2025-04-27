@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -94,6 +95,8 @@ func WithBrokerId(id string) Option {
 	}
 }
 
+var timeSetterOnce sync.Once
+
 func New(key, secret, passphrase string, opts ...Option) *Exchange {
 	client := okexapi.NewClient()
 	log.Infof("creating new okex rest client with base url: %s", okexapi.RestBaseURL)
@@ -118,6 +121,23 @@ func New(key, secret, passphrase string, opts ...Option) *Exchange {
 	for _, o := range opts {
 		o(ex)
 	}
+
+	ctx := context.Background()
+	go timeSetterOnce.Do(func() {
+		ex.syncMarketSymbolCache(ctx)
+
+		ticker := time.NewTicker(time.Hour * 4)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case <-ticker.C:
+				ex.syncMarketSymbolCache(ctx)
+			}
+		}
+	})
 
 	return ex
 }
@@ -968,6 +988,25 @@ func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 
 func (e *Exchange) GetClient() *okexapi.RestClient {
 	return e.client
+}
+
+func (e *Exchange) syncMarketSymbolCache(ctx context.Context) {
+	markets, err := e.QueryMarkets(ctx)
+	if err != nil {
+		log.WithError(err).Warn("failed to synchronize market symbols cache")
+		return
+	}
+
+	for _, m := range markets {
+		symbolMap := spotSymbolMap
+		if e.IsFutures {
+			symbolMap = swapSymbolMap
+		}
+
+		if _, ok := symbolMap[m.Symbol]; !ok {
+			symbolMap[m.Symbol] = m.LocalSymbol
+		}
+	}
 }
 
 func setDualSidePosition(req *okexapi.PlaceOrderRequest, order types.SubmitOrder) {

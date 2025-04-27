@@ -10,6 +10,10 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+func ToLocalSymbol(symbol string, instType okexapi.InstrumentType) string {
+	return toLocalSymbol(symbol, instType)
+}
+
 func toGlobalSymbol(symbol string) string {
 	symbol = strings.TrimSuffix(symbol, "-SWAP")
 	return strings.ReplaceAll(symbol, "-", "")

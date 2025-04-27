@@ -659,3 +659,63 @@ func TestExchange_QueryFuturesAccount(t *testing.T) {
 	assert.NotNil(t, account.FuturesInfo)
 	assert.NotEmpty(t, account.FuturesInfo.Positions)
 }
+
+func TestExchange_SyncMarketSymbolCache(t *testing.T) {
+	// Test for unknown symbols in both spot and swap markets
+	t.Run("unknown symbol handling", func(t *testing.T) {
+		// Test spot market unknown symbol
+		t.Run("spot market", func(t *testing.T) {
+			transport := &httptesting.MockTransport{}
+			ex := New("key", "secret", "passphrase")
+			ex.client.HttpClient.Transport = transport
+
+			transport.GET("/api/v5/public/instruments", func(req *http.Request) (*http.Response, error) {
+				query := req.URL.Query()
+				assert.Equal(t, "SPOT", query.Get("instType"))
+
+				resp := &okexapi.APIResponse{
+					Code: "0",
+					Data: []byte(`[
+						{"instId":"NEW-USDT","baseCcy":"NEW","quoteCcy":"USDT","minSz":"0.001","tickSz":"0.01","lotSz":"0.001"}
+					]`),
+				}
+				respRaw, err := json.Marshal(resp)
+				assert.NoError(t, err)
+				return httptesting.BuildResponseString(http.StatusOK, string(respRaw)), nil
+			})
+
+			ctx := context.Background()
+			ex.syncMarketSymbolCache(ctx)
+
+			assert.Equal(t, "NEW-USDT", spotSymbolMap["NEWUSDT"])
+		})
+
+		// Test swap market unknown symbol
+		t.Run("swap market", func(t *testing.T) {
+			transport := &httptesting.MockTransport{}
+			ex := New("key", "secret", "passphrase")
+			ex.UseFutures()
+			ex.client.HttpClient.Transport = transport
+
+			transport.GET("/api/v5/public/instruments", func(req *http.Request) (*http.Response, error) {
+				query := req.URL.Query()
+				assert.Equal(t, "SWAP", query.Get("instType"))
+
+				resp := &okexapi.APIResponse{
+					Code: "0",
+					Data: []byte(`[
+						{"instId":"XYZ-USDT-SWAP","baseCcy":"XYZ","quoteCcy":"USDT","minSz":"0.01","tickSz":"0.001","lotSz":"0.01"}
+					]`),
+				}
+				respRaw, err := json.Marshal(resp)
+				assert.NoError(t, err)
+				return httptesting.BuildResponseString(http.StatusOK, string(respRaw)), nil
+			})
+
+			ctx := context.Background()
+			ex.syncMarketSymbolCache(ctx)
+
+			assert.Equal(t, "XYZ-USDT-SWAP", swapSymbolMap["XYZUSDT"])
+		})
+	})
+}
