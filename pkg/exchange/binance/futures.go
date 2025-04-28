@@ -96,7 +96,7 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 
 	a := &types.Account{
 		AccountType: types.AccountTypeFutures,
-		FuturesInfo: toGlobalFuturesAccountInfo(account), // In binance GO api, Account define account info which mantain []*AccountAsset and []*AccountPosition.
+		FuturesInfo: toGlobalFuturesAccountInfo(account), // In binance GO api, Account define account info which maintain []*AccountAsset and []*AccountPosition.
 		CanDeposit:  account.CanDeposit,                  // if can transfer in asset
 		CanTrade:    account.CanTrade,                    // if can trade
 		CanWithdraw: account.CanWithdraw,                 // if can transfer out asset
