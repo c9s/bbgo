@@ -62,6 +62,11 @@ func (store *SerialMarketDataStore) handleKLineClosed(kline types.KLine) {
 }
 
 func (store *SerialMarketDataStore) handleMarketTrade(trade types.Trade) {
+	// the market data stream may subscribe to trades of multiple symbols
+	// so we need to check if the trade is for the symbol we are interested in
+	if trade.Symbol != store.Symbol {
+		return
+	}
 	store.mu.Lock()
 	store.price = trade.Price
 	store.c = store.price
