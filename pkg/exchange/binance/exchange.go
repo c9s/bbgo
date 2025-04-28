@@ -2,7 +2,9 @@ package binance
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,6 +43,11 @@ const FutureTestBaseURL = "https://testnet.binancefuture.com"
 const FuturesWebSocketURL = "wss://fstream.binance.com"
 const FuturesWebSocketTestURL = "wss://stream.binancefuture.com"
 
+// WebSocket API
+// listenKey is deprecated. Official recommendation is to use ws-api for user data stream
+const WsApiWebSocketURL = "wss://ws-api.binance.com:443/ws-api/v3"
+const WsApiWebSocketTestURL = "wss://testnet.binance.vision/ws-api/v3"
+
 // orderLimiter - the default order limiter apply 5 requests per second and a 2 initial bucket
 // this includes SubmitOrder, CancelOrder and QueryClosedOrders
 //
@@ -49,6 +56,7 @@ var orderLimiter = rate.NewLimiter(5, 2)
 var queryTradeLimiter = rate.NewLimiter(1, 2)
 
 var dualSidePosition = false
+var wsApiWebsocketUrl string
 
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
@@ -70,6 +78,12 @@ func init() {
 	if val, ok := envvar.Bool("BINANCE_ENABLE_FUTURES_HEDGE_MODE"); ok {
 		dualSidePosition = val
 	}
+	testNet, _ := envvar.Bool("BINANCE_TESTNET", false)
+	if testNet {
+		wsApiWebsocketUrl = WsApiWebSocketTestURL
+	} else {
+		wsApiWebsocketUrl = WsApiWebSocketURL
+	}
 }
 
 func isBinanceUs() bool {
@@ -81,7 +95,9 @@ type Exchange struct {
 	types.MarginSettings
 	types.FuturesSettings
 
-	key, secret string
+	key, secret       string
+	ed25519PrivateKey ed25519.PrivateKey
+	ed25519Auth       bool
 	// client is used for spot & margin
 	client *binance.Client
 
@@ -101,6 +117,12 @@ func New(key, secret string) *Exchange {
 	if util.IsPaperTrade() {
 		binance.UseTestnet = true
 	}
+	// parse ed25519 private key
+	var ed25519PKeyPEM string = os.Getenv("BINANCE_API_PRIVATE_KEY_PEM")
+	var ed25519Auth bool
+	ed25519PrivateKey, err := util.ParseEd25519PrivateKey(ed25519PKeyPEM)
+	ed25519Auth = err == nil
+
 	var client = binance.NewClient(key, secret)
 	client.HTTPClient = binanceapi.DefaultHttpClient
 	client.Debug = viper.GetBool("debug-binance-client")
@@ -117,12 +139,14 @@ func New(key, secret string) *Exchange {
 	futuresClient2 := binanceapi.NewFuturesRestClient(futuresClient.BaseURL)
 
 	ex := &Exchange{
-		key:            key,
-		secret:         secret,
-		client:         client,
-		futuresClient:  futuresClient,
-		client2:        client2,
-		futuresClient2: futuresClient2,
+		key:               key,
+		secret:            secret,
+		ed25519PrivateKey: ed25519PrivateKey,
+		ed25519Auth:       ed25519Auth,
+		client:            client,
+		futuresClient:     futuresClient,
+		client2:           client2,
+		futuresClient2:    futuresClient2,
 	}
 
 	if len(key) > 0 && len(secret) > 0 {
@@ -148,6 +172,14 @@ func New(key, secret string) *Exchange {
 	})
 
 	return ex
+}
+
+func (e *Exchange) getEd25519PrivateKey() ed25519.PrivateKey {
+	return e.ed25519PrivateKey
+}
+
+func (e *Exchange) getEd25519Auth() bool {
+	return e.ed25519Auth
 }
 
 func (e *Exchange) setServerTimeOffset(ctx context.Context) {
@@ -464,7 +496,7 @@ func (e *Exchange) QueryCrossMarginAccount(ctx context.Context) (*types.Account,
 	marginLevel := fixedpoint.MustNewFromString(marginAccount.MarginLevel)
 	a := &types.Account{
 		AccountType:     types.AccountTypeMargin,
-		MarginInfo:      toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
+		MarginInfo:      toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which maintain []*AccountAsset and []*AccountPosition.
 		MarginLevel:     marginLevel,
 		MarginTolerance: calculateMarginTolerance(marginLevel),
 		BorrowEnabled:   marginAccount.BorrowEnabled,
@@ -498,7 +530,7 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 
 	a := &types.Account{
 		AccountType:        types.AccountTypeIsolatedMargin,
-		IsolatedMarginInfo: toGlobalIsolatedMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
+		IsolatedMarginInfo: toGlobalIsolatedMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which maintain []*AccountAsset and []*AccountPosition.
 	}
 
 	if len(marginAccount.Assets) == 0 {

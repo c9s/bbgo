@@ -2,7 +2,10 @@ package binance
 
 import (
 	"context"
+	"crypto/ed25519"
 	"net"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/depth"
@@ -12,6 +15,7 @@ import (
 	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
 
+	api "github.com/c9s/bbgo/pkg/exchange/binance/binanceapi"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -33,6 +37,16 @@ type WebSocketCommand struct {
 	Params []string `json:"params"`
 }
 
+type LoginParams struct {
+	APIKey    string `json:"apiKey"`
+	Signature string `json:"signature"`
+	Timestamp int64  `json:"timestamp"`
+}
+type LoginCommand struct {
+	WebSocketCommand
+	Params LoginParams `json:"params"`
+}
+
 //go:generate callbackgen -type Stream -interface
 type Stream struct {
 	types.MarginSettings
@@ -41,6 +55,8 @@ type Stream struct {
 
 	client        *binance.Client
 	futuresClient *futures.Client
+	privateKey    ed25519.PrivateKey
+	ed25519Auth   bool
 
 	// custom callbacks
 	depthEventCallbacks       []func(e *DepthEvent)
@@ -78,6 +94,8 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 		StandardStream: types.NewStandardStream(),
 		client:         client,
 		futuresClient:  futuresClient,
+		privateKey:     ex.getEd25519PrivateKey(),
+		ed25519Auth:    ex.getEd25519Auth(),
 		depthBuffers:   make(map[string]*depth.Buffer),
 	}
 
@@ -146,24 +164,66 @@ func (s *Stream) handleDisconnect() {
 }
 
 func (s *Stream) handleConnect() {
+	var err error
 	if !s.PublicOnly {
-		// Emit Auth before establishing the connection to prevent the caller from missing the Update data after
-		// creating the order.
-
-		// spawn a goroutine to emit auth event to prevent blocking the main event loop
-		go s.EmitAuth()
-		return
+		if s.ed25519Auth {
+			err = s.authConnectEd25519()
+		} else {
+			log.Warnf("Ed25519 private key is not set, using deprecated HMAC authentication")
+			err = s.authConnectHMAC()
+		}
+	} else {
+		err = s.writeSubscriptions()
 	}
+	if err != nil {
+		log.WithError(err).Error("subscribe error")
+	}
+}
 
+func (s *Stream) authConnectHMAC() error {
+	// Emit Auth before establishing the connection to prevent the caller from missing the Update data after
+	// creating the order.
+	// spawn a goroutine to emit auth event to prevent blocking the main event loop
+	go s.EmitAuth()
+	return nil
+}
+
+func (s *Stream) authConnectEd25519() error {
+	timestamp := time.Now().UnixNano() / 1e6
+	paramString := strings.Join([]string{
+		"apiKey=" + s.client.APIKey,
+		"timestamp=" + strconv.FormatInt(timestamp, 10),
+	}, "&")
+	signature := api.GenerateSignatureEd25519(paramString, s.privateKey)
+	err := s.Conn.WriteJSON(LoginCommand{
+		WebSocketCommand: WebSocketCommand{
+			Method: "session.login",
+			ID:     1,
+		},
+		Params: LoginParams{
+			APIKey:    s.client.APIKey,
+			Signature: signature,
+			Timestamp: timestamp,
+		},
+	})
+	if err == nil {
+		// Emit auth to notify that the user data stream connection is established
+		// spawn a goroutine to prevent blocking the main event loop
+		go s.EmitAuth()
+	}
+	return err
+}
+
+// writeSubscriptions send the subscription command to the websocket
+// server in order to establish the connection to market data sources
+func (s *Stream) writeSubscriptions() error {
 	var params []string
 	for _, subscription := range s.Subscriptions {
 		params = append(params, convertSubscription(subscription))
 	}
-
 	if len(params) == 0 {
-		return
+		return nil
 	}
-
 	log.Infof("subscribing channels: %+v", params)
 	err := s.Conn.WriteJSON(WebSocketCommand{
 		Method: "SUBSCRIBE",
@@ -171,9 +231,7 @@ func (s *Stream) handleConnect() {
 		ID:     1,
 	})
 
-	if err != nil {
-		log.WithError(err).Error("subscribe error")
-	}
+	return err
 }
 
 func (s *Stream) handleContinuousKLineEvent(e *ContinuousKLineEvent) {
@@ -315,6 +373,14 @@ func (s *Stream) getEndpointUrl(listenKey string) string {
 }
 
 func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
+	if s.ed25519Auth {
+		return s.createEndpointEd25519()
+	}
+	return s.createEndpointHMAC(ctx)
+
+}
+
+func (s *Stream) createEndpointHMAC(ctx context.Context) (string, error) {
 	var err error
 	var listenKey string
 	if s.PublicOnly {
@@ -330,6 +396,26 @@ func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 	}
 
 	url := s.getEndpointUrl(listenKey)
+	return url, nil
+}
+
+func (s *Stream) createEndpointEd25519() (string, error) {
+	var url string
+	if s.PublicOnly {
+		// use websocket stream endpoint
+		log.Debugf("(ed25519) stream is set to public only mode")
+		if s.IsFutures {
+			url = FuturesWebSocketURL + "/ws"
+		} else if isBinanceUs() {
+			url = BinanceUSWebSocketURL + "/ws"
+		} else {
+			url = WebSocketURL + "/ws"
+		}
+	} else {
+		// new ws-api for user data stream
+		url = wsApiWebsocketUrl
+	}
+
 	return url, nil
 }
 
