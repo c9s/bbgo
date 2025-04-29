@@ -659,3 +659,37 @@ func TestExchange_QueryFuturesAccount(t *testing.T) {
 	assert.NotNil(t, account.FuturesInfo)
 	assert.NotEmpty(t, account.FuturesInfo.Positions)
 }
+
+func TestExchange_QueryMarkets_SymbolCache(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	t.Run("spot mode", func(t *testing.T) {
+		delete(spotSymbolMap, "ETHUSDT")
+		delete(swapSymbolMap, "ETHUSDT")
+
+		ex := New(key, secret, passphrase)
+
+		_, err := ex.QueryMarkets(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, "ETH-USDT", spotSymbolMap["ETHUSDT"])
+		assert.NotContains(t, swapSymbolMap, "ETHUSDT")
+	})
+
+	t.Run("futures mode", func(t *testing.T) {
+		delete(spotSymbolMap, "ETHUSDT")
+		delete(swapSymbolMap, "ETHUSDT")
+
+		// Futures mode
+		ex := New(key, secret, passphrase)
+		ex.IsFutures = true
+
+		_, err := ex.QueryMarkets(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, "ETH-USDT-SWAP", swapSymbolMap["ETHUSDT"])
+		assert.NotContains(t, spotSymbolMap, "ETHUSDT")
+	})
+}

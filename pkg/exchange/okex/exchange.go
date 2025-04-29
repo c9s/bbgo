@@ -172,6 +172,8 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 		markets[symbol] = market
 	}
 
+	e.syncLocalSymbolMap(markets)
+
 	return markets, nil
 }
 
@@ -968,6 +970,32 @@ func (e *Exchange) IsSupportedInterval(interval types.Interval) bool {
 
 func (e *Exchange) GetClient() *okexapi.RestClient {
 	return e.client
+}
+
+// syncLocalSymbolMap synchronizes the local symbol map with market data:
+// - Updates existing symbols
+// - Adds new symbols from markets
+// - Removes symbols that no longer exist in markets
+func (e *Exchange) syncLocalSymbolMap(markets types.MarketMap) {
+	symbolMap := spotSymbolMap
+	if e.IsFutures {
+		symbolMap = swapSymbolMap
+	}
+
+	existingSymbols := make(map[string]struct{})
+
+	// Update existing and add new symbols
+	for symbol, market := range markets {
+		symbolMap[symbol] = market.LocalSymbol
+		existingSymbols[symbol] = struct{}{}
+	}
+
+	// Remove symbols that don't exist in markets anymore
+	for symbol := range symbolMap {
+		if _, exists := existingSymbols[symbol]; !exists {
+			delete(symbolMap, symbol)
+		}
+	}
 }
 
 func setDualSidePosition(req *okexapi.PlaceOrderRequest, order types.SubmitOrder) {
