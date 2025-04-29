@@ -121,3 +121,48 @@ func Test_toGlobalFuturesPositions(t *testing.T) {
 	assert.Equal(t, fixedpoint.NewFromFloat(5.0), ethPosition.PositionRisk.Leverage)
 	assert.Equal(t, testTime.Unix(), ethPosition.UpdateTime)
 }
+
+func TestToGlobalPositionSide(t *testing.T) {
+	assert.Equal(t, types.PositionLong, toGlobalPositionSide(okexapi.PosSideLong))
+	assert.Equal(t, types.PositionShort, toGlobalPositionSide(okexapi.PosSideShort))
+	assert.Equal(t, types.PositionType("BOTH"), toGlobalPositionSide(okexapi.PosSide("BOTH")))
+}
+
+func TestToGlobalPositionRisk(t *testing.T) {
+	positions := []okexapi.Position{
+		{
+			InstId:      "BTC-USDT-SWAP",
+			PosSide:     "long",
+			MarkPx:      fixedpoint.MustNewFromString("51000"),
+			AvgPx:       fixedpoint.MustNewFromString("50000"),
+			BePx:        fixedpoint.MustNewFromString("49000"),
+			Upl:         "1000",
+			Imr:         "0.1",
+			Mmr:         "0.05",
+			NotionalUsd: "51000",
+			Lever:       fixedpoint.MustNewFromString("10"),
+			Ccy:         "USDT",
+			Adl:         fixedpoint.MustNewFromString("1"),
+			UpdatedTime: types.MillisecondTimestamp(time.Unix(1234567890/1000, 0)),
+		},
+	}
+
+	risks := toGlobalPositionRisk(positions)
+	assert.NotNil(t, risks)
+	assert.Len(t, risks, 1)
+
+	risk := risks[0]
+	assert.Equal(t, "BTCUSDT", risk.Symbol)
+	assert.Equal(t, types.PositionLong, risk.PositionSide)
+	assert.Equal(t, fixedpoint.MustNewFromString("51000"), risk.MarkPrice)
+	assert.Equal(t, fixedpoint.MustNewFromString("50000"), risk.EntryPrice)
+	assert.Equal(t, fixedpoint.MustNewFromString("49000"), risk.BreakEvenPrice)
+	assert.Equal(t, fixedpoint.MustNewFromString("1000"), risk.UnrealizedPnL)
+	assert.Equal(t, fixedpoint.MustNewFromString("0.1"), risk.InitialMargin)
+	assert.Equal(t, fixedpoint.MustNewFromString("0.05"), risk.MaintMargin)
+	assert.Equal(t, fixedpoint.MustNewFromString("51000"), risk.Notional)
+	assert.Equal(t, fixedpoint.MustNewFromString("10"), risk.Leverage)
+	assert.Equal(t, "USDT", risk.MarginAsset)
+	assert.Equal(t, fixedpoint.MustNewFromString("1"), risk.Adl)
+	assert.Equal(t, types.MillisecondTimestamp(time.Unix(1234567890/1000, 0)), risk.UpdateTime)
+}

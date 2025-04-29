@@ -58,3 +58,34 @@ func toGlobalFuturesPositions(futuresPositions []okexapi.Position) types.Futures
 
 	return retFuturesPositions
 }
+
+func toGlobalPositionSide(positionSide okexapi.PosSide) types.PositionType {
+	if positionSide == okexapi.PosSideLong {
+		return types.PositionLong
+	} else if positionSide == okexapi.PosSideShort {
+		return types.PositionShort
+	}
+	return types.PositionType(positionSide)
+}
+
+func toGlobalPositionRisk(positions []okexapi.Position) []types.PositionRisk {
+	retPositions := make([]types.PositionRisk, len(positions))
+	for i, position := range positions {
+		retPositions[i] = types.PositionRisk{
+			Leverage:       position.Lever,
+			Symbol:         toGlobalSymbol(position.InstId),
+			PositionSide:   toGlobalPositionSide(okexapi.PosSide(position.PosSide)),
+			EntryPrice:     position.AvgPx,
+			MarkPrice:      position.MarkPx,
+			BreakEvenPrice: position.BePx,
+			InitialMargin:  fixedpoint.MustNewFromString(position.Imr),
+			MaintMargin:    fixedpoint.MustNewFromString(position.Mmr),
+			UnrealizedPnL:  fixedpoint.MustNewFromString(position.Upl),
+			Notional:       fixedpoint.MustNewFromString(position.NotionalUsd),
+			MarginAsset:    position.Ccy,
+			Adl:            position.Adl,
+			UpdateTime:     position.UpdatedTime,
+		}
+	}
+	return retPositions
+}
