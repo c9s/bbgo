@@ -30,7 +30,7 @@ type MarketInfoResponse []MarketInfo
 
 // https://docs.cdp.coinbase.com/exchange/reference/exchangerestapi_getproducts
 //
-//go:generate requestgen -method GET -url /products -type GetMarketInfoRequest -responseType .MarketInfoResponse
+//go:generate requestgen -method GET -url /products -rateLimiter 1+20/2s -type GetMarketInfoRequest -responseType .MarketInfoResponse
 type GetMarketInfoRequest struct {
 	client requestgen.APIClient
 }

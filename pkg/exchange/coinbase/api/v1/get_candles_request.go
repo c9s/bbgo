@@ -41,7 +41,7 @@ func (rc *RawCandle) Candle() (*Candle, error) {
 
 // https://docs.cdp.coinbase.com/exchange/reference/exchangerestapi_getproductcandles
 //
-//go:generate requestgen -method GET -url /products/:product_id/candles -type GetCandlesRequest -responseType .GetCandlesResponse
+//go:generate requestgen -method GET -url /products/:product_id/candles -rateLimiter 1+20/2s -type GetCandlesRequest -responseType .GetCandlesResponse
 type GetCandlesRequest struct {
 	client requestgen.AuthenticatedAPIClient
 

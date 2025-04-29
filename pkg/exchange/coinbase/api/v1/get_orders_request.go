@@ -42,7 +42,7 @@ type Order struct {
 
 type OrderSnapshot []Order
 
-//go:generate requestgen -method GET -url "/orders" -type GetOrdersRequest -responseType .OrderSnapshot
+//go:generate requestgen -method GET -url /orders -rateLimiter 1+20/2s -type GetOrdersRequest -responseType .OrderSnapshot
 type GetOrdersRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
@@ -58,7 +58,7 @@ type GetOrdersRequest struct {
 	status    []string   `param:"status,required"`
 }
 
-//go:generate requestgen -method GET -url "/orders/:order_id" -type GetSingleOrderRequest -responseType .Order
+//go:generate requestgen -method GET -url /orders/:order_id -rateLimiter 1+20/2s  -type GetSingleOrderRequest -responseType .Order
 type GetSingleOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
