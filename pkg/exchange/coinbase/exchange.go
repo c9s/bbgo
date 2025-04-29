@@ -14,16 +14,11 @@ import (
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/time/rate"
 )
 
 var (
 	// https://docs.cdp.coinbase.com/exchange/docs/rate-limits
-	//
 	// Rate Limit: 10 requests per 2 seconds, Rate limit rule: UserID
-	queryAccountLimiter = rate.NewLimiter(rate.Every(200*time.Millisecond), 1)
-	// Rate Limit: 10 requests per second
-	queryMarketDataLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 1)
 
 	// compile time check: implemented interface
 	_ types.Exchange                             = &Exchange{}
@@ -95,10 +90,6 @@ func (e *Exchange) PlatformFeeCurrency() string {
 
 // ExchangeAccountService
 func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
-	if err := queryAccountLimiter.Wait(ctx); err != nil {
-		return nil, err
-	}
-
 	balances, err := e.QueryAccountBalances(ctx)
 	if err != nil {
 		return nil, err
@@ -109,10 +100,6 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 }
 
 func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
-	if err := queryAccountLimiter.Wait(ctx); err != nil {
-		return nil, err
-	}
-
 	req := e.client.NewGetBalancesRequest()
 	accounts, err := req.Do(ctx)
 	if err != nil {
@@ -240,9 +227,6 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.
 
 // if symbol is empty string, it will return all orders
 func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, status []string) ([]api.Order, error) {
-	if err := queryAccountLimiter.Wait(ctx); err != nil {
-		return nil, err
-	}
 	sortedBy := "created_at"
 	sorting := "desc"
 	localSymbol := toLocalSymbol(symbol)
