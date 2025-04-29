@@ -149,9 +149,12 @@ func New(key, secret string) *Exchange {
 		futuresClient2:    futuresClient2,
 	}
 
-	if len(key) > 0 && len(secret) > 0 {
-		client2.Auth(key, secret)
-		futuresClient2.Auth(key, secret)
+	if ed25519Auth {
+		client2.Auth(key, secret, ed25519PrivateKey)
+		futuresClient2.Auth(key, secret, ed25519PrivateKey)
+	} else if len(key) > 0 && len(secret) > 0 {
+		client2.Auth(key, secret, nil)
+		futuresClient2.Auth(key, secret, nil)
 	}
 
 	ctx := context.Background()
