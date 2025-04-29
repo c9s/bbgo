@@ -30,6 +30,22 @@ type ExchangeFee struct {
 type PositionRisk struct {
 	Leverage         fixedpoint.Value `json:"leverage,omitempty"`
 	LiquidationPrice fixedpoint.Value `json:"liquidationPrice,omitempty"`
+
+	Symbol                 string               `json:"symbol,omitempty"`
+	PositionSide           PositionType         `json:"positionSide,omitempty"`
+	EntryPrice             fixedpoint.Value     `json:"entryPrice,omitempty"`
+	MarkPrice              fixedpoint.Value     `json:"markPrice,omitempty"`
+	BreakEvenPrice         fixedpoint.Value     `json:"breakEvenPrice,omitempty"`
+	PositionAmount         fixedpoint.Value     `json:"positionAmount,omitempty"`
+	UnrealizedPnL          fixedpoint.Value     `json:"unrealizedPnL,omitempty"`
+	Notional               fixedpoint.Value     `json:"notional,omitempty"`
+	InitialMargin          fixedpoint.Value     `json:"initialMargin,omitempty"`
+	MaintMargin            fixedpoint.Value     `json:"maintMargin,omitempty"`
+	PositionInitialMargin  fixedpoint.Value     `json:"positionInitialMargin,omitempty"`
+	OpenOrderInitialMargin fixedpoint.Value     `json:"openOrderInitialMargin,omitempty"`
+	Adl                    fixedpoint.Value     `json:"adl,omitempty"`
+	MarginAsset            string               `json:"marginAsset,omitempty"`
+	UpdateTime             MillisecondTimestamp `json:"updateTime,omitempty"`
 }
 
 // Position stores the position data

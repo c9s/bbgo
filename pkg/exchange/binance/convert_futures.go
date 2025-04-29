@@ -280,19 +280,27 @@ func convertPremiumIndex(index *futures.PremiumIndex) (*types.PremiumIndex, erro
 	}, nil
 }
 
-func convertPositionRisk(risk *futures.PositionRisk) (*types.PositionRisk, error) {
-	leverage, err := fixedpoint.NewFromString(risk.Leverage)
-	if err != nil {
-		return nil, err
+func toGlobalPositionRisk(positions []binanceapi.FuturesPositionRisk) []types.PositionRisk {
+	retPositions := make([]types.PositionRisk, len(positions))
+	for i, position := range positions {
+		retPositions[i] = types.PositionRisk{
+			LiquidationPrice:       position.LiquidationPrice,
+			PositionSide:           types.PositionType(position.PositionSide),
+			Symbol:                 position.Symbol,
+			MarkPrice:              position.MarkPrice,
+			EntryPrice:             position.EntryPrice,
+			PositionAmount:         position.PositionAmount,
+			BreakEvenPrice:         position.BreakEvenPrice,
+			UnrealizedPnL:          position.UnRealizedProfit,
+			InitialMargin:          position.InitialMargin,
+			Notional:               position.Notional,
+			PositionInitialMargin:  position.PositionInitialMargin,
+			MaintMargin:            position.MaintMargin,
+			Adl:                    position.Adl,
+			OpenOrderInitialMargin: position.OpenOrderInitialMargin,
+			UpdateTime:             position.UpdateTime,
+			MarginAsset:            position.MarginAsset,
+		}
 	}
-
-	liquidationPrice, err := fixedpoint.NewFromString(risk.LiquidationPrice)
-	if err != nil {
-		return nil, err
-	}
-
-	return &types.PositionRisk{
-		Leverage:         leverage,
-		LiquidationPrice: liquidationPrice,
-	}, nil
+	return retPositions
 }

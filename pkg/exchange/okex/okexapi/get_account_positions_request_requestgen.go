@@ -16,6 +16,11 @@ func (g *GetAccountPositionsRequest) InstType(instType InstrumentType) *GetAccou
 	return g
 }
 
+func (g *GetAccountPositionsRequest) InstId(instId string) *GetAccountPositionsRequest {
+	g.instId = &instId
+	return g
+}
+
 // GetQueryParameters builds and checks the query parameters and returns url.Values
 func (g *GetAccountPositionsRequest) GetQueryParameters() (url.Values, error) {
 	var params = map[string]interface{}{}
@@ -48,6 +53,14 @@ func (g *GetAccountPositionsRequest) GetParameters() (map[string]interface{}, er
 
 		// assign parameter of instType
 		params["instType"] = instType
+	} else {
+	}
+	// check instId field -> json key instId
+	if g.instId != nil {
+		instId := *g.instId
+
+		// assign parameter of instId
+		params["instId"] = instId
 	} else {
 	}
 

@@ -177,6 +177,11 @@ type ExchangeRewardService interface {
 	QueryRewards(ctx context.Context, startTime time.Time) ([]Reward, error)
 }
 
+type ExchangeRiskService interface {
+	SetLeverage(ctx context.Context, symbol string, leverage int) error
+	QueryPositionRisk(ctx context.Context, symbol string) ([]PositionRisk, error)
+}
+
 type TradeQueryOptions struct {
 	StartTime   *time.Time
 	EndTime     *time.Time

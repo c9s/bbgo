@@ -331,19 +331,6 @@ func (e *Exchange) queryFuturesTrades(
 	return trades, nil
 }
 
-func (e *Exchange) QueryFuturesPositionRisks(ctx context.Context, symbol string) error {
-	req := e.futuresClient.NewGetPositionRiskService()
-	req.Symbol(symbol)
-	res, err := req.Do(ctx)
-	if err != nil {
-		return err
-	}
-
-	_ = res
-
-	return nil
-}
-
 // BBGO is a futures broker on Binance
 const futuresBrokerID = "gBhMvywy"
 
@@ -412,6 +399,36 @@ func (e *Exchange) QueryFuturesIncomeHistory(
 
 	resp, err := req.Do(ctx)
 	return resp, err
+}
+
+func (e *Exchange) SetLeverage(ctx context.Context, symbol string, leverage int) error {
+	if e.IsFutures {
+		_, err := e.futuresClient2.NewFuturesChangeInitialLeverageRequest().
+			Symbol(symbol).
+			Leverage(leverage).
+			Do(ctx)
+		return err
+	}
+	return fmt.Errorf("not supported set leverage")
+}
+
+func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) ([]types.PositionRisk, error) {
+	var (
+		positions []binanceapi.FuturesPositionRisk
+		err       error
+	)
+
+	if e.IsFutures {
+		req := e.futuresClient2.NewFuturesGetPositionRisksRequest()
+		if len(symbol) > 0 {
+			req.Symbol(symbol)
+		}
+		if positions, err = req.Do(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	return toGlobalPositionRisk(positions), nil
 }
 
 func setDualSidePosition(req *futures.CreateOrderService, order types.SubmitOrder) {
