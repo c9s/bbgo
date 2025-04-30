@@ -362,6 +362,12 @@ func TestStreamInvalidCredentials(t *testing.T) {
 	})
 }
 
+func TestPrivateChannelSymbols(t *testing.T) {
+	stream := getTestStreamOrSkip(t)
+	stream.SetPrivateChannelSymbols([]string{"BTCUSD", "ETHUSD"})
+	assert.Equal(t, []string{"BTC-USD", "ETH-USD"}, stream.privateChannelLocalSymbols())
+}
+
 func getTestStreamOrSkip(t *testing.T) *Stream {
 	if isCI, _ := strconv.ParseBool(os.Getenv("CI")); isCI {
 		t.Skip("skip test for CI")
