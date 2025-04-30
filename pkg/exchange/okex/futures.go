@@ -33,3 +33,40 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 
 	return account, nil
 }
+
+func (e *Exchange) SetLeverage(ctx context.Context, symbol string, leverage int) error {
+	if e.IsFutures {
+		mgnMode := okexapi.MarginModeCross
+		if e.IsIsolatedFutures {
+			mgnMode = okexapi.MarginModeIsolated
+		}
+
+		_, err := e.client.NewSetAccountLeverageRequest().
+			InstrumentId(toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)).
+			Leverage(leverage).
+			MarginMode(okexapi.MarginMode(mgnMode)).
+			Do(ctx)
+		return err
+	}
+	return fmt.Errorf("not supported set leverage")
+}
+
+func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) ([]types.PositionRisk, error) {
+	var (
+		positions []okexapi.Position
+		err       error
+	)
+
+	if e.IsFutures {
+		req := e.client.NewGetAccountPositionsRequest().
+			InstType(okexapi.InstrumentTypeSwap)
+		if len(symbol) > 0 {
+			req.InstId(toLocalSymbol(symbol, okexapi.InstrumentTypeSwap))
+		}
+		if positions, err = req.Do(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	return toGlobalPositionRisk(positions), nil
+}
