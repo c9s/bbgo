@@ -82,6 +82,7 @@ type GetAccountPositionsRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
 	instType *InstrumentType `param:"instType"`
+	instId   *string         `param:"instId"`
 }
 
 func (c *RestClient) NewGetAccountPositionsRequest() *GetAccountPositionsRequest {

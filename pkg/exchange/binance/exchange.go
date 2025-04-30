@@ -1551,16 +1551,6 @@ func (e *Exchange) QueryFundingRateHistory(ctx context.Context, symbol string) (
 	}, nil
 }
 
-func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) (*types.PositionRisk, error) {
-	// when symbol is set, only one position risk will be returned.
-	risks, err := e.futuresClient.NewGetPositionRiskService().Symbol(symbol).Do(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return convertPositionRisk(risks[0])
-}
-
 // in seconds
 var SupportedIntervals = map[types.Interval]int{
 	types.Interval1s:  1,
