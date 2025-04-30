@@ -84,11 +84,15 @@ func (s *Stream) handleConnect() {
 		if !s.authEnabled {
 			panic("user channel requires authentication")
 		}
+		privateChannelLocalSymbols := s.privateChannelLocalSymbols()
+		if len(privateChannelLocalSymbols) == 0 {
+			panic("user channel requires at least one private symbol")
+		}
 		// subscribe private symbols to user channel
 		// Once subscribe to the user channel, it will receive events for the following types:
 		// - order life cycle events: receive, open, done, change, activate(for stop orders)
 		// - order match
-		subProductsMap[userChannel] = append(subProductsMap[userChannel], s.privateChannelSymbols...)
+		subProductsMap[userChannel] = privateChannelLocalSymbols
 	} else {
 		// market data stream: subscribe to channels
 		if len(s.Subscriptions) == 0 {
