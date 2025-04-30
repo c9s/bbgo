@@ -108,6 +108,13 @@ func (s *Stream) SetPrivateChannelSymbols(symbols []string) {
 	s.privateChannelSymbols = symbols
 }
 
+func (s *Stream) privateChannelLocalSymbols() (localSymbols []string) {
+	for _, symbol := range s.privateChannelSymbols {
+		localSymbols = append(localSymbols, toLocalSymbol(symbol))
+	}
+	return
+}
+
 func logSubscriptions(m *SubscriptionsMessage) {
 	if m == nil {
 		return
