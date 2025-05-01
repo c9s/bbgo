@@ -243,9 +243,10 @@ func (k *KLine) Color() string {
 }
 
 func (k *KLine) String() string {
-	return fmt.Sprintf("%s %s %s %s O: %.4f H: %.4f L: %.4f C: %.4f CHG: %.4f MAXCHG: %.4f V: %.4f QV: %.2f TBBV: %.2f",
+	return fmt.Sprintf("%s %s %s %s %s O: %.4f H: %.4f L: %.4f C: %.4f CHG: %.4f MAXCHG: %.4f V: %.4f QV: %.2f TBBV: %.2f",
 		k.Exchange.String(),
-		k.StartTime.Time().Format("2006-01-02 15:04"),
+		k.StartTime.Time().Format("2006-01-02 15:04:00.000"),
+		k.EndTime.Time().Format("2006-01-02 15:04:00.000"),
 		k.Symbol, k.Interval, k.Open.Float64(), k.High.Float64(), k.Low.Float64(), k.Close.Float64(), k.GetChange().Float64(), k.GetMaxChange().Float64(), k.Volume.Float64(), k.QuoteVolume.Float64(), k.TakerBuyBaseAssetVolume.Float64())
 }
 
