@@ -228,6 +228,9 @@ type MatchMessage struct {
 	MakerFeeRate   fixedpoint.Value `json:"maker_fee_rate,omitempty"`
 }
 
+// Trade() convert this message to a Trade
+// fee currency on Coinbase is USD:
+// https://help.coinbase.com/en/exchange/trading-and-funding/exchange-fees
 func (msg *MatchMessage) Trade() types.Trade {
 	var side types.SideType
 	switch msg.Side {
@@ -250,7 +253,7 @@ func (msg *MatchMessage) Trade() types.Trade {
 		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       msg.IsAuthMaker(),
 		Time:          types.Time(msg.Time),
-		FeeCurrency:   msg.QuoteCurrency(),
+		FeeCurrency:   "USD",
 		Fee:           quoteQuantity.Mul(msg.FeeRate()),
 	}
 }
