@@ -71,12 +71,14 @@ func NewStream(
 	passphrase string,
 ) *Stream {
 	s := Stream{
-		StandardStream: types.NewStandardStream(),
-		exchange:       exchange,
-		apiKey:         apiKey,
-		passphrase:     passphrase,
-		secretKey:      secretKey,
-		authEnabled:    len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
+		StandardStream:     types.NewStandardStream(),
+		exchange:           exchange,
+		apiKey:             apiKey,
+		passphrase:         passphrase,
+		secretKey:          secretKey,
+		authEnabled:        len(apiKey) > 0 && len(passphrase) > 0 && len(secretKey) > 0,
+		lastSequenceMsgMap: make(map[string]SequenceNumberType),
+		workingOrdersMap:   make(map[string]types.Order),
 	}
 	s.SetParser(parseMessage)
 	s.SetDispatcher(s.dispatchEvent)
