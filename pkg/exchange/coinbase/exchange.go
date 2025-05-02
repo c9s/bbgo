@@ -25,6 +25,7 @@ var (
 	_ types.ExchangeMarketDataService            = &Exchange{}
 	_ types.CustomIntervalProvider               = &Exchange{}
 	_ tradingutil.CancelAllOrdersBySymbolService = &Exchange{}
+	_ types.ExchangeDefaultFeeRates              = &Exchange{}
 )
 
 const (
@@ -84,8 +85,10 @@ func (e *Exchange) Name() types.ExchangeName {
 	return types.ExchangeCoinBase
 }
 
+// Empty string: Coinbase trading fee is dynamic and depends on the market conditions
+// https://help.coinbase.com/en/exchange/trading-and-funding/exchange-fees
 func (e *Exchange) PlatformFeeCurrency() string {
-	return PlatformToken
+	return ""
 }
 
 // ExchangeAccountService
@@ -463,4 +466,14 @@ func (e *Exchange) CancelOrdersBySymbol(ctx context.Context, symbol string) ([]t
 		})
 	}
 	return orders, nil
+}
+
+// Coinbase trading fee is dynamic and depends on the market conditions
+// Set to tier 2 as a fallback fee rate
+// https://help.coinbase.com/en/exchange/trading-and-funding/exchange-fees
+func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
+	return types.ExchangeFee{
+		MakerFeeRate: fixedpoint.NewFromFloat(0.25 * 0.01), // 25 bps = 0.25%
+		TakerFeeRate: fixedpoint.NewFromFloat(0.4 * 0.01),  // 40 bps = 0.4%
+	}
 }
