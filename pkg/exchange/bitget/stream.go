@@ -91,10 +91,7 @@ func (s *Stream) syncSubscriptions(opType WsEventType) error {
 	batchSize := 10
 	lenArgs := len(args)
 	for begin := 0; begin < lenArgs; begin += batchSize {
-		end := begin + batchSize
-		if end > lenArgs {
-			end = lenArgs
-		}
+		end := min(begin+batchSize, lenArgs)
 
 		if err := s.Conn.WriteJSON(WsOp{
 			Op:   opType,
