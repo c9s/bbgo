@@ -287,6 +287,9 @@ func (s *Stream) handleConnect() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 
+		// emit auth to notify the connection is established
+		s.EmitAuth()
+
 		// emit balance snapshot on connection
 		// query account balances for user stream
 		balances, err := s.exchange.QueryAccountBalances(ctx)
