@@ -61,6 +61,7 @@ func TestStreamBasic(t *testing.T) {
 
 	t.Run("Test Status", func(t *testing.T) {
 		stream := getTestStreamOrSkip(t)
+		stream.SetPublicOnly()
 		chanStatus := make(chan StatusMessage)
 
 		stream.Subscribe(statusChannel, "", types.SubscribeOptions{})
@@ -84,6 +85,7 @@ func TestStreamBasic(t *testing.T) {
 
 	t.Run("Test Ticker", func(t *testing.T) {
 		stream := getTestStreamOrSkip(t)
+		stream.SetPublicOnly()
 		chanTicker := make(chan TickerMessage)
 
 		for _, productID := range productIDs {
@@ -109,6 +111,7 @@ func TestStreamBasic(t *testing.T) {
 
 	t.Run("Test Match", func(t *testing.T) {
 		stream := getTestStreamOrSkip(t)
+		stream.SetPublicOnly()
 		chanMatch := make(chan MatchMessage)
 
 		for _, productID := range productIDs {
@@ -195,6 +198,7 @@ func TestStreamFull(t *testing.T) {
 func TestLevel2(t *testing.T) {
 	t.Run("Run Level2", func(t *testing.T) {
 		stream := getTestStreamOrSkip(t)
+		stream.SetPublicOnly()
 		c := make(chan string, 2)
 		productIDs := []string{"BTC-USD"}
 		getSnapshot := false
@@ -247,6 +251,7 @@ func TestBalance(t *testing.T) {
 
 		c := make(chan struct{}, 1)
 		stream := getTestStreamOrSkip(t)
+		stream.SetPublicOnly()
 		for _, accountID := range accounts {
 			stream.Subscribe(balanceChannel, accountID, types.SubscribeOptions{})
 		}
