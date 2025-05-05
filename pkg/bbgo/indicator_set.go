@@ -13,14 +13,14 @@ type IndicatorSet struct {
 	Symbol string
 
 	stream types.Stream
-	store  *MarketDataStore
+	store  *types.MarketDataStore
 
 	// caches
 	kLines      map[types.Interval]*indicatorv2.KLineStream
 	closePrices map[types.Interval]*indicatorv2.PriceStream
 }
 
-func NewIndicatorSet(symbol string, stream types.Stream, store *MarketDataStore) *IndicatorSet {
+func NewIndicatorSet(symbol string, stream types.Stream, store *types.MarketDataStore) *IndicatorSet {
 	return &IndicatorSet{
 		Symbol: symbol,
 		store:  store,

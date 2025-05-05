@@ -227,7 +227,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 	return errors.New("exceed retry limit")
 }
 
-func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
+func (s *Strategy) initIndicators(store *types.SerialMarketDataStore) error {
 	s.ma = &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
 	s.stdevHigh = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
 	s.stdevLow = &indicator.StdDev{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.HLRangeWindow}}
