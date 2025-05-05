@@ -3,7 +3,6 @@ sessions:
   # spot
   binance:
     exchange: binance
-    margin: true
 
   # cross margin
   binance_margin:

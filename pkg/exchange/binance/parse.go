@@ -20,6 +20,7 @@ import (
 type EventType = string
 
 const (
+	EventTypeError                   EventType = "error"
 	EventTypeKLine                   EventType = "kline"
 	EventTypeOutboundAccountPosition EventType = "outboundAccountPosition"
 	EventTypeOutboundAccountInfo     EventType = "outboundAccountInfo"
@@ -313,9 +314,31 @@ type OutboundAccountInfoEvent struct {
 	Permissions []string  `json:"P,omitempty"`
 }
 
+type RateLimit struct {
+	RateLimitType string `json:"rateLimitType"`
+	Interval      string `json:"interval"`
+	IntervalNum   int    `json:"intervalNum"`
+	Limit         int    `json:"limit"`
+	Count         int    `json:"count"`
+}
+
+type Error struct {
+	Code    int    `json:"code"`
+	Message string `json:"msg"`
+}
+
 type ResultEvent struct {
-	Result interface{} `json:"result,omitempty"`
-	ID     int         `json:"id"`
+	ID     int            `json:"id"`
+	Error  *Error         `json:"error,omitempty"`
+	Result map[string]any `json:"result,omitempty"`
+	Status int            `json:"status"`
+}
+
+type ErrorEvent struct {
+	Id         int         `json:"id"`
+	Status     int         `json:"status"`
+	Error      *Error      `json:"error"`
+	RateLimits []RateLimit `json:"rateLimits,omitempty"`
 }
 
 var parserPool fastjson.ParserPool
@@ -334,9 +357,19 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 		} else if isPartialDepth(val) {
 			eventType = EventTypePartialDepth
 		}
+	} else {
+		errVal := val.Get("error")
+		if errVal != nil {
+			eventType = EventTypeError
+		}
 	}
 
 	switch eventType {
+
+	case EventTypeError:
+		var event ErrorEvent
+		err = json.Unmarshal(message, &event)
+		return &event, err
 
 	case EventTypeOutboundAccountPosition:
 		var event OutboundAccountPositionEvent

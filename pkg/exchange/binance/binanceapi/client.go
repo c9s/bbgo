@@ -94,7 +94,7 @@ func (c *RestClient) Auth(key, secret string, privateKey ed25519.PrivateKey) {
 }
 
 func (c *RestClient) IsUsingEd25519Auth() bool {
-	return c.PrivateKey == nil
+	return len(c.PrivateKey) > 0
 }
 
 // NewRequest create new API request. Relative url can be provided in refURL.
