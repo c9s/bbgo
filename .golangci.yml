@@ -1,9 +1,28 @@
+version: "2"
 run:
   issues-exit-code: 0
   tests: true
-  timeout: 5m
 linters:
-  disable-all: true
+  default: none
+  enable:
+    - staticcheck
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
   enable:
     - gofmt
-    - gosimple
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
