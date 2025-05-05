@@ -2,15 +2,16 @@ package binance
 
 import (
 	"context"
-	"crypto/ed25519"
+	"encoding/json"
 	"net"
+	"net/url"
 	"strconv"
-	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/depth"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/sirupsen/logrus"
 
 	"github.com/adshao/go-binance/v2"
 	"github.com/adshao/go-binance/v2/futures"
@@ -32,19 +33,15 @@ const listenKeyKeepAliveInterval = 15 * time.Minute
 
 type WebSocketCommand struct {
 	// request ID is required
-	ID     int      `json:"id"`
-	Method string   `json:"method"`
-	Params []string `json:"params"`
+	ID     any    `json:"id"`
+	Method string `json:"method"`
+	Params any    `json:"params,omitempty"`
 }
 
-type LoginParams struct {
+type LogonParams struct {
 	APIKey    string `json:"apiKey"`
 	Signature string `json:"signature"`
 	Timestamp int64  `json:"timestamp"`
-}
-type LoginCommand struct {
-	WebSocketCommand
-	Params LoginParams `json:"params"`
 }
 
 //go:generate callbackgen -type Stream -interface
@@ -55,8 +52,8 @@ type Stream struct {
 
 	client        *binance.Client
 	futuresClient *futures.Client
-	privateKey    ed25519.PrivateKey
-	ed25519Auth   bool
+
+	ed25519authentication
 
 	// custom callbacks
 	depthEventCallbacks       []func(e *DepthEvent)
@@ -85,6 +82,8 @@ type Stream struct {
 	marginCallEventCallbacks          []func(e *MarginCallEvent)
 	listenKeyExpiredCallbacks         []func(e *ListenKeyExpired)
 
+	errorCallbacks []func(e *ErrorEvent)
+
 	// depthBuffers is used for storing the depth info
 	depthBuffers map[string]*depth.Buffer
 }
@@ -94,14 +93,21 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 		StandardStream: types.NewStandardStream(),
 		client:         client,
 		futuresClient:  futuresClient,
-		privateKey:     ex.getEd25519PrivateKey(),
-		ed25519Auth:    ex.getEd25519Auth(),
-		depthBuffers:   make(map[string]*depth.Buffer),
+
+		ed25519authentication: ex.ed25519authentication,
+		MarginSettings:        ex.MarginSettings,
+		FuturesSettings:       ex.FuturesSettings,
+
+		depthBuffers: make(map[string]*depth.Buffer),
 	}
 
 	stream.SetParser(parseWebSocketEvent)
 	stream.SetDispatcher(stream.dispatchEvent)
 	stream.SetEndpointCreator(stream.createEndpoint)
+
+	stream.OnError(func(e *ErrorEvent) {
+		log.Errorf("ErrorEvent: %+v", e)
+	})
 
 	stream.OnDepthEvent(func(e *DepthEvent) {
 		f, ok := stream.depthBuffers[e.Symbol]
@@ -148,6 +154,12 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnOrderTradeUpdateEvent(stream.handleOrderTradeUpdateEvent)
 	// ===================================
 
+	if debugMode {
+		stream.OnRawMessage(func(raw []byte) {
+			log.Info(string(raw))
+		})
+	}
+
 	stream.OnDisconnect(stream.handleDisconnect)
 	stream.OnConnect(stream.handleConnect)
 	stream.OnListenKeyExpired(func(e *ListenKeyExpired) {
@@ -164,54 +176,62 @@ func (s *Stream) handleDisconnect() {
 }
 
 func (s *Stream) handleConnect() {
-	var err error
-	if !s.PublicOnly {
-		if s.ed25519Auth {
-			err = s.authConnectEd25519()
-		} else {
-			log.Warnf("Ed25519 private key is not set, using deprecated HMAC authentication")
-			err = s.authConnectHMAC()
+	if s.PublicOnly {
+		if err := s.writeSubscriptions(); err != nil {
+			log.WithError(err).Error("subscribe error")
 		}
+	} else if s.shouldUseEd25519Authentication() {
+		if err := s.sendEd25519LoginCommand(); err != nil {
+			log.WithError(err).Error("ed25519 auth error")
+		}
+
+		time.Sleep(1 * time.Second)
+		if err := s.sendSubscribeUserDataStreamCommand(); err != nil {
+			log.WithError(err).Error("subscribe user data stream error")
+		}
+
+		// TODO: ensure that we receive an authorized event to trigger this auth event
+		go s.EmitAuth()
 	} else {
-		err = s.writeSubscriptions()
-	}
-	if err != nil {
-		log.WithError(err).Error("subscribe error")
+		// Emit Auth before establishing the connection to prevent the caller from missing the Update data after
+		// creating the order.
+		// spawn a goroutine to emit auth event to prevent blocking the main event loop
+		go s.EmitAuth()
 	}
 }
 
-func (s *Stream) authConnectHMAC() error {
-	// Emit Auth before establishing the connection to prevent the caller from missing the Update data after
-	// creating the order.
-	// spawn a goroutine to emit auth event to prevent blocking the main event loop
-	go s.EmitAuth()
-	return nil
-}
-
-func (s *Stream) authConnectEd25519() error {
-	timestamp := time.Now().UnixNano() / 1e6
-	paramString := strings.Join([]string{
-		"apiKey=" + s.client.APIKey,
-		"timestamp=" + strconv.FormatInt(timestamp, 10),
-	}, "&")
-	signature := api.GenerateSignatureEd25519(paramString, s.privateKey)
-	err := s.Conn.WriteJSON(LoginCommand{
-		WebSocketCommand: WebSocketCommand{
-			Method: "session.login",
-			ID:     1,
-		},
-		Params: LoginParams{
+// sendEd25519LoginCommand
+// Sample response:
+//
+//	  {"id":1,"status":200,"result":{"apiKey":".....",
+//		  "authorizedSince":1746456891079,
+//		  "connectedSince":1746456891107,
+//		  "returnRateLimits":true,
+//		  "serverTime":1746456891153,"userDataStream":false},
+//		"rateLimits":[{"rateLimitType":"REQUEST_WEIGHT","interval":"MINUTE","intervalNum":1,"limit":6000,"count":14}]}
+func (s *Stream) sendEd25519LoginCommand() error {
+	timestamp := time.Now().UnixMilli()
+	params := url.Values{}
+	params.Add("apiKey", s.client.APIKey)
+	params.Add("timestamp", strconv.FormatInt(timestamp, 10))
+	paramsStr := params.Encode()
+	signature := api.GenerateSignatureEd25519(paramsStr, s.ed25519authentication.privateKey)
+	return s.Conn.WriteJSON(&WebSocketCommand{
+		Method: "session.logon",
+		ID:     1,
+		Params: &LogonParams{
 			APIKey:    s.client.APIKey,
 			Signature: signature,
 			Timestamp: timestamp,
 		},
 	})
-	if err == nil {
-		// Emit auth to notify that the user data stream connection is established
-		// spawn a goroutine to prevent blocking the main event loop
-		go s.EmitAuth()
-	}
-	return err
+}
+
+func (s *Stream) sendSubscribeUserDataStreamCommand() error {
+	return s.Conn.WriteJSON(&WebSocketCommand{
+		ID:     2,
+		Method: "userDataStream.subscribe",
+	})
 }
 
 // writeSubscriptions send the subscription command to the websocket
@@ -224,11 +244,12 @@ func (s *Stream) writeSubscriptions() error {
 	if len(params) == 0 {
 		return nil
 	}
+
 	log.Infof("subscribing channels: %+v", params)
-	err := s.Conn.WriteJSON(WebSocketCommand{
+	err := s.Conn.WriteJSON(&WebSocketCommand{
 		Method: "SUBSCRIBE",
 		Params: params,
-		ID:     1,
+		ID:     2,
 	})
 
 	return err
@@ -372,51 +393,55 @@ func (s *Stream) getEndpointUrl(listenKey string) string {
 	return url
 }
 
+func (s *Stream) shouldUseEd25519Authentication() bool {
+	if s.MarginSettings.IsMargin || s.FuturesSettings.IsFutures {
+		return false
+	}
+
+	return s.ed25519authentication.usingEd25519
+}
+
 func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
-	if s.ed25519Auth {
+	if s.shouldUseEd25519Authentication() {
 		return s.createEndpointEd25519()
 	}
-	return s.createEndpointHMAC(ctx)
 
+	return s.createEndpointHMAC(ctx)
 }
 
 func (s *Stream) createEndpointHMAC(ctx context.Context) (string, error) {
 	var err error
 	var listenKey string
 	if s.PublicOnly {
-		log.Debugf("stream is set to public only mode")
+		debug("stream is set to public only mode")
 	} else {
 		listenKey, err = s.fetchListenKey(ctx)
 		if err != nil {
 			return "", err
 		}
 
-		log.Debugf("listen key is created: %s", util.MaskKey(listenKey))
+		debug("listen key is created, starting listen key keep alive worker: %s", util.MaskKey(listenKey))
 		go s.listenKeyKeepAlive(ctx, listenKey)
 	}
 
-	url := s.getEndpointUrl(listenKey)
-	return url, nil
+	return s.getEndpointUrl(listenKey), nil
 }
 
 func (s *Stream) createEndpointEd25519() (string, error) {
-	var url string
 	if s.PublicOnly {
 		// use websocket stream endpoint
-		log.Debugf("(ed25519) stream is set to public only mode")
+		debug("(ed25519) stream is set to public only mode")
 		if s.IsFutures {
-			url = FuturesWebSocketURL + "/ws"
+			return FuturesWebSocketURL + "/ws", nil
 		} else if isBinanceUs() {
-			url = BinanceUSWebSocketURL + "/ws"
-		} else {
-			url = WebSocketURL + "/ws"
+			return BinanceUSWebSocketURL + "/ws", nil
 		}
-	} else {
-		// new ws-api for user data stream
-		url = wsApiWebsocketUrl
+
+		return WebSocketURL + "/ws", nil
 	}
 
-	return url, nil
+	// use the new ws-api for user data stream
+	return wsApiWebsocketUrl, nil
 }
 
 func (s *Stream) dispatchEvent(e interface{}) {
@@ -471,34 +496,33 @@ func (s *Stream) dispatchEvent(e interface{}) {
 		s.EmitForceOrderEvent(e)
 
 	case *MarginCallEvent:
-
 	}
 }
 
 func (s *Stream) fetchListenKey(ctx context.Context) (string, error) {
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
-			log.Debugf("isolated margin %s is enabled, requesting margin user stream listen key...", s.IsolatedMarginSymbol)
+			debug("isolated margin %s is enabled, requesting margin user stream listen key...", s.IsolatedMarginSymbol)
 			req := s.client.NewStartIsolatedMarginUserStreamService()
 			req.Symbol(s.IsolatedMarginSymbol)
 			return req.Do(ctx)
 		}
 
-		log.Debugf("margin mode is enabled, requesting margin user stream listen key...")
+		debug("margin mode is enabled, requesting margin user stream listen key...")
 		req := s.client.NewStartMarginUserStreamService()
 		return req.Do(ctx)
 	} else if s.IsFutures {
-		log.Debugf("futures mode is enabled, requesting futures user stream listen key...")
+		debug("futures mode is enabled, requesting futures user stream listen key...")
 		req := s.futuresClient.NewStartUserStreamService()
 		return req.Do(ctx)
 	}
 
-	log.Debugf("spot mode is enabled, requesting user stream listen key...")
+	debug("spot mode is enabled, requesting user stream listen key...")
 	return s.client.NewStartUserStreamService().Do(ctx)
 }
 
 func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error {
-	log.Debugf("keepalive listen key: %s", util.MaskKey(listenKey))
+	debug("keepalive listen key: %s", util.MaskKey(listenKey))
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
 			req := s.client.NewKeepaliveIsolatedMarginUserStreamService().ListenKey(listenKey)
@@ -517,7 +541,7 @@ func (s *Stream) keepaliveListenKey(ctx context.Context, listenKey string) error
 
 func (s *Stream) closeListenKey(ctx context.Context, listenKey string) (err error) {
 	// should use background context to invalidate the user stream
-	log.Debugf("closing listen key: %s", util.MaskKey(listenKey))
+	debug("closing listen key: %s", util.MaskKey(listenKey))
 
 	if s.IsMargin {
 		if s.IsIsolatedMargin {
@@ -607,4 +631,9 @@ func (s *Stream) listenKeyKeepAlive(ctx context.Context, listenKey string) {
 
 		}
 	}
+}
+
+func toJson(a any) string {
+	o, _ := json.MarshalIndent(a, "", " ")
+	return string(o)
 }
