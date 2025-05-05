@@ -146,7 +146,7 @@ type ExchangeSession struct {
 	lastPriceUpdatedAt time.Time
 
 	// marketDataStores contains the market data store of each market
-	marketDataStores map[string]*MarketDataStore
+	marketDataStores map[string]*types.MarketDataStore
 
 	positions map[string]*types.Position
 
@@ -202,7 +202,7 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 		startPrices:           make(map[string]fixedpoint.Value, 30),
 		lastPrices:            make(map[string]fixedpoint.Value, 30),
 		positions:             make(map[string]*types.Position),
-		marketDataStores:      make(map[string]*MarketDataStore),
+		marketDataStores:      make(map[string]*types.MarketDataStore),
 		standardIndicatorSets: make(map[string]*StandardIndicatorSet),
 		indicators:            make(map[string]*IndicatorSet),
 		usedSymbols:           make(map[string]struct{}),
@@ -557,7 +557,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 	position.BindStream(session.UserDataStream)
 	session.positions[symbol] = position
 
-	marketDataStore := NewMarketDataStore(symbol)
+	marketDataStore := types.NewMarketDataStore(symbol)
 	if !disableMarketDataStore {
 		if _, ok := session.marketDataStores[symbol]; !ok {
 			marketDataStore.BindStream(session.MarketDataStream)
@@ -698,13 +698,13 @@ func (session *ExchangeSession) Positions() map[string]*types.Position {
 }
 
 // MarketDataStore returns the market data store of a symbol
-func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataStore, ok bool) {
+func (session *ExchangeSession) MarketDataStore(symbol string) (s *types.MarketDataStore, ok bool) {
 	s, ok = session.marketDataStores[symbol]
 	if ok {
 		return s, true
 	}
 
-	s = NewMarketDataStore(symbol)
+	s = types.NewMarketDataStore(symbol)
 	s.BindStream(session.MarketDataStream)
 	session.marketDataStores[symbol] = s
 	return s, true
@@ -713,7 +713,7 @@ func (session *ExchangeSession) MarketDataStore(symbol string) (s *MarketDataSto
 // KLine updates will be received in the order listend in intervals array
 func (session *ExchangeSession) SerialMarketDataStore(
 	ctx context.Context, symbol string, intervals []types.Interval, useAggTrade ...bool,
-) (store *SerialMarketDataStore, ok bool) {
+) (store *types.SerialMarketDataStore, ok bool) {
 	st, ok := session.MarketDataStore(symbol)
 	if !ok {
 		return nil, false
@@ -724,7 +724,7 @@ func (session *ExchangeSession) SerialMarketDataStore(
 			minInterval = i
 		}
 	}
-	store = NewSerialMarketDataStore(symbol, minInterval, useAggTrade...)
+	store = types.NewSerialMarketDataStore(symbol, minInterval, useAggTrade...)
 	klines, ok := st.KLinesOfInterval(minInterval)
 	if !ok {
 		log.Errorf("SerialMarketDataStore: cannot get %s history", minInterval)
@@ -1004,7 +1004,7 @@ func (session *ExchangeSession) InitExchange(name string, ex types.Exchange) err
 	session.markets = make(map[string]types.Market)
 	session.lastPrices = make(map[string]fixedpoint.Value)
 	session.startPrices = make(map[string]fixedpoint.Value)
-	session.marketDataStores = make(map[string]*MarketDataStore)
+	session.marketDataStores = make(map[string]*types.MarketDataStore)
 	session.positions = make(map[string]*types.Position)
 	session.standardIndicatorSets = make(map[string]*StandardIndicatorSet)
 	session.indicators = make(map[string]*IndicatorSet)

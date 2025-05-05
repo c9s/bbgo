@@ -1,7 +1,6 @@
 package supertrend
 
 import (
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -31,7 +30,7 @@ func (dd *DoubleDema) getDemaSignal(openPrice float64, closePrice float64) types
 }
 
 // preloadDema preloads DEMA indicators
-func (dd *DoubleDema) preloadDema(kLineStore *bbgo.MarketDataStore) {
+func (dd *DoubleDema) preloadDema(kLineStore *types.MarketDataStore) {
 	if klines, ok := kLineStore.KLinesOfInterval(dd.fastDEMA.Interval); ok {
 		for i := 0; i < len(*klines); i++ {
 			dd.fastDEMA.Update((*klines)[i].GetClose().Float64())
@@ -45,7 +44,7 @@ func (dd *DoubleDema) preloadDema(kLineStore *bbgo.MarketDataStore) {
 }
 
 // newDoubleDema initializes double DEMA indicators
-func newDoubleDema(kLineStore *bbgo.MarketDataStore, interval types.Interval, fastDEMAWindow int, slowDEMAWindow int) *DoubleDema {
+func newDoubleDema(kLineStore *types.MarketDataStore, interval types.Interval, fastDEMAWindow int, slowDEMAWindow int) *DoubleDema {
 	dd := DoubleDema{Interval: interval, FastDEMAWindow: fastDEMAWindow, SlowDEMAWindow: slowDEMAWindow}
 
 	// DEMA

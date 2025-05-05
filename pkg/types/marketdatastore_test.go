@@ -1,23 +1,21 @@
-package bbgo
+package types
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/c9s/bbgo/pkg/types"
 )
 
 func TestMarketDataStore_AddKLineAndTruncateWindow(t *testing.T) {
 	store := NewMarketDataStore("BTCUSD")
 
-	interval := types.Interval1s
+	interval := Interval1s
 
 	capFixed := false
 
 	var gid uint64 = 0
 	for ; gid < KLineWindowCapacityLimit*2; gid++ {
-		store.AddKLine(types.KLine{
+		store.AddKLine(KLine{
 			Interval: interval,
 			GID:      gid,
 		})

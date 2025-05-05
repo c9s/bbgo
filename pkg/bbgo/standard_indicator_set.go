@@ -32,7 +32,7 @@ type StandardIndicatorSet struct {
 	macdIndicators map[indicator.MACDConfig]*indicator.MACDLegacy
 
 	stream types.Stream
-	store  *MarketDataStore
+	store  *types.MarketDataStore
 }
 
 type indicatorKey struct {
@@ -40,7 +40,7 @@ type indicatorKey struct {
 	id string
 }
 
-func NewStandardIndicatorSet(symbol string, stream types.Stream, store *MarketDataStore) *StandardIndicatorSet {
+func NewStandardIndicatorSet(symbol string, stream types.Stream, store *types.MarketDataStore) *StandardIndicatorSet {
 	return &StandardIndicatorSet{
 		Symbol:         symbol,
 		store:          store,
