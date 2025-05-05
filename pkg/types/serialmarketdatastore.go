@@ -1,4 +1,4 @@
-package bbgo
+package types
 
 import (
 	"context"
@@ -6,16 +6,14 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
-	"github.com/c9s/bbgo/pkg/types"
-	log "github.com/sirupsen/logrus"
 )
 
 type SerialMarketDataStore struct {
 	*MarketDataStore
 	UseMarketTrade           bool
-	KLines                   map[types.Interval]*types.KLine
-	MinInterval              types.Interval
-	Subscription             []types.Interval
+	KLines                   map[Interval]*KLine
+	MinInterval              Interval
+	Subscription             []Interval
 	o, h, l, c, v, qv, price fixedpoint.Value
 	mu                       sync.Mutex
 }
@@ -23,17 +21,17 @@ type SerialMarketDataStore struct {
 // @param symbol: symbol to trace on
 // @param minInterval: unit interval, related to your signal timeframe
 // @param useMarketTrade: if not assigned, default to false. if assigned to true, will use MarketTrade signal to generate klines
-func NewSerialMarketDataStore(symbol string, minInterval types.Interval, useMarketTrade ...bool) *SerialMarketDataStore {
+func NewSerialMarketDataStore(symbol string, minInterval Interval, useMarketTrade ...bool) *SerialMarketDataStore {
 	return &SerialMarketDataStore{
 		MarketDataStore: NewMarketDataStore(symbol),
-		KLines:          make(map[types.Interval]*types.KLine),
+		KLines:          make(map[Interval]*KLine),
 		UseMarketTrade:  len(useMarketTrade) > 0 && useMarketTrade[0],
-		Subscription:    []types.Interval{},
+		Subscription:    []Interval{},
 		MinInterval:     minInterval,
 	}
 }
 
-func (store *SerialMarketDataStore) Subscribe(interval types.Interval) {
+func (store *SerialMarketDataStore) Subscribe(interval Interval) {
 	// dedup
 	for _, i := range store.Subscription {
 		if i == interval {
@@ -43,13 +41,14 @@ func (store *SerialMarketDataStore) Subscribe(interval types.Interval) {
 	store.Subscription = append(store.Subscription, interval)
 }
 
-func (store *SerialMarketDataStore) BindStream(ctx context.Context, stream types.Stream) {
+func (store *SerialMarketDataStore) BindStream(ctx context.Context, stream Stream) {
 	if store.UseMarketTrade {
-		if IsBackTesting {
-			log.Errorf("right now in backtesting, aggTrade event is not yet supported. Use OnKLineClosed instead.")
-			stream.OnKLineClosed(store.handleKLineClosed)
-			return
-		}
+		// TODO: add backtesting suppport
+		// if IsBackTesting {
+		// 	log.Errorf("right now in backtesting, aggTrade event is not yet supported. Use OnKLineClosed instead.")
+		// 	stream.OnKLineClosed(store.handleKLineClosed)
+		// 	return
+		// }
 		go store.tickerProcessor(ctx)
 		stream.OnMarketTrade(store.handleMarketTrade)
 	} else {
@@ -57,11 +56,11 @@ func (store *SerialMarketDataStore) BindStream(ctx context.Context, stream types
 	}
 }
 
-func (store *SerialMarketDataStore) handleKLineClosed(kline types.KLine) {
+func (store *SerialMarketDataStore) handleKLineClosed(kline KLine) {
 	store.AddKLine(kline)
 }
 
-func (store *SerialMarketDataStore) handleMarketTrade(trade types.Trade) {
+func (store *SerialMarketDataStore) handleMarketTrade(trade Trade) {
 	// the market data stream may subscribe to trades of multiple symbols
 	// so we need to check if the trade is for the symbol we are interested in
 	if trade.Symbol != store.Symbol {
@@ -103,10 +102,10 @@ func (store *SerialMarketDataStore) tickerProcessor(ctx context.Context) {
 	for {
 		select {
 		case time := <-intervalCloseTicker.C:
-			kline := types.KLine{
+			kline := KLine{
 				Symbol:    store.Symbol,
-				StartTime: types.Time(time.Add(-1 * duration).Round(duration)),
-				EndTime:   types.Time(time),
+				StartTime: Time(time.Add(-1 * duration).Round(duration)),
+				EndTime:   Time(time),
 				Interval:  store.MinInterval,
 				Closed:    true,
 			}
@@ -141,7 +140,7 @@ func (store *SerialMarketDataStore) tickerProcessor(ctx context.Context) {
 
 }
 
-func (store *SerialMarketDataStore) AddKLine(kline types.KLine, async ...bool) {
+func (store *SerialMarketDataStore) AddKLine(kline KLine, async ...bool) {
 	if kline.Symbol != store.Symbol {
 		return
 	}
@@ -155,7 +154,7 @@ func (store *SerialMarketDataStore) AddKLine(kline types.KLine, async ...bool) {
 	for _, val := range store.Subscription {
 		k, ok := store.KLines[val]
 		if !ok {
-			k = &types.KLine{}
+			k = &KLine{}
 			k.Set(&kline)
 			k.Interval = val
 			k.Closed = false

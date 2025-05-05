@@ -215,7 +215,7 @@ func (inc *VWEMA) UpdateVal(price float64, vol float64) {
 }
 
 // Setup the Indicators going to be used
-func (s *Strategy) SetupIndicators(store *bbgo.MarketDataStore) {
+func (s *Strategy) SetupIndicators(store *types.MarketDataStore) {
 	window5 := types.IntervalWindow{Interval: s.Interval, Window: 5}
 	window34 := types.IntervalWindow{Interval: s.Interval, Window: 34}
 	s.atr = &indicator.ATR{IntervalWindow: window34}
