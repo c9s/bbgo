@@ -13,8 +13,6 @@ import (
 	"github.com/adshao/go-binance/v2"
 
 	"github.com/adshao/go-binance/v2/futures"
-	"github.com/spf13/viper"
-
 	"go.uber.org/multierr"
 
 	"golang.org/x/time/rate"
@@ -44,7 +42,7 @@ const FuturesWebSocketURL = "wss://fstream.binance.com"
 const FuturesWebSocketTestURL = "wss://stream.binancefuture.com"
 
 // WebSocket API
-// listenKey is deprecated. Official recommendation is to use ws-api for user data stream
+// listenKey will be deprecated. Official recommendation is to use ws-api for user data stream
 const WsApiWebSocketURL = "wss://ws-api.binance.com:443/ws-api/v3"
 const WsApiWebSocketTestURL = "wss://testnet.binance.vision/ws-api/v3"
 
@@ -58,14 +56,31 @@ var queryTradeLimiter = rate.NewLimiter(1, 2)
 var dualSidePosition = false
 var wsApiWebsocketUrl string
 
+var debugMode = false
+
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
 })
+
+var debug func(string, ...any)
+
+func debugLog(msg string, args ...any) {
+	log.Infof("BINANCE_DEBUG: "+msg, args...)
+}
+
+func debugDummy(msg string, args ...any) {}
 
 func init() {
 	_ = types.Exchange(&Exchange{})
 	_ = types.MarginExchange(&Exchange{})
 	_ = types.FuturesExchange(&Exchange{})
+
+	if v, ok := envvar.Bool("DEBUG_BINANCE", false); ok {
+		debugMode = v
+		debug = debugLog
+	} else {
+		debug = debugDummy
+	}
 
 	if n, ok := envvar.Int("BINANCE_ORDER_RATE_LIMITER"); ok {
 		orderLimiter = rate.NewLimiter(rate.Every(time.Duration(n)*time.Minute), 2)
@@ -91,13 +106,27 @@ func isBinanceUs() bool {
 	return ok && v
 }
 
+type ed25519authentication struct {
+	privateKey ed25519.PrivateKey
+
+	usingEd25519 bool
+}
+
+func (e *ed25519authentication) getEd25519PrivateKey() ed25519.PrivateKey {
+	return e.privateKey
+}
+
+func (e *ed25519authentication) getEd25519Auth() bool {
+	return e.usingEd25519
+}
+
 type Exchange struct {
 	types.MarginSettings
 	types.FuturesSettings
 
-	key, secret       string
-	ed25519PrivateKey ed25519.PrivateKey
-	usingEd25519Auth  bool
+	key, secret string
+
+	ed25519authentication
 
 	// client is used for spot & margin
 	client *binance.Client
@@ -129,9 +158,13 @@ func New(key, secret string, args ...string) *Exchange {
 	}
 
 	// parse ed25519 private key
-	ed25519PrivateKey, err := util.ParseEd25519PrivateKey(ed25519PKeyPEM)
-	if err != nil {
-		log.WithError(err).Warnf("binance exchange: failed to parse ed25519 private key, using default auth: %s", ed25519PKeyPEM)
+	var ed25519PrivateKey ed25519.PrivateKey
+	var err error
+	if len(ed25519PKeyPEM) > 0 {
+		ed25519PrivateKey, err = util.ParseEd25519PrivateKey(ed25519PKeyPEM)
+		if err != nil {
+			log.WithError(err).Warnf("binance exchange: failed to parse ed25519 private key, using default auth: %s", ed25519PKeyPEM)
+		}
 	}
 
 	// if parse is successful, we will use ed25519 auth
@@ -142,11 +175,14 @@ func New(key, secret string, args ...string) *Exchange {
 
 	var client = binance.NewClient(key, secret)
 	client.HTTPClient = binanceapi.DefaultHttpClient
-	client.Debug = viper.GetBool("debug-binance-client")
 
 	var futuresClient = binance.NewFuturesClient(key, secret)
 	futuresClient.HTTPClient = binanceapi.DefaultHttpClient
-	futuresClient.Debug = viper.GetBool("debug-binance-futures-client")
+
+	if v, ok := envvar.Bool("DEBUG_BINANCE_CLIENT", false); ok {
+		client.Debug = v
+		futuresClient.Debug = v
+	}
 
 	if isBinanceUs() {
 		client.BaseURL = BinanceUSBaseURL
@@ -156,10 +192,13 @@ func New(key, secret string, args ...string) *Exchange {
 	futuresClient2 := binanceapi.NewFuturesRestClient(futuresClient.BaseURL)
 
 	ex := &Exchange{
-		key:               key,
-		secret:            secret,
-		ed25519PrivateKey: ed25519PrivateKey,
-		usingEd25519Auth:  ed25519Auth,
+		key:    key,
+		secret: secret,
+
+		ed25519authentication: ed25519authentication{
+			privateKey:   ed25519PrivateKey,
+			usingEd25519: ed25519Auth,
+		},
 
 		client:         client,
 		futuresClient:  futuresClient,
@@ -190,14 +229,6 @@ func New(key, secret string, args ...string) *Exchange {
 	})
 
 	return ex
-}
-
-func (e *Exchange) getEd25519PrivateKey() ed25519.PrivateKey {
-	return e.ed25519PrivateKey
-}
-
-func (e *Exchange) getEd25519Auth() bool {
-	return e.usingEd25519Auth
 }
 
 func (e *Exchange) setServerTimeOffset(ctx context.Context) {
@@ -356,10 +387,7 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedp
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	stream := NewStream(e, e.client, e.futuresClient)
-	stream.MarginSettings = e.MarginSettings
-	stream.FuturesSettings = e.FuturesSettings
-	return stream
+	return NewStream(e, e.client, e.futuresClient)
 }
 
 func (e *Exchange) QueryMarginFutureHourlyInterestRate(
