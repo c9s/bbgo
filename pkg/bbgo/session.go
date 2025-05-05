@@ -915,10 +915,10 @@ func (session *ExchangeSession) newBasicPrivateExchange(exchangeName types.Excha
 	var err error
 	var exMinimal types.ExchangeMinimal
 	if session.Key != "" && session.Secret != "" {
-		options := exchange2.ExchangeOptions{
-			exchange2.ExchangeOptionsKeyAPIKey:        session.Key,
-			exchange2.ExchangeOptionsKeyAPISecret:     session.Secret,
-			exchange2.ExchangeOptionsKeyAPIPassphrase: session.Passphrase,
+		options := exchange2.Options{
+			exchange2.OptionKeyAPIKey:        session.Key,
+			exchange2.OptionKeyAPISecret:     session.Secret,
+			exchange2.OptionKeyAPIPassphrase: session.Passphrase,
 		}
 		exMinimal, err = exchange2.New(exchangeName, options)
 	} else {
