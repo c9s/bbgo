@@ -10,7 +10,7 @@ import (
 
 func newTestIndicatorSet() *IndicatorSet {
 	symbol := "BTCUSDT"
-	store := NewMarketDataStore(symbol)
+	store := types.NewMarketDataStore(symbol)
 	store.KLineWindows[types.Interval1m] = &types.KLineWindow{
 		{Open: number(19000.0), Close: number(19100.0)},
 		{Open: number(19100.0), Close: number(19200.0)},

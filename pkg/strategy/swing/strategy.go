@@ -36,7 +36,7 @@ type Strategy struct {
 	// MarketDataStore is a pointer only injection field. public trades, k-lines (candlestick)
 	// and order book updates are maintained in the market data store.
 	// This field will be injected automatically since we defined the Symbol field.
-	*bbgo.MarketDataStore
+	*types.MarketDataStore
 
 	// StandardIndicatorSet contains the standard indicators of a market (symbol)
 	// This field will be injected automatically since we defined the Symbol field.

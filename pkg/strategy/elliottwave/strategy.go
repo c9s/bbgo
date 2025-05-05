@@ -159,7 +159,7 @@ func (s *Strategy) ClosePosition(ctx context.Context, percentage fixedpoint.Valu
 
 }
 
-func (s *Strategy) initIndicators(store *bbgo.SerialMarketDataStore) error {
+func (s *Strategy) initIndicators(store *types.SerialMarketDataStore) error {
 	s.priceLines = types.NewQueue(300)
 	maSlow := &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.WindowSlow}}
 	maQuick := &indicator.SMA{IntervalWindow: types.IntervalWindow{Interval: s.Interval, Window: s.WindowQuick}}

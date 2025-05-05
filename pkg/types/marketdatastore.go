@@ -1,8 +1,4 @@
-package bbgo
-
-import (
-	"github.com/c9s/bbgo/pkg/types"
-)
+package types
 
 const KLineWindowCapacityLimit = 5_000
 const KLineWindowShrinkThreshold = KLineWindowCapacityLimit * 4 / 5
@@ -15,10 +11,10 @@ type MarketDataStore struct {
 	Symbol string
 
 	// KLineWindows stores all loaded klines per interval
-	KLineWindows map[types.Interval]*types.KLineWindow `json:"-"`
+	KLineWindows map[Interval]*KLineWindow `json:"-"`
 
-	kLineWindowUpdateCallbacks []func(interval types.Interval, klines types.KLineWindow)
-	kLineClosedCallbacks       []func(k types.KLine)
+	kLineWindowUpdateCallbacks []func(interval Interval, klines KLineWindow)
+	kLineClosedCallbacks       []func(k KLine)
 }
 
 func NewMarketDataStore(symbol string) *MarketDataStore {
@@ -26,25 +22,25 @@ func NewMarketDataStore(symbol string) *MarketDataStore {
 		Symbol: symbol,
 
 		// KLineWindows stores all loaded klines per interval
-		KLineWindows: make(map[types.Interval]*types.KLineWindow, len(types.SupportedIntervals)), // 13 interval, 1s,1m,5m,15m,30m,1h,2h,4h,6h,12h,1d,3d,1w
+		KLineWindows: make(map[Interval]*KLineWindow, len(SupportedIntervals)), // 13 interval, 1s,1m,5m,15m,30m,1h,2h,4h,6h,12h,1d,3d,1w
 	}
 }
 
-func (store *MarketDataStore) SetKLineWindows(windows map[types.Interval]*types.KLineWindow) {
+func (store *MarketDataStore) SetKLineWindows(windows map[Interval]*KLineWindow) {
 	store.KLineWindows = windows
 }
 
 // KLinesOfInterval returns the kline window of the given interval
-func (store *MarketDataStore) KLinesOfInterval(interval types.Interval) (kLines *types.KLineWindow, ok bool) {
+func (store *MarketDataStore) KLinesOfInterval(interval Interval) (kLines *KLineWindow, ok bool) {
 	kLines, ok = store.KLineWindows[interval]
 	return kLines, ok
 }
 
-func (store *MarketDataStore) BindStream(stream types.Stream) {
+func (store *MarketDataStore) BindStream(stream Stream) {
 	stream.OnKLineClosed(store.handleKLineClosed)
 }
 
-func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
+func (store *MarketDataStore) handleKLineClosed(kline KLine) {
 	if kline.Symbol != store.Symbol {
 		return
 	}
@@ -52,10 +48,10 @@ func (store *MarketDataStore) handleKLineClosed(kline types.KLine) {
 	store.AddKLine(kline)
 }
 
-func (store *MarketDataStore) AddKLine(k types.KLine) {
+func (store *MarketDataStore) AddKLine(k KLine) {
 	window, ok := store.KLineWindows[k.Interval]
 	if !ok {
-		var tmp = make(types.KLineWindow, 0, KLineWindowCapacityLimit)
+		var tmp = make(KLineWindow, 0, KLineWindowCapacityLimit)
 		store.KLineWindows[k.Interval] = &tmp
 		window = &tmp
 	}
@@ -67,6 +63,6 @@ func (store *MarketDataStore) AddKLine(k types.KLine) {
 	store.EmitKLineWindowUpdate(k.Interval, *window)
 }
 
-func truncateKLineWindowIfNeeded(window *types.KLineWindow) {
-	*window = types.ShrinkSlice(*window, KLineWindowShrinkThreshold, KLineWindowShrinkSize)
+func truncateKLineWindowIfNeeded(window *KLineWindow) {
+	*window = ShrinkSlice(*window, KLineWindowShrinkThreshold, KLineWindowShrinkSize)
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/wcharczuk/go-chart/v2"
 )
 
-func (s *Strategy) InitDrawCommands(store *bbgo.SerialMarketDataStore, profit, cumProfit types.Series) {
+func (s *Strategy) InitDrawCommands(store *types.SerialMarketDataStore, profit, cumProfit types.Series) {
 	bbgo.RegisterCommand("/draw", "Draw Indicators", func(reply interact.Reply) {
 		go func() {
 			canvas := s.DrawIndicators(store)
@@ -51,7 +51,7 @@ func (s *Strategy) InitDrawCommands(store *bbgo.SerialMarketDataStore, profit, c
 	})
 }
 
-func (s *Strategy) DrawIndicators(store *bbgo.SerialMarketDataStore) *types.Canvas {
+func (s *Strategy) DrawIndicators(store *types.SerialMarketDataStore) *types.Canvas {
 	time := types.Time(s.startTime)
 	canvas := types.NewCanvas(s.InstanceID(), s.Interval)
 	Length := s.priceLines.Length()
@@ -101,7 +101,7 @@ func (s *Strategy) DrawCumPNL(cumProfit types.Series) *types.Canvas {
 	return canvas
 }
 
-func (s *Strategy) Draw(store *bbgo.SerialMarketDataStore, profit, cumProfit types.Series) {
+func (s *Strategy) Draw(store *types.SerialMarketDataStore, profit, cumProfit types.Series) {
 	canvas := s.DrawIndicators(store)
 	f, err := os.Create(s.GraphIndicatorPath)
 	if err != nil {
