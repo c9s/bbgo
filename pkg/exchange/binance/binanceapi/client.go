@@ -27,6 +27,12 @@ const RestBaseURL = "https://api.binance.com"
 const SandboxRestBaseURL = "https://testnet.binance.vision"
 const DebugRequestResponse = false
 
+var errEmptyPrivateKey = errors.New("empty private key")
+
+var errNoApiKey = errors.New("empty api key")
+
+var errNoApiSecret = errors.New("empty api secret")
+
 var dialer = &net.Dialer{
 	Timeout:   30 * time.Second,
 	KeepAlive: 30 * time.Second,
@@ -87,12 +93,14 @@ func (c *RestClient) Auth(key, secret string, privateKey ed25519.PrivateKey) {
 	c.PrivateKey = privateKey
 }
 
-func (c *RestClient) Ed25519Auth() bool {
+func (c *RestClient) IsUsingEd25519Auth() bool {
 	return c.PrivateKey == nil
 }
 
 // NewRequest create new API request. Relative url can be provided in refURL.
-func (c *RestClient) NewRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewRequest(
+	ctx context.Context, method, refURL string, params url.Values, payload interface{},
+) (*http.Request, error) {
 	rel, err := url.Parse(refURL)
 	if err != nil {
 		return nil, err
@@ -147,9 +155,11 @@ func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(
+	ctx context.Context, method, refURL string, params url.Values, payload interface{},
+) (*http.Request, error) {
 	signFunc := c.signHMAC
-	if c.Ed25519Auth() {
+	if c.IsUsingEd25519Auth() {
 		signFunc = c.signEd25519
 	}
 	return c.newAuthenticatedRequest(ctx, method, refURL, params, payload, signFunc)
@@ -159,19 +169,22 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 // See the doc links for details:
 // - https://developers.binance.com/docs/binance-spot-api-docs/rest-api/endpoint-security-type
 // - https://developers.binance.com/docs/binance-spot-api-docs/rest-api/general-information-on-endpoints
-func (c *RestClient) newAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}, signFunc func(string) string) (*http.Request, error) {
-	if c.Ed25519Auth() {
+func (c *RestClient) newAuthenticatedRequest(
+	ctx context.Context, method, refURL string, params url.Values, payload interface{}, signFunc func(string) string,
+) (*http.Request, error) {
+	if c.IsUsingEd25519Auth() {
 		// Ed25519 authentication
 		if len(c.PrivateKey) == 0 {
-			return nil, errors.New("empty private key")
+			return nil, errEmptyPrivateKey
 		}
 	} else {
 		// HMAC authentication
 		if len(c.Key) == 0 {
-			return nil, errors.New("empty api key")
+			return nil, errNoApiKey
 		}
+
 		if len(c.Secret) == 0 {
-			return nil, errors.New("empty api secret")
+			return nil, errNoApiSecret
 		}
 	}
 
