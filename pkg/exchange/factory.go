@@ -16,73 +16,74 @@ import (
 )
 
 const (
-	ExchangeOptionsKeyAPIKey        = "API_KEY"
-	ExchangeOptionsKeyAPISecret     = "API_SECRET"
-	ExchangeOptionsKeyAPIPassphrase = "API_PASSPHRASE"
+	OptionKeyAPIKey        = "API_KEY"
+	OptionKeyAPISecret     = "API_SECRET"
+	OptionKeyAPIPassphrase = "API_PASSPHRASE"
+	OptionKeyAPIPrivateKey = "API_PRIVATE_KEy"
 )
 
-// ExchangeOptions is a map of exchange options used to initialize an exchange
-type ExchangeOptions map[string]string
+// Options is a map of exchange options used to initialize an exchange
+type Options map[string]string
 
 // ExchangeEnvLoader is a function type to load exchange options from environment variables
 // According to pkg/bbgo/environment.go, we must to get the environment variable with %s-api-key so that we can add this custom exchange.
-type ExchangeEnvLoader func(varPrefix string) (ExchangeOptions, error)
+type EnvLoader func(varPrefix string) (Options, error)
 
 // ExchangeConstructor is a function type to create an exchange instance with the given options
-type ExchangeConstructor func(ExchangeOptions) (types.Exchange, error)
+type Constructor func(Options) (types.Exchange, error)
 
-type ExchangeFactory struct {
-	EnvLoader   ExchangeEnvLoader
-	Constructor ExchangeConstructor
+type Factory struct {
+	EnvLoader   EnvLoader
+	Constructor Constructor
 }
 
-var exchangeFactories = map[types.ExchangeName]ExchangeFactory{
+var factories = map[types.ExchangeName]Factory{
 	types.ExchangeBinance: {
 		EnvLoader: DefaultEnvVarLoader,
-		Constructor: func(options ExchangeOptions) (types.Exchange, error) {
-			return binance.New(options[ExchangeOptionsKeyAPIKey], options[ExchangeOptionsKeyAPISecret]), nil
+		Constructor: func(options Options) (types.Exchange, error) {
+			return binance.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret], options[OptionKeyAPIPrivateKey]), nil
 		},
 	},
 	types.ExchangeMax: {
 		EnvLoader: DefaultEnvVarLoader,
-		Constructor: func(options ExchangeOptions) (types.Exchange, error) {
-			return max.New(options[ExchangeOptionsKeyAPIKey], options[ExchangeOptionsKeyAPISecret]), nil
+		Constructor: func(options Options) (types.Exchange, error) {
+			return max.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret]), nil
 		},
 	},
 	types.ExchangeOKEx: {
 		EnvLoader: DefaultEnvVarLoader,
-		Constructor: func(options ExchangeOptions) (types.Exchange, error) {
-			return okex.New(options[ExchangeOptionsKeyAPIKey], options[ExchangeOptionsKeyAPISecret], options[ExchangeOptionsKeyAPIPassphrase]), nil
+		Constructor: func(options Options) (types.Exchange, error) {
+			return okex.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret], options[OptionKeyAPIPassphrase]), nil
 		},
 	},
 	types.ExchangeKucoin: {
 		EnvLoader: DefaultEnvVarLoader,
-		Constructor: func(options ExchangeOptions) (types.Exchange, error) {
-			return kucoin.New(options[ExchangeOptionsKeyAPIKey], options[ExchangeOptionsKeyAPISecret], options[ExchangeOptionsKeyAPIPassphrase]), nil
+		Constructor: func(options Options) (types.Exchange, error) {
+			return kucoin.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret], options[OptionKeyAPIPassphrase]), nil
 		},
 	},
 	types.ExchangeBitget: {
 		EnvLoader: DefaultEnvVarLoader,
-		Constructor: func(options ExchangeOptions) (types.Exchange, error) {
-			return bitget.New(options[ExchangeOptionsKeyAPIKey], options[ExchangeOptionsKeyAPISecret], options[ExchangeOptionsKeyAPIPassphrase]), nil
+		Constructor: func(options Options) (types.Exchange, error) {
+			return bitget.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret], options[OptionKeyAPIPassphrase]), nil
 		},
 	},
 	types.ExchangeBybit: {
 		EnvLoader: DefaultEnvVarLoader,
-		Constructor: func(options ExchangeOptions) (types.Exchange, error) {
-			return bybit.New(options[ExchangeOptionsKeyAPIKey], options[ExchangeOptionsKeyAPISecret])
+		Constructor: func(options Options) (types.Exchange, error) {
+			return bybit.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret])
 		},
 	},
 	types.ExchangeCoinBase: {
 		EnvLoader: DefaultEnvVarLoader,
-		Constructor: func(options ExchangeOptions) (types.Exchange, error) {
-			return coinbase.New(options[ExchangeOptionsKeyAPIKey], options[ExchangeOptionsKeyAPISecret], options[ExchangeOptionsKeyAPIPassphrase], 0), nil
+		Constructor: func(options Options) (types.Exchange, error) {
+			return coinbase.New(options[OptionKeyAPIKey], options[OptionKeyAPISecret], options[OptionKeyAPIPassphrase], 0), nil
 		},
 	},
 }
 
-func RegisterExchange(name types.ExchangeName, factory ExchangeFactory) {
-	exchangeFactories[name] = factory
+func Register(name types.ExchangeName, factory Factory) {
+	factories[name] = factory
 
 	types.SupportedExchanges[name] = struct{}{}
 }
@@ -100,8 +101,8 @@ func NewPublic(exchangeName types.ExchangeName) (types.Exchange, error) {
 	return nil, fmt.Errorf("exchange %T does not implement types.Exchange", exMinimal)
 }
 
-func New(n types.ExchangeName, options ExchangeOptions) (types.ExchangeMinimal, error) {
-	factory, existing := exchangeFactories[n]
+func New(n types.ExchangeName, options Options) (types.ExchangeMinimal, error) {
+	factory, existing := factories[n]
 	if !existing {
 		return nil, fmt.Errorf("unsupported exchange: %v", n)
 	}
@@ -122,7 +123,7 @@ func NewWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.Exchange
 
 	varPrefix = strings.ToUpper(varPrefix)
 
-	factory, existing := exchangeFactories[n]
+	factory, existing := factories[n]
 	if !existing {
 		return nil, fmt.Errorf("unsupported exchange: %v", n)
 	}
@@ -139,7 +140,7 @@ func NewWithEnvVarPrefix(n types.ExchangeName, varPrefix string) (types.Exchange
 	return New(n, options)
 }
 
-func DefaultEnvVarLoader(varPrefix string) (ExchangeOptions, error) {
+func DefaultEnvVarLoader(varPrefix string) (Options, error) {
 	key := os.Getenv(varPrefix + "_API_KEY")
 	secret := os.Getenv(varPrefix + "_API_SECRET")
 	if len(key) == 0 || len(secret) == 0 {
@@ -147,10 +148,11 @@ func DefaultEnvVarLoader(varPrefix string) (ExchangeOptions, error) {
 	}
 
 	passphrase := os.Getenv(varPrefix + "_API_PASSPHRASE")
-
-	return ExchangeOptions{
-		ExchangeOptionsKeyAPIKey:        key,
-		ExchangeOptionsKeyAPISecret:     secret,
-		ExchangeOptionsKeyAPIPassphrase: passphrase,
+	privateKey := os.Getenv(varPrefix + "_API_PRIVATE_KEY")
+	return Options{
+		OptionKeyAPIKey:        key,
+		OptionKeyAPISecret:     secret,
+		OptionKeyAPIPassphrase: passphrase,
+		OptionKeyAPIPrivateKey: privateKey,
 	}, nil
 }
