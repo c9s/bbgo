@@ -3,6 +3,7 @@ package okex
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -330,6 +331,130 @@ func Test_toGlobalCurrency(t *testing.T) {
 			}
 			if gotQuote != tt.wantQuote {
 				t.Errorf("toGlobalCurrency() gotQuote = %v, want %v", gotQuote, tt.wantQuote)
+			}
+		})
+	}
+}
+
+func Test_convertSubscription(t *testing.T) {
+	tests := []struct {
+		name     string
+		sub      types.Subscription
+		instType okexapi.InstrumentType
+		want     WebsocketSubscription
+		wantErr  bool
+	}{
+		{
+			name: "convert kline subscription",
+			sub: types.Subscription{
+				Channel: types.KLineChannel,
+				Symbol:  "BTCUSDT",
+				Options: types.SubscribeOptions{
+					Interval: types.Interval1h,
+				},
+			},
+			instType: okexapi.InstrumentTypeSpot,
+			want: WebsocketSubscription{
+				Channel:      "candle1H",
+				InstrumentID: "BTC-USDT",
+			},
+			wantErr: false,
+		},
+		{
+			name: "convert book subscription with full depth",
+			sub: types.Subscription{
+				Channel: types.BookChannel,
+				Symbol:  "BTCUSDT",
+				Options: types.SubscribeOptions{
+					Depth: types.DepthLevelFull,
+				},
+			},
+			instType: okexapi.InstrumentTypeSpot,
+			want: WebsocketSubscription{
+				Channel:      ChannelBooks,
+				InstrumentID: "BTC-USDT",
+			},
+			wantErr: false,
+		},
+		{
+			name: "convert book subscription with medium depth",
+			sub: types.Subscription{
+				Channel: types.BookChannel,
+				Symbol:  "BTCUSDT",
+				Options: types.SubscribeOptions{
+					Depth: types.DepthLevelMedium,
+				},
+			},
+			instType: okexapi.InstrumentTypeSpot,
+			want: WebsocketSubscription{
+				Channel:      ChannelBooks50,
+				InstrumentID: "BTC-USDT",
+			},
+			wantErr: false,
+		},
+		{
+			name: "convert book ticker subscription",
+			sub: types.Subscription{
+				Channel: types.BookTickerChannel,
+				Symbol:  "BTCUSDT",
+			},
+			instType: okexapi.InstrumentTypeSpot,
+			want: WebsocketSubscription{
+				Channel:      ChannelBooks5,
+				InstrumentID: "BTC-USDT",
+			},
+			wantErr: false,
+		},
+		{
+			name: "convert market trade subscription",
+			sub: types.Subscription{
+				Channel: types.MarketTradeChannel,
+				Symbol:  "BTCUSDT",
+			},
+			instType: okexapi.InstrumentTypeSpot,
+			want: WebsocketSubscription{
+				Channel:      ChannelMarketTrades,
+				InstrumentID: "BTC-USDT",
+			},
+			wantErr: false,
+		},
+		{
+			name: "convert swap instrument subscription",
+			sub: types.Subscription{
+				Channel: types.KLineChannel,
+				Symbol:  "BTCUSDT",
+				Options: types.SubscribeOptions{
+					Interval: types.Interval1h,
+				},
+			},
+			instType: okexapi.InstrumentTypeSwap,
+			want: WebsocketSubscription{
+				Channel:      "candle1H",
+				InstrumentID: "BTC-USDT-SWAP",
+			},
+			wantErr: false,
+		},
+		{
+			name: "unsupported channel",
+			sub: types.Subscription{
+				Channel: "unsupported",
+				Symbol:  "BTCUSDT",
+			},
+			instType: okexapi.InstrumentTypeSpot,
+			want:     WebsocketSubscription{},
+			wantErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := convertSubscription(tt.sub, tt.instType)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("convertSubscription() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("convertSubscription() = %v, want %v", got, tt.want)
 			}
 		})
 	}

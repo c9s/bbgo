@@ -39,10 +39,8 @@ type Stream struct {
 	types.StandardStream
 	kLineStream *KLineStream
 
-	client          *okexapi.RestClient
-	balanceProvider types.ExchangeAccountService
-
-	isFutures bool
+	client   *okexapi.RestClient
+	exchange *Exchange
 
 	// public callbacks
 	kLineEventCallbacks       []func(candle KLineEvent)
@@ -52,12 +50,12 @@ type Stream struct {
 	marketTradeEventCallbacks []func(tradeDetail []MarketTradeEvent)
 }
 
-func NewStream(client *okexapi.RestClient, balanceProvider types.ExchangeAccountService) *Stream {
+func NewStream(client *okexapi.RestClient, exchange *Exchange) *Stream {
 	stream := &Stream{
-		client:          client,
-		balanceProvider: balanceProvider,
-		StandardStream:  types.NewStandardStream(),
-		kLineStream:     NewKLineStream(),
+		client:         client,
+		exchange:       exchange,
+		StandardStream: types.NewStandardStream(),
+		kLineStream:    NewKLineStream(exchange),
 	}
 
 	stream.SetParser(parseWebSocketEvent)
@@ -77,11 +75,7 @@ func NewStream(client *okexapi.RestClient, balanceProvider types.ExchangeAccount
 	return stream
 }
 
-func (s *Stream) UseFutures() {
-	s.isFutures = true
-}
-
-func syncSubscriptions(conn *websocket.Conn, subscriptions []types.Subscription, opType WsEventType) error {
+func syncSubscriptions(conn *websocket.Conn, subscriptions []types.Subscription, opType WsEventType, instType okexapi.InstrumentType) error {
 	if opType != WsEventTypeUnsubscribe && opType != WsEventTypeSubscribe {
 		return fmt.Errorf("unexpected subscription type: %v", opType)
 	}
@@ -89,7 +83,7 @@ func syncSubscriptions(conn *websocket.Conn, subscriptions []types.Subscription,
 	logger := log.WithField("opType", opType)
 	var topics []WebsocketSubscription
 	for _, subscription := range subscriptions {
-		topic, err := convertSubscription(subscription)
+		topic, err := convertSubscription(subscription, instType)
 		if err != nil {
 			logger.WithError(err).Errorf("convert error, subscription: %+v", subscription)
 			return err
@@ -112,7 +106,8 @@ func syncSubscriptions(conn *websocket.Conn, subscriptions []types.Subscription,
 
 func (s *Stream) Unsubscribe() {
 	// errors are handled in the syncSubscriptions, so they are skipped here.
-	_ = syncSubscriptions(s.StandardStream.Conn, s.StandardStream.Subscriptions, WsEventTypeUnsubscribe)
+	instType := s.exchange.getInstrumentType()
+	_ = syncSubscriptions(s.StandardStream.Conn, s.StandardStream.Subscriptions, WsEventTypeUnsubscribe, instType)
 
 	err := s.Resubscribe(func(old []types.Subscription) (new []types.Subscription, err error) {
 		// clear the subscriptions
@@ -163,8 +158,10 @@ func subscribe(conn *websocket.Conn, subs []WebsocketSubscription) {
 func (s *Stream) handleConnect() {
 	if s.PublicOnly {
 		var subs []WebsocketSubscription
+
+		instType := s.exchange.getInstrumentType()
 		for _, subscription := range s.Subscriptions {
-			sub, err := convertSubscription(subscription)
+			sub, err := convertSubscription(subscription, instType)
 			if err != nil {
 				log.WithError(err).Errorf("subscription convert error")
 				continue
@@ -202,14 +199,10 @@ func (s *Stream) handleConnect() {
 
 func (s *Stream) subscribePrivateChannels(next func()) func() {
 	return func() {
-		instType := string(okexapi.InstrumentTypeSpot)
-		if s.isFutures {
-			instType = string(okexapi.InstrumentTypeSwap)
-		}
-
+		instType := s.exchange.getInstrumentType()
 		var subs = []WebsocketSubscription{
 			{Channel: ChannelAccount},
-			{Channel: "orders", InstrumentType: instType},
+			{Channel: "orders", InstrumentType: string(instType)},
 		}
 
 		// https://www.okx.com/docs-v5/zh/#overview-websocket-connect
@@ -235,7 +228,7 @@ func (s *Stream) emitBalanceSnapshot() {
 	var balancesMap types.BalanceMap
 	var err error
 	err = retry.GeneralBackoff(ctx, func() error {
-		balancesMap, err = s.balanceProvider.QueryAccountBalances(ctx)
+		balancesMap, err = s.exchange.QueryAccountBalances(ctx)
 		return err
 	})
 	if err != nil {
