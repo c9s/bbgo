@@ -69,9 +69,9 @@ var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
 })
 
-var debug func(string, ...any)
-
 func debugDummy(msg string, args ...any) {}
+
+var debug = debugDummy
 
 func init() {
 	_ = types.Exchange(&Exchange{})
@@ -81,8 +81,6 @@ func init() {
 	if v, ok := envvar.Bool("DEBUG_BINANCE", false); ok {
 		debugMode = v
 		debug = log.Infof
-	} else {
-		debug = debugDummy
 	}
 
 	if n, ok := envvar.Int("BINANCE_ORDER_RATE_LIMITER"); ok {
