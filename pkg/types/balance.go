@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -265,7 +264,7 @@ func (m BalanceMap) Assets(prices PriceMap, priceTime time.Time) asset.Map {
 	return assets
 }
 
-func (m BalanceMap) Print() {
+func (m BalanceMap) Print(log LogFunc) {
 	for _, balance := range m {
 		if balance.Net().IsZero() {
 			continue
@@ -280,7 +279,7 @@ func (m BalanceMap) Print() {
 			o += fmt.Sprintf(" (borrowed %v)", balance.Borrowed)
 		}
 
-		log.Infoln(o)
+		log(o)
 	}
 }
 
