@@ -61,8 +61,6 @@ var queryTradeLimiter = rate.NewLimiter(1, 2)
 
 var dualSidePosition = false
 
-var wsApiWebsocketUrl string
-
 var testNet = false
 
 var debugMode = false
