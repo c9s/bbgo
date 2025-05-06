@@ -106,14 +106,6 @@ type ed25519authentication struct {
 	usingEd25519 bool
 }
 
-func (e *ed25519authentication) getEd25519PrivateKey() ed25519.PrivateKey {
-	return e.privateKey
-}
-
-func (e *ed25519authentication) isUsingEd25519Auth() bool {
-	return e.usingEd25519
-}
-
 type Exchange struct {
 	types.MarginSettings
 	types.FuturesSettings
