@@ -172,17 +172,12 @@ func (c *RestClient) NewAuthenticatedRequest(
 func (c *RestClient) newAuthenticatedRequest(
 	ctx context.Context, method, refURL string, params url.Values, payload interface{}, signFunc func(string) string,
 ) (*http.Request, error) {
-	if c.IsUsingEd25519Auth() {
-		// Ed25519 authentication
-		if len(c.PrivateKey) == 0 {
-			return nil, errEmptyPrivateKey
-		}
-	} else {
-		// HMAC authentication
-		if len(c.Key) == 0 {
-			return nil, errNoApiKey
-		}
+	if len(c.Key) == 0 {
+		return nil, errNoApiKey
+	}
 
+	if !c.IsUsingEd25519Auth() {
+		// using HMAC authentication
 		if len(c.Secret) == 0 {
 			return nil, errNoApiSecret
 		}
