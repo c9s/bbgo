@@ -356,10 +356,10 @@ func parseWebSocketEvent(message []byte) (interface{}, error) {
 			eventType = EventTypeBookTicker
 		} else if isPartialDepth(val) {
 			eventType = EventTypePartialDepth
-		}
-	} else {
-		errVal := val.Get("error")
-		if errVal != nil {
+		} else if eventWrapper := val.Get("event"); eventWrapper != nil {
+			eventType = string(eventWrapper.GetStringBytes("e"))
+			message = val.Get("event").MarshalTo(nil)
+		} else if errVal := val.Get("error"); errVal != nil {
 			eventType = EventTypeError
 		}
 	}
