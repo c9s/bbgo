@@ -194,6 +194,16 @@ func (s *Stream) EmitListenKeyExpired(e *ListenKeyExpired) {
 	}
 }
 
+func (s *Stream) OnError(cb func(e *ErrorEvent)) {
+	s.errorCallbacks = append(s.errorCallbacks, cb)
+}
+
+func (s *Stream) EmitError(e *ErrorEvent) {
+	for _, cb := range s.errorCallbacks {
+		cb(e)
+	}
+}
+
 type StreamEventHub interface {
 	OnDepthEvent(cb func(e *DepthEvent))
 
@@ -232,4 +242,6 @@ type StreamEventHub interface {
 	OnMarginCallEvent(cb func(e *MarginCallEvent))
 
 	OnListenKeyExpired(cb func(e *ListenKeyExpired))
+
+	OnError(cb func(e *ErrorEvent))
 }

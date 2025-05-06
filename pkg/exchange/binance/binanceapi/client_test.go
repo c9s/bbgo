@@ -27,7 +27,7 @@ func getTestClientOrSkip(t *testing.T) *RestClient {
 	}
 
 	client := NewClient("")
-	client.Auth(key, secret)
+	client.Auth(key, secret, nil)
 	return client
 }
 
@@ -141,7 +141,7 @@ func TestClient_privateCall(t *testing.T) {
 	}
 
 	client := NewClient("")
-	client.Auth(key, secret)
+	client.Auth(key, secret, nil)
 
 	ctx := context.Background()
 

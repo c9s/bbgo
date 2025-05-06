@@ -1,5 +1,9 @@
 ---
 sessions:
+  # spot
+  binance:
+    exchange: binance
+
   # cross margin
   binance_margin:
     exchange: binance

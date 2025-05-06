@@ -13,8 +13,6 @@ import (
 	"github.com/adshao/go-binance/v2"
 
 	"github.com/adshao/go-binance/v2/futures"
-	"github.com/spf13/viper"
-
 	"go.uber.org/multierr"
 
 	"golang.org/x/time/rate"
@@ -37,16 +35,22 @@ const DefaultDepthLimit = 5000
 const BinanceUSBaseURL = "https://api.binance.us"
 const BinanceTestBaseURL = "https://testnet.binance.vision"
 const BinanceUSWebSocketURL = "wss://stream.binance.us:9443"
-const WebSocketURL = "wss://stream.binance.com:9443"
-const WebSocketTestURL = "wss://testnet.binance.vision"
-const FutureTestBaseURL = "https://testnet.binancefuture.com"
-const FuturesWebSocketURL = "wss://fstream.binance.com"
-const FuturesWebSocketTestURL = "wss://stream.binancefuture.com"
 
-// WebSocket API
-// listenKey is deprecated. Official recommendation is to use ws-api for user data stream
-const WsApiWebSocketURL = "wss://ws-api.binance.com:443/ws-api/v3"
-const WsApiWebSocketTestURL = "wss://testnet.binance.vision/ws-api/v3"
+const WebSocketURL = "wss://stream.binance.com:9443"
+const FuturesWebSocketURL = "wss://fstream.binance.com"
+const TestNetFuturesWebSocketURL = "wss://stream.binancefuture.com"
+
+// TestNet URLs
+const TestNetWebSocketURL = "wss://testnet.binance.vision"
+const TestNetFuturesBaseURL = "https://testnet.binancefuture.com"
+
+// New WebSocket API Endpoints
+// listenKey will be deprecated. Official recommendation is to use ws-api for user data stream
+const WsSpotWebSocketURL = "wss://ws-api.binance.com:443/ws-api/v3"
+const WsTestNetWebSocketURL = "wss://testnet.binance.vision/ws-api/v3"
+
+const WsFuturesWebSocketURL = "wss://ws-fapi.binance.com/ws-fapi/v1"
+const WsTestNetFuturesWebSocketURL = "wss://testnet.binancefuture.com/ws-fapi/v1"
 
 // orderLimiter - the default order limiter apply 5 requests per second and a 2 initial bucket
 // this includes SubmitOrder, CancelOrder and QueryClosedOrders
@@ -56,16 +60,36 @@ var orderLimiter = rate.NewLimiter(5, 2)
 var queryTradeLimiter = rate.NewLimiter(1, 2)
 
 var dualSidePosition = false
+
 var wsApiWebsocketUrl string
+
+var testNet = false
+
+var debugMode = false
 
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "binance",
 })
 
+var debug func(string, ...any)
+
+func debugLog(msg string, args ...any) {
+	log.Infof("BINANCE_DEBUG: "+msg, args...)
+}
+
+func debugDummy(msg string, args ...any) {}
+
 func init() {
 	_ = types.Exchange(&Exchange{})
 	_ = types.MarginExchange(&Exchange{})
 	_ = types.FuturesExchange(&Exchange{})
+
+	if v, ok := envvar.Bool("DEBUG_BINANCE", false); ok {
+		debugMode = v
+		debug = debugLog
+	} else {
+		debug = debugDummy
+	}
 
 	if n, ok := envvar.Int("BINANCE_ORDER_RATE_LIMITER"); ok {
 		orderLimiter = rate.NewLimiter(rate.Every(time.Duration(n)*time.Minute), 2)
@@ -78,12 +102,8 @@ func init() {
 	if val, ok := envvar.Bool("BINANCE_ENABLE_FUTURES_HEDGE_MODE"); ok {
 		dualSidePosition = val
 	}
-	testNet, _ := envvar.Bool("BINANCE_TESTNET", false)
-	if testNet {
-		wsApiWebsocketUrl = WsApiWebSocketTestURL
-	} else {
-		wsApiWebsocketUrl = WsApiWebSocketURL
-	}
+
+	testNet, _ = envvar.Bool("BINANCE_TESTNET", false)
 }
 
 func isBinanceUs() bool {
@@ -91,13 +111,28 @@ func isBinanceUs() bool {
 	return ok && v
 }
 
+type ed25519authentication struct {
+	privateKey ed25519.PrivateKey
+
+	usingEd25519 bool
+}
+
+func (e *ed25519authentication) getEd25519PrivateKey() ed25519.PrivateKey {
+	return e.privateKey
+}
+
+func (e *ed25519authentication) getEd25519Auth() bool {
+	return e.usingEd25519
+}
+
 type Exchange struct {
 	types.MarginSettings
 	types.FuturesSettings
 
-	key, secret       string
-	ed25519PrivateKey ed25519.PrivateKey
-	ed25519Auth       bool
+	key, secret string
+
+	ed25519authentication
+
 	// client is used for spot & margin
 	client *binance.Client
 
@@ -113,23 +148,46 @@ type Exchange struct {
 
 var timeSetterOnce sync.Once
 
-func New(key, secret string) *Exchange {
+func New(key, secret string, args ...string) *Exchange {
 	if util.IsPaperTrade() {
 		binance.UseTestnet = true
 	}
+
+	ed25519PKeyPEM := os.Getenv("BINANCE_API_PRIVATE_KEY")
+	if len(args) > 0 && len(args[0]) > 0 {
+		// override the global private key with args[0] is provided
+		if len(ed25519PKeyPEM) > 0 {
+			log.Warnf("binance exchange: ed25519 private key is set in both env and args, using args[0] instead")
+		}
+		ed25519PKeyPEM = args[0]
+	}
+
 	// parse ed25519 private key
-	var ed25519PKeyPEM string = os.Getenv("BINANCE_API_PRIVATE_KEY_PEM")
-	var ed25519Auth bool
-	ed25519PrivateKey, err := util.ParseEd25519PrivateKey(ed25519PKeyPEM)
-	ed25519Auth = err == nil
+	var ed25519PrivateKey ed25519.PrivateKey
+	var err error
+	if len(ed25519PKeyPEM) > 0 {
+		ed25519PrivateKey, err = util.ParseEd25519PrivateKey(ed25519PKeyPEM)
+		if err != nil {
+			log.WithError(err).Warnf("binance exchange: failed to parse ed25519 private key, using default auth: %s", ed25519PKeyPEM)
+		}
+	}
+
+	// if parse is successful, we will use ed25519 auth
+	ed25519Auth := len(ed25519PKeyPEM) > 0 && len(ed25519PrivateKey) > 0 && err == nil
+	if ed25519Auth {
+		log.Info("binance exchange: using ed25519 private key for authentication")
+	}
 
 	var client = binance.NewClient(key, secret)
 	client.HTTPClient = binanceapi.DefaultHttpClient
-	client.Debug = viper.GetBool("debug-binance-client")
 
 	var futuresClient = binance.NewFuturesClient(key, secret)
 	futuresClient.HTTPClient = binanceapi.DefaultHttpClient
-	futuresClient.Debug = viper.GetBool("debug-binance-futures-client")
+
+	if v, ok := envvar.Bool("DEBUG_BINANCE_CLIENT", false); ok {
+		client.Debug = v
+		futuresClient.Debug = v
+	}
 
 	if isBinanceUs() {
 		client.BaseURL = BinanceUSBaseURL
@@ -139,19 +197,23 @@ func New(key, secret string) *Exchange {
 	futuresClient2 := binanceapi.NewFuturesRestClient(futuresClient.BaseURL)
 
 	ex := &Exchange{
-		key:               key,
-		secret:            secret,
-		ed25519PrivateKey: ed25519PrivateKey,
-		ed25519Auth:       ed25519Auth,
-		client:            client,
-		futuresClient:     futuresClient,
-		client2:           client2,
-		futuresClient2:    futuresClient2,
+		key:    key,
+		secret: secret,
+
+		ed25519authentication: ed25519authentication{
+			privateKey:   ed25519PrivateKey,
+			usingEd25519: ed25519Auth,
+		},
+
+		client:         client,
+		futuresClient:  futuresClient,
+		client2:        client2,
+		futuresClient2: futuresClient2,
 	}
 
-	if len(key) > 0 && len(secret) > 0 {
-		client2.Auth(key, secret)
-		futuresClient2.Auth(key, secret)
+	if (len(key) > 0 && len(secret) > 0) || len(ed25519PrivateKey) > 0 {
+		client2.Auth(key, secret, ed25519PrivateKey)
+		futuresClient2.Auth(key, secret, ed25519PrivateKey)
 	}
 
 	ctx := context.Background()
@@ -172,14 +234,6 @@ func New(key, secret string) *Exchange {
 	})
 
 	return ex
-}
-
-func (e *Exchange) getEd25519PrivateKey() ed25519.PrivateKey {
-	return e.ed25519PrivateKey
-}
-
-func (e *Exchange) getEd25519Auth() bool {
-	return e.ed25519Auth
 }
 
 func (e *Exchange) setServerTimeOffset(ctx context.Context) {
@@ -338,10 +392,7 @@ func (e *Exchange) QueryAveragePrice(ctx context.Context, symbol string) (fixedp
 }
 
 func (e *Exchange) NewStream() types.Stream {
-	stream := NewStream(e, e.client, e.futuresClient)
-	stream.MarginSettings = e.MarginSettings
-	stream.FuturesSettings = e.FuturesSettings
-	return stream
+	return NewStream(e, e.client, e.futuresClient)
 }
 
 func (e *Exchange) QueryMarginFutureHourlyInterestRate(
@@ -372,7 +423,9 @@ func (e *Exchange) QueryMarginFutureHourlyInterestRate(
 	return rateMap, nil
 }
 
-func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error) {
+func (e *Exchange) QueryMarginAssetMaxBorrowable(
+	ctx context.Context, asset string,
+) (amount fixedpoint.Value, err error) {
 	req := e.client2.NewGetMarginMaxBorrowableRequest()
 	req.Asset(asset)
 	if e.IsIsolatedMargin {
@@ -601,7 +654,9 @@ func (e *Exchange) Withdraw(
 	return nil
 }
 
-func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (withdraws []types.Withdraw, err error) {
+func (e *Exchange) QueryWithdrawHistory(
+	ctx context.Context, asset string, since, until time.Time,
+) (withdraws []types.Withdraw, err error) {
 	var emptyTime = time.Time{}
 	if since == emptyTime {
 		since, err = getLaunchDate()
@@ -661,7 +716,9 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 	return withdraws, nil
 }
 
-func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
+func (e *Exchange) QueryDepositHistory(
+	ctx context.Context, asset string, since, until time.Time,
+) (allDeposits []types.Deposit, err error) {
 	if since.IsZero() {
 		since, err = getLaunchDate()
 		if err != nil {
@@ -1397,7 +1454,9 @@ func (e *Exchange) queryMarginTrades(
 	return trades, nil
 }
 
-func (e *Exchange) querySpotTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) querySpotTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (trades []types.Trade, err error) {
 	req := e.client2.NewGetMyTradesRequest()
 	req.Symbol(symbol)
 
@@ -1444,7 +1503,9 @@ func (e *Exchange) querySpotTrades(ctx context.Context, symbol string, options *
 	return trades, nil
 }
 
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
+func (e *Exchange) QueryTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) ([]types.Trade, error) {
 	if err := queryTradeLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
@@ -1475,7 +1536,9 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 }
 
 // QueryDepth query the order book depth of a symbol
-func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+func (e *Exchange) QueryDepth(
+	ctx context.Context, symbol string,
+) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	if e.IsFutures {
 		return e.queryFuturesDepth(ctx, symbol)
 	}
@@ -1488,7 +1551,9 @@ func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot type
 	return convertDepth(symbol, response)
 }
 
-func convertDepth(symbol string, response *binanceapi.Depth) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+func convertDepth(
+	symbol string, response *binanceapi.Depth,
+) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	snapshot.Symbol = symbol
 	snapshot.Time = time.Now()
 	snapshot.LastUpdateId = response.LastUpdateId

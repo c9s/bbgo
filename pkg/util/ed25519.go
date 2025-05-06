@@ -10,8 +10,9 @@ import (
 
 func ParseEd25519PrivateKey(pemString string) (ed25519.PrivateKey, error) {
 	if len(pemString) == 0 {
-		return nil, errors.New("empty PEM string")
+		return nil, fmt.Errorf("unable to parse private key (PEM format), empty string given")
 	}
+
 	block, _ := pem.Decode([]byte(pemString))
 	if block == nil {
 		return nil, errors.New("failed to parse PEM block containing the private key")
@@ -22,9 +23,11 @@ func ParseEd25519PrivateKey(pemString string) (ed25519.PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	privateKey, ok := pkcs8Key.(ed25519.PrivateKey)
 	if !ok {
-		return nil, fmt.Errorf("not an ED25519 private key: %T given", pkcs8Key)
+		return nil, fmt.Errorf("not a valid ED25519 private key: %T given", pkcs8Key)
 	}
+
 	return privateKey, nil
 }
