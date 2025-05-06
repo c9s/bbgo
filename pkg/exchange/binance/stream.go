@@ -163,6 +163,7 @@ func NewStream(ex *Exchange, client *binance.Client, futuresClient *futures.Clie
 	stream.OnDisconnect(stream.handleDisconnect)
 	stream.OnConnect(stream.handleConnect)
 	stream.OnListenKeyExpired(func(e *ListenKeyExpired) {
+		log.Warnf("listen key expired, triggering reconnect: %+v", e)
 		stream.Reconnect()
 	})
 	return stream
@@ -180,14 +181,19 @@ func (s *Stream) handleConnect() {
 		if err := s.writeSubscriptions(); err != nil {
 			log.WithError(err).Error("subscribe error")
 		}
-	} else if s.shouldUseEd25519Authentication() {
+	} else if s.canUseWsApiEndpoint() {
+
 		if err := s.sendEd25519LoginCommand(); err != nil {
 			log.WithError(err).Error("ed25519 auth error")
 		}
 
 		time.Sleep(1 * time.Second)
-		if err := s.sendSubscribeUserDataStreamCommand(); err != nil {
-			log.WithError(err).Error("subscribe user data stream error")
+
+		// futures does
+		if !s.IsFutures {
+			if err := s.sendSubscribeUserDataStreamCommand(); err != nil {
+				log.WithError(err).Error("subscribe user data stream error")
+			}
 		}
 
 		// TODO: ensure that we receive an authorized event to trigger this auth event
@@ -376,12 +382,23 @@ func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
 
 func (s *Stream) getPublicEndpointUrl() string {
 	if s.IsFutures {
+		if testNet {
+			return TestNetFuturesBaseURL + "/ws"
+		}
+
 		return FuturesWebSocketURL + "/ws"
 	} else if isBinanceUs() {
+		if testNet {
+			return BinanceTestBaseURL + "/ws"
+		}
 		return BinanceUSWebSocketURL + "/ws"
-	}
+	} else {
+		if testNet {
+			return TestNetWebSocketURL + "/ws"
+		}
 
-	return WebSocketURL + "/ws"
+		return WebSocketURL + "/ws"
+	}
 }
 
 func (s *Stream) getUserDataStreamEndpointUrl(listenKey string) string {
@@ -389,9 +406,9 @@ func (s *Stream) getUserDataStreamEndpointUrl(listenKey string) string {
 	return u + "/" + listenKey
 }
 
-// shouldUseEd25519Authentication returns true if the stream should use ed25519 authentication
+// canUseWsApiEndpoint returns true if the stream should use ed25519 authentication with the new ws api endpoint
 // only the new spot trading websocket endpoint supports ed25519 authentication
-func (s *Stream) shouldUseEd25519Authentication() bool {
+func (s *Stream) canUseWsApiEndpoint() bool {
 	// margin and futures don't support ed25519 authentication
 	if s.MarginSettings.IsMargin || s.FuturesSettings.IsFutures {
 		return false
@@ -405,28 +422,26 @@ func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
 		return s.getPublicEndpointUrl(), nil
 	}
 
-	if s.shouldUseEd25519Authentication() {
+	if s.canUseWsApiEndpoint() {
 		// The new websocket api is only for spot trading
-		return wsApiWebsocketUrl, nil
+		if testNet {
+			return WsTestNetWebSocketURL, nil
+		}
+
+		return WsSpotWebSocketURL, nil
 	}
 
 	return s.createUserDataStreamEndpoint(ctx)
 }
 
 func (s *Stream) createUserDataStreamEndpoint(ctx context.Context) (string, error) {
-	var err error
-	var listenKey string
-	if s.PublicOnly {
-		debug("stream is set to public only mode")
-	} else {
-		listenKey, err = s.fetchListenKey(ctx)
-		if err != nil {
-			return "", err
-		}
-
-		debug("listen key is created, starting listen key keep alive worker: %s", util.MaskKey(listenKey))
-		go s.listenKeyKeepAlive(ctx, listenKey)
+	listenKey, err := s.fetchListenKey(ctx)
+	if err != nil {
+		return "", err
 	}
+
+	debug("listen key is created, starting listen key keep alive worker: %s", util.MaskKey(listenKey))
+	go s.listenKeyKeepAlive(ctx, listenKey)
 
 	return s.getUserDataStreamEndpointUrl(listenKey), nil
 }
