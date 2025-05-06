@@ -110,7 +110,7 @@ func (e *ed25519authentication) getEd25519PrivateKey() ed25519.PrivateKey {
 	return e.privateKey
 }
 
-func (e *ed25519authentication) getEd25519Auth() bool {
+func (e *ed25519authentication) isUsingEd25519Auth() bool {
 	return e.usingEd25519
 }
 
