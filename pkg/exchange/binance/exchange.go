@@ -35,16 +35,22 @@ const DefaultDepthLimit = 5000
 const BinanceUSBaseURL = "https://api.binance.us"
 const BinanceTestBaseURL = "https://testnet.binance.vision"
 const BinanceUSWebSocketURL = "wss://stream.binance.us:9443"
-const WebSocketURL = "wss://stream.binance.com:9443"
-const WebSocketTestURL = "wss://testnet.binance.vision"
-const FutureTestBaseURL = "https://testnet.binancefuture.com"
-const FuturesWebSocketURL = "wss://fstream.binance.com"
-const FuturesWebSocketTestURL = "wss://stream.binancefuture.com"
 
-// WebSocket API
+const WebSocketURL = "wss://stream.binance.com:9443"
+const FuturesWebSocketURL = "wss://fstream.binance.com"
+const TestNetFuturesWebSocketURL = "wss://stream.binancefuture.com"
+
+// TestNet URLs
+const TestNetWebSocketURL = "wss://testnet.binance.vision"
+const TestNetFuturesBaseURL = "https://testnet.binancefuture.com"
+
+// New WebSocket API Endpoints
 // listenKey will be deprecated. Official recommendation is to use ws-api for user data stream
-const WsApiWebSocketURL = "wss://ws-api.binance.com:443/ws-api/v3"
-const WsApiWebSocketTestURL = "wss://testnet.binance.vision/ws-api/v3"
+const WsSpotWebSocketURL = "wss://ws-api.binance.com:443/ws-api/v3"
+const WsTestNetWebSocketURL = "wss://testnet.binance.vision/ws-api/v3"
+
+const WsFuturesWebSocketURL = "wss://ws-fapi.binance.com/ws-fapi/v1"
+const WsTestNetFuturesWebSocketURL = "wss://testnet.binancefuture.com/ws-fapi/v1"
 
 // orderLimiter - the default order limiter apply 5 requests per second and a 2 initial bucket
 // this includes SubmitOrder, CancelOrder and QueryClosedOrders
@@ -54,7 +60,10 @@ var orderLimiter = rate.NewLimiter(5, 2)
 var queryTradeLimiter = rate.NewLimiter(1, 2)
 
 var dualSidePosition = false
+
 var wsApiWebsocketUrl string
+
+var testNet = false
 
 var debugMode = false
 
@@ -93,12 +102,8 @@ func init() {
 	if val, ok := envvar.Bool("BINANCE_ENABLE_FUTURES_HEDGE_MODE"); ok {
 		dualSidePosition = val
 	}
-	testNet, _ := envvar.Bool("BINANCE_TESTNET", false)
-	if testNet {
-		wsApiWebsocketUrl = WsApiWebSocketTestURL
-	} else {
-		wsApiWebsocketUrl = WsApiWebSocketURL
-	}
+
+	testNet, _ = envvar.Bool("BINANCE_TESTNET", false)
 }
 
 func isBinanceUs() bool {
