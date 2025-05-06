@@ -510,7 +510,11 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 }
 
 func (s *StandardStream) Close() error {
-	log.Debugf("[websocket] closing stream...")
+	if s.PublicOnly {
+		log.Debugf("[websocket] closing public stream...")
+	} else {
+		log.Debugf("[websocket] closing user data stream...")
+	}
 
 	// close the close signal channel, so that reader and ping worker will stop
 	close(s.CloseC)
