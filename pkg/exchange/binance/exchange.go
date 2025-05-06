@@ -93,10 +93,7 @@ func init() {
 		queryTradeLimiter = rate.NewLimiter(rate.Every(time.Duration(n)*time.Minute), 2)
 	}
 
-	if val, ok := envvar.Bool("BINANCE_ENABLE_FUTURES_HEDGE_MODE"); ok {
-		dualSidePosition = val
-	}
-
+	dualSidePosition, _ = envvar.Bool("BINANCE_ENABLE_FUTURES_HEDGE_MODE", false)
 	testNet, _ = envvar.Bool("BINANCE_TESTNET", false)
 }
 
