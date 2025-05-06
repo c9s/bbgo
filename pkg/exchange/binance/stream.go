@@ -251,14 +251,14 @@ func (s *Stream) writeSubscriptions() error {
 		return nil
 	}
 
+	// TODO: handle subscribe response
+	// sample response: {"result":null,"id":2}
 	log.Infof("subscribing channels: %+v", params)
-	err := s.Conn.WriteJSON(&WebSocketCommand{
+	return s.Conn.WriteJSON(&WebSocketCommand{
 		Method: "SUBSCRIBE",
 		Params: params,
 		ID:     2,
 	})
-
-	return err
 }
 
 func (s *Stream) handleContinuousKLineEvent(e *ContinuousKLineEvent) {
