@@ -468,7 +468,7 @@ func (e *Exchange) QueryCrossMarginAccount(ctx context.Context) (*types.Account,
 		AccountType:     types.AccountTypeMargin,
 		MarginInfo:      toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
 		MarginLevel:     marginLevel,
-		MarginTolerance: calculateMarginTolerance(marginLevel),
+		MarginTolerance: util.CalculateMarginTolerance(marginLevel),
 		BorrowEnabled:   types.BoolPtr(marginAccount.BorrowEnabled),
 		TransferEnabled: types.BoolPtr(marginAccount.TransferEnabled),
 	}
@@ -515,7 +515,7 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 	userAsset := marginAccount.Assets[0]
 	marginLevel := fixedpoint.MustNewFromString(userAsset.MarginLevel)
 	a.MarginLevel = marginLevel
-	a.MarginTolerance = calculateMarginTolerance(marginLevel)
+	a.MarginTolerance = util.CalculateMarginTolerance(marginLevel)
 	a.MarginRatio = fixedpoint.MustNewFromString(userAsset.MarginRatio)
 	a.BorrowEnabled = types.BoolPtr(userAsset.BaseAsset.BorrowEnabled || userAsset.QuoteAsset.BorrowEnabled)
 	a.LiquidationPrice = fixedpoint.MustNewFromString(userAsset.LiquidatePrice)
@@ -1599,20 +1599,6 @@ func getLaunchDate() (time.Time, error) {
 	}
 
 	return time.Date(2017, time.July, 14, 0, 0, 0, 0, loc), nil
-}
-
-// Margin tolerance ranges from 0.0 (liquidation) to 1.0 (safest level of margin).
-func calculateMarginTolerance(marginLevel fixedpoint.Value) fixedpoint.Value {
-	if marginLevel.IsZero() {
-		// Although margin level shouldn't be zero, that would indicate a significant problem.
-		// In that case, margin tolerance should return 0.0 to also reflect that problem.
-		return fixedpoint.Zero
-	}
-
-	// Formula created by operations team for our binance code.  Liquidation occurs at 1.1,
-	// so when marginLevel equals 1.1, the formula becomes 1.0 - 1.0, or zero.
-	// = 1.0 - (1.1 / marginLevel)
-	return fixedpoint.One.Sub(fixedpoint.NewFromFloat(1.1).Div(marginLevel))
 }
 
 func logResponse(resp interface{}, err error, req interface{}) error {

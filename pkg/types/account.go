@@ -50,9 +50,12 @@ type Account struct {
 	BorrowEnabled   *bool `json:"borrowEnabled,omitempty"`
 	TransferEnabled *bool `json:"transferEnabled,omitempty"`
 
-	// isolated margin related fields
+	// Isolated margin related fields
+	// ------------------------------
+	// MarginRatio is almost the same as MarginLevel, we can deprecate it later
+	MarginRatio fixedpoint.Value `json:"marginRatio,omitempty"`
+
 	// LiquidationPrice is only used when account is in the isolated margin mode
-	MarginRatio      fixedpoint.Value `json:"marginRatio,omitempty"`
 	LiquidationPrice fixedpoint.Value `json:"liquidationPrice,omitempty"`
 	LiquidationRate  fixedpoint.Value `json:"liquidationRate,omitempty"`
 
