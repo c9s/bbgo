@@ -1,0 +1,18 @@
+---
+sessions:
+  # spot
+  binance:
+    exchange: binance
+
+  # cross margin futures
+  binance_futures:
+    exchange: binance
+    futures: true
+
+exchangeStrategies:
+
+- on: binance_futures
+  dummy:
+    symbol: LINKUSDT
+    interval: 1m
+
