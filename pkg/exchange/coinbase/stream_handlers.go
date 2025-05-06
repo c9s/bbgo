@@ -25,6 +25,20 @@ const (
 	balanceChannel     types.Channel = "balance"
 )
 
+// minInterval: for the kline updater
+// It will be set to the minimum interval of all the supported intervals in the `init` function
+var minInterval = types.Interval("1s")
+
+func init() {
+	minSeconds := 0
+	for interval, seconds := range supportedIntervalMap {
+		if minSeconds == 0 || seconds <= minSeconds {
+			minInterval = interval
+			minSeconds = seconds
+		}
+	}
+}
+
 type channelType struct {
 	Name       types.Channel `json:"name"`
 	ProductIDs []string      `json:"product_ids,omitempty"`
@@ -77,6 +91,8 @@ func (msg subscribeMsgType2) String() string {
 }
 
 func (s *Stream) handleConnect() {
+	// context for kline workers
+	s.klineCtx, s.klineCancel = context.WithCancel(context.Background())
 	// channel2LocalSymbolsMap is a map from channel to local symbols
 	channel2LocalSymbolsMap := make(map[types.Channel][]string)
 
@@ -92,6 +108,10 @@ func (s *Stream) handleConnect() {
 	s.clearWorkingOrders()
 	go func() {
 		if s.PublicOnly {
+			// start kline workers
+			for _, store := range s.serialMarketStores {
+				store.BindStream(s.klineCtx, s)
+			}
 			return
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -152,6 +172,9 @@ func (s *Stream) buildMapForMarketStream(channel2LocalSymbolsMap map[types.Chann
 	// bridge bbgo channels to coinbase channels
 	// auth required: level2, full, user
 	dedupLocalSymbols := make(map[types.Channel]map[string]struct{})
+	// klineOptionsMap: map from **global symbol** to kline options
+	// this map will be used to create kline workers which build klines by market trades
+	klineOptionsMap := make(map[string][]types.SubscribeOptions)
 
 	for _, sub := range s.Subscriptions {
 		if _, ok := dedupLocalSymbols[sub.Channel]; !ok {
@@ -159,6 +182,9 @@ func (s *Stream) buildMapForMarketStream(channel2LocalSymbolsMap map[types.Chann
 		}
 		localSymbol := toLocalSymbol(sub.Symbol)
 		dedupLocalSymbols[sub.Channel][localSymbol] = struct{}{}
+		if sub.Channel == types.KLineChannel {
+			klineOptionsMap[sub.Symbol] = append(klineOptionsMap[sub.Symbol], sub.Options)
+		}
 	}
 	// temp helper function to extract keys from map
 	keys := func(mm map[string]struct{}) (localSymbols []string) {
@@ -183,7 +209,11 @@ func (s *Stream) buildMapForMarketStream(channel2LocalSymbolsMap map[types.Chann
 			// ticker channel provides feeds on best bid/ask prices
 			channel2LocalSymbolsMap[tickerChannel] = keys(dedupLocalSymbols)
 			logStream.Infof("bridge %s to %s", channel, tickerChannel)
-		case types.KLineChannel, types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
+		case types.KLineChannel:
+			// kline stream is available on Advanced Trade API only: https://docs.cdp.coinbase.com/advanced-trade/docs/ws-channels#candles-channel
+			// We implement the subscription to kline channel by market trade feeds for now
+			// symbols for kline channel will be added to match later with deduplication so we do nothing here
+		case types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
 			logStream.Warnf("coinbase stream does not support subscription to %s, skipped", channel)
 		default:
 			// rfqMatchChannel allow empty symbol
@@ -194,6 +224,31 @@ func (s *Stream) buildMapForMarketStream(channel2LocalSymbolsMap map[types.Chann
 				}
 				channel2LocalSymbolsMap[channel] = append(channel2LocalSymbolsMap[channel], localSymbol)
 			}
+		}
+	}
+
+	if len(klineOptionsMap) > 0 {
+		// adding symbols to matches channel for market trades
+		seenMatchSymbols, ok := dedupLocalSymbols[matchesChannel]
+		if !ok {
+			seenMatchSymbols = make(map[string]struct{})
+			dedupLocalSymbols[matchesChannel] = seenMatchSymbols
+		}
+		for symbol := range klineOptionsMap {
+			if _, ok := seenMatchSymbols[symbol]; !ok {
+				channel2LocalSymbolsMap[matchesChannel] = append(channel2LocalSymbolsMap[matchesChannel], toLocalSymbol(symbol))
+			}
+		}
+
+		// binding serial market store
+		for symbol, options := range klineOptionsMap {
+			store := types.NewSerialMarketDataStore(symbol, minInterval, true)
+			for _, option := range options {
+				logStream.Debugf("subscribe to kline %s(%s)", symbol, option.Interval)
+				store.Subscribe(option.Interval)
+			}
+			store.OnKLineClosed(s.EmitKLineClosed)
+			s.serialMarketStores = append(s.serialMarketStores, store)
 		}
 	}
 }
@@ -347,6 +402,11 @@ func (s *Stream) handleDisconnect() {
 	// clear sequence numbers
 	s.clearSequenceNumber()
 	s.clearWorkingOrders()
+	if s.klineCancel != nil {
+		s.klineCancel()
+		s.klineCtx = nil
+		s.klineCancel = nil
+	}
 }
 
 // Local Handlers: handlers that deal with the messages from the Coinbase WebSocket
