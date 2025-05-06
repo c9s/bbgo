@@ -48,7 +48,7 @@ var balancesCmd = &cobra.Command{
 				return err
 			}
 
-			b.Print()
+			b.Print(log.Infof)
 		} else {
 			for _, session := range environ.Sessions() {
 
@@ -58,7 +58,7 @@ var balancesCmd = &cobra.Command{
 				}
 
 				log.Infof("SESSION %s", session.Name)
-				b.Print()
+				b.Print(log.Infof)
 			}
 		}
 
