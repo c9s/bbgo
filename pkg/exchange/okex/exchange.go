@@ -317,7 +317,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		// okx market order with trade mode cross will be rejected:
 		//   "The corresponding product of this BTC-USDT doesn't support the tgtCcy parameter"
 		if order.Type == types.OrderTypeMarket {
-			log.Warnf("market order with margin mode is not supported, fallback to cash mode, please see %s for more details",
+			log.Errorf("market order with margin mode is not supported, fallback to cash mode, please see %s for more details",
 				"https://www.okx.com/docs-v5/trick_en/#order-management-trade-mode")
 			orderReq.TradeMode(okexapi.TradeModeCash)
 		} else {
