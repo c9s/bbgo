@@ -500,7 +500,12 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 		return nil
 	})
 
-	log.Infof("[websocket] connected, public = %v, read timeout = %v", s.PublicOnly, readTimeout)
+	if s.PublicOnly {
+		log.Infof("[websocket] public stream connected, read timeout = %v", readTimeout)
+	} else {
+		log.Infof("[websocket] user data stream connected, read timeout = %v", readTimeout)
+	}
+
 	return conn, nil
 }
 
