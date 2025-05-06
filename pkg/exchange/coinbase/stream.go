@@ -62,6 +62,10 @@ type Stream struct {
 	workingOrdersMap    map[string]types.Order
 
 	privateChannelSymbols []string
+
+	klineCtx           context.Context
+	klineCancel        context.CancelFunc
+	serialMarketStores []*types.SerialMarketDataStore
 }
 
 func NewStream(
