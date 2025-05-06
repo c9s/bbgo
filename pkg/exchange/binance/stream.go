@@ -372,28 +372,27 @@ func (s *Stream) handleOrderTradeUpdateEvent(e *OrderTradeUpdateEvent) {
 	case "CALCULATED - Liquidation Execution":
 		log.Infof("CALCULATED - Liquidation Execution not support yet.")
 	}
-
 }
 
-func (s *Stream) getEndpointUrl(listenKey string) string {
-	var url string
-
+func (s *Stream) getPublicEndpointUrl() string {
 	if s.IsFutures {
-		url = FuturesWebSocketURL + "/ws"
+		return FuturesWebSocketURL + "/ws"
 	} else if isBinanceUs() {
-		url = BinanceUSWebSocketURL + "/ws"
-	} else {
-		url = WebSocketURL + "/ws"
+		return BinanceUSWebSocketURL + "/ws"
 	}
 
-	if !s.PublicOnly {
-		url += "/" + listenKey
-	}
-
-	return url
+	return WebSocketURL + "/ws"
 }
 
+func (s *Stream) getUserDataStreamEndpointUrl(listenKey string) string {
+	u := s.getPublicEndpointUrl()
+	return u + "/" + listenKey
+}
+
+// shouldUseEd25519Authentication returns true if the stream should use ed25519 authentication
+// only the new spot trading websocket endpoint supports ed25519 authentication
 func (s *Stream) shouldUseEd25519Authentication() bool {
+	// margin and futures don't support ed25519 authentication
 	if s.MarginSettings.IsMargin || s.FuturesSettings.IsFutures {
 		return false
 	}
@@ -402,14 +401,19 @@ func (s *Stream) shouldUseEd25519Authentication() bool {
 }
 
 func (s *Stream) createEndpoint(ctx context.Context) (string, error) {
-	if s.shouldUseEd25519Authentication() {
-		return s.createEndpointEd25519()
+	if s.PublicOnly {
+		return s.getPublicEndpointUrl(), nil
 	}
 
-	return s.createEndpointHMAC(ctx)
+	if s.shouldUseEd25519Authentication() {
+		// The new websocket api is only for spot trading
+		return wsApiWebsocketUrl, nil
+	}
+
+	return s.createUserDataStreamEndpoint(ctx)
 }
 
-func (s *Stream) createEndpointHMAC(ctx context.Context) (string, error) {
+func (s *Stream) createUserDataStreamEndpoint(ctx context.Context) (string, error) {
 	var err error
 	var listenKey string
 	if s.PublicOnly {
@@ -424,24 +428,7 @@ func (s *Stream) createEndpointHMAC(ctx context.Context) (string, error) {
 		go s.listenKeyKeepAlive(ctx, listenKey)
 	}
 
-	return s.getEndpointUrl(listenKey), nil
-}
-
-func (s *Stream) createEndpointEd25519() (string, error) {
-	if s.PublicOnly {
-		// use websocket stream endpoint
-		debug("(ed25519) stream is set to public only mode")
-		if s.IsFutures {
-			return FuturesWebSocketURL + "/ws", nil
-		} else if isBinanceUs() {
-			return BinanceUSWebSocketURL + "/ws", nil
-		}
-
-		return WebSocketURL + "/ws", nil
-	}
-
-	// use the new ws-api for user data stream
-	return wsApiWebsocketUrl, nil
+	return s.getUserDataStreamEndpointUrl(listenKey), nil
 }
 
 func (s *Stream) dispatchEvent(e interface{}) {
