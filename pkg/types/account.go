@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -48,8 +47,8 @@ type Account struct {
 	MarginLevel     fixedpoint.Value `json:"marginLevel,omitempty"`
 	MarginTolerance fixedpoint.Value `json:"marginTolerance,omitempty"`
 
-	BorrowEnabled   bool `json:"borrowEnabled,omitempty"`
-	TransferEnabled bool `json:"transferEnabled,omitempty"`
+	BorrowEnabled   *bool `json:"borrowEnabled,omitempty"`
+	TransferEnabled *bool `json:"transferEnabled,omitempty"`
 
 	// isolated margin related fields
 	// LiquidationPrice is only used when account is in the isolated margin mode
@@ -110,8 +109,8 @@ func NewAccount() *Account {
 		IsolatedMarginInfo: nil,
 		MarginLevel:        fixedpoint.Zero,
 		MarginTolerance:    fixedpoint.Zero,
-		BorrowEnabled:      false,
-		TransferEnabled:    false,
+		BorrowEnabled:      BoolPtr(false),
+		TransferEnabled:    BoolPtr(false),
 		MarginRatio:        fixedpoint.Zero,
 		LiquidationPrice:   fixedpoint.Zero,
 		LiquidationRate:    fixedpoint.Zero,
@@ -249,20 +248,44 @@ func (a *Account) UpdateBalances(balances BalanceMap) {
 	}
 }
 
-func (a *Account) Print() {
+func (a *Account) Print(log LogFunc) {
 	a.Lock()
 	defer a.Unlock()
 
 	if a.AccountType != "" {
-		logrus.Infof("account type: %s", a.AccountType)
+		log("AccountType: %s", a.AccountType)
 	}
 
-	if a.MakerFeeRate.Sign() > 0 {
-		logrus.Infof("maker fee rate: %v", a.MakerFeeRate)
-	}
-	if a.TakerFeeRate.Sign() > 0 {
-		logrus.Infof("taker fee rate: %v", a.TakerFeeRate)
+	switch a.AccountType {
+	case AccountTypeMargin, AccountTypeFutures:
+		if a.MarginLevel.Sign() != 0 {
+			log("MarginLevel: %f", a.MarginLevel.Float64())
+		}
+
+		if a.MarginTolerance.Sign() != 0 {
+			log("MarginTolerance: %f", a.MarginTolerance.Float64())
+		}
+
+		if a.BorrowEnabled != nil {
+			log("BorrowEnabled: %v", *a.BorrowEnabled)
+		}
+
+		if a.MarginInfo != nil {
+			log("MarginInfo: %#v", a.MarginInfo)
+		}
 	}
 
-	a.balances.Print()
+	if a.TransferEnabled != nil {
+		log("TransferEnabled: %v", *a.TransferEnabled)
+	}
+
+	if a.MakerFeeRate.Sign() != 0 {
+		log("MakerFeeRate: %v", a.MakerFeeRate)
+	}
+
+	if a.TakerFeeRate.Sign() != 0 {
+		log("TakerFeeRate: %v", a.TakerFeeRate)
+	}
+
+	a.balances.Print(log)
 }
