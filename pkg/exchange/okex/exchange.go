@@ -802,6 +802,16 @@ func (e *Exchange) QueryInterestHistory(
 	return nil, nil
 }
 
+func (e *Exchange) getInstrumentType() okexapi.InstrumentType {
+	if e.MarginSettings.IsMargin {
+		return okexapi.InstrumentTypeMargin
+	} else if e.IsFutures {
+		return okexapi.InstrumentTypeSwap
+	}
+
+	return okexapi.InstrumentTypeSpot
+}
+
 func (e *Exchange) QueryDepositHistory(
 	ctx context.Context, asset string, startTime, endTime *time.Time,
 ) ([]types.Deposit, error) {
@@ -897,52 +907,41 @@ func (e *Exchange) QueryTrades(
 		instrumentID = toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)
 	}
 
+	instrType := e.getInstrumentType()
+
 	if lessThan3Day {
-		c := e.client.NewGetThreeDaysTransactionHistoryRequest().
+		req := e.client.NewGetThreeDaysTransactionHistoryRequest().
 			InstrumentID(instrumentID).
+			InstrumentType(instrType).
 			StartTime(newStartTime).
 			EndTime(endTime).
 			Limit(uint64(limit))
-
-		if e.MarginSettings.IsMargin {
-			c.InstrumentType(okexapi.InstrumentTypeMargin)
-		} else if e.FuturesSettings.IsFutures {
-			c.InstrumentType(okexapi.InstrumentTypeSwap)
-		} else {
-			c.InstrumentType(okexapi.InstrumentTypeSpot)
-		}
 
 		return getTrades(ctx, logger, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
 			if billId != "" && billId != "0" {
 				// the `after` will get the data after the billId
 				// so DON'T fill the billId if it's 0
-				c.After(billId)
+				req.After(billId)
 			}
-			return c.Do(ctx)
+			return req.Do(ctx)
 		})
 	}
 
-	c := e.client.NewGetTransactionHistoryRequest().
+	req := e.client.NewGetTransactionHistoryRequest().
 		InstrumentID(instrumentID).
+		InstrumentType(instrType).
 		StartTime(newStartTime).
 		EndTime(endTime).
 		Limit(uint64(limit))
-
-	if e.MarginSettings.IsMargin {
-		c.InstrumentType(okexapi.InstrumentTypeMargin)
-	} else if e.FuturesSettings.IsFutures {
-		c.InstrumentType(okexapi.InstrumentTypeSwap)
-	} else {
-		c.InstrumentType(okexapi.InstrumentTypeSpot)
-	}
 
 	return getTrades(ctx, logger, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
 		if billId != "" && billId != "0" {
 			// the `after` will get the data after the billId
 			// so DON'T fill the billId if it's 0
-			c.After(billId)
+			req.After(billId)
 		}
-		return c.Do(ctx)
+
+		return req.Do(ctx)
 	})
 }
 
@@ -967,9 +966,7 @@ func getTrades(
 		if tradeLen > limit {
 			logger.WithError(err).Warnf("getTrades: trade length %d exceeds limit %d", tradeLen, limit)
 			return nil, fmt.Errorf("unexpected trade length %d", tradeLen)
-		}
-
-		if tradeLen < limit {
+		} else if tradeLen < limit {
 			logger.Warnf("getTrades: trade length %d less than limit %d", tradeLen, limit)
 			break
 		}
@@ -977,6 +974,7 @@ func getTrades(
 		// use After filter to get all data.
 		billId = response[tradeLen-1].BillId.String()
 	}
+
 	return trades, nil
 }
 

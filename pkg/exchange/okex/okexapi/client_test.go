@@ -290,15 +290,23 @@ func TestClient_ThreeDaysTransactionHistoryWithTime(t *testing.T) {
 		// [{"side":"sell","fillSz":"1","fillPx":"46446.4","fillPxVol":"","fillFwdPx":"","fee":"-46.4464","fillPnl":"0","ordId":"665951654130348158","feeRate":"-0.001","instType":"SPOT","fillPxUsd":"","instId":"BTC-USDT","clOrdId":"","posSide":"net","billId":"665951654138736652","fillMarkVol":"","tag":"","fillTime":"1705047247128","execType":"T","fillIdxPx":"","tradeId":"724072849","fillMarkPx":"","feeCcy":"USDT","ts":"1705047247130"}]
 		// [{"side":"sell","fillSz":"11.053006","fillPx":"54.17","fillPxVol":"","fillFwdPx":"","fee":"-0.59874133502","fillPnl":"0","ordId":"665951812901531754","feeRate":"-0.001","instType":"SPOT","fillPxUsd":"","instId":"OKB-USDT","clOrdId":"","posSide":"net","billId":"665951812905726068","fillMarkVol":"","tag":"","fillTime":"1705047284982","execType":"T","fillIdxPx":"","tradeId":"589438381","fillMarkPx":"","feeCcy":"USDT","ts":"1705047284983"}]
 		// [{"side":"sell","fillSz":"88.946994","filollPx":"54.16","fillPxVol":"","fillFwdPx":"","fee":"-4.81736919504","fillPnl":"0","ordId":"665951812901531754","feeRate":"-0.001","instType":"SPOT","fillPxUsd":"","instId":"OKB-USDT","clOrdId":"","posSide":"net","billId":"665951812905726084","fillMarkVol":"","tag":"","fillTime":"1705047284982","execType":"T","fillIdxPx":"","tradeId":"589438382","fillMarkPx":"","feeCcy":"USDT","ts":"1705047284983"}]
-		c := client.NewGetThreeDaysTransactionHistoryRequest().
+		req := client.NewGetThreeDaysTransactionHistoryRequest().
 			StartTime(types.NewMillisecondTimestampFromInt(startTime.UnixMilli()).Time()).
 			EndTime(types.NewMillisecondTimestampFromInt(end.UnixMilli()).Time()).
 			Limit(1)
+
+		// req.InstrumentType(InstrumentTypeMargin)
+
 		if beforeId != 0 {
-			c.Before(strconv.FormatInt(beforeId, 10))
+			req.Before(strconv.FormatInt(beforeId, 10))
 		}
-		res, err := c.Do(ctx)
+
+		res, err := req.Do(ctx)
 		assert.NoError(t, err)
+
+		for _, td := range res {
+			t.Logf("TRADE: %+v", td)
+		}
 
 		if len(res) != 1 {
 			break
