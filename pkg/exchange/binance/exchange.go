@@ -71,10 +71,6 @@ var log = logrus.WithFields(logrus.Fields{
 
 var debug func(string, ...any)
 
-func debugLog(msg string, args ...any) {
-	log.Infof("BINANCE_DEBUG: "+msg, args...)
-}
-
 func debugDummy(msg string, args ...any) {}
 
 func init() {
@@ -84,7 +80,7 @@ func init() {
 
 	if v, ok := envvar.Bool("DEBUG_BINANCE", false); ok {
 		debugMode = v
-		debug = debugLog
+		debug = log.Infof
 	} else {
 		debug = debugDummy
 	}
