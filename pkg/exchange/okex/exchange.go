@@ -144,13 +144,14 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	markets := types.MarketMap{}
 	for _, instrument := range instruments {
 		symbol := toGlobalSymbol(instrument.InstrumentID)
+		baseCurrency, quoteCurrency := toGlobalCurrency(instrument)
 		market := types.Market{
 			Exchange:    types.ExchangeOKEx,
 			Symbol:      symbol,
 			LocalSymbol: instrument.InstrumentID,
 
-			QuoteCurrency: instrument.QuoteCurrency,
-			BaseCurrency:  instrument.BaseCurrency,
+			QuoteCurrency: quoteCurrency,
+			BaseCurrency:  baseCurrency,
 
 			// convert tick size OKEx to precision
 			PricePrecision:  instrument.TickSize.NumFractionalDigits(),
@@ -519,11 +520,11 @@ func (e *Exchange) QueryKLines(
 	req.Bar(intervalParam)
 
 	if options.StartTime != nil {
-		req.After(*options.StartTime)
+		req.Before(*options.StartTime)
 	}
 
 	if options.EndTime != nil {
-		req.Before(*options.EndTime)
+		req.After(*options.EndTime)
 	}
 
 	candles, err := req.Do(ctx)
