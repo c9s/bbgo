@@ -473,3 +473,12 @@ func toGlobalDeposit(record okexapi.DepositRecord) types.Deposit {
 	}
 
 }
+
+func toGlobalCurrency(record okexapi.InstrumentInfo) (baseCurrency, quoteCurrency string) {
+	baseCurrency, quoteCurrency = record.BaseCurrency, record.QuoteCurrency
+	if len(baseCurrency) == 0 && len(quoteCurrency) == 0 {
+		symbols := strings.Split(record.InstrumentID, "-")
+		baseCurrency, quoteCurrency = symbols[0], symbols[1]
+	}
+	return
+}

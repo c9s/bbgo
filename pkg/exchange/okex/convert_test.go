@@ -282,3 +282,55 @@ func Test_toGlobalOrder(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, globalOrder.IsFutures)
 }
+
+func Test_toGlobalCurrency(t *testing.T) {
+	tests := []struct {
+		name      string
+		record    okexapi.InstrumentInfo
+		wantBase  string
+		wantQuote string
+	}{
+		{
+			name: "get from BaseCurrency and QuoteCurrency",
+			record: okexapi.InstrumentInfo{
+				BaseCurrency:  "BTC",
+				QuoteCurrency: "USDT",
+				InstrumentID:  "BTC-USDT",
+			},
+			wantBase:  "BTC",
+			wantQuote: "USDT",
+		},
+		{
+			name: "parse from InstrumentID",
+			record: okexapi.InstrumentInfo{
+				BaseCurrency:  "",
+				QuoteCurrency: "",
+				InstrumentID:  "BTC-USDT",
+			},
+			wantBase:  "BTC",
+			wantQuote: "USDT",
+		},
+		{
+			name: "parse from InstrumentID with SWAP suffix",
+			record: okexapi.InstrumentInfo{
+				BaseCurrency:  "",
+				QuoteCurrency: "",
+				InstrumentID:  "BTC-USDT-SWAP",
+			},
+			wantBase:  "BTC",
+			wantQuote: "USDT",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotBase, gotQuote := toGlobalCurrency(tt.record)
+			if gotBase != tt.wantBase {
+				t.Errorf("toGlobalCurrency() gotBase = %v, want %v", gotBase, tt.wantBase)
+			}
+			if gotQuote != tt.wantQuote {
+				t.Errorf("toGlobalCurrency() gotQuote = %v, want %v", gotQuote, tt.wantQuote)
+			}
+		})
+	}
+}
