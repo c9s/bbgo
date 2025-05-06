@@ -495,9 +495,6 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 
 func (e *Exchange) NewStream() types.Stream {
 	s := NewStream(e.client, e)
-	if e.IsFutures {
-		s.UseFutures()
-	}
 
 	return s
 }

@@ -9,11 +9,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/testutil"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func getTestClientOrSkip(t *testing.T) *Stream {
+func getTestClientOrSkip(t *testing.T) *Exchange {
 	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
 		t.Skip("skip test for CI")
 	}
@@ -25,12 +26,13 @@ func getTestClientOrSkip(t *testing.T) *Stream {
 	}
 
 	exchange := New(key, secret, passphrase)
-	return NewStream(exchange.client, exchange)
+	return exchange
 }
 
 func TestStream(t *testing.T) {
 	t.Skip()
-	s := getTestClientOrSkip(t)
+	ex := getTestClientOrSkip(t)
+	s := NewStream(ex.client, ex)
 
 	t.Run("account test", func(t *testing.T) {
 		err := s.Connect(context.Background())
@@ -188,19 +190,22 @@ func TestStream(t *testing.T) {
 }
 
 func TestUseFutures(t *testing.T) {
-	s := getTestClientOrSkip(t)
-	s.UseFutures()
+	ex := getTestClientOrSkip(t)
+	ex.UseFutures()
+
+	s := NewStream(ex.client, ex)
 
 	err := s.Connect(context.Background())
 	assert.NoError(t, err)
-	assert.True(t, s.isFutures)
+	assert.Equal(t, okexapi.InstrumentTypeSwap, s.exchange.getInstrumentType())
 }
 
 func TestSubscribePrivateChannels(t *testing.T) {
-	s := getTestClientOrSkip(t)
+	ex := getTestClientOrSkip(t)
 
 	// Test normal case
 	t.Run("normal case", func(t *testing.T) {
+		s := NewStream(ex.client, ex)
 		// Create a channel to track if the next function is called
 		nextCalled := make(chan struct{})
 
@@ -227,8 +232,8 @@ func TestSubscribePrivateChannels(t *testing.T) {
 
 	// Test futures mode
 	t.Run("futures mode", func(t *testing.T) {
-		s := getTestClientOrSkip(t)
-		s.UseFutures()
+		ex.UseFutures()
+		s := NewStream(ex.client, ex)
 
 		// Create a channel to track if the next function is called
 		nextCalled := make(chan struct{})
@@ -254,6 +259,6 @@ func TestSubscribePrivateChannels(t *testing.T) {
 		}
 
 		// Verify that the isFutures flag is correctly set
-		assert.True(t, s.isFutures)
+		assert.Equal(t, okexapi.InstrumentTypeSwap, s.exchange.getInstrumentType())
 	})
 }
