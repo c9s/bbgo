@@ -146,8 +146,9 @@ func New(key, secret string, args ...string) *Exchange {
 	if len(args) > 0 && len(args[0]) > 0 {
 		// override the global private key with args[0] is provided
 		if len(ed25519PKeyPEM) > 0 {
-			log.Warnf("binance exchange: ed25519 private key is set in both env and args, using args[0] instead")
+			debug("binance exchange: ed25519 private key is set in both env and args, using args[0] instead")
 		}
+
 		ed25519PKeyPEM = args[0]
 	}
 
@@ -164,7 +165,7 @@ func New(key, secret string, args ...string) *Exchange {
 	// if parse is successful, we will use ed25519 auth
 	ed25519Auth := len(ed25519PKeyPEM) > 0 && len(ed25519PrivateKey) > 0 && err == nil
 	if ed25519Auth {
-		log.Info("binance exchange: using ed25519 private key for authentication")
+		debug("binance exchange: using ed25519 private key for authentication")
 	}
 
 	var client = binance.NewClient(key, secret)
