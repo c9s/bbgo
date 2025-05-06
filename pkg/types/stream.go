@@ -539,6 +539,7 @@ func (s *StandardStream) Close() error {
 	log.Debugf("[websocket] stream closed")
 
 	// let the reader close the connection
+	// TODO: use signal channel instead
 	<-time.After(time.Second)
 	return nil
 }
