@@ -272,6 +272,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		account.AccountType = types.AccountTypeMargin
 		account.MarginRatio = accounts[0].MarginRatio
 		account.MarginLevel = accounts[0].MarginRatio
+		account.MarginTolerance = util.CalculateMarginTolerance(accounts[0].MarginRatio)
 		account.TotalAccountValue = accounts[0].TotalEquityInUSD
 
 		account.BorrowEnabled = types.BoolPtr(accountConfigs[0].EnableSpotBorrow)
