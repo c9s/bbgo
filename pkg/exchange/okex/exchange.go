@@ -96,7 +96,8 @@ func WithBrokerId(id string) Option {
 
 func New(key, secret, passphrase string, opts ...Option) *Exchange {
 	client := okexapi.NewClient()
-	log.Infof("creating new okex rest client with base url: %s", okexapi.RestBaseURL)
+
+	log.Debugf("creating new okex rest client with base url: %s", okexapi.RestBaseURL)
 
 	if len(key) > 0 && len(secret) > 0 {
 		client.Auth(key, secret, passphrase)
@@ -267,12 +268,17 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	account.UpdateBalances(balances)
 
 	// for margin account
-	account.MarginRatio = accounts[0].MarginRatio
-	account.MarginLevel = accounts[0].MarginRatio
-	account.TotalAccountValue = accounts[0].TotalEquityInUSD
+	if e.MarginSettings.IsMargin {
+		account.AccountType = types.AccountTypeMargin
+		account.MarginRatio = accounts[0].MarginRatio
+		account.MarginLevel = accounts[0].MarginRatio
+		account.TotalAccountValue = accounts[0].TotalEquityInUSD
 
-	if e.MarginSettings.IsMargin && !accountConfigs[0].EnableSpotBorrow {
-		log.Warnf("margin is set, but okx enableSpotBorrow field is false, please turn on auto-borrow from the okx UI")
+		account.BorrowEnabled = types.BoolPtr(accountConfigs[0].EnableSpotBorrow)
+
+		if e.MarginSettings.IsMargin && !accountConfigs[0].EnableSpotBorrow {
+			log.Warnf("margin is set, but okx enableSpotBorrow field is false, please turn on auto-borrow from the okx UI")
+		}
 	}
 
 	return account, nil
@@ -729,7 +735,9 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 	return resp[0].MaxLoan, nil
 }
 
-func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginLoan, error) {
+func (e *Exchange) QueryLoanHistory(
+	ctx context.Context, asset string, startTime, endTime *time.Time,
+) ([]types.MarginLoan, error) {
 	req := e.client.NewGetAccountSpotBorrowRepayHistoryRequest().Currency(asset)
 	if endTime != nil {
 		req.Before(*endTime)
@@ -754,7 +762,9 @@ func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime
 	return records, nil
 }
 
-func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginRepay, error) {
+func (e *Exchange) QueryRepayHistory(
+	ctx context.Context, asset string, startTime, endTime *time.Time,
+) ([]types.MarginRepay, error) {
 	req := e.client.NewGetAccountSpotBorrowRepayHistoryRequest().Currency(asset)
 	if endTime != nil {
 		req.Before(*endTime)
@@ -779,15 +789,21 @@ func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTim
 	return records, nil
 }
 
-func (e *Exchange) QueryLiquidationHistory(ctx context.Context, startTime, endTime *time.Time) ([]types.MarginLiquidation, error) {
+func (e *Exchange) QueryLiquidationHistory(
+	ctx context.Context, startTime, endTime *time.Time,
+) ([]types.MarginLiquidation, error) {
 	return nil, nil
 }
 
-func (e *Exchange) QueryInterestHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginInterest, error) {
+func (e *Exchange) QueryInterestHistory(
+	ctx context.Context, asset string, startTime, endTime *time.Time,
+) ([]types.MarginInterest, error) {
 	return nil, nil
 }
 
-func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.Deposit, error) {
+func (e *Exchange) QueryDepositHistory(
+	ctx context.Context, asset string, startTime, endTime *time.Time,
+) ([]types.Deposit, error) {
 	req := e.client.NewGetAssetDepositHistoryRequest().Currency(asset)
 	if endTime != nil {
 		req.Before(*endTime)
@@ -821,7 +837,9 @@ REMARK: If your start time is 90 days earlier, we will update it to now - 90 day
 If you want to query all trades within a large time range (e.g. total orders > 100), we recommend using batch.TradeBatchQuery.
 We don't support the last trade id as a filter because okx supports bill ID only.
 */
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) QueryTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (trades []types.Trade, err error) {
 	logger := util.GetLoggerFromCtxOrFallback(ctx, log)
 	if symbol == "" {
 		return nil, ErrSymbolRequired
@@ -928,7 +946,8 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 }
 
 func getTrades(
-	ctx context.Context, logger *logrus.Entry, limit int64, doFunc func(ctx context.Context, billId string) ([]okexapi.Trade, error),
+	ctx context.Context, logger *logrus.Entry, limit int64,
+	doFunc func(ctx context.Context, billId string) ([]okexapi.Trade, error),
 ) (trades []types.Trade, err error) {
 	billId := "0"
 	for {

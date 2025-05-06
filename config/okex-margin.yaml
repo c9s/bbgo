@@ -1,0 +1,14 @@
+---
+sessions:
+  okex:
+    exchange: okex
+    # enable cross margin
+    margin: true
+
+exchangeStrategies:
+
+- on: okex
+  dummy:
+    symbol: LINKUSDT
+    interval: 1m
+

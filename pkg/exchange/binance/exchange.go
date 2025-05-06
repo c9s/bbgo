@@ -340,7 +340,9 @@ func (e *Exchange) QueryMarginFutureHourlyInterestRate(
 	return rateMap, nil
 }
 
-func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset string) (amount fixedpoint.Value, err error) {
+func (e *Exchange) QueryMarginAssetMaxBorrowable(
+	ctx context.Context, asset string,
+) (amount fixedpoint.Value, err error) {
 	req := e.client2.NewGetMarginMaxBorrowableRequest()
 	req.Asset(asset)
 	if e.IsIsolatedMargin {
@@ -467,8 +469,8 @@ func (e *Exchange) QueryCrossMarginAccount(ctx context.Context) (*types.Account,
 		MarginInfo:      toGlobalMarginAccountInfo(marginAccount), // In binance GO api, Account define marginAccount info which mantain []*AccountAsset and []*AccountPosition.
 		MarginLevel:     marginLevel,
 		MarginTolerance: calculateMarginTolerance(marginLevel),
-		BorrowEnabled:   marginAccount.BorrowEnabled,
-		TransferEnabled: marginAccount.TransferEnabled,
+		BorrowEnabled:   types.BoolPtr(marginAccount.BorrowEnabled),
+		TransferEnabled: types.BoolPtr(marginAccount.TransferEnabled),
 	}
 
 	// convert cross margin user assets into balances
@@ -515,7 +517,7 @@ func (e *Exchange) QueryIsolatedMarginAccount(ctx context.Context) (*types.Accou
 	a.MarginLevel = marginLevel
 	a.MarginTolerance = calculateMarginTolerance(marginLevel)
 	a.MarginRatio = fixedpoint.MustNewFromString(userAsset.MarginRatio)
-	a.BorrowEnabled = userAsset.BaseAsset.BorrowEnabled || userAsset.QuoteAsset.BorrowEnabled
+	a.BorrowEnabled = types.BoolPtr(userAsset.BaseAsset.BorrowEnabled || userAsset.QuoteAsset.BorrowEnabled)
 	a.LiquidationPrice = fixedpoint.MustNewFromString(userAsset.LiquidatePrice)
 	a.LiquidationRate = fixedpoint.MustNewFromString(userAsset.LiquidateRate)
 
@@ -569,7 +571,9 @@ func (e *Exchange) Withdraw(
 	return nil
 }
 
-func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) (withdraws []types.Withdraw, err error) {
+func (e *Exchange) QueryWithdrawHistory(
+	ctx context.Context, asset string, since, until time.Time,
+) (withdraws []types.Withdraw, err error) {
 	var emptyTime = time.Time{}
 	if since == emptyTime {
 		since, err = getLaunchDate()
@@ -629,7 +633,9 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 	return withdraws, nil
 }
 
-func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) (allDeposits []types.Deposit, err error) {
+func (e *Exchange) QueryDepositHistory(
+	ctx context.Context, asset string, since, until time.Time,
+) (allDeposits []types.Deposit, err error) {
 	if since.IsZero() {
 		since, err = getLaunchDate()
 		if err != nil {
@@ -1365,7 +1371,9 @@ func (e *Exchange) queryMarginTrades(
 	return trades, nil
 }
 
-func (e *Exchange) querySpotTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) querySpotTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (trades []types.Trade, err error) {
 	req := e.client2.NewGetMyTradesRequest()
 	req.Symbol(symbol)
 
@@ -1412,7 +1420,9 @@ func (e *Exchange) querySpotTrades(ctx context.Context, symbol string, options *
 	return trades, nil
 }
 
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
+func (e *Exchange) QueryTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) ([]types.Trade, error) {
 	if err := queryTradeLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
@@ -1443,7 +1453,9 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 }
 
 // QueryDepth query the order book depth of a symbol
-func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+func (e *Exchange) QueryDepth(
+	ctx context.Context, symbol string,
+) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	if e.IsFutures {
 		return e.queryFuturesDepth(ctx, symbol)
 	}
@@ -1456,7 +1468,9 @@ func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (snapshot type
 	return convertDepth(symbol, response)
 }
 
-func convertDepth(symbol string, response *binanceapi.Depth) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+func convertDepth(
+	symbol string, response *binanceapi.Depth,
+) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	snapshot.Symbol = symbol
 	snapshot.Time = time.Now()
 	snapshot.LastUpdateId = response.LastUpdateId
