@@ -276,8 +276,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 
 		account.BorrowEnabled = types.BoolPtr(accountConfigs[0].EnableSpotBorrow)
 
-		if e.MarginSettings.IsMargin && !accountConfigs[0].EnableSpotBorrow {
-			log.Warnf("margin is set, but okx enableSpotBorrow field is false, please turn on auto-borrow from the okx UI")
+		if !accountConfigs[0].EnableSpotBorrow {
+			log.Warnf("margin is enabled, but okx enableSpotBorrow field is false, please turn on auto-borrow from the okx UI, this is the only way to enable spot margin auto-borrow")
 		}
 	}
 
