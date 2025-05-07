@@ -53,12 +53,13 @@ var userDataStreamCmd = &cobra.Command{
 			log.Infof("[balanceSnapshot] %+v", trade)
 		})
 
-		log.Infof("connecting...")
+		log.Infof("connecting user data stream...")
 		if err := s.Connect(ctx); err != nil {
 			return fmt.Errorf("failed to connect to %s", sessionName)
 		}
 
-		log.Infof("connected")
+		log.Infof("user data stream connected")
+
 		defer func() {
 			log.Infof("closing connection...")
 			if err := s.Close(); err != nil {

@@ -500,12 +500,21 @@ func (s *StandardStream) Dial(ctx context.Context, args ...string) (*websocket.C
 		return nil
 	})
 
-	log.Infof("[websocket] connected, public = %v, read timeout = %v", s.PublicOnly, readTimeout)
+	if s.PublicOnly {
+		log.Infof("[websocket] public stream connected, read timeout = %v", readTimeout)
+	} else {
+		log.Infof("[websocket] user data stream connected, read timeout = %v", readTimeout)
+	}
+
 	return conn, nil
 }
 
 func (s *StandardStream) Close() error {
-	log.Debugf("[websocket] closing stream...")
+	if s.PublicOnly {
+		log.Debugf("[websocket] closing public stream...")
+	} else {
+		log.Debugf("[websocket] closing user data stream...")
+	}
 
 	// close the close signal channel, so that reader and ping worker will stop
 	close(s.CloseC)
@@ -530,6 +539,7 @@ func (s *StandardStream) Close() error {
 	log.Debugf("[websocket] stream closed")
 
 	// let the reader close the connection
+	// TODO: use signal channel instead
 	<-time.After(time.Second)
 	return nil
 }
