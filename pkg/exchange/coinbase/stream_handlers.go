@@ -77,206 +77,16 @@ func (msg subscribeMsgType2) String() string {
 }
 
 func (s *Stream) handleConnect() {
-	subProductsMap := make(map[types.Channel][]string)
+	// channel2LocalSymbolsMap is a map from channel to local symbols
+	channel2LocalSymbolsMap := make(map[types.Channel][]string)
 
-	// user data strea, subscribe to user channel for the user order/trade updates
+	// user data stream, subscribe to user channel for the user order/trade updates
 	if !s.PublicOnly {
-		if !s.authEnabled {
-			panic("user channel requires authentication")
-		}
-		privateChannelLocalSymbols := s.privateChannelLocalSymbols()
-		if len(privateChannelLocalSymbols) == 0 {
-			panic("user channel requires at least one private symbol")
-		}
-		// subscribe private symbols to user channel
-		// Once subscribe to the user channel, it will receive events for the following types:
-		// - order life cycle events: receive, open, done, change, activate(for stop orders)
-		// - order match
-		subProductsMap[userChannel] = privateChannelLocalSymbols
+		s.buildMapForUserDataStream(channel2LocalSymbolsMap)
 	} else {
-		// market data stream: subscribe to channels
-		if len(s.Subscriptions) == 0 {
-			return
-		}
-		// bridge bbgo channels to coinbase channels
-		// auth required: level2, full, user
-		for _, sub := range s.Subscriptions {
-			localSymbol := toLocalSymbol(sub.Symbol)
-			switch sub.Channel {
-			case types.BookChannel:
-				// bridge to level2 channel, which provides order book snapshot and book updates
-				logStream.Infof("bridge %s to level2_batch channel (%s)", sub.Channel, sub.Symbol)
-				subProductsMap[level2BatchChannel] = append(subProductsMap[level2Channel], localSymbol)
-			case types.MarketTradeChannel:
-				// matches: all trades
-				if !s.PublicOnly {
-					panic("subscribe to market trade channel for a public stream is not allowed")
-				}
-				subProductsMap[matchesChannel] = append(subProductsMap[matchesChannel], localSymbol)
-				logStream.Infof("bridge %s to %s(%s)", sub.Channel, matchesChannel, localSymbol)
-			case types.BookTickerChannel:
-				// ticker channel provides feeds on best bid/ask prices
-				subProductsMap[tickerChannel] = append(subProductsMap[tickerChannel], localSymbol)
-				logStream.Infof("bridge %s to %s(%s)", sub.Channel, tickerChannel, localSymbol)
-			case types.KLineChannel:
-				// TODO: add support to kline channel
-				// kline stream is available on Advanced Trade API only: https://docs.cdp.coinbase.com/advanced-trade/docs/ws-channels#candles-channel
-			case types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
-				logStream.Warnf("coinbase stream does not support subscription to %s, skipped", sub.Channel)
-			default:
-				// rfqMatchChannel allow empty symbol
-				if sub.Channel != rfqMatchChannel && sub.Channel != statusChannel && len(sub.Symbol) == 0 {
-					logStream.Warnf("do not support subscription to %s without symbol, skipped", sub.Channel)
-					continue
-				}
-				subProductsMap[sub.Channel] = append(subProductsMap[sub.Channel], localSymbol)
-			}
-		}
+		s.buildMapForMarketStream(channel2LocalSymbolsMap)
 	}
-
-	// do subscription
-	var subCmds []any
-	signature, ts := s.generateSignature()
-	for channel, productIDs := range subProductsMap {
-		var subType string
-		if channel == rfqMatchChannel {
-			subType = "subscriptions"
-		} else {
-			subType = "subscribe"
-		}
-
-		var subCmd any
-		switch channel {
-		case statusChannel:
-			subCmd = subscribeMsgType1{
-				Type: subType,
-				Channels: []channelType{
-					{
-						Name: channel,
-					},
-				},
-			}
-		case auctionChannel, rfqMatchChannel:
-			subCmd = subscribeMsgType1{
-				Type: subType,
-				Channels: []channelType{
-					{
-						Name:       channel,
-						ProductIDs: productIDs,
-					},
-				},
-			}
-		case matchesChannel:
-			subCmd = subscribeMsgType1{
-				Type: subType,
-				Channels: []channelType{
-					{
-						Name:       channel,
-						ProductIDs: productIDs,
-					},
-				},
-			}
-			if v, _ := subCmd.(subscribeMsgType1); s.authEnabled {
-				v.authMsg = authMsg{
-					Signature:  signature,
-					Key:        s.apiKey,
-					Passphrase: s.passphrase,
-					Timestamp:  ts,
-				}
-				subCmd = v
-			}
-		case tickerChannel, tickerBatchChannel:
-			subCmd = subscribeMsgType2{
-				Type:       subType,
-				Channels:   []types.Channel{channel},
-				ProductIDs: productIDs,
-			}
-		case fullChannel, userChannel:
-			if !s.authEnabled {
-				panic("full/user channel requires authentication")
-			}
-			if channel == fullChannel && !s.PublicOnly {
-				panic("cannot subscribe to full channel on a private stream")
-			}
-			subCmd = subscribeMsgType2{
-				Type:       subType,
-				Channels:   []types.Channel{channel},
-				ProductIDs: productIDs,
-				authMsg: authMsg{
-					Signature:  signature,
-					Key:        s.apiKey,
-					Passphrase: s.passphrase,
-					Timestamp:  ts,
-				},
-			}
-		case level2Channel:
-			if !s.authEnabled {
-				panic("level2 channel requires authentication")
-			}
-			subCmd = subscribeMsgType2{
-				Type:       subType,
-				Channels:   []types.Channel{channel},
-				ProductIDs: productIDs,
-
-				authMsg: authMsg{
-					Signature:  signature,
-					Key:        s.apiKey,
-					Passphrase: s.passphrase,
-					Timestamp:  ts,
-				},
-			}
-		case level2BatchChannel:
-			subCmd = subscribeMsgType2{
-				Type:       subType,
-				Channels:   []types.Channel{channel},
-				ProductIDs: productIDs,
-			}
-		case balanceChannel:
-			if !s.authEnabled {
-				panic("balance channel requires authentication")
-			}
-			subCmd = subscribeMsgType2{
-				Type:       subType,
-				Channels:   []types.Channel{channel},
-				AccountIDs: productIDs,
-
-				authMsg: authMsg{
-					Signature:  signature,
-					Key:        s.apiKey,
-					Passphrase: s.passphrase,
-					Timestamp:  ts,
-				},
-			}
-		default:
-			subCmd = subscribeMsgType1{
-				Type: subType,
-				Channels: []channelType{
-					{
-						Name:       channel,
-						ProductIDs: productIDs,
-					},
-				},
-			}
-			if v, _ := subCmd.(subscribeMsgType1); s.authEnabled {
-				v.authMsg = authMsg{
-					Signature:  signature,
-					Key:        s.apiKey,
-					Passphrase: s.passphrase,
-					Timestamp:  ts,
-				}
-				subCmd = v
-			}
-		}
-		subCmds = append(subCmds, subCmd)
-	}
-	for _, subCmd := range subCmds {
-		err := s.Conn.WriteJSON(subCmd)
-		if err != nil {
-			logStream.WithError(err).Errorf("subscription error: %s", subCmd)
-		} else {
-			logStream.Infof("subscribed to %s", subCmd)
-		}
-	}
+	s.writeSubscribeJson(channel2LocalSymbolsMap)
 
 	s.clearSequenceNumber()
 	s.clearWorkingOrders()
@@ -317,6 +127,220 @@ func (s *Stream) handleConnect() {
 		}
 
 	}()
+}
+
+func (s *Stream) buildMapForUserDataStream(channel2LocalSymbolsMap map[types.Channel][]string) {
+	if !s.authEnabled {
+		panic("user channel requires authentication")
+	}
+	privateChannelLocalSymbols := s.privateChannelLocalSymbols()
+	if len(privateChannelLocalSymbols) == 0 {
+		panic("user channel requires at least one private symbol")
+	}
+	// subscribe private symbols to user channel
+	// Once subscribe to the user channel, it will receive events for the following types:
+	// - order life cycle events: receive, open, done, change, activate(for stop orders)
+	// - order match
+	channel2LocalSymbolsMap[userChannel] = privateChannelLocalSymbols
+}
+
+func (s *Stream) buildMapForMarketStream(channel2LocalSymbolsMap map[types.Channel][]string) {
+	// market data stream: subscribe to channels
+	if len(s.Subscriptions) == 0 {
+		return
+	}
+	// bridge bbgo channels to coinbase channels
+	// auth required: level2, full, user
+	dedupLocalSymbols := make(map[types.Channel]map[string]struct{})
+
+	for _, sub := range s.Subscriptions {
+		if _, ok := dedupLocalSymbols[sub.Channel]; !ok {
+			dedupLocalSymbols[sub.Channel] = make(map[string]struct{})
+		}
+		localSymbol := toLocalSymbol(sub.Symbol)
+		dedupLocalSymbols[sub.Channel][localSymbol] = struct{}{}
+	}
+	// temp helper function to extract keys from map
+	keys := func(mm map[string]struct{}) (localSymbols []string) {
+		localSymbols = make([]string, 0, len(mm))
+		for product := range mm {
+			localSymbols = append(localSymbols, product)
+		}
+		return
+	}
+	// populate channel2LocalSymbolsMap
+	for channel, dedupLocalSymbols := range dedupLocalSymbols {
+		switch channel {
+		case types.BookChannel:
+			// bridge to level2 channel, which provides order book snapshot and book updates
+			logStream.Infof("bridge %s to level2_batch channel", channel)
+			channel2LocalSymbolsMap[level2BatchChannel] = keys(dedupLocalSymbols)
+		case types.MarketTradeChannel:
+			// matches: all trades
+			channel2LocalSymbolsMap[matchesChannel] = keys(dedupLocalSymbols)
+			logStream.Infof("bridge %s to %s", channel, matchesChannel)
+		case types.BookTickerChannel:
+			// ticker channel provides feeds on best bid/ask prices
+			channel2LocalSymbolsMap[tickerChannel] = keys(dedupLocalSymbols)
+			logStream.Infof("bridge %s to %s", channel, tickerChannel)
+		case types.KLineChannel, types.AggTradeChannel, types.ForceOrderChannel, types.MarkPriceChannel, types.LiquidationOrderChannel, types.ContractInfoChannel:
+			logStream.Warnf("coinbase stream does not support subscription to %s, skipped", channel)
+		default:
+			// rfqMatchChannel allow empty symbol
+			for _, localSymbol := range keys(dedupLocalSymbols) {
+				if channel != rfqMatchChannel && channel != statusChannel && len(localSymbol) == 0 {
+					logStream.Warnf("do not support subscription to %s without symbol, skipped", channel)
+					continue
+				}
+				channel2LocalSymbolsMap[channel] = append(channel2LocalSymbolsMap[channel], localSymbol)
+			}
+		}
+	}
+}
+
+func (s *Stream) writeSubscribeJson(channel2LocalSymbolsMap map[types.Channel][]string) {
+	var subCmds []any
+	signature, ts := s.generateSignature()
+	for channel, localSymbols := range channel2LocalSymbolsMap {
+		var subType string
+		if channel == rfqMatchChannel {
+			subType = "subscriptions"
+		} else {
+			subType = "subscribe"
+		}
+
+		var subCmd any
+		switch channel {
+		case statusChannel:
+			subCmd = subscribeMsgType1{
+				Type: subType,
+				Channels: []channelType{
+					{
+						Name: channel,
+					},
+				},
+			}
+		case auctionChannel, rfqMatchChannel:
+			subCmd = subscribeMsgType1{
+				Type: subType,
+				Channels: []channelType{
+					{
+						Name:       channel,
+						ProductIDs: localSymbols,
+					},
+				},
+			}
+		case matchesChannel:
+			subCmd = subscribeMsgType1{
+				Type: subType,
+				Channels: []channelType{
+					{
+						Name:       channel,
+						ProductIDs: localSymbols,
+					},
+				},
+			}
+			if v, _ := subCmd.(subscribeMsgType1); s.authEnabled {
+				v.authMsg = authMsg{
+					Signature:  signature,
+					Key:        s.apiKey,
+					Passphrase: s.passphrase,
+					Timestamp:  ts,
+				}
+				subCmd = v
+			}
+		case tickerChannel, tickerBatchChannel:
+			subCmd = subscribeMsgType2{
+				Type:       subType,
+				Channels:   []types.Channel{channel},
+				ProductIDs: localSymbols,
+			}
+		case fullChannel, userChannel:
+			if !s.authEnabled {
+				panic("full/user channel requires authentication")
+			}
+			if channel == fullChannel && !s.PublicOnly {
+				panic("cannot subscribe to full channel on a private stream")
+			}
+			subCmd = subscribeMsgType2{
+				Type:       subType,
+				Channels:   []types.Channel{channel},
+				ProductIDs: localSymbols,
+				authMsg: authMsg{
+					Signature:  signature,
+					Key:        s.apiKey,
+					Passphrase: s.passphrase,
+					Timestamp:  ts,
+				},
+			}
+		case level2Channel:
+			if !s.authEnabled {
+				panic("level2 channel requires authentication")
+			}
+			subCmd = subscribeMsgType2{
+				Type:       subType,
+				Channels:   []types.Channel{channel},
+				ProductIDs: localSymbols,
+
+				authMsg: authMsg{
+					Signature:  signature,
+					Key:        s.apiKey,
+					Passphrase: s.passphrase,
+					Timestamp:  ts,
+				},
+			}
+		case level2BatchChannel:
+			subCmd = subscribeMsgType2{
+				Type:       subType,
+				Channels:   []types.Channel{channel},
+				ProductIDs: localSymbols,
+			}
+		case balanceChannel:
+			if !s.authEnabled {
+				panic("balance channel requires authentication")
+			}
+			subCmd = subscribeMsgType2{
+				Type:       subType,
+				Channels:   []types.Channel{channel},
+				AccountIDs: localSymbols,
+
+				authMsg: authMsg{
+					Signature:  signature,
+					Key:        s.apiKey,
+					Passphrase: s.passphrase,
+					Timestamp:  ts,
+				},
+			}
+		default:
+			subCmd = subscribeMsgType1{
+				Type: subType,
+				Channels: []channelType{
+					{
+						Name:       channel,
+						ProductIDs: localSymbols,
+					},
+				},
+			}
+			if v, _ := subCmd.(subscribeMsgType1); s.authEnabled {
+				v.authMsg = authMsg{
+					Signature:  signature,
+					Key:        s.apiKey,
+					Passphrase: s.passphrase,
+					Timestamp:  ts,
+				}
+				subCmd = v
+			}
+		}
+		subCmds = append(subCmds, subCmd)
+	}
+	for _, subCmd := range subCmds {
+		err := s.Conn.WriteJSON(subCmd)
+		if err != nil {
+			panic(fmt.Errorf("subscription error for %s: %w", subCmd, err))
+		} else {
+			logStream.Infof("subscribed to %s", subCmd)
+		}
+	}
 }
 
 func (s *Stream) handleDisconnect() {
