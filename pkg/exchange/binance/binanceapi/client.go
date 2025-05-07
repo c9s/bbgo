@@ -3,6 +3,7 @@ package binanceapi
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/tls"
@@ -25,6 +26,12 @@ const defaultHTTPTimeout = time.Second * 10
 const RestBaseURL = "https://api.binance.com"
 const SandboxRestBaseURL = "https://testnet.binance.vision"
 const DebugRequestResponse = false
+
+var errEmptyPrivateKey = errors.New("empty private key")
+
+var errNoApiKey = errors.New("empty api key")
+
+var errNoApiSecret = errors.New("empty api secret")
 
 var dialer = &net.Dialer{
 	Timeout:   30 * time.Second,
@@ -52,6 +59,7 @@ type RestClient struct {
 	requestgen.BaseAPIClient
 
 	Key, Secret string
+	PrivateKey  ed25519.PrivateKey
 
 	recvWindow int
 	timeOffset int64
@@ -78,14 +86,21 @@ func NewClient(baseURL string) *RestClient {
 	return client
 }
 
-func (c *RestClient) Auth(key, secret string) {
+func (c *RestClient) Auth(key, secret string, privateKey ed25519.PrivateKey) {
 	c.Key = key
 	// pragma: allowlist nextline secret
 	c.Secret = secret
+	c.PrivateKey = privateKey
+}
+
+func (c *RestClient) IsUsingEd25519Auth() bool {
+	return len(c.PrivateKey) > 0
 }
 
 // NewRequest create new API request. Relative url can be provided in refURL.
-func (c *RestClient) NewRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewRequest(
+	ctx context.Context, method, refURL string, params url.Values, payload interface{},
+) (*http.Request, error) {
 	rel, err := url.Parse(refURL)
 	if err != nil {
 		return nil, err
@@ -140,13 +155,32 @@ func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error
 }
 
 // newAuthenticatedRequest creates new http request for authenticated routes.
-func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
+func (c *RestClient) NewAuthenticatedRequest(
+	ctx context.Context, method, refURL string, params url.Values, payload interface{},
+) (*http.Request, error) {
+	signFunc := c.signHMAC
+	if c.IsUsingEd25519Auth() {
+		signFunc = c.signEd25519
+	}
+	return c.newAuthenticatedRequest(ctx, method, refURL, params, payload, signFunc)
+}
+
+// newAuthenticatedRequest creates new http request for authenticated routes.
+// See the doc links for details:
+// - https://developers.binance.com/docs/binance-spot-api-docs/rest-api/endpoint-security-type
+// - https://developers.binance.com/docs/binance-spot-api-docs/rest-api/general-information-on-endpoints
+func (c *RestClient) newAuthenticatedRequest(
+	ctx context.Context, method, refURL string, params url.Values, payload interface{}, signFunc func(string) string,
+) (*http.Request, error) {
 	if len(c.Key) == 0 {
-		return nil, errors.New("empty api key")
+		return nil, errNoApiKey
 	}
 
-	if len(c.Secret) == 0 {
-		return nil, errors.New("empty api secret")
+	if !c.IsUsingEd25519Auth() {
+		// using HMAC authentication
+		if len(c.Secret) == 0 {
+			return nil, errNoApiSecret
+		}
 	}
 
 	rel, err := url.Parse(refURL)
@@ -172,7 +206,7 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	}
 
 	toSign := rawQuery + string(body)
-	signature := sign(c.Secret, toSign)
+	signature := signFunc(toSign)
 
 	// sv is the extra url parameters that we need to attach to the request
 	sv := url.Values{}
@@ -204,15 +238,20 @@ func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL
 	return req, nil
 }
 
-// sign uses sha256 to sign the payload with the given secret
-func sign(secret, payload string) string {
-	var sig = hmac.New(sha256.New, []byte(secret))
+// signHMAC uses sha256 to sign the payload with the given secret
+func (c *RestClient) signHMAC(payload string) string {
+	var sig = hmac.New(sha256.New, []byte(c.Secret))
 	_, err := sig.Write([]byte(payload))
 	if err != nil {
 		return ""
 	}
 
 	return fmt.Sprintf("%x", sig.Sum(nil))
+}
+
+// signEd25519 uses ed25519 to sign the payload with the given private key
+func (c *RestClient) signEd25519(payload string) string {
+	return GenerateSignatureEd25519(payload, c.PrivateKey)
 }
 
 func currentTimestamp() int64 {
