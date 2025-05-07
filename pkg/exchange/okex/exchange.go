@@ -96,7 +96,8 @@ func WithBrokerId(id string) Option {
 
 func New(key, secret, passphrase string, opts ...Option) *Exchange {
 	client := okexapi.NewClient()
-	log.Infof("creating new okex rest client with base url: %s", okexapi.RestBaseURL)
+
+	log.Debugf("creating new okex rest client with base url: %s", okexapi.RestBaseURL)
 
 	if len(key) > 0 && len(secret) > 0 {
 		client.Auth(key, secret, passphrase)
@@ -266,13 +267,24 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	account := types.NewAccount()
 	account.UpdateBalances(balances)
 
-	// for margin account
+	// Spot mode could have margin ratio as well
 	account.MarginRatio = accounts[0].MarginRatio
 	account.MarginLevel = accounts[0].MarginRatio
-	account.TotalAccountValue = accounts[0].TotalEquityInUSD
 
-	if e.MarginSettings.IsMargin && !accountConfigs[0].EnableSpotBorrow {
-		log.Warnf("margin is set, but okx enableSpotBorrow field is false, please turn on auto-borrow from the okx UI")
+	if account.MarginRatio.Sign() > 0 {
+		account.MarginTolerance = util.CalculateMarginTolerance(account.MarginRatio)
+	}
+
+	// for margin account
+	if e.MarginSettings.IsMargin {
+		account.AccountType = types.AccountTypeMargin
+		account.TotalAccountValue = accounts[0].TotalEquityInUSD
+
+		account.BorrowEnabled = types.BoolPtr(accountConfigs[0].EnableSpotBorrow)
+
+		if !accountConfigs[0].EnableSpotBorrow {
+			log.Warnf("margin is enabled, but okx enableSpotBorrow field is false, please turn on auto-borrow from the okx UI, this is the only way to enable spot margin auto-borrow")
+		}
 	}
 
 	return account, nil
@@ -310,7 +322,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		// okx market order with trade mode cross will be rejected:
 		//   "The corresponding product of this BTC-USDT doesn't support the tgtCcy parameter"
 		if order.Type == types.OrderTypeMarket {
-			log.Warnf("market order with margin mode is not supported, fallback to cash mode, please see %s for more details",
+			log.Errorf("market order with margin mode is not supported, fallback to cash mode, please see %s for more details",
 				"https://www.okx.com/docs-v5/trick_en/#order-management-trade-mode")
 			orderReq.TradeMode(okexapi.TradeModeCash)
 		} else {
@@ -729,7 +741,9 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(ctx context.Context, asset stri
 	return resp[0].MaxLoan, nil
 }
 
-func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginLoan, error) {
+func (e *Exchange) QueryLoanHistory(
+	ctx context.Context, asset string, startTime, endTime *time.Time,
+) ([]types.MarginLoan, error) {
 	req := e.client.NewGetAccountSpotBorrowRepayHistoryRequest().Currency(asset)
 	if endTime != nil {
 		req.Before(*endTime)
@@ -754,7 +768,9 @@ func (e *Exchange) QueryLoanHistory(ctx context.Context, asset string, startTime
 	return records, nil
 }
 
-func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginRepay, error) {
+func (e *Exchange) QueryRepayHistory(
+	ctx context.Context, asset string, startTime, endTime *time.Time,
+) ([]types.MarginRepay, error) {
 	req := e.client.NewGetAccountSpotBorrowRepayHistoryRequest().Currency(asset)
 	if endTime != nil {
 		req.Before(*endTime)
@@ -779,15 +795,31 @@ func (e *Exchange) QueryRepayHistory(ctx context.Context, asset string, startTim
 	return records, nil
 }
 
-func (e *Exchange) QueryLiquidationHistory(ctx context.Context, startTime, endTime *time.Time) ([]types.MarginLiquidation, error) {
+func (e *Exchange) QueryLiquidationHistory(
+	ctx context.Context, startTime, endTime *time.Time,
+) ([]types.MarginLiquidation, error) {
 	return nil, nil
 }
 
-func (e *Exchange) QueryInterestHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.MarginInterest, error) {
+func (e *Exchange) QueryInterestHistory(
+	ctx context.Context, asset string, startTime, endTime *time.Time,
+) ([]types.MarginInterest, error) {
 	return nil, nil
 }
 
-func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, startTime, endTime *time.Time) ([]types.Deposit, error) {
+func (e *Exchange) getInstrumentType() okexapi.InstrumentType {
+	if e.MarginSettings.IsMargin {
+		return okexapi.InstrumentTypeMargin
+	} else if e.IsFutures {
+		return okexapi.InstrumentTypeSwap
+	}
+
+	return okexapi.InstrumentTypeSpot
+}
+
+func (e *Exchange) QueryDepositHistory(
+	ctx context.Context, asset string, startTime, endTime *time.Time,
+) ([]types.Deposit, error) {
 	req := e.client.NewGetAssetDepositHistoryRequest().Currency(asset)
 	if endTime != nil {
 		req.Before(*endTime)
@@ -821,7 +853,9 @@ REMARK: If your start time is 90 days earlier, we will update it to now - 90 day
 If you want to query all trades within a large time range (e.g. total orders > 100), we recommend using batch.TradeBatchQuery.
 We don't support the last trade id as a filter because okx supports bill ID only.
 */
-func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) (trades []types.Trade, err error) {
+func (e *Exchange) QueryTrades(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (trades []types.Trade, err error) {
 	logger := util.GetLoggerFromCtxOrFallback(ctx, log)
 	if symbol == "" {
 		return nil, ErrSymbolRequired
@@ -878,57 +912,47 @@ func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *type
 		instrumentID = toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)
 	}
 
+	instrType := e.getInstrumentType()
+
 	if lessThan3Day {
-		c := e.client.NewGetThreeDaysTransactionHistoryRequest().
+		req := e.client.NewGetThreeDaysTransactionHistoryRequest().
 			InstrumentID(instrumentID).
+			InstrumentType(instrType).
 			StartTime(newStartTime).
 			EndTime(endTime).
 			Limit(uint64(limit))
-
-		if e.MarginSettings.IsMargin {
-			c.InstrumentType(okexapi.InstrumentTypeMargin)
-		} else if e.FuturesSettings.IsFutures {
-			c.InstrumentType(okexapi.InstrumentTypeSwap)
-		} else {
-			c.InstrumentType(okexapi.InstrumentTypeSpot)
-		}
 
 		return getTrades(ctx, logger, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
 			if billId != "" && billId != "0" {
 				// the `after` will get the data after the billId
 				// so DON'T fill the billId if it's 0
-				c.After(billId)
+				req.After(billId)
 			}
-			return c.Do(ctx)
+			return req.Do(ctx)
 		})
 	}
 
-	c := e.client.NewGetTransactionHistoryRequest().
+	req := e.client.NewGetTransactionHistoryRequest().
 		InstrumentID(instrumentID).
+		InstrumentType(instrType).
 		StartTime(newStartTime).
 		EndTime(endTime).
 		Limit(uint64(limit))
-
-	if e.MarginSettings.IsMargin {
-		c.InstrumentType(okexapi.InstrumentTypeMargin)
-	} else if e.FuturesSettings.IsFutures {
-		c.InstrumentType(okexapi.InstrumentTypeSwap)
-	} else {
-		c.InstrumentType(okexapi.InstrumentTypeSpot)
-	}
 
 	return getTrades(ctx, logger, limit, func(ctx context.Context, billId string) ([]okexapi.Trade, error) {
 		if billId != "" && billId != "0" {
 			// the `after` will get the data after the billId
 			// so DON'T fill the billId if it's 0
-			c.After(billId)
+			req.After(billId)
 		}
-		return c.Do(ctx)
+
+		return req.Do(ctx)
 	})
 }
 
 func getTrades(
-	ctx context.Context, logger *logrus.Entry, limit int64, doFunc func(ctx context.Context, billId string) ([]okexapi.Trade, error),
+	ctx context.Context, logger *logrus.Entry, limit int64,
+	doFunc func(ctx context.Context, billId string) ([]okexapi.Trade, error),
 ) (trades []types.Trade, err error) {
 	billId := "0"
 	for {
@@ -947,9 +971,7 @@ func getTrades(
 		if tradeLen > limit {
 			logger.WithError(err).Warnf("getTrades: trade length %d exceeds limit %d", tradeLen, limit)
 			return nil, fmt.Errorf("unexpected trade length %d", tradeLen)
-		}
-
-		if tradeLen < limit {
+		} else if tradeLen < limit {
 			logger.Warnf("getTrades: trade length %d less than limit %d", tradeLen, limit)
 			break
 		}
@@ -957,6 +979,7 @@ func getTrades(
 		// use After filter to get all data.
 		billId = response[tradeLen-1].BillId.String()
 	}
+
 	return trades, nil
 }
 
