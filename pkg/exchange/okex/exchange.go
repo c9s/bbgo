@@ -170,6 +170,8 @@ func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 			// OKEx does not offer minimal notional, use 1 USD here.
 			MinNotional: fixedpoint.One,
 			MinAmount:   fixedpoint.One,
+
+			ContractValue: instrument.ContractValue,
 		}
 		markets[symbol] = market
 	}
@@ -329,7 +331,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 			orderReq.TradeMode(okexapi.TradeModeCross)
 		}
 	} else if e.IsFutures {
+		quantity := order.Market.AdjustQuantityToContractSize(order.Quantity)
+		orderReq.Size(order.Market.FormatQuantity(quantity))
 		orderReq.InstrumentID(toLocalSymbol(order.Symbol, okexapi.InstrumentTypeSwap))
+
 		if e.FuturesSettings.IsIsolatedFutures {
 			orderReq.TradeMode(okexapi.TradeModeIsolated)
 		} else {

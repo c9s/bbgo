@@ -55,6 +55,8 @@ type Market struct {
 
 	MinPrice fixedpoint.Value `json:"minPrice,omitempty"`
 	MaxPrice fixedpoint.Value `json:"maxPrice,omitempty"`
+
+	ContractValue fixedpoint.Value `json:"contractValue,omitempty"`
 }
 
 func (m Market) IsDustQuantity(quantity, price fixedpoint.Value) bool {
@@ -263,6 +265,17 @@ func (m Market) AdjustQuantityByMaxAmount(quantity, currentPrice, maxAmount fixe
 	ratio := maxAmount.Div(amount)
 	quantity = quantity.Mul(ratio)
 	return m.TruncateQuantity(quantity)
+}
+
+// AdjustQuantityToContractSize adjusts the quantity to contract size
+func (m Market) AdjustQuantityToContractSize(quantity fixedpoint.Value) fixedpoint.Value {
+	// Validate input parameters
+	if quantity.Sign() <= 0 || m.ContractValue.Sign() <= 0 || m.StepSize.Sign() <= 0 {
+		return fixedpoint.Zero
+	}
+
+	contractQuantity := quantity.Div(m.ContractValue)
+	return m.RoundUpByStepSize(contractQuantity)
 }
 
 type MarketMap map[string]Market
