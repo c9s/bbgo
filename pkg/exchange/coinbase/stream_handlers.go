@@ -80,7 +80,7 @@ func (s *Stream) handleConnect() {
 	// channel2LocalSymbolsMap is a map from channel to local symbols
 	channel2LocalSymbolsMap := make(map[types.Channel][]string)
 
-	// user data strea, subscribe to user channel for the user order/trade updates
+	// user data stream, subscribe to user channel for the user order/trade updates
 	if !s.PublicOnly {
 		s.buildMapForUserDataStream(channel2LocalSymbolsMap)
 	} else {
