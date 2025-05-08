@@ -614,6 +614,8 @@ func (s *Strategy) placeLiquidityOrders(ctx context.Context) {
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orderForms...)
 	if util.LogErr(err, "unable to place liquidity orders") {
+		openOrderBidExposureInUsdMetrics.With(s.metricsLabels).Set(0.0)
+		openOrderAskExposureInUsdMetrics.With(s.metricsLabels).Set(0.0)
 		return
 	}
 
