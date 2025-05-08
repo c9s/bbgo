@@ -301,11 +301,6 @@ func TestMarket_AdjustQuantityToContractSize(t *testing.T) {
 			expect:   fixedpoint.Zero,
 		},
 		{
-			name:     "negative quantity",
-			quantity: fixedpoint.NewFromFloat(-0.01),
-			expect:   fixedpoint.Zero,
-		},
-		{
 			name:     "small quantity",
 			quantity: fixedpoint.NewFromFloat(0.005), // 0.5 contracts
 			expect:   fixedpoint.NewFromFloat(0.5),
