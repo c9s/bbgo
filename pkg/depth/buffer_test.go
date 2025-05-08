@@ -186,7 +186,7 @@ func TestDepthBuffer_FuturesReadyState(t *testing.T) {
 		}, 33, nil
 	}, time.Millisecond*5)
 
-	buf.UseFutures()
+	buf.CheckPreviousID()
 
 	readyC := make(chan struct{})
 	buf.OnReady(func(snapshot types.SliceOrderBook, updates []Update) {
@@ -232,7 +232,7 @@ func TestDepthBuffer_FuturesCorruptedUpdateAtTheBeginning(t *testing.T) {
 		}, snapshotFinalID, nil
 	}, time.Millisecond)
 
-	buf.UseFutures()
+	buf.CheckPreviousID()
 
 	resetC := make(chan struct{}, 2)
 
