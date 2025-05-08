@@ -95,7 +95,9 @@ func (a *MarginHighInterestRateAlert) SlackAttachment() slack.Attachment {
 }
 
 type marginFutureInterestQueryService interface {
-	QueryMarginFutureHourlyInterestRate(ctx context.Context, assets []string) (rates types.MarginNextHourlyInterestRateMap, err error)
+	QueryMarginFutureHourlyInterestRate(
+		ctx context.Context, assets []string,
+	) (rates types.MarginNextHourlyInterestRateMap, err error)
 }
 
 type MarginHighInterestRateWorker struct {
@@ -106,7 +108,9 @@ type MarginHighInterestRateWorker struct {
 	service marginFutureInterestQueryService
 }
 
-func newMarginHighInterestRateWorker(strategy *Strategy, config *MarginHighInterestRateAlertConfig) *MarginHighInterestRateWorker {
+func newMarginHighInterestRateWorker(
+	strategy *Strategy, config *MarginHighInterestRateAlertConfig,
+) *MarginHighInterestRateWorker {
 	session := strategy.ExchangeSession
 	service, support := session.Exchange.(marginFutureInterestQueryService)
 	if !support {
@@ -222,12 +226,15 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 				continue
 			}
 
-			if len(highRateAssets) > 0 {
-				log.Infof("found high interest rate assets: %+v", highRateAssets)
+			if len(highRateAssets) == 0 {
+				continue
 			}
+
+			log.Infof("found high interest rate assets: %+v", highRateAssets)
 
 			nextTotalInterestValue := fixedpoint.Zero
 			exceededDebtAmount := false
+			hasHighRateDebt := false
 			for cur, bal := range debts {
 				price, ok := w.session.GetPriceSolver().ResolvePrice(cur, currency.USDT)
 				if !ok {
@@ -235,20 +242,27 @@ func (w *MarginHighInterestRateWorker) Run(ctx context.Context) {
 					continue
 				}
 
-				if rate, ok := rateMap[cur]; ok {
-					debtValue := bal.Debt().Mul(price)
-					nextTotalInterestValue = nextTotalInterestValue.Add(
-						debtValue.Mul(rate.HourlyRate))
+				rate, ok := highRateAssets[cur]
+				if !ok {
+					continue
+				}
 
-					if w.config.MinDebtAmount.Sign() > 0 &&
-						debtValue.Compare(w.config.MinDebtAmount) > 0 {
+				debtValue := bal.Debt().Mul(price)
+				nextTotalInterestValue = nextTotalInterestValue.Add(
+					debtValue.Mul(rate.HourlyRate))
+
+				if w.config.MinDebtAmount.Sign() > 0 {
+					if debtValue.Compare(w.config.MinDebtAmount) > 0 {
+						log.Infof("debt value %s is greater than min debt amount %s", debtValue.String(), w.config.MinDebtAmount.String())
 						exceededDebtAmount = true
 					}
+				} else {
+					hasHighRateDebt = true
 				}
 			}
 
 			shouldAlert := func() bool {
-				return len(highRateAssets) > 0 && exceededDebtAmount
+				return hasHighRateDebt || exceededDebtAmount
 			}
 
 			// either danger or margin level is less than the minimal margin level
