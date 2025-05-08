@@ -269,9 +269,8 @@ func (m Market) AdjustQuantityByMaxAmount(quantity, currentPrice, maxAmount fixe
 
 // AdjustQuantityToContractSize adjusts the quantity to contract size
 func (m Market) AdjustQuantityToContractSize(quantity fixedpoint.Value) fixedpoint.Value {
-	// Validate input parameters
-	if quantity.Sign() <= 0 || m.ContractValue.Sign() <= 0 || m.StepSize.Sign() <= 0 {
-		return fixedpoint.Zero
+	if m.ContractValue.Sign() <= 0 || m.StepSize.Sign() <= 0 {
+		return quantity
 	}
 
 	contractQuantity := quantity.Div(m.ContractValue)
