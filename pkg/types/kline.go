@@ -447,10 +447,7 @@ func (k *KLineWindow) Truncate(size int) {
 	}
 
 	end := len(*k)
-	start := end - size
-	if start < 0 {
-		start = 0
-	}
+	start := max(end-size, 0)
 	kn := (*k)[start:]
 	*k = kn
 }

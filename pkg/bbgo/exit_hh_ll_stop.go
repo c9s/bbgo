@@ -157,10 +157,7 @@ func (s *HigherHighLowerLowStop) updateHighLowNumber(kline types.KLine) {
 		// Truncate highLows
 		if len(s.highLows) > s.HighLowWindow {
 			end := len(s.highLows)
-			start := end - s.HighLowWindow
-			if start < 0 {
-				start = 0
-			}
+			start := max(end-s.HighLowWindow, 0)
 			kn := s.highLows[start:]
 			s.highLows = kn
 		}

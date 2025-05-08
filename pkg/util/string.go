@@ -5,16 +5,12 @@ import (
 	"unicode/utf8"
 )
 
-
 func MaskKey(key string) string {
 	if len(key) == 0 {
 		return "{empty}"
 	}
 
-	h := len(key) / 3
-	if h > 5 {
-		h = 5
-	}
+	h := min(len(key)/3, 5)
 
 	maskKey := key[0:h]
 	maskKey += strings.Repeat("*", len(key)-h*2)

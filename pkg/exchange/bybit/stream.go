@@ -119,10 +119,7 @@ func (s *Stream) syncSubscriptions(opType WsOpType) error {
 	logger := log.WithField("opType", opType)
 	lens := len(s.Subscriptions)
 	for begin := 0; begin < lens; begin += spotArgsLimit {
-		end := begin + spotArgsLimit
-		if end > lens {
-			end = lens
-		}
+		end := min(begin+spotArgsLimit, lens)
 
 		topics := []string{}
 		for _, subscription := range s.Subscriptions[begin:end] {

@@ -54,10 +54,7 @@ func AddMigration(packageName string, up, down rockhopper.TransactionHandler) {
 
 // parseFuncPackageName parses the package name from a given runtime caller function name
 func _parseFuncPackageName(funcName string) string {
-	lastSlash := strings.LastIndexByte(funcName, '/')
-	if lastSlash < 0 {
-		lastSlash = 0
-	}
+	lastSlash := max(strings.LastIndexByte(funcName, '/'), 0)
 
 	lastDot := strings.LastIndexByte(funcName[lastSlash:], '.') + lastSlash
 	packageName := funcName[:lastDot]
