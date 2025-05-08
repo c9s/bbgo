@@ -14,7 +14,7 @@ import (
 type SnapshotFetcher func() (snapshot types.SliceOrderBook, finalUpdateID int64, err error)
 
 type Update struct {
-	FirstUpdateID, FinalUpdateID int64
+	FirstUpdateID, FinalUpdateID, PreviousUpdateID int64
 
 	// Object is the update object
 	Object types.SliceOrderBook
@@ -43,6 +43,9 @@ type Buffer struct {
 	bufferingPeriod time.Duration
 
 	logger *logrus.Entry
+
+	// isFutures indicates whether the buffer is for futures or spot
+	isFutures bool
 }
 
 func NewBuffer(fetcher SnapshotFetcher, bufferingPeriod time.Duration) *Buffer {
@@ -60,6 +63,10 @@ func (b *Buffer) SetLogger(logger *logrus.Entry) {
 
 func (b *Buffer) SetUpdateTimeout(d time.Duration) {
 	b.updateTimeout = d
+}
+
+func (b *Buffer) UseFutures() {
+	b.isFutures = true
 }
 
 func (b *Buffer) resetSnapshot() {
@@ -121,10 +128,16 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 		finalUpdateID = finalArgs[0]
 	}
 
+	var previousUpdateID int64
+	if len(finalArgs) > 1 {
+		previousUpdateID = finalArgs[1]
+	}
+
 	u := Update{
-		FirstUpdateID: firstUpdateID,
-		FinalUpdateID: finalUpdateID,
-		Object:        o,
+		FirstUpdateID:    firstUpdateID,
+		FinalUpdateID:    finalUpdateID,
+		PreviousUpdateID: previousUpdateID,
+		Object:           o,
 	}
 
 	// if the snapshot is set to nil, we need to buffer the message
@@ -142,9 +155,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 		})
 		b.mu.Unlock()
 		return nil
-
 	default:
-
 	}
 
 	// snapshot is nil means we haven't fetched the snapshot yet
@@ -163,29 +174,52 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 
 	// skip older events
 	if u.FinalUpdateID <= b.finalUpdateID {
-		b.logger.Infof("the final update id %d of event is less than equal to the final update id %d of the snapshot, skip", u.FinalUpdateID, b.finalUpdateID)
+		b.logger.Infof("the final update id %d of event is less than equal to the final update id %d of the snapshot, skip",
+			u.FinalUpdateID, b.finalUpdateID)
 		b.mu.Unlock()
 		return nil
 	}
 
 	// if there is a missing update, we should reset the snapshot and re-fetch the snapshot
-	if u.FirstUpdateID > b.finalUpdateID+1 {
-		// drop the prior updates in the buffer since it's corrupted
-		b.buffer = []Update{u}
-		b.resetSnapshot()
-		b.once.Reset()
-		b.once.Do(func() {
-			b.logger.Info("try fetching the snapshot due to missing update")
-			go b.tryFetch()
-		})
+	if b.isFutures {
+		// previousUpdateID ensures continuity of depth updates from Binance futures.
+		// As per Binance docs, each update must satisfy: pu == previousUpdateID.
+		// If not, the order book is out of sync and a snapshot refresh is required.
+		//ref: https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/How-to-manage-a-local-order-book-correctly
+		previousUpdateID := b.finalUpdateID
+		if previousUpdateID != 0 && u.PreviousUpdateID != previousUpdateID {
+			// drop the prior updates in the buffer since it's corrupted
+			b.buffer = []Update{u}
+			b.resetSnapshot()
+			b.once.Reset()
+			b.once.Do(func() {
+				b.logger.Info("try fetching the snapshot due to missing update")
+				go b.tryFetch()
+			})
 
-		b.mu.Unlock()
-		b.EmitReset()
+			b.mu.Unlock()
+			b.EmitReset()
 
-		return fmt.Errorf("found missing update between finalUpdateID %d and firstUpdateID %d, diff: %d",
-			b.finalUpdateID+1,
-			u.FirstUpdateID,
-			u.FirstUpdateID-b.finalUpdateID)
+			return fmt.Errorf("found missing update, new event's previousUpdateID: %d not equal previous event's finalUpdateID: %d",
+				u.PreviousUpdateID, previousUpdateID)
+		}
+	} else {
+		if u.FirstUpdateID > b.finalUpdateID+1 {
+			// drop the prior updates in the buffer since it's corrupted
+			b.buffer = []Update{u}
+			b.resetSnapshot()
+			b.once.Reset()
+			b.once.Do(func() {
+				b.logger.Info("try fetching the snapshot due to missing update")
+				go b.tryFetch()
+			})
+
+			b.mu.Unlock()
+			b.EmitReset()
+
+			return fmt.Errorf("found missing update between finalUpdateID %d and firstUpdateID %d, diff: %d",
+				b.finalUpdateID+1, u.FirstUpdateID, u.FirstUpdateID-b.finalUpdateID)
+		}
 	}
 
 	b.logger.Debugf("depth update id %d -> %d", b.finalUpdateID, u.FinalUpdateID)

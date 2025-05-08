@@ -31,6 +31,7 @@ import (
 const BNB = "BNB"
 
 const DefaultDepthLimit = 5000
+const DefaultFuturesDepthLimit = 1000
 
 const BinanceUSBaseURL = "https://api.binance.us"
 const BinanceTestBaseURL = "https://testnet.binance.vision"

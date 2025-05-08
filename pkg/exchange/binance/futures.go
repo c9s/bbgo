@@ -362,7 +362,7 @@ func newFuturesClientOrderID(originalID string) (clientOrderID string) {
 }
 
 func (e *Exchange) queryFuturesDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
-	res, err := e.futuresClient.NewDepthService().Symbol(symbol).Do(ctx)
+	res, err := e.futuresClient.NewDepthService().Symbol(symbol).Limit(DefaultFuturesDepthLimit).Do(ctx)
 	if err != nil {
 		return snapshot, finalUpdateID, err
 	}

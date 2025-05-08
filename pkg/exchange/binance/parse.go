@@ -512,9 +512,10 @@ type DepthEntry struct {
 type DepthEvent struct {
 	EventBase
 
-	Symbol        string `json:"s"`
-	FirstUpdateID int64  `json:"U"`
-	FinalUpdateID int64  `json:"u"`
+	Symbol           string `json:"s"`
+	FirstUpdateID    int64  `json:"U"`
+	FinalUpdateID    int64  `json:"u"`
+	PreviousUpdateID int64  `json:"pu"`
 
 	Bids types.PriceVolumeSlice `json:"b"`
 	Asks types.PriceVolumeSlice `json:"a"`
@@ -581,11 +582,12 @@ func parseDepthEvent(val *fastjson.Value) (depth *DepthEvent, err error) {
 			Event: string(val.GetStringBytes("e")),
 			Time:  types.NewMillisecondTimestampFromInt(val.GetInt64("E")),
 		},
-		Symbol:        string(val.GetStringBytes("s")),
-		FirstUpdateID: val.GetInt64("U"),
-		FinalUpdateID: val.GetInt64("u"),
-		Bids:          make(types.PriceVolumeSlice, 0, 50),
-		Asks:          make(types.PriceVolumeSlice, 0, 50),
+		Symbol:           string(val.GetStringBytes("s")),
+		FirstUpdateID:    val.GetInt64("U"),
+		FinalUpdateID:    val.GetInt64("u"),
+		PreviousUpdateID: val.GetInt64("pu"),
+		Bids:             make(types.PriceVolumeSlice, 0, 50),
+		Asks:             make(types.PriceVolumeSlice, 0, 50),
 	}
 
 	for _, ev := range val.GetArray("b") {
