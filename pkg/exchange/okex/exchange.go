@@ -186,10 +186,7 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 		return nil, fmt.Errorf("ticker rate limiter wait error: %w", err)
 	}
 
-	symbol = toLocalSymbol(symbol)
-	if e.IsFutures {
-		symbol = toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)
-	}
+	symbol = e.getInstrumentId(symbol)
 	marketTicker, err := e.client.NewGetTickerRequest().InstId(symbol).Do(ctx)
 	if err != nil {
 		return nil, err
@@ -316,7 +313,7 @@ func (e *Exchange) queryAccountBalance(ctx context.Context) ([]okexapi.Account, 
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
 	orderReq := e.client.NewPlaceOrderRequest()
 
-	orderReq.InstrumentID(toLocalSymbol(order.Symbol))
+	orderReq.InstrumentID(e.getInstrumentId(order.Symbol))
 	orderReq.Side(toLocalSideType(order.Side))
 	orderReq.Size(order.Market.FormatQuantity(order.Quantity))
 
@@ -331,10 +328,6 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 			orderReq.TradeMode(okexapi.TradeModeCross)
 		}
 	} else if e.IsFutures {
-		quantity := order.Market.AdjustQuantityToContractSize(order.Quantity)
-		orderReq.Size(order.Market.FormatQuantity(quantity))
-		orderReq.InstrumentID(toLocalSymbol(order.Symbol, okexapi.InstrumentTypeSwap))
-
 		if e.FuturesSettings.IsIsolatedFutures {
 			orderReq.TradeMode(okexapi.TradeModeIsolated)
 		} else {
@@ -355,12 +348,8 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 	case types.OrderTypeMarket:
 		// target currency = Default is quote_ccy for buy, base_ccy for sell
 		// Because our order.Quantity unit is base coin, so we indicate the target currency to Base.
-		switch order.Side {
-		case types.SideTypeSell:
-			orderReq.Size(order.Market.FormatQuantity(order.Quantity))
-			orderReq.TargetCurrency(okexapi.TargetCurrencyBase)
-		case types.SideTypeBuy:
-			orderReq.Size(order.Market.FormatQuantity(order.Quantity))
+		// Only applicable to SPOT Market Orders
+		if !e.IsFutures {
 			orderReq.TargetCurrency(okexapi.TargetCurrencyBase)
 		}
 	}
@@ -424,7 +413,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 // QueryOpenOrders retrieves the pending orders. The data returned is ordered by createdTime, and we utilized the
 // `After` parameter to acquire all orders.
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	instrumentID := toLocalSymbol(symbol)
+	instrumentID := e.getInstrumentId(symbol)
 
 	nextCursor := int64(0)
 	for {
@@ -439,7 +428,6 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 		if e.MarginSettings.IsMargin {
 			req.InstrumentType(okexapi.InstrumentTypeMargin)
 		} else if e.IsFutures {
-			req.InstrumentID(toLocalSymbol(symbol, okexapi.InstrumentTypeSwap))
 			req.InstrumentType(okexapi.InstrumentTypeSwap)
 		}
 
@@ -484,10 +472,8 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		}
 
 		req := e.client.NewCancelOrderRequest()
-		req.InstrumentID(toLocalSymbol(order.Symbol))
-		if e.IsFutures {
-			req.InstrumentID(toLocalSymbol(order.Symbol, okexapi.InstrumentTypeSwap))
-		}
+		req.InstrumentID(e.getInstrumentId(order.Symbol))
+
 		req.OrderID(strconv.FormatUint(order.OrderID, 10))
 		if len(order.ClientOrderID) > 0 {
 			if ok := clientOrderIdRegex.MatchString(order.ClientOrderID); !ok {
@@ -528,10 +514,7 @@ func (e *Exchange) QueryKLines(
 		return nil, fmt.Errorf("failed to get interval: %w", err)
 	}
 
-	instrumentID := toLocalSymbol(symbol)
-	if e.IsFutures {
-		instrumentID = toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)
-	}
+	instrumentID := e.getInstrumentId(symbol)
 
 	req := e.client.NewGetCandlesRequest().InstrumentID(instrumentID)
 	req.Bar(intervalParam)
@@ -566,10 +549,8 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		return nil, errors.New("okex.QueryOrder: OrderId or ClientOrderId is required parameter")
 	}
 	req := e.client.NewGetOrderDetailsRequest()
-	instrumentID := toLocalSymbol(q.Symbol)
-	if e.IsFutures {
-		instrumentID = toLocalSymbol(q.Symbol, okexapi.InstrumentTypeSwap)
-	}
+	instrumentID := e.getInstrumentId(q.Symbol)
+
 	req.InstrumentID(instrumentID)
 	// Either ordId or clOrdId is required, if both are passed, ordId will be used
 	// ref: https://www.okx.com/docs-v5/en/#order-book-trading-trade-get-order-details
@@ -599,10 +580,7 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (tr
 
 	req := e.client.NewGetThreeDaysTransactionHistoryRequest()
 	if len(q.Symbol) != 0 {
-		instrumentID := toLocalSymbol(q.Symbol)
-		if e.IsFutures {
-			instrumentID = toLocalSymbol(q.Symbol, okexapi.InstrumentTypeSwap)
-		}
+		instrumentID := e.getInstrumentId(q.Symbol)
 		req.InstrumentID(instrumentID)
 	}
 
@@ -662,11 +640,7 @@ func (e *Exchange) QueryClosedOrders(
 	}
 
 	req := e.client.NewGetOrderHistoryRequest()
-	instrumentID := toLocalSymbol(symbol)
-	if e.IsFutures {
-		instrumentID = toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)
-		req.InstrumentType(okexapi.InstrumentTypeSwap)
-	}
+	instrumentID := e.getInstrumentId(symbol)
 
 	req.InstrumentID(instrumentID).
 		StartTime(since).
@@ -822,6 +796,14 @@ func (e *Exchange) getInstrumentType() okexapi.InstrumentType {
 	return okexapi.InstrumentTypeSpot
 }
 
+func (e *Exchange) getInstrumentId(symbol string) string {
+	if e.IsFutures {
+		return toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)
+	}
+
+	return toLocalSymbol(symbol)
+}
+
 func (e *Exchange) QueryDepositHistory(
 	ctx context.Context, asset string, startTime, endTime *time.Time,
 ) ([]types.Deposit, error) {
@@ -912,11 +894,7 @@ func (e *Exchange) QueryTrades(
 		"req_id":        uuid.New().String(),
 	})
 
-	instrumentID := toLocalSymbol(symbol)
-	if e.IsFutures {
-		instrumentID = toLocalSymbol(symbol, okexapi.InstrumentTypeSwap)
-	}
-
+	instrumentID := e.getInstrumentId(symbol)
 	instrType := e.getInstrumentType()
 
 	if lessThan3Day {
