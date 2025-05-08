@@ -64,10 +64,7 @@ func (s *Strategy) InitDrawCommands(profit, cumProfit types.Series) {
 
 func (s *Strategy) DrawIndicators(time types.Time) *types.Canvas {
 	canvas := types.NewCanvas(s.InstanceID(), s.Interval)
-	length := s.priceLines.Length()
-	if length > 300 {
-		length = 300
-	}
+	length := min(s.priceLines.Length(), 300)
 	log.Infof("draw indicators with %d data", length)
 	mean := s.priceLines.Mean(length)
 	highestPrice := s.priceLines.Minus(mean).Abs().Highest(length)

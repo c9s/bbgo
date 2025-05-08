@@ -240,10 +240,7 @@ func (o *HyperparameterOptimizer) Run(ctx context.Context, executor Executor, co
 	objective := o.buildObjective(executor, configJson, paramDomains)
 
 	maxEvaluation := o.Config.MaxEvaluation
-	numOfProcesses := o.Config.Executor.LocalExecutorConfig.MaxNumberOfProcesses
-	if numOfProcesses > maxEvaluation {
-		numOfProcesses = maxEvaluation
-	}
+	numOfProcesses := min(o.Config.Executor.LocalExecutorConfig.MaxNumberOfProcesses, maxEvaluation)
 	maxEvaluationPerProcess := maxEvaluation / numOfProcesses
 	if maxEvaluation%numOfProcesses > 0 {
 		maxEvaluationPerProcess++
@@ -277,10 +274,7 @@ func (o *HyperparameterOptimizer) Run(ctx context.Context, executor Executor, co
 	eg, studyCtx := errgroup.WithContext(ctx)
 	study.WithContext(studyCtx)
 	for i := 0; i < numOfProcesses; i++ {
-		processEvaluations := maxEvaluationPerProcess
-		if processEvaluations > maxEvaluation {
-			processEvaluations = maxEvaluation
-		}
+		processEvaluations := min(maxEvaluationPerProcess, maxEvaluation)
 		eg.Go(func() error {
 			return study.Optimize(objective, processEvaluations)
 		})
