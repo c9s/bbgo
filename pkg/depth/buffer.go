@@ -44,8 +44,8 @@ type Buffer struct {
 
 	logger *logrus.Entry
 
-	// isFutures indicates whether the buffer is for futures or spot
-	isFutures bool
+	// checkPreviousID indicates whether the buffer is for futures or spot
+	checkPreviousID bool
 }
 
 func NewBuffer(fetcher SnapshotFetcher, bufferingPeriod time.Duration) *Buffer {
@@ -65,8 +65,8 @@ func (b *Buffer) SetUpdateTimeout(d time.Duration) {
 	b.updateTimeout = d
 }
 
-func (b *Buffer) UseFutures() {
-	b.isFutures = true
+func (b *Buffer) CheckPreviousID() {
+	b.checkPreviousID = true
 }
 
 func (b *Buffer) resetSnapshot() {
@@ -181,7 +181,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 	}
 
 	// if there is a missing update, we should reset the snapshot and re-fetch the snapshot
-	if b.isFutures {
+	if b.checkPreviousID {
 		// previousUpdateID ensures continuity of depth updates from Binance futures.
 		// As per Binance docs, each update must satisfy: pu == previousUpdateID.
 		// If not, the order book is out of sync and a snapshot refresh is required.
