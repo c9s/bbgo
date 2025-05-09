@@ -35,7 +35,11 @@ const priceUpdateTimeout = 5 * time.Minute
 
 const ID = "xdepthmaker"
 
-var prometheusPriceRange = fixedpoint.MustNewFromString("5%")
+var prometheusPriceRanges []fixedpoint.Value = []fixedpoint.Value{
+	fixedpoint.MustNewFromString("3%"),
+	fixedpoint.MustNewFromString("5%"),
+	fixedpoint.MustNewFromString("10%"),
+}
 var log = logrus.WithField("strategy", ID)
 
 var ErrZeroQuantity = stderrors.New("quantity is zero")
@@ -590,11 +594,13 @@ func (s *Strategy) CrossRun(
 	s.sourceBook = types.NewStreamBook(s.HedgeSymbol, s.hedgeSession.ExchangeName)
 	s.sourceBook.BindStream(sourceMarketStream)
 	// s.sourceBook.DebugBindStream(sourceMarketStream, log)
-	s.sourceBook.BindUpdate(s.newUpdateMetrics(
-		string(s.hedgeSession.ExchangeName),
-		s.HedgeSymbol,
-		prometheusPriceRange,
-	))
+	for _, priceRange := range prometheusPriceRanges {
+		s.sourceBook.BindUpdate(s.newUpdateMetrics(
+			string(s.hedgeSession.ExchangeName),
+			s.HedgeSymbol,
+			priceRange,
+		))
+	}
 
 	// initialize maker book
 	makerMarketStream := s.makerSession.Exchange.NewStream()
@@ -606,11 +612,13 @@ func (s *Strategy) CrossRun(
 	s.makerBook = types.NewStreamBook(s.Symbol, s.makerSession.ExchangeName)
 	s.makerBook.BindStream(makerMarketStream)
 	// s.makerBook.DebugBindStream(makerMarketStream, log)
-	s.makerBook.BindUpdate(s.newUpdateMetrics(
-		string(s.makerSession.ExchangeName),
-		s.Symbol,
-		prometheusPriceRange,
-	))
+	for _, priceRange := range prometheusPriceRanges {
+		s.makerBook.BindUpdate(s.newUpdateMetrics(
+			string(s.makerSession.ExchangeName),
+			s.Symbol,
+			priceRange,
+		))
+	}
 
 	if err := sourceMarketStream.Connect(ctx); err != nil {
 		return err
