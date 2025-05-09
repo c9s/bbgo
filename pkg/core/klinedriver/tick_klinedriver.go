@@ -160,9 +160,9 @@ func (t *TickKLineDriver) ProcessTick(tickTime time.Time) {
 				if kline.Closed {
 					// subtract 1ms: 08:01:00 -> 08:00:59.999, which is logically correct
 					kline.EndTime = types.Time(kline.EndTime.Time().Truncate(time.Second).Add(-time.Millisecond * 1))
-					t.kLineEmitter.EmitKLineClosed(kline)
+					t.kLineEmitter.EmitKLineClosed(*kline)
 				} else {
-					t.kLineEmitter.EmitKLine(kline)
+					t.kLineEmitter.EmitKLine(*kline)
 				}
 			}
 		}

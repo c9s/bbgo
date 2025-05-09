@@ -59,6 +59,57 @@ func (bucket *Bucket) FillingGapKLines(numShifts uint64) (kLines []*types.KLine)
 	return
 }
 
+func (bucket *Bucket) accumulateTrade(trade *types.Trade) {
+	// expecting the trade time is in the same timezone as the kline
+	// if you are about to use the trade time, make sure to convert the timezone properly
+	// IMPORTANT: the trade should be treated as read-only here
+	tradeTimeInLocalTz := types.Time(trade.Time.Time().In(bucket.KLine.StartTime.Time().Location()))
+	bucket.KLine.Exchange = trade.Exchange
+	bucket.KLine.EndTime = tradeTimeInLocalTz
+	bucket.KLine.Close = trade.Price
+	bucket.KLine.High = fixedpoint.Max(bucket.KLine.High, trade.Price)
+	if bucket.KLine.NumberOfTrades == 0 {
+		bucket.KLine.Open = trade.Price
+		bucket.KLine.Low = trade.Price
+	} else {
+		bucket.KLine.Low = fixedpoint.Min(bucket.KLine.Low, trade.Price)
+	}
+	bucket.KLine.Volume = bucket.KLine.Volume.Add(trade.Quantity)
+	bucket.KLine.QuoteVolume = bucket.KLine.QuoteVolume.Add(trade.QuoteQuantity)
+	bucket.KLine.NumberOfTrades++
+	bucket.KLine.LastTradeID = trade.ID
+	if trade.IsBuyer && !trade.IsMaker {
+		bucket.KLine.TakerBuyBaseAssetVolume = bucket.KLine.TakerBuyBaseAssetVolume.Add(trade.Quantity)
+		bucket.KLine.TakerBuyQuoteAssetVolume = bucket.KLine.TakerBuyQuoteAssetVolume.Add(trade.QuoteQuantity)
+	}
+
+}
+
+func (bucket *Bucket) findNextBucket(currentTime types.Time) (nextBucket *Bucket, numShifts uint64) {
+	nextBucket = &Bucket{
+		StartTime: bucket.StartTime,
+		EndTime:   bucket.EndTime,
+		Interval:  bucket.Interval,
+		KLine:     nil,
+	}
+	if currentTime.Before(nextBucket.StartTime.Time()) {
+		return
+	}
+	for {
+		if currentTime.Equal(nextBucket.EndTime.Time()) {
+			nextBucket.StartTime = nextBucket.EndTime
+			break
+		}
+		if currentTime.After(nextBucket.StartTime.Time()) && currentTime.Before(nextBucket.EndTime.Time()) {
+			break
+		}
+		nextBucket.StartTime = nextBucket.EndTime
+		nextBucket.EndTime = types.Time(nextBucket.StartTime.Time().Add(nextBucket.Interval.Duration()))
+		numShifts++
+	}
+	return
+}
+
 // KLineBuilder builds klines from trades and trades only
 type KLineBuilder struct {
 	symbol string
@@ -104,7 +155,7 @@ func (kb *KLineBuilder) AddTrade(trade *types.Trade) {
 		// need not to check if the kline is closed because the trade is in the bucket
 		// accKLine must not be closed here
 		if accBucket.Contains(trade.Time) {
-			accumulateKLineInPlace(accBucket.KLine, trade)
+			accBucket.accumulateTrade(trade)
 			continue
 		}
 		// trade is not in the current bucket, find the next containing bucket
@@ -122,7 +173,7 @@ func (kb *KLineBuilder) AddTrade(trade *types.Trade) {
 			accBucket.Exposed = true
 		}
 		// find the next containing bucket
-		nextBucket, numShifts := findNextBucket(trade.Time, accBucket)
+		nextBucket, numShifts := accBucket.findNextBucket(trade.Time)
 		// setup the last kline and update the accumulating kline
 		lastBucket := *accBucket // make a copy
 		kb.resetKLine(interval, nextBucket.StartTime)
@@ -131,24 +182,26 @@ func (kb *KLineBuilder) AddTrade(trade *types.Trade) {
 		kb.klinesBuffer[interval] = append(kb.klinesBuffer[interval], fillingKLines...)
 
 		kb.lastBucketMap[interval] = &lastBucket
-		accumulateKLineInPlace(accBucket.KLine, trade)
+		accBucket.accumulateTrade(trade)
 	}
 }
 
 // Update updates the KLineBuilder with the given update time.
 // The semantics of the Update is to notify the current timestamp to the KLineBuilder.
-func (kb *KLineBuilder) Update(updateTime types.Time) (kLinesMap map[types.Interval][]types.KLine) {
-	kLinesMap = make(map[types.Interval][]types.KLine)
+func (kb *KLineBuilder) Update(updateTime types.Time) (kLinesMap map[types.Interval][]*types.KLine) {
+	kLinesMap = make(map[types.Interval][]*types.KLine)
 	for interval, bufferedKLines := range kb.klinesBuffer {
-		for _, kline := range bufferedKLines {
-			kLinesMap[interval] = append(kLinesMap[interval], *kline)
+		for _, klineRef := range bufferedKLines {
+			kline := *klineRef
+			kLinesMap[interval] = append(kLinesMap[interval], &kline)
 		}
 		kb.klinesBuffer[interval] = make([]*types.KLine, 0)
 	}
 	for interval, accBucket := range kb.accBucketMap {
 		if updateTime.Before(accBucket.StartTime.Time()) {
 			// update time is before the start time, just add kline
-			kLinesMap[interval] = append(kLinesMap[interval], *accBucket.KLine)
+			kline := *accBucket.KLine
+			kLinesMap[interval] = append(kLinesMap[interval], &kline)
 			continue
 		}
 
@@ -182,7 +235,8 @@ func (kb *KLineBuilder) Update(updateTime types.Time) (kLinesMap map[types.Inter
 		if accBucket.Contains(updateTime) {
 			// update time is in the accumulating bucket, just add kline
 			accBucket.KLine.EndTime = updateTime
-			kLinesMap[interval] = append(kLinesMap[interval], *accBucket.KLine)
+			kline := *accBucket.KLine
+			kLinesMap[interval] = append(kLinesMap[interval], &kline)
 			continue
 		}
 
@@ -190,16 +244,16 @@ func (kb *KLineBuilder) Update(updateTime types.Time) (kLinesMap map[types.Inter
 		// we should close the current accumulating bucket and add kline
 		accBucket.KLine.Closed = true
 		accBucket.KLine.EndTime = accBucket.EndTime
-		kLinesMap[interval] = append(kLinesMap[interval], *accBucket.KLine)
+		kline := *accBucket.KLine
+		kLinesMap[interval] = append(kLinesMap[interval], &kline)
 		accBucket.Exposed = true
 		// find the next containing bucket and reset the accumulating bucket
-		nextBucket, numShifts := findNextBucket(updateTime, accBucket)
+		nextBucket, numShifts := accBucket.findNextBucket(updateTime)
 		nextBucket = kb.resetKLine(interval, nextBucket.StartTime)
 		// fill the gaps
 		fillingKLines := accBucket.FillingGapKLines(numShifts)
-		for _, kline := range fillingKLines {
-			kLinesMap[interval] = append(kLinesMap[interval], *kline)
-		}
+		kLinesMap[interval] = append(kLinesMap[interval], fillingKLines...)
+
 		nextBucket.KLine.Open = accBucket.KLine.Close
 		nextBucket.KLine.High = accBucket.KLine.Close
 		nextBucket.KLine.Low = accBucket.KLine.Close
@@ -208,7 +262,8 @@ func (kb *KLineBuilder) Update(updateTime types.Time) (kLinesMap map[types.Inter
 		// add an opening kline
 		nextBucket.KLine.EndTime = updateTime
 		nextBucket.KLine.Closed = false
-		kLinesMap[interval] = append(kLinesMap[interval], *nextBucket.KLine)
+		nextKLine := *nextBucket.KLine
+		kLinesMap[interval] = append(kLinesMap[interval], &nextKLine)
 	}
 	return
 }
@@ -233,57 +288,4 @@ func (kb *KLineBuilder) resetKLine(resetInterval types.Interval, resetTime types
 	}
 
 	return newBucket
-}
-
-// util functions
-
-func accumulateKLineInPlace(accKLine *types.KLine, trade *types.Trade) {
-	// expecting the trade time is in the same timezone as the kline
-	// if you are about to use the trade time, make sure to convert the timezone properly
-	// IMPORTANT: the trade should be treated as read-only here
-	tradeTimeInLocalTz := types.Time(trade.Time.Time().In(accKLine.StartTime.Time().Location()))
-	accKLine.Exchange = trade.Exchange
-	accKLine.EndTime = tradeTimeInLocalTz
-	accKLine.Close = trade.Price
-	accKLine.High = fixedpoint.Max(accKLine.High, trade.Price)
-	if accKLine.NumberOfTrades == 0 {
-		accKLine.Open = trade.Price
-		accKLine.Low = trade.Price
-	} else {
-		accKLine.Low = fixedpoint.Min(accKLine.Low, trade.Price)
-	}
-	accKLine.Volume = accKLine.Volume.Add(trade.Quantity)
-	accKLine.QuoteVolume = accKLine.QuoteVolume.Add(trade.QuoteQuantity)
-	accKLine.NumberOfTrades++
-	accKLine.LastTradeID = trade.ID
-	if trade.IsBuyer && !trade.IsMaker {
-		accKLine.TakerBuyBaseAssetVolume = accKLine.TakerBuyBaseAssetVolume.Add(trade.Quantity)
-		accKLine.TakerBuyQuoteAssetVolume = accKLine.TakerBuyQuoteAssetVolume.Add(trade.QuoteQuantity)
-	}
-
-}
-
-func findNextBucket(currentTime types.Time, bucket *Bucket) (nextBucket *Bucket, numShifts uint64) {
-	nextBucket = &Bucket{
-		StartTime: bucket.StartTime,
-		EndTime:   bucket.EndTime,
-		Interval:  bucket.Interval,
-		KLine:     nil,
-	}
-	if currentTime.Before(nextBucket.StartTime.Time()) {
-		return
-	}
-	for {
-		if currentTime.Equal(nextBucket.EndTime.Time()) {
-			nextBucket.StartTime = nextBucket.EndTime
-			break
-		}
-		if currentTime.After(nextBucket.StartTime.Time()) && currentTime.Before(nextBucket.EndTime.Time()) {
-			break
-		}
-		nextBucket.StartTime = nextBucket.EndTime
-		nextBucket.EndTime = types.Time(nextBucket.StartTime.Time().Add(nextBucket.Interval.Duration()))
-		numShifts++
-	}
-	return
 }
