@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/core/klinedriver"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -109,8 +110,8 @@ func (s *Stream) handleConnect() {
 	go func() {
 		if s.PublicOnly {
 			// start kline workers
-			for _, store := range s.serialMarketStores {
-				store.BindStream(s.klineCtx, s)
+			for _, driver := range s.klineDrivers {
+				driver.Run(s.klineCtx)
 			}
 			return
 		}
@@ -242,13 +243,22 @@ func (s *Stream) buildMapForMarketStream(channel2LocalSymbolsMap map[types.Chann
 
 		// binding serial market store
 		for symbol, options := range klineOptionsMap {
-			store := types.NewSerialMarketDataStore(symbol, minInterval, true)
+			klineDriver := klinedriver.NewTickKLineDriver(
+				symbol, types.Interval("3s"),
+			)
 			for _, option := range options {
 				logStream.Debugf("subscribe to kline %s(%s)", symbol, option.Interval)
-				store.Subscribe(option.Interval)
+				err := klineDriver.Subscribe(option.Interval)
+				if err != nil {
+					logStream.WithError(err).Warnf("failed to subscribe to kline %s(%s)", symbol, option.Interval)
+					continue
+				}
 			}
-			store.OnKLineClosed(s.EmitKLineClosed)
-			s.serialMarketStores = append(s.serialMarketStores, store)
+			s.OnMarketTrade(func(trade types.Trade) {
+				klineDriver.AddTrade(trade)
+			})
+			klineDriver.SetKLineEmitter(s)
+			s.klineDrivers = append(s.klineDrivers, klineDriver)
 		}
 	}
 }
