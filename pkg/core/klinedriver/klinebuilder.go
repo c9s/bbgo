@@ -257,6 +257,7 @@ func (kb *KLineBuilder) Update(updateTime types.Time) (kLinesMap map[types.Inter
 		nextBucket.KLine.Open = accBucket.KLine.Close
 		nextBucket.KLine.High = accBucket.KLine.Close
 		nextBucket.KLine.Low = accBucket.KLine.Close
+		nextBucket.KLine.Close = accBucket.KLine.Close
 		nextBucket.KLine.LastTradeID = accBucket.KLine.LastTradeID
 		kb.lastBucketMap[interval] = accBucket
 		// add an opening kline
