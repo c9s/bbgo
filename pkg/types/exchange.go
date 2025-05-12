@@ -179,7 +179,7 @@ type ExchangeRewardService interface {
 
 type ExchangeRiskService interface {
 	SetLeverage(ctx context.Context, symbol string, leverage int) error
-	QueryPositionRisk(ctx context.Context, symbol string) ([]PositionRisk, error)
+	QueryPositionRisk(ctx context.Context, symbol ...string) ([]PositionRisk, error)
 }
 
 type TradeQueryOptions struct {
