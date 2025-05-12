@@ -89,10 +89,12 @@ func (sel SyncTask) execute(
 	switch sel.Type.(type) {
 	case types.Trade:
 		// use upsert if the last record is a self-trade
-		// or it will cause a duplicate key error
-		useUpsert = detectLastestSelfTrade(ctx, db, sel, recordSliceRef)
+		// o.w it will cause a duplicate key error
+		useUpsert = detectLastestSelfTrade(ctx, db, sel, recordSliceRef, logger)
+		// hotfix: apply upsert for mysql, self-trade detection might not be sufficient to prevent duplicate key error on some exchanges
+		useUpsert = useUpsert || db.DriverName() == "mysql"
 	}
-
+	logger.Infof("[sync task] use upsert: %v", useUpsert)
 	if sel.OnLoad != nil {
 		sel.OnLoad(recordSliceRef.Interface())
 	}
@@ -225,7 +227,7 @@ func buildIdMap(sel SyncTask, recordSliceRef reflect.Value) map[string]struct{} 
 	return ids
 }
 
-func detectLastestSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value) bool {
+func detectLastestSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, recordSliceRef reflect.Value, logger *logrus.Entry) bool {
 	// address the issue if the last record is a self-trade
 	// detect self-trade by counting the number of trades with trade id as the lastest record
 	// if the number of trades is 2, then it's a self-trade
@@ -267,5 +269,7 @@ func detectLastestSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, reco
 	if recordsRef.Kind() == reflect.Ptr {
 		recordsRef = recordsRef.Elem()
 	}
-	return recordsRef.Len() == 2
+	numTrades := recordsRef.Len()
+	logger.Infof("number of trades with the id %s: %d", lastTradeId, numTrades)
+	return recordsRef.Len() >= 2
 }
