@@ -11,12 +11,15 @@ import (
 type KLineStream struct {
 	types.StandardStream
 
+	exchange *Exchange
+
 	kLineEventCallbacks []func(candle KLineEvent)
 }
 
-func NewKLineStream() *KLineStream {
+func NewKLineStream(exchange *Exchange) *KLineStream {
 	k := &KLineStream{
 		StandardStream: types.NewStandardStream(),
+		exchange:       exchange,
 	}
 
 	k.SetParser(parseWebSocketEvent)
@@ -34,12 +37,15 @@ func NewKLineStream() *KLineStream {
 
 func (s *KLineStream) handleConnect() {
 	var subs []WebsocketSubscription
+
+	instType := s.exchange.getInstrumentType()
+
 	for _, subscription := range s.Subscriptions {
 		if subscription.Channel != types.KLineChannel {
 			continue
 		}
 
-		sub, err := convertSubscription(subscription)
+		sub, err := convertSubscription(subscription, instType)
 		if err != nil {
 			log.WithError(err).Errorf("subscription convert error")
 			continue
@@ -84,8 +90,9 @@ func (s *KLineStream) dispatchEvent(e interface{}) {
 
 func (s *KLineStream) Unsubscribe() {
 	// errors are handled in the syncSubscriptions, so they are skipped here.
+	instType := s.exchange.getInstrumentType()
 	if len(s.StandardStream.Subscriptions) != 0 {
-		_ = syncSubscriptions(s.StandardStream.Conn, s.StandardStream.Subscriptions, WsEventTypeUnsubscribe)
+		_ = syncSubscriptions(s.StandardStream.Conn, s.StandardStream.Subscriptions, WsEventTypeUnsubscribe, instType)
 	}
 	s.Resubscribe(func(old []types.Subscription) (new []types.Subscription, err error) {
 		// clear the subscriptions

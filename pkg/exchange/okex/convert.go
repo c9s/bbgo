@@ -92,13 +92,13 @@ func convertIntervalToCandle(interval types.Interval) string {
 	return "candle" + s
 }
 
-func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
+func convertSubscription(s types.Subscription, instType okexapi.InstrumentType) (WebsocketSubscription, error) {
 	switch s.Channel {
 	case types.KLineChannel:
 		// Channel names are:
 		return WebsocketSubscription{
 			Channel:      Channel(convertIntervalToCandle(s.Options.Interval)),
-			InstrumentID: toLocalSymbol(s.Symbol),
+			InstrumentID: toLocalSymbol(s.Symbol, instType),
 		}, nil
 
 	case types.BookChannel:
@@ -123,17 +123,17 @@ func convertSubscription(s types.Subscription) (WebsocketSubscription, error) {
 
 		return WebsocketSubscription{
 			Channel:      ch,
-			InstrumentID: toLocalSymbol(s.Symbol),
+			InstrumentID: toLocalSymbol(s.Symbol, instType),
 		}, nil
 	case types.BookTickerChannel:
 		return WebsocketSubscription{
 			Channel:      ChannelBooks5,
-			InstrumentID: toLocalSymbol(s.Symbol),
+			InstrumentID: toLocalSymbol(s.Symbol, instType),
 		}, nil
 	case types.MarketTradeChannel:
 		return WebsocketSubscription{
 			Channel:      ChannelMarketTrades,
-			InstrumentID: toLocalSymbol(s.Symbol),
+			InstrumentID: toLocalSymbol(s.Symbol, instType),
 		}, nil
 	}
 
