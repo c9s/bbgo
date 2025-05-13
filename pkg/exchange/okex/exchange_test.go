@@ -693,3 +693,68 @@ func TestExchange_QueryMarkets_SymbolCache(t *testing.T) {
 		assert.NotContains(t, spotSymbolMap, "ETHUSDT")
 	})
 }
+
+func TestExchange_QueryPositionRisk(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := New(key, secret, passphrase)
+	ex.UseFutures()
+
+	ctx := context.Background()
+
+	t.Run("query all positions", func(t *testing.T) {
+		// Test querying all positions
+		positions, err := ex.QueryPositionRisk(ctx)
+		assert.NoError(t, err)
+		assert.NotNil(t, positions)
+
+		// Verify position data structure
+		for _, pos := range positions {
+			assert.NotEmpty(t, pos.Symbol)
+			assert.NotEmpty(t, pos.EntryPrice)
+			assert.NotEmpty(t, pos.PositionAmount)
+			assert.NotEmpty(t, pos.Leverage)
+			assert.NotEmpty(t, pos.MarkPrice)
+			assert.NotEmpty(t, pos.LiquidationPrice)
+		}
+	})
+
+	t.Run("query specific symbol position", func(t *testing.T) {
+		// Test querying specific symbol position
+		symbol := "BTCUSDT"
+		positions, err := ex.QueryPositionRisk(ctx, symbol)
+		assert.NoError(t, err)
+		assert.NotNil(t, positions)
+
+		// If there are positions, verify the symbol matches
+		if len(positions) > 0 {
+			for _, pos := range positions {
+				assert.Equal(t, symbol, pos.Symbol)
+			}
+		}
+	})
+
+	t.Run("query multiple symbols", func(t *testing.T) {
+		// Test querying multiple symbols
+		symbols := []string{"BTCUSDT", "ETHUSDT"}
+		positions, err := ex.QueryPositionRisk(ctx, symbols...)
+		assert.NoError(t, err)
+		assert.NotNil(t, positions)
+
+		// If there are positions, verify they belong to requested symbols
+		if len(positions) > 0 {
+			symbolSet := make(map[string]bool)
+			for _, symbol := range symbols {
+				symbolSet[symbol] = true
+			}
+
+			for _, pos := range positions {
+				assert.True(t, symbolSet[pos.Symbol], "Position symbol should be one of the requested symbols")
+			}
+		}
+	})
+}

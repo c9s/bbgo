@@ -3,6 +3,7 @@ package okex
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/c9s/bbgo/pkg/exchange/okex/okexapi"
 	"github.com/c9s/bbgo/pkg/types"
@@ -51,7 +52,7 @@ func (e *Exchange) SetLeverage(ctx context.Context, symbol string, leverage int)
 	return fmt.Errorf("not supported set leverage")
 }
 
-func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) ([]types.PositionRisk, error) {
+func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol ...string) ([]types.PositionRisk, error) {
 	var (
 		positions []okexapi.Position
 		err       error
@@ -61,7 +62,11 @@ func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) ([]type
 		req := e.client.NewGetAccountPositionsRequest().
 			InstType(okexapi.InstrumentTypeSwap)
 		if len(symbol) > 0 {
-			req.InstId(toLocalSymbol(symbol, okexapi.InstrumentTypeSwap))
+			symbols := make([]string, len(symbol))
+			for i, s := range symbol {
+				symbols[i] = toLocalSymbol(s, okexapi.InstrumentTypeSwap)
+			}
+			req.InstId(strings.Join(symbols, ","))
 		}
 		if positions, err = req.Do(ctx); err != nil {
 			return nil, err
