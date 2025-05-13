@@ -412,23 +412,43 @@ func (e *Exchange) SetLeverage(ctx context.Context, symbol string, leverage int)
 	return fmt.Errorf("not supported set leverage")
 }
 
-func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol string) ([]types.PositionRisk, error) {
-	var (
-		positions []binanceapi.FuturesPositionRisk
-		err       error
-	)
+func (e *Exchange) QueryPositionRisk(ctx context.Context, symbol ...string) ([]types.PositionRisk, error) {
+	if !e.IsFutures {
+		return nil, fmt.Errorf("not supported for non-futures exchange")
+	}
 
-	if e.IsFutures {
-		req := e.futuresClient2.NewFuturesGetPositionRisksRequest()
-		if len(symbol) > 0 {
-			req.Symbol(symbol)
-		}
-		if positions, err = req.Do(ctx); err != nil {
+	req := e.futuresClient2.NewFuturesGetPositionRisksRequest()
+	if len(symbol) == 1 {
+		req.Symbol(symbol[0])
+		positions, err := req.Do(ctx)
+		if err != nil {
 			return nil, err
+		}
+		return toGlobalPositionRisk(positions), nil
+	}
+
+	positions, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(symbol) == 0 {
+		return toGlobalPositionRisk(positions), nil
+	}
+
+	symbolSet := make(map[string]struct{}, len(symbol))
+	for _, s := range symbol {
+		symbolSet[s] = struct{}{}
+	}
+
+	filteredPositions := make([]binanceapi.FuturesPositionRisk, 0, len(symbol))
+	for _, pos := range positions {
+		if _, ok := symbolSet[pos.Symbol]; ok {
+			filteredPositions = append(filteredPositions, pos)
 		}
 	}
 
-	return toGlobalPositionRisk(positions), nil
+	return toGlobalPositionRisk(filteredPositions), nil
 }
 
 func setDualSidePosition(req *futures.CreateOrderService, order types.SubmitOrder) {
