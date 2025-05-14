@@ -37,7 +37,7 @@ func TestToGlobalPositionRisk(t *testing.T) {
 
 	risk := risks[0]
 	assert.Equal(t, "BTCUSDT", risk.Symbol)
-	assert.Equal(t, types.PositionType("LONG"), risk.PositionSide)
+	assert.Equal(t, types.PositionLong, risk.PositionSide)
 	assert.Equal(t, fixedpoint.MustNewFromString("51000"), risk.MarkPrice)
 	assert.Equal(t, fixedpoint.MustNewFromString("50000"), risk.EntryPrice)
 	assert.Equal(t, fixedpoint.MustNewFromString("1.0"), risk.PositionAmount)
