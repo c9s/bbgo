@@ -366,6 +366,7 @@ func (s *Strategy) Close(ctx context.Context) error {
 
 	var err error
 	if s.UseCancelAllOrdersApiWhenClose {
+		s.logger.Info("UseCancelAllOrdersApiWhenClose is set, will cancel all orders by cancel all orders API")
 		err = tradingutil.UniversalCancelAllOrders(ctx, s.ExchangeSession.Exchange, s.Symbol, nil)
 	} else {
 		err = s.OrderExecutor.GracefulCancel(ctx)
@@ -429,7 +430,10 @@ func (s *Strategy) ContinueNextRound() {
 	s.nextRoundPaused = false
 }
 
-func (s *Strategy) UpdateProfitStatsUntilSuccessful(ctx context.Context) error {
+// UpdateProfitStatsUntilSuccessful will update the profit stats until duration (duration == 0 means no stop)
+// it will retry for 30 minutes with exponential backoff
+// if it is not successful, it will return an error and the ProfitStats will not be updated into persistence
+func (s *Strategy) UpdateProfitStatsUntilDuration(ctx context.Context, duration time.Duration) error {
 	var op = func() error {
 		if updated, err := s.UpdateProfitStats(ctx); err != nil {
 			return errors.Wrapf(err, "failed to update profit stats, please check it")
@@ -443,8 +447,8 @@ func (s *Strategy) UpdateProfitStatsUntilSuccessful(ctx context.Context) error {
 	// exponential increased interval retry until success
 	bo := backoff.NewExponentialBackOff()
 	bo.InitialInterval = 5 * time.Second
-	bo.MaxInterval = 20 * time.Minute
-	bo.MaxElapsedTime = 0
+	bo.MaxInterval = 5 * time.Minute
+	bo.MaxElapsedTime = duration
 
 	return backoff.Retry(op, backoff.WithContext(bo, ctx))
 }
@@ -460,6 +464,8 @@ func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
 		return false, errors.Wrapf(err, "failed to collect finish rounds from #%d", s.ProfitStats.FromOrderID)
 	}
 
+	s.logger.Infof("there are %d finished rounds from #%d", len(rounds), s.ProfitStats.FromOrderID)
+
 	var updated bool = false
 	for _, round := range rounds {
 		trades, err := s.collector.CollectRoundTrades(ctx, round)
@@ -471,6 +477,11 @@ func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
 			s.logger.Infof("update profit stats from trade: %s", trade.String())
 			s.ProfitStats.AddTrade(trade)
 		}
+
+		s.logger.Infof("profit stats:\n%s", s.ProfitStats.String())
+
+		// emit profit
+		s.EmitProfit(s.ProfitStats)
 
 		// update profit stats FromOrderID to make sure we will not collect duplicated rounds
 		for _, order := range round.TakeProfitOrders {
@@ -485,11 +496,6 @@ func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
 		// sync to persistence
 		bbgo.Sync(ctx, s)
 		updated = true
-
-		s.logger.Infof("profit stats:\n%s", s.ProfitStats.String())
-
-		// emit profit
-		s.EmitProfit(s.ProfitStats)
 
 		// make profit stats forward to new round
 		s.ProfitStats.NewRound()
