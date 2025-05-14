@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/core/klinedriver"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -24,20 +25,6 @@ const (
 	userChannel        types.Channel = "user"
 	balanceChannel     types.Channel = "balance"
 )
-
-// minInterval: for the kline updater
-// It will be set to the minimum interval of all the supported intervals in the `init` function
-var minInterval = types.Interval("1s")
-
-func init() {
-	minSeconds := 0
-	for interval, seconds := range supportedIntervalMap {
-		if minSeconds == 0 || seconds <= minSeconds {
-			minInterval = interval
-			minSeconds = seconds
-		}
-	}
-}
 
 type channelType struct {
 	Name       types.Channel `json:"name"`
@@ -109,8 +96,8 @@ func (s *Stream) handleConnect() {
 	go func() {
 		if s.PublicOnly {
 			// start kline workers
-			for _, store := range s.serialMarketStores {
-				store.BindStream(s.klineCtx, s)
+			for _, driver := range s.klineDrivers {
+				driver.Run(s.klineCtx)
 			}
 			return
 		}
@@ -242,13 +229,22 @@ func (s *Stream) buildMapForMarketStream(channel2LocalSymbolsMap map[types.Chann
 
 		// binding serial market store
 		for symbol, options := range klineOptionsMap {
-			store := types.NewSerialMarketDataStore(symbol, minInterval, true)
+			klineDriver := klinedriver.NewTickKLineDriver(
+				symbol, time.Second*5,
+			)
 			for _, option := range options {
 				logStream.Debugf("subscribe to kline %s(%s)", symbol, option.Interval)
-				store.Subscribe(option.Interval)
+				err := klineDriver.AddInterval(option.Interval)
+				if err != nil {
+					logStream.WithError(err).Warnf("failed to subscribe to kline %s(%s)", symbol, option.Interval)
+					continue
+				}
 			}
-			store.OnKLineClosed(s.EmitKLineClosed)
-			s.serialMarketStores = append(s.serialMarketStores, store)
+			s.OnMarketTrade(func(trade types.Trade) {
+				klineDriver.AddTrade(trade)
+			})
+			klineDriver.SetKLineEmitter(s)
+			s.klineDrivers = append(s.klineDrivers, klineDriver)
 		}
 	}
 }
