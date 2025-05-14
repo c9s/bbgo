@@ -11,6 +11,10 @@ import (
 type State int64
 
 const (
+	MaxRetryDurationToUpdateProfitStats time.Duration = 30 * time.Minute
+)
+
+const (
 	None State = iota
 	IdleWaiting
 	OpenPositionReady
@@ -243,8 +247,9 @@ func (s *Strategy) finishTakeProfitStage(ctx context.Context, next State) bool {
 	s.logger.Info("[State] finishTakeProfitStage - start resetting position and calculate quote investment for next round")
 
 	// update profit stats
-	if err := s.UpdateProfitStatsUntilSuccessful(ctx); err != nil {
-		s.logger.WithError(err).Warn("failed to calculate and emit profit")
+	// it will try to update profit stats for 30 minutes
+	if err := s.UpdateProfitStatsUntilDuration(ctx, MaxRetryDurationToUpdateProfitStats); err != nil {
+		s.logger.WithError(err).Error("failed to calculate and emit profit, please check it")
 	}
 
 	// reset position and open new round for profit stats before position opening
