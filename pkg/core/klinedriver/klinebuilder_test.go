@@ -45,7 +45,7 @@ func TestKLineBuilder(t *testing.T) {
 			},
 		}
 		for _, trade := range trades {
-			builder.AddTrade(&trade)
+			builder.AddTrade(trade)
 		}
 		updateTime := types.Time(startTime.Time().Add(1 * time.Minute))
 		kLines := builder.Update(updateTime)
@@ -90,7 +90,7 @@ func TestKLineBuilder(t *testing.T) {
 			},
 		}
 		for _, trade := range trades {
-			builder.AddTrade(&trade)
+			builder.AddTrade(trade)
 		}
 		// 1 interval passed
 		updateTime := types.Time(startTime.Time().Add(1 * time.Minute))
@@ -140,7 +140,7 @@ func TestKLineBuilder(t *testing.T) {
 				Time:   types.Time(startTime.Time().Add(55 * time.Second)),
 			},
 		} {
-			builder.AddTrade(&trade)
+			builder.AddTrade(trade)
 		}
 		// 1 interval passed
 		updateTime := types.Time(startTime.Time().Add(1 * time.Minute))
@@ -163,7 +163,7 @@ func TestKLineBuilder(t *testing.T) {
 				Time:   types.Time(updateTime.Time().Add(59 * time.Second)),
 			},
 		} {
-			builder.AddTrade(&trade)
+			builder.AddTrade(trade)
 		}
 		// 2 intervals passed
 		updateTime = types.Time(updateTime.Time().Add(1 * time.Minute))
@@ -222,7 +222,7 @@ func TestKLineBuilder(t *testing.T) {
 			},
 		}
 		for _, trade := range trades {
-			builder.AddTrade(&trade)
+			builder.AddTrade(trade)
 		}
 		updateTime := types.Time(startTime.Time().Add(5 * time.Minute))
 		lastKLines := builder.Update(updateTime)
@@ -234,7 +234,7 @@ func TestKLineBuilder(t *testing.T) {
 			if !ok {
 				assert.Fail(t, "kline not found")
 			}
-			assert.Equal(t, newKLine[0].StartTime, updateTime)
+			assert.Equal(t, types.Time(updateTime.Time().UTC()), newKLine[0].StartTime)
 			assert.Equal(t, lastKLine[0].Close, newKLine[0].Open)
 			assert.Equal(t, lastKLine[0].Close, newKLine[0].High)
 			assert.Equal(t, lastKLine[0].Close, newKLine[0].Low)
