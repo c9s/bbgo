@@ -12,12 +12,11 @@ import (
 
 type TickKLineDriver struct {
 	symbol        string
-	tickInterval  types.Interval
+	tickDuration  time.Duration
 	intervals     map[types.Interval]struct{}
 	intervalSlice []types.Interval
 
-	tradeTimeLocation *time.Location
-	kLineEmitter      KLineEmitter
+	kLineEmitter KLineEmitter
 
 	mu           sync.Mutex
 	builder      *KLineBuilder
@@ -30,10 +29,10 @@ type KLineEmitter interface {
 	EmitKLineClosed(types.KLine)
 }
 
-func NewTickKLineDriver(symbol string, tickInterval types.Interval) *TickKLineDriver {
+func NewTickKLineDriver(symbol string, tickDuration time.Duration) *TickKLineDriver {
 	return &TickKLineDriver{
 		symbol:        symbol,
-		tickInterval:  tickInterval,
+		tickDuration:  tickDuration,
 		intervals:     make(map[types.Interval]struct{}),
 		intervalSlice: []types.Interval{},
 		builder:       NewKLineBuilder(symbol),
@@ -58,9 +57,9 @@ func (t *TickKLineDriver) SetRunning(startTime time.Time) {
 	t.running = true
 }
 
-func (t *TickKLineDriver) Subscribe(interval types.Interval) error {
-	if interval.Duration() < t.tickInterval.Duration() {
-		return fmt.Errorf("interval %s can't be smaller than tick interval %s", interval, t.tickInterval)
+func (t *TickKLineDriver) AddInterval(interval types.Interval) error {
+	if interval.Duration() < t.tickDuration {
+		return fmt.Errorf("interval %s can't be smaller than tick interval %s", interval, t.tickDuration)
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -77,11 +76,6 @@ func (t *TickKLineDriver) AddTrade(trade types.Trade) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	// set trade time location
-	if t.tradeTimeLocation == nil {
-		t.tradeTimeLocation = trade.Time.Time().Location()
-	}
-
 	// it's not running yet, buffer the trade
 	if !t.running {
 		t.tradesBuffer = append(t.tradesBuffer, &trade)
@@ -90,12 +84,12 @@ func (t *TickKLineDriver) AddTrade(trade types.Trade) {
 	// it's running, add buffered trades first
 	if len(t.tradesBuffer) > 0 {
 		for _, bufferTrade := range t.tradesBuffer {
-			t.builder.AddTrade(bufferTrade)
+			t.builder.AddTrade(*bufferTrade)
 		}
 		// empty the buffer
 		t.tradesBuffer = []*types.Trade{}
 	}
-	t.builder.AddTrade(&trade)
+	t.builder.AddTrade(trade)
 }
 
 // Run starts the kline driver.
@@ -111,8 +105,8 @@ func (t *TickKLineDriver) run(ctx context.Context) {
 
 	t.mu.Lock()
 	// start ticker
-	log.Debugf("start kline driver: %s(%s) %v", t.symbol, t.tickInterval, t.intervalSlice)
-	ticker := time.NewTicker(t.tickInterval.Duration())
+	log.Debugf("starting kline driver: %s(%s) %v", t.symbol, t.tickDuration, t.intervalSlice)
+	ticker := time.NewTicker(t.tickDuration)
 	defer ticker.Stop()
 
 	// set running state
@@ -120,7 +114,7 @@ func (t *TickKLineDriver) run(ctx context.Context) {
 
 	// add buffered trades if any
 	for _, trade := range t.tradesBuffer {
-		t.builder.AddTrade(trade)
+		t.builder.AddTrade(*trade)
 	}
 	t.mu.Unlock()
 
@@ -140,12 +134,6 @@ func (t *TickKLineDriver) ProcessTick(tickTime time.Time) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.tradeTimeLocation == nil {
-		// no trades yet, do nothing
-		log.Debugf("no trades yet, no klines are emitted: %s(%s)", t.symbol, t.tickInterval)
-		return
-	}
-
 	kLinesMap := t.builder.Update(types.Time(tickTime))
 	for _, interval := range t.intervalSlice {
 		klines, ok := kLinesMap[interval]
@@ -154,8 +142,6 @@ func (t *TickKLineDriver) ProcessTick(tickTime time.Time) {
 			continue
 		}
 		for _, kline := range klines {
-			kline.StartTime = types.Time(kline.StartTime.Time().In(t.tradeTimeLocation))
-			kline.EndTime = types.Time(kline.EndTime.Time().In(t.tradeTimeLocation))
 			if t.kLineEmitter != nil {
 				if kline.Closed {
 					// subtract 1ms: 08:01:00 -> 08:00:59.999, which is logically correct
