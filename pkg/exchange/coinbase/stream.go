@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/c9s/bbgo/pkg/core/klinedriver"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -63,9 +64,9 @@ type Stream struct {
 
 	privateChannelSymbols []string
 
-	klineCtx           context.Context
-	klineCancel        context.CancelFunc
-	serialMarketStores []*types.SerialMarketDataStore
+	klineCtx     context.Context
+	klineCancel  context.CancelFunc
+	klineDrivers []*klinedriver.TickKLineDriver
 }
 
 func NewStream(
