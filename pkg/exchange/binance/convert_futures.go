@@ -285,7 +285,7 @@ func toGlobalPositionRisk(positions []binanceapi.FuturesPositionRisk) []types.Po
 	for i, position := range positions {
 		retPositions[i] = types.PositionRisk{
 			LiquidationPrice:       position.LiquidationPrice,
-			PositionSide:           types.PositionType(position.PositionSide),
+			PositionSide:           toGlobalPositionSide(position.PositionSide),
 			Symbol:                 position.Symbol,
 			MarkPrice:              position.MarkPrice,
 			EntryPrice:             position.EntryPrice,
@@ -303,4 +303,15 @@ func toGlobalPositionRisk(positions []binanceapi.FuturesPositionRisk) []types.Po
 		}
 	}
 	return retPositions
+}
+
+func toGlobalPositionSide(positionSide string) types.PositionType {
+	switch positionSide {
+	case "LONG":
+		return types.PositionLong
+	case "SHORT":
+		return types.PositionShort
+	default:
+		return types.PositionType(positionSide)
+	}
 }
