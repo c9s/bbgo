@@ -26,6 +26,8 @@ const ID = "xalign"
 
 var log = logrus.WithField("strategy", ID)
 
+const defaultPriceQuoteCurrency = "USDT"
+
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -139,7 +141,7 @@ func (s *Strategy) netBalanceValue(b types.Balance) (float64, error) {
 		return 0.0, errors.New("price resolver not initialized")
 	}
 
-	if assetPrice, ok := s.priceResolver.ResolvePrice(b.Currency, "USDT"); ok {
+	if assetPrice, ok := s.priceResolver.ResolvePrice(b.Currency, defaultPriceQuoteCurrency); ok {
 		return b.Net().Float64() * assetPrice.Float64(), nil
 	}
 
@@ -560,7 +562,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 
 	log.Debugf("checking all fault balance records...")
 
-	amountQuoteCurrency := "USDT"
+	amountQuoteCurrency := defaultPriceQuoteCurrency
 	if s.LargeAmountAlert != nil {
 		amountQuoteCurrency = s.LargeAmountAlert.QuoteCurrency
 	}
