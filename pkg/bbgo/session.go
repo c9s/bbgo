@@ -34,6 +34,36 @@ var KLinePreloadLimit int64 = 1000
 
 var ErrEmptyMarketInfo = errors.New("market info should not be empty, 0 markets loaded")
 
+type ExchangeSessionMap map[string]*ExchangeSession
+
+func (sessions ExchangeSessionMap) AggregateBalances(
+	ctx context.Context, skipUpdate bool,
+) (types.BalanceMap, map[string]types.BalanceMap, error) {
+	totalBalances := make(types.BalanceMap)
+	sessionBalances := make(map[string]types.BalanceMap)
+
+	var err error
+
+	// iterate the sessions and record them
+	for sessionName, session := range sessions {
+		// update the account balances and the margin information
+		account := session.GetAccount()
+		if !skipUpdate {
+			account, err = session.UpdateAccount(ctx)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+
+		balances := account.Balances()
+
+		sessionBalances[sessionName] = balances
+		totalBalances = totalBalances.Add(balances)
+	}
+
+	return totalBalances, sessionBalances, nil
+}
+
 // ExchangeSession presents the exchange connection Session
 // It also maintains and collects the data returned from the stream.
 //

@@ -526,7 +526,7 @@ func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.Excha
 	return true, nil
 }
 
-func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
+func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) {
 	for sessionName, session := range sessions {
 		ob, ok := s.orderBooks[sessionName]
 		if !ok {
@@ -550,7 +550,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 		return
 	}
 
-	totalBalances, _, err := s.aggregateBalances(ctx, sessions)
+	totalBalances, _, err := sessions.AggregateBalances(ctx, false)
 	if err != nil {
 		log.WithError(err).Errorf("unable to aggregate balances")
 		return

@@ -12,8 +12,8 @@ func TestBalanceDeviationDetector(t *testing.T) {
 	// Initialize DeviationDetector for types.Balance
 	detector := NewDeviationDetector(
 		types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(10.0)}, // Expected balance
-		0.01,                                                                    // Tolerance percentage (1%)
-		time.Minute*4,                                                           // Duration for sustained deviation
+		0.01,          // Tolerance percentage (1%)
+		time.Minute*4, // Duration for sustained deviation
 		func(b types.Balance) (float64, error) {
 			return b.Net().Float64(), nil // Use Net() as the base for deviation detection
 		},
@@ -53,8 +53,8 @@ func TestBalanceRecordTracking(t *testing.T) {
 	// Initialize DeviationDetector for types.Balance
 	detector := NewDeviationDetector(
 		types.Balance{Currency: "BTC", NetAsset: fixedpoint.NewFromFloat(10.0)}, // Expected balance
-		0.01,                                                                    // Tolerance percentage (1%)
-		time.Minute*5,                                                           // Duration for sustained deviation
+		0.01,          // Tolerance percentage (1%)
+		time.Minute*5, // Duration for sustained deviation
 		func(b types.Balance) (float64, error) {
 			return b.Net().Float64(), nil
 		},

@@ -60,7 +60,7 @@ func (b Balance) Add(b2 Balance) Balance {
 	if !b.NetAsset.IsZero() && !b2.NetAsset.IsZero() {
 		newB.NetAsset = b.NetAsset.Add(b2.NetAsset)
 	} else {
-		// do not use this field, reset it
+		// do not use this field, reset it when any of the balance is zero
 		newB.NetAsset = fixedpoint.Zero
 	}
 
