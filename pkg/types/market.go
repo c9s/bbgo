@@ -267,8 +267,16 @@ func (m Market) AdjustQuantityByMaxAmount(quantity, currentPrice, maxAmount fixe
 
 type MarketMap map[string]Market
 
-func (m MarketMap) Add(market Market) {
-	m[market.Symbol] = market
+func (m MarketMap) Add(markets ...Market) {
+	for _, market := range markets {
+		m[market.Symbol] = market
+	}
+}
+
+func (m MarketMap) Merge(marketMap MarketMap) {
+	for symbol, market := range marketMap {
+		m[symbol] = market
+	}
 }
 
 func (m MarketMap) Has(symbol string) bool {
