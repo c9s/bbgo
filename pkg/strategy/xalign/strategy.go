@@ -550,13 +550,11 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 		return
 	}
 
-	totalBalances, sessionBalances, err := s.aggregateBalances(ctx, sessions)
+	totalBalances, _, err := s.aggregateBalances(ctx, sessions)
 	if err != nil {
 		log.WithError(err).Errorf("unable to aggregate balances")
 		return
 	}
-
-	_ = sessionBalances
 
 	s.recordBalances(totalBalances, time.Now())
 
