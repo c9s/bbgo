@@ -396,7 +396,9 @@ func (s *Strategy) selectSessionForCurrency(
 	return nil, nil
 }
 
-func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+func (s *Strategy) CrossRun(
+	ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
+) error {
 	instanceID := s.InstanceID()
 
 	s.sessions = make(map[string]*bbgo.ExchangeSession)
@@ -497,23 +499,11 @@ func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
 	}
 }
 
-func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
-	for sessionName, session := range sessions {
-		ob, ok := s.orderBooks[sessionName]
-		if !ok {
-			log.Errorf("orderbook on session %s not found", sessionName)
-			return
-		}
-		if ok {
-			if err := ob.GracefulCancel(ctx, session.Exchange); err != nil {
-				log.WithError(err).Errorf("unable to cancel order")
-			}
-		}
-	}
+func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (bool, error) {
 
 	pendingWithdraw, err := s.detectActiveWithdraw(ctx, sessions)
 	if err != nil {
-		log.WithError(err).Errorf("unable to check active transfers (withdraw)")
+		return false, fmt.Errorf("unable to check active transfers (withdraw): %w", err)
 	} else if pendingWithdraw != nil {
 		log.Warnf("found active transfer (%f %s withdraw), skip balance align check",
 			pendingWithdraw.Amount.Float64(),
@@ -527,12 +517,12 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 				pendingWithdraw)
 		}
 
-		return
+		return false, nil
 	}
 
 	pendingDeposit, err := s.detectActiveDeposit(ctx, sessions)
 	if err != nil {
-		log.WithError(err).Errorf("unable to check active transfers (deposit)")
+		return false, fmt.Errorf("unable to check active transfers (deposit): %w", err)
 	} else if pendingDeposit != nil {
 		log.Warnf("found active transfer (%f %s deposit), skip balance align check",
 			pendingDeposit.Amount.Float64(),
@@ -545,6 +535,34 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 				pendingDeposit.Asset,
 				pendingDeposit)
 		}
+
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
+	for sessionName, session := range sessions {
+		ob, ok := s.orderBooks[sessionName]
+		if !ok {
+			log.Errorf("orderbook on session %s not found", sessionName)
+			return
+		}
+
+		if err := ob.GracefulCancel(ctx, session.Exchange); err != nil {
+			log.WithError(err).Errorf("unable to cancel order")
+		}
+	}
+
+	canAlign, err := s.canAlign(ctx, sessions)
+	if err != nil {
+		log.WithError(err).Errorf("unable to transfer activities")
+		return
+	}
+
+	if !canAlign {
+		log.Infof("skip balance align check due to active transfer")
 		return
 	}
 
