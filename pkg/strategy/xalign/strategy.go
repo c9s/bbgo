@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -70,7 +69,7 @@ type Strategy struct {
 
 	priceResolver *pricesolver.SimplePriceSolver
 
-	sessions   map[string]*bbgo.ExchangeSession
+	sessions   bbgo.ExchangeSessionMap
 	orderBooks map[string]*bbgo.ActiveOrderBook
 
 	orderStore *core.OrderStore
@@ -357,22 +356,19 @@ func (s *Strategy) CrossRun(
 		return err
 	}
 
-	for _, sessionName := range s.PreferredSessions {
-		session, ok := sessions[sessionName]
-		if !ok {
-			return fmt.Errorf("incorrect preferred session name: %s is not defined", sessionName)
-		}
+	s.sessions = sessions
 
+	s.sessions = s.sessions.Filter(s.PreferredSessions)
+	for sessionName, session := range s.sessions {
+		// bind session stream to the global order store
 		s.orderStore.BindStream(session.UserDataStream)
 
 		orderBook := bbgo.NewActiveOrderBook("")
 		orderBook.BindStream(session.UserDataStream)
 		s.orderBooks[sessionName] = orderBook
-
-		s.sessions[sessionName] = session
 	}
 
-	s.initializePriceResolver(s.collectAllMarkets(sessions))
+	s.priceResolver = s.initializePriceResolver(s.sessions.CollectMarkets(s.PreferredSessions))
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -405,35 +401,19 @@ func (s *Strategy) monitor(ctx context.Context) {
 	}
 }
 
-// collectAllMarkets collects all markets from the sessions
-//
-// markets.Merge override the previous defined markets
-// so we need to merge the markets in reverse order
-func (s *Strategy) collectAllMarkets(sessions map[string]*bbgo.ExchangeSession) types.MarketMap {
-	allMarkets := types.MarketMap{}
-
-	priceSessions := s.PreferredSessions
-	sort.Sort(sort.Reverse(sort.StringSlice(priceSessions)))
-	for _, sessionName := range priceSessions {
-		if session, ok := sessions[sessionName]; ok {
-			allMarkets.Merge(session.Markets())
-		}
-	}
-
-	return allMarkets
-}
-
-func (s *Strategy) initializePriceResolver(allMarkets types.MarketMap) {
-	s.priceResolver = pricesolver.NewSimplePriceResolver(allMarkets)
+func (s *Strategy) initializePriceResolver(allMarkets types.MarketMap) *pricesolver.SimplePriceSolver {
+	priceResolver := pricesolver.NewSimplePriceResolver(allMarkets)
 	for _, session := range s.sessions {
 		for symbol, price := range session.LastPrices() {
-			s.priceResolver.Update(symbol, price)
+			priceResolver.Update(symbol, price)
 		}
 
 		session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
-			s.priceResolver.Update(k.Symbol, k.Close)
+			priceResolver.Update(k.Symbol, k.Close)
 		})
 	}
+
+	return priceResolver
 }
 
 func (s *Strategy) subscribePrices(sessions map[string]*bbgo.ExchangeSession) {
