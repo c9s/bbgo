@@ -550,7 +550,12 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 		return
 	}
 
-	totalBalances, sessionBalances := s.aggregateBalances(ctx, sessions)
+	totalBalances, sessionBalances, err := s.aggregateBalances(ctx, sessions)
+	if err != nil {
+		log.WithError(err).Errorf("unable to aggregate balances")
+		return
+	}
+
 	_ = sessionBalances
 
 	s.recordBalances(totalBalances, time.Now())
@@ -671,16 +676,16 @@ func (s *Strategy) calculateRefillQuantity(
 
 func (s *Strategy) aggregateBalances(
 	ctx context.Context, sessions map[string]*bbgo.ExchangeSession,
-) (totalBalances types.BalanceMap, sessionBalances map[string]types.BalanceMap) {
-	totalBalances = make(types.BalanceMap)
-	sessionBalances = make(map[string]types.BalanceMap)
+) (types.BalanceMap, map[string]types.BalanceMap, error) {
+	totalBalances := make(types.BalanceMap)
+	sessionBalances := make(map[string]types.BalanceMap)
 
 	// iterate the sessions and record them
 	for sessionName, session := range sessions {
 		// update the account balances and the margin information
 		if _, err := session.UpdateAccount(ctx); err != nil {
-			log.WithError(err).Errorf("can not update account")
-			return
+			log.WithError(err).Errorf("unable to update account")
+			return nil, nil, err
 		}
 
 		account := session.GetAccount()
@@ -690,7 +695,7 @@ func (s *Strategy) aggregateBalances(
 		totalBalances = totalBalances.Add(balances)
 	}
 
-	return totalBalances, sessionBalances
+	return totalBalances, sessionBalances, nil
 }
 
 func (s *Strategy) detectActiveWithdraw(
