@@ -109,7 +109,26 @@ func (s *Strategy) Defaults() error {
 func (s *Strategy) Initialize() error {
 	s.activeTransferNotificationLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
 	s.deviationDetectors = make(map[string]*detector.DeviationDetector[types.Balance])
+
+	s.sessions = make(map[string]*bbgo.ExchangeSession)
+	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
+	s.orderStore = core.NewOrderStore("")
+
+	for currency, expectedValue := range s.ExpectedBalances {
+		s.deviationDetectors[currency] = detector.NewDeviationDetector(
+			types.Balance{Currency: currency, NetAsset: expectedValue}, // Expected value
+			s.BalanceToleranceRange.Float64(),                          // Tolerance (1%)
+			s.Duration.Duration(),                                      // Duration for sustained deviation
+			func(b types.Balance) float64 {
+				return b.Net().Float64()
+			},
+		)
+
+		s.deviationDetectors[currency].SetLogger(log)
+	}
+
 	return nil
+
 }
 
 func (s *Strategy) Validate() error {
@@ -401,25 +420,8 @@ func (s *Strategy) CrossRun(
 ) error {
 	instanceID := s.InstanceID()
 
-	s.sessions = make(map[string]*bbgo.ExchangeSession)
-	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
-	s.orderStore = core.NewOrderStore("")
-
 	if err := dynamic.InitializeConfigMetrics(ID, instanceID, s); err != nil {
 		return err
-	}
-
-	for currency, expectedValue := range s.ExpectedBalances {
-		s.deviationDetectors[currency] = detector.NewDeviationDetector(
-			types.Balance{Currency: currency, NetAsset: expectedValue}, // Expected value
-			s.BalanceToleranceRange.Float64(),                          // Tolerance (1%)
-			s.Duration.Duration(),                                      // Duration for sustained deviation
-			func(b types.Balance) float64 {
-				return b.Net().Float64()
-			},
-		)
-
-		s.deviationDetectors[currency].SetLogger(log)
 	}
 
 	markets := types.MarketMap{}
@@ -484,9 +486,8 @@ func (s *Strategy) resetFaultBalanceRecords(currency string) {
 	}
 }
 
-func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
-	now := time.Now()
-
+// recordBalances records the balances for each currency in the totalBalances map.
+func (s *Strategy) recordBalances(totalBalances types.BalanceMap, now time.Time) {
 	for currency := range s.ExpectedBalances {
 		balance, hasBal := totalBalances[currency]
 		if d, ok := s.deviationDetectors[currency]; ok {
@@ -499,8 +500,9 @@ func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
 	}
 }
 
+// canAlign checks if the strategy can align the balances by checking for active transfers.
+// If there are any active transfers, it returns false and resets the fault balance records.
 func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (bool, error) {
-
 	pendingWithdraw, err := s.detectActiveWithdraw(ctx, sessions)
 	if err != nil {
 		return false, fmt.Errorf("unable to check active transfers (withdraw): %w", err)
@@ -569,7 +571,7 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 	totalBalances, sessionBalances := s.aggregateBalances(ctx, sessions)
 	_ = sessionBalances
 
-	s.recordBalance(totalBalances)
+	s.recordBalances(totalBalances, time.Now())
 
 	log.Debugf("checking all fault balance records...")
 
