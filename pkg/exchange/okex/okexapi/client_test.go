@@ -278,6 +278,60 @@ func TestClient_TransactionHistoryWithTime(t *testing.T) {
 	}
 }
 
+func TestClient_SubmitOrder(t *testing.T) {
+	client := getTestClientOrSkip(t)
+	ctx := context.Background()
+	// side := SideTypeBuy
+	side := SideTypeSell
+
+	// This test case should pass under:
+	// 1) Spot mode
+	// 2) Spot & Futures mode
+	//
+	// Market order with cash trade mode
+	// and target currency = base currency works on both modes
+	t.Run("market order w cash mode", func(t *testing.T) {
+		req := client.NewPlaceOrderRequest()
+		req.InstrumentID("BTC-USDT")
+		req.Side(side)
+		req.OrderType(OrderTypeMarket)
+		req.TradeMode(TradeModeCash)
+		req.TargetCurrency(TargetCurrencyBase)
+		req.Size("0.0001")
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("response: %+v", resp)
+		}
+	})
+
+	// You should get the error when:
+	// Under spot mode:
+	//    You can't complete this request under your current account mode
+	// Under spot & futures mode:
+	//    The instrument corresponding to this BTC-USDT does not support the tgtCcy parameter
+	//
+	// When using TradeModeCross:
+	// You can't set target currency
+	// You can only place market order with quote currency and the size is in quote currency
+	t.Run("market order w cross margin trade mode", func(t *testing.T) {
+		req := client.NewPlaceOrderRequest()
+		req.InstrumentID("BTC-USDT")
+		req.Side(side)
+		req.OrderType(OrderTypeMarket)
+		req.TradeMode(TradeModeCross)
+
+		// req.TargetCurrency(TargetCurrencyBase)
+
+		req.Currency("USDT")
+		req.Size("8")
+
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("response: %+v", resp)
+		}
+	})
+}
+
 func TestClient_ThreeDaysTransactionHistoryWithTime(t *testing.T) {
 	client := getTestClientOrSkip(t)
 	ctx := context.Background()

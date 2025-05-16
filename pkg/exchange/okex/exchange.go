@@ -310,47 +310,68 @@ func (e *Exchange) queryAccountBalance(ctx context.Context) ([]okexapi.Account, 
 	return e.client.NewGetAccountBalanceRequest().Do(ctx)
 }
 
-func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
-	orderReq := e.client.NewPlaceOrderRequest()
+/*
+Market order behaviors under different account mode:
 
-	orderReq.InstrumentID(e.getInstrumentId(order.Symbol))
-	orderReq.Side(toLocalSideType(order.Side))
-	orderReq.Size(order.Market.FormatQuantity(order.Quantity))
+OKX Spot mode:
+- Market order + TradeModeCash + TargetCurrencyBase ✅ (order history shows the order under "Spot")
+- Market order + TradeModeCash + TargetCurrencyQuote ✅ (order history shows the order under "Spot")
+- Market order + TradeModeCross + TargetCurrencyBase ❌ (You can't complete this request under your current account mode)
+- Market order + TradeModeCross + TargetCurrencyQuote ❌ (You can't complete this request under your current account mode)
+OKX Spot & Futures mode:
+- Market order + TradeModeCash + TargetCurrencyBase ✅ (fallback to Spot mode, order history shows the order under "Spot")
+- Market order + TradeModeCash + TargetCurrencyQuote ✅ (order history shows the order under "Spot")
+- Market order + TradeModeCross + TargetCurrencyBase ❌ (The instrument corresponding to this BTC-USDT does not support the tgtCcy parameter)
+- Market order + TradeModeCross + CurrencyQuote=USDT ✅ (order history shows the order under "Margin")
+
+This affects the behavior of syncing order history.
+
+Under OKX’s margin mode (specifically spot & futures mode), it’s possible to place orders using the cash mode.
+However, if you try to query order history using the margin mode, you won’t be able to find those orders placed
+via cash mode, because they’re categorized under “Spot”.
+
+When using OKX margin, it seems that operating in Spot mode is generally easier—mainly because
+market orders can specify size using the base currency instead of the quote.
+
+That said, when syncing, we’ll need a workaround to handle this edge case: the query for order history
+should be forced to use “spot” instead of “margin”.
+*/
+func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
+	req := e.client.NewPlaceOrderRequest()
+
+	req.InstrumentID(e.getInstrumentId(order.Symbol))
+	req.Side(toLocalSideType(order.Side))
+	req.Size(order.Market.FormatQuantity(order.Quantity))
 
 	if e.MarginSettings.IsMargin {
 		// okx market order with trade mode cross will be rejected:
 		//   "The corresponding product of this BTC-USDT doesn't support the tgtCcy parameter"
-		if order.Type == types.OrderTypeMarket {
-			log.Errorf("market order with margin mode is not supported, fallback to cash mode, please see %s for more details",
-				"https://www.okx.com/docs-v5/trick_en/#order-management-trade-mode")
-			orderReq.TradeMode(okexapi.TradeModeCash)
-		} else {
-			orderReq.TradeMode(okexapi.TradeModeCross)
-		}
+		// See: https://www.okx.com/docs-v5/trick_en/#order-management-trade-mode
+		req.TradeMode(okexapi.TradeModeCash)
 	} else if e.IsFutures {
 		if e.FuturesSettings.IsIsolatedFutures {
-			orderReq.TradeMode(okexapi.TradeModeIsolated)
+			req.TradeMode(okexapi.TradeModeIsolated)
 		} else {
-			orderReq.TradeMode(okexapi.TradeModeCross)
+			req.TradeMode(okexapi.TradeModeCross)
 		}
 
 		if dualSidePosition {
-			setDualSidePosition(orderReq, order)
+			setDualSidePosition(req, order)
 		}
 	} else {
-		orderReq.TradeMode(okexapi.TradeModeCash)
+		req.TradeMode(okexapi.TradeModeCash)
 	}
 
 	// set price field for limit orders
 	switch order.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
-		orderReq.Price(order.Market.FormatPrice(order.Price))
+		req.Price(order.Market.FormatPrice(order.Price))
 	case types.OrderTypeMarket:
 		// target currency = Default is quote_ccy for buy, base_ccy for sell
 		// Because our order.Quantity unit is base coin, so we indicate the target currency to Base.
 		// Only applicable to SPOT Market Orders
 		if !e.IsFutures {
-			orderReq.TargetCurrency(okexapi.TargetCurrencyBase)
+			req.TargetCurrency(okexapi.TargetCurrencyBase)
 		}
 	}
 
@@ -361,11 +382,11 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 
 	switch order.TimeInForce {
 	case types.TimeInForceFOK:
-		orderReq.OrderType(okexapi.OrderTypeFOK)
+		req.OrderType(okexapi.OrderTypeFOK)
 	case types.TimeInForceIOC:
-		orderReq.OrderType(okexapi.OrderTypeIOC)
+		req.OrderType(okexapi.OrderTypeIOC)
 	default:
-		orderReq.OrderType(orderType)
+		req.OrderType(orderType)
 	}
 
 	if err := placeOrderLimiter.Wait(ctx); err != nil {
@@ -376,15 +397,15 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*t
 		if ok := clientOrderIdRegex.MatchString(order.ClientOrderID); !ok {
 			return nil, fmt.Errorf("client order id should be case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters: %s", order.ClientOrderID)
 		}
-		orderReq.ClientOrderID(order.ClientOrderID)
+		req.ClientOrderID(order.ClientOrderID)
 	}
 
 	if len(e.brokerId) != 0 {
-		orderReq.Tag(e.brokerId)
+		req.Tag(e.brokerId)
 	}
 
 	timeNow := time.Now()
-	orders, err := orderReq.Do(ctx)
+	orders, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -425,11 +446,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 			InstrumentID(instrumentID).
 			After(strconv.FormatInt(nextCursor, 10))
 
-		if e.MarginSettings.IsMargin {
-			req.InstrumentType(okexapi.InstrumentTypeMargin)
-		} else if e.IsFutures {
-			req.InstrumentType(okexapi.InstrumentTypeSwap)
-		}
+		req.InstrumentType(e.getInstrumentType())
 
 		openOrders, err := req.Do(ctx)
 		if err != nil {
@@ -581,11 +598,7 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (tr
 		req.InstrumentID(instrumentID)
 	}
 
-	if e.MarginSettings.IsMargin {
-		req.InstrumentType(okexapi.InstrumentTypeMargin)
-	} else if e.IsFutures {
-		req.InstrumentType(okexapi.InstrumentTypeSwap)
-	}
+	req.InstrumentType(e.getInstrumentType())
 
 	if len(q.OrderID) != 0 {
 		req.OrderID(q.OrderID)
@@ -642,15 +655,11 @@ func (e *Exchange) QueryClosedOrders(
 	req.InstrumentID(instrumentID).
 		StartTime(since).
 		EndTime(until).
+		InstrumentType(e.getInstrumentType()).
 		Limit(defaultQueryLimit).
 		Before(strconv.FormatUint(lastOrderID, 10))
 
-	if e.MarginSettings.IsMargin {
-		req.InstrumentType(okexapi.InstrumentTypeMargin)
-	}
-
 	res, err := req.Do(ctx)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
 	}
@@ -785,7 +794,8 @@ func (e *Exchange) QueryInterestHistory(
 
 func (e *Exchange) getInstrumentType() okexapi.InstrumentType {
 	if e.MarginSettings.IsMargin {
-		return okexapi.InstrumentTypeMargin
+		// Why do we set Spot here? See the doc comment of the SubmitOrder method
+		return okexapi.InstrumentTypeSpot
 	} else if e.IsFutures {
 		return okexapi.InstrumentTypeSwap
 	}
