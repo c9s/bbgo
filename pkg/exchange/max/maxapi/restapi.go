@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -24,6 +25,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/envvar"
+	"github.com/c9s/bbgo/pkg/util/apikey"
 	"github.com/c9s/bbgo/pkg/util/backoff"
 	"github.com/c9s/bbgo/pkg/version"
 )
@@ -117,6 +119,8 @@ type RestClient struct {
 	OrderService      *OrderService
 	RewardService     *RewardService
 	WithdrawalService *WithdrawalService
+
+	apiKeyRotator *apikey.RoundTripBalancer
 }
 
 func NewRestClient(baseURL string) *RestClient {
@@ -138,6 +142,16 @@ func NewRestClient(baseURL string) *RestClient {
 	client.OrderService = &OrderService{client}
 	client.RewardService = &RewardService{client}
 	client.WithdrawalService = &WithdrawalService{client}
+
+	if v, ok := envvar.Bool("MAX_ENABLE_API_KEY_ROTATION"); v && ok {
+		loader := apikey.NewEnvKeyLoader("MAX_API_", "", "KEY", "SECRET")
+		source, err := loader.Load(os.Environ())
+		if err != nil {
+			panic(err)
+		}
+
+		client.apiKeyRotator = apikey.NewRoundTripBalancer(source)
+	}
 
 	// defaultHttpClient.MaxTokenService = &MaxTokenService{defaultHttpClient}
 	client.initNonce()
@@ -264,10 +278,16 @@ func (c *RestClient) newAuthenticatedRequest(
 
 	encoded := base64.StdEncoding.EncodeToString(p)
 
+	apiKey := c.APIKey
+	apiSecret := c.APISecret
+	if c.apiKeyRotator != nil {
+		apiKey, apiSecret = c.apiKeyRotator.Next().GetKeySecret()
+	}
+
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("X-MAX-ACCESSKEY", c.APIKey)
+	req.Header.Add("X-MAX-ACCESSKEY", apiKey)
 	req.Header.Add("X-MAX-PAYLOAD", encoded)
-	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, c.APISecret))
+	req.Header.Add("X-MAX-SIGNATURE", signPayload(encoded, apiSecret))
 
 	if disableUserAgentHeader {
 		req.Header.Set("USER-AGENT", "")
