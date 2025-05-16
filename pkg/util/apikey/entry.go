@@ -7,6 +7,14 @@ type Entry struct {
 	Fields map[string]string
 }
 
+func (e *Entry) GetKeySecret() (key, secret string) {
+	if e.Key != "" && e.Secret != "" {
+		return e.Key, e.Secret
+	}
+
+	return "", ""
+}
+
 func (e *Entry) Get(field string) (val string, ok bool) {
 	val, ok = e.Fields[field]
 	return val, ok
