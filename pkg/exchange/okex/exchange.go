@@ -446,11 +446,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders [
 			InstrumentID(instrumentID).
 			After(strconv.FormatInt(nextCursor, 10))
 
-		if e.MarginSettings.IsMargin {
-			req.InstrumentType(okexapi.InstrumentTypeMargin)
-		} else if e.IsFutures {
-			req.InstrumentType(okexapi.InstrumentTypeSwap)
-		}
+		req.InstrumentType(e.getInstrumentType())
 
 		openOrders, err := req.Do(ctx)
 		if err != nil {
@@ -602,11 +598,7 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) (tr
 		req.InstrumentID(instrumentID)
 	}
 
-	if e.MarginSettings.IsMargin {
-		req.InstrumentType(okexapi.InstrumentTypeMargin)
-	} else if e.IsFutures {
-		req.InstrumentType(okexapi.InstrumentTypeSwap)
-	}
+	req.InstrumentType(e.getInstrumentType())
 
 	if len(q.OrderID) != 0 {
 		req.OrderID(q.OrderID)
@@ -663,15 +655,11 @@ func (e *Exchange) QueryClosedOrders(
 	req.InstrumentID(instrumentID).
 		StartTime(since).
 		EndTime(until).
+		InstrumentType(e.getInstrumentType()).
 		Limit(defaultQueryLimit).
 		Before(strconv.FormatUint(lastOrderID, 10))
 
-	if e.MarginSettings.IsMargin {
-		req.InstrumentType(okexapi.InstrumentTypeMargin)
-	}
-
 	res, err := req.Do(ctx)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to call get order histories error: %w", err)
 	}
@@ -806,7 +794,8 @@ func (e *Exchange) QueryInterestHistory(
 
 func (e *Exchange) getInstrumentType() okexapi.InstrumentType {
 	if e.MarginSettings.IsMargin {
-		return okexapi.InstrumentTypeMargin
+		// Why do we set Spot here? See the doc comment of the SubmitOrder method
+		return okexapi.InstrumentTypeSpot
 	} else if e.IsFutures {
 		return okexapi.InstrumentTypeSwap
 	}
