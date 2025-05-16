@@ -500,6 +500,56 @@ func TestExchange_Futures_SubmitOrder(t *testing.T) {
 	assert.NotEmpty(t, orders)
 }
 
+func TestExchange_Futures_SubmitMarketOrder(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := New(key, secret, passphrase)
+	ex.UseFutures()
+	dualSidePosition = true
+
+	markets, err := ex.QueryMarkets(context.Background())
+	assert.NoError(t, err)
+
+	market := markets["BTCUSDT"]
+	orders, err := ex.SubmitOrder(context.Background(), types.SubmitOrder{
+		Symbol:   "BTCUSDT",
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeMarket,
+		Quantity: market.MinQuantity,
+		Market:   market,
+	})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, orders)
+}
+
+func TestExchange_Spot_SubmitMarketOrder(t *testing.T) {
+	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
+	if !ok {
+		t.SkipNow()
+		return
+	}
+
+	ex := New(key, secret, passphrase)
+
+	markets, err := ex.QueryMarkets(context.Background())
+	assert.NoError(t, err)
+
+	market := markets["BTCUSDT"]
+	orders, err := ex.SubmitOrder(context.Background(), types.SubmitOrder{
+		Symbol:   "BTCUSDT",
+		Side:     types.SideTypeBuy,
+		Type:     types.OrderTypeMarket,
+		Quantity: market.MinQuantity,
+		Market:   market,
+	})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, orders)
+}
+
 func TestExchange_QueryKlines(t *testing.T) {
 	key, secret, passphrase, ok := testutil.IntegrationTestWithPassphraseConfigured(t, "OKEX")
 	if !ok {
@@ -757,4 +807,53 @@ func TestExchange_QueryPositionRisk(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestExchange_getInstrumentId(t *testing.T) {
+	tests := []struct {
+		name           string
+		symbol         string
+		isFutures      bool
+		expectedSymbol string
+	}{
+		{
+			name:           "BTCUSDT in spot mode",
+			symbol:         "BTCUSDT",
+			isFutures:      false,
+			expectedSymbol: "BTC-USDT",
+		},
+		{
+			name:           "BTCUSDT in futures mode",
+			symbol:         "BTCUSDT",
+			isFutures:      true,
+			expectedSymbol: "BTC-USDT-SWAP",
+		},
+		{
+			name:           "ETHUSDT in spot mode",
+			symbol:         "ETHUSDT",
+			isFutures:      false,
+			expectedSymbol: "ETH-USDT",
+		},
+		{
+			name:           "ETHUSDT in futures mode",
+			symbol:         "ETHUSDT",
+			isFutures:      true,
+			expectedSymbol: "ETH-USDT-SWAP",
+		},
+		{
+			name:           "empty symbol",
+			symbol:         "",
+			isFutures:      false,
+			expectedSymbol: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ex := New("", "", "")
+			ex.IsFutures = tt.isFutures
+			got := ex.getInstrumentId(tt.symbol)
+			assert.Equal(t, tt.expectedSymbol, got)
+		})
+	}
 }

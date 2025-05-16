@@ -15,7 +15,7 @@ type InstrumentInfo struct {
 	BaseCurrency          string                     `json:"baseCcy"`
 	QuoteCurrency         string                     `json:"quoteCcy"`
 	SettleCurrency        string                     `json:"settleCcy"`
-	ContractValue         string                     `json:"ctVal"`
+	ContractValue         fixedpoint.Value           `json:"ctVal"`
 	ContractMultiplier    string                     `json:"ctMult"`
 	ContractValueCurrency string                     `json:"ctValCcy"`
 	ListTime              types.MillisecondTimestamp `json:"listTime"`
