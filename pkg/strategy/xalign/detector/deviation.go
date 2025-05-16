@@ -15,23 +15,25 @@ type Record[T any] struct {
 
 type DeviationDetector[T any] struct {
 	mu            sync.Mutex
-	expectedValue T               // Expected value for comparison
-	tolerance     float64         // Tolerance percentage (e.g., 0.01 for 1%)
-	duration      time.Duration   // Time limit for sustained deviation
-	toFloat64     func(T) float64 // Function to convert T to float64
-	records       []Record[T]     // Tracks deviation records
+	expectedValue T             // Expected value for comparison
+	tolerance     float64       // Tolerance percentage (e.g., 0.01 for 1%)
+	duration      time.Duration // Time limit for sustained deviation
+
+	toFloat64Amount func(T) (float64, error) // Function to convert T to float64
+	records         []Record[T]              // Tracks deviation records
 
 	logger logrus.FieldLogger
 }
 
 // NewDeviationDetector creates a new instance of DeviationDetector
 func NewDeviationDetector[T any](
-	expectedValue T, tolerance float64, duration time.Duration, toFloat64 func(T) float64,
+	expectedValue T, tolerance float64, duration time.Duration, converter func(T) (float64, error),
 ) *DeviationDetector[T] {
-	if toFloat64 == nil {
+	if converter == nil {
 		if _, ok := any(expectedValue).(float64); ok {
-			toFloat64 = func(value T) float64 {
-				return any(value).(float64)
+			// create default converter
+			converter = func(value T) (float64, error) {
+				return any(value).(float64), nil
 			}
 		} else {
 			panic("No conversion function provided for non-float64 type")
@@ -39,15 +41,14 @@ func NewDeviationDetector[T any](
 	}
 
 	logger := logrus.New()
-	// logger.SetLevel(logrus.ErrorLevel)
-	logger.SetLevel(logrus.DebugLevel)
+	logger.SetLevel(logrus.ErrorLevel)
 	return &DeviationDetector[T]{
-		expectedValue: expectedValue,
-		tolerance:     tolerance,
-		duration:      duration,
-		toFloat64:     toFloat64,
-		records:       nil,
-		logger:        logger,
+		expectedValue:   expectedValue,
+		tolerance:       tolerance,
+		duration:        duration,
+		toFloat64Amount: converter,
+		records:         nil,
+		logger:          logger,
 	}
 }
 
@@ -57,17 +58,31 @@ func (d *DeviationDetector[T]) SetLogger(logger logrus.FieldLogger) {
 
 func (d *DeviationDetector[T]) AddRecord(at time.Time, value T) (bool, time.Duration) {
 	// Calculate deviation percentage
-	expected := d.toFloat64(d.expectedValue)
-	current := d.toFloat64(value)
+	expected, err := d.toFloat64Amount(d.expectedValue)
+	if err != nil {
+		d.logger.WithError(err).Errorf("unable to calculate deviation for value %v", value)
+		return false, 0
+	}
+
+	current, err := d.toFloat64Amount(value)
+	if err != nil {
+		d.logger.WithError(err).Errorf("unable to calculate deviation for value %v", value)
+		return false, 0
+	}
+
 	deviationPercentage := math.Abs((current - expected) / expected)
 
-	d.logger.Infof("deviation detection: expected=%f, current=%f, deviation=%f", expected, current, deviationPercentage)
+	d.logger.Infof("deviation detection: current/expected=%f/%f, deviation=%.2f%%", current, expected, deviationPercentage*100.0)
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	// Reset records if deviation is within tolerance
 	if deviationPercentage <= d.tolerance {
+		if len(d.records) > 0 {
+			d.logger.Infof("deviation within tolerance, resetting records")
+		}
+
 		d.records = nil
 		return false, 0
 	}
