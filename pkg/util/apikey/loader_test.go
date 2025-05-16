@@ -49,5 +49,4 @@ func TestEnvKeyLoader_Load(t *testing.T) {
 		assert.Equal(t, "secret2", entry2.Fields["SECRET"])
 		assert.Equal(t, "extra2", entry2.Fields["EXTRA"])
 	}
-
 }
