@@ -266,3 +266,56 @@ func TestMarket_AdjustQuantityByMinNotional(t *testing.T) {
 		assert.False(t, market.IsDustQuantity(q2, testCase.price))
 	}
 }
+
+func TestMarket_AdjustQuantityToContractSize(t *testing.T) {
+	market := Market{
+		Symbol:          "BTCUSDT",
+		StepSize:        fixedpoint.NewFromFloat(0.01), // step size is 0.01 BTC
+		ContractValue:   fixedpoint.NewFromFloat(0.01), // 1 contract = 0.01 BTC
+		VolumePrecision: 8,
+	}
+
+	testCases := []struct {
+		name     string
+		quantity fixedpoint.Value
+		expect   fixedpoint.Value
+	}{
+		{
+			name:     "exact contract size",
+			quantity: fixedpoint.NewFromFloat(0.01), // 1 contract
+			expect:   fixedpoint.NewFromFloat(1.0),
+		},
+		{
+			name:     "multiple contracts",
+			quantity: fixedpoint.NewFromFloat(0.05), // 5 contracts
+			expect:   fixedpoint.NewFromFloat(5.0),
+		},
+		{
+			name:     "round up to step size",
+			quantity: fixedpoint.NewFromFloat(0.024), // 2.4 contracts
+			expect:   fixedpoint.NewFromFloat(2.4),
+		},
+		{
+			name:     "zero quantity",
+			quantity: fixedpoint.Zero,
+			expect:   fixedpoint.Zero,
+		},
+		{
+			name:     "small quantity",
+			quantity: fixedpoint.NewFromFloat(0.005), // 0.5 contracts
+			expect:   fixedpoint.NewFromFloat(0.5),
+		},
+		{
+			name:     "large quantity",
+			quantity: fixedpoint.NewFromFloat(1.0), // 100 contracts
+			expect:   fixedpoint.NewFromFloat(100.0),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := market.AdjustQuantityToContractSize(tc.quantity)
+			assert.Equal(t, tc.expect, result, "quantity: %v", tc.quantity.Float64())
+		})
+	}
+}
