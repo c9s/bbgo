@@ -25,6 +25,8 @@ const ID = "xalign"
 
 var log = logrus.WithField("strategy", ID)
 
+const defaultPriceQuoteCurrency = "USDT"
+
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -54,6 +56,8 @@ type Strategy struct {
 
 	WarningDuration types.Duration `json:"warningFor"`
 
+	SkipTransferCheck bool `json:"skipTransferCheck"`
+
 	MaxAmounts       map[string]fixedpoint.Value `json:"maxAmounts"`
 	LargeAmountAlert *LargeAmountAlertConfig     `json:"largeAmountAlert"`
 
@@ -65,7 +69,7 @@ type Strategy struct {
 
 	priceResolver *pricesolver.SimplePriceSolver
 
-	sessions   map[string]*bbgo.ExchangeSession
+	sessions   bbgo.ExchangeSessionMap
 	orderBooks map[string]*bbgo.ActiveOrderBook
 
 	orderStore *core.OrderStore
@@ -92,6 +96,7 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
+	s.subscribePrices(sessions)
 }
 
 func (s *Strategy) Defaults() error {
@@ -109,7 +114,41 @@ func (s *Strategy) Defaults() error {
 func (s *Strategy) Initialize() error {
 	s.activeTransferNotificationLimiter = rate.NewLimiter(rate.Every(5*time.Minute), 1)
 	s.deviationDetectors = make(map[string]*detector.DeviationDetector[types.Balance])
+
+	s.sessions = make(map[string]*bbgo.ExchangeSession)
+	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
+	s.orderStore = core.NewOrderStore("")
+
+	for currency, expectedValue := range s.ExpectedBalances {
+		s.deviationDetectors[currency] = detector.NewDeviationDetector(
+			types.Balance{Currency: currency, NetAsset: expectedValue}, // Expected value
+			s.BalanceToleranceRange.Float64(),                          // Tolerance (1%)
+			s.Duration.Duration(),                                      // Duration for sustained deviation
+			// can switch from s.netBalanceValue to s.netBalance,
+			s.netBalanceValue,
+		)
+
+		s.deviationDetectors[currency].SetLogger(log)
+	}
+
 	return nil
+}
+
+// netBalanceValue returns the net balance value for a given balance
+func (s *Strategy) netBalanceValue(b types.Balance) (float64, error) {
+	if s.priceResolver == nil {
+		return 0.0, errors.New("price resolver not initialized")
+	}
+
+	if assetPrice, ok := s.priceResolver.ResolvePrice(b.Currency, defaultPriceQuoteCurrency); ok {
+		return b.Net().Float64() * assetPrice.Float64(), nil
+	}
+
+	return 0.0, fmt.Errorf("unable to resolve price for %s", b.Currency)
+}
+
+func (s *Strategy) netBalance(b types.Balance) (float64, error) {
+	return b.Net().Float64(), nil
 }
 
 func (s *Strategy) Validate() error {
@@ -118,94 +157,6 @@ func (s *Strategy) Validate() error {
 	}
 
 	return nil
-}
-
-func (s *Strategy) aggregateBalances(
-	ctx context.Context, sessions map[string]*bbgo.ExchangeSession,
-) (totalBalances types.BalanceMap, sessionBalances map[string]types.BalanceMap) {
-	totalBalances = make(types.BalanceMap)
-	sessionBalances = make(map[string]types.BalanceMap)
-
-	// iterate the sessions and record them
-	for sessionName, session := range sessions {
-		// update the account balances and the margin information
-		if _, err := session.UpdateAccount(ctx); err != nil {
-			log.WithError(err).Errorf("can not update account")
-			return
-		}
-
-		account := session.GetAccount()
-		balances := account.Balances()
-
-		sessionBalances[sessionName] = balances
-		totalBalances = totalBalances.Add(balances)
-	}
-
-	return totalBalances, sessionBalances
-}
-
-func (s *Strategy) detectActiveWithdraw(
-	ctx context.Context,
-	sessions map[string]*bbgo.ExchangeSession,
-) (*types.Withdraw, error) {
-	var err2 error
-	until := time.Now()
-	since := until.Add(-time.Hour * 24)
-	for _, session := range sessions {
-		transferService, ok := session.Exchange.(types.WithdrawHistoryService)
-		if !ok {
-			continue
-		}
-
-		withdraws, err := transferService.QueryWithdrawHistory(ctx, "", since, until)
-		if err != nil {
-			log.WithError(err).Errorf("unable to query withdraw history")
-			err2 = err
-			continue
-		}
-
-		for _, withdraw := range withdraws {
-			log.Infof("checking withdraw status: %s", withdraw.String())
-			switch withdraw.Status {
-			case types.WithdrawStatusSent, types.WithdrawStatusProcessing, types.WithdrawStatusAwaitingApproval:
-				return &withdraw, nil
-			}
-		}
-	}
-
-	return nil, err2
-}
-
-func (s *Strategy) detectActiveDeposit(
-	ctx context.Context,
-	sessions map[string]*bbgo.ExchangeSession,
-) (*types.Deposit, error) {
-	var err2 error
-	until := time.Now()
-	since := until.Add(-time.Hour * 24)
-	for _, session := range sessions {
-		transferService, ok := session.Exchange.(types.DepositHistoryService)
-		if !ok {
-			continue
-		}
-
-		deposits, err := transferService.QueryDepositHistory(ctx, "", since, until)
-		if err != nil {
-			log.WithError(err).Errorf("unable to query deposit history")
-			err2 = err
-			continue
-		}
-
-		for _, deposit := range deposits {
-			log.Infof("checking deposit status: %s", deposit.String())
-			switch deposit.Status {
-			case types.DepositPending:
-				return &deposit, nil
-			}
-		}
-	}
-
-	return nil, err2
 }
 
 func (s *Strategy) selectSessionForCurrency(
@@ -396,55 +347,28 @@ func (s *Strategy) selectSessionForCurrency(
 	return nil, nil
 }
 
-func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+func (s *Strategy) CrossRun(
+	ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
+) error {
 	instanceID := s.InstanceID()
-
-	s.sessions = make(map[string]*bbgo.ExchangeSession)
-	s.orderBooks = make(map[string]*bbgo.ActiveOrderBook)
-	s.orderStore = core.NewOrderStore("")
 
 	if err := dynamic.InitializeConfigMetrics(ID, instanceID, s); err != nil {
 		return err
 	}
 
-	for currency, expectedValue := range s.ExpectedBalances {
-		s.deviationDetectors[currency] = detector.NewDeviationDetector(
-			types.Balance{Currency: currency, NetAsset: expectedValue}, // Expected value
-			s.BalanceToleranceRange.Float64(),                          // Tolerance (1%)
-			s.Duration.Duration(),                                      // Duration for sustained deviation
-			func(b types.Balance) float64 {
-				return b.Net().Float64()
-			},
-		)
+	s.sessions = sessions
 
-		s.deviationDetectors[currency].SetLogger(log)
-	}
-
-	markets := types.MarketMap{}
-	for _, sessionName := range s.PreferredSessions {
-		session, ok := sessions[sessionName]
-		if !ok {
-			return fmt.Errorf("incorrect preferred session name: %s is not defined", sessionName)
-		}
-
+	s.sessions = s.sessions.Filter(s.PreferredSessions)
+	for sessionName, session := range s.sessions {
+		// bind session stream to the global order store
 		s.orderStore.BindStream(session.UserDataStream)
 
 		orderBook := bbgo.NewActiveOrderBook("")
 		orderBook.BindStream(session.UserDataStream)
 		s.orderBooks[sessionName] = orderBook
-
-		s.sessions[sessionName] = session
-
-		for _, market := range session.Markets() {
-			markets.Add(market)
-		}
 	}
 
-	s.priceResolver = pricesolver.NewSimplePriceResolver(markets)
-	for _, session := range s.sessions {
-		// bind on trade to update price
-		session.UserDataStream.OnTradeUpdate(s.priceResolver.UpdateFromTrade)
-	}
+	s.priceResolver = s.initializePriceResolver(s.sessions.CollectMarkets(s.PreferredSessions))
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -455,25 +379,65 @@ func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, se
 		}
 	})
 
-	go func() {
-		s.align(ctx, s.sessions)
+	go s.monitor(ctx)
+	return nil
+}
 
-		ticker := time.NewTicker(s.Interval.Duration())
-		defer ticker.Stop()
+func (s *Strategy) monitor(ctx context.Context) {
+	s.align(ctx, s.sessions)
 
-		for {
-			select {
+	ticker := time.NewTicker(s.Interval.Duration())
+	defer ticker.Stop()
 
-			case <-ctx.Done():
-				return
+	for {
+		select {
 
-			case <-ticker.C:
-				s.align(ctx, s.sessions)
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			s.align(ctx, s.sessions)
+		}
+	}
+}
+
+func (s *Strategy) initializePriceResolver(allMarkets types.MarketMap) *pricesolver.SimplePriceSolver {
+	priceResolver := pricesolver.NewSimplePriceResolver(allMarkets)
+	for _, session := range s.sessions {
+		for symbol, price := range session.LastPrices() {
+			priceResolver.Update(symbol, price)
+		}
+
+		session.MarketDataStream.OnKLineClosed(func(k types.KLine) {
+			priceResolver.Update(k.Symbol, k.Close)
+		})
+	}
+
+	return priceResolver
+}
+
+func (s *Strategy) subscribePrices(sessions map[string]*bbgo.ExchangeSession) {
+	possibleQuoteCurrencies := append(s.PreferredQuoteCurrencies.Buy, s.PreferredQuoteCurrencies.Sell...)
+	for asset := range s.ExpectedBalances {
+		for _, quote := range possibleQuoteCurrencies {
+			for _, sId := range s.PreferredSessions {
+				if session, ok := sessions[sId]; ok {
+					markets := session.Markets()
+					if len(markets) == 0 {
+						panic("session has no markets")
+					}
+
+					market, foundMarket := markets.FindPair(asset, quote)
+					if !foundMarket {
+						// skip to next market
+						continue
+					}
+
+					session.Subscribe(types.KLineChannel, market.Symbol, types.SubscribeOptions{Interval: types.Interval5m})
+				}
 			}
 		}
-	}()
-
-	return nil
+	}
 }
 
 func (s *Strategy) resetFaultBalanceRecords(currency string) {
@@ -482,9 +446,8 @@ func (s *Strategy) resetFaultBalanceRecords(currency string) {
 	}
 }
 
-func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
-	now := time.Now()
-
+// recordBalances records the balances for each currency in the totalBalances map.
+func (s *Strategy) recordBalances(totalBalances types.BalanceMap, now time.Time) {
 	for currency := range s.ExpectedBalances {
 		balance, hasBal := totalBalances[currency]
 		if d, ok := s.deviationDetectors[currency]; ok {
@@ -497,23 +460,16 @@ func (s *Strategy) recordBalance(totalBalances types.BalanceMap) {
 	}
 }
 
-func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) {
-	for sessionName, session := range sessions {
-		ob, ok := s.orderBooks[sessionName]
-		if !ok {
-			log.Errorf("orderbook on session %s not found", sessionName)
-			return
-		}
-		if ok {
-			if err := ob.GracefulCancel(ctx, session.Exchange); err != nil {
-				log.WithError(err).Errorf("unable to cancel order")
-			}
-		}
+// canAlign checks if the strategy can align the balances by checking for active transfers.
+// If there are any active transfers, it returns false and resets the fault balance records.
+func (s *Strategy) canAlign(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) (bool, error) {
+	if s.SkipTransferCheck {
+		return true, nil
 	}
 
 	pendingWithdraw, err := s.detectActiveWithdraw(ctx, sessions)
 	if err != nil {
-		log.WithError(err).Errorf("unable to check active transfers (withdraw)")
+		return false, fmt.Errorf("unable to check active transfers (withdraw): %w", err)
 	} else if pendingWithdraw != nil {
 		log.Warnf("found active transfer (%f %s withdraw), skip balance align check",
 			pendingWithdraw.Amount.Float64(),
@@ -527,12 +483,12 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 				pendingWithdraw)
 		}
 
-		return
+		return false, nil
 	}
 
 	pendingDeposit, err := s.detectActiveDeposit(ctx, sessions)
 	if err != nil {
-		log.WithError(err).Errorf("unable to check active transfers (deposit)")
+		return false, fmt.Errorf("unable to check active transfers (deposit): %w", err)
 	} else if pendingDeposit != nil {
 		log.Warnf("found active transfer (%f %s deposit), skip balance align check",
 			pendingDeposit.Amount.Float64(),
@@ -545,17 +501,48 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 				pendingDeposit.Asset,
 				pendingDeposit)
 		}
+
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) {
+	for sessionName, session := range sessions {
+		ob, ok := s.orderBooks[sessionName]
+		if !ok {
+			log.Errorf("orderbook on session %s not found", sessionName)
+			return
+		}
+
+		if err := ob.GracefulCancel(ctx, session.Exchange); err != nil {
+			log.WithError(err).Errorf("unable to cancel order")
+		}
+	}
+
+	canAlign, err := s.canAlign(ctx, sessions)
+	if err != nil {
+		log.WithError(err).Errorf("unable to transfer activities")
 		return
 	}
 
-	totalBalances, sessionBalances := s.aggregateBalances(ctx, sessions)
-	_ = sessionBalances
+	if !canAlign {
+		log.Infof("skip balance align check due to active transfer")
+		return
+	}
 
-	s.recordBalance(totalBalances)
+	totalBalances, _, err := sessions.AggregateBalances(ctx, false)
+	if err != nil {
+		log.WithError(err).Errorf("unable to aggregate balances")
+		return
+	}
+
+	s.recordBalances(totalBalances, time.Now())
 
 	log.Debugf("checking all fault balance records...")
 
-	amountQuoteCurrency := "USDT"
+	amountQuoteCurrency := defaultPriceQuoteCurrency
 	if s.LargeAmountAlert != nil {
 		amountQuoteCurrency = s.LargeAmountAlert.QuoteCurrency
 	}
@@ -565,9 +552,9 @@ func (s *Strategy) align(ctx context.Context, sessions map[string]*bbgo.Exchange
 		quantity := q.Abs()
 
 		price, ok := s.priceResolver.ResolvePrice(currency, amountQuoteCurrency)
-
 		if !ok {
 			log.Warnf("unable to resolve price for %s, skip alert checking", currency)
+			continue
 		}
 
 		amount := price.Mul(quantity)
@@ -665,4 +652,92 @@ func (s *Strategy) calculateRefillQuantity(
 		return expectedBalance.Sub(netBalance)
 	}
 	return expectedBalance
+}
+
+func (s *Strategy) aggregateBalances(
+	ctx context.Context, sessions map[string]*bbgo.ExchangeSession,
+) (types.BalanceMap, map[string]types.BalanceMap, error) {
+	totalBalances := make(types.BalanceMap)
+	sessionBalances := make(map[string]types.BalanceMap)
+
+	// iterate the sessions and record them
+	for sessionName, session := range sessions {
+		// update the account balances and the margin information
+		if _, err := session.UpdateAccount(ctx); err != nil {
+			log.WithError(err).Errorf("unable to update account")
+			return nil, nil, err
+		}
+
+		account := session.GetAccount()
+		balances := account.Balances()
+
+		sessionBalances[sessionName] = balances
+		totalBalances = totalBalances.Add(balances)
+	}
+
+	return totalBalances, sessionBalances, nil
+}
+
+func (s *Strategy) detectActiveWithdraw(
+	ctx context.Context,
+	sessions map[string]*bbgo.ExchangeSession,
+) (*types.Withdraw, error) {
+	var err2 error
+	until := time.Now()
+	since := until.Add(-time.Hour * 24)
+	for _, session := range sessions {
+		transferService, ok := session.Exchange.(types.WithdrawHistoryService)
+		if !ok {
+			continue
+		}
+
+		withdraws, err := transferService.QueryWithdrawHistory(ctx, "", since, until)
+		if err != nil {
+			log.WithError(err).Errorf("unable to query withdraw history")
+			err2 = err
+			continue
+		}
+
+		for _, withdraw := range withdraws {
+			log.Infof("checking withdraw status: %s", withdraw.String())
+			switch withdraw.Status {
+			case types.WithdrawStatusSent, types.WithdrawStatusProcessing, types.WithdrawStatusAwaitingApproval:
+				return &withdraw, nil
+			}
+		}
+	}
+
+	return nil, err2
+}
+
+func (s *Strategy) detectActiveDeposit(
+	ctx context.Context,
+	sessions map[string]*bbgo.ExchangeSession,
+) (*types.Deposit, error) {
+	var err2 error
+	until := time.Now()
+	since := until.Add(-time.Hour * 24)
+	for _, session := range sessions {
+		transferService, ok := session.Exchange.(types.DepositHistoryService)
+		if !ok {
+			continue
+		}
+
+		deposits, err := transferService.QueryDepositHistory(ctx, "", since, until)
+		if err != nil {
+			log.WithError(err).Errorf("unable to query deposit history")
+			err2 = err
+			continue
+		}
+
+		for _, deposit := range deposits {
+			log.Infof("checking deposit status: %s", deposit.String())
+			switch deposit.Status {
+			case types.DepositPending:
+				return &deposit, nil
+			}
+		}
+	}
+
+	return nil, err2
 }

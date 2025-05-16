@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"sort"
 	"sync"
 	"time"
 
@@ -33,6 +34,77 @@ const defaultMaxSessionTradeBufferSize = 3500
 var KLinePreloadLimit int64 = 1000
 
 var ErrEmptyMarketInfo = errors.New("market info should not be empty, 0 markets loaded")
+
+type ExchangeSessionMap map[string]*ExchangeSession
+
+func (sessions ExchangeSessionMap) Filter(names []string) ExchangeSessionMap {
+	mm := ExchangeSessionMap{}
+
+	for _, name := range names {
+		if session, ok := sessions[name]; ok {
+			mm[name] = session
+		}
+	}
+
+	return mm
+}
+
+func (sessions ExchangeSessionMap) Names() (slice []string) {
+	for n := range sessions {
+		slice = append(slice, n)
+	}
+
+	return slice
+}
+
+// CollectMarkets collects all markets from the sessions
+//
+// markets.Merge override the previous defined markets
+// so we need to merge the markets in reverse order
+func (sessions ExchangeSessionMap) CollectMarkets(preferredSessions []string) types.MarketMap {
+	if len(preferredSessions) == 0 {
+		preferredSessions = sessions.Names()
+	}
+
+	allMarkets := types.MarketMap{}
+
+	sort.Sort(sort.Reverse(sort.StringSlice(preferredSessions)))
+	for _, sessionName := range preferredSessions {
+		if session, ok := sessions[sessionName]; ok {
+			allMarkets.Merge(session.Markets())
+		}
+	}
+
+	return allMarkets
+}
+
+func (sessions ExchangeSessionMap) AggregateBalances(
+	ctx context.Context, skipUpdate bool,
+) (types.BalanceMap, map[string]types.BalanceMap, error) {
+	totalBalances := make(types.BalanceMap)
+	sessionBalances := make(map[string]types.BalanceMap)
+
+	var err error
+
+	// iterate the sessions and record them
+	for sessionName, session := range sessions {
+		// update the account balances and the margin information
+		account := session.GetAccount()
+		if !skipUpdate {
+			account, err = session.UpdateAccount(ctx)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+
+		balances := account.Balances()
+
+		sessionBalances[sessionName] = balances
+		totalBalances = totalBalances.Add(balances)
+	}
+
+	return totalBalances, sessionBalances, nil
+}
 
 // ExchangeSession presents the exchange connection Session
 // It also maintains and collects the data returned from the stream.
