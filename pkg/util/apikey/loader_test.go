@@ -50,3 +50,18 @@ func TestEnvKeyLoader_Load(t *testing.T) {
 		assert.Equal(t, "extra2", entry2.Fields["EXTRA"])
 	}
 }
+
+func Test_NewSourceFromArray(t *testing.T) {
+	data := [][]string{
+		{"key1", "secret1"},
+		{"key2", "secret2"},
+		{"key3", "secret3"},
+	}
+
+	source := NewSourceFromArray(data)
+	assert.NotNil(t, source)
+	assert.Len(t, source.Entries, 3)
+	for _, entry := range source.Entries {
+		t.Logf("Index: %d, Key: %s, Secret: %s\n", entry.Index, entry.Key, entry.Secret)
+	}
+}

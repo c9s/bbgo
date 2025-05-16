@@ -25,6 +25,30 @@ func (s *Source) Get(index int) *Entry {
 	return &s.Entries[index]
 }
 
+func NewSourceFromArray(data [][]string) *Source {
+	var entries []Entry
+
+	for i, item := range data {
+		if len(item) < 2 {
+			continue
+		}
+
+		entry := Entry{
+			Index:  i + 1,
+			Key:    item[0],
+			Secret: item[1],
+			Fields: map[string]string{
+				"KEY":    item[0],
+				"SECRET": item[1],
+			},
+		}
+
+		entries = append(entries, entry)
+	}
+
+	return &Source{Entries: entries}
+}
+
 type EnvKeyLoader struct {
 	Prefix  string
 	Postfix string
