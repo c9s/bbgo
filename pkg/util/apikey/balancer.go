@@ -1,7 +1,7 @@
 package apikey
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"strconv"
 	"sync"
 
@@ -145,7 +145,7 @@ func (b *RandomBalancer) Next() *Entry {
 	}
 
 	// Randomly select an entry
-	index := rand.Intn(len(b.source.Entries))
+	index := rand.IntN(len(b.source.Entries))
 	entry := &b.source.Entries[index]
 
 	// Update hit counter and metrics
