@@ -145,9 +145,16 @@ func NewRestClient(baseURL string) *RestClient {
 
 	if v, ok := envvar.Bool("MAX_ENABLE_API_KEY_ROTATION"); v && ok {
 		loader := apikey.NewEnvKeyLoader("MAX_API_", "", "KEY", "SECRET")
+
+		// this loads MAX_API_KEY_1, MAX_API_KEY_2, MAX_API_KEY_3, ...
 		source, err := loader.Load(os.Environ())
 		if err != nil {
 			panic(err)
+		}
+
+		// load the original one as index 0
+		if client.APIKey != "" && client.APISecret != "" {
+			source.Add(apikey.Entry{Index: 0, Key: client.APIKey, Secret: client.APISecret})
 		}
 
 		client.apiKeyRotator = apikey.NewRoundTripBalancer(source)
