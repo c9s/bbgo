@@ -3,12 +3,14 @@ package service
 import (
 	"context"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"time"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -173,17 +175,20 @@ func (sel SyncTask) execute(
 				} else {
 					logger.Debugf("inserting %T: %+v", obj, obj)
 				}
+				var err error
 				if sel.Insert != nil {
 					// for custom insert
-					if err := sel.Insert(obj); err != nil {
-						logger.WithError(err).Errorf("can not insert record: %v", obj)
-						return err
-					}
+					err = sel.Insert(obj)
 				} else {
-					if err := insertType(db, obj, useUpsert); err != nil {
-						logger.WithError(err).Errorf("can not insert record: %v", obj)
-						return err
-					}
+					err = insertType(db, obj, useUpsert)
+				}
+				if isMysqlDuplicateError(err) {
+					// ignore duplicate error
+					logger.Warnf("duplicate entry for %T, skipped: %+v", obj, obj)
+					continue
+				} else if err != nil {
+					logger.WithError(err).Errorf("can not insert record: %+v", obj)
+					return err
 				}
 			}
 		}
@@ -268,4 +273,21 @@ func detectLastestSelfTrade(ctx context.Context, db *sqlx.DB, sel SyncTask, reco
 		recordsRef = recordsRef.Elem()
 	}
 	return recordsRef.Len() == 2
+}
+
+var dupKeyErrPattern = regexp.MustCompile("Duplicate entry")
+
+func isMysqlDuplicateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// check if it's a duplicate error:
+	//    "Error 1062 (23000): Duplicate entry"
+	if parentErr := errors.Unwrap(err); parentErr != nil {
+		if mysqlErr, ok := parentErr.(*mysql.MySQLError); ok {
+			return mysqlErr.Number == 1062
+		}
+	}
+
+	return dupKeyErrPattern.MatchString(err.Error())
 }
