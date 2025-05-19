@@ -17,6 +17,10 @@ func (s *Source) Len() int {
 	return len(s.Entries)
 }
 
+func (s *Source) Add(entry Entry) {
+	s.Entries = append(s.Entries, entry)
+}
+
 func (s *Source) Get(index int) *Entry {
 	if index < 0 || index >= len(s.Entries) {
 		return nil
