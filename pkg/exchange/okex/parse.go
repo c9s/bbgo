@@ -123,6 +123,7 @@ const (
 	WsEventTypeUnsubscribe     WsEventType = "unsubscribe"
 	WsEventTypeConnectionInfo  WsEventType = "channel-conn-count"
 	WsEventTypeConnectionError WsEventType = "channel-conn-count-error"
+	WsEventTypeNotice          WsEventType = "notice"
 )
 
 type WebSocketEvent struct {
@@ -143,6 +144,10 @@ func (w *WebSocketEvent) IsValid() error {
 	switch w.Event {
 	case WsEventTypeError:
 		return fmt.Errorf("websocket request error, code: %s, msg: %s", w.Code, w.Message)
+
+	case WsEventTypeNotice:
+		log.Warnf("[okex] notice: %s(%s)", w.Message, w.Code)
+		return nil
 
 	case WsEventTypeSubscribe, WsEventTypeUnsubscribe:
 		return nil
