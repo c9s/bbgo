@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
-	"go.uber.org/multierr"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
@@ -92,6 +91,8 @@ type Strategy struct {
 	takeProfitPrice      fixedpoint.Value
 	startTimeOfNextRound time.Time
 	nextRoundPaused      bool
+	writeCtx             context.Context
+	cancelWrite          context.CancelFunc
 
 	// callbacks
 	common.StatusCallbacks
@@ -164,6 +165,9 @@ func (s *Strategy) newPrometheusLabels() prometheus.Labels {
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 	s.ExchangeSession = session
+
+	// context for submit orders
+	s.writeCtx, s.cancelWrite = context.WithCancel(ctx)
 
 	s.logger.Infof("persistence ttl: %s", s.PersistenceTTL.Duration())
 	if s.ProfitStats == nil {
@@ -360,23 +364,24 @@ func (s *Strategy) updateTakeProfitPrice() {
 }
 
 func (s *Strategy) Close(ctx context.Context) error {
-	s.logger.Infof("closing %s dca2", s.Symbol)
-
 	defer s.EmitClosed()
 
-	var err error
-	if s.UseCancelAllOrdersApiWhenClose {
-		err = tradingutil.UniversalCancelAllOrders(ctx, s.ExchangeSession.Exchange, s.Symbol, nil)
-	} else {
-		err = s.OrderExecutor.GracefulCancel(ctx)
+	s.logger.Infof("closing %s dca2", s.Symbol)
+
+	if s.cancelWrite != nil {
+		s.cancelWrite()
 	}
 
-	if err != nil {
-		s.logger.WithError(err).Errorf("there are errors when cancelling orders when closing (UseCancelAllOrdersApiWhenClose = %t)", s.UseCancelAllOrdersApiWhenClose)
+	// cancel first time
+	if err := s.cancelAllOrders(ctx); err != nil {
+		s.logger.WithError(err).Error("failed to cancel all orders")
 	}
 
 	bbgo.Sync(ctx, s)
-	return err
+
+	// wait for 10 seconds and then cancel again to make sure all orders are cancelled
+	time.Sleep(10 * time.Second)
+	return s.cancelAllOrders(ctx)
 }
 
 func (s *Strategy) CleanUp(ctx context.Context) error {
@@ -388,36 +393,29 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 		return fmt.Errorf("session is nil, please check it")
 	}
 
-	// ignore the first cancel error, this skips one open-orders query request
-	if err := tradingutil.UniversalCancelAllOrders(ctx, session.Exchange, s.Symbol, nil); err == nil {
-		return nil
+	if s.cancelWrite != nil {
+		s.cancelWrite()
 	}
 
-	// if cancel all orders returns error, get the open orders and retry the cancel in each round
-	var werr error
-	for {
-		s.logger.Infof("checking %s open orders...", s.Symbol)
-
-		openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, session.Exchange, s.Symbol)
-		if err != nil {
-			s.logger.WithError(err).Errorf("unable to query open orders")
-			continue
-		}
-
-		// all clean up
-		if len(openOrders) == 0 {
-			break
-		}
-
-		if err := tradingutil.UniversalCancelAllOrders(ctx, session.Exchange, s.Symbol, openOrders); err != nil {
-			s.logger.WithError(err).Errorf("unable to cancel all orders")
-			werr = multierr.Append(werr, err)
-		}
-
-		time.Sleep(1 * time.Second)
+	// cancel first time
+	if err := s.cancelAllOrders(ctx); err != nil {
+		s.logger.WithError(err).Error("failed to cancel all orders")
 	}
 
-	return werr
+	// wait for 10 seconds and then cancel again to make sure all orders are cancelled
+	time.Sleep(10 * time.Second)
+	return s.cancelAllOrders(ctx)
+}
+
+func (s *Strategy) cancelAllOrders(ctx context.Context) error {
+	var err error
+	if s.UseCancelAllOrdersApiWhenClose {
+		err = tradingutil.UniversalCancelAllOrders(ctx, s.ExchangeSession.Exchange, s.Symbol, nil)
+	} else {
+		err = s.OrderExecutor.GracefulCancel(ctx)
+	}
+
+	return fmt.Errorf("there are errors when cancelling orders when closing (UseCancelAllOrdersApiWhenClose = %t), %w", s.UseCancelAllOrdersApiWhenClose, err)
 }
 
 // PauseNextRound will stop openning open-position orders at the next round

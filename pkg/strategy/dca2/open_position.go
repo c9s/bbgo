@@ -26,7 +26,7 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 		return fmt.Errorf("failed to generate open position orders: %w", err)
 	}
 
-	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, orders...)
+	createdOrders, err := s.OrderExecutor.SubmitOrders(s.writeCtx, orders...)
 	if err != nil {
 		return fmt.Errorf("failed to submit open position orders: %w", err)
 	}

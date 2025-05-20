@@ -999,11 +999,19 @@ func (s *Strategy) CloseGrid(ctx context.Context) error {
 	// now we can cancel the open orders
 	s.logger.Infof("canceling grid orders...")
 
-	err := s.cancelAll(ctx)
+	if err := s.cancelAll(ctx); err != nil {
+		s.logger.WithError(err).Error("failed to cancel all orders")
+	}
 
 	// free the grid object
 	s.setGrid(nil)
 	s.updateGridNumOfOrdersMetricsWithLock()
+
+	// wait 10 seconds and then cancel all orders again
+	// because method CloseGrid and SubmitOrders may be in the different goroutines
+	// we may submit orders after we cancel all orders
+	time.Sleep(10 * time.Second)
+	err := s.cancelAll(ctx)
 
 	// store the grid into persistence if we wanna get the profit or positions after the grid is closed
 	bbgo.Sync(ctx, s)
@@ -1767,6 +1775,20 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	_ = s.Initialize()
 
 	defer s.EmitGridClosed()
+
+	// make sure the write context is canceled
+	if s.cancelWrite != nil {
+		s.cancelWrite()
+	}
+
+	if err := s.cancelAll(ctx); err != nil {
+		s.logger.WithError(err).Error("failed to cancel all orders")
+	}
+
+	// wait 10 seconds and then cancel all orders again
+	// because method CloseGrid and SubmitOrders may be in the different goroutines
+	// we may submit orders after we cancel all orders
+	time.Sleep(10 * time.Second)
 	return s.cancelAll(ctx)
 }
 
@@ -1984,8 +2006,6 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 			s.EmitGridError(errors.Wrapf(err, "failed to start process, recover error"))
 			return err
 		}
-
-		s.EmitGridReady()
 	}
 
 	// avoid using goroutine here for back-test
@@ -1994,6 +2014,7 @@ func (s *Strategy) startProcess(ctx context.Context, session *bbgo.ExchangeSessi
 		return err
 	}
 
+	s.EmitGridReady()
 	return nil
 }
 

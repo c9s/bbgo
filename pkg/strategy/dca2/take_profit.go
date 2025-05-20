@@ -55,7 +55,7 @@ func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round)
 		s.logger.Warnf("the diff between balance (%s) and the take-profit order (%s) is larger than min quantity %s", bal.String(), order.Quantity.String(), s.Market.MinQuantity.String())
 	}
 
-	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, order)
+	createdOrders, err := s.OrderExecutor.SubmitOrders(s.writeCtx, order)
 	if err != nil {
 		return err
 	}

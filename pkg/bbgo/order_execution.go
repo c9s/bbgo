@@ -360,6 +360,7 @@ func BatchRetryPlaceOrder(
 		var err2 error
 		createdOrders, errIdx, err2 = BatchPlaceOrder(ctx, exchange, orderCallback, submitOrders...)
 		if err2 != nil {
+			logger.WithError(err2).Warn("failed to place all orders, will retry the errored orders")
 			werr = multierr.Append(werr, err2)
 		} else {
 			return createdOrders, nil, nil
@@ -377,8 +378,11 @@ func BatchRetryPlaceOrder(
 	var errIdxNext []int
 batchRetryOrder:
 	for retryRound := 0; len(errIdx) > 0 && retryRound < 10; retryRound++ {
-		// sleep for 200 millisecond between each retry
 		logger.Warnf("retry round #%d, cooling down for %s", retryRound+1, coolDownTime)
+		// reset the error to let us know the final errors
+		werr = nil
+
+		// sleep for 200 millisecond between each retry
 		time.Sleep(coolDownTime)
 
 		// reset error index since it's a new retry
