@@ -76,6 +76,10 @@ func ValidExchangeName(a string) (ExchangeName, error) {
 	return exName, nil
 }
 
+type Initializer interface {
+	Initialize(ctx context.Context) error
+}
+
 type ExchangeMinimal interface {
 	Name() ExchangeName
 	PlatformFeeCurrency() string
