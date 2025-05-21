@@ -234,7 +234,7 @@ func switchIface(b interface{}) Series {
 // Divid two series, result[i] = a[i] / b[i]
 func Div(a interface{}, b interface{}) SeriesExtend {
 	aa := switchIface(a)
-	if 0 == b {
+	if b == 0 {
 		panic("Divid by zero exception")
 	}
 	bb := switchIface(b)
@@ -406,6 +406,41 @@ func Array(a Series, limit ...int) (result []float64) {
 		result[i] = a.Last(i)
 	}
 	return
+}
+
+type RegressionType string
+
+const (
+	RegressionTypeConstant              RegressionType = "c"
+	RegressionTypeConstantTrend         RegressionType = "ct"
+	RegressionTypeConstantTrendSeasonal RegressionType = "ctt"
+	RegressionTypeNone                  RegressionType = "n"
+)
+
+// Ordinary Least Squares fit result, only support 1d array
+func OSL(a SeriesExtend, b SeriesExtend, n int) (float64, float64) {
+	if a.Length() < n {
+		n = a.Length()
+	}
+	if b.Length() < n {
+		n = b.Length()
+	}
+	numerator := 0.0
+	denominator := 0.0
+	meana := a.Mean(n)
+	meanb := b.Mean(n)
+	for i := 0; i < n; i++ {
+		x := a.Last(i)
+		y := b.Last(i)
+		numerator += (x - meana) * (y - meanb)
+		denominator += (x - meana) * (x - meana)
+	}
+	if denominator == 0 {
+		return 0, 0
+	}
+	beta := numerator / denominator
+	alpha := meanb - beta*meana
+	return alpha, beta
 }
 
 // Similar to Array but in reverse order.
