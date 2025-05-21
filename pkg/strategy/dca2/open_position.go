@@ -10,10 +10,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type cancelOrdersByGroupIDApi interface {
-	CancelOrdersByGroupID(ctx context.Context, groupID int64) ([]types.Order, error)
-}
-
 func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 	s.logger.Infof("start placing open position orders")
 	price, err := getBestPriceUntilSuccess(ctx, s.ExchangeSession.Exchange, s.Symbol)
