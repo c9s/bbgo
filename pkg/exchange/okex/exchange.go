@@ -266,20 +266,23 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	account := types.NewAccount()
 	account.UpdateBalances(balances)
 
-	// Spot mode could have margin ratio as well
-	account.MarginRatio = accounts[0].MarginRatio
-	account.MarginLevel = accounts[0].MarginRatio
-
-	if account.MarginRatio.Sign() > 0 {
-		account.MarginTolerance = util.CalculateMarginTolerance(account.MarginRatio)
-	}
-
 	// for margin account
 	if e.MarginSettings.IsMargin {
 		account.AccountType = types.AccountTypeMargin
 		account.TotalAccountValue = accounts[0].TotalEquityInUSD
 
 		account.BorrowEnabled = types.BoolPtr(accountConfigs[0].EnableSpotBorrow)
+
+		// Spot mode could have margin ratio as well
+		account.MarginRatio = fixedpoint.NewFromFloat(999.99)
+		if accounts[0].MarginRatio.Sign() > 0 {
+			account.MarginRatio = accounts[0].MarginRatio
+			account.MarginLevel = accounts[0].MarginRatio
+		}
+
+		if account.MarginRatio.Sign() > 0 {
+			account.MarginTolerance = util.CalculateMarginTolerance(account.MarginRatio)
+		}
 
 		if !accountConfigs[0].EnableSpotBorrow {
 			log.Warnf("margin is enabled, but okx enableSpotBorrow field is false, please turn on auto-borrow from the okx UI, this is the only way to enable spot margin auto-borrow")
