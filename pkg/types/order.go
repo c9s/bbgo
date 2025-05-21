@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -505,12 +506,7 @@ func OrdersAll(orders []Order, f func(o Order) bool) bool {
 }
 
 func OrdersAny(orders []Order, f func(o Order) bool) bool {
-	for _, o := range orders {
-		if f(o) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(orders, f)
 }
 
 func IsActiveOrder(o Order) bool {
