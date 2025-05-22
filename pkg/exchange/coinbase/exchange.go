@@ -379,10 +379,10 @@ func (e *Exchange) QueryKLines(ctx context.Context, symbol string, interval type
 
 // ExchangeOrderQueryService
 func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
-	req := e.client.NewSingleOrderRequst().OrderID(q.OrderID)
+	req := e.client.NewSingleOrderRequst().OrderID(q.OrderUUID)
 	cbOrder, err := req.Do(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get order: %v", q.OrderID)
+		return nil, errors.Wrapf(err, "failed to get order: %v", q.OrderUUID)
 	}
 	order := toGlobalOrder(cbOrder)
 	return &order, nil
@@ -402,8 +402,8 @@ func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]
 
 func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, q types.OrderQuery) (api.TradeSnapshot, error) {
 	req := e.client.NewGetOrderTradesRequest().Limit(PaginationLimit)
-	if len(q.OrderID) > 0 {
-		req.OrderID(q.OrderID)
+	if len(q.OrderUUID) > 0 {
+		req.OrderID(q.OrderUUID)
 	}
 	if len(q.Symbol) > 0 {
 		req.ProductID(toLocalSymbol(q.Symbol))

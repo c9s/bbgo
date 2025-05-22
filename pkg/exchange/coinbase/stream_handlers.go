@@ -803,7 +803,7 @@ func (s *Stream) retrieveOrderById(orderId string) (*types.Order, error) {
 		logStream.Warn(msg)
 		return nil, errors.New(msg)
 	}
-	order, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderID: orderId})
+	order, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderUUID: orderId})
 	if err != nil {
 		return nil, err
 	}

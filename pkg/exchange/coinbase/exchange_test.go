@@ -70,7 +70,7 @@ func TestExchange_OrdersAPI(t *testing.T) {
 	assert.NotEmpty(t, order)
 
 	// test query open orders
-	order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderID: order.UUID, ClientOrderID: order.UUID})
+	order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderUUID: order.UUID, ClientOrderID: order.UUID})
 	assert.NoError(t, err)
 	assert.NotNil(t, order)
 
@@ -81,7 +81,7 @@ func TestExchange_OrdersAPI(t *testing.T) {
 			break
 		}
 		time.Sleep(time.Millisecond * 500)
-		order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderID: order.UUID, ClientOrderID: order.UUID})
+		order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderUUID: order.UUID, ClientOrderID: order.UUID})
 		assert.NoError(t, err)
 	}
 
@@ -128,7 +128,7 @@ func TestExchange_CancelOrdersBySymbol(t *testing.T) {
 			break
 		}
 		time.Sleep(time.Millisecond * 500)
-		order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderID: order.UUID, ClientOrderID: order.UUID})
+		order, err = ex.QueryOrder(ctx, types.OrderQuery{Symbol: symbol, OrderUUID: order.UUID, ClientOrderID: order.UUID})
 		assert.NoError(t, err)
 	}
 	_, err = ex.CancelOrdersBySymbol(ctx, symbol)

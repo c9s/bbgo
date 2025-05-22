@@ -259,6 +259,7 @@ func (o *SubmitOrder) SlackAttachment() slack.Attachment {
 type OrderQuery struct {
 	Symbol        string
 	OrderID       string
+	OrderUUID     string
 	ClientOrderID string
 }
 
