@@ -980,6 +980,7 @@ func (s *Strategy) cancelAll(ctx context.Context) error {
 
 	var err error
 	if s.UseCancelAllOrdersApiWhenClose {
+		s.logger.Info("UseCancelAllOrdersApiWhenClose is set, will cancel all orders by cancel all orders API")
 		err = tradingutil.UniversalCancelAllOrders(ctx, session.Exchange, s.Symbol, nil)
 	} else {
 		err = s.orderExecutor.GracefulCancel(ctx)

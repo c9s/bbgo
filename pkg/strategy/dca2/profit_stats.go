@@ -38,6 +38,7 @@ func newProfitStats(market types.Market, quoteInvestment fixedpoint.Value) *Prof
 	}
 }
 
+// AddTrade adds a trade to the profit stats and updates the current round profit and total profit.
 func (s *ProfitStats) AddTrade(trade types.Trade) {
 	if s.CurrentRoundFee == nil {
 		s.CurrentRoundFee = make(map[string]fixedpoint.Value)
