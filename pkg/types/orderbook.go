@@ -274,3 +274,54 @@ func defaultTime(a time.Time, b func() time.Time) time.Time {
 
 	return a
 }
+
+// DepthBook wraps a StreamOrderBook and provides price calculation at a specific quote depth.
+type DepthBook struct {
+	Source *StreamOrderBook
+	Depth  fixedpoint.Value
+}
+
+// NewDepthBook creates a DepthBook from a StreamOrderBook and a quote depth.
+func NewDepthBook(source *StreamOrderBook, depth fixedpoint.Value) *DepthBook {
+	return &DepthBook{Source: source, Depth: depth}
+}
+
+// PriceAtQuoteDepth returns the average price at the specified quote depth for the given side.
+// If the depth is zero or negative, returns zero.
+func (db *DepthBook) PriceAtQuoteDepth(side SideType) fixedpoint.Value {
+	quoteDepth := db.Depth
+	if db.Source == nil || quoteDepth.Sign() <= 0 {
+		return fixedpoint.Zero
+	}
+	pvs := db.Source.SideBook(side)
+	if len(pvs) == 0 {
+		return fixedpoint.Zero
+	}
+	sumQty := fixedpoint.Zero
+	sumQuote := fixedpoint.Zero
+	for _, pv := range pvs {
+		amount := pv.Price.Mul(pv.Volume)
+		if sumQuote.Add(amount).Compare(quoteDepth) >= 0 {
+			remain := quoteDepth.Sub(sumQuote)
+			if pv.Price.Sign() > 0 {
+				partialQty := remain.Div(pv.Price)
+				sumQty = sumQty.Add(partialQty)
+				sumQuote = sumQuote.Add(partialQty.Mul(pv.Price))
+			}
+			break
+		}
+		sumQty = sumQty.Add(pv.Volume)
+		sumQuote = sumQuote.Add(amount)
+	}
+	if sumQty.Sign() == 0 {
+		return fixedpoint.Zero
+	}
+	return sumQuote.Div(sumQty)
+}
+
+// BestBidAndAskAtQuoteDepth returns the bid and ask price at the specified quote depth.
+func (db *DepthBook) BestBidAndAskAtQuoteDepth() (bid, ask fixedpoint.Value) {
+	bid = db.PriceAtQuoteDepth(SideTypeBuy)
+	ask = db.PriceAtQuoteDepth(SideTypeSell)
+	return
+}
