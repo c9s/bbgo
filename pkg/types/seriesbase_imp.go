@@ -157,6 +157,6 @@ func (s *SeriesBase) Filter(b func(int, float64) bool, length int) SeriesExtend 
 	return Filter(s, b, length)
 }
 
-func (s *SeriesBase) OSL(b SeriesExtend, window int) (float64, float64) {
-	return OSL(s, b, window)
+func (s *SeriesBase) OLS(b SeriesExtend, window int) (float64, float64) {
+	return OLS(s, b, window)
 }

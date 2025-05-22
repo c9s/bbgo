@@ -250,3 +250,22 @@ func TestFilter(t *testing.T) {
 	assert.Equal(t, b.Last(0), 1000.)
 	assert.Equal(t, b.Sum(3), 1200.)
 }
+
+func TestOLS(t *testing.T) {
+	/*
+		python
+		import numpy as np
+		import statsmodels.api as sm
+		x = np.array([1., 2., 3., 4., 5.])
+		y = np.array([2., 3., 4., 5., 6.])
+		x = sm.add_constant(x)
+		model = sm.OLS(y, x)
+		results = model.fit()
+		print(results.params)
+	*/
+	a := floats.Slice{1., 2., 3., 4., 5.}
+	b := floats.Slice{2., 3., 4., 5., 6.}
+	alpha, beta := OLS(NewSeries(&a), NewSeries(&b), a.Length())
+	assert.InDelta(t, alpha, 1.0, 0.001)
+	assert.InDelta(t, beta, 1.0, 0.001)
+}
