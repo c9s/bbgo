@@ -2,6 +2,7 @@ package currency
 
 import (
 	"math/big"
+	"slices"
 
 	"github.com/leekchan/accounting"
 
@@ -34,19 +35,9 @@ var FiatCurrencies = []string{"USDC", "USDT", "USD", "TWD", "EUR", "GBP", "BUSD"
 var USDFiatCurrencies = []string{"USDT", "USDC", "USD", "BUSD"}
 
 func IsUSDFiatCurrency(currency string) bool {
-	for _, c := range USDFiatCurrencies {
-		if c == currency {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(USDFiatCurrencies, currency)
 }
 
 func IsFiatCurrency(currency string) bool {
-	for _, c := range FiatCurrencies {
-		if c == currency {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(FiatCurrencies, currency)
 }

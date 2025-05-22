@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/sirupsen/logrus"
 
@@ -71,10 +72,8 @@ func (s *Strategy) Validate() error {
 		return fmt.Errorf("taretCurrencies should not be empty")
 	}
 
-	for _, c := range s.BaseCurrencies {
-		if c == s.QuoteCurrency {
-			return fmt.Errorf("targetCurrencies contain baseCurrency")
-		}
+	if slices.Contains(s.BaseCurrencies, s.QuoteCurrency) {
+		return fmt.Errorf("targetCurrencies contain baseCurrency")
 	}
 
 	if s.Threshold.Sign() < 0 {
