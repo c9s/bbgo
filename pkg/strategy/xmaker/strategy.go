@@ -126,6 +126,9 @@ type Strategy struct {
 
 	Symbol string `json:"symbol"`
 
+	// SourceSymbol allows subscribing to a different symbol for price/book
+	SourceSymbol string `json:"sourceSymbol,omitempty"`
+
 	// SourceExchange session name
 	SourceExchange string `json:"sourceExchange"`
 
@@ -289,7 +292,7 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 		panic(fmt.Errorf("source session %s is not defined", s.SourceExchange))
 	}
 
-	sourceSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
+	sourceSession.Subscribe(types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: "1m"})
 
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
@@ -300,10 +303,10 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 	for _, sig := range s.SignalConfigList {
 		if sig.TradeVolumeWindowSignal != nil {
-			sourceSession.Subscribe(types.MarketTradeChannel, s.Symbol, types.SubscribeOptions{})
+			sourceSession.Subscribe(types.MarketTradeChannel, s.SourceSymbol, types.SubscribeOptions{})
 		} else if sig.BollingerBandTrendSignal != nil {
 			sourceSession.Subscribe(
-				types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: sig.BollingerBandTrendSignal.Interval},
+				types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: sig.BollingerBandTrendSignal.Interval},
 			)
 		}
 	}
@@ -1898,6 +1901,12 @@ func (s *Strategy) Defaults() error {
 	s.circuitBreakerAlertLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 2)
 	s.reportProfitStatsRateLimiter = rate.NewLimiter(rate.Every(3*time.Minute), 1)
 	s.hedgeErrorLimiter = rate.NewLimiter(rate.Every(1*time.Minute), 1)
+
+	// Set SourceSymbol to Symbol if not set
+	if s.SourceSymbol == "" {
+		s.SourceSymbol = s.Symbol
+	}
+
 	return nil
 }
 
@@ -2106,9 +2115,9 @@ func (s *Strategy) CrossRun(
 
 	s.makerSession = makerSession
 
-	s.sourceMarket, ok = s.sourceSession.Market(s.Symbol)
+	s.sourceMarket, ok = s.sourceSession.Market(s.SourceSymbol)
 	if !ok {
-		return fmt.Errorf("source session market %s is not defined", s.Symbol)
+		return fmt.Errorf("source session market %s is not defined", s.SourceSymbol)
 	}
 
 	s.makerMarket, ok = s.makerSession.Market(s.Symbol)
@@ -2116,7 +2125,7 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
 
-	indicators := s.sourceSession.Indicators(s.Symbol)
+	indicators := s.sourceSession.Indicators(s.SourceSymbol)
 
 	s.boll = indicators.BOLL(
 		types.IntervalWindow{
@@ -2181,7 +2190,7 @@ func (s *Strategy) CrossRun(
 
 	s.sourceSession.MarketDataStream.OnKLineClosed(
 		types.KLineWith(
-			s.Symbol, types.Interval1m, func(k types.KLine) {
+			s.SourceSymbol, types.Interval1m, func(k types.KLine) {
 				feeToken := s.sourceSession.Exchange.PlatformFeeCurrency()
 				if feePrice, ok := s.priceSolver.ResolvePrice(feeToken, feeTokenQuote); ok {
 					s.Position.SetFeeAverageCost(feeToken, feePrice)
@@ -2283,13 +2292,13 @@ func (s *Strategy) CrossRun(
 	sourceMarketStream := s.sourceSession.Exchange.NewStream()
 	sourceMarketStream.SetPublicOnly()
 	sourceMarketStream.Subscribe(
-		types.BookChannel, s.Symbol, types.SubscribeOptions{
+		types.BookChannel, s.SourceSymbol, types.SubscribeOptions{
 			Depth: types.DepthLevelFull,
 			Speed: types.SpeedLow,
 		},
 	)
 
-	s.sourceBook = types.NewStreamBook(s.Symbol, s.sourceSession.ExchangeName)
+	s.sourceBook = types.NewStreamBook(s.SourceSymbol, s.sourceSession.ExchangeName)
 	s.sourceBook.BindStream(sourceMarketStream)
 
 	if err := sourceMarketStream.Connect(ctx); err != nil {
@@ -2332,7 +2341,7 @@ func (s *Strategy) CrossRun(
 
 		if binder, ok := signal.(SessionBinder); ok {
 			s.logger.Infof("binding session on signal %T", signal)
-			if err := binder.Bind(ctx, s.sourceSession, s.Symbol); err != nil {
+			if err := binder.Bind(ctx, s.sourceSession, s.SourceSymbol); err != nil {
 				return err
 			}
 		}
