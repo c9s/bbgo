@@ -93,6 +93,11 @@ type Strategy struct {
 	startTimeOfNextRound time.Time
 	nextRoundPaused      bool
 
+	// writeMutex is used to protect submit/cancel orders
+	writeMutex  sync.Mutex
+	writeCtx    context.Context
+	cancelWrite context.CancelFunc
+
 	// callbacks
 	common.StatusCallbacks
 	profitCallbacks         []func(*ProfitStats)
@@ -164,6 +169,9 @@ func (s *Strategy) newPrometheusLabels() prometheus.Labels {
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	instanceID := s.InstanceID()
 	s.ExchangeSession = session
+
+	// context for submit/cancel orders
+	s.writeCtx, s.cancelWrite = context.WithCancel(ctx)
 
 	s.logger.Infof("persistence ttl: %s", s.PersistenceTTL.Duration())
 	if s.ProfitStats == nil {
@@ -360,7 +368,15 @@ func (s *Strategy) updateTakeProfitPrice() {
 }
 
 func (s *Strategy) Close(ctx context.Context) error {
+	s.writeMutex.Lock()
+	defer s.writeMutex.Unlock()
+
 	s.logger.Infof("closing %s dca2", s.Symbol)
+
+	// cancel write context to stop the order executor
+	if s.cancelWrite != nil {
+		s.cancelWrite()
+	}
 
 	defer s.EmitClosed()
 
@@ -380,6 +396,16 @@ func (s *Strategy) Close(ctx context.Context) error {
 }
 
 func (s *Strategy) CleanUp(ctx context.Context) error {
+	s.writeMutex.Lock()
+	defer s.writeMutex.Unlock()
+
+	s.logger.Infof("cleaning up %s dca2", s.Symbol)
+
+	// cancel write context to stop the order executor
+	if s.cancelWrite != nil {
+		s.cancelWrite()
+	}
+
 	_ = s.Initialize()
 	defer s.EmitClosed()
 

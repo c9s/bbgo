@@ -145,6 +145,9 @@ func (s *Strategy) moveToNextState(ctx context.Context, nextState State) bool {
 // if startTimeOfNextRound is not reached, it will not place the open-position orders
 // if it place open-position orders successfully, it will update the state to OpenPositionReady and return true to trigger the next state immediately
 func (s *Strategy) openPosition(ctx context.Context) bool {
+	s.writeMutex.Lock()
+	defer s.writeMutex.Unlock()
+
 	if s.nextRoundPaused {
 		s.logger.Info("[State] openPosition - nextRoundPaused is set to true")
 		return false
@@ -168,7 +171,7 @@ func (s *Strategy) openPosition(ctx context.Context) bool {
 	}
 
 	s.logger.Info("[State] openPosition - place open-position orders")
-	if err := s.placeOpenPositionOrders(ctx); err != nil {
+	if err := s.placeOpenPositionOrders(s.writeCtx); err != nil {
 		if strings.Contains(err.Error(), "failed to generate open position orders") {
 			s.logger.WithError(err).Warn("failed to place open-position orders, please check it.")
 		} else {
@@ -202,6 +205,9 @@ func (s *Strategy) finishOpenPositionStage(_ context.Context) bool {
 
 // cancelOpenPositionOrdersAndPlaceTakeProfitOrder will cancel the open-position orders and place the take-profit orders
 func (s *Strategy) cancelOpenPositionOrdersAndPlaceTakeProfitOrder(ctx context.Context) bool {
+	s.writeMutex.Lock()
+	defer s.writeMutex.Unlock()
+
 	// validate we are still in open-position stage
 	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - validate we are still in open-position stage")
 	currentRound, err := s.collector.CollectCurrentRound(ctx)
@@ -224,7 +230,7 @@ func (s *Strategy) cancelOpenPositionOrdersAndPlaceTakeProfitOrder(ctx context.C
 
 	// place the take-profit order
 	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - place the take-profit order")
-	if err := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
+	if err := s.placeTakeProfitOrder(s.writeCtx, currentRound); err != nil {
 		s.logger.WithError(err).Error("failed to open take profit orders")
 		return false
 	}
