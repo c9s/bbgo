@@ -408,17 +408,8 @@ func Array(a Series, limit ...int) (result []float64) {
 	return
 }
 
-type RegressionType string
-
-const (
-	RegressionTypeConstant              RegressionType = "c"
-	RegressionTypeConstantTrend         RegressionType = "ct"
-	RegressionTypeConstantTrendSeasonal RegressionType = "ctt"
-	RegressionTypeNone                  RegressionType = "n"
-)
-
 // Ordinary Least Squares fit result, only support 1d array
-func OSL(a SeriesExtend, b SeriesExtend, n int) (float64, float64) {
+func OLS(a SeriesExtend, b SeriesExtend, n int) (float64, float64) {
 	if a.Length() < n {
 		n = a.Length()
 	}
