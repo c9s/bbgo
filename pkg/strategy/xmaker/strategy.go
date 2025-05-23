@@ -73,44 +73,6 @@ type SessionBinder interface {
 	Bind(ctx context.Context, session *bbgo.ExchangeSession, symbol string) error
 }
 
-type SignalNumber float64
-
-const (
-	SignalNumberMaxLong  = 2.0
-	SignalNumberMaxShort = -2.0
-)
-
-type SignalProvider interface {
-	CalculateSignal(ctx context.Context) (float64, error)
-}
-
-type KLineShapeSignal struct {
-	FullBodyThreshold float64 `json:"fullBodyThreshold"`
-}
-
-type SignalConfig struct {
-	Weight                   float64                         `json:"weight"`
-	BollingerBandTrendSignal *BollingerBandTrendSignal       `json:"bollingerBandTrend,omitempty"`
-	OrderBookBestPriceSignal *OrderBookBestPriceVolumeSignal `json:"orderBookBestPrice,omitempty"`
-	DepthRatioSignal         *DepthRatioSignal               `json:"depthRatio,omitempty"`
-	KLineShapeSignal         *KLineShapeSignal               `json:"klineShape,omitempty"`
-	TradeVolumeWindowSignal  *TradeVolumeWindowSignal        `json:"tradeVolumeWindow,omitempty"`
-}
-
-func (c *SignalConfig) Get() SignalProvider {
-	if c.OrderBookBestPriceSignal != nil {
-		return c.OrderBookBestPriceSignal
-	} else if c.DepthRatioSignal != nil {
-		return c.DepthRatioSignal
-	} else if c.BollingerBandTrendSignal != nil {
-		return c.BollingerBandTrendSignal
-	} else if c.TradeVolumeWindowSignal != nil {
-		return c.TradeVolumeWindowSignal
-	}
-
-	panic(fmt.Errorf("no valid signal provider found, please check your config"))
-}
-
 func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
@@ -1322,30 +1284,6 @@ func (s *Strategy) makerOrderCreateCallback(createdOrder types.Order) {
 	s.activeMakerOrders.Add(createdOrder)
 }
 
-func aggregatePriceVolumeSliceWithPriceFilter(
-	side types.SideType,
-	pvs types.PriceVolumeSlice,
-	filterPrice fixedpoint.Value,
-) types.PriceVolume {
-	var totalVolume = fixedpoint.Zero
-	var lastPrice = fixedpoint.Zero
-	for _, pv := range pvs {
-		if side == types.SideTypeSell && pv.Price.Compare(filterPrice) > 0 {
-			break
-		} else if side == types.SideTypeBuy && pv.Price.Compare(filterPrice) < 0 {
-			break
-		}
-
-		lastPrice = pv.Price
-		totalVolume = totalVolume.Add(pv.Volume)
-	}
-
-	return types.PriceVolume{
-		Price:  lastPrice,
-		Volume: totalVolume,
-	}
-}
-
 // tryArbitrage tries to arbitrage between the source and maker exchange
 func (s *Strategy) tryArbitrage(
 	ctx context.Context, quote *Quote, makerBalances, hedgeBalances types.BalanceMap, disableBid, disableAsk bool,
@@ -1654,7 +1592,7 @@ func (s *Strategy) spreadMakerHedge(
 	return pos, nil
 }
 
-func (s *Strategy) Hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
+func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
 	if uncoveredPosition.IsZero() {
 		return
 	}
@@ -2088,7 +2026,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 				continue
 			}
 
-			s.Hedge(ctx, uncoverPosition)
+			s.hedge(ctx, uncoverPosition)
 			profitChanged = true
 
 		case <-reportTicker.C:
@@ -2537,4 +2475,28 @@ func getPositionProfitPrice(side types.SideType, cost, profitRatio fixedpoint.Va
 	}
 
 	return cost
+}
+
+func aggregatePriceVolumeSliceWithPriceFilter(
+	side types.SideType,
+	pvs types.PriceVolumeSlice,
+	filterPrice fixedpoint.Value,
+) types.PriceVolume {
+	var totalVolume = fixedpoint.Zero
+	var lastPrice = fixedpoint.Zero
+	for _, pv := range pvs {
+		if side == types.SideTypeSell && pv.Price.Compare(filterPrice) > 0 {
+			break
+		} else if side == types.SideTypeBuy && pv.Price.Compare(filterPrice) < 0 {
+			break
+		}
+
+		lastPrice = pv.Price
+		totalVolume = totalVolume.Add(pv.Volume)
+	}
+
+	return types.PriceVolume{
+		Price:  lastPrice,
+		Volume: totalVolume,
+	}
 }
