@@ -388,7 +388,7 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 
 	cbOrder, err := req.Do(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get order: %v", q.UUID)
+		return nil, errors.Wrapf(err, "failed to get order: %+v", q)
 	}
 	order := toGlobalOrder(cbOrder)
 	return &order, nil
