@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -16,6 +17,10 @@ type TradingMarket struct {
 	stream    types.Stream
 	book      *types.StreamOrderBook
 	depthBook *types.DepthBook
+
+	position       *types.Position
+	orderStore     *core.OrderStore
+	tradeCollector *core.TradeCollector
 }
 
 // SyntheticHedge is a strategy that uses synthetic hedging to manage risk
@@ -67,6 +72,29 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 	}
 
 	return nil
+}
+
+func (s *SyntheticHedge) Hedge(ctx context.Context, pos fixedpoint.Value) error {
+	// record the fiat price from the fiat market
+	fiatBidPrice, fiatAskPrice := s.fiatMarket.depthBook.BestBidAndAskAtQuoteDepth()
+	_ = fiatBidPrice
+	_ = fiatAskPrice
+
+	// get the source price and submit the hedge order to the source exchange
+
+	// query trades from of the hedge order
+
+	// build up the source hedge position for the average cost
+
+	// submit fiat hedge order to the fiat market to convert the quote
+
+	// merge the positions
+
+	return nil
+}
+
+func (s *SyntheticHedge) onTrade(trade types.Trade) {
+
 }
 
 func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, bool) {
@@ -125,6 +153,17 @@ func initializeTradingMarket(
 	book.BindStream(stream)
 
 	depthBook := types.NewDepthBook(book, depth)
+
+	position := types.NewPositionFromMarket(market)
+
+	orderStore := core.NewOrderStore(symbol)
+	tradeCollector := core.NewTradeCollector(symbol, position, orderStore)
+	if err := tradeCollector.Initialize(); err != nil {
+		return nil, err
+	}
+
+	tradeCollector.BindStream(session.UserDataStream)
+
 	return &TradingMarket{
 		symbol:    symbol,
 		session:   session,
@@ -132,5 +171,9 @@ func initializeTradingMarket(
 		stream:    stream,
 		book:      book,
 		depthBook: depthBook,
+
+		position:       position,
+		orderStore:     orderStore,
+		tradeCollector: tradeCollector,
 	}, nil
 }
