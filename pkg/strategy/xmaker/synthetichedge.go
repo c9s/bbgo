@@ -69,6 +69,29 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 	return nil
 }
 
+func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, bool) {
+	if s.sourceMarket == nil || s.fiatMarket == nil {
+		return fixedpoint.Zero, fixedpoint.Zero, false
+	}
+
+	bid, ask := s.sourceMarket.depthBook.BestBidAndAskAtQuoteDepth()
+	bid2, ask2 := s.fiatMarket.depthBook.BestBidAndAskAtQuoteDepth()
+
+	if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency {
+		bid = bid.Mul(bid2)
+		ask = ask.Mul(ask2)
+		return bid, ask, bid.Sign() > 0 && ask.Sign() > 0
+	}
+
+	if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.QuoteCurrency {
+		bid = bid.Div(bid2)
+		ask = ask.Div(ask2)
+		return bid, ask, bid.Sign() > 0 && ask.Sign() > 0
+	}
+
+	return fixedpoint.Zero, fixedpoint.Zero, false
+}
+
 func (s *SyntheticHedge) Start(ctx context.Context) error {
 	if !s.Enabled {
 		return nil
