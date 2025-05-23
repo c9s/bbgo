@@ -2,6 +2,7 @@ package xmaker
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -71,6 +72,49 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 		return err
 	}
 
+	// when receiving trades from the source session,
+	// mock a trade with the quote amount and add to the fiat position
+	s.sourceMarket.tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
+		// get the fiat book price from here?
+		bid, ask := s.fiatMarket.depthBook.BestBidAndAskAtQuoteDepth()
+		var price fixedpoint.Value
+		var quantity = trade.QuoteQuantity.Abs()
+		var side = trade.Side.Reverse()
+
+		switch trade.Side {
+		case types.SideTypeBuy:
+			price = ask
+		case types.SideTypeSell:
+			price = bid
+		}
+
+		fiatTrade := types.Trade{
+			// TODO: update the fields later
+			// ID:            trade.ID,
+			// Exchange:      trade.Exchange,
+			// OrderID:       trade.OrderID,
+			Price:         price,
+			Quantity:      quantity,
+			QuoteQuantity: quantity.Mul(price),
+			Symbol:        s.fiatMarket.symbol,
+			Side:          side,
+			IsBuyer:       side == types.SideTypeBuy,
+			IsMaker:       true,
+			Time:          trade.Time,
+			Fee:           fixedpoint.Zero,
+			FeeCurrency:   "",
+			StrategyID: sql.NullString{
+				String: ID,
+				Valid:  true,
+			},
+		}
+
+		if profit, netProfit, madeProfit := s.fiatMarket.position.AddTrade(fiatTrade); madeProfit {
+			_ = profit
+			_ = netProfit
+		}
+	})
+
 	return nil
 }
 
@@ -91,10 +135,6 @@ func (s *SyntheticHedge) Hedge(ctx context.Context, pos fixedpoint.Value) error 
 	// merge the positions
 
 	return nil
-}
-
-func (s *SyntheticHedge) onTrade(trade types.Trade) {
-
 }
 
 func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, bool) {
