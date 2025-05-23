@@ -1571,10 +1571,15 @@ func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(
 	}
 }
 
-func (s *Strategy) Hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
-	pos := uncoveredPosition.Neg()
-	if pos.IsZero() {
-		return
+func (s *Strategy) spreadMakerHedge(
+	ctx context.Context, signal float64, uncoveredPosition, pos fixedpoint.Value,
+) (fixedpoint.Value, error) {
+	now := time.Now()
+	if s.SpreadMaker == nil {
+		return pos, nil
+	}
+	if !s.SpreadMaker.Enabled || s.makerBook == nil {
+		return pos, nil
 	}
 
 	side := types.SideTypeBuy
@@ -1582,79 +1587,98 @@ func (s *Strategy) Hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		side = types.SideTypeSell
 	}
 
-	now := time.Now()
-	signal := s.lastAggregatedSignal.Get()
+	makerBid, makerAsk, hasMakerPrice := s.makerBook.BestBidAndAsk()
+	if !hasMakerPrice {
+		return pos, nil
+	}
 
-	if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.makerBook != nil {
-		if makerBid, makerAsk, hasMakerPrice := s.makerBook.BestBidAndAsk(); hasMakerPrice {
+	curOrder, hasOrder := s.SpreadMaker.getOrder()
 
-			curOrder, hasOrder := s.SpreadMaker.getOrder()
+	if makerOrderForm, ok := s.SpreadMaker.canSpreadMaking(
+		signal, s.Position, uncoveredPosition, s.makerMarket, makerBid.Price, makerAsk.Price,
+	); ok {
 
-			if makerOrderForm, ok := s.SpreadMaker.canSpreadMaking(
-				signal, s.Position, uncoveredPosition, s.makerMarket, makerBid.Price, makerAsk.Price,
-			); ok {
+		s.logger.Infof(
+			"position: %f@%f, maker book bid: %f/%f, spread maker order form: %+v",
+			s.Position.GetBase().Float64(),
+			s.Position.GetAverageCost().Float64(),
+			makerAsk.Price.Float64(),
+			makerBid.Price.Float64(),
+			makerOrderForm,
+		)
+
+		// if we have the existing order, cancel it and return the covered position
+		// keptOrder means we kept the current order and we don't need to place a new order
+		keptOrder := false
+		if hasOrder {
+			keptOrder = s.SpreadMaker.shouldKeepOrder(curOrder, now)
+			if !keptOrder {
+				s.logger.Infof("canceling current spread maker order...")
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, &s.coveredPosition)
+			}
+		}
+
+		if !hasOrder || !keptOrder {
+			spreadMakerCounterMetrics.With(s.metricsLabels).Inc()
+			s.logger.Infof("placing new spread maker order: %+v...", makerOrderForm)
+
+			retOrder, err := s.SpreadMaker.placeOrder(ctx, makerOrderForm)
+			if err != nil {
+				s.logger.WithError(err).Errorf("unable to place spread maker order")
+			} else if retOrder != nil {
+				s.orderStore.Add(*retOrder)
+				s.orderStore.Prune(8 * time.Hour)
 
 				s.logger.Infof(
-					"position: %f@%f, maker book bid: %f/%f, spread maker order form: %+v",
-					s.Position.GetBase().Float64(),
-					s.Position.GetAverageCost().Float64(),
-					makerAsk.Price.Float64(),
-					makerBid.Price.Float64(),
-					makerOrderForm,
+					"spread maker order placed: #%d %f@%f (%s)", retOrder.OrderID, retOrder.Quantity.Float64(),
+					retOrder.Price.Float64(), retOrder.Status,
 				)
 
-				// if we have the existing order, cancel it and return the covered position
-				// keptOrder means we kept the current order and we don't need to place a new order
-				keptOrder := false
-				if hasOrder {
-					keptOrder = s.SpreadMaker.shouldKeepOrder(curOrder, now)
-					if !keptOrder {
-						s.logger.Infof("canceling current spread maker order...")
-						s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, &s.coveredPosition)
-					}
-				}
-
-				if !hasOrder || !keptOrder {
-					spreadMakerCounterMetrics.With(s.metricsLabels).Inc()
-					s.logger.Infof("placing new spread maker order: %+v...", makerOrderForm)
-
-					retOrder, err := s.SpreadMaker.placeOrder(ctx, makerOrderForm)
-					if err != nil {
-						s.logger.WithError(err).Errorf("unable to place spread maker order")
-					} else if retOrder != nil {
-						s.orderStore.Add(*retOrder)
-						s.orderStore.Prune(8 * time.Hour)
-
-						s.logger.Infof(
-							"spread maker order placed: #%d %f@%f (%s)", retOrder.OrderID, retOrder.Quantity.Float64(),
-							retOrder.Price.Float64(), retOrder.Status,
-						)
-
-						// add covered position from the created order
-						switch side {
-						case types.SideTypeSell:
-							s.coveredPosition.Add(retOrder.Quantity)
-							pos = pos.Add(retOrder.Quantity)
-						case types.SideTypeBuy:
-							s.coveredPosition.Add(retOrder.Quantity.Neg())
-							pos = pos.Add(retOrder.Quantity.Neg())
-						}
-					}
-				}
-			} else if s.SpreadMaker.ReverseSignalOrderCancel {
-				if !isSignalSidePosition(signal, s.Position.Side()) {
-					s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, &s.coveredPosition)
+				// add covered position from the created order
+				switch side {
+				case types.SideTypeSell:
+					s.coveredPosition.Add(retOrder.Quantity)
+					pos = pos.Add(retOrder.Quantity)
+				case types.SideTypeBuy:
+					s.coveredPosition.Add(retOrder.Quantity.Neg())
+					pos = pos.Add(retOrder.Quantity.Neg())
 				}
 			}
 		}
+	} else if s.SpreadMaker.ReverseSignalOrderCancel {
+		if !isSignalSidePosition(signal, s.Position.Side()) {
+			s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, &s.coveredPosition)
+		}
 	}
 
-	if s.canDelayHedge(side, pos) {
+	return pos, nil
+}
+
+func (s *Strategy) Hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
+	if uncoveredPosition.IsZero() {
+		return
+	}
+
+	// if the uncovered position is negative, e.g., -10 BTC,
+	// then we need to hedge +10 BTC, hence call .Neg() here
+	hedgePosition := uncoveredPosition.Neg()
+	side := types.SideTypeBuy
+	if hedgePosition.Sign() < 0 {
+		side = types.SideTypeSell
+	}
+
+	signal := s.lastAggregatedSignal.Get()
+	hedgePosition, err := s.spreadMakerHedge(ctx, signal, uncoveredPosition, hedgePosition)
+	if err != nil {
+		log.WithError(err).Errorf("unable to place spread maker order")
+	}
+
+	if s.canDelayHedge(side, hedgePosition) {
 		return
 	}
 
 	lastPrice := s.lastPrice.Get()
-	quantity := pos.Abs()
+	quantity := hedgePosition.Abs()
 
 	bestBid, bestAsk, ok := s.sourceBook.BestBidAndAsk()
 	if ok {
