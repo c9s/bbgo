@@ -18,6 +18,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/dynamic"
+	"github.com/c9s/bbgo/pkg/exchange/mock"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/pricesolver"
@@ -180,6 +181,9 @@ type Strategy struct {
 	// ProfitFixerConfig is the profit fixer configuration
 	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer,omitempty"`
 
+	UseMockExchange      bool             `json:"useMockExchange,omitempty"`
+	MockExchangeBalances types.BalanceMap `json:"mockExchangeBalances,omitempty"`
+
 	// --------------------------------
 	// private field
 
@@ -238,6 +242,8 @@ type Strategy struct {
 
 	positionStartedAt      *time.Time
 	positionStartedAtMutex sync.Mutex
+
+	sourceOrderExecutor *bbgo.GeneralOrderExecutor
 }
 
 func (s *Strategy) ID() string {
@@ -2087,6 +2093,37 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
 
+	if s.UseMockExchange {
+
+		balances := s.MockExchangeBalances
+		if balances == nil {
+			balances = types.BalanceMap{
+				s.sourceMarket.BaseCurrency:  types.NewBalance(s.sourceMarket.BaseCurrency, fixedpoint.NewFromFloat(50.0)),
+				s.sourceMarket.QuoteCurrency: types.NewBalance(s.sourceMarket.QuoteCurrency, fixedpoint.NewFromFloat(10_000.0)),
+			}
+		}
+
+		s.logger.Warnf("using mock exchange to simulate hedge with balances: %+v", balances)
+
+		mockEx := mock.New(s.sourceSession.Exchange, s.sourceSession.MarketDataStream, s.SourceSymbol, balances)
+
+		if err := mockEx.Initialize(ctx); err != nil {
+			return err
+		}
+
+		userDataStream := mockEx.GetUserDataStream()
+		s.sourceSession.Exchange = mockEx
+		s.sourceSession.UserDataStream = userDataStream
+
+		// rebind user data connectivity
+		userDataConnectivity := types.NewConnectivity()
+		userDataConnectivity.Bind(userDataStream)
+		s.sourceSession.UserDataConnectivity = userDataConnectivity
+
+		// rebuild the connectivity group
+		s.sourceSession.Connectivity = types.NewConnectivityGroup(s.sourceSession.MarketDataConnectivity, s.sourceSession.UserDataConnectivity)
+	}
+
 	indicators := s.sourceSession.Indicators(s.SourceSymbol)
 
 	s.boll = indicators.BOLL(
@@ -2171,6 +2208,10 @@ func (s *Strategy) CrossRun(
 			},
 		),
 	)
+
+	// for direct hedge, we can share the position with different order executor
+	s.sourceOrderExecutor = bbgo.NewGeneralOrderExecutor(s.sourceSession, s.SourceSymbol, ID, instanceID, s.Position)
+	s.sourceOrderExecutor.Bind()
 
 	if s.ProfitFixerConfig != nil {
 		bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)

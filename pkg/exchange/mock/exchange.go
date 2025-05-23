@@ -3,17 +3,34 @@ package mock
 import (
 	"context"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type Stream struct {
+	types.StandardStream
+}
+
+func (s *Stream) Connect(ctx context.Context) error {
+	s.StandardStream.EmitConnect()
+	return nil
+}
+
+func (s *Stream) Close() error {
+	return nil
+}
+
 type Exchange struct {
 	publicEx types.ExchangePublic
 
-	userDataStream *types.StandardStream
+	marketDataStream types.Stream
+	userDataStream   *Stream
 
 	account *types.Account
 
@@ -24,18 +41,101 @@ type Exchange struct {
 	openOrders map[uint64]types.Order
 
 	markets types.MarketMap
+
+	mu sync.Mutex
+
+	// trading symbol
+	symbol string
 }
 
-func New(ex types.ExchangePublic, bals types.BalanceMap) *Exchange {
-	stream := types.NewStandardStream()
+func New(publicEx types.ExchangePublic, marketDataStream types.Stream, symbol string, bals types.BalanceMap) *Exchange {
+	stream := &Stream{
+		StandardStream: types.NewStandardStream(),
+	}
+
+	stream.OnConnect(func() {
+		go stream.EmitAuth()
+	})
+
 	account := types.NewAccount()
 	account.UpdateBalances(bals)
 
-	return &Exchange{
-		publicEx:       ex,
-		userDataStream: &stream,
-		account:        account,
-		openOrders:     make(map[uint64]types.Order),
+	ex := &Exchange{
+		publicEx:         publicEx,
+		marketDataStream: marketDataStream,
+		userDataStream:   stream,
+		account:          account,
+		symbol:           symbol,
+		openOrders:       make(map[uint64]types.Order),
+	}
+
+	marketDataStream.OnKLine(types.KLineWith(symbol, types.Interval1m, func(k types.KLine) {
+		ex.matchOpenOrders(k.Close)
+	}))
+
+	return ex
+}
+
+// matchOpenOrders matches open orders with the latest close price
+func (e *Exchange) matchOpenOrders(closePrice fixedpoint.Value) {
+	for orderID := range e.openOrders {
+		e.mu.Lock()
+		order := e.openOrders[orderID]
+		e.mu.Unlock()
+
+		if order.Type != types.OrderTypeLimit && order.Type != types.OrderTypeLimitMaker {
+			continue
+		}
+
+		matched := false
+		switch order.Side {
+		case types.SideTypeBuy:
+			if order.Price.Compare(closePrice) >= 0 {
+				matched = true
+			}
+		case types.SideTypeSell:
+			if order.Price.Compare(closePrice) <= 0 {
+				matched = true
+			}
+		}
+
+		if !matched {
+			continue
+		}
+
+		order.Status = types.OrderStatusFilled
+		order.ExecutedQuantity = order.Quantity
+		order.AveragePrice = closePrice
+
+		trade := newMockTradeFromOrder(&order, true)
+		e.userDataStream.EmitTradeUpdate(trade)
+		e.userDataStream.EmitOrderUpdate(order)
+
+		balances := e.account.Balances()
+		switch order.Side {
+		case types.SideTypeBuy:
+			quoteBal := balances[order.Market.QuoteCurrency]
+			baseBal := balances[order.Market.BaseCurrency]
+			cost := order.Quantity.Mul(order.Price)
+			quoteBal.Locked = quoteBal.Locked.Sub(cost)
+			baseBal.Available = baseBal.Available.Add(order.Quantity)
+			balances[order.Market.QuoteCurrency] = quoteBal
+			balances[order.Market.BaseCurrency] = baseBal
+		case types.SideTypeSell:
+			baseBal := balances[order.Market.BaseCurrency]
+			quoteBal := balances[order.Market.QuoteCurrency]
+			baseBal.Locked = baseBal.Locked.Sub(order.Quantity)
+			quoteBal.Available = quoteBal.Available.Add(order.Quantity.Mul(order.Price))
+			balances[order.Market.BaseCurrency] = baseBal
+			balances[order.Market.QuoteCurrency] = quoteBal
+		}
+
+		e.account.UpdateBalances(balances)
+		e.userDataStream.EmitBalanceUpdate(balances)
+
+		e.mu.Lock()
+		delete(e.openOrders, orderID)
+		e.mu.Unlock()
 	}
 }
 
@@ -61,7 +161,7 @@ func (e *Exchange) NewStream() types.Stream {
 	return e.publicEx.NewStream()
 }
 
-func (e *Exchange) NewUserDataStream() types.Stream {
+func (e *Exchange) GetUserDataStream() types.Stream {
 	return e.userDataStream
 }
 
@@ -93,6 +193,11 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 
 // SubmitOrder simulates order submission
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
+	log.Info("SubmitOrder")
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	market, ok := e.markets[order.Symbol]
 	if !ok {
 		return nil, fmt.Errorf("market not found: %s", order.Symbol)
@@ -121,7 +226,6 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		case types.OrderTypeMarket:
 			quoteBal.Available = quoteBal.Available.Sub(cost)
 		case types.OrderTypeLimit, types.OrderTypeLimitMaker, types.OrderTypeStopLimit, types.OrderTypeStopMarket:
-			// 限價單鎖定
 			quoteBal.Available = quoteBal.Available.Sub(cost)
 			quoteBal.Locked = quoteBal.Locked.Add(cost)
 		default:
@@ -181,10 +285,71 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) (orders []types.Order, err error) {
-	return nil, nil
+	log.Info("QueryOpenOrders")
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	orders = make([]types.Order, 0)
+	for _, order := range e.openOrders {
+		if order.Symbol == symbol {
+			orders = append(orders, order)
+		}
+	}
+
+	return orders, nil
 }
 
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
+	log.Info("CancelOrders")
+
+	for _, order := range orders {
+		e.mu.Lock()
+		_, ok := e.openOrders[order.OrderID]
+		e.mu.Unlock()
+
+		if !ok {
+			return fmt.Errorf("order not found: %d", order.OrderID)
+		}
+
+		market, ok := e.markets[order.Symbol]
+		if !ok {
+			return fmt.Errorf("market not found: %s", order.Symbol)
+		}
+
+		balances := e.account.Balances()
+		switch order.Side {
+		case types.SideTypeBuy:
+			bal, ok := balances[market.QuoteCurrency]
+			if !ok {
+				return fmt.Errorf("quote balance not found: %s", market.QuoteCurrency)
+			}
+			bal.Available = bal.Available.Add(order.Quantity.Mul(order.Price))
+			bal.Locked = bal.Locked.Sub(order.Quantity.Mul(order.Price))
+			balances[market.QuoteCurrency] = bal
+		case types.SideTypeSell:
+			bal, ok := balances[market.BaseCurrency]
+			if !ok {
+				return fmt.Errorf("base balance not found: %s", market.BaseCurrency)
+			}
+			bal.Available = bal.Available.Add(order.Quantity)
+			bal.Locked = bal.Locked.Sub(order.Quantity)
+			balances[market.BaseCurrency] = bal
+		default:
+			return fmt.Errorf("unknown order side: %s", order.Side)
+		}
+
+		e.account.UpdateBalances(balances)
+		e.userDataStream.EmitBalanceUpdate(balances)
+
+		order.Status = types.OrderStatusCanceled
+		e.userDataStream.EmitOrderUpdate(order)
+
+		e.mu.Lock()
+		delete(e.openOrders, order.OrderID)
+		e.mu.Unlock()
+	}
+
 	return nil
 }
 
