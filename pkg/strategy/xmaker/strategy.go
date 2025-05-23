@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -2102,7 +2103,6 @@ func (s *Strategy) CrossRun(
 	}
 
 	if s.UseMockExchange {
-
 		balances := s.MockExchangeBalances
 		if balances == nil {
 			balances = types.BalanceMap{
@@ -2548,4 +2548,25 @@ func aggregatePriceVolumeSliceWithPriceFilter(
 		Price:  lastPrice,
 		Volume: totalVolume,
 	}
+}
+
+func parseSymbolSelector(
+	selector string, sessions map[string]*bbgo.ExchangeSession,
+) (*bbgo.ExchangeSession, types.Market, error) {
+	parts := strings.SplitN(selector, ".", 2)
+	if len(parts) != 2 {
+		return nil, types.Market{}, fmt.Errorf("invalid symbol selector: %s", selector)
+	}
+
+	sessionName, symbol := parts[0], parts[1]
+	session, ok := sessions[sessionName]
+	if !ok {
+		return nil, types.Market{}, fmt.Errorf("session %s not found", sessionName)
+	}
+
+	market, ok := session.Market(symbol)
+	if !ok {
+		return nil, types.Market{}, fmt.Errorf("market %s not found in session %s", symbol, sessionName)
+	}
+	return session, market, nil
 }
