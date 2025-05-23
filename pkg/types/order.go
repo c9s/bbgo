@@ -260,6 +260,7 @@ type OrderQuery struct {
 	Symbol        string
 	OrderID       string
 	ClientOrderID string
+	UUID          string
 }
 
 type Order struct {
