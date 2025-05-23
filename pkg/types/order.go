@@ -329,6 +329,7 @@ func (o Order) AsQuery() OrderQuery {
 	return OrderQuery{
 		Symbol:  o.Symbol,
 		OrderID: strconv.FormatUint(o.OrderID, 10),
+		UUID:    o.UUID,
 	}
 }
 
