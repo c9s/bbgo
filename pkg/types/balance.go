@@ -36,6 +36,12 @@ type Balance struct {
 	MaxWithdrawAmount fixedpoint.Value `json:"maxWithdrawAmount,omitempty"`
 }
 
+func NewBalance(currency string, aval fixedpoint.Value) Balance {
+	b := NewZeroBalance(currency)
+	b.Available = aval
+	return b
+}
+
 func NewZeroBalance(currency string) Balance {
 	return Balance{
 		Currency:             currency,
