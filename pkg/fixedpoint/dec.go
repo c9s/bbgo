@@ -15,7 +15,7 @@ import (
 
 type Value struct {
 	coef uint64
-	sign int8
+	sign int
 	exp  int
 }
 
@@ -132,7 +132,7 @@ func NewFromInt(n int64) Value {
 		return Zero
 	}
 	// n0 := n
-	sign := int8(signPos)
+	sign := signPos
 	if n < 0 {
 		n = -n
 		sign = signNeg
@@ -157,7 +157,7 @@ func NewFromFloat(f float64) Value {
 		return Zero
 	}
 
-	sign := int8(signPos)
+	sign := signPos
 	if f < 0 {
 		f = -f
 		sign = signNeg
@@ -167,18 +167,25 @@ func NewFromFloat(f float64) Value {
 		return newNoSignCheck(sign, n, digitsMax)
 	}
 	_, e := math.Frexp(f)
-	e = int(float32(e) / log2of10)
-	c := uint64(f/math.Pow10(e-16) + 0.5)
-	return newNoSignCheck(sign, c, e)
+	e = int(float32(e)/log2of10) - 16
+	var c uint64
+	if e < 0 && e > -lenPow10 {
+		c = uint64(f*pow10f[-e] + 0.5)
+	} else if e >= 0 && e < lenPow10 {
+		c = uint64(f/pow10f[e] + 0.5)
+	} else {
+		c = uint64(f/math.Pow10(e) + 0.5)
+	}
+	return newNoSignCheck(sign, c, e+16)
 }
 
 // Raw constructs a Value without normalizing - arguments must be valid.
 // Used by SuValue Unpack
-func Raw(sign int8, coef uint64, exp int) Value {
+func Raw(sign int, coef uint64, exp int) Value {
 	return Value{coef, sign, int(exp)}
 }
 
-func newNoSignCheck(sign int8, coef uint64, exp int) Value {
+func newNoSignCheck(sign int, coef uint64, exp int) Value {
 	atmax := false
 	for coef > coefMax {
 		coef = (coef + 5) / 10
@@ -196,7 +203,7 @@ func newNoSignCheck(sign int8, coef uint64, exp int) Value {
 
 // New constructs a Value, maximizing coef and handling exp out of range
 // Used to normalize results of operations
-func New(sign int8, coef uint64, exp int) Value {
+func New(sign int, coef uint64, exp int) Value {
 	if sign == 0 || coef == 0 {
 		return Zero
 	} else if sign == signPosInf {
@@ -240,7 +247,7 @@ func ilog10(x uint64) int {
 	return y
 }
 
-func Inf(sign int8) Value {
+func Inf(sign int) Value {
 	switch {
 	case sign < 0:
 		return NegInf
@@ -667,12 +674,12 @@ func (r *readerBytes) matchStrIgnoreCase(pre string) bool {
 	return true
 }
 
-func (r *readerBytes) getSign() int8 {
+func (r *readerBytes) getSign() int {
 	if r.match('-') {
-		return int8(signNeg)
+		return signNeg
 	}
 	r.match('+')
-	return int8(signPos)
+	return signPos
 }
 
 func (r *readerBytes) getCoef() (uint64, int) {
@@ -785,12 +792,12 @@ func (r *reader) matchStrIgnoreCase(pre string) bool {
 	return false
 }
 
-func (r *reader) getSign() int8 {
+func (r *reader) getSign() int {
 	if r.match('-') {
-		return int8(signNeg)
+		return signNeg
 	}
 	r.match('+')
-	return int8(signPos)
+	return signPos
 }
 
 func (r *reader) getCoef() (uint64, int) {
@@ -861,6 +868,8 @@ func (dn Value) IsZero() bool {
 	return dn.sign == signZero
 }
 
+const lenPow10 = len(pow10)
+
 // Float64 converts a Value to float64
 func (dn Value) Float64() float64 {
 	if dn.IsInf() {
@@ -871,6 +880,12 @@ func (dn Value) Float64() float64 {
 		g = -g
 	}
 	i := int(dn.exp) - digitsMax
+
+	if i < 0 && i > -lenPow10 {
+		return g / pow10f[-i]
+	} else if i >= 0 && i < lenPow10 {
+		return g * pow10f[i]
+	}
 	return g * math.Pow(10, float64(i))
 }
 
@@ -880,23 +895,24 @@ func (dn Value) Int64() int64 {
 		return 0
 	}
 	if dn.sign != signNegInf && dn.sign != signPosInf {
-		if 0 < dn.exp && dn.exp < digitsMax {
-			return int64(dn.sign) * int64(dn.coef/pow10[digitsMax-dn.exp])
+		digitDiff := digitsMax - dn.exp
+		if 0 < dn.exp && digitDiff > 0 {
+			return int64(dn.sign) * int64(dn.coef/pow10[digitDiff])
 		} else if dn.exp <= 0 && dn.coef != 0 {
 			result := math.Log10(float64(dn.coef)) - float64(digitsMax) + float64(dn.exp)
 			return int64(dn.sign) * int64(math.Pow(10, result))
 		}
-		if dn.exp == digitsMax {
+		switch digitDiff {
+		case 0:
 			return int64(dn.sign) * int64(dn.coef)
-		}
-		if dn.exp == digitsMax+1 {
+		case 1:
 			return int64(dn.sign) * (int64(dn.coef) * 10)
-		}
-		if dn.exp == digitsMax+2 {
+		case 2:
 			return int64(dn.sign) * (int64(dn.coef) * 100)
-		}
-		if dn.exp == digitsMax+3 && dn.coef < math.MaxInt64/1000 {
-			return int64(dn.sign) * (int64(dn.coef) * 1000)
+		case 3:
+			if dn.coef < math.MaxInt64/1000 {
+				return int64(dn.sign) * (int64(dn.coef) * 1000)
+			}
 		}
 	}
 	panic("unable to convert Value to int64")
@@ -913,7 +929,7 @@ func (dn Value) Int() int {
 
 // Sign returns -1 for negative, 0 for zero, and +1 for positive
 func (dn Value) Sign() int {
-	return int(dn.sign)
+	return dn.sign
 }
 
 // Coef returns the coefficient
@@ -923,7 +939,7 @@ func (dn Value) Coef() uint64 {
 
 // Exp returns the exponent
 func (dn Value) Exp() int {
-	return int(dn.exp)
+	return dn.exp
 }
 
 // Frac returns the fractional portion, i.e. x - x.Int()
@@ -1203,8 +1219,6 @@ func align(x, y *Value) bool {
 	return true
 }
 
-const e7 = 10000000
-
 // Mul returns the product of two Value's
 func Mul(x, y Value) Value {
 	sign := x.sign * y.sign
@@ -1218,14 +1232,14 @@ func Mul(x, y Value) Value {
 
 	// split unevenly to use full 64 bit range to get more precision
 	// and avoid needing xlo * ylo
-	xhi := x.coef / e7 // 9 digits
-	xlo := x.coef % e7 // 7 digits
-	yhi := y.coef / e7 // 9 digits
-	ylo := y.coef % e7 // 7 digits
+	xhi := x.coef / 1e7 // 9 digits
+	xlo := x.coef % 1e7 // 7 digits
+	yhi := y.coef / 1e7 // 9 digits
+	ylo := y.coef % 1e7 // 7 digits
 
 	c := xhi * yhi
 	if (xlo | ylo) != 0 {
-		c += (xlo*yhi + ylo*xhi) / e7
+		c += (xlo*yhi + ylo*xhi) / 1e7
 	}
 	return New(sign, c, e-2)
 }
