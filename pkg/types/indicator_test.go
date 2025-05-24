@@ -19,6 +19,17 @@ func TestQueue(t *testing.T) {
 	assert.Equal(t, zeroq.Index(0), 0.)
 	zeroq.Update(1.)
 	assert.Equal(t, zeroq.Length(), 0)
+
+	q := NewQueue(10)
+	for i := 0; i < 10; i++ {
+		q.Update(float64(i))
+	}
+	assert.Equal(t, q.Last(0), 9.0)
+	assert.Equal(t, q.Last(1), 8.0)
+	assert.Equal(t, q.Last(2), 7.0)
+	assert.Equal(t, q.Last(10), 0.0)
+	assert.Equal(t, q.Last(11), 0.0)
+
 }
 
 func TestFloat(t *testing.T) {

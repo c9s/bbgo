@@ -4,14 +4,38 @@ package types
 // with size limit (the only difference compare to float64slice)
 type Queue struct {
 	SeriesBase
-	arr  []float64
-	size int
+	arr      []float64
+	size     int // size of the queue
+	start    int // start index of the queue
+	last     int // last index of the queue
+	realSize int // real size of the queue
+}
+
+// the real size of the queue is the next power of 2
+func getRealSize(n int) int {
+	if n <= 1 {
+		return 1
+	}
+	n--
+	n |= n >> 1
+	n |= n >> 2
+	n |= n >> 4
+	n |= n >> 8
+	n |= n >> 16
+	if ^uint(0)>>32 != 0 { // 64 bit
+		n |= n >> 32
+	}
+	return n
 }
 
 func NewQueue(size int) *Queue {
+	realSize := getRealSize(size)
 	out := &Queue{
-		arr:  make([]float64, 0, size),
-		size: size,
+		arr:      make([]float64, 0, realSize+1),
+		size:     size,
+		start:    0,
+		last:     -1,
+		realSize: realSize,
 	}
 	out.SeriesBase.Series = out
 	return out
@@ -22,7 +46,7 @@ func (inc *Queue) Last(i int) float64 {
 		return 0
 	}
 
-	return inc.arr[len(inc.arr)-1-i]
+	return inc.arr[(inc.last-i)&inc.realSize]
 }
 
 func (inc *Queue) Index(i int) float64 {
@@ -30,22 +54,36 @@ func (inc *Queue) Index(i int) float64 {
 }
 
 func (inc *Queue) Length() int {
+	if inc.size < len(inc.arr) {
+		return inc.size
+	}
 	return len(inc.arr)
 }
 
 func (inc *Queue) Clone() *Queue {
 	out := &Queue{
-		arr:  inc.arr[:],
-		size: inc.size,
+		arr:      inc.arr[:],
+		size:     inc.size,
+		start:    inc.start,
+		last:     inc.last,
+		realSize: inc.realSize,
 	}
 	out.SeriesBase.Series = out
 	return out
 }
 
 func (inc *Queue) Update(v float64) {
-	inc.arr = append(inc.arr, v)
-	if len(inc.arr) > inc.size {
-		inc.arr = inc.arr[len(inc.arr)-inc.size:]
+	c := len(inc.arr)
+	if c <= inc.realSize {
+		inc.arr = append(inc.arr, v)
+		inc.last++
+	} else {
+		if inc.size == 0 {
+			return
+		}
+		inc.arr[inc.start] = v
+		inc.start = (inc.start + 1) & inc.realSize
+		inc.last = (inc.last + 1) & inc.realSize
 	}
 }
 
