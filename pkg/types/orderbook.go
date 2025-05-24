@@ -323,5 +323,5 @@ func (db *DepthBook) PriceAtQuoteDepth(side SideType) fixedpoint.Value {
 func (db *DepthBook) BestBidAndAskAtQuoteDepth() (bid, ask fixedpoint.Value) {
 	bid = db.PriceAtQuoteDepth(SideTypeBuy)
 	ask = db.PriceAtQuoteDepth(SideTypeSell)
-	return
+	return bid, ask
 }
