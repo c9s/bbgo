@@ -563,7 +563,7 @@ func (s *Strategy) iocOrderExecution(
 	}()
 
 	go func() {
-		o, err := retry.QueryOrderUntilFilled(ctx, service, iocOrder.Symbol, iocOrder.OrderID)
+		o, err := retry.QueryOrderUntilFilled(ctx, service, iocOrder.AsQuery())
 		if err != nil {
 			log.WithError(err).Errorf("ioc order restful wait error")
 			return

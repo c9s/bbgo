@@ -240,10 +240,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 		// verify the current open orders via the RESTful API
 		if orderQueryService, ok := ex.(types.ExchangeOrderQueryService); ok {
 			for idx, o := range orders {
-				retOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
-					Symbol:  o.Symbol,
-					OrderID: strconv.FormatUint(o.OrderID, 10),
-				})
+				retOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, o.AsQuery())
 
 				if err != nil {
 					log.WithError(err).Errorf("unable to update order #%d", o.OrderID)
@@ -557,7 +554,7 @@ func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange, buf
 			delete(openOrdersMap, activeOrder.OrderID)
 		} else {
 			log.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
-			updatedOrder, err := b.SyncOrder(ctx, ex, activeOrder.OrderID, syncBefore)
+			updatedOrder, err := b.SyncOrder(ctx, ex, activeOrder.OrderID, activeOrder.UUID, syncBefore)
 			if err != nil {
 				errs = multierr.Append(errs, err)
 				continue
@@ -585,7 +582,7 @@ func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange, buf
 	return updatedOrders, errs
 }
 
-func (b *ActiveOrderBook) SyncOrder(ctx context.Context, ex types.Exchange, orderID uint64, syncBefore time.Time) (*types.Order, error) {
+func (b *ActiveOrderBook) SyncOrder(ctx context.Context, ex types.Exchange, orderID uint64, orderUUID string, syncBefore time.Time) (*types.Order, error) {
 	isMax := exchange.IsMaxExchange(ex)
 
 	orderQueryService, ok := ex.(types.ExchangeOrderQueryService)
@@ -594,8 +591,9 @@ func (b *ActiveOrderBook) SyncOrder(ctx context.Context, ex types.Exchange, orde
 	}
 
 	updatedOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, types.OrderQuery{
-		Symbol:  b.Symbol,
-		OrderID: strconv.FormatUint(orderID, 10),
+		Symbol:    b.Symbol,
+		OrderID:   strconv.FormatUint(orderID, 10),
+		OrderUUID: orderUUID,
 	})
 
 	if err != nil {
