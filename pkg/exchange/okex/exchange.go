@@ -994,25 +994,30 @@ func (e *Exchange) GetClient() *okexapi.RestClient {
 // - Adds new symbols from markets
 // - Removes symbols that no longer exist in markets
 func (e *Exchange) syncLocalSymbolMap(markets types.MarketMap) {
-	symbolMap := spotSymbolMap
+	symbolMap := spotSymbolSyncMap
 	if e.IsFutures {
-		symbolMap = swapSymbolMap
+		symbolMap = swapSymbolSyncMap
 	}
 
 	existingSymbols := make(map[string]struct{})
 
 	// Update existing and add new symbols
 	for symbol, market := range markets {
-		symbolMap[symbol] = market.LocalSymbol
+		symbolMap.Store(symbol, market.LocalSymbol)
 		existingSymbols[symbol] = struct{}{}
 	}
 
 	// Remove symbols that don't exist in markets anymore
-	for symbol := range symbolMap {
-		if _, exists := existingSymbols[symbol]; !exists {
-			delete(symbolMap, symbol)
+	symbolMap.Range(func(key, value interface{}) bool {
+		symbol, ok := key.(string)
+		if !ok {
+			return true
 		}
-	}
+		if _, exists := existingSymbols[symbol]; !exists {
+			symbolMap.Delete(symbol)
+		}
+		return true
+	})
 }
 
 func setDualSidePosition(req *okexapi.PlaceOrderRequest, order types.SubmitOrder) {
