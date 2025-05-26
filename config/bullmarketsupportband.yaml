@@ -1,0 +1,67 @@
+# This is an example configuration for the Bull Market Support Band strategy.
+
+# Define sessions to be used.
+# Each session connects to a specific exchange with given credentials (usually via environment variables).
+sessions:
+  binance: # Name of the session, can be anything.
+    exchange: binance # Must match an exchange supported by bbgo (e.g., binance, max, kucoin, etc.)
+    # Environment variable prefix for API keys (e.g., BINANCE_API_KEY, BINANCE_API_SECRET)
+    # Ensure these environment variables are set in your system or .env file.
+    envVarPrefix: BINANCE_EXAMPLE_BMSB # Using a unique prefix for this example
+
+# exchangeStrategies define which strategies to run on which exchange sessions.
+# It's a list, so you can define multiple strategy instances or types.
+exchangeStrategies:
+  - on: binance # Specifies that the following strategy configuration applies to the "binance" session defined above.
+    bull-market-support-band: # This is the ID of the strategy, must match the ID registered in its init() function.
+      symbol: "BTCUSDT" # The trading pair to use, e.g., "BTCUSDT", "ETHUSDT".
+      timeframe: "1w" # The K-line timeframe for the strategy (e.g., "1m", "5m", "1h", "1d", "1w"). "1w" for weekly.
+      
+      emaPeriodShort: 20 # The period for the shorter Exponential Moving Average (EMA).
+                         # Typically, the 20-period EMA on the weekly timeframe is part of the Bull Market Support Band.
+                         
+      smaPeriodLong: 21  # The period for the longer Simple Moving Average (SMA).
+                         # Typically, the 21-period SMA on the weekly timeframe is the other part of the Bull Market Support Band.
+                         
+      marketConditionSmaPeriod: 50 # The period for the SMA used to determine the overall market condition (e.g., bull or bear market).
+                                   # A common general market trend indicator.
+                                   
+      quantity: "0.01" # The fixed quantity of the base asset (e.g., BTC in BTCUSDT) to trade per signal.
+                       # This should be a string that can be parsed into a fixedpoint.Value.
+                       
+      leverage: 1      # The leverage to use. For spot markets, this is typically 1.
+                       # For futures markets, this can be higher (e.g., 5, 10, 20).
+                       # Ensure the exchange and market type support the specified leverage.
+
+# Example backtest configuration (optional, but useful for testing)
+# backtest:
+#   startTime: "2020-01-01" # Start date for the backtest
+#   endTime: "2023-01-01"   # End date for the backtest
+#   symbols:
+#     - "BTCUSDT"             # List of symbols to backtest on
+#   sessions: ["binance"]     # Which configured sessions to use for backtesting data
+#   accounts:
+#     binance: # Account simulation for the "binance" session
+#       makerFeeRate: "0.0002"  # Example maker fee rate (0.02%)
+#       takerFeeRate: "0.0004"  # Example taker fee rate (0.04%)
+#       balances:
+#         BTC: "0.0"          # Initial base currency balance
+#         USDT: "10000.0"     # Initial quote currency balance
+#   generateReport: true      # Whether to generate a backtest report
+#   plot: true                # Whether to generate plots for the backtest
+#   showTrades: true          # Whether to show individual trades in the report
+#   showOrders: true          # Whether to show individual orders in the report
+
+# Persistence configuration (optional, for saving strategy state)
+# persistence:
+#   json:
+#     directory: var/data # Directory to save JSON state files
+#   redis:
+#     host: 127.0.0.1
+#     port: 6379
+#     db: 0
+#     # password: "your-redis-password" # Uncomment if your Redis requires a password
+#   # ttl: "24h" # Time-to-live for persisted data, e.g., "1h", "24h"
+#   # saveOnExit: true # Whether to save state when bbgo exits gracefully
+#   # loadOnStart: true # Whether to load state when bbgo starts
+#   # syncInterval: "5m" # How often to sync state to persistence (e.g., "1m", "5m")

@@ -54,4 +54,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/xgap"
 	_ "github.com/c9s/bbgo/pkg/strategy/xmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/xnav"
+
+	// Custom strategies from maxsetgros
+	_ "github.com/maxsetgros/pkg/strategy/swing"
 )
