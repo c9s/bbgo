@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -21,20 +20,17 @@ type advancedOrderCancelService interface {
 }
 
 func QueryOrderUntilCanceled(
-	ctx context.Context, queryOrderService types.ExchangeOrderQueryService, symbol string, orderId uint64,
+	ctx context.Context, queryOrderService types.ExchangeOrderQueryService, query types.OrderQuery,
 ) (o *types.Order, err error) {
 	var op = func() (err2 error) {
-		o, err2 = queryOrderService.QueryOrder(ctx, types.OrderQuery{
-			Symbol:  symbol,
-			OrderID: strconv.FormatUint(orderId, 10),
-		})
+		o, err2 = queryOrderService.QueryOrder(ctx, query)
 
 		if err2 != nil {
 			return err2
 		}
 
 		if o == nil {
-			return fmt.Errorf("order #%d response is nil", orderId)
+			return fmt.Errorf("order #%+v response is nil", query)
 		}
 
 		if o.Status == types.OrderStatusCanceled || o.Status == types.OrderStatusFilled {
@@ -49,13 +45,10 @@ func QueryOrderUntilCanceled(
 }
 
 func QueryOrderUntilFilled(
-	ctx context.Context, queryOrderService types.ExchangeOrderQueryService, symbol string, orderId uint64,
+	ctx context.Context, queryOrderService types.ExchangeOrderQueryService, query types.OrderQuery,
 ) (o *types.Order, err error) {
 	var op = func() (err2 error) {
-		o, err2 = queryOrderService.QueryOrder(ctx, types.OrderQuery{
-			Symbol:  symbol,
-			OrderID: strconv.FormatUint(orderId, 10),
-		})
+		o, err2 = queryOrderService.QueryOrder(ctx, query)
 
 		if err2 != nil {
 			return err2

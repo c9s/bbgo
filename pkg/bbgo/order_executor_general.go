@@ -517,7 +517,7 @@ func (e *GeneralOrderExecutor) ClosePosition(ctx context.Context, percentage fix
 	if queryOrderService, ok := e.session.Exchange.(types.ExchangeOrderQueryService); ok && !IsBackTesting {
 		switch submitOrder.Type {
 		case types.OrderTypeMarket:
-			_, err2 := retry.QueryOrderUntilFilled(ctx, queryOrderService, createdOrders[0].Symbol, createdOrders[0].OrderID)
+			_, err2 := retry.QueryOrderUntilFilled(ctx, queryOrderService, createdOrders[0].AsQuery())
 			if err2 != nil {
 				log.WithError(err2).Errorf("unable to query order")
 			}

@@ -26,6 +26,11 @@ var ErrMissingSequence = errors.New("sequence is missing")
 // KCS is the platform currency of Kucoin, pre-allocate static string here
 const KCS = "KCS"
 
+var (
+	_ types.Exchange                  = &Exchange{}
+	_ types.ExchangeOrderQueryService = &Exchange{}
+)
+
 var log = logrus.WithFields(logrus.Fields{
 	"exchange": "kucoin",
 })
@@ -442,4 +447,45 @@ func (e *Exchange) QueryDepth(ctx context.Context, symbol string) (types.SliceOr
 		Bids:   orderBook.Bids,
 		Asks:   orderBook.Asks,
 	}, sequence, nil
+}
+
+// ExchangeOrderQueryService
+func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.Order, error) {
+	req := e.client.TradeService.NewGetOrderRequest()
+	if q.OrderUUID == "" {
+		return nil, errors.New("order uuid is empty")
+	}
+	req.OrderId(q.OrderUUID)
+	if err := queryOrderLimiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	kuOrder, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+	order := toGlobalOrder(*kuOrder)
+	return &order, nil
+}
+
+func (e *Exchange) QueryOrderTrades(ctx context.Context, q types.OrderQuery) ([]types.Trade, error) {
+	req := e.client.TradeService.NewGetFillsRequest()
+	if q.OrderUUID == "" {
+		return nil, errors.New("order uuid is empty")
+	}
+	req.OrderID(q.OrderUUID)
+	if err := queryTradeLimiter.Wait(ctx); err != nil {
+		return nil, err
+	}
+	response, err := req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var trades []types.Trade
+	for _, fill := range response.Items {
+		trade := toGlobalTrade(fill)
+		trades = append(trades, trade)
+	}
+
+	return trades, nil
 }
