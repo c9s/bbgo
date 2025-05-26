@@ -794,16 +794,16 @@ func (s *Stream) clearWorkingOrders() {
 	s.workingOrdersMap = make(map[string]types.Order)
 }
 
-func (s *Stream) retrieveOrderById(orderId string) (*types.Order, error) {
+func (s *Stream) retrieveOrderById(uuid string) (*types.Order, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	if s.PublicOnly {
-		msg := fmt.Sprintf("retrieve order by id disabled on a public stream: %s", orderId)
+		msg := fmt.Sprintf("retrieve order by id disabled on a public stream: %s", uuid)
 		logStream.Warn(msg)
 		return nil, errors.New(msg)
 	}
-	order, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderID: orderId})
+	order, err := s.exchange.QueryOrder(ctx, types.OrderQuery{OrderUUID: uuid})
 	if err != nil {
 		return nil, err
 	}
