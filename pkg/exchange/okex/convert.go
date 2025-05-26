@@ -25,8 +25,12 @@ func toLocalSymbol(symbol string, instType ...okexapi.InstrumentType) string {
 		}
 	}
 
-	if s, ok := spotSymbolMap[symbol]; ok {
-		return s
+	if s, ok := spotSymbolSyncMap.Load(symbol); ok {
+		if localSymbol, ok := s.(string); ok {
+			return localSymbol
+		}
+
+		log.Errorf("failed to convert symbol %s to local symbol, but found in spotSymbolSyncMap", symbol)
 	}
 
 	log.Errorf("failed to look up local symbol from %s", symbol)

@@ -1,6 +1,10 @@
 package okex
 
-import "github.com/c9s/bbgo/pkg/types"
+import (
+	"sync"
+
+	"github.com/c9s/bbgo/pkg/types"
+)
 
 var (
 	// below are supported UTC timezone interval for okex
@@ -38,3 +42,16 @@ var (
 		types.Interval1mo: "1Mutc",
 	}
 )
+
+var spotSymbolSyncMap sync.Map
+var swapSymbolSyncMap sync.Map
+
+func init() {
+	for key, val := range spotSymbolMap {
+		spotSymbolSyncMap.Store(key, val)
+	}
+
+	for key, val := range swapSymbolMap {
+		swapSymbolSyncMap.Store(key, val)
+	}
+}
