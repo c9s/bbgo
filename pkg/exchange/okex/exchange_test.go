@@ -718,20 +718,23 @@ func TestExchange_QueryMarkets_SymbolCache(t *testing.T) {
 	}
 
 	t.Run("spot mode", func(t *testing.T) {
-		delete(spotSymbolMap, "ETHUSDT")
-		delete(swapSymbolMap, "ETHUSDT")
+		spotSymbolSyncMap.Delete("ETHUSDT")
+		swapSymbolSyncMap.Delete("ETHUSDT")
 
 		ex := New(key, secret, passphrase)
 
 		_, err := ex.QueryMarkets(context.Background())
 		assert.NoError(t, err)
-		assert.Equal(t, "ETH-USDT", spotSymbolMap["ETHUSDT"])
-		assert.NotContains(t, swapSymbolMap, "ETHUSDT")
+		val, ok := spotSymbolSyncMap.Load("ETHUSDT")
+		assert.True(t, ok)
+		assert.Equal(t, "ETH-USDT", val)
+		_, ok = swapSymbolSyncMap.Load("ETHUSDT")
+		assert.False(t, ok)
 	})
 
 	t.Run("futures mode", func(t *testing.T) {
-		delete(spotSymbolMap, "ETHUSDT")
-		delete(swapSymbolMap, "ETHUSDT")
+		spotSymbolSyncMap.Delete("ETHUSDT")
+		swapSymbolSyncMap.Delete("ETHUSDT")
 
 		// Futures mode
 		ex := New(key, secret, passphrase)
@@ -739,8 +742,12 @@ func TestExchange_QueryMarkets_SymbolCache(t *testing.T) {
 
 		_, err := ex.QueryMarkets(context.Background())
 		assert.NoError(t, err)
-		assert.Equal(t, "ETH-USDT-SWAP", swapSymbolMap["ETHUSDT"])
-		assert.NotContains(t, spotSymbolMap, "ETHUSDT")
+		val, ok := swapSymbolSyncMap.Load("ETHUSDT")
+		assert.True(t, ok)
+		assert.Equal(t, "ETH-USDT-SWAP", val)
+
+		_, ok = spotSymbolSyncMap.Load("ETHUSDT")
+		assert.False(t, ok)
 	})
 }
 
