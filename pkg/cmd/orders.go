@@ -56,8 +56,9 @@ var getOrderCmd = &cobra.Command{
 		}
 
 		order, err := service.QueryOrder(ctx, types.OrderQuery{
-			OrderID: orderID,
-			Symbol:  symbol,
+			OrderID:   orderID,
+			OrderUUID: orderID,
+			Symbol:    symbol,
 		})
 		if err != nil {
 			return err

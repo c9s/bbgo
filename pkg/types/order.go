@@ -260,6 +260,7 @@ type OrderQuery struct {
 	Symbol        string
 	OrderID       string
 	ClientOrderID string
+	OrderUUID     string
 }
 
 type Order struct {
@@ -326,8 +327,9 @@ func (o *Order) GetRemainingQuantity() fixedpoint.Value {
 
 func (o Order) AsQuery() OrderQuery {
 	return OrderQuery{
-		Symbol:  o.Symbol,
-		OrderID: strconv.FormatUint(o.OrderID, 10),
+		Symbol:    o.Symbol,
+		OrderID:   strconv.FormatUint(o.OrderID, 10),
+		OrderUUID: o.UUID,
 	}
 }
 
