@@ -13,6 +13,11 @@ type KLineStream struct {
 	kLines []types.KLine
 }
 
+func (s *KLineStream) PushAndEmit(k types.KLine) {
+	s.kLines = append(s.kLines, k)
+	s.EmitUpdate(k)
+}
+
 func (s *KLineStream) Length() int {
 	return len(s.kLines)
 }
@@ -42,8 +47,7 @@ func (s *KLineStream) AddSubscriber(f func(k types.KLine)) {
 
 func (s *KLineStream) BackFill(kLines []types.KLine) {
 	for _, k := range kLines {
-		s.kLines = append(s.kLines, k)
-		s.EmitUpdate(k)
+		s.PushAndEmit(k)
 	}
 }
 
