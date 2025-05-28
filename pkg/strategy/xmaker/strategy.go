@@ -861,10 +861,17 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	if s.CircuitBreaker != nil {
 		now := time.Now()
 		if reason, halted := s.CircuitBreaker.IsHalted(now); halted {
-			s.logger.Warnf("strategy %s is halted, reason: %s", ID, reason)
+			instance := s.InstanceID()
+
+			s.logger.Warnf("strategy %s is halted, reason: %s", instance, reason)
 
 			if s.circuitBreakerAlertLimiter.AllowN(now, 1) {
-				bbgo.Notify("Strategy %s is halted, reason: %s", ID, reason)
+				bbgo.Notify("Strategy %s is halted, reason: %s", instance, reason)
+			}
+
+			// make sure spread maker order is canceled
+			if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, &s.coveredPosition)
 			}
 
 			return nil
@@ -1484,7 +1491,6 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 	return false
 }
 
-// TODO: move this method to SpreadMaker
 func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(
 	ctx context.Context, coveredPosition *fixedpoint.MutexValue,
 ) {
@@ -1496,8 +1502,8 @@ func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(
 		return
 	}
 
+	// if the final order is nil means the order is already canceled or not found
 	if finalOrder == nil {
-		s.logger.Errorf("spread maker: no order found")
 		return
 	}
 
