@@ -155,10 +155,6 @@ func (c *SpreadMaker) cancelOrder(ctx context.Context) error {
 
 // cancelAndQueryOrder cancels the current order and queries the order status until the order is canceled
 func (c *SpreadMaker) cancelAndQueryOrder(ctx context.Context) (*types.Order, error) {
-	if c.order == nil {
-		return nil, nil
-	}
-
 	if err := c.cancelOrder(ctx); err != nil {
 		return nil, err
 	}
