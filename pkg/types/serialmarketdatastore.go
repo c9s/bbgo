@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -33,10 +34,8 @@ func NewSerialMarketDataStore(symbol string, minInterval Interval, useMarketTrad
 
 func (store *SerialMarketDataStore) Subscribe(interval Interval) {
 	// dedup
-	for _, i := range store.Subscription {
-		if i == interval {
-			return
-		}
+	if slices.Contains(store.Subscription, interval) {
+		return
 	}
 	store.Subscription = append(store.Subscription, interval)
 }

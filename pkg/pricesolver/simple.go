@@ -2,6 +2,7 @@ package pricesolver
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -120,10 +121,8 @@ func (m *SimplePriceSolver) inferencePrice(asset string, assetPrice float64, pre
 	quotePrices, ok := m.pricesByBase[asset]
 	if ok {
 		for quote, price := range quotePrices {
-			for _, fiat := range preferredFiats {
-				if quote == fiat {
-					return price * assetPrice, true
-				}
+			if slices.Contains(preferredFiats, quote) {
+				return price * assetPrice, true
 			}
 		}
 
@@ -139,10 +138,8 @@ func (m *SimplePriceSolver) inferencePrice(asset string, assetPrice float64, pre
 	basePrices, ok := m.pricesByQuote[asset]
 	if ok {
 		for base, basePrice := range basePrices {
-			for _, fiat := range preferredFiats {
-				if base == fiat {
-					return assetPrice / basePrice, true
-				}
+			if slices.Contains(preferredFiats, base) {
+				return assetPrice / basePrice, true
 			}
 		}
 
