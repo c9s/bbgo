@@ -13,7 +13,7 @@ type MASource interface {
 }
 
 var (
-	_ MASource = &SMMAStream{}
+	_ MASource = &SMAStream{}
 	_ MASource = &EWMAStream{}
 )
 
