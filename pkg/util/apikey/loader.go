@@ -2,6 +2,7 @@ package apikey
 
 import (
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -181,10 +182,5 @@ func extractNamedGroups(re *regexp.Regexp, input string) map[string]string {
 }
 
 func contains(list []string, item string) bool {
-	for _, s := range list {
-		if s == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, item)
 }
