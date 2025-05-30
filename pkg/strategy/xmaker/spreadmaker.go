@@ -160,9 +160,14 @@ func (c *SpreadMaker) cancelAndQueryOrder(ctx context.Context) (*types.Order, er
 	}
 
 	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.order == nil {
+		return nil, nil
+	}
+
 	order := c.order
 	c.order = nil
-	c.mu.Unlock()
 
 	finalOrder, err := retry.QueryOrderUntilCanceled(ctx, c.orderQueryService, order.AsQuery())
 	if err != nil {
