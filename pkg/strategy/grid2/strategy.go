@@ -1775,6 +1775,8 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	s.writeMutex.Lock()
 	defer s.writeMutex.Unlock()
 
+	_ = s.Initialize()
+
 	s.logger.Infof("cleaning up %s grid", s.Symbol)
 
 	if s.cancelWrite != nil {
@@ -1784,8 +1786,6 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	if s.ExchangeSession != nil {
 		s.session = s.ExchangeSession
 	}
-
-	_ = s.Initialize()
 
 	defer s.EmitGridClosed()
 	return s.cancelAll(ctx)
