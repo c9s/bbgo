@@ -81,11 +81,19 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 	// when receiving trades from the source session,
 	// mock a trade with the quote amount and add to the fiat position
 	s.sourceMarket.tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
-		// get the fiat book price from here?
-		bid, ask := s.fiatMarket.depthBook.BestBidAndAskAtQuoteDepth()
-		var price fixedpoint.Value
+		var price, bid, ask fixedpoint.Value
 		var quantity = trade.QuoteQuantity.Abs()
 		var side = trade.Side.Reverse()
+
+		// get the fiat book price from the snapshot when possible
+		s.mu.Lock()
+		if s.fiatQuotingPrice != nil {
+			bid = s.fiatQuotingPrice.Buy
+			ask = s.fiatQuotingPrice.Sell
+		} else {
+			bid, ask = s.fiatMarket.depthBook.BestBidAndAskAtQuoteDepth()
+		}
+		s.mu.Unlock()
 
 		switch trade.Side {
 		case types.SideTypeBuy:
@@ -95,10 +103,10 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 		}
 
 		fiatTrade := types.Trade{
-			// TODO: update the fields later
+			// TODO: set the order id and trade id from ???
 			// ID:            trade.ID,
-			// Exchange:      trade.Exchange,
 			// OrderID:       trade.OrderID,
+			Exchange:      s.fiatMarket.session.ExchangeName,
 			Price:         price,
 			Quantity:      quantity,
 			QuoteQuantity: quantity.Mul(price),
@@ -116,6 +124,7 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 		}
 
 		if profit, netProfit, madeProfit := s.fiatMarket.position.AddTrade(fiatTrade); madeProfit {
+			// TODO: record the profits in somewhere?
 			_ = profit
 			_ = netProfit
 		}
@@ -124,21 +133,37 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 	return nil
 }
 
-func (s *SyntheticHedge) Hedge(ctx context.Context, pos fixedpoint.Value) error {
-	// record the fiat price from the fiat market
-	fiatBidPrice, fiatAskPrice := s.fiatMarket.depthBook.BestBidAndAskAtQuoteDepth()
-	_ = fiatBidPrice
-	_ = fiatAskPrice
+// Hedge is the main function to perform the synthetic hedging:
+// 1) use the snapshot price as the source average cost
+// 2) submit the hedge order to the source exchange
+// 3) query trades from of the hedge order.
+// 4) build up the source hedge position for the average cost.
+// 5) submit fiat hedge order to the fiat market to convert the quote.
+// 6) merge the positions.
+func (s *SyntheticHedge) Hedge(
+	ctx context.Context, uncoveredPosition fixedpoint.Value,
+) error {
+	if uncoveredPosition.IsZero() {
+		return nil
+	}
 
-	// get the source price and submit the hedge order to the source exchange
+	/*
+		var bid, ask, price fixedpoint.Value
+		s.mu.Lock()
+		if s.sourceQuotingPrice != nil {
+			bid = s.sourceQuotingPrice.Buy
+			ask = s.sourceQuotingPrice.Sell
+		} else {
+			bid, ask = s.sourceMarket.depthBook.BestBidAndAskAtQuoteDepth()
+		}
+		s.mu.Unlock()
 
-	// query trades from of the hedge order
-
-	// build up the source hedge position for the average cost
-
-	// submit fiat hedge order to the fiat market to convert the quote
-
-	// merge the positions
+		hedgePosition := uncoveredPosition.Neg()
+		side := types.SideTypeBuy
+		if hedgePosition.Sign() < 0 {
+			side = types.SideTypeSell
+		}
+	*/
 
 	return nil
 }
@@ -155,6 +180,7 @@ func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, b
 	bid, ask := s.sourceMarket.depthBook.BestBidAndAskAtQuoteDepth()
 	bid2, ask2 := s.fiatMarket.depthBook.BestBidAndAskAtQuoteDepth()
 
+	// store prices as snapshot
 	s.sourceQuotingPrice = &types.Ticker{
 		Buy:  bid,
 		Sell: ask,
