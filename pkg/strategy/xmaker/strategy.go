@@ -1611,10 +1611,7 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	// if the uncovered position is negative, e.g., -10 BTC,
 	// then we need to hedge +10 BTC, hence call .Neg() here
 	hedgePosition := uncoveredPosition.Neg()
-	side := types.SideTypeBuy
-	if hedgePosition.Sign() < 0 {
-		side = types.SideTypeSell
-	}
+	side := positionToSide(hedgePosition)
 
 	signal := s.lastAggregatedSignal.Get()
 
@@ -1643,15 +1640,15 @@ func (s *Strategy) directHedge(
 ) (*types.Order, error) {
 	quantity := hedgePosition.Abs()
 
-	lastPrice := s.lastPrice.Get()
+	price := s.lastPrice.Get()
 
 	bestBid, bestAsk, ok := s.sourceBook.BestBidAndAsk()
 	if ok {
 		switch side {
 		case types.SideTypeBuy:
-			lastPrice = bestAsk.Price
+			price = bestAsk.Price
 		case types.SideTypeSell:
-			lastPrice = bestBid.Price
+			price = bestBid.Price
 		}
 	}
 
@@ -1666,19 +1663,19 @@ func (s *Strategy) directHedge(
 		}
 	} else {
 		quantity = AdjustHedgeQuantityWithAvailableBalance(
-			account, s.sourceMarket, side, quantity, lastPrice,
+			account, s.sourceMarket, side, quantity, price,
 		)
 	}
 
-	if s.MaxHedgeQuoteQuantityPerOrder.Sign() > 0 && !lastPrice.IsZero() {
-		quantity = s.sourceMarket.AdjustQuantityByMaxAmount(quantity, lastPrice, s.MaxHedgeQuoteQuantityPerOrder)
+	if s.MaxHedgeQuoteQuantityPerOrder.Sign() > 0 && !price.IsZero() {
+		quantity = s.sourceMarket.AdjustQuantityByMaxAmount(quantity, price, s.MaxHedgeQuoteQuantityPerOrder)
 	} else {
 		// truncate quantity for the supported precision
 		quantity = s.sourceMarket.TruncateQuantity(quantity)
 	}
 
-	if s.sourceMarket.IsDustQuantity(quantity, lastPrice) {
-		s.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
+	if s.sourceMarket.IsDustQuantity(quantity, price) {
+		s.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
 		return nil, nil
 	}
 
@@ -2585,4 +2582,12 @@ func parseSymbolSelector(
 		return nil, types.Market{}, fmt.Errorf("market %s not found in session %s", symbol, sessionName)
 	}
 	return session, market, nil
+}
+
+func positionToSide(pos fixedpoint.Value) types.SideType {
+	side := types.SideTypeBuy
+	if pos.Sign() < 0 {
+		side = types.SideTypeSell
+	}
+	return side
 }
