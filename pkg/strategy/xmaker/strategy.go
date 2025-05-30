@@ -1525,10 +1525,8 @@ func (s *Strategy) spreadMakerHedge(
 	ctx context.Context, signal float64, uncoveredPosition, pos fixedpoint.Value,
 ) (fixedpoint.Value, error) {
 	now := time.Now()
-	if s.SpreadMaker == nil {
-		return pos, nil
-	}
-	if !s.SpreadMaker.Enabled || s.makerBook == nil {
+
+	if s.SpreadMaker == nil || !s.SpreadMaker.Enabled || s.makerBook == nil {
 		return pos, nil
 	}
 
@@ -1618,9 +1616,13 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	}
 
 	signal := s.lastAggregatedSignal.Get()
-	hedgePosition, err := s.spreadMakerHedge(ctx, signal, uncoveredPosition, hedgePosition)
-	if err != nil {
-		log.WithError(err).Errorf("unable to place spread maker order")
+
+	var err error
+	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
+		hedgePosition, err = s.spreadMakerHedge(ctx, signal, uncoveredPosition, hedgePosition)
+		if err != nil {
+			log.WithError(err).Errorf("unable to place spread maker order")
+		}
 	}
 
 	if s.canDelayHedge(side, hedgePosition) {
