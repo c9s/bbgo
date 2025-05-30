@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
@@ -38,6 +40,10 @@ type SyntheticHedge struct {
 	FiatDepthInQuote fixedpoint.Value `json:"fiatDepthInQuote"`
 
 	sourceMarket, fiatMarket *TradingMarket
+
+	sourceQuotingPrice, fiatQuotingPrice *types.Ticker
+
+	mu sync.Mutex
 }
 
 func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) error {
@@ -142,8 +148,24 @@ func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, b
 		return fixedpoint.Zero, fixedpoint.Zero, false
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
 	bid, ask := s.sourceMarket.depthBook.BestBidAndAskAtQuoteDepth()
 	bid2, ask2 := s.fiatMarket.depthBook.BestBidAndAskAtQuoteDepth()
+
+	s.sourceQuotingPrice = &types.Ticker{
+		Buy:  bid,
+		Sell: ask,
+		Time: now,
+	}
+
+	s.fiatQuotingPrice = &types.Ticker{
+		Buy:  bid2,
+		Sell: ask2,
+		Time: now,
+	}
 
 	if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency {
 		bid = bid.Mul(bid2)
