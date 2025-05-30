@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -1610,10 +1611,7 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	// if the uncovered position is negative, e.g., -10 BTC,
 	// then we need to hedge +10 BTC, hence call .Neg() here
 	hedgePosition := uncoveredPosition.Neg()
-	side := types.SideTypeBuy
-	if hedgePosition.Sign() < 0 {
-		side = types.SideTypeSell
-	}
+	side := positionToSide(hedgePosition)
 
 	signal := s.lastAggregatedSignal.Get()
 
@@ -1629,16 +1627,28 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		return
 	}
 
-	lastPrice := s.lastPrice.Get()
+	if _, err := s.directHedge(ctx, hedgePosition, side); err != nil {
+		log.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgePosition.Float64())
+		return
+	}
+
+	s.resetPositionStartTime()
+}
+
+func (s *Strategy) directHedge(
+	ctx context.Context, hedgePosition fixedpoint.Value, side types.SideType,
+) (*types.Order, error) {
 	quantity := hedgePosition.Abs()
+
+	price := s.lastPrice.Get()
 
 	bestBid, bestAsk, ok := s.sourceBook.BestBidAndAsk()
 	if ok {
 		switch side {
 		case types.SideTypeBuy:
-			lastPrice = bestAsk.Price
+			price = bestAsk.Price
 		case types.SideTypeSell:
-			lastPrice = bestBid.Price
+			price = bestBid.Price
 		}
 	}
 
@@ -1646,33 +1656,32 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	if s.sourceSession.Margin {
 		// check the margin level
 		if !s.MinMarginLevel.IsZero() && !account.MarginLevel.IsZero() && account.MarginLevel.Compare(s.MinMarginLevel) < 0 {
-			s.logger.Errorf(
-				"margin level %f is too low (< %f), skip hedge", account.MarginLevel.Float64(),
-				s.MinMarginLevel.Float64(),
+			err := fmt.Errorf("margin level is too low, current margin level: %f, required margin level: %f",
+				account.MarginLevel.Float64(), s.MinMarginLevel.Float64(),
 			)
-			return
+			return nil, err
 		}
 	} else {
 		quantity = AdjustHedgeQuantityWithAvailableBalance(
-			account, s.sourceMarket, side, quantity, lastPrice,
+			account, s.sourceMarket, side, quantity, price,
 		)
 	}
 
-	if s.MaxHedgeQuoteQuantityPerOrder.Sign() > 0 && !lastPrice.IsZero() {
-		quantity = s.sourceMarket.AdjustQuantityByMaxAmount(quantity, lastPrice, s.MaxHedgeQuoteQuantityPerOrder)
+	if s.MaxHedgeQuoteQuantityPerOrder.Sign() > 0 && !price.IsZero() {
+		quantity = s.sourceMarket.AdjustQuantityByMaxAmount(quantity, price, s.MaxHedgeQuoteQuantityPerOrder)
 	} else {
 		// truncate quantity for the supported precision
 		quantity = s.sourceMarket.TruncateQuantity(quantity)
 	}
 
-	if s.sourceMarket.IsDustQuantity(quantity, lastPrice) {
-		s.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), lastPrice.Float64())
-		return
+	if s.sourceMarket.IsDustQuantity(quantity, price) {
+		s.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
+		return nil, nil
 	}
 
 	if s.hedgeErrorRateReservation != nil {
 		if !s.hedgeErrorRateReservation.OK() {
-			return
+			return nil, nil
 		}
 
 		bbgo.Notify("Hit hedge error rate limit, waiting...")
@@ -1695,8 +1704,7 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 
 	formattedOrders, err := s.sourceSession.FormatOrders(submitOrders)
 	if err != nil {
-		log.WithError(err).Errorf("unable to format hedge orders")
-		return
+		return nil, fmt.Errorf("unable to format hedge orders: %w", err)
 	}
 
 	orderCreateCallback := func(createdOrder types.Order) {
@@ -1708,13 +1716,19 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	createdOrders, _, err := bbgo.BatchPlaceOrder(
 		ctx, s.sourceSession.Exchange, orderCreateCallback, formattedOrders...,
 	)
+
 	if err != nil {
 		s.hedgeErrorRateReservation = s.hedgeErrorLimiter.Reserve()
-		log.WithError(err).Errorf("market order submit error: %s", err.Error())
-		return
+		return nil, fmt.Errorf("unable to place order: %w", err)
 	}
 
-	log.Infof("submitted hedge orders: %+v", createdOrders)
+	if len(createdOrders) == 0 {
+		return nil, fmt.Errorf("no hedge orders created")
+	}
+
+	createdOrder := createdOrders[0]
+
+	log.Infof("submitted hedge orders: %+v", createdOrder)
 
 	// if it's selling, then we should add a positive position
 	switch side {
@@ -1724,7 +1738,7 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		s.coveredPosition.Add(quantity.Neg())
 	}
 
-	s.resetPositionStartTime()
+	return &createdOrder, nil
 }
 
 func (s *Strategy) tradeRecover(ctx context.Context) {
@@ -2102,7 +2116,6 @@ func (s *Strategy) CrossRun(
 	}
 
 	if s.UseMockExchange {
-
 		balances := s.MockExchangeBalances
 		if balances == nil {
 			balances = types.BalanceMap{
@@ -2548,4 +2561,33 @@ func aggregatePriceVolumeSliceWithPriceFilter(
 		Price:  lastPrice,
 		Volume: totalVolume,
 	}
+}
+
+func parseSymbolSelector(
+	selector string, sessions map[string]*bbgo.ExchangeSession,
+) (*bbgo.ExchangeSession, types.Market, error) {
+	parts := strings.SplitN(selector, ".", 2)
+	if len(parts) != 2 {
+		return nil, types.Market{}, fmt.Errorf("invalid symbol selector: %s", selector)
+	}
+
+	sessionName, symbol := parts[0], parts[1]
+	session, ok := sessions[sessionName]
+	if !ok {
+		return nil, types.Market{}, fmt.Errorf("session %s not found", sessionName)
+	}
+
+	market, ok := session.Market(symbol)
+	if !ok {
+		return nil, types.Market{}, fmt.Errorf("market %s not found in session %s", symbol, sessionName)
+	}
+	return session, market, nil
+}
+
+func positionToSide(pos fixedpoint.Value) types.SideType {
+	side := types.SideTypeBuy
+	if pos.Sign() < 0 {
+		side = types.SideTypeSell
+	}
+	return side
 }
