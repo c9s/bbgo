@@ -399,6 +399,8 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 	s.writeMutex.Lock()
 	defer s.writeMutex.Unlock()
 
+	_ = s.Initialize()
+
 	s.logger.Infof("cleaning up %s dca2", s.Symbol)
 
 	// cancel write context to stop the order executor
@@ -406,7 +408,6 @@ func (s *Strategy) CleanUp(ctx context.Context) error {
 		s.cancelWrite()
 	}
 
-	_ = s.Initialize()
 	defer s.EmitClosed()
 
 	session := s.ExchangeSession
