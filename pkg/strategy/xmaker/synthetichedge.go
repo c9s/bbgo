@@ -13,7 +13,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type TradingMarket struct {
+type HedgeMarket struct {
 	symbol    string
 	session   *bbgo.ExchangeSession
 	market    types.Market
@@ -21,17 +21,25 @@ type TradingMarket struct {
 	book      *types.StreamOrderBook
 	depthBook *types.DepthBook
 
+	quotingPrice *types.Ticker
+
+	curPosition, coveredPosition fixedpoint.MutexValue
+
+	positionDeltaC chan fixedpoint.Value // channel to receive position delta updates
+
 	position          *types.Position
 	orderStore        *core.OrderStore
 	tradeCollector    *core.TradeCollector
 	activeMakerOrders *bbgo.ActiveOrderBook
+
+	mu sync.Mutex
 }
 
-func newTradingMarket(
+func newHedgeMarket(
 	session *bbgo.ExchangeSession,
 	market types.Market,
 	depth fixedpoint.Value,
-) *TradingMarket {
+) *HedgeMarket {
 	symbol := market.Symbol
 	stream := session.Exchange.NewStream()
 	stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{Depth: types.DepthLevelFull})
@@ -52,7 +60,7 @@ func newTradingMarket(
 	activeMakerOrders := bbgo.NewActiveOrderBook(symbol)
 	activeMakerOrders.BindStream(session.UserDataStream)
 
-	return &TradingMarket{
+	m := &HedgeMarket{
 		session:   session,
 		market:    market,
 		symbol:    market.Symbol,
@@ -65,9 +73,26 @@ func newTradingMarket(
 		tradeCollector:    tradeCollector,
 		activeMakerOrders: activeMakerOrders,
 	}
+
+	tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
+		delta := trade.PositionDelta()
+		m.coveredPosition.Add(delta)
+
+		log.Infof("received trade: %+v, position delta: %f, covered position: %f",
+			trade, delta.Float64(), m.coveredPosition.Get().Float64())
+
+		// TODO: pass Environment to HedgeMarket
+		/*
+			if profit.Compare(fixedpoint.Zero) == 0 {
+				s.Environment.RecordPosition(s.Position, trade, nil)
+			}
+		*/
+	})
+
+	return m
 }
 
-func (m *TradingMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
+func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
 	submitOrder.Market = m.market
 	submitOrder.Symbol = m.symbol
 
@@ -82,6 +107,11 @@ func (m *TradingMarket) submitOrder(ctx context.Context, submitOrder types.Submi
 
 	orderCreateCallback := func(createdOrder types.Order) {
 		m.orderStore.Add(createdOrder)
+
+		// for track non-market-orders
+		if createdOrder.Type != types.OrderTypeMarket {
+			m.activeMakerOrders.Add(createdOrder)
+		}
 	}
 
 	defer m.tradeCollector.Process()
@@ -98,6 +128,128 @@ func (m *TradingMarket) submitOrder(ctx context.Context, submitOrder types.Submi
 	return &createdOrder, nil
 }
 
+func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	now := time.Now()
+	bid, ask = m.depthBook.BestBidAndAskAtQuoteDepth()
+
+	// store prices as snapshot
+	m.quotingPrice = &types.Ticker{
+		Buy:  bid,
+		Sell: ask,
+		Time: now,
+	}
+
+	return bid, ask
+}
+
+func (m *HedgeMarket) hedge(
+	ctx context.Context, uncoveredPosition fixedpoint.Value,
+) error {
+
+	if uncoveredPosition.IsZero() {
+		return nil
+	}
+
+	var bid, ask, price fixedpoint.Value
+	m.mu.Lock()
+	if m.quotingPrice != nil {
+		bid = m.quotingPrice.Buy
+		ask = m.quotingPrice.Sell
+	} else {
+		bid, ask = m.depthBook.BestBidAndAskAtQuoteDepth()
+	}
+	m.mu.Unlock()
+
+	hedgeDelta := uncoveredPosition.Neg()
+	quantity := hedgeDelta.Abs()
+	side := types.SideTypeBuy
+	if hedgeDelta.Sign() < 0 {
+		side = types.SideTypeSell
+	}
+
+	// use taker price
+	switch side {
+	case types.SideTypeBuy:
+		price = ask
+	case types.SideTypeSell:
+		price = bid
+	}
+
+	quantity = AdjustHedgeQuantityWithAvailableBalance(
+		m.session.GetAccount(), m.market, side, quantity, price,
+	)
+
+	// skip dust quantity
+	if m.market.IsDustQuantity(quantity, price) {
+		log.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
+		return nil
+	}
+
+	hedgeOrder, err := m.submitOrder(ctx, types.SubmitOrder{
+		Symbol: m.symbol,
+		Market: m.market,
+		Side:   side,
+		Type:   types.OrderTypeMarket,
+		// Price: price,
+		Quantity: quantity,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.coveredPosition.Add(hedgeDelta.Neg())
+
+	log.Infof("hedge order created: %+v, covered position: %f", hedgeOrder, m.coveredPosition.Get().Float64())
+	return nil
+}
+
+func (m *HedgeMarket) getUncoveredPosition() fixedpoint.Value {
+	position := m.curPosition.Get()
+	coveredPosition := m.coveredPosition.Get()
+	uncoverPosition := position.Sub(coveredPosition)
+
+	log.Infof(
+		"%s base position %v coveredPosition: %v uncoverPosition: %v",
+		m.symbol,
+		position,
+		coveredPosition,
+		uncoverPosition,
+	)
+
+	return uncoverPosition
+}
+
+func (m *HedgeMarket) start(ctx context.Context) error {
+	if err := m.stream.Connect(ctx); err != nil {
+		return err
+	}
+
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+
+		case now := <-ticker.C:
+			_ = now
+			uncoveredPosition := m.getUncoveredPosition()
+			if err := m.hedge(ctx, uncoveredPosition); err != nil {
+				log.WithError(err).Errorf("hedge failed")
+			}
+
+		case delta := <-m.positionDeltaC:
+			if delta.IsZero() {
+				m.curPosition.Add(delta)
+			}
+		}
+	}
+}
+
 // SyntheticHedge is a strategy that uses synthetic hedging to manage risk
 // SourceSymbol could be something like binance.BTCUSDT
 // FiatSymbol could be something like max.USDTTWD
@@ -111,7 +263,7 @@ type SyntheticHedge struct {
 	FiatSymbol       string           `json:"fiatSymbol"`
 	FiatDepthInQuote fixedpoint.Value `json:"fiatDepthInQuote"`
 
-	sourceMarket, fiatMarket *TradingMarket
+	sourceMarket, fiatMarket *HedgeMarket
 
 	sourceQuotingPrice, fiatQuotingPrice *types.Ticker
 
@@ -140,8 +292,8 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 		return err
 	}
 
-	s.sourceMarket = newTradingMarket(sourceSession, sourceMarket, s.SourceDepthInQuote)
-	s.fiatMarket = newTradingMarket(fiatSession, fiatMarket, s.FiatDepthInQuote)
+	s.sourceMarket = newHedgeMarket(sourceSession, sourceMarket, s.SourceDepthInQuote)
+	s.fiatMarket = newHedgeMarket(fiatSession, fiatMarket, s.FiatDepthInQuote)
 
 	// when receiving trades from the source session,
 	// mock a trade with the quote amount and add to the fiat position
@@ -212,23 +364,54 @@ func (s *SyntheticHedge) Hedge(
 		return nil
 	}
 
-	/*
-		var bid, ask, price fixedpoint.Value
-		s.mu.Lock()
-		if s.sourceQuotingPrice != nil {
-			bid = s.sourceQuotingPrice.Buy
-			ask = s.sourceQuotingPrice.Sell
-		} else {
-			bid, ask = s.sourceMarket.depthBook.BestBidAndAskAtQuoteDepth()
-		}
-		s.mu.Unlock()
+	var bid, ask, price fixedpoint.Value
+	s.mu.Lock()
+	if s.sourceQuotingPrice != nil {
+		bid = s.sourceQuotingPrice.Buy
+		ask = s.sourceQuotingPrice.Sell
+	} else {
+		bid, ask = s.sourceMarket.depthBook.BestBidAndAskAtQuoteDepth()
+	}
+	s.mu.Unlock()
 
-		hedgePosition := uncoveredPosition.Neg()
-		side := types.SideTypeBuy
-		if hedgePosition.Sign() < 0 {
-			side = types.SideTypeSell
-		}
-	*/
+	hedgePosition := uncoveredPosition.Neg()
+	quantity := hedgePosition.Abs()
+	side := types.SideTypeBuy
+	if hedgePosition.Sign() < 0 {
+		side = types.SideTypeSell
+	}
+
+	// use taker price
+	switch side {
+	case types.SideTypeBuy:
+		price = ask
+	case types.SideTypeSell:
+		price = bid
+	}
+
+	quantity = AdjustHedgeQuantityWithAvailableBalance(
+		s.sourceMarket.session.GetAccount(), s.sourceMarket.market, side, quantity, price,
+	)
+
+	// skip dust quantity
+	if s.sourceMarket.market.IsDustQuantity(quantity, price) {
+		log.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
+		return nil
+	}
+
+	hedgeOrder, err := s.sourceMarket.submitOrder(ctx, types.SubmitOrder{
+		Symbol: s.sourceMarket.symbol,
+		Market: s.sourceMarket.market,
+		Side:   side,
+		Type:   types.OrderTypeMarket,
+		// Price: price,
+		Quantity: quantity,
+	})
+	if err != nil {
+		return err
+	}
+
+	_ = hedgeOrder
 
 	return nil
 }
@@ -238,25 +421,8 @@ func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, b
 		return fixedpoint.Zero, fixedpoint.Zero, false
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	now := time.Now()
-	bid, ask := s.sourceMarket.depthBook.BestBidAndAskAtQuoteDepth()
-	bid2, ask2 := s.fiatMarket.depthBook.BestBidAndAskAtQuoteDepth()
-
-	// store prices as snapshot
-	s.sourceQuotingPrice = &types.Ticker{
-		Buy:  bid,
-		Sell: ask,
-		Time: now,
-	}
-
-	s.fiatQuotingPrice = &types.Ticker{
-		Buy:  bid2,
-		Sell: ask2,
-		Time: now,
-	}
+	bid, ask := s.sourceMarket.getQuotePrice()
+	bid2, ask2 := s.fiatMarket.getQuotePrice()
 
 	if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency {
 		bid = bid.Mul(bid2)
@@ -282,11 +448,11 @@ func (s *SyntheticHedge) Start(ctx context.Context) error {
 		return fmt.Errorf("sourceMarket and fiatMarket must be initialized")
 	}
 
-	if err := s.sourceMarket.stream.Connect(ctx); err != nil {
+	if err := s.sourceMarket.start(ctx); err != nil {
 		return err
 	}
 
-	if err := s.fiatMarket.stream.Connect(ctx); err != nil {
+	if err := s.fiatMarket.start(ctx); err != nil {
 		return err
 	}
 
