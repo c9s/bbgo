@@ -21,17 +21,18 @@ type TradingMarket struct {
 	book      *types.StreamOrderBook
 	depthBook *types.DepthBook
 
-	position       *types.Position
-	orderStore     *core.OrderStore
-	tradeCollector *core.TradeCollector
+	position          *types.Position
+	orderStore        *core.OrderStore
+	tradeCollector    *core.TradeCollector
+	activeMakerOrders *bbgo.ActiveOrderBook
 }
 
-func initializeTradingMarket(
-	symbol string,
+func newTradingMarket(
 	session *bbgo.ExchangeSession,
 	market types.Market,
 	depth fixedpoint.Value,
-) (*TradingMarket, error) {
+) *TradingMarket {
+	symbol := market.Symbol
 	stream := session.Exchange.NewStream()
 	stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{Depth: types.DepthLevelFull})
 
@@ -43,25 +44,27 @@ func initializeTradingMarket(
 	position := types.NewPositionFromMarket(market)
 
 	orderStore := core.NewOrderStore(symbol)
-	tradeCollector := core.NewTradeCollector(symbol, position, orderStore)
-	if err := tradeCollector.Initialize(); err != nil {
-		return nil, err
-	}
+	orderStore.BindStream(session.UserDataStream)
 
+	tradeCollector := core.NewTradeCollector(symbol, position, orderStore)
 	tradeCollector.BindStream(session.UserDataStream)
 
+	activeMakerOrders := bbgo.NewActiveOrderBook(symbol)
+	activeMakerOrders.BindStream(session.UserDataStream)
+
 	return &TradingMarket{
-		symbol:    symbol,
 		session:   session,
 		market:    market,
+		symbol:    market.Symbol,
 		stream:    stream,
 		book:      book,
 		depthBook: depthBook,
 
-		position:       position,
-		orderStore:     orderStore,
-		tradeCollector: tradeCollector,
-	}, nil
+		position:          position,
+		orderStore:        orderStore,
+		tradeCollector:    tradeCollector,
+		activeMakerOrders: activeMakerOrders,
+	}
 }
 
 func (m *TradingMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
@@ -132,20 +135,13 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 		return err
 	}
 
-	s.sourceMarket, err = initializeTradingMarket(sourceMarket.Symbol, sourceSession, sourceMarket, s.SourceDepthInQuote)
-	if err != nil {
-		return err
-	}
-
 	fiatSession, fiatMarket, err := parseSymbolSelector(s.FiatSymbol, sessions)
 	if err != nil {
 		return err
 	}
 
-	s.fiatMarket, err = initializeTradingMarket(fiatMarket.Symbol, fiatSession, fiatMarket, s.FiatDepthInQuote)
-	if err != nil {
-		return err
-	}
+	s.sourceMarket = newTradingMarket(sourceSession, sourceMarket, s.SourceDepthInQuote)
+	s.fiatMarket = newTradingMarket(fiatSession, fiatMarket, s.FiatDepthInQuote)
 
 	// when receiving trades from the source session,
 	// mock a trade with the quote amount and add to the fiat position
