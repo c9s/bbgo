@@ -26,6 +26,75 @@ type TradingMarket struct {
 	tradeCollector *core.TradeCollector
 }
 
+func initializeTradingMarket(
+	symbol string,
+	session *bbgo.ExchangeSession,
+	market types.Market,
+	depth fixedpoint.Value,
+) (*TradingMarket, error) {
+	stream := session.Exchange.NewStream()
+	stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{Depth: types.DepthLevelFull})
+
+	book := types.NewStreamBook(symbol, session.Exchange.Name())
+	book.BindStream(stream)
+
+	depthBook := types.NewDepthBook(book, depth)
+
+	position := types.NewPositionFromMarket(market)
+
+	orderStore := core.NewOrderStore(symbol)
+	tradeCollector := core.NewTradeCollector(symbol, position, orderStore)
+	if err := tradeCollector.Initialize(); err != nil {
+		return nil, err
+	}
+
+	tradeCollector.BindStream(session.UserDataStream)
+
+	return &TradingMarket{
+		symbol:    symbol,
+		session:   session,
+		market:    market,
+		stream:    stream,
+		book:      book,
+		depthBook: depthBook,
+
+		position:       position,
+		orderStore:     orderStore,
+		tradeCollector: tradeCollector,
+	}, nil
+}
+
+func (m *TradingMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
+	submitOrder.Market = m.market
+	submitOrder.Symbol = m.symbol
+
+	submitOrders := []types.SubmitOrder{
+		submitOrder,
+	}
+
+	formattedOrders, err := m.session.FormatOrders(submitOrders)
+	if err != nil {
+		return nil, fmt.Errorf("unable to format hedge orders: %w", err)
+	}
+
+	orderCreateCallback := func(createdOrder types.Order) {
+		m.orderStore.Add(createdOrder)
+	}
+
+	defer m.tradeCollector.Process()
+
+	createdOrders, _, err := bbgo.BatchPlaceOrder(
+		ctx, m.session.Exchange, orderCreateCallback, formattedOrders...,
+	)
+
+	if len(createdOrders) == 0 {
+		return nil, fmt.Errorf("no hedge order created")
+	}
+
+	createdOrder := createdOrders[0]
+	return &createdOrder, nil
+}
+
 // SyntheticHedge is a strategy that uses synthetic hedging to manage risk
 // SourceSymbol could be something like binance.BTCUSDT
 // FiatSymbol could be something like max.USDTTWD
@@ -226,42 +295,4 @@ func (s *SyntheticHedge) Start(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func initializeTradingMarket(
-	symbol string,
-	session *bbgo.ExchangeSession,
-	market types.Market,
-	depth fixedpoint.Value,
-) (*TradingMarket, error) {
-	stream := session.Exchange.NewStream()
-	stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{Depth: types.DepthLevelFull})
-
-	book := types.NewStreamBook(symbol, session.Exchange.Name())
-	book.BindStream(stream)
-
-	depthBook := types.NewDepthBook(book, depth)
-
-	position := types.NewPositionFromMarket(market)
-
-	orderStore := core.NewOrderStore(symbol)
-	tradeCollector := core.NewTradeCollector(symbol, position, orderStore)
-	if err := tradeCollector.Initialize(); err != nil {
-		return nil, err
-	}
-
-	tradeCollector.BindStream(session.UserDataStream)
-
-	return &TradingMarket{
-		symbol:    symbol,
-		session:   session,
-		market:    market,
-		stream:    stream,
-		book:      book,
-		depthBook: depthBook,
-
-		position:       position,
-		orderStore:     orderStore,
-		tradeCollector: tradeCollector,
-	}, nil
 }
