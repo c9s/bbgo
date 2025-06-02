@@ -1610,25 +1610,25 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 
 	// if the uncovered position is negative, e.g., -10 BTC,
 	// then we need to hedge +10 BTC, hence call .Neg() here
-	hedgePosition := uncoveredPosition.Neg()
-	side := positionToSide(hedgePosition)
+	hedgeDelta := uncoveredPosition.Neg()
+	side := positionToSide(hedgeDelta)
 
 	signal := s.lastAggregatedSignal.Get()
 
 	var err error
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
-		hedgePosition, err = s.spreadMakerHedge(ctx, signal, uncoveredPosition, hedgePosition)
+		hedgeDelta, err = s.spreadMakerHedge(ctx, signal, uncoveredPosition, hedgeDelta)
 		if err != nil {
 			log.WithError(err).Errorf("unable to place spread maker order")
 		}
 	}
 
-	if s.canDelayHedge(side, hedgePosition) {
+	if s.canDelayHedge(side, hedgeDelta) {
 		return
 	}
 
-	if _, err := s.directHedge(ctx, hedgePosition, side); err != nil {
-		log.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgePosition.Float64())
+	if _, err := s.directHedge(ctx, hedgeDelta, side); err != nil {
+		log.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
 		return
 	}
 
@@ -1636,9 +1636,9 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 }
 
 func (s *Strategy) directHedge(
-	ctx context.Context, hedgePosition fixedpoint.Value, side types.SideType,
+	ctx context.Context, hedgeDelta fixedpoint.Value, side types.SideType,
 ) (*types.Order, error) {
-	quantity := hedgePosition.Abs()
+	quantity := hedgeDelta.Abs()
 
 	price := s.lastPrice.Get()
 

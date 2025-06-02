@@ -37,12 +37,12 @@ func TestSyntheticHedge_GetQuotePrices_BaseQuote(t *testing.T) {
 		},
 	})
 
-	source := &TradingMarket{
+	source := &HedgeMarket{
 		market:    sourceMarket,
 		book:      sourceBook,
 		depthBook: types.NewDepthBook(sourceBook, Number(1)),
 	}
-	fiat := &TradingMarket{
+	fiat := &HedgeMarket{
 		market:    fiatMarket,
 		book:      fiatBook,
 		depthBook: types.NewDepthBook(fiatBook, Number(1)),
