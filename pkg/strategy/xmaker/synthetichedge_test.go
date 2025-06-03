@@ -208,8 +208,8 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	assert.Equal(t, Number(1.0), hm.coveredPosition.Get())
-	assert.Equal(t, Number(1.0), hm.curPosition.Get())
+	assert.Equal(t, Number(1.0), hm.positionExposure.pending.Get())
+	assert.Equal(t, Number(1.0), hm.positionExposure.net.Get())
 
 	userDataStream.EmitTradeUpdate(types.Trade{
 		ID:            2,
@@ -226,11 +226,44 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	})
 
 	time.Sleep(100 * time.Millisecond)
-	assert.Equal(t, Number(0.0), hm.coveredPosition.Get())
-	assert.Equal(t, Number(0.0), hm.curPosition.Get())
+	assert.Equal(t, Number(0.0), hm.positionExposure.pending.Get())
+	assert.Equal(t, Number(0.0), hm.positionExposure.net.Get())
 
 	cancel()
 	<-doneC
+}
+
+func TestPositionExposure(t *testing.T) {
+	pe := newPositionExposure("BTCUSDT")
+
+	// initial value
+	assert.Equal(t, Number(0), pe.net.Get())
+	assert.Equal(t, Number(0), pe.pending.Get())
+	assert.Equal(t, Number(0), pe.GetUncovered())
+
+	// open position (maker orders are filled)
+	pe.Open(Number(2))
+	assert.Equal(t, Number(2), pe.net.Get())
+	assert.Equal(t, Number(0), pe.pending.Get())
+	assert.Equal(t, Number(2), pe.GetUncovered())
+
+	// cover 1 (hedge order is placed, and pending is updated)
+	pe.Cover(Number(1))
+	assert.Equal(t, Number(2), pe.net.Get())
+	assert.Equal(t, Number(1), pe.pending.Get())
+	assert.Equal(t, Number(1), pe.GetUncovered())
+
+	// close 1 (hedge order is filled, pending is updated)
+	pe.Close(Number(-1))
+	assert.Equal(t, Number(1), pe.net.Get())
+	assert.Equal(t, Number(0), pe.pending.Get())
+	assert.Equal(t, Number(1), pe.GetUncovered())
+
+	// close 1 (another hedge order is filled, pending is updated)
+	pe.Open(Number(-1))
+	assert.Equal(t, Number(0), pe.net.Get())
+	assert.Equal(t, Number(0), pe.pending.Get())
+	assert.Equal(t, Number(0), pe.GetUncovered())
 }
 
 // bindMockMarketDataStream binds default market data stream behaviors
