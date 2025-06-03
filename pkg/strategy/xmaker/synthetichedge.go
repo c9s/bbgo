@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -345,15 +346,18 @@ type SyntheticHedge struct {
 
 	sourceMarket, fiatMarket *HedgeMarket
 
-	sourceQuotingPrice, fiatQuotingPrice *types.Ticker
+	syntheticTradeId uint64
 
 	mu sync.Mutex
 }
 
+// InitializeAndBind
+// not a good way to initialize the synthetic hedge with the strategy instance
+// but we need to build the trade collector to update the profit and position
 func (s *SyntheticHedge) InitializeAndBind(
 	ctx context.Context,
 	sessions map[string]*bbgo.ExchangeSession,
-	targetPosition *types.Position,
+	strategy *Strategy,
 ) error {
 	if !s.Enabled {
 		return nil
@@ -457,11 +461,12 @@ func (s *SyntheticHedge) InitializeAndBind(
 		}
 
 		side := trade.Side
-		mockTargetTrade := types.Trade{
-			ID:            0,  // TODO: generate a unique ID
-			OrderID:       0,  // TODO: like above
-			Exchange:      "", // TODO: use the maker exchange name
-			Symbol:        "", // TODO: use the maker symbol
+		tradeId := atomic.AddUint64(&s.syntheticTradeId, 1)
+		syntheticTrade := types.Trade{
+			ID:            tradeId,
+			OrderID:       tradeId,
+			Exchange:      strategy.makerSession.ExchangeName,
+			Symbol:        strategy.makerMarket.Symbol,
 			Price:         price,
 			Quantity:      baseQuantity,
 			QuoteQuantity: baseQuantity.Mul(price),
@@ -472,9 +477,11 @@ func (s *SyntheticHedge) InitializeAndBind(
 			Fee:           trade.Fee,         // apply trade fee when possible
 			FeeCurrency:   trade.FeeCurrency, // apply trade fee when possible
 		}
-
-		// TODO: add to the maker position delta
-		_ = mockTargetTrade
+		log.Infof("synthetic trade created: %+v, average cost: %f", syntheticTrade, avgCost.Float64())
+		syntheticOrder := newMockOrderFromTrade(syntheticTrade, types.OrderTypeMarket)
+		strategy.orderStore.Add(syntheticOrder)
+		strategy.tradeCollector.TradeStore().Add(syntheticTrade)
+		strategy.tradeCollector.Process()
 	})
 
 	return nil
@@ -540,4 +547,25 @@ func (s *SyntheticHedge) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func newMockOrderFromTrade(trade types.Trade, orderType types.OrderType) types.Order {
+	return types.Order{
+		SubmitOrder: types.SubmitOrder{
+			Symbol:       trade.Symbol,
+			Side:         trade.Side,
+			Type:         orderType,
+			Quantity:     trade.Quantity,
+			Price:        trade.Price,
+			AveragePrice: fixedpoint.Zero,
+			StopPrice:    fixedpoint.Zero,
+		},
+		Exchange:         trade.Exchange,
+		OrderID:          trade.OrderID,
+		Status:           types.OrderStatusFilled,
+		ExecutedQuantity: trade.Quantity,
+		IsWorking:        false,
+		CreationTime:     trade.Time,
+		UpdateTime:       trade.Time,
+	}
 }
