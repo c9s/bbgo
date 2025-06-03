@@ -99,7 +99,8 @@ type HedgeMarket struct {
 	tradeCollector    *core.TradeCollector
 	activeMakerOrders *bbgo.ActiveOrderBook
 
-	mu sync.Mutex
+	mockTradeId uint64
+	mu          sync.Mutex
 }
 
 func newHedgeMarket(
@@ -162,6 +163,33 @@ func newHedgeMarket(
 	})
 
 	return m
+}
+
+func (m *HedgeMarket) newMockTrade(
+	side types.SideType, price, quantity fixedpoint.Value, tradeTime time.Time,
+) types.Trade {
+	m.mockTradeId++
+
+	return types.Trade{
+		ID:            m.mockTradeId,
+		OrderID:       m.mockTradeId,
+		Exchange:      m.session.ExchangeName,
+		Price:         price,
+		Quantity:      quantity,
+		QuoteQuantity: quantity.Mul(price),
+		Symbol:        m.symbol,
+		Side:          side,
+		IsBuyer:       side == types.SideTypeBuy,
+		IsMaker:       true,
+		Time:          types.Time(tradeTime),
+		Fee:           fixedpoint.Zero,
+		FeeCurrency:   "",
+		StrategyID: sql.NullString{
+			String: ID,
+			Valid:  true,
+		},
+	}
+
 }
 
 func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
@@ -349,54 +377,102 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 
 	// when receiving trades from the source session,
 	// mock a trade with the quote amount and add to the fiat position
+	//
+	// hedge flow:
+	//   maker trade -> update source market position delta
+	//   source market position delta -> convert to fiat trade -> update fiat market position delta
 	s.sourceMarket.tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
-		var price, bid, ask fixedpoint.Value
-		var quantity = trade.QuoteQuantity.Abs()
-		var side = trade.Side.Reverse()
+		price := fixedpoint.Zero
 
-		// get the fiat book price from the snapshot when possible
-		s.mu.Lock()
-		if s.fiatQuotingPrice != nil {
-			bid = s.fiatQuotingPrice.Buy
-			ask = s.fiatQuotingPrice.Sell
-		} else {
-			bid, ask = s.fiatMarket.depthBook.BestBidAndAskAtQuoteDepth()
-		}
-		s.mu.Unlock()
+		// 1) get the fiat book price from the snapshot when possible
+		bid, ask := s.fiatMarket.getQuotePrice()
+
+		// 2) build up fiat position from the trade quote quantity
+		fiatQuantity := trade.QuoteQuantity
+		fiatDelta := fiatQuantity
+
+		// reverse side because we assume source's quote currency is the fiat market's base currency here
+		fiatSide := trade.Side.Reverse()
 
 		switch trade.Side {
 		case types.SideTypeBuy:
 			price = ask
+			fiatDelta = fiatQuantity.Neg()
 		case types.SideTypeSell:
 			price = bid
+			fiatDelta = fiatQuantity
+		default:
+			return
 		}
 
-		fiatTrade := types.Trade{
-			// TODO: set the order id and trade id from ???
-			// ID:            trade.ID,
-			// OrderID:       trade.OrderID,
-			Exchange:      s.fiatMarket.session.ExchangeName,
-			Price:         price,
-			Quantity:      quantity,
-			QuoteQuantity: quantity.Mul(price),
-			Symbol:        s.fiatMarket.symbol,
-			Side:          side,
-			IsBuyer:       side == types.SideTypeBuy,
-			IsMaker:       true,
-			Time:          trade.Time,
-			Fee:           fixedpoint.Zero,
-			FeeCurrency:   "",
-			StrategyID: sql.NullString{
-				String: ID,
-				Valid:  true,
-			},
-		}
-
+		// 3) convert source trade into fiat trade as the average cost of the fiat market position
+		// This assumes source's quote currency is the fiat market's base currency
+		fiatTrade := s.fiatMarket.newMockTrade(fiatSide, price, fiatQuantity, trade.Time.Time())
 		if profit, netProfit, madeProfit := s.fiatMarket.position.AddTrade(fiatTrade); madeProfit {
 			// TODO: record the profits in somewhere?
 			_ = profit
 			_ = netProfit
 		}
+
+		// add position delta to let the fiat market hedge the position
+		s.fiatMarket.positionDeltaC <- fiatDelta
+	})
+
+	s.fiatMarket.tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
+		s.fiatMarket.positionExposure.Close(trade.PositionDelta())
+
+		avgCost := s.sourceMarket.position.AverageCost
+
+		// convert the trade quantity to the source market's base currency quantity
+		// calculate how much base quantity we can close the source position
+		baseQuantity := fixedpoint.Zero
+		if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency {
+			baseQuantity = trade.Quantity.Div(avgCost)
+		} else {
+			// To handle the case where the source market's quote currency is not the fiat market's base currency:
+			// Assume it's TWD/USDT, the exchange rate is 0.03125 when USDT/TWD is at 32.0,
+			// and trade quantity is in TWD,
+			// so we need to convert Quantity from TWD to USDT unit by div
+			baseQuantity = avgCost.Div(trade.Quantity.Div(trade.Price))
+		}
+
+		// convert the fiat trade into source trade to close the source position
+		// side is reversed because we are closing the source hedge position
+		mockSourceTrade := s.sourceMarket.newMockTrade(trade.Side.Reverse(), avgCost, baseQuantity, trade.Time.Time())
+		if profit, netProfit, madeProfit := s.sourceMarket.position.AddTrade(mockSourceTrade); madeProfit {
+			_ = profit
+			_ = netProfit
+		}
+
+		// close the maker position
+		// TODO: create a mock trade for closing the maker position
+		// This assumes the source market's quote currency is the fiat market's base currency
+		price := fixedpoint.Zero
+		if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency {
+			price = avgCost.Mul(trade.Price)
+		} else {
+			price = avgCost.Div(trade.Price)
+		}
+
+		side := trade.Side
+		mockTargetTrade := types.Trade{
+			ID:            0,  // TODO: generate a unique ID
+			OrderID:       0,  // TODO: like above
+			Exchange:      "", // TODO: use the maker exchange name
+			Price:         price,
+			Quantity:      baseQuantity,
+			QuoteQuantity: baseQuantity.Mul(price),
+			Symbol:        "", // TODO: use the maker symbol
+			Side:          side,
+			IsBuyer:       side == types.SideTypeBuy,
+			IsMaker:       false,
+			Time:          trade.Time,
+			Fee:           fixedpoint.Zero, // TODO: apply trade fee when possible
+			FeeCurrency:   "",              // TODO: apply trade fee when possible
+		}
+
+		// TODO: add to the maker position delta
+		_ = mockTargetTrade
 	})
 
 	return nil
@@ -416,55 +492,8 @@ func (s *SyntheticHedge) Hedge(
 		return nil
 	}
 
-	var bid, ask, price fixedpoint.Value
-	s.mu.Lock()
-	if s.sourceQuotingPrice != nil {
-		bid = s.sourceQuotingPrice.Buy
-		ask = s.sourceQuotingPrice.Sell
-	} else {
-		bid, ask = s.sourceMarket.depthBook.BestBidAndAskAtQuoteDepth()
-	}
-	s.mu.Unlock()
-
-	hedgePosition := uncoveredPosition.Neg()
-	quantity := hedgePosition.Abs()
-	side := types.SideTypeBuy
-	if hedgePosition.Sign() < 0 {
-		side = types.SideTypeSell
-	}
-
-	// use taker price
-	switch side {
-	case types.SideTypeBuy:
-		price = ask
-	case types.SideTypeSell:
-		price = bid
-	}
-
-	quantity = AdjustHedgeQuantityWithAvailableBalance(
-		s.sourceMarket.session.GetAccount(), s.sourceMarket.market, side, quantity, price,
-	)
-
-	// skip dust quantity
-	if s.sourceMarket.market.IsDustQuantity(quantity, price) {
-		log.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
-		return nil
-	}
-
-	hedgeOrder, err := s.sourceMarket.submitOrder(ctx, types.SubmitOrder{
-		Symbol: s.sourceMarket.symbol,
-		Market: s.sourceMarket.market,
-		Side:   side,
-		Type:   types.OrderTypeMarket,
-		// Price: price,
-		Quantity: quantity,
-	})
-	if err != nil {
-		return err
-	}
-
-	_ = hedgeOrder
-
+	c := s.sourceMarket.positionDeltaC
+	c <- uncoveredPosition
 	return nil
 }
 
