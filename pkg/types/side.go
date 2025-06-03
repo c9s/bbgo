@@ -59,6 +59,18 @@ func (side *SideType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (side SideType) Int() int {
+	switch side {
+	case SideTypeBuy:
+		return 1
+
+	case SideTypeSell:
+		return -1
+	}
+
+	return 0
+}
+
 func (side SideType) Reverse() SideType {
 	switch side {
 	case SideTypeBuy:
