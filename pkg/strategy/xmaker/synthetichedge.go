@@ -42,6 +42,7 @@ func newHedgeMarket(
 ) *HedgeMarket {
 	symbol := market.Symbol
 	stream := session.Exchange.NewStream()
+	stream.SetPublicOnly()
 	stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{Depth: types.DepthLevelFull})
 
 	book := types.NewStreamBook(symbol, session.Exchange.Name())
