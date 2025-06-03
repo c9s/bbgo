@@ -259,7 +259,7 @@ func TestPositionExposure(t *testing.T) {
 	assert.Equal(t, Number(0), pe.pending.Get())
 	assert.Equal(t, Number(1), pe.GetUncovered())
 
-	// close 1 (another hedge order is filled, pending is updated)
+	// open 1 (another maker order is filled, pending is updated)
 	pe.Open(Number(-1))
 	assert.Equal(t, Number(0), pe.net.Get())
 	assert.Equal(t, Number(0), pe.pending.Get())
