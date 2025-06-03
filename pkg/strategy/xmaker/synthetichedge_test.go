@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 
 	"github.com/c9s/bbgo/pkg/types"
@@ -78,7 +79,7 @@ func Test_newHedgeMarket(t *testing.T) {
 	doneC := make(chan struct{})
 	hm := newHedgeMarket(session, market, depth)
 	go func() {
-		err := hm.start(ctx)
+		err := hm.start(ctx, 1*time.Millisecond)
 		assert.NoError(t, err)
 		close(doneC)
 	}()
@@ -138,6 +139,101 @@ func TestHedgeMarket_hedge(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestHedgeMarket_startAndHedge(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	market := Market("BTCUSDT")
+
+	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx)
+	_ = userDataStream
+
+	mockExchange := session.Exchange.(*mocks.MockExchange)
+
+	submitOrder := types.SubmitOrder{
+		Market:   market,
+		Symbol:   "BTCUSDT",
+		Quantity: Number(2.0),
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeMarket,
+	}
+	createdOrder := types.Order{
+		OrderID:          1,
+		SubmitOrder:      submitOrder,
+		ExecutedQuantity: Number(2.0),
+		Status:           types.OrderStatusFilled,
+	}
+	mockExchange.EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil)
+
+	doneC := make(chan struct{})
+	hm := newHedgeMarket(session, market, Number(100.0))
+	go func() {
+		err := hm.start(ctx, 40*time.Millisecond)
+		assert.NoError(t, err)
+		close(doneC)
+	}()
+
+	marketDataStream.EmitBookSnapshot(types.SliceOrderBook{
+		Symbol: "BTCUSDT",
+		Bids: types.PriceVolumeSlice{
+			{Price: Number(10000), Volume: Number(100)},
+		},
+		Asks: types.PriceVolumeSlice{
+			{Price: Number(10010), Volume: Number(100)},
+		},
+	})
+
+	hm.positionDeltaC <- Number(1.0)
+	hm.positionDeltaC <- Number(1.0)
+
+	time.Sleep(100 * time.Millisecond)
+
+	// emit trades
+	userDataStream.EmitTradeUpdate(types.Trade{
+		ID:            1,
+		OrderID:       1,
+		Exchange:      types.ExchangeBinance,
+		Price:         Number(103000.0),
+		Quantity:      Number(1.0),
+		QuoteQuantity: Number(103000.0 * 1.0),
+		Symbol:        "BTCUSDT",
+		Side:          types.SideTypeSell,
+		IsBuyer:       false,
+		Time:          types.Time{},
+		Fee:           fixedpoint.Zero,
+	})
+
+	time.Sleep(100 * time.Millisecond)
+
+	assert.Equal(t, Number(1.0), hm.coveredPosition.Get())
+	assert.Equal(t, Number(1.0), hm.curPosition.Get())
+
+	userDataStream.EmitTradeUpdate(types.Trade{
+		ID:            2,
+		OrderID:       1,
+		Exchange:      types.ExchangeBinance,
+		Price:         Number(103000.0),
+		Quantity:      Number(1.0),
+		QuoteQuantity: Number(103000.0 * 1.0),
+		Symbol:        "BTCUSDT",
+		Side:          types.SideTypeSell,
+		IsBuyer:       false,
+		Time:          types.Time{},
+		Fee:           fixedpoint.Zero,
+	})
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, Number(0.0), hm.coveredPosition.Get())
+	assert.Equal(t, Number(0.0), hm.curPosition.Get())
+
+	cancel()
+	<-doneC
+}
+
+// bindMockMarketDataStream binds default market data stream behaviors
 func bindMockMarketDataStream(mockStream *mocks.MockStream, stream *types.StandardStream) {
 	mockStream.EXPECT().OnBookSnapshot(Catch(func(x any) {
 		stream.OnBookSnapshot(x.(func(book types.SliceOrderBook)))
@@ -153,6 +249,7 @@ func bindMockMarketDataStream(mockStream *mocks.MockStream, stream *types.Standa
 	})).AnyTimes()
 }
 
+// bindMockUserDataStream binds default user data stream behaviors
 func bindMockUserDataStream(mockStream *mocks.MockStream, stream *types.StandardStream) {
 	mockStream.EXPECT().OnOrderUpdate(Catch(func(x any) {
 		stream.OnOrderUpdate(x.(func(order types.Order)))
