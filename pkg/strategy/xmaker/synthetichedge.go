@@ -13,6 +13,73 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type PositionExposure struct {
+	symbol string
+
+	// net = net position
+	// pending = covered position
+	net, pending fixedpoint.MutexValue
+}
+
+func newPositionExposure(symbol string) *PositionExposure {
+	return &PositionExposure{
+		symbol: symbol,
+	}
+}
+
+func (m *PositionExposure) Open(delta fixedpoint.Value) {
+	m.net.Add(delta)
+
+	log.Infof(
+		"%s opened:%f netPosition:%f coveredPosition: %f",
+		m.symbol,
+		delta.Float64(),
+		m.net.Get().Float64(),
+		m.pending.Get().Float64(),
+	)
+}
+
+func (m *PositionExposure) Cover(delta fixedpoint.Value) {
+	m.pending.Add(delta)
+
+	log.Infof(
+		"%s covered:%f netPosition:%f coveredPosition: %f",
+		m.symbol,
+		delta.Float64(),
+		m.net.Get().Float64(),
+		m.pending.Get().Float64(),
+	)
+}
+
+func (m *PositionExposure) Close(delta fixedpoint.Value) {
+	m.pending.Add(delta)
+	m.net.Add(delta)
+
+	log.Infof(
+		"%s closed:%f netPosition:%f coveredPosition: %f",
+		m.symbol,
+		delta.Float64(),
+		m.net.Get().Float64(),
+		m.pending.Get().Float64(),
+	)
+}
+
+func (m *PositionExposure) GetUncovered() fixedpoint.Value {
+	netPosition := m.net.Get()
+	coveredPosition := m.pending.Get()
+	uncoverPosition := netPosition.Sub(coveredPosition)
+
+	log.Infof(
+		"%s netPosition:%v coveredPosition: %v uncoverPosition: %v",
+		m.symbol,
+		netPosition,
+		coveredPosition,
+		uncoverPosition,
+	)
+
+	return uncoverPosition
+}
+
 type HedgeMarket struct {
 	symbol    string
 	session   *bbgo.ExchangeSession
@@ -23,7 +90,7 @@ type HedgeMarket struct {
 
 	quotingPrice *types.Ticker
 
-	curPosition, coveredPosition fixedpoint.MutexValue
+	positionExposure *PositionExposure
 
 	positionDeltaC chan fixedpoint.Value // channel to receive position delta updates
 
@@ -69,6 +136,8 @@ func newHedgeMarket(
 		book:      book,
 		depthBook: depthBook,
 
+		positionExposure: newPositionExposure(symbol),
+
 		positionDeltaC:    make(chan fixedpoint.Value, 5),
 		position:          position,
 		orderStore:        orderStore,
@@ -78,11 +147,11 @@ func newHedgeMarket(
 
 	tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
 		delta := trade.PositionDelta()
-		m.coveredPosition.Add(delta)
-		m.curPosition.Add(delta)
+		m.positionExposure.pending.Add(delta)
+		m.positionExposure.net.Add(delta)
 
 		log.Infof("trade collector received trade: %+v, position delta: %f, covered position: %f",
-			trade, delta.Float64(), m.coveredPosition.Get().Float64())
+			trade, delta.Float64(), m.positionExposure.pending.Get().Float64())
 
 		// TODO: pass Environment to HedgeMarket
 		/*
@@ -201,26 +270,10 @@ func (m *HedgeMarket) hedge(
 		return err
 	}
 
-	m.coveredPosition.Add(hedgeDelta.Neg())
+	m.positionExposure.pending.Add(hedgeDelta.Neg())
 
-	log.Infof("hedge order created: %+v, covered position: %f", hedgeOrder, m.coveredPosition.Get().Float64())
+	log.Infof("hedge order created: %+v, covered position: %f", hedgeOrder, m.positionExposure.pending.Get().Float64())
 	return nil
-}
-
-func (m *HedgeMarket) getUncoveredPosition() fixedpoint.Value {
-	position := m.curPosition.Get()
-	coveredPosition := m.coveredPosition.Get()
-	uncoverPosition := position.Sub(coveredPosition)
-
-	log.Infof(
-		"%s base position %v coveredPosition: %v uncoverPosition: %v",
-		m.symbol,
-		position,
-		coveredPosition,
-		uncoverPosition,
-	)
-
-	return uncoverPosition
 }
 
 func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) error {
@@ -238,13 +291,13 @@ func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) er
 
 		case now := <-ticker.C:
 			_ = now
-			uncoveredPosition := m.getUncoveredPosition()
+			uncoveredPosition := m.positionExposure.GetUncovered()
 			if err := m.hedge(ctx, uncoveredPosition); err != nil {
 				log.WithError(err).Errorf("hedge failed")
 			}
 
 		case delta := <-m.positionDeltaC:
-			m.curPosition.Add(delta)
+			m.positionExposure.net.Add(delta)
 		}
 	}
 }
