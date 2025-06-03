@@ -69,6 +69,7 @@ func newHedgeMarket(
 		book:      book,
 		depthBook: depthBook,
 
+		positionDeltaC:    make(chan fixedpoint.Value, 5),
 		position:          position,
 		orderStore:        orderStore,
 		tradeCollector:    tradeCollector,
@@ -78,8 +79,9 @@ func newHedgeMarket(
 	tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
 		delta := trade.PositionDelta()
 		m.coveredPosition.Add(delta)
+		m.curPosition.Add(delta)
 
-		log.Infof("received trade: %+v, position delta: %f, covered position: %f",
+		log.Infof("trade collector received trade: %+v, position delta: %f, covered position: %f",
 			trade, delta.Float64(), m.coveredPosition.Get().Float64())
 
 		// TODO: pass Environment to HedgeMarket
@@ -221,12 +223,12 @@ func (m *HedgeMarket) getUncoveredPosition() fixedpoint.Value {
 	return uncoverPosition
 }
 
-func (m *HedgeMarket) start(ctx context.Context) error {
+func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) error {
 	if err := m.stream.Connect(ctx); err != nil {
 		return err
 	}
 
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(hedgeInterval)
 	defer ticker.Stop()
 
 	for {
@@ -242,9 +244,7 @@ func (m *HedgeMarket) start(ctx context.Context) error {
 			}
 
 		case delta := <-m.positionDeltaC:
-			if delta.IsZero() {
-				m.curPosition.Add(delta)
-			}
+			m.curPosition.Add(delta)
 		}
 	}
 }
@@ -447,11 +447,11 @@ func (s *SyntheticHedge) Start(ctx context.Context) error {
 		return fmt.Errorf("sourceMarket and fiatMarket must be initialized")
 	}
 
-	if err := s.sourceMarket.start(ctx); err != nil {
+	if err := s.sourceMarket.start(ctx, 3*time.Second); err != nil {
 		return err
 	}
 
-	if err := s.fiatMarket.start(ctx); err != nil {
+	if err := s.fiatMarket.start(ctx, 3*time.Second); err != nil {
 		return err
 	}
 
