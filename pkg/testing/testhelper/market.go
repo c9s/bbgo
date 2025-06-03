@@ -18,6 +18,7 @@ var _markets = types.MarketMap{
 		MinAmount:       fixedpoint.MustNewFromString("10.0"),
 		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
 		TickSize:        fixedpoint.MustNewFromString("0.01"),
+		StepSize:        Number(0.0001),
 	},
 
 	"ETHUSDT": {
@@ -30,6 +31,7 @@ var _markets = types.MarketMap{
 		MinAmount:       fixedpoint.MustNewFromString("10.0"),
 		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
 		TickSize:        fixedpoint.MustNewFromString("0.01"),
+		StepSize:        Number(0.0001),
 	},
 
 	"USDCUSDT": {
@@ -42,6 +44,7 @@ var _markets = types.MarketMap{
 		MinAmount:       fixedpoint.MustNewFromString("10.0"),
 		MinQuantity:     fixedpoint.MustNewFromString("10.0"),
 		TickSize:        fixedpoint.MustNewFromString("0.0001"),
+		StepSize:        Number(1.0),
 	},
 
 	"USDTTWD": {
@@ -54,6 +57,7 @@ var _markets = types.MarketMap{
 		MinAmount:       fixedpoint.MustNewFromString("10.0"),
 		MinQuantity:     fixedpoint.MustNewFromString("10.0"),
 		TickSize:        fixedpoint.MustNewFromString("0.01"),
+		StepSize:        Number(1.0),
 	},
 }
 
