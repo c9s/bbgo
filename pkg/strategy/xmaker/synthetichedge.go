@@ -350,7 +350,11 @@ type SyntheticHedge struct {
 	mu sync.Mutex
 }
 
-func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[string]*bbgo.ExchangeSession) error {
+func (s *SyntheticHedge) InitializeAndBind(
+	ctx context.Context,
+	sessions map[string]*bbgo.ExchangeSession,
+	targetPosition *types.Position,
+) error {
 	if !s.Enabled {
 		return nil
 	}
@@ -419,8 +423,6 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 	})
 
 	s.fiatMarket.tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
-		s.fiatMarket.positionExposure.Close(trade.PositionDelta())
-
 		avgCost := s.sourceMarket.position.AverageCost
 
 		// convert the trade quantity to the source market's base currency quantity
@@ -445,7 +447,7 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 		}
 
 		// close the maker position
-		// TODO: create a mock trade for closing the maker position
+		// create a mock trade for closing the maker position
 		// This assumes the source market's quote currency is the fiat market's base currency
 		price := fixedpoint.Zero
 		if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency {
@@ -459,16 +461,16 @@ func (s *SyntheticHedge) InitializeAndBind(ctx context.Context, sessions map[str
 			ID:            0,  // TODO: generate a unique ID
 			OrderID:       0,  // TODO: like above
 			Exchange:      "", // TODO: use the maker exchange name
+			Symbol:        "", // TODO: use the maker symbol
 			Price:         price,
 			Quantity:      baseQuantity,
 			QuoteQuantity: baseQuantity.Mul(price),
-			Symbol:        "", // TODO: use the maker symbol
 			Side:          side,
 			IsBuyer:       side == types.SideTypeBuy,
 			IsMaker:       false,
 			Time:          trade.Time,
-			Fee:           fixedpoint.Zero, // TODO: apply trade fee when possible
-			FeeCurrency:   "",              // TODO: apply trade fee when possible
+			Fee:           trade.Fee,         // apply trade fee when possible
+			FeeCurrency:   trade.FeeCurrency, // apply trade fee when possible
 		}
 
 		// TODO: add to the maker position delta
