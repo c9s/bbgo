@@ -101,11 +101,6 @@ func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitO
 		submitOrder,
 	}
 
-	formattedOrders, err := m.session.FormatOrders(submitOrders)
-	if err != nil {
-		return nil, fmt.Errorf("unable to format hedge orders: %w", err)
-	}
-
 	orderCreateCallback := func(createdOrder types.Order) {
 		m.orderStore.Add(createdOrder)
 
@@ -118,8 +113,11 @@ func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitO
 	defer m.tradeCollector.Process()
 
 	createdOrders, _, err := bbgo.BatchPlaceOrder(
-		ctx, m.session.Exchange, orderCreateCallback, formattedOrders...,
+		ctx, m.session.Exchange, orderCreateCallback, submitOrders...,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to submit order: %w", err)
+	}
 
 	if len(createdOrders) == 0 {
 		return nil, fmt.Errorf("no hedge order created")
