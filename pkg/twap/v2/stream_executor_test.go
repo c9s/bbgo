@@ -2,7 +2,6 @@ package twap
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -27,48 +26,6 @@ func getTestMarket() types.Market {
 		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
 	}
 	return market
-}
-
-type OrderMatcher struct {
-	Order types.Order
-}
-
-func MatchOrder(o types.Order) *OrderMatcher {
-	return &OrderMatcher{
-		Order: o,
-	}
-}
-
-func (m *OrderMatcher) Matches(x interface{}) bool {
-	order, ok := x.(types.Order)
-	if !ok {
-		return false
-	}
-
-	return m.Order.OrderID == order.OrderID && m.Order.Price.Compare(m.Order.Price) == 0
-}
-
-func (m *OrderMatcher) String() string {
-	return fmt.Sprintf("OrderMatcher expects %+v", m.Order)
-}
-
-type CatchMatcher struct {
-	f func(x any)
-}
-
-func Catch(f func(x any)) *CatchMatcher {
-	return &CatchMatcher{
-		f: f,
-	}
-}
-
-func (m *CatchMatcher) Matches(x interface{}) bool {
-	m.f(x)
-	return true
-}
-
-func (m *CatchMatcher) String() string {
-	return "CatchMatcher"
 }
 
 func bindMockMarketDataStream(mockStream *mocks.MockStream, stream *types.StandardStream) {
