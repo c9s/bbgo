@@ -8,7 +8,7 @@ import (
 )
 
 func TestPremiumSignal(t *testing.T) {
-	sig := PremiumSignalStream{
+	sig := PremiumStream{
 		Float64Series: types.NewFloat64Series(),
 		premiumMargin: 0.01,
 	}
@@ -20,21 +20,22 @@ func TestPremiumSignal(t *testing.T) {
 	p := sig.Last(0)
 	assert.Equal(t, 0.0, p)
 
-	sig.price1 = 1.05
-	sig.price2 = 1.0
+	sig.priceSlice1.Append(1.05)
+	sig.priceSlice2.Append(1.0)
 	sig.calculatePremium()
 	p = sig.Last(0)
 	assert.Equal(t, 1.05, p)
 	assert.Equal(t, p, p_prime)
 
-	sig.price1 = 1.0
-	sig.price2 = 1.5
+	sig.priceSlice1.Append(1.0)
+	sig.priceSlice2.Append(1.5)
 	sig.calculatePremium()
 	p = sig.Last(0)
 	assert.Equal(t, 1.0/1.5, p)
 	assert.Equal(t, p, p_prime)
 
-	sig.price2 = 1.005
+	sig.priceSlice1.Append(1.0)
+	sig.priceSlice2.Append(1.005)
 	sig.calculatePremium()
 	p = sig.Last(0)
 	assert.Equal(t, 0.0, p)
