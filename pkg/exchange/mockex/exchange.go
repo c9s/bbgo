@@ -1,4 +1,4 @@
-package mock
+package mockex
 
 import (
 	"context"
@@ -193,7 +193,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 
 // SubmitOrder simulates order submission
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
-	log.Info("SubmitOrder")
+	log.Infof("SubmitOrder: %+v", order)
 
 	e.mu.Lock()
 	defer e.mu.Unlock()
