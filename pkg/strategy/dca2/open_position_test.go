@@ -52,7 +52,7 @@ func TestGenerateOpenPositionOrders(t *testing.T) {
 		profit := Number("300")
 		askPrice := Number("30000")
 		margin := Number("0.05")
-		submitOrders, err := generateOpenPositionOrders(strategy.Market, false, quoteInvestment, profit, askPrice, margin, 4, strategy.OrderGroupID)
+		submitOrders, err := generateOpenPositionOrders(strategy.Market, quoteInvestment, profit, askPrice, margin, 4, strategy.OrderGroupID)
 		if !assert.NoError(err) {
 			return
 		}
@@ -73,7 +73,7 @@ func TestGenerateOpenPositionOrders(t *testing.T) {
 		profit := Number("99.47871711")
 		askPrice := Number("40409.72")
 		margin := Number("0.1")
-		submitOrders, err := generateOpenPositionOrders(strategy.Market, false, quoteInvestment, profit, askPrice, margin, 2, strategy.OrderGroupID)
+		submitOrders, err := generateOpenPositionOrders(strategy.Market, quoteInvestment, profit, askPrice, margin, 2, strategy.OrderGroupID)
 		if !assert.NoError(err) {
 			return
 		}
@@ -85,12 +85,4 @@ func TestGenerateOpenPositionOrders(t *testing.T) {
 		assert.Equal(Number("0.013748"), submitOrders[1].Quantity)
 	})
 
-	t.Run("case 3: some orders' price will below 0, so we should not create such order", func(t *testing.T) {
-	})
-
-	t.Run("case 4: notional is too small, so we should decrease num of orders", func(t *testing.T) {
-	})
-
-	t.Run("case 5: quantity is too small, so we should decrease num of orders", func(t *testing.T) {
-	})
 }
