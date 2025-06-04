@@ -326,3 +326,35 @@ func (db *DepthBook) BestBidAndAskAtQuoteDepth() (bid, ask fixedpoint.Value) {
 	ask = db.PriceAtQuoteDepth(SideTypeSell, db.Depth)
 	return bid, ask
 }
+
+// PriceAtDepth returns the average price at which the cumulative base volume
+// reaches the specified baseVolume for the given side.
+// This is similar to PriceAtQuoteDepth but accumulates based on base quantity.
+func (db *DepthBook) PriceAtDepth(side SideType, baseVolume fixedpoint.Value) fixedpoint.Value {
+	if db.Source == nil || baseVolume.Sign() <= 0 {
+		return fixedpoint.Zero
+	}
+
+	pvs := db.Source.SideBook(side)
+	if len(pvs) == 0 {
+		return fixedpoint.Zero
+	}
+
+	sumBase := fixedpoint.Zero
+	sumPrice := fixedpoint.Zero
+	for _, pv := range pvs {
+		if sumBase.Add(pv.Volume).Compare(baseVolume) >= 0 {
+			remain := baseVolume.Sub(sumBase)
+			sumPrice = sumPrice.Add(remain.Mul(pv.Price))
+			sumBase = baseVolume
+			break
+		}
+		sumBase = sumBase.Add(pv.Volume)
+		sumPrice = sumPrice.Add(pv.Volume.Mul(pv.Price))
+	}
+
+	if sumBase.IsZero() {
+		return fixedpoint.Zero
+	}
+	return sumPrice.Div(sumBase)
+}
