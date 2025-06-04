@@ -618,16 +618,19 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 	return q, nil
 }
 
+func (s *Strategy) getLayerPriceWithDepth(
+	i int, side types.SideType, requiredDepth fixedpoint.Value,
+) (price fixedpoint.Value) {
+	price = s.depthSourceBook.PriceAtQuoteDepth(side, requiredDepth)
+	return price
+}
+
 // getLayerPrice returns the price for the layer
 // i is the layer index, starting from 0
 // side is the side of the order
 // sourceBook is the source order book
 func (s *Strategy) getLayerPrice(
-	i int,
-	side types.SideType,
-	sourceBook *types.StreamOrderBook,
-	quote *Quote,
-	requiredDepth fixedpoint.Value,
+	i int, side types.SideType, sourceBook *types.StreamOrderBook, quote *Quote,
 ) (price fixedpoint.Value) {
 	var margin, delta, pips fixedpoint.Value
 
@@ -658,17 +661,9 @@ func (s *Strategy) getLayerPrice(
 		price = pv.Price
 	}
 
-	if requiredDepth.Sign() > 0 {
-		price = aggregatePrice(sideBook, requiredDepth)
-		price = price.Mul(fixedpoint.One.Add(delta))
-		if i > 0 {
-			price = price.Add(pips.Mul(s.makerMarket.TickSize))
-		}
-	} else {
-		price = price.Mul(fixedpoint.One.Add(delta))
-		if i > 0 {
-			price = price.Add(pips.Mul(s.makerMarket.TickSize))
-		}
+	price = price.Mul(fixedpoint.One.Add(delta))
+	if i > 0 {
+		price = price.Add(pips.Mul(s.makerMarket.TickSize))
 	}
 
 	return price
@@ -888,7 +883,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	bestAskPrice := fixedpoint.Zero
 
 	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-		bestBid, bestAsk, hasPrice := s.SyntheticHedge.GetQuotePrices(fixedpoint.Zero)
+		bestBid, bestAsk, hasPrice := s.SyntheticHedge.GetQuotePrices(s.DepthQuantity)
 		if !hasPrice {
 			s.logger.Warnf("no valid price, skip quoting")
 			return nil
@@ -1159,16 +1154,29 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			// for maker bid orders
 			accumulativeBidQuantity = accumulativeBidQuantity.Add(bidQuantity)
 
-			requiredDepth := fixedpoint.Zero
-			if s.UseDepthPrice {
-				if s.DepthQuantity.Sign() > 0 {
+			bidPrice := fixedpoint.Zero
+			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+				if bid, _, ok := s.SyntheticHedge.GetQuotePrices(accumulativeBidQuantity); ok {
+					bidPrice = bid
+				} else {
+					s.logger.Warnf("no valid synthetic price")
+				}
+			} else if s.UseDepthPrice {
+				requiredDepth := fixedpoint.Zero
+				if i == 0 && s.DepthQuantity.Sign() > 0 {
 					requiredDepth = s.DepthQuantity
 				} else {
 					requiredDepth = accumulativeBidQuantity
 				}
+				bidPrice = s.getLayerPriceWithDepth(i, types.SideTypeBuy, requiredDepth)
+			} else {
+				bidPrice = s.getLayerPrice(i, types.SideTypeBuy, s.sourceBook, quote)
 			}
 
-			bidPrice := s.getLayerPrice(i, types.SideTypeBuy, s.sourceBook, quote, requiredDepth)
+			if bidPrice.IsZero() {
+				s.logger.Warnf("no valid bid price, skip quoting")
+				break
+			}
 
 			if i == 0 {
 				s.logger.Infof("maker best bid price %f", bidPrice.Float64())
@@ -1227,16 +1235,29 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			accumulativeAskQuantity = accumulativeAskQuantity.Add(askQuantity)
 
-			requiredDepth := fixedpoint.Zero
-			if s.UseDepthPrice {
+			askPrice := fixedpoint.Zero
+			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+				if _, ask, ok := s.SyntheticHedge.GetQuotePrices(accumulativeAskQuantity); ok {
+					askPrice = ask
+				} else {
+					s.logger.Warnf("no valid synthetic price")
+				}
+			} else if s.UseDepthPrice {
+				requiredDepth := fixedpoint.Zero
 				if s.DepthQuantity.Sign() > 0 {
 					requiredDepth = s.DepthQuantity
 				} else {
 					requiredDepth = accumulativeAskQuantity
 				}
+				askPrice = s.getLayerPriceWithDepth(i, types.SideTypeSell, requiredDepth)
+			} else {
+				askPrice = s.getLayerPrice(i, types.SideTypeSell, s.sourceBook, quote)
 			}
 
-			askPrice := s.getLayerPrice(i, types.SideTypeSell, s.sourceBook, quote, requiredDepth)
+			if askPrice.IsZero() {
+				s.logger.Warnf("no valid ask price, skip quoting")
+				break
+			}
 
 			if i == 0 {
 				s.logger.Infof("maker best ask price %f", askPrice.Float64())
@@ -2351,7 +2372,6 @@ func (s *Strategy) CrossRun(
 
 	s.sourceBook = types.NewStreamBook(s.SourceSymbol, s.sourceSession.ExchangeName)
 	s.sourceBook.BindStream(sourceMarketStream)
-
 	s.depthSourceBook = types.NewDepthBook(s.sourceBook, s.DepthQuantity)
 
 	if err := sourceMarketStream.Connect(ctx); err != nil {
