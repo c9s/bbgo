@@ -79,12 +79,13 @@ func Test_newHedgeMarket(t *testing.T) {
 	doneC := make(chan struct{})
 	hm := newHedgeMarket(session, market, depth)
 	go func() {
-		err := hm.start(ctx, 1*time.Millisecond)
+		err := hm.start(ctx, 3*time.Millisecond)
 		assert.NoError(t, err)
 		close(doneC)
 	}()
 
-	time.Sleep(3 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
+	marketDataStream.EmitConnect()
 	cancel()
 	<-doneC
 
@@ -175,6 +176,8 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 		assert.NoError(t, err)
 		close(doneC)
 	}()
+
+	marketDataStream.EmitConnect()
 
 	marketDataStream.EmitBookSnapshot(types.SliceOrderBook{
 		Symbol: "BTCUSDT",
@@ -280,6 +283,9 @@ func bindMockMarketDataStream(mockStream *mocks.MockStream, stream *types.Standa
 	mockStream.EXPECT().OnDisconnect(Catch(func(x any) {
 		stream.OnDisconnect(x.(func()))
 	})).AnyTimes()
+	mockStream.EXPECT().OnAuth(Catch(func(x any) {
+		stream.OnAuth(x.(func()))
+	})).AnyTimes()
 }
 
 // bindMockUserDataStream binds default user data stream behaviors
@@ -346,6 +352,7 @@ func newMockMarketDataStream(
 	mockMarketDataStream.EXPECT().Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
 		Depth: types.DepthLevelFull,
 	})
+
 	mockMarketDataStream.EXPECT().Connect(gomock.AssignableToTypeOf(ctx))
 	return marketDataStream, mockMarketDataStream
 }
