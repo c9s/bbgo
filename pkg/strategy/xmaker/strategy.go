@@ -621,7 +621,21 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 func (s *Strategy) getLayerPriceWithDepth(
 	i int, side types.SideType, requiredDepth fixedpoint.Value,
 ) (price fixedpoint.Value) {
-	price = s.depthSourceBook.PriceAtQuoteDepth(side, requiredDepth)
+	price = s.depthSourceBook.PriceAtDepth(side, requiredDepth)
+
+	pips := fixedpoint.Zero
+	switch side {
+	case types.SideTypeSell:
+		pips = fixedpoint.One
+	case types.SideTypeBuy:
+		pips = fixedpoint.One.Neg()
+	}
+
+	// this prevents returning the same price when the book depth is always greater than requiredDepth
+	if i > 0 {
+		price = price.Add(pips.Mul(s.makerMarket.TickSize))
+	}
+
 	return price
 }
 
@@ -1156,6 +1170,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			bidPrice := fixedpoint.Zero
 			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+				// note: the accumulativeBidQuantity is not used yet,
+				// reason: the fiat market base unit is different from the maker market.
 				if bid, _, ok := s.SyntheticHedge.GetQuotePrices(accumulativeBidQuantity); ok {
 					bidPrice = bid
 				} else {
