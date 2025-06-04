@@ -182,8 +182,10 @@ type Strategy struct {
 	// ProfitFixerConfig is the profit fixer configuration
 	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer,omitempty"`
 
-	UseSandbox              bool             `json:"useSandbox,omitempty"`
-	SandboxExchangeBalances types.BalanceMap `json:"sandboxExchangeBalances,omitempty"`
+	UseSandbox              bool                        `json:"useSandbox,omitempty"`
+	SandboxExchangeBalances map[string]fixedpoint.Value `json:"sandboxExchangeBalances,omitempty"`
+
+	SyntheticHedge *SyntheticHedge `json:"syntheticHedge,omitempty"`
 
 	// --------------------------------
 	// private field
@@ -1627,18 +1629,26 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		return
 	}
 
-	if _, err := s.directHedge(ctx, hedgeDelta, side); err != nil {
-		log.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
-		return
+	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		if err := s.SyntheticHedge.Hedge(ctx, hedgeDelta); err != nil {
+			log.WithError(err).Errorf("unable to place synthetic hedge order")
+			return
+		}
+	} else {
+		if _, err := s.directHedge(ctx, hedgeDelta); err != nil {
+			log.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
+			return
+		}
 	}
 
 	s.resetPositionStartTime()
 }
 
 func (s *Strategy) directHedge(
-	ctx context.Context, hedgeDelta fixedpoint.Value, side types.SideType,
+	ctx context.Context, hedgeDelta fixedpoint.Value,
 ) (*types.Order, error) {
 	quantity := hedgeDelta.Abs()
+	side := positionToSide(hedgeDelta)
 
 	price := s.lastPrice.Get()
 
@@ -2070,7 +2080,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 }
 
 func (s *Strategy) CrossRun(
-	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
+	ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
 	s.tradingCtx, s.cancelTrading = context.WithCancel(ctx)
 
@@ -2116,15 +2126,20 @@ func (s *Strategy) CrossRun(
 	}
 
 	if s.UseSandbox {
-		balances := s.SandboxExchangeBalances
-		if balances == nil {
-			balances = types.BalanceMap{
-				s.sourceMarket.BaseCurrency:  types.NewBalance(s.sourceMarket.BaseCurrency, fixedpoint.NewFromFloat(50.0)),
-				s.sourceMarket.QuoteCurrency: types.NewBalance(s.sourceMarket.QuoteCurrency, fixedpoint.NewFromFloat(10_000.0)),
+		balances := types.BalanceMap{
+			s.sourceMarket.BaseCurrency:  types.NewBalance(s.sourceMarket.BaseCurrency, fixedpoint.NewFromFloat(50.0)),
+			s.sourceMarket.QuoteCurrency: types.NewBalance(s.sourceMarket.QuoteCurrency, fixedpoint.NewFromFloat(10_000.0)),
+		}
+
+		customBalances := s.SandboxExchangeBalances
+		if customBalances != nil {
+			balances = types.BalanceMap{}
+			for cur, balance := range customBalances {
+				balances[cur] = types.NewBalance(cur, balance)
 			}
 		}
 
-		s.logger.Warnf("using mock exchange to simulate hedge with balances: %+v", balances)
+		s.logger.Warnf("using sandbox exchange to simulate hedge with balances: %+v", balances)
 
 		mockEx := sandbox.New(s.sourceSession.Exchange, s.sourceSession.MarketDataStream, s.SourceSymbol, balances)
 
@@ -2453,6 +2468,19 @@ func (s *Strategy) CrossRun(
 	// bind two user data streams so that we can collect the trades together
 	s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
+
+	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		s.logger.Infof("syntheticHedge is enabled: %+v", s.SyntheticHedge)
+		if err := s.SyntheticHedge.InitializeAndBind(ctx, sessions, s); err != nil {
+			return err
+		}
+
+		go func() {
+			if err := s.SyntheticHedge.Start(ctx); err != nil {
+				s.logger.WithError(err).Errorf("failed to start syntheticHedge")
+			}
+		}()
+	}
 
 	s.stopC = make(chan struct{})
 

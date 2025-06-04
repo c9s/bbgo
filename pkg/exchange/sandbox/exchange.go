@@ -7,11 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var log = logrus.WithField("exchange", "sandbox")
 
 type Stream struct {
 	types.StandardStream
