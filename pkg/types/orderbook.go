@@ -288,15 +288,16 @@ func NewDepthBook(source *StreamOrderBook, depth fixedpoint.Value) *DepthBook {
 
 // PriceAtQuoteDepth returns the average price at the specified quote depth for the given side.
 // If the depth is zero or negative, returns zero.
-func (db *DepthBook) PriceAtQuoteDepth(side SideType) fixedpoint.Value {
-	quoteDepth := db.Depth
+func (db *DepthBook) PriceAtQuoteDepth(side SideType, quoteDepth fixedpoint.Value) fixedpoint.Value {
 	if db.Source == nil || quoteDepth.Sign() <= 0 {
 		return fixedpoint.Zero
 	}
+
 	pvs := db.Source.SideBook(side)
 	if len(pvs) == 0 {
 		return fixedpoint.Zero
 	}
+
 	sumQty := fixedpoint.Zero
 	sumQuote := fixedpoint.Zero
 	for _, pv := range pvs {
@@ -321,7 +322,7 @@ func (db *DepthBook) PriceAtQuoteDepth(side SideType) fixedpoint.Value {
 
 // BestBidAndAskAtQuoteDepth returns the bid and ask price at the specified quote depth.
 func (db *DepthBook) BestBidAndAskAtQuoteDepth() (bid, ask fixedpoint.Value) {
-	bid = db.PriceAtQuoteDepth(SideTypeBuy)
-	ask = db.PriceAtQuoteDepth(SideTypeSell)
+	bid = db.PriceAtQuoteDepth(SideTypeBuy, db.Depth)
+	ask = db.PriceAtQuoteDepth(SideTypeSell, db.Depth)
 	return bid, ask
 }

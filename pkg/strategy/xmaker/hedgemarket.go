@@ -14,10 +14,13 @@ import (
 )
 
 type HedgeMarket struct {
-	symbol    string
-	session   *bbgo.ExchangeSession
-	market    types.Market
-	stream    types.Stream
+	symbol  string
+	session *bbgo.ExchangeSession
+	market  types.Market
+	stream  types.Stream
+
+	connectivity *types.Connectivity
+
 	book      *types.StreamOrderBook
 	depthBook *types.DepthBook
 
@@ -46,6 +49,9 @@ func newHedgeMarket(
 	stream.SetPublicOnly()
 	stream.Subscribe(types.BookChannel, symbol, types.SubscribeOptions{Depth: types.DepthLevelFull})
 
+	connectivity := types.NewConnectivity()
+	connectivity.Bind(stream)
+
 	book := types.NewStreamBook(symbol, session.Exchange.Name())
 	book.BindStream(stream)
 
@@ -69,6 +75,8 @@ func newHedgeMarket(
 		stream:    stream,
 		book:      book,
 		depthBook: depthBook,
+
+		connectivity: connectivity,
 
 		positionExposure: newPositionExposure(symbol),
 
@@ -241,6 +249,9 @@ func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) er
 	if err := m.stream.Connect(ctx); err != nil {
 		return err
 	}
+
+	log.Infof("waiting for %s hedge market connectivity...", m.symbol)
+	<-m.connectivity.ConnectedC()
 
 	ticker := time.NewTicker(hedgeInterval)
 	defer ticker.Stop()

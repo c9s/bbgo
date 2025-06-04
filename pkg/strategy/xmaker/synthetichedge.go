@@ -265,7 +265,7 @@ func (s *SyntheticHedge) Hedge(
 	return nil
 }
 
-func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, bool) {
+func (s *SyntheticHedge) GetQuotePrices(depth fixedpoint.Value) (fixedpoint.Value, fixedpoint.Value, bool) {
 	if s.sourceMarket == nil || s.fiatMarket == nil {
 		return fixedpoint.Zero, fixedpoint.Zero, false
 	}
@@ -274,15 +274,25 @@ func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, b
 	bid2, ask2 := s.fiatMarket.getQuotePrice()
 
 	if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency {
-		bid = bid.Mul(bid2)
-		ask = ask.Mul(ask2)
-		return bid, ask, bid.Sign() > 0 && ask.Sign() > 0
+		sBid := bid.Mul(bid2)
+		sAsk := ask.Mul(ask2)
+
+		log.Infof("synthetic quote:[%f/%f] source:[%f/%f] fiat:[%f/%f]",
+			sAsk.Float64(), sBid.Float64(),
+			ask.Float64(), bid.Float64(),
+			ask2.Float64(), bid2.Float64())
+		return sBid, sAsk, sBid.Sign() > 0 && sAsk.Sign() > 0
 	}
 
 	if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.QuoteCurrency {
-		bid = bid.Div(bid2)
-		ask = ask.Div(ask2)
-		return bid, ask, bid.Sign() > 0 && ask.Sign() > 0
+		sBid := bid.Div(bid2)
+		sAsk := ask.Div(ask2)
+
+		log.Infof("synthetic quote:[%f/%f] source:[%f/%f] fiat:[%f/%f]",
+			sAsk.Float64(), sBid.Float64(),
+			ask.Float64(), bid.Float64(),
+			ask2.Float64(), bid2.Float64())
+		return sBid, sAsk, sBid.Sign() > 0 && sAsk.Sign() > 0
 	}
 
 	return fixedpoint.Zero, fixedpoint.Zero, false
@@ -299,16 +309,23 @@ func (s *SyntheticHedge) Start(ctx context.Context) error {
 
 	interval := s.HedgeInterval.Duration()
 	if interval == 0 {
-		interval = 2 * time.Second // default interval
+		interval = 3 * time.Second // default interval
 	}
 
-	if err := s.sourceMarket.start(ctx, interval); err != nil {
-		return err
-	}
+	go func() {
+		if err := s.sourceMarket.start(ctx, interval); err != nil {
+			s.logger.WithError(err).Errorf("synthetic hedge failed to start")
+		}
+	}()
 
-	if err := s.fiatMarket.start(ctx, interval); err != nil {
-		return err
-	}
+	go func() {
+		if err := s.fiatMarket.start(ctx, interval); err != nil {
+			s.logger.WithError(err).Errorf("synthetic hedge failed to start")
+		}
+	}()
+
+	<-s.sourceMarket.connectivity.ConnectedC()
+	<-s.fiatMarket.connectivity.ConnectedC()
 
 	return nil
 }
