@@ -19,7 +19,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/dynamic"
-	"github.com/c9s/bbgo/pkg/exchange/mockex"
+	"github.com/c9s/bbgo/pkg/exchange/sandbox"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/pricesolver"
@@ -2126,7 +2126,7 @@ func (s *Strategy) CrossRun(
 
 		s.logger.Warnf("using mock exchange to simulate hedge with balances: %+v", balances)
 
-		mockEx := mockex.New(s.sourceSession.Exchange, s.sourceSession.MarketDataStream, s.SourceSymbol, balances)
+		mockEx := sandbox.New(s.sourceSession.Exchange, s.sourceSession.MarketDataStream, s.SourceSymbol, balances)
 
 		if err := mockEx.Initialize(ctx); err != nil {
 			return err
