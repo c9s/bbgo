@@ -246,6 +246,8 @@ func TestSyntheticHedgeMarket_StartAndHedge(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
+	stepTime := 30 * time.Millisecond
+
 	makerMarket := Market("BTCTWD")
 	_ = makerMarket
 
@@ -265,7 +267,7 @@ func TestSyntheticHedgeMarket_StartAndHedge(t *testing.T) {
 		},
 	})
 
-	fiatSession, fiatMarketDataStream, _ := newMockSession(mockCtrl, ctx, fiatMarket.Symbol)
+	fiatSession, fiatMarketDataStream, fiatUserDataStream := newMockSession(mockCtrl, ctx, fiatMarket.Symbol)
 	fiatSession.SetMarkets(AllMarkets())
 	fiatHedgeMarket := newHedgeMarket(fiatSession, fiatMarket, Number(10.0))
 	fiatHedgeMarket.book.Load(types.SliceOrderBook{
@@ -281,7 +283,9 @@ func TestSyntheticHedgeMarket_StartAndHedge(t *testing.T) {
 	orderStore := core.NewOrderStore(makerMarket.Symbol)
 	position := types.NewPositionFromMarket(makerMarket)
 	strategy := &Strategy{
-		makerSession:   nil,
+		makerSession: &bbgo.ExchangeSession{
+			ExchangeName: types.ExchangeMax,
+		},
 		makerMarket:    makerMarket,
 		orderStore:     orderStore,
 		tradeCollector: core.NewTradeCollector(makerMarket.Symbol, position, orderStore),
@@ -345,9 +349,27 @@ func TestSyntheticHedgeMarket_StartAndHedge(t *testing.T) {
 	fiatSession.Exchange.(*mocks.MockExchange).EXPECT().SubmitOrder(gomock.Any(), submitOrder2).Return(&createdOrder2, nil)
 
 	// add position to delta
-	sourceHedgeMarket.positionDeltaC <- Number(1.0)
+	position.AddTrade(types.Trade{
+		ID:            1,
+		OrderID:       1,
+		Exchange:      types.ExchangeMax,
+		Price:         Number(3_110_000.0),
+		Quantity:      Number(1.0),
+		QuoteQuantity: Number(3_110_000.0 * 1.0),
+		Symbol:        makerMarket.Symbol,
+		Side:          types.SideTypeBuy,
+		IsBuyer:       true,
+		IsMaker:       true,
+		Time:          types.Time{},
+		Fee:           fixedpoint.Zero,
+		FeeCurrency:   "",
+	})
+	assert.Equal(t, Number(1.0).Float64(), position.GetBase().Float64(), "make sure position is updated correctly")
+	assert.Equal(t, Number(3_110_000.0).Float64(), position.GetAverageCost().Float64(), "make sure average cost is updated correctly")
 
-	time.Sleep(30 * time.Millisecond)
+	// send position delta to source hedge market
+	sourceHedgeMarket.positionDeltaC <- Number(1.0)
+	time.Sleep(stepTime)
 
 	sourceUserDataStream.EmitTradeUpdate(types.Trade{
 		ID:            createdOrder.OrderID,
@@ -364,7 +386,28 @@ func TestSyntheticHedgeMarket_StartAndHedge(t *testing.T) {
 		Fee:           fixedpoint.Zero,
 		FeeCurrency:   "",
 	})
-	time.Sleep(30 * time.Millisecond)
+	time.Sleep(stepTime)
+	assert.Equal(t, Number(104000.0*1.0).Float64(), fiatHedgeMarket.position.Base.Float64(), "fiat position should be updated to the quote quantity")
+
+	fiatUserDataStream.EmitTradeUpdate(types.Trade{
+		ID:            createdOrder2.OrderID,
+		OrderID:       createdOrder2.OrderID,
+		Exchange:      createdOrder2.Exchange,
+		Price:         Number(30.0),
+		Quantity:      Number(104000.0),
+		QuoteQuantity: Number(104000.0 * 30.0),
+		Symbol:        createdOrder2.Symbol,
+		Side:          createdOrder2.Side,
+		IsBuyer:       createdOrder2.Side == types.SideTypeBuy,
+		IsMaker:       false,
+		Time:          types.Time{},
+		Fee:           fixedpoint.Zero,
+		FeeCurrency:   "",
+	})
+	time.Sleep(stepTime)
+	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.position.Base.Float64(), "source position should be closed to 0")
+	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.position.Base.Float64(), "fiat position should be closed to 0")
+	assert.Equal(t, Number(0).Float64(), position.Base.Float64(), "the maker position should be closed to 0")
 
 	cancel()
 	<-doneC
