@@ -17,6 +17,7 @@ import (
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/strategy/common"
+	"github.com/c9s/bbgo/pkg/strategy/dca2/statemachine"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
@@ -31,8 +32,9 @@ const (
 )
 
 var (
-	log        = logrus.WithField("strategy", ID)
-	baseLabels prometheus.Labels
+	recoverSinceLimit = time.Date(2024, time.January, 29, 12, 0, 0, 0, time.Local)
+	log               = logrus.WithField("strategy", ID)
+	baseLabels        prometheus.Labels
 )
 
 func init() {
@@ -92,6 +94,9 @@ type Strategy struct {
 	takeProfitPrice      fixedpoint.Value
 	startTimeOfNextRound time.Time
 	nextRoundPaused      bool
+
+	// state machine
+	stateMachine *statemachine.StateMachine
 
 	// writeMutex is used to protect submit/cancel orders
 	writeMutex  sync.Mutex
@@ -215,6 +220,12 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		})
 	}
 
+	// state machine
+	s.stateMachine = statemachine.NewStateMachine(s.logger)
+	s.stateMachine.OnStart(func() {})
+	s.stateMachine.OnClose(func() {})
+
+	// order executor
 	s.OrderExecutor = bbgo.NewGeneralOrderExecutor(session, s.Symbol, ID, instanceID, s.Position)
 	s.OrderExecutor.SetLogger(s.logger)
 	s.OrderExecutor.SetMaxRetries(5)
@@ -347,14 +358,12 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
-
 		if s.KeepOrdersWhenShutdown {
 			s.logger.Infof("keepOrdersWhenShutdown is set, will keep the orders on the exchange")
 			return
 		}
-
 		if err := s.Close(ctx); err != nil {
-			s.logger.WithError(err).Errorf("dca2 graceful order cancel error")
+			s.logger.WithError(err).Errorf("failed to close dca2 gracefully")
 		}
 	})
 

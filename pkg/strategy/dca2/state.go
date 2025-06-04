@@ -2,10 +2,7 @@ package dca2
 
 import (
 	"context"
-	"strings"
 	"time"
-
-	"github.com/c9s/bbgo/pkg/bbgo"
 )
 
 type State int64
@@ -44,9 +41,8 @@ func (s *Strategy) initializeNextStateC() bool {
 }
 
 func (s *Strategy) updateState(state State) {
+	s.logger.Infof("[state] update state from %d to %d", s.state, state)
 	s.state = state
-
-	s.logger.Infof("[state] update state to %d", state)
 
 	updateStatsMetrics(state)
 	updateNumOfActiveOrdersMetrics(s.OrderExecutor.ActiveMakerOrders().NumOfOrders())
@@ -125,147 +121,53 @@ func (s *Strategy) triggerNextState() {
 func (s *Strategy) moveToNextState(ctx context.Context, nextState State) bool {
 	switch s.state {
 	case IdleWaiting:
-		return s.openPosition(ctx)
+		s.writeMutex.Lock()
+		defer s.writeMutex.Unlock()
+
+		if err := s.openPosition(ctx); err != nil {
+			s.logger.WithError(err).Error("failed to open position, please check it")
+			return false
+		}
+
+		s.updateState(OpenPositionReady)
+		return false
 	case OpenPositionReady:
-		return s.readyToFinishOpenPositionStage(ctx)
+		if err := s.readyToFinishOpenPositionStage(ctx); err != nil {
+			s.logger.WithError(err).Error("failed to ready to finish open position stage, please check it")
+			return false
+		}
+
+		s.updateState(OpenPositionOrderFilled)
+		return false
 	case OpenPositionOrderFilled:
-		return s.finishOpenPositionStage(ctx)
+		if err := s.finishOpenPositionStage(ctx); err != nil {
+			s.logger.WithError(err).Error("failed to finish open position stage, please check it")
+			return false
+		}
+
+		s.updateState(OpenPositionFinished)
+		return true // trigger next state immediately
 	case OpenPositionFinished:
-		return s.cancelOpenPositionOrdersAndPlaceTakeProfitOrder(ctx)
+		s.writeMutex.Lock()
+		defer s.writeMutex.Unlock()
+
+		if err := s.cancelOpenPositionOrdersAndPlaceTakeProfitOrder(ctx); err != nil {
+			s.logger.WithError(err).Error("failed to cancel open position orders and place take profit order, please check it")
+			return false
+		}
+
+		s.updateState(TakeProfitReady)
+		return false
 	case TakeProfitReady:
-		return s.finishTakeProfitStage(ctx, nextState)
+		if err := s.finishTakeProfitStage(ctx); err != nil {
+			s.logger.WithError(err).Error("failed to finish take profit stage, please check it")
+			return false
+		}
+
+		s.updateState(IdleWaiting)
+		return false
 	}
 
 	s.logger.Errorf("unexpected state: %d, please check it", s.state)
-	return false
-}
-
-// openPosition will place the open-position orders
-// if nextRoundPaused is set to true, it will not place the open-position orders
-// if startTimeOfNextRound is not reached, it will not place the open-position orders
-// if it place open-position orders successfully, it will update the state to OpenPositionReady and return true to trigger the next state immediately
-func (s *Strategy) openPosition(ctx context.Context) bool {
-	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
-
-	if s.nextRoundPaused {
-		s.logger.Info("[State] openPosition - nextRoundPaused is set to true")
-		return false
-	}
-
-	if time.Now().Before(s.startTimeOfNextRound) {
-		return false
-	}
-
-	// validate the stage by orders
-	s.logger.Info("[State] openPosition - validate we are not in open-position stage")
-	currentRound, err := s.collector.CollectCurrentRound(ctx)
-	if err != nil {
-		s.logger.WithError(err).Error("openPosition - failed to collect current round")
-		return false
-	}
-
-	if len(currentRound.OpenPositionOrders) > 0 && len(currentRound.TakeProfitOrders) == 0 {
-		s.logger.Error("openPosition - there is an open-position order so we are already in open-position stage. please check it and manually fix it")
-		return false
-	}
-
-	s.logger.Info("[State] openPosition - place open-position orders")
-	if err := s.placeOpenPositionOrders(s.writeCtx); err != nil {
-		if strings.Contains(err.Error(), "failed to generate open position orders") {
-			s.logger.WithError(err).Warn("failed to place open-position orders, please check it.")
-		} else {
-			s.logger.WithError(err).Error("failed to place open-position orders, please check it.")
-		}
-
-		return false
-	}
-
-	s.updateState(OpenPositionReady)
-	s.logger.Info("[State] IdleWaiting -> OpenPositionReady")
-	// do not trigger next state immediately, because OpenPositionReady state only triggers by kline to move to the next state
-	return false
-}
-
-// readyToFinishOpenPositionStage will update the state to OpenPositionOrderFilled if there is at least one open-position order filled
-// it will not trigger the next state immediately because OpenPositionOrderFilled state only trigger by kline to move to the next state
-func (s *Strategy) readyToFinishOpenPositionStage(_ context.Context) bool {
-	s.updateState(OpenPositionOrderFilled)
-	s.logger.Info("[State] OpenPositionReady -> OpenPositionOrderFilled")
-	// do not trigger next state immediately, because OpenPositionOrderFilled state only trigger by kline to move to the next state
-	return false
-}
-
-// finishOpenPositionStage will update the state to OpenPositionFinish and return true to trigger the next state immediately
-func (s *Strategy) finishOpenPositionStage(_ context.Context) bool {
-	s.updateState(OpenPositionFinished)
-	s.logger.Info("[State] OpenPositionOrderFilled -> OpenPositionFinished")
-	return true
-}
-
-// cancelOpenPositionOrdersAndPlaceTakeProfitOrder will cancel the open-position orders and place the take-profit orders
-func (s *Strategy) cancelOpenPositionOrdersAndPlaceTakeProfitOrder(ctx context.Context) bool {
-	s.writeMutex.Lock()
-	defer s.writeMutex.Unlock()
-
-	// validate we are still in open-position stage
-	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - validate we are still in open-position stage")
-	currentRound, err := s.collector.CollectCurrentRound(ctx)
-	if err != nil {
-		s.logger.WithError(err).Error("cancelOpenPositionOrdersAndPlaceTakeProfitOrder - failed to collect current round")
-		return false
-	}
-
-	if len(currentRound.TakeProfitOrders) > 0 {
-		s.logger.Error("cancelOpenPositionOrdersAndPlaceTakeProfitOrder - there is a take-profit order so we are already in take-profit stage. please check it and manually fix it")
-		return false
-	}
-
-	// cancel open-position orders
-	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - cancel open-position orders")
-	if err := s.OrderExecutor.GracefulCancel(ctx); err != nil {
-		s.logger.WithError(err).Error("failed to cancel maker orders")
-		return false
-	}
-
-	// place the take-profit order
-	s.logger.Info("[State] cancelOpenPositionOrdersAndPlaceTakeProfitOrder - place the take-profit order")
-	if err := s.placeTakeProfitOrder(s.writeCtx, currentRound); err != nil {
-		s.logger.WithError(err).Error("failed to open take profit orders")
-		return false
-	}
-
-	s.updateState(TakeProfitReady)
-	s.logger.Info("[State] OpenPositionOrdersCancelled -> TakeProfitReady")
-	// do not trigger next state immediately, because TakeProfitReady state only trigger by kline to move to the next state
-	return false
-}
-
-// finishTakeProfitStage will update the profit stats and reset the position, then wait the next round
-func (s *Strategy) finishTakeProfitStage(ctx context.Context, next State) bool {
-	// wait 3 seconds to avoid position not update
-	time.Sleep(3 * time.Second)
-
-	s.logger.Info("[State] finishTakeProfitStage - start resetting position and calculate quote investment for next round")
-
-	// update profit stats
-	if err := s.UpdateProfitStatsUntilSuccessful(ctx); err != nil {
-		s.logger.WithError(err).Warn("failed to calculate and emit profit")
-	}
-
-	// reset position and open new round for profit stats before position opening
-	s.Position.Reset()
-
-	// emit position
-	s.OrderExecutor.TradeCollector().EmitPositionUpdate(s.Position)
-
-	// store into redis
-	bbgo.Sync(ctx, s)
-
-	// set the start time of the next round
-	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())
-	s.updateState(IdleWaiting)
-	s.logger.Infof("[State] TakeProfitReady -> IdleWaiting (startTimeOfNextRound: %s)", s.startTimeOfNextRound.String())
-
 	return false
 }
