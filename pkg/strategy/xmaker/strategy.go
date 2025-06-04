@@ -1666,8 +1666,10 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		return
 	}
 
-	// if the uncovered position is negative, e.g., -10 BTC,
-	// then we need to hedge +10 BTC, hence call .Neg() here
+	// if the uncovered position is a positive number, e.g., +10 BTC,
+	// then we need to sell 10 BTC, hence call .Neg() here
+	// if the uncovered position is a negative number, e.g., -10 BTC,
+	// then we need to buy 10 BTC, hence call .Neg() here
 	hedgeDelta := uncoveredPosition.Neg()
 	side := positionToSide(hedgeDelta)
 
@@ -1686,12 +1688,12 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	}
 
 	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-		if err := s.SyntheticHedge.Hedge(ctx, hedgeDelta); err != nil {
+		if err := s.SyntheticHedge.Hedge(ctx, uncoveredPosition); err != nil {
 			log.WithError(err).Errorf("unable to place synthetic hedge order")
 			return
 		}
 
-		s.positionExposure.Cover(hedgeDelta)
+		s.positionExposure.Cover(uncoveredPosition)
 	} else {
 		if _, err := s.directHedge(ctx, hedgeDelta); err != nil {
 			log.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
@@ -2102,6 +2104,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 			uncoverPosition := s.getUncoveredPosition()
 			absPos := uncoverPosition.Abs()
 
+			// TODO: consider synthetic hedge here
 			if s.sourceMarket.IsDustQuantity(absPos, s.lastPrice.Get()) {
 				continue
 			}
@@ -2457,10 +2460,11 @@ func (s *Strategy) CrossRun(
 		func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 			delta := trade.PositionDelta()
 
-			// only consider hedge here
+			// trades from source session are always hedge trades
 			if trade.Exchange == s.sourceSession.ExchangeName {
 				s.positionExposure.Close(delta)
 			} else if trade.Exchange == s.makerSession.ExchangeName {
+				// trades from maker session can be hedge trades only when spread maker is enabled and it's a spread maker order
 				if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.SpreadMaker.orderStore.Exists(trade.OrderID) {
 					s.positionExposure.Close(delta)
 				} else {

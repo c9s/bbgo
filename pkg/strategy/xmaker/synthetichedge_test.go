@@ -5,7 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
 
@@ -72,7 +75,7 @@ func Test_newHedgeMarket(t *testing.T) {
 
 	market := Market("BTCUSDT")
 	depth := Number(100.0)
-	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx)
+	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx, market.Symbol)
 	_ = marketDataStream
 	_ = userDataStream
 
@@ -101,7 +104,7 @@ func TestHedgeMarket_hedge(t *testing.T) {
 
 	market := Market("BTCUSDT")
 
-	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx)
+	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx, market.Symbol)
 	_ = userDataStream
 
 	mockExchange := session.Exchange.(*mocks.MockExchange)
@@ -149,7 +152,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 
 	market := Market("BTCUSDT")
 
-	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx)
+	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx, market.Symbol)
 	_ = userDataStream
 
 	mockExchange := session.Exchange.(*mocks.MockExchange)
@@ -236,6 +239,137 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	<-doneC
 }
 
+func TestSyntheticHedgeMarket_StartAndHedge(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	makerMarket := Market("BTCTWD")
+	_ = makerMarket
+
+	sourceMarket := Market("BTCUSDT")
+	fiatMarket := Market("USDTTWD")
+
+	sourceSession, sourceMarketDataStream, sourceUserDataStream := newMockSession(mockCtrl, ctx, sourceMarket.Symbol)
+	sourceSession.SetMarkets(AllMarkets())
+	sourceHedgeMarket := newHedgeMarket(sourceSession, sourceMarket, Number(100.0))
+	sourceHedgeMarket.book.Load(types.SliceOrderBook{
+		Symbol: "BTCUSDT",
+		Bids: types.PriceVolumeSlice{
+			{Price: Number(104_000.), Volume: Number(1)},
+		},
+		Asks: types.PriceVolumeSlice{
+			{Price: Number(104_050.0), Volume: Number(1)},
+		},
+	})
+
+	fiatSession, fiatMarketDataStream, _ := newMockSession(mockCtrl, ctx, fiatMarket.Symbol)
+	fiatSession.SetMarkets(AllMarkets())
+	fiatHedgeMarket := newHedgeMarket(fiatSession, fiatMarket, Number(10.0))
+	fiatHedgeMarket.book.Load(types.SliceOrderBook{
+		Symbol: "USDTTWD",
+		Bids: types.PriceVolumeSlice{
+			{Price: Number(30.1), Volume: Number(125000)},
+		},
+		Asks: types.PriceVolumeSlice{
+			{Price: Number(30.0), Volume: Number(125000)},
+		},
+	})
+
+	orderStore := core.NewOrderStore(makerMarket.Symbol)
+	position := types.NewPositionFromMarket(makerMarket)
+	strategy := &Strategy{
+		makerSession:   nil,
+		makerMarket:    makerMarket,
+		orderStore:     orderStore,
+		tradeCollector: core.NewTradeCollector(makerMarket.Symbol, position, orderStore),
+	}
+
+	syn := &SyntheticHedge{
+		Enabled:            true,
+		SourceSymbol:       "binance." + sourceMarket.Symbol,
+		SourceDepthInQuote: Number(1000.0),
+		FiatSymbol:         "max." + fiatMarket.Symbol,
+		FiatDepthInQuote:   Number(30.0 * 1000.0),
+		HedgeInterval:      types.Duration(10 * time.Millisecond),
+		sourceMarket:       sourceHedgeMarket,
+		fiatMarket:         fiatHedgeMarket,
+		syntheticTradeId:   0,
+		logger:             logrus.StandardLogger(),
+	}
+	err := syn.initialize(strategy)
+	assert.NoError(t, err)
+
+	doneC := make(chan struct{})
+
+	go func() {
+		err := syn.Start(ctx)
+		assert.NoError(t, err)
+
+		close(doneC)
+	}()
+
+	sourceMarketDataStream.EmitConnect()
+	fiatMarketDataStream.EmitConnect()
+
+	submitOrder := types.SubmitOrder{
+		Market:   sourceMarket,
+		Symbol:   "BTCUSDT",
+		Quantity: Number(1.0),
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeMarket,
+	}
+	createdOrder := types.Order{
+		OrderID:          1,
+		SubmitOrder:      submitOrder,
+		ExecutedQuantity: Number(1.0),
+		Status:           types.OrderStatusFilled,
+	}
+	sourceSession.Exchange.(*mocks.MockExchange).EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil)
+
+	submitOrder2 := types.SubmitOrder{
+		Market:   fiatMarket,
+		Symbol:   "USDTTWD",
+		Quantity: Number(104000.0),
+		Side:     types.SideTypeSell,
+		Type:     types.OrderTypeMarket,
+	}
+	createdOrder2 := types.Order{
+		OrderID:          2,
+		SubmitOrder:      submitOrder2,
+		ExecutedQuantity: Number(104000.0),
+		Status:           types.OrderStatusFilled,
+	}
+	fiatSession.Exchange.(*mocks.MockExchange).EXPECT().SubmitOrder(gomock.Any(), submitOrder2).Return(&createdOrder2, nil)
+
+	// add position to delta
+	sourceHedgeMarket.positionDeltaC <- Number(1.0)
+
+	time.Sleep(30 * time.Millisecond)
+
+	sourceUserDataStream.EmitTradeUpdate(types.Trade{
+		ID:            createdOrder.OrderID,
+		OrderID:       createdOrder.OrderID,
+		Exchange:      createdOrder.Exchange,
+		Price:         Number(104_000.0),
+		Quantity:      Number(1.0),
+		QuoteQuantity: Number(104000.0 * 1.0),
+		Symbol:        createdOrder.Symbol,
+		Side:          createdOrder.Side,
+		IsBuyer:       createdOrder.Side == types.SideTypeBuy,
+		IsMaker:       false,
+		Time:          types.Time{},
+		Fee:           fixedpoint.Zero,
+		FeeCurrency:   "",
+	})
+	time.Sleep(30 * time.Millisecond)
+
+	cancel()
+	<-doneC
+}
+
 func TestPositionExposure(t *testing.T) {
 	pe := newPositionExposure("BTCUSDT")
 
@@ -310,10 +444,10 @@ func bindMockUserDataStream(mockStream *mocks.MockStream, stream *types.Standard
 // newMockSession creates a mock ExchangeSession with a marketDataStream and userDataStream.
 // marketDataStream and userDataStream are used to simulate the events
 func newMockSession(
-	mockCtrl *gomock.Controller, ctx context.Context,
+	mockCtrl *gomock.Controller, ctx context.Context, symbol string,
 ) (*bbgo.ExchangeSession, *types.StandardStream, *types.StandardStream) {
 	// setup market data stream
-	marketDataStream, mockMarketDataStream := newMockMarketDataStream(mockCtrl, ctx)
+	marketDataStream, mockMarketDataStream := newMockMarketDataStream(mockCtrl, ctx, symbol)
 
 	// setup user data stream
 	userDataStream, mockUserDataStream := newMockUserDataStream(mockCtrl)
@@ -323,7 +457,7 @@ func newMockSession(
 	mockEx.EXPECT().Name().Return(types.ExchangeBinance)
 
 	mockBalances := types.BalanceMap{
-		"USDT": types.NewBalance("USDT", Number(100000)),
+		"USDT": types.NewBalance("USDT", Number(200000)),
 		"BTC":  types.NewBalance("BTC", Number(10)),
 	}
 
@@ -341,7 +475,7 @@ func newMockSession(
 }
 
 func newMockMarketDataStream(
-	mockCtrl *gomock.Controller, ctx context.Context,
+	mockCtrl *gomock.Controller, ctx context.Context, symbol string,
 ) (*types.StandardStream, *mocks.MockStream) {
 	marketDataStream := &types.StandardStream{}
 	mockMarketDataStream := mocks.NewMockStream(mockCtrl)
@@ -349,11 +483,12 @@ func newMockMarketDataStream(
 
 	// newHedgeMarket calls these methods
 	mockMarketDataStream.EXPECT().SetPublicOnly()
-	mockMarketDataStream.EXPECT().Subscribe(types.BookChannel, "BTCUSDT", types.SubscribeOptions{
+	mockMarketDataStream.EXPECT().Subscribe(types.BookChannel, symbol, types.SubscribeOptions{
 		Depth: types.DepthLevelFull,
 	})
 
 	mockMarketDataStream.EXPECT().Connect(gomock.AssignableToTypeOf(ctx))
+
 	return marketDataStream, mockMarketDataStream
 }
 
