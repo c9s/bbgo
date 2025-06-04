@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -34,6 +36,8 @@ type HedgeMarket struct {
 	orderStore        *core.OrderStore
 	tradeCollector    *core.TradeCollector
 	activeMakerOrders *bbgo.ActiveOrderBook
+
+	logger logrus.FieldLogger
 
 	mockTradeId uint64
 	mu          sync.Mutex
@@ -68,6 +72,11 @@ func newHedgeMarket(
 	activeMakerOrders := bbgo.NewActiveOrderBook(symbol)
 	activeMakerOrders.BindStream(session.UserDataStream)
 
+	logger := log.WithFields(logrus.Fields{
+		"exchange":     session.ExchangeName,
+		"hedge_market": market.Symbol,
+	})
+
 	m := &HedgeMarket{
 		session:   session,
 		market:    market,
@@ -85,14 +94,15 @@ func newHedgeMarket(
 		orderStore:        orderStore,
 		tradeCollector:    tradeCollector,
 		activeMakerOrders: activeMakerOrders,
+
+		logger: logger,
 	}
 
 	tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
 		delta := trade.PositionDelta()
-		m.positionExposure.pending.Add(delta)
-		m.positionExposure.net.Add(delta)
+		m.positionExposure.Close(delta)
 
-		log.Infof("trade collector received trade: %+v, position delta: %f, covered position: %f",
+		m.logger.Infof("trade collector received trade: %+v, position delta: %f, covered position: %f",
 			trade, delta.Float64(), m.positionExposure.pending.Get().Float64())
 
 		// TODO: pass Environment to HedgeMarket
@@ -223,7 +233,7 @@ func (m *HedgeMarket) hedge(
 
 	// skip dust quantity
 	if m.market.IsDustQuantity(quantity, price) {
-		log.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
+		m.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
 		return nil
 	}
 
@@ -241,7 +251,7 @@ func (m *HedgeMarket) hedge(
 
 	m.positionExposure.pending.Add(hedgeDelta.Neg())
 
-	log.Infof("hedge order created: %+v, covered position: %f", hedgeOrder, m.positionExposure.pending.Get().Float64())
+	m.logger.Infof("hedge order created: %+v, covered position: %f", hedgeOrder, m.positionExposure.pending.Get().Float64())
 	return nil
 }
 
@@ -250,7 +260,7 @@ func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) er
 		return err
 	}
 
-	log.Infof("waiting for %s hedge market connectivity...", m.symbol)
+	m.logger.Infof("waiting for %s hedge market connectivity...", m.symbol)
 	<-m.connectivity.ConnectedC()
 
 	ticker := time.NewTicker(hedgeInterval)
@@ -265,7 +275,7 @@ func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) er
 			_ = now
 			uncoveredPosition := m.positionExposure.GetUncovered()
 			if err := m.hedge(ctx, uncoveredPosition); err != nil {
-				log.WithError(err).Errorf("hedge failed")
+				m.logger.WithError(err).Errorf("hedge failed")
 			}
 
 		case delta := <-m.positionDeltaC:

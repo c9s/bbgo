@@ -141,6 +141,10 @@ func (s *SyntheticHedge) InitializeAndBind(
 	s.sourceMarket = newHedgeMarket(sourceSession, sourceMarket, s.SourceDepthInQuote)
 	s.fiatMarket = newHedgeMarket(fiatSession, fiatMarket, s.FiatDepthInQuote)
 
+	return s.initialize(strategy)
+}
+
+func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 	// when receiving trades from the source session,
 	// mock a trade with the quote amount and add to the fiat position
 	//
@@ -235,7 +239,7 @@ func (s *SyntheticHedge) InitializeAndBind(
 			Fee:           trade.Fee,         // apply trade fee when possible
 			FeeCurrency:   trade.FeeCurrency, // apply trade fee when possible
 		}
-		s.logger.Infof("synthetic trade created: %+v, average cost: %f", syntheticTrade, avgCost.Float64())
+		s.logger.Infof("[syntheticHedge] synthetic trade created: %+v, average cost: %f", syntheticTrade, avgCost.Float64())
 		syntheticOrder := newMockOrderFromTrade(syntheticTrade, types.OrderTypeMarket)
 		strategy.orderStore.Add(syntheticOrder)
 		strategy.tradeCollector.TradeStore().Add(syntheticTrade)
@@ -254,14 +258,14 @@ func (s *SyntheticHedge) InitializeAndBind(
 // 6) merge the positions.
 func (s *SyntheticHedge) Hedge(
 	_ context.Context,
-	hedgeDelta fixedpoint.Value,
+	uncoveredPosition fixedpoint.Value,
 ) error {
-	if hedgeDelta.IsZero() {
+	if uncoveredPosition.IsZero() {
 		return nil
 	}
 
-	s.logger.Infof("synthetic hedging with delta: %f", hedgeDelta.Float64())
-	s.sourceMarket.positionDeltaC <- hedgeDelta
+	s.logger.Infof("[syntheticHedge] synthetic hedging with delta: %f", uncoveredPosition.Float64())
+	s.sourceMarket.positionDeltaC <- uncoveredPosition
 	return nil
 }
 
@@ -314,13 +318,13 @@ func (s *SyntheticHedge) Start(ctx context.Context) error {
 
 	go func() {
 		if err := s.sourceMarket.start(ctx, interval); err != nil {
-			s.logger.WithError(err).Errorf("synthetic hedge failed to start")
+			s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
 		}
 	}()
 
 	go func() {
 		if err := s.fiatMarket.start(ctx, interval); err != nil {
-			s.logger.WithError(err).Errorf("synthetic hedge failed to start")
+			s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
 		}
 	}()
 
