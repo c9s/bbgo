@@ -881,14 +881,54 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		}
 	}
 
-	bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
-	if !hasPrice {
-		s.logger.Warnf("no valid price, skip quoting")
-		return nil
+	bestBidPrice := fixedpoint.Zero
+	bestAskPrice := fixedpoint.Zero
+
+	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		bestBid, bestAsk, hasPrice := s.SyntheticHedge.GetQuotePrices()
+		if !hasPrice {
+			s.logger.Warnf("no valid price, skip quoting")
+			return nil
+		}
+
+		bestBidPrice = bestBid
+		bestAskPrice = bestAsk
+	} else {
+		bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
+		if !hasPrice {
+			s.logger.Warnf("no valid price, skip quoting")
+			return nil
+		}
+
+		bookLastUpdateTime := s.sourceBook.LastUpdateTime()
+		if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
+			s.logger.WithError(err).Errorf(
+				"quote update error, %s price not updating, order book last update: %s ago",
+				s.Symbol,
+				time.Since(bookLastUpdateTime),
+			)
+
+			s.sourceSession.MarketDataStream.Reconnect()
+			s.sourceBook.Reset()
+			return err
+		}
+
+		if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
+			s.logger.WithError(err).Errorf(
+				"quote update error, %s price not updating, order book last update: %s ago",
+				s.Symbol,
+				time.Since(bookLastUpdateTime),
+			)
+
+			s.sourceSession.MarketDataStream.Reconnect()
+			s.sourceBook.Reset()
+			return err
+		}
+
+		bestBidPrice = bestBid.Price
+		bestAskPrice = bestAsk.Price
 	}
 
-	bestBidPrice := bestBid.Price
-	bestAskPrice := bestAsk.Price
 	s.logger.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
 
 	if bestBidPrice.Compare(bestAskPrice) > 0 {
@@ -900,35 +940,9 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	// use mid-price for the last price
-	midPrice := bestBid.Price.Add(bestAsk.Price).Div(two)
+	midPrice := bestBidPrice.Add(bestAskPrice).Div(two)
 	s.lastPrice.Set(midPrice)
 	s.priceSolver.Update(s.Symbol, midPrice)
-
-	bookLastUpdateTime := s.sourceBook.LastUpdateTime()
-
-	if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
-		s.logger.WithError(err).Errorf(
-			"quote update error, %s price not updating, order book last update: %s ago",
-			s.Symbol,
-			time.Since(bookLastUpdateTime),
-		)
-
-		s.sourceSession.MarketDataStream.Reconnect()
-		s.sourceBook.Reset()
-		return err
-	}
-
-	if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
-		s.logger.WithError(err).Errorf(
-			"quote update error, %s price not updating, order book last update: %s ago",
-			s.Symbol,
-			time.Since(bookLastUpdateTime),
-		)
-
-		s.sourceSession.MarketDataStream.Reconnect()
-		s.sourceBook.Reset()
-		return err
-	}
 
 	sourceBook := s.sourceBook.CopyDepth(10)
 	if valid, err := sourceBook.IsValid(); !valid {
@@ -1008,7 +1022,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 		allowMarginSell, bidQuota := s.allowMarginHedge(types.SideTypeBuy)
 		if allowMarginSell {
-			hedgeQuota.BaseAsset.Add(bidQuota.Div(bestBid.Price))
+			hedgeQuota.BaseAsset.Add(bidQuota.Div(bestBidPrice))
 		} else {
 			s.logger.Warnf("margin hedge sell is disabled, disabling maker bid orders...")
 			disableMakerBid = true
@@ -1016,7 +1030,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 		allowMarginBuy, sellQuota := s.allowMarginHedge(types.SideTypeSell)
 		if allowMarginBuy {
-			hedgeQuota.QuoteAsset.Add(sellQuota.Mul(bestAsk.Price))
+			hedgeQuota.QuoteAsset.Add(sellQuota.Mul(bestAskPrice))
 		} else {
 			s.logger.Warnf("margin hedge buy is disabled, disabling maker ask orders...")
 			disableMakerAsk = true
@@ -2143,14 +2157,15 @@ func (s *Strategy) CrossRun(
 
 		s.logger.Warnf("using sandbox exchange to simulate hedge with balances: %+v", balances)
 
-		mockEx := sandbox.New(s.sourceSession.Exchange, s.sourceSession.MarketDataStream, s.SourceSymbol, balances)
+		sandboxEx := sandbox.New(s.sourceSession.Exchange, s.sourceSession.MarketDataStream, s.SourceSymbol, balances)
 
-		if err := mockEx.Initialize(ctx); err != nil {
+		if err := sandboxEx.Initialize(ctx); err != nil {
 			return err
 		}
 
-		userDataStream := mockEx.GetUserDataStream()
-		s.sourceSession.Exchange = mockEx
+		// replace the user data stream created in the exchange session
+		userDataStream := sandboxEx.GetUserDataStream()
+		s.sourceSession.Exchange = sandboxEx
 		s.sourceSession.UserDataStream = userDataStream
 
 		// rebind user data connectivity
@@ -2330,6 +2345,7 @@ func (s *Strategy) CrossRun(
 		},
 	)
 
+	// TODO: replace this with HedgeMarket
 	sourceMarketStream := s.sourceSession.Exchange.NewStream()
 	sourceMarketStream.SetPublicOnly()
 	sourceMarketStream.Subscribe(
@@ -2392,7 +2408,6 @@ func (s *Strategy) CrossRun(
 	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
 
 	s.orderStore = core.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(s.sourceSession.UserDataStream)
 	s.orderStore.BindStream(s.makerSession.UserDataStream)
 
 	s.tradeCollector = core.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
@@ -2438,20 +2453,23 @@ func (s *Strategy) CrossRun(
 
 	s.tradeCollector.OnProfit(
 		func(trade types.Trade, profit *types.Profit) {
-			if profit != nil {
-				if s.CircuitBreaker != nil {
-					s.CircuitBreaker.RecordProfit(profit.Profit, trade.Time.Time())
-				}
-
-				if shouldNotifyProfit(trade, profit) {
-					bbgo.Notify(profit)
-				}
-
-				netProfitMarginHistogram.With(s.metricsLabels).Observe(profit.NetProfitMargin.Float64())
-
-				s.ProfitStats.AddProfit(*profit)
-				s.Environment.RecordPosition(s.Position, trade, profit)
+			// a simple guard - the behavior was changed at some timepoint
+			if profit == nil {
+				return
 			}
+
+			if s.CircuitBreaker != nil {
+				s.CircuitBreaker.RecordProfit(profit.Profit, trade.Time.Time())
+			}
+
+			if shouldNotifyProfit(trade, profit) {
+				bbgo.Notify(profit)
+			}
+
+			netProfitMarginHistogram.With(s.metricsLabels).Observe(profit.NetProfitMargin.Float64())
+
+			s.ProfitStats.AddProfit(*profit)
+			s.Environment.RecordPosition(s.Position, trade, profit)
 		},
 	)
 
@@ -2468,7 +2486,6 @@ func (s *Strategy) CrossRun(
 	)
 
 	// bind two user data streams so that we can collect the trades together
-	s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
 
 	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
@@ -2482,6 +2499,9 @@ func (s *Strategy) CrossRun(
 				s.logger.WithError(err).Errorf("failed to start syntheticHedge")
 			}
 		}()
+	} else {
+		s.orderStore.BindStream(s.sourceSession.UserDataStream)
+		s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
 	}
 
 	s.stopC = make(chan struct{})
