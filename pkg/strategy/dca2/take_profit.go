@@ -30,10 +30,21 @@ func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round)
 
 		roundPosition.AddTrade(trade)
 	}
-
 	s.logger.Infof("position of this round before place the take-profit order: %s", roundPosition.String())
 
-	order := generateTakeProfitOrder(s.Market, s.TakeProfitRatio, roundPosition, s.OrderGroupID)
+	takeProfitPrice := s.Market.TruncatePrice(roundPosition.AverageCost.Mul(fixedpoint.One.Add(s.TakeProfitRatio)))
+	order := types.SubmitOrder{
+		Symbol:      s.Market.Symbol,
+		Market:      s.Market,
+		Type:        types.OrderTypeLimit,
+		Price:       takeProfitPrice,
+		Side:        TakeProfitSide,
+		TimeInForce: types.TimeInForceGTC,
+		Quantity:    roundPosition.GetBase().Abs(),
+		Tag:         orderTag,
+		GroupID:     s.OrderGroupID,
+	}
+	s.logger.Infof("placing take-profit order: %s", order.String())
 
 	// verify the volume of order
 	bals, err := retry.QueryAccountBalancesUntilSuccessfulLite(ctx, s.ExchangeSession.Exchange)
@@ -46,13 +57,8 @@ func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round)
 		return fmt.Errorf("there is no %s in the balances %+v", s.Market.BaseCurrency, bals)
 	}
 
-	quantityDiff := bal.Available.Sub(order.Quantity)
-	if quantityDiff.Sign() < 0 {
-		return fmt.Errorf("the balance (%s) is not enough for the order (%s)", bal.String(), order.Quantity.String())
-	}
-
-	if quantityDiff.Compare(s.Market.MinQuantity) > 0 {
-		s.logger.Warnf("the diff between balance (%s) and the take-profit order (%s) is larger than min quantity %s", bal.String(), order.Quantity.String(), s.Market.MinQuantity.String())
+	if bal.Available.Compare(order.Quantity) < 0 {
+		return fmt.Errorf("the available base balance (%s) is not enough for the order (%s)", bal.Available.String(), order.Quantity.String())
 	}
 
 	createdOrders, err := s.OrderExecutor.SubmitOrders(ctx, order)
@@ -61,23 +67,8 @@ func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round)
 	}
 
 	for _, createdOrder := range createdOrders {
-		s.logger.Info("SUBMIT TAKE PROFIT ORDER ", createdOrder.String())
+		s.logger.Infof("submit take-profit order successfully: %s", createdOrder.String())
 	}
 
 	return nil
-}
-
-func generateTakeProfitOrder(market types.Market, takeProfitRatio fixedpoint.Value, position *types.Position, orderGroupID uint32) types.SubmitOrder {
-	takeProfitPrice := market.TruncatePrice(position.AverageCost.Mul(fixedpoint.One.Add(takeProfitRatio)))
-	return types.SubmitOrder{
-		Symbol:      market.Symbol,
-		Market:      market,
-		Type:        types.OrderTypeLimit,
-		Price:       takeProfitPrice,
-		Side:        TakeProfitSide,
-		TimeInForce: types.TimeInForceGTC,
-		Quantity:    position.GetBase().Abs(),
-		Tag:         orderTag,
-		GroupID:     orderGroupID,
-	}
 }

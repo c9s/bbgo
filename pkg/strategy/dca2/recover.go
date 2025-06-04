@@ -14,8 +14,6 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-var recoverSinceLimit = time.Date(2024, time.January, 29, 12, 0, 0, 0, time.Local)
-
 type descendingClosedOrderQueryService interface {
 	QueryClosedOrdersDesc(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error)
 }
