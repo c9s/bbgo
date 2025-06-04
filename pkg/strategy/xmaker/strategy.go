@@ -182,8 +182,8 @@ type Strategy struct {
 	// ProfitFixerConfig is the profit fixer configuration
 	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer,omitempty"`
 
-	UseMockExchange      bool             `json:"useMockExchange,omitempty"`
-	MockExchangeBalances types.BalanceMap `json:"mockExchangeBalances,omitempty"`
+	UseSandbox              bool             `json:"useSandbox,omitempty"`
+	SandboxExchangeBalances types.BalanceMap `json:"sandboxExchangeBalances,omitempty"`
 
 	// --------------------------------
 	// private field
@@ -2115,8 +2115,8 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
 
-	if s.UseMockExchange {
-		balances := s.MockExchangeBalances
+	if s.UseSandbox {
+		balances := s.SandboxExchangeBalances
 		if balances == nil {
 			balances = types.BalanceMap{
 				s.sourceMarket.BaseCurrency:  types.NewBalance(s.sourceMarket.BaseCurrency, fixedpoint.NewFromFloat(50.0)),
