@@ -59,7 +59,7 @@ func TestSyntheticHedge_GetQuotePrices_BaseQuote(t *testing.T) {
 		fiatMarket:   fiat,
 	}
 
-	bid, ask, ok := hedge.GetQuotePrices()
+	bid, ask, ok := hedge.GetQuotePrices(fixedpoint.Zero)
 	assert.True(t, ok)
 	assert.Equal(t, Number(10000*30), bid)
 	assert.Equal(t, Number(10010*31), ask)
