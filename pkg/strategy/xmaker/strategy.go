@@ -1634,6 +1634,8 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 			log.WithError(err).Errorf("unable to place synthetic hedge order")
 			return
 		}
+
+		s.coveredPosition.Add(hedgeDelta)
 	} else {
 		if _, err := s.directHedge(ctx, hedgeDelta); err != nil {
 			log.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
@@ -1774,7 +1776,7 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 				startTime := time.Now().Add(-tradeScanInterval).Add(-tradeScanOverlapBufferPeriod)
 
 				if err := s.tradeCollector.Recover(
-					ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime,
+					ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.SourceSymbol, startTime,
 				); err != nil {
 					log.WithError(err).Errorf("query trades error")
 				}
