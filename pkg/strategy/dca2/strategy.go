@@ -88,8 +88,8 @@ type Strategy struct {
 
 	// private field
 	mu                   sync.Mutex
-	nextStateC           chan State
-	state                State
+	nextStateC           chan statemachine.State
+	state                statemachine.State
 	collector            *Collector
 	takeProfitPrice      fixedpoint.Value
 	startTimeOfNextRound time.Time
