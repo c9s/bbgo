@@ -11,6 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
+	"github.com/c9s/bbgo/pkg/strategy/dca2/statemachine"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -62,7 +63,7 @@ func (s *Strategy) recover(ctx context.Context) error {
 }
 
 // recover state
-func recoverState(currentRound Round, orderExecutor *bbgo.GeneralOrderExecutor) (State, error) {
+func recoverState(currentRound Round, orderExecutor *bbgo.GeneralOrderExecutor) (statemachine.State, error) {
 	// no open-position orders and no take-profit orders means this is the whole new strategy
 	if len(currentRound.OpenPositionOrders) == 0 && len(currentRound.TakeProfitOrders) == 0 {
 		return IdleWaiting, nil
@@ -84,7 +85,7 @@ func recoverState(currentRound Round, orderExecutor *bbgo.GeneralOrderExecutor) 
 }
 
 // recoverStateIfAtTakeProfitStage will recover the state if the strategy is stopped at take-profit stage
-func recoverStateIfAtTakeProfitStage(orders types.OrderSlice, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore) (State, error) {
+func recoverStateIfAtTakeProfitStage(orders types.OrderSlice, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore) (statemachine.State, error) {
 	// because we may manually recover the strategy by cancelling the orders and placing the orders again, so we don't need to consider the cancelled orders
 	openedOrders, cancelledOrders, filledOrders, unexpectedOrders := orders.ClassifyByStatus()
 
@@ -113,7 +114,7 @@ func recoverStateIfAtTakeProfitStage(orders types.OrderSlice, activeOrderBook *b
 }
 
 // recoverStateIfAtOpenPositionStage will recover the state if the strategy is stopped at open-position stage
-func recoverStateIfAtOpenPositionStage(orders types.OrderSlice, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore) (State, error) {
+func recoverStateIfAtOpenPositionStage(orders types.OrderSlice, activeOrderBook *bbgo.ActiveOrderBook, orderStore *core.OrderStore) (statemachine.State, error) {
 	openedOrders, cancelledOrders, filledOrders, unexpectedOrders := orders.ClassifyByStatus()
 	if len(unexpectedOrders) > 0 {
 		return None, fmt.Errorf("there is unexpected status of orders %+v at open-position stage recovery", unexpectedOrders)
