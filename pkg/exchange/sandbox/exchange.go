@@ -1,4 +1,4 @@
-package mock
+package sandbox
 
 import (
 	"context"
@@ -7,11 +7,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var log = logrus.WithField("exchange", "sandbox")
 
 type Stream struct {
 	types.StandardStream
@@ -193,7 +195,7 @@ func (e *Exchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, 
 
 // SubmitOrder simulates order submission
 func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (createdOrder *types.Order, err error) {
-	log.Info("SubmitOrder")
+	log.Infof("SubmitOrder: %+v", order)
 
 	e.mu.Lock()
 	defer e.mu.Unlock()
