@@ -30,7 +30,7 @@ func Test_RecoverState(t *testing.T) {
 		currentRound := Round{}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(currentRound, orderExecutor)
+		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, IdleWaiting, state)
 	})
@@ -48,7 +48,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(currentRound, orderExecutor)
+		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionReady, state)
 	})
@@ -66,7 +66,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(currentRound, orderExecutor)
+		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionOrderFilled, state)
 	})
@@ -84,7 +84,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(currentRound, orderExecutor)
+		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionFinished, state)
 	})
@@ -102,7 +102,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(currentRound, orderExecutor)
+		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, OpenPositionFinished, state)
 	})
@@ -123,7 +123,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(currentRound, orderExecutor)
+		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, TakeProfitReady, state)
 	})
@@ -144,7 +144,7 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverState(currentRound, orderExecutor)
+		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
 		assert.NoError(t, err)
 		assert.Equal(t, IdleWaiting, state)
 	})
@@ -164,9 +164,9 @@ func Test_classifyOrders(t *testing.T) {
 		{Status: types.OrderStatusCanceled},
 	}
 
-	opened, cancelled, filled, unexpected := orders.ClassifyByStatus()
+	opened, filled, cancelled, unexpected := orders.ClassifyByStatus()
 	assert.Equal(t, 3, len(opened))
-	assert.Equal(t, 4, len(cancelled))
 	assert.Equal(t, 2, len(filled))
+	assert.Equal(t, 4, len(cancelled))
 	assert.Equal(t, 1, len(unexpected))
 }
