@@ -11,6 +11,10 @@ import (
 
 type State int64
 
+const (
+	None State = iota
+)
+
 type StateMachine struct {
 	once   util.Reonce
 	logger *logrus.Entry
@@ -36,7 +40,7 @@ type StateMachine struct {
 func NewStateMachine(logger *logrus.Entry) *StateMachine {
 	s := &StateMachine{
 		logger:        logger,
-		nextStateC:    make(chan State, 1),
+		nextStateC:    make(chan State, 5),
 		closeC:        make(chan struct{}, 1),
 		recoverStateC: make(chan struct{}, 1),
 	}
@@ -142,7 +146,7 @@ func (s *StateMachine) runState(ctx context.Context) {
 			s.logger.Info("context done, exiting state machine")
 			return
 		case <-s.closeC:
-			s.logger.Info("state machine closed")
+			s.logger.Info("state machine closed by request")
 			s.emitClose()
 			return
 		case <-s.recoverStateC:
