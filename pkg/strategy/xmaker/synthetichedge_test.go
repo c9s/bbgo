@@ -47,14 +47,20 @@ func TestSyntheticHedge_GetQuotePrices_BaseQuote(t *testing.T) {
 	})
 
 	source := &HedgeMarket{
+		HedgeMarketConfig: &HedgeMarketConfig{
+			QuotingDepth: Number(1.0),
+		},
 		market:    sourceMarket,
 		book:      sourceBook,
-		depthBook: types.NewDepthBook(sourceBook, Number(1)),
+		depthBook: types.NewDepthBook(sourceBook),
 	}
 	fiat := &HedgeMarket{
+		HedgeMarketConfig: &HedgeMarketConfig{
+			QuotingDepth: Number(1.0),
+		},
 		market:    fiatMarket,
 		book:      fiatBook,
-		depthBook: types.NewDepthBook(fiatBook, Number(1)),
+		depthBook: types.NewDepthBook(fiatBook),
 	}
 
 	hedge := &SyntheticHedge{
@@ -62,7 +68,7 @@ func TestSyntheticHedge_GetQuotePrices_BaseQuote(t *testing.T) {
 		fiatMarket:   fiat,
 	}
 
-	bid, ask, ok := hedge.GetQuotePrices(fixedpoint.Zero)
+	bid, ask, ok := hedge.GetQuotePrices()
 	assert.True(t, ok)
 	assert.Equal(t, Number(10000*30), bid)
 	assert.Equal(t, Number(10010*31), ask)
@@ -80,9 +86,13 @@ func Test_newHedgeMarket(t *testing.T) {
 	_ = userDataStream
 
 	doneC := make(chan struct{})
-	hm := newHedgeMarket(session, market, depth)
+	hm := newHedgeMarket(&HedgeMarketConfig{
+		Symbol:        "BTCUSDT",
+		HedgeInterval: types.Duration(3 * time.Millisecond),
+		QuotingDepth:  depth,
+	}, session, market)
 	go func() {
-		err := hm.start(ctx, 3*time.Millisecond)
+		err := hm.Start(ctx)
 		assert.NoError(t, err)
 		close(doneC)
 	}()
@@ -124,7 +134,12 @@ func TestHedgeMarket_hedge(t *testing.T) {
 	}
 	mockExchange.EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil)
 
-	hm := newHedgeMarket(session, market, Number(100.0))
+	depth := Number(100.0)
+	hm := newHedgeMarket(&HedgeMarketConfig{
+		Symbol:        "BTCUSDT",
+		HedgeInterval: types.Duration(3 * time.Millisecond),
+		QuotingDepth:  depth,
+	}, session, market)
 
 	err := hm.stream.Connect(ctx)
 	assert.NoError(t, err)
@@ -173,7 +188,13 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	mockExchange.EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil)
 
 	doneC := make(chan struct{})
-	hm := newHedgeMarket(session, market, Number(100.0))
+	depth := Number(100.0)
+	hm := newHedgeMarket(&HedgeMarketConfig{
+		Symbol:        "BTCUSDT",
+		HedgeInterval: types.Duration(3 * time.Millisecond),
+		QuotingDepth:  depth,
+	}, session, market)
+
 	go func() {
 		err := hm.start(ctx, 40*time.Millisecond)
 		assert.NoError(t, err)
@@ -256,7 +277,13 @@ func TestSyntheticHedgeMarket_StartAndHedge(t *testing.T) {
 
 	sourceSession, sourceMarketDataStream, sourceUserDataStream := newMockSession(mockCtrl, ctx, sourceMarket.Symbol)
 	sourceSession.SetMarkets(AllMarkets())
-	sourceHedgeMarket := newHedgeMarket(sourceSession, sourceMarket, Number(100.0))
+
+	sourceHedgeMarket := newHedgeMarket(&HedgeMarketConfig{
+		Symbol:        sourceMarket.Symbol,
+		HedgeInterval: types.Duration(3 * time.Millisecond),
+		QuotingDepth:  Number(100.0),
+	}, sourceSession, sourceMarket)
+
 	sourceHedgeMarket.book.Load(types.SliceOrderBook{
 		Symbol: "BTCUSDT",
 		Bids: types.PriceVolumeSlice{
@@ -269,7 +296,12 @@ func TestSyntheticHedgeMarket_StartAndHedge(t *testing.T) {
 
 	fiatSession, fiatMarketDataStream, fiatUserDataStream := newMockSession(mockCtrl, ctx, fiatMarket.Symbol)
 	fiatSession.SetMarkets(AllMarkets())
-	fiatHedgeMarket := newHedgeMarket(fiatSession, fiatMarket, Number(10.0))
+	fiatHedgeMarket := newHedgeMarket(&HedgeMarketConfig{
+		Symbol:        fiatMarket.Symbol,
+		HedgeInterval: types.Duration(3 * time.Millisecond),
+		QuotingDepth:  Number(10.0),
+	}, fiatSession, fiatMarket)
+
 	fiatHedgeMarket.book.Load(types.SliceOrderBook{
 		Symbol: "USDTTWD",
 		Bids: types.PriceVolumeSlice{
@@ -292,16 +324,21 @@ func TestSyntheticHedgeMarket_StartAndHedge(t *testing.T) {
 	}
 
 	syn := &SyntheticHedge{
-		Enabled:            true,
-		SourceSymbol:       "binance." + sourceMarket.Symbol,
-		SourceDepthInQuote: Number(1000.0),
-		FiatSymbol:         "max." + fiatMarket.Symbol,
-		FiatDepthInQuote:   Number(30.0 * 1000.0),
-		HedgeInterval:      types.Duration(10 * time.Millisecond),
-		sourceMarket:       sourceHedgeMarket,
-		fiatMarket:         fiatHedgeMarket,
-		syntheticTradeId:   0,
-		logger:             logrus.StandardLogger(),
+		Enabled: true,
+		Source: &HedgeMarketConfig{
+			Symbol:        "binance." + sourceMarket.Symbol,
+			QuotingDepth:  Number(10.0),
+			HedgeInterval: types.Duration(10 * time.Millisecond),
+		},
+		Fiat: &HedgeMarketConfig{
+			Symbol:        "max." + fiatMarket.Symbol,
+			QuotingDepth:  Number(30.0 * 1000.0),
+			HedgeInterval: types.Duration(10 * time.Millisecond),
+		},
+		sourceMarket:     sourceHedgeMarket,
+		fiatMarket:       fiatHedgeMarket,
+		syntheticTradeId: 0,
+		logger:           logrus.StandardLogger(),
 	}
 	err := syn.initialize(strategy)
 	assert.NoError(t, err)

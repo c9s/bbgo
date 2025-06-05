@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -81,6 +80,47 @@ func (m *PositionExposure) GetUncovered() fixedpoint.Value {
 	return uncoverPosition
 }
 
+type HedgeMethod string
+
+const (
+	// HedgeMethodMarket is the default hedge method that uses the market order to hedge
+	HedgeMethodMarket HedgeMethod = "market"
+
+	// HedgeMethodCounterparty1 is a hedge method that uses limit order at the first counterparty price level to hedge
+	HedgeMethodCounterparty1 HedgeMethod = "counterparty1"
+
+	// HedgeMethodCounterparty3 is a hedge method that uses limit order at the third counterparty price level to hedge
+	HedgeMethodCounterparty3 HedgeMethod = "counterparty3"
+
+	// HedgeMethodCounterparty5 is a hedge method that uses limit order at the fifth counterparty price level to hedge
+	HedgeMethodCounterparty5 HedgeMethod = "counterparty5"
+
+	// HedgeMethodQueue1 is a hedge method that uses limit order at the first price level in the queue to hedge
+	HedgeMethodQueue1 HedgeMethod = "queue1"
+)
+
+type HedgeMarketConfig struct {
+	Symbol        string         `json:"symbol"`
+	HedgeMethod   HedgeMethod    `json:"hedgeMethod"`
+	HedgeInterval types.Duration `json:"hedgeInterval"`
+
+	QuotingDepth        fixedpoint.Value `json:"quotingDepth"`
+	QuotingDepthInQuote fixedpoint.Value `json:"quotingDepthInQuote"`
+}
+
+func initializeHedgeMarketFromConfig(
+	c *HedgeMarketConfig,
+	sessions map[string]*bbgo.ExchangeSession,
+) (*HedgeMarket, error) {
+	session, market, err := parseSymbolSelector(c.Symbol, sessions)
+	if err != nil {
+		return nil, err
+	}
+
+	hm := newHedgeMarket(c, session, market)
+	return hm, nil
+}
+
 // SyntheticHedge is a strategy that uses synthetic hedging to manage risk
 // SourceSymbol could be something like binance.BTCUSDT
 // FiatSymbol could be something like max.USDTTWD
@@ -88,13 +128,8 @@ type SyntheticHedge struct {
 	// SyntheticHedge is a strategy that uses synthetic hedging to manage risk
 	Enabled bool `json:"enabled"`
 
-	SourceSymbol       string           `json:"sourceSymbol"`
-	SourceDepthInQuote fixedpoint.Value `json:"sourceDepthInQuote"`
-
-	FiatSymbol       string           `json:"fiatSymbol"`
-	FiatDepthInQuote fixedpoint.Value `json:"fiatDepthInQuote"`
-
-	HedgeInterval types.Duration `json:"hedgeInterval"`
+	Source *HedgeMarketConfig `json:"source"`
+	Fiat   *HedgeMarketConfig `json:"fiat"`
 
 	sourceMarket, fiatMarket *HedgeMarket
 
@@ -118,8 +153,8 @@ func (s *SyntheticHedge) InitializeAndBind(
 	}
 
 	// Initialize the synthetic quote
-	if s.SourceSymbol == "" || s.FiatSymbol == "" {
-		return fmt.Errorf("sourceSymbol and fiatSymbol must be set")
+	if s.Source == nil || s.Fiat == nil {
+		return fmt.Errorf("source and fiat must be set")
 	}
 
 	s.logger = log.WithFields(logrus.Fields{
@@ -128,18 +163,15 @@ func (s *SyntheticHedge) InitializeAndBind(
 
 	var err error
 
-	sourceSession, sourceMarket, err := parseSymbolSelector(s.SourceSymbol, sessions)
+	s.sourceMarket, err = initializeHedgeMarketFromConfig(s.Source, sessions)
 	if err != nil {
 		return err
 	}
 
-	fiatSession, fiatMarket, err := parseSymbolSelector(s.FiatSymbol, sessions)
+	s.fiatMarket, err = initializeHedgeMarketFromConfig(s.Source, sessions)
 	if err != nil {
 		return err
 	}
-
-	s.sourceMarket = newHedgeMarket(sourceSession, sourceMarket, s.SourceDepthInQuote)
-	s.fiatMarket = newHedgeMarket(fiatSession, fiatMarket, s.FiatDepthInQuote)
 
 	return s.initialize(strategy)
 }
@@ -269,7 +301,7 @@ func (s *SyntheticHedge) Hedge(
 	return nil
 }
 
-func (s *SyntheticHedge) GetQuotePrices(depth fixedpoint.Value) (fixedpoint.Value, fixedpoint.Value, bool) {
+func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, bool) {
 	if s.sourceMarket == nil || s.fiatMarket == nil {
 		return fixedpoint.Zero, fixedpoint.Zero, false
 	}
@@ -311,25 +343,20 @@ func (s *SyntheticHedge) Start(ctx context.Context) error {
 		return fmt.Errorf("sourceMarket and fiatMarket must be initialized")
 	}
 
-	interval := s.HedgeInterval.Duration()
-	if interval == 0 {
-		interval = 3 * time.Second // default interval
-	}
-
 	go func() {
-		if err := s.sourceMarket.start(ctx, interval); err != nil {
+		if err := s.sourceMarket.Start(ctx); err != nil {
 			s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
 		}
 	}()
 
 	go func() {
-		if err := s.fiatMarket.start(ctx, interval); err != nil {
+		if err := s.fiatMarket.Start(ctx); err != nil {
 			s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
 		}
 	}()
 
-	<-s.sourceMarket.connectivity.ConnectedC()
-	<-s.fiatMarket.connectivity.ConnectedC()
+	s.sourceMarket.WaitForReady(ctx)
+	s.fiatMarket.WaitForReady(ctx)
 
 	return nil
 }

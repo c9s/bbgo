@@ -16,7 +16,8 @@ import (
 )
 
 type HedgeMarket struct {
-	symbol  string
+	*HedgeMarketConfig
+
 	session *bbgo.ExchangeSession
 	market  types.Market
 	stream  types.Stream
@@ -44,9 +45,9 @@ type HedgeMarket struct {
 }
 
 func newHedgeMarket(
+	config *HedgeMarketConfig,
 	session *bbgo.ExchangeSession,
 	market types.Market,
-	depth fixedpoint.Value,
 ) *HedgeMarket {
 	symbol := market.Symbol
 	stream := session.Exchange.NewStream()
@@ -59,7 +60,7 @@ func newHedgeMarket(
 	book := types.NewStreamBook(symbol, session.Exchange.Name())
 	book.BindStream(stream)
 
-	depthBook := types.NewDepthBook(book, depth)
+	depthBook := types.NewDepthBook(book)
 
 	position := types.NewPositionFromMarket(market)
 
@@ -78,12 +79,12 @@ func newHedgeMarket(
 	})
 
 	m := &HedgeMarket{
-		session:   session,
-		market:    market,
-		symbol:    market.Symbol,
-		stream:    stream,
-		book:      book,
-		depthBook: depthBook,
+		HedgeMarketConfig: config,
+		session:           session,
+		market:            market,
+		stream:            stream,
+		book:              book,
+		depthBook:         depthBook,
 
 		connectivity: connectivity,
 
@@ -128,7 +129,7 @@ func (m *HedgeMarket) newMockTrade(
 		Price:         price,
 		Quantity:      quantity,
 		QuoteQuantity: quantity.Mul(price),
-		Symbol:        m.symbol,
+		Symbol:        m.Symbol,
 		Side:          side,
 		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       true,
@@ -145,7 +146,7 @@ func (m *HedgeMarket) newMockTrade(
 
 func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
 	submitOrder.Market = m.market
-	submitOrder.Symbol = m.symbol
+	submitOrder.Symbol = m.Symbol
 
 	submitOrders := []types.SubmitOrder{
 		submitOrder,
@@ -182,7 +183,11 @@ func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
 	defer m.mu.Unlock()
 
 	now := time.Now()
-	bid, ask = m.depthBook.BestBidAndAskAtQuoteDepth()
+	if m.QuotingDepthInQuote.Sign() > 0 {
+		bid, ask = m.depthBook.BestBidAndAskAtQuoteDepth(m.QuotingDepthInQuote)
+	} else {
+		bid, ask = m.depthBook.BestBidAndAskAtDepth(m.QuotingDepth)
+	}
 
 	// store prices as snapshot
 	m.quotingPrice = &types.Ticker{
@@ -203,14 +208,9 @@ func (m *HedgeMarket) hedge(
 	}
 
 	var bid, ask, price fixedpoint.Value
-	m.mu.Lock()
-	if m.quotingPrice != nil {
-		bid = m.quotingPrice.Buy
-		ask = m.quotingPrice.Sell
-	} else {
-		bid, ask = m.depthBook.BestBidAndAskAtQuoteDepth()
-	}
-	m.mu.Unlock()
+
+	// TODO: use hedge method to get the price
+	bid, ask = m.getQuotePrice()
 
 	hedgeDelta := uncoveredPosition.Neg()
 	quantity := hedgeDelta.Abs()
@@ -238,7 +238,7 @@ func (m *HedgeMarket) hedge(
 	}
 
 	hedgeOrder, err := m.submitOrder(ctx, types.SubmitOrder{
-		Symbol: m.symbol,
+		Symbol: m.Symbol,
 		Market: m.market,
 		Side:   side,
 		Type:   types.OrderTypeMarket,
@@ -255,12 +255,30 @@ func (m *HedgeMarket) hedge(
 	return nil
 }
 
+func (m *HedgeMarket) Start(ctx context.Context) error {
+	interval := m.HedgeInterval.Duration()
+	if interval == 0 {
+		interval = 3 * time.Second // default interval
+	}
+
+	return m.start(ctx, interval)
+}
+
+func (m *HedgeMarket) WaitForReady(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+		return
+	case <-m.connectivity.ConnectedC():
+		return
+	}
+}
+
 func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) error {
 	if err := m.stream.Connect(ctx); err != nil {
 		return err
 	}
 
-	m.logger.Infof("waiting for %s hedge market connectivity...", m.symbol)
+	m.logger.Infof("waiting for %s hedge market connectivity...", m.Symbol)
 	<-m.connectivity.ConnectedC()
 
 	ticker := time.NewTicker(hedgeInterval)
