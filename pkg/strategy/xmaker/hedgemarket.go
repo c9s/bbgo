@@ -15,36 +15,48 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type hedgeExecutor interface {
-	hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) error
+type HedgeExecutor interface {
+	// hedge executes a hedge order based on the uncovered position and the hedge delta
+	// uncoveredPosition: the current uncovered position that needs to be hedged
+	// hedgeDelta: the delta that needs to be hedged, which is the negative of uncoveredPosition
+	// quantity: the absolute value of hedgeDelta, which is the order quantity to be hedged
+	// side: the side of the hedge order, which is determined by the sign of hedgeDelta
+	hedge(
+		ctx context.Context,
+		uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
+		side types.SideType,
+	) error
 }
 
-type MarketOrderHedgeMethod struct {
+type MarketOrderHedgeExecutor struct {
 	*HedgeMarket
 }
 
 func newMarketOrderHedgeMethod(
 	market *HedgeMarket,
-) *MarketOrderHedgeMethod {
-	return &MarketOrderHedgeMethod{
+) *MarketOrderHedgeExecutor {
+	return &MarketOrderHedgeExecutor{
 		HedgeMarket: market,
 	}
 }
 
-func (m *MarketOrderHedgeMethod) hedge(
+func (m *MarketOrderHedgeExecutor) hedge(
 	ctx context.Context,
-	uncoveredPosition fixedpoint.Value,
+	uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
+	side types.SideType,
 ) error {
-	hedgeDelta := uncoveredPosition.Neg()
-	quantity := hedgeDelta.Abs()
-
-	side := deltaToSide(hedgeDelta)
 	bid, ask := m.getQuotePrice()
 	price := sideTakerPrice(bid, ask, side)
 
 	quantity = AdjustHedgeQuantityWithAvailableBalance(
 		m.session.GetAccount(), m.market, side, quantity, price,
 	)
+
+	if m.HedgeMethodMarket != nil {
+		if m.HedgeMethodMarket.MaxOrderQuantity.Sign() > 0 {
+			quantity = fixedpoint.Max(quantity, m.HedgeMethodMarket.MaxOrderQuantity)
+		}
+	}
 
 	// skip dust quantity
 	if m.market.IsDustQuantity(quantity, price) {
@@ -97,7 +109,7 @@ type HedgeMarket struct {
 	mockTradeId uint64
 	mu          sync.Mutex
 
-	hedgeExecutor hedgeExecutor
+	hedgeExecutor HedgeExecutor
 }
 
 func newHedgeMarket(
@@ -267,7 +279,10 @@ func (m *HedgeMarket) hedge(
 		return nil
 	}
 
-	return m.hedgeExecutor.hedge(ctx, uncoveredPosition)
+	hedgeDelta := uncoveredPosition.Neg()
+	quantity := hedgeDelta.Abs()
+	side := deltaToSide(hedgeDelta)
+	return m.hedgeExecutor.hedge(ctx, uncoveredPosition, hedgeDelta, quantity, side)
 }
 
 func (m *HedgeMarket) Start(ctx context.Context) error {
