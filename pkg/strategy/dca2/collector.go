@@ -73,7 +73,7 @@ func NewCollector(logger *logrus.Entry, symbol string, groupID uint32, filterGro
 	}
 }
 
-func (rc Collector) CollectCurrentRound(ctx context.Context) (Round, error) {
+func (rc Collector) CollectCurrentRound(ctx context.Context, sinceLimit time.Time) (Round, error) {
 	openOrders, err := retry.QueryOpenOrdersUntilSuccessful(ctx, rc.ex, rc.symbol)
 	if err != nil {
 		return Round{}, err
@@ -81,7 +81,7 @@ func (rc Collector) CollectCurrentRound(ctx context.Context) (Round, error) {
 
 	var closedOrders []types.Order
 	var op = func() (err2 error) {
-		closedOrders, err2 = rc.queryClosedOrderDesc.QueryClosedOrdersDesc(ctx, rc.symbol, recoverSinceLimit, time.Now(), 0)
+		closedOrders, err2 = rc.queryClosedOrderDesc.QueryClosedOrdersDesc(ctx, rc.symbol, sinceLimit, time.Now(), 0)
 		return err2
 	}
 	if err := retry.GeneralBackoff(ctx, op); err != nil {

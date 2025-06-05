@@ -289,7 +289,7 @@ func (s OrderSlice) SeparateBySide() (buyOrders, sellOrders []Order) {
 	return buyOrders, sellOrders
 }
 
-func (s OrderSlice) ClassifyByStatus() (opened, cancelled, filled, unexpected []Order) {
+func (s OrderSlice) ClassifyByStatus() (opened, filled, cancelled, unexpected []Order) {
 	for _, order := range s {
 		switch order.Status {
 		case OrderStatusNew, OrderStatusPartiallyFilled:
@@ -302,7 +302,7 @@ func (s OrderSlice) ClassifyByStatus() (opened, cancelled, filled, unexpected []
 			unexpected = append(unexpected, order)
 		}
 	}
-	return opened, cancelled, filled, unexpected
+	return opened, filled, cancelled, unexpected
 }
 
 func (s OrderSlice) Print() {
