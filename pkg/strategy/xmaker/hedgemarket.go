@@ -15,6 +15,60 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type hedgeExecutor interface {
+	hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) error
+}
+
+type MarketOrderHedgeMethod struct {
+	*HedgeMarket
+}
+
+func newMarketOrderHedgeMethod(
+	market *HedgeMarket,
+) *MarketOrderHedgeMethod {
+	return &MarketOrderHedgeMethod{
+		HedgeMarket: market,
+	}
+}
+
+func (m *MarketOrderHedgeMethod) hedge(
+	ctx context.Context,
+	uncoveredPosition fixedpoint.Value,
+) error {
+	hedgeDelta := uncoveredPosition.Neg()
+	quantity := hedgeDelta.Abs()
+
+	side := deltaToSide(hedgeDelta)
+	bid, ask := m.getQuotePrice()
+	price := sideTakerPrice(bid, ask, side)
+
+	quantity = AdjustHedgeQuantityWithAvailableBalance(
+		m.session.GetAccount(), m.market, side, quantity, price,
+	)
+
+	// skip dust quantity
+	if m.market.IsDustQuantity(quantity, price) {
+		m.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
+		return nil
+	}
+
+	hedgeOrder, err := m.submitOrder(ctx, types.SubmitOrder{
+		Symbol:   m.Symbol,
+		Market:   m.market,
+		Side:     side,
+		Type:     types.OrderTypeMarket,
+		Quantity: quantity,
+	})
+	if err != nil {
+		return err
+	}
+
+	m.positionExposure.Cover(hedgeDelta.Neg())
+
+	m.logger.Infof("hedge order created: %+v, covered position: %f", hedgeOrder, m.positionExposure.pending.Get().Float64())
+	return nil
+}
+
 type HedgeMarket struct {
 	*HedgeMarketConfig
 
@@ -42,6 +96,8 @@ type HedgeMarket struct {
 
 	mockTradeId uint64
 	mu          sync.Mutex
+
+	hedgeExecutor hedgeExecutor
 }
 
 func newHedgeMarket(
@@ -97,6 +153,11 @@ func newHedgeMarket(
 		activeMakerOrders: activeMakerOrders,
 
 		logger: logger,
+	}
+
+	switch m.HedgeMethod {
+	default:
+		m.hedgeExecutor = newMarketOrderHedgeMethod(m)
 	}
 
 	tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
@@ -202,57 +263,11 @@ func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
 func (m *HedgeMarket) hedge(
 	ctx context.Context, uncoveredPosition fixedpoint.Value,
 ) error {
-
 	if uncoveredPosition.IsZero() {
 		return nil
 	}
 
-	var bid, ask, price fixedpoint.Value
-
-	// TODO: use hedge method to get the price
-	bid, ask = m.getQuotePrice()
-
-	hedgeDelta := uncoveredPosition.Neg()
-	quantity := hedgeDelta.Abs()
-	side := types.SideTypeBuy
-	if hedgeDelta.Sign() < 0 {
-		side = types.SideTypeSell
-	}
-
-	// use taker price
-	switch side {
-	case types.SideTypeBuy:
-		price = ask
-	case types.SideTypeSell:
-		price = bid
-	}
-
-	quantity = AdjustHedgeQuantityWithAvailableBalance(
-		m.session.GetAccount(), m.market, side, quantity, price,
-	)
-
-	// skip dust quantity
-	if m.market.IsDustQuantity(quantity, price) {
-		m.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
-		return nil
-	}
-
-	hedgeOrder, err := m.submitOrder(ctx, types.SubmitOrder{
-		Symbol: m.Symbol,
-		Market: m.market,
-		Side:   side,
-		Type:   types.OrderTypeMarket,
-		// Price: price,
-		Quantity: quantity,
-	})
-	if err != nil {
-		return err
-	}
-
-	m.positionExposure.pending.Add(hedgeDelta.Neg())
-
-	m.logger.Infof("hedge order created: %+v, covered position: %f", hedgeOrder, m.positionExposure.pending.Get().Float64())
-	return nil
+	return m.hedgeExecutor.hedge(ctx, uncoveredPosition)
 }
 
 func (m *HedgeMarket) Start(ctx context.Context) error {
@@ -300,4 +315,23 @@ func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) er
 			m.positionExposure.net.Add(delta)
 		}
 	}
+}
+
+func sideTakerPrice(bid, ask fixedpoint.Value, side types.SideType) fixedpoint.Value {
+	if side == types.SideTypeBuy {
+		return ask
+	}
+
+	return bid
+}
+
+func deltaToSide(delta fixedpoint.Value) types.SideType {
+	side := types.SideTypeBuy
+
+	if delta.Sign() < 0 {
+		side = types.SideTypeSell
+	}
+
+	return side
+
 }
