@@ -87,7 +87,7 @@ const (
 	HedgeMethodMarket HedgeMethod = "market"
 
 	// HedgeMethodCounterparty is a hedge method that uses limit order at the specific counterparty price level to hedge
-	HedgeMethodCounterparty1 HedgeMethod = "counterparty"
+	HedgeMethodCounterparty HedgeMethod = "counterparty"
 
 	// HedgeMethodQueue is a hedge method that uses limit order at the first price level in the queue to hedge
 	HedgeMethodQueue HedgeMethod = "queue"
@@ -98,13 +98,8 @@ type HedgeMarketConfig struct {
 	HedgeMethod   HedgeMethod    `json:"hedgeMethod"`
 	HedgeInterval types.Duration `json:"hedgeInterval"`
 
-	HedgeMethodMarket *struct {
-		MaxOrderQuantity fixedpoint.Value `json:"maxOrderQuantity,omitempty"` // max order quantity for market order hedge
-	} `json:"hedgeMethodMarket,omitempty"` // for backward compatibility, this is the default hedge method
-
-	HedgeMethodCounterparty *struct {
-		PriceLevel int `json:"priceLevel"`
-	} `json:"hedgeMethodCounterparty,omitempty"` // for backward compatibility, this is the default hedge method
+	HedgeMethodMarket       *MarketOrderHedgeExecutorConfig  `json:"hedgeMethodMarket,omitempty"`       // for backward compatibility, this is the default hedge method
+	HedgeMethodCounterparty *CounterpartyHedgeExecutorConfig `json:"hedgeMethodCounterparty,omitempty"` // for backward compatibility, this is the default hedge method
 
 	HedgeMethodQueue *struct {
 		PriceLevel int `json:"priceLevel"`
