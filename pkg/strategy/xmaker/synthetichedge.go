@@ -86,23 +86,29 @@ const (
 	// HedgeMethodMarket is the default hedge method that uses the market order to hedge
 	HedgeMethodMarket HedgeMethod = "market"
 
-	// HedgeMethodCounterparty1 is a hedge method that uses limit order at the first counterparty price level to hedge
-	HedgeMethodCounterparty1 HedgeMethod = "counterparty1"
+	// HedgeMethodCounterparty is a hedge method that uses limit order at the specific counterparty price level to hedge
+	HedgeMethodCounterparty1 HedgeMethod = "counterparty"
 
-	// HedgeMethodCounterparty3 is a hedge method that uses limit order at the third counterparty price level to hedge
-	HedgeMethodCounterparty3 HedgeMethod = "counterparty3"
-
-	// HedgeMethodCounterparty5 is a hedge method that uses limit order at the fifth counterparty price level to hedge
-	HedgeMethodCounterparty5 HedgeMethod = "counterparty5"
-
-	// HedgeMethodQueue1 is a hedge method that uses limit order at the first price level in the queue to hedge
-	HedgeMethodQueue1 HedgeMethod = "queue1"
+	// HedgeMethodQueue is a hedge method that uses limit order at the first price level in the queue to hedge
+	HedgeMethodQueue HedgeMethod = "queue"
 )
 
 type HedgeMarketConfig struct {
 	Symbol        string         `json:"symbol"`
 	HedgeMethod   HedgeMethod    `json:"hedgeMethod"`
 	HedgeInterval types.Duration `json:"hedgeInterval"`
+
+	HedgeMethodMarket *struct {
+		MaxOrderQuantity fixedpoint.Value `json:"maxOrderQuantity,omitempty"` // max order quantity for market order hedge
+	} `json:"hedgeMethodMarket,omitempty"` // for backward compatibility, this is the default hedge method
+
+	HedgeMethodCounterparty *struct {
+		PriceLevel int `json:"priceLevel"`
+	} `json:"hedgeMethodCounterparty,omitempty"` // for backward compatibility, this is the default hedge method
+
+	HedgeMethodQueue *struct {
+		PriceLevel int `json:"priceLevel"`
+	} `json:"hedgeMethodQueue,omitempty"` // for backward compatibility, this is the default hedge method
 
 	QuotingDepth        fixedpoint.Value `json:"quotingDepth"`
 	QuotingDepthInQuote fixedpoint.Value `json:"quotingDepthInQuote"`
