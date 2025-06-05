@@ -22,7 +22,7 @@ func (s *Strategy) openPosition(ctx context.Context) error {
 	}
 
 	// validate the stage by orders
-	currentRound, err := s.collector.CollectCurrentRound(ctx)
+	currentRound, err := s.collector.CollectCurrentRound(ctx, recoverSinceLimit)
 	if err != nil {
 		return fmt.Errorf("failed to collect current round: %w", err)
 	}
@@ -32,7 +32,7 @@ func (s *Strategy) openPosition(ctx context.Context) error {
 	}
 
 	s.logger.Info("[State] openPosition - place open-position orders")
-	if err := s.placeOpenPositionOrders(s.writeCtx); err != nil {
+	if err := s.placeOpenPositionOrders(ctx); err != nil {
 		return fmt.Errorf("failed to place open-position orders: %w", err)
 	}
 
@@ -47,12 +47,13 @@ func (s *Strategy) readyToFinishOpenPositionStage(_ context.Context) error {
 
 // finishOpenPositionStage will update the state to OpenPositionFinish and return true to trigger the next state immediately
 func (s *Strategy) finishOpenPositionStage(_ context.Context) error {
+	s.stateMachine.EmitNextState(TakeProfitReady)
 	return nil
 }
 
 // cancelOpenPositionOrdersAndPlaceTakeProfitOrder will cancel the open-position orders and place the take-profit orders
 func (s *Strategy) cancelOpenPositionOrdersAndPlaceTakeProfitOrder(ctx context.Context) error {
-	currentRound, err := s.collector.CollectCurrentRound(ctx)
+	currentRound, err := s.collector.CollectCurrentRound(ctx, recoverSinceLimit)
 	if err != nil {
 		return fmt.Errorf("failed to collect current round: %w", err)
 	}
@@ -67,7 +68,7 @@ func (s *Strategy) cancelOpenPositionOrdersAndPlaceTakeProfitOrder(ctx context.C
 	}
 
 	// place the take-profit order
-	if err := s.placeTakeProfitOrder(s.writeCtx, currentRound); err != nil {
+	if err := s.placeTakeProfitOrder(ctx, currentRound); err != nil {
 		return fmt.Errorf("failed to place take-profit order: %w", err)
 	}
 
