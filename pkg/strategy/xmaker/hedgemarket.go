@@ -141,17 +141,23 @@ func (m *CounterpartyHedgeExecutor) hedge(
 		return fmt.Errorf("side book is empty for %s", m.Symbol)
 	}
 
+	priceLevel := m.config.PriceLevel
 	offset := 0
 	if m.config.PriceLevel < 0 {
 		offset = m.config.PriceLevel
-		m.config.PriceLevel = 0
+		priceLevel = 0
+	} else {
+		priceLevel--
+		if priceLevel == 0 {
+			priceLevel = 1
+		}
 	}
 
-	if m.config.PriceLevel >= len(sideBook) {
+	if priceLevel > len(sideBook) {
 		return fmt.Errorf("invalid price level %d for %s", m.config.PriceLevel, m.Symbol)
 	}
 
-	price := sideBook[m.config.PriceLevel].Price
+	price := sideBook[priceLevel].Price
 	if offset > 0 {
 		ticks := m.market.TickSize.Mul(fixedpoint.NewFromInt(int64(offset)))
 		switch counterpartySide {
