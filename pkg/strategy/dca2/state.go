@@ -3,12 +3,12 @@ package dca2
 import (
 	"context"
 	"time"
+
+	"github.com/c9s/bbgo/pkg/strategy/dca2/statemachine"
 )
 
-type State int64
-
 const (
-	None State = iota
+	None statemachine.State = iota
 	IdleWaiting
 	OpenPositionReady
 	OpenPositionOrderFilled
@@ -16,7 +16,7 @@ const (
 	TakeProfitReady
 )
 
-var stateTransition map[State]State = map[State]State{
+var stateTransition map[statemachine.State]statemachine.State = map[statemachine.State]statemachine.State{
 	IdleWaiting:             OpenPositionReady,
 	OpenPositionReady:       OpenPositionOrderFilled,
 	OpenPositionOrderFilled: OpenPositionFinished,
@@ -31,7 +31,7 @@ func (s *Strategy) initializeNextStateC() bool {
 	isInitialize := false
 	if s.nextStateC == nil {
 		s.logger.Info("[DCA] initializing next state channel")
-		s.nextStateC = make(chan State, 1)
+		s.nextStateC = make(chan statemachine.State, 1)
 	} else {
 		s.logger.Info("[DCA] nextStateC is already initialized")
 		isInitialize = true
@@ -40,7 +40,7 @@ func (s *Strategy) initializeNextStateC() bool {
 	return isInitialize
 }
 
-func (s *Strategy) updateState(state State) {
+func (s *Strategy) updateState(state statemachine.State) {
 	s.logger.Infof("[state] update state from %d to %d", s.state, state)
 	s.state = state
 
@@ -48,7 +48,7 @@ func (s *Strategy) updateState(state State) {
 	updateNumOfActiveOrdersMetrics(s.OrderExecutor.ActiveMakerOrders().NumOfOrders())
 }
 
-func (s *Strategy) emitNextState(nextState State) {
+func (s *Strategy) emitNextState(nextState statemachine.State) {
 	select {
 	case s.nextStateC <- nextState:
 	default:
@@ -118,7 +118,7 @@ func (s *Strategy) triggerNextState() {
 
 // moveToNextState will run the process when moving current state to next state
 // it will return true if we want it trigger the next state immediately
-func (s *Strategy) moveToNextState(ctx context.Context, nextState State) bool {
+func (s *Strategy) moveToNextState(ctx context.Context, nextState statemachine.State) bool {
 	switch s.state {
 	case IdleWaiting:
 		s.writeMutex.Lock()

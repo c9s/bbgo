@@ -1,6 +1,7 @@
 package dca2
 
 import (
+	"github.com/c9s/bbgo/pkg/strategy/dca2/statemachine"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -84,7 +85,7 @@ func updateNumOfActiveOrdersMetrics(numOfActiveOrders int) {
 	metricsNumOfActiveOrders.With(labels).Set(float64(numOfActiveOrders))
 }
 
-func updateStatsMetrics(state State) {
+func updateStatsMetrics(state statemachine.State) {
 	// use ts to bind the state and numOfActiveOrders
 	labels := mergeLabels(baseLabels, prometheus.Labels{
 		// "ts": strconv.FormatInt(now.UnixMilli(), 10),

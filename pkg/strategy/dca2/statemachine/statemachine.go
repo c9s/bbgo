@@ -2,6 +2,7 @@ package statemachine
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/util"
@@ -10,10 +11,6 @@ import (
 
 type State int64
 
-const (
-	None State = iota
-)
-
 type StateMachine struct {
 	once   util.Reonce
 	logger *logrus.Entry
@@ -21,6 +18,7 @@ type StateMachine struct {
 	isRunning bool
 
 	// state-related fields
+	mu                  sync.Mutex
 	state               State
 	nextStateC          chan State
 	stateTransitionFunc map[State]map[State]func(context.Context) error
@@ -38,7 +36,6 @@ type StateMachine struct {
 func NewStateMachine(logger *logrus.Entry) *StateMachine {
 	s := &StateMachine{
 		logger:        logger,
-		state:         None,
 		nextStateC:    make(chan State, 1),
 		closeC:        make(chan struct{}, 1),
 		recoverStateC: make(chan struct{}, 1),
@@ -59,6 +56,20 @@ func (s *StateMachine) EmitNextState(state State) {
 	default:
 		s.logger.Warn("nextStateC is full")
 	}
+}
+
+func (s *StateMachine) GetState() State {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.state
+}
+
+func (s *StateMachine) UpdateState(state State) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.logger.Infof("update state from %d to %d", s.state, state)
+	s.state = state
 }
 
 // RegisterStartFunc registers a function to be called when the state machine from a to b.
@@ -145,7 +156,7 @@ func (s *StateMachine) runState(ctx context.Context) {
 				continue
 			}
 			s.logger.Infof("recovered state: %d", recoveredState)
-			s.state = recoveredState
+			s.UpdateState(recoveredState)
 		case nextState := <-s.nextStateC:
 			s.logger.Infof("transitioning from %d to %d", s.state, nextState)
 			if transitionMap, ok := s.stateTransitionFunc[s.state]; ok {
@@ -155,7 +166,7 @@ func (s *StateMachine) runState(ctx context.Context) {
 						continue
 					}
 
-					s.state = nextState
+					s.UpdateState(nextState)
 				} else {
 					s.logger.Errorf("no transition function defined from state %d to %d", s.state, nextState)
 				}
