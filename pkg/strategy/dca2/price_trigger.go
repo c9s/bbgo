@@ -2,6 +2,7 @@ package dca2
 
 import (
 	"context"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
@@ -70,7 +71,29 @@ func (s *Strategy) SetupPriceTriggerMode(ctx context.Context) {
 
 		if kline.Close.Compare(s.takeProfitPrice) >= 0 {
 			s.logger.Infof("take profit price (%s) reached, will emit next state", s.takeProfitPrice.String())
-			s.stateMachine.EmitNextState(TakeProfitReady)
+			s.stateMachine.EmitNextState(OpenPositionFinished)
 		}
 	})
+
+	go s.triggerNextStatePeriodically(ctx)
+}
+
+func (s *Strategy) triggerNextStatePeriodically(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			s.logger.Info("context done, exiting dca2 strategy")
+			return
+		case <-ticker.C:
+			switch s.stateMachine.GetState() {
+			case IdleWaiting:
+				s.stateMachine.EmitNextState(OpenPositionReady)
+			case OpenPositionFinished:
+				s.stateMachine.EmitNextState(TakeProfitReady)
+			}
+		}
+	}
 }
