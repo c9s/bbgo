@@ -19,7 +19,7 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/dynamic"
-	"github.com/c9s/bbgo/pkg/exchange/mockex"
+	"github.com/c9s/bbgo/pkg/exchange/sandbox"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/pricesolver"
@@ -182,8 +182,10 @@ type Strategy struct {
 	// ProfitFixerConfig is the profit fixer configuration
 	ProfitFixerConfig *common.ProfitFixerConfig `json:"profitFixer,omitempty"`
 
-	UseMockExchange      bool             `json:"useMockExchange,omitempty"`
-	MockExchangeBalances types.BalanceMap `json:"mockExchangeBalances,omitempty"`
+	UseSandbox              bool                        `json:"useSandbox,omitempty"`
+	SandboxExchangeBalances map[string]fixedpoint.Value `json:"sandboxExchangeBalances,omitempty"`
+
+	SyntheticHedge *SyntheticHedge `json:"syntheticHedge,omitempty"`
 
 	// --------------------------------
 	// private field
@@ -207,10 +209,12 @@ type Strategy struct {
 	tradingCtx    context.Context
 	cancelTrading context.CancelFunc
 
-	coveredPosition fixedpoint.MutexValue
+	positionExposure *PositionExposure
 
 	sourceBook, makerBook *types.StreamOrderBook
-	activeMakerOrders     *bbgo.ActiveOrderBook
+	depthSourceBook       *types.DepthBook
+
+	activeMakerOrders *bbgo.ActiveOrderBook
 
 	hedgeErrorLimiter         *rate.Limiter
 	hedgeErrorRateReservation *rate.Reservation
@@ -359,6 +363,7 @@ func (s *Strategy) Initialize() error {
 		}
 	}
 
+	s.positionExposure = newPositionExposure(s.Symbol)
 	return nil
 }
 
@@ -613,16 +618,33 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 	return q, nil
 }
 
+func (s *Strategy) getLayerPriceWithDepth(
+	i int, side types.SideType, requiredDepth fixedpoint.Value,
+) (price fixedpoint.Value) {
+	price = s.depthSourceBook.PriceAtDepth(side, requiredDepth)
+
+	pips := fixedpoint.Zero
+	switch side {
+	case types.SideTypeSell:
+		pips = fixedpoint.One
+	case types.SideTypeBuy:
+		pips = fixedpoint.One.Neg()
+	}
+
+	// this prevents returning the same price when the book depth is always greater than requiredDepth
+	if i > 0 {
+		price = price.Add(pips.Mul(s.makerMarket.TickSize))
+	}
+
+	return price
+}
+
 // getLayerPrice returns the price for the layer
 // i is the layer index, starting from 0
 // side is the side of the order
 // sourceBook is the source order book
 func (s *Strategy) getLayerPrice(
-	i int,
-	side types.SideType,
-	sourceBook *types.StreamOrderBook,
-	quote *Quote,
-	requiredDepth fixedpoint.Value,
+	i int, side types.SideType, sourceBook *types.StreamOrderBook, quote *Quote,
 ) (price fixedpoint.Value) {
 	var margin, delta, pips fixedpoint.Value
 
@@ -653,17 +675,9 @@ func (s *Strategy) getLayerPrice(
 		price = pv.Price
 	}
 
-	if requiredDepth.Sign() > 0 {
-		price = aggregatePrice(sideBook, requiredDepth)
-		price = price.Mul(fixedpoint.One.Add(delta))
-		if i > 0 {
-			price = price.Add(pips.Mul(s.makerMarket.TickSize))
-		}
-	} else {
-		price = price.Mul(fixedpoint.One.Add(delta))
-		if i > 0 {
-			price = price.Add(pips.Mul(s.makerMarket.TickSize))
-		}
+	price = price.Mul(fixedpoint.One.Add(delta))
+	if i > 0 {
+		price = price.Add(pips.Mul(s.makerMarket.TickSize))
 	}
 
 	return price
@@ -872,21 +886,61 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			// make sure spread maker order is canceled
 			if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
-				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, &s.coveredPosition)
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, s.positionExposure)
 			}
 
 			return nil
 		}
 	}
 
-	bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
-	if !hasPrice {
-		s.logger.Warnf("no valid price, skip quoting")
-		return nil
+	bestBidPrice := fixedpoint.Zero
+	bestAskPrice := fixedpoint.Zero
+
+	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		bestBid, bestAsk, hasPrice := s.SyntheticHedge.GetQuotePrices(s.DepthQuantity)
+		if !hasPrice {
+			s.logger.Warnf("no valid price, skip quoting")
+			return nil
+		}
+
+		bestBidPrice = bestBid
+		bestAskPrice = bestAsk
+	} else {
+		bestBid, bestAsk, hasPrice := s.sourceBook.BestBidAndAsk()
+		if !hasPrice {
+			s.logger.Warnf("no valid price, skip quoting")
+			return nil
+		}
+
+		bookLastUpdateTime := s.sourceBook.LastUpdateTime()
+		if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
+			s.logger.WithError(err).Errorf(
+				"quote update error, %s price not updating, order book last update: %s ago",
+				s.Symbol,
+				time.Since(bookLastUpdateTime),
+			)
+
+			s.sourceSession.MarketDataStream.Reconnect()
+			s.sourceBook.Reset()
+			return err
+		}
+
+		if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
+			s.logger.WithError(err).Errorf(
+				"quote update error, %s price not updating, order book last update: %s ago",
+				s.Symbol,
+				time.Since(bookLastUpdateTime),
+			)
+
+			s.sourceSession.MarketDataStream.Reconnect()
+			s.sourceBook.Reset()
+			return err
+		}
+
+		bestBidPrice = bestBid.Price
+		bestAskPrice = bestAsk.Price
 	}
 
-	bestBidPrice := bestBid.Price
-	bestAskPrice := bestAsk.Price
 	s.logger.Infof("%s book ticker: best ask / best bid = %v / %v", s.Symbol, bestAskPrice, bestBidPrice)
 
 	if bestBidPrice.Compare(bestAskPrice) > 0 {
@@ -898,35 +952,9 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	// use mid-price for the last price
-	midPrice := bestBid.Price.Add(bestAsk.Price).Div(two)
+	midPrice := bestBidPrice.Add(bestAskPrice).Div(two)
 	s.lastPrice.Set(midPrice)
 	s.priceSolver.Update(s.Symbol, midPrice)
-
-	bookLastUpdateTime := s.sourceBook.LastUpdateTime()
-
-	if _, err := s.bidPriceHeartBeat.Update(bestBid); err != nil {
-		s.logger.WithError(err).Errorf(
-			"quote update error, %s price not updating, order book last update: %s ago",
-			s.Symbol,
-			time.Since(bookLastUpdateTime),
-		)
-
-		s.sourceSession.MarketDataStream.Reconnect()
-		s.sourceBook.Reset()
-		return err
-	}
-
-	if _, err := s.askPriceHeartBeat.Update(bestAsk); err != nil {
-		s.logger.WithError(err).Errorf(
-			"quote update error, %s price not updating, order book last update: %s ago",
-			s.Symbol,
-			time.Since(bookLastUpdateTime),
-		)
-
-		s.sourceSession.MarketDataStream.Reconnect()
-		s.sourceBook.Reset()
-		return err
-	}
 
 	sourceBook := s.sourceBook.CopyDepth(10)
 	if valid, err := sourceBook.IsValid(); !valid {
@@ -1006,7 +1034,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 		allowMarginSell, bidQuota := s.allowMarginHedge(types.SideTypeBuy)
 		if allowMarginSell {
-			hedgeQuota.BaseAsset.Add(bidQuota.Div(bestBid.Price))
+			hedgeQuota.BaseAsset.Add(bidQuota.Div(bestBidPrice))
 		} else {
 			s.logger.Warnf("margin hedge sell is disabled, disabling maker bid orders...")
 			disableMakerBid = true
@@ -1014,7 +1042,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 		allowMarginBuy, sellQuota := s.allowMarginHedge(types.SideTypeSell)
 		if allowMarginBuy {
-			hedgeQuota.QuoteAsset.Add(sellQuota.Mul(bestAsk.Price))
+			hedgeQuota.QuoteAsset.Add(sellQuota.Mul(bestAskPrice))
 		} else {
 			s.logger.Warnf("margin hedge buy is disabled, disabling maker ask orders...")
 			disableMakerAsk = true
@@ -1140,16 +1168,31 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			// for maker bid orders
 			accumulativeBidQuantity = accumulativeBidQuantity.Add(bidQuantity)
 
-			requiredDepth := fixedpoint.Zero
-			if s.UseDepthPrice {
-				if s.DepthQuantity.Sign() > 0 {
+			bidPrice := fixedpoint.Zero
+			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+				// note: the accumulativeBidQuantity is not used yet,
+				// reason: the fiat market base unit is different from the maker market.
+				if bid, _, ok := s.SyntheticHedge.GetQuotePrices(accumulativeBidQuantity); ok {
+					bidPrice = bid
+				} else {
+					s.logger.Warnf("no valid synthetic price")
+				}
+			} else if s.UseDepthPrice {
+				requiredDepth := fixedpoint.Zero
+				if i == 0 && s.DepthQuantity.Sign() > 0 {
 					requiredDepth = s.DepthQuantity
 				} else {
 					requiredDepth = accumulativeBidQuantity
 				}
+				bidPrice = s.getLayerPriceWithDepth(i, types.SideTypeBuy, requiredDepth)
+			} else {
+				bidPrice = s.getLayerPrice(i, types.SideTypeBuy, s.sourceBook, quote)
 			}
 
-			bidPrice := s.getLayerPrice(i, types.SideTypeBuy, s.sourceBook, quote, requiredDepth)
+			if bidPrice.IsZero() {
+				s.logger.Warnf("no valid bid price, skip quoting")
+				break
+			}
 
 			if i == 0 {
 				s.logger.Infof("maker best bid price %f", bidPrice.Float64())
@@ -1208,16 +1251,29 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			accumulativeAskQuantity = accumulativeAskQuantity.Add(askQuantity)
 
-			requiredDepth := fixedpoint.Zero
-			if s.UseDepthPrice {
+			askPrice := fixedpoint.Zero
+			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+				if _, ask, ok := s.SyntheticHedge.GetQuotePrices(accumulativeAskQuantity); ok {
+					askPrice = ask
+				} else {
+					s.logger.Warnf("no valid synthetic price")
+				}
+			} else if s.UseDepthPrice {
+				requiredDepth := fixedpoint.Zero
 				if s.DepthQuantity.Sign() > 0 {
 					requiredDepth = s.DepthQuantity
 				} else {
 					requiredDepth = accumulativeAskQuantity
 				}
+				askPrice = s.getLayerPriceWithDepth(i, types.SideTypeSell, requiredDepth)
+			} else {
+				askPrice = s.getLayerPrice(i, types.SideTypeSell, s.sourceBook, quote)
 			}
 
-			askPrice := s.getLayerPrice(i, types.SideTypeSell, s.sourceBook, quote, requiredDepth)
+			if askPrice.IsZero() {
+				s.logger.Warnf("no valid ask price, skip quoting")
+				break
+			}
 
 			if i == 0 {
 				s.logger.Infof("maker best ask price %f", askPrice.Float64())
@@ -1493,7 +1549,7 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 }
 
 func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(
-	ctx context.Context, coveredPosition *fixedpoint.MutexValue,
+	ctx context.Context, coveredPosition *PositionExposure,
 ) {
 	s.logger.Infof("canceling current spread maker order...")
 
@@ -1516,9 +1572,9 @@ func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(
 	s.logger.Infof("returning remaining quantity %f to the covered position", remainingQuantity.Float64())
 	switch finalOrder.Side {
 	case types.SideTypeSell:
-		coveredPosition.Sub(remainingQuantity)
+		coveredPosition.Cover(remainingQuantity.Neg())
 	case types.SideTypeBuy:
-		coveredPosition.Add(remainingQuantity)
+		coveredPosition.Cover(remainingQuantity)
 	}
 }
 
@@ -1563,7 +1619,7 @@ func (s *Strategy) spreadMakerHedge(
 			keptOrder = s.SpreadMaker.shouldKeepOrder(curOrder, now)
 			if !keptOrder {
 				s.logger.Infof("canceling current spread maker order...")
-				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, &s.coveredPosition)
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, s.positionExposure)
 			}
 		}
 
@@ -1583,20 +1639,22 @@ func (s *Strategy) spreadMakerHedge(
 					retOrder.Price.Float64(), retOrder.Status,
 				)
 
-				// add covered position from the created order
+				// the side here is reversed from the position side
+				// long position -> sell side order to close the long position
+				// short position -> buy side order to close the short position
 				switch side {
 				case types.SideTypeSell:
-					s.coveredPosition.Add(retOrder.Quantity)
+					s.positionExposure.Cover(retOrder.Quantity)
 					pos = pos.Add(retOrder.Quantity)
 				case types.SideTypeBuy:
-					s.coveredPosition.Add(retOrder.Quantity.Neg())
+					s.positionExposure.Cover(retOrder.Quantity.Neg())
 					pos = pos.Add(retOrder.Quantity.Neg())
 				}
 			}
 		}
 	} else if s.SpreadMaker.ReverseSignalOrderCancel {
 		if !isSignalSidePosition(signal, s.Position.Side()) {
-			s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, &s.coveredPosition)
+			s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, s.positionExposure)
 		}
 	}
 
@@ -1608,8 +1666,10 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		return
 	}
 
-	// if the uncovered position is negative, e.g., -10 BTC,
-	// then we need to hedge +10 BTC, hence call .Neg() here
+	// if the uncovered position is a positive number, e.g., +10 BTC,
+	// then we need to sell 10 BTC, hence call .Neg() here
+	// if the uncovered position is a negative number, e.g., -10 BTC,
+	// then we need to buy 10 BTC, hence call .Neg() here
 	hedgeDelta := uncoveredPosition.Neg()
 	side := positionToSide(hedgeDelta)
 
@@ -1627,18 +1687,28 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		return
 	}
 
-	if _, err := s.directHedge(ctx, hedgeDelta, side); err != nil {
-		log.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
-		return
+	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		if err := s.SyntheticHedge.Hedge(ctx, uncoveredPosition); err != nil {
+			log.WithError(err).Errorf("unable to place synthetic hedge order")
+			return
+		}
+
+		s.positionExposure.Cover(uncoveredPosition)
+	} else {
+		if _, err := s.directHedge(ctx, hedgeDelta); err != nil {
+			log.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
+			return
+		}
 	}
 
 	s.resetPositionStartTime()
 }
 
 func (s *Strategy) directHedge(
-	ctx context.Context, hedgeDelta fixedpoint.Value, side types.SideType,
+	ctx context.Context, hedgeDelta fixedpoint.Value,
 ) (*types.Order, error) {
 	quantity := hedgeDelta.Abs()
+	side := positionToSide(hedgeDelta)
 
 	price := s.lastPrice.Get()
 
@@ -1733,9 +1803,9 @@ func (s *Strategy) directHedge(
 	// if it's selling, then we should add a positive position
 	switch side {
 	case types.SideTypeSell:
-		s.coveredPosition.Add(quantity)
+		s.positionExposure.Cover(quantity)
 	case types.SideTypeBuy:
-		s.coveredPosition.Add(quantity.Neg())
+		s.positionExposure.Cover(quantity.Neg())
 	}
 
 	return &createdOrder, nil
@@ -1764,7 +1834,7 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 				startTime := time.Now().Add(-tradeScanInterval).Add(-tradeScanOverlapBufferPeriod)
 
 				if err := s.tradeCollector.Recover(
-					ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime,
+					ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.SourceSymbol, startTime,
 				); err != nil {
 					log.WithError(err).Errorf("query trades error")
 				}
@@ -1989,25 +2059,13 @@ func (s *Strategy) houseCleanWorker(ctx context.Context) {
 }
 
 func (s *Strategy) getCoveredPosition() fixedpoint.Value {
-	coveredPosition := s.coveredPosition.Get()
+	coveredPosition := s.positionExposure.pending.Get()
 	coveredPositionMetrics.With(s.metricsLabels).Set(coveredPosition.Float64())
 	return coveredPosition
 }
 
 func (s *Strategy) getUncoveredPosition() fixedpoint.Value {
-	position := s.Position.GetBase()
-	coveredPosition := s.getCoveredPosition()
-	uncoverPosition := position.Sub(coveredPosition)
-
-	s.logger.Infof(
-		"%s base position %v coveredPosition: %v uncoveredPosition: %v",
-		s.Symbol,
-		position,
-		coveredPosition,
-		uncoverPosition,
-	)
-
-	return uncoverPosition
+	return s.positionExposure.GetUncovered()
 }
 
 func (s *Strategy) hedgeWorker(ctx context.Context) {
@@ -2046,6 +2104,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 			uncoverPosition := s.getUncoveredPosition()
 			absPos := uncoverPosition.Abs()
 
+			// TODO: consider synthetic hedge here
 			if s.sourceMarket.IsDustQuantity(absPos, s.lastPrice.Get()) {
 				continue
 			}
@@ -2070,7 +2129,7 @@ func (s *Strategy) hedgeWorker(ctx context.Context) {
 }
 
 func (s *Strategy) CrossRun(
-	ctx context.Context, orderExecutionRouter bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
+	ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
 ) error {
 	s.tradingCtx, s.cancelTrading = context.WithCancel(ctx)
 
@@ -2092,12 +2151,6 @@ func (s *Strategy) CrossRun(
 
 	s.sourceSession = sourceSession
 
-	// initialize the price resolver
-	sourceMarkets := s.sourceSession.Markets()
-	if len(sourceMarkets) == 0 {
-		return fmt.Errorf("source exchange %s has no markets", s.SourceExchange)
-	}
-
 	makerSession, ok := sessions[s.MakerExchange]
 	if !ok {
 		return fmt.Errorf("maker exchange session %s is not defined", s.MakerExchange)
@@ -2115,25 +2168,31 @@ func (s *Strategy) CrossRun(
 		return fmt.Errorf("maker session market %s is not defined", s.Symbol)
 	}
 
-	if s.UseMockExchange {
-		balances := s.MockExchangeBalances
-		if balances == nil {
-			balances = types.BalanceMap{
-				s.sourceMarket.BaseCurrency:  types.NewBalance(s.sourceMarket.BaseCurrency, fixedpoint.NewFromFloat(50.0)),
-				s.sourceMarket.QuoteCurrency: types.NewBalance(s.sourceMarket.QuoteCurrency, fixedpoint.NewFromFloat(10_000.0)),
+	if s.UseSandbox {
+		balances := types.BalanceMap{
+			s.sourceMarket.BaseCurrency:  types.NewBalance(s.sourceMarket.BaseCurrency, fixedpoint.NewFromFloat(50.0)),
+			s.sourceMarket.QuoteCurrency: types.NewBalance(s.sourceMarket.QuoteCurrency, fixedpoint.NewFromFloat(10_000.0)),
+		}
+
+		customBalances := s.SandboxExchangeBalances
+		if customBalances != nil {
+			balances = types.BalanceMap{}
+			for cur, balance := range customBalances {
+				balances[cur] = types.NewBalance(cur, balance)
 			}
 		}
 
-		s.logger.Warnf("using mock exchange to simulate hedge with balances: %+v", balances)
+		s.logger.Warnf("using sandbox exchange to simulate hedge with balances: %+v", balances)
 
-		mockEx := mockex.New(s.sourceSession.Exchange, s.sourceSession.MarketDataStream, s.SourceSymbol, balances)
+		sandboxEx := sandbox.New(s.sourceSession.Exchange, s.sourceSession.MarketDataStream, s.SourceSymbol, balances)
 
-		if err := mockEx.Initialize(ctx); err != nil {
+		if err := sandboxEx.Initialize(ctx); err != nil {
 			return err
 		}
 
-		userDataStream := mockEx.GetUserDataStream()
-		s.sourceSession.Exchange = mockEx
+		// replace the user data stream created in the exchange session
+		userDataStream := sandboxEx.GetUserDataStream()
+		s.sourceSession.Exchange = sandboxEx
 		s.sourceSession.UserDataStream = userDataStream
 
 		// rebind user data connectivity
@@ -2197,7 +2256,14 @@ func (s *Strategy) CrossRun(
 		}
 	}
 
-	s.priceSolver = pricesolver.NewSimplePriceResolver(sourceMarkets)
+	// initialize the price resolver
+	allMarkets := s.makerSession.Markets()
+	sourceMarkets := s.sourceSession.Markets()
+	if len(sourceMarkets) == 0 {
+		return fmt.Errorf("source exchange %s has no markets", s.SourceExchange)
+	}
+	allMarkets.Merge(sourceMarkets)
+	s.priceSolver = pricesolver.NewSimplePriceResolver(allMarkets)
 	s.priceSolver.BindStream(s.sourceSession.MarketDataStream)
 	s.sourceSession.UserDataStream.OnTradeUpdate(s.priceSolver.UpdateFromTrade)
 
@@ -2313,6 +2379,7 @@ func (s *Strategy) CrossRun(
 		},
 	)
 
+	// TODO: replace this with HedgeMarket
 	sourceMarketStream := s.sourceSession.Exchange.NewStream()
 	sourceMarketStream.SetPublicOnly()
 	sourceMarketStream.Subscribe(
@@ -2324,6 +2391,7 @@ func (s *Strategy) CrossRun(
 
 	s.sourceBook = types.NewStreamBook(s.SourceSymbol, s.sourceSession.ExchangeName)
 	s.sourceBook.BindStream(sourceMarketStream)
+	s.depthSourceBook = types.NewDepthBook(s.sourceBook, s.DepthQuantity)
 
 	if err := sourceMarketStream.Connect(ctx); err != nil {
 		return err
@@ -2375,7 +2443,6 @@ func (s *Strategy) CrossRun(
 	s.activeMakerOrders.BindStream(s.makerSession.UserDataStream)
 
 	s.orderStore = core.NewOrderStore(s.Symbol)
-	s.orderStore.BindStream(s.sourceSession.UserDataStream)
 	s.orderStore.BindStream(s.makerSession.UserDataStream)
 
 	s.tradeCollector = core.NewTradeCollector(s.Symbol, s.Position, s.orderStore)
@@ -2393,11 +2460,16 @@ func (s *Strategy) CrossRun(
 		func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 			delta := trade.PositionDelta()
 
-			// only consider hedge here
+			// trades from source session are always hedge trades
 			if trade.Exchange == s.sourceSession.ExchangeName {
-				s.coveredPosition.Add(delta)
-			} else if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.SpreadMaker.orderStore.Exists(trade.OrderID) {
-				s.coveredPosition.Add(delta)
+				s.positionExposure.Close(delta)
+			} else if trade.Exchange == s.makerSession.ExchangeName {
+				// trades from maker session can be hedge trades only when spread maker is enabled and it's a spread maker order
+				if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.SpreadMaker.orderStore.Exists(trade.OrderID) {
+					s.positionExposure.Close(delta)
+				} else {
+					s.positionExposure.Open(delta)
+				}
 			}
 
 			s.ProfitStats.AddTrade(trade)
@@ -2421,20 +2493,23 @@ func (s *Strategy) CrossRun(
 
 	s.tradeCollector.OnProfit(
 		func(trade types.Trade, profit *types.Profit) {
-			if profit != nil {
-				if s.CircuitBreaker != nil {
-					s.CircuitBreaker.RecordProfit(profit.Profit, trade.Time.Time())
-				}
-
-				if shouldNotifyProfit(trade, profit) {
-					bbgo.Notify(profit)
-				}
-
-				netProfitMarginHistogram.With(s.metricsLabels).Observe(profit.NetProfitMargin.Float64())
-
-				s.ProfitStats.AddProfit(*profit)
-				s.Environment.RecordPosition(s.Position, trade, profit)
+			// a simple guard - the behavior was changed at some timepoint
+			if profit == nil {
+				return
 			}
+
+			if s.CircuitBreaker != nil {
+				s.CircuitBreaker.RecordProfit(profit.Profit, trade.Time.Time())
+			}
+
+			if shouldNotifyProfit(trade, profit) {
+				bbgo.Notify(profit)
+			}
+
+			netProfitMarginHistogram.With(s.metricsLabels).Observe(profit.NetProfitMargin.Float64())
+
+			s.ProfitStats.AddProfit(*profit)
+			s.Environment.RecordPosition(s.Position, trade, profit)
 		},
 	)
 
@@ -2451,8 +2526,18 @@ func (s *Strategy) CrossRun(
 	)
 
 	// bind two user data streams so that we can collect the trades together
-	s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
 	s.tradeCollector.BindStream(s.makerSession.UserDataStream)
+
+	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+		s.logger.Infof("syntheticHedge is enabled: %+v", s.SyntheticHedge)
+		if err := s.SyntheticHedge.InitializeAndBind(ctx, sessions, s); err != nil {
+			return err
+		}
+
+	} else {
+		s.orderStore.BindStream(s.sourceSession.UserDataStream)
+		s.tradeCollector.BindStream(s.sourceSession.UserDataStream)
+	}
 
 	s.stopC = make(chan struct{})
 
@@ -2465,6 +2550,13 @@ func (s *Strategy) CrossRun(
 
 	go func() {
 		s.logger.Infof("waiting for authentication connections to be ready...")
+
+		if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+			if err := s.SyntheticHedge.Start(ctx); err != nil {
+				s.logger.WithError(err).Errorf("failed to start syntheticHedge")
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 

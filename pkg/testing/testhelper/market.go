@@ -8,6 +8,18 @@ import (
 )
 
 var _markets = types.MarketMap{
+	"BTCTWD": {
+		Symbol:          "BTCTWD",
+		PricePrecision:  0,
+		VolumePrecision: 2,
+		QuoteCurrency:   "TWD",
+		BaseCurrency:    "BTC",
+		MinNotional:     fixedpoint.MustNewFromString("300.0"),
+		MinAmount:       fixedpoint.MustNewFromString("300.0"),
+		MinQuantity:     fixedpoint.MustNewFromString("0.001"),
+		TickSize:        fixedpoint.MustNewFromString("1"),
+		StepSize:        Number(0.0001),
+	},
 	"BTCUSDT": {
 		Symbol:          "BTCUSDT",
 		PricePrecision:  2,
