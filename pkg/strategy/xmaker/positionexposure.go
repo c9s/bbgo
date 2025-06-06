@@ -53,6 +53,10 @@ func (m *PositionExposure) Close(delta fixedpoint.Value) {
 	)
 }
 
+func (m *PositionExposure) IsClosed() bool {
+	return m.net.Get().IsZero() && m.pending.Get().IsZero()
+}
+
 func (m *PositionExposure) GetUncovered() fixedpoint.Value {
 	netPosition := m.net.Get()
 	coveredPosition := m.pending.Get()
