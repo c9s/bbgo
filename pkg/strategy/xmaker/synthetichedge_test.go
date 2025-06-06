@@ -289,11 +289,11 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 
 	sourceHedgeMarket.book.Load(types.SliceOrderBook{
 		Symbol: "BTCUSDT",
-		Bids: types.PriceVolumeSlice{
-			{Price: Number(104_000.), Volume: Number(1)},
-		},
 		Asks: types.PriceVolumeSlice{
 			{Price: Number(104_050.0), Volume: Number(1)},
+		},
+		Bids: types.PriceVolumeSlice{
+			{Price: Number(104_000.), Volume: Number(1)},
 		},
 	})
 
