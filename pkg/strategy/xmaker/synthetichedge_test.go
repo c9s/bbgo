@@ -255,9 +255,9 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		FeeCurrency:   "",
 	})
 	time.Sleep(stepTime)
-	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.position.Base.Float64(), "source position should be closed to 0")
-	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.position.Base.Float64(), "fiat position should be closed to 0")
-	assert.Equal(t, Number(0).Float64(), position.Base.Float64(), "the maker position should be closed to 0")
+	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.position.GetBase().Float64(), "source position should be closed to 0")
+	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.position.GetBase().Float64(), "fiat position should be closed to 0")
+	assert.Equal(t, Number(0).Float64(), position.GetBase().Float64(), "the maker position should be closed to 0")
 
 	cancel()
 	<-doneC
