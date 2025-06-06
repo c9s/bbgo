@@ -54,6 +54,10 @@ func (m *MarketOrderHedgeExecutor) hedge(
 	uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
 	side types.SideType,
 ) error {
+	if uncoveredPosition.IsZero() {
+		return nil
+	}
+
 	bid, ask := m.getQuotePrice()
 	price := sideTakerPrice(bid, ask, side)
 
@@ -116,7 +120,7 @@ func (m *CounterpartyHedgeExecutor) hedge(
 	side types.SideType,
 ) error {
 	if m.hedgeOrder != nil {
-		if err := m.activeMakerOrders.GracefulCancel(ctx, m.session.Exchange, *m.hedgeOrder); err != nil {
+		if err := m.session.Exchange.CancelOrders(ctx, *m.hedgeOrder); err != nil {
 			m.logger.WithError(err).Errorf("failed to cancel order: %+v", m.hedgeOrder)
 		}
 
@@ -127,10 +131,14 @@ func (m *CounterpartyHedgeExecutor) hedge(
 			m.logger.Infof("hedge order canceled: %+v, returning covered position...", hedgeOrder)
 
 			// return covered position from the canceled order
-			m.positionExposure.Cover(quantityToDelta(hedgeOrder.Quantity, hedgeOrder.Side).Neg())
+			m.positionExposure.Cover(quantityToDelta(hedgeOrder.GetRemainingQuantity(), hedgeOrder.Side))
 		}
 
 		m.hedgeOrder = nil
+	}
+
+	if uncoveredPosition.IsZero() {
+		return nil
 	}
 
 	// use counterparty side book
@@ -148,9 +156,6 @@ func (m *CounterpartyHedgeExecutor) hedge(
 		priceLevel = 0
 	} else {
 		priceLevel--
-		if priceLevel == 0 {
-			priceLevel = 1
-		}
 	}
 
 	if priceLevel > len(sideBook) {
@@ -226,6 +231,8 @@ type HedgeMarket struct {
 	mu          sync.Mutex
 
 	hedgeExecutor HedgeExecutor
+
+	hedgedC chan struct{}
 }
 
 func newHedgeMarket(
@@ -280,7 +287,8 @@ func newHedgeMarket(
 		tradeCollector:    tradeCollector,
 		activeMakerOrders: activeMakerOrders,
 
-		logger: logger,
+		hedgedC: make(chan struct{}, 1),
+		logger:  logger,
 	}
 
 	switch m.HedgeMethod {
@@ -395,14 +403,18 @@ func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
 func (m *HedgeMarket) hedge(
 	ctx context.Context, uncoveredPosition fixedpoint.Value,
 ) error {
-	if uncoveredPosition.IsZero() {
-		return nil
-	}
-
 	hedgeDelta := uncoveredPosition.Neg()
 	quantity := hedgeDelta.Abs()
 	side := deltaToSide(hedgeDelta)
-	return m.hedgeExecutor.hedge(ctx, uncoveredPosition, hedgeDelta, quantity, side)
+	err := m.hedgeExecutor.hedge(ctx, uncoveredPosition, hedgeDelta, quantity, side)
+
+	// emit the hedgedC signal to notify that a hedge has been attempted
+	select {
+	case m.hedgedC <- struct{}{}:
+	default:
+	}
+
+	return err
 }
 
 func (m *HedgeMarket) Start(ctx context.Context) error {
@@ -439,8 +451,11 @@ func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) er
 		case <-ctx.Done():
 			return nil
 
-		case now := <-ticker.C:
-			_ = now
+		case <-ticker.C:
+			if m.positionExposure.IsClosed() {
+				continue
+			}
+
 			uncoveredPosition := m.positionExposure.GetUncovered()
 			if err := m.hedge(ctx, uncoveredPosition); err != nil {
 				m.logger.WithError(err).Errorf("hedge failed")
@@ -474,6 +489,9 @@ func sideTakerPrice(bid, ask fixedpoint.Value, side types.SideType) fixedpoint.V
 
 func deltaToSide(delta fixedpoint.Value) types.SideType {
 	side := types.SideTypeBuy
+	if delta.IsZero() {
+		side = types.SideTypeNone
+	}
 
 	if delta.Sign() < 0 {
 		side = types.SideTypeSell

@@ -57,7 +57,7 @@ func TestHedgeMarket_hedge(t *testing.T) {
 	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx, market.Symbol)
 	_ = userDataStream
 
-	mockExchange := session.Exchange.(*mocks.MockExchange)
+	mockExchange := session.Exchange.(*mocks.MockExchangeExtended)
 
 	submitOrder := types.SubmitOrder{
 		Market:   market,
@@ -110,7 +110,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	session, marketDataStream, userDataStream := newMockSession(mockCtrl, ctx, market.Symbol)
 	_ = userDataStream
 
-	mockExchange := session.Exchange.(*mocks.MockExchange)
+	mockExchange := session.Exchange.(*mocks.MockExchangeExtended)
 
 	submitOrder := types.SubmitOrder{
 		Market:   market,
