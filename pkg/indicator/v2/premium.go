@@ -36,7 +36,7 @@ func (s *PremiumStream) calculatePremium() {
 	s.PushAndEmit(premiumRatio)
 }
 
-func PremiumSignal(
+func Premium(
 	priceStream1, priceStream2 *PriceStream,
 	premiumMargin float64,
 ) *PremiumStream {
