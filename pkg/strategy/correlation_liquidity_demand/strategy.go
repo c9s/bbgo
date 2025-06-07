@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
-	indicatorv2 "github.com/c9s/bbgo/pkg/indicator/v2"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/sirupsen/logrus"
@@ -87,15 +86,11 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.Strategy.Initialize(ctx, s.Environment, session, s.Market, ID, s.InstanceID())
 
-	iw := types.IntervalWindow{
-		Interval: s.Interval,
-		Window:   s.Window,
-	}
-
-	liqDemand := indicatorv2.LiquidityDemand(
-		session.Indicators(s.Symbol).KLines(s.Interval),
-		session.Indicators(s.Symbol).EMA(iw),
-		session.Indicators(s.Symbol).EMA(iw),
+	liqDemand := session.Indicators(s.Symbol).LiquidityDemand(
+		types.IntervalWindow{
+			Interval: s.Interval,
+			Window:   s.Window,
+		},
 	)
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
 		s.kLineCloseBuffer.Push(k.Close.Float64())
