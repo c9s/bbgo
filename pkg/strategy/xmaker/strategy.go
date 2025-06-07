@@ -897,7 +897,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	bestAskPrice := fixedpoint.Zero
 
 	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-		bestBid, bestAsk, hasPrice := s.SyntheticHedge.GetQuotePrices(s.DepthQuantity)
+		bestBid, bestAsk, hasPrice := s.SyntheticHedge.GetQuotePrices()
 		if !hasPrice {
 			s.logger.Warnf("no valid price, skip quoting")
 			return nil
@@ -1172,7 +1172,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 				// note: the accumulativeBidQuantity is not used yet,
 				// reason: the fiat market base unit is different from the maker market.
-				if bid, _, ok := s.SyntheticHedge.GetQuotePrices(accumulativeBidQuantity); ok {
+				if bid, _, ok := s.SyntheticHedge.GetQuotePrices(); ok {
 					bidPrice = bid
 				} else {
 					s.logger.Warnf("no valid synthetic price")
@@ -1253,7 +1253,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			askPrice := fixedpoint.Zero
 			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
-				if _, ask, ok := s.SyntheticHedge.GetQuotePrices(accumulativeAskQuantity); ok {
+				if _, ask, ok := s.SyntheticHedge.GetQuotePrices(); ok {
 					askPrice = ask
 				} else {
 					s.logger.Warnf("no valid synthetic price")
@@ -2391,7 +2391,7 @@ func (s *Strategy) CrossRun(
 
 	s.sourceBook = types.NewStreamBook(s.SourceSymbol, s.sourceSession.ExchangeName)
 	s.sourceBook.BindStream(sourceMarketStream)
-	s.depthSourceBook = types.NewDepthBook(s.sourceBook, s.DepthQuantity)
+	s.depthSourceBook = types.NewDepthBook(s.sourceBook)
 
 	if err := sourceMarketStream.Connect(ctx); err != nil {
 		return err

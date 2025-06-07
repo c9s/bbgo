@@ -16,8 +16,10 @@ import (
 //go:generate callbackgen -type SliceOrderBook
 type SliceOrderBook struct {
 	Symbol string
-	Bids   PriceVolumeSlice
-	Asks   PriceVolumeSlice
+
+	Asks PriceVolumeSlice
+	Bids PriceVolumeSlice
+
 	// Time represents the server time. If empty, it indicates that the server does not provide this information.
 	Time time.Time
 

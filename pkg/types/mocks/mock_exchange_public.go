@@ -21,6 +21,7 @@ import (
 type MockExchangePublic struct {
 	ctrl     *gomock.Controller
 	recorder *MockExchangePublicMockRecorder
+	isgomock struct{}
 }
 
 // MockExchangePublicMockRecorder is the mock recorder for MockExchangePublic.
@@ -83,55 +84,55 @@ func (mr *MockExchangePublicMockRecorder) PlatformFeeCurrency() *gomock.Call {
 }
 
 // QueryKLines mocks base method.
-func (m *MockExchangePublic) QueryKLines(arg0 context.Context, arg1 string, arg2 types.Interval, arg3 types.KLineQueryOptions) ([]types.KLine, error) {
+func (m *MockExchangePublic) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryKLines", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "QueryKLines", ctx, symbol, interval, options)
 	ret0, _ := ret[0].([]types.KLine)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // QueryKLines indicates an expected call of QueryKLines.
-func (mr *MockExchangePublicMockRecorder) QueryKLines(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockExchangePublicMockRecorder) QueryKLines(ctx, symbol, interval, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryKLines", reflect.TypeOf((*MockExchangePublic)(nil).QueryKLines), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryKLines", reflect.TypeOf((*MockExchangePublic)(nil).QueryKLines), ctx, symbol, interval, options)
 }
 
 // QueryMarkets mocks base method.
-func (m *MockExchangePublic) QueryMarkets(arg0 context.Context) (types.MarketMap, error) {
+func (m *MockExchangePublic) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryMarkets", arg0)
+	ret := m.ctrl.Call(m, "QueryMarkets", ctx)
 	ret0, _ := ret[0].(types.MarketMap)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // QueryMarkets indicates an expected call of QueryMarkets.
-func (mr *MockExchangePublicMockRecorder) QueryMarkets(arg0 any) *gomock.Call {
+func (mr *MockExchangePublicMockRecorder) QueryMarkets(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryMarkets", reflect.TypeOf((*MockExchangePublic)(nil).QueryMarkets), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryMarkets", reflect.TypeOf((*MockExchangePublic)(nil).QueryMarkets), ctx)
 }
 
 // QueryTicker mocks base method.
-func (m *MockExchangePublic) QueryTicker(arg0 context.Context, arg1 string) (*types.Ticker, error) {
+func (m *MockExchangePublic) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryTicker", arg0, arg1)
+	ret := m.ctrl.Call(m, "QueryTicker", ctx, symbol)
 	ret0, _ := ret[0].(*types.Ticker)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // QueryTicker indicates an expected call of QueryTicker.
-func (mr *MockExchangePublicMockRecorder) QueryTicker(arg0, arg1 any) *gomock.Call {
+func (mr *MockExchangePublicMockRecorder) QueryTicker(ctx, symbol any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryTicker", reflect.TypeOf((*MockExchangePublic)(nil).QueryTicker), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryTicker", reflect.TypeOf((*MockExchangePublic)(nil).QueryTicker), ctx, symbol)
 }
 
 // QueryTickers mocks base method.
-func (m *MockExchangePublic) QueryTickers(arg0 context.Context, arg1 ...string) (map[string]types.Ticker, error) {
+func (m *MockExchangePublic) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{arg0}
-	for _, a := range arg1 {
+	varargs := []any{ctx}
+	for _, a := range symbol {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "QueryTickers", varargs...)
@@ -141,8 +142,8 @@ func (m *MockExchangePublic) QueryTickers(arg0 context.Context, arg1 ...string) 
 }
 
 // QueryTickers indicates an expected call of QueryTickers.
-func (mr *MockExchangePublicMockRecorder) QueryTickers(arg0 any, arg1 ...any) *gomock.Call {
+func (mr *MockExchangePublicMockRecorder) QueryTickers(ctx any, symbol ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{arg0}, arg1...)
+	varargs := append([]any{ctx}, symbol...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryTickers", reflect.TypeOf((*MockExchangePublic)(nil).QueryTickers), varargs...)
 }

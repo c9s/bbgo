@@ -93,6 +93,12 @@ type Exchange interface {
 	ExchangeTradeService
 }
 
+//go:generate mockgen -destination=mocks/mock_exchange_extended.go -package=mocks . ExchangeExtended
+type ExchangeExtended interface {
+	Exchange
+	ExchangeOrderQueryService
+}
+
 //go:generate mockgen -destination=mocks/mock_exchange_public.go -package=mocks . ExchangePublic
 type ExchangePublic interface {
 	ExchangeMinimal
@@ -131,7 +137,9 @@ type ExchangeDefaultFeeRates interface {
 //go:generate mockgen -destination=mocks/mock_exchange_trade_history.go -package=mocks . ExchangeTradeHistoryService
 type ExchangeTradeHistoryService interface {
 	QueryTrades(ctx context.Context, symbol string, options *TradeQueryOptions) ([]Trade, error)
-	QueryClosedOrders(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) (orders []Order, err error)
+	QueryClosedOrders(
+		ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64,
+	) (orders []Order, err error)
 }
 
 type ExchangeMarketDataService interface {
@@ -147,7 +155,9 @@ type ExchangeMarketDataService interface {
 }
 
 type OTCExchange interface {
-	RequestForQuote(ctx context.Context, symbol string, side SideType, quantity fixedpoint.Value) (submitOrder SubmitOrder, err error)
+	RequestForQuote(
+		ctx context.Context, symbol string, side SideType, quantity fixedpoint.Value,
+	) (submitOrder SubmitOrder, err error)
 }
 
 type CustomIntervalProvider interface {
@@ -174,7 +184,9 @@ type ExchangeTransferService interface {
 }
 
 type ExchangeWithdrawalService interface {
-	Withdraw(ctx context.Context, asset string, amount fixedpoint.Value, address string, options *WithdrawalOptions) error
+	Withdraw(
+		ctx context.Context, asset string, amount fixedpoint.Value, address string, options *WithdrawalOptions,
+	) error
 }
 
 type ExchangeRewardService interface {

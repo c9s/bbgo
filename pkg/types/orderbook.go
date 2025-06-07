@@ -278,12 +278,11 @@ func defaultTime(a time.Time, b func() time.Time) time.Time {
 // DepthBook wraps a StreamOrderBook and provides price calculation at a specific quote depth.
 type DepthBook struct {
 	Source *StreamOrderBook
-	Depth  fixedpoint.Value
 }
 
 // NewDepthBook creates a DepthBook from a StreamOrderBook and a quote depth.
-func NewDepthBook(source *StreamOrderBook, depth fixedpoint.Value) *DepthBook {
-	return &DepthBook{Source: source, Depth: depth}
+func NewDepthBook(source *StreamOrderBook) *DepthBook {
+	return &DepthBook{Source: source}
 }
 
 // PriceAtQuoteDepth returns the average price at the specified quote depth for the given side.
@@ -321,9 +320,15 @@ func (db *DepthBook) PriceAtQuoteDepth(side SideType, quoteDepth fixedpoint.Valu
 }
 
 // BestBidAndAskAtQuoteDepth returns the bid and ask price at the specified quote depth.
-func (db *DepthBook) BestBidAndAskAtQuoteDepth() (bid, ask fixedpoint.Value) {
-	bid = db.PriceAtQuoteDepth(SideTypeBuy, db.Depth)
-	ask = db.PriceAtQuoteDepth(SideTypeSell, db.Depth)
+func (db *DepthBook) BestBidAndAskAtQuoteDepth(depth fixedpoint.Value) (bid, ask fixedpoint.Value) {
+	bid = db.PriceAtQuoteDepth(SideTypeBuy, depth)
+	ask = db.PriceAtQuoteDepth(SideTypeSell, depth)
+	return bid, ask
+}
+
+func (db *DepthBook) BestBidAndAskAtDepth(depth fixedpoint.Value) (bid, ask fixedpoint.Value) {
+	bid = db.PriceAtDepth(SideTypeBuy, depth)
+	ask = db.PriceAtDepth(SideTypeSell, depth)
 	return bid, ask
 }
 
