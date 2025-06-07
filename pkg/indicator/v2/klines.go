@@ -38,6 +38,15 @@ var (
 	)
 )
 
+func init() {
+	prometheus.MustRegister(
+		metricsKLineStreamOpen,
+		metricsKLineStreamClose,
+		metricsKLineStreamHigh,
+		metricsKLineStreamLow,
+	)
+}
+
 //go:generate callbackgen -type KLineStream
 type KLineStream struct {
 	updateCallbacks []func(k types.KLine)
