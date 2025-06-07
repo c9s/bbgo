@@ -19,6 +19,8 @@ type SeriesExtend interface {
 	Series
 	Sum(limit ...int) float64
 	Mean(limit ...int) float64
+	Max(limit ...int) float64
+	Min(limit ...int) float64
 	Abs() SeriesExtend
 	Predict(lookback int, offset ...int) float64
 	NextCross(b Series, lookback int) (int, float64, bool)
@@ -122,4 +124,40 @@ func Mean(a Series, limit ...int) (mean float64) {
 		l = limit[0]
 	}
 	return Sum(a, l) / float64(l)
+}
+
+func Max(a Series, limit ...int) (max float64) {
+	l := a.Length()
+	if l == 0 {
+		return 0
+	}
+	if len(limit) > 0 && limit[0] < l {
+		l = limit[0]
+	}
+	max = a.Last(0)
+	for i := 1; i < l; i++ {
+		v := a.Last(i)
+		if v > max {
+			max = v
+		}
+	}
+	return max
+}
+
+func Min(a Series, limit ...int) (min float64) {
+	l := a.Length()
+	if l == 0 {
+		return 0
+	}
+	if len(limit) > 0 && limit[0] < l {
+		l = limit[0]
+	}
+	min = a.Last(0)
+	for i := 1; i < l; i++ {
+		v := a.Last(i)
+		if v < min {
+			min = v
+		}
+	}
+	return min
 }
