@@ -116,35 +116,34 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 		// dump records to a file in JSON format
-		if len(s.records) == 0 {
-			return
-		}
-		priceDiffs := types.NewFloat64Series()
-		ligDemands := types.NewFloat64Series()
-		for _, rec := range s.records {
-			priceDiffs.Push(rec.PriceDiff)
-			ligDemands.Push(rec.LiquidityDemand)
-		}
-		corr := priceDiffs.Correlation(ligDemands, priceDiffs.Length())
-		s.logger.Infof("correlation between price diff and liquidity demand: %f", corr)
-		s.logger.Infof("number of records: %d", len(s.records))
-		fileName := fmt.Sprintf("%s-%s-records.json", s.Symbol, s.Interval)
-		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-		if err != nil {
-			s.logger.WithError(err).Errorf("unable to open file %s for writing", fileName)
-			return
-		}
-		defer file.Close()
+		if len(s.records) > 0 {
+			priceDiffs := types.NewFloat64Series()
+			ligDemands := types.NewFloat64Series()
+			for _, rec := range s.records {
+				priceDiffs.Push(rec.PriceDiff)
+				ligDemands.Push(rec.LiquidityDemand)
+			}
+			corr := priceDiffs.Correlation(ligDemands, priceDiffs.Length())
+			s.logger.Infof("correlation between price diff and liquidity demand: %f", corr)
+			s.logger.Infof("number of records: %d", len(s.records))
+			fileName := fmt.Sprintf("%s-%s-records.json", s.Symbol, s.Interval)
+			file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+			if err != nil {
+				s.logger.WithError(err).Errorf("unable to open file %s for writing", fileName)
+				return
+			}
+			defer file.Close()
 
-		jsonData, err := json.MarshalIndent(s.records, "", "  ")
-		if err != nil {
-			s.logger.WithError(err).Errorf("unable to marshal records to JSON")
-			return
-		}
-		_, err = file.Write(jsonData)
-		if err != nil {
-			s.logger.WithError(err).Errorf("unable to write records to file %s", fileName)
-			return
+			jsonData, err := json.MarshalIndent(s.records, "", "  ")
+			if err != nil {
+				s.logger.WithError(err).Errorf("unable to marshal records to JSON")
+				return
+			}
+			_, err = file.Write(jsonData)
+			if err != nil {
+				s.logger.WithError(err).Errorf("unable to write records to file %s", fileName)
+				return
+			}
 		}
 	})
 	return nil
