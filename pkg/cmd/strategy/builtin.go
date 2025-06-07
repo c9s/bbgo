@@ -9,6 +9,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/bollgrid"
 	_ "github.com/c9s/bbgo/pkg/strategy/bollmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/convert"
+	_ "github.com/c9s/bbgo/pkg/strategy/correlation_liquidity_demand"
 	_ "github.com/c9s/bbgo/pkg/strategy/dca"
 	_ "github.com/c9s/bbgo/pkg/strategy/deposit2transfer"
 	_ "github.com/c9s/bbgo/pkg/strategy/drift"
