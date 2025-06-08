@@ -118,12 +118,11 @@ func (i *IndicatorSet) ADX(interval types.Interval, window int) *indicatorv2.ADX
 }
 
 func (i *IndicatorSet) LiquidityDemand(
-	interval types.Interval,
-	sellDemandMA, buyDemandMA indicatorv2.MASource,
+	iw types.IntervalWindow,
 ) *indicatorv2.LiquidityDemandStream {
 	return indicatorv2.LiquidityDemand(
-		i.KLines(interval),
-		sellDemandMA,
-		buyDemandMA,
+		i.KLines(iw.Interval),
+		i.EMA(iw),
+		i.EMA(iw),
 	)
 }
