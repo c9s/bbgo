@@ -1,6 +1,8 @@
 package indicatorv2
 
 import (
+	"math"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -33,21 +35,35 @@ func (s *LiquidityDemandStream) handleKLine(k types.KLine) {
 	s.PushAndEmit(netDemand)
 }
 
+/*
+price_range_buy := max(high - open, ε)
+price_range_sell := max(open - low, ε)
+buy_demand := volume / price_range_buy
+sell_demand := volume / price_range_sell
+buy_demand_ma.Push(buy_demand)
+sell_demand_ma.Push(sell_demand)
+*/
 func (s *LiquidityDemandStream) calculateKLine(k types.KLine) float64 {
-	if k.Close.Compare(k.Open) > 0 {
-		priceRange := k.High.Sub(k.Open).Add(s.epsilon)
-		buyDemand := k.Volume.Div(priceRange).Float64()
-		s.buyDemandMA.PushAndEmit(buyDemand)
-		s.sellDemandMA.PushAndEmit(0.0) // decay
-	} else {
-		priceRange := k.Open.Sub(k.Low).Add(s.epsilon)
-		sellDemand := k.Volume.Div(priceRange).Float64()
-		s.sellDemandMA.PushAndEmit(sellDemand)
-		s.buyDemandMA.PushAndEmit(0.0) // decay
-	}
-	buyDemand := s.buyDemandMA.Last(0)
-	sellDemand := s.sellDemandMA.Last(0)
-	return buyDemand - sellDemand
+	s.buyDemandMA.PushAndEmit(k.Volume.Div(
+		fixedpoint.Max(
+			k.High.Sub(k.Open),
+			s.epsilon,
+		),
+	).Float64(),
+	)
+	s.sellDemandMA.PushAndEmit(
+		k.Volume.Div(
+			fixedpoint.Max(
+				k.Open.Sub(k.Low),
+				s.epsilon,
+			),
+		).Float64(),
+	)
+	buyMomentum := s.buyDemandMA.Last(0) - s.buyDemandMA.Last(1)
+	sellMomentum := s.sellDemandMA.Last(0) - s.sellDemandMA.Last(1)
+	demandDirection := (buyMomentum - sellMomentum) / (math.Abs(buyMomentum) + math.Abs(sellMomentum) + s.epsilon.Float64())
+	demandMagnitude := math.Sqrt(math.Pow(buyMomentum, 2) + math.Pow(sellMomentum, 2))
+	return demandDirection * demandMagnitude
 }
 
 func LiquidityDemand(
