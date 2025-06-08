@@ -40,6 +40,8 @@ type Strategy struct {
 	logger           *logrus.Entry
 	records          []record
 	kLineCloseBuffer *types.Float64Series
+
+	startTime, endTime *types.Time
 }
 
 func (s *Strategy) ID() string {
@@ -93,6 +95,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		},
 	)
 	session.MarketDataStream.OnKLineClosed(types.KLineWith(s.Symbol, s.Interval, func(k types.KLine) {
+		if s.startTime == nil {
+			s.startTime = &k.EndTime
+		} else {
+			s.endTime = &k.EndTime
+		}
 		s.kLineCloseBuffer.Push(k.Close.Float64())
 		if s.kLineCloseBuffer.Length() > s.Delay {
 			ld := liqDemand.Last(s.Delay)
@@ -126,7 +133,14 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			corr := priceDiffs.Correlation(liqDemands, priceDiffs.Length())
 			s.logger.Infof("correlation between price diff and liquidity demand: %f", corr)
 			s.logger.Infof("number of records: %d", len(s.records))
-			fileName := fmt.Sprintf("%s-%s-records.json", s.Symbol, s.Interval)
+			fileName := fmt.Sprintf(
+				"%s-%s-%s-%s-%d-records.json",
+				s.Symbol,
+				s.startTime.Time().Format("2006-01-02"),
+				s.endTime.Time().Format("2006-01-02"),
+				s.Interval,
+				s.Window,
+			)
 			file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 			if err != nil {
 				s.logger.WithError(err).Errorf("unable to open file %s for writing", fileName)
