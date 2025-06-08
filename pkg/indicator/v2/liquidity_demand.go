@@ -1,8 +1,6 @@
 package indicatorv2
 
 import (
-	"math"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -59,11 +57,7 @@ func (s *LiquidityDemandStream) calculateKLine(k types.KLine) float64 {
 			),
 		).Float64(),
 	)
-	buyMomentum := s.buyDemandMA.Last(0) - s.buyDemandMA.Last(1)
-	sellMomentum := s.sellDemandMA.Last(0) - s.sellDemandMA.Last(1)
-	demandDirection := (buyMomentum - sellMomentum) / (math.Abs(buyMomentum) + math.Abs(sellMomentum) + s.epsilon.Float64())
-	demandMagnitude := math.Sqrt(math.Pow(buyMomentum, 2) + math.Pow(sellMomentum, 2))
-	return demandDirection * demandMagnitude
+	return (s.buyDemandMA.Last(0) - s.sellDemandMA.Last(0))
 }
 
 func LiquidityDemand(
