@@ -24,6 +24,7 @@ func TestKLineStream_metricsKLineUpdater(t *testing.T) {
 		Close:     fixedpoint.NewFromFloat(51000.0),
 		High:      fixedpoint.NewFromFloat(52000.0),
 		Low:       fixedpoint.NewFromFloat(49000.0),
+		Volume:    fixedpoint.NewFromFloat(100.5),
 	}
 
 	// Create KLineStream instance
@@ -32,31 +33,62 @@ func TestKLineStream_metricsKLineUpdater(t *testing.T) {
 	// Call the function being tested
 	stream.metricsKLineUpdater(k)
 
-	// Verify metric values
-	labels := prometheus.Labels{
-		"exchange":  k.Exchange.String(),
-		"symbol":    k.Symbol,
-		"interval":  k.Interval.String(),
-		"startTime": k.StartTime.Time().Format("2006-01-02 15:04:05"),
-		"endTime":   k.EndTime.Time().Format("2006-01-02 15:04:05"),
+	// Base labels for metrics
+	baseLabels := prometheus.Labels{
+		"exchange": k.Exchange.String(),
+		"symbol":   k.Symbol,
+		"interval": k.Interval.String(),
 	}
 
-	// Get metric values
-	openValue, err := metricsKLineStreamOpen.GetMetricWith(labels)
+	// Test OHLC price metrics
+	// Test open price
+	openLabels := prometheus.Labels{
+		"exchange": k.Exchange.String(),
+		"symbol":   k.Symbol,
+		"interval": k.Interval.String(),
+		"type":     "open",
+	}
+	openValue, err := metricsStreamKLinePrices.GetMetricWith(openLabels)
 	assert.NoError(t, err)
 	assert.Equal(t, 50000.0, getGaugeValue(t, openValue))
 
-	closeValue, err := metricsKLineStreamClose.GetMetricWith(labels)
+	// Test close price
+	closeLabels := prometheus.Labels{
+		"exchange": k.Exchange.String(),
+		"symbol":   k.Symbol,
+		"interval": k.Interval.String(),
+		"type":     "close",
+	}
+	closeValue, err := metricsStreamKLinePrices.GetMetricWith(closeLabels)
 	assert.NoError(t, err)
 	assert.Equal(t, 51000.0, getGaugeValue(t, closeValue))
 
-	highValue, err := metricsKLineStreamHigh.GetMetricWith(labels)
+	// Test high price
+	highLabels := prometheus.Labels{
+		"exchange": k.Exchange.String(),
+		"symbol":   k.Symbol,
+		"interval": k.Interval.String(),
+		"type":     "high",
+	}
+	highValue, err := metricsStreamKLinePrices.GetMetricWith(highLabels)
 	assert.NoError(t, err)
 	assert.Equal(t, 52000.0, getGaugeValue(t, highValue))
 
-	lowValue, err := metricsKLineStreamLow.GetMetricWith(labels)
+	// Test low price
+	lowLabels := prometheus.Labels{
+		"exchange": k.Exchange.String(),
+		"symbol":   k.Symbol,
+		"interval": k.Interval.String(),
+		"type":     "low",
+	}
+	lowValue, err := metricsStreamKLinePrices.GetMetricWith(lowLabels)
 	assert.NoError(t, err)
 	assert.Equal(t, 49000.0, getGaugeValue(t, lowValue))
+
+	// Test volume metric
+	volumeValue, err := metricsStreamKLineVolume.GetMetricWith(baseLabels)
+	assert.NoError(t, err)
+	assert.Equal(t, 100.5, getGaugeValue(t, volumeValue))
 }
 
 // Helper function: Get the value of a Gauge metric
