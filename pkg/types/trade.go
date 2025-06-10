@@ -223,8 +223,7 @@ func (trade Trade) SlackAttachment() slack.Attachment {
 		Fields: []slack.AttachmentField{
 			{Title: "Exchange", Value: trade.Exchange.String(), Short: true},
 			{Title: "QuoteQuantity", Value: trade.QuoteQuantity.String(), Short: true},
-			{Title: "Fee", Value: trade.Fee.String(), Short: true},
-			{Title: "FeeCurrency", Value: trade.FeeCurrency, Short: true},
+			{Title: "Fee", Value: trade.Fee.String() + " " + trade.FeeCurrency, Short: true},
 			{Title: "Liquidity", Value: liquidity, Short: true},
 			{Title: "Order ID", Value: strconv.FormatUint(trade.OrderID, 10), Short: true},
 		},
