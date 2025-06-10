@@ -74,25 +74,24 @@ func (p *Profit) SlackAttachment() slack.Attachment {
 	var fields []slack.AttachmentField
 
 	if !p.NetProfit.IsZero() {
+		val := fmt.Sprintf("%s %s (%s %s)", style.PnLSignString(p.Profit), p.QuoteCurrency, style.PnLSignString(p.NetProfit), p.QuoteCurrency)
 		fields = append(fields, slack.AttachmentField{
-			Title: "Net Profit",
-			Value: style.PnLSignString(p.NetProfit) + " " + p.QuoteCurrency,
+			Title: "Profit",
+			Value: val,
 			Short: true,
 		})
 	}
 
 	if !p.ProfitMargin.IsZero() {
+		val := p.ProfitMargin.Percentage()
+
+		if !p.NetProfitMargin.IsZero() {
+			val += " (" + p.NetProfitMargin.Percentage() + ")"
+		}
+
 		fields = append(fields, slack.AttachmentField{
 			Title: "Profit Margin",
-			Value: p.ProfitMargin.Percentage(),
-			Short: true,
-		})
-	}
-
-	if !p.NetProfitMargin.IsZero() {
-		fields = append(fields, slack.AttachmentField{
-			Title: "Net Profit Margin",
-			Value: p.NetProfitMargin.Percentage(),
+			Value: val,
 			Short: true,
 		})
 	}
@@ -100,7 +99,7 @@ func (p *Profit) SlackAttachment() slack.Attachment {
 	if !p.QuoteQuantity.IsZero() {
 		fields = append(fields, slack.AttachmentField{
 			Title: "Trade Amount",
-			Value: p.QuoteQuantity.String() + " " + p.QuoteCurrency,
+			Value: p.QuoteQuantity.String() + " " + p.QuoteCurrency + " @ " + p.Price.String(),
 			Short: true,
 		})
 	}
