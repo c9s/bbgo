@@ -199,6 +199,10 @@ func (m Market) FormatPriceCurrency(val fixedpoint.Value) string {
 
 func (m Market) FormatPrice(val fixedpoint.Value) string {
 	// p := math.Pow10(m.PricePrecision)
+	if m.TickSize.IsZero() {
+		return val.String()
+	}
+
 	return FormatPrice(val, m.TickSize)
 }
 

@@ -441,12 +441,13 @@ func (p *Position) SlackAttachment() slack.Attachment {
 		color = "#DC143C"
 	}
 
-	title := templateutil.Render(string(posType)+` Position {{ .Symbol }} `, p)
+	title := templateutil.Render(string(posType)+` Position {{ .Symbol }} `, p) + " @ " + p.Market.FormatPrice(averageCost) + " " + p.QuoteCurrency
+
+	desc := p.Market.FormatQuantity(base) + " @ " + p.Market.FormatPrice(averageCost) + " " + p.QuoteCurrency
+	desc += " (" + quote.String() + " " + p.QuoteCurrency + ")"
 
 	fields := []slack.AttachmentField{
-		{Title: "Average Cost", Value: averageCost.String() + " " + p.QuoteCurrency, Short: true},
-		{Title: p.BaseCurrency, Value: base.String(), Short: true},
-		{Title: p.QuoteCurrency, Value: quote.String()},
+		{Title: p.BaseCurrency + " / Average Cost", Value: desc, Short: false},
 	}
 
 	if p.TotalFee != nil {
@@ -461,7 +462,7 @@ func (p *Position) SlackAttachment() slack.Attachment {
 		}
 	}
 
-	footer := templateutil.Render("last updated time: {{ . }}",
+	footer := templateutil.Render("Last updated time: {{ . }}",
 		time.Now().Format(time.RFC822))
 
 	if len(p.Strategy) > 0 {
