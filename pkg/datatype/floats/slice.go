@@ -22,7 +22,7 @@ func NewRandomNormal(loc float64, scale float64, size ...int) Slice {
 		Mu:    loc,
 		Sigma: scale,
 	}
-	for i := 0; i < _size; i++ {
+	for i := range _size {
 		s[i] = norm.Rand()
 	}
 	return s
@@ -43,7 +43,7 @@ func NewRandomPoisson(lam float64, size ...int) Slice {
 	pois := distuv.Poisson{
 		Lambda: lam,
 	}
-	for i := 0; i < _size; i++ {
+	for i := range _size {
 		s[i] = pois.Rand()
 	}
 	return s
@@ -66,7 +66,7 @@ func NewRandomUniform(low float64, high float64, size ...int) Slice {
 		Min: low,
 		Max: high,
 	}
-	for i := 0; i < _size; i++ {
+	for i := range _size {
 		s[i] = uniform.Rand()
 	}
 	return s
