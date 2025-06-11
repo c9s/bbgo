@@ -1,6 +1,9 @@
 package floats
 
-import "sort"
+import (
+	"math"
+	"sort"
+)
 
 func Lower(arr []float64, x float64) []float64 {
 	sort.Float64s(arr)
@@ -76,10 +79,10 @@ func Multiply(inReal0 []float64, inReal1 []float64) []float64 {
 
 // CrossOver returns true if series1 is crossing over series2.
 //
-//    NOTE: Usually this is used with Media Average Series to check if it crosses for buy signals.
-//          It assumes first values are the most recent.
-//          The crossover function does not use most recent value, since usually it's not a complete candle.
-//          The second recent values and the previous are used, instead.
+//	NOTE: Usually this is used with Media Average Series to check if it crosses for buy signals.
+//	      It assumes first values are the most recent.
+//	      The crossover function does not use most recent value, since usually it's not a complete candle.
+//	      The second recent values and the previous are used, instead.
 //
 // ported from https://github.com/markcheno/go-talib/blob/master/talib.go
 func CrossOver(series1 []float64, series2 []float64) bool {
@@ -94,7 +97,7 @@ func CrossOver(series1 []float64, series2 []float64) bool {
 
 // CrossUnder returns true if series1 is crossing under series2.
 //
-//    NOTE: Usually this is used with Media Average Series to check if it crosses for sell signals.
+//	NOTE: Usually this is used with Media Average Series to check if it crosses for sell signals.
 //
 // ported from https://github.com/markcheno/go-talib/blob/master/talib.go
 func CrossUnder(series1 []float64, series2 []float64) bool {
@@ -164,4 +167,32 @@ func MinMax(inReal []float64, inTimePeriod int) (outMin []float64, outMax []floa
 		today++
 	}
 	return outMin, outMax
+}
+
+// Percentile function calculates the p-th percentile of a slice of float64 numbers.
+// Use linear interpolation to find the percentile value.
+func Percentile(arr []float64, p float64) float64 {
+	if len(arr) == 0 {
+		return 0.0
+	}
+
+	sort.Float64s(arr)
+
+	if p <= 0 {
+		return arr[0]
+	} else if p >= 100 {
+		return arr[len(arr)-1]
+	}
+
+	index := float64(len(arr)-1) * (p / 100.0)
+	if int(index) >= len(arr) {
+		index = float64(len(arr) - 1)
+	}
+	i := int(index)
+	a := arr[i]
+	j := int(math.Ceil(index))
+	if i == j {
+		return a
+	}
+	return arr[j]*(index-float64(i)) + (1-index+float64(i))*a
 }
