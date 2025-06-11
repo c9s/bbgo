@@ -4,9 +4,73 @@ import (
 	"math"
 
 	"gonum.org/v1/gonum/floats"
+	"gonum.org/v1/gonum/stat/distuv"
 )
 
 type Slice []float64
+
+// Align with numpy.random.normal
+func NewRandomNormal(loc float64, scale float64, size ...int) Slice {
+	var _size int
+	if len(size) == 0 {
+		_size = 1
+	} else {
+		_size = size[0]
+	}
+	s := make(Slice, _size)
+	norm := distuv.Normal{
+		Mu:    loc,
+		Sigma: scale,
+	}
+	for i := range _size {
+		s[i] = norm.Rand()
+	}
+	return s
+}
+
+// Align with numpy.random.posisson
+func NewRandomPoisson(lam float64, size ...int) Slice {
+	if lam < 0 {
+		panic("lambda must be greater than 0")
+	}
+	var _size int
+	if len(size) == 0 {
+		_size = 1
+	} else {
+		_size = size[0]
+	}
+	s := make(Slice, _size)
+	pois := distuv.Poisson{
+		Lambda: lam,
+	}
+	for i := range _size {
+		s[i] = pois.Rand()
+	}
+	return s
+}
+
+// Align with numpy.random.uniform
+func NewRandomUniform(low float64, high float64, size ...int) Slice {
+	if low >= high {
+		panic("low must be less than high")
+	}
+	var _size int
+	if len(size) == 0 {
+		_size = 1
+	} else {
+		_size = size[0]
+	}
+	s := make(Slice, _size)
+
+	uniform := distuv.Uniform{
+		Min: low,
+		Max: high,
+	}
+	for i := range _size {
+		s[i] = uniform.Rand()
+	}
+	return s
+}
 
 func New(a ...float64) Slice {
 	return Slice(a)
