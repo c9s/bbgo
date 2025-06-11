@@ -21,6 +21,7 @@ import (
 type MockExchange struct {
 	ctrl     *gomock.Controller
 	recorder *MockExchangeMockRecorder
+	isgomock struct{}
 }
 
 // MockExchangeMockRecorder is the mock recorder for MockExchange.
@@ -41,10 +42,10 @@ func (m *MockExchange) EXPECT() *MockExchangeMockRecorder {
 }
 
 // CancelOrders mocks base method.
-func (m *MockExchange) CancelOrders(arg0 context.Context, arg1 ...types.Order) error {
+func (m *MockExchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	m.ctrl.T.Helper()
-	varargs := []any{arg0}
-	for _, a := range arg1 {
+	varargs := []any{ctx}
+	for _, a := range orders {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "CancelOrders", varargs...)
@@ -53,9 +54,9 @@ func (m *MockExchange) CancelOrders(arg0 context.Context, arg1 ...types.Order) e
 }
 
 // CancelOrders indicates an expected call of CancelOrders.
-func (mr *MockExchangeMockRecorder) CancelOrders(arg0 any, arg1 ...any) *gomock.Call {
+func (mr *MockExchangeMockRecorder) CancelOrders(ctx any, orders ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{arg0}, arg1...)
+	varargs := append([]any{ctx}, orders...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelOrders", reflect.TypeOf((*MockExchange)(nil).CancelOrders), varargs...)
 }
 
@@ -102,100 +103,100 @@ func (mr *MockExchangeMockRecorder) PlatformFeeCurrency() *gomock.Call {
 }
 
 // QueryAccount mocks base method.
-func (m *MockExchange) QueryAccount(arg0 context.Context) (*types.Account, error) {
+func (m *MockExchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryAccount", arg0)
+	ret := m.ctrl.Call(m, "QueryAccount", ctx)
 	ret0, _ := ret[0].(*types.Account)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // QueryAccount indicates an expected call of QueryAccount.
-func (mr *MockExchangeMockRecorder) QueryAccount(arg0 any) *gomock.Call {
+func (mr *MockExchangeMockRecorder) QueryAccount(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryAccount", reflect.TypeOf((*MockExchange)(nil).QueryAccount), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryAccount", reflect.TypeOf((*MockExchange)(nil).QueryAccount), ctx)
 }
 
 // QueryAccountBalances mocks base method.
-func (m *MockExchange) QueryAccountBalances(arg0 context.Context) (types.BalanceMap, error) {
+func (m *MockExchange) QueryAccountBalances(ctx context.Context) (types.BalanceMap, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryAccountBalances", arg0)
+	ret := m.ctrl.Call(m, "QueryAccountBalances", ctx)
 	ret0, _ := ret[0].(types.BalanceMap)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // QueryAccountBalances indicates an expected call of QueryAccountBalances.
-func (mr *MockExchangeMockRecorder) QueryAccountBalances(arg0 any) *gomock.Call {
+func (mr *MockExchangeMockRecorder) QueryAccountBalances(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryAccountBalances", reflect.TypeOf((*MockExchange)(nil).QueryAccountBalances), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryAccountBalances", reflect.TypeOf((*MockExchange)(nil).QueryAccountBalances), ctx)
 }
 
 // QueryKLines mocks base method.
-func (m *MockExchange) QueryKLines(arg0 context.Context, arg1 string, arg2 types.Interval, arg3 types.KLineQueryOptions) ([]types.KLine, error) {
+func (m *MockExchange) QueryKLines(ctx context.Context, symbol string, interval types.Interval, options types.KLineQueryOptions) ([]types.KLine, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryKLines", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "QueryKLines", ctx, symbol, interval, options)
 	ret0, _ := ret[0].([]types.KLine)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // QueryKLines indicates an expected call of QueryKLines.
-func (mr *MockExchangeMockRecorder) QueryKLines(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockExchangeMockRecorder) QueryKLines(ctx, symbol, interval, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryKLines", reflect.TypeOf((*MockExchange)(nil).QueryKLines), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryKLines", reflect.TypeOf((*MockExchange)(nil).QueryKLines), ctx, symbol, interval, options)
 }
 
 // QueryMarkets mocks base method.
-func (m *MockExchange) QueryMarkets(arg0 context.Context) (types.MarketMap, error) {
+func (m *MockExchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryMarkets", arg0)
+	ret := m.ctrl.Call(m, "QueryMarkets", ctx)
 	ret0, _ := ret[0].(types.MarketMap)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // QueryMarkets indicates an expected call of QueryMarkets.
-func (mr *MockExchangeMockRecorder) QueryMarkets(arg0 any) *gomock.Call {
+func (mr *MockExchangeMockRecorder) QueryMarkets(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryMarkets", reflect.TypeOf((*MockExchange)(nil).QueryMarkets), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryMarkets", reflect.TypeOf((*MockExchange)(nil).QueryMarkets), ctx)
 }
 
 // QueryOpenOrders mocks base method.
-func (m *MockExchange) QueryOpenOrders(arg0 context.Context, arg1 string) ([]types.Order, error) {
+func (m *MockExchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.Order, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryOpenOrders", arg0, arg1)
+	ret := m.ctrl.Call(m, "QueryOpenOrders", ctx, symbol)
 	ret0, _ := ret[0].([]types.Order)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // QueryOpenOrders indicates an expected call of QueryOpenOrders.
-func (mr *MockExchangeMockRecorder) QueryOpenOrders(arg0, arg1 any) *gomock.Call {
+func (mr *MockExchangeMockRecorder) QueryOpenOrders(ctx, symbol any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryOpenOrders", reflect.TypeOf((*MockExchange)(nil).QueryOpenOrders), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryOpenOrders", reflect.TypeOf((*MockExchange)(nil).QueryOpenOrders), ctx, symbol)
 }
 
 // QueryTicker mocks base method.
-func (m *MockExchange) QueryTicker(arg0 context.Context, arg1 string) (*types.Ticker, error) {
+func (m *MockExchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryTicker", arg0, arg1)
+	ret := m.ctrl.Call(m, "QueryTicker", ctx, symbol)
 	ret0, _ := ret[0].(*types.Ticker)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // QueryTicker indicates an expected call of QueryTicker.
-func (mr *MockExchangeMockRecorder) QueryTicker(arg0, arg1 any) *gomock.Call {
+func (mr *MockExchangeMockRecorder) QueryTicker(ctx, symbol any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryTicker", reflect.TypeOf((*MockExchange)(nil).QueryTicker), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryTicker", reflect.TypeOf((*MockExchange)(nil).QueryTicker), ctx, symbol)
 }
 
 // QueryTickers mocks base method.
-func (m *MockExchange) QueryTickers(arg0 context.Context, arg1 ...string) (map[string]types.Ticker, error) {
+func (m *MockExchange) QueryTickers(ctx context.Context, symbol ...string) (map[string]types.Ticker, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{arg0}
-	for _, a := range arg1 {
+	varargs := []any{ctx}
+	for _, a := range symbol {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "QueryTickers", varargs...)
@@ -205,23 +206,23 @@ func (m *MockExchange) QueryTickers(arg0 context.Context, arg1 ...string) (map[s
 }
 
 // QueryTickers indicates an expected call of QueryTickers.
-func (mr *MockExchangeMockRecorder) QueryTickers(arg0 any, arg1 ...any) *gomock.Call {
+func (mr *MockExchangeMockRecorder) QueryTickers(ctx any, symbol ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{arg0}, arg1...)
+	varargs := append([]any{ctx}, symbol...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryTickers", reflect.TypeOf((*MockExchange)(nil).QueryTickers), varargs...)
 }
 
 // SubmitOrder mocks base method.
-func (m *MockExchange) SubmitOrder(arg0 context.Context, arg1 types.SubmitOrder) (*types.Order, error) {
+func (m *MockExchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (*types.Order, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubmitOrder", arg0, arg1)
+	ret := m.ctrl.Call(m, "SubmitOrder", ctx, order)
 	ret0, _ := ret[0].(*types.Order)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SubmitOrder indicates an expected call of SubmitOrder.
-func (mr *MockExchangeMockRecorder) SubmitOrder(arg0, arg1 any) *gomock.Call {
+func (mr *MockExchangeMockRecorder) SubmitOrder(ctx, order any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitOrder", reflect.TypeOf((*MockExchange)(nil).SubmitOrder), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitOrder", reflect.TypeOf((*MockExchange)(nil).SubmitOrder), ctx, order)
 }
