@@ -25,14 +25,17 @@ func generateTestOrder(side types.SideType, status types.OrderStatus, createdAt 
 
 func Test_RecoverState(t *testing.T) {
 	strategy := newTestStrategy()
+	pm := &PriceTriggerMode{
+		s: strategy,
+	}
 
 	t.Run("new strategy", func(t *testing.T) {
 		currentRound := Round{}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
+		state, err := pm.recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
-		assert.Equal(t, IdleWaiting, state)
+		assert.Equal(t, PriceTriggerStateIdleWaiting, state)
 	})
 
 	t.Run("at open position stage and no filled order", func(t *testing.T) {
@@ -48,9 +51,9 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
+		state, err := pm.recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
-		assert.Equal(t, OpenPositionReady, state)
+		assert.Equal(t, PriceTriggerStateOpenPositionReady, state)
 	})
 
 	t.Run("at open position stage and there at least one filled order", func(t *testing.T) {
@@ -66,9 +69,9 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
+		state, err := pm.recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
-		assert.Equal(t, OpenPositionOrderFilled, state)
+		assert.Equal(t, PriceTriggerStateOpenPositionOrderFilled, state)
 	})
 
 	t.Run("open position stage finish, but stop at cancelling", func(t *testing.T) {
@@ -84,9 +87,9 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
+		state, err := pm.recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
-		assert.Equal(t, OpenPositionFinished, state)
+		assert.Equal(t, PriceTriggerStateOpenPositionFinished, state)
 	})
 
 	t.Run("open-position orders are cancelled", func(t *testing.T) {
@@ -102,9 +105,9 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
+		state, err := pm.recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
-		assert.Equal(t, OpenPositionFinished, state)
+		assert.Equal(t, PriceTriggerStateOpenPositionFinished, state)
 	})
 
 	t.Run("at take profit stage, and not filled yet", func(t *testing.T) {
@@ -123,9 +126,9 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
+		state, err := pm.recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
-		assert.Equal(t, TakeProfitReady, state)
+		assert.Equal(t, PriceTriggerStateTakeProfitReady, state)
 	})
 
 	t.Run("at take profit stage, take-profit order filled", func(t *testing.T) {
@@ -144,9 +147,9 @@ func Test_RecoverState(t *testing.T) {
 		}
 		position := types.NewPositionFromMarket(strategy.Market)
 		orderExecutor := bbgo.NewGeneralOrderExecutor(&bbgo.ExchangeSession{}, strategy.Symbol, ID, "", position)
-		state, err := recoverStateForPriceTriggerMode(currentRound, orderExecutor)
+		state, err := pm.recoverState(currentRound, orderExecutor)
 		assert.NoError(t, err)
-		assert.Equal(t, IdleWaiting, state)
+		assert.Equal(t, PriceTriggerStateIdleWaiting, state)
 	})
 }
 
