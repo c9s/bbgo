@@ -102,7 +102,7 @@ func (s *SyntheticHedge) InitializeAndBind(
 		return err
 	}
 
-	s.fiatMarket, err = initializeHedgeMarketFromConfig(s.Source, sessions)
+	s.fiatMarket, err = initializeHedgeMarketFromConfig(s.Fiat, sessions)
 	if err != nil {
 		return err
 	}
