@@ -2,6 +2,8 @@ package analysis
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 /*
@@ -51,4 +53,10 @@ func TestMarkedHawkesProcessVP(t *testing.T) {
 	if intensity != expectedIntensity {
 		t.Errorf("Expected intensity %f, got %f", expectedIntensity, intensity)
 	}
+}
+
+func TestMarkedHawkesInvalidParam(t *testing.T) {
+	process := NewMarkedHawkesProcessVP(0.5, 0.1, 1.0, 1.0)
+	result := process.MarkFunction(199)
+	assert.Equal(t, 0.0, result, "Expected mark function to return 0 for invalid input")
 }
