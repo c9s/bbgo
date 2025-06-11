@@ -211,15 +211,18 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	s.OrderExecutor.BindEnvironment(s.Environment)
 	s.OrderExecutor.Bind()
 
+	// setup trigger mode
+	mode := PriceTriggerMode{
+		s: s,
+	}
+	mode.Bind(ctx)
+
 	session.UserDataStream.OnAuth(func() {
 		s.logger.Info("user data stream authenticated")
 		time.AfterFunc(3*time.Second, func() {
 			s.stateMachine.Run(ctx)
 		})
 	})
-
-	// set price trigger mode
-	s.SetupPriceTriggerMode(ctx)
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
