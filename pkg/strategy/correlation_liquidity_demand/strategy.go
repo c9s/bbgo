@@ -25,6 +25,7 @@ type record struct {
 	PriceDiff       float64    `json:"priceDiff"`
 	EntryPrice      float64    `json:"entryPrice"`
 	HitPrice        float64    `json:"hitPrice"`
+	CurrentClose    float64    `json:"currentClose"`
 	Time            types.Time `json:"time"`
 }
 
@@ -102,7 +103,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		} else {
 			s.endTime = &k.EndTime
 		}
-		s.kLineCloseBuffer.Push(k.Close.Float64())
+		currentClose := k.Close.Float64()
+		s.kLineCloseBuffer.Push(currentClose)
 		if s.kLineCloseBuffer.Length() > s.Delay {
 			ld := liqDemand.Last(s.Delay)
 			entryPrice := s.kLineCloseBuffer.Last(s.Delay)
@@ -114,6 +116,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 					PriceDiff:       hitPrice - entryPrice,
 					EntryPrice:      entryPrice,
 					HitPrice:        hitPrice,
+					CurrentClose:    currentClose,
 					Time:            k.EndTime,
 				})
 			} else {
@@ -123,6 +126,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 					PriceDiff:       hitPrice - entryPrice,
 					EntryPrice:      entryPrice,
 					HitPrice:        hitPrice,
+					CurrentClose:    currentClose,
 					Time:            k.EndTime,
 				})
 			}
