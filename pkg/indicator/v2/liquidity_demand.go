@@ -57,9 +57,7 @@ func (s *LiquidityDemandStream) calculateKLine(k types.KLine) float64 {
 			),
 		).Float64(),
 	)
-	buyMomentum := s.buyDemandMA.Last(0) - s.buyDemandMA.Last(1)
-	sellMomentum := s.sellDemandMA.Last(0) - s.sellDemandMA.Last(1)
-	return (buyMomentum - sellMomentum)
+	return (s.buyDemandMA.Last(0) - s.sellDemandMA.Last(0))
 }
 
 func LiquidityDemand(
