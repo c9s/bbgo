@@ -85,6 +85,10 @@ func (i *IndicatorSet) EWMA(iw types.IntervalWindow) *indicatorv2.EWMAStream {
 	return indicatorv2.EWMA2(i.CLOSE(iw.Interval), iw.Window)
 }
 
+func (i *IndicatorSet) SMA(iw types.IntervalWindow) *indicatorv2.SMAStream {
+	return indicatorv2.SMA(i.CLOSE(iw.Interval), iw.Window)
+}
+
 func (i *IndicatorSet) STOCH(iw types.IntervalWindow, dPeriod int) *indicatorv2.StochStream {
 	return indicatorv2.Stoch(i.KLines(iw.Interval), iw.Window, dPeriod)
 }
