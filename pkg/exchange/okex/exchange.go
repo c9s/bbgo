@@ -262,6 +262,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, fmt.Errorf("account config is empty")
 	}
 
+	log.Debugf("okex account balances: %+v", accounts[0])
+
 	balances := toGlobalBalance(&accounts[0])
 	account := types.NewAccount()
 	account.UpdateBalances(balances)
