@@ -10,7 +10,7 @@ func CalculateMarginTolerance(marginLevel fixedpoint.Value) fixedpoint.Value {
 		return fixedpoint.Zero
 	}
 
-	// Formula created by operations team for our binance code.  Liquidation occurs at 1.1,
+	// Liquidation occurs at 1.1,
 	// so when marginLevel equals 1.1, the formula becomes 1.0 - 1.0, or zero.
 	// = 1.0 - (1.1 / marginLevel)
 	return fixedpoint.One.Sub(fixedpoint.NewFromFloat(1.1).Div(marginLevel))

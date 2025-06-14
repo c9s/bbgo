@@ -61,13 +61,19 @@ type BalanceDetail struct {
 }
 
 type Account struct {
-	TotalEquityInUSD fixedpoint.Value           `json:"totalEq,omitempty"`
-	AdjustEquity     fixedpoint.Value           `json:"adjEq,omitempty"`
-	UpdateTime       types.MillisecondTimestamp `json:"uTime,omitempty"`
-	MarginRatio      fixedpoint.Value           `json:"mgnRatio,omitempty"`
-	NotionalUsd      fixedpoint.Value           `json:"notionalUsd,omitempty"`
-	UnrealizedPnl    fixedpoint.Value           `json:"upl,omitempty"`
-	Details          []BalanceDetail            `json:"details"`
+	TotalEquityInUSD      fixedpoint.Value           `json:"totalEq,omitempty"`
+	AdjustEquity          fixedpoint.Value           `json:"adjEq,omitempty"`
+	UpdateTime            types.MillisecondTimestamp `json:"uTime,omitempty"`
+	MarginRatio           fixedpoint.Value           `json:"mgnRatio,omitempty"`
+	NotionalUsd           fixedpoint.Value           `json:"notionalUsd,omitempty"`
+	NotionalUsdForBorrow  fixedpoint.Value           `json:"notionalUsdForBorrow,omitempty"`
+	NotionalUsdForSwap    fixedpoint.Value           `json:"notionalUsdForSwap,omitempty"`
+	NotionalUsdForFutures fixedpoint.Value           `json:"notionalUsdForFutures,omitempty"`
+	NotionalUsdForOption  fixedpoint.Value           `json:"notionalUsdForOption,omitempty"`
+	BorrowFroz            fixedpoint.Value           `json:"borrowFroz,omitempty"`
+
+	UnrealizedPnl fixedpoint.Value `json:"upl,omitempty"`
+	Details       []BalanceDetail  `json:"details"`
 
 	TotalInitialMargin          fixedpoint.Value `json:"imr,omitempty"`
 	TotalMaintMargin            fixedpoint.Value `json:"mmr,omitempty"`
