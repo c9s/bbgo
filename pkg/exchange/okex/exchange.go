@@ -293,7 +293,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		if accounts[0].NotionalUsdForBorrow.Sign() > 0 {
 			account.MarginLevel = accounts[0].TotalEquityInUSD.Div(accounts[0].NotionalUsdForBorrow)
 		} else {
-			account.MarginLevel = fixedpoint.NewFromFloat(999.9)
+			account.MarginLevel = fixedpoint.NewFromFloat(DefaultMaxMarginLevel)
 		}
 
 		if account.MarginLevel.Sign() > 0 {
