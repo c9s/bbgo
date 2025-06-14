@@ -23,6 +23,8 @@ import (
 )
 
 var (
+	defaultMaxMarginLevel = fixedpoint.NewFromFloat(999.99)
+
 	// clientOrderIdRegex combine of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
 	clientOrderIdRegex = regexp.MustCompile("^[a-zA-Z0-9]{0,32}$")
 
@@ -262,6 +264,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, fmt.Errorf("account config is empty")
 	}
 
+	log.Debugf("okex account balances: %+v", accounts[0])
+
 	balances := toGlobalBalance(&accounts[0])
 	account := types.NewAccount()
 	account.UpdateBalances(balances)
@@ -291,7 +295,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		if accounts[0].NotionalUsdForBorrow.Sign() > 0 {
 			account.MarginLevel = accounts[0].TotalEquityInUSD.Div(accounts[0].NotionalUsdForBorrow)
 		} else {
-			account.MarginLevel = fixedpoint.NewFromFloat(999.9)
+			account.MarginLevel = defaultMaxMarginLevel
 		}
 
 		if account.MarginLevel.Sign() > 0 {
