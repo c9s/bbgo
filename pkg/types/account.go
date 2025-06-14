@@ -42,19 +42,21 @@ type Account struct {
 	// Margin related common field
 	// From binance:
 	// Margin Level = Total Asset Value / (Total Borrowed + Total Accrued Interest)
+	//
 	// If your margin level drops to 1.3, you will receive a Margin Call, which is a reminder that you should either increase your collateral (by depositing more funds) or reduce your loan (by repaying what you’ve borrowed).
 	// If your margin level drops to 1.1, your assets will be automatically liquidated, meaning that Binance will sell your funds at market price to repay the loan.
-	MarginLevel     fixedpoint.Value `json:"marginLevel,omitempty"`
+	MarginLevel fixedpoint.Value `json:"marginLevel,omitempty"`
+
 	MarginTolerance fixedpoint.Value `json:"marginTolerance,omitempty"`
+
+	// MarginRatio = Adjusted equity / (Maintenance margin + Liquidation fees)
+	MarginRatio fixedpoint.Value `json:"marginRatio,omitempty"`
 
 	BorrowEnabled   *bool `json:"borrowEnabled,omitempty"`
 	TransferEnabled *bool `json:"transferEnabled,omitempty"`
 
 	// Isolated margin related fields
 	// ------------------------------
-	// MarginRatio is almost the same as MarginLevel, we can deprecate it later
-	MarginRatio fixedpoint.Value `json:"marginRatio,omitempty"`
-
 	// LiquidationPrice is only used when account is in the isolated margin mode
 	LiquidationPrice fixedpoint.Value `json:"liquidationPrice,omitempty"`
 	LiquidationRate  fixedpoint.Value `json:"liquidationRate,omitempty"`
@@ -62,6 +64,7 @@ type Account struct {
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate,omitempty"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate,omitempty"`
 
+	// TotalAccountValue is the total value of the account in USD or USDT
 	TotalAccountValue fixedpoint.Value `json:"totalAccountValue,omitempty"`
 
 	CanDeposit  bool `json:"canDeposit"`
