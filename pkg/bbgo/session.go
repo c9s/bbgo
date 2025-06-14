@@ -349,11 +349,21 @@ func (session *ExchangeSession) UpdateAccount(ctx context.Context) (*types.Accou
 
 	isolatedSymbol := session.GetIsolatedSymbol()
 
-	metrics.AccountMarginLevelMetrics.With(prometheus.Labels{
-		"exchange":        session.ExchangeName.String(),
-		"account_type":    string(account.AccountType),
-		"isolated_symbol": isolatedSymbol,
-	}).Set(account.MarginLevel.Float64())
+	if account.MarginLevel.Sign() > 0 {
+		metrics.AccountMarginLevelMetrics.With(prometheus.Labels{
+			"exchange":        session.ExchangeName.String(),
+			"account_type":    string(account.AccountType),
+			"isolated_symbol": isolatedSymbol,
+		}).Set(account.MarginLevel.Float64())
+	}
+
+	if account.MarginRatio.Sign() > 0 {
+		metrics.AccountMarginRatioMetrics.With(prometheus.Labels{
+			"exchange":        session.ExchangeName.String(),
+			"account_type":    string(account.AccountType),
+			"isolated_symbol": isolatedSymbol,
+		}).Set(account.MarginRatio.Float64())
+	}
 
 	session.setAccount(account)
 	return account, nil
