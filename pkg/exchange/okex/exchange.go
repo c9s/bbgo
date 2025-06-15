@@ -23,6 +23,8 @@ import (
 )
 
 var (
+	defaultMaxMarginLevel = fixedpoint.NewFromFloat(999.99)
+
 	// clientOrderIdRegex combine of case-sensitive alphanumerics, all numbers, or all letters of up to 32 characters.
 	clientOrderIdRegex = regexp.MustCompile("^[a-zA-Z0-9]{0,32}$")
 
@@ -262,26 +264,42 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, fmt.Errorf("account config is empty")
 	}
 
+	log.Debugf("okex account balances: %+v", accounts[0])
+
 	balances := toGlobalBalance(&accounts[0])
 	account := types.NewAccount()
 	account.UpdateBalances(balances)
 
-	// for margin account
+	account.TotalAccountValue = accounts[0].TotalEquityInUSD
+
+	// For OKX margin account
+	// OKX's margin ratio: Adjusted equity / (Maintenance margin + Liquidation fees)
+	// OKX does not provide margin level, Margin Level = total asset value / total liabilities
+	//
+	// The forced liquidation of multi-currency margin mode is based on whether the maintenance margin ratio reaches 100%.
+	// When the maintenance margin ratio is ≤ 300%, the system will send a warning to reduce the positions and the user should be aware of the liquidation risk. 300% is the warning parameter.
+	// OKX reserves the right to adjust this parameter according to the actual situation.
+	// When the maintenance margin ratio is ≤ 100%, the system will cancel orders according to the following rules, known as order cancellation by pre-liquidation:
 	if e.MarginSettings.IsMargin {
 		account.AccountType = types.AccountTypeMargin
-		account.TotalAccountValue = accounts[0].TotalEquityInUSD
 
 		account.BorrowEnabled = types.BoolPtr(accountConfigs[0].EnableSpotBorrow)
 
 		// Spot mode could have margin ratio as well
-		account.MarginRatio = fixedpoint.NewFromFloat(999.99)
+		account.MarginRatio = fixedpoint.NewFromFloat(1.0) // 100%
+
 		if accounts[0].MarginRatio.Sign() > 0 {
 			account.MarginRatio = accounts[0].MarginRatio
-			account.MarginLevel = accounts[0].MarginRatio
 		}
 
-		if account.MarginRatio.Sign() > 0 {
-			account.MarginTolerance = util.CalculateMarginTolerance(account.MarginRatio)
+		if accounts[0].NotionalUsdForBorrow.Sign() > 0 {
+			account.MarginLevel = accounts[0].TotalEquityInUSD.Div(accounts[0].NotionalUsdForBorrow)
+		} else {
+			account.MarginLevel = defaultMaxMarginLevel
+		}
+
+		if account.MarginLevel.Sign() > 0 {
+			account.MarginTolerance = util.CalculateMarginTolerance(account.MarginLevel)
 		}
 
 		if !accountConfigs[0].EnableSpotBorrow {
