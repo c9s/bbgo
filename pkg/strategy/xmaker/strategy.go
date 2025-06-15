@@ -2588,7 +2588,14 @@ func (s *Strategy) CrossRun(
 			defer wg.Done()
 
 			// send stop signal to the quoteWorker
+			// TODO: change this stopC to wait for the quoteWorker to stop
 			close(s.stopC)
+
+			if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
+				if err := s.SyntheticHedge.Stop(ctx); err != nil {
+					s.logger.WithError(err).Errorf("failed to stop syntheticHedge")
+				}
+			}
 
 			// wait for the quoter to stop
 			time.Sleep(s.UpdateInterval.Duration())
