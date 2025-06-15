@@ -126,14 +126,14 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	})
 
 	orderStore := core.NewOrderStore(makerMarket.Symbol)
-	position := types.NewPositionFromMarket(makerMarket)
+	makerPosition := types.NewPositionFromMarket(makerMarket)
 	strategy := &Strategy{
 		makerSession: &bbgo.ExchangeSession{
 			ExchangeName: types.ExchangeMax,
 		},
 		makerMarket:    makerMarket,
 		orderStore:     orderStore,
-		tradeCollector: core.NewTradeCollector(makerMarket.Symbol, position, orderStore),
+		tradeCollector: core.NewTradeCollector(makerMarket.Symbol, makerPosition, orderStore),
 	}
 
 	syn := &SyntheticHedge{
@@ -159,14 +159,10 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	doneC := make(chan struct{})
 
 	go func() {
+		defer close(doneC)
 		err := syn.Start(ctx)
 		assert.NoError(t, err)
-
-		close(doneC)
 	}()
-
-	sourceMarketDataStream.EmitConnect()
-	fiatMarketDataStream.EmitConnect()
 
 	submitOrder := types.SubmitOrder{
 		Market:   sourceMarket,
@@ -198,8 +194,11 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	}
 	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder2).Return(&createdOrder2, nil)
 
+	sourceMarketDataStream.EmitConnect()
+	fiatMarketDataStream.EmitConnect()
+
 	// add position to delta
-	position.AddTrade(types.Trade{
+	makerPosition.AddTrade(types.Trade{
 		ID:            1,
 		OrderID:       1,
 		Exchange:      types.ExchangeMax,
@@ -214,10 +213,10 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		Fee:           fixedpoint.Zero,
 		FeeCurrency:   "",
 	})
-	assert.Equal(t, Number(1.0).Float64(), position.GetBase().Float64(), "make sure position is updated correctly")
-	assert.Equal(t, Number(3_110_000.0).Float64(), position.GetAverageCost().Float64(), "make sure average cost is updated correctly")
+	assert.Equal(t, Number(1.0).Float64(), makerPosition.GetBase().Float64(), "make sure position is updated correctly")
+	assert.Equal(t, Number(3_110_000.0).Float64(), makerPosition.GetAverageCost().Float64(), "make sure average cost is updated correctly")
 
-	// send position delta to source hedge market
+	// TRIGGER: send position delta to source hedge market
 	sourceHedgeMarket.positionDeltaC <- Number(1.0)
 	time.Sleep(stepTime)
 
@@ -257,7 +256,7 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	time.Sleep(stepTime)
 	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.position.GetBase().Float64(), "source position should be closed to 0")
 	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.position.GetBase().Float64(), "fiat position should be closed to 0")
-	assert.Equal(t, Number(0).Float64(), position.GetBase().Float64(), "the maker position should be closed to 0")
+	assert.Equal(t, Number(0).Float64(), makerPosition.GetBase().Float64(), "the maker position should be closed to 0")
 
 	cancel()
 	<-doneC
