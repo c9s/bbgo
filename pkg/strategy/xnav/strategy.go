@@ -253,7 +253,11 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 		totalAssets = totalAssets.Merge(assets)
 	}
 
-	s.Environment.RecordAsset(priceTime, &bbgo.ExchangeSession{Name: "ALL"}, totalAssets)
+	s.Environment.RecordAsset(priceTime, &bbgo.ExchangeSession{
+		ExchangeSessionConfig: bbgo.ExchangeSessionConfig{
+			Name: "ALL",
+		},
+	}, totalAssets)
 
 	displayAssets := totalAssets.Filter(func(asset *asset.Asset) bool {
 		if s.IgnoreDusts && asset.NetAssetInUSD.Abs().Compare(ten) < 0 && asset.DebtInUSD.Abs().Compare(ten) < 0 {
@@ -317,7 +321,9 @@ func (s *Strategy) worker(ctx context.Context, sessions map[string]*bbgo.Exchang
 	}
 }
 
-func (s *Strategy) CrossRun(ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession) error {
+func (s *Strategy) CrossRun(
+	ctx context.Context, _ bbgo.OrderExecutionRouter, sessions map[string]*bbgo.ExchangeSession,
+) error {
 	if s.State == nil {
 		s.State = &State{}
 		s.State.Reset()

@@ -47,7 +47,9 @@ func TestStrategy_allowMarginHedge(t *testing.T) {
 		})
 
 		session := &bbgo.ExchangeSession{
-			Margin:  true,
+			ExchangeSessionConfig: bbgo.ExchangeSessionConfig{
+				Margin: true,
+			},
 			Account: account,
 		}
 
@@ -94,7 +96,9 @@ func TestStrategy_allowMarginHedge(t *testing.T) {
 		})
 
 		session := &bbgo.ExchangeSession{
-			Margin:  true,
+			ExchangeSessionConfig: bbgo.ExchangeSessionConfig{
+				Margin: true,
+			},
 			Account: account,
 		}
 

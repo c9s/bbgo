@@ -129,7 +129,9 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	position := types.NewPositionFromMarket(makerMarket)
 	strategy := &Strategy{
 		makerSession: &bbgo.ExchangeSession{
-			ExchangeName: types.ExchangeMax,
+			ExchangeSessionConfig: bbgo.ExchangeSessionConfig{
+				ExchangeName: types.ExchangeMax,
+			},
 		},
 		makerMarket:    makerMarket,
 		orderStore:     orderStore,
@@ -325,7 +327,9 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 	makerPosition := types.NewPositionFromMarket(makerMarket)
 	strategy := &Strategy{
 		makerSession: &bbgo.ExchangeSession{
-			ExchangeName: types.ExchangeMax,
+			ExchangeSessionConfig: bbgo.ExchangeSessionConfig{
+				ExchangeName: types.ExchangeMax,
+			},
 		},
 		makerMarket:    makerMarket,
 		orderStore:     orderStore,
