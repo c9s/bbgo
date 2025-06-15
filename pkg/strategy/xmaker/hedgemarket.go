@@ -220,7 +220,8 @@ type HedgeMarket struct {
 
 	positionDeltaC chan fixedpoint.Value // channel to receive position delta updates
 
-	position          *types.Position
+	Position *types.Position
+
 	orderStore        *core.OrderStore
 	tradeCollector    *core.TradeCollector
 	activeMakerOrders *bbgo.ActiveOrderBook
@@ -286,7 +287,7 @@ func newHedgeMarket(
 		positionExposure: newPositionExposure(symbol),
 
 		positionDeltaC:    make(chan fixedpoint.Value, 5),
-		position:          position,
+		Position:          position,
 		orderStore:        orderStore,
 		tradeCollector:    tradeCollector,
 		activeMakerOrders: activeMakerOrders,
@@ -499,7 +500,7 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 	}
 }
 
-func (m *HedgeMarket) Stop() {
+func (m *HedgeMarket) Stop(ctx context.Context) {
 	m.logger.Infof("stopping hedge market %s", m.Symbol)
 
 	// cancel the context to stop the hedge worker
@@ -511,6 +512,7 @@ func (m *HedgeMarket) Stop() {
 
 	// Wait for the worker goroutine to finish
 	select {
+	case <-ctx.Done():
 	case <-m.doneC:
 	case <-time.After(1 * time.Minute):
 		m.logger.Warnf("hedge market %s worker did not finish in time", m.Symbol)

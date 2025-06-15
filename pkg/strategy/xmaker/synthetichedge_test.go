@@ -236,7 +236,7 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		FeeCurrency:   "",
 	})
 	time.Sleep(stepTime)
-	assert.Equal(t, Number(104000.0*1.0).Float64(), fiatHedgeMarket.position.Base.Float64(), "fiat position should be updated to the quote quantity")
+	assert.Equal(t, Number(104000.0*1.0).Float64(), fiatHedgeMarket.Position.Base.Float64(), "fiat position should be updated to the quote quantity")
 
 	fiatUserDataStream.EmitTradeUpdate(types.Trade{
 		ID:            createdOrder2.OrderID,
@@ -254,8 +254,8 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		FeeCurrency:   "",
 	})
 	time.Sleep(stepTime)
-	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.position.GetBase().Float64(), "source position should be closed to 0")
-	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.position.GetBase().Float64(), "fiat position should be closed to 0")
+	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.Position.GetBase().Float64(), "source position should be closed to 0")
+	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.Position.GetBase().Float64(), "fiat position should be closed to 0")
 	assert.Equal(t, Number(0).Float64(), makerPosition.GetBase().Float64(), "the maker position should be closed to 0")
 
 	cancel()
@@ -494,8 +494,8 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 
 	<-fiatHedgeMarket.hedgedC
 	// the fiat hedge market should have a position now
-	assert.Equal(t, Number(-0.4).Float64(), sourceHedgeMarket.position.Base.Float64(), "source position should be updated to 0.5")
-	assert.Equal(t, Number(104000.0*0.4).Float64(), fiatHedgeMarket.position.Base.Float64(), "fiat position should be updated to the quote quantity")
+	assert.Equal(t, Number(-0.4).Float64(), sourceHedgeMarket.Position.Base.Float64(), "source position should be updated to 0.5")
+	assert.Equal(t, Number(104000.0*0.4).Float64(), fiatHedgeMarket.Position.Base.Float64(), "fiat position should be updated to the quote quantity")
 
 	// the fiat hedge market should send a hedge order
 	fiatUserDataStream.EmitTradeUpdate(types.Trade{
@@ -514,8 +514,8 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		FeeCurrency:   "",
 	})
 	time.Sleep(stepTime)
-	assert.Equal(t, Number(0.).Float64(), sourceHedgeMarket.position.Base.Float64(), "source position should be closed to 0.5")
-	assert.Equal(t, Number(0.).Float64(), fiatHedgeMarket.position.Base.Float64(), "fiat position should be updated to the quote quantity")
+	assert.Equal(t, Number(0.).Float64(), sourceHedgeMarket.Position.Base.Float64(), "source position should be closed to 0.5")
+	assert.Equal(t, Number(0.).Float64(), fiatHedgeMarket.Position.Base.Float64(), "fiat position should be updated to the quote quantity")
 
 	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().CancelOrders(gomock.Any(), createdOrder4).Return(nil)
 	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().QueryOrder(gomock.Any(), createdOrder4.AsQuery()).Return(&types.Order{
@@ -602,8 +602,8 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 	time.Sleep(stepTime)
 	<-doneC
 
-	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.position.GetBase().Float64(), "source position should be closed to 0")
-	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.position.GetBase().Float64(), "fiat position should be closed to 0")
+	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.Position.GetBase().Float64(), "source position should be closed to 0")
+	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.Position.GetBase().Float64(), "fiat position should be closed to 0")
 	assert.Equal(t, Number(0).Float64(), makerPosition.GetBase().Float64(), "the maker position should be closed to 0")
 }
 

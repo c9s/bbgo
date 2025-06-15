@@ -148,7 +148,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 		// 3) convert source trade into fiat trade as the average cost of the fiat market position
 		// This assumes source's quote currency is the fiat market's base currency
 		fiatTrade := s.fiatMarket.newMockTrade(fiatSide, price, fiatQuantity, trade.Time.Time())
-		if profit, netProfit, madeProfit := s.fiatMarket.position.AddTrade(fiatTrade); madeProfit {
+		if profit, netProfit, madeProfit := s.fiatMarket.Position.AddTrade(fiatTrade); madeProfit {
 			// TODO: record the profits in somewhere?
 			_ = profit
 			_ = netProfit
@@ -159,7 +159,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 	})
 
 	s.fiatMarket.tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
-		avgCost := s.sourceMarket.position.AverageCost
+		avgCost := s.sourceMarket.Position.AverageCost
 
 		// convert the trade quantity to the source market's base currency quantity
 		// calculate how much base quantity we can close the source position
@@ -177,7 +177,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 		// convert the fiat trade into source trade to close the source position
 		// side is reversed because we are closing the source hedge position
 		mockSourceTrade := s.sourceMarket.newMockTrade(trade.Side.Reverse(), avgCost, baseQuantity, trade.Time.Time())
-		if profit, netProfit, madeProfit := s.sourceMarket.position.AddTrade(mockSourceTrade); madeProfit {
+		if profit, netProfit, madeProfit := s.sourceMarket.Position.AddTrade(mockSourceTrade); madeProfit {
 			_ = profit
 			_ = netProfit
 		}
@@ -274,8 +274,8 @@ func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, b
 
 func (s *SyntheticHedge) Stop(shutdownCtx context.Context) error {
 	s.logger.Infof("[syntheticHedge] stopping synthetic hedge workers")
-	s.sourceMarket.Stop()
-	s.fiatMarket.Stop()
+	s.sourceMarket.Stop(shutdownCtx)
+	s.fiatMarket.Stop(shutdownCtx)
 	s.logger.Infof("[syntheticHedge] synthetic hedge workers stopped")
 	return nil
 }
