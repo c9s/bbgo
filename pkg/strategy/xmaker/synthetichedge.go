@@ -51,6 +51,10 @@ func initializeHedgeMarketFromConfig(
 		return nil, err
 	}
 
+	if c.QuotingDepth.IsZero() && c.QuotingDepthInQuote.IsZero() {
+		return nil, fmt.Errorf("quotingDepth or quotingDepthInQuote must be set for hedge market %s", c.Symbol)
+	}
+
 	hm := newHedgeMarket(c, session, market)
 	return hm, nil
 }
@@ -268,6 +272,14 @@ func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, b
 	return fixedpoint.Zero, fixedpoint.Zero, false
 }
 
+func (s *SyntheticHedge) Stop(shutdownCtx context.Context) error {
+	s.logger.Infof("[syntheticHedge] stopping synthetic hedge workers")
+	s.sourceMarket.Stop()
+	s.fiatMarket.Stop()
+	s.logger.Infof("[syntheticHedge] synthetic hedge workers stopped")
+	return nil
+}
+
 func (s *SyntheticHedge) Start(ctx context.Context) error {
 	if !s.Enabled {
 		return nil
@@ -292,6 +304,7 @@ func (s *SyntheticHedge) Start(ctx context.Context) error {
 	s.sourceMarket.WaitForReady(ctx)
 	s.fiatMarket.WaitForReady(ctx)
 
+	s.logger.Infof("[syntheticHedge] source market and fiat market are ready")
 	return nil
 }
 

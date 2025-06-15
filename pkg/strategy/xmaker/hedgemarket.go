@@ -233,6 +233,10 @@ type HedgeMarket struct {
 	hedgeExecutor HedgeExecutor
 
 	hedgedC chan struct{}
+	doneC   chan struct{}
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 func newHedgeMarket(
@@ -288,7 +292,9 @@ func newHedgeMarket(
 		activeMakerOrders: activeMakerOrders,
 
 		hedgedC: make(chan struct{}, 1),
-		logger:  logger,
+		doneC:   make(chan struct{}),
+
+		logger: logger,
 	}
 
 	switch m.HedgeMethod {
@@ -390,6 +396,12 @@ func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
 		bid, ask = m.depthBook.BestBidAndAskAtDepth(m.QuotingDepth)
 	}
 
+	if bid.IsZero() || ask.IsZero() {
+		bids := m.book.SideBook(types.SideTypeBuy)
+		asks := m.book.SideBook(types.SideTypeSell)
+		m.logger.Warnf("no valid bid/ask price found for %s, bids: %v, asks: %v", m.Symbol, bids, asks)
+	}
+
 	// store prices as snapshot
 	m.quotingPrice = &types.Ticker{
 		Buy:  bid,
@@ -417,15 +429,6 @@ func (m *HedgeMarket) hedge(
 	return err
 }
 
-func (m *HedgeMarket) Start(ctx context.Context) error {
-	interval := m.HedgeInterval.Duration()
-	if interval == 0 {
-		interval = 3 * time.Second // default interval
-	}
-
-	return m.start(ctx, interval)
-}
-
 func (m *HedgeMarket) WaitForReady(ctx context.Context) {
 	select {
 	case <-ctx.Done():
@@ -435,13 +438,38 @@ func (m *HedgeMarket) WaitForReady(ctx context.Context) {
 	}
 }
 
-func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) error {
+func (m *HedgeMarket) Start(ctx context.Context) error {
+	m.ctx, m.cancel = context.WithCancel(ctx)
+
+	interval := m.HedgeInterval.Duration()
+	if interval == 0 {
+		interval = 3 * time.Second // default interval
+	}
+
 	if err := m.stream.Connect(ctx); err != nil {
 		return err
 	}
 
 	m.logger.Infof("waiting for %s hedge market connectivity...", m.Symbol)
-	<-m.connectivity.ConnectedC()
+	select {
+	case <-ctx.Done():
+	case <-m.connectivity.ConnectedC():
+	case <-time.After(1 * time.Minute):
+		return fmt.Errorf("hedge market %s connectivity timeout", m.Symbol)
+	}
+
+	m.logger.Infof("%s hedge market is ready", m.Symbol)
+
+	// TODO: use goroutine here later, but we need to update the tests
+	m.hedgeWorker(ctx, interval)
+	return nil
+}
+
+func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Duration) {
+	defer func() {
+		close(m.doneC)
+		close(m.hedgedC)
+	}()
 
 	ticker := time.NewTicker(hedgeInterval)
 	defer ticker.Stop()
@@ -449,7 +477,7 @@ func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) er
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 
 		case <-ticker.C:
 			if m.positionExposure.IsClosed() {
@@ -461,10 +489,34 @@ func (m *HedgeMarket) start(ctx context.Context, hedgeInterval time.Duration) er
 				m.logger.WithError(err).Errorf("hedge failed")
 			}
 
-		case delta := <-m.positionDeltaC:
+		case delta, ok := <-m.positionDeltaC:
+			if !ok {
+				return
+			}
+
 			m.positionExposure.net.Add(delta)
 		}
 	}
+}
+
+func (m *HedgeMarket) Stop() {
+	m.logger.Infof("stopping hedge market %s", m.Symbol)
+
+	// cancel the context to stop the hedge worker
+	if m.cancel != nil {
+		m.cancel()
+	}
+
+	close(m.positionDeltaC)
+
+	// Wait for the worker goroutine to finish
+	select {
+	case <-m.doneC:
+	case <-time.After(1 * time.Minute):
+		m.logger.Warnf("hedge market %s worker did not finish in time", m.Symbol)
+	}
+
+	m.logger.Infof("hedge market %s stopped", m.Symbol)
 }
 
 func quantityToDelta(quantity fixedpoint.Value, side types.SideType) fixedpoint.Value {

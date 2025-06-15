@@ -136,7 +136,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	}, session, market)
 
 	go func() {
-		err := hm.start(ctx, 40*time.Millisecond)
+		err := hm.Start(ctx)
 		assert.NoError(t, err)
 		close(doneC)
 	}()
