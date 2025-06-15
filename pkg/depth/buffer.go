@@ -70,7 +70,7 @@ func (b *Buffer) CheckPreviousID() {
 }
 
 func (b *Buffer) resetSnapshot() {
-	b.logger.Info("resetting the snapshot")
+	b.logger.Debug("resetting the snapshot")
 	b.snapshot = nil
 	b.finalUpdateID = 0
 }
@@ -78,7 +78,7 @@ func (b *Buffer) resetSnapshot() {
 // emitFetch emits the fetch signal, and in the next call of AddUpdate, the buffer will try to fetch the snapshot
 // if the fetch signal is already emitted, it will be ignored
 func (b *Buffer) emitFetch() {
-	b.logger.Info("emitting fetch signal")
+	b.logger.Debug("emitting fetch signal")
 	select {
 	case b.fetchC <- struct{}{}:
 	default:
@@ -86,7 +86,7 @@ func (b *Buffer) emitFetch() {
 }
 
 func (b *Buffer) Reset() {
-	b.logger.Info("resetting this buffer")
+	b.logger.Debug("resetting this buffer")
 	b.mu.Lock()
 	b.resetSnapshot()
 	b.emitFetch()
@@ -108,7 +108,7 @@ func (b *Buffer) SetSnapshot(snapshot types.SliceOrderBook, firstUpdateID int64,
 		return nil
 	}
 
-	b.logger.Info("setting the snapshot")
+	b.logger.Debug("setting the snapshot")
 	// set the final update ID so that we will know if there is an update missing
 	b.finalUpdateID = finalUpdateID
 
@@ -145,12 +145,13 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 
 	select {
 	case <-b.fetchC:
-		b.logger.Info("fetch signal received")
+		b.logger.Debug("fetch signal received")
 		b.buffer = append(b.buffer, u)
 		b.resetSnapshot()
 		b.once.Reset()
 		b.once.Do(func() {
-			b.logger.Info("try fetching the snapshot due to fetch signal received")
+			b.logger.Debug("try fetching the snapshot due to fetch signal received")
+
 			go b.tryFetch()
 		})
 		b.mu.Unlock()
@@ -163,7 +164,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 	if b.snapshot == nil {
 		b.buffer = append(b.buffer, u)
 		b.once.Do(func() {
-			b.logger.Info("try fetching the snapshot due to no snapshot")
+			b.logger.Debug("try fetching the snapshot due to no snapshot")
 			go b.tryFetch()
 		})
 		b.mu.Unlock()
@@ -174,7 +175,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 
 	// skip older events
 	if u.FinalUpdateID <= b.finalUpdateID {
-		b.logger.Infof("the final update id %d of event is less than equal to the final update id %d of the snapshot, skip",
+		b.logger.Debugf("the final update id %d of event is less than equal to the final update id %d of the snapshot, skip",
 			u.FinalUpdateID, b.finalUpdateID)
 		b.mu.Unlock()
 		return nil
@@ -193,7 +194,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 			b.resetSnapshot()
 			b.once.Reset()
 			b.once.Do(func() {
-				b.logger.Info("try fetching the snapshot due to missing update")
+				b.logger.Debug("try fetching the snapshot due to missing update")
 				go b.tryFetch()
 			})
 
@@ -210,7 +211,7 @@ func (b *Buffer) AddUpdate(o types.SliceOrderBook, firstUpdateID int64, finalArg
 			b.resetSnapshot()
 			b.once.Reset()
 			b.once.Do(func() {
-				b.logger.Info("try fetching the snapshot due to missing update")
+				b.logger.Debug("try fetching the snapshot due to missing update")
 				go b.tryFetch()
 			})
 
@@ -253,7 +254,7 @@ func (b *Buffer) fetchAndPush() error {
 	}
 
 	b.mu.Lock()
-	b.logger.Infof("fetched depth snapshot, final update id %d", finalUpdateID)
+	b.logger.Debugf("fetched depth snapshot, final update id %d", finalUpdateID)
 
 	if len(b.buffer) > 0 {
 		// the snapshot is too early, we should re-fetch the snapshot

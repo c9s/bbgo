@@ -346,20 +346,20 @@ func (db *DepthBook) PriceAtDepth(side SideType, baseVolume fixedpoint.Value) fi
 	}
 
 	sumBase := fixedpoint.Zero
-	sumPrice := fixedpoint.Zero
+	sumAmount := fixedpoint.Zero
 	for _, pv := range pvs {
 		if sumBase.Add(pv.Volume).Compare(baseVolume) >= 0 {
 			remain := baseVolume.Sub(sumBase)
-			sumPrice = sumPrice.Add(remain.Mul(pv.Price))
+			sumAmount = sumAmount.Add(remain.Mul(pv.Price))
 			sumBase = baseVolume
 			break
 		}
 		sumBase = sumBase.Add(pv.Volume)
-		sumPrice = sumPrice.Add(pv.Volume.Mul(pv.Price))
+		sumAmount = sumAmount.Add(pv.Volume.Mul(pv.Price))
 	}
 
 	if sumBase.IsZero() {
 		return fixedpoint.Zero
 	}
-	return sumPrice.Div(sumBase)
+	return sumAmount.Div(sumBase)
 }
