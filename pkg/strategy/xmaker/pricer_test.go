@@ -231,22 +231,22 @@ func TestApplyMargin(t *testing.T) {
 		calls calls
 	}{
 		{
-			name: "buy, i=0, no margin",
+			name: "buy, i=0, margin=10",
 			args: args{
 				side:   types.SideTypeBuy,
-				margin: Number(10.0),
+				margin: Number(0.1),
 			},
 			calls: calls{
 				i:     0,
 				price: Number(100.0),
-				rst:   Number(100.0),
+				rst:   Number(110.0),
 			},
 		},
 		{
 			name: "buy, i=1, margin=10",
 			args: args{
 				side:   types.SideTypeBuy,
-				margin: Number(10.0),
+				margin: Number(0.1),
 			},
 			calls: calls{
 				i:     1,
@@ -258,7 +258,7 @@ func TestApplyMargin(t *testing.T) {
 			name: "sell, i=1, margin=10",
 			args: args{
 				side:   types.SideTypeSell,
-				margin: Number(10.0),
+				margin: Number(0.1),
 			},
 			calls: calls{
 				i:     1,
@@ -270,24 +270,24 @@ func TestApplyMargin(t *testing.T) {
 			name: "buy, i=2, margin=5",
 			args: args{
 				side:   types.SideTypeBuy,
-				margin: Number(5.0),
+				margin: Number(0.05),
 			},
 			calls: calls{
 				i:     2,
 				price: Number(50.0),
-				rst:   Number(55.0),
+				rst:   Number(52.5),
 			},
 		},
 		{
 			name: "sell, i=2, margin=5",
 			args: args{
 				side:   types.SideTypeSell,
-				margin: Number(5.0),
+				margin: Number(0.05),
 			},
 			calls: calls{
 				i:     2,
 				price: Number(50.0),
-				rst:   Number(45.0),
+				rst:   Number(47.5),
 			},
 		},
 	}
@@ -359,6 +359,63 @@ func TestFromDepth(t *testing.T) {
 			pricer := FromDepth(tt.side, tt.book, tt.depth)
 			got := pricer(tt.call.i, tt.call.price)
 			assert.Equal(t, tt.call.want, got)
+		})
+	}
+}
+
+func TestComposePricers(t *testing.T) {
+	type call struct {
+		i     int
+		price fixedpoint.Value
+		want  fixedpoint.Value
+	}
+
+	tests := []struct {
+		name    string
+		pricers []Pricer
+		call    call
+	}{
+		{
+			name: "apply fee then margin then tick",
+			pricers: []Pricer{
+				ApplyFeeRate(types.SideTypeBuy, Number(0.001)),          // price * (1 - 0.001)
+				ApplyMargin(types.SideTypeBuy, Number(10.0)),            // +10 if i>0
+				AdjustByTick(types.SideTypeBuy, Number(1), Number(0.1)), // +0.1 if i>0
+			},
+			call: call{
+				i:     1,
+				price: Number(100.0),
+				want:  Number(100.0*0.999 + 10.0 + 0.1),
+			},
+		},
+		{
+			name: "apply margin then fee",
+			pricers: []Pricer{
+				ApplyMargin(types.SideTypeSell, Number(5.0)),    // -5 if i>0
+				ApplyFeeRate(types.SideTypeSell, Number(0.002)), // price * (1 + 0.002)
+			},
+			call: call{
+				i:     2,
+				price: Number(200.0),
+				want:  Number((200.0 - 5.0) * 1.002),
+			},
+		},
+		{
+			name:    "no pricer",
+			pricers: []Pricer{},
+			call: call{
+				i:     0,
+				price: Number(123.45),
+				want:  Number(123.45),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pricer := ComposePricers(tt.pricers...)
+			got := pricer(tt.call.i, tt.call.price)
+			assert.InDeltaf(t, tt.call.want.Float64(), got.Float64(), 0.00001, "ComposePricers result mismatch")
 		})
 	}
 }

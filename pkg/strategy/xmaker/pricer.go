@@ -18,12 +18,8 @@ func ApplyMargin(side types.SideType, margin fixedpoint.Value) Pricer {
 		margin = margin.Neg()
 	}
 
-	return func(i int, price fixedpoint.Value) fixedpoint.Value {
-		if i == 0 {
-			return price
-		}
-
-		return price.Add(margin)
+	return func(_ int, price fixedpoint.Value) fixedpoint.Value {
+		return price.Mul(fixedpoint.One.Add(margin))
 	}
 }
 
