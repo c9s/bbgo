@@ -304,6 +304,10 @@ func (m *HedgeMarket) Start(ctx context.Context) error {
 
 func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Duration) {
 	defer func() {
+		if err := m.hedgeExecutor.clear(ctx); err != nil {
+			m.logger.WithError(err).Errorf("failed to clear hedge executor")
+		}
+
 		close(m.doneC)
 		close(m.hedgedC)
 	}()
@@ -336,7 +340,7 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 	}
 }
 
-func (m *HedgeMarket) Stop(ctx context.Context) {
+func (m *HedgeMarket) Stop(shutdownCtx context.Context) {
 	m.logger.Infof("stopping hedge market %s", m.Symbol)
 
 	// cancel the context to stop the hedge worker
@@ -348,7 +352,7 @@ func (m *HedgeMarket) Stop(ctx context.Context) {
 
 	// Wait for the worker goroutine to finish
 	select {
-	case <-ctx.Done():
+	case <-shutdownCtx.Done():
 	case <-m.doneC:
 	case <-time.After(1 * time.Minute):
 		m.logger.Warnf("hedge market %s worker did not finish in time", m.Symbol)
