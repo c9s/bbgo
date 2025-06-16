@@ -37,7 +37,7 @@ func Test_newHedgeMarket(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(stepTime)
 	marketDataStream.EmitConnect()
 	cancel()
 
