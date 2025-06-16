@@ -1,4 +1,4 @@
-package xmaker
+package pricer
 
 import (
 	"testing"
@@ -379,25 +379,25 @@ func TestComposePricers(t *testing.T) {
 			name: "apply fee then margin then tick",
 			pricers: []Pricer{
 				ApplyFeeRate(types.SideTypeBuy, Number(0.001)),          // price * (1 - 0.001)
-				ApplyMargin(types.SideTypeBuy, Number(10.0)),            // +10 if i>0
+				ApplyMargin(types.SideTypeBuy, Number(0.1)),             // *1.1
 				AdjustByTick(types.SideTypeBuy, Number(1), Number(0.1)), // +0.1 if i>0
 			},
 			call: call{
 				i:     1,
 				price: Number(100.0),
-				want:  Number(100.0*0.999 + 10.0 + 0.1),
+				want:  Number(109.99),
 			},
 		},
 		{
 			name: "apply margin then fee",
 			pricers: []Pricer{
-				ApplyMargin(types.SideTypeSell, Number(5.0)),    // -5 if i>0
-				ApplyFeeRate(types.SideTypeSell, Number(0.002)), // price * (1 + 0.002)
+				ApplyMargin(types.SideTypeSell, Number(0.05)),   // *0.95
+				ApplyFeeRate(types.SideTypeSell, Number(0.002)), // *1.002
 			},
 			call: call{
 				i:     2,
 				price: Number(200.0),
-				want:  Number((200.0 - 5.0) * 1.002),
+				want:  Number(190.38),
 			},
 		},
 		{
