@@ -80,7 +80,7 @@ func FromBestPrice(side types.SideType, book *types.StreamOrderBook) Pricer {
 }
 
 func ApplyMargin(side types.SideType, margin fixedpoint.Value) Pricer {
-	if side == types.SideTypeSell {
+	if side == types.SideTypeBuy {
 		margin = margin.Neg()
 	}
 
@@ -122,6 +122,10 @@ func AdjustByTick(side types.SideType, pips, tickSize fixedpoint.Value) Pricer {
 }
 
 func Compose(pricers ...Pricer) Pricer {
+	if len(pricers) == 1 {
+		return pricers[0]
+	}
+
 	return func(i int, price fixedpoint.Value) fixedpoint.Value {
 		for _, pricer := range pricers {
 			price = pricer(i, price)

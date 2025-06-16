@@ -239,7 +239,7 @@ func TestApplyMargin(t *testing.T) {
 			calls: calls{
 				i:     0,
 				price: Number(100.0),
-				rst:   Number(110.0),
+				rst:   Number(90.0), // buy: 100 * 0.9
 			},
 		},
 		{
@@ -251,7 +251,7 @@ func TestApplyMargin(t *testing.T) {
 			calls: calls{
 				i:     1,
 				price: Number(100.0),
-				rst:   Number(110.0),
+				rst:   Number(90.0), // buy: 100 * 0.9
 			},
 		},
 		{
@@ -263,7 +263,7 @@ func TestApplyMargin(t *testing.T) {
 			calls: calls{
 				i:     1,
 				price: Number(100.0),
-				rst:   Number(90.0),
+				rst:   Number(110.0), // sell: 100 * 1.1
 			},
 		},
 		{
@@ -275,7 +275,7 @@ func TestApplyMargin(t *testing.T) {
 			calls: calls{
 				i:     2,
 				price: Number(50.0),
-				rst:   Number(52.5),
+				rst:   Number(47.5), // buy: 50 * 0.95
 			},
 		},
 		{
@@ -287,7 +287,7 @@ func TestApplyMargin(t *testing.T) {
 			calls: calls{
 				i:     2,
 				price: Number(50.0),
-				rst:   Number(47.5),
+				rst:   Number(52.5), // sell: 50 * 1.05
 			},
 		},
 	}
@@ -379,25 +379,25 @@ func TestComposePricers(t *testing.T) {
 			name: "apply fee then margin then tick",
 			pricers: []Pricer{
 				ApplyFeeRate(types.SideTypeBuy, Number(0.001)),          // price * (1 - 0.001)
-				ApplyMargin(types.SideTypeBuy, Number(0.1)),             // *1.1
+				ApplyMargin(types.SideTypeBuy, Number(0.1)),             // price * 0.9
 				AdjustByTick(types.SideTypeBuy, Number(1), Number(0.1)), // +0.1 if i>0
 			},
 			call: call{
 				i:     1,
 				price: Number(100.0),
-				want:  Number(109.99),
+				want:  Number(90.01), // 100*0.999*0.9+0.1 = 90.01
 			},
 		},
 		{
 			name: "apply margin then fee",
 			pricers: []Pricer{
-				ApplyMargin(types.SideTypeSell, Number(0.05)),   // *0.95
+				ApplyMargin(types.SideTypeSell, Number(0.05)),   // price * 1.05
 				ApplyFeeRate(types.SideTypeSell, Number(0.002)), // *1.002
 			},
 			call: call{
 				i:     2,
 				price: Number(200.0),
-				want:  Number(190.38),
+				want:  Number(210.42), // (200*1.05)*1.002 = 210.42
 			},
 		},
 		{
