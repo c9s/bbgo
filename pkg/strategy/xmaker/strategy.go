@@ -2530,7 +2530,7 @@ func (s *Strategy) CrossRun(
 
 	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 		s.logger.Infof("syntheticHedge is enabled: %+v", s.SyntheticHedge)
-		if err := s.SyntheticHedge.InitializeAndBind(ctx, sessions, s); err != nil {
+		if err := s.SyntheticHedge.InitializeAndBind(sessions, s); err != nil {
 			return err
 		}
 
