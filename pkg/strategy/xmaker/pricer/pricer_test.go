@@ -356,7 +356,7 @@ func TestFromDepth(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pricer := FromDepth(tt.side, tt.book, tt.depth)
+			pricer := FromDepthBook(tt.side, tt.book, tt.depth)
 			got := pricer(tt.call.i, tt.call.price)
 			assert.Equal(t, tt.call.want, got)
 		})
@@ -413,9 +413,130 @@ func TestComposePricers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pricer := ComposePricers(tt.pricers...)
+			pricer := Compose(tt.pricers...)
 			got := pricer(tt.call.i, tt.call.price)
-			assert.InDeltaf(t, tt.call.want.Float64(), got.Float64(), 0.00001, "ComposePricers result mismatch")
+			assert.InDeltaf(t, tt.call.want.Float64(), got.Float64(), 0.00001, "Compose result mismatch")
 		})
 	}
+}
+
+func TestNewCoveredDepth(t *testing.T) {
+	book := types.NewStreamBook("BTCUSDT", "")
+	bids := PriceVolumeSliceFromText(`
+		100.1, 1
+		100.0, 2
+		99.9,  3
+		99.8,  4
+	`)
+	asks := PriceVolumeSliceFromText(`
+		101.0, 1
+		102.0, 1
+	`)
+
+	now := time.Now()
+	book.Load(types.SliceOrderBook{
+		Symbol: "BTCUSDT",
+		Bids:   bids,
+		Asks:   asks,
+		Time:   now,
+	})
+
+	depthBook := types.NewDepthBook(book)
+	initialDepth := Number(1)
+
+	coveredDepth := NewCoveredDepth(depthBook, initialDepth)
+	pricer := coveredDepth.Pricer(types.SideTypeBuy)
+
+	// Assume the order quantity per layer is 1
+	layerQty := Number(1)
+
+	tests := []struct {
+		name string
+		i    int
+		want fixedpoint.Value
+	}{
+		{
+			name: "layer 0, depth 1",
+			i:    0,
+			want: Number(0), // according to implementation, initial is 0
+		},
+		{
+			name: "layer 1, depth 2",
+			i:    1,
+			want: Number(100.1),
+		},
+		{
+			name: "layer 2, depth 3",
+			i:    2,
+			want: Number(100.05), // (100.1*1 + 100.0*1)/2
+		},
+		{
+			name: "layer 3, depth 4",
+			i:    3,
+			want: Number(100.03333333333333), // (100.1*1 + 100.0*1 + 99.9*1)/3
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.i > 0 {
+				coveredDepth.Cover(layerQty)
+			}
+			got := pricer(tt.i, Number(0))
+			assert.InDeltaf(t, tt.want.Float64(), got.Float64(), 0.001, "NewCoveredDepth.Pricer(%d)", tt.i)
+		})
+	}
+}
+
+func TestFromBestPrice(t *testing.T) {
+	book := types.NewStreamBook("BTCUSDT", "")
+
+	bids := PriceVolumeSliceFromText(`
+		123.45, 1
+		122.00, 2
+	`)
+	asks := PriceVolumeSliceFromText(`
+		234.56, 1
+		235.00, 2
+	`)
+
+	now := time.Now()
+	book.Load(types.SliceOrderBook{
+		Symbol: "BTCUSDT",
+		Bids:   bids,
+		Asks:   asks,
+		Time:   now,
+	})
+
+	t.Run("buy side returns best bid", func(t *testing.T) {
+		pricer := FromBestPrice(types.SideTypeBuy, book)
+		got := pricer(0, Number(0))
+		assert.Equal(t, Number(123.45), got)
+	})
+
+	t.Run("sell side returns best ask", func(t *testing.T) {
+		pricer := FromBestPrice(types.SideTypeSell, book)
+		got := pricer(0, Number(0))
+		assert.Equal(t, Number(234.56), got)
+	})
+
+	// clear bids/asks
+	book.Load(types.SliceOrderBook{
+		Symbol: "BTCUSDT",
+		Bids:   types.PriceVolumeSlice{},
+		Asks:   types.PriceVolumeSlice{},
+		Time:   now,
+	})
+
+	t.Run("buy side returns zero if no best bid", func(t *testing.T) {
+		pricer := FromBestPrice(types.SideTypeBuy, book)
+		got := pricer(0, Number(0))
+		assert.Equal(t, fixedpoint.Zero, got)
+	})
+
+	t.Run("sell side returns zero if no best ask", func(t *testing.T) {
+		pricer := FromBestPrice(types.SideTypeSell, book)
+		got := pricer(0, Number(0))
+		assert.Equal(t, fixedpoint.Zero, got)
+	})
 }
