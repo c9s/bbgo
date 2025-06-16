@@ -1101,11 +1101,11 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		coverBidDepth = bidCoveredDepth.Cover
 	}
 
-	bidPricer := pricer.Compose(append([]pricer.Pricer{bidSourcePricer}, []pricer.Pricer{
+	bidPricer := pricer.Compose(append([]pricer.Pricer{bidSourcePricer}, pricer.Compose(
 		pricer.ApplyMargin(types.SideTypeBuy, quote.BidMargin),
 		pricer.ApplyFeeRate(types.SideTypeBuy, s.makerSession.MakerFeeRate),
 		pricer.AdjustByTick(types.SideTypeBuy, quote.BidLayerPips, s.makerMarket.TickSize),
-	}...)...)
+	))...)
 
 	var askSourcePricer = pricer.FromBestPrice(types.SideTypeSell, s.sourceBook)
 	coverAskDepth := func(v fixedpoint.Value) {}
@@ -1115,11 +1115,11 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		askSourcePricer = askCoveredDepth.Pricer(types.SideTypeSell)
 	}
 
-	askPricer := pricer.Compose(append([]pricer.Pricer{askSourcePricer}, []pricer.Pricer{
+	askPricer := pricer.Compose(append([]pricer.Pricer{askSourcePricer}, pricer.Compose(
 		pricer.ApplyMargin(types.SideTypeSell, quote.AskMargin),
 		pricer.ApplyFeeRate(types.SideTypeSell, s.makerSession.MakerFeeRate),
 		pricer.AdjustByTick(types.SideTypeSell, quote.BidLayerPips, s.makerMarket.TickSize),
-	}...)...)
+	))...)
 
 	if !disableMakerBid {
 		for i := 0; i < s.NumLayers; i++ {
