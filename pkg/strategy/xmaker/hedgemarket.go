@@ -11,7 +11,6 @@ import (
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
-	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -27,179 +26,9 @@ type HedgeExecutor interface {
 		uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
 		side types.SideType,
 	) error
-}
 
-type MarketOrderHedgeExecutorConfig struct {
-	MaxOrderQuantity fixedpoint.Value `json:"maxOrderQuantity,omitempty"` // max order quantity for market order hedge
-}
-
-type MarketOrderHedgeExecutor struct {
-	*HedgeMarket
-
-	config *MarketOrderHedgeExecutorConfig
-}
-
-func newMarketOrderHedgeExecutor(
-	market *HedgeMarket,
-	config *MarketOrderHedgeExecutorConfig,
-) *MarketOrderHedgeExecutor {
-	return &MarketOrderHedgeExecutor{
-		HedgeMarket: market,
-		config:      config,
-	}
-}
-
-func (m *MarketOrderHedgeExecutor) hedge(
-	ctx context.Context,
-	uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
-	side types.SideType,
-) error {
-	if uncoveredPosition.IsZero() {
-		return nil
-	}
-
-	bid, ask := m.getQuotePrice()
-	price := sideTakerPrice(bid, ask, side)
-
-	quantity = AdjustHedgeQuantityWithAvailableBalance(
-		m.session.GetAccount(), m.market, side, quantity, price,
-	)
-
-	if m.config != nil {
-		if m.config.MaxOrderQuantity.Sign() > 0 {
-			quantity = fixedpoint.Max(quantity, m.config.MaxOrderQuantity)
-		}
-	}
-
-	if m.market.IsDustQuantity(quantity, price) {
-		m.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
-		return nil
-	}
-
-	hedgeOrder, err := m.submitOrder(ctx, types.SubmitOrder{
-		Symbol:   m.Symbol,
-		Market:   m.market,
-		Side:     side,
-		Type:     types.OrderTypeMarket,
-		Quantity: quantity,
-	})
-	if err != nil {
-		return err
-	}
-
-	m.positionExposure.Cover(uncoveredPosition)
-
-	m.logger.Infof("hedge order created: %+v", hedgeOrder)
-	return nil
-}
-
-type CounterpartyHedgeExecutorConfig struct {
-	PriceLevel int `json:"priceLevel"`
-}
-
-type CounterpartyHedgeExecutor struct {
-	*HedgeMarket
-
-	config     *CounterpartyHedgeExecutorConfig
-	hedgeOrder *types.Order
-}
-
-func newCounterpartyHedgeExecutor(
-	market *HedgeMarket,
-	config *CounterpartyHedgeExecutorConfig,
-) *CounterpartyHedgeExecutor {
-	return &CounterpartyHedgeExecutor{
-		HedgeMarket: market,
-		config:      config,
-	}
-}
-
-func (m *CounterpartyHedgeExecutor) hedge(
-	ctx context.Context,
-	uncoveredPosition, hedgeDelta, quantity fixedpoint.Value,
-	side types.SideType,
-) error {
-	if m.hedgeOrder != nil {
-		if err := m.session.Exchange.CancelOrders(ctx, *m.hedgeOrder); err != nil {
-			m.logger.WithError(err).Errorf("failed to cancel order: %+v", m.hedgeOrder)
-		}
-
-		hedgeOrder, err := retry.QueryOrderUntilCanceled(ctx, m.session.Exchange.(types.ExchangeOrderQueryService), m.hedgeOrder.AsQuery())
-		if err != nil {
-			m.logger.WithError(err).Errorf("failed to query order after cancel: %+v", m.hedgeOrder)
-		} else {
-			m.logger.Infof("hedge order canceled: %+v, returning covered position...", hedgeOrder)
-
-			// return covered position from the canceled order
-			m.positionExposure.Cover(quantityToDelta(hedgeOrder.GetRemainingQuantity(), hedgeOrder.Side))
-		}
-
-		m.hedgeOrder = nil
-	}
-
-	if uncoveredPosition.IsZero() {
-		return nil
-	}
-
-	// use counterparty side book
-	counterpartySide := side.Reverse()
-	sideBook := m.book.SideBook(counterpartySide)
-
-	if len(sideBook) == 0 {
-		return fmt.Errorf("side book is empty for %s", m.Symbol)
-	}
-
-	priceLevel := m.config.PriceLevel
-	offset := 0
-	if m.config.PriceLevel < 0 {
-		offset = m.config.PriceLevel
-		priceLevel = 0
-	} else {
-		priceLevel--
-	}
-
-	if priceLevel > len(sideBook) {
-		return fmt.Errorf("invalid price level %d for %s", m.config.PriceLevel, m.Symbol)
-	}
-
-	price := sideBook[priceLevel].Price
-	if offset > 0 {
-		ticks := m.market.TickSize.Mul(fixedpoint.NewFromInt(int64(offset)))
-		switch counterpartySide {
-		case types.SideTypeBuy:
-			price = price.Add(ticks)
-		case types.SideTypeSell:
-			price = price.Sub(ticks)
-		}
-	}
-
-	quantity = AdjustHedgeQuantityWithAvailableBalance(
-		m.session.GetAccount(), m.market, side, quantity, price,
-	)
-
-	if m.market.IsDustQuantity(quantity, price) {
-		m.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
-		return nil
-	}
-
-	hedgeOrder, err := m.submitOrder(ctx, types.SubmitOrder{
-		Type:     types.OrderTypeLimit,
-		Symbol:   m.Symbol,
-		Market:   m.market,
-		Side:     side,
-		Price:    price,
-		Quantity: quantity,
-	})
-
-	if err != nil {
-		return err
-	}
-
-	m.hedgeOrder = hedgeOrder
-	m.positionExposure.Cover(uncoveredPosition)
-	m.logger.Infof("hedge order created: %+v", hedgeOrder)
-	return nil
-
+	// clear clears any pending orders or state related to hedging
+	clear(ctx context.Context) error
 }
 
 type HedgeMarket struct {
@@ -236,8 +65,8 @@ type HedgeMarket struct {
 	hedgedC chan struct{}
 	doneC   chan struct{}
 
-	ctx    context.Context
-	cancel context.CancelFunc
+	tradingCtx    context.Context
+	cancelTrading context.CancelFunc
 }
 
 func newHedgeMarket(
@@ -420,6 +249,11 @@ func (m *HedgeMarket) hedge(
 	hedgeDelta := uncoveredPosition.Neg()
 	quantity := hedgeDelta.Abs()
 	side := deltaToSide(hedgeDelta)
+
+	if err := m.hedgeExecutor.clear(ctx); err != nil {
+		return fmt.Errorf("failed to clear hedge executor: %w", err)
+	}
+
 	err := m.hedgeExecutor.hedge(ctx, uncoveredPosition, hedgeDelta, quantity, side)
 
 	// emit the hedgedC signal to notify that a hedge has been attempted
@@ -441,7 +275,6 @@ func (m *HedgeMarket) WaitForReady(ctx context.Context) {
 }
 
 func (m *HedgeMarket) Start(ctx context.Context) error {
-	m.ctx, m.cancel = context.WithCancel(ctx)
 
 	interval := m.HedgeInterval.Duration()
 	if interval == 0 {
@@ -451,6 +284,8 @@ func (m *HedgeMarket) Start(ctx context.Context) error {
 	if err := m.stream.Connect(ctx); err != nil {
 		return err
 	}
+
+	m.tradingCtx, m.cancelTrading = context.WithCancel(ctx)
 
 	m.logger.Infof("waiting for %s hedge market connectivity...", m.Symbol)
 	select {
@@ -463,7 +298,7 @@ func (m *HedgeMarket) Start(ctx context.Context) error {
 	m.logger.Infof("%s hedge market is ready", m.Symbol)
 
 	// TODO: use goroutine here later, but we need to update the tests
-	go m.hedgeWorker(ctx, interval)
+	go m.hedgeWorker(m.tradingCtx, interval)
 	return nil
 }
 
@@ -505,8 +340,8 @@ func (m *HedgeMarket) Stop(ctx context.Context) {
 	m.logger.Infof("stopping hedge market %s", m.Symbol)
 
 	// cancel the context to stop the hedge worker
-	if m.cancel != nil {
-		m.cancel()
+	if m.cancelTrading != nil {
+		m.cancelTrading()
 	}
 
 	close(m.positionDeltaC)
