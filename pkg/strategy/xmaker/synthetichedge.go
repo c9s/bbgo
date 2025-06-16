@@ -289,17 +289,13 @@ func (s *SyntheticHedge) Start(ctx context.Context) error {
 		return fmt.Errorf("sourceMarket and fiatMarket must be initialized")
 	}
 
-	go func() {
-		if err := s.sourceMarket.Start(ctx); err != nil {
-			s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
-		}
-	}()
+	if err := s.sourceMarket.Start(ctx); err != nil {
+		s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
+	}
 
-	go func() {
-		if err := s.fiatMarket.Start(ctx); err != nil {
-			s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
-		}
-	}()
+	if err := s.fiatMarket.Start(ctx); err != nil {
+		s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
+	}
 
 	s.sourceMarket.WaitForReady(ctx)
 	s.fiatMarket.WaitForReady(ctx)

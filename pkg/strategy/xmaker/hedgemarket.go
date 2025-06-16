@@ -462,7 +462,7 @@ func (m *HedgeMarket) Start(ctx context.Context) error {
 	m.logger.Infof("%s hedge market is ready", m.Symbol)
 
 	// TODO: use goroutine here later, but we need to update the tests
-	m.hedgeWorker(ctx, interval)
+	go m.hedgeWorker(ctx, interval)
 	return nil
 }
 

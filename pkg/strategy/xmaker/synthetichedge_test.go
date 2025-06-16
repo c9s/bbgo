@@ -156,10 +156,8 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	err := syn.initialize(strategy)
 	assert.NoError(t, err)
 
-	doneC := make(chan struct{})
-
+	// the connectivity waiting is blocking, so we need to run it in a goroutine
 	go func() {
-		defer close(doneC)
 		err := syn.Start(ctx)
 		assert.NoError(t, err)
 	}()
@@ -259,7 +257,6 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	assert.Equal(t, Number(0).Float64(), makerPosition.GetBase().Float64(), "the maker position should be closed to 0")
 
 	cancel()
-	<-doneC
 }
 
 func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
@@ -359,13 +356,10 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 	err := syn.initialize(strategy)
 	assert.NoError(t, err)
 
-	doneC := make(chan struct{})
-
+	// the connectivity waiting is blocking, so we need to run it in a goroutine
 	go func() {
 		err := syn.Start(ctx)
 		assert.NoError(t, err)
-
-		close(doneC)
 	}()
 
 	sourceMarketDataStream.EmitConnect()
@@ -600,7 +594,6 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 
 	cancel()
 	time.Sleep(stepTime)
-	<-doneC
 
 	assert.Equal(t, Number(0).Float64(), sourceHedgeMarket.Position.GetBase().Float64(), "source position should be closed to 0")
 	assert.Equal(t, Number(0).Float64(), fiatHedgeMarket.Position.GetBase().Float64(), "fiat position should be closed to 0")

@@ -25,22 +25,23 @@ func Test_newHedgeMarket(t *testing.T) {
 	_ = marketDataStream
 	_ = userDataStream
 
-	doneC := make(chan struct{})
 	hm := newHedgeMarket(&HedgeMarketConfig{
 		Symbol:        "BTCUSDT",
 		HedgeInterval: types.Duration(3 * time.Millisecond),
 		QuotingDepth:  depth,
 	}, session, market)
+
+	// the connectivity waiting is blocking, so we need to run it in a goroutine
 	go func() {
 		err := hm.Start(ctx)
 		assert.NoError(t, err)
-		close(doneC)
 	}()
 
 	time.Sleep(10 * time.Millisecond)
 	marketDataStream.EmitConnect()
 	cancel()
-	<-doneC
+
+	hm.Stop(context.Background())
 
 	assert.NotNil(t, hm)
 	assert.NotNil(t, hm.session)
@@ -112,6 +113,19 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 
 	mockExchange := session.Exchange.(*mocks.MockExchangeExtended)
 
+	depth := testhelper.Number(100.0)
+	hm := newHedgeMarket(&HedgeMarketConfig{
+		Symbol:        "BTCUSDT",
+		HedgeInterval: types.Duration(3 * time.Millisecond),
+		QuotingDepth:  depth,
+	}, session, market)
+
+	// the connectivity waiting is blocking, so we need to run it in a goroutine
+	go func() {
+		err := hm.Start(ctx)
+		assert.NoError(t, err)
+	}()
+
 	submitOrder := types.SubmitOrder{
 		Market:   market,
 		Symbol:   "BTCUSDT",
@@ -126,20 +140,6 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 		Status:           types.OrderStatusFilled,
 	}
 	mockExchange.EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil)
-
-	doneC := make(chan struct{})
-	depth := testhelper.Number(100.0)
-	hm := newHedgeMarket(&HedgeMarketConfig{
-		Symbol:        "BTCUSDT",
-		HedgeInterval: types.Duration(3 * time.Millisecond),
-		QuotingDepth:  depth,
-	}, session, market)
-
-	go func() {
-		err := hm.Start(ctx)
-		assert.NoError(t, err)
-		close(doneC)
-	}()
 
 	marketDataStream.EmitConnect()
 
@@ -156,7 +156,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	hm.positionDeltaC <- testhelper.Number(1.0)
 	hm.positionDeltaC <- testhelper.Number(1.0)
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(stepTime)
 
 	// emit trades
 	userDataStream.EmitTradeUpdate(types.Trade{
@@ -173,7 +173,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 		Fee:           fixedpoint.Zero,
 	})
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(stepTime)
 
 	assert.Equal(t, testhelper.Number(1.0), hm.positionExposure.pending.Get())
 	assert.Equal(t, testhelper.Number(1.0), hm.positionExposure.net.Get())
@@ -192,10 +192,11 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 		Fee:           fixedpoint.Zero,
 	})
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(stepTime)
 	assert.Equal(t, testhelper.Number(0.0), hm.positionExposure.pending.Get())
 	assert.Equal(t, testhelper.Number(0.0), hm.positionExposure.net.Get())
 
 	cancel()
-	<-doneC
+
+	hm.Stop(context.Background())
 }
