@@ -619,17 +619,26 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 }
 
 func (s *Strategy) getLayerPriceWithDepth(
-	i int, side types.SideType, requiredDepth fixedpoint.Value,
+	i int, side types.SideType, quote *Quote, requiredDepth fixedpoint.Value,
 ) (price fixedpoint.Value) {
+	var margin, delta fixedpoint.Value
 	price = s.depthSourceBook.PriceAtDepth(side, requiredDepth)
 
 	pips := fixedpoint.Zero
 	switch side {
 	case types.SideTypeSell:
+		margin = quote.AskMargin
+		delta = margin
+
 		pips = fixedpoint.One
 	case types.SideTypeBuy:
+		margin = quote.AskMargin
+		delta = margin
+
 		pips = fixedpoint.One.Neg()
 	}
+
+	price = price.Mul(fixedpoint.One.Add(delta))
 
 	// this prevents returning the same price when the book depth is always greater than requiredDepth
 	if i > 0 {
@@ -1184,7 +1193,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				} else {
 					requiredDepth = accumulativeBidQuantity
 				}
-				bidPrice = s.getLayerPriceWithDepth(i, types.SideTypeBuy, requiredDepth)
+				bidPrice = s.getLayerPriceWithDepth(i, types.SideTypeBuy, quote, requiredDepth)
 			} else {
 				bidPrice = s.getLayerPrice(i, types.SideTypeBuy, s.sourceBook, quote)
 			}
@@ -1265,7 +1274,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 				} else {
 					requiredDepth = accumulativeAskQuantity
 				}
-				askPrice = s.getLayerPriceWithDepth(i, types.SideTypeSell, requiredDepth)
+				askPrice = s.getLayerPriceWithDepth(i, types.SideTypeSell, quote, requiredDepth)
 			} else {
 				askPrice = s.getLayerPrice(i, types.SideTypeSell, s.sourceBook, quote)
 			}
