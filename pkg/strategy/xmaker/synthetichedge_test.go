@@ -534,15 +534,13 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		Status:           types.OrderStatusFilled,
 	}
 	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder5).Return(&createdOrder5, nil)
-	/*
-		fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().CancelOrders(gomock.Any(), createdOrder5).Return(nil)
-		fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().QueryOrder(gomock.Any(), createdOrder5.AsQuery()).Return(&types.Order{
-			OrderID:          5,
-			SubmitOrder:      submitOrder4,
-			ExecutedQuantity: Number(104000.0 * 0.6),
-			Status:           types.OrderStatusFilled,
-		}, nil)
-	*/
+	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().CancelOrders(gomock.Any(), createdOrder5).Return(nil)
+	fiatSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().QueryOrder(gomock.Any(), createdOrder5.AsQuery()).Return(&types.Order{
+		OrderID:          5,
+		SubmitOrder:      submitOrder5,
+		ExecutedQuantity: Number(104000.0 * 0.6),
+		Status:           types.OrderStatusCanceled,
+	}, nil)
 
 	// TRIGGER
 	sourceUserDataStream.EmitTradeUpdate(types.Trade{
