@@ -1093,30 +1093,26 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		}
 	}
 
-	var bidSourcePricers pricer.Pricer
+	var bidSourcePricer = pricer.FromBestPrice(types.SideTypeBuy, s.sourceBook)
 	coverBidDepth := func(v fixedpoint.Value) {}
 	if s.UseDepthPrice {
 		bidCoveredDepth := pricer.NewCoveredDepth(s.depthSourceBook, s.DepthQuantity)
-		bidSourcePricers = bidCoveredDepth.Pricer(types.SideTypeBuy)
+		bidSourcePricer = bidCoveredDepth.Pricer(types.SideTypeBuy)
 		coverBidDepth = bidCoveredDepth.Cover
-	} else {
-		bidSourcePricers = pricer.FromBestPrice(types.SideTypeBuy, s.sourceBook)
 	}
 
-	bidPricer := pricer.Compose(append([]pricer.Pricer{bidSourcePricers}, []pricer.Pricer{
+	bidPricer := pricer.Compose(append([]pricer.Pricer{bidSourcePricer}, []pricer.Pricer{
 		pricer.ApplyMargin(types.SideTypeBuy, quote.BidMargin),
 		pricer.ApplyFeeRate(types.SideTypeBuy, s.makerSession.MakerFeeRate),
 		pricer.AdjustByTick(types.SideTypeBuy, quote.BidLayerPips, s.makerMarket.TickSize),
 	}...)...)
 
-	var askSourcePricer pricer.Pricer
+	var askSourcePricer = pricer.FromBestPrice(types.SideTypeSell, s.sourceBook)
 	coverAskDepth := func(v fixedpoint.Value) {}
 	if s.UseDepthPrice {
 		askCoveredDepth := pricer.NewCoveredDepth(s.depthSourceBook, s.DepthQuantity)
 		coverAskDepth = askCoveredDepth.Cover
 		askSourcePricer = askCoveredDepth.Pricer(types.SideTypeSell)
-	} else {
-		askSourcePricer = pricer.FromBestPrice(types.SideTypeSell, s.sourceBook)
 	}
 
 	askPricer := pricer.Compose(append([]pricer.Pricer{askSourcePricer}, []pricer.Pricer{
