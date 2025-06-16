@@ -259,6 +259,7 @@ func newHedgeMarket(
 	depthBook := types.NewDepthBook(book)
 
 	position := types.NewPositionFromMarket(market)
+	position.Strategy = ID
 
 	orderStore := core.NewOrderStore(symbol)
 	orderStore.BindStream(session.UserDataStream)

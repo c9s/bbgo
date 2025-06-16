@@ -76,16 +76,14 @@ type SyntheticHedge struct {
 	logger logrus.FieldLogger
 
 	mu sync.Mutex
+
+	environment *bbgo.Environment
 }
 
 // InitializeAndBind
 // not a good way to initialize the synthetic hedge with the strategy instance
 // but we need to build the trade collector to update the profit and position
-func (s *SyntheticHedge) InitializeAndBind(
-	ctx context.Context,
-	sessions map[string]*bbgo.ExchangeSession,
-	strategy *Strategy,
-) error {
+func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession, strategy *Strategy) error {
 	if !s.Enabled {
 		return nil
 	}
@@ -111,10 +109,16 @@ func (s *SyntheticHedge) InitializeAndBind(
 		return err
 	}
 
+	// update strategy instance ID for the source and fiat markets
+	s.sourceMarket.Position.StrategyInstanceID = strategy.InstanceID()
+	s.fiatMarket.Position.StrategyInstanceID = strategy.InstanceID()
+
 	return s.initialize(strategy)
 }
 
 func (s *SyntheticHedge) initialize(strategy *Strategy) error {
+	s.environment = strategy.Environment
+
 	// when receiving trades from the source session,
 	// mock a trade with the quote amount and add to the fiat position
 	//
