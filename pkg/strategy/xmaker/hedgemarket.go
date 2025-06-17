@@ -172,7 +172,7 @@ func (m *HedgeMarket) newMockTrade(
 		Price:         price,
 		Quantity:      quantity,
 		QuoteQuantity: quantity.Mul(price),
-		Symbol:        m.Symbol,
+		Symbol:        m.market.Symbol,
 		Side:          side,
 		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       true,
@@ -189,7 +189,7 @@ func (m *HedgeMarket) newMockTrade(
 
 func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
 	submitOrder.Market = m.market
-	submitOrder.Symbol = m.Symbol
+	submitOrder.Symbol = m.market.Symbol
 
 	submitOrders := []types.SubmitOrder{
 		submitOrder,
@@ -210,7 +210,7 @@ func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitO
 		ctx, m.session.Exchange, orderCreateCallback, submitOrders...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to submit order: %w", err)
+		return nil, fmt.Errorf("failed to submit order: %w, order: %+v", err, submitOrder)
 	}
 
 	if len(createdOrders) == 0 {
@@ -306,7 +306,7 @@ func (m *HedgeMarket) Start(ctx context.Context) error {
 }
 
 func (m *HedgeMarket) InstanceID() string {
-	return strings.Join([]string{"hedgeMarket", m.session.Name, m.Symbol}, "-")
+	return strings.Join([]string{"hedgeMarket", m.session.Name, m.market.Symbol}, "-")
 }
 
 // Restore loads the position from persistence and restores it to the HedgeMarket.
