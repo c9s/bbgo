@@ -52,7 +52,7 @@ func (m *MarketOrderHedgeExecutor) hedge(
 
 	if m.config != nil {
 		if m.config.MaxOrderQuantity.Sign() > 0 {
-			quantity = fixedpoint.Max(quantity, m.config.MaxOrderQuantity)
+			quantity = fixedpoint.Min(quantity, m.config.MaxOrderQuantity)
 		}
 	}
 
