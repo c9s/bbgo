@@ -371,7 +371,7 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 				return
 			}
 
-			m.positionExposure.net.Add(delta)
+			m.positionExposure.Open(delta)
 		}
 	}
 }
