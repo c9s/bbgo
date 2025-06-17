@@ -361,10 +361,13 @@ func (m *HedgeMarket) Stop(shutdownCtx context.Context) {
 	m.logger.Infof("hedge market %s stopped", m.Symbol)
 }
 
+// quantityToDelta converts side to fixedpoint.Value based on the side type,
+// and multiplies it with the quantity to get the delta value.
 func quantityToDelta(quantity fixedpoint.Value, side types.SideType) fixedpoint.Value {
 	return quantity.Mul(sideToFixedPointValue(side))
 }
 
+// sideToFixedPointValue converts a side type to a fixedpoint.Value
 func sideToFixedPointValue(side types.SideType) fixedpoint.Value {
 	if side == types.SideTypeBuy {
 		return fixedpoint.One

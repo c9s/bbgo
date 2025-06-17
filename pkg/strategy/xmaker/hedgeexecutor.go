@@ -72,7 +72,7 @@ func (m *MarketOrderHedgeExecutor) hedge(
 		return err
 	}
 
-	m.positionExposure.Cover(uncoveredPosition)
+	m.positionExposure.Cover(quantity.Mul(toSign(uncoveredPosition)))
 
 	m.logger.Infof("hedge order created: %+v", hedgeOrder)
 	return nil
@@ -186,8 +186,15 @@ func (m *CounterpartyHedgeExecutor) hedge(
 	}
 
 	m.hedgeOrder = hedgeOrder
-	m.positionExposure.Cover(uncoveredPosition)
+	m.positionExposure.Cover(quantity.Mul(toSign(uncoveredPosition)))
 	m.logger.Infof("hedge order created: %+v", hedgeOrder)
 	return nil
+}
 
+func toSign(v fixedpoint.Value) fixedpoint.Value {
+	if v.Sign() < 0 {
+		return fixedpoint.NegOne
+	}
+
+	return fixedpoint.One
 }
