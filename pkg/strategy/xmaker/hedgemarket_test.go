@@ -61,11 +61,12 @@ func TestHedgeMarket_hedge(t *testing.T) {
 	mockExchange := session.Exchange.(*mocks.MockExchangeExtended)
 
 	submitOrder := types.SubmitOrder{
-		Market:   market,
-		Symbol:   "BTCUSDT",
-		Quantity: testhelper.Number(1.0),
-		Side:     types.SideTypeSell,
-		Type:     types.OrderTypeMarket,
+		Market:           market,
+		Symbol:           market.Symbol,
+		Quantity:         testhelper.Number(1.0),
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeMarket,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
 	}
 	createdOrder := types.Order{
 		OrderID:          1,
@@ -127,11 +128,12 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	}()
 
 	submitOrder := types.SubmitOrder{
-		Market:   market,
-		Symbol:   "BTCUSDT",
-		Quantity: testhelper.Number(2.0),
-		Side:     types.SideTypeSell,
-		Type:     types.OrderTypeMarket,
+		Market:           market,
+		Symbol:           market.Symbol,
+		Quantity:         testhelper.Number(2.0),
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeMarket,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
 	}
 	createdOrder := types.Order{
 		OrderID:          1,
@@ -166,7 +168,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 		Price:         testhelper.Number(103000.0),
 		Quantity:      testhelper.Number(1.0),
 		QuoteQuantity: testhelper.Number(103000.0 * 1.0),
-		Symbol:        "BTCUSDT",
+		Symbol:        market.Symbol, // fixed to use market.Symbol
 		Side:          types.SideTypeSell,
 		IsBuyer:       false,
 		Time:          types.Time{},
@@ -185,7 +187,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 		Price:         testhelper.Number(103000.0),
 		Quantity:      testhelper.Number(1.0),
 		QuoteQuantity: testhelper.Number(103000.0 * 1.0),
-		Symbol:        "BTCUSDT",
+		Symbol:        market.Symbol, // fixed to use market.Symbol
 		Side:          types.SideTypeSell,
 		IsBuyer:       false,
 		Time:          types.Time{},

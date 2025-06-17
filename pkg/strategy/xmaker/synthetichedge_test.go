@@ -163,11 +163,12 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	}()
 
 	submitOrder := types.SubmitOrder{
-		Market:   sourceMarket,
-		Symbol:   "BTCUSDT",
-		Quantity: Number(1.0),
-		Side:     types.SideTypeSell,
-		Type:     types.OrderTypeMarket,
+		Market:           sourceMarket,
+		Symbol:           "BTCUSDT",
+		Quantity:         Number(1.0),
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeMarket,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
 	}
 	createdOrder := types.Order{
 		OrderID:          1,
@@ -178,11 +179,12 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	sourceSession.Exchange.(*mocks.MockExchangeExtended).EXPECT().SubmitOrder(gomock.Any(), submitOrder).Return(&createdOrder, nil)
 
 	submitOrder2 := types.SubmitOrder{
-		Market:   fiatMarket,
-		Symbol:   "USDTTWD",
-		Quantity: Number(104000.0),
-		Side:     types.SideTypeSell,
-		Type:     types.OrderTypeMarket,
+		Market:           fiatMarket,
+		Symbol:           "USDTTWD",
+		Quantity:         Number(104000.0),
+		Side:             types.SideTypeSell,
+		Type:             types.OrderTypeMarket,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
 	}
 	createdOrder2 := types.Order{
 		OrderID:          2,
