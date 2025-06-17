@@ -78,6 +78,8 @@ type SyntheticHedge struct {
 	mu sync.Mutex
 
 	environment *bbgo.Environment
+
+	strategy *Strategy
 }
 
 // InitializeAndBind
@@ -112,6 +114,7 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 	// update strategy instance ID for the source and fiat markets
 	s.sourceMarket.Position.StrategyInstanceID = strategy.InstanceID()
 	s.fiatMarket.Position.StrategyInstanceID = strategy.InstanceID()
+	s.strategy = strategy
 
 	return s.initialize(strategy)
 }
@@ -293,12 +296,29 @@ func (s *SyntheticHedge) Start(ctx context.Context) error {
 		return fmt.Errorf("sourceMarket and fiatMarket must be initialized")
 	}
 
+	instanceID := ID
+	if s.strategy != nil {
+		instanceID = s.strategy.InstanceID()
+	}
+
+	if err := s.sourceMarket.Restore(ctx, instanceID); err != nil {
+		s.logger.WithError(err).Errorf("[syntheticHedge] failed to restore source market persistence")
+		return err
+	}
+
+	if err := s.fiatMarket.Restore(ctx, instanceID); err != nil {
+		s.logger.WithError(err).Errorf("[syntheticHedge] failed to restore fiat market persistence")
+		return err
+	}
+
 	if err := s.sourceMarket.Start(ctx); err != nil {
 		s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
+		return err
 	}
 
 	if err := s.fiatMarket.Start(ctx); err != nil {
 		s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
+		return err
 	}
 
 	s.sourceMarket.WaitForReady(ctx)
