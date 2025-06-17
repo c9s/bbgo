@@ -66,6 +66,7 @@ func (m *PriceTriggerMode) Bind(ctx context.Context) {
 		// if recovery failed after maxTry attempts, the state in state machine will be None and there is no transition function will be triggered
 		if err != nil {
 			m.s.logger.WithError(err).Errorf("failed to recover after %d attempts, please check it", maxTry)
+			return
 		}
 
 		m.s.updateTakeProfitPrice()
@@ -73,6 +74,8 @@ func (m *PriceTriggerMode) Bind(ctx context.Context) {
 		if m.s.stateMachine.GetState() == PriceTriggerStateIdleWaiting {
 			m.s.stateMachine.EmitNextState(PriceTriggerStateOpenPositionReady)
 		}
+
+		m.s.EmitReady()
 	})
 
 	// state machine close callback
@@ -166,12 +169,7 @@ func (m *PriceTriggerMode) Bind(ctx context.Context) {
 				m.s.logger.Info("context done, exiting dca2 strategy")
 				return
 			case <-ticker.C:
-				switch m.s.stateMachine.GetState() {
-				case PriceTriggerStateIdleWaiting:
-					m.s.stateMachine.EmitNextState(PriceTriggerStateOpenPositionReady)
-				case PriceTriggerStateOpenPositionFinished:
-					m.s.stateMachine.EmitNextState(PriceTriggerStateTakeProfitReady)
-				}
+				m.triggerNextState()
 			}
 		}
 	}()
@@ -246,6 +244,10 @@ func (m *PriceTriggerMode) cancelOpenPositionOrdersAndPlaceTakeProfitOrder(ctx c
 
 // finishTakeProfitStage will update the profit stats and reset the position, then wait the next round
 func (m *PriceTriggerMode) finishTakeProfitStage(ctx context.Context) error {
+	if m.s.OrderExecutor.ActiveMakerOrders().NumOfOrders() > 0 {
+		return fmt.Errorf("there are still active orders so we can't finish take-profit stage, please check it")
+	}
+
 	// wait 3 seconds to avoid position not update
 	time.Sleep(3 * time.Second)
 
@@ -272,12 +274,11 @@ func (m *PriceTriggerMode) finishTakeProfitStage(ctx context.Context) error {
 }
 
 func (m *PriceTriggerMode) recover(ctx context.Context) error {
-	m.s.logger.Info("starting recovering")
+	m.s.logger.Info("recovering dca2 price trigger mode")
 	currentRound, err := m.s.collector.CollectCurrentRound(ctx, recoverSinceLimit)
 	if err != nil {
 		return fmt.Errorf("failed to collect current round: %w", err)
 	}
-	debugRoundOrders(m.s.logger, "current", currentRound)
 
 	// recover profit stats
 	if m.s.DisableProfitStatsRecover {
@@ -310,12 +311,13 @@ func (m *PriceTriggerMode) recover(ctx context.Context) error {
 	}
 
 	m.s.stateMachine.UpdateState(state)
-	m.s.logger.Info("recover stats DONE")
+	m.s.logger.Info("recovering dca2 price trigger mode DONE, current state: ", m.s.stateMachine.GetState())
 
 	return nil
 }
 
 func (m *PriceTriggerMode) recoverState(currentRound Round, orderExecutor *bbgo.GeneralOrderExecutor) (statemachine.State, error) {
+	m.s.logger.Info("recovering state for dca2 price trigger mode")
 	// no open-position orders and no take-profit orders means this is the whole new strategy
 	if len(currentRound.OpenPositionOrders) == 0 && len(currentRound.TakeProfitOrders) == 0 {
 		return PriceTriggerStateIdleWaiting, nil
@@ -395,4 +397,15 @@ func (m *PriceTriggerMode) recoverStateIfAtOpenPositionStage(orders types.OrderS
 
 	// if there is at least one filled order and still open orders, it means we are ready to take profit if we hit the take-profit price
 	return PriceTriggerStateOpenPositionOrderFilled, nil
+}
+
+func (m *PriceTriggerMode) triggerNextState() {
+	switch m.s.stateMachine.GetState() {
+	case PriceTriggerStateIdleWaiting:
+		m.s.stateMachine.EmitNextState(PriceTriggerStateOpenPositionReady)
+	case PriceTriggerStateOpenPositionFinished:
+		m.s.stateMachine.EmitNextState(PriceTriggerStateTakeProfitReady)
+	case PriceTriggerStateTakeProfitReady:
+		m.s.stateMachine.EmitNextState(PriceTriggerStateIdleWaiting)
+	}
 }

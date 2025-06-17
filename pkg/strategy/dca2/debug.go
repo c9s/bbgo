@@ -8,15 +8,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (s *Strategy) debugOrders(submitOrders []types.Order) {
+func debugOrders(logger *logrus.Entry, name string, orders []types.Order) {
 	var sb strings.Builder
-	sb.WriteString("DCA ORDERS[\n")
-	for i, order := range submitOrders {
+	sb.WriteString(name + " ORDERS[\n")
+	for i, order := range orders {
 		sb.WriteString(fmt.Sprintf("%3d) ", i+1) + order.String() + "\n")
 	}
-	sb.WriteString("] END OF DCA ORDERS")
+	sb.WriteString("] END OF " + name + " ORDERS")
 
-	s.logger.Info(sb.String())
+	logger.Info(sb.String())
 }
 
 func debugRoundOrders(logger *logrus.Entry, roundName string, round Round) {

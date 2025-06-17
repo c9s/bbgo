@@ -249,15 +249,17 @@ func (s *Strategy) Close(ctx context.Context) error {
 
 	defer s.EmitClosed()
 
-	// this is async call, we need to wait for the state machine to close
-	s.stateMachine.Close()
+	if s.stateMachine != nil {
+		// this is async call, we need to wait for the state machine to close
+		s.stateMachine.Close()
 
-	// wait for the state machine to close, timeout after 15 seconds and check every 100 milliseconds
-	checkInterval := 100 * time.Millisecond
-	timeout := 15 * time.Second
-	if isClosed := s.stateMachine.WaitForRunningIs(false, checkInterval, timeout); !isClosed {
-		s.logger.Infof("state machine for %s dca2 is still not closed after %s, please check it", s.Symbol, timeout)
-		return fmt.Errorf("state machine for %s dca2 is still not closed after %s, please check it", s.Symbol, timeout)
+		// wait for the state machine to close, timeout after 15 seconds and check every 100 milliseconds
+		checkInterval := 100 * time.Millisecond
+		timeout := 15 * time.Second
+		if isClosed := s.stateMachine.WaitForRunningIs(false, checkInterval, timeout); !isClosed {
+			s.logger.Infof("state machine for %s dca2 is still not closed after %s, please check it", s.Symbol, timeout)
+			return fmt.Errorf("state machine for %s dca2 is still not closed after %s, please check it", s.Symbol, timeout)
+		}
 	}
 
 	bbgo.Sync(ctx, s)
@@ -265,20 +267,22 @@ func (s *Strategy) Close(ctx context.Context) error {
 }
 
 func (s *Strategy) CleanUp(ctx context.Context) error {
-	s.logger.Infof("cleaning up %s dca2", s.Symbol)
 	_ = s.Initialize()
+	s.logger.Infof("cleaning up %s dca2", s.Symbol)
 
 	defer s.EmitClosed()
 
-	// this is async call, we need to wait for the state machine to close
-	s.stateMachine.Close()
+	if s.stateMachine != nil {
+		// this is async call, we need to wait for the state machine to close
+		s.stateMachine.Close()
 
-	// wait for the state machine to close, timeout after 15 seconds and check every 100 milliseconds
-	checkInterval := 100 * time.Millisecond
-	timeout := 15 * time.Second
-	if isClosed := s.stateMachine.WaitForRunningIs(false, checkInterval, timeout); !isClosed {
-		s.logger.Infof("state machine for %s dca2 is still not closed after %s, please check it", s.Symbol, timeout)
-		return fmt.Errorf("state machine for %s dca2 is still not closed after %s, please check it", s.Symbol, timeout)
+		// wait for the state machine to close, timeout after 15 seconds and check every 100 milliseconds
+		checkInterval := 100 * time.Millisecond
+		timeout := 15 * time.Second
+		if isClosed := s.stateMachine.WaitForRunningIs(false, checkInterval, timeout); !isClosed {
+			s.logger.Infof("state machine for %s dca2 is still not closed after %s, please check it", s.Symbol, timeout)
+			return fmt.Errorf("state machine for %s dca2 is still not closed after %s, please check it", s.Symbol, timeout)
+		}
 	}
 
 	return nil

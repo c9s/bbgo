@@ -31,7 +31,7 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 		return fmt.Errorf("failed to submit open position orders: %w", err)
 	}
 
-	s.debugOrders(createdOrders)
+	debugOrders(s.logger, "CREATED", createdOrders)
 
 	return nil
 }
