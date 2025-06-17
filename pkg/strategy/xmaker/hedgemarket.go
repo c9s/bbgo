@@ -3,7 +3,9 @@ package xmaker
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,8 +14,11 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/service"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+const defaultHedgeInterval = 3 * time.Second
 
 type HedgeExecutor interface {
 	// hedge executes a hedge order based on the uncovered position and the hedge delta
@@ -275,10 +280,9 @@ func (m *HedgeMarket) WaitForReady(ctx context.Context) {
 }
 
 func (m *HedgeMarket) Start(ctx context.Context) error {
-
 	interval := m.HedgeInterval.Duration()
 	if interval == 0 {
-		interval = 3 * time.Second // default interval
+		interval = defaultHedgeInterval
 	}
 
 	if err := m.stream.Connect(ctx); err != nil {
@@ -297,9 +301,41 @@ func (m *HedgeMarket) Start(ctx context.Context) error {
 
 	m.logger.Infof("%s hedge market is ready", m.Symbol)
 
-	// TODO: use goroutine here later, but we need to update the tests
 	go m.hedgeWorker(m.tradingCtx, interval)
 	return nil
+}
+
+func (m *HedgeMarket) InstanceID() string {
+	return strings.Join([]string{"hedgeMarket", m.session.Name, m.Symbol}, "-")
+}
+
+// Restore loads the position from persistence and restores it to the HedgeMarket.
+func (m *HedgeMarket) Restore(ctx context.Context, namespace string) error {
+	isolation := bbgo.GetIsolationFromContext(ctx)
+	ps := isolation.GetPersistenceService()
+	id := m.InstanceID()
+	store := ps.NewStore(namespace, id)
+
+	if err := store.Load(&m.Position); err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, service.ErrPersistenceNotExists) {
+			return nil
+		}
+
+		return fmt.Errorf("failed to load position for hedge market %s: %w", m.Symbol, err)
+	}
+
+	m.logger.Infof("restored position for hedge market %s: %+v", m.Symbol, m.Position)
+	return nil
+}
+
+func (m *HedgeMarket) Sync(ctx context.Context, namespace string) {
+	isolation := bbgo.GetIsolationFromContext(ctx)
+	ps := isolation.GetPersistenceService()
+	id := m.InstanceID()
+	store := ps.NewStore(namespace, id)
+	if err := store.Save(m.Position); err != nil {
+		m.logger.WithError(err).Errorf("failed to save position for hedge market %s", m.Symbol)
+	}
 }
 
 func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Duration) {
