@@ -51,6 +51,10 @@ func initializeHedgeMarketFromConfig(
 		return nil, err
 	}
 
+	if c.QuotingDepth.IsZero() && c.QuotingDepthInQuote.IsZero() {
+		return nil, fmt.Errorf("quotingDepth or quotingDepthInQuote must be set for hedge market %s", c.Symbol)
+	}
+
 	hm := newHedgeMarket(c, session, market)
 	return hm, nil
 }
@@ -72,16 +76,14 @@ type SyntheticHedge struct {
 	logger logrus.FieldLogger
 
 	mu sync.Mutex
+
+	environment *bbgo.Environment
 }
 
 // InitializeAndBind
 // not a good way to initialize the synthetic hedge with the strategy instance
 // but we need to build the trade collector to update the profit and position
-func (s *SyntheticHedge) InitializeAndBind(
-	ctx context.Context,
-	sessions map[string]*bbgo.ExchangeSession,
-	strategy *Strategy,
-) error {
+func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSession, strategy *Strategy) error {
 	if !s.Enabled {
 		return nil
 	}
@@ -107,10 +109,16 @@ func (s *SyntheticHedge) InitializeAndBind(
 		return err
 	}
 
+	// update strategy instance ID for the source and fiat markets
+	s.sourceMarket.Position.StrategyInstanceID = strategy.InstanceID()
+	s.fiatMarket.Position.StrategyInstanceID = strategy.InstanceID()
+
 	return s.initialize(strategy)
 }
 
 func (s *SyntheticHedge) initialize(strategy *Strategy) error {
+	s.environment = strategy.Environment
+
 	// when receiving trades from the source session,
 	// mock a trade with the quote amount and add to the fiat position
 	//
@@ -144,7 +152,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 		// 3) convert source trade into fiat trade as the average cost of the fiat market position
 		// This assumes source's quote currency is the fiat market's base currency
 		fiatTrade := s.fiatMarket.newMockTrade(fiatSide, price, fiatQuantity, trade.Time.Time())
-		if profit, netProfit, madeProfit := s.fiatMarket.position.AddTrade(fiatTrade); madeProfit {
+		if profit, netProfit, madeProfit := s.fiatMarket.Position.AddTrade(fiatTrade); madeProfit {
 			// TODO: record the profits in somewhere?
 			_ = profit
 			_ = netProfit
@@ -155,7 +163,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 	})
 
 	s.fiatMarket.tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
-		avgCost := s.sourceMarket.position.AverageCost
+		avgCost := s.sourceMarket.Position.AverageCost
 
 		// convert the trade quantity to the source market's base currency quantity
 		// calculate how much base quantity we can close the source position
@@ -173,7 +181,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 		// convert the fiat trade into source trade to close the source position
 		// side is reversed because we are closing the source hedge position
 		mockSourceTrade := s.sourceMarket.newMockTrade(trade.Side.Reverse(), avgCost, baseQuantity, trade.Time.Time())
-		if profit, netProfit, madeProfit := s.sourceMarket.position.AddTrade(mockSourceTrade); madeProfit {
+		if profit, netProfit, madeProfit := s.sourceMarket.Position.AddTrade(mockSourceTrade); madeProfit {
 			_ = profit
 			_ = netProfit
 		}
@@ -268,6 +276,14 @@ func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, b
 	return fixedpoint.Zero, fixedpoint.Zero, false
 }
 
+func (s *SyntheticHedge) Stop(shutdownCtx context.Context) error {
+	s.logger.Infof("[syntheticHedge] stopping synthetic hedge workers")
+	s.sourceMarket.Stop(shutdownCtx)
+	s.fiatMarket.Stop(shutdownCtx)
+	s.logger.Infof("[syntheticHedge] synthetic hedge workers stopped")
+	return nil
+}
+
 func (s *SyntheticHedge) Start(ctx context.Context) error {
 	if !s.Enabled {
 		return nil
@@ -277,21 +293,18 @@ func (s *SyntheticHedge) Start(ctx context.Context) error {
 		return fmt.Errorf("sourceMarket and fiatMarket must be initialized")
 	}
 
-	go func() {
-		if err := s.sourceMarket.Start(ctx); err != nil {
-			s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
-		}
-	}()
+	if err := s.sourceMarket.Start(ctx); err != nil {
+		s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
+	}
 
-	go func() {
-		if err := s.fiatMarket.Start(ctx); err != nil {
-			s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
-		}
-	}()
+	if err := s.fiatMarket.Start(ctx); err != nil {
+		s.logger.WithError(err).Errorf("[syntheticHedge] failed to start")
+	}
 
 	s.sourceMarket.WaitForReady(ctx)
 	s.fiatMarket.WaitForReady(ctx)
 
+	s.logger.Infof("[syntheticHedge] source market and fiat market are ready")
 	return nil
 }
 
