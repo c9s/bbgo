@@ -2,6 +2,7 @@ package dca2
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -93,6 +94,7 @@ func (rc Collector) CollectCurrentRound(ctx context.Context, sinceLimit time.Tim
 	allOrders = append(allOrders, closedOrders...)
 
 	types.SortOrdersDescending(allOrders)
+	debugOrders(rc.logger, "CURRENT", allOrders)
 
 	var currentRound Round
 	lastSide := TakeProfitSide
@@ -110,6 +112,16 @@ func (rc Collector) CollectCurrentRound(ctx context.Context, sinceLimit time.Tim
 		case OpenPositionSide:
 			currentRound.OpenPositionOrders = append(currentRound.OpenPositionOrders, order)
 		case TakeProfitSide:
+			if order.Status == types.OrderStatusRejected {
+				// skip the rejected order
+				continue
+			}
+
+			if order.Status == types.OrderStatusCanceled && order.ExecutedQuantity.IsZero() {
+				// skip the canceled order with no executed quantity
+				continue
+			}
+
 			currentRound.TakeProfitOrders = append(currentRound.TakeProfitOrders, order)
 		default:
 		}
@@ -117,6 +129,7 @@ func (rc Collector) CollectCurrentRound(ctx context.Context, sinceLimit time.Tim
 		lastSide = order.Side
 	}
 
+	debugRoundOrders(rc.logger, "CURRENT", currentRound)
 	return currentRound, nil
 }
 
@@ -129,6 +142,7 @@ func (rc *Collector) CollectFinishRounds(ctx context.Context, fromOrderID uint64
 		return nil, err
 	}
 	rc.logger.Infof("there are %d closed orders from order id #%d", len(orders), fromOrderID)
+	debugOrders(rc.logger, "CLOSED", orders)
 
 	var rounds []Round
 	var round Round
@@ -139,9 +153,9 @@ func (rc *Collector) CollectFinishRounds(ctx context.Context, fromOrderID uint64
 		}
 
 		switch order.Side {
-		case types.SideTypeBuy:
+		case OpenPositionSide:
 			round.OpenPositionOrders = append(round.OpenPositionOrders, order)
-		case types.SideTypeSell:
+		case TakeProfitSide:
 			round.TakeProfitOrders = append(round.TakeProfitOrders, order)
 
 			if order.Status != types.OrderStatusFilled {
@@ -157,18 +171,20 @@ func (rc *Collector) CollectFinishRounds(ctx context.Context, fromOrderID uint64
 			}
 
 			rounds = append(rounds, round)
+			debugRoundOrders(rc.logger, fmt.Sprintf("FINISHED #%d", len(rounds)), round)
 			round = Round{}
 		default:
 			rc.logger.Errorf("there is order with unsupported side")
 		}
 	}
 
+	rc.logger.Infof("there are %d finished rounds from order id #%d", len(rounds), fromOrderID)
 	return rounds, nil
 }
 
 // CollectRoundTrades collect the trades of the orders in the given round. The trades' fee are processed (feeProcessing = false)
 func (rc *Collector) CollectRoundTrades(ctx context.Context, round Round) ([]types.Trade, error) {
-	debugRoundOrders(rc.logger, "collect round trades", round)
+	debugRoundOrders(rc.logger, "TRADE", round)
 
 	var roundTrades []types.Trade
 	var roundOrders []types.Order = round.OpenPositionOrders

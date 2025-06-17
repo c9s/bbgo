@@ -40,7 +40,7 @@ type StateMachine struct {
 func NewStateMachine(logger *logrus.Entry) *StateMachine {
 	s := &StateMachine{
 		logger:        logger,
-		nextStateC:    make(chan State, 5),
+		nextStateC:    make(chan State, 1),
 		closeC:        make(chan struct{}, 1),
 		recoverStateC: make(chan struct{}, 1),
 	}
@@ -55,6 +55,7 @@ func NewStateMachine(logger *logrus.Entry) *StateMachine {
 }
 
 func (s *StateMachine) EmitNextState(state State) {
+	s.logger.Infof("emit next state: %d", state)
 	select {
 	case s.nextStateC <- state:
 	default:
@@ -132,9 +133,11 @@ func (s *StateMachine) WaitForRunningIs(isRunning bool, checkInterval, timeout t
 }
 
 func (s *StateMachine) runState(ctx context.Context) {
+	s.logger.Info("starting state machine")
 	defer func() {
 		s.isRunning = false
 		s.once.Reset()
+		s.logger.Info("state machine stopped")
 	}()
 
 	s.isRunning = true
