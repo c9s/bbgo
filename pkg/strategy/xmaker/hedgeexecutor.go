@@ -9,7 +9,12 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
+type BaseHedgeExecutorConfig struct {
+}
+
 type MarketOrderHedgeExecutorConfig struct {
+	BaseHedgeExecutorConfig
+
 	MaxOrderQuantity fixedpoint.Value `json:"maxOrderQuantity,omitempty"` // max order quantity for market order hedge
 }
 
@@ -56,6 +61,8 @@ func (m *MarketOrderHedgeExecutor) hedge(
 		}
 	}
 
+	quantity = m.market.TruncateQuantity(quantity)
+
 	if m.market.IsDustQuantity(quantity, price) {
 		m.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
 		return nil
@@ -81,6 +88,8 @@ func (m *MarketOrderHedgeExecutor) hedge(
 }
 
 type CounterpartyHedgeExecutorConfig struct {
+	BaseHedgeExecutorConfig
+
 	PriceLevel int `json:"priceLevel"`
 }
 
@@ -172,7 +181,7 @@ func (m *CounterpartyHedgeExecutor) hedge(
 		m.session.GetAccount(), m.market, side, quantity, price,
 	)
 
-	quantity = m.market.RoundUpByStepSize(quantity)
+	quantity = m.market.TruncateQuantity(quantity)
 
 	if m.market.IsDustQuantity(quantity, price) {
 		m.logger.Infof("skip dust quantity: %s @ price %f", quantity.String(), price.Float64())
