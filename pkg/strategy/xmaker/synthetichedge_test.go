@@ -11,6 +11,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	. "github.com/c9s/bbgo/pkg/testing/testhelper"
+	"github.com/c9s/bbgo/pkg/tradeid"
 
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
@@ -21,6 +22,10 @@ import (
 
 var stepTime = 30 * time.Millisecond
 var hedgeInterval = types.Duration(10 * time.Millisecond)
+
+func init() {
+	tradeid.GlobalGenerator = tradeid.NewDeterministicGenerator()
+}
 
 func TestSyntheticHedge_GetQuotePrices_BaseQuote(t *testing.T) {
 	// source: BTCUSDT, fiat: USDTTWD, source quote == fiat base
@@ -69,12 +74,13 @@ func TestSyntheticHedge_GetQuotePrices_BaseQuote(t *testing.T) {
 	hedge := &SyntheticHedge{
 		sourceMarket: source,
 		fiatMarket:   fiat,
+		forward:      true,
 	}
 
 	bid, ask, ok := hedge.GetQuotePrices()
 	assert.True(t, ok)
-	assert.Equal(t, Number(10000*30), bid)
-	assert.Equal(t, Number(10010*31), ask)
+	assert.Equal(t, Number(10000).Mul(Number(30)), bid)
+	assert.Equal(t, Number(10010).Mul(Number(31)), ask)
 }
 
 func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
@@ -152,6 +158,7 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 		fiatMarket:       fiatHedgeMarket,
 		syntheticTradeId: 0,
 		logger:           logrus.StandardLogger(),
+		forward:          true,
 	}
 	err := syn.initialize(strategy)
 	assert.NoError(t, err)
@@ -354,6 +361,7 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 		fiatMarket:       fiatHedgeMarket,
 		syntheticTradeId: 0,
 		logger:           logrus.StandardLogger(),
+		forward:          true,
 	}
 	err := syn.initialize(strategy)
 	assert.NoError(t, err)

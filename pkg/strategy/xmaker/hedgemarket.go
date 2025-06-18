@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
+	"github.com/c9s/bbgo/pkg/tradeid"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -62,8 +63,7 @@ type HedgeMarket struct {
 
 	logger logrus.FieldLogger
 
-	mockTradeId uint64
-	mu          sync.Mutex
+	mu sync.Mutex
 
 	hedgeExecutor HedgeExecutor
 
@@ -121,7 +121,7 @@ func newHedgeMarket(
 
 		positionExposure: newPositionExposure(symbol),
 
-		positionDeltaC:    make(chan fixedpoint.Value, 5),
+		positionDeltaC:    make(chan fixedpoint.Value, 100), // this depends on the number of trades
 		Position:          position,
 		orderStore:        orderStore,
 		tradeCollector:    tradeCollector,
@@ -163,11 +163,11 @@ func newHedgeMarket(
 func (m *HedgeMarket) newMockTrade(
 	side types.SideType, price, quantity fixedpoint.Value, tradeTime time.Time,
 ) types.Trade {
-	m.mockTradeId++
+	tradeId := tradeid.GlobalGenerator.Generate()
 
 	return types.Trade{
-		ID:            m.mockTradeId,
-		OrderID:       m.mockTradeId,
+		ID:            tradeId,
+		OrderID:       tradeId,
 		Exchange:      m.session.ExchangeName,
 		Price:         price,
 		Quantity:      quantity,

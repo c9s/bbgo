@@ -14,13 +14,15 @@ type CoveredDepth struct {
 	accumulatedDepth fixedpoint.Value
 	initialDepth     fixedpoint.Value
 	depthBook        *types.DepthBook
+	side             types.SideType
 }
 
-func NewCoveredDepth(depthBook *types.DepthBook, initialDepth fixedpoint.Value) *CoveredDepth {
+func NewCoveredDepth(depthBook *types.DepthBook, side types.SideType, initialDepth fixedpoint.Value) *CoveredDepth {
 	return &CoveredDepth{
 		lastIndex:        -1,
 		initialDepth:     initialDepth,
 		depthBook:        depthBook,
+		side:             side,
 		accumulatedDepth: fixedpoint.Zero,
 	}
 }
@@ -33,23 +35,21 @@ func (d *CoveredDepth) Cover(depth fixedpoint.Value) {
 	}
 }
 
-func (d *CoveredDepth) Pricer(
-	side types.SideType,
-) Pricer {
+func (d *CoveredDepth) Pricer() Pricer {
 	return func(i int, price fixedpoint.Value) fixedpoint.Value {
 		if i <= d.lastIndex {
 			// If the index is not increasing, we do not accumulate depth.
 			// This is to prevent re-accumulating depth when the same index is processed again.
 			log.Warnf("FromAccumulatedDepth: index %d is not increasing from last index %d, skipping accumulation", i, d.lastIndex)
-			return d.depthBook.PriceAtDepth(side, d.initialDepth)
+			return d.depthBook.PriceAtDepth(d.side, d.initialDepth)
 		}
 
 		if d.lastIndex == 0 {
 			// If this is the first index, we set the initial depth.
-			price = d.depthBook.PriceAtDepth(side, d.initialDepth)
+			price = d.depthBook.PriceAtDepth(d.side, d.initialDepth)
 			d.accumulatedDepth = d.initialDepth
 		} else {
-			price = d.depthBook.PriceAtDepth(side, d.accumulatedDepth)
+			price = d.depthBook.PriceAtDepth(d.side, d.accumulatedDepth)
 		}
 
 		d.lastIndex = i

@@ -10,9 +10,14 @@ import (
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/testing/testhelper"
+	"github.com/c9s/bbgo/pkg/tradeid"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/types/mocks"
 )
+
+func init() {
+	tradeid.GlobalGenerator = tradeid.NewDeterministicGenerator()
+}
 
 func Test_newHedgeMarket(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
