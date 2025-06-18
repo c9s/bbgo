@@ -15,6 +15,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
+	"github.com/c9s/bbgo/pkg/strategy/xmaker/pricer"
 	"github.com/c9s/bbgo/pkg/tradeid"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -226,11 +227,19 @@ func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
 	defer m.mu.Unlock()
 
 	now := time.Now()
-	if m.QuotingDepthInQuote.Sign() > 0 {
-		bid, ask = m.depthBook.BestBidAndAskAtQuoteDepth(m.QuotingDepthInQuote)
-	} else {
-		bid, ask = m.depthBook.BestBidAndAskAtDepth(m.QuotingDepth)
-	}
+
+	bidPricer := pricer.Compose(
+		pricer.FromBestPrice(types.SideTypeBuy, m.book),
+		pricer.ApplyFeeRate(types.SideTypeBuy, m.session.TakerFeeRate),
+	)
+
+	askPricer := pricer.Compose(
+		pricer.FromBestPrice(types.SideTypeSell, m.book),
+		pricer.ApplyFeeRate(types.SideTypeSell, m.session.TakerFeeRate),
+	)
+
+	bid = bidPricer(0, fixedpoint.Zero)
+	ask = askPricer(0, fixedpoint.Zero)
 
 	if bid.IsZero() || ask.IsZero() {
 		bids := m.book.SideBook(types.SideTypeBuy)
