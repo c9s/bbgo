@@ -307,7 +307,6 @@ func TestFromDepth(t *testing.T) {
 		want  fixedpoint.Value
 	}
 
-	// 使用 PriceVolumeSliceFromText 塞入測試資料
 	book := types.NewStreamBook("BTCUSDT", "")
 
 	// 假設 tickSize = 0.1
@@ -444,8 +443,8 @@ func TestNewCoveredDepth(t *testing.T) {
 	depthBook := types.NewDepthBook(book)
 	initialDepth := Number(1)
 
-	coveredDepth := NewCoveredDepth(depthBook, initialDepth)
-	pricer := coveredDepth.Pricer(types.SideTypeBuy)
+	coveredDepth := NewCoveredDepth(depthBook, types.SideTypeBuy, initialDepth)
+	pricer := coveredDepth.Pricer()
 
 	// Assume the order quantity per layer is 1
 	layerQty := Number(1)

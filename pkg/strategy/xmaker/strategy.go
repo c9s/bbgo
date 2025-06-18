@@ -45,6 +45,8 @@ const ID = "xmaker"
 
 var log = logrus.WithField("strategy", ID)
 
+func nopCover(v fixedpoint.Value) {}
+
 type MutexFloat64 struct {
 	value float64
 	mu    sync.Mutex
@@ -1094,10 +1096,10 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	var bidSourcePricer = pricer.FromBestPrice(types.SideTypeBuy, s.sourceBook)
-	coverBidDepth := func(v fixedpoint.Value) {}
+	coverBidDepth := nopCover
 	if s.UseDepthPrice {
-		bidCoveredDepth := pricer.NewCoveredDepth(s.depthSourceBook, s.DepthQuantity)
-		bidSourcePricer = bidCoveredDepth.Pricer(types.SideTypeBuy)
+		bidCoveredDepth := pricer.NewCoveredDepth(s.depthSourceBook, types.SideTypeBuy, s.DepthQuantity)
+		bidSourcePricer = bidCoveredDepth.Pricer()
 		coverBidDepth = bidCoveredDepth.Cover
 	}
 
@@ -1108,11 +1110,11 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	))...)
 
 	var askSourcePricer = pricer.FromBestPrice(types.SideTypeSell, s.sourceBook)
-	coverAskDepth := func(v fixedpoint.Value) {}
+	coverAskDepth := nopCover
 	if s.UseDepthPrice {
-		askCoveredDepth := pricer.NewCoveredDepth(s.depthSourceBook, s.DepthQuantity)
+		askCoveredDepth := pricer.NewCoveredDepth(s.depthSourceBook, types.SideTypeSell, s.DepthQuantity)
 		coverAskDepth = askCoveredDepth.Cover
-		askSourcePricer = askCoveredDepth.Pricer(types.SideTypeSell)
+		askSourcePricer = askCoveredDepth.Pricer()
 	}
 
 	askPricer := pricer.Compose(append([]pricer.Pricer{askSourcePricer}, pricer.Compose(
@@ -2408,7 +2410,7 @@ func (s *Strategy) CrossRun(
 			delta := trade.PositionDelta()
 
 			// trades from source session are always hedge trades
-			if trade.Exchange == s.sourceSession.ExchangeName {
+			if trade.Exchange == s.sourceSession.ExchangeName || trade.HasTag(TradeTagMock) {
 				s.positionExposure.Close(delta)
 			} else if trade.Exchange == s.makerSession.ExchangeName {
 				// trades from maker session can be hedge trades only when spread maker is enabled and it's a spread maker order

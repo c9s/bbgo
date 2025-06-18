@@ -62,12 +62,14 @@ func (m *MarketOrderHedgeExecutor) hedge(
 	}
 
 	hedgeOrder, err := m.submitOrder(ctx, types.SubmitOrder{
-		Symbol:   m.Symbol,
-		Market:   m.market,
-		Side:     side,
-		Type:     types.OrderTypeMarket,
-		Quantity: quantity,
+		Symbol:           m.market.Symbol,
+		Side:             side,
+		Type:             types.OrderTypeMarket,
+		Quantity:         quantity,
+		Market:           m.market,
+		MarginSideEffect: types.SideEffectTypeMarginBuy,
 	})
+
 	if err != nil {
 		return err
 	}
@@ -115,7 +117,10 @@ func (m *CounterpartyHedgeExecutor) clear(ctx context.Context) error {
 		m.logger.Infof("hedge order canceled: %+v, returning covered position...", hedgeOrder)
 
 		// return covered position from the canceled order
-		m.positionExposure.Cover(quantityToDelta(hedgeOrder.GetRemainingQuantity(), hedgeOrder.Side))
+		delta := quantityToDelta(hedgeOrder.GetRemainingQuantity(), hedgeOrder.Side)
+		if !delta.IsZero() {
+			m.positionExposure.Cover(delta)
+		}
 	}
 
 	m.hedgeOrder = nil
@@ -173,9 +178,9 @@ func (m *CounterpartyHedgeExecutor) hedge(
 	}
 
 	hedgeOrder, err := m.submitOrder(ctx, types.SubmitOrder{
-		Type:     types.OrderTypeLimit,
-		Symbol:   m.Symbol,
+		Symbol:   m.market.Symbol,
 		Market:   m.market,
+		Type:     types.OrderTypeLimit,
 		Side:     side,
 		Price:    price,
 		Quantity: quantity,
