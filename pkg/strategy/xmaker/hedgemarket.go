@@ -3,7 +3,9 @@ package xmaker
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,8 +14,12 @@ import (
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/service"
+	"github.com/c9s/bbgo/pkg/tradeid"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+const defaultHedgeInterval = 3 * time.Second
 
 type HedgeExecutor interface {
 	// hedge executes a hedge order based on the uncovered position and the hedge delta
@@ -57,8 +63,7 @@ type HedgeMarket struct {
 
 	logger logrus.FieldLogger
 
-	mockTradeId uint64
-	mu          sync.Mutex
+	mu sync.Mutex
 
 	hedgeExecutor HedgeExecutor
 
@@ -116,7 +121,7 @@ func newHedgeMarket(
 
 		positionExposure: newPositionExposure(symbol),
 
-		positionDeltaC:    make(chan fixedpoint.Value, 5),
+		positionDeltaC:    make(chan fixedpoint.Value, 100), // this depends on the number of trades
 		Position:          position,
 		orderStore:        orderStore,
 		tradeCollector:    tradeCollector,
@@ -158,16 +163,16 @@ func newHedgeMarket(
 func (m *HedgeMarket) newMockTrade(
 	side types.SideType, price, quantity fixedpoint.Value, tradeTime time.Time,
 ) types.Trade {
-	m.mockTradeId++
+	tradeId := tradeid.GlobalGenerator.Generate()
 
 	return types.Trade{
-		ID:            m.mockTradeId,
-		OrderID:       m.mockTradeId,
+		ID:            tradeId,
+		OrderID:       tradeId,
 		Exchange:      m.session.ExchangeName,
 		Price:         price,
 		Quantity:      quantity,
 		QuoteQuantity: quantity.Mul(price),
-		Symbol:        m.Symbol,
+		Symbol:        m.market.Symbol,
 		Side:          side,
 		IsBuyer:       side == types.SideTypeBuy,
 		IsMaker:       true,
@@ -184,7 +189,7 @@ func (m *HedgeMarket) newMockTrade(
 
 func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitOrder) (*types.Order, error) {
 	submitOrder.Market = m.market
-	submitOrder.Symbol = m.Symbol
+	submitOrder.Symbol = m.market.Symbol
 
 	submitOrders := []types.SubmitOrder{
 		submitOrder,
@@ -205,7 +210,7 @@ func (m *HedgeMarket) submitOrder(ctx context.Context, submitOrder types.SubmitO
 		ctx, m.session.Exchange, orderCreateCallback, submitOrders...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to submit order: %w", err)
+		return nil, fmt.Errorf("failed to submit order: %w, order: %+v", err, submitOrder)
 	}
 
 	if len(createdOrders) == 0 {
@@ -275,10 +280,9 @@ func (m *HedgeMarket) WaitForReady(ctx context.Context) {
 }
 
 func (m *HedgeMarket) Start(ctx context.Context) error {
-
 	interval := m.HedgeInterval.Duration()
 	if interval == 0 {
-		interval = 3 * time.Second // default interval
+		interval = defaultHedgeInterval
 	}
 
 	if err := m.stream.Connect(ctx); err != nil {
@@ -297,9 +301,41 @@ func (m *HedgeMarket) Start(ctx context.Context) error {
 
 	m.logger.Infof("%s hedge market is ready", m.Symbol)
 
-	// TODO: use goroutine here later, but we need to update the tests
 	go m.hedgeWorker(m.tradingCtx, interval)
 	return nil
+}
+
+func (m *HedgeMarket) InstanceID() string {
+	return strings.Join([]string{"hedgeMarket", m.session.Name, m.market.Symbol}, "-")
+}
+
+// Restore loads the position from persistence and restores it to the HedgeMarket.
+func (m *HedgeMarket) Restore(ctx context.Context, namespace string) error {
+	isolation := bbgo.GetIsolationFromContext(ctx)
+	ps := isolation.GetPersistenceService()
+	id := m.InstanceID()
+	store := ps.NewStore(namespace, id)
+
+	if err := store.Load(&m.Position); err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, service.ErrPersistenceNotExists) {
+			return nil
+		}
+
+		return fmt.Errorf("failed to load position for hedge market %s: %w", m.Symbol, err)
+	}
+
+	m.logger.Infof("restored position for hedge market %s: %+v", m.Symbol, m.Position)
+	return nil
+}
+
+func (m *HedgeMarket) Sync(ctx context.Context, namespace string) {
+	isolation := bbgo.GetIsolationFromContext(ctx)
+	ps := isolation.GetPersistenceService()
+	id := m.InstanceID()
+	store := ps.NewStore(namespace, id)
+	if err := store.Save(m.Position); err != nil {
+		m.logger.WithError(err).Errorf("failed to save position for hedge market %s", m.Symbol)
+	}
 }
 
 func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Duration) {
@@ -335,7 +371,7 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 				return
 			}
 
-			m.positionExposure.net.Add(delta)
+			m.positionExposure.Open(delta)
 		}
 	}
 }
