@@ -117,7 +117,10 @@ func (m *CounterpartyHedgeExecutor) clear(ctx context.Context) error {
 		m.logger.Infof("hedge order canceled: %+v, returning covered position...", hedgeOrder)
 
 		// return covered position from the canceled order
-		m.positionExposure.Cover(quantityToDelta(hedgeOrder.GetRemainingQuantity(), hedgeOrder.Side))
+		delta := quantityToDelta(hedgeOrder.GetRemainingQuantity(), hedgeOrder.Side)
+		if !delta.IsZero() {
+			m.positionExposure.Cover(delta)
+		}
 	}
 
 	m.hedgeOrder = nil

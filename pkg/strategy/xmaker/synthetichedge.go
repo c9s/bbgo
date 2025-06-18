@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/tradeid"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -25,6 +25,8 @@ const (
 	// HedgeMethodQueue is a hedge method that uses limit order at the first price level in the queue to hedge
 	HedgeMethodQueue HedgeMethod = "queue"
 )
+
+const TradeTagMock = "mock"
 
 type HedgeMarketConfig struct {
 	Symbol        string         `json:"symbol"`
@@ -80,6 +82,8 @@ type SyntheticHedge struct {
 	environment *bbgo.Environment
 
 	strategy *Strategy
+
+	forward bool
 }
 
 // InitializeAndBind
@@ -116,6 +120,9 @@ func (s *SyntheticHedge) InitializeAndBind(sessions map[string]*bbgo.ExchangeSes
 	s.fiatMarket.Position.StrategyInstanceID = strategy.InstanceID()
 	s.strategy = strategy
 
+	// BTC/USDT -> USDT/TWD = forward
+	// BTC/USDT -> USDC/USDT = reverse (!forward)
+	s.forward = s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency
 	return s.initialize(strategy)
 }
 
@@ -129,7 +136,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 	//   maker trade -> update source market position delta
 	//   source market position delta -> convert to fiat trade -> update fiat market position delta
 	s.sourceMarket.tradeCollector.OnTrade(func(trade types.Trade, _, _ fixedpoint.Value) {
-		price := fixedpoint.Zero
+		cost := fixedpoint.Zero
 
 		// 1) get the fiat book price from the snapshot when possible
 		bid, ask := s.fiatMarket.getQuotePrice()
@@ -139,14 +146,24 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 		fiatDelta := fiatQuantity
 
 		// reverse side because we assume source's quote currency is the fiat market's base currency here
-		fiatSide := trade.Side.Reverse()
+		fiatOrderSide := trade.Side
 
-		switch trade.Side {
+		if s.forward {
+			fiatQuantity = trade.QuoteQuantity
+			fiatOrderSide = trade.Side
+		} else {
+			fiatQuantity = fixedpoint.One.Div(trade.QuoteQuantity)
+			fiatOrderSide = trade.Side.Reverse()
+		}
+
+		fiatBaseSide := fiatOrderSide.Reverse()
+
+		switch fiatOrderSide {
 		case types.SideTypeBuy:
-			price = ask
+			cost = ask
 			fiatDelta = fiatQuantity.Neg()
 		case types.SideTypeSell:
-			price = bid
+			cost = bid
 			fiatDelta = fiatQuantity
 		default:
 			return
@@ -154,7 +171,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 
 		// 3) convert source trade into fiat trade as the average cost of the fiat market position
 		// This assumes source's quote currency is the fiat market's base currency
-		fiatTrade := s.fiatMarket.newMockTrade(fiatSide, price, fiatQuantity, trade.Time.Time())
+		fiatTrade := s.fiatMarket.newMockTrade(fiatBaseSide, cost, fiatQuantity, trade.Time.Time())
 		if profit, netProfit, madeProfit := s.fiatMarket.Position.AddTrade(fiatTrade); madeProfit {
 			// TODO: record the profits in somewhere?
 			_ = profit
@@ -171,7 +188,7 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 		// convert the trade quantity to the source market's base currency quantity
 		// calculate how much base quantity we can close the source position
 		baseQuantity := fixedpoint.Zero
-		if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency {
+		if s.forward {
 			baseQuantity = trade.Quantity.Div(avgCost)
 		} else {
 			// To handle the case where the source market's quote currency is not the fiat market's base currency:
@@ -193,14 +210,15 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 		// create a mock trade for closing the maker position
 		// This assumes the source market's quote currency is the fiat market's base currency
 		price := fixedpoint.Zero
-		if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency {
+		if s.forward {
 			price = avgCost.Mul(trade.Price)
 		} else {
 			price = avgCost.Div(trade.Price)
 		}
 
 		side := trade.Side
-		tradeId := atomic.AddUint64(&s.syntheticTradeId, 1)
+		tradeId := tradeid.GlobalGenerator.Generate()
+
 		syntheticTrade := types.Trade{
 			ID:            tradeId,
 			OrderID:       tradeId,
@@ -213,8 +231,9 @@ func (s *SyntheticHedge) initialize(strategy *Strategy) error {
 			IsBuyer:       side == types.SideTypeBuy,
 			IsMaker:       false,
 			Time:          trade.Time,
-			Fee:           trade.Fee,         // apply trade fee when possible
-			FeeCurrency:   trade.FeeCurrency, // apply trade fee when possible
+			Fee:           trade.Fee,
+			FeeCurrency:   trade.FeeCurrency,
+			Tag:           TradeTagMock,
 		}
 		s.logger.Infof("[syntheticHedge] synthetic trade created: %+v, average cost: %f", syntheticTrade, avgCost.Float64())
 		syntheticOrder := newMockOrderFromTrade(syntheticTrade, types.OrderTypeMarket)
@@ -254,7 +273,7 @@ func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, b
 	bid, ask := s.sourceMarket.getQuotePrice()
 	bid2, ask2 := s.fiatMarket.getQuotePrice()
 
-	if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.BaseCurrency {
+	if s.forward {
 		sBid := bid.Mul(bid2)
 		sAsk := ask.Mul(ask2)
 
@@ -263,9 +282,7 @@ func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, b
 			ask.Float64(), bid.Float64(),
 			ask2.Float64(), bid2.Float64())
 		return sBid, sAsk, sBid.Sign() > 0 && sAsk.Sign() > 0
-	}
-
-	if s.sourceMarket.market.QuoteCurrency == s.fiatMarket.market.QuoteCurrency {
+	} else {
 		sBid := bid.Div(bid2)
 		sAsk := ask.Div(ask2)
 
@@ -275,14 +292,21 @@ func (s *SyntheticHedge) GetQuotePrices() (fixedpoint.Value, fixedpoint.Value, b
 			ask2.Float64(), bid2.Float64())
 		return sBid, sAsk, sBid.Sign() > 0 && sAsk.Sign() > 0
 	}
-
-	return fixedpoint.Zero, fixedpoint.Zero, false
 }
 
 func (s *SyntheticHedge) Stop(shutdownCtx context.Context) error {
 	s.logger.Infof("[syntheticHedge] stopping synthetic hedge workers")
 	s.sourceMarket.Stop(shutdownCtx)
 	s.fiatMarket.Stop(shutdownCtx)
+
+	instanceID := ID
+	if s.strategy != nil {
+		instanceID = s.strategy.InstanceID()
+	}
+
+	s.sourceMarket.Sync(s.sourceMarket.tradingCtx, instanceID)
+	s.fiatMarket.Sync(s.fiatMarket.tradingCtx, instanceID)
+
 	s.logger.Infof("[syntheticHedge] synthetic hedge workers stopped")
 	return nil
 }

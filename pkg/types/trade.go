@@ -103,6 +103,12 @@ type Trade struct {
 	PnL sql.NullFloat64 `json:"pnl" db:"pnl"`
 
 	InsertedAt *Time `json:"insertedAt" db:"inserted_at"`
+
+	Tag string `json:"tags" db:"-"`
+}
+
+func (trade Trade) HasTag(tag string) bool {
+	return trade.Tag == tag
 }
 
 func (trade Trade) CsvHeader() []string {
