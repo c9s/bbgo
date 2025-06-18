@@ -235,9 +235,18 @@ func (m Market) AdjustQuantityByMinQuantity(quantity fixedpoint.Value) fixedpoin
 }
 
 func (m Market) RoundUpByStepSize(quantity fixedpoint.Value) fixedpoint.Value {
+	return m.RoundByStepSize(quantity, fixedpoint.Up)
+}
+
+func (m Market) RoundByStepSize(quantity fixedpoint.Value, mode fixedpoint.RoundingMode) fixedpoint.Value {
+	// if m.StepSize is not defined, return the quantity as is
+	if m.StepSize.IsZero() {
+		return quantity
+	}
+
 	ts := m.StepSize.Float64()
 	prec := int(math.Round(math.Log10(ts) * -1.0))
-	return quantity.Round(prec, fixedpoint.Up)
+	return quantity.Round(prec, mode)
 }
 
 // AdjustQuantityByMinNotional adjusts the quantity to make the amount greater than the given minAmount
