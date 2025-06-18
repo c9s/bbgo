@@ -94,6 +94,12 @@ func ApplyFeeRate(side types.SideType, feeRate fixedpoint.Value) Pricer {
 		feeRate = feeRate.Neg()
 	}
 
+	if feeRate.IsZero() {
+		return func(_ int, price fixedpoint.Value) fixedpoint.Value {
+			return price
+		}
+	}
+
 	return func(i int, price fixedpoint.Value) fixedpoint.Value {
 		return price.Mul(fixedpoint.One.Add(feeRate))
 	}
