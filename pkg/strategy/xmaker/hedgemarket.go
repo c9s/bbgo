@@ -134,6 +134,8 @@ func newHedgeMarket(
 		logger: logger,
 	}
 
+	m.logger.Infof("%+v", m.HedgeMethodMarket)
+
 	switch m.HedgeMethod {
 	case HedgeMethodMarket:
 		m.hedgeExecutor = newMarketOrderHedgeExecutor(m, m.HedgeMethodMarket)
