@@ -20,7 +20,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const defaultHedgeInterval = 3 * time.Second
+const defaultHedgeInterval = 200 * time.Millisecond
 
 type HedgeExecutor interface {
 	// hedge executes a hedge order based on the uncovered position and the hedge delta
