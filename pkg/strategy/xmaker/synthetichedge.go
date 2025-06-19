@@ -29,7 +29,7 @@ const (
 const TradeTagMock = "mock"
 
 type HedgeMarketConfig struct {
-	Symbol        string         `json:"symbol"`
+	Symbol        string         `json:"symbolSelector"`
 	HedgeMethod   HedgeMethod    `json:"hedgeMethod"`
 	HedgeInterval types.Duration `json:"hedgeInterval"`
 
