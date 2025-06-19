@@ -148,7 +148,7 @@ func (m *CounterpartyHedgeExecutor) hedge(
 	sideBook := m.book.SideBook(counterpartySide)
 
 	if len(sideBook) == 0 {
-		return fmt.Errorf("side book is empty for %s", m.Symbol)
+		return fmt.Errorf("side book is empty for %s", m.SymbolSelector)
 	}
 
 	priceLevel := m.config.PriceLevel
@@ -161,7 +161,7 @@ func (m *CounterpartyHedgeExecutor) hedge(
 	}
 
 	if priceLevel > len(sideBook) {
-		return fmt.Errorf("invalid price level %d for %s", m.config.PriceLevel, m.Symbol)
+		return fmt.Errorf("invalid price level %d for %s", m.config.PriceLevel, m.SymbolSelector)
 	}
 
 	price := sideBook[priceLevel].Price
