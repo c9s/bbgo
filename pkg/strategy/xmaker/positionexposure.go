@@ -2,12 +2,16 @@ package xmaker
 
 import "github.com/c9s/bbgo/pkg/fixedpoint"
 
+//go:generate callbackgen -type PositionExposure
 type PositionExposure struct {
 	symbol string
 
 	// net = net position
 	// pending = covered position
 	net, pending fixedpoint.MutexValue
+
+	coverCallbacks []func(d fixedpoint.Value)
+	closeCallbacks []func(d fixedpoint.Value)
 }
 
 func newPositionExposure(symbol string) *PositionExposure {
@@ -38,6 +42,8 @@ func (m *PositionExposure) Cover(delta fixedpoint.Value) {
 		m.net.Get().Float64(),
 		m.pending.Get().Float64(),
 	)
+
+	m.EmitCover(delta)
 }
 
 func (m *PositionExposure) Close(delta fixedpoint.Value) {
@@ -51,6 +57,8 @@ func (m *PositionExposure) Close(delta fixedpoint.Value) {
 		m.net.Get().Float64(),
 		m.pending.Get().Float64(),
 	)
+
+	m.EmitClose(delta)
 }
 
 func (m *PositionExposure) IsClosed() bool {
