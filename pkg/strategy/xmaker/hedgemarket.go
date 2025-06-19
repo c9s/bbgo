@@ -251,7 +251,7 @@ func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
 	if bid.IsZero() || ask.IsZero() {
 		bids := m.book.SideBook(types.SideTypeBuy)
 		asks := m.book.SideBook(types.SideTypeSell)
-		m.logger.Warnf("no valid bid/ask price found for %s, bids: %v, asks: %v", m.Symbol, bids, asks)
+		m.logger.Warnf("no valid bid/ask price found for %s, bids: %v, asks: %v", m.SymbolSelector, bids, asks)
 	}
 
 	// store prices as snapshot
@@ -307,15 +307,15 @@ func (m *HedgeMarket) Start(ctx context.Context) error {
 
 	m.tradingCtx, m.cancelTrading = context.WithCancel(ctx)
 
-	m.logger.Infof("waiting for %s hedge market connectivity...", m.Symbol)
+	m.logger.Infof("waiting for %s hedge market connectivity...", m.SymbolSelector)
 	select {
 	case <-ctx.Done():
 	case <-m.connectivity.ConnectedC():
 	case <-time.After(1 * time.Minute):
-		return fmt.Errorf("hedge market %s connectivity timeout", m.Symbol)
+		return fmt.Errorf("hedge market %s connectivity timeout", m.SymbolSelector)
 	}
 
-	m.logger.Infof("%s hedge market is ready", m.Symbol)
+	m.logger.Infof("%s hedge market is ready", m.SymbolSelector)
 
 	go m.hedgeWorker(m.tradingCtx, interval)
 	return nil
@@ -337,10 +337,10 @@ func (m *HedgeMarket) Restore(ctx context.Context, namespace string) error {
 			return nil
 		}
 
-		return fmt.Errorf("failed to load position for hedge market %s: %w", m.Symbol, err)
+		return fmt.Errorf("failed to load position for hedge market %s: %w", m.SymbolSelector, err)
 	}
 
-	m.logger.Infof("restored position for hedge market %s: %+v", m.Symbol, m.Position)
+	m.logger.Infof("restored position for hedge market %s: %+v", m.SymbolSelector, m.Position)
 	return nil
 }
 
@@ -350,7 +350,7 @@ func (m *HedgeMarket) Sync(ctx context.Context, namespace string) {
 	id := m.InstanceID()
 	store := ps.NewStore(namespace, id)
 	if err := store.Save(m.Position); err != nil {
-		m.logger.WithError(err).Errorf("failed to save position for hedge market %s", m.Symbol)
+		m.logger.WithError(err).Errorf("failed to save position for hedge market %s", m.SymbolSelector)
 	}
 }
 
@@ -393,7 +393,7 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 }
 
 func (m *HedgeMarket) Stop(shutdownCtx context.Context) {
-	m.logger.Infof("stopping hedge market %s", m.Symbol)
+	m.logger.Infof("stopping hedge market %s", m.SymbolSelector)
 
 	// cancel the context to stop the hedge worker
 	if m.cancelTrading != nil {
@@ -407,10 +407,10 @@ func (m *HedgeMarket) Stop(shutdownCtx context.Context) {
 	case <-shutdownCtx.Done():
 	case <-m.doneC:
 	case <-time.After(1 * time.Minute):
-		m.logger.Warnf("hedge market %s worker did not finish in time", m.Symbol)
+		m.logger.Warnf("hedge market %s worker did not finish in time", m.SymbolSelector)
 	}
 
-	m.logger.Infof("hedge market %s stopped", m.Symbol)
+	m.logger.Infof("hedge market %s stopped", m.SymbolSelector)
 }
 
 // quantityToDelta converts side to fixedpoint.Value based on the side type,

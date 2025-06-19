@@ -29,9 +29,9 @@ const (
 const TradeTagMock = "mock"
 
 type HedgeMarketConfig struct {
-	Symbol        string         `json:"symbolSelector"`
-	HedgeMethod   HedgeMethod    `json:"hedgeMethod"`
-	HedgeInterval types.Duration `json:"hedgeInterval"`
+	SymbolSelector string         `json:"symbolSelector"`
+	HedgeMethod    HedgeMethod    `json:"hedgeMethod"`
+	HedgeInterval  types.Duration `json:"hedgeInterval"`
 
 	HedgeMethodMarket       *MarketOrderHedgeExecutorConfig  `json:"hedgeMethodMarket,omitempty"`       // for backward compatibility, this is the default hedge method
 	HedgeMethodCounterparty *CounterpartyHedgeExecutorConfig `json:"hedgeMethodCounterparty,omitempty"` // for backward compatibility, this is the default hedge method
@@ -48,13 +48,13 @@ func initializeHedgeMarketFromConfig(
 	c *HedgeMarketConfig,
 	sessions map[string]*bbgo.ExchangeSession,
 ) (*HedgeMarket, error) {
-	session, market, err := parseSymbolSelector(c.Symbol, sessions)
+	session, market, err := parseSymbolSelector(c.SymbolSelector, sessions)
 	if err != nil {
 		return nil, err
 	}
 
 	if c.QuotingDepth.IsZero() && c.QuotingDepthInQuote.IsZero() {
-		return nil, fmt.Errorf("quotingDepth or quotingDepthInQuote must be set for hedge market %s", c.Symbol)
+		return nil, fmt.Errorf("quotingDepth or quotingDepthInQuote must be set for hedge market %s", c.SymbolSelector)
 	}
 
 	hm := newHedgeMarket(c, session, market)

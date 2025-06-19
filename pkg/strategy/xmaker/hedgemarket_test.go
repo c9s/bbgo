@@ -31,9 +31,9 @@ func Test_newHedgeMarket(t *testing.T) {
 	_ = userDataStream
 
 	hm := newHedgeMarket(&HedgeMarketConfig{
-		Symbol:        "BTCUSDT",
-		HedgeInterval: types.Duration(3 * time.Millisecond),
-		QuotingDepth:  depth,
+		SymbolSelector: "BTCUSDT",
+		HedgeInterval:  types.Duration(3 * time.Millisecond),
+		QuotingDepth:   depth,
 	}, session, market)
 
 	// the connectivity waiting is blocking, so we need to run it in a goroutine
@@ -83,9 +83,9 @@ func TestHedgeMarket_hedge(t *testing.T) {
 
 	depth := testhelper.Number(100.0)
 	hm := newHedgeMarket(&HedgeMarketConfig{
-		Symbol:        "BTCUSDT",
-		HedgeInterval: types.Duration(3 * time.Millisecond),
-		QuotingDepth:  depth,
+		SymbolSelector: "BTCUSDT",
+		HedgeInterval:  types.Duration(3 * time.Millisecond),
+		QuotingDepth:   depth,
 	}, session, market)
 
 	err := hm.stream.Connect(ctx)
@@ -121,9 +121,9 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 
 	depth := testhelper.Number(100.0)
 	hm := newHedgeMarket(&HedgeMarketConfig{
-		Symbol:        "BTCUSDT",
-		HedgeInterval: types.Duration(3 * time.Millisecond),
-		QuotingDepth:  depth,
+		SymbolSelector: "BTCUSDT",
+		HedgeInterval:  types.Duration(3 * time.Millisecond),
+		QuotingDepth:   depth,
 	}, session, market)
 
 	// the connectivity waiting is blocking, so we need to run it in a goroutine
