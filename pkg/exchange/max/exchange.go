@@ -530,7 +530,8 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 	var groupIDs = make(map[uint32]struct{})
 	var orphanOrders []types.Order
 	for _, o := range orders {
-		if o.GroupID > 0 {
+		// only the order's OrderID and ClientOrderID are unknown, we will think we want to cancel the group of orders
+		if o.GroupID > 0 && o.OrderID == 0 && len(o.ClientOrderID) == 0 {
 			groupIDs[o.GroupID] = struct{}{}
 		} else {
 			orphanOrders = append(orphanOrders, o)
