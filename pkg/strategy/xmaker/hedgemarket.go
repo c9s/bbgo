@@ -15,11 +15,12 @@ import (
 	"github.com/c9s/bbgo/pkg/core"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/service"
+	"github.com/c9s/bbgo/pkg/strategy/xmaker/pricer"
 	"github.com/c9s/bbgo/pkg/tradeid"
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-const defaultHedgeInterval = 3 * time.Second
+const defaultHedgeInterval = 200 * time.Millisecond
 
 type HedgeExecutor interface {
 	// hedge executes a hedge order based on the uncovered position and the hedge delta
@@ -133,6 +134,8 @@ func newHedgeMarket(
 		logger: logger,
 	}
 
+	m.logger.Infof("%+v", m.HedgeMethodMarket)
+
 	switch m.HedgeMethod {
 	case HedgeMethodMarket:
 		m.hedgeExecutor = newMarketOrderHedgeExecutor(m, m.HedgeMethodMarket)
@@ -226,16 +229,29 @@ func (m *HedgeMarket) getQuotePrice() (bid, ask fixedpoint.Value) {
 	defer m.mu.Unlock()
 
 	now := time.Now()
-	if m.QuotingDepthInQuote.Sign() > 0 {
-		bid, ask = m.depthBook.BestBidAndAskAtQuoteDepth(m.QuotingDepthInQuote)
-	} else {
-		bid, ask = m.depthBook.BestBidAndAskAtDepth(m.QuotingDepth)
+
+	takerFeeRate := fixedpoint.Zero
+	if m.session != nil {
+		takerFeeRate = m.session.TakerFeeRate
 	}
+
+	bidPricer := pricer.Compose(
+		pricer.FromBestPrice(types.SideTypeBuy, m.book),
+		pricer.ApplyFeeRate(types.SideTypeBuy, takerFeeRate),
+	)
+
+	askPricer := pricer.Compose(
+		pricer.FromBestPrice(types.SideTypeSell, m.book),
+		pricer.ApplyFeeRate(types.SideTypeSell, takerFeeRate),
+	)
+
+	bid = bidPricer(0, fixedpoint.Zero)
+	ask = askPricer(0, fixedpoint.Zero)
 
 	if bid.IsZero() || ask.IsZero() {
 		bids := m.book.SideBook(types.SideTypeBuy)
 		asks := m.book.SideBook(types.SideTypeSell)
-		m.logger.Warnf("no valid bid/ask price found for %s, bids: %v, asks: %v", m.Symbol, bids, asks)
+		m.logger.Warnf("no valid bid/ask price found for %s, bids: %v, asks: %v", m.SymbolSelector, bids, asks)
 	}
 
 	// store prices as snapshot
@@ -291,15 +307,15 @@ func (m *HedgeMarket) Start(ctx context.Context) error {
 
 	m.tradingCtx, m.cancelTrading = context.WithCancel(ctx)
 
-	m.logger.Infof("waiting for %s hedge market connectivity...", m.Symbol)
+	m.logger.Infof("waiting for %s hedge market connectivity...", m.SymbolSelector)
 	select {
 	case <-ctx.Done():
 	case <-m.connectivity.ConnectedC():
 	case <-time.After(1 * time.Minute):
-		return fmt.Errorf("hedge market %s connectivity timeout", m.Symbol)
+		return fmt.Errorf("hedge market %s connectivity timeout", m.SymbolSelector)
 	}
 
-	m.logger.Infof("%s hedge market is ready", m.Symbol)
+	m.logger.Infof("%s hedge market is ready", m.SymbolSelector)
 
 	go m.hedgeWorker(m.tradingCtx, interval)
 	return nil
@@ -321,10 +337,10 @@ func (m *HedgeMarket) Restore(ctx context.Context, namespace string) error {
 			return nil
 		}
 
-		return fmt.Errorf("failed to load position for hedge market %s: %w", m.Symbol, err)
+		return fmt.Errorf("failed to load position for hedge market %s: %w", m.SymbolSelector, err)
 	}
 
-	m.logger.Infof("restored position for hedge market %s: %+v", m.Symbol, m.Position)
+	m.logger.Infof("restored position for hedge market %s: %+v", m.SymbolSelector, m.Position)
 	return nil
 }
 
@@ -334,7 +350,7 @@ func (m *HedgeMarket) Sync(ctx context.Context, namespace string) {
 	id := m.InstanceID()
 	store := ps.NewStore(namespace, id)
 	if err := store.Save(m.Position); err != nil {
-		m.logger.WithError(err).Errorf("failed to save position for hedge market %s", m.Symbol)
+		m.logger.WithError(err).Errorf("failed to save position for hedge market %s", m.SymbolSelector)
 	}
 }
 
@@ -377,7 +393,7 @@ func (m *HedgeMarket) hedgeWorker(ctx context.Context, hedgeInterval time.Durati
 }
 
 func (m *HedgeMarket) Stop(shutdownCtx context.Context) {
-	m.logger.Infof("stopping hedge market %s", m.Symbol)
+	m.logger.Infof("stopping hedge market %s", m.SymbolSelector)
 
 	// cancel the context to stop the hedge worker
 	if m.cancelTrading != nil {
@@ -391,10 +407,10 @@ func (m *HedgeMarket) Stop(shutdownCtx context.Context) {
 	case <-shutdownCtx.Done():
 	case <-m.doneC:
 	case <-time.After(1 * time.Minute):
-		m.logger.Warnf("hedge market %s worker did not finish in time", m.Symbol)
+		m.logger.Warnf("hedge market %s worker did not finish in time", m.SymbolSelector)
 	}
 
-	m.logger.Infof("hedge market %s stopped", m.Symbol)
+	m.logger.Infof("hedge market %s stopped", m.SymbolSelector)
 }
 
 // quantityToDelta converts side to fixedpoint.Value based on the side type,

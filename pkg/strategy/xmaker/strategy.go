@@ -1641,8 +1641,6 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 			log.WithError(err).Errorf("unable to place synthetic hedge order")
 			return
 		}
-
-		s.positionExposure.Cover(uncoveredPosition)
 	} else {
 		if _, err := s.directHedge(ctx, hedgeDelta); err != nil {
 			log.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
@@ -2409,11 +2407,11 @@ func (s *Strategy) CrossRun(
 		func(trade types.Trade, profit, netProfit fixedpoint.Value) {
 			delta := trade.PositionDelta()
 
-			// trades from source session are always hedge trades
-			if trade.Exchange == s.sourceSession.ExchangeName || trade.HasTag(TradeTagMock) {
+			// for direct hedge: trades from source session are always hedge trades
+			if trade.Exchange == s.sourceSession.ExchangeName {
 				s.positionExposure.Close(delta)
 			} else if trade.Exchange == s.makerSession.ExchangeName {
-				// trades from maker session can be hedge trades only when spread maker is enabled and it's a spread maker order
+				// spread maker: trades from maker session can be hedge trades only when spread maker is enabled and it's a spread maker order
 				if s.SpreadMaker != nil && s.SpreadMaker.Enabled && s.SpreadMaker.orderStore.Exists(trade.OrderID) {
 					s.positionExposure.Close(delta)
 				} else {
@@ -2423,11 +2421,21 @@ func (s *Strategy) CrossRun(
 
 			s.ProfitStats.AddTrade(trade)
 
-			if profit.Compare(fixedpoint.Zero) == 0 {
-				s.Environment.RecordPosition(s.Position, trade, nil)
-			}
 		},
 	)
+
+	// callbacks for RecordPosition
+	s.tradeCollector.OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+		if profit.Compare(fixedpoint.Zero) == 0 {
+			s.Environment.RecordPosition(s.Position, trade, nil)
+		}
+	})
+	s.tradeCollector.OnProfit(func(trade types.Trade, profit *types.Profit) {
+		if profit == nil {
+			return
+		}
+		s.Environment.RecordPosition(s.Position, trade, profit)
+	})
 
 	shouldNotifyProfit := func(trade types.Trade, profit *types.Profit) bool {
 		amountThreshold := s.NotifyIgnoreSmallAmountProfitTrade
@@ -2456,9 +2464,7 @@ func (s *Strategy) CrossRun(
 			}
 
 			netProfitMarginHistogram.With(s.metricsLabels).Observe(profit.NetProfitMargin.Float64())
-
 			s.ProfitStats.AddProfit(*profit)
-			s.Environment.RecordPosition(s.Position, trade, profit)
 		},
 	)
 
@@ -2483,6 +2489,9 @@ func (s *Strategy) CrossRun(
 			return err
 		}
 
+		// TODO: make this call clean ?
+		s.SyntheticHedge.sourceMarket.positionExposure.OnCover(s.positionExposure.Cover)
+		s.SyntheticHedge.sourceMarket.positionExposure.OnClose(s.positionExposure.Close)
 	} else {
 		s.orderStore.BindStream(s.sourceSession.UserDataStream)
 		s.tradeCollector.BindStream(s.sourceSession.UserDataStream)

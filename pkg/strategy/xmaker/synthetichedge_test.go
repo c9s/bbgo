@@ -98,9 +98,9 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	sourceSession.SetMarkets(AllMarkets())
 
 	sourceHedgeMarket := newHedgeMarket(&HedgeMarketConfig{
-		Symbol:        sourceMarket.Symbol,
-		HedgeInterval: hedgeInterval,
-		QuotingDepth:  Number(100.0),
+		SymbolSelector: sourceMarket.Symbol,
+		HedgeInterval:  hedgeInterval,
+		QuotingDepth:   Number(100.0),
 	}, sourceSession, sourceMarket)
 
 	sourceHedgeMarket.book.Load(types.SliceOrderBook{
@@ -116,9 +116,9 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	fiatSession, fiatMarketDataStream, fiatUserDataStream := newMockSession(mockCtrl, ctx, fiatMarket.Symbol)
 	fiatSession.SetMarkets(AllMarkets())
 	fiatHedgeMarket := newHedgeMarket(&HedgeMarketConfig{
-		Symbol:        fiatMarket.Symbol,
-		HedgeInterval: hedgeInterval,
-		QuotingDepth:  Number(10.0),
+		SymbolSelector: fiatMarket.Symbol,
+		HedgeInterval:  hedgeInterval,
+		QuotingDepth:   Number(10.0),
 	}, fiatSession, fiatMarket)
 
 	fiatHedgeMarket.book.Load(types.SliceOrderBook{
@@ -147,14 +147,14 @@ func TestSyntheticHedge_MarketOrderHedge(t *testing.T) {
 	syn := &SyntheticHedge{
 		Enabled: true,
 		Source: &HedgeMarketConfig{
-			Symbol:        "binance." + sourceMarket.Symbol,
-			QuotingDepth:  Number(10.0),
-			HedgeInterval: hedgeInterval,
+			SymbolSelector: "binance." + sourceMarket.Symbol,
+			QuotingDepth:   Number(10.0),
+			HedgeInterval:  hedgeInterval,
 		},
 		Fiat: &HedgeMarketConfig{
-			Symbol:        "max." + fiatMarket.Symbol,
-			QuotingDepth:  Number(30.0 * 1000.0),
-			HedgeInterval: hedgeInterval,
+			SymbolSelector: "max." + fiatMarket.Symbol,
+			QuotingDepth:   Number(30.0 * 1000.0),
+			HedgeInterval:  hedgeInterval,
 		},
 		sourceMarket:     sourceHedgeMarket,
 		fiatMarket:       fiatHedgeMarket,
@@ -285,10 +285,10 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 	sourceSession.SetMarkets(AllMarkets())
 
 	sourceHedgeMarket := newHedgeMarket(&HedgeMarketConfig{
-		Symbol:        sourceMarket.Symbol,
-		HedgeInterval: hedgeInterval,
-		QuotingDepth:  Number(100.0),
-		HedgeMethod:   HedgeMethodCounterparty,
+		SymbolSelector: sourceMarket.Symbol,
+		HedgeInterval:  hedgeInterval,
+		QuotingDepth:   Number(100.0),
+		HedgeMethod:    HedgeMethodCounterparty,
 		HedgeMethodCounterparty: &CounterpartyHedgeExecutorConfig{
 			PriceLevel: 1,
 		},
@@ -309,10 +309,10 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 	fiatSession, fiatMarketDataStream, fiatUserDataStream := newMockSession(mockCtrl, ctx, fiatMarket.Symbol)
 	fiatSession.SetMarkets(AllMarkets())
 	fiatHedgeMarket := newHedgeMarket(&HedgeMarketConfig{
-		Symbol:        fiatMarket.Symbol,
-		HedgeInterval: hedgeInterval,
-		QuotingDepth:  Number(10.0),
-		HedgeMethod:   HedgeMethodCounterparty,
+		SymbolSelector: fiatMarket.Symbol,
+		HedgeInterval:  hedgeInterval,
+		QuotingDepth:   Number(10.0),
+		HedgeMethod:    HedgeMethodCounterparty,
 		HedgeMethodCounterparty: &CounterpartyHedgeExecutorConfig{
 			PriceLevel: 1,
 		},
@@ -344,19 +344,19 @@ func TestSyntheticHedge_CounterpartyOrderHedge(t *testing.T) {
 	syn := &SyntheticHedge{
 		Enabled: true,
 		Source: &HedgeMarketConfig{
-			Symbol:        "binance." + sourceMarket.Symbol,
-			QuotingDepth:  Number(10.0),
-			HedgeInterval: hedgeInterval,
-			HedgeMethod:   HedgeMethodCounterparty,
+			SymbolSelector: "binance." + sourceMarket.Symbol,
+			QuotingDepth:   Number(10.0),
+			HedgeInterval:  hedgeInterval,
+			HedgeMethod:    HedgeMethodCounterparty,
 			HedgeMethodCounterparty: &CounterpartyHedgeExecutorConfig{
 				PriceLevel: 1,
 			},
 		},
 		Fiat: &HedgeMarketConfig{
-			Symbol:        "max." + fiatMarket.Symbol,
-			QuotingDepth:  Number(30.0 * 1000.0),
-			HedgeInterval: hedgeInterval,
-			HedgeMethod:   HedgeMethodCounterparty,
+			SymbolSelector: "max." + fiatMarket.Symbol,
+			QuotingDepth:   Number(30.0 * 1000.0),
+			HedgeInterval:  hedgeInterval,
+			HedgeMethod:    HedgeMethodCounterparty,
 			HedgeMethodCounterparty: &CounterpartyHedgeExecutorConfig{
 				PriceLevel: 1,
 			},
