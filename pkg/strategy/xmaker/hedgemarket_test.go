@@ -32,7 +32,7 @@ func Test_newHedgeMarket(t *testing.T) {
 
 	hm := newHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: "BTCUSDT",
-		HedgeInterval:  types.Duration(3 * time.Millisecond),
+		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   depth,
 	}, session, market)
 
@@ -84,7 +84,7 @@ func TestHedgeMarket_hedge(t *testing.T) {
 	depth := testhelper.Number(100.0)
 	hm := newHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: "BTCUSDT",
-		HedgeInterval:  types.Duration(3 * time.Millisecond),
+		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   depth,
 	}, session, market)
 
@@ -122,7 +122,7 @@ func TestHedgeMarket_startAndHedge(t *testing.T) {
 	depth := testhelper.Number(100.0)
 	hm := newHedgeMarket(&HedgeMarketConfig{
 		SymbolSelector: "BTCUSDT",
-		HedgeInterval:  types.Duration(3 * time.Millisecond),
+		HedgeInterval:  hedgeInterval,
 		QuotingDepth:   depth,
 	}, session, market)
 
