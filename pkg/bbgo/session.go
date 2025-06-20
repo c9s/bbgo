@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -10,10 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/slack-go/slack"
-
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 	"github.com/spf13/viper"
 
 	"github.com/c9s/bbgo/pkg/cache"
@@ -106,16 +106,7 @@ func (sessions ExchangeSessionMap) AggregateBalances(
 	return totalBalances, sessionBalances, nil
 }
 
-// ExchangeSession presents the exchange connection Session
-// It also maintains and collects the data returned from the stream.
-//
-//go:generate callbackgen -type ExchangeSession
-type ExchangeSession struct {
-	// ---------------------------
-	// Session config fields
-	// ---------------------------
-
-	// Exchange Session name
+type ExchangeSessionConfig struct {
 	Name         string             `json:"name,omitempty" yaml:"name,omitempty"`
 	ExchangeName types.ExchangeName `json:"exchange" yaml:"exchange"`
 	EnvVarPrefix string             `json:"envVarPrefix" yaml:"envVarPrefix"`
@@ -124,8 +115,9 @@ type ExchangeSession struct {
 	Passphrase   string             `json:"passphrase,omitempty" yaml:"passphrase,omitempty"`
 	SubAccount   string             `json:"subAccount,omitempty" yaml:"subAccount,omitempty"`
 
-	// Withdrawal is used for enabling withdrawal functions
-	Withdrawal   bool             `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
+	// Margin Assets Configs
+	MarginInfoUpdaterInterval types.Duration `json:"marginInfoUpdaterInterval" yaml:"marginInfoUpdaterInterval"`
+
 	MakerFeeRate fixedpoint.Value `json:"makerFeeRate" yaml:"makerFeeRate"`
 	TakerFeeRate fixedpoint.Value `json:"takerFeeRate" yaml:"takerFeeRate"`
 
@@ -153,6 +145,19 @@ type ExchangeSession struct {
 
 	// AccountOwner is used for labeling the account owner of the session
 	AccountOwner string `json:"accountOwner,omitempty" yaml:"accountOwner,omitempty"`
+
+	// Withdrawal is used for enabling withdrawal functions
+	Withdrawal bool `json:"withdrawal,omitempty" yaml:"withdrawal,omitempty"`
+
+	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
+}
+
+// ExchangeSession presents the exchange connection Session
+// It also maintains and collects the data returned from the stream.
+//
+//go:generate callbackgen -type ExchangeSession
+type ExchangeSession struct {
+	ExchangeSessionConfig `yaml:",inline"`
 
 	// ---------------------------
 	// Runtime fields
@@ -194,11 +199,7 @@ type ExchangeSession struct {
 	// Exchange is the exchange instance, it is used for querying the exchange data or submitting orders
 	Exchange types.Exchange `json:"-" yaml:"-"`
 
-	UseHeikinAshi bool `json:"heikinAshi,omitempty" yaml:"heikinAshi,omitempty"`
-
-	// Margin Assets Configs
-	MarginInfoUpdaterInterval types.Duration     `json:"marginInfoUpdaterInterval" yaml:"marginInfoUpdaterInterval"`
-	marginInfoUpdater         *MarginInfoUpdater `json:"-" yaml:"-"`
+	marginInfoUpdater *MarginInfoUpdater
 
 	// Trades collects the executed trades from the exchange
 	// map: symbol -> []trade
@@ -254,9 +255,12 @@ func NewExchangeSession(name string, exchange types.Exchange) *ExchangeSession {
 	connectivityGroup := types.NewConnectivityGroup(marketDataConnectivity, userDataConnectivity)
 
 	session := &ExchangeSession{
-		Name:         name,
-		Exchange:     exchange,
-		ExchangeName: exchange.Name(),
+		ExchangeSessionConfig: ExchangeSessionConfig{
+			Name:         name,
+			ExchangeName: exchange.Name(),
+		},
+
+		Exchange: exchange,
 
 		UserDataStream:       userDataStream,
 		UserDataConnectivity: userDataConnectivity,
@@ -297,6 +301,20 @@ func (session *ExchangeSession) GetPriceSolver() *pricesolver.SimplePriceSolver 
 	}
 
 	return session.priceSolver
+}
+
+func (session *ExchangeSession) UnmarshalJSON(data []byte) error {
+	// unmarshal the config first
+	if err := json.Unmarshal(data, &session.ExchangeSessionConfig); err != nil {
+		return fmt.Errorf("unmarshal exchange session config: %w", err)
+	}
+
+	// then unmarshal the rest of the fields
+	if err := json.Unmarshal(data, session); err != nil {
+		return fmt.Errorf("unmarshal exchange session: %w", err)
+	}
+
+	return nil
 }
 
 func (session *ExchangeSession) GetAccountLabel() string {
