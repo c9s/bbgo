@@ -79,7 +79,7 @@ func AssertOrdersPriceSideQuantityFromText(
 	}
 }
 
-// AssertOrdersPriceSide asserts the orders with the given price and side (slice)
+// AssertOrdersPriceSideQuantity asserts the orders with the given price, side and quantity
 func AssertOrdersPriceSideQuantity(
 	t *testing.T, asserts []PriceSideQuantityAssert, orders []types.SubmitOrder,
 ) {
