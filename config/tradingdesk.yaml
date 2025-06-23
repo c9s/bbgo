@@ -2,4 +2,4 @@
 exchangeStrategies:
   - on: max
     tradingdesk:
-      quoteCurrency: USDT
+      maxLossLimit: 10
