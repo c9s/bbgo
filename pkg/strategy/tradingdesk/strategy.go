@@ -60,10 +60,15 @@ func (s *Strategy) Validate() error {
 	return nil
 }
 
-func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {}
+// Subscribe implements the strategy interface for market data subscriptions
+func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
+	// Currently no market data subscriptions needed
+}
 
+// Run implements the strategy interface for strategy execution
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.Session = session
+	// Strategy is ready to receive OpenPosition calls
 	return nil
 }
 
@@ -73,13 +78,14 @@ func (s *Strategy) getOrCreatePosition(symbol string) (*types.Position, error) {
 		return nil, fmt.Errorf("market %s not found", symbol)
 	}
 
-	position, ok := s.PositionMap[symbol]
-	if !ok {
-		position = types.NewPositionFromMarket(market)
-		position.Strategy = ID
-		position.StrategyInstanceID = s.InstanceID()
-		s.PositionMap[symbol] = position
+	if position, ok := s.PositionMap[symbol]; ok {
+		return position, nil
 	}
+
+	position := types.NewPositionFromMarket(market)
+	position.Strategy = ID
+	position.StrategyInstanceID = s.InstanceID()
+	s.PositionMap[symbol] = position
 
 	return position, nil
 }
@@ -90,18 +96,18 @@ func (s *Strategy) getOrCreateProfitStats(symbol string) (*types.ProfitStats, er
 		return nil, fmt.Errorf("market %s not found", symbol)
 	}
 
-	profitStats, ok := s.ProfitStatsMap[symbol]
-	if !ok {
-		profitStats = types.NewProfitStats(market)
-		s.ProfitStatsMap[symbol] = profitStats
+	if profitStats, ok := s.ProfitStatsMap[symbol]; ok {
+		return profitStats, nil
 	}
+
+	profitStats := types.NewProfitStats(market)
+	s.ProfitStatsMap[symbol] = profitStats
 
 	return profitStats, nil
 }
 
 func (s *Strategy) getOrCreateOrderExecutor(symbol string) (*bbgo.GeneralOrderExecutor, error) {
-	executor, ok := s.OrderExecutorMap[symbol]
-	if ok {
+	if executor, ok := s.OrderExecutorMap[symbol]; ok {
 		return executor, nil
 	}
 
@@ -115,7 +121,7 @@ func (s *Strategy) getOrCreateOrderExecutor(symbol string) (*bbgo.GeneralOrderEx
 		return nil, err
 	}
 
-	executor = bbgo.NewGeneralOrderExecutor(s.Session, symbol, s.ID(), s.InstanceID(), position)
+	executor := bbgo.NewGeneralOrderExecutor(s.Session, symbol, s.ID(), s.InstanceID(), position)
 	executor.BindEnvironment(s.Environment)
 	executor.BindProfitStats(profitStats)
 	executor.Bind()
@@ -124,6 +130,8 @@ func (s *Strategy) getOrCreateOrderExecutor(symbol string) (*bbgo.GeneralOrderEx
 	return executor, nil
 }
 
+// OpenPosition opens a new position with risk-based position sizing.
+// The position size is calculated based on MaxLossLimit, stop loss price, and available balance.
 func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParam) error {
 	executor, err := s.getOrCreateOrderExecutor(param.Symbol)
 	if err != nil {
@@ -185,62 +193,19 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 		return fixedpoint.Zero, fmt.Errorf("failed to get ticker for %s: %w", param.Symbol, err)
 	}
 
-	// Use appropriate price based on order side
-	var currentPrice fixedpoint.Value
-	if param.Side == types.SideTypeBuy {
-		currentPrice = ticker.Buy // Use ask price for buy orders
-		if currentPrice.IsZero() {
-			currentPrice = ticker.Last
-		}
-	} else {
-		currentPrice = ticker.Sell // Use bid price for sell orders
-		if currentPrice.IsZero() {
-			currentPrice = ticker.Last
-		}
-	}
-
+	currentPrice := s.getCurrentPrice(ticker, param.Side)
 	if currentPrice.IsZero() {
 		return fixedpoint.Zero, fmt.Errorf("invalid current price for %s", param.Symbol)
 	}
 
-	// Calculate risk per unit based on side
-	var riskPerUnit fixedpoint.Value
-	if param.Side == types.SideTypeBuy {
-		// For long positions, risk is current price - stop loss price
-		riskPerUnit = currentPrice.Sub(param.StopLossPrice)
-	} else {
-		// For short positions, risk is stop loss price - current price
-		riskPerUnit = param.StopLossPrice.Sub(currentPrice)
-	}
-
+	riskPerUnit := s.calculateRiskPerUnit(currentPrice, param.StopLossPrice, param.Side)
 	if riskPerUnit.Sign() <= 0 {
-		if param.Side == types.SideTypeBuy {
-			return fixedpoint.Zero, fmt.Errorf("invalid stop loss price for buy order: stop loss should be below current price (%s)", currentPrice.String())
-		} else {
-			return fixedpoint.Zero, fmt.Errorf("invalid stop loss price for sell order: stop loss should be above current price (%s)", currentPrice.String())
-		}
+		return fixedpoint.Zero, s.createInvalidStopLossError(param.Side, currentPrice)
 	}
 
-	// Get available balance for the appropriate currency
-	var availableBalance fixedpoint.Value
-	account := s.Session.GetAccount()
-
-	if param.Side == types.SideTypeBuy {
-		// For buy orders, we need quote currency balance
-		quoteCurrency := market.QuoteCurrency
-		balance, ok := account.Balance(quoteCurrency)
-		if !ok {
-			return fixedpoint.Zero, fmt.Errorf("no balance found for %s", quoteCurrency)
-		}
-		availableBalance = balance.Available
-	} else {
-		// For sell orders, we need base currency balance
-		baseCurrency := market.BaseCurrency
-		balance, ok := account.Balance(baseCurrency)
-		if !ok {
-			return fixedpoint.Zero, fmt.Errorf("no balance found for %s", baseCurrency)
-		}
-		availableBalance = balance.Available
+	availableBalance, err := s.getAvailableBalance(market, param.Side)
+	if err != nil {
+		return fixedpoint.Zero, err
 	}
 
 	// Calculate maximum quantity based on MaxLossLimit
@@ -255,11 +220,7 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 	var maxQuantityByBalance fixedpoint.Value
 	if param.Side == types.SideTypeBuy {
 		// For buy orders: available quote currency / price
-		if !currentPrice.IsZero() {
-			maxQuantityByBalance = availableBalance.Div(currentPrice)
-		} else {
-			return fixedpoint.Zero, fmt.Errorf("current price is zero")
-		}
+		maxQuantityByBalance = availableBalance.Div(currentPrice)
 	} else {
 		// For sell orders: available base currency
 		maxQuantityByBalance = availableBalance
@@ -277,4 +238,58 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 		param.Symbol, currentPrice, param.StopLossPrice, riskPerUnit, s.MaxLossLimit, availableBalance, quantity)
 
 	return quantity, nil
+}
+
+// getCurrentPrice returns the appropriate price based on order side
+func (s *Strategy) getCurrentPrice(ticker *types.Ticker, side types.SideType) fixedpoint.Value {
+	var price fixedpoint.Value
+	if side == types.SideTypeBuy {
+		price = ticker.Sell // Use ask price for buy orders
+		if price.IsZero() {
+			price = ticker.Last
+		}
+	} else {
+		price = ticker.Buy // Use bid price for sell orders
+		if price.IsZero() {
+			price = ticker.Last
+		}
+	}
+	return price
+}
+
+// calculateRiskPerUnit calculates the risk per unit based on current price, stop loss, and side
+func (s *Strategy) calculateRiskPerUnit(currentPrice, stopLossPrice fixedpoint.Value, side types.SideType) fixedpoint.Value {
+	if side == types.SideTypeBuy {
+		// For long positions, risk is current price - stop loss price
+		return currentPrice.Sub(stopLossPrice)
+	}
+	// For short positions, risk is stop loss price - current price
+	return stopLossPrice.Sub(currentPrice)
+}
+
+// createInvalidStopLossError creates an appropriate error message for invalid stop loss prices
+func (s *Strategy) createInvalidStopLossError(side types.SideType, currentPrice fixedpoint.Value) error {
+	if side == types.SideTypeBuy {
+		return fmt.Errorf("invalid stop loss price for buy order: stop loss should be below current price (%s)", currentPrice.String())
+	}
+	return fmt.Errorf("invalid stop loss price for sell order: stop loss should be above current price (%s)", currentPrice.String())
+}
+
+// getAvailableBalance returns the available balance for the appropriate currency based on order side
+func (s *Strategy) getAvailableBalance(market types.Market, side types.SideType) (fixedpoint.Value, error) {
+	account := s.Session.GetAccount()
+
+	var currency string
+	if side == types.SideTypeBuy {
+		currency = market.QuoteCurrency // For buy orders, we need quote currency balance
+	} else {
+		currency = market.BaseCurrency // For sell orders, we need base currency balance
+	}
+
+	balance, ok := account.Balance(currency)
+	if !ok {
+		return fixedpoint.Zero, fmt.Errorf("no balance found for %s", currency)
+	}
+
+	return balance.Available, nil
 }
