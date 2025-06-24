@@ -49,6 +49,10 @@ func (s *Strategy) Initialize() error {
 	if s.ProfitStatsMap == nil {
 		s.ProfitStatsMap = make(ProfitStatsMap)
 	}
+
+	if s.OrderExecutorMap == nil {
+		s.OrderExecutorMap = make(map[string]*bbgo.GeneralOrderExecutor)
+	}
 	return nil
 }
 
@@ -96,10 +100,6 @@ func (s *Strategy) getOrCreateProfitStats(symbol string) (*types.ProfitStats, er
 }
 
 func (s *Strategy) getOrCreateOrderExecutor(symbol string) (*bbgo.GeneralOrderExecutor, error) {
-	if s.OrderExecutorMap == nil {
-		s.OrderExecutorMap = make(map[string]*bbgo.GeneralOrderExecutor)
-	}
-
 	executor, ok := s.OrderExecutorMap[symbol]
 	if ok {
 		return executor, nil
@@ -214,11 +214,11 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 	}
 
 	if riskPerUnit.Sign() <= 0 {
-		return fixedpoint.Zero, fmt.Errorf("invalid stop loss price: stop loss should be below current price for buy orders and above for sell orders")
-	}
-
-	if riskPerUnit.IsZero() {
-		return fixedpoint.Zero, fmt.Errorf("risk per unit is zero")
+		if param.Side == types.SideTypeBuy {
+			return fixedpoint.Zero, fmt.Errorf("invalid stop loss price for buy order: stop loss should be below current price (%s)", currentPrice.String())
+		} else {
+			return fixedpoint.Zero, fmt.Errorf("invalid stop loss price for sell order: stop loss should be above current price (%s)", currentPrice.String())
+		}
 	}
 
 	// Get available balance for the appropriate currency
