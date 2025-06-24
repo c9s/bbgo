@@ -137,11 +137,11 @@ func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParam) er
 	}
 
 	order := types.SubmitOrder{
-		Symbol:      param.Symbol,
-		Side:        param.Side,
-		Type:        types.OrderTypeMarket,
-		Quantity:    quantity,
-		StopPrice:   param.StopLossPrice,
+		Symbol:    param.Symbol,
+		Side:      param.Side,
+		Type:      types.OrderTypeMarket,
+		Quantity:  quantity,
+		StopPrice: param.StopLossPrice,
 	}
 
 	createdOrders, err := executor.SubmitOrders(ctx, order)
@@ -153,10 +153,30 @@ func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParam) er
 	return nil
 }
 
+// calculatePositionSize calculates the optimal position size based on risk management parameters.
+// It considers three factors to determine the final quantity:
+// 1. MaxLossLimit: Limits maximum potential loss per position in quote currency
+// 2. Available balance: Ensures sufficient funds for the trade
+// 3. Original quantity: User-specified desired quantity
+//
+// The function uses stop loss price to calculate risk per unit:
+// - For buy orders: risk = currentPrice - stopLossPrice
+// - For sell orders: risk = stopLossPrice - currentPrice
+//
+// Final quantity = min(originalQuantity, maxQuantityByRisk, maxQuantityByBalance)
+// where maxQuantityByRisk = MaxLossLimit / riskPerUnit
+//
+// Example: If MaxLossLimit=100 USDT, currentPrice=50000, stopLoss=49000
+// then riskPerUnit=1000 USDT, maxQuantityByRisk=0.1 BTC
 func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPositionParam) (fixedpoint.Value, error) {
 	market, ok := s.Session.Market(param.Symbol)
 	if !ok {
 		return fixedpoint.Zero, fmt.Errorf("market %s not found", param.Symbol)
+	}
+
+	// Check if stop loss is provided, if not return original quantity
+	if param.StopLossPrice.IsZero() {
+		return param.Quantity, nil
 	}
 
 	// Get current market price
@@ -168,7 +188,7 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 	// Use appropriate price based on order side
 	var currentPrice fixedpoint.Value
 	if param.Side == types.SideTypeBuy {
-		currentPrice = ticker.Buy  // Use ask price for buy orders
+		currentPrice = ticker.Buy // Use ask price for buy orders
 		if currentPrice.IsZero() {
 			currentPrice = ticker.Last
 		}
@@ -178,28 +198,23 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 			currentPrice = ticker.Last
 		}
 	}
-	
+
 	if currentPrice.IsZero() {
 		return fixedpoint.Zero, fmt.Errorf("invalid current price for %s", param.Symbol)
 	}
 
 	// Calculate risk per unit based on side
 	var riskPerUnit fixedpoint.Value
-	if !param.StopLossPrice.IsZero() {
-		if param.Side == types.SideTypeBuy {
-			// For long positions, risk is current price - stop loss price
-			riskPerUnit = currentPrice.Sub(param.StopLossPrice)
-		} else {
-			// For short positions, risk is stop loss price - current price
-			riskPerUnit = param.StopLossPrice.Sub(currentPrice)
-		}
-		
-		if riskPerUnit.Sign() <= 0 {
-			return fixedpoint.Zero, fmt.Errorf("invalid stop loss price: stop loss should be below current price for buy orders and above for sell orders")
-		}
+	if param.Side == types.SideTypeBuy {
+		// For long positions, risk is current price - stop loss price
+		riskPerUnit = currentPrice.Sub(param.StopLossPrice)
 	} else {
-		// If no stop loss price, use the original quantity
-		return param.Quantity, nil
+		// For short positions, risk is stop loss price - current price
+		riskPerUnit = param.StopLossPrice.Sub(currentPrice)
+	}
+
+	if riskPerUnit.Sign() <= 0 {
+		return fixedpoint.Zero, fmt.Errorf("invalid stop loss price: stop loss should be below current price for buy orders and above for sell orders")
 	}
 
 	if riskPerUnit.IsZero() {
@@ -209,7 +224,7 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 	// Get available balance for the appropriate currency
 	var availableBalance fixedpoint.Value
 	account := s.Session.GetAccount()
-	
+
 	if param.Side == types.SideTypeBuy {
 		// For buy orders, we need quote currency balance
 		quoteCurrency := market.QuoteCurrency
