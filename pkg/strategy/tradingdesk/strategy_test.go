@@ -65,7 +65,7 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		param := OpenPositionParam{
 			Symbol:        "BTCUSDT",
 			Side:          types.SideTypeBuy,
-			Quantity:      Number(1.0), // Want to buy 1 BTC
+			Quantity:      Number(1.0),   // Want to buy 1 BTC
 			StopLossPrice: Number(49100), // Stop at 49,100
 		}
 
@@ -110,7 +110,7 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		param := OpenPositionParam{
 			Symbol:        "BTCUSDT",
 			Side:          types.SideTypeSell,
-			Quantity:      Number(1.0), // Want to sell 1 BTC
+			Quantity:      Number(1.0),   // Want to sell 1 BTC
 			StopLossPrice: Number(50900), // Stop at 50,900
 		}
 
