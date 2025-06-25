@@ -202,7 +202,7 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 		return fixedpoint.Zero, fmt.Errorf("invalid current price for %s", param.Symbol)
 	}
 
-	riskPerUnit := s.calculateRiskPerUnit(currentPrice, param.StopLossPrice, param.Side)
+	riskPerUnit := s.stopLossRange(currentPrice, param.StopLossPrice, param.Side)
 	if riskPerUnit.Sign() <= 0 {
 		return fixedpoint.Zero, s.createInvalidStopLossError(param.Side, currentPrice)
 	}
@@ -244,8 +244,8 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 	return quantity, nil
 }
 
-// calculateRiskPerUnit calculates the risk per unit based on current price, stop loss, and side
-func (s *Strategy) calculateRiskPerUnit(currentPrice, stopLossPrice fixedpoint.Value, side types.SideType) fixedpoint.Value {
+// stopLossRange calculates the risk per unit based on current price, stop loss, and side
+func (s *Strategy) stopLossRange(currentPrice, stopLossPrice fixedpoint.Value, side types.SideType) fixedpoint.Value {
 	if side == types.SideTypeBuy {
 		// For long positions, risk is current price - stop loss price
 		return currentPrice.Sub(stopLossPrice)
