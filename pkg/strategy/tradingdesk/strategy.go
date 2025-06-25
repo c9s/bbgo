@@ -31,6 +31,7 @@ type Strategy struct {
 	ProfitStatsMap   ProfitStatsMap `persistence:"profit_stats_map"`
 
 	MaxLossLimit fixedpoint.Value `json:"maxLossLimit"`
+	PriceType    types.PriceType  `json:"priceType"`
 }
 
 func (s *Strategy) ID() string {
@@ -57,6 +58,9 @@ func (s *Strategy) Initialize() error {
 }
 
 func (s *Strategy) Validate() error {
+	if s.PriceType == "" {
+		s.PriceType = types.PriceTypeMaker
+	}
 	return nil
 }
 
@@ -193,7 +197,7 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 		return fixedpoint.Zero, fmt.Errorf("failed to get ticker for %s: %w", param.Symbol, err)
 	}
 
-	currentPrice := s.getCurrentPrice(ticker, param.Side)
+	currentPrice := s.PriceType.GetPrice(ticker, param.Side)
 	if currentPrice.IsZero() {
 		return fixedpoint.Zero, fmt.Errorf("invalid current price for %s", param.Symbol)
 	}
@@ -238,23 +242,6 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 		param.Symbol, currentPrice, param.StopLossPrice, riskPerUnit, s.MaxLossLimit, availableBalance, quantity)
 
 	return quantity, nil
-}
-
-// getCurrentPrice returns the appropriate price based on order side
-func (s *Strategy) getCurrentPrice(ticker *types.Ticker, side types.SideType) fixedpoint.Value {
-	var price fixedpoint.Value
-	if side == types.SideTypeBuy {
-		price = ticker.Sell // Use ask price for buy orders
-		if price.IsZero() {
-			price = ticker.Last
-		}
-	} else {
-		price = ticker.Buy // Use bid price for sell orders
-		if price.IsZero() {
-			price = ticker.Last
-		}
-	}
-	return price
 }
 
 // calculateRiskPerUnit calculates the risk per unit based on current price, stop loss, and side

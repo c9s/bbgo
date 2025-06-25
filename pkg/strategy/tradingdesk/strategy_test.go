@@ -60,6 +60,7 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		strategy := &Strategy{
 			Session:      mockSession,
 			MaxLossLimit: Number(100), // 100 USDT max loss
+			PriceType:    types.PriceTypeMaker,
 		}
 
 		param := OpenPositionParam{
@@ -105,6 +106,7 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		strategy := &Strategy{
 			Session:      mockSession,
 			MaxLossLimit: Number(100),
+			PriceType:    types.PriceTypeMaker,
 		}
 
 		param := OpenPositionParam{
@@ -142,6 +144,7 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		strategy := &Strategy{
 			Session:      mockSession,
 			MaxLossLimit: Number(100),
+			PriceType:    types.PriceTypeMaker,
 		}
 
 		param := OpenPositionParam{
@@ -182,6 +185,7 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		strategy := &Strategy{
 			Session:      mockSession,
 			MaxLossLimit: Number(100),
+			PriceType:    types.PriceTypeMaker,
 		}
 
 		param := OpenPositionParam{
@@ -222,6 +226,7 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		strategy := &Strategy{
 			Session:      mockSession,
 			MaxLossLimit: Number(100),
+			PriceType:    types.PriceTypeMaker,
 		}
 
 		param := OpenPositionParam{
@@ -255,6 +260,7 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		lowBalanceStrategy := &Strategy{
 			Session:      lowBalanceSession,
 			MaxLossLimit: Number(100),
+			PriceType:    types.PriceTypeMaker,
 		}
 
 		ticker := &types.Ticker{
