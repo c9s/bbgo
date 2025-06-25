@@ -9,6 +9,7 @@ import (
 
 type OpenPositionParam struct {
 	Symbol          string           `json:"symbol"`
+	Confidence      fixedpoint.Value `json:"confidence"`
 	Side            types.SideType   `json:"side"`
 	Quantity        fixedpoint.Value `json:"quantity"`
 	StopLossPrice   fixedpoint.Value `json:"stopLossPrice"`
