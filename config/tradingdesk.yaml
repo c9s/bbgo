@@ -1,0 +1,5 @@
+---
+exchangeStrategies:
+  - on: max
+    tradingdesk:
+      maxLossLimit: 10
