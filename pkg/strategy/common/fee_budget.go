@@ -2,29 +2,29 @@ package common
 
 import (
 	"sync"
-	"time"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 
 type FeeBudget struct {
 	DailyFeeBudgets map[string]fixedpoint.Value `json:"dailyFeeBudgets,omitempty"`
-	State           *State                      `persistence:"state"`
+	DailyFeeTracker *util.DailyDataTracker      `persistence:"dailyFeeTracker"`
 
 	mu sync.Mutex
 }
 
 func (f *FeeBudget) Initialize() {
-	if f.State == nil {
-		f.State = &State{}
-		f.State.Reset()
+	if f.DailyFeeTracker == nil {
+		f.DailyFeeTracker = &util.DailyDataTracker{}
+		f.DailyFeeTracker.Reset()
 	}
 
-	if f.State.IsOver24Hours() {
+	if f.DailyFeeTracker.IsOver24Hours() {
 		log.Warn("[FeeBudget] state is over 24 hours, resetting to zero")
-		f.State.Reset()
+		f.DailyFeeTracker.Reset()
 	}
 }
 
@@ -33,17 +33,17 @@ func (f *FeeBudget) IsBudgetAllowed() bool {
 		return true
 	}
 
-	if f.State.AccumulatedFees == nil {
+	if f.DailyFeeTracker.Data == nil {
 		return true
 	}
 
-	if f.State.IsOver24Hours() {
-		f.State.Reset()
+	if f.DailyFeeTracker.IsOver24Hours() {
+		f.DailyFeeTracker.Reset()
 		return true
 	}
 
 	for asset, budget := range f.DailyFeeBudgets {
-		if fee, ok := f.State.AccumulatedFees[asset]; ok {
+		if fee, ok := f.DailyFeeTracker.Data[asset]; ok {
 			if fee.Compare(budget) >= 0 {
 				log.Warnf("[FeeBudget] accumulative fee %s exceeded the fee budget %s, skipping...", fee.String(), budget.String())
 				return false
@@ -57,36 +57,17 @@ func (f *FeeBudget) IsBudgetAllowed() bool {
 func (f *FeeBudget) HandleTradeUpdate(trade types.Trade) {
 	log.Infof("[FeeBudget] received trade %s", trade.String())
 
-	if f.State.IsOver24Hours() {
-		f.State.Reset()
+	if f.DailyFeeTracker.IsOver24Hours() {
+		f.DailyFeeTracker.Reset()
 	}
 
 	// safe check
-	if f.State.AccumulatedFees == nil {
+	if f.DailyFeeTracker.Data == nil {
 		f.mu.Lock()
-		f.State.AccumulatedFees = make(map[string]fixedpoint.Value)
+		f.DailyFeeTracker.Data = make(map[string]fixedpoint.Value)
 		f.mu.Unlock()
 	}
 
-	f.State.AccumulatedFees[trade.FeeCurrency] = f.State.AccumulatedFees[trade.FeeCurrency].Add(trade.Fee)
-	log.Infof("[FeeBudget] accumulated fee: %s %s", f.State.AccumulatedFees[trade.FeeCurrency].String(), trade.FeeCurrency)
-}
-
-type State struct {
-	AccumulatedFeeStartedAt time.Time                   `json:"accumulatedFeeStartedAt,omitempty"`
-	AccumulatedFees         map[string]fixedpoint.Value `json:"accumulatedFees,omitempty"`
-}
-
-func (s *State) IsOver24Hours() bool {
-	return time.Since(s.AccumulatedFeeStartedAt) >= 24*time.Hour
-}
-
-func (s *State) Reset() {
-	t := time.Now()
-	dateTime := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-
-	log.Infof("[State] resetting accumulated started time to: %s", dateTime)
-
-	s.AccumulatedFeeStartedAt = dateTime
-	s.AccumulatedFees = make(map[string]fixedpoint.Value)
+	f.DailyFeeTracker.Data[trade.FeeCurrency] = f.DailyFeeTracker.Data[trade.FeeCurrency].Add(trade.Fee)
+	log.Infof("[FeeBudget] accumulated fee: %s %s", f.DailyFeeTracker.Data[trade.FeeCurrency].String(), trade.FeeCurrency)
 }
