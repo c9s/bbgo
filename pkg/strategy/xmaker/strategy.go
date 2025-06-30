@@ -811,8 +811,8 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	s.logger.Infof("aggregated signal: %f", signal)
 	aggregatedSignalMetrics.With(s.metricsLabels).Set(signal)
 
+	now := time.Now()
 	if s.CircuitBreaker != nil {
-		now := time.Now()
 		if reason, halted := s.CircuitBreaker.IsHalted(now); halted {
 			instance := s.InstanceID()
 
@@ -824,7 +824,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 			// make sure spread maker order is canceled
 			if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
-				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, s.positionExposure)
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 			}
 
 			return nil
@@ -1498,7 +1498,7 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 }
 
 func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(
-	ctx context.Context, coveredPosition *PositionExposure,
+	ctx context.Context,
 ) {
 	s.logger.Infof("canceling current spread maker order...")
 
@@ -1521,9 +1521,9 @@ func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(
 	s.logger.Infof("returning remaining quantity %f to the covered position", remainingQuantity.Float64())
 	switch finalOrder.Side {
 	case types.SideTypeSell:
-		coveredPosition.Cover(remainingQuantity.Neg())
+		s.positionExposure.Cover(remainingQuantity.Neg())
 	case types.SideTypeBuy:
-		coveredPosition.Cover(remainingQuantity)
+		s.positionExposure.Cover(remainingQuantity)
 	}
 }
 
@@ -1567,7 +1567,7 @@ func (s *Strategy) spreadMakerHedge(
 			keptOrder = s.SpreadMaker.shouldKeepOrder(curOrder, now)
 			if !keptOrder {
 				s.logger.Infof("canceling current spread maker order...")
-				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, s.positionExposure)
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 			}
 		}
 
@@ -1605,13 +1605,13 @@ func (s *Strategy) spreadMakerHedge(
 		if s.SpreadMaker.ReverseSignalOrderCancel {
 			if !isSignalSidePosition(signal, s.Position.Side()) {
 				s.logger.Infof("canceling current spread maker order due to reversed signal...")
-				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, s.positionExposure)
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 			}
 		} else {
 			shouldKeep := s.SpreadMaker.shouldKeepOrder(curOrder, now)
 			if !shouldKeep {
 				s.logger.Infof("canceling current spread maker order...")
-				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, s.positionExposure)
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 			}
 		}
 	}
@@ -1620,7 +1620,7 @@ func (s *Strategy) spreadMakerHedge(
 }
 
 func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value) {
-	if uncoveredPosition.IsZero() {
+	if uncoveredPosition.IsZero() && s.positionExposure.IsClosed() {
 		return
 	}
 
@@ -1639,6 +1639,10 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 		if err != nil {
 			log.WithError(err).Errorf("unable to place spread maker order")
 		}
+	}
+
+	if hedgeDelta.IsZero() {
+		return
 	}
 
 	if s.canDelayHedge(side, hedgeDelta) {
