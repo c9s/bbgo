@@ -106,7 +106,7 @@ func ApplyFeeRate(side types.SideType, feeRate fixedpoint.Value) Pricer {
 }
 
 func AdjustByTick(side types.SideType, pips, tickSize fixedpoint.Value) Pricer {
-	if side == types.SideTypeSell {
+	if side == types.SideTypeBuy {
 		tickSize = tickSize.Neg()
 	}
 
