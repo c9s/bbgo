@@ -69,16 +69,5 @@ func (m *PositionExposure) GetUncovered() fixedpoint.Value {
 	netPosition := m.net.Get()
 	coveredPosition := m.pending.Get()
 	uncoverPosition := netPosition.Sub(coveredPosition)
-
-	if !netPosition.IsZero() || !coveredPosition.IsZero() {
-		log.Infof(
-			"%s netPosition:%v coveredPosition: %v uncoverPosition: %v",
-			m.symbol,
-			netPosition,
-			coveredPosition,
-			uncoverPosition,
-		)
-	}
-
 	return uncoverPosition
 }
