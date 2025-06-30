@@ -1604,6 +1604,7 @@ func (s *Strategy) spreadMakerHedge(
 		// cancel existing spread maker order if the signal is not strong enough
 		if s.SpreadMaker.ReverseSignalOrderCancel {
 			if !isSignalSidePosition(signal, s.Position.Side()) {
+				s.logger.Infof("canceling current spread maker order due to reversed signal...")
 				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, s.positionExposure)
 			}
 		} else {
