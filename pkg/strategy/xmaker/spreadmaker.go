@@ -86,6 +86,10 @@ func (c *SpreadMaker) canSpreadMaking(
 		return nil, false
 	}
 
+	if uncoveredPosition.IsZero() {
+		return nil, false
+	}
+
 	if math.Abs(signal) < c.SignalThreshold {
 		return nil, false
 	}
