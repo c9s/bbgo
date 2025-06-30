@@ -630,7 +630,7 @@ make embed && go run -tags web ./cmd/bbgo-lorca
 
 You can write an article about BBGO on any topic, in 750-1500 words for exchange, and I can implement the strategy for
 you (depending on the complexity and effort). If you're interested in, DM me in telegram <https://t.me/c123456789s> or
-twitter <https://twitter.com/c9s>, and we can discuss.
+x/twitter <https://x.com/c9s>, and we can discuss.
 
 ### Adding New Crypto Exchange support?
 
@@ -641,7 +641,7 @@ The cost is 10 ETH. If you're interested in it, DM me in telegram <https://t.me/
 
 - Telegram Group <https://t.me/bbgo_intl>
 - Telegram Group (Taiwan) <https://t.me/bbgocrypto>
-- Twitter <https://twitter.com/bbgotrading>
+- X/Twitter <https://x.com/bbgotrading>
 
 ## Contributing
 
