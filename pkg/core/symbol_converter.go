@@ -9,6 +9,9 @@ import (
 type Converter interface {
 	OrderConverter
 	TradeConverter
+	KLineConverter
+	MarketConverter
+	BalanceConverter
 	Initialize() error
 }
 
@@ -22,12 +25,33 @@ type TradeConverter interface {
 	ConvertTrade(trade types.Trade) (types.Trade, error)
 }
 
+// KLineConverter converts the kline to another kline
+type KLineConverter interface {
+	ConvertKLine(kline types.KLine) (types.KLine, error)
+}
+
+// MarketConverter converts the market to another market
+type MarketConverter interface {
+	ConvertMarket(market types.Market) (types.Market, error)
+}
+
+// BalanceConverter converts the balance to another balance
+type BalanceConverter interface {
+	ConvertBalance(balance types.Balance) (types.Balance, error)
+}
+
 type OrderConvertFunc func(order types.Order) (types.Order, error)
 type TradeConvertFunc func(trade types.Trade) (types.Trade, error)
+type KLineConvertFunc func(kline types.KLine) (types.KLine, error)
+type MarketConvertFunc func(market types.Market) (types.Market, error)
+type BalanceConvertFunc func(balance types.Balance) (types.Balance, error)
 
 type DynamicConverter struct {
-	orderConverter OrderConvertFunc
-	tradeConverter TradeConvertFunc
+	orderConverter   OrderConvertFunc
+	tradeConverter   TradeConvertFunc
+	klineConverter   KLineConvertFunc
+	marketConverter  MarketConvertFunc
+	balanceConverter BalanceConvertFunc
 }
 
 func NewDynamicConverter(orderConverter OrderConvertFunc, tradeConverter TradeConvertFunc) *DynamicConverter {
@@ -44,6 +68,18 @@ func (c *DynamicConverter) ConvertOrder(order types.Order) (types.Order, error) 
 
 func (c *DynamicConverter) ConvertTrade(trade types.Trade) (types.Trade, error) {
 	return c.tradeConverter(trade)
+}
+
+func (c *DynamicConverter) ConvertKLine(kline types.KLine) (types.KLine, error) {
+	return c.klineConverter(kline)
+}
+
+func (c *DynamicConverter) ConvertMarket(market types.Market) (types.Market, error) {
+	return c.marketConverter(market)
+}
+
+func (c *DynamicConverter) ConvertBalance(balance types.Balance) (types.Balance, error) {
+	return c.balanceConverter(balance)
 }
 
 // SymbolConverter converts the symbol to another symbol
@@ -73,6 +109,10 @@ func (c *SymbolConverter) ConvertOrder(order types.Order) (types.Order, error) {
 		order.Symbol = c.ToSymbol
 	}
 
+	if order.SubmitOrder.Market.Symbol == c.FromSymbol {
+		order.SubmitOrder.Market.Symbol = c.ToSymbol
+	}
+
 	return order, nil
 }
 
@@ -82,4 +122,23 @@ func (c *SymbolConverter) ConvertTrade(trade types.Trade) (types.Trade, error) {
 	}
 
 	return trade, nil
+}
+
+func (c *SymbolConverter) ConvertKLine(kline types.KLine) (types.KLine, error) {
+	if kline.Symbol == c.FromSymbol {
+		kline.Symbol = c.ToSymbol
+	}
+
+	return kline, nil
+}
+
+func (s *SymbolConverter) ConvertMarket(mkt types.Market) (types.Market, error) {
+	if mkt.Symbol == s.FromSymbol {
+		mkt.Symbol = s.ToSymbol
+	}
+	return mkt, nil
+}
+
+func (c *SymbolConverter) ConvertBalance(balance types.Balance) (types.Balance, error) {
+	return balance, nil
 }
