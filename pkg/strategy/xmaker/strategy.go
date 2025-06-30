@@ -1551,7 +1551,6 @@ func (s *Strategy) spreadMakerHedge(
 	if makerOrderForm, ok := s.SpreadMaker.canSpreadMaking(
 		signal, s.Position, uncoveredPosition, s.makerMarket, makerBid.Price, makerAsk.Price,
 	); ok {
-
 		s.logger.Infof(
 			"position: %f@%f, maker book bid: %f/%f, spread maker order form: %+v",
 			s.Position.GetBase().Float64(),
@@ -1601,9 +1600,18 @@ func (s *Strategy) spreadMakerHedge(
 				}
 			}
 		}
-	} else if s.SpreadMaker.ReverseSignalOrderCancel {
-		if !isSignalSidePosition(signal, s.Position.Side()) {
-			s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, s.positionExposure)
+	} else if hasOrder {
+		// cancel existing spread maker order if the signal is not strong enough
+		if s.SpreadMaker.ReverseSignalOrderCancel {
+			if !isSignalSidePosition(signal, s.Position.Side()) {
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, s.positionExposure)
+			}
+		} else {
+			shouldKeep := s.SpreadMaker.shouldKeepOrder(curOrder, now)
+			if !shouldKeep {
+				s.logger.Infof("canceling current spread maker order...")
+				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx, s.positionExposure)
+			}
 		}
 	}
 
