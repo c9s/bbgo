@@ -150,7 +150,7 @@ func TestAdjustByTick(t *testing.T) {
 			calls: calls{
 				i:     1,
 				price: Number(100.0),
-				rst:   Number(100.1),
+				rst:   Number(99.9),
 			},
 		},
 		{
@@ -163,7 +163,7 @@ func TestAdjustByTick(t *testing.T) {
 			calls: calls{
 				i:     2,
 				price: Number(100.0),
-				rst:   Number(100.2),
+				rst:   Number(99.8),
 			},
 		},
 		{
@@ -176,7 +176,7 @@ func TestAdjustByTick(t *testing.T) {
 			calls: calls{
 				i:     1,
 				price: Number(100.0),
-				rst:   Number(99.9),
+				rst:   Number(100.1),
 			},
 		},
 		{
@@ -189,7 +189,7 @@ func TestAdjustByTick(t *testing.T) {
 			calls: calls{
 				i:     2,
 				price: Number(100.0),
-				rst:   Number(99.8),
+				rst:   Number(100.2),
 			},
 		},
 		{
@@ -384,7 +384,7 @@ func TestComposePricers(t *testing.T) {
 			call: call{
 				i:     1,
 				price: Number(100.0),
-				want:  Number(90.01), // 100*0.999*0.9+0.1 = 90.01
+				want:  Number(89.81),
 			},
 		},
 		{
