@@ -202,23 +202,20 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 }
 
 func (n *Notifier) SendPhoto(buffer *bytes.Buffer) {
-	n.SendPhotoTo("", buffer)
+	select {
+	case n.taskC <- notifyTask{
+		photoBuffer: buffer,
+	}:
+	case <-time.After(1 * time.Second):
+		return
+	}
+
 }
 
 func photoFromBuffer(buffer *bytes.Buffer) telebot.InputMedia {
 	reader := bytes.NewReader(buffer.Bytes())
 	return &telebot.Photo{
 		File: telebot.FromReader(reader),
-	}
-}
-
-func (n *Notifier) SendPhotoTo(channel string, buffer *bytes.Buffer) {
-	select {
-	case n.taskC <- notifyTask{
-		photoBuffer: buffer,
-	}:
-	case <-time.After(50 * time.Millisecond):
-		return
 	}
 }
 

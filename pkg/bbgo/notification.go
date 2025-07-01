@@ -26,8 +26,13 @@ func SendPhoto(buffer *bytes.Buffer) {
 	Notification.SendPhoto(buffer)
 }
 
-func SendPhotoTo(channel string, buffer *bytes.Buffer) {
-	Notification.SendPhotoTo(channel, buffer)
+type UploadFile struct {
+	MineType string
+	Data     bytes.Buffer
+}
+
+func Upload(file *UploadFile) {
+
 }
 
 type Notifier interface {
@@ -109,11 +114,5 @@ func (m *Notifiability) NotifyTo(channel string, obj interface{}, args ...interf
 func (m *Notifiability) SendPhoto(buffer *bytes.Buffer) {
 	for _, n := range m.notifiers {
 		n.SendPhoto(buffer)
-	}
-}
-
-func (m *Notifiability) SendPhotoTo(channel string, buffer *bytes.Buffer) {
-	for _, n := range m.notifiers {
-		n.SendPhotoTo(channel, buffer)
 	}
 }
