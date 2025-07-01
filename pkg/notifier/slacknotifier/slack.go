@@ -505,7 +505,7 @@ func (n *Notifier) queueTask(ctx context.Context, task notifyTask, timeout time.
 	}
 }
 
-func (n *Notifier) SendPhoto(buffer *bytes.Buffer) {
+func (n *Notifier) Upload(buffer *bytes.Buffer) {
 	n.SendPhotoTo(n.channel, buffer)
 }
 

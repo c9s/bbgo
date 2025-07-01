@@ -8,26 +8,18 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-var Notification = &Notifiability{
-	SymbolChannelRouter:  NewPatternChannelRouter(nil),
-	SessionChannelRouter: NewPatternChannelRouter(nil),
-	ObjectChannelRouter:  NewObjectChannelRouter(),
-}
+var Notification = &Notifiability{}
 
 func Notify(obj interface{}, args ...interface{}) {
 	Notification.Notify(obj, args...)
 }
 
-func NotifyTo(channel string, obj interface{}, args ...interface{}) {
-	Notification.NotifyTo(channel, obj, args...)
-}
-
 func SendPhoto(buffer *bytes.Buffer) {
-	Notification.SendPhoto(buffer)
+	Notification.Upload(buffer)
 }
 
 type UploadFile struct {
-	MineType string
+	FileType string
 	Data     bytes.Buffer
 }
 
@@ -36,10 +28,8 @@ func Upload(file *UploadFile) {
 }
 
 type Notifier interface {
-	NotifyTo(channel string, obj interface{}, args ...interface{})
-	Notify(obj interface{}, args ...interface{})
-	SendPhotoTo(channel string, buffer *bytes.Buffer)
-	SendPhoto(buffer *bytes.Buffer)
+	Notify(obj any, args ...any)
+	Upload(buffer *bytes.Buffer)
 }
 
 type NullNotifier struct{}
@@ -48,41 +38,11 @@ func (n *NullNotifier) NotifyTo(channel string, obj interface{}, args ...interfa
 
 func (n *NullNotifier) Notify(obj interface{}, args ...interface{}) {}
 
-func (n *NullNotifier) SendPhoto(buffer *bytes.Buffer) {}
-
-func (n *NullNotifier) SendPhotoTo(channel string, buffer *bytes.Buffer) {}
+func (n *NullNotifier) Upload(buffer *bytes.Buffer) {}
 
 type Notifiability struct {
 	notifiers       []Notifier
 	liveNotePosters []LiveNotePoster
-
-	SessionChannelRouter *PatternChannelRouter `json:"-"`
-	SymbolChannelRouter  *PatternChannelRouter `json:"-"`
-	ObjectChannelRouter  *ObjectChannelRouter  `json:"-"`
-}
-
-// RouteSymbol routes symbol name to channel
-func (m *Notifiability) RouteSymbol(symbol string) (channel string, ok bool) {
-	if m.SymbolChannelRouter != nil {
-		return m.SymbolChannelRouter.Route(symbol)
-	}
-	return "", false
-}
-
-// RouteSession routes Session name to channel
-func (m *Notifiability) RouteSession(session string) (channel string, ok bool) {
-	if m.SessionChannelRouter != nil {
-		return m.SessionChannelRouter.Route(session)
-	}
-	return "", false
-}
-
-// RouteObject routes object to channel
-func (m *Notifiability) RouteObject(obj interface{}) (channel string, ok bool) {
-	if m.ObjectChannelRouter != nil {
-		return m.ObjectChannelRouter.Route(obj)
-	}
-	return "", false
 }
 
 // AddNotifier adds the notifier that implements the Notifier interface.
@@ -105,14 +65,8 @@ func (m *Notifiability) Notify(obj interface{}, args ...interface{}) {
 	}
 }
 
-func (m *Notifiability) NotifyTo(channel string, obj interface{}, args ...interface{}) {
+func (m *Notifiability) Upload(buffer *bytes.Buffer) {
 	for _, n := range m.notifiers {
-		n.NotifyTo(channel, obj, args...)
-	}
-}
-
-func (m *Notifiability) SendPhoto(buffer *bytes.Buffer) {
-	for _, n := range m.notifiers {
-		n.SendPhoto(buffer)
+		n.Upload(buffer)
 	}
 }
