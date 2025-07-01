@@ -5,6 +5,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
 )
 
@@ -15,30 +16,27 @@ func Notify(obj interface{}, args ...interface{}) {
 }
 
 func SendPhoto(buffer *bytes.Buffer) {
-	Notification.Upload(buffer)
+	Notification.Upload(&types.UploadFile{
+		Caption:  "Image",
+		FileType: types.FileTypeImage,
+		Data:     buffer,
+	})
 }
 
-type UploadFile struct {
-	FileType string
-	Data     bytes.Buffer
-}
-
-func Upload(file *UploadFile) {
-
+func Upload(file *types.UploadFile) {
+	Notification.Upload(file)
 }
 
 type Notifier interface {
 	Notify(obj any, args ...any)
-	Upload(buffer *bytes.Buffer)
+	Upload(file *types.UploadFile)
 }
 
 type NullNotifier struct{}
 
-func (n *NullNotifier) NotifyTo(channel string, obj interface{}, args ...interface{}) {}
+func (n *NullNotifier) Notify(_ interface{}, args ...interface{}) {}
 
-func (n *NullNotifier) Notify(obj interface{}, args ...interface{}) {}
-
-func (n *NullNotifier) Upload(buffer *bytes.Buffer) {}
+func (n *NullNotifier) Upload(_ *types.UploadFile) {}
 
 type Notifiability struct {
 	notifiers       []Notifier
@@ -65,8 +63,8 @@ func (m *Notifiability) Notify(obj interface{}, args ...interface{}) {
 	}
 }
 
-func (m *Notifiability) Upload(buffer *bytes.Buffer) {
+func (m *Notifiability) Upload(file *types.UploadFile) {
 	for _, n := range m.notifiers {
-		n.Upload(buffer)
+		n.Upload(file)
 	}
 }
