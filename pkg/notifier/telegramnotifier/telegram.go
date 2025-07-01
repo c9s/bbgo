@@ -201,7 +201,7 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 	}
 }
 
-func (n *Notifier) SendPhoto(buffer *bytes.Buffer) {
+func (n *Notifier) Upload(buffer *bytes.Buffer) {
 	select {
 	case n.taskC <- notifyTask{
 		photoBuffer: buffer,
