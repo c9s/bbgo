@@ -160,9 +160,5 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 }
 
 func (s *Strategy) notify(format string, args ...interface{}) {
-	if channel, ok := bbgo.Notification.RouteSymbol(s.Symbol); ok {
-		bbgo.NotifyTo(channel, format, args...)
-	} else {
-		bbgo.Notify(format, args...)
-	}
+	bbgo.Notify(format, args...)
 }
