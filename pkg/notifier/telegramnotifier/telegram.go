@@ -20,9 +20,12 @@ var apiLimiter = rate.NewLimiter(rate.Every(50*time.Millisecond), 20)
 var log = logrus.WithField("service", "telegram")
 
 type notifyTask struct {
-	message     string
-	texts       []string
+	message string
+	texts   []string
+
 	photoBuffer *bytes.Buffer
+
+	file *types.UploadFile
 }
 
 type Notifier struct {
@@ -102,8 +105,15 @@ func (n *Notifier) consume(task notifyTask) {
 			album := telebot.Album{
 				photoFromBuffer(task.photoBuffer),
 			}
-			if _, err := n.bot.SendAlbum(chat, album); err != nil {
+
+			if msgs, err := n.bot.SendAlbum(chat, album); err != nil {
 				log.WithError(err).Error("failed to send message")
+			} else {
+				if task.file.References == nil {
+					task.file.References = make(map[string]any)
+				}
+
+				task.file.SetReference("telegram", msgs)
 			}
 		}
 	} else if n.Chats != nil {
@@ -201,12 +211,13 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 	}
 }
 
-func (n *Notifier) Upload(buffer *bytes.Buffer) {
+func (n *Notifier) Upload(file *types.UploadFile) {
 	select {
 	case n.taskC <- notifyTask{
-		photoBuffer: buffer,
+		photoBuffer: file.Data,
 	}:
 	case <-time.After(1 * time.Second):
+		log.Warnf("[telegram] upload skip due to massive message sending, file: %+v", file)
 		return
 	}
 

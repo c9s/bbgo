@@ -492,7 +492,7 @@ func generateTextInputModalRequest(title string, prompt string, textFields ...Te
 		textInputObject := slack.NewPlainTextInputBlockElement(placeHolderObject, textField.Name)
 
 		// Notice that blockID is a unique identifier for a block
-		inputBlock := slack.NewInputBlock("block-"+textField.Name+"-"+uuid.NewString(), labelObject, textInputObject)
+		inputBlock := slack.NewInputBlock("block-"+textField.Name+"-"+uuid.NewString(), labelObject, labelObject, textInputObject)
 		blocks.BlockSet = append(blocks.BlockSet, inputBlock)
 	}
 
