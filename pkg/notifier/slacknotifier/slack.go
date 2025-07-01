@@ -1,7 +1,6 @@
 package slacknotifier
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -239,6 +238,44 @@ func (n *Notifier) translateHandle(ctx context.Context, handle string) (string, 
 	}
 
 	return "", fmt.Errorf("handle %s not found", handle)
+}
+
+// Upload is used to upload a file to the configured slack channel.
+// This is a blocking function, it will wait until the file is uploaded.
+func (n *Notifier) Upload(upload *types.UploadFile) {
+	if upload.Data == nil {
+		log.Error("slack upload error: Data field is nil")
+		return
+	}
+
+	if upload.FileName == "" {
+		log.Error("slack upload error: FileName field is empty")
+		return
+	}
+
+	params := slack.UploadFileV2Parameters{
+		Filename: upload.FileName,
+		FileSize: upload.Data.Len(),
+		Channel:  n.channel,
+		Title:    upload.Caption,
+
+		// You can choose one of the following options:
+		//   File: "path/to/your/image.png",
+		//   Content: "",
+		//   Reader: bytes.NewReader(upload.Data.Bytes()),
+		//
+		// Here we don't want to allow users to upload files from the local filesystem for security reasons,
+		// So we only allow uploading file from a bytes.Reader.
+		Reader: upload.Data,
+	}
+
+	file, err := n.client.UploadFileV2Context(n.ctx, params)
+	if err != nil {
+		log.WithError(err).Error("failed to upload file")
+	} else {
+		log.Infof("slack uploaded file ID: %s %+v", file.ID, file)
+		upload.SetReference("slack", file)
+	}
 }
 
 func (n *Notifier) PostLiveNote(obj livenote.Object, opts ...livenote.Option) error {
@@ -503,14 +540,6 @@ func (n *Notifier) queueTask(ctx context.Context, task notifyTask, timeout time.
 		return
 	case n.taskC <- task:
 	}
-}
-
-func (n *Notifier) SendPhoto(buffer *bytes.Buffer) {
-	n.SendPhotoTo(n.channel, buffer)
-}
-
-func (n *Notifier) SendPhotoTo(channel string, buffer *bytes.Buffer) {
-	// TODO
 }
 
 func toUserHandle(id string) string {
