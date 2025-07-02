@@ -33,7 +33,7 @@ func (m *TradingManager) Initialize(ctx context.Context, environ *bbgo.Environme
 
 type TradingManagerMap map[string]*TradingManager
 
-func (m TradingManagerMap) GetOrderExecutor(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, symbol, strategyID, instanceID string) (*bbgo.GeneralOrderExecutor, error) {
+func (m TradingManagerMap) GetTradingManager(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, symbol, strategyID, instanceID string) (*TradingManager, error) {
 	market, ok := session.Market(symbol)
 	if !ok {
 		return nil, fmt.Errorf("market %s not found", symbol)
@@ -46,5 +46,5 @@ func (m TradingManagerMap) GetOrderExecutor(ctx context.Context, environ *bbgo.E
 	}
 
 	manager.Initialize(ctx, environ, session, market, strategyID, instanceID)
-	return manager.OrderExecutor, nil
+	return manager, nil
 }
