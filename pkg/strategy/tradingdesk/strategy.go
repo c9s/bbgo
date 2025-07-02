@@ -69,7 +69,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 // OpenPosition opens a new position with risk-based position sizing.
 // The position size is calculated based on MaxLossLimit, stop loss price, and available balance.
 func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParam) error {
-	executor, err := s.TradingManagerMap.GetOrderExecutor(ctx, s.Environment, s.Session, param.Symbol, s.ID(), s.InstanceID())
+	m, err := s.TradingManagerMap.GetTradingManager(ctx, s.Environment, s.Session, param.Symbol, s.ID(), s.InstanceID())
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParam) er
 		StopPrice: param.StopLossPrice,
 	}
 
-	createdOrders, err := executor.SubmitOrders(ctx, order)
+	createdOrders, err := m.OrderExecutor.SubmitOrders(ctx, order)
 	if err != nil {
 		log.WithError(err).Errorf("failed to submit market order: %+v", order)
 		return err
