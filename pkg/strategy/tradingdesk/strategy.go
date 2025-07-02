@@ -26,9 +26,7 @@ type Strategy struct {
 	Session     *bbgo.ExchangeSession
 	Environment *bbgo.Environment
 
-	OrderExecutorMap map[string]*bbgo.GeneralOrderExecutor
-	PositionMap      PositionMap    `persistence:"position_map"`
-	ProfitStatsMap   ProfitStatsMap `persistence:"profit_stats_map"`
+	TradingManagerMap TradingManagerMap `persistence:"tradingManagerMap"`
 
 	MaxLossLimit fixedpoint.Value `json:"maxLossLimit"`
 	PriceType    types.PriceType  `json:"priceType"`
@@ -43,16 +41,8 @@ func (s *Strategy) InstanceID() string {
 }
 
 func (s *Strategy) Initialize() error {
-	if s.PositionMap == nil {
-		s.PositionMap = make(PositionMap)
-	}
-
-	if s.ProfitStatsMap == nil {
-		s.ProfitStatsMap = make(ProfitStatsMap)
-	}
-
-	if s.OrderExecutorMap == nil {
-		s.OrderExecutorMap = make(map[string]*bbgo.GeneralOrderExecutor)
+	if s.TradingManagerMap == nil {
+		s.TradingManagerMap = make(TradingManagerMap)
 	}
 	return nil
 }
@@ -76,68 +66,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	return nil
 }
 
-func (s *Strategy) getOrCreatePosition(symbol string) (*types.Position, error) {
-	market, ok := s.Session.Market(symbol)
-	if !ok {
-		return nil, fmt.Errorf("market %s not found", symbol)
-	}
-
-	if position, ok := s.PositionMap[symbol]; ok {
-		return position, nil
-	}
-
-	position := types.NewPositionFromMarket(market)
-	position.Strategy = ID
-	position.StrategyInstanceID = s.InstanceID()
-	s.PositionMap[symbol] = position
-
-	return position, nil
-}
-
-func (s *Strategy) getOrCreateProfitStats(symbol string) (*types.ProfitStats, error) {
-	market, ok := s.Session.Market(symbol)
-	if !ok {
-		return nil, fmt.Errorf("market %s not found", symbol)
-	}
-
-	if profitStats, ok := s.ProfitStatsMap[symbol]; ok {
-		return profitStats, nil
-	}
-
-	profitStats := types.NewProfitStats(market)
-	s.ProfitStatsMap[symbol] = profitStats
-
-	return profitStats, nil
-}
-
-func (s *Strategy) getOrCreateOrderExecutor(symbol string) (*bbgo.GeneralOrderExecutor, error) {
-	if executor, ok := s.OrderExecutorMap[symbol]; ok {
-		return executor, nil
-	}
-
-	position, err := s.getOrCreatePosition(symbol)
-	if err != nil {
-		return nil, err
-	}
-
-	profitStats, err := s.getOrCreateProfitStats(symbol)
-	if err != nil {
-		return nil, err
-	}
-
-	executor := bbgo.NewGeneralOrderExecutor(s.Session, symbol, s.ID(), s.InstanceID(), position)
-	executor.BindEnvironment(s.Environment)
-	executor.BindProfitStats(profitStats)
-	executor.Bind()
-
-	s.OrderExecutorMap[symbol] = executor
-	return executor, nil
-}
-
 // OpenPosition opens a new position with risk-based position sizing.
 // The position size is calculated based on MaxLossLimit, stop loss price, and available balance.
 func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParam) error {
-	executor, err := s.getOrCreateOrderExecutor(param.Symbol)
+	executor, err := s.TradingManagerMap.GetOrderExecutor(ctx, s.Environment, s.Session, param.Symbol, s.ID(), s.InstanceID())
 	if err != nil {
 		return err
 	}
