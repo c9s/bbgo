@@ -85,7 +85,7 @@ func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParam) er
 		Side:      param.Side,
 		Type:      types.OrderTypeMarket,
 		Quantity:  quantity,
-		StopPrice: param.StopLossPrice,
+		StopPrice: param.StopPrice,
 	}
 
 	createdOrders, err := m.OrderExecutor.SubmitOrders(ctx, order)
@@ -119,7 +119,7 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 	}
 
 	// Check if stop loss is provided, if not return original quantity
-	if param.StopLossPrice.IsZero() {
+	if param.StopPrice.IsZero() {
 		return param.Quantity, nil
 	}
 
@@ -134,7 +134,7 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 		return fixedpoint.Zero, fmt.Errorf("invalid current price for %s", param.Symbol)
 	}
 
-	riskPerUnit := s.stopLossRange(currentPrice, param.StopLossPrice, param.Side)
+	riskPerUnit := s.stopLossRange(currentPrice, param.StopPrice, param.Side)
 	if riskPerUnit.Sign() <= 0 {
 		return fixedpoint.Zero, s.createInvalidStopLossError(param.Side, currentPrice)
 	}
@@ -171,7 +171,7 @@ func (s *Strategy) calculatePositionSize(ctx context.Context, param OpenPosition
 	}
 
 	log.Infof("Position size calculation: symbol=%s, currentPrice=%s, stopLoss=%s, riskPerUnit=%s, maxLossLimit=%s, availableBalance=%s, finalQuantity=%s",
-		param.Symbol, currentPrice, param.StopLossPrice, riskPerUnit, s.MaxLossLimit, availableBalance, quantity)
+		param.Symbol, currentPrice, param.StopPrice, riskPerUnit, s.MaxLossLimit, availableBalance, quantity)
 
 	return quantity, nil
 }
