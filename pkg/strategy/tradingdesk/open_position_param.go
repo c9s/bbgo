@@ -12,7 +12,7 @@ type OpenPositionParam struct {
 	Confidence      fixedpoint.Value `json:"confidence"`
 	Side            types.SideType   `json:"side"`
 	Quantity        fixedpoint.Value `json:"quantity"`
-	StopLossPrice   fixedpoint.Value `json:"stopLossPrice"`
+	StopPrice       fixedpoint.Value `json:"stopPrice"`
 	TakeProfitPrice fixedpoint.Value `json:"takeProfitPrice"`
 	TimeToLive      time.Duration    `json:"timeToLive"`
 }
