@@ -37,6 +37,14 @@ func (s *SeriesBase) Mean(limit ...int) float64 {
 	return Mean(s, limit...)
 }
 
+func (s *SeriesBase) Max(limit ...int) float64 {
+	return Max(s, limit...)
+}
+
+func (s *SeriesBase) Min(limit ...int) float64 {
+	return Min(s, limit...)
+}
+
 func (s *SeriesBase) Abs() SeriesExtend {
 	return Abs(s)
 }
