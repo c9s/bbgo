@@ -1,5 +1,13 @@
 ---
+sessions:
+  binance:
+    exchange: binance
+
+  binance_futures:
+    exchange: binance
+    futures: true
+
 exchangeStrategies:
-  - on: max
+  - on: binance_futures
     tradingdesk:
       maxLossLimit: 10

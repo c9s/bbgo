@@ -16,7 +16,7 @@ import (
 	"github.com/c9s/bbgo/pkg/types/mocks"
 )
 
-func TestStrategy_calculatePositionSize(t *testing.T) {
+func TestTradingManager_calculatePositionSize(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup market
@@ -57,20 +57,22 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		}
 		mockSession.SetMarkets(types.MarketMap{"BTCUSDT": market})
 
-		strategy := &Strategy{
-			Session:      mockSession,
+		// Create trading manager
+		manager := &TradingManager{
 			MaxLossLimit: Number(100), // 100 USDT max loss
 			PriceType:    types.PriceTypeMaker,
+			Session:      mockSession,
+			Market:       market,
 		}
 
 		param := OpenPositionParam{
-			Symbol:        "BTCUSDT",
-			Side:          types.SideTypeBuy,
-			Quantity:      Number(1.0),   // Want to buy 1 BTC
-			StopLossPrice: Number(49100), // Stop at 49,100
+			Symbol:    "BTCUSDT",
+			Side:      types.SideTypeBuy,
+			Quantity:  Number(1.0),   // Want to buy 1 BTC
+			StopPrice: Number(49100), // Stop at 49,100
 		}
 
-		quantity, err := strategy.calculatePositionSize(ctx, param)
+		quantity, err := manager.calculatePositionSize(ctx, param)
 
 		assert.NoError(t, err)
 		// Risk per unit = 50100 - 49100 = 1000 USDT
@@ -103,20 +105,22 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		}
 		mockSession.SetMarkets(types.MarketMap{"BTCUSDT": market})
 
-		strategy := &Strategy{
-			Session:      mockSession,
+		// Create trading manager
+		manager := &TradingManager{
 			MaxLossLimit: Number(100),
 			PriceType:    types.PriceTypeMaker,
+			Session:      mockSession,
+			Market:       market,
 		}
 
 		param := OpenPositionParam{
-			Symbol:        "BTCUSDT",
-			Side:          types.SideTypeSell,
-			Quantity:      Number(1.0),   // Want to sell 1 BTC
-			StopLossPrice: Number(50900), // Stop at 50,900
+			Symbol:    "BTCUSDT",
+			Side:      types.SideTypeSell,
+			Quantity:  Number(1.0),   // Want to sell 1 BTC
+			StopPrice: Number(50900), // Stop at 50,900
 		}
 
-		quantity, err := strategy.calculatePositionSize(ctx, param)
+		quantity, err := manager.calculatePositionSize(ctx, param)
 
 		assert.NoError(t, err)
 		// Risk per unit = 50900 - 49900 = 1000 USDT
@@ -141,20 +145,22 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		}
 		mockSession.SetMarkets(types.MarketMap{"BTCUSDT": market})
 
-		strategy := &Strategy{
-			Session:      mockSession,
+		// Create trading manager
+		manager := &TradingManager{
 			MaxLossLimit: Number(100),
 			PriceType:    types.PriceTypeMaker,
+			Session:      mockSession,
+			Market:       market,
 		}
 
 		param := OpenPositionParam{
-			Symbol:        "BTCUSDT",
-			Side:          types.SideTypeBuy,
-			Quantity:      Number(0.05),
-			StopLossPrice: fixedpoint.Zero, // No stop loss
+			Symbol:    "BTCUSDT",
+			Side:      types.SideTypeBuy,
+			Quantity:  Number(0.05),
+			StopPrice: fixedpoint.Zero, // No stop loss
 		}
 
-		quantity, err := strategy.calculatePositionSize(ctx, param)
+		quantity, err := manager.calculatePositionSize(ctx, param)
 
 		assert.NoError(t, err)
 		assert.Equal(t, "0.05", quantity.String())
@@ -182,20 +188,22 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		}
 		mockSession.SetMarkets(types.MarketMap{"BTCUSDT": market})
 
-		strategy := &Strategy{
-			Session:      mockSession,
+		// Create trading manager
+		manager := &TradingManager{
 			MaxLossLimit: Number(100),
 			PriceType:    types.PriceTypeMaker,
+			Session:      mockSession,
+			Market:       market,
 		}
 
 		param := OpenPositionParam{
-			Symbol:        "BTCUSDT",
-			Side:          types.SideTypeBuy,
-			Quantity:      Number(1.0),
-			StopLossPrice: Number(51000), // Stop loss above current price
+			Symbol:    "BTCUSDT",
+			Side:      types.SideTypeBuy,
+			Quantity:  Number(1.0),
+			StopPrice: Number(51000), // Stop loss above current price
 		}
 
-		_, err := strategy.calculatePositionSize(ctx, param)
+		_, err := manager.calculatePositionSize(ctx, param)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid stop loss price")
@@ -223,20 +231,22 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		}
 		mockSession.SetMarkets(types.MarketMap{"BTCUSDT": market})
 
-		strategy := &Strategy{
-			Session:      mockSession,
+		// Create trading manager
+		manager := &TradingManager{
 			MaxLossLimit: Number(100),
 			PriceType:    types.PriceTypeMaker,
+			Session:      mockSession,
+			Market:       market,
 		}
 
 		param := OpenPositionParam{
-			Symbol:        "BTCUSDT",
-			Side:          types.SideTypeSell,
-			Quantity:      Number(1.0),
-			StopLossPrice: Number(49000), // Stop loss below current price
+			Symbol:    "BTCUSDT",
+			Side:      types.SideTypeSell,
+			Quantity:  Number(1.0),
+			StopPrice: Number(49000), // Stop loss below current price
 		}
 
-		_, err := strategy.calculatePositionSize(ctx, param)
+		_, err := manager.calculatePositionSize(ctx, param)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid stop loss price")
@@ -257,10 +267,12 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		}
 		lowBalanceSession.SetMarkets(types.MarketMap{"BTCUSDT": market})
 
-		lowBalanceStrategy := &Strategy{
-			Session:      lowBalanceSession,
+		// Create trading manager with low balance
+		lowBalanceManager := &TradingManager{
 			MaxLossLimit: Number(100),
 			PriceType:    types.PriceTypeMaker,
+			Session:      lowBalanceSession,
+			Market:       market,
 		}
 
 		ticker := &types.Ticker{
@@ -271,13 +283,13 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		mockExchange.EXPECT().QueryTicker(ctx, "BTCUSDT").Return(ticker, nil).Times(1)
 
 		param := OpenPositionParam{
-			Symbol:        "BTCUSDT",
-			Side:          types.SideTypeBuy,
-			Quantity:      Number(1.0),
-			StopLossPrice: Number(49100),
+			Symbol:    "BTCUSDT",
+			Side:      types.SideTypeBuy,
+			Quantity:  Number(1.0),
+			StopPrice: Number(49100),
 		}
 
-		quantity, err := lowBalanceStrategy.calculatePositionSize(ctx, param)
+		quantity, err := lowBalanceManager.calculatePositionSize(ctx, param)
 
 		assert.NoError(t, err)
 		// Max quantity by balance = 10 / 50100 ≈ 0.0001996 BTC
@@ -301,9 +313,12 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		}
 		mockSession.SetMarkets(types.MarketMap{"BTCUSDT": market})
 
-		strategyNoLimit := &Strategy{
-			Session:      mockSession,
+		// Create trading manager with no loss limit
+		managerNoLimit := &TradingManager{
 			MaxLossLimit: fixedpoint.Zero, // No loss limit
+			PriceType:    types.PriceTypeMaker,
+			Session:      mockSession,
+			Market:       market,
 		}
 
 		ticker := &types.Ticker{
@@ -314,13 +329,13 @@ func TestStrategy_calculatePositionSize(t *testing.T) {
 		mockExchange.EXPECT().QueryTicker(ctx, "BTCUSDT").Return(ticker, nil).Times(1)
 
 		param := OpenPositionParam{
-			Symbol:        "BTCUSDT",
-			Side:          types.SideTypeBuy,
-			Quantity:      Number(0.15), // Want 0.15 BTC
-			StopLossPrice: Number(49100),
+			Symbol:    "BTCUSDT",
+			Side:      types.SideTypeBuy,
+			Quantity:  Number(0.15), // Want 0.15 BTC
+			StopPrice: Number(49100),
 		}
 
-		quantity, err := strategyNoLimit.calculatePositionSize(ctx, param)
+		quantity, err := managerNoLimit.calculatePositionSize(ctx, param)
 
 		assert.NoError(t, err)
 		// Max quantity by balance = 10000 / 50100 ≈ 0.1996 BTC
