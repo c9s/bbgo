@@ -1012,9 +1012,9 @@ func (e *Exchange) GetClient() *okexapi.RestClient {
 // - Adds new symbols from markets
 // - Removes symbols that no longer exist in markets
 func (e *Exchange) syncLocalSymbolMap(markets types.MarketMap) {
-	symbolMap := spotSymbolSyncMap
+	symbolMap := &spotSymbolSyncMap
 	if e.IsFutures {
-		symbolMap = swapSymbolSyncMap
+		symbolMap = &swapSymbolSyncMap
 	}
 
 	existingSymbols := make(map[string]struct{})
