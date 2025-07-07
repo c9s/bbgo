@@ -129,7 +129,7 @@ func (m *TradingManager) calculatePositionSize(ctx context.Context, param OpenPo
 
 	riskPerUnit := m.stopLossRange(currentPrice, param.StopPrice, param.Side)
 	if riskPerUnit.Sign() <= 0 {
-		return fixedpoint.Zero, m.createInvalidStopLossError(param.Side, currentPrice)
+		return fixedpoint.Zero, createInvalidStopLossError(param.Side, currentPrice)
 	}
 
 	availableBalance, err := m.getAvailableBalance(param.Side)
@@ -180,7 +180,7 @@ func (m *TradingManager) stopLossRange(currentPrice, stopLossPrice fixedpoint.Va
 }
 
 // createInvalidStopLossError creates an appropriate error message for invalid stop loss prices
-func (m *TradingManager) createInvalidStopLossError(side types.SideType, currentPrice fixedpoint.Value) error {
+func createInvalidStopLossError(side types.SideType, currentPrice fixedpoint.Value) error {
 	if side == types.SideTypeBuy {
 		return fmt.Errorf("invalid stop loss price for buy order: stop loss should be below current price (%s)", currentPrice.String())
 	}
