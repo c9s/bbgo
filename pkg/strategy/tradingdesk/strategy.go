@@ -2,6 +2,7 @@ package tradingdesk
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
 
@@ -49,6 +50,10 @@ func (s *Strategy) Initialize() error {
 func (s *Strategy) Validate() error {
 	if s.PriceType == "" {
 		s.PriceType = types.PriceTypeMaker
+	}
+
+	if s.MaxLossLimit.Sign() <= 0 {
+		return fmt.Errorf("maxLossLimit should be greater than zero")
 	}
 	return nil
 }
