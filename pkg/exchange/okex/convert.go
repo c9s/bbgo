@@ -19,8 +19,10 @@ func toGlobalSymbol(symbol string) string {
 func toLocalSymbol(symbol string, instType ...okexapi.InstrumentType) string {
 	if len(instType) == 1 {
 		if instType[0] == okexapi.InstrumentTypeSwap {
-			if s, ok := swapSymbolMap[symbol]; ok {
-				return s
+			if s, ok := swapSymbolSyncMap.Load(symbol); ok {
+				if localSymbol, ok := s.(string); ok {
+					return localSymbol
+				}
 			}
 		}
 	}
