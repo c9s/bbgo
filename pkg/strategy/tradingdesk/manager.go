@@ -102,9 +102,10 @@ func (m *TradingManager) OpenPosition(ctx context.Context, param OpenPositionPar
 // 3. Calculates risk per unit based on stop loss distance
 // 4. Computes maximum quantity allowed by risk limit (MaxLossLimit / riskPerUnit)
 // 5. Determines available balance constraint:
-//    - Futures mode: uses quote currency balance / current price
-//    - Spot buy orders: uses quote currency balance / current price  
-//    - Spot sell orders: uses base currency balance
+//   - Futures mode: uses quote currency balance / current price
+//   - Spot buy orders: uses quote currency balance / current price
+//   - Spot sell orders: uses base currency balance
+//
 // 6. Returns the minimum of risk-limited quantity and balance-limited quantity
 //
 // This ensures positions never exceed risk tolerance or available funds.
@@ -125,7 +126,7 @@ func (m *TradingManager) calculatePositionSize(ctx context.Context, param OpenPo
 		return fixedpoint.Zero, fmt.Errorf("invalid current price for %s", param.Symbol)
 	}
 
-	riskPerUnit := m.stopLossRange(currentPrice, param.StopLossPrice, param.Side)
+	riskPerUnit := stopLossRange(currentPrice, param.StopLossPrice, param.Side)
 	if riskPerUnit.Sign() <= 0 {
 		return fixedpoint.Zero, createInvalidStopLossError(param.Side, currentPrice)
 	}
@@ -156,7 +157,7 @@ func (m *TradingManager) calculatePositionSize(ctx context.Context, param OpenPo
 }
 
 // stopLossRange calculates the risk per unit based on current price, stop loss, and side
-func (m *TradingManager) stopLossRange(currentPrice, stopLossPrice fixedpoint.Value, side types.SideType) fixedpoint.Value {
+func stopLossRange(currentPrice, stopLossPrice fixedpoint.Value, side types.SideType) fixedpoint.Value {
 	if side == types.SideTypeBuy {
 		// For long positions, risk is current price - stop loss price
 		return currentPrice.Sub(stopLossPrice)
