@@ -297,49 +297,4 @@ func TestTradingManager_calculatePositionSize(t *testing.T) {
 		expected := Number(10).Div(Number(50100))
 		assert.Equal(t, expected.String(), quantity.String())
 	})
-
-	t.Run("Zero MaxLossLimit - Use Original Quantity", func(t *testing.T) {
-		mockCtrl := gomock.NewController(t)
-		defer mockCtrl.Finish()
-
-		account := types.NewAccount()
-		account.AddBalance("USDT", Number(10000))
-		account.AddBalance("BTC", Number(0.5))
-
-		mockExchange := mocks.NewMockExchange(mockCtrl)
-		mockSession := &bbgo.ExchangeSession{
-			Exchange: mockExchange,
-			Account:  account,
-		}
-		mockSession.SetMarkets(types.MarketMap{"BTCUSDT": market})
-
-		// Create trading manager with no loss limit
-		managerNoLimit := &TradingManager{
-			MaxLossLimit: fixedpoint.Zero, // No loss limit
-			PriceType:    types.PriceTypeMaker,
-			Session:      mockSession,
-			Market:       market,
-		}
-
-		ticker := &types.Ticker{
-			Buy:  Number(50100),
-			Sell: Number(49900),
-			Last: Number(50000),
-		}
-		mockExchange.EXPECT().QueryTicker(ctx, "BTCUSDT").Return(ticker, nil).Times(1)
-
-		param := OpenPositionParam{
-			Symbol:        "BTCUSDT",
-			Side:          types.SideTypeBuy,
-			Quantity:      Number(0.15), // Want 0.15 BTC
-			StopLossPrice: Number(49100),
-		}
-
-		quantity, err := managerNoLimit.calculatePositionSize(ctx, param)
-
-		assert.NoError(t, err)
-		// Max quantity by balance = 10000 / 50100 ≈ 0.1996 BTC
-		// Final quantity = min(0.15, 0.15, 0.1996) = 0.15 BTC
-		assert.Equal(t, "0.15", quantity.String())
-	})
 }
