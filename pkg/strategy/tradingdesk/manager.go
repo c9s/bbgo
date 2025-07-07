@@ -83,7 +83,7 @@ func (m *TradingManager) OpenPosition(ctx context.Context, param OpenPositionPar
 		Side:      param.Side,
 		Type:      types.OrderTypeMarket,
 		Quantity:  quantity,
-		StopPrice: param.StopPrice,
+		StopPrice: param.StopLossPrice,
 	}
 
 	createdOrders, err := m.OrderExecutor.SubmitOrders(ctx, order)
@@ -112,7 +112,7 @@ func (m *TradingManager) OpenPosition(ctx context.Context, param OpenPositionPar
 // then riskPerUnit=1000 USDT, maxQuantityByRisk=0.1 BTC
 func (m *TradingManager) calculatePositionSize(ctx context.Context, param OpenPositionParam) (fixedpoint.Value, error) {
 	// Check if stop loss is provided, if not return original quantity
-	if param.StopPrice.IsZero() {
+	if param.StopLossPrice.IsZero() {
 		return param.Quantity, nil
 	}
 
@@ -127,7 +127,7 @@ func (m *TradingManager) calculatePositionSize(ctx context.Context, param OpenPo
 		return fixedpoint.Zero, fmt.Errorf("invalid current price for %s", param.Symbol)
 	}
 
-	riskPerUnit := m.stopLossRange(currentPrice, param.StopPrice, param.Side)
+	riskPerUnit := m.stopLossRange(currentPrice, param.StopLossPrice, param.Side)
 	if riskPerUnit.Sign() <= 0 {
 		return fixedpoint.Zero, createInvalidStopLossError(param.Side, currentPrice)
 	}
@@ -164,7 +164,7 @@ func (m *TradingManager) calculatePositionSize(ctx context.Context, param OpenPo
 	}
 
 	logrus.Infof("Position size calculation: symbol=%s, currentPrice=%s, stopLoss=%s, riskPerUnit=%s, maxLossLimit=%s, availableBalance=%s, finalQuantity=%s",
-		param.Symbol, currentPrice, param.StopPrice, riskPerUnit, m.MaxLossLimit, availableBalance, quantity)
+		param.Symbol, currentPrice, param.StopLossPrice, riskPerUnit, m.MaxLossLimit, availableBalance, quantity)
 
 	return quantity, nil
 }
