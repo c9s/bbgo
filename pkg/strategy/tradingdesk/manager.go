@@ -95,21 +95,19 @@ func (m *TradingManager) OpenPosition(ctx context.Context, param OpenPositionPar
 	return nil
 }
 
-// calculatePositionSize calculates the optimal position size based on risk management parameters.
-// It considers three factors to determine the final quantity:
-// 1. MaxLossLimit: Limits maximum potential loss per position in quote currency
-// 2. Available balance: Ensures sufficient funds for the trade
-// 3. Original quantity: User-specified desired quantity
+// calculatePositionSize calculates the position size based on risk management and available balance.
+// The function performs the following steps:
+// 1. Returns original quantity if no stop loss is provided
+// 2. Fetches current market price from exchange
+// 3. Calculates risk per unit based on stop loss distance
+// 4. Computes maximum quantity allowed by risk limit (MaxLossLimit / riskPerUnit)
+// 5. Determines available balance constraint:
+//    - Futures mode: uses quote currency balance / current price
+//    - Spot buy orders: uses quote currency balance / current price  
+//    - Spot sell orders: uses base currency balance
+// 6. Returns the minimum of risk-limited quantity and balance-limited quantity
 //
-// The function uses stop loss price to calculate risk per unit:
-// - For buy orders: risk = currentPrice - stopLossPrice
-// - For sell orders: risk = stopLossPrice - currentPrice
-//
-// Final quantity = min(originalQuantity, maxQuantityByRisk, maxQuantityByBalance)
-// where maxQuantityByRisk = MaxLossLimit / riskPerUnit
-//
-// Example: If MaxLossLimit=100 USDT, currentPrice=50000, stopLoss=49000
-// then riskPerUnit=1000 USDT, maxQuantityByRisk=0.1 BTC
+// This ensures positions never exceed risk tolerance or available funds.
 func (m *TradingManager) calculatePositionSize(ctx context.Context, param OpenPositionParam) (fixedpoint.Value, error) {
 	// Check if stop loss is provided, if not return original quantity
 	if param.StopLossPrice.IsZero() {
@@ -132,41 +130,29 @@ func (m *TradingManager) calculatePositionSize(ctx context.Context, param OpenPo
 		return fixedpoint.Zero, createInvalidStopLossError(param.Side, currentPrice)
 	}
 
-	availableBalance, err := m.getAvailableBalance(param.Side)
-	if err != nil {
-		return fixedpoint.Zero, err
-	}
-
-	// Calculate maximum quantity based on MaxLossLimit
-	var maxQuantityByRisk fixedpoint.Value
-	if !m.MaxLossLimit.IsZero() {
-		maxQuantityByRisk = m.MaxLossLimit.Div(riskPerUnit)
+	maxQuantityByRisk := m.MaxLossLimit.Div(riskPerUnit)
+	account := m.Session.GetAccount()
+	if m.Session.Futures {
+		quoteBalance, ok := account.Balance(m.Market.QuoteCurrency)
+		if !ok {
+			return fixedpoint.Zero, fmt.Errorf("no balance found for %s", m.Market.QuoteCurrency)
+		}
+		return fixedpoint.Min(quoteBalance.Available.Div(currentPrice), maxQuantityByRisk), nil
 	} else {
-		maxQuantityByRisk = param.Quantity
+		if param.Side == types.SideTypeBuy {
+			quoteBalance, ok := account.Balance(m.Market.QuoteCurrency)
+			if !ok {
+				return fixedpoint.Zero, fmt.Errorf("no balance found for %s", m.Market.QuoteCurrency)
+			}
+			return fixedpoint.Min(quoteBalance.Available.Div(currentPrice), maxQuantityByRisk), nil
+		}
+
+		baseBalance, ok := account.Balance(m.Market.BaseCurrency)
+		if !ok {
+			return fixedpoint.Zero, fmt.Errorf("no balance found for %s", m.Market.BaseCurrency)
+		}
+		return fixedpoint.Min(baseBalance.Available, maxQuantityByRisk), nil
 	}
-
-	// Calculate maximum quantity based on available balance
-	var maxQuantityByBalance fixedpoint.Value
-	if param.Side == types.SideTypeBuy {
-		// For buy orders: available quote currency / price
-		maxQuantityByBalance = availableBalance.Div(currentPrice)
-	} else {
-		// For sell orders: available base currency
-		maxQuantityByBalance = availableBalance
-	}
-
-	// Use the minimum of the three: original quantity, risk-based limit, balance-based limit
-	quantity := fixedpoint.Min(param.Quantity, fixedpoint.Min(maxQuantityByRisk, maxQuantityByBalance))
-
-	// Ensure quantity is positive
-	if quantity.Sign() <= 0 {
-		return fixedpoint.Zero, fmt.Errorf("calculated quantity is zero or negative")
-	}
-
-	logrus.Infof("Position size calculation: symbol=%s, currentPrice=%s, stopLoss=%s, riskPerUnit=%s, maxLossLimit=%s, availableBalance=%s, finalQuantity=%s",
-		param.Symbol, currentPrice, param.StopLossPrice, riskPerUnit, m.MaxLossLimit, availableBalance, quantity)
-
-	return quantity, nil
 }
 
 // stopLossRange calculates the risk per unit based on current price, stop loss, and side
@@ -185,23 +171,4 @@ func createInvalidStopLossError(side types.SideType, currentPrice fixedpoint.Val
 		return fmt.Errorf("invalid stop loss price for buy order: stop loss should be below current price (%s)", currentPrice.String())
 	}
 	return fmt.Errorf("invalid stop loss price for sell order: stop loss should be above current price (%s)", currentPrice.String())
-}
-
-// getAvailableBalance returns the available balance for the appropriate currency based on order side
-func (m *TradingManager) getAvailableBalance(side types.SideType) (fixedpoint.Value, error) {
-	account := m.Session.GetAccount()
-
-	var currency string
-	if side == types.SideTypeBuy {
-		currency = m.Market.QuoteCurrency // For buy orders, we need quote currency balance
-	} else {
-		currency = m.Market.BaseCurrency // For sell orders, we need base currency balance
-	}
-
-	balance, ok := account.Balance(currency)
-	if !ok {
-		return fixedpoint.Zero, fmt.Errorf("no balance found for %s", currency)
-	}
-
-	return balance.Available, nil
 }
