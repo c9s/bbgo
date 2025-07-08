@@ -7,7 +7,7 @@ import (
 )
 
 type Trade struct {
-	TradeID         int              `json:"trade_id"`
+	TradeID         uint64           `json:"trade_id"`
 	ProductID       string           `json:"product_id"`
 	OrderID         string           `json:"order_id"`
 	UserID          string           `json:"user_id"`
@@ -32,8 +32,8 @@ type GetOrderTradesRequest struct {
 	orderID    string      `param:"order_id"`
 	productID  string      `param:"product_id"` // one of order_id or product_id is required
 	limit      int         `param:"limit"`
-	before     *int        `param:"before"` // pagination id, which is the trade_id (exclusive)
-	after      *int        `param:"after"`  // pagination id, which is the trade_id (exclusive)
+	before     *uint64     `param:"before"` // pagination id, which is the trade_id (exclusive)
+	after      *uint64     `param:"after"`  // pagination id, which is the trade_id (exclusive)
 	marketType *MarketType `param:"market_type"`
 	startDate  *string     `param:"start_date"`
 	endDate    *string     `param:"end_date"`

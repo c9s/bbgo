@@ -29,12 +29,12 @@ func (g *GetOrderTradesRequest) Limit(limit int) *GetOrderTradesRequest {
 	return g
 }
 
-func (g *GetOrderTradesRequest) Before(before int) *GetOrderTradesRequest {
+func (g *GetOrderTradesRequest) Before(before uint64) *GetOrderTradesRequest {
 	g.before = &before
 	return g
 }
 
-func (g *GetOrderTradesRequest) After(after int) *GetOrderTradesRequest {
+func (g *GetOrderTradesRequest) After(after uint64) *GetOrderTradesRequest {
 	g.after = &after
 	return g
 }

@@ -155,7 +155,7 @@ func (g *GetOrdersRequest) GetParameters() (map[string]interface{}, error) {
 		before := *g.before
 
 		// assign parameter of before
-		params["before"] = before.Format("2006-01-02T15:04:05Z07:00")
+		params["before"] = before.Format("2006-01-02T15:04:05.999999999Z07:00")
 	} else {
 	}
 	// check after field -> json key after
@@ -163,7 +163,7 @@ func (g *GetOrdersRequest) GetParameters() (map[string]interface{}, error) {
 		after := *g.after
 
 		// assign parameter of after
-		params["after"] = after.Format("2006-01-02T15:04:05Z07:00")
+		params["after"] = after.Format("2006-01-02T15:04:05.999999999Z07:00")
 	} else {
 	}
 	// check limit field -> json key limit
