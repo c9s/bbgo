@@ -13,6 +13,7 @@ type Order struct {
 	Size      fixedpoint.Value `json:"size"`
 	Side      SideType         `json:"side"`
 	ProductID string           `json:"product_id"`
+	ProfileID string           `json:"profile_id"`
 	// ClientOID must be uuid
 	ClientOID string           `json:"client_oid"`
 	Stop      string           `json:"stop"`
@@ -52,8 +53,8 @@ type GetOrdersRequest struct {
 	sorting   *string    `param:"sorting" validValues:"asc,desc"`
 	startDate *time.Time `param:"start_date" timeFormat:"RFC3339"`
 	endDate   *time.Time `param:"end_date" timeFormat:"RFC3339"`
-	before    *time.Time `param:"before" timeFormat:"RFC3339"` // pagination id, which is the date of the order (exclusive)
-	after     *time.Time `param:"after" timeFormat:"RFC3339"`  // pagination id, which is the date of the order (exclusive)
+	before    *time.Time `param:"before" timeFormat:"RFC3339Nano"` // pagination id, which is the date of the order (exclusive)
+	after     *time.Time `param:"after" timeFormat:"RFC3339Nano"`  // pagination id, which is the date of the order (exclusive)
 	limit     int        `param:"limit,required"`
 	status    []string   `param:"status,required"`
 }
