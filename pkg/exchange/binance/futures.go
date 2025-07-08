@@ -361,7 +361,9 @@ func newFuturesClientOrderID(originalID string) (clientOrderID string) {
 	return clientOrderID
 }
 
-func (e *Exchange) queryFuturesDepth(ctx context.Context, symbol string) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
+func (e *Exchange) queryFuturesDepth(
+	ctx context.Context, symbol string,
+) (snapshot types.SliceOrderBook, finalUpdateID int64, err error) {
 	res, err := e.futuresClient.NewDepthService().Symbol(symbol).Limit(DefaultFuturesDepthLimit).Do(ctx)
 	if err != nil {
 		return snapshot, finalUpdateID, err
@@ -409,6 +411,7 @@ func (e *Exchange) SetLeverage(ctx context.Context, symbol string, leverage int)
 			Do(ctx)
 		return err
 	}
+
 	return fmt.Errorf("not supported set leverage")
 }
 
