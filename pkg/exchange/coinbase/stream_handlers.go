@@ -122,7 +122,7 @@ func (s *Stream) handleConnect() {
 		// the original order size to calculate the executed quantity.
 		// empty symbol -> all symbols
 		// empty status array -> all orders that are open or un-settled
-		workingRawOrders, err := s.exchange.queryOrdersByPagination(ctx, "", []string{})
+		workingRawOrders, err := s.exchange.queryOrdersByPagination(ctx, "", nil, nil, []string{})
 		if err != nil {
 			logStream.WithError(err).Warn("failed to query open orders, the orders snapshot is initialized with empty orders")
 		} else {
