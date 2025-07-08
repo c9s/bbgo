@@ -259,10 +259,7 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 	}
 
 	donePagination := len(cbOrdersDirty) < PaginationLimit
-	for {
-		if donePagination {
-			break
-		}
+	for !donePagination {
 		select {
 		case <-ctx.Done():
 			return cbOrdersDirty, ctx.Err()
@@ -440,10 +437,7 @@ func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, q types.Ord
 	}
 
 	donePagination := len(cbTrades) < PaginationLimit
-	for {
-		if donePagination {
-			break
-		}
+	for !donePagination {
 		select {
 		case <-ctx.Done():
 			return cbTrades, ctx.Err()
@@ -565,10 +559,7 @@ func (e *Exchange) queryProductTradesByPagination(
 	// 1. limit > 0 and we have enough trades
 	// 2. the trades are less than PaginationLimit -> have reached the end of the pagination
 	donePagination := (limit > 0 && len(cbTrades) >= limit) || (len(cbTrades) < PaginationLimit)
-	for {
-		if donePagination {
-			break
-		}
+	for !donePagination {
 		select {
 		case <-ctx.Done():
 			return cbTrades, ctx.Err()
