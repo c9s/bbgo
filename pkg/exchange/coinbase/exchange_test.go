@@ -233,6 +233,63 @@ func TestExchange_QueryOrderTrades(t *testing.T) {
 	assert.NotNil(t, trades)
 }
 
+func TestExchange_QueryTrades(t *testing.T) {
+	ex := getExchangeOrSkip(t)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	symbol := "BTCUSDT"
+	trades, err := ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{})
+	assert.NoError(t, err)
+	assert.NotNil(t, trades)
+	assert.Greater(t, len(trades), 0)
+
+	// query the last 100 trades
+	trades, err = ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
+		Limit: 100,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, trades)
+	assert.Equal(t, len(trades), 100)
+
+	// query the last 10 trades with last trade ID
+	lastTradeID := trades[10].ID
+	trades, err = ex.QueryTrades(ctx, symbol, &types.TradeQueryOptions{
+		LastTradeID: lastTradeID,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, trades)
+	assert.Equal(t, len(trades), 10)
+}
+
+func TestExchange_QueryClosedOrders(t *testing.T) {
+	ex := getExchangeOrSkip(t)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	symbol := "BTCUSDT"
+	startTime, _ := time.Parse(
+		time.RFC3339,
+		"2025-06-15T03:20:00Z",
+	)
+	endTime, _ := time.Parse(
+		time.RFC3339,
+		"2025-06-20T06:11:10Z",
+	)
+	orders, err := ex.QueryClosedOrders(ctx, symbol, startTime, endTime, 0)
+	assert.NoError(t, err)
+	assert.NotNil(t, orders)
+	assert.Greater(t, len(orders), 0)
+
+	// startTime and endTime are inclusive
+	startTime = orders[15].CreationTime.Time()
+	endTime = orders[10].CreationTime.Time()
+	orders, err = ex.QueryClosedOrders(ctx, symbol, startTime, endTime, 0)
+	assert.NoError(t, err)
+	assert.NotNil(t, orders)
+	assert.Equal(t, len(orders), 6)
+}
+
 func getExchangeOrSkip(t *testing.T) *Exchange {
 	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
 		t.Skip("skip test for CI")
