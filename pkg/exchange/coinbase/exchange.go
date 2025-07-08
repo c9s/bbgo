@@ -26,6 +26,7 @@ var (
 	_ types.CustomIntervalProvider               = &Exchange{}
 	_ tradingutil.CancelAllOrdersBySymbolService = &Exchange{}
 	_ types.ExchangeDefaultFeeRates              = &Exchange{}
+	_ types.ExchangeTradeHistoryService          = &Exchange{}
 )
 
 const (
@@ -244,12 +245,11 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 		return nil, errors.Wrap(err, "failed to get orders")
 	}
 
-	if len(cbOrders) < PaginationLimit {
-		return cbOrders, nil
-	}
-
-	done := false
+	donePagination := len(cbOrders) < PaginationLimit
 	for {
+		if donePagination {
+			break
+		}
 		select {
 		case <-ctx.Done():
 			return cbOrders, ctx.Err()
@@ -260,13 +260,8 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get orders while paginating")
 			}
-			if len(newOrders) < PaginationLimit {
-				done = true
-			}
 			cbOrders = append(cbOrders, newOrders...)
-		}
-		if done {
-			break
+			donePagination = len(newOrders) < PaginationLimit
 		}
 	}
 	return cbOrders, nil
@@ -421,11 +416,11 @@ func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, q types.Ord
 		return nil, err
 	}
 
-	if len(cbTrades) < PaginationLimit {
-		return cbTrades, nil
-	}
-	done := false
+	donePagination := len(cbTrades) < PaginationLimit
 	for {
+		if donePagination {
+			break
+		}
 		select {
 		case <-ctx.Done():
 			return cbTrades, ctx.Err()
@@ -436,13 +431,8 @@ func (e *Exchange) queryOrderTradesByPagination(ctx context.Context, q types.Ord
 			if err != nil {
 				return nil, err
 			}
-			if len(newTrades) < PaginationLimit {
-				done = true
-			}
 			cbTrades = append(cbTrades, newTrades...)
-		}
-		if done {
-			break
+			donePagination = len(newTrades) < PaginationLimit
 		}
 	}
 	return cbTrades, nil
@@ -484,4 +474,94 @@ func (e *Exchange) DefaultFeeRates() types.ExchangeFee {
 		MakerFeeRate: fixedpoint.NewFromFloat(0.25 * 0.01), // 25 bps = 0.25%
 		TakerFeeRate: fixedpoint.NewFromFloat(0.4 * 0.01),  // 40 bps = 0.4%
 	}
+}
+
+// ExchangeTradeHistoryService
+// QueryClosedOrders queries closed orders for the given symbol and time range.
+// startTime and endTime are inclusive.
+func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, startTime, endTime time.Time, lastOrderID uint64) ([]types.Order, error) {
+	if lastOrderID > 0 {
+		log.Warning("lastOrderID is not supported for Coinbase, it will be ignored")
+	}
+	cbOrders, err := e.queryOrdersByPagination(ctx, symbol, []string{"done"})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query closed orders for %s", symbol)
+	}
+	orders := make([]types.Order, 0)
+	for _, cbOrder := range cbOrders {
+		if cbOrder.CreatedAt.Before(startTime) || cbOrder.CreatedAt.After(endTime) {
+			continue
+		}
+		order := toGlobalOrder(&cbOrder)
+		orders = append(orders, order)
+	}
+	return orders, nil
+}
+
+func (e *Exchange) QueryTrades(ctx context.Context, symbol string, options *types.TradeQueryOptions) ([]types.Trade, error) {
+	cbTrades, err := e.queryProductTradesByPagination(
+		ctx, symbol, options,
+	)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query trades for %s", symbol)
+	}
+	var trades []types.Trade
+	for _, cbTrade := range cbTrades {
+		trades = append(trades, toGlobalTrade(&cbTrade))
+	}
+	return trades, nil
+}
+
+func (e *Exchange) queryProductTradesByPagination(
+	ctx context.Context, symbol string, options *types.TradeQueryOptions,
+) (cbTrades api.TradeSnapshot, err error) {
+	defer func() {
+		if err == nil && options.Limit > 0 {
+			cbTrades = cbTrades[:options.Limit]
+		}
+	}()
+	req := e.client.NewGetOrderTradesRequest().Limit(PaginationLimit)
+	req.ProductID(toLocalSymbol(symbol))
+	if options.StartTime != nil {
+		req.StartDate(
+			options.StartTime.Format(time.RFC3339Nano),
+		)
+	}
+	if options.EndTime != nil {
+		req.EndDate(
+			options.EndTime.Format(time.RFC3339Nano),
+		)
+	}
+	if options.LastTradeID > 0 {
+		req.Before(options.LastTradeID)
+	}
+	cbTrades, err = req.Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	limit := int(options.Limit)
+	// pagination done if
+	// 1. limit > 0 and we have enough trades
+	// 2. the trades are less than PaginationLimit -> have reached the end of the pagination
+	donePagination := (limit > 0 && len(cbTrades) >= limit) || (len(cbTrades) < PaginationLimit)
+	for {
+		if donePagination {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return cbTrades, ctx.Err()
+		default:
+			lastTrade := cbTrades[len(cbTrades)-1]
+			req.After(lastTrade.TradeID)
+			newTrades, err := req.Do(ctx)
+			if err != nil {
+				return nil, err
+			}
+			cbTrades = append(cbTrades, newTrades...)
+			donePagination = (limit > 0 && len(cbTrades) >= limit) || (len(newTrades) < PaginationLimit)
+		}
+	}
+	return cbTrades, nil
 }
