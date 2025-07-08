@@ -35,12 +35,12 @@ func (g *GetOrdersRequest) Sorting(sorting string) *GetOrdersRequest {
 	return g
 }
 
-func (g *GetOrdersRequest) StartDate(startDate time.Time) *GetOrdersRequest {
+func (g *GetOrdersRequest) StartDate(startDate string) *GetOrdersRequest {
 	g.startDate = &startDate
 	return g
 }
 
-func (g *GetOrdersRequest) EndDate(endDate time.Time) *GetOrdersRequest {
+func (g *GetOrdersRequest) EndDate(endDate string) *GetOrdersRequest {
 	g.endDate = &endDate
 	return g
 }
@@ -139,7 +139,7 @@ func (g *GetOrdersRequest) GetParameters() (map[string]interface{}, error) {
 		startDate := *g.startDate
 
 		// assign parameter of startDate
-		params["start_date"] = startDate.Format("2006-01-02T15:04:05Z07:00")
+		params["start_date"] = startDate
 	} else {
 	}
 	// check endDate field -> json key end_date
@@ -147,7 +147,7 @@ func (g *GetOrdersRequest) GetParameters() (map[string]interface{}, error) {
 		endDate := *g.endDate
 
 		// assign parameter of endDate
-		params["end_date"] = endDate.Format("2006-01-02T15:04:05Z07:00")
+		params["end_date"] = endDate
 	} else {
 	}
 	// check before field -> json key before
@@ -155,7 +155,7 @@ func (g *GetOrdersRequest) GetParameters() (map[string]interface{}, error) {
 		before := *g.before
 
 		// assign parameter of before
-		params["before"] = before.Format("2006-01-02T15:04:05Z07:00")
+		params["before"] = before.Format("2006-01-02T15:04:05.999999999Z07:00")
 	} else {
 	}
 	// check after field -> json key after
@@ -163,7 +163,7 @@ func (g *GetOrdersRequest) GetParameters() (map[string]interface{}, error) {
 		after := *g.after
 
 		// assign parameter of after
-		params["after"] = after.Format("2006-01-02T15:04:05Z07:00")
+		params["after"] = after.Format("2006-01-02T15:04:05.999999999Z07:00")
 	} else {
 	}
 	// check limit field -> json key limit
