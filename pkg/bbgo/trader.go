@@ -345,6 +345,11 @@ func (trader *Trader) LoadState(ctx context.Context) error {
 	log.Infof("loading strategies states...")
 	return trader.IterateStrategies(func(strategy types.StrategyID) error {
 		id := dynamic.CallID(strategy)
+
+		if customSync, ok := strategy.(CustomSync); ok {
+			return customSync.Load(ctx, id)
+		}
+
 		return loadPersistenceFields(strategy, id, ps)
 	})
 }
