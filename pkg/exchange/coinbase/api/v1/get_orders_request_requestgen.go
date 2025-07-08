@@ -35,12 +35,12 @@ func (g *GetOrdersRequest) Sorting(sorting string) *GetOrdersRequest {
 	return g
 }
 
-func (g *GetOrdersRequest) StartDate(startDate time.Time) *GetOrdersRequest {
+func (g *GetOrdersRequest) StartDate(startDate string) *GetOrdersRequest {
 	g.startDate = &startDate
 	return g
 }
 
-func (g *GetOrdersRequest) EndDate(endDate time.Time) *GetOrdersRequest {
+func (g *GetOrdersRequest) EndDate(endDate string) *GetOrdersRequest {
 	g.endDate = &endDate
 	return g
 }
@@ -139,7 +139,7 @@ func (g *GetOrdersRequest) GetParameters() (map[string]interface{}, error) {
 		startDate := *g.startDate
 
 		// assign parameter of startDate
-		params["start_date"] = startDate.Format("2006-01-02T15:04:05Z07:00")
+		params["start_date"] = startDate
 	} else {
 	}
 	// check endDate field -> json key end_date
@@ -147,7 +147,7 @@ func (g *GetOrdersRequest) GetParameters() (map[string]interface{}, error) {
 		endDate := *g.endDate
 
 		// assign parameter of endDate
-		params["end_date"] = endDate.Format("2006-01-02T15:04:05Z07:00")
+		params["end_date"] = endDate
 	} else {
 	}
 	// check before field -> json key before
