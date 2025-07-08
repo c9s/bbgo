@@ -347,7 +347,8 @@ func (trader *Trader) LoadState(ctx context.Context) error {
 		id := dynamic.CallID(strategy)
 
 		if customSync, ok := strategy.(CustomSync); ok {
-			return customSync.Load(ctx, id)
+			store := ps.NewStore(id)
+			return customSync.Load(ctx, store)
 		}
 
 		return loadPersistenceFields(strategy, id, ps)

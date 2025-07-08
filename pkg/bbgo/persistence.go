@@ -19,8 +19,8 @@ var defaultPersistenceServiceFacade = &service.PersistenceServiceFacade{
 }
 
 type CustomSync interface {
-	Store(ctx context.Context, id string) error
-	Load(ctx context.Context, id string) error
+	Store(ctx context.Context, store service.Store) error
+	Load(ctx context.Context, store service.Store) error
 }
 
 // Sync syncs the object properties into the persistence layer
@@ -43,9 +43,12 @@ func Sync(ctx context.Context, obj interface{}) {
 	}
 
 	if customSync, ok := obj.(CustomSync); ok {
-		if err := customSync.Store(ctx, id); err != nil {
+		store := ps.NewStore(id)
+		if err := customSync.Store(ctx, store); err != nil {
 			logger.WithError(err).Errorf("failed to store with id %s", id)
 		}
+
+		return
 	}
 
 	err := storePersistenceFields(obj, id, ps)

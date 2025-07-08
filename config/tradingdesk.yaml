@@ -2,12 +2,18 @@
 sessions:
   binance:
     exchange: binance
-
-  binance_futures:
-    exchange: binance
     futures: true
+    symbolLeverage:
+      BTCUSDT: 3
+      ETHUSDT: 3
 
 exchangeStrategies:
-  - on: binance_futures
+  - on: binance
     tradingdesk:
       maxLossLimit: 10
+      testOpenPosition:
+        symbol: BTCUSDT
+        side: BUY
+        quantity: 0.001
+        stopLossPrice: 105_000
+        takeProfitPrice: 109_500
