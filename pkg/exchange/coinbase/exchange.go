@@ -218,7 +218,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.Order, error) {
-	cbOrders, err := e.queryOrdersByPagination(ctx, symbol, []string{"open"})
+	cbOrders, err := e.queryOrdersByPagination(ctx, symbol, nil, nil, []string{"open"})
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +230,7 @@ func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.
 }
 
 // if symbol is empty string, it will return all orders
-func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, status []string) ([]api.Order, error) {
+func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, startTime, endTime *time.Time, status []string) ([]api.Order, error) {
 	sortedBy := "created_at"
 	sorting := "desc"
 	localSymbol := toLocalSymbol(symbol)
@@ -240,29 +240,52 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 	if len(localSymbol) > 0 {
 		getOrdersReq.ProductID(localSymbol)
 	}
-	cbOrders, err := getOrdersReq.Do(ctx)
+	startDate := ""
+	if startTime != nil {
+		startDate = startTime.Format("2006-01-02")
+		getOrdersReq.StartDate(startDate)
+	}
+	if endTime != nil {
+		endDate := endTime.Format("2006-01-02")
+		if endDate == startDate {
+			// add 24 hours to the end date to include the end time
+			endDate = endTime.Add(time.Hour * 24).Format("2006-01-02")
+		}
+		getOrdersReq.EndDate(endDate)
+	}
+	cbOrdersDirty, err := getOrdersReq.Do(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get orders")
 	}
 
-	donePagination := len(cbOrders) < PaginationLimit
+	donePagination := len(cbOrdersDirty) < PaginationLimit
 	for {
 		if donePagination {
 			break
 		}
 		select {
 		case <-ctx.Done():
-			return cbOrders, ctx.Err()
+			return cbOrdersDirty, ctx.Err()
 		default:
-			after := time.Time(cbOrders[len(cbOrders)-1].CreatedAt)
+			after := time.Time(cbOrdersDirty[len(cbOrdersDirty)-1].CreatedAt)
 			getOrdersReq.After(after)
 			newOrders, err := getOrdersReq.Do(ctx)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to get orders while paginating")
 			}
-			cbOrders = append(cbOrders, newOrders...)
+			cbOrdersDirty = append(cbOrdersDirty, newOrders...)
 			donePagination = len(newOrders) < PaginationLimit
 		}
+	}
+	var cbOrders []api.Order
+	for _, cbOrder := range cbOrdersDirty {
+		if startTime != nil && cbOrder.CreatedAt.Before(*startTime) {
+			continue
+		}
+		if endTime != nil && cbOrder.CreatedAt.After(*endTime) {
+			continue
+		}
+		cbOrders = append(cbOrders, cbOrder)
 	}
 	return cbOrders, nil
 }
@@ -483,15 +506,12 @@ func (e *Exchange) QueryClosedOrders(ctx context.Context, symbol string, startTi
 	if lastOrderID > 0 {
 		log.Warning("lastOrderID is not supported for Coinbase, it will be ignored")
 	}
-	cbOrders, err := e.queryOrdersByPagination(ctx, symbol, []string{"done"})
+	cbOrders, err := e.queryOrdersByPagination(ctx, symbol, &startTime, &endTime, []string{"done"})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to query closed orders for %s", symbol)
 	}
 	orders := make([]types.Order, 0)
 	for _, cbOrder := range cbOrders {
-		if cbOrder.CreatedAt.Before(startTime) || cbOrder.CreatedAt.After(endTime) {
-			continue
-		}
 		order := toGlobalOrder(&cbOrder)
 		orders = append(orders, order)
 	}
