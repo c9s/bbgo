@@ -63,7 +63,7 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 
 func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 	return types.Trade{
-		ID:            uint64(cbTrade.TradeID),
+		ID:            cbTrade.TradeID,
 		OrderID:       FNV64a(cbTrade.OrderID),
 		Exchange:      types.ExchangeCoinBase,
 		Price:         cbTrade.Price,
