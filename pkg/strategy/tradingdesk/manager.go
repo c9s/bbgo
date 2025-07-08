@@ -11,21 +11,35 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-type TradingManager struct {
-	Position      *types.Position    `persistence:"position"`
-	ProfitStats   *types.ProfitStats `persistence:"profitStats"`
-	OrderExecutor *bbgo.GeneralOrderExecutor
-
-	// Configuration for position opening
-	MaxLossLimit fixedpoint.Value
-	PriceType    types.PriceType
-
-	// References to strategy components
-	Session *bbgo.ExchangeSession
-	Market  types.Market
+type TradingManagerState struct {
+	Position    *types.Position    `persistence:"position" json:"position"`
+	ProfitStats *types.ProfitStats `persistence:"profitStats" json:"profitStats"`
 }
 
-func (m *TradingManager) Initialize(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market, strategyID, instanceID string) {
+type TradingManager struct {
+	TradingManagerState
+
+	orderExecutor *bbgo.GeneralOrderExecutor
+
+	// References to strategy components
+	session  *bbgo.ExchangeSession
+	market   types.Market
+	strategy *Strategy
+
+	takeProfitOrders, stopLossOrders []types.Order
+
+	logger logrus.FieldLogger
+}
+
+func (m *TradingManager) Initialize(
+	ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market,
+	strategy *Strategy,
+) {
+	strategyID := strategy.ID()
+	instanceID := strategy.InstanceID()
+
+	m.strategy = strategy
+
 	if m.Position == nil {
 		m.Position = types.NewPositionFromMarket(market)
 		m.Position.Strategy = strategyID
@@ -36,62 +50,140 @@ func (m *TradingManager) Initialize(ctx context.Context, environ *bbgo.Environme
 		m.ProfitStats = types.NewProfitStats(market)
 	}
 
-	m.OrderExecutor = bbgo.NewGeneralOrderExecutor(session, market.Symbol, strategyID, instanceID, m.Position)
-	m.OrderExecutor.BindEnvironment(environ)
-	m.OrderExecutor.BindProfitStats(m.ProfitStats)
-	m.OrderExecutor.Bind()
+	m.orderExecutor = bbgo.NewGeneralOrderExecutor(session, market.Symbol, strategyID, instanceID, m.Position)
+	m.orderExecutor.BindEnvironment(environ)
+	m.orderExecutor.BindProfitStats(m.ProfitStats)
+	m.orderExecutor.Bind()
 
-	// Store references for position opening
-	m.Session = session
-	m.Market = market
-
-	// Set default price type if not set
-	if m.PriceType == "" {
-		m.PriceType = types.PriceTypeMaker
-	}
+	// store references for position opening
+	m.session = session
+	m.market = market
 }
 
 type TradingManagerMap map[string]*TradingManager
 
-func (m TradingManagerMap) GetTradingManager(ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, symbol, strategyID, instanceID string) (*TradingManager, error) {
-	market, ok := session.Market(symbol)
-	if !ok {
-		return nil, fmt.Errorf("market %s not found", symbol)
+func (m TradingManagerMap) Get(
+	ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market,
+	strategy *Strategy,
+) *TradingManager {
+	manager, ok := m[market.Symbol]
+	if ok {
+		return manager
 	}
 
-	manager, ok := m[symbol]
-	if !ok {
-		manager = &TradingManager{}
-		m[symbol] = manager
-	}
+	manager = m.New(ctx, environ, session, market, strategy)
+	m[market.Symbol] = manager
+	return manager
+}
 
-	manager.Initialize(ctx, environ, session, market, strategyID, instanceID)
-	return manager, nil
+func (m TradingManagerMap) New(
+	ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market,
+	strategy *Strategy,
+) *TradingManager {
+	manager := &TradingManager{}
+	manager.Initialize(ctx, environ, session, market, strategy)
+	return manager
 }
 
 // OpenPosition opens a new position with risk-based position sizing.
 // The position size is calculated based on MaxLossLimit, stop loss price, and available balance.
-func (m *TradingManager) OpenPosition(ctx context.Context, param OpenPositionParam) error {
+func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionParams) error {
 	// Calculate position size based on risk management
-	quantity, err := m.calculatePositionSize(ctx, param)
+	quantity, err := m.calculatePositionSize(ctx, params)
 	if err != nil {
 		return err
 	}
 
 	order := types.SubmitOrder{
-		Symbol:    param.Symbol,
-		Side:      param.Side,
-		Type:      types.OrderTypeMarket,
-		Quantity:  quantity,
-		StopPrice: param.StopLossPrice,
+		Symbol:   params.Symbol,
+		Side:     params.Side,
+		Type:     types.OrderTypeMarket,
+		Market:   m.market,
+		Quantity: quantity,
 	}
 
-	createdOrders, err := m.OrderExecutor.SubmitOrders(ctx, order)
+	createdOrders, err := m.orderExecutor.SubmitOrders(ctx, order)
 	if err != nil {
-		logrus.WithError(err).Errorf("failed to submit market order: %+v", order)
-		return err
+		return fmt.Errorf("failed to open position for %s: %w", params.Symbol, err)
 	}
+
 	logrus.Infof("created orders: %+v", createdOrders)
+
+	if params.StopLossPrice.Sign() > 0 {
+		stopLossOrders, err := m.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			Market:        m.market,
+			Symbol:        params.Symbol,
+			Side:          params.Side.Reverse(),
+			Type:          types.OrderTypeStopMarket,
+			StopPrice:     params.StopLossPrice,
+			ClosePosition: true,
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to submit stop loss orders for %s: %w", params.Symbol, err)
+		}
+
+		m.strategy.logger.Infof("created stop loss orders: %+v", stopLossOrders)
+		m.stopLossOrders = stopLossOrders
+	}
+
+	if params.TakeProfitPrice.Sign() > 0 {
+		orderType := types.OrderTypeStopMarket
+
+		if m.session.Futures && m.session.ExchangeName == types.ExchangeBinance {
+			orderType = types.OrderTypeTakeProfitMarket
+		}
+
+		takeProfitOrders, err := m.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
+			Market:        m.market,
+			Symbol:        params.Symbol,
+			Side:          params.Side.Reverse(),
+			Type:          orderType,
+			StopPrice:     params.TakeProfitPrice,
+			ClosePosition: true,
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to submit take profit orders for %s: %w", params.Symbol, err)
+		}
+
+		m.strategy.logger.Infof("created take loss orders: %+v", takeProfitOrders)
+		m.takeProfitOrders = takeProfitOrders
+	}
+
+	return nil
+}
+
+func (m *TradingManager) GetPosition() *types.Position {
+	return m.Position
+}
+
+func (m *TradingManager) ClosePosition(ctx context.Context) error {
+	if m.Position == nil {
+		return fmt.Errorf("no position to close for %s", m.market.Symbol)
+	}
+
+	// Close position by submitting a market order in the opposite direction
+	order := types.SubmitOrder{
+		Symbol:     m.market.Symbol,
+		Side:       m.Position.Side().Reverse(),
+		Type:       types.OrderTypeMarket,
+		Market:     m.market,
+		Quantity:   m.Position.GetBase().Abs(),
+		ReduceOnly: true,
+
+		// ClosePosition is only used for stop market
+		ClosePosition: false,
+	}
+
+	_, err := m.orderExecutor.SubmitOrders(ctx, order)
+	if err != nil {
+		return fmt.Errorf("failed to close position for %s order: %+v: %w", m.market.Symbol, order, err)
+	}
+
+	// reset orders
+	m.takeProfitOrders = nil
+	m.stopLossOrders = nil
 	return nil
 }
 
@@ -109,19 +201,21 @@ func (m *TradingManager) OpenPosition(ctx context.Context, param OpenPositionPar
 // 6. Returns the minimum of risk-limited quantity and balance-limited quantity
 //
 // This ensures positions never exceed risk tolerance or available funds.
-func (m *TradingManager) calculatePositionSize(ctx context.Context, param OpenPositionParam) (fixedpoint.Value, error) {
+func (m *TradingManager) calculatePositionSize(
+	ctx context.Context, param OpenPositionParams,
+) (fixedpoint.Value, error) {
 	// Check if stop loss is provided, if not return original quantity
 	if param.StopLossPrice.IsZero() {
 		return param.Quantity, nil
 	}
 
 	// Get current market price
-	ticker, err := m.Session.Exchange.QueryTicker(ctx, param.Symbol)
+	ticker, err := m.session.Exchange.QueryTicker(ctx, param.Symbol)
 	if err != nil {
 		return fixedpoint.Zero, fmt.Errorf("failed to get ticker for %s: %w", param.Symbol, err)
 	}
 
-	currentPrice := m.PriceType.GetPrice(ticker, param.Side)
+	currentPrice := m.strategy.PriceType.GetPrice(ticker, param.Side)
 	if currentPrice.IsZero() {
 		return fixedpoint.Zero, fmt.Errorf("invalid current price for %s", param.Symbol)
 	}
@@ -131,26 +225,26 @@ func (m *TradingManager) calculatePositionSize(ctx context.Context, param OpenPo
 		return fixedpoint.Zero, createInvalidStopLossError(param.Side, currentPrice)
 	}
 
-	maxQuantityByRisk := m.MaxLossLimit.Div(riskPerUnit)
-	account := m.Session.GetAccount()
-	if m.Session.Futures {
-		quoteBalance, ok := account.Balance(m.Market.QuoteCurrency)
+	maxQuantityByRisk := m.strategy.MaxLossLimit.Div(riskPerUnit)
+	account := m.session.GetAccount()
+	if m.session.Futures {
+		quoteBalance, ok := account.Balance(m.market.QuoteCurrency)
 		if !ok {
-			return fixedpoint.Zero, fmt.Errorf("no balance found for %s", m.Market.QuoteCurrency)
+			return fixedpoint.Zero, fmt.Errorf("no balance found for %s", m.market.QuoteCurrency)
 		}
 		return fixedpoint.Min(quoteBalance.Available.Div(currentPrice), maxQuantityByRisk), nil
 	} else {
 		if param.Side == types.SideTypeBuy {
-			quoteBalance, ok := account.Balance(m.Market.QuoteCurrency)
+			quoteBalance, ok := account.Balance(m.market.QuoteCurrency)
 			if !ok {
-				return fixedpoint.Zero, fmt.Errorf("no balance found for %s", m.Market.QuoteCurrency)
+				return fixedpoint.Zero, fmt.Errorf("no balance found for %s", m.market.QuoteCurrency)
 			}
 			return fixedpoint.Min(quoteBalance.Available.Div(currentPrice), maxQuantityByRisk), nil
 		}
 
-		baseBalance, ok := account.Balance(m.Market.BaseCurrency)
+		baseBalance, ok := account.Balance(m.market.BaseCurrency)
 		if !ok {
-			return fixedpoint.Zero, fmt.Errorf("no balance found for %s", m.Market.BaseCurrency)
+			return fixedpoint.Zero, fmt.Errorf("no balance found for %s", m.market.BaseCurrency)
 		}
 		return fixedpoint.Min(baseBalance.Available, maxQuantityByRisk), nil
 	}

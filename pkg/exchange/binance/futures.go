@@ -180,7 +180,7 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 	// set stop price
 	switch order.Type {
 
-	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
+	case types.OrderTypeStopLimit, types.OrderTypeStopMarket, types.OrderTypeTakeProfitMarket:
 		if order.Market.Symbol != "" {
 			req.StopPrice(order.Market.FormatPrice(order.StopPrice))
 		} else {

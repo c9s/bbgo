@@ -95,6 +95,9 @@ func toLocalFuturesOrderType(orderType types.OrderType) (futures.OrderType, erro
 
 	case types.OrderTypeMarket:
 		return futures.OrderTypeMarket, nil
+
+	case types.OrderTypeTakeProfitMarket:
+		return futures.OrderTypeTakeProfitMarket, nil
 	}
 
 	return "", fmt.Errorf("can not convert to local order, order type %s not supported", orderType)
@@ -128,6 +131,7 @@ func toGlobalFuturesOrder(futuresOrder *futures.Order, isIsolated bool) (*types.
 			ReduceOnly:    futuresOrder.ReduceOnly,
 			ClosePosition: futuresOrder.ClosePosition,
 			Quantity:      fixedpoint.MustNewFromString(futuresOrder.OrigQuantity),
+			StopPrice:     fixedpoint.MustNewFromString(futuresOrder.StopPrice),
 			Price:         fixedpoint.MustNewFromString(orderPrice),
 			TimeInForce:   types.TimeInForce(futuresOrder.TimeInForce),
 		},
@@ -138,6 +142,7 @@ func toGlobalFuturesOrder(futuresOrder *futures.Order, isIsolated bool) (*types.
 		CreationTime:     types.Time(millisecondTime(futuresOrder.Time)),
 		UpdateTime:       types.Time(millisecondTime(futuresOrder.UpdateTime)),
 		IsFutures:        true,
+		IsIsolated:       isIsolated,
 	}, nil
 }
 
@@ -216,7 +221,7 @@ func toGlobalFuturesOrderType(orderType futures.OrderType) types.OrderType {
 		return types.OrderTypeStopLimit
 
 	case futures.OrderTypeTakeProfitMarket:
-		return types.OrderTypeStopMarket
+		return types.OrderTypeTakeProfitMarket
 
 	case futures.OrderTypeStopMarket:
 		return types.OrderTypeStopMarket
