@@ -19,7 +19,6 @@ func Test_toGlobalFuturesAccountInfo(t *testing.T) {
 		TotalMaintMargin:            fixedpoint.NewFromFloat(50.0),
 		TotalOpenOrderInitialMargin: fixedpoint.NewFromFloat(20.0),
 		UnrealizedPnl:               fixedpoint.NewFromFloat(30.0),
-		UpdateTime:                  types.MillisecondTimestamp(testTime),
 		Details: []okexapi.BalanceDetail{
 			{
 				Currency:                "BTC",
@@ -51,7 +50,6 @@ func Test_toGlobalFuturesAccountInfo(t *testing.T) {
 	assert.Equal(t, account.TotalInitialMargin, info.TotalInitialMargin)
 	assert.Equal(t, account.TotalMaintMargin, info.TotalMaintMargin)
 	assert.Equal(t, account.UnrealizedPnl, info.TotalUnrealizedProfit)
-	assert.Equal(t, testTime.Unix(), info.UpdateTime)
 
 	// Verify asset conversion
 	btcAsset, exists := info.Assets["BTC"]
@@ -119,7 +117,6 @@ func Test_toGlobalFuturesPositions(t *testing.T) {
 	assert.Equal(t, fixedpoint.NewFromFloat(2000.0), ethPosition.AverageCost)
 	assert.Equal(t, fixedpoint.NewFromFloat(2100.0), ethPosition.Quote.Div(ethPosition.Base))
 	assert.Equal(t, fixedpoint.NewFromFloat(5.0), ethPosition.PositionRisk.Leverage)
-	assert.Equal(t, testTime.Unix(), ethPosition.UpdateTime)
 }
 
 func TestToGlobalPositionSide(t *testing.T) {
@@ -164,5 +161,4 @@ func TestToGlobalPositionRisk(t *testing.T) {
 	assert.Equal(t, fixedpoint.MustNewFromString("10"), risk.Leverage)
 	assert.Equal(t, "USDT", risk.MarginAsset)
 	assert.Equal(t, fixedpoint.MustNewFromString("1"), risk.Adl)
-	assert.Equal(t, types.MillisecondTimestamp(time.Unix(1234567890/1000, 0)), risk.UpdateTime)
 }

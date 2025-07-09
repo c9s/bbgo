@@ -109,13 +109,21 @@ func (f *FuturesGetAccountRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (f *FuturesGetAccountRequest) GetPath() string {
+	return "/fapi/v2/account"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (f *FuturesGetAccountRequest) Do(ctx context.Context) (*FuturesAccount, error) {
 
 	// no body params
 	var params interface{}
 	query := url.Values{}
 
-	apiURL := "/fapi/v2/account"
+	var apiURL string
+
+	apiURL = f.GetPath()
 
 	req, err := f.client.NewAuthenticatedRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
@@ -128,8 +136,32 @@ func (f *FuturesGetAccountRequest) Do(ctx context.Context) (*FuturesAccount, err
 	}
 
 	var apiResponse FuturesAccount
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal json: %w", err)
+		}
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return &apiResponse, nil
 }

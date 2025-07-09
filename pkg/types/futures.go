@@ -30,7 +30,8 @@ func (s *FuturesSettings) UseIsolatedFutures(symbol string) {
 
 // FuturesUserAsset define cross/isolated futures account asset
 type FuturesUserAsset struct {
-	Asset                  string           `json:"asset"`
+	Asset string `json:"asset"`
+
 	InitialMargin          fixedpoint.Value `json:"initialMargin"`
 	MaintMargin            fixedpoint.Value `json:"maintMargin"`
 	MarginBalance          fixedpoint.Value `json:"marginBalance"`
