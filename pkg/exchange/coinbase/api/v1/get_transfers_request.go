@@ -21,7 +21,7 @@ const (
 // We handle it with a custom type TransferTime
 type TransferTime time.Time
 
-const transferTimeFormat = "2006-01-02 15:04:05.999999+00"
+const transferTimeFormat = "2006-01-02 15:04:05.999999Z07"
 
 func (t TransferTime) MarshalJSON() ([]byte, error) {
 	return json.Marshal(time.Time(t).Format(transferTimeFormat))
