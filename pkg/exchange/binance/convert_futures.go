@@ -13,44 +13,36 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func toGlobalFuturesAccountInfo(account *binanceapi.FuturesAccount) *types.FuturesAccountInfo {
-	return &types.FuturesAccountInfo{
+func toGlobalFuturesAccountInfo(account *binanceapi.FuturesAccount) *types.FuturesAccount {
+	return &types.FuturesAccount{
 		Assets:                      toGlobalFuturesUserAssets(account.Assets),
 		Positions:                   toGlobalFuturesPositions(account.Positions),
-		TotalInitialMargin:          fixedpoint.MustNewFromString(account.TotalInitialMargin),
-		TotalMaintMargin:            fixedpoint.MustNewFromString(account.TotalMaintMargin),
-		TotalMarginBalance:          fixedpoint.MustNewFromString(account.TotalMarginBalance),
-		TotalOpenOrderInitialMargin: fixedpoint.MustNewFromString(account.TotalOpenOrderInitialMargin),
-		TotalPositionInitialMargin:  fixedpoint.MustNewFromString(account.TotalPositionInitialMargin),
-		TotalUnrealizedProfit:       fixedpoint.MustNewFromString(account.TotalUnrealizedProfit),
-		TotalWalletBalance:          fixedpoint.MustNewFromString(account.TotalWalletBalance),
-		UpdateTime:                  account.UpdateTime,
+		TotalInitialMargin:          account.TotalInitialMargin,
+		TotalMaintMargin:            account.TotalMaintMargin,
+		TotalWalletBalance:          account.TotalWalletBalance,
+		TotalMarginBalance:          account.TotalMarginBalance,
+		TotalOpenOrderInitialMargin: account.TotalOpenOrderInitialMargin,
+		TotalPositionInitialMargin:  account.TotalPositionInitialMargin,
+		TotalUnrealizedProfit:       account.TotalUnrealizedProfit,
+
+		AvailableBalance: account.AvailableBalance,
 	}
 }
 
-func toGlobalFuturesBalance(balances []*futures.Balance) types.BalanceMap {
-	retBalances := make(types.BalanceMap)
-	for _, balance := range balances {
-		retBalances[balance.Asset] = types.Balance{
-			Currency:  balance.Asset,
-			Available: fixedpoint.MustNewFromString(balance.AvailableBalance),
-		}
-	}
-	return retBalances
-}
-
-func toGlobalFuturesPositions(futuresPositions []*binanceapi.FuturesAccountPosition) types.FuturesPositionMap {
+func toGlobalFuturesPositions(futuresPositions []binanceapi.FuturesAccountPosition) types.FuturesPositionMap {
 	retFuturesPositions := make(types.FuturesPositionMap)
 	for _, futuresPosition := range futuresPositions {
 		retFuturesPositions[futuresPosition.Symbol] = types.FuturesPosition{ // TODO: types.FuturesPosition
 			Isolated:    futuresPosition.Isolated,
-			AverageCost: fixedpoint.MustNewFromString(futuresPosition.EntryPrice),
-			Base:        fixedpoint.MustNewFromString(futuresPosition.PositionAmt),
-			Quote:       fixedpoint.MustNewFromString(futuresPosition.Notional),
+			AverageCost: futuresPosition.EntryPrice,
+			Base:        futuresPosition.PositionAmt,
+			Quote:       futuresPosition.Notional,
 
+			// TODO: convert position risk
 			PositionRisk: &types.PositionRisk{
-				Leverage: fixedpoint.MustNewFromString(futuresPosition.Leverage),
+				Leverage: futuresPosition.Leverage,
 			},
+
 			Symbol:     futuresPosition.Symbol,
 			UpdateTime: futuresPosition.UpdateTime,
 		}
@@ -59,19 +51,19 @@ func toGlobalFuturesPositions(futuresPositions []*binanceapi.FuturesAccountPosit
 	return retFuturesPositions
 }
 
-func toGlobalFuturesUserAssets(assets []*binanceapi.FuturesAccountAsset) (retAssets types.FuturesAssetMap) {
+func toGlobalFuturesUserAssets(assets []binanceapi.FuturesAccountAsset) (retAssets types.FuturesAssetMap) {
 	retFuturesAssets := make(types.FuturesAssetMap)
 	for _, futuresAsset := range assets {
 		retFuturesAssets[futuresAsset.Asset] = types.FuturesUserAsset{
 			Asset:                  futuresAsset.Asset,
-			InitialMargin:          fixedpoint.MustNewFromString(futuresAsset.InitialMargin),
-			MaintMargin:            fixedpoint.MustNewFromString(futuresAsset.MaintMargin),
-			MarginBalance:          fixedpoint.MustNewFromString(futuresAsset.MarginBalance),
-			MaxWithdrawAmount:      fixedpoint.MustNewFromString(futuresAsset.MaxWithdrawAmount),
-			OpenOrderInitialMargin: fixedpoint.MustNewFromString(futuresAsset.OpenOrderInitialMargin),
-			PositionInitialMargin:  fixedpoint.MustNewFromString(futuresAsset.PositionInitialMargin),
-			UnrealizedProfit:       fixedpoint.MustNewFromString(futuresAsset.UnrealizedProfit),
-			WalletBalance:          fixedpoint.MustNewFromString(futuresAsset.WalletBalance),
+			InitialMargin:          futuresAsset.InitialMargin,
+			MaintMargin:            futuresAsset.MaintMargin,
+			MarginBalance:          futuresAsset.MarginBalance,
+			MaxWithdrawAmount:      futuresAsset.MaxWithdrawAmount,
+			OpenOrderInitialMargin: futuresAsset.OpenOrderInitialMargin,
+			PositionInitialMargin:  futuresAsset.PositionInitialMargin,
+			UnrealizedProfit:       futuresAsset.UnrealizedProfit,
+			WalletBalance:          futuresAsset.WalletBalance,
 		}
 	}
 
