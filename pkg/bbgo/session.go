@@ -140,6 +140,9 @@ type ExchangeSessionConfig struct {
 	IsolatedFutures       bool   `json:"isolatedFutures,omitempty" yaml:"isolatedFutures,omitempty"`
 	IsolatedFuturesSymbol string `json:"isolatedFuturesSymbol,omitempty" yaml:"isolatedFuturesSymbol,omitempty"`
 
+	// Leverage is used for controlling the max leverage only if the exchange supports it
+	SymbolLeverage map[string]int `json:"symbolLeverage,omitempty" yaml:"symbolLeverage,omitempty"`
+
 	// AccountName is used for labeling the account name of the session
 	AccountName string `json:"accountName,omitempty" yaml:"accountName,omitempty"`
 
@@ -432,6 +435,16 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 	session.SetMarkets(markets)
 
 	session.priceSolver = pricesolver.NewSimplePriceResolver(markets)
+
+	if session.SymbolLeverage != nil && len(session.SymbolLeverage) > 0 && session.Futures {
+		if riskService, ok := session.Exchange.(types.ExchangeRiskService); ok {
+			for symbol, leverage := range session.SymbolLeverage {
+				if err := riskService.SetLeverage(ctx, symbol, leverage); err != nil {
+					logger.WithError(err).Error("failed to set leverage")
+				}
+			}
+		}
+	}
 
 	if feeRateProvider, ok := session.Exchange.(types.ExchangeDefaultFeeRates); ok {
 		defaultFeeRates := feeRateProvider.DefaultFeeRates()

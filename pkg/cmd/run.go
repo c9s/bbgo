@@ -75,12 +75,12 @@ func runSetup(baseCtx context.Context, userConfig *bbgo.Config, enableApiServer 
 	}
 
 	cmdutil.WaitForSignal(ctx, syscall.SIGINT, syscall.SIGTERM)
-	cancelTrading()
 
 	gracefulShutdownPeriod := 30 * time.Second
 	shtCtx, cancelShutdown := context.WithTimeout(bbgo.NewTodoContextWithExistingIsolation(ctx), gracefulShutdownPeriod)
 	bbgo.Shutdown(shtCtx)
 	cancelShutdown()
+	cancelTrading()
 
 	return nil
 }
