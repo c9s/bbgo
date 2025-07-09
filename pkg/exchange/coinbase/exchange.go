@@ -27,6 +27,7 @@ var (
 	_ tradingutil.CancelAllOrdersBySymbolService = &Exchange{}
 	_ types.ExchangeDefaultFeeRates              = &Exchange{}
 	_ types.ExchangeTradeHistoryService          = &Exchange{}
+	_ types.ExchangeTransferHistoryService       = &Exchange{}
 )
 
 const (
@@ -575,4 +576,91 @@ func (e *Exchange) queryProductTradesByPagination(
 		}
 	}
 	return cbTrades, nil
+}
+
+// ExchangeTransferHistoryService
+func (e *Exchange) QueryDepositHistory(ctx context.Context, asset string, since, until time.Time) ([]types.Deposit, error) {
+	transfers, err := e.queryTransferHistoryByPagination(ctx, asset, since, until, api.TransferTypeDeposit)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query deposit history for asset %s(%s ~ %s)", asset, since, until)
+	}
+	deposits := make([]types.Deposit, 0, len(transfers))
+	for _, transfer := range transfers {
+		deposits = append(deposits, toGlobalDeposit(&transfer))
+	}
+	return deposits, nil
+}
+
+func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since, until time.Time) ([]types.Withdraw, error) {
+	transfers, err := e.queryTransferHistoryByPagination(ctx, asset, since, until, api.TransferTypeWithdraw)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query withdraw history for asset %s(%s ~ %s)", asset, since, until)
+	}
+	withdraws := make([]types.Withdraw, 0, len(transfers))
+	for _, transfer := range transfers {
+		withdraws = append(withdraws, toGlobalWithdraw(&transfer))
+	}
+	return withdraws, nil
+}
+
+func (e *Exchange) queryTransferHistoryByPagination(ctx context.Context, asset string, since, until time.Time, transferType api.TransferType) ([]api.Transfer, error) {
+	if len(asset) == 0 {
+		return nil, errors.New("asset is required for querying transfer history")
+	}
+	req := e.client.NewGetTransfersRequest().
+		TransferType(transferType).
+		Limit(PaginationLimit).
+		Currency(strings.ToUpper(asset))
+	if !since.IsZero() {
+		req.Before(since)
+	}
+	if !until.IsZero() {
+		// `after` is exclusive, add one day to the until date
+		req.After(until.AddDate(0, 0, 1))
+	}
+	transfersDirty, err := req.Do(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to query transfer history for asset %s", asset)
+	}
+	seenTransfers := make(map[string]struct{})
+	for _, transfer := range transfersDirty {
+		seenTransfers[transfer.ID] = struct{}{}
+	}
+
+	donePagination := len(transfersDirty) < PaginationLimit
+	for !donePagination {
+		select {
+		case <-ctx.Done():
+			return transfersDirty, ctx.Err()
+		default:
+			lastTransfer := transfersDirty[len(transfersDirty)-1]
+			lastTime := lastTransfer.CreatedAt.Time()
+			// `after` is exclusive, we overlap the pagination to prevent missing transfers
+			req.After(lastTime.AddDate(0, 0, 1))
+			newTransfers, err := req.Do(ctx)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to query transfer history for asset %s while paginating", asset)
+			}
+			// deduplicate transfers for the overlapping pagination
+			for _, transfer := range newTransfers {
+				if _, seen := seenTransfers[transfer.ID]; seen {
+					continue
+				}
+				transfersDirty = append(transfersDirty, transfer)
+				seenTransfers[transfer.ID] = struct{}{}
+			}
+			donePagination = (len(newTransfers) < PaginationLimit) || lastTime.Before(since)
+		}
+	}
+	// filter transfers by `since` and `until`
+	// since `before` and `after` have granularity of day not second or millisecond.
+	transfers := make([]api.Transfer, 0, len(transfersDirty))
+	for _, transfer := range transfersDirty {
+		createTime := transfer.CreatedAt.Time()
+		if createTime.Before(since) || createTime.After(until) {
+			continue
+		}
+		transfers = append(transfers, transfer)
+	}
+	return transfers, nil
 }

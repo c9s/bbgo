@@ -186,6 +186,61 @@ func toGlobalTimeInForce(localTIF api.TimeInForceType) types.TimeInForce {
 	}
 }
 
+func toGlobalDeposit(transfer *api.Transfer) types.Deposit {
+	createTime := transfer.CreatedAt.Time()
+	cancelTime := transfer.CanceledAt.Time()
+	completeTime := transfer.CompletedAt.Time()
+	deposit := types.Deposit{
+		Exchange:      types.ExchangeCoinBase,
+		Time:          types.Time(createTime),
+		Amount:        transfer.Amount,
+		Asset:         transfer.Currency,
+		Address:       transfer.Details.CryptoAddress,
+		TransactionID: transfer.ID,
+		Network:       transfer.Details.Network,
+	}
+	switch {
+	case !cancelTime.IsZero():
+		// canceled_at is not zero -> canceled
+		deposit.Status = types.DepositCancelled
+	case !completeTime.IsZero():
+		// completed_at is not zero -> completed
+		deposit.Status = types.DepositSuccess
+	default:
+		deposit.Status = types.DepositStatus("unknown")
+	}
+	return deposit
+}
+
+func toGlobalWithdraw(transfer *api.Transfer) types.Withdraw {
+	createTime := transfer.CreatedAt.Time()
+	cancelTime := transfer.CanceledAt.Time()
+	completeTime := transfer.CompletedAt.Time()
+	withdraw := types.Withdraw{
+		Exchange: types.ExchangeCoinBase,
+		Asset:    transfer.Currency,
+		Amount:   transfer.Amount,
+		Address:  transfer.Details.SendToAddress,
+
+		TransactionID:          transfer.ID,
+		TransactionFee:         transfer.Details.Fee,
+		TransactionFeeCurrency: transfer.Currency,
+		ApplyTime:              types.Time(createTime),
+		Network:                transfer.Details.Network,
+	}
+	switch {
+	case !cancelTime.IsZero():
+		// canceled_at is not zero -> canceled
+		withdraw.Status = types.WithdrawStatusCancelled
+	case !completeTime.IsZero():
+		// completed_at is not zero -> completed
+		withdraw.Status = types.WithdrawStatusCompleted
+	default:
+		withdraw.Status = types.WithdrawStatusUnknown
+	}
+	return withdraw
+}
+
 func isWorkingOrder(status api.OrderStatus) bool {
 	switch status {
 	case api.OrderStatusRejected, api.OrderStatusDone:
