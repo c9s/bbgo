@@ -11,9 +11,10 @@ exchangeStrategies:
   - on: binance
     tradingdesk:
       maxLossLimit: 10
-      testOpenPosition:
-        symbol: BTCUSDT
-        side: BUY
+      openPositions:
+      - symbol: BTCUSDT
+        side: SELL
         quantity: 0.001
-        stopLossPrice: 105_000
-        takeProfitPrice: 109_500
+        stopLossPrice: 110_000
+        takeProfitPrice: 105_000
+      closePositionsOnShutdown: true
