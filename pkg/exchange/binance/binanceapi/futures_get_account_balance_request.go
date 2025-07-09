@@ -25,8 +25,9 @@ type FuturesBalance struct {
 	MaxWithdrawAmount fixedpoint.Value `json:"maxWithdrawAmount"`
 
 	// MarginAvailable - whether the asset can be used as margin in Multi-Assets mode
-	MarginAvailable bool                       `json:"marginAvailable"`
-	UpdateTime      types.MillisecondTimestamp `json:"updateTime"`
+	MarginAvailable bool `json:"marginAvailable"`
+
+	UpdateTime types.MillisecondTimestamp `json:"updateTime"`
 }
 
 //go:generate requestgen -method GET -url "/fapi/v2/balance" -type FuturesGetAccountBalanceRequest -responseType []FuturesBalance

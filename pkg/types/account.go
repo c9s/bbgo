@@ -35,7 +35,7 @@ type Account struct {
 	sync.Mutex `json:"-"`
 
 	AccountType        AccountType `json:"accountType,omitempty"`
-	FuturesInfo        *FuturesAccountInfo
+	FuturesInfo        *FuturesAccount
 	MarginInfo         *MarginAccountInfo
 	IsolatedMarginInfo *IsolatedMarginAccountInfo
 
@@ -74,18 +74,52 @@ type Account struct {
 	balances BalanceMap
 }
 
-type FuturesAccountInfo struct {
+// FuturesAccount defines the account information for futures trading
+// Mostly are derived from the Binance API response
+//
+// @see https://www.binance.com/en/support/faq/detail/b3c689c1f50a44cabb3a84e663b81d93?hl=en
+type FuturesAccount struct {
 	// Futures fields
-	Assets                      FuturesAssetMap    `json:"assets"`
-	Positions                   FuturesPositionMap `json:"positions"`
-	TotalInitialMargin          fixedpoint.Value   `json:"totalInitialMargin"`
-	TotalMaintMargin            fixedpoint.Value   `json:"totalMaintMargin"`
-	TotalMarginBalance          fixedpoint.Value   `json:"totalMarginBalance"`
-	TotalOpenOrderInitialMargin fixedpoint.Value   `json:"totalOpenOrderInitialMargin"`
-	TotalPositionInitialMargin  fixedpoint.Value   `json:"totalPositionInitialMargin"`
-	TotalUnrealizedProfit       fixedpoint.Value   `json:"totalUnrealizedProfit"`
-	TotalWalletBalance          fixedpoint.Value   `json:"totalWalletBalance"`
-	UpdateTime                  int64              `json:"updateTime"`
+	Assets    FuturesAssetMap    `json:"assets"`
+	Positions FuturesPositionMap `json:"positions"`
+
+	// Total initial margin required with current mark price (useless with isolated positions), only for USDT asset
+	//
+	// Initial Margin = Quantity * Entry Price * IMR
+	// IMR = 1 / leverage
+	TotalInitialMargin fixedpoint.Value `json:"totalInitialMargin"`
+
+	// Total maintenance margin required, only for USDT asset
+	//
+	// Maintenance Margin = Position Notional * Maintenance Margin Rate on the level of position notional -  Maintenance Amount on the level of position notional
+	TotalMaintMargin fixedpoint.Value `json:"totalMaintMargin"`
+
+	// Total wallet balance, only for USDT asset
+	//
+	// Wallet Balance = Total Net Transfer + Total Realized Profit + Total Net Funding Fee - Total Commission
+	TotalWalletBalance fixedpoint.Value `json:"totalWalletBalance"`
+
+	// Total margin balance, only for USDT asset
+	//
+	// Margin Balance = Wallet Balance + Unrealized PNL.
+	// Your positions will be liquidated once the Margin Balance ≤ the Maintenance Margin.
+	TotalMarginBalance fixedpoint.Value `json:"totalMarginBalance"`
+
+	// TotalOpenOrderInitialMargin
+	//
+	// For USDⓈ-M Futures:
+	// Available for Order =
+	//		max(0,
+	//			crossWalletBalance + ∑cross Unrealized PNL - (∑Cross Initial Margin + ∑Isolated Open Order Initial Margin)
+	//		)
+	// Isolated Open Order Initial Margin = abs(Isolated Present Notional) * IMR - abs(Size) * IMR * Mark Price
+	TotalOpenOrderInitialMargin fixedpoint.Value `json:"totalOpenOrderInitialMargin"`
+
+	TotalPositionInitialMargin fixedpoint.Value `json:"totalPositionInitialMargin"`
+	TotalUnrealizedProfit      fixedpoint.Value `json:"totalUnrealizedProfit"`
+
+	// AvailableBalance
+	AvailableBalance fixedpoint.Value `json:"availableBalance"`
 }
 
 type MarginAccountInfo struct {
