@@ -38,12 +38,19 @@ func (m *TradingManager) Initialize(
 	strategyID := strategy.ID()
 	instanceID := strategy.InstanceID()
 
+	m.session = session
+	m.market = market
 	m.strategy = strategy
+	m.logger = strategy.logger.WithField("symbol", market.Symbol)
 
 	if m.Position == nil {
 		m.Position = types.NewPositionFromMarket(market)
 		m.Position.Strategy = strategyID
 		m.Position.StrategyInstanceID = instanceID
+		m.Position.SetExchangeFeeRate(session.ExchangeName, types.ExchangeFee{
+			MakerFeeRate: session.MakerFeeRate,
+			TakerFeeRate: session.TakerFeeRate,
+		})
 	}
 
 	if m.ProfitStats == nil {
@@ -54,10 +61,6 @@ func (m *TradingManager) Initialize(
 	m.orderExecutor.BindEnvironment(environ)
 	m.orderExecutor.BindProfitStats(m.ProfitStats)
 	m.orderExecutor.Bind()
-
-	// store references for position opening
-	m.session = session
-	m.market = market
 }
 
 type TradingManagerMap map[string]*TradingManager
@@ -85,6 +88,10 @@ func (m TradingManagerMap) New(
 	return manager
 }
 
+func (m *TradingManager) SetLeverage(ctx context.Context, lv int) error {
+	return m.strategy.riskService.SetLeverage(ctx, m.market.Symbol, lv)
+}
+
 // OpenPosition opens a new position with risk-based position sizing.
 // The position size is calculated based on MaxLossLimit, stop loss price, and available balance.
 func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionParams) error {
@@ -107,7 +114,7 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 		return fmt.Errorf("failed to open position for %s: %w", params.Symbol, err)
 	}
 
-	logrus.Infof("created orders: %+v", createdOrders)
+	m.logger.Infof("created orders: %+v", createdOrders)
 
 	if params.StopLossPrice.Sign() > 0 {
 		stopLossOrders, err := m.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
@@ -151,6 +158,7 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 		m.takeProfitOrders = takeProfitOrders
 	}
 
+	m.logger.Infof("opened position: %s", m.Position.String())
 	return nil
 }
 
@@ -179,6 +187,14 @@ func (m *TradingManager) ClosePosition(ctx context.Context) error {
 	_, err := m.orderExecutor.SubmitOrders(ctx, order)
 	if err != nil {
 		return fmt.Errorf("failed to close position for %s order: %+v: %w", m.market.Symbol, order, err)
+	}
+
+	if err := m.orderExecutor.CancelOrders(ctx, m.takeProfitOrders...); err != nil {
+		m.logger.WithError(err).Warnf("failed to cancel orders")
+	}
+
+	if err := m.orderExecutor.CancelOrders(ctx, m.stopLossOrders...); err != nil {
+		m.logger.WithError(err).Warnf("failed to cancel orders")
 	}
 
 	// reset orders
@@ -220,19 +236,27 @@ func (m *TradingManager) calculatePositionSize(
 		return fixedpoint.Zero, fmt.Errorf("invalid current price for %s", param.Symbol)
 	}
 
-	riskPerUnit := stopLossRange(currentPrice, param.StopLossPrice, param.Side)
+	// stopLossRange returns the price range to the stop loss
+	riskPerUnit := stopLossRange(param.Side, currentPrice, param.StopLossPrice)
 	if riskPerUnit.Sign() <= 0 {
 		return fixedpoint.Zero, createInvalidStopLossError(param.Side, currentPrice)
 	}
 
 	maxQuantityByRisk := m.strategy.MaxLossLimit.Div(riskPerUnit)
+
 	account := m.session.GetAccount()
 	if m.session.Futures {
 		quoteBalance, ok := account.Balance(m.market.QuoteCurrency)
 		if !ok {
 			return fixedpoint.Zero, fmt.Errorf("no balance found for %s", m.market.QuoteCurrency)
 		}
-		return fixedpoint.Min(quoteBalance.Available.Div(currentPrice), maxQuantityByRisk), nil
+
+		maxPositionSize := quoteBalance.Available.Mul(fixedpoint.NewFromInt(int64(m.strategy.Leverage))).Div(currentPrice)
+		maxPositionSize = m.market.TruncateQuantity(maxPositionSize)
+		maxPositionSize = fixedpoint.Min(maxPositionSize, maxQuantityByRisk)
+
+		m.logger.Infof("max position size %s by quote balance: %s, current price: %s, leverage: %d", maxPositionSize.String(), quoteBalance.String(), currentPrice.String(), m.strategy.Leverage)
+		return maxPositionSize, nil
 	} else {
 		if param.Side == types.SideTypeBuy {
 			quoteBalance, ok := account.Balance(m.market.QuoteCurrency)
@@ -251,7 +275,7 @@ func (m *TradingManager) calculatePositionSize(
 }
 
 // stopLossRange calculates the risk per unit based on current price, stop loss, and side
-func stopLossRange(currentPrice, stopLossPrice fixedpoint.Value, side types.SideType) fixedpoint.Value {
+func stopLossRange(side types.SideType, currentPrice, stopLossPrice fixedpoint.Value) fixedpoint.Value {
 	if side == types.SideTypeBuy {
 		// For long positions, risk is current price - stop loss price
 		return currentPrice.Sub(stopLossPrice)
