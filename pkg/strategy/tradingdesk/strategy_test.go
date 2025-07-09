@@ -59,13 +59,15 @@ func TestTradingManager_calculatePositionSize(t *testing.T) {
 
 		// Create trading manager
 		manager := &TradingManager{
-			MaxLossLimit: Number(100), // 100 USDT max loss
-			PriceType:    types.PriceTypeMaker,
-			Session:      mockSession,
-			Market:       market,
+			strategy: &Strategy{
+				MaxLossLimit: Number(100), // 100 USDT max loss
+				PriceType:    types.PriceTypeMaker,
+			},
+			session: mockSession,
+			market:  market,
 		}
 
-		param := OpenPositionParam{
+		param := OpenPositionParams{
 			Symbol:        "BTCUSDT",
 			Side:          types.SideTypeBuy,
 			Quantity:      Number(1.0),   // Want to buy 1 BTC
@@ -107,13 +109,15 @@ func TestTradingManager_calculatePositionSize(t *testing.T) {
 
 		// Create trading manager
 		manager := &TradingManager{
-			MaxLossLimit: Number(100),
-			PriceType:    types.PriceTypeMaker,
-			Session:      mockSession,
-			Market:       market,
+			strategy: &Strategy{
+				MaxLossLimit: Number(100), // 100 USDT max loss
+				PriceType:    types.PriceTypeMaker,
+			},
+			session: mockSession,
+			market:  market,
 		}
 
-		param := OpenPositionParam{
+		param := OpenPositionParams{
 			Symbol:        "BTCUSDT",
 			Side:          types.SideTypeSell,
 			Quantity:      Number(1.0),   // Want to sell 1 BTC
@@ -147,13 +151,15 @@ func TestTradingManager_calculatePositionSize(t *testing.T) {
 
 		// Create trading manager
 		manager := &TradingManager{
-			MaxLossLimit: Number(100),
-			PriceType:    types.PriceTypeMaker,
-			Session:      mockSession,
-			Market:       market,
+			strategy: &Strategy{
+				MaxLossLimit: Number(100), // 100 USDT max loss
+				PriceType:    types.PriceTypeMaker,
+			},
+			session: mockSession,
+			market:  market,
 		}
 
-		param := OpenPositionParam{
+		param := OpenPositionParams{
 			Symbol:        "BTCUSDT",
 			Side:          types.SideTypeBuy,
 			Quantity:      Number(0.05),
@@ -190,13 +196,15 @@ func TestTradingManager_calculatePositionSize(t *testing.T) {
 
 		// Create trading manager
 		manager := &TradingManager{
-			MaxLossLimit: Number(100),
-			PriceType:    types.PriceTypeMaker,
-			Session:      mockSession,
-			Market:       market,
+			strategy: &Strategy{
+				MaxLossLimit: Number(100), // 100 USDT max loss
+				PriceType:    types.PriceTypeMaker,
+			},
+			session: mockSession,
+			market:  market,
 		}
 
-		param := OpenPositionParam{
+		param := OpenPositionParams{
 			Symbol:        "BTCUSDT",
 			Side:          types.SideTypeBuy,
 			Quantity:      Number(1.0),
@@ -233,13 +241,15 @@ func TestTradingManager_calculatePositionSize(t *testing.T) {
 
 		// Create trading manager
 		manager := &TradingManager{
-			MaxLossLimit: Number(100),
-			PriceType:    types.PriceTypeMaker,
-			Session:      mockSession,
-			Market:       market,
+			strategy: &Strategy{
+				MaxLossLimit: Number(100), // 100 USDT max loss
+				PriceType:    types.PriceTypeMaker,
+			},
+			session: mockSession,
+			market:  market,
 		}
 
-		param := OpenPositionParam{
+		param := OpenPositionParams{
 			Symbol:        "BTCUSDT",
 			Side:          types.SideTypeSell,
 			Quantity:      Number(1.0),
@@ -269,10 +279,12 @@ func TestTradingManager_calculatePositionSize(t *testing.T) {
 
 		// Create trading manager with low balance
 		lowBalanceManager := &TradingManager{
-			MaxLossLimit: Number(100),
-			PriceType:    types.PriceTypeMaker,
-			Session:      lowBalanceSession,
-			Market:       market,
+			strategy: &Strategy{
+				MaxLossLimit: Number(100), // 100 USDT max loss
+				PriceType:    types.PriceTypeMaker,
+			},
+			session: lowBalanceSession,
+			market:  market,
 		}
 
 		ticker := &types.Ticker{
@@ -282,7 +294,7 @@ func TestTradingManager_calculatePositionSize(t *testing.T) {
 		}
 		mockExchange.EXPECT().QueryTicker(ctx, "BTCUSDT").Return(ticker, nil).Times(1)
 
-		param := OpenPositionParam{
+		param := OpenPositionParams{
 			Symbol:        "BTCUSDT",
 			Side:          types.SideTypeBuy,
 			Quantity:      Number(1.0),

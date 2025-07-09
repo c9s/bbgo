@@ -1045,6 +1045,7 @@ func (e *OrderTradeUpdateEvent) OrderFutures() (*types.Order, error) {
 			Type:          toGlobalFuturesOrderType(futures.OrderType(e.OrderTrade.OrderType)),
 			Quantity:      e.OrderTrade.OriginalQuantity,
 			Price:         e.OrderTrade.OriginalPrice,
+			StopPrice:     e.OrderTrade.StopPrice,
 			TimeInForce:   types.TimeInForce(e.OrderTrade.TimeInForce),
 		},
 		OrderID:          uint64(e.OrderTrade.OrderId),

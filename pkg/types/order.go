@@ -87,6 +87,8 @@ const (
 	OrderTypeMarket     OrderType = "MARKET"
 	OrderTypeStopLimit  OrderType = "STOP_LIMIT"
 	OrderTypeStopMarket OrderType = "STOP_MARKET"
+
+	OrderTypeTakeProfitMarket OrderType = "TAKE_PROFIT_MARKET"
 )
 
 /*
@@ -160,7 +162,9 @@ type SubmitOrder struct {
 
 	MarginSideEffect MarginOrderSideEffectType `json:"marginSideEffect,omitempty"` // AUTO_BORROW_REPAY = borrowrepay, AUTO_REPAY = repay, MARGIN_BUY = borrow, defaults to  NO_SIDE_EFFECT
 
-	ReduceOnly    bool `json:"reduceOnly,omitempty" db:"reduce_only"`
+	ReduceOnly bool `json:"reduceOnly,omitempty" db:"reduce_only"`
+
+	// this is mostly designed for binance: true, false；Close-All，used with STOP_MARKET or TAKE_PROFIT_MARKET.
 	ClosePosition bool `json:"closePosition,omitempty" db:"close_position"`
 
 	Tag string `json:"tag,omitempty" db:"-"`
@@ -389,19 +393,22 @@ func (o Order) String() string {
 		orderID = strconv.FormatUint(o.OrderID, 10)
 	}
 
-	desc := fmt.Sprintf("ORDER %s | %s | %s | %s %-4s | %s/%s @ %s",
+	desc := fmt.Sprintf("ORDER %s | %s | %s | %s %-4s |",
 		o.Exchange.String(),
 		orderID,
 		o.Symbol,
 		o.Type,
 		o.Side,
-		o.ExecutedQuantity.String(),
+	)
+
+	switch o.Type {
+	case OrderTypeStopLimit, OrderTypeStopMarket, OrderTypeTakeProfitMarket:
+		desc += " stop@ " + o.StopPrice.String() + " ->"
+	}
+
+	desc += fmt.Sprintf(" %s/%s @ %s", o.ExecutedQuantity.String(),
 		o.Quantity.String(),
 		o.Price.String())
-
-	if o.Type == OrderTypeStopLimit {
-		desc += " Stop @ " + o.StopPrice.String()
-	}
 
 	desc += " | " + string(o.Status) + " | "
 
