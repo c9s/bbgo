@@ -2,6 +2,7 @@ package bbgo
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"fmt"
 	"image/png"
@@ -212,7 +213,9 @@ func (environ *Environment) ConfigureDatabase(ctx context.Context, config *Confi
 	return environ.ConfigureDatabaseDriver(ctx, dbDriver, dbDSN, extraPkgNames...)
 }
 
-func (environ *Environment) ConfigureDatabaseDriver(ctx context.Context, driver string, dsn string, extraPkgNames ...string) error {
+func (environ *Environment) ConfigureDatabaseDriver(
+	ctx context.Context, driver string, dsn string, extraPkgNames ...string,
+) error {
 	environ.DatabaseService = service.NewDatabaseService(driver, dsn)
 	environ.DatabaseService.AddMigrationPackages(extraPkgNames...)
 
@@ -704,7 +707,7 @@ func (environ *Environment) ConfigureNotificationSystem(ctx context.Context, use
 	}
 
 	// setup slack
-	slackToken := viper.GetString("slack-token")
+	slackToken := cmp.Or(viper.GetString("slack-bot-token"), viper.GetString("slack-token"))
 	if len(slackToken) > 0 && userConfig.Notifications != nil {
 		environ.setupSlack(userConfig, slackToken, persistence)
 	}

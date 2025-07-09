@@ -10,10 +10,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/c9s/bbgo/pkg/datatype/floats"
-	"github.com/c9s/bbgo/pkg/pricesolver"
-
 	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/datatype/floats"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/indicator"
 	"github.com/c9s/bbgo/pkg/report"
@@ -214,7 +212,9 @@ func (s *Strategy) setupIndicators() {
 	}
 }
 
-func (s *Strategy) shouldStop(kline types.KLine, stSignal types.Direction, demaSignal types.Direction, lgSignal types.Direction) bool {
+func (s *Strategy) shouldStop(
+	kline types.KLine, stSignal types.Direction, demaSignal types.Direction, lgSignal types.Direction,
+) bool {
 	stopNow := false
 	base := s.Position.GetBase()
 	baseSign := base.Sign()
@@ -244,7 +244,9 @@ func (s *Strategy) shouldStop(kline types.KLine, stSignal types.Direction, demaS
 	return stopNow
 }
 
-func (s *Strategy) getSide(stSignal types.Direction, demaSignal types.Direction, lgSignal types.Direction) types.SideType {
+func (s *Strategy) getSide(
+	stSignal types.Direction, demaSignal types.Direction, lgSignal types.Direction,
+) types.SideType {
 	var side types.SideType
 
 	if stSignal == types.DirectionUp && demaSignal == types.DirectionUp && (s.LinearRegression == nil || lgSignal == types.DirectionUp) {
@@ -272,7 +274,9 @@ func (s *Strategy) generateOrderForm(
 }
 
 // calculateQuantity returns leveraged quantity
-func (s *Strategy) calculateQuantity(ctx context.Context, currentPrice fixedpoint.Value, side types.SideType) fixedpoint.Value {
+func (s *Strategy) calculateQuantity(
+	ctx context.Context, currentPrice fixedpoint.Value, side types.SideType,
+) fixedpoint.Value {
 	// Quantity takes precedence
 	if !s.Quantity.IsZero() {
 		return s.Quantity
@@ -384,11 +388,7 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 		s.ProfitStatsTracker.Bind(s.session, s.orderExecutor.TradeCollector())
 	}
 
-	priceSolver := pricesolver.NewSimplePriceResolver(session.Markets())
-	priceSolver.BindStream(session.MarketDataStream)
-
-	// AccountValueCalculator
-	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, priceSolver, s.Market.QuoteCurrency)
+	s.AccountValueCalculator = bbgo.NewAccountValueCalculator(s.session, s.session.GetPriceSolver(), s.Market.QuoteCurrency)
 	if err := s.AccountValueCalculator.UpdatePrices(ctx); err != nil {
 		return err
 	}
@@ -399,7 +399,9 @@ func (s *Strategy) Run(ctx context.Context, orderExecutor bbgo.OrderExecutor, se
 	initAsset := s.CalcAssetValue(price).Float64()
 	cumProfitSlice := floats.Slice{initAsset, initAsset}
 
-	s.orderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value) {
+	s.orderExecutor.TradeCollector().OnTrade(func(
+		trade types.Trade, profit fixedpoint.Value, netProfit fixedpoint.Value,
+	) {
 		// For drawing/charting
 		price := trade.Price.Float64()
 		if s.buyPrice > 0 {

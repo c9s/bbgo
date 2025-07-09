@@ -6,8 +6,8 @@ import (
 	"github.com/c9s/bbgo/pkg/types"
 )
 
-func toGlobalFuturesAccountInfo(account *okexapi.Account, positions []okexapi.Position) *types.FuturesAccountInfo {
-	return &types.FuturesAccountInfo{
+func toGlobalFuturesAccountInfo(account *okexapi.Account, positions []okexapi.Position) *types.FuturesAccount {
+	return &types.FuturesAccount{
 		Assets:                      toGlobalFuturesUserAssets(account.Details),
 		Positions:                   toGlobalFuturesPositions(positions),
 		TotalInitialMargin:          account.TotalInitialMargin,
@@ -16,7 +16,6 @@ func toGlobalFuturesAccountInfo(account *okexapi.Account, positions []okexapi.Po
 		TotalUnrealizedProfit:       account.UnrealizedPnl,
 		TotalWalletBalance:          account.TotalEquityInUSD,
 		TotalOpenOrderInitialMargin: account.TotalOpenOrderInitialMargin,
-		UpdateTime:                  account.UpdateTime.Time().Unix(),
 	}
 }
 
@@ -51,8 +50,7 @@ func toGlobalFuturesPositions(futuresPositions []okexapi.Position) types.Futures
 			PositionRisk: &types.PositionRisk{
 				Leverage: futuresPosition.Lever,
 			},
-			Symbol:     symbol,
-			UpdateTime: futuresPosition.UpdatedTime.Time().Unix(),
+			Symbol: symbol,
 		}
 	}
 

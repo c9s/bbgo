@@ -33,6 +33,7 @@ type Strategy struct {
 
 	session *bbgo.ExchangeSession
 
+	Leverage     int              `json:"leverage"`
 	MaxLossLimit fixedpoint.Value `json:"maxLossLimit"`
 	PriceType    types.PriceType  `json:"priceType"`
 
@@ -101,6 +102,10 @@ func (s *Strategy) Defaults() error {
 		s.PriceType = types.PriceTypeMaker
 	}
 
+	if s.Leverage == 0 {
+		s.Leverage = 3
+	}
+
 	return nil
 }
 
@@ -135,13 +140,17 @@ func (s *Strategy) loadFromPositionRisks(ctx context.Context) error {
 		}
 
 		m.Position.Symbol = risk.Symbol
+		m.Position.AverageCost = risk.EntryPrice
 		m.Position.Base = risk.PositionAmount
+		m.Position.Market = market
 
 		switch risk.PositionSide {
 		case types.PositionLong:
 		case types.PositionShort:
 			m.Position.Base = m.Position.Base.Neg()
 		}
+
+		m.logger.Infof("updated position: %+v", m.Position)
 	}
 
 	return nil
@@ -176,9 +185,11 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		if len(s.tradingManagers) > 0 {
 			s.logger.Warnf("ignoring OpenPositions as trading managers are already initialized")
 		} else {
-			if err := s.openPositions(ctx, s.OpenPositions); err != nil {
-				return err
-			}
+			session.UserDataConnectivity.OnAuth(func() {
+				if err := s.openPositions(ctx, s.OpenPositions); err != nil {
+					s.logger.WithError(err).Error("failed to open positions")
+				}
+			})
 		}
 	}
 
@@ -217,5 +228,10 @@ func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParams) e
 	}
 
 	m := s.tradingManagers.Get(ctx, s.Environment, s.session, market, s)
+
+	if err := m.SetLeverage(ctx, s.Leverage); err != nil {
+		return err
+	}
+
 	return m.OpenPosition(ctx, param)
 }

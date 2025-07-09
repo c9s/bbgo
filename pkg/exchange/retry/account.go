@@ -3,6 +3,8 @@ package retry
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/c9s/bbgo/pkg/types"
 )
 
@@ -11,6 +13,10 @@ func QueryAccountUntilSuccessful(
 ) (account *types.Account, err error) {
 	var op = func() (err2 error) {
 		account, err2 = ex.QueryAccount(ctx)
+		if err2 != nil {
+			log.WithError(err2).Errorf("failed to query account")
+		}
+	
 		return err2
 	}
 
