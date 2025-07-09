@@ -290,6 +290,47 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 	assert.Equal(t, len(orders), 6)
 }
 
+func TestExchange_QueryDepositHistory(t *testing.T) {
+	ex := getExchangeOrSkip(t)
+	// ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	// defer cancel()
+	ctx := context.Background()
+
+	since, _ := time.Parse(
+		"2006-01-02",
+		"2025-02-01",
+	)
+	until, _ := time.Parse(
+		"2006-01-02",
+		"2025-07-08",
+	)
+	asset := "USDC"
+	transfers, err := ex.QueryDepositHistory(ctx, asset, since, until)
+	assert.NoError(t, err)
+	assert.NotNil(t, transfers)
+	assert.Greater(t, len(transfers), 0)
+}
+
+func TestExchange_QueryWithdrawHistory(t *testing.T) {
+	ex := getExchangeOrSkip(t)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	since, _ := time.Parse(
+		"2006-01-02",
+		"2025-02-01",
+	)
+	until, _ := time.Parse(
+		"2006-01-02",
+		"2025-07-08",
+	)
+	asset := "USDC"
+	withdraws, err := ex.QueryWithdrawHistory(ctx, asset, since, until)
+	assert.NoError(t, err)
+	assert.NotNil(t, withdraws)
+	assert.Greater(t, len(withdraws), 0)
+}
+
 func getExchangeOrSkip(t *testing.T) *Exchange {
 	if b, _ := strconv.ParseBool(os.Getenv("CI")); b {
 		t.Skip("skip test for CI")
