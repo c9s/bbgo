@@ -36,7 +36,9 @@ type Strategy struct {
 	MaxLossLimit fixedpoint.Value `json:"maxLossLimit"`
 	PriceType    types.PriceType  `json:"priceType"`
 
-	TestOpenPosition *OpenPositionParams `json:"testOpenPosition"`
+	OpenPositions []OpenPositionParams `json:"openPositions"`
+
+	ClosePositionsOnShutdown bool `json:"closePositionsOnShutdown"`
 
 	tradingManagers TradingManagerMap
 	logger          logrus.FieldLogger
@@ -115,6 +117,47 @@ func (s *Strategy) Subscribe(session *bbgo.ExchangeSession) {
 	// Currently no market data subscriptions needed
 }
 
+func (s *Strategy) loadFromPositionRisks(ctx context.Context) error {
+	s.logger.Infof("querying position risks...")
+
+	risks, err := s.riskService.QueryPositionRisk(ctx)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Infof("loaded position risks: %+v", risks)
+	for _, risk := range risks {
+		market, _ := s.session.Market(risk.Symbol)
+
+		m, ok := s.tradingManagers[risk.Symbol]
+		if !ok {
+			m = s.tradingManagers.Get(ctx, s.Environment, s.session, market, s)
+		}
+
+		m.Position.Symbol = risk.Symbol
+		m.Position.Base = risk.PositionAmount
+
+		switch risk.PositionSide {
+		case types.PositionLong:
+		case types.PositionShort:
+			m.Position.Base = m.Position.Base.Neg()
+		}
+	}
+
+	return nil
+}
+
+func (s *Strategy) openPositions(ctx context.Context, openPositions []OpenPositionParams) error {
+
+	for _, pos := range openPositions {
+		if err := s.OpenPosition(ctx, pos); err != nil {
+			return fmt.Errorf("open position error: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // Run implements the strategy interface for strategy execution
 func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.ExchangeSession) error {
 	s.session = session
@@ -123,54 +166,39 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 		s.riskService = riskService
 	}
 
-	if s.TestOpenPosition != nil {
-		if session.Futures && s.riskService != nil {
-			s.logger.Infof("querying position risk for %s", s.TestOpenPosition.Symbol)
+	if s.session.Futures && s.riskService != nil {
+		if err := s.loadFromPositionRisks(ctx); err != nil {
+			return err
+		}
+	}
 
-			risks, err := s.riskService.QueryPositionRisk(ctx)
-			if err != nil {
+	if len(s.OpenPositions) > 0 {
+		if len(s.tradingManagers) > 0 {
+			s.logger.Warnf("ignoring OpenPositions as trading managers are already initialized")
+		} else {
+			if err := s.openPositions(ctx, s.OpenPositions); err != nil {
 				return err
 			}
-
-			s.logger.Infof("got position risks: %+v", risks)
-			for _, risk := range risks {
-				market, _ := session.Market(risk.Symbol)
-
-				m, ok := s.tradingManagers[risk.Symbol]
-				if !ok {
-					m = s.tradingManagers.Get(ctx, s.Environment, s.session, market, s)
-				}
-
-				m.Position.Symbol = risk.Symbol
-				m.Position.Base = risk.PositionAmount
-
-				switch risk.PositionSide {
-				case types.PositionLong:
-				case types.PositionShort:
-					m.Position.Base = m.Position.Base.Neg()
-				}
-			}
-		}
-
-		if err := s.OpenPosition(ctx, *s.TestOpenPosition); err != nil {
-			return fmt.Errorf("open position error: %w", err)
 		}
 	}
 
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		if s.TestOpenPosition != nil {
-			param := s.TestOpenPosition
-			market, ok := s.session.Market(param.Symbol)
-			if !ok {
-				s.logger.Warnf("market %s not found in session, unable to close position", param.Symbol)
-				return
-			}
+		if s.ClosePositionsOnShutdown && len(s.OpenPositions) > 0 {
+			s.logger.Infof("closing open positions on shutdown...")
 
-			m := s.tradingManagers.Get(ctx, s.Environment, s.session, market, s)
-			if err := m.ClosePosition(ctx); err != nil {
-				s.logger.WithError(err).Errorf("unable to close position for symbol %s", param.Symbol)
+			for _, param := range s.OpenPositions {
+				market, ok := s.session.Market(param.Symbol)
+				if !ok {
+					s.logger.Warnf("market %s not found in session, unable to close position", param.Symbol)
+					return
+				}
+
+				m := s.tradingManagers.Get(ctx, s.Environment, s.session, market, s)
+				if err := m.ClosePosition(ctx); err != nil {
+					s.logger.WithError(err).Errorf("unable to close position for symbol %s", param.Symbol)
+				}
 			}
 
 			time.Sleep(1 * time.Second)
