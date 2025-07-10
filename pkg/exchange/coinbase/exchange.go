@@ -604,13 +604,12 @@ func (e *Exchange) QueryWithdrawHistory(ctx context.Context, asset string, since
 }
 
 func (e *Exchange) queryTransferHistoryByPagination(ctx context.Context, asset string, since, until time.Time, transferType api.TransferType) ([]api.Transfer, error) {
-	if len(asset) == 0 {
-		return nil, errors.New("asset is required for querying transfer history")
-	}
 	req := e.client.NewGetTransfersRequest().
 		TransferType(transferType).
-		Limit(PaginationLimit).
-		Currency(strings.ToUpper(asset))
+		Limit(PaginationLimit)
+	if len(asset) > 0 {
+		req.Currency(strings.ToUpper(asset))
+	}
 	if !since.IsZero() {
 		req.Before(since)
 	}

@@ -207,7 +207,7 @@ func toGlobalDeposit(transfer *api.Transfer) types.Deposit {
 		// completed_at is not zero -> completed
 		deposit.Status = types.DepositSuccess
 	default:
-		deposit.Status = types.DepositStatus("unknown")
+		deposit.Status = types.DepositPending
 	}
 	return deposit
 }
@@ -236,7 +236,7 @@ func toGlobalWithdraw(transfer *api.Transfer) types.Withdraw {
 		// completed_at is not zero -> completed
 		withdraw.Status = types.WithdrawStatusCompleted
 	default:
-		withdraw.Status = types.WithdrawStatusUnknown
+		withdraw.Status = types.WithdrawStatusProcessing
 	}
 	return withdraw
 }
