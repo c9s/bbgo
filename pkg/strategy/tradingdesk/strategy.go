@@ -196,19 +196,23 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
+		bbgo.Sync(ctx, s)
+
+		defer bbgo.Sync(ctx, s)
+
 		if s.ClosePositionsOnShutdown && len(s.OpenPositions) > 0 {
 			s.logger.Infof("closing open positions on shutdown...")
 
-			for _, param := range s.OpenPositions {
-				market, ok := s.session.Market(param.Symbol)
-				if !ok {
-					s.logger.Warnf("market %s not found in session, unable to close position", param.Symbol)
-					return
+			for _, manager := range s.tradingManagers {
+				if !s.HasPosition() {
+					s.logger.Warnf("trading manager for symbol %s has no position, skipping close", manager.market.Symbol)
+					continue
 				}
 
-				m := s.tradingManagers.Get(ctx, s.Environment, s.session, market, s)
-				if err := m.ClosePosition(ctx); err != nil {
-					s.logger.WithError(err).Errorf("unable to close position for symbol %s", param.Symbol)
+				if err := manager.ClosePosition(ctx); err != nil {
+					s.logger.WithError(err).Errorf("failed to close position for symbol %s", manager.market.Symbol)
+				} else {
+					s.logger.Infof("closed position for symbol %s", manager.market.Symbol)
 				}
 			}
 
@@ -234,4 +238,13 @@ func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParams) e
 	}
 
 	return m.OpenPosition(ctx, param)
+}
+
+func (s *Strategy) HasPosition() bool {
+	for _, manager := range s.tradingManagers {
+		if manager.Position != nil && manager.Position.Symbol != "" && !manager.Position.GetBase().IsZero() {
+			return true
+		}
+	}
+	return false
 }
