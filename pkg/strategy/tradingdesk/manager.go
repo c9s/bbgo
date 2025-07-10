@@ -255,6 +255,9 @@ func (m *TradingManager) calculatePositionSize(
 		maxPositionSize = m.market.TruncateQuantity(maxPositionSize)
 		maxPositionSize = fixedpoint.Min(maxPositionSize, maxQuantityByRisk)
 
+		maxPositionSize = fixedpoint.Max(maxPositionSize, m.market.MinQuantity)
+		maxPositionSize = m.market.AdjustQuantityByMinNotional(maxPositionSize, currentPrice)
+
 		m.logger.Infof("max position size %s by quote balance: %s, current price: %s, leverage: %d", maxPositionSize.String(), quoteBalance.String(), currentPrice.String(), m.strategy.Leverage)
 		return maxPositionSize, nil
 	} else {
