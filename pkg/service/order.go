@@ -13,6 +13,7 @@ import (
 	exchange2 "github.com/c9s/bbgo/pkg/exchange"
 	"github.com/c9s/bbgo/pkg/exchange/batch"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 type OrderService struct {
@@ -28,9 +29,12 @@ func (s *OrderService) Sync(
 	if isIsolated && len(isolatedSymbol) > 0 {
 		symbol = isolatedSymbol
 	}
+	logger := util.GetLoggerFromCtx(ctx)
+	logger.Infof("session attributes: isMargin=%v isFutures=%v isIsolated=%v isolatedSymbol=%s", isMargin, isFutures, isIsolated, isolatedSymbol)
 
 	api, ok := exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
+		logger.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing orders", exchange.Name())
 		return nil
 	}
 

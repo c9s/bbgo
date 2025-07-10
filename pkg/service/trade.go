@@ -80,6 +80,7 @@ func (s *TradeService) Sync(
 
 	api, ok := exchange.(types.ExchangeTradeHistoryService)
 	if !ok {
+		logger.Warnf("exchange %s does not implement ExchangeTradeHistoryService, skip syncing trades", exchange.Name())
 		return nil
 	}
 
