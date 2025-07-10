@@ -292,9 +292,8 @@ func TestExchange_QueryClosedOrders(t *testing.T) {
 
 func TestExchange_QueryDepositHistory(t *testing.T) {
 	ex := getExchangeOrSkip(t)
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	// defer cancel()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
 
 	since, _ := time.Parse(
 		"2006-01-02",
@@ -305,10 +304,15 @@ func TestExchange_QueryDepositHistory(t *testing.T) {
 		"2025-07-08",
 	)
 	asset := "USDC"
-	transfers, err := ex.QueryDepositHistory(ctx, asset, since, until)
+	deposits, err := ex.QueryDepositHistory(ctx, asset, since, until)
 	assert.NoError(t, err)
-	assert.NotNil(t, transfers)
-	assert.Greater(t, len(transfers), 0)
+	assert.NotNil(t, deposits)
+	assert.Greater(t, len(deposits), 0)
+
+	deposits, err = ex.QueryDepositHistory(ctx, "", since, until)
+	assert.NoError(t, err)
+	assert.NotNil(t, deposits)
+	assert.Greater(t, len(deposits), 0)
 }
 
 func TestExchange_QueryWithdrawHistory(t *testing.T) {
@@ -326,6 +330,11 @@ func TestExchange_QueryWithdrawHistory(t *testing.T) {
 	)
 	asset := "USDC"
 	withdraws, err := ex.QueryWithdrawHistory(ctx, asset, since, until)
+	assert.NoError(t, err)
+	assert.NotNil(t, withdraws)
+	assert.Greater(t, len(withdraws), 0)
+
+	withdraws, err = ex.QueryWithdrawHistory(ctx, "", since, until)
 	assert.NoError(t, err)
 	assert.NotNil(t, withdraws)
 	assert.Greater(t, len(withdraws), 0)
