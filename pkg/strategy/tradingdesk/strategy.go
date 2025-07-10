@@ -204,7 +204,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			s.logger.Infof("closing open positions on shutdown...")
 
 			for _, manager := range s.tradingManagers {
-				if manager.Position == nil || manager.Position.Symbol == "" || manager.Position.GetBase().IsZero() {
+				if !s.HasPosition() {
 					s.logger.Warnf("trading manager for symbol %s has no position, skipping close", manager.market.Symbol)
 					continue
 				}
@@ -238,4 +238,13 @@ func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParams) e
 	}
 
 	return m.OpenPosition(ctx, param)
+}
+
+func (s *Strategy) HasPosition() bool {
+	for _, manager := range s.tradingManagers {
+		if manager.Position != nil && manager.Position.Symbol != "" && !manager.Position.GetBase().IsZero() {
+			return true
+		}
+	}
+	return false
 }
