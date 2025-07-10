@@ -12,8 +12,11 @@ import (
 )
 
 type TradingManagerState struct {
-	Position    *types.Position    `persistence:"position" json:"position"`
-	ProfitStats *types.ProfitStats `persistence:"profitStats" json:"profitStats"`
+	Position    *types.Position    `json:"position,omitempty"`
+	ProfitStats *types.ProfitStats `json:"profitStats,omitempty"`
+
+	TakeProfitOrders []types.Order `json:"takeProfitOrders,omitempty"`
+	StopLossOrders   []types.Order `json:"stopLossOrders,omitempty"`
 }
 
 type TradingManager struct {
@@ -25,8 +28,6 @@ type TradingManager struct {
 	session  *bbgo.ExchangeSession
 	market   types.Market
 	strategy *Strategy
-
-	takeProfitOrders, stopLossOrders []types.Order
 
 	logger logrus.FieldLogger
 }
@@ -95,6 +96,11 @@ func (m *TradingManager) SetLeverage(ctx context.Context, lv int) error {
 // OpenPosition opens a new position with risk-based position sizing.
 // The position size is calculated based on MaxLossLimit, stop loss price, and available balance.
 func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionParams) error {
+	base := m.Position.GetBase()
+	if !base.IsZero() {
+		return fmt.Errorf("position already exists for %s: %s", params.Symbol, base.String())
+	}
+
 	// Calculate position size based on risk management
 	quantity, err := m.calculatePositionSize(ctx, params)
 	if err != nil {
@@ -131,7 +137,7 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 		}
 
 		m.strategy.logger.Infof("created stop loss orders: %+v", stopLossOrders)
-		m.stopLossOrders = stopLossOrders
+		m.StopLossOrders = stopLossOrders
 	}
 
 	if params.TakeProfitPrice.Sign() > 0 {
@@ -155,7 +161,7 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 		}
 
 		m.strategy.logger.Infof("created take loss orders: %+v", takeProfitOrders)
-		m.takeProfitOrders = takeProfitOrders
+		m.TakeProfitOrders = takeProfitOrders
 	}
 
 	m.logger.Infof("opened position: %s", m.Position.String())
@@ -189,17 +195,17 @@ func (m *TradingManager) ClosePosition(ctx context.Context) error {
 		return fmt.Errorf("failed to close position for %s order: %+v: %w", m.market.Symbol, order, err)
 	}
 
-	if err := m.orderExecutor.CancelOrders(ctx, m.takeProfitOrders...); err != nil {
+	if err := m.orderExecutor.CancelOrders(ctx, m.TakeProfitOrders...); err != nil {
 		m.logger.WithError(err).Warnf("failed to cancel orders")
 	}
 
-	if err := m.orderExecutor.CancelOrders(ctx, m.stopLossOrders...); err != nil {
+	if err := m.orderExecutor.CancelOrders(ctx, m.StopLossOrders...); err != nil {
 		m.logger.WithError(err).Warnf("failed to cancel orders")
 	}
 
 	// reset orders
-	m.takeProfitOrders = nil
-	m.stopLossOrders = nil
+	m.TakeProfitOrders = nil
+	m.StopLossOrders = nil
 	return nil
 }
 
@@ -254,6 +260,9 @@ func (m *TradingManager) calculatePositionSize(
 		maxPositionSize := quoteBalance.Available.Mul(fixedpoint.NewFromInt(int64(m.strategy.Leverage))).Div(currentPrice)
 		maxPositionSize = m.market.TruncateQuantity(maxPositionSize)
 		maxPositionSize = fixedpoint.Min(maxPositionSize, maxQuantityByRisk)
+
+		maxPositionSize = fixedpoint.Max(maxPositionSize, m.market.MinQuantity)
+		maxPositionSize = m.market.AdjustQuantityByMinNotional(maxPositionSize, currentPrice)
 
 		m.logger.Infof("max position size %s by quote balance: %s, current price: %s, leverage: %d", maxPositionSize.String(), quoteBalance.String(), currentPrice.String(), m.strategy.Leverage)
 		return maxPositionSize, nil

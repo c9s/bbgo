@@ -14,7 +14,7 @@ exchangeStrategies:
       openPositions:
       - symbol: BTCUSDT
         side: SELL
-        quantity: 0.001
-        stopLossPrice: 110_000
-        takeProfitPrice: 105_000
+        # quantity: 0.001
+        stopLossPrice: 125_000
+        takeProfitPrice: 90_000
       closePositionsOnShutdown: true
