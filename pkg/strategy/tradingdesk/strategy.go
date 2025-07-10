@@ -196,6 +196,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	bbgo.OnShutdown(ctx, func(ctx context.Context, wg *sync.WaitGroup) {
 		defer wg.Done()
 
+		bbgo.Sync(ctx, s)
+
+		defer bbgo.Sync(ctx, s)
+
 		if s.ClosePositionsOnShutdown && len(s.OpenPositions) > 0 {
 			s.logger.Infof("closing open positions on shutdown...")
 
