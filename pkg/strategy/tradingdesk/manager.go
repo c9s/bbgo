@@ -3,6 +3,7 @@ package tradingdesk
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -105,6 +106,13 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 	quantity, err := m.calculatePositionSize(ctx, params)
 	if err != nil {
 		return err
+	}
+
+	switch strings.ToUpper(string(params.Side)) {
+	case "LONG":
+		params.Side = types.SideTypeBuy
+	case "SHORT":
+		params.Side = types.SideTypeSell
 	}
 
 	order := types.SubmitOrder{
