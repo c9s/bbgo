@@ -115,6 +115,25 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 		params.Side = types.SideTypeSell
 	}
 
+	// get current price for validation
+	ticker, err := m.session.Exchange.QueryTicker(ctx, params.Symbol)
+	if err != nil {
+		return fmt.Errorf("failed to get ticker for %s: %w", params.Symbol, err)
+	}
+
+	ticker.GetValidPrice()
+
+	currentPrice := ticker.GetPrice(params.Side, m.strategy.PriceType)
+	if currentPrice.IsZero() {
+		return fmt.Errorf("invalid current price %s for %s", currentPrice.String(), params.Symbol)
+	}
+
+	ok, err := validateStopLossTakeProfit(params.Side, currentPrice, params.StopLossPrice, params.TakeProfitPrice)
+	if !ok {
+		m.logger.Errorf("invalid stop loss or take profit price: %v", err)
+		return err
+	}
+
 	order := types.SubmitOrder{
 		Symbol:   params.Symbol,
 		Side:     params.Side,
@@ -307,4 +326,26 @@ func createInvalidStopLossError(side types.SideType, currentPrice fixedpoint.Val
 		return fmt.Errorf("invalid stop loss price for buy order: stop loss should be below current price (%s)", currentPrice.String())
 	}
 	return fmt.Errorf("invalid stop loss price for sell order: stop loss should be above current price (%s)", currentPrice.String())
+}
+
+// validateStopLossTakeProfit checks the validity of stop loss and take profit prices based on side and current price.
+func validateStopLossTakeProfit(
+	side types.SideType, currentPrice, stopLossPrice, takeProfitPrice fixedpoint.Value,
+) (bool, error) {
+	if side == types.SideTypeBuy {
+		if stopLossPrice.Sign() > 0 && stopLossPrice >= currentPrice {
+			return false, fmt.Errorf("stop loss price must be less than current price for long position")
+		}
+		if takeProfitPrice.Sign() > 0 && takeProfitPrice <= currentPrice {
+			return false, fmt.Errorf("take profit price must be greater than current price for long position")
+		}
+	} else if side == types.SideTypeSell {
+		if stopLossPrice.Sign() > 0 && stopLossPrice <= currentPrice {
+			return false, fmt.Errorf("stop loss price must be greater than current price for short position")
+		}
+		if takeProfitPrice.Sign() > 0 && takeProfitPrice >= currentPrice {
+			return false, fmt.Errorf("take profit price must be less than current price for short position")
+		}
+	}
+	return true, nil
 }
