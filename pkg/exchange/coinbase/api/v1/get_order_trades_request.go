@@ -32,11 +32,11 @@ type GetOrderTradesRequest struct {
 	orderID    string      `param:"order_id"`
 	productID  string      `param:"product_id"` // one of order_id or product_id is required
 	limit      int         `param:"limit"`
-	before     *uint64     `param:"before"` // pagination id, which is the trade_id (exclusive)
-	after      *uint64     `param:"after"`  // pagination id, which is the trade_id (exclusive)
+	before     *uint64     `param:"before"` // pagination id, which is the trade_id (exclusive, newer)
+	after      *uint64     `param:"after"`  // pagination id, which is the trade_id (exclusive, older)
 	marketType *MarketType `param:"market_type"`
-	startDate  *string     `param:"start_date"`
-	endDate    *string     `param:"end_date"`
+	startDate  *string     `param:"start_date"` // inclusive
+	endDate    *string     `param:"end_date"`   //exclusive
 }
 
 func (c *RestAPIClient) NewGetOrderTradesRequest() *GetOrderTradesRequest {

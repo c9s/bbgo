@@ -539,41 +539,42 @@ func (e *Exchange) queryProductTradesByPagination(
 	req.ProductID(toLocalSymbol(symbol))
 	if options.StartTime != nil {
 		req.StartDate(
-			options.StartTime.Format(time.RFC3339Nano),
+			options.StartTime.Format("2006-01-02"),
 		)
 	}
 	if options.EndTime != nil {
+		// end_date is exclusive, add one day to the end date
 		req.EndDate(
-			options.EndTime.Format(time.RFC3339Nano),
+			options.EndTime.AddDate(0, 0, 1).Format("2006-01-02"),
 		)
 	}
-	if options.LastTradeID > 0 {
-		req.Before(options.LastTradeID)
-	}
-	cbTrades, err = req.Do(ctx)
+	cbTradesDirty, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	limit := int(options.Limit)
-	// pagination done if
-	// 1. limit > 0 and we have enough trades
-	// 2. the trades are less than PaginationLimit -> have reached the end of the pagination
-	donePagination := (limit > 0 && len(cbTrades) >= limit) || (len(cbTrades) < PaginationLimit)
+	// do pagination to get all trades within the start_date and end_date
+	// pagination done if the trades are less than PaginationLimit -> have reached the end of the pagination
+	donePagination := len(cbTradesDirty) < PaginationLimit
 	for !donePagination {
 		select {
 		case <-ctx.Done():
-			return cbTrades, ctx.Err()
+			return cbTradesDirty, ctx.Err()
 		default:
-			lastTrade := cbTrades[len(cbTrades)-1]
+			lastTrade := cbTradesDirty[len(cbTradesDirty)-1]
 			req.After(lastTrade.TradeID)
 			newTrades, err := req.Do(ctx)
 			if err != nil {
 				return nil, err
 			}
-			cbTrades = append(cbTrades, newTrades...)
-			donePagination = (limit > 0 && len(cbTrades) >= limit) || (len(newTrades) < PaginationLimit)
+			cbTradesDirty = append(cbTradesDirty, newTrades...)
+			donePagination = len(newTrades) < PaginationLimit
 		}
+	}
+	for _, trade := range cbTradesDirty {
+		if options.LastTradeID != 0 && trade.TradeID <= options.LastTradeID {
+			continue
+		}
+		cbTrades = append(cbTrades, trade)
 	}
 	return cbTrades, nil
 }
