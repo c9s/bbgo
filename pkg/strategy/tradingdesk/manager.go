@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -102,17 +103,50 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 		return fmt.Errorf("position already exists for %s: %s", params.Symbol, base.String())
 	}
 
-	// Calculate position size based on risk management
-	quantity, err := m.calculatePositionSize(ctx, params)
-	if err != nil {
-		return err
-	}
-
 	switch strings.ToUpper(string(params.Side)) {
 	case "LONG":
 		params.Side = types.SideTypeBuy
 	case "SHORT":
 		params.Side = types.SideTypeSell
+	}
+
+	// get current price for validation
+	ticker, err := m.session.Exchange.QueryTicker(ctx, params.Symbol)
+	if err != nil {
+		return fmt.Errorf("failed to get ticker for %s: %w", params.Symbol, err)
+	}
+
+	ticker.GetValidPrice()
+
+	currentPrice := ticker.GetPrice(params.Side, m.strategy.PriceType)
+	if currentPrice.IsZero() {
+		return fmt.Errorf("invalid current price %s for %s", currentPrice.String(), params.Symbol)
+	}
+
+	ok, err := validateStopLossTakeProfit(params.Side, currentPrice, params.StopLossPrice, params.TakeProfitPrice)
+	if !ok {
+		m.logger.Warnf("invalid SL or TP price setup, fallback to kline calculation: %v", err)
+
+		stopLoss, takeProfit, ferr := fallbackStopLossTakeProfit(ctx, m.session.Exchange, params.Symbol, time.Now(), 8*time.Hour, params.Side, 0.05)
+		if ferr != nil {
+			return fmt.Errorf("fallback kline calculation failed: %w", ferr)
+		}
+
+		params.StopLossPrice = stopLoss
+		params.TakeProfitPrice = takeProfit
+		m.logger.Infof("fallback SL price: %s, TP profit price: %s", stopLoss.String(), takeProfit.String())
+
+		// check again
+		ok, err = validateStopLossTakeProfit(params.Side, currentPrice, params.StopLossPrice, params.TakeProfitPrice)
+		if !ok {
+			return fmt.Errorf("stop loss or take profit price still invalid after fallback: %w", err)
+		}
+	}
+
+	// Calculate position size based on risk management
+	quantity, err := m.calculatePositionSize(ctx, params)
+	if err != nil {
+		return err
 	}
 
 	order := types.SubmitOrder{
@@ -307,4 +341,90 @@ func createInvalidStopLossError(side types.SideType, currentPrice fixedpoint.Val
 		return fmt.Errorf("invalid stop loss price for buy order: stop loss should be below current price (%s)", currentPrice.String())
 	}
 	return fmt.Errorf("invalid stop loss price for sell order: stop loss should be above current price (%s)", currentPrice.String())
+}
+
+// validateStopLossTakeProfit checks the validity of stop loss and take profit prices based on side and current price.
+func validateStopLossTakeProfit(
+	side types.SideType, currentPrice, stopLossPrice, takeProfitPrice fixedpoint.Value,
+) (bool, error) {
+	switch side {
+	case types.SideTypeBuy:
+		if stopLossPrice.Sign() > 0 && stopLossPrice.Compare(currentPrice) > 0 {
+			return false, fmt.Errorf("stop loss price (%s) must be less than current price (%s) for long position", stopLossPrice.String(), currentPrice.String())
+		}
+
+		if takeProfitPrice.Sign() > 0 && takeProfitPrice.Compare(currentPrice) < 0 {
+			return false, fmt.Errorf("take profit price (%s) must be greater than current price (%s) for long position", takeProfitPrice.String(), currentPrice.String())
+		}
+
+	case types.SideTypeSell:
+		if stopLossPrice.Sign() > 0 && stopLossPrice.Compare(currentPrice) < 0 {
+			return false, fmt.Errorf("stop loss price must be greater than current price for short position")
+		}
+
+		if takeProfitPrice.Sign() > 0 && takeProfitPrice.Compare(currentPrice) > 0 {
+			return false, fmt.Errorf("take profit price must be less than current price for short position")
+		}
+
+	default:
+		return false, fmt.Errorf("invalid side type: %s", side)
+	}
+
+	return true, nil
+}
+
+// fallbackStopLossTakeProfit calculates fallback stop loss and take profit prices from kline data.
+// percent is the adjustment ratio for take profit if the last kline is the extreme point (e.g. 0.05 for 5%).
+// duration is the lookback window for kline analysis (e.g. 8 * time.Hour).
+func fallbackStopLossTakeProfit(
+	ctx context.Context, exchange types.Exchange, symbol string, now time.Time, duration time.Duration,
+	side types.SideType, percent float64,
+) (stopLoss, takeProfit fixedpoint.Value, err error) {
+	interval := types.Interval15m
+	endTime := now
+	startTime := now.Add(-duration)
+	klines, err := exchange.QueryKLines(ctx, symbol, interval, types.KLineQueryOptions{
+		StartTime: &startTime,
+		EndTime:   &endTime,
+	})
+
+	if err != nil || len(klines) == 0 {
+		return fixedpoint.Zero, fixedpoint.Zero, fmt.Errorf("failed to query klines, error: %w", err)
+	}
+
+	minLow := klines[0].Low
+	maxHigh := klines[0].High
+	minIdx := 0
+	maxIdx := 0
+	for i, k := range klines {
+		if k.Low.Compare(minLow) <= 0 {
+			minLow = k.Low
+			minIdx = i
+		}
+		if k.High.Compare(maxHigh) >= 0 {
+			maxHigh = k.High
+			maxIdx = i
+		}
+	}
+	last := klines[len(klines)-1]
+	adj := fixedpoint.NewFromFloat(1 + percent)
+	adjDown := fixedpoint.NewFromFloat(1 - percent)
+
+	switch side {
+	case types.SideTypeBuy:
+		stopLoss = minLow
+		if maxIdx == len(klines)-1 {
+			takeProfit = last.High.Mul(adj)
+		} else {
+			takeProfit = maxHigh
+		}
+	case types.SideTypeSell:
+		stopLoss = maxHigh
+		if minIdx == len(klines)-1 {
+			takeProfit = last.Low.Mul(adjDown)
+		} else {
+			takeProfit = minLow
+		}
+	}
+	return stopLoss, takeProfit, nil
 }
