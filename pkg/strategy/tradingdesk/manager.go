@@ -33,6 +33,8 @@ type TradingManager struct {
 	strategy *Strategy
 
 	logger logrus.FieldLogger
+
+	closeTrigger func()
 }
 
 func (m *TradingManager) Initialize(
@@ -169,6 +171,9 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 	if params.TimeToLive > 0 {
 		expiryTime := time.Now().Add(params.TimeToLive)
 		m.ExpiryTime = &expiryTime
+
+		closeTrigger := m.createCloseTrigger(ctx, params.TimeToLive)
+		go closeTrigger()
 	}
 
 	if params.StopLossPrice.Sign() > 0 {
@@ -215,6 +220,24 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 
 	m.logger.Infof("opened position: %s", m.Position.String())
 	return nil
+}
+
+func (m *TradingManager) createCloseTrigger(ctx context.Context, ttl time.Duration) func() {
+	return func() {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-time.AfterFunc(ttl, func() {
+			m.logger.Infof("position expired (%s), closing position", ttl)
+
+			if err := m.ClosePosition(ctx); err != nil {
+				m.logger.WithError(err).Error("failed to close position")
+			}
+		}).C:
+			return
+		}
+	}
 }
 
 func (m *TradingManager) GetPosition() *types.Position {
