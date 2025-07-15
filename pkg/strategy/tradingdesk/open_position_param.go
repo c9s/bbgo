@@ -1,8 +1,6 @@
 package tradingdesk
 
 import (
-	"time"
-
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -13,5 +11,5 @@ type OpenPositionParams struct {
 	Quantity        fixedpoint.Value `json:"quantity"`
 	StopLossPrice   fixedpoint.Value `json:"stopLossPrice"`
 	TakeProfitPrice fixedpoint.Value `json:"takeProfitPrice"`
-	TimeToLive      time.Duration    `json:"timeToLive"`
+	TimeToLive      types.Duration   `json:"timeToLive"`
 }

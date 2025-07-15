@@ -151,13 +151,14 @@ func (s *Strategy) loadFromPositionRisks(ctx context.Context) error {
 		}
 
 		m.logger.Infof("updated position: %+v", m.Position)
+
+		bbgo.Notify("TradingManager %s loaded position", m.Position.Symbol, m.Position)
 	}
 
 	return nil
 }
 
 func (s *Strategy) openPositions(ctx context.Context, openPositions []OpenPositionParams) error {
-
 	for _, pos := range openPositions {
 		if err := s.OpenPosition(ctx, pos); err != nil {
 			return fmt.Errorf("open position error: %w", err)

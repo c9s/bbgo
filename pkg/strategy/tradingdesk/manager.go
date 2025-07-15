@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -12,59 +13,6 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
-
-type TradingManagerState struct {
-	Position    *types.Position    `json:"position,omitempty"`
-	ProfitStats *types.ProfitStats `json:"profitStats,omitempty"`
-
-	TakeProfitOrders []types.Order `json:"takeProfitOrders,omitempty"`
-	StopLossOrders   []types.Order `json:"stopLossOrders,omitempty"`
-}
-
-type TradingManager struct {
-	TradingManagerState
-
-	orderExecutor *bbgo.GeneralOrderExecutor
-
-	// References to strategy components
-	session  *bbgo.ExchangeSession
-	market   types.Market
-	strategy *Strategy
-
-	logger logrus.FieldLogger
-}
-
-func (m *TradingManager) Initialize(
-	ctx context.Context, environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market,
-	strategy *Strategy,
-) {
-	strategyID := strategy.ID()
-	instanceID := strategy.InstanceID()
-
-	m.session = session
-	m.market = market
-	m.strategy = strategy
-	m.logger = strategy.logger.WithField("symbol", market.Symbol)
-
-	if m.Position == nil {
-		m.Position = types.NewPositionFromMarket(market)
-		m.Position.Strategy = strategyID
-		m.Position.StrategyInstanceID = instanceID
-		m.Position.SetExchangeFeeRate(session.ExchangeName, types.ExchangeFee{
-			MakerFeeRate: session.MakerFeeRate,
-			TakerFeeRate: session.TakerFeeRate,
-		})
-	}
-
-	if m.ProfitStats == nil {
-		m.ProfitStats = types.NewProfitStats(market)
-	}
-
-	m.orderExecutor = bbgo.NewGeneralOrderExecutor(session, market.Symbol, strategyID, instanceID, m.Position)
-	m.orderExecutor.BindEnvironment(environ)
-	m.orderExecutor.BindProfitStats(m.ProfitStats)
-	m.orderExecutor.Bind()
-}
 
 type TradingManagerMap map[string]*TradingManager
 
@@ -89,6 +37,98 @@ func (m TradingManagerMap) New(
 	manager := &TradingManager{}
 	manager.Initialize(ctx, environ, session, market, strategy)
 	return manager
+}
+
+type TradingManagerState struct {
+	Position         *types.Position    `json:"position,omitempty"`
+	ProfitStats      *types.ProfitStats `json:"profitStats,omitempty"`
+	TakeProfitOrders types.OrderSlice   `json:"takeProfitOrders,omitempty"`
+	StopLossOrders   types.OrderSlice   `json:"stopLossOrders,omitempty"`
+
+	ExpiryTime *time.Time `json:"expiryTime,omitempty"`
+}
+
+type TradingManager struct {
+	TradingManagerState
+
+	orderExecutor *bbgo.GeneralOrderExecutor
+
+	// References to strategy components
+	session  *bbgo.ExchangeSession
+	market   types.Market
+	strategy *Strategy
+
+	logger logrus.FieldLogger
+
+	closeTrigger       func()
+	cancelCloseTrigger context.CancelFunc
+	closePositionMutex sync.Mutex
+}
+
+func (m *TradingManager) Initialize(
+	ctx context.Context,
+	environ *bbgo.Environment, session *bbgo.ExchangeSession, market types.Market,
+	strategy *Strategy,
+) {
+	strategyID := strategy.ID()
+	instanceID := strategy.InstanceID()
+
+	m.session = session
+	m.market = market
+	m.strategy = strategy
+	m.logger = strategy.logger.WithField("symbol", market.Symbol)
+
+	if m.Position == nil {
+		m.Position = types.NewPositionFromMarket(market)
+		m.Position.Strategy = strategyID
+		m.Position.StrategyInstanceID = instanceID
+
+		m.Position.SetExchangeFeeRate(session.ExchangeName, types.ExchangeFee{
+			MakerFeeRate: session.MakerFeeRate,
+			TakerFeeRate: session.TakerFeeRate,
+		})
+	}
+
+	if m.ProfitStats == nil {
+		m.ProfitStats = types.NewProfitStats(market)
+	}
+
+	m.orderExecutor = bbgo.NewGeneralOrderExecutor(session, market.Symbol, strategyID, instanceID, m.Position)
+	m.orderExecutor.BindEnvironment(environ)
+	m.orderExecutor.BindProfitStats(m.ProfitStats)
+	m.orderExecutor.Bind()
+	m.orderExecutor.ActiveMakerOrders().OnFilled(m.OnOrderFilled)
+
+	if m.ExpiryTime != nil {
+		m.closeTrigger, m.cancelCloseTrigger = m.createCloseTrigger(ctx, time.Until(*m.ExpiryTime))
+		go m.closeTrigger()
+	} else {
+		m.closeTrigger = nil
+		m.cancelCloseTrigger = nil
+	}
+}
+
+func (m *TradingManager) OnOrderFilled(order types.Order) {
+	matched := false
+	if len(m.TakeProfitOrders) > 0 {
+		if _, ok := m.TakeProfitOrders.FindByOrderID(order.OrderID); ok {
+			matched = true
+		}
+	}
+
+	if len(m.StopLossOrders) > 0 {
+		if _, ok := m.StopLossOrders.FindByOrderID(order.OrderID); ok {
+			if matched {
+				m.logger.Warnf("order %d matched both take profit and stop loss orders, this is unexpected", order.OrderID)
+			}
+
+			matched = true
+		}
+	}
+
+	if matched && m.cancelCloseTrigger != nil {
+		m.cancelCloseTrigger()
+	}
 }
 
 func (m *TradingManager) SetLeverage(ctx context.Context, lv int) error {
@@ -164,6 +204,14 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 
 	m.logger.Infof("created orders: %+v", createdOrders)
 
+	if params.TimeToLive > 0 {
+		expiryTime := time.Now().Add(params.TimeToLive.Duration())
+		m.ExpiryTime = &expiryTime
+
+		m.closeTrigger, m.cancelCloseTrigger = m.createCloseTrigger(ctx, params.TimeToLive.Duration())
+		go m.closeTrigger()
+	}
+
 	if params.StopLossPrice.Sign() > 0 {
 		stopLossOrders, err := m.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
 			Market:        m.market,
@@ -210,13 +258,39 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 	return nil
 }
 
+func (m *TradingManager) createCloseTrigger(baseCtx context.Context, ttl time.Duration) (func(), context.CancelFunc) {
+	ctx, cancel := context.WithCancel(baseCtx)
+
+	m.logger.Infof("creating close trigger with ttl %s for position %s", ttl.String(), m.Position.String())
+	return func() {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-time.AfterFunc(ttl, func() {
+			m.logger.Infof("position expired (%s), closing position", ttl)
+
+			if err := m.ClosePosition(baseCtx); err != nil {
+				m.logger.WithError(err).Error("failed to close position")
+			}
+
+		}).C:
+			return
+		}
+	}, cancel
+}
+
 func (m *TradingManager) GetPosition() *types.Position {
 	return m.Position
 }
 
 func (m *TradingManager) ClosePosition(ctx context.Context) error {
-	if m.Position == nil {
-		return fmt.Errorf("no position to close for %s", m.market.Symbol)
+	m.closePositionMutex.Lock()
+	defer m.closePositionMutex.Unlock()
+
+	base := m.Position.GetBase()
+	if m.Position == nil || base.IsZero() {
+		return nil
 	}
 
 	// Close position by submitting a market order in the opposite direction
@@ -225,7 +299,7 @@ func (m *TradingManager) ClosePosition(ctx context.Context) error {
 		Side:       m.Position.Side().Reverse(),
 		Type:       types.OrderTypeMarket,
 		Market:     m.market,
-		Quantity:   m.Position.GetBase().Abs(),
+		Quantity:   base.Abs(),
 		ReduceOnly: true,
 
 		// ClosePosition is only used for stop market
@@ -236,6 +310,13 @@ func (m *TradingManager) ClosePosition(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to close position for %s order: %+v: %w", m.market.Symbol, order, err)
 	}
+
+	if m.cancelCloseTrigger != nil {
+		m.cancelCloseTrigger()
+	}
+
+	// reset expiry time
+	m.TradingManagerState.ExpiryTime = nil
 
 	if err := m.orderExecutor.CancelOrders(ctx, m.TakeProfitOrders...); err != nil {
 		m.logger.WithError(err).Warnf("failed to cancel orders")
