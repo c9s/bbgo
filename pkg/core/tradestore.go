@@ -19,14 +19,14 @@ type TradeStore struct {
 
 	pruneEnabled        bool
 	storeSize           int
-	trades              map[uint64]types.Trade
+	trades              map[types.TradeKey]types.Trade
 	tradeExpiryDuration time.Duration
 	lastTradeTime       time.Time
 }
 
 func NewTradeStore() *TradeStore {
 	return &TradeStore{
-		trades:              make(map[uint64]types.Trade),
+		trades:              make(map[types.TradeKey]types.Trade),
 		storeSize:           MaximumTradeStoreSize,
 		tradeExpiryDuration: TradeExpiryTime,
 	}
@@ -62,17 +62,17 @@ func (s *TradeStore) Trades() (trades []types.Trade) {
 	return trades
 }
 
-func (s *TradeStore) Exists(oID uint64) (ok bool) {
+func (s *TradeStore) Exists(key types.TradeKey) (ok bool) {
 	s.Lock()
 	defer s.Unlock()
 
-	_, ok = s.trades[oID]
+	_, ok = s.trades[key]
 	return ok
 }
 
 func (s *TradeStore) Clear() {
 	s.Lock()
-	s.trades = make(map[uint64]types.Trade)
+	s.trades = make(map[types.TradeKey]types.Trade)
 	s.Unlock()
 }
 
@@ -81,10 +81,10 @@ type TradeFilter func(trade types.Trade) bool
 // Filter filters the trades by a given TradeFilter function
 func (s *TradeStore) Filter(filter TradeFilter) {
 	s.Lock()
-	var trades = make(map[uint64]types.Trade)
+	var trades = make(map[types.TradeKey]types.Trade)
 	for _, trade := range s.trades {
 		if !filter(trade) {
-			trades[trade.ID] = trade
+			trades[trade.Key()] = trade
 		}
 	}
 	s.trades = trades
@@ -108,7 +108,7 @@ func (s *TradeStore) GetAndClear() (trades []types.Trade) {
 	for _, t := range s.trades {
 		trades = append(trades, t)
 	}
-	s.trades = make(map[uint64]types.Trade)
+	s.trades = make(map[types.TradeKey]types.Trade)
 	s.Unlock()
 
 	return trades
@@ -119,7 +119,7 @@ func (s *TradeStore) Add(trades ...types.Trade) {
 	defer s.Unlock()
 
 	for _, trade := range trades {
-		s.trades[trade.ID] = trade
+		s.trades[trade.Key()] = trade
 		s.touchLastTradeTime(trade)
 	}
 }
@@ -136,7 +136,7 @@ func (s *TradeStore) Prune(curTime time.Time) {
 	s.Lock()
 	defer s.Unlock()
 
-	var trades = make(map[uint64]types.Trade)
+	var trades = make(map[types.TradeKey]types.Trade)
 	var cutOffTime = curTime.Add(-s.tradeExpiryDuration)
 
 	log.Infof("pruning expired trades, cutoff time = %s", cutOffTime.String())
@@ -145,7 +145,7 @@ func (s *TradeStore) Prune(curTime time.Time) {
 			continue
 		}
 
-		trades[trade.ID] = trade
+		trades[trade.Key()] = trade
 	}
 
 	s.trades = trades
