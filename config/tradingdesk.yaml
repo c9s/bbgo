@@ -17,4 +17,5 @@ exchangeStrategies:
         # quantity: 0.001
         stopLossPrice: 125_000
         takeProfitPrice: 90_000
+        timeToLive: "1m"
       closePositionsOnShutdown: true
