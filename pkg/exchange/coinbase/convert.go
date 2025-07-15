@@ -64,7 +64,7 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 	if cbOrder.Status == api.OrderStatusDone {
 		order.UpdateTime = cbOrder.DoneAt
 	} else {
-		order.UpdateTime = types.Time(time.Now())
+		order.UpdateTime = cbOrder.CreatedAt
 	}
 	return order
 }
