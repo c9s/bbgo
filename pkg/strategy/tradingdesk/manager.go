@@ -270,12 +270,10 @@ func (m *TradingManager) createCloseTrigger(baseCtx context.Context, ttl time.Du
 		case <-time.AfterFunc(ttl, func() {
 			m.logger.Infof("position expired (%s), closing position", ttl)
 
-			if err := m.ClosePosition(ctx); err != nil {
+			if err := m.ClosePosition(baseCtx); err != nil {
 				m.logger.WithError(err).Error("failed to close position")
 			}
 
-			// reset expiry time
-			m.TradingManagerState.ExpiryTime = nil
 		}).C:
 			return
 		}
@@ -291,7 +289,7 @@ func (m *TradingManager) ClosePosition(ctx context.Context) error {
 	defer m.closePositionMutex.Unlock()
 
 	base := m.Position.GetBase()
-	if m.Position == nil || base.IsZero() || m.Position.IsDust() {
+	if m.Position == nil || base.IsZero() {
 		return nil
 	}
 
@@ -316,6 +314,9 @@ func (m *TradingManager) ClosePosition(ctx context.Context) error {
 	if m.cancelCloseTrigger != nil {
 		m.cancelCloseTrigger()
 	}
+
+	// reset expiry time
+	m.TradingManagerState.ExpiryTime = nil
 
 	if err := m.orderExecutor.CancelOrders(ctx, m.TakeProfitOrders...); err != nil {
 		m.logger.WithError(err).Warnf("failed to cancel orders")
