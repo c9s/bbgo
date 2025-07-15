@@ -267,6 +267,16 @@ func (m *SyncOrderMap) Orders() (slice OrderSlice) {
 
 type OrderSlice []Order
 
+func (s OrderSlice) FindByOrderID(id uint64) (Order, bool) {
+	for _, o := range s {
+		if o.OrderID == id {
+			return o, true
+		}
+	}
+
+	return Order{}, false
+}
+
 func (s *OrderSlice) Add(o Order) {
 	*s = append(*s, o)
 }
