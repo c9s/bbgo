@@ -41,9 +41,10 @@ func toGlobalOrderStatus(order *api.Order) types.OrderStatus {
 }
 
 func toGlobalOrder(cbOrder *api.Order) types.Order {
-	return types.Order{
+	order := types.Order{
 		SubmitOrder: types.SubmitOrder{
 			ClientOrderID: cbOrder.ClientOID,
+			Symbol:        toGlobalSymbol(cbOrder.ProductID),
 			Type:          toGlobalOrderType(cbOrder.Type),
 			Side:          toGlobalSide(cbOrder.Side),
 			Quantity:      cbOrder.Size,
@@ -51,14 +52,21 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 			StopPrice:     cbOrder.StopPrice,
 			TimeInForce:   toGlobalTimeInForce(cbOrder.TimeInForce),
 		},
-		Exchange:       types.ExchangeCoinBase,
-		Status:         toGlobalOrderStatus(cbOrder),
-		UUID:           cbOrder.ID,
-		OrderID:        FNV64a(cbOrder.ID),
-		OriginalStatus: string(cbOrder.Status),
-		CreationTime:   cbOrder.CreatedAt,
-		IsWorking:      isWorkingOrder(cbOrder.Status),
+		Exchange:         types.ExchangeCoinBase,
+		Status:           toGlobalOrderStatus(cbOrder),
+		UUID:             cbOrder.ID,
+		OrderID:          FNV64a(cbOrder.ID),
+		OriginalStatus:   string(cbOrder.Status),
+		CreationTime:     cbOrder.CreatedAt,
+		IsWorking:        isWorkingOrder(cbOrder.Status),
+		ExecutedQuantity: cbOrder.FilledSize,
 	}
+	if cbOrder.Status == api.OrderStatusDone {
+		order.UpdateTime = cbOrder.DoneAt
+	} else {
+		order.UpdateTime = cbOrder.CreatedAt
+	}
+	return order
 }
 
 func toGlobalTrade(cbTrade *api.Trade) types.Trade {
@@ -75,6 +83,7 @@ func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 		IsMaker:       cbTrade.Liquidity == api.LiquidityMaker,
 		Fee:           cbTrade.Fee,
 		FeeCurrency:   cbTrade.FundingCurrency,
+		Time:          cbTrade.CreatedAt,
 	}
 }
 
