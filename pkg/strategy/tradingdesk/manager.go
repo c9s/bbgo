@@ -14,11 +14,12 @@ import (
 )
 
 type TradingManagerState struct {
-	Position    *types.Position    `json:"position,omitempty"`
-	ProfitStats *types.ProfitStats `json:"profitStats,omitempty"`
+	Position         *types.Position    `json:"position,omitempty"`
+	ProfitStats      *types.ProfitStats `json:"profitStats,omitempty"`
+	TakeProfitOrders []types.Order      `json:"takeProfitOrders,omitempty"`
+	StopLossOrders   []types.Order      `json:"stopLossOrders,omitempty"`
 
-	TakeProfitOrders []types.Order `json:"takeProfitOrders,omitempty"`
-	StopLossOrders   []types.Order `json:"stopLossOrders,omitempty"`
+	ExpiryTime *time.Time `json:"expiryTime,omitempty"`
 }
 
 type TradingManager struct {
@@ -50,6 +51,7 @@ func (m *TradingManager) Initialize(
 		m.Position = types.NewPositionFromMarket(market)
 		m.Position.Strategy = strategyID
 		m.Position.StrategyInstanceID = instanceID
+
 		m.Position.SetExchangeFeeRate(session.ExchangeName, types.ExchangeFee{
 			MakerFeeRate: session.MakerFeeRate,
 			TakerFeeRate: session.TakerFeeRate,
@@ -163,6 +165,11 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 	}
 
 	m.logger.Infof("created orders: %+v", createdOrders)
+
+	if params.TimeToLive > 0 {
+		expiryTime := time.Now().Add(params.TimeToLive)
+		m.ExpiryTime = &expiryTime
+	}
 
 	if params.StopLossPrice.Sign() > 0 {
 		stopLossOrders, err := m.orderExecutor.SubmitOrders(ctx, types.SubmitOrder{
