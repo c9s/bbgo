@@ -83,6 +83,7 @@ func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 		IsMaker:       cbTrade.Liquidity == api.LiquidityMaker,
 		Fee:           cbTrade.Fee,
 		FeeCurrency:   cbTrade.FundingCurrency,
+		Time:          cbTrade.CreatedAt,
 	}
 }
 
