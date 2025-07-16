@@ -79,7 +79,10 @@ func (msg subscribeMsgType2) String() string {
 
 func (s *Stream) handleConnect() {
 	// context for kline workers
-	s.klineCtx, s.klineCancel = context.WithCancel(context.Background())
+	// klineCtx not set -> first time connecting, create a new context
+	if s.klineCancel == nil {
+		s.klineCtx, s.klineCancel = context.WithCancel(context.Background())
+	}
 	// channel2LocalSymbolsMap is a map from channel to local symbols
 	channel2LocalSymbolsMap := make(map[types.Channel][]string)
 
