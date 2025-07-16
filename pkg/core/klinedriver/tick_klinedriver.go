@@ -93,14 +93,15 @@ func (t *TickKLineDriver) AddTrade(trade types.Trade) {
 }
 
 // Run starts the kline driver.
-// The driver can be only run once. Panic otherwise.
+// The driver should only run once.
 func (t *TickKLineDriver) Run(ctx context.Context) {
 	go t.run(ctx)
 }
 
 func (t *TickKLineDriver) run(ctx context.Context) {
 	if t.running {
-		panic("can not run kline driver twice")
+		log.Debugf("kline driver %s-%s is already running", t.symbol, t.intervals)
+		return
 	}
 
 	t.mu.Lock()
