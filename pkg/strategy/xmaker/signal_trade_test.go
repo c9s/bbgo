@@ -236,3 +236,46 @@ func TestMarketTradeWindowSignal_WithDecay(t *testing.T) {
 	// Verify ring buffer internal state updated (from filterTrades)
 	assert.Equal(t, 3, sig.count)
 }
+
+func TestMarketTradeWindowSignal_WithFrequency(t *testing.T) {
+	now := time.Now()
+	symbol := "BTCUSDT"
+	// Set up the signal with a 3-minute window so all trades are within range.
+	// Enable frequency consideration by setting ConsiderFreq to true.
+	sig := &TradeVolumeWindowSignal{
+		symbol:       symbol,
+		Threshold:    fixedpoint.NewFromFloat(0.10),
+		Window:       types.Duration(3 * time.Minute),
+		DecayRate:    0.05, // decay rate per second,
+		ConsiderFreq: true,
+	}
+
+	// Preallocate the ring buffer.
+	sig.trades = make([]types.Trade, tradeSliceCapacityLimit)
+	// Insert three trades with known timestamps.
+	// trade1: buy 2 minutes ago, weight = exp(-0.05*120) ≈ 0.00248.
+	// trade2: sell 20 seconds ago, weight = exp(-0.05*20) ≈ 0.36788.
+	// trade3: buy 1 second ago, weight = exp(-0.05*1) ≈ 0.95123.
+	trade1 := newFakeTrade(symbol, types.SideTypeBuy, Number(18000.0), Number(1.0), now.Add(-2*time.Minute))
+	trade2 := newFakeTrade(symbol, types.SideTypeSell, Number(18000.0), Number(0.5), now.Add(-20*time.Second))
+	trade3 := newFakeTrade(symbol, types.SideTypeBuy, Number(18000.0), Number(1.0), now.Add(-1*time.Second))
+	sig.trades[0] = trade1
+	sig.trades[1] = trade2
+	sig.trades[2] = trade3
+	sig.start = 0
+	sig.count = 3
+
+	// The expected score calculations (with Alpha=1.0 and Beta=1.0) are:
+	// trade1 score: 1*0.00247875 + 1*0.00247875 = 0.00495750.
+	// trade2 score: 0.5*0.367879 + 1*0.367879 = 0.551819.
+	// trade3 score: 1*0.951229 + 1*0.951229 = 1.902458.
+	// Buy score = trade1 + trade3 ≈ 1.907416, Sell score = trade2 ≈ 0.551819.
+	// Signal = (1.907416 - 0.551819) / (1.907416 + 0.551819) ≈ 0.551919, scaled by 2 yields ≈ 1.10384.
+
+	ctx := context.Background()
+	sigNum, err := sig.CalculateSignal(ctx)
+	assert.NoError(t, err)
+	assert.InDelta(t, 1.10384, sigNum, 0.01)
+	// Verify that the ring buffer internal state remains unchanged after filtering.
+	assert.Equal(t, 3, sig.count)
+}
