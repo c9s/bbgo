@@ -248,6 +248,8 @@ func TestMarketTradeWindowSignal_WithFrequency(t *testing.T) {
 		Window:       types.Duration(3 * time.Minute),
 		DecayRate:    0.05, // decay rate per second,
 		ConsiderFreq: true,
+		Alpha:        1.0,
+		Beta:         1.0,
 	}
 
 	// Preallocate the ring buffer.
