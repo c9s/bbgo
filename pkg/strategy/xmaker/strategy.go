@@ -259,7 +259,7 @@ func (s *Strategy) ID() string {
 }
 
 func (s *Strategy) InstanceID() string {
-	return fmt.Sprintf("%s:%s", ID, s.Symbol)
+	return strings.Join([]string{ID, s.Symbol}, ":")
 }
 
 func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
@@ -367,6 +367,7 @@ func (s *Strategy) Initialize() error {
 	}
 
 	s.positionExposure = newPositionExposure(s.Symbol)
+	s.positionExposure.SetMetricsLabels(ID, s.InstanceID(), s.MakerExchange, s.Symbol)
 	return nil
 }
 
@@ -2546,6 +2547,11 @@ func (s *Strategy) CrossRun(
 
 		if s.RecoverTrade {
 			go s.tradeRecover(ctx)
+		}
+
+		if !s.Position.IsDust() {
+			// restore position into the position exposure
+			s.positionExposure.Open(s.Position.GetBase())
 		}
 	}()
 

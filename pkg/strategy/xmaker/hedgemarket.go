@@ -301,6 +301,11 @@ func (m *HedgeMarket) Start(ctx context.Context) error {
 		interval = defaultHedgeInterval
 	}
 
+	m.positionExposure.SetMetricsLabels(ID,
+		m.InstanceID(),
+		m.session.ExchangeName.String(),
+		m.market.Symbol)
+
 	if err := m.stream.Connect(ctx); err != nil {
 		return err
 	}
