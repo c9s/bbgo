@@ -180,7 +180,7 @@ func calculateSignal(buyVol, sellVol, threshold float64) float64 {
 // If DecayRate > 0, older trades have less influence.
 // The computed signal is scaled by 2x.
 func (s *TradeVolumeWindowSignal) CalculateSignal(ctx context.Context) (float64, error) {
-	if s.ConsiderFreq {
+	if s.ConsiderFreq && s.Alpha != 0.0 && s.Beta != 0.0 {
 		return s.CalculateSignalWithFrequency(ctx)
 	}
 
