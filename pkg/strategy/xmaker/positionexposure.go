@@ -1,6 +1,40 @@
 package xmaker
 
-import "github.com/c9s/bbgo/pkg/fixedpoint"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/c9s/bbgo/pkg/fixedpoint"
+)
+
+var positionExposurePendingMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "bbgo_position_exposure_pending",
+		Help: "the pending position exposure",
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
+
+var positionExposureNetMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "bbgo_position_exposure_net",
+		Help: "the net position exposure",
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
+
+var positionExposureUncoveredMetrics = promauto.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "bbgo_position_exposure_uncovered",
+		Help: "the uncovered position exposure",
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
+
+var positionExposureSizeMetrics = promauto.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name:    "bbgo_position_exposure_size",
+		Help:    "the size of position exposure",
+		Buckets: prometheus.LinearBuckets(0, 10, 10),
+	}, []string{"strategy_type", "strategy_id", "exchange", "symbol"},
+)
 
 //go:generate callbackgen -type PositionExposure
 type PositionExposure struct {
@@ -10,8 +44,11 @@ type PositionExposure struct {
 	// pending = covered position
 	net, pending fixedpoint.MutexValue
 
+	openCallbacks  []func(d fixedpoint.Value)
 	coverCallbacks []func(d fixedpoint.Value)
 	closeCallbacks []func(d fixedpoint.Value)
+
+	labels prometheus.Labels
 }
 
 func newPositionExposure(symbol string) *PositionExposure {
@@ -30,6 +67,8 @@ func (m *PositionExposure) Open(delta fixedpoint.Value) {
 		m.net.Get().Float64(),
 		m.pending.Get().Float64(),
 	)
+
+	m.EmitOpen(delta)
 }
 
 func (m *PositionExposure) Cover(delta fixedpoint.Value) {
@@ -70,4 +109,28 @@ func (m *PositionExposure) GetUncovered() fixedpoint.Value {
 	coveredPosition := m.pending.Get()
 	uncoverPosition := netPosition.Sub(coveredPosition)
 	return uncoverPosition
+}
+
+func (m *PositionExposure) SetMetricsLabels(strategyType, strategyID, exchange, symbol string) {
+	m.labels = prometheus.Labels{
+		"strategy_type": strategyType,
+		"strategy_id":   strategyID,
+		"exchange":      exchange,
+		"symbol":        symbol,
+	}
+
+	updater := func(_ fixedpoint.Value) {
+		m.UpdateMetricsWith(m.labels)
+	}
+
+	m.OnOpen(updater)
+	m.OnCover(updater)
+	m.OnClose(updater)
+}
+
+func (m *PositionExposure) UpdateMetricsWith(labels prometheus.Labels) {
+	positionExposurePendingMetrics.With(labels).Set(m.pending.Get().Float64())
+	positionExposureNetMetrics.With(labels).Set(m.net.Get().Float64())
+	positionExposureUncoveredMetrics.With(labels).Set(m.GetUncovered().Float64())
+	positionExposureSizeMetrics.With(labels).Observe(m.net.Get().Float64())
 }
