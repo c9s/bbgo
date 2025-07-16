@@ -6,6 +6,16 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 )
 
+func (m *PositionExposure) OnOpen(cb func(d fixedpoint.Value)) {
+	m.openCallbacks = append(m.openCallbacks, cb)
+}
+
+func (m *PositionExposure) EmitOpen(d fixedpoint.Value) {
+	for _, cb := range m.openCallbacks {
+		cb(d)
+	}
+}
+
 func (m *PositionExposure) OnCover(cb func(d fixedpoint.Value)) {
 	m.coverCallbacks = append(m.coverCallbacks, cb)
 }
