@@ -35,7 +35,7 @@ type SlackAttachmentCreator interface {
 }
 
 type SlackBlocksCreator interface {
-	SlackBlocks() slack.Blocks
+	SlackBlocks() []slack.Block
 }
 
 type notifyTask struct {
@@ -515,6 +515,9 @@ func (n *Notifier) NotifyTo(channel string, obj interface{}, args ...interface{}
 
 	case *slack.Attachment:
 		opts = append(opts, slack.MsgOptionAttachments(append([]slack.Attachment{*a}, slackAttachments...)...))
+
+	case SlackBlocksCreator:
+		opts = append(opts, slack.MsgOptionBlocks(a.SlackBlocks()...))
 
 	case SlackAttachmentCreator:
 		// convert object to slack attachment (if supported)
