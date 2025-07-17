@@ -23,4 +23,4 @@ exchangeStrategies:
         stopLossPrice: 125_000
         takeProfitPrice: 90_000
         timeToLive: "1m"
-      closePositionsOnShutdown: false
+      closePositionsOnShutdown: true
