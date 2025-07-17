@@ -140,7 +140,15 @@ func (m *TradingManager) SetLeverage(ctx context.Context, lv int) error {
 func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionParams) error {
 	base := m.Position.GetBase()
 	if !base.IsZero() {
-		return fmt.Errorf("position already exists for %s: %s", params.Symbol, base.String())
+		// Check if the existing position is on the same side
+		if m.Position.Side() == params.Side {
+			return fmt.Errorf("position already exists for %s: %s", params.Symbol, base.String())
+		}
+
+		// Close the current position if it's on the opposite side
+		if err := m.ClosePosition(ctx); err != nil {
+			return fmt.Errorf("failed to close existing position for %s: %w", params.Symbol, err)
+		}
 	}
 
 	switch strings.ToUpper(string(params.Side)) {
