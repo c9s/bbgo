@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -151,11 +152,9 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 		}
 	}
 
-	switch strings.ToUpper(string(params.Side)) {
-	case "LONG":
-		params.Side = types.SideTypeBuy
-	case "SHORT":
-		params.Side = types.SideTypeSell
+	params.Side = normalizeSide(string(params.Side))
+	if params.Side == "" {
+		return fmt.Errorf("invalid side: %s", params.Side)
 	}
 
 	// get current price for validation
@@ -258,7 +257,7 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 			return fmt.Errorf("failed to submit take profit orders for %s: %w", params.Symbol, err)
 		}
 
-		m.strategy.logger.Infof("created take loss orders: %+v", takeProfitOrders)
+		m.strategy.logger.Infof("created take profit orders: %+v", takeProfitOrders)
 		m.TakeProfitOrders = takeProfitOrders
 	}
 
@@ -516,4 +515,120 @@ func fallbackStopLossTakeProfit(
 		}
 	}
 	return stopLoss, takeProfit, nil
+}
+
+// extractClosePositionPrice extracts the StopPrice of the first order with ClosePosition set to true.
+func extractClosePositionPrice(orders types.OrderSlice) fixedpoint.Value {
+	for _, order := range orders {
+		if order.ClosePosition {
+			return order.StopPrice
+		}
+	}
+
+	return fixedpoint.Zero
+}
+
+// SlackBlocks generates Slack message blocks with position details, take profit, stop loss prices, and unrealized profit.
+func (m *TradingManager) SlackBlocks() []slack.Block {
+	var blocks []slack.Block
+
+	// Query the latest price
+	ticker, err := m.session.Exchange.QueryTicker(context.Background(), m.Position.Symbol)
+	var currentPrice fixedpoint.Value
+	if err != nil {
+		m.logger.WithError(err).Errorf("failed to query ticker for %s", m.Position.Symbol)
+	} else {
+		currentPrice = ticker.GetValidPrice()
+	}
+
+	// Add position details
+	positionDetails := fmt.Sprintf("*TradingManager %s Position Details:*\n- Side: `%s`\n - Entry Price: `%s`\n - Size: `%s` (`%s` in %s) ",
+		m.market.Symbol,
+		m.Position.Side(),
+		m.Position.AverageCost.String(),
+		m.Position.GetBase().String(),
+		m.Position.AverageCost.Mul(m.Position.GetBase().Abs()),
+		m.market.QuoteCurrency,
+	)
+
+	if !currentPrice.IsZero() {
+		positionDetails += fmt.Sprintf("\n - Current Price: `%s`", currentPrice.String())
+	}
+
+	positionSection := slack.NewSectionBlock(
+		slack.NewTextBlockObject(
+			slack.MarkdownType,
+			positionDetails,
+			false,
+			false,
+		),
+		nil,
+		nil,
+	)
+	blocks = append(blocks, positionSection)
+
+	// Add unrealized profit
+	if !currentPrice.IsZero() {
+		unrealizedProfit := m.Position.UnrealizedProfit(currentPrice)
+		profitText := fmt.Sprintf("*Unrealized Profit:* `%s`", unrealizedProfit.String())
+
+		// Add ROI to the Slack blocks
+		if !currentPrice.IsZero() {
+			roi := m.Position.ROI(currentPrice)
+			profitText += fmt.Sprintf(" / *ROI*: `%s`", roi.FormatPercentage(2))
+		}
+
+		profitSection := slack.NewSectionBlock(
+			slack.NewTextBlockObject(
+				slack.MarkdownType,
+				profitText,
+				false,
+				false,
+			),
+			nil,
+			nil,
+		)
+		blocks = append(blocks, profitSection)
+	}
+
+	// Add take profit and stop loss prices
+	takeProfitPrice := extractClosePositionPrice(m.TakeProfitOrders)
+	stopLossPrice := extractClosePositionPrice(m.StopLossOrders)
+	if !takeProfitPrice.IsZero() || !stopLossPrice.IsZero() {
+		priceSection := slack.NewSectionBlock(
+			slack.NewTextBlockObject(
+				slack.MarkdownType,
+				fmt.Sprintf("*Take Profit Price:* %s / *Stop Loss Price:* %s", takeProfitPrice.String(), stopLossPrice.String()),
+				false,
+				false,
+			),
+			nil,
+			nil,
+		)
+		blocks = append(blocks, priceSection)
+	}
+
+	// Add footer with last updated time
+	if !m.Position.OpenedAt.IsZero() {
+		footerText := fmt.Sprintf("Opened at: %s", m.Position.OpenedAt.Format(time.RFC1123))
+		footerSection := slack.NewContextBlock(
+			"footer",
+			slack.NewTextBlockObject(slack.MarkdownType, footerText, false, false),
+		)
+		blocks = append(blocks, footerSection)
+	}
+
+	return blocks
+}
+
+// normalizeSide converts a string representation of a side (e.g., "LONG", "BUY") to its corresponding types.SideType.
+func normalizeSide(side string) types.SideType {
+	switch strings.ToUpper(side) {
+	case "LONG", "BUY":
+		return types.SideTypeBuy
+	case "SHORT", "SELL":
+		return types.SideTypeSell
+	default:
+		return ""
+	}
 }

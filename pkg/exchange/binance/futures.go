@@ -218,6 +218,7 @@ func (e *Exchange) submitFuturesOrder(ctx context.Context, order types.SubmitOrd
 		Type:             response.Type,
 		Side:             response.Side,
 		ReduceOnly:       response.ReduceOnly,
+		ClosePosition:    response.ClosePosition,
 	}, false)
 
 	return createdOrder, err

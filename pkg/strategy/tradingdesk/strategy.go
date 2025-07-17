@@ -158,21 +158,46 @@ func (s *Strategy) loadFromPositionRisks(ctx context.Context) error {
 		}
 
 		// Restore take profit and stop loss orders
-		for _, order := range orders {
-			switch order.Type {
-			case types.OrderTypeTakeProfitMarket:
-				m.TakeProfitOrders = append(m.TakeProfitOrders, order)
-			case types.OrderTypeStopMarket:
-				m.StopLossOrders = append(m.StopLossOrders, order)
+		// Add the order to the active order book of the order executor
+		m.orderExecutor.ActiveMakerOrders().Add(orders...)
+		m.orderExecutor.OrderStore().Add(orders...)
+
+		switch m.Position.Side() {
+
+		case types.SideTypeBuy:
+			for _, order := range orders {
+				switch order.Type {
+				case types.OrderTypeTakeProfitMarket:
+					m.TakeProfitOrders.Add(order)
+				case types.OrderTypeStopMarket:
+					if order.StopPrice.Compare(m.Position.AverageCost) < 0 {
+						m.StopLossOrders.Add(order)
+					} else {
+						m.TakeProfitOrders.Add(order)
+					}
+				}
 			}
 
-			// Add the order to the active order book of the order executor
-			m.orderExecutor.ActiveMakerOrders().Add(order)
-			m.orderExecutor.OrderStore().Add(order)
+		case types.SideTypeSell:
+			for _, order := range orders {
+				switch order.Type {
+				case types.OrderTypeTakeProfitMarket:
+					m.TakeProfitOrders.Add(order)
+				case types.OrderTypeStopMarket:
+					if order.StopPrice.Compare(m.Position.AverageCost) > 0 {
+						m.StopLossOrders.Add(order)
+					} else {
+						m.TakeProfitOrders.Add(order)
+					}
+				}
+			}
+
 		}
 
 		m.logger.Infof("updated position: %+v", m.Position)
 		bbgo.Notify("TradingManager %s loaded position", m.Position.Symbol, m.Position)
+
+		bbgo.Notify(m)
 	}
 
 	return nil
@@ -258,7 +283,12 @@ func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParams) e
 		return err
 	}
 
-	return m.OpenPosition(ctx, param)
+	if err := m.OpenPosition(ctx, param); err != nil {
+		return fmt.Errorf("open position error: %w", err)
+	}
+
+	bbgo.Notify(m)
+	return nil
 }
 
 func (s *Strategy) HasPosition() bool {
