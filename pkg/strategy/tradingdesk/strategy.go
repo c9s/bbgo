@@ -196,6 +196,8 @@ func (s *Strategy) loadFromPositionRisks(ctx context.Context) error {
 
 		m.logger.Infof("updated position: %+v", m.Position)
 		bbgo.Notify("TradingManager %s loaded position", m.Position.Symbol, m.Position)
+
+		bbgo.Notify(m)
 	}
 
 	return nil
@@ -281,7 +283,12 @@ func (s *Strategy) OpenPosition(ctx context.Context, param OpenPositionParams) e
 		return err
 	}
 
-	return m.OpenPosition(ctx, param)
+	if err := m.OpenPosition(ctx, param); err != nil {
+		return fmt.Errorf("open position error: %w", err)
+	}
+
+	bbgo.Notify(m)
+	return nil
 }
 
 func (s *Strategy) HasPosition() bool {

@@ -152,11 +152,9 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 		}
 	}
 
-	switch strings.ToUpper(string(params.Side)) {
-	case "LONG":
-		params.Side = types.SideTypeBuy
-	case "SHORT":
-		params.Side = types.SideTypeSell
+	params.Side = normalizeSide(string(params.Side))
+	if params.Side == "" {
+		return fmt.Errorf("invalid side: %s", params.Side)
 	}
 
 	// get current price for validation
@@ -259,7 +257,7 @@ func (m *TradingManager) OpenPosition(ctx context.Context, params OpenPositionPa
 			return fmt.Errorf("failed to submit take profit orders for %s: %w", params.Symbol, err)
 		}
 
-		m.strategy.logger.Infof("created take loss orders: %+v", takeProfitOrders)
+		m.strategy.logger.Infof("created take profit orders: %+v", takeProfitOrders)
 		m.TakeProfitOrders = takeProfitOrders
 	}
 
@@ -526,6 +524,7 @@ func extractClosePositionPrice(orders types.OrderSlice) fixedpoint.Value {
 			return order.StopPrice
 		}
 	}
+
 	return fixedpoint.Zero
 }
 
@@ -543,10 +542,22 @@ func (m *TradingManager) SlackBlocks() []slack.Block {
 	}
 
 	// Add position details
-	positionDetails := fmt.Sprintf("*Position Details:*\n - Entry Price: %s\n - Size: %s", m.Position.AverageCost.String(), m.Position.Base.String())
+	positionDetails := fmt.Sprintf("*TradingManager %s Position Details:*\n- Side: `%s`\n - Entry Price: `%s`\n - Size: `%s`",
+		m.market.Symbol,
+		m.Position.Side(),
+		m.Position.AverageCost.String(),
+		m.Position.Base.String())
+
 	if !currentPrice.IsZero() {
-		positionDetails += fmt.Sprintf("\n - Current Price: %s", currentPrice.String())
+		positionDetails += fmt.Sprintf("\n - Current Price: `%s`", currentPrice.String())
 	}
+
+	// Add ROI to the Slack blocks
+	if !currentPrice.IsZero() {
+		roi := m.Position.ROI(currentPrice)
+		positionDetails += fmt.Sprintf("\n - ROI: `%s`", roi.FormatPercentage(2))
+	}
+
 	positionSection := slack.NewSectionBlock(
 		slack.NewTextBlockObject(
 			slack.MarkdownType,
@@ -565,7 +576,7 @@ func (m *TradingManager) SlackBlocks() []slack.Block {
 		profitSection := slack.NewSectionBlock(
 			slack.NewTextBlockObject(
 				slack.MarkdownType,
-				fmt.Sprintf("*Unrealized Profit:* %s", unrealizedProfit.String()),
+				fmt.Sprintf("*Unrealized Profit:* `%s`", unrealizedProfit.String()),
 				false,
 				false,
 			),
@@ -582,7 +593,7 @@ func (m *TradingManager) SlackBlocks() []slack.Block {
 		priceSection := slack.NewSectionBlock(
 			slack.NewTextBlockObject(
 				slack.MarkdownType,
-				fmt.Sprintf("*Take Profit Price:* %s\n*Stop Loss Price:* %s", takeProfitPrice.String(), stopLossPrice.String()),
+				fmt.Sprintf("*Take Profit Price:* %s / *Stop Loss Price:* %s", takeProfitPrice.String(), stopLossPrice.String()),
 				false,
 				false,
 			),
@@ -592,5 +603,27 @@ func (m *TradingManager) SlackBlocks() []slack.Block {
 		blocks = append(blocks, priceSection)
 	}
 
+	// Add footer with last updated time
+	if !m.Position.OpenedAt.IsZero() {
+		footerText := fmt.Sprintf("Opened at: %s", m.Position.OpenedAt.Format(time.RFC1123))
+		footerSection := slack.NewContextBlock(
+			"footer",
+			slack.NewTextBlockObject(slack.MarkdownType, footerText, false, false),
+		)
+		blocks = append(blocks, footerSection)
+	}
+
 	return blocks
+}
+
+// normalizeSide converts a string representation of a side (e.g., "LONG", "BUY") to its corresponding types.SideType.
+func normalizeSide(side string) types.SideType {
+	switch strings.ToUpper(side) {
+	case "LONG", "BUY":
+		return types.SideTypeBuy
+	case "SHORT", "SELL":
+		return types.SideTypeSell
+	default:
+		return ""
+	}
 }

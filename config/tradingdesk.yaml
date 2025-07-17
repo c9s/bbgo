@@ -1,4 +1,9 @@
 ---
+notifications:
+  slack:
+    defaultChannel: "dev-bbgo"
+    errorChannel: "bbgo-error"
+
 sessions:
   binance:
     exchange: binance
@@ -18,4 +23,4 @@ exchangeStrategies:
         stopLossPrice: 125_000
         takeProfitPrice: 90_000
         timeToLive: "1m"
-      closePositionsOnShutdown: true
+      closePositionsOnShutdown: false
