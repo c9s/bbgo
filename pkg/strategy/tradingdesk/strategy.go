@@ -150,8 +150,28 @@ func (s *Strategy) loadFromPositionRisks(ctx context.Context) error {
 			m.Position.Base = m.Position.Base.Neg()
 		}
 
-		m.logger.Infof("updated position: %+v", m.Position)
+		// Query open orders for the symbol
+		orders, err := s.session.Exchange.QueryOpenOrders(ctx, risk.Symbol)
+		if err != nil {
+			s.logger.WithError(err).Errorf("failed to query open orders for %s", risk.Symbol)
+			continue
+		}
 
+		// Restore take profit and stop loss orders
+		for _, order := range orders {
+			switch order.Type {
+			case types.OrderTypeTakeProfitMarket:
+				m.TakeProfitOrders = append(m.TakeProfitOrders, order)
+			case types.OrderTypeStopMarket:
+				m.StopLossOrders = append(m.StopLossOrders, order)
+			}
+
+			// Add the order to the active order book of the order executor
+			m.orderExecutor.ActiveMakerOrders().Add(order)
+			m.orderExecutor.OrderStore().Add(order)
+		}
+
+		m.logger.Infof("updated position: %+v", m.Position)
 		bbgo.Notify("TradingManager %s loaded position", m.Position.Symbol, m.Position)
 	}
 
