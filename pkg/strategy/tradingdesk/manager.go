@@ -542,11 +542,14 @@ func (m *TradingManager) SlackBlocks() []slack.Block {
 	}
 
 	// Add position details
-	positionDetails := fmt.Sprintf("*TradingManager %s Position Details:*\n- Side: `%s`\n - Entry Price: `%s`\n - Size: `%s`",
+	positionDetails := fmt.Sprintf("*TradingManager %s Position Details:*\n- Side: `%s`\n - Entry Price: `%s`\n - Size: `%s` (`%s` in %s) ",
 		m.market.Symbol,
 		m.Position.Side(),
 		m.Position.AverageCost.String(),
-		m.Position.Base.String())
+		m.Position.GetBase().String(),
+		m.Position.AverageCost.Mul(m.Position.GetBase().Abs()),
+		m.market.QuoteCurrency,
+	)
 
 	if !currentPrice.IsZero() {
 		positionDetails += fmt.Sprintf("\n - Current Price: `%s`", currentPrice.String())
