@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -516,4 +517,80 @@ func fallbackStopLossTakeProfit(
 		}
 	}
 	return stopLoss, takeProfit, nil
+}
+
+// extractClosePositionPrice extracts the StopPrice of the first order with ClosePosition set to true.
+func extractClosePositionPrice(orders types.OrderSlice) fixedpoint.Value {
+	for _, order := range orders {
+		if order.ClosePosition {
+			return order.StopPrice
+		}
+	}
+	return fixedpoint.Zero
+}
+
+// SlackBlocks generates Slack message blocks with position details, take profit, stop loss prices, and unrealized profit.
+func (m *TradingManager) SlackBlocks() []slack.Block {
+	var blocks []slack.Block
+
+	// Query the latest price
+	ticker, err := m.session.Exchange.QueryTicker(context.Background(), m.Position.Symbol)
+	var currentPrice fixedpoint.Value
+	if err != nil {
+		m.logger.WithError(err).Errorf("failed to query ticker for %s", m.Position.Symbol)
+	} else {
+		currentPrice = ticker.GetValidPrice()
+	}
+
+	// Add position details
+	positionDetails := fmt.Sprintf("*Position Details:*\n - Entry Price: %s\n - Size: %s", m.Position.AverageCost.String(), m.Position.Base.String())
+	if !currentPrice.IsZero() {
+		positionDetails += fmt.Sprintf("\n - Current Price: %s", currentPrice.String())
+	}
+	positionSection := slack.NewSectionBlock(
+		slack.NewTextBlockObject(
+			slack.MarkdownType,
+			positionDetails,
+			false,
+			false,
+		),
+		nil,
+		nil,
+	)
+	blocks = append(blocks, positionSection)
+
+	// Add unrealized profit
+	if !currentPrice.IsZero() {
+		unrealizedProfit := m.Position.UnrealizedProfit(currentPrice)
+		profitSection := slack.NewSectionBlock(
+			slack.NewTextBlockObject(
+				slack.MarkdownType,
+				fmt.Sprintf("*Unrealized Profit:* %s", unrealizedProfit.String()),
+				false,
+				false,
+			),
+			nil,
+			nil,
+		)
+		blocks = append(blocks, profitSection)
+	}
+
+	// Add take profit and stop loss prices
+	takeProfitPrice := extractClosePositionPrice(m.TakeProfitOrders)
+	stopLossPrice := extractClosePositionPrice(m.StopLossOrders)
+	if !takeProfitPrice.IsZero() || !stopLossPrice.IsZero() {
+		priceSection := slack.NewSectionBlock(
+			slack.NewTextBlockObject(
+				slack.MarkdownType,
+				fmt.Sprintf("*Take Profit Price:* %s\n*Stop Loss Price:* %s", takeProfitPrice.String(), stopLossPrice.String()),
+				false,
+				false,
+			),
+			nil,
+			nil,
+		)
+		blocks = append(blocks, priceSection)
+	}
+
+	return blocks
 }
