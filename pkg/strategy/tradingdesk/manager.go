@@ -552,12 +552,6 @@ func (m *TradingManager) SlackBlocks() []slack.Block {
 		positionDetails += fmt.Sprintf("\n - Current Price: `%s`", currentPrice.String())
 	}
 
-	// Add ROI to the Slack blocks
-	if !currentPrice.IsZero() {
-		roi := m.Position.ROI(currentPrice)
-		positionDetails += fmt.Sprintf("\n - ROI: `%s`", roi.FormatPercentage(2))
-	}
-
 	positionSection := slack.NewSectionBlock(
 		slack.NewTextBlockObject(
 			slack.MarkdownType,
@@ -573,10 +567,18 @@ func (m *TradingManager) SlackBlocks() []slack.Block {
 	// Add unrealized profit
 	if !currentPrice.IsZero() {
 		unrealizedProfit := m.Position.UnrealizedProfit(currentPrice)
+		profitText := fmt.Sprintf("*Unrealized Profit:* `%s`", unrealizedProfit.String())
+
+		// Add ROI to the Slack blocks
+		if !currentPrice.IsZero() {
+			roi := m.Position.ROI(currentPrice)
+			profitText += fmt.Sprintf(" / *ROI*: `%s`", roi.FormatPercentage(2))
+		}
+
 		profitSection := slack.NewSectionBlock(
 			slack.NewTextBlockObject(
 				slack.MarkdownType,
-				fmt.Sprintf("*Unrealized Profit:* `%s`", unrealizedProfit.String()),
+				profitText,
 				false,
 				false,
 			),
