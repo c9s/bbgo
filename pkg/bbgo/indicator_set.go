@@ -116,3 +116,13 @@ func (i *IndicatorSet) ATRP(interval types.Interval, window int) *indicatorv2.AT
 func (i *IndicatorSet) ADX(interval types.Interval, window int) *indicatorv2.ADXStream {
 	return indicatorv2.ADX(i.KLines(interval), window)
 }
+
+func (i *IndicatorSet) LiquidityDemand(
+	iw types.IntervalWindow,
+) *indicatorv2.LiquidityDemandStream {
+	return indicatorv2.LiquidityDemand(
+		i.KLines(iw.Interval),
+		i.SMA(iw),
+		i.SMA(iw),
+	)
+}
