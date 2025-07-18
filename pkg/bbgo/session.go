@@ -220,6 +220,7 @@ type ExchangeSession struct {
 
 	lastPrices         map[string]fixedpoint.Value
 	lastPriceUpdatedAt time.Time
+	lastPricesMutex    sync.Mutex
 
 	// marketDataStores contains the market data store of each market
 	marketDataStores map[string]*types.MarketDataStore
@@ -571,20 +572,20 @@ func (session *ExchangeSession) Init(ctx context.Context, environ *Environment) 
 				session.startPrices[kline.Symbol] = kline.Open
 			}
 
-			session.lastPrices[kline.Symbol] = session.MarketDataStream.(*types.HeikinAshiStream).LastOrigin[kline.Symbol][kline.Interval].Close
+			session.setLastPrice(kline.Symbol, session.MarketDataStream.(*types.HeikinAshiStream).LastOrigin[kline.Symbol][kline.Interval].Close)
 		})
 	} else {
 		session.MarketDataStream.OnKLineClosed(func(kline types.KLine) {
 			if _, ok := session.startPrices[kline.Symbol]; !ok {
-				session.startPrices[kline.Symbol] = kline.Open
+				session.setLastPrice(kline.Symbol, kline.Open)
 			}
 
-			session.lastPrices[kline.Symbol] = kline.Close
+			session.setLastPrice(kline.Symbol, kline.Close)
 		})
 	}
 
 	session.MarketDataStream.OnMarketTrade(func(trade types.Trade) {
-		session.lastPrices[trade.Symbol] = trade.Price
+		session.setLastPrice(trade.Symbol, trade.Price)
 	})
 
 	// session-wide max borrowable updating worker
@@ -738,7 +739,7 @@ func (session *ExchangeSession) initSymbol(ctx context.Context, environ *Environ
 				// update last prices by the given kline
 				lastKLine := kLines[len(kLines)-1]
 				if interval == minInterval {
-					session.lastPrices[symbol] = lastKLine.Close
+					session.setLastPrice(symbol, lastKLine.Close)
 				}
 
 				for _, k := range kLines {
@@ -859,15 +860,21 @@ func (session *ExchangeSession) StartPrice(symbol string) (price fixedpoint.Valu
 }
 
 func (session *ExchangeSession) LastPrice(symbol string) (price fixedpoint.Value, ok bool) {
+	session.lastPricesMutex.Lock()
+	defer session.lastPricesMutex.Unlock()
+
 	price, ok = session.lastPrices[symbol]
 	return price, ok
 }
 
 func (session *ExchangeSession) AllLastPrices() map[string]fixedpoint.Value {
-	return session.lastPrices
+	return session.LastPrices()
 }
 
 func (session *ExchangeSession) LastPrices() map[string]fixedpoint.Value {
+	session.lastPricesMutex.Lock()
+	defer session.lastPricesMutex.Unlock()
+
 	return session.lastPrices
 }
 
@@ -965,12 +972,12 @@ func (session *ExchangeSession) UpdatePrices(ctx context.Context, currencies []s
 		// map things like BTCUSDT = {price}
 		if market, ok := markets[k]; ok {
 			if currency2.IsFiatCurrency(market.BaseCurrency) {
-				session.lastPrices[k] = validPrice.Div(fixedpoint.One)
+				session.setLastPrice(k, validPrice.Div(fixedpoint.One))
 			} else {
-				session.lastPrices[k] = validPrice
+				session.setLastPrice(k, validPrice)
 			}
 		} else {
-			session.lastPrices[k] = v.Last
+			session.setLastPrice(k, v.Last)
 		}
 
 		if v.Time.After(lastTime) {
@@ -1329,4 +1336,11 @@ func (session *ExchangeSession) UpdateMaxBorrowable(ctx context.Context) {
 		return
 	}
 	session.marginInfoUpdater.UpdateMaxBorrowable(ctx)
+}
+
+func (session *ExchangeSession) setLastPrice(symbol string, price fixedpoint.Value) {
+	session.lastPricesMutex.Lock()
+	defer session.lastPricesMutex.Unlock()
+
+	session.lastPrices[symbol] = price
 }
