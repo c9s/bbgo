@@ -2,6 +2,7 @@ package binance
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -78,6 +79,9 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 	if err != nil {
 		return nil, err
 	}
+
+	out, _ := json.MarshalIndent(accountBalances, "", "  ")
+	fmt.Println(string(out))
 
 	var balances = map[string]types.Balance{}
 	for _, b := range accountBalances {
