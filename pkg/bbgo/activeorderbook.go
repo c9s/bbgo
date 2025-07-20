@@ -20,7 +20,7 @@ import (
 )
 
 const DefaultCancelOrderWaitTime = 50 * time.Millisecond
-const DefaultOrderCancelTimeout = 5 * time.Second
+const DefaultOrderCancelTimeout = 15 * time.Second
 
 // ActiveOrderBook manages the local active order books.
 //
@@ -532,7 +532,9 @@ func (b *ActiveOrderBook) filterExistingOrders(orders []types.Order) (existingOr
 	return existingOrders
 }
 
-func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange, bufferDuration time.Duration) (types.OrderSlice, error) {
+func (b *ActiveOrderBook) SyncOrders(
+	ctx context.Context, ex types.Exchange, bufferDuration time.Duration,
+) (types.OrderSlice, error) {
 	openOrders, err := retry.QueryOpenOrdersUntilSuccessfulLite(ctx, ex, b.Symbol)
 	if err != nil {
 		return nil, err
@@ -582,7 +584,9 @@ func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange, buf
 	return updatedOrders, errs
 }
 
-func (b *ActiveOrderBook) SyncOrder(ctx context.Context, ex types.Exchange, orderID uint64, orderUUID string, syncBefore time.Time) (*types.Order, error) {
+func (b *ActiveOrderBook) SyncOrder(
+	ctx context.Context, ex types.Exchange, orderID uint64, orderUUID string, syncBefore time.Time,
+) (*types.Order, error) {
 	isMax := exchange.IsMaxExchange(ex)
 
 	orderQueryService, ok := ex.(types.ExchangeOrderQueryService)
