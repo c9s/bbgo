@@ -1249,13 +1249,16 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(
 		return fixedpoint.Zero, err
 	}
 
-	limits := *resp
+	if resp == nil {
+		return fixedpoint.Zero, errors.New("borrowing limits response is nil")
+	}
+
+	limits := resp
 	if limit, ok := limits[toLocalCurrency(asset)]; ok {
 		return limit, nil
 	}
 
-	err = fmt.Errorf("borrowing limit of %s not found", asset)
-	return amount, err
+	return amount, fmt.Errorf("borrowing limit of %s not found", asset)
 }
 
 // DefaultFeeRates returns the MAX VIP 0 fee schedule
