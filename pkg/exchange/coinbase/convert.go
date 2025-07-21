@@ -73,6 +73,7 @@ func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 	return types.Trade{
 		ID:            cbTrade.TradeID,
 		OrderID:       FNV64a(cbTrade.OrderID),
+		OrderUUID:     cbTrade.OrderID,
 		Exchange:      types.ExchangeCoinBase,
 		Price:         cbTrade.Price,
 		Quantity:      cbTrade.Size,

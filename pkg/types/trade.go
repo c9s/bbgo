@@ -70,6 +70,7 @@ type Trade struct {
 	// ID is the source trade ID
 	ID            uint64           `json:"id" db:"id"`
 	OrderID       uint64           `json:"orderID" db:"order_id"`
+	OrderUUID     string           `json:"orderUUID,omitempty" db:"order_uuid"`
 	Exchange      ExchangeName     `json:"exchange" db:"exchange"`
 	Price         fixedpoint.Value `json:"price" db:"price"`
 	Quantity      fixedpoint.Value `json:"quantity" db:"quantity"`
