@@ -238,6 +238,8 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		request.Id(uint64(orderID))
 	} else if len(q.ClientOrderID) > 0 {
 		request.ClientOrderID(q.ClientOrderID)
+	} else {
+		return nil, fmt.Errorf("max.QueryOrder: OrderID or ClientOrderID is required, got OrderQuery: %+v", q)
 	}
 
 	maxOrder, err := request.Do(ctx)
