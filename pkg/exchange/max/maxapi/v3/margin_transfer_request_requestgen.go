@@ -156,6 +156,12 @@ func (m *MarginTransferRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (m *MarginTransferRequest) GetPath() string {
+	return "/api/v3/wallet/m/transfer"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (m *MarginTransferRequest) Do(ctx context.Context) (*MarginTransferResponse, error) {
 
 	params, err := m.GetParameters()
@@ -164,7 +170,9 @@ func (m *MarginTransferRequest) Do(ctx context.Context) (*MarginTransferResponse
 	}
 	query := url.Values{}
 
-	apiURL := "/api/v3/wallet/m/transfer"
+	var apiURL string
+
+	apiURL = m.GetPath()
 
 	req, err := m.client.NewAuthenticatedRequest(ctx, "POST", apiURL, query, params)
 	if err != nil {
@@ -177,8 +185,32 @@ func (m *MarginTransferRequest) Do(ctx context.Context) (*MarginTransferResponse
 	}
 
 	var apiResponse MarginTransferResponse
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return &apiResponse, nil
 }

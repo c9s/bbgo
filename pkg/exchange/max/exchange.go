@@ -2,6 +2,7 @@ package max
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -9,13 +10,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/c9s/requestgen"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/multierr"
 	"golang.org/x/time/rate"
 
 	maxapi "github.com/c9s/bbgo/pkg/exchange/max/maxapi"
 	v3 "github.com/c9s/bbgo/pkg/exchange/max/maxapi/v3"
+	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 )
@@ -225,23 +227,19 @@ func (e *Exchange) QueryOrder(ctx context.Context, q types.OrderQuery) (*types.O
 		return nil, errors.New("max.QueryOrder: one of OrderID/ClientOrderID is required parameter")
 	}
 
-	if len(q.OrderID) != 0 && len(q.ClientOrderID) != 0 {
-		return nil, errors.New("max.QueryOrder: only accept one parameter of OrderID/ClientOrderID")
-	}
-
 	request := e.v3client.NewGetOrderRequest()
 
-	if len(q.OrderID) != 0 {
+	if len(q.OrderID) > 0 {
 		orderID, err := strconv.ParseInt(q.OrderID, 10, 64)
 		if err != nil {
 			return nil, err
 		}
 
 		request.Id(uint64(orderID))
-	}
-
-	if len(q.ClientOrderID) != 0 {
+	} else if len(q.ClientOrderID) > 0 {
 		request.ClientOrderID(q.ClientOrderID)
+	} else {
+		return nil, fmt.Errorf("max.QueryOrder: OrderID or ClientOrderID is required, got OrderQuery: %+v", q)
 	}
 
 	maxOrder, err := request.Do(ctx)
@@ -640,7 +638,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		quantityString = o.Quantity.String()
 	}
 
-	clientOrderID := NewClientOrderID(o.ClientOrderID)
+	o.ClientOrderID = NewClientOrderID(o.ClientOrderID)
 
 	req := e.v3client.NewCreateWalletOrderRequest(walletType)
 	req.Market(toLocalSymbol(o.Symbol)).
@@ -648,8 +646,8 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		Volume(quantityString).
 		OrderType(orderType)
 
-	if clientOrderID != "" {
-		req.ClientOrderID(clientOrderID)
+	if o.ClientOrderID != "" {
+		req.ClientOrderID(o.ClientOrderID)
 	}
 
 	if o.GroupID > 0 {
@@ -658,29 +656,43 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 
 	switch o.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeLimit, types.OrderTypeLimitMaker:
-		var priceInString string
 		if o.Market.Symbol != "" {
-			priceInString = o.Market.FormatPrice(o.Price)
+			req.Price(o.Market.FormatPrice(o.Price))
 		} else {
-			priceInString = o.Price.String()
+			req.Price(o.Price.String())
 		}
-		req.Price(priceInString)
 	}
 
 	// set stop price field for limit orders
 	switch o.Type {
 	case types.OrderTypeStopLimit, types.OrderTypeStopMarket:
-		var priceInString string
 		if o.Market.Symbol != "" {
-			priceInString = o.Market.FormatPrice(o.StopPrice)
+			req.StopPrice(o.Market.FormatPrice(o.StopPrice))
 		} else {
-			priceInString = o.StopPrice.String()
+			req.StopPrice(o.StopPrice.String())
 		}
-		req.StopPrice(priceInString)
 	}
 
 	retOrder, err := req.Do(ctx)
 	if err != nil {
+		var responseErr *requestgen.ErrResponse
+		if errors.As(err, &responseErr) {
+			log.Warnf("submit order error: %s, status code: %d, now trying to recover the order with query %+v",
+				responseErr.Error(),
+				responseErr.StatusCode,
+				o.AsQuery(),
+			)
+
+			if responseErr.StatusCode >= 500 {
+				recoveredOrder, recoverErr := e.recoverOrder(ctx, o)
+				if recoverErr != nil {
+					return createdOrder, fmt.Errorf("unable to recover order, error: %w", recoverErr)
+				}
+
+				return recoveredOrder, nil
+			}
+		}
+
 		return createdOrder, err
 	}
 
@@ -690,6 +702,29 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 
 	createdOrder, err = toGlobalOrder(*retOrder)
 	return createdOrder, err
+}
+
+func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder) (*types.Order, error) {
+	var err error = nil
+	var order *types.Order = nil
+	var query = orderForm.AsQuery()
+	var op = func() (err2 error) {
+		order, err2 = e.QueryOrder(ctx, query)
+
+		var responseErr *requestgen.ErrResponse
+		if errors.As(err2, &responseErr) {
+			if responseErr.StatusCode >= 400 && responseErr.StatusCode < 500 {
+				return nil
+			}
+		} else if order != nil && err2 == nil {
+			return nil
+		}
+
+		return err2
+	}
+
+	err = retry.GeneralBackoff(ctx, op)
+	return order, err
 }
 
 // PlatformFeeCurrency
@@ -1216,13 +1251,16 @@ func (e *Exchange) QueryMarginAssetMaxBorrowable(
 		return fixedpoint.Zero, err
 	}
 
-	limits := *resp
+	if resp == nil {
+		return fixedpoint.Zero, errors.New("borrowing limits response is nil")
+	}
+
+	limits := resp
 	if limit, ok := limits[toLocalCurrency(asset)]; ok {
 		return limit, nil
 	}
 
-	err = fmt.Errorf("borrowing limit of %s not found", asset)
-	return amount, err
+	return amount, fmt.Errorf("borrowing limit of %s not found", asset)
 }
 
 // DefaultFeeRates returns the MAX VIP 0 fee schedule

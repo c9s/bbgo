@@ -170,6 +170,13 @@ type SubmitOrder struct {
 	Tag string `json:"tag,omitempty" db:"-"`
 }
 
+func (o *SubmitOrder) AsQuery() OrderQuery {
+	return OrderQuery{
+		Symbol:        o.Symbol,
+		ClientOrderID: o.ClientOrderID,
+	}
+}
+
 func (o *SubmitOrder) In() (fixedpoint.Value, string) {
 	switch o.Side {
 	case SideTypeBuy:

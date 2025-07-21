@@ -139,6 +139,12 @@ func (g *GetWalletAccountsRequest) GetSlugsMap() (map[string]string, error) {
 	return slugs, nil
 }
 
+// GetPath returns the request path of the API
+func (g *GetWalletAccountsRequest) GetPath() string {
+	return "/api/v3/wallet/:walletType/accounts"
+}
+
+// Do generates the request object and send the request object to the API endpoint
 func (g *GetWalletAccountsRequest) Do(ctx context.Context) ([]max.Account, error) {
 
 	// no body params
@@ -148,7 +154,9 @@ func (g *GetWalletAccountsRequest) Do(ctx context.Context) ([]max.Account, error
 		return nil, err
 	}
 
-	apiURL := "/api/v3/wallet/:walletType/accounts"
+	var apiURL string
+
+	apiURL = g.GetPath()
 	slugs, err := g.GetSlugsMap()
 	if err != nil {
 		return nil, err
@@ -167,8 +175,32 @@ func (g *GetWalletAccountsRequest) Do(ctx context.Context) ([]max.Account, error
 	}
 
 	var apiResponse []max.Account
-	if err := response.DecodeJSON(&apiResponse); err != nil {
-		return nil, err
+
+	type responseUnmarshaler interface {
+		Unmarshal(data []byte) error
+	}
+
+	if unmarshaler, ok := interface{}(&apiResponse).(responseUnmarshaler); ok {
+		if err := unmarshaler.Unmarshal(response.Body); err != nil {
+			return nil, err
+		}
+	} else {
+		// The line below checks the content type, however, some API server might not send the correct content type header,
+		// Hence, this is commented for backward compatibility
+		// response.IsJSON()
+		if err := response.DecodeJSON(&apiResponse); err != nil {
+			return nil, err
+		}
+	}
+
+	type responseValidator interface {
+		Validate() error
+	}
+
+	if validator, ok := interface{}(&apiResponse).(responseValidator); ok {
+		if err := validator.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	return apiResponse, nil
 }

@@ -1,8 +1,9 @@
 package max
 
 import (
-	"github.com/c9s/bbgo/pkg/types"
 	"github.com/google/uuid"
+
+	"github.com/c9s/bbgo/pkg/types"
 )
 
 // BBGO is a broker on MAX
@@ -12,6 +13,8 @@ func NewClientOrderID(originalID string, tags ...string) (clientOrderID string) 
 	// skip blank client order ID
 	if originalID == types.NoClientOrderID {
 		return ""
+	} else if originalID != "" {
+		return originalID
 	}
 
 	prefix := "x-" + spotBrokerID + "-"
@@ -20,22 +23,10 @@ func NewClientOrderID(originalID string, tags ...string) (clientOrderID string) 
 		prefix += tag + "-"
 	}
 
-	prefixLen := len(prefix)
-
-	if originalID != "" {
-		// try to keep the whole original client order ID if user specifies it.
-		if prefixLen+len(originalID) > 32 {
-			return originalID
-		}
-
-		clientOrderID = prefix + originalID
-		return clientOrderID
-	}
-
 	clientOrderID = uuid.New().String()
 	clientOrderID = prefix + clientOrderID
-	if len(clientOrderID) > 32 {
-		return clientOrderID[0:32]
+	if len(clientOrderID) > 36 {
+		return clientOrderID[0:36]
 	}
 
 	return clientOrderID
