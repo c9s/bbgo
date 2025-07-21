@@ -45,8 +45,6 @@ type ActiveOrderBook struct {
 	cancelOrderTimeout  time.Duration
 
 	logger log.FieldLogger
-
-	preferCancelAllApi bool
 }
 
 func NewActiveOrderBook(symbol string) *ActiveOrderBook {
@@ -66,10 +64,6 @@ func NewActiveOrderBook(symbol string) *ActiveOrderBook {
 		cancelOrderTimeout:  DefaultOrderCancelTimeout,
 		logger:              logger,
 	}
-}
-
-func (b *ActiveOrderBook) SetPreferCancelAllApi(prefer bool) {
-	b.preferCancelAllApi = prefer
 }
 
 func (b *ActiveOrderBook) SetCancelOrderWaitTime(duration time.Duration) {
