@@ -199,42 +199,77 @@ func TestTradeVolumeWindowSignal_FilterTrades(t *testing.T) {
 }
 
 func TestMarketTradeWindowSignal_WithDecay(t *testing.T) {
-	now := time.Now()
 	symbol := "BTCUSDT"
-	// set up the signal with a 3-minute window so all trades are within range
-	sig := &TradeVolumeWindowSignal{
-		symbol:    symbol,
-		Threshold: fixedpoint.NewFromFloat(0.10),
-		Window:    types.Duration(3 * time.Minute),
-		DecayRate: 0.05, // decay rate per second
-	}
-	// Preallocate the buffer
-	sig.trades = make([]types.Trade, tradeSliceCapacityLimit)
-	// Insert three trades:
-	// trade1: buy trade 2 minutes ago, weight = exp(-0.05*120) ~ 0.00248
-	// trade2: sell trade 20 seconds ago, weight = exp(-0.05*20) ~ 0.36788
-	// trade3: buy trade 1 second ago, weight = exp(-0.05*1) ~ 0.95123
-	trade1 := newFakeTrade(symbol, types.SideTypeBuy, Number(18000.0), Number(1.0), now.Add(-2*time.Minute))
-	trade2 := newFakeTrade(symbol, types.SideTypeSell, Number(18000.0), Number(0.5), now.Add(-20*time.Second))
-	trade3 := newFakeTrade(symbol, types.SideTypeBuy, Number(18000.0), Number(1.0), now.Add(-1*time.Second))
-	sig.trades[0] = trade1
-	sig.trades[1] = trade2
-	sig.trades[2] = trade3
-	sig.start = 0
-	sig.count = 3
 
-	ctx := context.Background()
-	sigNum, err := sig.CalculateSignal(ctx)
-	assert.NoError(t, err)
+	t.Run("3min with 0.0001", func(t *testing.T) {
+		// set up the signal with a 3-minute window so all trades are within range
+		now := time.Now()
+		sig := &TradeVolumeWindowSignal{
+			symbol:    symbol,
+			Threshold: fixedpoint.NewFromFloat(0.10),
+			Window:    types.Duration(3 * time.Minute),
+			DecayRate: 0.02, // decay rate per second
+		}
+		// Preallocate the buffer
+		sig.trades = make([]types.Trade, tradeSliceCapacityLimit)
 
-	// Expected decayed volumes:
-	// buyVolume  = 1.0*exp(-6) + 1.0*exp(-0.05) ≈ 0.00248 + 0.95123 = 0.95371
-	// sellVolume = 0.5*exp(-1) ≈ 0.18394
-	// signal = (0.95371 - 0.18394) / (0.95371 + 0.18394) = 0.677 (approx)
-	// final signal = 0.677 * 2 = 1.354 (approx)
-	assert.InDelta(t, 1.354, sigNum, 0.01)
-	// Verify ring buffer internal state updated (from filterTrades)
-	assert.Equal(t, 3, sig.count)
+		trade1 := newFakeTrade(symbol, types.SideTypeSell, Number(18000.0), Number(1.0), now.Add(-59*3*time.Second))
+		trade2 := newFakeTrade(symbol, types.SideTypeBuy, Number(18000.0), Number(1.0), now.Add(-20*time.Second))
+		trade3 := newFakeTrade(symbol, types.SideTypeBuy, Number(18000.0), Number(1.0), now.Add(-10*time.Second))
+		trade4 := newFakeTrade(symbol, types.SideTypeBuy, Number(18000.0), Number(1.0), now.Add(-1*time.Second))
+		sig.trades[0] = trade1
+		sig.trades[1] = trade2
+		sig.trades[2] = trade3
+		sig.trades[3] = trade4
+		sig.start = 0
+		sig.count = 4
+
+		ctx := context.Background()
+		sigNum, err := sig.CalculateSignal(ctx)
+		assert.NoError(t, err)
+
+		assert.InDelta(t, 1.953, sigNum, 0.001)
+		assert.Equal(t, 4, sig.count)
+	})
+
+	t.Run("3min", func(t *testing.T) {
+		// set up the signal with a 3-minute window so all trades are within range
+		now := time.Now()
+		sig := &TradeVolumeWindowSignal{
+			symbol:    symbol,
+			Threshold: fixedpoint.NewFromFloat(0.10),
+			Window:    types.Duration(3 * time.Minute),
+			DecayRate: 0.05, // decay rate per second
+		}
+		// Preallocate the buffer
+		sig.trades = make([]types.Trade, tradeSliceCapacityLimit)
+		// Insert three trades:
+		// trade1: buy trade 2 minutes ago, weight = exp(-0.05*120) ~ 0.00248
+		// trade2: sell trade 20 seconds ago, weight = exp(-0.05*20) ~ 0.36788
+		// trade3: buy trade 1 second ago, weight = exp(-0.05*1) ~ 0.95123
+		trade1 := newFakeTrade(symbol, types.SideTypeBuy, Number(18000.0), Number(1.0), now.Add(-2*time.Minute))
+		trade2 := newFakeTrade(symbol, types.SideTypeSell, Number(18000.0), Number(0.5), now.Add(-20*time.Second))
+		trade3 := newFakeTrade(symbol, types.SideTypeBuy, Number(18000.0), Number(1.0), now.Add(-1*time.Second))
+		sig.trades[0] = trade1
+		sig.trades[1] = trade2
+		sig.trades[2] = trade3
+		sig.start = 0
+		sig.count = 3
+
+		ctx := context.Background()
+		sigNum, err := sig.CalculateSignal(ctx)
+		assert.NoError(t, err)
+
+		// Expected decayed volumes:
+		// buyVolume  = 1.0*exp(-6) + 1.0*exp(-0.05) ≈ 0.00248 + 0.95123 = 0.95371
+		// sellVolume = 0.5*exp(-1) ≈ 0.18394
+		// signal = (0.95371 - 0.18394) / (0.95371 + 0.18394) = 0.677 (approx)
+		// final signal = 0.677 * 2 = 1.354 (approx)
+		assert.InDelta(t, 1.354, sigNum, 0.01)
+		// Verify ring buffer internal state updated (from filterTrades)
+		assert.Equal(t, 3, sig.count)
+	})
+
 }
 
 func TestMarketTradeWindowSignal_WithFrequency(t *testing.T) {
