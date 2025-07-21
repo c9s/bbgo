@@ -1,6 +1,6 @@
 -- +up
 -- +begin
-ALTER TABLE `trades` ADD COLUMN `order_uuid` VARCHAR(255) NOT NULL DEFAULT '';
+ALTER TABLE `trades` ADD COLUMN `order_uuid` VARBINARY(16) NOT NULL DEFAULT '';
 -- +end
 
 -- +down

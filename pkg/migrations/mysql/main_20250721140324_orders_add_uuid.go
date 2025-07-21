@@ -12,7 +12,7 @@ func init() {
 
 func up_main_ordersAddUuid(ctx context.Context, tx rockhopper.SQLExecutor) (err error) {
 	// This code is executed when the migration is applied.
-	_, err = tx.ExecContext(ctx, "ALTER TABLE `orders` ADD COLUMN `uuid` VARCHAR(255) NOT NULL DEFAULT '';")
+	_, err = tx.ExecContext(ctx, "ALTER TABLE `orders` ADD COLUMN `uuid` VARBINARY(36) NOT NULL DEFAULT '';")
 	if err != nil {
 		return err
 	}
