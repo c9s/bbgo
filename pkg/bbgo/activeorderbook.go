@@ -20,7 +20,7 @@ import (
 )
 
 const DefaultCancelOrderWaitTime = 50 * time.Millisecond
-const DefaultOrderCancelTimeout = 5 * time.Second
+const DefaultOrderCancelTimeout = 15 * time.Second
 
 // ActiveOrderBook manages the local active order books.
 //
@@ -43,9 +43,20 @@ type ActiveOrderBook struct {
 
 	cancelOrderWaitTime time.Duration
 	cancelOrderTimeout  time.Duration
+
+	logger log.FieldLogger
+
+	preferCancelAllApi bool
 }
 
 func NewActiveOrderBook(symbol string) *ActiveOrderBook {
+	logFields := log.Fields{}
+
+	if symbol != "" {
+		logFields["symbol"] = symbol
+	}
+
+	logger := log.WithFields(logFields)
 	return &ActiveOrderBook{
 		Symbol:              symbol,
 		orders:              types.NewSyncOrderMap(),
@@ -53,7 +64,12 @@ func NewActiveOrderBook(symbol string) *ActiveOrderBook {
 		C:                   sigchan.New(1),
 		cancelOrderWaitTime: DefaultCancelOrderWaitTime,
 		cancelOrderTimeout:  DefaultOrderCancelTimeout,
+		logger:              logger,
 	}
+}
+
+func (b *ActiveOrderBook) SetPreferCancelAllApi(prefer bool) {
+	b.preferCancelAllApi = prefer
 }
 
 func (b *ActiveOrderBook) SetCancelOrderWaitTime(duration time.Duration) {
@@ -158,9 +174,9 @@ func (b *ActiveOrderBook) FastCancel(ctx context.Context, ex types.Exchange, ord
 		return ex.CancelOrders(ctx, orders...)
 	}
 
-	log.Debugf("[ActiveOrderBook] no wait cancelling %s orders...", b.Symbol)
+	b.logger.Debugf("[ActiveOrderBook] no wait cancelling %s orders...", b.Symbol)
 	if err := ex.CancelOrders(ctx, orders...); err != nil {
-		log.WithError(err).Errorf("[ActiveOrderBook] no wait can not cancel %s orders", b.Symbol)
+		b.logger.WithError(err).Errorf("[ActiveOrderBook] no wait can not cancel %s orders", b.Symbol)
 	}
 
 	for _, o := range orders {
@@ -193,7 +209,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 		return ex.CancelOrders(context.Background(), orders...)
 	}
 
-	log.Debugf("[ActiveOrderBook] gracefully cancelling %s orders...", b.Symbol)
+	b.logger.Debugf("[ActiveOrderBook] gracefully cancelling %s orders...", b.Symbol)
 	waitTime := b.cancelOrderWaitTime
 
 	startTime := time.Now()
@@ -206,33 +222,33 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 
 		// since ctx might be canceled, we should use background context here
 		if err := ex.CancelOrders(context.Background(), orders...); err != nil {
-			log.WithError(err).Warnf("[ActiveOrderBook] can not cancel %d %s orders", len(orders), b.Symbol)
+			b.logger.WithError(err).Warnf("[ActiveOrderBook] can not cancel %d %s orders", len(orders), b.Symbol)
 		}
 
-		log.Debugf("[ActiveOrderBook] waiting %s for %d %s orders to be cancelled...", waitTime, len(orders), b.Symbol)
+		b.logger.Debugf("[ActiveOrderBook] waiting %s for %d %s orders to be cancelled...", waitTime, len(orders), b.Symbol)
 
 		if cancelAll {
 			clear, err := b.waitAllClear(ctx, waitTime, b.cancelOrderTimeout)
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
-					log.WithError(err).Errorf("order cancel error")
+					b.logger.WithError(err).Errorf("order cancel error")
 				}
 
 				break
 			}
 
 			if clear {
-				log.Debugf("[ActiveOrderBook] %d %s orders are canceled", len(orders), b.Symbol)
+				b.logger.Debugf("[ActiveOrderBook] %d %s orders are canceled", len(orders), b.Symbol)
 				break
 			}
 
-			log.Warnf("[ActiveOrderBook] %d/%d %s orders are not cancelled yet", b.NumOfOrders(), len(orders), b.Symbol)
+			b.logger.Warnf("[ActiveOrderBook] %d/%d %s orders are not cancelled yet", b.NumOfOrders(), len(orders), b.Symbol)
 			b.Print()
 
 		} else {
 			existingOrders := b.filterExistingOrders(orders)
 			if len(existingOrders) == 0 {
-				log.Debugf("[ActiveOrderBook] orders are canceled")
+				b.logger.Debugf("[ActiveOrderBook] orders are canceled")
 				break
 			}
 		}
@@ -243,7 +259,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 				retOrder, err := retry.QueryOrderUntilSuccessful(ctx, orderQueryService, o.AsQuery())
 
 				if err != nil {
-					log.WithError(err).Errorf("unable to update order #%d", o.OrderID)
+					b.logger.WithError(err).Errorf("unable to update order #%d", o.OrderID)
 					continue
 				} else if retOrder != nil {
 					b.Update(*retOrder)
@@ -259,7 +275,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 				orders = filterCanceledOrders(orders)
 			}
 		} else {
-			log.Warnf("[ActiveOrderBook] using open orders API to verify the active orders...")
+			b.logger.Warnf("[ActiveOrderBook] using open orders API to verify the active orders...")
 
 			var symbolOrdersMap = categorizeOrderBySymbol(orders)
 			var errOccurred bool
@@ -268,7 +284,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 				openOrders, err := ex.QueryOpenOrders(ctx, symbol)
 				if err != nil {
 					errOccurred = true
-					log.WithError(err).Errorf("can not query %s open orders", symbol)
+					b.logger.WithError(err).Errorf("can not query %s open orders", symbol)
 					break
 				}
 
@@ -297,7 +313,7 @@ func (b *ActiveOrderBook) GracefulCancel(ctx context.Context, ex types.Exchange,
 		b.clear()
 	}
 
-	log.Debugf("[ActiveOrderBook] all %s orders are cancelled successfully in %s", b.Symbol, time.Since(startTime))
+	b.logger.Debugf("[ActiveOrderBook] all %s orders are cancelled successfully in %s", b.Symbol, time.Since(startTime))
 	return nil
 }
 
@@ -332,7 +348,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 
 	b.mu.Lock()
 	if !b.orders.Exists(order.OrderID) {
-		log.Debugf("[ActiveOrderBook] order #%d %s does not exist, adding it to pending order update", order.OrderID, order.Status)
+		b.logger.Debugf("[ActiveOrderBook] order #%d %s does not exist, adding it to pending order update", order.OrderID, order.Status)
 		b.pendingOrderUpdates.Add(order)
 		b.mu.Unlock()
 		return
@@ -344,7 +360,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 		// if we can't detect which is newer, isNewerOrderUpdate returns false
 		// if you pass two same objects to isNewerOrderUpdate, it returns false
 		if !isNewerOrderUpdate(order, previousOrder) {
-			log.Infof("[ActiveOrderBook] order #%d (update time %s) is out of date, skip it", order.OrderID, order.UpdateTime)
+			b.logger.Infof("[ActiveOrderBook] order #%d (update time %s) is out of date, skip it", order.OrderID, order.UpdateTime)
 			b.mu.Unlock()
 			return
 		}
@@ -357,7 +373,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 		b.mu.Unlock()
 
 		if removed {
-			log.Infof("[ActiveOrderBook] order #%d is filled: %s", order.OrderID, order.String())
+			b.logger.Infof("[ActiveOrderBook] order #%d is filled: %s", order.OrderID, order.String())
 			b.EmitFilled(order)
 		}
 		b.C.Emit()
@@ -374,7 +390,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 
 	case types.OrderStatusCanceled, types.OrderStatusRejected, types.OrderStatusExpired:
 		// TODO: note that orders transit to "canceled" may have partially filled
-		log.Debugf("[ActiveOrderBook] order is %s, removing order %s", order.Status, order)
+		b.logger.Debugf("[ActiveOrderBook] order is %s, removing order %s", order.Status, order)
 		b.orders.Remove(order.OrderID)
 		b.mu.Unlock()
 
@@ -385,7 +401,7 @@ func (b *ActiveOrderBook) Update(order types.Order) {
 
 	default:
 		b.mu.Unlock()
-		log.Warnf("[ActiveOrderBook] unhandled order status: %s", order.Status)
+		b.logger.Warnf("[ActiveOrderBook] unhandled order status: %s", order.Status)
 	}
 }
 
@@ -461,9 +477,9 @@ func (b *ActiveOrderBook) add(order types.Order) {
 		// if the pending order update time is newer than the adding order
 		// we should use the pending order rather than the adding order.
 		// if the pending order is older, then we should add the new one, and drop the pending order
-		log.Debugf("found pending order update: %+v", pendingOrder)
+		b.logger.Debugf("found pending order update: %+v", pendingOrder)
 		if isNewerOrderUpdate(pendingOrder, order) {
-			log.Debugf("pending order update is newer: %+v", pendingOrder)
+			b.logger.Debugf("pending order update is newer: %+v", pendingOrder)
 			if pendingOrder.Tag == "" {
 				pendingOrder.Tag = order.Tag
 				pendingOrder.GroupID = order.GroupID
@@ -532,7 +548,9 @@ func (b *ActiveOrderBook) filterExistingOrders(orders []types.Order) (existingOr
 	return existingOrders
 }
 
-func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange, bufferDuration time.Duration) (types.OrderSlice, error) {
+func (b *ActiveOrderBook) SyncOrders(
+	ctx context.Context, ex types.Exchange, bufferDuration time.Duration,
+) (types.OrderSlice, error) {
 	openOrders, err := retry.QueryOpenOrdersUntilSuccessfulLite(ctx, ex, b.Symbol)
 	if err != nil {
 		return nil, err
@@ -553,7 +571,7 @@ func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange, buf
 			// no need to sync active order already in active orderbook, because we only need to know if it filled or not.
 			delete(openOrdersMap, activeOrder.OrderID)
 		} else {
-			log.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
+			b.logger.Infof("found active order #%d is not in the open orders, updating...", activeOrder.OrderID)
 			updatedOrder, err := b.SyncOrder(ctx, ex, activeOrder.OrderID, activeOrder.UUID, syncBefore)
 			if err != nil {
 				errs = multierr.Append(errs, err)
@@ -568,10 +586,10 @@ func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange, buf
 
 	// update open orders not in active orders
 	for _, openOrder := range openOrdersMap {
-		log.Infof("found open order #%d is not in active orderbook, updating...", openOrder.OrderID)
+		b.logger.Infof("found open order #%d is not in active orderbook, updating...", openOrder.OrderID)
 		// we don't add open orders into active orderbook if updated in 3 min, because we may receive message from websocket and add it twice.
 		if openOrder.UpdateTime.After(syncBefore) {
-			log.Infof("open order #%d is updated in buffer duration (%s), skip updating...", openOrder.OrderID, bufferDuration.String())
+			b.logger.Infof("open order #%d is updated in buffer duration (%s), skip updating...", openOrder.OrderID, bufferDuration.String())
 			continue
 		}
 
@@ -582,7 +600,9 @@ func (b *ActiveOrderBook) SyncOrders(ctx context.Context, ex types.Exchange, buf
 	return updatedOrders, errs
 }
 
-func (b *ActiveOrderBook) SyncOrder(ctx context.Context, ex types.Exchange, orderID uint64, orderUUID string, syncBefore time.Time) (*types.Order, error) {
+func (b *ActiveOrderBook) SyncOrder(
+	ctx context.Context, ex types.Exchange, orderID uint64, orderUUID string, syncBefore time.Time,
+) (*types.Order, error) {
 	isMax := exchange.IsMaxExchange(ex)
 
 	orderQueryService, ok := ex.(types.ExchangeOrderQueryService)
