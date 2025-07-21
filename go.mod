@@ -9,7 +9,7 @@ require (
 	github.com/Masterminds/squirrel v1.5.3
 	github.com/adshao/go-binance/v2 v2.6.0
 	github.com/c-bata/goptuna v0.8.1
-	github.com/c9s/requestgen v1.4.3
+	github.com/c9s/requestgen v1.4.4
 	github.com/c9s/rockhopper/v2 v2.0.6
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/cheggaaa/pb/v3 v3.0.8
