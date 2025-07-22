@@ -1,7 +1,6 @@
 package coinbase
 
 import (
-	"errors"
 	"strconv"
 	"time"
 
@@ -69,77 +68,71 @@ func init() {
 	)
 }
 
-// Helper function to record order submission metrics
-func recordOrderSubmissionMetrics(order types.SubmitOrder, duration time.Duration, err error) {
+// Helper function to record successful order submission metrics
+func recordSuccessOrderSubmissionMetrics(order types.SubmitOrder, duration time.Duration) {
 	symbol := string(order.Symbol)
 
-	// Record submission status
-	success := "true"
-	if err != nil {
-		success = "false"
-		// Categorize error code for error count metrics
-		var responseErr *requestgen.ErrResponse
-		statusCode := "200"
-		if errors.As(err, &responseErr) {
-			statusCode = strconv.Itoa(responseErr.StatusCode)
-		}
-
-		orderSubmissionErrorCodeMetrics.With(prometheus.Labels{
-			"symbol":      symbol,
-			"side":        string(order.Side),
-			"type":        string(order.Type),
-			"status_code": statusCode,
-		}).Inc()
-	} else {
-		// Only record submission duration for successful requests
-		orderSubmissionLatencyMetrics.With(prometheus.Labels{
-			"symbol": symbol,
-			"side":   string(order.Side),
-			"type":   string(order.Type),
-		}).Observe(float64(duration.Milliseconds()))
-	}
+	orderSubmissionLatencyMetrics.With(prometheus.Labels{
+		"symbol": symbol,
+		"side":   string(order.Side),
+		"type":   string(order.Type),
+	}).Observe(float64(duration.Milliseconds()))
 
 	orderSubmissionTotalMetrics.With(prometheus.Labels{
 		"symbol":  symbol,
 		"side":    string(order.Side),
 		"type":    string(order.Type),
-		"success": success,
+		"success": "true",
+	}).Inc()
+}
+
+// Helper function to record failed order submission metrics
+func recordFailedOrderSubmissionMetrics(order types.SubmitOrder, err *requestgen.ErrResponse) {
+	symbol := string(order.Symbol)
+
+	orderSubmissionErrorCodeMetrics.With(prometheus.Labels{
+		"symbol":      symbol,
+		"side":        string(order.Side),
+		"type":        string(order.Type),
+		"status_code": strconv.Itoa(err.StatusCode),
+	}).Inc()
+	orderSubmissionTotalMetrics.With(prometheus.Labels{
+		"symbol":  symbol,
+		"side":    string(order.Side),
+		"type":    string(order.Type),
+		"success": "false",
 	}).Inc()
 }
 
 // Helper function to record order cancellation metrics
-func recordOrderCancelMetrics(order types.Order, duration time.Duration, err error) {
+func recordSuccessOrderCancelMetrics(order types.Order, duration time.Duration) {
 	symbol := string(order.Symbol)
 
-	// Record cancellation result in total metrics
-	success := "true"
-	if err != nil {
-		success = "false"
-		// Categorize cancellation error codes
-		var responseErr *requestgen.ErrResponse
-		statusCode := "200"
-		if errors.As(err, &responseErr) {
-			statusCode = strconv.Itoa(responseErr.StatusCode)
-		}
-		// Record the specific cancellation error
-		orderCancelErrorCodeMetrics.With(prometheus.Labels{
-			"symbol":      symbol,
-			"side":        string(order.Side),
-			"type":        string(order.Type),
-			"status_code": statusCode,
-		}).Inc()
-	} else {
-		// Only record cancellation latency for successful requests
-		orderCancelLatencyMetrics.With(prometheus.Labels{
-			"symbol": symbol,
-		}).Observe(float64(duration.Milliseconds()))
-	}
+	orderCancelLatencyMetrics.With(prometheus.Labels{
+		"symbol": symbol,
+	}).Observe(float64(duration.Milliseconds()))
 
-	// Record cancellation attempt total
 	orderCancelTotalMetrics.With(prometheus.Labels{
 		"symbol":  symbol,
 		"side":    string(order.Side),
 		"type":    string(order.Type),
-		"success": success,
+		"success": "true",
+	}).Inc()
+}
+
+func recordFailedOrderCancelMetrics(order types.Order, err *requestgen.ErrResponse) {
+	symbol := string(order.Symbol)
+
+	orderCancelErrorCodeMetrics.With(prometheus.Labels{
+		"symbol":      symbol,
+		"side":        string(order.Side),
+		"type":        string(order.Type),
+		"status_code": strconv.Itoa(err.StatusCode),
+	}).Inc()
+	orderCancelTotalMetrics.With(prometheus.Labels{
+		"symbol":  symbol,
+		"side":    string(order.Side),
+		"type":    string(order.Type),
+		"success": "false",
 	}).Inc()
 }
