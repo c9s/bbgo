@@ -34,7 +34,7 @@ func initMetrics(extendedLabels []string) {
 	if metricsNumOfActiveOrders == nil {
 		metricsNumOfActiveOrders = prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "bbgo_dca2_num_of_active_orders",
+				Name: "bbgo_dca3_num_of_active_orders",
 				Help: "number of active orders",
 			},
 			append([]string{
@@ -47,7 +47,7 @@ func initMetrics(extendedLabels []string) {
 	if metricsState == nil {
 		metricsState = prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "bbgo_dca2_state",
+				Name: "bbgo_dca3_state",
 				Help: "state of this strategy",
 			},
 			append([]string{
@@ -76,6 +76,10 @@ func registerMetrics() {
 }
 
 func updateNumOfActiveOrdersMetrics(numOfActiveOrders int) {
+	if metricsNumOfActiveOrders == nil {
+		return
+	}
+
 	// use ts to bind the state and numOfActiveOrders
 	labels := mergeLabels(baseLabels, prometheus.Labels{
 		// "ts": strconv.FormatInt(now.UnixMilli(), 10),
@@ -85,6 +89,10 @@ func updateNumOfActiveOrdersMetrics(numOfActiveOrders int) {
 }
 
 func updateStatsMetrics(state State) {
+	if metricsState == nil {
+		return
+	}
+
 	// use ts to bind the state and numOfActiveOrders
 	labels := mergeLabels(baseLabels, prometheus.Labels{
 		// "ts": strconv.FormatInt(now.UnixMilli(), 10),

@@ -3,6 +3,7 @@ package dca3
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/util"
@@ -29,7 +30,7 @@ type StateMachine struct {
 	// current state
 	state State
 	// isRunning indicates whether the state machine is currently running.
-	isRunning bool
+	isRunning atomic.Bool
 	// next state channel is used to emit the next state to be processed.
 	nextStateC chan State
 	// closeC is used to signal the state machine to stop processing.
@@ -99,6 +100,8 @@ func (s *StateMachine) UpdateState(state State) {
 
 	s.logger.Infof("update state from %d to %d", s.state, state)
 	s.state = state
+
+	updateStatsMetrics(s.state)
 }
 
 func (s *StateMachine) Close() {
@@ -118,7 +121,7 @@ func (s *StateMachine) WaitForRunningIs(isRunning bool, checkInterval, timeout t
 	for {
 		select {
 		case <-ticker.C:
-			if s.isRunning == isRunning {
+			if s.isRunning.Load() == isRunning {
 				return true
 			}
 		case <-timeoutC:
@@ -146,13 +149,13 @@ func (s *StateMachine) Run(ctx context.Context) {
 func (s *StateMachine) runState(ctx context.Context) {
 	s.logger.Info("starting state machine")
 	defer func() {
-		s.isRunning = false
+		s.isRunning.Store(false)
 		s.once.Reset()
 		s.logger.Info("state machine stopped")
 	}()
 
 	s.emitStart()
-	s.isRunning = true
+	s.isRunning.Store(true)
 
 	for {
 		select {
