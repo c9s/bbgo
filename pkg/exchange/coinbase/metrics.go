@@ -1,32 +1,13 @@
 package coinbase
 
 import (
-	"strings"
+	"errors"
+	"strconv"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/requestgen"
 	"github.com/prometheus/client_golang/prometheus"
-)
-
-// Error type constants for metrics
-type MetricOrderErrorType string
-
-const (
-	ErrorTypeUnknown             MetricOrderErrorType = "unknown"
-	ErrorTypeRateLimit           MetricOrderErrorType = "rate_limit"
-	ErrorTypeInsufficientBalance MetricOrderErrorType = "insufficient_balance"
-	ErrorTypeInvalidRequest      MetricOrderErrorType = "invalid_request"
-	ErrorTypeTimeout             MetricOrderErrorType = "timeout"
-	ErrorTypeOrderNotFound       MetricOrderErrorType = "order_not_found"
-	ErrorTypeAlreadyCanceled     MetricOrderErrorType = "already_canceled"
-)
-
-// Status constants for metrics
-type MetricStatus string
-
-const (
-	StatusSuccess MetricStatus = "success"
-	StatusError   MetricStatus = "error"
 )
 
 var (
@@ -34,8 +15,8 @@ var (
 	orderSubmissionLatencyMetrics = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "coinbase_order_submission_duration_milliseconds",
-			Help:    "Order submission duration from request to response in milliseconds",
-			Buckets: prometheus.ExponentialBuckets(1, 2.0, 15), // 1ms to ~32s
+			Help:    "Order submission duration from request to response in milliseconds (successful requests only)",
+			Buckets: prometheus.LinearBuckets(50, 25, 19), // 50ms to ~500ms
 		}, []string{"symbol", "side", "type"},
 	)
 
@@ -43,22 +24,22 @@ var (
 		prometheus.CounterOpts{
 			Name: "coinbase_order_submission_total",
 			Help: "Total number of order submissions",
-		}, []string{"symbol", "side", "type", "status"},
+		}, []string{"symbol", "side", "type", "success"},
 	)
 
-	orderSubmissionErrorMetrics = prometheus.NewCounterVec(
+	orderSubmissionErrorCodeMetrics = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "coinbase_order_submission_errors_total",
-			Help: "Total number of order submission errors",
-		}, []string{"symbol", "side", "type", "error_type"},
+			Name: "coinbase_order_submission_error_codes_total",
+			Help: "Total number of order submission errors by error type",
+		}, []string{"symbol", "side", "type", "status_code"},
 	)
 
 	// Order Cancel Metrics
 	orderCancelLatencyMetrics = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "coinbase_order_cancel_latency_milliseconds",
-			Help:    "Time from cancel request to cancel confirmation",
-			Buckets: prometheus.ExponentialBuckets(1, 2.0, 12), // 1ms to ~4s
+			Help:    "Time from cancel request to cancel confirmation (successful requests only)",
+			Buckets: prometheus.LinearBuckets(50, 25, 19), // 50ms to ~500ms
 		}, []string{"symbol"},
 	)
 
@@ -66,14 +47,14 @@ var (
 		prometheus.CounterOpts{
 			Name: "coinbase_order_cancel_total",
 			Help: "Total number of order cancellation attempts",
-		}, []string{"symbol", "side", "type", "status"},
+		}, []string{"symbol", "side", "type", "success"},
 	)
 
-	orderCancelErrorMetrics = prometheus.NewCounterVec(
+	orderCancelErrorCodeMetrics = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "coinbase_order_cancel_errors_total",
-			Help: "Total number of order cancellation errors",
-		}, []string{"symbol", "side", "type", "error_type"},
+			Name: "coinbase_order_cancel_error_codes_total",
+			Help: "Total number of order cancellation errors by error type",
+		}, []string{"symbol", "side", "type", "status_code"},
 	)
 )
 
@@ -81,10 +62,10 @@ func init() {
 	prometheus.MustRegister(
 		orderSubmissionLatencyMetrics,
 		orderSubmissionTotalMetrics,
-		orderSubmissionErrorMetrics,
+		orderSubmissionErrorCodeMetrics,
 		orderCancelLatencyMetrics,
 		orderCancelTotalMetrics,
-		orderCancelErrorMetrics,
+		orderCancelErrorCodeMetrics,
 	)
 }
 
@@ -92,42 +73,37 @@ func init() {
 func recordOrderSubmissionMetrics(order types.SubmitOrder, duration time.Duration, err error) {
 	symbol := string(order.Symbol)
 
-	// Record submission duration in milliseconds
-	orderSubmissionLatencyMetrics.With(prometheus.Labels{
-		"symbol": symbol,
-		"side":   string(order.Side),
-		"type":   string(order.Type),
-	}).Observe(float64(duration.Nanoseconds()) / 1e6)
-
 	// Record submission status
-	status := StatusSuccess
+	success := "true"
 	if err != nil {
-		status = StatusError
-		// Categorize error type
-		errorType := ErrorTypeUnknown
-		if strings.Contains(err.Error(), "rate limit") {
-			errorType = ErrorTypeRateLimit
-		} else if strings.Contains(err.Error(), "insufficient") {
-			errorType = ErrorTypeInsufficientBalance
-		} else if strings.Contains(err.Error(), "invalid") {
-			errorType = ErrorTypeInvalidRequest
-		} else if strings.Contains(err.Error(), "timeout") {
-			errorType = ErrorTypeTimeout
+		success = "false"
+		// Categorize error code for error count metrics
+		var responseErr *requestgen.ErrResponse
+		statusCode := "200"
+		if errors.As(err, &responseErr) {
+			statusCode = strconv.Itoa(responseErr.StatusCode)
 		}
 
-		orderSubmissionErrorMetrics.With(prometheus.Labels{
-			"symbol":     symbol,
-			"side":       string(order.Side),
-			"type":       string(order.Type),
-			"error_type": string(errorType),
+		orderSubmissionErrorCodeMetrics.With(prometheus.Labels{
+			"symbol":      symbol,
+			"side":        string(order.Side),
+			"type":        string(order.Type),
+			"status_code": statusCode,
 		}).Inc()
+	} else {
+		// Only record submission duration for successful requests
+		orderSubmissionLatencyMetrics.With(prometheus.Labels{
+			"symbol": symbol,
+			"side":   string(order.Side),
+			"type":   string(order.Type),
+		}).Observe(float64(duration.Milliseconds()))
 	}
 
 	orderSubmissionTotalMetrics.With(prometheus.Labels{
-		"symbol": symbol,
-		"side":   string(order.Side),
-		"type":   string(order.Type),
-		"status": string(status),
+		"symbol":  symbol,
+		"side":    string(order.Side),
+		"type":    string(order.Type),
+		"success": success,
 	}).Inc()
 }
 
@@ -135,41 +111,35 @@ func recordOrderSubmissionMetrics(order types.SubmitOrder, duration time.Duratio
 func recordOrderCancelMetrics(order types.Order, duration time.Duration, err error) {
 	symbol := string(order.Symbol)
 
-	// Record cancellation latency
-	orderCancelLatencyMetrics.With(prometheus.Labels{
-		"symbol": symbol,
-	}).Observe(float64(duration.Nanoseconds()) / 1e6)
-
 	// Record cancellation result in total metrics
-	status := StatusSuccess
+	success := "true"
 	if err != nil {
-		status = StatusError
-		// Categorize cancellation error types
-		errorType := ErrorTypeUnknown
-		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "does not exist") {
-			errorType = ErrorTypeOrderNotFound
-		} else if strings.Contains(err.Error(), "already canceled") {
-			errorType = ErrorTypeAlreadyCanceled
-		} else if strings.Contains(err.Error(), "rate limit") {
-			errorType = ErrorTypeRateLimit
-		} else if strings.Contains(err.Error(), "timeout") {
-			errorType = ErrorTypeTimeout
+		success = "false"
+		// Categorize cancellation error codes
+		var responseErr *requestgen.ErrResponse
+		statusCode := "200"
+		if errors.As(err, &responseErr) {
+			statusCode = strconv.Itoa(responseErr.StatusCode)
 		}
-
 		// Record the specific cancellation error
-		orderCancelErrorMetrics.With(prometheus.Labels{
-			"symbol":     symbol,
-			"side":       string(order.Side),
-			"type":       string(order.Type),
-			"error_type": string(errorType),
+		orderCancelErrorCodeMetrics.With(prometheus.Labels{
+			"symbol":      symbol,
+			"side":        string(order.Side),
+			"type":        string(order.Type),
+			"status_code": statusCode,
 		}).Inc()
+	} else {
+		// Only record cancellation latency for successful requests
+		orderCancelLatencyMetrics.With(prometheus.Labels{
+			"symbol": symbol,
+		}).Observe(float64(duration.Milliseconds()))
 	}
 
 	// Record cancellation attempt total
 	orderCancelTotalMetrics.With(prometheus.Labels{
-		"symbol": symbol,
-		"side":   string(order.Side),
-		"type":   string(order.Type),
-		"status": string(status),
+		"symbol":  symbol,
+		"side":    string(order.Side),
+		"type":    string(order.Type),
+		"success": success,
 	}).Inc()
 }
