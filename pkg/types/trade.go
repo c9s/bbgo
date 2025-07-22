@@ -70,6 +70,7 @@ type Trade struct {
 	// ID is the source trade ID
 	ID            uint64           `json:"id" db:"id"`
 	OrderID       uint64           `json:"orderID" db:"order_id"`
+	OrderUUID     string           `json:"orderUUID,omitempty" db:"order_uuid"`
 	Exchange      ExchangeName     `json:"exchange" db:"exchange"`
 	Price         fixedpoint.Value `json:"price" db:"price"`
 	Quantity      fixedpoint.Value `json:"quantity" db:"quantity"`
@@ -180,7 +181,11 @@ func trimTrailingZero(a float64) string {
 
 // String is for console output
 func (trade Trade) String() string {
-	return fmt.Sprintf("TRADE %s %s %4s %-4s @ %-6s | AMOUNT %s | FEE %s %s | OrderID %d | TID %d | %s | %s",
+	orderID := trade.OrderUUID
+	if orderID == "" {
+		orderID = strconv.FormatUint(trade.OrderID, 10)
+	}
+	return fmt.Sprintf("TRADE %s %s %4s %-4s @ %-6s | AMOUNT %s | FEE %s %s | OrderID %s | TID %d | %s | %s",
 		trade.Exchange.String(),
 		trade.Symbol,
 		trade.Side,
@@ -189,7 +194,7 @@ func (trade Trade) String() string {
 		trade.QuoteQuantity.String(),
 		trade.Fee.String(),
 		trade.FeeCurrency,
-		trade.OrderID,
+		orderID,
 		trade.ID,
 		trade.Time.Time().Format(time.StampMilli),
 		trade.Liquidity(),

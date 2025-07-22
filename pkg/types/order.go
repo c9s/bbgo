@@ -283,7 +283,7 @@ type Order struct {
 	// GID is used for relational database storage, it's an incremental ID
 	GID     uint64 `json:"gid,omitempty" db:"gid"`
 	OrderID uint64 `json:"orderID" db:"order_id"` // order id
-	UUID    string `json:"uuid,omitempty"`
+	UUID    string `json:"uuid,omitempty" db:"uuid"`
 
 	Status OrderStatus `json:"status" db:"status"`
 
