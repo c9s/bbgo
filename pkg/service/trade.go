@@ -118,6 +118,10 @@ func (s *TradeService) Sync(
 				id := strconv.FormatUint(trade.ID, 10) + trade.Side.String()
 				return id
 			},
+			Insert: func(obj interface{}) error {
+				trade := obj.(types.Trade)
+				return s.Insert(trade)
+			},
 			LogInsert: true,
 		},
 	}
@@ -436,6 +440,14 @@ func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err erro
 }
 
 func (s *TradeService) Insert(trade types.Trade) error {
+	if s.DB.DriverName() == "mysql" {
+		_, err := s.DB.NamedExec(`
+			INSERT INTO trades (id, order_id, order_uuid, exchange, price, quantity, quote_quantity, symbol, side, is_buyer, is_maker, traded_at, fee, fee_currency, is_margin, is_futures, is_isolated, strategy, pnl)
+			VALUES (:id, :order_id, UUID_TO_BIN(:order_uuid, true), :exchange, :price, :quantity, :quote_quantity, :symbol, :side, :is_buyer, :is_maker, :traded_at, :fee, :fee_currency, :is_margin, :is_futures, :is_isolated, :strategy, :pnl)
+			ON DUPLICATE KEY UPDATE id=:id, order_id=:order_id, order_uuid=:order_uuid, exchange=:exchange, price=:price, quantity=:quantity, quote_quantity=:quote_quantity, symbol=:symbol, side=:side, is_buyer=:is_buyer, is_maker=:is_maker, traded_at=:traded_at, fee=:fee, fee_currency=:fee_currency, is_margin=:is_margin, is_futures=:is_futures, is_isolated=:is_isolated, strategy=:strategy, pnl=:pnl;`,
+			trade)
+		return err
+	}
 	sql := dbCache.InsertSqlOf(trade)
 	_, err := s.DB.NamedExec(sql, trade)
 	return err
