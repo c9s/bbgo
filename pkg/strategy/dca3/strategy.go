@@ -36,7 +36,7 @@ func init() {
 	bbgo.RegisterStrategy(ID, &Strategy{})
 }
 
-//go:generate callbackgen -type Strateg
+//go:generate callbackgen -type Strategy
 type Strategy struct {
 	Position       *types.Position `json:"position,omitempty" persistence:"position"`
 	ProfitStats    *ProfitStats    `json:"profitStats,omitempty" persistence:"profit_stats"`
@@ -98,15 +98,15 @@ func (s *Strategy) ID() string {
 
 func (s *Strategy) Validate() error {
 	if s.MaxOrderCount < 1 {
-		return fmt.Errorf("maxOrderCount can not be < 1")
+		return fmt.Errorf("MaxOrderCount can not be < 1")
 	}
 
 	if s.TakeProfitRatio.Sign() <= 0 {
-		return fmt.Errorf("takeProfitSpread can not be <= 0")
+		return fmt.Errorf("TakeProfitSpread can not be <= 0")
 	}
 
 	if s.PriceDeviation.Sign() <= 0 {
-		return fmt.Errorf("priceDeviation can not be <= 0")
+		return fmt.Errorf("PriceDeviation can not be <= 0")
 	}
 
 	// TODO: validate balance is enough
@@ -213,6 +213,8 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	// order filled callback
 	s.OrderExecutor.ActiveMakerOrders().OnFilled(func(o types.Order) {
+		updateNumOfActiveOrdersMetrics(s.OrderExecutor.ActiveMakerOrders().NumOfOrders())
+
 		if o.Side != TakeProfitSide {
 			return
 		}

@@ -39,7 +39,7 @@ func (s *Strategy) syncPeriodically(ctx context.Context, validateStateC chan str
 			bbgo.Sync(ctx, s)
 		case <-syncActiveOrdersTicker.C:
 			if err := s.syncActiveOrders(ctx); err != nil {
-				s.logger.WithError(err).Warn(err, "failed to sync active orders")
+				s.logger.WithError(err).Warn("failed to sync active orders")
 			}
 		case <-validateStateTicker.C:
 			s.validateState(ctx)
