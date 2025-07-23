@@ -23,13 +23,6 @@ var (
 		prometheus.CounterOpts{
 			Name: "coinbase_order_submission_total",
 			Help: "Total number of order submissions",
-		}, []string{"symbol", "side", "type", "success"},
-	)
-
-	orderSubmissionErrorCodeMetrics = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "coinbase_order_submission_error_codes_total",
-			Help: "Total number of order submission errors by error type",
 		}, []string{"symbol", "side", "type", "status_code"},
 	)
 
@@ -46,13 +39,6 @@ var (
 		prometheus.CounterOpts{
 			Name: "coinbase_order_cancel_total",
 			Help: "Total number of order cancellation attempts",
-		}, []string{"symbol", "side", "type", "success"},
-	)
-
-	orderCancelErrorCodeMetrics = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "coinbase_order_cancel_error_codes_total",
-			Help: "Total number of order cancellation errors by error type",
 		}, []string{"symbol", "side", "type", "status_code"},
 	)
 )
@@ -61,10 +47,8 @@ func init() {
 	prometheus.MustRegister(
 		orderSubmissionLatencyMetrics,
 		orderSubmissionTotalMetrics,
-		orderSubmissionErrorCodeMetrics,
 		orderCancelLatencyMetrics,
 		orderCancelTotalMetrics,
-		orderCancelErrorCodeMetrics,
 	)
 }
 
@@ -79,10 +63,10 @@ func recordSuccessOrderSubmissionMetrics(order types.SubmitOrder, duration time.
 	}).Observe(float64(duration.Milliseconds()))
 
 	orderSubmissionTotalMetrics.With(prometheus.Labels{
-		"symbol":  symbol,
-		"side":    string(order.Side),
-		"type":    string(order.Type),
-		"success": "true",
+		"symbol":      symbol,
+		"side":        string(order.Side),
+		"type":        string(order.Type),
+		"status_code": "200",
 	}).Inc()
 }
 
@@ -90,21 +74,15 @@ func recordSuccessOrderSubmissionMetrics(order types.SubmitOrder, duration time.
 func recordFailedOrderSubmissionMetrics(order types.SubmitOrder, err *requestgen.ErrResponse) {
 	symbol := string(order.Symbol)
 
-	orderSubmissionErrorCodeMetrics.With(prometheus.Labels{
+	orderSubmissionTotalMetrics.With(prometheus.Labels{
 		"symbol":      symbol,
 		"side":        string(order.Side),
 		"type":        string(order.Type),
 		"status_code": strconv.Itoa(err.StatusCode),
 	}).Inc()
-	orderSubmissionTotalMetrics.With(prometheus.Labels{
-		"symbol":  symbol,
-		"side":    string(order.Side),
-		"type":    string(order.Type),
-		"success": "false",
-	}).Inc()
 }
 
-// Helper function to record order cancellation metrics
+// Helper function to record successful order cancellation metrics
 func recordSuccessOrderCancelMetrics(order types.Order, duration time.Duration) {
 	symbol := string(order.Symbol)
 
@@ -113,26 +91,21 @@ func recordSuccessOrderCancelMetrics(order types.Order, duration time.Duration) 
 	}).Observe(float64(duration.Milliseconds()))
 
 	orderCancelTotalMetrics.With(prometheus.Labels{
-		"symbol":  symbol,
-		"side":    string(order.Side),
-		"type":    string(order.Type),
-		"success": "true",
+		"symbol":      symbol,
+		"side":        string(order.Side),
+		"type":        string(order.Type),
+		"status_code": "200",
 	}).Inc()
 }
 
+// Helper function to record failed order cancellation metrics
 func recordFailedOrderCancelMetrics(order types.Order, err *requestgen.ErrResponse) {
 	symbol := string(order.Symbol)
 
-	orderCancelErrorCodeMetrics.With(prometheus.Labels{
+	orderCancelTotalMetrics.With(prometheus.Labels{
 		"symbol":      symbol,
 		"side":        string(order.Side),
 		"type":        string(order.Type),
 		"status_code": strconv.Itoa(err.StatusCode),
-	}).Inc()
-	orderCancelTotalMetrics.With(prometheus.Labels{
-		"symbol":  symbol,
-		"side":    string(order.Side),
-		"type":    string(order.Type),
-		"success": "false",
 	}).Inc()
 }
