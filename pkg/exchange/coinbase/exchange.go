@@ -12,6 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
+	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -201,21 +202,34 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		req.ClientOrderID(order.ClientOrderID)
 	}
 
-	timeNow := time.Now()
+	// Record metrics timing
+	requestTime := time.Now()
 	res, err := req.Do(ctx)
+	duration := time.Since(requestTime)
+	var responseErr *requestgen.ErrResponse
+	if errors.As(err, &responseErr) {
+		recordFailedOrderSubmissionMetrics(order, responseErr)
+	} else if err == nil {
+		// no error => record success metrics
+		recordSuccessOrderSubmissionMetrics(order, duration)
+	}
+
 	if err != nil {
 		return nil, err
 	}
-	return &types.Order{
+
+	createdOrder = &types.Order{
 		SubmitOrder:      order,
 		Exchange:         types.ExchangeCoinBase,
 		UUID:             res.ID,
 		Status:           types.OrderStatusNew,
 		ExecutedQuantity: fixedpoint.Zero,
 		IsWorking:        true,
-		CreationTime:     types.Time(timeNow),
-		UpdateTime:       types.Time(timeNow),
-	}, nil
+		CreationTime:     res.CreatedAt,
+		UpdateTime:       res.CreatedAt,
+	}
+
+	return createdOrder, nil
 }
 
 func (e *Exchange) QueryOpenOrders(ctx context.Context, symbol string) ([]types.Order, error) {
@@ -291,8 +305,22 @@ func (e *Exchange) queryOrdersByPagination(ctx context.Context, symbol string, s
 func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) error {
 	var failedOrderIDs []string
 	for _, order := range orders {
+
 		req := e.client.NewCancelOrderRequest().OrderID(order.UUID)
+		// Track cancellation metrics per order
+		startTime := time.Now()
 		res, err := req.Do(ctx)
+
+		// Record cancel metrics
+		duration := time.Since(startTime)
+		var responseErr *requestgen.ErrResponse
+		if errors.As(err, &responseErr) {
+			recordFailedOrderCancelMetrics(order, responseErr)
+		} else if err == nil {
+			// no error => record success metrics
+			recordSuccessOrderCancelMetrics(order, duration)
+		}
+
 		if err != nil {
 			log.WithError(err).Errorf("failed to cancel order: %v", order.UUID)
 			failedOrderIDs = append(failedOrderIDs, order.UUID)
