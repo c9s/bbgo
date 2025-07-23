@@ -213,6 +213,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		// no error => record success metrics
 		recordSuccessOrderSubmissionMetrics(order, duration)
 	}
+
 	if err != nil {
 		return nil, err
 	}
