@@ -208,10 +208,10 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	duration := time.Since(requestTime)
 	var responseErr *requestgen.ErrResponse
 	if errors.As(err, &responseErr) {
-		recordFailedOrderSubmissionMetrics(order, responseErr)
+		go recordFailedOrderSubmissionMetrics(order, responseErr)
 	} else if err == nil {
 		// no error => record success metrics
-		recordSuccessOrderSubmissionMetrics(order, duration)
+		go recordSuccessOrderSubmissionMetrics(order, duration)
 	}
 
 	if err != nil {
@@ -315,10 +315,10 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) erro
 		duration := time.Since(startTime)
 		var responseErr *requestgen.ErrResponse
 		if errors.As(err, &responseErr) {
-			recordFailedOrderCancelMetrics(order, responseErr)
+			go recordFailedOrderCancelMetrics(order, responseErr)
 		} else if err == nil {
 			// no error => record success metrics
-			recordSuccessOrderCancelMetrics(order, duration)
+			go recordSuccessOrderCancelMetrics(order, duration)
 		}
 
 		if err != nil {
