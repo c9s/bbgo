@@ -21,14 +21,14 @@ func toGlobalSide(cbSide api.SideType) types.SideType {
 	return types.SideTypeNone
 }
 
-func toGlobalOrderStatus(order *api.Order) types.OrderStatus {
-	switch order.Status {
+func toGlobalOrderStatus(cbStatus api.OrderStatus, doneReason string) types.OrderStatus {
+	switch cbStatus {
 	case api.OrderStatusRejected:
 		return types.OrderStatusRejected
 	case api.OrderStatusReceived, api.OrderStatusOpen, api.OrderStatusPending:
 		return types.OrderStatusNew
 	case api.OrderStatusDone:
-		switch order.DoneReason {
+		switch doneReason {
 		case "filled":
 			return types.OrderStatusFilled
 		case "canceled":
@@ -37,7 +37,7 @@ func toGlobalOrderStatus(order *api.Order) types.OrderStatus {
 			return types.OrderStatusRejected
 		}
 	}
-	return types.OrderStatus(strings.ToUpper(string(order.Status)))
+	return types.OrderStatus(strings.ToUpper(string(cbStatus)))
 }
 
 func toGlobalOrder(cbOrder *api.Order) types.Order {
@@ -53,7 +53,7 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 			TimeInForce:   toGlobalTimeInForce(cbOrder.TimeInForce),
 		},
 		Exchange:         types.ExchangeCoinBase,
-		Status:           toGlobalOrderStatus(cbOrder),
+		Status:           toGlobalOrderStatus(cbOrder.Status, cbOrder.DoneReason),
 		UUID:             cbOrder.ID,
 		OrderID:          FNV64a(cbOrder.ID),
 		OriginalStatus:   string(cbOrder.Status),
