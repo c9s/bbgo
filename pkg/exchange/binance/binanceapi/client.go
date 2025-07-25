@@ -154,7 +154,7 @@ func (c *RestClient) SendRequest(req *http.Request) (*requestgen.Response, error
 	return c.BaseAPIClient.SendRequest(req)
 }
 
-// newAuthenticatedRequest creates new http request for authenticated routes.
+// NewAuthenticatedRequest creates new http request for authenticated routes.
 func (c *RestClient) NewAuthenticatedRequest(
 	ctx context.Context, method, refURL string, params url.Values, payload interface{},
 ) (*http.Request, error) {
