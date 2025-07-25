@@ -222,9 +222,9 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		SubmitOrder:      order,
 		Exchange:         types.ExchangeCoinBase,
 		UUID:             res.ID,
-		Status:           types.OrderStatusNew,
-		ExecutedQuantity: fixedpoint.Zero,
-		IsWorking:        true,
+		Status:           toGlobalOrderStatus(res.Status, res.DoneReason),
+		ExecutedQuantity: res.ExecutedValue,
+		IsWorking:        !res.Settled,
 		CreationTime:     res.CreatedAt,
 		UpdateTime:       res.CreatedAt,
 	}
