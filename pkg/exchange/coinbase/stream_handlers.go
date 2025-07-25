@@ -477,7 +477,8 @@ func (s *Stream) handleOrderBookSnapshotMessage(msg *OrderBookSnapshotMessage) {
 		Symbol: symbol,
 		Bids:   bids,
 		Asks:   asks,
-		Time:   time.Now(),
+		// NOTE: Coinbase does not provide the timestamp for the order book snapshot, should leave it empty
+		// See `types.SliceOrderBook.Time` for details
 	}
 	s.EmitBookSnapshot(book)
 }
