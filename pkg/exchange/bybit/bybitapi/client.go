@@ -58,7 +58,7 @@ func (c *RestClient) Auth(key, secret string) {
 	c.secret = secret
 }
 
-// newAuthenticatedRequest creates new http request for authenticated routes.
+// NewAuthenticatedRequest creates new http request for authenticated routes.
 func (c *RestClient) NewAuthenticatedRequest(ctx context.Context, method, refURL string, params url.Values, payload interface{}) (*http.Request, error) {
 	if len(c.key) == 0 {
 		return nil, errors.New("empty api key")
