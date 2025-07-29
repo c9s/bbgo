@@ -74,10 +74,10 @@ func (e *Exchange) Name() types.ExchangeName {
 }
 
 func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
-	req := e.client.NewGetTickerRequest()
+	req := e.v3client.NewGetTickerRequest()
 	req.Market(toLocalSymbol(symbol))
-	ticker, err := req.Do(ctx)
 
+	ticker, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 
 		tickers[toGlobalSymbol(symbol[0])] = *ticker
 	} else {
-		req := e.client.NewGetTickersRequest()
+		req := e.v3client.NewGetTickersRequest()
 		maxTickers, err := req.Do(ctx)
 		if err != nil {
 			return nil, err
@@ -142,7 +142,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 }
 
 func (e *Exchange) QueryMarkets(ctx context.Context) (types.MarketMap, error) {
-	req := e.client.NewGetMarketsRequest()
+	req := e.v3client.NewGetMarketsRequest()
 	remoteMarkets, err := req.Do(ctx)
 	if err != nil {
 		return nil, err
@@ -1163,21 +1163,18 @@ func (e *Exchange) QueryKLines(
 	}
 
 	log.Infof("querying kline %s %s %+v", symbol, interval, options)
-	localKLines, err := e.client.PublicService.KLines(toLocalSymbol(symbol), string(interval), *options.StartTime, limit)
+
+	period, err := v3.IntervalToPeriod(string(interval))
 	if err != nil {
 		return nil, err
 	}
 
-	var kLines []types.KLine
-	for _, k := range localKLines {
-		if options.EndTime != nil && k.StartTime.After(*options.EndTime) {
-			break
-		}
+	localKLines, err := e.v3client.NewGetKLinesRequest().
+		Market(toLocalSymbol(symbol)).
+		Period(int(period)).Timestamp(*options.StartTime).Limit(limit).
+		Do(ctx)
 
-		kLines = append(kLines, k.KLine())
-	}
-
-	return kLines, nil
+	return toGlobalKLines(localKLines, symbol, period, interval, options.EndTime)
 }
 
 func (e *Exchange) QueryDepth(
