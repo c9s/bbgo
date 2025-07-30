@@ -602,7 +602,7 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 			return fixedpoint.Zero, fmt.Errorf("quantityScale error: %w", err)
 		}
 
-		log.Infof("%s scaling bid #%d quantity to %f", s.Symbol, i+1, qf)
+		s.logger.Infof("%s scaling bid #%d quantity to %f", s.Symbol, i+1, qf)
 
 		// override the default quantity
 		return fixedpoint.NewFromFloat(qf), nil
@@ -627,7 +627,7 @@ func (s *Strategy) getInitialLayerQuantity(i int) (fixedpoint.Value, error) {
 // - MMR with 10x leverage = 5%
 // - MMR with 5x leverage = 9%
 // - MMR with 3x leverage = 10%
-func calculateDebtQuota(totalValue, debtValue, minMarginLevel, leverage fixedpoint.Value) fixedpoint.Value {
+func (s *Strategy) calculateDebtQuota(totalValue, debtValue, minMarginLevel, leverage fixedpoint.Value) fixedpoint.Value {
 	if minMarginLevel.IsZero() || totalValue.IsZero() {
 		return fixedpoint.Zero
 	}
@@ -644,7 +644,7 @@ func calculateDebtQuota(totalValue, debtValue, minMarginLevel, leverage fixedpoi
 	debtCap := totalValue.Div(minMarginLevel).Div(defaultMmr)
 	marginLevel := totalValue.Div(debtValue).Div(defaultMmr)
 
-	log.Infof(
+	s.logger.Infof(
 		"calculateDebtQuota: debtCap=%f, debtValue=%f currentMarginLevel=%f mmr=%f",
 		debtCap.Float64(),
 		debtValue.Float64(),
@@ -691,7 +691,7 @@ func (s *Strategy) allowMarginHedge(makerSide types.SideType) (bool, fixedpoint.
 	if hedgeAccount.MarginLevel.Compare(s.MinMarginLevel) > 0 {
 
 		// debtQuota is the quota with minimal margin level
-		debtQuota := calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, s.MaxHedgeAccountLeverage)
+		debtQuota := s.calculateDebtQuota(marketValue, debtValue, bufMinMarginLevel, s.MaxHedgeAccountLeverage)
 
 		s.logger.Infof(
 			"hedge account margin level %f > %f, debt quota: %f",
@@ -1050,7 +1050,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	if disableMakerAsk && disableMakerBid {
-		log.Warnf("%s bid/ask maker is disabled", s.Symbol)
+		s.logger.Warnf("%s bid/ask maker is disabled", s.Symbol)
 		return nil
 	}
 
@@ -1077,7 +1077,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 
 	} else if s.EnableBollBandMargin {
 		if err := s.applyBollingerMargin(quote); err != nil {
-			log.WithError(err).Errorf("unable to apply bollinger margin")
+			s.logger.WithError(err).Errorf("unable to apply bollinger margin")
 		}
 	}
 
@@ -1269,7 +1269,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 	}
 
 	if len(submitOrders) == 0 {
-		log.Warnf("no orders generated")
+		s.logger.Warnf("no orders generated")
 		return nil
 	}
 
@@ -1285,7 +1285,7 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		ctx, s.makerSession.Exchange, s.makerOrderCreateCallback, formattedOrders...,
 	)
 	if err != nil {
-		log.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
+		s.logger.WithError(err).Errorf("unable to place maker orders: %+v", formattedOrders)
 		return err
 	}
 
@@ -1638,7 +1638,7 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
 		hedgeDelta, err = s.spreadMakerHedge(ctx, signal, uncoveredPosition, hedgeDelta)
 		if err != nil {
-			log.WithError(err).Errorf("unable to place spread maker order")
+			s.logger.WithError(err).Errorf("unable to place spread maker order")
 		}
 	}
 
@@ -1652,12 +1652,12 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 
 	if s.SyntheticHedge != nil && s.SyntheticHedge.Enabled {
 		if err := s.SyntheticHedge.Hedge(ctx, uncoveredPosition); err != nil {
-			log.WithError(err).Errorf("unable to place synthetic hedge order")
+			s.logger.WithError(err).Errorf("unable to place synthetic hedge order")
 			return
 		}
 	} else {
 		if _, err := s.directHedge(ctx, hedgeDelta); err != nil {
-			log.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
+			s.logger.WithError(err).Errorf("unable to hedge position %s %s %f", s.Symbol, side.String(), hedgeDelta.Float64())
 			return
 		}
 	}
@@ -1759,7 +1759,7 @@ func (s *Strategy) directHedge(
 
 	createdOrder := createdOrders[0]
 
-	log.Infof("submitted hedge orders: %+v", createdOrder)
+	s.logger.Infof("submitted hedge orders: %+v", createdOrder)
 
 	// if it's selling, then we should add a positive position
 	switch side {
@@ -1789,7 +1789,7 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 			return
 
 		case <-tradeScanTicker.C:
-			log.Infof("scanning trades from %s ago...", tradeScanInterval)
+			s.logger.Infof("scanning trades from %s ago...", tradeScanInterval)
 
 			if s.RecoverTrade {
 				startTime := time.Now().Add(-tradeScanInterval).Add(-tradeScanOverlapBufferPeriod)
@@ -1797,13 +1797,13 @@ func (s *Strategy) tradeRecover(ctx context.Context) {
 				if err := s.tradeCollector.Recover(
 					ctx, s.sourceSession.Exchange.(types.ExchangeTradeHistoryService), s.SourceSymbol, startTime,
 				); err != nil {
-					log.WithError(err).Errorf("query trades error")
+					s.logger.WithError(err).Errorf("query trades error")
 				}
 
 				if err := s.tradeCollector.Recover(
 					ctx, s.makerSession.Exchange.(types.ExchangeTradeHistoryService), s.Symbol, startTime,
 				); err != nil {
-					log.WithError(err).Errorf("query trades error")
+					s.logger.WithError(err).Errorf("query trades error")
 				}
 			}
 		}
@@ -1953,7 +1953,7 @@ func (s *Strategy) quoteWorker(ctx context.Context) {
 
 	defer func() {
 		if err := s.activeMakerOrders.GracefulCancel(context.Background(), s.makerSession.Exchange); err != nil {
-			log.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
+			s.logger.WithError(err).Errorf("can not cancel %s orders", s.Symbol)
 		}
 	}()
 
@@ -2264,7 +2264,7 @@ func (s *Strategy) CrossRun(
 	if s.ProfitFixerConfig != nil {
 		bbgo.Notify("Fixing %s profitStats and position...", s.Symbol)
 
-		log.Infof("profitFixer is enabled, checking checkpoint: %+v", s.ProfitFixerConfig.TradesSince)
+		s.logger.Infof("profitFixer is enabled, checking checkpoint: %+v", s.ProfitFixerConfig.TradesSince)
 
 		if s.ProfitFixerConfig.TradesSince.Time().IsZero() {
 			return errors.New("tradesSince time can not be zero")
@@ -2282,12 +2282,12 @@ func (s *Strategy) CrossRun(
 		// fixer.ConverterManager = s.ConverterManager
 
 		if ss, ok := makerSession.Exchange.(types.ExchangeTradeHistoryService); ok {
-			log.Infof("adding makerSession %s to profitFixer", makerSession.Name)
+			s.logger.Infof("adding makerSession %s to profitFixer", makerSession.Name)
 			fixer.AddExchange(makerSession.Name, ss)
 		}
 
 		if ss, ok := sourceSession.Exchange.(types.ExchangeTradeHistoryService); ok {
-			log.Infof("adding hedgeSession %s to profitFixer", sourceSession.Name)
+			s.logger.Infof("adding hedgeSession %s to profitFixer", sourceSession.Name)
 			fixer.AddExchange(sourceSession.Name, ss)
 		}
 
@@ -2578,7 +2578,7 @@ func (s *Strategy) CrossRun(
 			time.Sleep(s.UpdateInterval.Duration())
 
 			if err := s.activeMakerOrders.GracefulCancel(ctx, s.makerSession.Exchange); err != nil {
-				log.WithError(err).Errorf("graceful cancel error")
+				s.logger.WithError(err).Errorf("graceful cancel error")
 			}
 
 			bbgo.Sync(ctx, s)
