@@ -204,7 +204,7 @@ func (s *OrderService) Insert(order types.Order) (err error) {
 	if s.DB.DriverName() == "mysql" {
 		_, err = s.DB.NamedExec(`
 			INSERT INTO orders (exchange, order_id, client_order_id, order_type, status, symbol, price, stop_price, quantity, executed_quantity, side, is_working, time_in_force, created_at, updated_at, is_margin, is_futures, is_isolated, uuid)
-			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_futures, :is_isolated, UUID_TO_BIN(:uuid, true))
+			VALUES (:exchange, :order_id, :client_order_id, :order_type, :status, :symbol, :price, :stop_price, :quantity, :executed_quantity, :side, :is_working, :time_in_force, :created_at, :updated_at, :is_margin, :is_futures, :is_isolated, CASE WHEN :uuid != '' THEN UUID_TO_BIN(:uuid, true) ELSE '' END)
 			ON DUPLICATE KEY UPDATE status=:status, executed_quantity=:executed_quantity, is_working=:is_working, updated_at=:updated_at`, order)
 		return err
 	}
