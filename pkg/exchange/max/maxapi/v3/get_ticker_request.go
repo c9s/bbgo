@@ -8,11 +8,11 @@ import (
 //go:generate -command PostRequest requestgen -method POST
 //go:generate -command DeleteRequest requestgen -method DELETE
 
-//go:generate GetRequest -url "/api/v3/tickers/:market" -type GetTickerRequest -responseType .Ticker
+//go:generate GetRequest -url "/api/v3/ticker" -type GetTickerRequest -responseType .Ticker
 type GetTickerRequest struct {
 	client requestgen.APIClient
 
-	market *string `param:"market,slug"`
+	market *string `param:"market"`
 }
 
 func (c *Client) NewGetTickerRequest() *GetTickerRequest {
