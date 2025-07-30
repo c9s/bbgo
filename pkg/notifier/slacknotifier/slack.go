@@ -153,6 +153,7 @@ func (n *Notifier) worker(ctx context.Context) {
 			if err := n.executeTask(ctx, task); err != nil {
 				log.WithError(err).
 					WithField("channel", task.channel).
+					WithField("notifier", "slack").
 					Errorf("slack api error: %s", err.Error())
 			}
 		}
