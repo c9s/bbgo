@@ -27,11 +27,10 @@ func (g *GetTickersRequest) GetQueryParameters() (url.Values, error) {
 
 	query := url.Values{}
 	for _k, _v := range params {
-		if reflect.ValueOf(_v).Kind() == reflect.Slice {
-			for _i := 0; _i < reflect.ValueOf(_v).Len(); _i++ {
-				_e := reflect.ValueOf(_v).Index(_i).Interface()
-				query.Add(_k + "[]", fmt.Sprintf("%v", _e))
-			}
+		if g.isVarSlice(_v) {
+			g.iterateSlice(_v, func(it interface{}) {
+				query.Add(_k+"[]", fmt.Sprintf("%v", it))
+			})
 		} else {
 			query.Add(_k, fmt.Sprintf("%v", _v))
 		}
@@ -149,8 +148,6 @@ func (g *GetTickersRequest) Do(ctx context.Context) ([]Ticker, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Printf("req: %+v", req)
 
 	response, err := g.client.SendRequest(req)
 	if err != nil {
