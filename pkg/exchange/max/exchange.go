@@ -638,7 +638,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		quantityString = o.Quantity.String()
 	}
 
-	o.ClientOrderID = NewClientOrderID(o.ClientOrderID)
+	o.ClientOrderID = newClientOrderID(o.ClientOrderID)
 
 	req := e.v3client.NewCreateWalletOrderRequest(walletType)
 	req.Market(toLocalSymbol(o.Symbol)).
