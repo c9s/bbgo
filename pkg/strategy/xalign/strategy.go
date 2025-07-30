@@ -205,7 +205,7 @@ func (s *Strategy) selectSessionForCurrency(
 
 			ticker, err := session.Exchange.QueryTicker(ctx, symbol)
 			if err != nil {
-				log.WithError(err).Errorf("unable to query ticker on %s", symbol)
+				log.WithError(err).Errorf("unable to query ticker on %s (%s)", symbol, session.Name)
 				continue
 			}
 
