@@ -680,7 +680,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	if err != nil {
 		var responseErr *requestgen.ErrResponse
 		if errors.As(err, &responseErr) {
-			log.Warnf("submit order error: %s, status code: %d, now trying to recover the order with query %+v",
+			log.WithFields(o.LogFields()).Warnf("submit order error: %s, status code: %d, now trying to recover the order with query %+v",
 				responseErr.Error(),
 				responseErr.StatusCode,
 				o.AsQuery(),
