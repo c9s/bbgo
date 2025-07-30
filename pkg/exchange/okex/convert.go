@@ -238,7 +238,6 @@ func orderDetailToGlobalOrder(order *okexapi.OrderDetail) (*types.Order, error) 
 		},
 		Exchange:         types.ExchangeOKEx,
 		OrderID:          uint64(order.OrderId),
-		UUID:             strconv.FormatInt(int64(order.OrderId), 10),
 		Status:           orderStatus,
 		OriginalStatus:   string(order.State),
 		ExecutedQuantity: order.AccumulatedFillSize,
