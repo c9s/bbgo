@@ -542,24 +542,27 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			req.GroupID(groupID)
 
 			if _, err := req.Do(ctx); err != nil {
-				log.WithError(err).Errorf("group id order cancel error")
+				log.WithError(err).Errorf("group id %d order cancel error", groupID)
 				err2 = err
 			}
 		}
 	}
 
 	for _, o := range orphanOrders {
+		logFields := logrus.Fields{}
 		req := e.v3client.NewCancelOrderRequest()
 		if o.OrderID > 0 {
 			req.Id(o.OrderID)
+			logFields["order_id"] = o.OrderID
 		} else if len(o.ClientOrderID) > 0 && o.ClientOrderID != types.NoClientOrderID {
 			req.ClientOrderID(o.ClientOrderID)
+			logFields["client_order_id"] = o.ClientOrderID
 		} else {
 			return fmt.Errorf("order id or client order id is not defined, order=%+v", o)
 		}
 
 		if _, err := req.Do(ctx); err != nil {
-			log.WithError(err).Errorf("order cancel error")
+			log.WithError(err).WithFields(logFields).Errorf("order cancel error")
 			err2 = err
 		}
 	}
