@@ -40,7 +40,9 @@ type OrderExecutorExtended interface {
 
 type OrderExecutionRouter interface {
 	// SubmitOrdersTo submit order to a specific exchange Session
-	SubmitOrdersTo(ctx context.Context, session string, orders ...types.SubmitOrder) (createdOrders types.OrderSlice, err error)
+	SubmitOrdersTo(
+		ctx context.Context, session string, orders ...types.SubmitOrder,
+	) (createdOrders types.OrderSlice, err error)
 	CancelOrdersTo(ctx context.Context, session string, orders ...types.Order) error
 }
 
@@ -70,7 +72,9 @@ func (e *ExchangeOrderExecutionRouter) SubmitOrdersTo(
 	return createdOrders, err
 }
 
-func (e *ExchangeOrderExecutionRouter) CancelOrdersTo(ctx context.Context, session string, orders ...types.Order) error {
+func (e *ExchangeOrderExecutionRouter) CancelOrdersTo(
+	ctx context.Context, session string, orders ...types.Order,
+) error {
 	if executor, ok := e.executors[session]; ok {
 		return executor.CancelOrders(ctx, orders...)
 	}
@@ -98,7 +102,9 @@ type ExchangeOrderExecutor struct {
 	orderUpdateCallbacks []func(order types.Order)
 }
 
-func (e *ExchangeOrderExecutor) SubmitOrders(ctx context.Context, orders ...types.SubmitOrder) (types.OrderSlice, error) {
+func (e *ExchangeOrderExecutor) SubmitOrders(
+	ctx context.Context, orders ...types.SubmitOrder,
+) (types.OrderSlice, error) {
 	formattedOrders, err := e.Session.FormatOrders(orders)
 	if err != nil {
 		return nil, err
@@ -328,7 +334,10 @@ func BatchPlaceOrder(
 		if err2 != nil {
 			err = multierr.Append(err, err2)
 			errIndexes = append(errIndexes, i)
-		} else if createdOrder != nil {
+		}
+
+		// if createdOrder is not nil and has a valid OrderID, we should add it to the createdOrders
+		if createdOrder != nil && createdOrder.OrderID > 0 {
 			createdOrder.Tag = submitOrder.Tag
 
 			if orderCallback != nil {
