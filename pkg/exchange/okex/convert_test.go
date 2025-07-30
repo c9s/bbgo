@@ -2,7 +2,6 @@ package okex
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -54,7 +53,6 @@ func Test_orderDetailToGlobal(t *testing.T) {
 			},
 			Exchange:         types.ExchangeOKEx,
 			OrderID:          uint64(orderId),
-			UUID:             fmt.Sprintf("%d", orderId),
 			Status:           types.OrderStatusNew,
 			OriginalStatus:   string(okexapi.OrderStateLive),
 			ExecutedQuantity: fixedpoint.Zero,
