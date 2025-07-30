@@ -686,12 +686,13 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 				o.AsQuery(),
 			)
 
-			if responseErr.StatusCode >= 500 {
+			if responseErr.StatusCode >= 400 {
 				recoveredOrder, recoverErr := e.recoverOrder(ctx, o)
 				if recoverErr != nil {
 					return createdOrder, fmt.Errorf("unable to recover order, error: %w", recoverErr)
 				}
 
+				// note, recoveredOrder could be nil if the order is not found
 				return recoveredOrder, nil
 			}
 		}
@@ -711,19 +712,30 @@ func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder
 	var err error = nil
 	var order *types.Order = nil
 	var query = orderForm.AsQuery()
+	var logFields = orderForm.LogFields()
 
-	log.WithFields(orderForm.LogFields()).Warnf("start recovering the order with query %+v", query)
+	log.WithFields(logFields).Warnf("start recovering the order with query %+v", query)
 
 	var op = func() (err2 error) {
 		order, err2 = e.QueryOrder(ctx, query)
 
+		if err2 == nil && order != nil {
+			return nil
+		}
+
 		var responseErr *requestgen.ErrResponse
 		if errors.As(err2, &responseErr) {
-			if responseErr.StatusCode >= 400 && responseErr.StatusCode < 500 {
+			log.WithFields(logFields).Warnf("recover query order error: %s, status code: %d", responseErr.Status, responseErr.StatusCode)
+
+			switch responseErr.StatusCode {
+			case 404:
+				// 404 not found, stop retrying
 				return nil
+			default:
+				if responseErr.StatusCode >= 400 && responseErr.StatusCode < 500 {
+					return err2
+				}
 			}
-		} else if order != nil && err2 == nil {
-			return nil
 		}
 
 		return err2

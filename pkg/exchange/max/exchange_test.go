@@ -22,6 +22,13 @@ func TestExchange_recoverOrder(t *testing.T) {
 	ctx := context.Background()
 	ex := New(key, secret)
 
+	_, err := ex.recoverOrder(ctx, types.SubmitOrder{
+		Symbol:        "BTCUSDT",
+		ClientOrderID: "test" + strconv.FormatInt(time.Now().UnixMilli(), 10),
+	})
+	t.Logf("recover order error: %v", err)
+	assert.Nil(t, err, "order should be nil if not found")
+
 	orderForm := types.SubmitOrder{
 		Symbol:        "BTCUSDT",
 		ClientOrderID: "test" + strconv.FormatInt(time.Now().UnixMilli(), 10),
