@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -170,6 +171,18 @@ type SubmitOrder struct {
 	Tag string `json:"tag,omitempty" db:"-"`
 }
 
+func (o *SubmitOrder) LogFields() logrus.Fields {
+	fields := logrus.Fields{
+		"symbol": o.Symbol,
+	}
+
+	if len(o.ClientOrderID) > 0 {
+		fields["client_order_id"] = o.ClientOrderID
+	}
+
+	return fields
+}
+
 func (o *SubmitOrder) AsQuery() OrderQuery {
 	return OrderQuery{
 		Symbol:        o.Symbol,
@@ -305,6 +318,23 @@ type Order struct {
 	IsFutures  bool `json:"isFutures,omitempty" db:"is_futures"`
 	IsMargin   bool `json:"isMargin,omitempty" db:"is_margin"`
 	IsIsolated bool `json:"isIsolated,omitempty" db:"is_isolated"`
+}
+
+func (o *Order) LogFields() logrus.Fields {
+	fields := o.SubmitOrder.LogFields()
+	fields["exchange"] = o.Exchange.String()
+	fields["order_id"] = o.OrderID
+	fields["status"] = o.Status
+
+	if len(o.UUID) > 0 {
+		fields["uuid"] = o.UUID
+	}
+
+	if len(o.ClientOrderID) > 0 {
+		fields["client_order_id"] = o.ClientOrderID
+	}
+
+	return fields
 }
 
 func (o *Order) Update(update Order) {

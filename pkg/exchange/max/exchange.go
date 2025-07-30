@@ -542,24 +542,27 @@ func (e *Exchange) CancelOrders(ctx context.Context, orders ...types.Order) (err
 			req.GroupID(groupID)
 
 			if _, err := req.Do(ctx); err != nil {
-				log.WithError(err).Errorf("group id order cancel error")
+				log.WithError(err).Errorf("group id %d order cancel error", groupID)
 				err2 = err
 			}
 		}
 	}
 
 	for _, o := range orphanOrders {
+		logFields := logrus.Fields{}
 		req := e.v3client.NewCancelOrderRequest()
 		if o.OrderID > 0 {
 			req.Id(o.OrderID)
+			logFields["order_id"] = o.OrderID
 		} else if len(o.ClientOrderID) > 0 && o.ClientOrderID != types.NoClientOrderID {
 			req.ClientOrderID(o.ClientOrderID)
+			logFields["client_order_id"] = o.ClientOrderID
 		} else {
 			return fmt.Errorf("order id or client order id is not defined, order=%+v", o)
 		}
 
 		if _, err := req.Do(ctx); err != nil {
-			log.WithError(err).Errorf("order cancel error")
+			log.WithError(err).WithFields(logFields).Errorf("order cancel error")
 			err2 = err
 		}
 	}
@@ -677,18 +680,19 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	if err != nil {
 		var responseErr *requestgen.ErrResponse
 		if errors.As(err, &responseErr) {
-			log.Warnf("submit order error: %s, status code: %d, now trying to recover the order with query %+v",
+			log.WithFields(o.LogFields()).Warnf("submit order error: %s, status code: %d, now trying to recover the order with query %+v",
 				responseErr.Error(),
 				responseErr.StatusCode,
 				o.AsQuery(),
 			)
 
-			if responseErr.StatusCode >= 500 {
+			if responseErr.StatusCode >= 400 {
 				recoveredOrder, recoverErr := e.recoverOrder(ctx, o)
 				if recoverErr != nil {
 					return createdOrder, fmt.Errorf("unable to recover order, error: %w", recoverErr)
 				}
 
+				// note, recoveredOrder could be nil if the order is not found
 				return recoveredOrder, nil
 			}
 		}
@@ -708,16 +712,30 @@ func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder
 	var err error = nil
 	var order *types.Order = nil
 	var query = orderForm.AsQuery()
+	var logFields = orderForm.LogFields()
+
+	log.WithFields(logFields).Warnf("start recovering the order with query %+v", query)
+
 	var op = func() (err2 error) {
 		order, err2 = e.QueryOrder(ctx, query)
 
+		if err2 == nil && order != nil {
+			return nil
+		}
+
 		var responseErr *requestgen.ErrResponse
 		if errors.As(err2, &responseErr) {
-			if responseErr.StatusCode >= 400 && responseErr.StatusCode < 500 {
+			log.WithFields(logFields).Warnf("recover query order error: %s, status code: %d", responseErr.Status, responseErr.StatusCode)
+
+			switch responseErr.StatusCode {
+			case 404:
+				// 404 not found, stop retrying
 				return nil
+			default:
+				if responseErr.StatusCode >= 400 && responseErr.StatusCode < 500 {
+					return err2
+				}
 			}
-		} else if order != nil && err2 == nil {
-			return nil
 		}
 
 		return err2
