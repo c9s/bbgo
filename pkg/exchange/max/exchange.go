@@ -711,6 +711,9 @@ func (e *Exchange) recoverOrder(ctx context.Context, orderForm types.SubmitOrder
 	var err error = nil
 	var order *types.Order = nil
 	var query = orderForm.AsQuery()
+
+	log.WithFields(orderForm.LogFields()).Warnf("start recovering the order with query %+v", query)
+
 	var op = func() (err2 error) {
 		order, err2 = e.QueryOrder(ctx, query)
 
