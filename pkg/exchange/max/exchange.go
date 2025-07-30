@@ -108,24 +108,26 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 
 		tickers[toGlobalSymbol(symbol[0])] = *ticker
 	} else {
+		maxMarkets, err := e.v3client.NewGetMarketsRequest().Do(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		var marketIdSlice []string
+		for _, m := range maxMarkets {
+			marketIdSlice = append(marketIdSlice, m.ID)
+		}
+
 		req := e.v3client.NewGetTickersRequest()
+		req.Markets(marketIdSlice)
 		maxTickers, err := req.Do(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		m := make(map[string]struct{})
-		exists := struct{}{}
-		for _, s := range symbol {
-			m[toGlobalSymbol(s)] = exists
-		}
-
-		for k, v := range maxTickers {
-			if _, ok := m[toGlobalSymbol(k)]; len(symbol) != 0 && !ok {
-				continue
-			}
-
-			tickers[toGlobalSymbol(k)] = types.Ticker{
+		for _, v := range maxTickers {
+			marketId := toGlobalSymbol(v.Market)
+			tickers[marketId] = types.Ticker{
 				Time:   v.At.Time(),
 				Volume: v.Volume,
 				Last:   v.Last,

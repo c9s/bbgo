@@ -6,6 +6,8 @@ import (
 )
 
 type Ticker struct {
+	Market string `json:"market"`
+
 	At types.MillisecondTimestamp `json:"at"`
 
 	Buy    fixedpoint.Value `json:"buy"`
