@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func debugOrders(logger *logrus.Entry, name string, orders []types.Order) {
+func debugOrders(logger logrus.FieldLogger, name string, orders []types.Order) {
 	var sb strings.Builder
 	sb.WriteString(name + " ORDERS[\n")
 	for i, order := range orders {
@@ -19,7 +19,7 @@ func debugOrders(logger *logrus.Entry, name string, orders []types.Order) {
 	logger.Info(sb.String())
 }
 
-func debugRoundOrders(logger *logrus.Entry, roundName string, round Round) {
+func debugRoundOrders(logger logrus.FieldLogger, roundName string, round Round) {
 	var sb strings.Builder
 	sb.WriteString("ROUND " + roundName + " [\n")
 	for i, order := range round.TakeProfitOrders {

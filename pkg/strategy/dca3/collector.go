@@ -10,7 +10,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type descendingClosedOrderQueryService interface {
+type CollectorQueryService interface {
+	types.ExchangeTradeHistoryService
+	types.ExchangeOrderQueryService
 	QueryClosedOrdersDesc(ctx context.Context, symbol string, since, until time.Time, lastOrderID uint64) ([]types.Order, error)
 }
 
@@ -26,54 +28,30 @@ type Round struct {
 }
 
 type Collector struct {
-	logger        *logrus.Entry
+	logger        logrus.FieldLogger
 	symbol        string
 	groupID       uint32
 	filterGroupID bool
 
 	// service
-	ex                   types.Exchange
-	historyService       types.ExchangeTradeHistoryService
-	queryService         types.ExchangeOrderQueryService
-	tradeService         types.ExchangeTradeService
-	queryClosedOrderDesc descendingClosedOrderQueryService
+	ex           types.Exchange
+	queryService CollectorQueryService
 }
 
-func NewCollector(logger *logrus.Entry, symbol string, groupID uint32, filterGroupID bool, ex types.Exchange) *Collector {
-	historyService, ok := ex.(types.ExchangeTradeHistoryService)
+func NewCollector(logger logrus.FieldLogger, symbol string, groupID uint32, filterGroupID bool, ex types.Exchange) *Collector {
+	queryService, ok := ex.(CollectorQueryService)
 	if !ok {
-		logger.Errorf("exchange %s doesn't support ExchangeTradeHistoryService", ex.Name())
-		return nil
-	}
-
-	queryService, ok := ex.(types.ExchangeOrderQueryService)
-	if !ok {
-		logger.Errorf("exchange %s doesn't support ExchangeOrderQueryService", ex.Name())
-		return nil
-	}
-
-	tradeService, ok := ex.(types.ExchangeTradeService)
-	if !ok {
-		logger.Errorf("exchange %s doesn't support ExchangeTradeService", ex.Name())
-		return nil
-	}
-
-	queryClosedOrderDesc, ok := ex.(descendingClosedOrderQueryService)
-	if !ok {
-		logger.Errorf("exchange %s doesn't support query closed orders desc", ex.Name())
+		logger.Errorf("exchange %s doesn't support CollectorQueryService", ex.Name())
 		return nil
 	}
 
 	return &Collector{
-		logger:               logger,
-		symbol:               symbol,
-		groupID:              groupID,
-		filterGroupID:        filterGroupID,
-		ex:                   ex,
-		historyService:       historyService,
-		queryService:         queryService,
-		tradeService:         tradeService,
-		queryClosedOrderDesc: queryClosedOrderDesc,
+		logger:        logger,
+		symbol:        symbol,
+		groupID:       groupID,
+		filterGroupID: filterGroupID,
+		ex:            ex,
+		queryService:  queryService,
 	}
 }
 
@@ -109,7 +87,7 @@ func (rc Collector) CollectCurrentRound(ctx context.Context, sinceLimit time.Tim
 
 	var closedOrders []types.Order
 	var op = func() (err2 error) {
-		closedOrders, err2 = rc.queryClosedOrderDesc.QueryClosedOrdersDesc(ctx, rc.symbol, sinceLimit, time.Now(), 0)
+		closedOrders, err2 = rc.queryService.QueryClosedOrdersDesc(ctx, rc.symbol, sinceLimit, time.Now(), 0)
 		return err2
 	}
 	if err := retry.GeneralBackoff(ctx, op); err != nil {
@@ -152,7 +130,7 @@ func (rc *Collector) CollectRoundsFromOrderID(ctx context.Context, fromOrderID u
 	// TODO: pagination for it
 	// query the orders
 	rc.logger.Infof("query %s closed orders from order id #%d", rc.symbol, fromOrderID)
-	orders, err := retry.QueryClosedOrdersUntilSuccessfulLite(ctx, rc.historyService, rc.symbol, time.Time{}, time.Time{}, fromOrderID)
+	orders, err := retry.QueryClosedOrdersUntilSuccessfulLite(ctx, rc.queryService, rc.symbol, time.Time{}, time.Time{}, fromOrderID)
 	if err != nil {
 		return nil, err
 	}
