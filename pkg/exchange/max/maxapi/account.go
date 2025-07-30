@@ -41,25 +41,11 @@ type UserBank struct {
 }
 
 type UserInfo struct {
-	Sn              string    `json:"sn"`
-	Name            string    `json:"name"`
-	Type            string    `json:"member_type"`
-	Level           int       `json:"level"`
-	VipLevel        int       `json:"vip_level"`
-	Email           string    `json:"email"`
-	Accounts        []Account `json:"accounts"`
-	Bank            *UserBank `json:"bank,omitempty"`
-	IsFrozen        bool      `json:"is_frozen"`
-	IsActivated     bool      `json:"is_activated"`
-	KycApproved     bool      `json:"kyc_approved"`
-	KycState        string    `json:"kyc_state"`
-	PhoneSet        bool      `json:"phone_set"`
-	PhoneNumber     string    `json:"phone_number"`
-	ProfileVerified bool      `json:"profile_verified"`
-	CountryCode     string    `json:"country_code"`
-	IdentityNumber  string    `json:"identity_number"`
-	WithDrawable    bool      `json:"withdrawable"`
-	ReferralCode    string    `json:"referral_code"`
+	Email          string           `json:"email"`
+	Level          int              `json:"level"`
+	MWalletEnabled bool             `json:"m_wallet_enabled"`
+	Current        VipLevelSettings `json:"current_vip_level"`
+	Next           VipLevelSettings `json:"next_vip_level"`
 }
 
 type VipLevelSettings struct {
