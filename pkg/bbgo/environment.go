@@ -870,8 +870,10 @@ func (environ *Environment) setupSlack(userConfig *Config, slackToken string, pe
 	}
 
 	if conf.ErrorChannel != "" {
-		log.Debugf("found slack configured, setting up log hook...")
-		log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
+		if !conf.DisableErrorHook {
+			log.Debugf("found slack configured, setting up log hook...")
+			log.AddHook(slacklog.NewLogHook(slackToken, conf.ErrorChannel))
+		}
 	}
 
 	log.Debugf("adding slack notifier with default channel: %s", conf.DefaultChannel)
