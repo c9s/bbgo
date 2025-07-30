@@ -58,6 +58,7 @@ func (s *Strategy) placeOpenPositionOrders(ctx context.Context) error {
 	}
 
 	// according to the settings to generate the open position orders
+	s.logger.Infof("generate open position orders for %s, quote investment: %f, profit: %f, price: %f, price deviation: %f, max order count: %d", s.Symbol, s.QuoteInvestment.Float64(), s.ProfitStats.TotalProfit.Float64(), ticker.Sell.Float64(), s.PriceDeviation.Float64(), s.MaxOrderCount)
 	orders, err := generateOpenPositionOrders(s.Market, s.QuoteInvestment, s.ProfitStats.TotalProfit, ticker.Sell, s.PriceDeviation, s.MaxOrderCount, s.OrderGroupID)
 	if err != nil {
 		return fmt.Errorf("failed to generate open position orders: %w", err)

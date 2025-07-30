@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/exchange/retry"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
@@ -181,8 +180,8 @@ func (s *Strategy) finishTakeProfitStage(ctx context.Context) error {
 	// reset position and open new round for profit stats before position opening
 	s.Position.Reset()
 
-	// store into redis
-	bbgo.Sync(ctx, s)
+	// emit position
+	s.OrderExecutor.TradeCollector().EmitPositionUpdate(s.Position)
 
 	// set the start time of the next round
 	s.startTimeOfNextRound = time.Now().Add(s.CoolDownInterval.Duration())

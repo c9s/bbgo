@@ -3,6 +3,7 @@ package dca3
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -55,9 +56,17 @@ func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
 		}
 
 		for _, trade := range trades {
-			s.logger.Infof("update profit stats from trade: %s", trade.String())
 			s.ProfitStats.AddTrade(trade)
 			roundPosition.AddTrade(trade)
+			// s.logger.Infof("update profit stats from trade: %s\nposition: %s\nprofit state: %s", trade.String(), roundPosition.String(), s.ProfitStats.String())
+			var sb strings.Builder
+			sb.WriteString("update profit stats:\n")
+			sb.WriteString("[---------------------- Trade ---------------------]\n")
+			sb.WriteString(trade.String() + "\n")
+			sb.WriteString("[-------------------- Position --------------------]\n")
+			sb.WriteString(roundPosition.String() + "\n")
+			sb.WriteString(s.ProfitStats.String())
+			s.logger.Info(sb.String())
 		}
 
 		if roundPosition.GetBase().Compare(s.Market.MinQuantity) > 0 {
@@ -74,12 +83,11 @@ func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
 
 		// update quote investment
 		s.ProfitStats.QuoteInvestment = s.ProfitStats.QuoteInvestment.Add(s.ProfitStats.CurrentRoundProfit)
+		s.logger.Infof("profit stats:\n%s", s.ProfitStats.String())
 
 		// sync to persistence
 		bbgo.Sync(ctx, s)
 		updated = true
-
-		s.logger.Infof("profit stats:\n%s", s.ProfitStats.String())
 
 		// emit profit
 		s.EmitProfit(s.ProfitStats)
