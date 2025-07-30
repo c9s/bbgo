@@ -219,14 +219,14 @@ func (s *Strategy) recordNetAssetValue(ctx context.Context, sessions map[string]
 
 		// update the account balances and the margin information
 		if _, err := session.UpdateAccount(ctx); err != nil {
-			log.WithError(err).Errorf("can not update account")
+			log.WithError(err).Errorf("can not update account: %s", sessionName)
 			return
 		}
 
 		account := session.GetAccount()
 		balances := account.Balances().NotZero()
 		if err := session.UpdatePrices(ctx, balances.Currencies(), quoteCurrency); err != nil {
-			log.WithError(err).Error("price update failed")
+			log.WithError(err).Errorf("price update failed: %s", sessionName)
 			return
 		}
 
