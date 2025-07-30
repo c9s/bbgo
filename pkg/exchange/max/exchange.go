@@ -83,7 +83,7 @@ func (e *Exchange) QueryTicker(ctx context.Context, symbol string) (*types.Ticke
 	}
 
 	return &types.Ticker{
-		Time:   ticker.Time,
+		Time:   ticker.At.Time(),
 		Volume: ticker.Volume,
 		Last:   ticker.Last,
 		Open:   ticker.Open,
@@ -126,7 +126,7 @@ func (e *Exchange) QueryTickers(ctx context.Context, symbol ...string) (map[stri
 			}
 
 			tickers[toGlobalSymbol(k)] = types.Ticker{
-				Time:   v.Time,
+				Time:   v.At.Time(),
 				Volume: v.Volume,
 				Last:   v.Last,
 				Open:   v.Open,
