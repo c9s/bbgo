@@ -399,3 +399,34 @@ func convertDepth(symbol string, depth *v3.Depth) (snapshot types.SliceOrderBook
 
 	return snapshot, finalUpdateID, err
 }
+
+func toGlobalKLines(
+	data []v3.KLineData, symbol string, period v3.Period, interval types.Interval, until *time.Time,
+) ([]types.KLine, error) {
+	var kLines []types.KLine
+	for _, slice := range data {
+		ts := int64(slice[0])
+		startTime := time.Unix(ts, 0)
+		endTime := startTime.Add(time.Duration(period)*time.Minute - time.Millisecond)
+		isClosed := time.Now().Before(endTime)
+
+		if until != nil && startTime.After(*until) {
+			break
+		}
+
+		kLines = append(kLines, types.KLine{
+			Symbol:    symbol,
+			Interval:  interval,
+			StartTime: types.Time(startTime),
+			EndTime:   types.Time(endTime),
+			Open:      fixedpoint.NewFromFloat(slice[1]),
+			High:      fixedpoint.NewFromFloat(slice[2]),
+			Low:       fixedpoint.NewFromFloat(slice[3]),
+			Close:     fixedpoint.NewFromFloat(slice[4]),
+			Volume:    fixedpoint.NewFromFloat(slice[5]),
+			Closed:    isClosed,
+		})
+	}
+	return kLines, nil
+
+}

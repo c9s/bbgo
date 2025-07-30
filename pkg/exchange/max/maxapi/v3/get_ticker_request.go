@@ -1,4 +1,4 @@
-package max
+package v3
 
 import (
 	"github.com/c9s/requestgen"
@@ -15,6 +15,6 @@ type GetTickerRequest struct {
 	market *string `param:"market,slug"`
 }
 
-func (c *RestClient) NewGetTickerRequest() *GetTickerRequest {
-	return &GetTickerRequest{client: c}
+func (c *Client) NewGetTickerRequest() *GetTickerRequest {
+	return &GetTickerRequest{client: c.Client}
 }
