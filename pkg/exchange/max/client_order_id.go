@@ -9,7 +9,8 @@ import (
 // BBGO is a broker on MAX
 const spotBrokerID = "bbgo"
 
-func NewClientOrderID(originalID string, tags ...string) (clientOrderID string) {
+// newClientOrderID generates a new client order ID based on the original ID and optional tags.
+func newClientOrderID(originalID string, tags ...string) (clientOrderID string) {
 	// skip blank client order ID
 	if originalID == types.NoClientOrderID {
 		return ""
