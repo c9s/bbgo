@@ -172,7 +172,7 @@ func genOrderSQL(driver string, options QueryOrdersOptions) string {
 				continue
 			}
 			if colName == "uuid" {
-				selColumns = append(selColumns, "IF(orders.uuid != '', BIN_TO_UUID(orders.uuid, true), '') AS uuid")
+				selColumns = append(selColumns, binUuidSelector("orders", "uuid"))
 			} else {
 				selColumns = append(selColumns, "orders."+colName)
 			}
