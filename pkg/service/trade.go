@@ -431,15 +431,18 @@ func genTradeSelectColumns(driver string) []string {
 	if driver != "mysql" {
 		return []string{"*"}
 	}
-	v := reflect.TypeOf(types.Trade{})
+	tt := reflect.TypeOf(types.Trade{})
 	var columns []string
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		if colname := field.Tag.Get("db"); colname != "" {
-			if colname == "order_uuid" {
+	for i := 0; i < tt.NumField(); i++ {
+		field := tt.Field(i)
+		if colName := field.Tag.Get("db"); colName != "" {
+			if colName == "-" {
+				continue
+			}
+			if colName == "order_uuid" {
 				columns = append(columns, "IF(order_uuid != '', BIN_TO_UUID(order_uuid, true), '') as order_uuid")
-			} else if colname != "-" {
-				columns = append(columns, colname)
+			} else {
+				columns = append(columns, colName)
 			}
 		}
 	}
