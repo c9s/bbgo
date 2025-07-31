@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -119,7 +120,7 @@ type QueryOrdersOptions struct {
 }
 
 func (s *OrderService) Query(options QueryOrdersOptions) ([]AggOrder, error) {
-	sql := genOrderSQL(options)
+	sql := genOrderSQL(s.DB.DriverName(), options)
 
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"exchange": options.Exchange,
@@ -135,7 +136,7 @@ func (s *OrderService) Query(options QueryOrdersOptions) ([]AggOrder, error) {
 	return s.scanAggRows(rows)
 }
 
-func genOrderSQL(options QueryOrdersOptions) string {
+func genOrderSQL(driver string, options QueryOrdersOptions) string {
 	// ascending
 	ordering := "ASC"
 	switch v := strings.ToUpper(options.Ordering); v {
@@ -147,21 +148,42 @@ func genOrderSQL(options QueryOrdersOptions) string {
 	if options.LastGID > 0 {
 		switch ordering {
 		case "ASC":
-			where = append(where, "gid > :gid")
+			where = append(where, "orders.gid > :gid")
 		case "DESC":
-			where = append(where, "gid < :gid")
+			where = append(where, "orders.gid < :gid")
 
 		}
 	}
 
 	if len(options.Exchange) > 0 {
-		where = append(where, "exchange = :exchange")
+		where = append(where, "orders.exchange = :exchange")
 	}
 	if len(options.Symbol) > 0 {
-		where = append(where, "symbol = :symbol")
+		where = append(where, "orders.symbol = :symbol")
 	}
 
-	sql := `SELECT orders.*, IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price FROM orders` +
+	var selColumns []string
+	if driver == "mysql" {
+		to := reflect.TypeOf(types.Order{})
+		for i := 0; i < to.NumField(); i++ {
+			field := to.Field(i)
+			colName := field.Tag.Get("db")
+			if colName == "" || colName == "-" {
+				continue
+			}
+			if colName == "uuid" {
+				selColumns = append(selColumns, "IF(orders.uuid != '', BIN_TO_UUID(orders.uuid, true), '') AS uuid")
+			} else {
+				selColumns = append(selColumns, "orders."+colName)
+			}
+
+		}
+	} else {
+		selColumns = append(selColumns, "orders.*")
+	}
+	selColumns = append(selColumns, "IFNULL(SUM(t.price * t.quantity)/SUM(t.quantity), orders.price) AS average_price")
+
+	sql := `SELECT ` + strings.Join(selColumns, ", ") + ` FROM orders` +
 		` LEFT JOIN trades AS t ON (t.order_id = orders.order_id)`
 	if len(where) > 0 {
 		sql += ` WHERE ` + strings.Join(where, " AND ")
