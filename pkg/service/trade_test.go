@@ -110,15 +110,20 @@ func TestTradeService_Query(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, "invalid order by column: invalid_column", err.Error())
 
-	mock.ExpectQuery("SELECT \\* FROM trades WHERE gid > \\? ORDER BY gid ASC").WithArgs(1234).WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("SELECT .* FROM trades WHERE gid > \\? ORDER BY gid ASC").WithArgs(1234).WillReturnError(sql.ErrNoRows)
 	_, err = s.Query(QueryTradesOptions{LastGID: 1234, Ordering: "ASC", OrderByColumn: "gid"})
 	assert.Equal(t, sql.ErrNoRows, err)
 
-	mock.ExpectQuery("SELECT \\* FROM trades ORDER BY gid DESC").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("SELECT .* FROM trades ORDER BY gid DESC").WillReturnError(sql.ErrNoRows)
 	_, err = s.Query(QueryTradesOptions{Ordering: "DESC", OrderByColumn: "gid"})
 	assert.Equal(t, sql.ErrNoRows, err)
 
-	mock.ExpectQuery("SELECT \\* FROM trades ORDER BY traded_at ASC").WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("SELECT .* FROM trades ORDER BY traded_at ASC").WillReturnError(sql.ErrNoRows)
 	_, err = s.Query(QueryTradesOptions{Ordering: "ASC", OrderByColumn: "traded_at"})
 	assert.Equal(t, sql.ErrNoRows, err)
+}
+
+func Test_genTradeSelectColumns(t *testing.T) {
+	assert.Equal(t, []string{"*"}, genTradeSelectColumns("sqlite3"))
+	assert.Equal(t, []string{"gid", "id", "order_id", "IF(order_uuid != '', BIN_TO_UUID(order_uuid, true), '') as order_uuid", "exchange", "price", "quantity", "quote_quantity", "symbol", "side", "is_buyer", "is_maker", "traded_at", "fee", "fee_currency", "is_margin", "is_futures", "is_isolated", "strategy", "pnl", "inserted_at"}, genTradeSelectColumns("mysql"))
 }
