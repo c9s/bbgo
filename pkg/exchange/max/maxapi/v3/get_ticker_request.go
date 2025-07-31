@@ -12,7 +12,7 @@ import (
 type GetTickerRequest struct {
 	client requestgen.APIClient
 
-	market *string `param:"market"`
+	market string `param:"market,required"`
 }
 
 func (c *Client) NewGetTickerRequest() *GetTickerRequest {

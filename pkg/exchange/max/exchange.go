@@ -767,7 +767,7 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 		return nil, err
 	}
 
-	vipLevel, err := e.client.NewGetVipLevelRequest().Do(ctx)
+	userInfo, err := e.v3client.NewGetUserInfoRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -778,8 +778,8 @@ func (e *Exchange) QuerySpotAccount(ctx context.Context) (*types.Account, error)
 	a := &types.Account{
 		AccountType:  types.AccountTypeSpot,
 		MarginLevel:  fixedpoint.Zero,
-		MakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.MakerFee), // 0.15% = 0.0015
-		TakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.TakerFee), // 0.15% = 0.0015
+		MakerFeeRate: fixedpoint.NewFromFloat(userInfo.Current.MakerFee), // 0.15% = 0.0015
+		TakerFeeRate: fixedpoint.NewFromFloat(userInfo.Current.TakerFee), // 0.15% = 0.0015
 	}
 
 	balances, err := e.queryBalances(ctx, maxapi.WalletTypeSpot)
@@ -795,7 +795,7 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 		return nil, err
 	}
 
-	vipLevel, err := e.client.NewGetVipLevelRequest().Do(ctx)
+	userInfo, err := e.v3client.NewGetUserInfoRequest().Do(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -806,8 +806,8 @@ func (e *Exchange) QueryAccount(ctx context.Context) (*types.Account, error) {
 
 	a := &types.Account{
 		MarginLevel:  fixedpoint.Zero,
-		MakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.MakerFee), // 0.15% = 0.0015
-		TakerFeeRate: fixedpoint.NewFromFloat(vipLevel.Current.TakerFee), // 0.15% = 0.0015
+		MakerFeeRate: fixedpoint.NewFromFloat(userInfo.Current.MakerFee), // 0.15% = 0.0015
+		TakerFeeRate: fixedpoint.NewFromFloat(userInfo.Current.TakerFee), // 0.15% = 0.0015
 	}
 
 	if e.MarginSettings.IsMargin {
