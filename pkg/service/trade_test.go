@@ -125,5 +125,5 @@ func TestTradeService_Query(t *testing.T) {
 
 func Test_genTradeSelectColumns(t *testing.T) {
 	assert.Equal(t, []string{"*"}, genTradeSelectColumns("sqlite3"))
-	assert.Equal(t, []string{"gid", "id", "order_id", "IF(order_uuid != '', BIN_TO_UUID(order_uuid, true), '') as order_uuid", "exchange", "price", "quantity", "quote_quantity", "symbol", "side", "is_buyer", "is_maker", "traded_at", "fee", "fee_currency", "is_margin", "is_futures", "is_isolated", "strategy", "pnl", "inserted_at"}, genTradeSelectColumns("mysql"))
+	assert.Equal(t, []string{"gid", "id", "order_id", binUuidSelector("trades", "order_uuid"), "exchange", "price", "quantity", "quote_quantity", "symbol", "side", "is_buyer", "is_maker", "traded_at", "fee", "fee_currency", "is_margin", "is_futures", "is_isolated", "strategy", "pnl", "inserted_at"}, genTradeSelectColumns("mysql"))
 }
