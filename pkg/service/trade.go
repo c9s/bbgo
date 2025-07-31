@@ -440,7 +440,7 @@ func genTradeSelectColumns(driver string) []string {
 				continue
 			}
 			if colName == "order_uuid" {
-				columns = append(columns, "IF(order_uuid != '', BIN_TO_UUID(order_uuid, true), '') as order_uuid")
+				columns = append(columns, binUuidSelector("trades", "order_uuid"))
 			} else {
 				columns = append(columns, colName)
 			}
