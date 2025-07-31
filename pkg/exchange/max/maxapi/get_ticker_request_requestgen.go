@@ -12,7 +12,7 @@ import (
 )
 
 func (g *GetTickerRequest) Market(market string) *GetTickerRequest {
-	g.market = &market
+	g.market = market
 	return g
 }
 
@@ -31,6 +31,17 @@ func (g *GetTickerRequest) GetQueryParameters() (url.Values, error) {
 // GetParameters builds and checks the parameters and return the result in a map object
 func (g *GetTickerRequest) GetParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
+	// check market field -> json key market
+	market := g.market
+
+	// TEMPLATE check-required
+	if len(market) == 0 {
+		return nil, fmt.Errorf("market is required, empty string given")
+	}
+	// END TEMPLATE check-required
+
+	// assign parameter of market
+	params["market"] = market
 
 	return params, nil
 }
@@ -70,25 +81,6 @@ func (g *GetTickerRequest) GetParametersJSON() ([]byte, error) {
 // GetSlugParameters builds and checks the slug parameters and return the result in a map object
 func (g *GetTickerRequest) GetSlugParameters() (map[string]interface{}, error) {
 	var params = map[string]interface{}{}
-	// check market field -> json key market
-	if g.market != nil {
-		market := *g.market
-
-		// TEMPLATE check-valid-values
-		switch market {
-		case BookEventSnapshot, BookEventUpdate:
-			params["market"] = market
-
-		default:
-			return nil, fmt.Errorf("market value %v is invalid", market)
-
-		}
-		// END TEMPLATE check-valid-values
-
-		// assign parameter of market
-		params["market"] = market
-
-	}
 
 	return params, nil
 }
@@ -135,7 +127,7 @@ func (g *GetTickerRequest) GetSlugsMap() (map[string]string, error) {
 
 // GetPath returns the request path of the API
 func (g *GetTickerRequest) GetPath() string {
-	return "/api/v3/tickers/:market"
+	return "/api/v3/ticker"
 }
 
 // Do generates the request object and send the request object to the API endpoint
@@ -143,17 +135,14 @@ func (g *GetTickerRequest) Do(ctx context.Context) (*Ticker, error) {
 
 	// no body params
 	var params interface{}
-	query := url.Values{}
-
-	var apiURL string
-
-	apiURL = g.GetPath()
-	slugs, err := g.GetSlugsMap()
+	query, err := g.GetParametersQuery()
 	if err != nil {
 		return nil, err
 	}
 
-	apiURL = g.applySlugsToUrl(apiURL, slugs)
+	var apiURL string
+
+	apiURL = g.GetPath()
 
 	req, err := g.client.NewRequest(ctx, "GET", apiURL, query, params)
 	if err != nil {
