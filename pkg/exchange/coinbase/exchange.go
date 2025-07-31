@@ -161,23 +161,25 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 		return nil, fmt.Errorf("unsupported order side: %v", order.Side)
 	}
 	// set price and quantity
+	// NOTE: TruncateQuantity and TruncatePrice are must!
+	// ex: price 10000.0869, resulting in 400 response, err msg: "price is too accurate. Smallest unit is 0.01"
 	switch order.Type {
 	case types.OrderTypeLimit:
 		if order.Price.IsZero() || order.Quantity.IsZero() {
 			return nil, fmt.Errorf("order.Price and order.Quantity are required for limit order: %+v", order)
 		}
-		req.Size(order.Quantity)
-		req.Price(order.Price)
+		req.Size(order.Market.FormatQuantity(order.Quantity))
+		req.Price(order.Market.FormatPrice(order.Price))
 	case types.OrderTypeMarket:
-		req.Size(order.Quantity)
+		req.Size(order.Market.FormatQuantity(order.Quantity))
 		if !order.Price.IsZero() {
 			log.Warning("the price is ignored for market order")
 		}
 	case types.OrderTypeStopLimit:
-		req.Size(order.Quantity)
-		req.StopPrice(order.StopPrice)
-		req.Price(order.Price)
-		req.StopLimitPrice(order.Price)
+		req.Size(order.Market.FormatQuantity(order.Quantity))
+		req.StopPrice(order.Market.FormatPrice(order.StopPrice))
+		req.Price(order.Market.FormatPrice(order.Price))
+		req.StopLimitPrice(order.Market.FormatPrice(order.Price))
 	default:
 		return nil, fmt.Errorf("unsupported order type: %v", order.Type)
 	}

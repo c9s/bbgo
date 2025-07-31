@@ -45,17 +45,17 @@ func (c *CreateOrderRequest) Stop(stop string) *CreateOrderRequest {
 	return c
 }
 
-func (c *CreateOrderRequest) StopPrice(stopPrice fixedpoint.Value) *CreateOrderRequest {
+func (c *CreateOrderRequest) StopPrice(stopPrice string) *CreateOrderRequest {
 	c.stopPrice = &stopPrice
 	return c
 }
 
-func (c *CreateOrderRequest) Price(price fixedpoint.Value) *CreateOrderRequest {
+func (c *CreateOrderRequest) Price(price string) *CreateOrderRequest {
 	c.price = &price
 	return c
 }
 
-func (c *CreateOrderRequest) Size(size fixedpoint.Value) *CreateOrderRequest {
+func (c *CreateOrderRequest) Size(size string) *CreateOrderRequest {
 	c.size = &size
 	return c
 }
@@ -90,7 +90,7 @@ func (c *CreateOrderRequest) MaxFloor(maxFloor string) *CreateOrderRequest {
 	return c
 }
 
-func (c *CreateOrderRequest) StopLimitPrice(stopLimitPrice fixedpoint.Value) *CreateOrderRequest {
+func (c *CreateOrderRequest) StopLimitPrice(stopLimitPrice string) *CreateOrderRequest {
 	c.stopLimitPrice = &stopLimitPrice
 	return c
 }
