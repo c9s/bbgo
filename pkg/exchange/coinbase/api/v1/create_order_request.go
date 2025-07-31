@@ -48,16 +48,16 @@ type CreateOrderRequest struct {
 	productID      string            `param:"product_id,required"`
 	stp            *string           `param:"stp" validValues:"dc,co,cn,cb"`
 	stop           *string           `param:"stop" validValues:"loss,entry"`
-	stopPrice      *fixedpoint.Value `param:"stop_price"`
-	price          *fixedpoint.Value `param:"price"`
-	size           *fixedpoint.Value `param:"size"`
+	stopPrice      *string           `param:"stop_price"`
+	price          *string           `param:"price"`
+	size           *string           `param:"size"`
 	funds          *fixedpoint.Value `param:"funds"`
 	timeInForce    *string           `param:"time_in_force" validValues:"GTC,GCC,IOC,FOK"`
 	cancelAfter    *string           `param:"cancel_after" validValues:"min,hour,day"`
 	postOnly       *bool             `param:"post_only"`
 	clientOrderID  *string           `param:"client_oid"`
 	maxFloor       *string           `param:"max_floor"`
-	stopLimitPrice *fixedpoint.Value `param:"stop_limit_price"`
+	stopLimitPrice *string           `param:"stop_limit_price"`
 }
 
 func (client *RestAPIClient) NewCreateOrderRequest() *CreateOrderRequest {
