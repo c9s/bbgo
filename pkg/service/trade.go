@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -279,7 +280,7 @@ func generateMysqlTradingVolumeQuerySQL(options TradingVolumeQueryOptions) strin
 }
 
 func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol string, feeCurrency string) ([]types.Trade, error) {
-	sql := "SELECT * FROM trades WHERE exchange = :exchange AND (symbol = :symbol OR fee_currency = :fee_currency) ORDER BY traded_at ASC"
+	sql := "SELECT " + strings.Join(genTradeSelectColumns(s.DB.DriverName()), ", ") + " FROM trades WHERE exchange = :exchange AND (symbol = :symbol OR fee_currency = :fee_currency) ORDER BY traded_at ASC"
 	rows, err := s.DB.NamedQuery(sql, map[string]interface{}{
 		"exchange":     ex,
 		"symbol":       symbol,
@@ -295,7 +296,7 @@ func (s *TradeService) QueryForTradingFeeCurrency(ex types.ExchangeName, symbol 
 }
 
 func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) {
-	sel := sq.Select("*").
+	sel := sq.Select(genTradeSelectColumns(s.DB.DriverName())...).
 		From("trades")
 
 	if options.LastGID != 0 {
@@ -368,8 +369,8 @@ func (s *TradeService) Query(options QueryTradesOptions) ([]types.Trade, error) 
 
 func (s *TradeService) Load(ctx context.Context, id int64) (*types.Trade, error) {
 	var trade types.Trade
-
-	rows, err := s.DB.NamedQueryContext(ctx, "SELECT * FROM trades WHERE id = :id", map[string]interface{}{
+	query := "SELECT " + strings.Join(genTradeSelectColumns(s.DB.DriverName()), ", ") + " FROM trades WHERE id = :id"
+	rows, err := s.DB.NamedQueryContext(ctx, query, map[string]interface{}{
 		"id": id,
 	})
 	if err != nil {
@@ -424,6 +425,25 @@ func queryTradesSQL(options QueryTradesOptions) string {
 	}
 
 	return sql
+}
+
+func genTradeSelectColumns(driver string) []string {
+	if driver != "mysql" {
+		return []string{"*"}
+	}
+	v := reflect.TypeOf(types.Trade{})
+	var columns []string
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		if colname := field.Tag.Get("db"); colname != "" {
+			if colname == "order_uuid" {
+				columns = append(columns, "IF(order_uuid != '', BIN_TO_UUID(order_uuid, true), '') as order_uuid")
+			} else if colname != "-" {
+				columns = append(columns, colname)
+			}
+		}
+	}
+	return columns
 }
 
 func (s *TradeService) scanRows(rows *sqlx.Rows) (trades []types.Trade, err error) {
