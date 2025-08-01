@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -37,6 +38,7 @@ func TestMarketTradeWindowSignal_NoDecay(t *testing.T) {
 		Threshold: fixedpoint.NewFromFloat(0.10),
 		Window:    types.Duration(time.Minute),
 	}
+	sig.SetLogger(logrus.New())
 
 	t.Run("mid strength long", func(t *testing.T) {
 		// Setup ring buffer manually
@@ -106,6 +108,8 @@ func TestMarketTradeWindowSignal_ExceedCapacity(t *testing.T) {
 		Threshold: fixedpoint.NewFromFloat(0.65),
 		Window:    types.Duration(time.Minute),
 	}
+	sig.SetLogger(logrus.New())
+
 	// Preallocate the buffer and simulate a full ring buffer.
 	sig.trades = make([]types.Trade, tradeSliceCapacityLimit)
 	sig.start = 0
@@ -133,6 +137,8 @@ func TestTradeVolumeWindowSignal_FilterTrades(t *testing.T) {
 		Threshold: fixedpoint.NewFromFloat(0.65),
 		Window:    types.Duration(time.Minute),
 	}
+	sig.SetLogger(logrus.New())
+
 	// Preallocate fixed capacity buffer.
 	sig.trades = make([]types.Trade, tradeSliceCapacityLimit)
 	// Insert trades with sequential timestamps.
@@ -210,6 +216,8 @@ func TestMarketTradeWindowSignal_WithDecay(t *testing.T) {
 			Window:    types.Duration(3 * time.Minute),
 			DecayRate: 0.02, // decay rate per second
 		}
+		sig.SetLogger(logrus.New())
+
 		// Preallocate the buffer
 		sig.trades = make([]types.Trade, tradeSliceCapacityLimit)
 
@@ -241,6 +249,8 @@ func TestMarketTradeWindowSignal_WithDecay(t *testing.T) {
 			Window:    types.Duration(3 * time.Minute),
 			DecayRate: 0.05, // decay rate per second
 		}
+		sig.SetLogger(logrus.New())
+
 		// Preallocate the buffer
 		sig.trades = make([]types.Trade, tradeSliceCapacityLimit)
 		// Insert three trades:
@@ -286,6 +296,7 @@ func TestMarketTradeWindowSignal_WithFrequency(t *testing.T) {
 		Alpha:        1.0,
 		Beta:         1.0,
 	}
+	sig.SetLogger(logrus.New())
 
 	// Preallocate the ring buffer.
 	sig.trades = make([]types.Trade, tradeSliceCapacityLimit)

@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -27,12 +26,19 @@ type StreamBookSetter interface {
 }
 
 type OrderBookBestPriceVolumeSignal struct {
+	BaseProvider
+	Logger
+
 	RatioThreshold fixedpoint.Value `json:"ratioThreshold"`
 	MinVolume      fixedpoint.Value `json:"minVolume"`
 	MinQuoteVolume fixedpoint.Value `json:"minQuoteVolume"`
 
 	symbol string
 	book   *types.StreamOrderBook
+}
+
+func (s *OrderBookBestPriceVolumeSignal) ID() string {
+	return "orderBookBestPrice"
 }
 
 func (s *OrderBookBestPriceVolumeSignal) SetStreamBook(book *types.StreamOrderBook) {
@@ -71,7 +77,7 @@ func (s *OrderBookBestPriceVolumeSignal) CalculateSignal(ctx context.Context) (f
 		signal = -numerator.Div(denominator).Float64()
 	}
 
-	logrus.Infof("[OrderBookBestPriceVolumeSignal] %f bid/ask = %f/%f, bid ratio = %f, ratio threshold = %f",
+	s.logger.Infof("[OrderBookBestPriceVolumeSignal] %f bid/ask = %f/%f, bid ratio = %f, ratio threshold = %f",
 		signal,
 		bid.Volume.Float64(),
 		ask.Volume.Float64(),

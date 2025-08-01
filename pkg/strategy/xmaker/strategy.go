@@ -109,8 +109,9 @@ type Strategy struct {
 
 	SubscribeFeeTokenMarkets bool `json:"subscribeFeeTokenMarkets"`
 
-	EnableSignalMargin bool            `json:"enableSignalMargin"`
-	SignalConfigList   []signal.Config `json:"signals"`
+	EnableSignalMargin bool `json:"enableSignalMargin"`
+
+	SignalConfigList *signal.DynamicConfig `json:"signals"`
 
 	SignalReverseSideMargin       *SignalMargin `json:"signalReverseSideMargin,omitempty"`
 	SignalTrendSideMarginDiscount *SignalMargin `json:"signalTrendSideMarginDiscount,omitempty"`
@@ -278,24 +279,23 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 
-	for _, sig := range s.SignalConfigList {
-		if sig.TradeVolumeWindowSignal != nil {
-			sourceSession.Subscribe(types.MarketTradeChannel, s.SourceSymbol, types.SubscribeOptions{})
-		} else if sig.BollingerBandTrendSignal != nil {
-			sourceSession.Subscribe(
-				types.KLineChannel, s.SourceSymbol, types.SubscribeOptions{Interval: sig.BollingerBandTrendSignal.Interval},
-			)
-		}
+	for _, sig := range s.SignalConfigList.Signals {
+		sig.Signal.Subscribe(sourceSession, s.SourceSymbol)
 	}
 
 	if s.SubscribeFeeTokenMarkets {
 		subscribeOpts := types.SubscribeOptions{Interval: "1m"}
-		sourceSession.Subscribe(
-			types.KLineChannel, sourceSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts,
-		)
-		makerSession.Subscribe(
-			types.KLineChannel, makerSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts,
-		)
+		if cu := sourceSession.Exchange.PlatformFeeCurrency(); cu != "" {
+			sourceSession.Subscribe(
+				types.KLineChannel, sourceSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts,
+			)
+		}
+
+		if cu := makerSession.Exchange.PlatformFeeCurrency(); cu != "" {
+			makerSession.Subscribe(
+				types.KLineChannel, makerSession.Exchange.PlatformFeeCurrency()+feeTokenQuote, subscribeOpts,
+			)
+		}
 	}
 }
 
@@ -565,22 +565,21 @@ func (s *Strategy) applyBollingerMargin(
 	return nil
 }
 
+// TODO: move this aggregateSignal to the signal package
 func (s *Strategy) aggregateSignal(ctx context.Context) (float64, error) {
 	sum := 0.0
 	voters := 0.0
-	for _, signalConfig := range s.SignalConfigList {
-		signalProvider := signalConfig.Get()
-		sig, err := signalProvider.CalculateSignal(ctx)
-
+	for _, signalWrapper := range s.SignalConfigList.Signals {
+		sig, err := signalWrapper.Signal.CalculateSignal(ctx)
 		if err != nil {
 			return 0, err
 		} else if sig == 0.0 {
 			continue
 		}
 
-		if signalConfig.Weight > 0.0 {
-			sum += sig * signalConfig.Weight
-			voters += signalConfig.Weight
+		if signalWrapper.Weight > 0.0 {
+			sum += sig * signalWrapper.Weight
+			voters += signalWrapper.Weight
 		} else {
 			sum += sig
 			voters++
@@ -2386,15 +2385,22 @@ func (s *Strategy) CrossRun(
 		)
 	}
 
-	for _, signalConfig := range s.SignalConfigList {
-		sig := signalConfig.Get()
-		if setter, ok := sig.(signal.StreamBookSetter); ok {
-			s.logger.Infof("setting stream book on signal %T", sig)
+	for _, signalConfig := range s.SignalConfigList.Signals {
+		sigProvider := signalConfig.Signal
+		if setter, ok := sigProvider.(signal.StreamBookSetter); ok {
+			s.logger.Infof("setting stream book on signal %T", sigProvider)
 			setter.SetStreamBook(s.sourceBook)
 		}
 
-		if binder, ok := sig.(SessionBinder); ok {
-			s.logger.Infof("binding session on signal %T", sig)
+		// pass logger to the signal provider
+		if setter, ok := sigProvider.(interface {
+			SetLogger(logger logrus.FieldLogger)
+		}); ok {
+			setter.SetLogger(s.logger)
+		}
+
+		if binder, ok := sigProvider.(SessionBinder); ok {
+			s.logger.Infof("binding session on signal %T", sigProvider)
 			if err := binder.Bind(ctx, s.sourceSession, s.SourceSymbol); err != nil {
 				return err
 			}

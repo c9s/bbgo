@@ -33,7 +33,7 @@ func TestEnvKeyLoader_Load(t *testing.T) {
 		}
 	}
 
-	// Assert the number of Entries in Source
+	// Assert the number of entries in Source
 	if assert.Len(t, source.Entries, 2) {
 		// Validate the first Entry
 		entry1 := source.Entries[0]
