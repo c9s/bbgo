@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -30,6 +29,12 @@ type BollingerBandTrendSignal struct {
 	indicator *indicatorv2.BOLLStream
 	symbol    string
 	lastK     *types.KLine
+
+	Logger
+}
+
+func (s *BollingerBandTrendSignal) ID() string {
+	return "bollingerBandTrend"
 }
 
 func (s *BollingerBandTrendSignal) Bind(ctx context.Context, session *bbgo.ExchangeSession, symbol string) error {
@@ -77,7 +82,7 @@ func (s *BollingerBandTrendSignal) CalculateSignal(ctx context.Context) (float64
 		signal = closePrice.Sub(lastUpBand).Float64() / maxBandWidth * 2.0
 	}
 
-	logrus.Infof("[BollingerBandTrendSignal] %f up/down = %f/%f, close price = %f",
+	s.logger.Infof("[BollingerBandTrendSignal] %f up/down = %f/%f, close price = %f",
 		signal,
 		lastUpBand.Float64(),
 		lastDownBand.Float64(),

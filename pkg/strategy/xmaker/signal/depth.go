@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -30,6 +29,12 @@ type DepthRatioSignal struct {
 
 	symbol string
 	book   *types.StreamOrderBook
+
+	Logger
+}
+
+func (s *DepthRatioSignal) ID() string {
+	return "depthRatio"
 }
 
 func (s *DepthRatioSignal) SetStreamBook(book *types.StreamOrderBook) {
@@ -75,7 +80,7 @@ func (s *DepthRatioSignal) CalculateSignal(ctx context.Context) (float64, error)
 		signal = 0.0
 	}
 
-	logrus.Infof("[DepthRatioSignal] %f bid/ask = %f/%f", signal, bidDepthQuote.Float64(), askDepthQuote.Float64())
+	s.logger.Infof("[DepthRatioSignal] %f bid/ask = %f/%f", signal, bidDepthQuote.Float64(), askDepthQuote.Float64())
 	depthRatioSignalMetrics.WithLabelValues(s.symbol).Set(signal)
 	return signal, nil
 }

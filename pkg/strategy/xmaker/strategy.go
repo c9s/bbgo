@@ -2387,14 +2387,21 @@ func (s *Strategy) CrossRun(
 	}
 
 	for _, signalConfig := range s.SignalConfigList {
-		sig := signalConfig.Get()
-		if setter, ok := sig.(signal.StreamBookSetter); ok {
-			s.logger.Infof("setting stream book on signal %T", sig)
+		sigProvider := signalConfig.Get()
+		if setter, ok := sigProvider.(signal.StreamBookSetter); ok {
+			s.logger.Infof("setting stream book on signal %T", sigProvider)
 			setter.SetStreamBook(s.sourceBook)
 		}
 
-		if binder, ok := sig.(SessionBinder); ok {
-			s.logger.Infof("binding session on signal %T", sig)
+		// pass logger to the signal provider
+		if setter, ok := sigProvider.(interface {
+			SetLogger(logger logrus.FieldLogger)
+		}); ok {
+			setter.SetLogger(s.logger)
+		}
+
+		if binder, ok := sigProvider.(SessionBinder); ok {
+			s.logger.Infof("binding session on signal %T", sigProvider)
 			if err := binder.Bind(ctx, s.sourceSession, s.SourceSymbol); err != nil {
 				return err
 			}
