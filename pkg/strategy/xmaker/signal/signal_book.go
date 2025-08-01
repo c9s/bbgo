@@ -1,10 +1,11 @@
-package xmaker
+package signal
 
 import (
 	"context"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -70,7 +71,7 @@ func (s *OrderBookBestPriceVolumeSignal) CalculateSignal(ctx context.Context) (f
 		signal = -numerator.Div(denominator).Float64()
 	}
 
-	log.Infof("[OrderBookBestPriceVolumeSignal] %f bid/ask = %f/%f, bid ratio = %f, ratio threshold = %f",
+	logrus.Infof("[OrderBookBestPriceVolumeSignal] %f bid/ask = %f/%f, bid ratio = %f, ratio threshold = %f",
 		signal,
 		bid.Volume.Float64(),
 		ask.Volume.Float64(),
