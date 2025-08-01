@@ -53,6 +53,12 @@ type TradeVolumeWindowSignal struct {
 	symbol string
 
 	mu sync.Mutex
+
+	Logger
+}
+
+func (s *TradeVolumeWindowSignal) ID() string {
+	return "tradeVolumeWindow"
 }
 
 // handleTrade adds a trade into the ring buffer.
@@ -252,7 +258,7 @@ func (s *TradeVolumeWindowSignal) CalculateSignalWithFrequency(_ context.Context
 	sig := calculateSignalWithFrequency(buyScore, sellScore, threshold)
 	sig *= 2.0
 
-	logrus.Infof("[TradeVolumeWindowSignal] frequency signal=%f, buyScore=%f, sellScore=%f", sig, buyScore, sellScore)
+	s.logger.Infof("[TradeVolumeWindowSignal] frequency signal=%f, buyScore=%f, sellScore=%f", sig, buyScore, sellScore)
 	tradeVolumeWindowSignalMetrics.WithLabelValues(s.symbol).Set(sig)
 	return sig, nil
 }

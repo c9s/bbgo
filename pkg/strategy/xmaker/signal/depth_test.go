@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -149,6 +150,7 @@ func TestDepthRatioSignal_CalculateSignal(t *testing.T) {
 				symbol:     tt.fields.symbol,
 				book:       types.NewStreamBook("BTCUSDT", types.ExchangeBinance),
 			}
+			s.SetLogger(logrus.New())
 
 			s.book.Load(types.SliceOrderBook{
 				Symbol: "BTCUSDT",
