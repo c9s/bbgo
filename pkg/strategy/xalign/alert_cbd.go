@@ -8,8 +8,13 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/livenote"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
+)
+
+var (
+	_ livenote.Object = &CriticalBalanceDiscrepancyAlert{}
 )
 
 type CriticalBalanceDiscrepancyAlert struct {
@@ -92,4 +97,14 @@ func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
 			},
 		},
 	}
+}
+
+func (m *CriticalBalanceDiscrepancyAlert) ObjectID() string {
+	return fmt.Sprintf(
+		"critical-balance-discrepancy-%s-%s@%s-%s",
+		m.BaseCurrency,
+		m.Price.String(),
+		m.Delta.String(),
+		m.Side.String(),
+	)
 }
