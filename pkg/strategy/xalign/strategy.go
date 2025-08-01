@@ -574,23 +574,24 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 			if s.WarningDuration > 0 && sustainedDuration >= s.WarningDuration.Duration() {
 				if s.LargeAmountAlert != nil && price.Sign() > 0 {
 					if amount.Compare(s.LargeAmountAlert.Amount) > 0 {
-						bbgo.PostLiveNote(
-							&CriticalBalanceDiscrepancyAlert{
-								Warning:           true,
-								SlackAlert:        s.LargeAmountAlert.Slack,
-								QuoteCurrency:     s.LargeAmountAlert.QuoteCurrency,
-								AlertAmount:       s.LargeAmountAlert.Amount,
-								BaseCurrency:      currency,
-								SustainedDuration: sustainedDuration,
+						cbd := &CriticalBalanceDiscrepancyAlert{
+							Warning:           true,
+							SlackAlert:        s.LargeAmountAlert.Slack,
+							QuoteCurrency:     s.LargeAmountAlert.QuoteCurrency,
+							AlertAmount:       s.LargeAmountAlert.Amount,
+							BaseCurrency:      currency,
+							SustainedDuration: sustainedDuration,
 
-								Price:    price,
-								Delta:    q,
-								Quantity: quantity,
-								Amount:   amount,
-							},
+							Price:    price,
+							Delta:    q,
+							Quantity: quantity,
+							Amount:   amount,
+						}
+						bbgo.PostLiveNote(
+							cbd,
 							livenote.Channel(s.LargeAmountAlert.Slack.Channel),
 							livenote.OneTimeMention(s.SlackNotifyMentions...),
-							livenote.Comment(sustainedDuration.String()),
+							cbd.Comment(),
 						)
 					}
 				}
@@ -603,21 +604,22 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 
 		if s.LargeAmountAlert != nil && price.Sign() > 0 {
 			if amount.Compare(s.LargeAmountAlert.Amount) > 0 {
+				cbd := &CriticalBalanceDiscrepancyAlert{
+					SlackAlert:        s.LargeAmountAlert.Slack,
+					QuoteCurrency:     s.LargeAmountAlert.QuoteCurrency,
+					AlertAmount:       s.LargeAmountAlert.Amount,
+					BaseCurrency:      currency,
+					Delta:             q,
+					SustainedDuration: s.Duration.Duration(),
+					Price:             price,
+					Quantity:          quantity,
+					Amount:            amount,
+				}
 				bbgo.PostLiveNote(
-					&CriticalBalanceDiscrepancyAlert{
-						SlackAlert:        s.LargeAmountAlert.Slack,
-						QuoteCurrency:     s.LargeAmountAlert.QuoteCurrency,
-						AlertAmount:       s.LargeAmountAlert.Amount,
-						BaseCurrency:      currency,
-						Delta:             q,
-						SustainedDuration: s.Duration.Duration(),
-						Price:             price,
-						Quantity:          quantity,
-						Amount:            amount,
-					},
+					cbd,
 					livenote.Channel(s.LargeAmountAlert.Slack.Channel),
 					livenote.OneTimeMention(s.SlackNotifyMentions...),
-					livenote.Comment(s.Duration.Duration().String()),
+					cbd.Comment(),
 				)
 			}
 		}
