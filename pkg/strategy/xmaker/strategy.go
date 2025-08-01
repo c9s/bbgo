@@ -27,6 +27,7 @@ import (
 	"github.com/c9s/bbgo/pkg/risk/circuitbreaker"
 	"github.com/c9s/bbgo/pkg/strategy/common"
 	"github.com/c9s/bbgo/pkg/strategy/xmaker/pricer"
+	"github.com/c9s/bbgo/pkg/strategy/xmaker/signal"
 	"github.com/c9s/bbgo/pkg/style"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/c9s/bbgo/pkg/util"
@@ -108,8 +109,8 @@ type Strategy struct {
 
 	SubscribeFeeTokenMarkets bool `json:"subscribeFeeTokenMarkets"`
 
-	EnableSignalMargin bool           `json:"enableSignalMargin"`
-	SignalConfigList   []SignalConfig `json:"signals"`
+	EnableSignalMargin bool            `json:"enableSignalMargin"`
+	SignalConfigList   []signal.Config `json:"signals"`
 
 	SignalReverseSideMargin       *SignalMargin `json:"signalReverseSideMargin,omitempty"`
 	SignalTrendSideMarginDiscount *SignalMargin `json:"signalTrendSideMarginDiscount,omitempty"`
@@ -425,19 +426,19 @@ func (s *Strategy) getPositionHoldingPeriod(now time.Time) (time.Duration, bool)
 }
 
 func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
-	signal, err := s.aggregateSignal(ctx)
+	sig, err := s.aggregateSignal(ctx)
 	if err != nil {
 		return err
 	}
 
-	s.lastAggregatedSignal.Set(signal)
-	s.logger.Infof("aggregated signal: %f", signal)
+	s.lastAggregatedSignal.Set(sig)
+	s.logger.Infof("aggregated signal: %f", sig)
 
-	if signal == 0.0 {
+	if sig == 0.0 {
 		return nil
 	}
 
-	signalAbs := math.Abs(signal)
+	signalAbs := math.Abs(sig)
 
 	var trendSideMarginDiscount, reverseSideMargin float64
 	var trendSideMarginDiscountFp, reverseSideMarginFp fixedpoint.Value
@@ -449,12 +450,12 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 
 		if signalAbs > s.SignalTrendSideMarginDiscount.Threshold {
 			// trendSideMarginDiscount is the discount for the trend side margin
-			trendSideMarginDiscount = trendSideMarginScale.Call(math.Abs(signal))
+			trendSideMarginDiscount = trendSideMarginScale.Call(math.Abs(sig))
 			trendSideMarginDiscountFp = fixedpoint.NewFromFloat(trendSideMarginDiscount)
 
-			if signal > 0.0 {
+			if sig > 0.0 {
 				quote.BidMargin = quote.BidMargin.Sub(trendSideMarginDiscountFp)
-			} else if signal < 0.0 {
+			} else if sig < 0.0 {
 				quote.AskMargin = quote.AskMargin.Sub(trendSideMarginDiscountFp)
 			}
 		}
@@ -467,24 +468,24 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 		}
 
 		if signalAbs > s.SignalReverseSideMargin.Threshold {
-			reverseSideMargin = reverseSideMarginScale.Call(math.Abs(signal))
+			reverseSideMargin = reverseSideMarginScale.Call(math.Abs(sig))
 			reverseSideMarginFp = fixedpoint.NewFromFloat(reverseSideMargin)
-			if signal < 0.0 {
+			if sig < 0.0 {
 				quote.BidMargin = quote.BidMargin.Add(reverseSideMarginFp)
-			} else if signal > 0.0 {
+			} else if sig > 0.0 {
 				quote.AskMargin = quote.AskMargin.Add(reverseSideMarginFp)
 			}
 		}
 	}
 
 	s.logger.Infof(
-		"signal margin params: signal = %f, reverseSideMargin = %f, trendSideMarginDiscount = %f", signal,
+		"signal margin params: signal = %f, reverseSideMargin = %f, trendSideMarginDiscount = %f", sig,
 		reverseSideMargin, trendSideMarginDiscount,
 	)
 
 	s.logger.Infof(
 		"calculated signal margin: signal = %f, askMargin = %s, bidMargin = %s",
-		signal,
+		sig,
 		quote.AskMargin,
 		quote.BidMargin,
 	)
@@ -496,7 +497,7 @@ func (s *Strategy) applySignalMargin(ctx context.Context, quote *Quote) error {
 
 	s.logger.Infof(
 		"final signal margin: signal = %f, askMargin = %s, bidMargin = %s",
-		signal,
+		sig,
 		quote.AskMargin,
 		quote.BidMargin,
 	)
@@ -804,13 +805,13 @@ func (s *Strategy) updateQuote(ctx context.Context) error {
 		return nil
 	}
 
-	signal, err := s.aggregateSignal(ctx)
+	sig, err := s.aggregateSignal(ctx)
 	if err != nil {
 		return err
 	}
 
-	s.logger.Infof("aggregated signal: %f", signal)
-	aggregatedSignalMetrics.With(s.metricsLabels).Set(signal)
+	s.logger.Infof("aggregated signal: %f", sig)
+	aggregatedSignalMetrics.With(s.metricsLabels).Set(sig)
 
 	now := time.Now()
 	if s.CircuitBreaker != nil {
@@ -1457,8 +1458,8 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 		return false
 	}
 
-	signal := s.lastAggregatedSignal.Get()
-	signalAbs := math.Abs(signal)
+	sig := s.lastAggregatedSignal.Get()
+	signalAbs := math.Abs(sig)
 	if signalAbs < s.DelayedHedge.SignalThreshold {
 		return false
 	}
@@ -1482,11 +1483,11 @@ func (s *Strategy) canDelayHedge(hedgeSide types.SideType, pos fixedpoint.Value)
 		delay = maxDelay
 	}
 
-	if (signal > 0 && hedgeSide == types.SideTypeSell) || (signal < 0 && hedgeSide == types.SideTypeBuy) {
+	if (sig > 0 && hedgeSide == types.SideTypeSell) || (sig < 0 && hedgeSide == types.SideTypeBuy) {
 		if period < delay {
 			s.logger.Infof(
 				"delay hedge enabled, signal %f is strong enough, waiting for the next tick to hedge %s quantity (max delay %s)",
-				signal, pos, delay,
+				sig, pos, delay,
 			)
 
 			delayedHedgeCounterMetrics.With(s.metricsLabels).Inc()
@@ -1529,7 +1530,7 @@ func (s *Strategy) cancelSpreadMakerOrderAndReturnCoveredPos(
 }
 
 func (s *Strategy) spreadMakerHedge(
-	ctx context.Context, signal float64, uncoveredPosition, pos fixedpoint.Value,
+	ctx context.Context, sig float64, uncoveredPosition, pos fixedpoint.Value,
 ) (fixedpoint.Value, error) {
 	now := time.Now()
 
@@ -1550,7 +1551,7 @@ func (s *Strategy) spreadMakerHedge(
 	curOrder, hasOrder := s.SpreadMaker.getOrder()
 
 	if makerOrderForm, ok := s.SpreadMaker.canSpreadMaking(
-		signal, s.Position, uncoveredPosition, s.makerMarket, makerBid.Price, makerAsk.Price,
+		sig, s.Position, uncoveredPosition, s.makerMarket, makerBid.Price, makerAsk.Price,
 	); ok {
 		s.logger.Infof(
 			"position: %f@%f, maker book bid: %f/%f, spread maker order form: %+v",
@@ -1604,7 +1605,7 @@ func (s *Strategy) spreadMakerHedge(
 	} else if hasOrder {
 		// cancel existing spread maker order if the signal is not strong enough
 		if s.SpreadMaker.ReverseSignalOrderCancel {
-			if !isSignalSidePosition(signal, s.Position.Side()) {
+			if !isSignalSidePosition(sig, s.Position.Side()) {
 				s.logger.Infof("canceling current spread maker order due to reversed signal...")
 				s.cancelSpreadMakerOrderAndReturnCoveredPos(ctx)
 			}
@@ -1632,11 +1633,11 @@ func (s *Strategy) hedge(ctx context.Context, uncoveredPosition fixedpoint.Value
 	hedgeDelta := uncoveredPosition.Neg()
 	side := positionToSide(hedgeDelta)
 
-	signal := s.lastAggregatedSignal.Get()
+	sig := s.lastAggregatedSignal.Get()
 
 	var err error
 	if s.SpreadMaker != nil && s.SpreadMaker.Enabled {
-		hedgeDelta, err = s.spreadMakerHedge(ctx, signal, uncoveredPosition, hedgeDelta)
+		hedgeDelta, err = s.spreadMakerHedge(ctx, sig, uncoveredPosition, hedgeDelta)
 		if err != nil {
 			s.logger.WithError(err).Errorf("unable to place spread maker order")
 		}
@@ -2386,14 +2387,14 @@ func (s *Strategy) CrossRun(
 	}
 
 	for _, signalConfig := range s.SignalConfigList {
-		signal := signalConfig.Get()
-		if setter, ok := signal.(StreamBookSetter); ok {
-			s.logger.Infof("setting stream book on signal %T", signal)
+		sig := signalConfig.Get()
+		if setter, ok := sig.(signal.StreamBookSetter); ok {
+			s.logger.Infof("setting stream book on signal %T", sig)
 			setter.SetStreamBook(s.sourceBook)
 		}
 
-		if binder, ok := signal.(SessionBinder); ok {
-			s.logger.Infof("binding session on signal %T", signal)
+		if binder, ok := sig.(SessionBinder); ok {
+			s.logger.Infof("binding session on signal %T", sig)
 			if err := binder.Bind(ctx, s.sourceSession, s.SourceSymbol); err != nil {
 				return err
 			}

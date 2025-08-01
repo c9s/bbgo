@@ -1,4 +1,4 @@
-package xmaker
+package signal
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -74,7 +75,7 @@ func (s *DepthRatioSignal) CalculateSignal(ctx context.Context) (float64, error)
 		signal = 0.0
 	}
 
-	log.Infof("[DepthRatioSignal] %f bid/ask = %f/%f", signal, bidDepthQuote.Float64(), askDepthQuote.Float64())
+	logrus.Infof("[DepthRatioSignal] %f bid/ask = %f/%f", signal, bidDepthQuote.Float64(), askDepthQuote.Float64())
 	depthRatioSignalMetrics.WithLabelValues(s.symbol).Set(signal)
 	return signal, nil
 }
