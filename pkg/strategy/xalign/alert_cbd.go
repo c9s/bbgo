@@ -101,9 +101,9 @@ func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
 
 func (m *CriticalBalanceDiscrepancyAlert) ObjectID() string {
 	return fmt.Sprintf(
-		"critical-balance-discrepancy-%s-%s@%s-%s",
+		"critical-balance-discrepancy-%s%s-%s-%s",
 		m.BaseCurrency,
-		m.Price.String(),
+		m.QuoteCurrency,
 		m.Delta.String(),
 		m.Side.String(),
 	)
