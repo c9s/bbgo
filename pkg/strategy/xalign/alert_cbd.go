@@ -108,3 +108,18 @@ func (m *CriticalBalanceDiscrepancyAlert) ObjectID() string {
 		m.Side.String(),
 	)
 }
+
+func (m *CriticalBalanceDiscrepancyAlert) Comment() *livenote.OptionComment {
+	return livenote.Comment(
+		fmt.Sprintf(
+			"%s %s sustained for %s (~= %f %s > %f %s)",
+			m.BaseCurrency,
+			m.Delta,
+			m.SustainedDuration,
+			m.Amount.Float64(),
+			m.QuoteCurrency,
+			m.AlertAmount.Float64(),
+			m.QuoteCurrency,
+		),
+	)
+}
