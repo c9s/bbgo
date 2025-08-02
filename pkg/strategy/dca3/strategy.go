@@ -177,7 +177,12 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 	}
 
 	// collector
-	s.collector = NewCollector(s.logger, s.Symbol, s.OrderGroupID, !s.DisableOrderGroupIDFilter, s.ExchangeSession.Exchange)
+	queryService, ok := s.ExchangeSession.Exchange.(CollectorQueryService)
+	if !ok {
+		return fmt.Errorf("exchange %s doesn't support CollectorQueryService", s.ExchangeSession.Exchange.Name())
+	}
+
+	s.collector = NewCollector(s.logger, s.Symbol, s.OrderGroupID, !s.DisableOrderGroupIDFilter, s.ExchangeSession.Exchange, queryService)
 	if s.collector == nil {
 		return fmt.Errorf("failed to initialize collector")
 	}
@@ -269,6 +274,7 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 			return
 		}
 
+		s.OrderExecutor.TradeCollector().EmitPositionUpdate(s.Position)
 		s.EmitReady()
 		s.emitStateValidation()
 	})
