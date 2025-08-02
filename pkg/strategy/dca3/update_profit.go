@@ -55,23 +55,32 @@ func (s *Strategy) UpdateProfitStats(ctx context.Context) (bool, error) {
 			return updated, errors.Wrapf(err, "failed to collect the trades of round")
 		}
 
-		for _, trade := range trades {
-			s.ProfitStats.AddTrade(trade)
+		// Calculate the position of this round first. It will be used to determine if the round is finished
+		for i, trade := range trades {
 			roundPosition.AddTrade(trade)
-			// s.logger.Infof("update profit stats from trade: %s\nposition: %s\nprofit state: %s", trade.String(), roundPosition.String(), s.ProfitStats.String())
 			var sb strings.Builder
-			sb.WriteString("update profit stats:\n")
+			sb.WriteString(fmt.Sprintf("update round position #%d\n", i+1))
 			sb.WriteString("[---------------------- Trade ---------------------]\n")
 			sb.WriteString(trade.String() + "\n")
 			sb.WriteString("[-------------------- Position --------------------]\n")
 			sb.WriteString(roundPosition.String() + "\n")
-			sb.WriteString(s.ProfitStats.String())
 			s.logger.Info(sb.String())
 		}
 
-		if roundPosition.GetBase().Compare(s.Market.MinQuantity) > 0 {
-			// if there is still open position, it means this round is not finished
+		// if the round is not finished, we will not update profit stats
+		if !isFinishedRound(round, roundPosition, s.Market.MinQuantity) {
 			return updated, nil
+		}
+
+		// the round is finished, we need to update profit stats
+		for i, trade := range trades {
+			s.ProfitStats.AddTrade(trade)
+			var sb strings.Builder
+			sb.WriteString(fmt.Sprintf("update profit stats #%d\n", i+1))
+			sb.WriteString("[---------------------- Trade ---------------------]\n")
+			sb.WriteString(trade.String() + "\n")
+			sb.WriteString(s.ProfitStats.String())
+			s.logger.Info(sb.String())
 		}
 
 		// update profit stats FromOrderID to make sure we will not collect duplicated rounds
