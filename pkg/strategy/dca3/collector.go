@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/c9s/bbgo/pkg/exchange/retry"
+	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 	"github.com/sirupsen/logrus"
 )
@@ -38,13 +39,7 @@ type Collector struct {
 	queryService CollectorQueryService
 }
 
-func NewCollector(logger logrus.FieldLogger, symbol string, groupID uint32, filterGroupID bool, ex types.Exchange) *Collector {
-	queryService, ok := ex.(CollectorQueryService)
-	if !ok {
-		logger.Errorf("exchange %s doesn't support CollectorQueryService", ex.Name())
-		return nil
-	}
-
+func NewCollector(logger logrus.FieldLogger, symbol string, groupID uint32, filterGroupID bool, ex types.Exchange, queryService CollectorQueryService) *Collector {
 	return &Collector{
 		logger:        logger,
 		symbol:        symbol,
@@ -165,8 +160,32 @@ func (rc *Collector) CollectRoundsFromOrderID(ctx context.Context, fromOrderID u
 		lastSide = order.Side
 	}
 	rounds = append(rounds, round)
+
 	rc.logger.Infof("there are %d finished rounds from order id #%d", len(rounds), fromOrderID)
 	return rounds, nil
+}
+
+func isFinishedRound(round Round, position *types.Position, minQuantity fixedpoint.Value) bool {
+	// if there is no take-profit orders, it means this round is not finished
+	if len(round.TakeProfitOrders) == 0 {
+		return false
+	}
+
+	// if there is still active orders, it means this round is not finished
+	for _, order := range round.OpenPositionOrders {
+		if types.IsActiveOrder(order) {
+			return false
+		}
+	}
+
+	for _, order := range round.TakeProfitOrders {
+		if types.IsActiveOrder(order) {
+			return false
+		}
+	}
+
+	// we need to make sure the position base is less than MOQ
+	return position.GetBase().Compare(minQuantity) < 0
 }
 
 // CollectRoundTrades collect the trades of the orders in the given round. The trades' fee are processed (feeProcessing = false)
