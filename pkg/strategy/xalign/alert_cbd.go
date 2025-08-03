@@ -33,6 +33,8 @@ type CriticalBalanceDiscrepancyAlert struct {
 	Price    fixedpoint.Value
 	Quantity fixedpoint.Value
 	Amount   fixedpoint.Value
+
+	notifyDate time.Time
 }
 
 func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
@@ -100,11 +102,23 @@ func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
 }
 
 func (m *CriticalBalanceDiscrepancyAlert) ObjectID() string {
+	if m.notifyDate.IsZero() {
+		m.notifyDate = time.Now().Round(time.Hour * 24)
+	}
+	var dateString string
+	currentTime := time.Now()
+	if currentTime.Sub(m.notifyDate) <= time.Hour*24 {
+		dateString = m.notifyDate.Format("2006-01-02")
+	} else {
+		m.notifyDate = currentTime
+		dateString = currentTime.Format("2006-01-02")
+	}
+
 	return fmt.Sprintf(
 		"critical-balance-discrepancy-%s%s-%s-%s",
 		m.BaseCurrency,
 		m.QuoteCurrency,
-		m.Delta.String(),
+		dateString,
 		m.Side.String(),
 	)
 }
