@@ -8,9 +8,18 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
+	"github.com/c9s/bbgo/pkg/livenote"
 	"github.com/c9s/bbgo/pkg/slack/slackalert"
 	"github.com/c9s/bbgo/pkg/types"
 )
+
+var (
+	_ livenote.Object = &CriticalBalanceDiscrepancyAlert{}
+)
+
+var cbdDateCache = struct {
+	notifyDate time.Time
+}{}
 
 type CriticalBalanceDiscrepancyAlert struct {
 	SlackAlert *slackalert.SlackAlert
@@ -92,4 +101,41 @@ func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
 			},
 		},
 	}
+}
+
+func (m *CriticalBalanceDiscrepancyAlert) ObjectID() string {
+	if cbdDateCache.notifyDate.IsZero() {
+		cbdDateCache.notifyDate = time.Now().Round(time.Hour * 24)
+	}
+	var dateString string
+	currentTime := time.Now()
+	if currentTime.Sub(cbdDateCache.notifyDate) <= time.Hour*24 {
+		dateString = cbdDateCache.notifyDate.Format(time.DateOnly)
+	} else {
+		cbdDateCache.notifyDate = currentTime
+		dateString = currentTime.Format(time.DateOnly)
+	}
+
+	return fmt.Sprintf(
+		"critical-balance-discrepancy-%s%s-%s-%s",
+		m.BaseCurrency,
+		m.QuoteCurrency,
+		dateString,
+		m.Side.String(),
+	)
+}
+
+func (m *CriticalBalanceDiscrepancyAlert) Comment() *livenote.OptionComment {
+	return livenote.Comment(
+		fmt.Sprintf(
+			"%s %s sustained for %s (~= %f %s > %f %s)",
+			m.BaseCurrency,
+			m.Delta,
+			m.SustainedDuration,
+			m.Amount.Float64(),
+			m.QuoteCurrency,
+			m.AlertAmount.Float64(),
+			m.QuoteCurrency,
+		),
+	)
 }
