@@ -19,9 +19,7 @@ var (
 
 var cbdDateCache = struct {
 	notifyDate time.Time
-}{
-	notifyDate: time.Now().Round(time.Hour * 24),
-}
+}{}
 
 type CriticalBalanceDiscrepancyAlert struct {
 	SlackAlert *slackalert.SlackAlert
