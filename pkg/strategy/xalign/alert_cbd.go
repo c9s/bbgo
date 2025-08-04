@@ -17,6 +17,12 @@ var (
 	_ livenote.Object = &CriticalBalanceDiscrepancyAlert{}
 )
 
+var cbdDateCache = struct {
+	notifyDate time.Time
+}{
+	notifyDate: time.Now().Round(time.Hour * 24),
+}
+
 type CriticalBalanceDiscrepancyAlert struct {
 	SlackAlert *slackalert.SlackAlert
 
@@ -33,8 +39,6 @@ type CriticalBalanceDiscrepancyAlert struct {
 	Price    fixedpoint.Value
 	Quantity fixedpoint.Value
 	Amount   fixedpoint.Value
-
-	notifyDate time.Time
 }
 
 func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
@@ -102,16 +106,16 @@ func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
 }
 
 func (m *CriticalBalanceDiscrepancyAlert) ObjectID() string {
-	if m.notifyDate.IsZero() {
-		m.notifyDate = time.Now().Round(time.Hour * 24)
+	if cbdDateCache.notifyDate.IsZero() {
+		cbdDateCache.notifyDate = time.Now().Round(time.Hour * 24)
 	}
 	var dateString string
 	currentTime := time.Now()
-	if currentTime.Sub(m.notifyDate) <= time.Hour*24 {
-		dateString = m.notifyDate.Format("2006-01-02")
+	if currentTime.Sub(cbdDateCache.notifyDate) <= time.Hour*24 {
+		dateString = cbdDateCache.notifyDate.Format(time.DateOnly)
 	} else {
-		m.notifyDate = currentTime
-		dateString = currentTime.Format("2006-01-02")
+		cbdDateCache.notifyDate = currentTime
+		dateString = currentTime.Format(time.DateOnly)
 	}
 
 	return fmt.Sprintf(
