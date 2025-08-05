@@ -590,7 +590,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 						bbgo.PostLiveNote(
 							cbd,
 							livenote.Channel(s.LargeAmountAlert.Slack.Channel),
-							livenote.OneTimeMention(s.SlackNotifyMentions...),
+							livenote.OneTimeMention(s.LargeAmountAlert.Slack.Mentions...),
 							cbd.Comment(),
 						)
 					}
@@ -618,7 +618,7 @@ func (s *Strategy) align(ctx context.Context, sessions bbgo.ExchangeSessionMap) 
 				bbgo.PostLiveNote(
 					cbd,
 					livenote.Channel(s.LargeAmountAlert.Slack.Channel),
-					livenote.OneTimeMention(s.SlackNotifyMentions...),
+					livenote.OneTimeMention(s.LargeAmountAlert.Slack.Mentions...),
 					cbd.Comment(),
 				)
 			}
