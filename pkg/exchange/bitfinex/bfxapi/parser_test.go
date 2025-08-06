@@ -28,6 +28,7 @@ type response struct {
 	Field2 float64        // basic float conversion
 	Field3 string         // basic string conversion
 	Field4 testFixedValue // using UnmarshalJSON method
+	Field5 *int           // use pointer int
 }
 
 // TestParseArray tests the parseArray function using []json.RawMessage.
@@ -38,6 +39,7 @@ func TestParseArray(t *testing.T) {
 			json.RawMessage("3.14"),
 			json.RawMessage("\"hello\""),
 			json.RawMessage("256.0"),
+			json.RawMessage("null"),
 		}
 		var res response
 		err := parseArray(arr, &res)
@@ -46,11 +48,12 @@ func TestParseArray(t *testing.T) {
 		assert.Equal(t, 3.14, res.Field2, "Field2 should be 3.14")
 		assert.Equal(t, "hello", res.Field3, "Field3 should be 'hello'")
 		assert.Equal(t, 256.0, res.Field4.v, "Field4 should be 256.0")
+		assert.Nil(t, res.Field5, "Field5 should be nil")
 	})
 
-	// new sub-test using raw json input
+	// using raw json input
 	t.Run("raw json input", func(t *testing.T) {
-		raw := `[42, 3.14, "hello", 256.0]`
+		raw := `[42, 3.14, "hello", 256.0, 123]`
 		var rawMsgs []json.RawMessage
 		err := json.Unmarshal([]byte(raw), &rawMsgs)
 		assert.NoError(t, err, "expected no error unmarshalling raw json")
@@ -61,5 +64,6 @@ func TestParseArray(t *testing.T) {
 		assert.Equal(t, 3.14, res2.Field2, "Field2 should be 3.14")
 		assert.Equal(t, "hello", res2.Field3, "Field3 should be 'hello'")
 		assert.Equal(t, 256.0, res2.Field4.v, "Field4 should be 256.0")
+		assert.Equal(t, 123, *res2.Field5, "Field5 should be 123")
 	})
 }
