@@ -2,7 +2,6 @@ package binance
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -44,11 +43,12 @@ func (e *Exchange) TransferFuturesAccountAsset(
 	req.Asset(asset)
 	req.Amount(amount.String())
 
-	if io == types.TransferIn {
+	switch io {
+	case types.TransferIn:
 		req.TransferType(binanceapi.FuturesTransferSpotToUsdtFutures)
-	} else if io == types.TransferOut {
+	case types.TransferOut:
 		req.TransferType(binanceapi.FuturesTransferUsdtFuturesToSpot)
-	} else {
+	default:
 		return fmt.Errorf("unexpected transfer direction: %d given", io)
 	}
 
@@ -80,8 +80,8 @@ func (e *Exchange) QueryFuturesAccount(ctx context.Context) (*types.Account, err
 		return nil, err
 	}
 
-	out, _ := json.MarshalIndent(accountBalances, "", "  ")
-	fmt.Println(string(out))
+	// out, _ := json.MarshalIndent(accountBalances, "", "  ")
+	// fmt.Println(string(out))
 
 	var balances = map[string]types.Balance{}
 	for _, b := range accountBalances {
