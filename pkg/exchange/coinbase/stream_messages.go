@@ -8,6 +8,7 @@ import (
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 // TODO: Level3 channels
@@ -242,9 +243,27 @@ func (msg *MatchMessage) Trade() types.Trade {
 		side = types.SideType(msg.Side)
 	}
 	quoteQuantity := msg.Size.Mul(msg.Price)
+	orderUUID := ""
+	if msg.UserID != "" {
+		// it's an match of authenticated user, which means it's from a user data stream
+		switch msg.UserID {
+		case msg.TakerUserID:
+			// the user is the taker
+			orderUUID = msg.TakerOrderID
+		case msg.MakerUserID:
+			// the user is the maker
+			orderUUID = msg.MakerOrderID
+		}
+	}
+	var orderID uint64 = 0
+	if orderUUID != "" {
+		orderID = util.FNV64(orderUUID)
+	}
 	return types.Trade{
 		ID:            uint64(msg.TradeID),
 		Exchange:      types.ExchangeCoinBase,
+		OrderID:       orderID,
+		OrderUUID:     orderUUID,
 		Price:         msg.Price,
 		Quantity:      msg.Size,
 		QuoteQuantity: quoteQuantity,

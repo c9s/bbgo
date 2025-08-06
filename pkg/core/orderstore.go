@@ -82,6 +82,9 @@ func (s *OrderStore) Orders() (orders []types.Order) {
 func (s *OrderStore) Exists(oID uint64) (ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if oID == 0 {
+		logrus.Warn("[orderstore-Exists] given oID is 0")
+	}
 
 	_, ok = s.orders[oID]
 	return ok
@@ -93,6 +96,10 @@ func (s *OrderStore) Get(oID uint64) (order types.Order, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if oID == 0 {
+		logrus.Warn("[orderstore-Get] given oID is 0")
+	}
+
 	order, ok = s.orders[oID]
 	return order, ok
 }
@@ -102,6 +109,9 @@ func (s *OrderStore) Add(orders ...types.Order) {
 	defer s.mu.Unlock()
 
 	for _, o := range orders {
+		if o.OrderID == 0 {
+			logrus.Warnf("[orderstore] adding order %+v with OrderID 0", o)
+		}
 		old, ok := s.orders[o.OrderID]
 		if ok && o.Tag == "" && old.Tag != "" {
 			o.Tag = old.Tag
@@ -114,13 +124,19 @@ func (s *OrderStore) Remove(o types.Order) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if o.OrderID == 0 {
+		logrus.Warn("[orderstore-Remove] given o.OrderID is 0")
+	}
+
 	delete(s.orders, o.OrderID)
 }
 
 func (s *OrderStore) Update(o types.Order) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
+	if o.OrderID == 0 {
+		logrus.Warn("[orderstore-Update] given o.OrderID is 0")
+	}
 	existing, ok := s.orders[o.OrderID]
 	if ok {
 		existing.Update(o)

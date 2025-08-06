@@ -94,6 +94,9 @@ func (s *TradeStore) Filter(filter TradeFilter) {
 // GetOrderTrades finds the trades match order id matches to the given order
 func (s *TradeStore) GetOrderTrades(o types.Order) (trades []types.Trade) {
 	s.Lock()
+	if o.OrderID == 0 {
+		log.Warnf("[tradestore] getting trades for order %+v with OrderID 0", o)
+	}
 	for _, t := range s.trades {
 		if t.OrderID == o.OrderID {
 			trades = append(trades, t)
@@ -119,6 +122,9 @@ func (s *TradeStore) Add(trades ...types.Trade) {
 	defer s.Unlock()
 
 	for _, trade := range trades {
+		if trade.OrderID == 0 {
+			log.Warnf("[tradestore] detecting trade %+v with OrderID 0", trade)
+		}
 		s.trades[trade.Key()] = trade
 		s.touchLastTradeTime(trade)
 	}
