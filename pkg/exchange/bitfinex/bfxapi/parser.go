@@ -1,6 +1,7 @@
 package bfxapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -24,6 +25,7 @@ func isBasicType(t reflect.Type) bool {
 // parseArray uses reflection to decode a slice of json.RawMessage into the struct pointed to by object.
 // It maps each element in arr sequentially to each exported field of the struct.
 // For basic types (int, float, string, etc.), json.Unmarshal is called directly on the field pointer.
+// For pointer fields, if the corresponding json.RawMessage is null, the field is set to nil.
 func parseArray(arr []json.RawMessage, object any) error {
 	ov := reflect.ValueOf(object)
 	if ov.Kind() != reflect.Ptr || ov.Elem().Kind() != reflect.Struct {
@@ -42,7 +44,26 @@ func parseArray(arr []json.RawMessage, object any) error {
 			continue // skip unexported fields
 		}
 
-		raw := arr[i]
+		raw := bytes.TrimSpace(arr[i])
+		// handle pointer field: if raw is null, skip updating the field; otherwise allocate if needed and unmarshal.
+		if field.Kind() == reflect.Ptr {
+			if bytes.Equal(raw, []byte("null")) {
+				// skip updating pointer field if input is null
+				continue
+			}
+
+			if field.IsNil() {
+				field.Set(reflect.New(field.Type().Elem()))
+			}
+
+			if err := json.Unmarshal(raw, field.Interface()); err != nil {
+				logrus.Errorf("failed to unmarshal pointer element %d into field %s: %v", i, structField.Name, err)
+				return err
+			}
+
+			continue
+		}
+
 		// For basic types, unmarshal directly.
 		if isBasicType(field.Type()) {
 			if err := json.Unmarshal(raw, field.Addr().Interface()); err != nil {
