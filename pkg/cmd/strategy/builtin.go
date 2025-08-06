@@ -33,6 +33,7 @@ import (
 	_ "github.com/c9s/bbgo/pkg/strategy/linregmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/liquiditymaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/marketcap"
+	_ "github.com/c9s/bbgo/pkg/strategy/neutralmaker"
 	_ "github.com/c9s/bbgo/pkg/strategy/pivotshort"
 	_ "github.com/c9s/bbgo/pkg/strategy/random"
 	_ "github.com/c9s/bbgo/pkg/strategy/rebalance"
