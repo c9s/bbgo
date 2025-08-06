@@ -8,6 +8,7 @@ import (
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 // TODO: Level3 channels
@@ -256,7 +257,7 @@ func (msg *MatchMessage) Trade() types.Trade {
 	}
 	var orderID uint64 = 0
 	if orderUUID != "" {
-		orderID = FNV64a(orderUUID)
+		orderID = util.FNV64(orderUUID)
 	}
 	return types.Trade{
 		ID:            uint64(msg.TradeID),
