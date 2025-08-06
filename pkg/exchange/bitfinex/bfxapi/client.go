@@ -67,7 +67,7 @@ func (c *Client) sign(msg string) (string, error) {
 	sig := hmac.New(sha512.New384, []byte(c.apiSecret))
 	_, err := sig.Write([]byte(msg))
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	return hex.EncodeToString(sig.Sum(nil)), nil
