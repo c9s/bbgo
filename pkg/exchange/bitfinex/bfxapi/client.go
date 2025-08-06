@@ -48,21 +48,6 @@ func (c *Client) Credentials(key string, secret string) *Client {
 	return c
 }
 
-// Request is a wrapper for standard http.Request.  Default method is POST with no data.
-type Request struct {
-	RefURL  string     // ref url
-	Data    []byte     // body data
-	Method  string     // http method
-	Params  url.Values // query parameters
-	Headers map[string]string
-}
-
-// Response is a wrapper for standard http.Response and provides more methods.
-type Response struct {
-	Response *http.Response
-	Body     []byte
-}
-
 func (c *Client) sign(msg string) (string, error) {
 	sig := hmac.New(sha512.New384, []byte(c.apiSecret))
 	_, err := sig.Write([]byte(msg))
