@@ -2,6 +2,7 @@ package xalign
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -72,34 +73,42 @@ func (m *CriticalBalanceDiscrepancyAlert) SlackAttachment() slack.Attachment {
 		m.AlertAmount.Float64(),
 		m.QuoteCurrency,
 	)
-
+	fields := []slack.AttachmentField{
+		{
+			Title: "Base Currency",
+			Value: m.BaseCurrency,
+			Short: true,
+		},
+		{
+			Title: "Side",
+			Value: m.Side.String(),
+			Short: true,
+		},
+		{
+			Title: "Price",
+			Value: m.Price.String(),
+			Short: true,
+		},
+		{
+			Title: "Quantity",
+			Value: m.Quantity.String(),
+			Short: true,
+		},
+	}
+	hostName := getHostname()
+	if hostName != "" && hostName != "localhost" {
+		fields = append(fields, slack.AttachmentField{
+			Title: "Hostname",
+			Value: hostName,
+			Short: true,
+		})
+	}
 	return slack.Attachment{
 		Color:  color,
 		Title:  title,
 		Text:   strings.Join(m.SlackAlert.Mentions, " ") + " Please check the balances",
 		Footer: fmt.Sprintf("strategy: %s", ID),
-		Fields: []slack.AttachmentField{
-			{
-				Title: "Base Currency",
-				Value: m.BaseCurrency,
-				Short: true,
-			},
-			{
-				Title: "Side",
-				Value: m.Side.String(),
-				Short: true,
-			},
-			{
-				Title: "Price",
-				Value: m.Price.String(),
-				Short: true,
-			},
-			{
-				Title: "Quantity",
-				Value: m.Quantity.String(),
-				Short: true,
-			},
-		},
+		Fields: fields,
 	}
 }
 
@@ -138,4 +147,8 @@ func (m *CriticalBalanceDiscrepancyAlert) Comment() *livenote.OptionComment {
 			m.QuoteCurrency,
 		),
 	)
+}
+
+func getHostname() string {
+	return os.Getenv("HOSTNAME")
 }
