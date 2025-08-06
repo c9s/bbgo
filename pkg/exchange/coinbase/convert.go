@@ -1,7 +1,6 @@
 package coinbase
 
 import (
-	"hash/fnv"
 	"math"
 	"strings"
 	"time"
@@ -9,6 +8,7 @@ import (
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 func toGlobalSide(cbSide api.SideType) types.SideType {
@@ -55,7 +55,7 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 		Exchange:         types.ExchangeCoinBase,
 		Status:           toGlobalOrderStatus(cbOrder.Status, cbOrder.DoneReason),
 		UUID:             cbOrder.ID,
-		OrderID:          FNV64a(cbOrder.ID),
+		OrderID:          util.FNV64(cbOrder.ID),
 		OriginalStatus:   string(cbOrder.Status),
 		CreationTime:     cbOrder.CreatedAt,
 		IsWorking:        isWorkingOrder(cbOrder.Status),
@@ -72,7 +72,7 @@ func toGlobalOrder(cbOrder *api.Order) types.Order {
 func toGlobalTrade(cbTrade *api.Trade) types.Trade {
 	return types.Trade{
 		ID:            cbTrade.TradeID,
-		OrderID:       FNV64a(cbTrade.OrderID),
+		OrderID:       util.FNV64(cbTrade.OrderID),
 		OrderUUID:     cbTrade.OrderID,
 		Exchange:      types.ExchangeCoinBase,
 		Price:         cbTrade.Price,
@@ -122,13 +122,6 @@ func toGlobalMarket(cbMarket *api.MarketInfo) types.Market {
 		MinQuantity:     minQuantity,
 		MaxQuantity:     maxQuantity,
 	}
-}
-
-func FNV64a(text string) uint64 {
-	hash := fnv.New64a()
-	// In hash implementation, it says never return an error.
-	_, _ = hash.Write([]byte(text))
-	return hash.Sum64()
 }
 
 func toGlobalKline(symbol string, interval types.Interval, candle *api.Candle) types.KLine {

@@ -10,6 +10,7 @@ import (
 	"github.com/c9s/bbgo/pkg/core/klinedriver"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 )
 
 const (
@@ -542,6 +543,7 @@ func (s *Stream) handleReceivedMessage(msg *ReceivedMessage) {
 			Side:   toGlobalSide(msg.Side),
 		},
 		Status:     types.OrderStatusNew,
+		OrderID:    util.FNV64(msg.OrderID),
 		UUID:       msg.OrderID,
 		Exchange:   types.ExchangeCoinBase,
 		UpdateTime: types.Time(msg.Time),
@@ -599,6 +601,7 @@ func (s *Stream) handleOpenMessage(msg *OpenMessage) {
 		},
 		ExecutedQuantity: amountExecuted,
 		Status:           types.OrderStatusNew,
+		OrderID:          util.FNV64(msg.OrderID),
 		UUID:             msg.OrderID,
 		Exchange:         types.ExchangeCoinBase,
 		IsWorking:        true,
@@ -641,6 +644,7 @@ func (s *Stream) handleDoneMessage(msg *DoneMessage) {
 			Quantity: lastOrder.Quantity,
 		},
 		Status:           status,
+		OrderID:          util.FNV64(msg.OrderID),
 		UUID:             msg.OrderID,
 		Exchange:         types.ExchangeCoinBase,
 		ExecutedQuantity: quantityExecuted,
@@ -675,6 +679,7 @@ func (s *Stream) handleChangeMessage(msg *ChangeMessage) {
 			Price:    msg.NewPrice,
 			Quantity: msg.NewSize,
 		},
+		OrderID:    util.FNV64(msg.OrderID),
 		UUID:       msg.OrderID,
 		Exchange:   types.ExchangeCoinBase,
 		IsWorking:  true,
@@ -718,6 +723,7 @@ func (s *Stream) handleActivateMessage(msg *ActivateMessage) {
 			Quantity:  msg.Size,
 		},
 		Status:     types.OrderStatusNew,
+		OrderID:    util.FNV64(msg.OrderID),
 		UUID:       msg.OrderID,
 		Exchange:   types.ExchangeCoinBase,
 		IsWorking:  true,

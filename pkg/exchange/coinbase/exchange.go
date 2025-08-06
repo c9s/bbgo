@@ -11,6 +11,7 @@ import (
 	api "github.com/c9s/bbgo/pkg/exchange/coinbase/api/v1"
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
+	"github.com/c9s/bbgo/pkg/util"
 	"github.com/c9s/bbgo/pkg/util/tradingutil"
 	"github.com/c9s/requestgen"
 	"github.com/pkg/errors"
@@ -223,6 +224,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	createdOrder = &types.Order{
 		SubmitOrder:      order,
 		Exchange:         types.ExchangeCoinBase,
+		OrderID:          util.FNV64(res.ID),
 		UUID:             res.ID,
 		Status:           toGlobalOrderStatus(res.Status, res.DoneReason),
 		ExecutedQuantity: res.ExecutedValue,

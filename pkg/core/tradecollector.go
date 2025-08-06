@@ -239,6 +239,9 @@ func (c *TradeCollector) Process() bool {
 		}
 
 		// if it's the trade we're looking for, add it to the list and mark it as done
+		if trade.OrderID == 0 {
+			logrus.Warnf("[tradecollector] process trade %+v has no OrderID", trade)
+		}
 		if c.orderStore.Exists(trade.OrderID) {
 			trades = append(trades, trade)
 			c.doneTrades[key] = struct{}{}
@@ -288,6 +291,10 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 	if _, done := c.doneTrades[key]; done {
 		c.mu.Unlock()
 		return false
+	}
+
+	if trade.OrderID == 0 {
+		logrus.Warnf("[tradecollector] process trade %+v has no OrderID", trade)
 	}
 
 	if !c.orderStore.Exists(trade.OrderID) {
