@@ -18,14 +18,15 @@ func (ng *Nonce) GetString() string {
 }
 
 func (ng *Nonce) GetInt64() int64 {
-	nonce := time.Now().UnixMilli() * 1000
+	current := atomic.LoadInt64(&ng.current)
+	newNonce := time.Now().UnixMilli() * 1000
 
-	if nonce == atomic.LoadInt64(&ng.current) {
-		atomic.AddInt64(&ng.current, 1)
-	} else {
-		atomic.StoreInt64(&ng.current, nonce)
+	if newNonce > current {
+		atomic.CompareAndSwapInt64(&ng.current, current, newNonce)
+		return newNonce
 	}
-	return atomic.LoadInt64(&ng.current)
+
+	return atomic.AddInt64(&ng.current, 1)
 }
 
 func NewNonce() *Nonce {
