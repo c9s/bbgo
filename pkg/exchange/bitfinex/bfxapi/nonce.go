@@ -22,8 +22,9 @@ func (ng *Nonce) GetInt64() int64 {
 	newNonce := time.Now().UnixMilli() * 1000
 
 	if newNonce > current {
-		atomic.CompareAndSwapInt64(&ng.current, current, newNonce)
-		return newNonce
+		if atomic.CompareAndSwapInt64(&ng.current, current, newNonce) {
+			return newNonce
+		}
 	}
 
 	return atomic.AddInt64(&ng.current, 1)
