@@ -14,7 +14,7 @@ import (
 	"github.com/c9s/requestgen"
 )
 
-var productionBaseURL = "https://api.bitfinex.com/v2/"
+var productionBaseURL = "https://api.bitfinex.com/v2"
 
 type Client struct {
 	requestgen.BaseAPIClient
@@ -42,7 +42,7 @@ func NewClient() *Client {
 	}
 }
 
-func (c *Client) Credentials(key string, secret string) *Client {
+func (c *Client) Auth(key string, secret string) *Client {
 	c.apiKey = key
 	c.apiSecret = secret
 	return c
@@ -86,12 +86,13 @@ func (c *Client) newAuthenticatedRequest(
 
 	pathURL := c.BaseURL.ResolveReference(rel)
 
-	// /api/v2/auth/r/.....
-	// /api/v2/auth/w/.....
-	// pathURL := fmt.Sprintf("auth/%s", refURL)
-
 	nonce := c.nonce.GetString()
-	msg := pathURL.Path + nonce + string(data)
+	// sign("/api" + apiPath + nonce + data in JSON format)
+	msg := "/api" + pathURL.Path + nonce + string(data)
+	sig, err := c.sign(msg)
+	if err != nil {
+		return nil, err
+	}
 
 	rawQuery := params.Encode()
 	if rawQuery != "" {
@@ -103,16 +104,10 @@ func (c *Client) newAuthenticatedRequest(
 		return nil, err
 	}
 
-	sig, err := c.sign(msg)
-	if err != nil {
-		return nil, err
-	}
-
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
 	req.Header.Set("bfx-nonce", nonce)
-	req.Header.Set("bfx-signature", sig)
 	req.Header.Set("bfx-apikey", c.apiKey)
+	req.Header.Set("bfx-signature", sig)
 	return req, nil
 }
 
