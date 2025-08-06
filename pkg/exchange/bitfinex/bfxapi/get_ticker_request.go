@@ -1,8 +1,6 @@
 package bfxapi
 
 import (
-	"encoding/json"
-
 	"github.com/c9s/requestgen"
 
 	"github.com/c9s/bbgo/pkg/fixedpoint"
@@ -42,12 +40,7 @@ type TickerResponse struct {
 }
 
 func (r *TickerResponse) UnmarshalJSON(data []byte) error {
-	var raws []json.RawMessage
-	if err := json.Unmarshal(data, &raws); err != nil {
-		return err
-	}
-
-	return parseArray(raws, r)
+	return parseJsonArray(data, r)
 }
 
 // API: https://api-pub.bitfinex.com/v2/ticker/{symbol}
