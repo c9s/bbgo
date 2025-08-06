@@ -240,7 +240,7 @@ func (c *TradeCollector) Process() bool {
 
 		// if it's the trade we're looking for, add it to the list and mark it as done
 		if trade.OrderID == 0 {
-			logrus.Warnf("[tradecollector] process trade %+v has no OrderID", trade)
+			logrus.Errorf("[tradecollector] process trade %+v has no OrderID", trade)
 		}
 		if c.orderStore.Exists(trade.OrderID) {
 			trades = append(trades, trade)
@@ -294,7 +294,7 @@ func (c *TradeCollector) processTrade(trade types.Trade) bool {
 	}
 
 	if trade.OrderID == 0 {
-		logrus.Warnf("[tradecollector] process trade %+v has no OrderID", trade)
+		logrus.Errorf("[tradecollector] process trade %+v has no OrderID", trade)
 	}
 
 	if !c.orderStore.Exists(trade.OrderID) {

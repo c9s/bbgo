@@ -95,7 +95,7 @@ func (s *TradeStore) Filter(filter TradeFilter) {
 func (s *TradeStore) GetOrderTrades(o types.Order) (trades []types.Trade) {
 	s.Lock()
 	if o.OrderID == 0 {
-		log.Warnf("[tradestore] getting trades for order %+v with OrderID 0", o)
+		log.WithFields(o.LogFields()).Errorf("[tradestore] getting trades for order %+v with OrderID 0", o)
 	}
 	for _, t := range s.trades {
 		if t.OrderID == o.OrderID {
@@ -123,7 +123,7 @@ func (s *TradeStore) Add(trades ...types.Trade) {
 
 	for _, trade := range trades {
 		if trade.OrderID == 0 {
-			log.Warnf("[tradestore] detecting trade %+v with OrderID 0", trade)
+			log.Errorf("[tradestore] detecting trade %+v with OrderID 0", trade)
 		}
 		s.trades[trade.Key()] = trade
 		s.touchLastTradeTime(trade)
