@@ -109,8 +109,9 @@ type Strategy struct {
 
 	SubscribeFeeTokenMarkets bool `json:"subscribeFeeTokenMarkets"`
 
-	EnableSignalMargin bool            `json:"enableSignalMargin"`
-	SignalConfigList   []signal.Config `json:"signals"`
+	EnableSignalMargin bool `json:"enableSignalMargin"`
+
+	SignalConfigList *signal.DynamicConfig `json:"signals"`
 
 	SignalReverseSideMargin       *SignalMargin `json:"signalReverseSideMargin,omitempty"`
 	SignalTrendSideMarginDiscount *SignalMargin `json:"signalTrendSideMarginDiscount,omitempty"`
@@ -278,7 +279,9 @@ func (s *Strategy) CrossSubscribe(sessions map[string]*bbgo.ExchangeSession) {
 
 	makerSession.Subscribe(types.KLineChannel, s.Symbol, types.SubscribeOptions{Interval: "1m"})
 
-	for _, sig := range s.SignalConfigList {
+	for _, sig := range s.SignalConfigList.Signals {
+		sig.Signal.Subscribe(sourceSession)
+
 		if sig.TradeVolumeWindowSignal != nil {
 			sourceSession.Subscribe(types.MarketTradeChannel, s.SourceSymbol, types.SubscribeOptions{})
 		} else if sig.BollingerBandTrendSignal != nil {

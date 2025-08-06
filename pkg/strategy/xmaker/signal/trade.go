@@ -28,6 +28,9 @@ func init() {
 
 // TradeVolumeWindowSignal uses a fixed capacity ring buffer to store trades.
 type TradeVolumeWindowSignal struct {
+	BaseProvider
+	Logger
+
 	Threshold fixedpoint.Value `json:"threshold"`
 	Window    types.Duration   `json:"window"`
 
@@ -53,12 +56,14 @@ type TradeVolumeWindowSignal struct {
 	symbol string
 
 	mu sync.Mutex
-
-	Logger
 }
 
 func (s *TradeVolumeWindowSignal) ID() string {
 	return "tradeVolumeWindow"
+}
+
+func (s *TradeVolumeWindowSignal) Subscribe(session *bbgo.ExchangeSession, symbol string) {
+	// session.Subscribe(types.MarketTradeChannel, s.SourceSymbol, types.SubscribeOptions{})
 }
 
 // handleTrade adds a trade into the ring buffer.

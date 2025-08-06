@@ -22,6 +22,9 @@ func init() {
 }
 
 type BollingerBandTrendSignal struct {
+	BaseProvider
+	Logger
+
 	types.IntervalWindow
 	MinBandWidth float64 `json:"minBandWidth"`
 	MaxBandWidth float64 `json:"maxBandWidth"`
@@ -29,12 +32,26 @@ type BollingerBandTrendSignal struct {
 	indicator *indicatorv2.BOLLStream
 	symbol    string
 	lastK     *types.KLine
-
-	Logger
 }
 
 func (s *BollingerBandTrendSignal) ID() string {
 	return "bollingerBandTrend"
+}
+
+func (s *BollingerBandTrendSignal) Subscribe(session *bbgo.ExchangeSession, symbol string) {
+	if s.IntervalWindow.Interval == "" {
+		s.IntervalWindow.Interval = types.Interval1m
+	}
+
+	if s.MinBandWidth == 0.0 {
+		s.MinBandWidth = 1.0
+	}
+
+	if s.MaxBandWidth == 0.0 {
+		s.MaxBandWidth = 2.0
+	}
+
+	session.Subscribe(types.KLineChannel, symbol, types.SubscribeOptions{Interval: s.IntervalWindow.Interval})
 }
 
 func (s *BollingerBandTrendSignal) Bind(ctx context.Context, session *bbgo.ExchangeSession, symbol string) error {
