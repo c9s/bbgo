@@ -223,6 +223,7 @@ func (e *Exchange) SubmitOrder(ctx context.Context, order types.SubmitOrder) (cr
 	createdOrder = &types.Order{
 		SubmitOrder:      order,
 		Exchange:         types.ExchangeCoinBase,
+		OrderID:          FNV64a(res.ID),
 		UUID:             res.ID,
 		Status:           toGlobalOrderStatus(res.Status, res.DoneReason),
 		ExecutedQuantity: res.ExecutedValue,
