@@ -23,7 +23,7 @@ type Client struct {
 	apiKey    string
 	apiSecret string
 
-	nonce *EpochNonceGenerator
+	nonce *Nonce
 }
 
 // mock me in tests
@@ -38,7 +38,7 @@ func NewClient() *Client {
 			BaseURL:    u,
 			HttpClient: http.DefaultClient,
 		},
-		nonce: NewEpochNonceGenerator(),
+		nonce: NewNonce(),
 	}
 }
 
@@ -105,7 +105,7 @@ func (c *Client) newAuthenticatedRequest(
 	// /api/v2/auth/w/.....
 	// pathURL := fmt.Sprintf("auth/%s", refURL)
 
-	nonce := c.nonce.GetNonce()
+	nonce := c.nonce.GetString()
 	msg := pathURL.Path + nonce + string(data)
 
 	rawQuery := params.Encode()
