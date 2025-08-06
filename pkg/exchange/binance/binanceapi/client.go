@@ -97,28 +97,6 @@ func (c *RestClient) IsUsingEd25519Auth() bool {
 	return len(c.PrivateKey) > 0
 }
 
-// NewRequest create new API request. Relative url can be provided in refURL.
-func (c *RestClient) NewRequest(
-	ctx context.Context, method, refURL string, params url.Values, payload interface{},
-) (*http.Request, error) {
-	rel, err := url.Parse(refURL)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		rel.RawQuery = params.Encode()
-	}
-
-	body, err := castPayload(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	pathURL := c.BaseURL.ResolveReference(rel)
-	return http.NewRequestWithContext(ctx, method, pathURL.String(), bytes.NewReader(body))
-}
-
 func (c *RestClient) SetTimeOffsetFromServer(ctx context.Context) error {
 	req, err := c.NewRequest(ctx, "GET", "/api/v3/time", nil, nil)
 	if err != nil {
@@ -170,7 +148,7 @@ func (c *RestClient) NewAuthenticatedRequest(
 // - https://developers.binance.com/docs/binance-spot-api-docs/rest-api/endpoint-security-type
 // - https://developers.binance.com/docs/binance-spot-api-docs/rest-api/general-information-on-endpoints
 func (c *RestClient) newAuthenticatedRequest(
-	ctx context.Context, method, refURL string, params url.Values, payload interface{}, signFunc func(string) string,
+	ctx context.Context, method, refURL string, params url.Values, payload any, signFunc func(string) string,
 ) (*http.Request, error) {
 	if len(c.Key) == 0 {
 		return nil, errNoApiKey
@@ -197,7 +175,6 @@ func (c *RestClient) newAuthenticatedRequest(
 	}
 
 	params.Set("timestamp", strconv.FormatInt(currentTimestamp()-c.timeOffset, 10))
-	rawQuery := params.Encode()
 
 	pathURL := c.BaseURL.ResolveReference(rel)
 	body, err := castPayload(payload)
@@ -205,6 +182,7 @@ func (c *RestClient) newAuthenticatedRequest(
 		return nil, err
 	}
 
+	rawQuery := params.Encode()
 	toSign := rawQuery + string(body)
 	signature := signFunc(toSign)
 
