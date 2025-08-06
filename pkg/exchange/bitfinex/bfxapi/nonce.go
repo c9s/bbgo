@@ -21,7 +21,7 @@ func (u *EpochNonceGenerator) GetNonce() (nonceStr string) {
 	currentTime := u.getTime()
 	if currentTime > u.lastTime {
 		atomic.StoreUint64(&u.nonce, currentTime)
-		nonceStr = strconv.FormatUint(atomic.AddUint64(&u.nonce, 0), 10)
+		nonceStr = strconv.FormatUint(atomic.LoadUint64(&u.nonce), 10)
 		u.lastTime = currentTime
 	} else {
 		nonceStr = strconv.FormatUint(atomic.AddUint64(&u.nonce, 1), 10)
