@@ -1,11 +1,10 @@
-We are integrating a new Bitfinex API endpoint into our Go client. Bitfinex’s API responses often return JSON arrays
-instead of JSON objects, where each array element has a specific meaning and position, corresponding to fields in a
-struct.
+# Bitfinex API Integration Guidelines for Go Client
 
-Because of this, we cannot directly unmarshal the response using standard Go structs. Instead, we use a helper function
-called parseJsonArray() to manually map array elements to struct fields by position.
+We are integrating a new Bitfinex API endpoint into our Go client. Bitfinex’s API responses often return JSON arrays instead of JSON objects, where each array element has a specific meaning and position, corresponding to fields in a struct.
 
-Example of such response:
+Because of this, we cannot directly unmarshal the response using standard Go structs. Instead, we use a helper function called `parseJsonArray()` to manually map array elements to struct fields by position.
+
+### Example of such response:
 
 ```json
 [
@@ -17,21 +16,20 @@ Example of such response:
 ]
 ```
 
-To add a new API endpoint, we follow these conventions:
+## Convention for Adding a New Endpoint
 
-* Define the request name in the format: `{Verb}{Resource}Request`, using the API name as a prefix, like: `GetTickerRequest`, `PlaceOrderRequest`, etc.
-* Open a new file in the `pkg/exchange/bitfinex` directory, named after the request with snake case (e.g., `get_ticker_request.go`).
-* Define a request struct with the request name (e.g. `GetTickerRequest`).
+1. **Define the request struct** using the naming format `{Verb}{Resource}Request`. Example: `GetTickerRequest`.
+2. **File location**: Create a new file in `pkg/exchange/bitfinex`, using snake_case for the filename. Example: `get_ticker_request.go`.
+3. **Request Struct**:
 
 ```go
 type GetTickerRequest struct {
     client requestgen.APIClient
     symbol string `param:"symbol,slug"` // e.g. tBTCUSD
 }
-
 ```
 
-* Add a new method to the Client struct to create a new instance of the request, with the request name as a method name:
+4. **Client method** to create the request:
 
 ```go
 func (c *Client) NewGetTickerRequest() *GetTickerRequest {
@@ -39,17 +37,11 @@ func (c *Client) NewGetTickerRequest() *GetTickerRequest {
 }
 ```
 
-* Implement a method on the request struct to execute the request, using the `client` field to make the API call:
+5. **Execute method** using `client.Do` or similar logic. Use:
+    - `requestgen.APIClient` for public endpoints
+    - `requestgen.AuthenticatedAPIClient` for authenticated endpoints
 
-For public API endpoint, please use:
-
-        client requestgen.APIClient
-
-For private API endpoint that needs authentication, please use:
-
-        client requestgen.AuthenticatedAPIClient
-
-* Define a response struct, with the corresponding fields in the order they appear in the JSON array:
+6. **Define the response struct** matching the array positions:
 
 ```go
 type TickerResponse struct {
@@ -68,36 +60,54 @@ type TickerResponse struct {
 func (r *TickerResponse) UnmarshalJSON(data []byte) error {
     return parseJsonArray(data, r)
 }
-
 ```
 
-* Annotate the request with go:generate, so the requestgen tool can generate the necessary client logic:
+7. **Add go:generate annotation** for requestgen:
 
-```
+```go
 //go:generate requestgen -type GetTickerRequest -method GET -url "/v2/ticker/:symbol" -responseType .TickerResponse
 ```
 
-You can find fixedpoint.Value in the following import path:
+## Dependencies
 
-    "github.com/c9s/bbgo/pkg/fixedpoint"
+- `fixedpoint.Value` is in: `github.com/c9s/bbgo/pkg/fixedpoint`
+- `requestgen` package: `github.com/c9s/requestgen`
 
-And here is the requestgen package path:
+## Parsing Helpers
 
-    "github.com/c9s/requestgen"
+For parsing JSON arrays into struct fields, refer to:
 
-To know more details about defining request parameters, please refer to the requestgen documentation:
-<https://github.com/c9s/requestgen>
-
-Please refer to the `parser.go` file in the same directory of bfxapi package
-for the implementation of the `parseJsonArray` function and the `parseRawArray` function, which can 
-be used to parse the JSON array response or raw JSON array (json.RawMessage) into the struct fields.
+- `parser.go` in bfxapi package
+- Functions: `parseJsonArray`, `parseRawArray`
 
 ---
-Now, please help me integrate the following API endpoint using the above pattern:
 
-Bitfinex Authenticated Wallets Endpoint Doc:
+## Integration Task
+
+Please implement the following API based on the above pattern.
+
 https://docs.bitfinex.com/reference/rest-auth-wallets
 
-Please use the response format defined in the API doc to implement the fields of response struct.
+### Response Format (Example from Docs):
 
+```json
+[
+  [
+    "exchange",         // TYPE
+    "BTC",              // CURRENCY
+    0.1,                // BALANCE
+    0,                  // UNSETTLED_INTEREST
+    0.1,                // BALANCE_AVAILABLE
+    null,               // PLACEHOLDER1
+    null,               // PLACEHOLDER2
+    0                   // LAST_CHANGE
+  ]
+]
+```
+
+### Suggested Request Name
+
+```go
+GetWalletsRequest
+```
 
