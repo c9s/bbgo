@@ -85,6 +85,13 @@ And here is the requestgen package path:
 
     "github.com/c9s/requestgen"
 
+To know more details about defining request parameters, please refer to the requestgen documentation:
+<https://github.com/c9s/requestgen>
+
+Please refer to the `parser.go` file in the same directory of bfxapi package
+for the implementation of the `parseJsonArray` function and the `parseRawArray` function, which can 
+be used to parse the JSON array response or raw JSON array (json.RawMessage) into the struct fields.
+
 ---
 Now, please help me integrate the following API endpoint using the above pattern:
 
