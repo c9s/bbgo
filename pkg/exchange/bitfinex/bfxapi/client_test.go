@@ -45,4 +45,12 @@ func TestClient(t *testing.T) {
 		assert.NotEmpty(t, resp, "expected non-empty wallets response")
 	})
 
+	t.Run("GetBookRequest", func(t *testing.T) {
+		req := client.NewGetBookRequest()
+		req.Symbol("tBTCUSD")
+		resp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("book response: %+v", resp)
+		assert.NotEmpty(t, resp.BookEntries, "expected non-empty book entries")
+	})
 }
