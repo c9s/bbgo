@@ -70,18 +70,6 @@ func (s *Strategy) recoverPosition(ctx context.Context, currentRound Round, quer
 	var positionOrders []types.Order
 
 	var allOrdersClosed bool = true
-	for _, order := range currentRound.TakeProfitOrders {
-		if allOrdersClosed && types.IsActiveOrder(order) {
-			allOrdersClosed = false
-		}
-
-		if order.ExecutedQuantity.IsZero() {
-			continue
-		}
-		positionOrders = append(positionOrders, order)
-	}
-	s.logger.Info("position orders from take-profit orders done")
-
 	for _, order := range currentRound.OpenPositionOrders {
 		if allOrdersClosed && types.IsActiveOrder(order) {
 			allOrdersClosed = false
@@ -93,6 +81,18 @@ func (s *Strategy) recoverPosition(ctx context.Context, currentRound Round, quer
 		positionOrders = append(positionOrders, order)
 	}
 	s.logger.Info("position orders from open-position orders done")
+
+	for _, order := range currentRound.TakeProfitOrders {
+		if allOrdersClosed && types.IsActiveOrder(order) {
+			allOrdersClosed = false
+		}
+
+		if order.ExecutedQuantity.IsZero() {
+			continue
+		}
+		positionOrders = append(positionOrders, order)
+	}
+	s.logger.Info("position orders from take-profit orders done")
 
 	for _, positionOrder := range positionOrders {
 		s.logger.Infof("collecting trades for position order: %s", positionOrder.String())

@@ -52,13 +52,15 @@ func (s *Strategy) placeTakeProfitOrder(ctx context.Context, currentRound Round)
 	}
 
 	roundPosition := types.NewPositionFromMarket(s.Market)
-	roundPosition.SetExchangeFeeRate(s.ExchangeSession.ExchangeName, types.ExchangeFee{
-		MakerFeeRate: s.ExchangeSession.MakerFeeRate,
-		TakerFeeRate: s.ExchangeSession.TakerFeeRate,
-	})
+	if s.ExchangeSession.MakerFeeRate.Sign() > 0 || s.ExchangeSession.TakerFeeRate.Sign() > 0 {
+		roundPosition.SetExchangeFeeRate(s.ExchangeSession.ExchangeName, types.ExchangeFee{
+			MakerFeeRate: s.ExchangeSession.MakerFeeRate,
+			TakerFeeRate: s.ExchangeSession.TakerFeeRate,
+		})
+	}
 
-	for _, trade := range trades {
-		s.logger.Infof("add trade into the position of this round %s", trade.String())
+	for i, trade := range trades {
+		s.logger.Infof("add #%d trade into the position of this round %s", i, trade.String())
 		if trade.FeeProcessing {
 			return fmt.Errorf("failed to place the take-profit order because there is a trade's fee not ready")
 		}
