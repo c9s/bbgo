@@ -14,10 +14,16 @@ type GetCandlesRequest struct {
 
 	section string `param:"section,slug" validValues:"last,hist"` // e.g. last, hist
 
-	sort  int   `param:"sort"`  // optional, 1 for ascending, -1 for descending order
-	start int64 `param:"start"` // optional, millisecond timestamp
-	end   int64 `param:"end"`   // optional, millisecond timestamp
+	// sort: +1: sort in ascending order | -1: sort in descending order (by MTS field).
+	sort int `param:"sort"` // optional, 1 for ascending, -1 for descending order
 
+	// start: If start is given, only records with MTS >= start (milliseconds) will be given as response.
+	start int64 `param:"start"` // optional, millisecond timestamp
+
+	// end: If end is given, only records with MTS <= end (milliseconds) will be given as response.
+	end int64 `param:"end"` // optional, millisecond timestamp
+
+	// limit: Number of records in response (max. 10000).
 	limit int `param:"limit"` // optional, max number of candles
 }
 
