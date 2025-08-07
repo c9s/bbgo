@@ -22,11 +22,11 @@ func isBasicType(t reflect.Type) bool {
 	}
 }
 
-// parseArray uses reflection to decode a slice of json.RawMessage into the struct pointed to by object.
+// parseRawArray uses reflection to decode a slice of json.RawMessage into the struct pointed to by object.
 // It maps each element in arr sequentially to each exported field of the struct.
 // For basic types (int, float, string, etc.), json.Unmarshal is called directly on the field pointer.
 // For pointer fields, if the corresponding json.RawMessage is null, the field is set to nil.
-func parseArray(arr []json.RawMessage, object any) error {
+func parseRawArray(arr []json.RawMessage, object any) error {
 	ov := reflect.ValueOf(object)
 	if ov.Kind() != reflect.Ptr || ov.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("object must be pointer to struct")
@@ -97,4 +97,37 @@ func parseArray(arr []json.RawMessage, object any) error {
 		}
 	}
 	return nil
+}
+
+func parseJsonArray(data []byte, obj any) error {
+	var raws []json.RawMessage
+	if err := json.Unmarshal(data, &raws); err != nil {
+		return err
+	}
+
+	if len(raws) == 0 {
+		return nil
+	}
+
+	switch string(raws[0]) {
+	case "error":
+		var errResp ErrorResponse
+		if err := parseRawArray(raws, &errResp); err != nil {
+			return fmt.Errorf("failed to parse error response: %w", err)
+		}
+
+		return errResp
+	}
+
+	return parseRawArray(raws, obj)
+}
+
+type ErrorResponse struct {
+	Type    string
+	Code    int
+	Message string
+}
+
+func (e ErrorResponse) Error() string {
+	return fmt.Sprintf("error type: %s, code: %d, message: %s", e.Type, e.Code, e.Message)
 }
