@@ -498,10 +498,10 @@ func (b *ActiveOrderBook) add(order types.Order) {
 	}
 }
 
-func (b *ActiveOrderBook) Exists(order types.Order) bool {
+func (b *ActiveOrderBook) Exists(orderID uint64) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.orders.Exists(order.OrderID)
+	return b.orders.Exists(orderID)
 }
 
 func (b *ActiveOrderBook) Get(orderID uint64) (types.Order, bool) {
@@ -534,7 +534,7 @@ func (b *ActiveOrderBook) filterExistingOrders(orders []types.Order) (existingOr
 			continue
 		}
 
-		if b.Exists(o) {
+		if b.Exists(o.OrderID) {
 			existingOrders.Add(o)
 		}
 	}
