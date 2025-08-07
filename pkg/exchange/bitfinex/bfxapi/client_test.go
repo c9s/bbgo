@@ -29,6 +29,14 @@ func TestClient(t *testing.T) {
 		t.Logf("ticker response: %+v", resp)
 	})
 
+	t.Run("GetTickersRequest", func(t *testing.T) {
+		req := client.NewGetTickersRequest()
+		req.Symbols("ALL")
+		resp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("tickers response: %+v", resp)
+	})
+
 	t.Run("GetWalletsRequest", func(t *testing.T) {
 		req := client.NewGetWalletsRequest()
 		resp, err := req.Do(ctx)
@@ -36,4 +44,5 @@ func TestClient(t *testing.T) {
 		t.Logf("wallets response: %+v", resp)
 		assert.NotEmpty(t, resp, "expected non-empty wallets response")
 	})
+
 }
