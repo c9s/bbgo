@@ -237,6 +237,10 @@ func (s *Strategy) Run(ctx context.Context, _ bbgo.OrderExecutor, session *bbgo.
 
 	// trade callback
 	s.OrderExecutor.TradeCollector().OnTrade(func(trade types.Trade, profit, netProfit fixedpoint.Value) {
+		if !s.OrderExecutor.ActiveMakerOrders().Exists(trade.OrderID) {
+			return
+		}
+
 		s.lastTradeReceivedAt = time.Now()
 		switch s.stateMachine.GetState() {
 		case StateOpenPositionReady:

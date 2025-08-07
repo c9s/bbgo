@@ -36,7 +36,7 @@ func (s *SupportTakeProfit) Bind(session *ExchangeSession, orderExecutor *Genera
 	s.orderExecutor = orderExecutor
 	s.activeOrders = NewActiveOrderBook(s.Symbol)
 	session.UserDataStream.OnOrderUpdate(func(order types.Order) {
-		if s.activeOrders.Exists(order) {
+		if s.activeOrders.Exists(order.OrderID) {
 			if !s.currentSupportPrice.IsZero() {
 				s.triggeredPrices = append(s.triggeredPrices, s.currentSupportPrice)
 			}
