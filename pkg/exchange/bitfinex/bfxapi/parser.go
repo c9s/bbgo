@@ -26,25 +26,36 @@ func isBasicType(t reflect.Type) bool {
 // It maps each element in arr sequentially to each exported field of the struct.
 // For basic types (int, float, string, etc.), json.Unmarshal is called directly on the field pointer.
 // For pointer fields, if the corresponding json.RawMessage is null, the field is set to nil.
-func parseRawArray(arr []json.RawMessage, object any) error {
+func parseRawArray(arr []json.RawMessage, object any, skipFields int, va ...int) error {
 	ov := reflect.ValueOf(object)
 	if ov.Kind() != reflect.Ptr || ov.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("object must be pointer to struct")
 	}
+
 	ov = ov.Elem()
 	t := ov.Type()
 	n := t.NumField()
-	if len(arr) < n {
+	x := skipFields
+
+	if len(arr) < n-x {
 		return fmt.Errorf("array has insufficient elements: need %d but got %d", n, len(arr))
 	}
-	for i := 0; i < n; i++ {
-		field := ov.Field(i)
-		structField := t.Field(i)
+
+	for i := 0; i < len(arr); i++ {
+		raw := bytes.TrimSpace(arr[i])
+
+		if i+x >= n {
+			// If we have more raw elements than fields, we can ignore the extra ones.
+			logrus.Warnf("ignoring extra raw element [%d] while processing %T, expected at most %d fields: %s", i+x, object, n, raw)
+			continue
+		}
+
+		field := ov.Field(i + x)
+		structField := t.Field(i + x)
 		if !field.CanSet() {
 			continue // skip unexported fields
 		}
 
-		raw := bytes.TrimSpace(arr[i])
 		// handle pointer field: if raw is null, skip updating the field; otherwise allocate if needed and unmarshal.
 		if field.Kind() == reflect.Ptr {
 			if bytes.Equal(raw, []byte("null")) {
@@ -99,7 +110,7 @@ func parseRawArray(arr []json.RawMessage, object any) error {
 	return nil
 }
 
-func parseJsonArray(data []byte, obj any) error {
+func parseJsonArray(data []byte, obj any, skipFields int, va ...int) error {
 	var raws []json.RawMessage
 	if err := json.Unmarshal(data, &raws); err != nil {
 		return err
@@ -112,14 +123,14 @@ func parseJsonArray(data []byte, obj any) error {
 	switch string(raws[0]) {
 	case "error":
 		var errResp ErrorResponse
-		if err := parseRawArray(raws, &errResp); err != nil {
+		if err := parseRawArray(raws, &errResp, 0); err != nil {
 			return fmt.Errorf("failed to parse error response: %w", err)
 		}
 
 		return errResp
 	}
 
-	return parseRawArray(raws, obj)
+	return parseRawArray(raws, obj, skipFields, va...)
 }
 
 type ErrorResponse struct {
