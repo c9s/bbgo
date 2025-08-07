@@ -29,6 +29,16 @@ func TestClient(t *testing.T) {
 		t.Logf("ticker response: %+v", resp)
 	})
 
+	t.Run("GetCandlesRequest", func(t *testing.T) {
+		req := client.NewGetCandlesRequest()
+		req.Candle("trade:1m:tBTCUSD")
+		req.Section("hist")
+
+		resp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("candles response: %+v", resp)
+	})
+
 	t.Run("GetTickersRequest", func(t *testing.T) {
 		req := client.NewGetTickersRequest()
 		req.Symbols("ALL")
