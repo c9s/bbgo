@@ -197,12 +197,12 @@ func (rc *Collector) CollectRoundTrades(ctx context.Context, round Round) ([]typ
 
 	roundOrders = append(roundOrders, round.TakeProfitOrders...)
 
-	for _, order := range roundOrders {
+	for i, order := range roundOrders {
 		if order.ExecutedQuantity.IsZero() {
-			rc.logger.Info("collect trads from order but no executed quantity ", order.String())
+			rc.logger.Infof("collect trades from #%d order but no executed quantity %s", i, order.String())
 			continue
 		} else {
-			rc.logger.Info("collect trades from order ", order.String())
+			rc.logger.Infof("collect trades from #%d order %s", i, order.String())
 		}
 
 		// QueryOrderTradesUntilSuccessful will query trades and their feeProcessing = false
