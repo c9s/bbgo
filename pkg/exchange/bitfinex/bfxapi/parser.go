@@ -59,6 +59,7 @@ func parseArray(arr []json.RawMessage, object any) error {
 			if err := json.Unmarshal(raw, field.Interface()); err != nil {
 				logrus.Errorf("failed to unmarshal pointer element %d into field %s: %v", i, structField.Name, err)
 				return err
+
 			}
 
 			continue
