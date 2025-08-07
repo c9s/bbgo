@@ -6,53 +6,32 @@ import (
 	"time"
 )
 
-type EpochNonceGenerator struct {
-	nonce    uint64
-	lastTime uint64
-	getTime  func() uint64
+type Nonce struct {
+	current int64
 }
 
-// GetNonce is a naive nonce producer that takes the current Unix nano epoch
-// and counts upwards.
-// This is a naive approach because the nonce is bound to the currently used API
-// key and as such needs to be synchronised with other instances using the same
-// key in order to avoid race conditions.
-func (u *EpochNonceGenerator) GetNonce() (nonceStr string) {
-	currentTime := u.getTime()
-	if currentTime > u.lastTime {
-		atomic.StoreUint64(&u.nonce, currentTime)
-		nonceStr = strconv.FormatUint(atomic.LoadUint64(&u.nonce), 10)
-		u.lastTime = currentTime
-	} else {
-		nonceStr = strconv.FormatUint(atomic.AddUint64(&u.nonce, 1), 10)
+// GetString generates a unique nonce based on the current time in milliseconds * 1000.
+// If multiple calls occur within the same millisecond, atomic increment ensures uniqueness.
+func (ng *Nonce) GetString() string {
+	nonce := ng.GetInt64()
+	return strconv.FormatInt(nonce, 10)
+}
+
+func (ng *Nonce) GetInt64() int64 {
+	current := atomic.LoadInt64(&ng.current)
+	newNonce := time.Now().UnixMilli() * 1000
+
+	if newNonce > current {
+		if atomic.CompareAndSwapInt64(&ng.current, current, newNonce) {
+			return newNonce
+		}
 	}
-	return nonceStr
+
+	return atomic.AddInt64(&ng.current, 1)
 }
 
-func NewEpochNonceGenerator() *EpochNonceGenerator {
-	nonce := nanoSecondTimeStamp()
-	return &EpochNonceGenerator{
-		nonce:    nonce,
-		lastTime: nonce,
-		getTime:  nanoSecondTimeStamp,
+func NewNonce() *Nonce {
+	return &Nonce{
+		current: time.Now().UnixMilli() * 1000,
 	}
-}
-
-func NewV2EpochNonceGenerator() *EpochNonceGenerator {
-	nonce := milliSecondTimeStamp()
-	return &EpochNonceGenerator{
-		nonce:    nonce,
-		lastTime: nonce,
-		getTime:  milliSecondTimeStamp,
-	}
-}
-
-func milliSecondTimeStamp() uint64 {
-	// it returns the second * 1000
-	return uint64(time.Now().Unix()) * 1000
-}
-
-func nanoSecondTimeStamp() uint64 {
-	// it returns the second * 1e9
-	return uint64(time.Now().Unix()) * 1e9
 }
