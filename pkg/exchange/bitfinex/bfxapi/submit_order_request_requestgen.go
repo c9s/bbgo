@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -22,27 +23,27 @@ func (s *SubmitOrderRequest) Amount(amount string) *SubmitOrderRequest {
 }
 
 func (s *SubmitOrderRequest) Price(price string) *SubmitOrderRequest {
-	s.price = price
+	s.price = &price
 	return s
 }
 
-func (s *SubmitOrderRequest) OrderType(orderType string) *SubmitOrderRequest {
+func (s *SubmitOrderRequest) OrderType(orderType OrderType) *SubmitOrderRequest {
 	s.orderType = orderType
 	return s
 }
 
 func (s *SubmitOrderRequest) GroupId(groupId int64) *SubmitOrderRequest {
-	s.groupId = groupId
+	s.groupId = &groupId
 	return s
 }
 
 func (s *SubmitOrderRequest) ClientOrderId(clientOrderId int64) *SubmitOrderRequest {
-	s.clientOrderId = clientOrderId
+	s.clientOrderId = &clientOrderId
 	return s
 }
 
 func (s *SubmitOrderRequest) Flags(flags OrderFlag) *SubmitOrderRequest {
-	s.flags = flags
+	s.flags = &flags
 	return s
 }
 
@@ -72,6 +73,7 @@ func (s *SubmitOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// TEMPLATE check-required
 	if len(symbol) == 0 {
+		return nil, fmt.Errorf("symbol is required, empty string given")
 	}
 	// END TEMPLATE check-required
 
@@ -82,72 +84,97 @@ func (s *SubmitOrderRequest) GetParameters() (map[string]interface{}, error) {
 
 	// TEMPLATE check-required
 	if len(amount) == 0 {
+		return nil, fmt.Errorf("amount is required, empty string given")
 	}
 	// END TEMPLATE check-required
 
 	// assign parameter of amount
 	params["amount"] = amount
 	// check price field -> json key price
-	price := s.price
+	if s.price != nil {
+		price := *s.price
 
-	// TEMPLATE check-required
-	if len(price) == 0 {
+		// TEMPLATE check-required
+		if len(price) == 0 {
+		}
+		// END TEMPLATE check-required
+
+		// assign parameter of price
+		params["price"] = price
+	} else {
 	}
-	// END TEMPLATE check-required
-
-	// assign parameter of price
-	params["price"] = price
 	// check orderType field -> json key type
 	orderType := s.orderType
 
 	// TEMPLATE check-required
 	if len(orderType) == 0 {
-	}
-	// END TEMPLATE check-required
-
-	// assign parameter of orderType
-	params["type"] = orderType
-	// check groupId field -> json key gid
-	groupId := s.groupId
-
-	// TEMPLATE check-required
-	if groupId == 0 {
-	}
-	// END TEMPLATE check-required
-
-	// assign parameter of groupId
-	params["gid"] = groupId
-	// check clientOrderId field -> json key cid
-	clientOrderId := s.clientOrderId
-
-	// TEMPLATE check-required
-	if clientOrderId == 0 {
-	}
-	// END TEMPLATE check-required
-
-	// assign parameter of clientOrderId
-	params["cid"] = clientOrderId
-	// check flags field -> json key flags
-	flags := s.flags
-
-	// TEMPLATE check-required
-	if flags == 0 {
+		orderType = "EXCHANGE LIMIT"
 	}
 	// END TEMPLATE check-required
 
 	// TEMPLATE check-valid-values
-	switch flags {
-	case OrderFlagHidden, OrderFlagClose, OrderFlagReduceOnly, OrderFlagPostOnly, OrderFlagOCO, OrderFlagNoVarRate:
-		params["flags"] = flags
+	switch orderType {
+	case OrderTypeLimit, OrderTypeExchangeLimit, OrderTypeMarket, OrderTypeExchangeMarket, OrderTypeStop, OrderTypeExchangeStop, OrderTypeStopLimit, OrderTypeExchangeStopLimit, OrderTypeTrailingStop, OrderTypeExchangeTrailingStop, OrderTypeFOK, OrderTypeExchangeFOK, OrderTypeIOC, OrderTypeExchangeIOC:
+		params["type"] = orderType
 
 	default:
-		return nil, fmt.Errorf("flags value %v is invalid", flags)
+		return nil, fmt.Errorf("type value %v is invalid", orderType)
 
 	}
 	// END TEMPLATE check-valid-values
 
-	// assign parameter of flags
-	params["flags"] = flags
+	// assign parameter of orderType
+	params["type"] = orderType
+	// check groupId field -> json key gid
+	if s.groupId != nil {
+		groupId := *s.groupId
+
+		// TEMPLATE check-required
+		if groupId == 0 {
+		}
+		// END TEMPLATE check-required
+
+		// assign parameter of groupId
+		params["gid"] = groupId
+	} else {
+	}
+	// check clientOrderId field -> json key cid
+	if s.clientOrderId != nil {
+		clientOrderId := *s.clientOrderId
+
+		// TEMPLATE check-required
+		if clientOrderId == 0 {
+		}
+		// END TEMPLATE check-required
+
+		// assign parameter of clientOrderId
+		params["cid"] = clientOrderId
+	} else {
+	}
+	// check flags field -> json key flags
+	if s.flags != nil {
+		flags := *s.flags
+
+		// TEMPLATE check-required
+		if flags == 0 {
+		}
+		// END TEMPLATE check-required
+
+		// TEMPLATE check-valid-values
+		switch flags {
+		case OrderFlagHidden, OrderFlagClose, OrderFlagReduceOnly, OrderFlagPostOnly, OrderFlagOCO, OrderFlagNoVarRate:
+			params["flags"] = flags
+
+		default:
+			return nil, fmt.Errorf("flags value %v is invalid", flags)
+
+		}
+		// END TEMPLATE check-valid-values
+
+		// assign parameter of flags
+		params["flags"] = flags
+	} else {
+	}
 
 	return params, nil
 }
@@ -249,10 +276,13 @@ func (s *SubmitOrderRequest) Do(ctx context.Context) (*SubmitOrderResponse, erro
 
 	apiURL = s.GetPath()
 
+	log.Printf("API Request: %s %v %v", apiURL, query, params)
 	req, err := s.client.NewAuthenticatedRequest(ctx, "POST", apiURL, query, params)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("API Request: %s %s %+v", req.Method, req.URL.String(), req.Header)
 
 	response, err := s.client.SendRequest(req)
 	if err != nil {
