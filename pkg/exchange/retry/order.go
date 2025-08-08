@@ -183,12 +183,12 @@ func QueryOrderTradesUntilSuccessfulLite(
 		}
 
 		if len(trades) == 0 {
-			return fmt.Errorf("empty trades of order #%s on exchange %T", q.OrderID, ex)
+			return fmt.Errorf("empty trades of order %+v on exchange %T", q, ex)
 		}
 
 		for _, trade := range trades {
 			if trade.FeeProcessing {
-				return fmt.Errorf("there are some trades which trading fee is not ready")
+				return fmt.Errorf("there are some trades which trading fee is not ready: %+v", q)
 			}
 		}
 
