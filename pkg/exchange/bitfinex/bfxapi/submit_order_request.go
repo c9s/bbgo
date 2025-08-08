@@ -1,6 +1,8 @@
 package bfxapi
 
 import (
+	"encoding/json"
+
 	"github.com/c9s/bbgo/pkg/fixedpoint"
 	"github.com/c9s/bbgo/pkg/types"
 
@@ -31,21 +33,23 @@ func (c *Client) NewSubmitOrderRequest() *SubmitOrderRequest {
 
 // SubmitOrderResponse represents the response from Bitfinex order submission.
 type SubmitOrderResponse struct {
-	mts       types.MillisecondTimestamp
-	typeStr   string
-	messageID *string
-	_         any // unused field
-	data      []OrderData
-	code      *int64
-	status    string
-	text      string
+	Time types.MillisecondTimestamp
+	Type string // Notification's type ("on-req")
+
+	MessageID *int // Unique notification's ID
+
+	_      any // unused field
+	Data   []OrderData
+	Code   *int64 // W.I.P. (work in progress)
+	Status string
+	Text   string // Additional notification description
 }
 
 // OrderData represents a single order in the response DATA array.
 type OrderData struct {
-	Id            int64
+	OrderID       int64
 	GroupOrderID  *int64
-	ClientOrderID int64
+	ClientOrderID *int64
 	Symbol        string
 	CreatedAt     types.MillisecondTimestamp
 	UpdatedAt     types.MillisecondTimestamp
@@ -64,20 +68,20 @@ type OrderData struct {
 	_             any
 	Price         fixedpoint.Value
 	PriceAvg      fixedpoint.Value
-	PriceTrailing float64
-	PriceAuxLimit float64
-	_3            interface{}
-	_4            interface{}
-	_5            interface{}
+	PriceTrailing fixedpoint.Value
+	PriceAuxLimit fixedpoint.Value
+	_             any
+	_             any
+	_             any
 	Notify        int64
 	Hidden        int64
 	PlacedID      *int64
-	_6            interface{}
-	_7            interface{}
+	_             any
+	_             any
 	Routing       string
-	_8            interface{}
-	_9            interface{}
-	Meta          interface{}
+	_             any
+	_             any
+	Meta          json.RawMessage
 }
 
 // UnmarshalJSON parses the Bitfinex SubmitOrderResponse JSON array.
