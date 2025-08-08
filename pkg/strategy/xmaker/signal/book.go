@@ -1,4 +1,4 @@
-package xmaker
+package signal
 
 import (
 	"context"
@@ -32,6 +32,11 @@ type OrderBookBestPriceVolumeSignal struct {
 
 	symbol string
 	book   *types.StreamOrderBook
+	Logger
+}
+
+func (s *OrderBookBestPriceVolumeSignal) ID() string {
+	return "orderBookBestPrice"
 }
 
 func (s *OrderBookBestPriceVolumeSignal) SetStreamBook(book *types.StreamOrderBook) {
@@ -70,7 +75,7 @@ func (s *OrderBookBestPriceVolumeSignal) CalculateSignal(ctx context.Context) (f
 		signal = -numerator.Div(denominator).Float64()
 	}
 
-	log.Infof("[OrderBookBestPriceVolumeSignal] %f bid/ask = %f/%f, bid ratio = %f, ratio threshold = %f",
+	s.logger.Infof("[OrderBookBestPriceVolumeSignal] %f bid/ask = %f/%f, bid ratio = %f, ratio threshold = %f",
 		signal,
 		bid.Volume.Float64(),
 		ask.Volume.Float64(),
