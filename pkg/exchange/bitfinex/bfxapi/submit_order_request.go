@@ -16,14 +16,14 @@ import (
 type SubmitOrderRequest struct {
 	client requestgen.AuthenticatedAPIClient
 
-	symbol    string `param:"symbol"`
-	amount    string `param:"amount"`
-	price     string `param:"price"`
-	orderType string `param:"type"`
+	symbol    string    `param:"symbol,required"`
+	amount    string    `param:"amount,required"`
+	price     *string   `param:"price"`
+	orderType OrderType `param:"type" default:"EXCHANGE LIMIT"`
 
-	groupId       int64     `param:"gid,omitempty"`
-	clientOrderId int64     `param:"cid,omitempty"`
-	flags         OrderFlag `param:"flags,omitempty"`
+	groupId       *int64     `param:"gid,omitempty"`
+	clientOrderId *int64     `param:"cid,omitempty"`
+	flags         *OrderFlag `param:"flags,omitempty"`
 }
 
 // NewSubmitOrderRequest creates a new SubmitOrderRequest.

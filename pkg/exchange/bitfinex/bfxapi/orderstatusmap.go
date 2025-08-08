@@ -33,7 +33,6 @@ var AllOrderStatussSlice = []OrderStatus{
 	OrderStatusPartiallyCanceled,
 }
 
-// OrderStatusStrings converts a slice of OrderStatus to a slice of string
 func OrderStatusStrings(slice []OrderStatus) (out []string) {
 	for _, el := range slice {
 		out = append(out, string(el))

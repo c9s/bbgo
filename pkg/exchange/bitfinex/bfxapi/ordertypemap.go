@@ -35,7 +35,6 @@ var AllOrderTypesSlice = []OrderType{
 	OrderTypeExchangeIOC,
 }
 
-// OrderTypeStrings converts a slice of OrderType to a slice of string
 func OrderTypeStrings(slice []OrderType) (out []string) {
 	for _, el := range slice {
 		out = append(out, string(el))
