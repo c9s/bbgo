@@ -14,7 +14,7 @@ func QueryTradesUntilSuccessful(
 		trades, err2 = ex.QueryTrades(ctx, symbol, q)
 		for _, trade := range trades {
 			if trade.FeeProcessing {
-				return fmt.Errorf("trade fee of #%d (order #%d) is still processing", trade.ID, trade.OrderID)
+				return fmt.Errorf("order #%d(%s): trade fee of #%d is still processing", trade.OrderID, trade.OrderUUID, trade.ID)
 			}
 		}
 		return err2
@@ -31,7 +31,7 @@ func QueryTradesUntilSuccessfulLite(
 		trades, err2 = ex.QueryTrades(ctx, symbol, q)
 		for _, trade := range trades {
 			if trade.FeeProcessing {
-				return fmt.Errorf("trade fee of #%d (order #%d) is still processing", trade.ID, trade.OrderID)
+				return fmt.Errorf("order #%d(%s): trade fee of #%d is still processing", trade.OrderID, trade.OrderUUID, trade.ID)
 			}
 		}
 		return err2
