@@ -149,11 +149,13 @@ func NewRecorder(transport http.RoundTripper) *Recorder {
 func filterCredentials(header http.Header) {
 	patterns := []string{
 		`(?i)^authorization$`,
-		`(?i)^api[-_]key$`,
-		`(?i)^x[-_]api[-_]key$`,
-		`(?i)^cookie$`,
-		`(?i)^access[-_]token$`,
-		`(?i)^secret$`,
+		`(?i)apikey`,
+		`(?i)nonce`,
+		`(?i)api[-_]key`,
+		`(?i)x[-_]api[-_]key`,
+		`(?i)cookie`,
+		`(?i)access[-_]token`,
+		`(?i)secret`,
 	}
 	var regexps []*regexp.Regexp
 	for _, p := range patterns {
