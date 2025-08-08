@@ -2,7 +2,6 @@ package bfxapi
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/c9s/requestgen"
 	"github.com/sirupsen/logrus"
@@ -60,7 +59,6 @@ func (r *PairConfigResponse) UnmarshalJSON(data []byte) error {
 
 			pair.Pair = string(symbol[0]) // first element is the pair symbol
 
-			log.Printf("raw: %s", raw[1])
 			if len(raw[1]) < 10 {
 				logrus.Errorf("pair config for %s is incomplete, input: %s", pair, raw[1])
 				continue // skip incomplete config
