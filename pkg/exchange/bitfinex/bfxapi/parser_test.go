@@ -42,7 +42,7 @@ func Test_parseRawArray(t *testing.T) {
 			json.RawMessage("null"),
 		}
 		var res response
-		err := parseRawArray(arr, &res)
+		err := parseRawArray(arr, &res, 0)
 		assert.NoError(t, err, "expected no error during parseRawArray")
 		assert.Equal(t, 42, res.Field1, "Field1 should be 42")
 		assert.Equal(t, 3.14, res.Field2, "Field2 should be 3.14")
@@ -58,7 +58,7 @@ func Test_parseRawArray(t *testing.T) {
 		err := json.Unmarshal([]byte(raw), &rawMsgs)
 		assert.NoError(t, err, "expected no error unmarshalling raw json")
 		var res2 response
-		err = parseRawArray(rawMsgs, &res2)
+		err = parseRawArray(rawMsgs, &res2, 0)
 		assert.NoError(t, err, "expected no error during parseRawArray with raw json")
 		assert.Equal(t, 42, res2.Field1, "Field1 should be 42")
 		assert.Equal(t, 3.14, res2.Field2, "Field2 should be 3.14")

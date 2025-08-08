@@ -29,11 +29,28 @@ func TestClient(t *testing.T) {
 		t.Logf("ticker response: %+v", resp)
 	})
 
+	t.Run("GetTickersRequest", func(t *testing.T) {
+		req := client.NewGetTickersRequest()
+		req.Symbols("ALL")
+		resp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("tickers response: %+v", resp)
+	})
+
 	t.Run("GetWalletsRequest", func(t *testing.T) {
 		req := client.NewGetWalletsRequest()
 		resp, err := req.Do(ctx)
 		assert.NoError(t, err)
 		t.Logf("wallets response: %+v", resp)
 		assert.NotEmpty(t, resp, "expected non-empty wallets response")
+	})
+
+	t.Run("GetBookRequest", func(t *testing.T) {
+		req := client.NewGetBookRequest()
+		req.Symbol("tBTCUSD")
+		resp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("book response: %+v", resp)
+		assert.NotEmpty(t, resp.BookEntries, "expected non-empty book entries")
 	})
 }

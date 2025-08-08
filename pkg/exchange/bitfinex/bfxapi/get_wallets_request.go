@@ -40,7 +40,7 @@ type WalletResponse struct {
 
 // UnmarshalJSON maps the JSON array response to the WalletResponse struct fields.
 func (r *WalletResponse) UnmarshalJSON(data []byte) error {
-	return parseJsonArray(data, r)
+	return parseJsonArray(data, r, 0)
 }
 
 // GetWalletsRequest represents the request structure for the authenticated wallets endpoint.

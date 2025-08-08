@@ -23,7 +23,9 @@ Ticker JSON response:
 ]
 */
 
-type TickerResponse struct {
+// Ticker for trading pairs (symbol starts with 't')
+type Ticker struct {
+	Symbol  string
 	Bid     fixedpoint.Value
 	BidSize fixedpoint.Value
 
@@ -39,8 +41,9 @@ type TickerResponse struct {
 	Low    fixedpoint.Value
 }
 
-func (r *TickerResponse) UnmarshalJSON(data []byte) error {
-	return parseJsonArray(data, r)
+func (r *Ticker) UnmarshalJSON(data []byte) error {
+	// skip one field
+	return parseJsonArray(data, r, 1, 0)
 }
 
 // API: https://api-pub.bitfinex.com/v2/ticker/{symbol}
