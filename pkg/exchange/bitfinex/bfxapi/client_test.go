@@ -2,21 +2,46 @@ package bfxapi
 
 import (
 	"context"
+	"net/http"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/c9s/bbgo/pkg/testing/httptesting"
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
 func TestClient(t *testing.T) {
-	key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
-	if !ok {
-		t.Skipf("BITFINEX api key is not configured, skipping integration test")
-	}
-
 	client := NewClient()
-	client.Auth(key, secret)
+	mockTransport := &httptesting.MockTransport{}
+	recorder := httptesting.NewRecorder(http.DefaultTransport)
+
+	if os.Getenv("TEST_HTTP_RECORD") == "1" {
+		key, secret, ok := testutil.IntegrationTestConfigured(t, "BITFINEX")
+		if !ok {
+			t.Skipf("BITFINEX api key is not configured, skipping integration test")
+		}
+
+		client.Auth(key, secret)
+		client.HttpClient.Transport = recorder
+
+		defer func() {
+			if err := recorder.Save("testdata/test_client_requests.json"); err != nil {
+				t.Errorf("failed to save recorded requests: %v", err)
+			}
+		}()
+	} else {
+		if err := recorder.Load("testdata/test_client_requests.json"); err != nil {
+			t.Fatalf("failed to load recorded requests: %v", err)
+		}
+
+		if err := mockTransport.LoadFromRecorder(recorder); err != nil {
+			t.Fatalf("failed to load recordings: %v", err)
+		}
+
+		client.HttpClient.Transport = mockTransport
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
