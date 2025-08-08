@@ -1,0 +1,528 @@
+[
+  {
+    "timestamp": "2025-08-08T21:49:04.028673+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.bitfinex.com/v2/ticker/tBTCUSD",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Age": [
+          "8"
+        ],
+        "Cf-Cache-Status": [
+          "HIT"
+        ],
+        "Cf-Ray": [
+          "96bf7993fb794a09-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 08 Aug 2025 13:49:04 GMT"
+        ],
+        "Last-Modified": [
+          "Fri, 08 Aug 2025 13:48:56 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[117000,112.34323682,117010,12.65898966,240,0.00205479,117040,856.54241629,117900,115780]"
+    }
+  },
+  {
+    "timestamp": "2025-08-08T21:49:04.298868+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.bitfinex.com/v2/candles/trade:1m:tBTCUSD/hist?end=0\u0026limit=0\u0026sort=0\u0026start=0",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "EXPIRED"
+        ],
+        "Cf-Ray": [
+          "96bf79942bc64a09-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 08 Aug 2025 13:49:04 GMT"
+        ],
+        "Last-Modified": [
+          "Fri, 08 Aug 2025 13:49:04 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[1754660820000,117030,117040,117050,117030,0.0022124500000000004],[1754660760000,116990,116990,116990,116990,0.04298432],[1754660700000,117000,117060,117070,117000,0.015218470000000001],[1754660640000,116970,116980,116990,116970,0.02198603],[1754660580000,117070,117080,117080,117070,0.00085446],[1754660520000,117060,117060,117060,117060,0.00148579],[1754660460000,116980,117050,117060,116980,0.027497809999999998],[1754660400000,116910,116980,116980,116910,0.00659418],[1754660340000,116910,116910,116910,116910,0.0010810000000000001],[1754660220000,116880,116880,116880,116880,0.001],[1754660160000,116860,116880,116920,116860,0.11991908000000001],[1754660100000,116710,116830,116830,116710,0.15568545],[1754660040000,116760,116700,116760,116700,0.02381581],[1754659920000,116860,116770,116860,116770,0.12814132],[1754659800000,116890,116870,116900,116870,0.0063739800000000004],[1754659560000,116880,116880,116880,116880,0.01054862],[1754659440000,116860,116860,116860,116860,0.07949022],[1754659380000,116830,116860,116860,116830,0.03086014],[1754659320000,116820,116830,116830,116820,0.0014164800000000001],[1754659260000,116810,116810,116810,116810,0.00028109],[1754659200000,116780,116800,116800,116780,0.049513949999999994],[1754659080000,116760,116760,116760,116760,0.0000811],[1754658960000,116760,116750,116760,116750,0.22936015999999998],[1754658900000,116730,116700,116730,116700,0.00219797],[1754658780000,116710,116720,116720,116710,0.862],[1754658720000,116700,116700,116700,116700,0.002],[1754658660000,116700,116700,116700,116700,0.00016787],[1754658540000,116690,116690,116690,116690,0.002833],[1754658420000,116710,116710,116710,116710,0.0005],[1754658360000,116700,116710,116710,116700,0.002382],[1754658060000,116680,116690,116690,116680,0.00022162],[1754657640000,116710,116710,116710,116710,0.00017822],[1754657580000,116700,116700,116700,116700,0.0010812],[1754657520000,116720,116710,116720,116700,0.00384],[1754657460000,116740,116720,116740,116720,0.00244712],[1754657040000,116760,116760,116760,116760,0.01678761],[1754656980000,116750,116750,116750,116750,0.00785347],[1754656800000,116750,116750,116750,116750,0.00048118],[1754656740000,116770,116770,116770,116770,0.00009939999999999999],[1754656680000,116780,116770,116780,116770,0.000522],[1754656620000,116780,116780,116780,116780,0.00047206],[1754656560000,116780,116780,116780,116780,0.02],[1754656440000,116790,116790,116790,116790,0.01028436],[1754656200000,116800,116830,116840,116800,0.03600241],[1754656140000,116800,116800,116800,116800,0.01028595],[1754655900000,116770,116770,116770,116770,0.00077419],[1754655840000,116800,116800,116800,116800,0.00199999],[1754655780000,116800,116800,116800,116800,0.01143495],[1754655540000,116800,116800,116800,116800,0.007696],[1754655480000,116840,116840,116840,116840,0.000048],[1754655420000,116840,116840,116840,116840,0.000048],[1754655300000,116800,116800,116800,116800,0.00455631],[1754655240000,116800,116800,116800,116800,0.0178955],[1754655180000,116790,116800,116800,116790,0.01605732],[1754655120000,116810,116790,116810,116790,0.0028097699999999996],[1754655000000,116870,116800,116870,116800,0.21708963],[1754654940000,116930,116890,116930,116890,0.3036504],[1754654820000,117010,116940,117010,116940,0.92555314],[1754654760000,117010,117010,117010,117010,9.07499269],[1754654640000,117020,117010,117020,117010,0.00013002],[1754654580000,117030,117020,117030,117020,0.00019272],[1754654280000,117050,117060,117060,117050,0.018719239999999998],[1754654220000,117040,117040,117040,117040,0.0006],[1754654100000,117020,117030,117030,117020,0.0012472400000000002],[1754653920000,116930,117010,117010,116930,0.09754929],[1754653680000,116930,116930,116930,116930,0.05166137],[1754653560000,116980,116980,116980,116980,0.19818737],[1754653440000,116980,116980,116980,116980,0.50974707],[1754653320000,116990,116990,116990,116990,0.0453041],[1754653200000,116990,116990,116990,116990,0.02265204],[1754652780000,116990,116980,116990,116980,0.00239923],[1754652720000,116980,116980,116980,116980,0.0009652],[1754652540000,117000,116980,117000,116980,3.84939675],[1754652480000,116990,116990,116990,116990,5.5e-7],[1754652420000,116990,116990,116990,116990,0.005],[1754652360000,117000,117000,117000,117000,0.00264014],[1754652300000,116990,116990,116990,116990,0.0003682],[1754651880000,116990,116990,116990,116990,0.00005026],[1754651820000,116970,116980,116980,116970,0.02808943],[1754651700000,116950,116960,116960,116950,0.0179163],[1754651580000,116950,116950,116950,116950,0.05],[1754651460000,116910,116940,116950,116910,0.50610303],[1754651400000,116910,116910,116910,116910,0.00028093],[1754651340000,116880,116900,116900,116880,0.00174194],[1754651280000,116850,116870,116870,116850,0.10074198000000001],[1754651220000,116800,116840,116840,116800,0.03022712],[1754651160000,116780,116800,116800,116780,0.00068844],[1754651040000,116770,116790,116790,116770,0.02720955],[1754650980000,116760,116770,116770,116760,0.0288812],[1754650800000,116690,116740,116740,116690,0.4716495],[1754650560000,116690,116690,116690,116690,0.06739392],[1754650500000,116670,116700,116700,116670,0.60204256],[1754650440000,116610,116610,116610,116610,0.0021417000000000003],[1754650380000,116560,116570,116570,116560,0.02181367],[1754650320000,116530,116530,116530,116530,3.9996],[1754650260000,116570,116500,116570,116500,0.22079791],[1754650200000,116600,116570,116600,116570,0.05],[1754650140000,116630,116610,116630,116610,0.00105611],[1754649900000,116650,116640,116650,116640,0.00357074],[1754649840000,116660,116650,116660,116650,0.00890257],[1754649660000,116670,116670,116670,116670,0.0007],[1754649600000,116670,116670,116670,116670,0.0011783],[1754649480000,116700,116700,116700,116700,0.00009004],[1754649420000,116700,116700,116700,116700,0.01567163],[1754649000000,116680,116680,116680,116680,0.052825569999999995],[1754648940000,116700,116670,116700,116670,0.05187107],[1754648700000,116730,116710,116730,116710,0.00544736],[1754648640000,116740,116740,116740,116740,0.049315],[1754648520000,116750,116740,116750,116740,0.0015285300000000002],[1754648460000,116760,116760,116760,116760,0.014472],[1754648400000,116770,116770,116770,116770,0.00043315],[1754648340000,116790,116770,116790,116770,0.00024063],[1754647920000,116810,116800,116810,116800,0.00179428],[1754647800000,116840,116830,116840,116830,0.11725016],[1754647740000,116850,116850,116850,116850,0.00044],[1754647440000,116840,116850,116850,116840,0.123713],[1754647380000,116840,116840,116840,116840,0.00011944],[1754647260000,116850,116850,116850,116850,0.00271924],[1754647200000,116850,116850,116850,116850,0.00036666],[1754647080000,116860,116860,116860,116860,0.00168866]]"
+    }
+  },
+  {
+    "timestamp": "2025-08-08T21:49:04.347152+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.bitfinex.com/v2/conf/pub:info:pair",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Age": [
+          "91"
+        ],
+        "Cf-Cache-Status": [
+          "HIT"
+        ],
+        "Cf-Ray": [
+          "96bf7995ee064a09-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 08 Aug 2025 13:49:04 GMT"
+        ],
+        "Last-Modified": [
+          "Fri, 08 Aug 2025 13:47:33 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[[\"AAVE:USD\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,null,null,null,null]],[\"AAVE:UST\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,null,null,null,null]],[\"ADABTC\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,0.3,0.15,null,null]],[\"ADAUSD\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,0.3,0.15,null,null]],[\"ADAUST\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,0.3,0.15,null,null]],[\"AIOZ:USD\",[null,null,null,\"0.001\",\"65000.0\",null,null,null,null,null,null,null]],[\"ALGUSD\",[null,null,null,\"8.0\",\"150000.0\",null,null,null,0.5,0.25,null,null]],[\"ALT11M250830:USD\",[null,null,null,\"0.001\",\"100.0\",null,null,null,null,null,null,null]],[\"ALT11M250830:UST\",[null,null,null,\"0.001\",\"100.0\",null,null,null,null,null,null,null]],[\"ALT11M251029:USD\",[null,null,null,\"0.001\",\"100.0\",null,null,null,null,null,null,null]],[\"ALT11M251029:UST\",[null,null,null,\"0.001\",\"100.0\",null,null,null,null,null,null,null]],[\"ALT2612:USD\",[null,null,null,\"0.02\",\"360000.0\",null,null,null,null,null,null,null]],[\"ALT2612:UST\",[null,null,null,\"0.02\",\"360000.0\",null,null,null,null,null,null,null]],[\"AMPUSD\",[null,null,null,\"2.0\",\"25000.0\",null,null,null,null,null,null,null]],[\"AMPUST\",[null,null,null,\"2.0\",\"25000.0\",null,null,null,null,null,null,null]],[\"APENFT:USD\",[null,null,null,\"3669724.0\",\"40000000000.0\",null,null,null,null,null,null,null]],[\"APEUSD\",[null,null,null,\"0.8\",\"50000.0\",null,null,null,0.6,0.3,null,null]],[\"APEUST\",[null,null,null,\"0.8\",\"50000.0\",null,null,null,0.6,0.3,null,null]],[\"APTUSD\",[null,null,null,\"0.2\",\"30000.0\",null,null,null,0.3,0.15,null,null]],[\"APTUST\",[null,null,null,\"0.2\",\"30000.0\",null,null,null,0.3,0.15,null,null]],[\"ARBUSD\",[null,null,null,\"1.0\",\"75000.0\",null,null,null,null,null,null,null]],[\"ARBUST\",[null,null,null,\"1.0\",\"75000.0\",null,null,null,null,null,null,null]],[\"ATHUSD\",[null,null,null,\"0.001\",\"1300000.0\",null,null,null,null,null,null,null]],[\"ATHUST\",[null,null,null,\"0.001\",\"1300000.0\",null,null,null,null,null,null,null]],[\"ATOUSD\",[null,null,null,\"0.2\",\"100000.0\",null,null,null,0.5,0.25,null,null]],[\"ATOUST\",[null,null,null,\"0.2\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"AUSDT:USD\",[null,null,null,\"0.001\",\"5000000.0\",null,null,null,null,null,null,null]],[\"AUSDT:UST\",[null,null,null,\"0.001\",\"5000000.0\",null,null,null,null,null,null,null]],[\"AVAX:BTC\",[null,null,null,\"0.08\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"AVAX:USD\",[null,null,null,\"0.08\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"AVAX:UST\",[null,null,null,\"0.08\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"B2MUSD\",[null,null,null,\"210.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"B2MUST\",[null,null,null,\"210.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"BCHN:USD\",[null,null,null,\"0.006\",\"1000.0\",null,null,null,0.3,0.15,null,null]],[\"BGBUSD\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"BGBUST\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"BONK:USD\",[null,null,null,\"79634.0\",\"2000000000.0\",null,null,null,null,null,null,null]],[\"BONK:UST\",[null,null,null,\"79634.0\",\"2000000000.0\",null,null,null,null,null,null,null]],[\"BTC:EURQ\",[null,null,null,\"0.00004\",\"100.0\",null,null,null,null,null,null,null]],[\"BTC:EURR\",[null,null,null,\"0.00004\",\"100.0\",null,null,null,null,null,null,null]],[\"BTC:USDQ\",[null,null,null,\"0.00004\",\"100.0\",null,null,null,null,null,null,null]],[\"BTC:USDR\",[null,null,null,\"0.00004\",\"100.0\",null,null,null,null,null,null,null]],[\"BTC:XAUT\",[null,null,null,\"0.00004\",\"250.0\",null,null,null,null,null,null,null]],[\"BTCEUR\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.2,0.1,null,null]],[\"BTCGBP\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.3,0.15,null,null]],[\"BTCJPY\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.3,0.15,null,null]],[\"BTCTRY\",[null,null,null,\"0.00004\",\"500000.0\",null,null,null,null,null,null,null]],[\"BTCUSD\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.1,0.05,null,null]],[\"BTCUST\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.1,0.05,null,null]],[\"BTTUSD\",[null,null,null,\"1970444.0\",\"25000000000.0\",null,null,null,null,null,null,null]],[\"CELO:USD\",[null,null,null,\"2.0\",\"65000.0\",null,null,null,null,null,null,null]],[\"CELO:UST\",[null,null,null,\"2.0\",\"65000.0\",null,null,null,null,null,null,null]],[\"CHZUSD\",[null,null,null,\"16.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"CHZUST\",[null,null,null,\"16.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"CNHT:USD\",[null,null,null,\"34.0\",\"350000.0\",null,null,null,null,null,null,null]],[\"COMP:USD\",[null,null,null,\"0.04\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"COMP:UST\",[null,null,null,\"0.04\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"CRVUSD\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"CRVUST\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"DAIUSD\",[null,null,null,\"2.0\",\"200000.0\",null,null,null,0.66,0.33,null,null]],[\"DOGE:BTC\",[null,null,null,\"22.0\",\"1500000.0\",null,null,null,0.3,0.15,null,null]],[\"DOGE:USD\",[null,null,null,\"22.0\",\"1500000.0\",null,null,null,0.3,0.15,null,null]],[\"DOGE:UST\",[null,null,null,\"22.0\",\"1500000.0\",null,null,null,0.3,0.15,null,null]],[\"DOTUSD\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"DOTUST\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"DSHBTC\",[null,null,null,\"0.06\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"DSHUSD\",[null,null,null,\"0.06\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"DYMUSD\",[null,null,null,\"0.4\",\"11000.0\",null,null,null,null,null,null,null]],[\"DYMUST\",[null,null,null,\"0.4\",\"11000.0\",null,null,null,null,null,null,null]],[\"EGLD:USD\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"EGLD:UST\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"EIGEN:USD\",[null,null,null,\"0.001\",\"14000.0\",null,null,null,null,null,null,null]],[\"EIGEN:UST\",[null,null,null,\"0.001\",\"14000.0\",null,null,null,null,null,null,null]],[\"ENAUSD\",[null,null,null,\"0.001\",\"300000.0\",null,null,null,null,null,null,null]],[\"ENAUST\",[null,null,null,\"0.001\",\"300000.0\",null,null,null,null,null,null,null]],[\"EOSBTC\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"EOSUSD\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"EOSUST\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"ETCBTC\",[null,null,null,\"0.1\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"ETCUSD\",[null,null,null,\"0.1\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"ETCUST\",[null,null,null,\"0.1\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"ETH2X:ETH\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,null,null,null,null]],[\"ETH2X:USD\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,null,null,null,null]],[\"ETH2X:UST\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,null,null,null,null]],[\"ETH:XAUT\",[null,null,null,\"0.0008\",\"2500.0\",null,null,null,null,null,null,null]],[\"ETHBTC\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.2,0.1,null,null]],[\"ETHEUR\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"ETHGBP\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"ETHJPY\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"ETHUSD\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.2,0.1,null,null]],[\"ETHUST\",[null,null,null,\"0.0008\",\"2000.0\",null,null,null,0.2,0.1,null,null]],[\"EURQ:EUR\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"EURQ:USD\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"EURQ:UST\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"EURR:EUR\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"EURR:USD\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"EURR:UST\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"EURUST\",[null,null,null,\"2.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"EUTUSD\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"EUTUST\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"FETUSD\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"FETUST\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"FILUSD\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,0.3,0.15,null,null]],[\"FILUST\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,0.3,0.15,null,null]],[\"FLOKI:USD\",[null,null,null,\"14046.0\",\"2500000000.0\",null,null,null,null,null,null,null]],[\"FLOKI:UST\",[null,null,null,\"14046.0\",\"2500000000.0\",null,null,null,null,null,null,null]],[\"GALA:USD\",[null,null,null,\"44.0\",\"500000.0\",null,null,null,null,null,null,null]],[\"GALA:UST\",[null,null,null,\"44.0\",\"500000.0\",null,null,null,null,null,null,null]],[\"GBPUST\",[null,null,null,\"2.0\",\"500000.0\",null,null,null,null,null,null,null]],[\"GOMINING:USD\",[null,null,null,\"6.0\",\"360000.0\",null,null,null,null,null,null,null]],[\"GOMINING:UST\",[null,null,null,\"6.0\",\"360000.0\",null,null,null,null,null,null,null]],[\"GTXUSD\",[null,null,null,\"0.6\",\"10000.0\",null,null,null,null,null,null,null]],[\"GTXUST\",[null,null,null,\"0.6\",\"10000.0\",null,null,null,null,null,null,null]],[\"GUNUSD\",[null,null,null,\"0.001\",\"2000000.0\",null,null,null,null,null,null,null]],[\"GUNUST\",[null,null,null,\"0.001\",\"2000000.0\",null,null,null,null,null,null,null]],[\"HILSV:USD\",[null,null,null,\"0.001\",\"100.0\",null,null,null,null,null,null,null]],[\"HIXUSD\",[null,null,null,\"3618.0\",\"300000000.0\",null,null,null,null,null,null,null]],[\"HIXUST\",[null,null,null,\"3618.0\",\"300000000.0\",null,null,null,null,null,null,null]],[\"HTXDAO:USD\",[null,null,null,\"0.001\",\"20000000000.0\",null,null,null,null,null,null,null]],[\"HTXDAO:UST\",[null,null,null,\"0.001\",\"20000000000.0\",null,null,null,null,null,null,null]],[\"ICPUSD\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,null,null,null,null]],[\"ICPUST\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,null,null,null,null]],[\"IOTBTC\",[null,null,null,\"6.0\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"IOTUSD\",[null,null,null,\"6.0\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"JASMY:USD\",[null,null,null,\"144.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"JASMY:UST\",[null,null,null,\"144.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"JPYUST\",[null,null,null,\"300.0\",\"100000000.0\",null,null,null,null,null,null,null]],[\"JSTUSD\",[null,null,null,\"52.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"JSTUST\",[null,null,null,\"52.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"JUPUSD\",[null,null,null,\"4.0\",\"350000.0\",null,null,null,null,null,null,null]],[\"JUPUST\",[null,null,null,\"4.0\",\"350000.0\",null,null,null,null,null,null,null]],[\"JUSTICE:USD\",[null,null,null,\"15000.0\",\"300000000.0\",null,null,null,null,null,null,null]],[\"JUSTICE:UST\",[null,null,null,\"15000.0\",\"300000000.0\",null,null,null,null,null,null,null]],[\"JXXUSD\",[null,null,null,\"0.001\",\"400000.0\",null,null,null,null,null,null,null]],[\"JXXUST\",[null,null,null,\"0.001\",\"400000.0\",null,null,null,null,null,null,null]],[\"KAIA:USD\",[null,null,null,\"0.001\",\"400000.0\",null,null,null,null,null,null,null]],[\"KAIA:UST\",[null,null,null,\"0.001\",\"400000.0\",null,null,null,null,null,null,null]],[\"KANUSD\",[null,null,null,\"1556.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"KANUST\",[null,null,null,\"1556.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"KAVA:USD\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"KAVA:UST\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"LDOUSD\",[null,null,null,\"0.6\",\"100000.0\",null,null,null,null,null,null,null]],[\"LDOUST\",[null,null,null,\"0.6\",\"100000.0\",null,null,null,null,null,null,null]],[\"LEOBTC\",[null,null,null,\"0.6\",\"50000.0\",null,null,null,null,null,null,null]],[\"LEOETH\",[null,null,null,\"0.6\",\"50000.0\",null,null,null,null,null,null,null]],[\"LEOUSD\",[null,null,null,\"0.6\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"LEOUST\",[null,null,null,\"0.6\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"LIFIII:USD\",[null,null,null,\"74.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"LIFIII:UST\",[null,null,null,\"74.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"LINK:USD\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"LINK:UST\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"LTCBTC\",[null,null,null,\"0.04\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"LTCUSD\",[null,null,null,\"0.04\",\"5000.0\",null,null,null,0.2,0.1,null,null]],[\"LTCUST\",[null,null,null,\"0.04\",\"2000.0\",null,null,null,0.2,0.1,null,null]],[\"MEWUSD\",[null,null,null,\"0.001\",\"11500000.0\",null,null,null,null,null,null,null]],[\"MEWUST\",[null,null,null,\"0.001\",\"11500000.0\",null,null,null,null,null,null,null]],[\"MIMUSD\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"MIMUST\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"MKRUSD\",[null,null,null,\"0.002\",\"2500.0\",null,null,null,0.3,0.15,null,null]],[\"MKRUST\",[null,null,null,\"0.002\",\"2500.0\",null,null,null,null,null,null,null]],[\"MXNT:USD\",[null,null,null,\"34.0\",\"10000000.0\",null,null,null,null,null,null,null]],[\"NEAR:USD\",[null,null,null,\"0.4\",\"25000.0\",null,null,null,null,null,null,null]],[\"NEAR:UST\",[null,null,null,\"0.4\",\"25000.0\",null,null,null,null,null,null,null]],[\"NEOUSD\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,0.3,0.15,null,null]],[\"NEOUST\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,0.3,0.15,null,null]],[\"NEXO:BTC\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"NEXO:USD\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"NEXO:UST\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"NYMUSD\",[null,null,null,\"0.001\",\"600000.0\",null,null,null,null,null,null,null]],[\"NYMUST\",[null,null,null,\"0.001\",\"600000.0\",null,null,null,null,null,null,null]],[\"OMNUSD\",[null,null,null,\"0.8\",\"20000.0\",null,null,null,null,null,null,null]],[\"OPXUSD\",[null,null,null,\"0.6\",\"250000.0\",null,null,null,null,null,null,null]],[\"OPXUST\",[null,null,null,\"0.6\",\"250000.0\",null,null,null,null,null,null,null]],[\"PEPE:USD\",[null,null,null,\"392156.0\",\"50000000000.0\",null,null,null,null,null,null,null]],[\"PEPE:UST\",[null,null,null,\"392156.0\",\"50000000000.0\",null,null,null,null,null,null,null]],[\"PNKUSD\",[null,null,null,\"52.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"POLUSD\",[null,null,null,\"0.001\",\"65000.0\",null,null,null,null,null,null,null]],[\"POLUST\",[null,null,null,\"0.001\",\"65000.0\",null,null,null,null,null,null,null]],[\"RRTUSD\",[null,null,null,\"4.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"SEIUSD\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"SEIUST\",[null,null,null,\"2.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"SHIB:USD\",[null,null,null,\"141010.0\",\"5000000000.0\",null,null,null,0.3,0.15,null,null]],[\"SHIB:UST\",[null,null,null,\"141010.0\",\"5000000000.0\",null,null,null,0.3,0.15,null,null]],[\"SHMUSD\",[null,null,null,\"0.001\",\"250000.0\",null,null,null,null,null,null,null]],[\"SHMUST\",[null,null,null,\"0.001\",\"250000.0\",null,null,null,null,null,null,null]],[\"SOLBTC\",[null,null,null,\"0.02\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SOLUSD\",[null,null,null,\"0.02\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SOLUST\",[null,null,null,\"0.02\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SONIC:USD\",[null,null,null,\"0.001\",\"70000.0\",null,null,null,null,null,null,null]],[\"SONIC:UST\",[null,null,null,\"0.001\",\"70000.0\",null,null,null,null,null,null,null]],[\"SPEC:USD\",[null,null,null,\"0.001\",\"22000.0\",null,null,null,null,null,null,null]],[\"SPEC:UST\",[null,null,null,\"0.001\",\"22000.0\",null,null,null,null,null,null,null]],[\"SPELL:USD\",[null,null,null,\"1640.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"SPELL:UST\",[null,null,null,\"1640.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"STGUSD\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"STGUST\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,null,null,null,null]],[\"STRK:USD\",[null,null,null,\"2.0\",\"30000.0\",null,null,null,null,null,null,null]],[\"STRK:UST\",[null,null,null,\"2.0\",\"30000.0\",null,null,null,null,null,null,null]],[\"STXUSD\",[null,null,null,\"0.001\",\"75000.0\",null,null,null,null,null,null,null]],[\"STXUST\",[null,null,null,\"0.001\",\"75000.0\",null,null,null,null,null,null,null]],[\"SUIUSD\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SUIUST\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SUNUSD\",[null,null,null,\"216.0\",\"10000000.0\",null,null,null,null,null,null,null]],[\"SUNUST\",[null,null,null,\"216.0\",\"10000000.0\",null,null,null,null,null,null,null]],[\"SUSHI:USD\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SUSHI:UST\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"SWEAT:USD\",[null,null,null,\"168.0\",\"7000000.0\",null,null,null,null,null,null,null]],[\"SWEAT:UST\",[null,null,null,\"168.0\",\"7000000.0\",null,null,null,null,null,null,null]],[\"TESTADA:TESTUSD\",[null,null,null,\"4.0\",\"250000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTALGO:TESTUSD\",[null,null,null,\"8.0\",\"150000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTAPT:TESTUSD\",[null,null,null,\"0.2\",\"30000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTAVAX:TESTUSD\",[null,null,null,\"0.08\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTBTC:TESTUSD\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTBTC:TESTUSDT\",[null,null,null,\"0.00004\",\"2000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTDOGE:TESTUSD\",[null,null,null,\"22.0\",\"1500000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTDOT:TESTUSD\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTEOS:TESTUSD\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"TESTETH:TESTUSD\",[null,null,null,\"0.0008\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTFIL:TESTUSD\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTLTC:TESTUSD\",[null,null,null,\"0.04\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTNEAR:TESTUSD\",[null,null,null,\"0.4\",\"25000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTSOL:TESTUSD\",[null,null,null,\"0.02\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"TESTXAUT:TESTUSD\",[null,null,null,\"0.002\",\"400.0\",null,null,null,0.3,0.15,null,null]],[\"TESTXTZ:TESTUSD\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,0.3,0.15,null,null]],[\"TIAUSD\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,null,null,null,null]],[\"TIAUST\",[null,null,null,\"0.2\",\"10000.0\",null,null,null,null,null,null,null]],[\"TITAN1:GBP\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"TITAN1:USD\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"TITAN2:GBP\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"TITAN2:USD\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"TOKEN:USD\",[null,null,null,\"0.001\",\"650000.0\",null,null,null,null,null,null,null]],[\"TOKEN:UST\",[null,null,null,\"0.001\",\"650000.0\",null,null,null,null,null,null,null]],[\"TONUSD\",[null,null,null,\"1.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"TONUST\",[null,null,null,\"1.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"TRXBTC\",[null,null,null,\"22.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"TRXEUR\",[null,null,null,\"22.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"TRXUSD\",[null,null,null,\"22.0\",\"1000000.0\",null,null,null,0.3,0.15,null,null]],[\"TRXUST\",[null,null,null,\"22.0\",\"1000000.0\",null,null,null,0.3,0.15,null,null]],[\"TRYUST\",[null,null,null,\"62.0\",\"5000000.0\",null,null,null,null,null,null,null]],[\"TSDUSD\",[null,null,null,\"2.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"TSDUST\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"UDCUSD\",[null,null,null,\"2.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"UDCUST\",[null,null,null,\"2.0\",\"500000.0\",null,null,null,null,null,null,null]],[\"UNIUSD\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"UNIUST\",[null,null,null,\"0.2\",\"50000.0\",null,null,null,0.3,0.15,null,null]],[\"UOSBTC\",[null,null,null,\"4.0\",\"400000.0\",null,null,null,null,null,null,null]],[\"UOSUSD\",[null,null,null,\"4.0\",\"400000.0\",null,null,null,null,null,null,null]],[\"USDF:USD\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"USDF:UST\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"USDQ:USD\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"USDQ:UST\",[null,null,null,\"0.001\",\"50000.0\",null,null,null,null,null,null,null]],[\"USDR:USD\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"USDR:UST\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"UST:CNHT\",[null,null,null,\"2.0\",\"50000.0\",null,null,null,null,null,null,null]],[\"UST:MXNT\",[null,null,null,\"2.0\",\"10000000.0\",null,null,null,null,null,null,null]],[\"USTBL:USD\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"USTBL:UST\",[null,null,null,\"0.001\",\"100000.0\",null,null,null,null,null,null,null]],[\"USTUSD\",[null,null,null,\"2.0\",\"5000000.0\",null,null,null,0.1,0.05,null,null]],[\"UXLINK:USD\",[null,null,null,\"0.001\",\"500000.0\",null,null,null,null,null,null,null]],[\"UXLINK:UST\",[null,null,null,\"0.001\",\"500000.0\",null,null,null,null,null,null,null]],[\"WBTBTC\",[null,null,null,\"0.00004\",\"10.0\",null,null,null,null,null,null,null]],[\"WBTUSD\",[null,null,null,\"0.00004\",\"10.0\",null,null,null,null,null,null,null]],[\"WHBT:USD\",[null,null,null,\"0.2\",\"12500.0\",null,null,null,null,null,null,null]],[\"WHBT:UST\",[null,null,null,\"0.2\",\"12500.0\",null,null,null,null,null,null,null]],[\"WIFUSD\",[null,null,null,\"2.0\",\"10000.0\",null,null,null,null,null,null,null]],[\"WIFUST\",[null,null,null,\"2.0\",\"10000.0\",null,null,null,null,null,null,null]],[\"WOOUSD\",[null,null,null,\"4.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"WOOUST\",[null,null,null,\"4.0\",\"2500000.0\",null,null,null,null,null,null,null]],[\"XAUT:BTC\",[null,null,null,\"0.002\",\"400.0\",null,null,null,0.2,0.1,null,null]],[\"XAUT:USD\",[null,null,null,\"0.002\",\"400.0\",null,null,null,0.2,0.1,null,null]],[\"XAUT:UST\",[null,null,null,\"0.002\",\"400.0\",null,null,null,0.2,0.1,null,null]],[\"XDCUSD\",[null,null,null,\"54.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"XDCUST\",[null,null,null,\"54.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"XLMBTC\",[null,null,null,\"14.0\",\"1000000.0\",null,null,null,0.5,0.25,null,null]],[\"XLMUSD\",[null,null,null,\"14.0\",\"1000000.0\",null,null,null,0.5,0.25,null,null]],[\"XLMUST\",[null,null,null,\"14.0\",\"1000000.0\",null,null,null,0.5,0.25,null,null]],[\"XMRBTC\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"XMRUSD\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"XMRUST\",[null,null,null,\"0.02\",\"5000.0\",null,null,null,0.3,0.15,null,null]],[\"XRDBTC\",[null,null,null,\"44.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"XRDUSD\",[null,null,null,\"44.0\",\"1000000.0\",null,null,null,null,null,null,null]],[\"XRPBTC\",[null,null,null,\"4.0\",\"2000000.0\",null,null,null,0.2,0.1,null,null]],[\"XRPUSD\",[null,null,null,\"4.0\",\"2000000.0\",null,null,null,0.2,0.1,null,null]],[\"XRPUST\",[null,null,null,\"4.0\",\"2000000.0\",null,null,null,0.3,0.15,null,null]],[\"XTZUSD\",[null,null,null,\"2.0\",\"100000.0\",null,null,null,null,null,null,null]],[\"YFIUSD\",[null,null,null,\"0.0002\",\"100.0\",null,null,null,null,null,null,null]],[\"YFIUST\",[null,null,null,\"0.0002\",\"100.0\",null,null,null,null,null,null,null]],[\"ZECBTC\",[null,null,null,\"0.06\",\"20000.0\",null,null,null,0.3,0.15,null,null]],[\"ZECUSD\",[null,null,null,\"0.06\",\"20000.0\",null,null,null,0.3,0.15,null,null]],[\"ZKXUSD\",[null,null,null,\"0.001\",\"200000.0\",null,null,null,null,null,null,null]],[\"ZKXUST\",[null,null,null,\"0.001\",\"200000.0\",null,null,null,null,null,null,null]],[\"ZROUSD\",[null,null,null,\"0.001\",\"10000.0\",null,null,null,null,null,null,null]],[\"ZROUST\",[null,null,null,\"0.001\",\"10000.0\",null,null,null,null,null,null,null]],[\"ZRXUSD\",[null,null,null,\"6.0\",\"200000.0\",null,null,null,0.3,0.15,null,null]]]]"
+    }
+  },
+  {
+    "timestamp": "2025-08-08T21:49:04.386303+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.bitfinex.com/v2/tickers?symbols=ALL",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Age": [
+          "5"
+        ],
+        "Cf-Cache-Status": [
+          "HIT"
+        ],
+        "Cf-Ray": [
+          "96bf79963e634a09-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 08 Aug 2025 13:49:04 GMT"
+        ],
+        "Last-Modified": [
+          "Fri, 08 Aug 2025 13:48:59 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[\"tBTCUSD\",117000,112.34323682,117010,12.65898966,240,0.00205479,117040,856.54241629,117900,115780],[\"tLTCUSD\",123.01,545.23544195,123.02,887.69593016,2.09,0.0172813,123.03,65012.99073255,124.62,119.43],[\"tLTCBTC\",0.0010512,2073.11472868,0.0010522,2378.53191867,0.0000206,0.01996124,0.0010526,34454.33192808,0.0010614,0.0010276],[\"tETHUSD\",3989,59.9535476,3989.1,84.42820759,126.6,0.03278689,3987.9,26688.3337787,3990.5,3786.1],[\"tETHBTC\",0.034093,213.30376844,0.034101,257.78399257,0.000933,0.02813886,0.03409,30439.92186886,0.03409,0.032717],[\"tETCBTC\",0.00018726,10184.50087987,0.00018792,11792.49147616,0.00000383,0.02111473,0.00018522,145331.6703376,0.00018879,0.00017779],[\"tETCUSD\",21.907,13044.38698212,21.945,9281.86125668,0.705,0.03329398,21.88,206908.10121578,21.997,20.584],[\"tRRTUSD\",0.75001,320541.45069955,0.8,62689.53706285,0,0,0.7521,11.30206275,0.7521,0.7521],[\"tZECUSD\",38.568,4189.20781991,38.6,1911.2132148,3.26,0.09243507,38.528,3401.65839292,38.528,35.201],[\"tZECBTC\",0.00032413,3040.93963097,0.00033,393.73902973,0.00001806,0.05826934,0.000328,16.31601899,0.000328,0.00030301],[\"tXMRUSD\",270.61,310.0683715,270.62,232.46281387,-4.99,-0.01810529,270.62,33852.27009535,275.61,247.48],[\"tXMRBTC\",0.0023136,840.2662691,0.002317,990.95713843,-0.0000923,-0.03858212,0.0023,8650.26102465,0.0023923,0.002132],[\"tDSHUSD\",22.292,12738.63057068,22.314,6527.84023669,0.471,0.02180959,22.067,58849.35317017,22.458,21.366],[\"tDSHBTC\",0.00019059,13001.9878428,0.00019099,12211.51852104,0.00000479,0.0259129,0.00018964,9039.64723621,0.0001921,0.00018485],[\"tBTCEUR\",100280,5.92038403,100370,6.51552201,250,0.00249551,100430,2.4826315,100880,99535],[\"tBTCJPY\",16779000,10.78039276,17818000,0.01062974,-12000,-0.00071509,16769000,0.0003217,16781000,16769000],[\"tXRPUSD\",3.3533,92024.65406749,3.3547,84209.55071547,0.2801,0.09110128,3.3547,5228021.49544144,3.3839,3.0127],[\"tXRPBTC\",0.00002865,130234.82749317,0.00002869,128063.2943991,0.00000211,0.07995453,0.0000285,3423136.80880677,0.00002895,0.00002603],[\"tIOTUSD\",0.20173,480298.4492327,0.20208,128467.17259572,0.00592,0.03017791,0.20209,324808.27075172,0.2036,0.19347],[\"tIOTBTC\",0.00000172,136035.35628365,0.00000174,208632.5914477,4e-8,0.02380952,0.00000172,28883.39017904,0.00000175,0.00000165],[\"tEOSUSD\",0.52978,21500.80642952,0.53002,19592.42921728,-0.00027,-0.00051528,0.52372,9967.57947586,0.534,0.51351],[\"tEOSBTC\",0.00000452,73494.0328696,0.00000455,16436.10720502,6e-8,0.01342282,0.00000453,153.16331677,0.00000456,0.00000441],[\"tNEOUSD\",6.3888,32846.34161462,6.3999,19905.07923754,0.1635,0.02621747,6.3998,195884.00067753,6.4,6.0764],[\"tZRXUSD\",0.25404,210467.76997753,0.25828,326803.959577,0.00941,0.03813267,0.25618,6398.20304955,0.25842,0.24677],[\"tTRXUSD\",0.33915,659419.04134805,0.33933,473050.99509861,-0.00086,-0.00252949,0.33913,48514307.37715302,0.34208,0.33463],[\"tTRXBTC\",0.00000289,1431088.18250554,0.00000291,1318560.88103035,-1e-8,-0.00342466,0.00000291,10037665.16460506,0.00000293,0.00000286],[\"tBTCGBP\",87107,0.42415527,87286,0.34545059,200,0.00229885,87200,0.01615293,87700,86580],[\"tETHEUR\",3414.9,65.73536689,3424.6,66.57058391,106.7,0.03217732,3422.7,90.51374866,3422.7,3276.6],[\"tETHJPY\",571910,25102.35670134,607290,0.16506083,0,0,542170,0.00287481,542170,542020],[\"tETHGBP\",2969.6,102.38954897,2981.8,83.99069198,0,0,2920.6,0.0138,2920.6,2920.6],[\"tDAIUSD\",1.0001,24638.24640357,1.0047,25959.76003042,0.0034,0.00339559,1.0047,1765.64446837,1.0047,1.0013],[\"tXLMUSD\",0.46132,187003.43571751,0.46151,228847.34709194,0.04522,0.10846206,0.46214,20682033.11997922,0.46841,0.40367],[\"tXLMBTC\",0.00000393,125456.38862609,0.00000395,60442.33193536,3.8e-7,0.10644258,0.00000395,1194136.38667787,0.000004,0.00000348],[\"tMKRUSD\",2018.5,65.39116919,2020.5,45.05518972,32.3,0.01636189,2006.4,906.01463048,2030.5,1936.1],[\"tXTZUSD\",0.82479,223705.1880655,0.82706,226794.86363473,0.01625,0.02023384,0.81936,1368418.47572996,0.82837,0.77771],[\"tTRXEUR\",0.28983,6185582.0074686,0.29156,138016.59137876,-0.00059,-0.00203969,0.28867,34632.7947348,0.28926,0.28867],[\"tOMNUSD\",1.502,2806.93415932,2.2699,4001.10876189,0,0,1.6,2.50835424,1.6,1.6],[\"tPNKUSD\",0.034872,800000,0.035096,800000,-0.000963,-0.02672699,0.035068,1544565.027806,0.036031,0.034928],[\"tUSTUSD\",1.0013,10440816.85252161,1.0014,28553442.32486658,0.0002,0.00019978,1.0013,93142082.40413111,1.0016,1.0001],[\"tEUTUSD\",1.1409,121141.68952619,1.1599,4068.11447205,0.0001,0.00008622,1.1599,33.26422422,1.1599,1.1598],[\"tUDCUSD\",1.0011,841506.27097279,1.0012,962144.17719501,0.0003,0.00029973,1.0012,794057.09906033,1.0012,1],[\"tTSDUSD\",0.99546,73472.37728657,1.0033,17075.28840901,0,0,0.99546,10.91680176,0.99546,0.99546],[\"tBTTUSD\",6.7e-7,40724143456.6829,6.8e-7,39105213285.00639,0,0,6.5e-7,614060187.835179,6.5e-7,6.5e-7],[\"tBTCUST\",116830,8.16294448,116840,9.18308011,200,0.00171453,116850,790.02137419,117800,115630],[\"tETHUST\",3984.1,51.79980378,3985.1,82.20178098,126.1,0.03269296,3983.2,14009.82494491,3985.1,3781.9],[\"tLTCUST\",122.9,343.83409264,122.91,1098.21869711,2.18,0.01805084,122.95,37131.94584023,124.39,119.61],[\"tEOSUST\",0.52947,464723.35528312,0.53063,19174.08322625,0.00006,0.0001143,0.52498,3991.09932965,0.53367,0.51359],[\"tATOUSD\",4.6077,51188.16712622,4.6185,31606.3993565,0.2069,0.04701204,4.6079,395516.64549122,4.6079,4.3181],[\"tWBTUSD\",115850,1.9106676,117150,0.0441293,0,0,112920,0.00010591,112920,112920],[\"tLEOUSD\",9.0004,263.34633853,9.0117,14539.57427734,-0.0078,-0.00086479,9.0117,14109.57672418,9.02,8.9446],[\"tLEOBTC\",0.00007003,208246.23296312,0.00008899,19348.95696798,-0.00000197,-0.02430598,0.00007908,21.45292472,0.00008105,0.00007752],[\"tLEOUST\",8.9776,213.16735702,8.9883,6354.93085258,0.0243,0.00271084,8.9883,4685.25786469,9.039,8.9419],[\"tLEOETH\",0.0022627,68458.03381352,0.002308,63.1449749,-0.0000574,-0.02474031,0.0022627,9.54790325,0.0023899,0.0022627],[\"tGTXUSD\",16.936,2505.01598221,16.946,5042.33196939,-0.042,-0.00251452,16.661,636.9476,16.703,16.661],[\"tKANUSD\",0.00075794,21467428.03853274,0.00075797,21067219.13338528,-0.00002498,-0.03186306,0.000759,393253820.88036567,0.000785,0.00072622],[\"tGTXUST\",16.912,5875.08595762,16.922,5187.6636,0,0,16.702,636.9476,16.702,16.702],[\"tKANUST\",0.00075495,2608360.09123623,0.00077182,7787546.10550443,-0.00000923,-0.01180337,0.00077275,18209321.22434043,0.00078398,0.000734],[\"tAMPUSD\",1.2832,13476.96274594,1.2841,7682.92651597,0.0365,0.02927729,1.2832,14373.54555368,1.2833,1.2318],[\"tALGUSD\",0.26604,587746.10024961,0.26634,433810.65412016,0.00606,0.0234022,0.26501,17098072.72852006,0.26899,0.25121],[\"tAMPUST\",1.2798,40440.05146696,1.28,3984.86085264,0.0278,0.0222027,1.2799,26410.40600038,1.2798,1.2284],[\"tUOSUSD\",0.04901,2730620.43545903,0.04917,80747.2912708,0.00098,0.02040391,0.04901,168850.62852884,0.04917,0.04716],[\"tUOSBTC\",4.1e-7,81207.3535897,4.2e-7,140950.90464638,1e-8,0.02439024,4.2e-7,244227.96587545,4.3e-7,3.9e-7],[\"tUDCUST\",0.99947,547313.07504956,0.99958,829858.7286311,-0.00017,-0.00017003,0.99963,380545.34893105,0.99988,0.99944],[\"tTSDUST\",0.99348,34294.34880775,0.99841,35488.02817575,0,0,0.99841,12.0085976,0.99841,0.99841],[\"tUST:CNHT\",8,50628.65932048,9.25,2390.57747247,0,0,9.25,3.052536,9.25,9.25],[\"tCHZUSD\",0.041534,3331645.34835669,0.041609,2243621.71850318,0.001246,0.03092195,0.041541,26210825.16542004,0.041576,0.039823],[\"tCHZUST\",0.041505,3934959.47642632,0.041569,180742.53847837,0.000988,0.02464025,0.041085,5307925.40863399,0.04189,0.039962],[\"tXAUT:USD\",3393.9,340.30317618,3397.9,104.21465287,8,0.00236044,3397.2,1860.7319862,3401,3378],[\"tXAUT:BTC\",0.029035,120.77668812,0.029066,148.68737619,-0.000006,-0.00020617,0.029096,1660.68568929,0.02923,0.0288],[\"tXAUT:UST\",3392,444.40159251,3393.2,151.35931768,3.5,0.00103407,3388.2,3335.08336178,3401,3374.5],[\"tTESTBTC:TESTUSD\",116910,223.19333222,117140,227.02378687,280,0.00239603,117140,4.92169815,117960,115900],[\"tTESTBTC:TESTUSDT\",116730,249.80598001,116940,218.08716236,230,0.0019707,116940,1.57805727,117810,115810],[\"tDOTUSD\",3.9276,71388.27937042,3.9324,41352.8810378,0.1227,0.03227928,3.9239,1179701.50782312,3.9526,3.6986],[\"tADAUSD\",0.79758,112251.48092582,0.79815,213183.78995569,0.025,0.0324271,0.79596,13903259.99557644,0.80673,0.74352],[\"tADABTC\",0.00000681,525552.22919344,0.00000683,455318.7574682,1.9e-7,0.02883156,0.00000678,4803592.51842861,0.00000689,0.00000643],[\"tADAUST\",0.79642,128493.94918866,0.79734,237543.89329385,0.02585,0.03372868,0.79226,7328830.87095344,0.80379,0.74305],[\"tFETUSD\",0.69714,50969.11208799,0.69897,59928.42738619,0.01519,0.02232576,0.69557,8309.69588487,0.69918,0.68038],[\"tFETUST\",0.69659,22956.06367976,0.69808,33754.37921015,0.00881,0.01292964,0.69019,15532.40256725,0.69343,0.68011],[\"tDOTUST\",3.9269,46124.96564757,3.927,32992.02667167,0.1444,0.0381375,3.9307,420852.78243561,3.9593,3.6915],[\"tLINK:USD\",19.776,10817.45398994,19.788,9981.79268869,1.733,0.09598449,19.788,582589.64898338,19.788,17.632],[\"tLINK:UST\",19.745,11296.03655095,19.759,8739.00027769,1.656,0.0916842,19.718,510649.34780327,19.718,17.537],[\"tCOMP:USD\",48.648,4844.15969653,48.829,4812.78983009,0.389,0.0081177,48.309,21746.11160669,49.847,47.291],[\"tCOMP:UST\",48.638,3480.16816898,48.829,4713.73679508,0.632,0.01327536,48.239,4652.74442893,49.755,47.385],[\"tEGLD:USD\",15.467,15336.99232382,15.48,11016.32172566,0.057,0.00373134,15.333,70191.26147541,15.728,14.663],[\"tEGLD:UST\",15.447,10961.07551046,15.472,15334.86964941,0.081,0.00530695,15.344,30541.77503049,15.62,14.822],[\"tUNIUSD\",10.707,5297.75064539,10.719,11258.63470029,0.546,0.05373487,10.707,663553.10706056,10.721,9.9382],[\"tUNIUST\",10.689,6221.6487596,10.7,10942.86963908,0.549,0.05410999,10.695,333214.33542313,10.695,9.9308],[\"tAVAX:USD\",23.623,2764.54675673,23.638,3072.11565031,0.725,0.03176203,23.551,356247.73652424,23.714,22.258],[\"tAVAX:UST\",23.592,2889.51335309,23.619,6633.34646908,0.723,0.03183059,23.437,151843.8650093,23.674,22.237],[\"tYFIUSD\",5584.7,2.3140323,5594.1,1.51843756,201.5,0.03747861,5577.9,24.0793314,5620,5341.8],[\"tYFIUST\",5560.2,181.92925457,5589.3,1.17906136,81.4,0.01508357,5478,5.62634186,5535.9,4956.3],[\"tFILUSD\",2.5078,71703.63256753,2.5116,65731.02237367,0.0674,0.02767626,2.5027,738278.73299195,2.5243,2.3944],[\"tFILUST\",2.505,57247.56281728,2.5098,56469.07728445,0.0581,0.02388686,2.4904,541477.85580707,2.5217,2.3992],[\"tJSTUSD\",0.033136,867152.5013444,0.033401,936299.67192475,0,0,0.032937,408.60236987,0.032937,0.032937],[\"tJSTUST\",0.033148,3959685.1465384,0.033413,720440.26251287,0,0,0.033139,202.96135908,0.033139,0.033139],[\"tBCHN:USD\",581.11,343.82247735,581.97,177.70684178,4.73,0.00821851,580.26,2533.64864829,588,574.02],[\"tXDCUSD\",0.094022,797358.66552891,0.094024,781880.97831464,0.000667,0.00714462,0.094024,2418560.28044728,0.094442,0.090565],[\"tXDCUST\",0.09397,761984.06222647,0.094009,697386.21855894,0.000622,0.00666039,0.09401,5844977.10541675,0.094697,0.09044],[\"tSUNUSD\",0.022529,1536234.58512638,0.02253,1568166.4464666,0,0,0.022396,499.7134,0.022396,0.022396],[\"tSUNUST\",0.022455,92186398.6396424,0.022499,1568103.04387446,0,0,0.022499,323.208868,0.022499,0.022499],[\"tEUTUST\",1.1403,10033.86399273,1.15,145465.97816324,0.0099,0.00868345,1.15,14.76713226,1.15,1.1401],[\"tXMRUST\",270.32,178.06802095,270.4,612.61279922,-5.03,-0.01826899,270.3,23923.17911551,275.33,247.66],[\"tXRPUST\",3.3493,47035.63007123,3.3498,52136.07587568,0.2781,0.09054503,3.3495,7423313.40115383,3.3819,3.0099],[\"tSUSHI:USD\",0.84281,152063.26577357,0.84447,128026.00106014,0.00835,0.01018293,0.82835,963497.4575217,0.85001,0.79359],[\"tSUSHI:UST\",0.84196,158254.60436063,0.84397,181301.64529973,0.02275,0.02787375,0.83893,1449429.2091391,0.85122,0.79224],[\"tETH2X:USD\",3680.1,480818.71960333,3972.8,23.8993625,0,0,3840,0.1,3840,3840],[\"tETH2X:UST\",3510.8,259581.27926766,99990,9.29266328,-18,-0.00782609,2282,0.18275182,2300,2282],[\"tETH2X:ETH\",0.993,63896.89704935,1.0005,264.49180032,-0.00001,-0.00001007,0.993,0.099957,0.99301,0.993],[\"tAAVE:USD\",285.7,728.01844916,286.19,549.15771862,9.39,0.03442082,282.19,6822.5419918,288.49,271.76],[\"tAAVE:UST\",285.46,469.22358,285.79,804.363232,10.01,0.03671778,282.63,6786.75563967,287.76,271.34],[\"tXLMUST\",0.46058,248193.96607146,0.46105,288351.92849379,0.04255,0.10205061,0.4595,8265902.54096259,0.46763,0.4047],[\"tSOLUSD\",177.9,559.83184682,177.93,1332.12323707,6.01,0.03496219,177.91,97613.22876882,178.23,167.24],[\"tSOLUST\",177.67,749.58441367,177.68,812.48059788,5.93,0.03453095,177.66,60629.18007273,177.91,167.1],[\"tNEAR:USD\",2.6782,71267.65256289,2.6853,57428.9155532,0.0799,0.03068828,2.6835,192985.8626597,2.6962,2.5504],[\"tNEAR:UST\",2.6732,498406.12055512,2.6802,777.20502876,0.0875,0.03378378,2.6775,47621.98844881,2.6998,2.3769],[\"tDOGE:USD\",0.22601,375500.92421552,0.22615,428232.16481944,0.01123,0.05215493,0.22655,94850405.7859324,0.22722,0.21043],[\"tDOGE:UST\",0.22569,368221.00052786,0.22585,407125.1876462,0.00879,0.0410077,0.22314,46077290.64028105,0.22669,0.21074],[\"tNEXO:USD\",1.3275,33465.95728754,1.3303,22854.43375919,-0.0077,-0.00577731,1.3251,6020.57289103,1.3503,1.3251],[\"tNEXO:BTC\",0.00001135,30746.59188057,0.00001139,22426.63881402,-1e-8,-0.00088106,0.00001134,4523.35245045,0.00001149,0.00001134],[\"tNEXO:UST\",1.3255,709575.11373003,1.3309,21591.02044216,-0.0018,-0.00134882,1.3327,1797.39800606,1.345,1.3274],[\"tICPUSD\",5.4115,43359.80517615,5.4298,35046.40841533,0.1298,0.02476107,5.3719,89375.85369253,5.4117,5.2031],[\"tICPUST\",5.4026,873.36815609,5.4514,1629.95208992,0.1053,0.02008699,5.3475,6641.50603322,5.4,5.1997],[\"tXRDUSD\",0.0043342,2146133.80569516,0.0044,5285689.0607011,0.000413,0.10358666,0.0044,2770892.0437446,0.0044,0.003886],[\"tXRDBTC\",3e-8,4570345.17533671,4e-8,8906824.79947794,1e-8,0.33333333,4e-8,1068996.48186572,4e-8,3e-8],[\"tDOGE:BTC\",0.00000193,2607661.39848783,0.00000194,1727175.9485595,7e-8,0.03804348,0.00000191,4758313.91380676,0.00000191,0.00000183],[\"tETCUST\",21.896,10919.01947125,21.926,8740.44172937,0.696,0.03311605,21.713,94377.55193753,21.856,20.603],[\"tNEOUST\",6.3551,17512.05042726,6.3964,663.98916783,0.1759,0.02853852,6.3395,1585.05977253,6.354,6.0864],[\"tATOUST\",4.6044,41122.90599197,4.6133,33993.24713889,0.2194,0.05071191,4.5458,143376.07951309,4.5479,4.3263],[\"tTRXUST\",0.33887,332608.42755578,0.33889,471549.38176261,-0.00051,-0.00150177,0.33909,23838771.18774067,0.34168,0.33416],[\"tEURUST\",1.164,209087.48601558,1.1657,66010.86649223,-0.001,-0.000858,1.1645,1324256.02160976,1.168,1.1625],[\"tBTC:XAUT\",34.402,3.23551065,34.435,3.2425162,-0.022,-0.00063844,34.437,9.94832623,34.74,34.227],[\"tETH:XAUT\",1.1733,70.84071479,1.1768,66.8928148,0.0225,0.01997337,1.149,284.60661086,1.1549,1.1265],[\"tSOLBTC\",0.0015202,1868.19370436,0.0015215,1411.96928324,0.0000431,0.02918275,0.00152,54077.90355996,0.0015209,0.0014536],[\"tAVAX:BTC\",0.00020201,9951.09651186,0.00020247,13362.0790055,0.00000435,0.02225292,0.00019983,93279.42202368,0.00020245,0.00019218],[\"tJASMY:USD\",0.015932,10348370.54519483,0.015985,10637670.19274226,0.00056,0.03681546,0.015771,5632534.31891349,0.015975,0.01505],[\"tJASMY:UST\",0.015872,7251492.58816318,0.016042,359881.25030938,0.000512,0.03362669,0.015738,244163.36765403,0.015787,0.015065],[\"tSHIB:USD\",0.00001303,19049193007.593586,0.00001305,13722350384.358194,2.9e-7,0.02288871,0.00001296,106330730598.77657,0.00001307,0.00001252],[\"tSHIB:UST\",0.00001301,19221232819.04441,0.00001303,15214658119.682959,2.1e-7,0.01661392,0.00001285,119179300865.13412,0.00001307,0.00001244],[\"tMIMUSD\",0.80451,130560.98441868,1.2526,352.19699981,0,0,0.941,109.53476842,0.941,0.941],[\"tMIMUST\",0.98861,198532.24696088,1.0097,61646.44469719,0,0,1.0105,6.35179519,1.0105,1],[\"tMKRUST\",2012.4,954.45166883,2019.4,14.03983283,16.4,0.00828367,1996.2,25.57540524,2067.7,1943.7],[\"tSPELL:USD\",0.00051028,21631126.33732128,0.00053493,7217073.63502798,0.00000283,0.00534567,0.00053223,1608193.25333201,0.00054645,0.00051491],[\"tSPELL:UST\",0.00051539,3270454.04465176,0.00053614,1444272.19541323,0.00000256,0.00482046,0.00053363,59783.19331774,0.00053363,0.00053107],[\"tCRVUSD\",0.93424,194741.39132454,0.93836,121585.04682221,-0.00945,-0.0101271,0.92369,1256775.58503526,0.97188,0.8862],[\"tCRVUST\",0.93318,303953.76725533,0.94025,65329.26246383,-0.01399,-0.01494004,0.92242,338125.27923014,0.9711,0.88529],[\"tWOOUSD\",0.077489,228016.76025831,0.077752,9553.73999759,-0.000287,-0.00400179,0.071431,39.48099563,0.071718,0.071431],[\"tWOOUST\",0.077055,18602020.89388967,0.07796,2717.26227733,0,0,0.076379,70.65974631,0.076379,0.076379],[\"tGBPUST\",1.3365,12291.01139495,1.34,24734.72904769,-0.0008,-0.00059822,1.3365,10468.77041701,1.34,1.3365],[\"tJPYUST\",0.0063485,213508859.0472301,0.0068,2336293.39308715,0,0,0.0067,852.853312,0.0067,0.0067],[\"tHIXUSD\",0.00009045,203883064.80632335,0.00009061,105666027.63010707,-4.2e-7,-0.00462199,0.00009045,73004393.43689439,0.0000918,0.00009023],[\"tHIXUST\",0.00009042,146125939.09064367,0.00009064,104542761.83087952,-3.7e-7,-0.00406549,0.00009064,71279277.9169872,0.00009148,0.00009025],[\"tGALA:USD\",0.01669,6291391.29719422,0.016749,5911694.11223072,0.000469,0.02927773,0.016488,30878639.13112608,0.01718,0.015747],[\"tGALA:UST\",0.016641,791908.83895433,0.016725,704292.41886975,0.000291,0.01802192,0.016438,4456743.32987412,0.016759,0.015745],[\"tAPEUSD\",0.62225,372882.77672636,0.62387,275542.61766176,0.02032,0.03396346,0.61861,1675676.11445432,0.65691,0.58246],[\"tAPEUST\",0.62224,223729.20840478,0.62269,78768.19555988,0.03688,0.06306106,0.62171,805012.05260128,0.62331,0.58291],[\"tB2MUSD\",0.01326,7877233.99594621,0.01348,156195.75553416,0,0,0.011542,724.14047165,0.011542,0.011542],[\"tB2MUST\",0.01326,2226671.69485074,0.01348,79872.53433,-0.00005,-0.00382556,0.01302,3861.53725519,0.01307,0.01302],[\"tSTGUSD\",0.16117,1027813.54468467,0.16137,821013.90748101,0.00181,0.01132808,0.16159,197804.9509078,0.16418,0.1575],[\"tSTGUST\",0.16093,213145.03591212,0.16115,48418.01992488,0.00182,0.01149571,0.16014,140352.95366663,0.16123,0.15719],[\"tMXNT:USD\",0.01,851939.29684537,0.05,2264.4257182,-0.005,-0.25,0.015,50,0.02,0.02],[\"tUST:MXNT\",10,49.49767694,100,48.20155502,-0.0601,-0.00612634,9.75,4.996,9.8101,9.75],[\"tAPENFT:USD\",4.7e-7,151820132180.09274,4.8e-7,57371774067.48929,0,0,4.8e-7,458684267.414742,4.8e-7,4.8e-7],[\"tSWEAT:USD\",0.0024048,3805306.40903744,0.0024088,4408461.14742754,0.0000493,0.02086066,0.0024126,97026.05355582,0.0024426,0.0023633],[\"tSWEAT:UST\",0.0024018,4272434.91381385,0.0024063,3797967.13076945,0.0000401,0.01697139,0.0024029,325464.15586255,0.0024411,0.0023498],[\"tAPTUSD\",4.6453,27399.41769597,4.6485,25791.85364744,0.2992,0.06917279,4.6246,297181.44433812,4.7146,4.2778],[\"tAPTUST\",4.6353,24089.58993273,4.6426,4490.64108157,0.2666,0.06081759,4.6502,8034.15029287,4.7587,4.3697],[\"tBTCTRY\",215,11000001.695401,7510000,0.00104,0,0,1065500,0.0002,1065500,1065500],[\"tTRYUST\",0.0267,17146963.774462,0.03214,4853.36087394,0,0,0.02671,228.6,0.02671,0.0267],[\"tWBTBTC\",0.9996,5.14567257,1,95.24132646,0.00964,0.00973383,1,0.4529199,1,0.99036],[\"tTESTDOT:TESTUSD\",3.927,218057.05631432,3.9362,224510.02699245,0.148,0.03900382,3.9425,4481.06157851,3.955,3.7033],[\"tTESTSOL:TESTUSD\",177.68,224147.23638638,178.17,232944.3620756,6.41,0.03724579,178.51,4498.20626353,178.51,167.96],[\"tARBUSD\",0.42436,521283.39214057,0.42541,305866.50535588,0.01157,0.02816867,0.42231,2911363.93584563,0.42919,0.40024],[\"tARBUST\",0.42368,392813.14628024,0.42463,223433.43112853,0.01441,0.03506851,0.42532,2632868.74197514,0.42938,0.39994],[\"tTONUSD\",3.3673,35834.77959891,3.3696,38904.58758333,0.0337,0.01011617,3.365,685091.72494533,3.548,3.2685],[\"tTONUST\",3.364,35873.61047269,3.3682,63437.46539087,0.0293,0.00880356,3.3575,808055.28915072,3.4489,3.2652],[\"tTESTXAUT:TESTUSD\",3389.5,9359.81981936,3401.8,9021.99965851,6.9,0.00203246,3401.8,4.81486376,3403.2,3380.6],[\"tTESTETH:TESTUSD\",3984.8,1231.00168359,3991.2,1222.96597351,128.3,0.03321339,3991.2,1.5280981,3991.2,3792.5],[\"tTESTAVAX:TESTUSD\",23.596,225909.64941678,23.678,223373.01086032,0.849,0.03718954,23.678,4612.67179347,23.715,22.336],[\"tTESTDOGE:TESTUSD\",0.22591,22666141.50994744,0.22635,22662293.15792335,0.01162,0.05407418,0.22651,37672.17819168,0.22733,0.21111],[\"tTESTXTZ:TESTUSD\",0.82395,225370.12091994,0.82794,228304.70629635,0.02471,0.03073689,0.82863,4777.62744315,0.85111,0.7798],[\"tTESTALGO:TESTUSD\",0.26579,226013.80119287,0.26651,222099.67040786,0.00651,0.02504231,0.26647,15108.06352294,0.26969,0.25176],[\"tTESTNEAR:TESTUSD\",2.6723,227770.50022769,2.6898,222938.74531791,0.0775,0.02966734,2.6898,4428.46913275,2.7106,2.5461],[\"tTESTFIL:TESTUSD\",2.5057,224396.95915041,2.5137,226032.16141535,0.0642,0.02620943,2.5137,4487.60613889,2.5332,2.3993],[\"tTESTADA:TESTUSD\",0.79594,2209316.47705346,0.79978,2283188.3132307,0.02986,0.03878325,0.79978,6210.4530206,0.80815,0.74732],[\"tTESTLTC:TESTUSD\",122.99,11488.52301049,123.2,11029.32078349,2.11,0.01742506,123.2,4544.95276525,124.4,119.66],[\"tTESTAPT:TESTUSD\",4.7834,0,4.8049,0,-0.0086,-0.00178664,4.8049,28.76535954,4.8135,4.7957],[\"tTESTEOS:TESTUSD\",0.3,448.8,0.7,1998,0,0,0.7,2,0.7,0.7],[\"tLDOUSD\",1.1154,18513.65953973,1.1209,22235.646244,0.1013,0.09963608,1.118,115635.80243241,1.1285,0.99479],[\"tLDOUST\",1.1121,116263.43850991,1.1202,15616.13017622,0.1033,0.10176337,1.1184,200080.75610029,1.1258,0.96791],[\"tBGBUSD\",4.46,6391.10019546,4.5141,7834.80551,0,0,4.3819,60.39301599,4.3819,4.3819],[\"tBGBUST\",4.454,261908.005455,4.509,10205.00769294,0,0,4.3655,4.69,4.3655,4.3655],[\"tSUIUSD\",3.8338,4898.67166005,3.8364,14561.423795,0.0763,0.02030389,3.8342,1131254.28600275,3.8909,3.6459],[\"tSUIUST\",3.829,7234.5215535,3.8324,26523.91410737,0.0752,0.0200293,3.8297,1072419.23195872,3.8865,3.6397],[\"tFLOKI:USD\",0.00011708,201247180.63134468,0.00011744,106553700.74623863,0.000005,0.04464684,0.00011699,333761005.6133649,0.00012014,0.00011074],[\"tFLOKI:UST\",0.00011685,149661001.536251,0.00011734,159862456.33533925,6.3e-7,0.00547683,0.00011566,16431705.68347182,0.00011817,0.00011347],[\"tPEPE:USD\",0.00001126,14725374355.155258,0.00001128,16607911893.33524,2.2e-7,0.02,0.00001122,91685857400.67274,0.00001171,0.00001063],[\"tPEPE:UST\",0.00001125,14714413440.289576,0.00001127,14689685208.577961,1.3e-7,0.01186131,0.00001109,67280627755.39575,0.0000113,0.00001061],[\"tWHBT:USD\",43.624,28.357085,43.783,32.605,0,0,43.719,1.93844902,43.719,43.464],[\"tWHBT:UST\",43.648,309.11543643,43.772,251.35062257,-0.021,-0.00048031,43.701,120.21999995,43.722,43.474],[\"tKAVA:USD\",0.39425,26695.08688798,0.39433,18374.08360661,-0.00296,-0.00744898,0.39441,265887.43306703,0.40803,0.38721],[\"tKAVA:UST\",0.39346,61591.42360044,0.3941,22470.85189298,-0.00155,-0.00392902,0.39295,252424.06197747,0.40258,0.38675],[\"tOPXUSD\",0.74151,44773.40148861,0.74536,12956.98695762,0.03622,0.05124577,0.74301,427507.84326205,0.74575,0.68454],[\"tOPXUST\",0.7429,277188.39604218,0.74305,15249.43054503,0.03574,0.05054019,0.7429,278766.09243608,0.74984,0.6824],[\"tSEIUSD\",0.31151,36854.47366958,0.31236,14956.92358693,0.00804,0.02648134,0.31165,46570.79066967,0.31278,0.29898],[\"tSEIUST\",0.31022,40459.16952768,0.31243,110809.16557885,0.00146,0.00477655,0.30712,21206.52588358,0.31078,0.29656],[\"tTIAUSD\",1.7539,2347.9263802,1.7564,4037.00875503,0.0174,0.00999598,1.7581,56563.9253039,1.7726,1.6823],[\"tTIAUST\",1.7492,3574.05850764,1.7533,1388.09252299,0.0049,0.00280851,1.7496,21879.44866912,1.7578,1.6842],[\"tGOMINING:USD\",0.48866,37960.58295596,0.49084,59919.2115804,-0.00458,-0.00925627,0.49022,709.96861488,0.4948,0.4889],[\"tGOMINING:UST\",0.48866,56606.14352734,0.49084,64924.66069007,0,0,0.48937,636.05934189,0.48937,0.48937],[\"tBONK:USD\",0.00002633,1035364117.0668491,0.00002641,1013638397.1366805,5.4e-7,0.02110199,0.00002613,6002736540.952893,0.00002645,0.00002501],[\"tBONK:UST\",0.0000263,1101973732.6621299,0.00002638,1128472909.5783582,2.8e-7,0.0109589,0.00002583,6604946708.790767,0.00002637,0.00002487],[\"tALT2612:USD\",98,460,100,3240.30280988,0,0,100,1,100,100],[\"tALT2612:UST\",99,30.17786,105,1215.696,0,0,105,1.5,105,105],[\"tLIFIII:USD\",0.010373,420762.07587768,0.01039,382294.43068089,-0.000684,-0.06185008,0.010375,3818796.18205959,0.011059,0.010369],[\"tLIFIII:UST\",0.010369,1372394.77090621,0.01038,1961690.58906577,-0.000687,-0.06208205,0.010379,2220267.65450185,0.011075,0.010369],[\"tJUPUSD\",0.50107,35735.56836031,0.50614,37271.75450249,0.00469,0.0095271,0.49697,6633.76405586,0.50998,0.47865],[\"tJUPUST\",0.50225,56855.81548723,0.50305,86746.37194819,0.0082,0.01660087,0.50215,6844.32416149,0.50745,0.47604],[\"tDYMUSD\",0.25534,8310.77705779,0.25703,3683.02860001,0.00319,0.01261917,0.25598,14110.66486449,0.25895,0.24566],[\"tDYMUST\",0.25489,29733.85590672,0.25607,27694.29899055,0.00374,0.01483068,0.25592,19311.7668729,0.259,0.24504],[\"tWIFUSD\",0.96723,18819.83548794,0.97202,4852.58507097,0.02008,0.02150653,0.95375,4324.85664745,0.96667,0.8987],[\"tWIFUST\",0.96193,7769.21098742,0.96956,5272.02817162,0.03195,0.03412368,0.96825,7923.39545227,0.96825,0.90015],[\"tCELO:USD\",0.29957,11489.27706063,0.36289,29824.96711101,0.001,0.00306438,0.32733,428.33690947,0.32948,0.29885],[\"tCELO:UST\",0.31001,51606.1225035,0.36275,6971.45484116,0.03722,0.11506477,0.36069,125.49451524,0.36277,0.31001],[\"tSTRK:USD\",0.12728,62424.77727404,0.12833,110177.66010789,0.00189,0.01522843,0.126,376718.8321835,0.13,0.12101],[\"tSTRK:UST\",0.12704,95152.52203758,0.12809,59519.82132444,0.0012,0.00958849,0.12635,197771.52026655,0.12803,0.12482],[\"tENAUSD\",0.60097,4694.03923724,0.65177,6914.65903728,-0.05239,-0.07845516,0.61538,3805.48207119,0.66778,0.59742],[\"tENAUST\",0.59848,1109584.1679996,0.63779,55781.47091328,-0.02284,-0.03547906,0.62092,287.10907576,0.64376,0.5796],[\"tTOKEN:USD\",0.015964,1643253.77319471,0.016018,289053.2097715,0.000157,0.00984758,0.0161,10572.47497225,0.0161,0.015943],[\"tTOKEN:UST\",0.015964,5287215.04129585,0.016007,291303.13691549,-0.000019,-0.00119175,0.015924,1223.38272069,0.015943,0.015556],[\"tSPEC:USD\",0.54531,18514.42863987,0.54741,9697.10929687,0.03231,0.06280616,0.54675,2283.56684641,0.55,0.507],[\"tSPEC:UST\",0.54546,43436.33569358,0.54962,6823.40210784,0.01363,0.025789,0.54215,1146.04002723,0.54215,0.52232],[\"tHILSV:USD\",0,0,0,0,0,0,0,0.000001,0,0],[\"tATHUSD\",0.036329,1145869.89164146,0.036349,1271585.28805616,-0.000416,-0.0113932,0.036097,56745.9361843,0.036772,0.035641],[\"tATHUST\",0.036268,2389642.74318712,0.036298,2101103.18908834,-0.000537,-0.01474343,0.035886,180702.09989444,0.036747,0.035569],[\"tAIOZ:USD\",0.34329,70350.7779868,0.34374,70157.471317,0.00216,0.00640209,0.33955,23137.67110686,0.34613,0.33165],[\"tZKXUSD\",0.055687,141560.42594738,0.056076,149120.04157634,0.000697,0.01276487,0.0553,19252.95615635,0.056805,0.053402],[\"tZKXUST\",0.05588,510768.30229052,0.056015,550940.08532913,0.0017,0.03140588,0.05583,7689.44789121,0.056217,0.053815],[\"tAUSDT:USD\",0.99981,2318796.572623,1.0012,2372830.26573256,0.0004,0.0003996,1.0014,37811.70264301,1.0014,1.001],[\"tAUSDT:UST\",0.9995,2381391.03331092,1,2359870.45065717,-0.0441,-0.043444,0.971,37800.32863192,1.0151,0.97],[\"tZROUSD\",1.8438,4726.2165298,1.8738,4146.98789239,0.0448,0.0248282,1.8492,22.47459942,1.8691,1.7842],[\"tZROUST\",1.8557,45239.99086372,1.8606,4611.39909562,0.0049,0.00265611,1.8497,5.933518,1.8562,1.785],[\"tMEWUSD\",0.0032293,9331030.05881506,0.003245,1425969.40252328,0.0000901,0.02839137,0.0032636,1039609.50589489,0.0032636,0.0031017],[\"tMEWUST\",0.0032249,11407276.38073799,0.0032404,3089304.07583421,0.0000581,0.01837387,0.0032202,3195.97756845,0.0032504,0.0031376],[\"tUXLINK:USD\",0.3395,119693.43557348,0.34005,93176.859948,-0.0008,-0.00245783,0.32469,40.15250879,0.32549,0.32469],[\"tUXLINK:UST\",0.33901,615501.5644499,0.33934,10566.342718,0,0,0.32789,2.64745629,0.32789,0.32789],[\"tPOLUSD\",0.24087,563652.07381866,0.24172,577451.73644758,0.00076,0.0031758,0.24007,2894494.87338096,0.26857,0.23234],[\"tPOLUST\",0.24098,685169.95540333,0.24147,405746.0061724,-0.00644,-0.02696705,0.23237,206481.75385436,0.24062,0.23069],[\"tJUSTICE:USD\",0.00006641,68605573.03263795,0.00008619,50963842.97958937,8.6e-7,0.0105276,0.00008255,11093246.36803236,0.00008255,0.00007078],[\"tJUSTICE:UST\",0.00006651,33370173.57929078,0.0023455,1256643.46738503,0.0000135,0.20300752,0.00008,1725424.91360391,0.00008,0.0000665],[\"tEIGEN:USD\",1.2713,4662.12640667,1.2741,996.09336959,0.0362,0.02964297,1.2574,571.17408077,1.2882,1.1905],[\"tEIGEN:UST\",1.2683,8482.04783302,1.2715,4048.36141829,0.0325,0.02661099,1.2538,846.48492096,1.295,1.1905],[\"tNYMUSD\",0.05081,782314.0784452,0.051213,364228.85743784,-0.000692,-0.01340047,0.050948,62879.59037799,0.05212,0.049912],[\"tNYMUST\",0.0508,873791.2771569,0.051179,335182.75520001,0.000274,0.00540967,0.050924,52294.13368015,0.051681,0.049661],[\"tALT11M250830:USD\",100,0,100,0,0,0,100,0.000001,0,0],[\"tALT11M250830:UST\",100,0,100,0,0,0,100,0.000001,0,0],[\"tCNHT:USD\",0.11,332191.333,0.12,1221.63573727,0,0,0.12,362.13494046,0.12,0.12],[\"tEURQ:USD\",1.1624,77176.70795532,1.1655,53144.73805171,0,0,1.157,25.929,1.157,1.157],[\"tEURQ:UST\",1.162,187283.93418258,1.1648,152346.03274728,0.001,0.00086029,1.1634,257.86500581,1.1644,1.1624],[\"tUSDQ:USD\",0.998,34959.59052234,1.0004,49103.14675271,0,0,1.0005,369.84943326,1.0005,1.0004],[\"tUSDQ:UST\",0.99685,422762.39987529,0.99935,169301.17619863,0.0003,0.00030023,0.99955,1200.79999999,0.99955,0.99915],[\"tUSTBL:USD\",1,0,1.1,0,0,0,1.1,100,1.1,1.1],[\"tUSTBL:UST\",1.021,808.02217,1.0245,23562.551668,0,0,1.0245,181.528583,1.0245,1.0245],[\"tALT11M251029:USD\",1,0,1,0,0,0,1,0.000001,0,0],[\"tALT11M251029:UST\",1.000450203,0,1.000450203,0,0,0,1.000450203,0.000001,0,0],[\"tTITAN1:USD\",1.2,129.948,1.7,1300,0,0,1.6,100,1.6,1.6],[\"tTITAN1:GBP\",1.0114,210,1.1,114360,0,0,1.1,40,1.1,1.1],[\"tTITAN2:USD\",1.3,120,2,113700,0,0,2,100,2,2],[\"tTITAN2:GBP\",1.2666,7850,1.4,223000,0,0,1.38,10,1.38,1.38],[\"tEURR:USD\",1.1591,112291.13963663,1.1666,63979.91418156,0,0,1.1597,4311.779,1.1597,1.1597],[\"tEURR:UST\",1.1633,268208.84379713,1.1643,307227.18681104,0,0,1.1649,4030.2478,1.1649,1.1649],[\"tUSDR:USD\",0.998,7213.4229332,1.0005,61129.61749395,0,0,0.99671,61.34683497,0.99671,0.99671],[\"tUSDR:UST\",0.9971,91862.97244853,0.99885,175004.85435128,0,0,0.9985,22990.58,0.9985,0.9985],[\"tHTXDAO:USD\",0.00000222,3603643310.5181003,0.00000226,16620001523.787073,-3e-8,-0.0131579,0.00000225,5735633791.285391,0.00000228,0.00000222],[\"tHTXDAO:UST\",0.00000223,25624554690.47183,0.00000225,16131598457.505157,2e-8,0.00896861,0.00000225,5317936663.606003,0.00000226,0.00000223],[\"tJXXUSD\",0.099683,34749.7875528,0.099782,34034.88057,0.00473,0.04975595,0.099794,1360.60614053,0.10045,0.093974],[\"tJXXUST\",0.099554,8060122.984,0.099642,63096.611,0.004626,0.04866144,0.099691,2550.21520304,0.10009,0.094625],[\"tBTC:USDR\",116960,107.19522375,117060,4.30563636,0,0,116680,0.00214389,116680,116680],[\"tSONIC:USD\",0.30285,110833.09911922,0.30311,39245.86255207,0.00293,0.00985139,0.30035,21422.97271679,0.33211,0.2869],[\"tSONIC:UST\",0.3023,8667.16903258,0.30281,4289.2164381,0.00308,0.01041913,0.29869,2379.66121738,0.30762,0.2864],[\"tBTC:USDQ\",116960,4.83259703,117080,3.83017955,200,0.00171424,116870,0.03794579,116870,116080],[\"tKAIA:USD\",0.15082,13039.03377402,0.15127,11187.49092695,0.00299,0.02018361,0.15113,131.98178837,0.15113,0.14814],[\"tKAIA:UST\",0.15063,1833977.61363754,0.15136,11425.14331843,0.00305,0.0208248,0.14951,1046.68330898,0.15041,0.14646],[\"tGUNUSD\",0.029475,63940.59310976,0.030195,76837.44944698,0.000002,0.00006851,0.029196,1943.64707429,0.030597,0.029194],[\"tGUNUST\",0.029475,132842.53157245,0.031179,77239.81263194,0.000206,0.00665095,0.031179,1385.06817027,0.031179,0.030973],[\"tSTXUSD\",0.74076,117961.82412493,0.74338,31930.74994145,0.02593,0.03645028,0.73731,55.46874284,0.74545,0.70876],[\"tSTXUST\",0.7397,33109.51199041,0.74194,31770.49121527,0.00193,0.00264239,0.73233,5.27747384,0.73932,0.73035],[\"tBTC:EURQ\",100100,3.82401621,100560,3.81354429,-10,-0.00009993,100060,0.02102264,100070,99677],[\"tBTC:EURR\",100100,103.8264019,100560,3.79897292,0,0,97705,0.00014639,97705,97705],[\"tEURQ:EUR\",0.998,283664.12707046,1,418234.61472031,0,0,1,285.87232506,1,1],[\"tEURR:EUR\",0.9975,229057.32139592,1,435267.67639119,0,0,0.9975,551.166616,0.9975,0.9975],[\"tUSDF:USD\",0.9992,38742.04646236,1.0045,52114.24901926,0.0043,0.00429914,1.0045,62729.26948593,1.0045,0.9995],[\"tSHMUSD\",0.098136,30847.12023821,0.098727,30993.05992,0.003859,0.04000581,0.10032,327.75054767,0.11169,0.094528],[\"tSHMUST\",0.097415,510697.01449017,0.099384,7623.63099753,-0.000783,-0.008014,0.096921,1352.18898722,0.11222,0.091706],[\"tUSDF:UST\",0.9994,9687.31042204,1.0002,42490.95253348,-0.0008,-0.00079984,0.9994,20280.00923001,1.0002,0.9994],[\"tBTCF0:USTF0\",116930,82.32781966,116940,39.96385431,210,0.00179887,116950,1418.44338352,117780,115720],[\"tETHF0:USTF0\",3987.1,687.03023708,3987.2,477.43988373,127.3,0.03300493,3984.3,24634.85799327,3989,3781],[\"tXAUTF0:USTF0\",3400,1622.25338333,3401.6,943.56776554,10.4,0.00306984,3398.2,81.96087935,3402.7,3377.4],[\"tTESTBTCF0:TESTUSDTF0\",116880,475.42466121,117110,388.49421554,360,0.00308351,117110,1.55796999,117820,115900],[\"tEURF0:USTF0\",1.1607,1120642.05236859,1.1765,3333317.77955814,0,0,1.1655,100,1.1655,1.1655],[\"tGBPF0:USTF0\",1.3329,1000341.73179158,1.3363,2276.03801018,0,0,1.3342,2,1.3342,1.3342],[\"tJPYF0:USTF0\",0.006563,10026169.89616903,0.0067597,24349.13323055,0,0,0.006772,526.1,0.006772,0.0067672],[\"tEUROPE50IXF0:USTF0\",5176.8,2.3013781,5497.1,4.87952102,0,0,5540,0.0035,5540,5540],[\"tLTCF0:USTF0\",122.94,2985.672925,122.97,3941.03346569,2.22,0.018379,123.01,89910.80203147,124.72,119.42],[\"tDOTF0:USTF0\",3.9295,64885.02548231,3.9309,95122.3619524,0.1394,0.03677712,3.9298,1039324.67259449,3.9454,3.6981],[\"tXAGF0:USTF0\",38.468,50413.27561666,39.494,358.90990727,-0.49,-0.01274018,37.971,6.75901184,38.461,35.854],[\"tIOTF0:USTF0\",0.20096,1217302.05911671,0.20157,1081258.47824249,0.0071,0.03662248,0.20097,2263491.90720892,0.20141,0.19277],[\"tLINKF0:USTF0\",19.762,26234.98961732,19.765,34369.97697642,1.653,0.09133101,19.752,1135646.03710304,19.782,17.539],[\"tUNIF0:USTF0\",10.689,70497.42745357,10.716,19438.3603189,0.406,0.04009085,10.533,812971.42940753,10.707,9.9348],[\"tETHF0:BTCF0\",0.034069,156.23668422,0.034097,184.74328956,0.000967,0.02923482,0.034044,8634.73994468,0.034052,0.032692],[\"tADAF0:USTF0\",0.79717,260435.11377228,0.79744,651713.40722982,0.02616,0.03393656,0.79701,13581690.57560703,0.80648,0.7418],[\"tXLMF0:USTF0\",0.46076,522121.28167702,0.4617,637043.54296517,0.04267,0.10257458,0.45866,11072708.90850095,0.46817,0.40367],[\"tLTCF0:BTCF0\",0.0010532,2003.781421,0.0010549,2986.02116215,0.0000023,0.00220391,0.0010459,14273.61726428,0.0010546,0.0010326],[\"tXAUTF0:BTCF0\",0.029,10.0595046,0.029949,10.07665655,0,0,0.029209,5,0.029209,0.029209],[\"tDOGEF0:USTF0\",0.22584,3176504.01268447,0.22608,4366174.76409516,0.00951,0.04397891,0.22575,64629080.57885131,0.22686,0.21081],[\"tSOLF0:USTF0\",177.78,5666.10797227,177.83,4861.75133428,5.23,0.03036461,177.47,113896.22669843,178.1,167.14],[\"tSUSHIF0:USTF0\",0.84077,119540.57101588,0.84254,147667.81178438,0.01568,0.01921734,0.83161,1710827.03388796,0.84925,0.78988],[\"tFILF0:USTF0\",2.5052,75982.34314074,2.5114,89695.30463834,0.0584,0.02394718,2.4971,488982.34823754,2.5011,2.3912],[\"tAVAXF0:USTF0\",23.611,18564.70866336,23.621,21047.2617426,0.805,0.03529309,23.614,456022.95869025,23.717,22.239],[\"tXRPF0:USTF0\",3.3517,287222.24780183,3.3537,176037.45061401,0.2825,0.09200456,3.353,15979514.71411986,3.3822,3.0078],[\"tXMRF0:USTF0\",270.26,806.6152196,270.89,833.6917631,-7.46,-0.02690809,269.78,20914.68640451,277.24,247.07],[\"tXRPF0:BTCF0\",0.00002866,94224.12706823,0.00002871,100635.1397805,-1.4e-7,-0.00524148,0.00002657,328,0.00002671,0.00002657],[\"tALGF0:USTF0\",0.26541,892391.54634913,0.26607,889396.87699278,0.00424,0.01640803,0.26265,4479738.74576671,0.26878,0.25341],[\"tGERMANY40IXF0:USTF0\",23408,0.04214,24899,0.00694194,0,0,24326,0.00478854,24326,24326],[\"tAAVEF0:USTF0\",285.53,751.64718388,285.84,731.29960942,10.16,0.03689849,285.51,25547.49528319,287.9,269.54],[\"tEGLDF0:USTF0\",15.454,14799.63598559,15.485,14789.42894511,0.25,0.01658265,15.326,71189.46750783,15.618,14.84],[\"tAXSF0:USTF0\",2.4218,78281.6811423,2.4284,70329.97323802,0.0367,0.01553571,2.399,501561.96173689,2.4219,2.3604],[\"tCOMPF0:USTF0\",48.665,2466.96117872,48.763,4683.82841688,1.019,0.02148293,48.452,53478.52301804,49.228,46.697],[\"tXTZF0:USTF0\",0.82422,186963.52180268,0.82522,195060.18462494,0.0403,0.05189287,0.8169,2452070.13275145,0.82604,0.7766],[\"tTRXF0:USTF0\",0.33893,968583.8512709,0.33894,1015225.35376351,0.00023,0.00067849,0.33922,38150945.66484521,0.34173,0.33428],[\"tATOF0:USTF0\",4.6028,55522.50429049,4.6112,51968.51438094,0.1436,0.03275174,4.5281,293170.45820151,4.5374,4.3549],[\"tSHIBF0:USTF0\",0.00001301,35807550985.85324,0.00001304,35442747341.63324,4.6e-7,0.03682946,0.00001295,103216802493.95436,0.00001352,0.00001249],[\"tNEOF0:USTF0\",6.3751,23571.25859177,6.3926,21022.84868751,0.0966,0.0155273,6.3179,119083.38987926,6.3871,6.0505],[\"tZECF0:USTF0\",38.916,4532.7791229,38.921,4497.1128704,1.47,0.03926806,38.905,60779.03583796,38.905,36.765],[\"tCRVF0:USTF0\",0.93265,192724.78048385,0.93662,202269.42231979,-0.01635,-0.01737938,0.92442,1832288.81506317,0.97165,0.88639],[\"tNEARF0:USTF0\",2.677,73660.7412006,2.6805,106015.48313226,0.049,0.01886865,2.6459,1204396.55313846,2.694,2.5395],[\"tICPF0:USTF0\",5.4172,54591.45216898,5.4259,41286.03880988,0.1437,0.02727739,5.4118,231875.25123228,5.4243,5.1647],[\"tGALAF0:USTF0\",0.016688,7267137.36340341,0.016727,8222970.13000005,0.000523,0.03253499,0.016598,143536350.56330666,0.016761,0.015752],[\"tAPEF0:USTF0\",0.62176,320570.29615915,0.62283,405067.54536909,0.02456,0.04147738,0.61669,6812518.83692956,0.62082,0.5822],[\"tETCF0:USTF0\",21.929,9056.3023434,21.951,6654.71761536,0.852,0.04050392,21.887,238623.96680841,21.903,20.577],[\"tJASMYF0:USTF0\",0.015931,7338877.64370491,0.015971,8953339.1353253,0.000523,0.03402733,0.015893,11900468.45158957,0.015917,0.015142],[\"tSTGF0:USTF0\",0.16116,940172.65249778,0.16129,803935.18149201,0.00025,0.00156016,0.16049,477.87001877,0.16049,0.15984],[\"tSANDF0:USTF0\",0.28897,765132.69555913,0.28958,714437.11154911,0.00591,0.02107628,0.28632,4195743.00874287,0.28805,0.27414],[\"tMKRF0:USTF0\",2017.4,82.392598,2017.8,75.757378,43.6,0.02209385,2017,1099.4762446,2020,1936.3],[\"tAPTF0:USTF0\",4.632,55112.72496867,4.6406,60446.51966994,0.2989,0.06885193,4.6401,571213.58180794,4.7089,4.2903],[\"tTESTDOTF0:TESTUSDTF0\",3.9261,226208.08401153,3.9356,224621.66751079,0.1411,0.0371854,3.9356,4769.58522068,3.9603,3.7043],[\"tTESTSOLF0:TESTUSDTF0\",177.58,225830.24250439,178.2,142610.01967235,6.2,0.03604651,178.2,5044.95854065,178.36,167.77],[\"tUKOILF0:USTF0\",67.595,10002.24698035,69.277,3.17790523,0,0,69.826,1,69.826,67.513],[\"tXPTF0:USTF0\",1341.1,25.9628134,1371.8,1.41405699,0,0,1372.7,0.022,1372.7,1372.7],[\"tXPDF0:USTF0\",1110.8,11.67681546,1179.6,3.22087436,0,0,1252.4,0.00126417,1252.4,1252.4],[\"tARBF0:USTF0\",0.42367,502196.744849,0.42472,527914.420688,0.01116,0.0271414,0.42234,11100014.83684284,0.43168,0.39887],[\"tFRANCE40IXF0:USTF0\",7625,0.0398204,7942.9,0.2160957,-100,-0.01282051,7700,0.0012,7800,7700],[\"tSPAIN35IXF0:USTF0\",14860,1.67707422,14895,0.9824208,0,0,14818,0.00017451,14818,14818],[\"tUK100IXF0:USTF0\",8814.5,0.01597151,9359.4,0.01369357,0,0,9110.6,0.00119426,9110.6,9110.6],[\"tJAPAN225IXF0:USTF0\",40819,2.41984893,42705,0.01046745,0,0,42705,0.0003,42705,42705],[\"tHONGKONG50IXF0:USTF0\",24086,2.50584459,24713,0.01561491,-200,-0.00793651,25000,0.0004,25200,25000],[\"tAUSTRALIA200IXF0:USTF0\",8646,2.23928453,9068.5,2.15913418,0,0,8715.7,0.7433,8715.7,8715.7],[\"tTESTXAUTF0:TESTUSDTF0\",3397.2,1226.27027611,3403.6,1143.96052647,15.5,0.00457484,3403.6,3312.94238318,3407.6,3380],[\"tTESTETHF0:TESTUSDTF0\",3985.4,1186.8846265,3989.5,1013.90481666,126.1,0.03265909,3987.2,4284.76153865,3987.2,3786.6],[\"tTESTAVAXF0:TESTUSDTF0\",23.549,226391.22319426,23.689,230358.8352865,0.901,0.03953835,23.689,5745.40394593,23.704,22.338],[\"tTESTDOGEF0:TESTUSDTF0\",0.22546,22762020.50902043,0.22636,22740675.13104661,0.01187,0.05526328,0.22666,4681.60954058,0.22751,0.21113],[\"tTESTXTZF0:TESTUSDTF0\",0.82329,221492.82682571,0.82556,223055.92242696,0.02645,0.03304433,0.82689,4754.16807522,0.82982,0.77643],[\"tTESTALGOF0:TESTUSDTF0\",0.19,0,1.9,0,0,0,1.9,10000,1.9,1.9],[\"tTESTNEARF0:TESTUSDTF0\",2.6738,224100.60949535,2.683,227236.47292067,0.0816,0.031334,2.6858,4644.6757162,2.7103,2.5415],[\"tTESTFILF0:TESTUSDTF0\",2.5013,111001.69268902,2.5178,113611.81192291,0.0649,0.02651252,2.5128,3322.74468368,2.5297,2.3974],[\"tTESTADAF0:TESTUSDTF0\",0.79552,2243293.0332624,0.79785,2272520.79981511,0.02893,0.0376242,0.79785,4703.79647444,0.80729,0.74672],[\"tTESTLTCF0:TESTUSDTF0\",122.77,225007.42752059,123.1,221111.48744349,2.15,0.01777594,123.1,4687.53526607,124.73,119.63],[\"tTESTAPTF0:TESTUSDTF0\",4.6312,110525.67407327,4.6532,114547.80092979,0.3022,0.0694553,4.6532,4722.6992525,4.7595,4.2862],[\"tTRYF0:USTF0\",0.0247,8013.11751728,0.025282,105052.87942026,0,0,0.024622,100,0.024622,0.024622],[\"tBNBF0:USTF0\",788.2,275.08505091,790.86,300.61312909,16.57,0.02139445,791.07,1732.43569206,794.87,768.79],[\"tEVIVF0:USTF0\",67.858,943.43200923,68.541,922.41669541,0,0,66.5,0.2,66.5,66.5],[\"tBVIVF0:USTF0\",36.235,1884.8301454,36.24,999.05,-0.782,-0.02114542,36.2,23.7,37.402,35.52],[\"tTONF0:USTF0\",3.3634,66989.80773865,3.3666,69905.83883069,0.0325,0.00976152,3.3619,3700296.46138296,3.3869,3.2641],[\"tPOLF0:USTF0\",0.241,950179.82914411,0.24144,858685.63270296,0.0027,0.01133882,0.24082,5016521.39986689,0.24097,0.23211],[\"tPEPEF0:USTF0\",0.00001125,17510915707.740513,0.00001128,17893954921.996117,3e-7,0.02767528,0.00001114,141279860178.68677,0.0000113,0.00001072],[\"tCHZF0:USTF0\",0.04145,2778812.9650712,0.041572,2810510.22474397,0.001562,0.03922061,0.041388,10340590.58861284,0.041404,0.039826],[\"tSUIF0:USTF0\",3.8279,165159.0097942,3.8364,165022.65047338,0.0346,0.00915126,3.8155,2096087.0150004,3.8867,3.638],[\"fUSD\",0.00038706027397260274,0.00030136986301369865,120,12536340.0993641,0.00018115616438356164,2,81347.93138133,-0.00002415,-0.121,0.0001755,216825520.41256827,0.00039069,0.00007945,null,null,9654898.86495185],[\"fGBP\",0,0.000055,120,15757.13192502,0,30,9060520.12981634,0,0,0,86989.84180007,0,0,null,null,9051264.67917942],[\"fEUR\",0.00018036164383561644,0.000109757,120,336844.37669644,0.0001132633,2,108395.67517932,-0.00006902,-0.406,0.000101,432411.37183689,0.00018167,0.00001,null,null,67666679.36034253],[\"fBTC\",0.000018383561643835616,0.000001,120,36.19072509,9e-8,2,16.15572553,-0.00000644,-0.0644,1e-7,420.22188075,0.00001994,1e-8,null,null,1313.36752941],[\"fLTC\",0.00020113698630136987,2.5e-7,120,1038.03657738,0.00002564,2,923.98442325,-0.00026816,-0.9127,0.00002564,2318.54509627,0.0003,5e-7,null,null,199.55173946],[\"fETH\",3.013698630136986e-7,0,0,0,1.9e-7,2,2819.69721037,0,0,2e-7,1059.242786,3e-7,1.9e-7,null,null,2661.53370948],[\"fETC\",0.00023295890410958905,0.00005,120,391.327,0.0000718946,2,4369.28068076,0.00012439,1.2439,0.00022439,7241.54529324,0.00058837,0.00003,null,null,3219.99315862],[\"fZEC\",0.0002505917808219178,0.00021515706,2,270.46226999,0.0002505917808219178,2,5299.7547105,-0.0001318,-0.5991,0.0000882,827.2482996,0.00026512,0.0000882,null,null,1260.08517308],[\"fXMR\",0.000022084931506849314,0.00004,120,111.09555385,0.0000120849,2,889.99217948,0.00001472,0.1472,0.00001662,363.07623078,0.00002242,0.0000011,null,null,496.970721],[\"fDSH\",0.00025321643835616437,0,0,0,0.00025321643835616437,2,7881.66151319,0.00159883,1.9956,0.0024,2580.29309793,0.0022,0.0001,null,null,599.63287632],[\"fJPY\",0.000009558904109589042,0,0,0,0.0000085589,2,6540479.1811141,-0.00000837,-0.0837,0,55812,0.00000837,0.00000837,null,null,2025803.8726328],[\"fXRP\",0.00001196986301369863,9.7591792880009e-7,2,11136.5692245,0.0000019534,2,210071.32241504,-0.00000429,-0.0429,0.00000671,531089.68940783,0.00001216,5e-7,null,null,164287.13450599],[\"fIOT\",0.0005352027397260274,0.000391837662,2,6058.05867771,0.00049,2,588248.17004685,-0.00047417,-0.9723,0.0000135,383814.7131143,0.00052173,0.0000025,null,null,217173.05211877],[\"fNEO\",0.003788241095890411,0,0,0,9.642e-7,2,3160.40231153,1e-8,0.0001,9.6e-7,3388.3862858,0.00012329,9.3e-7,null,null,2197.86508142],[\"fZRX\",0.003492123287671233,0,0,0,0.0006,2,47998.33632497,-0.00036304,-0.0942,0.00349278,62501.50864444001,0.00385582,0.00042242,null,null,30904.44809256],[\"fTRX\",0.000026476712328767124,0.000005,120,110665.68569146,5e-7,2,539404.72201789,0,0,5e-7,870695.77322947,0.00006,5e-7,null,null,437735.6870433],[\"fDAI\",0.000006824657534246575,0.00003,120,13030.38228328,0.000006824657534246575,30,40539.89050505,0,0,0.0000019,546.02779566,0.0000019,0.0000019,null,null,39130.81629471],[\"fXLM\",0.0001086054794520548,0.0001,120,21956.07037797,0.0000986005,2,326619.1324207,0.00000348,0.0331,0.00010873,480354.26510801,0.00010996,0.000002,null,null,91708.7850637],[\"fMKR\",0.0055897342465753425,0,0,0,0.00097857,99,11.6093738,0.000621,0.4536,0.00199,3.58660832,0.00199,0.001369,null,null,2.74922396],[\"fUST\",0.0003167945205479452,0.0003167945205479452,30,26631768.53629402,0.00024496,2,105232.9776356,-0.00008719,-0.2706,0.00023499,78088332.85381782,0.00032218,8.7e-7,null,null,10709137.53561078],[\"fATO\",0.0016675780821917808,0,0,0,0.002,120,11998.33292274,0.00427806,6.5382,0.00493238,3487.97305246,0.00493238,0.0005,null,null,0],[\"fLEO\",0,0,0,0,0,30,322708.46239639,0,0,0,680.01295762,0,0,null,null,249210.08587157],[\"fALG\",0.00009051780821917808,0,0,0,0.00009051780821917808,7,319685.49709901,0.000011,0.11,0.0001,154387.38731854,0.0001,0.000089,null,null,6666.51737046],[\"fXAUT\",0.00003177260273972603,0.0000055,5,1012.8222492,0.00003177260273972603,2,737.01681454,3e-8,0.0003,0.00003178,1212.44186559,0.00003225,0.00002225,null,null,583.34747058],[\"fTESTUSD\",0.000038928767123287674,0,0,0,0.000038928767123287674,15,1639187327.8076122,0,0,0.00003893,115711.92387421,0.00003893,0.00003893,null,null,170893.19786539],[\"fTESTUSDT\",0.00009988767123287671,0,0,0,0.00009988767123287672,2,25337481.81906896,-1.1e-7,-0.0011,0.00009989,13592.05596311,0.0001,0.00009964,null,null,4568.45238563],[\"fTESTBTC\",0.0074995917808219174,1e-7,120,0.005,0.0089998999,120,67.30957649,0,0,0.00749959,102980.32239824,0.0074996,0.00009,null,null,0],[\"fDOT\",0.00008023287671232877,0.00010200000000000001,120,6000,0.000045,2,116349.21238064,-0.00000899,-0.0899,0.000045,142308.13807016,0.00008205,0.000001,null,null,105084.26017103],[\"fADA\",0.000012019178082191781,0.00002,120,47321.05074354,1e-8,2,322142.88690518,0,0,1e-8,549396.19663702,0.00001522,1e-8,null,null,208921.0224971],[\"fLINK\",0,0,0,0,0,120,12229.530911,0,0,0,11948.63014015,0.0021513,0.0000012,null,null,7203.41562024],[\"fCOMP\",0.003046076712328767,0,0,0,0.001,2,1240.92934099,0,0,0.001,33.770152870000004,0.001,0.0009,null,null,203.8224748],[\"fEGLD\",0.0041975534246575345,0,0,0,0.0015,2,836.36293225,0,0,0.0006,337.08531079,0.0006,0.0006,null,null,217.00823075],[\"fUNI\",0.0011476849315068492,0.001146993853881138,2,11603.28020794,0.0011476849315068492,2,6592.76142348,0.00049769,0.7657,0.00114768,8112.60544984,0.00643,0.00064,null,null,3160.80048642],[\"fAVAX\",0,0,0,0,0,2,44939.33518612,-0.0000404,-0.404,0,14516.89396216,0.001,1e-8,null,null,500.75892471],[\"fFIL\",0.004079769863013698,0,0,0,0.00007499,2,14008.5802394,0,0,0.00007499,11410.32121177,0.00048992,0.0000744,null,null,3174.42279163],[\"fBCHN\",7.972602739726027e-7,8e-7,30,32,7.972602739726027e-7,2,1185.15108728,1e-8,0.0001,8e-7,62.99652614,8e-7,7.9e-7,null,null,1040.19680125],[\"fSUSHI\",0.004206279452054795,0,0,0,0.0002,2,165554.25479475,0.00570785,4.4173,0.007,31431.20274869,0.005,0.00111862,null,null,4136.73379232],[\"fSOL\",0.00013656986301369863,0.000069,120,213.35959788,0.00008767,3,934.98794245,-0.00003433,-0.2814,0.00008767,38388.63547974,0.0699,0.000033,null,null,1304.82949227],[\"fDOGE\",0.000009454794520547945,0,0,0,9e-7,2,2041909.4074257,-0.00000131,-0.0131,0.0000031,3021017.13180062,0.0000125,9e-7,null,null,354800.83862583],[\"fSHIB\",0.00042992602739726026,0,0,0,0.00042992602739726026,2,151961364.32170853,0.0060747,15.1868,0.0064747,1760768180.5084589,0.00046787,0.000015,null,null,83256209.2817],[\"fAPE\",0,0,0,0,0,120,2978.79226167,0.00467173,1.6588,0.007488,81595.83436959,0.00281627,0.00281627,null,null,1816.3902956],[\"fAPT\",0.0042322,0,0,0,0.004,120,946.27362048,-0.00023219,-0.0549,0.004,100,0.00423219,0.00423219,null,null,923.22885456],[\"fTESTDOT\",0,0,0,0,0.0001,30,9999967984.922132,0,0,0.0001,1000,0.0001,0.0001,null,null,0],[\"fTESTXAUT\",0.0001,0,0,0,0.0001,30,100013092.81149031,0,0,0.0001,8.02379982,0.0001,0.0001,null,null,0],[\"fTESTETH\",0.0001,0,0,0,0.0001,30,9962498084.5384,0,0,0.0001,1.00642066,0.0001,0.0001,null,null,150],[\"fTESTAVAX\",0,0,0,0,0.0001,30,9999999579.999998,0,0,0.0001,20,0.0001,0.0001,null,null,0],[\"fTESTDOGE\",0,0,0,0,0,2,10000028917.535568,0,0,0.0001,15000,0.0001,0.0001,null,null,177],[\"fTESTXTZ\",0.0001,0,0,0,0.0001,30,9999362913.589617,0,0,0.0001,295.22277752,0.0001,0.0001,null,null,0],[\"fTESTALGO\",0,0,0,0,0.0001,30,9999969999.999998,0,0,0.0001,20000,0.0001,0.0001,null,null,0],[\"fTESTNEAR\",0.0001,0,0,0,0.0001,30,9999962425.271872,0,0,0.0001,1056.63651986,0.0001,0.0001,null,null,0],[\"fTESTFIL\",0.0001,0,0,0,0.0001,30,9999994267.696302,0,0,0.0001,176.24162206,0.0001,0.0001,null,null,0],[\"fTESTADA\",0,0,0,0,0.0001,30,9999781278.897017,0,0,0.0001,1805.64082192,0.0001,0.0001,null,null,0],[\"fTESTLTC\",0,0,0,0,0.0001,30,9999999058.883957,0,0,0.0001,9.44762585,0.0001,0.0001,null,null,0],[\"fTESTAPT\",0,0,0,0,0.0001,30,9999999799.999998,0,0,0.0001,200,0.0001,0.0001,null,null,0],[\"fSUI\",0.0020865808219178083,0,0,0,0.00094989,90,37637.10177967,0.00004,0.0444,0.0009399,9805.04126541,0.00138,0.0008999,null,null,540.68976623]]"
+    }
+  },
+  {
+    "timestamp": "2025-08-08T21:49:04.650576+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/r/wallets",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96bf79967eaa4a09-TPE"
+        ],
+        "Content-Length": [
+          "40"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 08 Aug 2025 13:49:04 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[\"exchange\",\"UST\",500,0,500,null,null]]"
+    }
+  },
+  {
+    "timestamp": "2025-08-08T21:49:04.931542+08:00",
+    "request": {
+      "method": "GET",
+      "url": "https://api.bitfinex.com/v2/book/tBTCUSD/P0?length=100",
+      "header": {}
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "EXPIRED"
+        ],
+        "Cf-Ray": [
+          "96bf799818d14a09-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 08 Aug 2025 13:49:04 GMT"
+        ],
+        "Last-Modified": [
+          "Fri, 08 Aug 2025 13:49:04 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[117000,2,0.00114184],[116990,1,0.02421],[116980,4,0.20825476],[116970,6,1.1707586],[116960,3,0.17994818],[116950,6,0.24714717],[116940,2,0.19594797],[116930,4,1.06940451],[116920,2,0.17137435],[116910,4,0.34008827],[116900,2,2.61834238],[116890,1,0.10676],[116880,5,0.51471723],[116870,2,0.01641368],[116860,1,0.0004],[116850,4,0.73965032],[116840,1,0.0004],[116830,4,0.6009191],[116820,2,1.28380704],[116810,4,0.03488928],[116800,3,1.04429027],[116780,4,50.51377452],[116770,1,0.53925185],[116760,1,0.0004],[116750,2,50.0004],[117010,3,-0.19556556],[117020,2,-0.17411095],[117030,3,-0.24891878],[117040,3,-0.51955989],[117050,3,-0.2044105],[117060,8,-0.80870694],[117070,5,-0.41495936],[117080,4,-2.23667885],[117090,3,-0.08553048],[117100,6,-0.09006184],[117110,3,-0.12907891],[117120,3,-0.0906092],[117130,2,-0.19790037],[117140,3,-0.28369878],[117150,3,-0.08036559],[117160,2,-0.16744568],[117170,4,-0.28932704],[117180,1,-0.0002],[117190,4,-0.31623275],[117200,5,-0.47563259],[117210,1,-1.5],[117220,3,-0.43249241],[117240,2,-0.8697727],[117250,1,-0.00027203],[117260,2,-0.69986]]"
+    }
+  },
+  {
+    "timestamp": "2025-08-08T21:49:05.192511+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/w/order/submit",
+      "header": {
+        "Bfx-Nonce": [
+          "1754660944932000"
+        ],
+        "Bfx-Signature": [
+          "4a278b6d1738ffb7753570c629babb1437fc0c9dc1d0ec014135a0fbea2d203fd3da4550be451eddb9ac238f14d25ffa"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96bf7999daa84a09-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 08 Aug 2025 13:49:05 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[1754660945,\"on-req\",null,null,[[214139954803,null,1754660945090,\"tBTCUST\",1754660945091,1754660945091,0.001,0.001,\"EXCHANGE LIMIT\",null,null,null,0,\"ACTIVE\",null,null,10500,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}]],null,\"SUCCESS\",\"Submitting 1 orders.\"]"
+    }
+  },
+  {
+    "timestamp": "2025-08-08T21:49:05.475829+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/r/orders",
+      "header": {
+        "Bfx-Signature": [
+          "3e11c6348dbb6beb826bff68196faaf5bd08c69058f644ca048a990d4a9652308c396cc26efdaf0bc5210b9a4841d137"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96bf799b7c754a09-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 08 Aug 2025 13:49:05 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[214139954803,null,1754660945090,\"tBTCUST\",1754660945091,1754660945092,0.001,0.001,\"EXCHANGE LIMIT\",null,null,null,0,\"ACTIVE\",null,null,10500,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}]]"
+    }
+  },
+  {
+    "timestamp": "2025-08-08T21:49:05.747434+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/w/order/cancel",
+      "header": {
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96bf799d3e8d4a09-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Fri, 08 Aug 2025 13:49:05 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[1754660945650,\"oc-req\",null,null,[214139954803,null,1754660945090,\"tBTCUST\",1754660945091,1754660945092,0.001,0.001,\"EXCHANGE LIMIT\",null,null,null,0,\"ACTIVE\",null,null,10500,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}],null,\"SUCCESS\",\"Submitted for cancellation; waiting for confirmation (ID: 214139954803).\"]"
+    }
+  }
+]
