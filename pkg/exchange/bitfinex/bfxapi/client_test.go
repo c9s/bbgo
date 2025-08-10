@@ -12,7 +12,7 @@ import (
 	"github.com/c9s/bbgo/pkg/testutil"
 )
 
-const AlwaysRecord = false
+const AlwaysRecord = true
 const RecordIfFileNotFound = false
 
 func RunHttpTestWithRecorder(t *testing.T, client *http.Client, recordFile string) (bool, func()) {
@@ -119,6 +119,22 @@ func TestClient_privateApis(t *testing.T) {
 		if assert.NotEmpty(t, resp, "expected non-empty order history") {
 			for _, order := range resp {
 				t.Logf("order: %+v", order.String())
+			}
+		}
+	})
+
+	t.Run("GetOrderHistoryBySymbolRequest", func(t *testing.T) {
+		req := client.NewGetOrderHistoryBySymbolRequest()
+		req.Symbol("tBTCUST")
+		req.Limit(10) // limit to 5 orders for testing
+
+		resp, err := req.Do(ctx)
+		if assert.NoError(t, err) {
+			t.Logf("order history by symbol response: %+v", resp)
+			if assert.NotEmpty(t, resp, "expected non-empty order history by symbol") {
+				for _, order := range resp {
+					t.Log(order.String())
+				}
 			}
 		}
 	})

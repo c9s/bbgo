@@ -1,0 +1,63 @@
+[
+  {
+    "timestamp": "2025-08-10T18:13:18.493365+08:00",
+    "request": {
+      "method": "POST",
+      "url": "https://api.bitfinex.com/v2/auth/r/orders/tBTCUST/hist",
+      "header": {
+        "Bfx-Signature": [
+          "9313ad084f483e095f43298051b6b91dbbcc6ea26be002bc9c84b11818ced2fafe7a029f45b1b8ea40c97eaf8b1a15f6"
+        ],
+        "Content-Type": [
+          "application/json"
+        ]
+      }
+    },
+    "response": {
+      "status": "200 OK",
+      "status_code": 200,
+      "header": {
+        "Cf-Cache-Status": [
+          "DYNAMIC"
+        ],
+        "Cf-Ray": [
+          "96ceb844dd3fa361-TPE"
+        ],
+        "Content-Type": [
+          "application/json; charset=utf-8"
+        ],
+        "Date": [
+          "Sun, 10 Aug 2025 10:13:18 GMT"
+        ],
+        "Referrer-Policy": [
+          "same-origin"
+        ],
+        "Server": [
+          "cloudflare"
+        ],
+        "Strict-Transport-Security": [
+          "max-age=31536000; includeSubdomains;"
+        ],
+        "Vary": [
+          "Accept-Encoding"
+        ],
+        "X-Content-Type-Options": [
+          "nosniff"
+        ],
+        "X-Download-Options": [
+          "noopen"
+        ],
+        "X-Frame-Options": [
+          "sameorigin"
+        ],
+        "X-Permitted-Cross-Domain-Policies": [
+          "none"
+        ],
+        "X-Xss-Protection": [
+          "1; mode=block"
+        ]
+      },
+      "body": "[[214307724072,null,1754819844258,\"tBTCUST\",1754819844258,1754819844737,0.001,0.001,\"EXCHANGE LIMIT\",null,null,null,0,\"CANCELED\",null,null,10500,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}],[214144442597,null,1754662336111,\"tBTCUST\",1754662336112,1754662336828,0.001,0.001,\"EXCHANGE LIMIT\",null,null,null,0,\"CANCELED\",null,null,10500,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}],[214139954803,null,1754660945090,\"tBTCUST\",1754660945091,1754660945651,0.001,0.001,\"EXCHANGE LIMIT\",null,null,null,0,\"CANCELED\",null,null,10500,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}],[214141949438,null,1754660854392,\"tBTCUST\",1754660854393,1754660854974,0.001,0.001,\"EXCHANGE LIMIT\",null,null,null,0,\"CANCELED\",null,null,10500,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}],[214135902072,null,1754659316271,\"tBTCUST\",1754659316271,1754659316967,0.001,0.001,\"EXCHANGE LIMIT\",null,null,null,0,\"CANCELED\",null,null,10500,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}],[214132288303,null,1754647875204,\"tBTCUST\",1754647875204,1754647876859,0.001,0.001,\"EXCHANGE LIMIT\",null,null,null,0,\"CANCELED\",null,null,10500,0,0,0,null,null,null,0,0,null,null,null,\"API\u003eBFX\",null,null,{\"source\":\"api\"}]]"
+    }
+  }
+]

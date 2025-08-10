@@ -113,8 +113,17 @@ func (o *OrderData) String() string {
 	if !o.Price.IsZero() {
 		buf = append(buf, fmt.Sprintf("Price=%s", o.Price.String()))
 	}
+
 	if !o.PriceAvg.IsZero() {
 		buf = append(buf, fmt.Sprintf("PriceAvg=%s", o.PriceAvg.String()))
+	}
+
+	if !o.Amount.IsZero() {
+		buf = append(buf, fmt.Sprintf("Amount=%s", o.Amount.String()))
+	}
+
+	if !o.AmountOrig.IsZero() {
+		buf = append(buf, fmt.Sprintf("AmountOrig=%s", o.AmountOrig.String()))
 	}
 
 	if !time.Time(o.CreatedAt).IsZero() {
@@ -125,13 +134,6 @@ func (o *OrderData) String() string {
 		buf = append(buf, fmt.Sprintf("UpdatedAt=%s", o.UpdatedAt))
 	}
 
-	if !o.Amount.IsZero() {
-		buf = append(buf, fmt.Sprintf("Amount=%s", o.Amount.String()))
-	}
-
-	if !o.AmountOrig.IsZero() {
-		buf = append(buf, fmt.Sprintf("AmountOrig=%s", o.AmountOrig.String()))
-	}
 	if o.TypePrev != nil && *o.TypePrev != "" {
 		buf = append(buf, fmt.Sprintf("TypePrev=%s", *o.TypePrev))
 	}
