@@ -29,6 +29,8 @@ type GetTickerRequest struct {
 }
 ```
 
+Parameters needs to be defined in lower case, and the `param` tag specifies how to format the parameter in the URL.
+
 4. **Client method** to create the request:
 
 ```go
@@ -62,7 +64,7 @@ func (r *TickerResponse) UnmarshalJSON(data []byte) error {
 }
 ```
 
-7. **Add go:generate annotation** for requestgen:
+7. **Add go:generate annotation** above the request definition for requestgen:
 
 ```go
 //go:generate requestgen -type GetTickerRequest -method GET -url "/v2/ticker/:symbol" -responseType .TickerResponse
