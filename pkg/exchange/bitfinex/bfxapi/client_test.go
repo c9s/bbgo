@@ -39,6 +39,22 @@ func TestClient(t *testing.T) {
 		t.Logf("candles response: %+v", resp)
 	})
 
+	t.Run("GetPairConfigRequest", func(t *testing.T) {
+		req := client.NewGetPairConfigRequest()
+		resp, err := req.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("pair config response: %+v", resp)
+
+		for _, pair := range resp.Pairs {
+			t.Logf("pair: %s, min order size: %s, max order size: %s, initial margin: %s, min margin: %s",
+				pair.Pair,
+				pair.MinOrderSize.String(),
+				pair.MaxOrderSize.String(),
+				pair.InitialMargin.String(),
+				pair.MinMargin.String())
+		}
+	})
+
 	t.Run("GetTickersRequest", func(t *testing.T) {
 		req := client.NewGetTickersRequest()
 		req.Symbols("ALL")
