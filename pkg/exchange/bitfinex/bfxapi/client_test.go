@@ -11,6 +11,9 @@ import (
 )
 
 func TestClient_privateApis(t *testing.T) {
+	// You can enable recording for updating the test data
+	// httptesting.AlwaysRecord = true
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -101,6 +104,90 @@ func TestClient_privateApis(t *testing.T) {
 				for _, order := range resp {
 					t.Log(order.String())
 				}
+			}
+		}
+	})
+
+	// Test GetOrderTradesRequest
+	t.Run("GetOrderTradesRequest", func(t *testing.T) {
+		submitOrder := func() {
+			submitOrderReq := client.NewSubmitOrderRequest()
+			submitOrderReq.Symbol("tBTCUST").Amount("0.001").OrderType(OrderTypeExchangeMarket)
+			submitOrderResp, err := submitOrderReq.Do(ctx)
+			if assert.NoError(t, err) {
+				t.Logf("submit order response: %+v", submitOrderResp)
+				assert.NotNil(t, submitOrderResp.Data, "expected order data in response")
+			} else {
+				return
+			}
+		}
+
+		var orders []Order
+
+		getOrderHistory := func() {
+			var err error
+			// For testing, we need a valid symbol and order ID. Use order history to get one.
+			orderHistoryReq := client.NewGetOrderHistoryRequest()
+			orderHistoryReq.Limit(10)
+			orders, err = orderHistoryReq.Do(ctx)
+			if assert.NoError(t, err) {
+				if len(orders) == 0 {
+					t.Skip("no orders found for order trades test")
+				} else {
+					t.Logf("found %d orders in history", len(orders))
+				}
+			}
+
+			assert.NotEmpty(t, orders, "expected non-empty order history")
+		}
+
+		getOrderHistory()
+
+		if len(orders) == 0 {
+			submitOrder()
+			getOrderHistory()
+		}
+
+		foundExecOrder := false
+		order := orders[0]
+
+		// find filled order
+		findExecOrder := func() {
+			for _, o := range orders {
+				if o.Amount.Compare(o.AmountOrig) != 0 {
+					order = o
+					foundExecOrder = true
+					return
+				}
+			}
+		}
+		findExecOrder()
+
+		if !foundExecOrder {
+			submitOrder()
+			getOrderHistory()
+			findExecOrder()
+		}
+
+		t.Logf("using order: %+v for trades test", order)
+
+		if order.OrderID == 0 || order.Symbol == "" {
+			t.Skip("no valid order found for order trades test")
+		}
+
+		if !order.Amount.IsZero() {
+			t.Skipf("order %d has zero amount, skipping order trades test", order.OrderID)
+		}
+
+		tradesReq := client.NewGetOrderTradesRequest()
+		tradesReq.Symbol(order.Symbol)
+		tradesReq.Id(order.OrderID)
+		trades, err := tradesReq.Do(ctx)
+		assert.NoError(t, err)
+		t.Logf("order trades response: %+v", trades)
+		if assert.NotEmpty(t, trades, "expected non-empty order trades response") {
+			for _, trade := range trades {
+				t.Logf("trade: %+v", trade)
 			}
 		}
 	})
