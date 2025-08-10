@@ -7,7 +7,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 
@@ -70,6 +70,8 @@ func (c *Client) NewAuthenticatedRequest(
 		return nil, err
 	}
 
+	log.Printf("body: %s from payload: %+v", string(body), payload)
+
 	return c.newAuthenticatedRequest(ctx, method, refURL, params, body)
 }
 
@@ -119,14 +121,6 @@ func castPayload(payload interface{}) ([]byte, error) {
 
 		case []byte:
 			return v, nil
-
-		case map[string]interface{}:
-			var params = url.Values{}
-			for a, b := range v {
-				params.Add(a, fmt.Sprintf("%v", b))
-			}
-
-			return []byte(params.Encode()), nil
 
 		default:
 			body, err := json.Marshal(v)
